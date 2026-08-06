@@ -7,7 +7,7 @@ export function ClassCard({ item }: { item: ClassItem }) {
     <div className="card-visual">
       <span className={`status-pill tone-${item.statusTone}`}>{item.status}</span>
       <span className="card-index">LIVE<br />PROGRAM</span>
-      <span className="card-number">0{item.slug === "local-marketing" ? 1 : item.slug === "brand-language" ? 2 : 3}</span>
+      <span className="card-number">BA</span>
     </div>
     <div className="card-body">
       <div className="card-meta"><span>{item.category}</span><span>강사 {item.instructor}</span></div>

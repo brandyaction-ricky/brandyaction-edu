@@ -20,7 +20,7 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 
 Vercel의 `brandyaction-edu` 프로젝트에서 `Settings → Environment Variables`로 이동해 같은 이름으로 등록하고 Production, Preview, Development에 적용한다.
 
-`service_role` 키, 데이터베이스 비밀번호, PG 비밀키는 채팅·스크린샷·브라우저 코드에 남기지 않는다. 서버 주문·결제 구현 전까지 `SUPABASE_SERVICE_ROLE_KEY`는 등록하지 않아도 된다.
+`SUPABASE_SERVICE_ROLE_KEY`는 서버 주문 생성·결제 승인·수강권·관리자 API에 필요하므로 Vercel 서버 환경변수로 등록한다. 데이터베이스 비밀번호와 PG 비밀키는 채팅·스크린샷·브라우저 코드에 남기지 않는다.
 
 ## 연결 확인
 

@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { BookOpen, ChevronDown, CreditCard, GraduationCap, LayoutDashboard, LogOut, MessageSquareText, Settings, Users } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 const nav = [
   { id:"dashboard",label:"대시보드",href:"/admin",icon:LayoutDashboard },
@@ -11,6 +13,16 @@ const nav = [
   { id:"settings",label:"사이트 설정",href:"/admin/settings",icon:Settings },
 ];
 
-export function AdminShell({active,children}:{active:string;children:React.ReactNode}){return <div className="admin-app"><aside className="admin-sidebar"><Link href="/" className="admin-logo">BA<span>EDU</span><small>ADMIN</small></Link><div className="site-switcher"><span className="site-symbol">B</span><div><strong>브랜디액션 에듀</strong><small>운영 중</small></div><ChevronDown/></div><nav>{nav.map(({id,label,href,icon:Icon})=><Link key={id} href={href} className={id===active?"active":""}><Icon/>{label}</Link>)}</nav><Link className="view-site" href="/"><LogOut/>고객 사이트 보기</Link></aside><div className="admin-body"><header className="admin-topbar"><div><span>운영센터</span><strong>브랜디액션 에듀</strong></div><div><span className="user-avatar">리</span><div><strong>리키</strong><small>최고 관리자</small></div><ChevronDown/></div></header><div className="admin-content">{children}</div></div></div>}
+export async function AdminShell({active,children}:{active:string;children:React.ReactNode}){
+  const supabase=await createClient();
+  const {data:userData}=await supabase.auth.getUser();
+  const {data:profile}=userData.user?await supabase.from("profiles").select("full_name,role").eq("id",userData.user.id).maybeSingle():{data:null};
+  const isAdmin=profile?.role==="admin";
+  let preferences:Record<string,unknown>={};
+  if(!isAdmin){const {data}=await createAdminClient().from("site_settings").select("value").eq("key","operator_preferences").maybeSingle();if(data?.value&&typeof data.value==="object"&&!Array.isArray(data.value))preferences=data.value as Record<string,unknown>}
+  const visibleNav=nav.filter(item=>item.id==="dashboard"||isAdmin||(item.id==="orders"?preferences.staffCanManageOrders===true:item.id==="members"?preferences.staffCanManageMembers===true:item.id==="settings"?false:preferences.staffCanManageProducts===true));
+  const name=profile?.full_name||userData.user?.email?.split("@")[0]||"운영자";
+  return <div className="admin-app"><aside className="admin-sidebar"><Link href="/" className="admin-logo">BA<span>EDU</span><small>ADMIN</small></Link><div className="site-switcher"><span className="site-symbol">B</span><div><strong>브랜디액션 에듀</strong><small>운영 중</small></div><ChevronDown/></div><nav>{visibleNav.map(({id,label,href,icon:Icon})=><Link key={id} href={href} className={id===active?"active":""}><Icon/>{label}</Link>)}</nav><Link className="view-site" href="/"><LogOut/>고객 사이트 보기</Link></aside><div className="admin-body"><header className="admin-topbar"><div><span>운영센터</span><strong>브랜디액션 에듀</strong></div><div><span className="user-avatar">{name[0]}</span><div><strong>{name}</strong><small>{isAdmin?"최고 관리자":"스태프"}</small></div><ChevronDown/></div></header><div className="admin-content">{children}</div></div></div>
+}
 
 export function AdminPageTitle({eyebrow,title,description,action}:{eyebrow:string;title:string;description:string;action?:React.ReactNode}){return <div className="admin-page-title"><div><span>{eyebrow}</span><h1>{title}</h1><p>{description}</p></div>{action}</div>}

@@ -2,6 +2,7 @@
 
 import type { CurriculumWeek } from "@/app/data";
 import { createClient } from "@/lib/supabase/client";
+import { safeExternalUrl } from "@/lib/safe-url";
 
 export type ProductStatus = "draft" | "published" | "archived";
 export type ProductPixels = { meta: string; kakao: string; google: string; enabled: boolean };
@@ -73,7 +74,7 @@ export function createEmptyProduct(): ProductEditorData {
       description: "",
       category: "실전 교육",
       instructorName: "",
-      listPrice: "1490000",
+      listPrice: "0",
       durationLabel: "수강기간 무제한",
       scheduleLabel: "일정 추후 안내",
       status: "draft",
@@ -326,6 +327,7 @@ export async function saveAdminProduct(input: {
 
       if (kind === "vod") {
         const vodUrl = lesson.contentUrl?.trim();
+        if (vodUrl && !safeExternalUrl(vodUrl)) throw new Error("VOD 링크는 https:// 주소로 입력해 주세요.");
         if (vodUrl) {
           const { error } = await supabase.from("lesson_contents").upsert({ lesson_id: lessonId, vod_url: vodUrl, resource_name: null, resource_storage_path: null }, { onConflict: "lesson_id" });
           if (error) throw new Error(messageOf(error, "VOD 링크를 저장하지 못했습니다."));
@@ -357,4 +359,30 @@ export async function saveAdminProduct(input: {
   const obsoletePaths = oldResourcePaths.filter((path) => !retainedResourcePaths.has(path));
   if (obsoletePaths.length) await supabase.storage.from("course-resources").remove(obsoletePaths);
   return courseId;
+}
+
+export async function deleteAdminProduct(courseId: string) {
+  const supabase = createClient();
+  const [assetsResult, contentsResult] = await Promise.all([
+    supabase.from("course_assets").select("storage_path").eq("course_id", courseId),
+    supabase
+      .from("lesson_contents")
+      .select("resource_storage_path,curriculum_lessons!inner(curriculum_weeks!inner(course_id))")
+      .eq("curriculum_lessons.curriculum_weeks.course_id", courseId),
+  ]);
+  if (assetsResult.error || contentsResult.error) throw new Error("삭제할 상품 파일을 확인하지 못했습니다.");
+
+  const { error } = await supabase.from("courses").delete().eq("id", courseId);
+  if (error) {
+    if (error.code === "23503") throw new Error("주문·수강권·후기가 연결된 상품은 삭제할 수 없습니다. 판매 상태를 ‘보관’으로 변경해 주세요.");
+    throw new Error(messageOf(error, "상품을 삭제하지 못했습니다."));
+  }
+
+  const assetPaths = (assetsResult.data || []).map((row) => row.storage_path);
+  const resourcePaths = (contentsResult.data || []).flatMap((row) => row.resource_storage_path ? [row.resource_storage_path] : []);
+  const cleanup = await Promise.all([
+    assetPaths.length ? supabase.storage.from("course-assets").remove(assetPaths) : Promise.resolve({ error: null }),
+    resourcePaths.length ? supabase.storage.from("course-resources").remove(resourcePaths) : Promise.resolve({ error: null }),
+  ]);
+  if (cleanup.some((result) => result.error)) throw new Error("상품은 삭제됐지만 일부 저장 파일 정리에 실패했습니다. Storage를 확인해 주세요.");
 }

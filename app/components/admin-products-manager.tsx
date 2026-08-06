@@ -12,6 +12,7 @@ import {
   ProductEditorData,
   ProductImage,
   ProductSummary,
+  deleteAdminProduct,
   saveAdminProduct,
 } from "@/lib/product-admin";
 
@@ -41,6 +42,7 @@ export function AdminProductsManager() {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [dragImage, setDragImage] = useState<number | null>(null);
@@ -110,6 +112,22 @@ export function AdminProductsManager() {
       setError(reason instanceof Error ? reason.message : "상품을 저장하지 못했습니다.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const removeProduct = async () => {
+    if (!editor?.draft.id || deleting) return;
+    if (!window.confirm("이 상품을 삭제할까요? 주문·수강권·후기가 연결된 상품은 삭제되지 않습니다.")) return;
+    setDeleting(true);
+    setError("");
+    try {
+      await deleteAdminProduct(editor.draft.id);
+      await refresh();
+      setEditor(null);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "상품을 삭제하지 못했습니다.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -185,7 +203,7 @@ export function AdminProductsManager() {
     <div className="editor-head">
       <button onClick={() => setEditor(null)}><ArrowLeft/> 상품 목록</button>
       <div><strong>{draft.title || "새 상품"}</strong><span className={`status-label ${draft.status === "published" ? "success" : "planned"}`}>{draft.id ? statusLabel[draft.status] : "신규 등록"}</span></div>
-      <div>{draft.id && <Link className="admin-outline" href={`/classes/${draft.slug}`}><Eye/> 미리보기</Link>}<button className="admin-primary" onClick={save} disabled={saving}><Save/> {saving ? "저장 중..." : draft.id ? "변경 저장" : "상품 등록"}</button></div>
+      <div>{draft.id && <button className="admin-outline product-delete-button" onClick={() => void removeProduct()} disabled={deleting || saving}><Trash2/> {deleting ? "삭제 중..." : "상품 삭제"}</button>}{draft.id && <Link className="admin-outline" href={`/classes/${draft.slug}`}><Eye/> 미리보기</Link>}<button className="admin-primary" onClick={save} disabled={saving || deleting}><Save/> {saving ? "저장 중..." : draft.id ? "변경 저장" : "상품 등록"}</button></div>
     </div>
     <div className="editor-tabs">{[["basic", "기본 정보"], ["detail", "이미지 상세페이지"], ["curriculum", "커리큘럼"], ["pixel", "픽셀·전환 추적"]].map(([id, label]) => <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)}>{label}{id === "detail" && <em>{images.length}</em>}</button>)}</div>
 

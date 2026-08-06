@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
-import { classes as fallbackClasses, defaultCurriculum, type ClassItem, type CurriculumWeek, type Session } from "@/app/data";
+import { type ClassItem, type CurriculumWeek, type Session } from "@/app/data";
 import { getSupabasePublicConfig, hasSupabaseEnv } from "@/lib/supabase/config";
+import { safePublicHref } from "@/lib/safe-url";
 
 type CourseRow = {
   id: string;
@@ -20,6 +21,8 @@ type CohortRow = {
   id: string;
   course_id: string;
   name: string;
+  recruitment_start_at: string | null;
+  recruitment_end_at: string | null;
   operation_start_at: string | null;
   operation_end_at: string | null;
   price: number;
@@ -41,6 +44,8 @@ type CurriculumLessonRow = { id: string; week_id: string; day_number: number; ti
 
 export type PublicBanner = { image?: string; eyebrow?: string; title?: string; copy?: string; link?: string };
 export type PublicCourseAppearance = { images: string[]; pixels: { meta?: string; kakao?: string; google?: string; enabled?: boolean } };
+export type PublicReview = { id: string; name: string; className: string; cohortName: string; rating: number; quote: string };
+export type PublicSupport = { supportEmail: string; refundEmail: string };
 
 const cohortPriority: Record<CohortRow["status"], number> = {
   recruiting: 0,
@@ -56,6 +61,24 @@ function publicClient() {
   return createClient(publicUrl, publishableKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
+}
+
+function emailValue(value: unknown, fallback: string) {
+  return typeof value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()) ? value.trim() : fallback;
+}
+
+export async function getPublicSupport(): Promise<PublicSupport> {
+  const fallback = "edu@brandyaction.co.kr";
+  if (!hasSupabaseEnv()) return { supportEmail: fallback, refundEmail: fallback };
+  const { data, error } = await publicClient().from("site_settings").select("key,value").in("key", ["site_basic", "payment_refund", "support_email"]);
+  if (error) return { supportEmail: fallback, refundEmail: fallback };
+  const values = new Map((data || []).map((row) => [row.key, row.value]));
+  const basic = values.get("site_basic");
+  const commerce = values.get("payment_refund");
+  const supportCandidate = basic && typeof basic === "object" && !Array.isArray(basic) ? (basic as Record<string, unknown>).supportEmail : values.get("support_email");
+  const supportEmail = emailValue(supportCandidate, fallback);
+  const refundCandidate = commerce && typeof commerce === "object" && !Array.isArray(commerce) ? (commerce as Record<string, unknown>).refundContact : null;
+  return { supportEmail, refundEmail: emailValue(refundCandidate, supportEmail) };
 }
 
 function formatDate(value: string | null) {
@@ -100,6 +123,9 @@ function cohortPresentation(cohort?: CohortRow) {
   if (!cohort) return { status: "모집 예정", statusTone: "blue" as const };
   const generation = cohort.name.match(/\d+기/)?.[0];
   if (cohort.status === "recruiting") {
+    const now = Date.now();
+    if (cohort.recruitment_start_at && new Date(cohort.recruitment_start_at).getTime() > now) return { status: "모집 예정", statusTone: "blue" as const };
+    if (cohort.recruitment_end_at && new Date(cohort.recruitment_end_at).getTime() <= now) return { status: "모집 마감", statusTone: "gray" as const };
     return { status: `${generation ? `${generation} ` : ""}모집 중`, statusTone: "red" as const };
   }
   if (cohort.status === "upcoming") return { status: "모집 예정", statusTone: "blue" as const };
@@ -137,7 +163,10 @@ function mapCurriculum(courseId: string, weeks: CurriculumWeekRow[], lessons: Cu
 function mapCourse(course: CourseRow, cohorts: CohortRow[], sessions: SessionRow[], weeks: CurriculumWeekRow[], lessons: CurriculumLessonRow[]): ClassItem {
   const cohort = cohorts
     .filter((item) => item.course_id === course.id && item.status !== "cancelled")
-    .sort((a, b) => cohortPriority[a.status] - cohortPriority[b.status])[0];
+    .sort((a, b) => {
+      const toneScore = (item: CohortRow) => cohortPresentation(item).statusTone === "red" ? 0 : cohortPresentation(item).statusTone === "blue" ? 1 : 2;
+      return toneScore(a) - toneScore(b) || cohortPriority[a.status] - cohortPriority[b.status];
+    })[0];
   const presentation = cohortPresentation(cohort);
   const sessionRows = cohort
     ? sessions.filter((item) => item.cohort_id === cohort.id).sort((a, b) => a.session_number - b.session_number)
@@ -145,6 +174,7 @@ function mapCourse(course: CourseRow, cohorts: CohortRow[], sessions: SessionRow
 
   return {
     slug: course.slug,
+    cohortId: cohort?.id,
     title: course.title,
     summary: course.summary || "현장에서 바로 적용하는 브랜디액션 실전 클래스입니다.",
     category: course.category || "실전 교육",
@@ -164,7 +194,7 @@ function mapCourse(course: CourseRow, cohorts: CohortRow[], sessions: SessionRow
 }
 
 export async function getPublishedClasses(): Promise<ClassItem[]> {
-  if (!hasSupabaseEnv()) return fallbackClasses;
+  if (!hasSupabaseEnv()) return [];
 
   try {
     const supabase = publicClient();
@@ -173,14 +203,14 @@ export async function getPublishedClasses(): Promise<ClassItem[]> {
       .select("id,slug,title,summary,category,instructor_name,list_price,duration_label,schedule_label,display_order,metadata")
       .eq("status", "published")
       .order("display_order", { ascending: false });
-    if (courseError || !courseData?.length) return fallbackClasses;
+    if (courseError || !courseData?.length) return [];
 
     const courseIds = courseData.map((course) => course.id);
     const { data: cohortData, error: cohortError } = await supabase
       .from("cohorts")
-      .select("id,course_id,name,operation_start_at,operation_end_at,price,capacity,status")
+      .select("id,course_id,name,recruitment_start_at,recruitment_end_at,operation_start_at,operation_end_at,price,capacity,status")
       .in("course_id", courseIds);
-    if (cohortError) return fallbackClasses;
+    if (cohortError) return [];
 
     const cohorts = (cohortData || []) as CohortRow[];
     const cohortIds = cohorts.map((cohort) => cohort.id);
@@ -208,7 +238,7 @@ export async function getPublishedClasses(): Promise<ClassItem[]> {
 
     return (courseData as CourseRow[]).map((course) => mapCourse(course, cohorts, sessions, weeks, lessons));
   } catch {
-    return fallbackClasses;
+    return [];
   }
 }
 
@@ -223,7 +253,7 @@ export async function getPublicBanner():Promise<PublicBanner>{
     const supabase=publicClient();
     const {data,error}=await supabase.from("site_banners").select("eyebrow,title,description,link_url,image_path").eq("is_active",true).order("display_order").limit(1).maybeSingle();
     if(error||!data)return {};
-    return {eyebrow:data.eyebrow||undefined,title:data.title||undefined,copy:data.description||undefined,link:data.link_url||undefined,image:data.image_path?supabase.storage.from("course-assets").getPublicUrl(data.image_path).data.publicUrl:undefined};
+    return {eyebrow:data.eyebrow||undefined,title:data.title||undefined,copy:data.description||undefined,link:data.link_url?safePublicHref(data.link_url,"/classes"):undefined,image:data.image_path?supabase.storage.from("course-assets").getPublicUrl(data.image_path).data.publicUrl:undefined};
   }catch{return {}}
 }
 
@@ -241,4 +271,18 @@ export async function getPublicCourseAppearance(slug:string):Promise<PublicCours
   }catch{return fallback}
 }
 
-export function fallbackCurriculum(){return defaultCurriculum}
+export async function getPublishedReviews(courseSlug?: string): Promise<PublicReview[]> {
+  if (!hasSupabaseEnv()) return [];
+  try {
+    const supabase = publicClient();
+    let query = supabase.from("reviews").select("id,author_name,rating,body,courses!inner(title,slug),cohorts(name)").eq("status", "published").order("is_featured", { ascending: false }).order("display_order").order("published_at", { ascending: false }).limit(12);
+    if (courseSlug) query = query.eq("courses.slug", courseSlug);
+    const { data, error } = await query;
+    if (error) return [];
+    return (data || []).map((review) => {
+      const course = Array.isArray(review.courses) ? review.courses[0] : review.courses;
+      const cohort = Array.isArray(review.cohorts) ? review.cohorts[0] : review.cohorts;
+      return { id: review.id, name: review.author_name, className: course?.title || "브랜디액션 클래스", cohortName: cohort?.name || "수강생", rating: Number(review.rating), quote: review.body };
+    });
+  } catch { return []; }
+}

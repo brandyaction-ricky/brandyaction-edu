@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, CalendarDays, ChevronRight, Clock3, Download, PlayCircle } from "lucide-react";
+import { ArrowRight, BookOpen, ChevronRight, Clock3, Download, PlayCircle } from "lucide-react";
 import { LearnerShell } from "../components/learner-shell";
 import { createClient } from "@/lib/supabase/server";
 import { hasSupabaseEnv } from "@/lib/supabase/config";
@@ -13,6 +13,7 @@ type EnrollmentRow = {
   cohorts: CohortRelation | CohortRelation[] | null;
 };
 type SessionWithCohort = {
+  cohort_id: string;
   title: string;
   scheduled_at: string;
   cohorts: { name: string } | { name: string }[] | null;
@@ -50,17 +51,8 @@ function dDay(value: string) {
   return days === 0 ? "D-DAY" : `D-${days}`;
 }
 
-function DemoDashboard() {
-  return <LearnerShell active="home" userName="리키">
-    <div className="app-page-heading"><div><span>{todayLabel()}</span><h1>리키님, 오늘도 실행해 볼까요?</h1></div><Link href="/classes">새 클래스 둘러보기 <ArrowRight/></Link></div>
-    <section className="next-live-card"><div className="live-badge">NEXT LIVE</div><div className="next-date"><strong>19</strong><span>AUG<br/>WED</span></div><div className="next-info"><span>매출을 만드는 자영업 마케팅 실전반 · 1기</span><h2>1주차 · 고객 발견과 포지셔닝</h2><p><Clock3/> 8월 19일 수요일 20:00–22:00</p></div><div className="next-action"><span>D-15</span><button disabled>수업 30분 전 입장 가능</button></div></section>
-    <div className="learner-dashboard-grid"><section><div className="panel-heading"><h2>수강 중인 클래스</h2><Link href="/my/cohort">전체보기 <ChevronRight/></Link></div><article className="enrolled-card"><div className="enrolled-art"><span>LIVE 01</span><strong>01</strong></div><div className="enrolled-copy"><span className="cohort-tag">1기 · 수강 예정</span><h3>매출을 만드는<br/>자영업 마케팅 실전반</h3><div className="progress-copy"><span>전체 진도</span><strong>0%</strong></div><div className="progress-bar"><i style={{width:"0%"}}/></div><Link href="/my/cohort">기수 홈으로 <ArrowRight/></Link></div></article></section>
-    <section><div className="panel-heading"><h2>연결 준비 상태</h2></div><div className="catalog-note"><strong>현재는 화면 확인용 데이터입니다.</strong><p>Vercel에 Supabase 연결값을 등록하면 실제 계정과 수강권 데이터로 자동 전환됩니다.</p></div></section></div>
-  </LearnerShell>;
-}
-
 export default async function MyPage() {
-  if (!hasSupabaseEnv()) return <DemoDashboard/>;
+  if (!hasSupabaseEnv()) return null;
 
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
@@ -74,6 +66,8 @@ export default async function MyPage() {
       .select("id,cohort_id,courses(title,slug),cohorts(name,operation_start_at)")
       .eq("user_id", user.id)
       .eq("status", "active")
+      .lte("access_starts_at", new Date().toISOString())
+      .or(`access_ends_at.is.null,access_ends_at.gt.${new Date().toISOString()}`)
       .order("created_at", { ascending: false }),
   ]);
 
@@ -95,7 +89,7 @@ export default async function MyPage() {
   if (cohortIds.length) {
     const { data } = await supabase
       .from("cohort_sessions")
-      .select("title,scheduled_at,cohorts(name)")
+      .select("cohort_id,title,scheduled_at,cohorts(name)")
       .in("cohort_id", cohortIds)
       .gte("scheduled_at", new Date().toISOString())
       .order("scheduled_at", { ascending: true })
@@ -108,15 +102,16 @@ export default async function MyPage() {
   const course = primary ? relationOne(primary.courses) : null;
   const cohort = primary ? relationOne(primary.cohorts) : null;
   const sessionCohort = nextSession ? relationOne(nextSession.cohorts) : null;
+  const nextEnrollment = nextSession ? enrollments.find((item) => item.cohort_id === nextSession.cohort_id) : null;
 
   return <LearnerShell active="home" userName={name}>
     <div className="app-page-heading"><div><span>{todayLabel()}</span><h1>{name}님, 오늘도 실행해 볼까요?</h1></div><Link href="/classes">새 클래스 둘러보기 <ArrowRight/></Link></div>
-    {nextSession?.scheduled_at && <section className="next-live-card"><div className="live-badge">NEXT LIVE</div><div className="next-date"><strong>{new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Seoul", day: "2-digit" }).format(new Date(nextSession.scheduled_at))}</strong><span>{new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Seoul", month: "short", weekday: "short" }).format(new Date(nextSession.scheduled_at)).toUpperCase()}</span></div><div className="next-info"><span>{sessionCohort?.name || cohort?.name}</span><h2>{nextSession.title}</h2><p><Clock3/> {liveDateLabel(nextSession.scheduled_at)}</p></div><div className="next-action"><span>{dDay(nextSession.scheduled_at)}</span><button disabled>수업 30분 전 입장 가능</button></div></section>}
+    {nextSession?.scheduled_at && <section className="next-live-card"><div className="live-badge">NEXT LIVE</div><div className="next-date"><strong>{new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Seoul", day: "2-digit" }).format(new Date(nextSession.scheduled_at))}</strong><span>{new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Seoul", month: "short", weekday: "short" }).format(new Date(nextSession.scheduled_at)).toUpperCase()}</span></div><div className="next-info"><span>{sessionCohort?.name || cohort?.name}</span><h2>{nextSession.title}</h2><p><Clock3/> {liveDateLabel(nextSession.scheduled_at)}</p></div><div className="next-action"><span>{dDay(nextSession.scheduled_at)}</span>{nextEnrollment && <Link href={`/my/cohort/${nextEnrollment.id}`}>수업 상세 확인</Link>}</div></section>}
 
-    {primary && course ? <div className="learner-dashboard-grid"><section><div className="panel-heading"><h2>수강 중인 클래스</h2><Link href="/my/cohort">전체보기 <ChevronRight/></Link></div><article className="enrolled-card"><div className="enrolled-art"><span>LIVE CLASS</span><strong>01</strong></div><div className="enrolled-copy"><span className="cohort-tag">{cohort?.name || "수강 중"}</span><h3>{course.title}</h3><div className="progress-copy"><span>전체 진도</span><strong>{progress}%</strong></div><div className="progress-bar"><i style={{width:`${progress}%`}}/></div><Link href="/my/cohort">기수 홈으로 <ArrowRight/></Link></div></article></section>
-      <section><div className="panel-heading"><h2>학습 안내</h2></div><div className="catalog-note"><strong>결제한 계정에 수강권이 연결되었습니다.</strong><p>VOD, 자료와 라이브 일정은 기수 홈에서 확인할 수 있습니다.</p><Link className="button button-dark" href="/my/cohort">기수 홈 열기</Link></div></section></div>
+    {primary && course ? <div className="learner-dashboard-grid"><section><div className="panel-heading"><h2>수강 중인 클래스</h2><Link href="/my/cohort">전체보기 <ChevronRight/></Link></div><article className="enrolled-card"><div className="enrolled-art"><span>LIVE CLASS</span><strong>01</strong></div><div className="enrolled-copy"><span className="cohort-tag">{cohort?.name || "수강 중"}</span><h3>{course.title}</h3><div className="progress-copy"><span>전체 진도</span><strong>{progress}%</strong></div><div className="progress-bar"><i style={{width:`${progress}%`}}/></div><Link href={`/my/cohort/${primary.id}`}>기수 홈으로 <ArrowRight/></Link></div></article></section>
+      <section><div className="panel-heading"><h2>학습 안내</h2></div><div className="catalog-note"><strong>결제한 계정에 수강권이 연결되었습니다.</strong><p>VOD, 자료와 라이브 일정은 기수 홈에서 확인할 수 있습니다.</p><Link className="button button-dark" href={`/my/cohort/${primary.id}`}>기수 홈 열기</Link></div></section></div>
       : <section className="catalog-note my-empty-state"><strong>아직 수강 중인 클래스가 없습니다.</strong><p>클래스를 결제하면 일정·VOD·자료가 이곳에 자동으로 연결됩니다.</p><Link className="button button-dark" href="/classes">클래스 둘러보기</Link></section>}
 
-    <section className="quick-links"><Link href="/my/cohort"><PlayCircle/><div><strong>라이브 수업</strong><span>수업 일정 확인</span></div><ArrowRight/></Link><Link href="/my/cohort"><Download/><div><strong>학습 자료</strong><span>워크북·템플릿</span></div><ArrowRight/></Link><a href="#"><CalendarDays/><div><strong>전체 일정</strong><span>내 캘린더에 추가</span></div><ArrowRight/></a></section>
+    <section className="quick-links"><Link href="/my/cohort"><PlayCircle/><div><strong>라이브 수업</strong><span>수업 일정 확인</span></div><ArrowRight/></Link><Link href="/my/cohort"><Download/><div><strong>학습 자료</strong><span>워크북·템플릿</span></div><ArrowRight/></Link><Link href="/my/cohort"><BookOpen/><div><strong>전체 커리큘럼</strong><span>VOD·자료 한눈에 보기</span></div><ArrowRight/></Link></section>
   </LearnerShell>;
 }

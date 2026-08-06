@@ -1,46 +1,64 @@
-# 브랜디액션 에듀 — Vercel 배포용 UI
+# 브랜디액션 에듀
 
-현재까지 확정된 고객용·관리자용 UI를 Next.js 프로젝트로 정리한 버전입니다.
+Next.js 16, Supabase, Toss Payments로 구성한 강의 판매·수강 운영 서비스입니다. 공개 클래스부터 주문·결제, 수강권, VOD·자료·진도, 관리자 상품·회원·주문·리뷰 운영까지 하나의 데이터 흐름으로 연결합니다.
 
-## 포함 화면
+## 구현 범위
 
-- 메인 랜딩페이지 및 고객 인터랙션
-- 클래스 목록·상세·결제·결제완료 화면
-- 로그인·내 클래스·기수별 학습 화면
-- 관리자 대시보드
-- 상품·기수·커리큘럼·결제·리뷰·메인 배너 관리 UI
+- 이메일 인증·로그인, Kakao·Google OAuth, 비밀번호 재설정
+- DB 기반 상품 목록·상세·기수 선택과 서버 금액 검증
+- Toss Payments 카드·계좌이체·가상계좌 결제, 승인·웹훅·환불
+- 결제 완료 수강권 자동 발급, 전액 환불 수강권 자동 회수
+- 사용자별 VOD·자료 다운로드·라이브·다시보기·진도·후기
+- 관리자 상품·이미지 순서·커리큘럼·기수·회원·주문·환불·리뷰·사이트 설정
+- `admin`/`staff` 역할과 스태프 업무 범위에 따른 API·RLS 접근 제어
+- 공개 파일과 수강생 전용 파일을 분리한 Supabase Storage 정책
 
-## 최신 반영사항
-
-- 커리큘럼을 `주차 → Day → 세부 커리큘럼`으로 관리
-- 콘텐츠 형식은 VOD와 자료만 제공
-- VOD는 영상 링크, 자료는 파일 업로드 UI 제공
-- 결제 조회기간 및 주문번호·이름·이메일·전화번호·클래스 검색
-- 대표 리뷰 지정·해제·삭제 및 메인 후기 슬라이드 연동
-- 새 기수 생성 화면
-- 메인 스크롤 등장, 후기 자동전환, 신청 바로가기 인터랙션
-- PC·모바일 반응형
+기능별 감사와 남은 운영 작업은 `docs/LAUNCH_AUDIT_2026-08-06_KO.md`를 확인하세요.
 
 ## 로컬 실행
 
 ```bash
 npm install
+cp .env.example .env.local
 npm run dev
 ```
 
-프로덕션 확인:
+검증 명령:
 
 ```bash
+npm run lint
+npx tsc --noEmit
 npm run build
-npm start
 ```
 
-## 현재 데이터 저장 방식
+## 환경변수
 
-현재는 UI 검증용 MVP입니다. 관리자에서 바꾼 배너·상세 이미지·커리큘럼·리뷰는 해당 브라우저의 로컬 저장소에만 저장됩니다. 다른 사용자나 다른 기기에 공유되지 않습니다.
+값은 저장소에 커밋하지 않습니다. 필요한 이름과 공개 가능 여부는 `.env.example`에 있습니다.
 
-실제 운영을 위해서는 다음 단계에서 Supabase DB·Storage·인증, PG 결제 승인·웹훅, 수강권 접근 제어를 연결해야 합니다.
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `NEXT_PUBLIC_TOSS_CLIENT_KEY`
+- `TOSS_SECRET_KEY`
+- `TOSS_WEBHOOK_TOKEN`
 
-## Vercel 배포
+## 데이터베이스
 
-자세한 순서는 `VERCEL_DEPLOY_KO.md`를 확인하세요.
+마이그레이션은 시간순으로 적용합니다.
+
+```text
+supabase/migrations/202608040001_initial_education_platform.sql
+supabase/migrations/202608060001_launch_transactions.sql
+```
+
+두 번째 마이그레이션은 주문 좌석 예약, 결제 멱등 처리, 수강권 발급·회수, 스태프 권한 RLS를 포함합니다. 운영 DB 적용 전 백업과 dry-run 검토가 필요합니다.
+
+## 배포
+
+Vercel 프로젝트에는 위 환경변수를 Production·Preview에 각각 등록합니다. Toss 웹훅은 다음 형식으로 등록하며 토큰은 긴 임의값을 사용합니다.
+
+```text
+https://<운영도메인>/api/payments/toss/webhook?token=<TOSS_WEBHOOK_TOKEN>
+```
+
+운영 배포는 `main`의 검증된 커밋을 기준으로 수행합니다.

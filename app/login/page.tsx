@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
-import { ArrowRight, CheckCircle2, LockKeyhole, Mail, Smartphone } from "lucide-react";
+import { ArrowRight, CheckCircle2, LockKeyhole, Mail, Smartphone, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { hasSupabaseEnv } from "@/lib/supabase/config";
 
@@ -21,7 +21,9 @@ export default function LoginPage() {
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [agreements, setAgreements] = useState({ terms: false, privacy: false });
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const configured = hasSupabaseEnv();
@@ -54,7 +56,7 @@ export default function LoginPage() {
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath())}`,
-        data: { phone },
+        data: { phone, full_name: name.trim(), terms_version: "2026-08-06", privacy_version: "2026-08-06", consented_at: new Date().toISOString() },
       },
     });
     if (error) {
@@ -76,13 +78,17 @@ export default function LoginPage() {
       setMessage("사이트 연결값을 설정한 뒤 소셜 로그인이 활성화됩니다.");
       return;
     }
+    if (mode === "signup" && (!agreements.terms || !agreements.privacy)) {
+      setMessage("회원가입 필수 약관에 동의해 주세요.");
+      return;
+    }
     setPending(true);
     setMessage("");
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath())}`,
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath())}${mode === "signup" ? "&consent=2026-08-06" : ""}`,
       },
     });
     if (error) {
@@ -113,10 +119,11 @@ export default function LoginPage() {
       <div className="social-login"><button type="button" className="kakao-button" onClick={() => handleSocial("kakao")} disabled={pending}><b>K</b>카카오로 {mode === "login" ? "로그인" : "시작하기"}</button><button type="button" className="google-button" onClick={() => handleSocial("google")} disabled={pending}><b>G</b>Google로 {mode === "login" ? "로그인" : "시작하기"}</button></div>
       <div className="auth-divider"><span>또는 이메일로 계속</span></div>
       <form onSubmit={handleEmail}>
-        <div className="auth-fields"><label><span><Mail/>이메일</span><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@company.com" autoComplete="email" required/></label><label><span><LockKeyhole/>비밀번호</span><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="8자 이상" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={8} required/></label>{mode === "signup" && <label><span><Smartphone/>휴대폰 번호</span><input value={phone} onChange={(event) => setPhone(event.target.value)} inputMode="tel" autoComplete="tel" placeholder="010-0000-0000"/></label>}</div>
-        {mode === "login" && <div className="auth-options"><label><input type="checkbox" defaultChecked/> 로그인 상태 유지</label><button type="button" onClick={handleReset}>비밀번호 재설정</button></div>}
+        <div className="auth-fields">{mode === "signup" && <label><span><UserRound/>이름</span><input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" required/></label>}<label><span><Mail/>이메일</span><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@company.com" autoComplete="email" required/></label><label><span><LockKeyhole/>비밀번호</span><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="8자 이상" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={8} required/></label>{mode === "signup" && <label><span><Smartphone/>휴대폰 번호</span><input value={phone} onChange={(event) => setPhone(event.target.value)} inputMode="tel" autoComplete="tel" placeholder="010-0000-0000"/></label>}</div>
+        {mode === "login" && <div className="auth-options"><span>보안 연결로 로그인합니다.</span><button type="button" onClick={handleReset}>비밀번호 재설정</button></div>}
+        {mode === "signup" && <div className="signup-agreements"><label><input type="checkbox" checked={agreements.terms} onChange={(event)=>setAgreements({...agreements,terms:event.target.checked})}/><span>[필수] <Link href="/policies/terms" target="_blank">이용약관</Link> 동의</span></label><label><input type="checkbox" checked={agreements.privacy} onChange={(event)=>setAgreements({...agreements,privacy:event.target.checked})}/><span>[필수] <Link href="/policies/privacy" target="_blank">개인정보처리방침</Link> 동의</span></label></div>}
         {message && <p className="auth-message" role="status">{message}</p>}
-        <button className="button button-primary button-lg full auth-submit" type="submit" disabled={pending}>{pending ? "처리 중..." : mode === "login" ? "로그인" : "이메일 인증 후 가입"}<ArrowRight/></button>
+        <button className="button button-primary button-lg full auth-submit" type="submit" disabled={pending || (mode === "signup" && (!agreements.terms || !agreements.privacy))}>{pending ? "처리 중..." : mode === "login" ? "로그인" : "이메일 인증 후 가입"}<ArrowRight/></button>
       </form>
       {mode === "signup" && <p className="signup-note"><CheckCircle2/>같은 이메일은 하나의 계정으로 관리됩니다.</p>}
     </div></section>

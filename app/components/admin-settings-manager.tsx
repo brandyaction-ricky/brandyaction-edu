@@ -19,7 +19,7 @@ const tabs: Array<{ id: SettingTab; label: string }> = [
 export function AdminSettingsManager() {
   const [tab, setTab] = useState<SettingTab>("basic");
   const [settings, setSettings] = useState<SiteSettingsBundle>(defaultSiteSettings);
-  const [banner, setBanner] = useState<BannerData>({ eyebrow: "BRANDYACTION EDU · LIVE", title: "감이 아닌 데이터로\n매출 구조를 만드세요.", copy: "4주 실전 클래스", link: "/classes" });
+  const [banner, setBanner] = useState<BannerData>({ eyebrow: "BRANDYACTION EDU · LIVE", title: "배운 것을 실행으로\n바꾸는 실전 클래스", copy: "모집 중인 클래스와 일정을 확인하세요.", link: "/classes" });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);

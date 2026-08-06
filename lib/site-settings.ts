@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { hasSupabaseEnv } from "@/lib/supabase/config";
 import { defaultPolicies } from "@/lib/legal-policies";
+import { safePublicHref } from "@/lib/safe-url";
 
 export type SiteMenuItem = { id: string; label: string; href: string; enabled: boolean };
 export type SiteBasicSettings = {
@@ -69,7 +70,7 @@ function menuValue(value: unknown) {
   return value.filter((item): item is SiteMenuItem => Boolean(item && typeof item === "object" && "label" in item && "href" in item)).map((item, index) => ({
     id: String(item.id || `menu-${index}`),
     label: String(item.label || "메뉴"),
-    href: String(item.href || "/"),
+    href: safePublicHref(item.href),
     enabled: item.enabled !== false,
   }));
 }
@@ -105,10 +106,11 @@ export async function loadSiteSettings(): Promise<SiteSettingsBundle> {
 
 export async function saveSiteSetting(key: "site_basic" | "site_navigation" | "payment_refund" | "site_policies" | "operator_preferences", value: unknown, isPublic: boolean) {
   const supabase = createClient();
-  const { error } = await supabase.from("site_settings").upsert({ key, value, is_public: isPublic }, { onConflict: "key" });
+  const safeValue = key === "site_navigation" ? menuValue(value) : key === "site_basic" ? { ...(value as SiteBasicSettings), ctaHref: safePublicHref((value as SiteBasicSettings).ctaHref, "/classes") } : value;
+  const { error } = await supabase.from("site_settings").upsert({ key, value: safeValue, is_public: isPublic }, { onConflict: "key" });
   if (error) throw new Error(error.message || "사이트 설정을 저장하지 못했습니다.");
   if (key === "site_basic") {
-    const basic = value as SiteBasicSettings;
+    const basic = safeValue as SiteBasicSettings;
     const { error: legacyError } = await supabase.from("site_settings").upsert([
       { key: "site_name", value: basic.siteName, is_public: true },
       { key: "support_email", value: basic.supportEmail, is_public: true },
@@ -119,5 +121,5 @@ export async function saveSiteSetting(key: "site_basic" | "site_navigation" | "p
 
 export async function loadPublicHeaderSettings() {
   const settings = await loadSiteSettings();
-  return { basic: settings.basic, navigation: settings.navigation.filter((item) => item.enabled) };
+  return { basic: { ...settings.basic, ctaHref: safePublicHref(settings.basic.ctaHref, "/classes") }, navigation: settings.navigation.filter((item) => item.enabled).map((item) => ({ ...item, href: safePublicHref(item.href) })) };
 }

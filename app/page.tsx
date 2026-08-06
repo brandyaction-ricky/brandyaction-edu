@@ -12,12 +12,12 @@ import { BrandHeader } from "./components/brand-header";
 import { ClassCard } from "./components/class-card";
 import { HomeExperience } from "./components/home-experience";
 import { LandingBanner, ReviewSlider } from "./components/site-live-content";
-import { getPublicBanner, getPublishedClasses } from "@/lib/education-data";
+import { getPublicBanner, getPublishedClasses, getPublishedReviews } from "@/lib/education-data";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const [classes,banner] = await Promise.all([getPublishedClasses(),getPublicBanner()]);
+  const [classes,banner,reviews] = await Promise.all([getPublishedClasses(),getPublicBanner(),getPublishedReviews()]);
   const featured = classes[0];
   return (
     <main>
@@ -37,7 +37,7 @@ export default async function Home() {
               <strong>LIVE</strong>
             </div>
             <div className="hero-actions">
-              <Link className="button button-primary button-lg" href={`/classes/${featured?.slug || "local-marketing"}`}>
+              <Link className="button button-primary button-lg" href={featured ? `/classes/${featured.slug}` : "/classes"}>
                 클래스 확인하기 <ArrowRight size={20} />
               </Link>
               <Link className="text-link" href="#programs">커리큘럼 먼저 보기 <ChevronRight size={17} /></Link>
@@ -51,10 +51,10 @@ export default async function Home() {
       <section className="proof-strip" data-home-reveal>
         <div className="container proof-grid">
           <div className="proof-title">실행을 확인하는 핵심 지표</div>
-          <div><span>수강생 평균 매출 성장</span><strong>+127%</strong></div>
-          <div><span>광고 ROAS 개선</span><strong>+184%</strong></div>
-          <div><span>평균 문의 증가</span><strong>+2.6배</strong></div>
-          <div><span>재수강 의향</span><strong>98%</strong></div>
+          <div><span>결제 후 제공</span><strong>VOD</strong></div>
+          <div><span>실시간 수업</span><strong>LIVE</strong></div>
+          <div><span>학습 자료</span><strong>다운로드</strong></div>
+          <div><span>수강 현황</span><strong>자동 저장</strong></div>
         </div>
       </section>
 
@@ -97,13 +97,13 @@ export default async function Home() {
       </section>
 
       <section className="section review-section" id="reviews" data-home-reveal>
-        <div className="container"><ReviewSlider /></div>
+        <div className="container"><ReviewSlider reviews={reviews}/></div>
       </section>
 
       <section className="final-cta" data-home-reveal>
-        <div className="container cta-inner"><div><span>{featured?.status || "다음 기수 준비 중"}</span><h2>배운 것을 실행으로 바꾸는<br />다음 클래스에 참여하세요.</h2></div><div><strong>{featured?.seats || "일정 확인"}</strong><Link className="button button-white button-lg" href={`/classes/${featured?.slug || "local-marketing"}`}>클래스 확인하기 <ArrowRight size={20} /></Link></div></div>
+        <div className="container cta-inner"><div><span>{featured?.status || "다음 기수 준비 중"}</span><h2>배운 것을 실행으로 바꾸는<br />다음 클래스에 참여하세요.</h2></div><div><strong>{featured?.seats || "일정 확인"}</strong><Link className="button button-white button-lg" href={featured ? `/classes/${featured.slug}` : "/classes"}>클래스 확인하기 <ArrowRight size={20} /></Link></div></div>
       </section>
-      <HomeExperience />
+      <HomeExperience title={featured?.title} status={featured?.status} schedule={`${featured?.startDate || ""}${featured?.schedule ? ` · ${featured.schedule}` : ""}`} href={featured ? `/classes/${featured.slug}` : undefined}/>
     </main>
   );
 }

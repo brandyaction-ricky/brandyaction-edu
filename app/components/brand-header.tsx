@@ -25,7 +25,7 @@ export function BrandHeader() {
       <Link href="/" className="brand-logo">{logo.prefix}<span>{logo.accent}</span></Link>
       <nav className={open ? "main-nav open" : "main-nav"} aria-label="주요 메뉴">
         {header.navigation.map((item) => <Link href={item.href} key={item.id} onClick={() => setOpen(false)}>{item.label}</Link>)}
-        <div className="mobile-actions"><Link href="/login">로그인</Link><Link href="/my">내 클래스</Link><Link href="/admin">운영자 데모</Link></div>
+        <div className="mobile-actions"><Link href="/login">로그인</Link><Link href="/my">내 클래스</Link></div>
       </nav>
       <div className="header-actions"><Link href="/login">로그인</Link><Link href="/my">내 클래스</Link><Link className="button button-primary button-sm" href={header.basic.ctaHref}>{header.basic.ctaLabel}</Link></div>
       <button className="menu-button" onClick={() => setOpen(!open)} aria-label="메뉴 열기">{open ? <X /> : <Menu />}</button>

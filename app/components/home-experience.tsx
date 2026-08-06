@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { useEffect, useState } from "react";
 
-export function HomeExperience(){
+export function HomeExperience({title,status,schedule,href}:{title?:string;status?:string;schedule?:string;href?:string}){
   const [heroPassed,setHeroPassed]=useState(false);
   const [finalVisible,setFinalVisible]=useState(false);
 
@@ -24,9 +24,10 @@ export function HomeExperience(){
     return()=>{revealObserver?.disconnect();heroObserver?.disconnect();finalObserver?.disconnect()};
   },[]);
 
+  if(!title||!href)return null;
   return <aside className={`sticky-apply-bar ${heroPassed&&!finalVisible?"show":""}`} aria-hidden={!heroPassed||finalVisible}>
-    <div><span>1기 모집 중 · 잔여 7석</span><strong>매출을 만드는 자영업 마케팅 실전반</strong></div>
-    <p>8월 19일 개강 · 매주 수요일 20:00</p>
-    <Link href="/classes/local-marketing">자세히 보기 <ArrowRight/></Link>
+    <div><span>{status||"모집 일정 확인"}</span><strong>{title}</strong></div>
+    <p>{schedule||"상세 일정 확인"}</p>
+    <Link href={href}>자세히 보기 <ArrowRight/></Link>
   </aside>;
 }

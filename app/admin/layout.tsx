@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { hasSupabaseEnv } from "@/lib/supabase/config";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  if (hasSupabaseEnv()) {
+  if (!hasSupabaseEnv()) redirect("/login?error=service_unavailable");
+  {
     const supabase = await createClient();
     const { data: authData, error } = await supabase.auth.getClaims();
     const userId = authData?.claims?.sub;

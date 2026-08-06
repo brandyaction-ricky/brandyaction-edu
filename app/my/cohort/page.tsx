@@ -28,12 +28,15 @@ function statusLabel(status: string) {
   return "이용 가능";
 }
 
-function DemoClasses() {
-  return <LearnerShell active="classes" userName="리키"><div className="app-page-heading"><div><span>MY CLASSES</span><h1>내 클래스</h1></div><Link href="/classes">새 클래스 둘러보기 <ArrowRight/></Link></div><div className="my-class-grid"><article className="my-class-card"><div className="my-class-art"><span>LIVE CLASS</span><strong>01</strong></div><div><span className="cohort-tag">1기 · 이용 가능</span><h2>매출을 만드는 자영업 마케팅 실전반</h2><p>운영기간 2026. 08. 19 — 2026. 09. 09</p><div className="progress-copy"><span>전체 진도</span><strong>0%</strong></div><div className="progress-bar"><i style={{ width: "0%" }}/></div><Link href="/my/cohort/session"><PlayCircle/> 수강하기</Link></div></article></div></LearnerShell>;
+function accessState(startsAt: string, endsAt: string | null) {
+  const now = Date.now();
+  if (new Date(startsAt).getTime() > now) return "scheduled" as const;
+  if (endsAt && new Date(endsAt).getTime() <= now) return "expired" as const;
+  return "active" as const;
 }
 
 export default async function MyClassesPage() {
-  if (!hasSupabaseEnv()) return <DemoClasses/>;
+  if (!hasSupabaseEnv()) return null;
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
   const user = userData.user;
@@ -61,8 +64,9 @@ export default async function MyClassesPage() {
       const course = one(enrollment.courses);
       const cohort = one(enrollment.cohorts);
       if (!course) return null;
+      const access = accessState(enrollment.access_starts_at, enrollment.access_ends_at);
       const progress = progressMap.get(enrollment.id) || 0;
-      return <article className="my-class-card" key={enrollment.id}><div className="my-class-art"><span>CLASS {String(index + 1).padStart(2, "0")}</span><strong>{String(index + 1).padStart(2, "0")}</strong></div><div><span className="cohort-tag">{cohort?.name || "수강 중"} · {statusLabel(cohort?.status || "")}</span><h2>{course.title}</h2><p><CalendarDays/> 운영기간 {dateLabel(cohort?.operation_start_at || null)} — {dateLabel(cohort?.operation_end_at || null)}</p><p><Clock3/> {course.duration_label || "수강기간 무제한"}</p><div className="progress-copy"><span>전체 진도</span><strong>{progress}%</strong></div><div className="progress-bar"><i style={{ width: `${progress}%` }}/></div><div className="my-class-actions"><Link href="/my/cohort/session"><PlayCircle/> 수강하기</Link><Link href={`/classes/${course.slug}`}><BookOpen/> 클래스 정보</Link></div></div></article>;
+      return <article className="my-class-card" key={enrollment.id}><div className="my-class-art"><span>CLASS {String(index + 1).padStart(2, "0")}</span><strong>{String(index + 1).padStart(2, "0")}</strong></div><div><span className="cohort-tag">{cohort?.name || "수강 중"} · {access === "expired" ? "수강 기간 종료" : access === "scheduled" ? "수강 시작 전" : statusLabel(cohort?.status || "")}</span><h2>{course.title}</h2><p><CalendarDays/> 운영기간 {dateLabel(cohort?.operation_start_at || null)} — {dateLabel(cohort?.operation_end_at || null)}</p><p><Clock3/> 접근 가능 기간 {dateLabel(enrollment.access_starts_at)} — {enrollment.access_ends_at ? dateLabel(enrollment.access_ends_at) : "제한 없음"}</p><div className="progress-copy"><span>전체 진도</span><strong>{progress}%</strong></div><div className="progress-bar"><i style={{ width: `${progress}%` }}/></div><div className="my-class-actions">{access === "active" ? <Link href={`/my/cohort/${enrollment.id}`}><PlayCircle/> 수강하기</Link> : <span className="class-access-disabled"><Clock3/> {access === "expired" ? "수강 종료" : "시작 전"}</span>}<Link href={`/classes/${course.slug}`}><BookOpen/> 클래스 정보</Link></div></div></article>;
     })}</div> : <section className="catalog-note my-empty-state"><strong>아직 이용 가능한 클래스가 없습니다.</strong><p>상품 결제 또는 관리자의 수강권 발급이 완료되면 등록된 클래스가 이 화면에 자동으로 나타납니다.</p><Link className="button button-dark" href="/classes">클래스 둘러보기</Link></section>}
   </LearnerShell>;
 }
