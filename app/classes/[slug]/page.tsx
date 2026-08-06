@@ -1,0 +1,41 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ArrowRight, CalendarDays, Clock3, Download, PlayCircle, ShieldCheck, Users } from "lucide-react";
+import { BrandHeader } from "../../components/brand-header";
+import { DetailImageStack } from "../../components/site-live-content";
+import { defaultCurriculum } from "../../data";
+import { getPublishedClass, getPublicCourseAppearance } from "@/lib/education-data";
+
+export const dynamic = "force-dynamic";
+
+export default async function ClassDetail({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const [item,appearance] = await Promise.all([getPublishedClass(slug),getPublicCourseAppearance(slug)]);
+  if (!item) notFound();
+  const isOpen = item.statusTone === "red";
+  return <main><BrandHeader />
+    <section className="detail-hero"><div className="container detail-hero-grid">
+      <div className="detail-copy"><span className={`status-pill tone-${item.statusTone}`}>{item.status}</span><p className="detail-category">{item.category} · {item.duration}</p><h1>{item.title}</h1><p>{item.summary}</p>
+        <div className="detail-facts"><span><CalendarDays/>운영 {item.operationPeriod || item.startDate}</span><span><Clock3/>{item.schedule}</span><span><Users/>{item.seats}</span></div>
+      </div>
+      <div className={`detail-art accent-${item.accent}`}><span>BRANDYACTION<br/>LIVE CLASS</span><strong>01</strong><small>Instructor · {item.instructor}</small></div>
+    </div></section>
+    <nav className="detail-tabs"><div className="container"><a href="#overview" className="active">클래스 소개</a><a href="#curriculum">커리큘럼</a><a href="#benefit">제공 혜택</a><a href="#review">수강 후기</a><a href="#faq">FAQ</a></div></nav>
+    <section className="detail-content" id="overview"><div className="container detail-layout">
+      <div className="detail-main">
+        <DetailImageStack images={appearance.images} pixels={appearance.pixels} courseTitle={item.title}/>
+        <section className="content-block" id="curriculum"><span className="section-kicker">CURRICULUM</span><div className="block-title-row"><h2>4주 동안 완성하는<br />매출 구조</h2><p>매주 수업 직후 바로 적용할 수 있는<br />하나의 결과물을 완성합니다.</p></div>
+          <div className="session-list">{(item.curriculum?.length?item.curriculum:defaultCurriculum).map((week,index)=><details key={week.id} open={index===0}><summary><span>WEEK {index+1}</span><div><strong>{week.title}</strong><small>{week.lessons.length}개 VOD·자료</small></div><em>{week.goal}</em><b>＋</b></summary><div className="session-body curriculum-public-lessons">{week.lessons.map(lesson=><p key={lesson.id}><strong>Day {lesson.day}</strong><span>{lesson.title}</span><small>{lesson.kind}{lesson.duration?` · ${lesson.duration}`:""}</small></p>)}</div></details>)}</div>
+        </section>
+        <section className="content-block" id="live-schedule"><span className="section-kicker">LIVE SCHEDULE</span><div className="block-title-row"><h2>기수별 라이브<br/>회차 일정</h2><p>기수 운영 일정과 라이브 회차는<br/>공통 커리큘럼과 별도로 관리됩니다.</p></div><div className="session-list">{item.sessions.map((session,index)=><details key={session.title} open={index===0}><summary><span>LIVE {index+1}</span><div><strong>{session.title}</strong><small>{session.date}</small></div><em>{session.output}</em><b>＋</b></summary><div className="session-body"><p>{session.description}</p><span><Download size={15}/> 실습 워크북 제공</span></div></details>)}</div></section>
+        <section className="content-block benefit-block" id="benefit"><span className="section-kicker">INCLUDED</span><h2>수강생에게 제공되는 것</h2><div className="benefit-grid"><article><PlayCircle/><strong>4회 라이브 수업</strong><p>매주 120분, 실시간 피드백</p></article><article><Download/><strong>공통 VOD·실전 자료</strong><p>결제 즉시 열리고 무기한 제공</p></article><article><Clock3/><strong>라이브 다시보기</strong><p>각 회차 종료 후 무기한 제공</p></article><article><Users/><strong>기수 전용 소통방</strong><p>과제 공유와 상호 피드백</p></article></div></section>
+        <section className="content-block reviews-block" id="review"><span className="section-kicker">REVIEWS</span><div className="block-title-row"><h2>먼저 실행한 사람들의<br />변화</h2><strong className="review-score">4.9 <small>/ 5.0</small></strong></div><article className="review-card"><div className="stars">★★★★★</div><p>매출이 떨어질 때마다 광고비를 늘렸는데, 수업을 듣고 고객이 첫 방문 후 다시 오게 만드는 과정이 빠져 있었다는 걸 알았습니다. 4주 동안 구조를 정리하니 팀원과의 회의도 훨씬 구체적으로 바뀌었습니다.</p><footer><strong>박성호</strong><span>외식업 운영 · 0기 수료</span></footer></article></section>
+        <section className="content-block faq-block" id="faq"><span className="section-kicker">FAQ</span><h2>자주 묻는 질문</h2>{["라이브에 참여하지 못하면 어떻게 되나요?","과제를 꼭 제출해야 하나요?","수강 기간은 어떻게 되나요?","환불은 언제까지 가능한가요?"].map((q,i)=><details key={q}><summary><span>0{i+1}</span>{q}<b>＋</b></summary><p>{i===0?"각 회차 종료 후 24시간 이내에 다시보기가 업로드되며, 기간 제한 없이 볼 수 있습니다.":i===2?"공통 VOD·자료와 라이브 녹화본은 결제한 계정에서 기간 제한 없이 이용할 수 있습니다.":i===3?"환불 신청 후 운영자가 VOD 진도와 참여 회차를 확인해 승인하며, 완료 즉시 모든 수강 권한이 종료됩니다.":"상세 운영 기준은 신청 완료 후 기수 홈에서 확인할 수 있습니다."}</p></details>)}</section>
+      </div>
+      <aside className="purchase-card"><div className="purchase-status"><span>{item.status}</span><strong>{item.seats}</strong></div><div className="purchase-price"><small>수강료</small><strong>{item.price}</strong><span>무이자 할부 가능</span></div><dl><div><dt>운영기간</dt><dd>{item.operationPeriod || item.startDate}</dd></div><div><dt>수업 일정</dt><dd>{item.schedule}</dd></div><div><dt>진행 방식</dt><dd>Zoom LIVE</dd></div><div><dt>VOD·다시보기</dt><dd>무기한</dd></div></dl>
+        {isOpen ? <Link className="button button-primary button-lg full" href="/checkout">1기 신청하기 <ArrowRight/></Link> : <button className="button button-dark button-lg full">오픈 알림 받기</button>}
+        <p className="safe-copy"><ShieldCheck size={15}/> 결제 전 <Link href="/policies/refund">환불규정</Link>을 확인해 주세요.</p>
+      </aside>
+    </div></section>
+  </main>;
+}

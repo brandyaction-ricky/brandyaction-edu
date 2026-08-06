@@ -1,0 +1,68 @@
+import Link from "next/link";
+import { ArrowRight, BookOpen, CalendarDays, Clock3, PlayCircle } from "lucide-react";
+import { LearnerShell } from "../../components/learner-shell";
+import { hasSupabaseEnv } from "@/lib/supabase/config";
+import { createClient } from "@/lib/supabase/server";
+
+export const dynamic = "force-dynamic";
+
+type CourseRelation = { title: string; slug: string; summary: string | null; duration_label: string | null };
+type CohortRelation = { name: string; operation_start_at: string | null; operation_end_at: string | null; status: string };
+type EnrollmentRow = {
+  id: string;
+  access_starts_at: string;
+  access_ends_at: string | null;
+  courses: CourseRelation | CourseRelation[] | null;
+  cohorts: CohortRelation | CohortRelation[] | null;
+};
+
+function one<T>(value: T | T[] | null) { return Array.isArray(value) ? value[0] || null : value; }
+function dateLabel(value: string | null) {
+  if (!value) return "미정";
+  return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(value)).replace(/\.\s/g, ". ").trim();
+}
+function statusLabel(status: string) {
+  if (status === "in_progress") return "진행 중";
+  if (status === "completed") return "종료·복습 가능";
+  if (status === "recruiting") return "수강 예정";
+  return "이용 가능";
+}
+
+function DemoClasses() {
+  return <LearnerShell active="classes" userName="리키"><div className="app-page-heading"><div><span>MY CLASSES</span><h1>내 클래스</h1></div><Link href="/classes">새 클래스 둘러보기 <ArrowRight/></Link></div><div className="my-class-grid"><article className="my-class-card"><div className="my-class-art"><span>LIVE CLASS</span><strong>01</strong></div><div><span className="cohort-tag">1기 · 이용 가능</span><h2>매출을 만드는 자영업 마케팅 실전반</h2><p>운영기간 2026. 08. 19 — 2026. 09. 09</p><div className="progress-copy"><span>전체 진도</span><strong>0%</strong></div><div className="progress-bar"><i style={{ width: "0%" }}/></div><Link href="/my/cohort/session"><PlayCircle/> 수강하기</Link></div></article></div></LearnerShell>;
+}
+
+export default async function MyClassesPage() {
+  if (!hasSupabaseEnv()) return <DemoClasses/>;
+  const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData.user;
+  if (!user) return null;
+
+  const [{ data: profile }, { data: enrollmentData }] = await Promise.all([
+    supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
+    supabase.from("enrollments").select("id,access_starts_at,access_ends_at,courses(title,slug,summary,duration_label),cohorts(name,operation_start_at,operation_end_at,status)").eq("user_id", user.id).eq("status", "active").order("created_at", { ascending: false }),
+  ]);
+  const enrollments = (enrollmentData || []) as unknown as EnrollmentRow[];
+  const enrollmentIds = enrollments.map((item) => item.id);
+  const progressMap = new Map<string, number>();
+  if (enrollmentIds.length) {
+    const { data: progressRows } = await supabase.from("lesson_progress").select("enrollment_id,progress_percent").in("enrollment_id", enrollmentIds);
+    for (const id of enrollmentIds) {
+      const rows = (progressRows || []).filter((row) => row.enrollment_id === id);
+      progressMap.set(id, rows.length ? Math.round(rows.reduce((sum, row) => sum + row.progress_percent, 0) / rows.length) : 0);
+    }
+  }
+  const name = profile?.full_name || user.user_metadata?.full_name || user.email?.split("@")[0] || "회원";
+
+  return <LearnerShell active="classes" userName={name}>
+    <div className="app-page-heading"><div><span>MY CLASSES</span><h1>내 클래스</h1></div><Link href="/classes">새 클래스 둘러보기 <ArrowRight/></Link></div>
+    {enrollments.length ? <div className="my-class-grid">{enrollments.map((enrollment, index) => {
+      const course = one(enrollment.courses);
+      const cohort = one(enrollment.cohorts);
+      if (!course) return null;
+      const progress = progressMap.get(enrollment.id) || 0;
+      return <article className="my-class-card" key={enrollment.id}><div className="my-class-art"><span>CLASS {String(index + 1).padStart(2, "0")}</span><strong>{String(index + 1).padStart(2, "0")}</strong></div><div><span className="cohort-tag">{cohort?.name || "수강 중"} · {statusLabel(cohort?.status || "")}</span><h2>{course.title}</h2><p><CalendarDays/> 운영기간 {dateLabel(cohort?.operation_start_at || null)} — {dateLabel(cohort?.operation_end_at || null)}</p><p><Clock3/> {course.duration_label || "수강기간 무제한"}</p><div className="progress-copy"><span>전체 진도</span><strong>{progress}%</strong></div><div className="progress-bar"><i style={{ width: `${progress}%` }}/></div><div className="my-class-actions"><Link href="/my/cohort/session"><PlayCircle/> 수강하기</Link><Link href={`/classes/${course.slug}`}><BookOpen/> 클래스 정보</Link></div></div></article>;
+    })}</div> : <section className="catalog-note my-empty-state"><strong>아직 이용 가능한 클래스가 없습니다.</strong><p>상품 결제 또는 관리자의 수강권 발급이 완료되면 등록된 클래스가 이 화면에 자동으로 나타납니다.</p><Link className="button button-dark" href="/classes">클래스 둘러보기</Link></section>}
+  </LearnerShell>;
+}
