@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowRight, CalendarDays, Clock3, Download, PlayCircle, ShieldCheck, Users } from "lucide-react";
 import { BrandHeader } from "../../components/brand-header";
+import { DetailTabs } from "../../components/detail-tabs";
 import { DetailImageStack } from "../../components/site-live-content";
 import { defaultCurriculum } from "../../data";
 import { getPublishedClass, getPublicCourseAppearance } from "@/lib/education-data";
@@ -20,7 +21,7 @@ export default async function ClassDetail({ params }: { params: Promise<{ slug: 
       </div>
       <div className={`detail-art accent-${item.accent}`}><span>BRANDYACTION<br/>LIVE CLASS</span><strong>01</strong><small>Instructor · {item.instructor}</small></div>
     </div></section>
-    <nav className="detail-tabs"><div className="container"><a href="#overview" className="active">클래스 소개</a><a href="#curriculum">커리큘럼</a><a href="#benefit">제공 혜택</a><a href="#review">수강 후기</a><a href="#faq">FAQ</a></div></nav>
+    <DetailTabs />
     <section className="detail-content" id="overview"><div className="container detail-layout">
       <div className="detail-main">
         <DetailImageStack images={appearance.images} pixels={appearance.pixels} courseTitle={item.title}/>
