@@ -18,7 +18,7 @@ export default async function ClassDetail({ params }: { params: Promise<{ slug: 
       <div className="detail-copy"><span className={`status-pill tone-${item.statusTone}`}>{item.status}</span><p className="detail-category">{item.category} · {item.duration}</p><h1>{item.title}</h1><p>{item.summary}</p>
         <div className="detail-facts"><span><CalendarDays/>운영 {item.operationPeriod || item.startDate}</span><span><Clock3/>{item.schedule}</span><span><Users/>{item.seats}</span></div>
       </div>
-      <div className={`detail-art accent-${item.accent}`}><span>BRANDYACTION<br/>LIVE CLASS</span><strong>01</strong><small>Instructor · {item.instructor}</small></div>
+      <div className={`detail-art accent-${item.accent} ${item.thumbnailUrl ? "has-thumbnail" : ""}`} style={item.thumbnailUrl ? { backgroundImage: `url(${item.thumbnailUrl})` } : undefined}><span>BRANDYACTION<br/>LIVE CLASS</span><strong>01</strong><small>Instructor · {item.instructor}</small></div>
     </div></section>
     <DetailTabs />
     <section className="detail-content" id="overview"><div className="container detail-layout">

@@ -22,6 +22,7 @@ export type ClassItem = {
   slug: string; cohortId?: string; title: string; summary: string; category: string; status: string;
   statusTone: "red" | "blue" | "gray"; startDate: string; operationPeriod?: string; schedule: string;
   duration: string; price: string; seats: string; instructor: string; accent: string;
+  thumbnailUrl?: string;
   sessions: Session[];
   curriculum?: CurriculumWeek[];
 };

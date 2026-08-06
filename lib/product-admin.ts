@@ -30,12 +30,14 @@ export type ProductSummary = {
   listPrice: number;
   durationLabel: string;
   status: ProductStatus;
+  thumbnailUrl?: string;
   imageCount: number;
   weekCount: number;
   lessonCount: number;
 };
 export type ProductEditorData = {
   draft: ProductDraft;
+  thumbnail: ProductImage | null;
   images: ProductImage[];
   curriculum: CurriculumWeek[];
   pixels: ProductPixels;
@@ -80,6 +82,7 @@ export function createEmptyProduct(): ProductEditorData {
       status: "draft",
       metadata: {},
     },
+    thumbnail: null,
     images: [],
     curriculum: [],
     pixels: defaultPixels,
@@ -98,7 +101,7 @@ export async function loadAdminProducts(): Promise<ProductSummary[]> {
   if (!ids.length) return [];
 
   const [assetResult, weekResult] = await Promise.all([
-    supabase.from("course_assets").select("id,course_id").in("course_id", ids).eq("asset_type", "detail"),
+    supabase.from("course_assets").select("id,course_id,asset_type,storage_path").in("course_id", ids),
     supabase.from("curriculum_weeks").select("id,course_id,curriculum_lessons(id)").in("course_id", ids),
   ]);
   if (assetResult.error) throw new Error(messageOf(assetResult.error, "상세 이미지 수를 확인하지 못했습니다."));
@@ -106,6 +109,8 @@ export async function loadAdminProducts(): Promise<ProductSummary[]> {
 
   return (courses || []).map((course) => {
     const weeks = (weekResult.data || []).filter((week) => week.course_id === course.id);
+    const courseAssets = (assetResult.data || []).filter((asset) => asset.course_id === course.id);
+    const thumbnail = courseAssets.find((asset) => asset.asset_type === "thumbnail");
     return {
       id: course.id,
       slug: course.slug,
@@ -114,7 +119,8 @@ export async function loadAdminProducts(): Promise<ProductSummary[]> {
       listPrice: course.list_price,
       durationLabel: course.duration_label || "기간 미정",
       status: course.status as ProductStatus,
-      imageCount: (assetResult.data || []).filter((asset) => asset.course_id === course.id).length,
+      thumbnailUrl: thumbnail ? supabase.storage.from("course-assets").getPublicUrl(thumbnail.storage_path).data.publicUrl : undefined,
+      imageCount: courseAssets.filter((asset) => asset.asset_type === "detail").length,
       weekCount: weeks.length,
       lessonCount: weeks.reduce((sum, week) => sum + (week.curriculum_lessons || []).length, 0),
     };
@@ -131,7 +137,7 @@ export async function loadAdminProduct(courseId: string): Promise<ProductEditorD
   if (error || !course) throw new Error(messageOf(error, "상품을 불러오지 못했습니다."));
 
   const [assetResult, weekResult] = await Promise.all([
-    supabase.from("course_assets").select("id,storage_path,display_order").eq("course_id", courseId).eq("asset_type", "detail").order("display_order"),
+    supabase.from("course_assets").select("id,asset_type,storage_path,display_order").eq("course_id", courseId).order("display_order"),
     supabase.from("curriculum_weeks").select("id,week_number,title,goal,display_order,curriculum_lessons(id,day_number,title,description,content_type,duration_label,display_order,lesson_contents(vod_url,resource_name,resource_storage_path))").eq("course_id", courseId).order("display_order"),
   ]);
   if (assetResult.error) throw new Error(messageOf(assetResult.error, "상세 이미지를 불러오지 못했습니다."));
@@ -156,7 +162,15 @@ export async function loadAdminProduct(courseId: string): Promise<ProductEditorD
       status: course.status as ProductStatus,
       metadata,
     },
-    images: (assetResult.data || []).map((asset) => ({
+    thumbnail: (() => {
+      const asset = (assetResult.data || []).find((item) => item.asset_type === "thumbnail");
+      return asset ? {
+        id: asset.id,
+        path: asset.storage_path,
+        url: supabase.storage.from("course-assets").getPublicUrl(asset.storage_path).data.publicUrl,
+      } : null;
+    })(),
+    images: (assetResult.data || []).filter((asset) => asset.asset_type === "detail").map((asset) => ({
       id: asset.id,
       path: asset.storage_path,
       url: supabase.storage.from("course-assets").getPublicUrl(asset.storage_path).data.publicUrl,
@@ -195,13 +209,14 @@ async function assertLessonsCanBeRemoved(lessonIds: string[]) {
 
 export async function saveAdminProduct(input: {
   course: ProductDraft;
+  thumbnail: ProductImage | null;
   images: ProductImage[];
   curriculum: CurriculumWeek[];
   pixels: ProductPixels;
   resourceFiles: Map<string, File>;
 }): Promise<string> {
   const supabase = createClient();
-  const { course, images, curriculum, pixels, resourceFiles } = input;
+  const { course, thumbnail, images, curriculum, pixels, resourceFiles } = input;
   const listPrice = Number(course.listPrice.replace(/[^0-9]/g, ""));
   if (!course.title.trim()) throw new Error("상품명을 입력해 주세요.");
   if (!course.slug.trim()) throw new Error("상품 URL을 입력해 주세요.");
@@ -233,8 +248,35 @@ export async function saveAdminProduct(input: {
     courseId = data.id;
   }
 
-  const { data: currentAssets, error: assetLoadError } = await supabase.from("course_assets").select("id,storage_path").eq("course_id", courseId).eq("asset_type", "detail");
-  if (assetLoadError) throw new Error(messageOf(assetLoadError, "기존 상세 이미지를 확인하지 못했습니다."));
+  const { data: currentAssets, error: assetLoadError } = await supabase.from("course_assets").select("id,asset_type,storage_path").eq("course_id", courseId);
+  if (assetLoadError) throw new Error(messageOf(assetLoadError, "기존 상품 이미지를 확인하지 못했습니다."));
+  const currentThumbnails = (currentAssets || []).filter((asset) => asset.asset_type === "thumbnail");
+  const currentDetailAssets = (currentAssets || []).filter((asset) => asset.asset_type === "detail");
+
+  let retainedThumbnailId = thumbnail?.id;
+  if (thumbnail?.id) {
+    const { error } = await supabase.from("course_assets").update({ alt_text: `${course.title} 썸네일`, display_order: 0 }).eq("id", thumbnail.id);
+    if (error) throw new Error(messageOf(error, "썸네일 정보를 저장하지 못했습니다."));
+  } else if (thumbnail?.file) {
+    const path = `${courseId}/thumbnail/${Date.now()}-${safeFileName(thumbnail.file.name)}`;
+    const { error: uploadError } = await supabase.storage.from("course-assets").upload(path, thumbnail.file, { contentType: thumbnail.file.type, upsert: false });
+    if (uploadError) throw new Error(messageOf(uploadError, "썸네일 업로드에 실패했습니다."));
+    const { data: insertedThumbnail, error: insertError } = await supabase.from("course_assets").insert({ course_id: courseId, asset_type: "thumbnail", storage_bucket: "course-assets", storage_path: path, alt_text: `${course.title} 썸네일`, display_order: 0 }).select("id").single();
+    if (insertError || !insertedThumbnail) {
+      await supabase.storage.from("course-assets").remove([path]);
+      throw new Error(messageOf(insertError, "썸네일 정보를 저장하지 못했습니다."));
+    }
+    retainedThumbnailId = insertedThumbnail.id;
+  }
+
+  const removedThumbnails = currentThumbnails.filter((asset) => asset.id !== retainedThumbnailId);
+  if (removedThumbnails.length) {
+    const { error } = await supabase.from("course_assets").delete().in("id", removedThumbnails.map((asset) => asset.id));
+    if (error) throw new Error(messageOf(error, "기존 썸네일 정보를 정리하지 못했습니다."));
+    const { error: removeError } = await supabase.storage.from("course-assets").remove(removedThumbnails.map((asset) => asset.storage_path));
+    if (removeError) throw new Error(messageOf(removeError, "기존 썸네일 파일을 정리하지 못했습니다."));
+  }
+
   const retainedAssetIds = new Set(images.flatMap((image) => image.id ? [image.id] : []));
 
   for (const [index, image] of images.entries()) {
@@ -254,7 +296,7 @@ export async function saveAdminProduct(input: {
     }
   }
 
-  const removedAssets = (currentAssets || []).filter((asset) => !retainedAssetIds.has(asset.id));
+  const removedAssets = currentDetailAssets.filter((asset) => !retainedAssetIds.has(asset.id));
   if (removedAssets.length) {
     const { error } = await supabase.from("course_assets").delete().in("id", removedAssets.map((asset) => asset.id));
     if (error) throw new Error(messageOf(error, "삭제한 상세 이미지 정보를 정리하지 못했습니다."));

@@ -41,6 +41,7 @@ type SessionRow = {
 
 type CurriculumWeekRow = { id: string; course_id: string; week_number: number; title: string; goal: string | null; display_order: number };
 type CurriculumLessonRow = { id: string; week_id: string; day_number: number; title: string; description: string | null; content_type: "vod" | "material"; duration_label: string | null; display_order: number };
+type CourseThumbnailRow = { course_id: string; storage_path: string };
 
 export type PublicBanner = { image?: string; eyebrow?: string; title?: string; copy?: string; link?: string };
 export type PublicCourseAppearance = { images: string[]; pixels: { meta?: string; kakao?: string; google?: string; enabled?: boolean } };
@@ -160,7 +161,7 @@ function mapCurriculum(courseId: string, weeks: CurriculumWeekRow[], lessons: Cu
   }));
 }
 
-function mapCourse(course: CourseRow, cohorts: CohortRow[], sessions: SessionRow[], weeks: CurriculumWeekRow[], lessons: CurriculumLessonRow[]): ClassItem {
+function mapCourse(course: CourseRow, cohorts: CohortRow[], sessions: SessionRow[], weeks: CurriculumWeekRow[], lessons: CurriculumLessonRow[], thumbnailUrl?: string): ClassItem {
   const cohort = cohorts
     .filter((item) => item.course_id === course.id && item.status !== "cancelled")
     .sort((a, b) => {
@@ -188,6 +189,7 @@ function mapCourse(course: CourseRow, cohorts: CohortRow[], sessions: SessionRow
     seats: cohort?.capacity ? `정원 ${cohort.capacity}명` : "정원 제한 없음",
     instructor: course.instructor_name || "브랜디액션",
     accent: "red",
+    thumbnailUrl,
     sessions: sessionRows.map(mapSession),
     curriculum: mapCurriculum(course.id,weeks,lessons),
   };
@@ -206,10 +208,19 @@ export async function getPublishedClasses(): Promise<ClassItem[]> {
     if (courseError || !courseData?.length) return [];
 
     const courseIds = courseData.map((course) => course.id);
-    const { data: cohortData, error: cohortError } = await supabase
-      .from("cohorts")
-      .select("id,course_id,name,recruitment_start_at,recruitment_end_at,operation_start_at,operation_end_at,price,capacity,status")
-      .in("course_id", courseIds);
+    const [cohortResult, thumbnailResult] = await Promise.all([
+      supabase
+        .from("cohorts")
+        .select("id,course_id,name,recruitment_start_at,recruitment_end_at,operation_start_at,operation_end_at,price,capacity,status")
+        .in("course_id", courseIds),
+      supabase
+        .from("course_assets")
+        .select("course_id,storage_path")
+        .in("course_id", courseIds)
+        .eq("asset_type", "thumbnail")
+        .order("display_order"),
+    ]);
+    const { data: cohortData, error: cohortError } = cohortResult;
     if (cohortError) return [];
 
     const cohorts = (cohortData || []) as CohortRow[];
@@ -236,7 +247,12 @@ export async function getPublishedClasses(): Promise<ClassItem[]> {
       if(!lessonError)lessons=(lessonData||[]) as CurriculumLessonRow[];
     }
 
-    return (courseData as CourseRow[]).map((course) => mapCourse(course, cohorts, sessions, weeks, lessons));
+    const thumbnails = thumbnailResult.error ? [] : (thumbnailResult.data || []) as CourseThumbnailRow[];
+    return (courseData as CourseRow[]).map((course) => {
+      const thumbnail = thumbnails.find((asset) => asset.course_id === course.id);
+      const thumbnailUrl = thumbnail ? supabase.storage.from("course-assets").getPublicUrl(thumbnail.storage_path).data.publicUrl : undefined;
+      return mapCourse(course, cohorts, sessions, weeks, lessons, thumbnailUrl);
+    });
   } catch {
     return [];
   }

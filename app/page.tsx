@@ -64,7 +64,7 @@ export default async function Home() {
             <div><span className="section-kicker">LIVE PROGRAM</span><h2>지금 참여할 수 있는 클래스</h2></div>
             <Link className="text-link" href="/classes">전체 클래스 보기 <ArrowRight size={18} /></Link>
           </div>
-          <div className="class-grid single-class-grid">
+          <div className="class-grid">
             {classes.map((item) => <ClassCard key={item.slug} item={item} />)}
           </div>
         </div>

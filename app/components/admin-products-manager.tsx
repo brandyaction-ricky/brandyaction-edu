@@ -99,7 +99,7 @@ export function AdminProductsManager() {
     setSaving(true);
     setError("");
     try {
-      const courseId = await saveAdminProduct({ course: editor.draft, images: editor.images, pixels: editor.pixels, curriculum: normalizeCurriculum(editor.curriculum), resourceFiles });
+      const courseId = await saveAdminProduct({ course: editor.draft, thumbnail: editor.thumbnail, images: editor.images, pixels: editor.pixels, curriculum: normalizeCurriculum(editor.curriculum), resourceFiles });
       await refresh();
       const reloaded = await loadAdminProduct(courseId);
       reloaded.curriculum = normalizeCurriculum(reloaded.curriculum);
@@ -147,7 +147,7 @@ export function AdminProductsManager() {
       </div>
       <div className="product-management-list">
         {visible.map((product, index) => <div className="product-management-row" key={product.id}>
-          <span className="product-name"><b className={`product-thumb thumb-${index % 3}`}>{String(index + 1).padStart(2, "0")}</b><span><strong>{product.title}</strong><small>{product.instructorName} · /classes/{product.slug}</small></span></span>
+          <span className="product-name">{product.thumbnailUrl ? <img className="product-thumb product-thumb-image" src={product.thumbnailUrl} alt=""/> : <b className={`product-thumb thumb-${index % 3}`}>{String(index + 1).padStart(2, "0")}</b>}<span><strong>{product.title}</strong><small>{product.instructorName} · /classes/{product.slug}</small></span></span>
           <div><small>판매 상태</small><span className={`status-label ${product.status === "published" ? "success" : "planned"}`}>{statusLabel[product.status]}</span></div>
           <div><small>가격</small><strong>{product.listPrice.toLocaleString()}원</strong></div>
           <div><small>상세페이지</small><strong>이미지 {product.imageCount}장</strong></div>
@@ -161,11 +161,33 @@ export function AdminProductsManager() {
     </section>
   </>;
 
-  const { draft, images, curriculum, pixels } = editor;
+  const { draft, thumbnail, images, curriculum, pixels } = editor;
   const lessonCount = curriculum.reduce((sum, week) => sum + week.lessons.length, 0);
   const setDraft = (patch: Partial<typeof draft>) => setEditor({ ...editor, draft: { ...draft, ...patch } });
+  const setThumbnail = (next: ProductImage | null) => setEditor({ ...editor, thumbnail: next });
   const setImages = (next: ProductImage[]) => setEditor({ ...editor, images: next });
   const setCurriculum = (next: CurriculumWeek[]) => setEditor({ ...editor, curriculum: normalizeCurriculum(next) });
+
+  const uploadThumbnail = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setError("썸네일은 JPG, PNG, WEBP 파일만 등록할 수 있습니다.");
+      return;
+    }
+    if (file.size > 5_000_000) {
+      setError("썸네일은 5MB 이하로 등록해 주세요.");
+      return;
+    }
+    if (thumbnail?.file && thumbnail.url.startsWith("blob:")) URL.revokeObjectURL(thumbnail.url);
+    setError("");
+    setThumbnail({ file, url: URL.createObjectURL(file) });
+  };
+  const removeThumbnail = () => {
+    if (thumbnail?.file && thumbnail.url.startsWith("blob:")) URL.revokeObjectURL(thumbnail.url);
+    setThumbnail(null);
+  };
 
   const uploadImages = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []).filter((file) => file.size <= 5_000_000).slice(0, 20 - images.length);
@@ -208,6 +230,7 @@ export function AdminProductsManager() {
     <div className="editor-tabs">{[["basic", "기본 정보"], ["detail", "이미지 상세페이지"], ["curriculum", "커리큘럼"], ["pixel", "픽셀·전환 추적"]].map(([id, label]) => <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)}>{label}{id === "detail" && <em>{images.length}</em>}</button>)}</div>
 
     {tab === "basic" && <div className="editor-grid"><section className="admin-panel admin-form-card"><div className="form-card-head"><div><h2>상품 기본 정보</h2><p>판매 중으로 저장하면 클래스 목록과 상품 상세페이지에 즉시 반영됩니다.</p></div><span className="completion-chip"><Check/> DB 연결</span></div><div className="admin-field-grid">
+      <div className="field-full product-thumbnail-field"><span>상품 썸네일</span><div className="product-thumbnail-editor"><div className={`product-thumbnail-preview ${thumbnail ? "has-image" : ""}`}>{thumbnail ? <img src={thumbnail.url} alt="상품 썸네일 미리보기"/> : <><ImagePlus/><small>썸네일 미등록</small></>}</div><div className="product-thumbnail-actions"><strong>목록 카드와 상품 상세 상단에 노출됩니다.</strong><p>가로형 4:3 또는 16:9 비율 권장 · JPG, PNG, WEBP · 5MB 이하</p><span><label className="admin-outline thumbnail-upload-button"><input type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadThumbnail}/><ImagePlus/> {thumbnail ? "이미지 교체" : "이미지 등록"}</label>{thumbnail && <button type="button" className="admin-outline thumbnail-remove-button" onClick={removeThumbnail}><Trash2/> 삭제</button>}</span></div></div></div>
       <label className="field-full">상품명<input value={draft.title} onChange={(event) => setDraft({ title: event.target.value })}/></label>
       <label>강사명<input value={draft.instructorName} onChange={(event) => setDraft({ instructorName: event.target.value })}/></label>
       <label>기본 정가<input inputMode="numeric" value={draft.listPrice} onChange={(event) => setDraft({ listPrice: event.target.value })}/></label>
@@ -218,7 +241,7 @@ export function AdminProductsManager() {
       <label>상품 코드<input value={draft.courseCode} onChange={(event) => setDraft({ courseCode: event.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, "_") })}/></label>
       <label>일정 표기<input value={draft.scheduleLabel} onChange={(event) => setDraft({ scheduleLabel: event.target.value })}/></label>
       <label>판매 상태<select value={draft.status} onChange={(event) => setDraft({ status: event.target.value as typeof draft.status })}><option value="draft">판매 중지</option><option value="published">판매 중</option><option value="archived">보관</option></select></label>
-    </div></section><aside className="admin-panel product-side-card"><span>노출 경로</span><div className="mini-product-preview"><b>URL</b><small>고객 상세페이지</small><strong>/classes/{draft.slug}</strong><em>{statusLabel[draft.status]}</em></div><p>‘내 클래스’에는 결제 또는 관리자가 발급한 활성 수강권이 있는 고객에게만 노출됩니다.</p></aside></div>}
+    </div></section><aside className="admin-panel product-side-card"><span>노출 경로</span><div className={`mini-product-preview ${thumbnail ? "has-thumbnail" : ""}`} style={thumbnail ? { backgroundImage: `url(${thumbnail.url})` } : undefined}><b>URL</b><small>고객 상세페이지</small><strong>/classes/{draft.slug}</strong><em>{statusLabel[draft.status]}</em></div><p>‘내 클래스’에는 결제 또는 관리자가 발급한 활성 수강권이 있는 고객에게만 노출됩니다.</p></aside></div>}
 
     {tab === "detail" && <section className="admin-panel detail-image-editor"><div className="form-card-head"><div><h2>이미지형 상세페이지</h2><p>드래그하거나 위·아래 버튼을 눌러 고객 화면의 노출 순서를 바꿀 수 있습니다.</p></div><span className="image-count">{images.length} / 20장</span></div><div className="detail-editor-grid"><label className="detail-dropzone"><input type="file" accept="image/png,image/jpeg,image/webp" multiple onChange={uploadImages}/><ImagePlus/><strong>상세 이미지를 업로드하세요</strong><span>JPG, PNG, WEBP · 장당 5MB 이하</span><b>이미지 선택</b></label><div className="detail-image-guide"><strong>순서 변경 방법</strong><p>PC에서는 항목을 잡아 드래그하고, 모바일에서는 위·아래 버튼을 사용하세요. 저장하면 이 순서가 고객 상세페이지에 그대로 반영됩니다.</p></div></div>
       <div className="uploaded-image-list sortable-image-list">{images.map((image, index) => <article key={`${image.id || image.url}-${index}`} draggable onDragStart={() => setDragImage(index)} onDragOver={(event) => event.preventDefault()} onDrop={(event) => dropImage(event, index)} className={dragImage === index ? "is-dragging" : ""}>

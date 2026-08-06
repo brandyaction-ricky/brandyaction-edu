@@ -4,7 +4,7 @@ import type { ClassItem } from "../data";
 
 export function ClassCard({ item }: { item: ClassItem }) {
   return <article className={`class-card accent-${item.accent}`}>
-    <div className="card-visual">
+    <div className={`card-visual ${item.thumbnailUrl ? "has-thumbnail" : ""}`} style={item.thumbnailUrl ? { backgroundImage: `url(${item.thumbnailUrl})` } : undefined}>
       <span className={`status-pill tone-${item.statusTone}`}>{item.status}</span>
       <span className="card-index">LIVE<br />PROGRAM</span>
       <span className="card-number">BA</span>
