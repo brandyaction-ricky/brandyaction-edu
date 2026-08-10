@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
-:root { --red:#ee251c; --red-dark:#b80f0a; --ink:#111; --muted:#6f6f6b; --line:#deded9; --paper:#f7f6f1; --soft:#efeee8; --blue:#3558e6; }
+/* BRANDYACTION main red is provisional until the original logo color is confirmed. */
+:root { --red:#A10D12; --red-dark:#75090C; --cta-red:#E11D2E; --box-red:#630100; --ink:#000000; --warm-ink:#1b1716; --muted:#6f6a67; --line:#dedad7; --paper:#FAFAFA; --soft:#edebde; --blue:#3558e6; }
 * { box-sizing:border-box; }
 html { scroll-behavior:smooth; }
 body { margin:0; color:var(--ink); background:#fff; font-family:Pretendard,"Apple SD Gothic Neo","Noto Sans KR",Arial,sans-serif; letter-spacing:-.02em; }
@@ -13,7 +14,7 @@ button,input,select,textarea { font:inherit; }
 .main-nav { display:flex; align-items:center; gap:38px; font-size:15px; font-weight:700; }.main-nav a:hover{color:var(--red)}
 .header-actions { display:flex; align-items:center; gap:25px; font-size:14px; font-weight:700; }.mobile-actions,.menu-button{display:none}
 .button { display:inline-flex; align-items:center; justify-content:center; gap:12px; border:0; font-weight:800; transition:.2s ease; cursor:pointer; }
-.button:hover { transform:translateY(-2px); }.button-sm{padding:13px 20px;font-size:14px}.button-lg{padding:20px 28px;font-size:17px;min-width:220px}.button-primary{background:var(--red);color:white}.button-primary:hover{background:#d91b14}.button-white{background:white;color:var(--red)}.button-dark{background:#111;color:white;padding:16px 22px}.full{width:100%}
+.button:hover { transform:translateY(-2px); }.button-sm{padding:13px 20px;font-size:14px}.button-lg{padding:20px 28px;font-size:17px;min-width:220px}.button-primary{background:var(--cta-red);color:white}.button-primary:hover{background:var(--red)}.button-white{background:white;color:var(--red)}.button-dark{background:#111;color:white;padding:16px 22px}.full{width:100%}
 .hero-shell { background:linear-gradient(135deg,#fbfaf7 0%,#f4f2ed 100%); padding:56px 0 44px; border-bottom:1px solid var(--line); }
 .hero-grid{display:grid;grid-template-columns:.84fr 1.16fr;gap:64px;align-items:center;min-height:650px}
 .hero-copy{padding:28px 0}.eyebrow{display:flex;align-items:center;gap:10px;color:var(--red);font-size:18px;font-weight:900;margin-bottom:28px}.eyebrow span{width:12px;height:12px;border-radius:50%;background:var(--red);box-shadow:0 0 0 7px rgba(238,37,28,.08)}
