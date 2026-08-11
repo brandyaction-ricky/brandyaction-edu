@@ -47,7 +47,7 @@ export async function POST(request: Request) {
   const { data: cohort } = await admin.from("cohorts").select("id,course_id,operation_start_at,operation_end_at").eq("id", body.cohortId).maybeSingle();
   if (!cohort) return NextResponse.json({ error: "기수를 찾을 수 없습니다." }, { status: 404 });
   const { data: existing } = await admin.from("enrollments").select("id").eq("user_id", body.userId).eq("cohort_id", body.cohortId).maybeSingle();
-  const payload = { user_id: body.userId, course_id: cohort.course_id, cohort_id: cohort.id, status: "active", source: "admin_grant", granted_by: operator.id, access_starts_at: new Date().toISOString(), access_ends_at: cohort.operation_end_at, revoked_at: null };
+  const payload = { user_id: body.userId, course_id: cohort.course_id, cohort_id: cohort.id, status: "active", source: "admin_grant", granted_by: operator.id, access_starts_at: new Date().toISOString(), access_ends_at: null, revoked_at: null };
   const result = existing ? await admin.from("enrollments").update(payload).eq("id", existing.id) : await admin.from("enrollments").insert(payload);
   if (result.error) return NextResponse.json({ error: "수강권을 발급하지 못했습니다. 최신 DB 마이그레이션 적용 여부를 확인해 주세요." }, { status: 500 });
   await admin.from("audit_logs").insert({ actor_user_id: operator.id, action: "enrollment.granted", entity_type: "profile", entity_id: body.userId, after_data: { cohort_id: body.cohortId } });

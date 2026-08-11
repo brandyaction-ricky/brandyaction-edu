@@ -93,11 +93,12 @@ export function safeEmbedUrl(value: string | null) {
     const url = new URL(value);
     if (url.protocol !== "https:") return null;
     if (url.hostname === "youtu.be") return `https://www.youtube.com/embed/${url.pathname.slice(1)}`;
-    if (url.hostname.includes("youtube.com")) {
+    if (url.hostname === "youtube.com" || url.hostname.endsWith(".youtube.com")) {
       const id = url.searchParams.get("v");
       if (id) return `https://www.youtube.com/embed/${id}`;
     }
-    if (url.hostname.includes("vimeo.com") && /^\/\d+/.test(url.pathname)) return `https://player.vimeo.com/video/${url.pathname.split("/")[1]}`;
-    return url.toString();
+    if ((url.hostname === "vimeo.com" || url.hostname === "www.vimeo.com") && /^\/\d+/.test(url.pathname)) return `https://player.vimeo.com/video/${url.pathname.split("/")[1]}`;
+    if (url.hostname === "player.vimeo.com" && /^\/video\/\d+/.test(url.pathname)) return url.toString();
+    return null;
   } catch { return null; }
 }

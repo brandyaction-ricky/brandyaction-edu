@@ -8,8 +8,15 @@ export async function POST(request: Request) {
   const token = new URL(request.url).searchParams.get("token");
   if (!configuredToken || token !== configuredToken) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
+  const contentLength = Number(request.headers.get("content-length") || 0);
+  if (contentLength > 1_000_000) return NextResponse.json({ error: "payload_too_large" }, { status: 413 });
   const raw = await request.text();
-  const payload = JSON.parse(raw || "{}") as { eventType?: string; createdAt?: string; data?: Record<string, unknown> };
+  let payload: { eventType?: string; createdAt?: string; data?: Record<string, unknown> };
+  try {
+    payload = JSON.parse(raw || "{}") as typeof payload;
+  } catch {
+    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+  }
   const eventId = createHash("sha256").update(raw).digest("hex");
   const admin = createAdminClient();
   const { error: eventError } = await admin.from("payment_events").insert({

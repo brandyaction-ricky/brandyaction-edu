@@ -15,6 +15,15 @@ type ItemRelation = {
     | null;
 };
 
+type VirtualAccountPayload = {
+  virtualAccount?: {
+    accountNumber?: string;
+    bankCode?: string;
+    customerName?: string;
+    dueDate?: string;
+  } | null;
+};
+
 export default async function OrderComplete({
   searchParams,
 }: {
@@ -46,6 +55,10 @@ export default async function OrderComplete({
   const payment = Array.isArray(order.payments)
     ? order.payments[0]
     : order.payments;
+  const providerPayload = payment?.provider_payload && typeof payment.provider_payload === "object"
+    ? payment.provider_payload as VirtualAccountPayload
+    : null;
+  const virtualAccount = providerPayload?.virtualAccount || null;
   const waiting =
     order.status === "pending" && payment?.status === "in_progress";
   if (order.status !== "paid" && !waiting)
@@ -91,6 +104,12 @@ export default async function OrderComplete({
             <strong>{waiting ? "입금 대기" : "결제 완료"}</strong>
           </div>
         </div>
+        {waiting && virtualAccount?.accountNumber && <div className="virtual-account-result" role="status">
+          <strong>입금 계좌</strong>
+          <span>{virtualAccount.bankCode ? `은행 코드 ${virtualAccount.bankCode} · ` : ""}{virtualAccount.accountNumber}</span>
+          {virtualAccount.customerName && <small>예금주 {virtualAccount.customerName}</small>}
+          {virtualAccount.dueDate && <small>입금기한 {new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(virtualAccount.dueDate))}</small>}
+        </div>}
         <Link
           className="button button-primary button-lg"
           href={waiting ? "/my/orders" : "/my/cohort"}

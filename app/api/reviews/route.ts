@@ -5,11 +5,12 @@ import { getAuthenticatedUser } from "@/lib/server-auth";
 export async function POST(request: Request) {
   const user = await getAuthenticatedUser();
   if (!user) return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
-  const body = await request.json().catch(() => null) as { courseId?: string; cohortId?: string; rating?: number; body?: string; authorName?: string } | null;
+  const body = await request.json().catch(() => null) as { courseId?: string; cohortId?: string; rating?: number; body?: string; nickname?: string } | null;
   const rating = Number(body?.rating);
   const reviewBody = body?.body?.trim() || "";
-  if (!body?.courseId || !body.cohortId || !Number.isInteger(rating) || rating < 1 || rating > 5 || reviewBody.length < 10 || reviewBody.length > 2000) {
-    return NextResponse.json({ error: "별점과 10자 이상의 후기를 입력해 주세요." }, { status: 400 });
+  const nickname = body?.nickname?.trim() || "";
+  if (!body?.courseId || !body.cohortId || !Number.isInteger(rating) || rating < 1 || rating > 5 || reviewBody.length < 10 || reviewBody.length > 2000 || nickname.length < 2 || nickname.length > 20) {
+    return NextResponse.json({ error: "2~20자 닉네임, 별점과 10자 이상의 후기를 입력해 주세요." }, { status: 400 });
   }
   const supabase = await createClient();
   const [{ data: enrollment }, { data: profile }] = await Promise.all([
@@ -21,7 +22,8 @@ export async function POST(request: Request) {
     user_id: user.id,
     course_id: body.courseId,
     cohort_id: body.cohortId,
-    author_name: profile?.full_name?.trim() || body.authorName?.trim() || user.email.split("@")[0],
+    author_name: profile?.full_name?.trim() || user.email.split("@")[0],
+    author_nickname: nickname,
     rating,
     body: reviewBody,
     status: "pending",

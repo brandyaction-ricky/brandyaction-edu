@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { type ClassItem, type CurriculumWeek, type Session } from "@/app/data";
 import { getSupabasePublicConfig, hasSupabaseEnv } from "@/lib/supabase/config";
 import { safePublicHref } from "@/lib/safe-url";
+import { publicReviewerName } from "@/lib/review-display";
 
 type CourseRow = {
   id: string;
@@ -291,14 +292,14 @@ export async function getPublishedReviews(courseSlug?: string): Promise<PublicRe
   if (!hasSupabaseEnv()) return [];
   try {
     const supabase = publicClient();
-    let query = supabase.from("reviews").select("id,author_name,rating,body,courses!inner(title,slug),cohorts(name)").eq("status", "published").order("is_featured", { ascending: false }).order("display_order").order("published_at", { ascending: false }).limit(12);
+    let query = supabase.from("reviews").select("id,author_name,author_nickname,rating,body,courses!inner(title,slug),cohorts(name)").eq("status", "published").order("is_featured", { ascending: false }).order("display_order").order("published_at", { ascending: false }).limit(12);
     if (courseSlug) query = query.eq("courses.slug", courseSlug);
     const { data, error } = await query;
     if (error) return [];
     return (data || []).map((review) => {
       const course = Array.isArray(review.courses) ? review.courses[0] : review.courses;
       const cohort = Array.isArray(review.cohorts) ? review.cohorts[0] : review.cohorts;
-      return { id: review.id, name: review.author_name, className: course?.title || "브랜디액션 클래스", cohortName: cohort?.name || "수강생", rating: Number(review.rating), quote: review.body };
+      return { id: review.id, name: publicReviewerName(review.author_name, review.author_nickname), className: course?.title || "브랜디액션 클래스", cohortName: cohort?.name || "수강생", rating: Number(review.rating), quote: review.body };
     });
   } catch { return []; }
 }

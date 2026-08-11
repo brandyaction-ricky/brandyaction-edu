@@ -63,6 +63,7 @@ export function AdminSettingsManager() {
   const uploadBanner = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) { setError("배너는 JPG, PNG, WEBP 파일만 등록할 수 있습니다."); event.target.value = ""; return; }
     if (file.size > 5_000_000) { setError("배너 이미지는 5MB 이하만 등록할 수 있습니다."); return; }
     setBanner((value) => ({ ...value, image: URL.createObjectURL(file), imageFile: file }));
     event.target.value = "";

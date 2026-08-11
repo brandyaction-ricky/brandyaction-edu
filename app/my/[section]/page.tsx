@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { CreditCard, ExternalLink, Mail, ReceiptText } from "lucide-react";
 import { LearnerShell } from "../../components/learner-shell";
 import { AccountSettings } from "../../components/account-settings";
+import { WithdrawAccount } from "../../components/withdraw-account";
 import { safeExternalUrl } from "@/lib/safe-url";
 import { createClient } from "@/lib/supabase/server";
 import { getPublicSupport } from "@/lib/education-data";
@@ -29,6 +30,7 @@ const labels: Record<string, string> = {
   partially_refunded: "부분 환불",
   refunded: "환불 완료",
 };
+type PaymentPayload = { virtualAccount?: { accountNumber?: string; bankCode?: string; dueDate?: string } | null };
 
 export default async function MySectionPage({
   params,
@@ -55,13 +57,14 @@ export default async function MySectionPage({
           initialName={profile?.full_name || ""}
           initialPhone={profile?.phone || ""}
         />
+        <WithdrawAccount />
       </LearnerShell>
     );
 
   const { data: orders } = await supabase
     .from("orders")
     .select(
-      "id,order_number,status,total_amount,created_at,order_items(item_name),payments(method,receipt_url,cancelled_amount,refunds(amount,status,completed_at))",
+      "id,order_number,status,total_amount,created_at,order_items(item_name),payments(method,status,receipt_url,cancelled_amount,provider_payload,refunds(amount,status,completed_at))",
     )
     .eq("user_id", userData.user.id)
     .order("created_at", { ascending: false });
@@ -84,6 +87,8 @@ export default async function MySectionPage({
               ? order.payments[0]
               : order.payments;
             const receiptUrl = safeExternalUrl(payment?.receipt_url);
+            const payload = payment?.provider_payload && typeof payment.provider_payload === "object" ? payment.provider_payload as PaymentPayload : null;
+            const virtualAccount = payload?.virtualAccount || null;
             return (
               <article key={order.id}>
                 <div>
@@ -99,6 +104,7 @@ export default async function MySectionPage({
                   {payment?.method && <small>{payment.method}</small>}
                 </div>
                 <div className="my-order-actions">
+                  {order.status === "pending" && virtualAccount?.accountNumber && <span className="virtual-account-summary"><strong>입금 계좌</strong>{virtualAccount.bankCode && <small>은행 코드 {virtualAccount.bankCode}</small>}<b>{virtualAccount.accountNumber}</b>{virtualAccount.dueDate && <small>{date(virtualAccount.dueDate)}까지</small>}</span>}
                   {receiptUrl ? (
                     <a href={receiptUrl} target="_blank" rel="noreferrer">
                       <ReceiptText /> 영수증 <ExternalLink />

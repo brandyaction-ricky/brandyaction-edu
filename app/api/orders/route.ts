@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/server-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { tossClientConfigured } from "@/lib/toss";
-
-const POLICY_VERSION = "2026-08-06";
+import { isValidPhone, normalizePhone } from "@/lib/auth-validation";
+import { POLICY_VERSION } from "@/lib/legal-policies";
 
 function messageFor(code: string) {
   if (code.includes("ALREADY_ENROLLED")) return "이미 수강 중인 기수입니다.";
@@ -29,6 +29,9 @@ export async function POST(request: Request) {
   if (!body?.cohortId || !body.name?.trim() || !body.email?.trim()) {
     return NextResponse.json({ error: "신청자와 상품 정보를 확인해 주세요." }, { status: 400 });
   }
+  if (!body.phone || !isValidPhone(body.phone)) {
+    return NextResponse.json({ error: "휴대폰 번호를 10~11자리 숫자로 입력해 주세요." }, { status: 400 });
+  }
   if (!body.agreements?.terms || !body.agreements.privacy || !body.agreements.refund) {
     return NextResponse.json({ error: "필수 약관에 모두 동의해 주세요." }, { status: 400 });
   }
@@ -45,7 +48,7 @@ export async function POST(request: Request) {
     p_cohort_id: body.cohortId,
     p_customer_name: body.name.trim(),
     p_customer_email: body.email.trim().toLowerCase(),
-    p_customer_phone: body.phone?.replace(/[^0-9]/g, "") || null,
+    p_customer_phone: normalizePhone(body.phone),
     p_terms_version: POLICY_VERSION,
     p_privacy_version: POLICY_VERSION,
     p_refund_policy_version: POLICY_VERSION,
@@ -56,7 +59,7 @@ export async function POST(request: Request) {
 
   await admin.from("profiles").update({
     full_name: body.name.trim(),
-    phone: body.phone?.replace(/[^0-9]/g, "") || null,
+    phone: normalizePhone(body.phone),
   }).eq("id", user.id);
 
   return NextResponse.json(data, { status: 201 });

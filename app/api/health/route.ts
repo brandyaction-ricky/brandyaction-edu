@@ -4,11 +4,12 @@ import { getSupabasePublicConfig, hasSupabaseEnv } from "@/lib/supabase/config";
 
 export async function GET() {
   const environment = process.env.NEXT_PUBLIC_APP_ENV ?? "production";
+  const headers = { "Cache-Control": "no-store, max-age=0" };
 
   if (!hasSupabaseEnv()) {
     return NextResponse.json(
       { ok: false, environment, service: "supabase", reason: "missing_public_environment" },
-      { status: 503 },
+      { status: 503, headers },
     );
   }
 
@@ -23,8 +24,8 @@ export async function GET() {
 
   if (error) {
     return NextResponse.json(
-      { ok: false, service: "supabase", reason: "query_failed" },
-      { status: 503 },
+      { ok: false, environment, service: "supabase", reason: "query_failed" },
+      { status: 503, headers },
     );
   }
 
@@ -33,5 +34,5 @@ export async function GET() {
     environment,
     service: "supabase",
     publishedCourses: count ?? 0,
-  });
+  }, { headers });
 }

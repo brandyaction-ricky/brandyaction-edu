@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { ArrowRight, CheckCircle2, LockKeyhole, Mail, Smartphone, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getSupabasePublicConfig, hasSupabaseEnv } from "@/lib/supabase/config";
+import { isValidPassword, normalizePhone, PASSWORD_REQUIREMENT } from "@/lib/auth-validation";
+import { POLICY_VERSION } from "@/lib/legal-policies";
 
 type Mode = "login" | "signup";
 type Provider = "kakao" | "google";
@@ -43,6 +45,21 @@ export default function LoginPage() {
   const [message, setMessage] = useState("");
   const configured = hasSupabaseEnv();
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get("error");
+    const notice = params.get("notice");
+    const copy = error === "auth_callback" ? "로그인을 완료하지 못했습니다. 다시 시도해 주세요."
+      : error === "consent_failed" ? "필수 약관 동의를 저장하지 못했습니다. 다시 가입해 주세요."
+      : error === "service_unavailable" ? "현재 로그인 서비스를 점검 중입니다. 잠시 후 다시 시도해 주세요."
+      : notice === "password_changed" ? "비밀번호가 변경되었습니다. 새 비밀번호로 다시 로그인해 주세요."
+      : notice === "withdrawn" ? "회원 탈퇴가 완료되었습니다."
+      : "";
+    if (!copy) return;
+    const timer = window.setTimeout(() => setMessage(copy), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   async function handleEmail(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!configured) {
@@ -66,16 +83,27 @@ export default function LoginPage() {
       return;
     }
 
+    if (!isValidPassword(password)) {
+      setMessage(PASSWORD_REQUIREMENT);
+      setPending(false);
+      return;
+    }
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath())}`,
-        data: { phone, full_name: name.trim(), terms_version: "2026-08-06", privacy_version: "2026-08-06", consented_at: new Date().toISOString() },
+        data: { phone: normalizePhone(phone), full_name: name.trim(), terms_version: POLICY_VERSION, privacy_version: POLICY_VERSION, consented_at: new Date().toISOString() },
       },
     });
     if (error) {
       setMessage(error.message.includes("registered") ? "이미 가입된 이메일입니다." : "회원가입 정보를 다시 확인해 주세요.");
+      setPending(false);
+      return;
+    }
+    if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      setMessage("이미 가입된 이메일입니다. 로그인하거나 비밀번호를 재설정해 주세요.");
       setPending(false);
       return;
     }
@@ -91,10 +119,6 @@ export default function LoginPage() {
   async function handleSocial(provider: Provider) {
     if (!configured) {
       setMessage("사이트 연결값을 설정한 뒤 소셜 로그인이 활성화됩니다.");
-      return;
-    }
-    if (mode === "signup" && (!agreements.terms || !agreements.privacy)) {
-      setMessage("회원가입 필수 약관에 동의해 주세요.");
       return;
     }
     setPending(true);
@@ -123,7 +147,7 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath())}${mode === "signup" ? "&consent=2026-08-06" : ""}`,
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath())}`,
       },
     });
     if (error) {
@@ -149,12 +173,12 @@ export default function LoginPage() {
   return <main className="auth-screen">
     <section className="auth-brand-panel"><Link href="/" className="auth-logo">BRANDYACTION <span>EDU</span></Link><div><span>LEARN · APPLY · GROW</span><h1>배운 것을<br/>실행으로 바꾸는 곳</h1><p>결제부터 VOD, 라이브 일정과 다시보기까지<br/>하나의 학습 공간에서 이어집니다.</p></div><small>© 2026 BrandyAction</small></section>
     <section className="auth-form-panel"><div className="auth-card">
-      <div className="auth-tabs"><button className={mode === "login" ? "active" : ""} onClick={() => { setMode("login"); setMessage(""); }}>로그인</button><button className={mode === "signup" ? "active" : ""} onClick={() => { setMode("signup"); setMessage(""); }}>회원가입</button></div>
+      <div className="auth-tabs"><button type="button" aria-pressed={mode === "login"} className={mode === "login" ? "active" : ""} onClick={() => { setMode("login"); setMessage(""); }}>로그인</button><button type="button" aria-pressed={mode === "signup"} className={mode === "signup" ? "active" : ""} onClick={() => { setMode("signup"); setMessage(""); }}>회원가입</button></div>
       <div className="auth-heading"><span>{mode === "login" ? "WELCOME BACK" : "JOIN BRANDYACTION EDU"}</span><h2>{mode === "login" ? "다시 만나 반갑습니다." : "실행을 시작할 계정을 만드세요."}</h2><p>{mode === "login" ? "수강 중인 클래스와 다음 일정을 확인하세요." : "가입 후 결제한 클래스가 내 학습공간에 연결됩니다."}</p></div>
       <div className="social-login"><button type="button" className="kakao-button" onClick={() => handleSocial("kakao")} disabled={pending}><span className="social-icon kakao-icon"><KakaoIcon/></span><span>카카오로 {mode === "login" ? "로그인" : "시작하기"}</span></button><button type="button" className="google-button" onClick={() => handleSocial("google")} disabled={pending}><span className="social-icon google-icon"><GoogleIcon/></span><span>Google로 {mode === "login" ? "로그인" : "시작하기"}</span></button></div>
       <div className="auth-divider"><span>또는 이메일로 계속</span></div>
       <form onSubmit={handleEmail}>
-        <div className="auth-fields">{mode === "signup" && <label><span><UserRound/>이름</span><input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" required/></label>}<label><span><Mail/>이메일</span><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@company.com" autoComplete="email" required/></label><label><span><LockKeyhole/>비밀번호</span><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="8자 이상" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={8} required/></label>{mode === "signup" && <label><span><Smartphone/>휴대폰 번호</span><input value={phone} onChange={(event) => setPhone(event.target.value)} inputMode="tel" autoComplete="tel" placeholder="010-0000-0000"/></label>}</div>
+        <div className="auth-fields">{mode === "signup" && <label><span><UserRound/>이름</span><input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" required/></label>}<label><span><Mail/>이메일</span><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@company.com" autoComplete="email" required/></label><label><span><LockKeyhole/>비밀번호</span><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder={mode === "signup" ? "영문+숫자 8자 이상" : "비밀번호"} autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={8} pattern={mode === "signup" ? "(?=.*[A-Za-z])(?=.*[0-9]).{8,}" : undefined} title={mode === "signup" ? PASSWORD_REQUIREMENT : undefined} required/></label>{mode === "signup" && <label><span><Smartphone/>휴대폰 번호</span><input value={phone} onChange={(event) => setPhone(event.target.value)} inputMode="tel" autoComplete="tel" placeholder="010-0000-0000"/></label>}</div>
         {mode === "login" && <div className="auth-options"><span>보안 연결로 로그인합니다.</span><button type="button" onClick={handleReset}>비밀번호 재설정</button></div>}
         {mode === "signup" && <div className="signup-agreements"><label><input type="checkbox" checked={agreements.terms} onChange={(event)=>setAgreements({...agreements,terms:event.target.checked})}/><span>[필수] <Link href="/policies/terms" target="_blank">이용약관</Link> 동의</span></label><label><input type="checkbox" checked={agreements.privacy} onChange={(event)=>setAgreements({...agreements,privacy:event.target.checked})}/><span>[필수] <Link href="/policies/privacy" target="_blank">개인정보처리방침</Link> 동의</span></label></div>}
         {message && <p className="auth-message" role="status">{message}</p>}

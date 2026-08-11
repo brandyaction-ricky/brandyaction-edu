@@ -5,6 +5,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { loadTossPayments } from "@tosspayments/tosspayments-sdk";
 import { ArrowLeft, Banknote, Check, CreditCard, Landmark, ShieldCheck } from "lucide-react";
 import type { CheckoutCourse } from "@/lib/checkout-data";
+import { isValidPhone } from "@/lib/auth-validation";
 
 type Method = "card" | "transfer" | "virtual";
 
@@ -42,6 +43,8 @@ export function CheckoutClient({ course, initialCohortId, customer, clientKey }:
     event.preventDefault();
     if (pending || !allChecked) return;
     if (!clientKey) { setError("결제 키가 설정되지 않았습니다. 운영자에게 문의해 주세요."); return; }
+    if (!name.trim()) { setError("신청자 이름을 입력해 주세요."); return; }
+    if (!isValidPhone(phone)) { setError("휴대폰 번호를 10~11자리 숫자로 입력해 주세요."); return; }
     setPending(true);
     setError("");
     try {

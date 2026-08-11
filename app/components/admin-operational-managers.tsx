@@ -59,6 +59,7 @@ type AdminOrder = {
 type AdminReview = {
   id: string;
   author_name: string;
+  author_nickname: string | null;
   rating: number;
   body: string;
   status: string;
@@ -92,6 +93,24 @@ function todayInput(offsetDays = 0) {
     value,
   );
 }
+
+async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(input, init);
+  } catch {
+    throw new Error("서버에 연결하지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.");
+  }
+  const result = await response.json().catch(() => ({})) as T & { error?: string };
+  if (!response.ok) throw new Error(result.error || "요청을 처리하지 못했습니다.");
+  return result;
+}
+
+function csvCell(value: unknown) {
+  const text = String(value ?? "");
+  const safe = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+  return `"${safe.replaceAll('"', '""')}"`;
+}
 const statusLabel: Record<string, string> = {
   active: "활성",
   suspended: "이용 정지",
@@ -117,17 +136,16 @@ export function AdminMembersManager() {
   const [cohortId, setCohortId] = useState("");
   const load = async () => {
     setLoading(true);
-    const response = await fetch("/api/admin/members", { cache: "no-store" });
-    const result = (await response.json()) as {
-      error?: string;
-      members?: Member[];
-      cohorts?: CohortOption[];
-    };
-    if (response.ok) {
+    setError("");
+    try {
+      const result = await requestJson<{ members?: Member[]; cohorts?: CohortOption[] }>("/api/admin/members", { cache: "no-store" });
       setMembers(result.members || []);
       setCohorts(result.cohorts || []);
-    } else setError(result.error || "회원을 불러오지 못했습니다.");
-    setLoading(false);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "회원을 불러오지 못했습니다.");
+    } finally {
+      setLoading(false);
+    }
   };
   useEffect(() => {
     void Promise.resolve().then(load);
@@ -146,28 +164,30 @@ export function AdminMembersManager() {
     changes: { status?: string; role?: string },
   ) => {
     setError("");
-    const response = await fetch("/api/admin/members", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: member.id, ...changes }),
-    });
-    const result = (await response.json()) as { error?: string };
-    if (!response.ok) setError(result.error || "저장하지 못했습니다.");
-    else await load();
+    try {
+      await requestJson("/api/admin/members", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: member.id, ...changes }),
+      });
+      await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "저장하지 못했습니다.");
+    }
   };
   const grant = async () => {
     if (!selected || !cohortId) return;
-    const response = await fetch("/api/admin/members", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: selected.id, cohortId }),
-    });
-    const result = (await response.json()) as { error?: string };
-    if (!response.ok) setError(result.error || "수강권을 발급하지 못했습니다.");
-    else {
+    try {
+      await requestJson("/api/admin/members", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: selected.id, cohortId }),
+      });
       setSelected(null);
       setCohortId("");
       await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "수강권을 발급하지 못했습니다.");
     }
   };
   if (loading)
@@ -356,14 +376,15 @@ export function AdminLiveOrdersManager() {
   });
   const load = async () => {
     setLoading(true);
-    const response = await fetch("/api/admin/orders", { cache: "no-store" });
-    const result = (await response.json()) as {
-      error?: string;
-      orders?: AdminOrder[];
-    };
-    if (response.ok) setOrders(result.orders || []);
-    else setError(result.error || "주문을 불러오지 못했습니다.");
-    setLoading(false);
+    setError("");
+    try {
+      const result = await requestJson<{ orders?: AdminOrder[] }>("/api/admin/orders", { cache: "no-store" });
+      setOrders(result.orders || []);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "주문을 불러오지 못했습니다.");
+    } finally {
+      setLoading(false);
+    }
   };
   useEffect(() => {
     void Promise.resolve().then(load);
@@ -421,32 +442,33 @@ export function AdminLiveOrdersManager() {
     const payment = refundTarget.payments[0];
     const isVirtual = payment?.method === "가상계좌";
     setRefunding(refundTarget.id);
-    const response = await fetch("/api/admin/refunds", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        orderNumber: refundTarget.order_number,
-        amount: Number(refundForm.amount.replace(/[^0-9]/g, "")),
-        reason: refundForm.reason,
-        requestId: refundForm.requestId,
-        ...(isVirtual
-          ? {
-              refundReceiveAccount: {
-                bank: refundForm.bank,
-                accountNumber: refundForm.accountNumber,
-                holderName: refundForm.holderName,
-              },
-            }
-          : {}),
-      }),
-    });
-    const result = (await response.json()) as { error?: string };
-    if (!response.ok) setError(result.error || "환불하지 못했습니다.");
-    else {
+    try {
+      await requestJson("/api/admin/refunds", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderNumber: refundTarget.order_number,
+          amount: Number(refundForm.amount.replace(/[^0-9]/g, "")),
+          reason: refundForm.reason,
+          requestId: refundForm.requestId,
+          ...(isVirtual
+            ? {
+                refundReceiveAccount: {
+                  bank: refundForm.bank,
+                  accountNumber: refundForm.accountNumber,
+                  holderName: refundForm.holderName,
+                },
+              }
+            : {}),
+        }),
+      });
       setRefundTarget(null);
       await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "환불하지 못했습니다.");
+    } finally {
+      setRefunding("");
     }
-    setRefunding("");
   };
   const exportCsv = () => {
     const rows = [
@@ -473,7 +495,7 @@ export function AdminLiveOrdersManager() {
     ];
     const blob = new Blob(
       [
-        `\uFEFF${rows.map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(",")).join("\n")}`,
+        `\uFEFF${rows.map((row) => row.map(csvCell).join(",")).join("\n")}`,
       ],
       { type: "text/csv;charset=utf-8" },
     );
@@ -709,14 +731,15 @@ export function AdminLiveReviewsManager() {
   const [error, setError] = useState("");
   const load = async () => {
     setLoading(true);
-    const response = await fetch("/api/admin/reviews", { cache: "no-store" });
-    const result = (await response.json()) as {
-      error?: string;
-      reviews?: AdminReview[];
-    };
-    if (response.ok) setReviews(result.reviews || []);
-    else setError(result.error || "리뷰를 불러오지 못했습니다.");
-    setLoading(false);
+    setError("");
+    try {
+      const result = await requestJson<{ reviews?: AdminReview[] }>("/api/admin/reviews", { cache: "no-store" });
+      setReviews(result.reviews || []);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "리뷰를 불러오지 못했습니다.");
+    } finally {
+      setLoading(false);
+    }
   };
   useEffect(() => {
     void Promise.resolve().then(load);
@@ -725,23 +748,21 @@ export function AdminLiveReviewsManager() {
     id: string,
     changes: { status?: string; featured?: boolean },
   ) => {
-    const response = await fetch("/api/admin/reviews", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, ...changes }),
-    });
-    const result = (await response.json()) as { error?: string };
-    if (!response.ok) setError(result.error || "리뷰를 저장하지 못했습니다.");
-    else await load();
+    try {
+      await requestJson("/api/admin/reviews", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, ...changes }) });
+      await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "리뷰를 저장하지 못했습니다.");
+    }
   };
   const remove = async (review: AdminReview) => {
     if (!window.confirm(`${review.author_name}님의 리뷰를 삭제할까요?`)) return;
-    const response = await fetch(
-      `/api/admin/reviews?id=${encodeURIComponent(review.id)}`,
-      { method: "DELETE" },
-    );
-    if (!response.ok) setError("리뷰를 삭제하지 못했습니다.");
-    else await load();
+    try {
+      await requestJson(`/api/admin/reviews?id=${encodeURIComponent(review.id)}`, { method: "DELETE" });
+      await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "리뷰를 삭제하지 못했습니다.");
+    }
   };
   const visible = reviews.filter((review) =>
     [review.author_name, review.body, one(review.courses)?.title || ""].some(
@@ -815,7 +836,7 @@ export function AdminLiveReviewsManager() {
                 <small>{one(review.cohorts)?.name}</small>
               </span>
               <span className="review-contact-cell">
-                <strong>{review.author_name}</strong>
+                <strong>{review.author_name} · {review.author_nickname || "닉네임 미입력"}</strong>
                 <small>{one(review.profiles)?.email}</small>
               </span>
               <span>{date(review.created_at)}</span>

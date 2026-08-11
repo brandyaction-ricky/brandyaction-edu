@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { hasSupabaseEnv } from "@/lib/supabase/config";
-import { defaultPolicies } from "@/lib/legal-policies";
+import { defaultPolicies, POLICY_VERSION } from "@/lib/legal-policies";
 import { safePublicHref } from "@/lib/safe-url";
 
 export type SiteMenuItem = { id: string; label: string; href: string; enabled: boolean };
@@ -20,7 +20,7 @@ export type SiteBasicSettings = {
   businessAddress: string;
 };
 export type CommerceSettings = { provider: string; refundContact: string; refundWindow: string; bankName: string; accountNumber: string; accountHolder: string };
-export type PolicySettings = { terms: string; privacy: string; refund: string };
+export type PolicySettings = { version?: string; terms: string; privacy: string; refund: string };
 export type OperatorSettings = { staffCanManageProducts: boolean; staffCanManageOrders: boolean; staffCanManageMembers: boolean; notifyOrderEmail: string; notifyRefundEmail: string };
 export type SiteSettingsBundle = { basic: SiteBasicSettings; navigation: SiteMenuItem[]; commerce: CommerceSettings; policies: PolicySettings; operators: OperatorSettings };
 
@@ -46,12 +46,12 @@ export const defaultSiteSettings: SiteSettingsBundle = {
   commerce: {
     provider: "토스페이먼츠",
     refundContact: "edu@brandyaction.co.kr",
-    refundWindow: "결제 후 7일 이내 및 콘텐츠 이용 전",
+    refundWindow: "전체 교육상품 이용률 50% 미만 시 불만족 전액 환불",
     bankName: "",
     accountNumber: "",
     accountHolder: "",
   },
-  policies: { ...defaultPolicies },
+  policies: { version: POLICY_VERSION, ...defaultPolicies },
   operators: {
     staffCanManageProducts: true,
     staffCanManageOrders: true,
@@ -77,6 +77,7 @@ function menuValue(value: unknown) {
 
 function policyValue(value: unknown): PolicySettings {
   const candidate = objectValue(value, defaultSiteSettings.policies);
+  if (candidate.version !== POLICY_VERSION) return defaultSiteSettings.policies;
   return {
     terms: candidate.terms.trim() || defaultPolicies.terms,
     privacy: candidate.privacy.trim() || defaultPolicies.privacy,
@@ -106,7 +107,7 @@ export async function loadSiteSettings(): Promise<SiteSettingsBundle> {
 
 export async function saveSiteSetting(key: "site_basic" | "site_navigation" | "payment_refund" | "site_policies" | "operator_preferences", value: unknown, isPublic: boolean) {
   const supabase = createClient();
-  const safeValue = key === "site_navigation" ? menuValue(value) : key === "site_basic" ? { ...(value as SiteBasicSettings), ctaHref: safePublicHref((value as SiteBasicSettings).ctaHref, "/classes") } : value;
+  const safeValue = key === "site_navigation" ? menuValue(value) : key === "site_basic" ? { ...(value as SiteBasicSettings), ctaHref: safePublicHref((value as SiteBasicSettings).ctaHref, "/classes") } : key === "site_policies" ? { ...(value as PolicySettings), version: POLICY_VERSION } : value;
   const { error } = await supabase.from("site_settings").upsert({ key, value: safeValue, is_public: isPublic }, { onConflict: "key" });
   if (error) throw new Error(error.message || "사이트 설정을 저장하지 못했습니다.");
   if (key === "site_basic") {

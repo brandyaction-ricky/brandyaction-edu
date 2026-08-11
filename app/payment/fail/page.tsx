@@ -1,7 +1,5 @@
 import Link from "next/link";
 import { CircleX } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 
 export default async function PaymentFailPage({
   searchParams,
@@ -10,28 +8,6 @@ export default async function PaymentFailPage({
 }) {
   const query = await searchParams;
   const canceled = query.code === "PAY_PROCESS_CANCELED";
-  if (query.orderId) {
-    const supabase = await createClient();
-    const { data: user } = await supabase.auth.getUser();
-    if (user.user) {
-      const { data: order } = await supabase
-        .from("orders")
-        .select("id,status")
-        .eq("order_number", query.orderId)
-        .eq("user_id", user.user.id)
-        .maybeSingle();
-      if (order?.status === "pending") {
-        await createAdminClient()
-          .from("orders")
-          .update({
-            status: canceled ? "cancelled" : "payment_failed",
-            ...(canceled ? { cancelled_at: new Date().toISOString() } : {}),
-          })
-          .eq("id", order.id)
-          .eq("status", "pending");
-      }
-    }
-  }
   return (
     <main className="payment-result-page">
       <section>

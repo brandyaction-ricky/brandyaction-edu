@@ -49,9 +49,12 @@ npm run build
 ```text
 supabase/migrations/202608040001_initial_education_platform.sql
 supabase/migrations/202608060001_launch_transactions.sql
+supabase/migrations/202608060002_security_hardening.sql
+supabase/migrations/202608110001_profile_column_security.sql
+supabase/migrations/202608110002_unlimited_course_access.sql
 ```
 
-두 번째 마이그레이션은 주문 좌석 예약, 결제 멱등 처리, 수강권 발급·회수, 스태프 권한 RLS를 포함합니다. 운영 DB 적용 전 백업과 dry-run 검토가 필요합니다.
+추가 마이그레이션은 주문 좌석 예약, 결제 멱등 처리, 수강권 발급·회수, 스태프 권한 RLS와 회원 프로필의 컬럼 단위 수정 권한 제한을 포함합니다. 운영 DB 적용 전 백업과 dry-run 검토가 필요합니다.
 
 ## 배포
 

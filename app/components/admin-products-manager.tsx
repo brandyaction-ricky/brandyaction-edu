@@ -34,6 +34,7 @@ function move<T>(items: T[], from: number, to: number) {
 }
 
 const statusLabel = { published: "판매 중", draft: "판매 중지", archived: "보관" } as const;
+const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 export function AdminProductsManager() {
   const [products, setProducts] = useState<ProductSummary[]>([]);
@@ -172,7 +173,7 @@ export function AdminProductsManager() {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+    if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
       setError("썸네일은 JPG, PNG, WEBP 파일만 등록할 수 있습니다.");
       return;
     }
@@ -190,7 +191,13 @@ export function AdminProductsManager() {
   };
 
   const uploadImages = (event: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []).filter((file) => file.size <= 5_000_000).slice(0, 20 - images.length);
+    const selected = Array.from(event.target.files || []);
+    const invalidType = selected.some((file) => !ALLOWED_IMAGE_TYPES.has(file.type));
+    const oversized = selected.some((file) => file.size > 5_000_000);
+    if (invalidType || oversized) {
+      setError(invalidType ? "상세 이미지는 JPG, PNG, WEBP 파일만 등록할 수 있습니다." : "상세 이미지는 파일당 5MB 이하로 등록해 주세요.");
+    }
+    const files = selected.filter((file) => ALLOWED_IMAGE_TYPES.has(file.type) && file.size <= 5_000_000).slice(0, 20 - images.length);
     setImages([...images, ...files.map((file) => ({ file, url: URL.createObjectURL(file) }))].slice(0, 20));
     event.target.value = "";
   };
