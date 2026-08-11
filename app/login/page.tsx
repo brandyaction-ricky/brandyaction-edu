@@ -5,10 +5,25 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { ArrowRight, CheckCircle2, LockKeyhole, Mail, Smartphone, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { hasSupabaseEnv } from "@/lib/supabase/config";
+import { getSupabasePublicConfig, hasSupabaseEnv } from "@/lib/supabase/config";
 
 type Mode = "login" | "signup";
 type Provider = "kakao" | "google";
+
+function KakaoIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path fill="currentColor" d="M12 3C6.48 3 2 6.58 2 11c0 2.84 1.85 5.34 4.64 6.76l-.95 3.49a.55.55 0 0 0 .83.61l4.13-2.73c.44.04.89.07 1.35.07 5.52 0 10-3.58 10-8.2S17.52 3 12 3Z"/>
+  </svg>;
+}
+
+function GoogleIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path fill="#4285F4" d="M21.35 12.22c0-.74-.06-1.28-.2-1.84H12v3.52h5.37a4.62 4.62 0 0 1-1.99 2.94l-.02.12 2.89 2.2.2.02c1.84-1.68 2.9-4.16 2.9-6.96Z"/>
+    <path fill="#34A853" d="M12 21.5c2.62 0 4.82-.85 6.43-2.32l-3.07-2.34c-.82.55-1.93.94-3.36.94a5.82 5.82 0 0 1-5.51-3.96l-.12.01-3 2.28-.04.11A9.72 9.72 0 0 0 12 21.5Z"/>
+    <path fill="#FBBC05" d="M6.49 13.82A5.8 5.8 0 0 1 6.17 12c0-.63.11-1.24.3-1.82v-.12L3.43 7.74l-.1.05A9.4 9.4 0 0 0 2.3 12c0 1.51.37 2.94 1.03 4.21l3.16-2.39Z"/>
+    <path fill="#EA4335" d="M12 6.22c1.83 0 3.06.78 3.76 1.42l2.73-2.63C16.81 3.47 14.62 2.5 12 2.5a9.72 9.72 0 0 0-8.67 5.29l3.14 2.39A5.84 5.84 0 0 1 12 6.22Z"/>
+  </svg>;
+}
 
 function nextPath() {
   if (typeof window === "undefined") return "/my";
@@ -84,6 +99,26 @@ export default function LoginPage() {
     }
     setPending(true);
     setMessage("");
+
+    try {
+      const { publicUrl, publishableKey } = getSupabasePublicConfig();
+      const response = await fetch(`${publicUrl}/auth/v1/settings`, {
+        headers: { apikey: publishableKey },
+      });
+      const settings = response.ok ? await response.json() : null;
+      const providerEnabled = settings?.external?.[provider] === true;
+
+      if (!providerEnabled) {
+        setMessage(`${provider === "kakao" ? "카카오" : "Google"} 로그인은 현재 설정 중입니다. 이메일 로그인을 이용해 주세요.`);
+        setPending(false);
+        return;
+      }
+    } catch {
+      setMessage("소셜 로그인 설정을 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      setPending(false);
+      return;
+    }
+
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
@@ -116,7 +151,7 @@ export default function LoginPage() {
     <section className="auth-form-panel"><div className="auth-card">
       <div className="auth-tabs"><button className={mode === "login" ? "active" : ""} onClick={() => { setMode("login"); setMessage(""); }}>로그인</button><button className={mode === "signup" ? "active" : ""} onClick={() => { setMode("signup"); setMessage(""); }}>회원가입</button></div>
       <div className="auth-heading"><span>{mode === "login" ? "WELCOME BACK" : "JOIN BRANDYACTION EDU"}</span><h2>{mode === "login" ? "다시 만나 반갑습니다." : "실행을 시작할 계정을 만드세요."}</h2><p>{mode === "login" ? "수강 중인 클래스와 다음 일정을 확인하세요." : "가입 후 결제한 클래스가 내 학습공간에 연결됩니다."}</p></div>
-      <div className="social-login"><button type="button" className="kakao-button" onClick={() => handleSocial("kakao")} disabled={pending}><b>K</b>카카오로 {mode === "login" ? "로그인" : "시작하기"}</button><button type="button" className="google-button" onClick={() => handleSocial("google")} disabled={pending}><b>G</b>Google로 {mode === "login" ? "로그인" : "시작하기"}</button></div>
+      <div className="social-login"><button type="button" className="kakao-button" onClick={() => handleSocial("kakao")} disabled={pending}><span className="social-icon kakao-icon"><KakaoIcon/></span><span>카카오로 {mode === "login" ? "로그인" : "시작하기"}</span></button><button type="button" className="google-button" onClick={() => handleSocial("google")} disabled={pending}><span className="social-icon google-icon"><GoogleIcon/></span><span>Google로 {mode === "login" ? "로그인" : "시작하기"}</span></button></div>
       <div className="auth-divider"><span>또는 이메일로 계속</span></div>
       <form onSubmit={handleEmail}>
         <div className="auth-fields">{mode === "signup" && <label><span><UserRound/>이름</span><input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" required/></label>}<label><span><Mail/>이메일</span><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@company.com" autoComplete="email" required/></label><label><span><LockKeyhole/>비밀번호</span><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="8자 이상" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={8} required/></label>{mode === "signup" && <label><span><Smartphone/>휴대폰 번호</span><input value={phone} onChange={(event) => setPhone(event.target.value)} inputMode="tel" autoComplete="tel" placeholder="010-0000-0000"/></label>}</div>
