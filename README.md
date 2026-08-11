@@ -55,10 +55,10 @@ supabase/migrations/202608060001_launch_transactions.sql
 
 ## 배포
 
-Vercel 프로젝트에는 위 환경변수를 Production·Preview에 각각 등록합니다. Toss 웹훅은 다음 형식으로 등록하며 토큰은 긴 임의값을 사용합니다.
+운영(`main`)과 테스트(`develop`)는 Vercel 프로젝트와 Supabase 프로젝트를 각각 분리합니다. 상세 승격 절차와 검수 기준은 `docs/ENVIRONMENT_OPERATION_KO.md`에 있습니다. Toss 웹훅은 다음 형식으로 등록하며 환경별로 서로 다른 긴 토큰을 사용합니다.
 
 ```text
 https://<운영도메인>/api/payments/toss/webhook?token=<TOSS_WEBHOOK_TOKEN>
 ```
 
-운영 배포는 `main`의 검증된 커밋을 기준으로 수행합니다.
+`develop`은 테스트 서버에만 자동 배포하고, 운영 배포는 검증 후 `main`에 병합된 커밋만 기준으로 수행합니다.

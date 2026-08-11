@@ -3,9 +3,11 @@ import { createClient } from "@supabase/supabase-js";
 import { getSupabasePublicConfig, hasSupabaseEnv } from "@/lib/supabase/config";
 
 export async function GET() {
+  const environment = process.env.NEXT_PUBLIC_APP_ENV ?? "production";
+
   if (!hasSupabaseEnv()) {
     return NextResponse.json(
-      { ok: false, service: "supabase", reason: "missing_public_environment" },
+      { ok: false, environment, service: "supabase", reason: "missing_public_environment" },
       { status: 503 },
     );
   }
@@ -26,5 +28,10 @@ export async function GET() {
     );
   }
 
-  return NextResponse.json({ ok: true, service: "supabase", publishedCourses: count ?? 0 });
+  return NextResponse.json({
+    ok: true,
+    environment,
+    service: "supabase",
+    publishedCourses: count ?? 0,
+  });
 }
