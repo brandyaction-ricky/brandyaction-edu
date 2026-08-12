@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isDevelopmentAdminBypassEnabled } from "@/lib/app-environment";
 
 export type AdminScope = "products" | "articles" | "orders" | "members" | "settings";
 
@@ -20,6 +21,20 @@ export async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> 
 }
 
 export async function getAdminUser(scope?: AdminScope) {
+  if (isDevelopmentAdminBypassEnabled()) {
+    const { data: profile } = await createAdminClient()
+      .from("profiles")
+      .select("id,email,role")
+      .eq("role", "admin")
+      .eq("status", "active")
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (!profile) return null;
+    return { id: profile.id, email: profile.email, role: "admin" as const };
+  }
+
   const user = await getAuthenticatedUser();
   if (!user) return null;
   const supabase = await createClient();

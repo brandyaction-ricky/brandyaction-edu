@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { hasSupabaseEnv } from "@/lib/supabase/config";
+import { isDevelopmentAdminBypassEnabled } from "@/lib/app-environment";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   if (!hasSupabaseEnv()) redirect("/login?error=service_unavailable");
-  {
+  if (!isDevelopmentAdminBypassEnabled()) {
     const supabase = await createClient();
     const { data: authData, error } = await supabase.auth.getClaims();
     const userId = authData?.claims?.sub;
