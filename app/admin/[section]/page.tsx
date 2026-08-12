@@ -2,10 +2,12 @@ import { redirect } from "next/navigation";
 import { AdminCohortsManager, AdminProductsManager, AdminSettingsManager } from "../../components/admin-managers";
 import { AdminLiveOrdersManager, AdminLiveReviewsManager, AdminMembersManager } from "../../components/admin-operational-managers";
 import { AdminPageTitle, AdminShell } from "../../components/admin-shell";
+import { AdminArticlesManager } from "../../components/admin-articles-manager";
 import { getAdminUser, type AdminScope } from "@/lib/server-auth";
 
 const info:Record<string,{eyebrow:string,title:string,desc:string}>={
   products:{eyebrow:"PRODUCTS",title:"상품 관리",desc:"상품 정보부터 이미지 상세페이지·커리큘럼·전환 픽셀까지 관리합니다."},
+  articles:{eyebrow:"GROWTH",title:"아티클 관리",desc:"카테고리와 게시글, 회원 전용 무료강의 영역을 한곳에서 관리합니다."},
   cohorts:{eyebrow:"COHORTS",title:"기수·회차 관리",desc:"모집 일정부터 라이브 회차와 수강생까지 기수 단위로 운영합니다."},
   members:{eyebrow:"MEMBERS",title:"회원 관리",desc:"가입 회원의 구매·수강 이력과 그룹을 관리합니다."},
   orders:{eyebrow:"ORDERS",title:"주문·결제 관리",desc:"결제, 취소, 환불 내역을 확인하고 처리합니다."},
@@ -16,7 +18,7 @@ const info:Record<string,{eyebrow:string,title:string,desc:string}>={
 export default async function AdminSection({params}:{params:Promise<{section:string}>}){
   const {section}=await params;
   const safeSection=info[section]?section:"products";
-  const scope: AdminScope = safeSection === "orders" ? "orders" : safeSection === "members" ? "members" : safeSection === "settings" ? "settings" : "products";
+  const scope: AdminScope = safeSection === "orders" ? "orders" : safeSection === "members" ? "members" : safeSection === "settings" ? "settings" : safeSection === "articles" ? "articles" : "products";
   if (!await getAdminUser(scope)) redirect("/admin?notice=permission_required");
   const meta=info[safeSection];
   return <AdminShell active={safeSection}><AdminPageTitle eyebrow={meta.eyebrow} title={meta.title} description={meta.desc} action={<SectionAction section={safeSection}/>}/><SectionContent section={safeSection}/></AdminShell>;
@@ -29,6 +31,7 @@ function SectionAction({section}:{section:string}){
 
 function SectionContent({section}:{section:string}){
   if(section==="products")return <AdminProductsManager/>;
+  if(section==="articles")return <AdminArticlesManager/>;
   if(section==="cohorts")return <AdminCohortsManager/>;
   if(section==="settings")return <AdminSettingsManager/>;
   if(section==="orders")return <AdminLiveOrdersManager/>;

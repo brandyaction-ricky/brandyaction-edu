@@ -1,0 +1,40 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ArrowLeft, ArrowRight } from "lucide-react";
+import { BrandHeader } from "../../components/brand-header";
+import { getPublicArticle } from "@/lib/article-data";
+import { articleReadingMinutes } from "@/lib/articles";
+
+export const dynamic = "force-dynamic";
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const article = await getPublicArticle(slug);
+  if (!article) return { title: "아티클을 찾을 수 없습니다" };
+  return { title: `${article.seoTitle || article.title} | 브랜디액션 에듀`, description: article.seoDescription || article.summary };
+}
+
+function dateLabel(value: string) {
+  return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(value)).replace(/\.\s/g, ". ").trim();
+}
+
+export default async function ArticleDetailPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const article = await getPublicArticle(slug);
+  if (!article) notFound();
+  return <main className="article-detail-page"><BrandHeader/>
+    <article>
+      <header className="article-detail-head"><div className="article-reading-container"><Link href="/articles" className="article-back"><ArrowLeft/> 아티클 목록</Link><span className="article-label">{article.categoryName}</span><h1>{article.title}</h1><p>{article.summary}</p><div className="article-meta"><span>{dateLabel(article.publishedAt)}</span><span>{articleReadingMinutes(article.blocks)}분 읽기</span><span>BRANDYACTION EDU</span></div></div></header>
+      {article.coverImageUrl && <div className="article-cover container" role="img" aria-label={article.coverImageAlt} style={{ backgroundImage: `url(${article.coverImageUrl})` }}/>}
+      <div className="article-reading-container article-body">{article.blocks.map((block) => {
+        if (block.type === "heading") return <h2 key={block.id}>{block.text}</h2>;
+        if (block.type === "quote") return <blockquote key={block.id}>{block.text}</blockquote>;
+        if (block.type === "list") return <ul key={block.id}>{block.text.split("\n").filter(Boolean).map((item, index) => <li key={`${block.id}-${index}`}>{item.replace(/^[-•]\s*/, "")}</li>)}</ul>;
+        if (block.type === "image") return block.imageUrl ? <figure key={block.id}><div role="img" aria-label={block.alt || "아티클 본문 이미지"} style={{ backgroundImage: `url(${block.imageUrl})` }}/>{block.text && <figcaption>{block.text}</figcaption>}</figure> : null;
+        return <p key={block.id}>{block.text}</p>;
+      })}</div>
+      <footer className="article-detail-cta"><div className="article-reading-container"><span>READ · THINK · ACT</span><h2>읽는 데서 멈추지 않고,<br/>내 기준을 실행으로 옮겨보세요.</h2><div><Link href="/articles">다른 아티클 보기 <ArrowLeft/></Link><Link href="/classes">클래스 확인하기 <ArrowRight/></Link></div></div></footer>
+    </article>
+  </main>;
+}

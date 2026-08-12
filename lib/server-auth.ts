@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-export type AdminScope = "products" | "orders" | "members" | "settings";
+export type AdminScope = "products" | "articles" | "orders" | "members" | "settings";
 
 export type AuthenticatedUser = {
   id: string;
@@ -33,7 +33,7 @@ export async function getAdminUser(scope?: AdminScope) {
     if (scope === "settings") return null;
     const { data } = await createAdminClient().from("site_settings").select("value").eq("key", "operator_preferences").maybeSingle();
     const preferences = data?.value && typeof data.value === "object" && !Array.isArray(data.value) ? data.value as Record<string, unknown> : {};
-    const key = scope === "products" ? "staffCanManageProducts" : scope === "orders" ? "staffCanManageOrders" : "staffCanManageMembers";
+    const key = scope === "products" || scope === "articles" ? "staffCanManageProducts" : scope === "orders" ? "staffCanManageOrders" : "staffCanManageMembers";
     if (preferences[key] !== true) return null;
   }
   return { ...user, role: profile.role as "staff" | "admin" };

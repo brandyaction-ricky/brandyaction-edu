@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { BookOpen, ChevronDown, CreditCard, GraduationCap, LayoutDashboard, LogOut, MessageSquareText, Settings, Users } from "lucide-react";
+import { BookOpen, ChevronDown, CreditCard, FileText, GraduationCap, LayoutDashboard, LogOut, MessageSquareText, Settings, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const nav = [
   { id:"dashboard",label:"대시보드",href:"/admin",icon:LayoutDashboard },
   { id:"products",label:"상품 관리",href:"/admin/products",icon:BookOpen },
+  { id:"articles",label:"아티클 관리",href:"/admin/articles",icon:FileText },
   { id:"cohorts",label:"기수·회차 관리",href:"/admin/cohorts",icon:GraduationCap },
   { id:"members",label:"회원 관리",href:"/admin/members",icon:Users },
   { id:"orders",label:"주문·결제",href:"/admin/orders",icon:CreditCard },

@@ -40,6 +40,7 @@ export const defaultSiteSettings: SiteSettingsBundle = {
   },
   navigation: [
     { id: "classes", label: "클래스", href: "/classes", enabled: true },
+    { id: "articles", label: "아티클", href: "/articles", enabled: true },
     { id: "philosophy", label: "교육 철학", href: "/#philosophy", enabled: true },
     { id: "reviews", label: "후기", href: "/#reviews", enabled: true },
   ],
