@@ -3,8 +3,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, Check, Quote } from "lucide-react";
-import type { PublicReview } from "@/lib/education-data";
+import { ArrowLeft, ArrowRight, Check, Play, Quote } from "lucide-react";
+import type { PublicReview, PublicReviewVideo } from "@/lib/education-data";
 
 type BannerData = { image?: string; eyebrow?: string; title?: string; copy?: string; link?: string };
 type PixelData = { meta?: string; kakao?: string; google?: string; enabled?: boolean };
@@ -22,19 +22,23 @@ export function LandingBanner({banner={}}:{banner?:BannerData}) {
   </div>;
 }
 
-export function ReviewSlider({reviews}:{reviews:PublicReview[]}){
+export function ReviewSlider({reviews,videos=[]}:{reviews:PublicReview[];videos?:PublicReviewVideo[]}){
   const [page,setPage]=useState(0);
   const [paused,setPaused]=useState(false);
   const [touchStart,setTouchStart]=useState<number|null>(null);
+  const [playing,setPlaying]=useState<string|null>(null);
   const featured=reviews;
-  const pageCount=Math.max(1,Math.ceil(featured.length/2));
+  const videoMode=videos.length>0;
+  const pageCount=Math.max(1,videoMode?videos.length:Math.ceil(featured.length/2));
   useEffect(()=>{if(paused||pageCount<=1)return;const timer=window.setInterval(()=>setPage(v=>(v+1)%pageCount),6000);return()=>window.clearInterval(timer)},[pageCount,paused]);
   const safePage=Math.min(page,pageCount-1);
   const visible=useMemo(()=>featured.slice(safePage*2,safePage*2+2),[featured,safePage]);
-  return <div className="review-slider" tabIndex={0} onMouseEnter={()=>setPaused(true)} onMouseLeave={()=>setPaused(false)} onFocusCapture={()=>setPaused(true)} onBlurCapture={()=>setPaused(false)} onKeyDown={event=>{if(event.key==="ArrowLeft")setPage((page+pageCount-1)%pageCount);if(event.key==="ArrowRight")setPage((page+1)%pageCount)}} onTouchStart={event=>setTouchStart(event.touches[0]?.clientX??null)} onTouchEnd={event=>{if(touchStart===null)return;const distance=(event.changedTouches[0]?.clientX??touchStart)-touchStart;if(Math.abs(distance)>45)setPage(distance<0?(page+1)%pageCount:(page+pageCount-1)%pageCount);setTouchStart(null)}}>
+  const video=videoMode?videos[safePage]:null;
+  const move=(next:number)=>{setPlaying(null);setPage(next)};
+  return <div className="review-slider" tabIndex={0} onMouseEnter={()=>setPaused(true)} onMouseLeave={()=>setPaused(false)} onFocusCapture={()=>setPaused(true)} onBlurCapture={()=>setPaused(false)} onKeyDown={event=>{if(event.key==="ArrowLeft")move((page+pageCount-1)%pageCount);if(event.key==="ArrowRight")move((page+1)%pageCount)}} onTouchStart={event=>setTouchStart(event.touches[0]?.clientX??null)} onTouchEnd={event=>{if(touchStart===null)return;const distance=(event.changedTouches[0]?.clientX??touchStart)-touchStart;if(Math.abs(distance)>45)move(distance<0?(page+1)%pageCount:(page+pageCount-1)%pageCount);setTouchStart(null)}}>
     <div className="review-slider-top"><div><span className="section-kicker">REAL REVIEW</span><h2>먼저 실행한 사람들의<br/>구체적인 변화</h2></div><div className="review-slider-controls"><span><b>{String(safePage+1).padStart(2,"0")}</b> / {String(pageCount).padStart(2,"0")}</span><button aria-label="이전 후기" onClick={()=>setPage((safePage+pageCount-1)%pageCount)}><ArrowLeft/></button><button aria-label="다음 후기" onClick={()=>setPage((safePage+1)%pageCount)}><ArrowRight/></button></div></div>
-    <div className="review-slide-track" aria-live="polite" key={`${safePage}-${featured.length}`}>{visible.length?visible.map((review,index)=><article className="review-slide-card" key={review.id}><Quote/><div className="review-result"><Check/> 평점 {review.rating.toFixed(1)}</div><p>“{review.quote}”</p><footer><span className="avatar">{review.name[0]}</span><div><strong>{review.name} 수강생</strong><small>{review.className} · {review.cohortName}</small></div><span className="verified"><Check/> 실제 수강생</span></footer><b className="review-number">{String(safePage*2+index+1).padStart(2,"0")}</b></article>):<div className="review-slider-empty"><Quote/><strong>아직 공개된 후기가 없습니다.</strong><span>수강생 후기가 승인되면 이곳에 표시됩니다.</span></div>}</div>
-    <div className="review-dots" aria-label="후기 페이지">{Array.from({length:pageCount},(_,i)=><button key={i} aria-label={`${i+1}번째 후기`} className={i===safePage?"active":""} onClick={()=>setPage(i)}/>)}</div>
+    {video?<article className="review-video-card" key={video.id}><div className="review-video-frame">{playing===video.id?<iframe src={`${video.embedUrl}?autoplay=1`} title={video.title} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen/>:<button type="button" onClick={()=>{setPlaying(video.id);setPaused(true)}} style={video.thumbnailUrl?{backgroundImage:`linear-gradient(rgba(0,0,0,.12),rgba(0,0,0,.42)),url(${video.thumbnailUrl})`}:undefined} aria-label={`${video.title} 영상 재생`}><span><Play fill="currentColor"/></span><small>영상 후기 재생</small></button>}</div><div className="review-video-copy"><span>VIDEO TESTIMONIAL · {String(safePage+1).padStart(2,"0")}</span><h3>{video.title}</h3>{video.description&&<p>{video.description}</p>}<footer><strong>{video.reviewerName}</strong><small>{video.reviewerRole}</small><em><Check/> 실제 후기</em></footer></div></article>:<div className="review-slide-track" aria-live="polite" key={`${safePage}-${featured.length}`}>{visible.length?visible.map((review,index)=><article className="review-slide-card" key={review.id}><Quote/><div className="review-result"><Check/> 평점 {review.rating.toFixed(1)}</div><p>“{review.quote}”</p><footer><span className="avatar">{review.name[0]}</span><div><strong>{review.name} 수강생</strong><small>{review.className} · {review.cohortName}</small></div><span className="verified"><Check/> 실제 수강생</span></footer><b className="review-number">{String(safePage*2+index+1).padStart(2,"0")}</b></article>):<div className="review-slider-empty"><Quote/><strong>아직 공개된 후기가 없습니다.</strong><span>수강생 후기 또는 영상 후기가 등록되면 이곳에 표시됩니다.</span></div>}</div>}
+    <div className="review-dots" aria-label="후기 페이지">{Array.from({length:pageCount},(_,i)=><button key={i} aria-label={`${i+1}번째 후기`} className={i===safePage?"active":""} onClick={()=>move(i)}/>)}</div>
   </div>
 }
 

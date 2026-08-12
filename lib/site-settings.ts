@@ -39,10 +39,9 @@ export const defaultSiteSettings: SiteSettingsBundle = {
     businessAddress: "충청남도 천안시 서북구 천안천4길 32 506호",
   },
   navigation: [
-    { id: "classes", label: "클래스", href: "/classes", enabled: true },
-    { id: "articles", label: "아티클", href: "/articles", enabled: true },
-    { id: "philosophy", label: "교육 철학", href: "/#philosophy", enabled: true },
-    { id: "reviews", label: "후기", href: "/#reviews", enabled: true },
+    { id: "classes", label: "클래스 소개", href: "/classes", enabled: true },
+    { id: "reviews", label: "리얼 후기", href: "/#reviews", enabled: true },
+    { id: "articles", label: "블로그", href: "/articles", enabled: true },
   ],
   commerce: {
     provider: "토스페이먼츠",

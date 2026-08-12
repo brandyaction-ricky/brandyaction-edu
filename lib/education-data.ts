@@ -3,6 +3,7 @@ import { type ClassItem, type CurriculumWeek, type Session } from "@/app/data";
 import { getSupabasePublicConfig, hasSupabaseEnv } from "@/lib/supabase/config";
 import { safePublicHref } from "@/lib/safe-url";
 import { publicReviewerName } from "@/lib/review-display";
+import { reviewVideoEmbedUrl, reviewVideoThumbnail } from "@/lib/review-video";
 
 type CourseRow = {
   id: string;
@@ -47,6 +48,7 @@ type CourseThumbnailRow = { course_id: string; storage_path: string };
 export type PublicBanner = { image?: string; eyebrow?: string; title?: string; copy?: string; link?: string };
 export type PublicCourseAppearance = { images: string[]; pixels: { meta?: string; kakao?: string; google?: string; enabled?: boolean } };
 export type PublicReview = { id: string; name: string; className: string; cohortName: string; rating: number; quote: string };
+export type PublicReviewVideo = { id: string; title: string; reviewerName: string; reviewerRole: string; description: string; embedUrl: string; thumbnailUrl: string };
 export type PublicSupport = { supportEmail: string; refundEmail: string };
 
 const cohortPriority: Record<CohortRow["status"], number> = {
@@ -300,6 +302,19 @@ export async function getPublishedReviews(courseSlug?: string): Promise<PublicRe
       const course = Array.isArray(review.courses) ? review.courses[0] : review.courses;
       const cohort = Array.isArray(review.cohorts) ? review.cohorts[0] : review.cohorts;
       return { id: review.id, name: publicReviewerName(review.author_name, review.author_nickname), className: course?.title || "브랜디액션 클래스", cohortName: cohort?.name || "수강생", rating: Number(review.rating), quote: review.body };
+    });
+  } catch { return []; }
+}
+
+export async function getPublishedReviewVideos(): Promise<PublicReviewVideo[]> {
+  if (!hasSupabaseEnv()) return [];
+  try {
+    const { data, error } = await publicClient().from("review_videos").select("id,title,reviewer_name,reviewer_role,description,video_url,thumbnail_url").eq("is_published", true).order("display_order").order("created_at", { ascending: false }).limit(12);
+    if (error) return [];
+    return (data || []).flatMap((video) => {
+      const embedUrl = reviewVideoEmbedUrl(video.video_url);
+      if (!embedUrl) return [];
+      return [{ id: video.id, title: video.title, reviewerName: video.reviewer_name, reviewerRole: video.reviewer_role || "수강생", description: video.description || "", embedUrl, thumbnailUrl: video.thumbnail_url || reviewVideoThumbnail(video.video_url) || "" }];
     });
   } catch { return []; }
 }

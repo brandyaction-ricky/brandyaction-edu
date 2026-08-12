@@ -4,11 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Check,
   Download,
+  Eye,
   RefreshCw,
+  Save,
   Search,
   ShieldCheck,
   Trash2,
   UserPlus,
+  Video,
 } from "lucide-react";
 
 type Member = {
@@ -72,6 +75,18 @@ type AdminReview = {
   courses: { title: string } | Array<{ title: string }> | null;
   cohorts: { name: string } | Array<{ name: string }> | null;
 };
+type AdminReviewVideo = {
+  id: string;
+  title: string;
+  reviewer_name: string;
+  reviewer_role: string | null;
+  description: string | null;
+  video_url: string;
+  thumbnail_url: string | null;
+  is_published: boolean;
+  display_order: number;
+};
+const emptyReviewVideo = { title: "", reviewerName: "", reviewerRole: "수강생", description: "", videoUrl: "", thumbnailUrl: "", isPublished: false, displayOrder: 0 };
 
 function one<T>(value: T | T[] | null) {
   return Array.isArray(value) ? value[0] || null : value;
@@ -272,7 +287,7 @@ export function AdminMembersManager() {
                 >
                   <option value="student">일반 회원</option>
                   <option value="staff">스태프</option>
-                  <option value="admin">관리자</option>
+                  <option value="admin">최고 관리자</option>
                 </select>
                 <strong>
                   {
@@ -726,6 +741,9 @@ export function AdminLiveOrdersManager() {
 
 export function AdminLiveReviewsManager() {
   const [reviews, setReviews] = useState<AdminReview[]>([]);
+  const [videos, setVideos] = useState<AdminReviewVideo[]>([]);
+  const [videoDraft, setVideoDraft] = useState({ ...emptyReviewVideo });
+  const [editingVideoId, setEditingVideoId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -733,8 +751,12 @@ export function AdminLiveReviewsManager() {
     setLoading(true);
     setError("");
     try {
-      const result = await requestJson<{ reviews?: AdminReview[] }>("/api/admin/reviews", { cache: "no-store" });
-      setReviews(result.reviews || []);
+      const [reviewResult, videoResult] = await Promise.all([
+        requestJson<{ reviews?: AdminReview[] }>("/api/admin/reviews", { cache: "no-store" }),
+        requestJson<{ videos?: AdminReviewVideo[] }>("/api/admin/review-videos", { cache: "no-store" }),
+      ]);
+      setReviews(reviewResult.reviews || []);
+      setVideos(videoResult.videos || []);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "리뷰를 불러오지 못했습니다.");
     } finally {
@@ -769,6 +791,22 @@ export function AdminLiveReviewsManager() {
       (value) => value.toLowerCase().includes(query.toLowerCase()),
     ),
   );
+  const editVideo = (video: AdminReviewVideo) => {
+    setEditingVideoId(video.id);
+    setVideoDraft({ title: video.title, reviewerName: video.reviewer_name, reviewerRole: video.reviewer_role || "", description: video.description || "", videoUrl: video.video_url, thumbnailUrl: video.thumbnail_url || "", isPublished: video.is_published, displayOrder: video.display_order });
+  };
+  const resetVideo = () => { setEditingVideoId(null); setVideoDraft({ ...emptyReviewVideo }); };
+  const saveVideo = async () => {
+    try {
+      await requestJson("/api/admin/review-videos", { method: editingVideoId ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editingVideoId || undefined, ...videoDraft }) });
+      resetVideo(); await load();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "영상 후기를 저장하지 못했습니다."); }
+  };
+  const removeVideo = async (video: AdminReviewVideo) => {
+    if (!window.confirm(`‘${video.title}’ 영상 후기를 삭제할까요?`)) return;
+    try { await requestJson(`/api/admin/review-videos?id=${encodeURIComponent(video.id)}`, { method: "DELETE" }); if (editingVideoId === video.id) resetVideo(); await load(); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "영상 후기를 삭제하지 못했습니다."); }
+  };
   if (loading)
     return (
       <section className="admin-panel admin-loading-state">
@@ -778,6 +816,10 @@ export function AdminLiveReviewsManager() {
     );
   return (
     <>
+      <section className="admin-panel review-video-manager">
+        <header><div><span><Video/></span><div><h2>영상 후기 관리</h2><p>공개한 영상은 메인 리얼 후기 섹션에 등록 순서대로 노출됩니다.</p></div></div><strong>{videos.filter((video)=>video.is_published).length}개 공개</strong></header>
+        <div className="review-video-admin-grid"><div className="review-video-form"><h3>{editingVideoId ? "영상 후기 수정" : "새 영상 후기 등록"}</h3><div className="form-two"><label>영상 제목<input value={videoDraft.title} onChange={(event)=>setVideoDraft({...videoDraft,title:event.target.value})} placeholder="수강 후 달라진 구체적인 변화"/></label><label>후기자 이름<input value={videoDraft.reviewerName} onChange={(event)=>setVideoDraft({...videoDraft,reviewerName:event.target.value})} placeholder="김OO"/></label></div><div className="form-two"><label>후기자 설명<input value={videoDraft.reviewerRole} onChange={(event)=>setVideoDraft({...videoDraft,reviewerRole:event.target.value})} placeholder="자영업 마케팅 1기 수강생"/></label><label>노출 순서<input type="number" min="0" value={videoDraft.displayOrder} onChange={(event)=>setVideoDraft({...videoDraft,displayOrder:Number(event.target.value)})}/></label></div><label>영상 URL<input value={videoDraft.videoUrl} onChange={(event)=>setVideoDraft({...videoDraft,videoUrl:event.target.value})} placeholder="YouTube 또는 Vimeo URL"/></label><label>썸네일 URL <small>선택 · YouTube는 자동 생성</small><input value={videoDraft.thumbnailUrl} onChange={(event)=>setVideoDraft({...videoDraft,thumbnailUrl:event.target.value})} placeholder="https://..."/></label><label>영상 설명<textarea value={videoDraft.description} onChange={(event)=>setVideoDraft({...videoDraft,description:event.target.value})} placeholder="영상에서 확인할 수 있는 변화와 결과를 요약하세요."/></label><label className="review-video-publish"><input type="checkbox" checked={videoDraft.isPublished} onChange={(event)=>setVideoDraft({...videoDraft,isPublished:event.target.checked})}/><span>메인 리얼 후기 섹션에 공개</span></label><div className="review-video-form-actions">{editingVideoId&&<button className="admin-outline" onClick={resetVideo}>취소</button>}<button className="admin-primary" onClick={()=>void saveVideo()} disabled={!videoDraft.title.trim()||!videoDraft.reviewerName.trim()||!videoDraft.videoUrl.trim()}><Save/>{editingVideoId?"수정 저장":"영상 등록"}</button></div></div><div className="review-video-admin-list">{videos.length?videos.map((video)=><article key={video.id}><div className="review-video-admin-thumb" style={video.thumbnail_url?{backgroundImage:`url(${video.thumbnail_url})`}:undefined}><Video/></div><div><span>{video.is_published?"공개":"비공개"} · 순서 {video.display_order}</span><strong>{video.title}</strong><small>{video.reviewer_name} · {video.reviewer_role||"수강생"}</small></div><div><a className="admin-outline" href={video.video_url} target="_blank" rel="noreferrer"><Eye/>보기</a><button className="admin-outline" onClick={()=>editVideo(video)}>수정</button><button className="admin-outline danger" onClick={()=>void removeVideo(video)}><Trash2/></button></div></article>):<div className="review-video-empty"><Video/><strong>등록된 영상 후기가 없습니다.</strong><span>왼쪽 입력창에서 첫 영상을 등록하세요.</span></div>}</div></div>
+      </section>
       <div className="review-admin-summary">
         <article>
           <span>전체 리뷰</span>

@@ -7,10 +7,10 @@ export async function GET() {
   if (!operator) return NextResponse.json({ error: "관리자 권한이 필요합니다." }, { status: 403 });
   const admin = createAdminClient();
   const [{ data: profiles, error }, { data: cohorts }] = await Promise.all([
-    admin.from("profiles").select("id,email,full_name,phone,role,status,created_at,enrollments(id,status,course_id,cohort_id,courses(title),cohorts(name)),orders(total_amount,status,payments(approved_amount,cancelled_amount))").order("created_at", { ascending: false }),
+    admin.from("profiles").select("id,email,full_name,phone,role,status,created_at,enrollments:enrollments!enrollments_user_id_fkey(id,status,course_id,cohort_id,courses(title),cohorts(name)),orders(total_amount,status,payments(approved_amount,cancelled_amount))").order("created_at", { ascending: false }),
     admin.from("cohorts").select("id,name,status,courses(id,title)").neq("status", "cancelled").order("operation_start_at", { ascending: false }),
   ]);
-  if (error) return NextResponse.json({ error: "회원 목록을 불러오지 못했습니다." }, { status: 500 });
+  if (error) return NextResponse.json({ error: `회원 목록을 불러오지 못했습니다. (${error.code || "QUERY_ERROR"})` }, { status: 500 });
   return NextResponse.json({ members: profiles || [], cohorts: cohorts || [], operatorRole: operator.role });
 }
 
@@ -24,6 +24,11 @@ export async function PATCH(request: Request) {
   if (!target) return NextResponse.json({ error: "회원을 찾을 수 없습니다." }, { status: 404 });
   if (operator.role === "staff" && target.role !== "student") return NextResponse.json({ error: "스태프는 다른 운영자 계정을 변경할 수 없습니다." }, { status: 403 });
   if (body.userId === operator.id && body.status && body.status !== "active") return NextResponse.json({ error: "현재 로그인한 운영자 계정은 직접 정지할 수 없습니다." }, { status: 400 });
+  const removesActiveAdmin = target.role === "admin" && target.status === "active" && ((body.role && body.role !== "admin") || (body.status && body.status !== "active"));
+  if (removesActiveAdmin) {
+    const { count } = await admin.from("profiles").select("id", { count: "exact", head: true }).eq("role", "admin").eq("status", "active");
+    if ((count || 0) <= 1) return NextResponse.json({ error: "마지막 활성 최고 관리자는 강등하거나 정지할 수 없습니다." }, { status: 400 });
+  }
   const changes: Record<string, string> = {};
   if (body.status && ["active", "suspended", "withdrawn"].includes(body.status)) changes.status = body.status;
   if (body.role && ["student", "staff", "admin"].includes(body.role)) {

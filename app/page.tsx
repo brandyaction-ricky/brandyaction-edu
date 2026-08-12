@@ -12,12 +12,12 @@ import { BrandHeader } from "./components/brand-header";
 import { ClassCard } from "./components/class-card";
 import { HomeExperience } from "./components/home-experience";
 import { LandingBanner, ReviewSlider } from "./components/site-live-content";
-import { getPublicBanner, getPublishedClasses, getPublishedReviews } from "@/lib/education-data";
+import { getPublicBanner, getPublishedClasses, getPublishedReviews, getPublishedReviewVideos } from "@/lib/education-data";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const [classes,banner,reviews] = await Promise.all([getPublishedClasses(),getPublicBanner(),getPublishedReviews()]);
+  const [classes,banner,reviews,reviewVideos] = await Promise.all([getPublishedClasses(),getPublicBanner(),getPublishedReviews(),getPublishedReviewVideos()]);
   const featured = classes[0];
   return (
     <main>
@@ -97,7 +97,7 @@ export default async function Home() {
       </section>
 
       <section className="section review-section" id="reviews" data-home-reveal>
-        <div className="container"><ReviewSlider reviews={reviews}/></div>
+        <div className="container"><ReviewSlider reviews={reviews} videos={reviewVideos}/></div>
       </section>
 
       <section className="final-cta" data-home-reveal>

@@ -40,7 +40,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [agreements, setAgreements] = useState({ terms: false, privacy: false });
+  const [agreements, setAgreements] = useState({ terms: false, privacy: false, marketing: false });
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const configured = hasSupabaseEnv();
@@ -94,7 +94,7 @@ export default function LoginPage() {
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath())}`,
-        data: { phone: normalizePhone(phone), full_name: name.trim(), terms_version: POLICY_VERSION, privacy_version: POLICY_VERSION, consented_at: new Date().toISOString() },
+        data: { phone: normalizePhone(phone), full_name: name.trim(), terms_version: POLICY_VERSION, privacy_version: POLICY_VERSION, consented_at: new Date().toISOString(), marketing_consent: agreements.marketing },
       },
     });
     if (error) {
@@ -180,7 +180,7 @@ export default function LoginPage() {
       <form onSubmit={handleEmail}>
         <div className="auth-fields">{mode === "signup" && <label><span><UserRound/>이름</span><input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" required/></label>}<label><span><Mail/>이메일</span><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@company.com" autoComplete="email" required/></label><label><span><LockKeyhole/>비밀번호</span><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder={mode === "signup" ? "영문+숫자 8자 이상" : "비밀번호"} autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={8} pattern={mode === "signup" ? "(?=.*[A-Za-z])(?=.*[0-9]).{8,}" : undefined} title={mode === "signup" ? PASSWORD_REQUIREMENT : undefined} required/></label>{mode === "signup" && <label><span><Smartphone/>휴대폰 번호</span><input value={phone} onChange={(event) => setPhone(event.target.value)} inputMode="tel" autoComplete="tel" placeholder="010-0000-0000"/></label>}</div>
         {mode === "login" && <div className="auth-options"><span>보안 연결로 로그인합니다.</span><button type="button" onClick={handleReset}>비밀번호 재설정</button></div>}
-        {mode === "signup" && <div className="signup-agreements"><label><input type="checkbox" checked={agreements.terms} onChange={(event)=>setAgreements({...agreements,terms:event.target.checked})}/><span>[필수] <Link href="/policies/terms" target="_blank">이용약관</Link> 동의</span></label><label><input type="checkbox" checked={agreements.privacy} onChange={(event)=>setAgreements({...agreements,privacy:event.target.checked})}/><span>[필수] <Link href="/policies/privacy" target="_blank">개인정보처리방침</Link> 동의</span></label></div>}
+        {mode === "signup" && <div className="signup-agreements"><label><input type="checkbox" checked={agreements.terms} onChange={(event)=>setAgreements({...agreements,terms:event.target.checked})}/><span>[필수] <Link href="/policies/terms" target="_blank">이용약관</Link> 동의</span></label><label><input type="checkbox" checked={agreements.privacy} onChange={(event)=>setAgreements({...agreements,privacy:event.target.checked})}/><span>[필수] <Link href="/policies/privacy" target="_blank">개인정보처리방침</Link> 동의</span></label><label><input type="checkbox" checked={agreements.marketing} onChange={(event)=>setAgreements({...agreements,marketing:event.target.checked})}/><span>[선택] 클래스·무료강의 등 마케팅 정보 수신 동의</span></label></div>}
         {message && <p className="auth-message" role="status">{message}</p>}
         <button className="button button-primary button-lg full auth-submit" type="submit" disabled={pending || (mode === "signup" && (!agreements.terms || !agreements.privacy))}>{pending ? "처리 중..." : mode === "login" ? "로그인" : "이메일 인증 후 가입"}<ArrowRight/></button>
       </form>

@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Menu, X } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { defaultSiteSettings, loadPublicHeaderSettings } from "@/lib/site-settings";
 
 export function BrandHeader() {
@@ -17,14 +18,9 @@ export function BrandHeader() {
     window.addEventListener("brandyaction:settings-updated", refresh);
     return () => { active = false; window.removeEventListener("brandyaction:settings-updated", refresh); };
   }, []);
-  const logo = useMemo(() => {
-    const parts = header.basic.siteName.trim().split(/\s+/);
-    const accent = parts.pop() || "EDU";
-    return { prefix: parts.length ? `${parts.join(" ")} ` : "", accent };
-  }, [header.basic.siteName]);
   return <header className="site-header">
     <div className="container header-inner">
-      <Link href="/" className="brand-logo">{logo.prefix}<span>{logo.accent}</span></Link>
+      <Link href="/" className="brand-logo" aria-label="Brandy Action 홈"><Image src="/brandy-action-logo.png" alt="Brandy Action" width={311} height={79} priority/></Link>
       <nav id="main-navigation" className={open ? "main-nav open" : "main-nav"} aria-label="주요 메뉴">
         {header.navigation.map((item) => {
           const path = item.href.split("#")[0];
