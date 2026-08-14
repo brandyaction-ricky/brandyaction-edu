@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { useSearchParams } from "next/navigation";
 import { Check, Filter, RefreshCw, Search, Tag, UserPlus, Users, X } from "lucide-react";
@@ -47,7 +47,7 @@ export function AdminMembersManager() {
   };
   useEffect(() => { void Promise.resolve().then(load); }, []);
   const selected = data.members.find((member) => member.id === selectedId) || null;
-  const memberTagIds = (memberId: string) => data.memberTags.filter((row) => row.member_id === memberId).map((row) => row.tag_id);
+  const memberTagIds = useCallback((memberId: string) => data.memberTags.filter((row) => row.member_id === memberId).map((row) => row.tag_id), [data.memberTags]);
   const courses = useMemo(() => {
     const map = new Map<string, string>();
     data.cohorts.forEach((cohort) => { const course = one(cohort.courses); if (course) map.set(course.id, course.title); });
@@ -63,7 +63,7 @@ export function AdminMembersManager() {
     const tagMatch = tagId === "all" || memberTagIds(member.id).includes(tagId);
     const statusMatch = status === "all" || member.status === status;
     return textMatch && courseMatch && cohortMatch && tagMatch && statusMatch;
-  }), [data, query, courseId, cohortId, tagId, status]);
+  }), [data, query, courseId, cohortId, tagId, status, memberTagIds]);
   const mutate = async (body: Record<string, unknown>, success: string) => {
     setSaving(true); setError(""); setMessage("");
     try { await request({ method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); setMessage(success); await load(); }

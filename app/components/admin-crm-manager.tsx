@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { AlertTriangle, Check, ChevronRight, Edit3, Megaphone, MessageSquareText, RefreshCw, Save, Send, Tags, Trash2, Users } from "lucide-react";
 
@@ -36,8 +36,8 @@ export function AdminCrmManager() {
   const load = async () => { setError(""); try { setData(await api() as unknown as Data); } catch (reason) { setError(reason instanceof Error ? reason.message : "CRM 데이터를 불러오지 못했습니다."); } finally { setLoading(false); } };
   useEffect(() => { void Promise.resolve().then(load); }, []);
   const mutate = async (body: Record<string, unknown>, success: string) => { setSaving(true); setError(""); setMessage(""); try { const result = await api(body); setMessage(success); await load(); return result; } catch (reason) { setError(reason instanceof Error ? reason.message : "저장하지 못했습니다."); return null; } finally { setSaving(false); } };
-  const memberTagIds = (memberId: string) => data.memberTags.filter((row) => row.member_id === memberId).map((row) => row.tag_id);
-  const targetMembers = useMemo(() => campaign.targetTagId ? data.members.filter((member) => memberTagIds(member.id).includes(campaign.targetTagId)) : data.members, [data, campaign.targetTagId]);
+  const memberTagIds = useCallback((memberId: string) => data.memberTags.filter((row) => row.member_id === memberId).map((row) => row.tag_id), [data.memberTags]);
+  const targetMembers = useMemo(() => campaign.targetTagId ? data.members.filter((member) => memberTagIds(member.id).includes(campaign.targetTagId)) : data.members, [data.members, campaign.targetTagId, memberTagIds]);
   const selectedTag = data.tags.find((tag) => tag.id === campaign.targetTagId) || null;
   const selectedTemplate = data.templates.find((template) => template.id === campaign.templateId) || null;
   const requiresConsent = selectedTemplate?.purpose !== "transactional";

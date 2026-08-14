@@ -20,7 +20,11 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
   const params = await searchParams;
   const requested = Number(params.period || 30);
   const period = periodOptions.some((option) => option.value === requested) ? requested : 30;
-  const start = new Date(Date.now() - period * 86_400_000).toISOString();
+  // This is a force-dynamic server component; the request timestamp intentionally
+  // changes between requests and is not client-rendered state.
+  // eslint-disable-next-line react-hooks/purity
+  const requestTimestamp = Date.now();
+  const start = new Date(requestTimestamp - period * 86_400_000).toISOString();
   const admin = createAdminClient();
   const [ordersResult, membersResult, enrollmentsResult, cohortsResult, reviewsResult, articlesResult, campaignsResult] = await Promise.all([
     admin.from("orders").select("id,user_id,order_number,status,total_amount,customer_name,created_at,order_items(item_name,course_id,cohort_id,courses(title),cohorts(name)),payments(approved_amount,cancelled_amount,method)").gte("created_at", start).order("created_at", { ascending: false }),
@@ -52,7 +56,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
     ...(sessionIssues.length ? [{ title: "회차 운영 정보 누락", body: `일정 또는 입장·다시보기 링크가 비어 있는 회차 ${sessionIssues.length}개입니다.` }] : []),
   ];
   const bars = Array.from({ length: 12 }, (_, index) => {
-    const bucketEnd = Date.now() - (11 - index) * (period / 12) * 86_400_000;
+    const bucketEnd = requestTimestamp - (11 - index) * (period / 12) * 86_400_000;
     const bucketStart = bucketEnd - (period / 12) * 86_400_000;
     const value = paidOrders.filter((order) => { const time = Date.parse(order.created_at); return time >= bucketStart && time < bucketEnd; }).reduce((sum, order) => { const payment = order.payments?.[0]; return sum + Math.max(0, (payment?.approved_amount || 0) - (payment?.cancelled_amount || 0)); }, 0);
     return { label: new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "2-digit", day: "2-digit" }).format(new Date(bucketEnd)).replace(/\.\s?/g, ".").replace(/\.$/, ""), value };
