@@ -758,7 +758,7 @@ export function AdminLiveReviewsManager() {
       setReviews(reviewResult.reviews || []);
       setVideos(videoResult.videos || []);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "리뷰를 불러오지 못했습니다.");
+      setError(reason instanceof Error ? reason.message : "후기를 불러오지 못했습니다.");
     } finally {
       setLoading(false);
     }
@@ -774,16 +774,16 @@ export function AdminLiveReviewsManager() {
       await requestJson("/api/admin/reviews", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, ...changes }) });
       await load();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "리뷰를 저장하지 못했습니다.");
+      setError(reason instanceof Error ? reason.message : "후기를 저장하지 못했습니다.");
     }
   };
   const remove = async (review: AdminReview) => {
-    if (!window.confirm(`${review.author_name}님의 리뷰를 삭제할까요?`)) return;
+    if (!window.confirm(`${review.author_name}님의 후기를 삭제할까요?`)) return;
     try {
       await requestJson(`/api/admin/reviews?id=${encodeURIComponent(review.id)}`, { method: "DELETE" });
       await load();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "리뷰를 삭제하지 못했습니다.");
+      setError(reason instanceof Error ? reason.message : "후기를 삭제하지 못했습니다.");
     }
   };
   const visible = reviews.filter((review) =>
@@ -811,7 +811,7 @@ export function AdminLiveReviewsManager() {
     return (
       <section className="admin-panel admin-loading-state">
         <RefreshCw className="spin" />
-        <strong>실제 리뷰 데이터를 불러오는 중입니다.</strong>
+        <strong>실제 후기 데이터를 불러오는 중입니다.</strong>
       </section>
     );
   return (
@@ -822,11 +822,11 @@ export function AdminLiveReviewsManager() {
       </section>
       <div className="review-admin-summary">
         <article>
-          <span>전체 리뷰</span>
+          <span>전체 후기</span>
           <strong>{reviews.length}</strong>
         </article>
         <article>
-          <span>공개 리뷰</span>
+          <span>공개 후기</span>
           <strong>
             {reviews.filter((r) => r.status === "published").length}
           </strong>
@@ -865,7 +865,7 @@ export function AdminLiveReviewsManager() {
             <span>작성자</span>
             <span>작성일</span>
             <span>평점</span>
-            <span>리뷰</span>
+            <span>후기</span>
             <span>관리</span>
           </div>
           {visible.map((review) => (

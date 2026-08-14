@@ -1,19 +1,21 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Check,
-  ChevronDown,
-  MoreHorizontal,
   Plus,
   Save,
+  Trash2,
+  Users,
 } from "lucide-react";
 import {
   AdminCohort,
   CohortStatus,
   createAdminCohort,
+  deleteAdminCohort,
   loadAdminCohorts,
   saveAdminCohort,
 } from "@/lib/admin-content";
@@ -103,6 +105,7 @@ export function AdminCohortsManager() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const [courseFilter, setCourseFilter] = useState("all");
   const [draft, setDraft] = useState({
     courseId: "",
     name: "새 기수",
@@ -174,6 +177,34 @@ export function AdminCohortsManager() {
           : row,
       ),
     );
+  const addSession = () => {
+    if (!selectedId) return;
+    setCohorts((rows) => rows.map((row) => row.id === selectedId ? {
+      ...row,
+      sessions: [...row.sessions, { id: `new-${crypto.randomUUID()}`, sessionNumber: row.sessions.length + 1, title: `${row.sessions.length + 1}회차 라이브 클래스`, description: "", expectedOutput: "", scheduledAt: "", liveUrl: "", replayUrl: "" }],
+    } : row));
+  };
+  const removeSession = (sessionId: string) => {
+    if (!selectedId || !window.confirm("이 회차를 삭제할까요? 저장하면 실제 DB에서도 삭제됩니다.")) return;
+    setCohorts((rows) => rows.map((row) => row.id === selectedId ? {
+      ...row,
+      sessions: row.sessions.filter((session) => session.id !== sessionId).map((session, index) => ({ ...session, sessionNumber: index + 1 })),
+    } : row));
+  };
+  const removeCohort = async (cohort: AdminCohort) => {
+    if (!window.confirm(`‘${cohort.name}’ 기수를 삭제할까요? 연결 주문·수강생이 있으면 안전하게 차단됩니다.`)) return;
+    setSaving(true);
+    setError("");
+    try {
+      await deleteAdminCohort(cohort.id);
+      await refresh();
+      if (selectedId === cohort.id) setSelectedId(null);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "기수를 삭제하지 못했습니다.");
+    } finally {
+      setSaving(false);
+    }
+  };
   const create = async () => {
     const course = courses.find((item) => item.id === draft.courseId);
     if (!course || saving) return;
@@ -529,7 +560,13 @@ export function AdminCohortsManager() {
             <div className="admin-field-grid">
               <label className="field-full">
                 연결 상품
-                <input value={selected.courseTitle} disabled />
+                <select value={selected.courseId} onChange={(event) => {
+                  const course = courses.find((item) => item.id === event.target.value);
+                  updateSelected({ courseId: event.target.value, courseTitle: course?.title || selected.courseTitle, courseCode: course?.courseCode || selected.courseCode });
+                }}>
+                  {courses.map((course) => <option key={course.id} value={course.id}>{course.title}</option>)}
+                </select>
+                <small>주문·수강생이 연결된 기수는 상품 변경이 차단됩니다.</small>
               </label>
               <label>
                 기수명
@@ -649,6 +686,7 @@ export function AdminCohortsManager() {
                 <dd>{selected.sessions.length}회</dd>
               </div>
             </dl>
+            <Link className="admin-outline cohort-student-link" href={`/admin/members?cohort=${selected.id}`}><Users /> 이 기수 수강생 관리</Link>
           </aside>
         </div>
         <section className="admin-panel cohort-session-editor">
@@ -657,6 +695,7 @@ export function AdminCohortsManager() {
               <h2>회차 운영</h2>
               <p>기수별 날짜·라이브 입장·다시보기 링크를 관리합니다.</p>
             </div>
+            <button className="admin-outline" onClick={addSession}><Plus /> 회차 추가</button>
           </div>
           {selected.sessions.map((session) => (
             <article key={session.id}>
@@ -711,9 +750,7 @@ export function AdminCohortsManager() {
                   }
                 />
               </label>
-              <span>
-                <ChevronDown />
-              </span>
+              <button className="session-remove" onClick={() => removeSession(session.id)} aria-label="회차 삭제"><Trash2 /></button>
             </article>
           ))}
           {error && (
@@ -763,9 +800,13 @@ export function AdminCohortsManager() {
             <strong>기수별 운영 현황</strong>
             <span>실제 DB의 판매 조건과 라이브 회차를 관리합니다.</span>
           </div>
-          <button className="admin-primary" onClick={() => setCreating(true)}>
-            <Plus /> 새 기수 만들기
-          </button>
+          <div className="cohort-toolbar-actions">
+            <select value={courseFilter} onChange={(event) => setCourseFilter(event.target.value)}>
+              <option value="all">전체 상품</option>
+              {courses.map((course) => <option key={course.id} value={course.id}>{course.title}</option>)}
+            </select>
+            <button className="admin-primary" onClick={() => setCreating(true)}><Plus /> 새 기수 만들기</button>
+          </div>
         </div>
         <div className="data-table cohort-table">
           <div className="data-head">
@@ -777,11 +818,11 @@ export function AdminCohortsManager() {
             <span>운영</span>
             <span />
           </div>
-          {cohorts.map((row) => (
+          {cohorts.filter((row) => courseFilter === "all" || row.courseId === courseFilter).map((row) => (
             <div className="data-row" key={row.id}>
               <span>
                 <strong>{row.name}</strong>
-                <small>{row.note || row.cohortCode}</small>
+                <small>{row.courseTitle} · {row.note || row.cohortCode}</small>
               </span>
               <span>
                 {dateOnly(row.operationStartAt)} —{" "}
@@ -802,9 +843,7 @@ export function AdminCohortsManager() {
               >
                 관리하기
               </button>
-              <span>
-                <MoreHorizontal />
-              </span>
+              <button className="icon-danger" onClick={() => void removeCohort(row)} aria-label="기수 삭제"><Trash2 /></button>
             </div>
           ))}
         </div>

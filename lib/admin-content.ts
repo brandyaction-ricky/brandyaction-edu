@@ -49,6 +49,7 @@ export type AdminCohort = {
   capacity: string;
   status: CohortStatus;
   enrolledCount: number;
+  students?: Array<{ id: string; userId: string; name: string; email: string; phone: string }>;
   sessions: AdminSession[];
 };
 export type AdminCourseOption = { id: string; courseCode: string; title: string; listPrice: number };
@@ -322,35 +323,18 @@ export async function saveAdminBanner(banner: BannerData) {
   if (error) throw new Error(messageOf(error, "메인 배너를 저장하지 못했습니다."));
 }
 
+async function cohortApi<T>(init?: RequestInit): Promise<T> {
+  const response = await fetch("/api/admin/cohorts", { cache: "no-store", ...init });
+  const result = await response.json().catch(() => ({})) as T & { error?: string };
+  if (!response.ok) throw new Error(result.error || "기수 요청을 처리하지 못했습니다.");
+  return result;
+}
+
 export async function loadAdminCohorts():Promise<{courses:AdminCourseOption[];cohorts:AdminCohort[]}>{
-  const supabase=createClient();
-  const {data:courseRows,error:courseError}=await supabase.from("courses").select("id,course_code,title,list_price").order("display_order",{ascending:false});
-  if(courseError)throw new Error(messageOf(courseError,"상품 목록을 불러오지 못했습니다."));
-  const courses:AdminCourseOption[]=(courseRows||[]).map(row=>({id:row.id,courseCode:row.course_code,title:row.title,listPrice:row.list_price}));
-  const {data:cohortRows,error:cohortError}=await supabase.from("cohorts").select("id,course_id,cohort_code,name,note,recruitment_start_at,recruitment_end_at,operation_start_at,operation_end_at,price,capacity,status").order("operation_start_at",{ascending:false});
-  if(cohortError)throw new Error(messageOf(cohortError,"기수 목록을 불러오지 못했습니다."));
-  const cohortIds=(cohortRows||[]).map(row=>row.id);
-  let sessionRows:Array<Record<string,unknown>>=[];
-  let enrollmentRows:Array<{cohort_id:string}>=[];
-  if(cohortIds.length){
-    const [sessionResult,enrollmentResult]=await Promise.all([
-      supabase.from("cohort_sessions").select("id,cohort_id,session_number,title,description,expected_output,scheduled_at,cohort_session_contents(live_url,replay_url)").in("cohort_id",cohortIds).order("session_number"),
-      supabase.from("enrollments").select("cohort_id").in("cohort_id",cohortIds).eq("status","active"),
-    ]);
-    if(sessionResult.error)throw new Error(messageOf(sessionResult.error,"라이브 회차를 불러오지 못했습니다."));
-    sessionRows=(sessionResult.data||[]) as Array<Record<string,unknown>>;
-    enrollmentRows=(enrollmentResult.data||[]) as Array<{cohort_id:string}>;
-  }
-  const courseMap=new Map(courses.map(course=>[course.id,course]));
-  const cohorts:AdminCohort[]=(cohortRows||[]).map(row=>{
-    const course=courseMap.get(row.course_id);
-    return {id:row.id,courseId:row.course_id,courseCode:course?.courseCode||"COURSE",courseTitle:course?.title||"연결 상품",cohortCode:row.cohort_code,name:row.name,note:row.note||"",recruitmentStartAt:row.recruitment_start_at||"",recruitmentEndAt:row.recruitment_end_at||"",operationStartAt:row.operation_start_at||"",operationEndAt:row.operation_end_at||"",price:String(row.price),capacity:String(row.capacity||""),status:row.status,enrolledCount:enrollmentRows.filter(item=>item.cohort_id===row.id).length,sessions:sessionRows.filter(item=>item.cohort_id===row.id).map(item=>{const raw=item.cohort_session_contents;const content=Array.isArray(raw)?raw[0]:raw as Record<string,unknown>|null|undefined;return {id:String(item.id),sessionNumber:Number(item.session_number),title:String(item.title||""),description:String(item.description||""),expectedOutput:String(item.expected_output||""),scheduledAt:String(item.scheduled_at||""),liveUrl:String(content?.live_url||""),replayUrl:String(content?.replay_url||"")}})};
-  });
-  return {courses,cohorts};
+  return cohortApi<{courses:AdminCourseOption[];cohorts:AdminCohort[]}>();
 }
 
 export async function createAdminCohort(input:{course:AdminCourseOption;name:string;status:CohortStatus;capacity:number;price:number;recruitmentStartAt:string;recruitmentEndAt:string;operationStartAt:string;operationEndAt:string;firstSessionAt:string;sessionCount:number}){
-  const supabase=createClient();
   if(!input.name.trim())throw new Error("기수명을 입력해 주세요.");
   if(!Number.isInteger(input.capacity)||input.capacity<=0)throw new Error("모집 정원은 1명 이상으로 입력해 주세요.");
   if(!Number.isInteger(input.price)||input.price<=0)throw new Error("판매가는 1원 이상으로 입력해 주세요.");
@@ -358,33 +342,23 @@ export async function createAdminCohort(input:{course:AdminCourseOption;name:str
   if(!input.firstSessionAt)throw new Error("첫 라이브 수업일과 시간을 입력해 주세요.");
   if(new Date(input.operationStartAt).getTime()>new Date(input.operationEndAt).getTime())throw new Error("운영 종료일은 시작일보다 빠를 수 없습니다.");
   if(input.recruitmentStartAt&&input.recruitmentEndAt&&new Date(input.recruitmentStartAt).getTime()>new Date(input.recruitmentEndAt).getTime())throw new Error("모집 종료일은 시작일보다 빠를 수 없습니다.");
-  const cohortCode=`${input.course.courseCode}_${Date.now()}`;
-  const {data:cohort,error}=await supabase.from("cohorts").insert({course_id:input.course.id,cohort_code:cohortCode,name:`${input.course.title} ${input.name}`.trim(),note:"",recruitment_start_at:input.recruitmentStartAt||null,recruitment_end_at:input.recruitmentEndAt||null,operation_start_at:input.operationStartAt,operation_end_at:input.operationEndAt,price:input.price,capacity:input.capacity,status:input.status}).select("id").single();
-  if(error||!cohort)throw new Error(messageOf(error,"기수를 생성하지 못했습니다."));
-  const sessions=Array.from({length:input.sessionCount},(_,index)=>({cohort_id:cohort.id,session_number:index+1,title:`${index+1}회차 라이브 클래스`,description:"",expected_output:"",scheduled_at:new Date(new Date(input.firstSessionAt).getTime()+index*7*86400000).toISOString(),is_public:true}));
-  const {error:sessionError}=await supabase.from("cohort_sessions").insert(sessions);
-  if(sessionError){await supabase.from("cohorts").delete().eq("id",cohort.id);throw new Error(messageOf(sessionError,"기수는 생성됐지만 회차 생성에 실패해 되돌렸습니다."))}
+  await cohortApi({method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({courseId:input.course.id,name:input.name,status:input.status,capacity:input.capacity,price:input.price,recruitmentStartAt:input.recruitmentStartAt,recruitmentEndAt:input.recruitmentEndAt,operationStartAt:input.operationStartAt,operationEndAt:input.operationEndAt,firstSessionAt:input.firstSessionAt,sessionCount:input.sessionCount})});
 }
 
 export async function saveAdminCohort(cohort:AdminCohort){
-  const supabase=createClient();
   const price=Number(cohort.price.replace(/[^0-9]/g,""));
   if(!Number.isInteger(price)||price<=0)throw new Error("판매가는 1원 이상으로 입력해 주세요.");
   if(!cohort.operationStartAt||!cohort.operationEndAt)throw new Error("기수 운영 시작일과 종료일을 입력해 주세요.");
   if(new Date(cohort.operationStartAt).getTime()>new Date(cohort.operationEndAt).getTime())throw new Error("운영 종료일은 시작일보다 빠를 수 없습니다.");
-  const {error}=await supabase.from("cohorts").update({name:cohort.name.trim(),note:cohort.note.trim()||null,recruitment_start_at:cohort.recruitmentStartAt||null,recruitment_end_at:cohort.recruitmentEndAt||null,operation_start_at:cohort.operationStartAt||null,operation_end_at:cohort.operationEndAt||null,price,capacity:Number(cohort.capacity.replace(/[^0-9]/g,""))||null,status:cohort.status}).eq("id",cohort.id);
-  if(error)throw new Error(messageOf(error,"기수 정보를 저장하지 못했습니다."));
   for(const session of cohort.sessions){
     if(session.liveUrl.trim()&&!safeExternalUrl(session.liveUrl))throw new Error("라이브 링크는 https:// 주소로 입력해 주세요.");
     if(session.replayUrl.trim()&&!safeExternalUrl(session.replayUrl))throw new Error("다시보기 링크는 https:// 주소로 입력해 주세요.");
-    const {error:sessionError}=await supabase.from("cohort_sessions").update({session_number:session.sessionNumber,title:session.title.trim(),description:session.description.trim()||null,expected_output:session.expectedOutput.trim()||null,scheduled_at:session.scheduledAt||null}).eq("id",session.id);
-    if(sessionError)throw new Error(messageOf(sessionError,"회차 정보를 저장하지 못했습니다."));
-    const content={session_id:session.id,live_url:session.liveUrl.trim()||null,replay_url:session.replayUrl.trim()||null,resource_storage_path:null};
-    if(content.live_url||content.replay_url){
-      const {error:contentError}=await supabase.from("cohort_session_contents").upsert(content,{onConflict:"session_id"});
-      if(contentError)throw new Error(messageOf(contentError,"라이브·다시보기 링크를 저장하지 못했습니다."));
-    }else{
-      await supabase.from("cohort_session_contents").delete().eq("session_id",session.id);
-    }
   }
+  await cohortApi({method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({...cohort,price,capacity:Number(cohort.capacity.replace(/[^0-9]/g,""))||null})});
+}
+
+export async function deleteAdminCohort(id:string){
+  const response=await fetch(`/api/admin/cohorts?id=${encodeURIComponent(id)}`,{method:"DELETE"});
+  const result=await response.json().catch(()=>({})) as {error?:string};
+  if(!response.ok)throw new Error(result.error||"기수를 삭제하지 못했습니다.");
 }

@@ -6,20 +6,43 @@ export async function GET() {
   const operator = await getAdminUser("members");
   if (!operator) return NextResponse.json({ error: "관리자 권한이 필요합니다." }, { status: 403 });
   const admin = createAdminClient();
-  const [{ data: profiles, error }, { data: cohorts }] = await Promise.all([
-    admin.from("profiles").select("id,email,full_name,phone,role,status,created_at,enrollments:enrollments!enrollments_user_id_fkey(id,status,course_id,cohort_id,courses(title),cohorts(name)),orders(total_amount,status,payments(approved_amount,cancelled_amount))").order("created_at", { ascending: false }),
-    admin.from("cohorts").select("id,name,status,courses(id,title)").neq("status", "cancelled").order("operation_start_at", { ascending: false }),
+  const [{ data: profiles, error }, { data: cohorts }, { data: tags }, { data: memberTags }] = await Promise.all([
+    admin.from("profiles").select("id,email,full_name,phone,role,status,marketing_consent,created_at,enrollments:enrollments!enrollments_user_id_fkey(id,status,source,course_id,cohort_id,courses(id,title),cohorts(id,name)),orders(total_amount,status,payments(approved_amount,cancelled_amount))").order("created_at", { ascending: false }),
+    admin.from("cohorts").select("id,course_id,name,status,courses(id,title)").neq("status", "cancelled").order("operation_start_at", { ascending: false }),
+    admin.from("crm_tags").select("id,name,color,description").order("name"),
+    admin.from("crm_member_tags").select("member_id,tag_id"),
   ]);
   if (error) return NextResponse.json({ error: `회원 목록을 불러오지 못했습니다. (${error.code || "QUERY_ERROR"})` }, { status: 500 });
-  return NextResponse.json({ members: profiles || [], cohorts: cohorts || [], operatorRole: operator.role });
+  return NextResponse.json({ members: profiles || [], cohorts: cohorts || [], tags: tags || [], memberTags: memberTags || [], operatorRole: operator.role });
 }
 
 export async function PATCH(request: Request) {
   const operator = await getAdminUser("members");
   if (!operator) return NextResponse.json({ error: "관리자 권한이 필요합니다." }, { status: 403 });
-  const body = await request.json().catch(() => null) as { userId?: string; role?: string; status?: string } | null;
-  if (!body?.userId) return NextResponse.json({ error: "회원을 선택해 주세요." }, { status: 400 });
+  const body = await request.json().catch(() => null) as { action?: string; userId?: string; role?: string; status?: string; enrollmentId?: string; tagIds?: string[] } | null;
+  if (!body) return NextResponse.json({ error: "요청 정보를 확인해 주세요." }, { status: 400 });
   const admin = createAdminClient();
+  if (body.action === "enrollment") {
+    if (!body.enrollmentId || !body.status || !["active", "expired", "revoked", "refunded"].includes(body.status)) return NextResponse.json({ error: "수강권과 변경 상태를 확인해 주세요." }, { status: 400 });
+    const { data: enrollment } = await admin.from("enrollments").select("id,user_id,status").eq("id", body.enrollmentId).maybeSingle();
+    if (!enrollment) return NextResponse.json({ error: "수강권을 찾을 수 없습니다." }, { status: 404 });
+    const { error } = await admin.from("enrollments").update({ status: body.status, revoked_at: body.status === "revoked" ? new Date().toISOString() : null, access_ends_at: null }).eq("id", body.enrollmentId);
+    if (error) return NextResponse.json({ error: "수강권 상태를 저장하지 못했습니다." }, { status: 500 });
+    await admin.from("audit_logs").insert({ actor_user_id: operator.id, action: `enrollment.${body.status}`, entity_type: "enrollment", entity_id: body.enrollmentId, after_data: { previous_status: enrollment.status, status: body.status } });
+    return NextResponse.json({ ok: true });
+  }
+  if (body.action === "tags") {
+    if (operator.role !== "admin") return NextResponse.json({ error: "고객 태그 변경은 최고 관리자만 할 수 있습니다." }, { status: 403 });
+    if (!body.userId || !Array.isArray(body.tagIds)) return NextResponse.json({ error: "회원과 태그를 확인해 주세요." }, { status: 400 });
+    await admin.from("crm_member_tags").delete().eq("member_id", body.userId);
+    if (body.tagIds.length) {
+      const { error } = await admin.from("crm_member_tags").insert(body.tagIds.map((tagId) => ({ member_id: body.userId, tag_id: tagId, assigned_by: operator.id })));
+      if (error) return NextResponse.json({ error: "회원 태그를 저장하지 못했습니다." }, { status: 500 });
+    }
+    await admin.from("audit_logs").insert({ actor_user_id: operator.id, action: "member.tags_updated", entity_type: "profile", entity_id: body.userId, after_data: { tag_ids: body.tagIds } });
+    return NextResponse.json({ ok: true });
+  }
+  if (!body.userId) return NextResponse.json({ error: "회원을 선택해 주세요." }, { status: 400 });
   const { data: target } = await admin.from("profiles").select("role,status").eq("id", body.userId).maybeSingle();
   if (!target) return NextResponse.json({ error: "회원을 찾을 수 없습니다." }, { status: 404 });
   if (operator.role === "staff" && target.role !== "student") return NextResponse.json({ error: "스태프는 다른 운영자 계정을 변경할 수 없습니다." }, { status: 403 });
