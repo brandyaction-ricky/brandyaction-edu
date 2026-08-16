@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import "./globals.css";
 import { SiteFooter } from "./components/site-footer";
+import { AnalyticsTracker } from "./components/analytics-tracker";
 import { loadCodeSettings } from "@/lib/code-settings";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +29,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           </div>
         ) : null}
         {children}
+        <Suspense fallback={null}><AnalyticsTracker /></Suspense>
         <SiteFooter />
       </body>
     </html>
