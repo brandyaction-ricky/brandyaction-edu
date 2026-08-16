@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { ArrowRight, BarChart3, CalendarDays, Play, Target } from "lucide-react";
+import { ArrowRight, BarChart3, CalendarDays, CheckCircle2, Play, Target } from "lucide-react";
 import { BrandHeader } from "./components/brand-header";
 import { ClassCard } from "./components/class-card";
 import { HomeExperience } from "./components/home-experience";
-import { LiveClassCarousel, ReviewSlider } from "./components/site-live-content";
+import { LandingBanner, ReviewSlider } from "./components/site-live-content";
 import { getPublicBanner, getPublishedClasses, getPublishedReviews, getPublishedReviewVideos } from "@/lib/education-data";
 import { getPublicArticleIndex } from "@/lib/article-data";
 import { getAuthenticatedUser } from "@/lib/server-auth";
@@ -28,17 +28,15 @@ export default async function Home() {
     <main>
       <BrandHeader />
 
-      <div id="live-classes"><LiveClassCarousel classes={classes} banner={banner}/></div>
+      <section className="home-primary-banner" id="live-classes"><div className="container"><LandingBanner banner={banner}/></div></section>
 
       <section className="section" id="programs" data-home-reveal>
         <div className="container">
           <div className="section-heading split-heading">
-            <div><span className="section-kicker">LIVE PROGRAM</span><h2>지금 참여할 수 있는 클래스</h2></div>
+            <div><span className="section-kicker">FREE · PAID CLASS</span><h2>필요한 단계부터 시작하세요</h2><p>먼저 방향을 찾는 무료 클래스와, 결과물을 완성하는 유료 라이브 클래스를 구분해 선택할 수 있습니다.</p></div>
             <Link className="text-link" href="/classes">전체 클래스 보기 <ArrowRight size={18} /></Link>
           </div>
-          <div className="class-grid">
-            {classes.map((item) => <ClassCard key={item.slug} item={item} />)}
-          </div>
+          <div className="program-choice-grid"><article className="free-program-card"><div><span>FREE CLASS</span><b>무료 3강</b></div><small>결제 전, 내 방향부터 확인</small><h3>진단 전에 먼저 보는<br/>내 업의 방향 클래스</h3><p>반복해서 비어 있던 자리가 가리키는 내 욕구와 일의 방향을 3개의 강의로 먼저 정리합니다.</p><ul><li><CheckCircle2/>회원가입 후 바로 시청</li><li><CheckCircle2/>별도 결제 없이 3강 전체 공개</li><li><CheckCircle2/>아티클과 함께 고민 구체화</li></ul><Link href="/articles#free-class">무료 클래스 시작하기 <ArrowRight/></Link></article><div className="paid-programs"><header><div><span>PAID LIVE CLASS</span><strong>유료 라이브 클래스</strong><small>기수 일정 · 피드백 · 실행 결과물</small></div><em>{classes.filter((item) => item.status.includes("모집 중")).length}개 모집 중</em></header><div className="class-grid">{classes.map((item) => <ClassCard key={item.slug} item={item} />)}</div></div></div>
         </div>
       </section>
 
