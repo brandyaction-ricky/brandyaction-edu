@@ -18,6 +18,17 @@ create index if not exists customer_journey_events_session_idx on public.custome
 create index if not exists customer_journey_events_name_idx on public.customer_journey_events (event_name, occurred_at desc);
 alter table public.customer_journey_events enable row level security;
 
+create or replace function public.get_customer_journey_events(p_days integer default 30)
+returns setof public.customer_journey_events
+language sql stable security definer set search_path=''
+as $$
+  select * from public.customer_journey_events
+  where occurred_at >= now() - make_interval(days => least(greatest(p_days, 1), 365))
+  order by occurred_at;
+$$;
+revoke all on function public.get_customer_journey_events(integer) from public, anon, authenticated;
+grant execute on function public.get_customer_journey_events(integer) to service_role;
+
 -- DEV 화면 검증용 연결 여정. 개발 관리자 계정이 없는 환경에서는 생성하지 않는다.
 do $$
 declare

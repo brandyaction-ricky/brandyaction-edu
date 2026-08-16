@@ -19,8 +19,7 @@ export default async function JourneyAnalyticsPage({searchParams}:{searchParams:
   const operator=await getAdminUser();
   if(!operator)redirect("/admin?notice=permission_required");
   const query=await searchParams;const days=[7,30,90].includes(Number(query.period))?Number(query.period):30;
-  const since=new Date(Date.now()-days*86400000).toISOString();
-  const {data,error}=await createAdminClient().from("customer_journey_events").select("session_id,user_id,event_name,path,target_path,element_label,metadata,occurred_at").gte("occurred_at",since).order("occurred_at").limit(10000);
+  const {data,error}=await createAdminClient().rpc("get_customer_journey_events",{p_days:days});
   const events=error?[]:(data||[]) as JourneyEvent[];
   const grouped=new Map<string,JourneyEvent[]>();events.forEach((event)=>grouped.set(event.session_id,[...(grouped.get(event.session_id)||[]),event]));
   const sessions:Session[]=[...grouped.entries()].map(([id,items])=>{const first=items[0];const application=items.find((event)=>event.event_name==="application_click"||event.event_name==="order_complete");const articles=[...new Set(items.filter((event)=>event.event_name==="article_view").map((event)=>event.path))];return{id,events:items,source:sourceName(first),landing:first.path,articles,applied:items.some((event)=>event.event_name==="application_click"),completed:items.some((event)=>event.event_name==="order_complete"),assisted:Boolean(application)&&items.some((event)=>event.event_name==="article_view"&&new Date(event.occurred_at)<=new Date(application!.occurred_at)),startedAt:first.occurred_at,convertedAt:application?.occurred_at||""};}).sort((a,b)=>b.startedAt.localeCompare(a.startedAt));
