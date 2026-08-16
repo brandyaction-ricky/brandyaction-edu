@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { useSearchParams } from "next/navigation";
-import { Check, Filter, RefreshCw, Search, Tag, UserPlus, Users, X } from "lucide-react";
+import { Check, Edit3, Filter, Plus, RefreshCw, Save, Search, Tag, Trash2, UserPlus, Users, X } from "lucide-react";
 
 type Relation<T> = T | T[] | null;
 type Enrollment = { id: string; status: string; source: string; course_id: string; cohort_id: string; courses: Relation<{ id: string; title: string }>; cohorts: Relation<{ id: string; name: string }> };
@@ -39,6 +39,7 @@ export function AdminMembersManager() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [tagDraft, setTagDraft] = useState({ id: "", name: "", color: "#A10D12", description: "" });
   const load = async () => {
     setError("");
     try { setData(await request<Data>()); }
@@ -81,6 +82,16 @@ export function AdminMembersManager() {
     const current = memberTagIds(memberId);
     await mutate({ action: "tags", userId: memberId, tagIds: current.includes(nextTagId) ? current.filter((id) => id !== nextTagId) : [...current, nextTagId] }, "고객 태그를 저장했습니다.");
   };
+  const saveTag = async () => {
+    if (!tagDraft.name.trim()) return;
+    await mutate({ action: "saveTag", tagId: tagDraft.id || undefined, name: tagDraft.name, color: tagDraft.color, description: tagDraft.description }, tagDraft.id ? "고객 태그를 수정했습니다." : "고객 태그를 등록했습니다.");
+    setTagDraft({ id: "", name: "", color: "#A10D12", description: "" });
+  };
+  const deleteTag = async (tag: CustomerTag) => {
+    if (!window.confirm(`‘${tag.name}’ 태그를 삭제할까요? 회원에게 지정된 태그도 함께 해제됩니다.`)) return;
+    await mutate({ action: "deleteTag", tagId: tag.id }, "고객 태그를 삭제했습니다.");
+    if (tagDraft.id === tag.id) setTagDraft({ id: "", name: "", color: "#A10D12", description: "" });
+  };
   const resetFilters = () => { setQuery(""); setCourseId("all"); setCohortId("all"); setTagId("all"); setStatus("all"); };
 
   if (loading) return <section className="admin-panel admin-loading-state"><RefreshCw className="spin"/><strong>실제 회원 데이터를 불러오는 중입니다.</strong></section>;
@@ -90,6 +101,12 @@ export function AdminMembersManager() {
       <article><span>활성 고객</span><strong>{data.members.filter((member) => member.status === "active").length}</strong><small>이용 가능</small></article>
       <article><span>수강 고객</span><strong>{data.members.filter((member) => member.enrollments.some((enrollment) => enrollment.status === "active")).length}</strong><small>활성 수강권 보유</small></article>
       <article><span>마케팅 동의</span><strong>{data.members.filter((member) => member.marketing_consent && member.phone).length}</strong><small>발송 가능 후보</small></article>
+    </section>
+    <section className="admin-panel member-tag-manager">
+      <header><div><Tag/><span><strong>고객 태그 관리</strong><small>회원 분류와 CRM 발송 대상에 공통으로 사용하는 태그입니다.</small></span></div><button className="admin-outline" onClick={() => setTagDraft({ id: "", name: "", color: "#A10D12", description: "" })}><Plus/>새 태그</button></header>
+      <div className="member-tag-workspace"><div className="member-tag-editor"><label><span>색상</span><input type="color" value={tagDraft.color} onChange={(event) => setTagDraft({ ...tagDraft, color: event.target.value })}/></label><label><span>태그 이름</span><input value={tagDraft.name} onChange={(event) => setTagDraft({ ...tagDraft, name: event.target.value })} placeholder="예: 무료강의 참여" maxLength={40}/></label><label className="tag-description"><span>분류 기준·용도</span><input value={tagDraft.description} onChange={(event) => setTagDraft({ ...tagDraft, description: event.target.value })} placeholder="예: 무료강의 2강 이상 시청한 회원" maxLength={200}/></label><button className="admin-primary" onClick={() => void saveTag()} disabled={saving || !tagDraft.name.trim()}><Save/>{tagDraft.id ? "수정 저장" : "태그 등록"}</button></div>
+        <div className="member-tag-library">{data.tags.map((tag) => <article key={tag.id} className={tagDraft.id === tag.id ? "editing" : ""}><i style={{ background: tag.color }}/><div><strong>{tag.name}</strong><small>{tag.description || "분류 기준 미입력"} · {data.memberTags.filter((row) => row.tag_id === tag.id).length}명</small></div><button onClick={() => setTagDraft({ id: tag.id, name: tag.name, color: tag.color, description: tag.description || "" })} aria-label={`${tag.name} 수정`}><Edit3/></button><button className="danger" onClick={() => void deleteTag(tag)} aria-label={`${tag.name} 삭제`}><Trash2/></button></article>)}{!data.tags.length && <div className="member-tag-empty"><Tag/><span><strong>등록된 태그가 없습니다.</strong><small>첫 태그를 등록하면 회원 상세와 CRM에서 바로 사용할 수 있습니다.</small></span></div>}</div>
+      </div>
     </section>
     <section className="admin-panel member-filter-panel">
       <header><div><Filter/><span><strong>고객 분류</strong><small>상품·기수·태그를 조합해 필요한 회원만 찾습니다.</small></span></div><button onClick={resetFilters}>필터 초기화</button></header>
@@ -124,7 +141,7 @@ export function AdminMembersManager() {
     {selected && <div className="member-drawer-backdrop" onMouseDown={() => setSelectedId(null)}><aside className="member-drawer" onMouseDown={(event) => event.stopPropagation()}>
       <header><div><span className="member-drawer-avatar">{(selected.full_name || selected.email)[0]}</span><div><strong>{selected.full_name || "이름 미입력"}</strong><small>{selected.email}</small></div></div><button onClick={() => setSelectedId(null)}><X/></button></header>
       <section><h3>회원 상태</h3><div className="drawer-inline"><select value={selected.status} onChange={(event) => void mutate({ userId: selected.id, status: event.target.value }, "회원 상태를 저장했습니다.")} disabled={saving}><option value="active">활성</option><option value="suspended">이용 정지</option><option value="withdrawn">탈퇴</option></select>{data.operatorRole === "admin" && <select value={selected.role} onChange={(event) => void mutate({ userId: selected.id, role: event.target.value }, "회원 역할을 저장했습니다.")} disabled={saving}><option value="student">일반 회원</option><option value="staff">스태프</option><option value="admin">최고 관리자</option></select>}</div></section>
-      <section><h3>고객 태그</h3><p>CRM 대상 분류와 동일한 태그입니다.</p><div className="drawer-tags">{data.tags.map((tag) => <button key={tag.id} className={memberTagIds(selected.id).includes(tag.id) ? "selected" : ""} style={{ "--tag-color": tag.color } as CSSProperties} onClick={() => void toggleTag(selected.id, tag.id)} disabled={saving}><Tag/>{tag.name}</button>)}{!data.tags.length && <small>CRM에서 고객 태그를 먼저 만들어 주세요.</small>}</div></section>
+      <section><h3>고객 태그</h3><p>회원 관리와 CRM 대상 분류에 함께 반영됩니다.</p><div className="drawer-tags">{data.tags.map((tag) => <button key={tag.id} className={memberTagIds(selected.id).includes(tag.id) ? "selected" : ""} style={{ "--tag-color": tag.color } as CSSProperties} onClick={() => void toggleTag(selected.id, tag.id)} disabled={saving}><Tag/>{tag.name}</button>)}{!data.tags.length && <small>상단 고객 태그 관리에서 첫 태그를 등록해 주세요.</small>}</div></section>
       <section><div className="drawer-section-head"><h3>수강권</h3><span>{selected.enrollments.length}개</span></div><div className="drawer-enrollments">{selected.enrollments.map((enrollment) => <article key={enrollment.id}><div><strong>{one(enrollment.courses)?.title}</strong><small>{one(enrollment.cohorts)?.name} · {enrollment.source === "purchase" ? "결제 발급" : "관리자 발급"}</small></div><select value={enrollment.status} onChange={(event) => void mutate({ action: "enrollment", enrollmentId: enrollment.id, status: event.target.value }, "수강권 상태를 저장했습니다.")} disabled={saving}><option value="active">활성</option><option value="revoked">중지</option><option value="expired">만료</option><option value="refunded">환불</option></select></article>)}</div><div className="drawer-grant"><select value={grantCohortId} onChange={(event) => setGrantCohortId(event.target.value)}><option value="">발급할 상품·기수 선택</option>{data.cohorts.map((cohort) => <option key={cohort.id} value={cohort.id}>{one(cohort.courses)?.title} · {cohort.name}</option>)}</select><button className="admin-primary" onClick={() => void grant()} disabled={!grantCohortId || saving}><UserPlus/>수강권 발급</button></div></section>
       <footer><span>{selected.marketing_consent ? <><Check/>마케팅 수신 동의</> : "마케팅 수신 미동의"}</span><small>{selected.phone || "휴대폰 정보 없음"}</small></footer>
     </aside></div>}

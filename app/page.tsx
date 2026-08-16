@@ -1,62 +1,36 @@
 import Link from "next/link";
-import {
-  ArrowRight,
-  BarChart3,
-  CalendarDays,
-  ChevronRight,
-  Clock3,
-  Play,
-  Target,
-} from "lucide-react";
+import { ArrowRight, BarChart3, BookOpen, CalendarDays, CheckCircle2, Compass, Play, Target, TrendingUp } from "lucide-react";
 import { BrandHeader } from "./components/brand-header";
 import { ClassCard } from "./components/class-card";
 import { HomeExperience } from "./components/home-experience";
-import { LandingBanner, ReviewSlider } from "./components/site-live-content";
+import { LiveClassCarousel, ReviewSlider } from "./components/site-live-content";
 import { getPublicBanner, getPublishedClasses, getPublishedReviews, getPublishedReviewVideos } from "@/lib/education-data";
+import { getPublicArticleIndex } from "@/lib/article-data";
+import { getAuthenticatedUser } from "@/lib/server-auth";
+import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const [classes,banner,reviews,reviewVideos] = await Promise.all([getPublishedClasses(),getPublicBanner(),getPublishedReviews(),getPublishedReviewVideos()]);
+  const [classes,banner,reviews,reviewVideos,articleIndex,user] = await Promise.all([getPublishedClasses(),getPublicBanner(),getPublishedReviews(),getPublishedReviewVideos(),getPublicArticleIndex(),getAuthenticatedUser()]);
   const featured = classes[0];
+  let currentEnrollment: { courseTitle: string; cohortName: string } | null = null;
+  if (user) {
+    const supabase = await createClient();
+    const { data } = await supabase.from("enrollments").select("courses(title),cohorts(name)").eq("user_id", user.id).eq("status", "active").order("created_at", { ascending: false }).limit(1).maybeSingle();
+    const course = Array.isArray(data?.courses) ? data.courses[0] : data?.courses;
+    const cohort = Array.isArray(data?.cohorts) ? data.cohorts[0] : data?.cohorts;
+    if (course?.title) currentEnrollment = { courseTitle: course.title, cohortName: cohort?.name || "수강 중" };
+  }
+  const topArticles = articleIndex.articles.slice(0, 3);
+  const nextClass = classes.find((item) => item.status.includes("모집 중"));
   return (
     <main>
       <BrandHeader />
 
-      <section className="hero-shell">
-        <div className="container hero-grid">
-          <div className="hero-copy">
-            <div className="eyebrow"><span />{featured?.status || "모집 예정"}</div>
-            <h1>{featured?.title || "브랜디액션 실전 클래스"}</h1>
-            <p className="hero-description">
-              {featured?.summary || "배운 것을 현장의 실행과 결과로 연결합니다."}
-            </p>
-            <div className="hero-meta">
-              <span><CalendarDays size={19} /> {featured?.startDate || "개강 일정 안내 예정"}</span>
-              <span><Clock3 size={19} /> {featured?.schedule || "수업 일정 안내 예정"}</span>
-              <strong>LIVE</strong>
-            </div>
-            <div className="hero-actions">
-              <Link className="button button-primary button-lg" href={featured ? `/classes/${featured.slug}` : "/classes"}>
-                클래스 확인하기 <ArrowRight size={20} />
-              </Link>
-              <Link className="text-link" href="#programs">커리큘럼 먼저 보기 <ChevronRight size={17} /></Link>
-            </div>
-          </div>
+      <section className="landing-value-hero"><div className="container"><div className="landing-value-copy"><span>KNOW YOUR WORK · MAKE IT REAL</span><h1>내 일의 방향을 찾고,<br/>현장에서 실행하는 곳</h1><p>브랜디액션 에듀는 유형을 알려주는 데서 멈추지 않습니다. 아티클과 무료 3강으로 기준을 찾고, 라이브 클래스에서 실제 결과물로 완성합니다.</p><div><Link className="button button-primary button-lg" href="#live-classes">모집 중 클래스 보기 <ArrowRight/></Link><Link href="/articles">내 고민부터 읽어보기 <BookOpen/></Link></div></div><div className="landing-value-proof"><span>왜 브랜디액션이어야 하나요?</span><article><Compass/><div><strong>방향을 발견하고</strong><p>반복되는 결핍과 욕구에서 내 일의 기준을 찾습니다.</p></div></article><article><CheckCircle2/><div><strong>결과물로 만들고</strong><p>매주 브랜드 문장과 실행 계획을 실제로 완성합니다.</p></div></article><article><TrendingUp/><div><strong>다음 행동까지 이어갑니다</strong><p>기수의 리듬과 피드백으로 혼자 멈추지 않게 합니다.</p></div></article></div></div></section>
 
-          <LandingBanner banner={banner}/>
-        </div>
-      </section>
-
-      <section className="proof-strip" data-home-reveal>
-        <div className="container proof-grid">
-          <div className="proof-title">실행을 확인하는 핵심 지표</div>
-          <div><span>결제 후 제공</span><strong>VOD</strong></div>
-          <div><span>실시간 수업</span><strong>LIVE</strong></div>
-          <div><span>학습 자료</span><strong>다운로드</strong></div>
-          <div><span>수강 현황</span><strong>자동 저장</strong></div>
-        </div>
-      </section>
+      <div id="live-classes"><LiveClassCarousel classes={classes} banner={banner}/></div>
 
       <section className="section" id="programs" data-home-reveal>
         <div className="container">
@@ -69,6 +43,10 @@ export default async function Home() {
           </div>
         </div>
       </section>
+
+      {user && <section className="member-next-step section" data-home-reveal><div className="container"><div><span className="section-kicker">MY LEARNING PATH</span><h2>{currentEnrollment ? "지금 수강 중인 흐름을\n다음 클래스로 이어가세요." : "내 클래스에서 학습 현황을\n바로 확인하세요."}</h2><p>{currentEnrollment ? `${currentEnrollment.courseTitle} · ${currentEnrollment.cohortName} 수강 중` : "수강권과 다음 라이브 일정을 한곳에서 확인할 수 있습니다."}</p><Link href="/my">마이페이지에서 확인 <ArrowRight/></Link></div>{nextClass && <article><span>{nextClass.status}</span><small>NEXT RECOMMENDED CLASS</small><h3>{nextClass.title}</h3><p>{nextClass.startDate} 개강 · {nextClass.schedule}</p><strong>{nextClass.price}</strong><Link href={`/classes/${nextClass.slug}`}>다음 기수 예약하기 <ArrowRight/></Link></article>}</div></section>}
+
+      <section className="landing-article-section section" data-home-reveal><div className="container"><div className="section-heading split-heading"><div><span className="section-kicker">TOP QUESTIONS BEFORE CLASS</span><h2>신청 전에 가장 많이 묻는 고민부터</h2><p>바로 결제하지 않아도 괜찮습니다. 내 질문과 가까운 글에서 먼저 방향을 확인하세요.</p></div><Link className="text-link" href="/articles">모든 아티클 보기 <ArrowRight/></Link></div><div className="landing-article-grid">{topArticles.map((article, index) => <article key={article.id}><Link href={`/articles/${article.slug}`}><span>{article.categoryName}</span><b>{String(index + 1).padStart(2,"0")}</b><h3>{article.title}</h3><p>{article.summary}</p><footer>이 고민부터 읽기 <ArrowRight/></footer></Link></article>)}</div><div className="landing-free-bridge"><div><span>무료 3강</span><strong>아티클에서 발견한 질문을<br/>내 일의 방향으로 연결하세요.</strong></div><p>회원가입만 하면 진단 전 무료 3강을 바로 볼 수 있습니다.</p><Link href="/articles#free-class">무료 3강 보기 <ArrowRight/></Link></div></div></section>
 
       <section className="section section-ink" id="philosophy" data-home-reveal>
         <div className="container philosophy-grid">

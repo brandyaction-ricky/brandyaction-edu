@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, CircleDollarSign, CreditCard, Megaphone, MessageSquareText, TrendingUp, UserPlus } from "lucide-react";
+import { Activity, AlertTriangle, ArrowRight, BarChart3, CalendarClock, CheckCircle2, CircleDollarSign, CreditCard, Download, Megaphone, MessageSquareText, PlayCircle, Radio, TrendingUp, UserPlus, Users } from "lucide-react";
 import { AdminPageTitle, AdminShell } from "../components/admin-shell";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAdminUser } from "@/lib/server-auth";
@@ -26,14 +26,17 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
   const requestTimestamp = Date.now();
   const start = new Date(requestTimestamp - period * 86_400_000).toISOString();
   const admin = createAdminClient();
-  const [ordersResult, membersResult, enrollmentsResult, cohortsResult, reviewsResult, articlesResult, campaignsResult] = await Promise.all([
+  const [ordersResult, membersResult, enrollmentsResult, cohortsResult, reviewsResult, articlesResult, campaignsResult, messageLogsResult, progressResult, usageResult] = await Promise.all([
     admin.from("orders").select("id,user_id,order_number,status,total_amount,customer_name,created_at,order_items(item_name,course_id,cohort_id,courses(title),cohorts(name)),payments(approved_amount,cancelled_amount,method)").gte("created_at", start).order("created_at", { ascending: false }),
     admin.from("profiles").select("id", { count: "exact", head: true }).gte("created_at", start),
     admin.from("enrollments").select("id,user_id,course_id,cohort_id").eq("status", "active"),
     admin.from("cohorts").select("id,name,status,capacity,operation_start_at,courses(title),enrollments(id,status),cohort_sessions(id,title,scheduled_at,cohort_session_contents(live_url,replay_url))").in("status", ["recruiting", "upcoming", "in_progress"]).order("operation_start_at"),
     admin.from("reviews").select("id,status,rating,author_name,created_at,courses(title)").gte("created_at", start).order("created_at", { ascending: false }),
     admin.from("articles").select("id,title,status,created_at").gte("created_at", start).order("created_at", { ascending: false }),
-    admin.from("crm_campaigns").select("id,status,recipient_count,success_count,failure_count,created_at").gte("created_at", start).order("created_at", { ascending: false }),
+    admin.from("crm_campaigns").select("id,name,status,sent_at,recipient_count,success_count,failure_count,created_at").gte("created_at", start).order("created_at", { ascending: false }),
+    admin.from("crm_message_logs").select("id,campaign_id,member_id,status,sent_at").gte("created_at", start),
+    admin.from("lesson_progress").select("id,enrollment_id,progress_percent,updated_at,enrollments(user_id)").gte("updated_at", start),
+    admin.from("learning_usage_events").select("id,enrollment_id,item_type,use_count,last_used_at,enrollments(user_id)").gte("last_used_at", start),
   ]);
   const orders = ordersResult.data || [];
   const paidOrders = orders.filter((order) => ["paid", "partially_refunded"].includes(order.status));
@@ -68,9 +71,36 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
   const sentCampaigns = (campaignsResult.data || []).filter((campaign) => campaign.status === "completed");
   const sentMessages = sentCampaigns.reduce((sum, campaign) => sum + campaign.success_count, 0);
   const publishedArticles = (articlesResult.data || []).filter((article) => article.status === "published").length;
+  const messageLogs = messageLogsResult.data || [];
+  const campaignConversions = sentCampaigns.map((campaign) => {
+    const recipients = messageLogs.filter((log) => log.campaign_id === campaign.id && log.status === "success" && log.member_id && log.sent_at);
+    const attributedOrders = paidOrders.filter((order) => recipients.some((log) => order.user_id === log.member_id && Date.parse(order.created_at) >= Date.parse(log.sent_at!) && Date.parse(order.created_at) <= Date.parse(log.sent_at!) + 7 * 86_400_000));
+    const amount = attributedOrders.reduce((sum, order) => { const payment = order.payments?.[0]; return sum + Math.max(0, (payment?.approved_amount || 0) - (payment?.cancelled_amount || 0)); }, 0);
+    return { ...campaign, orders: attributedOrders.length, amount, rate: campaign.success_count ? attributedOrders.length / campaign.success_count * 100 : 0 };
+  });
+  const attributedOrders = campaignConversions.reduce((sum, campaign) => sum + campaign.orders, 0);
+  const attributedRevenue = campaignConversions.reduce((sum, campaign) => sum + campaign.amount, 0);
+  const progressRows = progressResult.data || [];
+  const usageRows = usageResult.data || [];
+  const learnerIds = new Set([...progressRows.map((row) => one(row.enrollments)?.user_id), ...usageRows.map((row) => one(row.enrollments)?.user_id)].filter(Boolean));
+  const avgProgress = progressRows.length ? Math.round(progressRows.reduce((sum, row) => sum + row.progress_percent, 0) / progressRows.length) : 0;
+  const completionRate = progressRows.length ? Math.round(progressRows.filter((row) => row.progress_percent === 100).length / progressRows.length * 100) : 0;
+  const usageCount = (type: string) => usageRows.filter((row) => row.item_type === type).reduce((sum, row) => sum + row.use_count, 0);
+  const activeEnrollmentUsers = new Set((enrollmentsResult.data || []).map((row) => row.user_id));
+  const inactiveLearners = [...activeEnrollmentUsers].filter((id) => !learnerIds.has(id)).length;
 
   return <AdminShell active="dashboard">
-    <AdminPageTitle eyebrow="OVERVIEW" title="한눈에 보기" description="처리할 업무·이상 신호·통계·그로스 현황을 실제 운영 데이터로 확인합니다." action={<form className="dashboard-period"><label>전체 기간<select name="period" defaultValue={String(period)}>{periodOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label><button>적용</button></form>}/>
+    <AdminPageTitle eyebrow="OVERVIEW" title="모집·매출·전환·학습 한눈에 보기" description="현재 모집중인 기수부터 결제 고객, CRM 후행 전환, 실제 수강생 활동까지 연결해 확인합니다." action={<form className="dashboard-period"><label>분석 기간<select name="period" defaultValue={String(period)}>{periodOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label><button>적용</button></form>}/>
+
+    <section className="dashboard-section-title monitor"><div><i/><span><strong>모집·매출 스냅샷</strong><small>현재 모집중 기수와 선택 기간 결제 성과</small></span></div><em>RECRUITING</em></section>
+    <section className="dashboard-decision-kpis"><article><Users/><span>결제 고객<strong>{payingCustomers}명</strong><small>선택 기간 순고객</small></span></article><article><CircleDollarSign/><span>순매출<strong>{money(revenue)}</strong><small>취소·환불 차감</small></span></article><article><BarChart3/><span>객단가<strong>{money(paidOrders.length ? Math.round(revenue / paidOrders.length) : 0)}</strong><small>결제 완료 주문 기준</small></span></article><article><CalendarClock/><span>모집중 기수<strong>{cohorts.filter((cohort) => cohort.status === "recruiting").length}개</strong><small>지금 신청 가능</small></span></article></section>
+    <section className="dashboard-recruiting-grid">{cohorts.filter((cohort) => cohort.status === "recruiting").map((cohort) => { const count = (cohort.enrollments || []).filter((enrollment) => enrollment.status === "active").length; const rate = cohort.capacity ? Math.min(100, count / cohort.capacity * 100) : 0; const cohortOrders = paidOrders.filter((order) => order.order_items?.[0]?.cohort_id === cohort.id); const cohortRevenue = cohortOrders.reduce((sum, order) => sum + Math.max(0, (order.payments?.[0]?.approved_amount || 0) - (order.payments?.[0]?.cancelled_amount || 0)), 0); return <Link href="/admin/cohorts" className="admin-panel" key={cohort.id}><span>모집 중</span><h3>{cohort.name}</h3><p>{one(cohort.courses)?.title}</p><div><strong>{count} / {cohort.capacity || "∞"}명</strong><em>{money(cohortRevenue)}</em></div><i><b style={{ width: `${rate}%` }}/></i><small>{date(cohort.operation_start_at)} 개강 · 충원율 {Math.round(rate)}%</small></Link>; })}</section>
+
+    <section className="dashboard-section-title monitor"><div><i/><span><strong>CRM → 구매 전환</strong><small>발송 회원의 7일 이내 결제를 캠페인 후행 성과로 추정</small></span></div><em>ATTRIBUTION</em></section>
+    <section className="dashboard-conversion-layout"><div className="dashboard-decision-kpis compact"><article><Megaphone/><span>발송 성공<strong>{sentMessages}건</strong><small>{sentCampaigns.length}개 캠페인</small></span></article><article><TrendingUp/><span>추정 전환<strong>{attributedOrders}건</strong><small>7일 후행 결제</small></span></article><article><CircleDollarSign/><span>추정 전환 매출<strong>{money(attributedRevenue)}</strong><small>중복 캠페인 포함 가능</small></span></article></div><section className="admin-panel dashboard-campaign-table"><header><span>캠페인</span><span>발송</span><span>전환</span><span>전환율</span><span>매출</span></header>{campaignConversions.map((campaign) => <article key={campaign.id}><strong>{campaign.name}</strong><span>{campaign.success_count}건</span><span>{campaign.orders}건</span><span>{campaign.rate.toFixed(1)}%</span><b>{money(campaign.amount)}</b></article>)}{campaignConversions.length === 0 && <p>선택 기간 완료된 캠페인이 없습니다.</p>}</section><p className="dashboard-attribution-note">※ 클릭 식별자가 아직 없으므로 동일 회원에게 메시지를 보낸 뒤 7일 이내 발생한 결제를 추정 집계합니다.</p></section>
+
+    <section className="dashboard-section-title monitor"><div><i/><span><strong>수강생 활동</strong><small>진도와 자료·라이브·다시보기 실제 이용</small></span></div><em>LEARNING</em></section>
+    <section className="dashboard-learning-grid"><article><Activity/><span>활동 수강생<strong>{learnerIds.size}명</strong><small>선택 기간 학습 기록</small></span></article><article><TrendingUp/><span>평균 진도<strong>{avgProgress}%</strong><small>업데이트된 콘텐츠 기준</small></span></article><article><CheckCircle2/><span>콘텐츠 완주<strong>{completionRate}%</strong><small>진도 100% 비율</small></span></article><article><Radio/><span>라이브 입장<strong>{usageCount("live_join")}회</strong><small>기록된 이용 횟수</small></span></article><article><PlayCircle/><span>다시보기<strong>{usageCount("replay_view")}회</strong><small>기록된 이용 횟수</small></span></article><article><Download/><span>자료 다운로드<strong>{usageCount("material_download")}회</strong><small>기록된 이용 횟수</small></span></article><article className={inactiveLearners ? "warning" : ""}><AlertTriangle/><span>기간 내 미활동<strong>{inactiveLearners}명</strong><small>활성 수강권 중 기록 없음</small></span></article></section>
 
     <section className="dashboard-section-title action"><div><i/><span><strong>처리할 업무</strong><small>지금 운영자가 확인해야 할 항목</small></span></div><em>ACTION</em></section>
     <section className="dashboard-action-kpis">
