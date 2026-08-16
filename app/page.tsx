@@ -23,11 +23,14 @@ export default async function Home() {
   }
   const topArticles = articleIndex.articles.slice(0, 3);
   const nextClass = classes.find((item) => item.status.includes("모집 중"));
+  const paidOpen=Boolean(nextClass);
   return (
     <main>
       <BrandHeader />
 
       <section className="home-primary-banner" id="live-classes"><div className="container"><LandingBanner banner={banner}/></div></section>
+
+      <section className="recruitment-cycle"><div className="container"><header><span>COHORT RECRUITMENT CYCLE</span><strong>{paidOpen?"지금은 유료 클래스 모집 기간입니다.":"지금은 무료 클래스 모집 기간입니다."}</strong><p>{paidOpen?"무료 클래스에서 확인한 문제를 실제 실행으로 바꿀 기수를 1주간 모집합니다.":"2주 동안 무료 클래스로 고객 DB와 예비 수강생을 모집합니다."}</p></header><ol><li className={!paidOpen?"active":""}><b>01</b><span><strong>무료 클래스 모집</strong><small>2주 · 회원 DB 확보</small></span></li><li className={paidOpen?"active":""}><b>02</b><span><strong>유료 클래스 모집</strong><small>1주 · 신청·결제</small></span></li><li><b>03</b><span><strong>기수별 클래스 운영</strong><small>라이브 · 과제 · 피드백</small></span></li></ol><Link href={paidOpen?"/classes":"/articles#free-class"}>{paidOpen?"모집 중인 유료 클래스 보기":"무료 클래스 신청하기"}<ArrowRight/></Link></div></section>
 
       <section className="section" id="programs" data-home-reveal>
         <div className="container">

@@ -89,6 +89,7 @@ set value = jsonb_build_object(
     jsonb_build_object('id', 'lesson-2', 'title', 'AI로 줄일 일과 사람이 결정할 일', 'videoUrl', ''),
     jsonb_build_object('id', 'lesson-3', 'title', '7일 안에 실행할 매출 실험 설계', 'videoUrl', '')
   )
+)
 where key = 'article_free_course';
 
 commit;

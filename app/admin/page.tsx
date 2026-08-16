@@ -90,9 +90,14 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
   const usageCount = (type: string) => usageRows.filter((row) => row.item_type === type).reduce((sum, row) => sum + row.use_count, 0);
   const activeEnrollmentUsers = new Set((enrollmentsResult.data || []).map((row) => row.user_id));
   const inactiveLearners = [...activeEnrollmentUsers].filter((id) => !learnerIds.has(id)).length;
+  const freeLeads=membersResult.count||0;
+  const leadToPaid=freeLeads?payingCustomers/freeLeads*100:0;
+  const recruitingCohorts=cohorts.filter((cohort)=>cohort.status==="recruiting");
 
   return <AdminShell active="dashboard">
-    <AdminPageTitle eyebrow="OVERVIEW" title="모집·매출·전환·학습 한눈에 보기" description="현재 모집중인 기수부터 결제 고객, CRM 후행 전환, 실제 수강생 활동까지 연결해 확인합니다." action={<form className="dashboard-period"><label>분석 기간<select name="period" defaultValue={String(period)}>{periodOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label><button>적용</button></form>}/>
+    <AdminPageTitle eyebrow="OVERVIEW" title="무료 모집부터 유료 기수 운영까지" description="무료 클래스 2주 DB 모집 → 유료 클래스 1주 신청 모집 → 기수 운영 성과를 실제 데이터로 확인합니다." action={<form className="dashboard-period"><label>분석 기간<select name="period" defaultValue={String(period)}>{periodOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label><button>적용</button></form>}/>
+
+    <section className="admin-panel dashboard-acquisition-funnel"><header><div><span>RECRUITMENT FUNNEL</span><h2>기수 모집 퍼널</h2><p>현재 선택 기간의 회원가입과 결제를 같은 모집 흐름으로 비교합니다.</p></div><em>{recruitingCohorts.length?"유료 모집 1주 진행":"무료 DB 모집 2주 진행"}</em></header><div><article className={!recruitingCohorts.length?"active":""}><b>01 · 2주</b><span>무료 클래스 DB 모집<strong>{freeLeads}명</strong><small>선택 기간 신규 회원</small></span></article><i><ArrowRight/></i><article className={recruitingCohorts.length?"active":""}><b>02 · 1주</b><span>유료 클래스 모집<strong>{payingCustomers}명</strong><small>무료 DB 대비 {leadToPaid.toFixed(1)}% 결제</small></span></article><i><ArrowRight/></i><article><b>03 · 기수 운영</b><span>활성 수강생<strong>{activeEnrollmentUsers.size}명</strong><small>{cohorts.filter(cohort=>cohort.status==="in_progress").length}개 기수 운영 중</small></span></article></div></section>
 
     <section className="dashboard-section-title monitor"><div><i/><span><strong>모집·매출 스냅샷</strong><small>현재 모집중 기수와 선택 기간 결제 성과</small></span></div><em>RECRUITING</em></section>
     <section className="dashboard-decision-kpis"><article><Users/><span>결제 고객<strong>{payingCustomers}명</strong><small>선택 기간 순고객</small></span></article><article><CircleDollarSign/><span>순매출<strong>{money(revenue)}</strong><small>취소·환불 차감</small></span></article><article><BarChart3/><span>객단가<strong>{money(paidOrders.length ? Math.round(revenue / paidOrders.length) : 0)}</strong><small>결제 완료 주문 기준</small></span></article><article><CalendarClock/><span>모집중 기수<strong>{cohorts.filter((cohort) => cohort.status === "recruiting").length}개</strong><small>지금 신청 가능</small></span></article></section>

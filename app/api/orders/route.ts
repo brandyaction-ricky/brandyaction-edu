@@ -12,6 +12,11 @@ function messageFor(code: string) {
   if (code.includes("COHORT_NOT_RECRUITING") || code.includes("RECRUITMENT_CLOSED") || code.includes("COHORT_OPERATION_ENDED")) return "현재 신청할 수 없는 기수입니다.";
   if (code.includes("USER_NOT_ACTIVE")) return "이용이 제한된 계정입니다. 고객센터에 문의해 주세요.";
   if (code.includes("INVALID_SALE_PRICE")) return "판매 가격 설정을 확인해 주세요.";
+  if (code.includes("COUPON_NOT_FOUND")) return "사용할 수 없는 쿠폰 코드입니다.";
+  if (code.includes("COUPON_NOT_STARTED")) return "아직 사용 기간이 시작되지 않은 쿠폰입니다.";
+  if (code.includes("COUPON_EXPIRED")) return "사용 기간이 종료된 쿠폰입니다.";
+  if (code.includes("COUPON_PRODUCT_MISMATCH")) return "선택한 상품에는 사용할 수 없는 쿠폰입니다.";
+  if (code.includes("COUPON_SOLD_OUT")) return "쿠폰 사용 수량이 모두 소진되었습니다.";
   return "주문을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.";
 }
 
@@ -25,6 +30,7 @@ export async function POST(request: Request) {
     email?: string;
     phone?: string;
     agreements?: { terms?: boolean; privacy?: boolean; refund?: boolean };
+    couponCode?: string;
   } | null;
   if (!body?.cohortId || !body.name?.trim() || !body.email?.trim()) {
     return NextResponse.json({ error: "신청자와 상품 정보를 확인해 주세요." }, { status: 400 });
@@ -57,10 +63,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: messageFor(error?.message || "") }, { status: 409 });
   }
 
+  const orderData=data as Record<string,unknown>;
+  const {data:couponResult,error:couponError}=await admin.rpc("apply_coupon_to_order",{p_order_id:String(orderData.orderId),p_user_id:user.id,p_code:String(body.couponCode||"").trim().toUpperCase()});
+  if(couponError)return NextResponse.json({error:messageFor(couponError.message||"")},{status:409});
+  const couponData=(couponResult&&typeof couponResult==="object"&&!Array.isArray(couponResult)?couponResult:{}) as Record<string,unknown>;
+  const finalData={...orderData,...couponData};
+  if(Number(finalData.totalAmount)===0){const {error:freeError}=await admin.rpc("finalize_zero_total_coupon_order",{p_order_id:String(orderData.orderId),p_user_id:user.id});if(freeError)return NextResponse.json({error:"무료 쿠폰 주문을 완료하지 못했습니다."},{status:500});return NextResponse.json({...finalData,free:true},{status:201})}
+
   await admin.from("profiles").update({
     full_name: body.name.trim(),
     phone: normalizePhone(body.phone),
   }).eq("id", user.id);
 
-  return NextResponse.json(data, { status: 201 });
+  return NextResponse.json(finalData, { status: 201 });
 }

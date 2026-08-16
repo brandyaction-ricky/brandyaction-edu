@@ -11,6 +11,7 @@ import { AdminSuperAdminsManager } from "../../components/admin-super-admins-man
 import { AdminCodeSettingsManager } from "../../components/admin-code-settings-manager";
 import { AdminCrmManager } from "../../components/admin-crm-manager";
 import { AdminMemberTagsManager } from "../../components/admin-member-tags-manager";
+import { AdminCouponsManager } from "../../components/admin-coupons-manager";
 import { getAdminUser, type AdminScope } from "@/lib/server-auth";
 
 const info:Record<string,{eyebrow:string,title:string,desc:string}>={
@@ -20,6 +21,7 @@ const info:Record<string,{eyebrow:string,title:string,desc:string}>={
   members:{eyebrow:"MEMBERS",title:"회원 관리",desc:"상품·기수·고객 태그로 분류하고 수강권과 고객 상태를 한곳에서 관리합니다."},
   "member-tags":{eyebrow:"CUSTOMER TAGS",title:"고객 태그 관리",desc:"고객 분류 기준을 만들고 태그별 사용 인원을 관리합니다."},
   orders:{eyebrow:"ORDERS",title:"주문·결제 관리",desc:"프론트 결제와 연결된 상품·기수·승인·환불 데이터를 확인하고 처리합니다."},
+  coupons:{eyebrow:"COUPONS",title:"쿠폰 관리",desc:"상품별 할인 조건, 사용 수량과 기간을 설정하고 실제 결제 적용 현황을 관리합니다."},
   reviews:{eyebrow:"REVIEWS",title:"후기 관리",desc:"수강 후기의 공개 상태와 메인 노출 여부를 관리합니다."},
   "super-admins":{eyebrow:"SECURITY",title:"최고 관리자 관리",desc:"전체 운영 권한을 가진 최고 관리자 계정을 등록하고 관리합니다."},
   "code-settings":{eyebrow:"SEARCH & CODE",title:"검색 및 코드 설정",desc:"검색 소유확인과 분석·광고 코드를 전체 사이트에 적용합니다."},
@@ -30,9 +32,9 @@ const info:Record<string,{eyebrow:string,title:string,desc:string}>={
 export default async function AdminSection({params}:{params:Promise<{section:string}>}){
   const {section}=await params;
   const safeSection=info[section]?section:"products";
-  const scope: AdminScope = safeSection === "orders" ? "orders" : ["members", "member-tags"].includes(safeSection) ? "members" : safeSection === "settings" ? "settings" : safeSection === "articles" ? "articles" : "products";
+  const scope: AdminScope = ["orders","coupons"].includes(safeSection) ? "orders" : ["members", "member-tags"].includes(safeSection) ? "members" : safeSection === "settings" ? "settings" : safeSection === "articles" ? "articles" : "products";
   const operator = await getAdminUser(scope);
-  if (!operator || (["super-admins", "code-settings", "crm", "member-tags"].includes(safeSection) && operator.role !== "admin")) redirect("/admin?notice=permission_required");
+  if (!operator || (["super-admins", "code-settings", "crm", "member-tags", "coupons"].includes(safeSection) && operator.role !== "admin")) redirect("/admin?notice=permission_required");
   const meta=info[safeSection];
   return <AdminShell active={safeSection}><AdminPageTitle eyebrow={meta.eyebrow} title={meta.title} description={meta.desc} action={<SectionAction section={safeSection}/>}/><SectionContent section={safeSection}/></AdminShell>;
 }
@@ -49,6 +51,7 @@ function SectionContent({section}:{section:string}){
   if(section==="cohorts")return <AdminCohortsManager/>;
   if(section==="settings")return <AdminSettingsManager/>;
   if(section==="orders")return <AdminOrdersManager/>;
+  if(section==="coupons")return <AdminCouponsManager/>;
   if(section==="reviews")return <AdminLiveReviewsManager/>;
   if(section==="super-admins")return <AdminSuperAdminsManager/>;
   if(section==="code-settings")return <AdminCodeSettingsManager/>;
