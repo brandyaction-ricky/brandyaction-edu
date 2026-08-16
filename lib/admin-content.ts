@@ -293,34 +293,18 @@ export async function loadAdminBanner(): Promise<BannerData> {
 }
 
 export async function saveAdminBanner(banner: BannerData) {
-  const supabase = createClient();
-  let imagePath = banner.imagePath || null;
-  if (banner.imageFile) {
-    const path = `site/banners/${Date.now()}-${safeFileName(banner.imageFile.name)}`;
-    const { error: uploadError } = await supabase.storage.from("course-assets").upload(path, banner.imageFile, { upsert: false, contentType: banner.imageFile.type });
-    if (uploadError) throw new Error(messageOf(uploadError, "메인 배너 이미지를 업로드하지 못했습니다."));
-    if (banner.imagePath) await supabase.storage.from("course-assets").remove([banner.imagePath]);
-    imagePath = path;
-  } else if (!banner.image && banner.imagePath) {
-    await supabase.storage.from("course-assets").remove([banner.imagePath]);
-    imagePath = null;
-  }
-
-  const payload = {
-    eyebrow: banner.eyebrow.trim() || null,
-    title: banner.title.trim(),
-    description: banner.copy.trim() || null,
-    link_url: safePublicHref(banner.link, "/classes"),
-    image_path: imagePath,
-    is_active: true,
-    display_order: 0,
-  };
-  if (!payload.title) throw new Error("메인 배너 문구를 입력해 주세요.");
-  const query = banner.id
-    ? supabase.from("site_banners").update(payload).eq("id", banner.id)
-    : supabase.from("site_banners").insert(payload);
-  const { error } = await query;
-  if (error) throw new Error(messageOf(error, "메인 배너를 저장하지 못했습니다."));
+  const form = new FormData();
+  form.append("id", banner.id || "");
+  form.append("eyebrow", banner.eyebrow);
+  form.append("title", banner.title);
+  form.append("copy", banner.copy);
+  form.append("link", safePublicHref(banner.link, "/classes"));
+  form.append("imagePath", banner.imagePath || "");
+  form.append("removeImage", String(!banner.image && Boolean(banner.imagePath)));
+  if (banner.imageFile) form.append("image", banner.imageFile);
+  const response = await fetch("/api/admin/banner", { method: "POST", body: form });
+  const result = await response.json().catch(() => ({})) as { error?: string };
+  if (!response.ok) throw new Error(result.error || "메인 배너를 저장하지 못했습니다.");
 }
 
 async function cohortApi<T>(init?: RequestInit): Promise<T> {
