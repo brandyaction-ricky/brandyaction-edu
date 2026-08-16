@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChangeEvent, DragEvent, useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowLeft, ArrowUp, Check, ChevronDown, ChevronUp, Eye, GripVertical, ImagePlus, Link2, Plus, Save, Search, Trash2, Upload } from "lucide-react";
 import type { CurriculumLesson, CurriculumWeek } from "@/app/data";
+import { useAdminUnsavedChanges } from "./use-admin-unsaved-changes";
 import {
   createEmptyProduct,
   loadAdminProduct,
@@ -35,6 +36,7 @@ function move<T>(items: T[], from: number, to: number) {
 
 const statusLabel = { published: "판매 중", draft: "판매 중지", archived: "보관" } as const;
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const editorSignature = (value: ProductEditorData | null) => value ? JSON.stringify({ draft: value.draft, thumbnail: value.thumbnail, images: value.images, pixels: value.pixels, curriculum: value.curriculum }) : "";
 
 export function AdminProductsManager() {
   const [products, setProducts] = useState<ProductSummary[]>([]);
@@ -49,6 +51,9 @@ export function AdminProductsManager() {
   const [dragImage, setDragImage] = useState<number | null>(null);
   const [expandedWeeks, setExpandedWeeks] = useState<string[]>([]);
   const [resourceFiles, setResourceFiles] = useState<Map<string, File>>(new Map());
+  const [savedSignature, setSavedSignature] = useState("");
+  const hasUnsavedChanges = Boolean(editor) && (editorSignature(editor) !== savedSignature || resourceFiles.size > 0);
+  useAdminUnsavedChanges(hasUnsavedChanges && !saving);
 
   const refresh = async () => {
     const rows = await loadAdminProducts();
@@ -76,6 +81,7 @@ export function AdminProductsManager() {
       const data = await loadAdminProduct(id);
       data.curriculum = normalizeCurriculum(data.curriculum);
       setEditor(data);
+      setSavedSignature(editorSignature(data));
       setExpandedWeeks(data.curriculum.map((week) => week.id));
       setResourceFiles(new Map());
       setTab("basic");
@@ -89,6 +95,7 @@ export function AdminProductsManager() {
   const startNew = () => {
     const data = createEmptyProduct();
     setEditor(data);
+    setSavedSignature(editorSignature(data));
     setExpandedWeeks([]);
     setResourceFiles(new Map());
     setTab("basic");
@@ -105,6 +112,7 @@ export function AdminProductsManager() {
       const reloaded = await loadAdminProduct(courseId);
       reloaded.curriculum = normalizeCurriculum(reloaded.curriculum);
       setEditor(reloaded);
+      setSavedSignature(editorSignature(reloaded));
       setExpandedWeeks(reloaded.curriculum.map((week) => week.id));
       setResourceFiles(new Map());
       setSaved(true);
@@ -116,6 +124,13 @@ export function AdminProductsManager() {
     }
   };
 
+  const backToList = () => {
+    if (hasUnsavedChanges && !window.confirm("저장하지 않은 상품 변경사항을 버리고 목록으로 이동할까요?")) return;
+    setEditor(null);
+    setSavedSignature("");
+    setResourceFiles(new Map());
+  };
+
   const removeProduct = async () => {
     if (!editor?.draft.id || deleting) return;
     if (!window.confirm("이 상품을 삭제할까요? 주문·수강권·후기가 연결된 상품은 삭제되지 않습니다.")) return;
@@ -125,6 +140,7 @@ export function AdminProductsManager() {
       await deleteAdminProduct(editor.draft.id);
       await refresh();
       setEditor(null);
+      setSavedSignature("");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "상품을 삭제하지 못했습니다.");
     } finally {
@@ -232,7 +248,7 @@ export function AdminProductsManager() {
 
   return <div className="admin-editor-wrap">
     <div className="editor-head">
-      <button onClick={() => setEditor(null)}><ArrowLeft/> 상품 목록</button>
+      <button onClick={backToList}><ArrowLeft/> 상품 목록</button>
       <div><strong>{draft.title || "새 상품"}</strong><span className={`status-label ${draft.status === "published" ? "success" : "planned"}`}>{draft.id ? statusLabel[draft.status] : "신규 등록"}</span></div>
       <div>{draft.id && <button className="admin-outline product-delete-button" onClick={() => void removeProduct()} disabled={deleting || saving}><Trash2/> {deleting ? "삭제 중..." : "상품 삭제"}</button>}{draft.id && <Link className="admin-outline" href={`/admin/cohorts?course=${encodeURIComponent(draft.id)}`}>기수·회차 관리</Link>}{draft.id && <Link className="admin-outline" href={`/classes/${draft.slug}`}><Eye/> 미리보기</Link>}<button className="admin-primary" onClick={save} disabled={saving || deleting}><Save/> {saving ? "저장 중..." : draft.id ? "변경 저장" : "상품 등록"}</button></div>
     </div>

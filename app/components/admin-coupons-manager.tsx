@@ -1,6 +1,7 @@
 "use client";
 import { FormEvent, useEffect, useState } from "react";
 import { Copy, Pencil, Plus, Save, TicketPercent, Trash2, X } from "lucide-react";
+import { useAdminUnsavedChanges } from "./use-admin-unsaved-changes";
 
 type Course={id:string;title:string;status:string};
 type Coupon={id:string;name:string;description:string|null;code:string;usage_limit:number|null;product_scope:"all"|"specific";discount_type:"fixed"|"percentage";discount_value:number;starts_at:string|null;ends_at:string|null;is_active:boolean;courseIds:string[];usedCount:number};
@@ -18,13 +19,15 @@ export function AdminCouponsManager(){
   const [saving,setSaving]=useState(false);
   const [error,setError]=useState("");
   const [copied,setCopied]=useState("");
+  const dirty=modalOpen&&Boolean(form.id||form.name||form.description||form.code||form.usageLimit||form.discountValue||form.courseIds.length||form.startsAt||form.endsAt);
+  useAdminUnsavedChanges(dirty&&!saving);
   const load=async()=>{setLoading(true);const response=await fetch("/api/admin/coupons",{cache:"no-store"});const data=await response.json();if(!response.ok)setError(data.error||"쿠폰을 불러오지 못했습니다.");else{setCoupons(data.coupons);setCourses(data.courses)}setLoading(false)};
   useEffect(()=>{let active=true;fetch("/api/admin/coupons",{cache:"no-store"}).then(async response=>({response,data:await response.json()})).then(({response,data})=>{if(!active)return;if(!response.ok)setError(data.error||"쿠폰을 불러오지 못했습니다.");else{setCoupons(data.coupons);setCourses(data.courses)}}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[]);
-  const close=()=>{setModalOpen(false);setForm(empty);setError("")};
+  const close=(force:unknown=false)=>{if(force!==true&&dirty&&!saving&&!window.confirm("저장하지 않은 쿠폰 변경사항을 버릴까요?"))return;setModalOpen(false);setForm(empty);setError("")};
   const create=()=>{setForm(empty);setError("");setModalOpen(true)};
   const edit=(item:Coupon)=>{setForm({id:item.id,name:item.name,description:item.description||"",code:item.code,usageLimit:item.usage_limit?String(item.usage_limit):"",productScope:item.product_scope,courseIds:item.courseIds,discountType:item.discount_type,discountValue:String(item.discount_value),periodType:item.starts_at||item.ends_at?"range":"unlimited",startsAt:local(item.starts_at),endsAt:local(item.ends_at),isActive:item.is_active});setError("");setModalOpen(true)};
-  const submit=async(event:FormEvent)=>{event.preventDefault();setSaving(true);setError("");const response=await fetch("/api/admin/coupons",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...form,usageLimit:form.usageLimit?Number(form.usageLimit):null,discountValue:Number(form.discountValue),startsAt:form.periodType==="range"&&form.startsAt?new Date(form.startsAt).toISOString():null,endsAt:form.periodType==="range"&&form.endsAt?new Date(form.endsAt).toISOString():null})});const data=await response.json();if(!response.ok)setError(data.error||"쿠폰을 저장하지 못했습니다.");else{close();await load()}setSaving(false)};
-  const remove=async(id:string)=>{if(!window.confirm("이 쿠폰을 삭제하거나 사용 중지할까요?"))return;const response=await fetch("/api/admin/coupons",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});const data=await response.json();if(!response.ok)setError(data.error||"쿠폰을 삭제하지 못했습니다.");else await load()};
+  const submit=async(event:FormEvent)=>{event.preventDefault();setSaving(true);setError("");const response=await fetch("/api/admin/coupons",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...form,usageLimit:form.usageLimit?Number(form.usageLimit):null,discountValue:Number(form.discountValue),startsAt:form.periodType==="range"&&form.startsAt?new Date(form.startsAt).toISOString():null,endsAt:form.periodType==="range"&&form.endsAt?new Date(form.endsAt).toISOString():null})});const data=await response.json();if(!response.ok)setError(data.error||"쿠폰을 저장하지 못했습니다.");else{close(true);await load()}setSaving(false)};
+  const remove=async(id:string)=>{const item=coupons.find(coupon=>coupon.id===id);if(!window.confirm(`‘${item?.name||"선택한 쿠폰"}’을 삭제할까요? 결제 화면에서 즉시 사용할 수 없게 되며 사용 이력은 보존됩니다.`))return;const response=await fetch("/api/admin/coupons",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});const data=await response.json();if(!response.ok)setError(data.error||"쿠폰을 삭제하지 못했습니다.");else await load()};
   const toggle=async(item:Coupon)=>{setError("");const response=await fetch("/api/admin/coupons",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:item.id,isActive:!item.is_active})});const data=await response.json();if(!response.ok)setError(data.error||"쿠폰 상태를 변경하지 못했습니다.");else setCoupons(rows=>rows.map(row=>row.id===item.id?{...row,is_active:!row.is_active}:row))};
   const copy=async(code:string)=>{await navigator.clipboard.writeText(code);setCopied(code);window.setTimeout(()=>setCopied(""),1400)};
   if(loading)return <section className="admin-panel admin-loading-state"><strong>쿠폰 정보를 불러오는 중입니다.</strong></section>;

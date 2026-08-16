@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { Activity, AlertTriangle, ArrowRight, BarChart3, CalendarClock, CheckCircle2, CircleDollarSign, CreditCard, Download, Megaphone, MessageSquareText, PlayCircle, Radio, TrendingUp, UserPlus, Users } from "lucide-react";
+import { Activity, AlertTriangle, ArrowRight, BarChart3, CalendarClock, CheckCircle2, CircleDollarSign, CreditCard, Download, Megaphone, MessageSquareText, PlayCircle, Radio, ShieldCheck, TrendingUp, UserPlus, Users } from "lucide-react";
 import { AdminPageTitle, AdminShell } from "../components/admin-shell";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAdminUser } from "@/lib/server-auth";
@@ -15,7 +15,7 @@ const date = (value: string | null) => value ? new Intl.DateTimeFormat("ko-KR", 
 const orderLabel: Record<string, string> = { pending: "대기", paid: "결제 완료", payment_failed: "결제 실패", cancelled: "취소", partially_refunded: "부분 환불", refunded: "환불 완료" };
 const periodOptions = [{ value: 7, label: "최근 7일" }, { value: 30, label: "최근 30일" }, { value: 90, label: "최근 90일" }, { value: 365, label: "최근 1년" }];
 
-export default async function AdminDashboard({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
+export default async function AdminDashboard({ searchParams }: { searchParams: Promise<{ period?: string; notice?: string }> }) {
   const operator = await getAdminUser();
   if (!operator) redirect("/login?error=admin_required");
   const params = await searchParams;
@@ -42,7 +42,6 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
   const orders = ordersResult.data || [];
   const paidOrders = orders.filter((order) => ["paid", "partially_refunded"].includes(order.status));
   const revenue = paidOrders.reduce((sum, order) => { const payment = order.payments?.[0]; return sum + Math.max(0, (payment?.approved_amount || 0) - (payment?.cancelled_amount || 0)); }, 0);
-  const cancelled = orders.reduce((sum, order) => sum + (order.payments?.[0]?.cancelled_amount || 0), 0);
   const payingCustomers = new Set(paidOrders.map((order) => order.user_id).filter(Boolean)).size;
   const reviews = reviewsResult.data || [];
   const pendingReviews = reviews.filter((review) => review.status === "pending");
@@ -96,6 +95,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
 
   return <AdminShell active="dashboard">
     <AdminPageTitle eyebrow="OVERVIEW" title="무료 모집부터 유료 기수 운영까지" description="무료 클래스 2주 DB 모집 → 유료 클래스 1주 신청 모집 → 기수 운영 성과를 실제 데이터로 확인합니다." action={<form className="dashboard-period"><label>분석 기간<select name="period" defaultValue={String(period)}>{periodOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label><button>적용</button></form>}/>
+    {params.notice==="permission_required"&&<p className="admin-permission-notice" role="alert"><ShieldCheck/>현재 계정에는 요청한 메뉴 권한이 없습니다. 필요한 경우 최고 관리자에게 운영 범위 변경을 요청하세요.</p>}
 
     <section className="admin-panel dashboard-acquisition-funnel"><header><div><span>RECRUITMENT FUNNEL</span><h2>기수 모집 퍼널</h2><p>현재 선택 기간의 회원가입과 결제를 같은 모집 흐름으로 비교합니다.</p></div><em>{recruitingCohorts.length?"유료 모집 1주 진행":"무료 DB 모집 2주 진행"}</em></header><div><article className={!recruitingCohorts.length?"active":""}><b>01 · 2주</b><span>무료 클래스 DB 모집<strong>{freeLeads}명</strong><small>선택 기간 신규 회원</small></span></article><i><ArrowRight/></i><article className={recruitingCohorts.length?"active":""}><b>02 · 1주</b><span>유료 클래스 모집<strong>{payingCustomers}명</strong><small>무료 DB 대비 {leadToPaid.toFixed(1)}% 결제</small></span></article><i><ArrowRight/></i><article><b>03 · 기수 운영</b><span>활성 수강생<strong>{activeEnrollmentUsers.size}명</strong><small>{cohorts.filter(cohort=>cohort.status==="in_progress").length}개 기수 운영 중</small></span></article></div></section>
 
@@ -125,8 +125,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
     <section className="dashboard-section-title action"><div><i/><span><strong>이상 신호</strong><small>환불·저평점·운영 누락 자동 감지</small></span></div><em>ALERT</em></section>
     <section className={`dashboard-signals ${signals.length ? "has-alert" : ""}`}>{signals.length ? signals.map((signal) => <article key={signal.title}><AlertTriangle/><div><strong>{signal.title}</strong><p>{signal.body}</p></div></article>) : <article className="normal"><CheckCircle2/><div><strong>현재 감지된 이상 신호가 없습니다.</strong><p>선택한 기간의 결제·환불·후기·기수 운영 데이터를 확인했습니다.</p></div></article>}</section>
 
-    <section className="dashboard-section-title monitor"><div><i/><span><strong>통계</strong><small>선택 기간의 매출과 고객 흐름</small></span></div><em>MONITORING</em></section>
-    <section className="dashboard-stat-kpis"><article><span>실결제액</span><strong>{money(revenue)}</strong><small>취소·환불 차감</small></article><article><span>취소·환불</span><strong>{money(cancelled)}</strong><small>{refundOrders.length}건</small></article><article><span>신규 회원</span><strong>{membersResult.count || 0}명</strong><small>선택 기간 가입</small></article><article><span>활성 수강권</span><strong>{enrollmentsResult.data?.length || 0}건</strong><small>현재 접근 가능</small></article></section>
+    <section className="dashboard-section-title monitor"><div><i/><span><strong>매출 상세</strong><small>기간별 거래액과 클래스별 매출 기여도</small></span></div><em>REVENUE</em></section>
     <div className="dashboard-stats-grid"><section className="admin-panel dashboard-revenue-chart"><header><div><h2>기간별 거래액</h2><p>토스 승인액에서 취소액을 차감한 실결제 기준</p></div><strong>{money(revenue)}</strong></header><div className="dashboard-bars">{bars.map((bar) => <div key={bar.label}><span>{bar.value ? <><b>{bar.value.toLocaleString("ko-KR")}</b><em>원</em></> : ""}</span><i style={{ height: `${Math.max(bar.value ? 6 : 1, bar.value / max * 100)}%` }}/><small>{bar.label}</small></div>)}</div></section><section className="admin-panel dashboard-product-rank"><header><div><h2>클래스별 실매출</h2><p>결제·고객·환불을 클래스 단위로 비교</p></div><span>{paidOrders.length}건</span></header>{ranking.length ? ranking.slice(0, 6).map((item, index) => <article key={item.name}><b>{index + 1}</b><div><strong>{item.name}</strong><small>결제 {item.count}건 · 고객 {item.customers.size}명{item.refund ? ` · 환불 ${money(item.refund)}` : ""}</small><i><b style={{width:`${revenue ? Math.min(100,item.amount/revenue*100) : 0}%`}}/></i></div><span><strong>{money(item.amount)}</strong><small>매출 비중 {pct(item.amount,revenue)}</small></span></article>) : <div className="dashboard-empty">결제 완료 데이터가 없습니다.</div>}</section></div>
 
     <section className="dashboard-section-title monitor"><div><i/><span><strong>그로스 현황</strong><small>콘텐츠·후기·CRM 실행 결과</small></span></div><em>GROWTH</em></section>
