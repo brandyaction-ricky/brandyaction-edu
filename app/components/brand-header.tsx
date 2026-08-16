@@ -12,6 +12,7 @@ export function BrandHeader() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
+  const [selectedHref, setSelectedHref] = useState("");
   const [header, setHeader] = useState({ basic: defaultSiteSettings.basic, navigation: defaultSiteSettings.navigation });
   useEffect(() => {
     let active = true;
@@ -20,6 +21,12 @@ export function BrandHeader() {
     window.addEventListener("brandyaction:settings-updated", refresh);
     return () => { active = false; window.removeEventListener("brandyaction:settings-updated", refresh); };
   }, []);
+  useEffect(() => {
+    const sync = () => setSelectedHref(`${window.location.pathname}${window.location.hash}`);
+    const timer = window.setTimeout(sync, 0);
+    window.addEventListener("hashchange", sync);
+    return () => { window.clearTimeout(timer); window.removeEventListener("hashchange", sync); };
+  }, [pathname]);
   useEffect(() => {
     const supabase = createClient();
     let active = true;
@@ -34,8 +41,8 @@ export function BrandHeader() {
       <nav id="main-navigation" className={open ? "main-nav open" : "main-nav"} aria-label="주요 메뉴">
         {header.navigation.map((item) => {
           const path = item.href.split("#")[0];
-          const active = !item.href.includes("#") && path.startsWith("/") && (pathname === path || (path !== "/" && pathname.startsWith(`${path}/`)));
-          return <Link href={item.href} key={item.id} className={active ? "active" : undefined} aria-current={active ? "page" : undefined} onClick={() => setOpen(false)}>{item.label}</Link>;
+          const active = selectedHref === item.href || (!item.href.includes("#") && path.startsWith("/") && (pathname === path || (path !== "/" && pathname.startsWith(`${path}/`))));
+          return <Link href={item.href} key={item.id} className={active ? "active" : undefined} aria-current={active ? "page" : undefined} onClick={() => { setSelectedHref(item.href); setOpen(false); }}>{item.label}</Link>;
         })}
         <div className={`mobile-actions ${authenticated === null ? "checking" : ""}`}>{accountLink}</div>
       </nav>
