@@ -234,7 +234,7 @@ export function AdminProductsManager() {
     <div className="editor-head">
       <button onClick={() => setEditor(null)}><ArrowLeft/> 상품 목록</button>
       <div><strong>{draft.title || "새 상품"}</strong><span className={`status-label ${draft.status === "published" ? "success" : "planned"}`}>{draft.id ? statusLabel[draft.status] : "신규 등록"}</span></div>
-      <div>{draft.id && <button className="admin-outline product-delete-button" onClick={() => void removeProduct()} disabled={deleting || saving}><Trash2/> {deleting ? "삭제 중..." : "상품 삭제"}</button>}{draft.id && <Link className="admin-outline" href={`/classes/${draft.slug}`}><Eye/> 미리보기</Link>}<button className="admin-primary" onClick={save} disabled={saving || deleting}><Save/> {saving ? "저장 중..." : draft.id ? "변경 저장" : "상품 등록"}</button></div>
+      <div>{draft.id && <button className="admin-outline product-delete-button" onClick={() => void removeProduct()} disabled={deleting || saving}><Trash2/> {deleting ? "삭제 중..." : "상품 삭제"}</button>}{draft.id && <Link className="admin-outline" href={`/admin/cohorts?course=${encodeURIComponent(draft.id)}`}>기수·회차 관리</Link>}{draft.id && <Link className="admin-outline" href={`/classes/${draft.slug}`}><Eye/> 미리보기</Link>}<button className="admin-primary" onClick={save} disabled={saving || deleting}><Save/> {saving ? "저장 중..." : draft.id ? "변경 저장" : "상품 등록"}</button></div>
     </div>
     <div className="editor-tabs">{[["basic", "기본 정보"], ["detail", "이미지 상세페이지"], ["curriculum", "커리큘럼"], ["pixel", "픽셀·전환 추적"]].map(([id, label]) => <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)}>{label}{id === "detail" && <em>{images.length}</em>}</button>)}</div>
 

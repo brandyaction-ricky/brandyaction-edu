@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Check,
@@ -95,6 +95,8 @@ function Toast({
 
 export function AdminCohortsManager() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedCourse = searchParams.get("course");
   const [cohorts, setCohorts] = useState<AdminCohort[]>([]);
   const [courses, setCourses] = useState<
     Array<{ id: string; courseCode: string; title: string; listPrice: number }>
@@ -105,7 +107,7 @@ export function AdminCohortsManager() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
-  const [courseFilter, setCourseFilter] = useState("all");
+  const [courseFilter, setCourseFilter] = useState(searchParams.get("course") || "all");
   const [draft, setDraft] = useState({
     courseId: "",
     name: "새 기수",
@@ -120,18 +122,20 @@ export function AdminCohortsManager() {
     sessionTime: "20:00",
     sessionCount: "4",
   });
-  const applyData = (data: Awaited<ReturnType<typeof loadAdminCohorts>>) => {
+  const applyData = useCallback((data: Awaited<ReturnType<typeof loadAdminCohorts>>) => {
     setCourses(data.courses);
     setCohorts(data.cohorts);
+    const initialCourse = data.courses.find((course) => course.id === requestedCourse) || data.courses[0];
+    if (requestedCourse && data.courses.some((course) => course.id === requestedCourse)) setCourseFilter(requestedCourse);
     setDraft((current) => ({
       ...current,
-      courseId: current.courseId || data.courses[0]?.id || "",
+      courseId: current.courseId || initialCourse?.id || "",
       salePrice: current.courseId
         ? current.salePrice
-        : String(data.courses[0]?.listPrice || 0),
+        : String(initialCourse?.listPrice || 0),
     }));
     setLoading(false);
-  };
+  }, [requestedCourse]);
   const refresh = async () => applyData(await loadAdminCohorts());
   useEffect(() => {
     let active = true;
@@ -152,7 +156,7 @@ export function AdminCohortsManager() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [applyData]);
   const selected = cohorts.find((cohort) => cohort.id === selectedId) || null;
   const updateSelected = (changes: Partial<AdminCohort>) =>
     setCohorts((rows) =>

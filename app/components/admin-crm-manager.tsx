@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Check, ChevronRight, Edit3, Megaphone, MessageSquareText, RefreshCw, Save, Send, Tags, Trash2, Users } from "lucide-react";
+import { AlertTriangle, Check, ChevronRight, Clock3, Edit3, Megaphone, MessageSquareText, RefreshCw, Save, Send, Tags, Trash2, Users } from "lucide-react";
+import { AdminCrmAutomationManager } from "./admin-crm-automation-manager";
 
 type Tag = { id: string; name: string; color: string; description: string | null };
 type Template = { id: string; name: string; channel: "sms" | "lms" | "alimtalk"; purpose: "marketing" | "transactional"; content: string; alimtalk_template_id: string | null; is_active: boolean };
@@ -24,13 +25,14 @@ async function api(body?: Record<string, unknown>) {
 export function AdminCrmManager() {
   const [data, setData] = useState<Data>(empty);
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [crmMode, setCrmMode] = useState<"campaign" | "automation">("campaign");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [memberQuery, setMemberQuery] = useState("");
   const [templateDraft, setTemplateDraft] = useState({ ...emptyTemplate });
-  const [campaign, setCampaign] = useState({ name: "", targetTagId: "", templateId: "" });
+  const [campaign, setCampaign] = useState({ name: "", targetTagId: "", templateId: "", scheduledAt: "" });
   const load = async () => { setError(""); try { setData(await api() as unknown as Data); } catch (reason) { setError(reason instanceof Error ? reason.message : "CRM 데이터를 불러오지 못했습니다."); } finally { setLoading(false); } };
   useEffect(() => { void Promise.resolve().then(load); }, []);
   const mutate = async (body: Record<string, unknown>, success: string) => { setSaving(true); setError(""); setMessage(""); try { const result = await api(body); setMessage(success); await load(); return result; } catch (reason) { setError(reason instanceof Error ? reason.message : "저장하지 못했습니다."); return null; } finally { setSaving(false); } };
@@ -44,11 +46,13 @@ export function AdminCrmManager() {
   const visibleMembers = targetMembers.filter((member) => [member.full_name || "", member.email, member.phone || ""].some((value) => value.toLowerCase().includes(memberQuery.toLowerCase())));
   const saveTemplate = async () => { const result = await mutate({ action: "saveTemplate", id: templateDraft.id || undefined, name: templateDraft.name, channel: templateDraft.channel, purpose: templateDraft.purpose, content: templateDraft.content, alimtalkTemplateId: templateDraft.alimtalkTemplateId, isActive: templateDraft.isActive }, templateDraft.id ? "템플릿을 수정했습니다." : "템플릿을 저장했습니다."); if (result) { setTemplateDraft({ ...emptyTemplate }); if (!campaign.templateId && data.templates.length === 0) await load(); } };
   const editTemplate = (template: Template) => { setTemplateDraft({ id: template.id, name: template.name, channel: template.channel, purpose: template.purpose, content: template.content, alimtalkTemplateId: template.alimtalk_template_id || "", isActive: template.is_active }); };
-  const createCampaign = async (sendNow: boolean) => {
+  const createCampaign = async (mode: "draft" | "now" | "schedule") => {
     if (!campaign.name.trim() || !campaign.templateId) { setError("캠페인 이름과 메시지 템플릿을 선택해 주세요."); return; }
-    if (sendNow && !window.confirm(`${eligible.length}명에게 실제 메시지를 발송할까요? 발송 후에는 취소할 수 없습니다.`)) return;
-    const created = await mutate({ action: "saveCampaign", name: campaign.name, templateId: campaign.templateId, targetTagId: campaign.targetTagId || null }, sendNow ? "발송 준비를 완료했습니다." : "캠페인을 임시 저장했습니다.");
-    if (created?.id && sendNow) { const sent = await mutate({ action: "sendCampaign", campaignId: created.id }, `${eligible.length}명에게 발송 요청을 완료했습니다.`); if (sent) { setCampaign({ name: "", targetTagId: "", templateId: "" }); setStep(1); } }
+    if (mode === "schedule" && (!campaign.scheduledAt || new Date(campaign.scheduledAt) <= new Date())) { setError("현재 시각 이후의 예약 시간을 선택해 주세요."); return; }
+    if (mode === "now" && !window.confirm(`${eligible.length}명에게 실제 메시지를 발송할까요? 발송 후에는 취소할 수 없습니다.`)) return;
+    const created = await mutate({ action: "saveCampaign", name: campaign.name, templateId: campaign.templateId, targetTagId: campaign.targetTagId || null, scheduledAt: mode === "schedule" ? new Date(campaign.scheduledAt).toISOString() : null }, mode === "now" ? "발송 준비를 완료했습니다." : mode === "schedule" ? "예약 캠페인을 저장했습니다." : "캠페인을 임시 저장했습니다.");
+    if (created?.id && mode === "now") { const sent = await mutate({ action: "sendCampaign", campaignId: created.id }, `${eligible.length}명에게 발송 요청을 완료했습니다.`); if (sent) { setCampaign({ name: "", targetTagId: "", templateId: "", scheduledAt: "" }); setStep(1); } }
+    if (created?.id && mode === "schedule") { setCampaign({ name: "", targetTagId: "", templateId: "", scheduledAt: "" }); setStep(1); }
   };
 
   if (loading) return <section className="admin-panel admin-loading-state"><RefreshCw className="spin"/><strong>실행 가능한 CRM 환경을 준비하는 중입니다.</strong></section>;
@@ -59,6 +63,8 @@ export function AdminCrmManager() {
       <article><Tags/><span>고객 태그<strong>{data.tags.length}개</strong></span></article>
       <article className={data.solapiConfigured ? "ready" : "blocked"}><Send/><span>실발송 연결<strong>{data.solapiConfigured ? "SOLAPI 준비 완료" : "환경변수 필요"}</strong></span></article>
     </section>
+    <nav className="crm-mode-tabs"><button className={crmMode==="campaign"?"active":""} onClick={()=>setCrmMode("campaign")}><Megaphone/><span><strong>캠페인 발송</strong><small>대상 선택·즉시/예약 발송·성과 확인</small></span></button><button className={crmMode==="automation"?"active":""} onClick={()=>setCrmMode("automation")}><RefreshCw/><span><strong>자동화 엔진</strong><small>고객 행동 조건·대기 시간·자동 발송</small></span></button></nav>
+    {crmMode==="automation"?<AdminCrmAutomationManager/>:<>
     <nav className="crm-steps" aria-label="CRM 실행 단계">
       {([{ id: 1, label: "대상 분류", desc: "태그·동의 확인", icon: Users }, { id: 2, label: "메시지 작성", desc: "템플릿·미리보기", icon: MessageSquareText }, { id: 3, label: "검토·발송", desc: "대상 확정·실행", icon: Send }] as const).map((item, index) => { const Icon = item.icon; return <div key={item.id}><button className={step === item.id ? "active" : step > item.id ? "done" : ""} onClick={() => setStep(item.id)}><span>{step > item.id ? <Check/> : <Icon/>}</span><div><small>STEP {item.id}</small><strong>{item.label}</strong><em>{item.desc}</em></div></button>{index < 2 && <ChevronRight/>}</div>; })}
     </nav>
@@ -75,9 +81,9 @@ export function AdminCrmManager() {
     </div>}
 
     {step === 3 && <div className="crm-review-workspace">
-      <section className="admin-panel crm-send-review"><header><span>FINAL CHECK</span><h2>발송 전 마지막 확인</h2><p>대상, 동의 여부, 휴대폰 정보와 메시지 내용을 다시 확인합니다.</p></header><div className="crm-review-grid"><article><Users/><span>발송 대상</span><strong>{selectedTag?.name || "전체 수신 동의 회원"}</strong><em>{eligible.length}명 발송 가능</em></article><article><MessageSquareText/><span>메시지</span><strong>{selectedTemplate?.name || "선택 필요"}</strong><em>{selectedTemplate?.channel.toUpperCase()} · {selectedTemplate?.purpose === "marketing" ? "마케팅" : "정보성"}</em></article><article><Megaphone/><span>발송 시스템</span><strong>{data.solapiConfigured ? "SOLAPI 연결 완료" : "환경변수 미설정"}</strong><em>{data.solapiConfigured ? "실제 발송 가능" : "임시 저장만 가능"}</em></article></div><label className="campaign-name-field">캠페인 이름<input value={campaign.name} onChange={(event) => setCampaign({ ...campaign, name: event.target.value })} placeholder="예: 8월 무료강의 참여 안내"/></label><div className="crm-final-message"><span>실제 발송 내용</span><p>{selectedTemplate?.content.replaceAll("#{이름}", "회원명") || "메시지 템플릿을 선택해 주세요."}</p></div><div className="crm-exclusion-summary"><AlertTriangle/><div><strong>{targetMembers.length - eligible.length}명은 자동 제외됩니다.</strong><p>마케팅 미동의 {excluded.noConsent}명 · 휴대폰 없음 {excluded.noPhone}명 · 비활성 {excluded.inactive}명</p></div></div><footer><button className="admin-outline" onClick={() => void createCampaign(false)} disabled={!campaign.name.trim() || !campaign.templateId || saving}>임시 저장</button><button className="admin-primary" onClick={() => void createCampaign(true)} disabled={!campaign.name.trim() || !campaign.templateId || !eligible.length || !data.solapiConfigured || saving}><Send/>{saving ? "처리 중..." : `${eligible.length}명에게 실제 발송`}</button></footer>{!data.solapiConfigured && <p className="crm-config-warning">SOLAPI 키·시크릿·발신번호가 없어 실제 발송만 잠겨 있습니다. 태그·템플릿·캠페인 준비는 정상 사용할 수 있습니다.</p>}</section>
+      <section className="admin-panel crm-send-review"><header><span>FINAL CHECK</span><h2>발송 전 마지막 확인</h2><p>대상, 동의 여부, 휴대폰 정보와 메시지 내용을 다시 확인합니다.</p></header><div className="crm-review-grid"><article><Users/><span>발송 대상</span><strong>{selectedTag?.name || "전체 수신 동의 회원"}</strong><em>{eligible.length}명 발송 가능</em></article><article><MessageSquareText/><span>메시지</span><strong>{selectedTemplate?.name || "선택 필요"}</strong><em>{selectedTemplate?.channel.toUpperCase()} · {selectedTemplate?.purpose === "marketing" ? "마케팅" : "정보성"}</em></article><article><Megaphone/><span>발송 시스템</span><strong>{data.solapiConfigured ? "SOLAPI 연결 완료" : "환경변수 미설정"}</strong><em>{data.solapiConfigured ? "실제 발송 가능" : "임시 저장만 가능"}</em></article></div><div className="campaign-schedule-fields"><label>캠페인 이름<input value={campaign.name} onChange={(event) => setCampaign({ ...campaign, name: event.target.value })} placeholder="예: 8월 무료강의 참여 안내"/></label><label>예약 발송 시간 <small>선택 입력</small><input type="datetime-local" value={campaign.scheduledAt} onChange={(event)=>setCampaign({...campaign,scheduledAt:event.target.value})}/></label></div><div className="crm-final-message"><span>실제 발송 내용</span><p>{selectedTemplate?.content.replaceAll("#{이름}", "회원명") || "메시지 템플릿을 선택해 주세요."}</p></div><div className="crm-exclusion-summary"><AlertTriangle/><div><strong>{targetMembers.length - eligible.length}명은 자동 제외됩니다.</strong><p>마케팅 미동의 {excluded.noConsent}명 · 휴대폰 없음 {excluded.noPhone}명 · 비활성 {excluded.inactive}명</p></div></div><footer><button className="admin-outline" onClick={() => void createCampaign("draft")} disabled={!campaign.name.trim() || !campaign.templateId || saving}>임시 저장</button><button className="admin-outline" onClick={() => void createCampaign("schedule")} disabled={!campaign.name.trim() || !campaign.templateId || !campaign.scheduledAt || !eligible.length || !data.solapiConfigured || saving}><Clock3/>예약 발송</button><button className="admin-primary" onClick={() => void createCampaign("now")} disabled={!campaign.name.trim() || !campaign.templateId || !eligible.length || !data.solapiConfigured || saving}><Send/>{saving ? "처리 중..." : `${eligible.length}명에게 즉시 발송`}</button></footer>{!data.solapiConfigured && <p className="crm-config-warning">SOLAPI 키·시크릿·발신번호가 없어 실제 발송만 잠겨 있습니다. 태그·템플릿·캠페인 준비는 정상 사용할 수 있습니다.</p>}</section>
       <section className="admin-panel crm-history"><header><div><h2>캠페인 이력</h2><p>저장·발송 결과를 확인하고 실패 건은 다시 실행합니다.</p></div><span>{data.campaigns.length}개</span></header>{data.campaigns.map((item) => <article key={item.id}><span className={`campaign-status ${item.status}`}>{item.status}</span><div><strong>{item.name}</strong><small>{one(item.crm_templates)?.name} · {one(item.crm_tags)?.name || "전체 동의 회원"}</small>{item.error_message && <em>{item.error_message}</em>}</div><span>대상 {item.recipient_count}</span><span>성공 {item.success_count} / 실패 {item.failure_count}</span>{["draft", "failed"].includes(item.status) ? <button onClick={() => void mutate({ action: "sendCampaign", campaignId: item.id }, "메시지 발송 요청을 완료했습니다.")} disabled={!data.solapiConfigured || saving}><Send/>발송</button> : <time>{item.sent_at ? new Intl.DateTimeFormat("ko-KR", { dateStyle: "short", timeStyle: "short" }).format(new Date(item.sent_at)) : "-"}</time>}</article>)}</section>
     </div>}
-    {message && <p className="admin-save-success"><Check/>{message}</p>}{error && <p className="admin-save-error" role="alert">{error}</p>}
+    {message && <p className="admin-save-success"><Check/>{message}</p>}{error && <p className="admin-save-error" role="alert">{error}</p>}</>}
   </div>;
 }

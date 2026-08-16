@@ -50,3 +50,14 @@ export async function DELETE(request:Request){
   await admin.from("audit_logs").insert({actor_user_id:operator.id,action:count?"coupon.deactivated":"coupon.deleted",entity_type:"coupon",entity_id:id});
   return NextResponse.json({ok:true});
 }
+
+export async function PATCH(request:Request){
+  const operator=await getAdminUser("orders");
+  if(!operator||operator.role!=="admin")return NextResponse.json({error:"쿠폰 관리 권한이 필요합니다."},{status:403});
+  const body=await request.json().catch(()=>null) as {id?:string;isActive?:boolean}|null;
+  if(!body?.id||typeof body.isActive!=="boolean")return NextResponse.json({error:"변경할 쿠폰 상태를 확인해 주세요."},{status:400});
+  const admin=createAdminClient();const {error}=await admin.from("coupons").update({is_active:body.isActive}).eq("id",body.id);
+  if(error)return NextResponse.json({error:error.message},{status:500});
+  await admin.from("audit_logs").insert({actor_user_id:operator.id,action:body.isActive?"coupon.activated":"coupon.deactivated",entity_type:"coupon",entity_id:body.id});
+  return NextResponse.json({ok:true});
+}

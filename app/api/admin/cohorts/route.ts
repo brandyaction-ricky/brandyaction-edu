@@ -65,7 +65,7 @@ async function loadData() {
   const [sessionResult, enrollmentResult] = cohortIds.length
     ? await Promise.all([
         admin.from("cohort_sessions").select("id,cohort_id,session_number,title,description,expected_output,scheduled_at,cohort_session_contents(live_url,replay_url)").in("cohort_id", cohortIds).order("session_number"),
-        admin.from("enrollments").select("id,cohort_id,status,profiles(id,full_name,email,phone)").in("cohort_id", cohortIds).eq("status", "active"),
+        admin.from("enrollments").select("id,cohort_id,status,profiles!enrollments_user_id_fkey(id,full_name,email,phone)").in("cohort_id", cohortIds).eq("status", "active"),
       ])
     : [{ data: [], error: null }, { data: [], error: null }];
   if (sessionResult.error) throw new Error(errorMessage(sessionResult.error, "회차 목록을 불러오지 못했습니다."));
@@ -199,8 +199,12 @@ export async function PATCH(request: Request) {
   if (sessions.some((session) => !String(session.title || "").trim() || !validHttps(String(session.liveUrl || "")) || !validHttps(String(session.replayUrl || "")))) return NextResponse.json({ error: "회차 제목과 https:// 링크를 확인해 주세요." }, { status: 400 });
 
   const admin = createAdminClient();
-  const { data: existing } = await admin.from("cohorts").select("id,course_id").eq("id", id).maybeSingle();
+  const [{ data: existing }, { data: linkedCourse }] = await Promise.all([
+    admin.from("cohorts").select("id,course_id").eq("id", id).maybeSingle(),
+    admin.from("courses").select("id").eq("id", courseId).maybeSingle(),
+  ]);
   if (!existing) return NextResponse.json({ error: "기수를 찾을 수 없습니다." }, { status: 404 });
+  if (!linkedCourse) return NextResponse.json({ error: "연결할 상품을 찾을 수 없습니다." }, { status: 404 });
   if (existing.course_id !== courseId) {
     const [orderCount, enrollmentCount] = await Promise.all([
       admin.from("order_items").select("id", { count: "exact", head: true }).eq("cohort_id", id),

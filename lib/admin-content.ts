@@ -324,7 +324,7 @@ export async function loadAdminCohorts():Promise<{courses:AdminCourseOption[];co
 export async function createAdminCohort(input:{course:AdminCourseOption;name:string;status:CohortStatus;capacity:number;price:number;recruitmentStartAt:string;recruitmentEndAt:string;operationStartAt:string;operationEndAt:string;firstSessionAt:string;sessionCount:number}){
   if(!input.name.trim())throw new Error("기수명을 입력해 주세요.");
   if(!Number.isInteger(input.capacity)||input.capacity<=0)throw new Error("모집 정원은 1명 이상으로 입력해 주세요.");
-  if(!Number.isInteger(input.price)||input.price<=0)throw new Error("판매가는 1원 이상으로 입력해 주세요.");
+  if(!Number.isInteger(input.price)||input.price<0)throw new Error("판매가는 0원 이상으로 입력해 주세요.");
   if(!input.operationStartAt||!input.operationEndAt)throw new Error("기수 운영 시작일과 종료일을 입력해 주세요.");
   if(!input.firstSessionAt)throw new Error("첫 라이브 수업일과 시간을 입력해 주세요.");
   if(new Date(input.operationStartAt).getTime()>new Date(input.operationEndAt).getTime())throw new Error("운영 종료일은 시작일보다 빠를 수 없습니다.");
@@ -334,7 +334,7 @@ export async function createAdminCohort(input:{course:AdminCourseOption;name:str
 
 export async function saveAdminCohort(cohort:AdminCohort){
   const price=Number(cohort.price.replace(/[^0-9]/g,""));
-  if(!Number.isInteger(price)||price<=0)throw new Error("판매가는 1원 이상으로 입력해 주세요.");
+  if(!Number.isInteger(price)||price<0)throw new Error("판매가는 0원 이상으로 입력해 주세요.");
   if(!cohort.operationStartAt||!cohort.operationEndAt)throw new Error("기수 운영 시작일과 종료일을 입력해 주세요.");
   if(new Date(cohort.operationStartAt).getTime()>new Date(cohort.operationEndAt).getTime())throw new Error("운영 종료일은 시작일보다 빠를 수 없습니다.");
   for(const session of cohort.sessions){

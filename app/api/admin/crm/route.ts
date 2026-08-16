@@ -1,24 +1,27 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAdminUser } from "@/lib/server-auth";
-import { sendSolapiMessages, solapiConfigured, type SolapiMessage } from "@/lib/solapi";
+import { solapiConfigured } from "@/lib/solapi";
+import { processDueCrmJobs, sendCampaignById } from "@/lib/crm-engine";
 
 async function highestAdmin(){const user=await getAdminUser();return user?.role==="admin"?user:null}
 const cleanPhone=(value:string|null)=>value?.replace(/\D/g,"")||"";
 const maskPhone=(value:string)=>value.length>=8?`${value.slice(0,3)}****${value.slice(-4)}`:"****";
-const render=(text:string,name:string)=>text.replace(/#\{(?:이름|name)\}/g,name||"회원");
 
 export async function GET(){
   const operator=await highestAdmin();if(!operator)return NextResponse.json({error:"최고 관리자만 CRM에 접근할 수 있습니다."},{status:403});
   const admin=createAdminClient();
-  const [tags,templates,campaigns,members,memberTags]=await Promise.all([
+  const [tags,templates,campaigns,members,memberTags,automations,automationRuns,courses]=await Promise.all([
     admin.from("crm_tags").select("*").order("name"),admin.from("crm_templates").select("*").order("updated_at",{ascending:false}),
     admin.from("crm_campaigns").select("*,crm_templates(name,channel),crm_tags(name)").order("created_at",{ascending:false}).limit(100),
     admin.from("profiles").select("id,email,full_name,phone,status,marketing_consent,marketing_consent_at").neq("status","withdrawn").order("created_at",{ascending:false}),
-    admin.from("crm_member_tags").select("member_id,tag_id")
+    admin.from("crm_member_tags").select("member_id,tag_id"),
+    admin.from("crm_automations").select("*,crm_templates(name,channel,purpose),crm_tags!crm_automations_trigger_tag_id_fkey(name),courses!crm_automations_trigger_course_id_fkey(title)").order("updated_at",{ascending:false}),
+    admin.from("crm_automation_runs").select("id,automation_id,member_id,status,scheduled_for,executed_at,error_message,created_at").order("created_at",{ascending:false}).limit(200),
+    admin.from("courses").select("id,title,status").order("display_order",{ascending:false})
   ]);
-  const failed=[tags,templates,campaigns,members,memberTags].find(result=>result.error);if(failed?.error)return NextResponse.json({error:`CRM 데이터를 불러오지 못했습니다. (${failed.error.code})`},{status:500});
-  return NextResponse.json({tags:tags.data||[],templates:templates.data||[],campaigns:campaigns.data||[],members:(members.data||[]).map(member=>({...member,phone:member.phone?maskPhone(cleanPhone(member.phone)):null})),memberTags:memberTags.data||[],solapiConfigured:solapiConfigured(),alimtalkConfigured:Boolean(process.env.SOLAPI_KAKAO_PF_ID)});
+  const failed=[tags,templates,campaigns,members,memberTags,automations,automationRuns,courses].find(result=>result.error);if(failed?.error)return NextResponse.json({error:`CRM 데이터를 불러오지 못했습니다. (${failed.error.code})`},{status:500});
+  return NextResponse.json({tags:tags.data||[],templates:templates.data||[],campaigns:campaigns.data||[],members:(members.data||[]).map(member=>({...member,phone:member.phone?maskPhone(cleanPhone(member.phone)):null})),memberTags:memberTags.data||[],automations:automations.data||[],automationRuns:automationRuns.data||[],courses:courses.data||[],solapiConfigured:solapiConfigured(),alimtalkConfigured:Boolean(process.env.SOLAPI_KAKAO_PF_ID),engineConfigured:Boolean(process.env.CRON_SECRET)});
 }
 
 export async function POST(request:Request){
@@ -39,17 +42,21 @@ export async function POST(request:Request){
     const {data,error}=await admin.from("crm_campaigns").insert(payload).select("id").single();if(error)return NextResponse.json({error:"캠페인을 저장하지 못했습니다."},{status:500});return NextResponse.json({ok:true,id:data.id},{status:201});
   }else if(action==="sendCampaign"){
     const campaignId=String(body.campaignId||"");
-    const {data:campaign}=await admin.from("crm_campaigns").select("*,crm_templates(*)").eq("id",campaignId).maybeSingle();const template=Array.isArray(campaign?.crm_templates)?campaign.crm_templates[0]:campaign?.crm_templates;if(!campaign||!template)return NextResponse.json({error:"캠페인 또는 템플릿을 찾을 수 없습니다."},{status:404});
-    if(!["draft","scheduled","failed"].includes(campaign.status))return NextResponse.json({error:"이미 처리 중이거나 발송된 캠페인입니다."},{status:409});
-    let memberIds:string[]|null=null;if(campaign.target_tag_id){const {data}=await admin.from("crm_member_tags").select("member_id").eq("tag_id",campaign.target_tag_id);memberIds=(data||[]).map(row=>row.member_id);if(!memberIds.length)return NextResponse.json({error:"선택한 태그에 해당하는 회원이 없습니다."},{status:400});}
-    let query=admin.from("profiles").select("id,full_name,phone").eq("status","active").not("phone","is",null).limit(500);if(template.purpose==="marketing")query=query.eq("marketing_consent",true);if(memberIds)query=query.in("id",memberIds);
-    const {data:recipients,error:recipientError}=await query;if(recipientError)return NextResponse.json({error:"발송 대상을 조회하지 못했습니다."},{status:500});if(!recipients?.length)return NextResponse.json({error:"마케팅 수신 동의와 휴대폰 정보가 모두 있는 대상 회원이 없습니다."},{status:400});
-    const channel=template.channel as "sms"|"lms"|"alimtalk";if(!solapiConfigured())return NextResponse.json({error:"SOLAPI API 키·시크릿·발신번호 환경변수를 먼저 등록해 주세요."},{status:503});
-    if(template.purpose==="marketing"&&channel!=="alimtalk"&&!process.env.SOLAPI_OPTOUT_PHONE)return NextResponse.json({error:"광고 메시지 발송에는 무료 수신거부 번호(SOLAPI_OPTOUT_PHONE)가 필요합니다."},{status:503});
-    if(channel==="alimtalk"&&!process.env.SOLAPI_KAKAO_PF_ID)return NextResponse.json({error:"알림톡 발신 프로필 ID가 설정되지 않았습니다."},{status:503});
-    const optout=(process.env.SOLAPI_OPTOUT_PHONE||"").replace(/\D/g,"");const messages:SolapiMessage[]=recipients.map(recipient=>{let text=render(template.content,recipient.full_name||"회원");if(channel!=="alimtalk"&&Array.isArray(template.buttons))text+=template.buttons.map((button:{name?:string;url?:string})=>button.name&&button.url?`\n${button.name}: ${button.url}`:"").join("");if(template.purpose==="marketing"&&channel!=="alimtalk")text=`(광고) ${text}\n무료수신거부 ${optout}`;return{to:cleanPhone(recipient.phone),text,type:channel==="sms"?"SMS":channel==="lms"?"LMS":"ATA",...(channel==="alimtalk"?{kakaoOptions:{pfId:process.env.SOLAPI_KAKAO_PF_ID!,templateId:template.alimtalk_template_id}}:{})}});
-    await admin.from("crm_campaigns").update({status:"sending",recipient_count:messages.length,error_message:null}).eq("id",campaignId);
-    try{const result=await sendSolapiMessages(messages);await admin.from("crm_campaigns").update({status:"completed",sent_at:new Date().toISOString(),success_count:messages.length,failure_count:0,provider_group_id:result.groupId}).eq("id",campaignId);await admin.from("crm_message_logs").insert(recipients.map((recipient,index)=>({campaign_id:campaignId,member_id:recipient.id,channel,recipient_masked:maskPhone(messages[index].to),status:"queued",provider_group_id:result.groupId,sent_at:new Date().toISOString()})));return NextResponse.json({ok:true,sent:messages.length,groupId:result.groupId});}catch(reason){const message=reason instanceof Error?reason.message:"발송 실패";await admin.from("crm_campaigns").update({status:"failed",failure_count:messages.length,error_message:message}).eq("id",campaignId);return NextResponse.json({error:message},{status:502});}
+    try{return NextResponse.json({ok:true,...await sendCampaignById(campaignId)})}catch(reason){return NextResponse.json({error:reason instanceof Error?reason.message:"발송 실패"},{status:502})}
+  }else if(action==="cancelCampaign"){
+    const {error}=await admin.from("crm_campaigns").update({status:"cancelled"}).eq("id",String(body.campaignId||"")).in("status",["draft","scheduled"]);if(error)return NextResponse.json({error:"캠페인을 취소하지 못했습니다."},{status:500});
+  }else if(action==="saveAutomation"){
+    const triggerType=String(body.triggerType||"");const delayMinutes=Number(body.delayMinutes||0);const templateId=String(body.templateId||"");const name=String(body.name||"").trim();
+    if(!name||!templateId||!["member_joined","marketing_consent","tag_assigned","purchase_completed"].includes(triggerType)||!Number.isInteger(delayMinutes)||delayMinutes<0)return NextResponse.json({error:"자동화 이름·시작 조건·템플릿·대기 시간을 확인해 주세요."},{status:400});
+    if(triggerType==="tag_assigned"&&!body.triggerTagId)return NextResponse.json({error:"태그 지정 자동화는 기준 태그가 필요합니다."},{status:400});
+    const payload={name,trigger_type:triggerType,trigger_tag_id:triggerType==="tag_assigned"?String(body.triggerTagId):null,trigger_course_id:triggerType==="purchase_completed"&&body.triggerCourseId?String(body.triggerCourseId):null,template_id:templateId,delay_minutes:delayMinutes,is_active:body.isActive===true,created_by:operator.id};
+    const result=body.id?await admin.from("crm_automations").update(payload).eq("id",String(body.id)):await admin.from("crm_automations").insert(payload);if(result.error)return NextResponse.json({error:"자동화 규칙을 저장하지 못했습니다."},{status:500});
+  }else if(action==="toggleAutomation"){
+    const {error}=await admin.from("crm_automations").update({is_active:body.isActive===true}).eq("id",String(body.id||""));if(error)return NextResponse.json({error:"자동화 상태를 변경하지 못했습니다."},{status:500});
+  }else if(action==="deleteAutomation"){
+    const {error}=await admin.from("crm_automations").delete().eq("id",String(body.id||""));if(error)return NextResponse.json({error:"실행 이력이 있는 자동화를 삭제하지 못했습니다. 일시중지를 사용해 주세요."},{status:409});
+  }else if(action==="runEngine"){
+    try{return NextResponse.json({ok:true,...await processDueCrmJobs()})}catch(reason){return NextResponse.json({error:reason instanceof Error?reason.message:"자동화 엔진 실행 실패"},{status:500})}
   }else return NextResponse.json({error:"지원하지 않는 CRM 작업입니다."},{status:400});
   await admin.from("audit_logs").insert({actor_user_id:operator.id,action:`crm.${action}`,entity_type:"crm",after_data:body});return NextResponse.json({ok:true});
 }
