@@ -25,16 +25,7 @@ export async function POST(request:Request){
   const operator=await highestAdmin();if(!operator)return NextResponse.json({error:"최고 관리자만 CRM을 변경할 수 있습니다."},{status:403});
   const body=await request.json().catch(()=>null) as Record<string,unknown>|null;if(!body)return NextResponse.json({error:"요청 정보를 확인해 주세요."},{status:400});
   const action=String(body.action||"");const admin=createAdminClient();
-  if(action==="saveTag"){
-    const name=String(body.name||"").trim();if(!name)return NextResponse.json({error:"태그 이름을 입력해 주세요."},{status:400});
-    const payload={name,color:String(body.color||"#A10D12"),description:String(body.description||"").trim()||null,created_by:operator.id};
-    const result=body.id?await admin.from("crm_tags").update(payload).eq("id",String(body.id)):await admin.from("crm_tags").insert(payload);if(result.error)return NextResponse.json({error:"고객 태그를 저장하지 못했습니다."},{status:500});
-  }else if(action==="deleteTag"){
-    const {error}=await admin.from("crm_tags").delete().eq("id",String(body.id));if(error)return NextResponse.json({error:"사용 중인 태그를 삭제하지 못했습니다."},{status:500});
-  }else if(action==="setMemberTags"){
-    const memberId=String(body.memberId||"");const tagIds=Array.isArray(body.tagIds)?body.tagIds.map(String):[];
-    await admin.from("crm_member_tags").delete().eq("member_id",memberId);if(tagIds.length){const {error}=await admin.from("crm_member_tags").insert(tagIds.map(tagId=>({member_id:memberId,tag_id:tagId,assigned_by:operator.id})));if(error)return NextResponse.json({error:"회원 태그를 저장하지 못했습니다."},{status:500});}
-  }else if(action==="saveTemplate"){
+  if(action==="saveTemplate"){
     const channel=String(body.channel||"sms");const content=String(body.content||"").trim();const name=String(body.name||"").trim();if(!name||!content||!["sms","lms","alimtalk"].includes(channel))return NextResponse.json({error:"템플릿 이름·채널·내용을 확인해 주세요."},{status:400});
     if(channel==="alimtalk"&&!String(body.alimtalkTemplateId||"").trim())return NextResponse.json({error:"알림톡 승인 템플릿 ID를 입력해 주세요."},{status:400});
     const payload={name,channel,purpose:String(body.purpose)==="transactional"?"transactional":"marketing",content,alimtalk_template_id:String(body.alimtalkTemplateId||"").trim()||null,is_active:body.isActive!==false,created_by:operator.id};

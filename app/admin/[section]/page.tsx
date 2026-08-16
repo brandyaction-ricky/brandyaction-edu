@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
+import { Tags, Users } from "lucide-react";
 import { AdminCohortsManager, AdminProductsManager, AdminSettingsManager } from "../../components/admin-managers";
 import { AdminLiveReviewsManager } from "../../components/admin-operational-managers";
 import { AdminMembersManager } from "../../components/admin-members-manager";
@@ -8,6 +10,7 @@ import { AdminArticlesManager } from "../../components/admin-articles-manager";
 import { AdminSuperAdminsManager } from "../../components/admin-super-admins-manager";
 import { AdminCodeSettingsManager } from "../../components/admin-code-settings-manager";
 import { AdminCrmManager } from "../../components/admin-crm-manager";
+import { AdminMemberTagsManager } from "../../components/admin-member-tags-manager";
 import { getAdminUser, type AdminScope } from "@/lib/server-auth";
 
 const info:Record<string,{eyebrow:string,title:string,desc:string}>={
@@ -15,6 +18,7 @@ const info:Record<string,{eyebrow:string,title:string,desc:string}>={
   articles:{eyebrow:"GROWTH",title:"아티클 관리",desc:"카테고리와 게시글, 회원 전용 무료강의 영역을 한곳에서 관리합니다."},
   cohorts:{eyebrow:"COHORTS",title:"기수·회차 관리",desc:"모집 일정부터 라이브 회차와 수강생까지 기수 단위로 운영합니다."},
   members:{eyebrow:"MEMBERS",title:"회원 관리",desc:"상품·기수·고객 태그로 분류하고 수강권과 고객 상태를 한곳에서 관리합니다."},
+  "member-tags":{eyebrow:"CUSTOMER TAGS",title:"고객 태그 관리",desc:"고객 분류 기준을 만들고 태그별 사용 인원을 관리합니다."},
   orders:{eyebrow:"ORDERS",title:"주문·결제 관리",desc:"프론트 결제와 연결된 상품·기수·승인·환불 데이터를 확인하고 처리합니다."},
   reviews:{eyebrow:"REVIEWS",title:"후기 관리",desc:"수강 후기의 공개 상태와 메인 노출 여부를 관리합니다."},
   "super-admins":{eyebrow:"SECURITY",title:"최고 관리자 관리",desc:"전체 운영 권한을 가진 최고 관리자 계정을 등록하고 관리합니다."},
@@ -26,15 +30,16 @@ const info:Record<string,{eyebrow:string,title:string,desc:string}>={
 export default async function AdminSection({params}:{params:Promise<{section:string}>}){
   const {section}=await params;
   const safeSection=info[section]?section:"products";
-  const scope: AdminScope = safeSection === "orders" ? "orders" : safeSection === "members" ? "members" : safeSection === "settings" ? "settings" : safeSection === "articles" ? "articles" : "products";
+  const scope: AdminScope = safeSection === "orders" ? "orders" : ["members", "member-tags"].includes(safeSection) ? "members" : safeSection === "settings" ? "settings" : safeSection === "articles" ? "articles" : "products";
   const operator = await getAdminUser(scope);
-  if (!operator || (["super-admins", "code-settings", "crm"].includes(safeSection) && operator.role !== "admin")) redirect("/admin?notice=permission_required");
+  if (!operator || (["super-admins", "code-settings", "crm", "member-tags"].includes(safeSection) && operator.role !== "admin")) redirect("/admin?notice=permission_required");
   const meta=info[safeSection];
   return <AdminShell active={safeSection}><AdminPageTitle eyebrow={meta.eyebrow} title={meta.title} description={meta.desc} action={<SectionAction section={safeSection}/>}/><SectionContent section={safeSection}/></AdminShell>;
 }
 
 function SectionAction({section}:{section:string}){
-  void section;
+  if(section==="members")return <Link className="admin-outline" href="/admin/member-tags"><Tags/>고객 태그 관리</Link>;
+  if(section==="member-tags")return <Link className="admin-outline" href="/admin/members"><Users/>회원별 태그 지정</Link>;
   return null;
 }
 
@@ -49,5 +54,6 @@ function SectionContent({section}:{section:string}){
   if(section==="code-settings")return <AdminCodeSettingsManager/>;
   if(section==="crm")return <AdminCrmManager/>;
   if(section==="members")return <AdminMembersManager/>;
+  if(section==="member-tags")return <AdminMemberTagsManager/>;
   return null;
 }
