@@ -10,16 +10,16 @@ import type { ClassItem } from "@/app/data";
 type BannerData = { image?: string; eyebrow?: string; title?: string; copy?: string; link?: string; linkLabel?: string };
 type PixelData = { meta?: string; kakao?: string; google?: string; enabled?: boolean };
 
-export function LandingBanner({banner={}}:{banner?:BannerData}) {
-  return <div className={`hero-managed-banner ${banner.image?"has-upload":""}`} style={banner.image?{backgroundImage:`linear-gradient(90deg,rgba(17,17,17,.88),rgba(17,17,17,.2)),url(${banner.image})`}:undefined}>
-    <div className="managed-banner-lines" aria-hidden="true"><i/><i/><i/></div>
-    <div className="managed-banner-copy">
-      <span>{banner.eyebrow || "BRANDYACTION EDU · LIVE"}</span>
-      <strong>{banner.title || "배운 것을 실행으로\n바꾸는 실전 클래스"}</strong>
-      <p>{banner.copy || "모집 중인 클래스와 일정을 확인하세요."}</p>
-      <Link href={banner.link || "/classes"}>{banner.linkLabel || "클래스 자세히 보기"} <ArrowRight/></Link>
-    </div>
-    {!banner.image&&<div className="managed-banner-mark" aria-hidden="true"><span>01</span><b>LIVE</b></div>}
+export function LandingBanner({banners=[]}:{banners?:BannerData[]}) {
+  const [active,setActive]=useState(0);
+  const [paused,setPaused]=useState(false);
+  const count=banners.length;
+  useEffect(()=>{if(paused||count<=1)return;const timer=window.setInterval(()=>setActive(value=>(value+1)%count),5200);return()=>window.clearInterval(timer)},[count,paused]);
+  if(!count)return <div className="hero-managed-banner"><div className="managed-banner-lines" aria-hidden="true"><i/><i/><i/></div><div className="managed-banner-copy"><span>BRANDYACTION EDU · LIVE</span><strong>배운 것을 실행으로<br/>바꾸는 실전 클래스</strong><p>모집 중인 클래스와 일정을 확인하세요.</p><Link href="/classes">클래스 자세히 보기 <ArrowRight/></Link></div><div className="managed-banner-mark" aria-hidden="true"><span>01</span><b>LIVE</b></div></div>;
+  const move=(offset:number)=>setActive((active+offset+count)%count);
+  return <div className="landing-image-slider" onMouseEnter={()=>setPaused(true)} onMouseLeave={()=>setPaused(false)} onFocusCapture={()=>setPaused(true)} onBlurCapture={()=>setPaused(false)}>
+    <div className="landing-image-track" style={{transform:`translateX(-${active*100}%)`}}>{banners.map((banner,index)=><Link key={`${banner.image}-${index}`} href={banner.link||"/classes"} aria-hidden={index!==active} tabIndex={index===active?0:-1} style={{backgroundImage:`url(${banner.image})`}} aria-label={`${index+1}번째 배너 자세히 보기`}/>)}</div>
+    {count>1&&<div className="landing-image-controls"><span><b>{String(active+1).padStart(2,"0")}</b> / {String(count).padStart(2,"0")}</span><button onClick={()=>setPaused(value=>!value)} aria-label={paused?"자동 재생":"일시 정지"}>{paused?<Play/>:<Pause/>}</button><button onClick={()=>move(-1)} aria-label="이전 배너"><ArrowLeft/></button><button onClick={()=>move(1)} aria-label="다음 배너"><ArrowRight/></button></div>}
   </div>;
 }
 
@@ -35,7 +35,7 @@ export function LiveClassCarousel({ classes, banner = {} }: { classes: ClassItem
     const timer = window.setInterval(() => setActive((value) => (value + 1) % count), 5200);
     return () => window.clearInterval(timer);
   }, [count, paused]);
-  if (!count) return <section className="live-carousel-shell"><div className="container"><LandingBanner banner={banner}/></div></section>;
+  if (!count) return <section className="live-carousel-shell"><div className="container"><LandingBanner banners={banner.image ? [banner] : []}/></div></section>;
   const move = (offset: number) => setActive((active + offset + count) % count);
   return <section className="live-carousel-shell" aria-label="모집 중인 라이브 클래스">
     <div className="live-carousel-heading container"><div><span>LIVE NOW</span><h1>지금 모집 중인 클래스</h1><p>일정과 정원을 비교하고, 지금 필요한 실전 클래스를 선택하세요.</p></div><Link href="/classes">전체 클래스 <ArrowRight/></Link></div>

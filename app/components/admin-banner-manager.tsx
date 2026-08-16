@@ -1,88 +1,82 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- administrator-uploaded banner previews use blob and storage URLs */
 
 import Link from "next/link";
-import { ChangeEvent, useEffect, useMemo, useState } from "react";
-import { Check, Eye, Save, Upload, X } from "lucide-react";
-import { BannerData, loadAdminBanner, saveAdminBanner } from "@/lib/admin-content";
+import { ChangeEvent, useEffect, useState } from "react";
+import { Check, Eye, ImagePlus, Plus, Save, Trash2, X } from "lucide-react";
 import { useAdminUnsavedChanges } from "./use-admin-unsaved-changes";
 
-const emptyBanner: BannerData = {
-  eyebrow: "BRANDYACTION EDU · LIVE",
-  title: "배운 것을 실행으로\n바꾸는 실전 클래스",
-  copy: "모집 중인 클래스와 일정을 확인하세요.",
-  link: "/classes",
-  linkLabel: "클래스 자세히 보기",
-};
+type BannerRow = { id: string; link_url: string | null; image_path: string | null; image_url: string | null; display_order: number };
+type BannerDraft = { id: string; link: string; imagePath: string; imageUrl: string; file?: File };
+const emptyDraft = (): BannerDraft => ({ id: "", link: "/classes", imagePath: "", imageUrl: "" });
 
-function signature(banner: BannerData) {
-  return JSON.stringify({ ...banner, imageFile: undefined });
+async function bannerRequest<T>(input = "/api/admin/banner", init?: RequestInit): Promise<T> {
+  const response = await fetch(input, { cache: "no-store", ...init });
+  const result = await response.json().catch(() => ({})) as T & { error?: string };
+  if (!response.ok) throw new Error(result.error || "배너 요청을 처리하지 못했습니다.");
+  return result;
 }
 
 export function AdminBannerManager() {
-  const [banner, setBanner] = useState<BannerData>(emptyBanner);
-  const [savedSignature, setSavedSignature] = useState("");
+  const [banners, setBanners] = useState<BannerRow[]>([]);
+  const [draft, setDraft] = useState<BannerDraft | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
-  const dirty = useMemo(() => Boolean(savedSignature) && signature(banner) !== savedSignature, [banner, savedSignature]);
+  const [saved, setSaved] = useState(false);
+  const dirty = Boolean(draft?.file) || Boolean(draft && !draft.id);
   useAdminUnsavedChanges(dirty && !saving);
 
+  const load = async () => {
+    const result = await bannerRequest<{ banners: BannerRow[] }>();
+    setBanners(result.banners);
+  };
   useEffect(() => {
     let active = true;
-    loadAdminBanner().then((data) => {
-      if (!active) return;
-      setBanner(data);
-      setSavedSignature(signature(data));
-    }).catch((reason) => {
+    bannerRequest<{ banners: BannerRow[] }>().then((result) => { if (active) setBanners(result.banners); }).catch((reason) => {
       if (active) setError(reason instanceof Error ? reason.message : "배너를 불러오지 못했습니다.");
     }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []);
 
-  const uploadBanner = (event: ChangeEvent<HTMLInputElement>) => {
+  const open = (banner?: BannerRow) => setDraft(banner ? { id: banner.id, link: banner.link_url || "/classes", imagePath: banner.image_path || "", imageUrl: banner.image_url || "" } : emptyDraft());
+  const upload = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (!file) return;
+    if (!file || !draft) return;
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) return setError("배너는 JPG, PNG, WEBP 파일만 등록할 수 있습니다.");
     if (file.size > 5_000_000) return setError("배너 이미지는 5MB 이하만 등록할 수 있습니다.");
     setError("");
-    setBanner((current) => ({ ...current, image: URL.createObjectURL(file), imageFile: file }));
+    setDraft({ ...draft, file, imageUrl: URL.createObjectURL(file) });
   };
-
   const save = async () => {
-    if (saving) return;
-    if (!banner.title.trim()) return setError("메인 배너 문구를 입력해 주세요.");
-    if (!banner.link.trim()) return setError("배너 클릭 연결 URL을 입력해 주세요.");
-    setSaving(true);
-    setError("");
+    if (!draft || saving) return;
+    if (!draft.id && !draft.file) return setError("배너 이미지를 업로드해 주세요.");
+    if (!draft.link.trim()) return setError("배너 클릭 연결 URL을 입력해 주세요.");
+    setSaving(true); setError("");
     try {
-      await saveAdminBanner(banner);
-      const next = await loadAdminBanner();
-      setBanner(next);
-      setSavedSignature(signature(next));
-      setSaved(true);
-      window.setTimeout(() => setSaved(false), 1800);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "배너를 저장하지 못했습니다.");
-    } finally {
-      setSaving(false);
-    }
+      const form = new FormData();
+      form.append("id", draft.id); form.append("link", draft.link); form.append("imagePath", draft.imagePath);
+      if (draft.file) form.append("image", draft.file);
+      await bannerRequest("/api/admin/banner", { method: "POST", body: form });
+      await load(); setDraft(null); setSaved(true); window.setTimeout(() => setSaved(false), 1800);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "배너를 저장하지 못했습니다."); }
+    finally { setSaving(false); }
+  };
+  const remove = async (banner: BannerRow) => {
+    if (!window.confirm("이 배너를 삭제할까요? 고객 랜딩 슬라이드에서 즉시 제거됩니다.")) return;
+    try { await bannerRequest(`/api/admin/banner?id=${encodeURIComponent(banner.id)}`, { method: "DELETE" }); await load(); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "배너를 삭제하지 못했습니다."); }
   };
 
   if (loading) return <section className="admin-panel admin-loading-state"><strong>배너 정보를 불러오는 중입니다.</strong></section>;
-
   return <div className="admin-editor-wrap">
-    <section className="admin-panel banner-editor">
-      <div className="form-card-head"><div><h2>메인 랜딩 배너</h2><p>대표 이미지와 문구, 클릭 링크를 저장하면 고객 홈에 즉시 반영됩니다.</p></div><span className="status-label success">고객 화면 연동</span></div>
-      <div className={`banner-admin-preview ${banner.image ? "has-upload" : ""}`} style={banner.image ? { backgroundImage: `linear-gradient(90deg,rgba(17,17,17,.88),rgba(17,17,17,.15)),url(${banner.image})` } : undefined}><div><span>{banner.eyebrow}</span><strong>{banner.title}</strong><small>{banner.copy}</small></div>{!banner.image && <b>01</b>}</div>
-      <div className="banner-form-grid">
-        <label className="banner-upload"><input type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadBanner}/><Upload/><strong>{banner.image ? "배너 이미지 변경" : "배너 이미지 업로드"}</strong><span>가로형 JPG, PNG, WEBP · 5MB 이하</span></label>
-        <div className="admin-field-grid"><label>상단 문구<input value={banner.eyebrow} onChange={(event) => setBanner({ ...banner, eyebrow: event.target.value })}/></label><label>보조 문구<input value={banner.copy} onChange={(event) => setBanner({ ...banner, copy: event.target.value })}/></label><label className="field-full">메인 문구<textarea value={banner.title} onChange={(event) => setBanner({ ...banner, title: event.target.value })}/></label><label>버튼 문구<input value={banner.linkLabel} onChange={(event) => setBanner({ ...banner, linkLabel: event.target.value })} placeholder="클래스 자세히 보기"/></label><label>클릭 연결 URL<input value={banner.link} onChange={(event) => setBanner({ ...banner, link: event.target.value })} placeholder="/classes 또는 https://..."/></label></div>
-      </div>
-      <div className="banner-actions">{banner.image && <button className="admin-outline" onClick={() => setBanner({ ...banner, image: undefined, imageFile: undefined })}><X/> 이미지 삭제</button>}<Link className="admin-outline" href="/"><Eye/> 고객 화면 보기</Link><button className="admin-primary" onClick={save} disabled={saving}><Save/> {saving ? "저장 중..." : "배너 저장"}</button></div>
-      {error && <p className="admin-save-error" role="alert">{error}</p>}
+    <section className="admin-panel banner-library">
+      <div className="form-card-head"><div><h2>랜딩 이미지 배너</h2><p>등록한 순서대로 자동 슬라이드됩니다. 이미지 안에 문구를 포함해 업로드하세요.</p></div><button className="admin-primary" onClick={() => open()}><Plus/> 새 배너 등록</button></div>
+      <div className="banner-library-grid">{banners.map((banner, index) => <article key={banner.id}><button className="banner-library-image" onClick={() => open(banner)}>{banner.image_url ? <img src={banner.image_url} alt={`${index + 1}번째 배너`}/> : <span>이미지 없음</span>}<b>{String(index + 1).padStart(2, "0")}</b></button><div><span title={banner.link_url || "/classes"}>{banner.link_url || "/classes"}</span><button onClick={() => open(banner)}>수정</button><button onClick={() => remove(banner)} aria-label={`${index + 1}번째 배너 삭제`}><Trash2/></button></div></article>)}{!banners.length && <div className="product-empty-state"><strong>등록된 이미지 배너가 없습니다.</strong><p>새 배너 등록을 눌러 랜딩 슬라이드를 구성해 주세요.</p></div>}</div>
     </section>
-    <div className={`admin-toast ${saved ? "show" : ""}`} role="status" aria-live="polite"><Check/> 배너가 고객 화면에 반영되었습니다.</div>
+    {draft && <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setDraft(null); }}><section className="admin-modal banner-image-modal" role="dialog" aria-modal="true" aria-label={draft.id ? "배너 수정" : "새 배너 등록"}><header><div><span>BANNER</span><h2>{draft.id ? "배너 수정" : "새 배너 등록"}</h2></div><button onClick={() => setDraft(null)} aria-label="닫기"><X/></button></header><div className="banner-image-only-form"><label className={`banner-image-drop ${draft.imageUrl ? "has-image" : ""}`} style={draft.imageUrl ? { backgroundImage: `url(${draft.imageUrl})` } : undefined}><input type="file" accept="image/png,image/jpeg,image/webp" onChange={upload}/>{!draft.imageUrl && <><ImagePlus/><strong>배너 이미지 업로드</strong><span>가로형 JPG, PNG, WEBP · 5MB 이하</span></>}</label><label>배너 클릭 연결 URL<input value={draft.link} onChange={(event) => setDraft({ ...draft, link: event.target.value })} placeholder="/classes 또는 https://..."/></label><p>권장 비율 16:6 · 이미지 전체가 링크로 작동합니다.</p></div>{error && <p className="admin-save-error" role="alert">{error}</p>}<footer><Link className="admin-outline" href="/"><Eye/> 고객 화면 보기</Link><button className="admin-primary" onClick={save} disabled={saving}><Save/> {saving ? "저장 중..." : "배너 저장"}</button></footer></section></div>}
+    {error && !draft && <p className="admin-save-error" role="alert">{error}</p>}
+    <div className={`admin-toast ${saved ? "show" : ""}`} role="status" aria-live="polite"><Check/> 배너 슬라이드가 저장되었습니다.</div>
   </div>;
 }

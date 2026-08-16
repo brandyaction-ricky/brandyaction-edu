@@ -10,7 +10,6 @@ type SettingTab = "basic" | "banner" | "navigation" | "commerce" | "policies" | 
 
 const tabs: Array<{ id: SettingTab; label: string }> = [
   { id: "basic", label: "기본 정보" },
-  { id: "banner", label: "메인 배너" },
   { id: "navigation", label: "메뉴·페이지" },
   { id: "commerce", label: "결제·환불" },
   { id: "policies", label: "약관·정책" },

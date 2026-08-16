@@ -267,14 +267,14 @@ export async function getPublishedClass(slug: string) {
   return items.find((item) => item.slug === slug);
 }
 
-export async function getPublicBanner():Promise<PublicBanner>{
-  if(!hasSupabaseEnv())return {};
+export async function getPublicBanners():Promise<PublicBanner[]>{
+  if(!hasSupabaseEnv())return [];
   try{
     const supabase=publicClient();
-    const {data,error}=await supabase.from("site_banners").select("eyebrow,title,description,link_url,link_label,image_path").eq("is_active",true).order("display_order").limit(1).maybeSingle();
-    if(error||!data)return {};
-    return {eyebrow:data.eyebrow||undefined,title:data.title||undefined,copy:data.description||undefined,link:data.link_url?safePublicHref(data.link_url,"/classes"):undefined,linkLabel:data.link_label||undefined,image:data.image_path?supabase.storage.from("course-assets").getPublicUrl(data.image_path).data.publicUrl:undefined};
-  }catch{return {}}
+    const {data,error}=await supabase.from("site_banners").select("link_url,image_path").eq("is_active",true).not("image_path","is",null).order("display_order").limit(10);
+    if(error||!data)return [];
+    return data.flatMap((banner) => banner.image_path ? [{ link: banner.link_url ? safePublicHref(banner.link_url,"/classes") : "/classes", image: supabase.storage.from("course-assets").getPublicUrl(banner.image_path).data.publicUrl }] : []);
+  }catch{return []}
 }
 
 export async function getPublicCourseAppearance(slug:string):Promise<PublicCourseAppearance>{

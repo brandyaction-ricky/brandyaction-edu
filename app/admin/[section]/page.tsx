@@ -30,7 +30,7 @@ const info:Record<string,{eyebrow:string,title:string,desc:string}>={
   "code-settings":{eyebrow:"SEARCH & CODE",title:"검색 및 코드 설정",desc:"검색 소유확인과 분석·광고 코드를 전체 사이트에 적용합니다."},
   crm:{eyebrow:"MARKETING CRM",title:"마케팅 CRM",desc:"대상을 분류하고 메시지를 준비한 뒤 최종 확인을 거쳐 실제 발송합니다."},
   "message-templates":{eyebrow:"MESSAGE TEMPLATES",title:"메시지 템플릿 관리",desc:"반복 발송할 메시지 정보와 클릭 버튼을 미리 만들어 CRM에서 선택해 사용합니다."},
-  settings:{eyebrow:"SETTINGS",title:"사이트 설정",desc:"메인 배너, 메뉴, 약관과 운영자 권한을 설정합니다."}
+  settings:{eyebrow:"SETTINGS",title:"사이트 설정",desc:"사이트 기본 정보, 메뉴, 약관과 운영자 권한을 설정합니다."}
 };
 
 export default async function AdminSection({params}:{params:Promise<{section:string}>}){
