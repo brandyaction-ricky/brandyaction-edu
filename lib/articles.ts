@@ -1,4 +1,5 @@
 export type ArticleStatus = "draft" | "scheduled" | "published" | "hidden";
+export type ArticleContentType = "column" | "youtube";
 export type ArticleBlockType = "paragraph" | "heading" | "quote" | "list" | "image";
 
 export type ArticleBlock = {
@@ -28,6 +29,8 @@ export type Article = {
   slug: string;
   title: string;
   summary: string;
+  contentType: ArticleContentType;
+  videoUrl: string;
   blocks: ArticleBlock[];
   attachments: ArticleAttachment[];
   coverImagePath: string;

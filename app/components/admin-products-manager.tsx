@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { ChangeEvent, DragEvent, useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowLeft, ArrowUp, Check, ChevronDown, ChevronUp, Eye, GripVertical, ImagePlus, Link2, Plus, Save, Search, Trash2, Upload } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Check, ChevronDown, ChevronUp, Eye, GripVertical, ImagePlus, Link2, Pencil, Plus, Save, Search, Trash2, Upload } from "lucide-react";
 import type { CurriculumLesson, CurriculumWeek } from "@/app/data";
 import { useAdminUnsavedChanges } from "./use-admin-unsaved-changes";
 import {
@@ -164,6 +164,21 @@ export function AdminProductsManager() {
     }
   };
 
+  const removeListedProduct = async (product: ProductSummary) => {
+    if (deleting) return;
+    if (!window.confirm(`‘${product.title}’ 상품을 삭제할까요?\n\n주문·수강권·후기가 연결된 상품은 삭제되지 않으며, 이 경우 판매 상태를 ‘보관’으로 변경해야 합니다.`)) return;
+    setDeleting(true);
+    setError("");
+    try {
+      await deleteAdminProduct(product.id);
+      await refresh();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "상품을 삭제하지 못했습니다.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (loading && !editor && !products.length) return <section className="admin-panel admin-loading-state"><strong>상품 정보를 불러오는 중입니다.</strong></section>;
 
   if (!editor) return <>
@@ -187,8 +202,10 @@ export function AdminProductsManager() {
           <div><small>가격</small><strong>{product.listPrice.toLocaleString()}원</strong></div>
           <div><small>상세페이지</small><strong>이미지 {product.imageCount}장</strong></div>
           <div><small>커리큘럼</small><strong>{product.weekCount}주 · {product.lessonCount}개</strong></div>
-          <button className="manage-button prominent" onClick={() => openProduct(product.id)}>관리하기</button>
-          <Link className="product-preview-link" href={`/classes/${product.slug}`} aria-label={`${product.title} 고객 화면`}><Eye/></Link>
+          <div className="product-row-actions">
+            <button className="manage-button" onClick={() => void openProduct(product.id)} disabled={deleting}><Pencil/> 수정</button>
+            <button className="manage-button danger" onClick={() => void removeListedProduct(product)} disabled={deleting}><Trash2/> 삭제</button>
+          </div>
         </div>)}
         {!visible.length && <div className="product-empty-state"><strong>{products.length ? "검색 결과가 없습니다." : "등록된 상품이 없습니다."}</strong><p>새 상품 추가 버튼으로 첫 클래스를 등록해 주세요.</p></div>}
       </div>

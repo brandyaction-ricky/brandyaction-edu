@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAdminUser } from "@/lib/server-auth";
-import { defaultFreeCourse, normalizeBlocks, normalizeFreeCourse, slugify, type ArticleStatus } from "@/lib/articles";
+import { defaultFreeCourse, normalizeBlocks, normalizeFreeCourse, slugify, youtubeEmbedUrl, type ArticleContentType, type ArticleStatus } from "@/lib/articles";
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const statuses = new Set<ArticleStatus>(["draft", "scheduled", "published", "hidden"]);
+const contentTypes = new Set<ArticleContentType>(["column", "youtube"]);
 
 function errorMessage(error: unknown, fallback: string) {
   if (error && typeof error === "object" && "message" in error) return String(error.message);
@@ -64,11 +65,11 @@ function assetPaths(article: { cover_image_path?: string | null; content_blocks?
 
 export async function GET() {
   const operator = await getAdminUser("articles");
-  if (!operator) return NextResponse.json({ error: "아티클 관리 권한이 필요합니다." }, { status: 403 });
+  if (!operator) return NextResponse.json({ error: "블로그 관리 권한이 필요합니다." }, { status: 403 });
   try {
     const admin = createAdminClient();
     const [articles, categories, freeCourse] = await Promise.all([
-      admin.from("articles").select("id,category_id,slug,title,summary,content_blocks,attachments,cover_image_path,cover_image_alt,status,is_featured,seo_title,seo_description,scheduled_at,published_at,created_at,updated_at,article_categories(name)").order("updated_at", { ascending: false }),
+      admin.from("articles").select("id,category_id,slug,title,summary,content_type,video_url,content_blocks,attachments,cover_image_path,cover_image_alt,status,is_featured,seo_title,seo_description,scheduled_at,published_at,created_at,updated_at,article_categories(name)").order("updated_at", { ascending: false }),
       admin.from("article_categories").select("id,name,slug,description,display_order,is_active").order("display_order"),
       admin.from("site_settings").select("value").eq("key", "article_free_course").maybeSingle(),
     ]);
@@ -82,6 +83,8 @@ export async function GET() {
         slug: row.slug,
         title: row.title,
         summary: row.summary || "",
+        contentType: row.content_type === "youtube" ? "youtube" : "column",
+        videoUrl: row.video_url || "",
         blocks: displayBlocks(row.content_blocks),
         attachments: storedAttachments(row.attachments).map((item) => ({ ...item, url: publicResourceUrl(item.path) })),
         coverImagePath: row.cover_image_path || "",
@@ -100,13 +103,13 @@ export async function GET() {
       freeCourse: freeCourse.error ? defaultFreeCourse : normalizeFreeCourse(freeCourse.data?.value),
     });
   } catch (error) {
-    return NextResponse.json({ error: errorMessage(error, "아티클 데이터를 불러오지 못했습니다.") }, { status: 500 });
+    return NextResponse.json({ error: errorMessage(error, "블로그 데이터를 불러오지 못했습니다.") }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
   const operator = await getAdminUser("articles");
-  if (!operator) return NextResponse.json({ error: "아티클 관리 권한이 필요합니다." }, { status: 403 });
+  if (!operator) return NextResponse.json({ error: "블로그 관리 권한이 필요합니다." }, { status: 403 });
   try {
     const body = await request.json() as Record<string, unknown>;
     const action = String(body.action || "");
@@ -148,11 +151,14 @@ export async function POST(request: Request) {
       const title = String(article.title || "").trim().slice(0, 150);
       const slug = slugify(String(article.slug || title));
       const status = statuses.has(article.status as ArticleStatus) ? article.status as ArticleStatus : "draft";
+      const contentType = contentTypes.has(article.contentType as ArticleContentType) ? article.contentType as ArticleContentType : "column";
+      const videoUrl = String(article.videoUrl || "").trim().slice(0, 500);
       const categoryId = String(article.categoryId || "");
       const blocks = storedBlocks(article.blocks);
       const attachments = storedAttachments(article.attachments);
       const scheduledAt = String(article.scheduledAt || "");
       if (!title || !slug) return NextResponse.json({ error: "제목과 URL 주소를 입력해 주세요." }, { status: 400 });
+      if (contentType === "youtube" && !youtubeEmbedUrl(videoUrl)) return NextResponse.json({ error: "올바른 YouTube 영상 주소를 입력해 주세요." }, { status: 400 });
       if (categoryId && !uuidPattern.test(categoryId)) return NextResponse.json({ error: "카테고리를 다시 선택해 주세요." }, { status: 400 });
       if (status === "scheduled" && (!scheduledAt || Number.isNaN(new Date(scheduledAt).getTime()))) return NextResponse.json({ error: "예약 발행 날짜와 시간을 입력해 주세요." }, { status: 400 });
       const coverImagePath = String(article.coverImagePath || "");
@@ -163,6 +169,8 @@ export async function POST(request: Request) {
         slug,
         title,
         summary: String(article.summary || "").trim().slice(0, 500) || null,
+        content_type: contentType,
+        video_url: contentType === "youtube" ? videoUrl : null,
         content_blocks: blocks,
         attachments,
         cover_image_path: coverImagePath || null,
@@ -196,7 +204,7 @@ export async function POST(request: Request) {
 
     if (action === "deleteArticle") {
       const id = String(body.id || "");
-      if (!uuidPattern.test(id)) return NextResponse.json({ error: "잘못된 아티클입니다." }, { status: 400 });
+      if (!uuidPattern.test(id)) return NextResponse.json({ error: "잘못된 블로그 콘텐츠입니다." }, { status: 400 });
       const { data: article } = await admin.from("articles").select("cover_image_path,content_blocks,attachments").eq("id", id).maybeSingle();
       const { error } = await admin.from("articles").delete().eq("id", id);
       if (error) throw error;

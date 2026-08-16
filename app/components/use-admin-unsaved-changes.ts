@@ -7,7 +7,10 @@ const WARNING = "저장하지 않은 변경사항이 있습니다. 이 페이지
 export function useAdminUnsavedChanges(isDirty: boolean) {
   useEffect(() => {
     if (!isDirty) return;
-    const beforeUnload = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = WARNING; };
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = WARNING;
+    };
     const guardLinks = (event: MouseEvent) => {
       const target = event.target as HTMLElement | null;
       const anchor = target?.closest("a[href]") as HTMLAnchorElement | null;
@@ -18,6 +21,9 @@ export function useAdminUnsavedChanges(isDirty: boolean) {
     };
     window.addEventListener("beforeunload", beforeUnload);
     document.addEventListener("click", guardLinks, true);
-    return () => { window.removeEventListener("beforeunload", beforeUnload); document.removeEventListener("click", guardLinks, true); };
+    return () => {
+      window.removeEventListener("beforeunload", beforeUnload);
+      document.removeEventListener("click", guardLinks, true);
+    };
   }, [isDirty]);
 }

@@ -9,7 +9,7 @@ const navGroups = [
   { label:"운영 현황",items:[{ id:"dashboard",label:"대시보드",href:"/admin",icon:LayoutDashboard },{ id:"journey",label:"행동·전환 분석",href:"/admin/journey",icon:Route }] },
   { label:"교육 운영",items:[{ id:"products",label:"상품 관리",href:"/admin/products",icon:BookOpen },{ id:"cohorts",label:"기수·회차 관리",href:"/admin/cohorts",icon:GraduationCap },{ id:"reviews",label:"후기 관리",href:"/admin/reviews",icon:MessageSquareText }] },
   { label:"고객·매출",items:[{ id:"members",label:"회원 관리",href:"/admin/members",icon:Users },{ id:"member-tags",label:"고객 태그 관리",href:"/admin/member-tags",icon:Tags },{ id:"orders",label:"주문·결제",href:"/admin/orders",icon:CreditCard },{ id:"coupons",label:"쿠폰 관리",href:"/admin/coupons",icon:TicketPercent }] },
-  { label:"콘텐츠 관리",items:[{ id:"banners",label:"배너 관리",href:"/admin/banners",icon:FileImage },{ id:"articles",label:"아티클 관리",href:"/admin/articles",icon:FileText }] },
+  { label:"콘텐츠 관리",items:[{ id:"banners",label:"배너 관리",href:"/admin/banners",icon:FileImage },{ id:"articles",label:"블로그 관리",href:"/admin/articles",icon:FileText }] },
   { label:"마케팅 관리",items:[{ id:"code-settings",label:"검색·코드 설정",href:"/admin/code-settings",icon:Code2 },{ id:"message-templates",label:"메시지 템플릿",href:"/admin/message-templates",icon:MessagesSquare },{ id:"crm",label:"마케팅 CRM",href:"/admin/crm",icon:Megaphone }] },
   { label:"시스템 관리",items:[{ id:"super-admins",label:"최고 관리자",href:"/admin/super-admins",icon:ShieldCheck },{ id:"settings",label:"사이트 설정",href:"/admin/settings",icon:Settings }] },
 ];

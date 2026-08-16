@@ -6,43 +6,27 @@ import { LandingBanner, ReviewSlider } from "./components/site-live-content";
 import { ClassCatalog } from "./components/class-catalog";
 import { getPublicBanners, getPublishedClasses, getPublishedReviews, getPublishedReviewVideos } from "@/lib/education-data";
 import { getPublicArticleIndex } from "@/lib/article-data";
-import { getAuthenticatedUser } from "@/lib/server-auth";
-import { createClient } from "@/lib/supabase/server";
+import { articleReadingMinutes } from "@/lib/articles";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const [classes,banners,reviews,reviewVideos,articleIndex,user] = await Promise.all([getPublishedClasses(),getPublicBanners(),getPublishedReviews(),getPublishedReviewVideos(),getPublicArticleIndex(),getAuthenticatedUser()]);
-  const featured = classes[0];
-  let currentEnrollment: { courseTitle: string; cohortName: string } | null = null;
-  if (user) {
-    const supabase = await createClient();
-    const { data } = await supabase.from("enrollments").select("courses(title),cohorts(name)").eq("user_id", user.id).eq("status", "active").order("created_at", { ascending: false }).limit(1).maybeSingle();
-    const course = Array.isArray(data?.courses) ? data.courses[0] : data?.courses;
-    const cohort = Array.isArray(data?.cohorts) ? data.cohorts[0] : data?.cohorts;
-    if (course?.title) currentEnrollment = { courseTitle: course.title, cohortName: cohort?.name || "수강 중" };
-  }
+  const [classes,banners,reviews,reviewVideos,articleIndex] = await Promise.all([getPublishedClasses(),getPublicBanners(),getPublishedReviews(),getPublishedReviewVideos(),getPublicArticleIndex()]);
+  const recruitingPaid = classes.find((item) => item.programType === "paid" && item.status.includes("모집 중"));
   const topArticles = articleIndex.articles.slice(0, 3);
-  const nextClass = classes.find((item) => item.status.includes("모집 중"));
   return (
     <main>
       <BrandHeader />
 
       <section className="home-primary-banner" id="live-classes"><div className="container"><LandingBanner banners={banners}/></div></section>
 
-      <section className="section" id="programs" data-home-reveal>
+      <section className="section home-program-catalog" id="programs" data-home-reveal>
         <div className="container">
-          <div className="section-heading split-heading">
-            <div><span className="section-kicker">FREE · PAID CLASS</span><h2>내 사업의 매출 단계에 맞춰 시작하세요</h2><p>무료 클래스에서 마케팅 병목을 찾고, 유료 라이브 클래스에서 AI를 활용한 실행 결과물을 완성합니다.</p></div>
-            <Link className="text-link" href="/classes">전체 클래스 보기 <ArrowRight size={18} /></Link>
-          </div>
           <ClassCatalog classes={classes}/>
         </div>
       </section>
 
-      {user && <section className="member-next-step section" data-home-reveal><div className="container"><div><span className="section-kicker">MY LEARNING PATH</span><h2>{currentEnrollment ? "지금 수강 중인 흐름을\n다음 클래스로 이어가세요." : "내 클래스에서 학습 현황을\n바로 확인하세요."}</h2><p>{currentEnrollment ? `${currentEnrollment.courseTitle} · ${currentEnrollment.cohortName} 수강 중` : "수강권과 다음 라이브 일정을 한곳에서 확인할 수 있습니다."}</p><Link href="/my">마이페이지에서 확인 <ArrowRight/></Link></div>{nextClass && <article><span>{nextClass.status}</span><small>NEXT RECOMMENDED CLASS</small><h3>{nextClass.title}</h3><p>{nextClass.startDate} 개강 · {nextClass.schedule}</p><strong>{nextClass.price}</strong><Link href={`/classes/${nextClass.slug}`}>다음 기수 예약하기 <ArrowRight/></Link></article>}</div></section>}
-
-      <section className="landing-article-section section" data-home-reveal><div className="container"><div className="section-heading split-heading"><div><span className="section-kicker">TOP REVENUE QUESTIONS</span><h2>사업자들이 가장 많이 막히는 매출 문제부터</h2><p>광고·콘텐츠·AI·CRM 중 내 사업의 병목과 가까운 글에서 실행 방법을 확인하세요.</p></div><Link className="text-link" href="/articles">모든 실무 글 보기 <ArrowRight/></Link></div><div className="landing-article-grid">{topArticles.map((article, index) => <article key={article.id}><Link href={`/articles/${article.slug}`}><span>{article.categoryName}</span><b>{String(index + 1).padStart(2,"0")}</b><h3>{article.title}</h3><p>{article.summary}</p><footer>실행 방법 확인하기 <ArrowRight/></footer></Link></article>)}</div><div className="landing-free-bridge"><div><span>무료 3강</span><strong>블로그에서 찾은 매출 문제를<br/>내 사업의 실행안으로 바꾸세요.</strong></div><p>회원가입만 하면 사업자 마케팅·AI 무료 3강을 바로 볼 수 있습니다.</p><Link href="/articles#free-class">무료 3강 보기 <ArrowRight/></Link></div></div></section>
+      <section className="landing-article-section section" data-home-reveal><div className="container"><div className="section-heading split-heading"><div><span className="section-kicker">BUSINESS GROWTH INSIGHTS</span><h2>매출이 막힌 이유를 발견하면,<br/>다음 실행이 선명해집니다</h2><p>광고비를 더 쓰기 전에 사업자들이 실제로 놓치는 유입·콘텐츠·전환·AI 활용 지점을 확인하세요.</p></div><Link className="text-link" href="/articles">실무 인사이트 전체보기 <ArrowRight/></Link></div><div className="landing-article-grid">{topArticles.map((article, index) => <article className={index === 0 ? "featured-insight" : ""} key={article.id}><Link href={`/articles/${article.slug}`}><div className="insight-card-meta"><span>{article.categoryName}</span><em>{article.contentType === "youtube" ? "영상 인사이트" : `${articleReadingMinutes(article.blocks)}분 인사이트`}</em></div><b>INSIGHT {String(index + 1).padStart(2,"0")}</b><h3>{article.title}</h3><p><strong>이 콘텐츠에서 얻는 것</strong>{article.summary}</p><footer>핵심 인사이트 확인하기 <ArrowRight/></footer></Link></article>)}</div><div className="landing-free-bridge"><div><span>무료 3강</span><strong>인사이트를 읽는 데서 멈추지 말고<br/>내 사업의 실행안으로 바꾸세요.</strong></div><p>회원가입만 하면 사업자 마케팅·AI 무료 3강을 바로 볼 수 있습니다.</p><Link href="/articles#free-class">무료 클래스 보기 <ArrowRight/></Link></div></div></section>
 
       <section className="section section-ink" id="philosophy" data-home-reveal>
         <div className="container philosophy-grid">
@@ -60,12 +44,12 @@ export default async function Home() {
 
       <section className="section process-section" data-home-reveal>
         <div className="container">
-          <div className="section-heading centered"><span className="section-kicker">HOW IT WORKS</span><h2>신청부터 완주까지, 한 흐름으로</h2><p>결제 후 별도 안내를 기다릴 필요 없이 내 클래스에서 모든 일정을 확인합니다.</p></div>
+          <div className="section-heading centered"><span className="section-kicker">WHY IT WORKS</span><h2>배우고 끝나지 않기 때문에,<br/>내 사업의 결과가 남습니다</h2><p>정답을 듣는 강의가 아니라 내 사업의 문제를 찾고, 실행하고, 데이터로 개선하는 과정입니다.</p></div>
           <div className="process-grid">
-            <article><span className="process-icon"><Target /></span><strong>01</strong><h3>클래스 선택</h3><p>일정과 커리큘럼을 확인하고 원하는 기수를 신청합니다.</p></article>
-            <article><span className="process-icon"><CalendarDays /></span><strong>02</strong><h3>기수 자동 배정</h3><p>결제가 완료되면 내 클래스에 일정과 준비물이 열립니다.</p></article>
-            <article><span className="process-icon"><Play /></span><strong>03</strong><h3>라이브 참여</h3><p>수업 당일 활성화된 버튼으로 라이브 클래스에 입장합니다.</p></article>
-            <article><span className="process-icon"><BarChart3 /></span><strong>04</strong><h3>실행·완주</h3><p>자료와 다시보기를 활용해 과제를 완성하고 변화를 기록합니다.</p></article>
+            <article><span className="process-icon"><Target /></span><strong>01</strong><h3>내 매출 병목부터 진단</h3><p>유입·콘텐츠·전환·재구매 중 지금 성장을 막는 한 지점을 먼저 찾습니다.</p></article>
+            <article><span className="process-icon"><CalendarDays /></span><strong>02</strong><h3>내 사업의 실행안 설계</h3><p>일반적인 사례가 아니라 내 상품과 고객에 맞춘 문구·퍼널·AI 업무 흐름을 만듭니다.</p></article>
+            <article><span className="process-icon"><Play /></span><strong>03</strong><h3>정해진 기수 안에서 실행</h3><p>라이브 일정과 과제로 미루지 않고 실제 고객에게 적용할 결과물까지 완성합니다.</p></article>
+            <article><span className="process-icon"><BarChart3 /></span><strong>04</strong><h3>데이터와 피드백으로 개선</h3><p>느낌이 아니라 반응과 전환 데이터를 확인하고 다음 실행에서 성과를 높입니다.</p></article>
           </div>
         </div>
       </section>
@@ -75,9 +59,9 @@ export default async function Home() {
       </section>
 
       <section className="final-cta" data-home-reveal>
-        <div className="container cta-inner"><div><span>{featured?.status || "다음 기수 준비 중"}</span><h2>배운 것을 실행으로 바꾸는<br />다음 클래스에 참여하세요.</h2></div><div><strong>{featured?.seats || "일정 확인"}</strong><Link className="button button-white button-lg" href={featured ? `/classes/${featured.slug}` : "/classes"}>클래스 확인하기 <ArrowRight size={20} /></Link></div></div>
+        <div className="container cta-inner"><div><span>FREE CLASS · 회원가입 후 바로 수강</span><h2>광고비를 더 쓰기 전에,<br />내 매출의 병목부터 확인하세요.</h2></div><div><strong>무료 3강 · 별도 결제 없음</strong><Link className="button button-white button-lg" href="/articles#free-class">무료 클래스 보기 <ArrowRight size={20} /></Link></div></div>
       </section>
-      <HomeExperience title={featured?.title} status={featured?.status} schedule={`${featured?.startDate || ""}${featured?.schedule ? ` · ${featured.schedule}` : ""}`} href={featured ? `/classes/${featured.slug}` : undefined}/>
+      <HomeExperience title={recruitingPaid?.title} status={recruitingPaid?.status} price={recruitingPaid?.price} schedule={`${recruitingPaid?.startDate || ""}${recruitingPaid?.schedule ? ` · ${recruitingPaid.schedule}` : ""}`} href={recruitingPaid ? `/classes/${recruitingPaid.slug}` : undefined}/>
     </main>
   );
 }

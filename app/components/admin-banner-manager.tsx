@@ -7,8 +7,9 @@ import { Check, Eye, ImagePlus, Plus, Save, Trash2, X } from "lucide-react";
 import { useAdminUnsavedChanges } from "./use-admin-unsaved-changes";
 
 type BannerRow = { id: string; link_url: string | null; image_path: string | null; image_url: string | null; display_order: number };
-type BannerDraft = { id: string; link: string; imagePath: string; imageUrl: string; file?: File };
-const emptyDraft = (): BannerDraft => ({ id: "", link: "/classes", imagePath: "", imageUrl: "" });
+type CourseOption = { id: string; title: string; slug: string; status: "draft" | "published" };
+type BannerDraft = { id: string; courseId: string; link: string; imagePath: string; imageUrl: string; file?: File };
+const emptyDraft = (): BannerDraft => ({ id: "", courseId: "", link: "/classes", imagePath: "", imageUrl: "" });
 
 async function bannerRequest<T>(input = "/api/admin/banner", init?: RequestInit): Promise<T> {
   const response = await fetch(input, { cache: "no-store", ...init });
@@ -19,6 +20,7 @@ async function bannerRequest<T>(input = "/api/admin/banner", init?: RequestInit)
 
 export function AdminBannerManager() {
   const [banners, setBanners] = useState<BannerRow[]>([]);
+  const [courses, setCourses] = useState<CourseOption[]>([]);
   const [draft, setDraft] = useState<BannerDraft | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -28,18 +30,23 @@ export function AdminBannerManager() {
   useAdminUnsavedChanges(dirty && !saving);
 
   const load = async () => {
-    const result = await bannerRequest<{ banners: BannerRow[] }>();
+    const result = await bannerRequest<{ banners: BannerRow[]; courses: CourseOption[] }>();
     setBanners(result.banners);
+    setCourses(result.courses);
   };
   useEffect(() => {
     let active = true;
-    bannerRequest<{ banners: BannerRow[] }>().then((result) => { if (active) setBanners(result.banners); }).catch((reason) => {
+    bannerRequest<{ banners: BannerRow[]; courses: CourseOption[] }>().then((result) => { if (active) { setBanners(result.banners); setCourses(result.courses); } }).catch((reason) => {
       if (active) setError(reason instanceof Error ? reason.message : "배너를 불러오지 못했습니다.");
     }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []);
 
-  const open = (banner?: BannerRow) => setDraft(banner ? { id: banner.id, link: banner.link_url || "/classes", imagePath: banner.image_path || "", imageUrl: banner.image_url || "" } : emptyDraft());
+  const open = (banner?: BannerRow) => {
+    const link = banner?.link_url || "/classes";
+    const linkedCourse = courses.find((course) => `/classes/${course.slug}` === link);
+    setDraft(banner ? { id: banner.id, courseId: linkedCourse?.id || "", link, imagePath: banner.image_path || "", imageUrl: banner.image_url || "" } : emptyDraft());
+  };
   const upload = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -52,7 +59,7 @@ export function AdminBannerManager() {
   const save = async () => {
     if (!draft || saving) return;
     if (!draft.id && !draft.file) return setError("배너 이미지를 업로드해 주세요.");
-    if (!draft.link.trim()) return setError("배너 클릭 연결 URL을 입력해 주세요.");
+    if (!draft.link.trim()) return setError("배너 클릭 시 이동할 클래스를 선택해 주세요.");
     setSaving(true); setError("");
     try {
       const form = new FormData();
@@ -72,10 +79,10 @@ export function AdminBannerManager() {
   if (loading) return <section className="admin-panel admin-loading-state"><strong>배너 정보를 불러오는 중입니다.</strong></section>;
   return <div className="admin-editor-wrap">
     <section className="admin-panel banner-library">
-      <div className="form-card-head"><div><h2>랜딩 이미지 배너</h2><p>등록한 순서대로 자동 슬라이드됩니다. 이미지 안에 문구를 포함해 업로드하세요.</p></div><button className="admin-primary" onClick={() => open()}><Plus/> 새 배너 등록</button></div>
-      <div className="banner-library-grid">{banners.map((banner, index) => <article key={banner.id}><button className="banner-library-image" onClick={() => open(banner)}>{banner.image_url ? <img src={banner.image_url} alt={`${index + 1}번째 배너`}/> : <span>이미지 없음</span>}<b>{String(index + 1).padStart(2, "0")}</b></button><div><span title={banner.link_url || "/classes"}>{banner.link_url || "/classes"}</span><button onClick={() => open(banner)}>수정</button><button onClick={() => remove(banner)} aria-label={`${index + 1}번째 배너 삭제`}><Trash2/></button></div></article>)}{!banners.length && <div className="product-empty-state"><strong>등록된 이미지 배너가 없습니다.</strong><p>새 배너 등록을 눌러 랜딩 슬라이드를 구성해 주세요.</p></div>}</div>
+      <div className="form-card-head"><div><h2>랜딩 이미지 배너 <small className="banner-count">{banners.length}개</small></h2><p>배너를 개수 제한 없이 추가할 수 있으며, 등록한 순서대로 고객 화면에서 자동 슬라이드됩니다.</p></div><button className="admin-primary" onClick={() => open()}><Plus/> 배너 추가</button></div>
+      <div className="banner-library-grid">{banners.map((banner, index) => <article key={banner.id}><button className="banner-library-image" onClick={() => open(banner)}>{banner.image_url ? <img src={banner.image_url} alt={`${index + 1}번째 배너`}/> : <span>이미지 없음</span>}<b>{String(index + 1).padStart(2, "0")}</b></button><div><span title={banner.link_url || "/classes"}>{banner.link_url || "/classes"}</span><button onClick={() => open(banner)}>수정</button><button onClick={() => remove(banner)} aria-label={`${index + 1}번째 배너 삭제`}><Trash2/></button></div></article>)}<button className="banner-library-add" onClick={() => open()}><Plus/><strong>배너 추가</strong><span>이미지와 연결 URL 등록</span></button></div>
     </section>
-    {draft && <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setDraft(null); }}><section className="admin-modal banner-image-modal" role="dialog" aria-modal="true" aria-label={draft.id ? "배너 수정" : "새 배너 등록"}><header><div><span>BANNER</span><h2>{draft.id ? "배너 수정" : "새 배너 등록"}</h2></div><button onClick={() => setDraft(null)} aria-label="닫기"><X/></button></header><div className="banner-image-only-form"><label className={`banner-image-drop ${draft.imageUrl ? "has-image" : ""}`} style={draft.imageUrl ? { backgroundImage: `url(${draft.imageUrl})` } : undefined}><input type="file" accept="image/png,image/jpeg,image/webp" onChange={upload}/>{!draft.imageUrl && <><ImagePlus/><strong>배너 이미지 업로드</strong><span>가로형 JPG, PNG, WEBP · 5MB 이하</span></>}</label><label>배너 클릭 연결 URL<input value={draft.link} onChange={(event) => setDraft({ ...draft, link: event.target.value })} placeholder="/classes 또는 https://..."/></label><p>권장 비율 16:6 · 이미지 전체가 링크로 작동합니다.</p></div>{error && <p className="admin-save-error" role="alert">{error}</p>}<footer><Link className="admin-outline" href="/"><Eye/> 고객 화면 보기</Link><button className="admin-primary" onClick={save} disabled={saving}><Save/> {saving ? "저장 중..." : "배너 저장"}</button></footer></section></div>}
+    {draft && <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setDraft(null); }}><section className="admin-modal banner-image-modal" role="dialog" aria-modal="true" aria-label={draft.id ? "배너 수정" : "새 배너 등록"}><header><div><span>BANNER</span><h2>{draft.id ? "배너 수정" : "새 배너 등록"}</h2></div><button onClick={() => setDraft(null)} aria-label="닫기"><X/></button></header><div className="banner-image-only-form"><label className={`banner-image-drop ${draft.imageUrl ? "has-image" : ""}`} style={draft.imageUrl ? { backgroundImage: `url(${draft.imageUrl})` } : undefined}><input type="file" accept="image/png,image/jpeg,image/webp" onChange={upload}/>{!draft.imageUrl && <><ImagePlus/><strong>배너 이미지 업로드</strong><span>가로형 JPG, PNG, WEBP · 5MB 이하</span></>}</label><label>클릭 시 이동할 클래스<select value={draft.courseId} onChange={(event)=>{const course=courses.find((item)=>item.id===event.target.value);setDraft({...draft,courseId:event.target.value,link:course?`/classes/${course.slug}`:"/classes"});}}><option value="">전체 클래스 목록</option>{courses.map((course)=><option key={course.id} value={course.id}>{course.title}{course.status==="draft"?" · 판매 중지":""}</option>)}</select><small>선택한 클래스의 상세페이지 주소가 자동으로 연결됩니다.</small></label><p>권장 비율 16:6 · 이미지 전체가 링크로 작동합니다.</p></div>{error && <p className="admin-save-error" role="alert">{error}</p>}<footer><Link className="admin-outline" href="/"><Eye/> 고객 화면 보기</Link><button className="admin-primary" onClick={save} disabled={saving}><Save/> {saving ? "저장 중..." : "배너 저장"}</button></footer></section></div>}
     {error && !draft && <p className="admin-save-error" role="alert">{error}</p>}
     <div className={`admin-toast ${saved ? "show" : ""}`} role="status" aria-live="polite"><Check/> 배너 슬라이드가 저장되었습니다.</div>
   </div>;

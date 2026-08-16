@@ -14,9 +14,13 @@ async function operator() { return getAdminUser("settings"); }
 export async function GET() {
   if (!await operator()) return NextResponse.json({ error: "배너 관리 권한이 필요합니다." }, { status: 403 });
   const admin = createAdminClient();
-  const { data, error } = await admin.from("site_banners").select("id,link_url,image_path,is_active,display_order").order("display_order").order("created_at");
-  if (error) return NextResponse.json({ error: error.message || "배너를 불러오지 못했습니다." }, { status: 500 });
-  return NextResponse.json({ banners: (data || []).map((banner) => ({ ...banner, image_url: banner.image_path ? admin.storage.from("course-assets").getPublicUrl(banner.image_path).data.publicUrl : null })) });
+  const [bannerResult, courseResult] = await Promise.all([
+    admin.from("site_banners").select("id,link_url,image_path,is_active,display_order").order("display_order").order("created_at"),
+    admin.from("courses").select("id,title,slug,status").neq("status", "archived").order("display_order").order("created_at"),
+  ]);
+  if (bannerResult.error) return NextResponse.json({ error: bannerResult.error.message || "배너를 불러오지 못했습니다." }, { status: 500 });
+  if (courseResult.error) return NextResponse.json({ error: courseResult.error.message || "연결할 클래스를 불러오지 못했습니다." }, { status: 500 });
+  return NextResponse.json({ banners: (bannerResult.data || []).map((banner) => ({ ...banner, image_url: banner.image_path ? admin.storage.from("course-assets").getPublicUrl(banner.image_path).data.publicUrl : null })), courses: courseResult.data || [] });
 }
 
 export async function POST(request: Request) {
