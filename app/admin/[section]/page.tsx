@@ -19,7 +19,7 @@ import { getAdminUser, type AdminScope } from "@/lib/server-auth";
 const info:Record<string,{eyebrow:string,title:string,desc:string}>={
   products:{eyebrow:"PRODUCTS",title:"상품 관리",desc:"상품 정보부터 이미지 상세페이지·커리큘럼·전환 픽셀까지 관리합니다."},
   articles:{eyebrow:"GROWTH",title:"아티클 관리",desc:"카테고리와 게시글, 회원 전용 무료강의 영역을 한곳에서 관리합니다."},
-  banners:{eyebrow:"BANNERS",title:"배너 관리",desc:"메인 랜딩 배너 이미지와 문구, 클릭 연결 링크를 등록하고 관리합니다."},
+  banners:{eyebrow:"BANNERS",title:"배너 관리",desc:"메인 랜딩 이미지 배너를 여러 개 등록하고 슬라이드 연결 URL을 관리합니다."},
   cohorts:{eyebrow:"COHORTS",title:"기수·회차 관리",desc:"모집 일정부터 라이브 회차와 수강생까지 기수 단위로 운영합니다."},
   members:{eyebrow:"MEMBERS",title:"회원 관리",desc:"상품·기수·고객 태그로 분류하고 수강권과 고객 상태를 한곳에서 관리합니다."},
   "member-tags":{eyebrow:"CUSTOMER TAGS",title:"고객 태그 관리",desc:"고객 분류 기준을 만들고 태그별 사용 인원을 관리합니다."},
