@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { ArrowRight, BarChart3, CalendarDays, CheckCircle2, Play, Target } from "lucide-react";
+import { ArrowRight, BarChart3, CalendarDays, Play, Target } from "lucide-react";
 import { BrandHeader } from "./components/brand-header";
 import { HomeExperience } from "./components/home-experience";
 import { LandingBanner, ReviewSlider } from "./components/site-live-content";
+import { ClassCard } from "./components/class-card";
 import { getPublicBanner, getPublishedClasses, getPublishedReviews, getPublishedReviewVideos } from "@/lib/education-data";
 import { getPublicArticleIndex } from "@/lib/article-data";
 import { getAuthenticatedUser } from "@/lib/server-auth";
@@ -22,15 +23,13 @@ export default async function Home() {
     if (course?.title) currentEnrollment = { courseTitle: course.title, cohortName: cohort?.name || "수강 중" };
   }
   const topArticles = articleIndex.articles.slice(0, 3);
+  const freeClasses = classes.filter((item) => item.programType === "free").slice(0, 3);
   const nextClass = classes.find((item) => item.status.includes("모집 중"));
-  const paidOpen=Boolean(nextClass);
   return (
     <main>
       <BrandHeader />
 
       <section className="home-primary-banner" id="live-classes"><div className="container"><LandingBanner banner={banner}/></div></section>
-
-      <section className="recruitment-cycle"><div className="container"><header><span>COHORT RECRUITMENT CYCLE</span><strong>{paidOpen?"지금은 유료 클래스 모집 기간입니다.":"지금은 무료 클래스 모집 기간입니다."}</strong><p>{paidOpen?"무료 클래스에서 확인한 문제를 실제 실행으로 바꿀 기수를 1주간 모집합니다.":"2주 동안 무료 클래스로 고객 DB와 예비 수강생을 모집합니다."}</p></header><ol><li className={!paidOpen?"active":""}><b>01</b><span><strong>무료 클래스 모집</strong><small>2주 · 회원 DB 확보</small></span></li><li className={paidOpen?"active":""}><b>02</b><span><strong>유료 클래스 모집</strong><small>1주 · 신청·결제</small></span></li><li><b>03</b><span><strong>기수별 클래스 운영</strong><small>라이브 · 과제 · 피드백</small></span></li></ol><Link href={paidOpen?"/classes":"/articles#free-class"}>{paidOpen?"모집 중인 유료 클래스 보기":"무료 클래스 신청하기"}<ArrowRight/></Link></div></section>
 
       <section className="section" id="programs" data-home-reveal>
         <div className="container">
@@ -38,7 +37,7 @@ export default async function Home() {
             <div><span className="section-kicker">FREE · PAID CLASS</span><h2>내 사업의 매출 단계에 맞춰 시작하세요</h2><p>무료 클래스에서 마케팅 병목을 찾고, 유료 라이브 클래스에서 AI를 활용한 실행 결과물을 완성합니다.</p></div>
             <Link className="text-link" href="/classes">전체 클래스 보기 <ArrowRight size={18} /></Link>
           </div>
-          <div className="landing-free-program-list"><article className="free-program-card"><div><span>FREE CLASS</span><b>무료 3강</b></div><small>광고비를 늘리기 전, 매출 구조부터 점검</small><h3>사업자를 위한<br/>마케팅·AI 매출 진단</h3><p>고객 유입부터 콘텐츠, 전환, 재구매까지 지금 막힌 지점을 3개의 강의로 빠르게 찾습니다.</p><ul><li><CheckCircle2/>회원가입 후 바로 시청</li><li><CheckCircle2/>별도 결제 없이 3강 전체 공개</li><li><CheckCircle2/>실무 블로그와 함께 바로 적용</li></ul><Link href="/articles#free-class">무료 클래스 신청하기 <ArrowRight/></Link></article></div>
+          {freeClasses.length ? <div className="class-grid landing-class-grid">{freeClasses.map((item) => <ClassCard key={item.slug} item={item}/>)}</div> : <div className="catalog-note"><strong>무료 클래스를 준비하고 있습니다.</strong><p>공개되는 즉시 이 영역에서 신청할 수 있습니다.</p></div>}
         </div>
       </section>
 

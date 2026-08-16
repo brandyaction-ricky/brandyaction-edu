@@ -56,15 +56,16 @@ export async function POST(request: Request) {
   catch { return NextResponse.json({ error: "상품 저장 데이터가 올바르지 않습니다." }, { status: 400 }); }
   const admin = createAdminClient();
   const { course, thumbnail, images, curriculum, pixels } = input;
-  const listPrice = Number(String(course.listPrice).replace(/[^0-9]/g, ""));
+  const isFreeCourse = course.programType === "free";
+  const listPrice = isFreeCourse ? 0 : Number(String(course.listPrice).replace(/[^0-9]/g, ""));
   if (!course.title?.trim() || !course.slug?.trim() || !course.courseCode?.trim()) return NextResponse.json({ error: "상품명·URL·상품 코드를 입력해 주세요." }, { status: 400 });
-  if (!Number.isFinite(listPrice)) return NextResponse.json({ error: "정가를 숫자로 입력해 주세요." }, { status: 400 });
+  if (!Number.isFinite(listPrice) || (!isFreeCourse && listPrice <= 0)) return NextResponse.json({ error: "유료 클래스 정가는 1원 이상으로 입력해 주세요." }, { status: 400 });
   const coursePayload = {
     course_code: course.courseCode.trim(), slug: course.slug.trim(), title: course.title.trim(), summary: course.summary.trim() || null,
     description: course.description.trim() || null, category: course.category.trim() || null, instructor_name: course.instructorName.trim() || null,
     list_price: listPrice, duration_label: course.durationLabel.trim() || null, schedule_label: course.scheduleLabel.trim() || null,
     status: course.status, published_at: course.status === "published" ? new Date().toISOString() : null,
-    metadata: { ...(course.metadata || {}), programType: course.programType === "free" ? "free" : "paid", tracking: pixels },
+    metadata: { ...(course.metadata || {}), programType: isFreeCourse ? "free" : "paid", tracking: pixels },
   };
 
   let courseId = course.id;

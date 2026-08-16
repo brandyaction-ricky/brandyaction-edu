@@ -104,6 +104,22 @@ export function AdminProductsManager() {
 
   const save = async () => {
     if (!editor || saving) return;
+    const title = editor.draft.title.trim();
+    const slug = editor.draft.slug.trim();
+    const courseCode = editor.draft.courseCode.trim();
+    const paidPrice = Number(editor.draft.listPrice.replace(/[^0-9]/g, ""));
+    if (!title || !slug || !courseCode) {
+      setTab("basic");
+      setError("상품명·상품 URL·상품 코드는 필수입니다. 입력하지 않은 항목을 확인해 주세요.");
+      window.requestAnimationFrame(() => document.querySelector<HTMLInputElement>(!title ? '[data-product-field="title"]' : !slug ? '[data-product-field="slug"]' : '[data-product-field="courseCode"]')?.focus());
+      return;
+    }
+    if (editor.draft.programType === "paid" && (!Number.isFinite(paidPrice) || paidPrice <= 0)) {
+      setTab("basic");
+      setError("유료 클래스의 기본 정가는 1원 이상으로 입력해 주세요.");
+      window.requestAnimationFrame(() => document.querySelector<HTMLInputElement>('[data-product-field="listPrice"]')?.focus());
+      return;
+    }
     setSaving(true);
     setError("");
     try {
@@ -256,15 +272,15 @@ export function AdminProductsManager() {
 
     {tab === "basic" && <div className="editor-grid"><section className="admin-panel admin-form-card"><div className="form-card-head"><div><h2>상품 기본 정보</h2><p>판매 중으로 저장하면 클래스 목록과 상품 상세페이지에 즉시 반영됩니다.</p></div><span className="completion-chip"><Check/> DB 연결</span></div><div className="admin-field-grid">
       <div className="field-full product-thumbnail-field"><span>상품 썸네일</span><div className="product-thumbnail-editor"><div className={`product-thumbnail-preview ${thumbnail ? "has-image" : ""}`}>{thumbnail ? <img src={thumbnail.url} alt="상품 썸네일 미리보기"/> : <><ImagePlus/><small>썸네일 미등록</small></>}</div><div className="product-thumbnail-actions"><strong>목록 카드와 상품 상세 상단에 노출됩니다.</strong><p>가로형 4:3 또는 16:9 비율 권장 · JPG, PNG, WEBP · 5MB 이하</p><span><label className="admin-outline thumbnail-upload-button"><input type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadThumbnail}/><ImagePlus/> {thumbnail ? "이미지 교체" : "이미지 등록"}</label>{thumbnail && <button type="button" className="admin-outline thumbnail-remove-button" onClick={removeThumbnail}><Trash2/> 삭제</button>}</span></div></div></div>
-      <label className="field-full">상품명<input value={draft.title} onChange={(event) => setDraft({ title: event.target.value })}/></label>
+      <label className="field-full">상품명<input data-product-field="title" value={draft.title} onChange={(event) => setDraft({ title: event.target.value })}/></label>
       <label>강사명<input value={draft.instructorName} onChange={(event) => setDraft({ instructorName: event.target.value })}/></label>
       <label>클래스 유형<select value={draft.programType} onChange={(event) => setDraft({ programType: event.target.value as typeof draft.programType, ...(event.target.value === "free" ? { listPrice: "0" } : {}) })}><option value="free">무료 클래스</option><option value="paid">유료 클래스</option></select></label>
-      <label>기본 정가<input inputMode="numeric" value={draft.listPrice} onChange={(event) => setDraft({ listPrice: event.target.value })}/></label>
+      <label>기본 정가<input data-product-field="listPrice" inputMode="numeric" value={draft.programType === "free" ? "0" : draft.listPrice} disabled={draft.programType === "free"} onChange={(event) => setDraft({ listPrice: event.target.value })}/>{draft.programType === "free" && <small>무료 클래스는 0원으로 자동 저장됩니다.</small>}</label>
       <label>카테고리<input value={draft.category} onChange={(event) => setDraft({ category: event.target.value })}/></label>
       <label>수강기간 표기<input value={draft.durationLabel} onChange={(event) => setDraft({ durationLabel: event.target.value })}/></label>
       <label className="field-full">한 줄 소개<textarea value={draft.summary} onChange={(event) => setDraft({ summary: event.target.value })}/></label>
-      <label>상품 URL<input value={draft.slug} onChange={(event) => setDraft({ slug: event.target.value.replace(/[^a-zA-Z0-9-]/g, "-").toLowerCase() })}/></label>
-      <label>상품 코드<input value={draft.courseCode} onChange={(event) => setDraft({ courseCode: event.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, "_") })}/></label>
+      <label>상품 URL<input data-product-field="slug" value={draft.slug} onChange={(event) => setDraft({ slug: event.target.value.replace(/[^a-zA-Z0-9-]/g, "-").toLowerCase() })}/></label>
+      <label>상품 코드<input data-product-field="courseCode" value={draft.courseCode} onChange={(event) => setDraft({ courseCode: event.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, "_") })}/></label>
       <label>일정 표기<input value={draft.scheduleLabel} onChange={(event) => setDraft({ scheduleLabel: event.target.value })}/></label>
       <label>판매 상태<select value={draft.status} onChange={(event) => setDraft({ status: event.target.value as typeof draft.status })}><option value="draft">판매 중지</option><option value="published">판매 중</option><option value="archived">보관</option></select></label>
     </div></section><aside className="admin-panel product-side-card"><span>노출 경로</span><div className={`mini-product-preview ${thumbnail ? "has-thumbnail" : ""}`} style={thumbnail ? { backgroundImage: `url(${thumbnail.url})` } : undefined}><b>URL</b><small>고객 상세페이지</small><strong>/classes/{draft.slug}</strong><em>{statusLabel[draft.status]}</em></div><p>‘내 클래스’에는 결제 또는 관리자가 발급한 활성 수강권이 있는 고객에게만 노출됩니다.</p></aside></div>}
