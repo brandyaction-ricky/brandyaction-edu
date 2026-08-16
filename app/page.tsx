@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, BarChart3, BookOpen, CalendarDays, CheckCircle2, Compass, Play, Target, TrendingUp } from "lucide-react";
+import { ArrowRight, BarChart3, CalendarDays, Play, Target } from "lucide-react";
 import { BrandHeader } from "./components/brand-header";
 import { ClassCard } from "./components/class-card";
 import { HomeExperience } from "./components/home-experience";
@@ -27,8 +27,6 @@ export default async function Home() {
   return (
     <main>
       <BrandHeader />
-
-      <section className="landing-value-hero"><div className="container"><div className="landing-value-copy"><span>KNOW YOUR WORK · MAKE IT REAL</span><h1>내 일의 방향을 찾고,<br/>현장에서 실행하는 곳</h1><p>브랜디액션 에듀는 유형을 알려주는 데서 멈추지 않습니다. 아티클과 무료 3강으로 기준을 찾고, 라이브 클래스에서 실제 결과물로 완성합니다.</p><div><Link className="button button-primary button-lg" href="#live-classes">모집 중 클래스 보기 <ArrowRight/></Link><Link href="/articles">내 고민부터 읽어보기 <BookOpen/></Link></div></div><div className="landing-value-proof"><span>왜 브랜디액션이어야 하나요?</span><article><Compass/><div><strong>방향을 발견하고</strong><p>반복되는 결핍과 욕구에서 내 일의 기준을 찾습니다.</p></div></article><article><CheckCircle2/><div><strong>결과물로 만들고</strong><p>매주 브랜드 문장과 실행 계획을 실제로 완성합니다.</p></div></article><article><TrendingUp/><div><strong>다음 행동까지 이어갑니다</strong><p>기수의 리듬과 피드백으로 혼자 멈추지 않게 합니다.</p></div></article></div></div></section>
 
       <div id="live-classes"><LiveClassCarousel classes={classes} banner={banner}/></div>
 
