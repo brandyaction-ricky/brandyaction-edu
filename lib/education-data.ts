@@ -47,7 +47,7 @@ type CourseThumbnailRow = { course_id: string; storage_path: string };
 
 export type PublicBanner = { image?: string; eyebrow?: string; title?: string; copy?: string; link?: string; linkLabel?: string };
 export type PublicCourseAppearance = { images: string[]; pixels: { meta?: string; kakao?: string; google?: string; enabled?: boolean } };
-export type PublicReview = { id: string; name: string; className: string; cohortName: string; rating: number; quote: string };
+export type PublicReview = { id: string; name: string; className: string; cohortName: string; rating: number; quote: string; publishedAt: string };
 export type PublicReviewVideo = { id: string; title: string; reviewerName: string; reviewerRole: string; description: string; embedUrl: string; thumbnailUrl: string };
 export type PublicSupport = { supportEmail: string; refundEmail: string };
 
@@ -295,14 +295,14 @@ export async function getPublishedReviews(courseSlug?: string): Promise<PublicRe
   if (!hasSupabaseEnv()) return [];
   try {
     const supabase = publicClient();
-    let query = supabase.from("reviews").select("id,author_name,author_nickname,rating,body,courses!inner(title,slug),cohorts(name)").eq("status", "published").order("is_featured", { ascending: false }).order("display_order").order("published_at", { ascending: false }).limit(12);
+    let query = supabase.from("reviews").select("id,author_name,author_nickname,rating,body,published_at,created_at,courses!inner(title,slug),cohorts(name)").eq("status", "published").order("is_featured", { ascending: false }).order("display_order").order("published_at", { ascending: false }).limit(100);
     if (courseSlug) query = query.eq("courses.slug", courseSlug);
     const { data, error } = await query;
     if (error) return [];
     return (data || []).map((review) => {
       const course = Array.isArray(review.courses) ? review.courses[0] : review.courses;
       const cohort = Array.isArray(review.cohorts) ? review.cohorts[0] : review.cohorts;
-      return { id: review.id, name: publicReviewerName(review.author_name, review.author_nickname), className: course?.title || "브랜디액션 클래스", cohortName: cohort?.name || "수강생", rating: Number(review.rating), quote: review.body };
+      return { id: review.id, name: publicReviewerName(review.author_name, review.author_nickname), className: course?.title || "브랜디액션 클래스", cohortName: cohort?.name || "수강생", rating: Number(review.rating), quote: review.body, publishedAt: review.published_at || review.created_at };
     });
   } catch { return []; }
 }

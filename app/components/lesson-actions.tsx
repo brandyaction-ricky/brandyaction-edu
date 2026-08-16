@@ -21,7 +21,7 @@ export function ResourceDownload({ enrollmentId, lessonId, name }: { enrollmentI
   return <a className="learning-download" href={`/api/learning/resources?enrollment=${encodeURIComponent(enrollmentId)}&lesson=${encodeURIComponent(lessonId)}`}><Download/><span><strong>{name}</strong><small>권한 확인 후 안전하게 다운로드됩니다.</small></span></a>;
 }
 
-export function ReviewForm({ courseId, cohortId }: { courseId: string; cohortId: string; authorName: string }) {
+export function ReviewForm({ courseId, cohortId, authorName, courseTitle }: { courseId: string; cohortId: string; authorName: string; courseTitle: string }) {
   const [rating, setRating] = useState(5);
   const [nickname, setNickname] = useState("");
   const [body, setBody] = useState("");
@@ -35,5 +35,5 @@ export function ReviewForm({ courseId, cohortId }: { courseId: string; cohortId:
     if (response.ok) setBody("");
     setPending(false);
   };
-  return <section className="learning-review-form"><div><Star/><h2>수강 후기 작성</h2></div><label>별점<select value={rating} onChange={(event) => setRating(Number(event.target.value))}>{[5,4,3,2,1].map((value) => <option value={value} key={value}>{value}점</option>)}</select></label><label>공개 닉네임<input value={nickname} onChange={(event) => setNickname(event.target.value)} minLength={2} maxLength={20} placeholder="2~20자"/><small>실명은 성만 남기고 마스킹됩니다.</small></label><label>후기<textarea value={body} onChange={(event) => setBody(event.target.value)} minLength={10} maxLength={2000} placeholder="수강 후 달라진 점을 10자 이상 작성해 주세요."/></label><button onClick={submit} disabled={pending || nickname.trim().length < 2 || body.trim().length < 10}>{pending ? "접수 중..." : "후기 접수"}</button>{message && <p role="status">{message}</p>}</section>;
+  return <section className="learning-review-form"><div><Star/><h2>수강 후기 작성</h2><p>승인 후 고객 화면에 공개됩니다.</p></div><label>작성자<input value={authorName} readOnly/><small>계정 이름은 안전하게 마스킹됩니다.</small></label><label>공개 이름<input value={nickname} onChange={(event) => setNickname(event.target.value)} minLength={2} maxLength={20} placeholder="예: 김대표"/></label><label>상품<input value={courseTitle} readOnly/></label><label>별점<select value={rating} onChange={(event) => setRating(Number(event.target.value))}>{[5,4,3,2,1].map((value) => <option value={value} key={value}>{"★".repeat(value)} {value}점</option>)}</select></label><label className="review-body-field">후기<textarea value={body} onChange={(event) => setBody(event.target.value)} minLength={10} maxLength={2000} placeholder="수강 전 문제와 수강 후 달라진 점을 10자 이상 작성해 주세요."/></label><button onClick={submit} disabled={pending || nickname.trim().length < 2 || body.trim().length < 10}>{pending ? "접수 중..." : "후기 등록"}</button>{message && <p role="status">{message}</p>}</section>;
 }

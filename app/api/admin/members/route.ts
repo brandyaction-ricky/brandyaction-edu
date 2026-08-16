@@ -9,8 +9,8 @@ export async function GET() {
   const [{ data: profiles, error }, { data: cohorts }, { data: tags }, { data: memberTags }] = await Promise.all([
     admin.from("profiles").select("id,email,full_name,phone,role,status,marketing_consent,created_at,enrollments:enrollments!enrollments_user_id_fkey(id,status,source,course_id,cohort_id,courses(id,title),cohorts(id,name)),orders(total_amount,status,payments(approved_amount,cancelled_amount))").order("created_at", { ascending: false }),
     admin.from("cohorts").select("id,course_id,name,status,courses(id,title)").neq("status", "cancelled").order("operation_start_at", { ascending: false }),
-    admin.from("crm_tags").select("id,name,color,description").order("name"),
-    admin.from("crm_member_tags").select("member_id,tag_id"),
+    admin.from("crm_tags").select("id,name,color,description,tag_kind,rule_key").order("tag_kind", { ascending: false }).order("name"),
+    admin.from("crm_member_tags").select("member_id,tag_id,assignment_source,rule_key"),
   ]);
   if (error) return NextResponse.json({ error: `회원 목록을 불러오지 못했습니다. (${error.code || "QUERY_ERROR"})` }, { status: 500 });
   return NextResponse.json({ members: profiles || [], cohorts: cohorts || [], tags: tags || [], memberTags: memberTags || [], operatorRole: operator.role });
@@ -34,12 +34,15 @@ export async function PATCH(request: Request) {
   if (body.action === "tags") {
     if (operator.role !== "admin") return NextResponse.json({ error: "고객 태그 변경은 최고 관리자만 할 수 있습니다." }, { status: 403 });
     if (!body.userId || !Array.isArray(body.tagIds)) return NextResponse.json({ error: "회원과 태그를 확인해 주세요." }, { status: 400 });
-    await admin.from("crm_member_tags").delete().eq("member_id", body.userId);
-    if (body.tagIds.length) {
-      const { error } = await admin.from("crm_member_tags").insert(body.tagIds.map((tagId) => ({ member_id: body.userId, tag_id: tagId, assigned_by: operator.id })));
+    const { data: manualTags, error: tagError } = await admin.from("crm_tags").select("id").eq("tag_kind", "manual").in("id", body.tagIds.length ? body.tagIds : ["00000000-0000-0000-0000-000000000000"]);
+    if (tagError) return NextResponse.json({ error: "수동 태그 목록을 확인하지 못했습니다." }, { status: 500 });
+    const manualTagIds = (manualTags || []).map((tag) => tag.id);
+    await admin.from("crm_member_tags").delete().eq("member_id", body.userId).eq("assignment_source", "manual");
+    if (manualTagIds.length) {
+      const { error } = await admin.from("crm_member_tags").insert(manualTagIds.map((tagId) => ({ member_id: body.userId, tag_id: tagId, assigned_by: operator.id, assignment_source: "manual", rule_key: null })));
       if (error) return NextResponse.json({ error: "회원 태그를 저장하지 못했습니다." }, { status: 500 });
     }
-    await admin.from("audit_logs").insert({ actor_user_id: operator.id, action: "member.tags_updated", entity_type: "profile", entity_id: body.userId, after_data: { tag_ids: body.tagIds } });
+    await admin.from("audit_logs").insert({ actor_user_id: operator.id, action: "member.tags_updated", entity_type: "profile", entity_id: body.userId, after_data: { manual_tag_ids: manualTagIds } });
     return NextResponse.json({ ok: true });
   }
   if (!body.userId) return NextResponse.json({ error: "회원을 선택해 주세요." }, { status: 400 });

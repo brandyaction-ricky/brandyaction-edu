@@ -63,3 +63,34 @@
 }
 @media(max-width:480px){.dashboard-decision-kpis,.dashboard-learning-grid,.dashboard-action-kpis,.dashboard-growth-grid,.coupon-summary,.crm-automation-kpis,.crm-mode-tabs{grid-template-columns:1fr}.admin-page-title h1{font-size:28px}}
 @media(prefers-reduced-motion:reduce){.admin-app *{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
+/* Keep campaign review readable instead of compressing table text into single-character lines. */
+.crm-review-workspace{grid-template-columns:minmax(0,1fr)}
+.crm-send-review,.crm-history{min-width:0}
+.crm-review-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.campaign-schedule-fields{margin:18px 26px}
+.crm-history{overflow-x:auto}
+.crm-history>header{min-width:760px}
+.crm-history>article{grid-template-columns:90px minmax(220px,1fr) 90px 130px 130px;min-width:760px}
+.crm-history>article>.campaign-status,.crm-history>article>span,.crm-history>article>time{white-space:nowrap}
+.crm-history>article>div{min-width:0}
+.crm-history>article>div strong,.crm-history>article>div small,.crm-history>article>div em{overflow-wrap:normal;word-break:keep-all}
+.crm-phone-preview a{display:flex;align-items:center;justify-content:center;min-height:38px;margin-top:8px;border:1px solid #d8dade;background:#fff;color:#111;font-weight:800}
+
+/* Automatic customer tags are system-managed and visually distinct from manual taxonomy. */
+.member-tag-kpis{grid-template-columns:repeat(4,1fr)}
+.auto-tag-rule-guide{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px 20px;border-left:4px solid #8f151c}
+.auto-tag-rule-guide>div{display:flex;align-items:flex-start;gap:12px;min-width:0}
+.auto-tag-rule-guide>div>svg{width:20px;flex:none;color:#8f151c}
+.auto-tag-rule-guide span{display:flex;flex-direction:column;gap:4px}
+.auto-tag-rule-guide p{margin:0;color:#777;line-height:1.55}
+.auto-tag-rule-guide button{display:flex;align-items:center;gap:7px;white-space:nowrap}
+.auto-tag-rule-guide button svg{width:15px}
+.member-tag-catalog>article.automatic{background:#fbfbfc}
+.member-tag-catalog>article>div:first-child em{font-style:normal;font-size:9px;font-weight:900;color:#8f151c;background:#f8e8e9;padding:3px 5px}
+.auto-tag-locked{display:flex;align-items:center;gap:4px;color:#777;font-size:10px;white-space:nowrap}
+.auto-tag-locked svg{width:13px}
+.drawer-tags button.automatic{background:#f5f6f7;cursor:default;opacity:1}
+.drawer-tags button.automatic small{font-size:9px;color:#777}
+
+@media(max-width:1000px){.member-tag-kpis{grid-template-columns:1fr 1fr}.member-tag-kpis article:last-child{grid-column:auto}}
+@media(max-width:720px){.crm-review-grid{grid-template-columns:1fr}.campaign-schedule-fields{margin:16px 18px}.auto-tag-rule-guide{align-items:flex-start;flex-direction:column}.member-tag-kpis{grid-template-columns:1fr}}

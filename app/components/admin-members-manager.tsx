@@ -9,8 +9,8 @@ type Relation<T> = T | T[] | null;
 type Enrollment = { id: string; status: string; source: string; course_id: string; cohort_id: string; courses: Relation<{ id: string; title: string }>; cohorts: Relation<{ id: string; name: string }> };
 type Member = { id: string; email: string; full_name: string | null; phone: string | null; role: string; status: string; marketing_consent: boolean; created_at: string; enrollments: Enrollment[]; orders: Array<{ total_amount: number; status: string; payments: Array<{ approved_amount: number; cancelled_amount: number }> }> };
 type Cohort = { id: string; course_id: string; name: string; status: string; courses: Relation<{ id: string; title: string }> };
-type CustomerTag = { id: string; name: string; color: string; description: string | null };
-type MemberTag = { member_id: string; tag_id: string };
+type CustomerTag = { id: string; name: string; color: string; description: string | null; tag_kind: "manual" | "automatic"; rule_key: string | null };
+type MemberTag = { member_id: string; tag_id: string; assignment_source: "manual" | "automatic"; rule_key: string | null };
 type Data = { members: Member[]; cohorts: Cohort[]; tags: CustomerTag[]; memberTags: MemberTag[]; operatorRole: string };
 const empty: Data = { members: [], cohorts: [], tags: [], memberTags: [], operatorRole: "staff" };
 
@@ -78,7 +78,8 @@ export function AdminMembersManager() {
     finally { setSaving(false); }
   };
   const toggleTag = async (memberId: string, nextTagId: string) => {
-    const current = memberTagIds(memberId);
+    const manualTagIds = new Set(data.tags.filter((tag) => tag.tag_kind === "manual").map((tag) => tag.id));
+    const current = memberTagIds(memberId).filter((id) => manualTagIds.has(id));
     await mutate({ action: "tags", userId: memberId, tagIds: current.includes(nextTagId) ? current.filter((id) => id !== nextTagId) : [...current, nextTagId] }, "고객 태그를 저장했습니다.");
   };
   const resetFilters = () => { setQuery(""); setCourseId("all"); setCohortId("all"); setTagId("all"); setStatus("all"); };
@@ -124,7 +125,7 @@ export function AdminMembersManager() {
     {selected && <div className="member-drawer-backdrop" onMouseDown={() => setSelectedId(null)}><aside className="member-drawer" onMouseDown={(event) => event.stopPropagation()}>
       <header><div><span className="member-drawer-avatar">{(selected.full_name || selected.email)[0]}</span><div><strong>{selected.full_name || "이름 미입력"}</strong><small>{selected.email}</small></div></div><button onClick={() => setSelectedId(null)}><X/></button></header>
       <section><h3>회원 상태</h3><div className="drawer-inline"><select value={selected.status} onChange={(event) => void mutate({ userId: selected.id, status: event.target.value }, "회원 상태를 저장했습니다.")} disabled={saving}><option value="active">활성</option><option value="suspended">이용 정지</option><option value="withdrawn">탈퇴</option></select>{data.operatorRole === "admin" && <select value={selected.role} onChange={(event) => void mutate({ userId: selected.id, role: event.target.value }, "회원 역할을 저장했습니다.")} disabled={saving}><option value="student">일반 회원</option><option value="staff">스태프</option><option value="admin">최고 관리자</option></select>}</div></section>
-      <section><h3>고객 태그</h3><p>여기서는 회원에게 기존 태그를 지정합니다. 태그 등록·수정은 고객 태그 관리 메뉴에서 처리합니다.</p><div className="drawer-tags">{data.tags.map((tag) => <button key={tag.id} className={memberTagIds(selected.id).includes(tag.id) ? "selected" : ""} style={{ "--tag-color": tag.color } as CSSProperties} onClick={() => void toggleTag(selected.id, tag.id)} disabled={saving}><Tag/>{tag.name}</button>)}{!data.tags.length && <small>고객 태그 관리 메뉴에서 첫 태그를 등록해 주세요.</small>}</div></section>
+      <section><h3>고객 태그</h3><p>자동 태그는 결제·학습 행동에 따라 갱신됩니다. 수동 태그만 여기서 지정할 수 있습니다.</p><div className="drawer-tags">{data.tags.map((tag) => <button key={tag.id} className={`${memberTagIds(selected.id).includes(tag.id) ? "selected" : ""} ${tag.tag_kind === "automatic" ? "automatic" : ""}`} style={{ "--tag-color": tag.color } as CSSProperties} onClick={() => tag.tag_kind === "manual" && void toggleTag(selected.id, tag.id)} disabled={saving || tag.tag_kind === "automatic"} title={tag.tag_kind === "automatic" ? "고객 행동에 따라 자동으로 관리됩니다." : undefined}><Tag/>{tag.name}{tag.tag_kind === "automatic" && <small>자동</small>}</button>)}{!data.tags.length && <small>고객 태그 관리 메뉴에서 첫 태그를 등록해 주세요.</small>}</div></section>
       <section><div className="drawer-section-head"><h3>수강권</h3><span>{selected.enrollments.length}개</span></div><div className="drawer-enrollments">{selected.enrollments.map((enrollment) => <article key={enrollment.id}><div><strong>{one(enrollment.courses)?.title}</strong><small>{one(enrollment.cohorts)?.name} · {enrollment.source === "purchase" ? "결제 발급" : "관리자 발급"}</small></div><select value={enrollment.status} onChange={(event) => void mutate({ action: "enrollment", enrollmentId: enrollment.id, status: event.target.value }, "수강권 상태를 저장했습니다.")} disabled={saving}><option value="active">활성</option><option value="revoked">중지</option><option value="expired">만료</option><option value="refunded">환불</option></select></article>)}</div><div className="drawer-grant"><select value={grantCohortId} onChange={(event) => setGrantCohortId(event.target.value)}><option value="">발급할 상품·기수 선택</option>{data.cohorts.map((cohort) => <option key={cohort.id} value={cohort.id}>{one(cohort.courses)?.title} · {cohort.name}</option>)}</select><button className="admin-primary" onClick={() => void grant()} disabled={!grantCohortId || saving}><UserPlus/>수강권 발급</button></div></section>
       <footer><span>{selected.marketing_consent ? <><Check/>마케팅 수신 동의</> : "마케팅 수신 미동의"}</span><small>{selected.phone || "휴대폰 정보 없음"}</small></footer>
     </aside></div>}

@@ -5,6 +5,7 @@ import { Article, ArticleCategory, defaultFreeCourse, FreeCourseSettings, normal
 type CategoryRow = { id: string; name: string; slug: string; description: string | null; display_order: number; is_active: boolean };
 type ArticleRow = {
   id: string; category_id: string | null; slug: string; title: string; summary: string | null; content_blocks: unknown; attachments: unknown;
+  content_type: "column" | "youtube"; video_url: string | null;
   cover_image_path: string | null; cover_image_alt: string | null; status: "draft" | "scheduled" | "published" | "hidden";
   is_featured: boolean; seo_title: string | null; seo_description: string | null; scheduled_at: string | null;
   published_at: string | null; created_at: string; updated_at: string;
@@ -17,8 +18,8 @@ function publicClient() {
 }
 
 function categoryName(value: ArticleRow["article_categories"]) {
-  if (Array.isArray(value)) return value[0]?.name || "아티클";
-  return value?.name || "아티클";
+  if (Array.isArray(value)) return value[0]?.name || "블로그";
+  return value?.name || "블로그";
 }
 
 function articleUrl(client: ReturnType<typeof publicClient>, path: string | null) {
@@ -39,6 +40,8 @@ function mapArticle(client: ReturnType<typeof publicClient>, row: ArticleRow): A
     slug: row.slug,
     title: row.title,
     summary: row.summary || "",
+    contentType: row.content_type === "youtube" ? "youtube" : "column",
+    videoUrl: row.video_url || "",
     blocks,
     attachments: Array.isArray(row.attachments) ? row.attachments.flatMap((item, index) => item && typeof item === "object" && "path" in item ? [{ id: String((item as Record<string, unknown>).id || `attachment-${index}`), name: String((item as Record<string, unknown>).name || "관련 자료"), path: String((item as Record<string, unknown>).path), url: attachmentUrl(client, String((item as Record<string, unknown>).path)), size: Number((item as Record<string, unknown>).size) || 0 }] : []) : [],
     coverImagePath: row.cover_image_path || "",
@@ -65,7 +68,7 @@ export async function getPublicArticleIndex(): Promise<{ articles: Article[]; ca
   try {
     const client = publicClient();
     const [articleResult, categoryResult, settingResult] = await Promise.all([
-      client.from("articles").select("id,category_id,slug,title,summary,content_blocks,attachments,cover_image_path,cover_image_alt,status,is_featured,seo_title,seo_description,scheduled_at,published_at,created_at,updated_at,article_categories(name)").order("is_featured", { ascending: false }).order("published_at", { ascending: false }),
+      client.from("articles").select("id,category_id,slug,title,summary,content_type,video_url,content_blocks,attachments,cover_image_path,cover_image_alt,status,is_featured,seo_title,seo_description,scheduled_at,published_at,created_at,updated_at,article_categories(name)").order("is_featured", { ascending: false }).order("published_at", { ascending: false }),
       client.from("article_categories").select("id,name,slug,description,display_order,is_active").eq("is_active", true).order("display_order"),
       client.from("site_settings").select("value").eq("key", "article_free_course").maybeSingle(),
     ]);
@@ -81,7 +84,7 @@ export async function getPublicArticle(slug: string): Promise<Article | null> {
   if (!hasSupabaseEnv()) return null;
   try {
     const client = publicClient();
-    const { data, error } = await client.from("articles").select("id,category_id,slug,title,summary,content_blocks,attachments,cover_image_path,cover_image_alt,status,is_featured,seo_title,seo_description,scheduled_at,published_at,created_at,updated_at,article_categories(name)").eq("slug", slug).maybeSingle();
+    const { data, error } = await client.from("articles").select("id,category_id,slug,title,summary,content_type,video_url,content_blocks,attachments,cover_image_path,cover_image_alt,status,is_featured,seo_title,seo_description,scheduled_at,published_at,created_at,updated_at,article_categories(name)").eq("slug", slug).maybeSingle();
     if (error || !data) return null;
     const article = mapArticle(client, data as ArticleRow);
     return isVisible(article) ? article : null;
