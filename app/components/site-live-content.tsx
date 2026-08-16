@@ -7,7 +7,7 @@ import { ArrowLeft, ArrowRight, CalendarDays, Check, Clock3, Pause, Play, Quote,
 import type { PublicReview, PublicReviewVideo } from "@/lib/education-data";
 import type { ClassItem } from "@/app/data";
 
-type BannerData = { image?: string; eyebrow?: string; title?: string; copy?: string; link?: string };
+type BannerData = { image?: string; eyebrow?: string; title?: string; copy?: string; link?: string; linkLabel?: string };
 type PixelData = { meta?: string; kakao?: string; google?: string; enabled?: boolean };
 
 export function LandingBanner({banner={}}:{banner?:BannerData}) {
@@ -17,7 +17,7 @@ export function LandingBanner({banner={}}:{banner?:BannerData}) {
       <span>{banner.eyebrow || "BRANDYACTION EDU · LIVE"}</span>
       <strong>{banner.title || "배운 것을 실행으로\n바꾸는 실전 클래스"}</strong>
       <p>{banner.copy || "모집 중인 클래스와 일정을 확인하세요."}</p>
-      <Link href={banner.link || "/classes"}>클래스 자세히 보기 <ArrowRight/></Link>
+      <Link href={banner.link || "/classes"}>{banner.linkLabel || "클래스 자세히 보기"} <ArrowRight/></Link>
     </div>
     {!banner.image&&<div className="managed-banner-mark" aria-hidden="true"><span>01</span><b>LIVE</b></div>}
   </div>;

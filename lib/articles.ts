@@ -54,13 +54,13 @@ export type FreeCourseSettings = {
 
 export const defaultFreeCourse: FreeCourseSettings = {
   eyebrow: "FREE CLASS · 무료 3강",
-  title: "진단 전에 먼저 보는 무료 강의",
-  description: "성향 유형을 붙여 주는 강의가 아닙니다. 반복해서 비어 있던 자리가 가리키는 내 업의 방향을 세 번의 강의로 먼저 잡습니다.",
-  signupCopy: "무료 회원가입을 완료하면 3강 전체를 사이트에서 바로 볼 수 있어요. 별도 결제는 필요 없습니다.",
+  title: "사업자를 위한 마케팅·AI 매출 진단",
+  description: "광고비를 더 쓰기 전에 고객 유입, 콘텐츠, 전환, 재구매 중 어디에서 매출이 막히는지 먼저 확인합니다.",
+  signupCopy: "무료 회원가입을 완료하면 사업자용 3강 전체를 바로 볼 수 있습니다. 별도 결제는 필요 없습니다.",
   lessons: [
-    { id: "lesson-1", title: "왜 열심히 해도 제자리인지 — 방향의 구조", videoUrl: "" },
-    { id: "lesson-2", title: "결핍이 가리키는 6가지 핵심 욕구", videoUrl: "" },
-    { id: "lesson-3", title: "내 업의 방향을 잡는 첫 질문", videoUrl: "" },
+    { id: "lesson-1", title: "매출을 막는 마케팅 병목 찾기", videoUrl: "" },
+    { id: "lesson-2", title: "AI로 줄일 일과 사람이 결정할 일", videoUrl: "" },
+    { id: "lesson-3", title: "7일 안에 실행할 매출 실험 설계", videoUrl: "" },
   ],
 };
 

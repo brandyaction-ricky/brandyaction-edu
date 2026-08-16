@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, BarChart3, CalendarDays, CheckCircle2, Play, Target } from "lucide-react";
 import { BrandHeader } from "./components/brand-header";
-import { ClassCard } from "./components/class-card";
 import { HomeExperience } from "./components/home-experience";
 import { LandingBanner, ReviewSlider } from "./components/site-live-content";
 import { getPublicBanner, getPublishedClasses, getPublishedReviews, getPublishedReviewVideos } from "@/lib/education-data";
@@ -33,16 +32,16 @@ export default async function Home() {
       <section className="section" id="programs" data-home-reveal>
         <div className="container">
           <div className="section-heading split-heading">
-            <div><span className="section-kicker">FREE · PAID CLASS</span><h2>필요한 단계부터 시작하세요</h2><p>먼저 방향을 찾는 무료 클래스와, 결과물을 완성하는 유료 라이브 클래스를 구분해 선택할 수 있습니다.</p></div>
+            <div><span className="section-kicker">FREE · PAID CLASS</span><h2>내 사업의 매출 단계에 맞춰 시작하세요</h2><p>무료 클래스에서 마케팅 병목을 찾고, 유료 라이브 클래스에서 AI를 활용한 실행 결과물을 완성합니다.</p></div>
             <Link className="text-link" href="/classes">전체 클래스 보기 <ArrowRight size={18} /></Link>
           </div>
-          <div className="program-choice-grid"><article className="free-program-card"><div><span>FREE CLASS</span><b>무료 3강</b></div><small>결제 전, 내 방향부터 확인</small><h3>진단 전에 먼저 보는<br/>내 업의 방향 클래스</h3><p>반복해서 비어 있던 자리가 가리키는 내 욕구와 일의 방향을 3개의 강의로 먼저 정리합니다.</p><ul><li><CheckCircle2/>회원가입 후 바로 시청</li><li><CheckCircle2/>별도 결제 없이 3강 전체 공개</li><li><CheckCircle2/>아티클과 함께 고민 구체화</li></ul><Link href="/articles#free-class">무료 클래스 시작하기 <ArrowRight/></Link></article><div className="paid-programs"><header><div><span>PAID LIVE CLASS</span><strong>유료 라이브 클래스</strong><small>기수 일정 · 피드백 · 실행 결과물</small></div><em>{classes.filter((item) => item.status.includes("모집 중")).length}개 모집 중</em></header><div className="class-grid">{classes.map((item) => <ClassCard key={item.slug} item={item} />)}</div></div></div>
+          <div className="landing-free-program-list"><article className="free-program-card"><div><span>FREE CLASS</span><b>무료 3강</b></div><small>광고비를 늘리기 전, 매출 구조부터 점검</small><h3>사업자를 위한<br/>마케팅·AI 매출 진단</h3><p>고객 유입부터 콘텐츠, 전환, 재구매까지 지금 막힌 지점을 3개의 강의로 빠르게 찾습니다.</p><ul><li><CheckCircle2/>회원가입 후 바로 시청</li><li><CheckCircle2/>별도 결제 없이 3강 전체 공개</li><li><CheckCircle2/>실무 블로그와 함께 바로 적용</li></ul><Link href="/articles#free-class">무료 클래스 신청하기 <ArrowRight/></Link></article></div>
         </div>
       </section>
 
       {user && <section className="member-next-step section" data-home-reveal><div className="container"><div><span className="section-kicker">MY LEARNING PATH</span><h2>{currentEnrollment ? "지금 수강 중인 흐름을\n다음 클래스로 이어가세요." : "내 클래스에서 학습 현황을\n바로 확인하세요."}</h2><p>{currentEnrollment ? `${currentEnrollment.courseTitle} · ${currentEnrollment.cohortName} 수강 중` : "수강권과 다음 라이브 일정을 한곳에서 확인할 수 있습니다."}</p><Link href="/my">마이페이지에서 확인 <ArrowRight/></Link></div>{nextClass && <article><span>{nextClass.status}</span><small>NEXT RECOMMENDED CLASS</small><h3>{nextClass.title}</h3><p>{nextClass.startDate} 개강 · {nextClass.schedule}</p><strong>{nextClass.price}</strong><Link href={`/classes/${nextClass.slug}`}>다음 기수 예약하기 <ArrowRight/></Link></article>}</div></section>}
 
-      <section className="landing-article-section section" data-home-reveal><div className="container"><div className="section-heading split-heading"><div><span className="section-kicker">TOP QUESTIONS BEFORE CLASS</span><h2>신청 전에 가장 많이 묻는 고민부터</h2><p>바로 결제하지 않아도 괜찮습니다. 내 질문과 가까운 글에서 먼저 방향을 확인하세요.</p></div><Link className="text-link" href="/articles">모든 아티클 보기 <ArrowRight/></Link></div><div className="landing-article-grid">{topArticles.map((article, index) => <article key={article.id}><Link href={`/articles/${article.slug}`}><span>{article.categoryName}</span><b>{String(index + 1).padStart(2,"0")}</b><h3>{article.title}</h3><p>{article.summary}</p><footer>이 고민부터 읽기 <ArrowRight/></footer></Link></article>)}</div><div className="landing-free-bridge"><div><span>무료 3강</span><strong>아티클에서 발견한 질문을<br/>내 일의 방향으로 연결하세요.</strong></div><p>회원가입만 하면 진단 전 무료 3강을 바로 볼 수 있습니다.</p><Link href="/articles#free-class">무료 3강 보기 <ArrowRight/></Link></div></div></section>
+      <section className="landing-article-section section" data-home-reveal><div className="container"><div className="section-heading split-heading"><div><span className="section-kicker">TOP REVENUE QUESTIONS</span><h2>사업자들이 가장 많이 막히는 매출 문제부터</h2><p>광고·콘텐츠·AI·CRM 중 내 사업의 병목과 가까운 글에서 실행 방법을 확인하세요.</p></div><Link className="text-link" href="/articles">모든 실무 글 보기 <ArrowRight/></Link></div><div className="landing-article-grid">{topArticles.map((article, index) => <article key={article.id}><Link href={`/articles/${article.slug}`}><span>{article.categoryName}</span><b>{String(index + 1).padStart(2,"0")}</b><h3>{article.title}</h3><p>{article.summary}</p><footer>실행 방법 확인하기 <ArrowRight/></footer></Link></article>)}</div><div className="landing-free-bridge"><div><span>무료 3강</span><strong>블로그에서 찾은 매출 문제를<br/>내 사업의 실행안으로 바꾸세요.</strong></div><p>회원가입만 하면 사업자 마케팅·AI 무료 3강을 바로 볼 수 있습니다.</p><Link href="/articles#free-class">무료 3강 보기 <ArrowRight/></Link></div></div></section>
 
       <section className="section section-ink" id="philosophy" data-home-reveal>
         <div className="container philosophy-grid">

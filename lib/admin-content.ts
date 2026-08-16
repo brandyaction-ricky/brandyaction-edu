@@ -30,6 +30,7 @@ export type BannerData = {
   title: string;
   copy: string;
   link: string;
+  linkLabel: string;
 };
 export type CohortStatus = "upcoming" | "recruiting" | "closed" | "in_progress" | "completed" | "cancelled";
 export type AdminSession = { id: string; sessionNumber: number; title: string; description: string; expectedOutput: string; scheduledAt: string; liveUrl: string; replayUrl: string };
@@ -279,7 +280,7 @@ export async function saveCourseAdmin(input: {
 
 export async function loadAdminBanner(): Promise<BannerData> {
   const supabase = createClient();
-  const { data, error } = await supabase.from("site_banners").select("id,eyebrow,title,description,link_url,image_path").order("display_order").limit(1).maybeSingle();
+  const { data, error } = await supabase.from("site_banners").select("id,eyebrow,title,description,link_url,link_label,image_path").order("display_order").limit(1).maybeSingle();
   if (error) throw new Error(messageOf(error, "메인 배너를 불러오지 못했습니다."));
   return {
     id: data?.id,
@@ -289,6 +290,7 @@ export async function loadAdminBanner(): Promise<BannerData> {
     title: data?.title || "배운 것을 실행으로\n바꾸는 실전 클래스",
     copy: data?.description || "모집 중인 클래스와 일정을 확인하세요.",
     link: data?.link_url || "/classes",
+    linkLabel: data?.link_label || "클래스 자세히 보기",
   };
 }
 
@@ -299,6 +301,7 @@ export async function saveAdminBanner(banner: BannerData) {
   form.append("title", banner.title);
   form.append("copy", banner.copy);
   form.append("link", safePublicHref(banner.link, "/classes"));
+  form.append("linkLabel", banner.linkLabel || "클래스 자세히 보기");
   form.append("imagePath", banner.imagePath || "");
   form.append("removeImage", String(!banner.image && Boolean(banner.imagePath)));
   if (banner.imageFile) form.append("image", banner.imageFile);

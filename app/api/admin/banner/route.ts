@@ -36,6 +36,7 @@ export async function POST(request: Request) {
     title,
     description: String(form.get("copy") || "").trim().slice(0, 300) || null,
     link_url: safePublicHref(String(form.get("link") || ""), "/classes"),
+    link_label: String(form.get("linkLabel") || "").trim().slice(0, 40) || "클래스 자세히 보기",
     image_path: imagePath,
     is_active: true,
     display_order: 0,

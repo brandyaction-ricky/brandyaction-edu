@@ -45,7 +45,7 @@ type CurriculumWeekRow = { id: string; course_id: string; week_number: number; t
 type CurriculumLessonRow = { id: string; week_id: string; day_number: number; title: string; description: string | null; content_type: "vod" | "material"; duration_label: string | null; display_order: number };
 type CourseThumbnailRow = { course_id: string; storage_path: string };
 
-export type PublicBanner = { image?: string; eyebrow?: string; title?: string; copy?: string; link?: string };
+export type PublicBanner = { image?: string; eyebrow?: string; title?: string; copy?: string; link?: string; linkLabel?: string };
 export type PublicCourseAppearance = { images: string[]; pixels: { meta?: string; kakao?: string; google?: string; enabled?: boolean } };
 export type PublicReview = { id: string; name: string; className: string; cohortName: string; rating: number; quote: string };
 export type PublicReviewVideo = { id: string; title: string; reviewerName: string; reviewerRole: string; description: string; embedUrl: string; thumbnailUrl: string };
@@ -270,9 +270,9 @@ export async function getPublicBanner():Promise<PublicBanner>{
   if(!hasSupabaseEnv())return {};
   try{
     const supabase=publicClient();
-    const {data,error}=await supabase.from("site_banners").select("eyebrow,title,description,link_url,image_path").eq("is_active",true).order("display_order").limit(1).maybeSingle();
+    const {data,error}=await supabase.from("site_banners").select("eyebrow,title,description,link_url,link_label,image_path").eq("is_active",true).order("display_order").limit(1).maybeSingle();
     if(error||!data)return {};
-    return {eyebrow:data.eyebrow||undefined,title:data.title||undefined,copy:data.description||undefined,link:data.link_url?safePublicHref(data.link_url,"/classes"):undefined,image:data.image_path?supabase.storage.from("course-assets").getPublicUrl(data.image_path).data.publicUrl:undefined};
+    return {eyebrow:data.eyebrow||undefined,title:data.title||undefined,copy:data.description||undefined,link:data.link_url?safePublicHref(data.link_url,"/classes"):undefined,linkLabel:data.link_label||undefined,image:data.image_path?supabase.storage.from("course-assets").getPublicUrl(data.image_path).data.publicUrl:undefined};
   }catch{return {}}
 }
 
