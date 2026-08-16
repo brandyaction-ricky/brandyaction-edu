@@ -3,7 +3,7 @@ import { ArrowRight, BarChart3, CalendarDays, Play, Target } from "lucide-react"
 import { BrandHeader } from "./components/brand-header";
 import { HomeExperience } from "./components/home-experience";
 import { LandingBanner, ReviewSlider } from "./components/site-live-content";
-import { ClassCard } from "./components/class-card";
+import { ClassCatalog } from "./components/class-catalog";
 import { getPublicBanners, getPublishedClasses, getPublishedReviews, getPublishedReviewVideos } from "@/lib/education-data";
 import { getPublicArticleIndex } from "@/lib/article-data";
 import { getAuthenticatedUser } from "@/lib/server-auth";
@@ -23,7 +23,6 @@ export default async function Home() {
     if (course?.title) currentEnrollment = { courseTitle: course.title, cohortName: cohort?.name || "수강 중" };
   }
   const topArticles = articleIndex.articles.slice(0, 3);
-  const landingClasses = classes.slice(0, 3);
   const nextClass = classes.find((item) => item.status.includes("모집 중"));
   return (
     <main>
@@ -37,7 +36,7 @@ export default async function Home() {
             <div><span className="section-kicker">FREE · PAID CLASS</span><h2>내 사업의 매출 단계에 맞춰 시작하세요</h2><p>무료 클래스에서 마케팅 병목을 찾고, 유료 라이브 클래스에서 AI를 활용한 실행 결과물을 완성합니다.</p></div>
             <Link className="text-link" href="/classes">전체 클래스 보기 <ArrowRight size={18} /></Link>
           </div>
-          {landingClasses.length ? <div className="class-grid landing-class-grid">{landingClasses.map((item) => <ClassCard key={item.slug} item={item} applicationOnlyWhenRecruiting={item.programType === "paid"}/>)}</div> : <div className="catalog-note"><strong>클래스를 준비하고 있습니다.</strong><p>공개되는 즉시 이 영역에서 신청할 수 있습니다.</p></div>}
+          <ClassCatalog classes={classes}/>
         </div>
       </section>
 
