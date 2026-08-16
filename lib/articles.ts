@@ -19,6 +19,8 @@ export type ArticleCategory = {
   isActive: boolean;
 };
 
+export type ArticleAttachment = { id: string; name: string; path: string; url: string; size: number };
+
 export type Article = {
   id: string;
   categoryId: string;
@@ -27,6 +29,7 @@ export type Article = {
   title: string;
   summary: string;
   blocks: ArticleBlock[];
+  attachments: ArticleAttachment[];
   coverImagePath: string;
   coverImageUrl: string;
   coverImageAlt: string;

@@ -16,6 +16,20 @@ function publicAssetUrl(path: string | null) {
   return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/article-assets/${path.split("/").map(encodeURIComponent).join("/")}`;
 }
 
+function publicResourceUrl(path: string) {
+  return process.env.NEXT_PUBLIC_SUPABASE_URL ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/article-resources/${path.split("/").map(encodeURIComponent).join("/")}` : "";
+}
+
+function storedAttachments(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 12).flatMap((item, index) => {
+    const row = item && typeof item === "object" ? item as Record<string, unknown> : {};
+    const path = String(row.path || "");
+    if (!path.startsWith("resources/")) return [];
+    return [{ id: String(row.id || `attachment-${index}`).slice(0, 80), name: String(row.name || "관련 자료").slice(0, 180), path, size: Math.max(0, Number(row.size) || 0) }];
+  });
+}
+
 function relationName(value: unknown) {
   const item = Array.isArray(value) ? value[0] : value;
   return item && typeof item === "object" && "name" in item ? String(item.name) : "미분류";
@@ -54,7 +68,7 @@ export async function GET() {
   try {
     const admin = createAdminClient();
     const [articles, categories, freeCourse] = await Promise.all([
-      admin.from("articles").select("id,category_id,slug,title,summary,content_blocks,cover_image_path,cover_image_alt,status,is_featured,seo_title,seo_description,scheduled_at,published_at,created_at,updated_at,article_categories(name)").order("updated_at", { ascending: false }),
+      admin.from("articles").select("id,category_id,slug,title,summary,content_blocks,attachments,cover_image_path,cover_image_alt,status,is_featured,seo_title,seo_description,scheduled_at,published_at,created_at,updated_at,article_categories(name)").order("updated_at", { ascending: false }),
       admin.from("article_categories").select("id,name,slug,description,display_order,is_active").order("display_order"),
       admin.from("site_settings").select("value").eq("key", "article_free_course").maybeSingle(),
     ]);
@@ -69,6 +83,7 @@ export async function GET() {
         title: row.title,
         summary: row.summary || "",
         blocks: displayBlocks(row.content_blocks),
+        attachments: storedAttachments(row.attachments).map((item) => ({ ...item, url: publicResourceUrl(item.path) })),
         coverImagePath: row.cover_image_path || "",
         coverImageUrl: publicAssetUrl(row.cover_image_path),
         coverImageAlt: row.cover_image_alt || "",
@@ -135,6 +150,7 @@ export async function POST(request: Request) {
       const status = statuses.has(article.status as ArticleStatus) ? article.status as ArticleStatus : "draft";
       const categoryId = String(article.categoryId || "");
       const blocks = storedBlocks(article.blocks);
+      const attachments = storedAttachments(article.attachments);
       const scheduledAt = String(article.scheduledAt || "");
       if (!title || !slug) return NextResponse.json({ error: "제목과 URL 주소를 입력해 주세요." }, { status: 400 });
       if (categoryId && !uuidPattern.test(categoryId)) return NextResponse.json({ error: "카테고리를 다시 선택해 주세요." }, { status: 400 });
@@ -148,6 +164,7 @@ export async function POST(request: Request) {
         title,
         summary: String(article.summary || "").trim().slice(0, 500) || null,
         content_blocks: blocks,
+        attachments,
         cover_image_path: coverImagePath || null,
         cover_image_alt: String(article.coverImageAlt || "").trim().slice(0, 160) || title,
         status,
@@ -160,7 +177,7 @@ export async function POST(request: Request) {
       };
       if (payload.is_featured) await admin.from("articles").update({ is_featured: false }).eq("is_featured", true);
       const existing = id && uuidPattern.test(id)
-        ? await admin.from("articles").select("cover_image_path,content_blocks").eq("id", id).maybeSingle()
+        ? await admin.from("articles").select("cover_image_path,content_blocks,attachments").eq("id", id).maybeSingle()
         : { data: null, error: null };
       if (existing.error) throw existing.error;
       const result = id && uuidPattern.test(id)
@@ -170,6 +187,9 @@ export async function POST(request: Request) {
       const retainedPaths = new Set(assetPaths({ cover_image_path: payload.cover_image_path, content_blocks: blocks }));
       const replacedPaths = assetPaths(existing.data).filter((path) => !retainedPaths.has(path));
       if (replacedPaths.length) await admin.storage.from("article-assets").remove(replacedPaths);
+      const retainedResources = new Set(attachments.map((item) => item.path));
+      const removedResources = storedAttachments(existing.data?.attachments).map((item) => item.path).filter((path) => !retainedResources.has(path));
+      if (removedResources.length) await admin.storage.from("article-resources").remove(removedResources);
       await admin.from("audit_logs").insert({ actor_user_id: operator.id, action: id ? "article.updated" : "article.created", entity_type: "article", entity_id: result.data.id, after_data: { title, status, is_featured: payload.is_featured } });
       return NextResponse.json({ id: result.data.id });
     }
@@ -177,11 +197,13 @@ export async function POST(request: Request) {
     if (action === "deleteArticle") {
       const id = String(body.id || "");
       if (!uuidPattern.test(id)) return NextResponse.json({ error: "잘못된 아티클입니다." }, { status: 400 });
-      const { data: article } = await admin.from("articles").select("cover_image_path,content_blocks").eq("id", id).maybeSingle();
+      const { data: article } = await admin.from("articles").select("cover_image_path,content_blocks,attachments").eq("id", id).maybeSingle();
       const { error } = await admin.from("articles").delete().eq("id", id);
       if (error) throw error;
       const paths = assetPaths(article);
       if (paths.length) await admin.storage.from("article-assets").remove(paths);
+      const resourcePaths = storedAttachments(article?.attachments).map((item) => item.path);
+      if (resourcePaths.length) await admin.storage.from("article-resources").remove(resourcePaths);
       await admin.from("audit_logs").insert({ actor_user_id: operator.id, action: "article.deleted", entity_type: "article", entity_id: id });
       return NextResponse.json({ ok: true });
     }

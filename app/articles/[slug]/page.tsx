@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Download, FileText } from "lucide-react";
 import { BrandHeader } from "../../components/brand-header";
 import { getPublicArticle } from "@/lib/article-data";
 import { articleReadingMinutes } from "@/lib/articles";
@@ -34,6 +34,7 @@ export default async function ArticleDetailPage({ params }: { params: Promise<{ 
         if (block.type === "image") return block.imageUrl ? <figure key={block.id}><div role="img" aria-label={block.alt || "아티클 본문 이미지"} style={{ backgroundImage: `url(${block.imageUrl})` }}/>{block.text && <figcaption>{block.text}</figcaption>}</figure> : null;
         return <p key={block.id}>{block.text}</p>;
       })}</div>
+      {article.attachments.length > 0 && <section className="article-downloads"><div className="article-reading-container"><span>RELATED MATERIALS</span><h2>읽고 바로 실행할 수 있는 자료</h2><p>아티클과 함께 활용할 워크북·체크리스트를 내려받으세요.</p><div>{article.attachments.map((item) => <a href={item.url} download key={item.id}><FileText/><span><strong>{item.name}</strong><small>{item.size ? `${(item.size / 1_000_000).toFixed(item.size >= 1_000_000 ? 1 : 2)}MB` : "첨부 파일"}</small></span><Download/></a>)}</div></div></section>}
       <footer className="article-detail-cta"><div className="article-reading-container"><span>READ · THINK · ACT</span><h2>읽는 데서 멈추지 않고,<br/>내 기준을 실행으로 옮겨보세요.</h2><div><Link href="/articles">다른 아티클 보기 <ArrowLeft/></Link><Link href="/classes">클래스 확인하기 <ArrowRight/></Link></div></div></footer>
     </article>
   </main>;
