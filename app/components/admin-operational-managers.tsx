@@ -5,6 +5,7 @@ import {
   Check,
   Download,
   Eye,
+  MessageSquare,
   RefreshCw,
   Save,
   Search,
@@ -740,6 +741,7 @@ export function AdminLiveOrdersManager() {
 }
 
 export function AdminLiveReviewsManager() {
+  const [reviewView, setReviewView] = useState<"video" | "product">("video");
   const [reviews, setReviews] = useState<AdminReview[]>([]);
   const [videos, setVideos] = useState<AdminReviewVideo[]>([]);
   const [videoDraft, setVideoDraft] = useState({ ...emptyReviewVideo });
@@ -816,10 +818,15 @@ export function AdminLiveReviewsManager() {
     );
   return (
     <>
-      <section className="admin-panel review-video-manager">
+      <nav className="review-management-tabs" aria-label="후기 관리 유형">
+        <button className={reviewView === "video" ? "active" : ""} onClick={() => setReviewView("video")}><Video/><span><strong>랜딩페이지 영상 후기</strong><small>메인 리얼 후기 노출·순서 관리</small></span></button>
+        <button className={reviewView === "product" ? "active" : ""} onClick={() => setReviewView("product")}><MessageSquare/><span><strong>상품별 후기 관리</strong><small>클래스 후기 승인·대표 노출 관리</small></span></button>
+      </nav>
+      <section className={`admin-panel review-video-manager review-tab-panel ${reviewView !== "video" ? "hidden" : ""}`}>
         <header><div><span><Video/></span><div><h2>영상 후기 관리</h2><p>공개한 영상은 메인 리얼 후기 섹션에 등록 순서대로 노출됩니다.</p></div></div><strong>{videos.filter((video)=>video.is_published).length}개 공개</strong></header>
         <div className="review-video-admin-grid"><div className="review-video-form"><h3>{editingVideoId ? "영상 후기 수정" : "새 영상 후기 등록"}</h3><div className="form-two"><label>영상 제목<input value={videoDraft.title} onChange={(event)=>setVideoDraft({...videoDraft,title:event.target.value})} placeholder="수강 후 달라진 구체적인 변화"/></label><label>후기자 이름<input value={videoDraft.reviewerName} onChange={(event)=>setVideoDraft({...videoDraft,reviewerName:event.target.value})} placeholder="김OO"/></label></div><div className="form-two"><label>후기자 설명<input value={videoDraft.reviewerRole} onChange={(event)=>setVideoDraft({...videoDraft,reviewerRole:event.target.value})} placeholder="자영업 마케팅 1기 수강생"/></label><label>노출 순서<input type="number" min="0" value={videoDraft.displayOrder} onChange={(event)=>setVideoDraft({...videoDraft,displayOrder:Number(event.target.value)})}/></label></div><label>영상 URL<input value={videoDraft.videoUrl} onChange={(event)=>setVideoDraft({...videoDraft,videoUrl:event.target.value})} placeholder="YouTube 또는 Vimeo URL"/></label><label>썸네일 URL <small>선택 · YouTube는 자동 생성</small><input value={videoDraft.thumbnailUrl} onChange={(event)=>setVideoDraft({...videoDraft,thumbnailUrl:event.target.value})} placeholder="https://..."/></label><label>영상 설명<textarea value={videoDraft.description} onChange={(event)=>setVideoDraft({...videoDraft,description:event.target.value})} placeholder="영상에서 확인할 수 있는 변화와 결과를 요약하세요."/></label><label className="review-video-publish"><input type="checkbox" checked={videoDraft.isPublished} onChange={(event)=>setVideoDraft({...videoDraft,isPublished:event.target.checked})}/><span>메인 리얼 후기 섹션에 공개</span></label><div className="review-video-form-actions">{editingVideoId&&<button className="admin-outline" onClick={resetVideo}>취소</button>}<button className="admin-primary" onClick={()=>void saveVideo()} disabled={!videoDraft.title.trim()||!videoDraft.reviewerName.trim()||!videoDraft.videoUrl.trim()}><Save/>{editingVideoId?"수정 저장":"영상 등록"}</button></div></div><div className="review-video-admin-list">{videos.length?videos.map((video)=><article key={video.id}><div className="review-video-admin-thumb" style={video.thumbnail_url?{backgroundImage:`url(${video.thumbnail_url})`}:undefined}><Video/></div><div><span>{video.is_published?"공개":"비공개"} · 순서 {video.display_order}</span><strong>{video.title}</strong><small>{video.reviewer_name} · {video.reviewer_role||"수강생"}</small></div><div><a className="admin-outline" href={video.video_url} target="_blank" rel="noreferrer"><Eye/>보기</a><button className="admin-outline" onClick={()=>editVideo(video)}>수정</button><button className="admin-outline danger" onClick={()=>void removeVideo(video)}><Trash2/></button></div></article>):<div className="review-video-empty"><Video/><strong>등록된 영상 후기가 없습니다.</strong><span>왼쪽 입력창에서 첫 영상을 등록하세요.</span></div>}</div></div>
       </section>
+      <div className={`review-tab-panel ${reviewView !== "product" ? "hidden" : ""}`}>
       <div className="review-admin-summary">
         <article>
           <span>전체 후기</span>
@@ -921,6 +928,7 @@ export function AdminLiveReviewsManager() {
           ))}
         </div>
       </section>
+      </div>
       {error && (
         <p className="admin-save-error" role="alert">
           {error}

@@ -178,6 +178,7 @@ function mapCourse(course: CourseRow, cohorts: CohortRow[], sessions: SessionRow
 
   return {
     slug: course.slug,
+    programType: course.metadata?.programType === "free" || course.list_price === 0 ? "free" : "paid",
     cohortId: cohort?.id,
     title: course.title,
     summary: course.summary || "현장에서 바로 적용하는 브랜디액션 실전 클래스입니다.",

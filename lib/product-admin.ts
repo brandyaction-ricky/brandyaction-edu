@@ -18,6 +18,7 @@ export type ProductDraft = {
   listPrice: string;
   durationLabel: string;
   scheduleLabel: string;
+  programType: "free" | "paid";
   status: ProductStatus;
   metadata: Record<string, unknown>;
 };
@@ -29,6 +30,7 @@ export type ProductSummary = {
   listPrice: number;
   durationLabel: string;
   status: ProductStatus;
+  programType: "free" | "paid";
   thumbnailUrl?: string;
   imageCount: number;
   weekCount: number;
@@ -41,6 +43,10 @@ export type ProductEditorData = {
   curriculum: CurriculumWeek[];
   pixels: ProductPixels;
 };
+type ProductCourseRecord = { id:string; course_code:string; slug:string; title:string; summary:string|null; description:string|null; category:string|null; instructor_name:string|null; list_price:number; duration_label:string|null; schedule_label:string|null; status:ProductStatus; metadata:Record<string,unknown>|null };
+type ProductAssetRecord = { id:string; asset_type:string; storage_path:string; display_order:number };
+type ProductLessonRecord = { id:string; day_number:number; title:string; description:string|null; content_type:string; duration_label:string|null; display_order:number; lesson_contents:Array<{vod_url:string|null;resource_name:string|null;resource_storage_path:string|null}>|{vod_url:string|null;resource_name:string|null;resource_storage_path:string|null}|null };
+type ProductWeekRecord = { id:string; week_number:number; title:string; goal:string|null; display_order:number; curriculum_lessons:ProductLessonRecord[] };
 
 const defaultPixels: ProductPixels = { meta: "", kakao: "", google: "", enabled: true };
 
@@ -71,6 +77,7 @@ export function createEmptyProduct(): ProductEditorData {
       listPrice: "0",
       durationLabel: "수강기간 무제한",
       scheduleLabel: "일정 추후 안내",
+      programType: "paid",
       status: "draft",
       metadata: {},
     },
@@ -85,7 +92,7 @@ export async function loadAdminProducts(): Promise<ProductSummary[]> {
   const supabase = createClient();
   const { data: courses, error } = await supabase
     .from("courses")
-    .select("id,slug,title,instructor_name,list_price,duration_label,status,display_order")
+    .select("id,slug,title,instructor_name,list_price,duration_label,status,display_order,metadata")
     .order("display_order", { ascending: false })
     .order("created_at", { ascending: false });
   if (error) throw new Error(messageOf(error, "상품 목록을 불러오지 못했습니다."));
@@ -111,6 +118,7 @@ export async function loadAdminProducts(): Promise<ProductSummary[]> {
       listPrice: course.list_price,
       durationLabel: course.duration_label || "기간 미정",
       status: course.status as ProductStatus,
+      programType: course.metadata && typeof course.metadata === "object" && !Array.isArray(course.metadata) && (course.metadata as Record<string, unknown>).programType === "free" ? "free" : "paid",
       thumbnailUrl: thumbnail ? supabase.storage.from("course-assets").getPublicUrl(thumbnail.storage_path).data.publicUrl : undefined,
       imageCount: courseAssets.filter((asset) => asset.asset_type === "detail").length,
       weekCount: weeks.length,
@@ -121,19 +129,10 @@ export async function loadAdminProducts(): Promise<ProductSummary[]> {
 
 export async function loadAdminProduct(courseId: string): Promise<ProductEditorData> {
   const supabase = createClient();
-  const { data: course, error } = await supabase
-    .from("courses")
-    .select("id,course_code,slug,title,summary,description,category,instructor_name,list_price,duration_label,schedule_label,status,metadata")
-    .eq("id", courseId)
-    .single();
-  if (error || !course) throw new Error(messageOf(error, "상품을 불러오지 못했습니다."));
-
-  const [assetResult, weekResult] = await Promise.all([
-    supabase.from("course_assets").select("id,asset_type,storage_path,display_order").eq("course_id", courseId).order("display_order"),
-    supabase.from("curriculum_weeks").select("id,week_number,title,goal,display_order,curriculum_lessons(id,day_number,title,description,content_type,duration_label,display_order,lesson_contents(vod_url,resource_name,resource_storage_path))").eq("course_id", courseId).order("display_order"),
-  ]);
-  if (assetResult.error) throw new Error(messageOf(assetResult.error, "상세 이미지를 불러오지 못했습니다."));
-  if (weekResult.error) throw new Error(messageOf(weekResult.error, "커리큘럼을 불러오지 못했습니다."));
+  const result = await productRequest<{ course: ProductCourseRecord; assets: ProductAssetRecord[]; weeks: ProductWeekRecord[] }>(`/api/admin/products?id=${encodeURIComponent(courseId)}`);
+  const course = result.course;
+  const assets = result.assets || [];
+  const weeks = result.weeks || [];
 
   const metadata = course.metadata && typeof course.metadata === "object" && !Array.isArray(course.metadata)
     ? course.metadata as Record<string, unknown>
@@ -151,23 +150,24 @@ export async function loadAdminProduct(courseId: string): Promise<ProductEditorD
       listPrice: String(course.list_price),
       durationLabel: course.duration_label || "",
       scheduleLabel: course.schedule_label || "",
+      programType: metadata.programType === "free" ? "free" : "paid",
       status: course.status as ProductStatus,
       metadata,
     },
     thumbnail: (() => {
-      const asset = (assetResult.data || []).find((item) => item.asset_type === "thumbnail");
+      const asset = assets.find((item) => item.asset_type === "thumbnail");
       return asset ? {
         id: asset.id,
         path: asset.storage_path,
         url: supabase.storage.from("course-assets").getPublicUrl(asset.storage_path).data.publicUrl,
       } : null;
     })(),
-    images: (assetResult.data || []).filter((asset) => asset.asset_type === "detail").map((asset) => ({
+    images: assets.filter((asset) => asset.asset_type === "detail").map((asset) => ({
       id: asset.id,
       path: asset.storage_path,
       url: supabase.storage.from("course-assets").getPublicUrl(asset.storage_path).data.publicUrl,
     })),
-    curriculum: (weekResult.data || []).map((week) => ({
+    curriculum: weeks.map((week) => ({
       id: week.id,
       label: `${week.week_number}주차`,
       title: week.title,

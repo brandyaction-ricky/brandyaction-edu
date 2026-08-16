@@ -12,6 +12,7 @@ import { AdminCodeSettingsManager } from "../../components/admin-code-settings-m
 import { AdminCrmManager } from "../../components/admin-crm-manager";
 import { AdminMemberTagsManager } from "../../components/admin-member-tags-manager";
 import { AdminCouponsManager } from "../../components/admin-coupons-manager";
+import { AdminMessageTemplatesManager } from "../../components/admin-message-templates-manager";
 import { getAdminUser, type AdminScope } from "@/lib/server-auth";
 
 const info:Record<string,{eyebrow:string,title:string,desc:string}>={
@@ -26,6 +27,7 @@ const info:Record<string,{eyebrow:string,title:string,desc:string}>={
   "super-admins":{eyebrow:"SECURITY",title:"최고 관리자 관리",desc:"전체 운영 권한을 가진 최고 관리자 계정을 등록하고 관리합니다."},
   "code-settings":{eyebrow:"SEARCH & CODE",title:"검색 및 코드 설정",desc:"검색 소유확인과 분석·광고 코드를 전체 사이트에 적용합니다."},
   crm:{eyebrow:"MARKETING CRM",title:"마케팅 CRM",desc:"대상을 분류하고 메시지를 준비한 뒤 최종 확인을 거쳐 실제 발송합니다."},
+  "message-templates":{eyebrow:"MESSAGE TEMPLATES",title:"메시지 템플릿 관리",desc:"반복 발송할 메시지 정보와 클릭 버튼을 미리 만들어 CRM에서 선택해 사용합니다."},
   settings:{eyebrow:"SETTINGS",title:"사이트 설정",desc:"메인 배너, 메뉴, 약관과 운영자 권한을 설정합니다."}
 };
 
@@ -34,7 +36,7 @@ export default async function AdminSection({params}:{params:Promise<{section:str
   const safeSection=info[section]?section:"products";
   const scope: AdminScope = ["orders","coupons"].includes(safeSection) ? "orders" : ["members", "member-tags"].includes(safeSection) ? "members" : safeSection === "settings" ? "settings" : safeSection === "articles" ? "articles" : "products";
   const operator = await getAdminUser(scope);
-  if (!operator || (["super-admins", "code-settings", "crm", "member-tags", "coupons"].includes(safeSection) && operator.role !== "admin")) redirect("/admin?notice=permission_required");
+  if (!operator || (["super-admins", "code-settings", "message-templates", "crm", "member-tags", "coupons"].includes(safeSection) && operator.role !== "admin")) redirect("/admin?notice=permission_required");
   const meta=info[safeSection];
   return <AdminShell active={safeSection}><AdminPageTitle eyebrow={meta.eyebrow} title={meta.title} description={meta.desc} action={<SectionAction section={safeSection}/>}/><SectionContent section={safeSection}/></AdminShell>;
 }
@@ -56,6 +58,7 @@ function SectionContent({section}:{section:string}){
   if(section==="super-admins")return <AdminSuperAdminsManager/>;
   if(section==="code-settings")return <AdminCodeSettingsManager/>;
   if(section==="crm")return <AdminCrmManager/>;
+  if(section==="message-templates")return <AdminMessageTemplatesManager/>;
   if(section==="members")return <AdminMembersManager/>;
   if(section==="member-tags")return <AdminMemberTagsManager/>;
   return null;

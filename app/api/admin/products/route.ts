@@ -7,7 +7,7 @@ type StoredImage = { id?: string; path?: string };
 type LessonInput = { id: string; title: string; description: string; kind: "VOD" | "자료"; duration: string; contentUrl?: string; resourceName?: string; resourcePath?: string };
 type WeekInput = { id: string; title: string; goal: string; lessons: LessonInput[] };
 type SaveInput = {
-  course: { id: string; courseCode: string; slug: string; title: string; summary: string; description: string; category: string; instructorName: string; listPrice: string; durationLabel: string; scheduleLabel: string; status: "draft" | "published" | "archived"; metadata: Record<string, unknown> };
+  course: { id: string; courseCode: string; slug: string; title: string; summary: string; description: string; category: string; instructorName: string; listPrice: string; durationLabel: string; scheduleLabel: string; programType: "free" | "paid"; status: "draft" | "published" | "archived"; metadata: Record<string, unknown> };
   thumbnail: StoredImage | null;
   images: StoredImage[];
   curriculum: WeekInput[];
@@ -29,6 +29,23 @@ function uploadedFile(value: FormDataEntryValue | null) {
   return value instanceof File && value.size > 0 ? value : null;
 }
 
+export async function GET(request: Request) {
+  const operator = await getAdminUser("products");
+  if (!operator) return NextResponse.json({ error: "상품 관리 권한이 필요합니다." }, { status: 403 });
+  const id = new URL(request.url).searchParams.get("id") || "";
+  if (!id) return NextResponse.json({ error: "조회할 상품을 선택해 주세요." }, { status: 400 });
+  const admin = createAdminClient();
+  const [courseResult, assetResult, weekResult] = await Promise.all([
+    admin.from("courses").select("id,course_code,slug,title,summary,description,category,instructor_name,list_price,duration_label,schedule_label,status,metadata").eq("id", id).single(),
+    admin.from("course_assets").select("id,asset_type,storage_path,display_order").eq("course_id", id).order("display_order"),
+    admin.from("curriculum_weeks").select("id,week_number,title,goal,display_order,curriculum_lessons(id,day_number,title,description,content_type,duration_label,display_order,lesson_contents(vod_url,resource_name,resource_storage_path))").eq("course_id", id).order("display_order"),
+  ]);
+  if (courseResult.error || !courseResult.data) return NextResponse.json({ error: messageOf(courseResult.error, "상품을 불러오지 못했습니다.") }, { status: 404 });
+  if (assetResult.error) return NextResponse.json({ error: messageOf(assetResult.error, "상품 이미지를 불러오지 못했습니다.") }, { status: 500 });
+  if (weekResult.error) return NextResponse.json({ error: messageOf(weekResult.error, "상품 커리큘럼을 불러오지 못했습니다.") }, { status: 500 });
+  return NextResponse.json({ course: courseResult.data, assets: assetResult.data || [], weeks: weekResult.data || [] });
+}
+
 export async function POST(request: Request) {
   const operator = await getAdminUser("products");
   if (!operator) return NextResponse.json({ error: "상품 관리 권한이 필요합니다." }, { status: 403 });
@@ -47,7 +64,7 @@ export async function POST(request: Request) {
     description: course.description.trim() || null, category: course.category.trim() || null, instructor_name: course.instructorName.trim() || null,
     list_price: listPrice, duration_label: course.durationLabel.trim() || null, schedule_label: course.scheduleLabel.trim() || null,
     status: course.status, published_at: course.status === "published" ? new Date().toISOString() : null,
-    metadata: { ...(course.metadata || {}), tracking: pixels },
+    metadata: { ...(course.metadata || {}), programType: course.programType === "free" ? "free" : "paid", tracking: pixels },
   };
 
   let courseId = course.id;

@@ -137,6 +137,8 @@ export function AdminProductsManager() {
   if (!editor) return <>
     <div className="summary-chips">
       <span>전체 상품 <strong>{products.length}</strong></span>
+      <span>무료 클래스 <strong>{products.filter((product) => product.programType === "free").length}</strong></span>
+      <span>유료 클래스 <strong>{products.filter((product) => product.programType === "paid").length}</strong></span>
       <span>판매 중 <strong>{products.filter((product) => product.status === "published").length}</strong></span>
       <span>상세 이미지 <strong>{products.reduce((sum, product) => sum + product.imageCount, 0)}</strong></span>
       <span>전체 커리큘럼 <strong>{products.reduce((sum, product) => sum + product.lessonCount, 0)}개</strong></span>
@@ -148,7 +150,7 @@ export function AdminProductsManager() {
       </div>
       <div className="product-management-list">
         {visible.map((product, index) => <div className="product-management-row" key={product.id}>
-          <span className="product-name">{product.thumbnailUrl ? <img className="product-thumb product-thumb-image" src={product.thumbnailUrl} alt=""/> : <b className={`product-thumb thumb-${index % 3}`}>{String(index + 1).padStart(2, "0")}</b>}<span><strong>{product.title}</strong><small>{product.instructorName} · /classes/{product.slug}</small></span></span>
+          <span className="product-name">{product.thumbnailUrl ? <img className="product-thumb product-thumb-image" src={product.thumbnailUrl} alt=""/> : <b className={`product-thumb thumb-${index % 3}`}>{String(index + 1).padStart(2, "0")}</b>}<span><em className={`program-type-badge ${product.programType}`}>{product.programType === "free" ? "무료" : "유료"}</em><strong>{product.title}</strong><small>{product.instructorName} · /classes/{product.slug}</small></span></span>
           <div><small>판매 상태</small><span className={`status-label ${product.status === "published" ? "success" : "planned"}`}>{statusLabel[product.status]}</span></div>
           <div><small>가격</small><strong>{product.listPrice.toLocaleString()}원</strong></div>
           <div><small>상세페이지</small><strong>이미지 {product.imageCount}장</strong></div>
@@ -240,6 +242,7 @@ export function AdminProductsManager() {
       <div className="field-full product-thumbnail-field"><span>상품 썸네일</span><div className="product-thumbnail-editor"><div className={`product-thumbnail-preview ${thumbnail ? "has-image" : ""}`}>{thumbnail ? <img src={thumbnail.url} alt="상품 썸네일 미리보기"/> : <><ImagePlus/><small>썸네일 미등록</small></>}</div><div className="product-thumbnail-actions"><strong>목록 카드와 상품 상세 상단에 노출됩니다.</strong><p>가로형 4:3 또는 16:9 비율 권장 · JPG, PNG, WEBP · 5MB 이하</p><span><label className="admin-outline thumbnail-upload-button"><input type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadThumbnail}/><ImagePlus/> {thumbnail ? "이미지 교체" : "이미지 등록"}</label>{thumbnail && <button type="button" className="admin-outline thumbnail-remove-button" onClick={removeThumbnail}><Trash2/> 삭제</button>}</span></div></div></div>
       <label className="field-full">상품명<input value={draft.title} onChange={(event) => setDraft({ title: event.target.value })}/></label>
       <label>강사명<input value={draft.instructorName} onChange={(event) => setDraft({ instructorName: event.target.value })}/></label>
+      <label>클래스 유형<select value={draft.programType} onChange={(event) => setDraft({ programType: event.target.value as typeof draft.programType, ...(event.target.value === "free" ? { listPrice: "0" } : {}) })}><option value="free">무료 클래스</option><option value="paid">유료 클래스</option></select></label>
       <label>기본 정가<input inputMode="numeric" value={draft.listPrice} onChange={(event) => setDraft({ listPrice: event.target.value })}/></label>
       <label>카테고리<input value={draft.category} onChange={(event) => setDraft({ category: event.target.value })}/></label>
       <label>수강기간 표기<input value={draft.durationLabel} onChange={(event) => setDraft({ durationLabel: event.target.value })}/></label>
