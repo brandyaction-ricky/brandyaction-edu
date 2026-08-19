@@ -49,8 +49,7 @@ export async function getCheckoutCourse(slug: string): Promise<CheckoutCourse | 
       const startsAt = cohort.recruitment_start_at ? new Date(cohort.recruitment_start_at).getTime() : null;
       const endsAt = cohort.recruitment_end_at ? new Date(cohort.recruitment_end_at).getTime() : null;
       const dateWindowOpen = (startsAt === null || startsAt <= now) && (endsAt === null || endsAt > now);
-      return cohort.status === "recruiting" && dateWindowOpen
-        || cohort.status === "upcoming" && endsAt !== null && dateWindowOpen;
+      return cohort.status === "recruiting" && dateWindowOpen;
     })
     .sort((a, b) => String(a.operation_start_at).localeCompare(String(b.operation_start_at)));
   return {

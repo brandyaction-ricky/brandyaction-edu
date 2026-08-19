@@ -11,7 +11,15 @@ export const revalidate = 60;
 
 export default async function Home() {
   const [classes,banners,reviewVideos,articleIndex] = await Promise.all([getPublishedClasses(),getPublicBanners(),getPublishedReviewVideos(),getPublicArticleIndex()]);
-  const recruitingPaid = classes.find((item) => item.programType === "paid" && item.status.includes("모집 중"));
+  // 플로팅 CTA는 실제 신청 가능한 유료 클래스만 노출하고,
+  // 여러 상품이 열려 있으면 모집 마감이 가장 가까운 상품을 우선한다.
+  const recruitingPaid = classes
+    .filter((item) => item.programType === "paid" && item.applicationOpen)
+    .sort((a, b) => {
+      const aDeadline = a.recruitmentEndAt ? new Date(a.recruitmentEndAt).getTime() : Number.POSITIVE_INFINITY;
+      const bDeadline = b.recruitmentEndAt ? new Date(b.recruitmentEndAt).getTime() : Number.POSITIVE_INFINITY;
+      return aDeadline - bDeadline || a.title.localeCompare(b.title, "ko");
+    })[0];
   const topArticles = articleIndex.articles.slice(0, 3);
   return (
     <main>

@@ -7,7 +7,7 @@ type StoredImage = { id?: string; path?: string };
 type LessonInput = { id: string; title: string; description: string; kind: "VOD" | "자료"; duration: string; contentUrl?: string; resourceName?: string; resourcePath?: string };
 type WeekInput = { id: string; title: string; goal: string; lessons: LessonInput[] };
 type SaveInput = {
-  course: { id: string; courseCode: string; slug: string; title: string; summary: string; description: string; category: string; instructorName: string; listPrice: string; durationLabel: string; scheduleLabel: string; programType: "free" | "paid"; status: "draft" | "published" | "archived"; metadata: Record<string, unknown> };
+  course: { id: string; courseCode: string; slug: string; title: string; summary: string; description: string; category: string; instructorName: string; listPrice: string; durationLabel: string; scheduleLabel: string; programType: "free" | "paid"; status: "draft" | "published" | "archived"; recruitmentStatus: "preparing" | "recruiting" | "closed"; recruitmentStartAt: string; recruitmentEndAt: string; hasLinkedCohort: boolean; metadata: Record<string, unknown> };
   thumbnail: StoredImage | null;
   images: StoredImage[];
   curriculum: WeekInput[];
@@ -29,21 +29,49 @@ function uploadedFile(value: FormDataEntryValue | null) {
   return value instanceof File && value.size > 0 ? value : null;
 }
 
+function nullableDate(value: unknown) {
+  const text = String(value || "").trim();
+  return text && !Number.isNaN(Date.parse(text)) ? new Date(text).toISOString() : null;
+}
+
+function selectRecruitmentCohort<T extends { status:string; operation_start_at?:string|null; recruitment_start_at?:string|null; recruitment_end_at?:string|null }>(rows: T[]) {
+  const now = Date.now();
+  const rank = (item: T) => {
+    const startsAt = Date.parse(item.recruitment_start_at || "") || null;
+    const endsAt = Date.parse(item.recruitment_end_at || "") || null;
+    const isOpen = item.status === "recruiting" && (!startsAt || startsAt <= now) && (!endsAt || endsAt > now);
+    if (isOpen) return 0;
+    if (item.status === "upcoming") return 1;
+    if (item.status === "recruiting") return 2;
+    if (item.status === "closed") return 3;
+    return 9;
+  };
+  return [...rows].sort((a, b) => {
+    const statusOrder = rank(a) - rank(b);
+    if (statusOrder) return statusOrder;
+    const aDate = Date.parse(a.operation_start_at || a.recruitment_end_at || "") || 0;
+    const bDate = Date.parse(b.operation_start_at || b.recruitment_end_at || "") || 0;
+    return bDate - aDate;
+  })[0] || null;
+}
+
 export async function GET(request: Request) {
   const operator = await getAdminUser("products");
   if (!operator) return NextResponse.json({ error: "상품 관리 권한이 필요합니다." }, { status: 403 });
   const id = new URL(request.url).searchParams.get("id") || "";
   if (!id) return NextResponse.json({ error: "조회할 상품을 선택해 주세요." }, { status: 400 });
   const admin = createAdminClient();
-  const [courseResult, assetResult, weekResult] = await Promise.all([
+  const [courseResult, assetResult, weekResult, cohortResult] = await Promise.all([
     admin.from("courses").select("id,course_code,slug,title,summary,description,category,instructor_name,list_price,duration_label,schedule_label,status,metadata").eq("id", id).single(),
     admin.from("course_assets").select("id,asset_type,storage_path,display_order").eq("course_id", id).order("display_order"),
     admin.from("curriculum_weeks").select("id,week_number,title,goal,display_order,curriculum_lessons(id,day_number,title,description,content_type,duration_label,display_order,lesson_contents(vod_url,resource_name,resource_storage_path))").eq("course_id", id).order("display_order"),
+    admin.from("cohorts").select("id,status,recruitment_start_at,recruitment_end_at,operation_start_at").eq("course_id", id).in("status", ["upcoming", "recruiting", "closed"]),
   ]);
   if (courseResult.error || !courseResult.data) return NextResponse.json({ error: messageOf(courseResult.error, "상품을 불러오지 못했습니다.") }, { status: 404 });
   if (assetResult.error) return NextResponse.json({ error: messageOf(assetResult.error, "상품 이미지를 불러오지 못했습니다.") }, { status: 500 });
   if (weekResult.error) return NextResponse.json({ error: messageOf(weekResult.error, "상품 커리큘럼을 불러오지 못했습니다.") }, { status: 500 });
-  return NextResponse.json({ course: courseResult.data, assets: assetResult.data || [], weeks: weekResult.data || [] });
+  if (cohortResult.error) return NextResponse.json({ error: messageOf(cohortResult.error, "연결 기수의 모집 상태를 불러오지 못했습니다.") }, { status: 500 });
+  return NextResponse.json({ course: courseResult.data, assets: assetResult.data || [], weeks: weekResult.data || [], recruitment: selectRecruitmentCohort(cohortResult.data || []) });
 }
 
 export async function POST(request: Request) {
@@ -60,6 +88,20 @@ export async function POST(request: Request) {
   const listPrice = isFreeCourse ? 0 : Number(String(course.listPrice).replace(/[^0-9]/g, ""));
   if (!course.title?.trim() || !course.slug?.trim() || !course.courseCode?.trim()) return NextResponse.json({ error: "상품명·URL·상품 코드를 입력해 주세요." }, { status: 400 });
   if (!Number.isFinite(listPrice) || (!isFreeCourse && listPrice <= 0)) return NextResponse.json({ error: "유료 클래스 정가는 1원 이상으로 입력해 주세요." }, { status: 400 });
+  if (course.recruitmentStatus === "recruiting" && course.status !== "published") return NextResponse.json({ error: "모집 진행 상품은 판매 상태를 ‘판매 중’으로 설정해 주세요." }, { status: 400 });
+  const recruitmentStartAt = nullableDate(course.recruitmentStartAt);
+  const recruitmentEndAt = nullableDate(course.recruitmentEndAt);
+  const now = Date.now();
+  if (course.recruitmentStatus === "recruiting" && recruitmentStartAt && Date.parse(recruitmentStartAt) > now) return NextResponse.json({ error: "모집 진행 상태의 모집 시작일은 현재 시각 이전이어야 합니다." }, { status: 400 });
+  if (course.recruitmentStatus === "recruiting" && recruitmentEndAt && Date.parse(recruitmentEndAt) <= now) return NextResponse.json({ error: "모집 진행 상태의 모집 마감일은 현재 시각 이후여야 합니다." }, { status: 400 });
+  if (recruitmentStartAt && recruitmentEndAt && Date.parse(recruitmentStartAt) >= Date.parse(recruitmentEndAt)) return NextResponse.json({ error: "모집 마감일은 모집 시작일보다 뒤여야 합니다." }, { status: 400 });
+  let recruitmentCohort: { id:string; status:string; recruitment_start_at:string|null; recruitment_end_at:string|null; operation_start_at:string|null } | null = null;
+  if (course.id) {
+    const currentCohorts = await admin.from("cohorts").select("id,status,recruitment_start_at,recruitment_end_at,operation_start_at").eq("course_id", course.id).in("status", ["upcoming", "recruiting", "closed"]);
+    if (currentCohorts.error) return NextResponse.json({ error: messageOf(currentCohorts.error, "연결 기수의 모집 상태를 확인하지 못했습니다.") }, { status: 500 });
+    recruitmentCohort = selectRecruitmentCohort(currentCohorts.data || []);
+    if (course.recruitmentStatus !== "preparing" && !recruitmentCohort) return NextResponse.json({ error: "모집 상태를 변경할 기수가 없습니다. 먼저 기수·회차 관리에서 새 기수를 생성해 주세요." }, { status: 409 });
+  }
   const coursePayload = {
     course_code: course.courseCode.trim(), slug: course.slug.trim(), title: course.title.trim(), summary: course.summary.trim() || null,
     description: course.description.trim() || null, category: course.category.trim() || null, instructor_name: course.instructorName.trim() || null,
@@ -76,6 +118,12 @@ export async function POST(request: Request) {
     const { data, error } = await admin.from("courses").insert(coursePayload).select("id").single();
     if (error || !data) return NextResponse.json({ error: messageOf(error, "새 상품을 등록하지 못했습니다. URL이나 코드 중복을 확인해 주세요.") }, { status: 400 });
     courseId = data.id;
+  }
+
+  if (recruitmentCohort) {
+    const mappedStatus = course.recruitmentStatus === "recruiting" ? "recruiting" : course.recruitmentStatus === "closed" ? "closed" : "upcoming";
+    const cohortUpdate = await admin.from("cohorts").update({ status: mappedStatus, recruitment_start_at: recruitmentStartAt, recruitment_end_at: recruitmentEndAt }).eq("id", recruitmentCohort.id);
+    if (cohortUpdate.error) return NextResponse.json({ error: messageOf(cohortUpdate.error, "연결 기수의 모집 상태를 저장하지 못했습니다.") }, { status: 500 });
   }
 
   const { data: currentAssets, error: assetLoadError } = await admin.from("course_assets").select("id,asset_type,storage_path").eq("course_id", courseId);

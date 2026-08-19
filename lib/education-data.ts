@@ -131,10 +131,7 @@ function cohortPresentation(cohort?: CohortRow) {
   const startsAt = cohort.recruitment_start_at ? new Date(cohort.recruitment_start_at).getTime() : null;
   const endsAt = cohort.recruitment_end_at ? new Date(cohort.recruitment_end_at).getTime() : null;
   const dateWindowOpen = (startsAt === null || startsAt <= now) && (endsAt === null || endsAt > now);
-  // 운영자가 기수를 '예정'으로 둔 채 모집 기간만 먼저 연 경우에도
-  // 명시된 모집 마감일이 남아 있으면 고객 화면과 체크아웃을 동일하게 연다.
-  const applicationOpen = cohort.status === "recruiting" && dateWindowOpen
-    || cohort.status === "upcoming" && endsAt !== null && dateWindowOpen;
+  const applicationOpen = cohort.status === "recruiting" && dateWindowOpen;
   if (applicationOpen) {
     return { status: `${generation ? `${generation} ` : ""}모집 중`, statusTone: "red" as const, applicationOpen: true };
   }
