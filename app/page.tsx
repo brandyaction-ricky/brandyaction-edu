@@ -4,15 +4,22 @@ import { BrandHeader } from "./components/brand-header";
 import { HomeExperience } from "./components/home-experience";
 import { LandingBanner, ReviewSlider } from "./components/site-live-content";
 import { ClassCatalog } from "./components/class-catalog";
-import { getPublicBanners, getPublishedClasses, getPublishedReviews, getPublishedReviewVideos } from "@/lib/education-data";
+import { getPublicBanners, getPublishedClasses, getPublishedReviewVideos } from "@/lib/education-data";
 import { getPublicArticleIndex } from "@/lib/article-data";
-import { articleReadingMinutes } from "@/lib/articles";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export default async function Home() {
-  const [classes,banners,reviews,reviewVideos,articleIndex] = await Promise.all([getPublishedClasses(),getPublicBanners(),getPublishedReviews(),getPublishedReviewVideos(),getPublicArticleIndex()]);
-  const recruitingPaid = classes.find((item) => item.programType === "paid" && item.status.includes("모집 중"));
+  const [classes,banners,reviewVideos,articleIndex] = await Promise.all([getPublishedClasses(),getPublicBanners(),getPublishedReviewVideos(),getPublicArticleIndex()]);
+  // 플로팅 CTA는 실제 신청 가능한 유료 클래스만 노출하고,
+  // 여러 상품이 열려 있으면 모집 마감이 가장 가까운 상품을 우선한다.
+  const recruitingPaid = classes
+    .filter((item) => item.programType === "paid" && item.applicationOpen)
+    .sort((a, b) => {
+      const aDeadline = a.recruitmentEndAt ? new Date(a.recruitmentEndAt).getTime() : Number.POSITIVE_INFINITY;
+      const bDeadline = b.recruitmentEndAt ? new Date(b.recruitmentEndAt).getTime() : Number.POSITIVE_INFINITY;
+      return aDeadline - bDeadline || a.title.localeCompare(b.title, "ko");
+    })[0];
   const topArticles = articleIndex.articles.slice(0, 3);
   return (
     <main>
@@ -26,7 +33,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <section className="landing-article-section section" data-home-reveal><div className="container"><div className="section-heading split-heading"><div><span className="section-kicker">BUSINESS GROWTH INSIGHTS</span><h2>매출이 막힌 이유를 발견하면,<br/>다음 실행이 선명해집니다</h2><p>광고비를 더 쓰기 전에 사업자들이 실제로 놓치는 유입·콘텐츠·전환·AI 활용 지점을 확인하세요.</p></div><Link className="text-link" href="/articles">실무 인사이트 전체보기 <ArrowRight/></Link></div><div className="landing-article-grid">{topArticles.map((article, index) => <article className={index === 0 ? "featured-insight" : ""} key={article.id}><Link href={`/articles/${article.slug}`}><div className="insight-card-meta"><span>{article.categoryName}</span><em>{article.contentType === "youtube" ? "영상 인사이트" : `${articleReadingMinutes(article.blocks)}분 인사이트`}</em></div><b>INSIGHT {String(index + 1).padStart(2,"0")}</b><h3>{article.title}</h3><p><strong>이 콘텐츠에서 얻는 것</strong>{article.summary}</p><footer>핵심 인사이트 확인하기 <ArrowRight/></footer></Link></article>)}</div><div className="landing-free-bridge"><div><span>무료 3강</span><strong>인사이트를 읽는 데서 멈추지 말고<br/>내 사업의 실행안으로 바꾸세요.</strong></div><p>회원가입만 하면 사업자 마케팅·AI 무료 3강을 바로 볼 수 있습니다.</p><Link href="/articles#free-class">무료 클래스 보기 <ArrowRight/></Link></div></div></section>
+      <section className="landing-article-section section" data-home-reveal><div className="container"><div className="section-heading split-heading"><div><span className="section-kicker">BUSINESS GROWTH INSIGHTS</span><h2>매출이 막힌 이유를 발견하면,<br/>다음 실행이 선명해집니다</h2><p>광고비를 더 쓰기 전에 사업자들이 실제로 놓치는 유입·콘텐츠·전환·AI 활용 지점을 확인하세요.</p></div><Link className="text-link" href="/articles">실무 인사이트 전체보기 <ArrowRight/></Link></div><div className="landing-article-grid">{topArticles.map((article, index) => <article className={index === 0 ? "featured-insight" : ""} key={article.id}><Link href={`/articles/${article.slug}`}><div className="insight-card-meta"><span>{article.categoryName}</span></div><b>INSIGHT {String(index + 1).padStart(2,"0")}</b><h3>{article.title}</h3><p><strong>이 콘텐츠에서 얻는 것</strong>{article.summary}</p><footer>핵심 인사이트 확인하기 <ArrowRight/></footer></Link></article>)}</div><div className="landing-free-bridge"><div><span>무료 3강</span><strong>인사이트를 읽는 데서 멈추지 말고<br/>내 사업의 실행안으로 바꾸세요.</strong></div><p>회원가입만 하면 사업자 마케팅·AI 무료 3강을 바로 볼 수 있습니다.</p><Link href="/articles#free-class">무료 클래스 보기 <ArrowRight/></Link></div></div></section>
 
       <section className="section section-ink" id="philosophy" data-home-reveal>
         <div className="container philosophy-grid">
@@ -54,9 +61,9 @@ export default async function Home() {
         </div>
       </section>
 
-      <section className="section review-section" id="reviews" data-home-reveal>
-        <div className="container"><ReviewSlider reviews={reviews} videos={reviewVideos}/></div>
-      </section>
+      {reviewVideos.length > 0 && <section className="section review-section" id="reviews" data-home-reveal>
+        <div className="container"><ReviewSlider videos={reviewVideos}/></div>
+      </section>}
 
       <section className="final-cta" data-home-reveal>
         <div className="container cta-inner"><div><span>FREE CLASS · 회원가입 후 바로 수강</span><h2>광고비를 더 쓰기 전에,<br />내 매출의 병목부터 확인하세요.</h2></div><div><strong>무료 3강 · 별도 결제 없음</strong><Link className="button button-white button-lg" href="/articles#free-class">무료 클래스 보기 <ArrowRight size={20} /></Link></div></div>

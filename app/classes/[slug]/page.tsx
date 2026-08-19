@@ -1,18 +1,18 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowRight, CalendarDays, Clock3, Download, PlayCircle, ShieldCheck, Users } from "lucide-react";
+import { CalendarDays, Clock3, Download, PlayCircle, Users } from "lucide-react";
 import { BrandHeader } from "../../components/brand-header";
+import { ClassApplicationCard } from "../../components/class-application-card";
 import { DetailTabs } from "../../components/detail-tabs";
 import { DetailImageStack } from "../../components/site-live-content";
 import { getPublishedClass, getPublicCourseAppearance, getPublishedReviews } from "@/lib/education-data";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
+export const dynamic = "force-static";
 
 export default async function ClassDetail({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const [item,appearance,reviews] = await Promise.all([getPublishedClass(slug),getPublicCourseAppearance(slug),getPublishedReviews(slug)]);
   if (!item) notFound();
-  const isOpen = item.statusTone === "red";
   return <main><BrandHeader />
     <section className="detail-hero"><div className="container detail-hero-grid">
       <div className="detail-copy"><span className={`status-pill tone-${item.statusTone}`}>{item.status}</span><p className="detail-category">{item.category} · {item.duration}</p><h1>{item.title}</h1><p>{item.summary}</p>
@@ -32,10 +32,7 @@ export default async function ClassDetail({ params }: { params: Promise<{ slug: 
         <section className="content-block reviews-block" id="review"><span className="section-kicker">REVIEWS</span><div className="block-title-row"><h2>먼저 실행한 사람들의<br />변화</h2>{reviews.length>0&&<strong className="review-score">{(reviews.reduce((sum,review)=>sum+review.rating,0)/reviews.length).toFixed(1)} <small>/ 5.0</small></strong>}</div>{reviews.length?<div className="detail-review-list">{reviews.slice(0,3).map(review=><article className="review-card" key={review.id}><div className="stars">{"★".repeat(Math.round(review.rating))}</div><p>{review.quote}</p><footer><strong>{review.name}</strong><span>{review.cohortName}</span></footer></article>)}</div>:<div className="detail-review-empty">아직 공개된 수강 후기가 없습니다.</div>}</section>
         <section className="content-block faq-block" id="faq"><span className="section-kicker">FAQ</span><h2>자주 묻는 질문</h2>{["라이브에 참여하지 못하면 어떻게 되나요?","과제를 꼭 제출해야 하나요?","수강 기간은 어떻게 되나요?","환불은 언제까지 가능한가요?"].map((q,i)=><details key={q}><summary><span>0{i+1}</span>{q}<b>＋</b></summary><p>{i===0?"각 회차 종료 후 24시간 이내에 다시보기가 업로드되며, 기간 제한 없이 볼 수 있습니다.":i===2?"공통 VOD·자료와 라이브 녹화본은 결제한 계정에서 기간 제한 없이 이용할 수 있습니다.":i===3?"환불 신청 후 운영자가 VOD 진도와 참여 회차를 확인해 승인하며, 완료 즉시 모든 수강 권한이 종료됩니다.":"상세 운영 기준은 신청 완료 후 기수 홈에서 확인할 수 있습니다."}</p></details>)}</section>
       </div>
-      <aside className="purchase-card"><div className="purchase-status"><span>{item.status}</span><strong>{item.seats}</strong></div><div className="purchase-price"><small>수강료</small><strong>{item.price}</strong><span>결제창에서 수단 선택</span></div><dl><div><dt>운영기간</dt><dd>{item.operationPeriod || item.startDate}</dd></div><div><dt>수업 일정</dt><dd>{item.schedule}</dd></div><div><dt>진행 방식</dt><dd>온라인 LIVE</dd></div><div><dt>VOD·다시보기</dt><dd>{item.duration}</dd></div></dl>
-        {isOpen ? <Link className="button button-primary button-lg full" href={`/checkout?course=${encodeURIComponent(item.slug)}${item.cohortId?`&cohort=${encodeURIComponent(item.cohortId)}`:""}`}>신청하기 <ArrowRight/></Link> : <button className="button button-dark button-lg full" disabled>모집 준비 중</button>}
-        <p className="safe-copy"><ShieldCheck size={15}/> 결제 전 <Link href="/policies/refund">환불규정</Link>을 확인해 주세요.</p>
-      </aside>
+      <ClassApplicationCard item={item}/>
     </div></section>
   </main>;
 }

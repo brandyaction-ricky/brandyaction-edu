@@ -23,6 +23,9 @@ export type ClassItem = {
   programType: "free" | "paid";
   statusTone: "red" | "blue" | "gray"; startDate: string; operationPeriod?: string; schedule: string;
   duration: string; price: string; seats: string; instructor: string; accent: string;
+  applicationOpen: boolean;
+  recruitmentEndAt?: string;
+  capacity?: number | null;
   thumbnailUrl?: string;
   sessions: Session[];
   curriculum?: CurriculumWeek[];

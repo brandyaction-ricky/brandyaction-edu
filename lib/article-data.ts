@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { unstable_cache } from "next/cache";
 import { getSupabasePublicConfig, hasSupabaseEnv } from "@/lib/supabase/config";
 import { Article, ArticleCategory, defaultFreeCourse, FreeCourseSettings, normalizeBlocks, normalizeFreeCourse } from "@/lib/articles";
 
@@ -63,7 +64,7 @@ function isVisible(article: Article) {
   return article.status === "scheduled" && Boolean(article.scheduledAt) && new Date(article.scheduledAt).getTime() <= Date.now();
 }
 
-export async function getPublicArticleIndex(): Promise<{ articles: Article[]; categories: ArticleCategory[]; freeCourse: FreeCourseSettings }> {
+async function queryPublicArticleIndex(): Promise<{ articles: Article[]; categories: ArticleCategory[]; freeCourse: FreeCourseSettings }> {
   if (!hasSupabaseEnv()) return { articles: [], categories: [], freeCourse: defaultFreeCourse };
   try {
     const client = publicClient();
@@ -80,7 +81,15 @@ export async function getPublicArticleIndex(): Promise<{ articles: Article[]; ca
   }
 }
 
-export async function getPublicArticle(slug: string): Promise<Article | null> {
+const getPublicArticleIndexCached = unstable_cache(queryPublicArticleIndex, ["public-article-index"], {
+  revalidate: 60,
+});
+
+export async function getPublicArticleIndex() {
+  return getPublicArticleIndexCached();
+}
+
+async function queryPublicArticle(slug: string): Promise<Article | null> {
   if (!hasSupabaseEnv()) return null;
   try {
     const client = publicClient();
@@ -91,4 +100,12 @@ export async function getPublicArticle(slug: string): Promise<Article | null> {
   } catch {
     return null;
   }
+}
+
+const getPublicArticleCached = unstable_cache(queryPublicArticle, ["public-article-detail"], {
+  revalidate: 60,
+});
+
+export async function getPublicArticle(slug: string) {
+  return getPublicArticleCached(slug);
 }

@@ -4,6 +4,7 @@ import type { CurriculumWeek } from "@/app/data";
 import { createClient } from "@/lib/supabase/client";
 
 export type ProductStatus = "draft" | "published" | "archived";
+export type ProductRecruitmentStatus = "preparing" | "recruiting" | "closed";
 export type ProductPixels = { meta: string; kakao: string; google: string; enabled: boolean };
 export type ProductImage = { id?: string; path?: string; url: string; file?: File };
 export type ProductDraft = {
@@ -20,6 +21,10 @@ export type ProductDraft = {
   scheduleLabel: string;
   programType: "free" | "paid";
   status: ProductStatus;
+  recruitmentStatus: ProductRecruitmentStatus;
+  recruitmentStartAt: string;
+  recruitmentEndAt: string;
+  hasLinkedCohort: boolean;
   metadata: Record<string, unknown>;
 };
 export type ProductSummary = {
@@ -47,6 +52,7 @@ type ProductCourseRecord = { id:string; course_code:string; slug:string; title:s
 type ProductAssetRecord = { id:string; asset_type:string; storage_path:string; display_order:number };
 type ProductLessonRecord = { id:string; day_number:number; title:string; description:string|null; content_type:string; duration_label:string|null; display_order:number; lesson_contents:Array<{vod_url:string|null;resource_name:string|null;resource_storage_path:string|null}>|{vod_url:string|null;resource_name:string|null;resource_storage_path:string|null}|null };
 type ProductWeekRecord = { id:string; week_number:number; title:string; goal:string|null; display_order:number; curriculum_lessons:ProductLessonRecord[] };
+type ProductRecruitmentRecord = { id:string; status:string; recruitment_start_at:string|null; recruitment_end_at:string|null };
 
 const defaultPixels: ProductPixels = { meta: "", kakao: "", google: "", enabled: true };
 
@@ -60,6 +66,14 @@ function trackingOf(metadata: unknown): ProductPixels {
   return tracking && typeof tracking === "object" && !Array.isArray(tracking)
     ? { ...defaultPixels, ...(tracking as Partial<ProductPixels>) }
     : defaultPixels;
+}
+
+function localDateTime(value?: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }
 
 export function createEmptyProduct(): ProductEditorData {
@@ -79,6 +93,10 @@ export function createEmptyProduct(): ProductEditorData {
       scheduleLabel: "일정 추후 안내",
       programType: "paid",
       status: "draft",
+      recruitmentStatus: "preparing",
+      recruitmentStartAt: "",
+      recruitmentEndAt: "",
+      hasLinkedCohort: false,
       metadata: {},
     },
     thumbnail: null,
@@ -129,7 +147,7 @@ export async function loadAdminProducts(): Promise<ProductSummary[]> {
 
 export async function loadAdminProduct(courseId: string): Promise<ProductEditorData> {
   const supabase = createClient();
-  const result = await productRequest<{ course: ProductCourseRecord; assets: ProductAssetRecord[]; weeks: ProductWeekRecord[] }>(`/api/admin/products?id=${encodeURIComponent(courseId)}`);
+  const result = await productRequest<{ course: ProductCourseRecord; assets: ProductAssetRecord[]; weeks: ProductWeekRecord[]; recruitment: ProductRecruitmentRecord | null }>(`/api/admin/products?id=${encodeURIComponent(courseId)}`);
   const course = result.course;
   const assets = result.assets || [];
   const weeks = result.weeks || [];
@@ -152,6 +170,10 @@ export async function loadAdminProduct(courseId: string): Promise<ProductEditorD
       scheduleLabel: course.schedule_label || "",
       programType: metadata.programType === "free" ? "free" : "paid",
       status: course.status as ProductStatus,
+      recruitmentStatus: result.recruitment?.status === "recruiting" ? "recruiting" : result.recruitment?.status === "closed" ? "closed" : "preparing",
+      recruitmentStartAt: localDateTime(result.recruitment?.recruitment_start_at),
+      recruitmentEndAt: localDateTime(result.recruitment?.recruitment_end_at),
+      hasLinkedCohort: Boolean(result.recruitment?.id),
       metadata,
     },
     thumbnail: (() => {

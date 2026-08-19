@@ -44,10 +44,6 @@ export async function POST(request: Request) {
   if (body.email.trim().toLowerCase() !== user.email.toLowerCase()) {
     return NextResponse.json({ error: "결제 이메일은 로그인한 계정 이메일과 같아야 합니다." }, { status: 400 });
   }
-  if (!tossClientConfigured()) {
-    return NextResponse.json({ error: "결제 설정이 아직 완료되지 않았습니다. 운영자에게 문의해 주세요." }, { status: 503 });
-  }
-
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("create_checkout_order", {
     p_user_id: user.id,
@@ -68,7 +64,10 @@ export async function POST(request: Request) {
   if(couponError)return NextResponse.json({error:messageFor(couponError.message||"")},{status:409});
   const couponData=(couponResult&&typeof couponResult==="object"&&!Array.isArray(couponResult)?couponResult:{}) as Record<string,unknown>;
   const finalData={...orderData,...couponData};
-  if(Number(finalData.totalAmount)===0){const {error:freeError}=await admin.rpc("finalize_zero_total_coupon_order",{p_order_id:String(orderData.orderId),p_user_id:user.id});if(freeError)return NextResponse.json({error:"무료 쿠폰 주문을 완료하지 못했습니다."},{status:500});return NextResponse.json({...finalData,free:true},{status:201})}
+  if(Number(finalData.totalAmount)===0){const {error:freeError}=await admin.rpc("finalize_zero_total_order",{p_order_id:String(orderData.orderId),p_user_id:user.id});if(freeError)return NextResponse.json({error:"무료 수강 신청을 완료하지 못했습니다."},{status:500});return NextResponse.json({...finalData,free:true},{status:201})}
+  if (!tossClientConfigured()) {
+    return NextResponse.json({ error: "결제 설정이 아직 완료되지 않았습니다. 운영자에게 문의해 주세요." }, { status: 503 });
+  }
 
   await admin.from("profiles").update({
     full_name: body.name.trim(),

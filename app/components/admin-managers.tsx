@@ -24,8 +24,8 @@ export { AdminProductsManager } from "./admin-products-manager";
 export { AdminSettingsManager } from "./admin-settings-manager";
 
 const statusLabel: Record<CohortStatus, string> = {
-  upcoming: "예정",
-  recruiting: "모집 중",
+  upcoming: "모집 예정 (신청 불가)",
+  recruiting: "모집 중 (신청 가능)",
   closed: "모집 마감",
   in_progress: "진행 중",
   completed: "종료",
@@ -371,6 +371,7 @@ export function AdminCohortsManager() {
                       </option>
                     ))}
                   </select>
+                  <small>고객 화면에서 신청 버튼을 열려면 ‘모집 중’과 모집 기간을 함께 설정하세요.</small>
                 </label>
                 <label>
                   모집 정원
@@ -597,6 +598,7 @@ export function AdminCohortsManager() {
                     </option>
                   ))}
                 </select>
+                <small>‘모집 중’으로 저장하면 유효한 모집 기간 동안 고객 신청 버튼이 활성화됩니다.</small>
               </label>
               <label>
                 정원

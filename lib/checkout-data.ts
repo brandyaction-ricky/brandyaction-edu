@@ -45,7 +45,12 @@ export async function getCheckoutCourse(slug: string): Promise<CheckoutCourse | 
   if (error || !course) return null;
   const now = Date.now();
   const cohorts = ((course.cohorts || []) as CohortRow[])
-    .filter((cohort) => cohort.status === "recruiting" && (!cohort.recruitment_start_at || new Date(cohort.recruitment_start_at).getTime() <= now) && (!cohort.recruitment_end_at || new Date(cohort.recruitment_end_at).getTime() > now))
+    .filter((cohort) => {
+      const startsAt = cohort.recruitment_start_at ? new Date(cohort.recruitment_start_at).getTime() : null;
+      const endsAt = cohort.recruitment_end_at ? new Date(cohort.recruitment_end_at).getTime() : null;
+      const dateWindowOpen = (startsAt === null || startsAt <= now) && (endsAt === null || endsAt > now);
+      return cohort.status === "recruiting" && dateWindowOpen;
+    })
     .sort((a, b) => String(a.operation_start_at).localeCompare(String(b.operation_start_at)));
   return {
     id: course.id,
