@@ -6,7 +6,8 @@ import { BrandHeader } from "../../components/brand-header";
 import { getPublicArticle } from "@/lib/article-data";
 import { articleReadingMinutes, youtubeEmbedUrl } from "@/lib/articles";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
+export const dynamic = "force-static";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;

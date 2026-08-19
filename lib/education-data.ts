@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { unstable_cache } from "next/cache";
 import { type ClassItem, type CurriculumWeek, type Session } from "@/app/data";
 import { getSupabasePublicConfig, hasSupabaseEnv } from "@/lib/supabase/config";
 import { safePublicHref } from "@/lib/safe-url";
@@ -124,18 +125,28 @@ function formatPrice(value: number) {
 }
 
 function cohortPresentation(cohort?: CohortRow) {
-  if (!cohort) return { status: "모집 예정", statusTone: "blue" as const };
+  if (!cohort) return { status: "모집 예정", statusTone: "blue" as const, applicationOpen: false };
   const generation = cohort.name.match(/\d+기/)?.[0];
-  if (cohort.status === "recruiting") {
-    const now = Date.now();
-    if (cohort.recruitment_start_at && new Date(cohort.recruitment_start_at).getTime() > now) return { status: "모집 예정", statusTone: "blue" as const };
-    if (cohort.recruitment_end_at && new Date(cohort.recruitment_end_at).getTime() <= now) return { status: "모집 마감", statusTone: "gray" as const };
-    return { status: `${generation ? `${generation} ` : ""}모집 중`, statusTone: "red" as const };
+  const now = Date.now();
+  const startsAt = cohort.recruitment_start_at ? new Date(cohort.recruitment_start_at).getTime() : null;
+  const endsAt = cohort.recruitment_end_at ? new Date(cohort.recruitment_end_at).getTime() : null;
+  const dateWindowOpen = (startsAt === null || startsAt <= now) && (endsAt === null || endsAt > now);
+  // 운영자가 기수를 '예정'으로 둔 채 모집 기간만 먼저 연 경우에도
+  // 명시된 모집 마감일이 남아 있으면 고객 화면과 체크아웃을 동일하게 연다.
+  const applicationOpen = cohort.status === "recruiting" && dateWindowOpen
+    || cohort.status === "upcoming" && endsAt !== null && dateWindowOpen;
+  if (applicationOpen) {
+    return { status: `${generation ? `${generation} ` : ""}모집 중`, statusTone: "red" as const, applicationOpen: true };
   }
-  if (cohort.status === "upcoming") return { status: "모집 예정", statusTone: "blue" as const };
-  if (cohort.status === "in_progress") return { status: "진행 중", statusTone: "blue" as const };
-  if (cohort.status === "completed") return { status: "종료", statusTone: "gray" as const };
-  return { status: "모집 마감", statusTone: "gray" as const };
+  if (cohort.status === "recruiting") {
+    if (cohort.recruitment_start_at && new Date(cohort.recruitment_start_at).getTime() > now) return { status: "모집 예정", statusTone: "blue" as const, applicationOpen: false };
+    if (cohort.recruitment_end_at && new Date(cohort.recruitment_end_at).getTime() <= now) return { status: "모집 마감", statusTone: "gray" as const, applicationOpen: false };
+    return { status: "모집 예정", statusTone: "blue" as const, applicationOpen: false };
+  }
+  if (cohort.status === "upcoming") return { status: "모집 예정", statusTone: "blue" as const, applicationOpen: false };
+  if (cohort.status === "in_progress") return { status: "진행 중", statusTone: "blue" as const, applicationOpen: false };
+  if (cohort.status === "completed") return { status: "종료", statusTone: "gray" as const, applicationOpen: false };
+  return { status: "모집 마감", statusTone: "gray" as const, applicationOpen: false };
 }
 
 function mapSession(row: SessionRow): Session {
@@ -191,6 +202,9 @@ function mapCourse(course: CourseRow, cohorts: CohortRow[], sessions: SessionRow
     duration: `${course.duration_label || "기간 추후 안내"}${sessionRows.length ? " LIVE" : ""}`,
     price: formatPrice(cohort?.price ?? course.list_price),
     seats: cohort?.capacity ? `정원 ${cohort.capacity}명` : "정원 제한 없음",
+    applicationOpen: presentation.applicationOpen,
+    recruitmentEndAt: cohort?.recruitment_end_at || undefined,
+    capacity: cohort?.capacity ?? null,
     instructor: course.instructor_name || "브랜디액션",
     accent: "red",
     thumbnailUrl,
@@ -199,7 +213,7 @@ function mapCourse(course: CourseRow, cohorts: CohortRow[], sessions: SessionRow
   };
 }
 
-export async function getPublishedClasses(): Promise<ClassItem[]> {
+async function queryPublishedClasses(): Promise<ClassItem[]> {
   if (!hasSupabaseEnv()) return [];
 
   try {
@@ -228,46 +242,104 @@ export async function getPublishedClasses(): Promise<ClassItem[]> {
     if (cohortError) return [];
 
     const cohorts = (cohortData || []) as CohortRow[];
-    const cohortIds = cohorts.map((cohort) => cohort.id);
-    let sessions: SessionRow[] = [];
-    if (cohortIds.length) {
-      const { data: sessionData, error: sessionError } = await supabase
-        .from("cohort_sessions")
-        .select("cohort_id,session_number,title,description,expected_output,scheduled_at")
-        .in("cohort_id", cohortIds);
-      if (!sessionError) sessions = (sessionData || []) as SessionRow[];
-    }
-
-    const { data: weekData, error: weekError } = await supabase
-      .from("curriculum_weeks")
-      .select("id,course_id,week_number,title,goal,display_order")
-      .in("course_id", courseIds)
-      .eq("is_published", true);
-    const weeks = weekError ? [] : (weekData || []) as CurriculumWeekRow[];
-    const weekIds = weeks.map((week)=>week.id);
-    let lessons: CurriculumLessonRow[]=[];
-    if(weekIds.length){
-      const {data:lessonData,error:lessonError}=await supabase.from("curriculum_lessons").select("id,week_id,day_number,title,description,content_type,duration_label,display_order").in("week_id",weekIds).eq("is_published",true);
-      if(!lessonError)lessons=(lessonData||[]) as CurriculumLessonRow[];
-    }
-
     const thumbnails = thumbnailResult.error ? [] : (thumbnailResult.data || []) as CourseThumbnailRow[];
     return (courseData as CourseRow[]).map((course) => {
       const thumbnail = thumbnails.find((asset) => asset.course_id === course.id);
       const thumbnailUrl = thumbnail ? supabase.storage.from("course-assets").getPublicUrl(thumbnail.storage_path).data.publicUrl : undefined;
-      return mapCourse(course, cohorts, sessions, weeks, lessons, thumbnailUrl);
+      return mapCourse(course, cohorts, [], [], [], thumbnailUrl);
     });
   } catch {
     return [];
   }
 }
 
-export async function getPublishedClass(slug: string) {
-  const items = await getPublishedClasses();
-  return items.find((item) => item.slug === slug);
+const getPublishedClassesCached = unstable_cache(queryPublishedClasses, ["published-class-list"], {
+  revalidate: 60,
+});
+
+export async function getPublishedClasses() {
+  return getPublishedClassesCached();
 }
 
-export async function getPublicBanners():Promise<PublicBanner[]>{
+async function queryPublishedClass(slug: string): Promise<ClassItem | undefined> {
+  if (!hasSupabaseEnv()) return undefined;
+  try {
+    const supabase = publicClient();
+    const { data: courseData, error: courseError } = await supabase
+      .from("courses")
+      .select("id,slug,title,summary,category,instructor_name,list_price,duration_label,schedule_label,display_order,metadata")
+      .eq("slug", slug)
+      .eq("status", "published")
+      .maybeSingle();
+    if (courseError || !courseData) return undefined;
+
+    const course = courseData as CourseRow;
+    const [cohortResult, thumbnailResult, weekResult] = await Promise.all([
+      supabase
+        .from("cohorts")
+        .select("id,course_id,name,recruitment_start_at,recruitment_end_at,operation_start_at,operation_end_at,price,capacity,status")
+        .eq("course_id", course.id),
+      supabase
+        .from("course_assets")
+        .select("course_id,storage_path")
+        .eq("course_id", course.id)
+        .eq("asset_type", "thumbnail")
+        .order("display_order")
+        .limit(1),
+      supabase
+        .from("curriculum_weeks")
+        .select("id,course_id,week_number,title,goal,display_order")
+        .eq("course_id", course.id)
+        .eq("is_published", true),
+    ]);
+    if (cohortResult.error) return undefined;
+
+    const cohorts = (cohortResult.data || []) as CohortRow[];
+    const cohortIds = cohorts.map((cohort) => cohort.id);
+    const weeks = weekResult.error ? [] : (weekResult.data || []) as CurriculumWeekRow[];
+    const weekIds = weeks.map((week) => week.id);
+    const [sessionResult, lessonResult] = await Promise.all([
+      cohortIds.length
+        ? supabase
+            .from("cohort_sessions")
+            .select("cohort_id,session_number,title,description,expected_output,scheduled_at")
+            .in("cohort_id", cohortIds)
+        : Promise.resolve({ data: [] as SessionRow[], error: null }),
+      weekIds.length
+        ? supabase
+            .from("curriculum_lessons")
+            .select("id,week_id,day_number,title,description,content_type,duration_label,display_order")
+            .in("week_id", weekIds)
+            .eq("is_published", true)
+        : Promise.resolve({ data: [] as CurriculumLessonRow[], error: null }),
+    ]);
+
+    const thumbnail = thumbnailResult.error ? undefined : (thumbnailResult.data?.[0] as CourseThumbnailRow | undefined);
+    const thumbnailUrl = thumbnail
+      ? supabase.storage.from("course-assets").getPublicUrl(thumbnail.storage_path).data.publicUrl
+      : undefined;
+    return mapCourse(
+      course,
+      cohorts,
+      sessionResult.error ? [] : (sessionResult.data || []) as SessionRow[],
+      weeks,
+      lessonResult.error ? [] : (lessonResult.data || []) as CurriculumLessonRow[],
+      thumbnailUrl,
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+const getPublishedClassCached = unstable_cache(queryPublishedClass, ["published-class-detail"], {
+  revalidate: 60,
+});
+
+export async function getPublishedClass(slug: string) {
+  return getPublishedClassCached(slug);
+}
+
+async function queryPublicBanners():Promise<PublicBanner[]>{
   if(!hasSupabaseEnv())return [];
   try{
     const supabase=publicClient();
@@ -277,7 +349,15 @@ export async function getPublicBanners():Promise<PublicBanner[]>{
   }catch{return []}
 }
 
-export async function getPublicCourseAppearance(slug:string):Promise<PublicCourseAppearance>{
+const getPublicBannersCached = unstable_cache(queryPublicBanners, ["public-banners"], {
+  revalidate: 60,
+});
+
+export async function getPublicBanners() {
+  return getPublicBannersCached();
+}
+
+async function queryPublicCourseAppearance(slug:string):Promise<PublicCourseAppearance>{
   const fallback={images:[] as string[],pixels:{enabled:false}};
   if(!hasSupabaseEnv())return fallback;
   try{
@@ -291,7 +371,15 @@ export async function getPublicCourseAppearance(slug:string):Promise<PublicCours
   }catch{return fallback}
 }
 
-export async function getPublishedReviews(courseSlug?: string): Promise<PublicReview[]> {
+const getPublicCourseAppearanceCached = unstable_cache(queryPublicCourseAppearance, ["public-course-appearance"], {
+  revalidate: 60,
+});
+
+export async function getPublicCourseAppearance(slug: string) {
+  return getPublicCourseAppearanceCached(slug);
+}
+
+async function queryPublishedReviews(courseSlug?: string): Promise<PublicReview[]> {
   if (!hasSupabaseEnv()) return [];
   try {
     const supabase = publicClient();
@@ -307,7 +395,15 @@ export async function getPublishedReviews(courseSlug?: string): Promise<PublicRe
   } catch { return []; }
 }
 
-export async function getPublishedReviewVideos(): Promise<PublicReviewVideo[]> {
+const getPublishedReviewsCached = unstable_cache(queryPublishedReviews, ["published-reviews"], {
+  revalidate: 60,
+});
+
+export async function getPublishedReviews(courseSlug?: string) {
+  return getPublishedReviewsCached(courseSlug);
+}
+
+async function queryPublishedReviewVideos(): Promise<PublicReviewVideo[]> {
   if (!hasSupabaseEnv()) return [];
   try {
     const { data, error } = await publicClient().from("review_videos").select("id,title,reviewer_name,reviewer_role,description,video_url,thumbnail_url").eq("is_published", true).order("display_order").order("created_at", { ascending: false }).limit(12);
@@ -318,4 +414,12 @@ export async function getPublishedReviewVideos(): Promise<PublicReviewVideo[]> {
       return [{ id: video.id, title: video.title, reviewerName: video.reviewer_name, reviewerRole: video.reviewer_role || "수강생", description: video.description || "", embedUrl, thumbnailUrl: video.thumbnail_url || reviewVideoThumbnail(video.video_url) || "" }];
     });
   } catch { return []; }
+}
+
+const getPublishedReviewVideosCached = unstable_cache(queryPublishedReviewVideos, ["published-review-videos"], {
+  revalidate: 60,
+});
+
+export async function getPublishedReviewVideos() {
+  return getPublishedReviewVideosCached();
 }

@@ -2,7 +2,7 @@ import { BrandHeader } from "../components/brand-header";
 import { ClassCatalog } from "../components/class-catalog";
 import { getPublishedClasses } from "@/lib/education-data";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export default async function ClassesPage() {
   const classes = await getPublishedClasses();

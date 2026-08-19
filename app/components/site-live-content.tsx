@@ -3,8 +3,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, CalendarDays, Check, Clock3, Pause, Play, Quote, Users } from "lucide-react";
-import type { PublicReview, PublicReviewVideo } from "@/lib/education-data";
+import { ArrowLeft, ArrowRight, CalendarDays, Check, Clock3, Pause, Play, Users } from "lucide-react";
+import type { PublicReviewVideo } from "@/lib/education-data";
 import type { ClassItem } from "@/app/data";
 
 type BannerData = { image?: string; eyebrow?: string; title?: string; copy?: string; link?: string; linkLabel?: string };
@@ -17,8 +17,13 @@ export function LandingBanner({banners=[]}:{banners?:BannerData[]}) {
   useEffect(()=>{if(paused||count<=1)return;const timer=window.setInterval(()=>setActive(value=>(value+1)%count),5200);return()=>window.clearInterval(timer)},[count,paused]);
   if(!count)return <div className="hero-managed-banner"><div className="managed-banner-lines" aria-hidden="true"><i/><i/><i/></div><div className="managed-banner-copy"><span>BRANDYACTION EDU · LIVE</span><strong>배운 것을 실행으로<br/>바꾸는 실전 클래스</strong><p>모집 중인 클래스와 일정을 확인하세요.</p><Link href="/classes">클래스 자세히 보기 <ArrowRight/></Link></div><div className="managed-banner-mark" aria-hidden="true"><span>01</span><b>LIVE</b></div></div>;
   const move=(offset:number)=>setActive((active+offset+count)%count);
+  const next=(active+1)%count;
+  const previous=(active-1+count)%count;
   return <div className="landing-image-slider" onMouseEnter={()=>setPaused(true)} onMouseLeave={()=>setPaused(false)} onFocusCapture={()=>setPaused(true)} onBlurCapture={()=>setPaused(false)}>
-    <div className="landing-image-track" style={{transform:`translateX(-${active*100}%)`}}>{banners.map((banner,index)=><Link key={`${banner.image}-${index}`} href={banner.link||"/classes"} aria-hidden={index!==active} tabIndex={index===active?0:-1} style={{backgroundImage:`url(${banner.image})`}} aria-label={`${index+1}번째 배너 자세히 보기`}/>)}</div>
+    <div className="landing-image-track" style={{transform:`translateX(-${active*100}%)`}}>{banners.map((banner,index)=>{
+      const shouldLoad=index===active||index===next||index===previous;
+      return <Link key={`${banner.image}-${index}`} href={banner.link||"/classes"} aria-hidden={index!==active} tabIndex={index===active?0:-1} style={shouldLoad&&banner.image?{backgroundImage:`url(${banner.image})`}:undefined} aria-label={`${index+1}번째 배너 자세히 보기`}/>;
+    })}</div>
     {count>1&&<div className="landing-image-controls"><span><b>{String(active+1).padStart(2,"0")}</b> / {String(count).padStart(2,"0")}</span><button onClick={()=>setPaused(value=>!value)} aria-label={paused?"자동 재생":"일시 정지"}>{paused?<Play/>:<Pause/>}</button><button onClick={()=>move(-1)} aria-label="이전 배너"><ArrowLeft/></button><button onClick={()=>move(1)} aria-label="다음 배너"><ArrowRight/></button></div>}
   </div>;
 }
@@ -54,26 +59,20 @@ export function LiveClassCarousel({ classes, banner = {} }: { classes: ClassItem
   </section>;
 }
 
-export function ReviewSlider({reviews,videos=[]}:{reviews:PublicReview[];videos?:PublicReviewVideo[]}){
+export function ReviewSlider({videos=[]}:{videos?:PublicReviewVideo[]}){
   const [page,setPage]=useState(0);
   const [paused,setPaused]=useState(false);
   const [playing,setPlaying]=useState<string|null>(null);
-  const [reviewSort,setReviewSort]=useState<"latest"|"rating">("latest");
-  const [visibleCount,setVisibleCount]=useState(10);
   const pageCount=Math.max(1,videos.length);
   useEffect(()=>{if(paused||pageCount<=1)return;const timer=window.setInterval(()=>setPage(v=>(v+1)%pageCount),6000);return()=>window.clearInterval(timer)},[pageCount,paused]);
   const safePage=Math.min(page,pageCount-1);
   const video=videos[safePage]||null;
   const videoPreviews=useMemo(()=>Array.from({length:Math.min(3,Math.max(0,videos.length-1))},(_,index)=>videos[(safePage+index+1)%videos.length]),[videos,safePage]);
-  const sortedReviews=useMemo(()=>[...reviews].sort((a,b)=>reviewSort==="rating"?b.rating-a.rating:new Date(b.publishedAt).getTime()-new Date(a.publishedAt).getTime()),[reviews,reviewSort]);
-  const average=reviews.length?reviews.reduce((sum,item)=>sum+item.rating,0)/reviews.length:0;
-  const distribution=[5,4,3,2,1].map(score=>({score,count:reviews.filter(item=>Math.round(item.rating)===score).length}));
   const move=(next:number)=>{setPlaying(null);setPage(next)};
   return <div className="review-slider" tabIndex={0} onMouseEnter={()=>setPaused(true)} onMouseLeave={()=>setPaused(false)} onFocusCapture={()=>setPaused(true)} onBlurCapture={()=>setPaused(false)}>
-    <div className="review-slider-top"><div><span className="section-kicker">REVIEWS</span><h2>실제 수강생이 남긴<br/>구체적인 변화입니다</h2></div><p>수강생이 작성하고 운영자가 승인한 후기만 공개됩니다.<br/>상품과 별점을 함께 확인하세요.</p></div>
+    <div className="review-slider-top"><div><span className="section-kicker">REAL REVIEW</span><h2>먼저 실행한 사람들의<br/>구체적인 변화</h2></div><p>수강생의 실제 경험과 실행 결과를<br/>영상으로 확인하세요.</p></div>
     {video?<div className="review-video-stage" key={video.id}><article className="review-video-card"><div className="review-video-frame">{playing===video.id?<iframe src={`${video.embedUrl}?autoplay=1`} title={video.title} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen/>:<button type="button" onClick={()=>{setPlaying(video.id);setPaused(true)}} style={video.thumbnailUrl?{backgroundImage:`linear-gradient(rgba(0,0,0,.12),rgba(0,0,0,.42)),url(${video.thumbnailUrl})`}:undefined} aria-label={`${video.title} 영상 재생`}><span><Play fill="currentColor"/></span><small>영상 후기 재생</small></button>}</div><div className="review-video-copy"><span>VIDEO TESTIMONIAL · {String(safePage+1).padStart(2,"0")}</span><h3>{video.title}</h3>{video.description&&<p>{video.description}</p>}<footer><strong>{video.reviewerName}</strong><small>{video.reviewerRole}</small><em><Check/> 실제 후기</em></footer></div></article>{videoPreviews.length>0&&<aside className="review-video-rail"><header><strong>다음 실제 후기</strong><span>{videos.length}개의 변화</span></header>{videoPreviews.map((item,index)=><button key={item.id} onClick={()=>move((safePage+index+1)%videos.length)}><span className="review-preview-thumb" style={item.thumbnailUrl?{backgroundImage:`linear-gradient(rgba(0,0,0,.08),rgba(0,0,0,.3)),url(${item.thumbnailUrl})`}:undefined}><Play fill="currentColor"/></span><span><small>{String((safePage+index+1)%videos.length+1).padStart(2,"0")} · {item.reviewerRole}</small><strong>{item.title}</strong><em>{item.reviewerName}</em></span><ArrowRight/></button>)}</aside>}</div>:null}
     {videos.length>1&&<div className="review-dots" aria-label="영상 후기 페이지">{Array.from({length:pageCount},(_,i)=><button key={i} aria-label={`${i+1}번째 영상 후기`} className={i===safePage?"active":""} onClick={()=>move(i)}/>)}</div>}
-    <section className="buyer-review-board"><div className="buyer-review-summary"><div><strong>{average.toFixed(1)}</strong><span>/ 5.0</span><div aria-label={`평균 별점 ${average.toFixed(1)}점`}>{"★".repeat(Math.round(average))}{"☆".repeat(5-Math.round(average))}</div><small>실제 수강생 리뷰 <b>{reviews.length}건</b></small></div><div>{distribution.map(item=><p key={item.score}><span>{item.score}점</span><i><b style={{width:`${reviews.length?item.count/reviews.length*100:0}%`}}/></i><strong>{item.count}</strong></p>)}</div></div><div className="buyer-review-toolbar"><div><button className={reviewSort==="latest"?"active":""} onClick={()=>{setReviewSort("latest");setVisibleCount(10)}}>최신순</button><button className={reviewSort==="rating"?"active":""} onClick={()=>{setReviewSort("rating");setVisibleCount(10)}}>평점 높은순</button></div><Link href="/my">리뷰 작성하기 <ArrowRight/></Link></div><div className="buyer-review-list">{sortedReviews.length?sortedReviews.slice(0,visibleCount).map(review=><article key={review.id}><header><div><strong>{review.name}</strong><span>{review.className} · {review.cohortName}</span></div><small>{new Intl.DateTimeFormat("ko-KR",{timeZone:"Asia/Seoul",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(review.publishedAt))}</small></header><div className="buyer-review-stars" aria-label={`별점 ${review.rating}점`}>{"★".repeat(Math.round(review.rating))}{"☆".repeat(5-Math.round(review.rating))}<b>{review.rating.toFixed(1)}</b></div><p>{review.quote}</p><em>{review.className}</em></article>):<div className="buyer-review-empty"><Quote/><strong>아직 공개된 리뷰가 없습니다.</strong><span>수강생 리뷰가 승인되면 이 목록에 표시됩니다.</span></div>}</div>{visibleCount<sortedReviews.length&&<button className="buyer-review-more" onClick={()=>setVisibleCount(value=>value+10)}>리뷰 더보기 <span>{Math.min(visibleCount,sortedReviews.length)} / {sortedReviews.length}</span></button>}</section>
   </div>
 }
 
@@ -85,7 +84,7 @@ export function DetailImageStack({images=[],pixels={},courseTitle="자영업 마
     trackingWindow.dataLayer.push({event:"class_detail_view",product:courseTitle,google_id:pixels.google||undefined,kakao_id:pixels.kakao||undefined});
     if(pixels.meta&&trackingWindow.fbq) trackingWindow.fbq("track","ViewContent",{content_name:courseTitle});
   },[courseTitle,pixels.enabled,pixels.google,pixels.kakao,pixels.meta]);
-  if(images.length) return <section className="registered-detail-images" id="overview" aria-label="클래스 이미지 상세 설명">{images.map((src,index)=><img key={`${src.slice(-24)}-${index}`} src={src} alt={`${courseTitle} 상세 설명 ${index+1}`}/>)}</section>;
+  if(images.length) return <section className="registered-detail-images" id="overview" aria-label="클래스 이미지 상세 설명">{images.map((src,index)=><img key={`${src.slice(-24)}-${index}`} src={src} alt={`${courseTitle} 상세 설명 ${index+1}`} loading="lazy" decoding="async"/>)}</section>;
   return <section className="default-detail-stack" id="overview" aria-label="기본 이미지형 상세페이지">
     <article className="detail-poster detail-poster-problem"><span>01 · LEARN</span><h2>{courseTitle}</h2><p>커리큘럼과 기수 일정을 확인하고 현장에서 바로 적용할 학습을 시작하세요.</p><div><i>학습</i><i>실습</i><i>피드백</i><i>완주</i></div></article>
     <article className="detail-poster detail-poster-system"><span>02 · APPLY</span><h2>VOD와 라이브를<br/>하나의 실행 과정으로</h2><div className="poster-axis"><b>VOD</b><b>자료</b><b>LIVE</b><b>다시보기</b></div></article>

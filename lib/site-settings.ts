@@ -61,6 +61,8 @@ export const defaultSiteSettings: SiteSettingsBundle = {
   },
 };
 
+let publicSettingsRequest: Promise<SiteSettingsBundle> | null = null;
+
 function objectValue<T>(value: unknown, fallback: T): T {
   return value && typeof value === "object" && !Array.isArray(value) ? { ...fallback, ...(value as Partial<T>) } : fallback;
 }
@@ -85,7 +87,7 @@ function policyValue(value: unknown): PolicySettings {
   };
 }
 
-export async function loadSiteSettings(): Promise<SiteSettingsBundle> {
+async function querySiteSettings(): Promise<SiteSettingsBundle> {
   if (!hasSupabaseEnv()) return defaultSiteSettings;
   const supabase = createClient();
   const { data, error } = await supabase.from("site_settings").select("key,value").in("key", ["site_basic", "site_navigation", "payment_refund", "site_policies", "operator_preferences", "site_name", "support_email"]);
@@ -105,6 +107,16 @@ export async function loadSiteSettings(): Promise<SiteSettingsBundle> {
   };
 }
 
+export async function loadSiteSettings(): Promise<SiteSettingsBundle> {
+  if (!publicSettingsRequest) {
+    publicSettingsRequest = querySiteSettings().catch((error) => {
+      publicSettingsRequest = null;
+      throw error;
+    });
+  }
+  return publicSettingsRequest;
+}
+
 export async function saveSiteSetting(key: "site_basic" | "site_navigation" | "payment_refund" | "site_policies" | "operator_preferences", value: unknown, isPublic: boolean) {
   const supabase = createClient();
   const safeValue = key === "site_navigation" ? menuValue(value) : key === "site_basic" ? { ...(value as SiteBasicSettings), ctaHref: safePublicHref((value as SiteBasicSettings).ctaHref, "/classes") } : key === "site_policies" ? { ...(value as PolicySettings), version: POLICY_VERSION } : value;
@@ -118,6 +130,7 @@ export async function saveSiteSetting(key: "site_basic" | "site_navigation" | "p
     ], { onConflict: "key" });
     if (legacyError) throw new Error(legacyError.message || "기본 설정 호환값을 저장하지 못했습니다.");
   }
+  publicSettingsRequest = null;
 }
 
 export async function loadPublicHeaderSettings() {

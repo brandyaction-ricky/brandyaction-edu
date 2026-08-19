@@ -5,7 +5,7 @@ import { SiteFooter } from "./components/site-footer";
 import { AnalyticsTracker } from "./components/analytics-tracker";
 import { loadCodeSettings } from "@/lib/code-settings";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 export const metadata: Metadata = {
   title: "브랜디액션 에듀 | 실행으로 결과를 만드는 교육",
