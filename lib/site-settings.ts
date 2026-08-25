@@ -35,7 +35,7 @@ export const defaultSiteSettings: SiteSettingsBundle = {
     companyName: "주식회사 브랜디액션",
     representatives: "전태헌, 안정호",
     businessNumber: "677-87-02769",
-    mailOrderNumber: "",
+    mailOrderNumber: "제2026-충남천안-1825호",
     businessAddress: "충청남도 천안시 서북구 천안천4길 32 506호",
   },
   navigation: [
@@ -94,6 +94,7 @@ async function querySiteSettings(): Promise<SiteSettingsBundle> {
   if (error) throw new Error(error.message || "사이트 설정을 불러오지 못했습니다.");
   const values = new Map((data || []).map((row) => [row.key, row.value]));
   const basic = objectValue(values.get("site_basic"), defaultSiteSettings.basic);
+  if (!basic.mailOrderNumber.trim()) basic.mailOrderNumber = defaultSiteSettings.basic.mailOrderNumber;
   if (!values.has("site_basic")) {
     if (typeof values.get("site_name") === "string") basic.siteName = String(values.get("site_name"));
     if (typeof values.get("support_email") === "string") basic.supportEmail = String(values.get("support_email"));
