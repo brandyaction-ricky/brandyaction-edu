@@ -29,7 +29,7 @@ function articleUrl(client: ReturnType<typeof publicClient>, path: string | null
 
 function attachmentUrl(client: ReturnType<typeof publicClient>, path: string) { return client.storage.from("article-resources").getPublicUrl(path).data.publicUrl; }
 
-function mapArticle(client: ReturnType<typeof publicClient>, row: ArticleRow): Article {
+function mapArticle(client: ReturnType<typeof publicClient>, row: ArticleRow, landingFeaturedRank = 0): Article {
   const blocks = normalizeBlocks(row.content_blocks).map((block) => ({
     ...block,
     imageUrl: block.type === "image" ? articleUrl(client, block.imagePath || null) : "",
@@ -50,6 +50,7 @@ function mapArticle(client: ReturnType<typeof publicClient>, row: ArticleRow): A
     coverImageAlt: row.cover_image_alt || row.title,
     status: row.status,
     isFeatured: row.is_featured,
+    landingFeaturedRank,
     seoTitle: row.seo_title || "",
     seoDescription: row.seo_description || "",
     scheduledAt: row.scheduled_at || "",
@@ -68,12 +69,14 @@ async function queryPublicArticleIndex(): Promise<{ articles: Article[]; categor
   if (!hasSupabaseEnv()) return { articles: [], categories: [], freeCourse: defaultFreeCourse };
   try {
     const client = publicClient();
-    const [articleResult, categoryResult, settingResult] = await Promise.all([
+    const [articleResult, categoryResult, settingResult, landingFeaturedResult] = await Promise.all([
       client.from("articles").select("id,category_id,slug,title,summary,content_type,video_url,content_blocks,attachments,cover_image_path,cover_image_alt,status,is_featured,seo_title,seo_description,scheduled_at,published_at,created_at,updated_at,article_categories(name)").order("is_featured", { ascending: false }).order("published_at", { ascending: false }),
       client.from("article_categories").select("id,name,slug,description,display_order,is_active").eq("is_active", true).order("display_order"),
       client.from("site_settings").select("value").eq("key", "article_free_course").maybeSingle(),
+      client.from("site_settings").select("value").eq("key", "landing_featured_articles").maybeSingle(),
     ]);
-    const articles = articleResult.error ? [] : ((articleResult.data || []) as ArticleRow[]).map((row) => mapArticle(client, row)).filter(isVisible);
+    const landingFeaturedIds = landingFeaturedResult.error || !Array.isArray(landingFeaturedResult.data?.value) ? [] : landingFeaturedResult.data.value.filter((value): value is string => typeof value === "string").slice(0, 3);
+    const articles = articleResult.error ? [] : ((articleResult.data || []) as ArticleRow[]).map((row) => mapArticle(client, row, landingFeaturedIds.indexOf(row.id) + 1)).filter(isVisible);
     const categories = categoryResult.error ? [] : ((categoryResult.data || []) as CategoryRow[]).map((row) => ({ id: row.id, name: row.name, slug: row.slug, description: row.description || "", displayOrder: row.display_order, isActive: row.is_active }));
     return { articles, categories, freeCourse: settingResult.error ? defaultFreeCourse : normalizeFreeCourse(settingResult.data?.value) };
   } catch {

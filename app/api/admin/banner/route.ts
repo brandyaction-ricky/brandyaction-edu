@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAdminUser } from "@/lib/server-auth";
 import { safePublicHref } from "@/lib/safe-url";
@@ -57,6 +58,7 @@ export async function POST(request: Request) {
   }
   if (oldImagePath && oldImagePath !== imagePath) await admin.storage.from("course-assets").remove([oldImagePath]);
   await admin.from("audit_logs").insert({ actor_user_id: adminOperator.id, action: id ? "site_banner.updated" : "site_banner.created", entity_type: "site_banner", entity_id: result.data.id, after_data: payload });
+  revalidatePath("/");
   return NextResponse.json({ ok: true, id: result.data.id });
 }
 
@@ -71,5 +73,6 @@ export async function DELETE(request: Request) {
   if (error) return NextResponse.json({ error: error.message || "배너를 삭제하지 못했습니다." }, { status: 500 });
   if (data?.image_path) await admin.storage.from("course-assets").remove([data.image_path]);
   await admin.from("audit_logs").insert({ actor_user_id: adminOperator.id, action: "site_banner.deleted", entity_type: "site_banner", entity_id: id });
+  revalidatePath("/");
   return NextResponse.json({ ok: true });
 }
