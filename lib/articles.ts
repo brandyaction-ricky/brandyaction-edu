@@ -38,6 +38,7 @@ export type Article = {
   coverImageAlt: string;
   status: ArticleStatus;
   isFeatured: boolean;
+  landingFeaturedRank: number;
   seoTitle: string;
   seoDescription: string;
   scheduledAt: string;

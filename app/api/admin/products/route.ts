@@ -92,7 +92,6 @@ export async function POST(request: Request) {
   const recruitmentStartAt = nullableDate(course.recruitmentStartAt);
   const recruitmentEndAt = nullableDate(course.recruitmentEndAt);
   const now = Date.now();
-  if (course.recruitmentStatus === "recruiting" && recruitmentStartAt && Date.parse(recruitmentStartAt) > now) return NextResponse.json({ error: "모집 진행 상태의 모집 시작일은 현재 시각 이전이어야 합니다." }, { status: 400 });
   if (course.recruitmentStatus === "recruiting" && recruitmentEndAt && Date.parse(recruitmentEndAt) <= now) return NextResponse.json({ error: "모집 진행 상태의 모집 마감일은 현재 시각 이후여야 합니다." }, { status: 400 });
   if (recruitmentStartAt && recruitmentEndAt && Date.parse(recruitmentStartAt) >= Date.parse(recruitmentEndAt)) return NextResponse.json({ error: "모집 마감일은 모집 시작일보다 뒤여야 합니다." }, { status: 400 });
   let recruitmentCohort: { id:string; status:string; recruitment_start_at:string|null; recruitment_end_at:string|null; operation_start_at:string|null } | null = null;
@@ -100,7 +99,6 @@ export async function POST(request: Request) {
     const currentCohorts = await admin.from("cohorts").select("id,status,recruitment_start_at,recruitment_end_at,operation_start_at").eq("course_id", course.id).in("status", ["upcoming", "recruiting", "closed"]);
     if (currentCohorts.error) return NextResponse.json({ error: messageOf(currentCohorts.error, "연결 기수의 모집 상태를 확인하지 못했습니다.") }, { status: 500 });
     recruitmentCohort = selectRecruitmentCohort(currentCohorts.data || []);
-    if (course.recruitmentStatus !== "preparing" && !recruitmentCohort) return NextResponse.json({ error: "모집 상태를 변경할 기수가 없습니다. 먼저 기수·회차 관리에서 새 기수를 생성해 주세요." }, { status: 409 });
   }
   const coursePayload = {
     course_code: course.courseCode.trim(), slug: course.slug.trim(), title: course.title.trim(), summary: course.summary.trim() || null,
@@ -120,8 +118,27 @@ export async function POST(request: Request) {
     courseId = data.id;
   }
 
-  if (recruitmentCohort) {
-    const mappedStatus = course.recruitmentStatus === "recruiting" ? "recruiting" : course.recruitmentStatus === "closed" ? "closed" : "upcoming";
+  const mappedStatus = course.recruitmentStatus === "recruiting" ? "recruiting" : course.recruitmentStatus === "closed" ? "closed" : "upcoming";
+  if (!recruitmentCohort) {
+    const cohortCount = await admin.from("cohorts").select("id", { count: "exact", head: true }).eq("course_id", courseId);
+    if (cohortCount.error) return NextResponse.json({ error: messageOf(cohortCount.error, "기수 순서를 확인하지 못했습니다.") }, { status: 500 });
+    const cohortNumber = (cohortCount.count || 0) + 1;
+    const createdCohort = await admin.from("cohorts").insert({
+      course_id: courseId,
+      cohort_code: `${course.courseCode.trim()}_${Date.now()}`,
+      name: `${cohortNumber}기`,
+      note: "상품 등록 시 자동 생성",
+      recruitment_start_at: recruitmentStartAt,
+      recruitment_end_at: recruitmentEndAt,
+      operation_start_at: null,
+      operation_end_at: null,
+      price: listPrice,
+      capacity: null,
+      status: mappedStatus,
+    }).select("id,status,recruitment_start_at,recruitment_end_at,operation_start_at").single();
+    if (createdCohort.error || !createdCohort.data) return NextResponse.json({ error: messageOf(createdCohort.error, "상품은 저장했지만 모집 기수를 생성하지 못했습니다.") }, { status: 500 });
+    recruitmentCohort = createdCohort.data;
+  } else {
     const cohortUpdate = await admin.from("cohorts").update({ status: mappedStatus, recruitment_start_at: recruitmentStartAt, recruitment_end_at: recruitmentEndAt }).eq("id", recruitmentCohort.id);
     if (cohortUpdate.error) return NextResponse.json({ error: messageOf(cohortUpdate.error, "연결 기수의 모집 상태를 저장하지 못했습니다.") }, { status: 500 });
   }

@@ -63,6 +63,111 @@
 }
 @media(max-width:480px){.dashboard-decision-kpis,.dashboard-learning-grid,.dashboard-action-kpis,.dashboard-growth-grid,.coupon-summary,.crm-automation-kpis,.crm-mode-tabs{grid-template-columns:1fr}.admin-page-title h1{font-size:28px}}
 @media(prefers-reduced-motion:reduce){.admin-app *{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* Admin typography hierarchy
+ * 28px page title / 18px section title / 13px body & controls /
+ * 12px metadata / 11px eyebrow & table headings / 24px KPI.
+ * Keep this block late in the cascade so legacy 7–10px declarations do not
+ * make operational information unreadable or visually inconsistent.
+ */
+.admin-app{
+  --admin-type-page:28px;
+  --admin-type-section:18px;
+  --admin-type-panel:16px;
+  --admin-type-body:13px;
+  --admin-type-meta:12px;
+  --admin-type-label:11px;
+  --admin-type-kpi:24px;
+  font-size:var(--admin-type-body);
+  line-height:1.5;
+}
+.admin-page-title>div>span,
+.admin-nav-group>span,
+.crm-automation-list>header span,
+.crm-automation-modal header span,
+.crm-send-review>header>span{
+  font-size:var(--admin-type-label);
+  line-height:1.35;
+}
+.admin-page-title h1{font-size:var(--admin-type-page);line-height:1.25;margin:7px 0}
+.admin-page-title p{font-size:var(--admin-type-body);line-height:1.55}
+.admin-panel-head h2,
+.crm-tag-builder h2,
+.crm-segment-members h2,
+.crm-template-editor h2,
+.crm-template-library h2,
+.crm-history h2,
+.dashboard-revenue-chart h2,
+.dashboard-product-rank h2{font-size:var(--admin-type-panel);line-height:1.35}
+.crm-automation-list>header h2,
+.crm-automation-modal header h2,
+.crm-send-review h2{font-size:var(--admin-type-section);line-height:1.35}
+.admin-panel-head p,
+.admin-panel-head>a,
+.crm-tag-builder p,
+.crm-segment-members p,
+.crm-template-editor p,
+.crm-history p,
+.dashboard-revenue-chart p,
+.dashboard-product-rank p{font-size:var(--admin-type-meta);line-height:1.5}
+.admin-app :is(button,input,select,textarea,label),
+.admin-sidebar nav a,
+.view-site,
+.summary-chips span,
+.data-row,
+.table-row,
+.admin-toolbar>button,
+.search-box input,
+.manage-button,
+.review-admin-card>p,
+.review-controls button,
+.settings-layout>aside button,
+.settings-form label,
+.settings-form input,
+.settings-form textarea{
+  font-size:var(--admin-type-body);
+  line-height:1.45;
+}
+.data-head,
+.table-head,
+.member-tag-editor label>span,
+.metric-grid article>div,
+.order-metrics span,
+.order-metrics small,
+.review-admin-summary span,
+.cohort-status-cards span,
+.cohort-status-cards p,
+.settings-form>p,
+.upload-box small{
+  font-size:var(--admin-type-label);
+  line-height:1.45;
+}
+.admin-app small,
+.product-name small,
+.member-name small,
+.cohort-table .data-row small,
+.cohort-mini small,
+.reviewer small,
+.review-admin-summary small{
+  font-size:var(--admin-type-meta);
+  line-height:1.45;
+}
+.metric-grid article>strong,
+.cohort-status-cards strong,
+.review-admin-summary strong,
+.dashboard-action-kpis strong,
+.dashboard-stat-kpis strong,
+.member-tag-kpis strong{
+  font-size:var(--admin-type-kpi);
+  line-height:1.15;
+}
+.status-label{font-size:var(--admin-type-label);line-height:1.2}
+.site-switcher strong,.admin-topbar>div:last-child strong{font-size:var(--admin-type-meta)}
+.site-switcher small,.admin-topbar>div:last-child small{font-size:var(--admin-type-label)}
+@media(max-width:720px){
+  .admin-app{--admin-type-page:25px;--admin-type-section:17px;--admin-type-panel:15px}
+  .admin-sidebar nav a{font-size:var(--admin-type-meta)}
+}
 /* Keep campaign review readable instead of compressing table text into single-character lines. */
 .crm-review-workspace{grid-template-columns:minmax(0,1fr)}
 .crm-send-review,.crm-history{min-width:0}

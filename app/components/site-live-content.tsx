@@ -2,7 +2,7 @@
 /* eslint-disable @next/next/no-img-element -- administrator-uploaded images may be data URLs */
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, CalendarDays, Check, Clock3, Pause, Play, Users } from "lucide-react";
 import type { PublicReviewVideo } from "@/lib/education-data";
 import type { ClassItem } from "@/app/data";
@@ -13,18 +13,27 @@ type PixelData = { meta?: string; kakao?: string; google?: string; enabled?: boo
 export function LandingBanner({banners=[]}:{banners?:BannerData[]}) {
   const [active,setActive]=useState(0);
   const [paused,setPaused]=useState(false);
+  const [reduceMotion,setReduceMotion]=useState(false);
+  const [touchStart,setTouchStart]=useState<number|null>(null);
+  const trackRef=useRef<HTMLDivElement>(null);
   const count=banners.length;
-  useEffect(()=>{if(paused||count<=1)return;const timer=window.setInterval(()=>setActive(value=>(value+1)%count),5200);return()=>window.clearInterval(timer)},[count,paused]);
+  const loopBanners=count>1?[banners[count-1],...banners,banners[0]]:banners;
+  const displayActive=count>1?active+1:active;
+  useEffect(()=>{const query=window.matchMedia("(prefers-reduced-motion: reduce)");const sync=()=>setReduceMotion(query.matches);sync();query.addEventListener("change",sync);return()=>query.removeEventListener("change",sync)},[]);
+  useEffect(()=>{if(paused||reduceMotion||count<=1)return;const timer=window.setInterval(()=>setActive(value=>(value+1)%count),5200);return()=>window.clearInterval(timer)},[count,paused,reduceMotion]);
+  useEffect(()=>{const track=trackRef.current;const slide=track?.children.item(displayActive) as HTMLElement|null;if(!track||!slide)return;const left=slide.offsetLeft-(track.clientWidth-slide.offsetWidth)/2;track.scrollTo({left,behavior:reduceMotion?"auto":"smooth"})},[displayActive,reduceMotion]);
   if(!count)return <div className="hero-managed-banner"><div className="managed-banner-lines" aria-hidden="true"><i/><i/><i/></div><div className="managed-banner-copy"><span>BRANDYACTION EDU · LIVE</span><strong>배운 것을 실행으로<br/>바꾸는 실전 클래스</strong><p>모집 중인 클래스와 일정을 확인하세요.</p><Link href="/classes">클래스 자세히 보기 <ArrowRight/></Link></div><div className="managed-banner-mark" aria-hidden="true"><span>01</span><b>LIVE</b></div></div>;
   const move=(offset:number)=>setActive((active+offset+count)%count);
   const next=(active+1)%count;
   const previous=(active-1+count)%count;
-  return <div className="landing-image-slider" onMouseEnter={()=>setPaused(true)} onMouseLeave={()=>setPaused(false)} onFocusCapture={()=>setPaused(true)} onBlurCapture={()=>setPaused(false)}>
-    <div className="landing-image-track" style={{transform:`translateX(-${active*100}%)`}}>{banners.map((banner,index)=>{
-      const shouldLoad=index===active||index===next||index===previous;
-      return <Link key={`${banner.image}-${index}`} href={banner.link||"/classes"} aria-hidden={index!==active} tabIndex={index===active?0:-1} style={shouldLoad&&banner.image?{backgroundImage:`url(${banner.image})`}:undefined} aria-label={`${index+1}번째 배너 자세히 보기`}/>;
+  return <div className="landing-image-slider" tabIndex={0} onMouseEnter={()=>setPaused(true)} onMouseLeave={()=>setPaused(false)} onFocusCapture={()=>setPaused(true)} onBlurCapture={()=>setPaused(false)} onKeyDown={(event)=>{if(event.key==="ArrowLeft")move(-1);if(event.key==="ArrowRight")move(1)}} onTouchStart={(event)=>setTouchStart(event.touches[0]?.clientX??null)} onTouchEnd={(event)=>{if(touchStart===null)return;const delta=(event.changedTouches[0]?.clientX??touchStart)-touchStart;if(Math.abs(delta)>45)move(delta<0?1:-1);setTouchStart(null)}}>
+    <div className="landing-image-track" ref={trackRef}>{loopBanners.map((banner,index)=>{
+      const sourceIndex=count>1?(index-1+count)%count:index;
+      const isActive=index===displayActive;
+      const shouldLoad=sourceIndex===active||sourceIndex===next||sourceIndex===previous;
+      return <Link className={isActive?"active":""} key={`${banner.image}-${index}`} href={banner.link||"/classes"} aria-hidden={!isActive} tabIndex={isActive?0:-1} style={shouldLoad&&banner.image?{backgroundImage:`url(${banner.image})`}:undefined} aria-label={`${sourceIndex+1}번째 배너 자세히 보기`}/>;
     })}</div>
-    {count>1&&<div className="landing-image-controls"><span><b>{String(active+1).padStart(2,"0")}</b> / {String(count).padStart(2,"0")}</span><button onClick={()=>setPaused(value=>!value)} aria-label={paused?"자동 재생":"일시 정지"}>{paused?<Play/>:<Pause/>}</button><button onClick={()=>move(-1)} aria-label="이전 배너"><ArrowLeft/></button><button onClick={()=>move(1)} aria-label="다음 배너"><ArrowRight/></button></div>}
+    {count>1&&<><div className="landing-image-controls"><span><b>{String(active+1).padStart(2,"0")}</b> / {String(count).padStart(2,"0")}</span><button onClick={()=>setPaused(value=>!value)} aria-label={paused?"자동 재생":"일시 정지"}>{paused?<Play/>:<Pause/>}</button><button onClick={()=>move(-1)} aria-label="이전 배너"><ArrowLeft/></button><button onClick={()=>move(1)} aria-label="다음 배너"><ArrowRight/></button></div><div className="landing-image-dots" aria-label="배너 선택">{banners.map((_,index)=><button key={index} className={index===active?"active":""} onClick={()=>setActive(index)} aria-label={`${index+1}번째 배너 보기`} aria-current={index===active?"true":undefined}/>)}</div>{!paused&&!reduceMotion&&<i className="landing-image-progress" key={active} aria-hidden="true"/>}</>}
   </div>;
 }
 

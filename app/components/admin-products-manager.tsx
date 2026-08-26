@@ -122,16 +122,6 @@ export function AdminProductsManager() {
     }
     const recruitmentStart = editor.draft.recruitmentStartAt ? new Date(editor.draft.recruitmentStartAt).getTime() : null;
     const recruitmentEnd = editor.draft.recruitmentEndAt ? new Date(editor.draft.recruitmentEndAt).getTime() : null;
-    if (editor.draft.recruitmentStatus === "recruiting" && !editor.draft.hasLinkedCohort) {
-      setTab("basic");
-      setError("모집 상태를 변경할 기수가 없습니다. 먼저 기수·회차 관리에서 새 기수를 생성해 주세요.");
-      return;
-    }
-    if (editor.draft.recruitmentStatus === "recruiting" && recruitmentStart && recruitmentStart > Date.now()) {
-      setTab("basic");
-      setError("모집 진행 상태의 모집 시작일은 현재 시각 이전이어야 합니다.");
-      return;
-    }
     if (editor.draft.recruitmentStatus === "recruiting" && recruitmentEnd && recruitmentEnd <= Date.now()) {
       setTab("basic");
       setError("모집 진행 상태의 모집 마감일은 현재 시각 이후여야 합니다.");
@@ -322,13 +312,13 @@ export function AdminProductsManager() {
       <label>상품 코드<input data-product-field="courseCode" value={draft.courseCode} onChange={(event) => setDraft({ courseCode: event.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, "_") })}/></label>
       <label>일정 표기<input value={draft.scheduleLabel} onChange={(event) => setDraft({ scheduleLabel: event.target.value })}/></label>
       <label>판매 상태<select value={draft.status} onChange={(event) => setDraft({ status: event.target.value as typeof draft.status })}><option value="draft">판매 중지</option><option value="published">판매 중</option><option value="archived">보관</option></select></label>
-      <label>모집 상태<select value={draft.recruitmentStatus} disabled={!draft.hasLinkedCohort} onChange={(event) => {
+      <label>모집 상태<select value={draft.recruitmentStatus} onChange={(event) => {
         const recruitmentStatus = event.target.value as typeof draft.recruitmentStatus;
         setDraft({ recruitmentStatus, ...(recruitmentStatus === "recruiting" ? { status: "published" as const } : {}) });
-      }}><option value="preparing">모집 준비</option><option value="recruiting">모집 진행 · 신청 버튼 활성</option><option value="closed">모집 마감</option></select><small>{draft.hasLinkedCohort ? "연결된 최신 기수에 저장되며, ‘모집 진행’이면 고객 화면의 수강 신청 버튼이 활성화됩니다." : "연결된 기수가 없습니다. 상품 저장 후 기수·회차 관리에서 기수를 먼저 생성해 주세요."}</small></label>
-      <label>모집 시작<input type="datetime-local" value={draft.recruitmentStartAt} disabled={!draft.hasLinkedCohort} onChange={(event) => setDraft({ recruitmentStartAt: event.target.value })}/><small>비워 두면 시작 제한 없이 모집합니다.</small></label>
-      <label>모집 마감<input type="datetime-local" value={draft.recruitmentEndAt} disabled={!draft.hasLinkedCohort} onChange={(event) => setDraft({ recruitmentEndAt: event.target.value })}/><small>비워 두면 마감 제한 없이 모집합니다.</small></label>
-      {draft.hasLinkedCohort && <div className="field-full recruitment-connection-note"><strong>신청 버튼 연동 기준</strong><span>판매 중 + 모집 진행 + 현재 시각이 모집 기간 안일 때만 고객 화면에서 수강 신청이 활성화됩니다.</span><Link href={`/admin/cohorts?course=${encodeURIComponent(draft.id)}`}>기수 상세 설정</Link></div>}
+      }}><option value="preparing">모집 준비</option><option value="recruiting">모집 진행 · 신청 버튼 활성</option><option value="closed">모집 마감</option></select><small>{draft.hasLinkedCohort ? "연결된 최신 기수에 저장됩니다." : "상품 등록 시 1기 운영 정보가 자동 생성되어 바로 연결됩니다."}</small></label>
+      <label>모집 시작<input type="datetime-local" value={draft.recruitmentStartAt} onChange={(event) => setDraft({ recruitmentStartAt: event.target.value })}/><small>미래 일시를 지정하면 해당 시각부터 신청할 수 있습니다.</small></label>
+      <label>모집 마감<input type="datetime-local" value={draft.recruitmentEndAt} onChange={(event) => setDraft({ recruitmentEndAt: event.target.value })}/><small>비워 두면 마감 제한 없이 모집합니다.</small></label>
+      <div className="field-full recruitment-connection-note"><strong>신청 버튼 연동 기준</strong><span>판매 중 + 모집 진행 + 현재 시각이 모집 기간 안일 때 고객 화면에서 수강 신청이 활성화됩니다.</span>{draft.id ? <Link href={`/admin/cohorts?course=${encodeURIComponent(draft.id)}`}>기수 상세 설정</Link> : <span>등록 후 기수·회차에서 정원과 운영 일정을 추가할 수 있습니다.</span>}</div>
     </div></section><aside className="admin-panel product-side-card"><span>노출 경로</span><div className={`mini-product-preview ${thumbnail ? "has-thumbnail" : ""}`} style={thumbnail ? { backgroundImage: `url(${thumbnail.url})` } : undefined}><b>URL</b><small>고객 상세페이지</small><strong>/classes/{draft.slug}</strong><em>{statusLabel[draft.status]}</em></div><p>‘내 클래스’에는 결제 또는 관리자가 발급한 활성 수강권이 있는 고객에게만 노출됩니다.</p></aside></div>}
 
     {tab === "detail" && <section className="admin-panel detail-image-editor"><div className="form-card-head"><div><h2>이미지형 상세페이지</h2><p>드래그하거나 위·아래 버튼을 눌러 고객 화면의 노출 순서를 바꿀 수 있습니다.</p></div><span className="image-count">{images.length} / 20장</span></div><div className="detail-editor-grid"><label className="detail-dropzone"><input type="file" accept="image/png,image/jpeg,image/webp" multiple onChange={uploadImages}/><ImagePlus/><strong>상세 이미지를 업로드하세요</strong><span>JPG, PNG, WEBP · 장당 5MB 이하</span><b>이미지 선택</b></label><div className="detail-image-guide"><strong>순서 변경 방법</strong><p>PC에서는 항목을 잡아 드래그하고, 모바일에서는 위·아래 버튼을 사용하세요. 저장하면 이 순서가 고객 상세페이지에 그대로 반영됩니다.</p></div></div>

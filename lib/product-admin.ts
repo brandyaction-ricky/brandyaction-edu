@@ -215,8 +215,11 @@ export async function loadAdminProduct(courseId: string): Promise<ProductEditorD
 
 async function productRequest<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const response = await fetch(input, init);
-  const result = await response.json().catch(() => ({})) as T & { error?: string };
-  if (!response.ok) throw new Error(result.error || "상품 요청을 처리하지 못했습니다.");
+  const responseText = await response.text();
+  let result = {} as T & { error?: string };
+  try { result = responseText ? JSON.parse(responseText) as T & { error?: string } : result; }
+  catch { /* A proxy/runtime error may return HTML instead of the API JSON body. */ }
+  if (!response.ok) throw new Error(result.error || `상품 요청을 처리하지 못했습니다. (HTTP ${response.status})`);
   return result;
 }
 

@@ -27,7 +27,7 @@ export default async function ArticleDetailPage({ params }: { params: Promise<{ 
   const videoEmbed = article.contentType === "youtube" ? youtubeEmbedUrl(article.videoUrl) : "";
   return <main className="article-detail-page"><BrandHeader/>
     <article>
-      <header className="article-detail-head"><div className="article-reading-container"><Link href="/articles" className="article-back"><ArrowLeft/> 블로그 목록</Link><span className="article-label">{article.categoryName}</span><h1>{article.title}</h1><p>{article.summary}</p><div className="article-meta"><span>{dateLabel(article.publishedAt)}</span><span>{article.contentType === "youtube" ? "영상 인사이트" : `${articleReadingMinutes(article.blocks)}분 읽기`}</span><span>BRANDYACTION EDU</span></div></div></header>
+      <header className="article-detail-head"><div className="article-reading-container"><div className="article-detail-kicker"><Link href="/articles" className="article-back"><ArrowLeft/> 블로그 목록</Link><span className="article-label">{article.categoryName}</span></div><h1>{article.title}</h1><p>{article.summary}</p><div className="article-meta"><span>{dateLabel(article.publishedAt)}</span><span>{article.contentType === "youtube" ? "영상 인사이트" : `${articleReadingMinutes(article.blocks)}분 읽기`}</span><span>BRANDYACTION EDU</span></div></div></header>
       {videoEmbed && <div className="article-video container"><iframe src={videoEmbed} title={article.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen/></div>}
       {!videoEmbed && article.coverImageUrl && (
         <div className="article-cover container" role="img" aria-label={article.coverImageAlt} style={{ backgroundImage: `url(${article.coverImageUrl})` }}/>

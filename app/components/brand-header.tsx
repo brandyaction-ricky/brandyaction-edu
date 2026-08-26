@@ -56,13 +56,7 @@ export function BrandHeader() {
   const closeMenus = () => { setOpen(false); setAccountOpen(false); };
   const applicationCta = authenticated === false
     ? <Link className="button button-primary button-sm" href={header.basic.ctaHref}>{header.basic.ctaLabel}</Link>
-    : <button
-        type="button"
-        className="button button-sm button-disabled header-application-disabled"
-        disabled
-        aria-label={authenticated === null ? "로그인 상태 확인 중" : "로그인 회원은 클래스 신청 버튼을 사용할 수 없습니다"}
-        title={authenticated ? "로그인 회원은 내 클래스에서 신청 현황을 확인해 주세요." : "로그인 상태를 확인하고 있습니다."}
-      >{header.basic.ctaLabel}</button>;
+    : null;
   const accountLink = authenticated ? <div className="profile-menu" data-account-menu>
     <button type="button" className="profile-menu-trigger" onClick={() => setAccountOpen((value) => !value)} aria-expanded={accountOpen} aria-haspopup="menu">
       <span className="profile-avatar" style={account.avatarUrl ? { backgroundImage: `url(${account.avatarUrl})` } : undefined}>{account.avatarUrl ? "" : (account.name || account.email || "회").slice(0, 1).toUpperCase()}</span>
