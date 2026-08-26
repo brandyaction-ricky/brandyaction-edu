@@ -3,7 +3,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getAdminUser } from "@/lib/server-auth";
 import { defaultFreeCourse, normalizeBlocks, normalizeFreeCourse, slugify, youtubeEmbedUrl, type ArticleContentType, type ArticleStatus } from "@/lib/articles";
 
-const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+// Accept every UUID-shaped primary key. Some seeded records intentionally use
+// deterministic UUIDs whose version/variant bits are not RFC-generated.
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const statuses = new Set<ArticleStatus>(["draft", "scheduled", "published", "hidden"]);
 const contentTypes = new Set<ArticleContentType>(["column", "youtube"]);
 
@@ -121,8 +123,9 @@ export async function POST(request: Request) {
       const name = String(category.name || "").trim().slice(0, 40);
       const slug = slugify(String(category.slug || name));
       if (!name || !slug) return NextResponse.json({ error: "카테고리 이름을 입력해 주세요." }, { status: 400 });
+      if (id && !uuidPattern.test(id)) return NextResponse.json({ error: "카테고리 정보를 다시 불러온 뒤 수정해 주세요." }, { status: 400 });
       const payload = { name, slug, description: String(category.description || "").trim().slice(0, 160) || null, display_order: Number(category.displayOrder) || 0, is_active: category.isActive !== false };
-      const result = id && uuidPattern.test(id) ? await admin.from("article_categories").update(payload).eq("id", id).select("id").single() : await admin.from("article_categories").insert(payload).select("id").single();
+      const result = id ? await admin.from("article_categories").update(payload).eq("id", id).select("id").single() : await admin.from("article_categories").insert(payload).select("id").single();
       if (result.error) throw result.error;
       await admin.from("audit_logs").insert({ actor_user_id: operator.id, action: id ? "article_category.updated" : "article_category.created", entity_type: "article_category", entity_id: result.data.id, after_data: payload });
       return NextResponse.json({ id: result.data.id });
@@ -158,8 +161,14 @@ export async function POST(request: Request) {
       const attachments = storedAttachments(article.attachments);
       const scheduledAt = String(article.scheduledAt || "");
       if (!title || !slug) return NextResponse.json({ error: "제목과 URL 주소를 입력해 주세요." }, { status: 400 });
+      if (id && !uuidPattern.test(id)) return NextResponse.json({ error: "콘텐츠 정보를 다시 불러온 뒤 수정해 주세요." }, { status: 400 });
       if (contentType === "youtube" && !youtubeEmbedUrl(videoUrl)) return NextResponse.json({ error: "올바른 YouTube 영상 주소를 입력해 주세요." }, { status: 400 });
       if (categoryId && !uuidPattern.test(categoryId)) return NextResponse.json({ error: "카테고리를 다시 선택해 주세요." }, { status: 400 });
+      if (categoryId) {
+        const { data: category, error: categoryError } = await admin.from("article_categories").select("id").eq("id", categoryId).maybeSingle();
+        if (categoryError) throw categoryError;
+        if (!category) return NextResponse.json({ error: "선택한 카테고리가 삭제되었거나 사용할 수 없습니다. 카테고리를 다시 선택해 주세요." }, { status: 400 });
+      }
       if (status === "scheduled" && (!scheduledAt || Number.isNaN(new Date(scheduledAt).getTime()))) return NextResponse.json({ error: "예약 발행 날짜와 시간을 입력해 주세요." }, { status: 400 });
       const coverImagePath = String(article.coverImagePath || "");
       if (coverImagePath && !coverImagePath.startsWith("articles/")) return NextResponse.json({ error: "대표 이미지 경로가 올바르지 않습니다." }, { status: 400 });
@@ -183,7 +192,14 @@ export async function POST(request: Request) {
         published_at: status === "published" ? String(article.publishedAt || now) : null,
         updated_by: operator.id,
       };
-      if (payload.is_featured) await admin.from("articles").update({ is_featured: false }).eq("is_featured", true);
+      const featuredBefore = payload.is_featured
+        ? await admin.from("articles").select("id").eq("is_featured", true)
+        : { data: [], error: null };
+      if (featuredBefore.error) throw featuredBefore.error;
+      if (payload.is_featured) {
+        const { error: clearFeaturedError } = await admin.from("articles").update({ is_featured: false }).eq("is_featured", true);
+        if (clearFeaturedError) throw clearFeaturedError;
+      }
       const existing = id && uuidPattern.test(id)
         ? await admin.from("articles").select("cover_image_path,content_blocks,attachments").eq("id", id).maybeSingle()
         : { data: null, error: null };
@@ -191,7 +207,11 @@ export async function POST(request: Request) {
       const result = id && uuidPattern.test(id)
         ? await admin.from("articles").update(payload).eq("id", id).select("id").single()
         : await admin.from("articles").insert({ ...payload, created_by: operator.id }).select("id").single();
-      if (result.error) throw result.error;
+      if (result.error) {
+        const previousIds = (featuredBefore.data || []).map((item) => item.id);
+        if (previousIds.length) await admin.from("articles").update({ is_featured: true }).in("id", previousIds);
+        throw result.error;
+      }
       const retainedPaths = new Set(assetPaths({ cover_image_path: payload.cover_image_path, content_blocks: blocks }));
       const replacedPaths = assetPaths(existing.data).filter((path) => !retainedPaths.has(path));
       if (replacedPaths.length) await admin.storage.from("article-assets").remove(replacedPaths);
