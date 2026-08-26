@@ -1,4 +1,5 @@
 import "server-only";
+import { getTossPaymentConfig } from "@/lib/payment-config";
 
 const TOSS_API = "https://api.tosspayments.com/v1";
 
@@ -36,9 +37,9 @@ export class TossApiError extends Error {
 }
 
 function secretKey() {
-  const key = process.env.TOSS_SECRET_KEY || process.env.PG_SECRET_KEY;
-  if (!key) throw new Error("토스페이먼츠 시크릿 키가 설정되지 않았습니다.");
-  return key;
+  const config = getTossPaymentConfig();
+  if (!config.ready) throw new Error(config.error || "토스페이먼츠 결제 설정이 완료되지 않았습니다.");
+  return process.env.TOSS_SECRET_KEY || process.env.PG_SECRET_KEY || "";
 }
 
 async function tossRequest(path: string, init?: RequestInit): Promise<TossPayment> {
@@ -94,5 +95,5 @@ export function cancelTossPayment(
 }
 
 export function tossClientConfigured() {
-  return Boolean(process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY || process.env.NEXT_PUBLIC_PG_CLIENT_KEY);
+  return getTossPaymentConfig().ready;
 }

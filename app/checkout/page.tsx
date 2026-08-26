@@ -3,6 +3,7 @@ import { BrandHeader } from "../components/brand-header";
 import { CheckoutClient } from "../components/checkout-client";
 import { getCheckoutCourse } from "@/lib/checkout-data";
 import { createClient } from "@/lib/supabase/server";
+import { getTossPaymentConfig } from "@/lib/payment-config";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
   const cohort = course.cohorts.find((item) => item.id === query.cohort) || course.cohorts[0];
   if (!cohort) redirect(`/classes/${course.slug}?notice=closed`);
   const { data: profile } = await supabase.from("profiles").select("full_name,phone").eq("id", userData.user.id).maybeSingle();
+  const paymentConfig = getTossPaymentConfig();
 
   return <main className="checkout-page"><BrandHeader/><CheckoutClient
     course={course}
@@ -30,6 +32,9 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
       email: userData.user.email || "",
       phone: profile?.phone || String(userData.user.user_metadata?.phone || ""),
     }}
-    clientKey={process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY || process.env.NEXT_PUBLIC_PG_CLIENT_KEY || ""}
+    clientKey={paymentConfig.clientKey}
+    paymentMode={paymentConfig.clientMode}
+    paymentReady={paymentConfig.ready}
+    paymentConfigError={paymentConfig.error}
   /></main>;
 }
