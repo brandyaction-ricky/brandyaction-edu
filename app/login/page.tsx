@@ -12,6 +12,25 @@ import { POLICY_VERSION } from "@/lib/legal-policies";
 type Mode = "login" | "signup";
 type Provider = "kakao" | "google";
 
+function emailLoginError(error: { code?: string; message?: string }) {
+  const code = error.code || "";
+  const message = (error.message || "").toLowerCase();
+
+  if (code === "email_not_confirmed" || message.includes("email not confirmed")) {
+    return "이메일 인증이 완료되지 않았습니다. 받은 인증 메일을 확인해 주세요.";
+  }
+  if (code === "over_request_rate_limit" || message.includes("rate limit")) {
+    return "로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.";
+  }
+  if (code === "user_banned" || message.includes("banned")) {
+    return "사용이 중지된 계정입니다. 고객센터로 문의해 주세요.";
+  }
+  if (code === "invalid_credentials" || message.includes("invalid login credentials")) {
+    return "이메일 또는 비밀번호를 확인해 주세요.";
+  }
+  return "로그인 서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+}
+
 function KakaoIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true">
     <path fill="currentColor" d="M12 3C6.48 3 2 6.58 2 11c0 2.84 1.85 5.34 4.64 6.76l-.95 3.49a.55.55 0 0 0 .83.61l4.13-2.73c.44.04.89.07 1.35.07 5.52 0 10-3.58 10-8.2S17.52 3 12 3Z"/>
@@ -70,17 +89,27 @@ export default function LoginPage() {
     setPending(true);
     setMessage("");
     const supabase = createClient();
+    const normalizedEmail = email.trim().toLowerCase();
 
     if (mode === "login") {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) {
-        setMessage("이메일 또는 비밀번호를 확인해 주세요.");
-        setPending(false);
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: normalizedEmail,
+          password,
+        });
+        if (error || !data.session) {
+          setMessage(emailLoginError(error || {}));
+          return;
+        }
+        router.replace(nextPath());
+        router.refresh();
         return;
+      } catch {
+        setMessage("로그인 서버에 연결하지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.");
+        return;
+      } finally {
+        setPending(false);
       }
-      router.push(nextPath());
-      router.refresh();
-      return;
     }
 
     if (!isValidPassword(password)) {
@@ -90,7 +119,7 @@ export default function LoginPage() {
     }
 
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: normalizedEmail,
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath())}`,
@@ -163,7 +192,7 @@ export default function LoginPage() {
     }
     setPending(true);
     const supabase = createClient();
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
       redirectTo: `${window.location.origin}/auth/callback?next=/my/settings`,
     });
     setMessage(error ? "재설정 메일을 보내지 못했습니다. 잠시 후 다시 시도해 주세요." : "비밀번호 재설정 메일을 보냈습니다.");
@@ -178,7 +207,7 @@ export default function LoginPage() {
       <div className="social-login"><button type="button" className="kakao-button" onClick={() => handleSocial("kakao")} disabled={pending}><span className="social-icon kakao-icon"><KakaoIcon/></span><span>카카오로 {mode === "login" ? "로그인" : "시작하기"}</span></button><button type="button" className="google-button" onClick={() => handleSocial("google")} disabled={pending}><span className="social-icon google-icon"><GoogleIcon/></span><span>Google로 {mode === "login" ? "로그인" : "시작하기"}</span></button></div>
       <div className="auth-divider"><span>또는 이메일로 계속</span></div>
       <form onSubmit={handleEmail}>
-        <div className="auth-fields">{mode === "signup" && <label><span><UserRound/>이름</span><input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" required/></label>}<label><span><Mail/>이메일</span><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@company.com" autoComplete="email" required/></label><label><span><LockKeyhole/>비밀번호</span><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder={mode === "signup" ? "영문+숫자 8자 이상" : "비밀번호"} autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={8} pattern={mode === "signup" ? "(?=.*[A-Za-z])(?=.*[0-9]).{8,}" : undefined} title={mode === "signup" ? PASSWORD_REQUIREMENT : undefined} required/></label>{mode === "signup" && <label><span><Smartphone/>휴대폰 번호</span><input value={phone} onChange={(event) => setPhone(event.target.value)} inputMode="tel" autoComplete="tel" placeholder="010-0000-0000"/></label>}</div>
+        <div className="auth-fields">{mode === "signup" && <label><span><UserRound/>이름</span><input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" required/></label>}<label><span><Mail/>이메일</span><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@company.com" autoComplete="email" required/></label><label><span><LockKeyhole/>비밀번호</span><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder={mode === "signup" ? "영문+숫자 8자 이상" : "비밀번호"} autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "signup" ? 8 : undefined} pattern={mode === "signup" ? "(?=.*[A-Za-z])(?=.*[0-9]).{8,}" : undefined} title={mode === "signup" ? PASSWORD_REQUIREMENT : undefined} required/></label>{mode === "signup" && <label><span><Smartphone/>휴대폰 번호</span><input value={phone} onChange={(event) => setPhone(event.target.value)} inputMode="tel" autoComplete="tel" placeholder="010-0000-0000"/></label>}</div>
         {mode === "login" && <div className="auth-options"><span>보안 연결로 로그인합니다.</span><button type="button" onClick={handleReset}>비밀번호 재설정</button></div>}
         {mode === "signup" && <div className="signup-agreements"><label><input type="checkbox" checked={agreements.terms} onChange={(event)=>setAgreements({...agreements,terms:event.target.checked})}/><span>[필수] <Link href="/policies/terms" target="_blank">이용약관</Link> 동의</span></label><label><input type="checkbox" checked={agreements.privacy} onChange={(event)=>setAgreements({...agreements,privacy:event.target.checked})}/><span>[필수] <Link href="/policies/privacy" target="_blank">개인정보처리방침</Link> 동의</span></label><label><input type="checkbox" checked={agreements.marketing} onChange={(event)=>setAgreements({...agreements,marketing:event.target.checked})}/><span>[선택] 클래스·무료강의 등 마케팅 정보 수신 동의</span></label></div>}
         {message && <p className="auth-message" role="status">{message}</p>}
