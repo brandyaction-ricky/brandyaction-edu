@@ -1,9 +1,6 @@
 import Link from "next/link";
 import { BookOpen, ChevronDown, Code2, CreditCard, FileImage, FileText, GraduationCap, LayoutDashboard, LogOut, Megaphone, MessageSquareText, MessagesSquare, Route, Settings, ShieldCheck, Tags, TicketPercent, Users } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { isDevelopmentAdminBypassEnabled } from "@/lib/app-environment";
-import { getAdminUser } from "@/lib/server-auth";
+import { getAdminSession } from "@/lib/server-auth";
 
 const navGroups = [
   { label:"운영 현황",items:[{ id:"dashboard",label:"대시보드",href:"/admin",icon:LayoutDashboard },{ id:"journey",label:"행동·전환 분석",href:"/admin/journey",icon:Route }] },
@@ -15,20 +12,11 @@ const navGroups = [
 ];
 
 export async function AdminShell({active,children}:{active:string;children:React.ReactNode}){
-  const developmentBypass=isDevelopmentAdminBypassEnabled();
-  const supabase=await createClient();
-  const {data:userData}=developmentBypass?{data:{user:null}}:await supabase.auth.getUser();
-  const developmentOperator=developmentBypass?await getAdminUser():null;
-  const {data:profile}=developmentOperator
-    ?await createAdminClient().from("profiles").select("full_name,role").eq("id",developmentOperator.id).maybeSingle()
-    :userData.user
-      ?await supabase.from("profiles").select("full_name,role").eq("id",userData.user.id).maybeSingle()
-      :{data:null};
-  const isAdmin=profile?.role==="admin";
-  let preferences:Record<string,unknown>={};
-  if(!isAdmin){const {data}=await createAdminClient().from("site_settings").select("value").eq("key","operator_preferences").maybeSingle();if(data?.value&&typeof data.value==="object"&&!Array.isArray(data.value))preferences=data.value as Record<string,unknown>}
+  const operator=await getAdminSession();
+  const isAdmin=operator?.role==="admin";
+  const preferences=operator?.preferences||{};
   const canSee=(id:string)=>id==="dashboard"||id==="journey"||isAdmin||(id==="super-admins"||id==="code-settings"||id==="message-templates"||id==="crm"||id==="member-tags"||id==="coupons"||id==="settings"||id==="banners"?false:id==="orders"?preferences.staffCanManageOrders===true:id==="members"?preferences.staffCanManageMembers===true:preferences.staffCanManageProducts===true);
-  const name=profile?.full_name||developmentOperator?.email?.split("@")[0]||userData.user?.email?.split("@")[0]||"운영자";
+  const name=operator?.fullName||operator?.email?.split("@")[0]||"운영자";
   return <div className="admin-app"><a className="admin-skip-link" href="#admin-main">본문으로 바로가기</a><aside className="admin-sidebar"><div className="site-switcher"><span className="site-symbol">B</span><div><strong>브랜디액션 에듀</strong><small>운영 중</small></div><ChevronDown aria-hidden="true"/></div><nav aria-label="관리자 메뉴">{navGroups.map((group)=>{const items=group.items.filter((item)=>canSee(item.id));return items.length?<section className="admin-nav-group" key={group.label}><span>{group.label}</span>{items.map(({id,label,href,icon:Icon})=><Link key={id} href={href} className={id===active?"active":""} aria-current={id===active?"page":undefined}><Icon aria-hidden="true"/>{label}</Link>)}</section>:null})}</nav><Link className="view-site" href="/"><LogOut aria-hidden="true"/>고객 사이트 보기</Link></aside><div className="admin-body"><header className="admin-topbar"><div><span>운영센터</span><strong>브랜디액션 에듀</strong></div><div><span className="user-avatar">{name[0]}</span><div><strong>{name}</strong><small>{isAdmin?"최고 관리자":"스태프"}</small></div></div></header><main className="admin-content" id="admin-main" tabIndex={-1}>{children}</main></div></div>
 }
 
