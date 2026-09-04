@@ -2,12 +2,19 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isDevelopmentAdminBypassEnabled } from "@/lib/app-environment";
 import { randomUUID } from "node:crypto";
+import { cache } from "react";
 
 export type AdminScope = "products" | "articles" | "orders" | "members" | "settings";
 
 export type AuthenticatedUser = {
   id: string;
   email: string;
+};
+
+export type AdminSession = AuthenticatedUser & {
+  role: "staff" | "admin";
+  fullName: string | null;
+  preferences: Record<string, unknown>;
 };
 
 const DEVELOPMENT_ADMIN_EMAIL = "dev-admin@brandyaction.local";
@@ -84,26 +91,62 @@ export async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> 
   }
 }
 
-export async function getAdminUser(scope?: AdminScope) {
+/**
+ * Resolve the operator once per Server Component request.
+ *
+ * The admin layout, page and shell all need the same identity. Keeping this
+ * lookup in React cache prevents each layer from independently validating the
+ * token and loading the same profile over the network.
+ */
+export const getAdminSession = cache(async (): Promise<AdminSession | null> => {
   if (isDevelopmentAdminBypassEnabled()) {
-    return getDevelopmentAdminUser();
+    const operator = await getDevelopmentAdminUser();
+    if (!operator) return null;
+    const { data: profile } = await createAdminClient()
+      .from("profiles")
+      .select("full_name,role,status")
+      .eq("id", operator.id)
+      .maybeSingle();
+    if (!profile || profile.status !== "active" || !["staff", "admin"].includes(profile.role)) return null;
+    return { id: operator.id, email: operator.email, role: profile.role as "staff" | "admin", fullName: profile.full_name, preferences: {} };
   }
 
-  const user = await getAuthenticatedUser();
-  if (!user) return null;
-  const supabase = await createClient();
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role,status")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (!profile || profile.status !== "active" || !["staff", "admin"].includes(profile.role)) return null;
-  if (scope && profile.role === "staff") {
-    if (scope === "settings") return null;
-    const { data } = await createAdminClient().from("site_settings").select("value").eq("key", "operator_preferences").maybeSingle();
-    const preferences = data?.value && typeof data.value === "object" && !Array.isArray(data.value) ? data.value as Record<string, unknown> : {};
-    const key = scope === "products" || scope === "articles" ? "staffCanManageProducts" : scope === "orders" ? "staffCanManageOrders" : "staffCanManageMembers";
-    if (preferences[key] !== true) return null;
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.auth.getClaims();
+    const id = typeof data?.claims?.sub === "string" ? data.claims.sub : "";
+    const email = typeof data?.claims?.email === "string" ? data.claims.email : "";
+    if (error || !id || !email) return null;
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name,role,status")
+      .eq("id", id)
+      .maybeSingle();
+    if (!profile || profile.status !== "active" || !["staff", "admin"].includes(profile.role)) return null;
+
+    let preferences: Record<string, unknown> = {};
+    if (profile.role === "staff") {
+      const { data: setting } = await createAdminClient()
+        .from("site_settings")
+        .select("value")
+        .eq("key", "operator_preferences")
+        .maybeSingle();
+      if (setting?.value && typeof setting.value === "object" && !Array.isArray(setting.value)) preferences = setting.value as Record<string, unknown>;
+    }
+    return { id, email, role: profile.role as "staff" | "admin", fullName: profile.full_name, preferences };
+  } catch {
+    return null;
   }
-  return { ...user, role: profile.role as "staff" | "admin" };
+});
+
+export async function getAdminUser(scope?: AdminScope) {
+  const session = await getAdminSession();
+  if (!session) return null;
+  if (scope && session.role === "staff") {
+    if (scope === "settings") return null;
+    const key = scope === "products" || scope === "articles" ? "staffCanManageProducts" : scope === "orders" ? "staffCanManageOrders" : "staffCanManageMembers";
+    if (session.preferences[key] !== true) return null;
+  }
+  return { id: session.id, email: session.email, role: session.role };
 }
