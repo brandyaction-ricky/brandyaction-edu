@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { CalendarDays, Clock3, Download, PlayCircle, Users } from "lucide-react";
 import { BrandHeader } from "../../components/brand-header";
 import { ClassApplicationCard } from "../../components/class-application-card";
@@ -23,6 +24,7 @@ export default async function ClassDetail({ params }: { params: Promise<{ slug: 
     <DetailTabs />
     <section className="detail-content" id="overview"><div className="container detail-layout">
       <div className="detail-main">
+        {item.curriculum?.some((week) => week.lessons.some((lesson) => lesson.accessMode === "member")) && <section className="content-block"><span className="section-kicker">FREE RESOURCES</span><h2>가입하고 무료 콘텐츠 받기</h2><p>클래스에서 제공하는 회원 무료 영상·자료를 먼저 확인해 보세요.</p><Link href={`/resources/${item.slug}`}>무료 콘텐츠 확인 →</Link></section>}
         <DetailImageStack images={appearance.images} pixels={appearance.pixels} courseTitle={item.title}/>
         <section className="content-block" id="curriculum"><span className="section-kicker">CURRICULUM</span><div className="block-title-row"><h2>{item.curriculum?.length || "단계별"}주 동안 완성하는<br />실전 커리큘럼</h2><p>매주 수업 직후 바로 적용할 수 있는<br />하나의 결과물을 완성합니다.</p></div>
           <div className="session-list">{item.curriculum?.length?item.curriculum.map((week,index)=><details key={week.id} open={index===0}><summary><span>WEEK {index+1}</span><div><strong>{week.title}</strong><small>{week.lessons.length}개 VOD·자료</small></div><em>{week.goal}</em><b>＋</b></summary><div className="session-body curriculum-public-lessons">{week.lessons.map(lesson=><p key={lesson.id}><strong>Day {lesson.day}</strong><span>{lesson.title}</span><small>{lesson.kind}{lesson.duration?` · ${lesson.duration}`:""}</small></p>)}</div></details>):<div className="detail-review-empty">커리큘럼이 준비 중입니다.</div>}</div>

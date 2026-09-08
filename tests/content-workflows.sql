@@ -1,0 +1,78 @@
+-- DEV ONLY. Every fixture and mutation is rolled back; no real user is changed.
+begin;
+do $$
+declare
+  actor uuid:=gen_random_uuid(); student uuid:=gen_random_uuid(); course uuid:=gen_random_uuid(); cohort uuid:=gen_random_uuid();
+  ord uuid:=gen_random_uuid(); item uuid:=gen_random_uuid(); enrollment uuid:=gen_random_uuid(); wid uuid:=gen_random_uuid(); lid uuid:=gen_random_uuid(); lid2 uuid:=gen_random_uuid();
+  mid uuid; rev uuid; sid uuid; sid2 uuid; payload jsonb; result jsonb; caught boolean; n integer;
+begin
+  insert into auth.users(id,email,raw_user_meta_data) values(actor,actor::text||'@qa.invalid','{}'),(student,student::text||'@qa.invalid','{}');
+  insert into public.profiles(id,email,role,status) values(actor,actor::text||'@qa.invalid','admin','active'),(student,student::text||'@qa.invalid','student','active')
+    on conflict(id) do update set role=excluded.role,status=excluded.status;
+  insert into public.courses(id,course_code,slug,title,status) values(course,'QA_'||course,course::text,'QA rollback course','published');
+  insert into public.cohorts(id,course_id,cohort_code,name,price) values(cohort,course,'QA','QA',0);
+  insert into public.orders(id,order_number,user_id,subtotal,total_amount,customer_name,customer_email,terms_version,privacy_version,refund_policy_version)
+    values(ord,'QA_'||ord,student,0,0,'QA',student::text||'@qa.invalid','qa','qa','qa');
+  insert into public.order_items(id,order_id,course_id,cohort_id,item_name,unit_price) values(item,ord,course,cohort,'QA',0);
+  insert into public.enrollments(id,user_id,course_id,cohort_id,order_item_id,access_starts_at) values(enrollment,student,course,cohort,item,now()-interval '1 day');
+  payload:=jsonb_build_array(jsonb_build_object('id',wid,'title','Week 1','goal','','isPublished',true,'lessons',jsonb_build_array(
+    jsonb_build_object('id',lid,'title','QA mission','description','','kind','텍스트','duration','','bodyText','Private workbook','accessMode','member','isPublished',true,'mission',jsonb_build_object('title','QA quiz','instructions','','required',true,'isPublished',true,'submissionType','quiz','quiz',jsonb_build_object('questions','[{"id":"q1","prompt":"QA?","options":["yes","no"],"correctIndex":0}]'::jsonb,'passPercent',100))),
+    jsonb_build_object('id',lid2,'title','QA optional','description','','kind','텍스트','duration','','bodyText','Optional','accessMode','enrolled','isPublished',true)
+  )));
+  perform public.save_course_curriculum(course,actor,payload);
+  assert (select count(*)=2 from public.curriculum_lessons where week_id=wid), 'content registration';
+  select m.id,q.revision into mid,rev from public.curriculum_missions m join public.mission_quizzes q on q.mission_id=m.id where m.lesson_id=lid;
+  perform public.save_course_curriculum(course,actor,payload);
+  assert (select revision=rev from public.mission_quizzes where mission_id=mid), 'unchanged quiz retains revision';
+  result:=public.submit_learning_mission(student,enrollment,mid,'{}',rev,'{"passed":false,"score":0}');
+  assert result->>'passed'='false', 'failed quiz';
+  assert not exists(select 1 from public.mission_submissions where enrollment_id=enrollment), 'no approval queue on failure';
+  assert (select count(*)=1 from public.mission_quiz_attempts where enrollment_id=enrollment), 'failed attempt recorded';
+  caught:=false;
+  begin perform public.submit_learning_mission(student,enrollment,mid,'{}',gen_random_uuid(),'{"passed":true,"score":100}'); exception when raise_exception then caught:=true; end;
+  assert caught, 'stale quiz revision blocked';
+  result:=public.submit_learning_mission(student,enrollment,mid,'{}',rev,'{"passed":true,"score":100}'); sid:=(result->>'submissionId')::uuid;
+  assert (select status='submitted' and quiz_required and quiz_passed from public.mission_submissions where id=sid), 'quiz pass only pending';
+  caught:=false;
+  begin perform public.submit_learning_mission(student,enrollment,mid,'{}',rev,'{"passed":true,"score":100}'); exception when raise_exception then caught:=true; end;
+  assert caught, 'duplicate pending blocked';
+  perform public.review_mission_submissions(actor,array[sid],'rejected','다시 작성');
+  result:=public.submit_learning_mission(student,enrollment,mid,'{}',rev,'{"passed":true,"score":100}'); sid2:=(result->>'submissionId')::uuid;
+  assert (select attempt_number=2 from public.mission_submissions where id=sid2), 'rejected mission resubmitted';
+  caught:=false;
+  begin perform public.review_mission_submissions(actor,array[sid2,sid],'approved',''); exception when raise_exception then caught:=true; end;
+  assert caught, 'bulk review rejects stale row';
+  assert (select status='submitted' from public.mission_submissions where id=sid2), 'bulk failure rolled back';
+  perform public.review_mission_submissions(actor,array[sid2],'approved','완료');
+  assert (select status='approved' from public.mission_submissions where id=sid2), 'admin final gate';
+  assert (select count(*)=2 from public.audit_logs where entity_type='mission_submission' and entity_id in (sid::text,sid2::text)), 'transactional review audit';
+  caught:=false;
+  begin update public.mission_submissions set quiz_passed=false where id=sid2; exception when check_violation then caught:=true; end;
+  assert caught, 'database gate protects approved status';
+  insert into public.lesson_progress(enrollment_id,lesson_id,progress_percent) values(enrollment,lid,100);
+  insert into public.course_content_claims(user_id,lesson_id,source) values(student,lid,'qa');
+  insert into public.course_content_claims(user_id,lesson_id,source) values(student,lid,'repeat') on conflict(user_id,lesson_id) do nothing;
+  assert (select count(*)=1 from public.course_content_claims where user_id=student), 'claim idempotence';
+  payload:=jsonb_set(payload,'{0,lessons}',jsonb_build_array(payload->0->'lessons'->1,payload->0->'lessons'->0));
+  perform public.save_course_curriculum(course,actor,payload);
+  assert (select day_number=2 from public.curriculum_lessons where id=lid), 'stable-ID reordering';
+  assert (select progress_percent=100 from public.lesson_progress where lesson_id=lid and enrollment_id=enrollment), 'progress preserved';
+  caught:=false;
+  begin perform public.save_course_curriculum(course,actor,'[]'); exception when raise_exception then caught:=true; end;
+  assert caught, 'history blocks destructive delete';
+  assert (select count(*)=2 from public.curriculum_lessons where week_id=wid), 'failed save is atomic';
+  payload:=jsonb_set(payload,'{0,isPublished}','false'); perform public.save_course_curriculum(course,actor,payload);
+  assert (select not is_published from public.curriculum_weeks where id=wid), 'private section saved';
+  assert (select count(*)=1 from public.enrollments where id=enrollment), 'enrollment preserved';
+  assert not has_function_privilege('authenticated','public.submit_learning_mission(uuid,uuid,uuid,jsonb,uuid,jsonb)','EXECUTE'), 'no client RPC grading forgery';
+  assert not has_function_privilege('anon','public.save_course_curriculum(uuid,uuid,jsonb)','EXECUTE'), 'no anonymous curriculum edits';
+  assert not has_table_privilege('authenticated','public.course_content_claims','INSERT'), 'no forged claims';
+  perform set_config('request.jwt.claims',jsonb_build_object('sub',student,'role','authenticated')::text,true);
+  set local role authenticated;
+  select count(*) into n from public.mission_quizzes where mission_id=mid;
+  assert n=0, 'answer keys hidden by RLS';
+  reset role;
+end;
+$$;
+rollback;
+select 'PASS: curriculum, quiz gates, retries, bulk rollback, audit, history, claims, RLS; fixtures rolled back' as result;

@@ -12,13 +12,13 @@ export function ProgressButton({ enrollmentId, lessonId, initial }: { enrollment
   const [error, setError] = useState("");
   const complete = async () => {
     setPending(true); setError("");
-    const response = await fetch("/api/learning/progress", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enrollmentId, lessonId, progress: 100 }) });
-    const result = await response.json() as { error?: string; progress?: number };
-    if (response.ok) {
-      setProgress(result.progress || 100);
-      router.refresh();
-    } else setError(result.error || "진도를 저장하지 못했습니다.");
-    setPending(false);
+    try {
+      const response = await fetch("/api/learning/progress", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enrollmentId, lessonId, progress: 100 }) });
+      const result = await response.json() as { error?: string; progress?: number };
+      if (!response.ok) throw new Error(result.error || "진도를 저장하지 못했습니다.");
+      setProgress(result.progress ?? 100); router.refresh();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "연결을 확인하고 다시 시도해 주세요."); }
+    finally { setPending(false); }
   };
   return <div className="lesson-progress-action"><button className={progress === 100 ? "completed" : ""} onClick={complete} disabled={pending || progress === 100}><Check/>{progress === 100 ? "학습 완료" : pending ? "저장 중..." : "학습 완료로 표시"}</button>{error && <p role="alert">{error}</p>}</div>;
 }
@@ -31,22 +31,28 @@ export function MissionSubmissionForm({ enrollmentId, mission }: { enrollmentId:
   const router = useRouter();
   const [answerText, setAnswerText] = useState(mission.submission?.answerText || "");
   const [evidenceUrl, setEvidenceUrl] = useState(mission.submission?.evidenceUrl || "");
+  const [quizAnswers, setQuizAnswers] = useState<Record<string, number>>({});
+  const [quizFeedback, setQuizFeedback] = useState<{ score: number; wrongQuestionIds: string[] } | null>(null);
+  // Optimistic state only covers the old attempt. A later server review must win.
+  const [sentFromId, setSentFromId] = useState<string | null | undefined>(undefined);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
-  const status = mission.submission?.status;
+  const status = sentFromId !== undefined && sentFromId === (mission.submission?.id || null) ? "submitted" : mission.submission?.status;
   const canResubmit = !status || status === "rejected" || status === "changes_requested";
   const submit = async () => {
     setPending(true);
     setError("");
-    const response = await fetch("/api/learning/submissions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ enrollmentId, missionId: mission.id, answerText, evidenceUrl }),
-    });
-    const result = await response.json().catch(() => ({})) as { error?: string };
-    if (response.ok) router.refresh();
-    else setError(result.error || "과제를 제출하지 못했습니다.");
-    setPending(false);
+    try {
+      const response = await fetch("/api/learning/submissions", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enrollmentId, missionId: mission.id, answerText, evidenceUrl, quizAnswers, quizRevision: mission.quiz?.revision }),
+      });
+      const result = await response.json().catch(() => ({})) as { error?: string; passed?: boolean; quiz?: { score: number; wrongQuestionIds: string[] } };
+      if (!response.ok) throw new Error(result.error || "과제를 제출하지 못했습니다.");
+      if (result.passed === false && result.quiz) setQuizFeedback(result.quiz);
+      else { setQuizFeedback(null); setSentFromId(mission.submission?.id || null); router.refresh(); }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "연결을 확인하고 다시 시도해 주세요."); }
+    finally { setPending(false); }
   };
 
   return <section className="mission-submission-card">
@@ -58,7 +64,8 @@ export function MissionSubmissionForm({ enrollmentId, mission }: { enrollmentId:
         {mission.submission?.feedback && <div className="mission-feedback"><RotateCcw/><span><strong>관리자 피드백</strong><p>{mission.submission.feedback}</p></span></div>}
         {(mission.submissionType === "text" || mission.submissionType === "mixed") && <label>과제 답변<textarea value={answerText} onChange={(event) => setAnswerText(event.target.value)} maxLength={10000} placeholder="실행 내용과 결과를 구체적으로 작성해 주세요."/></label>}
         {(mission.submissionType === "link" || mission.submissionType === "mixed") && <label>증빙 링크<input type="url" value={evidenceUrl} onChange={(event) => setEvidenceUrl(event.target.value)} maxLength={2048} placeholder="https://"/></label>}
-        <button className="mission-submit-button" onClick={submit} disabled={pending}><Send/>{pending ? "제출 중..." : mission.submission ? "과제 재제출" : "과제 제출"}</button>
+        {mission.quiz && <div className="learner-quiz"><h3>확인 퀴즈</h3><p>{mission.quiz.passPercent}% 이상 정답이면 관리자 승인 대기로 접수됩니다.</p>{mission.quiz.questions.map((q, i) => <fieldset key={q.id} disabled={pending}><legend>{i + 1}. {q.prompt}</legend>{q.options.map((option, oi) => <label key={oi}><input type="radio" name={`quiz-${q.id}`} checked={quizAnswers[q.id] === oi} onChange={() => setQuizAnswers((current) => ({ ...current, [q.id]: oi }))}/><span>{option}</span></label>)}{quizFeedback?.wrongQuestionIds.includes(q.id) && <p className="quiz-wrong">다시 확인해 주세요.</p>}</fieldset>)}{quizFeedback && <p className="quiz-wrong" role="status">{quizFeedback.score}점 · 통과 기준에 도달하지 못했습니다. 표시된 문항을 확인하고 재응시하세요. 아직 승인 대기로 제출되지 않았습니다.</p>}</div>}
+        <button className="mission-submit-button" onClick={submit} disabled={pending || Boolean(mission.quiz?.questions.some((q) => quizAnswers[q.id] === undefined))}><Send/>{pending ? "제출 중..." : quizFeedback ? "퀴즈 재응시·제출" : mission.quiz ? "퀴즈 채점·미션 제출" : mission.submission ? "과제 재제출" : "과제 제출"}</button>
       </> : null}
     {error && <p className="mission-submit-error" role="alert">{error}</p>}
   </section>;

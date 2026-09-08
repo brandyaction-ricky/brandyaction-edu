@@ -1,5 +1,7 @@
 "use client";
 
+import { validateCurriculum } from "@/lib/course-content";
+import type { QuizDefinition } from "@/lib/mission-quiz";
 import type { CurriculumWeek } from "@/app/data";
 import { createClient } from "@/lib/supabase/client";
 
@@ -50,16 +52,12 @@ export type ProductEditorData = {
 };
 type ProductCourseRecord = { id:string; course_code:string; slug:string; title:string; summary:string|null; description:string|null; category:string|null; instructor_name:string|null; list_price:number; duration_label:string|null; schedule_label:string|null; status:ProductStatus; metadata:Record<string,unknown>|null };
 type ProductAssetRecord = { id:string; asset_type:string; storage_path:string; display_order:number };
-type ProductMissionRecord = { title:string; instructions:string|null; is_required:boolean; submission_type:string; is_published:boolean };
-type ProductLessonRecord = { id:string; day_number:number; title:string; description:string|null; content_type:string; duration_label:string|null; display_order:number; lesson_contents:Array<{vod_url:string|null;resource_name:string|null;resource_storage_path:string|null}>|{vod_url:string|null;resource_name:string|null;resource_storage_path:string|null}|null; curriculum_missions:ProductMissionRecord[]|ProductMissionRecord|null };
-type ProductWeekRecord = { id:string; week_number:number; title:string; goal:string|null; display_order:number; curriculum_lessons:ProductLessonRecord[] };
+type ProductMissionRecord = { title:string; instructions:string|null; is_required:boolean; submission_type:string; is_published:boolean; mission_quizzes:{questions:QuizDefinition["questions"];pass_percent:number}[]|{questions:QuizDefinition["questions"];pass_percent:number}|null };
+type ProductLessonRecord = { id:string; day_number:number; title:string; description:string|null; content_type:string; is_published:boolean; access_mode:"enrolled"|"member"; duration_label:string|null; display_order:number; lesson_contents:Array<{vod_url:string|null;resource_name:string|null;resource_storage_path:string|null;body_text:string|null;external_url:string|null}>|{vod_url:string|null;resource_name:string|null;resource_storage_path:string|null;body_text:string|null;external_url:string|null}|null; curriculum_missions:ProductMissionRecord[]|ProductMissionRecord|null };
+type ProductWeekRecord = { id:string; week_number:number; title:string; goal:string|null; is_published:boolean; display_order:number; curriculum_lessons:ProductLessonRecord[] };
 type ProductRecruitmentRecord = { id:string; status:string; recruitment_start_at:string|null; recruitment_end_at:string|null };
 
 const defaultPixels: ProductPixels = { meta: "", kakao: "", google: "", enabled: true };
-
-function messageOf(error: unknown, fallback: string) {
-  return error && typeof error === "object" && "message" in error ? String(error.message) : fallback;
-}
 
 function trackingOf(metadata: unknown): ProductPixels {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return defaultPixels;
@@ -108,42 +106,8 @@ export function createEmptyProduct(): ProductEditorData {
 }
 
 export async function loadAdminProducts(): Promise<ProductSummary[]> {
-  const supabase = createClient();
-  const { data: courses, error } = await supabase
-    .from("courses")
-    .select("id,slug,title,instructor_name,list_price,duration_label,status,display_order,metadata")
-    .order("display_order", { ascending: false })
-    .order("created_at", { ascending: false });
-  if (error) throw new Error(messageOf(error, "상품 목록을 불러오지 못했습니다."));
-  const ids = (courses || []).map((course) => course.id);
-  if (!ids.length) return [];
-
-  const [assetResult, weekResult] = await Promise.all([
-    supabase.from("course_assets").select("id,course_id,asset_type,storage_path").in("course_id", ids),
-    supabase.from("curriculum_weeks").select("id,course_id,curriculum_lessons(id)").in("course_id", ids),
-  ]);
-  if (assetResult.error) throw new Error(messageOf(assetResult.error, "상세 이미지 수를 확인하지 못했습니다."));
-  if (weekResult.error) throw new Error(messageOf(weekResult.error, "커리큘럼 수를 확인하지 못했습니다."));
-
-  return (courses || []).map((course) => {
-    const weeks = (weekResult.data || []).filter((week) => week.course_id === course.id);
-    const courseAssets = (assetResult.data || []).filter((asset) => asset.course_id === course.id);
-    const thumbnail = courseAssets.find((asset) => asset.asset_type === "thumbnail");
-    return {
-      id: course.id,
-      slug: course.slug,
-      title: course.title,
-      instructorName: course.instructor_name || "브랜디액션",
-      listPrice: course.list_price,
-      durationLabel: course.duration_label || "기간 미정",
-      status: course.status as ProductStatus,
-      programType: course.metadata && typeof course.metadata === "object" && !Array.isArray(course.metadata) && (course.metadata as Record<string, unknown>).programType === "free" ? "free" : "paid",
-      thumbnailUrl: thumbnail ? supabase.storage.from("course-assets").getPublicUrl(thumbnail.storage_path).data.publicUrl : undefined,
-      imageCount: courseAssets.filter((asset) => asset.asset_type === "detail").length,
-      weekCount: weeks.length,
-      lessonCount: weeks.reduce((sum, week) => sum + (week.curriculum_lessons || []).length, 0),
-    };
-  });
+  const result = await productRequest<{ products: ProductSummary[] }>("/api/admin/products");
+  return result.products;
 }
 
 export async function loadAdminProduct(courseId: string): Promise<ProductEditorData> {
@@ -195,25 +159,31 @@ export async function loadAdminProduct(courseId: string): Promise<ProductEditorD
       label: `${week.week_number}주차`,
       title: week.title,
       goal: week.goal || "",
+      isPublished: week.is_published,
       lessons: [...(week.curriculum_lessons || [])].sort((a, b) => a.display_order - b.display_order).map((lesson) => {
         const content = Array.isArray(lesson.lesson_contents) ? lesson.lesson_contents[0] : lesson.lesson_contents;
         const mission = Array.isArray(lesson.curriculum_missions) ? lesson.curriculum_missions[0] : lesson.curriculum_missions;
+        const quiz = Array.isArray(mission?.mission_quizzes) ? mission.mission_quizzes[0] : mission?.mission_quizzes;
         return {
           id: lesson.id,
           day: lesson.day_number,
           title: lesson.title,
           description: lesson.description || "",
-          kind: lesson.content_type === "material" ? "자료" as const : "VOD" as const,
+          kind: ({ material: "자료", text: "텍스트", link: "링크", vod: "VOD" } as const)[lesson.content_type as "material" | "text" | "link" | "vod"] || "VOD",
+          isPublished: lesson.is_published,
+          accessMode: lesson.access_mode,
+          bodyText: content?.body_text || "",
           duration: lesson.duration_label || "",
-          contentUrl: content?.vod_url || "",
+          contentUrl: content?.vod_url || content?.external_url || "",
           resourceName: content?.resource_name || undefined,
           resourcePath: content?.resource_storage_path || undefined,
           mission: mission ? {
             title: mission.title,
             instructions: mission.instructions || "",
             required: mission.is_required,
-            submissionType: mission.submission_type === "link" ? "link" as const : mission.submission_type === "mixed" ? "mixed" as const : "text" as const,
+            submissionType: mission.submission_type === "quiz" ? "quiz" as const : mission.submission_type === "link" ? "link" as const : mission.submission_type === "mixed" ? "mixed" as const : "text" as const,
             isPublished: mission.is_published,
+            quiz: quiz ? { questions: quiz.questions, passPercent: quiz.pass_percent } : undefined,
           } : undefined,
         };
       }),
@@ -232,29 +202,46 @@ async function productRequest<T>(input: RequestInfo, init?: RequestInit): Promis
   return result;
 }
 
+async function directUpload(courseId: string, file: File, kind: "resource" | "thumbnail" | "detail") {
+  const upload = await productRequest<{ bucket: string; path: string; token: string; contentType: string }>("/api/admin/content-upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ courseId, name: file.name, size: file.size, kind }) });
+  const { error } = await createClient().storage.from(upload.bucket).uploadToSignedUrl(upload.path, upload.token, file, { contentType: upload.contentType });
+  if (error) throw new Error(`${file.name}: 업로드하지 못했습니다. ${error.message}`);
+  return upload.path;
+}
+
 export async function saveAdminProduct(input: {
-  course: ProductDraft;
-  thumbnail: ProductImage | null;
-  images: ProductImage[];
-  curriculum: CurriculumWeek[];
-  pixels: ProductPixels;
-  resourceFiles: Map<string, File>;
+  course: ProductDraft; thumbnail: ProductImage | null; images: ProductImage[];
+  curriculum: CurriculumWeek[]; pixels: ProductPixels; resourceFiles: Map<string, File>;
+  onDraftCreated?: (id: string) => void;
 }): Promise<string> {
-  const form = new FormData();
-  form.append("payload", JSON.stringify({
-    course: input.course,
-    thumbnail: input.thumbnail ? { id: input.thumbnail.id, path: input.thumbnail.path } : null,
-    images: input.images.map((image) => ({ id: image.id, path: image.path })),
-    curriculum: input.curriculum,
-    pixels: input.pixels,
-  }));
-  if (input.thumbnail?.file) form.append("thumbnail", input.thumbnail.file);
-  input.images.forEach((image, index) => { if (image.file) form.append(`detail-${index}`, image.file); });
-  input.curriculum.forEach((week, weekIndex) => week.lessons.forEach((lesson, lessonIndex) => {
-    const file = input.resourceFiles.get(lesson.id);
-    if (file) form.append(`resource-${weekIndex}-${lessonIndex}`, file);
-  }));
-  const result = await productRequest<{ courseId: string }>("/api/admin/products", { method: "POST", body: form });
+  const invalid = validateCurriculum(input.curriculum, input.course.id);
+  if (invalid) throw new Error(invalid);
+  const persist = async (payload: Record<string, unknown>) => {
+    const form = new FormData(); form.append("payload", JSON.stringify(payload));
+    return productRequest<{ courseId: string }>("/api/admin/products", { method: "POST", body: form });
+  };
+  let courseId = input.course.id;
+  if (!courseId) {
+    // Establish a private draft before uploading. A failed upload can never publish an empty offer.
+    const draft = await persist({ course: { ...input.course, status: "draft", recruitmentStatus: "preparing" }, thumbnail: null, images: [], curriculum: [], pixels: input.pixels });
+    courseId = draft.courseId;
+    input.onDraftCreated?.(courseId);
+  }
+  const uploadImage = async (image: ProductImage, kind: "thumbnail" | "detail") => ({ id: image.file ? undefined : image.id, path: image.file ? await directUpload(courseId, image.file, kind) : image.path });
+  const thumbnail = input.thumbnail ? await uploadImage(input.thumbnail, "thumbnail") : null;
+  const images: { id?: string; path?: string }[] = [];
+  // Bound parallel uploads, and keep file bodies out of the Vercel API request.
+  for (let i = 0; i < input.images.length; i += 3) images.push(...await Promise.all(input.images.slice(i, i + 3).map((image) => uploadImage(image, "detail"))));
+  const curriculum: CurriculumWeek[] = [];
+  for (const week of input.curriculum) {
+    const lessons = [];
+    for (const lesson of week.lessons) {
+      const file = lesson.kind === "자료" ? input.resourceFiles.get(lesson.id) : undefined;
+      lessons.push(file ? { ...lesson, resourceName: file.name, resourcePath: await directUpload(courseId, file, "resource") } : lesson);
+    }
+    curriculum.push({ ...week, lessons });
+  }
+  const result = await persist({ course: { ...input.course, id: courseId }, thumbnail, images, curriculum, pixels: input.pixels });
   return result.courseId;
 }
 

@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
 import { getAdminUser } from "@/lib/server-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { safeExternalUrl } from "@/lib/safe-url";
+import { randomUUID } from "node:crypto";
+import { revalidatePath } from "next/cache";
+import type { CurriculumWeek } from "@/app/data";
+import { UUID_PATTERN, validateCurriculum } from "@/lib/course-content";
 
 type StoredImage = { id?: string; path?: string };
-type MissionInput = { title: string; instructions: string; required: boolean; submissionType: "text" | "link" | "mixed"; isPublished: boolean };
-type LessonInput = { id: string; title: string; description: string; kind: "VOD" | "자료"; duration: string; contentUrl?: string; resourceName?: string; resourcePath?: string; mission?: MissionInput };
-type WeekInput = { id: string; title: string; goal: string; lessons: LessonInput[] };
 type SaveInput = {
   course: { id: string; courseCode: string; slug: string; title: string; summary: string; description: string; category: string; instructorName: string; listPrice: string; durationLabel: string; scheduleLabel: string; programType: "free" | "paid"; status: "draft" | "published" | "archived"; recruitmentStatus: "preparing" | "recruiting" | "closed"; recruitmentStartAt: string; recruitmentEndAt: string; hasLinkedCohort: boolean; metadata: Record<string, unknown> };
   thumbnail: StoredImage | null;
   images: StoredImage[];
-  curriculum: WeekInput[];
+  curriculum: CurriculumWeek[];
   pixels: { meta: string; kakao: string; google: string; enabled: boolean };
 };
 
@@ -60,12 +60,27 @@ export async function GET(request: Request) {
   const operator = await getAdminUser("products");
   if (!operator) return NextResponse.json({ error: "상품 관리 권한이 필요합니다." }, { status: 403 });
   const id = new URL(request.url).searchParams.get("id") || "";
-  if (!id) return NextResponse.json({ error: "조회할 상품을 선택해 주세요." }, { status: 400 });
   const admin = createAdminClient();
+  if (!id) {
+    const courses = await admin.from("courses").select("id,slug,title,instructor_name,list_price,duration_label,status,metadata").order("display_order", { ascending: false }).order("created_at", { ascending: false });
+    if (courses.error) return NextResponse.json({ error: "클래스 목록을 불러오지 못했습니다." }, { status: 500 });
+    const ids = (courses.data || []).map((course) => course.id);
+    if (!ids.length) return NextResponse.json({ products: [] });
+    const [assets, weeks] = await Promise.all([
+      admin.from("course_assets").select("course_id,asset_type,storage_path").in("course_id", ids),
+      admin.from("curriculum_weeks").select("course_id,curriculum_lessons(id)").in("course_id", ids),
+    ]);
+    if (assets.error || weeks.error) return NextResponse.json({ error: "클래스 콘텐츠 정보를 불러오지 못했습니다." }, { status: 500 });
+    const counts = new Map(ids.map((courseId) => [courseId, { imageCount: 0, weekCount: 0, lessonCount: 0, thumbnailUrl: undefined as string | undefined }]));
+    for (const asset of assets.data || []) { const count = counts.get(asset.course_id); if (!count) continue; if (asset.asset_type === "detail") count.imageCount++; if (asset.asset_type === "thumbnail") count.thumbnailUrl = admin.storage.from("course-assets").getPublicUrl(asset.storage_path).data.publicUrl; }
+    for (const week of weeks.data || []) { const count = counts.get(week.course_id); if (!count) continue; count.weekCount++; count.lessonCount += week.curriculum_lessons?.length || 0; }
+    return NextResponse.json({ products: (courses.data || []).map((course) => ({ id: course.id, slug: course.slug, title: course.title, instructorName: course.instructor_name || "브랜디액션", listPrice: course.list_price, durationLabel: course.duration_label || "기간 미정", status: course.status, programType: course.metadata?.programType === "free" ? "free" : "paid", ...counts.get(course.id) })) }, { headers: { "Cache-Control": "private, no-store" } });
+  }
+  if (!UUID_PATTERN.test(id)) return NextResponse.json({ error: "클래스 ID를 확인해 주세요." }, { status: 400 });
   const [courseResult, assetResult, weekResult, cohortResult] = await Promise.all([
     admin.from("courses").select("id,course_code,slug,title,summary,description,category,instructor_name,list_price,duration_label,schedule_label,status,metadata").eq("id", id).single(),
     admin.from("course_assets").select("id,asset_type,storage_path,display_order").eq("course_id", id).order("display_order"),
-    admin.from("curriculum_weeks").select("id,week_number,title,goal,display_order,curriculum_lessons(id,day_number,title,description,content_type,duration_label,display_order,lesson_contents(vod_url,resource_name,resource_storage_path),curriculum_missions(title,instructions,is_required,submission_type,is_published))").eq("course_id", id).order("display_order"),
+    admin.from("curriculum_weeks").select("id,week_number,title,goal,is_published,display_order,curriculum_lessons(id,day_number,title,description,content_type,duration_label,is_published,access_mode,display_order,lesson_contents(vod_url,resource_name,resource_storage_path,body_text,external_url),curriculum_missions(title,instructions,is_required,submission_type,is_published,mission_quizzes(questions,pass_percent)))").eq("course_id", id).order("display_order"),
     admin.from("cohorts").select("id,status,recruitment_start_at,recruitment_end_at,operation_start_at").eq("course_id", id).in("status", ["upcoming", "recruiting", "closed"]),
   ]);
   if (courseResult.error || !courseResult.data) return NextResponse.json({ error: messageOf(courseResult.error, "상품을 불러오지 못했습니다.") }, { status: 404 });
@@ -83,8 +98,20 @@ export async function POST(request: Request) {
   let input: SaveInput;
   try { input = JSON.parse(String(form.get("payload") || "")) as SaveInput; }
   catch { return NextResponse.json({ error: "상품 저장 데이터가 올바르지 않습니다." }, { status: 400 }); }
+  if (!input || typeof input !== "object") return NextResponse.json({ error: "상품 저장 데이터를 확인해 주세요." }, { status: 400 });
   const admin = createAdminClient();
   const { course, thumbnail, images, curriculum, pixels } = input;
+  if (!course || !Array.isArray(images) || images.length > 20 || !pixels || !Array.isArray(curriculum)) return NextResponse.json({ error: "상품 저장 데이터를 확인해 주세요." }, { status: 400 });
+  const curriculumError = validateCurriculum(curriculum, course.id);
+  if (curriculumError) return NextResponse.json({ error: curriculumError }, { status: 400 });
+  if (curriculum.some((week) => week.isPublished !== false && week.lessons.some((lesson) => lesson.isPublished !== false && lesson.accessMode === "member" && lesson.kind === "자료" && !lesson.resourcePath))) return NextResponse.json({ error: "무료 자료 파일을 업로드한 뒤 공개해 주세요." }, { status: 400 });
+  if (course.id && !UUID_PATTERN.test(course.id)) return NextResponse.json({ error: "클래스 ID를 확인해 주세요." }, { status: 400 });
+  if (!["draft","published","archived"].includes(course.status) || !["free","paid"].includes(course.programType) || !["preparing","recruiting","closed"].includes(course.recruitmentStatus)) return NextResponse.json({ error: "공개·모집 상태를 확인해 주세요." }, { status: 400 });
+  for (const key of ["title","slug","courseCode","summary","description","category","instructorName","durationLabel","scheduleLabel"] as const) {
+    if (typeof course[key] !== "string" || course[key].length > 50000) return NextResponse.json({ error: "상품 입력값을 확인해 주세요." }, { status: 400 });
+  }
+  const assetPaths = [thumbnail, ...images].flatMap((asset) => asset?.path ? [asset.path] : []);
+  if (assetPaths.some((path) => !course.id || !path.startsWith(`${course.id}/`) || path.includes(".."))) return NextResponse.json({ error: "이 클래스에 업로드한 이미지만 연결할 수 있습니다." }, { status: 400 });
   const isFreeCourse = course.programType === "free";
   const listPrice = isFreeCourse ? 0 : Number(String(course.listPrice).replace(/[^0-9]/g, ""));
   if (!course.title?.trim() || !course.slug?.trim() || !course.courseCode?.trim()) return NextResponse.json({ error: "상품명·URL·상품 코드를 입력해 주세요." }, { status: 400 });
@@ -146,13 +173,19 @@ export async function POST(request: Request) {
 
   const { data: currentAssets, error: assetLoadError } = await admin.from("course_assets").select("id,asset_type,storage_path").eq("course_id", courseId);
   if (assetLoadError) return NextResponse.json({ error: messageOf(assetLoadError, "기존 상품 이미지를 확인하지 못했습니다.") }, { status: 500 });
+  const ownedAssetIds = new Set((currentAssets || []).map((asset) => asset.id));
+  if ([thumbnail, ...images].some((asset) => asset?.id && !ownedAssetIds.has(asset.id))) return NextResponse.json({ error: "이미지 정보가 변경되었습니다. 새로고침 후 다시 저장해 주세요." }, { status: 409 });
   const currentThumbnails = (currentAssets || []).filter((asset) => asset.asset_type === "thumbnail");
   const currentDetails = (currentAssets || []).filter((asset) => asset.asset_type === "detail");
   let retainedThumbnailId = thumbnail?.id;
   const thumbnailFile = uploadedFile(form.get("thumbnail"));
   if (thumbnail?.id) {
-    const { error } = await admin.from("course_assets").update({ alt_text: `${course.title} 썸네일`, display_order: 0 }).eq("id", thumbnail.id);
+    const { error } = await admin.from("course_assets").update({ alt_text: `${course.title} 썸네일`, display_order: 0 }).eq("id", thumbnail.id).eq("course_id", courseId);
     if (error) return NextResponse.json({ error: messageOf(error, "썸네일 정보를 저장하지 못했습니다.") }, { status: 500 });
+  } else if (thumbnail?.path) {
+    const inserted = await admin.from("course_assets").insert({ course_id: courseId, asset_type: "thumbnail", storage_bucket: "course-assets", storage_path: thumbnail.path, alt_text: `${course.title} 썸네일`, display_order: 0 }).select("id").single();
+    if (inserted.error || !inserted.data) return NextResponse.json({ error: "썸네일 연결에 실패했습니다." }, { status: 500 });
+    retainedThumbnailId = inserted.data.id;
   } else if (thumbnailFile) {
     const path = `${courseId}/thumbnail/${Date.now()}-${safeFileName(thumbnailFile.name)}`;
     const upload = await admin.storage.from("course-assets").upload(path, thumbnailFile, { contentType: thumbnailFile.type, upsert: false });
@@ -170,8 +203,14 @@ export async function POST(request: Request) {
   const retainedAssetIds = new Set(images.flatMap((image) => image.id ? [image.id] : []));
   for (const [index, image] of images.entries()) {
     if (image.id) {
-      const { error } = await admin.from("course_assets").update({ display_order: index, alt_text: `${course.title} 상세 이미지 ${index + 1}` }).eq("id", image.id);
+      const { error } = await admin.from("course_assets").update({ display_order: index, alt_text: `${course.title} 상세 이미지 ${index + 1}` }).eq("id", image.id).eq("course_id", courseId);
       if (error) return NextResponse.json({ error: messageOf(error, "상세 이미지 순서를 저장하지 못했습니다.") }, { status: 500 });
+      continue;
+    }
+    if (image.path) {
+      const inserted = await admin.from("course_assets").insert({ course_id: courseId, asset_type: "detail", storage_bucket: "course-assets", storage_path: image.path, alt_text: `${course.title} 상세 이미지 ${index + 1}`, display_order: index }).select("id").single();
+      if (inserted.error || !inserted.data) return NextResponse.json({ error: "상세 이미지 연결에 실패했습니다." }, { status: 500 });
+      retainedAssetIds.add(inserted.data.id);
       continue;
     }
     const file = uploadedFile(form.get(`detail-${index}`));
@@ -189,93 +228,15 @@ export async function POST(request: Request) {
     await admin.storage.from("course-assets").remove(removedDetails.map((asset) => asset.storage_path));
   }
 
-  const { data: currentWeeks, error: weeksError } = await admin.from("curriculum_weeks").select("id,curriculum_lessons(id,lesson_contents(resource_storage_path))").eq("course_id", courseId);
-  if (weeksError) return NextResponse.json({ error: messageOf(weeksError, "기존 커리큘럼을 확인하지 못했습니다.") }, { status: 500 });
-  const existingWeekIds = new Set((currentWeeks || []).map((week) => week.id));
-  const existingLessons = (currentWeeks || []).flatMap((week) => (week.curriculum_lessons || []).map((lesson) => ({ ...lesson, weekId: week.id })));
-  const retainedWeekIds = new Set(curriculum.filter((week) => existingWeekIds.has(week.id)).map((week) => week.id));
-  const existingLessonIds = new Set(existingLessons.map((lesson) => lesson.id));
-  const retainedLessonIds = new Set(curriculum.flatMap((week) => week.lessons.map((lesson) => lesson.id)).filter((id) => existingLessonIds.has(id)));
-  const removedLessonIds = existingLessons.filter((lesson) => !retainedWeekIds.has(lesson.weekId) || !retainedLessonIds.has(lesson.id)).map((lesson) => lesson.id);
-  if (removedLessonIds.length) {
-    const progress = await admin.from("lesson_progress").select("lesson_id").in("lesson_id", removedLessonIds).limit(1);
-    if (progress.data?.length) return NextResponse.json({ error: "수강 진도가 기록된 강의는 삭제할 수 없습니다. 콘텐츠만 수정해 주세요." }, { status: 409 });
-  }
-  const oldResourcePaths = existingLessons.flatMap((lesson) => { const content = Array.isArray(lesson.lesson_contents) ? lesson.lesson_contents[0] : lesson.lesson_contents; return content?.resource_storage_path ? [content.resource_storage_path] : []; });
-  const retainedResourcePaths = new Set<string>();
-  const removedWeeks = (currentWeeks || []).filter((week) => !retainedWeekIds.has(week.id));
-  if (removedWeeks.length) await admin.from("curriculum_weeks").delete().in("id", removedWeeks.map((week) => week.id));
-  const removedStandalone = existingLessons.filter((lesson) => retainedWeekIds.has(lesson.weekId) && !retainedLessonIds.has(lesson.id));
-  if (removedStandalone.length) await admin.from("curriculum_lessons").delete().in("id", removedStandalone.map((lesson) => lesson.id));
-  for (const [index, week] of curriculum.entries()) if (existingWeekIds.has(week.id)) await admin.from("curriculum_weeks").update({ week_number: 10000 + index, display_order: index }).eq("id", week.id);
-
-  let dayNumber = 1;
-  for (const [weekIndex, week] of curriculum.entries()) {
-    let weekId = week.id;
-    const weekPayload = { course_id: courseId, week_number: weekIndex + 1, title: week.title.trim() || `${weekIndex + 1}주차`, goal: week.goal.trim() || null, is_published: true, display_order: weekIndex };
-    if (existingWeekIds.has(week.id)) {
-      const result = await admin.from("curriculum_weeks").update(weekPayload).eq("id", week.id);
-      if (result.error) return NextResponse.json({ error: messageOf(result.error, "주차 정보를 수정하지 못했습니다.") }, { status: 500 });
-    } else {
-      const result = await admin.from("curriculum_weeks").insert(weekPayload).select("id").single();
-      if (result.error || !result.data) return NextResponse.json({ error: messageOf(result.error, "새 주차를 추가하지 못했습니다.") }, { status: 500 });
-      weekId = result.data.id;
-    }
-    const currentWeekLessonIds = new Set(existingLessons.filter((lesson) => lesson.weekId === week.id).map((lesson) => lesson.id));
-    for (const [index, lesson] of week.lessons.entries()) if (currentWeekLessonIds.has(lesson.id)) await admin.from("curriculum_lessons").update({ day_number: 10000 + index }).eq("id", lesson.id);
-    for (const [lessonIndex, lesson] of week.lessons.entries()) {
-      const kind = lesson.kind === "자료" ? "material" : "vod";
-      const lessonPayload = { week_id: weekId, day_number: dayNumber++, title: lesson.title.trim() || "새 강의", description: lesson.description.trim() || null, content_type: kind, duration_label: lesson.duration.trim() || null, is_preview: false, is_published: true, display_order: lessonIndex };
-      let lessonId = lesson.id;
-      if (currentWeekLessonIds.has(lesson.id)) {
-        const result = await admin.from("curriculum_lessons").update(lessonPayload).eq("id", lesson.id);
-        if (result.error) return NextResponse.json({ error: messageOf(result.error, "강의 정보를 수정하지 못했습니다.") }, { status: 500 });
-      } else {
-        const result = await admin.from("curriculum_lessons").insert(lessonPayload).select("id").single();
-        if (result.error || !result.data) return NextResponse.json({ error: messageOf(result.error, "새 강의를 추가하지 못했습니다.") }, { status: 500 });
-        lessonId = result.data.id;
-      }
-      if (lesson.mission) {
-        const missionTitle = lesson.mission.title.trim();
-        if (!missionTitle) return NextResponse.json({ error: `${lesson.title || "강의"}의 과제 제목을 입력해 주세요.` }, { status: 400 });
-        const missionResult = await admin.from("curriculum_missions").upsert({
-          lesson_id: lessonId,
-          title: missionTitle,
-          instructions: lesson.mission.instructions.trim() || null,
-          is_required: lesson.mission.required,
-          submission_type: lesson.mission.submissionType,
-          is_published: lesson.mission.isPublished,
-        }, { onConflict: "lesson_id" });
-        if (missionResult.error) return NextResponse.json({ error: messageOf(missionResult.error, "강의 과제를 저장하지 못했습니다.") }, { status: 500 });
-      } else {
-        const missionResult = await admin.from("curriculum_missions").delete().eq("lesson_id", lessonId);
-        if (missionResult.error) return NextResponse.json({ error: messageOf(missionResult.error, "강의 과제를 해제하지 못했습니다.") }, { status: 500 });
-      }
-      if (kind === "vod") {
-        const vodUrl = lesson.contentUrl?.trim();
-        if (vodUrl && !safeExternalUrl(vodUrl)) return NextResponse.json({ error: "VOD 링크는 https:// 주소로 입력해 주세요." }, { status: 400 });
-        if (vodUrl) await admin.from("lesson_contents").upsert({ lesson_id: lessonId, vod_url: vodUrl, resource_name: null, resource_storage_path: null }, { onConflict: "lesson_id" });
-        else await admin.from("lesson_contents").delete().eq("lesson_id", lessonId);
-        continue;
-      }
-      let resourcePath = lesson.resourcePath;
-      let resourceName = lesson.resourceName;
-      const file = uploadedFile(form.get(`resource-${weekIndex}-${lessonIndex}`));
-      if (file) {
-        resourcePath = `${courseId}/curriculum/${Date.now()}-${safeFileName(file.name)}`;
-        resourceName = file.name;
-        const upload = await admin.storage.from("course-resources").upload(resourcePath, file, { contentType: file.type || undefined, upsert: false });
-        if (upload.error) return NextResponse.json({ error: messageOf(upload.error, `${file.name} 업로드에 실패했습니다.`) }, { status: 500 });
-      }
-      if (resourcePath) {
-        retainedResourcePaths.add(resourcePath);
-        const result = await admin.from("lesson_contents").upsert({ lesson_id: lessonId, vod_url: null, resource_name: resourceName || "학습 자료", resource_storage_path: resourcePath }, { onConflict: "lesson_id" });
-        if (result.error) return NextResponse.json({ error: messageOf(result.error, "학습 자료를 연결하지 못했습니다.") }, { status: 500 });
-      } else await admin.from("lesson_contents").delete().eq("lesson_id", lessonId);
-    }
-  }
-  const obsoletePaths = oldResourcePaths.filter((path) => !retainedResourcePaths.has(path));
-  if (obsoletePaths.length) await admin.storage.from("course-resources").remove(obsoletePaths);
+  // Stable IDs and one transaction preserve learner history during reorder/edit.
+  const normalized = curriculum.map((week) => ({
+    ...week, id: UUID_PATTERN.test(week.id) ? week.id : randomUUID(),
+    lessons: week.lessons.map((lesson) => ({ ...lesson, id: UUID_PATTERN.test(lesson.id) ? lesson.id : randomUUID() })),
+  }));
+  const savedCurriculum = await admin.rpc("save_course_curriculum", { p_course_id: courseId, p_actor: operator.id, p_weeks: normalized });
+  if (savedCurriculum.error) return NextResponse.json({ error: `기본 정보는 저장했지만 콘텐츠 저장은 취소되었습니다. ${savedCurriculum.error.message}`, courseId }, { status: 409 });
+  revalidatePath(`/classes/${course.slug}`);
+  revalidatePath(`/resources/${course.slug}`);
   await admin.from("audit_logs").insert({ actor_user_id: operator.id, action: course.id ? "course.updated" : "course.created", entity_type: "course", entity_id: courseId, after_data: { title: course.title, status: course.status } });
   return NextResponse.json({ courseId });
 }

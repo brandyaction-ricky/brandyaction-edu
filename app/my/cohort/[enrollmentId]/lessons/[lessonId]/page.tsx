@@ -4,6 +4,7 @@ import { ArrowLeft, FileText, LockKeyhole, PlayCircle } from "lucide-react";
 import { LearnerShell } from "../../../../../components/learner-shell";
 import { MissionSubmissionForm, ProgressButton, ResourceDownload } from "../../../../../components/lesson-actions";
 import { getLearningLesson, safeEmbedUrl } from "@/lib/learning-data";
+import "../../../../../learning-content.css";
 
 export const dynamic = "force-dynamic";
 
@@ -23,13 +24,15 @@ export default async function LessonPage({ params }: { params: Promise<{ enrollm
         <section className="lesson-player">
           {learning.lesson.kind === "vod" ? embed
             ? <iframe src={embed} title={learning.lesson.title} allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowFullScreen/>
-            : <div className="lesson-content-missing"><LockKeyhole/><strong>VOD 준비 중입니다.</strong><p>운영자가 영상 링크를 등록하면 이곳에 표시됩니다.</p></div>
-            : <div className="material-hero"><FileText/><strong>학습 자료</strong><p>아래 다운로드 버튼으로 자료를 받아 학습을 진행하세요.</p></div>}
+            : learning.lesson.vodUrl ? <div className="material-hero"><PlayCircle/><a href={learning.lesson.vodUrl} target="_blank" rel="noopener noreferrer">영상 사이트에서 보기</a></div> : <div className="lesson-content-missing"><LockKeyhole/><strong>VOD 준비 중입니다.</strong><p>운영자가 영상 링크를 등록하면 이곳에 표시됩니다.</p></div>
+            : <div className="material-hero"><FileText/><strong>{learning.lesson.kind === "text" ? "학습 콘텐츠" : learning.lesson.kind === "link" ? "외부 콘텐츠" : "학습 자료"}</strong><p>아래 콘텐츠를 확인하고 학습을 진행하세요.</p></div>}
         </section>
         <section className="lesson-description">
           <span>WEEK {learning.week.number} · DAY {learning.lesson.day}</span>
           <h1>{learning.lesson.title}</h1>
           <p>{learning.lesson.description}</p>
+          {learning.lesson.kind === "text" && <div className="learning-text-content">{learning.lesson.bodyText || "콘텐츠를 준비 중입니다."}</div>}
+          {learning.lesson.kind === "link" && learning.lesson.externalUrl && <a className="learning-download" href={learning.lesson.externalUrl} target="_blank" rel="noopener noreferrer">콘텐츠 링크 열기</a>}
           {learning.lesson.kind === "material" && learning.lesson.resourcePath
             ? <ResourceDownload enrollmentId={enrollmentId} lessonId={lessonId} name={learning.lesson.resourceName || "학습 자료"}/>
             : learning.lesson.kind === "material"

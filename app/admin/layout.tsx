@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import "../admin-operations.css";
+import "../admin-studio.css";
 import { hasSupabaseEnv } from "@/lib/supabase/config";
 import { getAdminSession } from "@/lib/server-auth";
 

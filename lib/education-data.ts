@@ -43,7 +43,7 @@ type SessionRow = {
 };
 
 type CurriculumWeekRow = { id: string; course_id: string; week_number: number; title: string; goal: string | null; display_order: number };
-type CurriculumLessonRow = { id: string; week_id: string; day_number: number; title: string; description: string | null; content_type: "vod" | "material"; duration_label: string | null; display_order: number };
+type CurriculumLessonRow = { id: string; week_id: string; day_number: number; title: string; description: string | null; content_type: "vod" | "material" | "text" | "link"; access_mode: "enrolled" | "member"; duration_label: string | null; display_order: number };
 type CourseThumbnailRow = { course_id: string; storage_path: string };
 
 export type PublicBanner = { image?: string; eyebrow?: string; title?: string; copy?: string; link?: string; linkLabel?: string };
@@ -166,7 +166,8 @@ function mapCurriculum(courseId: string, weeks: CurriculumWeekRow[], lessons: Cu
       day:lesson.day_number,
       title:lesson.title,
       description:lesson.description||"",
-      kind:lesson.content_type==="material"?"자료":"VOD",
+      kind:({material:"자료",text:"텍스트",link:"링크",vod:"VOD"} as const)[lesson.content_type],
+      accessMode:lesson.access_mode,
       duration:lesson.duration_label||"",
     })),
   }));
@@ -305,7 +306,7 @@ async function queryPublishedClass(slug: string): Promise<ClassItem | undefined>
       weekIds.length
         ? supabase
             .from("curriculum_lessons")
-            .select("id,week_id,day_number,title,description,content_type,duration_label,display_order")
+            .select("id,week_id,day_number,title,description,content_type,access_mode,duration_label,display_order")
             .in("week_id", weekIds)
             .eq("is_published", true)
         : Promise.resolve({ data: [] as CurriculumLessonRow[], error: null }),

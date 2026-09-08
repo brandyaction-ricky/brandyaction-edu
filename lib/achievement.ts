@@ -81,7 +81,7 @@ export function calculateLearningProgress(
   const completed = uniqueLessonIds.filter((lessonId) => (progressByLesson.get(lessonId) || 0) >= 100).length;
 
   return {
-    percent: Math.round(progressTotal / uniqueLessonIds.length),
+    percent: completed === uniqueLessonIds.length ? 100 : Math.min(99, Math.round(progressTotal / uniqueLessonIds.length)),
     completed,
     total: uniqueLessonIds.length,
   };
@@ -134,7 +134,7 @@ export function calculateAchievement(
   const approved = Math.min(total, statuses.filter((status) => status === "approved").length);
   const pending = statuses.filter((status) => status === "submitted" || status === "pending").length;
   const rejected = statuses.filter((status) => status === "rejected" || status === "changes_requested").length;
-  const percent = total ? Math.round((approved / total) * 100) : 0;
+  const percent = total ? (approved === total ? 100 : Math.min(99, Math.floor((approved / total) * 100))) : 0;
 
   return {
     available: true,

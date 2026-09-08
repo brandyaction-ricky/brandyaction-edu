@@ -26,7 +26,7 @@ function delta(current:number,previous:number){if(!previous)return current?"신�
 function outcomeLabel(session:Session){if(session.completed)return "결제 완료";if(session.checkoutViewed)return "결제 진입";if(session.ctaClicked)return "신청 클릭";return "미전환";}
 
 export default async function JourneyAnalyticsPage({searchParams}:{searchParams:Promise<SearchQuery>}){
-  const operator=await getAdminUser();if(!operator)redirect("/admin?notice=permission_required");
+  const operator=await getAdminUser();if(!operator||operator.role!=="admin")redirect("/admin?notice=permission_required");
   const query=await searchParams;const days=[7,30,90].includes(Number(query.period))?Number(query.period):30;
   const {data,error}=await createAdminClient().rpc("get_customer_journey_events",{p_days:Math.min(days*2,180)});
   const allSessions=buildSessions(error?[]:(data||[]) as JourneyEvent[]);

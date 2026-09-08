@@ -4,18 +4,22 @@ export type CurriculumLesson = {
   day: number;
   title: string;
   description: string;
-  kind: "VOD" | "자료";
+  kind: "VOD" | "자료" | "텍스트" | "링크";
   duration: string;
   contentUrl?: string;
   resourceName?: string;
   resourceUrl?: string;
   resourcePath?: string;
+  bodyText?: string;
+  accessMode?: "enrolled" | "member";
+  isPublished?: boolean;
   mission?: {
     title: string;
     instructions: string;
     required: boolean;
-    submissionType: "text" | "link" | "mixed";
+    submissionType: "text" | "link" | "mixed" | "quiz";
     isPublished: boolean;
+    quiz?: import("@/lib/mission-quiz").QuizDefinition;
   };
 };
 export type CurriculumWeek = {
@@ -23,6 +27,7 @@ export type CurriculumWeek = {
   label: string;
   title: string;
   goal: string;
+  isPublished?: boolean;
   lessons: CurriculumLesson[];
 };
 export type ClassItem = {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, ExternalLink, FileCheck2, RefreshCw, RotateCcw, X } from "lucide-react";
 
 type Relation<T> = T | T[] | null;
@@ -96,18 +96,23 @@ export function AdminSubmissionsManager() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [selected, setSelected] = useState<string[]>([]);
+  const requestId = useRef(0);
 
   const load = useCallback(async () => {
+    const currentRequest = ++requestId.current;
     setLoading(true);
     setError("");
     try {
       const result = await request<Result>(`/api/admin/submissions?status=${status}&page=${page}`);
+      if (currentRequest !== requestId.current) return;
       setData(result);
+      setSelected([]);
       if (page > result.pagination.totalPages) setPage(result.pagination.totalPages);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "과제 제출 목록을 불러오지 못했습니다.");
+      if (currentRequest === requestId.current) setError(reason instanceof Error ? reason.message : "과제 제출 목록을 불러오지 못했습니다.");
     } finally {
-      setLoading(false);
+      if (currentRequest === requestId.current) setLoading(false);
     }
   }, [page, status]);
 
@@ -140,7 +145,21 @@ export function AdminSubmissionsManager() {
     }
   };
 
+  const bulkReview = async (decision: "approved" | "rejected") => {
+    if (!selected.length || saving || (decision === "rejected" && !feedback.trim())) return;
+    if (!window.confirm(`선택한 ${selected.length}건을 ${decision === "approved" ? "승인" : "반려"}할까요? 동일한 피드백이 적용됩니다.`)) return;
+    setSaving(true); setError(""); setMessage("");
+    try {
+      await request("/api/admin/submissions", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: selected, decision, feedback }) });
+      setMessage(`${selected.length}건을 ${decision === "approved" ? "승인" : "반려"}했습니다.`);
+      setFeedback(""); setReviewingId(null); await load();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "일괄 검토를 저장하지 못했습니다."); }
+    finally { setSaving(false); }
+  };
+
   const changeStatus = (nextStatus: string) => {
+    if (saving) return;
+    setSelected([]);
     setStatus(nextStatus);
     setPage(1);
     setReviewingId(null);
@@ -160,6 +179,7 @@ export function AdminSubmissionsManager() {
         <button className="admin-outline" onClick={() => void load()} disabled={loading}><RefreshCw className={loading ? "spin" : ""}/>새로고침</button>
       </header>
 
+      {status === "submitted" && <div className="submission-bulk"><label><input type="checkbox" disabled={loading || saving || !data.submissions.length} checked={data.submissions.length > 0 && selected.length === data.submissions.length} onChange={(e) => setSelected(e.target.checked ? data.submissions.map((row) => row.id) : [])}/>현재 페이지 선택 · {selected.length}건</label>{selected.length > 0 && <div><button className="admin-outline" disabled={saving || !feedback.trim()} onClick={() => void bulkReview("rejected")}>선택 반려</button><button className="admin-primary" disabled={saving} onClick={() => void bulkReview("approved")}>선택 승인</button></div>}{selected.length > 0 && <label className="field-full">공통 피드백 (반려 시 필수)<textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} maxLength={2000} disabled={saving}/></label>}</div>}
       {loading ? <div className="submission-review-empty"><RefreshCw className="spin"/><strong>제출 내역을 불러오는 중입니다.</strong></div> : data.submissions.map((submission) => {
         const enrollment = one(submission.enrollments);
         const profile = one(enrollment?.profiles || null);
@@ -172,6 +192,7 @@ export function AdminSubmissionsManager() {
         const entries = responseEntries(submission.response);
         return <article className="submission-review-card" key={submission.id}>
           <header>
+            {submission.status === "submitted" && <label className="submission-select"><input type="checkbox" disabled={saving} checked={selected.includes(submission.id)} onChange={(e) => setSelected((current) => e.target.checked ? [...current, submission.id] : current.filter((id) => id !== submission.id))}/>선택</label>}
             <div><span className="submission-avatar">{(profile?.full_name || profile?.email || "회")[0]}</span><span><strong>{profile?.full_name || "이름 미입력"}</strong><small>{profile?.email || "회원 정보 없음"}</small></span></div>
             <span className={`status-label ${submission.status === "approved" ? "success" : submission.status === "rejected" ? "refund" : "planned"}`}>{statusLabel[submission.status] || submission.status}</span>
           </header>
@@ -183,10 +204,11 @@ export function AdminSubmissionsManager() {
           </div>
           <section className="submission-answer">
             <div><strong>{mission?.title || "과제 정보 없음"}</strong>{mission?.instructions && <p>{mission.instructions}</p>}</div>
+            <QuizResponses value={submission.response.quiz}/>
             <dl>{entries.map(([key, raw]) => {
               const value = String(raw);
               return <div key={key}><dt>{key === "answerText" || key === "answer_text" ? "답변" : key === "evidenceUrl" || key === "evidence_url" ? "증빙" : key}</dt><dd>{safeHttps(value) ? <a href={value} target="_blank" rel="noreferrer">증빙 열기 <ExternalLink/></a> : value}</dd></div>;
-            })}{!entries.length && <div><dt>답변</dt><dd>표시할 제출 내용이 없습니다.</dd></div>}</dl>
+            })}{!entries.length && !submission.response.quiz && <div><dt>답변</dt><dd>표시할 제출 내용이 없습니다.</dd></div>}</dl>
           </section>
 
           {submission.status === "submitted" ? <footer>
@@ -208,4 +230,11 @@ export function AdminSubmissionsManager() {
     {message && <p className="admin-save-success"><Check/>{message}</p>}
     {error && <p className="admin-save-error" role="alert">{error}</p>}
   </div>;
+}
+
+function QuizResponses({ value }: { value: unknown }) {
+  if (!value || typeof value !== "object") return null;
+  const quiz = value as { score?: number; correct?: number; total?: number; passPercent?: number; questions?: { prompt: string; selectedOption: string; correct: boolean }[] };
+  if (typeof quiz.score !== "number" || !Array.isArray(quiz.questions)) return null;
+  return <div className="quiz-response-summary"><strong>퀴즈 통과 · {quiz.score}점 ({quiz.correct}/{quiz.total}문항)</strong><p>제출 당시 통과 기준 {quiz.passPercent}% · 최종 완료는 관리자 승인 후 반영</p><details><summary>문항별 제출 답변</summary><ul>{quiz.questions.map((q, i) => <li key={i}><strong>{q.prompt}</strong><p>{q.selectedOption} · {q.correct ? "정답" : "오답"}</p></li>)}</ul></details></div>;
 }

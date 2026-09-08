@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Tags, Users } from "lucide-react";
-import { AdminCohortsManager, AdminProductsManager, AdminSettingsManager } from "../../components/admin-managers";
+import { AdminCohortsManager } from "../../components/admin-managers";
+import { AdminProductsManager } from "../../components/admin-products-manager";
+import { AdminSettingsManager } from "../../components/admin-settings-manager";
 import { AdminLiveReviewsManager } from "../../components/admin-operational-managers";
 import { AdminMembersManager } from "../../components/admin-members-manager";
 import { AdminOrdersManager } from "../../components/admin-orders-manager";
@@ -18,7 +20,8 @@ import { AdminSubmissionsManager } from "../../components/admin-submissions-mana
 import { getAdminUser, type AdminScope } from "@/lib/server-auth";
 
 const info:Record<string,{eyebrow:string,title:string,desc:string}>={
-  products:{eyebrow:"PRODUCTS",title:"상품 관리",desc:"상품 정보부터 이미지 상세페이지·커리큘럼·전환 픽셀까지 관리합니다."},
+  products:{eyebrow:"CLASSES",title:"클래스 관리",desc:"클래스 기본 정보·판매·모집 상태를 관리합니다. 콘텐츠 탭에서 영상·자료·미션을 등록할 수 있습니다."},
+  content:{eyebrow:"CONTENT STUDIO",title:"콘텐츠·미션",desc:"주차별 콘텐츠, 가입 회원 무료자료와 실행 미션·확인 퀴즈를 관리합니다."},
   articles:{eyebrow:"GROWTH",title:"블로그 관리",desc:"칼럼·YouTube 영상과 카테고리, 회원 전용 무료강의 영역을 한곳에서 관리합니다."},
   banners:{eyebrow:"BANNERS",title:"배너 관리",desc:"메인 랜딩 이미지 배너를 여러 개 등록하고 슬라이드 연결 URL을 관리합니다."},
   cohorts:{eyebrow:"COHORTS",title:"기수·회차 관리",desc:"모집 일정부터 라이브 회차와 수강생까지 기수 단위로 운영합니다."},
@@ -53,6 +56,7 @@ function SectionAction({section}:{section:string}){
 
 function SectionContent({section}:{section:string}){
   if(section==="products")return <AdminProductsManager/>;
+  if(section==="content")return <AdminProductsManager contentMode/>;
   if(section==="banners")return <AdminBannerManager/>;
   if(section==="articles")return <AdminArticlesManager/>;
   if(section==="cohorts")return <AdminCohortsManager/>;

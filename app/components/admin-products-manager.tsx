@@ -2,9 +2,10 @@
 /* eslint-disable @next/next/no-img-element -- administrator-selected local image previews use blob URLs */
 
 import Link from "next/link";
-import { ChangeEvent, DragEvent, useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowLeft, ArrowUp, Check, ChevronDown, ChevronUp, Eye, GripVertical, ImagePlus, Link2, Pencil, Plus, Save, Search, Trash2, Upload } from "lucide-react";
-import type { CurriculumLesson, CurriculumWeek } from "@/app/data";
+import { ChangeEvent, DragEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowDown, ArrowLeft, ArrowUp, Check, Eye, GripVertical, ImagePlus, Pencil, Plus, Save, Search, Trash2 } from "lucide-react";
+import dynamic from "next/dynamic";
+import type { CurriculumWeek } from "@/app/data";
 import { useAdminUnsavedChanges } from "./use-admin-unsaved-changes";
 import {
   createEmptyProduct,
@@ -16,6 +17,8 @@ import {
   deleteAdminProduct,
   saveAdminProduct,
 } from "@/lib/product-admin";
+
+const CurriculumEditor = dynamic(() => import("./curriculum-editor").then((module) => module.CurriculumEditor), { loading: () => <section className="admin-panel ops-empty" role="status">콘텐츠 편집기를 준비 중입니다.</section> });
 
 function normalizeCurriculum(weeks: CurriculumWeek[]) {
   let day = 0;
@@ -38,7 +41,7 @@ const statusLabel = { published: "판매 중", draft: "판매 중지", archived:
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const editorSignature = (value: ProductEditorData | null) => value ? JSON.stringify({ draft: value.draft, thumbnail: value.thumbnail, images: value.images, pixels: value.pixels, curriculum: value.curriculum }) : "";
 
-export function AdminProductsManager() {
+export function AdminProductsManager({ contentMode = false }: { contentMode?: boolean }) {
   const [products, setProducts] = useState<ProductSummary[]>([]);
   const [editor, setEditor] = useState<ProductEditorData | null>(null);
   const [tab, setTab] = useState("basic");
@@ -49,7 +52,10 @@ export function AdminProductsManager() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [dragImage, setDragImage] = useState<number | null>(null);
-  const [expandedWeeks, setExpandedWeeks] = useState<string[]>([]);
+  const previewUrls = useRef(new Set<string>());
+  const previewUrl = (file: File) => { const url = URL.createObjectURL(file); previewUrls.current.add(url); return url; };
+  const releasePreviews = () => { previewUrls.current.forEach((url) => URL.revokeObjectURL(url)); previewUrls.current.clear(); };
+  useEffect(() => { const urls = previewUrls.current; return () => { urls.forEach((url) => URL.revokeObjectURL(url)); urls.clear(); }; }, []);
   const [resourceFiles, setResourceFiles] = useState<Map<string, File>>(new Map());
   const [savedSignature, setSavedSignature] = useState("");
   const hasUnsavedChanges = Boolean(editor) && (editorSignature(editor) !== savedSignature || resourceFiles.size > 0);
@@ -82,9 +88,8 @@ export function AdminProductsManager() {
       data.curriculum = normalizeCurriculum(data.curriculum);
       setEditor(data);
       setSavedSignature(editorSignature(data));
-      setExpandedWeeks(data.curriculum.map((week) => week.id));
       setResourceFiles(new Map());
-      setTab("basic");
+      setTab(contentMode ? "curriculum" : "basic");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "상품을 열지 못했습니다.");
     } finally {
@@ -96,7 +101,6 @@ export function AdminProductsManager() {
     const data = createEmptyProduct();
     setEditor(data);
     setSavedSignature(editorSignature(data));
-    setExpandedWeeks([]);
     setResourceFiles(new Map());
     setTab("basic");
     setError("");
@@ -135,13 +139,13 @@ export function AdminProductsManager() {
     setSaving(true);
     setError("");
     try {
-      const courseId = await saveAdminProduct({ course: editor.draft, thumbnail: editor.thumbnail, images: editor.images, pixels: editor.pixels, curriculum: normalizeCurriculum(editor.curriculum), resourceFiles });
+      const courseId = await saveAdminProduct({ course: editor.draft, thumbnail: editor.thumbnail, images: editor.images, pixels: editor.pixels, curriculum: normalizeCurriculum(editor.curriculum), resourceFiles, onDraftCreated: (id) => setEditor((current) => current ? { ...current, draft: { ...current.draft, id, hasLinkedCohort: true } } : current) });
       await refresh();
       const reloaded = await loadAdminProduct(courseId);
       reloaded.curriculum = normalizeCurriculum(reloaded.curriculum);
       setEditor(reloaded);
+      releasePreviews();
       setSavedSignature(editorSignature(reloaded));
-      setExpandedWeeks(reloaded.curriculum.map((week) => week.id));
       setResourceFiles(new Map());
       setSaved(true);
       window.setTimeout(() => setSaved(false), 1800);
@@ -154,6 +158,7 @@ export function AdminProductsManager() {
 
   const backToList = () => {
     if (hasUnsavedChanges && !window.confirm("저장하지 않은 상품 변경사항을 버리고 목록으로 이동할까요?")) return;
+    releasePreviews();
     setEditor(null);
     setSavedSignature("");
     setResourceFiles(new Map());
@@ -204,7 +209,7 @@ export function AdminProductsManager() {
     </div>
     <section className="admin-panel product-overview-panel">
       <div className="admin-toolbar product-toolbar product-list-actions">
-        <div><strong>등록 상품</strong><span>상품을 추가하면 클래스 목록에, 결제·수강권 발급 후에는 고객의 내 클래스에 반영됩니다.</span></div>
+        <div><strong>{contentMode ? "클래스 콘텐츠" : "등록 클래스"}</strong><span>{contentMode ? "클래스를 선택해 섹션·영상·무료자료·미션을 관리하세요." : "클래스 기본 정보와 판매·모집 상태를 관리합니다."}</span></div>
         <div className="product-list-buttons"><label className="search-box"><Search/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="상품명·강사·URL 검색"/></label><button className="admin-primary" onClick={startNew}><Plus/> 새 상품 추가</button></div>
       </div>
       <div className="product-management-list">
@@ -215,7 +220,7 @@ export function AdminProductsManager() {
           <div><small>상세페이지</small><strong>이미지 {product.imageCount}장</strong></div>
           <div><small>커리큘럼</small><strong>{product.weekCount}주 · {product.lessonCount}개</strong></div>
           <div className="product-row-actions">
-            <button className="manage-button" onClick={() => void openProduct(product.id)} disabled={deleting}><Pencil/> 수정</button>
+            <button className="manage-button" onClick={() => void openProduct(product.id)} disabled={deleting}><Pencil/> {contentMode ? "콘텐츠 편집" : "수정"}</button>
             <button className="manage-button danger" onClick={() => void removeListedProduct(product)} disabled={deleting}><Trash2/> 삭제</button>
           </div>
         </div>)}
@@ -226,7 +231,6 @@ export function AdminProductsManager() {
   </>;
 
   const { draft, thumbnail, images, curriculum, pixels } = editor;
-  const lessonCount = curriculum.reduce((sum, week) => sum + week.lessons.length, 0);
   const setDraft = (patch: Partial<typeof draft>) => setEditor({ ...editor, draft: { ...draft, ...patch } });
   const setThumbnail = (next: ProductImage | null) => setEditor({ ...editor, thumbnail: next });
   const setImages = (next: ProductImage[]) => setEditor({ ...editor, images: next });
@@ -246,7 +250,7 @@ export function AdminProductsManager() {
     }
     if (thumbnail?.file && thumbnail.url.startsWith("blob:")) URL.revokeObjectURL(thumbnail.url);
     setError("");
-    setThumbnail({ file, url: URL.createObjectURL(file) });
+    setThumbnail({ file, url: previewUrl(file) });
   };
   const removeThumbnail = () => {
     if (thumbnail?.file && thumbnail.url.startsWith("blob:")) URL.revokeObjectURL(thumbnail.url);
@@ -261,7 +265,7 @@ export function AdminProductsManager() {
       setError(invalidType ? "상세 이미지는 JPG, PNG, WEBP 파일만 등록할 수 있습니다." : "상세 이미지는 파일당 5MB 이하로 등록해 주세요.");
     }
     const files = selected.filter((file) => ALLOWED_IMAGE_TYPES.has(file.type) && file.size <= 5_000_000).slice(0, 20 - images.length);
-    setImages([...images, ...files.map((file) => ({ file, url: URL.createObjectURL(file) }))].slice(0, 20));
+    setImages([...images, ...files.map((file) => ({ file, url: previewUrl(file) }))].slice(0, 20));
     event.target.value = "";
   };
   const dropImage = (event: DragEvent, target: number) => {
@@ -272,41 +276,14 @@ export function AdminProductsManager() {
   };
   const moveImage = (index: number, direction: -1 | 1) => setImages(move(images, index, index + direction));
 
-  const updateWeek = (weekId: string, patch: Partial<CurriculumWeek>) => setCurriculum(curriculum.map((week) => week.id === weekId ? { ...week, ...patch } : week));
-  const addWeek = () => {
-    const id = `new-week-${Date.now()}`;
-    setCurriculum([...curriculum, { id, label: "", title: "새 주차", goal: "이번 주 완성 목표", lessons: [] }]);
-    setExpandedWeeks([...expandedWeeks, id]);
-  };
-  const addLesson = (weekId: string) => {
-    const id = `new-lesson-${Date.now()}`;
-    setCurriculum(curriculum.map((week) => week.id === weekId ? { ...week, lessons: [...week.lessons, { id, day: 0, title: "새 강의", description: "학습 내용을 입력하세요.", kind: "VOD", duration: "20분", contentUrl: "" }] } : week));
-  };
-  const updateLesson = (weekId: string, lessonId: string, patch: Partial<CurriculumLesson>) => setCurriculum(curriculum.map((week) => week.id === weekId ? { ...week, lessons: week.lessons.map((lesson) => lesson.id === lessonId ? { ...lesson, ...patch } : lesson) } : week));
-  const setMissionEnabled = (weekId: string, lesson: CurriculumLesson, enabled: boolean) => updateLesson(weekId, lesson.id, {
-    mission: enabled ? lesson.mission || {
-      title: `${lesson.title || "강의"} 실행 과제`,
-      instructions: "강의 내용을 적용한 결과를 제출해 주세요.",
-      required: true,
-      submissionType: "mixed",
-      isPublished: true,
-    } : undefined,
-  });
-  const uploadResource = (weekId: string, lessonId: string, event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    updateLesson(weekId, lessonId, { resourceName: file.name, resourcePath: undefined });
-    setResourceFiles((current) => { const next = new Map(current); next.set(lessonId, file); return next; });
-    event.target.value = "";
-  };
 
-  return <div className="admin-editor-wrap">
+  return <div className="admin-editor-wrap" aria-busy={saving || deleting}><fieldset disabled={saving || deleting} className="admin-editor-fields">
     <div className="editor-head">
       <button onClick={backToList}><ArrowLeft/> 상품 목록</button>
       <div><strong>{draft.title || "새 상품"}</strong><span className={`status-label ${draft.status === "published" ? "success" : "planned"}`}>{draft.id ? statusLabel[draft.status] : "신규 등록"}</span></div>
       <div>{draft.id && <button className="admin-outline product-delete-button" onClick={() => void removeProduct()} disabled={deleting || saving}><Trash2/> {deleting ? "삭제 중..." : "상품 삭제"}</button>}{draft.id && <Link className="admin-outline" href={`/admin/cohorts?course=${encodeURIComponent(draft.id)}`}>기수·회차 관리</Link>}{draft.id && <Link className="admin-outline" href={`/classes/${draft.slug}`}><Eye/> 미리보기</Link>}<button className="admin-primary" onClick={save} disabled={saving || deleting}><Save/> {saving ? "저장 중..." : draft.id ? "변경 저장" : "상품 등록"}</button></div>
     </div>
-    <div className="editor-tabs">{[["basic", "기본 정보"], ["detail", "이미지 상세페이지"], ["curriculum", "커리큘럼"], ["pixel", "픽셀·전환 추적"]].map(([id, label]) => <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)}>{label}{id === "detail" && <em>{images.length}</em>}</button>)}</div>
+    <div className="editor-tabs">{[["basic", "기본 정보"], ["detail", "이미지 상세페이지"], ["curriculum", "콘텐츠·미션"], ["pixel", "픽셀·전환 추적"]].map(([id, label]) => <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)}>{label}{id === "detail" && <em>{images.length}</em>}</button>)}</div>
 
     {tab === "basic" && <div className="editor-grid"><section className="admin-panel admin-form-card"><div className="form-card-head"><div><h2>상품 기본 정보</h2><p>판매 중으로 저장하면 클래스 목록과 상품 상세페이지에 즉시 반영됩니다.</p></div><span className="completion-chip"><Check/> DB 연결</span></div><div className="admin-field-grid">
       <div className="field-full product-thumbnail-field"><span>상품 썸네일</span><div className="product-thumbnail-editor"><div className={`product-thumbnail-preview ${thumbnail ? "has-image" : ""}`}>{thumbnail ? <img src={thumbnail.url} alt="상품 썸네일 미리보기"/> : <><ImagePlus/><small>썸네일 미등록</small></>}</div><div className="product-thumbnail-actions"><strong>목록 카드와 상품 상세 상단에 노출됩니다.</strong><p>가로형 4:3 또는 16:9 비율 권장 · JPG, PNG, WEBP · 5MB 이하</p><span><label className="admin-outline thumbnail-upload-button"><input type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadThumbnail}/><ImagePlus/> {thumbnail ? "이미지 교체" : "이미지 등록"}</label>{thumbnail && <button type="button" className="admin-outline thumbnail-remove-button" onClick={removeThumbnail}><Trash2/> 삭제</button>}</span></div></div></div>
@@ -336,16 +313,11 @@ export function AdminProductsManager() {
       </article>)}{!images.length && <div className="empty-image-state"><strong>등록된 상세 이미지가 없습니다.</strong><p>이미지를 추가하면 기본 상세 화면을 대체합니다.</p></div>}</div>
     </section>}
 
-    {tab === "curriculum" && <section className="admin-panel curriculum-editor weekly-curriculum-editor"><div className="form-card-head"><div><h2>주차·강의 커리큘럼</h2><p>기존 강의 ID를 유지해 수정하므로 수강생 진도 기록이 보존됩니다.</p></div><button className="admin-primary" onClick={addWeek}><Plus/> 주차 추가</button></div><div className="curriculum-summary-bar"><div><span>전체 구성</span><strong>{curriculum.length}주 · {lessonCount}개</strong></div><div><span>콘텐츠</span><strong>VOD · 자료</strong></div><p>수강 진도가 기록된 강의는 삭제할 수 없도록 저장 단계에서 차단합니다.</p></div><div className="curriculum-week-list">{curriculum.map((week, weekIndex) => {
-      const expanded = expandedWeeks.includes(week.id);
-      return <article className="curriculum-week-card" key={week.id}><header><span className="week-drag"><GripVertical/></span><b>WEEK {String(weekIndex + 1).padStart(2, "0")}</b><div><input value={week.title} onChange={(event) => updateWeek(week.id, { title: event.target.value })}/><span>{week.lessons.length}개 강의</span></div><input className="week-goal-input" value={week.goal} onChange={(event) => updateWeek(week.id, { goal: event.target.value })}/><button className="week-delete" onClick={() => setCurriculum(curriculum.filter((item) => item.id !== week.id))}><Trash2/></button><button className="week-toggle" onClick={() => setExpandedWeeks(expanded ? expandedWeeks.filter((id) => id !== week.id) : [...expandedWeeks, week.id])}>{expanded ? <ChevronUp/> : <ChevronDown/>}</button></header>
-        {expanded && <div className="week-lessons"><div className="lesson-editor-head"><span>일자</span><span>강의 정보</span><span>형식</span><span>콘텐츠</span><span>분량</span><span/></div>{week.lessons.map((lesson) => <div className="lesson-editor-item" key={lesson.id}><div className="daily-curriculum-row"><span className="day-sequence"><GripVertical/><b>Day {lesson.day}</b></span><div className="daily-copy-fields"><input value={lesson.title} onChange={(event) => updateLesson(week.id, lesson.id, { title: event.target.value })}/><input value={lesson.description} onChange={(event) => updateLesson(week.id, lesson.id, { description: event.target.value })}/></div><select value={lesson.kind} onChange={(event) => updateLesson(week.id, lesson.id, { kind: event.target.value as CurriculumLesson["kind"] })}><option>VOD</option><option>자료</option></select>{lesson.kind === "VOD" ? <label className="lesson-link-field"><Link2/><input type="url" placeholder="YouTube·Vimeo URL" value={lesson.contentUrl || ""} onChange={(event) => updateLesson(week.id, lesson.id, { contentUrl: event.target.value })}/></label> : <label className={`lesson-file-field ${lesson.resourceName ? "has-file" : ""}`}><input type="file" onChange={(event) => uploadResource(week.id, lesson.id, event)}/><Upload/><span>{lesson.resourceName || "자료 업로드"}</span></label>}<input value={lesson.duration} onChange={(event) => updateLesson(week.id, lesson.id, { duration: event.target.value })}/><button onClick={() => updateWeek(week.id, { lessons: week.lessons.filter((item) => item.id !== lesson.id) })}><Trash2/></button></div><div className={`lesson-mission-editor ${lesson.mission ? "enabled" : ""}`}><label className="lesson-mission-toggle"><input type="checkbox" checked={Boolean(lesson.mission)} onChange={(event) => setMissionEnabled(week.id, lesson, event.target.checked)}/><span>과제 사용</span></label>{lesson.mission && <><input aria-label="과제 제목" placeholder="과제 제목" value={lesson.mission.title} onChange={(event) => updateLesson(week.id, lesson.id, { mission: { ...lesson.mission!, title: event.target.value } })}/><textarea aria-label="과제 안내" placeholder="수강생이 수행할 내용과 제출 기준을 안내하세요." value={lesson.mission.instructions} onChange={(event) => updateLesson(week.id, lesson.id, { mission: { ...lesson.mission!, instructions: event.target.value } })}/><select aria-label="과제 제출 형식" value={lesson.mission.submissionType} onChange={(event) => updateLesson(week.id, lesson.id, { mission: { ...lesson.mission!, submissionType: event.target.value as NonNullable<CurriculumLesson["mission"]>["submissionType"] } })}><option value="text">텍스트 제출</option><option value="link">링크 제출</option><option value="mixed">텍스트 또는 링크</option></select><label className="lesson-mission-required"><input type="checkbox" checked={lesson.mission.required} onChange={(event) => updateLesson(week.id, lesson.id, { mission: { ...lesson.mission!, required: event.target.checked } })}/><span>필수 과제</span></label></>}</div></div>)}<button className="add-daily-row" onClick={() => addLesson(week.id)}><Plus/> 이 주차에 강의 추가</button></div>}
-      </article>;
-    })}</div></section>}
+    {tab === "curriculum" && <CurriculumEditor weeks={curriculum} onChange={setCurriculum} courseId={draft.id} slug={draft.slug} busy={saving || deleting} resources={resourceFiles} onResource={(id, file) => setResourceFiles((current) => { const next = new Map(current); if (file) next.set(id, file); else next.delete(id); return next; })}/>}
 
     {tab === "pixel" && <section className="admin-panel admin-form-card"><div className="form-card-head"><div><h2>픽셀·전환 추적</h2><p>상품별 상세 조회와 결제 전환에 사용할 ID를 저장합니다.</p></div><label className="toggle-row"><input type="checkbox" checked={pixels.enabled} onChange={(event) => setEditor({ ...editor, pixels: { ...pixels, enabled: event.target.checked } })}/><span/></label></div><div className="pixel-fields"><label><span><strong>Meta Pixel</strong></span><input value={pixels.meta} onChange={(event) => setEditor({ ...editor, pixels: { ...pixels, meta: event.target.value } })}/></label><label><span><strong>카카오 픽셀</strong></span><input value={pixels.kakao} onChange={(event) => setEditor({ ...editor, pixels: { ...pixels, kakao: event.target.value } })}/></label><label><span><strong>Google Analytics</strong></span><input value={pixels.google} onChange={(event) => setEditor({ ...editor, pixels: { ...pixels, google: event.target.value } })}/></label></div></section>}
 
     {error && <p className="admin-save-error" role="alert">{error}</p>}
-    <div className={`admin-toast ${saved ? "show" : ""}`}><Check/> 상품과 상세페이지가 저장되었습니다.</div>
-  </div>;
+    <div className={`admin-toast ${saved ? "show" : ""}`} role="status"><Check/> 상품과 상세페이지가 저장되었습니다.</div>
+  </fieldset></div>;
 }
