@@ -10,6 +10,13 @@ export type CurriculumLesson = {
   resourceName?: string;
   resourceUrl?: string;
   resourcePath?: string;
+  mission?: {
+    title: string;
+    instructions: string;
+    required: boolean;
+    submissionType: "text" | "link" | "mixed";
+    isPublished: boolean;
+  };
 };
 export type CurriculumWeek = {
   id: string;

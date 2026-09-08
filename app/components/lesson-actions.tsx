@@ -1,9 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Download, Star } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Check, CheckCircle2, Download, RotateCcw, Send, Star } from "lucide-react";
+import type { LearningMission } from "@/lib/learning-data";
 
 export function ProgressButton({ enrollmentId, lessonId, initial }: { enrollmentId: string; lessonId: string; initial: number }) {
+  const router = useRouter();
   const [progress, setProgress] = useState(initial);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -11,7 +14,10 @@ export function ProgressButton({ enrollmentId, lessonId, initial }: { enrollment
     setPending(true); setError("");
     const response = await fetch("/api/learning/progress", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enrollmentId, lessonId, progress: 100 }) });
     const result = await response.json() as { error?: string; progress?: number };
-    if (response.ok) setProgress(result.progress || 100); else setError(result.error || "진도를 저장하지 못했습니다.");
+    if (response.ok) {
+      setProgress(result.progress || 100);
+      router.refresh();
+    } else setError(result.error || "진도를 저장하지 못했습니다.");
     setPending(false);
   };
   return <div className="lesson-progress-action"><button className={progress === 100 ? "completed" : ""} onClick={complete} disabled={pending || progress === 100}><Check/>{progress === 100 ? "학습 완료" : pending ? "저장 중..." : "학습 완료로 표시"}</button>{error && <p role="alert">{error}</p>}</div>;
@@ -19,6 +25,43 @@ export function ProgressButton({ enrollmentId, lessonId, initial }: { enrollment
 
 export function ResourceDownload({ enrollmentId, lessonId, name }: { enrollmentId: string; lessonId: string; name: string }) {
   return <a className="learning-download" href={`/api/learning/resources?enrollment=${encodeURIComponent(enrollmentId)}&lesson=${encodeURIComponent(lessonId)}`}><Download/><span><strong>{name}</strong><small>권한 확인 후 안전하게 다운로드됩니다.</small></span></a>;
+}
+
+export function MissionSubmissionForm({ enrollmentId, mission }: { enrollmentId: string; mission: LearningMission }) {
+  const router = useRouter();
+  const [answerText, setAnswerText] = useState(mission.submission?.answerText || "");
+  const [evidenceUrl, setEvidenceUrl] = useState(mission.submission?.evidenceUrl || "");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  const status = mission.submission?.status;
+  const canResubmit = !status || status === "rejected" || status === "changes_requested";
+  const submit = async () => {
+    setPending(true);
+    setError("");
+    const response = await fetch("/api/learning/submissions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enrollmentId, missionId: mission.id, answerText, evidenceUrl }),
+    });
+    const result = await response.json().catch(() => ({})) as { error?: string };
+    if (response.ok) router.refresh();
+    else setError(result.error || "과제를 제출하지 못했습니다.");
+    setPending(false);
+  };
+
+  return <section className="mission-submission-card">
+    <header><div><span>{mission.required ? "필수 과제" : "선택 과제"}</span><h2>{mission.title}</h2></div>{status && <strong className={"mission-status " + status}>{status === "approved" ? "승인 완료" : status === "submitted" ? "검토 대기" : "보완 필요"}</strong>}</header>
+    {mission.instructions && <p>{mission.instructions}</p>}
+    {status === "approved" ? <div className="mission-result approved"><CheckCircle2/><span><strong>과제가 승인됐습니다.</strong><small>달성도와 레벨에 반영되었습니다.</small></span></div>
+      : status === "submitted" ? <div className="mission-result pending"><Send/><span><strong>관리자 검토를 기다리고 있습니다.</strong><small>검토 결과가 이 화면에 표시됩니다.</small></span></div>
+      : canResubmit ? <>
+        {mission.submission?.feedback && <div className="mission-feedback"><RotateCcw/><span><strong>관리자 피드백</strong><p>{mission.submission.feedback}</p></span></div>}
+        {(mission.submissionType === "text" || mission.submissionType === "mixed") && <label>과제 답변<textarea value={answerText} onChange={(event) => setAnswerText(event.target.value)} maxLength={10000} placeholder="실행 내용과 결과를 구체적으로 작성해 주세요."/></label>}
+        {(mission.submissionType === "link" || mission.submissionType === "mixed") && <label>증빙 링크<input type="url" value={evidenceUrl} onChange={(event) => setEvidenceUrl(event.target.value)} maxLength={2048} placeholder="https://"/></label>}
+        <button className="mission-submit-button" onClick={submit} disabled={pending}><Send/>{pending ? "제출 중..." : mission.submission ? "과제 재제출" : "과제 제출"}</button>
+      </> : null}
+    {error && <p className="mission-submit-error" role="alert">{error}</p>}
+  </section>;
 }
 
 export function ReviewForm({ courseId, cohortId, authorName, courseTitle }: { courseId: string; cohortId: string; authorName: string; courseTitle: string }) {

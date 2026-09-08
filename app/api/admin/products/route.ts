@@ -4,7 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { safeExternalUrl } from "@/lib/safe-url";
 
 type StoredImage = { id?: string; path?: string };
-type LessonInput = { id: string; title: string; description: string; kind: "VOD" | "자료"; duration: string; contentUrl?: string; resourceName?: string; resourcePath?: string };
+type MissionInput = { title: string; instructions: string; required: boolean; submissionType: "text" | "link" | "mixed"; isPublished: boolean };
+type LessonInput = { id: string; title: string; description: string; kind: "VOD" | "자료"; duration: string; contentUrl?: string; resourceName?: string; resourcePath?: string; mission?: MissionInput };
 type WeekInput = { id: string; title: string; goal: string; lessons: LessonInput[] };
 type SaveInput = {
   course: { id: string; courseCode: string; slug: string; title: string; summary: string; description: string; category: string; instructorName: string; listPrice: string; durationLabel: string; scheduleLabel: string; programType: "free" | "paid"; status: "draft" | "published" | "archived"; recruitmentStatus: "preparing" | "recruiting" | "closed"; recruitmentStartAt: string; recruitmentEndAt: string; hasLinkedCohort: boolean; metadata: Record<string, unknown> };
@@ -64,7 +65,7 @@ export async function GET(request: Request) {
   const [courseResult, assetResult, weekResult, cohortResult] = await Promise.all([
     admin.from("courses").select("id,course_code,slug,title,summary,description,category,instructor_name,list_price,duration_label,schedule_label,status,metadata").eq("id", id).single(),
     admin.from("course_assets").select("id,asset_type,storage_path,display_order").eq("course_id", id).order("display_order"),
-    admin.from("curriculum_weeks").select("id,week_number,title,goal,display_order,curriculum_lessons(id,day_number,title,description,content_type,duration_label,display_order,lesson_contents(vod_url,resource_name,resource_storage_path))").eq("course_id", id).order("display_order"),
+    admin.from("curriculum_weeks").select("id,week_number,title,goal,display_order,curriculum_lessons(id,day_number,title,description,content_type,duration_label,display_order,lesson_contents(vod_url,resource_name,resource_storage_path),curriculum_missions(title,instructions,is_required,submission_type,is_published))").eq("course_id", id).order("display_order"),
     admin.from("cohorts").select("id,status,recruitment_start_at,recruitment_end_at,operation_start_at").eq("course_id", id).in("status", ["upcoming", "recruiting", "closed"]),
   ]);
   if (courseResult.error || !courseResult.data) return NextResponse.json({ error: messageOf(courseResult.error, "상품을 불러오지 못했습니다.") }, { status: 404 });
@@ -233,6 +234,22 @@ export async function POST(request: Request) {
         const result = await admin.from("curriculum_lessons").insert(lessonPayload).select("id").single();
         if (result.error || !result.data) return NextResponse.json({ error: messageOf(result.error, "새 강의를 추가하지 못했습니다.") }, { status: 500 });
         lessonId = result.data.id;
+      }
+      if (lesson.mission) {
+        const missionTitle = lesson.mission.title.trim();
+        if (!missionTitle) return NextResponse.json({ error: `${lesson.title || "강의"}의 과제 제목을 입력해 주세요.` }, { status: 400 });
+        const missionResult = await admin.from("curriculum_missions").upsert({
+          lesson_id: lessonId,
+          title: missionTitle,
+          instructions: lesson.mission.instructions.trim() || null,
+          is_required: lesson.mission.required,
+          submission_type: lesson.mission.submissionType,
+          is_published: lesson.mission.isPublished,
+        }, { onConflict: "lesson_id" });
+        if (missionResult.error) return NextResponse.json({ error: messageOf(missionResult.error, "강의 과제를 저장하지 못했습니다.") }, { status: 500 });
+      } else {
+        const missionResult = await admin.from("curriculum_missions").delete().eq("lesson_id", lessonId);
+        if (missionResult.error) return NextResponse.json({ error: messageOf(missionResult.error, "강의 과제를 해제하지 못했습니다.") }, { status: 500 });
       }
       if (kind === "vod") {
         const vodUrl = lesson.contentUrl?.trim();
