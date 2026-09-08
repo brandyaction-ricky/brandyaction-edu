@@ -50,7 +50,8 @@ export type ProductEditorData = {
 };
 type ProductCourseRecord = { id:string; course_code:string; slug:string; title:string; summary:string|null; description:string|null; category:string|null; instructor_name:string|null; list_price:number; duration_label:string|null; schedule_label:string|null; status:ProductStatus; metadata:Record<string,unknown>|null };
 type ProductAssetRecord = { id:string; asset_type:string; storage_path:string; display_order:number };
-type ProductLessonRecord = { id:string; day_number:number; title:string; description:string|null; content_type:string; duration_label:string|null; display_order:number; lesson_contents:Array<{vod_url:string|null;resource_name:string|null;resource_storage_path:string|null}>|{vod_url:string|null;resource_name:string|null;resource_storage_path:string|null}|null };
+type ProductMissionRecord = { title:string; instructions:string|null; is_required:boolean; submission_type:string; is_published:boolean };
+type ProductLessonRecord = { id:string; day_number:number; title:string; description:string|null; content_type:string; duration_label:string|null; display_order:number; lesson_contents:Array<{vod_url:string|null;resource_name:string|null;resource_storage_path:string|null}>|{vod_url:string|null;resource_name:string|null;resource_storage_path:string|null}|null; curriculum_missions:ProductMissionRecord[]|ProductMissionRecord|null };
 type ProductWeekRecord = { id:string; week_number:number; title:string; goal:string|null; display_order:number; curriculum_lessons:ProductLessonRecord[] };
 type ProductRecruitmentRecord = { id:string; status:string; recruitment_start_at:string|null; recruitment_end_at:string|null };
 
@@ -196,6 +197,7 @@ export async function loadAdminProduct(courseId: string): Promise<ProductEditorD
       goal: week.goal || "",
       lessons: [...(week.curriculum_lessons || [])].sort((a, b) => a.display_order - b.display_order).map((lesson) => {
         const content = Array.isArray(lesson.lesson_contents) ? lesson.lesson_contents[0] : lesson.lesson_contents;
+        const mission = Array.isArray(lesson.curriculum_missions) ? lesson.curriculum_missions[0] : lesson.curriculum_missions;
         return {
           id: lesson.id,
           day: lesson.day_number,
@@ -206,6 +208,13 @@ export async function loadAdminProduct(courseId: string): Promise<ProductEditorD
           contentUrl: content?.vod_url || "",
           resourceName: content?.resource_name || undefined,
           resourcePath: content?.resource_storage_path || undefined,
+          mission: mission ? {
+            title: mission.title,
+            instructions: mission.instructions || "",
+            required: mission.is_required,
+            submissionType: mission.submission_type === "link" ? "link" as const : mission.submission_type === "mixed" ? "mixed" as const : "text" as const,
+            isPublished: mission.is_published,
+          } : undefined,
         };
       }),
     })),

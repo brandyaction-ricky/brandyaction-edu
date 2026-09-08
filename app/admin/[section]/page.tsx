@@ -14,6 +14,7 @@ import { AdminMemberTagsManager } from "../../components/admin-member-tags-manag
 import { AdminCouponsManager } from "../../components/admin-coupons-manager";
 import { AdminMessageTemplatesManager } from "../../components/admin-message-templates-manager";
 import { AdminBannerManager } from "../../components/admin-banner-manager";
+import { AdminSubmissionsManager } from "../../components/admin-submissions-manager";
 import { getAdminUser, type AdminScope } from "@/lib/server-auth";
 
 const info:Record<string,{eyebrow:string,title:string,desc:string}>={
@@ -21,6 +22,7 @@ const info:Record<string,{eyebrow:string,title:string,desc:string}>={
   articles:{eyebrow:"GROWTH",title:"블로그 관리",desc:"칼럼·YouTube 영상과 카테고리, 회원 전용 무료강의 영역을 한곳에서 관리합니다."},
   banners:{eyebrow:"BANNERS",title:"배너 관리",desc:"메인 랜딩 이미지 배너를 여러 개 등록하고 슬라이드 연결 URL을 관리합니다."},
   cohorts:{eyebrow:"COHORTS",title:"기수·회차 관리",desc:"모집 일정부터 라이브 회차와 수강생까지 기수 단위로 운영합니다."},
+  submissions:{eyebrow:"MISSION REVIEW",title:"과제 검토",desc:"교육생의 제출 내용을 확인하고 승인·반려 피드백과 달성도를 관리합니다."},
   members:{eyebrow:"MEMBERS",title:"회원 관리",desc:"상품·기수·고객 태그로 분류하고 수강권과 고객 상태를 한곳에서 관리합니다."},
   "member-tags":{eyebrow:"CUSTOMER TAGS",title:"고객 태그 관리",desc:"고객 분류 기준을 만들고 태그별 사용 인원을 관리합니다."},
   orders:{eyebrow:"ORDERS",title:"주문·결제 관리",desc:"프론트 결제와 연결된 상품·기수·승인·환불 데이터를 확인하고 처리합니다."},
@@ -36,7 +38,7 @@ const info:Record<string,{eyebrow:string,title:string,desc:string}>={
 export default async function AdminSection({params}:{params:Promise<{section:string}>}){
   const {section}=await params;
   const safeSection=info[section]?section:"products";
-  const scope: AdminScope = ["orders","coupons"].includes(safeSection) ? "orders" : ["members", "member-tags"].includes(safeSection) ? "members" : ["settings", "banners"].includes(safeSection) ? "settings" : safeSection === "articles" ? "articles" : "products";
+  const scope: AdminScope = ["orders","coupons"].includes(safeSection) ? "orders" : ["members", "member-tags", "submissions"].includes(safeSection) ? "members" : ["settings", "banners"].includes(safeSection) ? "settings" : safeSection === "articles" ? "articles" : "products";
   const operator = await getAdminUser(scope);
   if (!operator || (["super-admins", "code-settings", "message-templates", "crm", "member-tags", "coupons", "banners"].includes(safeSection) && operator.role !== "admin")) redirect("/admin?notice=permission_required");
   const meta=info[safeSection];
@@ -54,6 +56,7 @@ function SectionContent({section}:{section:string}){
   if(section==="banners")return <AdminBannerManager/>;
   if(section==="articles")return <AdminArticlesManager/>;
   if(section==="cohorts")return <AdminCohortsManager/>;
+  if(section==="submissions")return <AdminSubmissionsManager/>;
   if(section==="settings")return <AdminSettingsManager/>;
   if(section==="orders")return <AdminOrdersManager/>;
   if(section==="coupons")return <AdminCouponsManager/>;

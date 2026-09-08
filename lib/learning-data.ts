@@ -1,4 +1,5 @@
 import "server-only";
+import { calculateAchievement, calculateLearningProgress, type AchievementSummary, type LearningProgressSummary } from "@/lib/achievement";
 import { createClient } from "@/lib/supabase/server";
 import { safeExternalUrl } from "@/lib/safe-url";
 
@@ -20,11 +21,72 @@ export type LearningLesson = {
   resourceName: string | null;
   resourcePath: string | null;
   progress: number;
+  mission: LearningMission | null;
+};
+
+export type LearningMission = {
+  id: string;
+  title: string;
+  instructions: string;
+  required: boolean;
+  submissionType: "text" | "link" | "mixed";
+  submission: {
+    id: string;
+    attempt: number;
+    status: "submitted" | "changes_requested" | "approved" | "rejected";
+    feedback: string;
+    answerText: string;
+    evidenceUrl: string;
+  } | null;
 };
 
 export type LearningWeek = { id: string; number: number; title: string; goal: string; lessons: LearningLesson[] };
 export type LearningSession = { id: string; number: number; title: string; expectedOutput: string; scheduledAt: string | null; liveUrl: string | null; replayUrl: string | null };
-export type LearningHome = { enrollment: { id: string; accessEndsAt: string | null }; course: Course; cohort: Cohort; weeks: LearningWeek[]; sessions: LearningSession[] };
+export type LearningHome = { enrollment: { id: string; accessEndsAt: string | null }; course: Course; cohort: Cohort; weeks: LearningWeek[]; sessions: LearningSession[]; learningProgress: LearningProgressSummary; achievement: AchievementSummary };
+
+export async function getEnrollmentAchievements(enrollments: Array<{ id: string; courseId: string }>) {
+  const summaries = new Map<string, AchievementSummary>();
+  if (!enrollments.length) return summaries;
+  const supabase = await createClient();
+  const courseIds = [...new Set(enrollments.map((item) => item.courseId))];
+  const enrollmentIds = enrollments.map((item) => item.id);
+  const missionsResult = await supabase
+    .from("curriculum_missions")
+    .select("id,is_required,curriculum_lessons!inner(is_published,curriculum_weeks!inner(course_id,is_published))")
+    .eq("is_published", true)
+    .eq("is_required", true)
+    .eq("curriculum_lessons.is_published", true)
+    .eq("curriculum_lessons.curriculum_weeks.is_published", true)
+    .in("curriculum_lessons.curriculum_weeks.course_id", courseIds);
+  if (missionsResult.error) return summaries;
+  const missionsByCourse = new Map<string, string[]>();
+  for (const mission of missionsResult.data || []) {
+    const lesson = one(mission.curriculum_lessons);
+    const week = one(lesson?.curriculum_weeks || null);
+    if (!week) continue;
+    const ids = missionsByCourse.get(week.course_id) || [];
+    ids.push(mission.id);
+    missionsByCourse.set(week.course_id, ids);
+  }
+  const missionIds = (missionsResult.data || []).map((mission) => mission.id);
+  const submissionsResult = missionIds.length
+    ? await supabase
+        .from("mission_submissions")
+        .select("enrollment_id,mission_id,status,attempt_number")
+        .in("enrollment_id", enrollmentIds)
+        .in("mission_id", missionIds)
+        .order("attempt_number", { ascending: true })
+    : { data: [], error: null };
+  if (submissionsResult.error) return summaries;
+  for (const enrollment of enrollments) {
+    const courseMissionIds = new Set(missionsByCourse.get(enrollment.courseId) || []);
+    const rows = (submissionsResult.data || [])
+      .filter((row) => row.enrollment_id === enrollment.id && courseMissionIds.has(row.mission_id))
+      .map((row) => ({ mission_id: row.mission_id, status: row.status }));
+    summaries.set(enrollment.id, calculateAchievement(courseMissionIds.size, rows));
+  }
+  return summaries;
+}
 
 export async function getLearningHome(enrollmentId: string): Promise<LearningHome | null> {
   const supabase = await createClient();
@@ -43,19 +105,46 @@ export async function getLearningHome(enrollmentId: string): Promise<LearningHom
   if (!course || !cohort) return null;
 
   const [weeksResult, sessionsResult, progressResult] = await Promise.all([
-    supabase.from("curriculum_weeks").select("id,week_number,title,goal,display_order,curriculum_lessons(id,day_number,title,description,content_type,duration_label,display_order,lesson_contents(vod_url,resource_name,resource_storage_path))").eq("course_id", enrollment.course_id).eq("is_published", true).order("display_order"),
+    supabase.from("curriculum_weeks").select("id,week_number,title,goal,display_order,curriculum_lessons(id,day_number,title,description,content_type,duration_label,display_order,is_published,lesson_contents(vod_url,resource_name,resource_storage_path),curriculum_missions(id,title,instructions,is_required,submission_type,is_published))").eq("course_id", enrollment.course_id).eq("is_published", true).order("display_order"),
     supabase.from("cohort_sessions").select("id,session_number,title,expected_output,scheduled_at,cohort_session_contents(live_url,replay_url)").eq("cohort_id", enrollment.cohort_id).order("session_number"),
     supabase.from("lesson_progress").select("lesson_id,progress_percent").eq("enrollment_id", enrollment.id),
   ]);
-  if (weeksResult.error || sessionsResult.error) return null;
+  if (weeksResult.error || sessionsResult.error || progressResult.error) return null;
   const progress = new Map((progressResult.data || []).map((row) => [row.lesson_id, row.progress_percent]));
+  const missionRows = (weeksResult.data || []).flatMap((week) =>
+    (week.curriculum_lessons || []).flatMap((lesson) => {
+      const relation = lesson.curriculum_missions;
+      const mission = Array.isArray(relation) ? relation[0] : relation;
+      return mission?.is_published ? [mission] : [];
+    }),
+  );
+  const missionIds = missionRows.map((mission) => mission.id);
+  const submissionsResult = missionIds.length
+    ? await supabase
+        .from("mission_submissions")
+        .select("id,mission_id,attempt_number,status,response,reviewer_feedback")
+        .eq("enrollment_id", enrollment.id)
+        .in("mission_id", missionIds)
+        .order("attempt_number", { ascending: false })
+    : { data: [], error: null };
+  if (submissionsResult.error) return null;
+  const latestSubmission = new Map<string, (typeof submissionsResult.data)[number]>();
+  for (const row of submissionsResult.data || []) {
+    if (!latestSubmission.has(row.mission_id)) latestSubmission.set(row.mission_id, row);
+  }
   const weeks: LearningWeek[] = (weeksResult.data || []).map((week) => ({
     id: week.id,
     number: week.week_number,
     title: week.title,
     goal: week.goal || "",
-    lessons: [...(week.curriculum_lessons || [])].sort((a, b) => a.display_order - b.display_order).map((lesson) => {
+    lessons: [...(week.curriculum_lessons || [])].filter((lesson) => lesson.is_published).sort((a, b) => a.display_order - b.display_order).map((lesson) => {
       const content = Array.isArray(lesson.lesson_contents) ? lesson.lesson_contents[0] : lesson.lesson_contents;
+      const missionRelation = lesson.curriculum_missions;
+      const missionRow = Array.isArray(missionRelation) ? missionRelation[0] : missionRelation;
+      const submission = missionRow ? latestSubmission.get(missionRow.id) : null;
+      const response = submission?.response && typeof submission.response === "object" && !Array.isArray(submission.response)
+        ? submission.response as Record<string, unknown>
+        : {};
       return {
         id: lesson.id,
         day: lesson.day_number,
@@ -67,6 +156,21 @@ export async function getLearningHome(enrollmentId: string): Promise<LearningHom
         resourceName: content?.resource_name || null,
         resourcePath: content?.resource_storage_path || null,
         progress: progress.get(lesson.id) || 0,
+        mission: missionRow?.is_published ? {
+          id: missionRow.id,
+          title: missionRow.title,
+          instructions: missionRow.instructions || "",
+          required: missionRow.is_required,
+          submissionType: missionRow.submission_type as "text" | "link" | "mixed",
+          submission: submission ? {
+            id: submission.id,
+            attempt: submission.attempt_number,
+            status: submission.status as "submitted" | "changes_requested" | "approved" | "rejected",
+            feedback: submission.reviewer_feedback || "",
+            answerText: typeof response.answerText === "string" ? response.answerText : "",
+            evidenceUrl: typeof response.evidenceUrl === "string" ? response.evidenceUrl : "",
+          } : null,
+        } : null,
       };
     }),
   }));
@@ -74,7 +178,14 @@ export async function getLearningHome(enrollmentId: string): Promise<LearningHom
     const content = Array.isArray(session.cohort_session_contents) ? session.cohort_session_contents[0] : session.cohort_session_contents;
     return { id: session.id, number: session.session_number, title: session.title, expectedOutput: session.expected_output || "", scheduledAt: session.scheduled_at, liveUrl: safeExternalUrl(content?.live_url), replayUrl: safeExternalUrl(content?.replay_url) };
   });
-  return { enrollment: { id: enrollment.id, accessEndsAt: enrollment.access_ends_at }, course, cohort, weeks, sessions };
+  const lessonIds = weeks.flatMap((week) => week.lessons.map((lesson) => lesson.id));
+  const learningProgress = calculateLearningProgress(lessonIds, progressResult.data || []);
+  const requiredMissions = missionRows.filter((mission) => mission.is_required);
+  const achievement = calculateAchievement(requiredMissions.length, [...latestSubmission.values()].map((row) => ({
+    mission_id: row.mission_id,
+    status: row.status,
+  })));
+  return { enrollment: { id: enrollment.id, accessEndsAt: enrollment.access_ends_at }, course, cohort, weeks, sessions, learningProgress, achievement };
 }
 
 export async function getLearningLesson(enrollmentId: string, lessonId: string) {
