@@ -14,6 +14,7 @@ export type CurriculumLesson = {
   accessMode?: "enrolled" | "member";
   isPublished?: boolean;
   mission?: {
+    id?: string;
     title: string;
     instructions: string;
     required: boolean;

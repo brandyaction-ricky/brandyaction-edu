@@ -6,6 +6,8 @@ import { ClassApplicationCard } from "../../components/class-application-card";
 import { DetailTabs } from "../../components/detail-tabs";
 import { DetailImageStack } from "../../components/site-live-content";
 import { getPublishedClass, getPublicCourseAppearance, getPublishedReviews } from "@/lib/education-data";
+import { FreeClassDetail } from "../../components/free-class-detail";
+import "../../free-class.css";
 
 export const revalidate = 60;
 export const dynamic = "force-static";
@@ -14,6 +16,7 @@ export default async function ClassDetail({ params }: { params: Promise<{ slug: 
   const { slug } = await params;
   const [item,appearance,reviews] = await Promise.all([getPublishedClass(slug),getPublicCourseAppearance(slug),getPublishedReviews(slug)]);
   if (!item) notFound();
+  if (item.programType === "free" || item.price === "0원") return <FreeClassDetail item={item} appearance={appearance} reviews={reviews}/>;
   return <main><BrandHeader />
     <section className="detail-hero"><div className="container detail-hero-grid">
       <div className="detail-copy"><span className={`status-pill tone-${item.statusTone}`}>{item.status}</span><p className="detail-category">{item.category} · {item.duration}</p><h1>{item.title}</h1><p>{item.summary}</p>

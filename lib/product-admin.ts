@@ -30,6 +30,7 @@ export type ProductDraft = {
   metadata: Record<string, unknown>;
 };
 export type ProductSummary = {
+  productKind: "class" | "digital";
   id: string;
   slug: string;
   title: string;
@@ -202,7 +203,7 @@ async function productRequest<T>(input: RequestInfo, init?: RequestInit): Promis
   return result;
 }
 
-async function directUpload(courseId: string, file: File, kind: "resource" | "thumbnail" | "detail") {
+export async function directUpload(courseId: string, file: File, kind: "resource" | "thumbnail" | "detail") {
   const upload = await productRequest<{ bucket: string; path: string; token: string; contentType: string }>("/api/admin/content-upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ courseId, name: file.name, size: file.size, kind }) });
   const { error } = await createClient().storage.from(upload.bucket).uploadToSignedUrl(upload.path, upload.token, file, { contentType: upload.contentType });
   if (error) throw new Error(`${file.name}: 업로드하지 못했습니다. ${error.message}`);

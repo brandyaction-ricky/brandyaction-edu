@@ -7,6 +7,7 @@ import { ArrowDown, ArrowLeft, ArrowUp, Check, Eye, GripVertical, ImagePlus, Pen
 import dynamic from "next/dynamic";
 import type { CurriculumWeek } from "@/app/data";
 import { useAdminUnsavedChanges } from "./use-admin-unsaved-changes";
+import { AdminDetailPanel } from "./admin-detail-panel";
 import {
   createEmptyProduct,
   loadAdminProduct,
@@ -41,7 +42,7 @@ const statusLabel = { published: "판매 중", draft: "판매 중지", archived:
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const editorSignature = (value: ProductEditorData | null) => value ? JSON.stringify({ draft: value.draft, thumbnail: value.thumbnail, images: value.images, pixels: value.pixels, curriculum: value.curriculum }) : "";
 
-export function AdminProductsManager({ contentMode = false }: { contentMode?: boolean }) {
+export function AdminProductsManager({ contentMode = false, productKind }: { contentMode?: boolean; productKind?: "class" | "digital" }) {
   const [products, setProducts] = useState<ProductSummary[]>([]);
   const [editor, setEditor] = useState<ProductEditorData | null>(null);
   const [tab, setTab] = useState("basic");
@@ -77,8 +78,8 @@ export function AdminProductsManager({ contentMode = false }: { contentMode?: bo
 
   const visible = useMemo(() => {
     const keyword = query.trim().toLowerCase();
-    return keyword ? products.filter((product) => [product.title, product.instructorName, product.slug].some((value) => value.toLowerCase().includes(keyword))) : products;
-  }, [products, query]);
+    return products.filter((product) => (!productKind || (product.productKind || "class") === productKind) && (!keyword || [product.title, product.instructorName, product.slug].some((value) => value.toLowerCase().includes(keyword))));
+  }, [products, query, productKind]);
 
   const openProduct = async (id: string) => {
     setLoading(true);
@@ -99,6 +100,7 @@ export function AdminProductsManager({ contentMode = false }: { contentMode?: bo
 
   const startNew = () => {
     const data = createEmptyProduct();
+    data.draft.metadata = { ...data.draft.metadata, productKind: productKind || "class" };
     setEditor(data);
     setSavedSignature(editorSignature(data));
     setResourceFiles(new Map());
@@ -198,9 +200,9 @@ export function AdminProductsManager({ contentMode = false }: { contentMode?: bo
 
   if (loading && !editor && !products.length) return <section className="admin-panel admin-loading-state"><strong>상품 정보를 불러오는 중입니다.</strong></section>;
 
-  if (!editor) return <>
+  const productList = <>
     <div className="summary-chips">
-      <span>전체 상품 <strong>{products.length}</strong></span>
+      <span>등록 상품 <strong>{products.filter((product) => !productKind || product.productKind === productKind).length}</strong></span>
       <span>무료 클래스 <strong>{products.filter((product) => product.programType === "free").length}</strong></span>
       <span>유료 클래스 <strong>{products.filter((product) => product.programType === "paid").length}</strong></span>
       <span>판매 중 <strong>{products.filter((product) => product.status === "published").length}</strong></span>
@@ -209,7 +211,7 @@ export function AdminProductsManager({ contentMode = false }: { contentMode?: bo
     </div>
     <section className="admin-panel product-overview-panel">
       <div className="admin-toolbar product-toolbar product-list-actions">
-        <div><strong>{contentMode ? "클래스 콘텐츠" : "등록 클래스"}</strong><span>{contentMode ? "클래스를 선택해 섹션·영상·무료자료·미션을 관리하세요." : "클래스 기본 정보와 판매·모집 상태를 관리합니다."}</span></div>
+        <div><strong>{contentMode ? "클래스 콘텐츠" : productKind === "digital" ? "디지털 상품" : "강의 상품"}</strong><span>{contentMode ? "클래스를 선택해 섹션·영상·무료자료·미션을 관리하세요." : "클래스 기본 정보와 판매·모집 상태를 관리합니다."}</span></div>
         <div className="product-list-buttons"><label className="search-box"><Search/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="상품명·강사·URL 검색"/></label><button className="admin-primary" onClick={startNew}><Plus/> 새 상품 추가</button></div>
       </div>
       <div className="product-management-list">
@@ -230,6 +232,7 @@ export function AdminProductsManager({ contentMode = false }: { contentMode?: bo
     </section>
   </>;
 
+  if (!editor) return productList;
   const { draft, thumbnail, images, curriculum, pixels } = editor;
   const setDraft = (patch: Partial<typeof draft>) => setEditor({ ...editor, draft: { ...draft, ...patch } });
   const setThumbnail = (next: ProductImage | null) => setEditor({ ...editor, thumbnail: next });
@@ -277,7 +280,7 @@ export function AdminProductsManager({ contentMode = false }: { contentMode?: bo
   const moveImage = (index: number, direction: -1 | 1) => setImages(move(images, index, index + direction));
 
 
-  return <div className="admin-editor-wrap" aria-busy={saving || deleting}><fieldset disabled={saving || deleting} className="admin-editor-fields">
+  return <>{productList}<AdminDetailPanel title={draft.title || "새 상품 등록"} onClose={backToList} busy={saving || deleting}><div className="admin-editor-wrap" aria-busy={saving || deleting}><fieldset disabled={saving || deleting} className="admin-editor-fields">
     <div className="editor-head">
       <button onClick={backToList}><ArrowLeft/> 상품 목록</button>
       <div><strong>{draft.title || "새 상품"}</strong><span className={`status-label ${draft.status === "published" ? "success" : "planned"}`}>{draft.id ? statusLabel[draft.status] : "신규 등록"}</span></div>
@@ -285,9 +288,10 @@ export function AdminProductsManager({ contentMode = false }: { contentMode?: bo
     </div>
     <div className="editor-tabs">{[["basic", "기본 정보"], ["detail", "이미지 상세페이지"], ["curriculum", "콘텐츠·미션"], ["pixel", "픽셀·전환 추적"]].map(([id, label]) => <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)}>{label}{id === "detail" && <em>{images.length}</em>}</button>)}</div>
 
-    {tab === "basic" && <div className="editor-grid"><section className="admin-panel admin-form-card"><div className="form-card-head"><div><h2>상품 기본 정보</h2><p>판매 중으로 저장하면 클래스 목록과 상품 상세페이지에 즉시 반영됩니다.</p></div><span className="completion-chip"><Check/> DB 연결</span></div><div className="admin-field-grid">
+    {tab === "basic" && <div className="editor-grid"><section className="admin-panel admin-form-card"><div className="form-card-head"><div><h2>상품 기본 정보</h2><p>판매 중으로 저장하면 클래스 목록과 상품 상세페이지에 즉시 반영됩니다.</p></div><span className="completion-chip"><Check/> 상품 설정</span></div><div className="admin-field-grid">
       <div className="field-full product-thumbnail-field"><span>상품 썸네일</span><div className="product-thumbnail-editor"><div className={`product-thumbnail-preview ${thumbnail ? "has-image" : ""}`}>{thumbnail ? <img src={thumbnail.url} alt="상품 썸네일 미리보기"/> : <><ImagePlus/><small>썸네일 미등록</small></>}</div><div className="product-thumbnail-actions"><strong>목록 카드와 상품 상세 상단에 노출됩니다.</strong><p>가로형 4:3 또는 16:9 비율 권장 · JPG, PNG, WEBP · 5MB 이하</p><span><label className="admin-outline thumbnail-upload-button"><input type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadThumbnail}/><ImagePlus/> {thumbnail ? "이미지 교체" : "이미지 등록"}</label>{thumbnail && <button type="button" className="admin-outline thumbnail-remove-button" onClick={removeThumbnail}><Trash2/> 삭제</button>}</span></div></div></div>
       <label className="field-full">상품명<input data-product-field="title" value={draft.title} onChange={(event) => setDraft({ title: event.target.value })}/></label>
+      <label>상품 구분<select value={draft.metadata.productKind === "digital" ? "digital" : "class"} onChange={(event) => setDraft({ metadata: { ...draft.metadata, productKind: event.target.value } })}><option value="class">강의 상품</option><option value="digital">디지털 상품 · 자료·템플릿</option></select></label>
       <label>강사명<input value={draft.instructorName} onChange={(event) => setDraft({ instructorName: event.target.value })}/></label>
       <label>클래스 유형<select value={draft.programType} onChange={(event) => setDraft({ programType: event.target.value as typeof draft.programType, ...(event.target.value === "free" ? { listPrice: "0" } : {}) })}><option value="free">무료 클래스</option><option value="paid">유료 클래스</option></select></label>
       <label>기본 정가<input data-product-field="listPrice" inputMode="numeric" value={draft.programType === "free" ? "0" : draft.listPrice} disabled={draft.programType === "free"} onChange={(event) => setDraft({ listPrice: event.target.value })}/>{draft.programType === "free" && <small>무료 클래스는 0원으로 자동 저장됩니다.</small>}</label>
@@ -319,5 +323,5 @@ export function AdminProductsManager({ contentMode = false }: { contentMode?: bo
 
     {error && <p className="admin-save-error" role="alert">{error}</p>}
     <div className={`admin-toast ${saved ? "show" : ""}`} role="status"><Check/> 상품과 상세페이지가 저장되었습니다.</div>
-  </fieldset></div>;
+  </fieldset></div></AdminDetailPanel></>;
 }

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-const tabs = [
+const baseTabs = [
   { id: "overview", label: "클래스 소개" },
   { id: "curriculum", label: "커리큘럼" },
   { id: "benefit", label: "제공 혜택" },
@@ -10,9 +10,10 @@ const tabs = [
   { id: "faq", label: "FAQ" },
 ] as const;
 
-type TabId = (typeof tabs)[number]["id"];
+type TabId = (typeof baseTabs)[number]["id"] | "free-resources";
 
-export function DetailTabs() {
+export function DetailTabs({ resources = false, compact = false }: { resources?: boolean; compact?: boolean }) {
+  const tabs = useMemo(() => resources ? [...baseTabs.slice(0, 2), { id: "free-resources" as const, label: "무료 자료" }, ...baseTabs.slice(2)] : baseTabs, [resources]);
   const [activeTab, setActiveTab] = useState<TabId>("overview");
 
   useEffect(() => {
@@ -53,7 +54,7 @@ export function DetailTabs() {
       window.removeEventListener("scroll", handleScroll);
       window.removeEventListener("resize", handleScroll);
     };
-  }, []);
+  }, [tabs]);
 
   const selectTab = (event: React.MouseEvent<HTMLAnchorElement>, id: TabId) => {
     event.preventDefault();
@@ -76,7 +77,7 @@ export function DetailTabs() {
             aria-current={activeTab === tab.id ? "location" : undefined}
             onClick={(event) => selectTab(event, tab.id)}
           >
-            {tab.label}
+            {compact && tab.id === "overview" ? "소개" : compact && tab.id === "curriculum" ? "콘텐츠" : tab.label}
           </a>
         ))}
       </div>

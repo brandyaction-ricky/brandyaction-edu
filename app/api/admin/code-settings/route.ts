@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { loadCodeSettings } from "@/lib/code-settings";
+import { revalidateTag, revalidatePath } from "next/cache";
 import { emptyCodeSettings, type CodeSettings } from "@/lib/code-settings-shared";
 import { getAdminUser } from "@/lib/server-auth";
 
@@ -11,7 +11,9 @@ async function highestAdmin() {
 
 export async function GET() {
   if (!await highestAdmin()) return NextResponse.json({ error: "최고 관리자만 접근할 수 있습니다." }, { status: 403 });
-  return NextResponse.json({ settings: await loadCodeSettings() });
+  const { data, error } = await createAdminClient().from("site_settings").select("value").eq("key", "search_code_settings").maybeSingle();
+  if (error) return NextResponse.json({ error: "코드 설정을 불러오지 못했습니다." }, { status: 503 });
+  return NextResponse.json({ settings: data?.value || emptyCodeSettings }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function PUT(request: Request) {
@@ -27,5 +29,6 @@ export async function PUT(request: Request) {
   const { error } = await admin.from("site_settings").upsert({ key: "search_code_settings", value: settings, is_public: false, updated_by: operator.id }, { onConflict: "key" });
   if (error) return NextResponse.json({ error: "검색·코드 설정을 저장하지 못했습니다." }, { status: 500 });
   await admin.from("audit_logs").insert({ actor_user_id: operator.id, action: "search_code_settings.updated", entity_type: "site_setting", entity_id: "search_code_settings", before_data: before?.value || emptyCodeSettings, after_data: settings });
+  revalidateTag("public-code-settings", { expire: 0 }); revalidatePath("/", "layout");
   return NextResponse.json({ ok: true });
 }

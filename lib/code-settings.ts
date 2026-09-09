@@ -16,5 +16,5 @@ async function queryCodeSettings(): Promise<CodeSettings> {
 }
 
 export const loadCodeSettings = unstable_cache(queryCodeSettings, ["public-code-settings"], {
-  revalidate: 300,
+  revalidate: 300, tags: ["public-code-settings"],
 });

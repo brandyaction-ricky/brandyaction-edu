@@ -1,14 +1,15 @@
 import Link from "next/link";
-import { BookOpen, CheckSquare2, ChevronDown, Code2, CreditCard, FileImage, FileText, GraduationCap, LayoutDashboard, LogOut, Megaphone, MessageSquareText, MessagesSquare, Route, Settings, ShieldCheck, Tags, TicketPercent, Users } from "lucide-react";
+import { BookOpen, CheckSquare2, ChevronDown, Code2, CreditCard, FileImage, FileText, GraduationCap, LayoutDashboard, LogOut, Megaphone, MessageSquareText, MessagesSquare, Route, Settings, ShieldCheck, Tags, TicketPercent, Users, Target, ListChecks, Files, Search, UsersRound, ChartNoAxesColumn } from "lucide-react";
 import { getAdminSession } from "@/lib/server-auth";
 
 const navGroups = [
   { label:"운영",items:[{ id:"dashboard",label:"오늘의 운영",href:"/admin",icon:LayoutDashboard }] },
-  { label:"교육·콘텐츠",items:[{ id:"products",label:"클래스 관리",href:"/admin/products",icon:BookOpen },{ id:"content",label:"콘텐츠·미션",href:"/admin/content",icon:FileText },{ id:"cohorts",label:"기수·회차",href:"/admin/cohorts",icon:GraduationCap }] },
-  { label:"수강생·승인",items:[{ id:"submissions",label:"미션 승인",href:"/admin/submissions",icon:CheckSquare2 },{ id:"members",label:"회원·달성도",href:"/admin/members",icon:Users },{ id:"leads",label:"무료 콘텐츠 이용",href:"/admin/leads",icon:FileText },{ id:"reviews",label:"수강 후기",href:"/admin/reviews",icon:MessageSquareText }] },
-  { label:"결제·사이트",items:[{ id:"orders",label:"주문·결제",href:"/admin/orders",icon:CreditCard },{ id:"coupons",label:"쿠폰",href:"/admin/coupons",icon:TicketPercent },{ id:"banners",label:"배너",href:"/admin/banners",icon:FileImage },{ id:"articles",label:"블로그",href:"/admin/articles",icon:FileText }] },
-  { label:"분석·마케팅",extra:true,items:[{ id:"analytics",label:"상세 운영 분석",href:"/admin/analytics",icon:LayoutDashboard },{ id:"journey",label:"행동·전환 분석",href:"/admin/journey",icon:Route },{ id:"member-tags",label:"고객 태그",href:"/admin/member-tags",icon:Tags },{ id:"crm",label:"마케팅 CRM",href:"/admin/crm",icon:Megaphone },{ id:"message-templates",label:"메시지 템플릿",href:"/admin/message-templates",icon:MessagesSquare },{ id:"code-settings",label:"검색·코드",href:"/admin/code-settings",icon:Code2 }] },
-  { label:"설정",extra:true,items:[{ id:"super-admins",label:"관리자 권한",href:"/admin/super-admins",icon:ShieldCheck },{ id:"settings",label:"사이트 설정",href:"/admin/settings",icon:Settings }] },
+  { label:"회원·참여",items:[{ id:"members",label:"회원 관리",href:"/admin/members",icon:Users },{ id:"groups",label:"회원 그룹 관리",href:"/admin/groups",icon:UsersRound },{ id:"participants",label:"참가자 현황",href:"/admin/participants",icon:ChartNoAxesColumn },{ id:"leads",label:"무료 콘텐츠 이용",href:"/admin/leads",icon:FileText }] },
+  { label:"교육·상품",items:[{ id:"products",label:"강의 상품 관리",href:"/admin/products",icon:BookOpen },{ id:"digital-products",label:"디지털 상품 관리",href:"/admin/digital-products",icon:Files },{ id:"content",label:"커리큘럼·콘텐츠",href:"/admin/content",icon:FileText },{ id:"cohorts",label:"기수·회차",href:"/admin/cohorts",icon:GraduationCap }] },
+  { label:"미션·평가",items:[{ id:"missions",label:"미션 관리",href:"/admin/missions",icon:Target },{ id:"quizzes",label:"확인 퀴즈",href:"/admin/quizzes",icon:ListChecks },{ id:"submissions",label:"미션 승인",href:"/admin/submissions",icon:CheckSquare2 },{ id:"reviews",label:"리뷰 관리",href:"/admin/reviews",icon:MessageSquareText }] },
+  { label:"결제·사이트",items:[{ id:"orders",label:"주문·결제",href:"/admin/orders",icon:CreditCard },{ id:"coupons",label:"쿠폰",href:"/admin/coupons",icon:TicketPercent },{ id:"banners",label:"배너",href:"/admin/banners",icon:FileImage },{ id:"articles",label:"아티클 관리",href:"/admin/articles",icon:FileText }] },
+  { label:"분석·마케팅",extra:true,items:[{ id:"analytics",label:"상세 운영 분석",href:"/admin/analytics",icon:LayoutDashboard },{ id:"journey",label:"행동·전환 분석",href:"/admin/journey",icon:Route },{ id:"member-tags",label:"고객 태그",href:"/admin/member-tags",icon:Tags },{ id:"crm",label:"마케팅 CRM",href:"/admin/crm",icon:Megaphone },{ id:"message-templates",label:"메시지 템플릿",href:"/admin/message-templates",icon:MessagesSquare }] },
+  { label:"설정",items:[{ id:"super-admins",label:"관리자 계정 관리",href:"/admin/super-admins",icon:ShieldCheck },{ id:"seo",label:"SEO",href:"/admin/seo",icon:Search },{ id:"code-settings",label:"Meta / Header / Body",href:"/admin/code-settings",icon:Code2 },{ id:"settings",label:"사이트 설정",href:"/admin/settings",icon:Settings }] },
 ];
 
 export async function AdminShell({active,children}:{active:string;children:React.ReactNode}){
@@ -17,9 +18,9 @@ export async function AdminShell({active,children}:{active:string;children:React
   const preferences=operator?.preferences||{};
   const canSee=(id:string)=>{
     if (isAdmin || id==="dashboard") return true;
-    if (["members","submissions","leads"].includes(id)) return preferences.staffCanManageMembers===true;
+    if (["members","groups","participants","submissions","leads"].includes(id)) return preferences.staffCanManageMembers===true;
     if (id==="orders") return preferences.staffCanManageOrders===true;
-    if (["products","content","cohorts","reviews","articles"].includes(id)) return preferences.staffCanManageProducts===true;
+    if (["products","digital-products","content","missions","quizzes","cohorts","reviews","articles"].includes(id)) return preferences.staffCanManageProducts===true;
     return false;
   };
   const name=operator?.fullName||operator?.email?.split("@")[0]||"운영자";
