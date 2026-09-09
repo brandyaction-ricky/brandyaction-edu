@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { useSearchParams } from "next/navigation";
-import { Check, Filter, RefreshCw, Search, Tag, UserPlus, Users, X } from "lucide-react";
+import { Check, Filter, RefreshCw, Search, Tag, UserPlus, Users, Download } from "lucide-react";
+
+import { AdminDetailPanel } from "./admin-detail-panel";
+import { downloadCsv } from "@/lib/admin-participants";
 
 type Relation<T> = T | T[] | null;
 type Enrollment = { id: string; status: string; source: string; course_id: string; cohort_id: string; courses: Relation<{ id: string; title: string }>; cohorts: Relation<{ id: string; name: string }> };
@@ -47,7 +50,10 @@ export function AdminMembersManager() {
   };
   useEffect(() => { void Promise.resolve().then(load); }, []);
   const selected = data.members.find((member) => member.id === selectedId) || null;
-  const memberTagIds = useCallback((memberId: string) => data.memberTags.filter((row) => row.member_id === memberId).map((row) => row.tag_id), [data.memberTags]);
+  const tagIndex = useMemo(() => { const map = new Map<string, string[]>(); for (const row of data.memberTags) map.set(row.member_id, [...(map.get(row.member_id) || []), row.tag_id]); return map; }, [data.memberTags]);
+  const memberTagIds = useCallback((memberId: string) => tagIndex.get(memberId) || [], [tagIndex]);
+  const [page, setPage] = useState(1);
+  const perPage = 50;
   const courses = useMemo(() => {
     const map = new Map<string, string>();
     data.cohorts.forEach((cohort) => { const course = one(cohort.courses); if (course) map.set(course.id, course.title); });
@@ -64,6 +70,7 @@ export function AdminMembersManager() {
     const statusMatch = status === "all" || member.status === status;
     return textMatch && courseMatch && cohortMatch && tagMatch && statusMatch;
   }), [data, query, courseId, cohortId, tagId, status, memberTagIds]);
+  const currentPage = Math.min(page, Math.max(1, Math.ceil(visible.length / perPage)));
   const mutate = async (body: Record<string, unknown>, success: string) => {
     setSaving(true); setError(""); setMessage("");
     try { await request({ method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); setMessage(success); await load(); }
@@ -103,10 +110,10 @@ export function AdminMembersManager() {
       </div>
     </section>
     <section className="admin-panel table-panel member-results">
-      <div className="member-result-head"><div><strong>회원 목록</strong><span>{visible.length}명</span></div><button className="admin-outline" onClick={() => void load()}><RefreshCw/>새로고침</button></div>
+      <div className="member-result-head"><div><strong>회원 목록</strong><span>{visible.length}명</span></div><button className="admin-outline" onClick={() => downloadCsv("members.csv", [["이름", "이메일", "휴대폰", "상태", "가입일"], ...visible.map((member) => [member.full_name, member.email, member.phone, statusLabel[member.status], member.created_at])])}><Download/>목록 내보내기</button><button className="admin-outline" onClick={() => void load()}><RefreshCw/>새로고침</button></div>
       <div className="member-ops-table">
         <div className="member-ops-head"><span>회원</span><span>고객 태그</span><span>상품·기수</span><span>누적 결제</span><span>상태</span><span>관리</span></div>
-        {visible.map((member) => {
+        {visible.slice((currentPage - 1) * perPage, currentPage * perPage).map((member) => {
           const paid = member.orders.reduce((sum, order) => { const payment = order.payments?.[0]; return sum + Math.max(0, (payment?.approved_amount || 0) - (payment?.cancelled_amount || 0)); }, 0);
           const active = member.enrollments.filter((enrollment) => enrollment.status === "active");
           const tags = data.tags.filter((tag) => memberTagIds(member.id).includes(tag.id));
@@ -122,13 +129,14 @@ export function AdminMembersManager() {
         {!visible.length && <div className="member-empty"><Users/><strong>조건에 맞는 회원이 없습니다.</strong><span>필터를 초기화하거나 다른 조건을 선택해 보세요.</span></div>}
       </div>
     </section>
-    {selected && <div className="member-drawer-backdrop" onMouseDown={() => setSelectedId(null)}><aside className="member-drawer" onMouseDown={(event) => event.stopPropagation()}>
-      <header><div><span className="member-drawer-avatar">{(selected.full_name || selected.email)[0]}</span><div><strong>{selected.full_name || "이름 미입력"}</strong><small>{selected.email}</small></div></div><button onClick={() => setSelectedId(null)}><X/></button></header>
+    <div className="workspace-pagination"><span>총 {visible.length}명 · {currentPage} 페이지 · 50명씩 표시</span><div><button className="admin-outline" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>이전</button><button className="admin-outline" disabled={currentPage * perPage >= visible.length} onClick={() => setPage(currentPage + 1)}>다음</button></div></div>
+    {selected && <AdminDetailPanel title={selected.full_name || "회원 상세 관리"} busy={saving} onClose={() => setSelectedId(null)}><aside className="member-detail-content">
+      <header><div><span className="member-drawer-avatar">{(selected.full_name || selected.email)[0]}</span><div><strong>{selected.full_name || "이름 미입력"}</strong><small>{selected.email}</small></div></div></header>
       <section><h3>회원 상태</h3><div className="drawer-inline"><select value={selected.status} onChange={(event) => void mutate({ userId: selected.id, status: event.target.value }, "회원 상태를 저장했습니다.")} disabled={saving}><option value="active">활성</option><option value="suspended">이용 정지</option><option value="withdrawn">탈퇴</option></select>{data.operatorRole === "admin" && <select value={selected.role} onChange={(event) => void mutate({ userId: selected.id, role: event.target.value }, "회원 역할을 저장했습니다.")} disabled={saving}><option value="student">일반 회원</option><option value="staff">스태프</option><option value="admin">최고 관리자</option></select>}</div></section>
-      <section><h3>고객 태그</h3><p>자동 태그는 결제·학습 행동에 따라 갱신됩니다. 수동 태그만 여기서 지정할 수 있습니다.</p><div className="drawer-tags">{data.tags.map((tag) => <button key={tag.id} className={`${memberTagIds(selected.id).includes(tag.id) ? "selected" : ""} ${tag.tag_kind === "automatic" ? "automatic" : ""}`} style={{ "--tag-color": tag.color } as CSSProperties} onClick={() => tag.tag_kind === "manual" && void toggleTag(selected.id, tag.id)} disabled={saving || tag.tag_kind === "automatic"} title={tag.tag_kind === "automatic" ? "고객 행동에 따라 자동으로 관리됩니다." : undefined}><Tag/>{tag.name}{tag.tag_kind === "automatic" && <small>자동</small>}</button>)}{!data.tags.length && <small>고객 태그 관리 메뉴에서 첫 태그를 등록해 주세요.</small>}</div></section>
+      <section><h3>고객 태그</h3><p>자동 태그는 결제·학습 행동에 따라 갱신됩니다. 수동 태그만 여기서 지정할 수 있습니다.</p><div className="drawer-tags">{data.tags.map((tag) => <button key={tag.id} className={`${memberTagIds(selected.id).includes(tag.id) ? "selected" : ""} ${tag.tag_kind === "automatic" ? "automatic" : ""}`} style={{ "--tag-color": tag.color } as CSSProperties} onClick={() => tag.tag_kind === "manual" && void toggleTag(selected.id, tag.id)} disabled={saving || tag.tag_kind === "automatic" || data.operatorRole !== "admin"} title={tag.tag_kind === "automatic" ? "고객 행동에 따라 자동으로 관리됩니다." : undefined}><Tag/>{tag.name}{tag.tag_kind === "automatic" && <small>자동</small>}</button>)}{!data.tags.length && <small>고객 태그 관리 메뉴에서 첫 태그를 등록해 주세요.</small>}</div></section>
       <section><div className="drawer-section-head"><h3>수강권</h3><span>{selected.enrollments.length}개</span></div><div className="drawer-enrollments">{selected.enrollments.map((enrollment) => <article key={enrollment.id}><div><strong>{one(enrollment.courses)?.title}</strong><small>{one(enrollment.cohorts)?.name} · {enrollment.source === "purchase" ? "결제 발급" : "관리자 발급"}</small></div><select value={enrollment.status} onChange={(event) => void mutate({ action: "enrollment", enrollmentId: enrollment.id, status: event.target.value }, "수강권 상태를 저장했습니다.")} disabled={saving}><option value="active">활성</option><option value="revoked">중지</option><option value="expired">만료</option><option value="refunded">환불</option></select></article>)}</div><div className="drawer-grant"><select value={grantCohortId} onChange={(event) => setGrantCohortId(event.target.value)}><option value="">발급할 상품·기수 선택</option>{data.cohorts.map((cohort) => <option key={cohort.id} value={cohort.id}>{one(cohort.courses)?.title} · {cohort.name}</option>)}</select><button className="admin-primary" onClick={() => void grant()} disabled={!grantCohortId || saving}><UserPlus/>수강권 발급</button></div></section>
       <footer><span>{selected.marketing_consent ? <><Check/>마케팅 수신 동의</> : "마케팅 수신 미동의"}</span><small>{selected.phone || "휴대폰 정보 없음"}</small></footer>
-    </aside></div>}
+    </aside></AdminDetailPanel>}
     {message && <p className="admin-save-success"><Check/>{message}</p>}{error && <p className="admin-save-error" role="alert">{error}</p>}
   </div>;
 }

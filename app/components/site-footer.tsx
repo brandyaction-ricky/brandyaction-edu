@@ -12,6 +12,7 @@ export function SiteFooter() {
   const [settings, setSettings] = useState(defaultSiteSettings);
 
   useEffect(() => {
+    if (hiddenPrefixes.some((prefix) => pathname.startsWith(prefix))) return;
     let active = true;
     const refresh = () => loadSiteSettings().then((value) => { if (active) setSettings(value); }).catch(() => undefined);
     refresh();
@@ -20,7 +21,7 @@ export function SiteFooter() {
       active = false;
       window.removeEventListener("brandyaction:settings-updated", refresh);
     };
-  }, []);
+  }, [pathname]);
 
   if (hiddenPrefixes.some((prefix) => pathname.startsWith(prefix))) return null;
 

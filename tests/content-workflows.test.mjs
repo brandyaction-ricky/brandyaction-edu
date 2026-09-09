@@ -16,11 +16,40 @@ function load(name) {
 const { gradeQuiz, publicQuiz, validateQuiz } = load("mission-quiz");
 const { validateCurriculum, resourceMime, httpsUrl } = load("course-content");
 const { calculateAchievement, calculateLearningProgress, calculateLearningProgressByEnrollment } = load("achievement");
+const { reorderWeekMissions, missionSummary, missionIsVisible } = load("admin-missions");
+const { csvCell } = load("admin-participants");
 const quiz = { passPercent: 100, questions: [ { id: "q1", prompt: "Question 1", options: ["A", "B"], correctIndex: 1 }, { id: "q2", prompt: "Question 2", options: ["C", "D"], correctIndex: 0 } ] };
 const lesson = { id: "lesson1", title: "콘텐츠", description: "", kind: "텍스트", duration: "", bodyText: "내용", accessMode: "member", isPublished: true };
 const curriculum = (patch = {}) => [{ id: "week1", title: "주차", goal: "", isPublished: true, lessons: [{ ...lesson, ...patch }] }];
 
 test("all correct passes and exposes no correct indexes", () => { assert.equal(gradeQuiz(quiz, { q1: 1, q2: 0 }).passed, true); assert.ok(!JSON.stringify(publicQuiz(quiz, "rev")).includes("correctIndex")); });
+test("mission reorder preserves normal lessons, stable IDs, quiz and resource metadata", () => {
+  const a = { ...lesson, id: "a", mission: { title: "A", quiz }, resourcePath: "course/file.pdf" };
+  const b = { ...lesson, id: "b", mission: { title: "B" } };
+  const normal = { ...lesson, id: "normal" };
+  const source = [{ id: "w", lessons: [a, normal, b] }, { id: "w2", lessons: [normal] }];
+  const next = reorderWeekMissions(source, "w", "a", "b");
+  assert.deepEqual(next[0].lessons.map((item) => item.id), ["b", "normal", "a"]);
+  assert.equal(next[0].lessons[1], normal); assert.equal(next[0].lessons[2], a);
+  assert.equal(next[1], source[1]); assert.equal(source[0].lessons[0], a);
+});
+test("invalid and cross-week mission drops do not remove any lesson", () => {
+  const source = [{ id: "w", lessons: [{ ...lesson, mission: { title: "A" } }] }];
+  assert.deepEqual(reorderWeekMissions(source, "w", "lesson1", "outside"), source);
+  assert.equal(reorderWeekMissions(source, "w", "lesson1", "lesson1"), source);
+});
+test("mission visibility respects both content and week publication", () => {
+  const l = { ...lesson, mission: { title: "A", isPublished: true, quiz } };
+  assert.equal(missionIsVisible({ isPublished: false }, l), false);
+  assert.equal(missionIsVisible({}, { ...l, isPublished: false }), false);
+  const sum = missionSummary([{ isPublished: false, lessons: [l] }, { lessons: [l, { ...l, mission: { title: "B", isPublished: false } }] }]);
+  assert.deepEqual(sum, { total: 3, published: 1, private: 2, quizzes: 2 });
+});
+test("CSV exports escape cells and neutralize spreadsheet formulas", () => {
+  assert.equal(csvCell('Kim,"A"'), '"Kim,""A"""');
+  assert.equal(csvCell('=HYPERLINK("x")'), '"\'=HYPERLINK(""x"")"');
+  assert.equal(csvCell("  @SUM(1)"), '"\'  @SUM(1)"');
+});
 test("wrong answers never enter approval queue", () => { const r = gradeQuiz(quiz, { q1: 0, q2: 0 }); assert.equal(r.passed, false); assert.deepEqual(r.wrongQuestionIds, ["q1"]); assert.equal(r.score, 50); });
 test("configurable threshold uses exact ratio", () => { assert.equal(gradeQuiz({ ...quiz, passPercent: 50 }, { q1: 0, q2: 0 }).passed, true); assert.equal(gradeQuiz({ ...quiz, passPercent: 51 }, { q1: 0, q2: 0 }).passed, false); });
 for (const [label, answers] of [["missing", {}], ["string index", { q1: "1", q2: 0 }], ["out of range", { q1: 2, q2: 0 }], ["null", null], ["array", [1, 0]], ["client passed flag", { passed: true, score: 100 }]]) test(`reject ${label} quiz responses`, () => assert.throws(() => gradeQuiz(quiz, answers)));

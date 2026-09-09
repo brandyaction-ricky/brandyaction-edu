@@ -4,14 +4,19 @@ import "./globals.css";
 import { SiteFooter } from "./components/site-footer";
 import { AnalyticsTracker } from "./components/analytics-tracker";
 import { loadCodeSettings } from "@/lib/code-settings";
+import { loadSeoSettings } from "@/lib/seo-settings";
 
 export const revalidate = 300;
 
-export const metadata: Metadata = {
-  title: "브랜디액션 에듀 | 실행으로 결과를 만드는 교육",
-  description: "자영업자와 사업가를 위한 기수제 라이브 실전 교육 플랫폼",
-  icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const seo = await loadSeoSettings();
+  return {
+    title: seo.title, description: seo.description,
+    openGraph: { title: seo.title, description: seo.description, ...(seo.image ? { images: [seo.image] } : {}) },
+    robots: (process.env.NEXT_PUBLIC_APP_ENV ?? "production") !== "production" ? { index: false, follow: false } : undefined,
+    icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
+  };
+}
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const appEnvironment = process.env.NEXT_PUBLIC_APP_ENV ?? "production";

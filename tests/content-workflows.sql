@@ -5,6 +5,7 @@ declare
   actor uuid:=gen_random_uuid(); student uuid:=gen_random_uuid(); course uuid:=gen_random_uuid(); cohort uuid:=gen_random_uuid();
   ord uuid:=gen_random_uuid(); item uuid:=gen_random_uuid(); enrollment uuid:=gen_random_uuid(); wid uuid:=gen_random_uuid(); lid uuid:=gen_random_uuid(); lid2 uuid:=gen_random_uuid();
   mid uuid; rev uuid; sid uuid; sid2 uuid; payload jsonb; result jsonb; caught boolean; n integer;
+  snapshot jsonb; report jsonb; qa_group_id uuid:=gen_random_uuid();
 begin
   insert into auth.users(id,email,raw_user_meta_data) values(actor,actor::text||'@qa.invalid','{}'),(student,student::text||'@qa.invalid','{}');
   insert into public.profiles(id,email,role,status) values(actor,actor::text||'@qa.invalid','admin','active'),(student,student::text||'@qa.invalid','student','active')
@@ -61,6 +62,33 @@ begin
   begin perform public.save_course_curriculum(course,actor,'[]'); exception when raise_exception then caught:=true; end;
   assert caught, 'history blocks destructive delete';
   assert (select count(*)=2 from public.curriculum_lessons where week_id=wid), 'failed save is atomic';
+  snapshot:=public.admin_mission_workspace(course);
+  assert snapshot->>'courseId'=course::text, 'workspace selects requested course';
+  assert (snapshot->'counts'->lid::text->>'approved')::integer=1, 'approved count does not include rejected attempts';
+  assert (snapshot->'counts'->lid::text->>'pending')::integer=0, 'reviewed mission no longer pending';
+  report:=public.admin_participant_report(cohort);
+  assert (report->>'total')::integer=1, 'cohort participant count';
+  assert (report->'rows'->0->>'achievement')::integer=100 and (report->'rows'->0->>'level')::integer=5, 'approved required mission reaches completion level';
+  assert (report->'rows'->0->>'submitted')::integer=1, 'participant count ignores duplicate attempts';
+  assert (report->'rows'->0->>'learning_percent')::integer=50, 'content progress remains independent of achievement';
+  assert (public.admin_participant_report(cohort,'not-a-real-member')->>'total')::integer=0, 'participant search';
+  assert (public.admin_participant_report(cohort,'',4)->>'total')::integer=0, 'participant level filter';
+  result:=public.save_admin_mission_workspace(course,actor,jsonb_set(snapshot->'weeks','{0,goal}','"Updated safely"'),snapshot->>'revision');
+  assert result->>'revision'<>snapshot->>'revision', 'new revision returned after write';
+  caught:=false;
+  begin perform public.save_admin_mission_workspace(course,actor,snapshot->'weeks',snapshot->>'revision'); exception when serialization_failure then caught:=true; end;
+  assert caught, 'stale mission editor cannot overwrite';
+  assert (select goal='Updated safely' from public.curriculum_weeks where id=wid), 'stale save rolled back';
+  assert (select revision=rev from public.mission_quizzes where mission_id=mid), 'unchanged quiz revision survives mission workspace save';
+  insert into public.member_groups(id,name,created_by) values(qa_group_id,'QA group',actor);
+  insert into public.member_group_members(group_id,member_id) values(qa_group_id,student);
+  insert into public.member_group_members(group_id,member_id) values(qa_group_id,student) on conflict do nothing;
+  assert (select count(*)=1 from public.member_group_members gm where gm.group_id=qa_group_id), 'group membership idempotence';
+  delete from public.member_groups g where g.id=qa_group_id;
+  assert exists(select 1 from public.profiles where id=student), 'removing group preserves member';
+  assert not has_function_privilege('authenticated','public.admin_mission_workspace(uuid)','EXECUTE'), 'quiz keys not available through workspace RPC';
+  assert not has_function_privilege('anon','public.admin_participant_report(uuid,text,integer,boolean,integer)','EXECUTE'), 'participant PII not exposed';
+  assert not has_table_privilege('authenticated','public.member_group_members','INSERT'), 'no forged group membership';
   payload:=jsonb_set(payload,'{0,isPublished}','false'); perform public.save_course_curriculum(course,actor,payload);
   assert (select not is_published from public.curriculum_weeks where id=wid), 'private section saved';
   assert (select count(*)=1 from public.enrollments where id=enrollment), 'enrollment preserved';

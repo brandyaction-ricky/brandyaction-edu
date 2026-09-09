@@ -20,18 +20,19 @@ import { AdminSubmissionsManager } from "../../components/admin-submissions-mana
 import { getAdminUser, type AdminScope } from "@/lib/server-auth";
 
 const info:Record<string,{eyebrow:string,title:string,desc:string}>={
-  products:{eyebrow:"CLASSES",title:"클래스 관리",desc:"클래스 기본 정보·판매·모집 상태를 관리합니다. 콘텐츠 탭에서 영상·자료·미션을 등록할 수 있습니다."},
-  content:{eyebrow:"CONTENT STUDIO",title:"콘텐츠·미션",desc:"주차별 콘텐츠, 가입 회원 무료자료와 실행 미션·확인 퀴즈를 관리합니다."},
-  articles:{eyebrow:"GROWTH",title:"블로그 관리",desc:"칼럼·YouTube 영상과 카테고리, 회원 전용 무료강의 영역을 한곳에서 관리합니다."},
+  products:{eyebrow:"CLASSES",title:"강의 상품 관리",desc:"클래스 기본 정보·판매·모집 상태를 관리합니다. 콘텐츠 탭에서 영상·자료·미션을 등록할 수 있습니다."},
+  "digital-products":{eyebrow:"DIGITAL PRODUCTS",title:"디지털 상품 관리",desc:"자료·워크북·템플릿을 등록하고 가격·제공 파일·이용 권한을 관리합니다."},
+  content:{eyebrow:"CONTENT STUDIO",title:"커리큘럼·콘텐츠",desc:"주차별 콘텐츠, 가입 회원 무료자료와 실행 미션·확인 퀴즈를 관리합니다."},
+  articles:{eyebrow:"GROWTH",title:"아티클 관리",desc:"칼럼·YouTube 영상과 카테고리, 회원 전용 무료강의 영역을 한곳에서 관리합니다."},
   banners:{eyebrow:"BANNERS",title:"배너 관리",desc:"메인 랜딩 이미지 배너를 여러 개 등록하고 슬라이드 연결 URL을 관리합니다."},
   cohorts:{eyebrow:"COHORTS",title:"기수·회차 관리",desc:"모집 일정부터 라이브 회차와 수강생까지 기수 단위로 운영합니다."},
-  submissions:{eyebrow:"MISSION REVIEW",title:"과제 검토",desc:"교육생의 제출 내용을 확인하고 승인·반려 피드백과 달성도를 관리합니다."},
+  submissions:{eyebrow:"MISSION REVIEW",title:"미션 승인",desc:"교육생의 제출 내용을 확인하고 승인·반려 피드백과 달성도를 관리합니다."},
   members:{eyebrow:"MEMBERS",title:"회원 관리",desc:"상품·기수·고객 태그로 분류하고 수강권과 고객 상태를 한곳에서 관리합니다."},
   "member-tags":{eyebrow:"CUSTOMER TAGS",title:"고객 태그 관리",desc:"고객 분류 기준을 만들고 태그별 사용 인원을 관리합니다."},
   orders:{eyebrow:"ORDERS",title:"주문·결제 관리",desc:"프론트 결제와 연결된 상품·기수·승인·환불 데이터를 확인하고 처리합니다."},
   coupons:{eyebrow:"COUPONS",title:"쿠폰 관리",desc:"상품별 할인 조건, 사용 수량과 기간을 설정하고 실제 결제 적용 현황을 관리합니다."},
   reviews:{eyebrow:"REVIEWS",title:"후기 관리",desc:"수강 후기의 공개 상태와 메인 노출 여부를 관리합니다."},
-  "super-admins":{eyebrow:"SECURITY",title:"최고 관리자 관리",desc:"전체 운영 권한을 가진 최고 관리자 계정을 등록하고 관리합니다."},
+  "super-admins":{eyebrow:"SECURITY",title:"관리자 계정 관리",desc:"전체 운영 권한을 가진 최고 관리자 계정을 등록하고 관리합니다."},
   "code-settings":{eyebrow:"SEARCH & CODE",title:"검색 및 코드 설정",desc:"검색 소유확인과 분석·광고 코드를 전체 사이트에 적용합니다."},
   crm:{eyebrow:"MARKETING CRM",title:"마케팅 CRM",desc:"대상을 분류하고 메시지를 준비한 뒤 최종 확인을 거쳐 실제 발송합니다."},
   "message-templates":{eyebrow:"MESSAGE TEMPLATES",title:"메시지 템플릿 관리",desc:"반복 발송할 메시지 정보와 클릭 버튼을 미리 만들어 CRM에서 선택해 사용합니다."},
@@ -55,7 +56,8 @@ function SectionAction({section}:{section:string}){
 }
 
 function SectionContent({section}:{section:string}){
-  if(section==="products")return <AdminProductsManager/>;
+  if(section==="products")return <AdminProductsManager productKind="class"/>;
+  if(section==="digital-products")return <AdminProductsManager productKind="digital"/>;
   if(section==="content")return <AdminProductsManager contentMode/>;
   if(section==="banners")return <AdminBannerManager/>;
   if(section==="articles")return <AdminArticlesManager/>;
