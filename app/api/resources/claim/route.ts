@@ -13,8 +13,19 @@ export async function POST(request: Request) {
   const admin = createAdminClient();
   const profile = await admin.from("profiles").select("status").eq("id", user.id).maybeSingle();
   if (profile.error || profile.data?.status !== "active") return NextResponse.json({ error: "활성 회원 계정으로 이용해 주세요." }, { status: 403 });
-  const { data: lesson, error } = await admin.from("curriculum_lessons").select("id,content_type,lesson_contents(vod_url,resource_name,resource_storage_path,body_text,external_url),curriculum_weeks!inner(course_id,is_published,courses!inner(status))").eq("id", body.lessonId).eq("access_mode", "member").eq("is_published", true).eq("curriculum_weeks.is_published", true).eq("curriculum_weeks.courses.status", "published").maybeSingle();
+  const { data: lesson, error } = await admin.from("curriculum_lessons").select("id,content_type,access_mode,lesson_contents(vod_url,resource_name,resource_storage_path,body_text,external_url),curriculum_weeks!inner(course_id,is_published,courses!inner(status,list_price,metadata))").eq("id", body.lessonId).eq("is_published", true).eq("curriculum_weeks.is_published", true).eq("curriculum_weeks.courses.status", "published").maybeSingle();
   if (error || !lesson) return NextResponse.json({ error: "현재 제공되지 않는 콘텐츠입니다." }, { status: 404 });
+  // Free-class materials remain subject to their configured audience. Merely
+  // supplying a lesson ID never grants paid or unregistered enrollment access.
+  if (lesson.access_mode !== "member") {
+    const week = one(lesson.curriculum_weeks);
+    const course = one(week?.courses || null);
+    if (!week || !course || (course.list_price !== 0 && course.metadata?.programType !== "free") || lesson.content_type !== "material") return NextResponse.json({ error: "수강 권한이 필요한 콘텐츠입니다." }, { status: 403 });
+    const now = new Date().toISOString();
+    const enrollment = await admin.from("enrollments").select("id").eq("user_id", user.id).eq("course_id", week.course_id).eq("status", "active").lte("access_starts_at", now).or(`access_ends_at.is.null,access_ends_at.gt.${now}`).limit(1).maybeSingle();
+    if (enrollment.error) return NextResponse.json({ error: "수강 권한을 확인하지 못했습니다. 다시 시도해 주세요." }, { status: 503 });
+    if (!enrollment.data) return NextResponse.json({ error: "무료 수강 신청이 필요합니다.", code: "enrollment_required" }, { status: 403 });
+  }
   const content = one(lesson.lesson_contents);
   if (!content) return NextResponse.json({ error: "콘텐츠를 준비 중입니다." }, { status: 404 });
   let delivery: { kind: string; url?: string; name?: string; body?: string; embedUrl?: string | null } = { kind: lesson.content_type };
