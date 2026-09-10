@@ -212,3 +212,34 @@
   .admin-app h1,.admin-app .admin-page-title h1,.mission-page-header h1{font-size:20px}
   .admin-app .admin-detail-panel{width:100vw}.admin-app .workspace-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+/* Project Center surface cleanup
+ * Legacy feature modules used literal light fills. Keep every operational
+ * surface on the shared tokens so dark/light modes remain visually coherent.
+ */
+.admin-app :is(.ops-metrics>a,.ops-guide,.dashboard-decision-kpis,.dashboard-decision-kpis>article,.dashboard-learning-grid>article,.journey-kpis article,.submission-review-kpis,.submission-review-kpis button,.submission-bulk){
+  background:var(--bg2);border-color:var(--line);color:var(--ink)
+}
+.admin-app :is(.ops-metrics>a:hover,.submission-review-kpis button:hover){background:var(--bg3);border-color:var(--line2)}
+.admin-app .submission-review-kpis button.active{background:var(--primary-bg);border-top-color:var(--primary)}
+.admin-app :is(.ops-metrics span,.ops-metrics small,.ops-guide p,.submission-review-kpis span,.submission-review-kpis small,.dashboard-decision-kpis span,.dashboard-decision-kpis small,.dashboard-learning-grid span,.dashboard-learning-grid small,.journey-kpis span,.journey-kpis small){color:var(--ink3)}
+.admin-app :is(.ops-metrics strong,.submission-review-kpis strong,.dashboard-decision-kpis strong,.dashboard-learning-grid strong,.journey-kpis strong){color:var(--ink)}
+.admin-app :is(.ops-guide,.dashboard-learning-grid>article.warning){background:var(--primary-bg);border-color:var(--primary-line)}
+.admin-app :is(.dashboard-acquisition-funnel article,.journey-funnel article){background:var(--bg3);border-color:var(--line)}
+.admin-app :is(.dashboard-acquisition-funnel article.active,.journey-funnel article.complete){background:var(--primary-bg);border-color:var(--primary-line);box-shadow:inset 2px 0 var(--primary)}
+.admin-app :is(.dashboard-acquisition-funnel article strong,.journey-funnel article strong){color:var(--ink)}
+.admin-app :is(.dashboard-acquisition-funnel article>span,.dashboard-acquisition-funnel article small,.journey-funnel article>span,.journey-funnel article>em){color:var(--ink3)}
+.admin-app :is(.dashboard-campaign-table>header,.journey-campaign-head,.journey-recent-head,.journey-event-flow){background:var(--bg1);color:var(--ink3);border-color:var(--line)}
+.admin-app :is(.dashboard-campaign-table>article,.journey-campaigns>article,.journey-recent details,.journey-recent summary,.journey-event-flow>article){border-color:var(--line)}
+.admin-app .journey-action-list article{background:var(--amber-bg);border-color:rgba(224,166,66,.35)}
+.admin-app .journey-action-list article.danger{background:var(--down-bg);border-color:rgba(255,106,106,.3)}
+.admin-app .journey-action-list article.good{background:var(--up-bg);border-color:rgba(70,201,128,.3)}
+.admin-app :is(.journey-funnel header em,.journey-campaigns header em,.journey-recent header em,.journey-recent summary>b,.studio-badge:not(.live):not(.free):not(.waiting):not(.rejected)){background:var(--bg3);color:var(--ink2)}
+.admin-app .journey-recent summary>b.intent{background:var(--amber-bg);color:var(--amber)}
+.admin-app .journey-recent summary>b.completed{background:var(--up-bg);color:var(--up)}
+.admin-app :is(.status-label.refund,.status-label.danger){background:var(--down-bg);color:var(--down)}
+.admin-app :is(.submission-review-meta,.submission-review-result,.quiz-response-summary){background:var(--bg3);border-color:var(--line);color:var(--ink)}
+.admin-app :is(.submission-answer,.submission-review-card,.submission-review-list>header,.submission-pagination){border-color:var(--line)}
+.admin-app :is(.submission-pagination button,.submission-reject){background:var(--bg2);border-color:var(--line2);color:var(--ink2)}
+.admin-app :is(table th,.table-head,.data-head){background:var(--bg1)!important;color:var(--ink3);border-color:var(--line)}
+.admin-app :is(table td,.table-row,.data-row){border-color:var(--line)}
