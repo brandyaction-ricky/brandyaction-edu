@@ -30,6 +30,8 @@ git push -u origin feature/product-payment
 4. CI와 사람 검수가 모두 통과한 PR만 `main`에 병합합니다.
 5. `main` 병합 후 운영 서버를 확인하고 해당 커밋에 릴리스 태그를 붙입니다.
 
+`main`으로 향하는 PR의 source 브랜치는 반드시 `develop`이어야 합니다. 운영 장애 대응으로 `main`에 긴급 변경이 생긴 경우에는 같은 변경을 즉시 `develop`으로 역병합해 두 브랜치가 갈라지지 않게 유지합니다. CI는 `main` 대상 PR이 `develop`에서 시작했는지 검사하고, `main`과 `develop`의 push를 모두 검증합니다.
+
 운영 장애의 긴급 수정도 테스트 서버 검증을 원칙으로 합니다. 운영 데이터를 테스트하거나 운영 DB에 임시 데이터를 넣지 않습니다.
 
 ## 커밋 메시지
