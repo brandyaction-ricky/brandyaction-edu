@@ -1,3 +1,4 @@
+import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { getAuthenticatedUser } from '@/lib/server-auth';
 export async function GET(request: Request) {
@@ -13,7 +14,7 @@ export async function GET(request: Request) {
     const { data: content } = await db.from('lesson_contents').select('resource_storage_path,resource_name').eq('lesson_id', lesson).single();
     if (!content?.resource_storage_path)
         return Response.json({ error: '자료를 이용할 권한이 없습니다.' }, { status: 403 });
-    const { data, error } = await db.storage.from('course-resources').createSignedUrl(content.resource_storage_path, 60, { download: content.resource_name || true });
+    const { data, error } = await createAdminClient().storage.from('course-resources').createSignedUrl(content.resource_storage_path, 60, { download: content.resource_name || true });
     if (error || !data)
         return Response.json({ error: '자료를 다운로드하지 못했습니다.' }, { status: 503 });
     return Response.redirect(data.signedUrl, 303);
