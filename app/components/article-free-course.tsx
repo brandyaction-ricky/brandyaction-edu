@@ -17,7 +17,7 @@ export function ArticleFreeCourse({ settings, authenticated }: { settings: FreeC
       </div>
       <div className="free-class-copy">
         <span className="free-class-eyebrow">{settings.eyebrow}</span>
-        <h1>{settings.title}</h1>
+        <h2 className="ba-free-course-title">{settings.title}</h2>
         <p>{settings.description}</p>
         <div className="free-lesson-list">{settings.lessons.map((item, index) => <button type="button" className={authenticated && active === index ? "active" : ""} key={item.id} onClick={() => authenticated && setActive(index)} aria-pressed={authenticated && active === index}><span>{String(index + 1).padStart(2, "0")}</span><strong>{item.title}</strong>{authenticated ? <Play/> : <Check/>}</button>)}</div>
         <strong className="free-signup-copy">{settings.signupCopy}</strong>
