@@ -4,6 +4,7 @@ import { CreditCard, ExternalLink, Mail, ReceiptText } from "lucide-react";
 import { LearnerShell } from "../../components/learner-shell";
 import { AccountSettings } from "../../components/account-settings";
 import { WithdrawAccount } from "../../components/withdraw-account";
+import { AccountLibrary } from "../../components/account-library";
 import { safeExternalUrl } from "@/lib/safe-url";
 import { createClient } from "@/lib/supabase/server";
 import { getPublicSupport } from "@/lib/education-data";
@@ -34,10 +35,16 @@ type PaymentPayload = { virtualAccount?: { accountNumber?: string; bankCode?: st
 
 export default async function MySectionPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ section: string }>;
+  searchParams: Promise<{ enrollment?: string }>;
 }) {
   const { section } = await params;
+  if (["missions","resources","reviews","coupons","questions"].includes(section)) {
+    const { enrollment } = await searchParams;
+    return <AccountLibrary section={section} enrollmentId={enrollment}/>;
+  }
   if (!["orders", "settings"].includes(section)) redirect("/my");
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();

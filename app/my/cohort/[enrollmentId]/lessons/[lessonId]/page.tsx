@@ -42,12 +42,13 @@ export default async function LessonPage({ params }: { params: Promise<{ enrollm
           {learning.lesson.mission && <MissionSubmissionForm enrollmentId={enrollmentId} mission={learning.lesson.mission}/>}
         </section>
       </main>
-      <aside>
+      <aside className="ba-lesson-outline">
         <span>이번 콘텐츠</span>
         <strong>{learning.lesson.kind === "vod" ? <PlayCircle/> : <FileText/>}{learning.lesson.kind === "vod" ? "VOD" : "자료"}</strong>
         <p>{learning.lesson.duration || "학습시간 별도 안내"}</p>
         {learning.lesson.mission && <p className="lesson-mission-note">과제 {learning.lesson.mission.submission?.status === "approved" ? "승인 완료" : learning.lesson.mission.submission?.status === "submitted" ? "검토 대기" : "제출 필요"}</p>}
         <Link href={"/my/cohort/" + enrollmentId}>전체 커리큘럼</Link>
+        <nav aria-label="학습 커리큘럼">{learning.weeks.map(week => <details key={week.id} open={week.id === learning.week.id}><summary>WEEK {week.number} · {week.title}</summary>{week.lessons.map(lesson => <Link key={lesson.id} href={`/my/cohort/${enrollmentId}/lessons/${lesson.id}`} className={lesson.id === lessonId ? "active" : ""} aria-current={lesson.id === lessonId ? "page" : undefined}><span>{lesson.progress === 100 ? "✓" : String(lesson.day).padStart(2, "0")}</span><span>{lesson.title}<small>{lesson.mission ? "미션 포함" : lesson.kind === "vod" ? "동영상" : "학습 콘텐츠"}</small></span></Link>)}</details>)}</nav>
       </aside>
     </div>
   </LearnerShell>;

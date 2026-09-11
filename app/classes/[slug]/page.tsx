@@ -7,6 +7,7 @@ import { DetailTabs } from "../../components/detail-tabs";
 import { DetailImageStack } from "../../components/site-live-content";
 import { getPublishedClass, getPublicCourseAppearance, getPublishedReviews } from "@/lib/education-data";
 import { FreeClassDetail } from "../../components/free-class-detail";
+import { DigitalProductDetail } from "../../components/digital-product-detail";
 import "../../free-class.css";
 
 export const revalidate = 60;
@@ -16,6 +17,7 @@ export default async function ClassDetail({ params }: { params: Promise<{ slug: 
   const { slug } = await params;
   const [item,appearance,reviews] = await Promise.all([getPublishedClass(slug),getPublicCourseAppearance(slug),getPublishedReviews(slug)]);
   if (!item) notFound();
+  if (item.productKind === "digital") return <DigitalProductDetail item={item} appearance={appearance} reviews={reviews}/>;
   if (item.programType === "free" || item.price === "0원") return <FreeClassDetail item={item} appearance={appearance} reviews={reviews}/>;
   return <main><BrandHeader />
     <section className="detail-hero"><div className="container detail-hero-grid">

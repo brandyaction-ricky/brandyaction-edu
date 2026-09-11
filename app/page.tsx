@@ -1,71 +1,31 @@
 import Link from "next/link";
-import { ArrowRight, BarChart3, CalendarDays, Play, Target } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { BrandHeader } from "./components/brand-header";
-import { HomeExperience } from "./components/home-experience";
+import { ClassCard } from "./components/class-card";
 import { LandingBanner, ReviewSlider } from "./components/site-live-content";
-import { ClassCatalog } from "./components/class-catalog";
 import { getPublicBanners, getPublishedClasses, getPublishedReviewVideos } from "@/lib/education-data";
 import { getPublicArticleIndex } from "@/lib/article-data";
 
 export const revalidate = 60;
 
 export default async function Home() {
-  const [classes,banners,reviewVideos,articleIndex] = await Promise.all([getPublishedClasses(),getPublicBanners(),getPublishedReviewVideos(),getPublicArticleIndex()]);
-  // 플로팅 CTA는 실제 신청 가능한 유료 클래스만 노출하고,
-  // 여러 상품이 열려 있으면 모집 마감이 가장 가까운 상품을 우선한다.
-  const recruitingPaid = classes
-    .filter((item) => item.programType === "paid" && item.applicationOpen)
-    .sort((a, b) => {
-      const aDeadline = a.recruitmentEndAt ? new Date(a.recruitmentEndAt).getTime() : Number.POSITIVE_INFINITY;
-      const bDeadline = b.recruitmentEndAt ? new Date(b.recruitmentEndAt).getTime() : Number.POSITIVE_INFINITY;
-      return aDeadline - bDeadline || a.title.localeCompare(b.title, "ko");
-    })[0];
-  const topArticles = articleIndex.articles.filter((article) => article.landingFeaturedRank > 0).sort((a, b) => a.landingFeaturedRank - b.landingFeaturedRank).slice(0, 3);
-  return (
-    <main>
-      <BrandHeader />
-
-      <section className="home-primary-banner" id="live-classes"><div className="container"><LandingBanner banners={banners}/></div></section>
-
-      <section className="section home-program-catalog" id="programs" data-home-reveal>
-        <div className="container">
-          <ClassCatalog classes={classes}/>
-        </div>
-      </section>
-
-      {topArticles.length > 0 && <section className="landing-article-section section" data-home-reveal><div className="container"><div className="section-heading split-heading"><div><span className="section-kicker">BUSINESS GROWTH INSIGHTS</span><h2>매출이 막힌 이유를 발견하면,<br/>다음 실행이 선명해집니다</h2><p>광고비를 더 쓰기 전에 사업자들이 실제로 놓치는 유입·콘텐츠·전환·AI 활용 지점을 확인하세요.</p></div><Link className="text-link" href="/articles">실무 인사이트 전체보기 <ArrowRight/></Link></div><div className="landing-article-grid">{topArticles.map((article, index) => <article className={index === 0 ? "featured-insight" : ""} key={article.id}><Link href={`/articles/${article.slug}`}><div className="insight-card-meta"><span>{article.categoryName}</span></div><b>INSIGHT {String(index + 1).padStart(2,"0")}</b><h3>{article.title}</h3><p><strong>이 콘텐츠에서 얻는 것</strong>{article.summary}</p><footer>핵심 인사이트 확인하기 <ArrowRight/></footer></Link></article>)}</div><div className="landing-free-bridge"><div><span>무료 3강</span><strong>인사이트를 읽는 데서 멈추지 말고<br/>내 사업의 실행안으로 바꾸세요.</strong></div><p>회원가입만 하면 사업자 마케팅·AI 무료 3강을 바로 볼 수 있습니다.</p><Link href="/articles#free-class">무료 클래스 보기 <ArrowRight/></Link></div></div></section>}
-
-      <section className="section section-ink" id="philosophy" data-home-reveal>
-        <div className="container philosophy-grid">
-          <div>
-            <span className="section-kicker inverse">WHY BRANDYACTION EDU</span>
-            <h2>아는 것보다,<br />실행해 결과를 만드는 교육</h2>
-          </div>
-          <div className="principle-list">
-            <article><span>01</span><div><h3>현장에서 바로 쓰는 결과물</h3><p>매주 듣고 끝나는 강의가 아니라, 내 사업에 적용된 하나의 결과물을 완성합니다.</p></div></article>
-            <article><span>02</span><div><h3>데이터로 확인하는 변화</h3><p>조회수보다 문의·방문·구매처럼 실제 사업 성과에 가까운 지표를 추적합니다.</p></div></article>
-            <article><span>03</span><div><h3>기수와 함께하는 실행 리듬</h3><p>정해진 일정과 동료의 실행이 혼자서는 만들기 어려운 완주율을 만듭니다.</p></div></article>
-          </div>
-        </div>
-      </section>
-
-      <section className="section process-section" data-home-reveal>
-        <div className="container">
-          <div className="section-heading centered"><span className="section-kicker">WHY IT WORKS</span><h2>배우고 끝나지 않기 때문에,<br/>내 사업의 결과가 남습니다</h2><p>정답을 듣는 강의가 아니라 내 사업의 문제를 찾고, 실행하고, 데이터로 개선하는 과정입니다.</p></div>
-          <div className="process-grid">
-            <article><span className="process-icon"><Target /></span><strong>01</strong><h3>내 매출 병목부터 진단</h3><p>유입·콘텐츠·전환·재구매 중 지금 성장을 막는 한 지점을 먼저 찾습니다.</p></article>
-            <article><span className="process-icon"><CalendarDays /></span><strong>02</strong><h3>내 사업의 실행안 설계</h3><p>일반적인 사례가 아니라 내 상품과 고객에 맞춘 문구·퍼널·AI 업무 흐름을 만듭니다.</p></article>
-            <article><span className="process-icon"><Play /></span><strong>03</strong><h3>정해진 기수 안에서 실행</h3><p>라이브 일정과 과제로 미루지 않고 실제 고객에게 적용할 결과물까지 완성합니다.</p></article>
-            <article><span className="process-icon"><BarChart3 /></span><strong>04</strong><h3>데이터와 피드백으로 개선</h3><p>느낌이 아니라 반응과 전환 데이터를 확인하고 다음 실행에서 성과를 높입니다.</p></article>
-          </div>
-        </div>
-      </section>
-
-      {reviewVideos.length > 0 && <section className="section review-section" id="reviews" data-home-reveal>
-        <div className="container"><ReviewSlider videos={reviewVideos}/></div>
-      </section>}
-
-      <HomeExperience title={recruitingPaid?.title} status={recruitingPaid?.status} price={recruitingPaid?.price} schedule={`${recruitingPaid?.startDate || ""}${recruitingPaid?.schedule ? ` · ${recruitingPaid.schedule}` : ""}`} href={recruitingPaid ? `/classes/${recruitingPaid.slug}` : undefined}/>
-    </main>
-  );
+  const [classes, banners, reviewVideos, articleIndex] = await Promise.all([getPublishedClasses(), getPublicBanners(), getPublishedReviewVideos(), getPublicArticleIndex()]);
+  const free = classes.find(item => item.programType === "free" && item.applicationOpen) || classes.find(item => item.programType === "free");
+  const freeHref = free ? `/classes/${free.slug}` : "/classes";
+  const featured = classes.filter(item => item.applicationOpen).slice(0, 3);
+  const displayClasses = featured.length ? featured : classes.slice(0, 3);
+  const topArticles = [...articleIndex.articles].sort((a,b) => (a.landingFeaturedRank || 999) - (b.landingFeaturedRank || 999)).slice(0,3);
+  return <main className="ba-marketing"><BrandHeader/>
+    <section className="ba-hero"><div className="container"><div className="ba-hero-grid">
+      <div className="ba-hero-copy"><span className="ba-eyebrow">BRANDYACTION EDU · LEARN TO ACT</span><h1>배운 것을,<br/><em>내 일의 성과로.</em></h1><p>AI와 마케팅을 아는 것에서 끝내지 마세요.<br/>내 업무에 적용하고, 실행한 결과를 남기는 교육.</p><div className="ba-hero-actions"><Link href={freeHref} className="ba-button primary">무료 클래스부터 시작하기 <ArrowRight/></Link><Link href="/classes" className="ba-text-link">전체 클래스 보기 <ArrowRight/></Link></div><small>실행 중심 클래스 · 미션과 피드백으로 쌓는 변화</small></div>
+      <Link className="ba-featured-offer" href={freeHref}><div className="ba-offer-top"><span className="ba-eyebrow">YOUR FIRST ACTION</span><span className="ba-offer-status">{free?.status || "다음 클래스 준비 중"}</span></div><div className="ba-offer-content"><span>01 / 내 업무를 바꾸는 첫 클래스</span><h2>{free?.title || "배움에서 실행으로,\n첫걸음을 함께."}</h2><p>{free?.summary || "새로운 교육과 자료를 준비하고 있습니다. 전체 클래스에서 공개된 과정을 확인해 보세요."}</p></div>{free && <dl className="ba-offer-spec"><div><dt>일정</dt><dd>{free.startDate}</dd></div><div><dt>진행</dt><dd>{free.schedule}</dd></div><div><dt>참가비</dt><dd>무료</dd></div></dl>}<div className="ba-offer-bottom"><span>클래스 자세히 보기</span><ArrowRight/></div></Link>
+    </div><div className="ba-hero-bottom"><span>지식을 넘어, 실행이 남는 학습.</span><span>LEARN. APPLY. REPEAT.</span></div></div></section>
+    <div className="container">
+      {banners.length > 0 && <section className="ba-campaign" aria-label="클래스 소식"><LandingBanner banners={banners}/></section>}
+      <section className="ba-section" id="programs"><div className="ba-section-head"><div><span className="ba-eyebrow">01 / NEXT PROGRAM</span><h2>지금 참여할 수 있는 클래스</h2><p>시작의 크기는 달라도, 목표는 실제 업무의 변화입니다.</p></div><Link href="/classes" className="ba-text-link">모든 클래스 <ArrowRight/></Link></div>{displayClasses.length ? <div className="ba-course-grid">{displayClasses.map(item => <ClassCard item={item} key={item.slug}/>)}</div> : <div className="ba-empty"><h3>새로운 클래스를 준비하고 있습니다.</h3><p>공개되면 모집 일정과 함께 안내하겠습니다.</p></div>}</section>
+      <section className="ba-execution" id="philosophy"><div><span className="ba-eyebrow">02 / THE WAY WE LEARN</span><h2>시청에서 멈추지 않는<br/>학습의 구조.</h2><p>강의마다 다음 행동이 있습니다.<br/>작게 적용하고, 기록하고, 다시 개선합니다.</p><Link href="/my" className="ba-text-link">나의 학습으로 <ArrowRight/></Link></div><ol>{[["내 문제로 배웁니다","지금 내 업무에서 해결할 문제를 정하고 필요한 개념을 배웁니다."],["미션으로 실행합니다","배운 내용을 적용한 과정과 결과물을 남깁니다."],["피드백으로 다음을 만듭니다","잘된 점과 보완할 점을 확인하고, 다음 실행으로 이어갑니다."]].map(([title,copy],index) => <li key={title}><span>0{index+1}</span><div><h3>{title}</h3><p>{copy}</p></div></li>)}</ol></section>
+      {topArticles.length > 0 && <section className="ba-section"><div className="ba-section-head"><div><span className="ba-eyebrow">03 / INSIGHT TO ACTION</span><h2>일하는 방식을 바꾸는 인사이트</h2><p>내 업무에 가져갈 수 있는 구체적인 관점과 방법.</p></div><Link href="/articles" className="ba-text-link">아티클 전체 보기 <ArrowRight/></Link></div><div className="ba-editorial-grid">{topArticles.map(article => <Link className="ba-editorial-card" key={article.id} href={`/articles/${article.slug}`}><span className="ba-badge">{article.categoryName}</span><h3>{article.title}</h3><p>{article.summary}</p><span className="ba-text-link">인사이트 읽기 <ArrowRight/></span></Link>)}</div></section>}
+      {reviewVideos.length > 0 && <section className="ba-section" id="reviews"><div className="ba-section-head"><div><span className="ba-eyebrow">04 / LEARNING IN PRACTICE</span><h2>실행한 과정이, 다음 사람의 시작으로.</h2></div><Link className="ba-text-link" href="/stories">고객 이야기 <ArrowRight/></Link></div><ReviewSlider videos={reviewVideos}/></section>}
+    </div><section className="ba-final-offer"><div className="container"><div><span className="ba-eyebrow">YOUR NEXT ACTION</span><h2>첫 실행은, 무료 클래스에서.</h2><p>내 업무 한 가지를 떠올리고 시작해 보세요.</p></div><Link href={freeHref} className="ba-button primary">무료 클래스 살펴보기 <ArrowRight/></Link></div></section>
+  </main>;
 }

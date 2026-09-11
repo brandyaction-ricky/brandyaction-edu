@@ -55,7 +55,7 @@ export function MissionSubmissionForm({ enrollmentId, mission }: { enrollmentId:
     finally { setPending(false); }
   };
 
-  return <section className="mission-submission-card">
+  return <section className="mission-submission-card" id="mission">
     <header><div><span>{mission.required ? "필수 과제" : "선택 과제"}</span><h2>{mission.title}</h2></div>{status && <strong className={"mission-status " + status}>{status === "approved" ? "승인 완료" : status === "submitted" ? "검토 대기" : "보완 필요"}</strong>}</header>
     {mission.instructions && <p>{mission.instructions}</p>}
     {status === "approved" ? <div className="mission-result approved"><CheckCircle2/><span><strong>과제가 승인됐습니다.</strong><small>달성도와 레벨에 반영되었습니다.</small></span></div>
@@ -67,6 +67,7 @@ export function MissionSubmissionForm({ enrollmentId, mission }: { enrollmentId:
         {mission.quiz && <div className="learner-quiz"><h3>확인 퀴즈</h3><p>{mission.quiz.passPercent}% 이상 정답이면 관리자 승인 대기로 접수됩니다.</p>{mission.quiz.questions.map((q, i) => <fieldset key={q.id} disabled={pending}><legend>{i + 1}. {q.prompt}</legend>{q.options.map((option, oi) => <label key={oi}><input type="radio" name={`quiz-${q.id}`} checked={quizAnswers[q.id] === oi} onChange={() => setQuizAnswers((current) => ({ ...current, [q.id]: oi }))}/><span>{option}</span></label>)}{quizFeedback?.wrongQuestionIds.includes(q.id) && <p className="quiz-wrong">다시 확인해 주세요.</p>}</fieldset>)}{quizFeedback && <p className="quiz-wrong" role="status">{quizFeedback.score}점 · 통과 기준에 도달하지 못했습니다. 표시된 문항을 확인하고 재응시하세요. 아직 승인 대기로 제출되지 않았습니다.</p>}</div>}
         <button className="mission-submit-button" onClick={submit} disabled={pending || Boolean(mission.quiz?.questions.some((q) => quizAnswers[q.id] === undefined))}><Send/>{pending ? "제출 중..." : quizFeedback ? "퀴즈 재응시·제출" : mission.quiz ? "퀴즈 채점·미션 제출" : mission.submission ? "과제 재제출" : "과제 제출"}</button>
       </> : null}
+    {!canResubmit && mission.submission && <div className="ba-submission-record"><h3>내 제출 내역</h3>{mission.submission.answerText && <p>{mission.submission.answerText}</p>}{mission.submission.evidenceUrl && <p>제출 링크 · {mission.submission.evidenceUrl}</p>}{mission.submission.feedback && <blockquote className="ba-feedback"><strong>관리자 피드백</strong><p>{mission.submission.feedback}</p></blockquote>}</div>}
     {error && <p className="mission-submit-error" role="alert">{error}</p>}
   </section>;
 }
@@ -79,11 +80,14 @@ export function ReviewForm({ courseId, cohortId, authorName, courseTitle }: { co
   const [pending, setPending] = useState(false);
   const submit = async () => {
     setPending(true); setMessage("");
-    const response = await fetch("/api/reviews", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ courseId, cohortId, nickname, rating, body }) });
-    const result = await response.json() as { error?: string };
-    setMessage(response.ok ? "후기가 접수되었습니다. 관리자 확인 후 공개됩니다." : result.error || "후기를 저장하지 못했습니다.");
-    if (response.ok) setBody("");
-    setPending(false);
+    try {
+      const response = await fetch("/api/reviews", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ courseId, cohortId, nickname, rating, body }) });
+      const result = await response.json() as { error?: string };
+      setMessage(response.ok ? "후기가 접수되었습니다. 관리자 확인 후 공개됩니다." : result.error || "후기를 저장하지 못했습니다.");
+      if (response.ok) setBody("");
+    } catch {
+      setMessage("연결을 확인하고 다시 시도해 주세요. 입력한 내용은 유지됩니다.");
+    } finally { setPending(false); }
   };
   return <section className="learning-review-form"><div><Star/><h2>수강 후기 작성</h2><p>승인 후 고객 화면에 공개됩니다.</p></div><label>작성자<input value={authorName} readOnly/><small>계정 이름은 안전하게 마스킹됩니다.</small></label><label>공개 이름<input value={nickname} onChange={(event) => setNickname(event.target.value)} minLength={2} maxLength={20} placeholder="예: 김대표"/></label><label>상품<input value={courseTitle} readOnly/></label><label>별점<select value={rating} onChange={(event) => setRating(Number(event.target.value))}>{[5,4,3,2,1].map((value) => <option value={value} key={value}>{"★".repeat(value)} {value}점</option>)}</select></label><label className="review-body-field">후기<textarea value={body} onChange={(event) => setBody(event.target.value)} minLength={10} maxLength={2000} placeholder="수강 전 문제와 수강 후 달라진 점을 10자 이상 작성해 주세요."/></label><button onClick={submit} disabled={pending || nickname.trim().length < 2 || body.trim().length < 10}>{pending ? "접수 중..." : "후기 등록"}</button>{message && <p role="status">{message}</p>}</section>;
 }
