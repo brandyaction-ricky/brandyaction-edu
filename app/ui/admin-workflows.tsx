@@ -14,6 +14,9 @@ type Props = {
     send: WorkflowSend;
     pending: boolean;
     selection?: string[];
+    pagination?: { page: number; pageSize: number; total: number } | null;
+    setPage?: (page: number) => void;
+    loading?: boolean;
 };
 const rows = (data: Data, key: string) => data[key] || [];
 const named = (row?: Row) => t(row, 'title') || t(row, 'name') || t(row, 'full_name') || t(row, 'email');
@@ -1247,13 +1250,12 @@ function Analytics() {
         </>
     );
 }
-function OrdersPanel({ data, send, pending }: Props) {
+function OrdersPanel({ data, send, pending, pagination, setPage, loading }: Props) {
     const [query, setQuery] = useState('');
     const [status, setStatus] = useState('');
     const [from, setFrom] = useState('');
     const [to, setTo] = useState('');
     const [course, setCourse] = useState('');
-    const [page, setPage] = useState(1);
     const orders = rows(data, 'orders').filter(
         (o) =>
             (!status || o.status === status) &&
@@ -1276,7 +1278,6 @@ function OrdersPanel({ data, send, pending }: Props) {
     const payments = rows(data, 'payments').filter((p) => ids.has(t(p, 'order_id')));
     const paid = payments.reduce((sum, p) => sum + Number(p.approved_amount || 0), 0);
     const refunded = payments.reduce((sum, p) => sum + Number(p.cancelled_amount || 0), 0);
-    const currentPage = Math.min(page, Math.max(1, Math.ceil(orders.length / 30)));
     return (
         <>
             <div className="admin-toolbar-v2">
@@ -1284,10 +1285,9 @@ function OrdersPanel({ data, send, pending }: Props) {
                     type="search"
                     value={query}
                     aria-label="주문 검색"
-                    placeholder="주문번호·회원·상품 검색"
+                    placeholder="현재 페이지 주문번호·회원·상품 검색"
                     onChange={(e) => {
                         setQuery(e.target.value);
-                        setPage(1);
                     }}
                 />
                 <select
@@ -1295,7 +1295,6 @@ function OrdersPanel({ data, send, pending }: Props) {
                     value={course}
                     onChange={(e) => {
                         setCourse(e.target.value);
-                        setPage(1);
                     }}
                 >
                     <option value="">전체 상품</option>
@@ -1310,7 +1309,6 @@ function OrdersPanel({ data, send, pending }: Props) {
                     value={status}
                     onChange={(e) => {
                         setStatus(e.target.value);
-                        setPage(1);
                     }}
                 >
                     <option value="">전체 상태</option>
@@ -1326,7 +1324,6 @@ function OrdersPanel({ data, send, pending }: Props) {
                         value={from}
                         onChange={(e) => {
                             setFrom(e.target.value);
-                            setPage(1);
                         }}
                     />
                 </Field>
@@ -1336,17 +1333,16 @@ function OrdersPanel({ data, send, pending }: Props) {
                         value={to}
                         onChange={(e) => {
                             setTo(e.target.value);
-                            setPage(1);
                         }}
                     />
                 </Field>
             </div>
             <div className="stats-row mb24">
                 {[
-                    ['승인 결제액', money(paid)],
-                    ['환불 완료액', money(refunded)],
-                    ['순결제액', money(paid - refunded)],
-                    ['주문 수', orders.length],
+                    ['현재 페이지 승인 결제액', money(paid)],
+                    ['현재 페이지 환불 완료액', money(refunded)],
+                    ['현재 페이지 순결제액', money(paid - refunded)],
+                    ['현재 페이지 주문 수', orders.length],
                 ].map(([label, value]) => (
                     <div className="stat-card" key={label}>
                         <span>{label}</span>
@@ -1355,7 +1351,7 @@ function OrdersPanel({ data, send, pending }: Props) {
                 ))}
             </div>
             <div className="stack">
-                {orders.slice((currentPage - 1) * 30, currentPage * 30).map((o) => {
+                {orders.map((o) => {
                     const items = rows(data, 'order_items').filter((i) => i.order_id === o.id);
                     const payments = rows(data, 'payments').filter((p) => p.order_id === o.id);
                     return (
@@ -1410,17 +1406,17 @@ function OrdersPanel({ data, send, pending }: Props) {
                 })}
                 {!orders.length && <p className="panel pad muted">조건에 맞는 주문이 없습니다.</p>}
             </div>
-            <div className="workflow-pagination">
-                <button className="btn" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>
+            {pagination && pagination.total > pagination.pageSize && <div className="workflow-pagination">
+                <button className="btn" disabled={loading || pagination.page <= 1} onClick={() => setPage?.(pagination.page - 1)}>
                     이전
                 </button>
                 <span>
-                    {currentPage} / {Math.max(1, Math.ceil(orders.length / 30))} 페이지
+                    {pagination.page} / {Math.max(1, Math.ceil(pagination.total / pagination.pageSize))} 페이지 · 전체 {pagination.total}건
                 </span>
-                <button className="btn" disabled={currentPage * 30 >= orders.length} onClick={() => setPage(currentPage + 1)}>
+                <button className="btn" disabled={loading || pagination.page * pagination.pageSize >= pagination.total} onClick={() => setPage?.(pagination.page + 1)}>
                     다음
                 </button>
-            </div>
+            </div>}
         </>
     );
 }

@@ -1551,7 +1551,7 @@ export function Platform({ path, user: initialUser }: { path: string[]; user: Us
                                 </div>
                             </>
                         ) : standaloneAdmin.includes(sec.key) ? (
-                            <AdminWorkflows section={sec.key} data={data} send={send} pending={pending} />
+                            <AdminWorkflows section={sec.key} data={data} send={send} pending={pending} pagination={pagination} setPage={setAdminPage} loading={loading} />
                         ) : (
                             <>
                                 <AdminWorkflows section={sec.key} data={data} send={send} pending={pending} selection={selection} />

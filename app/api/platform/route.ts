@@ -25,7 +25,7 @@ export async function GET(request: Request) {
         const adminMode = params.get('admin') === '1';
         const sectionKey = params.get('section') || 'home';
         const page = Math.max(1, Math.min(100000, Number(params.get('page')) || 1));
-        const pageSize = 100;
+        const pageSize = sectionKey === 'orders' ? 30 : 100;
         const operator = adminMode ? await getOperatorUser(sectionScopes[sectionKey]) : null;
         if (adminMode && (!operator || (sectionKey === 'staff' && operator.role !== 'admin'))) return reply({ error: '이 화면에 접근할 운영 권한이 필요합니다.' }, 403);
         const db = adminMode ? createAdminClient() : await createClient();
@@ -34,10 +34,12 @@ export async function GET(request: Request) {
         if (adminMode && sectionKey === 'home' && operator?.role === 'staff') tables = tables.filter((table) => (['courses', 'cohorts'].includes(table) && operator.permissions.products) || (['mission_submissions', 'edu_questions'].includes(table) && operator.permissions.members));
         const data: Record<string, Row[]> = {};
         let pagination: { page: number; pageSize: number; total: number } | null = null;
+        const primaryTable = sections.find((section) => section.key === sectionKey)?.table;
+        const deferredOrderTables = adminMode && sectionKey === 'orders' ? new Set(['order_items', 'payments', 'enrollments', 'edu_refund_requests']) : new Set<string>();
         await Promise.all(
-            tables.map(async (table) => {
+            tables.filter((table) => !deferredOrderTables.has(table)).map(async (table) => {
                 const columns = table === 'payments' ? 'id,order_id,method,status,approved_amount,cancelled_amount,receipt_url,approved_at,created_at' : table === 'edu_refund_requests' ? 'id,payment_id,amount,reason,status,created_at' : table === 'reviews' && !adminMode ? 'id,course_id,author_name,author_nickname,rating,body,is_featured,display_order,published_at,created_at' : '*';
-                const serverPaged = adminMode && table === adminTables[sectionKey]?.[0] && !['home', 'members', 'reviews', 'analytics', 'metrics', 'seo', 'settings', 'orders', 'staff', 'templates', 'campaigns', 'automations'].includes(sectionKey);
+                const serverPaged = adminMode && table === primaryTable && !['home', 'members', 'reviews', 'analytics', 'metrics', 'seo', 'settings', 'staff', 'templates', 'campaigns', 'automations'].includes(sectionKey);
                 let query = db.from(table).select(columns, serverPaged ? { count: 'exact' } : undefined);
                 query = serverPaged ? query.range((page - 1) * pageSize, page * pageSize - 1) : query.limit(1000);
                 if (table === 'edu_questions' && !adminMode) query = query.eq('is_archived', false);
@@ -58,6 +60,33 @@ export async function GET(request: Request) {
                 if (serverPaged) pagination = { page, pageSize, total: r.count || 0 };
             }),
         );
+        if (adminMode && sectionKey === 'orders') {
+            const orderIds = (data.orders || []).map((row) => row.id).filter(Boolean);
+            data.order_items = [];
+            data.payments = [];
+            data.enrollments = [];
+            data.edu_refund_requests = [];
+            if (orderIds.length) {
+                const [items, payments] = await Promise.all([
+                    db.from('order_items').select('*').in('order_id', orderIds),
+                    db.from('payments').select('id,order_id,method,status,approved_amount,cancelled_amount,receipt_url,approved_at,created_at').in('order_id', orderIds),
+                ]);
+                if (items.error) throw items.error;
+                if (payments.error) throw payments.error;
+                data.order_items = (items.data || []) as Row[];
+                data.payments = (payments.data || []) as Row[];
+                const itemIds = data.order_items.map((row) => row.id).filter(Boolean);
+                const paymentIds = data.payments.map((row) => row.id).filter(Boolean);
+                const [enrollments, refunds] = await Promise.all([
+                    itemIds.length ? db.from('enrollments').select('*').in('order_item_id', itemIds) : Promise.resolve({ data: [], error: null }),
+                    paymentIds.length ? db.from('edu_refund_requests').select('id,payment_id,amount,reason,status,created_at').in('payment_id', paymentIds) : Promise.resolve({ data: [], error: null }),
+                ]);
+                if (enrollments.error) throw enrollments.error;
+                if (refunds.error) throw refunds.error;
+                data.enrollments = (enrollments.data || []) as Row[];
+                data.edu_refund_requests = (refunds.data || []) as Row[];
+            }
+        }
         if (user && !adminMode) {
             for (const table of ['enrollments', 'orders', 'edu_questions', 'customer_coupons', 'edu_mission_drafts']) {
                 const columns = table === 'customer_coupons' ? '*,coupon:coupons(name,code,discount_type,discount_value,ends_at)' : '*';
