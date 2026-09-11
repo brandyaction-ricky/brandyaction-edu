@@ -47,6 +47,7 @@ function handler(user) {
  '@/lib/mission-quiz':quiz,
  '@/lib/platform':load('lib/platform.ts'),
  '@/lib/refunds':{processRefund:async()=>{throw Error('unexpected refund provider call');}},
+ '@/lib/operator-permissions':{permissionsFor:async u=>({products:u?.role==='admin',members:u?.role==='admin',orders:u?.role==='admin',content:u?.role==='admin',marketing:u?.role==='admin'}),normalizeOperatorPermissions:v=>v||{}},
  });return {...exports,calls};
 }
 const request=(body,origin='https://example.com')=>new Request('https://example.com/api/platform/workflows',{method:'POST',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify(body)});
