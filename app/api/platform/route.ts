@@ -5,6 +5,7 @@ import { sections, safeUrl, type Row } from '@/lib/platform';
 import { hasLearningAccess } from '@/lib/platform-rules';
 import { getEduSettings } from '@/lib/edu-settings';
 import { gradeQuiz, type QuizDefinition } from '@/lib/mission-quiz';
+import { adminTables, archiveValues, phoneNumber, validImage, assetPath, databaseMessage } from '@/lib/qa-rules';
 import { POLICY_VERSION } from '@/lib/legal-policies';
 const reply = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
 const uid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
@@ -12,14 +13,18 @@ function fail(message: string, status = 400): never { throw Object.assign(new Er
 export async function GET(request: Request) {
     try {
         const user = await getAuthenticatedUser();
-        const adminMode = new URL(request.url).searchParams.get('admin') === '1';
+        const params = new URL(request.url).searchParams;
+        const adminMode = params.get('admin') === '1';
+        const sectionKey = params.get('section') || 'home';
         if (adminMode && user?.role !== 'admin')
             return reply({ error: '관리자 권한이 필요합니다.' }, 403);
         const db = adminMode ? createAdminClient() : await createClient();
-        const tables = adminMode ? [...new Set([...sections.map(s => s.table), 'enrollments', 'curriculum_weeks', 'curriculum_lessons', 'lesson_contents', 'curriculum_missions', 'mission_quizzes', 'cohort_sessions', 'cohort_session_contents', 'crm_member_tags', 'customer_coupons', 'lesson_progress', 'payments', 'order_items'])] : ['courses', 'cohorts', 'curriculum_weeks', 'curriculum_lessons', 'articles', 'review_videos', 'site_banners', 'reviews', 'cohort_sessions'];
+        if (adminMode && !Object.hasOwn(adminTables, sectionKey)) return reply({ error: '조회 화면을 확인해 주세요.' }, 400);
+        const tables = adminMode ? adminTables[sectionKey] : ['courses', 'cohorts', 'curriculum_weeks', 'curriculum_lessons', 'articles', 'review_videos', 'site_banners', 'reviews', 'cohort_sessions'];
         const data: Record<string, Row[]> = {};
         await Promise.all(tables.map(async (table) => {
-            let query = db.from(table).select(table === 'payments' ? 'id,order_id,method,status,approved_amount,cancelled_amount,receipt_url,approved_at,created_at' : '*').limit(1000);
+            let query = db.from(table).select(table === 'payments' ? 'id,order_id,method,status,approved_amount,cancelled_amount,receipt_url,approved_at,created_at' : table === 'edu_refund_requests' ? 'id,payment_id,amount,reason,status,created_at' : table === 'reviews' && !adminMode ? 'id,course_id,author_name,author_nickname,rating,body,is_featured,display_order,published_at,created_at' : '*').limit(1000);
+            if (table === 'edu_questions' && !adminMode) query = query.eq('is_archived', false);
             if (['courses', 'review_videos', 'site_banners', 'curriculum_lessons', 'reviews'].includes(table)) query = query.order('display_order');
             else if (table === 'curriculum_weeks') query = query.order('week_number');
             else if (table === 'lesson_progress') query = query.order('updated_at', { ascending: false });
@@ -41,7 +46,9 @@ export async function GET(request: Request) {
         if (user && !adminMode) {
             for (const table of ['enrollments', 'orders', 'edu_questions', 'customer_coupons', 'edu_mission_drafts']) {
                 const columns = table === 'customer_coupons' ? '*,coupon:coupons(name,code,discount_type,discount_value,ends_at)' : '*';
-                const r = await db.from(table).select(columns).eq('user_id', user.id).limit(1000);
+                let query = db.from(table).select(columns).eq('user_id', user.id).limit(1000);
+                if (table === 'edu_questions') query = query.eq('is_archived', false);
+                const r = await query;
                 if (r.error)
                     throw r.error;
                 data[table] = r.data as unknown as Row[];
@@ -89,7 +96,24 @@ export async function GET(request: Request) {
             const now = Date.now();
             data.site_banners = (data.site_banners || []).filter(b => (!b.starts_at || Date.parse(String(b.starts_at)) <= now) && (!b.ends_at || Date.parse(String(b.ends_at)) > now));
         }
+        if (adminMode) {
+            const summary = await db.rpc('edu_admin_summary');
+            if (summary.error) throw summary.error;
+            data.admin_summary = [summary.data as Row];
+        }
         const {operations}=await getEduSettings();
+        if (adminMode && data.site_settings) {
+            const setting = data.site_settings.find(r => r.key === 'edu_operations');
+            if (setting) setting.value = operations;
+            else data.site_settings.push({ id: 'edu_operations', key: 'edu_operations', value: operations });
+        }
+        if (!adminMode) for (const course of data.courses || []) {
+            const metadata = course.metadata as Record<string, unknown> | null;
+            if (metadata) for (const key of ['thumbnailUrl', 'thumbnail_url', 'detailImageUrl', 'detail_image_url']) {
+                const value = metadata[key];
+                if (typeof value === 'string' && value && !/^https?:\/\//.test(value) && !value.startsWith('/')) metadata[key] = process.env.NEXT_PUBLIC_SUPABASE_URL + '/storage/v1/object/public/course-assets/' + value;
+            }
+        }
         return reply({ user, data, support: { email: typeof operations.supportEmail === 'string' ? operations.supportEmail : '', url: typeof operations.supportUrl === 'string' ? operations.supportUrl : '' } });
     }
     catch (error) {
@@ -108,6 +132,15 @@ export async function POST(request: Request) {
         const body = await request.json() as Record<string, unknown>;
         const action = String(body.action || '');
         const db = createAdminClient();
+        if (action === 'archive') {
+            if (user.role !== 'admin') return reply({ error: '관리자 권한이 필요합니다.' }, 403);
+            const section = sections.find(s => s.key === body.section);
+            const ids = body.ids;
+            if (!section || !archiveValues[section.key] || !Array.isArray(ids) || !ids.length || ids.length > 50 || !ids.every(uid)) fail('보관할 항목을 최대 50개까지 선택해 주세요.');
+            const result = await db.rpc('edu_archive_records', { p_actor: user.id, p_section: section.key, p_ids: [...new Set(ids)] });
+            if (result.error) throw result.error;
+            return reply({ ok: true, result: result.data });
+        }
         if (action === 'save') {
             if (user.role !== 'admin')
                 return reply({ error: '관리자 권한이 필요합니다.' }, 403);
@@ -116,6 +149,7 @@ export async function POST(request: Request) {
                 fail('수정할 수 없는 항목입니다.');
             const input = (body.values || {}) as Record<string, unknown>;
             const values: Record<string, unknown> = {};
+            if (body.id && archiveValues[section.key]) values.archived_at = null;
             for (const field of section.fields) {
                 if (field.key in input) {
                     const value = input[field.key];
@@ -124,11 +158,12 @@ export async function POST(request: Request) {
                     if (field.type === 'number' && value !== null && (!Number.isFinite(Number(value)) || Number(value) < 0))
                         fail('숫자를 확인해 주세요.');
                     if (field.type === 'checkbox' && typeof value !== 'boolean') fail('선택 항목을 확인해 주세요.');
-                    if (['url', 'image'].includes(field.type || '') && value && !safeUrl(value)) fail(`${field.label} 주소를 확인해 주세요.`);
+                    if (field.type === 'url' && value && !safeUrl(value)) fail(`${field.label} 주소를 확인해 주세요.`);
+                    if (field.type === 'image' && value && !validImage(value)) fail(`${field.label}은 https 이미지 주소 또는 업로드한 이미지 경로를 입력해 주세요.`);
                     if (field.type === 'datetime-local' && value && !Number.isFinite(Date.parse(String(value)))) fail('날짜를 확인해 주세요.');
                     if (field.options && !field.options.includes(String(value)))
                         fail('선택값을 확인해 주세요.');
-                    values[field.key] = value;
+                    values[field.key] = field.type === 'image' ? assetPath(value, process.env.NEXT_PUBLIC_SUPABASE_URL || '') || null : value;
                 }
             }
             if (!body.id) {
@@ -136,6 +171,8 @@ export async function POST(request: Request) {
                     if (!(field.key in values))
                         fail(`${field.label}을 입력해 주세요.`);
             }
+            if (section.table === 'cohorts' && values.capacity !== undefined && values.capacity !== null && (!Number.isSafeInteger(values.capacity) || Number(values.capacity) < 1)) fail('정원은 1명 이상의 정수로 입력해 주세요.');
+            if (section.table === 'profiles' && 'phone' in values) { try { values.phone = phoneNumber(values.phone); } catch (e) { fail((e as Error).message); } }
             if (['courses','articles'].includes(section.table) && values.slug && !/^[a-z0-9-]+$/.test(String(values.slug))) fail('페이지 주소는 영문 소문자·숫자·하이픈으로 입력해 주세요.');
             if (section.table === 'courses') {
                 const { data: previous } = body.id ? await db.from('courses').select('metadata').eq('id', body.id).single() : { data: null };
@@ -186,10 +223,11 @@ export async function POST(request: Request) {
                 values.is_public = false;
             }
             const key = section.table === 'site_settings' ? 'key' : section.table === 'lesson_contents' ? 'lesson_id' : 'id';
-            const result = body.id ? await db.from(section.table).update(values).eq(key, body.id).select().single() : await db.from(section.table).insert(values).select().single();
+            if (!body.id && !uid(body.requestId)) fail('새 등록 요청을 다시 열고 저장해 주세요.');
+            const result = body.id ? await db.from(section.table).update(values).eq(key, body.id).select().single() : await db.rpc('edu_create_record', { p_actor: user.id, p_request: body.requestId, p_table: section.table, p_values: values });
             if (result.error) {
-                console.error(result.error);
-                fail('저장하지 못했습니다. 중복 코드와 필수 항목을 확인해 주세요.', 409);
+                if (!['23505', '23514', '23503', '23502', 'P0001'].includes(result.error.code)) console.error('platform save', result.error.code);
+                fail(databaseMessage(result.error.code), 409);
             }
             return reply({ ok: true, row: result.data });
         }
@@ -197,7 +235,9 @@ export async function POST(request: Request) {
             const name = String(body.name || '').trim();
             if (!name || name.length > 80)
                 fail('이름을 확인해 주세요.');
-            const r = await db.from('profiles').update({ full_name: name, phone: String(body.phone || '').replace(/\D/g, '') }).eq('id', user.id);
+            let phone;
+            try { phone = phoneNumber(body.phone); } catch (e) { fail((e as Error).message); }
+            const r = await db.from('profiles').update({ full_name: name, phone }).eq('id', user.id);
             if (r.error)
                 throw r.error;
             return reply({ ok: true });
@@ -206,7 +246,8 @@ export async function POST(request: Request) {
             const title = String(body.title || '').trim(), content = String(body.content || '').trim();
             if (!title || !content || title.length > 200 || content.length > 10000)
                 fail('질문 제목과 내용을 확인해 주세요.');
-            const r = await db.from('edu_questions').insert({ user_id: user.id, title, content, course_id: uid(body.courseId) ? body.courseId : null });
+            if (!uid(body.requestId)) fail('질문 입력 화면을 새로 열고 등록해 주세요.');
+            const r = await db.rpc('edu_create_record', { p_actor: user.id, p_request: body.requestId, p_table: 'edu_questions', p_values: { user_id: user.id, title, content, course_id: uid(body.courseId) ? body.courseId : null } });
             if (r.error)
                 throw r.error;
             return reply({ ok: true });
@@ -214,8 +255,9 @@ export async function POST(request: Request) {
         if (action === 'order') {
             if (!uid(body.cohortId) || body.agreed !== true)
                 fail('상품과 필수 동의를 확인해 주세요.');
-            const phone = String(body.phone || '').replace(/\D/g, '');
-            if (!/^0\d{9,10}$/.test(phone) || !String(body.name || '').trim())
+            let phone;
+            try { phone = phoneNumber(body.phone, true); } catch (e) { fail((e as Error).message); }
+            if (!phone || !String(body.name || '').trim())
                 fail('신청자 이름과 연락처를 확인해 주세요.');
             const r = await db.rpc('create_checkout_order', { p_user_id: user.id, p_cohort_id: body.cohortId, p_customer_name: String(body.name).trim(), p_customer_email: user.email, p_customer_phone: phone, p_terms_version: POLICY_VERSION, p_privacy_version: POLICY_VERSION, p_refund_policy_version: POLICY_VERSION });
             if (r.error) {
@@ -302,7 +344,7 @@ export async function POST(request: Request) {
         const e = error as Error & {
             status?: number;
         };
-        console.error('platform write', e);
+        if (!e.status || e.status >= 500) console.error('platform write', (e as Error & { code?: string }).code || 'unexpected');
         return reply({ error: e.status ? e.message : '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.' }, e.status || 500);
     }
 }

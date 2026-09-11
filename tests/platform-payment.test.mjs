@@ -36,10 +36,10 @@ test('mismatched provider receipts cannot grant an enrollment', async () => {
 });
 test('a verified payment is finalized with the provider-approved values', async () => {
   const finalized = [];
-  const providerData = { orderId: 'BAE-1', totalAmount: 1000, status: 'DONE', currency: 'KRW', paymentKey: 'verified', method: 'CARD', approvedAt: '2026-09-11T00:00:00Z' };
+  const providerData = { orderId: 'BAE-1', totalAmount: 1000, status: 'DONE', currency: 'KRW', paymentKey: 'test-payment', method: 'CARD', approvedAt: '2026-09-11T00:00:00Z' };
   const handler = paymentHandler({ order: { id: 'order', total_amount: 1000, status: 'pending' }, finalized, provider: async () => Response.json(providerData) });
   assert.equal((await handler(request())).status, 200);
   assert.equal(finalized[0][0], 'finalize_toss_payment');
   assert.equal(finalized[0][1].p_approved_amount, 1000);
-  assert.equal(finalized[0][1].p_payment_key, 'verified');
+  assert.equal(finalized[0][1].p_payment_key, 'test-payment');
 });
