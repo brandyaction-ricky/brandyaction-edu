@@ -53,8 +53,8 @@ export function databaseMessage(code?: string): string {
 // Only dependencies used by the current screen. Analytics is always aggregated by RPC.
 export const adminTables: Record<string, string[]> = {
   home: ['courses', 'cohorts', 'mission_submissions', 'edu_questions'],
-  products: ['courses'], cohorts: ['courses', 'cohorts', 'cohort_sessions', 'cohort_session_contents'],
-  learning: ['courses', 'curriculum_weeks', 'curriculum_lessons'],
+  products: ['courses', 'cohorts'], cohorts: ['courses', 'cohorts', 'cohort_sessions', 'cohort_session_contents'],
+  learning: ['courses', 'curriculum_weeks', 'curriculum_lessons', 'lesson_contents', 'curriculum_missions', 'mission_quizzes'],
   weeks: ['courses', 'curriculum_weeks'],
   contents: ['courses', 'curriculum_weeks', 'curriculum_lessons', 'lesson_contents'],
   missions: ['courses', 'curriculum_weeks', 'curriculum_lessons', 'curriculum_missions', 'mission_quizzes'],

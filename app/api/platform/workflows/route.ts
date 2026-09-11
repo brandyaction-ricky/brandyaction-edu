@@ -6,6 +6,8 @@ import { uuid, validateSetting } from '@/lib/edu-workflows';
 import { publicQuiz, validateQuiz, type QuizDefinition } from '@/lib/mission-quiz';
 import { safeUrl } from '@/lib/platform';
 import { normalizeOperatorPermissions, permissionsFor } from '@/lib/operator-permissions';
+import { participantMatrix } from '@/lib/participant-matrix';
+import type { Row } from '@/lib/platform';
 
 const reply = (value: unknown, status = 200) =>
     Response.json(value, {
@@ -71,7 +73,26 @@ export async function GET(request: Request) {
                 p_page: page,
             });
             if (r.error) throw r.error;
-            return reply(r.data);
+            const report = r.data as { rows: Row[]; weeks: Row[] };
+            const week = report.weeks.find(row => row.id === params.get('week')) || report.weeks[0];
+            const lessons = week ? await db.from('curriculum_lessons').select('id,title,day_number,display_order').eq('week_id', week.id).eq('is_published', true).order('display_order') : { data: [], error: null };
+            if (lessons.error) throw lessons.error;
+            const columns = (lessons.data || []) as Row[];
+            const missionResult = columns.length ? await db.from('curriculum_missions').select('id,lesson_id').in('lesson_id', columns.map(row => row.id)).eq('is_published', true).eq('is_required', true) : { data: [], error: null };
+            if (missionResult.error) throw missionResult.error;
+            const missions = (missionResult.data || []) as Row[];
+            const submissions: Row[] = [];
+            if (report.rows.length && missions.length) {
+                // Read only the authorized report page and selected week's required missions.
+                for (let offset = 0; ; offset += 1000) {
+                    const pageResult = await db.from('mission_submissions').select('id,enrollment_id,mission_id,status,attempt_number').in('enrollment_id', report.rows.map(row => row.id)).in('mission_id', missions.map(row => row.id)).order('id').range(offset, offset + 999);
+                    if (pageResult.error) throw pageResult.error;
+                    submissions.push(...(pageResult.data || []) as Row[]);
+                    if ((pageResult.data || []).length < 1000) break;
+                    if (offset >= 99000) fail('해당 주차의 제출 이력이 너무 많습니다. 더 좁은 회원 조건으로 조회해 주세요.');
+                }
+            }
+            return reply({ ...report, weekId: week?.id || null, columns, matrix: participantMatrix(report.rows, columns, missions, submissions) });
         }
         if (kind === 'analytics') {
             if (!permissions.marketing) return reply({ error: '마케팅 관리 권한이 필요합니다.' }, 403);
