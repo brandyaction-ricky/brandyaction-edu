@@ -9,6 +9,7 @@ export type User = {
     phone: string | null;
     role: string;
     marketing_consent?: boolean;
+    permissions?: Record<string, boolean>;
 };
 export type Snapshot = {
     user: User | null;
@@ -56,6 +57,7 @@ export const sections: Section[] = [
     { key: 'reviews', title: '제출물 검토', group: '클래스 관리', table: 'mission_submissions', fields: [f('status', '검토 결과', 'select', true, ['approved', 'changes_requested', 'rejected']), f('reviewer_feedback', '피드백', 'textarea')] },
     { key: 'questions', title: '질문함', group: '클래스 관리', table: 'edu_questions', fields: [f('answer', '답변', 'textarea', true), f('status', '상태', 'select', false, ['open', 'answered']), f('is_archived', '질문 보관', 'checkbox')] },
     { key: 'customers', title: '회원 관리', group: '고객 관리', table: 'profiles', fields: [f('full_name', '이름'), f('phone', '연락처'), f('status', '상태', 'select', false, ['active', 'suspended'])] },
+    { key: 'staff', title: '스태프 권한', group: '고객 관리', table: 'profiles', readOnly: true, fields: [] },
     { key: 'tags', title: '고객 태그', group: '고객 관리', table: 'crm_tags', fields: [f('name', '태그명', 'text', true), f('color', '태그 색상', 'color'), f('description', '설명', 'textarea')] },
     { key: 'coupons', title: '쿠폰 관리', group: '고객 관리', table: 'coupons', fields: [f('name', '쿠폰명', 'text', true), f('code', '쿠폰 코드', 'text', true), f('discount_type', '할인 유형', 'select', true, ['fixed', 'percentage']), f('discount_value', '할인 금액 / 비율', 'number', true), f('usage_limit', '총 사용 한도', 'number'), f('starts_at', '사용 시작', 'datetime-local'), f('ends_at', '사용 종료', 'datetime-local'), f('is_active', '사용 가능', 'checkbox')] },
     { key: 'product-reviews', title: '상품 후기', group: '고객 관리', table: 'reviews', fields: [f('status', '공개 상태', 'select', false, ['pending', 'published', 'hidden']), f('is_featured', '대표 후기', 'checkbox')] },
@@ -63,6 +65,9 @@ export const sections: Section[] = [
     { key: 'articles', title: '아티클', group: '콘텐츠 관리', table: 'articles', fields: [f('title', '제목', 'text', true), f('slug', '페이지 주소', 'text', true), f('summary', '요약', 'textarea'), f('content_type', '종류', 'select', false, ['column', 'video']), f('content_blocks', '아티클 본문', 'blocks'), f('video_url', '영상 URL', 'url'), f('status', '공개 상태', 'select', false, ['draft', 'published', 'hidden']), f('is_featured', '대표 노출', 'checkbox')] },
     { key: 'testimonials', title: '고객 후기', group: '콘텐츠 관리', table: 'review_videos', fields: [f('title', '제목', 'text', true), f('reviewer_name', '고객명', 'text', true), f('reviewer_role', '직업'), f('description', '내용', 'textarea'), f('video_url', '영상 URL', 'url', true), f('thumbnail_url', '썸네일', 'image'), f('is_published', '공개', 'checkbox')] },
     { key: 'orders', title: '주문 결제', group: '매출 관리', table: 'orders', readOnly: true, fields: [] },
+    { key: 'templates', title: '메시지 템플릿', group: '마케팅 관리', table: 'crm_templates', fields: [] },
+    { key: 'campaigns', title: '캠페인 발송', group: '마케팅 관리', table: 'crm_campaigns', fields: [] },
+    { key: 'automations', title: '자동 메시지', group: '마케팅 관리', table: 'crm_automations', fields: [] },
     { key: 'analytics', title: '랜딩 성과', group: '마케팅 관리', table: 'customer_journey_events', readOnly: true, fields: [] },
     { key: 'metrics', title: '실측 입력', group: '마케팅 관리', table: 'site_settings', fields: [f('key', '기간 / 캠페인 코드', 'text', true), f('value', '지표 (JSON)', 'json', true)] },
     { key: 'seo', title: '검색코드 설정', group: '마케팅 관리', table: 'site_settings', fields: [f('key', '설정명', 'text', true), f('value', '설정값 (JSON)', 'json', true)] },
