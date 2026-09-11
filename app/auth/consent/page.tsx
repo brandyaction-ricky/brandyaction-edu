@@ -7,9 +7,7 @@ import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { POLICY_VERSION } from "@/lib/legal-policies";
 
-function safeNext(value: string | null) {
-  return value?.startsWith("/") && !value.startsWith("//") ? value : "/my";
-}
+import { safeNext } from "@/lib/platform";
 
 export default function SocialConsentPage() {
   const router = useRouter();
