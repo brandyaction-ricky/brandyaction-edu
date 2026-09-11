@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import "../admin-operations.css";
 import "../admin-studio.css";
 import "../admin-workspace.css";
+import "../brand-admin.css";
 import { hasSupabaseEnv } from "@/lib/supabase/config";
 import { getAdminSession } from "@/lib/server-auth";
 

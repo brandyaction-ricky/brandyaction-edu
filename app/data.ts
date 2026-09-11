@@ -34,6 +34,7 @@ export type CurriculumWeek = {
 export type ClassItem = {
   slug: string; cohortId?: string; title: string; summary: string; category: string; status: string;
   programType: "free" | "paid";
+  productKind?: "class" | "digital";
   statusTone: "red" | "blue" | "gray"; startDate: string; operationPeriod?: string; schedule: string;
   duration: string; price: string; seats: string; instructor: string; accent: string;
   applicationOpen: boolean;

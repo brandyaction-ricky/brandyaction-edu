@@ -17,11 +17,12 @@ function subscribeTheme(callback: () => void) {
 }
 
 function getTheme(): AdminTheme {
-  return window.localStorage.getItem(THEME_KEY) === "light" ? "light" : "dark";
+  try { return window.localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light"; }
+  catch { return "light"; }
 }
 
 export function AdminThemeToggle() {
-  const theme = useSyncExternalStore(subscribeTheme, getTheme, () => "dark");
+  const theme = useSyncExternalStore(subscribeTheme, getTheme, () => "light");
 
   useEffect(() => {
     document.documentElement.dataset.adminTheme = theme;
@@ -29,7 +30,7 @@ export function AdminThemeToggle() {
 
   const toggle = () => {
     const next: AdminTheme = theme === "dark" ? "light" : "dark";
-    window.localStorage.setItem(THEME_KEY, next);
+    try { window.localStorage.setItem(THEME_KEY, next); } catch { /* Storage may be blocked. */ }
     window.dispatchEvent(new Event(THEME_EVENT));
   };
 

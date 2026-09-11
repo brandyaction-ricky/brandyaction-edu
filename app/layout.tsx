@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import "./globals.css";
+import "./brand-system.css";
 import { SiteFooter } from "./components/site-footer";
 import { AnalyticsTracker } from "./components/analytics-tracker";
 import { loadCodeSettings } from "@/lib/code-settings";
@@ -26,7 +27,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   return (
     <html lang="ko">
       <head dangerouslySetInnerHTML={{ __html: `${codes.metaCode}\n${codes.headerCode}` }}/>
-      <body data-app-environment={appEnvironment}>
+      <body className="brand-final" data-app-environment={appEnvironment}>
         {codes.bodyCode ? <div className="body-code-injection" dangerouslySetInnerHTML={{ __html: codes.bodyCode }}/> : null}
         {isNonProduction ? (
           <div className="environment-banner" role="status">

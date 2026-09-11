@@ -187,6 +187,7 @@ function mapCourse(course: CourseRow, cohorts: CohortRow[], sessions: SessionRow
 
   return {
     slug: course.slug,
+    productKind: course.metadata?.productKind === "digital" ? "digital" : "class",
     programType: course.metadata?.programType === "free" || course.list_price === 0 ? "free" : "paid",
     cohortId: cohort?.id,
     title: course.title,
