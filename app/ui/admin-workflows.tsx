@@ -372,7 +372,7 @@ function CrmManager({ section, data, send, pending }: Props) {
                         </label>
                     </>
                 )}
-                <p className="meta mt16">{section === 'campaigns' ? '마케팅 템플릿은 수신 동의·활성 상태·정상 연락처를 모두 만족하는 회원에게만 발송됩니다.' : selectedTemplate?.purpose === 'marketing' ? '마케팅 수신 동의가 없는 회원은 자동 제외됩니다.' : '발송 키가 없는 환경에서는 저장만 되고 외부 발송은 실행되지 않습니다.'}</p>
+                <p className="meta mt16">{section === 'campaigns' ? '마케팅 템플릿은 수신 동의·활성 상태·정상 연락처를 모두 만족하는 회원에게만 발송되며, 캠페인 1회 대상은 최대 500명입니다.' : selectedTemplate?.purpose === 'marketing' ? '마케팅 수신 동의가 없는 회원은 자동 제외됩니다.' : '발송 키가 없는 환경에서는 저장만 되고 외부 발송은 실행되지 않습니다.'}</p>
                 <button className="btn primary mt24" disabled={pending}>
                     {section === 'campaigns' ? '캠페인 예약' : '저장하기'}
                 </button>
@@ -406,7 +406,7 @@ function CrmManager({ section, data, send, pending }: Props) {
                         {section === 'automations' && <span className="badge mt16">{item.is_active ? '자동 실행 중' : '중지'}</span>}
                     </article>
                 ))}
-                {!items.length && <p className="panel pad muted">등록된 {title}이 없습니다.</p>}
+                {!items.length && <p className="panel pad muted">{section === 'templates' ? '등록된 메시지 템플릿이 없습니다.' : section === 'campaigns' ? '등록된 예약 캠페인이 없습니다.' : '등록된 자동 메시지가 없습니다.'}</p>}
             </div>
         </>
     );
