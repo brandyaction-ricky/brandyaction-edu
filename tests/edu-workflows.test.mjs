@@ -46,11 +46,12 @@ function handler(user) {
  '@/lib/edu-workflows':rules,
  '@/lib/mission-quiz':quiz,
  '@/lib/platform':load('lib/platform.ts'),
+ '@/lib/refunds':{processRefund:async()=>{throw Error('unexpected refund provider call');}},
  });return {...exports,calls};
 }
 const request=(body,origin='https://example.com')=>new Request('https://example.com/api/platform/workflows',{method:'POST',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify(body)});
 test('all operational writes require admin authentication and same origin',async()=>{
- for(const action of ['session','clone-cohort','quiz','review','assign','settings']) {
+ for(const action of ['session','clone-cohort','quiz','review','assign','settings','refund','grant-enrollment']) {
   assert.equal((await handler(null).POST(request({action}))).status,401);
   assert.equal((await handler({id:uid,role:'student'}).POST(request({action,role:'admin'}))).status,403);
   assert.equal((await handler({id:uid,role:'admin'}).POST(request({action},'https://other.example'))).status,403);

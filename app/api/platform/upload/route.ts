@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     const path = `edu/${crypto.randomUUID()}.${extension}`;
     const { error } = await db.storage.from(bucket).upload(path, bytes, { contentType: allowed[extension], upsert: false });
     if (error) { console.error('platform upload', error.message); return Response.json({ error: '파일을 올리지 못했습니다. 파일 형식과 용량을 확인해 주세요.' }, { status: 409 }); }
-    return Response.json({ value: image ? db.storage.from(bucket).getPublicUrl(path).data.publicUrl : path, name: file.name });
+    return Response.json({ value: path, name: file.name });
   } catch {
     return Response.json({ error: '파일을 올리지 못했습니다. 다시 시도해 주세요.' }, { status: 500 });
   }

@@ -1,3 +1,4 @@
+import { processRefund } from '@/lib/refunds';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { hasLearningAccess } from '@/lib/platform-rules';
@@ -48,7 +49,7 @@ export async function GET(request: Request) {
       return reply(r.data);
     }
     fail('조회 종류를 확인해 주세요.');
-  } catch (e) { const error = e as Error & { status?: number }; console.error('workflow read', error.message); return reply({ error: error.status ? error.message : '정보를 불러오지 못했습니다.' }, error.status || 503); }
+  } catch (e) { const error = e as Error & { status?: number }; if (!error.status || error.status >= 500) console.error('workflow read', 'unexpected'); return reply({ error: error.status ? error.message : '정보를 불러오지 못했습니다.' }, error.status || 503); }
 }
 export async function POST(request: Request) {
   try {
@@ -59,7 +60,13 @@ export async function POST(request: Request) {
     const body = await request.json();
     const db = createAdminClient();
     let result;
-    if (body.action === 'session') {
+    if (body.action === 'refund') return processRefund(user.id, body);
+    if (body.action === 'grant-enrollment') {
+      if (!uuid(body.memberId) || !uuid(body.cohortId) || string(body.reason,500).length < 2) fail('회원·기수·발급 사유를 확인해 주세요.');
+      const ends = body.endsAt ? date(body.endsAt) : null;
+      if (ends && Date.parse(ends) <= Date.now()) fail('만료일은 현재 이후로 선택해 주세요.');
+      result = await db.rpc('edu_grant_enrollment', { p_actor: user.id, p_member: body.memberId, p_cohort: body.cohortId, p_ends: ends, p_reason: string(body.reason,500) });
+    } else if (body.action === 'session') {
       const v = body.values || {};
       if (!uuid(v.cohort_id) || (body.id && !uuid(body.id)) || !Number.isSafeInteger(v.session_number) || v.session_number < 1 || v.session_number > 365 || !string(v.title) || typeof v.is_public !== 'boolean') fail('회차의 기수·순서·제목을 확인해 주세요.');
       for (const field of ['live_url','replay_url']) if (v[field] && (!safeUrl(v[field]) || !/^https?:\/\//.test(v[field]) || String(v[field]).length > 2000)) fail('라이브·다시보기 주소를 확인해 주세요.');
@@ -86,7 +93,7 @@ export async function POST(request: Request) {
       result = await db.from('site_settings').upsert({ key, value, is_public: false }, { onConflict: 'key' });
     } else fail('작업 종류를 확인해 주세요.');
     if (result.error) {
-      console.error('workflow write', result.error.code);
+      if (!['23505','23514','23503','23502','P0001'].includes(result.error.code)) console.error('workflow write', result.error.code);
       const message = /[가-힣]/.test(result.error.message) ? result.error.message : result.error.code === '23505' ? '이미 사용 중인 코드 또는 회차 순서입니다.' : '저장하지 못했습니다. 입력값을 확인해 주세요.';
       return reply({ error: message }, 409);
     }
