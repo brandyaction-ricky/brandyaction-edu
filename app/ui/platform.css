@@ -6,3 +6,34 @@
 .upload-field,.blocks-editor{display:grid;gap:12px;font-weight:400}.upload-control{position:relative;display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:6px;padding:12px 16px;width:fit-content;cursor:pointer}.upload-control input[type=file]{position:absolute;inset:0;opacity:0;width:100%;cursor:pointer}.upload-field small{font-size:.875rem;color:var(--muted)}.upload-pending-guard{position:absolute;width:1px!important;height:1px!important;min-height:0!important;padding:0!important;opacity:0}.block-editor{display:grid;gap:12px;padding:16px;border:1px solid var(--line);border-radius:8px}.admin-toolbar-v2>select{border:1px solid var(--border-strong);border-radius:6px;padding:10px 14px;background:white;min-height:44px}.admin-caption{font-size:12px}.admin-nav-group>span{font-size:14px}.upload-field input:disabled{opacity:.6}
 /* Functional operating panels use the supplied Action System surfaces. */
 .workflow-fieldset{border:0;padding:0;min-width:0}.workflow-fieldset:disabled{opacity:.7}.workflow-session{display:flex;justify-content:space-between;align-items:center;gap:20px;padding:20px 0;border-bottom:1px solid var(--line,#e5e7eb)}.workflow-session:last-child{border-bottom:0}.workflow-session p{margin-top:6px}.wrap-flex{flex-wrap:wrap}.workflow-progress{display:block;width:100%;height:8px;accent-color:#a10d12;margin:16px 0 8px}.workflow-list-button{width:100%;display:flex;align-items:center;justify-content:space-between;text-align:left;padding:16px;background:white;border:1px solid #e5e7eb;margin-bottom:8px;cursor:pointer;border-radius:8px;gap:12px}.workflow-list-button small{display:block;margin-top:6px;color:#69707c}.workflow-list-button.selected{border-color:#a10d12;background:#fff8f8}.quiz-question{padding:20px;border:1px solid #e5e7eb;border-radius:8px;margin:20px 0}.quiz-question legend{font-weight:650;padding:0 8px;font-size:16px}.quiz-option{display:flex;align-items:flex-start;gap:12px;border:1px solid #e5e7eb;padding:14px;margin:8px 0;border-radius:6px;cursor:pointer}.quiz-option:has(input:checked){background:#fff5f5;border-color:#a10d12}.quiz-option input,.quiz-edit-option input[type=radio]{width:auto;margin-top:3px;accent-color:#a10d12}.quiz-edit-option{display:grid;grid-template-columns:100px 1fr;gap:12px;align-items:center;margin-top:8px}.quiz-edit-option label{display:flex;align-items:center;gap:8px}.quiz-question .between>.field{flex:1}.workflow-pagination{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:24px}.admin-toolbar-v2>input,.admin-toolbar-v2>select{min-height:42px;border:1px solid #ddd;border-radius:6px;padding:8px 12px}.admin-toolbar-v2 .field{margin-bottom:0}.admin-content-v2 .stat-card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px}.admin-content-v2 .stat-card strong{display:block;font-size:28px;margin-top:12px}.admin-content-v2 .stat-card span{color:#626875}.panel h2>svg,.panel h3>svg{vertical-align:middle;margin-right:6px}.quiz-workspace{margin-top:24px}.panel .reading-copy{white-space:pre-wrap;overflow-wrap:anywhere}@media(max-width:760px){.workflow-session{align-items:flex-start;flex-direction:column}.workflow-pagination{flex-wrap:wrap}.quiz-edit-option{grid-template-columns:85px 1fr}.quiz-question{padding:14px}.admin-content-v2>.panel .grid2{grid-template-columns:1fr}.workflow-session .btn{font-size:14px}}
+
+/* Admin navigation mirrors the category hierarchy used by the operations workspace. */
+.admin-shell-v2{grid-template-columns:286px minmax(0,1fr)}
+.admin-sidebar-v2{display:flex;flex-direction:column;padding:32px 20px 24px;color:#686f7b;scrollbar-width:thin}
+.admin-brand{display:flex;align-items:center;gap:14px;padding:0 12px;margin-bottom:28px;color:#17191c}
+.admin-brand-mark{display:grid;place-items:center;width:42px;height:42px;background:#17191c;color:#fff;font-size:30px;font-weight:800;line-height:1}
+.admin-brand>span:last-child{display:flex;flex-direction:column;gap:5px;min-width:0}
+.admin-brand b{font-size:22px;line-height:1;letter-spacing:-.055em;color:#17191c}
+.admin-brand small{font-size:13px;font-weight:700;letter-spacing:.06em;color:#6f7580}
+.admin-workspace-card{display:flex;align-items:center;gap:12px;min-height:68px;margin:0 0 28px;padding:14px 16px;border:1px solid #dfe2e6;border-radius:6px;background:#f7f8f9;font-size:14px;color:#6d7480}
+.admin-workspace-card>span{display:grid;place-items:center;width:32px;height:32px;border:1px solid #d9dde2;border-radius:5px;background:#fff;font-size:17px;font-weight:500}
+.admin-workspace-card>b{font-weight:500;line-height:1.45}
+.admin-navigation{display:block}
+.admin-home-link,.admin-nav-group a,.admin-customer-link{display:flex;align-items:center;gap:13px;min-height:44px;padding:10px 14px;border-radius:6px;font-size:15px;color:#717784;position:relative}
+.admin-home-link{margin-bottom:26px}
+.admin-home-link.active,.admin-nav-group a.active{background:#fff0f1;color:#c91824;font-weight:700;box-shadow:inset 4px 0 #df2531}
+.admin-home-link:hover,.admin-nav-group a:hover,.admin-customer-link:hover{background:#f5f6f7;color:#2d3239}
+.admin-home-link.active:hover,.admin-nav-group a.active:hover{background:#fff0f1;color:#c91824}
+.admin-home-link svg,.admin-nav-group a svg{width:20px;height:20px;stroke-width:1.8}
+.admin-nav-group{margin:0 0 20px}
+.admin-nav-group summary{display:flex;align-items:center;justify-content:space-between;min-height:40px;padding:6px 14px;color:#636a76;font-size:14px;font-weight:700;cursor:pointer;list-style:none}
+.admin-nav-group summary::-webkit-details-marker{display:none}
+.admin-nav-group summary svg{width:17px;height:17px;transition:transform .18s ease}
+.admin-nav-group:not([open]) summary svg{transform:rotate(-90deg)}
+.admin-nav-group>div{display:grid;gap:1px}
+.admin-nav-group a>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.admin-nav-count{display:grid;place-items:center;min-width:28px;height:26px;margin-left:auto;padding:0 8px;border-radius:6px;background:#f0f2f4;color:#686f7b;font-size:13px;font-style:normal;font-weight:600}
+.admin-customer-link{margin-top:auto;border-top:1px solid #e6e8eb;border-radius:0;padding-top:20px}
+.admin-customer-link svg{margin-left:auto;width:18px;height:18px}
+@media(max-width:1100px){.admin-shell-v2{grid-template-columns:250px minmax(0,1fr)}.admin-sidebar-v2{padding-left:14px;padding-right:14px}.admin-brand b{font-size:19px}.admin-workspace-card{padding-left:12px;padding-right:12px}}
+@media(max-width:800px){.admin-shell-v2{display:block}.admin-sidebar-v2{display:none}.admin-sidebar-v2.open{display:flex;top:72px;width:286px;height:calc(100dvh - 72px);padding-bottom:28px}}
