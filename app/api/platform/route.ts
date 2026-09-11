@@ -24,6 +24,8 @@ export async function GET(request: Request) {
         const params = new URL(request.url).searchParams;
         const adminMode = params.get('admin') === '1';
         const sectionKey = params.get('section') || 'home';
+        const record = params.get('record');
+        if (record && (!uid(record) || !['products', 'learning'].includes(sectionKey))) return reply({ error: '편집할 항목을 확인해 주세요.' }, 400);
         const page = Math.max(1, Math.min(100000, Number(params.get('page')) || 1));
         const pageSize = sectionKey === 'orders' ? 30 : 100;
         const operator = adminMode ? await getOperatorUser(sectionScopes[sectionKey]) : null;
@@ -38,9 +40,10 @@ export async function GET(request: Request) {
         const deferredOrderTables = adminMode && sectionKey === 'orders' ? new Set(['order_items', 'payments', 'enrollments', 'edu_refund_requests']) : new Set<string>();
         await Promise.all(
             tables.filter((table) => !deferredOrderTables.has(table)).map(async (table) => {
-                const columns = table === 'payments' ? 'id,order_id,method,status,approved_amount,cancelled_amount,receipt_url,approved_at,created_at' : table === 'edu_refund_requests' ? 'id,payment_id,amount,reason,status,created_at' : table === 'reviews' && !adminMode ? 'id,course_id,author_name,author_nickname,rating,body,is_featured,display_order,published_at,created_at' : '*';
+                const columns = table === 'crm_tags' && adminMode && sectionKey === 'tags' ? '*,crm_member_tags(count)' : table === 'payments' ? 'id,order_id,method,status,approved_amount,cancelled_amount,receipt_url,approved_at,created_at' : table === 'edu_refund_requests' ? 'id,payment_id,amount,reason,status,created_at' : table === 'reviews' && !adminMode ? 'id,course_id,author_name,author_nickname,rating,body,is_featured,display_order,published_at,created_at' : '*';
                 const serverPaged = adminMode && table === primaryTable && !['home', 'members', 'reviews', 'analytics', 'metrics', 'seo', 'settings', 'staff', 'templates', 'campaigns', 'automations'].includes(sectionKey);
                 let query = db.from(table).select(columns, serverPaged ? { count: 'exact' } : undefined);
+                if (record && adminMode && table === primaryTable) query = query.eq('id', record);
                 query = serverPaged ? query.range((page - 1) * pageSize, page * pageSize - 1) : query.limit(1000);
                 if (table === 'edu_questions' && !adminMode) query = query.eq('is_archived', false);
                 if (table === 'site_settings' && adminMode && operator?.role !== 'admin') query = query.not('key', 'like', 'edu_staff_permissions_%');

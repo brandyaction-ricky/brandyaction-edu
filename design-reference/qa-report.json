@@ -1,0 +1,42 @@
+{
+  "date": "2026-09-11",
+  "pages": {
+    "frontend": 25,
+    "admin": 22,
+    "designSystem": 1
+  },
+  "legacyChecks": {
+    "frontendRenderedStates": 62,
+    "adminRenderedStates": 71,
+    "adminDialogStates": 21
+  },
+  "brandChecks": {
+    "sharedTokens": true,
+    "semanticFontSizes": true,
+    "cssDelimiterValidation": true,
+    "homeOfferHierarchy": true,
+    "nextLessonFirst": true,
+    "learningChrome": true,
+    "freeDetailContractPreserved": true,
+    "articleBannerAndVideoPreserved": true,
+    "adminCategoriesPreserved": true,
+    "tableMobileLabels": true,
+    "matrixPriorityColumns": true,
+    "mobileCheckoutReadingOrder": true
+  },
+  "responsive": {
+    "implementation": "desktop / tablet / mobile",
+    "specifiedWidths": [
+      360,
+      390,
+      680,
+      768,
+      1024,
+      1440
+    ],
+    "visualBrowserTest": "not performed — static HTML has no compatible supervised preview in this environment",
+    "note": "Listed widths are design targets, not browser-tested viewports."
+  },
+  "scope": "Offline UI prototype; no deployment, API, real auth, payment, tracking or persistent data.",
+  "result": "passed static checks"
+}

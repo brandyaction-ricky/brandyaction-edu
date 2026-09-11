@@ -44,6 +44,7 @@ function handler(user) {
  '@/lib/server-auth':{getAuthenticatedUser:async()=>user},
  '@/lib/platform-rules':load('lib/platform-rules.ts'),
  '@/lib/edu-workflows':rules,
+ '@/lib/participant-matrix':load('lib/participant-matrix.ts'),
  '@/lib/mission-quiz':quiz,
  '@/lib/platform':load('lib/platform.ts'),
  '@/lib/refunds':{processRefund:async()=>{throw Error('unexpected refund provider call');}},
@@ -51,6 +52,13 @@ function handler(user) {
  });return {...exports,calls};
 }
 const request=(body,origin='https://example.com')=>new Request('https://example.com/api/platform/workflows',{method:'POST',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify(body)});
+test('participant matrix requires membership operations permission before querying data', async () => {
+ const request = new Request('https://example.com/api/platform/workflows?kind=participants');
+ assert.equal((await handler(null).GET(request)).status,401);
+ const member = handler({id:uid,role:'member'});
+ assert.equal((await member.GET(request)).status,403);
+ assert.equal(member.calls.length,0);
+});
 test('all operational writes require admin authentication and same origin',async()=>{
  for(const action of ['session','clone-cohort','quiz','review','assign','settings','refund','grant-enrollment']) {
   assert.equal((await handler(null).POST(request({action}))).status,401);
