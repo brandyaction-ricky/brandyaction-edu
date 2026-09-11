@@ -32,7 +32,6 @@ import {
   Empty,
   Heading,
   ResourceRow,
-  Story,
   Video,
   courseType,
 } from "./primitives";
@@ -424,28 +423,37 @@ export function ArticleBanner({
 }) {
   const [index, setIndex] = useState(0),
     [playing, setPlaying] = useState(false);
+  const configured = object((data.article_banner || [])[0], "value");
+  if ((data.article_banner || []).length && configured.enabled === false) return null;
+  const configuredVideos = Array.isArray(configured.videos)
+    ? configured.videos.slice(0, 3).map((item, i) => {
+        const video = item as Record<string, unknown>;
+        return { id: `configured-${i}`, title: String(video.title || `무료 강의 ${i + 1}`), url: safeUrl(video.url), available: video.available === true };
+      })
+    : [];
   const candidates = (data.curriculum_lessons || []).filter(
     (l) => l.is_preview,
   );
-  const lessons = candidates.slice(0, 3),
+  const lessons = configuredVideos.length ? configuredVideos : candidates.slice(0, 3),
     lesson = lessons[index] || lessons[0];
   const content = (data.lesson_contents || []).find(
     (c) => c.lesson_id === lesson?.id,
   );
+  const videoUrl = "url" in (lesson || {}) ? String(lesson?.url || "") : t(content, "vod_url");
   if (!lessons.length) return null;
   return (
     <section className="ab-banner" aria-label="회원 무료강의">
       <div className="ab-media">
         <div className="ab-player">
-          {playing && user && safeUrl(content?.vod_url) ? (
-            <Video url={t(content, "vod_url")} />
+          {playing && user && safeUrl(videoUrl) ? (
+            <Video url={videoUrl} />
           ) : (
             <>
               <span className="ab-player-corner">BRANDYACTION EDU</span>
               <button
                 className="ab-play-button"
                 aria-label="선택한 무료강의 재생"
-                disabled={!user || !safeUrl(content?.vod_url)}
+                disabled={!user || !safeUrl(videoUrl)}
                 onClick={() => setPlaying(true)}
               >
                 <Play />
@@ -453,7 +461,7 @@ export function ArticleBanner({
               <strong>{t(lesson, "title")}</strong>
               <p>
                 {user
-                  ? content?.vod_url
+                  ? videoUrl
                     ? "재생 버튼을 눌러 시작하세요."
                     : "내 클래스에서 수강 권한을 확인해 주세요."
                   : "회원가입 후 무료강의를 시청하세요."}
@@ -467,13 +475,9 @@ export function ArticleBanner({
         </div>
       </div>
       <div className="ab-copy">
-        <div className="ab-eyebrow">MEMBERS ONLY / FREE CLASS</div>
-        <h2>
-          배우고, 내 일에
-          <br />
-          바로 적용해 보세요.
-        </h2>
-        <p className="ab-description">회원에게 공개된 무료강의를 확인하세요.</p>
+        <div className="ab-eyebrow">{String(configured.eyebrow || "MEMBERS ONLY / FREE CLASS")}</div>
+        <h2>{String(configured.title || "배우고, 내 일에 바로 적용해 보세요.")}</h2>
+        <p className="ab-description">{String(configured.description || "회원에게 공개된 무료강의를 확인하세요.")}</p>
         <div className="ab-playlist">
           {lessons.map((l, i) => (
             <button
@@ -578,11 +582,11 @@ export function ArticlesView({
   );
   return (
     <div className="wrap">
+      <ArticleBanner data={data} user={user} />
       <Heading
         title="일하는 방식을 바꾸는 인사이트"
         description="읽고, 배우고, 내 일에 적용해 보세요."
       />
-      <ArticleBanner data={data} user={user} />
       <div className="filter-row mt32">
         <div className="chips">
           {["전체", "글", "영상"].map((x) => (
@@ -625,8 +629,9 @@ export function StoriesView({
   data: Data;
   loading: boolean;
 }) {
-  const stories = data.review_videos || [],
-    featured = stories[0];
+  const stories = data.review_videos || [];
+  const [selectedId, setSelectedId] = useState("");
+  const featured = stories.find((story) => story.id === selectedId) || stories[0];
   return (
     <div className="wrap">
       <Heading
@@ -650,10 +655,15 @@ export function StoriesView({
           <Video url={t(featured, "video_url")} />
         </section>
       )}
-      <div className="section">
-        <div className="grid3">
-          {stories.slice(1).map((s) => (
-            <Story key={s.id} story={s} />
+      <div className="section story-library">
+        <div className="section-head"><div><div className="eyebrow">MORE STORIES</div><h2>다양한 실행 후기를 만나보세요.</h2><p>후기를 선택하면 위 영상과 이야기가 바뀝니다.</p></div><b>{stories.length}개의 고객 이야기</b></div>
+        <div className="story-video-grid">
+          {stories.map((s, index) => (
+            <button className={"story-video-card " + (s.id === featured?.id ? "active" : "")} key={s.id} onClick={() => setSelectedId(s.id)}>
+              <span className="story-video-thumb">{safeUrl(s.thumbnail_url) ? <img src={safeUrl(s.thumbnail_url)} alt="" /> : <><Play /><small>STORY {String(index + 1).padStart(2, "0")}</small></>}</span>
+              <strong>{t(s, "title")}</strong>
+              <span>{t(s, "reviewer_name")} · {t(s, "reviewer_role")}</span>
+            </button>
           ))}
           {!loading && !stories.length && (
             <Empty title="공개된 고객 이야기가 없습니다." />

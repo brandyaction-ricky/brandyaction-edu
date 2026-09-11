@@ -144,6 +144,17 @@ export async function GET(request: Request) {
         if (!adminMode) {
             const now = Date.now();
             data.site_banners = (data.site_banners || []).filter((b) => (!b.starts_at || Date.parse(String(b.starts_at)) <= now) && (!b.ends_at || Date.parse(String(b.ends_at)) > now));
+            const bannerResult = await createAdminClient().from('site_settings').select('key,value').eq('key', 'edu_article_banner').limit(1);
+            const bannerSetting = Array.isArray(bannerResult.data) ? bannerResult.data[0] : bannerResult.data;
+            if (!bannerResult.error && bannerSetting) {
+                const value = bannerSetting.value as Record<string, unknown>;
+                const videos = Array.isArray(value?.videos) ? value.videos.slice(0, 3).map((item) => {
+                    const video = item as Record<string, unknown>;
+                    const url = safeUrl(video.url);
+                    return { title: String(video.title || '').slice(0, 120), available: Boolean(url), url: user ? url : '' };
+                }) : [];
+                data.article_banner = [{ id: 'edu_article_banner', key: 'edu_article_banner', value: { enabled: value?.enabled !== false, eyebrow: String(value?.eyebrow || '').slice(0, 80), title: String(value?.title || '').slice(0, 120), description: String(value?.description || '').slice(0, 200), videos } }];
+            }
         }
         if (adminMode) {
             const summary = await db.rpc('edu_admin_summary');
@@ -179,6 +190,11 @@ export async function GET(request: Request) {
                         if (typeof value === 'string' && value && !/^https?:\/\//.test(value) && !value.startsWith('/')) metadata[key] = process.env.NEXT_PUBLIC_SUPABASE_URL + '/storage/v1/object/public/course-assets/' + value;
                     }
             }
+        if (!adminMode)
+            for (const article of data.articles || []) {
+                const value = article.cover_image_path;
+                if (typeof value === 'string' && value && !/^https?:\/\//.test(value) && !value.startsWith('/')) article.cover_image_url = process.env.NEXT_PUBLIC_SUPABASE_URL + '/storage/v1/object/public/course-assets/' + value;
+            }
         return reply({
             user: adminMode ? operator : user,
             data,
@@ -202,6 +218,29 @@ export async function POST(request: Request) {
         const body = (await request.json()) as Record<string, unknown>;
         const action = String(body.action || '');
         const db = createAdminClient();
+        if (action === 'article-banner') {
+            const permissions = await permissionsFor(user);
+            if (!permissions.content) return reply({ error: '콘텐츠 관리 권한이 필요합니다.' }, 403);
+            const value = body.value as Record<string, unknown>;
+            const title = String(value?.title || '').trim();
+            const videos = Array.isArray(value?.videos) ? value.videos.slice(0, 3).map((item) => {
+                const video = item as Record<string, unknown>;
+                const url = String(video.url || '').trim();
+                if (url) {
+                    let allowed = false;
+                    try {
+                        const parsed = new URL(url);
+                        allowed = parsed.protocol === 'https:' && (parsed.hostname === 'youtu.be' || parsed.hostname === 'youtube.com' || parsed.hostname.endsWith('.youtube.com'));
+                    } catch {}
+                    if (!allowed) fail('무료 영상은 YouTube https 주소를 입력해 주세요.');
+                }
+                return { title: String(video.title || '').trim().slice(0, 120), url };
+            }) : [];
+            if (!title || title.length > 120) fail('배너 제목을 확인해 주세요.');
+            const result = await db.from('site_settings').upsert({ key: 'edu_article_banner', value: { enabled: value?.enabled !== false, eyebrow: String(value?.eyebrow || '').trim().slice(0, 80), title, description: String(value?.description || '').trim().slice(0, 200), videos }, is_public: false }, { onConflict: 'key' });
+            if (result.error) throw result.error;
+            return reply({ ok: true });
+        }
         if (action === 'archive') {
             const section = sections.find((s) => s.key === body.section);
             const permissions = await permissionsFor(user);

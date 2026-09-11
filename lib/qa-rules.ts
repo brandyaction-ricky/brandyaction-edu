@@ -64,7 +64,7 @@ export const adminTables: Record<string, string[]> = {
   customers: ['profiles', 'crm_tags', 'crm_member_tags', 'coupons', 'courses', 'cohorts', 'enrollments'],
   staff: ['profiles', 'site_settings'],
   tags: ['crm_tags'], coupons: ['coupons'], 'product-reviews': ['courses', 'reviews', 'profiles'],
-  banners: ['site_banners'], articles: ['articles'], testimonials: ['review_videos'],
+  banners: ['site_banners'], articles: ['articles', 'site_settings'], testimonials: ['review_videos'],
   templates: ['crm_templates'], campaigns: ['crm_campaigns', 'crm_templates', 'crm_tags', 'crm_message_logs'],
   automations: ['crm_automations', 'crm_automation_runs', 'crm_templates', 'crm_tags', 'courses'],
   orders: ['courses', 'cohorts', 'orders', 'order_items', 'payments', 'enrollments', 'edu_refund_requests'],

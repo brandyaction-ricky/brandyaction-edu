@@ -69,7 +69,8 @@ export function Heading({
 export function Brand() {
   return (
     <Link href="/" className="brand">
-      <span className="brand-mark">b</span>brandyaction <small>EDU</small>
+      <img className="brand-logo" src="/brandy-action-logo.png" alt="brandyaction" />
+      <small>EDU</small>
     </Link>
   );
 }
@@ -148,8 +149,20 @@ export function CourseCard({ course }: { course: Row }) {
   );
 }
 export function ArticleCard({ article }: { article: Row }) {
+  const thumbnail = safeUrl(
+    article.cover_image_url ||
+      article.cover_image_path ||
+      article.thumbnail_image_url,
+  );
   return (
     <Link className="article-card" href={"/articles/" + t(article, "slug")}>
+      <div className="article-thumbnail">
+        {thumbnail ? (
+          <img src={thumbnail} alt={t(article, "cover_image_alt") || t(article, "title")} />
+        ) : (
+          <span>BRANDYACTION EDU</span>
+        )}
+      </div>
       <span className="tag">
         {article.content_type === "video" ? "영상" : "인사이트"}
       </span>

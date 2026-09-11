@@ -110,6 +110,11 @@ test('F-02 archive cannot be invoked by a member', async () => {
   const h = handler({ ...admin, role: 'student' }, {});
   assert.equal((await h.POST(request({ action: 'archive', section: 'banners', ids: [crypto.randomUUID()] }))).status, 403);
 });
+test('article banner rejects deceptive non-YouTube URLs before writing', async () => {
+  const h = handler(admin, { from: () => { throw Error('must not write'); } });
+  const response = await h.POST(request({ action: 'article-banner', value: { title: '무료 영상', videos: [{ title: '위장 주소', url: 'https://evil.example/?next=youtube.com' }] } }));
+  assert.equal(response.status, 400);
+});
 test('F-14 anonymous API selects only public review fields', async () => {
   let projection;
   const db = { from(table) { return { select(columns) { if (table === 'reviews') projection = columns; return this; }, limit() { return this; }, order() { return this; }, eq() { return this; }, then(resolve) { resolve({ data: [] }); } }; } };
