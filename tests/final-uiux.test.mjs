@@ -83,6 +83,26 @@ test('social-only login and product detail variants use the final publishing str
   assert.match(html(ArticlesView, { data, user, loading: false }), /테스트 아티클/);
   assert.match(html(StoriesView, { data, loading: false }), /등록된 고객 이야기/);
 });
+test('article hub includes the managed free-video banner and representative thumbnails', () => {
+  const { ArticlesView } = load('app/ui/final/public-views.tsx');
+  const banner = { id: 'edu_article_banner', value: { enabled: true, title: '회원 무료 영상', videos: [{ title: '첫 영상', url: 'https://youtu.be/dQw4w9WgXcQ', available: true }] } };
+  const articleData = { ...data, article_banner: [banner], articles: [{ ...data.articles[0], cover_image_url: 'https://cdn.example/thumb.webp', cover_image_alt: '대표 이미지' }] };
+  const markup = html(ArticlesView, { data: articleData, user, loading: false });
+  assert.match(markup, /회원 무료 영상/);
+  assert.match(markup, /article-thumbnail/);
+  assert.match(markup, /thumb\.webp/);
+  const platformSource = read('app/ui/platform.tsx');
+  assert.doesNotMatch(platformSource, /THE WAY WE LEARN|시청에서 멈추지 않는/);
+  assert.match(platformSource, /제2026-충남천안-1825호/);
+  assert.match(platformSource, /policies\/refund/);
+});
+test('article management renders the free-video banner editor', () => {
+  const { ArticleBannerEditor } = load('app/ui/final/article-banner-editor.tsx');
+  const markup = html(ArticleBannerEditor, { settings: [], send, pending: false });
+  assert.match(markup, /상단 무료강의 영상 배너/);
+  assert.equal((markup.match(/무료 영상 [123]/g) || []).length >= 3, true);
+  assert.ok(platform.sections.find(row => row.key === 'articles').fields.some(field => field.key === 'cover_image_path'));
+});
 test('all member screens render real data, with no authentication or payment writes', () => {
   const { MemberViews } = load('app/ui/final/member-views.tsx');
   for (const section of ['dashboard', 'classes', 'missions', 'questions', 'orders', 'coupons', 'resources', 'profile', 'reviews']) {

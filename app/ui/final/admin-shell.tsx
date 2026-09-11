@@ -212,9 +212,9 @@ export function AdminShell({
           <X />
         </button>
         <Link className="brand" href="/admin">
-          <span className="brand-mark">b</span>
+          <img className="brand-logo" src="/brandy-action-logo.png" alt="brandyaction" />
           <span>
-            brandyaction<small>EDU / ADMIN</small>
+            <small>EDU / ADMIN</small>
           </span>
         </Link>
         <div className="workspace-label">

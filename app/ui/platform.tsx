@@ -33,6 +33,7 @@ import {
 import { AdminWorkflows, standaloneAdmin } from "./admin-workflows";
 import { BlocksField, UploadField } from "./editor-fields";
 import { AdminCatalog } from "./final/admin-catalog";
+import { ArticleBannerEditor } from "./final/article-banner-editor";
 import { LearningEditor, ProductEditor } from "./final/admin-editors";
 import {
   AdminHeading,
@@ -363,17 +364,23 @@ export function Platform({
     ) : (
       <footer className="footer">
         <div className="wrap">
-          <div className="between">
+          <div className="footer-top">
             <Brand />
             <div className="footer-links">
               <Link href="/policies/terms">이용약관</Link>
               <Link href="/policies/privacy">개인정보 처리방침</Link>
+              <Link href="/policies/refund">환불규정</Link>
               <Link href="/my/questions">고객 문의</Link>
             </div>
           </div>
-          <p>배움을 실행으로, 실행을 내 일의 변화로 연결합니다.</p>
+          <div className="footer-company">
+            <p><b>주식회사 브랜디액션</b></p>
+            <p>대표 전태헌 · 안정호 <span>사업자등록번호 677-87-02769</span> <span>통신판매업 신고 제2026-충남천안-1825호</span></p>
+            <p>충남 천안시 서북구 천안천4길 32 506호 <span>대표전화 070-7736-3744</span> <a href="mailto:edu@brandyaction.co.kr">edu@brandyaction.co.kr</a></p>
+          </div>
           <div className="footer-bottom">
-            © BRANDYACTION EDU. ALL RIGHTS RESERVED.
+            <span>© BRANDYACTION. ALL RIGHTS RESERVED.</span>
+            <span>배움을 실행으로, 실행을 내 일의 변화로 연결합니다.</span>
           </div>
         </div>
       </footer>
@@ -512,48 +519,6 @@ export function Platform({
             {!loading && !recruitingCourses.length && (
               <Empty title="새로운 클래스를 준비하고 있습니다." />
             )}
-          </section>
-          <section className="execution-section">
-            <div className="execution-intro">
-              <div className="eyebrow">02 / THE WAY WE LEARN</div>
-              <h2>
-                시청에서 멈추지 않는
-                <br />
-                학습의 구조.
-              </h2>
-              <p>
-                강의마다 다음 행동이 있습니다.
-                <br />
-                작게 적용하고, 기록하고, 다시 개선합니다.
-              </p>
-              <Link className="link" href="/my/classes">
-                나의 학습 확인하기 <ArrowRight />
-              </Link>
-            </div>
-            <ol className="execution-steps">
-              {[
-                [
-                  "내 문제로 배웁니다",
-                  "지금 내 업무에서 해결할 문제를 정하고 필요한 개념을 배웁니다.",
-                ],
-                [
-                  "미션으로 실행합니다",
-                  "배운 내용을 적용한 과정과 결과물을 남깁니다.",
-                ],
-                [
-                  "피드백으로 다음을 만듭니다",
-                  "잘된 점과 보완할 점을 확인하고, 다음 실행으로 이어갑니다.",
-                ],
-              ].map(([title, desc], i) => (
-                <li key={title}>
-                  <span>0{i + 1}</span>
-                  <div>
-                    <h3>{title}</h3>
-                    <p>{desc}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
           </section>
           <section className="section">
             <div className="section-head">
@@ -839,6 +804,8 @@ export function Platform({
                 loading={loading}
               />
             ) : (
+              <>
+              {section.key === "articles" && <ArticleBannerEditor settings={rows("site_settings")} send={send} pending={pending} />}
               <AdminCatalog
                 key={section.key}
                 section={section}
@@ -864,6 +831,7 @@ export function Platform({
                   ) : undefined
                 }
               />
+              </>
             )}
           </>
         )}

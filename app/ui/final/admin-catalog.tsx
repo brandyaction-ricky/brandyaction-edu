@@ -309,7 +309,7 @@ export function AdminCatalog({
     ],
     banners: [
       {
-        label: "배너",
+        label: "메인 히어로",
         value: (r) => (
           <div className="catalog-name">
             <div className="catalog-cover">
@@ -320,14 +320,14 @@ export function AdminCatalog({
               )}
             </div>
             <div>
-              <b>{t(r, "title")}</b>
-              <p>{t(r, "eyebrow")}</p>
+              <button className="title-btn" onClick={() => edit(s, r)}>{t(r, "title")}</button>
+              <p>{t(r, "eyebrow")} · {t(r, "description")}</p>
             </div>
           </div>
         ),
       },
       {
-        label: "연결",
+        label: "CTA 버튼·연결",
         value: (r) =>
           safeUrl(r.link_url) ? (
             <a
@@ -351,17 +351,15 @@ export function AdminCatalog({
           </>
         ),
       },
-      { label: "순서", value: (r) => num(r, "display_order") },
-      { label: "공개", value: badge },
+      { label: "노출 순서", value: (r) => num(r, "display_order") },
+      { label: "사용 상태", value: badge },
     ],
     articles: [
       {
         label: "아티클",
         value: (r) => (
           <div className="article-table-title">
-            <span className="article-type-icon">
-              {r.content_type === "video" ? <BookOpen /> : <FileText />}
-            </span>
+            {safeUrl(r.cover_image_url || r.cover_image_path) ? <img className="article-admin-thumb" src={safeUrl(r.cover_image_url || r.cover_image_path)} alt="" /> : <span className="article-type-icon">{r.content_type === "video" ? <BookOpen /> : <FileText />}</span>}
             <div>
               <button className="title-btn" onClick={() => edit(s, r)}>
                 {t(r, "title")}
