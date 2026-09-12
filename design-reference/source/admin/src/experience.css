@@ -19,3 +19,21 @@ table{font-size:var(--type-small);font-variant-numeric:tabular-nums;white-space:
   #member-table th:first-child,#member-table td:first-child{min-width:40px;width:40px;left:0}#member-table th:nth-child(2),#member-table td:nth-child(2){left:40px;min-width:152px;max-width:152px}.status-cell{min-width:44px;width:44px;height:44px}
 }
 @media(max-width:380px){.metric{padding:var(--space-3)}.metric-value{font-size:var(--type-h3)}.metrics{gap:var(--space-2)}.toolbar select{min-width:100%;width:100%}.funnel{grid-template-columns:1fr}.drawer .metrics{grid-template-columns:1fr}.table-foot .row{flex-wrap:wrap}}
+
+/* Focused operations views keep the supplied information hierarchy with live data. */
+.admin-content-tabs{margin:0 0 var(--space-5)}
+.mission-week-pills{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;margin:0 0 var(--space-5)}
+.mission-week-pills .pill{min-height:44px;padding:var(--space-2) var(--space-4)}
+.mission-week-pills .pill span{margin-left:var(--space-2);opacity:.72}
+.mission-catalog{margin-top:0}
+.mission-catalog .week-head{padding-bottom:var(--space-4);border-bottom:1px solid var(--line);margin-bottom:var(--space-4)}
+.mission-catalog .mission-row{width:100%}
+.mission-catalog .title-btn{text-align:left}
+.customer-detail{margin-bottom:var(--space-6)}
+.customer-detail .drawer-profile{display:flex;align-items:center;gap:var(--space-4);margin-bottom:var(--space-5)}
+.customer-detail .drawer-profile .avatar{width:52px;height:52px;font-size:var(--type-large)}
+.customer-summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--space-3);margin-bottom:var(--space-6)}
+.customer-summary-grid>div{display:grid;gap:var(--space-1);padding:var(--space-4);background:var(--surface-subtle);border:1px solid var(--line)}
+.customer-summary-grid span{font-size:var(--type-small);color:var(--text-secondary)}
+.customer-summary-grid b{font-size:var(--type-body)}
+@media(max-width:720px){.mission-week-pills{flex-wrap:nowrap;overflow:auto;padding-bottom:var(--space-2)}.mission-week-pills .pill{flex:0 0 auto}.customer-summary-grid{grid-template-columns:1fr}.mission-catalog .mission-row{display:grid;grid-template-columns:24px 36px minmax(0,1fr)}.mission-catalog .mission-row>.badge{grid-column:3}.mission-catalog .mission-actions{grid-column:3}}
