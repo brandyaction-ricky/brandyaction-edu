@@ -1,12 +1,23 @@
-import { NextResponse } from "next/server";
-import { processDueCrmJobs } from "@/lib/crm-engine";
+import { dispatchDueCrm } from "@/lib/crm-delivery";
 
-export const dynamic="force-dynamic";
-export const maxDuration=60;
+export const maxDuration = 60;
 
-export async function GET(request:Request){
-  const secret=process.env.CRON_SECRET||"";
-  if(!secret||request.headers.get("authorization")!==`Bearer ${secret}`)return NextResponse.json({error:"Unauthorized"},{status:401});
-  try{return NextResponse.json({ok:true,...await processDueCrmJobs()})}
-  catch(reason){return NextResponse.json({error:reason instanceof Error?reason.message:"CRM 자동화 실행 실패"},{status:500})}
+export async function GET(request: Request) {
+  if (
+    !process.env.CRON_SECRET ||
+    request.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`
+  )
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    return Response.json({ ok: true, ...(await dispatchDueCrm()) });
+  } catch (error) {
+    console.error(
+      "crm cron",
+      error instanceof Error ? error.message : "unexpected",
+    );
+    return Response.json(
+      { error: "CRM 예약 작업을 완료하지 못했습니다." },
+      { status: 503 },
+    );
+  }
 }

@@ -1,37 +1,12 @@
-import type { Metadata } from "next";
-import { Suspense } from "react";
-import "./globals.css";
-import { SiteFooter } from "./components/site-footer";
-import { AnalyticsTracker } from "./components/analytics-tracker";
-import { loadCodeSettings } from "@/lib/code-settings";
-
-export const revalidate = 300;
-
-export const metadata: Metadata = {
-  title: "브랜디액션 에듀 | 실행으로 결과를 만드는 교육",
-  description: "자영업자와 사업가를 위한 기수제 라이브 실전 교육 플랫폼",
-  icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
-};
-
-export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const appEnvironment = process.env.NEXT_PUBLIC_APP_ENV ?? "production";
-  const isNonProduction = appEnvironment !== "production";
-  const codes = await loadCodeSettings();
-
-  return (
-    <html lang="ko">
-      <head dangerouslySetInnerHTML={{ __html: `${codes.metaCode}\n${codes.headerCode}` }}/>
-      <body data-app-environment={appEnvironment}>
-        {codes.bodyCode ? <div className="body-code-injection" dangerouslySetInnerHTML={{ __html: codes.bodyCode }}/> : null}
-        {isNonProduction ? (
-          <div className="environment-banner" role="status">
-            DEV 테스트 서버 · 이곳의 회원·상품·결제 데이터는 운영 서버와 분리됩니다.
-          </div>
-        ) : null}
-        {children}
-        <Suspense fallback={null}><AnalyticsTracker /></Suspense>
-        <SiteFooter />
-      </body>
-    </html>
-  );
-}
+import { getEduSettings } from '@/lib/edu-settings';
+import { LandingTestBanner } from './ui/landing/test-banner';
+import './ui/landing/landing.css';
+import { EventsTracker } from './ui/events-tracker';
+import { Suspense } from 'react';
+import type { Metadata } from 'next';
+import './ui/final/tokens.css';
+import './ui/final/frontend.css';
+import './ui/final/admin.css';
+import './ui/final/integration.css';
+export const metadata: Metadata = {title:'BrandyAction EDU | 배운 것을, 내 일의 성과로.',description:'AI와 마케팅을 배우고 내 업무에 적용하는 실행 중심 교육.',robots: process.env.NEXT_PUBLIC_APP_ENV === 'production' ? undefined : {index:false,follow:false}};
+export default async function Layout({children}:{children:React.ReactNode}) { const {operations}=await getEduSettings(); return <html lang="ko"><body><Suspense><LandingTestBanner /></Suspense>{children}<Suspense><EventsTracker enabled={operations.trackingEnabled===true}/></Suspense></body></html>; }

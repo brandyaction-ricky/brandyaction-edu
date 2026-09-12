@@ -1,0 +1,22 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import vm from 'node:vm';
+import {fileURLToPath} from 'node:url';
+const root=path.dirname(fileURLToPath(import.meta.url));
+const dest=path.join(root,'dist');fs.mkdirSync(path.join(dest,'assets'),{recursive:true});
+const imagePath=path.join(root,'src','free-class-detail.png');
+const image=fs.readFileSync(imagePath);
+const css=[fs.readFileSync(path.join(root,'src/interface.css'),'utf8'),...['tokens.css','components.css'].map(f=>fs.readFileSync(path.join(root,'../shared',f),'utf8')),fs.readFileSync(path.join(root,'src/experience.css'),'utf8')].join('\n');
+const names=['core.js','worksheets.js','article-banner.js','public.js','home.js','member.js','articles-update.js','mypage.js'];
+const source=names.map(n=>fs.readFileSync(path.join(root,'src',n),'utf8')).join('\n');
+const asset=`const DETAIL_IMAGE='data:image/png;base64,${image.toString('base64')}';\n`;
+const runtime=fs.readFileSync(path.join(root,'src/runtime.js'),'utf8');
+const ctx=vm.createContext({console});vm.runInContext(asset+source.split('// ARTICLE FRONT EVENTS')[0]+fs.readFileSync(path.join(root,'src/mypage.js'),'utf8').split('// MYPAGE EVENTS')[0],ctx);
+const routes=vm.runInContext('ROUTES',ctx);
+function renderFile(route,filename){vm.runInContext(`state.route=${JSON.stringify(route)};state.logged=${['mypage','mymissions','myclasses','learning','mission','questions','orders','resources','coupons','profile','myreviews','checkout','apply','applied','result'].includes(route)};state.applied=${route==='applied'};state.paid=${route==='result'};`,ctx);const html=vm.runInContext(`header()+'<main id="main" tabindex="-1">'+views[${JSON.stringify(route)}]()+'</main>'+footer()`,ctx);const doc=`<!doctype html>\n<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow"><meta name="color-scheme" content="light"><title>${routes[route][0]} · Brandy Edu · Brand Final</title><meta name="description" content="Brandyaction EDU 프론트 HTML UIUX 시안. 공통 브랜드 디자인 시스템 · 25개 대표 화면과 마이페이지, 아티클 무료강의, 이미지 중심 무료 클래스 상세."><style>${css}</style></head><body class="${route==='free'?'has-cta':''}"><div id="app">${html}</div><dialog class="modal" id="modal" aria-labelledby="modal-title"></dialog><div id="toast" class="toast" role="status" hidden></div><noscript><p style="padding:20px;text-align:center">화면 이동과 다운로드를 확인하려면 JavaScript를 허용해 주세요.</p></noscript><script>const INITIAL_ROUTE=${JSON.stringify(route)};\n${asset}${source}\n${runtime}</script></body></html>`;fs.writeFileSync(path.join(dest,filename),doc);}
+for(const [route,[label,file]]of Object.entries(routes))renderFile(route,file);
+renderFile('home','brandy-frontend-final.html');
+const worksheets=vm.runInContext('WORKSHEETS',ctx);for(const file of Object.values(worksheets))fs.writeFileSync(path.join(dest,'assets',file.filename),file.html);
+fs.copyFileSync(imagePath,path.join(dest,'assets','free-class-detail.png'));
+fs.writeFileSync(path.join(dest,'page-index.json'),JSON.stringify(Object.fromEntries(Object.entries(routes).map(([r,[title,file,group]])=>[r,{title,file,group}])),null,2));
+console.log(`Built ${Object.keys(routes).length} standalone pages + integrated HTML; 4 downloadable worksheets; embedded image and no external dependencies.`);
