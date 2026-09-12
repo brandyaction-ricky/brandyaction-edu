@@ -29,8 +29,14 @@ export async function generateMetadata({params}:{params:Promise<{path?:string[]}
  let description=String(seo.description||'AI와 마케팅을 배우고 내 업무에 적용하는 실행 중심 교육.');
  if(['classes','articles'].includes(path[0])&&path[1]) {
   const db=await createClient();
-  const {data}=await db.from(path[0]==='classes'?'courses':'articles').select('title,summary').eq('slug',path[1]).eq('status','published').maybeSingle();
-  if(data){title=data.title+' | BrandyAction EDU';if(data.summary)description=data.summary;}
+  const isCourse=path[0]==='classes';
+  const {data}=await db.from(isCourse?'courses':'articles').select(isCourse?'title,summary,metadata':'title,summary').eq('slug',path[1]).eq('status','published').maybeSingle();
+  if(data){
+   const row=data as unknown as {title:string;summary?:string;metadata?:Record<string,unknown>};
+   const metadata=isCourse&&row.metadata&&typeof row.metadata==='object'?row.metadata:{};
+   title=(typeof metadata.seo_title==='string'&&metadata.seo_title.trim()?metadata.seo_title:row.title)+' | BrandyAction EDU';
+   description=String(metadata.seo_description||row.summary||description);
+  }
  }
  const privatePage=['admin','my','learn','checkout','apply','payment','login','signup','auth'].includes(path[0]);
  return {title,description,openGraph:{title,description},robots:privatePage||process.env.NEXT_PUBLIC_APP_ENV!=='production'?{index:false,follow:false}:undefined,verification:{google:seo.googleVerification?String(seo.googleVerification):undefined,other:seo.naverVerification?{'naver-site-verification':String(seo.naverVerification)}:undefined}};

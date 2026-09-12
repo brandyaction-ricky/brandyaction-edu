@@ -1403,6 +1403,13 @@ function SettingsForm({ section, data, send, pending }: Props) {
     "value",
   );
   const [message, setMessage] = useState("");
+  const [seoTab, setSeoTab] = useState<'search' | 'verification' | 'measurement'>('search');
+  const [seoDraft, setSeoDraft] = useState(() => ({
+    title: String(initial.title || 'BrandyAction EDU | 배운 것을, 내 일의 성과로.'),
+    description: String(initial.description || 'AI와 마케팅을 배우고 내 업무에 적용하는 실행 중심 교육.'),
+    googleVerification: String(initial.googleVerification || ''),
+    naverVerification: String(initial.naverVerification || ''),
+  }));
   const [metric, setMetric] = useState<Row | null>(null);
   const metrics = rows(data, "site_settings")
     .filter((r) => t(r, "key").startsWith("edu_metric_"))
@@ -1415,6 +1422,11 @@ function SettingsForm({ section, data, send, pending }: Props) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
     const values = Object.fromEntries(f.entries()) as Record<string, unknown>;
+    if (section === 'seo' && !String(values.title || '').trim()) {
+      setSeoTab('search');
+      setMessage('사이트 제목을 입력해 주세요.');
+      return;
+    }
     if (section === "settings")
       values.trackingEnabled = f.get("trackingEnabled") === "on";
     if (section === "metrics")
@@ -1434,7 +1446,10 @@ function SettingsForm({ section, data, send, pending }: Props) {
     section === "metrics" ? object(metric || undefined, "value") : initial;
   return (
     <>
-      <div className="settings-layout">
+      {section === 'seo' && <nav className="tabs catalog-tabs seo-settings-tabs" aria-label="검색코드 설정 탭">
+        {([['search', '검색·공유'], ['verification', '소유 확인'], ['measurement', '측정·추가 코드']] as const).map(([tab, label]) => <button key={tab} type="button" className={seoTab === tab ? 'tab active' : 'tab'} aria-pressed={seoTab === tab} onClick={() => setSeoTab(tab)}>{label}</button>)}
+      </nav>}
+      <div className={section === 'seo' && seoTab !== 'search' ? 'stack seo-settings-layout' : 'settings-layout'}>
         <form
           key={section + String(metric?.key || "new")}
           className="panel pad"
@@ -1442,16 +1457,15 @@ function SettingsForm({ section, data, send, pending }: Props) {
         >
           {section === "seo" ? (
             <>
-              <h2>검색 결과 기본 정보</h2>
+              <div hidden={seoTab !== 'search'}>
+              <h2>사이트 기본 검색 정보</h2>
               <Field label="사이트 제목">
                 <input
                   name="title"
-                  required
+                  required={seoTab === 'search'}
                   maxLength={200}
-                  defaultValue={String(
-                    value.title ||
-                      "BrandyAction EDU | 배운 것을, 내 일의 성과로.",
-                  )}
+                  value={seoDraft.title}
+                  onChange={e => setSeoDraft(previous => ({ ...previous, title: e.target.value }))}
                 />
               </Field>
               <Field label="사이트 설명">
@@ -1459,32 +1473,49 @@ function SettingsForm({ section, data, send, pending }: Props) {
                   name="description"
                   rows={3}
                   maxLength={500}
-                  defaultValue={String(
-                    value.description ||
-                      "AI와 마케팅을 배우고 내 업무에 적용하는 실행 중심 교육.",
-                  )}
+                  value={seoDraft.description}
+                  onChange={e => setSeoDraft(previous => ({ ...previous, description: e.target.value }))}
                 />
               </Field>
+              <Field label="사이트 대표 주소"><input value="https://brandyaction-edu.com" readOnly /></Field>
+              <p className="notice mt16">운영 사이트의 공개 페이지는 검색에 노출됩니다. 관리자·학습실·회원 화면과 DEV 사이트는 검색에서 제외됩니다.</p>
+              </div>
+              <div hidden={seoTab !== 'verification'}>
+              <h2>사이트 소유 확인</h2>
+              <p className="meta mt16">검색엔진에서 발급받은 인증 메타 태그의 content 값만 입력해 주세요.</p>
               <div className="grid2">
                 <Field label="Google 사이트 소유권 확인 코드">
                   <input
                     name="googleVerification"
                     maxLength={200}
-                    defaultValue={String(value.googleVerification || "")}
+                    value={seoDraft.googleVerification}
+                    placeholder="인증 메타 태그의 content 값"
+                    onChange={e => setSeoDraft(previous => ({ ...previous, googleVerification: e.target.value }))}
                   />
                 </Field>
                 <Field label="네이버 사이트 소유권 확인 코드">
                   <input
                     name="naverVerification"
                     maxLength={200}
-                    defaultValue={String(value.naverVerification || "")}
+                    value={seoDraft.naverVerification}
+                    placeholder="인증 메타 태그의 content 값"
+                    onChange={e => setSeoDraft(previous => ({ ...previous, naverVerification: e.target.value }))}
                   />
                 </Field>
               </div>
               <p className="meta">
-                사이트 제목·설명과 소유권 확인 메타 태그를 적용합니다. DEV
-                사이트의 검색 제외 설정은 유지됩니다.
+                저장한 인증 값은 사이트 메타 태그에 반영됩니다. 소유 확인 완료 여부는 Google Search Console 또는 네이버 서치어드바이저에서 확인하세요.
               </p>
+              </div>
+              {seoTab === 'measurement' && <>
+                <h2>측정·추가 코드 관리</h2>
+                <p className="meta mt16">방문 기록과 무료클래스 광고 측정은 아래 설정 화면에서 관리합니다.</p>
+                <div className="table-scroll mt24"><table className="data-table"><thead><tr><th>항목</th><th>적용 범위</th><th>관리</th></tr></thead><tbody>
+                  <tr><td><strong>공개 페이지 방문 기록</strong><p className="meta">방문·아티클·클래스 조회와 신청 버튼 클릭</p></td><td>사이트 공개 페이지</td><td><Link className="btn small" href="/admin/settings">운영·트래킹 설정</Link></td></tr>
+                  <tr><td><strong>무료클래스 픽셀·이벤트</strong><p className="meta">클래스별 CTA와 광고 이벤트 측정</p></td><td>선택한 무료클래스</td><td><Link className="btn small" href="/admin/landing">무료클래스 트래킹</Link></td></tr>
+                </tbody></table></div>
+                <p className="notice mt24">측정 설정은 각 관리 화면에서 저장·적용합니다. 추가 코드의 직접 실행은 지원하지 않습니다.</p>
+              </>}
             </>
           ) : section === "settings" ? (
             <>
@@ -1578,12 +1609,12 @@ function SettingsForm({ section, data, send, pending }: Props) {
               </p>
             </>
           )}
-          <button className="btn primary mt24" disabled={pending}>
-            변경사항 저장
-          </button>
+          {(section !== 'seo' || seoTab !== 'measurement') && <button className="btn primary mt24" disabled={pending}>
+            {section === 'seo' ? seoTab === 'verification' ? '인증 값 저장' : '검색 정보 저장' : '변경사항 저장'}
+          </button>}
           <Status message={message} />
         </form>
-        <aside className="stack">
+        {(section !== 'seo' || seoTab === 'search') && <aside className="stack">
           <section className="panel">
             <div className="panel-head">
               <h2>
@@ -1598,12 +1629,9 @@ function SettingsForm({ section, data, send, pending }: Props) {
               {section === "seo" ? (
                 <div className="snippet">
                   <div className="snippet-url">brandyaction-edu.com</div>
-                  <h3>{String(value.title || "BrandyAction EDU")}</h3>
+                  <h3>{seoDraft.title || 'BrandyAction EDU'}</h3>
                   <p>
-                    {String(
-                      value.description ||
-                        "사이트 설명을 저장하면 검색 메타 정보에 반영됩니다.",
-                    )}
+                    {seoDraft.description || '사이트 설명을 입력해 주세요.'}
                   </p>
                 </div>
               ) : (
@@ -1622,7 +1650,7 @@ function SettingsForm({ section, data, send, pending }: Props) {
               )}
             </div>
           </section>
-        </aside>
+        </aside>}
       </div>
       {section === "metrics" && (
         <div className="table-scroll mobile-cards mt24">
@@ -1823,14 +1851,29 @@ function OrdersPanel({
   const [status, setStatus] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [appliedDates, setAppliedDates] = useState({ from: "", to: "" });
+  const [dateError, setDateError] = useState("");
   const [course, setCourse] = useState("");
+  const fromTimestamp = appliedDates.from
+    ? Date.parse(appliedDates.from + "T00:00:00+09:00")
+    : null;
+  const toTimestamp = appliedDates.to
+    ? Date.parse(appliedDates.to + "T00:00:00+09:00") + 86400000
+    : null;
+  function applyDates() {
+    if (from && to && from > to) {
+      setDateError("조회 종료일은 시작일 이후로 선택해 주세요.");
+      return;
+    }
+    setDateError("");
+    setAppliedDates({ from, to });
+    setOpened("");
+  }
   const orders = rows(data, "orders").filter(
     (o) =>
       (!status || o.status === status) &&
-      (!from || String(o.created_at) >= from) &&
-      (!to ||
-        String(o.created_at) <
-          new Date(Date.parse(to) + 86400000).toISOString()) &&
+      (fromTimestamp === null || Date.parse(String(o.created_at)) >= fromTimestamp) &&
+      (toTimestamp === null || Date.parse(String(o.created_at)) < toTimestamp) &&
       (!course ||
         rows(data, "order_items").some(
           (i) => i.order_id === o.id && i.course_id === course,
@@ -1859,129 +1902,103 @@ function OrdersPanel({
     (sum, p) => sum + Number(p.cancelled_amount || 0),
     0,
   );
+  const paymentIds = new Set(payments.map(payment => payment.id));
+  const processingRefunds = rows(data, "edu_refund_requests").filter(
+    request => request.status === "processing" && paymentIds.has(String(request.payment_id)),
+  );
   return (
     <>
-      <div className="toolbar">
-        <input
-          type="search"
-          value={query}
-          aria-label="주문 검색"
-          placeholder="현재 페이지 주문번호·회원·상품 검색"
-          onChange={(e) => {
-            setQuery(e.target.value);
-          }}
-        />
-        <select
-          aria-label="상품 필터"
-          value={course}
-          onChange={(e) => {
-            setCourse(e.target.value);
-          }}
-        >
-          <option value="">전체 상품</option>
-          {rows(data, "courses").map((c) => (
-            <option key={c.id} value={c.id}>
-              {named(c)}
-            </option>
-          ))}
-        </select>
-        <select
-          aria-label="결제 상태"
-          value={status}
-          onChange={(e) => {
-            setStatus(e.target.value);
-          }}
-        >
-          <option value="">전체 상태</option>
-          {[
-            "paid",
-            "pending",
-            "payment_failed",
-            "partially_refunded",
-            "refunded",
-            "cancelled",
-          ].map((s) => (
-            <option key={s} value={s}>
-              {labels[s] || s}
-            </option>
-          ))}
-        </select>
-        <Field label="주문 시작일">
-          <input
-            type="date"
-            value={from}
-            onChange={(e) => {
-              setFrom(e.target.value);
-            }}
-          />
-        </Field>
-        <Field label="종료일">
-          <input
-            type="date"
-            value={to}
-            onChange={(e) => {
-              setTo(e.target.value);
-            }}
-          />
-        </Field>
-      </div>
-      <div className="metrics mb24">
+      <section className="order-date-panel" aria-label="주문 날짜 조회">
+        <form className="date-range" onSubmit={event => { event.preventDefault(); applyDates(); }}>
+          <label className="select-filter">
+            <span>주문일 시작 · KST</span>
+            <input type="date" aria-label="주문일 시작" value={from} onChange={event => setFrom(event.target.value)} />
+          </label>
+          <span className="date-separator" aria-hidden="true">–</span>
+          <label className="select-filter">
+            <span>주문일 종료 · KST</span>
+            <input type="date" aria-label="주문일 종료" value={to} onChange={event => setTo(event.target.value)} />
+          </label>
+          <button className="btn primary" type="submit" disabled={loading}>조회</button>
+          <button className="btn" type="button" onClick={() => { setFrom(""); setTo(""); setAppliedDates({ from: "", to: "" }); setDateError(""); setOpened(""); }}>전체 기간</button>
+        </form>
+        <p className="meta mt8">적용 기간: {appliedDates.from || "전체 시작일"} ~ {appliedDates.to || "전체 종료일"} · 주문일 기준, 종료일 포함 · 현재 조회 페이지 내 검색</p>
+        {dateError && <p className="field-error mt8" role="alert">{dateError}</p>}
+      </section>
+      <div className="metrics" aria-busy={loading}>
         {[
-          ["현재 페이지 승인 결제액", money(paid)],
-          ["현재 페이지 환불 완료액", money(refunded)],
-          ["현재 페이지 순결제액", money(paid - refunded)],
-          ["현재 페이지 주문 수", orders.length],
-        ].map(([label, value]) => (
-          <div className="metric" key={label}>
-            <span>{label}</span>
-            <strong>{value}</strong>
+          ["결제 완료액", money(paid), "현재 페이지 조회 조건의 승인 결제 합계"],
+          ["환불 완료액", money(refunded), "현재 페이지 결제의 취소 완료액"],
+          ["순결제액", money(paid - refunded), "결제 완료 − 환불 완료"],
+          ["환불 처리 확인", processingRefunds.length + "건", "현재 페이지의 결과 확인 중인 환불"],
+        ].map(([label, value, note], index) => (
+          <div className={"metric" + (index === 2 ? " highlight" : "")} key={label}>
+            <div className="metric-label">{label}</div>
+            <div className="metric-value num">{loading ? "—" : value}</div>
+            <div className="metric-note">{note}</div>
           </div>
         ))}
       </div>
-      <div className="stack">
-        <div className="table-scroll mobile-cards">
+      <section className="panel" aria-label="주문 목록" aria-busy={loading}>
+        <div className="filter-row">
+          <label className="search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><circle cx="10" cy="10" r="7" /><path d="m15 15 6 6" /></svg>
+            <input type="search" value={query} aria-label="주문 검색" placeholder="주문번호 · 회원명 · 상품명 검색" onChange={event => { setQuery(event.target.value); setOpened(""); }} />
+          </label>
+          <span className="spacer" />
+          <label className="select-filter"><span>상품</span><select aria-label="상품 필터" value={course} onChange={event => { setCourse(event.target.value); setOpened(""); }}><option value="">전체 상품</option>{rows(data, "courses").map(item => <option key={item.id} value={item.id}>{named(item)}</option>)}</select></label>
+          <select aria-label="결제 상태" value={status} onChange={event => { setStatus(event.target.value); setOpened(""); }}><option value="">전체 상태</option>{["paid", "pending", "payment_failed", "partially_refunded", "refunded", "cancelled"].map(value => <option key={value} value={value}>{labels[value] || value}</option>)}</select>
+        </div>
+        <div className="table-scroll mobile-cards" tabIndex={0} role="region" aria-label="주문 데이터 표">
           <table>
             <thead>
               <tr>
                 {[
-                  "주문 번호",
-                  "상품",
-                  "구매자",
-                  "주문 금액",
-                  "상태",
-                  "주문일",
+                  "주문",
+                  "회원",
+                  "결제액",
+                  "결제 상태",
+                  "환불 상태",
+                  "수강 권한",
                   "관리",
                 ].map((label) => (
-                  <th key={label}>{label}</th>
+                  <th scope="col" key={label}>{label}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {orders.map((order) => (
+              {orders.map((order) => {
+                const orderItems = rows(data, "order_items").filter(item => item.order_id === order.id);
+                const orderPayments = rows(data, "payments").filter(payment => payment.order_id === order.id);
+                const approvedAmount = orderPayments.reduce((sum, payment) => sum + Number(payment.approved_amount || 0), 0);
+                const cancelledAmount = orderPayments.reduce((sum, payment) => sum + Number(payment.cancelled_amount || 0), 0);
+                const checkingRefund = processingRefunds.some(request => orderPayments.some(payment => payment.id === request.payment_id));
+                const refundLabel = checkingRefund ? "결과 확인 중" : cancelledAmount > 0 ? (cancelledAmount >= approvedAmount ? "환불 완료" : "부분 환불") : "없음";
+                const access = rows(data, "enrollments").filter(enrollment => orderItems.some(item => item.id === enrollment.order_item_id));
+                const accessLabels = [...new Set(access.map(enrollment => labels[t(enrollment, "status")] || t(enrollment, "status")))];
+                return (
                 <tr key={order.id}>
-                  <td data-label="주문 번호">
+                  <td data-label="주문">
                     <b>{t(order, "order_number")}</b>
+                    {orderItems.map(item => <p className="table-excerpt" key={item.id}>{t(item, "item_name")}</p>)}
+                    <p>{timeLabel(order.created_at)}</p>
                   </td>
-                  <td data-label="상품">
-                    {rows(data, "order_items")
-                      .filter((item) => item.order_id === order.id)
-                      .map((item) => (
-                        <p key={item.id}>{t(item, "item_name")}</p>
-                      ))}
-                  </td>
-                  <td data-label="구매자">
-                    {t(order, "customer_name")}
+                  <td data-label="회원">
+                    <b>{t(order, "customer_name") || "이름 미등록"}</b>
                     <small>{t(order, "customer_email")}</small>
                   </td>
-                  <td data-label="주문 금액">
-                    {money(Number(order.total_amount))}
+                  <td data-label="결제액">
+                    <b>{money(approvedAmount)}</b>
+                    <p>{[...new Set(orderPayments.map(payment => t(payment, "method")).filter(Boolean))].join(" · ") || (Number(order.total_amount) === 0 ? "무료 신청" : "승인 내역 없음")}</p>
+                    {Number(order.discount_amount) > 0 && <p>할인 {money(Number(order.discount_amount))}</p>}
                   </td>
-                  <td data-label="상태">
-                    <span className="badge">
+                  <td data-label="결제 상태">
+                    <span className={"badge " + (order.status === "paid" ? "green" : order.status === "payment_failed" ? "red" : order.status === "pending" ? "amber" : "")}>
                       {labels[t(order, "status")] || t(order, "status")}
                     </span>
                   </td>
-                  <td data-label="주문일">{timeLabel(order.created_at)}</td>
+                  <td data-label="환불 상태"><span className={"badge " + (checkingRefund ? "amber" : "")}>{refundLabel}</span>{cancelledAmount > 0 && <p>{money(cancelledAmount)}</p>}</td>
+                  <td data-label="수강 권한">{accessLabels.join(" · ") || "부여 내역 없음"}</td>
                   <td data-label="관리">
                     <button
                       className="btn small"
@@ -1990,14 +2007,19 @@ function OrdersPanel({
                         setOpened(opened === order.id ? "" : order.id)
                       }
                     >
-                      상세 · 환불
+                      상세
                     </button>
                   </td>
                 </tr>
-              ))}
+              );})}
             </tbody>
           </table>
         </div>
+        {!orders.length && !loading && <div className="empty"><h3>해당 주문이 없습니다.</h3><p>현재 조회 페이지의 기간·상품·상태 또는 검색어를 확인하세요.</p></div>}
+        {loading && <p className="pad muted" role="status">주문 내역을 불러오고 있습니다.</p>}
+        <div className="table-foot"><span>{orders.length}건 표시 · 현재 조회 페이지 내 검색·집계</span><span>정산·회계 매출은 결제액과 별도</span></div>
+      </section>
+      <div className="stack mt24">
         {orders
           .filter((order) => order.id === opened)
           .map((o) => {
@@ -2089,9 +2111,6 @@ function OrdersPanel({
               </details>
             );
           })}
-        {!orders.length && (
-          <p className="panel pad muted">조건에 맞는 주문이 없습니다.</p>
-        )}
       </div>
       {pagination && pagination.total > pagination.pageSize && (
         <div className="workflow-pagination">

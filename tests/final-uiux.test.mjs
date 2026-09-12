@@ -144,7 +144,8 @@ test('catalogues and separate editors render without dropping existing fields', 
   assert.match(missions, /mission-week-pills/); assert.match(missions, /일차별 미션/); assert.match(missions, /mission-row/);
   const customers = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'customers') });
   assert.match(customers, /마케팅 수신 동의/); assert.match(customers, /수강 중인 클래스/); assert.match(customers, /전체 클래스/);
-  const { ProductEditor, LearningEditor } = load('app/ui/final/admin-editors.tsx');
+  const { ProductEditor } = load('app/ui/final/admin-editors.tsx');
+  const { LearningEditor } = load('app/ui/final/learning-editor.tsx');
   const markup = html(ProductEditor, { data, row: course, pending: false, send, back() {} });
   assert.match(markup, /editor-savebar/);
   for (const field of platform.sections.find(row => row.key === 'products').fields) assert.ok(markup.includes(`name="${field.key}"`), field.key);
