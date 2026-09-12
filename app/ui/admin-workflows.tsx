@@ -1,4 +1,6 @@
 "use client";
+import dynamic from "next/dynamic";
+const LandingAdmin = dynamic(() => import("./landing/admin").then(m => m.LandingAdmin));
 import { type QuizDefinition, type QuizQuestion } from "@/lib/mission-quiz";
 import {
   labels,
@@ -23,6 +25,7 @@ export const standaloneAdmin = [
   "automations",
   "members",
   "reviews",
+  "landing",
   "analytics",
   "metrics",
   "seo",
@@ -124,6 +127,7 @@ export function AdminWorkflows(props: Props) {
         {...p}
       />
     );
+  if (props.section === "landing") return <LandingAdmin />;
   if (props.section === "analytics") return <Analytics />;
   if (props.section === "orders") return <OrdersPanel {...p} />;
   return null;

@@ -68,6 +68,7 @@ export const sections: Section[] = [
     { key: 'templates', title: '메시지 템플릿', group: '마케팅 관리', table: 'crm_templates', fields: [] },
     { key: 'campaigns', title: '캠페인 발송', group: '마케팅 관리', table: 'crm_campaigns', fields: [] },
     { key: 'automations', title: '자동 메시지', group: '마케팅 관리', table: 'crm_automations', fields: [] },
+    { key: 'landing', title: '무료클래스 트래킹', group: '마케팅 관리', table: 'landing_configs', readOnly: true, fields: [] },
     { key: 'analytics', title: '랜딩 성과', group: '마케팅 관리', table: 'customer_journey_events', readOnly: true, fields: [] },
     { key: 'metrics', title: '실측 입력', group: '마케팅 관리', table: 'site_settings', fields: [f('key', '기간 / 캠페인 코드', 'text', true), f('value', '지표 (JSON)', 'json', true)] },
     { key: 'seo', title: '검색코드 설정', group: '마케팅 관리', table: 'site_settings', fields: [f('key', '설정명', 'text', true), f('value', '설정값 (JSON)', 'json', true)] },

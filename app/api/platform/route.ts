@@ -144,6 +144,22 @@ export async function GET(request: Request) {
         if (!adminMode) {
             const now = Date.now();
             data.site_banners = (data.site_banners || []).filter((b) => (!b.starts_at || Date.parse(String(b.starts_at)) <= now) && (!b.ends_at || Date.parse(String(b.ends_at)) > now));
+            const landingDb = createAdminClient();
+            const freeCourseIds = (data.courses || []).filter(c => Number(c.list_price) === 0).map(c => c.id);
+            const landingResult = freeCourseIds.length ? await landingDb.from('landing_configs').select('*').eq('enabled', true).in('id', freeCourseIds) : { data: [], error: null };
+            if (!landingResult.error && landingResult.data?.length) {
+                const snapshots = await landingDb.from('section_snapshots').select('landing_id,layout_ver,content').or(landingResult.data.map(c => `and(landing_id.eq.${c.id},layout_ver.eq.${c.layout_ver})`).join(','));
+                data.landing_configs = landingResult.data.map(c => {
+                    const snapshot = snapshots.data?.find(s => s.landing_id === c.id && s.layout_ver === c.layout_ver);
+                    const frozen = snapshot?.content?.course || {};
+                    const metadata = { ...frozen.metadata };
+                    for (const key of ['detailImageUrl', 'detail_image_url', 'thumbnailUrl', 'thumbnail_url']) {
+                        const value = metadata[key];
+                        if (typeof value === 'string' && value && !/^https?:\/\//.test(value) && !value.startsWith('/')) metadata[key] = process.env.NEXT_PUBLIC_SUPABASE_URL + '/storage/v1/object/public/course-assets/' + value;
+                    }
+                    return { ...c, course_snapshot: { ...frozen, metadata } };
+                });
+            }
             const bannerResult = await createAdminClient().from('site_settings').select('key,value').eq('key', 'edu_article_banner').limit(1);
             const bannerSetting = Array.isArray(bannerResult.data) ? bannerResult.data[0] : bannerResult.data;
             if (!bannerResult.error && bannerSetting) {

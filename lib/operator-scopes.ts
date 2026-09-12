@@ -38,6 +38,7 @@ export const sectionScopes: Record<string, OperatorScope> = {
   templates: "marketing",
   campaigns: "marketing",
   automations: "marketing",
+  landing: "marketing",
   analytics: "marketing",
   metrics: "marketing",
   seo: "marketing",

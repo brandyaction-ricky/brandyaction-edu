@@ -91,6 +91,7 @@ test('article hub includes the managed free-video banner and representative thum
   assert.match(markup, /회원 무료 영상/);
   assert.match(markup, /article-thumbnail/);
   assert.match(markup, /thumb\.webp/);
+  assert.doesNotMatch(markup, /class="tag">(?:인사이트|영상)</);
   const platformSource = read('app/ui/platform.tsx');
   assert.doesNotMatch(platformSource, /THE WAY WE LEARN|시청에서 멈추지 않는/);
   assert.match(platformSource, /제2026-충남천안-1825호/);
@@ -156,4 +157,29 @@ test('participant matrix uses latest attempts, required missions and enrollment 
   ]);
   assert.equal(result.e1[0].status, 'changes_requested'); assert.equal(result.e1[0].submissionId, 's2'); assert.equal(result.e1[0].approved, 1);
   assert.equal(result.e2[0].status, 'empty'); assert.equal(result.e1[1].status, 'none');
+});
+
+test('campaign class keeps published content, escapes copy, and sends all CTA positions to one Kakao URL', () => {
+  const { ProductDetail } = load('app/ui/final/public-views.tsx');
+  const { defaultConfig } = load('lib/landing.ts');
+  const cfg = { ...defaultConfig(course.id), layout_ver: 1, revision: 1, kakao_url: 'https://open.kakao.com/o/testRoom', custom_sections: true, sections: [{ id: 'proof', title: '고객 이야기', body: '<script>unsafe()</script>', image: 'https://cdn.example/proof.webp' }], course_snapshot: { title: '발행한 제목', summary: '발행 당시 소개' } };
+  const markup = html(ProductDetail, { course, data: { ...data, landing_configs: [cfg] } });
+  for (const position of ['hero_cta', 'sticky_cta', 'final_cta']) assert.match(markup, new RegExp('data-landing-cta="' + position + '"'));
+  assert.equal((markup.match(/href="https:\/\/open.kakao.com\/o\/testRoom"/g) || []).length, 3);
+  assert.match(markup, /발행한 제목/); assert.doesNotMatch(markup, /등록된 테스트 클래스/);
+  assert.match(markup, /data-section="proof"/); assert.match(markup, /loading="lazy"/);
+  assert.match(markup, /&lt;script&gt;/); assert.doesNotMatch(markup, /<script>|checkout/);
+  assert.doesNotMatch(html(ProductDetail, { course, data: { ...data, landing_configs: [{ ...cfg, enabled: false }] } }), /data-landing-cta/);
+});
+
+test('landing report separates repeated clicks, missing actuals, direct traffic and per-version reach', () => {
+  const { LandingDashboard } = load('app/ui/landing/dashboard.tsx');
+  const { defaultConfig } = load('lib/landing.ts');
+  const dimension = { campaign: 'campaign', adset: 'set', creative: 'ad', traffic: 'direct', layout_ver: 1 };
+  const report = { config: defaultConfig(course.id), groups: [{ ...dimension, sessions: 400, clicks: 100, converted: 80, alive: 2, bounced: 120, completed_no_click: 3, avg_depth: 1.5, top_exit: 'hero' }], sections: [{ ...dimension, section: 'hero', reached: 400, dwell_ms: 3000 }, { ...dimension, section: 'final', reached: 200, dwell_ms: 1000 }], snapshots: [{ layout_ver: 1, sections: ['hero', 'final'], created_at: '2026-09-14T00:00:00Z', note: '첫 발행' }], actuals: [{ day: '2026-09-14', joins: null, payments: null, live_peak: null, exits: null }], meta: [{ day: '2026-09-14', campaign: 'campaign', adset: 'set', creative: 'ad', impressions: 987654, link_clicks: 900, spend: 10000 }], daily: [], ctas: [], environment: [], options: [], last_event_at: null };
+  const markup = html(LandingDashboard, { report, filtered: true, traffic: 'direct' });
+  assert.match(markup, /20\.0%/); assert.match(markup, /50\.0%/);
+  assert.match(markup, /클릭 100회/); assert.match(markup, /클릭 세션 80회/);
+  assert.doesNotMatch(markup, /987,654|위너 후보<\/span>|링크클릭 대비 세션 갭이 기준/);
+  assert.match(markup, /카카오 누적 입장<\/span><strong>—/);
 });

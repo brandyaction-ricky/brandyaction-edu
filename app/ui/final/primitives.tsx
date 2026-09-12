@@ -163,9 +163,6 @@ export function ArticleCard({ article }: { article: Row }) {
           <span>BRANDYACTION EDU</span>
         )}
       </div>
-      <span className="tag">
-        {article.content_type === "video" ? "영상" : "인사이트"}
-      </span>
       <h3>{t(article, "title")}</h3>
       <p className="muted">{t(article, "summary")}</p>
       <span className="meta">

@@ -42,7 +42,7 @@ export const finalAdminGroups = [
   ["고객 관리", ["customers", "tags", "coupons", "product-reviews"]],
   ["콘텐츠 관리", ["banners", "articles", "testimonials"]],
   ["매출 관리", ["orders"]],
-  ["마케팅 관리", ["analytics", "metrics", "seo", "settings"]],
+  ["마케팅 관리", ["landing", "analytics", "metrics", "seo", "settings"]],
 ] as const;
 const icons: Record<string, LucideIcon> = {
   products: BookOpen,
@@ -60,6 +60,7 @@ const icons: Record<string, LucideIcon> = {
   articles: FilePenLine,
   testimonials: MessageCircle,
   orders: LayoutGrid,
+  landing: LineChart,
   analytics: LineChart,
   metrics: FilePenLine,
   seo: Settings,
@@ -91,6 +92,7 @@ export const sectionDescription: Record<string, string> = {
   articles: "글·영상 콘텐츠의 편집과 공개 상태를 관리합니다.",
   testimonials: "홈페이지에 노출할 고객 사례와 영상을 관리합니다.",
   orders: "주문·결제·환불 상태와 수강 권한을 함께 확인합니다.",
+  landing: "무료클래스의 유입·섹션·CTA 성과와 캠페인 설정을 관리합니다.",
   analytics: "유입부터 신청까지, 모집 과정의 수집된 성과를 확인합니다.",
   metrics: "자동 추적이 끊기는 구간을 날짜별로 보완합니다.",
   seo: "검색 노출 정보와 측정·인증 코드를 안전하게 관리합니다.",

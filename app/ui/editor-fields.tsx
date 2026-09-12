@@ -11,13 +11,13 @@ async function validImageHeader(file: File) {
     return bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
 }
 
-export function UploadField({ name, value, image, disabled }: { name: string; value: string; image: boolean; disabled: boolean }) {
+export function UploadField({ name, value, image, disabled, onChange, optimize = false }: { name: string; value: string; image: boolean; disabled: boolean; onChange?: (value: string) => void; optimize?: boolean }) {
     const [current, setCurrent] = useState(value);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState('');
     return (
         <span className="upload-field">
-            <input name={name} type="text" value={current} onChange={(e) => setCurrent(e.target.value)} placeholder={image ? '이미지 주소 또는 파일 선택' : '등록된 자료 경로 또는 파일 선택'} disabled={disabled || pending} />
+            <input name={name} type="text" value={current} onChange={(e) => { setCurrent(e.target.value); onChange?.(e.target.value); }} placeholder={image ? '이미지 주소 또는 파일 선택' : '등록된 자료 경로 또는 파일 선택'} disabled={disabled || pending} />
             <span className="upload-control">
                 <Upload size={16} />
                 <span>{pending ? '올리는 중…' : '파일 선택'}</span>
@@ -26,7 +26,7 @@ export function UploadField({ name, value, image, disabled }: { name: string; va
                     disabled={disabled || pending}
                     accept={image ? '.png,.jpg,.jpeg,.webp' : '.pdf,.zip,.txt,.csv,.hwp,.doc,.docx,.xls,.xlsx,.ppt,.pptx'}
                     onChange={async (e) => {
-                        const file = e.target.files?.[0];
+                        let file = e.target.files?.[0];
                         if (!file) return;
                         setPending(true);
                         setError('');
@@ -34,6 +34,18 @@ export function UploadField({ name, value, image, disabled }: { name: string; va
                             const limit = (image ? 10 : 20) * 1024 * 1024;
                             if (!file.size || file.size > limit) throw new Error(`${image ? 10 : 20}MB 이하의 파일을 선택해 주세요.`);
                             if (image && !(await validImageHeader(file))) throw new Error('이미지 파일 형식을 확인해 주세요.');
+                            if (image && optimize && file.type !== 'image/webp') {
+                                const bitmap = await createImageBitmap(file);
+                                const canvas = document.createElement('canvas');
+                                const ratio = Math.min(1, 2000 / bitmap.width);
+                                canvas.width = Math.round(bitmap.width * ratio); canvas.height = Math.round(bitmap.height * ratio);
+                                const context = canvas.getContext('2d');
+                                if (!context) throw Error('이미지 변환을 지원하지 않는 브라우저입니다. WEBP 파일을 선택해 주세요.');
+                                context.drawImage(bitmap, 0, 0, canvas.width, canvas.height); bitmap.close();
+                                const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/webp', 0.88));
+                                if (!blob || blob.type !== 'image/webp') throw Error('WEBP 변환에 실패했습니다. WEBP 파일을 선택해 주세요.');
+                                file = new File([blob], file.name.replace(/\.[^.]+$/, '') + '.webp', { type: 'image/webp' });
+                            }
                             const response = await fetch('/api/platform/upload', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
@@ -50,6 +62,7 @@ export function UploadField({ name, value, image, disabled }: { name: string; va
                             });
                             if (uploaded.error) throw new Error('파일 전송에 실패했습니다. 다시 시도해 주세요.');
                             setCurrent(result.value);
+                            onChange?.(result.value);
                         } catch (cause) {
                             setError(cause instanceof Error ? cause.message : '업로드하지 못했습니다.');
                         } finally {
