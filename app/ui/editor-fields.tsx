@@ -12,15 +12,17 @@ async function validImageHeader(file: File) {
     return bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
 }
 
-export function UploadField({ name, value, image, disabled, onChange, optimize = false }: { name: string; value: string; image: boolean; disabled: boolean; onChange?: (value: string) => void; optimize?: boolean }) {
+export function UploadField({ name, value, image, disabled, onChange, onStatusChange, optimize = false, dropzone = false }: { name: string; value: string; image: boolean; disabled: boolean; onChange?: (value: string) => void; optimize?: boolean; dropzone?: boolean; onStatusChange?: (status: 'idle' | 'uploading' | 'error') => void }) {
     const [current, setCurrent] = useState(value);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState('');
     const [brokenPreview, setBrokenPreview] = useState('');
     const preview = image ? imagePreviewUrl(current, process.env.NEXT_PUBLIC_SUPABASE_URL || '') : '';
     return (
-        <span className="upload-field">
-            <input name={name} aria-label={image ? '이미지 주소' : '자료 경로'} type="text" value={current} onChange={(e) => { setCurrent(e.target.value); setError(''); setBrokenPreview(''); onChange?.(e.target.value); }} placeholder={image ? '이미지 주소 또는 파일 선택' : '등록된 자료 경로 또는 파일 선택'} disabled={disabled || pending} />
+        <span className={"upload-field" + (dropzone ? " upload-dropzone" : "")}>
+            <span className={dropzone ? "upload-zone" : "upload-inline"}>
+            {dropzone && <><Upload aria-hidden="true" /><span className="upload-label">{image ? (name.includes("detail") ? "상세페이지 이미지를 선택하세요." : "썸네일 이미지를 선택하세요.") : "PDF · 문서 · 템플릿 자료 추가"}</span></>}
+
             <span className="upload-control">
                 <Upload size={16} />
                 <span>{pending ? '올리는 중…' : '파일 선택'}</span>
@@ -33,6 +35,7 @@ export function UploadField({ name, value, image, disabled, onChange, optimize =
                         if (!file) return;
                         setPending(true);
                         setError('');
+                        onStatusChange?.('uploading');
                         try {
                             const limit = (image ? 10 : 20) * 1024 * 1024;
                             if (!file.size || file.size > limit) throw new Error(`${image ? 10 : 20}MB 이하의 파일을 선택해 주세요.`);
@@ -67,8 +70,10 @@ export function UploadField({ name, value, image, disabled, onChange, optimize =
                             setCurrent(result.value);
                             setBrokenPreview('');
                             onChange?.(result.value);
+                            onStatusChange?.('idle');
                         } catch (cause) {
                             setError(cause instanceof Error ? cause.message : '업로드하지 못했습니다.');
+                            onStatusChange?.('error');
                         } finally {
                             setPending(false);
                         }
@@ -79,9 +84,11 @@ export function UploadField({ name, value, image, disabled, onChange, optimize =
                 최대 {image ? 10 : 20}MB
                 {image ? ' · PNG, JPG, WEBP' : ' · PDF, ZIP, TXT, CSV, HWP, Office 문서'}
             </small>
-            {(pending || error) && <input required aria-label="파일 업로드 완료 대기" value="" readOnly className="upload-pending-guard" tabIndex={-1} />}
+            </span>
+            <input id={"edit-" + name} name={name} aria-label={image ? '이미지 주소' : '자료 경로'} type="text" value={current} onChange={(e) => { setCurrent(e.target.value); setError(''); onStatusChange?.('idle'); setBrokenPreview(''); onChange?.(e.target.value); }} placeholder={image ? '이미지 주소 또는 파일 선택' : '등록된 자료 경로 또는 파일 선택'} disabled={disabled || pending} />
+            {(pending || error) && <input required aria-label="파일 업로드 완료 대기" value="" onChange={() => {}} className="upload-pending-guard" tabIndex={-1} />}
             {error && <span role="alert">{error}</span>}
-            {error && <button type="button" className="btn" disabled={disabled || pending} onClick={() => setError('')}>업로드 취소 · 기존 값 유지</button>}
+            {error && <button type="button" className="btn" disabled={disabled || pending} onClick={() => { setError(''); onStatusChange?.('idle'); }}>업로드 취소 · 기존 값 유지</button>}
             {preview && brokenPreview !== preview && <img className="upload-preview" src={preview} alt="등록할 이미지 미리보기" onError={() => setBrokenPreview(preview)} />}
             {preview && brokenPreview === preview && <small role="status">이미지를 불러오지 못했습니다. 주소와 공개 여부를 확인해 주세요.</small>}
         </span>

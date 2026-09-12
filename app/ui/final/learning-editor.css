@@ -1,0 +1,35 @@
+.edu-admin .learning-editor .learning-editor-fields{border:0;min-width:0;margin:0}
+.edu-admin .learning-editor .learning-editor-fields[disabled]{opacity:.7}
+.edu-admin .learning-editor .learning-content-fields{padding:0}
+.edu-admin .learning-editor .learning-content-fields>.field:first-child{margin-top:0}
+.edu-admin .learning-editor .learning-content-tabs{display:flex;gap:20px;border-bottom:1px solid var(--line);margin:24px 0 20px;overflow-x:auto}
+.edu-admin .learning-editor .learning-content-tabs button{display:inline-flex;gap:6px;align-items:center;flex:none;border:0;border-bottom:2px solid transparent;background:none;border-radius:0;padding:12px 0;color:var(--muted);font-size:13px;cursor:pointer}
+.edu-admin .learning-editor .learning-content-tabs button.active{color:var(--ink);border-bottom-color:var(--red);font-weight:700}
+.edu-admin .learning-editor .learning-content-tabs button:focus-visible{outline:2px solid var(--red);outline-offset:-2px}
+.edu-admin .learning-editor .learning-preview-badges{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.edu-admin .learning-editor .preview-window{min-width:0;scroll-margin-top:100px}
+.edu-admin .learning-editor .safe-html-preview h2{margin-bottom:16px;overflow-wrap:anywhere}
+.edu-admin .learning-editor .reading-copy{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.85}
+.edu-admin .learning-editor .learning-resource-preview{display:flex;gap:12px;align-items:center;border:1px solid var(--line);background:white;border-radius:4px;padding:16px}
+.edu-admin .learning-editor .learning-resource-preview svg{flex:none;color:var(--muted)}
+.edu-admin .learning-editor .learning-resource-preview b{overflow-wrap:anywhere;font-size:14px}
+.edu-admin .learning-editor .learning-content-placeholder{padding:40px 20px;border:1px dashed var(--line);border-radius:4px;background:#fff;text-align:center;color:var(--muted)}
+.edu-admin .learning-editor .learning-content-placeholder>svg{margin:0 auto 12px}
+.edu-admin .learning-editor .learning-material-upload .upload-field{display:block;min-width:0;width:100%;text-align:left;margin-top:16px}
+.edu-admin .learning-editor .learning-preview-only{grid-template-columns:minmax(0,1fr)}
+.edu-admin .learning-editor .learning-preview-only .preview-window{width:100%;max-width:820px;margin:auto}
+.edu-admin .learning-editor .learning-quiz-settings{display:flex;align-items:center;justify-content:space-between;gap:24px}
+.edu-admin .learning-editor .learning-quiz-settings>div{min-width:0}
+.edu-admin .learning-editor .learning-quiz-settings b{font-size:14px}
+.edu-admin .learning-editor .learning-quiz-settings .field{width:160px;flex:none;margin:0}
+.edu-admin .learning-editor .learning-section-actions{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:24px}
+.edu-admin .learning-editor .question-title-row>input{min-width:0;flex:1}
+.edu-admin .learning-editor .question-title-row .btn,.edu-admin .learning-editor .option-row .btn{flex:none}
+.edu-admin .learning-editor .question-title-row>span{flex:none;min-width:16px}
+.edu-admin .learning-editor .option-row input[type=radio]{width:18px;height:18px;min-height:0;padding:0;margin:0;accent-color:var(--red)}
+.edu-admin .learning-editor .learning-quiz-head p{font-size:13px;color:var(--muted);margin-top:8px}
+.edu-admin .learning-editor .learning-mission-picker{padding-bottom:0}
+.edu-admin .learning-editor .learning-mission-picker>.field{margin:0}
+.edu-admin .learning-editor [hidden]{display:none!important}
+@media(min-width:1100px){.edu-admin .learning-editor .lesson-body-grid{grid-template-columns:minmax(0,1fr) minmax(280px,.85fr)}.edu-admin .learning-editor .learning-preview-only{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:720px){.edu-admin .learning-editor .learning-content-tabs{gap:16px}.edu-admin .learning-editor .learning-quiz-settings,.edu-admin .learning-editor .learning-section-actions{align-items:stretch;flex-direction:column;gap:16px}.edu-admin .learning-editor .learning-quiz-settings .field{width:100%}.edu-admin .learning-editor .learning-quiz-head{align-items:flex-start;gap:12px}.edu-admin .learning-editor .learning-quiz-head .btn{flex:none}.edu-admin .learning-editor .learning-resource-preview{align-items:flex-start}.edu-admin .learning-editor .editor-savebar .dirty-note{width:100%}}

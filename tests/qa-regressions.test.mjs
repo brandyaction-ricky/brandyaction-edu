@@ -90,6 +90,7 @@ function handler(user, database) {
     '@/lib/supabase/admin': { createAdminClient: () => database },
     '@/lib/supabase/server': { createClient: async () => database },
     '@/lib/platform': platform, '@/lib/platform-rules': load('lib/platform-rules.ts'), '@/lib/qa-rules': rules,
+    '@/lib/product-metadata': load('lib/product-metadata.ts', { './platform': platform }),
     '@/lib/edu-settings': { getEduSettings: async () => ({ operations: {} }) },
     '@/lib/mission-quiz': {}, '@/lib/legal-policies': { POLICY_VERSION: 'test' },
     '@/lib/operator-permissions': { getOperatorUser: async () => user?.role === 'admin' ? user : null, permissionsFor: async value => ({ products: value?.role === 'admin', members: value?.role === 'admin', orders: value?.role === 'admin', content: value?.role === 'admin', marketing: value?.role === 'admin' }), sectionScopes: { cohorts: 'products', testimonials: 'content', products: 'products' } },

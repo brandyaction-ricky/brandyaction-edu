@@ -34,7 +34,8 @@ import { AdminWorkflows, standaloneAdmin } from "./admin-workflows";
 import { BlocksField, UploadField } from "./editor-fields";
 import { AdminCatalog } from "./final/admin-catalog";
 import { ArticleBannerEditor } from "./final/article-banner-editor";
-import { LearningEditor, ProductEditor } from "./final/admin-editors";
+import { ProductEditor } from "./final/admin-editors";
+import { LearningEditor } from "./final/learning-editor";
 import {
   AdminHeading,
   AdminShell,
@@ -1112,7 +1113,8 @@ function Editor({
   };
   return (
     <dialog
-      className="editor-dialog"
+      className={"editor-dialog" + (section.key === "customers" && row ? " drawer customer-drawer" : "")}
+      aria-label={section.key === "customers" ? "회원 관리 상세" : section.title}
       ref={ref}
       onCancel={(e) => {
         if (pending) e.preventDefault();
@@ -1164,12 +1166,12 @@ function Editor({
                       <p>{t(row, "email")}<br />{t(row, "phone") || "연락처 미등록"}</p>
                     </div>
                   </div>
-                  <div className="customer-summary-grid">
-                    <div><span>계정 상태</span><b>{labels[t(row, "status")] || t(row, "status")}</b></div>
-                    <div><span>마케팅 수신</span><b>{row.marketing_consent ? "동의" : "미동의"}</b></div>
-                    <div><span>가입일</span><b>{new Date(String(row.created_at)).toLocaleDateString("ko-KR")}</b></div>
+                  <div className="customer-account-summary">
+                    <div className="setting-line"><span>계정 상태</span><span className={`badge ${row.status === "suspended" ? "amber" : "green"}`}>{row.status === "suspended" ? "이용 제한" : "정상"}</span></div>
+                    <div className="setting-line"><span>마케팅 수신 동의</span><b>{row.marketing_consent ? "동의" : "미동의"}</b></div>
+                    <div className="setting-line"><span>가입일</span><b>{row.created_at ? new Date(String(row.created_at)).toLocaleDateString("ko-KR") : "—"}</b></div>
                   </div>
-                  <h3>수강 권한</h3>
+                  <h3 className="mt24">수강 권한</h3>
                   {customerEnrollments.length ? customerEnrollments.map((enrollment) => (
                     <div className="asset-row" key={enrollment.id}>
                       <span className="square">C</span>
@@ -1184,7 +1186,12 @@ function Editor({
                   <div className="tag-list mt8">
                     {customerTags.length ? customerTags.map((tag) => <span className="badge" key={tag.id}>{t(tag, "name")}</span>) : <span className="meta">등록된 태그가 없습니다.</span>}
                   </div>
+                  <div className="row mt16 wrap-flex">
+                    <Link className="btn small" href="/admin/tags">고객 태그 관리</Link>
+                    <Link className="btn small" href="/admin/members">미션 진행 보기</Link>
+                  </div>
                   <div className="divider" />
+                  <h3 className="mb16">회원 정보·계정 상태 수정</h3>
                 </div>
               )}
               {row &&
@@ -1204,7 +1211,7 @@ function Editor({
                 )}
               <div className="editor-fields">
                 {section.fields.map((f) => (
-                  <label
+                  <div
                     className={
                       "field " +
                       ([
@@ -1219,12 +1226,12 @@ function Editor({
                     }
                     key={f.key}
                   >
-                    <span>
+                    <label htmlFor={"edit-" + f.key}>
                       {f.label}
                       {f.required ? " *" : ""}
-                    </span>
+                    </label>
                     {control(f)}
-                  </label>
+                  </div>
                 ))}
               </div>
               {section.table === "lesson_contents" && (
