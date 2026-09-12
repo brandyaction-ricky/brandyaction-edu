@@ -146,7 +146,7 @@ export async function GET(request: Request) {
             data.site_banners = (data.site_banners || []).filter((b) => (!b.starts_at || Date.parse(String(b.starts_at)) <= now) && (!b.ends_at || Date.parse(String(b.ends_at)) > now));
             const landingDb = createAdminClient();
             const freeCourseIds = (data.courses || []).filter(c => Number(c.list_price) === 0).map(c => c.id);
-            const landingResult = freeCourseIds.length ? await landingDb.from('landing_configs').select('*').eq('enabled', true).in('id', freeCourseIds) : { data: [], error: null };
+            const landingResult = freeCourseIds.length ? await landingDb.from('landing_configs').select('*').in('id', freeCourseIds) : { data: [], error: null };
             if (!landingResult.error && landingResult.data?.length) {
                 const snapshots = await landingDb.from('section_snapshots').select('landing_id,layout_ver,content').or(landingResult.data.map(c => `and(landing_id.eq.${c.id},layout_ver.eq.${c.layout_ver})`).join(','));
                 data.landing_configs = landingResult.data.map(c => {

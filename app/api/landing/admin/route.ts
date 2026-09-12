@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getOperatorUser } from '@/lib/operator-permissions';
 import { validId, validDate, validateConfig, sectionOrder, validateActuals, validateMeta, reportRange } from '@/lib/landing';
+import { assetPath, validImage } from '@/lib/qa-rules';
 
 const reply = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'private, no-store' } });
 export async function GET(request: Request) {
@@ -8,7 +9,7 @@ export async function GET(request: Request) {
   try {
     const db = createAdminClient(), q = new URL(request.url).searchParams, id = q.get('landing');
     if (!id) {
-      const [configs, courses] = await Promise.all([db.from('landing_configs').select('*').order('updated_at', { ascending: false }), db.from('courses').select('id,title,slug,status,list_price').eq('list_price', 0).order('created_at', { ascending: false })]);
+      const [configs, courses] = await Promise.all([db.from('landing_configs').select('*').order('updated_at', { ascending: false }), db.from('courses').select('id,title,slug,status,list_price,metadata').eq('list_price', 0).order('created_at', { ascending: false })]);
       if (configs.error || courses.error) throw Error('랜딩 설정을 불러오지 못했습니다.');
       return reply({ configs: configs.data, courses: courses.data });
     }
@@ -37,14 +38,21 @@ export async function POST(request: Request) {
     const raw = await request.text();
     if (raw.length > 1500000) return reply({ error: '입력 내용이 너무 큽니다.' }, 413);
     const body = JSON.parse(raw), db = createAdminClient();
-    if (body.action === 'publish') {
+    if (body.action === 'publish' || body.action === 'publish_live') {
+      if (body.action === 'publish_live' && !await getOperatorUser('products')) return reply({ error: '상세 이미지 수정에는 상품 관리 권한도 필요합니다.' }, 403);
       const config = validateConfig(body.config);
-      const { data: course, error } = await db.from('courses').select('id,title,summary,description,metadata,list_price').eq('id', config.id).eq('list_price', 0).maybeSingle();
+      const { data: course, error } = await db.from('courses').select('id').eq('id', config.id).eq('list_price', 0).maybeSingle();
       if (error || !course) throw Error('무료클래스를 선택해 주세요.');
+      let detail: string | null = null;
+      if (body.action === 'publish_live') {
+        if (!config.kakao_url) throw Error('카카오 오픈채팅 주소를 입력해 주세요.');
+        if (typeof body.detail_image_url !== 'string' || body.detail_image_url.length > 2048) throw Error('상세 이미지 주소를 확인해 주세요.');
+        detail = assetPath(body.detail_image_url, process.env.NEXT_PUBLIC_SUPABASE_URL || '');
+        if (detail && !validImage(detail)) throw Error('상세 이미지 주소를 확인해 주세요.');
+      }
       const note = String(body.note || '').trim().slice(0,500);
       if (!note) throw Error('발행 변경 메모를 입력해 주세요.');
-      const content = { course, custom_sections: config.custom_sections, sections: config.sections, cta_label: config.cta_label, kakao_url: config.kakao_url };
-      const result = await db.rpc('edu_publish_landing', { p_config: config, p_order: sectionOrder(config), p_content: content, p_note: note, p_revision: config.revision });
+      const result = await db.rpc('edu_publish_live_asset', { p_config: config, p_order: sectionOrder(config), p_note: note, p_revision: config.revision, p_detail_image: detail });
       if (result.error) {
         if (result.error.message.includes('STALE_REVISION')) return reply({ error: '다른 관리자가 수정했습니다. 새로 불러온 뒤 다시 저장해 주세요.' }, 409);
         throw Error('랜딩 발행에 실패했습니다.');

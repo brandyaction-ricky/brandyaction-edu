@@ -42,6 +42,13 @@ export function validImage(value: unknown): boolean {
   return /^(?:\/?(?:edu|site|images|assets|courses)\/)[A-Za-z0-9_./%-]+\.(?:png|jpe?g|webp|gif|avif)$/i.test(raw) && !raw.includes('..');
 }
 
+export function imagePreviewUrl(value: string, supabaseUrl: string): string {
+  const raw = value.trim();
+  if (!validImage(raw)) return '';
+  if (raw.startsWith('/') || /^https:\/\//i.test(raw)) return raw;
+  return supabaseUrl ? `${supabaseUrl.replace(/\/$/, '')}/storage/v1/object/public/course-assets/${raw}` : '';
+}
+
 export function databaseMessage(code?: string): string {
   if (code === '23505') return '이미 사용 중인 코드·주소·순서입니다. 다른 값을 입력해 주세요.';
   if (code === '23514') return '허용 범위를 벗어난 값입니다. 정원·금액·날짜·상태를 확인해 주세요.';

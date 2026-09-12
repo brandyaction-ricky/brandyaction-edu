@@ -514,3 +514,7 @@ body {
     grid-column: auto;
   }
 }
+.edu-front .email-auth-fields,.edu-admin .live-setup-fields{border:0;padding:0;margin:16px 0 0;min-width:0}
+.edu-front .email-auth h2{font-size:20px;margin-bottom:20px}
+.edu-admin .landing-advanced>summary{cursor:pointer;padding:20px 0;font-weight:600}
+.edu-admin .upload-preview{display:block;width:100%;max-height:420px;object-fit:contain;background:#f6f7f8;border:1px solid #dfe2e7;margin-top:12px}

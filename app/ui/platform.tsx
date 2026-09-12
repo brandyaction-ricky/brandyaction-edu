@@ -405,6 +405,7 @@ export function Platform({
         pending={pending}
         social={social}
         next={safeNext(searchParams.get("next"))}
+        authError={searchParams.get("error")}
       />
     );
   else if ((account || learning) && !user)
@@ -413,7 +414,7 @@ export function Platform({
         <Empty title="로그인하고 학습을 이어가세요." />
         <div className="center">
           <Link className="btn primary" href={loginHref}>
-            구글·카카오로 시작하기 <ArrowRight />
+            로그인·회원가입 <ArrowRight />
           </Link>
         </div>
       </div>
