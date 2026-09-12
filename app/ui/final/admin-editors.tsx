@@ -19,7 +19,8 @@ import type { Data, WorkflowSend } from "../learning-workflows";
 import { AdminHeading } from "./admin-shell";
 import { Badge } from "./primitives";
 import { ProductDetailHtml } from "./product-detail-html";
-import { productMetadataFields, sanitizeProductHtml } from "@/lib/product-metadata";
+import { productDetailImages, productMetadataFields, sanitizeProductHtml } from "@/lib/product-metadata";
+import { DetailImageGallery } from "./detail-image-gallery";
 
 function fieldValue(s: Section, row: Row | undefined, f: Field) {
   return s.table === "courses" &&
@@ -205,6 +206,7 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
   const [cohortDrafts, setCohortDrafts] = useState<Record<string, Record<string, string>>>({});
   const [htmlSource, setHtmlSource] = useState(String(metadata.detail_html || ""));
   const [htmlFilename, setHtmlFilename] = useState("");
+  const [detailUploadStatus, setDetailUploadStatus] = useState<"idle" | "uploading" | "error">("idle");
   const [preview, setPreview] = useState({ title: t(row, "title"), summary: t(row, "summary"), price: num(row, "list_price"), regular: Number(metadata.regular_price || 0), status: t(row, "status") || "draft", category: t(row, "category") || "paid_class", slug: t(row, "slug"), seoTitle: String(metadata.seo_title || ""), seoDescription: String(metadata.seo_description || "") });
   const formRef = useRef<HTMLFormElement>(null);
   const groups = [["basic", "기본·판매"], ["detail", "상세페이지"], ["resources", "제공 자료"], ["access", "수강·권한"], ["publish", "공개·검색"]] as const;
@@ -227,6 +229,7 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
   function close() { if (!dirty || window.confirm("저장하지 않은 변경사항이 있습니다. 목록으로 돌아갈까요?")) back(); }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError("");
+    if (detailUploadStatus !== "idle") { setTab("detail"); setError(detailUploadStatus === "uploading" ? "상세 이미지 업로드가 끝난 뒤 저장해 주세요." : "상세 이미지 업로드 오류를 확인해 주세요."); return; }
     const form = event.currentTarget;
     const invalid = Array.from(form.elements).find(element => "checkValidity" in element && !(element as HTMLInputElement).checkValidity()) as HTMLInputElement | undefined;
     if (invalid) { const panel = invalid.closest("[data-tab]"); if (panel) setTab(panel.getAttribute("data-tab")!); const details = invalid.closest("details"); if (details) details.open = true; requestAnimationFrame(() => { invalid.focus(); invalid.reportValidity(); }); return; }
@@ -283,7 +286,7 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
           <ProductField label="상세 본문 · HTML" hint="외부 스크립트와 폼 없이 본문을 등록해 주세요."><textarea className="code-editor" name="detail_html" aria-label="상세 본문 · HTML" rows={9} value={htmlSource} onChange={event => setHtmlSource(event.target.value)} disabled={pending} /></ProductField>
           <div className="row"><button className="btn small" type="button" onClick={() => { if (showPreview) { setShowPreview(false); return; } try { setHtmlPreview(sanitizeProductHtml(htmlSource)); setShowPreview(true); } catch (cause) { setError((cause as Error).message); } }}>{showPreview ? "미리보기 닫기" : "본문 미리보기"}</button><span className="meta">저장 전 본문과 줄바꿈을 확인하세요.</span></div>
           {showPreview && <ProductDetailHtml html={htmlPreview} className="product-detail-html safe-html-preview product-html-preview mt16" />}
-          <div className="upload-box product-upload mt16"><Download aria-hidden="true" /><p>이미지형 상세페이지 선택</p><UploadField name="detail_image_url" value={String(metadata.detail_image_url || metadata.detailImageUrl || "")} image disabled={pending} onChange={() => setDirty(true)} /><p className="meta">긴 이미지는 원본 비율로 표시됩니다.</p></div>
+          <DetailImageGallery key={String(row?.id || "new-product")} initial={productDetailImages(metadata)} disabled={pending} onChange={() => setDirty(true)} onStatusChange={setDetailUploadStatus} />
           <details className="product-extra mt24"><summary>텍스트 상세 설명</summary><div className="mt16">{field("description", "텍스트 상세 설명", true, "HTML 본문이 없는 경우 표시할 상품 설명입니다.")}</div></details>
           {row && <><div className="divider" /><h3>저장 정보</h3><div className="setting-line"><div><b>현재 상품</b><p>{row.updated_at ? new Date(String(row.updated_at)).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) : "등록된 상품 정보를 편집하고 있습니다."}</p></div><Badge color={preview.status === "published" ? "green" : ""}>{statusLabels[preview.status]}</Badge></div></>}
           {row && preview.category === "free" && <div className="notice mt24"><p>무료 라이브의 CTA와 랜딩 이미지는 라이브 관리에서 함께 발행할 수 있습니다.</p><Link className="btn mt16" href={"/admin/landing?course=" + row.id}>무료 라이브 CTA·이미지 관리</Link></div>}
@@ -299,7 +302,7 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
           <h2 className="mb16">공개·검색 설정</h2>{field("slug", "상품 주소 (slug)", true, "영문 소문자·숫자·하이픈을 사용하세요. 기존 주소를 바꾸면 공유한 링크도 변경됩니다.")}{field("course_code", "상품 코드", true)}{field("seo_title", "검색 제목", true)}{field("seo_description", "검색 설명", true)}
           <div className="snippet"><div className="snippet-url">brandyaction-edu.com › classes › {preview.slug || "상품 주소"}</div><h3>{preview.seoTitle || preview.title || "상품명"}</h3><p>{preview.seoDescription || preview.summary || "검색 결과에 표시할 설명을 작성해 주세요."}</p></div><div className="divider" /><h3>공개 전 점검</h3><div className="checkbox-stack mt16">{["상품명·가격·모집 기간 확인", "상세페이지 PC·모바일 확인", "자료 다운로드 권한 확인", "기수·수강 기간 확인"].map(label => <label key={label}><input type="checkbox" />{label}</label>)}</div>
         </div>
-      </section><div className="editor-savebar"><span className="dirty-note">{dirty ? "저장하지 않은 변경사항이 있습니다." : "변경 내용을 저장하면 반영됩니다."}</span><button className="btn" type="button" onClick={close} disabled={pending}>목록으로</button>{tab !== "publish" && <button className="btn" type="button" onClick={() => setTab("publish")} disabled={pending}>공개 전 확인</button>}<button className="btn primary" type="submit" disabled={pending}>{pending ? "저장 중…" : "저장하기"}</button></div>{error && <p className="notice mt16" role="alert">{error}</p>}</div>
+      </section><div className="editor-savebar"><span className="dirty-note">{dirty ? "저장하지 않은 변경사항이 있습니다." : "변경 내용을 저장하면 반영됩니다."}</span><button className="btn" type="button" onClick={close} disabled={pending || detailUploadStatus === "uploading"}>목록으로</button>{tab !== "publish" && <button className="btn" type="button" onClick={() => setTab("publish")} disabled={pending || detailUploadStatus === "uploading"}>공개 전 확인</button>}<button className="btn primary" type="submit" disabled={pending || detailUploadStatus !== "idle"}>{pending ? "저장 중…" : detailUploadStatus === "uploading" ? "업로드 중…" : "저장하기"}</button></div>{error && <p className="notice mt16" role="alert">{error}</p>}</div>
       <aside className="editor-aside"><div className="side-preview"><span className="section-code">고객에게 보이는 상품</span><div className="preview-cover mt16"><p>BRANDYACTION EDU</p><h3>{preview.title || "상품명"}</h3><p className="accent">{labels[preview.category] || "유료 클래스"}</p></div><div className="preview-meta"><b>{!previewSalePrice ? "무료" : money(previewSalePrice)}</b>{preview.regular > previewSalePrice && <s>{money(preview.regular)}</s>}</div><p className="meta mt8">{cohort ? t(cohort, "name") + " 기수 판매가" : "상품 기본 판매가"}</p><p className="meta mt8">{preview.summary || "상품 소개를 입력해 주세요."}</p><div className="divider" /><div className="setting-line"><span>상품 상태</span><Badge color={preview.status === "published" ? "green" : ""}>{statusLabels[preview.status]}</Badge></div><div className="setting-line"><span>연결 기수</span><b>{t(cohort, "name") || "미연결"}</b></div><div className="setting-line"><span>제공 자료</span><b>{resourceCount}개</b></div><Link className="btn full mt16" href="/admin/cohorts">기수·회차 관리</Link></div></aside></div>
     </form>
   </div>;

@@ -58,6 +58,20 @@ test('partial product updates preserve existing metadata and validate price and 
   assert.throws(() => mergeProductMetadata(previous, { seo_title: 'a'.repeat(201) }), /200자/);
   assert.deepEqual(mergeProductMetadata(previous, { seo_title: '' }), { ...previous, seo_title: '' });
 });
+test('detail image gallery keeps legacy images, validates entries and preserves display order', () => {
+  const { productDetailImages } = load('lib/product-metadata.ts');
+  assert.deepEqual(productDetailImages({ detail_image_url: 'edu/legacy.webp' }), [{ path: 'edu/legacy.webp', name: '기존 상세 이미지', alt: '' }]);
+  const detail_images = [
+    { path: 'edu/first.webp', name: '첫 장.webp', alt: '첫 장' },
+    { path: 'https://cdn.example/second.jpg', name: '둘째 장.jpg', alt: '' },
+  ];
+  const merged = mergeProductMetadata({ detail_image_url: 'edu/legacy.webp' }, { detail_images });
+  assert.deepEqual(merged.detail_images, detail_images);
+  assert.equal(merged.detail_image_url, 'edu/first.webp');
+  assert.deepEqual(productDetailImages(merged), detail_images);
+  assert.throws(() => mergeProductMetadata({}, { detail_images: [{ path: 'javascript:alert(1)' }] }), /주소/);
+  assert.throws(() => mergeProductMetadata({}, { detail_images: Array.from({ length: 31 }, () => ({ path: 'edu/a.webp' })) }), /30장/);
+});
 
 test('product save API persists approved editor metadata and stops if existing metadata cannot be loaded', async () => {
   const previous = { metadata: { campaign: { enabled: true }, thumbnail_url: 'existing.webp' } };

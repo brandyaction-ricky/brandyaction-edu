@@ -158,6 +158,12 @@ export async function GET(request: Request) {
                         const value = metadata[key];
                         if (typeof value === 'string' && value && !/^https?:\/\//.test(value) && !value.startsWith('/')) metadata[key] = process.env.NEXT_PUBLIC_SUPABASE_URL + '/storage/v1/object/public/course-assets/' + value;
                     }
+                    if (Array.isArray(metadata.detail_images)) metadata.detail_images = metadata.detail_images.map((entry: unknown) => {
+                        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return entry;
+                        const image = { ...(entry as Record<string, unknown>) }, value = image.path;
+                        if (typeof value === 'string' && value && !/^https?:\/\//.test(value) && !value.startsWith('/')) image.path = process.env.NEXT_PUBLIC_SUPABASE_URL + '/storage/v1/object/public/course-assets/' + value;
+                        return image;
+                    });
                     return { ...c, course_snapshot: { ...frozen, metadata } };
                 });
             }
@@ -201,11 +207,18 @@ export async function GET(request: Request) {
         if (!adminMode)
             for (const course of data.courses || []) {
                 const metadata = course.metadata as Record<string, unknown> | null;
-                if (metadata)
+                if (metadata) {
                     for (const key of ['thumbnailUrl', 'thumbnail_url', 'detailImageUrl', 'detail_image_url']) {
                         const value = metadata[key];
                         if (typeof value === 'string' && value && !/^https?:\/\//.test(value) && !value.startsWith('/')) metadata[key] = process.env.NEXT_PUBLIC_SUPABASE_URL + '/storage/v1/object/public/course-assets/' + value;
                     }
+                    if (Array.isArray(metadata.detail_images)) metadata.detail_images = metadata.detail_images.map((entry: unknown) => {
+                        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return entry;
+                        const image = { ...(entry as Record<string, unknown>) }, value = image.path;
+                        if (typeof value === 'string' && value && !/^https?:\/\//.test(value) && !value.startsWith('/')) image.path = process.env.NEXT_PUBLIC_SUPABASE_URL + '/storage/v1/object/public/course-assets/' + value;
+                        return image;
+                    });
+                }
             }
         if (!adminMode)
             for (const article of data.articles || []) {
