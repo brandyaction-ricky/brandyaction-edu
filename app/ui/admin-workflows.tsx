@@ -1,6 +1,7 @@
 "use client";
 import dynamic from "next/dynamic";
 const LandingAdmin = dynamic(() => import("./landing/admin").then(m => m.LandingAdmin));
+const KakaoSyncSettings = dynamic(() => import("./kakao-sync-settings").then(m => m.KakaoSyncSettings));
 import { type QuizDefinition, type QuizQuestion } from "@/lib/mission-quiz";
 import {
   labels,
@@ -122,10 +123,13 @@ export function AdminWorkflows(props: Props) {
     return <CrmManager {...p} />;
   if (["seo", "settings", "metrics"].includes(props.section))
     return (
+      <>
       <SettingsForm
         key={props.section + JSON.stringify(props.data.site_settings || [])}
         {...p}
       />
+      {props.section === "settings" && <KakaoSyncSettings />}
+      </>
     );
   if (props.section === "landing") return <LandingAdmin />;
   if (props.section === "analytics") return <Analytics />;

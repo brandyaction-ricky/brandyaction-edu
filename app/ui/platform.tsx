@@ -252,11 +252,23 @@ export function Platform({
           "로그인 서비스를 준비하고 있습니다. 잠시 후 다시 시도해 주세요.",
         );
       const next = safeNext(new URLSearchParams(location.search).get("next"));
+      // Only Kakao opts into Sync. Google and the anonymous free-class CTA are unchanged.
+      let syncOptions: { scopes?: string } = {};
+      if (provider === "kakao") {
+        try {
+          const response = await fetch("/api/auth/kakao-sync", { cache: "no-store", signal: AbortSignal.timeout(2500) });
+          if (response.ok) {
+            const config = await response.json();
+            if (config.options?.scopes === "plusfriends") syncOptions = { scopes: "plusfriends" };
+          }
+        } catch { /* Fall back to the existing Kakao login. */ }
+      }
       const { error } = await createClient().auth.signInWithOAuth({
         provider,
         options: {
+          ...syncOptions,
           redirectTo:
-            location.origin + "/auth/callback?next=" + encodeURIComponent(next),
+            location.origin + "/auth/callback?next=" + encodeURIComponent(next) + "&provider=" + provider,
         },
       });
       if (error) throw error;
