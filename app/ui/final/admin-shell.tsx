@@ -279,7 +279,7 @@ export function AdminShell({
             <span className="crumb-root">관리자</span>
             <span className="crumb-root">/</span>
             <span>
-              {finalAdminTitles[selected] ||
+              {current === "product-editor" ? "상품 등록·수정" : current === "learning-editor" ? "학습 콘텐츠 편집" : finalAdminTitles[selected] ||
                 byKey.get(selected)?.title ||
                 "운영 홈"}
             </span>

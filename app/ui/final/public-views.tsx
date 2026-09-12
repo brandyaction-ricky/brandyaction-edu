@@ -24,6 +24,7 @@ import Link from "next/link";
 import { useState } from "react";
 import type { Data } from "../learning-workflows";
 import { EmailAuth } from "../email-auth";
+import { ProductDetailHtml } from './product-detail-html';
 import {
   ArticleCard,
   Badge,
@@ -148,6 +149,7 @@ function StandardProductDetail({
     free = type === "무료 클래스";
   const meta = object(c, "metadata"),
     detailImage = safeUrl(meta.detailImageUrl || meta.detail_image_url);
+  const detailHtml = typeof meta.detail_html === 'string' ? meta.detail_html : '';
   const price = available ? num(available, "price") : num(c, "list_price");
   const unavailableFree = free && !enrolled;
   const href = enrolled
@@ -215,7 +217,7 @@ function StandardProductDetail({
                   <Cover course={c} />
                   <h2 className="mt24">{t(c, "title")}</h2>
                   <p className="lead mt16">{t(c, "summary")}</p>
-                  <div className="reading-copy mt24">{t(c, "description")}</div>
+                  {detailHtml ? <ProductDetailHtml html={detailHtml} className="product-detail-html reading-copy mt24" /> : <div className="reading-copy mt24">{t(c, "description")}</div>}
                 </section>
               )}
               {downloadSection}
@@ -254,7 +256,7 @@ function StandardProductDetail({
                     src={detailImage}
                     alt={t(c, "title") + " 상세 안내"}
                   />
-                ) : (
+                ) : detailHtml ? <ProductDetailHtml html={detailHtml} /> : (
                   <div className="reading-copy">
                     {t(c, "description") || t(c, "summary")}
                   </div>
@@ -354,6 +356,7 @@ function StandardProductDetail({
               <div className="purchase-card">
                 <Badge color="red">{type}</Badge>
                 <h2>{t(c, "title")}</h2>
+                {Number(meta.regular_price) > price && <del className="meta">{money(Number(meta.regular_price))}</del>}
                 <div className="price">{money(price)}</div>
                 <dl className="info-lines">
                   <div>

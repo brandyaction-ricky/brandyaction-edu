@@ -9,6 +9,7 @@ import { adminTables, archiveValues, phoneNumber, validImage, assetPath, databas
 import { POLICY_VERSION } from '@/lib/legal-policies';
 import { getOperatorUser, permissionsFor, sectionScopes } from '@/lib/operator-permissions';
 import { crmDeliveryState } from '@/lib/crm-delivery';
+import { mergeProductMetadata, productMetadataFields } from '@/lib/product-metadata';
 const reply = (data: unknown, status = 200) =>
     Response.json(data, {
         status,
@@ -305,19 +306,11 @@ export async function POST(request: Request) {
             }
             if (['courses', 'articles'].includes(section.table) && values.slug && !/^[a-z0-9-]+$/.test(String(values.slug))) fail('페이지 주소는 영문 소문자·숫자·하이픈으로 입력해 주세요.');
             if (section.table === 'courses') {
-                const { data: previous } = body.id ? await db.from('courses').select('metadata').eq('id', body.id).single() : { data: null };
-                const metadata = { ...(previous?.metadata || {}) };
-                for (const [field, oldField] of [
-                    ['thumbnail_url', 'thumbnailUrl'],
-                    ['detail_image_url', 'detailImageUrl'],
-                ]) {
-                    if (field in values) {
-                        metadata[field] = values[field];
-                        delete metadata[oldField];
-                        delete values[field];
-                    }
-                }
-                values.metadata = metadata;
+                const previous = body.id ? await db.from('courses').select('metadata').eq('id', body.id).single() : { data: null, error: null };
+                if (previous.error) fail('기존 상품 정보를 불러오지 못했습니다. 새로고침 후 다시 저장해 주세요.', 409);
+                try { values.metadata = mergeProductMetadata(previous.data?.metadata, values); }
+                catch (error) { fail((error as Error).message); }
+                for (const field of productMetadataFields) delete values[field];
             }
             if (section.table === 'articles' && 'content_blocks' in values) {
                 if (!Array.isArray(values.content_blocks) || values.content_blocks.length > 100) fail('본문은 최대 100개까지 추가할 수 있습니다.');
