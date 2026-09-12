@@ -914,3 +914,47 @@ body {
 
 .edu-admin .catalog-name .asset-preview { flex-shrink: 0; }
 .edu-admin .seo-settings-layout { min-width: 0; }
+
+/* Product detail gallery follows the supplied multi-image publishing layout. */
+.edu-admin .detail-gallery { margin-top: var(--space-6); padding-top: var(--space-6); border-top: 1px solid var(--line); }
+.edu-admin .detail-gallery-head { align-items: flex-start; gap: var(--space-4); margin-bottom: var(--space-4); }
+.edu-admin .detail-gallery-head h3 { margin: 0 0 var(--space-1); }
+.edu-admin .detail-gallery-head > strong { color: var(--ba-info); font-size: var(--type-small); white-space: nowrap; }
+.edu-admin .detail-gallery-upload { display: grid; grid-template-columns: minmax(0, 1fr) 250px; border: 1px dashed var(--border-strong); background: var(--surface-subtle); margin-bottom: var(--space-4); }
+.edu-admin .detail-gallery-upload > div { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-2); min-height: 150px; padding: var(--space-6) var(--space-4) var(--space-2); text-align: center; }
+.edu-admin .detail-gallery-upload > div svg { color: var(--ba-info); }
+.edu-admin .detail-gallery-upload > div b { font-size: var(--type-body); }
+.edu-admin .detail-gallery-upload > div small { color: var(--text-secondary); font-size: var(--type-small); }
+.edu-admin .detail-gallery-upload > .upload-label { justify-self: center; align-self: start; margin-bottom: var(--space-6); }
+.edu-admin .detail-gallery-upload > aside { grid-column: 2; grid-row: 1 / span 2; display: flex; flex-direction: column; justify-content: center; gap: var(--space-3); padding: var(--space-5); border-left: 1px solid var(--line); background: var(--surface-raised); font-size: var(--type-small); }
+.edu-admin .detail-gallery-upload > aside b { padding-bottom: var(--space-3); border-bottom: 1px solid var(--line); }
+.edu-admin .detail-gallery-upload > aside span { display: flex; justify-content: space-between; gap: var(--space-3); }
+.edu-admin .detail-gallery-error { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-4); }
+.edu-admin .detail-gallery-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.edu-admin .detail-gallery-item { display: grid; grid-template-columns: 20px 100px minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); min-width: 0; padding: var(--space-3); border: 1px solid var(--line); background: var(--surface-raised); }
+.edu-admin .detail-gallery-item.is-dragging { opacity: .48; border-color: var(--ba-red); }
+.edu-admin .detail-gallery-grip { width: 16px; color: var(--text-tertiary); }
+.edu-admin .detail-gallery-item > img,
+.edu-admin .detail-gallery-missing { width: 100px; height: 92px; object-fit: contain; background: var(--surface-subtle); }
+.edu-admin .detail-gallery-missing { display: grid; place-items: center; color: var(--muted); font-size: 11px; text-align: center; }
+.edu-admin .detail-gallery-copy { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.edu-admin .detail-gallery-copy b { font-size: var(--type-small); }
+.edu-admin .detail-gallery-copy span { overflow: hidden; color: var(--text-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.edu-admin .detail-gallery-copy input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]) { min-height: 34px; padding: 6px 8px; font-size: 12px; }
+.edu-admin .detail-gallery-actions { display: flex; flex-direction: column; gap: var(--space-1); }
+.edu-admin .detail-gallery-actions .icon-btn { width: 32px; height: 32px; min-height: 32px; }
+.edu-admin .detail-gallery-actions .danger { color: var(--ba-red); }
+.edu-front .detail-image-stack { width: 100%; line-height: 0; }
+.edu-front .detail-image-stack .detail-image { display: block; width: 100%; height: auto; margin: 0; }
+@media (max-width: 900px) {
+  .edu-admin .detail-gallery-list { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 680px) {
+  .edu-admin .detail-gallery-upload { grid-template-columns: minmax(0, 1fr); }
+  .edu-admin .detail-gallery-upload > aside { grid-column: 1; grid-row: auto; border-top: 1px solid var(--line); border-left: 0; }
+  .edu-admin .detail-gallery-item { grid-template-columns: 16px 76px minmax(0, 1fr); }
+  .edu-admin .detail-gallery-item > img,
+  .edu-admin .detail-gallery-missing { width: 76px; height: 76px; }
+  .edu-admin .detail-gallery-actions { grid-column: 2 / -1; flex-direction: row; justify-content: flex-end; }
+  .edu-admin .detail-gallery-error { align-items: stretch; flex-direction: column; }
+}

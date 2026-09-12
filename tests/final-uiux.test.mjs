@@ -147,6 +147,8 @@ test('catalogues and separate editors render without dropping existing fields', 
   const { ProductEditor } = load('app/ui/final/admin-editors.tsx');
   const { LearningEditor } = load('app/ui/final/learning-editor.tsx');
   const markup = html(ProductEditor, { data, row: course, pending: false, send, back() {} });
+  assert.match(markup, /name="detail_images"/);
+  assert.match(markup, /multiple=""/);
   assert.match(markup, /editor-savebar/);
   for (const field of platform.sections.find(row => row.key === 'products').fields) assert.ok(markup.includes(`name="${field.key}"`), field.key);
   assert.match(html(LearningEditor, { data, row: lesson, pending: false, send, back() {} }), /editor-/);
