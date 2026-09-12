@@ -12,9 +12,9 @@ import {
 } from "@/lib/platform";
 import { isRecruiting, recordId } from "@/lib/platform-rules";
 import { archiveValues, cohortPeriod, cohortStatus } from "@/lib/qa-rules";
-import { ArrowRight, BookOpen, FileText, Search } from "lucide-react";
+import { ArrowRight, BookOpen, FileText, GripVertical, Search } from "lucide-react";
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { Data } from "../learning-workflows";
 import { Metric } from "./admin-shell";
 import { Badge, Empty, courseType } from "./primitives";
@@ -56,11 +56,43 @@ export function AdminCatalog({
     [course, setCourse] = useState(""),
     [week, setWeek] = useState(""),
     [archived, setArchived] = useState(false);
-  const rows = data[s.table] || [],
-    courses = data.courses || [],
-    weeks = data.curriculum_weeks || [],
-    lessons = data.curriculum_lessons || [],
-    cohorts = data.cohorts || [];
+  const rows = data[s.table] || [];
+  const courses = useMemo(() => data.courses || [], [data.courses]);
+  const weeks = useMemo(() => data.curriculum_weeks || [], [data.curriculum_weeks]);
+  const lessons = useMemo(
+    () => data.curriculum_lessons || [],
+    [data.curriculum_lessons],
+  );
+  const cohorts = data.cohorts || [];
+  const enrollments = useMemo(() => data.enrollments || [], [data.enrollments]);
+  const customerCourseNames = useMemo(() => {
+    const courseNames = new Map(courses.map((item) => [item.id, named(item)]));
+    const result = new Map<unknown, Set<string>>();
+    for (const enrollment of enrollments) {
+      if (enrollment.status !== "active") continue;
+      const name = courseNames.get(String(enrollment.course_id));
+      if (!name || name === "—") continue;
+      const names = result.get(enrollment.user_id) || new Set<string>();
+      names.add(name);
+      result.set(enrollment.user_id, names);
+    }
+    return result;
+  }, [courses, enrollments]);
+  const resourceCounts = useMemo(() => {
+    const weekCourse = new Map(weeks.map((item) => [item.id, String(item.course_id)]));
+    const lessonCourse = new Map(
+      lessons.map((item) => [item.id, weekCourse.get(String(item.week_id)) || ""]),
+    );
+    const result = new Map<string, number>();
+    for (const item of data.lesson_contents || []) {
+      if (!item.resource_storage_path && !item.resource_name) continue;
+      const productId = lessonCourse.get(String(item.lesson_id));
+      if (productId) result.set(productId, (result.get(productId) || 0) + 1);
+    }
+    return result;
+  }, [data.lesson_contents, lessons, weeks]);
+  const customerCourses = (memberId: unknown) => [...(customerCourseNames.get(memberId) || [])];
+  const productResourceCount = (productId: unknown) => resourceCounts.get(String(productId)) || 0;
   const getCourse = (r: Row) =>
     r.course_id ||
     (s.key === "learning"
@@ -81,7 +113,15 @@ export function AdminCatalog({
       (!status || getStatus(r) === status) &&
       (!type ||
         (s.key === "products" ? courseType(r) : r.content_type) === type) &&
-      (!course || getCourse(r) === course) &&
+      (!course ||
+        (s.key === "customers"
+          ? enrollments.some(
+              (enrollment) =>
+                enrollment.user_id === r.id &&
+                enrollment.course_id === course &&
+                enrollment.status === "active",
+            )
+          : getCourse(r) === course)) &&
       (!week ||
         (s.key === "learning"
           ? r.week_id
@@ -174,6 +214,7 @@ export function AdminCatalog({
             .map((c) => t(c, "name"))
             .join(", ") || "미연결",
       },
+      { label: "자료", value: (r) => productResourceCount(r.id) + "개" },
       { label: "공개 상태", value: badge },
     ],
     cohorts: [
@@ -217,7 +258,10 @@ export function AdminCatalog({
           </div>
         ),
       },
-      { label: "연락처", value: (r) => t(r, "phone") || "미등록" },
+      {
+        label: "수강 중인 클래스",
+        value: (r) => customerCourses(r.id).join(", ") || "수강 없음",
+      },
       {
         label: "태그",
         value: (r) => (
@@ -233,7 +277,11 @@ export function AdminCatalog({
         ),
       },
       { label: "가입일", value: (r) => date(r.created_at) },
-      { label: "이용 상태", value: badge },
+      {
+        label: "수신 동의",
+        value: (r) => r.marketing_consent ? "동의" : "미동의",
+      },
+      { label: "계정 상태", value: badge },
     ],
     tags: [
       { label: "태그명", value: (r) => <Badge>{t(r, "name")}</Badge> },
@@ -549,6 +597,31 @@ export function AdminCatalog({
         </div>
       )}
       {scope}
+      {s.key === "customers" && (
+        <div className="metrics">
+          <Metric
+            label="전체 회원"
+            value={<>{pagination?.total ?? rows.length}<small>명</small></>}
+            note="현재 운영 회원"
+          />
+          <Metric
+            label="정상 회원"
+            value={<>{rows.filter((r) => r.status === "active").length}<small>명</small></>}
+            note="로그인·수강 이용 가능"
+            highlight
+          />
+          <Metric
+            label="이용 제한"
+            value={<>{rows.filter((r) => r.status === "suspended").length}<small>명</small></>}
+            note="계정 상태 기준"
+          />
+          <Metric
+            label="마케팅 수신 동의"
+            value={<>{rows.filter((r) => r.marketing_consent).length}<small>명</small></>}
+            note="서비스 알림과 구분"
+          />
+        </div>
+      )}
       {s.key === "learning" && (
         <>
           <div className="metrics">
@@ -603,12 +676,38 @@ export function AdminCatalog({
           <div className="panel-body">{tools}</div>
         </details>
       )}
+      {s.key === "missions" && (
+        <>
+          <div className="tabs admin-content-tabs" role="tablist" aria-label="커리큘럼 관리 영역">
+            <button className="tab active" type="button" role="tab" aria-selected="true">
+              일차별 미션 <span>{rows.length}</span>
+            </button>
+            <Link className="tab" href="/admin/learning">
+              학습 콘텐츠 <span>{lessons.length}</span>
+            </Link>
+          </div>
+          <div className="mission-week-pills" aria-label="미션 주차 선택">
+            <button className={!week ? "pill active" : "pill"} onClick={() => setWeek("")}>전체 주차</button>
+            {weeks
+              .filter((item) => !course || item.course_id === course)
+              .map((item) => (
+                <button
+                  className={week === item.id ? "pill active" : "pill"}
+                  key={item.id}
+                  onClick={() => setWeek(item.id)}
+                >
+                  {num(item, "week_number")}주차 <span>{lessons.filter((lesson) => lesson.week_id === item.id).length}</span>
+                </button>
+              ))}
+          </div>
+        </>
+      )}
       <div
         className={
-          ["learning", "missions"].includes(s.key) ? "learning-layout" : ""
+          s.key === "learning" ? "learning-layout" : ""
         }
       >
-        {["learning", "missions"].includes(s.key) && (
+        {s.key === "learning" && (
           <aside className="week-nav">
             <div className="week-nav-title">학습 구성</div>
             <button
@@ -635,7 +734,7 @@ export function AdminCatalog({
             ["learning", "missions", "questions"].includes(s.key) ? "" : "panel"
           }
         >
-          <div className="filter-row">
+          {s.key !== "missions" && <div className="filter-row">
             {search}
             <span className="spacer" />
             {s.key === "products" && (
@@ -661,9 +760,22 @@ export function AdminCatalog({
                 <option value="video">영상</option>
               </select>
             )}
+            {s.key === "customers" && (
+              <select
+                aria-label="수강 클래스"
+                value={course}
+                onChange={(e) => {
+                  setCourse(e.target.value);
+                  setSelection([]);
+                }}
+              >
+                <option value="">전체 클래스</option>
+                {courses.map((item) => <option key={item.id} value={item.id}>{t(item, "title")}</option>)}
+              </select>
+            )}
             {statusFilter}
-          </div>
-          <div className="toolbar">
+          </div>}
+          {s.key !== "missions" && <div className="toolbar">
             <label className="checkline">
               <input
                 type="checkbox"
@@ -691,7 +803,7 @@ export function AdminCatalog({
                 선택 {selection.length}개 보관·숨김
               </button>
             )}
-          </div>
+          </div>}
           {s.key === "learning" ? (
             <div className="lesson-list">
               {filtered.map((l) => (
@@ -737,52 +849,37 @@ export function AdminCatalog({
               ))}
             </div>
           ) : s.key === "missions" ? (
-            <div className="mission-grid">
+            <section className="week-card mission-catalog">
+              <div className="spread week-head">
+                <div className="row">
+                  <span className="week-label">CURRICULUM</span>
+                  <strong>{week ? named(weeks.find((item) => item.id === week)) : "전체 주차 미션"}</strong>
+                </div>
+                <span className="meta">공개 {filtered.filter((item) => item.is_published).length} · 비공개 {filtered.filter((item) => !item.is_published).length}</span>
+              </div>
+              <p className="meta mb16">미션 제목을 누르면 제출 방식과 공개 상태를 편집할 수 있습니다.</p>
               {filtered.map((m) => (
-                <article className="mission-card panel" key={m.id}>
-                  <div className="panel-body">
-                    <div className="between">
-                      <Badge>
-                        DAY{" "}
-                        {num(
-                          lessons.find((l) => l.id === m.lesson_id),
-                          "day_number",
-                        )}
-                      </Badge>
-                      {badge(m)}
-                    </div>
-                    <h3 className="mt16">{t(m, "title")}</h3>
-                    <p className="meta mt8">{t(m, "instructions")}</p>
-                    <div className="flex mt16">
-                      <Badge>
-                        {labels[t(m, "submission_type")] ||
-                          t(m, "submission_type")}
-                      </Badge>
-                      {Boolean(m.is_required) && (
-                        <Badge color="red">필수</Badge>
-                      )}
-                    </div>
-                    <div className="between mt24">
-                      <input
-                        type="checkbox"
-                        aria-label={title(m) + " 선택"}
-                        checked={selection.includes(recordId(m))}
-                        onChange={(e) =>
-                          setSelection(
-                            e.target.checked
-                              ? [...selection, recordId(m)]
-                              : selection.filter((id) => id !== recordId(m)),
-                          )
-                        }
-                      />
-                      <button className="btn small" onClick={() => edit(s, m)}>
-                        미션 편집
-                      </button>
-                    </div>
+                <article className="mission-row" key={m.id}>
+                  <GripVertical className="draghandle" aria-hidden="true" />
+                  <span className="day-no">{String(num(lessons.find((l) => l.id === m.lesson_id), "day_number")).padStart(2, "0")}</span>
+                  <div className="mission-copy">
+                    <button className="title-btn" onClick={() => edit(s, m)}><strong>{t(m, "title")}</strong></button>
+                    <p>{labels[t(m, "submission_type")] || t(m, "submission_type")} · {t(m, "instructions")}</p>
+                  </div>
+                  {badge(m)}
+                  {Boolean(m.is_required) && <Badge color="red">필수</Badge>}
+                  <div className="row mission-actions">
+                    <input
+                      type="checkbox"
+                      aria-label={title(m) + " 선택"}
+                      checked={selection.includes(recordId(m))}
+                      onChange={(e) => setSelection(e.target.checked ? [...selection, recordId(m)] : selection.filter((id) => id !== recordId(m)))}
+                    />
+                    <button className="btn small" onClick={() => edit(s, m)}>편집</button>
                   </div>
                 </article>
               ))}
-            </div>
+            </section>
           ) : s.key === "questions" ? (
             <div className="stack">
               {filtered.map((q) => (

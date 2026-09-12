@@ -15,7 +15,7 @@ import {
   type Section,
   type User,
 } from "@/lib/platform";
-import { isRecruiting, localDateTime, recordId } from "@/lib/platform-rules";
+import { homepageCourses, isRecruiting, localDateTime, recordId } from "@/lib/platform-rules";
 import { archiveValues } from "@/lib/qa-rules";
 import { createClient } from "@/lib/supabase/client";
 import { getSupabasePublicConfig } from "@/lib/supabase/config";
@@ -232,6 +232,7 @@ export function Platform({
   const recruitingCourses = courses.filter((c) =>
     rows("cohorts").some((g) => g.course_id === c.id && isRecruiting(g)),
   );
+  const availableCourses = homepageCourses(courses, rows("cohorts"));
   const free =
     recruitingCourses.find((c) => num(c, "list_price") === 0) ||
     courses.find((c) => num(c, "list_price") === 0);
@@ -525,11 +526,11 @@ export function Platform({
               </Link>
             </div>
             <div className="grid3 course-grid">
-              {recruitingCourses.slice(0, 3).map((c) => (
+              {availableCourses.slice(0, 3).map((c) => (
                 <CourseCard key={c.id} course={c} />
               ))}
             </div>
-            {!loading && !recruitingCourses.length && (
+            {!loading && !availableCourses.length && (
               <Empty title="새로운 클래스를 준비하고 있습니다." />
             )}
           </section>
@@ -788,6 +789,14 @@ export function Platform({
                       : undefined
               }
             >
+              {section.key === "customers" && (
+                <button
+                  className="btn"
+                  onClick={() => downloadCsv(rows("profiles"), "customers")}
+                >
+                  회원 명단 내보내기
+                </button>
+              )}
               {!standaloneAdmin.includes(section.key) &&
                 !section.readOnly &&
                 ![
@@ -967,6 +976,17 @@ function Editor({
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [error, setError] = useState("");
+  const customerEnrollments =
+    section.key === "customers" && row
+      ? (data.enrollments || []).filter((item) => item.user_id === row.id)
+      : [];
+  const customerTags =
+    section.key === "customers" && row
+      ? (data.crm_member_tags || [])
+          .filter((item) => item.member_id === row.id)
+          .map((item) => (data.crm_tags || []).find((tag) => tag.id === item.tag_id))
+          .filter(Boolean) as Row[]
+      : [];
   useEffect(() => {
     ref.current?.showModal();
     const d = ref.current;
@@ -1104,7 +1124,9 @@ function Editor({
           <div>
             <span className="eyebrow">{section.group}</span>
             <h2>
-              {section.title} · {row ? "상세" : "등록"}
+              {section.key === "customers" && row
+                ? "회원 관리 상세"
+                : `${section.title} · ${row ? "상세" : "등록"}`}
             </h2>
           </div>
           <button
@@ -1133,6 +1155,38 @@ function Editor({
             </dl>
           ) : (
             <>
+              {section.key === "customers" && row && (
+                <div className="customer-detail">
+                  <div className="drawer-profile">
+                    <span className="avatar red">{(t(row, "full_name") || t(row, "email")).slice(0, 1)}</span>
+                    <div>
+                      <h2>{t(row, "full_name") || "이름 미등록"}</h2>
+                      <p>{t(row, "email")}<br />{t(row, "phone") || "연락처 미등록"}</p>
+                    </div>
+                  </div>
+                  <div className="customer-summary-grid">
+                    <div><span>계정 상태</span><b>{labels[t(row, "status")] || t(row, "status")}</b></div>
+                    <div><span>마케팅 수신</span><b>{row.marketing_consent ? "동의" : "미동의"}</b></div>
+                    <div><span>가입일</span><b>{new Date(String(row.created_at)).toLocaleDateString("ko-KR")}</b></div>
+                  </div>
+                  <h3>수강 권한</h3>
+                  {customerEnrollments.length ? customerEnrollments.map((enrollment) => (
+                    <div className="asset-row" key={enrollment.id}>
+                      <span className="square">C</span>
+                      <div>
+                        <b>{t((data.courses || []).find((course) => course.id === enrollment.course_id), "title") || "연결 상품"}</b>
+                        <p>{t((data.cohorts || []).find((cohort) => cohort.id === enrollment.cohort_id), "name") || "기수 미연결"}</p>
+                      </div>
+                      <span className={`badge ${enrollment.status === "active" ? "green" : ""}`}>{labels[t(enrollment, "status")] || t(enrollment, "status")}</span>
+                    </div>
+                  )) : <p className="meta mt8">등록된 수강 권한이 없습니다.</p>}
+                  <h3 className="mt24">고객 태그</h3>
+                  <div className="tag-list mt8">
+                    {customerTags.length ? customerTags.map((tag) => <span className="badge" key={tag.id}>{t(tag, "name")}</span>) : <span className="meta">등록된 태그가 없습니다.</span>}
+                  </div>
+                  <div className="divider" />
+                </div>
+              )}
               {row &&
                 ["reviews", "mission_submissions", "edu_questions"].includes(
                   section.table,
