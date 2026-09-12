@@ -14,6 +14,17 @@ const fileKinds = {
             webp: 'image/webp',
         } as Record<string, string>,
     },
+    'detail-image': {
+        bucket: 'course-assets',
+        maxBytes: 20 * MB,
+        allowed: {
+            png: 'image/png',
+            jpg: 'image/jpeg',
+            jpeg: 'image/jpeg',
+            webp: 'image/webp',
+            gif: 'image/gif',
+        } as Record<string, string>,
+    },
     resource: {
         bucket: 'course-resources',
         maxBytes: 20 * MB,
@@ -44,7 +55,7 @@ export async function POST(request: Request) {
             size?: unknown;
             kind?: unknown;
         };
-        const kind = body.kind === 'image' ? 'image' : body.kind === 'resource' ? 'resource' : null;
+        const kind = body.kind === 'image' || body.kind === 'detail-image' ? body.kind : body.kind === 'resource' ? 'resource' : null;
         if (!kind) return Response.json({ error: '업로드 종류를 확인해 주세요.' }, { status: 400 });
         const config = fileKinds[kind];
         const name = String(body.name || '').normalize('NFC');
@@ -53,7 +64,7 @@ export async function POST(request: Request) {
         if (!name || name.length > 240 || /[\\/\u0000-\u001f]/.test(name) || !config.allowed[extension])
             return Response.json(
                 {
-                    error: kind === 'image' ? 'PNG, JPG, WEBP 이미지를 선택해 주세요.' : 'PDF, ZIP, TXT, CSV, 문서 파일을 선택해 주세요.',
+                    error: kind === 'resource' ? 'PDF, ZIP, TXT, CSV, 문서 파일을 선택해 주세요.' : kind === 'detail-image' ? 'PNG, JPG, WEBP, GIF 이미지를 선택해 주세요.' : 'PNG, JPG, WEBP 이미지를 선택해 주세요.',
                 },
                 { status: 400 },
             );

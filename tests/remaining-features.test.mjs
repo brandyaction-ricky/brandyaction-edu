@@ -54,6 +54,8 @@ test("large uploads use signed direct storage and retain client-side limits", ()
   const field = source("app/ui/editor-fields.tsx");
   assert.match(route, /createSignedUploadUrl/);
   assert.doesNotMatch(route, /request\.formData/);
+  assert.match(route, /['"]detail-image['"]/);
+  assert.match(route, /20 \* MB/);
   assert.match(field, /uploadToSignedUrl/);
   assert.match(field, /image \? 10 : 20/);
 });

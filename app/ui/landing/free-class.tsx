@@ -6,6 +6,7 @@ import { startLandingTracking } from '@/lib/landing-browser';
 import { object, safeUrl, text as t, type Row } from '@/lib/platform';
 import { Cover } from '../final/primitives';
 import { ProductDetailHtml } from '../final/product-detail-html';
+import { productDetailImages } from '@/lib/product-metadata';
 
 export function LandingTracker({ config, children }: { config: LandingConfig; children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -13,7 +14,7 @@ export function LandingTracker({ config, children }: { config: LandingConfig; ch
   return <div ref={ref} className="landing-campaign">{children}</div>;
 }
 export function CampaignFreeClass({ course, config }: { course: Row; config: LandingConfig }) {
-  const meta = object(course,'metadata'), image = safeUrl(meta.detailImageUrl || meta.detail_image_url);
+  const meta = object(course,'metadata'), images = productDetailImages(meta).map(item => ({ ...item, path: safeUrl(item.path) })).filter(item => item.path), image = images[0]?.path || '';
   const detailHtml = typeof meta.detail_html === 'string' ? meta.detail_html : '';
   const cta = (position: string, full = false) => <a className={'btn primary large ' + (full ? 'full' : '')} href={config.kakao_url} data-landing-cta={config.enabled ? position : undefined}>{config.cta_label}<ArrowRight /></a>;
   return <LandingTracker config={config}>
@@ -26,7 +27,7 @@ export function CampaignFreeClass({ course, config }: { course: Row; config: Lan
       {config.custom_sections ? config.sections.map(s=><section className="campaign-section" data-section={s.id} key={s.id}>
         {s.title && <h2>{s.title}</h2>}{s.image && <img src={s.image} alt={s.title || ''} loading="lazy" decoding="async" />}{s.body && <div className="reading-copy">{s.body}</div>}
       </section>) : <>
-        <section data-section="detail">{image ? <img className="detail-image" src={image} alt={t(course,'title')+' 상세 안내'} loading="lazy" decoding="async" /> : <div className="panel-body"><Cover course={course}/>{detailHtml ? <ProductDetailHtml html={detailHtml} className="product-detail-html reading-copy mt24" /> : <div className="reading-copy mt24">{t(course,'description') || t(course,'summary')}</div>}</div>}</section>
+        <section data-section="detail">{image ? <div className="detail-image-stack">{images.map((item, index) => <img className="detail-image" src={item.path} alt={item.alt || `${t(course,'title')} 상세 안내 ${index + 1}`} loading="lazy" decoding="async" key={item.path + index} />)}</div> : <div className="panel-body"><Cover course={course}/>{detailHtml ? <ProductDetailHtml html={detailHtml} className="product-detail-html reading-copy mt24" /> : <div className="reading-copy mt24">{t(course,'description') || t(course,'summary')}</div>}</div>}</section>
         <section className="campaign-section" data-section="materials"><h2>무료 라이브 참여 안내</h2><p>참여 링크와 강의 관련 안내는 카카오 오픈채팅방에서 확인해 주세요.</p></section>
       </>}
       <section className="campaign-section campaign-final" data-section="final"><h2>무료 라이브에서 만나요.</h2><p>{t(course,'schedule_label')}</p>{cta('final_cta')}</section>

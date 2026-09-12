@@ -25,6 +25,7 @@ import { useState } from "react";
 import type { Data } from "../learning-workflows";
 import { EmailAuth } from "../email-auth";
 import { ProductDetailHtml } from './product-detail-html';
+import { productDetailImages } from '@/lib/product-metadata';
 import {
   ArticleCard,
   Badge,
@@ -148,7 +149,8 @@ function StandardProductDetail({
     digital = type === "디지털 상품",
     free = type === "무료 클래스";
   const meta = object(c, "metadata"),
-    detailImage = safeUrl(meta.detailImageUrl || meta.detail_image_url);
+    detailImages = productDetailImages(meta).map(image => ({ ...image, path: safeUrl(image.path) })).filter(image => image.path),
+    detailImage = detailImages[0]?.path || '';
   const detailHtml = typeof meta.detail_html === 'string' ? meta.detail_html : '';
   const price = available ? num(available, "price") : num(c, "list_price");
   const unavailableFree = free && !enrolled;
@@ -207,11 +209,12 @@ function StandardProductDetail({
           <div className="free-body">
             <div className="free-sheet">
               {detailImage ? (
-                <img
+                <div className="detail-image-stack">{detailImages.map((image, index) => <img
                   className="detail-image"
-                  src={detailImage}
-                  alt={t(c, "title") + " 상세 안내"}
-                />
+                  src={image.path}
+                  alt={image.alt || `${t(c, "title")} 상세 안내 ${index + 1}`}
+                  key={image.path + index}
+                />)}</div>
               ) : (
                 <section className="panel-body">
                   <Cover course={c} />
@@ -251,11 +254,12 @@ function StandardProductDetail({
                     : "이 클래스에서 만들 변화"}
                 </h2>
                 {detailImage ? (
-                  <img
+                  <div className="detail-image-stack">{detailImages.map((image, index) => <img
                     className="detail-image"
-                    src={detailImage}
-                    alt={t(c, "title") + " 상세 안내"}
-                  />
+                    src={image.path}
+                    alt={image.alt || `${t(c, "title")} 상세 안내 ${index + 1}`}
+                    key={image.path + index}
+                  />)}</div>
                 ) : detailHtml ? <ProductDetailHtml html={detailHtml} /> : (
                   <div className="reading-copy">
                     {t(c, "description") || t(c, "summary")}

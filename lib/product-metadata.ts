@@ -1,6 +1,31 @@
 import { safeUrl } from './platform';
 
-export const productMetadataFields = ['thumbnail_url', 'detail_image_url', 'regular_price', 'seo_title', 'seo_description', 'detail_html'] as const;
+function validProductImage(value: unknown) {
+  if (typeof value !== 'string' || !value || value.length > 2048 || value.includes('..')) return false;
+  if (/^https:\/\//i.test(value)) {
+    try {
+      const url = new URL(value);
+      return !url.username && !url.password;
+    } catch { return false; }
+  }
+  return /^(?:\/?(?:edu|site|images|assets|courses)\/)[a-z0-9/_\-.]+\.(?:png|jpe?g|webp|gif|avif)(?:\?[^#]*)?$/i.test(value);
+}
+
+export const productMetadataFields = ['thumbnail_url', 'detail_image_url', 'detail_images', 'regular_price', 'seo_title', 'seo_description', 'detail_html'] as const;
+export type ProductDetailImage = { path: string; name: string; alt: string };
+
+export function productDetailImages(metadata: Record<string, unknown>): ProductDetailImage[] {
+  const stored = Array.isArray(metadata.detail_images) ? metadata.detail_images : [];
+  const images = stored.flatMap((entry, index) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return [];
+    const item = entry as Record<string, unknown>, path = String(item.path || item.url || '').trim();
+    if (!validProductImage(path)) return [];
+    return [{ path, name: String(item.name || `상세 이미지 ${index + 1}`).slice(0, 240), alt: String(item.alt || '').slice(0, 500) }];
+  });
+  if (images.length) return images.slice(0, 30);
+  const legacy = String(metadata.detail_image_url || metadata.detailImageUrl || '').trim();
+  return validProductImage(legacy) ? [{ path: legacy, name: '기존 상세 이미지', alt: '' }] : [];
+}
 export type ProductHtmlNode = string | { tag: string; attrs: Record<string, string>; children: ProductHtmlNode[] };
 const allowed = new Set('h1 h2 h3 h4 h5 h6 p div section article span strong b em i u s small blockquote pre code ul ol li dl dt dd figure figcaption a img br hr table thead tbody tfoot tr th td'.split(' '));
 const discarded = new Set('head script style iframe object embed svg math template form button input textarea select option video audio canvas noscript'.split(' '));
@@ -77,6 +102,17 @@ export function mergeProductMetadata(previous: unknown, values: Record<string, u
     if (field === 'regular_price') {
       if (value !== null && value !== '' && (!Number.isSafeInteger(Number(value)) || Number(value) < 0)) throw new Error('정가는 0원 이상의 정수로 입력해 주세요.');
       metadata[field] = value === null || value === '' ? null : Number(value);
+    } else if (field === 'detail_images') {
+      if (!Array.isArray(value) || value.length > 30) throw new Error('상세 이미지는 최대 30장까지 등록할 수 있습니다.');
+      const images = value.map((entry, index) => {
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw new Error(`${index + 1}번째 상세 이미지 정보를 확인해 주세요.`);
+        const item = entry as Record<string, unknown>, path = String(item.path || '').trim();
+        if (!validProductImage(path)) throw new Error(`${index + 1}번째 상세 이미지 주소를 확인해 주세요.`);
+        return { path, name: String(item.name || `상세 이미지 ${index + 1}`).slice(0, 240), alt: String(item.alt || '').slice(0, 500) };
+      });
+      metadata.detail_images = images;
+      metadata.detail_image_url = images[0]?.path || '';
+      delete metadata.detailImageUrl;
     } else if (field === 'detail_html') {
       if (value !== null && typeof value !== 'string') throw new Error('상세페이지 HTML 형식을 확인해 주세요.');
       metadata[field] = sanitizeProductHtml(value || '');
