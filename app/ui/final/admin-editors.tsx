@@ -326,6 +326,7 @@ export function ProductEditor({
                     pending={pending}
                     keys={[...keys]}
                   />
+                  {key === 'detail' && row && num(row, 'list_price') === 0 && <div className="notice mt24"><p>광고 라이브는 CTA와 상세 이미지를 함께 저장·발행하면 현재 랜딩에 즉시 반영됩니다. 이곳에서 이미지만 수정했다면 라이브 관리에서 다시 발행해 주세요.</p><Link className="btn mt16" href={'/admin/landing?course=' + row.id}>무료 라이브 CTA·이미지 관리</Link></div>}
                   {key === "resources" && (
                     <>
                       <p>

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
-function load(file,mocks={}) {const exports={};const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;new Function('exports','require',code)(exports,name=>{if(mocks[name])return mocks[name];throw Error('Unexpected dependency '+name);});return exports;}
+function load(file,mocks={}) {const exports={};const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;new Function('exports','require',code)(exports,name=>{if(mocks[name])return mocks[name];if(name==='@/lib/qa-rules')return load('lib/qa-rules.ts');throw Error('Unexpected dependency '+name);});return exports;}
 const logic=load('lib/landing.ts');
 const id='aaaaaaaa-aaaa-4000-8000-000000000001';
 const packet={landing_id:id,session_id:id,visitor_id:id,layout_ver:1,attribution:{utm_source:'meta',utm_content:'%ED%95%9C%EA%B8%80+%26+ad',email:'never-store',referrer:'https://ref.example/path?email=secret'},events:[{id,event_type:'click_cta',payload:{to:'sticky_cta',section:'proof',scrollPct:47,password:'never-store'}}]};

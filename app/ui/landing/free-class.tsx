@@ -13,7 +13,7 @@ export function LandingTracker({ config, children }: { config: LandingConfig; ch
 }
 export function CampaignFreeClass({ course, config }: { course: Row; config: LandingConfig }) {
   const meta = object(course,'metadata'), image = safeUrl(meta.detailImageUrl || meta.detail_image_url);
-  const cta = (position: string, full = false) => <a className={'btn primary large ' + (full ? 'full' : '')} href={config.kakao_url} data-landing-cta={position}>{config.cta_label}<ArrowRight /></a>;
+  const cta = (position: string, full = false) => <a className={'btn primary large ' + (full ? 'full' : '')} href={config.kakao_url} data-landing-cta={config.enabled ? position : undefined}>{config.cta_label}<ArrowRight /></a>;
   return <LandingTracker config={config}>
     <div className="free-body"><div className="free-sheet">
       <section className="campaign-hero panel-body" data-section="hero">

@@ -15,6 +15,9 @@ export async function GET(request: Request) {
     if (!error) {
       const { data: userData } = await supabase.auth.getUser();
       const metadata = userData.user?.user_metadata || {};
+      if (userData.user && next === '/auth/reset-password') {
+        return NextResponse.redirect(`${origin}/auth/reset-password`);
+      }
       const syncAgreed = searchParams.get("provider") === "kakao" && userData.user
         ? await syncKakaoConsent(userData.user, sessionData.session?.provider_token)
         : false;

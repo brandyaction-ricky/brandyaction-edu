@@ -71,11 +71,12 @@ test('five admin categories and scoped navigation render from the final shell', 
   const restricted = html(AdminShell, { ...props, available: platform.sections.filter(row => row.key === 'products') });
   assert.doesNotMatch(restricted, /href="\/admin\/(questions|customers|members|orders)"/);
 });
-test('social-only login and product detail variants use the final publishing structures', () => {
+test('three signup methods and product detail variants use the final publishing structures', () => {
   const { AuthView, ProductDetail, ArticlesView, StoriesView } = load('app/ui/final/public-views.tsx');
   for (const signup of [false, true]) {
     const markup = html(AuthView, { signup, pending: false, social: send, next: '/my' });
     assert.match(markup, /form-card/); assert.match(markup, /카카오로 계속하기/); assert.match(markup, /Google로 계속하기/); assert.doesNotMatch(markup, /type="password"/);
+    assert.match(markup, new RegExp(signup ? '이메일로 회원가입' : '이메일로 로그인'));
   }
   assert.match(html(ProductDetail, { course, data }), /product-layout/);
   assert.match(html(ProductDetail, { course: { ...course, list_price: 0, category: 'free' }, data }), /free-body/);
@@ -162,6 +163,7 @@ test('participant matrix uses latest attempts, required missions and enrollment 
 test('campaign class keeps published content, escapes copy, and sends all CTA positions to one Kakao URL', () => {
   const { ProductDetail } = load('app/ui/final/public-views.tsx');
   const { defaultConfig } = load('lib/landing.ts');
+  const course = { ...data.courses[0], list_price: 0 };
   const cfg = { ...defaultConfig(course.id), layout_ver: 1, revision: 1, kakao_url: 'https://open.kakao.com/o/testRoom', custom_sections: true, sections: [{ id: 'proof', title: '고객 이야기', body: '<script>unsafe()</script>', image: 'https://cdn.example/proof.webp' }], course_snapshot: { title: '발행한 제목', summary: '발행 당시 소개' } };
   const markup = html(ProductDetail, { course, data: { ...data, landing_configs: [cfg] } });
   for (const position of ['hero_cta', 'sticky_cta', 'final_cta']) assert.match(markup, new RegExp('data-landing-cta="' + position + '"'));
@@ -170,6 +172,14 @@ test('campaign class keeps published content, escapes copy, and sends all CTA po
   assert.match(markup, /data-section="proof"/); assert.match(markup, /loading="lazy"/);
   assert.match(markup, /&lt;script&gt;/); assert.doesNotMatch(markup, /<script>|checkout/);
   assert.doesNotMatch(html(ProductDetail, { course, data: { ...data, landing_configs: [{ ...cfg, enabled: false }] } }), /data-landing-cta/);
+  const untracked = html(ProductDetail, { course, data: { ...data, enrollments: [], landing_configs: [{ ...cfg, enabled: false }] } });
+  assert.equal((untracked.match(/href="https:\/\/open.kakao.com\/o\/testRoom"/g) || []).length, 3);
+  assert.doesNotMatch(untracked, /href="\/(?:apply|signup|login)/);
+  const missing = html(ProductDetail, { course, data: { ...data, enrollments: [], landing_configs: [{ ...cfg, kakao_url: '' }] } });
+  assert.match(missing, /disabled="">참여 링크 준비 중/);
+  assert.doesNotMatch(missing, /href="\/apply/);
+  const paid = html(ProductDetail, { course: { ...course, list_price: 10000 }, data: { ...data, landing_configs: [cfg] } });
+  assert.doesNotMatch(paid, /href="https:\/\/open.kakao.com\/o\/testRoom"/);
 });
 
 test('landing report separates repeated clicks, missing actuals, direct traffic and per-version reach', () => {

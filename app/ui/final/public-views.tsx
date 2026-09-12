@@ -23,6 +23,7 @@ import {
 import Link from "next/link";
 import { useState } from "react";
 import type { Data } from "../learning-workflows";
+import { EmailAuth } from "../email-auth";
 import {
   ArticleCard,
   Badge,
@@ -41,11 +42,13 @@ export function AuthView({
   pending,
   social,
   next,
+  authError,
 }: {
   signup: boolean;
   pending: boolean;
   social: (provider: "google" | "kakao") => Promise<void>;
   next: string;
+  authError?: string | null;
 }) {
   return (
     <div className="form-page">
@@ -63,6 +66,7 @@ export function AuthView({
             ? "클래스와 자료를 한 계정에서 관리하세요."
             : "로그인하고 내 일의 다음 단계를 이어가세요."}
         </p>
+        {authError && ['auth_callback', 'email_confirmation'].includes(authError) && <p className="notice mt16" role="alert">인증 링크가 만료되었거나 인증을 완료하지 못했습니다. 이메일 링크는 요청한 브라우저에서 다시 열거나, 아래에서 로그인·인증 메일 재발송을 진행해 주세요.</p>}
         <div className="social-stack">
           <button
             className="btn kakao full"
@@ -80,8 +84,9 @@ export function AuthView({
             <span className="social-mark">G</span>Google로 계속하기
           </button>
         </div>
+        <EmailAuth key={signup ? 'signup' : 'login'} signup={signup} next={next} disabled={pending} />
         <p className="meta">
-          처음 방문하셨다면 소셜 계정으로 가입한 뒤 필수 약관을 확인합니다.
+          처음 방문하셨다면 가입 후 필수 약관을 확인합니다.
         </p>
         <div className="form-bottom">
           <Link
@@ -102,11 +107,11 @@ export function AuthView({
   );
 }
 
-import type { LandingConfig } from "@/lib/landing";
+import { kakaoUrl, type LandingConfig } from "@/lib/landing";
 import { CampaignFreeClass } from "../landing/free-class";
 
 export function ProductDetail({ course, data }: { course: Row; data: Data }) {
-  const config = (data.landing_configs || []).find(row => row.id === course.id && row.enabled === true && row.kakao_url);
+  const config = num(course, 'list_price') === 0 ? (data.landing_configs || []).find(row => row.id === course.id && kakaoUrl(row.kakao_url)) : undefined;
   if (config) {
     const frozen = object(config, "course_snapshot");
     return <CampaignFreeClass course={{ ...course, ...frozen } as Row} config={config as unknown as LandingConfig} />;
@@ -144,25 +149,26 @@ function StandardProductDetail({
   const meta = object(c, "metadata"),
     detailImage = safeUrl(meta.detailImageUrl || meta.detail_image_url);
   const price = available ? num(available, "price") : num(c, "list_price");
+  const unavailableFree = free && !enrolled;
   const href = enrolled
     ? digital
       ? "/my/resources"
       : "/learn/" + enrolled.id
-    : available
+    : unavailableFree ? '/classes' : available
       ? "/" + (price === 0 ? "apply" : "checkout") + "?cohort=" + available.id
       : "/classes";
   const cta = enrolled
     ? digital
       ? "내 자료실로 이동"
       : "학습 이어가기"
-    : available
+    : unavailableFree ? '참여 링크 준비 중' : available
       ? free
         ? "무료로 신청하기"
         : digital
           ? "구매하기"
           : "수강 신청하기"
       : "다음 모집 준비 중";
-  const button = (
+  const button = unavailableFree ? <button className="btn primary full large" disabled>참여 링크 준비 중</button> : (
     <Link
       href={href}
       aria-disabled={!enrolled && !available}
@@ -409,7 +415,7 @@ function StandardProductDetail({
               {t(available, "name") || t(c, "schedule_label")}
             </p>
           </div>
-          <Link
+          {unavailableFree ? <button className="btn primary large" disabled>참여 링크 준비 중</button> : <Link
             href={href}
             aria-disabled={!enrolled && !available}
             className={
@@ -418,7 +424,7 @@ function StandardProductDetail({
           >
             {cta}
             <ArrowRight />
-          </Link>
+          </Link>}
         </div>
       </aside>
     </>

@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Plus, Trash2, Upload } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { imagePreviewUrl } from '@/lib/qa-rules';
 
 async function validImageHeader(file: File) {
     const bytes = new Uint8Array(await file.slice(0, 12).arrayBuffer());
@@ -15,9 +16,11 @@ export function UploadField({ name, value, image, disabled, onChange, optimize =
     const [current, setCurrent] = useState(value);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState('');
+    const [brokenPreview, setBrokenPreview] = useState('');
+    const preview = image ? imagePreviewUrl(current, process.env.NEXT_PUBLIC_SUPABASE_URL || '') : '';
     return (
         <span className="upload-field">
-            <input name={name} type="text" value={current} onChange={(e) => { setCurrent(e.target.value); onChange?.(e.target.value); }} placeholder={image ? '이미지 주소 또는 파일 선택' : '등록된 자료 경로 또는 파일 선택'} disabled={disabled || pending} />
+            <input name={name} aria-label={image ? '이미지 주소' : '자료 경로'} type="text" value={current} onChange={(e) => { setCurrent(e.target.value); setError(''); setBrokenPreview(''); onChange?.(e.target.value); }} placeholder={image ? '이미지 주소 또는 파일 선택' : '등록된 자료 경로 또는 파일 선택'} disabled={disabled || pending} />
             <span className="upload-control">
                 <Upload size={16} />
                 <span>{pending ? '올리는 중…' : '파일 선택'}</span>
@@ -62,6 +65,7 @@ export function UploadField({ name, value, image, disabled, onChange, optimize =
                             });
                             if (uploaded.error) throw new Error('파일 전송에 실패했습니다. 다시 시도해 주세요.');
                             setCurrent(result.value);
+                            setBrokenPreview('');
                             onChange?.(result.value);
                         } catch (cause) {
                             setError(cause instanceof Error ? cause.message : '업로드하지 못했습니다.');
@@ -75,8 +79,11 @@ export function UploadField({ name, value, image, disabled, onChange, optimize =
                 최대 {image ? 10 : 20}MB
                 {image ? ' · PNG, JPG, WEBP' : ' · PDF, ZIP, TXT, CSV, HWP, Office 문서'}
             </small>
-            {pending && <input required aria-label="파일 업로드 완료 대기" value="" readOnly className="upload-pending-guard" tabIndex={-1} />}
+            {(pending || error) && <input required aria-label="파일 업로드 완료 대기" value="" readOnly className="upload-pending-guard" tabIndex={-1} />}
             {error && <span role="alert">{error}</span>}
+            {error && <button type="button" className="btn" disabled={disabled || pending} onClick={() => setError('')}>업로드 취소 · 기존 값 유지</button>}
+            {preview && brokenPreview !== preview && <img className="upload-preview" src={preview} alt="등록할 이미지 미리보기" onError={() => setBrokenPreview(preview)} />}
+            {preview && brokenPreview === preview && <small role="status">이미지를 불러오지 못했습니다. 주소와 공개 여부를 확인해 주세요.</small>}
         </span>
     );
 }

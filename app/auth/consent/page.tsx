@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { POLICY_VERSION } from "@/lib/legal-policies";
@@ -16,14 +16,18 @@ export default function SocialConsentPage() {
   const [marketing, setMarketing] = useState(false);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
+  const busy = useRef(false);
 
   const complete = async () => {
+    if (busy.current) return;
     if (!terms || !privacy) {
       setMessage("필수 약관에 모두 동의해 주세요.");
       return;
     }
     setPending(true);
+    busy.current = true;
     setMessage("");
+    try {
     const supabase = createClient();
     const { error } = await supabase.auth.updateUser({
       data: {
@@ -56,13 +60,24 @@ export default function SocialConsentPage() {
       safeNext(new URLSearchParams(window.location.search).get("next")),
     );
     router.refresh();
+    } catch {
+      setMessage("동의를 저장하지 못했습니다. 연결 상태를 확인하고 다시 시도해 주세요.");
+    } finally {
+      busy.current = false;
+      setPending(false);
+    }
   };
 
   const cancel = async () => {
+    if (busy.current) return;
+    busy.current = true;
     setPending(true);
+    try {
     await createClient().auth.signOut();
     router.replace("/login");
     router.refresh();
+    } catch { setMessage("로그아웃하지 못했습니다. 다시 시도해 주세요."); }
+    finally { busy.current = false; setPending(false); }
   };
 
   return (
@@ -76,7 +91,7 @@ export default function SocialConsentPage() {
               </Link>
               <h1>서비스 이용 동의</h1>
               <p className="muted mt16">
-                필수 약관에 동의하면 소셜 계정 가입이 완료됩니다.
+                필수 약관에 동의하면 회원가입이 완료됩니다.
               </p>
             </div>
             <div className="stack mt32">
