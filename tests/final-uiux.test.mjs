@@ -135,6 +135,15 @@ test('catalogues and separate editors render without dropping existing fields', 
     const section = platform.sections.find(row => row.key === key);
     assert.ok(html(AdminCatalog, { section, data, selection: [], setSelection() {}, edit() {}, archive() {}, pending: false, loading: false, pagination: null, setPage() {}, exportCsv() {} }).length > 100, key);
   }
+  const props = { data, selection: [], setSelection() {}, edit() {}, archive() {}, pending: false, loading: false, pagination: null, setPage() {}, exportCsv() {} };
+  const products = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'products') });
+  assert.match(products, /전체 상품/); assert.match(products, /연결 기수/); assert.match(products, /<th>자료<\/th>/);
+  const learning = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'learning') });
+  assert.match(learning, /learning-layout/); assert.match(learning, /학습 구성/); assert.match(learning, /lesson-list-item/);
+  const missions = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'missions') });
+  assert.match(missions, /mission-week-pills/); assert.match(missions, /일차별 미션/); assert.match(missions, /mission-row/);
+  const customers = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'customers') });
+  assert.match(customers, /마케팅 수신 동의/); assert.match(customers, /수강 중인 클래스/); assert.match(customers, /전체 클래스/);
   const { ProductEditor, LearningEditor } = load('app/ui/final/admin-editors.tsx');
   const markup = html(ProductEditor, { data, row: course, pending: false, send, back() {} });
   assert.match(markup, /editor-savebar/);
