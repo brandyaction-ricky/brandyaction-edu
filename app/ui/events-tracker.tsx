@@ -1,10 +1,11 @@
 'use client';
+import {syncTestMode} from '@/lib/landing-browser';
 import {useEffect} from 'react';
 import {usePathname} from 'next/navigation';
 export function EventsTracker({enabled}:{enabled:boolean}) {
  const path=usePathname();
  useEffect(()=>{
-  if(!enabled||!/^\/(?:$|classes(?:\/[a-zA-Z0-9_-]+)?$|articles(?:\/[a-zA-Z0-9_-]+)?$|stories$|checkout$|apply$)/.test(path))return;
+  if(syncTestMode()||!enabled||!/^\/(?:$|classes(?:\/[a-zA-Z0-9_-]+)?$|articles(?:\/[a-zA-Z0-9_-]+)?$|stories$|checkout$|apply$)/.test(path))return;
   let session='';let metadata:Record<string,string>={};
   try {session=sessionStorage.getItem('edu-visit')||crypto.randomUUID();sessionStorage.setItem('edu-visit',session);const params=new URLSearchParams(location.search);for(const key of ['source','medium','campaign']){const value=params.get('utm_'+key);if(value)metadata[key]=value.slice(0,100);}if(Object.keys(metadata).length)sessionStorage.setItem('edu-utm',JSON.stringify(metadata));else metadata=JSON.parse(sessionStorage.getItem('edu-utm')||'{}');}catch{return;}
   const send=(event:string,target?:string)=>{void fetch('/api/platform/events',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session,path,event,target,metadata}),keepalive:true}).catch(()=>{});};

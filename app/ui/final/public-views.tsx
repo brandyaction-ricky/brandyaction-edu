@@ -102,7 +102,19 @@ export function AuthView({
   );
 }
 
-export function ProductDetail({
+import type { LandingConfig } from "@/lib/landing";
+import { CampaignFreeClass } from "../landing/free-class";
+
+export function ProductDetail({ course, data }: { course: Row; data: Data }) {
+  const config = (data.landing_configs || []).find(row => row.id === course.id && row.enabled === true && row.kakao_url);
+  if (config) {
+    const frozen = object(config, "course_snapshot");
+    return <CampaignFreeClass course={{ ...course, ...frozen } as Row} config={config as unknown as LandingConfig} />;
+  }
+  return <StandardProductDetail course={course} data={data} />;
+}
+
+function StandardProductDetail({
   course: c,
   data,
 }: {

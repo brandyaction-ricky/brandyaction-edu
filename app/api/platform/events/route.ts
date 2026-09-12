@@ -1,8 +1,10 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { isTestRequest } from '@/lib/landing';
 import { uuid } from '@/lib/edu-workflows';
 const permitted = /^\/(?:$|classes(?:\/[a-zA-Z0-9_-]+)?$|articles(?:\/[a-zA-Z0-9_-]+)?$|stories$|checkout$|apply$)/;
 export async function POST(request:Request) {
   if(request.headers.get('origin')!==new URL(request.url).origin)return new Response(null,{status:403});
+  if(isTestRequest(request.headers.get('cookie')))return new Response(null,{status:204});
   try {
     const raw=await request.text();if(raw.length>4096)return new Response(null,{status:413});
     const body=JSON.parse(raw);
