@@ -7,7 +7,7 @@ const source = fs.readFileSync(new URL('../lib/platform-rules.ts', import.meta.u
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const exports = {};
 new Function('exports', compiled)(exports);
-const { hasLearningAccess, isRecruiting, matchingOrder, recordId } = exports;
+const { homepageCourses, hasLearningAccess, isRecruiting, matchingOrder, recordId } = exports;
 const now = Date.parse('2026-09-11T12:00:00Z');
 
 test('learning access closes at expiry, before release, and after revocation', () => {
@@ -27,6 +27,13 @@ test('scheduled recruitment opens and closes at the stored boundaries', () => {
   assert.equal(isRecruiting(cohort, now + 86400000), false);
   assert.equal(isRecruiting({ ...cohort, status: 'closed' }, now), false);
   assert.equal(isRecruiting({ ...cohort, operation_end_at: '2026-09-11T00:00:00Z' }, now), false);
+});
+
+test('homepage shows published courses even when no cohort has been created', () => {
+  const courses = [{ id: 'new' }, { id: 'recruiting' }];
+  const cohorts = [{ course_id: 'recruiting', status: 'recruiting' }];
+  assert.deepEqual(homepageCourses(courses, cohorts, now).map(course => course.id), ['recruiting', 'new']);
+  assert.deepEqual(homepageCourses([{ id: 'new' }], [], now).map(course => course.id), ['new']);
 });
 
 test('a previous paid order does not make another checkout successful', () => {

@@ -15,7 +15,7 @@ import {
   type Section,
   type User,
 } from "@/lib/platform";
-import { isRecruiting, localDateTime, recordId } from "@/lib/platform-rules";
+import { homepageCourses, isRecruiting, localDateTime, recordId } from "@/lib/platform-rules";
 import { archiveValues } from "@/lib/qa-rules";
 import { createClient } from "@/lib/supabase/client";
 import { getSupabasePublicConfig } from "@/lib/supabase/config";
@@ -232,6 +232,7 @@ export function Platform({
   const recruitingCourses = courses.filter((c) =>
     rows("cohorts").some((g) => g.course_id === c.id && isRecruiting(g)),
   );
+  const availableCourses = homepageCourses(courses, rows("cohorts"));
   const free =
     recruitingCourses.find((c) => num(c, "list_price") === 0) ||
     courses.find((c) => num(c, "list_price") === 0);
@@ -525,11 +526,11 @@ export function Platform({
               </Link>
             </div>
             <div className="grid3 course-grid">
-              {recruitingCourses.slice(0, 3).map((c) => (
+              {availableCourses.slice(0, 3).map((c) => (
                 <CourseCard key={c.id} course={c} />
               ))}
             </div>
-            {!loading && !recruitingCourses.length && (
+            {!loading && !availableCourses.length && (
               <Empty title="새로운 클래스를 준비하고 있습니다." />
             )}
           </section>

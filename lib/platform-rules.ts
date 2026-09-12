@@ -13,6 +13,17 @@ export function isRecruiting(cohort: Row, now = Date.now()) {
     && (!cohort.operation_end_at || Date.parse(String(cohort.operation_end_at)) > now);
 }
 
+export function homepageCourses(courses: Row[], cohorts: Row[], now = Date.now()) {
+  const recruitingIds = new Set(
+    cohorts.filter(cohort => isRecruiting(cohort, now)).map(cohort => cohort.course_id),
+  );
+
+  return [
+    ...courses.filter(course => recruitingIds.has(course.id)),
+    ...courses.filter(course => !recruitingIds.has(course.id)),
+  ];
+}
+
 export function recordId(row: Row) {
   return row.id || String(row.key || row.lesson_id || '');
 }
