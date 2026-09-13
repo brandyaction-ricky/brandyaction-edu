@@ -13,6 +13,33 @@ function validProductImage(value: unknown) {
 
 export const productMetadataFields = ['thumbnail_url', 'detail_image_url', 'detail_images', 'regular_price', 'seo_title', 'seo_description', 'detail_html'] as const;
 export type ProductDetailImage = { path: string; name: string; alt: string };
+export const productResourceScopes = ['public', 'authenticated', 'enrolled', 'purchaser'] as const;
+export type ProductResourceScope = (typeof productResourceScopes)[number];
+export type ProductResource = { id: string; name: string; path: string; scope: ProductResourceScope };
+
+const validProductResourcePath = (value: unknown) => typeof value === 'string' && /^edu\/[a-z0-9-]+\.[a-z0-9]{1,12}$/i.test(value) && !value.includes('..');
+export function productResources(metadata: Record<string, unknown>): ProductResource[] {
+  if (!Array.isArray(metadata.product_resources)) return [];
+  return metadata.product_resources.flatMap((entry) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return [];
+    const item = entry as Record<string, unknown>;
+    const id = String(item.id || ''), name = String(item.name || '').trim().slice(0, 240);
+    const scope = String(item.scope || 'public') as ProductResourceScope;
+    const path = validProductResourcePath(item.path) ? String(item.path) : '';
+    if (!/^[0-9a-f-]{36}$/i.test(id) || !name || !productResourceScopes.includes(scope)) return [];
+    return [{ id, name, path, scope }];
+  }).slice(0, 30);
+}
+
+export function mergeProductResources(previous: unknown, next: ProductResource[]) {
+  const metadata: Record<string, unknown> = previous && typeof previous === 'object' && !Array.isArray(previous) ? { ...previous } : {};
+  if (next.length > 30) throw new Error('제공 자료는 최대 30개까지 등록할 수 있습니다.');
+  metadata.product_resources = next.map((item) => {
+    if (!/^[0-9a-f-]{36}$/i.test(item.id) || !item.name.trim() || item.name.length > 240 || !validProductResourcePath(item.path) || !productResourceScopes.includes(item.scope)) throw new Error('제공 자료 정보를 확인해 주세요.');
+    return { id: item.id, name: item.name.trim(), path: item.path, scope: item.scope };
+  });
+  return metadata;
+}
 
 export function productDetailImages(metadata: Record<string, unknown>): ProductDetailImage[] {
   const stored = Array.isArray(metadata.detail_images) ? metadata.detail_images : [];
@@ -27,6 +54,7 @@ export function productDetailImages(metadata: Record<string, unknown>): ProductD
   return validProductImage(legacy) ? [{ path: legacy, name: '기존 상세 이미지', alt: '' }] : [];
 }
 export type ProductHtmlNode = string | { tag: string; attrs: Record<string, string>; children: ProductHtmlNode[] };
+const MAX_PRODUCT_HTML_LENGTH = 3_000_000;
 const allowed = new Set('h1 h2 h3 h4 h5 h6 p div section article span strong b em i u s small blockquote pre code ul ol li dl dt dd figure figcaption a img br hr table thead tbody tfoot tr th td'.split(' '));
 const discarded = new Set('head script style iframe object embed svg math template form button input textarea select option video audio canvas noscript'.split(' '));
 const voidTags = new Set(['img', 'br', 'hr']);
@@ -44,8 +72,8 @@ export function parseProductHtml(value: string): ProductHtmlNode[] {
   const stack: { tag: string; children: ProductHtmlNode[] }[] = [{ tag: '', children: roots }];
   const blocked: string[] = [];
   // Quoted attributes can contain >. No raw token is ever forwarded to the browser.
-  const tokens = value.slice(0, 200000).match(/<!--[\s\S]*?(?:-->|$)|<![^>]*>|<\/?[a-z][^>"']*(?:(?:"[^"]*"|'[^']*')[^>"']*)*>|[^<]+|</gi) || [];
-  for (const token of tokens.slice(0, 10000)) {
+  const tokens = value.slice(0, MAX_PRODUCT_HTML_LENGTH).match(/<!--[\s\S]*?(?:-->|$)|<![^>]*>|<\/?[a-z][^>"']*(?:(?:"[^"]*"|'[^']*')[^>"']*)*>|[^<]+|</gi) || [];
+  for (const token of tokens.slice(0, 100000)) {
     if (token.startsWith('<!')) continue;
     const tagMatch = /^<(\/)?([a-z][\w:-]*)\b([\s\S]*?)>$/i.exec(token);
     if (!tagMatch) { if (!blocked.length) stack.at(-1)!.children.push(decode(token)); continue; }
@@ -85,7 +113,7 @@ export function parseProductHtml(value: string): ProductHtmlNode[] {
 }
 
 export function sanitizeProductHtml(value: string) {
-  if (value.length > 200000) throw new Error('상세페이지 HTML은 200,000자 이하로 입력해 주세요.');
+  if (value.length > MAX_PRODUCT_HTML_LENGTH) throw new Error('HTML 파일이 너무 큽니다. 이미지 파일은 상세 이미지 영역에 별도로 등록해 주세요.');
   const serialize = (nodes: ProductHtmlNode[]): string => nodes.map(node => {
     if (typeof node === 'string') return escape(node);
     const attrs = Object.entries(node.attrs).map(([key, content]) => ` ${key}="${escape(content)}"`).join('');

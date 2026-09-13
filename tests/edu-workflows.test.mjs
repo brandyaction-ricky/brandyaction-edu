@@ -90,6 +90,8 @@ test('private resource signing only follows a published lesson and authorized co
  return load('app/api/platform/resource/route.ts',{
  '@/lib/server-auth':{getAuthenticatedUser:async()=>user},
  '@/lib/supabase/server':{createClient:async()=>({from:()=>query})},
+ '@/lib/platform-rules':load('lib/platform-rules.ts'),
+ '@/lib/product-metadata':load('lib/product-metadata.ts',{'./platform':load('lib/platform.ts')}),
  '@/lib/supabase/admin':{createAdminClient:()=>({storage:{from:()=>({createSignedUrl:async(path,ttl)=>{assert.equal(path,'edu/private.pdf');assert.equal(ttl,60);signed++;return {data:{signedUrl:'https://signed.example/resource'}};}})}})},
  }).GET;}
  const req=new Request('https://example.com/api/platform/resource?lesson='+uid);

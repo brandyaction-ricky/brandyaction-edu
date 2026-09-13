@@ -25,7 +25,7 @@ import { useState } from "react";
 import type { Data } from "../learning-workflows";
 import { EmailAuth } from "../email-auth";
 import { ProductDetailHtml } from './product-detail-html';
-import { productDetailImages } from '@/lib/product-metadata';
+import { productDetailImages, productResources } from '@/lib/product-metadata';
 import {
   ArticleCard,
   Badge,
@@ -35,6 +35,7 @@ import {
   Empty,
   Heading,
   ResourceRow,
+  ProductResourceRow,
   Video,
   courseType,
 } from "./primitives";
@@ -116,7 +117,9 @@ export function ProductDetail({ course, data }: { course: Row; data: Data }) {
   const config = num(course, 'list_price') === 0 ? (data.landing_configs || []).find(row => row.id === course.id && kakaoUrl(row.kakao_url)) : undefined;
   if (config) {
     const frozen = object(config, "course_snapshot");
-    return <CampaignFreeClass course={{ ...course, ...frozen } as Row} config={config as unknown as LandingConfig} />;
+    const currentMetadata = object(course, "metadata");
+    const campaignCourse = { ...course, ...frozen, metadata: { ...object(frozen as Row, "metadata"), ...currentMetadata } } as Row;
+    return <CampaignFreeClass course={campaignCourse} config={config as unknown as LandingConfig} resources={productResources(currentMetadata)} />;
   }
   return <StandardProductDetail course={course} data={data} />;
 }
@@ -149,6 +152,7 @@ function StandardProductDetail({
     digital = type === "디지털 상품",
     free = type === "무료 클래스";
   const meta = object(c, "metadata"),
+    directResources = productResources(meta),
     detailImages = productDetailImages(meta).map(image => ({ ...image, path: safeUrl(image.path) })).filter(image => image.path),
     detailImage = detailImages[0]?.path || '';
   const detailHtml = typeof meta.detail_html === 'string' ? meta.detail_html : '';
@@ -188,10 +192,11 @@ function StandardProductDetail({
     <section className="free-downloads">
       <h2>{free ? "클래스와 함께 사용할 자료" : "구성 자료"}</h2>
       <p>내 업무에 배운 내용을 적용할 때 활용하세요.</p>
-      {resources.length ? (
-        resources.map((r) => (
+      {directResources.length || resources.length ? (<>
+        {directResources.map(resource => <ProductResourceRow key={resource.id} resource={resource} courseId={c.id} />)}
+        {resources.map((r) => (
           <ResourceRow key={t(r, "lesson_id")} content={r} />
-        ))
+        ))}</>
       ) : (
         <p className="notice">
           {enrolled
