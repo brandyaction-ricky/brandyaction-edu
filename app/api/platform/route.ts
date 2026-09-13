@@ -90,6 +90,12 @@ export async function GET(request: Request) {
                 if (serverPaged) pagination = { page, pageSize, total: r.count || 0 };
             }),
         ]);
+        if (adminMode && sectionKey === 'products' && data.courses?.length) {
+            // Preserve existing landing CTA settings until the product explicitly overrides them.
+            const configs = await db.from('landing_configs').select('id,kakao_url,cta_label,pixel_enabled,pixel_id').in('id', data.courses.map(course => course.id));
+            if (configs.error) throw configs.error;
+            data.landing_configs = (configs.data || []) as Row[];
+        }
         if (adminMode && sectionKey === 'orders') {
             const orderIds = (data.orders || []).map((row) => row.id).filter(Boolean);
             data.order_items = [];
@@ -338,6 +344,14 @@ export async function POST(request: Request) {
             if (!section || section.readOnly) fail('수정할 수 없는 항목입니다.');
             const input = (body.values || {}) as Record<string, unknown>;
             const values: Record<string, unknown> = {};
+            if (section.table === 'courses' && !body.id) {
+                // Removed publishing controls are generated only for new products.
+                // Retrying the same creation intent must keep the same RPC fingerprint.
+                if (!uid(body.requestId)) fail('새 등록 요청을 다시 열고 저장해 주세요.');
+                const suffix = body.requestId;
+                if (!input.slug) input.slug = 'product-' + suffix;
+                if (!input.course_code) input.course_code = 'PRD-' + suffix;
+            }
             if (body.id && archiveValues[section.key]) values.archived_at = null;
             for (const field of section.fields) {
                 if (field.key in input) {

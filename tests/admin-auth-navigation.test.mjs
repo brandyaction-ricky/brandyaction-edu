@@ -72,7 +72,7 @@ function apiHarness(user, failure = null) {
     '@/lib/platform': platform,
     '@/lib/platform-rules': load('lib/platform-rules.ts'),
     '@/lib/qa-rules': load('lib/qa-rules.ts'),
-    '@/lib/product-metadata': load('lib/product-metadata.ts', { './platform': platform }),
+    '@/lib/product-metadata': load('lib/product-metadata.ts', { './platform': platform, './product-conversion': load('lib/product-conversion.ts'), './product-html-document': load('lib/product-html-document.ts') }),
     '@/lib/edu-settings': { getEduSettings: async () => ({ operations: {} }) },
     '@/lib/mission-quiz': {}, '@/lib/legal-policies': { POLICY_VERSION: 'test' },
     '@/lib/operator-permissions': operators,

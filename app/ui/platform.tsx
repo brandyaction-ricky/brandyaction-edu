@@ -231,14 +231,14 @@ export function Platform({
     }
     if (
       !window.confirm(
-        `${section.title} ${ids.length}개를 보관·숨김 처리할까요? 연결된 주문과 학습 기록, 파일은 삭제하지 않습니다. 기수 보관은 모집을 취소합니다.`,
+        section.key === "products" ? `선택한 상품 ${ids.length}개를 삭제할까요? 판매 목록에서 숨겨지며 주문·수강 기록과 파일은 유지됩니다. 삭제 항목 포함에서 복구할 수 있습니다.` : `${section.title} ${ids.length}개를 보관·숨김 처리할까요? 연결된 주문과 학습 기록, 파일은 삭제하지 않습니다. 기수 보관은 모집을 취소합니다.`,
       )
     )
       return;
     try {
       await send(
         { action: "archive", section: section.key, ids },
-        "보관·숨김 처리했습니다.",
+        section.key === "products" ? "상품을 삭제했습니다. 주문·수강 기록은 유지됩니다." : "보관·숨김 처리했습니다.",
       );
       setSelection([]);
       setEditor(null);

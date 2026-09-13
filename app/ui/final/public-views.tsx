@@ -25,6 +25,9 @@ import { useState } from "react";
 import type { Data } from "../learning-workflows";
 import { EmailAuth } from "../email-auth";
 import { ProductDetailHtml } from './product-detail-html';
+import { productDocument } from '@/lib/product-html-document';
+import { productConversion } from '@/lib/product-conversion';
+import { ProductPixel, ProductCtaLink } from './product-conversion';
 import { productDetailImages, productResources } from '@/lib/product-metadata';
 import {
   ArticleCard,
@@ -115,7 +118,7 @@ import { CampaignFreeClass } from "../landing/free-class";
 
 export function ProductDetail({ course, data }: { course: Row; data: Data }) {
   const config = num(course, 'list_price') === 0 ? (data.landing_configs || []).find(row => row.id === course.id && kakaoUrl(row.kakao_url)) : undefined;
-  if (config) {
+  if (config && productConversion(object(course, 'metadata'), config).url) {
     const frozen = object(config, "course_snapshot");
     const currentMetadata = object(course, "metadata");
     const campaignCourse = { ...course, ...frozen, metadata: { ...object(frozen as Row, "metadata"), ...currentMetadata } } as Row;
@@ -156,6 +159,9 @@ function StandardProductDetail({
     detailImages = productDetailImages(meta).map(image => ({ ...image, path: safeUrl(image.path) })).filter(image => image.path),
     detailImage = detailImages[0]?.path || '';
   const detailHtml = typeof meta.detail_html === 'string' ? meta.detail_html : '';
+  const documentSource = productDocument(meta);
+  const conversion = productConversion(meta);
+  const customCta = !enrolled && !!conversion.url;
   const price = available ? num(available, "price") : num(c, "list_price");
   const unavailableFree = free && !enrolled;
   const href = enrolled
@@ -176,7 +182,7 @@ function StandardProductDetail({
           ? "구매하기"
           : "수강 신청하기"
       : "다음 모집 준비 중";
-  const button = unavailableFree ? <button className="btn primary full large" disabled>참여 링크 준비 중</button> : (
+  const button = customCta ? <ProductCtaLink conversion={conversion} courseId={c.id} position="sidebar_cta" className="btn primary full large" /> : unavailableFree ? <button className="btn primary full large" disabled>참여 링크 준비 중</button> : (
     <Link
       href={href}
       aria-disabled={!enrolled && !available}
@@ -208,12 +214,13 @@ function StandardProductDetail({
   );
   return (
     <>
+      <ProductPixel courseId={c.id} pixelId={conversion.pixelId} />
       {free ? (
         <>
           <h1 className="sr-only">{t(c, "title")} · 무료 클래스</h1>
           <div className="free-body">
             <div className="free-sheet">
-              {detailImage ? (
+              {documentSource || detailHtml ? <ProductDetailHtml html={detailHtml} documentSource={documentSource} /> : detailImage ? (
                 <div className="detail-image-stack">{detailImages.map((image, index) => <img
                   className="detail-image"
                   src={image.path}
@@ -258,7 +265,7 @@ function StandardProductDetail({
                     ? "반복 업무를 줄이는 작은 도구."
                     : "이 클래스에서 만들 변화"}
                 </h2>
-                {detailImage ? (
+                {documentSource || detailHtml ? <ProductDetailHtml html={detailHtml} documentSource={documentSource} /> : detailImage ? (
                   <div className="detail-image-stack">{detailImages.map((image, index) => <img
                     className="detail-image"
                     src={image.path}
@@ -427,7 +434,7 @@ function StandardProductDetail({
               {t(available, "name") || t(c, "schedule_label")}
             </p>
           </div>
-          {unavailableFree ? <button className="btn primary large" disabled>참여 링크 준비 중</button> : <Link
+          {customCta ? <ProductCtaLink conversion={conversion} courseId={c.id} position="sticky_cta" /> : unavailableFree ? <button className="btn primary large" disabled>참여 링크 준비 중</button> : <Link
             href={href}
             aria-disabled={!enrolled && !available}
             className={

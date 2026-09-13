@@ -908,6 +908,7 @@ export function AdminCatalog({
                         </td>
                       ))}
                       <td data-label="관리">
+                        {s.key === "products" && !r.archived_at && <button className="btn small danger" aria-label={t(r, "title") + " 삭제"} disabled={pending} onClick={() => archive(s, [recordId(r)])}>삭제</button>}
                         <button
                           className="btn small"
                           onClick={() => edit(s, r)}
@@ -993,7 +994,7 @@ export function AdminCatalog({
                   setSelection([]);
                 }}
               />
-              보관 항목 포함
+              {s.key === "products" ? "삭제 항목 포함" : "보관 항목 포함"}
             </label>
             <span className="spacer" />
             <button
@@ -1008,7 +1009,7 @@ export function AdminCatalog({
                 disabled={pending || !selection.length || selection.length > 50}
                 onClick={() => archive(s, selection)}
               >
-                선택 {selection.length}개 보관·숨김
+                선택 {selection.length}개 {s.key === "products" ? "삭제" : "보관·숨김"}
               </button>
             )}
           </div>
