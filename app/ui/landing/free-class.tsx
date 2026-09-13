@@ -33,6 +33,6 @@ export function CampaignFreeClass({ course, config, resources = [] }: { course: 
       </section>)}
       <section className="campaign-section" data-section="materials"><h2>{resources.length ? '무료 제공 자료' : '무료 라이브 참여 안내'}</h2><p>{resources.length ? '클래스와 함께 활용할 자료를 내려받아 사용하세요.' : '참여 링크와 강의 관련 안내는 카카오 오픈채팅방에서 확인해 주세요.'}</p>{resources.map(resource => <ProductResourceRow key={resource.id} resource={resource} courseId={course.id} />)}</section>
     </div></div>
-    <aside className="bottom-cta campaign-sticky"><div className="wrap"><div><strong>무료 라이브</strong><p className="meta">{t(course,'title')}</p></div>{cta('sticky_cta')}</div></aside>
+    <aside className="bottom-cta campaign-sticky"><div className="wrap"><div><strong>{conversion.priceLabel}</strong><p className="meta">{t(course,'title')}</p></div>{cta('sticky_cta')}</div></aside>
   </LandingTracker>;
 }

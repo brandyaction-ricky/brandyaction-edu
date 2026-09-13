@@ -102,19 +102,21 @@ test('full HTML source preserves CSS separately from the safe legacy fallback', 
 test('CTA settings round-trip without clearing existing codes, metadata or resources', () => {
   const { productConversion, conversionUrl, ctaTextColor } = load('lib/product-conversion.ts');
   const previous = { seo_title: '검색 제목', product_resources: ['preserved'], campaign: { enabled: true } };
-  const fields = { cta_label: '무료 웨비나 참여하기', cta_url: 'https://open.kakao.com/o/test', cta_color: '#E22400', meta_pixel_id: '123456789012345' };
+  const fields = { cta_price_label: '지금 무료', cta_label: '무료 웨비나 참여하기', cta_url: 'https://open.kakao.com/o/test', cta_color: '#E22400', meta_pixel_id: '123456789012345' };
   const merged = mergeProductMetadata(previous, fields);
   assert.deepEqual(merged, { ...previous, ...fields });
-  assert.deepEqual(productConversion(merged), { label: fields.cta_label, url: fields.cta_url, color: fields.cta_color, pixelId: fields.meta_pixel_id });
+  assert.deepEqual(productConversion(merged), { priceLabel: fields.cta_price_label, label: fields.cta_label, url: fields.cta_url, color: fields.cta_color, pixelId: fields.meta_pixel_id });
   const legacy = { kakao_url: 'https://open.kakao.com/o/legacy', cta_label: '기존 참여', pixel_enabled: true, pixel_id: '12345' };
   assert.equal(productConversion({}, legacy).url, legacy.kakao_url);
   assert.equal(productConversion({ cta_url: '', meta_pixel_id: '' }, legacy).url, '');
   assert.equal(productConversion({ meta_pixel_id: '' }, legacy).pixelId, '');
+  assert.equal(productConversion({}, legacy).priceLabel, '무료');
   for (const url of ['javascript:alert(1)', '//evil.test', '/\\evil.test', 'https://user:secret@example.test', 'data:text/html,x']) {
     assert.equal(conversionUrl(url), '');
     assert.throws(() => mergeProductMetadata({}, { cta_url: url }), /주소/);
   }
   assert.throws(() => mergeProductMetadata({}, { cta_color: '#FFF' }), /HEX/);
+  assert.throws(() => mergeProductMetadata({}, { cta_price_label: '가'.repeat(41) }), /40자/);
   assert.throws(() => mergeProductMetadata({}, { meta_pixel_id: '<script>' }), /Pixel/);
   assert.equal(ctaTextColor('#FFFFFF'), '#111111');
   assert.equal(ctaTextColor('#000000'), '#ffffff');
