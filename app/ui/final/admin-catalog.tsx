@@ -379,38 +379,36 @@ export function AdminCatalog({
     banners: [
       { label: "순서", value: (r) => num(r, "display_order") },
       {
-        label: "메인 히어로",
+        label: "배너 텍스트·이미지",
         value: (r) => (
           <div className="catalog-name">
             <div className="asset-preview">
-              {safeUrl(r.image_path) ? (
-                <img src={safeUrl(r.image_path)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              {safeUrl(r.image_url || r.image_path) ? (
+                <img src={safeUrl(r.image_url || r.image_path)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               ) : (
                 <span>{t(r, "title") || "메인 배너"}</span>
               )}
             </div>
             <div>
+              <span className="section-code">{t(r, "eyebrow") || "상단 문구 미등록"}</span>
               <button className="title-btn" onClick={() => edit(s, r)}>{t(r, "title")}</button>
-              <p>{t(r, "eyebrow")} · {t(r, "description")}</p>
+              <p>{t(r, "description") || "설명 문구 미등록"}</p>
             </div>
           </div>
         ),
       },
       {
         label: "CTA 버튼·연결",
-        value: (r) =>
-          safeUrl(r.link_url) ? (
-            <a
-              className="text-link"
-              href={safeUrl(r.link_url)}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {t(r, "link_label") || t(r, "link_url")}
-            </a>
-          ) : (
-            "연결 없음"
-          ),
+        value: (r) => (
+          <div className="banner-cta-cell">
+            <b>{t(r, "link_label") || "기본 CTA 문구"}</b>
+            {safeUrl(r.link_url) ? (
+              <a className="text-link" href={safeUrl(r.link_url)} target="_blank" rel="noreferrer">
+                {t(r, "link_url")}
+              </a>
+            ) : <small>기본 무료 클래스 연결</small>}
+          </div>
+        ),
       },
       {
         label: "노출 기간",

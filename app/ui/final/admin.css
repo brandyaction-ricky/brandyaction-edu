@@ -119,6 +119,8 @@
 .edu-admin .mission-catalog .week-head{padding-bottom:var(--space-4);border-bottom:1px solid var(--line);margin-bottom:var(--space-4)}
 .edu-admin .mission-catalog .mission-row{width:100%}
 .edu-admin .mission-catalog .title-btn{text-align:left}
+.edu-admin .banner-cta-cell{display:grid;gap:var(--space-1);min-width:180px}.edu-admin .banner-cta-cell b{font-size:var(--type-small)}.edu-admin .banner-cta-cell small{color:var(--text-secondary)}.edu-admin .catalog-name .section-code{display:block;margin-bottom:var(--space-1)}
+.edu-admin .banner-cta-cell{overflow-wrap:anywhere}
 .edu-admin .customer-detail{margin-bottom:var(--space-6)}
 .edu-admin .customer-detail .drawer-profile{display:flex;align-items:center;gap:var(--space-4);margin-bottom:var(--space-5)}
 .edu-admin .customer-detail .drawer-profile .avatar{width:52px;height:52px;font-size:var(--type-large)}
