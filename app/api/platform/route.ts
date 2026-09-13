@@ -346,7 +346,9 @@ export async function POST(request: Request) {
             const values: Record<string, unknown> = {};
             if (section.table === 'courses' && !body.id) {
                 // Removed publishing controls are generated only for new products.
-                const suffix = crypto.randomUUID();
+                // Retrying the same creation intent must keep the same RPC fingerprint.
+                if (!uid(body.requestId)) fail('새 등록 요청을 다시 열고 저장해 주세요.');
+                const suffix = body.requestId;
                 if (!input.slug) input.slug = 'product-' + suffix;
                 if (!input.course_code) input.course_code = 'PRD-' + suffix;
             }

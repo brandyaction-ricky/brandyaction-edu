@@ -139,6 +139,24 @@ test('deletion uses the audited archive transaction and never physically removes
   assert.equal(calls.length, 1);
 });
 
+test('new product identifiers are stable across retries of the same creation request', async () => {
+  const writes = [];
+  const route = load('app/api/platform/route.ts', {
+    '@/lib/supabase/admin': { createAdminClient: () => ({ async rpc(name, args) { writes.push([name, args]); return { data: { id: 'new' }, error: null }; } }) },
+    '@/lib/supabase/server': {}, '@/lib/server-auth': { getAuthenticatedUser: async () => ({ id: 'operator' }) },
+    '@/lib/operator-permissions': { permissionsFor: async () => ({ products: true }), sectionScopes: { products: 'products' } },
+    '@/lib/edu-settings': {}, '@/lib/crm-delivery': {},
+  });
+  const requestId = '11111111-1111-4111-8111-111111111111';
+  for (let i = 0; i < 2; i++) {
+    const result = await route.POST(new Request('https://edu.example/api/platform', { method: 'POST', headers: { origin: 'https://edu.example' }, body: JSON.stringify({ action: 'save', section: 'products', requestId, values: { title: '새 상품', category: 'free', status: 'draft' } }) }));
+    assert.equal(result.status, 200);
+  }
+  assert.deepEqual(writes[0], writes[1]);
+  assert.equal(writes[0][1].p_values.slug, 'product-' + requestId);
+  assert.equal(writes[0][1].p_values.course_code, 'PRD-' + requestId);
+});
+
 test('product save API persists approved editor metadata and stops if existing metadata cannot be loaded', async () => {
   const previous = { metadata: { campaign: { enabled: true }, thumbnail_url: 'existing.webp' } };
   const writes = [];
