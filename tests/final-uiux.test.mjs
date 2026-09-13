@@ -100,8 +100,10 @@ test('article hub includes the managed free-video banner and representative thum
   assert.doesNotMatch(markup, /class="tag">(?:인사이트|영상)</);
   const platformSource = read('app/ui/platform.tsx');
   assert.doesNotMatch(platformSource, /THE WAY WE LEARN|시청에서 멈추지 않는/);
-  assert.match(platformSource, /제2026-충남천안-1825호/);
-  assert.match(platformSource, /policies\/refund/);
+  assert.match(platformSource, /<SiteFooter\b/);
+  const footerSource = read('app/ui/final/site-footer.tsx');
+  assert.match(footerSource, /제2026-충남천안-1825호/);
+  assert.match(footerSource, /policies\/refund/);
 });
 test('article management renders the free-video banner editor', () => {
   const { ArticleBannerEditor } = load('app/ui/final/article-banner-editor.tsx');
