@@ -208,20 +208,21 @@ test('participant matrix uses latest attempts, required missions and enrollment 
   assert.equal(result.e2[0].status, 'empty'); assert.equal(result.e1[1].status, 'none');
 });
 
-test('campaign class keeps published content, escapes copy, and sends all CTA positions to one Kakao URL', () => {
+test('campaign class keeps published content and only the mobile sticky CTA', () => {
   const { ProductDetail } = load('app/ui/final/public-views.tsx');
   const { defaultConfig } = load('lib/landing.ts');
   const course = { ...data.courses[0], list_price: 0 };
   const cfg = { ...defaultConfig(course.id), layout_ver: 1, revision: 1, kakao_url: 'https://open.kakao.com/o/testRoom', custom_sections: true, sections: [{ id: 'proof', title: '고객 이야기', body: '<script>unsafe()</script>', image: 'https://cdn.example/proof.webp' }], course_snapshot: { title: '발행한 제목', summary: '발행 당시 소개' } };
   const markup = html(ProductDetail, { course, data: { ...data, landing_configs: [cfg] } });
-  for (const position of ['hero_cta', 'sticky_cta', 'final_cta']) assert.match(markup, new RegExp('data-landing-cta="' + position + '"'));
-  assert.equal((markup.match(/href="https:\/\/open.kakao.com\/o\/testRoom"/g) || []).length, 3);
+  assert.match(markup, /data-landing-cta="sticky_cta"/);
+  assert.doesNotMatch(markup, /data-landing-cta="(?:hero_cta|final_cta)"|data-section="(?:hero|final)"|무료 라이브에서 만나요/);
+  assert.equal((markup.match(/href="https:\/\/open.kakao.com\/o\/testRoom"/g) || []).length, 1);
   assert.match(markup, /발행한 제목/); assert.doesNotMatch(markup, /등록된 테스트 클래스/);
   assert.match(markup, /data-section="proof"/); assert.match(markup, /loading="lazy"/);
   assert.match(markup, /&lt;script&gt;/); assert.doesNotMatch(markup, /<script>|checkout/);
   assert.doesNotMatch(html(ProductDetail, { course, data: { ...data, landing_configs: [{ ...cfg, enabled: false }] } }), /data-landing-cta/);
   const untracked = html(ProductDetail, { course, data: { ...data, enrollments: [], landing_configs: [{ ...cfg, enabled: false }] } });
-  assert.equal((untracked.match(/href="https:\/\/open.kakao.com\/o\/testRoom"/g) || []).length, 3);
+  assert.equal((untracked.match(/href="https:\/\/open.kakao.com\/o\/testRoom"/g) || []).length, 1);
   assert.doesNotMatch(untracked, /href="\/(?:apply|signup|login)/);
   const missing = html(ProductDetail, { course, data: { ...data, enrollments: [], landing_configs: [{ ...cfg, kakao_url: '' }] } });
   assert.match(missing, /disabled="">참여 링크 준비 중/);

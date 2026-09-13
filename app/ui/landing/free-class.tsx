@@ -27,17 +27,11 @@ export function CampaignFreeClass({ course, config, resources = [] }: { course: 
   return <LandingTracker config={trackingConfig}>
     <ProductPixel courseId={course.id} pixelId={conversion.pixelId} />
     <div className="free-body"><div className="free-sheet">
-      <section className="campaign-hero panel-body" data-section="hero">
-        <div className="eyebrow">FREE LIVE CLASS</div><h1>{t(course,'title')}</h1><p className="lead">{t(course,'summary')}</p>
-        {t(course,'schedule_label') && <p className="meta">{t(course,'schedule_label')}</p>}
-        {cta('hero_cta')}<p className="meta mt16">카카오 오픈채팅에서 무료 라이브 참여 안내를 확인하세요.</p>
-      </section>
       <section data-section="detail">{documentSource || detailHtml ? <ProductDetailHtml html={detailHtml} documentSource={documentSource} /> : image ? <div className="detail-image-stack">{images.map((item, index) => <img className="detail-image" src={item.path} alt={item.alt || `${t(course,'title')} 상세 안내 ${index + 1}`} loading="lazy" decoding="async" key={item.path + index} />)}</div> : <div className="panel-body"><Cover course={course}/><div className="reading-copy mt24">{t(course,'description') || t(course,'summary')}</div></div>}</section>
       {config.custom_sections && config.sections.map(s=><section className="campaign-section" data-section={s.id} key={s.id}>
         {s.title && <h2>{s.title}</h2>}{s.image && <img src={s.image} alt={s.title || ''} loading="lazy" decoding="async" />}{s.body && <div className="reading-copy">{s.body}</div>}
       </section>)}
       <section className="campaign-section" data-section="materials"><h2>{resources.length ? '무료 제공 자료' : '무료 라이브 참여 안내'}</h2><p>{resources.length ? '클래스와 함께 활용할 자료를 내려받아 사용하세요.' : '참여 링크와 강의 관련 안내는 카카오 오픈채팅방에서 확인해 주세요.'}</p>{resources.map(resource => <ProductResourceRow key={resource.id} resource={resource} courseId={course.id} />)}</section>
-      <section className="campaign-section campaign-final" data-section="final"><h2>무료 라이브에서 만나요.</h2><p>{t(course,'schedule_label')}</p>{cta('final_cta')}</section>
     </div></div>
     <aside className="bottom-cta campaign-sticky"><div className="wrap"><div><strong>무료 라이브</strong><p className="meta">{t(course,'title')}</p></div>{cta('sticky_cta')}</div></aside>
   </LandingTracker>;
