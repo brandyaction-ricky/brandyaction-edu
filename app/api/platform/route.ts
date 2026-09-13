@@ -350,6 +350,15 @@ export async function POST(request: Request) {
             if (!section || section.readOnly) fail('수정할 수 없는 항목입니다.');
             const input = (body.values || {}) as Record<string, unknown>;
             const values: Record<string, unknown> = {};
+            const productSchedule = section.table === 'courses' && ('recruitmentStartAt' in body || 'recruitmentEndAt' in body) ? {
+                start: body.recruitmentStartAt === null ? null : String(body.recruitmentStartAt || ''),
+                end: body.recruitmentEndAt === null ? null : String(body.recruitmentEndAt || ''),
+            } : null;
+            if (productSchedule) {
+                if ((productSchedule.start && !Number.isFinite(Date.parse(productSchedule.start))) || (productSchedule.end && !Number.isFinite(Date.parse(productSchedule.end)))) fail('모집 일정을 확인해 주세요.');
+                if (productSchedule.start && productSchedule.end && Date.parse(productSchedule.start) >= Date.parse(productSchedule.end)) fail('모집 마감은 모집 시작 이후로 설정해 주세요.');
+                if (body.cohortId && !uid(body.cohortId)) fail('연결 기수를 확인해 주세요.');
+            }
             if (section.table === 'courses' && !body.id) {
                 // Removed publishing controls are generated only for new products.
                 // Retrying the same creation intent must keep the same RPC fingerprint.
@@ -464,7 +473,38 @@ export async function POST(request: Request) {
                 if (!['23505', '23514', '23503', '23502', 'P0001'].includes(result.error.code)) console.error('platform save', result.error.code);
                 fail(databaseMessage(result.error.code), 409);
             }
-            return reply({ ok: true, row: result.data });
+            let scheduledCohort = null;
+            if (section.table === 'courses' && productSchedule) {
+                const course = result.data as Row;
+                const now = Date.now();
+                const cohortStatus = productSchedule.end && Date.parse(productSchedule.end) <= now
+                    ? 'closed'
+                    : productSchedule.start && Date.parse(productSchedule.start) > now
+                      ? 'upcoming'
+                      : 'recruiting';
+                const scheduleValues = {
+                    recruitment_start_at: productSchedule.start || null,
+                    recruitment_end_at: productSchedule.end || null,
+                };
+                const cohortResult = body.cohortId
+                    ? await db.from('cohorts').update(scheduleValues).eq('id', body.cohortId).eq('course_id', course.id).select().single()
+                    : await db.from('cohorts').upsert({
+                          course_id: course.id,
+                          cohort_code: 'DEFAULT',
+                          name: '기본 기수',
+                          note: '상품 등록 시 자동 생성',
+                          price: Number(course.list_price || 0),
+                          capacity: null,
+                          status: cohortStatus,
+                          ...scheduleValues,
+                      }, { onConflict: 'course_id,cohort_code' }).select().single();
+                if (cohortResult.error) {
+                    if (!body.id) await db.from('courses').delete().eq('id', course.id);
+                    fail('상품의 모집 일정을 저장하지 못했습니다. 일정을 확인하고 다시 저장해 주세요.', 409);
+                }
+                scheduledCohort = cohortResult.data;
+            }
+            return reply({ ok: true, row: result.data, cohort: scheduledCohort });
         }
         if (action === 'profile') {
             const name = String(body.name || '').trim();
