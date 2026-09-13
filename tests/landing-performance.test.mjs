@@ -71,7 +71,7 @@ test('performance UI uses the native admin dashboard and removes all CTA/detail 
   const zero = renderToStaticMarkup(React.createElement(PerformanceDashboard, { report: empty }));
   for (const value of ['Unique Visitors', 'CTA Clicks', 'Conversion Rate', 'Avg Dwell Time', '평균 스크롤 깊이', 'Traffic &amp; Conversions', 'Top Sources', 'No traffic data yet']) assert.ok(zero.includes(value));
   assert.doesNotMatch(zero, /NaN|Infinity|performance-/); assert.match(zero, /<caption/);
-  for (const className of ['metrics', 'metric', 'two-col', 'panel', 'panel-head', 'panel-body', 'empty']) assert.ok(zero.includes(`class="${className}`));
+  for (const className of ['metrics landing-kpis', 'metric', 'two-col', 'panel', 'panel-head', 'panel-body', 'empty']) assert.ok(zero.includes(`class="${className}`));
   const real = renderToStaticMarkup(React.createElement(PerformanceDashboard, { report: { ...empty, summary: { ...empty.summary, visitors: 4, clicks: 17, converted_visitors: 2, sessions: 5 }, sources: [{ source: '%3Cscript%3E', visitors: 4, clicks: 17 }] } }));
   assert.match(real, /50\.0%/); assert.match(real, /미수집/); assert.match(real, /&lt;script&gt;/); assert.doesNotMatch(real, /<script>/);
 });
@@ -94,7 +94,7 @@ test('performance API is read-only, permission-scoped and never returns fake suc
   const response = await good.route.GET(new Request(`https://dev.example/api/landing/performance?landing=${id}&days=30`));
   assert.equal(response.status, 200); assert.equal(response.headers.get('cache-control'), 'private, no-store');
   assert.ok(good.calls.some(call => call[0] === 'rpc' && call[1] === 'edu_landing_performance'));
-  assert.ok(good.calls.some(call => call[0] === 'eq' && call[1] === 'list_price' && call[2] === 0));
+  assert.ok(good.calls.some(call => call[0] === 'eq' && call[1] === 'category' && call[2] === 'free'));
   assert.ok(good.calls.some(call => call[0] === 'is' && call[1] === 'archived_at' && call[2] === null));
   assert.ok(!good.calls.some(call => call[0] === 'from' && call[1] === 'funnel_events'));
   const broken = routeWith({ rpcError: { message: 'unavailable' } });

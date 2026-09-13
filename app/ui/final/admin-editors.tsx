@@ -47,7 +47,7 @@ export function FieldControl({
   pending: boolean;
 }) {
   const value = fieldValue(section, row, f),
-    props = { name: f.key, id: "edit-" + f.key, required: f.required };
+    props = { name: f.key, id: "edit-" + f.key, required: f.required, maxLength: f.maxLength };
   if (f.type === "blocks") return <BlocksField name={f.key} value={value} />;
   if (["image", "resource"].includes(f.type || ""))
     return (
