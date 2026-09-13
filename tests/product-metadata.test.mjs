@@ -157,6 +157,37 @@ test('new product identifiers are stable across retries of the same creation req
   assert.equal(writes[0][1].p_values.course_code, 'PRD-' + requestId);
 });
 
+test('new product registration creates its default cohort with the submitted KST recruitment period', async () => {
+  let cohortValues;
+  const db = {
+    async rpc() { return { data: { id: 'course-id', list_price: 45000 }, error: null }; },
+    from(table) {
+      assert.equal(table, 'cohorts');
+      return {
+        upsert(values, options) { cohortValues = values; assert.deepEqual(options, { onConflict: 'course_id,cohort_code' }); return this; },
+        select() { return this; },
+        async single() { return { data: { id: 'cohort-id', ...cohortValues }, error: null }; },
+      };
+    },
+  };
+  const route = load('app/api/platform/route.ts', {
+    '@/lib/supabase/admin': { createAdminClient: () => db },
+    '@/lib/supabase/server': {}, '@/lib/server-auth': { getAuthenticatedUser: async () => ({ id: 'operator' }) },
+    '@/lib/operator-permissions': { permissionsFor: async () => ({ products: true }), sectionScopes: { products: 'products' } },
+    '@/lib/edu-settings': {}, '@/lib/crm-delivery': {},
+  });
+  const response = await route.POST(new Request('https://edu.example/api/platform', { method: 'POST', headers: { origin: 'https://edu.example' }, body: JSON.stringify({
+    action: 'save', section: 'products', requestId: '11111111-1111-4111-8111-111111111111',
+    recruitmentStartAt: '2099-09-20T01:00:00.000Z', recruitmentEndAt: '2099-09-30T09:00:00.000Z',
+    values: { title: '기간 설정 상품', category: 'paid_class', list_price: 45000, status: 'draft' },
+  }) }));
+  assert.equal(response.status, 200);
+  assert.deepEqual(cohortValues, {
+    course_id: 'course-id', cohort_code: 'DEFAULT', name: '기본 기수', note: '상품 등록 시 자동 생성', price: 45000, capacity: null,
+    status: 'upcoming', recruitment_start_at: '2099-09-20T01:00:00.000Z', recruitment_end_at: '2099-09-30T09:00:00.000Z',
+  });
+});
+
 test('product save API persists approved editor metadata and stops if existing metadata cannot be loaded', async () => {
   const previous = { metadata: { campaign: { enabled: true }, thumbnail_url: 'existing.webp' } };
   const writes = [];

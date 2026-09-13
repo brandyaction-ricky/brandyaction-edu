@@ -11,7 +11,7 @@ import {
   type Section,
 } from "@/lib/platform";
 import { localDateTime } from "@/lib/platform-rules";
-import { Check, Download } from "lucide-react";
+import { Check, Code2, Download, Image as ImageIcon } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import { BlocksField, UploadField, uploadPlatformFile } from "../editor-fields";
@@ -214,6 +214,7 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
   const [dirty, setDirty] = useState(false);
   const [cohortDrafts, setCohortDrafts] = useState<Record<string, Record<string, string>>>({});
   const [htmlSource, setHtmlSource] = useState(productDocument(metadata) || String(metadata.detail_html || ""));
+  const [detailMode, setDetailMode] = useState<"image" | "html">(productDocument(metadata) || String(metadata.detail_html || "") ? "html" : "image");
   const conversion = productConversion(metadata, (data.landing_configs || []).find(item => item.id === row?.id));
   const [ctaColor, setCtaColor] = useState(conversion.color);
   const [htmlFilename, setHtmlFilename] = useState("");
@@ -265,13 +266,19 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
       if (start && end && Date.parse(String(start)) >= Date.parse(String(end))) { setCohortId(linked.id); setTab("basic"); setError(t(linked, "name") + "의 모집 마감은 모집 시작 이후로 설정해 주세요."); return; }
       cohortChanges.push({ id: linked.id, values: changed });
     }
-    let productSaved = false;
     try {
-      await send({ action: "save", section: "products", id: row?.id, values });
-      productSaved = true;
-      for (const change of cohortChanges) await send({ action: "save", section: "cohorts", id: change.id, values: change.values }, "상품과 기수 모집 일정을 저장했습니다.");
+      await send({
+        action: "save",
+        section: "products",
+        id: row?.id,
+        cohortId: cohort?.id,
+        recruitmentStartAt: submitted.get("recruitment_start_at") ? new Date(String(submitted.get("recruitment_start_at")) + ":00+09:00").toISOString() : null,
+        recruitmentEndAt: submitted.get("recruitment_end_at") ? new Date(String(submitted.get("recruitment_end_at")) + ":00+09:00").toISOString() : null,
+        values,
+      });
+      for (const change of cohortChanges.filter(change => change.id !== cohort?.id)) await send({ action: "save", section: "cohorts", id: change.id, values: change.values }, "상품과 기수 모집 일정을 저장했습니다.");
       setDirty(false); back();
-    } catch (cause) { setError((productSaved ? "상품은 저장했지만 기수 모집 일정은 저장하지 못했습니다. 일정을 확인하고 다시 저장해 주세요. " : "") + (cause as Error).message); }
+    } catch (cause) { setError((cause as Error).message); }
   }
   return <div className="product-editor">
     <AdminHeading title={row ? "상품 수정" : "상품 등록"} description={t(row, "title") || "상품 정보·상세페이지·제공 자료·판매 조건을 입력하세요."} eyebrow="PRODUCT EDITOR">{Boolean(row?.slug) && <Link className="btn" href={"/classes/" + t(row, "slug")} target="_blank">고객 화면 미리보기</Link>}</AdminHeading>
@@ -286,21 +293,27 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
             {field("summary", "상품 한 줄 소개", true)}
             {field("regular_price", "정가 · 원")}
             {field("list_price", "상품 기본 판매가 · 원", false, "무료 클래스는 0원입니다. 기수별 실제 결제 금액은 기수·회차 관리에서 설정합니다.")}
-            <ProductField label="모집 시작 · KST"><input key={cohortId + "-start"} name="recruitment_start_at" aria-label="모집 시작 · KST" type="datetime-local" value={cohortDrafts[cohortId]?.recruitment_start_at ?? kstInput(cohort?.recruitment_start_at)} onChange={event => setCohortDrafts(current => ({ ...current, [cohortId]: { ...current[cohortId], recruitment_start_at: event.target.value } }))} disabled={!cohort || pending} /></ProductField>
-            <ProductField label="모집 마감 · KST"><input key={cohortId + "-end"} name="recruitment_end_at" aria-label="모집 마감 · KST" type="datetime-local" value={cohortDrafts[cohortId]?.recruitment_end_at ?? kstInput(cohort?.recruitment_end_at)} onChange={event => setCohortDrafts(current => ({ ...current, [cohortId]: { ...current[cohortId], recruitment_end_at: event.target.value } }))} disabled={!cohort || pending} /></ProductField>
+            <ProductField label="모집 시작 · KST"><input key={cohortId + "-start"} name="recruitment_start_at" aria-label="모집 시작 · KST" type="datetime-local" value={cohortDrafts[cohortId]?.recruitment_start_at ?? kstInput(cohort?.recruitment_start_at)} onChange={event => setCohortDrafts(current => ({ ...current, [cohortId]: { ...current[cohortId], recruitment_start_at: event.target.value } }))} disabled={pending} /></ProductField>
+            <ProductField label="모집 마감 · KST"><input key={cohortId + "-end"} name="recruitment_end_at" aria-label="모집 마감 · KST" type="datetime-local" value={cohortDrafts[cohortId]?.recruitment_end_at ?? kstInput(cohort?.recruitment_end_at)} onChange={event => setCohortDrafts(current => ({ ...current, [cohortId]: { ...current[cohortId], recruitment_end_at: event.target.value } }))} disabled={pending} /></ProductField>
           </div>
-          <p className="meta product-cohort-hint">{cohort ? `현재 ${t(cohort, "name")}의 모집 일정입니다. 수강·권한 탭에서 기수를 선택할 수 있으며 변경한 기수 일정은 함께 저장됩니다.` : "상품을 저장하고 기수를 연결하면 모집 일정을 설정할 수 있습니다."}</p>
+          <p className="meta product-cohort-hint">{cohort ? `현재 ${t(cohort, "name")}의 모집 일정입니다. 수강·권한 탭에서 기수를 선택할 수 있으며 변경한 기수 일정은 함께 저장됩니다.` : "상품을 저장하면 기본 기수가 생성되고 입력한 모집 일정이 함께 적용됩니다."}</p>
           <h3>상품 썸네일</h3><div className="upload-box product-upload"><Download aria-hidden="true" /><p>썸네일 이미지를 선택하세요.</p><UploadField name="thumbnail_url" value={String(metadata.thumbnail_url || metadata.thumbnailUrl || "")} image disabled={pending} onChange={() => setDirty(true)} /><p className="meta">권장 비율 16:9 · PNG/JPG/WebP</p></div>
           <div className="notice mt16">썸네일과 상세페이지 이미지는 별도로 관리합니다. 디지털 자료도 상품 정보와 제공 자료를 각각 등록해 주세요.</div>
           <details className="product-extra mt24"><summary>추가 상품 정보</summary><div className="form-grid mt16">{field("instructor_name", "강사명")}{field("schedule_label", "일정 안내")}</div></details>
         </div>
         <div className="section-pad" id="product-panel-detail" data-tab="detail" role="tabpanel" aria-labelledby="product-tab-detail" hidden={tab !== "detail"}>
-          <h2 className="mb16">상세페이지 업로드</h2><p className="meta detail-upload-intro">HTML의 CSS·글꼴·반응형 디자인을 유지합니다. HTML이 있으면 기존 상세 이미지보다 우선 표시합니다.</p>
-          <input type="hidden" name="detail_html_document" value={htmlSource} />
+          <h2 className="mb8">상세페이지 등록</h2><p className="meta detail-upload-intro">이미지 묶음 또는 HTML 파일 중 한 가지 방식을 선택해 등록하세요.</p>
+          <div className="detail-mode-tabs" role="tablist" aria-label="상세페이지 등록 방식">
+            <button type="button" role="tab" aria-selected={detailMode === "image"} className={detailMode === "image" ? "active" : ""} onClick={() => { setDetailMode("image"); setDirty(true); }}><ImageIcon aria-hidden="true" />이미지 상세페이지</button>
+            <button type="button" role="tab" aria-selected={detailMode === "html"} className={detailMode === "html" ? "active" : ""} onClick={() => { setDetailMode("html"); setDirty(true); }}><Code2 aria-hidden="true" />HTML 상세페이지</button>
+          </div>
+          <input type="hidden" name="detail_html_document" value={detailMode === "html" ? htmlSource : ""} />
           <input type="hidden" name="description" value={t(row, "description")} />
-          <div className={`upload-box html-detail-upload${htmlSource ? " has-file" : ""}`}><Download aria-hidden="true" /><div><b>상세페이지 HTML 파일을 선택하세요</b><p className="meta">HTML·HTM · CSS 유지 · 스크립트·폼 실행 차단</p></div><label className="btn upload-label"><input type="file" accept=".html,.htm,text/html" disabled={pending} onChange={async event => { const input = event.currentTarget; const file = input.files?.[0]; if (!file) return; setError(""); if (!/\.html?$/i.test(file.name)) { setError("HTML 또는 HTM 파일을 선택해 주세요."); input.value = ""; return; } try { if (file.size > 3_000_000) throw new Error("HTML 파일은 3MB 이하로 등록해 주세요."); const source = validateProductDocument(await file.text()); const clean = sanitizeProductHtml(source); if (!clean.trim()) throw new Error("등록 가능한 HTML 본문이 없습니다. 파일 내용을 확인해 주세요."); setHtmlSource(source); setHtmlFilename(file.name.normalize("NFC")); setDirty(true); } catch (cause) { setError((cause as Error).message || "HTML 파일을 읽지 못했습니다. 다시 선택해 주세요."); } finally { input.value = ""; } }} />{htmlSource ? "HTML 파일 변경" : "HTML 파일 선택"}</label><p className="html-upload-status" role="status">{htmlFilename ? `${htmlFilename} · 불러오기 완료` : htmlSource ? "기존 HTML 상세페이지가 등록되어 있습니다." : "파일을 선택한 뒤 상품을 저장하면 고객 상세페이지에 반영됩니다."}</p>{htmlSource && <button className="btn small" type="button" disabled={pending} onClick={() => { setHtmlSource(""); setHtmlFilename(""); setDirty(true); }}>등록 HTML 삭제</button>}</div>
-          {htmlSource && <details className="product-extra mt24"><summary>HTML 디자인 확인</summary><p className="meta mt16">스크립트와 폼 실행은 차단됩니다. CSS가 이미 제거된 기존 파일은 원본 HTML을 다시 선택해 주세요.</p><div className="product-html-preview mt16"><ProductDetailHtml html="" documentSource={htmlSource} /></div></details>}
-          <DetailImageGallery key={String(row?.id || "new-product")} initial={productDetailImages(metadata)} allowUpload={false} disabled={pending} onChange={() => setDirty(true)} onStatusChange={setDetailUploadStatus} />
+          {detailMode === "html" && <>
+            <div className={`upload-box html-detail-upload${htmlSource ? " has-file" : ""}`}><Download aria-hidden="true" /><div><b>{htmlSource ? "HTML 파일이 등록되었습니다" : "상세페이지 HTML 파일을 선택하세요"}</b><p className="meta">HTML·HTM · CSS 유지 · 스크립트·폼 실행 차단</p></div><label className="btn upload-label"><input type="file" accept=".html,.htm,text/html" disabled={pending} onChange={async event => { const input = event.currentTarget; const file = input.files?.[0]; if (!file) return; setError(""); if (!/\.html?$/i.test(file.name)) { setError("HTML 또는 HTM 파일을 선택해 주세요."); input.value = ""; return; } try { if (file.size > 3_000_000) throw new Error("HTML 파일은 3MB 이하로 등록해 주세요."); const source = validateProductDocument(await file.text()); const clean = sanitizeProductHtml(source); if (!clean.trim()) throw new Error("등록 가능한 HTML 본문이 없습니다. 파일 내용을 확인해 주세요."); setHtmlSource(source); setHtmlFilename(file.name.normalize("NFC")); setDirty(true); } catch (cause) { setError((cause as Error).message || "HTML 파일을 읽지 못했습니다. 다시 선택해 주세요."); } finally { input.value = ""; } }} />{htmlSource ? "다른 HTML 파일로 교체" : "HTML 파일 선택"}</label><p className="html-upload-status" role="status">{htmlFilename ? `${htmlFilename} · 불러오기 완료` : htmlSource ? "클릭하여 다른 파일로 교체할 수 있습니다." : "파일을 선택한 뒤 상품을 저장하면 고객 상세페이지에 반영됩니다."}</p>{htmlSource && <button className="btn small" type="button" disabled={pending} onClick={() => { setHtmlSource(""); setHtmlFilename(""); setDirty(true); }}>등록 HTML 삭제</button>}</div>
+            {htmlSource && <details className="product-extra mt24"><summary>HTML 디자인 확인</summary><p className="meta mt16">스크립트와 폼 실행은 차단됩니다. CSS가 이미 제거된 기존 파일은 원본 HTML을 다시 선택해 주세요.</p><div className="product-html-preview mt16"><ProductDetailHtml html="" documentSource={htmlSource} /></div></details>}
+          </>}
+          {detailMode === "image" && <DetailImageGallery key={String(row?.id || "new-product")} initial={productDetailImages(metadata)} disabled={pending} onChange={() => setDirty(true)} onStatusChange={setDetailUploadStatus} />}
         </div>
         <div className="section-pad" id="product-panel-resources" data-tab="resources" role="tabpanel" aria-labelledby="product-tab-resources" hidden={tab !== "resources"}><ProductResources row={row} pending={pending} send={send} /></div>
         <div className="section-pad" id="product-panel-access" data-tab="access" role="tabpanel" aria-labelledby="product-tab-access" hidden={tab !== "access"}>
