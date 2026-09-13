@@ -20,6 +20,9 @@ import { AdminHeading } from "./admin-shell";
 import { Badge } from "./primitives";
 import { productDetailImages, productMetadataFields, productResources, sanitizeProductHtml, type ProductResourceScope } from "@/lib/product-metadata";
 import { DetailImageGallery } from "./detail-image-gallery";
+import { productConversion, DEFAULT_CTA_COLOR } from "@/lib/product-conversion";
+import { productDocument, validateProductDocument } from "@/lib/product-html-document";
+import { ProductDetailHtml } from "./product-detail-html";
 
 function fieldValue(s: Section, row: Row | undefined, f: Field) {
   return s.table === "courses" &&
@@ -121,6 +124,8 @@ export function FieldControl({
 export function formValues(section: Section, form: FormData) {
   const values: Record<string, unknown> = {};
   for (const f of section.fields) {
+    // Hidden/removed editor controls must not erase stored values on partial updates.
+    if (!form.has(f.key)) continue;
     const value = form.get(f.key);
     if (f.type === "checkbox") values[f.key] = value === "on";
     else if (f.type === "json" || f.type === "blocks")
@@ -208,7 +213,9 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
   const [error, setError] = useState("");
   const [dirty, setDirty] = useState(false);
   const [cohortDrafts, setCohortDrafts] = useState<Record<string, Record<string, string>>>({});
-  const [htmlSource, setHtmlSource] = useState(String(metadata.detail_html || ""));
+  const [htmlSource, setHtmlSource] = useState(productDocument(metadata) || String(metadata.detail_html || ""));
+  const conversion = productConversion(metadata, (data.landing_configs || []).find(item => item.id === row?.id));
+  const [ctaColor, setCtaColor] = useState(conversion.color);
   const [htmlFilename, setHtmlFilename] = useState("");
   const [detailUploadStatus, setDetailUploadStatus] = useState<"idle" | "uploading" | "error">("idle");
   const [preview, setPreview] = useState({ title: t(row, "title"), summary: t(row, "summary"), price: num(row, "list_price"), regular: Number(metadata.regular_price || 0), status: t(row, "status") || "draft", category: t(row, "category") || "paid_class", slug: t(row, "slug"), seoTitle: String(metadata.seo_title || ""), seoDescription: String(metadata.seo_description || "") });
@@ -229,6 +236,11 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
     setPreview({ title: String(values.get("title") || ""), summary: String(values.get("summary") || ""), price: Number(values.get("list_price") || 0), regular: Number(values.get("regular_price") || 0), status: String(values.get("status") || "draft"), category: String(values.get("category") || "paid_class"), slug: String(values.get("slug") || ""), seoTitle: String(values.get("seo_title") || ""), seoDescription: String(values.get("seo_description") || "") });
   }
   function close() { if (!dirty || window.confirm("저장하지 않은 변경사항이 있습니다. 목록으로 돌아갈까요?")) back(); }
+  async function removeProduct() {
+    if (!row?.id || pending || !window.confirm(`「${t(row, "title")}」 상품을 삭제할까요? 판매 목록에서 숨겨지며 주문·수강 기록과 파일은 유지됩니다. 삭제 항목 포함에서 다시 열어 저장하면 복구할 수 있습니다.`)) return;
+    try { await send({ action: "archive", section: "products", ids: [row.id] }, "상품을 삭제했습니다. 주문·수강 기록은 유지됩니다."); back(); }
+    catch (cause) { setError((cause as Error).message); }
+  }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError("");
     if (detailUploadStatus !== "idle") { setTab("detail"); setError(detailUploadStatus === "uploading" ? "상세 이미지 업로드가 끝난 뒤 저장해 주세요." : "상세 이미지 업로드 오류를 확인해 주세요."); return; }
@@ -283,11 +295,12 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
           <details className="product-extra mt24"><summary>추가 상품 정보</summary><div className="form-grid mt16">{field("instructor_name", "강사명")}{field("schedule_label", "일정 안내")}</div></details>
         </div>
         <div className="section-pad" id="product-panel-detail" data-tab="detail" role="tabpanel" aria-labelledby="product-tab-detail" hidden={tab !== "detail"}>
-          <h2 className="mb16">상세페이지 업로드</h2><p className="meta detail-upload-intro">HTML 파일 또는 이미지형 상세페이지 중 필요한 방식을 등록할 수 있습니다.</p>
-          <input type="hidden" name="detail_html" value={htmlSource} />
+          <h2 className="mb16">상세페이지 업로드</h2><p className="meta detail-upload-intro">HTML의 CSS·글꼴·반응형 디자인을 유지합니다. HTML이 있으면 기존 상세 이미지보다 우선 표시합니다.</p>
+          <input type="hidden" name="detail_html_document" value={htmlSource} />
           <input type="hidden" name="description" value={t(row, "description")} />
-          <div className={`upload-box html-detail-upload${htmlSource ? " has-file" : ""}`}><Download aria-hidden="true" /><div><b>상세페이지 HTML 파일을 선택하세요</b><p className="meta">HTML·HTM · 스크립트와 폼은 자동 제외</p></div><label className="btn upload-label"><input type="file" accept=".html,.htm,text/html" disabled={pending} onChange={async event => { const input = event.currentTarget; const file = input.files?.[0]; if (!file) return; setError(""); if (!/\.html?$/i.test(file.name)) { setError("HTML 또는 HTM 파일을 선택해 주세요."); input.value = ""; return; } try { const source = await file.text(); const clean = sanitizeProductHtml(source); if (!clean.trim()) throw new Error("등록 가능한 HTML 본문이 없습니다. 파일 내용을 확인해 주세요."); setHtmlSource(clean); setHtmlFilename(file.name.normalize("NFC")); setDirty(true); } catch (cause) { setError((cause as Error).message || "HTML 파일을 읽지 못했습니다. 다시 선택해 주세요."); } finally { input.value = ""; } }} />{htmlSource ? "HTML 파일 변경" : "HTML 파일 선택"}</label><p className="html-upload-status" role="status">{htmlFilename ? `${htmlFilename} · 불러오기 완료` : htmlSource ? "기존 HTML 상세페이지가 등록되어 있습니다." : "파일을 선택한 뒤 상품을 저장하면 고객 상세페이지에 반영됩니다."}</p>{htmlSource && <button className="btn small" type="button" disabled={pending} onClick={() => { setHtmlSource(""); setHtmlFilename(""); setDirty(true); }}>등록 HTML 삭제</button>}</div>
-          <DetailImageGallery key={String(row?.id || "new-product")} initial={productDetailImages(metadata)} disabled={pending} onChange={() => setDirty(true)} onStatusChange={setDetailUploadStatus} />
+          <div className={`upload-box html-detail-upload${htmlSource ? " has-file" : ""}`}><Download aria-hidden="true" /><div><b>상세페이지 HTML 파일을 선택하세요</b><p className="meta">HTML·HTM · CSS 유지 · 스크립트·폼 실행 차단</p></div><label className="btn upload-label"><input type="file" accept=".html,.htm,text/html" disabled={pending} onChange={async event => { const input = event.currentTarget; const file = input.files?.[0]; if (!file) return; setError(""); if (!/\.html?$/i.test(file.name)) { setError("HTML 또는 HTM 파일을 선택해 주세요."); input.value = ""; return; } try { if (file.size > 3_000_000) throw new Error("HTML 파일은 3MB 이하로 등록해 주세요."); const source = validateProductDocument(await file.text()); const clean = sanitizeProductHtml(source); if (!clean.trim()) throw new Error("등록 가능한 HTML 본문이 없습니다. 파일 내용을 확인해 주세요."); setHtmlSource(source); setHtmlFilename(file.name.normalize("NFC")); setDirty(true); } catch (cause) { setError((cause as Error).message || "HTML 파일을 읽지 못했습니다. 다시 선택해 주세요."); } finally { input.value = ""; } }} />{htmlSource ? "HTML 파일 변경" : "HTML 파일 선택"}</label><p className="html-upload-status" role="status">{htmlFilename ? `${htmlFilename} · 불러오기 완료` : htmlSource ? "기존 HTML 상세페이지가 등록되어 있습니다." : "파일을 선택한 뒤 상품을 저장하면 고객 상세페이지에 반영됩니다."}</p>{htmlSource && <button className="btn small" type="button" disabled={pending} onClick={() => { setHtmlSource(""); setHtmlFilename(""); setDirty(true); }}>등록 HTML 삭제</button>}</div>
+          {htmlSource && <details className="product-extra mt24"><summary>HTML 디자인 확인</summary><p className="meta mt16">스크립트와 폼 실행은 차단됩니다. CSS가 이미 제거된 기존 파일은 원본 HTML을 다시 선택해 주세요.</p><div className="product-html-preview mt16"><ProductDetailHtml html="" documentSource={htmlSource} /></div></details>}
+          <DetailImageGallery key={String(row?.id || "new-product")} initial={productDetailImages(metadata)} allowUpload={false} disabled={pending} onChange={() => setDirty(true)} onStatusChange={setDetailUploadStatus} />
         </div>
         <div className="section-pad" id="product-panel-resources" data-tab="resources" role="tabpanel" aria-labelledby="product-tab-resources" hidden={tab !== "resources"}><ProductResources row={row} pending={pending} send={send} /></div>
         <div className="section-pad" id="product-panel-access" data-tab="access" role="tabpanel" aria-labelledby="product-tab-access" hidden={tab !== "access"}>
@@ -297,10 +310,14 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
           <div className="divider" /><div className="notice">수강 권한은 신청·결제 내역과 기수 일정에 따라 부여됩니다. 개별 수강권의 기간·회수 상태는 주문 및 회원 화면에서 확인하세요.</div><div className="row mt16"><Link className="btn" href="/admin/orders">주문·수강 권한 확인</Link><Link className="btn" href="/admin/cohorts">기수·회차 관리</Link></div>
         </div>
         <div className="section-pad" id="product-panel-publish" data-tab="publish" role="tabpanel" aria-labelledby="product-tab-publish" hidden={tab !== "publish"}>
-          <h2 className="mb16">공개·검색 설정</h2>{field("slug", "상품 주소 (slug)", true, "영문 소문자·숫자·하이픈을 사용하세요. 기존 주소를 바꾸면 공유한 링크도 변경됩니다.")}{field("course_code", "상품 코드", true)}{field("seo_title", "검색 제목", true)}{field("seo_description", "검색 설명", true)}
-          <div className="snippet"><div className="snippet-url">brandyaction-edu.com › classes › {preview.slug || "상품 주소"}</div><h3>{preview.seoTitle || preview.title || "상품명"}</h3><p>{preview.seoDescription || preview.summary || "검색 결과에 표시할 설명을 작성해 주세요."}</p></div><div className="divider" /><h3>공개 전 점검</h3><div className="checkbox-stack mt16">{["상품명·가격·모집 기간 확인", "상세페이지 PC·모바일 확인", "자료 다운로드 권한 확인", "기수·수강 기간 확인"].map(label => <label key={label}><input type="checkbox" />{label}</label>)}</div>
+          <section className="product-conversion-card"><h2>Call to Action</h2><p className="meta">고객이 클릭할 주요 버튼과 이동할 페이지를 설정하세요.</p>
+            <ProductField controlId="product-cta-label" label="Button Label"><input id="product-cta-label" name="cta_label" maxLength={100} defaultValue={conversion.label} placeholder="무료 웨비나 참여하기" disabled={pending} /></ProductField>
+            <ProductField controlId="product-cta-url" label="Destination URL" hint="비워 두면 기존 신청·결제·학습 이동 동작을 사용합니다."><input id="product-cta-url" name="cta_url" maxLength={2048} defaultValue={conversion.url} placeholder="https://open.kakao.com/o/..." disabled={pending} /></ProductField>
+            <ProductField controlId="product-cta-color" label="CTA Button Color" hint="색상 선택 또는 #을 포함한 6자리 HEX 코드를 입력하세요."><div className="product-color-control"><input type="color" aria-label="CTA 버튼 색상 선택" value={/^#[0-9a-f]{6}$/i.test(ctaColor) ? ctaColor : DEFAULT_CTA_COLOR} onChange={event => setCtaColor(event.target.value)} disabled={pending} /><input id="product-cta-color" name="cta_color" value={ctaColor} onChange={event => setCtaColor(event.target.value)} pattern="#[0-9a-fA-F]{6}" maxLength={7} required disabled={pending} /></div></ProductField>
+          </section>
+          <section className="product-conversion-card"><h2>Tracking integration</h2><p className="meta">상품별 광고 추적을 연결하세요.</p><ProductField controlId="product-pixel-id" label="Meta Pixel ID (Optional)" hint="입력한 상품에만 PageView와 CTA 클릭(Lead)을 전송합니다. 구매 완료 이벤트는 결제 처리와 구분됩니다. 비워 두면 사용하지 않습니다."><input id="product-pixel-id" name="meta_pixel_id" inputMode="numeric" pattern="[0-9]{5,30}" maxLength={30} defaultValue={conversion.pixelId} placeholder="Meta Pixel ID" disabled={pending} /></ProductField></section>
         </div>
-      </section><div className="editor-savebar"><span className="dirty-note">{dirty ? "저장하지 않은 변경사항이 있습니다." : "변경 내용을 저장하면 반영됩니다."}</span><button className="btn" type="button" onClick={close} disabled={pending || detailUploadStatus === "uploading"}>목록으로</button>{tab !== "publish" && <button className="btn" type="button" onClick={() => setTab("publish")} disabled={pending || detailUploadStatus === "uploading"}>공개 전 확인</button>}<button className="btn primary" type="submit" disabled={pending || detailUploadStatus !== "idle"}>{pending ? "저장 중…" : detailUploadStatus === "uploading" ? "업로드 중…" : "저장하기"}</button></div>{error && <p className="notice mt16" role="alert">{error}</p>}</div>
+      </section><div className="editor-savebar">{row?.id && !row.archived_at && <button className="btn danger" type="button" onClick={() => void removeProduct()} disabled={pending || detailUploadStatus === "uploading"}>상품 삭제</button>}<span className="dirty-note">{dirty ? "저장하지 않은 변경사항이 있습니다." : "변경 내용을 저장하면 반영됩니다."}</span><button className="btn" type="button" onClick={close} disabled={pending || detailUploadStatus === "uploading"}>목록으로</button>{tab !== "publish" && <button className="btn" type="button" onClick={() => setTab("publish")} disabled={pending || detailUploadStatus === "uploading"}>공개 전 확인</button>}<button className="btn primary" type="submit" disabled={pending || detailUploadStatus !== "idle"}>{pending ? "저장 중…" : detailUploadStatus === "uploading" ? "업로드 중…" : "저장하기"}</button></div>{error && <p className="notice mt16" role="alert">{error}</p>}</div>
       <aside className="editor-aside"><div className="side-preview"><span className="section-code">고객에게 보이는 상품</span><div className="preview-cover mt16"><p>BRANDYACTION EDU</p><h3>{preview.title || "상품명"}</h3><p className="accent">{labels[preview.category] || "유료 클래스"}</p></div><div className="preview-meta"><b>{!previewSalePrice ? "무료" : money(previewSalePrice)}</b>{preview.regular > previewSalePrice && <s>{money(preview.regular)}</s>}</div><p className="meta mt8">{cohort ? t(cohort, "name") + " 기수 판매가" : "상품 기본 판매가"}</p><p className="meta mt8">{preview.summary || "상품 소개를 입력해 주세요."}</p><div className="divider" /><div className="setting-line"><span>상품 상태</span><Badge color={preview.status === "published" ? "green" : ""}>{statusLabels[preview.status]}</Badge></div><div className="setting-line"><span>연결 기수</span><b>{t(cohort, "name") || "미연결"}</b></div><div className="setting-line"><span>제공 자료</span><b>{resourceCount}개</b></div><Link className="btn full mt16" href="/admin/cohorts">기수·회차 관리</Link></div></aside></div>
     </form>
   </div>;

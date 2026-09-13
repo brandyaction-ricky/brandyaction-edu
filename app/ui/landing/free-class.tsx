@@ -1,6 +1,5 @@
 'use client';
-import { useEffect, useRef } from 'react';
-import { ArrowRight } from 'lucide-react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { LandingConfig } from '@/lib/landing';
 import { startLandingTracking } from '@/lib/landing-browser';
 import { object, safeUrl, text as t, type Row } from '@/lib/platform';
@@ -8,6 +7,9 @@ import { Cover } from '../final/primitives';
 import { ProductDetailHtml } from '../final/product-detail-html';
 import { productDetailImages, type ProductResource } from '@/lib/product-metadata';
 import { ProductResourceRow } from '../final/primitives';
+import { productConversion } from '@/lib/product-conversion';
+import { productDocument } from '@/lib/product-html-document';
+import { ProductCtaLink, ProductPixel } from '../final/product-conversion';
 
 export function LandingTracker({ config, children }: { config: LandingConfig; children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -17,15 +19,20 @@ export function LandingTracker({ config, children }: { config: LandingConfig; ch
 export function CampaignFreeClass({ course, config, resources = [] }: { course: Row; config: LandingConfig; resources?: ProductResource[] }) {
   const meta = object(course,'metadata'), images = productDetailImages(meta).map(item => ({ ...item, path: safeUrl(item.path) })).filter(item => item.path), image = images[0]?.path || '';
   const detailHtml = typeof meta.detail_html === 'string' ? meta.detail_html : '';
-  const cta = (position: string, full = false) => <a className={'btn primary large ' + (full ? 'full' : '')} href={config.kakao_url} data-landing-cta={config.enabled ? position : undefined}>{config.cta_label}<ArrowRight /></a>;
-  return <LandingTracker config={config}>
+  const documentSource = productDocument(meta);
+  const conversion = productConversion(meta, config);
+  const trackingConfig = useMemo(() => ({ ...config, pixel_enabled: false }), [config]);
+  const cta = (position: string, full = false) => <ProductCtaLink conversion={conversion} courseId={course.id} position={position} tracked={config.enabled} conversionEvent="CompleteRegistration" className={'btn primary large ' + (full ? 'full' : '')} />;
+  // The product integration owns Pixel events; internal landing analytics remain active.
+  return <LandingTracker config={trackingConfig}>
+    <ProductPixel courseId={course.id} pixelId={conversion.pixelId} />
     <div className="free-body"><div className="free-sheet">
       <section className="campaign-hero panel-body" data-section="hero">
         <div className="eyebrow">FREE LIVE CLASS</div><h1>{t(course,'title')}</h1><p className="lead">{t(course,'summary')}</p>
         {t(course,'schedule_label') && <p className="meta">{t(course,'schedule_label')}</p>}
         {cta('hero_cta')}<p className="meta mt16">카카오 오픈채팅에서 무료 라이브 참여 안내를 확인하세요.</p>
       </section>
-      <section data-section="detail">{image ? <div className="detail-image-stack">{images.map((item, index) => <img className="detail-image" src={item.path} alt={item.alt || `${t(course,'title')} 상세 안내 ${index + 1}`} loading="lazy" decoding="async" key={item.path + index} />)}</div> : <div className="panel-body"><Cover course={course}/>{detailHtml ? <ProductDetailHtml html={detailHtml} className="product-detail-html reading-copy mt24" /> : <div className="reading-copy mt24">{t(course,'description') || t(course,'summary')}</div>}</div>}</section>
+      <section data-section="detail">{documentSource || detailHtml ? <ProductDetailHtml html={detailHtml} documentSource={documentSource} /> : image ? <div className="detail-image-stack">{images.map((item, index) => <img className="detail-image" src={item.path} alt={item.alt || `${t(course,'title')} 상세 안내 ${index + 1}`} loading="lazy" decoding="async" key={item.path + index} />)}</div> : <div className="panel-body"><Cover course={course}/><div className="reading-copy mt24">{t(course,'description') || t(course,'summary')}</div></div>}</section>
       {config.custom_sections && config.sections.map(s=><section className="campaign-section" data-section={s.id} key={s.id}>
         {s.title && <h2>{s.title}</h2>}{s.image && <img src={s.image} alt={s.title || ''} loading="lazy" decoding="async" />}{s.body && <div className="reading-copy">{s.body}</div>}
       </section>)}

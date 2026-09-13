@@ -18,7 +18,8 @@ async function validImageHeader(file: File) {
   return bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
 }
 
-export function DetailImageGallery({ initial, disabled, onChange, onStatusChange }: {
+export function DetailImageGallery({ initial, disabled, onChange, onStatusChange, allowUpload = true }: {
+  allowUpload?: boolean;
   initial: ProductDetailImage[];
   disabled: boolean;
   onChange: () => void;
@@ -70,14 +71,14 @@ export function DetailImageGallery({ initial, disabled, onChange, onStatusChange
   }
   return <section className="detail-gallery" aria-labelledby="detail-gallery-title">
     <input type="hidden" name="detail_images" value={JSON.stringify(images)} />
-    <div className="between detail-gallery-head">
+    {(allowUpload || images.length > 0) && <div className="between detail-gallery-head">
       <div><h3 id="detail-gallery-title">이미지형 상세페이지</h3><p className="meta">등록한 이미지가 위에서 아래 순서대로 고객 상세페이지에 이어 붙습니다.</p></div>
       <strong>{images.length} / {MAX_IMAGES}장</strong>
-    </div>
-    <div className="detail-gallery-upload">
+    </div>}
+    {allowUpload && <div className="detail-gallery-upload">
       <div><ImagePlus aria-hidden="true" /><b>{uploading ? "이미지를 업로드하고 있습니다…" : "상세 이미지를 업로드하세요"}</b><small>여러 장 선택 가능 · JPG · PNG · WEBP · GIF · 파일당 최대 20MB</small></div>
       <label className="btn primary upload-label"><input type="file" multiple accept=".jpg,.jpeg,.png,.webp,.gif" disabled={disabled || uploading || images.length >= MAX_IMAGES} onChange={event => { void upload(event.target.files); event.currentTarget.value = ""; }} />{uploading ? "업로드 중…" : "이미지 선택"}</label>
-    </div>
+    </div>}
     {error && <div className="notice detail-gallery-error" role="alert"><span>{error}</span><button type="button" className="btn small" onClick={() => { setError(""); onStatusChange("idle"); }}>오류 닫기 · 성공 파일 유지</button></div>}
     {images.length > 0 && <div className="detail-gallery-list">
       {images.map((image, index) => {

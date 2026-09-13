@@ -77,3 +77,14 @@
 }
 
 .edu-admin .product-editor .product-upload .upload-inline { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.edu-admin .product-editor .product-conversion-card { padding: 28px; border: 1px solid #dce2ea; border-radius: 16px; background: #fff; box-shadow: 0 1px 4px #17243812; }
+.edu-admin .product-editor .product-conversion-card + .product-conversion-card { margin-top: 24px; }
+.edu-admin .product-editor .product-conversion-card h2 { font-size: 24px; line-height: 1.3; }
+.edu-admin .product-editor .product-conversion-card > .meta { margin: 8px 0 28px; }
+.edu-admin .product-editor .product-conversion-card .field:last-child { margin-bottom: 0; }
+.edu-admin .product-editor .product-conversion-card .field-label { font-size: 15px; }
+.edu-admin .product-editor .product-conversion-card input { background: #f8fafc; border: 1px solid #dce2ea; border-radius: 8px; }
+.edu-admin .product-editor .product-color-control { display: flex; gap: 12px; }
+.edu-admin .product-editor .product-color-control input[type=color] { padding: 6px; width: 56px; height: 48px; flex-shrink: 0; }
+.edu-admin .product-editor .product-color-control input[type=text], .edu-admin .product-editor .product-color-control input:not([type]) { min-width: 0; width: 100%; }
+@media (max-width: 600px) { .edu-admin .product-editor .product-conversion-card { padding: 20px; } }
