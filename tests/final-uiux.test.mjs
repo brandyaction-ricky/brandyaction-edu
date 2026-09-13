@@ -217,6 +217,8 @@ test('campaign class keeps published content and only the mobile sticky CTA', ()
   assert.match(markup, /data-landing-cta="sticky_cta"/);
   assert.doesNotMatch(markup, /data-landing-cta="(?:hero_cta|final_cta)"|data-section="(?:hero|final)"|무료 라이브에서 만나요/);
   assert.equal((markup.match(/href="https:\/\/open.kakao.com\/o\/testRoom"/g) || []).length, 1);
+  assert.match(read('app/ui/platform.tsx'), /free-class-detail-page/);
+  assert.match(read('app/ui/final/frontend.css'), /@media\(max-width:680px\)\{\.edu-front\.free-class-detail-page>\.site-header\{display:none\}\}/);
   assert.match(markup, /발행한 제목/); assert.doesNotMatch(markup, /등록된 테스트 클래스/);
   assert.match(markup, /data-section="proof"/); assert.match(markup, /loading="lazy"/);
   assert.match(markup, /&lt;script&gt;/); assert.doesNotMatch(markup, /<script>|checkout/);
