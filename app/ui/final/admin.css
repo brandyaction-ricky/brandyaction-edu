@@ -128,3 +128,6 @@
 .edu-admin .customer-summary-grid b{font-size:var(--type-body)}
 @media(max-width:720px){.edu-admin .mission-week-pills{flex-wrap:nowrap;overflow:auto;padding-bottom:var(--space-2)}.edu-admin .mission-week-pills .pill{flex:0 0 auto}.edu-admin .customer-summary-grid{grid-template-columns:1fr}.edu-admin .mission-catalog .mission-row{display:grid;grid-template-columns:24px 36px minmax(0,1fr)}.edu-admin .mission-catalog .mission-row>.badge{grid-column:3}.edu-admin .mission-catalog .mission-actions{grid-column:3}}
 
+/* The landing overview has five KPIs; keep them together on desktop only. */
+@media(min-width:1025px){.edu-admin .landing-kpis{grid-template-columns:repeat(5,minmax(0,1fr))}.edu-admin .landing-kpis .metric{min-width:0}.edu-admin .landing-kpis .metric-label{white-space:nowrap}}
+

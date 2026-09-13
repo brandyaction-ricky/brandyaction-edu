@@ -37,3 +37,6 @@ table{font-size:var(--type-small);font-variant-numeric:tabular-nums;white-space:
 .customer-summary-grid span{font-size:var(--type-small);color:var(--text-secondary)}
 .customer-summary-grid b{font-size:var(--type-body)}
 @media(max-width:720px){.mission-week-pills{flex-wrap:nowrap;overflow:auto;padding-bottom:var(--space-2)}.mission-week-pills .pill{flex:0 0 auto}.customer-summary-grid{grid-template-columns:1fr}.mission-catalog .mission-row{display:grid;grid-template-columns:24px 36px minmax(0,1fr)}.mission-catalog .mission-row>.badge{grid-column:3}.mission-catalog .mission-actions{grid-column:3}}
+
+/* The landing overview has five KPIs; keep them together on desktop only. */
+@media(min-width:1025px){.landing-kpis{grid-template-columns:repeat(5,minmax(0,1fr))}.landing-kpis .metric{min-width:0}.landing-kpis .metric-label{white-space:nowrap}}
