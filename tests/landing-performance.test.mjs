@@ -58,18 +58,20 @@ test('page engagement excludes background time, retains maximum depth and bounds
   assert.deepEqual(malformed.sample(true, Infinity, 0), { dwellMs: 0, scrollPct: 0 });
 });
 
-test('performance UI matches reference cards and removes all CTA/detail registration forms', () => {
+test('performance UI uses the native admin dashboard and removes all CTA/detail registration forms', () => {
   const { LandingAdmin } = load('app/ui/landing/admin.tsx');
   const admin = renderToStaticMarkup(React.createElement(LandingAdmin));
-  for (const value of ['Marketing Performance', '7D', '30D', '90D']) assert.ok(admin.includes(value));
+  for (const value of ['7D', '30D', '90D', 'class="toolbar"', 'class="tabs"']) assert.ok(admin.includes(value));
+  assert.doesNotMatch(admin, /Marketing Performance|무료클래스의 방문과 CTA 전환 성과를 확인하세요/);
   assert.doesNotMatch(admin, /<form|type="file"|CTA·이미지 저장|랜딩·Pixel 설정|발행 이력/);
   const source = fs.readFileSync('app/ui/landing/admin.tsx', 'utf8');
-  assert.doesNotMatch(source, /LiveSetup|UploadField|method:\s*['"]POST|initial\.revision/);
+  assert.doesNotMatch(source, /LiveSetup|UploadField|method:\s*['"]POST|initial\.revision|performance\.css|className=[^\n]*performance-/);
   assert.match(source, /result\.key === requestKey/); assert.match(source, /controller\.abort/);
   const { PerformanceDashboard } = load('app/ui/landing/performance-dashboard.tsx');
   const zero = renderToStaticMarkup(React.createElement(PerformanceDashboard, { report: empty }));
   for (const value of ['Unique Visitors', 'CTA Clicks', 'Conversion Rate', 'Avg Dwell Time', '평균 스크롤 깊이', 'Traffic &amp; Conversions', 'Top Sources', 'No traffic data yet']) assert.ok(zero.includes(value));
-  assert.doesNotMatch(zero, /NaN|Infinity/); assert.match(zero, /<caption>/);
+  assert.doesNotMatch(zero, /NaN|Infinity|performance-/); assert.match(zero, /<caption/);
+  for (const className of ['metrics', 'metric', 'two-col', 'panel', 'panel-head', 'panel-body', 'empty']) assert.ok(zero.includes(`class="${className}`));
   const real = renderToStaticMarkup(React.createElement(PerformanceDashboard, { report: { ...empty, summary: { ...empty.summary, visitors: 4, clicks: 17, converted_visitors: 2, sessions: 5 }, sources: [{ source: '%3Cscript%3E', visitors: 4, clicks: 17 }] } }));
   assert.match(real, /50\.0%/); assert.match(real, /미수집/); assert.match(real, /&lt;script&gt;/); assert.doesNotMatch(real, /<script>/);
 });
