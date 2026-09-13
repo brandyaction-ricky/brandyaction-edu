@@ -20,8 +20,10 @@ function fail(message: string, status = 400): never {
     throw Object.assign(new Error(message), { status });
 }
 export async function GET(request: Request) {
+    const started = performance.now();
     try {
         const user = await getAuthenticatedUser();
+        const authenticated = performance.now();
         const params = new URL(request.url).searchParams;
         const adminMode = params.get('admin') === '1';
         const sectionKey = params.get('section') || 'home';
@@ -31,6 +33,7 @@ export async function GET(request: Request) {
         const pageSize = sectionKey === 'orders' ? 30 : 100;
         if (adminMode && !user) return reply({ error: '로그인이 필요합니다.', user: null }, 401);
         const operator = adminMode ? await getOperatorUser(sectionScopes[sectionKey], user) : null;
+        const authorized = performance.now();
         if (adminMode && (!operator || (sectionKey === 'staff' && operator.role !== 'admin'))) return reply({ error: '이 화면에 접근할 운영 권한이 필요합니다.', user }, 403);
         const db = adminMode ? createAdminClient() : await createClient();
         if (adminMode && !Object.hasOwn(adminTables, sectionKey)) return reply({ error: '조회 화면을 확인해 주세요.' }, 400);
@@ -238,7 +241,7 @@ export async function GET(request: Request) {
                 const value = article.cover_image_path;
                 if (typeof value === 'string' && value && !/^https?:\/\//.test(value) && !value.startsWith('/')) article.cover_image_url = process.env.NEXT_PUBLIC_SUPABASE_URL + '/storage/v1/object/public/course-assets/' + value;
             }
-        return reply({
+        const response = reply({
             user: adminMode ? operator : user,
             data,
             pagination,
@@ -247,6 +250,8 @@ export async function GET(request: Request) {
                 url: typeof operations.supportUrl === 'string' ? operations.supportUrl : '',
             },
         });
+        response.headers.set('Server-Timing', `auth;dur=${(authenticated - started).toFixed(1)},permissions;dur=${(authorized - authenticated).toFixed(1)},data;dur=${(performance.now() - authorized).toFixed(1)},total;dur=${(performance.now() - started).toFixed(1)}`);
+        return response;
     } catch (error) {
         console.error('platform read', error);
         return reply({ error: '데이터를 불러오지 못했습니다. 다시 시도해 주세요.' }, 503);

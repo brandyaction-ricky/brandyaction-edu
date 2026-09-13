@@ -146,6 +146,7 @@ export function Platform({
     setError("");
     setAccessDenied(false);
     try {
+      const started = performance.now();
       const response = await fetch(
         "/api/platform" +
           (admin
@@ -160,6 +161,9 @@ export function Platform({
         { cache: "no-store", signal: controller.signal },
       );
       const result = await response.json();
+      if (admin && process.env.NEXT_PUBLIC_APP_ENV !== "production") {
+        console.debug("[edu navigation] " + JSON.stringify({ section: adminSection, durationMs: Math.round(performance.now() - started), serverTiming: response.headers.get("Server-Timing") }));
+      }
       if (controller.signal.aborted || !alive.current) return;
       if (admin && [401, 403].includes(response.status)) {
         setUser(result.user || null);
