@@ -15,6 +15,7 @@ export function productConversion(metadata: Record<string, unknown>, legacy: Rec
   const color = String(metadata.cta_color || DEFAULT_CTA_COLOR);
   const pixelId = String(value('meta_pixel_id', legacy.pixel_enabled ? legacy.pixel_id : '') || '');
   return {
+    priceLabel: String(value('cta_price_label', legacy.cta_price_label) || '').trim() || '무료',
     label: String(value('cta_label', legacy.cta_label) || '').trim() || '참여하기',
     url: conversionUrl(value('cta_url', legacy.kakao_url)),
     color: /^#[0-9a-f]{6}$/i.test(color) ? color : DEFAULT_CTA_COLOR,
