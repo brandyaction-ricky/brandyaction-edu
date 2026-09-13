@@ -36,6 +36,7 @@ export type Field = {
     type?: string;
     required?: boolean;
     options?: string[];
+    maxLength?: number;
 };
 export type Section = {
     key: string;
@@ -46,6 +47,7 @@ export type Section = {
     readOnly?: boolean;
 };
 const f = (key: string, label: string, type = 'text', required = false, options?: string[]): Field => ({ key, label, type, required, options });
+export const bannerTextLimits = { eyebrow: 80, title: 120, description: 300, link_label: 50 } as const;
 export const sections: Section[] = [
     { key: 'products', title: '상품 관리', group: '클래스 관리', table: 'courses', fields: [f('title', '상품명', 'text', true), f('course_code', '상품 코드', 'text', true), f('slug', '페이지 주소', 'text', true), f('category', '상품 유형', 'select', false, ['free', 'paid_class', 'digital']), f('summary', '한 줄 소개'), f('description', '상세 설명', 'textarea'), f('detail_html', '상세 본문 · HTML', 'textarea'), f('detail_html_document', '상세 HTML 원본', 'textarea'), f('detail_images', '상세 이미지 목록', 'json'), f('instructor_name', '강사명'), f('regular_price', '정가', 'number'), f('list_price', '판매가', 'number'), f('duration_label', '수강 기간'), f('schedule_label', '일정 안내'), f('status', '공개 상태', 'select', false, ['draft', 'published', 'archived']), f('thumbnail_url', '목록 이미지', 'image'), f('seo_title', '검색 제목'), f('seo_description', '검색 설명', 'textarea'), f('cta_label', 'Button Label'), f('cta_url', 'Destination URL'), f('cta_color', 'CTA Button Color'), f('meta_pixel_id', 'Meta Pixel ID')] },
     { key: 'cohorts', title: '기수·회차 관리', group: '클래스 관리', table: 'cohorts', fields: [f('course_id', '상품', 'course', true), f('name', '기수명', 'text', true), f('cohort_code', '기수 코드', 'text', true), f('price', '기수 판매가', 'number', true), f('capacity', '정원', 'number'), f('recruitment_start_at', '모집 시작', 'datetime-local'), f('recruitment_end_at', '모집 마감', 'datetime-local'), f('operation_start_at', '운영 시작', 'datetime-local'), f('operation_end_at', '운영 종료', 'datetime-local'), f('status', '상태', 'select', false, ['upcoming', 'recruiting', 'closed', 'in_progress', 'completed', 'cancelled'])] },
@@ -61,7 +63,7 @@ export const sections: Section[] = [
     { key: 'tags', title: '고객 태그', group: '고객 관리', table: 'crm_tags', fields: [f('name', '태그명', 'text', true), f('color', '태그 색상', 'color'), f('description', '설명', 'textarea')] },
     { key: 'coupons', title: '쿠폰 관리', group: '고객 관리', table: 'coupons', fields: [f('name', '쿠폰명', 'text', true), f('code', '쿠폰 코드', 'text', true), f('discount_type', '할인 유형', 'select', true, ['fixed', 'percentage']), f('discount_value', '할인 금액 / 비율', 'number', true), f('usage_limit', '총 사용 한도', 'number'), f('starts_at', '사용 시작', 'datetime-local'), f('ends_at', '사용 종료', 'datetime-local'), f('is_active', '사용 가능', 'checkbox')] },
     { key: 'product-reviews', title: '상품 후기', group: '고객 관리', table: 'reviews', fields: [f('status', '공개 상태', 'select', false, ['pending', 'published', 'hidden']), f('is_featured', '대표 후기', 'checkbox')] },
-    { key: 'banners', title: '메인 배너', group: '콘텐츠 관리', table: 'site_banners', fields: [f('eyebrow', '상단 문구'), f('title', '제목', 'text', true), f('description', '설명', 'textarea'), f('image_path', '배너 이미지', 'image'), f('link_label', '버튼 이름'), f('link_url', '연결 주소', 'url'), f('is_active', '사용', 'checkbox'), f('display_order', '노출 순서', 'number'), f('starts_at', '노출 시작', 'datetime-local'), f('ends_at', '노출 종료', 'datetime-local')] },
+    { key: 'banners', title: '메인 배너', group: '콘텐츠 관리', table: 'site_banners', fields: [{ ...f('eyebrow', '브랜드 상단 문구'), maxLength: bannerTextLimits.eyebrow }, { ...f('title', '메인 제목', 'text', true), maxLength: bannerTextLimits.title }, { ...f('description', '설명 문구', 'textarea'), maxLength: bannerTextLimits.description }, f('image_path', '배너 배경 이미지', 'image'), { ...f('link_label', 'CTA 버튼 문구'), maxLength: bannerTextLimits.link_label }, f('link_url', 'CTA 연결 주소', 'url'), f('is_active', '프론트 노출', 'checkbox'), f('display_order', '슬라이드 순서', 'number'), f('starts_at', '노출 시작', 'datetime-local'), f('ends_at', '노출 종료', 'datetime-local')] },
     { key: 'articles', title: '아티클', group: '콘텐츠 관리', table: 'articles', fields: [f('title', '제목', 'text', true), f('slug', '페이지 주소', 'text', true), f('summary', '요약', 'textarea'), f('cover_image_path', '대표 썸네일', 'image'), f('cover_image_alt', '대표 썸네일 대체 문구'), f('content_type', '종류', 'select', false, ['column', 'video']), f('content_blocks', '아티클 본문', 'blocks'), f('video_url', '영상 URL', 'url'), f('status', '공개 상태', 'select', false, ['draft', 'published', 'hidden']), f('is_featured', '대표 노출', 'checkbox')] },
     { key: 'testimonials', title: '고객 후기', group: '콘텐츠 관리', table: 'review_videos', fields: [f('title', '제목', 'text', true), f('reviewer_name', '고객명', 'text', true), f('reviewer_role', '직업'), f('description', '내용', 'textarea'), f('video_url', '영상 URL', 'url', true), f('thumbnail_url', '썸네일', 'image'), f('is_published', '공개', 'checkbox')] },
     { key: 'orders', title: '주문 결제', group: '매출 관리', table: 'orders', readOnly: true, fields: [] },

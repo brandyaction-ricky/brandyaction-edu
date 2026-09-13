@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     const db = createAdminClient();
     if (!id) {
       const [courses, configs] = await Promise.all([
-        db.from('courses').select('id,title,slug,status').eq('list_price', 0).is('archived_at', null).order('created_at', { ascending: false }),
+        db.from('courses').select('id,title,slug,status,category').eq('category', 'free').is('archived_at', null).order('created_at', { ascending: false }),
         db.from('landing_configs').select('id,enabled,layout_ver'),
       ]);
       if (courses.error || configs.error) throw Error('무료클래스 목록을 불러오지 못했습니다.');
@@ -26,7 +26,7 @@ export async function GET(request: Request) {
         return { ...course, tracking: !config?.layout_ver ? 'not_configured' : config.enabled ? 'active' : 'paused' };
       }) });
     }
-    const course = await db.from('courses').select('id').eq('id', id).eq('list_price', 0).is('archived_at', null).maybeSingle();
+    const course = await db.from('courses').select('id').eq('id', id).eq('category', 'free').is('archived_at', null).maybeSingle();
     if (course.error) throw Error('무료클래스를 확인하지 못했습니다.');
     if (!course.data) return reply({ error: '조회할 무료클래스가 없습니다.' }, 404);
     // Only aggregates leave the server; never send visitor/session identifiers or raw events.

@@ -88,7 +88,7 @@ export const sectionDescription: Record<string, string> = {
   tags: "고객의 수강·구매 행동과 운영 기준으로 태그를 관리합니다.",
   coupons: "할인 금액·기간·수량과 적용 조건을 관리합니다.",
   "product-reviews": "수강 후기를 검토하고 공개 여부와 대표 노출을 관리합니다.",
-  banners: "메인 이미지와 연결 링크·노출 기간을 관리합니다.",
+  banners: "프론트 메인 배너의 문구·이미지·CTA·슬라이드 순서와 노출 기간을 관리합니다.",
   articles: "글·영상 콘텐츠의 편집과 공개 상태를 관리합니다.",
   testimonials: "홈페이지에 노출할 고객 사례와 영상을 관리합니다.",
   orders: "주문·결제·환불 상태와 수강 권한을 함께 확인합니다.",

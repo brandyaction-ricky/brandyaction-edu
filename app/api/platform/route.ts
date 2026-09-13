@@ -1,11 +1,11 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { getAuthenticatedUser } from '@/lib/server-auth';
-import { sections, safeUrl, type Row } from '@/lib/platform';
+import { bannerTextLimits, sections, safeUrl, type Row } from '@/lib/platform';
 import { hasLearningAccess } from '@/lib/platform-rules';
 import { getEduSettings } from '@/lib/edu-settings';
 import { gradeQuiz, type QuizDefinition } from '@/lib/mission-quiz';
-import { adminTables, archiveValues, phoneNumber, validImage, assetPath, databaseMessage } from '@/lib/qa-rules';
+import { adminTables, archiveValues, phoneNumber, validImage, assetPath, imagePreviewUrl, databaseMessage } from '@/lib/qa-rules';
 import { POLICY_VERSION } from '@/lib/legal-policies';
 import { getOperatorUser, permissionsFor, sectionScopes } from '@/lib/operator-permissions';
 import { crmDeliveryState } from '@/lib/crm-delivery';
@@ -74,7 +74,10 @@ export async function GET(request: Request) {
                 query = serverPaged ? query.range((page - 1) * pageSize, page * pageSize - 1) : query.limit(1000);
                 if (table === 'edu_questions' && !adminMode) query = query.eq('is_archived', false);
                 if (table === 'site_settings' && adminMode && operator?.role !== 'admin') query = query.not('key', 'like', 'edu_staff_permissions_%');
-                if (['courses', 'review_videos', 'site_banners', 'curriculum_lessons', 'reviews'].includes(table)) query = query.order('display_order');
+                if (['courses', 'review_videos', 'site_banners', 'curriculum_lessons', 'reviews'].includes(table)) {
+                    query = query.order('display_order');
+                    if (table === 'site_banners') query = query.order('created_at');
+                }
                 else if (table === 'curriculum_weeks') query = query.order('week_number');
                 else if (table === 'lesson_progress') query = query.order('updated_at', { ascending: false });
                 else if (!['site_settings', 'lesson_contents', 'mission_quizzes', 'cohort_session_contents', 'crm_member_tags'].includes(table)) query = query.order('created_at', { ascending: false });
@@ -90,6 +93,9 @@ export async function GET(request: Request) {
                 if (serverPaged) pagination = { page, pageSize, total: r.count || 0 };
             }),
         ]);
+        for (const banner of data.site_banners || []) {
+            banner.image_url = imagePreviewUrl(String(banner.image_path || ''), process.env.NEXT_PUBLIC_SUPABASE_URL || '');
+        }
         if (adminMode && sectionKey === 'products' && data.courses?.length) {
             // Preserve existing landing CTA settings until the product explicitly overrides them.
             const configs = await db.from('landing_configs').select('id,kakao_url,cta_label,pixel_enabled,pixel_id').in('id', data.courses.map(course => course.id));
@@ -370,6 +376,15 @@ export async function POST(request: Request) {
                 for (const field of section.fields.filter((f) => f.required)) if (!(field.key in values)) fail(`${field.label}을 입력해 주세요.`);
             }
             if (section.table === 'cohorts' && values.capacity !== undefined && values.capacity !== null && (!Number.isSafeInteger(values.capacity) || Number(values.capacity) < 1)) fail('정원은 1명 이상의 정수로 입력해 주세요.');
+            if (section.table === 'site_banners') {
+                for (const [key, limit] of Object.entries(bannerTextLimits)) {
+                    if (!(key in values) || values[key] === null) continue;
+                    const copy = String(values[key]).trim();
+                    if (copy.length > limit) fail(`${sections.find((item) => item.key === 'banners')?.fields.find((field) => field.key === key)?.label || key}은 ${limit}자 이하로 입력해 주세요.`);
+                    values[key] = copy || null;
+                }
+                if (values.display_order !== undefined && values.display_order !== null && !Number.isSafeInteger(values.display_order)) fail('슬라이드 순서는 정수로 입력해 주세요.');
+            }
             if (section.table === 'profiles' && 'phone' in values) {
                 try {
                     values.phone = phoneNumber(values.phone);

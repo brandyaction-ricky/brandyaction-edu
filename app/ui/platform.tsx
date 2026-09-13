@@ -4,7 +4,6 @@ import { createMutationGate } from "@/lib/mutation-gate";
 import { sectionScopes } from "@/lib/operator-scopes";
 import {
   labels,
-  number as num,
   object,
   safeNext,
   safeUrl,
@@ -63,6 +62,7 @@ import {
 } from "./final/public-views";
 import { OrderResult } from "./order-result";
 import { SiteFooter } from "./final/site-footer";
+import { HomeHero } from "./final/home-hero";
 type Data = Record<string, Row[]>;
 const nav = [
   ["/classes?type=free", "무료 클래스"],
@@ -251,8 +251,8 @@ export function Platform({
   );
   const availableCourses = homepageCourses(courses, rows("cohorts"));
   const free =
-    recruitingCourses.find((c) => num(c, "list_price") === 0) ||
-    courses.find((c) => num(c, "list_price") === 0);
+    recruitingCourses.find((c) => t(c, "category") === "free") ||
+    courses.find((c) => t(c, "category") === "free");
   const freeOpen = !!free && recruitingCourses.some((c) => c.id === free.id);
   const selected = courses.find((c) => c.slug === path[1] || c.id === path[1]);
   async function social(provider: "google" | "kakao") {
@@ -420,95 +420,11 @@ export function Platform({
   else if (path.length === 0)
     body = (
       <>
-        <section className="brand-hero">
-          <div className="wrap">
-            <div className="hero-grid">
-              <div className="hero-copy">
-                <div className="eyebrow">BRANDYACTION EDU · LEARN TO ACT</div>
-                <h1>
-                  배운 것을,
-                  <br />
-                  <em>내 일의 성과로.</em>
-                </h1>
-                <p className="lead">
-                  AI와 마케팅을 아는 것에서 끝내지 마세요.
-                  <br />내 업무에 적용하고, 실행한 결과를 남기는 교육.
-                </p>
-                <div className="hero-actions">
-                  <Link
-                    href={free ? "/classes/" + free.slug : "/classes?type=free"}
-                    className="btn primary large"
-                  >
-                    무료 클래스부터 시작하기 <ArrowRight />
-                  </Link>
-                  <Link className="hero-secondary" href="/classes">
-                    전체 클래스 보기 <ArrowRight />
-                  </Link>
-                </div>
-                <p className="hero-support">
-                  실행 중심 클래스 · 내 업무에 적용하는 학습
-                </p>
-              </div>
-              {free ? (
-                <Link className="featured-offer" href={"/classes/" + free.slug}>
-                  <div className="offer-top">
-                    <span className="eyebrow">
-                      {freeOpen
-                        ? "NOW OPEN / FREE CLASS"
-                        : "FREE CLASS / 다음 모집 준비 중"}
-                    </span>
-                    <span className="offer-status">무료 클래스</span>
-                  </div>
-                  <div className="offer-content">
-                    <span className="offer-category">
-                      01 / 내 업무를 바꾸는 첫 클래스
-                    </span>
-                    <h2>{t(free, "title")}</h2>
-                    <p>{t(free, "summary")}</p>
-                  </div>
-                  <dl className="offer-spec">
-                    <div>
-                      <dt>일정</dt>
-                      <dd>{t(free, "schedule_label") || "상세페이지 확인"}</dd>
-                    </div>
-                    <div>
-                      <dt>진행</dt>
-                      <dd>{t(free, "duration_label") || "온라인 클래스"}</dd>
-                    </div>
-                    <div>
-                      <dt>참가비</dt>
-                      <dd>무료</dd>
-                    </div>
-                  </dl>
-                  <div className="offer-bottom">
-                    <span>클래스 자세히 보기</span>
-                    <ArrowRight />
-                  </div>
-                </Link>
-              ) : (
-                <Link className="featured-offer" href="/classes">
-                  <div className="offer-content">
-                    <span className="eyebrow">YOUR NEXT ACTION</span>
-                    <h2>
-                      내 일에 필요한
-                      <br />
-                      다음 배움을
-                      <br />
-                      찾아보세요.
-                    </h2>
-                  </div>
-                  <div className="offer-bottom">
-                    전체 클래스 보기 <ArrowRight />
-                  </div>
-                </Link>
-              )}
-            </div>
-            <div className="hero-bottom">
-              <span>지식을 넘어, 실행이 남는 학습.</span>
-              <span>LEARN. APPLY. REPEAT.</span>
-            </div>
-          </div>
-        </section>
+        <HomeHero
+          banners={rows("site_banners")}
+          freeCourse={free}
+          freeOpen={freeOpen}
+        />
         <div className="wrap">
           <section className="section recruiting-section">
             <div className="section-head">
@@ -1027,7 +943,7 @@ function Editor({
             f.key === "thumbnail_url" ? "thumbnailUrl" : "detailImageUrl"
           ]
         : row?.[f.key];
-    const props = { name: f.key, id: "edit-" + f.key, required: f.required };
+    const props = { name: f.key, id: "edit-" + f.key, required: f.required, maxLength: f.maxLength };
     if (f.type === "blocks") return <BlocksField name={f.key} value={value} />;
     if (["image", "resource"].includes(f.type || ""))
       return (
@@ -1036,6 +952,7 @@ function Editor({
           value={String(value || "")}
           image={f.type === "image"}
           disabled={pending}
+          optimize={section.key === "banners"}
         />
       );
     if (f.type === "checkbox")
@@ -1153,6 +1070,11 @@ function Editor({
             </dl>
           ) : (
             <>
+              {section.key === "banners" && (
+                <div className="notice mb24">
+                  이 화면의 상단 문구·메인 제목·설명 문구·CTA가 프론트 메인 배너에 그대로 표시됩니다. 활성 배너가 2개 이상이면 슬라이드 순서대로 자동 전환됩니다.
+                </div>
+              )}
               {section.key === "customers" && row && (
                 <div className="customer-detail">
                   <div className="drawer-profile">
