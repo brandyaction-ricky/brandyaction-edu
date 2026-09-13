@@ -1,4 +1,5 @@
 import { CTA_IDS, TEST_COOKIE, decodeLabel, validId, isTestRequest, rawAttribution, type LandingConfig, type LandingEvent } from './landing';
+import { createEngagementMeter } from './landing-engagement';
 
 type Pixel = ((...args: unknown[]) => void) & { callMethod?: (...args: unknown[]) => void; queue?: unknown[][]; push?: Pixel; loaded?: boolean; version?: string };
 declare global { interface Window { fbq?: Pixel; _fbq?: Pixel; eduPixelIds?: Set<string>; } }
@@ -48,6 +49,16 @@ export function startLandingTracking(root: HTMLElement, config: LandingConfig) {
   }
   let destroyed = false;
   const prefix = `edu-landing:${config.id}:${session}:${config.layout_ver}`;
+  let previousEngagement = null;
+  try { previousEngagement = JSON.parse(sessionStorage.getItem(prefix + ':engagement') || 'null'); } catch {}
+  const engagement = createEngagementMeter(previousEngagement, performance.now());
+  const pageEventId = crypto.randomUUID();
+  const sampleEngagement = () => engagement.sample(document.visibilityState === 'visible', Math.max(0, Math.min(100, scrollY / Math.max(1, document.documentElement.scrollHeight - innerHeight) * 100)), performance.now());
+  const pageEvent = (): LandingEvent => {
+    const payload = sampleEngagement();
+    try { sessionStorage.setItem(prefix + ':engagement', JSON.stringify(payload)); } catch {}
+    return { id: pageEventId, event_type: 'view_page', payload };
+  };
   const send = (events: LandingEvent[]) => {
     if (!events.length || syncTestMode()) return;
     try {
@@ -60,10 +71,8 @@ export function startLandingTracking(root: HTMLElement, config: LandingConfig) {
     } catch {}
   };
   try {
-    if (!sessionStorage.getItem(prefix + ':page')) {
-      send([{ id: crypto.randomUUID(), event_type:'view_page', payload:{} }]);
-      sessionStorage.setItem(prefix + ':page','1');
-    }
+    // The server deduplicates this stable page row while accepting cumulative engagement.
+    send([pageEvent()]);
     if (config.pixel_enabled && !sessionStorage.getItem(prefix + ':pixel:' + config.pixel_id)) { pixel(config,'PageView'); sessionStorage.setItem(prefix + ':pixel:' + config.pixel_id,'1'); }
   } catch { pixel(config,'PageView'); }
   type State = { id: string; dwell: number; since: number; visible: boolean; reached: boolean };
@@ -74,7 +83,7 @@ export function startLandingTracking(root: HTMLElement, config: LandingConfig) {
   const pause = (s: State) => { if(s.since) s.dwell += performance.now() - s.since; s.since = 0; };
   const persist = (el: HTMLElement,s: State) => { try { sessionStorage.setItem(prefix + ':' + el.dataset.section, JSON.stringify({ id:s.id, dwell:s.dwell, reached:s.reached })); } catch {} };
   const flush = () => {
-    const events: LandingEvent[] = [];
+    const events: LandingEvent[] = [pageEvent()];
     for(const [el,s] of states) {
       if (!s.reached) continue;
       pause(s); persist(el,s); events.push(eventFor(el,s));
@@ -85,6 +94,7 @@ export function startLandingTracking(root: HTMLElement, config: LandingConfig) {
   // Use half of the viewport for tall image sections, which can never be 50% of their own height.
   const measure = () => {
     if(destroyed) return;
+    sampleEngagement();
     let best = 0;
     for(const [el,s] of states) {
       const r = el.getBoundingClientRect();
@@ -132,6 +142,7 @@ export function startLandingTracking(root: HTMLElement, config: LandingConfig) {
   };
   const cleanupVisibility: (()=>void)[]=[];
   root.addEventListener('click',click); window.addEventListener('scroll',scroll,{passive:true}); window.addEventListener('resize',scroll); window.addEventListener('pagehide',flush); document.addEventListener('visibilitychange',visibility);
+  const heartbeat = setInterval(() => { if (document.visibilityState === 'visible') flush(); }, 15000);
   discover();
-  return () => { destroyed=true; flush(); observer?.disconnect(); mutations.disconnect(); timers.forEach(clearTimeout); cleanupVisibility.forEach(fn=>fn()); if(frame)cancelAnimationFrame(frame); root.removeEventListener('click',click); window.removeEventListener('scroll',scroll); window.removeEventListener('resize',scroll); window.removeEventListener('pagehide',flush); document.removeEventListener('visibilitychange',visibility); };
+  return () => { destroyed=true; clearInterval(heartbeat); flush(); observer?.disconnect(); mutations.disconnect(); timers.forEach(clearTimeout); cleanupVisibility.forEach(fn=>fn()); if(frame)cancelAnimationFrame(frame); root.removeEventListener('click',click); window.removeEventListener('scroll',scroll); window.removeEventListener('resize',scroll); window.removeEventListener('pagehide',flush); document.removeEventListener('visibilitychange',visibility); };
 }
