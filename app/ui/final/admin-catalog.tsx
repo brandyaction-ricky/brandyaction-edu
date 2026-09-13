@@ -978,7 +978,7 @@ export function AdminCatalog({
         <section className="panel"><div className="panel-head"><h2>자동 태그 적용 흐름</h2></div><div className="panel-body"><div className="workflow-row"><span>로그인 회원의 행동</span><span>태그 조건 확인</span><span className="active">태그 부여</span></div><p className="mt16">무료 클래스 학습 완료와 유료 상품 결제처럼 확인 가능한 회원 행동을 기준으로 자동 분류합니다.</p></div></section>
         <section className="panel"><div className="panel-head"><h2>조건 변경 시 영향</h2></div><div className="panel-body"><h3>자동 태그와 수동 태그를 구분해 관리</h3><p className="mt8">자동 태그는 연결된 행동 조건에 따라 갱신됩니다. 수동 태그는 회원 관리에서 직접 부여하거나 해제할 수 있습니다.</p><p className="privacy-note mt16">태그 이름과 설명을 변경해도 자동 부여 기준은 변경되지 않습니다.</p></div></section>
       </div>}
-      <details className="catalog-bulk-tools mt24" onToggle={(event) => { if (!(event.currentTarget as HTMLDetailsElement).open) { setBulkMode(false); setSelection([]); } }}>
+      {s.key !== "products" && <details className="catalog-bulk-tools mt24" onToggle={(event) => { if (!(event.currentTarget as HTMLDetailsElement).open) { setBulkMode(false); setSelection([]); } }}>
         <summary>목록 내보내기 · 선택 관리</summary>
         <div className="catalog-bulk-body">
           <label className="checkline"><input type="checkbox" checked={bulkMode} onChange={(event) => { setBulkMode(event.target.checked); setSelection([]); }} />목록 선택 표시</label>
@@ -1012,7 +1012,7 @@ export function AdminCatalog({
             )}
           </div>
         </div>
-      </details>
+      </details>}
       {tools && (
         <details className="panel operation-tools mb24">
           <summary className="section-pad">
@@ -1026,12 +1026,6 @@ export function AdminCatalog({
           </summary>
           <div className="panel-body">{tools}</div>
         </details>
-      )}
-      {s.key === "products" && (
-        <div className="notice mt24">
-          상품은 가격·판매·자료의 단위, 기수는 일정·정원·수강생의 단위로
-          분리합니다. 상품을 수정해도 기존 주문 금액은 소급 변경하지 않습니다.
-        </div>
       )}
     </>
   );

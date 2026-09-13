@@ -255,6 +255,11 @@ export function Platform({
     courses.find((c) => t(c, "category") === "free");
   const freeOpen = !!free && recruitingCourses.some((c) => c.id === free.id);
   const selected = courses.find((c) => c.slug === path[1] || c.id === path[1]);
+  const freeClassDetail =
+    path[0] === "classes" &&
+    path.length > 1 &&
+    !!selected &&
+    courseType(selected) === "무료 클래스";
   async function social(provider: "google" | "kakao") {
     setPending(true);
     setNotice("");
@@ -774,7 +779,13 @@ export function Platform({
     );
   }
   return (
-    <div className={admin ? "edu-admin" : "edu-front"}>
+    <div
+      className={
+        admin
+          ? "edu-admin"
+          : "edu-front" + (freeClassDetail ? " free-class-detail-page" : "")
+      }
+    >
       {!admin && header}
       <main
         id="main"

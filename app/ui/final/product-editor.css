@@ -37,6 +37,12 @@
 .edu-admin .product-editor .product-entitlements svg { width: 20px; height: 20px; padding: 2px; border-radius: 2px; color: white; background: var(--red); }
 .edu-admin .product-editor .product-html-preview { width: 100%; min-height: 240px; max-height: 520px; overflow: auto; border: 1px solid var(--line); border-radius: 4px; background: white; }
 .edu-admin .product-editor .detail-upload-intro { margin: -4px 0 20px; }
+.edu-admin .product-editor .detail-mode-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 4px; margin-bottom: 24px; border-radius: 8px; background: var(--surface-subtle); }
+.edu-admin .product-editor .detail-mode-tabs button { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 52px; border: 0; border-radius: 6px; color: var(--text-secondary); background: transparent; font: inherit; font-weight: 600; cursor: pointer; }
+.edu-admin .product-editor .detail-mode-tabs button.active { color: white; background: var(--red); box-shadow: 0 1px 3px #17243826; }
+.edu-admin .product-editor .detail-mode-tabs svg { width: 20px; height: 20px; }
+.edu-admin .product-editor .detail-gallery { margin-top: 0; padding-top: 0; border-top: 0; }
+.edu-admin .product-editor .detail-gallery-list { grid-template-columns: minmax(0, 1fr); }
 .edu-admin .product-editor .html-detail-upload { display: flex; min-height: 220px; margin: 0; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; border-style: dashed; background: #fafbfc; }
 .edu-admin .product-editor .html-detail-upload.has-file { border-color: #99bba9; background: #f8fcfa; }
 .edu-admin .product-editor .html-detail-upload > svg { margin: 0; color: var(--muted); }
@@ -74,6 +80,7 @@
   .edu-admin .product-editor .editor-savebar .btn { flex: 1; padding-inline: 12px; }
   .edu-admin .product-editor .product-html-preview { max-height: 360px; }
   .edu-admin .product-editor .side-preview { margin-top: 24px; }
+  .edu-admin .product-editor .detail-mode-tabs button { min-height: 48px; font-size: 13px; }
 }
 
 .edu-admin .product-editor .product-upload .upload-inline { display: flex; flex-direction: column; align-items: center; gap: 12px; }
