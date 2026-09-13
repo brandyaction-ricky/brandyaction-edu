@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { PERFORMANCE_PERIODS, type PerformanceCourse, type PerformancePeriod, type PerformanceReport } from '@/lib/landing-performance';
 import { PerformanceDashboard } from './performance-dashboard';
-import './performance.css';
 
 export function LandingAdmin() {
   const [courses, setCourses] = useState<PerformanceCourse[]>([]);
@@ -51,21 +50,19 @@ export function LandingAdmin() {
   const loading = list.loading || (!!selected && !fresh);
   const error = list.error || (fresh ? result.error : '');
   const report = !error && fresh ? result.report : undefined;
-  return <div className="landing-admin performance-admin">
-    <header className="performance-heading">
-      <div><h1>Marketing Performance</h1><p>무료클래스의 방문과 CTA 전환 성과를 확인하세요.</p></div>
-      <div className="performance-periods" role="group" aria-label="조회 기간">{PERFORMANCE_PERIODS.map(days => <button key={days} type="button" aria-pressed={period === days} onClick={() => setPeriod(days)}>{days}D</button>)}</div>
-    </header>
-    <div className="performance-toolbar">
-      <label>대상 무료클래스<select aria-label="대상 무료클래스" value={selected} onChange={event => setSelected(event.target.value)} disabled={!courses.length}>{!courses.length && <option value="">등록된 무료클래스 없음</option>}{courses.map(course => <option key={course.id} value={course.id}>{course.title}{course.status === 'published' ? '' : ' · 미공개'}</option>)}</select></label>
-      {current && <span className={'performance-tracking ' + current.tracking}>{current.tracking === 'active' ? '데이터 수집 중' : current.tracking === 'paused' ? '데이터 수집 중지됨' : '수집 설정 없음'}</span>}
+  return <div className="landing-admin">
+    <div className="toolbar">
+      <label className="select-filter"><span>대상 무료클래스</span><select aria-label="대상 무료클래스" value={selected} onChange={event => setSelected(event.target.value)} disabled={!courses.length}>{!courses.length && <option value="">등록된 무료클래스 없음</option>}{courses.map(course => <option key={course.id} value={course.id}>{course.title}{course.status === 'published' ? '' : ' · 미공개'}</option>)}</select></label>
+      {current && <span className={'badge ' + (current.tracking === 'active' ? 'green' : current.tracking === 'paused' ? 'amber' : '')}>{current.tracking === 'active' ? '데이터 수집 중' : current.tracking === 'paused' ? '데이터 수집 중지됨' : '수집 설정 없음'}</span>}
+      <span className="spacer" />
+      {report && <span className="meta">{report.range.startDay} — {report.range.endDay} · KST</span>}
       <button type="button" className="btn" onClick={() => setReload(value => value + 1)}><RefreshCw size={16} aria-hidden="true" />새로고침</button>
-      {report && <span className="performance-range">{report.range.startDay} — {report.range.endDay} · KST</span>}
     </div>
-    {error ? <div className="performance-message" role="alert">{error} 새로고침으로 다시 시도해 주세요.</div>
-      : loading ? <div className="performance-message" role="status">실제 성과 데이터를 불러오고 있습니다.</div>
-      : !current ? <div className="performance-message">등록된 무료클래스가 없습니다. 상품 관리에서 등록한 무료클래스가 표시됩니다.</div>
+    <div className="tabs" role="group" aria-label="조회 기간">{PERFORMANCE_PERIODS.map(days => <button key={days} type="button" className={'tab ' + (period === days ? 'active' : '')} aria-pressed={period === days} onClick={() => setPeriod(days)}>{days}D</button>)}</div>
+    {error ? <div className="empty" role="alert"><h3>성과 데이터를 불러오지 못했습니다.</h3><p>{error} 새로고침으로 다시 시도해 주세요.</p></div>
+      : loading ? <div className="empty" role="status"><p>실제 성과 데이터를 불러오고 있습니다.</p></div>
+      : !current ? <div className="empty"><h3>등록된 무료클래스가 없습니다.</h3><p>상품 관리에서 등록한 무료클래스가 표시됩니다.</p></div>
       : report && <PerformanceDashboard report={report} />}
-    {current && !loading && !error && current.tracking !== 'active' && <p className="performance-note">{current.tracking === 'paused' ? '현재 이 클래스의 신규 데이터 수집이 중지되어 있습니다. 기존 기록만 조회하며, 수집 설정은 변경하지 않았습니다.' : '이 클래스에는 기존 트래킹 설정이 없습니다. 수집되지 않은 방문은 통계에 포함되지 않습니다.'}</p>}
+    {current && !loading && !error && current.tracking !== 'active' && <p className="notice amber mt24">{current.tracking === 'paused' ? '현재 이 클래스의 신규 데이터 수집이 중지되어 있습니다. 기존 기록만 조회하며, 수집 설정은 변경하지 않았습니다.' : '이 클래스에는 기존 트래킹 설정이 없습니다. 수집되지 않은 방문은 통계에 포함되지 않습니다.'}</p>}
   </div>;
 }
