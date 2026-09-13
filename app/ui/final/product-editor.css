@@ -36,6 +36,13 @@
 .edu-admin .product-editor .product-entitlements li { display: flex; align-items: center; gap: 10px; }
 .edu-admin .product-editor .product-entitlements svg { width: 20px; height: 20px; padding: 2px; border-radius: 2px; color: white; background: var(--red); }
 .edu-admin .product-editor .product-html-preview { width: 100%; min-height: 240px; max-height: 520px; overflow: auto; border: 1px solid var(--line); border-radius: 4px; background: white; }
+.edu-admin .product-editor .detail-upload-intro { margin: -4px 0 20px; }
+.edu-admin .product-editor .html-detail-upload { display: flex; min-height: 220px; margin: 0; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; border-style: dashed; background: #fafbfc; }
+.edu-admin .product-editor .html-detail-upload.has-file { border-color: #99bba9; background: #f8fcfa; }
+.edu-admin .product-editor .html-detail-upload > svg { margin: 0; color: var(--muted); }
+.edu-admin .product-editor .html-detail-upload > div b { display: block; margin-bottom: 6px; font-size: 15px; }
+.edu-admin .product-editor .html-detail-upload p { margin: 0; }
+.edu-admin .product-editor .html-detail-upload .html-upload-status { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
 .edu-admin .product-editor .editor-aside { top: 94px; }
 .edu-admin .product-editor .side-preview { padding: 24px; }
 .edu-admin .product-editor .side-preview .section-code { font-size: 13px; letter-spacing: 0; font-weight: 400; color: var(--muted); }

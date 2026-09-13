@@ -18,12 +18,15 @@ export default async function Page({params}:{params:Promise<{path?:string[]}>}) 
   || (root === 'payment' && ['success','fail'].includes(section) && path.length === 2)
   || (root === 'policies' && ['terms','privacy','refund'].includes(section) && path.length === 2);
  if (!valid) notFound();
- const user = await getAuthenticatedUser();
+ // The admin API verifies identity, account status and section permissions once.
+ // Stream the admin shell immediately instead of repeating Auth + profile queries.
+ const user = root === 'admin' ? null : await getAuthenticatedUser();
  return <Platform key={path.join('/')} path={path} user={user}/>;
 }
 
 export async function generateMetadata({params}:{params:Promise<{path?:string[]}>}):Promise<Metadata> {
  const {path=[]}=await params;
+ if (path[0] === 'admin') return { title: '운영 관리 | BrandyAction EDU', robots: { index: false, follow: false } };
  const {seo}=await getEduSettings();
  let title=String(seo.title||'BrandyAction EDU | 배운 것을, 내 일의 성과로.');
  let description=String(seo.description||'AI와 마케팅을 배우고 내 업무에 적용하는 실행 중심 교육.');

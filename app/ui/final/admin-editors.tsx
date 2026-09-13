@@ -10,16 +10,15 @@ import {
   type Row,
   type Section,
 } from "@/lib/platform";
-import { localDateTime, recordId } from "@/lib/platform-rules";
+import { localDateTime } from "@/lib/platform-rules";
 import { Check, Download } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
-import { BlocksField, UploadField } from "../editor-fields";
+import { BlocksField, UploadField, uploadPlatformFile } from "../editor-fields";
 import type { Data, WorkflowSend } from "../learning-workflows";
 import { AdminHeading } from "./admin-shell";
 import { Badge } from "./primitives";
-import { ProductDetailHtml } from "./product-detail-html";
-import { productDetailImages, productMetadataFields, sanitizeProductHtml } from "@/lib/product-metadata";
+import { productDetailImages, productMetadataFields, productResources, sanitizeProductHtml, type ProductResourceScope } from "@/lib/product-metadata";
 import { DetailImageGallery } from "./detail-image-gallery";
 
 function fieldValue(s: Section, row: Row | undefined, f: Field) {
@@ -144,49 +143,56 @@ function kstInput(value: unknown) {
   return new Date(Date.parse(String(value)) + 9 * 60 * 60 * 1000).toISOString().slice(0, 16);
 }
 
-function ProductResources({ data, row, pending, send }: { data: Data; row?: Row; pending: boolean; send: WorkflowSend }) {
-  const weekIds = new Set((data.curriculum_weeks || []).filter(week => week.course_id === row?.id).map(week => week.id));
-  const lessons = (data.curriculum_lessons || []).filter(lesson => weekIds.has(String(lesson.week_id)));
-  const lessonIds = new Set(lessons.map(lesson => lesson.id));
-  const resources = (data.lesson_contents || []).filter(content => lessonIds.has(String(content.lesson_id)) && content.resource_storage_path);
-  const materialLessons = lessons.filter(lesson => lesson.content_type === "material");
+function ProductResources({ row, pending, send }: { row?: Row; pending: boolean; send: WorkflowSend }) {
+  const resources = productResources(object(row, "metadata"));
   const [editing, setEditing] = useState<string | null>(null);
   const [resourceName, setResourceName] = useState("");
   const [resourcePath, setResourcePath] = useState("");
+  const [accessScope, setAccessScope] = useState<ProductResourceScope>("public");
   const [message, setMessage] = useState("");
-  const [selectedLesson, setSelectedLesson] = useState("");
   const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "error">("idle");
-  function edit(content?: Row) {
-    const lessonId = content ? String(content.lesson_id) : "";
-    setEditing(content ? lessonId : "new");
-    setSelectedLesson(lessonId);
-    setResourceName(t(content, "resource_name"));
-    setResourcePath(t(content, "resource_storage_path"));
+  const scopeLabels: Record<ProductResourceScope, string> = { public: "누구나 다운로드", authenticated: "로그인 회원", enrolled: "신청 완료 회원", purchaser: "구매자 전용" };
+  async function selectNewFile(file: File | undefined) {
+    if (!file || pending) return;
+    setMessage(""); setUploadStatus("uploading");
+    try {
+      if (!file.size || file.size > 20 * 1024 * 1024) throw new Error("20MB 이하의 파일을 선택해 주세요.");
+      const result = await uploadPlatformFile(file, "resource");
+      setEditing("new"); setResourceName(result.name); setResourcePath(result.value); setAccessScope("public"); setUploadStatus("idle");
+    } catch (cause) {
+      setUploadStatus("error"); setMessage(cause instanceof Error ? cause.message : "파일을 업로드하지 못했습니다.");
+    }
+  }
+  function edit(resource?: (typeof resources)[number]) {
+    setEditing(resource?.id || "new");
+    setResourceName(resource?.name || "");
+    setResourcePath(resource?.path || "");
+    setAccessScope(resource?.scope || "public");
     setMessage("");
     setUploadStatus("idle");
   }
   async function save() {
     if (pending || uploadStatus !== "idle") { setMessage(uploadStatus === "error" ? "업로드 오류를 해결하거나 업로드를 취소한 뒤 저장해 주세요." : "파일 업로드가 완료된 뒤 저장해 주세요."); return; }
-    if (!selectedLesson || !resourcePath.trim()) { setMessage("자료를 연결할 학습과 파일을 선택해 주세요."); return; }
-    const previous = (data.lesson_contents || []).find(content => content.lesson_id === selectedLesson);
-    if (previous && !previous.resource_storage_path && (previous.vod_url || previous.body_text || previous.external_url)) {
-      setMessage("이미 본문 또는 영상이 등록된 학습입니다. 자료 유형의 학습을 선택해 주세요."); return;
-    }
+    if (!row?.id || !resourcePath.trim()) { setMessage("상품을 저장하고 업로드할 파일을 선택해 주세요."); return; }
     try {
-      await send({ action: "save", section: "contents", id: previous ? recordId(previous) : undefined, values: { lesson_id: selectedLesson, resource_name: resourceName.trim() || resourcePath.split("/").pop(), resource_storage_path: resourcePath, vod_url: null, body_text: null, external_url: null } });
+      await send({ action: "save-product-resource", courseId: row.id, resourceId: editing !== "new" ? editing : undefined, resourceName: resourceName.trim() || resourcePath.split("/").pop(), storagePath: resourcePath, accessScope });
       setMessage("자료를 저장했습니다."); setEditing(null);
     } catch (cause) { setMessage((cause as Error).message); }
   }
+  async function remove(resourceId: string) {
+    if (!row?.id || pending || !window.confirm("이 자료를 삭제할까요?")) return;
+    try { await send({ action: "delete-product-resource", courseId: row.id, resourceId }); setEditing(null); setMessage("자료를 삭제했습니다."); }
+    catch (cause) { setMessage((cause as Error).message); }
+  }
   return <>
-    <h2>제공 자료</h2><p className="meta mt8">다운로드 파일과 연결된 학습을 관리합니다.</p>
-    <div className="product-assets mt16">{resources.map(content => <div className="asset-row" key={String(content.lesson_id)}><span className="file-icon">{String(content.resource_name || content.resource_storage_path).split(".").pop()?.slice(0, 4).toUpperCase() || "FILE"}</span><div><b>{t(content, "resource_name") || "학습 자료"}</b><p>{t(lessons.find(lesson => lesson.id === content.lesson_id), "title")} · 수강 권한 보유 회원</p></div><button className="btn small" type="button" onClick={() => edit(content)} disabled={pending || uploadStatus === "uploading"}>설정</button></div>)}</div>
+    <h2>제공 자료</h2><p className="meta mt8">업로드할 파일과 다운로드 대상을 지정합니다.</p>
+    <div className="product-assets mt16">{resources.map(resource => <div className="asset-row" key={resource.id}><span className="file-icon">{resource.name.split(".").pop()?.slice(0, 4).toUpperCase() || "FILE"}</span><div><b>{resource.name}</b><p>{scopeLabels[resource.scope]}</p></div><button className="btn small" type="button" onClick={() => edit(resource)} disabled={pending || uploadStatus === "uploading"}>설정</button></div>)}</div>
     {editing !== null ? <div className="product-resource-editor">
-      <div className="form-grid"><ProductField label="자료를 연결할 학습" wide><select value={selectedLesson} onChange={event => setSelectedLesson(event.target.value)} aria-label="자료를 연결할 학습" disabled={editing !== "new" || pending || uploadStatus === "uploading"}><option value="">학습 선택</option>{(editing === "new" ? materialLessons : lessons).map(lesson => <option value={lesson.id} key={lesson.id}>{t(lesson, "title")}</option>)}</select></ProductField><ProductField label="자료 이름" wide><input value={resourceName} onChange={event => setResourceName(event.target.value)} aria-label="자료 이름" disabled={pending} /></ProductField></div>
-      <div className="upload-box product-upload"><Download aria-hidden="true" /><p>PDF · 문서 · 템플릿 자료 추가</p><UploadField key={editing} name="product_resource_upload" value={resourcePath} image={false} disabled={pending} onChange={setResourcePath} onStatusChange={setUploadStatus} /></div>
-      <div className="row mt16"><button className="btn" type="button" onClick={() => setEditing(null)} disabled={pending || uploadStatus === "uploading"}>취소</button><button className="btn primary" type="button" onClick={() => void save()} disabled={pending || uploadStatus !== "idle" || !resourcePath || !selectedLesson}>자료 저장</button></div>
-    </div> : <div className="upload-box"><Download aria-hidden="true" /><p>{resources.length ? "PDF · 문서 · 템플릿 자료 추가" : "등록된 제공 자료가 없습니다."}</p>{materialLessons.length ? <button className="btn" type="button" onClick={() => edit()} disabled={pending}>파일 등록</button> : <Link className="btn" href="/admin/learning">자료를 연결할 학습 만들기</Link>}<p className="meta">자료는 상품에 연결된 학습 단위로 저장됩니다.</p></div>}
-    <ProductField label="기본 다운로드 권한" hint="자료 다운로드 시 로그인 및 유효한 수강 권한을 확인합니다."><div className="product-value">신청·구매 후 수강 권한 보유 회원</div></ProductField>
-    <div className="notice warning mt16">신청 또는 구매로 부여된 수강 권한이 있어야 자료를 다운로드할 수 있습니다. 환불·권한 회수 후에는 다운로드가 제한됩니다.</div>
+      <div className="form-grid"><ProductField label="자료 이름"><input value={resourceName} onChange={event => setResourceName(event.target.value)} aria-label="자료 이름" disabled={pending} placeholder="업로드 파일 이름" /></ProductField><ProductField label="다운로드 권한"><select value={accessScope} onChange={event => setAccessScope(event.target.value as ProductResourceScope)} aria-label="다운로드 권한" disabled={pending}>{Object.entries(scopeLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></ProductField></div>
+      <div className="upload-box product-upload"><Download aria-hidden="true" /><p>업로드할 파일 선택하기</p><UploadField key={editing} name="product_resource_upload" value={resourcePath} image={false} disabled={pending} onChange={setResourcePath} onStatusChange={setUploadStatus} /></div>
+      <div className="row mt16">{editing !== "new" && <button className="btn danger" type="button" onClick={() => void remove(editing)} disabled={pending || uploadStatus === "uploading"}>삭제</button>}<span className="spacer"/><button className="btn" type="button" onClick={() => setEditing(null)} disabled={pending || uploadStatus === "uploading"}>취소</button><button className="btn primary" type="button" onClick={() => void save()} disabled={pending || uploadStatus !== "idle" || !resourcePath}>무료자료 등록</button></div>
+    </div> : <div className="upload-box"><Download aria-hidden="true" /><p>{resources.length ? "PDF · 문서 · 템플릿 자료 추가" : "등록된 제공 자료가 없습니다."}</p><label className={`btn upload-label${pending || !row?.id ? " disabled" : ""}`}><input type="file" accept=".pdf,.zip,.txt,.csv,.hwp,.doc,.docx,.xls,.xlsx,.ppt,.pptx" disabled={pending || !row?.id} onChange={event => { const input = event.currentTarget; void selectNewFile(input.files?.[0]).finally(() => { input.value = ""; }); }} />{uploadStatus === "uploading" ? "업로드 중…" : "업로드할 파일 선택하기"}</label><p className="meta">파일별로 공개 범위를 설정할 수 있습니다.</p></div>}
+    <div className="notice warning mt16">누구나 다운로드부터 구매자 전용까지 파일별 권한을 설정할 수 있습니다.</div>
     {message && <p className="notice mt16" role="status">{message}</p>}
   </>;
 }
@@ -201,8 +207,6 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
   const [tab, setTab] = useState("basic");
   const [error, setError] = useState("");
   const [dirty, setDirty] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
-  const [htmlPreview, setHtmlPreview] = useState("");
   const [cohortDrafts, setCohortDrafts] = useState<Record<string, Record<string, string>>>({});
   const [htmlSource, setHtmlSource] = useState(String(metadata.detail_html || ""));
   const [htmlFilename, setHtmlFilename] = useState("");
@@ -210,9 +214,7 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
   const [preview, setPreview] = useState({ title: t(row, "title"), summary: t(row, "summary"), price: num(row, "list_price"), regular: Number(metadata.regular_price || 0), status: t(row, "status") || "draft", category: t(row, "category") || "paid_class", slug: t(row, "slug"), seoTitle: String(metadata.seo_title || ""), seoDescription: String(metadata.seo_description || "") });
   const formRef = useRef<HTMLFormElement>(null);
   const groups = [["basic", "기본·판매"], ["detail", "상세페이지"], ["resources", "제공 자료"], ["access", "수강·권한"], ["publish", "공개·검색"]] as const;
-  const weekIds = new Set((data.curriculum_weeks || []).filter(week => week.course_id === row?.id).map(week => week.id));
-  const lessonIds = new Set((data.curriculum_lessons || []).filter(lesson => weekIds.has(String(lesson.week_id))).map(lesson => lesson.id));
-  const resourceCount = (data.lesson_contents || []).filter(content => lessonIds.has(String(content.lesson_id)) && content.resource_storage_path).length;
+  const resourceCount = productResources(metadata).length;
   const previewSalePrice = preview.category === "free" ? 0 : cohort ? num(cohort, "price") : preview.price;
   const statusLabels: Record<string, string> = { draft: "작성 중", published: "판매 중", archived: "판매 종료" };
   function field(key: string, label?: string, wide = false, hint?: string) {
@@ -281,17 +283,13 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
           <details className="product-extra mt24"><summary>추가 상품 정보</summary><div className="form-grid mt16">{field("instructor_name", "강사명")}{field("schedule_label", "일정 안내")}</div></details>
         </div>
         <div className="section-pad" id="product-panel-detail" data-tab="detail" role="tabpanel" aria-labelledby="product-tab-detail" hidden={tab !== "detail"}>
-          <h2 className="mb16">상세페이지 업로드</h2><p className="meta">HTML 파일을 불러오거나 아래 본문을 편집합니다. 긴 이미지형 상세페이지도 등록할 수 있습니다.</p>
-          <div className="upload-box"><Download aria-hidden="true" /><p>상세페이지 HTML 파일 선택</p><label className="btn upload-label"><input type="file" accept=".html,.htm,text/html" disabled={pending} onChange={async event => { const file = event.target.files?.[0]; if (!file) return; if (file.size > 1024 * 1024) { setError("HTML 파일은 1MB 이하로 선택해 주세요."); return; } try { const source = await file.text(); sanitizeProductHtml(source); setHtmlSource(source); setHtmlFilename(file.name); setDirty(true); } catch (cause) { setError((cause as Error).message || "HTML 파일을 읽지 못했습니다. 다시 선택해 주세요."); } }} />파일 선택</label><p className="meta">{htmlFilename || "파일을 불러온 후 저장하면 상세페이지 본문에 반영됩니다."}</p></div>
-          <ProductField label="상세 본문 · HTML" hint="외부 스크립트와 폼 없이 본문을 등록해 주세요."><textarea className="code-editor" name="detail_html" aria-label="상세 본문 · HTML" rows={9} value={htmlSource} onChange={event => setHtmlSource(event.target.value)} disabled={pending} /></ProductField>
-          <div className="row"><button className="btn small" type="button" onClick={() => { if (showPreview) { setShowPreview(false); return; } try { setHtmlPreview(sanitizeProductHtml(htmlSource)); setShowPreview(true); } catch (cause) { setError((cause as Error).message); } }}>{showPreview ? "미리보기 닫기" : "본문 미리보기"}</button><span className="meta">저장 전 본문과 줄바꿈을 확인하세요.</span></div>
-          {showPreview && <ProductDetailHtml html={htmlPreview} className="product-detail-html safe-html-preview product-html-preview mt16" />}
+          <h2 className="mb16">상세페이지 업로드</h2><p className="meta detail-upload-intro">HTML 파일 또는 이미지형 상세페이지 중 필요한 방식을 등록할 수 있습니다.</p>
+          <input type="hidden" name="detail_html" value={htmlSource} />
+          <input type="hidden" name="description" value={t(row, "description")} />
+          <div className={`upload-box html-detail-upload${htmlSource ? " has-file" : ""}`}><Download aria-hidden="true" /><div><b>상세페이지 HTML 파일을 선택하세요</b><p className="meta">HTML·HTM · 스크립트와 폼은 자동 제외</p></div><label className="btn upload-label"><input type="file" accept=".html,.htm,text/html" disabled={pending} onChange={async event => { const input = event.currentTarget; const file = input.files?.[0]; if (!file) return; setError(""); if (!/\.html?$/i.test(file.name)) { setError("HTML 또는 HTM 파일을 선택해 주세요."); input.value = ""; return; } try { const source = await file.text(); const clean = sanitizeProductHtml(source); if (!clean.trim()) throw new Error("등록 가능한 HTML 본문이 없습니다. 파일 내용을 확인해 주세요."); setHtmlSource(clean); setHtmlFilename(file.name.normalize("NFC")); setDirty(true); } catch (cause) { setError((cause as Error).message || "HTML 파일을 읽지 못했습니다. 다시 선택해 주세요."); } finally { input.value = ""; } }} />{htmlSource ? "HTML 파일 변경" : "HTML 파일 선택"}</label><p className="html-upload-status" role="status">{htmlFilename ? `${htmlFilename} · 불러오기 완료` : htmlSource ? "기존 HTML 상세페이지가 등록되어 있습니다." : "파일을 선택한 뒤 상품을 저장하면 고객 상세페이지에 반영됩니다."}</p>{htmlSource && <button className="btn small" type="button" disabled={pending} onClick={() => { setHtmlSource(""); setHtmlFilename(""); setDirty(true); }}>등록 HTML 삭제</button>}</div>
           <DetailImageGallery key={String(row?.id || "new-product")} initial={productDetailImages(metadata)} disabled={pending} onChange={() => setDirty(true)} onStatusChange={setDetailUploadStatus} />
-          <details className="product-extra mt24"><summary>텍스트 상세 설명</summary><div className="mt16">{field("description", "텍스트 상세 설명", true, "HTML 본문이 없는 경우 표시할 상품 설명입니다.")}</div></details>
-          {row && <><div className="divider" /><h3>저장 정보</h3><div className="setting-line"><div><b>현재 상품</b><p>{row.updated_at ? new Date(String(row.updated_at)).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) : "등록된 상품 정보를 편집하고 있습니다."}</p></div><Badge color={preview.status === "published" ? "green" : ""}>{statusLabels[preview.status]}</Badge></div></>}
-          {row && preview.category === "free" && <div className="notice mt24"><p>무료 라이브의 CTA와 랜딩 이미지는 라이브 관리에서 함께 발행할 수 있습니다.</p><Link className="btn mt16" href={"/admin/landing?course=" + row.id}>무료 라이브 CTA·이미지 관리</Link></div>}
         </div>
-        <div className="section-pad" id="product-panel-resources" data-tab="resources" role="tabpanel" aria-labelledby="product-tab-resources" hidden={tab !== "resources"}><ProductResources data={data} row={row} pending={pending} send={send} /></div>
+        <div className="section-pad" id="product-panel-resources" data-tab="resources" role="tabpanel" aria-labelledby="product-tab-resources" hidden={tab !== "resources"}><ProductResources row={row} pending={pending} send={send} /></div>
         <div className="section-pad" id="product-panel-access" data-tab="access" role="tabpanel" aria-labelledby="product-tab-access" hidden={tab !== "access"}>
           <h2 className="mb16">수강·기수 연결</h2><ProductField label="연결 기수"><select value={cohortId} onChange={event => setCohortId(event.target.value)} aria-label="연결 기수" disabled={!cohorts.length || pending}>{!cohorts.length && <option value="">미연결</option>}{cohorts.map(item => <option key={item.id} value={item.id}>{t(item, "name")}</option>)}</select></ProductField>
           <div className="form-grid"><ProductField label="수강 시작 기준"><div className="product-value">주문별 수강권의 시작일 기준</div></ProductField><ProductField label="연결 기수 운영 종료"><div className="product-value">{cohort?.operation_end_at ? new Date(String(cohort.operation_end_at)).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" }) : "기수에 지정된 종료일 없음"}</div></ProductField>{field("duration_label", "고객에게 보이는 수강 기간", true)}</div>

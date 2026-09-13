@@ -77,7 +77,6 @@ export function DetailImageGallery({ initial, disabled, onChange, onStatusChange
     <div className="detail-gallery-upload">
       <div><ImagePlus aria-hidden="true" /><b>{uploading ? "이미지를 업로드하고 있습니다…" : "상세 이미지를 업로드하세요"}</b><small>여러 장 선택 가능 · JPG · PNG · WEBP · GIF · 파일당 최대 20MB</small></div>
       <label className="btn primary upload-label"><input type="file" multiple accept=".jpg,.jpeg,.png,.webp,.gif" disabled={disabled || uploading || images.length >= MAX_IMAGES} onChange={event => { void upload(event.target.files); event.currentTarget.value = ""; }} />{uploading ? "업로드 중…" : "이미지 선택"}</label>
-      <aside><b>권장 제작 기준</b><span>가로 860px 이상</span><span>위에서 아래 이어 붙임</span><span>드래그로 순서 변경</span></aside>
     </div>
     {error && <div className="notice detail-gallery-error" role="alert"><span>{error}</span><button type="button" className="btn small" onClick={() => { setError(""); onStatusChange("idle"); }}>오류 닫기 · 성공 파일 유지</button></div>}
     {images.length > 0 && <div className="detail-gallery-list">

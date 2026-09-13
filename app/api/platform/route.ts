@@ -9,7 +9,7 @@ import { adminTables, archiveValues, phoneNumber, validImage, assetPath, databas
 import { POLICY_VERSION } from '@/lib/legal-policies';
 import { getOperatorUser, permissionsFor, sectionScopes } from '@/lib/operator-permissions';
 import { crmDeliveryState } from '@/lib/crm-delivery';
-import { mergeProductMetadata, productMetadataFields } from '@/lib/product-metadata';
+import { mergeProductMetadata, mergeProductResources, productMetadataFields, productResources, productResourceScopes } from '@/lib/product-metadata';
 const reply = (data: unknown, status = 200) =>
     Response.json(data, {
         status,
@@ -29,18 +29,41 @@ export async function GET(request: Request) {
         if (record && (!uid(record) || !['products', 'learning'].includes(sectionKey))) return reply({ error: '편집할 항목을 확인해 주세요.' }, 400);
         const page = Math.max(1, Math.min(100000, Number(params.get('page')) || 1));
         const pageSize = sectionKey === 'orders' ? 30 : 100;
-        const operator = adminMode ? await getOperatorUser(sectionScopes[sectionKey]) : null;
-        if (adminMode && (!operator || (sectionKey === 'staff' && operator.role !== 'admin'))) return reply({ error: '이 화면에 접근할 운영 권한이 필요합니다.' }, 403);
+        if (adminMode && !user) return reply({ error: '로그인이 필요합니다.', user: null }, 401);
+        const operator = adminMode ? await getOperatorUser(sectionScopes[sectionKey], user) : null;
+        if (adminMode && (!operator || (sectionKey === 'staff' && operator.role !== 'admin'))) return reply({ error: '이 화면에 접근할 운영 권한이 필요합니다.', user }, 403);
         const db = adminMode ? createAdminClient() : await createClient();
         if (adminMode && !Object.hasOwn(adminTables, sectionKey)) return reply({ error: '조회 화면을 확인해 주세요.' }, 400);
+        const settings = getEduSettings();
         let tables = adminMode ? adminTables[sectionKey] : ['courses', 'cohorts', 'curriculum_weeks', 'curriculum_lessons', 'articles', 'review_videos', 'site_banners', 'reviews', 'cohort_sessions'];
         if (adminMode && sectionKey === 'home' && operator?.role === 'staff') tables = tables.filter((table) => (['courses', 'cohorts'].includes(table) && operator.permissions.products) || (['mission_submissions', 'edu_questions'].includes(table) && operator.permissions.members));
         const data: Record<string, Row[]> = {};
         let pagination: { page: number; pageSize: number; total: number } | null = null;
         const primaryTable = sections.find((section) => section.key === sectionKey)?.table;
         const deferredOrderTables = adminMode && sectionKey === 'orders' ? new Set(['order_items', 'payments', 'enrollments', 'edu_refund_requests']) : new Set<string>();
-        await Promise.all(
-            tables.filter((table) => !deferredOrderTables.has(table)).map(async (table) => {
+        await Promise.all([
+            (async () => {
+                if (!adminMode) return;
+                if (sectionKey === 'home') {
+                    const summary = await db.rpc('edu_admin_summary');
+                    if (summary.error) throw summary.error;
+                    const row = summary.data as Row;
+                    data.admin_summary = [operator?.role === 'staff' ? {
+                        id: 'staff-summary',
+                        members: operator.permissions.members ? row.members : 0,
+                        activeEnrollments: operator.permissions.members || operator.permissions.products ? row.activeEnrollments : 0,
+                        pendingReviews: operator.permissions.members ? row.pendingReviews : 0,
+                        openQuestions: operator.permissions.members ? row.openQuestions : 0,
+                        netRevenue: operator.permissions.orders ? row.netRevenue : 0,
+                    } : row];
+                } else if (operator?.role === 'admin' || operator?.permissions.members) {
+                    // The sidebar needs only this badge, not full revenue/member aggregates.
+                    const pending = await db.from('mission_submissions').select('id', { count: 'exact', head: true }).eq('status', 'submitted');
+                    if (pending.error) throw pending.error;
+                    data.admin_summary = [{ id: 'navigation-summary', pendingReviews: pending.count || 0 }];
+                }
+            })(),
+            ...tables.filter((table) => !deferredOrderTables.has(table)).map(async (table) => {
                 const columns = table === 'crm_tags' && adminMode && sectionKey === 'tags' ? '*,crm_member_tags(count)' : table === 'payments' ? 'id,order_id,method,status,approved_amount,cancelled_amount,receipt_url,approved_at,created_at' : table === 'edu_refund_requests' ? 'id,payment_id,amount,reason,status,created_at' : table === 'reviews' && !adminMode ? 'id,course_id,author_name,author_nickname,rating,body,is_featured,display_order,published_at,created_at' : '*';
                 const serverPaged = adminMode && table === primaryTable && !['home', 'members', 'reviews', 'analytics', 'metrics', 'seo', 'settings', 'staff', 'templates', 'campaigns', 'automations'].includes(sectionKey);
                 let query = db.from(table).select(columns, serverPaged ? { count: 'exact' } : undefined);
@@ -63,7 +86,7 @@ export async function GET(request: Request) {
                 data[table] = (r.data || []) as unknown as Row[];
                 if (serverPaged) pagination = { page, pageSize, total: r.count || 0 };
             }),
-        );
+        ]);
         if (adminMode && sectionKey === 'orders') {
             const orderIds = (data.orders || []).map((row) => row.id).filter(Boolean);
             data.order_items = [];
@@ -92,24 +115,24 @@ export async function GET(request: Request) {
             }
         }
         if (user && !adminMode) {
-            for (const table of ['enrollments', 'orders', 'edu_questions', 'customer_coupons', 'edu_mission_drafts']) {
+            await Promise.all(['enrollments', 'orders', 'edu_questions', 'customer_coupons', 'edu_mission_drafts'].map(async (table) => {
                 const columns = table === 'customer_coupons' ? '*,coupon:coupons(name,code,discount_type,discount_value,ends_at)' : '*';
                 let query = db.from(table).select(columns).eq('user_id', user.id).limit(1000);
                 if (table === 'edu_questions') query = query.eq('is_archived', false);
                 const r = await query;
                 if (r.error) throw r.error;
                 data[table] = r.data as unknown as Row[];
-            }
+            }));
             const orderIds = (data.orders || []).map((o) => o.id);
             if (orderIds.length) {
-                for (const table of ['order_items', 'payments']) {
+                await Promise.all(['order_items', 'payments'].map(async (table) => {
                     const result = await db
                         .from(table)
                         .select(table === 'payments' ? 'id,order_id,method,status,approved_amount,cancelled_amount,receipt_url,approved_at' : 'id,order_id,course_id,cohort_id,item_name,unit_price')
                         .in('order_id', orderIds);
                     if (result.error) throw result.error;
                     data[table] = result.data as unknown as Row[];
-                }
+                }));
             }
             const cohortIds = (data.enrollments || []).filter((e) => hasLearningAccess(e)).map((e) => e.cohort_id);
             const sessionIds = (data.cohort_sessions || []).filter((s) => cohortIds.includes(s.cohort_id)).map((s) => s.id);
@@ -120,24 +143,24 @@ export async function GET(request: Request) {
             }
             const ids = (data.enrollments || []).filter((e) => hasLearningAccess(e)).map((e) => e.id);
             if (ids.length) {
-                for (const table of ['lesson_progress', 'mission_submissions']) {
+                await Promise.all(['lesson_progress', 'mission_submissions'].map(async (table) => {
                     const r = await db.from(table).select('*').in('enrollment_id', ids);
                     if (r.error) throw r.error;
                     data[table] = r.data as Row[];
-                }
+                }));
             }
-            for (const table of ['curriculum_missions', 'lesson_contents']) {
+            await Promise.all(['curriculum_missions', 'lesson_contents'].map(async (table) => {
                 const lessons = (data.curriculum_lessons || []).filter((l) => (data.curriculum_weeks || []).some((w) => w.id === l.week_id)).map((l) => l.id);
                 if (!lessons.length) {
                     data[table] = [];
-                    continue;
+                    return;
                 }
                 let query = db.from(table).select('*').in('lesson_id', lessons).limit(1000);
                 if (table === 'curriculum_missions') query = query.eq('is_published', true);
                 const r = await query;
                 if (r.error) throw r.error;
                 data[table] = r.data as Row[];
-            }
+            }));
             const r = await db.from('reviews').select('*').eq('user_id', user.id);
             if (r.error) throw r.error;
             data.my_reviews = r.data as Row[];
@@ -180,20 +203,9 @@ export async function GET(request: Request) {
             }
         }
         if (adminMode) {
-            const summary = await db.rpc('edu_admin_summary');
-            if (summary.error) throw summary.error;
-            const summaryRow = summary.data as Row;
-            data.admin_summary = [operator?.role === 'staff' ? {
-                id: 'staff-summary',
-                members: operator.permissions.members ? summaryRow.members : 0,
-                activeEnrollments: operator.permissions.members || operator.permissions.products ? summaryRow.activeEnrollments : 0,
-                pendingReviews: operator.permissions.members ? summaryRow.pendingReviews : 0,
-                openQuestions: operator.permissions.members ? summaryRow.openQuestions : 0,
-                netRevenue: operator.permissions.orders ? summaryRow.netRevenue : 0,
-            } : summaryRow];
             if (['templates', 'campaigns', 'automations'].includes(sectionKey)) data.crm_delivery_state = [crmDeliveryState() as unknown as Row];
         }
-        const { operations } = await getEduSettings();
+        const { operations } = await settings;
         if (adminMode && data.site_settings) {
             const setting = data.site_settings.find((r) => r.key === 'edu_operations');
             if (setting) setting.value = operations;
@@ -218,6 +230,7 @@ export async function GET(request: Request) {
                         if (typeof value === 'string' && value && !/^https?:\/\//.test(value) && !value.startsWith('/')) image.path = process.env.NEXT_PUBLIC_SUPABASE_URL + '/storage/v1/object/public/course-assets/' + value;
                         return image;
                     });
+                    if (Array.isArray(metadata.product_resources)) metadata.product_resources = productResources(metadata).map(resource => ({ id: resource.id, name: resource.name, scope: resource.scope }));
                 }
             }
         if (!adminMode)
@@ -248,6 +261,34 @@ export async function POST(request: Request) {
         const body = (await request.json()) as Record<string, unknown>;
         const action = String(body.action || '');
         const db = createAdminClient();
+        if (action === 'save-product-resource' || action === 'delete-product-resource') {
+            const permissions = await permissionsFor(user);
+            if (!permissions.products) return reply({ error: '상품 관리 권한이 필요합니다.' }, 403);
+            const courseId = String(body.courseId || '');
+            if (!uid(courseId)) fail('상품을 먼저 저장한 뒤 자료를 등록해 주세요.');
+            const current = await db.from('courses').select('metadata').eq('id', courseId).single();
+            if (current.error || !current.data) fail('상품 정보를 불러오지 못했습니다.', 404);
+            const resources = productResources((current.data.metadata || {}) as Record<string, unknown>);
+            const resourceId = String(body.resourceId || '');
+            if (action === 'delete-product-resource') {
+                if (!uid(resourceId) || !resources.some(item => item.id === resourceId)) fail('삭제할 자료를 확인해 주세요.');
+                const result = await db.from('courses').update({ metadata: mergeProductResources(current.data.metadata, resources.filter(item => item.id !== resourceId)) }).eq('id', courseId);
+                if (result.error) throw result.error;
+                return reply({ ok: true });
+            }
+            const name = String(body.resourceName || '').trim();
+            const path = String(body.storagePath || '').trim();
+            const scope = String(body.accessScope || 'public');
+            if (!name || name.length > 240) fail('자료 이름을 240자 이하로 입력해 주세요.');
+            if (!/^edu\/[a-z0-9-]+\.[a-z0-9]{1,12}$/i.test(path) || path.includes('..')) fail('업로드할 파일을 선택해 주세요.');
+            if (!productResourceScopes.includes(scope as (typeof productResourceScopes)[number])) fail('다운로드 권한을 확인해 주세요.');
+            const id = uid(resourceId) ? resourceId : crypto.randomUUID();
+            const item = { id, name, path, scope: scope as (typeof productResourceScopes)[number] };
+            const next = resources.some(resource => resource.id === id) ? resources.map(resource => resource.id === id ? item : resource) : [...resources, item];
+            const result = await db.from('courses').update({ metadata: mergeProductResources(current.data.metadata, next) }).eq('id', courseId);
+            if (result.error) throw result.error;
+            return reply({ ok: true, resource: item });
+        }
         if (action === 'article-banner') {
             const permissions = await permissionsFor(user);
             if (!permissions.content) return reply({ error: '콘텐츠 관리 권한이 필요합니다.' }, 403);
