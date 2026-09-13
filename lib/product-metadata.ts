@@ -1,4 +1,6 @@
 import { safeUrl } from './platform';
+import { conversionUrl } from './product-conversion';
+import { validateProductDocument } from './product-html-document';
 
 function validProductImage(value: unknown) {
   if (typeof value !== 'string' || !value || value.length > 2048 || value.includes('..')) return false;
@@ -11,7 +13,7 @@ function validProductImage(value: unknown) {
   return /^(?:\/?(?:edu|site|images|assets|courses)\/)[a-z0-9/_\-.]+\.(?:png|jpe?g|webp|gif|avif)(?:\?[^#]*)?$/i.test(value);
 }
 
-export const productMetadataFields = ['thumbnail_url', 'detail_image_url', 'detail_images', 'regular_price', 'seo_title', 'seo_description', 'detail_html'] as const;
+export const productMetadataFields = ['thumbnail_url', 'detail_image_url', 'detail_images', 'regular_price', 'seo_title', 'seo_description', 'detail_html', 'detail_html_document', 'cta_label', 'cta_url', 'cta_color', 'meta_pixel_id'] as const;
 export type ProductDetailImage = { path: string; name: string; alt: string };
 export const productResourceScopes = ['public', 'authenticated', 'enrolled', 'purchaser'] as const;
 export type ProductResourceScope = (typeof productResourceScopes)[number];
@@ -141,6 +143,19 @@ export function mergeProductMetadata(previous: unknown, values: Record<string, u
       metadata.detail_images = images;
       metadata.detail_image_url = images[0]?.path || '';
       delete metadata.detailImageUrl;
+    } else if (field === 'detail_html_document') {
+      const source = validateProductDocument(value);
+      metadata.detail_html_document = source;
+      // Keep the legacy text-only fallback safe for older clients and search previews.
+      metadata.detail_html = sanitizeProductHtml(source);
+    } else if (field === 'cta_label' || field === 'cta_url' || field === 'cta_color' || field === 'meta_pixel_id') {
+      if (value !== null && typeof value !== 'string') throw new Error('CTA·추적 설정 형식을 확인해 주세요.');
+      const content = String(value || '').trim();
+      if (field === 'cta_label' && content.length > 100) throw new Error('버튼 문구는 100자 이하로 입력해 주세요.');
+      if (field === 'cta_url' && content && !conversionUrl(content)) throw new Error('이동 주소는 https 주소 또는 사이트 내 경로로 입력해 주세요.');
+      if (field === 'cta_color' && content && !/^#[0-9a-f]{6}$/i.test(content)) throw new Error('버튼 색상은 #을 포함한 6자리 HEX 코드로 입력해 주세요.');
+      if (field === 'meta_pixel_id' && content && !/^\d{5,30}$/.test(content)) throw new Error('Meta Pixel ID는 5~30자리 숫자로 입력해 주세요.');
+      metadata[field] = field === 'cta_url' ? conversionUrl(content) : content;
     } else if (field === 'detail_html') {
       if (value !== null && typeof value !== 'string') throw new Error('상세페이지 HTML 형식을 확인해 주세요.');
       metadata[field] = sanitizeProductHtml(value || '');

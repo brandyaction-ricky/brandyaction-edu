@@ -82,6 +82,63 @@ test('product resources preserve private storage paths and validate per-file acc
   assert.throws(() => mergeProductResources({}, [{ ...resource, scope: 'admin' }]), /정보/);
 });
 
+test('full HTML source preserves CSS separately from the safe legacy fallback', () => {
+  const source = '<!doctype html><html><head><style>:root{--red:#e22400}.hero{display:grid}@media(max-width:600px){.hero{color:red}}</style></head><body class="landing"><section class="hero" style="padding:40px"><h1>디자인 유지</h1></section><script>parent.evil()</script></body></html>';
+  const metadata = mergeProductMetadata({ campaign: { enabled: true } }, { detail_html_document: source });
+  assert.equal(metadata.detail_html_document, source);
+  assert.match(metadata.detail_html, /디자인 유지/);
+  assert.doesNotMatch(metadata.detail_html, /script|style=|class=|<style/);
+  const markup = renderToStaticMarkup(React.createElement(ProductDetailHtml, { html: metadata.detail_html, documentSource: source }));
+  assert.match(markup, /sandbox="allow-same-origin"/);
+  assert.doesNotMatch(markup, /sandbox="[^"]*allow-(scripts|forms|popups|top-navigation)/);
+  assert.match(markup, /script-src &#x27;none&#x27;/);
+  assert.match(markup, /referrerPolicy="no-referrer"/i);
+  assert.match(markup, /@media\(max-width:600px\)/);
+  assert.doesNotMatch(markup, /<script>/);
+  assert.throws(() => mergeProductMetadata({}, { detail_html_document: 12 }), /형식/);
+  assert.throws(() => mergeProductMetadata({}, { detail_html_document: 'x'.repeat(3000001) }), /3MB/);
+});
+
+test('CTA settings round-trip without clearing existing codes, metadata or resources', () => {
+  const { productConversion, conversionUrl, ctaTextColor } = load('lib/product-conversion.ts');
+  const previous = { seo_title: '검색 제목', product_resources: ['preserved'], campaign: { enabled: true } };
+  const fields = { cta_label: '무료 웨비나 참여하기', cta_url: 'https://open.kakao.com/o/test', cta_color: '#E22400', meta_pixel_id: '123456789012345' };
+  const merged = mergeProductMetadata(previous, fields);
+  assert.deepEqual(merged, { ...previous, ...fields });
+  assert.deepEqual(productConversion(merged), { label: fields.cta_label, url: fields.cta_url, color: fields.cta_color, pixelId: fields.meta_pixel_id });
+  const legacy = { kakao_url: 'https://open.kakao.com/o/legacy', cta_label: '기존 참여', pixel_enabled: true, pixel_id: '12345' };
+  assert.equal(productConversion({}, legacy).url, legacy.kakao_url);
+  assert.equal(productConversion({ cta_url: '', meta_pixel_id: '' }, legacy).url, '');
+  assert.equal(productConversion({ meta_pixel_id: '' }, legacy).pixelId, '');
+  for (const url of ['javascript:alert(1)', '//evil.test', '/\\evil.test', 'https://user:secret@example.test', 'data:text/html,x']) {
+    assert.equal(conversionUrl(url), '');
+    assert.throws(() => mergeProductMetadata({}, { cta_url: url }), /주소/);
+  }
+  assert.throws(() => mergeProductMetadata({}, { cta_color: '#FFF' }), /HEX/);
+  assert.throws(() => mergeProductMetadata({}, { meta_pixel_id: '<script>' }), /Pixel/);
+  assert.equal(ctaTextColor('#FFFFFF'), '#111111');
+  assert.equal(ctaTextColor('#000000'), '#ffffff');
+});
+
+test('deletion uses the audited archive transaction and never physically removes records', async () => {
+  let allowed = true;
+  const calls = [];
+  const route = load('app/api/platform/route.ts', {
+    '@/lib/supabase/admin': { createAdminClient: () => ({ async rpc(name, args) { calls.push([name, args]); return { data: args.p_ids.length, error: null }; } }) },
+    '@/lib/supabase/server': {}, '@/lib/server-auth': { getAuthenticatedUser: async () => ({ id: 'operator' }) },
+    '@/lib/operator-permissions': { permissionsFor: async () => ({ products: allowed }), sectionScopes: { products: 'products' } },
+    '@/lib/edu-settings': {}, '@/lib/crm-delivery': {},
+  });
+  const id = '11111111-1111-4111-8111-111111111111';
+  const send = ids => route.POST(new Request('https://edu.example/api/platform', { method: 'POST', headers: { origin: 'https://edu.example' }, body: JSON.stringify({ action: 'archive', section: 'products', ids }) }));
+  assert.equal((await send([id, id])).status, 200);
+  assert.deepEqual(calls[0], ['edu_archive_records', { p_actor: 'operator', p_section: 'products', p_ids: [id] }]);
+  assert.equal((await send(['bad'])).status, 400);
+  allowed = false;
+  assert.equal((await send([id])).status, 403);
+  assert.equal(calls.length, 1);
+});
+
 test('product save API persists approved editor metadata and stops if existing metadata cannot be loaded', async () => {
   const previous = { metadata: { campaign: { enabled: true }, thumbnail_url: 'existing.webp' } };
   const writes = [];

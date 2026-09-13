@@ -13,7 +13,7 @@ export function environment(ua: string) {
   const browser = /Instagram/i.test(ua) ? 'Instagram' : /FBAN|FBAV/i.test(ua) ? 'Facebook' : /KAKAOTALK/i.test(ua) ? 'Kakao' : /Edg\//i.test(ua) ? 'Edge' : /Firefox|FxiOS/i.test(ua) ? 'Firefox' : /Chrome|CriOS/i.test(ua) ? 'Chrome' : /Safari/i.test(ua) ? 'Safari' : 'Other';
   return { device: /iPad|Tablet/i.test(ua) ? 'tablet' : /Mobi|iPhone|Android/i.test(ua) ? 'mobile' : 'desktop', browser, isInApp: ['Instagram','Facebook','Kakao'].includes(browser) };
 }
-export function pixel(config: LandingConfig, event: string, values: Record<string, unknown> = {}, id?: string) {
+export function pixel(config: Pick<LandingConfig, 'pixel_enabled' | 'pixel_id'>, event: string, values: Record<string, unknown> = {}, id?: string) {
   if (!config.pixel_enabled || !/^\d{5,30}$/.test(config.pixel_id) || syncTestMode()) return;
   try {
     if (!window.fbq) {

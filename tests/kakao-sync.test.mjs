@@ -143,6 +143,7 @@ test('callback keeps Google/normal consent fallback and allows verified Kakao co
 });
 test('anonymous free-class CTA is not wrapped by login, signup or Sync', () => {
   const source = fs.readFileSync('app/ui/landing/free-class.tsx', 'utf8');
-  assert.match(source, /href=\{config.kakao_url\}/);
+  assert.match(source, /productConversion\(meta, config\)/);
+  assert.match(source, /<ProductCtaLink conversion=\{conversion\}/);
   assert.doesNotMatch(source, /signInWithOAuth|\/login|\/signup|kakao-sync|requestSubmit/);
 });

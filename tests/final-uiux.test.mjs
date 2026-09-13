@@ -105,6 +105,22 @@ test('article hub includes the managed free-video banner and representative thum
   assert.match(footerSource, /제2026-충남천안-1825호/);
   assert.match(footerSource, /policies\/refund/);
 });
+
+test('product HTML takes precedence over old images and per-product CTA settings reach both layouts', () => {
+  const { ProductDetail } = load('app/ui/final/public-views.tsx');
+  const changed = { ...course, category: 'free', list_price: 0, metadata: { detail_html: '<h1>원본 디자인</h1>', detail_html_document: '<style>.hero{color:red}</style><h1 class="hero">원본 디자인</h1>', detail_images: [{ path: 'https://cdn.example/old-detail.webp' }], cta_label: '새로운 참여 버튼', cta_url: 'https://example.test/webinar', cta_color: '#123456' } };
+  for (const campaigns of [[], [{ id: course.id, enabled: true, kakao_url: 'https://open.kakao.com/o/legacy', cta_label: '예전 버튼', sections: [] }]]) {
+    const markup = html(ProductDetail, { course: changed, data: { ...data, enrollments: [], landing_configs: campaigns } });
+    assert.match(markup, /상품 HTML 상세페이지/);
+    assert.doesNotMatch(markup, /old-detail.webp|예전 버튼/);
+    assert.match(markup, /새로운 참여 버튼/);
+    assert.match(markup, /href="https:\/\/example.test\/webinar"/);
+    assert.match(markup, /background-color:#123456/);
+  }
+  const { formValues } = load('app/ui/final/admin-editors.tsx');
+  const form = new FormData(); form.set('title', '이름만 변경');
+  assert.deepEqual(formValues(platform.sections.find(row => row.key === 'products'), form), { title: '이름만 변경' });
+});
 test('article management renders the free-video banner editor', () => {
   const { ArticleBannerEditor } = load('app/ui/final/article-banner-editor.tsx');
   const markup = html(ArticleBannerEditor, { settings: [], send, pending: false });
@@ -155,16 +171,22 @@ test('catalogues and separate editors render without dropping existing fields', 
   const { LearningEditor } = load('app/ui/final/learning-editor.tsx');
   const markup = html(ProductEditor, { data, row: course, pending: false, send, back() {} });
   assert.match(markup, /name="detail_images"/);
-  assert.match(markup, /multiple=""/);
+  assert.doesNotMatch(markup, /multiple=""|상세 이미지를 업로드하세요|>이미지 선택</);
   assert.match(markup, /accept="\.html,\.htm,text\/html"/);
-  assert.match(markup, /name="detail_html"/);
+  assert.match(markup, /name="detail_html_document"/);
+  assert.match(markup, /상품 삭제/);
+  assert.match(markup, /Call to Action/);
+  assert.match(markup, /Tracking integration/);
+  assert.match(markup, /name="cta_color"/);
+  assert.match(markup, /name="meta_pixel_id"/);
+  assert.doesNotMatch(markup, /상품 주소 \(slug\)|검색 결과에 표시할 설명|class="snippet"/);
   assert.doesNotMatch(markup, /200,000자|권장 제작 기준/);
   assert.doesNotMatch(markup, /상세 본문 · HTML|본문 미리보기|텍스트 상세 설명|무료 라이브 CTA·이미지 관리/);
   assert.match(markup, /업로드할 파일 선택하기/);
   assert.match(markup, /파일별로 공개 범위를 설정/);
   assert.doesNotMatch(markup, /자료를 연결할 학습 만들기/);
   assert.match(markup, /editor-savebar/);
-  for (const field of platform.sections.find(row => row.key === 'products').fields) assert.ok(markup.includes(`name="${field.key}"`), field.key);
+  for (const field of platform.sections.find(row => row.key === 'products').fields.filter(field => !['slug', 'course_code', 'seo_title', 'seo_description', 'detail_html'].includes(field.key))) assert.ok(markup.includes(`name="${field.key}"`), field.key);
   assert.match(html(LearningEditor, { data, row: lesson, pending: false, send, back() {} }), /editor-/);
 });
 test('submission review keeps queue and inspector, escaping text and unsafe links', () => {
