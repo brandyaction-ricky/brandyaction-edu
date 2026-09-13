@@ -428,7 +428,7 @@ function StandardProductDetail({
         <div className="wrap">
           <div>
             <div className="cta-price">
-              {price === 0 ? "무료" : money(price)}
+              {price === 0 ? conversion.priceLabel : money(price)}
             </div>
             <p className="meta">
               {t(available, "name") || t(c, "schedule_label")}
