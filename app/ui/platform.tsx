@@ -62,6 +62,7 @@ import {
   StoriesView,
 } from "./final/public-views";
 import { OrderResult } from "./order-result";
+import { SiteFooter } from "./final/site-footer";
 type Data = Record<string, Row[]>;
 const nav = [
   ["/classes?type=free", "무료 클래스"],
@@ -391,28 +392,7 @@ export function Platform({
         </div>
       </footer>
     ) : (
-      <footer className="footer">
-        <div className="wrap">
-          <div className="footer-top">
-            <Brand />
-            <div className="footer-links">
-              <Link href="/policies/terms">이용약관</Link>
-              <Link href="/policies/privacy">개인정보 처리방침</Link>
-              <Link href="/policies/refund">환불규정</Link>
-              <Link href="/my/questions">고객 문의</Link>
-            </div>
-          </div>
-          <div className="footer-company">
-            <p><b>주식회사 브랜디액션</b></p>
-            <p>대표 전태헌 · 안정호 <span>사업자등록번호 677-87-02769</span> <span>통신판매업 신고 제2026-충남천안-1825호</span></p>
-            <p>충남 천안시 서북구 천안천4길 32 506호 <span>대표전화 070-7736-3744</span> <a href="mailto:edu@brandyaction.co.kr">edu@brandyaction.co.kr</a></p>
-          </div>
-          <div className="footer-bottom">
-            <span>© BRANDYACTION. ALL RIGHTS RESERVED.</span>
-            <span>배움을 실행으로, 실행을 내 일의 변화로 연결합니다.</span>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter supportEmail={support.email} supportUrl={safeUrl(support.url)} />
     );
   let body: ReactNode;
   if (path[0] === "login" || path[0] === "signup")
@@ -900,7 +880,7 @@ export function Platform({
         {body}
       </main>
       {!admin && footer}
-      {!admin && (support.email || safeUrl(support.url)) && (
+      {(account || learning) && (support.email || safeUrl(support.url)) && (
         <div className="wrap flex gap8 mb24">
           {support.email && (
             <a className="link" href={"mailto:" + support.email}>

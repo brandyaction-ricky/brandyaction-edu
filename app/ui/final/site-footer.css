@@ -1,0 +1,40 @@
+.edu-front .site-footer {
+  padding: 48px 0 28px;
+  background: #111111;
+  color: #b3b3b3;
+  font-size: 14px;
+  line-height: 22px;
+  letter-spacing: -.025em;
+}
+.edu-front .site-footer-inner { width: min(1360px, calc(100% - 64px)); margin: 0 auto; }
+.edu-front .site-footer-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 32px; }
+.edu-front .site-footer-name { display: inline-block; color: #f5f5f5; font-size: 20px; line-height: 28px; font-weight: 800; letter-spacing: -.045em; }
+.edu-front .site-footer-description { margin: 9px 0 0; color: #909090; font-size: 12px; line-height: 18px; }
+.edu-front .site-footer-links { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; }
+.edu-front .site-footer-links a { display: inline-flex; align-items: center; min-height: 24px; color: #d5d5d5; font-size: 13px; line-height: 20px; font-weight: 700; white-space: nowrap; }
+.edu-front .site-footer-company { margin-top: 32px; padding-top: 24px; border-top: 1px solid #333333; }
+.edu-front .site-footer dl { margin: 0; }
+.edu-front .site-footer-business { display: flex; flex-wrap: wrap; column-gap: 24px; row-gap: 9px; }
+.edu-front .site-footer dl > div { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.edu-front .site-footer dt { flex-shrink: 0; color: #d5d5d5; font-size: 13px; font-weight: 700; }
+.edu-front .site-footer dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.edu-front .site-footer .site-footer-contact { display: grid; gap: 9px; margin-top: 9px; }
+.edu-front .site-footer-copyright { margin: 30px 0 0; color: #777777; font-size: 12px; line-height: 18px; letter-spacing: -.015em; }
+.edu-front .site-footer a:hover { color: #ffffff; }
+.edu-front .site-footer a:focus-visible { outline: 2px solid #d5d5d5; outline-offset: 5px; border-radius: 2px; }
+
+@media (max-width: 900px) {
+  .edu-front .site-footer-top { flex-direction: column; gap: 20px; }
+  .edu-front .site-footer-company { margin-top: 24px; }
+  .edu-front .site-footer-links a { min-height: 36px; }
+}
+@media (max-width: 600px) {
+  .edu-front .site-footer { padding: 36px 0 28px; font-size: 13px; }
+  .edu-front .site-footer-inner { width: calc(100% - 40px); }
+  .edu-front .site-footer-business { flex-direction: column; gap: 9px; }
+  .edu-front .site-footer-links { column-gap: 20px; }
+  .edu-front .site-footer-links a { min-height: 44px; font-size: 12px; }
+  .edu-front .site-footer-company { margin-top: 20px; padding-top: 20px; }
+  .edu-front .site-footer-copyright { margin-top: 28px; font-size: 11px; }
+}
+@media print { .edu-front .site-footer { display: none !important; } }
