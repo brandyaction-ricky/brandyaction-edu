@@ -95,7 +95,13 @@ export function validatePacket(input: unknown) {
     } else if (e.event_type === 'post_click_alive') {
       if (!(CTA_IDS as readonly unknown[]).includes(p.to) || !validId(p.clickId)) throw Error('Invalid CTA reference');
       payload.to = p.to; payload.clickId = p.clickId; payload.elapsedMs = finite(p.elapsedMs, 1000, 3600000, true);
-    } else if (e.event_type !== 'view_page') throw Error('Invalid event type');
+    } else if (e.event_type === 'view_page') {
+      // Older clients send an empty page payload; historical engagement stays unknown.
+      if (p.dwellMs !== undefined || p.scrollPct !== undefined) {
+        payload.dwellMs = finite(p.dwellMs, 0, 86400000, true);
+        payload.scrollPct = finite(p.scrollPct, 0, 100);
+      }
+    } else throw Error('Invalid event type');
     return { id: e.id, event_type: e.event_type, payload };
   });
   return { landing_id: b.landing_id, session_id: b.session_id, visitor_id: b.visitor_id, layout_ver: Number(b.layout_ver), attribution, events };

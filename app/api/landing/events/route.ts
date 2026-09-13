@@ -9,7 +9,7 @@ export async function POST(request: Request) {
     const raw = await request.text();
     if (raw.length > 48000) return new Response(null, { status: 413 });
     const packet = validatePacket(JSON.parse(raw));
-    const { error } = await createAdminClient().rpc('edu_ingest_landing', { p_packet: packet });
+    const { error } = await createAdminClient().rpc('edu_ingest_landing_performance', { p_packet: packet });
     return new Response(null, { status: error ? 503 : 204 });
   } catch { return new Response(null, { status: 400 }); }
 }
