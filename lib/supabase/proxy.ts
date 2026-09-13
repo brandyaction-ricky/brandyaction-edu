@@ -1,9 +1,22 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { oauthCallbackRecoveryPath } from "@/lib/oauth-callback";
 import { getSupabasePublicConfig, hasSupabaseEnv } from "./config";
 
 export async function updateSession(request: NextRequest) {
   if (!hasSupabaseEnv()) return NextResponse.next({ request });
+
+  // Supabase falls back to the configured Site URL when an OAuth redirect URL
+  // is missing from its allow list. Recover that response without accepting
+  // unrelated `?code=` query parameters on the homepage.
+  const recoveryPath = oauthCallbackRecoveryPath({
+    pathname: request.nextUrl.pathname,
+    code: request.nextUrl.searchParams.get("code"),
+    cookieNames: request.cookies.getAll().map(({ name }) => name),
+  });
+  if (recoveryPath) {
+    return NextResponse.redirect(new URL(recoveryPath, request.url));
+  }
 
   let response = NextResponse.next({ request });
   const { publicUrl, publishableKey } = getSupabasePublicConfig();
