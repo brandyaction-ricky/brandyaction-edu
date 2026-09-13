@@ -62,6 +62,7 @@ import {
   StoriesView,
 } from "./final/public-views";
 import { OrderResult } from "./order-result";
+import { SiteFooter } from "./final/site-footer";
 type Data = Record<string, Row[]>;
 const nav = [
   ["/classes?type=free", "무료 클래스"],
@@ -85,6 +86,7 @@ export function Platform({
   const [user, setUser] = useState(initialUser);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [accessDenied, setAccessDenied] = useState(false);
   const [notice, setNotice] = useState("");
   const [pending, setPending] = useState(false);
   const [mobile, setMobile] = useState(false);
@@ -117,6 +119,7 @@ export function Platform({
   } | null>(null);
   const [selection, setSelection] = useState<string[]>([]);
   const alive = useRef(true);
+  const readRequest = useRef<AbortController | null>(null);
   const mutationGate = useRef(createMutationGate<Record<string, unknown>>());
   const adminSection =
     path[1] === "product-editor"
@@ -137,12 +140,14 @@ export function Platform({
           : update,
     }));
   const refresh = useCallback(async () => {
+    readRequest.current?.abort();
+    const controller = new AbortController();
+    readRequest.current = controller;
+    setLoading(true);
     setError("");
-    if (admin && !["admin", "staff"].includes(initialUser?.role || "")) {
-      setLoading(false);
-      return;
-    }
+    setAccessDenied(false);
     try {
+      const started = performance.now();
       const response = await fetch(
         "/api/platform" +
           (admin
@@ -154,9 +159,19 @@ export function Platform({
                 ? "&record=" + encodeURIComponent(editorRecordId)
                 : "")
             : ""),
-        { cache: "no-store" },
+        { cache: "no-store", signal: controller.signal },
       );
       const result = await response.json();
+      if (admin && process.env.NEXT_PUBLIC_APP_ENV !== "production") {
+        console.debug("[edu navigation] " + JSON.stringify({ section: adminSection, durationMs: Math.round(performance.now() - started), serverTiming: response.headers.get("Server-Timing") }));
+      }
+      if (controller.signal.aborted || !alive.current) return;
+      if (admin && [401, 403].includes(response.status)) {
+        setUser(result.user || null);
+        setData({});
+        setAccessDenied(response.status === 403);
+        return;
+      }
       if (!response.ok) throw new Error(result.error);
       if (alive.current) {
         setData(result.data);
@@ -165,17 +180,18 @@ export function Platform({
         setPagination(result.pagination || null);
       }
     } catch (e) {
-      if (alive.current) setError((e as Error).message);
+      if (alive.current && !controller.signal.aborted) setError((e as Error).message);
     } finally {
-      if (alive.current) setLoading(false);
+      if (alive.current && !controller.signal.aborted) setLoading(false);
     }
-  }, [admin, adminPage, adminSection, editorRecordId, initialUser?.role]);
+  }, [admin, adminPage, adminSection, editorRecordId]);
   useEffect(() => {
     alive.current = true;
     const timer = setTimeout(() => void refresh(), 0);
     return () => {
       clearTimeout(timer);
       alive.current = false;
+      readRequest.current?.abort();
     };
   }, [refresh]);
   useEffect(() => {
@@ -376,28 +392,7 @@ export function Platform({
         </div>
       </footer>
     ) : (
-      <footer className="footer">
-        <div className="wrap">
-          <div className="footer-top">
-            <Brand />
-            <div className="footer-links">
-              <Link href="/policies/terms">이용약관</Link>
-              <Link href="/policies/privacy">개인정보 처리방침</Link>
-              <Link href="/policies/refund">환불규정</Link>
-              <Link href="/my/questions">고객 문의</Link>
-            </div>
-          </div>
-          <div className="footer-company">
-            <p><b>주식회사 브랜디액션</b></p>
-            <p>대표 전태헌 · 안정호 <span>사업자등록번호 677-87-02769</span> <span>통신판매업 신고 제2026-충남천안-1825호</span></p>
-            <p>충남 천안시 서북구 천안천4길 32 506호 <span>대표전화 070-7736-3744</span> <a href="mailto:edu@brandyaction.co.kr">edu@brandyaction.co.kr</a></p>
-          </div>
-          <div className="footer-bottom">
-            <span>© BRANDYACTION. ALL RIGHTS RESERVED.</span>
-            <span>배움을 실행으로, 실행을 내 일의 변화로 연결합니다.</span>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter supportEmail={support.email} supportUrl={safeUrl(support.url)} />
     );
   let body: ReactNode;
   if (path[0] === "login" || path[0] === "signup")
@@ -692,15 +687,16 @@ export function Platform({
     return <Checkout data={data} user={user} pending={pending} send={send} />;
   }
   function adminView() {
+    if (accessDenied) return <div className="wrap"><Empty title="이 메뉴에 접근할 운영 권한이 없습니다." /><div className="center"><Link className="btn" href="/admin">운영 홈</Link><Link className="btn" href="/my">마이페이지</Link></div></div>;
     if (!["admin", "staff"].includes(user?.role || ""))
       return (
         <div className="wrap">
-          <Empty title="운영자 로그인이 필요합니다." />
-          <div className="center">
-            <Link className="btn primary" href="/login?next=/admin">
+          <Empty title={loading ? "운영자 권한을 확인하고 있습니다." : error ? "로그인 정보를 확인하지 못했습니다." : "운영자 로그인이 필요합니다."} />
+          {!loading && !error && <div className="center">
+            <Link className="btn primary" href={"/login?next=" + encodeURIComponent("/" + routeKey)}>
               로그인하기
             </Link>
-          </div>
+          </div>}
         </div>
       );
     const available = sections.filter(
@@ -884,7 +880,7 @@ export function Platform({
         {body}
       </main>
       {!admin && footer}
-      {!admin && (support.email || safeUrl(support.url)) && (
+      {(account || learning) && (support.email || safeUrl(support.url)) && (
         <div className="wrap flex gap8 mb24">
           {support.email && (
             <a className="link" href={"mailto:" + support.email}>

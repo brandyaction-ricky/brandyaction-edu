@@ -22,7 +22,7 @@ function load(file, mocks = {}) {
   });
   return exports;
 }
-const { sanitizeProductHtml, mergeProductMetadata } = load('lib/product-metadata.ts');
+const { sanitizeProductHtml, mergeProductMetadata, mergeProductResources, productResources } = load('lib/product-metadata.ts');
 const { ProductDetailHtml } = load('app/ui/final/product-detail-html.tsx');
 test('product HTML retains content structure while rejecting executable content and attributes', () => {
   const dirty = '<!doctype html><html><head><style>body{display:none}</style></head><body><h2 onclick="evil()">AI &amp; 실행</h2><p style="color:red">소개 <strong>강조</strong></p><script>alert(1)</script><iframe src="https://evil.test"></iframe><svg><a href="javascript:evil()">x</a></svg><img src="https://cdn.example/image.webp" onerror="evil()" alt="이미지"><a href="java&#x73;cript:evil()">금지 링크</a><a href="https://example.test/class">안전 링크</a></body></html>';
@@ -47,7 +47,8 @@ test('malformed and encoded product HTML cannot create browser-controlled proper
     const rendered = renderToStaticMarkup(React.createElement(ProductDetailHtml, { html: dirty }));
     assert.doesNotMatch(rendered, /<(?:script|svg|math|iframe|style)\b|\s(?:style|onerror|onclick|srcdoc)="|href="javascript:/i);
   }
-  assert.throws(() => sanitizeProductHtml('a'.repeat(200001)), /200,000/);
+  assert.equal(sanitizeProductHtml('a'.repeat(200001)).length, 200001);
+  assert.throws(() => sanitizeProductHtml('a'.repeat(3000001)), /너무 큽니다/);
 });
 test('partial product updates preserve existing metadata and validate price and SEO boundaries', () => {
   const previous = { thumbnail_url: 'existing.webp', campaign: { enabled: true }, seo_title: '검색 제목' };
@@ -71,6 +72,14 @@ test('detail image gallery keeps legacy images, validates entries and preserves 
   assert.deepEqual(productDetailImages(merged), detail_images);
   assert.throws(() => mergeProductMetadata({}, { detail_images: [{ path: 'javascript:alert(1)' }] }), /주소/);
   assert.throws(() => mergeProductMetadata({}, { detail_images: Array.from({ length: 31 }, () => ({ path: 'edu/a.webp' })) }), /30장/);
+});
+test('product resources preserve private storage paths and validate per-file access', () => {
+  const resource = { id: '11111111-1111-4111-8111-111111111111', name: '무료 워크북.pdf', path: 'edu/11111111-1111-4111-8111-111111111111.pdf', scope: 'public' };
+  const merged = mergeProductResources({ campaign: true }, [resource]);
+  assert.deepEqual(productResources(merged), [resource]);
+  assert.equal(merged.campaign, true);
+  assert.throws(() => mergeProductResources({}, [{ ...resource, path: '../private.pdf' }]), /정보/);
+  assert.throws(() => mergeProductResources({}, [{ ...resource, scope: 'admin' }]), /정보/);
 });
 
 test('product save API persists approved editor metadata and stops if existing metadata cannot be loaded', async () => {

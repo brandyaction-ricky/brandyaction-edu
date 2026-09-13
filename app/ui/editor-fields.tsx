@@ -4,6 +4,23 @@ import { Plus, Trash2, Upload } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { imagePreviewUrl } from '@/lib/qa-rules';
 
+export type PlatformUploadKind = 'image' | 'detail-image' | 'resource';
+
+export async function uploadPlatformFile(file: File, kind: PlatformUploadKind) {
+    const response = await fetch('/api/platform/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: file.name, size: file.size, kind }),
+    });
+    const result = await response.json().catch(() => ({ error: '업로드 요청을 처리하지 못했습니다. 다시 시도해 주세요.' }));
+    if (!response.ok) throw new Error(result.error || '파일 업로드를 시작하지 못했습니다.');
+    const uploaded = await createClient().storage.from(result.bucket).uploadToSignedUrl(result.path, result.token, file, {
+        contentType: result.contentType,
+    });
+    if (uploaded.error) throw new Error(`파일 전송에 실패했습니다. ${uploaded.error.message || '다시 시도해 주세요.'}`);
+    return result as { bucket: string; path: string; token: string; contentType: string; value: string; name: string };
+}
+
 async function validImageHeader(file: File) {
     const bytes = new Uint8Array(await file.slice(0, 12).arrayBuffer());
     const extension = file.name.split('.').pop()?.toLowerCase();
@@ -31,7 +48,8 @@ export function UploadField({ name, value, image, disabled, onChange, onStatusCh
                     disabled={disabled || pending}
                     accept={image ? '.png,.jpg,.jpeg,.webp' : '.pdf,.zip,.txt,.csv,.hwp,.doc,.docx,.xls,.xlsx,.ppt,.pptx'}
                     onChange={async (e) => {
-                        let file = e.target.files?.[0];
+                        const input = e.currentTarget;
+                        let file = input.files?.[0];
                         if (!file) return;
                         setPending(true);
                         setError('');
@@ -52,21 +70,7 @@ export function UploadField({ name, value, image, disabled, onChange, onStatusCh
                                 if (!blob || blob.type !== 'image/webp') throw Error('WEBP 변환에 실패했습니다. WEBP 파일을 선택해 주세요.');
                                 file = new File([blob], file.name.replace(/\.[^.]+$/, '') + '.webp', { type: 'image/webp' });
                             }
-                            const response = await fetch('/api/platform/upload', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    name: file.name,
-                                    size: file.size,
-                                    kind: image ? 'image' : 'resource',
-                                }),
-                            });
-                            const result = await response.json();
-                            if (!response.ok) throw new Error(result.error);
-                            const uploaded = await createClient().storage.from(result.bucket).uploadToSignedUrl(result.path, result.token, file, {
-                                contentType: result.contentType,
-                            });
-                            if (uploaded.error) throw new Error('파일 전송에 실패했습니다. 다시 시도해 주세요.');
+                            const result = await uploadPlatformFile(file, image ? 'image' : 'resource');
                             setCurrent(result.value);
                             setBrokenPreview('');
                             onChange?.(result.value);
@@ -76,6 +80,7 @@ export function UploadField({ name, value, image, disabled, onChange, onStatusCh
                             onStatusChange?.('error');
                         } finally {
                             setPending(false);
+                            input.value = '';
                         }
                     }}
                 />

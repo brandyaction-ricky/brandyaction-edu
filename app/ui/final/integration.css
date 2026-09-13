@@ -920,15 +920,12 @@ body {
 .edu-admin .detail-gallery-head { align-items: flex-start; gap: var(--space-4); margin-bottom: var(--space-4); }
 .edu-admin .detail-gallery-head h3 { margin: 0 0 var(--space-1); }
 .edu-admin .detail-gallery-head > strong { color: var(--ba-info); font-size: var(--type-small); white-space: nowrap; }
-.edu-admin .detail-gallery-upload { display: grid; grid-template-columns: minmax(0, 1fr) 250px; border: 1px dashed var(--border-strong); background: var(--surface-subtle); margin-bottom: var(--space-4); }
+.edu-admin .detail-gallery-upload { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 220px; border: 1px dashed var(--border-strong); background: var(--surface-subtle); margin-bottom: var(--space-4); }
 .edu-admin .detail-gallery-upload > div { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-2); min-height: 150px; padding: var(--space-6) var(--space-4) var(--space-2); text-align: center; }
 .edu-admin .detail-gallery-upload > div svg { color: var(--ba-info); }
 .edu-admin .detail-gallery-upload > div b { font-size: var(--type-body); }
 .edu-admin .detail-gallery-upload > div small { color: var(--text-secondary); font-size: var(--type-small); }
 .edu-admin .detail-gallery-upload > .upload-label { justify-self: center; align-self: start; margin-bottom: var(--space-6); }
-.edu-admin .detail-gallery-upload > aside { grid-column: 2; grid-row: 1 / span 2; display: flex; flex-direction: column; justify-content: center; gap: var(--space-3); padding: var(--space-5); border-left: 1px solid var(--line); background: var(--surface-raised); font-size: var(--type-small); }
-.edu-admin .detail-gallery-upload > aside b { padding-bottom: var(--space-3); border-bottom: 1px solid var(--line); }
-.edu-admin .detail-gallery-upload > aside span { display: flex; justify-content: space-between; gap: var(--space-3); }
 .edu-admin .detail-gallery-error { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-4); }
 .edu-admin .detail-gallery-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
 .edu-admin .detail-gallery-item { display: grid; grid-template-columns: 20px 100px minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); min-width: 0; padding: var(--space-3); border: 1px solid var(--line); background: var(--surface-raised); }
@@ -950,8 +947,6 @@ body {
   .edu-admin .detail-gallery-list { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 680px) {
-  .edu-admin .detail-gallery-upload { grid-template-columns: minmax(0, 1fr); }
-  .edu-admin .detail-gallery-upload > aside { grid-column: 1; grid-row: auto; border-top: 1px solid var(--line); border-left: 0; }
   .edu-admin .detail-gallery-item { grid-template-columns: 16px 76px minmax(0, 1fr); }
   .edu-admin .detail-gallery-item > img,
   .edu-admin .detail-gallery-missing { width: 76px; height: 76px; }

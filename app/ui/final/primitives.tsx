@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import type { ProductResource } from "@/lib/product-metadata";
 
 export function Badge({
   children,
@@ -274,4 +275,12 @@ export function ResourceRow({ content }: { content: Row }) {
       </a>
     </div>
   );
+}
+const resourceScopeLabels = { public: "누구나 다운로드", authenticated: "로그인 후 다운로드", enrolled: "신청 완료 회원 전용", purchaser: "구매자 전용" };
+export function ProductResourceRow({ resource, courseId }: { resource: ProductResource; courseId: string }) {
+  return <div className="resource-row">
+    <div className="file-icon"><FileText /></div>
+    <div className="resource-text"><b>{resource.name}</b><small>{resourceScopeLabels[resource.scope]}</small></div>
+    <a className="btn small" href={"/api/platform/resource?course=" + encodeURIComponent(courseId) + "&resource=" + encodeURIComponent(resource.id)}><Download />다운로드</a>
+  </div>;
 }

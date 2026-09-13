@@ -81,6 +81,11 @@ test('three signup methods and product detail variants use the final publishing 
   assert.match(html(ProductDetail, { course, data }), /product-layout/);
   assert.match(html(ProductDetail, { course: { ...course, list_price: 0, category: 'free' }, data }), /free-body/);
   assert.match(html(ProductDetail, { course: { ...course, category: 'digital' }, data }), /product-layout/);
+  const resourceId = '11111111-1111-4111-8111-111111111111';
+  const currentFree = { ...course, list_price: 0, category: 'free', metadata: { detail_images: [{ path: 'https://cdn.example/current-detail.webp', name: '상세', alt: '' }], product_resources: [{ id: resourceId, name: '무료 자료.pdf', scope: 'public' }] } };
+  const campaignData = { ...data, landing_configs: [{ id: course.id, enabled: true, kakao_url: 'https://open.kakao.com/o/testRoom', cta_label: '참여하기', custom_sections: false, sections: [], course_snapshot: { title: '발행 당시 제목', metadata: {} } }] };
+  const campaign = html(ProductDetail, { course: currentFree, data: campaignData });
+  assert.match(campaign, /current-detail\.webp/); assert.match(campaign, /무료 자료\.pdf/); assert.match(campaign, /resource=11111111/);
   assert.match(html(ArticlesView, { data, user, loading: false }), /테스트 아티클/);
   assert.match(html(StoriesView, { data, loading: false }), /등록된 고객 이야기/);
 });
@@ -95,8 +100,10 @@ test('article hub includes the managed free-video banner and representative thum
   assert.doesNotMatch(markup, /class="tag">(?:인사이트|영상)</);
   const platformSource = read('app/ui/platform.tsx');
   assert.doesNotMatch(platformSource, /THE WAY WE LEARN|시청에서 멈추지 않는/);
-  assert.match(platformSource, /제2026-충남천안-1825호/);
-  assert.match(platformSource, /policies\/refund/);
+  assert.match(platformSource, /<SiteFooter\b/);
+  const footerSource = read('app/ui/final/site-footer.tsx');
+  assert.match(footerSource, /제2026-충남천안-1825호/);
+  assert.match(footerSource, /policies\/refund/);
 });
 test('article management renders the free-video banner editor', () => {
   const { ArticleBannerEditor } = load('app/ui/final/article-banner-editor.tsx');
@@ -149,6 +156,13 @@ test('catalogues and separate editors render without dropping existing fields', 
   const markup = html(ProductEditor, { data, row: course, pending: false, send, back() {} });
   assert.match(markup, /name="detail_images"/);
   assert.match(markup, /multiple=""/);
+  assert.match(markup, /accept="\.html,\.htm,text\/html"/);
+  assert.match(markup, /name="detail_html"/);
+  assert.doesNotMatch(markup, /200,000자|권장 제작 기준/);
+  assert.doesNotMatch(markup, /상세 본문 · HTML|본문 미리보기|텍스트 상세 설명|무료 라이브 CTA·이미지 관리/);
+  assert.match(markup, /업로드할 파일 선택하기/);
+  assert.match(markup, /파일별로 공개 범위를 설정/);
+  assert.doesNotMatch(markup, /자료를 연결할 학습 만들기/);
   assert.match(markup, /editor-savebar/);
   for (const field of platform.sections.find(row => row.key === 'products').fields) assert.ok(markup.includes(`name="${field.key}"`), field.key);
   assert.match(html(LearningEditor, { data, row: lesson, pending: false, send, back() {} }), /editor-/);

@@ -19,16 +19,20 @@ export async function permissionsFor(user: { id: string; role: string }) {
       operatorScopes.map((scope) => [scope, true]),
     ) as OperatorPermissions;
   if (user.role !== "staff") return emptyOperatorPermissions();
-  const { data } = await createAdminClient()
+  const { data, error } = await createAdminClient()
     .from("site_settings")
     .select("value")
     .eq("key", `edu_staff_permissions_${user.id}`)
     .maybeSingle();
+  if (error) throw Object.assign(new Error('운영 권한을 확인하지 못했습니다. 다시 시도해 주세요.'), { status: 503 });
   return normalizeOperatorPermissions(data?.value);
 }
 
-export async function getOperatorUser(scope?: OperatorScope) {
-  const user = await getAuthenticatedUser();
+export async function getOperatorUser(
+  scope?: OperatorScope,
+  authenticatedUser?: Awaited<ReturnType<typeof getAuthenticatedUser>>,
+) {
+  const user = authenticatedUser === undefined ? await getAuthenticatedUser() : authenticatedUser;
   if (!user || !["admin", "staff"].includes(user.role)) return null;
   const permissions = await permissionsFor(user);
   if (scope && !permissions[scope]) return null;
