@@ -67,6 +67,7 @@ test("admin pagination follows each section primary table and scopes order relat
   assert.match(route, /deferredOrderTables/);
   assert.match(route, /\.in\(['"]order_id['"], orderIds\)/);
   assert.match(route, /\.in\(['"]payment_id['"], paymentIds\)/);
+  assert.match(route, /crm_member_tags['"], ['"]coupon_products/);
 });
 
 test("CRM delivery and scheduler are fail-closed without explicit secrets", () => {
