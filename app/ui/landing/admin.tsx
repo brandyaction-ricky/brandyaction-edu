@@ -1,59 +1,133 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { Download, RefreshCw, RotateCcw, Save } from 'lucide-react';
-import { PERFORMANCE_PRESETS, campaignRange, displayDimension, presetRange, previousRange, type DashboardReport, type PerformanceCampaign, type PerformanceCourse, type PerformancePreset, type PerformanceRow } from '@/lib/landing-performance';
+import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { RefreshCw } from 'lucide-react';
+import { PERFORMANCE_PRESETS, campaignRange, presetRange, previousRange, validDay, type ActualRow, type DashboardReport, type PerformanceCampaign, type PerformanceCourse, type PerformancePreset } from '@/lib/landing-performance';
+import { appendFilters, campaignStatus, emptyFilters, metaStatus, parseTab, periodError, readFilters, readPeriod, TRACKING_TABS, type TrackingFilters, type TrackingPeriod, type TrackingTab } from '@/lib/landing-admin-state';
 import { PerformanceDashboard } from './performance-dashboard';
+import { ActualDrawer, ActualsPanel, CampaignSettings } from './tracking-operations';
+import { CompactEmpty, InlineError, TrackingFiltersPanel, TrackingSkeleton } from './tracking-controls';
+import './tracking-admin.css';
 
-type Filters = { utm_campaign:string[];ad_type:string[];adset:string[];creative:string[];device:string[];layout:string[] };
-const emptyFilters: Filters = { utm_campaign:[],ad_type:[],adset:[],creative:[],device:[],layout:[] };
-const labels: Record<string,string> = { today:'오늘',yesterday:'어제','7d':'7일','14d':'14일',campaign:'캠페인 전체' };
-const queryFilters = (query: URLSearchParams, filters: Filters) => Object.entries(filters).forEach(([key,values])=>values.forEach(value=>query.append(key,value)));
-async function responseJson(response: Response) { const value=await response.json(); if(!response.ok) throw Error(value.error||'요청에 실패했습니다.'); return value; }
+const labels = { today: '오늘', yesterday: '어제', '7d': '7일', '14d': '14일', campaign: '캠페인 전체', custom: '직접 기간' };
+async function responseJson(response: Response) { const value = await response.json(); if (!response.ok) throw Error(value.error || '요청에 실패했습니다.'); return value; }
+const initialPeriod: TrackingPeriod = { preset: '7d', start: '', end: '', compare: false, compareStart: '', compareEnd: '' };
 
 export function LandingAdmin() {
-  const [courses,setCourses]=useState<PerformanceCourse[]>([]),[courseId,setCourseId]=useState(''),[campaignId,setCampaignId]=useState('');
-  const [preset,setPreset]=useState<PerformancePreset>('7d'),[start,setStart]=useState(''),[end,setEnd]=useState('');
-  const [compare,setCompare]=useState(false),[compareStart,setCompareStart]=useState(''),[compareEnd,setCompareEnd]=useState('');
-  const [filters,setFilters]=useState<Filters>(emptyFilters),[reload,setReload]=useState(0),[pending,setPending]=useState(false);
-  const [list,setList]=useState({loading:true,error:'',canManage:false}),[result,setResult]=useState<{key:string;report?:DashboardReport;error?:string}>({key:''});
-  const [message,setMessage]=useState('');
-  const pendingRef=useRef(false);
-  const course=courses.find(value=>value.id===courseId),campaign=course?.campaigns.find(value=>value.id===campaignId);
-
-  useEffect(()=>{const controller=new AbortController();fetch('/api/landing/performance',{cache:'no-store',signal:controller.signal}).then(responseJson).then(value=>{
-    if(controller.signal.aborted)return; const items:PerformanceCourse[]=value.courses||[],url=new URLSearchParams(location.search),requestedCourse=url.get('course'),requestedCampaign=url.get('campaign');
-    const nextCourse=items.find(item=>item.id===requestedCourse)||items.find(item=>item.status==='published'&&item.tracking==='active')||items[0];
-    const nextCampaign=nextCourse?.campaigns.find(item=>item.id===requestedCampaign)||nextCourse?.campaigns[0];
-    setCourses(items);setCourseId(nextCourse?.id||'');setCampaignId(nextCampaign?.id||'');setList({loading:false,error:'',canManage:Boolean(value.can_manage_campaign)});
-    if(nextCampaign){const urlStart=url.get('start'),urlEnd=url.get('end'),urlPreset=(url.get('preset')||'7d') as PerformancePreset;const range=campaignRange(urlStart&&urlEnd?{startDay:urlStart,endDay:urlEnd}:presetRange(urlPreset,nextCampaign),nextCampaign);setPreset(urlPreset);setStart(range.startDay);setEnd(range.endDay);const enabled=url.get('compare')==='1';setCompare(enabled);if(enabled){const previous=url.get('compare_start')&&url.get('compare_end')?{startDay:url.get('compare_start')!,endDay:url.get('compare_end')!}:previousRange(range.startDay,range.endDay);setCompareStart(previous.startDay);setCompareEnd(previous.endDay);}}
-  }).catch(error=>{if(!controller.signal.aborted)setList({loading:false,error:error.message,canManage:false});});return()=>controller.abort();},[reload]);
-
-  const query=useMemo(()=>{if(!courseId||!campaignId||!start||!end)return '';const value=new URLSearchParams({landing:courseId,campaign:campaignId,start,end});if(compare){value.set('compare_start',compareStart);value.set('compare_end',compareEnd);}queryFilters(value,filters);return value.toString();},[courseId,campaignId,start,end,compare,compareStart,compareEnd,filters]);
-  const requestKey=query+':'+reload;
-  useEffect(()=>{if(!query)return;const controller=new AbortController();fetch('/api/landing/performance?'+query,{cache:'no-store',signal:controller.signal}).then(responseJson).then(value=>{if(!controller.signal.aborted)setResult({key:requestKey,report:value});}).catch(error=>{if(!controller.signal.aborted)setResult({key:requestKey,error:error.message});});return()=>controller.abort();},[query,requestKey]);
-  useEffect(()=>{if(!courseId||!campaignId||!start||!end)return;const url=new URL(location.href);url.search='';url.searchParams.set('course',courseId);url.searchParams.set('campaign',campaignId);url.searchParams.set('preset',preset);url.searchParams.set('start',start);url.searchParams.set('end',end);if(compare){url.searchParams.set('compare','1');url.searchParams.set('compare_start',compareStart);url.searchParams.set('compare_end',compareEnd);}queryFilters(url.searchParams,filters);history.replaceState(null,'',url);},[courseId,campaignId,preset,start,end,compare,compareStart,compareEnd,filters]);
-
-  function chooseCourse(id:string){setCourseId(id);const next=courses.find(value=>value.id===id)?.campaigns[0];setCampaignId(next?.id||'');if(next){const range=campaignRange(presetRange('7d',next),next);setStart(range.startDay);setEnd(range.endDay);}setFilters(emptyFilters);}
-  function chooseCampaign(id:string){setCampaignId(id);const next=course?.campaigns.find(value=>value.id===id);if(next){const range=campaignRange(presetRange(preset,next),next);setStart(range.startDay);setEnd(range.endDay);}setFilters(emptyFilters);}
-  function choosePreset(value:PerformancePreset){if(!campaign)return;const range=campaignRange(presetRange(value,campaign),campaign);setPreset(value);setStart(range.startDay);setEnd(range.endDay);if(compare){const previous=previousRange(range.startDay,range.endDay);setCompareStart(previous.startDay);setCompareEnd(previous.endDay);}}
-  function toggleCompare(value:boolean){setCompare(value);if(value&&start&&end){const previous=previousRange(start,end);setCompareStart(previous.startDay);setCompareEnd(previous.endDay);}}
-  function comparisonPreset(days:1|7|14){if(!campaign)return;const value=days===1?'today':`${days}d` as '7d'|'14d',range=campaignRange(presetRange(value,campaign),campaign),previous=previousRange(range.startDay,range.endDay);setPreset('custom');setStart(range.startDay);setEnd(range.endDay);setCompare(true);setCompareStart(previous.startDay);setCompareEnd(previous.endDay);}
-  function selectFilter(key:keyof Filters,event:React.ChangeEvent<HTMLSelectElement>){setFilters(previous=>({...previous,[key]:Array.from(event.target.selectedOptions).map(option=>option.value)}));}
-  async function post(body:Record<string,unknown>,success:string){if(pendingRef.current)return;pendingRef.current=true;setPending(true);setMessage('');try{await responseJson(await fetch('/api/landing/performance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));setMessage(success);setReload(value=>value+1);}catch(error){setMessage((error as Error).message);}finally{pendingRef.current=false;setPending(false);}}
-  async function classify(row:PerformanceRow,value:string){await post({action:'classification',campaign_id:campaignId,adset:row.adset,creative:row.creative,ad_type:value},'광고 유형을 저장했습니다.');}
-  const fresh=result.key===requestKey,report=fresh?result.report:undefined,error=list.error||(fresh?result.error:'');
-  return <div className="landing-admin">
-    <div className="toolbar landing-dashboard-toolbar"><div className="landing-class-control"><label htmlFor="landing-course">무료클래스</label><select id="landing-course" value={courseId} onChange={event=>chooseCourse(event.target.value)} disabled={!courses.length}>{!courses.length&&<option value="">등록된 무료클래스 없음</option>}{courses.map(item=><option value={item.id} key={item.id}>{item.title}{item.status==='published'?'':' · 미공개'}</option>)}</select></div><div><label htmlFor="landing-campaign">캠페인</label><select id="landing-campaign" value={campaignId} onChange={event=>chooseCampaign(event.target.value)} disabled={!course?.campaigns.length}>{!course?.campaigns.length&&<option value="">등록된 캠페인 없음</option>}{course?.campaigns.map(item=><option value={item.id} key={item.id}>{item.name}</option>)}</select></div><span className="spacer"/><button type="button" className="btn" onClick={()=>setReload(value=>value+1)}><RefreshCw size={16}/>새로고침</button></div>
-    {campaign&&<><div className="tabs landing-periods" role="group" aria-label="조회 기간">{PERFORMANCE_PRESETS.map(value=><button type="button" key={value} className={`tab ${preset===value?'active':''}`} onClick={()=>choosePreset(value)}>{labels[value]}</button>)}<label>시작일<input type="date" min={campaign.start_day} max={campaign.end_day} value={start} onChange={event=>{setPreset('custom');setStart(event.target.value);}}/></label><label>종료일<input type="date" min={campaign.start_day} max={campaign.end_day} value={end} onChange={event=>{setPreset('custom');setEnd(event.target.value);}}/></label></div>
-      <section className="panel landing-compare-panel"><div className="panel-body landing-compare"><label className="check-row"><input type="checkbox" checked={compare} onChange={event=>toggleCompare(event.target.checked)}/>비교 모드</label>{compare&&<><div className="row"><button type="button" className="btn small" onClick={()=>comparisonPreset(1)}>어제 → 오늘</button><button type="button" className="btn small" onClick={()=>comparisonPreset(7)}>직전 7일 → 최근 7일</button><button type="button" className="btn small" onClick={()=>comparisonPreset(14)}>직전 14일 → 최근 14일</button></div><div className="landing-date-pair"><label>A · 예전 기간<input type="date" value={compareStart} onChange={event=>setCompareStart(event.target.value)}/></label><label>A 종료<input type="date" value={compareEnd} onChange={event=>setCompareEnd(event.target.value)}/></label><p className="meta">직접 맞추기 · B {start} — {end}</p></div></>}</div></section></>}
-    {report&&<FilterPanel report={report} filters={filters} onChange={selectFilter} onReset={()=>setFilters(emptyFilters)} exportUrl={`/api/landing/performance/export?${query}`}/>}
-    {message&&<p className="notice neutral" role="status">{message}</p>}
-    {error?<div className="empty" role="alert"><h3>성과 데이터를 불러오지 못했습니다.</h3><p>{error}</p></div>:list.loading||(!fresh&&campaignId)?<div className="empty" role="status"><p>실제 성과 데이터를 불러오고 있습니다.</p></div>:!campaign?<div className="empty"><h3>등록된 캠페인이 없습니다.</h3><p>무료클래스에 연결된 캠페인 설정이 필요합니다.</p></div>:report&&<PerformanceDashboard report={report} compare={compare} onClassify={classify}/>}
-    {campaign&&report&&<div className="two-col landing-operations"><ActualForm campaign={campaign} pending={pending} onSave={(values)=>post({action:'actual',campaign_id:campaign.id,values},'일별 실측값을 저장했습니다.')}/><CampaignForm campaign={campaign} canManage={list.canManage} pending={pending} onSave={(values)=>post({action:'campaign',campaign_id:campaign.id,values},'캠페인 설정을 저장했습니다.')} onSync={async()=>{if(pendingRef.current)return;pendingRef.current=true;setPending(true);setMessage('');try{const value=await responseJson(await fetch('/api/landing/performance/meta',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({campaign_id:campaign.id})}));setMessage(`Meta ${value.rows}행을 동기화했습니다.`);setReload(v=>v+1);}catch(e){setMessage((e as Error).message);}finally{pendingRef.current=false;setPending(false);}}}/></div>}
+  const [courses, setCourses] = useState<PerformanceCourse[]>([]), [courseId, setCourseId] = useState(''), [campaignId, setCampaignId] = useState('');
+  const [tab, setTab] = useState<TrackingTab>('dashboard'), [period, setPeriod] = useState<TrackingPeriod>(initialPeriod), [filters, setFilters] = useState<TrackingFilters>(emptyFilters);
+  const [list, setList] = useState({ loading: true, error: '', canManage: false }), [listVersion, setListVersion] = useState(0), [reload, setReload] = useState(0);
+  const [result, setResult] = useState<{ requestKey: string; report?: DashboardReport; error?: string }>({ requestKey: '' });
+  const [pending, setPending] = useState(false), [syncing, setSyncing] = useState(false), [dirty, setDirty] = useState(false), [message, setMessage] = useState('');
+  const [drawer, setDrawer] = useState<{ row: ActualRow | null } | null>(null);
+  const pendingRef = useRef(false), initialized = useRef(false);
+  const course = courses.find(item => item.id === courseId), campaign = course?.campaigns.find(item => item.id === campaignId);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/landing/performance', { cache: 'no-store', signal: controller.signal }).then(responseJson).then(value => {
+      if (controller.signal.aborted) return;
+      const items: PerformanceCourse[] = value.courses || [];
+      setCourses(items); setList({ loading: false, error: '', canManage: Boolean(value.can_manage_campaign) });
+      if (initialized.current) return;
+      const url = new URLSearchParams(location.search), requestedCourse = url.get('course') || url.get('landing'), requestedCampaign = url.get('campaign');
+      const nextCourse = requestedCourse ? items.find(item => item.id === requestedCourse) : requestedCampaign ? items.find(item => item.campaigns.some(c => c.id === requestedCampaign)) : items.find(item => item.status === 'published' && item.tracking === 'active') || items[0];
+      const nextCampaign = requestedCampaign ? nextCourse?.campaigns.find(item => item.id === requestedCampaign) : nextCourse?.campaigns[0];
+      setTab(parseTab(url.get('tab'))); setFilters(readFilters(url));
+      if ((requestedCourse && !nextCourse) || (requestedCampaign && !nextCampaign)) { setList({ loading: false, error: '존재하지 않거나 접근할 수 없는 클래스·캠페인입니다. 선택을 다시 확인해 주세요.', canManage: Boolean(value.can_manage_campaign) }); return; }
+      initialized.current = true;
+      setCourseId(nextCourse?.id || ''); setCampaignId(nextCampaign?.id || '');
+      if (nextCampaign) setPeriod(readPeriod(url, nextCampaign));
+    }).catch(error => { if (!controller.signal.aborted) setList(previous => ({ ...previous, loading: false, error: error.message })); });
+    return () => controller.abort();
+  }, [listVersion]);
+  const validationError = campaign ? periodError(period, campaign) : '';
+  const query = (() => {
+    if (!courseId || !campaignId || !period.start || !period.end || validationError) return '';
+    const value = new URLSearchParams({ landing: courseId, campaign: campaignId, start: period.start, end: period.end });
+    if (period.compare) { value.set('compare_start', period.compareStart); value.set('compare_end', period.compareEnd); }
+    appendFilters(value, filters); return value.toString();
+  })();
+  const requestKey = query + ':' + reload;
+  useEffect(() => {
+    if (!query) return;
+    const controller = new AbortController();
+    fetch('/api/landing/performance?' + query + '&include=ui', { cache: 'no-store', signal: controller.signal }).then(responseJson).then(value => { if (!controller.signal.aborted) setResult({ requestKey, report: value }); }).catch(error => { if (!controller.signal.aborted) setResult(previous => ({ ...previous, requestKey, error: error.message })); });
+    return () => controller.abort();
+  }, [query, requestKey]);
+  useEffect(() => {
+    if (!initialized.current) return;
+    const url = new URL(location.href);
+    for (const key of ['course', 'landing', 'campaign', 'preset', 'start', 'end', 'compare', 'compare_start', 'compare_end', 'tab', ...Object.keys(filters)]) url.searchParams.delete(key);
+    url.searchParams.set('tab', tab);
+    if (courseId) url.searchParams.set('course', courseId);
+    if (campaignId) { url.searchParams.set('campaign', campaignId); url.searchParams.set('preset', period.preset); url.searchParams.set('start', period.start); url.searchParams.set('end', period.end); }
+    if (period.compare) { url.searchParams.set('compare', '1'); url.searchParams.set('compare_start', period.compareStart); url.searchParams.set('compare_end', period.compareEnd); }
+    appendFilters(url.searchParams, filters);
+    // Preserve Next's history state and scroll position. No route-wide refresh.
+    history.replaceState(history.state, '', url);
+  }, [tab, courseId, campaignId, period, filters]);
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
+  function allowNavigation() { if (pendingRef.current) return false; if (dirty && !confirm('저장하지 않은 설정이 있습니다. 변경사항을 버리고 이동할까요?')) return false; setDirty(false); return true; }
+  function changeTab(next: TrackingTab) { if (next !== tab && allowNavigation()) setTab(next); }
+  function applyCampaign(next?: PerformanceCampaign) {
+    setCampaignId(next?.id || ''); setFilters(emptyFilters()); setDrawer(null); setMessage('');
+    if (next) setPeriod(readPeriod(new URLSearchParams({ preset: '7d' }), next));
+  }
+  function chooseCourse(id: string) { if (!allowNavigation()) return; initialized.current = true; setList(previous => ({ ...previous, error: '' })); setCourseId(id); applyCampaign(courses.find(item => item.id === id)?.campaigns[0]); }
+  function chooseCampaign(id: string) { if (allowNavigation()) applyCampaign(course?.campaigns.find(item => item.id === id)); }
+  function choosePreset(value: PerformancePreset) {
+    if (!campaign) return;
+    if (value === 'custom') { setPeriod(previous => ({ ...previous, preset: value })); return; }
+    const range = campaignRange(presetRange(value, campaign), campaign), previous = previousRange(range.startDay, range.endDay);
+    setPeriod(old => ({ ...old, preset: value, start: range.startDay, end: range.endDay, compareStart: previous.startDay, compareEnd: previous.endDay }));
+  }
+  function dateChange(key: 'start' | 'end', value: string) { setPeriod(old => { const next = { ...old, [key]: value, preset: 'custom' as const }; if (old.compare && validDay(next.start) && validDay(next.end) && next.start <= next.end) { const prior = previousRange(next.start, next.end); next.compareStart = prior.startDay; next.compareEnd = prior.endDay; } return next; }); }
+  function toggleCompare(value: boolean) { setPeriod(old => { const previous = validDay(old.start) && validDay(old.end) && old.start <= old.end ? previousRange(old.start, old.end) : { startDay: '', endDay: '' }; return { ...old, compare: value, compareStart: previous.startDay, compareEnd: previous.endDay }; }); }
+  function comparisonPreset(days: 1 | 7 | 14) { if (!campaign) return; const preset = days === 1 ? 'today' : days === 7 ? '7d' : '14d', range = campaignRange(presetRange(preset, campaign), campaign), previous = previousRange(range.startDay, range.endDay); setPeriod({ preset, start: range.startDay, end: range.endDay, compare: true, compareStart: previous.startDay, compareEnd: previous.endDay }); }
+  function refresh() { if (!allowNavigation()) return; setListVersion(value => value + 1); setReload(value => value + 1); }
+  async function post(body: Record<string, unknown>, success: string) {
+    if (pendingRef.current) return false;
+    pendingRef.current = true; setPending(true); setMessage('');
+    try {
+      const value = await responseJson(await fetch('/api/landing/performance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }));
+      if (value.campaign) { const saved = value.campaign as PerformanceCampaign; setCourses(previous => previous.map(item => ({ ...item, campaigns: item.campaigns.map(c => c.id === saved.id ? saved : c) }))); setDirty(false); const range = campaignRange({ startDay: period.start, endDay: period.end }, saved); if (range.startDay !== period.start || range.endDay !== period.end) { const prior = previousRange(range.startDay, range.endDay); setPeriod(old => ({ ...old, start: range.startDay, end: range.endDay, compareStart: prior.startDay, compareEnd: prior.endDay })); } }
+      setMessage(success); setReload(value => value + 1); return true;
+    } catch (error) { setMessage((error as Error).message); return false; } finally { pendingRef.current = false; setPending(false); }
+  }
+  async function sync() {
+    if (!campaign || pendingRef.current || dirty || !campaign.meta_campaign_id) return false;
+    pendingRef.current = true; setPending(true); setSyncing(true); setMessage('Meta 데이터를 동기화하고 있습니다.');
+    try { const value = await responseJson(await fetch('/api/landing/performance/meta', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ campaign_id: campaign.id }) })); setMessage(`Meta 동기화 성공 · ${value.rows}행을 반영했습니다.`); return true; }
+    catch (error) { setMessage('동기화 실패 · ' + (error as Error).message); return false; }
+    finally { pendingRef.current = false; setPending(false); setSyncing(false); setListVersion(value => value + 1); setReload(value => value + 1); }
+  }
+  const report = result.report?.campaign.id === campaign?.id ? result.report : undefined;
+  const loading = !!query && result.requestKey !== requestKey;
+  const error = validationError || (result.requestKey === requestKey ? result.error : '');
+  return <div className="landing-admin tracking-admin">
+    <div className="tracking-context">
+      <div className="tracking-context-row"><label>무료클래스<select value={courseId} onChange={event => chooseCourse(event.target.value)} disabled={pending || !courses.length}>{!courseId && <option value="">{list.loading ? '불러오는 중' : '클래스 선택'}</option>}{courses.map(item => <option key={item.id} value={item.id}>{item.title}{item.status === 'published' ? '' : ' · 미공개'}</option>)}</select></label><label>캠페인<select value={campaignId} onChange={event => chooseCampaign(event.target.value)} disabled={pending || !course?.campaigns.length}>{!campaignId && <option value="">등록된 캠페인 없음</option>}{course?.campaigns.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><div className="tracking-context-status"><span className="tracking-badge">{campaignStatus(campaign)}</span>{campaign && <span className={`tracking-badge ${campaign.meta_sync_status === 'failed' ? 'error' : campaign.meta_sync_status === 'success' ? 'success' : ''}`}>{metaStatus(campaign, syncing)}</span>}</div><button type="button" className="btn" onClick={refresh} disabled={pending || loading}><RefreshCw size={16}/>새로고침</button></div>
+      {campaign && <><div className="tracking-periods" role="group" aria-label="조회 기간">{[...PERFORMANCE_PRESETS, 'custom' as const].map(value => <button type="button" key={value} className={`btn ${period.preset === value ? 'selected' : ''}`} aria-pressed={period.preset === value} onClick={() => choosePreset(value)}>{labels[value]}</button>)}<label className="tracking-check"><input type="checkbox" checked={period.compare} onChange={event => toggleCompare(event.target.checked)}/>비교 모드</label><span className="tracking-help">{period.start} — {period.end} · KST</span></div>
+      {period.preset === 'custom' && <div className="tracking-date-inputs"><label>B 시작일<input type="date" value={period.start} min={campaign.start_day} max={campaign.end_day} onChange={event => dateChange('start', event.target.value)}/></label><label>B 종료일<input type="date" value={period.end} min={campaign.start_day} max={campaign.end_day} onChange={event => dateChange('end', event.target.value)}/></label></div>}
+      {period.compare && <div className="tracking-compare"><div className="tracking-compare-presets">{([1, 7, 14] as const).map(days => <button type="button" className="btn" key={days} onClick={() => comparisonPreset(days)}>{days === 1 ? '어제 → 오늘' : `직전 ${days}일 → 최근 ${days}일`}</button>)}<button type="button" className="btn" onClick={() => choosePreset('custom')}>직접 맞추기</button></div><div className="tracking-date-inputs"><label>A · 예전 기간 시작<input type="date" value={period.compareStart} onChange={event => setPeriod(old => ({ ...old, compareStart: event.target.value }))}/></label><label>A · 예전 기간 종료<input type="date" value={period.compareEnd} onChange={event => setPeriod(old => ({ ...old, compareEnd: event.target.value }))}/></label><span className="tracking-help">B · 최근 기간 {period.start} — {period.end}</span></div></div>}</>}
+      <div className="tracking-tabs" role="tablist" aria-label="무료클래스 트래킹">{(Object.entries(TRACKING_TABS) as [TrackingTab, string][]).map(([key, label], index, tabs) => <button type="button" role="tab" id={`tracking-tab-${key}`} aria-controls={`tracking-panel-${key}`} aria-selected={tab === key} tabIndex={tab === key ? 0 : -1} key={key} onClick={() => changeTab(key)} onKeyDown={event => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) { event.preventDefault(); const next = event.key === 'Home' ? 0 : event.key === 'End' ? 2 : (index + (event.key === 'ArrowRight' ? 1 : 2)) % 3; if (allowNavigation()) { setTab(tabs[next][0]); document.getElementById(`tracking-tab-${tabs[next][0]}`)?.focus(); } } }}>{label}</button>)}</div>
+    </div>
+    {list.error && <InlineError onRetry={() => setListVersion(value => value + 1)}>{list.error}</InlineError>}
+    {message && <div className="tracking-notice" role="status">{message}</div>}
+    <div role="tabpanel" id={`tracking-panel-${tab}`} aria-labelledby={`tracking-tab-${tab}`} className="tracking-tab-panel">
+      {error && <InlineError onRetry={() => setReload(value => value + 1)}>{error}{report && ' 이전 조회 결과는 아래에 유지됩니다.'}</InlineError>}
+      {!campaign ? list.loading ? <TrackingSkeleton kind={tab}/> : <CompactEmpty title={courses.length ? '캠페인이 등록되지 않았습니다.' : '무료클래스가 등록되지 않았습니다.'} action={<Link className="btn" href="/admin/products">상품 관리 확인</Link>}>무료클래스와 연결된 캠페인 구성을 확인해 주세요.</CompactEmpty> : tab === 'settings' ? <CampaignSettings key={JSON.stringify(campaign) + ':' + listVersion} campaign={campaign} canManage={list.canManage} pending={pending} syncing={syncing} onDirty={setDirty} onSave={values => post({ action: 'campaign', campaign_id: campaign.id, values }, '캠페인 설정을 저장했습니다.')} onSync={sync}/> : !report ? error ? null : <TrackingSkeleton kind={tab}/> : <>
+        {loading && <p className="tracking-help" role="status">새 조건을 조회하고 있습니다. 아래는 이전 조회 결과입니다.</p>}
+        <div aria-busy={loading} className={loading ? 'tracking-refreshing' : ''}>{tab === 'dashboard' ? <PerformanceDashboard report={report} compare={period.compare} pending={pending || loading || !!error} onRetry={() => setReload(value => value + 1)} onClassify={(row, value) => void post({ action: 'classification', campaign_id: campaign.id, adset: row.adset, creative: row.creative, ad_type: value }, '광고 유형을 저장했습니다.')}/> : <ActualsPanel report={report} onEdit={row => setDrawer({ row })} onAdd={() => setDrawer({ row: null })} onSettings={() => changeTab('settings')} onRetry={() => setReload(value => value + 1)}/>}</div>
+      </>}
+      {tab === 'dashboard' && campaign && <TrackingFiltersPanel options={report?.options} filters={filters} onChange={setFilters} exportUrl={`/api/landing/performance/export?${query}`} disabled={!query || loading || !!error}/>}
+    </div>
+    {drawer && campaign && <ActualDrawer campaign={campaign} initial={drawer.row} pending={pending} onClose={() => setDrawer(null)} onSave={values => post({ action: 'actual', campaign_id: campaign.id, values }, '일별 실측값을 저장했습니다.')}/>}
   </div>;
 }
-
-function FilterPanel({report,filters,onChange,onReset,exportUrl}:{report:DashboardReport;filters:Filters;onChange:(key:keyof Filters,event:React.ChangeEvent<HTMLSelectElement>)=>void;onReset:()=>void;exportUrl:string}){const options=report.options;const configs:[keyof Filters,string,(string|number)[]][]=[['utm_campaign','캠페인',options.campaigns],['ad_type','광고 유형',['cold','retarget','unclassified']],['adset','광고세트',options.adsets],['creative','소재',options.creatives],['device','기기',options.devices],['layout','레이아웃 버전',options.layouts]];return <section className="panel"><div className="panel-head"><h2>다중 필터</h2><div className="row"><button type="button" className="btn" onClick={onReset}><RotateCcw size={15}/>초기화</button><a className="btn primary" href={exportUrl}><Download size={15}/>CSV 내보내기</a></div></div><div className="panel-body landing-filter-body"><div className="landing-filter-grid">{configs.map(([key,label,values])=><label key={key}>{label}<select multiple value={filters[key]} onChange={event=>onChange(key,event)}>{values.map(value=><option key={value} value={value}>{key==='ad_type'?value==='cold'?'콜드':value==='retarget'?'리타겟':'미분류':displayDimension(String(value))}</option>)}</select></label>)}</div><p className="meta">Ctrl 또는 Command 키를 누른 채 여러 값을 선택할 수 있습니다.</p></div></section>}
-function ActualForm({campaign,pending,onSave}:{campaign:PerformanceCampaign;pending:boolean;onSave:(value:Record<string,unknown>)=>void}){function submit(event:FormEvent<HTMLFormElement>){event.preventDefault();const form=new FormData(event.currentTarget),value:Record<string,unknown>={day:form.get('day'),clear:form.getAll('clear')};for(const key of ['kakao_members','new_payments','existing_payments','memo']){const field=form.get(key);if(field!==null&&field!=='')value[key]=field;}onSave(value);}return <form className="panel landing-operations-form" onSubmit={submit}><div className="panel-head"><div><h2>일별 실측 입력</h2><p className="meta">빈칸은 기존값을 유지합니다. 0은 실제 0으로 저장되며, 삭제는 필드별 초기화를 선택합니다.</p></div></div><div className="panel-body"><label className="field">날짜<input name="day" type="date" min={campaign.start_day} max={campaign.end_day} required disabled={pending}/></label>{[['kakao_members','자정 기준 카카오톡방 현재 인원'],['new_payments','신규 고객 결제 건수'],['existing_payments','기존 고객 결제 건수']].map(([name,label])=><div className="landing-reset-field" key={name}><label className="field">{label}<input name={name} type="number" min="0" inputMode="numeric" disabled={pending}/></label><label className="check-row"><input type="checkbox" name="clear" value={name} disabled={pending}/>초기화</label></div>)}<div className="landing-reset-field"><label className="field">메모<textarea name="memo" maxLength={1000} disabled={pending}/></label><label className="check-row"><input type="checkbox" name="clear" value="memo" disabled={pending}/>초기화</label></div><button className="btn primary" disabled={pending}><Save size={16}/>{pending?'저장 중':'부분 저장'}</button></div></form>}
-function CampaignForm({campaign,canManage,pending,onSave,onSync}:{campaign:PerformanceCampaign;canManage:boolean;pending:boolean;onSave:(value:Record<string,unknown>)=>void;onSync:()=>void}){function submit(event:FormEvent<HTMLFormElement>){event.preventDefault();onSave(Object.fromEntries(new FormData(event.currentTarget)));}return <form className="panel landing-operations-form" onSubmit={submit}><div className="panel-head"><h2>캠페인 설정</h2><span className={`badge ${campaign.meta_sync_status==='success'?'green':campaign.meta_sync_status==='failed'?'red':'amber'}`}>{campaign.meta_sync_status}</span></div><div className="panel-body"><fieldset disabled={!canManage||pending}><label className="field">캠페인명<input name="name" defaultValue={campaign.name} required/></label><label className="field">UTM campaign<input name="utm_campaign" defaultValue={campaign.utm_campaign} required/></label><div className="landing-date-pair"><label>시작일<input name="start_day" type="date" defaultValue={campaign.start_day} required/></label><label>종료일<input name="end_day" type="date" defaultValue={campaign.end_day} required/></label></div><label className="field">라이브 최대 동시시청<input name="live_peak" type="number" min="0" defaultValue={campaign.live_peak??''}/></label><div className="landing-date-pair"><label>신규 고객 가격<input name="new_customer_price" type="number" min="0" defaultValue={campaign.new_customer_price}/></label><label>기존 고객 가격<input name="existing_customer_price" type="number" min="0" defaultValue={campaign.existing_customer_price}/></label></div><label className="field">Meta 광고계정 ID · 공통<input value={campaign.meta_ad_account_id||''} readOnly aria-readonly="true"/><small className="meta">모든 무료클래스 캠페인에 자동 적용됩니다.</small></label><label className="field">Meta 캠페인 ID<input name="meta_campaign_id" inputMode="numeric" placeholder="광고 세팅 후 캠페인 ID 입력" defaultValue={campaign.meta_campaign_id||''}/></label><div className="row"><button className="btn primary" disabled={pending}><Save size={16}/>설정 저장</button><button type="button" className="btn" disabled={pending||!campaign.meta_campaign_id} onClick={onSync}><RefreshCw size={16}/>Meta 재동기화</button></div></fieldset>{!canManage&&<p className="meta">캠페인·Meta 연결 설정은 관리자만 변경할 수 있습니다.</p>}{campaign.meta_last_synced_at&&<p className="meta">마지막 동기화 {new Date(campaign.meta_last_synced_at).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})} KST</p>}{campaign.meta_sync_error&&<p className="notice amber">{campaign.meta_sync_error}</p>}</div></form>}

@@ -30,6 +30,13 @@ export type ActualRow = {
   memo: string | null; revenue: number; updated_at: string;
 };
 export type DashboardReport = {
+  ui?: {
+    daily_a: DashboardReport['daily'] | null;
+    last_collected_at: string | null;
+    actual_presence: { new_payments: boolean; existing_payments: boolean } | null;
+    previous_day_members: Record<string, number | null>;
+    errors: { trend?: string; collection?: string; actuals?: string };
+  };
   campaign: PerformanceCampaign; summary_b: MetricSummary; summary_a: MetricSummary | null;
   performance: PerformanceRow[];
   daily: { day: string; sessions: number; visitors: number; cta_click_sessions: number; cta_clicks: number }[];
