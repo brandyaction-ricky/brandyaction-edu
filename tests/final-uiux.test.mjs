@@ -316,6 +316,7 @@ test('campaign class keeps published content and one responsive sticky CTA', () 
   assert.match(markup, /발행한 제목/); assert.doesNotMatch(markup, /등록된 테스트 클래스/);
   assert.match(markup, /data-section="proof"/); assert.match(markup, /loading="lazy"/);
   assert.match(markup, /&lt;script&gt;/); assert.doesNotMatch(markup, /<script>|checkout/);
+  assert.doesNotMatch(markup, /data-section="materials"|무료 라이브 참여 안내|참여 링크와 강의 관련 안내/);
   assert.doesNotMatch(html(ProductDetail, { course, data: { ...data, landing_configs: [{ ...cfg, enabled: false }] } }), /data-landing-cta/);
   const untracked = html(ProductDetail, { course, data: { ...data, enrollments: [], landing_configs: [{ ...cfg, enabled: false }] } });
   assert.equal((untracked.match(/href="https:\/\/open.kakao.com\/o\/testRoom"/g) || []).length, 1);
