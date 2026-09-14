@@ -165,6 +165,10 @@ test('catalogues and separate editors render without dropping existing fields', 
   const props = { data, selection: [], setSelection() {}, edit() {}, archive() {}, pending: false, loading: false, pagination: null, setPage() {}, exportCsv() {} };
   const products = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'products') });
   assert.match(products, /전체 상품/); assert.match(products, /연결 기수/); assert.match(products, /<th>자료<\/th>/);
+  assert.match(products, /catalog-actions/); assert.match(products, /등록된 테스트 클래스 삭제/); assert.match(products, /등록된 테스트 클래스 수정/);
+  assert.doesNotMatch(products, />삭제<\/button>|>수정<\/button>/);
+  const countedProducts = html(AdminCatalog, { ...props, data: { ...data, product_summary: [{ id: 'product-summary', total: 12, published: 7, upcoming: 3, draft: 2 }] }, section: platform.sections.find(row => row.key === 'products') });
+  for (const value of ['12', '7', '3', '2']) assert.match(countedProducts, new RegExp(`>${value}<`));
   assert.doesNotMatch(products, /목록 내보내기 · 선택 관리|삭제 항목 포함|현재 페이지 CSV|상품은 가격·판매·자료의 단위/);
   const learning = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'learning') });
   assert.match(learning, /learning-layout/); assert.match(learning, /학습 구성/); assert.match(learning, /lesson-list-item/);
@@ -244,6 +248,8 @@ test('campaign class keeps published content and only the mobile sticky CTA', ()
   const missing = html(ProductDetail, { course, data: { ...data, enrollments: [], landing_configs: [{ ...cfg, kakao_url: '' }] } });
   assert.match(missing, /disabled="">참여 링크 준비 중/);
   assert.doesNotMatch(missing, /href="\/apply/);
+  const metadataCta = html(ProductDetail, { course: { ...course, metadata: { cta_url: 'https://example.com/join' } }, data: { ...data, landing_configs: [{ ...cfg, kakao_url: '' }] } });
+  assert.match(metadataCta, /data-landing-cta="sticky_cta"/); assert.match(metadataCta, /href="https:\/\/example.com\/join"/);
   const paid = html(ProductDetail, { course: { ...course, list_price: 10000 }, data: { ...data, landing_configs: [cfg] } });
   assert.doesNotMatch(paid, /href="https:\/\/open.kakao.com\/o\/testRoom"/);
 });

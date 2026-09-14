@@ -45,6 +45,14 @@ export function LandingAdmin() {
     return () => controller.abort();
   }, [selected, query, requestKey]);
 
+  useEffect(() => {
+    if (!selected) return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') setReload(value => value + 1);
+    }, 30000);
+    return () => window.clearInterval(timer);
+  }, [selected]);
+
   const current = courses.find(course => course.id === selected);
   const fresh = result.key === requestKey;
   const loading = list.loading || (!!selected && !fresh);
@@ -52,8 +60,7 @@ export function LandingAdmin() {
   const report = !error && fresh ? result.report : undefined;
   return <div className="landing-admin">
     <div className="toolbar">
-      <label className="select-filter"><span>대상 무료클래스</span><select aria-label="대상 무료클래스" value={selected} onChange={event => setSelected(event.target.value)} disabled={!courses.length}>{!courses.length && <option value="">등록된 무료클래스 없음</option>}{courses.map(course => <option key={course.id} value={course.id}>{course.title}{course.status === 'published' ? '' : ' · 미공개'}</option>)}</select></label>
-      {current && <span className={'badge ' + (current.tracking === 'active' ? 'green' : current.tracking === 'paused' ? 'amber' : '')}>{current.tracking === 'active' ? '데이터 수집 중' : current.tracking === 'paused' ? '데이터 수집 중지됨' : '수집 설정 없음'}</span>}
+      <div className="landing-class-control"><label htmlFor="landing-course">대상 무료클래스</label><div className="landing-class-row"><select id="landing-course" aria-label="대상 무료클래스" value={selected} onChange={event => setSelected(event.target.value)} disabled={!courses.length}>{!courses.length && <option value="">등록된 무료클래스 없음</option>}{courses.map(course => <option key={course.id} value={course.id}>{course.title}{course.status === 'published' ? '' : ' · 미공개'}</option>)}</select>{current && <span className={'badge ' + (current.tracking === 'active' ? 'green' : current.tracking === 'paused' ? 'amber' : '')}>{current.tracking === 'active' ? '데이터 수집 중' : current.tracking === 'paused' ? '데이터 수집 중지됨' : '수집 설정 없음'}</span>}</div></div>
       <span className="spacer" />
       {report && <span className="meta">{report.range.startDay} — {report.range.endDay} · KST</span>}
       <button type="button" className="btn" onClick={() => setReload(value => value + 1)}><RefreshCw size={16} aria-hidden="true" />새로고침</button>

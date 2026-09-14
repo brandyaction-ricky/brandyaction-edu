@@ -67,6 +67,7 @@ test('performance UI uses the native admin dashboard and removes all CTA/detail 
   const source = fs.readFileSync('app/ui/landing/admin.tsx', 'utf8');
   assert.doesNotMatch(source, /LiveSetup|UploadField|method:\s*['"]POST|initial\.revision|performance\.css|className=[^\n]*performance-/);
   assert.match(source, /result\.key === requestKey/); assert.match(source, /controller\.abort/);
+  assert.match(source, /landing-class-control/); assert.match(source, /setInterval/);
   const { PerformanceDashboard } = load('app/ui/landing/performance-dashboard.tsx');
   const zero = renderToStaticMarkup(React.createElement(PerformanceDashboard, { report: empty }));
   for (const value of ['Unique Visitors', 'CTA Clicks', 'Conversion Rate', 'Avg Dwell Time', '평균 스크롤 깊이', 'Traffic &amp; Conversions', 'Top Sources', 'No traffic data yet']) assert.ok(zero.includes(value));

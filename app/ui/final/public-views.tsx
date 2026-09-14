@@ -113,11 +113,11 @@ export function AuthView({
   );
 }
 
-import { kakaoUrl, type LandingConfig } from "@/lib/landing";
+import type { LandingConfig } from "@/lib/landing";
 import { CampaignFreeClass } from "../landing/free-class";
 
 export function ProductDetail({ course, data }: { course: Row; data: Data }) {
-  const config = num(course, 'list_price') === 0 ? (data.landing_configs || []).find(row => row.id === course.id && kakaoUrl(row.kakao_url)) : undefined;
+  const config = num(course, 'list_price') === 0 ? (data.landing_configs || []).find(row => row.id === course.id) : undefined;
   if (config && productConversion(object(course, 'metadata'), config).url) {
     const frozen = object(config, "course_snapshot");
     const currentMetadata = object(course, "metadata");
