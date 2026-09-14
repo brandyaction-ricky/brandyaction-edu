@@ -140,6 +140,8 @@ test('product HTML takes precedence over old images and per-product CTA settings
     assert.match(markup, /href="https:\/\/example.test\/webinar"/);
     assert.match(markup, /background-color:#123456/);
   }
+  const emptyFreeMarkup = html(ProductDetail, { course: changed, data: { ...data, enrollments: [], landing_configs: [], lesson_contents: [] } });
+  assert.doesNotMatch(emptyFreeMarkup, /free-downloads|클래스와 함께 사용할 자료|신청·구매 후 제공되는 자료/);
   const paidMarkup = html(ProductDetail, { course, data });
   assert.match(paidMarkup, /bottom-cta product-mobile-cta/);
   assert.match(paidMarkup, /class="cta-price"/);
