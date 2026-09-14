@@ -11,26 +11,32 @@ export async function GET(request: Request) {
   const id = params.get('landing');
   if (id !== null && !validId(id)) return reply({ error: '무료클래스를 선택해 주세요.' }, 400);
   let range;
-  try { range = performanceRange(params.get('days')); }
+  try { range = performanceRange(params.get('days'), new Date(), params.get('start'), params.get('end')); }
   catch (error) { return reply({ error: (error as Error).message }, 400); }
   try {
     const db = createAdminClient();
     if (!id) {
       const [courses, configs] = await Promise.all([
         db.from('courses').select('id,title,slug,status,category').eq('category', 'free').is('archived_at', null).order('created_at', { ascending: false }),
-        db.from('landing_configs').select('id,enabled,layout_ver'),
+        db.from('landing_configs').select('id,enabled,layout_ver,campaign_start,campaign_end'),
       ]);
       if (courses.error || configs.error) throw Error('무료클래스 목록을 불러오지 못했습니다.');
       return reply({ courses: (courses.data || []).map(course => {
         const config = configs.data?.find(value => value.id === course.id);
-        return { ...course, tracking: !config?.layout_ver ? 'not_configured' : config.enabled ? 'active' : 'paused' };
+        return { ...course, campaign_start: config?.campaign_start, campaign_end: config?.campaign_end, tracking: !config?.layout_ver ? 'not_configured' : config.enabled ? 'active' : 'paused' };
       }) });
     }
     const course = await db.from('courses').select('id').eq('id', id).eq('category', 'free').is('archived_at', null).maybeSingle();
     if (course.error) throw Error('무료클래스를 확인하지 못했습니다.');
     if (!course.data) return reply({ error: '조회할 무료클래스가 없습니다.' }, 404);
     // Only aggregates leave the server; never send visitor/session identifiers or raw events.
-    const result = await db.rpc('edu_landing_performance', { p_landing: id, p_start: range.start, p_end: range.end });
+    const result = await db.rpc('edu_landing_performance_filtered', {
+      p_landing: id, p_start: range.start, p_end: range.end,
+      p_campaign: (params.get('campaign') || '').slice(0, 250),
+      p_adset: (params.get('adset') || '').slice(0, 250),
+      p_creative: (params.get('creative') || '').slice(0, 250),
+      p_device: (params.get('device') || '').slice(0, 40),
+    });
     if (result.error || !result.data) throw Error('성과 데이터를 불러오지 못했습니다.');
     return reply({ ...result.data, range: { startDay: range.startDay, endDay: range.endDay } });
   } catch (error) { return reply({ error: error instanceof Error ? error.message : '조회에 실패했습니다.' }, 503); }

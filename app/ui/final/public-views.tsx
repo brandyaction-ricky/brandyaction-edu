@@ -9,7 +9,7 @@ import {
   type Row,
   type User,
 } from "@/lib/platform";
-import { containsFreeClassCampaign, hasLearningAccess, isPurchasableOffer, isRecruiting, paidCourseReadinessIssues } from "@/lib/platform-rules";
+import { containsFreeClassCampaign, hasLearningAccess, isPurchasableOffer, paidCourseReadinessIssues } from "@/lib/platform-rules";
 import { cohortPeriod } from "@/lib/qa-rules";
 import {
   ArrowLeft,
