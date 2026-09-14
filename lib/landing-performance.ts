@@ -54,6 +54,11 @@ export function presetRange(preset: PerformancePreset, campaign: Pick<Performanc
   if (preset === 'campaign') return { startDay: campaign.start_day, endDay: campaign.end_day };
   return { startDay: today, endDay: today };
 }
+export function campaignRange(range: {startDay:string;endDay:string}, campaign: Pick<PerformanceCampaign,'start_day'|'end_day'>) {
+  const clamp = (day: string) => day < campaign.start_day ? campaign.start_day : day > campaign.end_day ? campaign.end_day : day;
+  const endDay = clamp(range.endDay), startDay = clamp(range.startDay);
+  return { startDay: startDay > endDay ? endDay : startDay, endDay };
+}
 export function validateDashboardRange(startDay: unknown, endDay: unknown, campaign: Pick<PerformanceCampaign,'start_day'|'end_day'>) {
   if (!validDay(startDay) || !validDay(endDay)) throw Error('조회 날짜를 확인해 주세요.');
   const length = (dateValue(endDay) - dateValue(startDay)) / DAY + 1;
