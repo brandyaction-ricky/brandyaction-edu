@@ -89,6 +89,14 @@ test('three signup methods and product detail variants use the final publishing 
   assert.match(html(ArticlesView, { data, user, loading: false }), /테스트 아티클/);
   assert.match(html(StoriesView, { data, loading: false }), /등록된 고객 이야기/);
 });
+test('a published paid product uses its upcoming cohort for CTA and the actual deadline', () => {
+  const { ProductDetail } = load('app/ui/final/public-views.tsx');
+  const upcoming = { ...cohort, id: 'upcoming-cohort', status: 'upcoming', recruitment_start_at: '2098-12-01T00:00:00Z', recruitment_end_at: '2099-01-31T00:00:00Z' };
+  const markup = html(ProductDetail, { course, data: { ...data, cohorts: [upcoming], enrollments: [] } });
+  assert.match(markup, /checkout\?cohort=upcoming-cohort/);
+  assert.match(markup, /2099/);
+  assert.doesNotMatch(markup, /다음 모집 준비 중|이용·환불 안내/);
+});
 test('article hub includes the managed free-video banner and representative thumbnails', () => {
   const { ArticlesView } = load('app/ui/final/public-views.tsx');
   const banner = { id: 'edu_article_banner', value: { enabled: true, title: '회원 무료 영상', videos: [{ title: '첫 영상', url: 'https://youtu.be/dQw4w9WgXcQ', available: true }] } };
@@ -170,6 +178,11 @@ test('catalogues and separate editors render without dropping existing fields', 
   const countedProducts = html(AdminCatalog, { ...props, data: { ...data, product_summary: [{ id: 'product-summary', total: 12, published: 7, upcoming: 3, draft: 2 }] }, section: platform.sections.find(row => row.key === 'products') });
   for (const value of ['12', '7', '3', '2']) assert.match(countedProducts, new RegExp(`>${value}<`));
   assert.doesNotMatch(products, /목록 내보내기 · 선택 관리|삭제 항목 포함|현재 페이지 CSV|상품은 가격·판매·자료의 단위/);
+  const bannerData = { ...data, site_banners: [{ id: 'banner-2', title: '두 번째', display_order: 2, is_active: true }, { id: 'banner-1', title: '첫 번째', display_order: 1, is_active: true }] };
+  const banners = html(AdminCatalog, { ...props, data: bannerData, send, section: platform.sections.find(row => row.key === 'banners') });
+  assert.ok(banners.indexOf('첫 번째') < banners.indexOf('두 번째'));
+  assert.match(banners, /첫 번째 아래로 이동|두 번째 위로 이동/);
+  assert.doesNotMatch(banners, /배너 노출 기준|연결 페이지 확인|목록 내보내기 · 선택 관리/);
   const learning = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'learning') });
   assert.match(learning, /learning-layout/); assert.match(learning, /학습 구성/); assert.match(learning, /lesson-list-item/);
   const missions = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'missions') });
@@ -227,7 +240,7 @@ test('participant matrix uses latest attempts, required missions and enrollment 
   assert.equal(result.e2[0].status, 'empty'); assert.equal(result.e1[1].status, 'none');
 });
 
-test('campaign class keeps published content and only the mobile sticky CTA', () => {
+test('campaign class keeps published content and one responsive sticky CTA', () => {
   const { ProductDetail } = load('app/ui/final/public-views.tsx');
   const { defaultConfig } = load('lib/landing.ts');
   const course = { ...data.courses[0], list_price: 0 };
@@ -236,6 +249,12 @@ test('campaign class keeps published content and only the mobile sticky CTA', ()
   assert.match(markup, /data-landing-cta="sticky_cta"/);
   assert.doesNotMatch(markup, /data-landing-cta="(?:hero_cta|final_cta)"|data-section="(?:hero|final)"|무료 라이브에서 만나요/);
   assert.equal((markup.match(/href="https:\/\/open.kakao.com\/o\/testRoom"/g) || []).length, 1);
+  assert.match(markup, /campaign-layout/); assert.match(markup, /aria-label="무료 클래스 신청"/);
+  const landingCss = read('app/ui/landing/landing.css');
+  assert.match(landingCss, /grid-template-columns:minmax\(0,860px\) 320px/);
+  assert.match(landingCss, /\.campaign-sticky\{position:sticky/);
+  assert.match(landingCss, /@media\(max-width:900px\)[^{]*\{[^}]*\.edu-front \.campaign-layout\{display:block/);
+  assert.match(landingCss, /\.campaign-sticky\{position:fixed;inset:auto 0 0/);
   assert.match(read('app/ui/platform.tsx'), /free-class-detail-page/);
   assert.match(read('app/ui/final/frontend.css'), /@media\(max-width:680px\)\{\.edu-front\.free-class-detail-page>\.site-header\{display:none\}\}/);
   assert.match(markup, /발행한 제목/); assert.doesNotMatch(markup, /등록된 테스트 클래스/);
