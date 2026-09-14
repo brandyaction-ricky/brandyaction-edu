@@ -10,7 +10,7 @@ import {
   type Row,
   type Section,
 } from "@/lib/platform";
-import { recordId } from "@/lib/platform-rules";
+import { paidCourseReadinessIssues, recordId } from "@/lib/platform-rules";
 import { archiveValues, cohortPeriod, cohortStatus } from "@/lib/qa-rules";
 import { ArrowRight, BookOpen, ChevronDown, ChevronUp, FileText, Pencil, RotateCcw, Search, Trash2 } from "lucide-react";
 import Link from "next/link";
@@ -183,6 +183,8 @@ export function AdminCatalog({
   );
   const badge = (r: Row) => {
     const value = getStatus(r);
+    const publicationIssues = s.key === "products" ? paidCourseReadinessIssues(r, cohorts, weeks, lessons) : [];
+    if (value === "published" && publicationIssues.length) return <Badge color="amber">판매 보류</Badge>;
     return (
       <Badge
         color={
@@ -265,6 +267,10 @@ export function AdminCatalog({
             .join(", ") || "미연결",
       },
       { label: "자료", value: (r) => productResourceCount(r.id) + "개" },
+      { label: "공개 점검", value: (r) => {
+        const issues = paidCourseReadinessIssues(r, cohorts, weeks, lessons);
+        return issues.length ? <><Badge color="red">확인 필요</Badge><small>{issues.join(" · ")}</small></> : <Badge color="green">준비 완료</Badge>;
+      } },
       { label: "판매 상태", value: badge },
     ],
     cohorts: [
@@ -597,9 +603,9 @@ export function AdminCatalog({
             note="클래스 · 디지털 자료"
           />
           <Metric
-            label="판매 중"
+            label="공개 설정"
             value={<>{productSummary ? num(productSummary, "published") : rows.filter((item) => !item.archived_at && item.status === "published").length}<small>개</small></>}
-            note="고객에게 공개된 상품"
+            note="DB 공개 상태 · 판매 준비 점검 별도"
             highlight
           />
           <Metric
@@ -968,7 +974,7 @@ export function AdminCatalog({
           <div className="table-foot">
             {filtered.length}개 표시
             {pagination
-              ? ` · 전체 ${pagination.total}개 · 현재 페이지에서 검색`
+              ? ` · 전체 ${s.key === "products" && productSummary ? (productVisibility === "archived" ? num(productSummary, "archived") : num(productSummary, "total")) : pagination.total}개 · 현재 페이지에서 검색`
               : ""}
           </div>
         </div>

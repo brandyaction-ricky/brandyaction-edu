@@ -403,7 +403,15 @@ export function Platform({
       <footer className="learning-footer">
         <div className="wrap">
           <span>BRANDYACTION EDU · 나의 배움과 실행</span>
-          <Link href="/">홈으로</Link>
+          <nav className="learning-footer-links" aria-label="마이페이지 푸터 안내">
+            {support.email && <a href={"mailto:" + support.email}>이메일 문의</a>}
+            {safeUrl(support.url) && (
+              <a target="_blank" rel="noreferrer" href={safeUrl(support.url)}>
+                고객센터
+              </a>
+            )}
+            <Link href="/">홈으로</Link>
+          </nav>
         </div>
       </footer>
     ) : (
@@ -821,25 +829,6 @@ export function Platform({
         {body}
       </main>
       {!admin && footer}
-      {(account || learning) && (support.email || safeUrl(support.url)) && (
-        <div className="wrap flex gap8 mb24">
-          {support.email && (
-            <a className="link" href={"mailto:" + support.email}>
-              이메일 문의
-            </a>
-          )}
-          {safeUrl(support.url) && (
-            <a
-              className="link"
-              target="_blank"
-              rel="noreferrer"
-              href={safeUrl(support.url)}
-            >
-              고객센터
-            </a>
-          )}
-        </div>
-      )}
       {notice && (
         <div className="toast" role="status">
           {notice}

@@ -7,7 +7,7 @@ const source = fs.readFileSync(new URL('../lib/platform-rules.ts', import.meta.u
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const exports = {};
 new Function('exports', compiled)(exports);
-const { homepageCourses, hasLearningAccess, isPurchasableOffer, isRecruiting, matchingOrder, recordId } = exports;
+const { homepageCourses, hasLearningAccess, isPurchasableOffer, isRecruiting, matchingOrder, paidCourseReadinessIssues, recordId } = exports;
 const now = Date.parse('2026-09-11T12:00:00Z');
 
 test('learning access closes at expiry, before release, and after revocation', () => {
@@ -36,6 +36,14 @@ test('published paid products can sell an upcoming cohort until its actual deadl
   assert.equal(isPurchasableOffer({ ...course, status: 'draft' }, upcoming, now), false);
   assert.equal(isPurchasableOffer({ ...course, category: 'free' }, upcoming, now), false);
   assert.equal(isPurchasableOffer(course, { ...upcoming, recruitment_end_at: '2026-09-11T12:00:00Z' }, now), false);
+});
+
+test('paid products expose missing publication requirements before checkout', () => {
+  const course = { id: 'course', status: 'published', category: 'paid_class', metadata: {} };
+  const cohort = { course_id: 'course', status: 'recruiting', price: 100000, recruitment_end_at: '2026-10-01T00:00:00Z' };
+  assert.deepEqual(paidCourseReadinessIssues(course, [cohort], [], []), ['학습 기간', '일정 안내', '공개 커리큘럼', '상세 콘텐츠']);
+  assert.deepEqual(paidCourseReadinessIssues({ ...course, description: '상세', duration_label: '4주', schedule_label: '화요일' }, [cohort], [{ id: 'week', course_id: 'course', is_published: true }], [{ week_id: 'week', is_published: true }]), []);
+  assert.equal(isPurchasableOffer({ ...course, status: 'draft' }, cohort, now), false);
 });
 
 test('homepage shows published courses even when no cohort has been created', () => {

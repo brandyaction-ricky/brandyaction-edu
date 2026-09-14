@@ -113,6 +113,16 @@ export function validateActuals(input: unknown) {
   for (const key of ['joins','exits','live_peak','payments']) out[key] = v[key] === null || v[key] === '' ? null : finite(v[key], 0, 100000000, true);
   return out;
 }
+export function validateActualsPatch(input: unknown) {
+  const v = input as Record<string, unknown>;
+  if (!v || !validDate(v.day)) throw Error('KST 기준 날짜를 확인해 주세요.');
+  const out: Record<string, unknown> = { day: v.day };
+  for (const key of ['room_members','joins','exits','live_peak','payments','payments_new','payments_existing']) {
+    if (v[key] !== undefined && v[key] !== null && v[key] !== '') out[key] = finite(v[key], 0, 100000000, true);
+  }
+  if (Object.keys(out).length === 1) throw Error('저장할 실측 값을 하나 이상 입력해 주세요.');
+  return out;
+}
 export function validateMeta(input: unknown) {
   const v = input as Record<string, unknown>;
   if (!v || !validDate(v.day)) throw Error('KST 기준 날짜를 확인해 주세요.');

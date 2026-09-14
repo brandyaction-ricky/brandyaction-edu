@@ -36,7 +36,7 @@ function load(file) {
 const html = (component, props) => renderToStaticMarkup(React.createElement(component, props));
 const platform = load('lib/platform.ts');
 const user = { id: 'user', full_name: '테스트 회원', email: 'member@example.test', role: 'member' };
-const course = { id: 'course', slug: 'test-course', title: '등록된 테스트 클래스', summary: '실제 저장된 소개', category: 'paid_class', status: 'published', list_price: 100000, metadata: {} };
+const course = { id: 'course', slug: 'test-course', title: '등록된 테스트 클래스', summary: '실제 저장된 소개', description: '상세 학습 안내', duration_label: '4주', schedule_label: '매주 화요일', category: 'paid_class', status: 'published', list_price: 100000, metadata: {} };
 const cohort = { id: 'cohort', course_id: 'course', name: '테스트 기수', status: 'recruiting', price: 100000, recruitment_start_at: '2020-01-01', recruitment_end_at: '2099-01-01' };
 const enrollment = { id: 'enrollment', user_id: 'user', course_id: 'course', cohort_id: 'cohort', status: 'active', access_starts_at: '2020-01-01' };
 const lesson = { id: 'lesson', week_id: 'week', title: '첫 번째 학습', day_number: 1, is_published: true };
@@ -114,11 +114,15 @@ test('article hub includes the managed free-video banner and representative thum
   const platformSource = read('app/ui/platform.tsx');
   assert.doesNotMatch(platformSource, /THE WAY WE LEARN|시청에서 멈추지 않는/);
   assert.match(platformSource, /<SiteFooter\b/);
+  assert.match(platformSource, /learning-footer-links/);
+  assert.doesNotMatch(platformSource, /className="wrap flex gap8 mb24"/);
+  assert.doesNotMatch(read('app/ui/final/home-hero.tsx'), /지식을 넘어, 실행이 남는 학습|LEARN\. APPLY\. REPEAT/);
   const footerSource = read('app/ui/final/site-footer.tsx');
   const footerStyles = read('app/ui/final/site-footer.css');
   assert.match(footerSource, /제2026-충남천안-1825호/);
   assert.match(footerSource, /policies\/refund/);
   assert.match(footerStyles, /@media \(max-width: 600px\)[\s\S]*?\.edu-front \.site-footer \{ display: none; \}/);
+  assert.match(footerStyles, /\.edu-front \.learning-footer-links/);
 });
 
 test('product HTML takes precedence over old images and per-product CTA settings reach both layouts', () => {
@@ -171,7 +175,10 @@ test('classroom, mission, checkout and completion preserve authorized workflow e
   assert.match(resource, /\/api\/platform\/resource\?lesson=lesson/); assert.doesNotMatch(resource, /private\/test/);
   search = new URLSearchParams('cohort=cohort');
   const { Checkout } = load('app/ui/final/checkout.tsx');
-  assert.match(html(Checkout, { data, user, send, pending: false }), /checkout-layout/);
+  const checkout = html(Checkout, { data, user, send, pending: false });
+  assert.match(checkout, /checkout-layout/);
+  assert.match(checkout, /<button[^>]*disabled=""[^>]*aria-describedby="checkout-agreement-help"[^>]*>[^<]*결제하기/s);
+  assert.match(read('app/api/platform/route.ts'), /paidCourseReadinessIssues[\s\S]*판매 준비가 완료되지 않았습니다/);
   search = new URLSearchParams('order=order');
   const { OrderResult } = load('app/ui/order-result.tsx');
   const result = html(OrderResult, { data: { ...data, orders: [{ id: 'order', status: 'paid', total_amount: 0 }] }, refresh: send });
@@ -187,6 +194,7 @@ test('catalogues and separate editors render without dropping existing fields', 
   const props = { data, selection: [], setSelection() {}, edit() {}, archive() {}, pending: false, loading: false, pagination: null, setPage() {}, exportCsv() {} };
   const products = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'products') });
   assert.match(products, /전체 상품/); assert.match(products, /연결 기수/); assert.match(products, /<th>자료<\/th>/);
+  assert.match(products, /공개 점검/); assert.match(read('app/api/platform/route.ts'), /archivedProducts/);
   assert.match(products, /상품 표시 범위/); assert.match(products, /삭제된 상품/);
   assert.match(products, /catalog-actions/); assert.match(products, /등록된 테스트 클래스 삭제/); assert.match(products, /등록된 테스트 클래스 수정/);
   assert.ok(products.indexOf('등록된 테스트 클래스 수정') < products.indexOf('등록된 테스트 클래스 삭제'));
@@ -286,9 +294,14 @@ test('campaign class keeps published content and one responsive sticky CTA', () 
   const cfg = { ...defaultConfig(course.id), layout_ver: 1, revision: 1, kakao_url: 'https://open.kakao.com/o/testRoom', custom_sections: true, sections: [{ id: 'proof', title: '고객 이야기', body: '<script>unsafe()</script>', image: 'https://cdn.example/proof.webp' }], course_snapshot: { title: '발행한 제목', summary: '발행 당시 소개' } };
   const markup = html(ProductDetail, { course, data: { ...data, landing_configs: [cfg] } });
   assert.match(markup, /data-landing-cta="sticky_cta"/);
+  assert.match(markup, /data-product-cta="sticky_cta"/);
   assert.doesNotMatch(markup, /data-landing-cta="(?:hero_cta|final_cta)"|data-section="(?:hero|final)"|무료 라이브에서 만나요/);
   assert.equal((markup.match(/href="https:\/\/open.kakao.com\/o\/testRoom"/g) || []).length, 1);
   assert.match(markup, /campaign-layout/); assert.match(markup, /aria-label="무료 클래스 신청"/);
+  assert.match(read('lib/landing-browser.ts'), /'autoConfig', false/);
+  assert.match(read('app\/ui\/landing\/free-class.tsx'), /ProductConversionClickTracker/);
+  assert.match(read('app\/ui\/final\/product-detail-html.tsx'), /dispatchEvent\(new CustomEvent\(PRODUCT_CTA_EVENT/);
+  assert.doesNotMatch(markup, /campaign-cta-copy|카카오 오픈채팅으로 이동하며 사이트 수강 내역에는 자동 반영되지 않습니다/);
   const landingCss = read('app/ui/landing/landing.css');
   assert.match(landingCss, /grid-template-columns:minmax\(0,860px\) 320px/);
   assert.match(landingCss, /\.campaign-sticky\{position:sticky/);
@@ -310,6 +323,16 @@ test('campaign class keeps published content and one responsive sticky CTA', () 
   assert.match(metadataCta, /data-landing-cta="sticky_cta"/); assert.match(metadataCta, /href="https:\/\/example.com\/join"/);
   const paid = html(ProductDetail, { course: { ...course, list_price: 10000 }, data: { ...data, landing_configs: [cfg] } });
   assert.doesNotMatch(paid, /href="https:\/\/open.kakao.com\/o\/testRoom"/);
+});
+
+test('paid products hide mismatched free-class HTML and block checkout until ready', () => {
+  const { ProductDetail } = load('app/ui/final/public-views.tsx');
+  const mismatched = { ...course, duration_label: '', schedule_label: '', metadata: { detail_html_document: '<h1>무료 라이브 강의</h1><a href="https://open.kakao.com/o/room">무료강의 대기방 입장</a>' } };
+  const markup = html(ProductDetail, { course: mismatched, data: { ...data, enrollments: [], curriculum_weeks: [], curriculum_lessons: [] } });
+  assert.doesNotMatch(markup, /무료강의 대기방 입장/);
+  assert.match(markup, /무료 클래스 안내와 외부 참여 링크는 노출하지 않습니다/);
+  assert.match(markup, /학습 기간 · 일정 안내 · 공개 커리큘럼/);
+  assert.match(markup, /aria-disabled="true"/);
 });
 
 test('landing report separates repeated clicks, missing actuals, direct traffic and per-version reach', () => {

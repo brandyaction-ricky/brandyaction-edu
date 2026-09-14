@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getOperatorUser } from '@/lib/operator-permissions';
-import { validId, validDate, validateConfig, sectionOrder, validateActuals, validateMeta, reportRange } from '@/lib/landing';
+import { validId, validDate, validateConfig, sectionOrder, validateActualsPatch, validateMeta, reportRange } from '@/lib/landing';
 import { assetPath, validImage } from '@/lib/qa-rules';
 
 const reply = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'private, no-store' } });
@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     if (q.has('actual_day')) {
       const day = q.get('actual_day');
       if (!validDate(day)) return reply({ error: '기준일을 확인해 주세요.' }, 400);
-      const result = await db.from('landing_actuals').select('day,joins,exits,live_peak,payments').eq('landing_id', id).eq('day', day).maybeSingle();
+      const result = await db.from('landing_actuals').select('day,room_members,joins,exits,live_peak,payments,payments_new,payments_existing').eq('landing_id', id).eq('day', day).maybeSingle();
       if (result.error) throw Error('해당 날짜의 실측을 불러오지 못했습니다.');
       return reply({ actual: result.data });
     }
@@ -61,9 +61,13 @@ export async function POST(request: Request) {
     }
     if (!validId(body.landing_id)) throw Error('랜딩을 선택해 주세요.');
     if (body.action === 'actuals') {
-      const values = validateActuals(body.values);
+      const values = validateActualsPatch(body.values);
       const r = await db.from('landing_actuals').upsert({ landing_id: body.landing_id, ...values, updated_at: new Date().toISOString() }, { onConflict: 'landing_id,day' });
       if (r.error) throw Error('실측 입력을 저장하지 못했습니다.');
+    } else if (body.action === 'delete_actual') {
+      if (!validDate(body.day)) throw Error('삭제할 실측 날짜를 확인해 주세요.');
+      const r = await db.from('landing_actuals').delete().eq('landing_id', body.landing_id).eq('day', body.day);
+      if (r.error) throw Error('실측 기록을 삭제하지 못했습니다.');
     } else if (body.action === 'meta') {
       const values = validateMeta(body.values);
       const r = await db.from('landing_meta_daily').upsert({ landing_id: body.landing_id, ...values, updated_at: new Date().toISOString() }, { onConflict: 'landing_id,day,campaign,adset,creative' });

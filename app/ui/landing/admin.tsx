@@ -1,75 +1,46 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
-import { PERFORMANCE_PERIODS, type PerformanceCourse, type PerformancePeriod, type PerformanceReport } from '@/lib/landing-performance';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { Download, RefreshCw, Trash2 } from 'lucide-react';
+import { decodeLabel, kstDate } from '@/lib/landing';
+import type { PerformanceCourse, PerformanceReport } from '@/lib/landing-performance';
 import { PerformanceDashboard } from './performance-dashboard';
 
+type Filters = { start: string; end: string; campaign: string; adset: string; creative: string; device: string };
+type Actual = { day: string; room_members: number | null; live_peak: number | null; payments_new: number | null; payments_existing: number | null };
+const shift = (day: string, amount: number) => new Date(Date.parse(day + 'T00:00:00Z') + amount * 86400000).toISOString().slice(0, 10);
+const api = async (url: string, init?: RequestInit) => { const response = await fetch(url, { cache: 'no-store', ...init }); const value = await response.json(); if (!response.ok) throw Error(value.error || '요청을 처리하지 못했습니다.'); return value; };
+
 export function LandingAdmin() {
-  const [courses, setCourses] = useState<PerformanceCourse[]>([]);
-  const [selected, setSelected] = useState('');
-  const [period, setPeriod] = useState<PerformancePeriod>(7);
-  const [reload, setReload] = useState(0);
-  const [list, setList] = useState({ loading: true, error: '' });
-  const [result, setResult] = useState<{ key: string; report?: PerformanceReport; error?: string }>({ key: '' });
-  const query = new URLSearchParams({ landing: selected, days: String(period) }).toString();
-  const requestKey = query + ':' + reload;
-
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch('/api/landing/performance', { signal: controller.signal, cache: 'no-store' })
-      .then(async response => {
-        const value = await response.json();
-        if (!response.ok) throw Error(value.error || '무료클래스 목록을 불러오지 못했습니다.');
-        if (controller.signal.aborted) return;
-        const items: PerformanceCourse[] = value.courses;
-        setCourses(items);
-        const requested = new URLSearchParams(location.search).get('course');
-        setSelected(current => items.find(item => item.id === (current || requested))?.id || items.find(item => item.status === 'published' && item.tracking === 'active')?.id || items.find(item => item.status === 'published')?.id || items[0]?.id || '');
-        setList({ loading: false, error: '' });
-      })
-      .catch(error => { if (!controller.signal.aborted) setList({ loading: false, error: error.message }); });
-    return () => controller.abort();
-  }, [reload]);
-
-  useEffect(() => {
-    if (!selected) return;
-    const controller = new AbortController();
-    fetch('/api/landing/performance?' + query, { signal: controller.signal, cache: 'no-store' })
-      .then(async response => {
-        const value = await response.json();
-        if (!response.ok) throw Error(value.error || '성과 데이터를 불러오지 못했습니다.');
-        if (!controller.signal.aborted) setResult({ key: requestKey, report: value });
-      })
-      .catch(error => { if (!controller.signal.aborted) setResult({ key: requestKey, error: error.message }); });
-    return () => controller.abort();
-  }, [selected, query, requestKey]);
-
-  useEffect(() => {
-    if (!selected) return;
-    const timer = window.setInterval(() => {
-      if (document.visibilityState === 'visible') setReload(value => value + 1);
-    }, 30000);
-    return () => window.clearInterval(timer);
-  }, [selected]);
-
-  const current = courses.find(course => course.id === selected);
-  const fresh = result.key === requestKey;
-  const loading = list.loading || (!!selected && !fresh);
-  const error = list.error || (fresh ? result.error : '');
-  const report = !error && fresh ? result.report : undefined;
+  const today = kstDate();
+  const [courses, setCourses] = useState<PerformanceCourse[]>([]), [selected, setSelected] = useState('');
+  const [tab, setTab] = useState<'report' | 'actuals'>('report'), [reload, setReload] = useState(0), [compare, setCompare] = useState(false);
+  const [filters, setFilters] = useState<Filters>({ start: shift(today, -6), end: today, campaign: '', adset: '', creative: '', device: '' });
+  const [state, setState] = useState<{ key: string; report?: PerformanceReport; previous?: PerformanceReport; error?: string }>({ key: '' });
+  const query = useMemo(() => new URLSearchParams({ landing: selected, start: filters.start, end: filters.end, campaign: filters.campaign, adset: filters.adset, creative: filters.creative, device: filters.device }).toString(), [selected, filters]);
+  const requestKey = query + ':' + reload + ':' + compare;
+  useEffect(() => { const controller = new AbortController(); api('/api/landing/performance', { signal: controller.signal }).then(value => { const items: PerformanceCourse[] = value.courses; setCourses(items); const requested = new URLSearchParams(location.search).get('course'); setSelected(current => items.find(item => item.id === (current || requested))?.id || items.find(item => item.status === 'published' && item.tracking === 'active')?.id || items[0]?.id || ''); }).catch(error => { if (!controller.signal.aborted) setState({ key: '', error: error.message }); }); return () => controller.abort(); }, [reload]);
+  useEffect(() => { if (!selected || tab !== 'report') return; const controller = new AbortController(); const span = Math.round((Date.parse(filters.end) - Date.parse(filters.start)) / 86400000) + 1; const previousEnd = shift(filters.start, -1), previousStart = shift(previousEnd, -(span - 1)); Promise.all([api('/api/landing/performance?' + query, { signal: controller.signal }), compare ? api('/api/landing/performance?' + new URLSearchParams({ ...Object.fromEntries(new URLSearchParams(query)), start: previousStart, end: previousEnd }).toString(), { signal: controller.signal }) : Promise.resolve(undefined)]).then(([report, previous]) => { if (!controller.signal.aborted) setState({ key: requestKey, report, previous }); }).catch(error => { if (!controller.signal.aborted) setState({ key: requestKey, error: error.message }); }); return () => controller.abort(); }, [selected, tab, query, requestKey, compare, filters.start, filters.end]);
+  useEffect(() => { if (!selected) return; const timer = window.setInterval(() => { if (document.visibilityState === 'visible') setReload(value => value + 1); }, 30000); return () => window.clearInterval(timer); }, [selected]);
+  const current = courses.find(course => course.id === selected), fresh = state.key === requestKey, report = fresh ? state.report : undefined;
+  const applyPreset = (kind: 'today' | 'yesterday' | '7' | '14' | 'campaign') => { const end = kind === 'yesterday' ? shift(today, -1) : kind === 'campaign' ? current?.campaign_end || today : today; const start = kind === 'campaign' ? current?.campaign_start || end : kind === '7' ? shift(end, -6) : kind === '14' ? shift(end, -13) : end; setFilters(value => ({ ...value, start, end })); };
+  const options = report?.options || { campaigns: [], adsets: [], creatives: [], devices: [] };
   return <div className="landing-admin">
-    <div className="toolbar">
-      <div className="landing-class-control"><label htmlFor="landing-course">대상 무료클래스</label><div className="landing-class-row"><select id="landing-course" aria-label="대상 무료클래스" value={selected} onChange={event => setSelected(event.target.value)} disabled={!courses.length}>{!courses.length && <option value="">등록된 무료클래스 없음</option>}{courses.map(course => <option key={course.id} value={course.id}>{course.title}{course.status === 'published' ? '' : ' · 미공개'}</option>)}</select>{current && <span className={'badge ' + (current.tracking === 'active' ? 'green' : current.tracking === 'paused' ? 'amber' : '')}>{current.tracking === 'active' ? '데이터 수집 중' : current.tracking === 'paused' ? '데이터 수집 중지됨' : '수집 설정 없음'}</span>}</div></div>
-      <span className="spacer" />
-      {report && <span className="meta">{report.range.startDay} — {report.range.endDay} · KST</span>}
-      <button type="button" className="btn" onClick={() => setReload(value => value + 1)}><RefreshCw size={16} aria-hidden="true" />새로고침</button>
-    </div>
-    <div className="tabs" role="group" aria-label="조회 기간">{PERFORMANCE_PERIODS.map(days => <button key={days} type="button" className={'tab ' + (period === days ? 'active' : '')} aria-pressed={period === days} onClick={() => setPeriod(days)}>{days}D</button>)}</div>
-    {error ? <div className="empty" role="alert"><h3>성과 데이터를 불러오지 못했습니다.</h3><p>{error} 새로고침으로 다시 시도해 주세요.</p></div>
-      : loading ? <div className="empty" role="status"><p>실제 성과 데이터를 불러오고 있습니다.</p></div>
-      : !current ? <div className="empty"><h3>등록된 무료클래스가 없습니다.</h3><p>상품 관리에서 등록한 무료클래스가 표시됩니다.</p></div>
-      : report && <PerformanceDashboard report={report} />}
-    {current && !loading && !error && current.tracking !== 'active' && <p className="notice amber mt24">{current.tracking === 'paused' ? '현재 이 클래스의 신규 데이터 수집이 중지되어 있습니다. 기존 기록만 조회하며, 수집 설정은 변경하지 않았습니다.' : '이 클래스에는 기존 트래킹 설정이 없습니다. 수집되지 않은 방문은 통계에 포함되지 않습니다.'}</p>}
+    <div className="toolbar"><div className="landing-class-control"><label htmlFor="landing-course">대상 무료클래스</label><div className="landing-class-row"><select id="landing-course" value={selected} onChange={event => setSelected(event.target.value)}>{courses.map(course => <option key={course.id} value={course.id}>{course.title}{course.status === 'published' ? '' : ' · 미공개'}</option>)}</select>{current && <span className={'badge ' + (current.tracking === 'active' ? 'green' : 'amber')}>{current.tracking === 'active' ? '데이터 수집 중' : current.tracking === 'paused' ? '수집 중지됨' : '수집 설정 없음'}</span>}</div></div><span className="spacer"/><button type="button" className="btn" onClick={() => setReload(value => value + 1)}><RefreshCw size={16}/>새로고침</button></div>
+    <nav className="tabs" aria-label="무료클래스 트래킹 관리"><button type="button" className={'tab ' + (tab === 'report' ? 'active' : '')} onClick={() => setTab('report')}>성과 분석</button><button type="button" className={'tab ' + (tab === 'actuals' ? 'active' : '')} onClick={() => setTab('actuals')}>실측 입력</button></nav>
+    {!current ? <div className="empty"><h3>등록된 무료클래스가 없습니다.</h3></div> : tab === 'actuals' ? <ActualManager course={current} reload={reload} onReload={() => setReload(value => value + 1)}/> : <>
+      <section className="panel panel-body landing-report-controls"><div className="landing-presets"><button className="chip" onClick={() => applyPreset('today')}>오늘</button><button className="chip" onClick={() => applyPreset('yesterday')}>어제</button><button className="chip" onClick={() => applyPreset('7')}>7일</button><button className="chip" onClick={() => applyPreset('14')}>14일</button><button className="chip" onClick={() => applyPreset('campaign')}>캠페인 전체</button></div><div className="landing-filter-grid"><label>시작일<input type="date" value={filters.start} onChange={event => setFilters({ ...filters, start: event.target.value })}/></label><label>종료일<input type="date" value={filters.end} onChange={event => setFilters({ ...filters, end: event.target.value })}/></label><label>광고세트<select value={filters.adset} onChange={event => setFilters({ ...filters, adset: event.target.value })}><option value="">전체</option>{options.adsets.map(value => <option key={value} value={value}>{decodeLabel(value)}</option>)}</select></label><label>소재<select value={filters.creative} onChange={event => setFilters({ ...filters, creative: event.target.value })}><option value="">전체</option>{options.creatives.map(value => <option key={value} value={value}>{decodeLabel(value)}</option>)}</select></label><label>기기<select value={filters.device} onChange={event => setFilters({ ...filters, device: event.target.value })}><option value="">전체</option>{options.devices.map(value => <option key={value} value={value}>{value}</option>)}</select></label><label>캠페인<select value={filters.campaign} onChange={event => setFilters({ ...filters, campaign: event.target.value })}><option value="">전체</option>{options.campaigns.map(value => <option key={value} value={value}>{decodeLabel(value)}</option>)}</select></label></div><div className="between"><label className="check"><input type="checkbox" checked={compare} onChange={event => setCompare(event.target.checked)}/> 직전 동일 기간과 비교</label>{report && <button className="btn" type="button" onClick={() => downloadCsv(report)}><Download size={16}/>원본 단위 CSV</button>}</div></section>
+      {fresh && state.error ? <div className="empty" role="alert"><h3>성과 데이터를 불러오지 못했습니다.</h3><p>{state.error}</p></div> : !fresh ? <div className="empty" role="status"><p>성과 데이터를 집계하고 있습니다.</p></div> : report && <PerformanceDashboard report={report} previous={state.previous}/>}</>}
   </div>;
+}
+
+function downloadCsv(report: PerformanceReport) { const header = ['날짜','캠페인','광고세트','소재','유입','기기','고유 방문자','방문','CTA 클릭 방문','CTA 클릭 횟수','평균 스크롤','평균 체류(ms)']; const rows = report.export_rows.map(row => [row.day, decodeLabel(row.campaign), decodeLabel(row.adset), decodeLabel(row.creative), row.traffic, row.device, row.visitors, row.sessions, row.converted_sessions, row.clicks, row.avg_scroll_depth ?? '', row.avg_dwell_ms ?? '']); const csv = '\ufeff' + [header, ...rows].map(row => row.map(value => '"' + String(value ?? '').replaceAll('"','""') + '"').join(',')).join('\n'); const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); link.download = `free-class-performance-${report.range.startDay}-${report.range.endDay}.csv`; link.click(); URL.revokeObjectURL(link.href); }
+
+function ActualManager({ course, reload, onReload }: { course: PerformanceCourse; reload: number; onReload: () => void }) {
+  const [actuals, setActuals] = useState<Actual[]>([]), [day, setDay] = useState(kstDate()), [message, setMessage] = useState(''), [pending, setPending] = useState(false);
+  useEffect(() => { const controller = new AbortController(); const start = course.campaign_start || shift(kstDate(), -30), end = [course.campaign_end || '', kstDate()].sort().at(-1)!; api('/api/landing/admin?' + new URLSearchParams({ landing: course.id, start, end }), { signal: controller.signal }).then(value => setActuals(value.actuals || [])).catch(error => { if (!controller.signal.aborted) setMessage(error.message); }); return () => controller.abort(); }, [course, reload]);
+  const ordered = [...actuals].sort((a,b) => a.day.localeCompare(b.day)), latest = ordered.at(-1), newCount = ordered.reduce((sum,row) => sum + Number(row.payments_new || 0), 0), existingCount = ordered.reduce((sum,row) => sum + Number(row.payments_existing || 0), 0), livePeak = Math.max(0, ...ordered.map(row => Number(row.live_peak || 0)));
+  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const form = new FormData(event.currentTarget), values: Record<string, unknown> = { day }; for (const key of ['room_members','payments_new','payments_existing','live_peak']) { const value = form.get(key); if (value !== '') values[key] = Number(value); } setPending(true); setMessage(''); try { await api('/api/landing/admin', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ action:'actuals', landing_id:course.id, values }) }); setMessage('입력한 항목만 저장했습니다. 빈칸의 기존 값은 유지됩니다.'); onReload(); } catch (error) { setMessage((error as Error).message); } finally { setPending(false); } }
+  async function remove(target: string) { if (!confirm(`${target} 실측 기록을 삭제할까요?`)) return; setPending(true); try { await api('/api/landing/admin', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ action:'delete_actual', landing_id:course.id, day:target }) }); setMessage('실측 기록을 삭제했습니다.'); onReload(); } catch (error) { setMessage((error as Error).message); } finally { setPending(false); } }
+  return <div className="landing-actual-manager"><section className="landing-campaign-summary"><div><span>현재 카카오방 인원</span><strong>{latest?.room_members ?? '—'}명</strong></div><div><span>누적 결제</span><strong>{newCount + existingCount}건</strong><small>신규 {newCount} · 기존 {existingCount}</small></div><div><span>계산 매출</span><strong>{(newCount * 1650000 + existingCount * 1100000).toLocaleString()}원</strong></div><div><span>라이브 최대 동시시청</span><strong>{livePeak || '—'}명</strong></div></section><form className="panel panel-body" onSubmit={submit}><h2>일별 실측 입력</h2><p className="meta">카카오방은 해당 시점 총원을, 결제는 그날 발생한 건수만 입력합니다. 마감일은 고정하지 않으며 캠페인 종료 후에도 날짜별 기록을 추가할 수 있습니다.</p><div className="landing-filter-grid"><label>날짜<input type="date" value={day} onChange={event => setDay(event.target.value)} required/></label><label>카카오방 현재 인원<input name="room_members" type="number" min="0" placeholder="미확인은 비워두기"/></label><label>결제 건수 · 신규 165만원<input name="payments_new" type="number" min="0" placeholder="미확인은 비워두기"/></label><label>결제 건수 · 기존 110만원<input name="payments_existing" type="number" min="0" placeholder="미확인은 비워두기"/></label><label>라이브 최대 동시시청<input name="live_peak" type="number" min="0" placeholder="캠페인당 1회 입력"/></label></div><button className="btn primary" disabled={pending}>{pending ? '저장 중…' : '입력한 항목 저장'}</button>{message && <p className="notice mt24" role="status">{message}</p>}</form><section className="panel"><div className="panel-head"><h2>저장된 기록</h2></div><div className="table-scroll"><table><thead><tr><th>날짜</th><th>카카오방 인원</th><th>전일 대비</th><th>결제(신규)</th><th>결제(기존)</th><th>동시시청</th><th>관리</th></tr></thead><tbody>{ordered.map((row,index) => { const previous = ordered[index-1]?.room_members; const change = row.room_members == null || previous == null ? '비교 못함' : (row.room_members - previous >= 0 ? '+' : '') + (row.room_members - previous); return <tr key={row.day}><td>{row.day}</td><td>{row.room_members ?? '—'}</td><td>{change}</td><td>{row.payments_new ?? '—'}</td><td>{row.payments_existing ?? '—'}</td><td>{row.live_peak ?? '—'}</td><td><button type="button" className="iconbtn danger" aria-label={`${row.day} 기록 삭제`} disabled={pending} onClick={() => void remove(row.day)}><Trash2 size={16}/></button></td></tr>; })}</tbody></table></div></section></div>;
 }

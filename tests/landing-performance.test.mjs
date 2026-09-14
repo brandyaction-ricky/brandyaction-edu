@@ -24,15 +24,15 @@ function load(file, mocks = {}) {
 }
 const logic = load('lib/landing-performance.ts');
 const id = 'aaaaaaaa-aaaa-4000-8000-000000000001';
-const empty = { summary: { visitors: 0, clicks: 0, converted_visitors: 0, sessions: 0, measured_sessions: 0, avg_dwell_ms: null, avg_scroll_depth: null }, daily: [{ day: '2026-09-13', visitors: 0, clicks: 0 }], sources: [], last_event_at: null, range: { startDay: '2026-09-13', endDay: '2026-09-13' } };
+const empty = { summary: { visitors: 0, clicks: 0, converted_visitors: 0, sessions: 0, converted_sessions: 0, measured_sessions: 0, avg_dwell_ms: null, avg_scroll_depth: null }, daily: [{ day: '2026-09-13', visitors: 0, sessions: 0, clicks: 0, converted_sessions: 0 }], sources: [], export_rows: [], options: { campaigns: [], adsets: [], creatives: [], devices: [] }, last_event_at: null, range: { startDay: '2026-09-13', endDay: '2026-09-13' } };
 
 test('performance periods include today in KST and reject unbounded queries', () => {
   const now = new Date('2026-09-13T15:01:00Z');
   const seven = logic.performanceRange('7', now);
   assert.equal(seven.startDay, '2026-09-08'); assert.equal(seven.endDay, '2026-09-14');
   assert.equal(seven.start, '2026-09-07T15:00:00.000Z'); assert.equal(seven.end, '2026-09-14T15:00:00.000Z');
-  for (const days of ['7', '30', '90']) { const range = logic.performanceRange(days, now); assert.equal((Date.parse(range.end) - Date.parse(range.start)) / 86400000, Number(days)); }
-  for (const days of ['', '1', '365', '7junk', '-1']) assert.throws(() => logic.performanceRange(days, now));
+  for (const days of ['1', '7', '14', '30', '90']) { const range = logic.performanceRange(days, now); assert.equal((Date.parse(range.end) - Date.parse(range.start)) / 86400000, Number(days)); }
+  for (const days of ['', '365', '7junk', '-1']) assert.throws(() => logic.performanceRange(days, now));
 });
 
 test('conversion uses distinct converted visitors and engagement preserves unknown versus zero', () => {
@@ -58,22 +58,23 @@ test('page engagement excludes background time, retains maximum depth and bounds
   assert.deepEqual(malformed.sample(true, Infinity, 0), { dwellMs: 0, scrollPct: 0 });
 });
 
-test('performance UI uses the native admin dashboard and removes all CTA/detail registration forms', () => {
+test('performance UI supports operational filters, comparison, CSV and partial actuals', () => {
   const { LandingAdmin } = load('app/ui/landing/admin.tsx');
   const admin = renderToStaticMarkup(React.createElement(LandingAdmin));
-  for (const value of ['7D', '30D', '90D', 'class="toolbar"', 'class="tabs"']) assert.ok(admin.includes(value));
+  for (const value of ['성과 분석', '실측 입력', 'class="toolbar"', 'class="tabs"']) assert.ok(admin.includes(value));
   assert.doesNotMatch(admin, /Marketing Performance|무료클래스의 방문과 CTA 전환 성과를 확인하세요/);
-  assert.doesNotMatch(admin, /<form|type="file"|CTA·이미지 저장|랜딩·Pixel 설정|발행 이력/);
+  assert.doesNotMatch(admin, /type="file"|CTA·이미지 저장|랜딩·Pixel 설정|발행 이력/);
   const source = fs.readFileSync('app/ui/landing/admin.tsx', 'utf8');
-  assert.doesNotMatch(source, /LiveSetup|UploadField|method:\s*['"]POST|initial\.revision|performance\.css|className=[^\n]*performance-/);
-  assert.match(source, /result\.key === requestKey/); assert.match(source, /controller\.abort/);
+  for (const value of ['오늘', '어제', '7일', '14일', '캠페인 전체', '원본 단위 CSV', '직전 동일 기간과 비교', 'payments_new', 'delete_actual']) assert.ok(source.includes(value));
+  assert.doesNotMatch(source, /LiveSetup|UploadField|initial\.revision|performance\.css|className=[^\n]*performance-/);
+  assert.match(source, /state\.key === requestKey/); assert.match(source, /controller\.abort/);
   assert.match(source, /landing-class-control/); assert.match(source, /setInterval/);
   const { PerformanceDashboard } = load('app/ui/landing/performance-dashboard.tsx');
   const zero = renderToStaticMarkup(React.createElement(PerformanceDashboard, { report: empty }));
   for (const value of ['Unique Visitors', 'CTA Clicks', 'Conversion Rate', 'Avg Dwell Time', '평균 스크롤 깊이', 'Traffic &amp; Conversions', 'Top Sources', 'No traffic data yet']) assert.ok(zero.includes(value));
   assert.doesNotMatch(zero, /NaN|Infinity|performance-/); assert.match(zero, /<caption/);
   for (const className of ['metrics landing-kpis', 'metric', 'two-col', 'panel', 'panel-head', 'panel-body', 'empty']) assert.ok(zero.includes(`class="${className}`));
-  const real = renderToStaticMarkup(React.createElement(PerformanceDashboard, { report: { ...empty, summary: { ...empty.summary, visitors: 4, clicks: 17, converted_visitors: 2, sessions: 5 }, sources: [{ source: '%3Cscript%3E', visitors: 4, clicks: 17 }] } }));
+  const real = renderToStaticMarkup(React.createElement(PerformanceDashboard, { report: { ...empty, summary: { ...empty.summary, visitors: 4, clicks: 17, converted_visitors: 2, sessions: 5, converted_sessions: 2 }, sources: [{ campaign: '', adset: '', creative: '%3Cscript%3E', traffic: 'meta', device: 'mobile', visitors: 4, sessions: 5, clicks: 17, converted_sessions: 2, avg_dwell_ms: null, avg_scroll_depth: null }] } }));
   assert.match(real, /50\.0%/); assert.match(real, /미수집/); assert.match(real, /&lt;script&gt;/); assert.doesNotMatch(real, /<script>/);
 });
 
@@ -94,7 +95,7 @@ test('performance API is read-only, permission-scoped and never returns fake suc
   assert.equal(good.calls.length, 0);
   const response = await good.route.GET(new Request(`https://dev.example/api/landing/performance?landing=${id}&days=30`));
   assert.equal(response.status, 200); assert.equal(response.headers.get('cache-control'), 'private, no-store');
-  assert.ok(good.calls.some(call => call[0] === 'rpc' && call[1] === 'edu_landing_performance'));
+  assert.ok(good.calls.some(call => call[0] === 'rpc' && call[1] === 'edu_landing_performance_filtered'));
   assert.ok(good.calls.some(call => call[0] === 'eq' && call[1] === 'category' && call[2] === 'free'));
   assert.ok(good.calls.some(call => call[0] === 'is' && call[1] === 'archived_at' && call[2] === null));
   assert.ok(!good.calls.some(call => call[0] === 'from' && call[1] === 'funnel_events'));

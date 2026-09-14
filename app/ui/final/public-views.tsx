@@ -9,7 +9,7 @@ import {
   type Row,
   type User,
 } from "@/lib/platform";
-import { hasLearningAccess, isPurchasableOffer, isRecruiting } from "@/lib/platform-rules";
+import { containsFreeClassCampaign, hasLearningAccess, isPurchasableOffer, paidCourseReadinessIssues } from "@/lib/platform-rules";
 import { cohortPeriod } from "@/lib/qa-rules";
 import {
   ArrowLeft,
@@ -141,7 +141,7 @@ function StandardProductDetail({
   const cohorts = (data.cohorts || []).filter((g) => g.course_id === c.id),
     [cohortId, setCohortId] = useState("");
   const purchasable = (cohort: Row) => isPurchasableOffer(c, cohort);
-  const available =
+  let available =
     cohorts.find((g) => g.id === cohortId && purchasable(g)) ||
     cohorts.find(purchasable);
   const enrolled = (data.enrollments || []).find(
@@ -163,8 +163,14 @@ function StandardProductDetail({
     detailImage = detailImages[0]?.path || '';
   const detailHtml = typeof meta.detail_html === 'string' ? meta.detail_html : '';
   const documentSource = productDocument(meta);
+  const mismatchedFreeContent = !free && containsFreeClassCampaign(documentSource || detailHtml);
+  const visibleDocumentSource = mismatchedFreeContent ? '' : documentSource;
+  const visibleDetailHtml = mismatchedFreeContent ? '' : detailHtml;
+  const readinessIssues = paidCourseReadinessIssues(c, cohorts, data.curriculum_weeks || [], data.curriculum_lessons || []);
+  const readyForSale = readinessIssues.length === 0;
+  if (!readyForSale) available = undefined;
   const conversion = productConversion(meta);
-  const customCta = !enrolled && !!conversion.url;
+  const customCta = !enrolled && readyForSale && !!conversion.url;
   const price = available ? num(available, "price") : num(c, "list_price");
   const unavailableFree = free && !enrolled;
   const href = enrolled
@@ -268,18 +274,19 @@ function StandardProductDetail({
                     ? "반복 업무를 줄이는 작은 도구."
                     : "이 클래스에서 만들 변화"}
                 </h2>
-                {documentSource || detailHtml ? <ProductDetailHtml html={detailHtml} documentSource={documentSource} /> : detailImage ? (
+                {visibleDocumentSource || visibleDetailHtml ? <ProductDetailHtml html={visibleDetailHtml} documentSource={visibleDocumentSource} /> : detailImage ? (
                   <div className="detail-image-stack">{detailImages.map((image, index) => <img
                     className="detail-image"
                     src={image.path}
                     alt={image.alt || `${t(c, "title")} 상세 안내 ${index + 1}`}
                     key={image.path + index}
                   />)}</div>
-                ) : detailHtml ? <ProductDetailHtml html={detailHtml} /> : (
+                ) : visibleDetailHtml ? <ProductDetailHtml html={visibleDetailHtml} /> : (
                   <div className="reading-copy">
                     {t(c, "description") || t(c, "summary")}
                   </div>
                 )}
+                {mismatchedFreeContent && <p className="notice mt24">유료 클래스 상세 콘텐츠를 준비하고 있습니다. 무료 클래스 안내와 외부 참여 링크는 노출하지 않습니다.</p>}
               </section>
               <section className="detail-section" id="curriculum">
                 <h2>{digital ? "구성 자료" : "학습 방식과 커리큘럼"}</h2>
@@ -418,6 +425,7 @@ function StandardProductDetail({
                 {available && (
                   <p className="meta mb24">{t(available, "name")}</p>
                 )}
+                {!enrolled && readinessIssues.length > 0 && <p className="notice mb24">판매 준비 중입니다. {readinessIssues.join(" · ")} 정보를 확인하고 있습니다.</p>}
                 {button}
               </div>
             </aside>
@@ -654,7 +662,9 @@ export function ArticlesView({
           <ArticleCard key={a.id} article={a} />
         ))}
         {!loading && !filtered.length && (
-          <Empty title="조회된 아티클이 없습니다." />
+          <Empty title="조회된 아티클이 없습니다.">
+            <div className="row center mt16"><Link className="btn primary" href="/classes?type=free">무료 클래스 보기</Link><Link className="btn" href="/classes">전체 클래스 보기</Link></div>
+          </Empty>
         )}
       </div>
       </section>
@@ -705,7 +715,9 @@ export function StoriesView({
             </button>
           ))}
           {!loading && !stories.length && (
-            <Empty title="공개된 고객 이야기가 없습니다." />
+            <Empty title="공개된 고객 이야기가 없습니다.">
+              <div className="row center mt16"><Link className="btn primary" href="/classes?type=free">무료 클래스 보기</Link><Link className="btn" href="/my/questions">문의하기</Link></div>
+            </Empty>
           )}
         </div>
       </div>

@@ -38,3 +38,18 @@
   .edu-front .site-footer-copyright { margin-top: 28px; font-size: 11px; }
 }
 @media print { .edu-front .site-footer { display: none !important; } }
+
+.edu-front .learning-footer-links {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+}
+.edu-front .learning-footer-links a { color: var(--text-secondary); white-space: nowrap; }
+.edu-front .learning-footer-links a:hover { color: var(--text-primary); }
+
+@media (max-width: 600px) {
+  .edu-front .learning-footer .wrap { align-items: flex-start; flex-direction: column; }
+  .edu-front .learning-footer-links { justify-content: flex-start; }
+}

@@ -2,7 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { bannerTextLimits, sections, safeUrl, type Row } from '@/lib/platform';
-import { hasLearningAccess } from '@/lib/platform-rules';
+import { containsFreeClassCampaign, hasLearningAccess, paidCourseReadinessIssues } from '@/lib/platform-rules';
 import { getEduSettings } from '@/lib/edu-settings';
 import { gradeQuiz, type QuizDefinition } from '@/lib/mission-quiz';
 import { adminTables, archiveValues, cohortStatus, phoneNumber, validImage, assetPath, imagePreviewUrl, databaseMessage } from '@/lib/qa-rules';
@@ -98,14 +98,16 @@ export async function GET(request: Request) {
             banner.image_url = imagePreviewUrl(String(banner.image_path || ''), process.env.NEXT_PUBLIC_SUPABASE_URL || '');
         }
         if (adminMode && sectionKey === 'products') {
-            const [allProducts, publishedProducts, draftProducts] = await Promise.all([
+            const [allProducts, publishedProducts, draftProducts, archivedProducts] = await Promise.all([
                 db.from('courses').select('id', { count: 'exact' }).is('archived_at', null).limit(1000),
                 db.from('courses').select('id', { count: 'exact', head: true }).is('archived_at', null).eq('status', 'published'),
                 db.from('courses').select('id', { count: 'exact', head: true }).is('archived_at', null).eq('status', 'draft'),
+                db.from('courses').select('id', { count: 'exact', head: true }).not('archived_at', 'is', null),
             ]);
             if (allProducts.error) throw allProducts.error;
             if (publishedProducts.error) throw publishedProducts.error;
             if (draftProducts.error) throw draftProducts.error;
+            if (archivedProducts.error) throw archivedProducts.error;
             const activeProductIds = new Set((allProducts.data || []).map(product => String(product.id)));
             const upcomingProductIds = new Set(
                 (data.cohorts || [])
@@ -118,6 +120,7 @@ export async function GET(request: Request) {
                 published: publishedProducts.count || 0,
                 upcoming: upcomingProductIds.size,
                 draft: draftProducts.count || 0,
+                archived: archivedProducts.count || 0,
             }];
         }
         if (adminMode && sectionKey === 'products' && data.courses?.length) {
@@ -706,6 +709,23 @@ export async function POST(request: Request) {
         }
         if (action === 'order') {
             if (!uid(body.cohortId) || body.agreed !== true) fail('상품과 필수 동의를 확인해 주세요.');
+            const offer = await db.from('cohorts').select('*,courses!inner(*)').eq('id', body.cohortId).single();
+            if (offer.error || !offer.data) fail('상품 모집 정보를 확인해 주세요.', 409);
+            const offeredCourse = offer.data.courses as Row;
+            if (offeredCourse.category === 'paid_class') {
+                const weeks = await db.from('curriculum_weeks').select('*').eq('course_id', offeredCourse.id).eq('is_published', true);
+                if (weeks.error) throw weeks.error;
+                const weekIds = (weeks.data || []).map((item) => item.id);
+                const lessons = weekIds.length
+                    ? await db.from('curriculum_lessons').select('*').in('week_id', weekIds).eq('is_published', true)
+                    : { data: [], error: null };
+                if (lessons.error) throw lessons.error;
+                const metadata = (offeredCourse.metadata && typeof offeredCourse.metadata === 'object' ? offeredCourse.metadata : {}) as Record<string, unknown>;
+                const source = String(metadata.detail_html_document || metadata.detail_html || '');
+                const issues = paidCourseReadinessIssues(offeredCourse, [offer.data], (weeks.data || []) as Row[], (lessons.data || []) as Row[]);
+                if (containsFreeClassCampaign(source)) issues.push('유료 전용 상세 콘텐츠');
+                if (issues.length) fail(`판매 준비가 완료되지 않았습니다: ${[...new Set(issues)].join(' · ')}`, 409);
+            }
             let phone;
             try {
                 phone = phoneNumber(body.phone, true);
