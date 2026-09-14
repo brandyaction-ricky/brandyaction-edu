@@ -12,9 +12,9 @@ import {
   type Row,
 } from "@/lib/platform";
 import { localDateTime } from "@/lib/platform-rules";
-import { CalendarDays, Copy, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, Copy, Plus, Trash2, X } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { SubmissionReview } from "./final/submission-review";
 import { timeLabel, type Data, type WorkflowSend } from "./learning-workflows";
 import { EnrollmentGrant, RefundAction } from "./operations-actions";
@@ -1404,6 +1404,8 @@ function SettingsForm({ section, data, send, pending }: Props) {
   );
   const [message, setMessage] = useState("");
   const [seoTab, setSeoTab] = useState<'search' | 'verification' | 'measurement'>('search');
+  const [codeOpen, setCodeOpen] = useState(false);
+  const codeDialogRef = useRef<HTMLDialogElement>(null);
   const [seoDraft, setSeoDraft] = useState(() => ({
     title: String(initial.title || 'BrandyAction EDU | 배운 것을, 내 일의 성과로.'),
     description: String(initial.description || 'AI와 마케팅을 배우고 내 업무에 적용하는 실행 중심 교육.'),
@@ -1411,6 +1413,12 @@ function SettingsForm({ section, data, send, pending }: Props) {
     naverVerification: String(initial.naverVerification || ''),
   }));
   const [metric, setMetric] = useState<Row | null>(null);
+  const metricValue = object(metric || undefined, "value");
+  const legacyPaymentDays = [0, 1, 2, 3, 4].map(day => ({ day, count: Number(metricValue[`paymentsDay${day}`] || 0) }));
+  const storedPaymentDays = Array.isArray(metricValue.paymentDays) ? metricValue.paymentDays as { day: number; count: number }[] : legacyPaymentDays;
+  const [paymentDays, setPaymentDays] = useState<{ day: number; count: number }[]>([{ day: 0, count: 0 }]);
+  const measurementCodesValue = object(rows(data, "site_settings").find(row => row.key === "edu_measurement_codes"), "value");
+  const measurementCodes = Array.isArray(measurementCodesValue.items) ? measurementCodesValue.items.filter(item => item && typeof item === "object") as Row[] : [];
   const metrics = rows(data, "site_settings")
     .filter((r) => t(r, "key").startsWith("edu_metric_"))
     .sort((a, b) =>
@@ -1418,6 +1426,24 @@ function SettingsForm({ section, data, send, pending }: Props) {
         String(object(a, "value").date),
       ),
     );
+  useEffect(() => {
+    const dialog = codeDialogRef.current;
+    if (!dialog) return;
+    if (codeOpen && !dialog.open) dialog.showModal();
+    if (!codeOpen && dialog.open) dialog.close();
+  }, [codeOpen]);
+  useEffect(() => {
+    setPaymentDays(storedPaymentDays.length ? storedPaymentDays.map(row => ({ day: Number(row.day), count: Number(row.count) })) : [{ day: 0, count: 0 }]);
+  }, [metric?.key]);
+  async function saveMeasurementCode(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    try {
+      await send({ action: "measurement-code", values: { name: form.get("name"), location: form.get("location"), scope: form.get("scope"), code: form.get("code"), purpose: form.get("purpose"), confirmed: form.get("confirmed") === "on" } }, "추가 코드를 초안으로 저장했습니다.");
+      setCodeOpen(false);
+      setMessage("추가 코드 초안을 저장했습니다.");
+    } catch (error) { setMessage((error as Error).message); }
+  }
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
@@ -1429,9 +1455,11 @@ function SettingsForm({ section, data, send, pending }: Props) {
     }
     if (section === "settings")
       values.trackingEnabled = f.get("trackingEnabled") === "on";
-    if (section === "metrics")
-      for (const key of ["spend", "impressions", "clicks", "leads", "revenue"])
+    if (section === "metrics") {
+      for (const key of ["spend", "impressions", "clicks", "leads", "revenue", "livePeak"])
         values[key] = Number(f.get(key) || 0);
+      values.paymentDays = paymentDays;
+    }
     try {
       await send(
         { action: "settings", kind: section, values },
@@ -1449,7 +1477,7 @@ function SettingsForm({ section, data, send, pending }: Props) {
       {section === 'seo' && <nav className="tabs catalog-tabs seo-settings-tabs" aria-label="검색코드 설정 탭">
         {([['search', '검색·공유'], ['verification', '소유 확인'], ['measurement', '측정·추가 코드']] as const).map(([tab, label]) => <button key={tab} type="button" className={seoTab === tab ? 'tab active' : 'tab'} aria-pressed={seoTab === tab} onClick={() => setSeoTab(tab)}>{label}</button>)}
       </nav>}
-      <div className={section === 'seo' && seoTab !== 'search' ? 'stack seo-settings-layout' : 'settings-layout'}>
+      <div className={section === 'metrics' ? 'stack metrics-data-layout' : section === 'seo' && seoTab !== 'search' ? 'stack seo-settings-layout' : 'settings-layout'}>
         <form
           key={section + String(metric?.key || "new")}
           className="panel pad"
@@ -1508,13 +1536,13 @@ function SettingsForm({ section, data, send, pending }: Props) {
               </p>
               </div>
               {seoTab === 'measurement' && <>
-                <h2>측정·추가 코드 관리</h2>
-                <p className="meta mt16">방문 기록과 무료클래스 광고 측정은 아래 설정 화면에서 관리합니다.</p>
+                <div className="between wrap-flex"><div><h2>측정·추가 코드 관리</h2><p className="meta mt8">방문 기록과 무료클래스 광고 측정, 검토 전 추가 코드 초안을 관리합니다.</p></div><button className="btn primary" type="button" onClick={() => setCodeOpen(true)}>+ 추가 코드</button></div>
                 <div className="table-scroll mt24"><table className="data-table"><thead><tr><th>항목</th><th>적용 범위</th><th>관리</th></tr></thead><tbody>
                   <tr><td><strong>공개 페이지 방문 기록</strong><p className="meta">방문·아티클·클래스 조회와 신청 버튼 클릭</p></td><td>사이트 공개 페이지</td><td><Link className="btn small" href="/admin/settings">운영·트래킹 설정</Link></td></tr>
                   <tr><td><strong>무료클래스 픽셀·이벤트</strong><p className="meta">클래스별 CTA와 광고 이벤트 측정</p></td><td>선택한 무료클래스</td><td><Link className="btn small" href="/admin/landing">무료클래스 트래킹</Link></td></tr>
+                  {measurementCodes.map(code => <tr key={code.id}><td><strong>{t(code, "name")}</strong><p className="meta">{t(code, "purpose")}</p></td><td>{code.scope === "public" ? "사이트 공개 페이지" : "랜딩페이지만"} · {code.location === "body-end" ? "Body 끝" : "Head"}</td><td><span className="badge amber">초안</span></td></tr>)}
                 </tbody></table></div>
-                <p className="notice mt24">측정 설정은 각 관리 화면에서 저장·적용합니다. 추가 코드의 직접 실행은 지원하지 않습니다.</p>
+                <p className="notice mt24">추가 코드는 초안으로만 저장되며 이 화면이나 고객 페이지에서 실행되지 않습니다. 검토·테스트·승인 후 별도 개발 단계에서 적용합니다.</p>
               </>}
             </>
           ) : section === "settings" ? (
@@ -1552,9 +1580,9 @@ function SettingsForm({ section, data, send, pending }: Props) {
             </>
           ) : (
             <>
-              <div className="between">
-                <h2>{metric ? "실측 기록 수정" : "실측 기록 입력"}</h2>
-                {metric && (
+              {metric && (
+                <div className="between metrics-edit-actions">
+                  <span className="badge">선택 기록 수정 중</span>
                   <button
                     type="button"
                     className="btn small"
@@ -1562,8 +1590,8 @@ function SettingsForm({ section, data, send, pending }: Props) {
                   >
                     새 기록
                   </button>
-                )}
-              </div>
+                </div>
+              )}
               <div className="grid2">
                 <Field label="기준일">
                   <input
@@ -1591,6 +1619,7 @@ function SettingsForm({ section, data, send, pending }: Props) {
                   ["clicks", "클릭 수"],
                   ["leads", "문의·신청 수"],
                   ["revenue", "확인한 매출 (원)"],
+                  ["livePeak", "라이브 최대 동시시청"],
                 ].map(([key, label]) => (
                   <Field key={key} label={label}>
                     <input
@@ -1603,6 +1632,12 @@ function SettingsForm({ section, data, send, pending }: Props) {
                     />
                   </Field>
                 ))}
+                <section className="span2 metric-payment-group"><div className="between"><div><h3>일차별 결제 건수</h3><p className="meta">마감 일정에 맞춰 필요한 일차만 추가하세요.</p></div><button className="btn small" type="button" onClick={() => setPaymentDays(rows => [...rows, { day: Math.max(-1, ...rows.map(row => row.day)) + 1, count: 0 }])} disabled={paymentDays.length >= 31}>+ 일차 추가</button></div><div className="metric-payment-table"><div className="metric-payment-head"><span>결제 일차</span><span>결제 건수</span><span>관리</span></div>{paymentDays.map((row, index) => <div className="metric-payment-row" key={`${row.day}-${index}`}><label><span className="sr-only">결제 일차</span><select aria-label={`${index + 1}번째 결제 일차`} value={row.day} onChange={event => setPaymentDays(current => current.map((item, i) => i === index ? { ...item, day: Number(event.target.value) } : item))}>{Array.from({ length: 366 }, (_, day) => <option value={day} key={day}>{day === 0 ? "당일" : `${day}일차`}</option>)}</select></label><label><span className="sr-only">결제 건수</span><input aria-label={`${row.day === 0 ? "당일" : `${row.day}일차`} 결제 건수`} type="number" min={0} step={1} value={row.count} onChange={event => setPaymentDays(current => current.map((item, i) => i === index ? { ...item, count: Number(event.target.value) } : item))} /></label><button className="icon-btn" type="button" aria-label={`${row.day === 0 ? "당일" : `${row.day}일차`} 행 삭제`} onClick={() => setPaymentDays(current => current.length === 1 ? current : current.filter((_, i) => i !== index))} disabled={paymentDays.length === 1}><Trash2 /></button></div>)}</div></section>
+                <div className="span2">
+                  <Field label="메모">
+                    <textarea name="memo" rows={4} maxLength={1000} defaultValue={String(value.memo || "")} placeholder="라이브 운영·결제 성과와 관련된 메모를 입력하세요." />
+                  </Field>
+                </div>
               </div>
               <p className="meta">
                 같은 날짜·캠페인을 저장하면 기존 실측 기록을 수정합니다.
@@ -1614,15 +1649,13 @@ function SettingsForm({ section, data, send, pending }: Props) {
           </button>}
           <Status message={message} />
         </form>
-        {(section !== 'seo' || seoTab === 'search') && <aside className="stack">
+        {section !== 'metrics' && (section !== 'seo' || seoTab === 'search') && <aside className="stack">
           <section className="panel">
             <div className="panel-head">
               <h2>
                 {section === "seo"
                   ? "검색 노출 미리보기"
-                  : section === "metrics"
-                    ? "실측 입력 안내"
-                    : "운영 설정 안내"}
+                  : "운영 설정 안내"}
               </h2>
             </div>
             <div className="panel-body">
@@ -1637,14 +1670,10 @@ function SettingsForm({ section, data, send, pending }: Props) {
               ) : (
                 <>
                   <h3>
-                    {section === "metrics"
-                      ? "자동 집계와 구분해서 확인하세요."
-                      : "저장 후 실제 서비스에 적용됩니다."}
+                    저장 후 실제 서비스에 적용됩니다.
                   </h3>
                   <p className="meta mt16">
-                    {section === "metrics"
-                      ? "광고 관리자 등에서 확인한 날짜별 캠페인 기록입니다. 랜딩 성과의 세션 집계와 동일한 데이터가 아닙니다."
-                      : "문의 채널과 공개 페이지 활동 수집 여부를 설정합니다. 비공개 학습·회원정보는 방문 기록에 포함하지 않습니다."}
+                    문의 채널과 공개 페이지 활동 수집 여부를 설정합니다. 비공개 학습·회원정보는 방문 기록에 포함하지 않습니다.
                   </p>
                 </>
               )}
@@ -1652,6 +1681,23 @@ function SettingsForm({ section, data, send, pending }: Props) {
           </section>
         </aside>}
       </div>
+      <dialog className="drawer measurement-code-drawer" ref={codeDialogRef} aria-label="추가 코드 초안" onCancel={event => { event.preventDefault(); setCodeOpen(false); }} onClose={() => setCodeOpen(false)}>
+        <form className="order-detail-shell" onSubmit={saveMeasurementCode}>
+          <header className="dialog-head"><h2>추가 코드 초안</h2><button type="button" className="iconbtn" aria-label="추가 코드 닫기" onClick={() => setCodeOpen(false)}><X /></button></header>
+          <div className="dialog-body">
+            <Field label="코드 이름 *"><input name="name" required maxLength={100} placeholder="용도를 알 수 있는 이름" /></Field>
+            <div className="grid2">
+              <Field label="삽입 위치"><select name="location" defaultValue="head"><option value="head">Head</option><option value="body-end">Body 끝</option></select></Field>
+              <Field label="적용 범위"><select name="scope" defaultValue="landing"><option value="landing">랜딩페이지만</option><option value="public">사이트 공개 페이지</option></select></Field>
+            </div>
+            <Field label="코드 원문 *"><textarea name="code" required maxLength={20000} rows={12} spellCheck={false} placeholder="검토할 코드 입력 · 저장만 되며 실행되지 않습니다." /></Field>
+            <Field label="등록 목적·책임자 *"><input name="purpose" required maxLength={300} placeholder="측정 목적 / 운영 책임자" /></Field>
+            <label className="checkline"><input name="confirmed" type="checkbox" required />기존 픽셀 중복·개인정보 전송·적용 권한 확인</label>
+            <p className="notice mt16">입력한 코드는 텍스트로만 취급합니다. 운영 적용은 검토·테스트·승인 이후 별도 개발 단계입니다.</p>
+          </div>
+          <footer className="dialog-foot"><button className="btn" type="button" onClick={() => setCodeOpen(false)}>취소</button><button className="btn primary" disabled={pending}>입력 내용 확인</button></footer>
+        </form>
+      </dialog>
       {section === "metrics" && (
         <div className="table-scroll mobile-cards mt24">
           <table className="data-table">
@@ -1663,6 +1709,9 @@ function SettingsForm({ section, data, send, pending }: Props) {
                   "클릭률",
                   "클릭당 비용",
                   "ROAS",
+                  "최대 동시시청",
+                  "일차별 결제",
+                  "메모",
                   "관리",
                 ].map((h) => (
                   <th key={h}>{h}</th>
@@ -1699,8 +1748,11 @@ function SettingsForm({ section, data, send, pending }: Props) {
                           ) + "%"
                         : "—"}
                     </td>
+                    <td data-label="최대 동시시청">{Number(v.livePeak || 0)}명</td>
+                    <td data-label="일차별 결제"><div className="metric-payment-summary">{((Array.isArray(v.paymentDays) ? v.paymentDays : [0,1,2,3,4].map(day => ({ day, count: Number(v[`paymentsDay${day}`] || 0) }))) as Array<{ day: number; count: number }>).map(entry => <span key={entry.day}><b>{Number(entry.day) === 0 ? "당일" : `${entry.day}일차`}</b>{Number(entry.count || 0)}건</span>)}</div></td>
+                    <td data-label="메모"><span className="metric-note-cell">{String(v.memo || "—")}</span></td>
                     <td data-label="관리">
-                      <button
+                      <div className="row"><button
                         className="btn small"
                         onClick={() => {
                           setMetric(m);
@@ -1708,7 +1760,7 @@ function SettingsForm({ section, data, send, pending }: Props) {
                         }}
                       >
                         수정
-                      </button>
+                      </button><button className="icon-btn danger" aria-label={`${String(v.campaign)} 실측 기록 삭제`} disabled={pending} onClick={async () => { if (!window.confirm(`${String(v.date)} · ${String(v.campaign)} 실측 기록을 삭제할까요?`)) return; await send({ action: "delete-metric", key: m.key }, "실측 기록을 삭제했습니다."); if (metric?.key === m.key) setMetric(null); }}><Trash2 /></button></div>
                     </td>
                   </tr>
                 );
@@ -1847,6 +1899,7 @@ function OrdersPanel({
   loading,
 }: Props) {
   const [opened, setOpened] = useState("");
+  const detailRef = useRef<HTMLDialogElement>(null);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [from, setFrom] = useState("");
@@ -1854,6 +1907,9 @@ function OrdersPanel({
   const [appliedDates, setAppliedDates] = useState({ from: "", to: "" });
   const [dateError, setDateError] = useState("");
   const [course, setCourse] = useState("");
+  const registeredCourses = rows(data, "courses")
+    .filter(item => !item.archived_at && item.status !== "archived")
+    .toSorted((a, b) => named(a).localeCompare(named(b), "ko"));
   const fromTimestamp = appliedDates.from
     ? Date.parse(appliedDates.from + "T00:00:00+09:00")
     : null;
@@ -1906,6 +1962,28 @@ function OrdersPanel({
   const processingRefunds = rows(data, "edu_refund_requests").filter(
     request => request.status === "processing" && paymentIds.has(String(request.payment_id)),
   );
+  const selectedOrder = orders.find(order => order.id === opened);
+  const selectedItems = selectedOrder
+    ? rows(data, "order_items").filter(item => item.order_id === selectedOrder.id)
+    : [];
+  const selectedPayments = selectedOrder
+    ? rows(data, "payments").filter(payment => payment.order_id === selectedOrder.id)
+    : [];
+  const selectedEnrollments = rows(data, "enrollments").filter(enrollment =>
+    selectedItems.some(item => item.id === enrollment.order_item_id),
+  );
+  const selectedRefunds = rows(data, "edu_refund_requests").filter(request =>
+    selectedPayments.some(payment => payment.id === request.payment_id),
+  );
+  const selectedApproved = selectedPayments.reduce((sum, payment) => sum + Number(payment.approved_amount || 0), 0);
+  const selectedCancelled = selectedPayments.reduce((sum, payment) => sum + Number(payment.cancelled_amount || 0), 0);
+  const selectedRemaining = Math.max(0, selectedApproved - selectedCancelled);
+  useEffect(() => {
+    const dialog = detailRef.current;
+    if (!dialog) return;
+    if (opened && !dialog.open) dialog.showModal();
+    if (!opened && dialog.open) dialog.close();
+  }, [opened]);
   return (
     <>
       <section className="order-date-panel" aria-label="주문 날짜 조회">
@@ -1946,7 +2024,7 @@ function OrdersPanel({
             <input type="search" value={query} aria-label="주문 검색" placeholder="주문번호 · 회원명 · 상품명 검색" onChange={event => { setQuery(event.target.value); setOpened(""); }} />
           </label>
           <span className="spacer" />
-          <label className="select-filter"><span>상품</span><select aria-label="상품 필터" value={course} onChange={event => { setCourse(event.target.value); setOpened(""); }}><option value="">전체 상품</option>{rows(data, "courses").map(item => <option key={item.id} value={item.id}>{named(item)}</option>)}</select></label>
+          <label className="select-filter"><span>상품</span><select aria-label="상품 필터" value={course} onChange={event => { setCourse(event.target.value); setOpened(""); }}><option value="">전체 상품</option>{registeredCourses.map(item => <option key={item.id} value={item.id}>{named(item)}</option>)}</select></label>
           <select aria-label="결제 상태" value={status} onChange={event => { setStatus(event.target.value); setOpened(""); }}><option value="">전체 상태</option>{["paid", "pending", "payment_failed", "partially_refunded", "refunded", "cancelled"].map(value => <option key={value} value={value}>{labels[value] || value}</option>)}</select>
         </div>
         <div className="table-scroll mobile-cards" tabIndex={0} role="region" aria-label="주문 데이터 표">
@@ -2002,10 +2080,8 @@ function OrdersPanel({
                   <td data-label="관리">
                     <button
                       className="btn small"
-                      aria-expanded={opened === order.id}
-                      onClick={() =>
-                        setOpened(opened === order.id ? "" : order.id)
-                      }
+                      aria-haspopup="dialog"
+                      onClick={() => setOpened(order.id)}
                     >
                       상세
                     </button>
@@ -2019,99 +2095,69 @@ function OrdersPanel({
         {loading && <p className="pad muted" role="status">주문 내역을 불러오고 있습니다.</p>}
         <div className="table-foot"><span>{orders.length}건 표시 · 현재 조회 페이지 내 검색·집계</span><span>정산·회계 매출은 결제액과 별도</span></div>
       </section>
-      <div className="stack mt24">
-        {orders
-          .filter((order) => order.id === opened)
-          .map((o) => {
-            const items = rows(data, "order_items").filter(
-              (i) => i.order_id === o.id,
-            );
-            const payments = rows(data, "payments").filter(
-              (p) => p.order_id === o.id,
-            );
-            return (
-              <details className="panel pad" key={o.id} open>
-                <summary>
-                  <b>{t(o, "order_number")}</b> · {t(o, "customer_name")} ·{" "}
-                  {money(Number(o.total_amount))}{" "}
-                  <span className="badge">
-                    {labels[t(o, "status")] || t(o, "status")}
-                  </span>
-                </summary>
-                <div className="grid2 mt24">
-                  <div>
-                    <h3>신청 상품</h3>
-                    {items.map((i) => (
-                      <p className="mt16" key={i.id}>
-                        {t(i, "item_name")} ·{" "}
-                        {named(
-                          rows(data, "cohorts").find(
-                            (c) => c.id === i.cohort_id,
-                          ),
-                        )}
-                      </p>
-                    ))}
-                    <p className="meta mt16">
-                      주문일 {timeLabel(o.created_at)}
-                    </p>
-                    <p>주문 이메일 {t(o, "customer_email")}</p>
-                    <p>연락처 {t(o, "customer_phone") || "—"}</p>
-                  </div>
-                  <div>
-                    <h3>결제 내역</h3>
-                    <p className="mt16">
-                      상품 금액 {money(Number(o.subtotal))} · 할인{" "}
-                      {money(Number(o.discount_amount))}
-                    </p>
-                    {payments.map((p) => (
-                      <div key={p.id} className="mt16">
-                        <p>
-                          {t(p, "method")} · 승인{" "}
-                          {money(Number(p.approved_amount))}
-                        </p>
-                        <p>환불 완료 {money(Number(p.cancelled_amount))}</p>
-                        {safeUrl(p.receipt_url) && (
-                          <a
-                            className="btn small mt16"
-                            href={safeUrl(p.receipt_url)}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            결제 영수증
-                          </a>
-                        )}
-                        <RefundAction
-                          payment={p}
-                          requests={rows(data, "edu_refund_requests")}
-                          send={send}
-                          pending={pending}
-                        />
-                      </div>
-                    ))}
-                    {!payments.length && (
-                      <p className="meta mt16">
-                        유료 결제 승인 내역이 없습니다.
-                      </p>
-                    )}
-                    <h3 className="mt24">수강 권한</h3>
-                    {rows(data, "enrollments")
-                      .filter((e) =>
-                        items.some((i) => i.id === e.order_item_id),
-                      )
-                      .map((e) => (
-                        <p key={e.id}>
-                          {labels[t(e, "status")] || t(e, "status")} ·{" "}
-                          {e.access_ends_at
-                            ? timeLabel(e.access_ends_at)
-                            : "기한 제한 없음"}
-                        </p>
-                      ))}
-                  </div>
-                </div>
-              </details>
-            );
-          })}
-      </div>
+      <dialog
+        className="drawer order-detail-drawer"
+        ref={detailRef}
+        aria-label="주문 상세"
+        onCancel={event => { event.preventDefault(); setOpened(""); }}
+        onClose={() => setOpened("")}
+        onClick={event => { if (event.target === event.currentTarget) setOpened(""); }}
+      >
+        {selectedOrder && (
+          <div className="order-detail-shell">
+            <header className="dialog-head">
+              <h2>주문 상세</h2>
+              <button type="button" className="iconbtn" aria-label="주문 상세 닫기" onClick={() => setOpened("")}><X /></button>
+            </header>
+            <div className="dialog-body">
+              <h3 className="order-detail-number">{t(selectedOrder, "order_number")}</h3>
+              <p className="meta mt8">{timeLabel(selectedOrder.created_at)} · {t(selectedOrder, "customer_name") || "이름 미등록"}</p>
+              <div className="order-detail-badges mt16">
+                <span className={`badge ${selectedOrder.status === "paid" ? "green" : selectedOrder.status === "payment_failed" ? "red" : selectedOrder.status === "pending" ? "amber" : ""}`}>{labels[t(selectedOrder, "status")] || t(selectedOrder, "status")}</span>
+                <span className="badge">{selectedCancelled > 0 ? (selectedRemaining ? "부분 환불" : "환불 완료") : "환불 없음"}</span>
+                <span className="badge">{selectedEnrollments.some(enrollment => enrollment.status === "active") ? "수강 가능" : "수강 권한 없음"}</span>
+              </div>
+              <div className="divider" />
+              <section className="order-detail-section">
+                {selectedItems.map(item => {
+                  const registeredCourse = registeredCourses.find(product => product.id === item.course_id);
+                  const cohort = rows(data, "cohorts").find(entry => entry.id === item.cohort_id);
+                  return <div className="order-detail-product" key={item.id}>
+                    <h3>{named(registeredCourse) || t(item, "item_name") || "상품 정보 없음"}{named(cohort) ? ` · ${named(cohort)}` : ""}</h3>
+                  </div>;
+                })}
+                {!selectedItems.length && <p className="meta">연결된 주문 상품이 없습니다.</p>}
+                <dl className="order-detail-money">
+                  <div><dt>상품 금액</dt><dd>{money(Number(selectedOrder.subtotal))}</dd></div>
+                  <div><dt>쿠폰 할인</dt><dd>-{money(Number(selectedOrder.discount_amount || 0))}</dd></div>
+                  <div><dt>결제 완료</dt><dd>{money(selectedApproved)}</dd></div>
+                  <div><dt>환불 완료</dt><dd>-{money(selectedCancelled)}</dd></div>
+                  <div className="total"><dt>남은 결제액</dt><dd>{money(selectedRemaining)}</dd></div>
+                </dl>
+              </section>
+              <section className="order-detail-section">
+                <h3>처리 이력</h3>
+                <ol className="order-timeline mt16">
+                  <li><b>주문 생성</b><time>{timeLabel(selectedOrder.created_at)}</time><p>{t(selectedOrder, "customer_email")}{t(selectedOrder, "customer_phone") ? ` · ${t(selectedOrder, "customer_phone")}` : ""}</p></li>
+                  {selectedPayments.map(payment => <li key={payment.id}><b>결제 {payment.status === "paid" ? "완료" : labels[t(payment, "status")] || t(payment, "status")}</b><time>{timeLabel(payment.approved_at || payment.created_at)}</time><p>{t(payment, "method") || "결제수단 미확인"} · {money(Number(payment.approved_amount || 0))}</p></li>)}
+                  {selectedRefunds.map(refund => <li key={refund.id}><b>환불 {refund.status === "processing" ? "요청" : labels[t(refund, "status")] || t(refund, "status")}</b><time>{timeLabel(refund.created_at)}</time><p>{money(Number(refund.amount || 0))}{t(refund, "reason") ? ` · ${t(refund, "reason")}` : ""}</p></li>)}
+                  {selectedEnrollments.map(enrollment => <li key={enrollment.id}><b>수강 권한 {labels[t(enrollment, "status")] || t(enrollment, "status")}</b><time>{timeLabel(enrollment.created_at)}</time><p>{enrollment.access_ends_at ? `${timeLabel(enrollment.access_ends_at)}까지` : "기한 제한 없음"}</p></li>)}
+                </ol>
+              </section>
+              <section className="order-detail-section">
+                <div className="between"><h3>수강 권한</h3><span className="badge">{selectedEnrollments.some(enrollment => enrollment.status === "active") ? "수강 가능" : "권한 없음"}</span></div>
+                {selectedEnrollments.map(enrollment => <div className="setting-line mt16" key={enrollment.id}><span>{named(registeredCourses.find(product => product.id === enrollment.course_id)) || "연결 상품"}</span><b>{enrollment.access_ends_at ? timeLabel(enrollment.access_ends_at) : "기한 제한 없음"}</b></div>)}
+                {!selectedEnrollments.length && <p className="order-detail-notice mt16">결제 실패·입금 대기에는 수강 권한을 부여하지 않습니다. 결제 완료와 권한 회수 결과도 각각 확인할 수 있습니다.</p>}
+              </section>
+              {selectedPayments.map(payment => <RefundAction key={payment.id} payment={payment} requests={rows(data, "edu_refund_requests")} send={send} pending={pending} />)}
+            </div>
+            <footer className="dialog-foot">
+              {selectedPayments.map(payment => safeUrl(payment.receipt_url) ? <a className="btn" href={safeUrl(payment.receipt_url)} target="_blank" rel="noreferrer" key={payment.id}>영수증</a> : null)}
+              <button type="button" className="btn" onClick={() => setOpened("")}>닫기</button>
+            </footer>
+          </div>
+        )}
+      </dialog>
       {pagination && pagination.total > pagination.pageSize && (
         <div className="workflow-pagination">
           <button

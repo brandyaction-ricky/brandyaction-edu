@@ -100,11 +100,14 @@ test('a published paid product uses its upcoming cohort for CTA and the actual d
 test('article hub includes the managed free-video banner and representative thumbnails', () => {
   const { ArticlesView } = load('app/ui/final/public-views.tsx');
   const banner = { id: 'edu_article_banner', value: { enabled: true, title: '회원 무료 영상', videos: [{ title: '첫 영상', url: 'https://youtu.be/dQw4w9WgXcQ', available: true }] } };
-  const articleData = { ...data, article_banner: [banner], articles: [{ ...data.articles[0], cover_image_url: 'https://cdn.example/thumb.webp', cover_image_alt: '대표 이미지' }] };
+  const category = { id: 'category-marketing', name: '마케팅', slug: 'marketing', is_active: true, display_order: 0 };
+  const articleData = { ...data, article_banner: [banner], article_categories: [category], articles: [{ ...data.articles[0], category_id: category.id, cover_image_url: 'https://cdn.example/thumb.webp', cover_image_alt: '대표 이미지' }] };
   const markup = html(ArticlesView, { data: articleData, user, loading: false });
   assert.match(markup, /회원 무료 영상/);
   assert.match(markup, /article-thumbnail/);
   assert.match(markup, /thumb\.webp/);
+  assert.match(markup, /article-card-grid/);
+  assert.match(markup, /마케팅/);
   assert.doesNotMatch(markup, /class="tag">(?:인사이트|영상)</);
   const platformSource = read('app/ui/platform.tsx');
   assert.doesNotMatch(platformSource, /THE WAY WE LEARN|시청에서 멈추지 않는/);
@@ -135,11 +138,14 @@ test('product HTML takes precedence over old images and per-product CTA settings
   assert.match(editorMarkup, /CTA 왼쪽 문구/);
   assert.match(editorMarkup, /name="cta_price_label"/);
 });
-test('article management renders the free-video banner editor', () => {
+test('article management renders the connected three-video banner editor', () => {
   const { ArticleBannerEditor } = load('app/ui/final/article-banner-editor.tsx');
   const markup = html(ArticleBannerEditor, { settings: [], send, pending: false });
-  assert.match(markup, /상단 무료강의 영상 배너/);
-  assert.equal((markup.match(/무료 영상 [123]/g) || []).length >= 3, true);
+  assert.match(markup, /회원 무료강의 상단 영역/);
+  assert.match(markup, /무료강의 3강 설정/);
+  assert.equal((markup.match(/YouTube URL/g) || []).length, 3);
+  assert.match(read('app/ui/platform.tsx'), /아티클 콘텐츠[\s\S]*무료강의 상단 설정/);
+  assert.match(read('app/api/platform/route.ts'), /if \(!bannerResult\.error\)[\s\S]*사업자를 위한 마케팅·AI 매출 진단/);
   assert.ok(platform.sections.find(row => row.key === 'articles').fields.some(field => field.key === 'cover_image_path'));
 });
 test('all member screens render real data, with no authentication or payment writes', () => {
@@ -175,8 +181,13 @@ test('catalogues and separate editors render without dropping existing fields', 
   const props = { data, selection: [], setSelection() {}, edit() {}, archive() {}, pending: false, loading: false, pagination: null, setPage() {}, exportCsv() {} };
   const products = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'products') });
   assert.match(products, /전체 상품/); assert.match(products, /연결 기수/); assert.match(products, /<th>자료<\/th>/);
+  assert.match(products, /상품 표시 범위/); assert.match(products, /삭제된 상품/);
   assert.match(products, /catalog-actions/); assert.match(products, /등록된 테스트 클래스 삭제/); assert.match(products, /등록된 테스트 클래스 수정/);
+  assert.ok(products.indexOf('등록된 테스트 클래스 수정') < products.indexOf('등록된 테스트 클래스 삭제'));
+  assert.doesNotMatch(products, /PRD-|\/classes\/test-course/);
   assert.doesNotMatch(products, />삭제<\/button>|>수정<\/button>/);
+  const catalogSource = read('app/ui/final/admin-catalog.tsx');
+  assert.match(catalogSource, /action: "restore-products"/); assert.match(catalogSource, /복원\s*<\/button>/);
   const countedProducts = html(AdminCatalog, { ...props, data: { ...data, product_summary: [{ id: 'product-summary', total: 12, published: 7, upcoming: 3, draft: 2 }] }, section: platform.sections.find(row => row.key === 'products') });
   for (const value of ['12', '7', '3', '2']) assert.match(countedProducts, new RegExp(`>${value}<`));
   assert.doesNotMatch(products, /목록 내보내기 · 선택 관리|삭제 항목 포함|현재 페이지 CSV|상품은 가격·판매·자료의 단위/);
@@ -185,6 +196,15 @@ test('catalogues and separate editors render without dropping existing fields', 
   assert.ok(banners.indexOf('첫 번째') < banners.indexOf('두 번째'));
   assert.match(banners, /첫 번째 아래로 이동|두 번째 위로 이동/);
   assert.doesNotMatch(banners, /배너 노출 기준|연결 페이지 확인|목록 내보내기 · 선택 관리/);
+  const tagMarkup = html(AdminCatalog, { ...props, data: { ...data, crm_tags: [{ id: 'tag', name: '무료 1강', tag_kind: 'automatic', rule_key: 'free_lesson_1', is_active: true }] }, section: platform.sections.find(row => row.key === 'tags') });
+  assert.match(tagMarkup, /무료강의 1강 시청|조건설정/);
+  assert.doesNotMatch(tagMarkup, /자동 태그 적용 흐름|조건 변경 시 영향/);
+  const couponMarkup = html(AdminCatalog, { ...props, data: { ...data, coupons: [{ id: 'coupon', name: '첫 구매', code: 'WELCOME10', discount_type: 'percentage', discount_value: 10, minimum_order_amount: 100000, product_scope: 'paid', issue_target: 'all', is_active: true }], coupon_redemptions: [{ id: 'use', coupon_id: 'coupon', status: 'used' }] }, section: platform.sections.find(row => row.key === 'coupons') });
+  assert.match(couponMarkup, /발급 중|사용 횟수|1 \/ ∞|설정/);
+  const platformSource = read('app/ui/platform.tsx');
+  const pageSource = read('app/[[...path]]/page.tsx');
+  assert.match(platformSource, /무료강의 3강 시청[\s\S]*결제 완료[\s\S]*미션 수행[\s\S]*회원가입/);
+  assert.match(platformSource, /쿠폰 등록·설정[\s\S]*최소 주문 금액[\s\S]*회원당 발급 횟수/);
   const learning = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'learning') });
   assert.match(learning, /learning-layout/); assert.match(learning, /학습 구성/); assert.match(learning, /lesson-list-item/);
   const missions = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'missions') });
@@ -210,6 +230,7 @@ test('catalogues and separate editors render without dropping existing fields', 
   assert.match(newProduct, /상품을 저장하면 기본 기수가 생성되고 입력한 모집 일정이 함께 적용됩니다/);
   assert.match(newProduct, /multiple=""/);
   assert.match(newProduct, /상세 이미지를 업로드하세요/);
+  assert.match(read('app/ui/final/integration.css'), /\.detail-gallery-upload > \.upload-label \{ align-self: center;/);
   const htmlProduct = html(ProductEditor, { data, row: { ...course, metadata: { detail_html_document: '<h1>상세</h1>' } }, pending: false, send, back() {} });
   assert.match(htmlProduct, /accept="\.html,\.htm,text\/html"/);
   assert.match(htmlProduct, /HTML 파일이 등록되었습니다/);
@@ -220,6 +241,16 @@ test('catalogues and separate editors render without dropping existing fields', 
   assert.match(markup, /파일별로 공개 범위를 설정/);
   assert.doesNotMatch(markup, /자료를 연결할 학습 만들기/);
   assert.match(markup, /editor-savebar/);
+  const productEditorSource = read('app/ui/final/admin-editors.tsx');
+  assert.match(productEditorSource, /현재 화면에서 계속 수정할 수 있습니다/);
+  assert.match(productEditorSource, /setDirty\(false\);[\s\S]*if \(!row\?\.id\) back\(\)/);
+  assert.doesNotMatch(productEditorSource, /setDirty\(false\);\s*back\(\)/);
+  assert.match(platformSource, /loading && id && !edited/);
+  assert.match(platformSource, /cachedAdminUser: User \| null/);
+  assert.match(platformSource, /initialUser \|\| \(admin \? cachedAdminUser : null\)/);
+  assert.match(platformSource, /if \(admin\) cachedAdminUser = result\.user/);
+  assert.match(pageSource, /root === 'admin' \? 'admin' : path\.join\('\/'\)/);
+  assert.match(read('design-reference/source/admin/src/experience.css'), /\.metric-value small\{display:inline-block;margin-left:var\(--space-1\)\}/);
   for (const field of platform.sections.find(row => row.key === 'products').fields.filter(field => !['slug', 'course_code', 'seo_title', 'seo_description', 'detail_html'].includes(field.key))) assert.ok(markup.includes(`name="${field.key}"`), field.key);
   assert.match(html(LearningEditor, { data, row: lesson, pending: false, send, back() {} }), /editor-/);
 });

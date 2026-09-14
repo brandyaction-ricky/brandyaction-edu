@@ -12,7 +12,7 @@ import {
 } from "@/lib/platform";
 import { recordId } from "@/lib/platform-rules";
 import { archiveValues, cohortPeriod, cohortStatus } from "@/lib/qa-rules";
-import { ArrowRight, BookOpen, ChevronDown, ChevronUp, FileText, Pencil, Search, Trash2 } from "lucide-react";
+import { ArrowRight, BookOpen, ChevronDown, ChevronUp, FileText, Pencil, RotateCcw, Search, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import type { Data, WorkflowSend } from "../learning-workflows";
@@ -37,6 +37,7 @@ type Props = {
 type Column = { label: string; value: (row: Row) => ReactNode };
 const named = (r?: Row) =>
   t(r, "title") || t(r, "name") || t(r, "full_name") || t(r, "email") || "—";
+const tagRuleLabel = (value: unknown) => ({ free_lesson_1: "무료강의 1강 시청", free_lesson_2: "무료강의 2강 시청", free_lesson_3: "무료강의 3강 시청", paid_customer: "결제 완료", mission_completed: "미션 수행", signed_up: "회원가입" }[String(value)] || "관리자가 직접 부여");
 export function AdminCatalog({
   section: s,
   data,
@@ -58,6 +59,7 @@ export function AdminCatalog({
     [course, setCourse] = useState(""),
     [week, setWeek] = useState(""),
     [archived, setArchived] = useState(false),
+    [productVisibility, setProductVisibility] = useState<"active" | "archived">("active"),
     [bulkMode, setBulkMode] = useState(false),
     [tagMode, setTagMode] = useState(""),
     [now] = useState(Date.now);
@@ -110,7 +112,7 @@ export function AdminCatalog({
   const customerTags = (memberId: unknown) => memberTags.filter((item) => item.member_id === memberId).flatMap((item) => { const tag = tags.find((tag) => tag.id === item.tag_id); return tag ? [tag] : []; });
   const couponStatus = (row: Row) => !row.is_active ? "inactive" : row.ends_at && Date.parse(String(row.ends_at)) < now ? "expired" : row.starts_at && Date.parse(String(row.starts_at)) > now ? "upcoming" : "active";
   const bannerStatus = (row: Row) => !row.is_active ? "hidden" : row.ends_at && Date.parse(String(row.ends_at)) < now ? "completed" : row.starts_at && Date.parse(String(row.starts_at)) > now ? "upcoming" : "published";
-  const statusLabel = (value: string) => s.key === "coupons" ? ({ active: "사용 가능", upcoming: "사용 예정", expired: "기간 종료", inactive: "사용 중지" }[value] || value) : s.key === "banners" ? ({ published: "게시 중", upcoming: "예약", completed: "노출 종료", hidden: "비공개" }[value] || value) : s.key === "customers" ? ({ active: "정상", suspended: "이용 제한" }[value] || labels[value] || value) : s.key === "products" ? ({ published: "판매 중", draft: "작성 중", archived: "판매 종료" }[value] || labels[value] || value) : value === "hidden" && ["learning", "missions"].includes(s.key) ? "비공개" : labels[value] || value;
+  const statusLabel = (value: string) => s.key === "coupons" ? ({ active: "발급 중", upcoming: "발급 예정", expired: "종료", inactive: "사용 중지" }[value] || value) : s.key === "banners" ? ({ published: "게시 중", upcoming: "예약", completed: "노출 종료", hidden: "비공개" }[value] || value) : s.key === "customers" ? ({ active: "정상", suspended: "이용 제한" }[value] || labels[value] || value) : s.key === "products" ? ({ published: "판매 중", draft: "작성 중", archived: "판매 종료" }[value] || labels[value] || value) : value === "hidden" && ["learning", "missions"].includes(s.key) ? "비공개" : labels[value] || value;
   const productResourceCount = (productId: unknown) => resourceCounts.get(String(productId)) || 0;
   const getCourse = (r: Row) =>
     r.course_id ||
@@ -130,7 +132,7 @@ export function AdminCatalog({
         (r.is_active || r.is_published ? "published" : "hidden");
   const filtered = rows.filter(
     (r) =>
-      (archived || !r.archived_at) &&
+      (s.key === "products" ? productVisibility === "archived" ? Boolean(r.archived_at) : !r.archived_at : archived || !r.archived_at) &&
       (!status || getStatus(r) === status) &&
       (!tagMode || r.tag_kind === tagMode) &&
       (!type ||
@@ -243,9 +245,6 @@ export function AdminCatalog({
               <button className="title-btn" onClick={() => edit(s, r)}>
                 {t(r, "title")}
               </button>
-              <p>
-                {t(r, "course_code")} · /classes/{t(r, "slug")}
-              </p>
             </div>
           </div>
         ),
@@ -333,9 +332,9 @@ export function AdminCatalog({
     tags: [
       { label: "태그", value: (r) => <b className="tag-name"><span className="tag-marker" style={{ "--tag-color": /^#[0-9a-f]{3,8}$/i.test(t(r, "color")) ? t(r, "color") : "#667ca0" } as CSSProperties} />{t(r, "name")}</b> },
       { label: "분류", value: (r) => <Badge color={r.tag_kind === "automatic" ? "blue" : ""}>{r.tag_kind === "automatic" ? "자동" : "수동"}</Badge> },
-      { label: "부여 조건", value: (r) => <p className="tag-condition">{t(r, "description") || (r.tag_kind === "automatic" ? "연결된 회원 행동 조건에 따라 부여" : "관리자가 직접 부여")}</p> },
+      { label: "부여 조건", value: (r) => <p className="tag-condition">{r.tag_kind === "automatic" ? tagRuleLabel(r.rule_key) : "관리자가 직접 부여"}</p> },
       { label: "회원 수", value: (r) => Array.isArray(r.crm_member_tags) ? String(r.crm_member_tags[0]?.count ?? 0) + "명" : "—" },
-      { label: "상태", value: () => <Badge color="green">사용 중</Badge> },
+      { label: "상태", value: (r) => <Badge color={r.is_active === false ? "" : "green"}>{r.is_active === false ? "사용 중지" : "사용 중"}</Badge> },
     ],
     coupons: [
       {
@@ -348,27 +347,19 @@ export function AdminCatalog({
         ),
       },
       {
-        label: "할인",
-        value: (r) =>
-          r.discount_type === "percentage"
-            ? num(r, "discount_value") + "%"
-            : money(num(r, "discount_value")),
+        label: "혜택",
+        value: (r) => <>{r.discount_type === "percentage" ? num(r, "discount_value") + "%" : money(num(r, "discount_value"))}<small>{Number(r.minimum_order_amount || 0) > 0 ? `최소 ${money(num(r, "minimum_order_amount"))}` : "최소 주문 제한 없음"}</small></>,
       },
       {
-        label: "사용 기간",
-        value: (r) => (
-          <>
-            {date(r.starts_at)}
-            <br />~ {date(r.ends_at)}
-          </>
-        ),
+        label: "적용 대상",
+        value: (r) => { const tag = tags.find(item => item.id === r.target_tag_id); const product = courses.find(item => item.id === (data.coupon_products || []).find(link => link.coupon_id === r.id)?.course_id); return <>{r.issue_target === "tag" ? named(tag) : "전체 회원"}<small>{r.product_scope === "specific" ? named(product) : r.product_scope === "paid" ? "유료 클래스" : "전체 상품"}</small></>; },
       },
       {
-        label: "발급 한도",
-        value: (r) =>
-          r.usage_limit ? num(r, "usage_limit") + "회" : "제한 없음",
+        label: "사용 / 수량",
+        value: (r) => `${(data.coupon_redemptions || []).filter(redemption => redemption.coupon_id === r.id && redemption.status === "used").length} / ${r.usage_limit ? num(r, "usage_limit") : "∞"}`,
       },
-      { label: "사용 상태", value: badge },
+      { label: "유효기간", value: (r) => <>{date(r.starts_at)}<br />~ {date(r.ends_at)}</> },
+      { label: "상태", value: badge },
     ],
     "product-reviews": [
       {
@@ -625,9 +616,9 @@ export function AdminCatalog({
       )}
       {s.key === "coupons" && <div className="metrics">
         <Metric label="전체 쿠폰" value={<>{pagination?.total ?? rows.length}<small>개</small></>} note="등록된 할인 혜택" />
-        <Metric label="사용 가능" value={<>{rows.filter((item) => couponStatus(item) === "active").length}<small>개</small></>} note="현재 사용 기간 내 활성 쿠폰" highlight />
-        <Metric label="사용 예정" value={<>{rows.filter((item) => couponStatus(item) === "upcoming").length}<small>개</small></>} note="시작일 이후 사용 가능" />
-        <Metric label="종료·중지" value={<>{rows.filter((item) => ["expired", "inactive"].includes(couponStatus(item))).length}<small>개</small></>} note="기간 종료 또는 사용 중지" />
+        <Metric label="발급 중" value={<>{rows.filter((item) => couponStatus(item) === "active").length}<small>개</small></>} note="현재 기간 내 발급" highlight />
+        <Metric label="발급 예정" value={<>{rows.filter((item) => couponStatus(item) === "upcoming").length}<small>개</small></>} note="시작일 이후 사용 가능" />
+        <Metric label="사용 횟수" value={<>{(data.coupon_redemptions || []).filter(item => item.status === "used").length}<small>회</small></>} note="조회된 쿠폰 전체 합계" />
       </div>}
       {s.key === "product-reviews" && <div className="ops-callout mb16">상품 후기 → 해당 상품 상세페이지에 표시 · <Link className="text-link" href="/admin/testimonials">고객 후기</Link> → 별도로 선정한 홈페이지 사례</div>}
       {scope}
@@ -757,16 +748,29 @@ export function AdminCatalog({
             {search}
             <span className="spacer" />
             {s.key === "products" && (
-              <select
-                aria-label="상품 유형"
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-              >
-                <option value="">전체 유형</option>
-                {["무료 클래스", "유료 클래스", "디지털 상품"].map((v) => (
-                  <option key={v}>{v}</option>
-                ))}
-              </select>
+              <>
+                <select
+                  aria-label="상품 유형"
+                  value={type}
+                  onChange={(e) => setType(e.target.value)}
+                >
+                  <option value="">전체 유형</option>
+                  {["무료 클래스", "유료 클래스", "디지털 상품"].map((v) => (
+                    <option key={v}>{v}</option>
+                  ))}
+                </select>
+                <select
+                  aria-label="상품 표시 범위"
+                  value={productVisibility}
+                  onChange={(event) => {
+                    setProductVisibility(event.target.value as "active" | "archived");
+                    setSelection([]);
+                  }}
+                >
+                  <option value="active">판매 상품</option>
+                  <option value="archived">삭제된 상품</option>
+                </select>
+              </>
             )}
             {s.key === "articles" && (
               <select
@@ -924,13 +928,30 @@ export function AdminCatalog({
                           <button className="btn iconbtn" type="button" title="아래로 이동" aria-label={t(r, "title") + " 아래로 이동"} disabled={pending || filtered.at(-1)?.id === r.id} onClick={() => void moveBanner(r, 1)}><ChevronDown size={17} aria-hidden="true" /></button>
                           <button className="btn iconbtn" type="button" title="수정" aria-label={t(r, "title") + " 수정"} onClick={() => edit(s, r)}><Pencil size={17} aria-hidden="true" /></button>
                         </div> : s.key === "products" ? <div className="catalog-actions">
-                          {!r.archived_at && <button className="btn iconbtn danger" type="button" title="삭제" aria-label={t(r, "title") + " 삭제"} disabled={pending} onClick={() => archive(s, [recordId(r)])}><Trash2 size={17} aria-hidden="true" /></button>}
-                          <button className="btn iconbtn" type="button" title="수정" aria-label={t(r, "title") + " 수정"} onClick={() => edit(s, r)}><Pencil size={17} aria-hidden="true" /></button>
+                          {r.archived_at ? (
+                            <button
+                              className="btn small"
+                              type="button"
+                              disabled={pending || !send}
+                              onClick={() => void send?.(
+                                { action: "restore-products", ids: [recordId(r)] },
+                                `「${t(r, "title")}」 상품을 작성 중 상태로 복원했습니다.`,
+                              )}
+                            >
+                              <RotateCcw size={16} aria-hidden="true" />
+                              복원
+                            </button>
+                          ) : (
+                            <>
+                              <button className="btn iconbtn" type="button" title="수정" aria-label={t(r, "title") + " 수정"} onClick={() => edit(s, r)}><Pencil size={17} aria-hidden="true" /></button>
+                              <button className="btn iconbtn danger" type="button" title="삭제" aria-label={t(r, "title") + " 삭제"} disabled={pending} onClick={() => archive(s, [recordId(r)])}><Trash2 size={17} aria-hidden="true" /></button>
+                            </>
+                          )}
                         </div> : <button
                             className="btn small"
                             onClick={() => edit(s, r)}
                           >
-                            {s.key === "customers" || s.readOnly ? "상세" : s.key === "tags" ? "조건·설정" : s.key === "product-reviews" ? "검토" : "수정"}
+                            {s.key === "customers" || s.readOnly ? "상세" : s.key === "tags" ? "조건설정" : s.key === "coupons" ? "설정" : s.key === "product-reviews" ? "검토" : "수정"}
                           </button>}
                       </td>
                     </tr>
@@ -987,12 +1008,7 @@ export function AdminCatalog({
       {s.key === "learning" && <div className="row mt24"><Link className="btn" href="/admin/weeks">주차 구성</Link><Link className="btn" href="/admin/contents">영상·자료 등록</Link><Link className="btn" href="/admin/missions">미션·퀴즈 관리</Link></div>}
       {s.key === "missions" && <div className="notice mt16">미션은 연결 학습의 일차 순서로 표시됩니다. 학습 순서는 학습 콘텐츠 편집에서 변경할 수 있습니다. 제출물 검토와 피드백은 <Link className="text-link" href="/admin/reviews">제출물 검토</Link>에서 관리합니다.</div>}
       {s.key === "product-reviews" && <div className="notice mt24">후기 원문과 평점은 유지하며, 검토 화면에서 공개 상태와 상품 대표 노출을 설정합니다.</div>}
-      {s.key === "coupons" && <div className="notice mt24">쿠폰 할인·사용 기간·사용 한도를 확인한 뒤 적용하세요. 쿠폰 사용 이력과 발급 이력은 별도로 관리됩니다.</div>}
-      {s.key === "tags" && <div className="equal-col catalog-tag-panels mt24">
-        <section className="panel"><div className="panel-head"><h2>자동 태그 적용 흐름</h2></div><div className="panel-body"><div className="workflow-row"><span>로그인 회원의 행동</span><span>태그 조건 확인</span><span className="active">태그 부여</span></div><p className="mt16">무료 클래스 학습 완료와 유료 상품 결제처럼 확인 가능한 회원 행동을 기준으로 자동 분류합니다.</p></div></section>
-        <section className="panel"><div className="panel-head"><h2>조건 변경 시 영향</h2></div><div className="panel-body"><h3>자동 태그와 수동 태그를 구분해 관리</h3><p className="mt8">자동 태그는 연결된 행동 조건에 따라 갱신됩니다. 수동 태그는 회원 관리에서 직접 부여하거나 해제할 수 있습니다.</p><p className="privacy-note mt16">태그 이름과 설명을 변경해도 자동 부여 기준은 변경되지 않습니다.</p></div></section>
-      </div>}
-      {!["products", "banners", "customers"].includes(s.key) && <details className="catalog-bulk-tools mt24" onToggle={(event) => { if (!(event.currentTarget as HTMLDetailsElement).open) { setBulkMode(false); setSelection([]); } }}>
+      {!["products", "banners", "customers", "tags", "coupons"].includes(s.key) && <details className="catalog-bulk-tools mt24" onToggle={(event) => { if (!(event.currentTarget as HTMLDetailsElement).open) { setBulkMode(false); setSelection([]); } }}>
         <summary>목록 내보내기 · 선택 관리</summary>
         <div className="catalog-bulk-body">
           <label className="checkline"><input type="checkbox" checked={bulkMode} onChange={(event) => { setBulkMode(event.target.checked); setSelection([]); }} />목록 선택 표시</label>

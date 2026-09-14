@@ -21,7 +21,7 @@ export default async function Page({params}:{params:Promise<{path?:string[]}>}) 
  // The admin API verifies identity, account status and section permissions once.
  // Stream the admin shell immediately instead of repeating Auth + profile queries.
  const user = root === 'admin' ? null : await getAuthenticatedUser();
- return <Platform key={path.join('/')} path={path} user={user}/>;
+ return <Platform key={root === 'admin' ? 'admin' : path.join('/')} path={path} user={user}/>;
 }
 
 export async function generateMetadata({params}:{params:Promise<{path?:string[]}>}):Promise<Metadata> {

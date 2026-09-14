@@ -23,6 +23,7 @@ import { DetailImageGallery } from "./detail-image-gallery";
 import { productConversion, DEFAULT_CTA_COLOR } from "@/lib/product-conversion";
 import { productDocument, validateProductDocument } from "@/lib/product-html-document";
 import { ProductDetailHtml } from "./product-detail-html";
+import { DigitalContentManager } from "./digital-content-manager";
 
 function fieldValue(s: Section, row: Row | undefined, f: Field) {
   return s.table === "courses" &&
@@ -221,7 +222,7 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
   const [detailUploadStatus, setDetailUploadStatus] = useState<"idle" | "uploading" | "error">("idle");
   const [preview, setPreview] = useState({ title: t(row, "title"), summary: t(row, "summary"), price: num(row, "list_price"), regular: Number(metadata.regular_price || 0), status: t(row, "status") || "draft", category: t(row, "category") || "paid_class", slug: t(row, "slug"), seoTitle: String(metadata.seo_title || ""), seoDescription: String(metadata.seo_description || "") });
   const formRef = useRef<HTMLFormElement>(null);
-  const groups = [["basic", "기본·판매"], ["detail", "상세페이지"], ["resources", "제공 자료"], ["access", "수강·권한"], ["publish", "공개·검색"]] as const;
+  const groups = [["basic", "기본·판매"], ["detail", "상세페이지"], ["resources", preview.category === "digital" ? "콘텐츠 구성" : "제공 자료"], ["access", "수강·권한"], ["publish", "공개·검색"]] as const;
   const resourceCount = productResources(metadata).length;
   const previewSalePrice = preview.category === "free" ? 0 : cohort ? num(cohort, "price") : preview.price;
   const statusLabels: Record<string, string> = { draft: "작성 중", published: "판매 중", archived: "판매 종료" };
@@ -275,9 +276,11 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
         recruitmentStartAt: submitted.get("recruitment_start_at") ? new Date(String(submitted.get("recruitment_start_at")) + ":00+09:00").toISOString() : null,
         recruitmentEndAt: submitted.get("recruitment_end_at") ? new Date(String(submitted.get("recruitment_end_at")) + ":00+09:00").toISOString() : null,
         values,
-      });
+      }, row?.id ? "상품을 저장했습니다. 현재 화면에서 계속 수정할 수 있습니다." : "상품을 등록했습니다.");
       for (const change of cohortChanges.filter(change => change.id !== cohort?.id)) await send({ action: "save", section: "cohorts", id: change.id, values: change.values }, "상품과 기수 모집 일정을 저장했습니다.");
-      setDirty(false); back();
+      setCohortDrafts({});
+      setDirty(false);
+      if (!row?.id) back();
     } catch (cause) { setError((cause as Error).message); }
   }
   return <div className="product-editor">
@@ -315,7 +318,7 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
           </>}
           {detailMode === "image" && <DetailImageGallery key={String(row?.id || "new-product")} initial={productDetailImages(metadata)} disabled={pending} onChange={() => setDirty(true)} onStatusChange={setDetailUploadStatus} />}
         </div>
-        <div className="section-pad" id="product-panel-resources" data-tab="resources" role="tabpanel" aria-labelledby="product-tab-resources" hidden={tab !== "resources"}><ProductResources row={row} pending={pending} send={send} /></div>
+        <div className="section-pad" id="product-panel-resources" data-tab="resources" role="tabpanel" aria-labelledby="product-tab-resources" hidden={tab !== "resources"}>{preview.category === "digital" ? <DigitalContentManager row={row} pending={pending} send={send} /> : <ProductResources row={row} pending={pending} send={send} />}</div>
         <div className="section-pad" id="product-panel-access" data-tab="access" role="tabpanel" aria-labelledby="product-tab-access" hidden={tab !== "access"}>
           <h2 className="mb16">수강·기수 연결</h2><ProductField label="연결 기수"><select value={cohortId} onChange={event => setCohortId(event.target.value)} aria-label="연결 기수" disabled={!cohorts.length || pending}>{!cohorts.length && <option value="">미연결</option>}{cohorts.map(item => <option key={item.id} value={item.id}>{t(item, "name")}</option>)}</select></ProductField>
           <div className="form-grid"><ProductField label="수강 시작 기준"><div className="product-value">주문별 수강권의 시작일 기준</div></ProductField><ProductField label="연결 기수 운영 종료"><div className="product-value">{cohort?.operation_end_at ? new Date(String(cohort.operation_end_at)).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" }) : "기수에 지정된 종료일 없음"}</div></ProductField>{field("duration_label", "고객에게 보이는 수강 기간", true)}</div>
