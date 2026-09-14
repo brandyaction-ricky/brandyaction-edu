@@ -13,6 +13,14 @@ export function isRecruiting(cohort: Row, now = Date.now()) {
     && (!cohort.operation_end_at || Date.parse(String(cohort.operation_end_at)) > now);
 }
 
+export function isPurchasableOffer(course: Row, cohort: Row, now = Date.now()) {
+  if (isRecruiting(cohort, now)) return true;
+  if (course.status !== 'published' || course.category === 'free' || cohort.status !== 'upcoming') return false;
+  return Boolean(cohort.recruitment_end_at)
+    && Date.parse(String(cohort.recruitment_end_at)) > now
+    && (!cohort.operation_end_at || Date.parse(String(cohort.operation_end_at)) > now);
+}
+
 export function homepageCourses(courses: Row[], cohorts: Row[], now = Date.now()) {
   const recruitingIds = new Set(
     cohorts.filter(cohort => isRecruiting(cohort, now)).map(cohort => cohort.course_id),

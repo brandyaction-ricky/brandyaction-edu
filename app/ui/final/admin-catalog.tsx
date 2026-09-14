@@ -12,10 +12,10 @@ import {
 } from "@/lib/platform";
 import { recordId } from "@/lib/platform-rules";
 import { archiveValues, cohortPeriod, cohortStatus } from "@/lib/qa-rules";
-import { ArrowRight, BookOpen, FileText, Pencil, Search, Trash2 } from "lucide-react";
+import { ArrowRight, BookOpen, ChevronDown, ChevronUp, FileText, Pencil, Search, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
-import type { Data } from "../learning-workflows";
+import type { Data, WorkflowSend } from "../learning-workflows";
 import { Metric } from "./admin-shell";
 import { Badge, Empty, courseType } from "./primitives";
 
@@ -31,6 +31,7 @@ type Props = {
   pagination: { page: number; pageSize: number; total: number } | null;
   setPage: (page: number) => void;
   exportCsv: (rows: Row[], name: string) => void;
+  send?: WorkflowSend;
   tools?: ReactNode;
 };
 type Column = { label: string; value: (row: Row) => ReactNode };
@@ -48,6 +49,7 @@ export function AdminCatalog({
   pagination,
   setPage,
   exportCsv,
+  send,
   tools,
 }: Props) {
   const [query, setQuery] = useState(""),
@@ -146,8 +148,18 @@ export function AdminCatalog({
         (s.key === "learning"
           ? r.week_id
           : lessons.find((l) => l.id === r.lesson_id)?.week_id) === week) &&
-      (s.key === "customers" ? `${JSON.stringify(r)} ${customerTags(r.id).map(named).join(" ")} ${customerCourses(r.id).join(" ")}` : JSON.stringify(r)).toLowerCase().includes(query.toLowerCase()),
-  );
+    (s.key === "customers" ? `${JSON.stringify(r)} ${customerTags(r.id).map(named).join(" ")} ${customerCourses(r.id).join(" ")}` : JSON.stringify(r)).toLowerCase().includes(query.toLowerCase()),
+  ).toSorted((a, b) => s.key === "banners" ? num(a, "display_order") - num(b, "display_order") : 0);
+  async function moveBanner(row: Row, direction: -1 | 1) {
+    if (!send || pending) return;
+    const index = filtered.findIndex(item => item.id === row.id);
+    const target = filtered[index + direction];
+    if (!target) return;
+    const currentOrder = num(row, "display_order");
+    const targetOrder = num(target, "display_order");
+    await send({ action: "save", section: "banners", id: row.id, values: { display_order: targetOrder } });
+    await send({ action: "save", section: "banners", id: target.id, values: { display_order: currentOrder } }, "배너 노출 순서를 변경했습니다.");
+  }
   const missionGroups = scopedWeeks
     .filter((item) => !week || item.id === week)
     .map((item) => ({ week: item, missions: filtered.filter((mission) => lessonById.get(String(mission.lesson_id))?.week_id === item.id).toSorted((a, b) => num(lessonById.get(String(a.lesson_id)), "day_number") - num(lessonById.get(String(b.lesson_id)), "day_number")) }))
@@ -907,7 +919,11 @@ export function AdminCatalog({
                         </td>
                       ))}
                       <td data-label="관리">
-                        {s.key === "products" ? <div className="catalog-actions">
+                        {s.key === "banners" ? <div className="catalog-actions banner-order-actions">
+                          <button className="btn iconbtn" type="button" title="위로 이동" aria-label={t(r, "title") + " 위로 이동"} disabled={pending || filtered[0]?.id === r.id} onClick={() => void moveBanner(r, -1)}><ChevronUp size={17} aria-hidden="true" /></button>
+                          <button className="btn iconbtn" type="button" title="아래로 이동" aria-label={t(r, "title") + " 아래로 이동"} disabled={pending || filtered.at(-1)?.id === r.id} onClick={() => void moveBanner(r, 1)}><ChevronDown size={17} aria-hidden="true" /></button>
+                          <button className="btn iconbtn" type="button" title="수정" aria-label={t(r, "title") + " 수정"} onClick={() => edit(s, r)}><Pencil size={17} aria-hidden="true" /></button>
+                        </div> : s.key === "products" ? <div className="catalog-actions">
                           {!r.archived_at && <button className="btn iconbtn danger" type="button" title="삭제" aria-label={t(r, "title") + " 삭제"} disabled={pending} onClick={() => archive(s, [recordId(r)])}><Trash2 size={17} aria-hidden="true" /></button>}
                           <button className="btn iconbtn" type="button" title="수정" aria-label={t(r, "title") + " 수정"} onClick={() => edit(s, r)}><Pencil size={17} aria-hidden="true" /></button>
                         </div> : <button
@@ -971,17 +987,13 @@ export function AdminCatalog({
       {s.key === "customers" && <div className="row mt24"><Link className="btn" href="/admin/members">회원 미션관리</Link><Link className="btn" href="/admin/tags">고객 태그 설정</Link></div>}
       {s.key === "learning" && <div className="row mt24"><Link className="btn" href="/admin/weeks">주차 구성</Link><Link className="btn" href="/admin/contents">영상·자료 등록</Link><Link className="btn" href="/admin/missions">미션·퀴즈 관리</Link></div>}
       {s.key === "missions" && <div className="notice mt16">미션은 연결 학습의 일차 순서로 표시됩니다. 학습 순서는 학습 콘텐츠 편집에서 변경할 수 있습니다. 제출물 검토와 피드백은 <Link className="text-link" href="/admin/reviews">제출물 검토</Link>에서 관리합니다.</div>}
-      {s.key === "banners" && <div className="equal-col mt24">
-        <section className="panel"><div className="panel-head"><h2>배너 노출 기준</h2></div><div className="panel-body"><div className="setting-line"><span>노출 순서</span><b>설정한 순서대로 노출</b></div><div className="setting-line"><span>노출 기간</span><b>시작·종료 일정 기준</b></div><div className="setting-line"><span>사용 상태</span><b>사용 중인 배너만 표시</b></div><p className="meta mt16">수정에서 배너 이미지·제목·버튼·노출 순서와 일정을 함께 관리합니다.</p></div></section>
-        <section className="panel"><div className="panel-head"><h2>연결 페이지 확인</h2></div><div className="panel-body"><h3>배너 이미지와 CTA가 같은 목적지로</h3><p className="mt8">고객에게 표시되는 버튼 이름과 연결 주소를 확인하고, 연결된 상품의 공개 상태와 모집 일정을 함께 확인하세요.</p><div className="row mt16"><Link className="btn" href="/admin/products">상품 관리</Link><Link className="btn" href="/">고객 화면 보기</Link></div></div></section>
-      </div>}
       {s.key === "product-reviews" && <div className="notice mt24">후기 원문과 평점은 유지하며, 검토 화면에서 공개 상태와 상품 대표 노출을 설정합니다.</div>}
       {s.key === "coupons" && <div className="notice mt24">쿠폰 할인·사용 기간·사용 한도를 확인한 뒤 적용하세요. 쿠폰 사용 이력과 발급 이력은 별도로 관리됩니다.</div>}
       {s.key === "tags" && <div className="equal-col catalog-tag-panels mt24">
         <section className="panel"><div className="panel-head"><h2>자동 태그 적용 흐름</h2></div><div className="panel-body"><div className="workflow-row"><span>로그인 회원의 행동</span><span>태그 조건 확인</span><span className="active">태그 부여</span></div><p className="mt16">무료 클래스 학습 완료와 유료 상품 결제처럼 확인 가능한 회원 행동을 기준으로 자동 분류합니다.</p></div></section>
         <section className="panel"><div className="panel-head"><h2>조건 변경 시 영향</h2></div><div className="panel-body"><h3>자동 태그와 수동 태그를 구분해 관리</h3><p className="mt8">자동 태그는 연결된 행동 조건에 따라 갱신됩니다. 수동 태그는 회원 관리에서 직접 부여하거나 해제할 수 있습니다.</p><p className="privacy-note mt16">태그 이름과 설명을 변경해도 자동 부여 기준은 변경되지 않습니다.</p></div></section>
       </div>}
-      {s.key !== "products" && <details className="catalog-bulk-tools mt24" onToggle={(event) => { if (!(event.currentTarget as HTMLDetailsElement).open) { setBulkMode(false); setSelection([]); } }}>
+      {!["products", "banners"].includes(s.key) && <details className="catalog-bulk-tools mt24" onToggle={(event) => { if (!(event.currentTarget as HTMLDetailsElement).open) { setBulkMode(false); setSelection([]); } }}>
         <summary>목록 내보내기 · 선택 관리</summary>
         <div className="catalog-bulk-body">
           <label className="checkline"><input type="checkbox" checked={bulkMode} onChange={(event) => { setBulkMode(event.target.checked); setSelection([]); }} />목록 선택 표시</label>
