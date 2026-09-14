@@ -99,6 +99,12 @@ test('full HTML source preserves CSS separately from the safe legacy fallback', 
   assert.throws(() => mergeProductMetadata({}, { detail_html_document: 'x'.repeat(3000001) }), /3MB/);
 });
 
+test('free campaign HTML is identifiable before showing it on a paid product', () => {
+  const { containsFreeClassCampaign } = load('lib/platform-rules.ts');
+  assert.equal(containsFreeClassCampaign('<h1>무료 라이브 강의</h1><a href="https://open.kakao.com/o/room">무료강의 대기방 입장</a>'), true);
+  assert.equal(containsFreeClassCampaign('<h1>유료 AI 클래스</h1><p>카카오 활용법을 배웁니다.</p>'), false);
+});
+
 test('CTA settings round-trip without clearing existing codes, metadata or resources', () => {
   const { productConversion, conversionUrl, ctaTextColor, productCtaPosition } = load('lib/product-conversion.ts');
   const previous = { seo_title: '검색 제목', product_resources: ['preserved'], campaign: { enabled: true } };

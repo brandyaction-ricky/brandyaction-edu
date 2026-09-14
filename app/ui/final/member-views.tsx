@@ -276,10 +276,10 @@ function Dashboard({
             <Link
               className="btn primary"
               href={
-                e ? "/learn/" + e.id + (next ? "/" + next.id : "") : "/classes"
+                e ? "/learn/" + e.id + (next ? "/" + next.id : "") : "/classes?type=free"
               }
             >
-              {e ? "학습 이어가기" : "클래스 찾아보기"}
+              {e ? "학습 이어가기" : "무료 클래스 시작하기"}
               <ArrowRight />
             </Link>
           </div>
@@ -450,7 +450,7 @@ function Dashboard({
         ))}
         {!active.length && (
           <Empty title="신청한 클래스가 없습니다.">
-            <Link href="/classes">클래스 찾아보기</Link>
+            <Link href="/classes?type=free">무료 클래스부터 시작하기</Link>
           </Empty>
         )}
       </section>
