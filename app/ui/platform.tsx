@@ -64,6 +64,9 @@ import { OrderResult } from "./order-result";
 import { SiteFooter } from "./final/site-footer";
 import { HomeHero } from "./final/home-hero";
 type Data = Record<string, Row[]>;
+// Preserve only the last server-verified operator identity during client-side
+// admin navigation. Every read and write is still authorized by the server.
+let cachedAdminUser: User | null = null;
 const nav = [
   ["/classes?type=free", "무료 클래스"],
   ["/classes", "전체 클래스"],
@@ -83,7 +86,9 @@ export function Platform({
   const learning = path[0] === "learn";
   const [support, setSupport] = useState({ email: "", url: "" });
   const [data, setData] = useState<Data>({});
-  const [user, setUser] = useState(initialUser);
+  const [user, setUser] = useState(() =>
+    initialUser || (admin ? cachedAdminUser : null),
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [accessDenied, setAccessDenied] = useState(false);
@@ -168,7 +173,8 @@ export function Platform({
       }
       if (controller.signal.aborted || !alive.current) return;
       if (admin && [401, 403].includes(response.status)) {
-        setUser(result.user || null);
+        cachedAdminUser = result.user || null;
+        setUser(cachedAdminUser);
         setData({});
         setAccessDenied(response.status === 403);
         return;
@@ -177,6 +183,7 @@ export function Platform({
       if (alive.current) {
         setData(result.data);
         setSupport(result.support || { email: "", url: "" });
+        if (admin) cachedAdminUser = result.user;
         setUser(result.user);
         setPagination(result.pagination || null);
       }
@@ -311,6 +318,7 @@ export function Platform({
       setPending(false);
       return;
     }
+    cachedAdminUser = null;
     setUser(null);
     router.replace("/login");
     router.refresh();
