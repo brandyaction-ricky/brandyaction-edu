@@ -81,7 +81,7 @@ export async function GET(request: Request) {
                 }
                 else if (table === 'curriculum_weeks') query = query.order('week_number');
                 else if (table === 'lesson_progress') query = query.order('updated_at', { ascending: false });
-                else if (!['site_settings', 'lesson_contents', 'mission_quizzes', 'cohort_session_contents', 'crm_member_tags'].includes(table)) query = query.order('created_at', { ascending: false });
+                else if (!['site_settings', 'lesson_contents', 'mission_quizzes', 'cohort_session_contents', 'crm_member_tags', 'coupon_products'].includes(table)) query = query.order('created_at', { ascending: false });
                 if (!adminMode) {
                     if (['courses', 'articles', 'reviews'].includes(table)) query = query.eq('status', 'published');
                     if (['review_videos', 'curriculum_weeks', 'curriculum_lessons'].includes(table)) query = query.eq('is_published', true);
