@@ -121,7 +121,7 @@ export function AdminWorkflows(props: Props) {
   if (props.section === "staff") return <StaffPermissions {...p} />;
   if (["templates", "campaigns", "automations"].includes(props.section))
     return <CrmManager {...p} />;
-  if (["seo", "settings", "metrics"].includes(props.section))
+  if (["seo", "settings"].includes(props.section))
     return (
       <>
       <SettingsForm
@@ -131,7 +131,7 @@ export function AdminWorkflows(props: Props) {
       {props.section === "settings" && <KakaoSyncSettings />}
       </>
     );
-  if (props.section === "landing") return <LandingAdmin />;
+  if (props.section === "landing" || props.section === "metrics") return <LandingAdmin />;
   if (props.section === "analytics") return <Analytics />;
   if (props.section === "orders") return <OrdersPanel {...p} />;
   return null;

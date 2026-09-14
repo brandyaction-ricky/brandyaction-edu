@@ -1,48 +1,42 @@
-import { ArrowDownToLine, Clock3, Globe2, MousePointerClick, UsersRound } from 'lucide-react';
-import { decodeLabel } from '@/lib/landing';
-import { conversionRate, engagementLabel, sessionConversionRate, type PerformanceReport } from '@/lib/landing-performance';
+import { MousePointerClick, UsersRound, WalletCards } from 'lucide-react';
+import { delta, displayDimension, engagementLabel, rate, type DashboardReport, type PerformanceRow } from '@/lib/landing-performance';
 
-const count = (value: number) => value.toLocaleString('ko-KR');
-export function PerformanceDashboard({ report, previous }: { report: PerformanceReport; previous?: PerformanceReport }) {
-  const { summary, daily, sources } = report;
-  const metrics = [
-    { label: 'Unique Visitors', detail: '고유 방문자', value: count(summary.visitors), icon: UsersRound },
-    { label: 'CTA Clicks', detail: '전체 CTA 클릭 횟수', value: count(summary.clicks), icon: MousePointerClick },
-    { label: 'Conversion Rate', detail: `방문자 ${conversionRate(summary).toFixed(1)}% · 방문 ${sessionConversionRate(summary).toFixed(1)}%`, value: conversionRate(summary).toFixed(1) + '%', icon: ArrowDownToLine },
-    { label: 'Avg Dwell Time', detail: '화면이 보이는 동안의 평균 체류', value: engagementLabel(summary.avg_dwell_ms, summary.sessions, 'time'), icon: Clock3 },
-    { label: '평균 스크롤 깊이', detail: '방문별 최대 스크롤 깊이의 평균', value: engagementLabel(summary.avg_scroll_depth, summary.sessions, 'percent'), icon: ArrowDownToLine },
-  ];
+const count = (value: number | null | undefined) => value == null ? '—' : Number(value).toLocaleString('ko-KR', { maximumFractionDigits: 1 });
+const money = (value: number) => value.toLocaleString('ko-KR') + '원';
+function Compare({ current, previous, previousHasData }: { current: number; previous?: number; previousHasData: boolean }) {
+  if (previous === undefined) return null;
+  const change = delta(current, previous, previousHasData);
+  return <small>{!change ? '비교 못함' : `A ${count(previous)} → B ${count(current)} · ${change.amount >= 0 ? '+' : ''}${count(change.amount)} (${change.rate === null ? '증감률 계산 불가' : `${change.rate >= 0 ? '+' : ''}${change.rate.toFixed(1)}%`})`}</small>;
+}
+function Kpi({ label, value, aValue, compare, previousHasData, icon: Icon, note }: { label: string; value: string; aValue?: number; compare: boolean; previousHasData: boolean; icon: typeof UsersRound; note: string }) {
+  return <section className="metric"><div className="metric-label"><Icon size={16} aria-hidden="true" />{label}</div><div className="metric-value num">{value}</div>{compare && <Compare current={Number(value.replace(/[^0-9.-]/g,'')) || 0} previous={aValue} previousHasData={previousHasData} />}<div className="metric-note">{note}</div></section>;
+}
+export function PerformanceDashboard({ report, compare, onClassify }: { report: DashboardReport; compare: boolean; onClassify: (row: PerformanceRow, value: string) => void }) {
+  const b = report.summary_b, a = report.summary_a;
+  const visitorRate = rate(b.converted_visitors,b.visitors), sessionRate = rate(b.cta_click_sessions,b.sessions);
+  const aVisitorRate = a ? rate(a.converted_visitors,a.visitors) : undefined, aSessionRate = a ? rate(a.cta_click_sessions,a.sessions) : undefined;
+  const summary = report.campaign_summary;
   return <div>
-    {previous && <PeriodComparison current={report} previous={previous} />}
-    <div className="metrics landing-kpis">{metrics.map(({ label, detail, value, icon: Icon }) => <section className="metric" key={label} aria-label={label}><div className="metric-label"><Icon size={16} aria-hidden="true" />{label}</div><div className="metric-value num">{value}</div><div className="metric-note">{detail}</div></section>)}</div>
-    <div className="two-col">
-      <section className="panel"><div className="panel-head"><h2>Traffic &amp; Conversions</h2><div className="row"><span className="badge blue">Visitors</span><span className="badge red">Clicks</span></div></div><div className="panel-body landing-trend"><TrafficChart daily={daily} />{!summary.visitors && <p className="meta">선택한 기간에 수집된 방문 데이터가 없습니다.</p>}</div></section>
-      <section className="panel"><div className="panel-head"><h2><Globe2 size={20} aria-hidden="true" /> Top Sources · 소재별 유입</h2></div>{sources.length ? <div className="table-scroll" tabIndex={0} role="region" aria-label="광고세트와 소재별 데이터 표"><table><thead><tr><th scope="col">광고세트 / 소재</th><th scope="col">방문</th><th scope="col">CTA 방문</th><th scope="col">전환율</th></tr></thead><tbody>{sources.map((source,index) => { const sessions = Number(source.sessions || 0), converted = Number(source.converted_sessions || 0); return <tr key={[source.campaign,source.adset,source.creative,source.device,index].join(':')}><th scope="row">{source.traffic === 'direct' ? '직접 유입' : `${decodeLabel(source.adset) || '미지정'} / ${decodeLabel(source.creative) || '미지정'}`}<small className="block meta">{source.device}</small></th><td>{count(sessions)}회</td><td>{count(converted)}회</td><td>{sessions ? (converted / sessions * 100).toFixed(1) + '%' : '—'}</td></tr>; })}</tbody></table></div> : <div className="empty"><Globe2 size={30} aria-hidden="true" /><h3>No traffic data yet</h3><p>수집된 유입 경로가 없습니다.</p></div>}</section>
+    <div className="metrics landing-kpis">
+      <Kpi label="고유 방문자" value={count(b.visitors)} aValue={a?.visitors} compare={compare} previousHasData={Boolean(a?.has_data)} icon={UsersRound} note="브라우저 방문자 ID 중복 제거" />
+      <Kpi label="전체 방문" value={count(b.sessions)} aValue={a?.sessions} compare={compare} previousHasData={Boolean(a?.has_data)} icon={UsersRound} note="세션 기준" />
+      <Kpi label="CTA 클릭 세션" value={count(b.cta_click_sessions)} aValue={a?.cta_click_sessions} compare={compare} previousHasData={Boolean(a?.has_data)} icon={MousePointerClick} note={`전체 클릭 ${count(b.cta_clicks)}회`} />
+      <Kpi label="광고비" value={count(b.spend)} aValue={a?.spend} compare={compare} previousHasData={Boolean(a?.has_data)} icon={WalletCards} note="Meta 동기화 기준" />
     </div>
-    <div className="notice neutral mt24"><p>브라우저별 고유 방문자를 중복 제거합니다. 전환율은 구매율이 아닌 CTA 클릭 전환율이며, 일별 방문자의 합계와 기간 고유 방문자는 다를 수 있습니다.</p><p>체류·스크롤은 측정된 {count(summary.measured_sessions)}개 방문 기준입니다. 기존 미수집 기록은 평균에서 제외하며 테스트 모드 방문은 집계하지 않습니다.</p>{report.last_event_at && <p>마지막 수집: {new Date(report.last_event_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })} KST</p>}</div>
-    <details className="panel mt24"><summary className="panel-head">일별 데이터 보기</summary><div className="table-scroll" tabIndex={0} role="region" aria-label="일별 방문자와 CTA 클릭 데이터 표"><table><caption className="meta">선택한 기간의 일별 고유 방문자와 CTA 클릭</caption><thead><tr><th scope="col">날짜 · KST</th><th scope="col">고유 방문자</th><th scope="col">CTA 클릭</th></tr></thead><tbody>{daily.map(day => <tr key={day.day}><th scope="row">{day.day}</th><td>{count(day.visitors)}</td><td>{count(day.clicks)}</td></tr>)}</tbody></table></div></details>
+    <section className="panel mt24"><div className="panel-head"><h2>CTA 전환율 기준</h2></div><div className="panel-body landing-rate-pair">
+      <div><span>방문자 기준</span><strong>{visitorRate.toFixed(1)}%</strong><p>클릭 고유 방문자 {count(b.converted_visitors)} ÷ 고유 방문자 {count(b.visitors)}</p>{compare && <Compare current={visitorRate} previous={aVisitorRate} previousHasData={Boolean(a?.has_data)} />}</div>
+      <div><span>방문 기준</span><strong>{sessionRate.toFixed(1)}%</strong><p>클릭 세션 {count(b.cta_click_sessions)} ÷ 전체 세션 {count(b.sessions)}</p>{compare && <Compare current={sessionRate} previous={aSessionRate} previousHasData={Boolean(a?.has_data)} />}</div>
+    </div></section>
+    <div className="landing-stats mt24">
+      <div><span>라이브 최대 동시시청</span><strong>{count(summary.live_peak)}</strong></div>
+      <div><span>현재 카카오톡방 인원</span><strong>{count(summary.kakao_members)}</strong><small>직전 기록 대비 {summary.kakao_delta == null ? '—' : `${summary.kakao_delta >= 0 ? '+' : ''}${count(summary.kakao_delta)}`}</small></div>
+      <div><span>누적 결제</span><strong>{count(summary.new_payments + summary.existing_payments)}건</strong><small>신규 {count(summary.new_payments)} · 기존 {count(summary.existing_payments)}</small></div>
+      <div><span>누적 매출 / ROAS</span><strong>{money(summary.revenue)}</strong><small>{summary.roas == null ? '광고비 0 · 계산 불가' : `ROAS ${summary.roas.toFixed(1)}%`} · 광고비 {money(summary.spend)}</small></div>
+    </div>
+    <section className="panel mt24"><div className="panel-head"><h2>소재별 성과</h2></div>{report.performance.length ? <div className="table-scroll" tabIndex={0} role="region" aria-label="소재별 성과표"><table className="landing-performance-table"><thead><tr>{['광고 유형','캠페인','광고세트','소재','방문','고유 방문자','CTA 클릭 세션','CTA 클릭 횟수','방문 전환율','평균 스크롤','평균 체류','Meta 노출','Meta 링크 클릭','Meta CTR','광고비'].map(value=><th key={value}>{value}</th>)}</tr></thead><tbody>{report.performance.map((row,index)=><tr key={`${row.campaign}-${row.adset}-${row.creative}-${index}`}>
+        <td><select aria-label={`${displayDimension(row.adset)} 광고 유형`} value={row.ad_type} onChange={event=>onClassify(row,event.target.value)}><option value="cold">콜드</option><option value="retarget">리타겟</option><option value="unclassified">미분류</option></select></td><td>{displayDimension(row.campaign)}</td><td>{displayDimension(row.adset)}</td><td>{displayDimension(row.creative)}</td><td>{count(row.sessions)}</td><td>{count(row.visitors)}</td><td>{count(row.cta_click_sessions)}</td><td>{count(row.cta_clicks)}</td><td>{rate(row.cta_click_sessions,row.sessions).toFixed(1)}%</td><td>{engagementLabel(row.avg_scroll_depth,row.sessions,'percent')}</td><td>{engagementLabel(row.avg_dwell_ms,row.sessions,'time')}</td><td>{count(row.impressions)}</td><td>{count(row.link_clicks)}</td><td>{rate(row.link_clicks,row.impressions).toFixed(1)}%</td><td>{money(Number(row.spend))}</td>
+      </tr>)}</tbody></table></div> : <div className="empty"><h3>조건에 맞는 데이터가 없습니다.</h3><p>{report.data_state.sessions_exist ? '필터를 초기화하거나 기간을 변경해 주세요.' : '선택한 기간에 원천 방문 데이터가 없습니다.'}</p></div>}</section>
+    <section className="panel mt24"><div className="panel-head"><h2>일별 방문 추이</h2></div><div className="table-scroll"><table><thead><tr><th>날짜 · KST</th><th>방문</th><th>고유 방문자</th><th>CTA 클릭 세션</th><th>CTA 클릭 횟수</th></tr></thead><tbody>{report.daily.map(row=><tr key={row.day}><th>{row.day}</th><td>{count(row.sessions)}</td><td>{count(row.visitors)}</td><td>{count(row.cta_click_sessions)}</td><td>{count(row.cta_clicks)}</td></tr>)}</tbody></table></div></section>
+    <section className="panel mt24"><div className="panel-head"><h2>일별 실측 기록</h2></div>{report.actuals.length?<div className="table-scroll"><table><thead><tr><th>날짜</th><th>카카오톡방 인원</th><th>신규 결제</th><th>기존 결제</th><th>당일 매출</th><th>메모</th></tr></thead><tbody>{report.actuals.map(row=><tr key={row.day}><th>{row.day}</th><td>{count(row.kakao_members)}</td><td>{count(row.new_payments)}</td><td>{count(row.existing_payments)}</td><td>{money(row.revenue)}</td><td>{row.memo||'—'}</td></tr>)}</tbody></table></div>:<div className="empty"><p>선택 기간에 저장된 실측값이 없습니다.</p></div>}</section>
   </div>;
-}
-
-function PeriodComparison({ current, previous }: { current: PerformanceReport; previous: PerformanceReport }) {
-  const rows: [string, number, number, string][] = [
-    ['고유 방문자', previous.summary.visitors, current.summary.visitors, '명'],
-    ['CTA 클릭', previous.summary.clicks, current.summary.clicks, '건'],
-    ['CTA 전환율', conversionRate(previous.summary), conversionRate(current.summary), '%'],
-    ['평균 스크롤', previous.summary.avg_scroll_depth ?? NaN, current.summary.avg_scroll_depth ?? NaN, '%'],
-  ];
-  return <section className="panel landing-compare"><div className="panel-head"><div><h2>기간 비교</h2><p className="meta">A {previous.range.startDay}–{previous.range.endDay} · B {current.range.startDay}–{current.range.endDay}</p></div></div><div className="table-scroll"><table><thead><tr><th>지표</th><th>A 예전</th><th>B 최근</th><th>증감</th></tr></thead><tbody>{rows.map(([label,a,b,unit]) => { const unavailable = Number.isNaN(a) || Number.isNaN(b) || previous.summary.sessions === 0; const delta = b-a; return <tr key={label}><th>{label}</th><td>{Number.isNaN(a) ? '미수집' : a.toFixed(unit === '%' ? 1 : 0)+unit}</td><td>{Number.isNaN(b) ? '미수집' : b.toFixed(unit === '%' ? 1 : 0)+unit}</td><td>{unavailable ? '비교 못함' : `${delta >= 0 ? '▲' : '▼'} ${Math.abs(delta).toFixed(unit === '%' ? 1 : 0)}${unit}`}</td></tr>; })}</tbody></table></div></section>;
-}
-
-function TrafficChart({ daily }: { daily: PerformanceReport['daily'] }) {
-  const ceiling = Math.max(4, Math.ceil(Math.max(...daily.map(day => Math.max(day.visitors, day.clicks)), 0) / 4) * 4);
-  const x = (index: number) => 58 + index / Math.max(1, daily.length - 1) * 766;
-  const y = (value: number) => 366 - value / ceiling * 318;
-  const labels = new Set(Array.from({ length: Math.min(5, daily.length) }, (_, index) => Math.round(index * (daily.length - 1) / Math.max(1, Math.min(5, daily.length) - 1))));
-  return <svg viewBox="0 0 860 426" role="img" aria-label="선택 기간의 일별 고유 방문자와 CTA 클릭 추이. 정확한 수치는 아래 일별 데이터에서 확인할 수 있습니다.">
-    {[0, 1, 2, 3, 4].map(tick => <g key={tick}><line x1="58" x2="824" y1={y(tick * ceiling / 4)} y2={y(tick * ceiling / 4)} stroke="var(--line)" strokeDasharray="4 4" /><text x="43" y={y(tick * ceiling / 4) + 5} textAnchor="end">{count(tick * ceiling / 4)}</text></g>)}
-    <polyline fill="none" stroke="var(--ba-info)" strokeWidth="3" strokeLinejoin="round" points={daily.map((day, index) => `${x(index)},${y(day.visitors)}`).join(' ')} />
-    <polyline fill="none" stroke="var(--ba-red)" strokeWidth="3" strokeLinejoin="round" points={daily.map((day, index) => `${x(index)},${y(day.clicks)}`).join(' ')} />
-    {daily.map((day, index) => <g key={day.day}><circle cx={x(index)} cy={y(day.visitors)} r="4" fill="var(--ba-info)" opacity={day.visitors ? 1 : 0}><title>{`${day.day} · 방문자 ${count(day.visitors)}명`}</title></circle><circle cx={x(index)} cy={y(day.clicks)} r="4" fill="var(--ba-red)" opacity={day.clicks ? 1 : 0}><title>{`${day.day} · 클릭 ${count(day.clicks)}회`}</title></circle>{labels.has(index) && <text x={x(index)} y="404" textAnchor={index === 0 ? 'start' : index === daily.length - 1 ? 'end' : 'middle'}>{day.day}</text>}</g>)}
-  </svg>;
 }
