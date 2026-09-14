@@ -100,11 +100,14 @@ test('a published paid product uses its upcoming cohort for CTA and the actual d
 test('article hub includes the managed free-video banner and representative thumbnails', () => {
   const { ArticlesView } = load('app/ui/final/public-views.tsx');
   const banner = { id: 'edu_article_banner', value: { enabled: true, title: '회원 무료 영상', videos: [{ title: '첫 영상', url: 'https://youtu.be/dQw4w9WgXcQ', available: true }] } };
-  const articleData = { ...data, article_banner: [banner], articles: [{ ...data.articles[0], cover_image_url: 'https://cdn.example/thumb.webp', cover_image_alt: '대표 이미지' }] };
+  const category = { id: 'category-marketing', name: '마케팅', slug: 'marketing', is_active: true, display_order: 0 };
+  const articleData = { ...data, article_banner: [banner], article_categories: [category], articles: [{ ...data.articles[0], category_id: category.id, cover_image_url: 'https://cdn.example/thumb.webp', cover_image_alt: '대표 이미지' }] };
   const markup = html(ArticlesView, { data: articleData, user, loading: false });
   assert.match(markup, /회원 무료 영상/);
   assert.match(markup, /article-thumbnail/);
   assert.match(markup, /thumb\.webp/);
+  assert.match(markup, /article-card-grid/);
+  assert.match(markup, /마케팅/);
   assert.doesNotMatch(markup, /class="tag">(?:인사이트|영상)</);
   const platformSource = read('app/ui/platform.tsx');
   assert.doesNotMatch(platformSource, /THE WAY WE LEARN|시청에서 멈추지 않는/);
@@ -227,6 +230,7 @@ test('catalogues and separate editors render without dropping existing fields', 
   assert.match(newProduct, /상품을 저장하면 기본 기수가 생성되고 입력한 모집 일정이 함께 적용됩니다/);
   assert.match(newProduct, /multiple=""/);
   assert.match(newProduct, /상세 이미지를 업로드하세요/);
+  assert.match(read('app/ui/final/integration.css'), /\.detail-gallery-upload > \.upload-label \{ align-self: center;/);
   const htmlProduct = html(ProductEditor, { data, row: { ...course, metadata: { detail_html_document: '<h1>상세</h1>' } }, pending: false, send, back() {} });
   assert.match(htmlProduct, /accept="\.html,\.htm,text\/html"/);
   assert.match(htmlProduct, /HTML 파일이 등록되었습니다/);

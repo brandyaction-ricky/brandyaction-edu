@@ -18,6 +18,8 @@ export type ProductDetailImage = { path: string; name: string; alt: string };
 export const productResourceScopes = ['public', 'authenticated', 'enrolled', 'purchaser'] as const;
 export type ProductResourceScope = (typeof productResourceScopes)[number];
 export type ProductResource = { id: string; name: string; path: string; scope: ProductResourceScope };
+export type DigitalContentItem = { id: string; title: string; type: 'file' | 'video'; resourceId: string; videoUrl: string; body: string; durationLabel: string };
+export type DigitalContentSection = { id: string; title: string; items: DigitalContentItem[] };
 
 const validProductResourcePath = (value: unknown) => typeof value === 'string' && /^edu\/[a-z0-9-]+\.[a-z0-9]{1,12}$/i.test(value) && !value.includes('..');
 export function productResources(metadata: Record<string, unknown>): ProductResource[] {
@@ -40,6 +42,48 @@ export function mergeProductResources(previous: unknown, next: ProductResource[]
     if (!/^[0-9a-f-]{36}$/i.test(item.id) || !item.name.trim() || item.name.length > 240 || !validProductResourcePath(item.path) || !productResourceScopes.includes(item.scope)) throw new Error('제공 자료 정보를 확인해 주세요.');
     return { id: item.id, name: item.name.trim(), path: item.path, scope: item.scope };
   });
+  return metadata;
+}
+
+const validId = (value: unknown) => typeof value === 'string' && /^[0-9a-f-]{36}$/i.test(value);
+const validVideoUrl = (value: unknown) => {
+  const url = safeUrl(value);
+  if (!url) return '';
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return host === 'youtu.be' || host === 'youtube.com' || host.endsWith('.youtube.com') || host === 'vimeo.com' || host.endsWith('.vimeo.com') ? url : '';
+  } catch { return ''; }
+};
+
+export function productDigitalSections(metadata: Record<string, unknown>, requirePrivateValues = true): DigitalContentSection[] {
+  if (!Array.isArray(metadata.digital_content_sections)) return [];
+  return metadata.digital_content_sections.flatMap(section => {
+    if (!section || typeof section !== 'object' || Array.isArray(section)) return [];
+    const value = section as Record<string, unknown>;
+    if (!validId(value.id)) return [];
+    const title = String(value.title || '').trim().slice(0, 80);
+    if (!title) return [];
+    const items = (Array.isArray(value.items) ? value.items : []).flatMap(entry => {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return [];
+      const item = entry as Record<string, unknown>, type = String(item.type || 'file');
+      if (!validId(item.id) || !['file', 'video'].includes(type)) return [];
+      const itemTitle = String(item.title || '').trim().slice(0, 200);
+      const resourceId = validId(item.resourceId) ? String(item.resourceId) : '';
+      const videoUrl = validVideoUrl(item.videoUrl);
+      if (!itemTitle || (type === 'file' ? !resourceId : requirePrivateValues && !videoUrl)) return [];
+      return [{ id: String(item.id), title: itemTitle, type: type as 'file' | 'video', resourceId, videoUrl, body: String(item.body || '').trim().slice(0, 5000), durationLabel: String(item.durationLabel || '').trim().slice(0, 40) }];
+    }).slice(0, 100);
+    return [{ id: String(value.id), title, items }];
+  }).slice(0, 30);
+}
+
+export function mergeProductDigitalSections(previous: unknown, next: DigitalContentSection[]) {
+  const metadata: Record<string, unknown> = previous && typeof previous === 'object' && !Array.isArray(previous) ? { ...previous } : {};
+  if (next.length > 30 || next.some(section => section.items.length > 100)) throw new Error('콘텐츠는 섹션 30개, 섹션별 100개까지 등록할 수 있습니다.');
+  metadata.digital_content_sections = next;
+  const validated = productDigitalSections(metadata);
+  if (validated.length !== next.length || validated.some((section, index) => section.items.length !== next[index]?.items.length)) throw new Error('디지털 콘텐츠 정보를 확인해 주세요.');
+  metadata.digital_content_sections = validated;
   return metadata;
 }
 

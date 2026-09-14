@@ -139,7 +139,7 @@ export async function POST(request: Request) {
                 message: role === 'staff' ? '스태프 권한을 저장했습니다.' : '스태프 권한을 해제했습니다.',
             });
         }
-        const actionScope = ['session', 'clone-cohort', 'quiz'].includes(body.action) ? 'products' : ['review', 'grant-enrollment', 'assign'].includes(body.action) ? 'members' : body.action === 'refund' ? 'orders' : ['settings', 'measurement-code', 'crm-save'].includes(body.action) ? 'marketing' : null;
+        const actionScope = ['session', 'clone-cohort', 'quiz'].includes(body.action) ? 'products' : ['review', 'grant-enrollment', 'assign'].includes(body.action) ? 'members' : body.action === 'refund' ? 'orders' : ['settings', 'delete-metric', 'measurement-code', 'crm-save'].includes(body.action) ? 'marketing' : null;
         if (!actionScope || !permissions[actionScope as keyof typeof permissions]) return reply({ error: '이 작업에 필요한 운영 권한이 없습니다.' }, 403);
         let result;
         if (body.action === 'crm-save') {
@@ -299,6 +299,10 @@ export async function POST(request: Request) {
             const items = Array.isArray(stored?.items) ? stored.items.slice(0, 99) : [];
             if (items.some(item => item && typeof item === 'object' && String((item as Record<string, unknown>).code || '').trim() === value.code)) fail('같은 코드가 이미 등록되어 있습니다.', 409);
             result = await db.from('site_settings').upsert({ key: 'edu_measurement_codes', value: { items: [{ id: crypto.randomUUID(), ...value, createdAt: new Date().toISOString(), createdBy: user.id }, ...items] }, is_public: false, updated_by: user.id }, { onConflict: 'key' });
+        } else if (body.action === 'delete-metric') {
+            const key = String(body.key || '');
+            if (!/^edu_metric_[A-Za-z0-9_-]+$/.test(key)) fail('삭제할 실측 기록을 확인해 주세요.');
+            result = await db.from('site_settings').delete().eq('key', key).select('key').maybeSingle();
         } else if (body.action === 'settings') {
             let value;
             try {
