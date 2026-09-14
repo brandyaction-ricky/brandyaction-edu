@@ -943,6 +943,8 @@ body {
 .edu-admin .detail-gallery-actions .danger { color: var(--ba-red); }
 .edu-front .detail-image-stack { width: 100%; line-height: 0; }
 .edu-front .detail-image-stack .detail-image { display: block; width: 100%; height: auto; margin: 0; }
+.edu-front .bottom-cta.single-cta .wrap { display: block; }
+.edu-front .bottom-cta.single-cta .btn { width: 100%; min-width: 0; white-space: normal; text-align: center; }
 @media (max-width: 900px) {
   .edu-admin .detail-gallery-list { grid-template-columns: minmax(0, 1fr); }
 }

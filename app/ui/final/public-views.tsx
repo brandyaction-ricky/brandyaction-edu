@@ -432,16 +432,16 @@ function StandardProductDetail({
           </div>
         </div>
       )}
-      <aside className={"bottom-cta " + (!free ? "product-mobile-cta" : "")}>
+      <aside className={"bottom-cta " + (free ? "single-cta" : "product-mobile-cta")}>
         <div className="wrap">
-          <div>
+          {!free && <div>
             <div className="cta-price">
-              {(free && customCta) || price === 0 ? conversion.priceLabel : money(price)}
+              {price === 0 ? conversion.priceLabel : money(price)}
             </div>
             <p className="meta">
               {t(available, "name") || t(c, "schedule_label")}
             </p>
-          </div>
+          </div>}
           {customCta ? <ProductCtaLink conversion={conversion} courseId={c.id} position="sticky_cta" /> : unavailableFree ? <button className="btn primary large" disabled>참여 링크 준비 중</button> : <Link
             href={href}
             aria-disabled={!enrolled && !available}
