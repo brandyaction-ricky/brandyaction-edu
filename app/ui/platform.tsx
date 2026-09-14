@@ -18,7 +18,7 @@ import { homepageCourses, isRecruiting, localDateTime, recordId } from "@/lib/pl
 import { archiveValues } from "@/lib/qa-rules";
 import { createClient } from "@/lib/supabase/client";
 import { getSupabasePublicConfig } from "@/lib/supabase/config";
-import { ArrowRight, Menu, Plus, Search, X } from "lucide-react";
+import { ArrowRight, BookOpen, Menu, Pencil, Plus, Search, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -118,6 +118,7 @@ export function Platform({
     row?: Row;
   } | null>(null);
   const [selection, setSelection] = useState<string[]>([]);
+  const [articleAdminTab, setArticleAdminTab] = useState<"content" | "banner">("content");
   const alive = useRef(true);
   const readRequest = useRef<AbortController | null>(null);
   const mutationGate = useRef(createMutationGate<Record<string, unknown>>());
@@ -715,6 +716,7 @@ export function Platform({
                   회원 명단 내보내기
                 </button>
               )}
+              {section.key === "articles" && <Link className="btn" href="/articles" target="_blank">고객 화면 미리보기</Link>}
               {!standaloneAdmin.includes(section.key) &&
                 !section.readOnly &&
                 ![
@@ -729,6 +731,8 @@ export function Platform({
                       ? "상품 등록"
                       : section.key === "learning"
                         ? "학습 추가"
+                        : section.key === "coupons"
+                          ? "쿠폰 만들기"
                         : "새로 등록"}
                   </button>
                 )}
@@ -745,8 +749,8 @@ export function Platform({
               />
             ) : (
               <>
-              {section.key === "articles" && <ArticleBannerEditor settings={rows("site_settings")} send={send} pending={pending} />}
-              <AdminCatalog
+              {section.key === "articles" && <nav className="article-admin-tabs" aria-label="아티클 관리 구분"><button type="button" className={`btn ${articleAdminTab === "content" ? "dark" : ""}`} aria-pressed={articleAdminTab === "content"} onClick={() => setArticleAdminTab("content")}><Pencil />아티클 콘텐츠</button><button type="button" className={`btn ${articleAdminTab === "banner" ? "dark" : ""}`} aria-pressed={articleAdminTab === "banner"} onClick={() => setArticleAdminTab("banner")}><BookOpen />무료강의 상단 설정</button></nav>}
+              {section.key === "articles" && articleAdminTab === "banner" ? <ArticleBannerEditor key={JSON.stringify(object(rows("site_settings").find(row => row.key === "edu_article_banner"), "value"))} settings={rows("site_settings")} send={send} pending={pending} /> : <AdminCatalog
                 key={section.key}
                 section={section}
                 data={data}
@@ -771,7 +775,7 @@ export function Platform({
                     />
                   ) : undefined
                 }
-              />
+              />}
               </>
             )}
           </>
@@ -857,11 +861,12 @@ export function Platform({
                 }
               : undefined
           }
-          save={async (values) => {
+          save={async (values, requestId) => {
             await send({
               action: "save",
               section: editor.section.key,
               id: editor.row ? recordId(editor.row) : undefined,
+              requestId,
               values,
             });
             setEditor(null);
@@ -909,12 +914,19 @@ function Editor({
   data: Data;
   pending: boolean;
   close: () => void;
-  save: (values: Record<string, unknown>) => Promise<void>;
+  save: (values: Record<string, unknown>, requestId?: string) => Promise<void>;
   archive?: () => void;
   deleteMember?: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const requestId = useRef(crypto.randomUUID());
   const [error, setError] = useState("");
+  const [tagKind, setTagKind] = useState(String(row?.tag_kind || "manual"));
+  const [couponDiscountType, setCouponDiscountType] = useState(String(row?.discount_type || "percentage"));
+  const [couponDiscountValue, setCouponDiscountValue] = useState(Number(row?.discount_value || 10));
+  const [couponProductScope, setCouponProductScope] = useState(String(row?.product_scope || "paid"));
+  const [couponIssueTarget, setCouponIssueTarget] = useState(String(row?.issue_target || "all"));
+  const couponCourseId = String((data.coupon_products || []).find(item => item.coupon_id === row?.id)?.course_id || "");
   const customerEnrollments =
     section.key === "customers" && row
       ? (data.enrollments || []).filter((item) => item.user_id === row.id)
@@ -937,6 +949,27 @@ function Editor({
     const form = new FormData(e.currentTarget);
     try {
       const values: Record<string, unknown> = {};
+      if (section.key === "tags") {
+        const kind = String(form.get("tag_kind") || "manual");
+        values.name = form.get("name") || null;
+        values.color = form.get("color") || "#667ca0";
+        values.description = form.get("description") || null;
+        values.tag_kind = kind;
+        values.rule_key = kind === "automatic" ? form.get("rule_key") || null : null;
+        values.is_active = form.get("is_active") === "on";
+        await save(values, row ? undefined : requestId.current);
+        return;
+      }
+      if (section.key === "coupons") {
+        for (const key of ["name", "code", "discount_type", "discount_value", "max_discount_amount", "minimum_order_amount", "product_scope", "applicable_course_id", "issue_target", "target_tag_id", "starts_at", "ends_at", "usage_limit", "per_user_limit"]) {
+          const value = form.get(key);
+          values[key] = ["discount_value", "max_discount_amount", "minimum_order_amount", "usage_limit", "per_user_limit"].includes(key) ? (value === "" ? null : Number(value)) : ["starts_at", "ends_at"].includes(key) ? (value ? new Date(String(value)).toISOString() : null) : value || null;
+        }
+        values.is_active = form.get("is_active") === "on";
+        values.exclude_free = form.get("exclude_free") === "on";
+        await save(values, row ? undefined : requestId.current);
+        return;
+      }
       for (const field of section.fields) {
         const value = form.get(field.key);
         if (field.type === "checkbox") values[field.key] = value === "on";
@@ -955,7 +988,7 @@ function Editor({
             : null;
         else values[field.key] = value || null;
       }
-      await save(values);
+      await save(values, row ? undefined : requestId.current);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -1052,8 +1085,8 @@ function Editor({
   };
   return (
     <dialog
-      className={"editor-dialog" + (section.key === "customers" && row ? " drawer customer-drawer" : "")}
-      aria-label={section.key === "customers" ? "회원 관리 상세" : section.title}
+      className={"editor-dialog" + (section.key === "customers" && row ? " drawer customer-drawer" : section.key === "tags" ? " drawer tag-settings-drawer" : section.key === "coupons" ? " drawer coupon-settings-drawer" : "")}
+      aria-label={section.key === "customers" ? "회원 관리 상세" : section.key === "tags" ? "고객 태그 설정" : section.key === "coupons" ? "쿠폰 등록·설정" : section.title}
       ref={ref}
       onCancel={(e) => {
         if (pending) e.preventDefault();
@@ -1067,6 +1100,10 @@ function Editor({
             <h2>
               {section.key === "customers" && row
                 ? "회원 관리 상세"
+                : section.key === "tags"
+                  ? "고객 태그 설정"
+                : section.key === "coupons"
+                  ? "쿠폰 등록·설정"
                 : `${section.title} · ${row ? "상세" : "등록"}`}
             </h2>
           </div>
@@ -1153,7 +1190,48 @@ function Editor({
                     </p>
                   </div>
                 )}
-              <div className="editor-fields">
+              {section.key === "tags" ? (
+                <div className="tag-settings-form">
+                  <div className="field"><label htmlFor="edit-name">태그명 *</label><input id="edit-name" name="name" required maxLength={100} defaultValue={t(row, "name")} /></div>
+                  <div className="grid2">
+                    <div className="field"><label htmlFor="edit-tag-kind">부여 방식</label><select id="edit-tag-kind" name="tag_kind" value={tagKind} onChange={event => setTagKind(event.target.value)}><option value="automatic">자동</option><option value="manual">수동</option></select></div>
+                    <div className="field"><label htmlFor="edit-is-active">사용 상태</label><select id="edit-is-active" name="is_active" defaultValue={row?.is_active === false ? "" : "on"}><option value="on">사용 중</option><option value="">사용 중지</option></select></div>
+                  </div>
+                  <section className={`tag-rule-box ${tagKind === "manual" ? "tag-rules-disabled" : ""}`}>
+                    <h3>자동 태그 조건</h3>
+                    <div className="field mt16"><label htmlFor="edit-rule-key">조건 행동</label><select id="edit-rule-key" name="rule_key" disabled={tagKind === "manual"} required={tagKind === "automatic"} defaultValue={t(row, "rule_key") || "free_lesson_1"}><option value="free_lesson_1">무료강의 1강 시청</option><option value="free_lesson_2">무료강의 2강 시청</option><option value="free_lesson_3">무료강의 3강 시청</option><option value="paid_customer">결제 완료</option><option value="mission_completed">미션 수행</option><option value="signed_up">회원가입</option></select></div>
+                    <p className="meta mt8">수동 태그는 행동 조건을 적용하지 않습니다.</p>
+                  </section>
+                  <div className="grid2">
+                    <div className="field"><label htmlFor="edit-color">태그 색상</label><input id="edit-color" name="color" type="color" defaultValue={/^#[0-9a-f]{6}$/i.test(t(row, "color")) ? t(row, "color") : "#667ca0"} /></div>
+                    <div className="field"><label htmlFor="edit-description">설명</label><textarea id="edit-description" name="description" rows={3} maxLength={300} defaultValue={t(row, "description")} /></div>
+                  </div>
+                  <p className="notice">조건을 저장하면 기존 회원 기록과 이후 발생하는 행동에 실제 자동 태그 조건이 적용됩니다.</p>
+                </div>
+              ) : section.key === "coupons" ? (
+                <div className="coupon-settings-form">
+                  <div className="coupon-preview"><span>BRANDYACTION BENEFIT</span><strong>{couponDiscountType === "percentage" ? `${couponDiscountValue}% 할인` : `${couponDiscountValue.toLocaleString("ko-KR")}원 할인`}</strong><p>적용 가능 여부를 발급 전에 확인하세요.</p></div>
+                  <div className="grid2">
+                    <div className="field"><label htmlFor="coupon-name">쿠폰명 *</label><input id="coupon-name" name="name" required maxLength={100} defaultValue={t(row, "name")} placeholder="운영용 이름" /></div>
+                    <div className="field"><label htmlFor="coupon-code">쿠폰 코드 *</label><input id="coupon-code" name="code" required pattern="[A-Za-z0-9_-]{3,30}" maxLength={30} defaultValue={t(row, "code")} placeholder="영문 대문자·숫자" /></div>
+                    <div className="field"><label htmlFor="coupon-type">할인 방식</label><select id="coupon-type" name="discount_type" value={couponDiscountType} onChange={event => setCouponDiscountType(event.target.value)}><option value="percentage">정률</option><option value="fixed">정액</option></select></div>
+                    <div className="field"><label htmlFor="coupon-value">할인 수치 *</label><input id="coupon-value" name="discount_value" type="number" min={1} max={couponDiscountType === "percentage" ? 100 : undefined} required value={couponDiscountValue} onChange={event => setCouponDiscountValue(Number(event.target.value))} /></div>
+                    <div className="field"><label htmlFor="coupon-max">최대 할인액 · 원</label><input id="coupon-max" name="max_discount_amount" type="number" min={0} defaultValue={row?.max_discount_amount == null ? "" : Number(row.max_discount_amount)} disabled={couponDiscountType === "fixed"} /></div>
+                    <div className="field"><label htmlFor="coupon-minimum">최소 주문 금액 · 원</label><input id="coupon-minimum" name="minimum_order_amount" type="number" min={0} defaultValue={Number(row?.minimum_order_amount || 0)} /></div>
+                    <div className="field"><label htmlFor="coupon-target">발급 대상</label><select id="coupon-target" name="issue_target" value={couponIssueTarget} onChange={event => setCouponIssueTarget(event.target.value)}><option value="all">전체 회원</option><option value="tag">고객 태그 회원</option></select></div>
+                    <div className="field"><label htmlFor="coupon-tag">대상 태그</label><select id="coupon-tag" name="target_tag_id" defaultValue={t(row, "target_tag_id")} disabled={couponIssueTarget !== "tag"} required={couponIssueTarget === "tag"}><option value="">태그 선택</option>{(data.crm_tags || []).map(tag => <option key={tag.id} value={tag.id}>{t(tag, "name")}</option>)}</select></div>
+                    <div className="field"><label htmlFor="coupon-product-scope">적용 상품</label><select id="coupon-product-scope" name="product_scope" value={couponProductScope} onChange={event => setCouponProductScope(event.target.value)}><option value="all">전체 상품</option><option value="paid">유료 클래스</option><option value="specific">특정 상품</option></select></div>
+                    <div className="field"><label htmlFor="coupon-course">특정 상품</label><select id="coupon-course" name="applicable_course_id" defaultValue={couponCourseId} disabled={couponProductScope !== "specific"} required={couponProductScope === "specific"}><option value="">상품 선택</option>{(data.courses || []).filter(course => !course.archived_at).map(course => <option key={course.id} value={course.id}>{t(course, "title")}</option>)}</select></div>
+                    <div className="field"><label htmlFor="coupon-start">시작일 · KST</label><input id="coupon-start" name="starts_at" type="datetime-local" defaultValue={row?.starts_at ? localDateTime(row.starts_at) : ""} /></div>
+                    <div className="field"><label htmlFor="coupon-end">종료일 · KST</label><input id="coupon-end" name="ends_at" type="datetime-local" defaultValue={row?.ends_at ? localDateTime(row.ends_at) : ""} /></div>
+                    <div className="field"><label htmlFor="coupon-limit">총 발급 수량</label><input id="coupon-limit" name="usage_limit" type="number" min={1} defaultValue={row?.usage_limit == null ? "" : Number(row.usage_limit)} /></div>
+                    <div className="field"><label htmlFor="coupon-user-limit">회원당 발급 횟수</label><input id="coupon-user-limit" name="per_user_limit" type="number" min={1} defaultValue={Number(row?.per_user_limit || 1)} /></div>
+                  </div>
+                  <label className="checkline"><input name="is_active" type="checkbox" defaultChecked={row?.is_active !== false} />쿠폰 사용 활성화</label>
+                  <label className="checkline"><input name="exclude_free" type="checkbox" defaultChecked={row?.exclude_free !== false} />무료 상품 적용 제외</label>
+                  <p className="notice">발급 후에도 이미 완료된 주문의 할인 금액은 변경하지 않습니다. 변경된 조건은 이후 쿠폰 적용 요청부터 검증됩니다.</p>
+                </div>
+              ) : <div className="editor-fields">
                 {section.fields.map((f) => (
                   <div
                     className={
@@ -1177,7 +1255,7 @@ function Editor({
                     {control(f)}
                   </div>
                 ))}
-              </div>
+              </div>}
               {section.table === "lesson_contents" && (
                 <p className="meta">
                   영상 URL 또는 자료 경로 중 하나를 등록합니다.
@@ -1222,7 +1300,7 @@ function Editor({
           </button>
           {!section.readOnly && (
             <button className="btn primary" disabled={pending}>
-              {pending ? "저장 중..." : "저장하기"}
+              {pending ? "저장 중..." : ["tags", "coupons"].includes(section.key) ? "입력 내용 확인" : "저장하기"}
             </button>
           )}
         </footer>

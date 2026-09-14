@@ -36,6 +36,16 @@ test('settings allowlist keeps scripts out and requires valid typed metrics',()=
  assert.throws(()=>rules.validateSetting('metrics',{date:'2026-02-30',campaign:'test',spend:1,impressions:1,clicks:1,leads:0,revenue:0}));
  assert.throws(()=>rules.validateSetting('metrics',{date:'2026-09-11',campaign:'test',spend:-1,impressions:1,clicks:1,leads:0,revenue:0}));
 });
+test('measurement data accepts live peak, staged payments and memo',()=>{
+ const value=rules.validateSetting('metrics',{date:'2026-09-14',campaign:'live',spend:1000,impressions:100,clicks:10,leads:4,revenue:30000,livePeak:57,paymentsDay0:2,paymentsDay1:1,paymentsDay2:0,paymentsDay3:1,paymentsDay4:0,memo:'라이브 종료 후 집계'});
+ assert.equal(value.livePeak,57);assert.equal(value.paymentsDay3,1);assert.equal(value.memo,'라이브 종료 후 집계');
+ assert.throws(()=>rules.validateSetting('metrics',{...value,paymentsDay4:-1}));
+});
+test('measurement code drafts validate scope, consent and size',()=>{
+ assert.deepEqual(rules.validateMeasurementCode({name:'전환 보조',location:'head',scope:'landing',code:'<script>window.dataLayer=[]</script>',purpose:'전환 측정 / 리키',confirmed:true}),{name:'전환 보조',location:'head',scope:'landing',code:'<script>window.dataLayer=[]</script>',purpose:'전환 측정 / 리키',status:'draft'});
+ assert.throws(()=>rules.validateMeasurementCode({name:'x',location:'footer',scope:'landing',code:'x',purpose:'x',confirmed:true}));
+ assert.throws(()=>rules.validateMeasurementCode({name:'x',location:'head',scope:'landing',code:'x',purpose:'x',confirmed:false}));
+});
 const uid='11111111-1111-4111-8111-111111111111';
 function handler(user) {
  let calls=[];

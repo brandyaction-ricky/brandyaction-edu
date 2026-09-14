@@ -135,11 +135,13 @@ test('product HTML takes precedence over old images and per-product CTA settings
   assert.match(editorMarkup, /CTA 왼쪽 문구/);
   assert.match(editorMarkup, /name="cta_price_label"/);
 });
-test('article management renders the free-video banner editor', () => {
+test('article management renders the connected three-video banner editor', () => {
   const { ArticleBannerEditor } = load('app/ui/final/article-banner-editor.tsx');
   const markup = html(ArticleBannerEditor, { settings: [], send, pending: false });
-  assert.match(markup, /상단 무료강의 영상 배너/);
-  assert.equal((markup.match(/무료 영상 [123]/g) || []).length >= 3, true);
+  assert.match(markup, /회원 무료강의 상단 영역/);
+  assert.match(markup, /무료강의 3강 설정/);
+  assert.equal((markup.match(/YouTube URL/g) || []).length, 3);
+  assert.match(read('app/ui/platform.tsx'), /아티클 콘텐츠[\s\S]*무료강의 상단 설정/);
   assert.ok(platform.sections.find(row => row.key === 'articles').fields.some(field => field.key === 'cover_image_path'));
 });
 test('all member screens render real data, with no authentication or payment writes', () => {
@@ -185,6 +187,14 @@ test('catalogues and separate editors render without dropping existing fields', 
   assert.ok(banners.indexOf('첫 번째') < banners.indexOf('두 번째'));
   assert.match(banners, /첫 번째 아래로 이동|두 번째 위로 이동/);
   assert.doesNotMatch(banners, /배너 노출 기준|연결 페이지 확인|목록 내보내기 · 선택 관리/);
+  const tagMarkup = html(AdminCatalog, { ...props, data: { ...data, crm_tags: [{ id: 'tag', name: '무료 1강', tag_kind: 'automatic', rule_key: 'free_lesson_1', is_active: true }] }, section: platform.sections.find(row => row.key === 'tags') });
+  assert.match(tagMarkup, /무료강의 1강 시청|조건설정/);
+  assert.doesNotMatch(tagMarkup, /자동 태그 적용 흐름|조건 변경 시 영향/);
+  const couponMarkup = html(AdminCatalog, { ...props, data: { ...data, coupons: [{ id: 'coupon', name: '첫 구매', code: 'WELCOME10', discount_type: 'percentage', discount_value: 10, minimum_order_amount: 100000, product_scope: 'paid', issue_target: 'all', is_active: true }], coupon_redemptions: [{ id: 'use', coupon_id: 'coupon', status: 'used' }] }, section: platform.sections.find(row => row.key === 'coupons') });
+  assert.match(couponMarkup, /발급 중|사용 횟수|1 \/ ∞|설정/);
+  const platformSource = read('app/ui/platform.tsx');
+  assert.match(platformSource, /무료강의 3강 시청[\s\S]*결제 완료[\s\S]*미션 수행[\s\S]*회원가입/);
+  assert.match(platformSource, /쿠폰 등록·설정[\s\S]*최소 주문 금액[\s\S]*회원당 발급 횟수/);
   const learning = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'learning') });
   assert.match(learning, /learning-layout/); assert.match(learning, /학습 구성/); assert.match(learning, /lesson-list-item/);
   const missions = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'missions') });
