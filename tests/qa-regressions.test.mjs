@@ -44,6 +44,7 @@ test('F-03 no admin screen downloads raw journey events', () => {
   for (const tables of Object.values(rules.adminTables)) assert.equal(tables.includes('customer_journey_events'), false);
   assert.deepEqual(rules.adminTables.analytics, []);
   assert.deepEqual(rules.adminTables.banners, ['site_banners']);
+  assert.deepEqual(rules.adminTables.articles, ['articles', 'article_categories', 'site_settings']);
 });
 test('F-04 status reflects expired recruitment, ended operation, scheduled start and override', () => {
   const now = Date.parse('2026-09-11T00:00:00Z');
@@ -124,7 +125,7 @@ test('member administration exposes explicit roles and protects deletion', async
 });
 test('customer catalog removes unrelated lower management panels', () => {
   const source = fs.readFileSync(new URL('../app/ui/final/admin-catalog.tsx', import.meta.url), 'utf8');
-  assert.match(source, /\["products", "banners", "customers"\]/);
+  assert.match(source, /\["products", "banners", "customers", "tags", "coupons"\]/);
   assert.match(source, /tools && s\.key !== "customers"/);
   assert.doesNotMatch(source, /s\.key === "customers" && <div className="row mt24"><Link className="btn" href="\/admin\/members"/);
 });
@@ -132,6 +133,13 @@ test('article banner rejects deceptive non-YouTube URLs before writing', async (
   const h = handler(admin, { from: () => { throw Error('must not write'); } });
   const response = await h.POST(request({ action: 'article-banner', value: { title: '무료 영상', videos: [{ title: '위장 주소', url: 'https://evil.example/?next=youtube.com' }] } }));
   assert.equal(response.status, 400);
+});
+test('article category fields and server actions use the shared category table', () => {
+  const article = platform.sections.find(section => section.key === 'articles');
+  assert.equal(article.fields.find(field => field.key === 'category_id').type, 'article-category');
+  const source = fs.readFileSync(new URL('../app/api/platform/route.ts', import.meta.url), 'utf8');
+  assert.match(source, /article-category-save/);
+  assert.match(source, /사용 중인 카테고리는 삭제할 수 없습니다/);
 });
 test('F-14 anonymous API selects only public review fields', async () => {
   let projection;

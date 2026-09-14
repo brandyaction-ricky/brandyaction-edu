@@ -17,7 +17,7 @@ export function achievement(enrollmentId: string, missions: Row[], submissions: 
 export const settingFields = {
   seo: ['title', 'description', 'googleVerification', 'naverVerification'],
   settings: ['supportEmail', 'supportUrl', 'trackingEnabled'],
-  metrics: ['date', 'campaign', 'spend', 'impressions', 'clicks', 'leads', 'revenue', 'livePeak', 'paymentsDay0', 'paymentsDay1', 'paymentsDay2', 'paymentsDay3', 'paymentsDay4', 'memo'],
+  metrics: ['date', 'campaign', 'spend', 'impressions', 'clicks', 'leads', 'revenue', 'livePeak', 'paymentDays', 'memo'],
 } as const;
 
 export function validateSetting(kind: string, input: Record<string, unknown>) {
@@ -29,7 +29,16 @@ export function validateSetting(kind: string, input: Record<string, unknown>) {
     if (key === 'trackingEnabled') {
       if (typeof value !== 'boolean') throw new Error('트래킹 설정을 확인해 주세요.');
       result[key] = value;
-    } else if (['spend', 'impressions', 'clicks', 'leads', 'revenue', 'livePeak', 'paymentsDay0', 'paymentsDay1', 'paymentsDay2', 'paymentsDay3', 'paymentsDay4'].includes(key)) {
+    } else if (key === 'paymentDays') {
+      if (!Array.isArray(value) || !value.length || value.length > 31) throw new Error('일차별 결제 건수를 1~31개 행으로 입력해 주세요.');
+      const days = value.map(entry => {
+        const row = entry as Record<string, unknown>;
+        if (!row || typeof row !== 'object' || !Number.isSafeInteger(row.day) || Number(row.day) < 0 || Number(row.day) > 365 || !Number.isSafeInteger(row.count) || Number(row.count) < 0) throw new Error('결제 일차와 건수는 0 이상의 정수로 입력해 주세요.');
+        return { day: Number(row.day), count: Number(row.count) };
+      });
+      if (new Set(days.map(row => row.day)).size !== days.length) throw new Error('같은 결제 일차를 중복 입력할 수 없습니다.');
+      result[key] = days.toSorted((a, b) => a.day - b.day);
+    } else if (['spend', 'impressions', 'clicks', 'leads', 'revenue', 'livePeak'].includes(key)) {
       if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) throw new Error('지표는 0 이상의 정수로 입력해 주세요.');
       result[key] = value;
     } else {

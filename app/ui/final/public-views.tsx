@@ -28,7 +28,7 @@ import { ProductDetailHtml } from './product-detail-html';
 import { productDocument } from '@/lib/product-html-document';
 import { productConversion } from '@/lib/product-conversion';
 import { ProductPixel, ProductCtaLink } from './product-conversion';
-import { productDetailImages, productResources } from '@/lib/product-metadata';
+import { productDetailImages, productDigitalSections, productResources } from '@/lib/product-metadata';
 import {
   ArticleCard,
   Badge,
@@ -39,6 +39,7 @@ import {
   Heading,
   ResourceRow,
   ProductResourceRow,
+  DigitalContentOutline,
   Video,
   courseType,
 } from "./primitives";
@@ -157,6 +158,7 @@ function StandardProductDetail({
   );
   const meta = object(c, "metadata"),
     directResources = productResources(meta),
+    digitalSections = productDigitalSections(meta, false),
     detailImages = productDetailImages(meta).map(image => ({ ...image, path: safeUrl(image.path) })).filter(image => image.path),
     detailImage = detailImages[0]?.path || '';
   const detailHtml = typeof meta.detail_html === 'string' ? meta.detail_html : '';
@@ -282,7 +284,7 @@ function StandardProductDetail({
               <section className="detail-section" id="curriculum">
                 <h2>{digital ? "구성 자료" : "학습 방식과 커리큘럼"}</h2>
                 {digital
-                  ? downloadSection
+                  ? digitalSections.length ? <DigitalContentOutline sections={digitalSections} courseId={c.id} accessible={Boolean(enrolled)} /> : downloadSection
                   : weeks.map((w) => (
                       <details className="accordion" key={w.id}>
                         <summary>
@@ -611,10 +613,10 @@ export function ArticlesView({
     );
   const filtered = all.filter(
     (a) =>
-      (type === "전체" ||
-        (a.content_type === "video" ? "영상" : "글") === type) &&
+      (type === "전체" || a.category_id === type) &&
       t(a, "title").toLowerCase().includes(query.toLowerCase()),
   );
+  const categories = (data.article_categories || []).filter(category => category.is_active !== false).sort((a, b) => Number(a.display_order || 0) - Number(b.display_order || 0));
   return (
     <div className="wrap">
       <ArticleBanner data={data} user={user} />
@@ -625,14 +627,14 @@ export function ArticlesView({
       />
       <div className="filter-row mt32">
         <div className="chips">
-          {["전체", "글", "영상"].map((x) => (
+          {[{ id: "전체", name: "전체" }, ...categories.map(category => ({ id: String(category.id), name: t(category, "name") }))].map((x) => (
             <button
-              key={x}
-              className={"chip " + (x === type ? "active" : "")}
-              aria-pressed={x === type}
-              onClick={() => setType(x)}
+              key={x.id}
+              className={"chip " + (x.id === type ? "active" : "")}
+              aria-pressed={x.id === type}
+              onClick={() => setType(x.id)}
             >
-              {x}
+              {x.name}
             </button>
           ))}
         </div>
@@ -647,7 +649,7 @@ export function ArticlesView({
           />
         </label>
       </div>
-      <div className="grid3 pb64">
+      <div className="grid3 article-card-grid pb64">
         {filtered.map((a) => (
           <ArticleCard key={a.id} article={a} />
         ))}

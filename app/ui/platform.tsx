@@ -33,6 +33,7 @@ import { AdminWorkflows, standaloneAdmin } from "./admin-workflows";
 import { BlocksField, UploadField } from "./editor-fields";
 import { AdminCatalog } from "./final/admin-catalog";
 import { ArticleBannerEditor } from "./final/article-banner-editor";
+import { ArticleCategoryManager } from "./final/article-category-manager";
 import { ProductEditor } from "./final/admin-editors";
 import { LearningEditor } from "./final/learning-editor";
 import {
@@ -758,7 +759,7 @@ export function Platform({
             ) : (
               <>
               {section.key === "articles" && <nav className="article-admin-tabs" aria-label="아티클 관리 구분"><button type="button" className={`btn ${articleAdminTab === "content" ? "dark" : ""}`} aria-pressed={articleAdminTab === "content"} onClick={() => setArticleAdminTab("content")}><Pencil />아티클 콘텐츠</button><button type="button" className={`btn ${articleAdminTab === "banner" ? "dark" : ""}`} aria-pressed={articleAdminTab === "banner"} onClick={() => setArticleAdminTab("banner")}><BookOpen />무료강의 상단 설정</button></nav>}
-              {section.key === "articles" && articleAdminTab === "banner" ? <ArticleBannerEditor key={JSON.stringify(object(rows("site_settings").find(row => row.key === "edu_article_banner"), "value"))} settings={rows("site_settings")} send={send} pending={pending} /> : <AdminCatalog
+              {section.key === "articles" && articleAdminTab === "banner" ? <ArticleBannerEditor key={JSON.stringify(object(rows("site_settings").find(row => row.key === "edu_article_banner"), "value"))} settings={rows("site_settings")} send={send} pending={pending} /> : <>{section.key === "articles" && <ArticleCategoryManager categories={rows("article_categories")} articles={rows("articles")} send={send} pending={pending} />}<AdminCatalog
                 key={section.key}
                 section={section}
                 data={data}
@@ -783,7 +784,7 @@ export function Platform({
                     />
                   ) : undefined
                 }
-              />}
+              /></>}
               </>
             )}
           </>
@@ -930,6 +931,7 @@ function Editor({
   const requestId = useRef(crypto.randomUUID());
   const [error, setError] = useState("");
   const [tagKind, setTagKind] = useState(String(row?.tag_kind || "manual"));
+  const [tagRule, setTagRule] = useState(String(row?.rule_key || "free_lesson_1"));
   const [couponDiscountType, setCouponDiscountType] = useState(String(row?.discount_type || "percentage"));
   const [couponDiscountValue, setCouponDiscountValue] = useState(Number(row?.discount_value || 10));
   const [couponProductScope, setCouponProductScope] = useState(String(row?.product_scope || "paid"));
@@ -960,10 +962,12 @@ function Editor({
       if (section.key === "tags") {
         const kind = String(form.get("tag_kind") || "manual");
         values.name = form.get("name") || null;
-        values.color = form.get("color") || "#667ca0";
-        values.description = form.get("description") || null;
+        values.color = row?.color || "#667ca0";
+        values.description = row?.description || null;
         values.tag_kind = kind;
         values.rule_key = kind === "automatic" ? form.get("rule_key") || null : null;
+        values.threshold_percent = kind === "automatic" && tagRule.startsWith("free_lesson_") ? Number(form.get("threshold_percent") || 80) : 100;
+        values.apply_existing = form.get("apply_existing") === "on";
         values.is_active = form.get("is_active") === "on";
         await save(values, row ? undefined : requestId.current);
         return;
@@ -1044,6 +1048,13 @@ function Editor({
         </select>
       );
     }
+    if (f.type === "article-category")
+      return (
+        <select {...props} defaultValue={String(value || "")}>
+          <option value="">미분류</option>
+          {(data.article_categories || []).filter(category => category.is_active !== false || category.id === value).sort((a, b) => Number(a.display_order || 0) - Number(b.display_order || 0)).map(category => <option key={category.id} value={category.id}>{t(category, "name")}</option>)}
+        </select>
+      );
     if (f.options)
       return (
         <select {...props} defaultValue={String(value || f.options[0])}>
@@ -1207,14 +1218,11 @@ function Editor({
                   </div>
                   <section className={`tag-rule-box ${tagKind === "manual" ? "tag-rules-disabled" : ""}`}>
                     <h3>자동 태그 조건</h3>
-                    <div className="field mt16"><label htmlFor="edit-rule-key">조건 행동</label><select id="edit-rule-key" name="rule_key" disabled={tagKind === "manual"} required={tagKind === "automatic"} defaultValue={t(row, "rule_key") || "free_lesson_1"}><option value="free_lesson_1">무료강의 1강 시청</option><option value="free_lesson_2">무료강의 2강 시청</option><option value="free_lesson_3">무료강의 3강 시청</option><option value="paid_customer">결제 완료</option><option value="mission_completed">미션 수행</option><option value="signed_up">회원가입</option></select></div>
+                    <div className="tag-rule-grid mt16"><div className="field"><label htmlFor="edit-rule-key">조건 행동</label><select id="edit-rule-key" name="rule_key" disabled={tagKind === "manual"} required={tagKind === "automatic"} value={tagRule} onChange={event => setTagRule(event.target.value)}><option value="free_lesson_1">무료강의 1강 시청</option><option value="free_lesson_2">무료강의 2강 시청</option><option value="free_lesson_3">무료강의 3강 시청</option><option value="paid_customer">결제 완료</option><option value="mission_completed">미션 수행</option><option value="signed_up">회원가입</option></select></div>{tagRule.startsWith("free_lesson_") && <div className="field"><label htmlFor="edit-threshold-percent">기준 시청률 · %</label><input id="edit-threshold-percent" name="threshold_percent" type="number" min={1} max={100} defaultValue={Number(row?.threshold_percent || 80)} disabled={tagKind === "manual"} /></div>}</div>
                     <p className="meta mt8">수동 태그는 행동 조건을 적용하지 않습니다.</p>
                   </section>
-                  <div className="grid2">
-                    <div className="field"><label htmlFor="edit-color">태그 색상</label><input id="edit-color" name="color" type="color" defaultValue={/^#[0-9a-f]{6}$/i.test(t(row, "color")) ? t(row, "color") : "#667ca0"} /></div>
-                    <div className="field"><label htmlFor="edit-description">설명</label><textarea id="edit-description" name="description" rows={3} maxLength={300} defaultValue={t(row, "description")} /></div>
-                  </div>
-                  <p className="notice">조건을 저장하면 기존 회원 기록과 이후 발생하는 행동에 실제 자동 태그 조건이 적용됩니다.</p>
+                  <section className="tag-apply-scope"><h3>변경 적용 범위</h3><label className="checkline"><input type="radio" name="apply_existing" value="" defaultChecked />앞으로 발생하는 행동부터 적용</label><label className="checkline"><input type="radio" name="apply_existing" value="on" />기존 회원 기록도 재평가</label></section>
+                  <p className="notice amber">조건 미리보기에는 로그인 회원의 확인 가능한 행동만 사용합니다. 기존 기록 재평가는 대상 수에 따라 반영까지 시간이 걸릴 수 있습니다.</p>
                 </div>
               ) : section.key === "coupons" ? (
                 <div className="coupon-settings-form">
@@ -1232,9 +1240,8 @@ function Editor({
                     <div className="field"><label htmlFor="coupon-course">특정 상품</label><select id="coupon-course" name="applicable_course_id" defaultValue={couponCourseId} disabled={couponProductScope !== "specific"} required={couponProductScope === "specific"}><option value="">상품 선택</option>{(data.courses || []).filter(course => !course.archived_at).map(course => <option key={course.id} value={course.id}>{t(course, "title")}</option>)}</select></div>
                     <div className="field"><label htmlFor="coupon-start">시작일 · KST</label><input id="coupon-start" name="starts_at" type="datetime-local" defaultValue={row?.starts_at ? localDateTime(row.starts_at) : ""} /></div>
                     <div className="field"><label htmlFor="coupon-end">종료일 · KST</label><input id="coupon-end" name="ends_at" type="datetime-local" defaultValue={row?.ends_at ? localDateTime(row.ends_at) : ""} /></div>
-                    <div className="field"><label htmlFor="coupon-limit">총 발급 수량</label><input id="coupon-limit" name="usage_limit" type="number" min={1} defaultValue={row?.usage_limit == null ? "" : Number(row.usage_limit)} /></div>
-                    <div className="field"><label htmlFor="coupon-user-limit">회원당 발급 횟수</label><input id="coupon-user-limit" name="per_user_limit" type="number" min={1} defaultValue={Number(row?.per_user_limit || 1)} /></div>
                   </div>
+                  <section className="coupon-limit-group"><div><h3>발급 수량 설정</h3><p className="meta">전체 발급 한도와 회원별 사용 가능 횟수를 관리합니다.</p></div><div className="grid2"><div className="field"><label htmlFor="coupon-limit">총 발급 수량</label><input id="coupon-limit" name="usage_limit" type="number" min={1} defaultValue={row?.usage_limit == null ? "" : Number(row.usage_limit)} placeholder="제한 없음" /></div><div className="field"><label htmlFor="coupon-user-limit">회원당 발급 횟수</label><input id="coupon-user-limit" name="per_user_limit" type="number" min={1} defaultValue={Number(row?.per_user_limit || 1)} /></div></div></section>
                   <label className="checkline"><input name="is_active" type="checkbox" defaultChecked={row?.is_active !== false} />쿠폰 사용 활성화</label>
                   <label className="checkline"><input name="exclude_free" type="checkbox" defaultChecked={row?.exclude_free !== false} />무료 상품 적용 제외</label>
                   <p className="notice">발급 후에도 이미 완료된 주문의 할인 금액은 변경하지 않습니다. 변경된 조건은 이후 쿠폰 적용 요청부터 검증됩니다.</p>

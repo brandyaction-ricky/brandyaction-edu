@@ -37,6 +37,8 @@ import {
   type WorkflowSend,
 } from "../learning-workflows";
 import { Badge, Empty, Heading, ResourceRow } from "./primitives";
+import { DigitalContentOutline, ProductResourceRow } from "./primitives";
+import { productDigitalSections, productResources } from "@/lib/product-metadata";
 
 const accountGroups = [
   [
@@ -939,14 +941,19 @@ function Resources({ data }: { data: Data }) {
           lessons = rows(data, "curriculum_lessons").filter((l) =>
             weeks.some((w) => w.id === l.week_id),
           );
+        const enrollment = rows(data, "enrollments").find(entry => entry.course_id === c.id && hasLearningAccess(entry));
+        const digitalSections = enrollment ? productDigitalSections(object(c, "metadata"), false) : [];
+        const productFiles = enrollment ? productResources(object(c, "metadata")) : [];
         return {
           c,
           files: contents.filter((r) =>
             lessons.some((l) => l.id === r.lesson_id),
           ),
+          digitalSections,
+          productFiles,
         };
       })
-      .filter((g) => g.files.length && (!course || course === g.c.id));
+      .filter((g) => (g.files.length || g.digitalSections.length || g.productFiles.length) && (!course || course === g.c.id));
   return (
     <>
       <Heading
@@ -966,7 +973,7 @@ function Resources({ data }: { data: Data }) {
           </select>
         </label>
       </div>
-      {grouped.map(({ c, files }) => (
+      {grouped.map(({ c, files, digitalSections, productFiles }) => (
         <section className="panel mb24" key={c.id}>
           <div className="panel-head">
             <h2>{t(c, "title")}</h2>
@@ -976,6 +983,7 @@ function Resources({ data }: { data: Data }) {
             {files.map((r) => (
               <ResourceRow key={t(r, "lesson_id")} content={r} />
             ))}
+            {digitalSections.length ? <DigitalContentOutline sections={digitalSections} courseId={c.id} accessible /> : productFiles.map(resource => <ProductResourceRow key={resource.id} resource={resource} courseId={c.id} />)}
           </div>
         </section>
       ))}

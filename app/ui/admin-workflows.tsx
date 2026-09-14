@@ -1413,6 +1413,10 @@ function SettingsForm({ section, data, send, pending }: Props) {
     naverVerification: String(initial.naverVerification || ''),
   }));
   const [metric, setMetric] = useState<Row | null>(null);
+  const metricValue = object(metric || undefined, "value");
+  const legacyPaymentDays = [0, 1, 2, 3, 4].map(day => ({ day, count: Number(metricValue[`paymentsDay${day}`] || 0) }));
+  const storedPaymentDays = Array.isArray(metricValue.paymentDays) ? metricValue.paymentDays as { day: number; count: number }[] : legacyPaymentDays;
+  const [paymentDays, setPaymentDays] = useState<{ day: number; count: number }[]>([{ day: 0, count: 0 }]);
   const measurementCodesValue = object(rows(data, "site_settings").find(row => row.key === "edu_measurement_codes"), "value");
   const measurementCodes = Array.isArray(measurementCodesValue.items) ? measurementCodesValue.items.filter(item => item && typeof item === "object") as Row[] : [];
   const metrics = rows(data, "site_settings")
@@ -1428,6 +1432,9 @@ function SettingsForm({ section, data, send, pending }: Props) {
     if (codeOpen && !dialog.open) dialog.showModal();
     if (!codeOpen && dialog.open) dialog.close();
   }, [codeOpen]);
+  useEffect(() => {
+    setPaymentDays(storedPaymentDays.length ? storedPaymentDays.map(row => ({ day: Number(row.day), count: Number(row.count) })) : [{ day: 0, count: 0 }]);
+  }, [metric?.key]);
   async function saveMeasurementCode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -1448,9 +1455,11 @@ function SettingsForm({ section, data, send, pending }: Props) {
     }
     if (section === "settings")
       values.trackingEnabled = f.get("trackingEnabled") === "on";
-    if (section === "metrics")
-      for (const key of ["spend", "impressions", "clicks", "leads", "revenue", "livePeak", "paymentsDay0", "paymentsDay1", "paymentsDay2", "paymentsDay3", "paymentsDay4"])
+    if (section === "metrics") {
+      for (const key of ["spend", "impressions", "clicks", "leads", "revenue", "livePeak"])
         values[key] = Number(f.get(key) || 0);
+      values.paymentDays = paymentDays;
+    }
     try {
       await send(
         { action: "settings", kind: section, values },
@@ -1611,11 +1620,6 @@ function SettingsForm({ section, data, send, pending }: Props) {
                   ["leads", "문의·신청 수"],
                   ["revenue", "확인한 매출 (원)"],
                   ["livePeak", "라이브 최대 동시시청"],
-                  ["paymentsDay0", "당일 결제 건수"],
-                  ["paymentsDay1", "1일차 결제 건수"],
-                  ["paymentsDay2", "2일차 결제 건수"],
-                  ["paymentsDay3", "3일차 결제 건수"],
-                  ["paymentsDay4", "4일차 결제 건수"],
                 ].map(([key, label]) => (
                   <Field key={key} label={label}>
                     <input
@@ -1628,6 +1632,7 @@ function SettingsForm({ section, data, send, pending }: Props) {
                     />
                   </Field>
                 ))}
+                <section className="span2 metric-payment-group"><div className="between"><div><h3>일차별 결제 건수</h3><p className="meta">마감 일정에 맞춰 필요한 일차만 추가하세요.</p></div><button className="btn small" type="button" onClick={() => setPaymentDays(rows => [...rows, { day: Math.max(-1, ...rows.map(row => row.day)) + 1, count: 0 }])} disabled={paymentDays.length >= 31}>+ 일차 추가</button></div><div className="metric-payment-table"><div className="metric-payment-head"><span>결제 일차</span><span>결제 건수</span><span>관리</span></div>{paymentDays.map((row, index) => <div className="metric-payment-row" key={`${row.day}-${index}`}><label><span className="sr-only">결제 일차</span><select aria-label={`${index + 1}번째 결제 일차`} value={row.day} onChange={event => setPaymentDays(current => current.map((item, i) => i === index ? { ...item, day: Number(event.target.value) } : item))}>{Array.from({ length: 366 }, (_, day) => <option value={day} key={day}>{day === 0 ? "당일" : `${day}일차`}</option>)}</select></label><label><span className="sr-only">결제 건수</span><input aria-label={`${row.day === 0 ? "당일" : `${row.day}일차`} 결제 건수`} type="number" min={0} step={1} value={row.count} onChange={event => setPaymentDays(current => current.map((item, i) => i === index ? { ...item, count: Number(event.target.value) } : item))} /></label><button className="icon-btn" type="button" aria-label={`${row.day === 0 ? "당일" : `${row.day}일차`} 행 삭제`} onClick={() => setPaymentDays(current => current.length === 1 ? current : current.filter((_, i) => i !== index))} disabled={paymentDays.length === 1}><Trash2 /></button></div>)}</div></section>
                 <div className="span2">
                   <Field label="메모">
                     <textarea name="memo" rows={4} maxLength={1000} defaultValue={String(value.memo || "")} placeholder="라이브 운영·결제 성과와 관련된 메모를 입력하세요." />
@@ -1705,11 +1710,7 @@ function SettingsForm({ section, data, send, pending }: Props) {
                   "클릭당 비용",
                   "ROAS",
                   "최대 동시시청",
-                  "당일 결제",
-                  "1일차",
-                  "2일차",
-                  "3일차",
-                  "4일차",
+                  "일차별 결제",
                   "메모",
                   "관리",
                 ].map((h) => (
@@ -1748,14 +1749,10 @@ function SettingsForm({ section, data, send, pending }: Props) {
                         : "—"}
                     </td>
                     <td data-label="최대 동시시청">{Number(v.livePeak || 0)}명</td>
-                    <td data-label="당일 결제">{Number(v.paymentsDay0 || 0)}건</td>
-                    <td data-label="1일차">{Number(v.paymentsDay1 || 0)}건</td>
-                    <td data-label="2일차">{Number(v.paymentsDay2 || 0)}건</td>
-                    <td data-label="3일차">{Number(v.paymentsDay3 || 0)}건</td>
-                    <td data-label="4일차">{Number(v.paymentsDay4 || 0)}건</td>
+                    <td data-label="일차별 결제"><div className="metric-payment-summary">{((Array.isArray(v.paymentDays) ? v.paymentDays : [0,1,2,3,4].map(day => ({ day, count: Number(v[`paymentsDay${day}`] || 0) }))) as Array<{ day: number; count: number }>).map(entry => <span key={entry.day}><b>{Number(entry.day) === 0 ? "당일" : `${entry.day}일차`}</b>{Number(entry.count || 0)}건</span>)}</div></td>
                     <td data-label="메모"><span className="metric-note-cell">{String(v.memo || "—")}</span></td>
                     <td data-label="관리">
-                      <button
+                      <div className="row"><button
                         className="btn small"
                         onClick={() => {
                           setMetric(m);
@@ -1763,7 +1760,7 @@ function SettingsForm({ section, data, send, pending }: Props) {
                         }}
                       >
                         수정
-                      </button>
+                      </button><button className="icon-btn danger" aria-label={`${String(v.campaign)} 실측 기록 삭제`} disabled={pending} onClick={async () => { if (!window.confirm(`${String(v.date)} · ${String(v.campaign)} 실측 기록을 삭제할까요?`)) return; await send({ action: "delete-metric", key: m.key }, "실측 기록을 삭제했습니다."); if (metric?.key === m.key) setMetric(null); }}><Trash2 /></button></div>
                     </td>
                   </tr>
                 );
