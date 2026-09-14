@@ -7,7 +7,7 @@ import { PERFORMANCE_PRESETS, campaignRange, presetRange, previousRange, validDa
 import { appendFilters, campaignStatus, emptyFilters, metaStatus, parseTab, periodError, readFilters, readPeriod, TRACKING_TABS, type TrackingFilters, type TrackingPeriod, type TrackingTab } from '@/lib/landing-admin-state';
 import { PerformanceDashboard } from './performance-dashboard';
 import { ActualDrawer, ActualsPanel, CampaignSettings } from './tracking-operations';
-import { CompactEmpty, InlineError, TrackingFiltersPanel, TrackingSkeleton } from './tracking-controls';
+import { CompactEmpty, DiscardConfirmation, InlineError, TrackingFiltersPanel, TrackingSkeleton } from './tracking-controls';
 import './tracking-admin.css';
 
 const labels = { today: '오늘', yesterday: '어제', '7d': '7일', '14d': '14일', campaign: '캠페인 전체', custom: '직접 기간' };
@@ -21,6 +21,7 @@ export function LandingAdmin() {
   const [result, setResult] = useState<{ requestKey: string; report?: DashboardReport; error?: string }>({ requestKey: '' });
   const [pending, setPending] = useState(false), [syncing, setSyncing] = useState(false), [dirty, setDirty] = useState(false), [message, setMessage] = useState('');
   const [drawer, setDrawer] = useState<{ row: ActualRow | null } | null>(null);
+  const [navigation, setNavigation] = useState<{ proceed: () => void } | null>(null);
   const pendingRef = useRef(false), initialized = useRef(false);
   const course = courses.find(item => item.id === courseId), campaign = course?.campaigns.find(item => item.id === campaignId);
   useEffect(() => {
@@ -73,14 +74,14 @@ export function LandingAdmin() {
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
-  function allowNavigation() { if (pendingRef.current) return false; if (dirty && !confirm('저장하지 않은 설정이 있습니다. 변경사항을 버리고 이동할까요?')) return false; setDirty(false); return true; }
-  function changeTab(next: TrackingTab) { if (next !== tab && allowNavigation()) setTab(next); }
+  function navigate(proceed: () => void) { if (pendingRef.current) return; if (dirty) setNavigation({ proceed }); else proceed(); }
+  function changeTab(next: TrackingTab) { if (next !== tab) navigate(() => setTab(next)); }
   function applyCampaign(next?: PerformanceCampaign) {
     setCampaignId(next?.id || ''); setFilters(emptyFilters()); setDrawer(null); setMessage('');
     if (next) setPeriod(readPeriod(new URLSearchParams({ preset: '7d' }), next));
   }
-  function chooseCourse(id: string) { if (!allowNavigation()) return; initialized.current = true; setList(previous => ({ ...previous, error: '' })); setCourseId(id); applyCampaign(courses.find(item => item.id === id)?.campaigns[0]); }
-  function chooseCampaign(id: string) { if (allowNavigation()) applyCampaign(course?.campaigns.find(item => item.id === id)); }
+  function chooseCourse(id: string) { navigate(() => { initialized.current = true; setList(previous => ({ ...previous, error: '' })); setCourseId(id); applyCampaign(courses.find(item => item.id === id)?.campaigns[0]); }); }
+  function chooseCampaign(id: string) { navigate(() => applyCampaign(course?.campaigns.find(item => item.id === id))); }
   function choosePreset(value: PerformancePreset) {
     if (!campaign) return;
     if (value === 'custom') { setPeriod(previous => ({ ...previous, preset: value })); return; }
@@ -90,7 +91,7 @@ export function LandingAdmin() {
   function dateChange(key: 'start' | 'end', value: string) { setPeriod(old => { const next = { ...old, [key]: value, preset: 'custom' as const }; if (old.compare && validDay(next.start) && validDay(next.end) && next.start <= next.end) { const prior = previousRange(next.start, next.end); next.compareStart = prior.startDay; next.compareEnd = prior.endDay; } return next; }); }
   function toggleCompare(value: boolean) { setPeriod(old => { const previous = validDay(old.start) && validDay(old.end) && old.start <= old.end ? previousRange(old.start, old.end) : { startDay: '', endDay: '' }; return { ...old, compare: value, compareStart: previous.startDay, compareEnd: previous.endDay }; }); }
   function comparisonPreset(days: 1 | 7 | 14) { if (!campaign) return; const preset = days === 1 ? 'today' : days === 7 ? '7d' : '14d', range = campaignRange(presetRange(preset, campaign), campaign), previous = previousRange(range.startDay, range.endDay); setPeriod({ preset, start: range.startDay, end: range.endDay, compare: true, compareStart: previous.startDay, compareEnd: previous.endDay }); }
-  function refresh() { if (!allowNavigation()) return; setListVersion(value => value + 1); setReload(value => value + 1); }
+  function refresh() { navigate(() => { setListVersion(value => value + 1); setReload(value => value + 1); }); }
   async function post(body: Record<string, unknown>, success: string) {
     if (pendingRef.current) return false;
     pendingRef.current = true; setPending(true); setMessage('');
@@ -116,7 +117,7 @@ export function LandingAdmin() {
       {campaign && <><div className="tracking-periods" role="group" aria-label="조회 기간">{[...PERFORMANCE_PRESETS, 'custom' as const].map(value => <button type="button" key={value} className={`btn ${period.preset === value ? 'selected' : ''}`} aria-pressed={period.preset === value} onClick={() => choosePreset(value)}>{labels[value]}</button>)}<label className="tracking-check"><input type="checkbox" checked={period.compare} onChange={event => toggleCompare(event.target.checked)}/>비교 모드</label><span className="tracking-help">{period.start} — {period.end} · KST</span></div>
       {period.preset === 'custom' && <div className="tracking-date-inputs"><label>B 시작일<input type="date" value={period.start} min={campaign.start_day} max={campaign.end_day} onChange={event => dateChange('start', event.target.value)}/></label><label>B 종료일<input type="date" value={period.end} min={campaign.start_day} max={campaign.end_day} onChange={event => dateChange('end', event.target.value)}/></label></div>}
       {period.compare && <div className="tracking-compare"><div className="tracking-compare-presets">{([1, 7, 14] as const).map(days => <button type="button" className="btn" key={days} onClick={() => comparisonPreset(days)}>{days === 1 ? '어제 → 오늘' : `직전 ${days}일 → 최근 ${days}일`}</button>)}<button type="button" className="btn" onClick={() => choosePreset('custom')}>직접 맞추기</button></div><div className="tracking-date-inputs"><label>A · 예전 기간 시작<input type="date" value={period.compareStart} onChange={event => setPeriod(old => ({ ...old, compareStart: event.target.value }))}/></label><label>A · 예전 기간 종료<input type="date" value={period.compareEnd} onChange={event => setPeriod(old => ({ ...old, compareEnd: event.target.value }))}/></label><span className="tracking-help">B · 최근 기간 {period.start} — {period.end}</span></div></div>}</>}
-      <div className="tracking-tabs" role="tablist" aria-label="무료클래스 트래킹">{(Object.entries(TRACKING_TABS) as [TrackingTab, string][]).map(([key, label], index, tabs) => <button type="button" role="tab" id={`tracking-tab-${key}`} aria-controls={`tracking-panel-${key}`} aria-selected={tab === key} tabIndex={tab === key ? 0 : -1} key={key} onClick={() => changeTab(key)} onKeyDown={event => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) { event.preventDefault(); const next = event.key === 'Home' ? 0 : event.key === 'End' ? 2 : (index + (event.key === 'ArrowRight' ? 1 : 2)) % 3; if (allowNavigation()) { setTab(tabs[next][0]); document.getElementById(`tracking-tab-${tabs[next][0]}`)?.focus(); } } }}>{label}</button>)}</div>
+      <div className="tracking-tabs" role="tablist" aria-label="무료클래스 트래킹">{(Object.entries(TRACKING_TABS) as [TrackingTab, string][]).map(([key, label], index, tabs) => <button type="button" role="tab" id={`tracking-tab-${key}`} aria-controls={`tracking-panel-${key}`} aria-selected={tab === key} tabIndex={tab === key ? 0 : -1} key={key} onClick={() => changeTab(key)} onKeyDown={event => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) { event.preventDefault(); const next = event.key === 'Home' ? 0 : event.key === 'End' ? 2 : (index + (event.key === 'ArrowRight' ? 1 : 2)) % 3; navigate(() => { setTab(tabs[next][0]); document.getElementById(`tracking-tab-${tabs[next][0]}`)?.focus(); }); } }}>{label}</button>)}</div>
     </div>
     {list.error && <InlineError onRetry={() => setListVersion(value => value + 1)}>{list.error}</InlineError>}
     {message && <div className="tracking-notice" role="status">{message}</div>}
@@ -129,5 +130,6 @@ export function LandingAdmin() {
       {tab === 'dashboard' && campaign && <TrackingFiltersPanel options={report?.options} filters={filters} onChange={setFilters} exportUrl={`/api/landing/performance/export?${query}`} disabled={!query || loading || !!error}/>}
     </div>
     {drawer && campaign && <ActualDrawer campaign={campaign} initial={drawer.row} pending={pending} onClose={() => setDrawer(null)} onSave={values => post({ action: 'actual', campaign_id: campaign.id, values }, '일별 실측값을 저장했습니다.')}/>}
+    {navigation && <DiscardConfirmation message="변경한 캠페인 설정을 저장하지 않고 이동할까요?" onCancel={() => setNavigation(null)} onDiscard={() => { const proceed = navigation.proceed; setNavigation(null); setDirty(false); proceed(); }}/>}
   </div>;
 }

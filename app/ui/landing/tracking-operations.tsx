@@ -5,7 +5,7 @@ import { Plus, RefreshCw, Save } from 'lucide-react';
 import { campaignRange, presetRange, type ActualRow, type DashboardReport, type PerformanceCampaign } from '@/lib/landing-performance';
 import { actualPayload, actualRevenue, campaignStatus, count, kstTime, metaStatus, money, signed } from '@/lib/landing-admin-state';
 import { OperationsSummary } from './performance-dashboard';
-import { CompactEmpty, InlineError, TrackingModal } from './tracking-controls';
+import { CompactEmpty, DiscardConfirmation, InlineError, TrackingModal } from './tracking-controls';
 
 export function ActualsPanel({ report, onEdit, onAdd, onRetry, onSettings }: { report: DashboardReport; onEdit: (row: ActualRow) => void; onAdd: () => void; onRetry: () => void; onSettings: () => void }) {
   return <div className="tracking-stack"><section><div className="tracking-section-head"><h2>캠페인 운영 요약</h2><button type="button" className="btn" onClick={onSettings}>라이브·캠페인 설정</button></div><OperationsSummary report={report}/></section>
@@ -23,6 +23,7 @@ export function ActualDrawer({ campaign, initial, pending, onClose, onSave }: { 
   const [day, setDay] = useState(initial?.day || campaignRange(presetRange('today', campaign), campaign).startDay);
   const [record, setRecord] = useState<{ day: string; row: ActualRow | null; error?: string }>({ day: initial?.day || '', row: initial });
   const [clears, setClears] = useState<string[]>([]), [dirty, setDirty] = useState(false), [error, setError] = useState(''), [retry, setRetry] = useState(0);
+  const [discard, setDiscard] = useState<{ nextDay?: string } | null>(null);
   const form = useRef<HTMLFormElement>(null), saveLock = useRef(false);
   useEffect(() => {
     if (initial?.day === day && retry === 0) return;
@@ -33,7 +34,8 @@ export function ActualDrawer({ campaign, initial, pending, onClose, onSave }: { 
     return () => controller.abort();
   }, [day, campaign.id, campaign.landing_id, campaign.start_day, campaign.end_day, initial?.day, retry]);
   const loading = day !== record.day, editing = !loading && !!record.row;
-  function close() { if (!pending && !saveLock.current && (!dirty || confirm('입력 중인 내용을 저장하지 않고 닫을까요?'))) onClose(); }
+  function close() { if (pending || saveLock.current) return; if (dirty) setDiscard({}); else onClose(); }
+  function changeDay(value: string) { setDay(value); setClears([]); setDirty(false); setError(''); }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (pending || saveLock.current || loading || record.error) return;
     saveLock.current = true; setError('');
@@ -42,9 +44,9 @@ export function ActualDrawer({ campaign, initial, pending, onClose, onSave }: { 
     if (okay) onClose(); else setError('저장하지 못했습니다. 입력값은 유지됩니다. 내용을 확인하고 다시 저장해 주세요.');
   }
   return <TrackingModal title={editing ? '실측 기록 수정' : '실측 기록 추가'} onClose={close}>
-    <form ref={form} className="tracking-drawer-form" onSubmit={submit} onChange={() => setDirty(true)}>
+    <form ref={form} className="tracking-drawer-form" onSubmit={submit} onChange={event => { if (event.target.getAttribute('name') !== 'day') setDirty(true); }}>
       <div className="tracking-drawer-body"><p className="tracking-help">빈칸은 기존값을 유지합니다. 숫자 0은 실제 0으로 저장됩니다.</p>
-        <label className="field">날짜 · KST<input name="day" type="date" value={day} min={campaign.start_day} max={campaign.end_day} required disabled={pending} onChange={event => { if (dirty && !confirm('날짜를 변경하면 작성 중인 내용이 사라집니다. 변경할까요?')) return; setDay(event.target.value); setClears([]); setDirty(false); setError(''); }}/></label>
+        <label className="field">날짜 · KST<input name="day" type="date" value={day} min={campaign.start_day} max={campaign.end_day} required disabled={pending} onChange={event => { if (dirty) setDiscard({ nextDay: event.target.value }); else changeDay(event.target.value); }}/></label>
         {loading && <p role="status">해당 날짜의 기존 기록을 확인하고 있습니다.</p>}
         {record.error && <InlineError onRetry={() => setRetry(value => value + 1)}>{record.error}</InlineError>}
         <fieldset disabled={pending || loading || !!record.error} key={day}>{actualFields.map(([name, label]) => <div className="tracking-actual-field" key={name}><label className="field">{label}{name === 'memo' ? <textarea name={name} maxLength={1000} rows={3} disabled={clears.includes(name)} placeholder={editing ? '변경할 메모 입력' : '운영 메모를 남겨 주세요.'}/> : <input name={name} type="number" inputMode="numeric" min="0" max="100000000" step="1" disabled={clears.includes(name)} placeholder={editing ? '변경할 값 입력' : '미입력'}/>}</label>{editing && <div className="tracking-field-current"><small>현재: {name === 'memo' ? record.row?.memo || '—' : count(record.row?.[name])}</small><button type="button" className="btn" aria-pressed={clears.includes(name)} onClick={() => { setClears(values => values.includes(name) ? values.filter(key => key !== name) : [...values, name]); setDirty(true); }}>{clears.includes(name) ? '비우기 취소' : '값 비우기'}<span className="sr-only"> · {label}</span></button></div>}{clears.includes(name) && <p className="tracking-help">저장하면 이 값이 비워집니다.</p>}</div>)}</fieldset>
@@ -52,6 +54,7 @@ export function ActualDrawer({ campaign, initial, pending, onClose, onSave }: { 
         {error && <InlineError>{error}</InlineError>}
       </div><footer><button type="button" className="btn" onClick={close} disabled={pending}>취소</button><button className="btn primary" disabled={pending || loading || !!record.error || !day}><Save size={16}/>{pending ? '저장 중' : editing ? '부분 저장' : '실측 기록 저장'}</button></footer>
     </form>
+    {discard && <DiscardConfirmation message={discard.nextDay !== undefined ? '날짜를 변경하면 작성 중인 내용이 사라집니다.' : '입력 중인 실측값을 저장하지 않고 닫을까요?'} onCancel={() => setDiscard(null)} onDiscard={() => { const nextDay = discard.nextDay; setDiscard(null); if (nextDay !== undefined) changeDay(nextDay); else onClose(); }}/>}
   </TrackingModal>;
 }
 export function campaignDraft(campaign: PerformanceCampaign) {

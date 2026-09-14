@@ -30,6 +30,12 @@ test('legacy metrics redirect preserves repeated filters and safe internal desti
   assert.equal(q.get('tab'), 'actuals'); assert.equal(q.get('course'), 'class'); assert.deepEqual(q.getAll('adset'), ['a&b', 'c']); assert.equal(q.get('testmode'), '1');
 });
 test('tab parsing rejects unknown and prototype property names', () => { for (const key of ['constructor', '__proto__', 'bad', null]) assert.equal(state.parseTab(key), 'dashboard'); assert.equal(state.parseTab('actuals'), 'actuals'); });
+test('unsaved confirmation uses an accessible in-page dialog with explicit choices', () => {
+  const { DiscardConfirmation } = load('app/ui/landing/tracking-controls.tsx');
+  const html = renderToStaticMarkup(React.createElement(DiscardConfirmation, { message: '입력 유지 확인', onCancel() {}, onDiscard() {} }));
+  assert.match(html, /<dialog[^>]*aria-labelledby/); assert.match(html, /계속 편집/); assert.match(html, /변경사항 버리기/);
+  for (const file of ['admin.tsx', 'tracking-operations.tsx']) assert.doesNotMatch(fs.readFileSync('app/ui/landing/' + file, 'utf8'), /\bconfirm\(/);
+});
 test('all six multi filters round-trip without changing raw UTM values', () => {
   const source = new URLSearchParams('adset=a%2520b&adset=c&creative=1&device=mobile&device=tablet&layout=2&utm_campaign=sept&ad_type=cold');
   const filters = state.readFilters(source), output = new URLSearchParams(); state.appendFilters(output, filters);

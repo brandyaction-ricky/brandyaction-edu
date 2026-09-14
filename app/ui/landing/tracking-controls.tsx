@@ -5,18 +5,25 @@ import { ChevronDown, Download, SlidersHorizontal, X } from 'lucide-react';
 import { displayDimension, type DashboardReport } from '@/lib/landing-performance';
 import { FILTER_LABELS, emptyFilters, type FilterKey, type TrackingFilters } from '@/lib/landing-admin-state';
 
-export function TrackingModal({ title, children, onClose, variant = 'drawer' }: { title: string; children: ReactNode; onClose: () => void; variant?: 'drawer' | 'filters' }) {
+let modalDepth = 0;
+let savedBodyOverflow = '';
+
+export function TrackingModal({ title, children, onClose, variant = 'drawer' }: { title: string; children: ReactNode; onClose: () => void; variant?: 'drawer' | 'filters' | 'confirm' }) {
   const ref = useRef<HTMLDialogElement>(null), id = useId();
   useEffect(() => {
     const dialog = ref.current!, previous = document.activeElement as HTMLElement | null;
-    const overflow = document.body.style.overflow;
+    if (modalDepth === 0) savedBodyOverflow = document.body.style.overflow;
+    modalDepth++;
     dialog.showModal();
     document.body.style.overflow = 'hidden';
-    return () => { dialog.close(); document.body.style.overflow = overflow; previous?.focus(); };
+    return () => { dialog.close(); modalDepth--; if (modalDepth === 0) document.body.style.overflow = savedBodyOverflow; if (previous?.isConnected) previous.focus(); };
   }, []);
   return <dialog ref={ref} className={`tracking-modal tracking-${variant}`} aria-labelledby={id} onCancel={event => { event.preventDefault(); onClose(); }} onClick={event => { if (event.target === event.currentTarget) { const box = event.currentTarget.getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) onClose(); } }}>
     <header><h2 id={id}>{title}</h2><button type="button" className="btn icon" aria-label="패널 닫기" onClick={onClose}><X size={18}/></button></header>{children}
   </dialog>;
+}
+export function DiscardConfirmation({ message, onCancel, onDiscard }: { message: string; onCancel: () => void; onDiscard: () => void }) {
+  return <TrackingModal title="저장하지 않은 변경사항" variant="confirm" onClose={onCancel}><div className="tracking-drawer-body"><p>{message}</p></div><footer><button type="button" className="btn" onClick={onCancel}>계속 편집</button><button type="button" className="btn primary" onClick={onDiscard}>변경사항 버리기</button></footer></TrackingModal>;
 }
 export function InlineError({ children, onRetry }: { children: ReactNode; onRetry?: () => void }) {
   return <div className="tracking-error" role="alert"><span>{children}</span>{onRetry && <button type="button" className="btn" onClick={onRetry}>재시도</button>}</div>;
