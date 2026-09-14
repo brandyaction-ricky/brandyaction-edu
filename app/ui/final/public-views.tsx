@@ -203,11 +203,12 @@ function StandardProductDetail({
       <ArrowRight />
     </Link>
   );
+  const hasResources = directResources.length > 0 || resources.length > 0;
   const downloadSection = (
     <section className="free-downloads">
       <h2>{free ? "클래스와 함께 사용할 자료" : "구성 자료"}</h2>
       <p>내 업무에 배운 내용을 적용할 때 활용하세요.</p>
-      {directResources.length || resources.length ? (<>
+      {hasResources ? (<>
         {directResources.map(resource => <ProductResourceRow key={resource.id} resource={resource} courseId={c.id} />)}
         {resources.map((r) => (
           <ResourceRow key={t(r, "lesson_id")} content={r} />
@@ -244,7 +245,7 @@ function StandardProductDetail({
                   {detailHtml ? <ProductDetailHtml html={detailHtml} className="product-detail-html reading-copy mt24" /> : <div className="reading-copy mt24">{t(c, "description")}</div>}
                 </section>
               )}
-              {downloadSection}
+              {hasResources && downloadSection}
             </div>
           </div>
         </>
