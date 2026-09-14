@@ -759,6 +759,7 @@ export function Platform({
                 pagination={pagination}
                 setPage={setAdminPage}
                 exportCsv={downloadCsv}
+                send={send}
                 tools={
                   ["cohorts", "missions", "customers"].includes(section.key) ? (
                     <AdminWorkflows

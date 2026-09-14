@@ -9,7 +9,7 @@ import {
   type Row,
   type User,
 } from "@/lib/platform";
-import { hasLearningAccess, isRecruiting } from "@/lib/platform-rules";
+import { hasLearningAccess, isPurchasableOffer, isRecruiting } from "@/lib/platform-rules";
 import { cohortPeriod } from "@/lib/qa-rules";
 import {
   ArrowLeft,
@@ -134,11 +134,15 @@ function StandardProductDetail({
   course: Row;
   data: Data;
 }) {
+  const type = courseType(c),
+    digital = type === "디지털 상품",
+    free = type === "무료 클래스";
   const cohorts = (data.cohorts || []).filter((g) => g.course_id === c.id),
     [cohortId, setCohortId] = useState("");
+  const purchasable = (cohort: Row) => isPurchasableOffer(c, cohort);
   const available =
-    cohorts.find((g) => g.id === cohortId && isRecruiting(g)) ||
-    cohorts.find(isRecruiting);
+    cohorts.find((g) => g.id === cohortId && purchasable(g)) ||
+    cohorts.find(purchasable);
   const enrolled = (data.enrollments || []).find(
     (e) => e.course_id === c.id && hasLearningAccess(e),
   );
@@ -151,9 +155,6 @@ function StandardProductDetail({
   const resources = (data.lesson_contents || []).filter(
     (x) => x.resource_storage_path && lessons.some((l) => l.id === x.lesson_id),
   );
-  const type = courseType(c),
-    digital = type === "디지털 상품",
-    free = type === "무료 클래스";
   const meta = object(c, "metadata"),
     directResources = productResources(meta),
     detailImages = productDetailImages(meta).map(image => ({ ...image, path: safeUrl(image.path) })).filter(image => image.path),
@@ -397,14 +398,14 @@ function StandardProductDetail({
                     <dd>{date(available?.recruitment_end_at)}</dd>
                   </div>
                 </dl>
-                {cohorts.filter(isRecruiting).length > 1 && (
+                {cohorts.filter(purchasable).length > 1 && (
                   <label className="field">
                     기수 선택
                     <select
                       value={available?.id || ""}
                       onChange={(e) => setCohortId(e.target.value)}
                     >
-                      {cohorts.filter(isRecruiting).map((g) => (
+                      {cohorts.filter(purchasable).map((g) => (
                         <option key={g.id} value={g.id}>
                           {t(g, "name")}
                         </option>
@@ -416,9 +417,6 @@ function StandardProductDetail({
                   <p className="meta mb24">{t(available, "name")}</p>
                 )}
                 {button}
-                <p className="meta">
-                  <Link href="/policies/refund">이용·환불 안내</Link>
-                </p>
               </div>
             </aside>
           </div>
@@ -428,7 +426,7 @@ function StandardProductDetail({
         <div className="wrap">
           <div>
             <div className="cta-price">
-              {price === 0 ? conversion.priceLabel : money(price)}
+              {(free && customCta) || price === 0 ? conversion.priceLabel : money(price)}
             </div>
             <p className="meta">
               {t(available, "name") || t(c, "schedule_label")}

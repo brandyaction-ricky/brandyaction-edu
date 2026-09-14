@@ -500,13 +500,19 @@ export async function POST(request: Request) {
             if (section.table === 'courses' && productSchedule) {
                 const course = result.data as Row;
                 const now = Date.now();
-                const cohortStatus = productSchedule.end && Date.parse(productSchedule.end) <= now
+                const publishedPaidProduct = course.status === 'published' && course.category !== 'free';
+                const recruitmentStart = publishedPaidProduct && productSchedule.start && Date.parse(productSchedule.start) > now
+                    ? new Date(now).toISOString()
+                    : productSchedule.start;
+                const cohortStatus = publishedPaidProduct
+                    ? 'recruiting'
+                    : productSchedule.end && Date.parse(productSchedule.end) <= now
                     ? 'closed'
                     : productSchedule.start && Date.parse(productSchedule.start) > now
                       ? 'upcoming'
                       : 'recruiting';
                 const scheduleValues = {
-                    recruitment_start_at: productSchedule.start || null,
+                    recruitment_start_at: recruitmentStart || null,
                     recruitment_end_at: productSchedule.end || null,
                 };
                 const cohortResult = body.cohortId
