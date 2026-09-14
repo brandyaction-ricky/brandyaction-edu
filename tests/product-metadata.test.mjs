@@ -99,8 +99,14 @@ test('full HTML source preserves CSS separately from the safe legacy fallback', 
   assert.throws(() => mergeProductMetadata({}, { detail_html_document: 'x'.repeat(3000001) }), /3MB/);
 });
 
+test('free campaign HTML is identifiable before showing it on a paid product', () => {
+  const { containsFreeClassCampaign } = load('lib/platform-rules.ts');
+  assert.equal(containsFreeClassCampaign('<h1>무료 라이브 강의</h1><a href="https://open.kakao.com/o/room">무료강의 대기방 입장</a>'), true);
+  assert.equal(containsFreeClassCampaign('<h1>유료 AI 클래스</h1><p>카카오 활용법을 배웁니다.</p>'), false);
+});
+
 test('CTA settings round-trip without clearing existing codes, metadata or resources', () => {
-  const { productConversion, conversionUrl, ctaTextColor } = load('lib/product-conversion.ts');
+  const { productConversion, conversionUrl, ctaTextColor, productCtaPosition } = load('lib/product-conversion.ts');
   const previous = { seo_title: '검색 제목', product_resources: ['preserved'], campaign: { enabled: true } };
   const fields = { cta_price_label: '지금 무료', cta_label: '무료 웨비나 참여하기', cta_url: 'https://open.kakao.com/o/test', cta_color: '#E22400', meta_pixel_id: '123456789012345' };
   const merged = mergeProductMetadata(previous, fields);
@@ -120,6 +126,10 @@ test('CTA settings round-trip without clearing existing codes, metadata or resou
   assert.throws(() => mergeProductMetadata({}, { meta_pixel_id: '<script>' }), /Pixel/);
   assert.equal(ctaTextColor('#FFFFFF'), '#111111');
   assert.equal(ctaTextColor('#000000'), '#ffffff');
+  assert.equal(productCtaPosition('https://example.com/join', 'sticky_cta'), 'sticky_cta');
+  assert.equal(productCtaPosition('https://open.kakao.com/o/testRoom'), 'detail_cta');
+  assert.equal(productCtaPosition('https://open.kakao.com.attacker.example/o/testRoom'), '');
+  assert.equal(productCtaPosition('javascript:alert(1)'), '');
 });
 
 test('deletion uses the audited archive transaction and never physically removes records', async () => {

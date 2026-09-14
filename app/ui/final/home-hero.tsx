@@ -206,10 +206,6 @@ export function HomeHero({
           </div>
           <FeaturedFreeClass course={freeCourse} open={freeOpen} />
         </div>
-        <div className="hero-bottom">
-          <span>지식을 넘어, 실행이 남는 학습.</span>
-          <span>LEARN. APPLY. REPEAT.</span>
-        </div>
       </div>
     </section>
   );

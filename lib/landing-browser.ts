@@ -24,6 +24,9 @@ export function pixel(config: Pick<LandingConfig, 'pixel_enabled' | 'pixel_id'>,
       const script = document.createElement('script'); script.async = true; script.src = 'https://connect.facebook.net/en_US/fbevents.js'; document.head.appendChild(script);
     }
     window.eduPixelIds ||= new Set();
+    // Disable Meta's automatic/event-setup click inference. Product CTA events are
+    // emitted explicitly below with a stable eventID, so auto detection duplicates them.
+    window.fbq('set', 'autoConfig', false, config.pixel_id);
     if (!window.eduPixelIds.has(config.pixel_id)) { window.fbq('init', config.pixel_id); window.eduPixelIds.add(config.pixel_id); }
     window.fbq('trackSingle', config.pixel_id, event, values, id ? { eventID: id } : {});
   } catch {}

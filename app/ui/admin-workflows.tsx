@@ -121,7 +121,7 @@ export function AdminWorkflows(props: Props) {
   if (props.section === "staff") return <StaffPermissions {...p} />;
   if (["templates", "campaigns", "automations"].includes(props.section))
     return <CrmManager {...p} />;
-  if (["seo", "settings", "metrics"].includes(props.section))
+  if (["seo", "settings"].includes(props.section))
     return (
       <>
       <SettingsForm
@@ -131,7 +131,7 @@ export function AdminWorkflows(props: Props) {
       {props.section === "settings" && <KakaoSyncSettings />}
       </>
     );
-  if (props.section === "landing") return <LandingAdmin />;
+  if (props.section === "landing" || props.section === "metrics") return <LandingAdmin />;
   if (props.section === "analytics") return <Analytics />;
   if (props.section === "orders") return <OrdersPanel {...p} />;
   return null;
@@ -1413,9 +1413,6 @@ function SettingsForm({ section, data, send, pending }: Props) {
     naverVerification: String(initial.naverVerification || ''),
   }));
   const [metric, setMetric] = useState<Row | null>(null);
-  const metricValue = object(metric || undefined, "value");
-  const legacyPaymentDays = [0, 1, 2, 3, 4].map(day => ({ day, count: Number(metricValue[`paymentsDay${day}`] || 0) }));
-  const storedPaymentDays = Array.isArray(metricValue.paymentDays) ? metricValue.paymentDays as { day: number; count: number }[] : legacyPaymentDays;
   const [paymentDays, setPaymentDays] = useState<{ day: number; count: number }[]>([{ day: 0, count: 0 }]);
   const measurementCodesValue = object(rows(data, "site_settings").find(row => row.key === "edu_measurement_codes"), "value");
   const measurementCodes = Array.isArray(measurementCodesValue.items) ? measurementCodesValue.items.filter(item => item && typeof item === "object") as Row[] : [];
@@ -1432,9 +1429,6 @@ function SettingsForm({ section, data, send, pending }: Props) {
     if (codeOpen && !dialog.open) dialog.showModal();
     if (!codeOpen && dialog.open) dialog.close();
   }, [codeOpen]);
-  useEffect(() => {
-    setPaymentDays(storedPaymentDays.length ? storedPaymentDays.map(row => ({ day: Number(row.day), count: Number(row.count) })) : [{ day: 0, count: 0 }]);
-  }, [metric?.key]);
   async function saveMeasurementCode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -1586,7 +1580,7 @@ function SettingsForm({ section, data, send, pending }: Props) {
                   <button
                     type="button"
                     className="btn small"
-                    onClick={() => setMetric(null)}
+                    onClick={() => { setMetric(null); setPaymentDays([{ day: 0, count: 0 }]); }}
                   >
                     새 기록
                   </button>
@@ -1756,6 +1750,10 @@ function SettingsForm({ section, data, send, pending }: Props) {
                         className="btn small"
                         onClick={() => {
                           setMetric(m);
+                          const value = object(m, "value");
+                          const legacy = [0, 1, 2, 3, 4].map(day => ({ day, count: Number(value[`paymentsDay${day}`] || 0) }));
+                          const saved = Array.isArray(value.paymentDays) ? value.paymentDays as { day: number; count: number }[] : legacy;
+                          setPaymentDays(saved.length ? saved.map(row => ({ day: Number(row.day), count: Number(row.count) })) : [{ day: 0, count: 0 }]);
                           setMessage("");
                         }}
                       >

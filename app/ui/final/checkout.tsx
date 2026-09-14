@@ -23,13 +23,18 @@ export function Checkout({
     router = useRouter();
   const [processing, setProcessing] = useState(false),
     [error, setError] = useState(""),
-    [coupon, setCoupon] = useState("");
+    [coupon, setCoupon] = useState(""),
+    [agreed, setAgreed] = useState(false);
   const lock = useRef(false),
     cohort = (data.cohorts || []).find((c) => c.id === cohortId),
     course = (data.courses || []).find((c) => c.id === cohort?.course_id),
     free = !!cohort && num(cohort, "price") === 0;
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!agreed) {
+      setError("필수 약관에 동의해 주세요.");
+      return;
+    }
     if (lock.current) return;
     lock.current = true;
     setProcessing(true);
@@ -132,7 +137,7 @@ export function Checkout({
   const agreement = (
     <div className="check-group">
       <label className="checkline">
-        <input type="checkbox" name="agreement" required />
+        <input type="checkbox" name="agreement" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} required />
         <span>
           [필수] 상품 정보와{" "}
           <Link href="/policies/terms" target="_blank">
@@ -155,7 +160,8 @@ export function Checkout({
     <>
       <button
         className="btn primary full large"
-        disabled={pending || processing}
+        disabled={pending || processing || !agreed}
+        aria-describedby="checkout-agreement-help"
       >
         {pending || processing
           ? "처리 중..."
@@ -164,6 +170,7 @@ export function Checkout({
             : "결제하기"}
         <ArrowRight />
       </button>
+      {!agreed && <p className="meta mt8" id="checkout-agreement-help">필수 약관에 동의하면 {free ? "신청" : "결제"}할 수 있습니다.</p>}
       {error && (
         <p className="form-error mt16" role="alert">
           {error}
