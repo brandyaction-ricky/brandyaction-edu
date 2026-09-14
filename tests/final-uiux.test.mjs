@@ -178,8 +178,13 @@ test('catalogues and separate editors render without dropping existing fields', 
   const props = { data, selection: [], setSelection() {}, edit() {}, archive() {}, pending: false, loading: false, pagination: null, setPage() {}, exportCsv() {} };
   const products = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'products') });
   assert.match(products, /전체 상품/); assert.match(products, /연결 기수/); assert.match(products, /<th>자료<\/th>/);
+  assert.match(products, /상품 표시 범위/); assert.match(products, /삭제된 상품/);
   assert.match(products, /catalog-actions/); assert.match(products, /등록된 테스트 클래스 삭제/); assert.match(products, /등록된 테스트 클래스 수정/);
+  assert.ok(products.indexOf('등록된 테스트 클래스 수정') < products.indexOf('등록된 테스트 클래스 삭제'));
+  assert.doesNotMatch(products, /PRD-|\/classes\/test-course/);
   assert.doesNotMatch(products, />삭제<\/button>|>수정<\/button>/);
+  const catalogSource = read('app/ui/final/admin-catalog.tsx');
+  assert.match(catalogSource, /action: "restore-products"/); assert.match(catalogSource, /복원\s*<\/button>/);
   const countedProducts = html(AdminCatalog, { ...props, data: { ...data, product_summary: [{ id: 'product-summary', total: 12, published: 7, upcoming: 3, draft: 2 }] }, section: platform.sections.find(row => row.key === 'products') });
   for (const value of ['12', '7', '3', '2']) assert.match(countedProducts, new RegExp(`>${value}<`));
   assert.doesNotMatch(products, /목록 내보내기 · 선택 관리|삭제 항목 포함|현재 페이지 CSV|상품은 가격·판매·자료의 단위/);
@@ -194,6 +199,7 @@ test('catalogues and separate editors render without dropping existing fields', 
   const couponMarkup = html(AdminCatalog, { ...props, data: { ...data, coupons: [{ id: 'coupon', name: '첫 구매', code: 'WELCOME10', discount_type: 'percentage', discount_value: 10, minimum_order_amount: 100000, product_scope: 'paid', issue_target: 'all', is_active: true }], coupon_redemptions: [{ id: 'use', coupon_id: 'coupon', status: 'used' }] }, section: platform.sections.find(row => row.key === 'coupons') });
   assert.match(couponMarkup, /발급 중|사용 횟수|1 \/ ∞|설정/);
   const platformSource = read('app/ui/platform.tsx');
+  const pageSource = read('app/[[...path]]/page.tsx');
   assert.match(platformSource, /무료강의 3강 시청[\s\S]*결제 완료[\s\S]*미션 수행[\s\S]*회원가입/);
   assert.match(platformSource, /쿠폰 등록·설정[\s\S]*최소 주문 금액[\s\S]*회원당 발급 횟수/);
   const learning = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'learning') });
@@ -231,6 +237,13 @@ test('catalogues and separate editors render without dropping existing fields', 
   assert.match(markup, /파일별로 공개 범위를 설정/);
   assert.doesNotMatch(markup, /자료를 연결할 학습 만들기/);
   assert.match(markup, /editor-savebar/);
+  const productEditorSource = read('app/ui/final/admin-editors.tsx');
+  assert.match(productEditorSource, /현재 화면에서 계속 수정할 수 있습니다/);
+  assert.match(productEditorSource, /setDirty\(false\);[\s\S]*if \(!row\?\.id\) back\(\)/);
+  assert.doesNotMatch(productEditorSource, /setDirty\(false\);\s*back\(\)/);
+  assert.match(platformSource, /loading && id && !edited/);
+  assert.match(pageSource, /root === 'admin' \? 'admin' : path\.join\('\/'\)/);
+  assert.match(read('design-reference/source/admin/src/experience.css'), /\.metric-value small\{display:inline-block;margin-left:var\(--space-1\)\}/);
   for (const field of platform.sections.find(row => row.key === 'products').fields.filter(field => !['slug', 'course_code', 'seo_title', 'seo_description', 'detail_html'].includes(field.key))) assert.ok(markup.includes(`name="${field.key}"`), field.key);
   assert.match(html(LearningEditor, { data, row: lesson, pending: false, send, back() {} }), /editor-/);
 });

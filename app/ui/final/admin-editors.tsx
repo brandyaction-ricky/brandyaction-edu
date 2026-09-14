@@ -275,9 +275,11 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
         recruitmentStartAt: submitted.get("recruitment_start_at") ? new Date(String(submitted.get("recruitment_start_at")) + ":00+09:00").toISOString() : null,
         recruitmentEndAt: submitted.get("recruitment_end_at") ? new Date(String(submitted.get("recruitment_end_at")) + ":00+09:00").toISOString() : null,
         values,
-      });
+      }, row?.id ? "상품을 저장했습니다. 현재 화면에서 계속 수정할 수 있습니다." : "상품을 등록했습니다.");
       for (const change of cohortChanges.filter(change => change.id !== cohort?.id)) await send({ action: "save", section: "cohorts", id: change.id, values: change.values }, "상품과 기수 모집 일정을 저장했습니다.");
-      setDirty(false); back();
+      setCohortDrafts({});
+      setDirty(false);
+      if (!row?.id) back();
     } catch (cause) { setError((cause as Error).message); }
   }
   return <div className="product-editor">
