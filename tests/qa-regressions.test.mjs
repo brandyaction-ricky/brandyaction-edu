@@ -111,6 +111,23 @@ test('F-02 archive cannot be invoked by a member', async () => {
   const h = handler({ ...admin, role: 'student' }, {});
   assert.equal((await h.POST(request({ action: 'archive', section: 'banners', ids: [crypto.randomUUID()] }))).status, 403);
 });
+test('member administration exposes explicit roles and protects deletion', async () => {
+  const customer = platform.sections.find(section => section.key === 'customers');
+  assert.deepEqual(customer.fields.find(field => field.key === 'role').options, ['student', 'staff', 'admin']);
+  const memberId = crypto.randomUUID();
+  const calls = [];
+  const db = { async rpc(name, values) { calls.push([name, values]); return { data: true, error: null }; } };
+  assert.equal((await handler({ ...admin, role: 'student' }, db).POST(request({ action: 'delete-member', id: memberId }))).status, 403);
+  assert.equal((await handler(admin, db).POST(request({ action: 'delete-member', id: admin.id }))).status, 400);
+  assert.equal((await handler(admin, db).POST(request({ action: 'delete-member', id: memberId }))).status, 200);
+  assert.deepEqual(calls[0], ['edu_delete_member', { p_actor: admin.id, p_member: memberId }]);
+});
+test('customer catalog removes unrelated lower management panels', () => {
+  const source = fs.readFileSync(new URL('../app/ui/final/admin-catalog.tsx', import.meta.url), 'utf8');
+  assert.match(source, /\["products", "banners", "customers"\]/);
+  assert.match(source, /tools && s\.key !== "customers"/);
+  assert.doesNotMatch(source, /s\.key === "customers" && <div className="row mt24"><Link className="btn" href="\/admin\/members"/);
+});
 test('article banner rejects deceptive non-YouTube URLs before writing', async () => {
   const h = handler(admin, { from: () => { throw Error('must not write'); } });
   const response = await h.POST(request({ action: 'article-banner', value: { title: '무료 영상', videos: [{ title: '위장 주소', url: 'https://evil.example/?next=youtube.com' }] } }));

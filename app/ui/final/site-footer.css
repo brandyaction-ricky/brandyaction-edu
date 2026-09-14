@@ -29,7 +29,7 @@
   .edu-front .site-footer-links a { min-height: 36px; }
 }
 @media (max-width: 600px) {
-  .edu-front .site-footer { padding: 36px 0 28px; font-size: 13px; }
+  .edu-front .site-footer { display: none; }
   .edu-front .site-footer-inner { width: calc(100% - 40px); }
   .edu-front .site-footer-business { flex-direction: column; gap: 9px; }
   .edu-front .site-footer-links { column-gap: 20px; }

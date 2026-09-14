@@ -72,6 +72,7 @@ export async function GET(request: Request) {
                 let query = db.from(table).select(columns, serverPaged ? { count: 'exact' } : undefined);
                 if (record && adminMode && table === primaryTable) query = query.eq('id', record);
                 query = serverPaged ? query.range((page - 1) * pageSize, page * pageSize - 1) : query.limit(1000);
+                if (adminMode && sectionKey === 'customers' && table === 'profiles') query = query.neq('status', 'withdrawn');
                 if (table === 'edu_questions' && !adminMode) query = query.eq('is_archived', false);
                 if (table === 'site_settings' && adminMode && operator?.role !== 'admin') query = query.not('key', 'like', 'edu_staff_permissions_%');
                 if (['courses', 'review_videos', 'site_banners', 'curriculum_lessons', 'reviews'].includes(table)) {
@@ -301,6 +302,17 @@ export async function POST(request: Request) {
         const body = (await request.json()) as Record<string, unknown>;
         const action = String(body.action || '');
         const db = createAdminClient();
+        if (action === 'delete-member') {
+            if (user.role !== 'admin') return reply({ error: '관리자만 회원을 삭제할 수 있습니다.' }, 403);
+            if (!uid(body.id)) fail('삭제할 회원을 확인해 주세요.');
+            if (body.id === user.id) fail('현재 로그인한 관리자 계정은 삭제할 수 없습니다.');
+            const result = await db.rpc('edu_delete_member', { p_actor: user.id, p_member: body.id });
+            if (result.error) {
+                if (result.error.code !== 'P0001') console.error('member delete', result.error.code);
+                fail(result.error.message || '회원을 삭제하지 못했습니다.', 409);
+            }
+            return reply({ ok: true, result: result.data });
+        }
         if (action === 'save-product-resource' || action === 'delete-product-resource') {
             const permissions = await permissionsFor(user);
             if (!permissions.products) return reply({ error: '상품 관리 권한이 필요합니다.' }, 403);
@@ -424,6 +436,26 @@ export async function POST(request: Request) {
                     fail((e as Error).message);
                 }
             }
+            if (section.table === 'profiles') {
+                if (!uid(body.id)) fail('기존 회원을 선택해 주세요.');
+                const current = await db.from('profiles').select('id,role,status').eq('id', body.id).single();
+                if (current.error || !current.data) fail('회원 정보를 다시 불러온 뒤 저장해 주세요.', 409);
+                if ('role' in values) {
+                    if (user.role !== 'admin') fail('관리자만 계정 권한을 변경할 수 있습니다.', 403);
+                    if (body.id === user.id && values.role !== 'admin') fail('현재 로그인한 관리자 권한은 해제할 수 없습니다.');
+                    if (current.data.role === 'admin' && values.role !== 'admin') {
+                        const admins = await db.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'admin').eq('status', 'active');
+                        if (admins.error) fail('관리자 계정 수를 확인하지 못했습니다.', 409);
+                        if ((admins.count || 0) <= 1) fail('최소 한 명의 활성 관리자가 필요합니다.');
+                    }
+                }
+                if (current.data.role === 'admin' && values.status !== undefined && values.status !== 'active') {
+                    if (body.id === user.id) fail('현재 로그인한 관리자 계정은 정지할 수 없습니다.');
+                    const admins = await db.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'admin').eq('status', 'active');
+                    if (admins.error) fail('관리자 계정 수를 확인하지 못했습니다.', 409);
+                    if ((admins.count || 0) <= 1) fail('최소 한 명의 활성 관리자가 필요합니다.');
+                }
+            }
             if (['courses', 'articles'].includes(section.table) && values.slug && !/^[a-z0-9-]+$/.test(String(values.slug))) fail('페이지 주소는 영문 소문자·숫자·하이픈으로 입력해 주세요.');
             if (section.table === 'courses') {
                 const previous = body.id ? await db.from('courses').select('metadata').eq('id', body.id).single() : { data: null, error: null };
@@ -472,12 +504,10 @@ export async function POST(request: Request) {
                     .maybeSingle();
                 if (!quiz) fail('미션을 비공개로 저장한 뒤 퀴즈 문항을 등록해 주세요.');
             }
-            if (section.table === 'profiles' && body.id === user.id && values.status !== 'active') fail('자신의 관리자 계정은 정지할 수 없습니다.');
             if (section.table === 'edu_questions') {
                 if (!uid(body.id)) fail('질문을 선택해 주세요.');
                 values.status = 'answered';
             }
-            if (section.table === 'profiles' && !uid(body.id)) fail('기존 회원을 선택해 주세요.');
             if (section.table === 'site_settings') {
                 if (!String(values.key || body.id).startsWith('edu_')) fail('설정 이름은 edu_로 시작해 주세요.');
                 values.is_public = false;
