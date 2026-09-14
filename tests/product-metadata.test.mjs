@@ -133,12 +133,26 @@ test('deletion uses the audited archive transaction and never physically removes
   });
   const id = '11111111-1111-4111-8111-111111111111';
   const send = ids => route.POST(new Request('https://edu.example/api/platform', { method: 'POST', headers: { origin: 'https://edu.example' }, body: JSON.stringify({ action: 'archive', section: 'products', ids }) }));
+  const restore = ids => route.POST(new Request('https://edu.example/api/platform', { method: 'POST', headers: { origin: 'https://edu.example' }, body: JSON.stringify({ action: 'restore-products', ids }) }));
   assert.equal((await send([id, id])).status, 200);
   assert.deepEqual(calls[0], ['edu_archive_records', { p_actor: 'operator', p_section: 'products', p_ids: [id] }]);
+  assert.equal((await restore([id, id])).status, 200);
+  assert.deepEqual(calls[1], ['edu_restore_products', { p_actor: 'operator', p_ids: [id] }]);
   assert.equal((await send(['bad'])).status, 400);
+  assert.equal((await restore(['bad'])).status, 400);
   allowed = false;
   assert.equal((await send([id])).status, 403);
-  assert.equal(calls.length, 1);
+  assert.equal((await restore([id])).status, 403);
+  assert.equal(calls.length, 2);
+});
+
+test('product restore migration reactivates archives as drafts through an audited service-role function', () => {
+  const migration = fs.readFileSync(path.resolve(root, 'supabase/migrations/20260914053000_restore_archived_products.sql'), 'utf8');
+  assert.match(migration, /create or replace function public\.edu_restore_products/);
+  assert.match(migration, /set archived_at = null,[\s\S]*status = 'draft'/);
+  assert.match(migration, /'course\.restored'/);
+  assert.match(migration, /revoke all on function public\.edu_restore_products\(uuid, uuid\[\]\) from public, anon, authenticated/);
+  assert.match(migration, /grant execute on function public\.edu_restore_products\(uuid, uuid\[\]\) to service_role/);
 });
 
 test('new product identifiers are stable across retries of the same creation request', async () => {

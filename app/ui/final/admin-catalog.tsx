@@ -12,7 +12,7 @@ import {
 } from "@/lib/platform";
 import { recordId } from "@/lib/platform-rules";
 import { archiveValues, cohortPeriod, cohortStatus } from "@/lib/qa-rules";
-import { ArrowRight, BookOpen, ChevronDown, ChevronUp, FileText, Pencil, Search, Trash2 } from "lucide-react";
+import { ArrowRight, BookOpen, ChevronDown, ChevronUp, FileText, Pencil, RotateCcw, Search, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import type { Data, WorkflowSend } from "../learning-workflows";
@@ -59,6 +59,7 @@ export function AdminCatalog({
     [course, setCourse] = useState(""),
     [week, setWeek] = useState(""),
     [archived, setArchived] = useState(false),
+    [productVisibility, setProductVisibility] = useState<"active" | "archived">("active"),
     [bulkMode, setBulkMode] = useState(false),
     [tagMode, setTagMode] = useState(""),
     [now] = useState(Date.now);
@@ -131,7 +132,7 @@ export function AdminCatalog({
         (r.is_active || r.is_published ? "published" : "hidden");
   const filtered = rows.filter(
     (r) =>
-      (archived || !r.archived_at) &&
+      (s.key === "products" ? productVisibility === "archived" ? Boolean(r.archived_at) : !r.archived_at : archived || !r.archived_at) &&
       (!status || getStatus(r) === status) &&
       (!tagMode || r.tag_kind === tagMode) &&
       (!type ||
@@ -244,9 +245,6 @@ export function AdminCatalog({
               <button className="title-btn" onClick={() => edit(s, r)}>
                 {t(r, "title")}
               </button>
-              <p>
-                {t(r, "course_code")} · /classes/{t(r, "slug")}
-              </p>
             </div>
           </div>
         ),
@@ -750,16 +748,29 @@ export function AdminCatalog({
             {search}
             <span className="spacer" />
             {s.key === "products" && (
-              <select
-                aria-label="상품 유형"
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-              >
-                <option value="">전체 유형</option>
-                {["무료 클래스", "유료 클래스", "디지털 상품"].map((v) => (
-                  <option key={v}>{v}</option>
-                ))}
-              </select>
+              <>
+                <select
+                  aria-label="상품 유형"
+                  value={type}
+                  onChange={(e) => setType(e.target.value)}
+                >
+                  <option value="">전체 유형</option>
+                  {["무료 클래스", "유료 클래스", "디지털 상품"].map((v) => (
+                    <option key={v}>{v}</option>
+                  ))}
+                </select>
+                <select
+                  aria-label="상품 표시 범위"
+                  value={productVisibility}
+                  onChange={(event) => {
+                    setProductVisibility(event.target.value as "active" | "archived");
+                    setSelection([]);
+                  }}
+                >
+                  <option value="active">판매 상품</option>
+                  <option value="archived">삭제된 상품</option>
+                </select>
+              </>
             )}
             {s.key === "articles" && (
               <select
@@ -917,8 +928,25 @@ export function AdminCatalog({
                           <button className="btn iconbtn" type="button" title="아래로 이동" aria-label={t(r, "title") + " 아래로 이동"} disabled={pending || filtered.at(-1)?.id === r.id} onClick={() => void moveBanner(r, 1)}><ChevronDown size={17} aria-hidden="true" /></button>
                           <button className="btn iconbtn" type="button" title="수정" aria-label={t(r, "title") + " 수정"} onClick={() => edit(s, r)}><Pencil size={17} aria-hidden="true" /></button>
                         </div> : s.key === "products" ? <div className="catalog-actions">
-                          {!r.archived_at && <button className="btn iconbtn danger" type="button" title="삭제" aria-label={t(r, "title") + " 삭제"} disabled={pending} onClick={() => archive(s, [recordId(r)])}><Trash2 size={17} aria-hidden="true" /></button>}
-                          <button className="btn iconbtn" type="button" title="수정" aria-label={t(r, "title") + " 수정"} onClick={() => edit(s, r)}><Pencil size={17} aria-hidden="true" /></button>
+                          {r.archived_at ? (
+                            <button
+                              className="btn small"
+                              type="button"
+                              disabled={pending || !send}
+                              onClick={() => void send?.(
+                                { action: "restore-products", ids: [recordId(r)] },
+                                `「${t(r, "title")}」 상품을 작성 중 상태로 복원했습니다.`,
+                              )}
+                            >
+                              <RotateCcw size={16} aria-hidden="true" />
+                              복원
+                            </button>
+                          ) : (
+                            <>
+                              <button className="btn iconbtn" type="button" title="수정" aria-label={t(r, "title") + " 수정"} onClick={() => edit(s, r)}><Pencil size={17} aria-hidden="true" /></button>
+                              <button className="btn iconbtn danger" type="button" title="삭제" aria-label={t(r, "title") + " 삭제"} disabled={pending} onClick={() => archive(s, [recordId(r)])}><Trash2 size={17} aria-hidden="true" /></button>
+                            </>
+                          )}
                         </div> : <button
                             className="btn small"
                             onClick={() => edit(s, r)}

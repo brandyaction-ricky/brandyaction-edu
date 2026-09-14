@@ -391,6 +391,22 @@ export async function POST(request: Request) {
             if (result.error) throw result.error;
             return reply({ ok: true, result: result.data });
         }
+        if (action === 'restore-products') {
+            const permissions = await permissionsFor(user);
+            const ids = body.ids;
+            if (!permissions.products) return reply({ error: '상품 관리 권한이 필요합니다.' }, 403);
+            if (!Array.isArray(ids) || !ids.length || ids.length > 50 || !ids.every(uid)) fail('복원할 상품을 최대 50개까지 선택해 주세요.');
+            const result = await db.rpc('edu_restore_products', {
+                p_actor: user.id,
+                p_ids: [...new Set(ids)],
+            });
+            if (result.error) {
+                if (result.error.code !== 'P0001') console.error('product restore', result.error.code);
+                fail(result.error.message || '상품을 복원하지 못했습니다.', 409);
+            }
+            if (!Number(result.data)) fail('이미 복원됐거나 삭제 상태가 아닌 상품입니다.', 409);
+            return reply({ ok: true, result: result.data });
+        }
         if (action === 'save') {
             const section = sections.find((s) => s.key === body.section);
             const permissions = await permissionsFor(user);
