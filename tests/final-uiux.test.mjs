@@ -126,6 +126,8 @@ test('article hub includes the managed free-video banner and representative thum
 });
 
 test('product HTML takes precedence over old images and per-product CTA settings reach both layouts', () => {
+  const integrationStyles = read('app/ui/final/integration.css');
+  assert.match(integrationStyles, /\.bottom-cta\.single-cta \.btn \{[^}]*max-width: none/);
   const { ProductDetail } = load('app/ui/final/public-views.tsx');
   const changed = { ...course, category: 'free', list_price: 0, metadata: { detail_html: '<h1>원본 디자인</h1>', detail_html_document: '<style>.hero{color:red}</style><h1 class="hero">원본 디자인</h1>', detail_images: [{ path: 'https://cdn.example/old-detail.webp' }], cta_price_label: '지금 무료', cta_label: '새로운 참여 버튼', cta_url: 'https://example.test/webinar', cta_color: '#123456' } };
   for (const campaigns of [[], [{ id: course.id, enabled: true, kakao_url: 'https://open.kakao.com/o/legacy', cta_label: '예전 버튼', sections: [] }]]) {
