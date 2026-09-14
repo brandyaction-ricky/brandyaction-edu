@@ -231,8 +231,21 @@ export async function GET(request: Request) {
             }
             const bannerResult = await createAdminClient().from('site_settings').select('key,value').eq('key', 'edu_article_banner').limit(1);
             const bannerSetting = Array.isArray(bannerResult.data) ? bannerResult.data[0] : bannerResult.data;
-            if (!bannerResult.error && bannerSetting) {
-                const value = bannerSetting.value as Record<string, unknown>;
+            if (!bannerResult.error) {
+                const value = bannerSetting ? bannerSetting.value as Record<string, unknown> : {
+                    enabled: true,
+                    eyebrow: 'FREE CLASS · 사업자 무료 3강',
+                    title: '사업자를 위한 마케팅·AI 매출 진단',
+                    description: '광고비를 더 쓰기 전에 고객 유입, 콘텐츠, 전환, 재구매 중 어디에서 매출이 막히는지 먼저 확인합니다.',
+                    signupNotice: '무료 회원가입을 완료하면 사업자용 3강 전체를 바로 볼 수 있습니다. 별도 결제는 필요 없습니다.',
+                    signupCTA: '무료 회원가입하고 3강 보기',
+                    memberCTA: '아티클 읽으러 가기',
+                    videos: [
+                        { title: '매출을 막는 마케팅 병목 찾기', url: '' },
+                        { title: 'AI로 줄일 일과 사람이 결정할 일', url: '' },
+                        { title: '7일 안에 실행할 매출 실험 설계', url: '' },
+                    ],
+                };
                 const videos = Array.isArray(value?.videos) ? value.videos.slice(0, 3).map((item) => {
                     const video = item as Record<string, unknown>;
                     const url = safeUrl(video.url);
