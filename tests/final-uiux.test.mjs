@@ -110,8 +110,10 @@ test('article hub includes the managed free-video banner and representative thum
   assert.doesNotMatch(platformSource, /THE WAY WE LEARN|시청에서 멈추지 않는/);
   assert.match(platformSource, /<SiteFooter\b/);
   const footerSource = read('app/ui/final/site-footer.tsx');
+  const footerStyles = read('app/ui/final/site-footer.css');
   assert.match(footerSource, /제2026-충남천안-1825호/);
   assert.match(footerSource, /policies\/refund/);
+  assert.match(footerStyles, /@media \(max-width: 600px\)[\s\S]*?\.edu-front \.site-footer \{ display: none; \}/);
 });
 
 test('product HTML takes precedence over old images and per-product CTA settings reach both layouts', () => {
