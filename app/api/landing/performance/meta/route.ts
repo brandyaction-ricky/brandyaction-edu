@@ -12,15 +12,20 @@ export async function POST(request: Request) {
     const body = await request.json() as Record<string, unknown>;
     if (!validId(body.campaign_id)) return reply({ error: '캠페인을 선택해 주세요.' }, 400);
     const db = createAdminClient();
-    const found = await db.from('landing_campaigns').select('*').eq('id', body.campaign_id).maybeSingle();
+    const [found, setting] = await Promise.all([
+      db.from('landing_campaigns').select('*').eq('id', body.campaign_id).maybeSingle(),
+      db.from('site_settings').select('value').eq('key', 'edu_meta_marketing').maybeSingle(),
+    ]);
     if (found.error || !found.data) return reply({ error: '캠페인을 찾을 수 없습니다.' }, 404);
+    if (setting.error) throw Error('META_ACCOUNT_SETTING_FAILED');
     const campaign = found.data;
-    if (!campaign.meta_ad_account_id || !campaign.meta_campaign_id) return reply({ error: 'Meta 광고계정과 캠페인 ID를 먼저 연결해 주세요.' }, 400);
+    const accountId = setting.data?.value && typeof setting.data.value === 'object' ? String((setting.data.value as Record<string,unknown>).adAccountId || '').trim() : '';
+    if (!/^act_\d+$/.test(accountId) || !campaign.meta_campaign_id) return reply({ error: 'Meta 공통 광고계정과 캠페인 ID를 먼저 연결해 주세요.' }, 400);
     const token = process.env.META_ACCESS_TOKEN, version = process.env.META_GRAPH_API_VERSION;
     if (!token || !version) return reply({ error: 'DEV 서버의 Meta API 환경변수가 설정되지 않았습니다.' }, 503);
     await db.from('landing_campaigns').update({ meta_sync_status: 'syncing', meta_sync_error: null, updated_by: user.id, updated_at: new Date().toISOString() }).eq('id', campaign.id);
     try {
-      const rows = await fetchMetaCampaign({ version, token, accountId: campaign.meta_ad_account_id, campaignId: campaign.meta_campaign_id, startDay: campaign.start_day, endDay: campaign.end_day });
+      const rows = await fetchMetaCampaign({ version, token, accountId, campaignId: campaign.meta_campaign_id, startDay: campaign.start_day, endDay: campaign.end_day });
       if (rows.length) {
         const meta = await db.from('landing_campaign_meta_daily').upsert(rows.map(row => ({ campaign_id: campaign.id, ...row, synced_at: new Date().toISOString() })), { onConflict: 'campaign_id,day,meta_ad_id' });
         if (meta.error) throw Error('META_STORE_FAILED');
