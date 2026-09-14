@@ -2,7 +2,7 @@
 import { createElement, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { parseProductHtml, type ProductHtmlNode } from '@/lib/product-metadata';
 import { buildProductDocument } from '@/lib/product-html-document';
-import { conversionUrl } from '@/lib/product-conversion';
+import { conversionUrl, PRODUCT_CTA_EVENT } from '@/lib/product-conversion';
 
 function ProductDocumentFrame({ source }: { source: string }) {
   const ref = useRef<HTMLIFrameElement>(null);
@@ -37,7 +37,10 @@ function ProductDocumentFrame({ source }: { source: string }) {
           } catch {}
         } else {
           const url = conversionUrl(href);
-          if (url) window.open(url, '_blank', 'noopener,noreferrer');
+          if (url) {
+            window.dispatchEvent(new CustomEvent(PRODUCT_CTA_EVENT, { detail: { href: url } }));
+            window.open(url, '_blank', 'noopener,noreferrer');
+          }
         }
       };
       const observer = new ResizeObserver(resize);

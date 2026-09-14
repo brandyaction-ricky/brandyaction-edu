@@ -1,4 +1,5 @@
 export const DEFAULT_CTA_COLOR = '#E22400';
+export const PRODUCT_CTA_EVENT = 'edu:product-cta';
 
 export function conversionUrl(value: unknown) {
   const text = typeof value === 'string' ? value.trim() : '';
@@ -21,6 +22,19 @@ export function productConversion(metadata: Record<string, unknown>, legacy: Rec
     color: /^#[0-9a-f]{6}$/i.test(color) ? color : DEFAULT_CTA_COLOR,
     pixelId: /^\d{5,30}$/.test(pixelId) ? pixelId : '',
   };
+}
+
+const PRODUCT_CTA_POSITIONS = new Set(['hero_cta', 'sticky_cta', 'final_cta']);
+
+export function productCtaPosition(href: unknown, explicitPosition: unknown = '') {
+  const explicit = typeof explicitPosition === 'string' ? explicitPosition : '';
+  if (PRODUCT_CTA_POSITIONS.has(explicit)) return explicit;
+  try {
+    const url = new URL(typeof href === 'string' ? href : '');
+    return url.protocol === 'https:' && url.hostname === 'open.kakao.com' ? 'detail_cta' : '';
+  } catch {
+    return '';
+  }
 }
 
 export function ctaTextColor(color: string) {

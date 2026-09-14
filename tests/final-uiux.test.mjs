@@ -280,9 +280,13 @@ test('campaign class keeps published content and one responsive sticky CTA', () 
   const cfg = { ...defaultConfig(course.id), layout_ver: 1, revision: 1, kakao_url: 'https://open.kakao.com/o/testRoom', custom_sections: true, sections: [{ id: 'proof', title: '고객 이야기', body: '<script>unsafe()</script>', image: 'https://cdn.example/proof.webp' }], course_snapshot: { title: '발행한 제목', summary: '발행 당시 소개' } };
   const markup = html(ProductDetail, { course, data: { ...data, landing_configs: [cfg] } });
   assert.match(markup, /data-landing-cta="sticky_cta"/);
+  assert.match(markup, /data-product-cta="sticky_cta"/);
   assert.doesNotMatch(markup, /data-landing-cta="(?:hero_cta|final_cta)"|data-section="(?:hero|final)"|무료 라이브에서 만나요/);
   assert.equal((markup.match(/href="https:\/\/open.kakao.com\/o\/testRoom"/g) || []).length, 1);
   assert.match(markup, /campaign-layout/); assert.match(markup, /aria-label="무료 클래스 신청"/);
+  assert.match(read('lib/landing-browser.ts'), /'autoConfig', false/);
+  assert.match(read('app\/ui\/landing\/free-class.tsx'), /ProductConversionClickTracker/);
+  assert.match(read('app\/ui\/final\/product-detail-html.tsx'), /dispatchEvent\(new CustomEvent\(PRODUCT_CTA_EVENT/);
   const landingCss = read('app/ui/landing/landing.css');
   assert.match(landingCss, /grid-template-columns:minmax\(0,860px\) 320px/);
   assert.match(landingCss, /\.campaign-sticky\{position:sticky/);

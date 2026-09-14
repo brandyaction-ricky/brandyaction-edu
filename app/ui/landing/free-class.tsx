@@ -9,7 +9,7 @@ import { productDetailImages, type ProductResource } from '@/lib/product-metadat
 import { ProductResourceRow } from '../final/primitives';
 import { productConversion } from '@/lib/product-conversion';
 import { productDocument } from '@/lib/product-html-document';
-import { ProductCtaLink, ProductPixel } from '../final/product-conversion';
+import { ProductConversionClickTracker, ProductCtaLink, ProductPixel } from '../final/product-conversion';
 
 export function LandingTracker({ config, children }: { config: LandingConfig; children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -22,10 +22,11 @@ export function CampaignFreeClass({ course, config, resources = [] }: { course: 
   const documentSource = productDocument(meta);
   const conversion = productConversion(meta, config);
   const trackingConfig = useMemo(() => ({ ...config, pixel_enabled: false }), [config]);
-  const cta = (position: string, full = false) => <ProductCtaLink conversion={conversion} courseId={course.id} position={position} tracked={config.enabled} conversionEvent="CompleteRegistration" className={'btn primary large ' + (full ? 'full' : '')} />;
+  const cta = (position: string, full = false) => <ProductCtaLink conversion={conversion} courseId={course.id} position={position} tracked={config.enabled} conversionEvent="CompleteRegistration" delegated className={'btn primary large ' + (full ? 'full' : '')} />;
   // The product integration owns Pixel events; internal landing analytics remain active.
   return <LandingTracker config={trackingConfig}>
     <ProductPixel courseId={course.id} pixelId={conversion.pixelId} />
+    <ProductConversionClickTracker courseId={course.id} pixelId={conversion.pixelId} />
     <div className="free-body"><div className="campaign-layout"><div className="free-sheet">
         <section data-section="detail">{documentSource || detailHtml ? <ProductDetailHtml html={detailHtml} documentSource={documentSource} /> : image ? <div className="detail-image-stack">{images.map((item, index) => <img className="detail-image" src={item.path} alt={item.alt || `${t(course,'title')} 상세 안내 ${index + 1}`} loading="lazy" decoding="async" key={item.path + index} />)}</div> : <div className="panel-body"><Cover course={course}/><div className="reading-copy mt24">{t(course,'description') || t(course,'summary')}</div></div>}</section>
         {config.custom_sections && config.sections.map(s=><section className="campaign-section" data-section={s.id} key={s.id}>
