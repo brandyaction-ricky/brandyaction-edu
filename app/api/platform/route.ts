@@ -238,7 +238,7 @@ export async function GET(request: Request) {
                     const url = safeUrl(video.url);
                     return { title: String(video.title || '').slice(0, 120), available: Boolean(url), url: user ? url : '' };
                 }) : [];
-                data.article_banner = [{ id: 'edu_article_banner', key: 'edu_article_banner', value: { enabled: value?.enabled !== false, eyebrow: String(value?.eyebrow || '').slice(0, 80), title: String(value?.title || '').slice(0, 120), description: String(value?.description || '').slice(0, 200), videos } }];
+                data.article_banner = [{ id: 'edu_article_banner', key: 'edu_article_banner', value: { enabled: value?.enabled !== false, eyebrow: String(value?.eyebrow || '').slice(0, 80), title: String(value?.title || '').slice(0, 120), description: String(value?.description || '').slice(0, 240), signupNotice: String(value?.signupNotice || '').slice(0, 220), signupCTA: String(value?.signupCTA || '').slice(0, 45), memberCTA: String(value?.memberCTA || '').slice(0, 45), videos } }];
             }
         }
         if (adminMode) {
@@ -360,7 +360,7 @@ export async function POST(request: Request) {
                 return { title: String(video.title || '').trim().slice(0, 120), url };
             }) : [];
             if (!title || title.length > 120) fail('배너 제목을 확인해 주세요.');
-            const result = await db.from('site_settings').upsert({ key: 'edu_article_banner', value: { enabled: value?.enabled !== false, eyebrow: String(value?.eyebrow || '').trim().slice(0, 80), title, description: String(value?.description || '').trim().slice(0, 200), videos }, is_public: false }, { onConflict: 'key' });
+            const result = await db.from('site_settings').upsert({ key: 'edu_article_banner', value: { enabled: value?.enabled !== false, eyebrow: String(value?.eyebrow || '').trim().slice(0, 80), title, description: String(value?.description || '').trim().slice(0, 240), signupNotice: String(value?.signupNotice || '').trim().slice(0, 220), signupCTA: String(value?.signupCTA || '').trim().slice(0, 45), memberCTA: String(value?.memberCTA || '').trim().slice(0, 45), videos }, is_public: false }, { onConflict: 'key' });
             if (result.error) throw result.error;
             return reply({ ok: true });
         }
@@ -385,6 +385,7 @@ export async function POST(request: Request) {
             if (!section || section.readOnly) fail('수정할 수 없는 항목입니다.');
             const input = (body.values || {}) as Record<string, unknown>;
             const values: Record<string, unknown> = {};
+            const couponCourseId = section.table === 'coupons' ? String(input.applicable_course_id || '') : '';
             const productSchedule = section.table === 'courses' && ('recruitmentStartAt' in body || 'recruitmentEndAt' in body) ? {
                 start: body.recruitmentStartAt === null ? null : String(body.recruitmentStartAt || ''),
                 end: body.recruitmentEndAt === null ? null : String(body.recruitmentEndAt || ''),
@@ -412,7 +413,7 @@ export async function POST(request: Request) {
                     if (field.type === 'url' && value && !safeUrl(value)) fail(`${field.label} 주소를 확인해 주세요.`);
                     if (field.type === 'image' && value && !validImage(value)) fail(`${field.label}은 https 이미지 주소 또는 업로드한 이미지 경로를 입력해 주세요.`);
                     if (field.type === 'datetime-local' && value && !Number.isFinite(Date.parse(String(value)))) fail('날짜를 확인해 주세요.');
-                    if (field.options && !field.options.includes(String(value))) fail('선택값을 확인해 주세요.');
+                    if (field.options && value !== null && !field.options.includes(String(value))) fail('선택값을 확인해 주세요.');
                     values[field.key] = field.type === 'image' ? assetPath(value, process.env.NEXT_PUBLIC_SUPABASE_URL || '') || null : value;
                 }
             }
@@ -474,6 +475,19 @@ export async function POST(request: Request) {
             if (section.table === 'coupons') {
                 if (typeof values.code === 'string') values.code = values.code.trim().toUpperCase();
                 if (values.discount_type === 'percentage' && Number(values.discount_value) > 100) fail('할인율은 100% 이하여야 합니다.');
+                if (values.product_scope === 'specific' && !uid(couponCourseId)) fail('쿠폰을 적용할 상품을 선택해 주세요.');
+                if (values.issue_target === 'tag' && !uid(values.target_tag_id)) fail('쿠폰 발급 대상 태그를 선택해 주세요.');
+                if (values.issue_target !== 'tag') values.target_tag_id = null;
+                for (const key of ['discount_value', 'max_discount_amount', 'minimum_order_amount', 'usage_limit', 'per_user_limit']) {
+                    if (values[key] !== null && values[key] !== undefined && (!Number.isSafeInteger(values[key]) || Number(values[key]) < (key === 'minimum_order_amount' || key === 'max_discount_amount' ? 0 : 1))) fail('쿠폰 금액·수량은 허용 범위의 정수로 입력해 주세요.');
+                }
+            }
+            if (section.table === 'crm_tags') {
+                values.name = String(values.name || '').trim();
+                values.description = String(values.description || '').trim() || null;
+                values.color = /^#[0-9a-f]{6}$/i.test(String(values.color || '')) ? values.color : '#667ca0';
+                if (values.tag_kind === 'automatic' && !values.rule_key) fail('자동 태그의 조건 행동을 선택해 주세요.');
+                if (values.tag_kind === 'manual') values.rule_key = null;
             }
             if (values.status === 'published') values.published_at = new Date().toISOString();
             for (const [start, end] of [
@@ -525,6 +539,21 @@ export async function POST(request: Request) {
             if (result.error) {
                 if (!['23505', '23514', '23503', '23502', 'P0001'].includes(result.error.code)) console.error('platform save', result.error.code);
                 fail(databaseMessage(result.error.code), 409);
+            }
+            if (section.table === 'crm_tags') {
+                const synced = await db.rpc('crm_resync_all_automatic_tags');
+                if (synced.error) fail('태그 조건은 저장했지만 기존 회원 태그를 다시 계산하지 못했습니다.', 409);
+            }
+            if (section.table === 'coupons') {
+                const coupon = result.data as Row;
+                const couponId = String(coupon.id || body.id || '');
+                if (!uid(couponId)) fail('저장된 쿠폰을 다시 불러오지 못했습니다.', 409);
+                const removed = await db.from('coupon_products').delete().eq('coupon_id', couponId);
+                if (removed.error) fail('쿠폰 적용 상품을 갱신하지 못했습니다.', 409);
+                if (values.product_scope === 'specific') {
+                    const linked = await db.from('coupon_products').insert({ coupon_id: couponId, course_id: couponCourseId });
+                    if (linked.error) fail('쿠폰 적용 상품을 저장하지 못했습니다.', 409);
+                }
             }
             let scheduledCohort = null;
             if (section.table === 'courses' && productSchedule) {

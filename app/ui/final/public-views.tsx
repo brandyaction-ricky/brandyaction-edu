@@ -499,7 +499,7 @@ export function ArticleBanner({
                   ? videoUrl
                     ? "재생 버튼을 눌러 시작하세요."
                     : "내 클래스에서 수강 권한을 확인해 주세요."
-                  : "회원가입 후 무료강의를 시청하세요."}
+                  : String(configured.signupNotice || "회원가입 후 무료강의를 시청하세요.")}
               </p>
             </>
           )}
@@ -532,9 +532,9 @@ export function ArticleBanner({
         <div className="ab-actions mt24">
           <Link
             className="ab-primary"
-            href={user ? "/my/classes" : "/signup?next=/articles"}
+            href={user ? "#article-library" : "/signup?next=/articles"}
           >
-            {user ? "내 클래스에서 확인하기" : "회원가입하고 무료로 배우기"}
+            {user ? String(configured.memberCTA || "아티클 읽으러 가기") : String(configured.signupCTA || "회원가입하고 무료로 배우기")}
             <ArrowRight />
           </Link>
           {!user && (
@@ -618,6 +618,7 @@ export function ArticlesView({
   return (
     <div className="wrap">
       <ArticleBanner data={data} user={user} />
+      <section className="article-library" id="article-library">
       <Heading
         title="일하는 방식을 바꾸는 인사이트"
         description="읽고, 배우고, 내 일에 적용해 보세요."
@@ -654,6 +655,7 @@ export function ArticlesView({
           <Empty title="조회된 아티클이 없습니다." />
         )}
       </div>
+      </section>
     </div>
   );
 }

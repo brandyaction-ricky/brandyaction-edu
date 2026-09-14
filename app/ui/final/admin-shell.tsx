@@ -94,7 +94,7 @@ export const sectionDescription: Record<string, string> = {
   orders: "주문·결제·환불 상태와 수강 권한을 함께 확인합니다.",
   landing: "무료클래스의 실제 방문·CTA 전환·체류 성과를 확인합니다.",
   analytics: "유입부터 신청까지, 모집 과정의 수집된 성과를 확인합니다.",
-  metrics: "자동 추적이 끊기는 구간을 날짜별로 보완합니다.",
+  metrics: "광고·라이브·결제 실측 데이터를 날짜별로 기록하고 관리합니다.",
   seo: "검색 노출 정보와 측정·인증 코드를 안전하게 관리합니다.",
   settings: "교육 운영 규칙과 광고 측정 설정을 구분해 관리합니다.",
 };

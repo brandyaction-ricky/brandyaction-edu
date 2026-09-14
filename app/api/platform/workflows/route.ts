@@ -2,7 +2,7 @@ import { processRefund } from '@/lib/refunds';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { hasLearningAccess } from '@/lib/platform-rules';
-import { uuid, validateSetting } from '@/lib/edu-workflows';
+import { uuid, validateMeasurementCode, validateSetting } from '@/lib/edu-workflows';
 import { publicQuiz, validateQuiz, type QuizDefinition } from '@/lib/mission-quiz';
 import { safeUrl } from '@/lib/platform';
 import { normalizeOperatorPermissions, permissionsFor } from '@/lib/operator-permissions';
@@ -139,7 +139,7 @@ export async function POST(request: Request) {
                 message: role === 'staff' ? '스태프 권한을 저장했습니다.' : '스태프 권한을 해제했습니다.',
             });
         }
-        const actionScope = ['session', 'clone-cohort', 'quiz'].includes(body.action) ? 'products' : ['review', 'grant-enrollment', 'assign'].includes(body.action) ? 'members' : body.action === 'refund' ? 'orders' : ['settings', 'crm-save'].includes(body.action) ? 'marketing' : null;
+        const actionScope = ['session', 'clone-cohort', 'quiz'].includes(body.action) ? 'products' : ['review', 'grant-enrollment', 'assign'].includes(body.action) ? 'members' : body.action === 'refund' ? 'orders' : ['settings', 'measurement-code', 'crm-save'].includes(body.action) ? 'marketing' : null;
         if (!actionScope || !permissions[actionScope as keyof typeof permissions]) return reply({ error: '이 작업에 필요한 운영 권한이 없습니다.' }, 403);
         let result;
         if (body.action === 'crm-save') {
@@ -286,6 +286,19 @@ export async function POST(request: Request) {
                 p_target: body.targetId,
                 p_remove: body.remove,
             });
+        } else if (body.action === 'measurement-code') {
+            let value;
+            try {
+                value = validateMeasurementCode(body.values || {});
+            } catch (e) {
+                fail((e as Error).message);
+            }
+            const current = await db.from('site_settings').select('value').eq('key', 'edu_measurement_codes').maybeSingle();
+            if (current.error) throw current.error;
+            const stored = current.data?.value as { items?: unknown[] } | null;
+            const items = Array.isArray(stored?.items) ? stored.items.slice(0, 99) : [];
+            if (items.some(item => item && typeof item === 'object' && String((item as Record<string, unknown>).code || '').trim() === value.code)) fail('같은 코드가 이미 등록되어 있습니다.', 409);
+            result = await db.from('site_settings').upsert({ key: 'edu_measurement_codes', value: { items: [{ id: crypto.randomUUID(), ...value, createdAt: new Date().toISOString(), createdBy: user.id }, ...items] }, is_public: false, updated_by: user.id }, { onConflict: 'key' });
         } else if (body.action === 'settings') {
             let value;
             try {
