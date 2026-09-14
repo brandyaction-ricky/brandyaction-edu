@@ -984,7 +984,6 @@ export function AdminCatalog({
           </button>
         </div>
       )}
-      {s.key === "customers" && <div className="row mt24"><Link className="btn" href="/admin/members">회원 미션관리</Link><Link className="btn" href="/admin/tags">고객 태그 설정</Link></div>}
       {s.key === "learning" && <div className="row mt24"><Link className="btn" href="/admin/weeks">주차 구성</Link><Link className="btn" href="/admin/contents">영상·자료 등록</Link><Link className="btn" href="/admin/missions">미션·퀴즈 관리</Link></div>}
       {s.key === "missions" && <div className="notice mt16">미션은 연결 학습의 일차 순서로 표시됩니다. 학습 순서는 학습 콘텐츠 편집에서 변경할 수 있습니다. 제출물 검토와 피드백은 <Link className="text-link" href="/admin/reviews">제출물 검토</Link>에서 관리합니다.</div>}
       {s.key === "product-reviews" && <div className="notice mt24">후기 원문과 평점은 유지하며, 검토 화면에서 공개 상태와 상품 대표 노출을 설정합니다.</div>}
@@ -993,7 +992,7 @@ export function AdminCatalog({
         <section className="panel"><div className="panel-head"><h2>자동 태그 적용 흐름</h2></div><div className="panel-body"><div className="workflow-row"><span>로그인 회원의 행동</span><span>태그 조건 확인</span><span className="active">태그 부여</span></div><p className="mt16">무료 클래스 학습 완료와 유료 상품 결제처럼 확인 가능한 회원 행동을 기준으로 자동 분류합니다.</p></div></section>
         <section className="panel"><div className="panel-head"><h2>조건 변경 시 영향</h2></div><div className="panel-body"><h3>자동 태그와 수동 태그를 구분해 관리</h3><p className="mt8">자동 태그는 연결된 행동 조건에 따라 갱신됩니다. 수동 태그는 회원 관리에서 직접 부여하거나 해제할 수 있습니다.</p><p className="privacy-note mt16">태그 이름과 설명을 변경해도 자동 부여 기준은 변경되지 않습니다.</p></div></section>
       </div>}
-      {!["products", "banners"].includes(s.key) && <details className="catalog-bulk-tools mt24" onToggle={(event) => { if (!(event.currentTarget as HTMLDetailsElement).open) { setBulkMode(false); setSelection([]); } }}>
+      {!["products", "banners", "customers"].includes(s.key) && <details className="catalog-bulk-tools mt24" onToggle={(event) => { if (!(event.currentTarget as HTMLDetailsElement).open) { setBulkMode(false); setSelection([]); } }}>
         <summary>목록 내보내기 · 선택 관리</summary>
         <div className="catalog-bulk-body">
           <label className="checkline"><input type="checkbox" checked={bulkMode} onChange={(event) => { setBulkMode(event.target.checked); setSelection([]); }} />목록 선택 표시</label>
@@ -1028,7 +1027,7 @@ export function AdminCatalog({
           </div>
         </div>
       </details>}
-      {tools && (
+      {tools && s.key !== "customers" && (
         <details className="panel operation-tools mb24">
           <summary className="section-pad">
             {s.key === "cohorts"

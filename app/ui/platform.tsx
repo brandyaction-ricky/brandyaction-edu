@@ -845,6 +845,18 @@ export function Platform({
               ? () => void archive(editor.section, [recordId(editor.row!)])
               : undefined
           }
+          deleteMember={
+            editor.row && editor.section.key === "customers"
+              ? () => {
+                  const member = editor.row!;
+                  if (!window.confirm(`${t(member, "full_name") || t(member, "email")} 회원을 삭제할까요? 로그인과 서비스 이용은 차단되며 주문·결제·수강 이력은 보존됩니다.`)) return;
+                  void send(
+                    { action: "delete-member", id: recordId(member) },
+                    "회원을 삭제했습니다. 주문·결제·수강 이력은 유지됩니다.",
+                  ).then(() => setEditor(null)).catch(() => undefined);
+                }
+              : undefined
+          }
           save={async (values) => {
             await send({
               action: "save",
@@ -890,6 +902,7 @@ function Editor({
   close,
   save,
   archive,
+  deleteMember,
 }: {
   section: Section;
   row?: Row;
@@ -898,6 +911,7 @@ function Editor({
   close: () => void;
   save: (values: Record<string, unknown>) => Promise<void>;
   archive?: () => void;
+  deleteMember?: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [error, setError] = useState("");
@@ -1178,6 +1192,16 @@ function Editor({
           )}
         </div>
         <footer className="dialog-foot">
+          {deleteMember && (
+            <button
+              type="button"
+              className="btn danger"
+              disabled={pending}
+              onClick={deleteMember}
+            >
+              회원 삭제
+            </button>
+          )}
           {archive && (
             <button
               type="button"
