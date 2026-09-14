@@ -231,6 +231,11 @@ test('catalogues and separate editors render without dropping existing fields', 
   assert.match(markup, /파일별로 공개 범위를 설정/);
   assert.doesNotMatch(markup, /자료를 연결할 학습 만들기/);
   assert.match(markup, /editor-savebar/);
+  const productEditorSource = read('app/ui/final/admin-editors.tsx');
+  assert.match(productEditorSource, /현재 화면에서 계속 수정할 수 있습니다/);
+  assert.match(productEditorSource, /setDirty\(false\);[\s\S]*if \(!row\?\.id\) back\(\)/);
+  assert.doesNotMatch(productEditorSource, /setDirty\(false\);\s*back\(\)/);
+  assert.match(platformSource, /loading && id && !edited/);
   for (const field of platform.sections.find(row => row.key === 'products').fields.filter(field => !['slug', 'course_code', 'seo_title', 'seo_description', 'detail_html'].includes(field.key))) assert.ok(markup.includes(`name="${field.key}"`), field.key);
   assert.match(html(LearningEditor, { data, row: lesson, pending: false, send, back() {} }), /editor-/);
 });

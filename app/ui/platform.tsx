@@ -670,7 +670,7 @@ export function Platform({
         ) : !section ? (
           <Empty title="이 화면에 접근할 운영 권한이 필요합니다." />
         ) : key === "product-editor" || key === "learning-editor" ? (
-          loading ? (
+          loading && id && !edited ? (
             <p role="status">편집 정보를 불러오고 있습니다.</p>
           ) : id && !edited ? (
             <Empty title="편집할 항목을 찾을 수 없습니다." />
