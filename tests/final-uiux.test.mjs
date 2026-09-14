@@ -242,6 +242,9 @@ test('catalogues and separate editors render without dropping existing fields', 
   assert.match(productEditorSource, /setDirty\(false\);[\s\S]*if \(!row\?\.id\) back\(\)/);
   assert.doesNotMatch(productEditorSource, /setDirty\(false\);\s*back\(\)/);
   assert.match(platformSource, /loading && id && !edited/);
+  assert.match(platformSource, /cachedAdminUser: User \| null/);
+  assert.match(platformSource, /initialUser \|\| \(admin \? cachedAdminUser : null\)/);
+  assert.match(platformSource, /if \(admin\) cachedAdminUser = result\.user/);
   assert.match(pageSource, /root === 'admin' \? 'admin' : path\.join\('\/'\)/);
   assert.match(read('design-reference/source/admin/src/experience.css'), /\.metric-value small\{display:inline-block;margin-left:var\(--space-1\)\}/);
   for (const field of platform.sections.find(row => row.key === 'products').fields.filter(field => !['slug', 'course_code', 'seo_title', 'seo_description', 'detail_html'].includes(field.key))) assert.ok(markup.includes(`name="${field.key}"`), field.key);
