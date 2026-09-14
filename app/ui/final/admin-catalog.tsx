@@ -12,7 +12,7 @@ import {
 } from "@/lib/platform";
 import { recordId } from "@/lib/platform-rules";
 import { archiveValues, cohortPeriod, cohortStatus } from "@/lib/qa-rules";
-import { ArrowRight, BookOpen, FileText, Search } from "lucide-react";
+import { ArrowRight, BookOpen, FileText, Pencil, Search, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import type { Data } from "../learning-workflows";
@@ -60,6 +60,7 @@ export function AdminCatalog({
     [tagMode, setTagMode] = useState(""),
     [now] = useState(Date.now);
   const rows = data[s.table] || [];
+  const productSummary = data.product_summary?.[0];
   const courses = useMemo(() => data.courses || [], [data.courses]);
   const weeks = useMemo(() => data.curriculum_weeks || [], [data.curriculum_weeks]);
   const lessons = useMemo(
@@ -586,7 +587,7 @@ export function AdminCatalog({
             label="전체 상품"
             value={
               <>
-                {pagination?.total ?? rows.length}
+                {productSummary ? num(productSummary, "total") : pagination?.total ?? rows.filter((item) => !item.archived_at).length}
                 <small>개</small>
               </>
             }
@@ -594,18 +595,18 @@ export function AdminCatalog({
           />
           <Metric
             label="판매 중"
-            value={<>{rows.filter((item) => item.status === "published").length}<small>개</small></>}
+            value={<>{productSummary ? num(productSummary, "published") : rows.filter((item) => !item.archived_at && item.status === "published").length}<small>개</small></>}
             note="고객에게 공개된 상품"
             highlight
           />
           <Metric
             label="모집 예정"
-            value={<>{rows.filter((item) => cohorts.some((cohort) => cohort.course_id === item.id && cohortStatus(cohort) === "upcoming")).length}<small>개</small></>}
+            value={<>{productSummary ? num(productSummary, "upcoming") : rows.filter((item) => !item.archived_at && cohorts.some((cohort) => cohort.course_id === item.id && cohortStatus(cohort) === "upcoming")).length}<small>개</small></>}
             note="연결 기수의 모집 일정 기준"
           />
           <Metric
             label="작성 중"
-            value={<>{rows.filter((r) => r.status === "draft").length}<small>개</small></>}
+            value={<>{productSummary ? num(productSummary, "draft") : rows.filter((item) => !item.archived_at && item.status === "draft").length}<small>개</small></>}
             note="공개 전 필수 정보 확인"
           />
         </div>
@@ -906,13 +907,15 @@ export function AdminCatalog({
                         </td>
                       ))}
                       <td data-label="관리">
-                        {s.key === "products" && !r.archived_at && <button className="btn small danger" aria-label={t(r, "title") + " 삭제"} disabled={pending} onClick={() => archive(s, [recordId(r)])}>삭제</button>}
-                        <button
-                          className="btn small"
-                          onClick={() => edit(s, r)}
-                        >
-                          {s.key === "customers" || s.readOnly ? "상세" : s.key === "tags" ? "조건·설정" : s.key === "product-reviews" ? "검토" : "수정"}
-                        </button>
+                        {s.key === "products" ? <div className="catalog-actions">
+                          {!r.archived_at && <button className="btn iconbtn danger" type="button" title="삭제" aria-label={t(r, "title") + " 삭제"} disabled={pending} onClick={() => archive(s, [recordId(r)])}><Trash2 size={17} aria-hidden="true" /></button>}
+                          <button className="btn iconbtn" type="button" title="수정" aria-label={t(r, "title") + " 수정"} onClick={() => edit(s, r)}><Pencil size={17} aria-hidden="true" /></button>
+                        </div> : <button
+                            className="btn small"
+                            onClick={() => edit(s, r)}
+                          >
+                            {s.key === "customers" || s.readOnly ? "상세" : s.key === "tags" ? "조건·설정" : s.key === "product-reviews" ? "검토" : "수정"}
+                          </button>}
                       </td>
                     </tr>
                   ))}

@@ -5,7 +5,7 @@ import { bannerTextLimits, sections, safeUrl, type Row } from '@/lib/platform';
 import { hasLearningAccess } from '@/lib/platform-rules';
 import { getEduSettings } from '@/lib/edu-settings';
 import { gradeQuiz, type QuizDefinition } from '@/lib/mission-quiz';
-import { adminTables, archiveValues, phoneNumber, validImage, assetPath, imagePreviewUrl, databaseMessage } from '@/lib/qa-rules';
+import { adminTables, archiveValues, cohortStatus, phoneNumber, validImage, assetPath, imagePreviewUrl, databaseMessage } from '@/lib/qa-rules';
 import { POLICY_VERSION } from '@/lib/legal-policies';
 import { getOperatorUser, permissionsFor, sectionScopes } from '@/lib/operator-permissions';
 import { crmDeliveryState } from '@/lib/crm-delivery';
@@ -95,6 +95,29 @@ export async function GET(request: Request) {
         ]);
         for (const banner of data.site_banners || []) {
             banner.image_url = imagePreviewUrl(String(banner.image_path || ''), process.env.NEXT_PUBLIC_SUPABASE_URL || '');
+        }
+        if (adminMode && sectionKey === 'products') {
+            const [allProducts, publishedProducts, draftProducts] = await Promise.all([
+                db.from('courses').select('id', { count: 'exact' }).is('archived_at', null).limit(1000),
+                db.from('courses').select('id', { count: 'exact', head: true }).is('archived_at', null).eq('status', 'published'),
+                db.from('courses').select('id', { count: 'exact', head: true }).is('archived_at', null).eq('status', 'draft'),
+            ]);
+            if (allProducts.error) throw allProducts.error;
+            if (publishedProducts.error) throw publishedProducts.error;
+            if (draftProducts.error) throw draftProducts.error;
+            const activeProductIds = new Set((allProducts.data || []).map(product => String(product.id)));
+            const upcomingProductIds = new Set(
+                (data.cohorts || [])
+                    .filter(cohort => activeProductIds.has(String(cohort.course_id)) && cohortStatus(cohort) === 'upcoming')
+                    .map(cohort => String(cohort.course_id)),
+            );
+            data.product_summary = [{
+                id: 'product-summary',
+                total: allProducts.count || 0,
+                published: publishedProducts.count || 0,
+                upcoming: upcomingProductIds.size,
+                draft: draftProducts.count || 0,
+            }];
         }
         if (adminMode && sectionKey === 'products' && data.courses?.length) {
             // Preserve existing landing CTA settings until the product explicitly overrides them.
