@@ -77,7 +77,9 @@ test('filters toggle without reset, update chips and hide non-attributed manual 
   await page.getByRole('checkbox', { name: '모바일', exact: true }).check();
   await page.getByRole('checkbox', { name: '데스크톱', exact: true }).check();
   const done = page.getByRole('button', { name: '선택 완료', exact: true });
+  console.log('filter-before-close', await page.evaluate(() => ({ width: innerWidth, mobile: matchMedia('(max-width: 700px)').matches, dialogs: Array.from(document.querySelectorAll('dialog')).map(d => ({ open: d.open, text: d.textContent, rect: d.getBoundingClientRect().toJSON() })) })));
   if (await done.isVisible()) await done.click(); else await toggle.click();
+  console.log('filter-after-close', await page.evaluate(() => ({ width: innerWidth, mobile: matchMedia('(max-width: 700px)').matches, dialogs: Array.from(document.querySelectorAll('dialog')).map(d => ({ open: d.open, text: d.textContent, rect: d.getBoundingClientRect().toJSON() })), active: document.activeElement?.outerHTML })));
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   await expect(page.getByText('실측값은 소재·기기 필터가 적용되지 않습니다.', { exact: false })).toBeVisible();
   const funnel = page.getByRole('region', { name: '선택 기간 전환 퍼널' });
