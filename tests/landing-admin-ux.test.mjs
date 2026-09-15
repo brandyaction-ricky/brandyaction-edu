@@ -111,9 +111,21 @@ test('supplemental reads are paginated, campaign-scoped, filtered and preserve r
   for (const call of db.calls.filter(call => call.table === 'funnel_sessions')) {
     assert.ok(call.steps.some(step => step[0] === 'eq' && step[1] === 'landing_id' && step[2] === campaign.landing_id));
     assert.ok(call.steps.some(step => step[0] === 'in' && step[1] === 'attribution->>utm_term')); assert.ok(call.steps.some(step => step[0] === 'range'));
-    assert.ok(call.steps.some(step => step[0] === 'or' && step[1].includes(JSON.stringify(campaign.utm_campaign))));
+    assert.ok(call.steps.some(step => step[0] === 'gte' && step[1] === 'created_at'));
+    assert.ok(call.steps.some(step => step[0] === 'lt' && step[1] === 'created_at'));
+    assert.ok(!call.steps.some(step => step[0] === 'or' && step[1].includes('utm_campaign')));
+    assert.ok(call.steps.some(step => step[0] === 'or' && step[1].includes('device.is.null')));
   }
   assert.doesNotMatch(JSON.stringify(result), /private|visitor_id|session_id/);
+});
+test('supplemental reads use explicit multi UTM filters without an implicit configured-UTM gate', async () => {
+  const db = fakeDb(() => ({ data: [], error: null }));
+  const query = makeQuery(); query.append('utm_campaign', 'ad-a'); query.append('utm_campaign', 'organic');
+  await server.performanceUiDetails(db, campaign, query, new AbortController().signal);
+  for (const call of db.calls.filter(call => call.table === 'funnel_sessions')) {
+    assert.deepEqual(call.steps.find(step => step[0] === 'in' && step[1] === 'attribution->>utm_campaign'), ['in', 'attribution->>utm_campaign', ['ad-a', 'organic']]);
+    assert.ok(!call.steps.some(step => step[0] === 'or' && step[1].includes('utm_campaign')));
+  }
 });
 test('supplemental failure is regional and never returns partial values as zero', async () => {
   const db = fakeDb(() => ({ data: null, error: new Error('private provider details') }));

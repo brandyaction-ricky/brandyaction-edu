@@ -75,6 +75,7 @@ export function CampaignSettings({ campaign, canManage, pending, syncing, onDirt
   }
   const status = metaStatus(campaign, syncing);
   return <form className="tracking-settings tracking-stack" onSubmit={submit}>
+    <p className="tracking-help">방문 집계는 선택한 클래스·기간의 모든 UTM과 직접 유입을 포함합니다. 아래 UTM 캠페인 값은 집계 제한이 아니며, 광고·오가닉 UTM은 대시보드 상세 필터에서 여러 개 선택할 수 있습니다. UTM이 없는 유입은 출처를 구분할 수 없습니다.</p>
     {!canManage && <p className="tracking-help">설정은 조회만 가능합니다. 캠페인·Meta 설정 변경에는 관리자 권한이 필요합니다.</p>}
     <fieldset disabled={!canManage || pending}><section className="tracking-card"><h2>기본 정보</h2><div className="tracking-form-grid">{field('name', '캠페인명')}{field('utm_campaign', 'UTM 캠페인')}{field('start_day', '시작일', 'date')}{field('end_day', '종료일', 'date')}{field('live_peak', '라이브 최대 동시시청', 'number')}<div className="field"><span>운영 상태</span><strong>{campaignStatus({ start_day: draft.start_day, end_day: draft.end_day })}</strong><small className="tracking-help">한국 시간의 시작일·종료일 기준으로 자동 표시됩니다.</small></div></div></section>
     <section className="tracking-card"><h2>결제 설정</h2><div className="tracking-form-grid">{field('new_customer_price', '신규 고객 가격 · 원', 'number')}{field('existing_customer_price', '기존 고객 가격 · 원', 'number')}</div><p className="tracking-help">새 실측 기록에는 캠페인 가격이 적용됩니다. 기존 기록의 단가 스냅샷은 유지되어 과거 매출이 바뀌지 않습니다.</p></section>

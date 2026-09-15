@@ -48,8 +48,8 @@ export async function performanceUiDetails(db: Db, campaign: PerformanceCampaign
   const quote = (value: string) => JSON.stringify(value);
   function sessions(start: string, end: string, columns: string) {
     let query = db.from('funnel_sessions').select(columns).eq('landing_id', campaign.landing_id)
-      .gte('created_at', start + 'T00:00:00+09:00').lt('created_at', new Date(Date.parse(end + 'T00:00:00+09:00') + 86400000).toISOString())
-      .or(`attribution->>utm_campaign.is.null,attribution->>utm_campaign.eq."",attribution->>utm_campaign.eq.${quote(campaign.utm_campaign)}`);
+      .gte('created_at', start + 'T00:00:00+09:00').lt('created_at', new Date(Date.parse(end + 'T00:00:00+09:00') + 86400000).toISOString());
+    // Match the dashboard/export RPC: all landing traffic unless explicitly filtered.
     for (const [key, column] of [['utm_campaign', 'utm_campaign'], ['adset', 'utm_term'], ['creative', 'utm_content']] as const) {
       const values = filterValues(params, key);
       if (values.length) query = query.in('attribution->>' + column, values);
