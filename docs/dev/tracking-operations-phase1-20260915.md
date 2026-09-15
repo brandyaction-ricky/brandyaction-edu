@@ -10,6 +10,7 @@
 - 확인 시 열린 PR 없음. 캠페인 저장 BUGFIX #78은 이미 병합되어 재사용.
 - Admin Design System 최종 QA PASS 미확인. 정본의 기능 Branch 작업 허용 범위로 진행.
 - DEV Supabase: `vjmjhaidlqkmascdjocw`. 최신 관련 적용 Migration `20260915022006 support_multiple_meta_campaigns` 확인.
+- 개발 중 BUGFIX #79 (`BA-ADMIN-FOCUS-001`)가 develop에 병합됨. 최신 기준 `5e80ce5aa90a4b20e44220a5b49eeacbf3dcea91`, Tree `8a79ba15ab6970861472c651d233574f6d2995fa`를 기능 Branch에 충돌 없이 포함해 재검증한다. 공통 포커스 코드는 재사용한다.
 
 ## 구현 범위와 재사용
 
@@ -68,3 +69,5 @@
 13. 비회원/일반 회원/marketing/admin 접근, 세션 만료, 빈 데이터/오류 상태.
 
 자동화 결과와 실제 브라우저 검증 범위, 정확한 구현/배포 Commit·Tree는 DEV 최종 보고에서 별도로 확정한다.
+
+`tests/browser/tracking-operations.spec.ts`는 실제 React 컴포넌트와 합성 응답을 사용해 표본·정렬·필터·설정 저장·광고 유형 저장 실패/재시도를 3개 viewport에서 검증한다. 실 DB/API 저장 검증을 대신하는 테스트는 아니다. #79의 기존 포커스 회귀 테스트도 함께 유지한다.
