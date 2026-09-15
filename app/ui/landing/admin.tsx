@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { metaCampaignIds } from '@/lib/meta-campaign-settings';
+import { DEFAULT_SAMPLE_MIN, parseSampleMin } from '@/lib/landing-operations-phase1';
+import type { Classify } from './ad-type-control';
 import { RefreshCw, Settings2 } from 'lucide-react';
 import { PERFORMANCE_PRESETS, campaignRange, presetRange, previousRange, validDay, type ActualRow, type DashboardReport, type PerformanceCampaign, type PerformanceCourse, type PerformancePreset } from '@/lib/landing-performance';
 import { appendFilters, campaignStatus, emptyFilters, metaStatus, periodError, readFilters, readPeriod, type TrackingFilters, type TrackingPeriod } from '@/lib/landing-admin-state';
@@ -24,17 +26,20 @@ export function LandingAdmin() {
   const [pending, setPending] = useState(false), [syncing, setSyncing] = useState(false), [dirty, setDirty] = useState(false), [message, setMessage] = useState('');
   const [drawer, setDrawer] = useState<{ row: ActualRow | null } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [sampleMin, setSampleMin] = useState(String(DEFAULT_SAMPLE_MIN));
   const [navigation, setNavigation] = useState<{ proceed: () => void } | null>(null);
   const pendingRef = useRef(false), initialized = useRef(false), actualsRequested = useRef(false);
+  const requestSequence = useRef(0), listSequence = useRef(0);
   const course = courses.find(item => item.id === courseId), campaign = course?.campaigns.find(item => item.id === campaignId);
   useEffect(() => {
-    const controller = new AbortController();
+    const controller = new AbortController(), sequence = ++listSequence.current;
     fetch('/api/landing/performance', { cache: 'no-store', signal: controller.signal }).then(responseJson).then(value => {
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted || sequence !== listSequence.current) return;
       const items: PerformanceCourse[] = value.courses || [];
       setCourses(items); setList({ loading: false, error: '', canManage: Boolean(value.can_manage_campaign) });
       if (initialized.current) return;
       const url = new URLSearchParams(location.search), requestedCourse = url.get('course') || url.get('landing'), requestedCampaign = url.get('campaign');
+      setSampleMin(String(parseSampleMin(url.get('sample_min')) ?? DEFAULT_SAMPLE_MIN));
       const nextCourse = requestedCourse ? items.find(item => item.id === requestedCourse) : requestedCampaign ? items.find(item => item.campaigns.some(c => c.id === requestedCampaign)) : items.find(item => item.status === 'published' && item.tracking === 'active') || items[0];
       const nextCampaign = requestedCampaign ? nextCourse?.campaigns.find(item => item.id === requestedCampaign) : nextCourse?.campaigns[0];
       setSettingsOpen(url.get('panel') === 'settings' || url.get('tab') === 'settings'); actualsRequested.current = url.get('tab') === 'actuals'; setFilters(readFilters(url));
@@ -42,7 +47,7 @@ export function LandingAdmin() {
       initialized.current = true;
       setCourseId(nextCourse?.id || ''); setCampaignId(nextCampaign?.id || '');
       if (nextCampaign) setPeriod(readPeriod(url, nextCampaign));
-    }).catch(error => { if (!controller.signal.aborted) setList(previous => ({ ...previous, loading: false, error: error.message })); });
+    }).catch(error => { if (!controller.signal.aborted && sequence === listSequence.current) setList(previous => ({ ...previous, loading: false, error: error.message })); });
     return () => controller.abort();
   }, [listVersion]);
   const validationError = campaign ? periodError(period, campaign) : '';
@@ -55,9 +60,12 @@ export function LandingAdmin() {
   const requestKey = query + ':' + reload;
   useEffect(() => {
     if (!query) return;
-    const controller = new AbortController();
-    fetch('/api/landing/performance?' + query + '&include=ui', { cache: 'no-store', signal: controller.signal }).then(responseJson).then(value => { if (!controller.signal.aborted) setResult({ requestKey, report: value }); }).catch(error => { if (!controller.signal.aborted) setResult(previous => ({ ...previous, requestKey, error: error.message })); });
-    return () => controller.abort();
+    const controller = new AbortController(), sequence = ++requestSequence.current;
+    // Update filter checkboxes and URL immediately; coalesce rapid selections.
+    const timer = setTimeout(() => {
+      fetch('/api/landing/performance?' + query + '&include=ui', { cache: 'no-store', signal: controller.signal }).then(responseJson).then(value => { if (!controller.signal.aborted && sequence === requestSequence.current) setResult({ requestKey, report: value }); }).catch(error => { if (!controller.signal.aborted && sequence === requestSequence.current) setResult(previous => ({ ...previous, requestKey, error: error.message })); });
+    }, 500);
+    return () => { clearTimeout(timer); controller.abort(); };
   }, [query, requestKey]);
   useEffect(() => {
     if (!initialized.current) return;
@@ -67,10 +75,12 @@ export function LandingAdmin() {
     if (campaignId) { url.searchParams.set('campaign', campaignId); url.searchParams.set('preset', period.preset); url.searchParams.set('start', period.start); url.searchParams.set('end', period.end); }
     if (period.compare) { url.searchParams.set('compare', '1'); url.searchParams.set('compare_start', period.compareStart); url.searchParams.set('compare_end', period.compareEnd); }
     if (settingsOpen) url.searchParams.set('panel', 'settings');
+    else if (url.searchParams.get('tab') === 'settings') url.searchParams.set('tab', 'dashboard');
+    if (parseSampleMin(sampleMin) !== null) url.searchParams.set('sample_min', sampleMin);
     appendFilters(url.searchParams, filters);
     // Preserve Next's history state and scroll position. No route-wide refresh.
     history.replaceState(history.state, '', url);
-  }, [courseId, campaignId, period, filters, settingsOpen]);
+  }, [courseId, campaignId, period, filters, settingsOpen, sampleMin]);
   useEffect(() => {
     if (!dirty) return;
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
@@ -101,10 +111,19 @@ export function LandingAdmin() {
     pendingRef.current = true; setPending(true); setMessage('');
     try {
       const value = await responseJson(await fetch('/api/landing/performance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }));
+      // A pre-save GET must not overwrite the confirmed persisted state.
+      requestSequence.current++;
+      if (value.campaign) listSequence.current++;
       if (value.campaign) { const saved = value.campaign as PerformanceCampaign; setCourses(previous => previous.map(item => ({ ...item, campaigns: item.campaigns.map(c => c.id === saved.id ? saved : c) }))); setDirty(false); const range = campaignRange({ startDay: period.start, endDay: period.end }, saved); if (range.startDay !== period.start || range.endDay !== period.end) { const prior = previousRange(range.startDay, range.endDay); setPeriod(old => ({ ...old, start: range.startDay, end: range.endDay, compareStart: prior.startDay, compareEnd: prior.endDay })); } }
       setMessage(success); setReload(value => value + 1); return true;
     } catch (error) { setMessage((error as Error).message); if (propagateError) throw error; return false; } finally { pendingRef.current = false; setPending(false); }
   }
+  const classify: Classify = async (row, value) => {
+    if (!campaign) return false;
+    const okay = await post({ action: 'classification', campaign_id: campaign.id, adset: row.adset, creative: row.creative, ad_type: value }, '광고 유형을 저장했습니다.');
+    if (okay) setResult(previous => !previous.report || previous.report.campaign.id !== campaign.id ? previous : ({ ...previous, report: { ...previous.report, performance: previous.report.performance.map(item => item.adset === row.adset && item.creative === row.creative ? { ...item, ad_type: value } : item) } }));
+    return okay;
+  };
   async function sync() {
     if (!campaign || pendingRef.current || dirty || !campaign.meta_ad_account_id || !metaCampaignIds(campaign).length) return false;
     pendingRef.current = true; setPending(true); setSyncing(true); setMessage('Meta 데이터를 동기화하고 있습니다.');
@@ -131,11 +150,11 @@ export function LandingAdmin() {
       {error && <InlineError onRetry={() => setReload(value => value + 1)}>{error}{report && ' 이전 조회 결과는 아래에 유지됩니다.'}</InlineError>}
       {!campaign ? list.loading ? <TrackingSkeleton/> : <CompactEmpty title={courses.length ? '캠페인이 등록되지 않았습니다.' : '무료클래스가 등록되지 않았습니다.'} action={<Link className="admin-button admin-button--tertiary" href="/admin/products">상품 관리 확인</Link>}>무료클래스와 연결된 캠페인 구성을 확인해 주세요.</CompactEmpty> : !report ? error ? null : <TrackingSkeleton/> : <>
         {loading && <p className="tracking-help" role="status">새 조건을 조회하고 있습니다. 아래는 이전 조회 결과입니다.</p>}
-        <div aria-busy={loading} className={loading ? 'tracking-refreshing' : ''}><PerformanceDashboard report={report} compare={period.compare} pending={pending || loading || !!error} onRetry={() => setReload(value => value + 1)} onClassify={(row, value) => void post({ action: 'classification', campaign_id: campaign.id, adset: row.adset, creative: row.creative, ad_type: value }, '광고 유형을 저장했습니다.')}/><ActualsPanel report={report} onEdit={row => setDrawer({ row })} onAdd={() => setDrawer({ row: null })} onSettings={() => setSettingsOpen(true)} onRetry={() => setReload(value => value + 1)}/></div>
+        <div aria-busy={loading} className={loading ? 'tracking-refreshing' : ''}><PerformanceDashboard key={campaign.id} report={report} compare={period.compare} filtered={Object.values(filters).some(values => values.length > 0)} sampleMin={sampleMin} onSampleMin={setSampleMin} pending={pending || loading || !!error} onRetry={() => setReload(value => value + 1)} onClassify={classify}/><ActualsPanel report={report} onEdit={row => setDrawer({ row })} onAdd={() => setDrawer({ row: null })} onSettings={() => setSettingsOpen(true)} onRetry={() => setReload(value => value + 1)}/></div>
       </>}
     </div>
     {drawer && campaign && <ActualDrawer campaign={campaign} initial={drawer.row} pending={pending} onClose={() => setDrawer(null)} onSave={values => post({ action: 'actual', campaign_id: campaign.id, values }, '일별 실측값을 저장했습니다.')}/>}
-    {settingsOpen && campaign && <AdminDrawer title="캠페인 설정" size="large" onClose={closeSettings}><CampaignSettings key={JSON.stringify(campaign) + ':' + listVersion} campaign={campaign} canManage={list.canManage} pending={pending} syncing={syncing} onDirty={setDirty} onSave={values => post({ action: 'campaign', campaign_id: campaign.id, values }, '캠페인 설정을 저장했습니다.', true)} onSync={sync}/></AdminDrawer>}
+    {settingsOpen && campaign && <AdminDrawer title="캠페인 설정" size="large" className="tracking-settings-drawer" onClose={closeSettings}><CampaignSettings key={JSON.stringify(campaign) + ':' + listVersion} campaign={campaign} canManage={list.canManage} pending={pending} syncing={syncing} onDirty={setDirty} onSave={values => post({ action: 'campaign', campaign_id: campaign.id, values }, '캠페인 설정을 저장했습니다.', true)} onSync={sync}/></AdminDrawer>}
     {navigation && (
       <DiscardConfirmation message="변경한 캠페인 설정을 저장하지 않고 이동할까요?" onCancel={() => setNavigation(null)} onDiscard={() => { const proceed = navigation.proceed; setNavigation(null); setDirty(false); proceed(); }}/>
     )}

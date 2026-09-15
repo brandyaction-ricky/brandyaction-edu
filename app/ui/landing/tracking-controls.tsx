@@ -32,8 +32,10 @@ function MultiSelect({ filterKey, values, selected, onToggle }: { filterKey: Fil
   useEffect(() => {
     if (!open) return;
     const outside = (event: MouseEvent) => { if (!root.current?.contains(event.target as Node)) setOpen(false); };
-    document.addEventListener('mousedown', outside);
-    return () => document.removeEventListener('mousedown', outside);
+    // Mobile options are in normal flow. Closing on mousedown shifts the
+    // pressed footer/chip before mouseup and can swallow its click.
+    document.addEventListener('click', outside);
+    return () => document.removeEventListener('click', outside);
   }, [open]);
   return <div className="tracking-multiselect" ref={root} onKeyDown={event => { if (event.key === 'Escape' && open) { event.preventDefault(); event.stopPropagation(); setOpen(false); root.current?.querySelector('button')?.focus(); } }}>
     <AdminButton type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)}>{FILTER_LABELS[filterKey]}{selected.length > 0 && ` · ${selected.length}`}<ChevronDown size={14}/></AdminButton>

@@ -28,3 +28,21 @@
 @media(max-width:720px){.edu-admin .tracking-toolbar{padding:14px}.edu-admin .tracking-context-row>.admin-field{width:100%;flex-basis:100%}.edu-admin .tracking-context-status{flex-basis:100%}.edu-admin .tracking-context-row>.admin-button{flex:1}.edu-admin .tracking-periods{gap:4px}.edu-admin .tracking-periods>.admin-button{flex:1 0 auto}.edu-admin .tracking-date-inputs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.edu-admin .tracking-date-inputs>label{width:auto}.edu-admin .tracking-date-inputs>.tracking-help{grid-column:1/-1}.edu-admin .tracking-filter-drawer{inset:auto 0 0;height:auto;max-height:85dvh;border-radius:12px 12px 0 0}.edu-admin .tracking-filter-drawer .tracking-filter-body{overflow:auto;padding:16px}.edu-admin .tracking-filter-grid{grid-template-columns:1fr}.edu-admin .tracking-filter-drawer .tracking-options{position:static;width:100%;max-width:none;max-height:220px;margin-top:6px;box-shadow:none;background:var(--admin-surface-subtle)}.edu-admin .tracking-ops-strip{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 0}.edu-admin .tracking-ops-strip>div:nth-child(3n){border-right:1px solid var(--admin-border)}.edu-admin .tracking-ops-strip>div:nth-child(2n){border:0}.edu-admin .tracking-skeleton-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.edu-admin .tracking-subsection-head{align-items:flex-start;flex-direction:column}.edu-admin .tracking-drawer-body{padding:16px}.edu-admin .tracking-settings>p{margin-inline:16px}.edu-admin .tracking-settings>fieldset{padding:16px}}
 @media(max-width:380px){.edu-admin .tracking-date-inputs,.edu-admin .tracking-skeleton-metrics{grid-template-columns:1fr}.edu-admin .tracking-ops-strip{grid-template-columns:1fr}.edu-admin .tracking-ops-strip>div{border-right:0}.edu-admin .tracking-context-row>.admin-button{flex-basis:100%}}
 @media(prefers-reduced-motion:reduce){.edu-admin .tracking-refreshing{transition:none}}
+
+/* Phase 1: funnel and inline feedback, scoped to this dashboard. */
+.edu-admin .tracking-funnel{display:grid;gap:12px;min-width:0}
+.edu-admin .tracking-funnel h2{margin:0;font-size:16px;font-weight:650}
+.edu-admin .tracking-funnel>.tracking-help{margin:0}
+.edu-admin .tracking-metric-details>summary{cursor:pointer;font-size:13px;font-weight:600;min-height:44px;align-content:center}
+.edu-admin .tracking-metric-details[open]>.admin-metric-grid{margin-top:12px}
+.edu-admin .tracking-sample-min{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary)}
+.edu-admin .tracking-sample-min .admin-input{width:100px}
+.edu-admin .tracking-low-sample{color:var(--text-secondary);font-size:12px}
+.edu-admin .tracking-low-sample small,.edu-admin .tracking-ad-type small{display:block;font-size:11px;line-height:16px}
+.edu-admin .tracking-ad-type{display:grid;gap:4px;justify-items:start}
+.edu-admin .tracking-ad-type small{color:var(--text-secondary)}
+.edu-admin .tracking-ad-type [role=alert]{color:var(--danger,#b42318);white-space:normal;max-width:160px}
+.edu-admin .tracking-admin .admin-data-table :is(th,td)[data-align=number]{text-align:right}
+.edu-admin .tracking-options span,.edu-admin .tracking-chip{overflow-wrap:anywhere}
+@media(max-width:720px){.edu-admin .tracking-admin :is(.admin-input,.admin-select,.tracking-chip,.tracking-options label){min-height:44px}.edu-admin .tracking-performance-table [aria-sort] button{min-height:44px}}
+@media(max-width:720px){.edu-admin .tracking-admin dialog:is(.tracking-settings-drawer,.tracking-drawer){inset:0;width:100%;max-width:100%;height:100dvh;max-height:100dvh;border-radius:0}.edu-admin .tracking-admin dialog.tracking-filter-drawer{width:100%;max-width:100%;border-radius:12px 12px 0 0}}
