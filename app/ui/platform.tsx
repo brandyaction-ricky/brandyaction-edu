@@ -608,18 +608,22 @@ export function Platform({
   else
     body = (
       <div className="wrap">
-        <Empty
-          title={
-            loading
-              ? "페이지를 불러오고 있습니다."
-              : "페이지를 찾을 수 없습니다."
-          }
-        />
-        <div className="center">
-          <Link className="btn primary" href="/">
-            홈으로
-          </Link>
-        </div>
+        {loading ? (
+          <section className="page-loading" role="status" aria-live="polite" aria-busy="true">
+            <span className="page-loading-spinner" aria-hidden="true" />
+            <h1>곧 열립니다</h1>
+            <p>페이지를 준비하고 있어요. 잠시만 기다려 주세요.</p>
+          </section>
+        ) : (
+          <>
+            <Empty title={error ? "페이지를 불러오지 못했습니다." : "페이지를 찾을 수 없습니다."} />
+            {!error && <div className="center">
+              <Link className="btn primary" href="/">
+                홈으로
+              </Link>
+            </div>}
+          </>
+        )}
       </div>
     );
   function checkout() {
