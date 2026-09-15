@@ -175,6 +175,11 @@ export function AdminShell({
           : current,
     byKey = new Map(available.map((s) => [s.key, s])),
     pending = num((data.admin_summary || [])[0], "pendingReviews");
+  const contentWidth = ["landing", "analytics", "orders", "customers", "members", "reviews"].includes(selected)
+    ? "wide"
+    : ["seo", "settings", "staff"].includes(selected)
+      ? "narrow"
+      : "standard";
   const navLink = (key: string) => {
     const s = byKey.get(key);
     if (!s && key !== "overview") return null;
@@ -306,7 +311,7 @@ export function AdminShell({
             </span>
           </div>
         </header>
-        <div className="content" id="admin-content" tabIndex={-1}>
+        <div className={`content admin-content-${contentWidth}`} id="admin-content" tabIndex={-1}>
           {children}
         </div>
       </div>
