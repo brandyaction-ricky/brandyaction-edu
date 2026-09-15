@@ -20,10 +20,22 @@ BrandyAction EDU Admin Design System 공통 기반과 무료클래스 트래킹 
 
 ## 테스트 환경
 
-- Branch: `feat/admin-design-system`에서 검증 후 `develop` 반영 예정
-- Base commit: `cc8a025fa1eb441f1e77bc46eca1e55fcfd021cc`
+- Branch: `develop`
+- 구현 commit: `54a0bcb5c8a97d6b0eb7c7bcb00ec2ba0ccbe114`
 - DEV URL: `https://brandyaction-edu-dev.vercel.app/admin/landing`
+- Vercel deployment: `dpl_2XXbWTbPGMFHZQ1wE7eQmpvmjd3c` · READY
 - DB Migration: 없음
+
+## DEV 자체 검증
+
+- TypeScript: `npx tsc --noEmit` 통과
+- 전체 자동화 테스트: 165개 통과
+- ESLint: 오류 0건, 기존 `<img>` 최적화 경고 15건
+- Production build: Next.js 16.3.0 build 통과
+- DEV Desktop: Sidebar 224px, Topbar 64px, 8 KPI 4×2, 문서 가로 overflow 0 확인
+- Drawer: 설정 640px, 실측 520px, Escape 닫기·focus 복귀·body scroll lock 확인
+- 호환 route: `/admin/metrics` query 보존과 통합 실측 영역 scroll 확인
+- 모바일: 720px 이하 2열 KPI, 전체 화면 Drawer, 44px control, 표 horizontal scroll을 자동화된 CSS contract test로 확인
 
 ## 필수 테스트 시나리오
 
