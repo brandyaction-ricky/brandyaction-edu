@@ -85,18 +85,45 @@ export function AdminEmptyState({ title, children, action, compact = false }: { 
 export function AdminSkeleton({ lines = 3, className }: { lines?: number; className?: string }) { return <div className={classes('admin-skeleton', className)} role="status" aria-label="불러오는 중">{Array.from({ length: lines }, (_, index) => <span key={index}/>)}</div>; }
 export function AdminInlineError({ children, onRetry }: { children: ReactNode; onRetry?: () => void }) { return <div className="admin-inline-error" role="alert"><span>{children}</span>{onRetry && <AdminButton size="sm" onClick={onRetry}>재시도</AdminButton>}</div>; }
 
-let overlayDepth = 0;
+const dialogStack: Array<{ node: HTMLDialogElement; restoreFocus: HTMLElement | null }> = [];
 let savedOverflow = '';
+function dialogTabStops(node: HTMLDialogElement) {
+  return Array.from(node.querySelectorAll<HTMLElement>('a[href],area[href],button,input,select,textarea,summary,iframe,object,embed,[contenteditable],[tabindex]'))
+    .filter(element => element.tabIndex >= 0 && !element.matches(':disabled') && !element.closest('[hidden],[inert]') && element.closest('dialog') === node && element.getClientRects().length > 0 && !['hidden', 'collapse'].includes(getComputedStyle(element).visibility))
+    .sort((a, b) => (a.tabIndex || Infinity) - (b.tabIndex || Infinity));
+}
 function AdminDialogSurface({ title, onClose, className, children }: { title: string; onClose: () => void; className: string; children: ReactNode }) {
   const dialog = useRef<HTMLDialogElement>(null), titleId = useId(), closeHandler = useRef(onClose);
   useEffect(() => { closeHandler.current = onClose; }, [onClose]);
   useEffect(() => {
-    const node = dialog.current!, previous = document.activeElement as HTMLElement | null;
-    if (overlayDepth === 0) savedOverflow = document.body.style.overflow;
-    overlayDepth += 1; node.showModal(); document.body.style.overflow = 'hidden';
-    return () => { node.close(); overlayDepth -= 1; if (overlayDepth === 0) document.body.style.overflow = savedOverflow; if (previous?.isConnected) previous.focus(); };
+    const node = dialog.current!, entry = { node, restoreFocus: document.activeElement as HTMLElement | null };
+    if (dialogStack.length === 0) savedOverflow = document.body.style.overflow;
+    dialogStack.push(entry); node.showModal(); document.body.style.overflow = 'hidden';
+    function trapTab(event: KeyboardEvent) {
+      if (event.key !== 'Tab' || event.defaultPrevented || dialogStack.at(-1) !== entry) return;
+      // Recompute on each key: saving, validation and nested dialogs can change
+      // which controls are enabled or visible without remounting this surface.
+      const stops = dialogTabStops(node), first = stops[0], last = stops.at(-1), active = document.activeElement;
+      if (!first || !stops.includes(active as HTMLElement) || (event.shiftKey ? active === first : active === last)) {
+        event.preventDefault(); event.stopPropagation();
+        (event.shiftKey ? last : first)?.focus();
+        if (!first) node.focus();
+      }
+    }
+    document.addEventListener('keydown', trapTab, true);
+    return () => {
+      document.removeEventListener('keydown', trapTab, true);
+      dialogStack.splice(dialogStack.indexOf(entry), 1);
+      // A confirm may unmount together with its parent drawer. Carry its return
+      // target forward so effect cleanup order cannot strand focus on BODY.
+      for (const remaining of dialogStack) if (remaining.restoreFocus && node.contains(remaining.restoreFocus)) remaining.restoreFocus = entry.restoreFocus;
+      node.close();
+      const top = dialogStack.at(-1);
+      if (!top) document.body.style.overflow = savedOverflow;
+      if (entry.restoreFocus?.isConnected && (!top || top.node.contains(entry.restoreFocus))) entry.restoreFocus.focus();
+    };
   }, []);
-  return <dialog ref={dialog} className={classes('admin-dialog', className)} aria-labelledby={titleId} onCancel={event => { event.preventDefault(); closeHandler.current(); }} onClick={event => { if (event.target !== event.currentTarget) return; const box = event.currentTarget.getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) closeHandler.current(); }}><header className="admin-dialog-header"><h2 id={titleId}>{title}</h2><AdminIconButton label="닫기" onClick={() => closeHandler.current()}><X size={18}/></AdminIconButton></header>{children}</dialog>;
+  return <dialog ref={dialog} className={classes('admin-dialog', className)} aria-labelledby={titleId} onCancel={event => { event.preventDefault(); event.stopPropagation(); closeHandler.current(); }} onClick={event => { if (event.target !== event.currentTarget) return; const box = event.currentTarget.getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) closeHandler.current(); }}><header className="admin-dialog-header"><h2 id={titleId}>{title}</h2><AdminIconButton label="닫기" onClick={() => closeHandler.current()}><X size={18}/></AdminIconButton></header>{children}</dialog>;
 }
 export function AdminDrawer({ title, onClose, size = 'default', children, className }: { title: string; onClose: () => void; size?: 'small' | 'default' | 'large'; children: ReactNode; className?: string }) { return <AdminDialogSurface title={title} onClose={onClose} className={classes('admin-drawer', `admin-drawer--${size}`, className)}>{children}</AdminDialogSurface>; }
 export function AdminModal({ title, onClose, children, className }: { title: string; onClose: () => void; children: ReactNode; className?: string }) { return <AdminDialogSurface title={title} onClose={onClose} className={classes('admin-modal', className)}>{children}</AdminDialogSurface>; }
