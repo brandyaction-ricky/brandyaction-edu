@@ -21,20 +21,21 @@ function load(file, mocks = {}) {
 const settings = load('lib/meta-campaign-settings.ts');
 const idA='120000000000000001', idB='120000000000000003';
 const campaign={id:'bbbbbbbb-bbbb-4000-8000-000000000002',landing_id:'aaaaaaaa-aaaa-4000-8000-000000000001',name:'Fixture campaign',utm_campaign:'fixture',start_day:'2026-09-01',end_day:'2036-09-01',new_customer_price:1200,existing_customer_price:900,live_peak:null,meta_ad_account_id:null,meta_campaign_id:null,meta_campaign_ids:[],meta_sync_status:'not_configured',meta_sync_error:null,updated_at:'2026-09-01T00:00:00.000Z'};
-function setup({initial=campaign,role='admin',fetchRows=async()=>[]}={}) {
+const commonAccount='act_123456789';
+function setup({initial=campaign,role='admin',fetchRows=async()=>[],account=commonAccount,accountError=null}={}) {
   let row=structuredClone(initial), writes=0; const rpcCalls=[];
   const db={from(table){let patch=null,filters=[];const query={
     select(){return query},eq(key,value){filters.push([key,value]);return query},is(){return query},order(){return query},
     update(value){patch=value;return query},
     async maybeSingle(){return run(false)},async single(){return run(false)},then(resolve,reject){return Promise.resolve(run(true)).then(resolve,reject)}
   };function run(list){
-    if(table==='site_settings')return{data:null,error:null};
+    if(table==='site_settings')return{data:account==null?null:{value:{adAccountId:account}},error:accountError};
     if(table==='courses')return{data:[{id:row.landing_id,title:'Fixture',category:'free'}],error:null};
     if(table==='landing_configs')return{data:[],error:null};
     if(filters.some(([key,value])=>row[key]!==value))return{data:null,error:null};
     if(patch){row={...row,...patch};writes++;}
     return{data:list?[structuredClone(row)]:structuredClone(row),error:null};
-  }return query;},async rpc(name,args){rpcCalls.push({name,args});return{data:null,error:null}}};
+  }return query;},async rpc(name,args){rpcCalls.push({name,args});return{data:name==='edu_marketing_dashboard'?{performance:[],summary_b:{spend:37.5}}:null,error:null}}};
   const mocks={'@/lib/supabase/admin':{createAdminClient:()=>db},'@/lib/operator-permissions':{getOperatorUser:async()=>role?{role,id:null}:null},'@/lib/landing-performance-ui-server':{performanceUiDetails:async()=>null},'@/lib/meta-marketing':{fetchMetaCampaigns:fetchRows}};
   const api=load('app/api/landing/performance/route.ts',mocks), meta=load('app/api/landing/performance/meta/route.ts',mocks);
   const request=(values,origin='https://fixture.test')=>new Request('https://fixture.test/api/landing/performance',{method:'POST',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify({action:'campaign',campaign_id:row.id,values})});
@@ -51,22 +52,22 @@ test('numeric account normalization and multiple IDs preserve integer precision'
   assert.throws(()=>settings.normalizeMetaAccountId('act_'));
 });
 test('settings save and fresh GET retain normalized IDs, all values and zero price',async()=>{
-  const h=setup();const response=await h.api.POST(h.request({...values,meta_ad_account_id:'123456789',meta_campaign_ids:`${idA}\n${idB},${idA}`}));
+  const h=setup();const response=await h.api.POST(h.request({...values,meta_ad_account_id:'999999999',meta_campaign_ids:`${idA}\n${idB},${idA}`}));
   assert.equal(response.status,200);
   const saved=(await response.json()).campaign;
   assert.equal(saved.meta_ad_account_id,'act_123456789');assert.deepEqual(saved.meta_campaign_ids,[idA,idB]);assert.equal(saved.meta_campaign_id,idA);assert.equal(saved.meta_sync_status,'idle');
   const loaded=await (await h.api.GET(new Request('https://fixture.test/api/landing/performance'))).json();
   assert.deepEqual(loaded.courses[0].campaigns[0],saved);assert.equal(saved.new_customer_price,0);assert.equal(saved.existing_customer_price,900);assert.equal(saved.live_peak,null);assert.equal(saved.name,values.name);
 });
-test('basic settings save without Meta account or common configuration; invalid IDs preserve DB',async()=>{
-  const h=setup();assert.equal((await h.api.POST(h.request({...values,meta_ad_account_id:'',meta_campaign_ids:[]}))).status,200);
+test('basic settings save without common configuration; invalid campaign IDs preserve DB',async()=>{
+  const h=setup({account:null});assert.equal((await h.api.POST(h.request({...values,meta_ad_account_id:'',meta_campaign_ids:[]}))).status,200);
   assert.equal(h.row().meta_sync_status,'not_configured');const before=structuredClone(h.row());
-  const response=await h.api.POST(h.request({...values,meta_ad_account_id:'act_bad',meta_campaign_ids:[idA]}));assert.equal(response.status,400);assert.match((await response.json()).error,/광고계정/);assert.deepEqual(h.row(),before);
+  const response=await h.api.POST(h.request({...values,meta_ad_account_id:'act_bad',meta_campaign_ids:['invalid']}));assert.equal(response.status,400);assert.match((await response.json()).error,/캠페인 ID/);assert.deepEqual(h.row(),before);
 });
 test('legacy single ID payload and clearing IDs are compatible; non-admin and foreign origin remain denied',async()=>{
   const h=setup();assert.equal((await h.api.POST(h.request({...values,meta_ad_account_id:'act_123',meta_campaign_id:idA}))).status,200);assert.deepEqual(h.row().meta_campaign_ids,[idA]);
   assert.equal((await h.api.POST(h.request({...values,meta_ad_account_id:'',meta_campaign_ids:[]}))).status,200);
-  const loaded=await(await h.api.GET(new Request('https://fixture.test/api/landing/performance'))).json();assert.equal(loaded.courses[0].campaigns[0].meta_ad_account_id,null);
+  const loaded=await(await h.api.GET(new Request('https://fixture.test/api/landing/performance'))).json();assert.equal(loaded.courses[0].campaigns[0].meta_ad_account_id,commonAccount);
   for (const role of ['operator',null]) { const denied=setup({role});assert.equal((await denied.api.POST(denied.request(values))).status,403);assert.equal(denied.writes(),0); }
   assert.equal((await h.api.POST(h.request(values,'https://elsewhere.test'))).status,403);
 });
@@ -81,7 +82,7 @@ test('all Meta campaigns fetch before one atomic write; future end day is capped
   try{
     let requested;const initial={...campaign,meta_ad_account_id:'act_123',meta_campaign_id:idA,meta_campaign_ids:[idA,idB]};
     const h=setup({initial,fetchRows:async input=>{requested=input;return[];}});
-    assert.equal((await h.meta.POST(h.request({}))).status,200);assert.deepEqual(requested.campaignIds,[idA,idB]);assert.equal(requested.endDay,new Date(Date.now()+9*3600000).toISOString().slice(0,10));assert.equal(h.rpcCalls.length,1);assert.equal(h.rpcCalls[0].name,'edu_store_campaign_meta');
+    assert.equal((await h.meta.POST(h.request({}))).status,200);assert.equal(requested.accountId,commonAccount);assert.deepEqual(requested.campaignIds,[idA,idB]);assert.equal(requested.endDay,new Date(Date.now()+9*3600000).toISOString().slice(0,10));assert.equal(h.rpcCalls.length,1);assert.equal(h.rpcCalls[0].name,'edu_store_campaign_meta');
     const fail=setup({initial,fetchRows:async()=>{throw Error('fixture failure')}});assert.equal((await fail.meta.POST(fail.request({}))).status,502);assert.equal(fail.rpcCalls.length,0);assert.equal(fail.row().meta_sync_status,'failed');
   }finally{for(const [i,key]of['META_ACCESS_TOKEN','META_GRAPH_API_VERSION'].entries())if(previous[i]===undefined)delete process.env[key];else process.env[key]=previous[i];}
 });
@@ -95,4 +96,28 @@ test('Meta fetch retrieves and deduplicates multiple campaign IDs, rejects mixed
     const rows=await api.fetchMetaCampaigns(input);assert.equal(rows.length,2);assert.equal(rows.reduce((n,r)=>n+r.spend,0),25);assert.equal(fetched.filter(p=>p.endsWith('/insights')).length,2);
     mismatch=true;await assert.rejects(api.fetchMetaCampaigns(input),/META_CAMPAIGN_MISMATCH/);
   }finally{global.fetch=original;}
+});
+
+test('list and detail always use common account for null and stale campaign rows',async()=>{
+  for(const account of [null,'act_999']){
+    const h=setup({initial:{...campaign,meta_ad_account_id:account}});
+    const list=await(await h.api.GET(new Request('https://fixture.test/api/landing/performance'))).json();
+    assert.equal(list.courses[0].campaigns[0].meta_ad_account_id,commonAccount);
+    const detail=await(await h.api.GET(new Request(`https://fixture.test/api/landing/performance?landing=${campaign.landing_id}&campaign=${campaign.id}&start=2026-09-14&end=2026-09-15`))).json();
+    assert.equal(detail.campaign.meta_ad_account_id,commonAccount);assert.equal(detail.summary_b.spend,37.5);assert.equal(h.writes(),0);
+  }
+});
+test('legacy account payload cannot change or clear the common account, including invalid input',async()=>{
+  for(const value of ['',null,'act_999','invalid',123]){
+    const h=setup();const response=await h.api.POST(h.request({...values,meta_ad_account_id:value,meta_campaign_ids:[idA]}));
+    assert.equal(response.status,200);assert.equal(h.row().meta_ad_account_id,commonAccount);assert.equal(h.row().meta_sync_status,'idle');
+  }
+});
+test('missing shared account prevents Meta requests even when a stale row has an account',async()=>{
+  let fetched=false;const h=setup({account:null,initial:{...campaign,meta_ad_account_id:'act_999',meta_campaign_ids:[idA]},fetchRows:async()=>{fetched=true;return[]}});
+  const response=await h.meta.POST(h.request({}));assert.equal(response.status,503);assert.match((await response.json()).error,/공통 광고계정/);assert.equal(fetched,false);assert.equal(h.writes(),0);assert.equal(h.rpcCalls.length,0);
+});
+test('shared setting query failure leaves stored campaign values untouched',async()=>{
+  const h=setup({accountError:{message:'fixture failure'}});const response=await h.api.POST(h.request({...values,meta_campaign_ids:[idA]}));
+  assert.equal(response.status,400);assert.match((await response.json()).error,/공통 설정/);assert.equal(h.writes(),0);
 });
