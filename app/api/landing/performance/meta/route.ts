@@ -1,7 +1,8 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getOperatorUser } from '@/lib/operator-permissions';
 import { validId } from '@/lib/landing';
-import { fetchMetaCampaign } from '@/lib/meta-marketing';
+import { fetchMetaCampaigns } from '@/lib/meta-marketing';
+import { metaCampaignIds, normalizeMetaAccountId } from '@/lib/meta-campaign-settings';
 
 const reply = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'private, no-store' } });
 export async function POST(request: Request) {
@@ -12,32 +13,33 @@ export async function POST(request: Request) {
     const body = await request.json() as Record<string, unknown>;
     if (!validId(body.campaign_id)) return reply({ error: '캠페인을 선택해 주세요.' }, 400);
     const db = createAdminClient();
-    const [found, setting] = await Promise.all([
-      db.from('landing_campaigns').select('*').eq('id', body.campaign_id).maybeSingle(),
-      db.from('site_settings').select('value').eq('key', 'edu_meta_marketing').maybeSingle(),
-    ]);
+    const found = await db.from('landing_campaigns').select('*').eq('id', body.campaign_id).maybeSingle();
     if (found.error || !found.data) return reply({ error: '캠페인을 찾을 수 없습니다.' }, 404);
-    if (setting.error) throw Error('META_ACCOUNT_SETTING_FAILED');
     const campaign = found.data;
-    const accountId = setting.data?.value && typeof setting.data.value === 'object' ? String((setting.data.value as Record<string,unknown>).adAccountId || '').trim() : '';
-    if (!/^act_\d+$/.test(accountId) || !campaign.meta_campaign_id) return reply({ error: 'Meta 공통 광고계정과 캠페인 ID를 먼저 연결해 주세요.' }, 400);
+    const accountId = normalizeMetaAccountId(campaign.meta_ad_account_id), campaignIds = metaCampaignIds(campaign);
+    if (!accountId || !campaignIds.length) return reply({ error: 'Meta 광고계정 ID와 캠페인 ID를 입력하고 설정을 저장해 주세요.' }, 400);
     const token = process.env.META_ACCESS_TOKEN, version = process.env.META_GRAPH_API_VERSION;
-    if (!token || !version) return reply({ error: 'DEV 서버의 Meta API 환경변수가 설정되지 않았습니다.' }, 503);
-    await db.from('landing_campaigns').update({ meta_sync_status: 'syncing', meta_sync_error: null, updated_by: user.id, updated_at: new Date().toISOString() }).eq('id', campaign.id);
+    if (!token || !version) {
+      const error = '서버 연동 설정이 필요합니다. 운영 담당자가 META_ACCESS_TOKEN과 META_GRAPH_API_VERSION을 설정해야 합니다. 저장된 ID는 유지됩니다.';
+      await db.from('landing_campaigns').update({ meta_sync_status: 'failed', meta_sync_error: error, updated_at: new Date().toISOString() }).eq('id', campaign.id).eq('updated_at', campaign.updated_at);
+      return reply({ error }, 503);
+    }
+    const today = new Date(Date.now() + 9 * 3600000).toISOString().slice(0,10);
+    const endDay = campaign.end_day < today ? campaign.end_day : today;
+    if (campaign.start_day > endDay) return reply({ error: '캠페인 시작일 이후에 Meta 데이터를 동기화할 수 있습니다.' }, 400);
+    const syncStarted = new Date().toISOString();
+    const started = await db.from('landing_campaigns').update({ meta_sync_status: 'syncing', meta_sync_error: null, updated_by: user.id, updated_at: syncStarted }).eq('id', campaign.id).eq('updated_at', campaign.updated_at).select('updated_at').maybeSingle();
+    if (started.error || !started.data) return reply({ error: '설정이 변경됐습니다. 새로고침 후 다시 동기화해 주세요.' }, 409);
     try {
-      const rows = await fetchMetaCampaign({ version, token, accountId, campaignId: campaign.meta_campaign_id, startDay: campaign.start_day, endDay: campaign.end_day });
-      if (rows.length) {
-        const meta = await db.from('landing_campaign_meta_daily').upsert(rows.map(row => ({ campaign_id: campaign.id, ...row, synced_at: new Date().toISOString() })), { onConflict: 'campaign_id,day,meta_ad_id' });
-        if (meta.error) throw Error('META_STORE_FAILED');
-        const dimensions = await db.from('landing_campaign_dimensions').upsert(rows.map(row => ({ campaign_id: campaign.id, adset_key: encodeURIComponent(row.adset_name), creative_key: encodeURIComponent(row.creative_name), meta_adset_id: row.meta_adset_id, meta_ad_id: row.meta_ad_id, meta_creative_id: row.meta_creative_id, ad_type: 'unclassified', updated_by: user.id, updated_at: new Date().toISOString() })), { onConflict: 'campaign_id,adset_key,creative_key', ignoreDuplicates: true });
-        if (dimensions.error) throw Error('META_DIMENSION_STORE_FAILED');
-      }
-      const syncedAt = new Date().toISOString();
-      await db.from('landing_campaigns').update({ meta_sync_status: 'success', meta_last_synced_at: syncedAt, meta_sync_error: null, updated_by: user.id, updated_at: syncedAt }).eq('id', campaign.id);
-      return reply({ ok: true, rows: rows.length, synced_at: syncedAt });
+      const rows = await fetchMetaCampaigns({ version, token, accountId, campaignIds, startDay: campaign.start_day, endDay });
+      const dimensions = rows.map(row => ({ adset_key: encodeURIComponent(row.adset_name), creative_key: encodeURIComponent(row.creative_name), meta_adset_id: row.meta_adset_id, meta_ad_id: row.meta_ad_id, meta_creative_id: row.meta_creative_id }));
+      const stored = await db.rpc('edu_store_campaign_meta', { p_campaign: campaign.id, p_expected_updated_at: started.data.updated_at, p_rows: rows, p_dimensions: dimensions, p_actor: user.id });
+      if (stored.error) throw Error('META_STORE_FAILED');
+      return reply({ ok: true, rows: rows.length, campaigns: campaignIds.length });
     } catch {
-      await db.from('landing_campaigns').update({ meta_sync_status: 'failed', meta_sync_error: 'Meta 동기화에 실패했습니다. 연결 ID와 권한을 확인해 주세요.', updated_by: user.id, updated_at: new Date().toISOString() }).eq('id', campaign.id);
-      return reply({ error: 'Meta 동기화에 실패했습니다. 기존 데이터는 보존했습니다.' }, 502);
+      const error = 'Meta 동기화에 실패했습니다. 캠페인의 광고계정 소속과 조회 권한을 확인해 주세요. 기존 실적은 보존됐습니다.';
+      await db.from('landing_campaigns').update({ meta_sync_status: 'failed', meta_sync_error: error, updated_by: user.id, updated_at: new Date().toISOString() }).eq('id', campaign.id).eq('updated_at', started.data.updated_at);
+      return reply({ error }, 502);
     }
   } catch { return reply({ error: 'Meta 동기화 요청을 확인해 주세요.' }, 400); }
 }

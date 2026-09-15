@@ -1,5 +1,6 @@
 'use client';
 
+import { metaCampaignIds, metaConnectionHelp, normalizeMetaAccountId, parseMetaCampaignIds } from '@/lib/meta-campaign-settings';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Plus, RefreshCw, Save } from 'lucide-react';
 import { campaignRange, presetRange, type ActualRow, type DashboardReport, type PerformanceCampaign } from '@/lib/landing-performance';
@@ -58,20 +59,25 @@ export function ActualDrawer({ campaign, initial, pending, onClose, onSave }: { 
   </TrackingModal>;
 }
 export function campaignDraft(campaign: PerformanceCampaign) {
-  return { name: campaign.name, utm_campaign: campaign.utm_campaign, start_day: campaign.start_day, end_day: campaign.end_day, live_peak: campaign.live_peak == null ? '' : String(campaign.live_peak), new_customer_price: String(campaign.new_customer_price), existing_customer_price: String(campaign.existing_customer_price), meta_campaign_id: campaign.meta_campaign_id || '' };
+  return { name: campaign.name, utm_campaign: campaign.utm_campaign, start_day: campaign.start_day, end_day: campaign.end_day, live_peak: campaign.live_peak == null ? '' : String(campaign.live_peak), new_customer_price: String(campaign.new_customer_price), existing_customer_price: String(campaign.existing_customer_price), meta_ad_account_id: campaign.meta_ad_account_id || '', meta_campaign_ids: metaCampaignIds(campaign).join('\n') };
 }
 export function CampaignSettings({ campaign, canManage, pending, syncing, onDirty, onSave, onSync }: { campaign: PerformanceCampaign; canManage: boolean; pending: boolean; syncing: boolean; onDirty: (dirty: boolean) => void; onSave: (value: Record<string, unknown>) => Promise<boolean>; onSync: () => Promise<boolean> }) {
   const [draft, setDraft] = useState(() => campaignDraft(campaign)), [baseline, setBaseline] = useState(() => campaignDraft(campaign)), [message, setMessage] = useState('');
   const dirty = JSON.stringify(draft) !== JSON.stringify(baseline), saveLock = useRef(false);
   useEffect(() => { onDirty(dirty); }, [dirty, onDirty]);
   const change = (key: keyof typeof draft, value: string) => { setDraft(values => ({ ...values, [key]: value })); setMessage(''); };
-  const field = (key: keyof typeof draft, label: string, type = 'text') => <label className="field">{label}<input name={key} type={type} value={draft[key]} required={key !== 'live_peak' && key !== 'meta_campaign_id'} min={type === 'number' ? '0' : undefined} step={type === 'number' ? '1' : undefined} inputMode={type === 'number' || key === 'meta_campaign_id' ? 'numeric' : undefined} maxLength={key === 'name' ? 200 : key === 'utm_campaign' ? 250 : undefined} placeholder={key === 'meta_campaign_id' ? '광고 세팅 후 캠페인 ID 입력' : undefined} onChange={event => change(key, event.target.value)}/></label>;
+  const field = (key: keyof typeof draft, label: string, type = 'text') => <label className="field">{label}<input name={key} type={type} value={draft[key]} required={key !== 'live_peak' && key !== 'meta_ad_account_id' && key !== 'meta_campaign_ids'} min={type === 'number' ? '0' : undefined} step={type === 'number' ? '1' : undefined} inputMode={type === 'number' || key === 'meta_campaign_ids' ? 'numeric' : undefined} maxLength={key === 'name' ? 200 : key === 'utm_campaign' ? 250 : undefined} placeholder={key === 'meta_campaign_ids' ? '광고 세팅 후 캠페인 ID 입력' : undefined} onChange={event => change(key, event.target.value)}/></label>;
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (!dirty || pending || saveLock.current) return;
     if (draft.end_day < draft.start_day) { setMessage('종료일은 시작일 이후로 선택해 주세요.'); return; }
     saveLock.current = true;
-    const okay = await onSave(draft); saveLock.current = false;
-    if (okay) { setBaseline(draft); setMessage('설정을 저장했습니다.'); onDirty(false); } else setMessage('설정을 저장하지 못했습니다. 입력값을 확인하고 다시 저장해 주세요.');
+    try {
+      const values = { ...draft, meta_ad_account_id: normalizeMetaAccountId(draft.meta_ad_account_id), meta_campaign_ids: parseMetaCampaignIds(draft.meta_campaign_ids) };
+      const okay = await onSave(values);
+      if (okay) { const saved = { ...draft, meta_ad_account_id: values.meta_ad_account_id, meta_campaign_ids: values.meta_campaign_ids.join('\n') }; setDraft(saved); setBaseline(saved); setMessage('설정을 저장했습니다.'); onDirty(false); }
+      else setMessage('설정을 저장하지 못했습니다. 입력값은 유지됩니다. 다시 저장해 주세요.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : '설정을 저장하지 못했습니다. 입력값은 유지됩니다.'); }
+    finally { saveLock.current = false; }
   }
   const status = metaStatus(campaign, syncing);
   return <form className="tracking-settings tracking-stack" onSubmit={submit}>
@@ -79,9 +85,9 @@ export function CampaignSettings({ campaign, canManage, pending, syncing, onDirt
     {!canManage && <p className="tracking-help">설정은 조회만 가능합니다. 캠페인·Meta 설정 변경에는 관리자 권한이 필요합니다.</p>}
     <fieldset disabled={!canManage || pending}><section className="tracking-card"><h2>기본 정보</h2><div className="tracking-form-grid">{field('name', '캠페인명')}{field('utm_campaign', 'UTM 캠페인')}{field('start_day', '시작일', 'date')}{field('end_day', '종료일', 'date')}{field('live_peak', '라이브 최대 동시시청', 'number')}<div className="field"><span>운영 상태</span><strong>{campaignStatus({ start_day: draft.start_day, end_day: draft.end_day })}</strong><small className="tracking-help">한국 시간의 시작일·종료일 기준으로 자동 표시됩니다.</small></div></div></section>
     <section className="tracking-card"><h2>결제 설정</h2><div className="tracking-form-grid">{field('new_customer_price', '신규 고객 가격 · 원', 'number')}{field('existing_customer_price', '기존 고객 가격 · 원', 'number')}</div><p className="tracking-help">새 실측 기록에는 캠페인 가격이 적용됩니다. 기존 기록의 단가 스냅샷은 유지되어 과거 매출이 바뀌지 않습니다.</p></section>
-    <section className="tracking-card"><div className="tracking-section-head"><h2>Meta 광고 연동</h2><span className={`tracking-badge ${status === '동기화 오류' ? 'error' : status === '동기화 성공' ? 'success' : ''}`}>{status}</span></div><div className="tracking-form-grid"><label className="field">Meta 광고계정 ID · 공통<input value={campaign.meta_ad_account_id || ''} readOnly aria-readonly="true"/><small className="tracking-help">모든 무료클래스 캠페인에 공통 적용됩니다.</small></label>{field('meta_campaign_id', 'Meta 캠페인 ID')}</div>
-      <dl className="tracking-sync-details"><div><dt>마지막 동기화</dt><dd>{kstTime(campaign.meta_last_synced_at)}</dd></div><div><dt>마지막 결과</dt><dd>{campaign.meta_sync_error || status}</dd></div></dl>
-      <div className="tracking-sync-action"><button type="button" className="btn" disabled={!canManage || pending || dirty || !campaign.meta_campaign_id} onClick={() => void onSync()}><RefreshCw size={16}/>{syncing ? '동기화 중' : 'Meta 재동기화'}</button><p className="tracking-help">{!campaign.meta_campaign_id ? 'Meta 캠페인 ID를 입력하고 설정을 저장하면 동기화할 수 있습니다.' : dirty ? '변경사항을 먼저 저장한 뒤 동기화해 주세요.' : '저장된 캠페인 ID의 광고 데이터만 다시 가져옵니다.'}</p></div>
+    <section className="tracking-card"><div className="tracking-section-head"><h2>Meta 광고 연동</h2><span className={`tracking-badge ${status === '동기화 오류' ? 'error' : status === '동기화 성공' ? 'success' : ''}`}>{status}</span></div><div className="tracking-form-grid"><label className="field">Meta 광고계정 ID<input name="meta_ad_account_id" value={draft.meta_ad_account_id} placeholder="숫자 또는 act_숫자" onChange={event => change('meta_ad_account_id', event.target.value)}/><small className="tracking-help">이 캠페인에 사용할 광고계정입니다. 숫자만 입력해도 저장됩니다.</small></label><label className="field">Meta 캠페인 ID<textarea name="meta_campaign_ids" value={draft.meta_campaign_ids} rows={4} placeholder="캠페인 ID를 한 줄에 하나씩 입력" onChange={event => change('meta_campaign_ids', event.target.value)}/><small className="tracking-help">같은 광고계정의 캠페인을 최대 20개 연결할 수 있습니다. 줄바꿈 또는 쉼표로 구분하며, 중복 ID는 한 번만 반영됩니다.</small></label></div>
+      <p className="tracking-help">{metaConnectionHelp(campaign)}</p><dl className="tracking-sync-details"><div><dt>마지막 동기화</dt><dd>{kstTime(campaign.meta_last_synced_at)}</dd></div><div><dt>마지막 결과</dt><dd>{campaign.meta_sync_error || status}</dd></div></dl>
+      <div className="tracking-sync-action"><button type="button" className="btn" disabled={!canManage || pending || dirty || !campaign.meta_ad_account_id || !metaCampaignIds(campaign).length} onClick={() => void onSync()}><RefreshCw size={16}/>{syncing ? '동기화 중' : 'Meta 재동기화'}</button><p className="tracking-help">{!campaign.meta_ad_account_id || !metaCampaignIds(campaign).length ? '연동 ID를 입력하고 설정을 저장하면 동기화할 수 있습니다.' : dirty ? '변경사항을 먼저 저장한 뒤 동기화해 주세요.' : '저장된 모든 캠페인의 광고 데이터를 함께 가져옵니다. ID를 제거해도 이미 수집된 과거 실적은 보존됩니다.'}</p></div>
     </section></fieldset>
     <div className="tracking-action-bar"><span role="status">{message || (dirty ? '저장하지 않은 변경사항이 있습니다.' : '저장된 설정과 동일합니다.')}</span><button className="btn primary" disabled={!canManage || pending || !dirty}><Save size={16}/>{pending && !syncing ? '저장 중' : '설정 저장'}</button></div>
   </form>;

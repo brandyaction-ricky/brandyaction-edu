@@ -20,7 +20,7 @@ function load(file, mocks = {}) {
 }
 const state = load('lib/landing-admin-state.ts');
 const server = load('lib/landing-performance-ui-server.ts');
-const campaign = { id: 'bbbbbbbb-bbbb-4000-8000-000000000002', landing_id: 'aaaaaaaa-aaaa-4000-8000-000000000001', name: '테스트', utm_campaign: 'cold,"one', start_day: '2026-09-01', end_day: '2026-09-30', new_customer_price: 1650000, existing_customer_price: 1100000, live_peak: null, meta_ad_account_id: 'act_245402678098216', meta_campaign_id: null, meta_sync_status: 'not_configured', meta_last_synced_at: null, meta_sync_error: null };
+const campaign = { id: 'bbbbbbbb-bbbb-4000-8000-000000000002', landing_id: 'aaaaaaaa-aaaa-4000-8000-000000000001', name: '테스트', utm_campaign: 'cold,"one', start_day: '2026-09-01', end_day: '2026-09-30', new_customer_price: 1650000, existing_customer_price: 1100000, live_peak: null, meta_ad_account_id: 'act_123456789', meta_campaign_id: null, meta_sync_status: 'not_configured', meta_last_synced_at: null, meta_sync_error: null };
 const makeQuery = () => new URLSearchParams({ landing: campaign.landing_id, campaign: campaign.id, start: '2026-09-08', end: '2026-09-14', compare_start: '2026-09-01', compare_end: '2026-09-07' });
 
 test('legacy metrics redirect preserves repeated filters and safe internal destination', () => {
@@ -55,8 +55,8 @@ test('KST operating state is derived at day boundaries without mutable status', 
   assert.equal(state.campaignStatus(), '설정 필요');
 });
 test('Meta labels never expose status enums and prioritize missing campaign ID', () => {
-  assert.equal(state.metaStatus(campaign), 'Meta 미연동');
-  for (const [status, label] of [['not_configured', '설정 필요'], ['idle', '동기화 대기'], ['syncing', '동기화 중'], ['success', '동기화 성공'], ['failed', '동기화 오류']]) assert.equal(state.metaStatus({ ...campaign, meta_campaign_id: '123', meta_sync_status: status }), label);
+  assert.equal(state.metaStatus(campaign), '연동 전');
+  for (const [status, label] of [['not_configured', '연동 전'], ['idle', '동기화 대기'], ['syncing', '동기화 중'], ['success', '동기화 성공'], ['failed', '동기화 오류']]) assert.equal(state.metaStatus({ ...campaign, meta_campaign_id: '123', meta_sync_status: status }), label);
 });
 test('actual drawer submits only explicit changes, keeps zero and separates clears', () => {
   const form = new FormData(); form.set('day', '2026-09-15'); form.set('new_payments', '0'); form.set('existing_payments', ''); form.set('kakao_members', '500'); form.set('memo', '');
@@ -72,10 +72,10 @@ test('new and edit drawer render distinct clear controls and shared partial save
   const edit = renderToStaticMarkup(React.createElement(ActualDrawer, { ...props, initial: { day: '2026-09-15', kakao_members: 0, new_payments: 1, existing_payments: null, new_price_snapshot: 100, existing_price_snapshot: 200 } }));
   assert.equal((edit.match(/값 비우기/g) || []).length, 4); assert.match(edit, /현재: 0/); assert.match(edit, /신규 100원/);
 });
-test('settings save and sync are disabled initially, common account is read-only, marketing staff cannot mutate', () => {
+test('settings save and sync are disabled initially, multiple IDs render, marketing staff cannot mutate', () => {
   const { CampaignSettings } = load('app/ui/landing/tracking-operations.tsx');
   const html = renderToStaticMarkup(React.createElement(CampaignSettings, { campaign, canManage: false, pending: false, syncing: false, onDirty() {}, onSave: async () => true, onSync: async () => true }));
-  assert.match(html, /<fieldset disabled/); assert.match(html, /aria-readonly="true"/); assert.match(html, /Meta 미연동/); assert.doesNotMatch(html, />not_configured</);
+  assert.match(html, /<fieldset disabled/); assert.match(html, /name="meta_ad_account_id"/); assert.match(html, /<textarea[^>]*name="meta_campaign_ids"/); assert.match(html, /연동 전/); assert.doesNotMatch(html, />not_configured</);
   assert.match(html, /<button[^>]*disabled[^>]*>[\s\S]*?설정 저장/);
 });
 test('daily A aggregation separates repeat visitor, click session and total clicks in KST', () => {

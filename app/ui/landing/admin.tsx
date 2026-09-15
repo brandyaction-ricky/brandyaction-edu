@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { metaCampaignIds } from '@/lib/meta-campaign-settings';
 import { RefreshCw } from 'lucide-react';
 import { PERFORMANCE_PRESETS, campaignRange, presetRange, previousRange, validDay, type ActualRow, type DashboardReport, type PerformanceCampaign, type PerformanceCourse, type PerformancePreset } from '@/lib/landing-performance';
 import { appendFilters, campaignStatus, emptyFilters, metaStatus, parseTab, periodError, readFilters, readPeriod, TRACKING_TABS, type TrackingFilters, type TrackingPeriod, type TrackingTab } from '@/lib/landing-admin-state';
@@ -92,17 +93,17 @@ export function LandingAdmin() {
   function toggleCompare(value: boolean) { setPeriod(old => { const previous = validDay(old.start) && validDay(old.end) && old.start <= old.end ? previousRange(old.start, old.end) : { startDay: '', endDay: '' }; return { ...old, compare: value, compareStart: previous.startDay, compareEnd: previous.endDay }; }); }
   function comparisonPreset(days: 1 | 7 | 14) { if (!campaign) return; const preset = days === 1 ? 'today' : days === 7 ? '7d' : '14d', range = campaignRange(presetRange(preset, campaign), campaign), previous = previousRange(range.startDay, range.endDay); setPeriod({ preset, start: range.startDay, end: range.endDay, compare: true, compareStart: previous.startDay, compareEnd: previous.endDay }); }
   function refresh() { navigate(() => { setListVersion(value => value + 1); setReload(value => value + 1); }); }
-  async function post(body: Record<string, unknown>, success: string) {
+  async function post(body: Record<string, unknown>, success: string, propagateError = false) {
     if (pendingRef.current) return false;
     pendingRef.current = true; setPending(true); setMessage('');
     try {
       const value = await responseJson(await fetch('/api/landing/performance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }));
       if (value.campaign) { const saved = value.campaign as PerformanceCampaign; setCourses(previous => previous.map(item => ({ ...item, campaigns: item.campaigns.map(c => c.id === saved.id ? saved : c) }))); setDirty(false); const range = campaignRange({ startDay: period.start, endDay: period.end }, saved); if (range.startDay !== period.start || range.endDay !== period.end) { const prior = previousRange(range.startDay, range.endDay); setPeriod(old => ({ ...old, start: range.startDay, end: range.endDay, compareStart: prior.startDay, compareEnd: prior.endDay })); } }
       setMessage(success); setReload(value => value + 1); return true;
-    } catch (error) { setMessage((error as Error).message); return false; } finally { pendingRef.current = false; setPending(false); }
+    } catch (error) { setMessage((error as Error).message); if (propagateError) throw error; return false; } finally { pendingRef.current = false; setPending(false); }
   }
   async function sync() {
-    if (!campaign || pendingRef.current || dirty || !campaign.meta_campaign_id) return false;
+    if (!campaign || pendingRef.current || dirty || !campaign.meta_ad_account_id || !metaCampaignIds(campaign).length) return false;
     pendingRef.current = true; setPending(true); setSyncing(true); setMessage('Meta 데이터를 동기화하고 있습니다.');
     try { const value = await responseJson(await fetch('/api/landing/performance/meta', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ campaign_id: campaign.id }) })); setMessage(`Meta 동기화 성공 · ${value.rows}행을 반영했습니다.`); return true; }
     catch (error) { setMessage('동기화 실패 · ' + (error as Error).message); return false; }
@@ -123,7 +124,7 @@ export function LandingAdmin() {
     {message && <div className="tracking-notice" role="status">{message}</div>}
     <div role="tabpanel" id={`tracking-panel-${tab}`} aria-labelledby={`tracking-tab-${tab}`} className="tracking-tab-panel">
       {error && <InlineError onRetry={() => setReload(value => value + 1)}>{error}{report && ' 이전 조회 결과는 아래에 유지됩니다.'}</InlineError>}
-      {!campaign ? list.loading ? <TrackingSkeleton kind={tab}/> : <CompactEmpty title={courses.length ? '캠페인이 등록되지 않았습니다.' : '무료클래스가 등록되지 않았습니다.'} action={<Link className="btn" href="/admin/products">상품 관리 확인</Link>}>무료클래스와 연결된 캠페인 구성을 확인해 주세요.</CompactEmpty> : tab === 'settings' ? <CampaignSettings key={JSON.stringify(campaign) + ':' + listVersion} campaign={campaign} canManage={list.canManage} pending={pending} syncing={syncing} onDirty={setDirty} onSave={values => post({ action: 'campaign', campaign_id: campaign.id, values }, '캠페인 설정을 저장했습니다.')} onSync={sync}/> : !report ? error ? null : <TrackingSkeleton kind={tab}/> : <>
+      {!campaign ? list.loading ? <TrackingSkeleton kind={tab}/> : <CompactEmpty title={courses.length ? '캠페인이 등록되지 않았습니다.' : '무료클래스가 등록되지 않았습니다.'} action={<Link className="btn" href="/admin/products">상품 관리 확인</Link>}>무료클래스와 연결된 캠페인 구성을 확인해 주세요.</CompactEmpty> : tab === 'settings' ? <CampaignSettings key={JSON.stringify(campaign) + ':' + listVersion} campaign={campaign} canManage={list.canManage} pending={pending} syncing={syncing} onDirty={setDirty} onSave={values => post({ action: 'campaign', campaign_id: campaign.id, values }, '캠페인 설정을 저장했습니다.', true)} onSync={sync}/> : !report ? error ? null : <TrackingSkeleton kind={tab}/> : <>
         {loading && <p className="tracking-help" role="status">새 조건을 조회하고 있습니다. 아래는 이전 조회 결과입니다.</p>}
         <div aria-busy={loading} className={loading ? 'tracking-refreshing' : ''}>{tab === 'dashboard' ? <PerformanceDashboard report={report} compare={period.compare} pending={pending || loading || !!error} onRetry={() => setReload(value => value + 1)} onClassify={(row, value) => void post({ action: 'classification', campaign_id: campaign.id, adset: row.adset, creative: row.creative, ad_type: value }, '광고 유형을 저장했습니다.')}/> : <ActualsPanel report={report} onEdit={row => setDrawer({ row })} onAdd={() => setDrawer({ row: null })} onSettings={() => changeTab('settings')} onRetry={() => setReload(value => value + 1)}/>}</div>
       </>}
