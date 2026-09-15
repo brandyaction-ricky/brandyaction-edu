@@ -24,6 +24,6 @@ export function metaCampaignIds(campaign: MetaSettings): string[] {
 }
 
 export function metaConnectionHelp(campaign: MetaSettings & { meta_ad_account_id?: string | null }): string {
-  const missing = [!campaign.meta_ad_account_id && 'Meta 광고계정 ID', !metaCampaignIds(campaign).length && 'Meta 캠페인 ID'].filter(Boolean);
-  return missing.length ? `${missing.join('와 ')}를 입력하고 설정을 저장해 주세요. 기본 정보는 연동 전에도 저장할 수 있습니다.` : 'ID가 저장됐습니다. Meta 재동기화를 실행하면 광고비·노출을 가져옵니다. 서버의 Meta API 설정과 조회 권한도 필요합니다.';
+  if (!campaign.meta_ad_account_id) return '공통 광고계정이 설정되지 않았습니다. 운영 담당자에게 공통 설정을 요청해 주세요. 기본 정보는 연동 전에도 저장할 수 있습니다.';
+  return !metaCampaignIds(campaign).length ? 'Meta 캠페인 ID를 입력하고 설정을 저장해 주세요. 기본 정보는 연동 전에도 저장할 수 있습니다.' : 'ID가 저장됐습니다. Meta 재동기화를 실행하면 광고비·노출을 가져옵니다. 서버의 Meta API 설정과 조회 권한도 필요합니다.';
 }

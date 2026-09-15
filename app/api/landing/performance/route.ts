@@ -1,4 +1,5 @@
-import { metaCampaignIds, normalizeMetaAccountId, parseMetaCampaignIds } from '@/lib/meta-campaign-settings';
+import { metaCampaignIds, parseMetaCampaignIds } from '@/lib/meta-campaign-settings';
+import { commonMetaAccountId } from '@/lib/meta-common-account';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getOperatorUser } from '@/lib/operator-permissions';
 import { validId } from '@/lib/landing';
@@ -8,13 +9,6 @@ import { performanceUiDetails } from '@/lib/landing-performance-ui-server';
 const reply = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'private, no-store' } });
 const sameOrigin = (request: Request) => request.headers.get('origin') === new URL(request.url).origin;
 const nullable = <T,>(values: T[]) => values.length ? values : null;
-
-async function commonMetaAccountId(db: ReturnType<typeof createAdminClient>) {
-  const result = await db.from('site_settings').select('value').eq('key', 'edu_meta_marketing').maybeSingle();
-  if (result.error) throw Error('Meta 공통 설정을 확인하지 못했습니다.');
-  const account = result.data?.value && typeof result.data.value === 'object' ? String((result.data.value as Record<string,unknown>).adAccountId || '').trim() : '';
-  return account ? normalizeMetaAccountId(account) : '';
-}
 
 async function campaignFor(db: ReturnType<typeof createAdminClient>, id: string) {
   const result = await db.from('landing_campaigns').select('*').eq('id', id).maybeSingle();
@@ -30,6 +24,7 @@ export async function GET(request: Request) {
   const campaignId = params.get('campaign');
   try {
     const db = createAdminClient();
+    const account = await commonMetaAccountId(db);
     if (!landingId && !campaignId) {
       const [courses, configs, campaigns] = await Promise.all([
         db.from('courses').select('id,title,slug,status,category').eq('category', 'free').is('archived_at', null).order('created_at', { ascending: false }),
@@ -39,12 +34,13 @@ export async function GET(request: Request) {
       if (courses.error || configs.error || campaigns.error) throw Error('무료클래스와 캠페인 목록을 불러오지 못했습니다.');
       return reply({ can_manage_campaign: user.role === 'admin', courses: (courses.data || []).map(course => {
         const config = configs.data?.find(value => value.id === course.id);
-        return { ...course, tracking: !config?.layout_ver ? 'not_configured' : config.enabled ? 'active' : 'paused', campaigns: (campaigns.data?.filter(value => value.landing_id === course.id) || []) };
+        return { ...course, tracking: !config?.layout_ver ? 'not_configured' : config.enabled ? 'active' : 'paused', campaigns: (campaigns.data?.filter(value => value.landing_id === course.id) || []).map(value => ({ ...value, meta_ad_account_id: account || null })) };
       }) });
     }
     if (!validId(landingId) || !validId(campaignId)) return reply({ error: '무료클래스와 캠페인을 선택해 주세요.' }, 400);
     const campaign = await campaignFor(db, campaignId);
     if (!campaign || campaign.landing_id !== landingId) return reply({ error: '선택한 클래스의 캠페인이 아닙니다.' }, 404);
+    campaign.meta_ad_account_id = account || null;
     const range = validateDashboardRange(params.get('start'), params.get('end'), campaign);
     const compareStart = params.get('compare_start'), compareEnd = params.get('compare_end');
     if ((compareStart || compareEnd) && (!validDay(compareStart) || !validDay(compareEnd) || Date.parse(compareEnd) < Date.parse(compareStart) || Date.parse(compareEnd) - Date.parse(compareStart) !== Date.parse(range.endDay) - Date.parse(range.startDay))) {
@@ -92,7 +88,7 @@ export async function POST(request: Request) {
       const newPrice = Number(values.new_customer_price), existingPrice = Number(values.existing_customer_price);
       const livePeak = values.live_peak === '' || values.live_peak === null ? null : Number(values.live_peak);
       if (![newPrice,existingPrice].every(value => Number.isInteger(value) && value >= 0) || (livePeak !== null && (!Number.isInteger(livePeak) || livePeak < 0))) throw Error('가격과 최대 동시시청 값을 확인해 주세요.');
-      const account = normalizeMetaAccountId('meta_ad_account_id' in values ? values.meta_ad_account_id : campaign.meta_ad_account_id || await commonMetaAccountId(db));
+      const account = await commonMetaAccountId(db);
       const metaIds = 'meta_campaign_ids' in values ? parseMetaCampaignIds(values.meta_campaign_ids) : 'meta_campaign_id' in values ? parseMetaCampaignIds(values.meta_campaign_id) : metaCampaignIds(campaign);
       const connectionChanged = account !== (campaign.meta_ad_account_id || '') || JSON.stringify(metaIds) !== JSON.stringify(metaCampaignIds(campaign));
       const syncStatus = !account || !metaIds.length ? 'not_configured' : connectionChanged || campaign.meta_sync_status === 'not_configured' ? 'idle' : campaign.meta_sync_status;

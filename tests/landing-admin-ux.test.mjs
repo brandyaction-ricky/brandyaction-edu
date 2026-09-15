@@ -75,7 +75,7 @@ test('new and edit drawer render distinct clear controls and shared partial save
 test('settings save and sync are disabled initially, multiple IDs render, marketing staff cannot mutate', () => {
   const { CampaignSettings } = load('app/ui/landing/tracking-operations.tsx');
   const html = renderToStaticMarkup(React.createElement(CampaignSettings, { campaign, canManage: false, pending: false, syncing: false, onDirty() {}, onSave: async () => true, onSync: async () => true }));
-  assert.match(html, /<fieldset disabled/); assert.match(html, /name="meta_ad_account_id"/); assert.match(html, /<textarea[^>]*name="meta_campaign_ids"/); assert.match(html, /연동 전/); assert.doesNotMatch(html, />not_configured</);
+  assert.match(html, /<fieldset disabled/); assert.match(html, /<input(?=[^>]*name="meta_ad_account_id")(?=[^>]*readOnly)[^>]*>/i); assert.match(html, /<textarea[^>]*name="meta_campaign_ids"/); assert.match(html, /연동 전/); assert.doesNotMatch(html, />not_configured</);
   assert.match(html, /<button[^>]*disabled[^>]*>[\s\S]*?설정 저장/);
 });
 test('daily A aggregation separates repeat visitor, click session and total clicks in KST', () => {
