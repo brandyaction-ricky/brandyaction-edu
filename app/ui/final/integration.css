@@ -471,6 +471,37 @@ body {
   background: var(--ba-red);
   z-index: 500;
 }
+.edu-front .page-loading {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 16px;
+  min-height: 320px;
+  padding: 48px 16px;
+  text-align: center;
+}
+.edu-front .page-loading h1 {
+  margin: 0;
+  font-size: 24px;
+}
+.edu-front .page-loading p {
+  margin: 0;
+  line-height: 1.6;
+}
+.edu-front .page-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--ba-red-soft);
+  border-top-color: var(--ba-red);
+  border-radius: 50%;
+  animation: edu-page-loading-spin 0.8s linear infinite;
+}
+@keyframes edu-page-loading-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .edu-front .page-loading-spinner { animation: none; }
+}
 :where(.edu-front, .edu-admin) .toast {
   position: fixed;
   bottom: 24px;
