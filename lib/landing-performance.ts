@@ -9,7 +9,7 @@ export type PerformanceCourse = {
 export type PerformanceCampaign = {
   id: string; landing_id: string; name: string; utm_campaign: string; start_day: string; end_day: string;
   new_customer_price: number; existing_customer_price: number; live_peak: number | null;
-  meta_ad_account_id: string | null; meta_campaign_id: string | null;
+  meta_ad_account_id: string | null; meta_campaign_id: string | null; meta_campaign_ids?: string[] | null;
   meta_sync_status: 'not_configured' | 'idle' | 'syncing' | 'success' | 'failed';
   meta_last_synced_at: string | null; meta_sync_error: string | null;
 };

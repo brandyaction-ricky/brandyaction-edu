@@ -1,3 +1,5 @@
+import { parseMetaCampaignIds } from './meta-campaign-settings';
+
 type MetaPage<T> = { data?: T[]; paging?: { next?: string } };
 type MetaInsight = { date_start: string; campaign_id: string; campaign_name?: string; adset_id: string; adset_name?: string; ad_id: string; ad_name?: string; impressions?: string; spend?: string; actions?: { action_type: string; value: string }[] };
 type MetaAd = { id: string; name?: string; adset_id?: string; creative?: { id?: string } };
@@ -16,6 +18,7 @@ async function graphPages<T>(url: URL, token: string) {
     rows.push(...(body.data || []));
     next = body.paging?.next || null;
   }
+  if (next) throw Error('META_PAGING_LIMIT');
   return rows;
 }
 
@@ -43,6 +46,7 @@ export async function fetchMetaCampaign(input: { version: string; token: string;
   insightsUrl.searchParams.set('time_range', JSON.stringify({ since: input.startDay, until: input.endDay }));
   const insights = await graphPages<MetaInsight>(insightsUrl, input.token);
   return insights.map(row => {
+    if (row.campaign_id !== input.campaignId) throw Error('META_CAMPAIGN_MISMATCH');
     const ad = adsById.get(row.ad_id);
     const linkClicks = (row.actions || []).filter(action => action.action_type === 'link_click').reduce((sum, action) => sum + Number(action.value || 0), 0);
     return {
@@ -53,4 +57,14 @@ export async function fetchMetaCampaign(input: { version: string; token: string;
       link_clicks: Math.max(0, linkClicks), spend: Math.max(0, Number(row.spend || 0)),
     };
   });
+}
+
+export async function fetchMetaCampaigns(input: Omit<Parameters<typeof fetchMetaCampaign>[0], 'campaignId'> & { campaignIds: string[] }) {
+  const rows: Awaited<ReturnType<typeof fetchMetaCampaign>> = [];
+  // Finish every campaign before the caller writes anything. A failed campaign
+  // must not present a partial total as a successful synchronization.
+  for (const campaignId of parseMetaCampaignIds(input.campaignIds)) {
+    rows.push(...await fetchMetaCampaign({ ...input, campaignId }));
+  }
+  return rows;
 }

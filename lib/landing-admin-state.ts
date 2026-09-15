@@ -1,3 +1,4 @@
+import { metaCampaignIds } from './meta-campaign-settings';
 import { kstDate } from './landing';
 import { campaignRange, filterValues, PERFORMANCE_PRESETS, presetRange, previousRange, validDay, validateDashboardRange, type ActualRow, type PerformanceCampaign } from './landing-performance';
 
@@ -47,9 +48,9 @@ export function campaignStatus(campaign?: Pick<PerformanceCampaign, 'start_day' 
   return today < campaign.start_day ? '시작 전' : today > campaign.end_day ? '종료' : '운영 중';
 }
 export function metaStatus(campaign: PerformanceCampaign, syncing = false) {
-  if (!campaign.meta_campaign_id) return 'Meta 미연동';
+  if (!campaign.meta_ad_account_id || !metaCampaignIds(campaign).length) return '연동 전';
   if (syncing || campaign.meta_sync_status === 'syncing') return '동기화 중';
-  return ({ not_configured: '설정 필요', idle: '동기화 대기', success: '동기화 성공', failed: '동기화 오류' } as Record<string, string>)[campaign.meta_sync_status] || '설정 필요';
+  return ({ not_configured: '연동 전', idle: '동기화 대기', success: '동기화 성공', failed: '동기화 오류' } as Record<string, string>)[campaign.meta_sync_status] || '설정 필요';
 }
 export const count = (value: number | null | undefined) => value == null ? '—' : Number(value).toLocaleString('ko-KR', { maximumFractionDigits: 1 });
 export const money = (value: number | null | undefined) => value == null ? '—' : count(value) + '원';

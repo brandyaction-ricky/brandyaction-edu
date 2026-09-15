@@ -1,3 +1,4 @@
+import { metaCampaignIds, normalizeMetaAccountId, parseMetaCampaignIds } from '@/lib/meta-campaign-settings';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getOperatorUser } from '@/lib/operator-permissions';
 import { validId } from '@/lib/landing';
@@ -12,7 +13,7 @@ async function commonMetaAccountId(db: ReturnType<typeof createAdminClient>) {
   const result = await db.from('site_settings').select('value').eq('key', 'edu_meta_marketing').maybeSingle();
   if (result.error) throw Error('Meta 공통 설정을 확인하지 못했습니다.');
   const account = result.data?.value && typeof result.data.value === 'object' ? String((result.data.value as Record<string,unknown>).adAccountId || '').trim() : '';
-  return /^act_\d+$/.test(account) ? account : '';
+  return account ? normalizeMetaAccountId(account) : '';
 }
 
 async function campaignFor(db: ReturnType<typeof createAdminClient>, id: string) {
@@ -30,16 +31,15 @@ export async function GET(request: Request) {
   try {
     const db = createAdminClient();
     if (!landingId && !campaignId) {
-      const [courses, configs, campaigns, metaAccountId] = await Promise.all([
+      const [courses, configs, campaigns] = await Promise.all([
         db.from('courses').select('id,title,slug,status,category').eq('category', 'free').is('archived_at', null).order('created_at', { ascending: false }),
         db.from('landing_configs').select('id,enabled,layout_ver'),
         db.from('landing_campaigns').select('*').order('start_day', { ascending: false }),
-        commonMetaAccountId(db),
       ]);
       if (courses.error || configs.error || campaigns.error) throw Error('무료클래스와 캠페인 목록을 불러오지 못했습니다.');
       return reply({ can_manage_campaign: user.role === 'admin', courses: (courses.data || []).map(course => {
         const config = configs.data?.find(value => value.id === course.id);
-        return { ...course, tracking: !config?.layout_ver ? 'not_configured' : config.enabled ? 'active' : 'paused', campaigns: (campaigns.data?.filter(value => value.landing_id === course.id) || []).map(value => ({ ...value, meta_ad_account_id: metaAccountId || null })) };
+        return { ...course, tracking: !config?.layout_ver ? 'not_configured' : config.enabled ? 'active' : 'paused', campaigns: (campaigns.data?.filter(value => value.landing_id === course.id) || []) };
       }) });
     }
     if (!validId(landingId) || !validId(campaignId)) return reply({ error: '무료클래스와 캠페인을 선택해 주세요.' }, 400);
@@ -92,14 +92,15 @@ export async function POST(request: Request) {
       const newPrice = Number(values.new_customer_price), existingPrice = Number(values.existing_customer_price);
       const livePeak = values.live_peak === '' || values.live_peak === null ? null : Number(values.live_peak);
       if (![newPrice,existingPrice].every(value => Number.isInteger(value) && value >= 0) || (livePeak !== null && (!Number.isInteger(livePeak) || livePeak < 0))) throw Error('가격과 최대 동시시청 값을 확인해 주세요.');
-      const account = await commonMetaAccountId(db), metaCampaign = String(values.meta_campaign_id || '').trim();
-      if (!account) throw Error('Meta 공통 광고계정 ID를 먼저 설정해 주세요.');
-      if (metaCampaign && !/^\d+$/.test(metaCampaign)) throw Error('Meta 캠페인 ID를 확인해 주세요.');
+      const account = normalizeMetaAccountId('meta_ad_account_id' in values ? values.meta_ad_account_id : campaign.meta_ad_account_id || await commonMetaAccountId(db));
+      const metaIds = 'meta_campaign_ids' in values ? parseMetaCampaignIds(values.meta_campaign_ids) : 'meta_campaign_id' in values ? parseMetaCampaignIds(values.meta_campaign_id) : metaCampaignIds(campaign);
+      const connectionChanged = account !== (campaign.meta_ad_account_id || '') || JSON.stringify(metaIds) !== JSON.stringify(metaCampaignIds(campaign));
+      const syncStatus = !account || !metaIds.length ? 'not_configured' : connectionChanged || campaign.meta_sync_status === 'not_configured' ? 'idle' : campaign.meta_sync_status;
       const result = await db.from('landing_campaigns').update({
         name: String(values.name || campaign.name).trim().slice(0,200), utm_campaign: String(values.utm_campaign || campaign.utm_campaign).trim().slice(0,250),
         start_day: start, end_day: end, new_customer_price: newPrice, existing_customer_price: existingPrice, live_peak: livePeak,
-        meta_ad_account_id: account || null, meta_campaign_id: metaCampaign || null,
-        meta_sync_status: account && metaCampaign ? 'idle' : 'not_configured', meta_sync_error: null, updated_by: user.id, updated_at: new Date().toISOString(),
+        meta_ad_account_id: account || null, meta_campaign_id: metaIds[0] || null, meta_campaign_ids: metaIds,
+        meta_sync_status: syncStatus, meta_sync_error: connectionChanged ? null : campaign.meta_sync_error, updated_by: user.id, updated_at: new Date().toISOString(),
       }).eq('id', campaign.id).select('*').single();
       if (result.error) throw Error('캠페인 설정을 저장하지 못했습니다.');
       return reply({ ok: true, campaign: result.data });
