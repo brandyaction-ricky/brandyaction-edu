@@ -35,6 +35,7 @@ export type DashboardReport = {
     last_collected_at: string | null;
     actual_presence: { new_payments: boolean; existing_payments: boolean } | null;
     previous_day_members: Record<string, number | null>;
+    period_actuals?: { kakao_members: number | null; kakao_day: string | null; payments: number | null } | null;
     errors: { trend?: string; collection?: string; actuals?: string };
   };
   campaign: PerformanceCampaign; summary_b: MetricSummary; summary_a: MetricSummary | null;

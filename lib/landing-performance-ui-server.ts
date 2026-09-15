@@ -1,6 +1,7 @@
 import type { createAdminClient } from './supabase/admin';
 import { filterValues, type DashboardReport, type PerformanceCampaign } from './landing-performance';
 import { kstDate } from './landing';
+import { periodActuals } from './landing-operations-phase1';
 
 type Db = ReturnType<typeof createAdminClient>;
 type Session = { session_id: string; visitor_id?: string; created_at: string; last_seen_at: string; clicks?: number; attribution: Record<string, string> | null };
@@ -87,9 +88,9 @@ export async function performanceUiDetails(db: Db, campaign: PerformanceCampaign
     try {
       const rows = await pages<{ day: string; kakao_members: number | null; new_payments: number | null; existing_payments: number | null }>((from, to) => db.from('landing_campaign_actuals').select('day,kakao_members,new_payments,existing_payments').eq('campaign_id', campaign.id).order('day').range(from, to).abortSignal(limitedSignal), 10000);
       const byDay = new Map(rows.map(row => [row.day, row.kakao_members]));
-      return { presence: { new_payments: rows.some(row => row.new_payments !== null), existing_payments: rows.some(row => row.existing_payments !== null) }, previous: Object.fromEntries(rows.map(row => [row.day, byDay.get(new Date(Date.parse(row.day + 'T00:00:00Z') - 86400000).toISOString().slice(0, 10)) ?? null])) };
+      return { period: periodActuals(rows, params.get('start')!, params.get('end')!), presence: { new_payments: rows.some(row => row.new_payments !== null), existing_payments: rows.some(row => row.existing_payments !== null) }, previous: Object.fromEntries(rows.map(row => [row.day, byDay.get(new Date(Date.parse(row.day + 'T00:00:00Z') - 86400000).toISOString().slice(0, 10)) ?? null])) };
     } catch { errors.actuals = '실측 입력 여부와 전일 인원을 확인하지 못했습니다.'; return null; }
   };
   const [daily_a, last_collected_at, actual] = await Promise.all([trend(), collection(), actuals()]);
-  return { daily_a, last_collected_at, actual_presence: actual?.presence || null, previous_day_members: actual?.previous || {}, errors };
+  return { daily_a, last_collected_at, actual_presence: actual?.presence || null, previous_day_members: actual?.previous || {}, period_actuals: actual?.period ?? null, errors };
 }
