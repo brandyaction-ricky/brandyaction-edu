@@ -121,3 +121,9 @@ test('homepage consumes managed banners and resolves stored banner assets', () =
   assert.match(route, /banner\.image_url = imagePreviewUrl/);
   assert.match(route, /table === 'site_banners'\) query = query\.order\('created_at'\)/);
 });
+
+test('homepage hero keeps bottom breathing room across responsive layouts', () => {
+  const experience = fs.readFileSync(path.join(root, 'design-reference/source/frontend/src/experience.css'), 'utf8');
+  assert.match(experience, /\.brand-hero\{background:[^}]+padding:var\(--space-16\) 0\}/);
+  assert.match(experience, /\.brand-hero\{padding:var\(--space-12\) 0\}/);
+});

@@ -3,10 +3,11 @@ import { getEduSettings } from '@/lib/edu-settings';
 import { createClient } from '@/lib/supabase/server';
 import { Platform } from '@/app/ui/platform';
 import { getAuthenticatedUser } from '@/lib/server-auth';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
+import { metricsRedirect } from '@/lib/landing-admin-state';
 import { sections } from '@/lib/platform';
 export const dynamic = 'force-dynamic';
-export default async function Page({params}:{params:Promise<{path?:string[]}>}) {
+export default async function Page({params,searchParams}:{params:Promise<{path?:string[]}>;searchParams:Promise<Record<string,string|string[]|undefined>>}) {
  const {path=[]} = await params;
  const [root, section] = path;
  const valid = path.length === 0
@@ -18,6 +19,7 @@ export default async function Page({params}:{params:Promise<{path?:string[]}>}) 
   || (root === 'payment' && ['success','fail'].includes(section) && path.length === 2)
   || (root === 'policies' && ['terms','privacy','refund'].includes(section) && path.length === 2);
  if (!valid) notFound();
+ if (root === 'admin' && section === 'metrics') redirect(metricsRedirect(await searchParams));
  // The admin API verifies identity, account status and section permissions once.
  // Stream the admin shell immediately instead of repeating Auth + profile queries.
  const user = root === 'admin' ? null : await getAuthenticatedUser();

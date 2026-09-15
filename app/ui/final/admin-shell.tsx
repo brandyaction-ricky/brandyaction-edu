@@ -42,7 +42,7 @@ export const finalAdminGroups = [
   ["고객 관리", ["customers", "tags", "coupons", "product-reviews"]],
   ["콘텐츠 관리", ["banners", "articles", "testimonials"]],
   ["매출 관리", ["orders"]],
-  ["마케팅 관리", ["landing", "analytics", "metrics", "seo", "settings"]],
+  ["마케팅 관리", ["landing", "analytics", "seo", "settings"]],
 ] as const;
 const icons: Record<string, LucideIcon> = {
   products: BookOpen,
@@ -92,8 +92,8 @@ export const sectionDescription: Record<string, string> = {
   articles: "글·영상 콘텐츠의 편집과 공개 상태를 관리합니다.",
   testimonials: "홈페이지에 노출할 고객 사례와 영상을 관리합니다.",
   orders: "주문·결제·환불 상태와 수강 권한을 함께 확인합니다.",
-  landing: "무료클래스의 실제 방문·CTA 전환·체류 성과를 확인합니다.",
-  analytics: "유입부터 신청까지, 모집 과정의 수집된 성과를 확인합니다.",
+  landing: "광고 성과를 확인하고, 실측 기록과 캠페인 설정을 관리합니다.",
+  analytics: "전체 사이트의 유입 경로와 고객 행동 성과를 확인합니다.",
   metrics: "광고·라이브·결제 실측 데이터를 날짜별로 기록하고 관리합니다.",
   seo: "검색 노출 정보와 측정·인증 코드를 안전하게 관리합니다.",
   settings: "교육 운영 규칙과 광고 측정 설정을 구분해 관리합니다.",
@@ -175,6 +175,11 @@ export function AdminShell({
           : current,
     byKey = new Map(available.map((s) => [s.key, s])),
     pending = num((data.admin_summary || [])[0], "pendingReviews");
+  const contentWidth = ["landing", "analytics", "orders", "customers", "members", "reviews"].includes(selected)
+    ? "wide"
+    : ["seo", "settings", "staff"].includes(selected)
+      ? "narrow"
+      : "standard";
   const navLink = (key: string) => {
     const s = byKey.get(key);
     if (!s && key !== "overview") return null;
@@ -306,7 +311,7 @@ export function AdminShell({
             </span>
           </div>
         </header>
-        <div className="content" id="admin-content" tabIndex={-1}>
+        <div className={`content admin-content-${contentWidth}`} id="admin-content" tabIndex={-1}>
           {children}
         </div>
       </div>

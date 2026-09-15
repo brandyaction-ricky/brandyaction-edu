@@ -716,7 +716,7 @@ export function Platform({
           )
         ) : (
           <>
-            <AdminHeading
+            {section.key !== "landing" && <AdminHeading
               title={finalAdminTitles[section.key] || section.title}
               description={sectionDescription[section.key]}
               eyebrow={
@@ -757,7 +757,7 @@ export function Platform({
                         : "새로 등록"}
                   </button>
                 )}
-            </AdminHeading>
+            </AdminHeading>}
             {standaloneAdmin.includes(section.key) ? (
               <AdminWorkflows
                 section={section.key}

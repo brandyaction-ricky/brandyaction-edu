@@ -9,7 +9,7 @@ export type PerformanceCourse = {
 export type PerformanceCampaign = {
   id: string; landing_id: string; name: string; utm_campaign: string; start_day: string; end_day: string;
   new_customer_price: number; existing_customer_price: number; live_peak: number | null;
-  meta_ad_account_id: string | null; meta_campaign_id: string | null;
+  meta_ad_account_id: string | null; meta_campaign_id: string | null; meta_campaign_ids?: string[] | null;
   meta_sync_status: 'not_configured' | 'idle' | 'syncing' | 'success' | 'failed';
   meta_last_synced_at: string | null; meta_sync_error: string | null;
 };
@@ -30,6 +30,14 @@ export type ActualRow = {
   memo: string | null; revenue: number; updated_at: string;
 };
 export type DashboardReport = {
+  ui?: {
+    daily_a: DashboardReport['daily'] | null;
+    last_collected_at: string | null;
+    actual_presence: { new_payments: boolean; existing_payments: boolean } | null;
+    previous_day_members: Record<string, number | null>;
+    period_actuals?: { kakao_members: number | null; kakao_day: string | null; payments: number | null } | null;
+    errors: { trend?: string; collection?: string; actuals?: string };
+  };
   campaign: PerformanceCampaign; summary_b: MetricSummary; summary_a: MetricSummary | null;
   performance: PerformanceRow[];
   daily: { day: string; sessions: number; visitors: number; cta_click_sessions: number; cta_clicks: number }[];

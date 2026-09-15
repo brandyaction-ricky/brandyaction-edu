@@ -7,6 +7,7 @@ import type { Metadata } from 'next';
 import './ui/final/tokens.css';
 import './ui/final/frontend.css';
 import './ui/final/admin.css';
+import './ui/final/admin-system.css';
 import './ui/final/integration.css';
 import './ui/final/product-editor.css';
 import './ui/final/learning-editor.css';
