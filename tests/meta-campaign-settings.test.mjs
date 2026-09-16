@@ -97,6 +97,17 @@ test('Meta fetch retrieves and deduplicates multiple campaign IDs, rejects mixed
     mismatch=true;await assert.rejects(api.fetchMetaCampaigns(input),/META_CAMPAIGN_MISMATCH/);
   }finally{global.fetch=original;}
 });
+test('Meta registration count and result cost are copied from action arrays without recalculation',async()=>{
+  const original=global.fetch;
+  global.fetch=async input=>{const url=new URL(input),parts=url.pathname.split('/'),id=parts[2];
+    if(parts.length===3)return Response.json({id,account_id:'123',name:'Fixture'});
+    if(parts[3]==='ads')return Response.json({data:[]});
+    assert.match(url.searchParams.get('fields'),/cost_per_action_type/);
+    return Response.json({data:[{date_start:'2026-09-15',campaign_id:id,adset_id:'1',adset_name:'Set',ad_id:'2',ad_name:'Creative',impressions:'100',spend:'7000',actions:[{action_type:'offsite_conversion.fb_pixel_complete_registration',value:'4'}],cost_per_action_type:[{action_type:'offsite_conversion.fb_pixel_complete_registration',value:'1750'}]}]});
+  };
+  try{const api=load('lib/meta-marketing.ts');const rows=await api.fetchMetaCampaigns({version:'v99.0',token:'test',accountId:'act_123',campaignIds:[idA],startDay:'2026-09-15',endDay:'2026-09-15'});assert.equal(rows[0].registrations,4);assert.equal(rows[0].registration_cost,1750);assert.equal(api.metaActionValue([{action_type:'complete_registration',value:'9'}],'complete_registration'),9);}
+  finally{global.fetch=original;}
+});
 
 test('list and detail always use common account for null and stale campaign rows',async()=>{
   for(const account of [null,'act_999']){

@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     if (started.error || !started.data) return reply({ error: '설정이 변경됐습니다. 새로고침 후 다시 동기화해 주세요.' }, 409);
     try {
       const rows = await fetchMetaCampaigns({ version, token, accountId, campaignIds, startDay: campaign.start_day, endDay });
-      const dimensions = rows.map(row => ({ adset_key: encodeURIComponent(row.adset_name), creative_key: encodeURIComponent(row.creative_name), meta_adset_id: row.meta_adset_id, meta_ad_id: row.meta_ad_id, meta_creative_id: row.meta_creative_id }));
+      const dimensions = rows.map(row => ({ adset_key: row.adset_name, creative_key: row.creative_name, meta_adset_id: row.meta_adset_id, meta_ad_id: row.meta_ad_id, meta_creative_id: row.meta_creative_id }));
       const stored = await db.rpc('edu_store_campaign_meta', { p_campaign: campaign.id, p_expected_updated_at: started.data.updated_at, p_rows: rows, p_dimensions: dimensions, p_actor: user.id });
       if (stored.error) throw Error('META_STORE_FAILED');
       return reply({ ok: true, rows: rows.length, campaigns: campaignIds.length });

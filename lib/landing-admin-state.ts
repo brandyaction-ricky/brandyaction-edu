@@ -28,7 +28,7 @@ export function readPeriod(params: URLSearchParams, campaign: PerformanceCampaig
   return { preset, start: range.startDay, end: range.endDay, compare, compareStart: params.get('compare_start') ?? previous.startDay, compareEnd: params.get('compare_end') ?? previous.endDay };
 }
 export type TrackingPeriod = ReturnType<typeof readPeriod>;
-export function periodError(period: TrackingPeriod, campaign: PerformanceCampaign) {
+export function periodError(period: TrackingPeriod, campaign: Pick<PerformanceCampaign, 'start_day' | 'end_day'>) {
   try {
     validateDashboardRange(period.start, period.end, campaign);
     if (period.compare && (!validDay(period.compareStart) || !validDay(period.compareEnd) || period.compareStart > period.compareEnd || Date.parse(period.compareEnd) - Date.parse(period.compareStart) !== Date.parse(period.end) - Date.parse(period.start))) return '비교 기간은 조회 기간과 같은 길이로 선택해 주세요.';
