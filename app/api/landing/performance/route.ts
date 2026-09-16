@@ -21,7 +21,8 @@ export async function GET(request: Request) {
   if (!user) return reply({ error: '마케팅 관리 권한이 필요합니다.' }, 403);
   const params = new URL(request.url).searchParams;
   const landingId = params.get('landing');
-  const campaignId = params.get('campaign');
+  const campaignIds = [...new Set(params.getAll('campaign'))];
+  const campaignId = campaignIds[0] || null;
   try {
     const db = createAdminClient();
     const account = await commonMetaAccountId(db);
@@ -36,6 +37,31 @@ export async function GET(request: Request) {
         const config = configs.data?.find(value => value.id === course.id);
         return { ...course, tracking: !config?.layout_ver ? 'not_configured' : config.enabled ? 'active' : 'paused', campaigns: (campaigns.data?.filter(value => value.landing_id === course.id) || []).map(value => ({ ...value, meta_ad_account_id: account || null })) };
       }) });
+    }
+    if (campaignIds.length > 1) {
+      if (campaignIds.length > 20 || campaignIds.some(id => !validId(id))) return reply({ error: '무료클래스는 최대 20개까지 선택할 수 있습니다.' }, 400);
+      const found = await db.from('landing_campaigns').select('*').in('id', campaignIds);
+      if (found.error || found.data?.length !== campaignIds.length) return reply({ error: '선택한 무료클래스 캠페인을 확인하지 못했습니다.' }, 404);
+      const campaigns = campaignIds.map(id => found.data!.find(value => value.id === id) as PerformanceCampaign);
+      const range = campaigns.map(value => validateDashboardRange(params.get('start'), params.get('end'), value))[0];
+      const compareStart = params.get('compare_start'), compareEnd = params.get('compare_end');
+      if ((compareStart || compareEnd) && (!validDay(compareStart) || !validDay(compareEnd) || Date.parse(compareEnd) < Date.parse(compareStart) || Date.parse(compareEnd) - Date.parse(compareStart) !== Date.parse(range.endDay) - Date.parse(range.startDay))) return reply({ error: '비교 기간은 조회 기간과 같은 길이로 선택해 주세요.' }, 400);
+      const courseRows = await db.from('courses').select('id,title').in('id', campaigns.map(value => value.landing_id));
+      if (courseRows.error) throw Error('무료클래스 이름을 불러오지 못했습니다.');
+      const reports = await Promise.all(campaigns.map(async campaign => {
+        campaign.meta_ad_account_id = account || null;
+        const [rpc, ui] = await Promise.all([
+          db.rpc('edu_marketing_dashboard', {
+            p_campaign: campaign.id, p_b_start: range.startDay, p_b_end: range.endDay,
+            p_a_start: compareStart || null, p_a_end: compareEnd || null,
+            p_campaigns: null, p_ad_types: null, p_adsets: null, p_creatives: null, p_devices: null, p_layouts: null,
+          }),
+          performanceUiDetails(db, campaign, params, request.signal),
+        ]);
+        if (rpc.error || !rpc.data) throw Error('성과 데이터를 불러오지 못했습니다.');
+        return { ...rpc.data, ui, campaign, source_title: courseRows.data?.find(value => value.id === campaign.landing_id)?.title || campaign.name, range: { startDay: range.startDay, endDay: range.endDay, compareStartDay: compareStart || null, compareEndDay: compareEnd || null } };
+      }));
+      return reply({ multi: true, reports });
     }
     if (!validId(landingId) || !validId(campaignId)) return reply({ error: '무료클래스와 캠페인을 선택해 주세요.' }, 400);
     const campaign = await campaignFor(db, campaignId);
@@ -94,7 +120,7 @@ export async function POST(request: Request) {
       const syncStatus = !account || !metaIds.length ? 'not_configured' : connectionChanged || campaign.meta_sync_status === 'not_configured' ? 'idle' : campaign.meta_sync_status;
       const result = await db.from('landing_campaigns').update({
         name: String(values.name || campaign.name).trim().slice(0,200), utm_campaign: String(values.utm_campaign || campaign.utm_campaign).trim().slice(0,250),
-        start_day: start, end_day: end, new_customer_price: newPrice, existing_customer_price: existingPrice, live_peak: livePeak,
+        start_day: start, end_day: end, uses_ads: 'uses_ads' in values ? values.uses_ads === true : campaign.uses_ads, new_customer_price: newPrice, existing_customer_price: existingPrice, live_peak: livePeak,
         meta_ad_account_id: account || null, meta_campaign_id: metaIds[0] || null, meta_campaign_ids: metaIds,
         meta_sync_status: syncStatus, meta_sync_error: connectionChanged ? null : campaign.meta_sync_error, updated_by: user.id, updated_at: new Date().toISOString(),
       }).eq('id', campaign.id).select('*').single();

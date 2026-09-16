@@ -1,9 +1,16 @@
 import { parseMetaCampaignIds } from './meta-campaign-settings';
 
 type MetaPage<T> = { data?: T[]; paging?: { next?: string } };
-type MetaInsight = { date_start: string; campaign_id: string; campaign_name?: string; adset_id: string; adset_name?: string; ad_id: string; ad_name?: string; impressions?: string; spend?: string; actions?: { action_type: string; value: string }[] };
+type ActionStat = { action_type: string; value: string };
+type MetaInsight = { date_start: string; campaign_id: string; campaign_name?: string; adset_id: string; adset_name?: string; ad_id: string; ad_name?: string; impressions?: string; spend?: string; actions?: ActionStat[]; cost_per_action_type?: ActionStat[] };
 type MetaAd = { id: string; name?: string; adset_id?: string; creative?: { id?: string } };
 const GRAPH_HOST = 'graph.facebook.com';
+export function metaActionValue(rows: ActionStat[] | undefined, action: string) {
+  const exact = rows?.find(row => row.action_type === action);
+  const compatible = exact || rows?.find(row => row.action_type.endsWith(action));
+  const value = Number(compatible?.value);
+  return Number.isFinite(value) && value >= 0 ? value : null;
+}
 
 async function graphPages<T>(url: URL, token: string) {
   const rows: T[] = [];
@@ -39,7 +46,7 @@ export async function fetchMetaCampaign(input: { version: string; token: string;
   const adsById = new Map(ads.map(ad => [ad.id, ad]));
 
   const insightsUrl = new URL(`${base}/${input.campaignId}/insights`);
-  insightsUrl.searchParams.set('fields', 'date_start,campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,impressions,spend,actions');
+  insightsUrl.searchParams.set('fields', 'date_start,campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,impressions,spend,actions,cost_per_action_type');
   insightsUrl.searchParams.set('level', 'ad');
   insightsUrl.searchParams.set('time_increment', '1');
   insightsUrl.searchParams.set('limit', '500');
@@ -48,13 +55,16 @@ export async function fetchMetaCampaign(input: { version: string; token: string;
   return insights.map(row => {
     if (row.campaign_id !== input.campaignId) throw Error('META_CAMPAIGN_MISMATCH');
     const ad = adsById.get(row.ad_id);
-    const linkClicks = (row.actions || []).filter(action => action.action_type === 'link_click').reduce((sum, action) => sum + Number(action.value || 0), 0);
+    const linkClicks = metaActionValue(row.actions, 'link_click') || 0;
+    const registrations = metaActionValue(row.actions, 'complete_registration') || 0;
+    const registrationCost = metaActionValue(row.cost_per_action_type, 'complete_registration');
     return {
       day: row.date_start, campaign_name: row.campaign_name || identity.name || input.campaignId,
       adset_name: row.adset_name || row.adset_id, creative_name: row.ad_name || ad?.name || row.ad_id,
       meta_campaign_id: row.campaign_id, meta_adset_id: row.adset_id, meta_ad_id: row.ad_id,
       meta_creative_id: ad?.creative?.id || null, impressions: Math.max(0, Number(row.impressions || 0)),
       link_clicks: Math.max(0, linkClicks), spend: Math.max(0, Number(row.spend || 0)),
+      registrations: Math.max(0, registrations), registration_cost: registrationCost,
     };
   });
 }
