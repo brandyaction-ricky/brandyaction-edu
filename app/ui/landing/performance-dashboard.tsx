@@ -143,7 +143,7 @@ const sourceRow = (report: SourceReport): SourceRow => ({
   kakao: report.ui?.period_actuals?.kakao_delta ?? null,
   payments: report.ui?.period_actuals?.payments ?? 0,
   revenue: report.actuals.reduce((sum, row) => sum + row.revenue, 0),
-  spend: report.summary_b.spend,
+  spend: report.campaign.uses_ads ? report.summary_b.spend : 0,
 });
 const totalSource = (label: string, paid: boolean, rows: SourceRow[]): SourceRow => ({
   label, paid,
@@ -154,10 +154,10 @@ const totalSource = (label: string, paid: boolean, rows: SourceRow[]): SourceRow
 export function MultiSourceComparison({ reports }: { reports: SourceReport[] }) {
   const items = reports.map(sourceRow), paid = items.filter(row => row.paid), organic = items.filter(row => !row.paid);
   const groups = [{ label: '페이드 소계', paid: true, rows: paid }, { label: '오가닉 소계', paid: false, rows: organic }].filter(group => group.rows.length);
-  const total = totalSource('합계', false, items);
-  const render = (row: SourceRow, totalRow = false) => <tr key={row.label} className={totalRow ? 'tracking-source-total' : undefined}><th scope="row">{row.label}{!totalRow && <AdminStatusBadge status={row.paid ? 'active' : 'not_configured'} label={row.paid ? '페이드' : '오가닉'}/>}</th><td data-align="number">{count(row.visits)}</td><td data-align="number">{count(row.clicks)}</td><td data-align="number">{count(row.kakao)}</td><td data-align="number">{count(row.payments)}</td><td data-align="number">{money(row.revenue)}</td><td data-align="number">{money(row.spend)}</td><td data-align="number">{row.paid && row.spend > 0 ? `${count(row.revenue / row.spend * 100)}%` : '—'}</td><td data-align="number">{money(row.revenue - row.spend)}</td></tr>;
+  const total = totalSource('합계', true, items);
+  const render = (row: SourceRow, totalRow = false, overall = false) => <tr key={row.label} className={totalRow ? 'tracking-source-total' : undefined}><th scope="row">{row.label}{!totalRow && <AdminStatusBadge status={row.paid ? 'active' : 'not_configured'} label={row.paid ? '페이드' : '오가닉'}/>}</th><td data-align="number">{count(row.visits)}</td><td data-align="number">{count(row.clicks)}</td><td data-align="number">{count(row.kakao)}</td><td data-align="number">{count(row.payments)}</td><td data-align="number">{money(row.revenue)}</td><td data-align="number">{row.paid || overall ? money(row.spend) : '—'}</td><td data-align="number">{(row.paid || overall) && row.spend > 0 ? `${count(row.revenue / row.spend * 100)}%` : '—'}</td><td data-align="number">{row.paid || overall ? money(row.revenue - row.spend) : '—'}</td></tr>;
   return <AdminSection bordered title="유입별 성과 비교" description="선택한 무료클래스의 기간 성과 · KST">
-    <AdminDataTable label="유입별 성과 비교표" tableClassName="tracking-source-table"><thead><tr>{['페이지','방문','CTA 클릭','카톡방','결제','매출','광고비','ROAS','광고비 뺀 매출'].map((label,index) => <th scope="col" data-align={index ? 'number' : undefined} key={label}>{label}</th>)}</tr></thead><tbody>{groups.flatMap(group => [...group.rows.map(row => render(row)), render(totalSource(group.label, group.paid, group.rows), true)])}{render(total, true)}</tbody></AdminDataTable>
-    <p className="tracking-help">ROAS는 광고 사용으로 표시한 페이드 페이지만 계산합니다. 광고비 뺀 매출은 매출에서 광고비만 차감한 값입니다.</p>
+    <AdminDataTable label="유입별 성과 비교표" tableClassName="tracking-source-table"><thead><tr>{['페이지','방문','CTA 클릭','카톡방','결제','매출','광고비','ROAS','광고비 뺀 매출'].map((label,index) => <th scope="col" data-align={index ? 'number' : undefined} key={label}>{label}</th>)}</tr></thead><tbody>{groups.flatMap(group => [...group.rows.map(row => render(row)), render(totalSource(group.label, group.paid, group.rows), true)])}{render(total, true, true)}</tbody></AdminDataTable>
+    <p className="tracking-help">광고비·ROAS·광고비 뺀 매출은 Meta 캠페인 ID로 연결된 페이드 페이지에만 적용합니다. 오가닉은 광고비 차감 지표를 계산하지 않습니다.</p>
   </AdminSection>;
 }

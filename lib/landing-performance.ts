@@ -12,7 +12,7 @@ export type PerformanceCampaign = {
   uses_ads: boolean;
   meta_ad_account_id: string | null; meta_campaign_id: string | null; meta_campaign_ids?: string[] | null;
   meta_sync_status: 'not_configured' | 'idle' | 'syncing' | 'success' | 'failed';
-  meta_last_synced_at: string | null; meta_sync_error: string | null;
+  meta_last_synced_at: string | null; meta_sync_attempted_at?: string | null; meta_sync_error: string | null;
 };
 export type MetricSummary = {
   has_data: boolean; sessions: number; visitors: number; cta_click_sessions: number; cta_clicks: number;
