@@ -9,10 +9,21 @@ export async function POST(request: Request) {
         return Response.json({ error: '로그인이 필요합니다.' }, { status: 401 });
     try {
         const body = await request.json();
-        if (typeof body.paymentKey !== 'string' || typeof body.orderId !== 'string' || !Number.isSafeInteger(body.amount))
+        if (
+            typeof body.paymentKey !== 'string' ||
+            typeof body.orderId !== 'string' ||
+            !body.paymentKey.trim() ||
+            !body.orderId.trim() ||
+            body.paymentKey.length > 200 ||
+            body.orderId.length > 100 ||
+            !Number.isSafeInteger(body.amount) ||
+            body.amount <= 0
+        )
             return Response.json({ error: '결제 정보를 확인해 주세요.' }, { status: 400 });
+        const paymentKey = body.paymentKey.trim();
+        const orderId = body.orderId.trim();
         const db = createAdminClient();
-        const { data: order } = await db.from('orders').select('id,status,total_amount').eq('order_number', body.orderId).eq('user_id', user.id).single();
+        const { data: order } = await db.from('orders').select('id,status,total_amount').eq('order_number', orderId).eq('user_id', user.id).single();
         if (!order || order.total_amount !== body.amount)
             return Response.json({ error: '주문 금액이 일치하지 않습니다.' }, { status: 409 });
         if (order.status === 'paid')
@@ -23,15 +34,18 @@ export async function POST(request: Request) {
         if (!secret)
             return Response.json({ error: '결제 설정을 확인하고 있습니다.' }, { status: 503 });
         const headers = { 'Authorization': 'Basic ' + Buffer.from(secret + ':').toString('base64'), 'Content-Type': 'application/json', 'Idempotency-Key': 'edu-confirm-' + order.id };
-        let response = await fetch('https://api.tosspayments.com/v1/payments/confirm', { method: 'POST', headers, body: JSON.stringify({ paymentKey: body.paymentKey, orderId: body.orderId, amount: order.total_amount }), signal: AbortSignal.timeout(15000) });
+        let response = await fetch('https://api.tosspayments.com/v1/payments/confirm', { method: 'POST', headers, body: JSON.stringify({ paymentKey, orderId, amount: order.total_amount }), signal: AbortSignal.timeout(15000) });
         let payment = await response.json();
         if (!response.ok && payment.code === 'ALREADY_PROCESSED_PAYMENT') {
-            response = await fetch('https://api.tosspayments.com/v1/payments/' + encodeURIComponent(body.paymentKey), { headers, signal: AbortSignal.timeout(15000) });
+            response = await fetch('https://api.tosspayments.com/v1/payments/' + encodeURIComponent(paymentKey), { headers, signal: AbortSignal.timeout(15000) });
             payment = await response.json();
         }
-        if (!response.ok)
+        if (!response.ok) {
+            const failed = await db.from('orders').update({ status: 'payment_failed' }).eq('id', order.id).eq('user_id', user.id).eq('status', 'pending');
+            if (failed.error) console.error('payment failure state update failed', failed.error.code);
             return Response.json({ error: '결제를 승인하지 못했습니다. 주문 내역을 확인해 주세요.' }, { status: 409 });
-        if (payment.paymentKey !== body.paymentKey || payment.orderId !== body.orderId || payment.totalAmount !== order.total_amount || payment.status !== 'DONE' || payment.currency !== 'KRW')
+        }
+        if (payment.paymentKey !== paymentKey || payment.orderId !== orderId || payment.totalAmount !== order.total_amount || payment.status !== 'DONE' || payment.currency !== 'KRW')
             return Response.json({ error: '결제 완료 상태를 확인할 수 없습니다.' }, { status: 409 });
         const { error } = await db.rpc('finalize_toss_payment', { p_order_number: payment.orderId, p_payment_key: payment.paymentKey, p_method: payment.method, p_approved_amount: payment.totalAmount, p_receipt_url: payment.receipt?.url || null, p_payload: payment, p_approved_at: payment.approvedAt });
         if (error) {
