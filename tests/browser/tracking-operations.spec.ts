@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 // Exercise the actual React screen with deterministic transport failures and
 // responses. These tests never write to DEV/Production, Auth or Meta.
 async function fixture(page: Page, failClassification = false) {
-  let campaign = { id: 'bbbbbbbb-bbbb-4000-8000-000000000002', landing_id: 'aaaaaaaa-aaaa-4000-8000-000000000001', name: '운영 검증 캠페인', utm_campaign: 'qa', start_day: '2026-09-01', end_day: '2026-09-30', new_customer_price: 1650000, existing_customer_price: 1100000, live_peak: null, meta_ad_account_id: null, meta_campaign_ids: [], meta_sync_status: 'not_configured', meta_last_synced_at: null, meta_sync_error: null };
+  let campaign = { id: 'bbbbbbbb-bbbb-4000-8000-000000000002', landing_id: 'aaaaaaaa-aaaa-4000-8000-000000000001', name: '운영 검증 캠페인', utm_campaign: 'qa', start_day: '2026-09-01', end_day: '2026-09-30', new_customer_price: 1650000, existing_customer_price: 1100000, live_peak: null, uses_ads: false, meta_ad_account_id: null, meta_campaign_ids: [], meta_sync_status: 'not_configured', meta_last_synced_at: null, meta_sync_error: null };
   const rows = [
     { creative: '소재 60', sessions: 60, visitors: 30, cta_click_sessions: 20, cta_clicks: 60 },
     { creative: '소재 40', sessions: 40, visitors: 20, cta_click_sessions: 4, cta_clicks: 12 },
@@ -95,9 +95,10 @@ test('campaign save updates persisted form and legacy settings URL stays closed 
   const drawer = page.getByRole('dialog', { name: '캠페인 설정', exact: true });
   await drawer.getByRole('textbox', { name: '캠페인명', exact: true }).fill('저장된 캠페인');
   await drawer.getByRole('button', { name: '설정 저장', exact: true }).click();
-  await expect(page.getByRole('combobox', { name: '캠페인', exact: true })).toContainText('저장된 캠페인');
+  await expect(drawer.getByRole('textbox', { name: '캠페인명', exact: true })).toHaveValue('저장된 캠페인');
   await expect(drawer.getByRole('button', { name: '설정 저장', exact: true })).toBeDisabled();
   await drawer.getByRole('button', { name: '닫기', exact: true }).click();
-  await page.reload(); await expect(page.getByRole('combobox', { name: '캠페인', exact: true })).toContainText('저장된 캠페인');
+  await page.reload();
+  await expect(page.getByRole('checkbox', { name: /운영 검증 클래스/ })).toBeChecked();
   await expect(drawer).toHaveCount(0); await expect(page).toHaveURL(/tab=dashboard/);
 });
