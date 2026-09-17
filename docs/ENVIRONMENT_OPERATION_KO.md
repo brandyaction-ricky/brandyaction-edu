@@ -21,6 +21,10 @@
 - PC·태블릿·모바일 화면에 치명적 오류가 없는가
 - `/api/health` 응답의 `environment`가 `development`인가
 
+`/api/health`는 환경명뿐 아니라 DEV Supabase 연결, 프로젝트 참조, Toss 키 모드와 웹훅 설정 유무를 비밀값 없이 반환한다. HTTP 200과 `ok: true`, `services.toss.mode: "test"`를 모두 확인한 뒤 DEV 쓰기 검증을 시작한다.
+
+고정 QA 상품·구매자·E2E 증거 기준은 `docs/dev/QA_DATA_AND_TOSS_E2E_KO.md`를 따른다.
+
 ## 운영 승격 전 조건
 
 - 테스트 체크리스트 전 항목 통과
