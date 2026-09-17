@@ -60,7 +60,7 @@ test('Meta-only dimensions populate all supported filters and reset without web-
     await filters.getByRole('button', { name, exact: true }).click();
     await expect(filters.getByRole('group', { name: `${name} 다중 선택` })).toContainText('수집된 항목이 없습니다.');
   }
-  await filters.getByRole('button', { name: '전체 초기화', exact: true }).click();
+  await page.getByRole('button', { name: '전체 초기화', exact: true }).last().click();
   await expect(page).not.toHaveURL(/creative=/);
   await expect(page.getByRole('region', { name: '소재별 성과표' }).locator('tbody tr')).toHaveCount(8);
 });
