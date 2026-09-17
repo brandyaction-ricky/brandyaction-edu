@@ -52,9 +52,10 @@ export async function POST(request: Request) {
     if (started.error || !started.data) return reply({ error: '설정이 변경됐습니다. 새로고침 후 다시 동기화해 주세요.' }, 409);
     try {
       const rows = await fetchMetaCampaigns({ version, token, accountId, campaignIds, startDay: campaign.start_day, endDay });
-      const dimensions = rows.map(row => ({ adset_key: row.adset_name, creative_key: row.creative_name, meta_adset_id: row.meta_adset_id, meta_ad_id: row.meta_ad_id, meta_creative_id: row.meta_creative_id }));
+      const dimensionMap = new Map(rows.map(row => [`${row.meta_adset_id}\u0000${row.meta_ad_id}`, { adset_key: row.adset_name, creative_key: row.creative_name, meta_adset_id: row.meta_adset_id, meta_ad_id: row.meta_ad_id, meta_creative_id: row.meta_creative_id }]));
+      const dimensions = [...dimensionMap.values()];
       const stored = await db.rpc('edu_store_campaign_meta', { p_campaign: campaign.id, p_expected_updated_at: started.data.updated_at, p_rows: rows, p_dimensions: dimensions, p_actor: user.id });
-      if (stored.error) throw { type: 'database', stage: 'database', retryable: true };
+      if (stored.error) throw { type: 'database', stage: 'database', retryable: true, dbCode: stored.error.code || null };
       console.info('meta_sync_success', { campaign_id: campaign.id, campaigns: campaignIds.length, rows: rows.length, duration_ms: Date.now() - Date.parse(syncStarted) });
       return reply({ ok: true, rows: rows.length, campaigns: campaignIds.length });
     } catch (cause) {
