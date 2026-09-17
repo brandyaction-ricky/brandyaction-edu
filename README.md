@@ -2,6 +2,19 @@
 
 Next.js 16, Supabase, Toss Payments로 구성한 강의 판매·수강 운영 서비스입니다. 공개 클래스부터 주문·결제, 수강권, VOD·자료·진도, 관리자 상품·회원·주문·리뷰 운영까지 하나의 데이터 흐름으로 연결합니다.
 
+## Codex 작업 시작
+
+새 Codex 환경에서는 루트 `AGENTS.md`를 먼저 읽고 다음 문서를 순서대로 확인합니다.
+
+1. `docs/codex/PROJECT_CONTEXT.md`
+2. `docs/codex/CURRENT_STATE.md`
+3. `docs/codex/ARCHITECTURE.md`
+4. `docs/codex/ENVIRONMENTS.md`
+5. `docs/codex/DATABASE.md`
+6. `docs/codex/WORKFLOW.md`
+
+`CURRENT_STATE.md`는 특정 시점의 인수인계 스냅샷입니다. 실제 작업 전에는 반드시 `git fetch --all --prune` 후 원격 브랜치·PR·배포·Migration 상태와 다시 대조합니다.
+
 ## 구현 범위
 
 - 이메일 인증·로그인, Kakao·Google OAuth, 비밀번호 재설정
