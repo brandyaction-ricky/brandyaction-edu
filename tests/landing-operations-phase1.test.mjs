@@ -106,11 +106,15 @@ test('multi-source comparison separates paid and organic rows and never labels m
   const make = (title, paid, spend) => ({ ...report, source_title: title, campaign: { ...report.campaign, uses_ads: paid }, summary_b: { ...summary, sessions: 10, cta_click_sessions: 4, spend }, actuals: [{ revenue: 10000 }], ui: { ...report.ui, period_actuals: { ...report.ui.period_actuals, kakao_delta: 3, payments: 1 } } });
   const html = renderToStaticMarkup(React.createElement(MultiSourceComparison, { reports: [make('광고 페이지', true, 1000), make('오가닉 페이지', false, 0)] }));
   assert.match(html, /페이드 소계/); assert.match(html, /오가닉 소계/); assert.match(html, /광고비 뺀 매출/); assert.doesNotMatch(html, /순이익/);
+  const organicRow = html.slice(html.indexOf('오가닉 페이지'), html.indexOf('오가닉 소계'));
+  assert.doesNotMatch(organicRow, /9,000원|10,000%/); assert.match(organicRow, /—/);
 });
-test('dashboard repair joins web and Meta by adset plus creative before applying classification', () => {
-  const sql = fs.readFileSync('supabase/migrations/20260916080955_improve_marketing_dashboard_attribution.sql', 'utf8');
-  assert.match(sql, /full join meta_rows m using\(adset,creative\)/i);
+test('dashboard repair gates Meta by paid configuration and joins stable IDs before applying classification', () => {
+  const sql = fs.readFileSync('supabase/migrations/20260916233858_repair_dashboard_attribution_and_meta_sync.sql', 'utf8');
+  assert.match(sql, /join selected c on c\.uses_ads=true/i);
+  assert.match(sql, /m\.meta_campaign_id=any\(c\.meta_campaign_ids\)/i);
+  assert.match(sql, /full join meta_rows m on w\.meta_adset_id=m\.meta_adset_id and w\.meta_ad_id=m\.meta_ad_id/i);
   assert.doesNotMatch(sql, /full join meta_rows m using\([^)]*ad_type/i);
-  assert.match(sql, /d\.adset_key=m\.adset_name and d\.creative_key=m\.creative_name/i);
-  assert.match(sql, /uses_ads boolean not null default false/i);
+  assert.match(sql, /meta_sync_attempted_at timestamptz/i);
+  assert.match(sql, /edu_marketing_export/i);
 });
