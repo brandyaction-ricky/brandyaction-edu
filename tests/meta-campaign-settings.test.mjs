@@ -81,8 +81,9 @@ test('all Meta campaigns fetch before one atomic write; future end day is capped
   const previous=[process.env.META_ACCESS_TOKEN,process.env.META_GRAPH_API_VERSION];process.env.META_ACCESS_TOKEN='fixture-token';process.env.META_GRAPH_API_VERSION='v99.0';
   try{
     let requested;const initial={...campaign,meta_ad_account_id:'act_123',meta_campaign_id:idA,meta_campaign_ids:[idA,idB]};
-    const h=setup({initial,fetchRows:async input=>{requested=input;return[];}});
-    assert.equal((await h.meta.POST(h.request({}))).status,200);assert.equal(requested.accountId,commonAccount);assert.deepEqual(requested.campaignIds,[idA,idB]);assert.equal(requested.endDay,new Date(Date.now()+9*3600000).toISOString().slice(0,10));assert.equal(h.rpcCalls.length,1);assert.equal(h.rpcCalls[0].name,'edu_store_campaign_meta');
+    const duplicateDimension={day:'2026-09-15',adset_name:'Set',creative_name:'Ad',meta_adset_id:'1',meta_ad_id:'2',meta_creative_id:'3'};
+    const h=setup({initial,fetchRows:async input=>{requested=input;return[duplicateDimension,{...duplicateDimension,day:'2026-09-16'}];}});
+    assert.equal((await h.meta.POST(h.request({}))).status,200);assert.equal(requested.accountId,commonAccount);assert.deepEqual(requested.campaignIds,[idA,idB]);assert.equal(requested.endDay,new Date(Date.now()+9*3600000).toISOString().slice(0,10));assert.equal(h.rpcCalls.length,1);assert.equal(h.rpcCalls[0].name,'edu_store_campaign_meta');assert.equal(h.rpcCalls[0].args.p_dimensions.length,1);
     const fail=setup({initial,fetchRows:async()=>{throw Error('fixture failure')}});assert.equal((await fail.meta.POST(fail.request({}))).status,502);assert.equal(fail.rpcCalls.length,0);assert.equal(fail.row().meta_sync_status,'failed');
   }finally{for(const [i,key]of['META_ACCESS_TOKEN','META_GRAPH_API_VERSION'].entries())if(previous[i]===undefined)delete process.env[key];else process.env[key]=previous[i];}
 });
