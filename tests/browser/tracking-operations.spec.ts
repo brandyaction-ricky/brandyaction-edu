@@ -2,13 +2,14 @@ import { expect, test, type Page } from '@playwright/test';
 
 // Exercise the actual React screen with deterministic transport failures and
 // responses. These tests never write to DEV/Production, Auth or Meta.
-async function fixture(page: Page, failClassification = false) {
-  let campaign = { id: 'bbbbbbbb-bbbb-4000-8000-000000000002', landing_id: 'aaaaaaaa-aaaa-4000-8000-000000000001', name: '운영 검증 캠페인', utm_campaign: 'qa', start_day: '2026-09-01', end_day: '2026-09-30', new_customer_price: 1650000, existing_customer_price: 1100000, live_peak: null, uses_ads: false, meta_ad_account_id: null, meta_campaign_ids: [], meta_sync_status: 'not_configured', meta_last_synced_at: null, meta_sync_error: null };
-  const rows = [
+async function fixture(page: Page, failClassification = false, metaOnly = false) {
+  let campaign = { id: 'bbbbbbbb-bbbb-4000-8000-000000000002', landing_id: 'aaaaaaaa-aaaa-4000-8000-000000000001', name: '운영 검증 캠페인', utm_campaign: 'qa', start_day: '2026-09-01', end_day: '2026-09-30', new_customer_price: 1650000, existing_customer_price: 1100000, live_peak: null, uses_ads: metaOnly, meta_ad_account_id: metaOnly ? 'act_245402678098216' : null, meta_campaign_ids: metaOnly ? ['120252432290300270'] : [], meta_sync_status: metaOnly ? 'success' : 'not_configured', meta_last_synced_at: null, meta_sync_error: null };
+  const sourceRows = metaOnly ? Array.from({ length: 8 }, (_, index) => ({ creative: `cr${String(index + 1).padStart(2, '0')}`, sessions: 0, visitors: 0, cta_click_sessions: 0, cta_clicks: 0 })) : [
     { creative: '소재 60', sessions: 60, visitors: 30, cta_click_sessions: 20, cta_clicks: 60 },
     { creative: '소재 40', sessions: 40, visitors: 20, cta_click_sessions: 4, cta_clicks: 12 },
     { creative: '소재 2', sessions: 2, visitors: 1, cta_click_sessions: 2, cta_clicks: 6 },
-  ].map(row => ({ ...row, campaign: 'qa', adset: '광고세트', ad_type: 'unclassified', impressions: 0, link_clicks: 0, spend: 0, avg_scroll_depth: 50, avg_dwell_ms: 60000 }));
+  ];
+  const rows = sourceRows.map((row, index) => ({ ...row, campaign: metaOnly ? 'META_Cold_카톡방입장_2609' : 'qa', adset: metaOnly ? 'A_메인_브로드_25-54' : '광고세트', ad_type: 'unclassified', impressions: metaOnly ? 1000 + index : 0, link_clicks: metaOnly ? 50 + index : 0, spend: metaOnly ? 10000 + index : 0, registrations: metaOnly ? 5 + index : 0, avg_scroll_depth: metaOnly ? null : 50, avg_dwell_ms: metaOnly ? null : 60000 }));
   let classificationRequests = 0;
   await page.route('**/api/landing/performance**', async route => {
     const url = new URL(route.request().url());
@@ -26,12 +27,12 @@ async function fixture(page: Page, failClassification = false) {
     if (!url.searchParams.has('start')) {
       await route.fulfill({ json: { can_manage_campaign: true, courses: [{ id: campaign.landing_id, title: '운영 검증 클래스', status: 'published', tracking: 'active', campaigns: [campaign] }] } }); return;
     }
-    const devices = url.searchParams.getAll('device');
-    const performance = devices.length === 1 ? rows.slice(0, 1) : rows;
+    const devices = url.searchParams.getAll('device'), creatives = url.searchParams.getAll('creative');
+    const performance = creatives.length ? rows.filter(row => creatives.includes(row.creative)) : devices.length === 1 ? rows.slice(0, 1) : rows;
     await route.fulfill({ json: {
-      campaign, performance, summary_b: { has_data: true, sessions: devices.length === 1 ? 60 : 102, visitors: 51, cta_click_sessions: 26, cta_clicks: 78, converted_visitors: 13, meta_impressions: 0, meta_link_clicks: 0, spend: 0 }, summary_a: null,
-      actuals: [], daily: [], options: { campaigns: ['qa'], adsets: ['광고세트'], creatives: rows.map(r => r.creative), devices: ['mobile', 'desktop'], layouts: [1], ad_types: ['unclassified', 'cold', 'retarget'] },
-      data_state: { sessions_exist: true, filtered_sessions_exist: true, meta_exists: false },
+      campaign, performance, summary_b: { has_data: true, sessions: metaOnly ? 0 : devices.length === 1 ? 60 : 102, visitors: metaOnly ? 0 : 51, cta_click_sessions: metaOnly ? 0 : 26, cta_clicks: metaOnly ? 0 : 78, converted_visitors: metaOnly ? 0 : 13, meta_impressions: metaOnly ? 8028 : 0, meta_link_clicks: metaOnly ? 428 : 0, spend: metaOnly ? 80028 : 0 }, summary_a: null,
+      actuals: [], daily: [], options: { campaigns: [metaOnly ? 'META_Cold_카톡방입장_2609' : 'qa'], adsets: [metaOnly ? 'A_메인_브로드_25-54' : '광고세트'], creatives: rows.map(r => r.creative), devices: metaOnly ? [] : ['mobile', 'desktop'], layouts: metaOnly ? [] : [1], ad_types: metaOnly ? ['unclassified'] : ['unclassified', 'cold', 'retarget'] },
+      data_state: { sessions_exist: !metaOnly, filtered_sessions_exist: !metaOnly, meta_exists: metaOnly },
       campaign_summary: { kakao_members: 100, kakao_delta: 20, new_payments: 31, existing_payments: 7, revenue: 58850000, spend: 0, roas: null, live_peak: null },
       ui: { errors: {}, daily_a: null, last_collected_at: null, actual_presence: { new_payments: true, existing_payments: true }, previous_day_members: {}, period_actuals: { kakao_members: 80, kakao_day: '2026-09-10', payments: 3 } },
       range: { startDay: url.searchParams.get('start'), endDay: url.searchParams.get('end'), compareStartDay: null, compareEndDay: null },
@@ -41,6 +42,28 @@ async function fixture(page: Page, failClassification = false) {
   await expect(page.getByRole('region', { name: '소재별 성과표' })).toBeVisible();
   return { requests: () => classificationRequests };
 }
+
+test('Meta-only dimensions populate all supported filters and reset without web-only options', async ({ page }) => {
+  await fixture(page, false, true);
+  const filters = page.getByRole('region', { name: '무료클래스 조회 조건' });
+  await filters.getByRole('button', { name: /^상세 필터/ }).click();
+  for (const [name, value] of [['캠페인', 'META_Cold_카톡방입장_2609'], ['광고 유형', '미분류'], ['광고세트', 'A_메인_브로드_25-54']] as const) {
+    await filters.getByRole('button', { name, exact: true }).click();
+    await expect(filters.getByRole('checkbox', { name: value, exact: true })).toBeVisible();
+  }
+  await filters.getByRole('button', { name: '소재', exact: true }).click();
+  await expect(filters.getByRole('group', { name: '소재 다중 선택' }).getByRole('checkbox')).toHaveCount(8);
+  await filters.getByRole('checkbox', { name: 'cr08', exact: true }).check();
+  await expect(page).toHaveURL(/creative=cr08/);
+  await expect(page.getByRole('region', { name: '소재별 성과표' }).locator('tbody tr')).toHaveCount(1);
+  for (const name of ['기기', '레이아웃 버전']) {
+    await filters.getByRole('button', { name, exact: true }).click();
+    await expect(filters.getByRole('group', { name: `${name} 다중 선택` })).toContainText('수집된 항목이 없습니다.');
+  }
+  await page.getByRole('button', { name: '전체 초기화', exact: true }).click();
+  await expect(page).not.toHaveURL(/creative=/);
+  await expect(page.getByRole('region', { name: '소재별 성과표' }).locator('tbody tr')).toHaveCount(8);
+});
 
 test('sample threshold persists and conversion sorting keeps insufficient rows last in both directions', async ({ page }) => {
   await fixture(page);
