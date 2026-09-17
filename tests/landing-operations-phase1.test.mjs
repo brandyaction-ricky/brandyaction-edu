@@ -117,4 +117,7 @@ test('dashboard repair gates Meta by paid configuration and joins stable IDs bef
   assert.doesNotMatch(sql, /full join meta_rows m using\([^)]*ad_type/i);
   assert.match(sql, /meta_sync_attempted_at timestamptz/i);
   assert.match(sql, /edu_marketing_export/i);
+  const joinRepair = fs.readFileSync('supabase/migrations/20260917002218_dedupe_dashboard_meta_dimension_join.sql', 'utf8');
+  assert.equal((joinRepair.match(/left join lateral/g) || []).length, 2);
+  assert.match(joinRepair, /meta_ad_id=m\.meta_ad_id[\s\S]*limit 1\) d on true/i);
 });
