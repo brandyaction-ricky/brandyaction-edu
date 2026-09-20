@@ -43,3 +43,18 @@ test('a verified payment is finalized with the provider-approved values', async 
   assert.equal(finalized[0][1].p_approved_amount, 1000);
   assert.equal(finalized[0][1].p_payment_key, 'test-payment');
 });
+test('a verified virtual account issuance is recorded without granting enrollment', async () => {
+  const finalized = [];
+  const providerData = {
+    orderId: 'BAE-1', totalAmount: 1000, status: 'WAITING_FOR_DEPOSIT', currency: 'KRW',
+    paymentKey: 'test-payment', method: '가상계좌',
+    virtualAccount: { accountNumber: '1234567890', bankCode: '88', customerName: '테스트', dueDate: '2026-09-21T12:00:00+09:00' },
+  };
+  const handler = paymentHandler({ order: { id: 'order', total_amount: 1000, status: 'pending' }, finalized, provider: async () => Response.json(providerData) });
+  const response = await handler(request());
+  assert.equal(response.status, 200);
+  assert.equal(finalized[0][0], 'record_toss_waiting_payment');
+  assert.equal(finalized[0][1].p_amount, 1000);
+  assert.equal(finalized[0][1].p_expires_at, providerData.virtualAccount.dueDate);
+  assert.equal((await response.json()).status, 'waiting_for_deposit');
+});

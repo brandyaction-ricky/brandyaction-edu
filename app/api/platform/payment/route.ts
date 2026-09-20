@@ -31,7 +31,35 @@ export async function POST(request: Request) {
         }
         if (!response.ok)
             return Response.json({ error: '결제를 승인하지 못했습니다. 주문 내역을 확인해 주세요.' }, { status: 409 });
-        if (payment.paymentKey !== body.paymentKey || payment.orderId !== body.orderId || payment.totalAmount !== order.total_amount || payment.status !== 'DONE' || payment.currency !== 'KRW')
+        if (payment.paymentKey !== body.paymentKey || payment.orderId !== body.orderId || payment.totalAmount !== order.total_amount || payment.currency !== 'KRW')
+            return Response.json({ error: '결제 완료 상태를 확인할 수 없습니다.' }, { status: 409 });
+        if (payment.status === 'WAITING_FOR_DEPOSIT') {
+            const virtualAccount = payment.virtualAccount && typeof payment.virtualAccount === 'object' ? payment.virtualAccount : {};
+            const { error } = await db.rpc('record_toss_waiting_payment', {
+                p_order_number: payment.orderId,
+                p_payment_key: payment.paymentKey,
+                p_method: payment.method || null,
+                p_amount: payment.totalAmount,
+                p_receipt_url: payment.receipt?.url || null,
+                p_payload: payment,
+                p_expires_at: typeof virtualAccount.dueDate === 'string' ? virtualAccount.dueDate : null,
+            });
+            if (error) {
+                console.error('waiting payment recording failed', error.code);
+                return Response.json({ error: '가상계좌 발급 정보를 저장하지 못했습니다. 주문 내역에서 다시 확인해 주세요.' }, { status: 503 });
+            }
+            return Response.json({
+                ok: true,
+                status: 'waiting_for_deposit',
+                virtualAccount: {
+                    accountNumber: typeof virtualAccount.accountNumber === 'string' ? virtualAccount.accountNumber : null,
+                    bankCode: typeof virtualAccount.bankCode === 'string' ? virtualAccount.bankCode : null,
+                    customerName: typeof virtualAccount.customerName === 'string' ? virtualAccount.customerName : null,
+                    dueDate: typeof virtualAccount.dueDate === 'string' ? virtualAccount.dueDate : null,
+                },
+            });
+        }
+        if (payment.status !== 'DONE')
             return Response.json({ error: '결제 완료 상태를 확인할 수 없습니다.' }, { status: 409 });
         const { error } = await db.rpc('finalize_toss_payment', { p_order_number: payment.orderId, p_payment_key: payment.paymentKey, p_method: payment.method, p_approved_amount: payment.totalAmount, p_receipt_url: payment.receipt?.url || null, p_payload: payment, p_approved_at: payment.approvedAt });
         if (error) {
