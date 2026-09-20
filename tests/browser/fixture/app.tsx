@@ -1,6 +1,7 @@
 import { StrictMode, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { LandingAdmin } from '../../../app/ui/landing/admin';
+import { ConversionFixture } from './conversion';
 import { AdminButton, AdminConfirmDialog, AdminDrawer, AdminInput } from '../../../app/ui/final/admin-system';
 import '../../../app/ui/final/tokens.css';
 import '../../../app/ui/final/admin-system.css';
@@ -21,4 +22,4 @@ function BoundaryFixture() {
     {confirm && <AdminConfirmDialog title="중첩 확인" message="상위 Drawer는 유지됩니다." onCancel={() => setConfirm(false)} onConfirm={() => {setConfirm(false);setOpen(false);}}/>}
   </AdminDrawer>}</section>;
 }
-createRoot(document.getElementById('root')!).render(<StrictMode><div className="edu-admin" style={{padding:24,minHeight:'180vh'}}><BoundaryFixture/><LandingAdmin/></div></StrictMode>);
+createRoot(document.getElementById('root')!).render(<StrictMode><div className="edu-admin" style={{padding:24,minHeight:'180vh'}}>{window.location.pathname.startsWith('/admin/conversion') ? <ConversionFixture/> : <><BoundaryFixture/><LandingAdmin/></>}</div></StrictMode>);

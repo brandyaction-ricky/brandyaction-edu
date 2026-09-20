@@ -39,7 +39,7 @@ export const finalAdminGroups = [
       "questions",
     ],
   ],
-  ["고객 관리", ["customers", "tags", "coupons", "product-reviews"]],
+  ["고객 관리", ["customers", "conversion", "tags", "coupons", "product-reviews"]],
   ["콘텐츠 관리", ["banners", "articles", "testimonials"]],
   ["매출 관리", ["orders"]],
   ["마케팅 관리", ["landing", "analytics", "seo", "settings"]],
@@ -53,6 +53,7 @@ const icons: Record<string, LucideIcon> = {
   reviews: CheckSquare2,
   questions: MessageCircle,
   customers: UsersRound,
+  conversion: MessageCircle,
   tags: UsersRound,
   coupons: LayoutGrid,
   "product-reviews": MessageCircle,
@@ -85,6 +86,7 @@ export const sectionDescription: Record<string, string> = {
   reviews: "목록을 이동하며 제출 내용을 확인하고 피드백을 남기세요.",
   questions: "학습 중 막힌 지점을 확인하고 답변으로 연결합니다.",
   customers: "회원의 수강·구매 이력과 태그를 함께 관리합니다.",
+  conversion: "문의에 필요한 설명을 검토하고 운영자의 결정을 기록합니다.",
   tags: "고객의 수강·구매 행동과 운영 기준으로 태그를 관리합니다.",
   coupons: "할인 금액·기간·수량과 적용 조건을 관리합니다.",
   "product-reviews": "수강 후기를 검토하고 공개 여부와 대표 노출을 관리합니다.",
@@ -175,7 +177,7 @@ export function AdminShell({
           : current,
     byKey = new Map(available.map((s) => [s.key, s])),
     pending = num((data.admin_summary || [])[0], "pendingReviews");
-  const contentWidth = ["landing", "analytics", "orders", "customers", "members", "reviews"].includes(selected)
+  const contentWidth = ["landing", "analytics", "orders", "customers", "conversion", "members", "reviews"].includes(selected)
     ? "wide"
     : ["seo", "settings", "staff"].includes(selected)
       ? "narrow"

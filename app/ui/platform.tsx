@@ -64,6 +64,7 @@ import {
 import { OrderResult } from "./order-result";
 import { SiteFooter } from "./final/site-footer";
 import { HomeHero } from "./final/home-hero";
+import { ConversionReview } from "./conversion-review";
 type Data = Record<string, Row[]>;
 // Preserve only the last server-verified operator identity during client-side
 // admin navigation. Every read and write is still authorized by the server.
@@ -690,6 +691,8 @@ export function Platform({
           <Overview data={data} available={available} />
         ) : !section ? (
           <Empty title="이 화면에 접근할 운영 권한이 필요합니다." />
+        ) : key === "conversion" ? (
+          <ConversionReview />
         ) : key === "product-editor" || key === "learning-editor" ? (
           loading && id && !edited ? (
             <p role="status">편집 정보를 불러오고 있습니다.</p>
