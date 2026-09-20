@@ -9,6 +9,7 @@ import { PGlite } from '@electric-sql/pglite';
 // synthetic dependency schema intentionally contains no production data or URL.
 const db = new PGlite();
 const sql = fs.readFileSync(new URL('../supabase/migrations/202609200001_conversion_review.sql', import.meta.url), 'utf8');
+const permissionsSql = fs.readFileSync(new URL('../supabase/migrations/202609200002_conversion_review_permissions.sql', import.meta.url), 'utf8');
 const serverSource = fs.readFileSync(new URL('../lib/conversion-review-server.ts', import.meta.url), 'utf8');
 const serverExports = {};
 new Function('exports', 'require', ts.transpileModule(serverSource, {
@@ -27,6 +28,9 @@ before(async () => {
     create role anon;
     create role authenticated;
     create role service_role bypassrls;
+    -- Hosted Supabase grants new public tables to these roles by default.
+    -- Test the migration against those inherited ACLs, not empty local grants.
+    alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
     create table public.profiles (id uuid primary key, role text not null, status text not null default 'active');
     create table public.site_settings (key text primary key, value jsonb not null);
     create table public.courses (id uuid primary key);
@@ -39,6 +43,7 @@ before(async () => {
     );
   `);
   await db.exec(sql);
+  await db.exec(permissionsSql);
   await db.query('insert into profiles(id,role) values ($1,\'admin\'),($2,\'staff\'),($3,\'student\')', [ids.admin, ids.staff, ids.student]);
   await db.query('insert into courses(id) values ($1),($2)', [ids.course, ids.otherCourse]);
   await db.query('insert into cohorts(id,course_id) values ($1,$2),($3,$4)', [ids.cohort, ids.course, ids.otherCohort, ids.otherCourse]);
@@ -232,9 +237,14 @@ test('RLS and grants block browser roles and direct service writes; only the RPC
   }
   await db.exec('set role service_role');
   try {
-    await db.query('select * from edu_conversion_cases');
+    for (const table of tables.filter(table => table !== 'edu_conversion_receipts')) {
+      await db.query(`select * from ${table}`);
+    }
     await assert.rejects(db.query('select * from edu_conversion_receipts'), /permission denied/);
-    await assert.rejects(db.query('delete from edu_conversion_cases'), /permission denied/);
-    await assert.rejects(db.query("insert into edu_conversion_cases default values"), /permission denied/);
+    for (const table of tables) {
+      for (const statement of [`insert into ${table} default values`, `update ${table} set created_at=now()`, `delete from ${table}`, `truncate ${table} cascade`]) {
+        await assert.rejects(db.query(statement), /permission denied/);
+      }
+    }
   } finally { await db.exec('reset role'); }
 });
