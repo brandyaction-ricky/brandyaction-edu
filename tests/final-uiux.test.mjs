@@ -182,6 +182,9 @@ test('classroom, mission, checkout and completion preserve authorized workflow e
   const checkout = html(Checkout, { data, user, send, pending: false });
   assert.match(checkout, /checkout-layout/);
   assert.match(checkout, /<button[^>]*disabled=""[^>]*aria-describedby="checkout-agreement-help"[^>]*>[^<]*결제하기/s);
+  assert.match(checkout, /value="CARD"/);
+  assert.match(checkout, /value="VIRTUAL_ACCOUNT"/);
+  assert.match(checkout, /입금 확인 후 수강권/);
   assert.match(read('app/api/platform/route.ts'), /paidCourseReadinessIssues[\s\S]*판매 준비가 완료되지 않았습니다/);
   search = new URLSearchParams('order=order');
   const { OrderResult } = load('app/ui/order-result.tsx');
