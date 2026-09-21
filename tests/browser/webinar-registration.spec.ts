@@ -79,6 +79,9 @@ test('followup separates room and direct drafts, preserves reload and clears aud
  await expect(page.getByRole('textbox',{name:'문자·알림톡 개별 안내 초안',exact:true})).toHaveValue('합성 개별 안내');
  await page.getByRole('button',{name:'문자·알림톡 개별 안내 초안 저장',exact:true}).click();
  await expect(page.getByText('저장 버전 1 · 미발송 초안',{exact:true})).toHaveCount(2);expect(writes).toBe(2);
+ await expect(page.getByRole('link',{name:'저장된 초안으로 발송용 템플릿 준비'})).toHaveAttribute('href','/admin/templates?followup='+code+'&revision=1');
+ await page.getByRole('textbox',{name:'문자·알림톡 개별 안내 초안',exact:true}).fill('미저장 변경');
+ await expect(page.getByRole('link',{name:'저장된 초안으로 발송용 템플릿 준비'})).toHaveCount(0);
  await page.reload();await expect(page.getByRole('textbox',{name:'카톡방 공지 초안',exact:true})).toHaveValue('합성 앵콜 공지');
  await expect(page.getByRole('textbox',{name:'문자·알림톡 개별 안내 초안',exact:true})).toHaveValue('합성 개별 안내');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);

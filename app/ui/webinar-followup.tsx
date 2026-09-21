@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { RecruitmentDetails, RecruitmentHelp } from './recruitment-help';
 import { useEffect,useRef,useState } from 'react';
 import { AdminButton,AdminSection,AdminSelect,AdminStack,AdminTextarea } from './final/admin-system';
@@ -25,6 +26,10 @@ function DraftEditor({code,channel,draft,saved}:{code:string;channel:Draft['chan
     <AdminButton disabled={pending||!body.trim()} onClick={()=>void save()}>{label} 초안 저장</AdminButton>
    </AdminStack></fieldset>
    <p>{draft?`저장 버전 ${draft.revision} · 미발송 초안`:'저장된 초안 없음'}</p>
+   {channel==='direct'&&draft&&<div>
+    {body===draft.body&&purpose===draft.purpose&&!pending?<Link className="conversion-link" href={'/admin/templates?'+new URLSearchParams({followup:code,revision:String(draft.revision)}).toString()}>저장된 초안으로 발송용 템플릿 준비</Link>:<p>변경한 내용을 먼저 저장하면 템플릿 준비로 이어갈 수 있습니다.</p>}
+    <p>문구만 가져갑니다. 발송 대상·예약은 자동으로 만들어지지 않습니다.</p>
+   </div>}
    {error&&<p role="alert">{error}</p>}
   </AdminStack>
  </AdminSection>;
