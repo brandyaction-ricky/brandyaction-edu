@@ -11,6 +11,7 @@ import {
   AdminPageHeader, AdminSearchField, AdminSection, AdminSelect, AdminTextarea,
 } from './final/admin-system';
 import './conversion-review.css';
+import { RecruitmentFunnel } from './recruitment-funnel';
 
 const topicNames: Record<string, string> = { price: '가격', schedule: '일정', content: '교육 내용', level: '수강 수준', usage: '이용 방법' };
 const inquiryNames: Record<string, string> = { prepurchase: '구매 전 상품 질문', support: '이용 지원', payment_refund: '결제·환불', mixed: '여러 종류의 문의', unknown: '판단 불가' };
@@ -33,6 +34,7 @@ export function ConversionReview() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [drawer, setDrawer] = useState<'case' | 'evidence' | null>(null);
+  const [showFunnel, setShowFunnel] = useState(false);
   const [editingCase, setEditingCase] = useState<ConversionCase | undefined>();
   const [editingEvidence, setEditingEvidence] = useState<ConversionEvidence | undefined>();
   const gate = useRef(createMutationGate<Record<string, unknown>>());
@@ -107,6 +109,8 @@ export function ConversionReview() {
     {loading && !snapshot && <p role="status">문의와 검토 기록을 불러오고 있습니다.</p>}
     {!loading && !snapshot && <AdminEmptyState title="전환 관리 정보를 불러오지 못했습니다." action={<AdminButton onClick={() => void refresh()}>다시 불러오기</AdminButton>}>접근 권한과 기능 사용 가능 여부를 확인해 주세요.</AdminEmptyState>}
     {snapshot && <>
+      <div className="funnel-entry"><AdminButton aria-expanded={showFunnel} aria-controls="recruitment-funnel-preparation" onClick={() => setShowFunnel(value => !value)}>{showFunnel ? '모집 경로 준비 닫기' : '모집 경로 준비'}</AdminButton><span className="conversion-muted">무료 교육부터 유료 구매까지 연결할 경로를 확인합니다.</span></div>
+      {showFunnel && <div id="recruitment-funnel-preparation"><RecruitmentFunnel key={String(snapshot.capabilities.can_manage_funnel)} courses={snapshot.courses} cohorts={snapshot.cohorts} canSave={snapshot.capabilities.can_manage_funnel === true} /></div>}
       <div className="conversion-intro"><span className="conversion-tag">운영자 검토</span><p>설명 추천과 고객 답변을 구분해서 관리합니다. 이 화면에 저장한 내용은 자동 발송되지 않습니다.</p></div>
       <div className="conversion-grid" aria-busy={pending || loading}>
         <AdminSection title="문의" description={`불러온 문의 ${snapshot.cases.length}건`} bordered>

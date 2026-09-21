@@ -30,7 +30,7 @@ export async function GET() {
     for (const item of result) if (item.error) conversionDatabaseError(item.error);
     const [cases, evidence, questions, courses, cohorts, runs, reviews] = result.map(item => item.data || []);
     return reply({ cases, evidence, questions, courses, cohorts, runs, reviews,
-      capabilities: { can_manage_evidence: user.permissions.products, can_mock: conversionCapabilities(process.env).can_mock },
+      capabilities: { can_manage_evidence: user.permissions.products, can_mock: conversionCapabilities(process.env).can_mock, can_manage_funnel: user.permissions.products && user.permissions.marketing },
       limits: { cases: 200, evidence: 500, questions: 200, runs: 500, reviews: 500 } });
   } catch (error) { return failure(error); }
 }
