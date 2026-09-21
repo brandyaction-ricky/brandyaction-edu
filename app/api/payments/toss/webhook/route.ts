@@ -137,10 +137,11 @@ async function reconcilePayment(db: ReturnType<typeof createAdminClient>, paymen
   }
 
   if (['CANCELED', 'ABORTED', 'EXPIRED'].includes(status)) {
-    return db.rpc('record_toss_terminal_payment', {
+    const result = await db.rpc('record_toss_terminal_payment', {
       ...common,
       p_status: status,
     });
+    return { ...result, ignoreMissingOrder: true };
   }
 
   return { error: null, ignored: true };
@@ -224,7 +225,8 @@ export async function POST(request: Request) {
 
     const result = await reconcilePayment(db, payment);
     if (result.error) {
-      if (orderNotFound(result.error)) {
+      const ignoreMissingOrder = 'ignoreMissingOrder' in result && result.ignoreMissingOrder === true;
+      if (ignoreMissingOrder && orderNotFound(result.error)) {
         const recorded = await recordEvent(db, providerEventId, event.type, payment, 'ignored', 'ORDER_NOT_FOUND');
         if (recorded.error) {
           console.error('toss webhook event recording failed', recorded.error.code);

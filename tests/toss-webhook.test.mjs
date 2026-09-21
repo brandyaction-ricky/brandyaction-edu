@@ -219,10 +219,14 @@ test('database failures request a retry and do not claim successful processing',
   assert.equal(recordFailure.rpcCalls.length, 1);
 });
 
-test('an unknown order is recorded as ignored and no longer requests retries', async () => {
-  const handler = webhook({ rpcError: { code: 'P0001', message: 'ORDER_NOT_FOUND' } });
-  const first = await handler.post(request(paymentEvent()));
-  const repeated = await handler.post(request(paymentEvent()));
+test('an unknown terminal order is recorded as ignored and no longer requests retries', async () => {
+  const expiredPayment = { ...payment, status: 'EXPIRED', approvedAt: null, method: null };
+  const handler = webhook({
+    provider: async () => Response.json(expiredPayment),
+    rpcError: { code: 'P0001', message: 'ORDER_NOT_FOUND' },
+  });
+  const first = await handler.post(request(paymentEvent(expiredPayment)));
+  const repeated = await handler.post(request(paymentEvent(expiredPayment)));
 
   assert.equal(first.status, 200);
   assert.deepEqual(await first.json(), { ok: true, ignored: true });
@@ -232,6 +236,15 @@ test('an unknown order is recorded as ignored and no longer requests retries', a
   assert.deepEqual(await repeated.json(), { ok: true, ignored: true, duplicate: true });
   assert.equal(handler.rpcCalls.length, 1);
   assert.equal(handler.eventWrites.length, 1);
+});
+
+test('an unknown completed order still requests a retry', async () => {
+  const handler = webhook({ rpcError: { code: 'P0001', message: 'ORDER_NOT_FOUND' } });
+  const response = await handler.post(request(paymentEvent()));
+
+  assert.equal(response.status, 503);
+  assert.equal(handler.rpcCalls[0].name, 'finalize_toss_payment');
+  assert.equal(handler.eventWrites.length, 0);
 });
 
 test('event body hash is used when Toss transmission id is absent', async () => {
