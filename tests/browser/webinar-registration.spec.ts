@@ -1,5 +1,6 @@
 import {test,expect} from '@playwright/test';
 test.beforeEach(async({page})=>{
+ await page.route('**/api/conversion/followup**',route=>route.fulfill({json:{drafts:[],audienceState:'unmapped',counts:null,asOf:'2026-09-21T00:00:00Z'}}));
  await page.route('**/api/webinar/attendance**',route=>route.fulfill({json:{sessions:[]}}));
  await page.route('**/api/conversion/broadcast**',route=>route.fulfill({json:{sessions:[],offerReady:false,counts:[]}}));
 });
@@ -57,4 +58,31 @@ test('admin saves broadcast link without enabling unmapped paid offer',async({pa
  await expect(page.getByLabel('첫 웨비나 공통 방송 링크',{exact:true})).toHaveValue(/first\/unknown\/live$/);
  await expect(page.getByLabel('첫 웨비나 광고방 교육 안내 링크',{exact:true})).toHaveCount(0);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+});
+
+test('followup separates room and direct drafts, preserves reload and clears audience on denied refresh',async({page})=>{
+ const code='33333333-3333-4333-8333-333333333333';let drafts:Record<string,unknown>[]=[];let writes=0,denied=false;
+ await page.route(/\/api\/conversion\/webinar(?:\?|$)/,route=>route.fulfill({json:{campaign:{id:code,freeCourse:'22222222-2222-4222-8222-222222222222',paidCohort:null,enabled:true,revision:1},registrations:1,purchases:null,purchase_state:'unmapped'}}));
+ await page.route('**/api/conversion/followup**',async route=>{
+  if(denied)return route.fulfill({status:403,json:{error:'권한이 회수되었습니다.'}});
+  if(route.request().method()==='POST'){const b=route.request().postDataJSON();expect(b.expected).toBe(0);drafts=[...drafts,{...b,revision:1}];writes++;}
+  return route.fulfill({json:{drafts,audienceState:'ready',counts:{total:8,candidate:1,inactive:1,order_hold:3,no_consent:2,no_phone:1},asOf:'2026-09-21T00:00:00Z'}});
+ });
+ await page.goto('/webinar-admin-test');
+ await expect(page.getByText('사이트 무료 신청 8명 중 개별 안내 검토 후보 1명',{exact:true})).toBeVisible();
+ await page.getByRole('textbox',{name:'카톡방 공지 초안',exact:true}).fill('합성 앵콜 공지');
+ await page.getByRole('textbox',{name:'문자·알림톡 개별 안내 초안',exact:true}).fill('합성 개별 안내');
+ await page.getByRole('button',{name:'카톡방 공지 초안 저장',exact:true}).click();
+ await expect(page.getByText('저장 버전 1 · 미발송 초안',{exact:true})).toHaveCount(1);
+
+ await expect(page.getByRole('textbox',{name:'문자·알림톡 개별 안내 초안',exact:true})).toHaveValue('합성 개별 안내');
+ await page.getByRole('button',{name:'문자·알림톡 개별 안내 초안 저장',exact:true}).click();
+ await expect(page.getByText('저장 버전 1 · 미발송 초안',{exact:true})).toHaveCount(2);expect(writes).toBe(2);
+ await page.reload();await expect(page.getByRole('textbox',{name:'카톡방 공지 초안',exact:true})).toHaveValue('합성 앵콜 공지');
+ await expect(page.getByRole('textbox',{name:'문자·알림톡 개별 안내 초안',exact:true})).toHaveValue('합성 개별 안내');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+ denied=true;await page.getByRole('button',{name:'후속 안내 초안·대상 다시 확인',exact:true}).click();
+ await expect(page.getByText('권한이 회수되었습니다.',{exact:true})).toBeVisible();
+ await expect(page.getByText('사이트 무료 신청 8명 중 개별 안내 검토 후보 1명',{exact:true})).toHaveCount(0);
+ await expect(page.getByRole('textbox',{name:'카톡방 공지 초안',exact:true})).toHaveCount(0);
 });
