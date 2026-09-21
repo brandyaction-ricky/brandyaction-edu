@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { RecruitmentDelivery } from './recruitment-delivery';
 import { RecruitmentDetails, RecruitmentHelp } from './recruitment-help';
 import { useEffect,useRef,useState } from 'react';
 import { AdminButton,AdminSection,AdminSelect,AdminStack,AdminTextarea } from './final/admin-system';
@@ -46,7 +47,7 @@ export function WebinarFollowup({code}:{code:string}){
  const reload=()=>{setReport(null);setPending(true);setError('');setRefresh(n=>n+1);};
  return <AdminSection className="recruitment-guidance" title="후속 CRM 안내 준비" description="카톡방 공지와 개별 안내를 따로 준비합니다. 초안 저장은 발송·예약·승인이 아닙니다." bordered>
   <AdminStack>
-   <RecruitmentHelp title="발송 전 준비"><p>게시·발송 전에 확정 일정과 활성 링크를 확인하세요.</p><p>문자·알림톡은 발송 채널의 템플릿·수신 조건을 별도로 검토해야 합니다.</p><p>현재 기능은 메시지 사업자나 자동 발송에 연결하지 않습니다.</p></RecruitmentHelp>
+   <RecruitmentHelp title="발송 전 준비"><p>게시·발송 전에 확정 일정과 활성 링크를 확인하세요.</p><p>문자·알림톡은 발송 채널의 템플릿·수신 조건을 별도로 검토해야 합니다.</p><p>초안은 자동 발송되지 않습니다. 개별 안내 예약은 아래에서 별도로 검토합니다.</p></RecruitmentHelp>
    {report&&<>
     <h3>개별 안내 대상 사전 점검</h3>
     {report.counts?<>
@@ -54,9 +55,10 @@ export function WebinarFollowup({code}:{code:string}){
      <p>회원 미연결·비활성 {report.counts.inactive}명 · 구매·주문 검토로 제외 {report.counts.order_hold}명 · 수신 동의 확인 필요 {report.counts.no_consent}명 · 휴대전화 확인 필요 {report.counts.no_phone}명</p>
      <RecruitmentDetails title="안내 대상 집계 기준"><p>제외 사유는 위 순서로 한 가지씩 집계합니다.</p><p>구매·주문 검토에는 신청 전 구매, 결제 진행, 환불 및 결제 정보 확인이 필요한 주문도 포함합니다.</p><p>후보는 발송 확정 대상이 아니며 번호 소유·수신 가능 여부는 검증하지 않았습니다.</p></RecruitmentDetails>
     </>:<p>{({forbidden:'개별 대상 조회·초안 저장에는 회원·주문 권한이 추가로 필요합니다.',unmapped:'유료 기수 연결 전 · 개별 안내 대상 미확인',paused:'모집이 중지되어 개별 안내 대상 점검을 보류합니다.',unavailable:'연결한 유료 상품이 공개 상태인지 확인해 주세요.',ready:'대상을 확인하지 못했습니다.'})[report.audienceState]}</p>}
-    <p>조회 기준 {report.asOf}. 다시 확인 버튼은 저장하지 않은 초안을 지우고 현재 상태를 다시 불러옵니다. 실제 발송 직전 구매·수신 거부·중복 발송 여부를 다시 확인하는 연결은 후속 단계입니다. 후보 수를 카톡방 인원이나 시청자 수로 해석하지 않습니다.</p>
+    <p>조회 기준 {report.asOf}. 다시 확인 버튼은 저장하지 않은 초안을 지우고 현재 상태를 다시 불러옵니다. 아래 모집 신청자 개별 안내에서 발송 대상을 검토하고 예약할 수 있습니다. 후보 수를 카톡방 인원이나 시청자 수로 해석하지 않습니다.</p>
     {(['room','direct'] as const).filter(channel=>channel==='room'||report.audienceState!=='forbidden').map(channel=><DraftEditor key={`${code}:${channel}:${report.drafts.find(d=>d.channel===channel)?.revision??0}`} code={code} channel={channel} draft={report.drafts.find(d=>d.channel===channel)} saved={setReport}/>)}
    </>}
+   {report&&report.audienceState!=='forbidden'&&<RecruitmentDelivery key={code} code={code}/>}
    <AdminButton disabled={pending} onClick={reload}>후속 안내 초안·대상 다시 확인</AdminButton>
    {error&&<p role="alert">{error}</p>}
   </AdminStack>

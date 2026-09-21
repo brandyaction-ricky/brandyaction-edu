@@ -168,6 +168,11 @@ export async function POST(request: Request) {
                           .select()
                           .single();
             } else if (kind === 'campaign') {
+                if (id) {
+                    const existing = await db.from('crm_campaigns').select('recruitment_id').eq('id', id).single();
+                    if (existing.error) throw existing.error;
+                    if (existing.data.recruitment_id) fail('모집 안내 예약은 모집 운영에서 취소한 뒤 다시 검토해 주세요.');
+                }
                 if (!string(body.name, 100) || !uuid(body.templateId) || (body.tagId && !uuid(body.tagId))) fail('캠페인 이름·템플릿·대상을 확인해 주세요.');
                 const scheduledAt = date(body.scheduledAt);
                 if (Date.parse(scheduledAt) < Date.now() - 60000) fail('예약 시각은 현재 이후로 선택해 주세요.');

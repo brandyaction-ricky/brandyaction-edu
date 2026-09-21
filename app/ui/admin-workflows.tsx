@@ -604,7 +604,7 @@ function CrmManager({ section, data, send, pending }: Props) {
                 className="btn small"
                 disabled={
                   section === "campaigns" &&
-                  ["sending", "completed"].includes(t(item, "status"))
+                  (!!item.recruitment_id || ["sending", "completed"].includes(t(item, "status")))
                 }
                 onClick={() => {
                   setEditing(item);
@@ -620,7 +620,7 @@ function CrmManager({ section, data, send, pending }: Props) {
             )}
             {section === "campaigns" && (
               <p className="meta mt16">
-                대상 {Number(item.recipient_count || 0)} · 성공{" "}
+                {item.recruitment_id ? '모집 연결 안내 · ' : ''}대상 {Number(item.recipient_count || 0)} · 성공{" "}
                 {Number(item.success_count || 0)} · 실패{" "}
                 {Number(item.failure_count || 0)}
               </p>
