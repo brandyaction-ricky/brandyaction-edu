@@ -204,7 +204,7 @@ export function AdminShell({
       </Link>
     );
   };
-  const extra = ["staff", "templates", "campaigns", "automations"].filter(
+  const extra = ["staff"].filter(
     (key) => byKey.has(key),
   );
   return (
