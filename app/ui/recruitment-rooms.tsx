@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { EMPTY_RECRUITMENT_ROOMS, recruitmentPeriod, recruitmentRooms, type RecruitmentRooms } from '@/lib/recruitment-rooms';
+import { RecruitmentLinks } from './recruitment-links';
 import { createMutationGate } from '@/lib/mutation-gate';
 import { AdminButton, AdminInput, AdminSection, AdminSelect } from './final/admin-system';
 
@@ -43,7 +44,7 @@ export function RecruitmentRoomSettings() {
       });
       if (!active.current) return;
       setSettings(clean); setVersion(result.draft.version);
-      setMessage('방 설정을 저장했습니다. 고객 페이지 연결·입장 측정·메시지 발송은 아직 시작되지 않았습니다.');
+      setMessage('방 설정을 저장했습니다. 모집 링크에는 별도 활성화로 적용됩니다. 입장 확인·메시지 발송은 시작되지 않습니다.');
     } catch (e) {
       if (!active.current) return;
       if ([401,403,409].includes((e as { status?: number }).status || 0)) { setVersion(null); setSettings(EMPTY_RECRUITMENT_ROOMS); }
@@ -66,6 +67,7 @@ export function RecruitmentRoomSettings() {
     <AdminButton disabled={pending || version === null} onClick={() => void save()}>모집 방 설정 저장</AdminButton>
     {version !== null && <p>방 설정 버전 {version} · {period}</p>}
     {message && <p role="status">{message}</p>}
+    {version !== null && version > 0 && <RecruitmentLinks key={`${period}:${version}`} period={period} version={version} />}
     <p className="conversion-muted">다음 모집에 방을 바꿔도 이전 모집 주소와 저장 이력은 유지됩니다. 월별 집계·방 입장 확인은 별도 연결이 필요합니다. 방 운영 방식 선택만으로 카톡방을 생성하거나 폐쇄하지 않습니다.</p>
   </AdminSection>;
 }

@@ -221,6 +221,7 @@ test('review and manual-entry drawer fit the viewport without horizontal overflo
 test('room settings save separately from product mapping and changing recruitment cannot overwrite prior rooms', async ({page}) => {
   const state=await fixture(page); state.snapshot.capabilities.can_manage_funnel=true;
   await page.route('**/api/conversion/funnel', route=>route.fulfill({json:{draft:null,measurement:'unverified'}}));
+  await page.route('**/api/conversion/links**',route=>route.fulfill({json:{link:null,counts:{paid:0,organic:0}}}));
   const records: Record<string, Record<string, unknown>>={};
   let writes=0;
   await page.route('**/api/conversion/rooms**', async route=>{
@@ -251,4 +252,33 @@ test('room settings save separately from product mapping and changing recruitmen
   await expect(page.getByLabel('광고 오픈채팅방 주소',{exact:true})).toHaveValue('https://open.kakao.com/o/paidTest');
   expect(writes).toBe(1);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
+});
+
+
+test('recruitment links activate explicitly, show distinct channel URLs and stop without losing counts',async({page})=>{
+ const state=await fixture(page);state.snapshot.capabilities.can_manage_funnel=true;
+ await page.route('**/api/conversion/funnel',route=>route.fulfill({json:{draft:null}}));
+ await page.route('**/api/conversion/rooms**',route=>route.fulfill({json:{draft:{version:1,settings:{label:'Synthetic',organicUrl:'https://open.kakao.com/o/organicTest',paidUrl:'https://open.kakao.com/o/paidTest',paidMode:'undecided'}}}}));
+ const mutations: Record<string,unknown>[]=[];
+ let link:{id:string;room_version:number;revision:number;enabled:boolean}|null=null;
+ await page.route('**/api/conversion/links**',async route=>{
+  if(route.request().method()==='POST') {const body=route.request().postDataJSON();mutations.push(body);expect(body.period).toBe('moonshot-4');expect(body.version).toBe(1);expect(body.expected).toBe(link?.revision??0);link={id:courseId,room_version:1,revision:(link?.revision??0)+1,enabled:body.enabled};}
+  return route.fulfill({json:{link,counts:{paid:2,organic:1}}});
+ });
+ await page.getByRole('button',{name:'새로고침',exact:true}).click();
+ await page.getByRole('button',{name:'모집 경로 준비',exact:true}).click();
+ await page.getByRole('button',{name:'모집별 카톡방 관리',exact:true}).click();
+ await page.getByRole('button',{name:'모집 방 설정 불러오기',exact:true}).click();
+ await expect(page.getByRole('button',{name:'저장된 방으로 링크 활성화',exact:true})).toBeEnabled();
+ expect(mutations).toHaveLength(0);
+ await page.getByRole('button',{name:'저장된 방으로 링크 활성화',exact:true}).click();
+ await expect(page.getByLabel('광고용 모집 링크',{exact:true})).toHaveValue(new RegExp('/join/'+courseId+'/paid$'));
+ await expect(page.getByLabel('오가닉용 모집 링크',{exact:true})).toHaveValue(new RegExp('/join/'+courseId+'/organic$'));
+ await page.getByRole('button',{name:'모집 링크 중지',exact:true}).click();
+ await expect(page.getByText('링크 상태: 중지 · 연결된 방 버전 1',{exact:true})).toBeVisible();
+ await expect(page.getByText('전체 방 버전의 이동 버튼 클릭 기록 — 광고용 링크 2회 · 오가닉용 링크 1회',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'링크·클릭 기록 새로고침',exact:true}).click();
+ await expect(page.getByRole('button',{name:'모집 링크 중지',exact:true})).toBeDisabled();
+ expect(mutations.map(m=>m.enabled)).toEqual([true,false]);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
 });
