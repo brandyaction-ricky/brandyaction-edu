@@ -6,9 +6,11 @@ import {
   EMPTY_FUNNEL_DRAFT, FUNNEL_ACQUISITION_CHANNELS, FUNNEL_MEASUREMENT_STEPS, validateFunnelDraft,
   type FunnelCourse, type FunnelCohort, type FunnelDraft,
 } from '@/lib/recruitment-funnel';
+import { RecruitmentRoomSettings } from './recruitment-rooms';
 import { AdminButton, AdminSection, AdminSelect } from './final/admin-system';
 
 export function RecruitmentFunnel({ courses, cohorts, canSave = false }: { courses: FunnelCourse[]; cohorts: FunnelCohort[]; canSave?: boolean }) {
+  const [showRooms, setShowRooms] = useState(false);
   const [draft, setDraft] = useState<FunnelDraft>(EMPTY_FUNNEL_DRAFT);
   const [version, setVersion] = useState<number | null>(null);
   const [pending, setPending] = useState(false);
@@ -91,10 +93,14 @@ export function RecruitmentFunnel({ courses, cohorts, canSave = false }: { cours
     <div role="status" className="funnel-readiness">
       {validation.valid ? <p>상품·기수 선택 완료 · 무료/유료 판매 조건과 실제 측정 연결은 확인 전입니다.</p> : <ul>{validation.issues.map(issue => <li key={issue}>{issue}</li>)}</ul>}
     </div>
+    {canSave && <>
+      <AdminButton aria-expanded={showRooms} onClick={() => setShowRooms(value => !value)}>{showRooms ? '카톡방 설정 닫기' : '모집별 카톡방 관리'}</AdminButton>
+      {showRooms && <RecruitmentRoomSettings />}
+    </>}
     <div className="funnel-selection-grid" aria-label="모집 유입 경로">
       {FUNNEL_ACQUISITION_CHANNELS.map(channel => <div key={channel.id}><strong>{channel.label}</strong><p>{channel.evidence} → {channel.room} → 무료 웨비나 (YouTube Live) → 문샷 챌린지 4기</p></div>)}
     </div>
-    <p className="conversion-muted">광고와 오가닉은 각각 전용 오픈채팅방으로 유입된 뒤 같은 후속 CRM·앵콜 흐름으로 이어집니다. 방 링크와 첫·앵콜 라이브 주소는 연결 확인 전입니다. 2차 전환은 동일 4기 추가 모집 기준입니다. 유입 출처와 1·2차 전환을 별도로 구분하며, 과거 외부 사이트 교육 이력은 이번 모집에 합산하지 않습니다.</p>
+    <p className="conversion-muted">광고와 오가닉은 각각 전용 오픈채팅방으로 유입된 뒤 같은 후속 CRM·앵콜 흐름으로 이어집니다. 방 주소는 모집별 카톡방 관리에서 별도로 저장합니다. 첫·앵콜 라이브 주소와 실제 고객 동선은 연결 확인 전입니다. 2차 전환은 동일 4기 추가 모집 기준입니다. 유입 출처와 1·2차 전환을 별도로 구분하며, 과거 외부 사이트 교육 이력은 이번 모집에 합산하지 않습니다.</p>
     <ol className="funnel-measurement-grid" aria-label="모집 단계별 측정 준비">
       {FUNNEL_MEASUREMENT_STEPS.map(step => <li key={step.id}>
         <strong>{step.label}</strong><span className="conversion-tag">연결 확인 전</span><p>{step.evidence}</p>
