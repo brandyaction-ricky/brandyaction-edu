@@ -36,6 +36,7 @@ import { ArticleBannerEditor } from "./final/article-banner-editor";
 import { ArticleCategoryManager } from "./final/article-category-manager";
 import { ProductEditor } from "./final/admin-editors";
 import { LearningEditor } from "./final/learning-editor";
+import { MissionEditor } from "./final/mission-editor";
 import {
   AdminHeading,
   AdminShell,
@@ -851,7 +852,7 @@ export function Platform({
           {notice}
         </div>
       )}
-      {editor && (
+      {editor?.section.key === "missions" ? <MissionEditor key={editor.row?.id || "new-mission"} row={editor.row} data={data} pending={pending} send={send} close={() => setEditor(null)} /> : editor && (
         <Editor
           key={editor.section.key + (editor.row ? recordId(editor.row) : "new")}
           section={editor.section}

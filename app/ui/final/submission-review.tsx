@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { timeLabel, type Data, type WorkflowSend } from "../learning-workflows";
 import { Badge, Empty } from "./primitives";
+import { MissionResponse } from './mission-questions';
 
 type Submission = Row & { member?: Row; mission?: Row; course?: Row };
 const name = (row?: Row) =>
@@ -70,6 +71,7 @@ export function SubmissionReview({
         (sort === "old" ? 1 : -1),
     );
   const current = list.find((row) => row.id === currentId) || list[0];
+  const missionSnapshot = object(current, 'response').mission_snapshot as Record<string, unknown> | undefined;
   async function save(ids: string[], decision: string, feedback: string) {
     await send(
       { action: "review", ids, decision, feedback },
@@ -227,7 +229,7 @@ export function SubmissionReview({
                 <b>{name(current.member) || "회원"}</b>
                 <Badge>{labels[t(current, "status")]}</Badge>
               </div>
-              <h2>{name(current.mission) || "미션"}</h2>
+              <h2>{String(missionSnapshot?.title || name(current.mission) || "미션")}</h2>
               <p className="meta mt8">
                 {name(current.course)} · {t(current, "attempt_number")}차 제출 ·{" "}
                 {timeLabel(current.submitted_at)}
@@ -236,13 +238,14 @@ export function SubmissionReview({
             <div className="review-grid">
               <div className="answers">
                 <details className="guide">
-                  <summary>현재 미션 안내와 제출 기준 보기</summary>
+                  <summary>{missionSnapshot ? '제출 당시 미션 안내 보기' : '현재 미션 안내와 제출 기준 보기'}</summary>
                   <p className="reading-copy">
-                    {t(current.mission, "instructions") ||
+                    {String(missionSnapshot ? missionSnapshot.instructions || '' : t(current.mission, "instructions")) ||
                       "등록된 안내가 없습니다."}
                   </p>
                 </details>
-                <div className="answer-block">
+                <MissionResponse response={object(current, 'response')}/>
+                <div className="answer-block" hidden={!object(current, 'response').text && Boolean(object(current, 'response').form_snapshot)}>
                   <label>회원이 제출한 답변</label>
                   <div className="answer-copy reading-copy">
                     {String(
