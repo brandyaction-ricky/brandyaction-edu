@@ -20,10 +20,13 @@ function webhook({
   provider = async () => Response.json(payment),
   rpcError = null,
   recordError = null,
+  lookupError = null,
+  initialEvents = [],
 } = {}) {
   const providerCalls = [];
   const rpcCalls = [];
   const eventWrites = [];
+  const storedEvents = new Map(initialEvents.map(event => [event.provider_event_id, event]));
   const db = {
     async rpc(name, args) {
       rpcCalls.push({ name, args });
@@ -32,8 +35,25 @@ function webhook({
     from(table) {
       assert.equal(table, 'payment_events');
       return {
+        select(columns) {
+          assert.equal(columns, 'processing_status');
+          const filters = {};
+          const chain = {
+            eq(column, value) {
+              filters[column] = value;
+              return chain;
+            },
+            async maybeSingle() {
+              if (lookupError) return { data: null, error: lookupError };
+              assert.equal(filters.provider, 'toss');
+              return { data: storedEvents.get(filters.provider_event_id) || null, error: null };
+            },
+          };
+          return chain;
+        },
         async upsert(value, options) {
           eventWrites.push({ value, options });
+          if (!recordError) storedEvents.set(value.provider_event_id, value);
           return { error: recordError };
         },
       };
@@ -128,6 +148,18 @@ test('DONE event uses provider-authoritative values and records the transmission
   assert.equal(handler.eventWrites[0].value.processing_status, 'processed');
 });
 
+test('a repeated transmission is acknowledged without reconciling the payment twice', async () => {
+  const handler = webhook();
+  const first = await handler.post(request(paymentEvent()));
+  const repeated = await handler.post(request(paymentEvent()));
+
+  assert.equal(first.status, 200);
+  assert.equal(repeated.status, 200);
+  assert.deepEqual(await repeated.json(), { ok: true, ignored: false, duplicate: true });
+  assert.equal(handler.rpcCalls.length, 1);
+  assert.equal(handler.eventWrites.length, 1);
+});
+
 test('provider identity mismatch cannot mutate payment state', async () => {
   const handler = webhook({ provider: async () => Response.json({ ...payment, paymentKey: 'another-key' }) });
   assert.equal((await handler.post(request(paymentEvent()))).status, 409);
@@ -178,9 +210,41 @@ test('database failures request a retry and do not claim successful processing',
   assert.equal((await reconcileFailure.post(request(paymentEvent()))).status, 503);
   assert.equal(reconcileFailure.eventWrites.length, 0);
 
+  const lookupFailure = webhook({ lookupError: { code: 'database_unavailable' } });
+  assert.equal((await lookupFailure.post(request(paymentEvent()))).status, 503);
+  assert.equal(lookupFailure.rpcCalls.length, 0);
+
   const recordFailure = webhook({ recordError: { code: 'database_unavailable' } });
   assert.equal((await recordFailure.post(request(paymentEvent()))).status, 503);
   assert.equal(recordFailure.rpcCalls.length, 1);
+});
+
+test('an unknown terminal order is recorded as ignored and no longer requests retries', async () => {
+  const expiredPayment = { ...payment, status: 'EXPIRED', approvedAt: null, method: null };
+  const handler = webhook({
+    provider: async () => Response.json(expiredPayment),
+    rpcError: { code: 'P0001', message: 'ORDER_NOT_FOUND' },
+  });
+  const first = await handler.post(request(paymentEvent(expiredPayment)));
+  const repeated = await handler.post(request(paymentEvent(expiredPayment)));
+
+  assert.equal(first.status, 200);
+  assert.deepEqual(await first.json(), { ok: true, ignored: true });
+  assert.equal(handler.eventWrites[0].value.processing_status, 'ignored');
+  assert.equal(handler.eventWrites[0].value.error_message, 'ORDER_NOT_FOUND');
+  assert.equal(repeated.status, 200);
+  assert.deepEqual(await repeated.json(), { ok: true, ignored: true, duplicate: true });
+  assert.equal(handler.rpcCalls.length, 1);
+  assert.equal(handler.eventWrites.length, 1);
+});
+
+test('an unknown completed order still requests a retry', async () => {
+  const handler = webhook({ rpcError: { code: 'P0001', message: 'ORDER_NOT_FOUND' } });
+  const response = await handler.post(request(paymentEvent()));
+
+  assert.equal(response.status, 503);
+  assert.equal(handler.rpcCalls[0].name, 'finalize_toss_payment');
+  assert.equal(handler.eventWrites.length, 0);
 });
 
 test('event body hash is used when Toss transmission id is absent', async () => {

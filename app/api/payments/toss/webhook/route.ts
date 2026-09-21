@@ -22,6 +22,14 @@ function nonEmpty(value: unknown, maximum: number): value is string {
   return typeof value === 'string' && value.length > 0 && value.length <= maximum;
 }
 
+function databaseErrorMessage(error: unknown) {
+  return object(error) && typeof error.message === 'string' ? error.message : '';
+}
+
+function orderNotFound(error: unknown) {
+  return databaseErrorMessage(error) === 'ORDER_NOT_FOUND';
+}
+
 function validToken(received: string | null, expected: string) {
   if (received === null) return false;
   const actualDigest = createHash('sha256').update(received).digest();
@@ -129,13 +137,45 @@ async function reconcilePayment(db: ReturnType<typeof createAdminClient>, paymen
   }
 
   if (['CANCELED', 'ABORTED', 'EXPIRED'].includes(status)) {
-    return db.rpc('record_toss_terminal_payment', {
+    const result = await db.rpc('record_toss_terminal_payment', {
       ...common,
       p_status: status,
     });
+    return { ...result, ignoreMissingOrder: true };
   }
 
   return { error: null, ignored: true };
+}
+
+async function recordedEvent(
+  db: ReturnType<typeof createAdminClient>,
+  providerEventId: string,
+) {
+  return db
+    .from('payment_events')
+    .select('processing_status')
+    .eq('provider', 'toss')
+    .eq('provider_event_id', providerEventId)
+    .maybeSingle();
+}
+
+async function recordEvent(
+  db: ReturnType<typeof createAdminClient>,
+  providerEventId: string,
+  eventType: string,
+  payment: JsonObject,
+  processingStatus: 'processed' | 'ignored',
+  errorMessage: string | null = null,
+) {
+  return db.from('payment_events').upsert({
+    provider: 'toss',
+    provider_event_id: providerEventId,
+    event_type: eventType,
+    processing_status: processingStatus,
+    payload: payment,
+    error_message: errorMessage,
+    processed_at: new Date().toISOString(),
+  }, { onConflict: 'provider,provider_event_id' });
 }
 
 export async function POST(request: Request) {
@@ -170,26 +210,36 @@ export async function POST(request: Request) {
     if (!verifiedIdentity(event.type, event.hint, payment)) return reply({ error: '결제 조회 결과가 일치하지 않습니다.' }, 409);
 
     const db = createAdminClient();
+    const transmissionId = request.headers.get('tosspayments-webhook-transmission-id');
+    const providerEventId = nonEmpty(transmissionId, 200)
+      ? transmissionId
+      : createHash('sha256').update(rawBody).digest('hex');
+    const existing = await recordedEvent(db, providerEventId);
+    if (existing.error) {
+      console.error('toss webhook event lookup failed', existing.error.code);
+      return reply({ error: '결제 이벤트 기록을 확인하지 못했습니다.' }, 503);
+    }
+    if (existing.data?.processing_status === 'processed' || existing.data?.processing_status === 'ignored') {
+      return reply({ ok: true, ignored: existing.data.processing_status === 'ignored', duplicate: true });
+    }
+
     const result = await reconcilePayment(db, payment);
     if (result.error) {
+      const ignoreMissingOrder = 'ignoreMissingOrder' in result && result.ignoreMissingOrder === true;
+      if (ignoreMissingOrder && orderNotFound(result.error)) {
+        const recorded = await recordEvent(db, providerEventId, event.type, payment, 'ignored', 'ORDER_NOT_FOUND');
+        if (recorded.error) {
+          console.error('toss webhook event recording failed', recorded.error.code);
+          return reply({ error: '결제 이벤트 기록을 완료하지 못했습니다.' }, 503);
+        }
+        return reply({ ok: true, ignored: true });
+      }
       console.error('toss webhook reconciliation failed', result.error.code);
       return reply({ error: '결제 상태 반영을 완료하지 못했습니다.' }, 503);
     }
     const ignored = 'ignored' in result && Boolean(result.ignored);
 
-    const transmissionId = request.headers.get('tosspayments-webhook-transmission-id');
-    const providerEventId = nonEmpty(transmissionId, 200)
-      ? transmissionId
-      : createHash('sha256').update(rawBody).digest('hex');
-    const recorded = await db.from('payment_events').upsert({
-      provider: 'toss',
-      provider_event_id: providerEventId,
-      event_type: event.type,
-      processing_status: ignored ? 'ignored' : 'processed',
-      payload: payment,
-      error_message: null,
-      processed_at: new Date().toISOString(),
-    }, { onConflict: 'provider,provider_event_id' });
+    const recorded = await recordEvent(db, providerEventId, event.type, payment, ignored ? 'ignored' : 'processed');
     if (recorded.error) {
       console.error('toss webhook event recording failed', recorded.error.code);
       return reply({ error: '결제 이벤트 기록을 완료하지 못했습니다.' }, 503);
