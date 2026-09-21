@@ -95,7 +95,7 @@ export function RecruitmentFunnel({ courses, cohorts, canSave = false }: { cours
     </div>
     {canSave && <>
       <AdminButton aria-expanded={showRooms} onClick={() => setShowRooms(value => !value)}>{showRooms ? '카톡방 설정 닫기' : '모집별 카톡방 관리'}</AdminButton>
-      {showRooms && <RecruitmentRoomSettings />}
+      {showRooms && <RecruitmentRoomSettings courses={courses} cohorts={cohorts} />}
     </>}
     <div className="funnel-selection-grid" aria-label="모집 유입 경로">
       {FUNNEL_ACQUISITION_CHANNELS.map(channel => <div key={channel.id}><strong>{channel.label}</strong><p>{channel.evidence} → {channel.room} → 무료 웨비나 (YouTube Live) → 문샷 챌린지 4기</p></div>)}

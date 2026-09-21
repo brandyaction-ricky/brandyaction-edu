@@ -1,6 +1,8 @@
 import { StrictMode, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { LandingAdmin } from '../../../app/ui/landing/admin';
+import { WebinarRegistration } from '../../../app/ui/webinar-registration';
+import { WebinarManagement } from '../../../app/ui/webinar-management';
 import { ConversionFixture } from './conversion';
 import { AdminButton, AdminConfirmDialog, AdminDrawer, AdminInput } from '../../../app/ui/final/admin-system';
 import '../../../app/ui/final/tokens.css';
@@ -22,4 +24,4 @@ function BoundaryFixture() {
     {confirm && <AdminConfirmDialog title="중첩 확인" message="상위 Drawer는 유지됩니다." onCancel={() => setConfirm(false)} onConfirm={() => {setConfirm(false);setOpen(false);}}/>}
   </AdminDrawer>}</section>;
 }
-createRoot(document.getElementById('root')!).render(<StrictMode><div className="edu-admin" style={{padding:24,minHeight:'180vh'}}>{window.location.pathname.startsWith('/admin/conversion') ? <ConversionFixture/> : <><BoundaryFixture/><LandingAdmin/></>}</div></StrictMode>);
+createRoot(document.getElementById('root')!).render(<StrictMode><div className="edu-admin" style={{padding:24,minHeight:'180vh'}}>{window.location.pathname.startsWith('/webinar-test') ? <WebinarRegistration code="11111111-1111-4111-8111-111111111111" channel="organic"/> : window.location.pathname.startsWith('/webinar-admin-test') ? <WebinarManagement period="sample" courses={[{id:'22222222-2222-4222-8222-222222222222',title:'합성 무료 교육'}]} cohorts={[]}/> : window.location.pathname.startsWith('/admin/conversion') ? <ConversionFixture/> : <><BoundaryFixture/><LandingAdmin/></>}</div></StrictMode>);
