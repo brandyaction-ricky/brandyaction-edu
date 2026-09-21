@@ -39,10 +39,10 @@ export const finalAdminGroups = [
       "questions",
     ],
   ],
-  ["고객 관리", ["customers", "conversion", "tags", "coupons", "product-reviews"]],
+  ["고객 관리", ["customers", "tags", "coupons", "product-reviews"]],
   ["콘텐츠 관리", ["banners", "articles", "testimonials"]],
   ["매출 관리", ["orders"]],
-  ["마케팅 관리", ["landing", "analytics", "seo", "settings"]],
+  ["마케팅·전환", ["conversion", "landing", "analytics", "campaigns", "templates", "automations", "seo", "settings"]],
 ] as const;
 const icons: Record<string, LucideIcon> = {
   products: BookOpen,
@@ -69,6 +69,8 @@ const icons: Record<string, LucideIcon> = {
   staff: ShieldCheck,
 };
 export const finalAdminTitles: Record<string, string> = {
+  conversion: "모집 운영",
+  landing: "광고·웨비나 성과",
   learning: "학습 콘텐츠 관리",
   members: "회원 미션관리",
   tags: "고객 태그 관리",
@@ -202,7 +204,7 @@ export function AdminShell({
       </Link>
     );
   };
-  const extra = ["staff", "templates", "campaigns", "automations"].filter(
+  const extra = ["staff"].filter(
     (key) => byKey.has(key),
   );
   return (

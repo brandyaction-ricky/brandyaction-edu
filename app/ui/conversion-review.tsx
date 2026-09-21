@@ -11,6 +11,7 @@ import {
   AdminPageHeader, AdminSearchField, AdminSection, AdminSelect, AdminTextarea,
 } from './final/admin-system';
 import './conversion-review.css';
+import { RecruitmentRoomSettings } from './recruitment-rooms';
 import { RecruitmentFunnel } from './recruitment-funnel';
 
 const topicNames: Record<string, string> = { price: '가격', schedule: '일정', content: '교육 내용', level: '수강 수준', usage: '이용 방법' };
@@ -25,7 +26,8 @@ async function readResponse(response: Response) {
   return data;
 }
 
-export function ConversionReview() {
+export function ConversionReview({ workspace = false }: { workspace?: boolean }) {
+  const [workspaceView, setWorkspaceView] = useState<'recruitment' | 'inquiries'>('recruitment');
   const [snapshot, setSnapshot] = useState<ConversionSnapshot | null>(null);
   const [selectedId, setSelectedId] = useState('');
   const [query, setQuery] = useState('');
@@ -100,17 +102,28 @@ export function ConversionReview() {
   const openEvidence = (item?: ConversionEvidence) => { setEditingEvidence(item); setDrawer('evidence'); };
 
   return <AdminPage width="wide" template="review" className="conversion-review">
-    <AdminPageHeader title="전환 관리" description="문의에 필요한 설명을 찾고, 검토한 내용을 기록합니다." eyebrow="CUSTOMER MANAGEMENT" actions={<>
+    <AdminPageHeader title={workspace ? "모집 운영" : "전환 관리"} description={workspace ? "모집별 연결·구매 현황·후속 안내를 한곳에서 관리합니다." : "문의에 필요한 설명을 찾고, 검토한 내용을 기록합니다."} eyebrow="MARKETING" actions={<>
       <AdminButton disabled={pending || loading} onClick={() => void refresh()}>새로고침</AdminButton>
-      {snapshot && <AdminButton tone="primary" disabled={pending} onClick={() => openCase()}>문의 연결</AdminButton>}
+      {snapshot && (!workspace || workspaceView === 'inquiries') && <AdminButton tone="primary" disabled={pending} onClick={() => openCase()}>문의 연결</AdminButton>}
     </>} />
     {error && <div role="alert" className="conversion-alert">{error}</div>}
     {notice && <p role="status" className="conversion-notice">{notice}</p>}
     {loading && !snapshot && <p role="status">문의와 검토 기록을 불러오고 있습니다.</p>}
     {!loading && !snapshot && <AdminEmptyState title="전환 관리 정보를 불러오지 못했습니다." action={<AdminButton onClick={() => void refresh()}>다시 불러오기</AdminButton>}>접근 권한과 기능 사용 가능 여부를 확인해 주세요.</AdminEmptyState>}
     {snapshot && <>
-      <div className="funnel-entry"><AdminButton aria-expanded={showFunnel} aria-controls="recruitment-funnel-preparation" onClick={() => setShowFunnel(value => !value)}>{showFunnel ? '모집 경로 준비 닫기' : '모집 경로 준비'}</AdminButton><span className="conversion-muted">무료 교육부터 유료 구매까지 연결할 경로를 확인합니다.</span></div>
+      {workspace ? <>
+        <div className="funnel-entry" aria-label="모집 운영 작업">
+          <AdminButton aria-pressed={workspaceView === 'recruitment'} onClick={() => setWorkspaceView('recruitment')}>모집 설정·구매·후속 안내</AdminButton>
+          <AdminButton aria-pressed={workspaceView === 'inquiries'} onClick={() => setWorkspaceView('inquiries')}>구매 전 문의 검토</AdminButton>
+        </div>
+        <div hidden={workspaceView !== 'recruitment'}>
+          <p className="conversion-muted">모집 코드를 불러오면 카톡방 → 무료 신청·유료 기수 → 구매 현황 → 방송·후속 안내 순서로 확인합니다. 상품 연결은 아래 실제 모집 설정에서 한 번만 관리합니다.</p>
+          {snapshot.capabilities.can_manage_funnel ? <RecruitmentRoomSettings courses={snapshot.courses} cohorts={snapshot.cohorts} expanded /> : <p>모집 설정에는 마케팅·상품 관리 권한이 필요합니다.</p>}
+        </div>
+      </> : <>      <div className="funnel-entry"><AdminButton aria-expanded={showFunnel} aria-controls="recruitment-funnel-preparation" onClick={() => setShowFunnel(value => !value)}>{showFunnel ? '모집 경로 준비 닫기' : '모집 경로 준비'}</AdminButton><span className="conversion-muted">무료 교육부터 유료 구매까지 연결할 경로를 확인합니다.</span></div>
       {showFunnel && <div id="recruitment-funnel-preparation"><RecruitmentFunnel key={String(snapshot.capabilities.can_manage_funnel)} courses={snapshot.courses} cohorts={snapshot.cohorts} canSave={snapshot.capabilities.can_manage_funnel === true} /></div>}
+</>}
+      <div hidden={workspace && workspaceView !== 'inquiries'}>
       <div className="conversion-intro"><span className="conversion-tag">운영자 검토</span><p>설명 추천과 고객 답변을 구분해서 관리합니다. 이 화면에 저장한 내용은 자동 발송되지 않습니다.</p></div>
       <div className="conversion-grid" aria-busy={pending || loading}>
         <AdminSection title="문의" description={`불러온 문의 ${snapshot.cases.length}건`} bordered>
@@ -164,6 +177,7 @@ export function ConversionReview() {
           {!records.length && <AdminEmptyState compact title="아직 검토 기록이 없습니다." />}
           <div className="conversion-next"><strong>구매·환불 결과</strong><p>주문 연결은 준비 중입니다. 현재 화면의 기록으로 구매 성과를 계산하지 않습니다.</p></div>
         </AdminSection>
+      </div>
       </div>
       {drawer === 'case' && <AdminDrawer title={editingCase ? '문의 정보 수정' : '문의 연결'} onClose={() => { if (!pending) setDrawer(null); }}>
         <CaseForm key={editingCase?.id || 'new'} snapshot={snapshot} item={editingCase} pending={pending} mutate={mutate} onSaved={id => { setSelectedId(id); setDrawer(null); }} />

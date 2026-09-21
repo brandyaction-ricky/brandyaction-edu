@@ -86,3 +86,26 @@ test('followup separates room and direct drafts, preserves reload and clears aud
  await expect(page.getByText('사이트 무료 신청 8명 중 개별 안내 검토 후보 1명',{exact:true})).toHaveCount(0);
  await expect(page.getByRole('textbox',{name:'카톡방 공지 초안',exact:true})).toHaveCount(0);
 });
+
+
+test('workspace separates setup, results and followup without losing an unsaved draft',async({page})=>{
+ const code='33333333-3333-4333-8333-333333333333';let writes=0;
+ await page.route(/\/api\/conversion\/webinar(?:\?|$)/,route=>{
+  if(route.request().method()!=='GET')writes++;
+  return route.fulfill({json:{campaign:{id:code,freeCourse:'22222222-2222-4222-8222-222222222222',paidCohort:null,enabled:true,revision:4},registrations:1,purchases:null,purchase_state:'unmapped'}});
+ });
+ await page.goto('/webinar-admin-test?workspace=1');
+ await expect(page.getByRole('combobox',{name:'웨비나 무료 상품',exact:true})).toBeVisible();
+ await expect(page.getByRole('textbox',{name:'카톡방 공지 초안',exact:true})).not.toBeVisible();
+ await page.getByRole('button',{name:'2. 신청·구매 현황',exact:true}).click();
+ await expect(page.getByText('신청 1건 · 웨비나 실제 참여: 미확인',{exact:true})).toBeVisible();
+ await expect(page.getByRole('combobox',{name:'웨비나 무료 상품',exact:true})).not.toBeVisible();
+ await page.getByRole('button',{name:'4. 후속 안내',exact:true}).click();
+ await page.getByRole('textbox',{name:'카톡방 공지 초안',exact:true}).fill('아직 저장하지 않은 합성 초안');
+ await page.getByRole('button',{name:'3. 방송·교육 링크',exact:true}).click();
+ await expect(page.getByLabel('첫 웨비나 YouTube 주소',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'4. 후속 안내',exact:true}).click();
+ await expect(page.getByRole('textbox',{name:'카톡방 공지 초안',exact:true})).toHaveValue('아직 저장하지 않은 합성 초안');
+ expect(writes).toBe(0);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+});
