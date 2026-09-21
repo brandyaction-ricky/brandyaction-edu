@@ -84,6 +84,7 @@ function apiHarness(user, failure = null) {
     '@/lib/product-metadata': load('lib/product-metadata.ts', { './platform': platform, './product-conversion': load('lib/product-conversion.ts'), './product-html-document': load('lib/product-html-document.ts') }),
     '@/lib/edu-settings': { getEduSettings: async () => ({ operations: {} }) },
     '@/lib/mission-quiz': {}, '@/lib/legal-policies': { POLICY_VERSION: 'test' },
+    '@/lib/mission-workspace': load('lib/mission-workspace.ts'),
     '@/lib/operator-permissions': operators,
     '@/lib/crm-delivery': { crmDeliveryState: () => ({}) },
   });

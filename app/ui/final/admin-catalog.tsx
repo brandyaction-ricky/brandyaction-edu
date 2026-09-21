@@ -12,6 +12,7 @@ import {
 } from "@/lib/platform";
 import { paidCourseReadinessIssues, recordId } from "@/lib/platform-rules";
 import { archiveValues, cohortPeriod, cohortStatus } from "@/lib/qa-rules";
+import { readMissionForm } from "@/lib/mission-workspace";
 import { ArrowRight, BookOpen, ChevronDown, ChevronUp, FileText, Pencil, RotateCcw, Search, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
@@ -167,12 +168,14 @@ export function AdminCatalog({
     .map((item) => ({ week: item, missions: filtered.filter((mission) => lessonById.get(String(mission.lesson_id))?.week_id === item.id).toSorted((a, b) => num(lessonById.get(String(a.lesson_id)), "day_number") - num(lessonById.get(String(b.lesson_id)), "day_number")) }))
     .filter((group) => group.missions.length || week);
   const unmatchedMissions = s.key === "missions" ? filtered.filter((mission) => !weeks.some((item) => item.id === lessonById.get(String(mission.lesson_id))?.week_id)) : [];
-  const renderMission = (mission: Row) => (
+  const renderMission = (mission: Row) => {
+    const form = readMissionForm(mission.form_schema);
+    return (
     <article className="mission-row" key={mission.id}>
       <span className="day-no">{lessonById.has(String(mission.lesson_id)) ? String(num(lessonById.get(String(mission.lesson_id)), "day_number")).padStart(2, "0") : "—"}</span>
       <div className="mission-copy">
         <button className="title-btn" onClick={() => edit(s, mission)}><strong>{t(mission, "title")}</strong></button>
-        <p>{labels[t(mission, "submission_type")] || t(mission, "submission_type")} · 확인 퀴즈 {quizCount(mission.id)}문항 · {mission.is_required ? "필수 미션" : "선택 미션"}{mission.submission_type === "quiz" ? "" : " · 관리자 승인"}</p>
+        <p>{labels[t(mission, "submission_type")] || t(mission, "submission_type")} · {form.questions.length ? `질문 ${form.questions.length}개 · ` : ""}{form.checklist.length ? `체크 ${form.checklist.length}개 · ` : ""}{quizCount(mission.id) ? `퀴즈 ${quizCount(mission.id)}문항 · ` : ""}{mission.is_required ? "필수 미션" : "선택 미션"}</p>
       </div>
       <Badge color={mission.is_published ? "green" : ""}>{mission.is_published ? "공개" : "비공개"}</Badge>
       <div className="row mission-actions">
@@ -181,6 +184,7 @@ export function AdminCatalog({
       </div>
     </article>
   );
+  };
   const badge = (r: Row) => {
     const value = getStatus(r);
     const publicationIssues = s.key === "products" ? paidCourseReadinessIssues(r, cohorts, weeks, lessons) : [];
@@ -691,6 +695,11 @@ export function AdminCatalog({
       )}
       {s.key === "missions" && (
         <>
+          <div className="mission-overview" aria-label="미션 구성 현황">
+            <div><span>등록한 미션</span><b>{rows.filter(item => !course || getCourse(item) === course).length}</b></div>
+            <div><span>공개 중</span><b>{rows.filter(item => item.is_published && (!course || getCourse(item) === course)).length}</b></div>
+            <div><span>비공개 초안</span><b>{rows.filter(item => !item.is_published && (!course || getCourse(item) === course)).length}</b></div>
+          </div>
           <div className="tabs admin-content-tabs" role="tablist" aria-label="커리큘럼 관리 영역">
             <button className="tab active" type="button" role="tab" aria-selected="true">
               일차별 미션 <span>{rows.filter((item) => !course || getCourse(item) === course).length}</span>
@@ -698,6 +707,7 @@ export function AdminCatalog({
             <Link className="tab" href="/admin/learning">
               학습 콘텐츠 <span>{scopedLessons.length}</span>
             </Link>
+            <Link className="tab" href="/admin/reviews">제출물 검토 · 피드백</Link>
           </div>
           <div className="mission-week-pills" aria-label="미션 주차 선택">
             <button className={!week ? "pill active" : "pill"} aria-pressed={!week} onClick={() => { setWeek(""); setSelection([]); }}>전체 주차</button>
@@ -710,7 +720,7 @@ export function AdminCatalog({
                   aria-pressed={week === item.id}
                   onClick={() => { setWeek(item.id); setSelection([]); }}
                 >
-                  {num(item, "week_number")}주차 <span>{rows.filter((mission) => lessonById.get(String(mission.lesson_id))?.week_id === item.id).length}</span>
+                  {!course ? `${named(courses.find(c => c.id === item.course_id))} · ` : ""}{num(item, "week_number")}주차 <span>{rows.filter((mission) => lessonById.get(String(mission.lesson_id))?.week_id === item.id).length}</span>
                 </button>
               ))}
           </div>
@@ -750,7 +760,7 @@ export function AdminCatalog({
             ["learning", "missions", "questions"].includes(s.key) ? "" : "panel"
           }
         >
-          {!["missions", "tags"].includes(s.key) && <div className={s.key === "learning" ? "toolbar learning-filter" : "filter-row"}>
+          {s.key !== "tags" && <div className={["learning", "missions"].includes(s.key) ? "toolbar learning-filter" : "filter-row"}>
             {search}
             <span className="spacer" />
             {s.key === "products" && (

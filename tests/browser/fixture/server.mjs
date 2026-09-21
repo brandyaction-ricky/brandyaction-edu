@@ -14,6 +14,7 @@ const assets = new Map(result.outputFiles.map(file=>['/'+file.path.split('/').at
 const server = createServer((request,response)=>{
   const url=new URL(request.url,'http://localhost');
   if(request.method!=='GET'){response.writeHead(405).end();return;}
+  if(url.pathname==='/api/platform/workflows' && url.searchParams.get('kind')==='quiz'){response.setHeader('Content-Type','application/json');response.end(JSON.stringify({quiz:null}));return;}
   if(url.pathname==='/api/landing/performance'){
     response.setHeader('Content-Type','application/json');
     const start=url.searchParams.get('start'),end=url.searchParams.get('end');
@@ -23,4 +24,4 @@ const server = createServer((request,response)=>{
   if(asset){response.setHeader('Content-Type',url.pathname.endsWith('.css')?'text/css':'text/javascript');response.end(asset);return;}
   response.setHeader('Content-Type','text/html');response.end('<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin focus fixture</title><link rel="stylesheet" href="/app.css"></head><body style="overflow:auto"><div id="root"></div><script type="module" src="/app.js"></script></body></html>');
 });
-server.listen(4173,'0.0.0.0',()=>console.log('Focus fixture ready on port 4173'));
+server.listen(4173,'127.0.0.1',()=>console.log('Focus fixture ready on port 4173'));

@@ -5,6 +5,7 @@ import { bannerTextLimits, sections, safeUrl, type Row } from '@/lib/platform';
 import { containsFreeClassCampaign, hasLearningAccess, paidCourseReadinessIssues } from '@/lib/platform-rules';
 import { getEduSettings } from '@/lib/edu-settings';
 import { gradeQuiz, type QuizDefinition } from '@/lib/mission-quiz';
+import { validateMissionForm, readMissionForm, missionFormResponse } from '@/lib/mission-workspace';
 import { adminTables, archiveValues, cohortStatus, phoneNumber, validImage, assetPath, imagePreviewUrl, databaseMessage } from '@/lib/qa-rules';
 import { POLICY_VERSION } from '@/lib/legal-policies';
 import { getOperatorUser, permissionsFor, sectionScopes } from '@/lib/operator-permissions';
@@ -589,6 +590,14 @@ export async function POST(request: Request) {
             if (section.table === 'lesson_contents') {
                 if (['vod_url', 'resource_storage_path', 'body_text', 'external_url'].filter((k) => values[k]).length !== 1) fail('영상·자료·본문·외부 링크 중 학습 유형에 맞는 하나를 등록해 주세요.');
             }
+            if (section.table === 'curriculum_missions' && 'form_schema' in input) {
+                try { values.form_schema = validateMissionForm(input.form_schema); } catch (error) { fail((error as Error).message); }
+                if (String(values.title || '').trim().length < 1 || String(values.title).length > 200 || String(values.instructions || '').length > 20000) fail('미션 제목과 안내 길이를 확인해 주세요.');
+                values.title = String(values.title).trim();
+                if (!uid(values.lesson_id)) fail('연결할 학습을 선택해 주세요.');
+                if (body.id && typeof body.expectedUpdatedAt !== 'string') fail('미션을 다시 열고 저장해 주세요.', 409);
+                if (values.submission_type === 'quiz' && (values.form_schema as {questions: unknown[]}).questions.length) fail('퀴즈형 미션은 학습 콘텐츠에서 퀴즈 문항을 구성해 주세요.');
+            }
             if (section.table === 'curriculum_missions' && values.submission_type === 'quiz' && values.is_published) {
                 const { data: quiz } = await db
                     .from('mission_quizzes')
@@ -607,6 +616,12 @@ export async function POST(request: Request) {
             }
             const key = section.table === 'site_settings' ? 'key' : section.table === 'lesson_contents' ? 'lesson_id' : 'id';
             if (!body.id && !uid(body.requestId)) fail('새 등록 요청을 다시 열고 저장해 주세요.');
+            if (section.table === 'curriculum_missions' && body.id && 'form_schema' in input) {
+                const result = await db.from(section.table).update(values).eq('id', body.id).eq('lesson_id', values.lesson_id).eq('updated_at', body.expectedUpdatedAt).select().maybeSingle();
+                if (result.error) fail(databaseMessage(result.error.code), 409);
+                if (!result.data) fail('다른 작업에서 미션을 변경했습니다. 편집 내용을 보관한 뒤 다시 열어 주세요.', 409);
+                return reply({ ok: true, row: result.data });
+            }
             const result = body.id
                 ? await db.from(section.table).update(values).eq(key, body.id).select().single()
                 : await db.rpc('edu_create_record', {
@@ -811,9 +826,14 @@ export async function POST(request: Request) {
             }
             const { data: mission } = await db.from('curriculum_missions').select('*').eq('id', body.missionId).eq('lesson_id', lessonId).eq('is_published', true).single();
             if (!mission) fail('미션을 확인해 주세요.');
+            if (body.draft !== undefined && typeof body.draft !== 'boolean') fail('임시저장 여부를 확인해 주세요.');
+            let formResponse;
+            const form = readMissionForm(mission.form_schema);
+            if (Object.keys(mission.form_schema || {}).length && body.missionVersion !== mission.updated_at) fail('미션이 변경되었습니다. 작성 내용을 보관한 뒤 새로고침해 주세요.', 409);
+            try { formResponse = missionFormResponse(form, body.formAnswers, body.checklist, body.draft === true); } catch (error) { fail((error as Error).message); }
             const content = String(body.content || '').trim();
-            if (body.url && !safeUrl(body.url)) fail('결과물 링크를 확인해 주세요.');
-            if (content.length > 20000 || (!body.draft && ['text', 'mixed'].includes(mission.submission_type) && !content) || (!body.draft && ['link', 'mixed'].includes(mission.submission_type) && !body.url)) fail('미션 답변을 입력해 주세요.');
+            if (typeof body.url !== 'string' && body.url != null || String(body.url || '').length > 2000 || (!body.draft && body.url && !safeUrl(body.url))) fail('결과물 링크를 확인해 주세요.');
+            if (content.length > 20000 || (!body.draft && !form.questions.length && ['text', 'mixed'].includes(mission.submission_type) && !content) || (!body.draft && ['link', 'mixed'].includes(mission.submission_type) && !body.url)) fail('미션 답변을 입력해 주세요.');
             const { data: previous } = await db.from('mission_submissions').select('*').eq('enrollment_id', enrollment.id).eq('mission_id', mission.id).order('attempt_number', { ascending: false }).limit(1).maybeSingle();
             if (previous && ['approved', 'submitted'].includes(previous.status)) fail('이미 제출한 미션입니다. 검토 결과를 확인해 주세요.', 409);
             if (body.draft) {
@@ -824,6 +844,7 @@ export async function POST(request: Request) {
                         mission_id: mission.id,
                         content,
                         url: String(body.url || ''),
+                        response: { ...formResponse, quiz_answers: body.answers || {}, quiz_revision: uid(body.revision) ? body.revision : null, form_snapshot: mission.form_schema || {} },
                         updated_at: new Date().toISOString(),
                     },
                     { onConflict: 'enrollment_id,mission_id' },
@@ -856,6 +877,9 @@ export async function POST(request: Request) {
                 p_response: {
                     text: content,
                     url: String(body.url || ''),
+                    ...formResponse,
+                    form_snapshot: mission.form_schema || {},
+                    mission_snapshot: { title: mission.title, instructions: mission.instructions, submission_type: mission.submission_type },
                     ...(quizRow ? { answers: body.answers, score: grade!.score } : {}),
                 },
                 p_revision: quizRow ? String(body.revision || '') : null,
