@@ -41,8 +41,15 @@
 .edu-admin .recruitment-readiness-list button { flex-shrink: 0; }
 .edu-admin .recruitment-readiness-state { display: block; margin-top: 4px; font-size: 13px; font-weight: 600; color: #4b5563; }
 .edu-admin .recruitment-readiness-note { border-top: 1px solid var(--line, #e1e6e3); padding-top: 12px; }
+.edu-admin .recruitment-copy-link { margin: 16px 0; min-width: 0; }
+.edu-admin .recruitment-copy-row { display: flex; align-items: flex-end; gap: 10px; }
+.edu-admin .recruitment-copy-row > label { flex: 1; min-width: 0; }
+.edu-admin .recruitment-copy-row > button { flex-shrink: 0; }
+.edu-admin .recruitment-copy-link p { margin: 6px 0; font-size: 13px; line-height: 1.7; color: #4b5563; overflow-wrap: anywhere; }
 @media (max-width: 700px) {
   .edu-admin .recruitment-help, .edu-admin .recruitment-details { padding: 12px 14px; }
   .edu-admin .recruitment-readiness { padding: 14px; }
   .edu-admin .recruitment-readiness-list li { align-items: flex-start; flex-direction: column; gap: 6px; }
+  .edu-admin .recruitment-copy-row { align-items: stretch; flex-direction: column; }
+  .edu-admin .recruitment-copy-row > button { align-self: flex-start; }
 }
