@@ -1,4 +1,14 @@
 .conversion-review { color: var(--admin-text, #202524); }
+.funnel-entry { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.funnel-selection-grid, .funnel-measurement-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.funnel-selection { min-width: 0; margin: 0; padding: 16px; border: 1px solid var(--admin-border, #e1e6e3); border-radius: 8px; display: grid; gap: 12px; }
+.funnel-selection legend { padding: 0 6px; font-weight: 600; }
+.funnel-readiness { line-height: 1.7; margin: 16px 0; }
+.funnel-measurement-grid { list-style: none; padding: 0; }
+.funnel-measurement-grid li { border-top: 1px solid var(--admin-border, #e1e6e3); padding: 12px 0; min-width: 0; }
+.funnel-measurement-grid strong { display: block; margin-bottom: 8px; }
+.funnel-measurement-grid p { font-size: 13px; line-height: 1.7; }
+@media (max-width: 700px) { .funnel-selection-grid, .funnel-measurement-grid { grid-template-columns: minmax(0, 1fr); } }
 .conversion-grid { display: grid; grid-template-columns: minmax(200px, .8fr) minmax(300px, 1.8fr) minmax(210px, .85fr); gap: 20px; align-items: start; }
 .conversion-grid > *, .conversion-main { min-width: 0; }
 .conversion-main, .conversion-form { display: flex; flex-direction: column; gap: 18px; }

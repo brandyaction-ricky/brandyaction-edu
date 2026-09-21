@@ -76,7 +76,7 @@ export type ConversionSnapshot = {
   cohorts: { id: string; course_id: string; name: string }[];
   runs: ConversionRun[];
   reviews: ConversionReviewRecord[];
-  capabilities: { can_manage_evidence: boolean; can_mock: boolean };
+  capabilities: { can_manage_evidence: boolean; can_mock: boolean; can_manage_funnel?: boolean };
 };
 
 export const MOCK_NOTICE = '모의 판단입니다. 단어 일치로 화면과 기록 흐름을 확인하며, 실제 AI 판단이나 답변 정확도를 검증한 결과가 아닙니다. 모든 내용은 운영자가 확인해야 합니다.';
