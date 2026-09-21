@@ -217,3 +217,38 @@ test('review and manual-entry drawer fit the viewport without horizontal overflo
   await expect(page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: '문의 연결', exact: true }) })).toBeVisible();
   await noOverflow();
 });
+
+test('room settings save separately from product mapping and changing recruitment cannot overwrite prior rooms', async ({page}) => {
+  const state=await fixture(page); state.snapshot.capabilities.can_manage_funnel=true;
+  await page.route('**/api/conversion/funnel', route=>route.fulfill({json:{draft:null,measurement:'unverified'}}));
+  const records: Record<string, Record<string, unknown>>={};
+  let writes=0;
+  await page.route('**/api/conversion/rooms**', async route=>{
+    if(route.request().method()==='GET') return route.fulfill({json:{draft:records[new URL(route.request().url()).searchParams.get('period')!]??null}});
+    const body=route.request().postDataJSON(); expect(body.requestId).toMatch(/^[a-f0-9-]{36}$/); expect(body.expected_version).toBe(0);
+    records[body.period]={period_id:body.period,version:1,settings:body.settings};writes++;
+    return route.fulfill({json:{draft:records[body.period]}});
+  });
+  await page.getByRole('button',{name:'새로고침',exact:true}).click();
+  await page.getByRole('button',{name:'모집 경로 준비',exact:true}).click();
+  await page.getByRole('button',{name:'모집별 카톡방 관리',exact:true}).click();
+  await page.getByRole('button',{name:'모집 방 설정 불러오기',exact:true}).click();
+  await page.getByLabel('모집 이름',{exact:true}).fill('Synthetic recruitment');
+  await page.getByLabel('오가닉 오픈채팅방 주소',{exact:true}).fill('https://open.kakao.com/o/organicTest');
+  await page.getByLabel('광고 오픈채팅방 주소',{exact:true}).fill('https://open.kakao.com.evil.test/o/paidTest');
+  await page.getByRole('button',{name:'모집 방 설정 저장',exact:true}).click();
+  await expect(page.getByText('https://open.kakao.com/o/... 형식의 방 주소를 입력해 주세요.',{exact:true})).toBeVisible();
+  expect(writes).toBe(0);
+  await page.getByLabel('광고 오픈채팅방 주소',{exact:true}).fill('https://open.kakao.com/o/paidTest');
+  await page.getByRole('button',{name:'모집 방 설정 저장',exact:true}).click();
+  await expect(page.getByText('방 설정 버전 1 · moonshot-4',{exact:true})).toBeVisible();
+  await page.getByRole('textbox',{name:/^모집 구분 코드/}).fill('next-month');
+  await expect(page.getByRole('button',{name:'모집 방 설정 저장',exact:true})).toBeDisabled();
+  await page.getByRole('button',{name:'모집 방 설정 불러오기',exact:true}).click();
+  await expect(page.getByLabel('오가닉 오픈채팅방 주소',{exact:true})).toHaveValue('');
+  await page.getByRole('textbox',{name:/^모집 구분 코드/}).fill('moonshot-4');
+  await page.getByRole('button',{name:'모집 방 설정 불러오기',exact:true}).click();
+  await expect(page.getByLabel('광고 오픈채팅방 주소',{exact:true})).toHaveValue('https://open.kakao.com/o/paidTest');
+  expect(writes).toBe(1);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
+});
