@@ -1,0 +1,36 @@
+.edu-admin .recruitment-help,
+.edu-admin .recruitment-details {
+  margin: 16px 0;
+  padding: 16px 18px;
+  border: 1px solid var(--line, #e1e6e3);
+  border-radius: var(--radius-sm, 8px);
+  background: #f8f9fa;
+  color: #4b5563;
+  font-size: 14px;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+.edu-admin .recruitment-help > strong,
+.edu-admin .recruitment-details > summary {
+  color: #2c2e33;
+  font-size: 14px;
+  font-weight: 600;
+}
+.edu-admin .recruitment-help > strong { display: block; margin-bottom: 6px; }
+.edu-admin .recruitment-details > summary { cursor: pointer; padding: 2px 0; }
+.edu-admin .recruitment-details > summary:focus-visible { outline: 2px solid var(--red, #b52b38); outline-offset: 4px; border-radius: 2px; }
+.edu-admin .recruitment-details[open] > summary { margin-bottom: 10px; }
+.edu-admin .recruitment-help p,
+.edu-admin .recruitment-details p { margin: 0; max-width: 76ch; font-size: inherit; line-height: inherit; color: inherit; }
+.edu-admin .recruitment-help p + p,
+.edu-admin .recruitment-details p + p { margin-top: 8px; }
+.edu-admin .recruitment-guidance > .admin-section-header p { max-width: 76ch; line-height: 1.7; }
+.edu-admin .recruitment-campaign-panel { margin: 24px 0; padding-top: 20px; border-top: 1px solid var(--line, #e1e6e3); }
+.edu-admin .recruitment-campaign-choice { display: flex; align-items: flex-start; gap: 10px; padding: 12px 0; line-height: 1.65; overflow-wrap: anywhere; }
+.edu-admin .recruitment-campaign-choice input { flex: 0 0 auto; margin-top: 5px; }
+.edu-admin .recruitment-campaign-choice strong { display: block; font-weight: 500; }
+.edu-admin .recruitment-campaign-choice small { display: block; color: #5b6470; font-size: 13px; }
+@media (max-width: 700px) {
+  .edu-admin .recruitment-help, .edu-admin .recruitment-details { padding: 12px 14px; }
+}
