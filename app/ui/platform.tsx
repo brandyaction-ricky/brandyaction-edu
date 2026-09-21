@@ -64,6 +64,7 @@ import {
 import { OrderResult } from "./order-result";
 import { SiteFooter } from "./final/site-footer";
 import { HomeHero } from "./final/home-hero";
+import { MarketingWorkspaceNav } from "./marketing-workspace-nav";
 import { ConversionReview } from "./conversion-review";
 type Data = Record<string, Row[]>;
 // Preserve only the last server-verified operator identity during client-side
@@ -687,12 +688,13 @@ export function Platform({
         setMobile={setMobile}
         logout={logout}
       >
+        <MarketingWorkspaceNav current={key} available={available} />
         {key === "overview" ? (
           <Overview data={data} available={available} />
         ) : !section ? (
           <Empty title="이 화면에 접근할 운영 권한이 필요합니다." />
         ) : key === "conversion" ? (
-          <ConversionReview />
+          <ConversionReview workspace />
         ) : key === "product-editor" || key === "learning-editor" ? (
           loading && id && !edited ? (
             <p role="status">편집 정보를 불러오고 있습니다.</p>

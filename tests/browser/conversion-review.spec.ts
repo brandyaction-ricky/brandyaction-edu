@@ -282,3 +282,16 @@ test('recruitment links activate explicitly, show distinct channel URLs and stop
  expect(mutations.map(m=>m.enabled)).toEqual([true,false]);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
 });
+
+test('integrated workspace separates inquiry review from recruitment and removes duplicate mapping draft', async ({ page }) => {
+  await fixture(page);
+  await page.goto('/admin/conversion?workspace=1');
+  await expect(page.getByRole('heading', { name: '모집 운영', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '모집 경로 초안 저장', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '문의 연결', exact: true })).not.toBeVisible();
+  await page.getByRole('button', { name: '구매 전 문의 검토', exact: true }).click();
+  await expect(page.getByRole('button', { name: '문의 연결', exact: true })).toBeVisible();
+  await expect(page.getByText('초보 수강과 녹화 문의', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '모집 설정·구매·후속 안내', exact: true }).click();
+  await expect(page.getByRole('button', { name: '문의 연결', exact: true })).not.toBeVisible();
+});
