@@ -44,7 +44,7 @@ export function RecruitmentRoomSettings() {
       });
       if (!active.current) return;
       setSettings(clean); setVersion(result.draft.version);
-      setMessage('방 설정을 저장했습니다. 고객 페이지 연결·입장 측정·메시지 발송은 아직 시작되지 않았습니다.');
+      setMessage('방 설정을 저장했습니다. 모집 링크에는 별도 활성화로 적용됩니다. 입장 확인·메시지 발송은 시작되지 않습니다.');
     } catch (e) {
       if (!active.current) return;
       if ([401,403,409].includes((e as { status?: number }).status || 0)) { setVersion(null); setSettings(EMPTY_RECRUITMENT_ROOMS); }
