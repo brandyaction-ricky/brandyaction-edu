@@ -4,6 +4,7 @@ import { marketingContextHref } from '@/lib/marketing-context';
 import { RecruitmentCampaignLinks } from './recruitment-campaign-links';
 import { useEffect, useRef, useState } from 'react';
 import { WebinarFollowup } from './webinar-followup';
+import { RecruitmentReadiness } from './recruitment-readiness';
 import { WebinarBroadcastManagement } from './webinar-broadcast-management';
 import { AdminButton, AdminInput, AdminSection, AdminSelect } from './final/admin-system';
 import type { FunnelCourse, FunnelCohort } from '@/lib/recruitment-funnel';
@@ -12,6 +13,7 @@ type Report={campaign:Campaign|null;registrations:number;purchase_state:string;p
 export function WebinarManagement({period,courses,cohorts,workspace=false}:{period:string;courses:FunnelCourse[];cohorts:FunnelCohort[];workspace?:boolean}) {
  const [report,setReport]=useState<Report|null>(null),[free,setFree]=useState(''),[paid,setPaid]=useState(''),[enabled,setEnabled]=useState(false),[pending,setPending]=useState(true),[message,setMessage]=useState(''),[origin,setOrigin]=useState(''),[refresh,setRefresh]=useState(0);
  const [view,setView]=useState('settings');
+ const stageNavigation=useRef<HTMLDivElement>(null);
  const busy=useRef(false);
  useEffect(()=>{
   const controller=new AbortController();
@@ -30,7 +32,8 @@ export function WebinarManagement({period,courses,cohorts,workspace=false}:{peri
   }catch(e){setMessage((e as Error).message);}finally{busy.current=false;setPending(false);}
  };
  return <AdminSection className="recruitment-guidance" title="무료 신청·구매 연결" description="무료 웨비나는 기수 없이 신청을 받습니다." bordered>
-  {workspace&&<div className="funnel-entry" aria-label="모집 진행 단계">{[['settings','1. 신청·상품 연결'],['performance','2. 신청·구매 현황'],['broadcast','3. 방송·교육 링크'],['followup','4. 후속 안내']].map(([key,label])=><AdminButton key={key} aria-pressed={view===key} onClick={()=>setView(key)}>{label}</AdminButton>)}</div>}
+  {workspace&&<RecruitmentReadiness key={period} period={period} onNavigate={next=>{setView(next);stageNavigation.current?.focus({preventScroll:true});stageNavigation.current?.scrollIntoView({block:'start'});}}/>}
+  {workspace&&<div ref={stageNavigation} tabIndex={-1} className="funnel-entry" aria-label="모집 진행 단계">{[['settings','1. 신청·상품 연결'],['performance','2. 신청·구매 현황'],['broadcast','3. 방송·교육 링크'],['followup','4. 후속 안내']].map(([key,label])=><AdminButton key={key} aria-pressed={view===key} onClick={()=>setView(key)}>{label}</AdminButton>)}</div>}
   <div hidden={workspace&&view!=='settings'}>
   <fieldset disabled={pending||!report}>
    <legend>신청 대상 연결</legend>
