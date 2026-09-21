@@ -1,4 +1,5 @@
 'use client';
+import { RecruitmentDetails, RecruitmentHelp } from './recruitment-help';
 import { marketingContextHref } from '@/lib/marketing-context';
 import { RecruitmentCampaignLinks } from './recruitment-campaign-links';
 import { useEffect, useRef, useState } from 'react';
@@ -28,7 +29,7 @@ export function WebinarManagement({period,courses,cohorts,workspace=false}:{peri
    setReport(data);setMessage('신청 설정을 저장했습니다. 링크를 게시하거나 안내 메시지를 발송하지는 않았습니다.');
   }catch(e){setMessage((e as Error).message);}finally{busy.current=false;setPending(false);}
  };
- return <AdminSection title="무료 신청·구매 연결" description="무료 웨비나는 기수 없이 신청을 받습니다." bordered>
+ return <AdminSection className="recruitment-guidance" title="무료 신청·구매 연결" description="무료 웨비나는 기수 없이 신청을 받습니다." bordered>
   {workspace&&<div className="funnel-entry" aria-label="모집 진행 단계">{[['settings','1. 신청·상품 연결'],['performance','2. 신청·구매 현황'],['broadcast','3. 방송·교육 링크'],['followup','4. 후속 안내']].map(([key,label])=><AdminButton key={key} aria-pressed={view===key} onClick={()=>setView(key)}>{label}</AdminButton>)}</div>}
   <div hidden={workspace&&view!=='settings'}>
   <fieldset disabled={pending||!report}>
@@ -37,7 +38,7 @@ export function WebinarManagement({period,courses,cohorts,workspace=false}:{peri
    <AdminSelect label="구매를 확인할 유료 기수" value={paid} onChange={e=>setPaid(e.target.value)}><option value="">미연결 · 확정 후 연결</option>{cohorts.map(c=><option key={c.id} value={c.id}>{courses.find(s=>s.id===c.course_id)?.title} · {c.name}</option>)}</AdminSelect>
    <label><input type="checkbox" checked={enabled} onChange={e=>setEnabled(e.target.checked)}/> 무료 신청 링크 활성화</label>
   </fieldset>
-  <p>기본 기수를 자동으로 4기로 간주하지 않습니다. 신청이 발생한 뒤에는 무료 상품과 이미 연결한 유료 기수를 바꿀 수 없습니다. 미연결 유료 기수는 이후 추가할 수 있습니다. 같은 유료 기수는 한 모집에만 연결합니다.</p>
+  <RecruitmentHelp title="연결 전 확인"><p>기본 기수를 자동으로 4기로 간주하지 않습니다.</p><p>신청이 발생한 뒤에는 무료 상품과 이미 연결한 유료 기수를 바꿀 수 없습니다.</p><p>미연결 유료 기수는 이후 추가할 수 있습니다.</p><p>같은 유료 기수는 한 모집에만 연결합니다.</p></RecruitmentHelp>
   <AdminButton disabled={pending||!report||!free} onClick={()=>void save()}>웨비나 신청 설정 저장</AdminButton>
   </div>
   <AdminButton disabled={pending} onClick={()=>{setPending(true);setReport(null);setMessage('');setRefresh(n=>n+1);}}>신청·구매 기록 새로고침</AdminButton>
@@ -54,7 +55,7 @@ export function WebinarManagement({period,courses,cohorts,workspace=false}:{peri
     <p>결제 {report.purchases.gross.toLocaleString()}원 − 환불 {report.purchases.refunds.toLocaleString()}원 = 순매출 {report.purchases.net.toLocaleString()}원</p>
     <p>집계 제외·검토 필요 주문 {report.purchases.needs_review}건 · 조회 기준 {report.purchases.as_of}</p>
    </>:<p>{report.purchase_state==='forbidden'?'구매 조회에는 주문 관리 권한이 필요합니다.':'유료 기수 연결 전 · 구매 실적 미확인'}</p>}
-   <p>현재 모집 신청자와 동일한 회원 계정의 신청 이후 결제만 관찰합니다. 해당 유료 기수의 전체 매출·광고 효과·1차/앵콜 전환율이 아닙니다. 0원 주문은 유료 구매에서 제외하고, 여러 상품이 포함된 주문과 결제 증거가 맞지 않는 주문은 검토 대상으로 구분합니다. 환불은 조회 시점의 누적액입니다.</p>
+   <RecruitmentDetails title="구매 집계 기준 자세히 보기"><p>현재 모집 신청자와 동일한 회원 계정의 신청 이후 결제만 관찰합니다.</p><p>해당 유료 기수의 전체 매출·광고 효과·1차/앵콜 전환율이 아닙니다.</p><p>0원 주문은 유료 구매에서 제외하고, 여러 상품이 포함된 주문과 결제 증거가 맞지 않는 주문은 검토 대상으로 구분합니다.</p><p>환불은 조회 시점의 누적액입니다.</p></RecruitmentDetails>
    </div>
   </>}
   {report?.campaign&&<div hidden={workspace&&view!=='broadcast'}><WebinarBroadcastManagement key={report.campaign.id} code={report.campaign.id}/></div>}

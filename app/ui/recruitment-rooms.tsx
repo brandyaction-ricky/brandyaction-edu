@@ -1,4 +1,5 @@
 'use client';
+import { RecruitmentHelp } from './recruitment-help';
 import { recruitmentContext } from '@/lib/marketing-context';
 import { useEffect, useRef, useState } from 'react';
 import { EMPTY_RECRUITMENT_ROOMS, recruitmentPeriod, recruitmentRooms, type RecruitmentRooms } from '@/lib/recruitment-rooms';
@@ -63,8 +64,8 @@ export function RecruitmentRoomSettings({courses,cohorts,expanded=false,initialP
       setMessage((e as Error).message);
     } finally { if (active.current) setPending(false); }
   };
-  return <AdminSection title="모집별 카톡방 설정" description="같은 방을 유지해도 모집 구분은 따로 관리합니다." bordered>
-    <p>오가닉은 누적 운영합니다. 광고 방은 모집마다 새 방 또는 기존 방 재사용을 선택할 수 있으며, 미정으로 저장해도 됩니다.</p>
+  return <AdminSection className="recruitment-guidance" title="모집별 카톡방 설정" description="같은 방을 유지해도 모집 구분은 따로 관리합니다." bordered>
+    <RecruitmentHelp title="카톡방 운영 방법"><p>오가닉은 누적 운영합니다.</p><p>광고 방은 모집마다 새 방 또는 기존 방 재사용을 선택할 수 있으며, 미정으로 저장해도 됩니다.</p></RecruitmentHelp>
     <AdminInput label="모집 구분 코드" value={period} disabled={pending} onChange={e => { setPeriod(e.target.value); setVersion(null); setSettings(EMPTY_RECRUITMENT_ROOMS); setMessage('모집 구분을 바꿨습니다. 먼저 불러오기를 눌러 주세요.'); }} helper="예: moonshot-4. 다음 모집은 새 코드를 쓰고 같은 방 주소를 다시 연결할 수 있습니다. 무료 교육 기수와는 별개입니다." />
     <AdminButton disabled={pending} onClick={() => void load()}>모집 방 설정 불러오기</AdminButton>
     <fieldset className="funnel-selection" disabled={pending || version === null}>
