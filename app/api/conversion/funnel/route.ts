@@ -3,7 +3,7 @@ import { getOperatorUser } from '@/lib/operator-permissions';
 import { conversionCapabilities, conversionDatabaseError, conversionError, conversionId } from '@/lib/conversion-review-server';
 
 const reply = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
-const projection = 'version,free_course_id,free_cohort_id,paid_course_id,paid_cohort_id,created_at';
+const projection = 'flow_version,version,free_course_id,free_cohort_id,paid_course_id,paid_cohort_id,created_at';
 async function operator() {
   if (!conversionCapabilities(process.env).enabled) conversionError('전환 관리 기능이 활성화되지 않았습니다.', 404);
   const user = await getOperatorUser('marketing');
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     if (!body || typeof body !== 'object' || Array.isArray(body)) conversionError('요청 형식을 확인해 주세요.');
     if (!Number.isSafeInteger(body.expected_version) || Number(body.expected_version) < 0) conversionError('최신 버전을 다시 불러와 주세요.', 409);
     const args = { p_actor: user.id, p_request: conversionId(body.requestId), p_expected: Number(body.expected_version),
-      p_free_course: conversionId(body.freeCourseId), p_free_cohort: conversionId(body.freeCohortId),
+      p_free_course: conversionId(body.freeCourseId), p_free_cohort: body.freeCohortId == null || body.freeCohortId === '' ? null : conversionId(body.freeCohortId),
       p_paid_course: conversionId(body.paidCourseId), p_paid_cohort: conversionId(body.paidCohortId) };
     if (args.p_free_course === args.p_paid_course) conversionError('무료 교육과 유료 교육은 서로 다른 상품으로 연결해 주세요.');
     const { data, error } = await createAdminClient().rpc('edu_save_recruitment_funnel', args);

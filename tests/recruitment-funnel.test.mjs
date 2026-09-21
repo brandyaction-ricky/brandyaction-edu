@@ -10,7 +10,7 @@ new Function('exports', ts.transpileModule(fs.readFileSync(new URL('../lib/recru
 const { validateFunnelDraft } = exports;
 const courses = [{ id: 'free', title: 'Sample free class' }, { id: 'paid', title: 'Sample paid class' }];
 const cohorts = [{ id: 'session', course_id: 'free', name: 'Session' }, { id: 'cohort', course_id: 'paid', name: 'Cohort' }];
-const draft = { freeCourseId: 'free', freeCohortId: 'session', paidCourseId: 'paid', paidCohortId: 'cohort' };
+const draft = { freeCourseId: 'free', paidCourseId: 'paid', paidCohortId: 'cohort' };
 
 test('a cohort from a different course cannot complete the funnel draft', () => {
   assert.equal(validateFunnelDraft({ ...draft, paidCohortId: 'session' }, courses, cohorts).valid, false);
@@ -22,4 +22,9 @@ test('a removed product or cohort invalidates a previously valid draft', () => {
 });
 test('same product cannot silently stand in for both free and paid offers', () => {
   assert.equal(validateFunnelDraft({ ...draft, paidCourseId: 'free', paidCohortId: 'session' }, courses, cohorts).valid, false);
+});
+
+test('free education needs no cohort while the paid cohort remains required', () => {
+  assert.equal(validateFunnelDraft(draft, courses, cohorts.filter(x => x.course_id === 'paid')).valid, true);
+  assert.equal(validateFunnelDraft({...draft, paidCohortId:''}, courses, cohorts).valid, false);
 });

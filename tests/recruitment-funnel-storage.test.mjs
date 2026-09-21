@@ -15,6 +15,7 @@ before(async () => {
     create table courses(id uuid primary key);
     create table cohorts(id uuid primary key,course_id uuid references courses(id));`);
   await db.exec(fs.readFileSync(new URL('../supabase/migrations/202609210001_recruitment_funnel_draft.sql', import.meta.url), 'utf8'));
+  await db.exec(fs.readFileSync(new URL('../supabase/migrations/202609210002_recruitment_funnel_free_without_cohort.sql', import.meta.url), 'utf8'));
   await db.query("insert into profiles values ($1,'admin','active'),($2,'staff','active')", [admin, staff]);
   await db.query('insert into courses values ($1),($2)', [free, paid]);
   await db.query('insert into cohorts values ($1,$2),($3,$4)', [session, free, cohort, paid]);
@@ -53,4 +54,17 @@ test('default Supabase grants cannot expose or directly mutate funnel revisions'
     assert.equal(result.rows[0].allowed, role === 'service_role');
   }
   assert.equal((await db.query("select relrowsecurity from pg_class where oid='public.edu_recruitment_funnel_revisions'::regclass")).rows[0].relrowsecurity, true);
+});
+
+test('cohort-free revisions preserve legacy history and null-safe request identity', async () => {
+  const request = randomUUID();
+  const row = await save(admin, request, 3, null);
+  assert.equal(row.free_cohort_id, null);
+  assert.equal(row.flow_version, 2);
+  assert.deepEqual(await save(admin, request, 3, null), row);
+  await assert.rejects(save(admin, request, 3, session), /CONVERSION_REQUEST_REUSED/);
+  await assert.rejects(save(admin, randomUUID(), 3, null), /CONVERSION_STALE/);
+  const old = (await db.query('select free_cohort_id,flow_version from edu_recruitment_funnel_revisions where version=1')).rows[0];
+  assert.equal(old.free_cohort_id, session);
+  assert.equal(old.flow_version, 1);
 });

@@ -80,13 +80,13 @@ test('funnel preparation rejects cross-product cohorts and never saves or fabric
   await page.getByRole('button', { name: '새로고침', exact: true }).click();
   await page.getByRole('button', { name: '모집 경로 준비', exact: true }).click();
   await page.getByRole('combobox', { name: '무료 교육 상품', exact: true }).selectOption(courseId);
-  await page.getByRole('combobox', { name: '무료 교육 회차·기수', exact: true }).selectOption(state.snapshot.cohorts[0].id);
   await page.getByRole('combobox', { name: '유료 교육 상품', exact: true }).selectOption('paid');
+  await expect(page.getByRole('combobox', { name: '무료 교육 회차·기수', exact: true })).toHaveCount(0);
   const paidCohort = page.getByRole('combobox', { name: '유료 교육 회차·기수', exact: true });
   await expect(paidCohort.locator('option')).toHaveCount(2);
   await paidCohort.selectOption('paid-cohort');
   await expect(page.getByText('상품·기수 선택 완료 · 무료/유료 판매 조건과 실제 측정 연결은 확인 전입니다.', { exact: true })).toBeVisible();
-  await expect(page.getByText('연결 확인 전', { exact: true })).toHaveCount(6);
+  await expect(page.getByText('연결 확인 전', { exact: true })).toHaveCount(10);
   await page.getByRole('combobox', { name: '유료 교육 상품', exact: true }).selectOption(courseId);
   await expect(paidCohort).toHaveValue('');
   await expect(page.getByText('무료 교육과 유료 교육은 서로 다른 상품으로 연결해 주세요.', { exact: true })).toBeVisible();
@@ -112,6 +112,7 @@ test('authorized funnel draft can be saved and reloaded while stale writes requi
     const body = route.request().postDataJSON();
     expect(body.requestId).toMatch(/^[a-f0-9-]{36}$/);
     expect(body.expected_version).toBe(0);
+    expect(body).not.toHaveProperty('freeCohortId');
     saved = { version: 1, free_course_id: body.freeCourseId, free_cohort_id: body.freeCohortId, paid_course_id: body.paidCourseId, paid_cohort_id: body.paidCohortId };
     writes++;
     return route.fulfill({ json: { draft: saved, measurement: 'unverified' } });
@@ -121,7 +122,6 @@ test('authorized funnel draft can be saved and reloaded while stale writes requi
   await page.getByRole('button', { name: '모집 경로 준비', exact: true }).click();
   await expect(page.getByText('아직 저장된 경로 없음', { exact: true })).toBeVisible();
   await page.getByRole('combobox', { name: '무료 교육 상품', exact: true }).selectOption(courseId);
-  await page.getByRole('combobox', { name: '무료 교육 회차·기수', exact: true }).selectOption(state.snapshot.cohorts[0].id);
   await page.getByRole('combobox', { name: '유료 교육 상품', exact: true }).selectOption('paid');
   await page.getByRole('combobox', { name: '유료 교육 회차·기수', exact: true }).selectOption('paid-cohort');
   await page.getByRole('button', { name: '모집 경로 초안 저장', exact: true }).click();
@@ -136,7 +136,7 @@ test('authorized funnel draft can be saved and reloaded while stale writes requi
   await expect(page.getByRole('button', { name: '모집 경로 초안 저장', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: '저장된 경로 다시 불러오기', exact: true }).click();
   await expect(page.getByRole('button', { name: '모집 경로 초안 저장', exact: true })).toBeEnabled();
-  await expect(page.getByText('연결 확인 전', { exact: true })).toHaveCount(6);
+  await expect(page.getByText('연결 확인 전', { exact: true })).toHaveCount(10);
 });
 
 test('manual inquiry can be entered and saved without inventing a customer identity', async ({ page }) => {
