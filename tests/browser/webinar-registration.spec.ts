@@ -1,7 +1,7 @@
 import {test,expect} from '@playwright/test';
 test.beforeEach(async({page})=>{
  await page.route('**/api/webinar/attendance**',route=>route.fulfill({json:{sessions:[]}}));
- await page.route('**/api/conversion/webinar-attendance**',route=>route.fulfill({json:{sessions:[],unique:0,both:0}}));
+ await page.route('**/api/conversion/broadcast**',route=>route.fulfill({json:{sessions:[],offerReady:false,counts:[]}}));
 });
 test('cohortless application requires explicit agreement, displays success and reloads without duplicate submit',async({page})=>{
  let registered=false,writes=0;
@@ -29,30 +29,32 @@ test('missing paid mapping remains unknown while free-only campaign saves and ge
  await expect(page.getByText('신청 0건 · 웨비나 실제 참여: 미확인',{exact:true})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
 });
-test('registered member explicitly checks first live once; YouTube open is not attendance and encore stays closed',async({page})=>{
- let checked=false,writes=0;
+test('registered member has no separate attendance action or attendance request',async({page})=>{
+ let attendanceRequests=0;
  await page.route(/\/api\/webinar(?:\?|$)/,route=>route.fulfill({json:{authenticated:true,revision:1,policy:'2026-08-11',registered:true}}));
- await page.route('**/api/webinar/attendance**',async route=>{
-  if(route.request().method()==='POST'){expect(route.request().postDataJSON().phase).toBe('first');checked=true;writes++;}
-  return route.fulfill({json:{sessions:[{phase:'first',url:'https://www.youtube.com/watch?v=abcdefghijk',open:true,revision:2,checked},{phase:'encore',url:null,open:false,revision:1,checked:false}]}});
- });
- await page.goto('/webinar-test');await expect(page.getByRole('button',{name:'첫 웨비나 출석 확인',exact:true})).toBeVisible();expect(writes).toBe(0);
- await expect(page.getByRole('link',{name:'첫 웨비나 YouTube 열기'})).toHaveAttribute('href','https://www.youtube.com/watch?v=abcdefghijk');
- await expect(page.getByRole('button',{name:'앵콜 라이브 출석 확인',exact:true})).toHaveCount(0);
- await page.getByRole('button',{name:'첫 웨비나 출석 확인',exact:true}).click();await expect(page.getByText('첫 웨비나 출석 확인 완료',{exact:true})).toBeVisible();
- await page.reload();await expect(page.getByText('첫 웨비나 출석 확인 완료',{exact:true})).toBeVisible();expect(writes).toBe(1);
- expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+ await page.route('**/api/webinar/attendance**',route=>{attendanceRequests++;return route.fulfill({json:{sessions:[]}});});
+ await page.goto('/webinar-test');
+ await expect(page.getByRole('heading',{name:'신청이 완료되었습니다.'})).toBeVisible();
+ await expect(page.getByRole('button',{name:/출석/})).toHaveCount(0);
+ expect(attendanceRequests).toBe(0);
 });
-test('admin saves phase settings and closes attendance while retaining counts',async({page})=>{
- const code='33333333-3333-4333-8333-333333333333';let session={phase:'first',url:'https://www.youtube.com/watch?v=abcdefghijk',open:true,revision:1,count:1};let writes=0;
+test('admin saves broadcast link without enabling unmapped paid offer',async({page})=>{
+ const code='33333333-3333-4333-8333-333333333333';
+ let session={phase:'first',url:null as string|null,enabled:false,offerEnabled:false,revision:1};let writes=0;
  await page.route(/\/api\/conversion\/webinar(?:\?|$)/,route=>route.fulfill({json:{campaign:{id:code,freeCourse:'22222222-2222-4222-8222-222222222222',paidCohort:null,enabled:true,revision:1},registrations:1,purchases:null,purchase_state:'unmapped'}}));
- await page.route('**/api/conversion/webinar-attendance**',async route=>{
-  if(route.request().method()==='POST'){const body=route.request().postDataJSON();expect(body.phase).toBe('first');expect(body.expected).toBe(1);session={...session,open:body.open,revision:2};writes++;}
-  return route.fulfill({json:{sessions:[session],unique:1,both:0}});
+ await page.route('**/api/conversion/broadcast**',async route=>{
+  if(route.request().method()==='POST'){const body=route.request().postDataJSON();expect(body.phase).toBe('first');expect(body.expected).toBe(1);expect(body.offerEnabled).toBe(false);session={...session,url:body.url,enabled:body.enabled,revision:2};writes++;}
+  return route.fulfill({json:{sessions:[session],offerReady:false,counts:[]}});
  });
- await page.goto('/webinar-admin-test');await expect(page.getByLabel('첫 웨비나 YouTube 주소',{exact:true})).toHaveAttribute('readonly','');
- await page.getByRole('checkbox',{name:'첫 웨비나 출석 접수 열기',exact:true}).uncheck();await page.getByRole('button',{name:'첫 웨비나 설정 저장',exact:true}).click();
- await expect(page.getByText('저장 상태: 접수 닫힘 · 버전 2 · 본인 출석 확인 1명',{exact:true})).toBeVisible();expect(writes).toBe(1);
- await expect(page.getByText('미설정 · 출석 확인 집계 전',{exact:true})).toBeVisible();
+ await page.goto('/webinar-admin-test');
+ await expect(page.getByRole('checkbox',{name:'첫 웨비나 유료 교육 안내 링크 활성화',exact:true})).toBeDisabled();
+ await page.getByLabel('첫 웨비나 YouTube 주소',{exact:true}).fill('https://www.youtube.com/watch?v=abcdefghijk');
+ await page.getByRole('checkbox',{name:'첫 웨비나 방송 이동 링크 활성화',exact:true}).check();
+ await page.getByRole('button',{name:'첫 웨비나 링크 설정 저장',exact:true}).click();
+ await expect(page.getByText('저장 버전 2 · 방송 링크 활성 · 교육 안내 링크 중지',{exact:true})).toBeVisible();expect(writes).toBe(1);
+ await expect(page.getByLabel('첫 웨비나 광고방 방송 링크',{exact:true})).toHaveValue(new RegExp('/go/'+code+'/first/paid/live$'));
+ await expect(page.getByLabel('첫 웨비나 오가닉방 방송 링크',{exact:true})).toHaveValue(/first\/organic\/live$/);
+ await expect(page.getByLabel('첫 웨비나 공통 방송 링크',{exact:true})).toHaveValue(/first\/unknown\/live$/);
+ await expect(page.getByLabel('첫 웨비나 광고방 교육 안내 링크',{exact:true})).toHaveCount(0);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
 });

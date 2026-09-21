@@ -1,7 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { WebinarAttendance } from './webinar-attendance';
 type State={revision:number;registered:boolean;authenticated:boolean;policy:string};
 export function WebinarRegistration({code,channel}:{code:string;channel:string}) {
  const [data,setData]=useState<State|null>(null),[message,setMessage]=useState(''),[agreed,setAgreed]=useState(false),[pending,setPending]=useState(false);
@@ -31,7 +30,6 @@ export function WebinarRegistration({code,channel}:{code:string;channel:string})
    <p>마케팅 수신 동의는 변경하지 않습니다.</p>
    <button type="submit" disabled={!agreed||pending} style={{padding:'16px 24px',borderRadius:12,background:agreed?'#e22400':'#777',color:'white',border:0,fontSize:17}}>{pending?'신청 중…':'무료 웨비나 신청하기'}</button>
   </form>}
-  {data?.registered&&<WebinarAttendance key={code} code={code}/>}
   {message&&<p role="alert">{message} 페이지를 새로고침한 뒤 다시 확인해 주세요.</p>}
  </main>;
 }

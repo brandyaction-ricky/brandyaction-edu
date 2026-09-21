@@ -8,6 +8,7 @@ async function handle(request:Request,write:boolean) {
  try {
   if(!conversionCapabilities(process.env).enabled) conversionError('기능이 활성화되지 않았습니다.',404);
   if(write&&request.headers.get('origin')!==new URL(request.url).origin) conversionError('요청 출처를 확인해 주세요.',403);
+  if(write) conversionError('출석 접수 대신 방송·교육 안내 링크 설정을 사용해 주세요.',410);
   const actor=await getOperatorUser('marketing');
   if(!actor?.permissions.products) conversionError('마케팅·상품 권한이 필요합니다.',403);
   let body; let settings=null;
