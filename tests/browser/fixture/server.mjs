@@ -9,7 +9,7 @@ const campaign = {id:'bbbbbbbb-bbbb-4000-8000-000000000002',landing_id:'aaaaaaaa
 const actual = {campaign_id:campaign.id,day:relativeDay(-1),kakao_members:10,new_payments:0,existing_payments:0,memo:null,new_price_snapshot:1000,existing_price_snapshot:500};
 const summary = {has_data:false,sessions:0,visitors:0,cta_click_sessions:0,cta_clicks:0,converted_visitors:0,avg_dwell_ms:0,avg_scroll_depth:0,meta_impressions:0,meta_link_clicks:0,spend:0};
 const report = {campaign,summary_b:summary,summary_a:null,performance:[],daily:[],actuals:[actual],campaign_summary:{live_peak:null,kakao_members:10,kakao_delta:null,new_payments:0,existing_payments:0,revenue:0,spend:0,roas:null},options:{campaigns:[],ad_types:[],adsets:[],creatives:[],devices:[],layouts:[]},data_state:{sessions_exist:false,filtered_sessions_exist:false,meta_exists:false}};
-const result = await build({entryPoints:['tests/browser/fixture/app.tsx'],bundle:true,write:false,outdir:'focus-fixture',platform:'browser',format:'esm',jsx:'automatic',define:{'process.env.NODE_ENV':'"development"'},alias:{'next/link':resolve('tests/browser/fixture/link.tsx')}});
+const result = await build({entryPoints:['tests/browser/fixture/app.tsx'],bundle:true,write:false,outdir:'focus-fixture',platform:'browser',format:'esm',jsx:'automatic',define:{'process.env.NODE_ENV':'"development"'},alias:{'next/link':resolve('tests/browser/fixture/link.tsx'),'next/navigation':resolve('tests/browser/fixture/navigation.ts')}});
 const assets = new Map(result.outputFiles.map(file=>['/'+file.path.split('/').at(-1),file.contents]));
 const server = createServer((request,response)=>{
   const url=new URL(request.url,'http://localhost');

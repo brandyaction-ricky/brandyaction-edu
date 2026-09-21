@@ -1,5 +1,6 @@
 "use client";
 import dynamic from "next/dynamic";
+import { FollowupTemplateSource } from "./followup-template-source";
 const LandingAdmin = dynamic(() => import("./landing/admin").then(m => m.LandingAdmin));
 const KakaoSyncSettings = dynamic(() => import("./kakao-sync-settings").then(m => m.KakaoSyncSettings));
 import { type QuizDefinition, type QuizQuestion } from "@/lib/mission-quiz";
@@ -271,6 +272,8 @@ function CrmManager({ section, data, send, pending }: Props) {
   const tags = rows(data, "crm_tags");
   const courses = rows(data, "courses");
   const [editing, setEditing] = useState<Row | null>(null);
+  const [dirty, setDirty] = useState(false);
+  const [formVersion, setFormVersion] = useState(0);
   const [message, setMessage] = useState("");
   const title =
     section === "templates"
@@ -287,13 +290,13 @@ function CrmManager({ section, data, send, pending }: Props) {
           {
             action: "crm-save",
             kind: "template",
-            id: editing?.id,
+            id: editing?.id || undefined,
             name: form.get("name"),
             channel: form.get("channel"),
-            purpose: form.get("purpose"),
+            purpose: editing?._followupKey ? "marketing" : form.get("purpose"),
             content: form.get("content"),
             alimtalkTemplateId: form.get("alimtalk_template_id"),
-            isActive: form.get("is_active") === "on",
+            isActive: editing?._followupKey ? false : form.get("is_active") === "on",
           },
           "템플릿을 저장했습니다.",
         );
@@ -302,7 +305,7 @@ function CrmManager({ section, data, send, pending }: Props) {
           {
             action: "crm-save",
             kind: "campaign",
-            id: editing?.id,
+            id: editing?.id || undefined,
             name: form.get("name"),
             templateId: form.get("template_id"),
             tagId: form.get("target_tag_id"),
@@ -317,7 +320,7 @@ function CrmManager({ section, data, send, pending }: Props) {
           {
             action: "crm-save",
             kind: "automation",
-            id: editing?.id,
+            id: editing?.id || undefined,
             name: form.get("name"),
             templateId: form.get("template_id"),
             triggerType: form.get("trigger_type"),
@@ -330,6 +333,8 @@ function CrmManager({ section, data, send, pending }: Props) {
         );
       }
       setEditing(null);
+      setDirty(false);
+      setFormVersion(value=>value+1);
       setMessage(
         section === "campaigns"
           ? "예약을 저장했습니다. 발송 기능이 활성화된 환경에서 예약 실행됩니다."
@@ -342,13 +347,14 @@ function CrmManager({ section, data, send, pending }: Props) {
   const selectedTemplate = templates.find(
     (item) => item.id === editing?.template_id,
   );
-  const formKey = `${section}-${editing?.id || "new"}`;
+  const formKey = `${section}-${editing?.id || editing?._followupKey || "new"}-${formVersion}`;
   return (
     <>
-      <form key={formKey} className="panel pad mb24" onSubmit={submit}>
+      {section === "templates" && <FollowupTemplateSource blocked={pending || dirty || !!editing} onApply={value => { setEditing(value); setMessage(""); }}/>}
+      <form key={formKey} className="panel pad mb24" onChange={()=>setDirty(true)} onSubmit={submit}>
         <div className="between">
           <h2>
-            {title} {editing ? "수정" : "등록"}
+            {title} {editing?.id ? "수정" : "등록"}
           </h2>
           <span className={`badge ${delivery?.enabled ? "green" : ""}`}>
             {delivery?.enabled
@@ -357,12 +363,14 @@ function CrmManager({ section, data, send, pending }: Props) {
                 ? "발송 안전 정지"
                 : "SOLAPI 연결 필요"}
           </span>
-          {editing && (
+          {(editing || dirty) && (
             <button
               type="button"
               className="btn small"
               onClick={() => {
                 setEditing(null);
+                setDirty(false);
+                setFormVersion(value=>value+1);
                 setMessage("");
               }}
             >
@@ -394,6 +402,7 @@ function CrmManager({ section, data, send, pending }: Props) {
               <Field label="메시지 목적">
                 <select
                   name="purpose"
+                  disabled={!!editing?._followupKey}
                   defaultValue={
                     t(editing || undefined, "purpose") || "marketing"
                   }
@@ -423,10 +432,11 @@ function CrmManager({ section, data, send, pending }: Props) {
             <label className="checkline">
               <input
                 name="is_active"
+                disabled={!!editing?._followupKey}
                 type="checkbox"
                 defaultChecked={editing ? Boolean(editing.is_active) : true}
               />
-              사용 가능한 템플릿
+              {editing?._followupKey ? "준비용 템플릿은 사용 중지 상태로 저장됩니다" : "사용 가능한 템플릿"}
             </label>
           </>
         ) : section === "campaigns" ? (
@@ -563,7 +573,9 @@ function CrmManager({ section, data, send, pending }: Props) {
           </>
         )}
         <p className="meta mt16">
-          {section === "campaigns"
+          {editing?._followupKey
+            ? "불러온 원본의 사본입니다. 사용 중지 상태로 저장되며 발송 대상·예약은 생성되지 않습니다."
+            : section === "campaigns"
             ? "마케팅 템플릿은 수신 동의·활성 상태·정상 연락처를 모두 만족하는 회원에게만 발송되며, 캠페인 1회 대상은 최대 500명입니다."
             : selectedTemplate?.purpose === "marketing"
               ? "마케팅 수신 동의가 없는 회원은 자동 제외됩니다."
@@ -596,6 +608,7 @@ function CrmManager({ section, data, send, pending }: Props) {
                 }
                 onClick={() => {
                   setEditing(item);
+                  setDirty(false);
                   setMessage("");
                 }}
               >
