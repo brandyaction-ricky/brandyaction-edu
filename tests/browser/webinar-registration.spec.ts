@@ -1,5 +1,6 @@
 import {test,expect} from '@playwright/test';
 test.beforeEach(async({page})=>{
+ await page.route('**/api/conversion/marketing**',route=>route.fulfill({json:{revision:0,freeCourse:'22222222-2222-4222-8222-222222222222',webinarRevision:4,candidates:[],selected:[]}}));
  await page.route('**/api/conversion/followup**',route=>route.fulfill({json:{drafts:[],audienceState:'unmapped',counts:null,asOf:'2026-09-21T00:00:00Z'}}));
  await page.route('**/api/webinar/attendance**',route=>route.fulfill({json:{sessions:[]}}));
  await page.route('**/api/conversion/broadcast**',route=>route.fulfill({json:{sessions:[],offerReady:false,counts:[]}}));
@@ -108,5 +109,34 @@ test('workspace separates setup, results and followup without losing an unsaved 
  await page.getByRole('button',{name:'4. 후속 안내',exact:true}).click();
  await expect(page.getByRole('textbox',{name:'카톡방 공지 초안',exact:true})).toHaveValue('아직 저장하지 않은 합성 초안');
  expect(writes).toBe(0);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+});
+
+test('recruitment campaign selection is explicit, persists and clears stale links on conflict',async({page})=>{
+ const free='22222222-2222-4222-8222-222222222222',id='44444444-4444-4444-8444-444444444444';
+ const item={id,name:'합성 광고 캠페인',start:'2026-09-01',end:'2026-09-30',usesAds:true,available:true,valid:true};
+ let selected:typeof item[]=[],revision=0,writes=0,conflict=false;
+ await page.route(/\/api\/conversion\/webinar(?:\?|$)/,route=>route.fulfill({json:{campaign:{id:'33333333-3333-4333-8333-333333333333',freeCourse:free,paidCohort:null,enabled:true,revision:4},registrations:1,purchases:null,purchase_state:'unmapped'}}));
+ await page.route('**/api/conversion/marketing**',route=>{
+  if(route.request().method()==='POST'){
+   if(conflict)return route.fulfill({status:409,json:{error:'다른 운영자가 연결을 변경했습니다.'}});
+   const b=route.request().postDataJSON();expect(b.expected).toBe(revision);expect(b.webinarRevision).toBe(4);expect(b.freeCourse).toBe(free);
+   selected=b.campaignIds.length?[item]:[];revision++;writes++;
+  }
+  return route.fulfill({json:{revision,freeCourse:free,webinarRevision:4,candidates:[item],selected}});
+ });
+ await page.goto('/webinar-admin-test?workspace=1');
+ await expect(page.getByRole('checkbox',{name:/합성 광고 캠페인/})).not.toBeChecked();expect(writes).toBe(0);
+ await page.getByRole('checkbox',{name:/합성 광고 캠페인/}).check();
+ await page.getByRole('button',{name:'2. 신청·구매 현황',exact:true}).click();
+ await expect(page.getByRole('link',{name:'합성 광고 캠페인 성과 보기'})).toHaveCount(0);
+ await page.getByRole('button',{name:'1. 신청·상품 연결',exact:true}).click();
+ await page.getByRole('button',{name:'모집 캠페인 연결 저장',exact:true}).click();
+ await expect(page.getByRole('link',{name:'합성 광고 캠페인 성과 보기'})).toHaveAttribute('href',`/admin/landing?recruitment=sample&course=${free}&campaign=${id}&preset=7d`);
+ await page.reload();await expect(page.getByRole('checkbox',{name:/합성 광고 캠페인/})).toBeChecked();expect(writes).toBe(1);
+ conflict=true;await page.getByRole('button',{name:'모집 캠페인 연결 저장',exact:true}).click();
+ await expect(page.getByText('다른 운영자가 연결을 변경했습니다.',{exact:true})).toBeVisible();
+ await expect(page.getByRole('link',{name:'합성 광고 캠페인 성과 보기'})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'모집 캠페인 연결 저장',exact:true})).toBeDisabled();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
 });

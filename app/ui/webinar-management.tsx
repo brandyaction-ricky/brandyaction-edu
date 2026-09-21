@@ -1,5 +1,6 @@
 'use client';
 import { marketingContextHref } from '@/lib/marketing-context';
+import { RecruitmentCampaignLinks } from './recruitment-campaign-links';
 import { useEffect, useRef, useState } from 'react';
 import { WebinarFollowup } from './webinar-followup';
 import { WebinarBroadcastManagement } from './webinar-broadcast-management';
@@ -40,6 +41,7 @@ export function WebinarManagement({period,courses,cohorts,workspace=false}:{peri
   <AdminButton disabled={pending||!report||!free} onClick={()=>void save()}>웨비나 신청 설정 저장</AdminButton>
   </div>
   <AdminButton disabled={pending} onClick={()=>{setPending(true);setReport(null);setMessage('');setRefresh(n=>n+1);}}>신청·구매 기록 새로고침</AdminButton>
+  {workspace&&report?.campaign&&<RecruitmentCampaignLinks key={period+':'+report.campaign.revision} period={period} view={view}/>}
   {report?.campaign&&<>
    <div hidden={workspace&&view!=='settings'}>
    <p>신청 링크: {report.campaign.enabled?'활성':'중지'} · 설정 버전 {report.campaign.revision}</p>
