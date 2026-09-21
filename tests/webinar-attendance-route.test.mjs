@@ -12,14 +12,10 @@ test('YouTube live URLs are normalized and reject other hosts, credentials, sche
  for(const url of ['http://youtu.be/abcdefghijk','https://youtube.com.evil.test/watch?v=abcdefghijk','https://user@youtube.com/watch?v=abcdefghijk','javascript:alert(1)','https://youtube.com/@channel/live','https://youtu.be/short'])assert.throws(()=>rules.youtubeLiveUrl(url));
  assert.equal(rules.youtubeLiveUrl(''),null);
 });
-test('attendance API uses authenticated identity and explicit POST; admin enforces permission and canonical URL',async()=>{
- const body={code,phase:'first',expected:1,user_id:randomUUID()};const h=harness();
- let response=await h.public.GET(new Request(`https://example.test/api/webinar/attendance?code=${code}`));assert.equal(response.status,200);assert.equal(h.calls[0].args.p_phase,null);assert.equal(response.headers.get('cache-control'),'private, no-store');
- response=await h.public.POST(req(body));assert.equal(response.status,200);assert.equal(h.calls[1].args.p_user,user);assert.equal(h.calls[1].args.p_phase,'first');
- assert.equal((await h.public.POST(req(body,'https://evil.test'))).status,403);assert.equal((await h.public.POST(req({...body,phase:'other'}))).status,400);assert.equal(h.calls.length,2);
- assert.equal((await harness({authenticated:false}).public.POST(req(body))).status,401);assert.equal((await harness({enabled:false}).public.POST(req(body))).status,404);
- assert.equal((await harness({error:{message:'ATTENDANCE_CLOSED'}}).public.POST(req(body))).status,409);
- const settings={...body,expected:0,url:'https://youtu.be/abcdefghijk?si=x',open:true,actor:randomUUID()};assert.equal((await h.admin.POST(req(settings))).status,200);assert.equal(h.calls[2].args.p_actor,user);assert.equal(h.calls[2].args.p_settings.url,'https://www.youtube.com/watch?v=abcdefghijk');
- const denied=harness({allowed:false});assert.equal((await denied.admin.POST(req(settings))).status,403);assert.equal(denied.calls.length,0);
- assert.equal((await h.admin.POST(req({...settings,url:null}))).status,400);
+test('legacy attendance remains readable but new checkins and settings writes are retired',async()=>{
+ const h=harness();const response=await h.public.GET(new Request(`https://example.test/api/webinar/attendance?code=${code}`));assert.equal(response.status,200);assert.equal(h.calls[0].args.p_phase,null);
+ assert.equal((await h.public.POST(req({code,phase:'first',expected:1}))).status,410);
+ assert.equal((await h.admin.POST(req({code,phase:'first',expected:0,url:null,open:false}))).status,410);
+ assert.equal(h.calls.length,1);
+ assert.equal((await harness({authenticated:false}).public.GET(new Request(`https://example.test/api/webinar/attendance?code=${code}`))).status,401);
 });

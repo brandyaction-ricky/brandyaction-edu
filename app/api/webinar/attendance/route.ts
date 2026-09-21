@@ -22,4 +22,4 @@ async function handle(request:Request,write:boolean){
  }catch(e){const status=Number((e as {status?:number})?.status||503);return reply({error:status===503?'출석 정보를 확인하지 못했습니다.':(e as Error).message},status);}
 }
 export const GET=(request:Request)=>handle(request,false);
-export const POST=(request:Request)=>handle(request,true);
+export const POST=()=>reply({error:'별도 출석 체크는 더 이상 사용하지 않습니다. 카톡방의 방송 안내 링크를 이용해 주세요.'},410);
