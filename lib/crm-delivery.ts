@@ -89,7 +89,7 @@ function message(
 async function sendBatch(
   template: Template,
   members: Member[],
-  context: { campaignId?: string; automationRuns?: Record<string, string> },
+  context: { campaignId?: string; recruitment?: boolean; automationRuns?: Record<string, string> },
 ) {
   const active = provider();
   if (!active) return { sent: 0, failed: 0, disabled: true };
@@ -121,7 +121,7 @@ async function sendBatch(
     );
     const groupId = response.groupInfo.groupId;
     const ids = inserted.data.map((log) => log.id);
-    await db
+    const accepted = await db
       .from("crm_message_logs")
       .update({
         status: "accepted",
@@ -130,6 +130,7 @@ async function sendBatch(
         sent_at: new Date().toISOString(),
       })
       .in("id", ids);
+    if (accepted.error && context.recruitment) throw new Error("발송 접수 기록을 확인하지 못했습니다.");
     const failedPhones = new Set(
       response.failedMessageList.map((item) => digits(item.to)),
     );
@@ -156,22 +157,22 @@ async function sendBatch(
       disabled: false,
     };
   } catch (error) {
-    const reason =
+    const reason = context.recruitment ? "메시지 사업자 접수 결과를 확인할 수 없습니다. 자동 재발송하지 않습니다." :
       error instanceof Error
         ? error.message.slice(0, 500)
         : "메시지 사업자 요청 실패";
     await db
       .from("crm_message_logs")
       .update({
-        status: "failed",
-        provider_status: "failed",
+        status: context.recruitment ? "unknown" : "failed",
+        provider_status: context.recruitment ? "unknown" : "failed",
         error_message: reason,
       })
       .in(
         "id",
         inserted.data.map((log) => log.id),
       );
-    throw error;
+    throw context.recruitment ? new Error(reason) : error;
   }
 }
 
@@ -203,37 +204,50 @@ export async function dispatchDueCrm() {
       .maybeSingle();
     if (locked.data) {
       try {
-        let ids: string[] | null = null;
-        if (campaign.target_tag_id) {
-          const tagged = await db
-            .from("crm_member_tags")
-            .select("member_id")
-            .eq("tag_id", campaign.target_tag_id)
+        let selectedMembers: Member[];
+        let selectedTemplate = campaign.template as Template;
+        if (campaign.recruitment_id) {
+          if (process.env.EDU_CONVERSION_REVIEW_ENABLED !== "true") throw new Error("모집 운영 기능이 중지되어 발송을 보류했습니다.");
+          // Validate provider message configuration before making durable recipient claims.
+          message(selectedTemplate, {id: "preflight",phone:"01000000000"}, provider()!.sender);
+          // No fallback to tags/all members. SQL rechecks consent, orders and durable claims.
+          const claim = await db.rpc('edu_claim_recruitment_delivery', { p_campaign: campaign.id });
+          if (claim.error) throw new Error('모집 안내 발송 전 검토가 중단됐습니다. 모집·문구·권한을 다시 확인해 주세요.');
+          if (!claim.data || !Array.isArray(claim.data.members) || !claim.data.template)
+            throw new Error('모집 안내 대상 응답을 확인하지 못했습니다.');
+          selectedMembers = claim.data.members;
+          selectedTemplate = claim.data.template;
+        } else {
+          let ids: string[] | null = null;
+          if (campaign.target_tag_id) {
+            const tagged = await db
+              .from("crm_member_tags")
+              .select("member_id")
+              .eq("tag_id", campaign.target_tag_id)
+              .limit(501);
+            if (tagged.error) throw tagged.error;
+            if (tagged.data.length > 500)
+              throw new Error("캠페인 대상이 500명을 초과했습니다. 대상을 나눠 예약해 주세요.");
+            ids = tagged.data.map((row) => row.member_id);
+          }
+          let memberQuery = db
+            .from("profiles")
+            .select("id,phone,full_name,email,marketing_consent,status")
+            .eq("status", "active")
             .limit(501);
-          if (tagged.error) throw tagged.error;
-          if (tagged.data.length > 500)
+          if (ids)
+            memberQuery = memberQuery.in(
+              "id",
+              ids.length ? ids : ["00000000-0000-0000-0000-000000000000"],
+            );
+          const memberResult = await memberQuery;
+          if (memberResult.error) throw memberResult.error;
+          if (memberResult.data.length > 500)
             throw new Error("캠페인 대상이 500명을 초과했습니다. 대상을 나눠 예약해 주세요.");
-          ids = tagged.data.map((row) => row.member_id);
+          selectedMembers = memberResult.data;
         }
-        let memberQuery = db
-          .from("profiles")
-          .select("id,phone,full_name,email,marketing_consent,status")
-          .eq("status", "active")
-          .limit(501);
-        if (ids)
-          memberQuery = memberQuery.in(
-            "id",
-            ids.length ? ids : ["00000000-0000-0000-0000-000000000000"],
-          );
-        const memberResult = await memberQuery;
-        if (memberResult.error) throw memberResult.error;
-        if (memberResult.data.length > 500)
-          throw new Error("캠페인 대상이 500명을 초과했습니다. 대상을 나눠 예약해 주세요.");
-        const result = await sendBatch(
-          campaign.template as Template,
-          memberResult.data,
-          { campaignId: campaign.id },
-        );
+        const result = await sendBatch(selectedTemplate, selectedMembers, { campaignId: campaign.id, recruitment: !!campaign.recruitment_id });
+        if (result.disabled) throw new Error("발송 설정이 중지됐습니다. 자동 재발송하지 않습니다.");
         sent += result.sent;
         failed += result.failed;
         campaigns += 1;
@@ -242,7 +256,7 @@ export async function dispatchDueCrm() {
           .update({
             status: "completed",
             sent_at: new Date().toISOString(),
-            recipient_count: memberResult.data.length,
+            recipient_count: selectedMembers.length,
             success_count: result.sent,
             failure_count: result.failed,
             provider_group_id: result.groupId || null,
