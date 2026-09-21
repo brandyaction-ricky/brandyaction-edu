@@ -106,6 +106,6 @@ export function RecruitmentFunnel({ courses, cohorts, canSave = false }: { cours
         <strong>{step.label}</strong><span className="conversion-tag">연결 확인 전</span><p>{step.evidence}</p>
       </li>)}
     </ol>
-    <p className="conversion-muted">모집 링크의 이동 버튼 클릭은 카톡방 관리에서 확인합니다. 상품별 신청·참여·구매 실적은 아직 집계하지 않습니다. 신청과 참여를 구분하고, 연결되지 않은 단계는 0명으로 표시하지 않습니다. 기존 수집 기능의 존재만으로 이 경로의 측정 완료를 판단하지 않습니다.</p>
+    <p className="conversion-muted">모집 링크의 이동 버튼 클릭은 카톡방 관리에서 확인합니다. 무료 신청과 연결한 유료 기수의 신청 이후 구매는 ‘무료 신청·구매 연결’에서 확인합니다. 실제 웨비나 참여와 1차·앵콜 전환 구분은 아직 연결하지 않았습니다. 연결되지 않은 단계는 0명으로 표시하지 않습니다.</p>
   </AdminSection>;
 }
