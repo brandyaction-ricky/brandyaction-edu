@@ -1,11 +1,14 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { EMPTY_RECRUITMENT_ROOMS, recruitmentPeriod, recruitmentRooms, type RecruitmentRooms } from '@/lib/recruitment-rooms';
+import { WebinarManagement } from './webinar-management';
+import type { FunnelCourse, FunnelCohort } from '@/lib/recruitment-funnel';
 import { RecruitmentLinks } from './recruitment-links';
 import { createMutationGate } from '@/lib/mutation-gate';
 import { AdminButton, AdminInput, AdminSection, AdminSelect } from './final/admin-system';
 
-export function RecruitmentRoomSettings() {
+export function RecruitmentRoomSettings({courses,cohorts}:{courses:FunnelCourse[];cohorts:FunnelCohort[]}) {
+  const [showWebinar,setShowWebinar]=useState(false);
   const [period, setPeriod] = useState('moonshot-4');
   const [settings, setSettings] = useState<RecruitmentRooms>(EMPTY_RECRUITMENT_ROOMS);
   const [version, setVersion] = useState<number | null>(null);
@@ -68,6 +71,7 @@ export function RecruitmentRoomSettings() {
     {version !== null && <p>방 설정 버전 {version} · {period}</p>}
     {message && <p role="status">{message}</p>}
     {version !== null && version > 0 && <RecruitmentLinks key={`${period}:${version}`} period={period} version={version} />}
+    {version !== null && version > 0 && <><AdminButton onClick={()=>setShowWebinar(v=>!v)}>{showWebinar?'무료 신청 관리 닫기':'무료 신청·구매 연결 열기'}</AdminButton>{showWebinar&&<WebinarManagement key={period} period={period} courses={courses} cohorts={cohorts}/>}</>}
     <p className="conversion-muted">다음 모집에 방을 바꿔도 이전 모집 주소와 저장 이력은 유지됩니다. 월별 집계·방 입장 확인은 별도 연결이 필요합니다. 방 운영 방식 선택만으로 카톡방을 생성하거나 폐쇄하지 않습니다.</p>
   </AdminSection>;
 }
