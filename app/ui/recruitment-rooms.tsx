@@ -35,7 +35,7 @@ export function RecruitmentRoomSettings({courses,cohorts,expanded=false,initialP
         if (url.searchParams.get('recruitment') !== key) {
           url.search = '';
           url.searchParams.set('recruitment', key);
-          history.replaceState(history.state, '', url);
+          history.replaceState(null, '', url);
         }
       }
       setVersion(data.draft?.version ?? 0);

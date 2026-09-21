@@ -86,8 +86,8 @@ export function LandingAdmin() {
     else if (url.searchParams.get('tab') === 'settings') url.searchParams.set('tab', 'dashboard');
     if (parseSampleMin(sampleMin) !== null) url.searchParams.set('sample_min', sampleMin);
     if (selectedCampaignIds.length === 1) appendFilters(url.searchParams, filters);
-    // Preserve Next's history state and scroll position. No route-wide refresh.
-    history.replaceState(history.state, '', url);
+    // Next copies its internal history state; passing that state ourselves skips search-param updates.
+    history.replaceState(null, '', url);
   }, [courseId, campaignId, selectedCampaignIds, period, filters, settingsOpen, sampleMin]);
   useEffect(() => {
     if (!dirty) return;
