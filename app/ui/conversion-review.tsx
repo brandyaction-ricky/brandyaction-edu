@@ -26,7 +26,7 @@ async function readResponse(response: Response) {
   return data;
 }
 
-export function ConversionReview({ workspace = false }: { workspace?: boolean }) {
+export function ConversionReview({ workspace = false, initialPeriod }: { workspace?: boolean; initialPeriod?: string }) {
   const [workspaceView, setWorkspaceView] = useState<'recruitment' | 'inquiries'>('recruitment');
   const [snapshot, setSnapshot] = useState<ConversionSnapshot | null>(null);
   const [selectedId, setSelectedId] = useState('');
@@ -118,7 +118,7 @@ export function ConversionReview({ workspace = false }: { workspace?: boolean })
         </div>
         <div hidden={workspaceView !== 'recruitment'}>
           <p className="conversion-muted">모집 코드를 불러오면 카톡방 → 무료 신청·유료 기수 → 구매 현황 → 방송·후속 안내 순서로 확인합니다. 상품 연결은 아래 실제 모집 설정에서 한 번만 관리합니다.</p>
-          {snapshot.capabilities.can_manage_funnel ? <RecruitmentRoomSettings courses={snapshot.courses} cohorts={snapshot.cohorts} expanded /> : <p>모집 설정에는 마케팅·상품 관리 권한이 필요합니다.</p>}
+          {snapshot.capabilities.can_manage_funnel ? <RecruitmentRoomSettings initialPeriod={initialPeriod} courses={snapshot.courses} cohorts={snapshot.cohorts} expanded /> : <p>모집 설정에는 마케팅·상품 관리 권한이 필요합니다.</p>}
         </div>
       </> : <>      <div className="funnel-entry"><AdminButton aria-expanded={showFunnel} aria-controls="recruitment-funnel-preparation" onClick={() => setShowFunnel(value => !value)}>{showFunnel ? '모집 경로 준비 닫기' : '모집 경로 준비'}</AdminButton><span className="conversion-muted">무료 교육부터 유료 구매까지 연결할 경로를 확인합니다.</span></div>
       {showFunnel && <div id="recruitment-funnel-preparation"><RecruitmentFunnel key={String(snapshot.capabilities.can_manage_funnel)} courses={snapshot.courses} cohorts={snapshot.cohorts} canSave={snapshot.capabilities.can_manage_funnel === true} /></div>}

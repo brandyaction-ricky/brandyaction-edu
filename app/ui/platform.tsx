@@ -688,13 +688,13 @@ export function Platform({
         setMobile={setMobile}
         logout={logout}
       >
-        <MarketingWorkspaceNav current={key} available={available} />
+        <MarketingWorkspaceNav current={key} available={available} search={searchParams.toString()} />
         {key === "overview" ? (
           <Overview data={data} available={available} />
         ) : !section ? (
           <Empty title="이 화면에 접근할 운영 권한이 필요합니다." />
         ) : key === "conversion" ? (
-          <ConversionReview workspace />
+          <ConversionReview workspace initialPeriod={searchParams.get("recruitment") || undefined} />
         ) : key === "product-editor" || key === "learning-editor" ? (
           loading && id && !edited ? (
             <p role="status">편집 정보를 불러오고 있습니다.</p>
