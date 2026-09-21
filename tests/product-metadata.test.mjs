@@ -260,3 +260,43 @@ test('published product metadata drives search and sharing titles while an empty
   assert.equal(metadata.title, '상품 이름 | BrandyAction EDU');
   assert.equal(metadata.description, '상품 소개');
 });
+
+
+test('cohortless free webinar saves do not create a phantom cohort; explicit and paid schedules still persist', async () => {
+  for (const scenario of [
+    { category: 'free', existing: false, expected: 0 },
+    { category: 'free', existing: true, expected: 0 },
+    { category: 'free', existing: true, cohortId: '11111111-1111-4111-8111-111111111111', expected: 1 },
+    { category: 'free', existing: true, end: '2099-09-30T09:00:00.000Z', expected: 1 },
+    { category: 'paid_class', existing: true, expected: 1 },
+  ]) {
+    const course = { id: 'course-id', category: scenario.category, metadata: {}, list_price: 0, status: 'draft' };
+    const schedules = [];
+    const db = {
+      async rpc() { return { data: course, error: null }; },
+      from(table) {
+        assert.ok(['courses','cohorts'].includes(table));
+        return {
+          select() { return this; }, eq() { return this; },
+          update(values) { if(table==='cohorts') schedules.push(values); return this; },
+          upsert(values) { schedules.push(values); return this; },
+          async single() { return { data: table==='courses'?course:{id:'cohort-id'},error:null }; },
+        };
+      },
+    };
+    const route = load('app/api/platform/route.ts', {
+      '@/lib/supabase/admin': { createAdminClient: () => db }, '@/lib/supabase/server': {},
+      '@/lib/server-auth': { getAuthenticatedUser: async () => ({ id: 'operator' }) },
+      '@/lib/operator-permissions': { permissionsFor: async () => ({ products: true }), sectionScopes: { products: 'products' } },
+      '@/lib/edu-settings': {}, '@/lib/crm-delivery': {},
+    });
+    const response=await route.POST(new Request('https://edu.example/api/platform',{method:'POST',headers:{origin:'https://edu.example'},body:JSON.stringify({
+      action:'save',section:'products',id:scenario.existing?'course-id':undefined,requestId:'22222222-2222-4222-8222-222222222222',
+      cohortId:scenario.cohortId,recruitmentStartAt:null,recruitmentEndAt:scenario.end||null,
+      values:{title:'합성 무료 웨비나',category:scenario.category,status:'draft'},
+    })}));
+    assert.equal(response.status,200,JSON.stringify(scenario));
+    assert.equal(schedules.length,scenario.expected,JSON.stringify(scenario));
+    if(scenario.cohortId)assert.deepEqual(schedules[0],{recruitment_start_at:null,recruitment_end_at:null});
+  }
+});
