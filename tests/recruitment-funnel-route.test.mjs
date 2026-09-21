@@ -53,3 +53,11 @@ test('bad origin, invalid ids, and stale revision errors cannot become success',
   assert.deepEqual(h.calls,[]);
   assert.equal((await harness({error:{message:'CONVERSION_STALE'}}).POST(request())).status,409);
 });
+
+test('a free product without a cohort reaches the RPC as null', async () => {
+  for (const value of [undefined, null, '']) {
+    const h = harness();
+    assert.equal((await h.POST(request({...input, freeCohortId:value}))).status, 200);
+    assert.equal(h.calls[0].args.p_free_cohort, null);
+  }
+});
