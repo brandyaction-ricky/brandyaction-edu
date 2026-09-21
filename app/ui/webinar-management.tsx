@@ -3,10 +3,11 @@ import { RecruitmentDetails, RecruitmentHelp } from './recruitment-help';
 import { marketingContextHref } from '@/lib/marketing-context';
 import { RecruitmentCampaignLinks } from './recruitment-campaign-links';
 import { useEffect, useRef, useState } from 'react';
+import { RecruitmentCopyLink } from './recruitment-copy-link';
 import { WebinarFollowup } from './webinar-followup';
 import { RecruitmentReadiness } from './recruitment-readiness';
 import { WebinarBroadcastManagement } from './webinar-broadcast-management';
-import { AdminButton, AdminInput, AdminSection, AdminSelect } from './final/admin-system';
+import { AdminButton, AdminSection, AdminSelect } from './final/admin-system';
 import type { FunnelCourse, FunnelCohort } from '@/lib/recruitment-funnel';
 type Campaign={id:string;freeCourse:string;paidCohort:string|null;enabled:boolean;revision:number};
 type Report={campaign:Campaign|null;registrations:number;purchase_state:string;purchases:null|{orders:number;buyers:number;gross:number;refunds:number;net:number;needs_review:number;as_of:string}};
@@ -49,7 +50,7 @@ export function WebinarManagement({period,courses,cohorts,workspace=false}:{peri
   {report?.campaign&&<>
    <div hidden={workspace&&view!=='settings'}>
    <p>신청 링크: {report.campaign.enabled?'활성':'중지'} · 설정 버전 {report.campaign.revision}</p>
-   {(['paid','organic','unknown'] as const).map(channel=><AdminInput key={channel} label={`${channel==='paid'?'광고 방':channel==='organic'?'오가닉 방':'출처 미지정'} 신청 링크`} readOnly value={`${origin}/webinar/${report.campaign!.id}/${channel}`}/>)}
+   {(['paid','organic','unknown'] as const).map(channel=><RecruitmentCopyLink key={channel} label={`${channel==='paid'?'광고 방':channel==='organic'?'오가닉 방':'출처 미지정'} 신청 링크`} value={origin ? `${origin}/webinar/${report.campaign!.id}/${channel}` : ''} blocked={pending ? '설정을 확인하고 있습니다.' : free!==report.campaign!.freeCourse||paid!==(report.campaign!.paidCohort??'')||enabled!==report.campaign!.enabled ? '변경한 신청 설정을 먼저 저장하세요.' : !report.campaign!.enabled ? '신청이 중지되어 있습니다. 활성화 후 복사하세요.' : ''} usage={channel==='paid'?'광고방 공지에 사용하세요.':channel==='organic'?'오가닉방 공지에 사용하세요.':'유입 경로를 구분할 수 없는 공통 안내에 사용하세요.'}/>)}
    </div><div hidden={workspace&&view!=='performance'}>
    {workspace&&<p><a className="conversion-link" href={marketingContextHref('landing', typeof location === 'undefined' ? '' : location.search, {period,course:report.campaign.freeCourse})}>이 무료 교육의 광고·웨비나 성과 보기</a> · 캠페인은 성과 화면에서 확인하세요. 모집과의 자동 귀속은 적용하지 않습니다.</p>}
    <p>신청 {report.registrations}건 · 웨비나 실제 참여: 미확인</p>
@@ -61,7 +62,7 @@ export function WebinarManagement({period,courses,cohorts,workspace=false}:{peri
    <RecruitmentDetails title="구매 집계 기준 자세히 보기"><p>현재 모집 신청자와 동일한 회원 계정의 신청 이후 결제만 관찰합니다.</p><p>해당 유료 기수의 전체 매출·광고 효과·1차/앵콜 전환율이 아닙니다.</p><p>0원 주문은 유료 구매에서 제외하고, 여러 상품이 포함된 주문과 결제 증거가 맞지 않는 주문은 검토 대상으로 구분합니다.</p><p>환불은 조회 시점의 누적액입니다.</p></RecruitmentDetails>
    </div>
   </>}
-  {report?.campaign&&<div hidden={workspace&&view!=='broadcast'}><WebinarBroadcastManagement key={report.campaign.id} code={report.campaign.id}/></div>}
+  {report?.campaign&&<div hidden={workspace&&view!=='broadcast'}><WebinarBroadcastManagement key={report.campaign.id} code={report.campaign.id} campaignEnabled={report.campaign.enabled}/></div>}
   {report?.campaign&&<div hidden={workspace&&view!=='followup'}><WebinarFollowup key={report.campaign.id+":"+report.campaign.revision} code={report.campaign.id}/></div>}
   {workspace&&!report?.campaign&&!pending&&view!=='settings'&&<p>신청·상품 연결을 먼저 저장하면 이 단계를 사용할 수 있습니다.</p>}
   {message&&<p role="status">{message}</p>}

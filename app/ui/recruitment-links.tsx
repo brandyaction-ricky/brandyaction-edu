@@ -1,7 +1,8 @@
 'use client';
 import { RecruitmentDetails, RecruitmentHelp } from './recruitment-help';
 import { useEffect, useRef, useState } from 'react';
-import { AdminButton, AdminInput, AdminSection } from './final/admin-system';
+import { RecruitmentCopyLink } from './recruitment-copy-link';
+import { AdminButton, AdminSection } from './final/admin-system';
 type State = { link: {id: string; room_version: number; revision: number; enabled: boolean} | null; counts: {paid: number; organic: number} };
 export function RecruitmentLinks({period, version}: {period: string; version: number}) {
   const busy = useRef(false);
@@ -37,7 +38,7 @@ export function RecruitmentLinks({period, version}: {period: string; version: nu
     <AdminButton disabled={pending} onClick={() => { setState(null); setPending(true); setMessage(''); setRefresh(n => n + 1); }}>링크·클릭 기록 새로고침</AdminButton>
     {state?.link && <>
       <p>링크 상태: {state.link.enabled ? '활성' : '중지'} · 연결된 방 버전 {state.link.room_version}</p>
-      {(['paid','organic'] as const).map(channel => <AdminInput key={channel} label={channel === 'paid' ? '광고용 모집 링크' : '오가닉용 모집 링크'} readOnly value={`${origin}/join/${state.link!.id}/${channel}`} />)}
+      {(['paid','organic'] as const).map(channel => <RecruitmentCopyLink key={channel} label={channel === 'paid' ? '광고용 모집 링크' : '오가닉용 모집 링크'} value={origin ? `${origin}/join/${state.link!.id}/${channel}` : ''} blocked={pending ? '저장된 링크 상태를 확인하고 있습니다.' : !state.link!.enabled ? '중지된 링크입니다. 활성화 후 복사하세요.' : state.link!.room_version !== version ? '이전 방 설정을 사용하는 링크입니다. 최신 방으로 활성화한 뒤 복사하세요.' : ''} usage={channel === 'paid' ? '광고 소재에 사용합니다. 광고 전용 카톡방으로 안내합니다.' : '오가닉 콘텐츠에 사용합니다. 오가닉 전용 카톡방으로 안내합니다.'} />)}
     </>}
     {state && <p>전체 방 버전의 이동 버튼 클릭 기록 — 광고용 링크 {state.counts.paid}회 · 오가닉용 링크 {state.counts.organic}회</p>}
     <RecruitmentDetails title="모집 링크 클릭 집계 기준"><p>링크 용도를 기준으로 분류합니다.</p><p>공유·재방문·자동 요청이 섞일 수 있어 실제 광고 유입, 고유 인원, 방 입장, 신청·구매로 해석하지 않습니다.</p><p>링크 열기와 미리보기는 집계하지 않으며 분당 수집 한도 초과 시 일부 클릭은 누락될 수 있습니다.</p></RecruitmentDetails>
