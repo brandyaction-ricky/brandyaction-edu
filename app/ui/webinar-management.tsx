@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { WebinarAttendanceManagement } from './webinar-attendance-management';
 import { AdminButton, AdminInput, AdminSection, AdminSelect } from './final/admin-system';
 import type { FunnelCourse, FunnelCohort } from '@/lib/recruitment-funnel';
 type Campaign={id:string;freeCourse:string;paidCohort:string|null;enabled:boolean;revision:number};
@@ -44,6 +45,7 @@ export function WebinarManagement({period,courses,cohorts}:{period:string;course
    </>:<p>{report.purchase_state==='forbidden'?'구매 조회에는 주문 관리 권한이 필요합니다.':'유료 기수 연결 전 · 구매 실적 미확인'}</p>}
    <p>현재 모집 신청자와 동일한 회원 계정의 신청 이후 결제만 관찰합니다. 해당 유료 기수의 전체 매출·광고 효과·1차/앵콜 전환율이 아닙니다. 0원 주문은 유료 구매에서 제외하고, 여러 상품이 포함된 주문과 결제 증거가 맞지 않는 주문은 검토 대상으로 구분합니다. 환불은 조회 시점의 누적액입니다.</p>
   </>}
+  {report?.campaign&&<WebinarAttendanceManagement key={report.campaign.id} code={report.campaign.id}/>}
   {message&&<p role="status">{message}</p>}
  </AdminSection>;
 }
