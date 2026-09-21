@@ -1,6 +1,6 @@
 'use client';
 import { useEffect,useRef,useState } from 'react';
-import { AdminButton,AdminInput,AdminSection } from './final/admin-system';
+import { AdminButton,AdminCheckbox,AdminInput,AdminSection } from './final/admin-system';
 import { liveLabel,type LivePhase } from '@/lib/webinar-attendance';
 import type { BroadcastReport,BroadcastSession } from '@/lib/broadcast-entry';
 function Editor({code,phase,session,offerReady,origin,saved}:{code:string;phase:LivePhase;session?:BroadcastSession;offerReady:boolean;origin:string;saved:()=>void}){
@@ -16,8 +16,8 @@ function Editor({code,phase,session,offerReady,origin,saved}:{code:string;phase:
  return <fieldset disabled={pending}>
   <legend>{liveLabel(phase)}</legend>
   <AdminInput label={`${liveLabel(phase)} YouTube 주소`} value={url} onChange={e=>setUrl(e.target.value)}/>
-  <label><input type="checkbox" checked={enabled} onChange={e=>setEnabled(e.target.checked)}/> {liveLabel(phase)} 방송 이동 링크 활성화</label>
-  <label><input type="checkbox" checked={offer} disabled={!offerReady&&!offer} onChange={e=>setOffer(e.target.checked)}/> {liveLabel(phase)} 유료 교육 안내 링크 활성화</label>
+  <AdminCheckbox label={`${liveLabel(phase)} 방송 이동 링크 활성화`} checked={enabled} onChange={e=>setEnabled(e.target.checked)}/>
+  <AdminCheckbox label={`${liveLabel(phase)} 유료 교육 안내 링크 활성화`} checked={offer} disabled={!offerReady&&!offer} onChange={e=>setOffer(e.target.checked)}/>
   {!offerReady&&<p>유료 기수와 공개된 유료 상품 연결 후 교육 안내 링크를 활성화할 수 있습니다.</p>}
   <p>{session?`저장 버전 ${session.revision} · 방송 링크 ${session.enabled?'활성':'중지'} · 교육 안내 링크 ${session.offerEnabled?'활성':'중지'}`:'링크 설정 전'}</p>
   <AdminButton disabled={pending||(enabled&&!url.trim())||(offer&&!offerReady)} onClick={()=>void save()}>{liveLabel(phase)} 링크 설정 저장</AdminButton>
