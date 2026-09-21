@@ -1,4 +1,5 @@
 'use client';
+import { marketingContextHref } from '@/lib/marketing-context';
 import { useEffect, useRef, useState } from 'react';
 import { WebinarFollowup } from './webinar-followup';
 import { WebinarBroadcastManagement } from './webinar-broadcast-management';
@@ -44,6 +45,7 @@ export function WebinarManagement({period,courses,cohorts,workspace=false}:{peri
    <p>신청 링크: {report.campaign.enabled?'활성':'중지'} · 설정 버전 {report.campaign.revision}</p>
    {(['paid','organic','unknown'] as const).map(channel=><AdminInput key={channel} label={`${channel==='paid'?'광고 방':channel==='organic'?'오가닉 방':'출처 미지정'} 신청 링크`} readOnly value={`${origin}/webinar/${report.campaign!.id}/${channel}`}/>)}
    </div><div hidden={workspace&&view!=='performance'}>
+   {workspace&&<p><a className="conversion-link" href={marketingContextHref('landing', typeof location === 'undefined' ? '' : location.search, {period,course:report.campaign.freeCourse})}>이 무료 교육의 광고·웨비나 성과 보기</a> · 캠페인은 성과 화면에서 확인하세요. 모집과의 자동 귀속은 적용하지 않습니다.</p>}
    <p>신청 {report.registrations}건 · 웨비나 실제 참여: 미확인</p>
    {report.purchases?<>
     <p>신청 이후 유료 구매자 {report.purchases.buyers}명 · 결제 주문 {report.purchases.orders}건</p>

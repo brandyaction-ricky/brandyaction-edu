@@ -99,6 +99,7 @@ test('workspace separates setup, results and followup without losing an unsaved 
  await expect(page.getByRole('textbox',{name:'카톡방 공지 초안',exact:true})).not.toBeVisible();
  await page.getByRole('button',{name:'2. 신청·구매 현황',exact:true}).click();
  await expect(page.getByText('신청 1건 · 웨비나 실제 참여: 미확인',{exact:true})).toBeVisible();
+ await expect(page.getByRole('link',{name:'이 무료 교육의 광고·웨비나 성과 보기'})).toHaveAttribute('href','/admin/landing?recruitment=sample&course=22222222-2222-4222-8222-222222222222');
  await expect(page.getByRole('combobox',{name:'웨비나 무료 상품',exact:true})).not.toBeVisible();
  await page.getByRole('button',{name:'4. 후속 안내',exact:true}).click();
  await page.getByRole('textbox',{name:'카톡방 공지 초안',exact:true}).fill('아직 저장하지 않은 합성 초안');

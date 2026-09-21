@@ -1,4 +1,5 @@
 'use client';
+import { recruitmentContext } from '@/lib/marketing-context';
 import { useEffect, useRef, useState } from 'react';
 import { EMPTY_RECRUITMENT_ROOMS, recruitmentPeriod, recruitmentRooms, type RecruitmentRooms } from '@/lib/recruitment-rooms';
 import { WebinarManagement } from './webinar-management';
@@ -7,9 +8,9 @@ import { RecruitmentLinks } from './recruitment-links';
 import { createMutationGate } from '@/lib/mutation-gate';
 import { AdminButton, AdminInput, AdminSection, AdminSelect } from './final/admin-system';
 
-export function RecruitmentRoomSettings({courses,cohorts,expanded=false}:{courses:FunnelCourse[];cohorts:FunnelCohort[];expanded?:boolean}) {
+export function RecruitmentRoomSettings({courses,cohorts,expanded=false,initialPeriod}:{courses:FunnelCourse[];cohorts:FunnelCohort[];expanded?:boolean;initialPeriod?:string}) {
   const [showWebinar,setShowWebinar]=useState(expanded);
-  const [period, setPeriod] = useState('moonshot-4');
+  const [period, setPeriod] = useState(recruitmentContext(initialPeriod) || 'moonshot-4');
   const [settings, setSettings] = useState<RecruitmentRooms>(EMPTY_RECRUITMENT_ROOMS);
   const [version, setVersion] = useState<number | null>(null);
   const [pending, setPending] = useState(false);
@@ -29,6 +30,14 @@ export function RecruitmentRoomSettings({courses,cohorts,expanded=false}:{course
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || '불러오지 못했습니다.');
       if (!active.current || controller.signal.aborted) return;
+      if (expanded) {
+        const url = new URL(location.href);
+        if (url.searchParams.get('recruitment') !== key) {
+          url.search = '';
+          url.searchParams.set('recruitment', key);
+          history.replaceState(history.state, '', url);
+        }
+      }
       setVersion(data.draft?.version ?? 0);
       setSettings(data.draft ? recruitmentRooms(data.draft.settings) : EMPTY_RECRUITMENT_ROOMS);
       setMessage(data.draft ? '저장된 방 설정을 불러왔습니다.' : '새 모집 구분입니다. 방 주소를 입력하고 저장하세요.');
