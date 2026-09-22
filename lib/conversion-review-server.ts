@@ -28,6 +28,22 @@ function version(value: unknown, required = true) {
   if (!Number.isSafeInteger(value) || Number(value) < 1) conversionError('최신 버전을 다시 불러와 주세요.', 409);
   return Number(value);
 }
+function calibration(value: unknown) {
+  if (value === undefined || value === null) return null;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) conversionError('운영자 독립 판정을 확인해 주세요.');
+  const item = value as Record<string, unknown>;
+  const allowed = {
+    purchase_intent: ['high', 'medium', 'low', 'unclear'],
+    primary_barrier: ['price', 'schedule', 'skill_level', 'content_fit', 'trust', 'none_or_unknown'],
+    purchase_readiness: [0, 1, 2, 3, 4],
+    next_action: ['answer_specific_questions', 'invite_webinar', 'offer_purchase_info', 'human_consult', 'hold_no_contact'],
+  } as const;
+  if (Object.keys(item).length !== 4 || !Object.entries(allowed).every(([key, values]) => (values as readonly unknown[]).includes(item[key]))) {
+    conversionError('운영자 독립 판정의 모든 항목을 확인해 주세요.');
+  }
+  return { purchase_intent: item.purchase_intent, primary_barrier: item.primary_barrier,
+    purchase_readiness: item.purchase_readiness, next_action: item.next_action };
+}
 export function conversionPayload(raw: unknown) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) conversionError('요청 형식을 확인해 주세요.');
   const body = raw as Record<string, unknown>;
@@ -52,7 +68,8 @@ export function conversionPayload(raw: unknown) {
   } else if (action === 'review') {
     if (!['accept', 'edit', 'hold', 'reject'].includes(String(body.decision))) conversionError('검토 결정을 확인해 주세요.');
     payload = { case_id: conversionId(body.case_id), run_id: conversionId(body.run_id), decision: body.decision,
-      reply_text: text(body.reply_text, 10000, ['accept', 'edit'].includes(String(body.decision))), reason: text(body.reason, 1000, body.decision !== 'accept') };
+      reply_text: text(body.reply_text, 10000, ['accept', 'edit'].includes(String(body.decision))), reason: text(body.reason, 1000, body.decision !== 'accept'),
+      calibration: calibration(body.calibration) };
   } else conversionError('지원하지 않는 작업입니다.');
   // Only validated semantic input is fingerprinted. Generated mock output is not
   // part of the client's intent, so a lost response can be retried unchanged.

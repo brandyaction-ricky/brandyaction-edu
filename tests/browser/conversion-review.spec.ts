@@ -61,7 +61,7 @@ async function fixture(page: Page, provider: 'mock' | 'jev' = 'mock') {
     }
     if (body.action === 'review') {
       const review = { id: `review-${snapshot.reviews.length + 1}`, case_id: body.case_id, run_id: body.run_id,
-        decision: body.decision, reply_text: body.reply_text, reason: body.reason,
+        decision: body.decision, reply_text: body.reply_text, reason: body.reason, calibration: body.calibration,
         created_at: timestamp, actor_id: 'synthetic-operator' };
       snapshot.reviews.push(review);
       await route.fulfill({ json: { ok: true, review } }); return;
@@ -78,13 +78,30 @@ test('Jev shadow result shows decisions and confidence without triggering anothe
   await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
   await page.getByRole('button', { name: 'Jev 그림자 판정 실행', exact: true }).click();
   await expect(page.getByText('Jev 그림자 판정 · 운영자 확인 필요', { exact: true })).toBeVisible();
+  await expect(page.getByText('운영자 독립 판정을 먼저 저장해 주세요.', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Jev 전환 판정')).toHaveCount(0);
+  expect(state.unexpectedApi).toEqual([]);
+  expect(state.mutations.map(item => item.action)).toEqual(['analyze']);
+});
+
+test('first Jev review stores blind operator labels then reveals comparison and aggregate rates', async ({ page }) => {
+  const state = await fixture(page, 'jev');
+  await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
+  await page.getByRole('button', { name: 'Jev 그림자 판정 실행', exact: true }).click();
+  await page.getByLabel('사람 판단 · 구매 의도').selectOption('medium');
+  await page.getByLabel('사람 판단 · 주요 장애물').selectOption('price');
+  await page.getByLabel('사람 판단 · 구매 준비도').selectOption('3');
+  await page.getByLabel('사람 판단 · 다음 행동').selectOption('answer_specific_questions');
+  await page.getByLabel(/^검토 사유/).fill('합성 독립 판정');
+  await page.getByRole('button', { name: '검토 기록 저장', exact: true }).click();
   const result = page.getByLabel('Jev 전환 판정');
   await expect(result).toContainText('구매 의도중간신뢰도 97%');
   await expect(result).toContainText('주요 장애물수강 수준신뢰도 82%');
-  await expect(result).toContainText('구매 준비도2.8 / 4신뢰도 88%');
-  await expect(result).toContainText('권장 다음 행동질문에 구체적으로 답변신뢰도 99%');
+  await expect(page.getByLabel('사람과 Jev 비교')).toContainText('구매 의도사람 중간Jev 중간일치');
+  await expect(page.getByLabel('Jev 교정 현황')).toContainText('독립 판정 표본1건');
+  await expect(page.getByLabel('Jev 교정 현황')).toContainText('구매 의도 일치100%');
+  expect(state.mutations[1]).toMatchObject({ action: 'review', calibration: { purchase_intent: 'medium', primary_barrier: 'price', purchase_readiness: 3, next_action: 'answer_specific_questions' } });
   expect(state.unexpectedApi).toEqual([]);
-  expect(state.mutations.map(item => item.action)).toEqual(['analyze']);
 });
 
 async function selectAndAnalyze(page: Page) {
