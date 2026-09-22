@@ -22,6 +22,25 @@ export function isPurchasableOffer(course: Row, cohort: Row, now = Date.now()) {
     && (!cohort.operation_end_at || Date.parse(String(cohort.operation_end_at)) > now);
 }
 
+export type OfferLifecycle = 'recruiting' | 'upcoming' | 'closed' | 'cancelled';
+
+export function offerLifecycle(cohort: Row | undefined, now = Date.now()): OfferLifecycle {
+  if (!cohort || cohort.status === 'cancelled') return cohort?.status === 'cancelled' ? 'cancelled' : 'closed';
+  const starts = cohort.recruitment_start_at ? Date.parse(String(cohort.recruitment_start_at)) : null;
+  const ends = cohort.recruitment_end_at ? Date.parse(String(cohort.recruitment_end_at)) : null;
+  if (starts && starts > now) return 'upcoming';
+  if (['closed', 'completed'].includes(String(cohort.status)) || (ends && ends <= now)) return 'closed';
+  return isRecruiting(cohort, now) ? 'recruiting' : cohort.status === 'upcoming' ? 'upcoming' : 'closed';
+}
+
+export function courseOfferLifecycle(course: Row, cohorts: Row[], now = Date.now()): OfferLifecycle {
+  const own = cohorts.filter(item => item.course_id === course.id && !item.archived_at);
+  if (own.some(item => offerLifecycle(item, now) === 'recruiting')) return 'recruiting';
+  if (own.some(item => offerLifecycle(item, now) === 'upcoming')) return 'upcoming';
+  if (own.length && own.every(item => offerLifecycle(item, now) === 'cancelled')) return 'cancelled';
+  return 'closed';
+}
+
 export function containsFreeClassCampaign(value: unknown) {
   if (typeof value !== 'string' || !value.trim()) return false;
   const signals = [/무료\s*(?:라이브\s*)?강의/i, /무료강의\s*(?:대기방|참여|입장)/i, /open\.kakao\.com/i];

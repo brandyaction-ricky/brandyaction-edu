@@ -14,7 +14,7 @@ import {
   type Section,
   type User,
 } from "@/lib/platform";
-import { homepageCourses, isRecruiting, localDateTime, recordId } from "@/lib/platform-rules";
+import { courseOfferLifecycle, homepageCourses, isRecruiting, localDateTime, recordId } from "@/lib/platform-rules";
 import { archiveValues } from "@/lib/qa-rules";
 import { createClient } from "@/lib/supabase/client";
 import { getSupabasePublicConfig } from "@/lib/supabase/config";
@@ -99,6 +99,9 @@ export function Platform({
   const [pending, setPending] = useState(false);
   const [mobile, setMobile] = useState(false);
   const [query, setQuery] = useState("");
+  const [offerStatus, setOfferStatus] = useState("전체 상태");
+  const [sort, setSort] = useState("추천순");
+  const [classPage, setClassPage] = useState(1);
   const [adminPaging, setAdminPaging] = useState({ section: "", page: 1 });
   const [pagination, setPagination] = useState<{
     page: number;
@@ -467,7 +470,7 @@ export function Platform({
             </div>
             <div className="grid3 course-grid">
               {availableCourses.slice(0, 3).map((c) => (
-                <CourseCard key={c.id} course={c} />
+                <CourseCard key={c.id} course={c} cohorts={rows("cohorts")} />
               ))}
             </div>
             {!loading && !availableCourses.length && (
@@ -529,7 +532,24 @@ export function Platform({
       </>
     );
   else if (path[0] === "classes" && path.length === 1)
-    body = (
+    body = (() => {
+      const normalizedQuery = query.trim().toLocaleLowerCase("ko-KR");
+      const filteredCourses = courses.filter((course) => {
+        const lifecycle = courseOfferLifecycle(course, rows("cohorts"));
+        const searchable = [t(course, "title"), t(course, "summary"), String(object(course, "metadata").public_keywords || "")].join(" ").toLocaleLowerCase("ko-KR");
+        return (filter === "전체" || courseType(course) === filter)
+          && (offerStatus === "전체 상태" || lifecycle === ({ "모집 중": "recruiting", "모집 예정": "upcoming", "모집 종료": "closed" } as Record<string, string>)[offerStatus] || offerStatus === "모집 종료" && lifecycle === "cancelled")
+          && (!normalizedQuery || searchable.includes(normalizedQuery));
+      }).sort((a, b) => {
+        if (sort === "최신순") return Date.parse(String(b.created_at || 0)) - Date.parse(String(a.created_at || 0));
+        if (sort === "가격 낮은순") return Number(a.list_price || 0) - Number(b.list_price || 0);
+        if (sort === "가격 높은순") return Number(b.list_price || 0) - Number(a.list_price || 0);
+        return Number(a.display_order || 0) - Number(b.display_order || 0);
+      });
+      const pageSize = 12, totalPages = Math.max(1, Math.ceil(filteredCourses.length / pageSize));
+      const visibleCourses = filteredCourses.slice((Math.min(classPage, totalPages) - 1) * pageSize, Math.min(classPage, totalPages) * pageSize);
+      const reset = () => { setFilter("전체"); setOfferStatus("전체 상태"); setSort("추천순"); setQuery(""); setClassPage(1); };
+      return (
       <div className="wrap">
         <Heading
           title="내 일의 다음 단계를 찾아보세요."
@@ -541,12 +561,14 @@ export function Platform({
               <button
                 key={f}
                 className={"chip " + (filter === f ? "active" : "")}
-                onClick={() => setFilter(f)}
+                onClick={() => { setFilter(f); setClassPage(1); }}
               >
                 {f}
               </button>
             ))}
           </div>
+          <label className="field compact-field">모집 상태<select aria-label="모집 상태" value={offerStatus} onChange={event => { setOfferStatus(event.target.value); setClassPage(1); }}><option>전체 상태</option><option>모집 중</option><option>모집 예정</option><option>모집 종료</option></select></label>
+          <label className="field compact-field">정렬<select aria-label="클래스 정렬" value={sort} onChange={event => { setSort(event.target.value); setClassPage(1); }}><option>추천순</option><option>최신순</option><option>가격 낮은순</option><option>가격 높은순</option></select></label>
           <label className="search">
             <Search />
             <input
@@ -554,26 +576,20 @@ export function Platform({
               placeholder="클래스 검색"
               aria-label="클래스 검색"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => { setQuery(e.target.value); setClassPage(1); }}
             />
           </label>
         </div>
         <div className="grid3 course-grid pb64">
-          {courses
-            .filter(
-              (c) =>
-                (filter === "전체" || courseType(c) === filter) &&
-                t(c, "title").includes(query),
-            )
-            .map((c) => (
-              <CourseCard key={c.id} course={c} />
+          {visibleCourses.map((c) => (
+              <CourseCard key={c.id} course={c} cohorts={rows("cohorts")} />
             ))}
         </div>
-        {!loading && !courses.length && (
-          <Empty title="등록된 클래스가 없습니다." />
-        )}
+        {!loading && !filteredCourses.length && <Empty title="조건에 맞는 클래스가 없습니다."><button className="btn" type="button" onClick={reset}>필터 초기화</button><Link className="btn primary" href="/classes" onClick={reset}>다른 상품 둘러보기</Link></Empty>}
+        {filteredCourses.length > pageSize && <nav className="class-pagination" aria-label="클래스 목록 페이지"><button className="btn" disabled={classPage <= 1} onClick={() => setClassPage(page => Math.max(1, page - 1))}>이전</button><span>{Math.min(classPage, totalPages)} / {totalPages}</span><button className="btn" disabled={classPage >= totalPages} onClick={() => setClassPage(page => Math.min(totalPages, page + 1))}>다음</button></nav>}
       </div>
-    );
+      );
+    })();
   else if (path[0] === "classes" && selected)
     body = <ProductDetail key={selected.id} course={selected} data={data} />;
   else if (path[0] === "articles")

@@ -13,7 +13,7 @@ function validProductImage(value: unknown) {
   return /^(?:\/?(?:edu|site|images|assets|courses)\/)[a-z0-9/_\-.]+\.(?:png|jpe?g|webp|gif|avif)(?:\?[^#]*)?$/i.test(value);
 }
 
-export const productMetadataFields = ['thumbnail_url', 'detail_image_url', 'detail_images', 'regular_price', 'seo_title', 'seo_description', 'detail_html', 'detail_html_document', 'cta_price_label', 'cta_label', 'cta_url', 'cta_color', 'meta_pixel_id'] as const;
+export const productMetadataFields = ['thumbnail_url', 'detail_image_url', 'detail_images', 'regular_price', 'public_keywords', 'instructor_bio', 'instructor_approved', 'provided_items', 'usage_notes', 'participation_guide', 'seo_title', 'seo_description', 'detail_html', 'detail_html_document', 'cta_price_label', 'cta_label', 'cta_url', 'cta_color', 'meta_pixel_id'] as const;
 export type ProductDetailImage = { path: string; name: string; alt: string };
 export const productResourceScopes = ['public', 'authenticated', 'enrolled', 'purchaser'] as const;
 export type ProductResourceScope = (typeof productResourceScopes)[number];
@@ -204,6 +204,14 @@ export function mergeProductMetadata(previous: unknown, values: Record<string, u
     } else if (field === 'detail_html') {
       if (value !== null && typeof value !== 'string') throw new Error('상세페이지 HTML 형식을 확인해 주세요.');
       metadata[field] = sanitizeProductHtml(value || '');
+    } else if (field === 'instructor_approved') {
+      metadata[field] = value === true;
+    } else if (['public_keywords', 'instructor_bio', 'provided_items', 'usage_notes', 'participation_guide'].includes(field)) {
+      if (value !== null && typeof value !== 'string') throw new Error('상품 공개 안내 정보를 확인해 주세요.');
+      const maximum = field === 'public_keywords' ? 500 : 5000;
+      const content = String(value || '').trim();
+      if (content.length > maximum) throw new Error(`상품 공개 안내는 ${maximum}자 이하로 입력해 주세요.`);
+      metadata[field] = content;
     } else if (field === 'seo_title' || field === 'seo_description') {
       if (value !== null && typeof value !== 'string') throw new Error('검색 정보를 확인해 주세요.');
       const content = String(value || '').trim(), maximum = field === 'seo_title' ? 200 : 500;
