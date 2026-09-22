@@ -1,11 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { posix } from 'node:path';
 import ts from 'typescript';
 function load(path, dependencies={}) {
  const source=fs.readFileSync(new URL('../'+path,import.meta.url),'utf8');
  const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
- const exports={};new Function('exports','require',js)(exports,name=>{if(name in dependencies)return dependencies[name];throw Error(name);});return exports;
+ const exports={};new Function('exports','require',js)(exports,name=>{
+  if(name in dependencies)return dependencies[name];
+  if(name.startsWith('@/') || name.startsWith('.')) {
+   const target=name.startsWith('@/')?name.slice(2):posix.normalize(posix.join(posix.dirname(path),name));
+   return load(target+'.ts',dependencies);
+  }
+  throw Error(name);
+ });return exports;
 }
 const quiz=load('lib/mission-quiz.ts');
 const rules=load('lib/edu-workflows.ts');

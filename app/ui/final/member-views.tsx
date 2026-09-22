@@ -12,6 +12,10 @@ import {
   type User,
 } from "@/lib/platform";
 import { hasLearningAccess } from "@/lib/platform-rules";
+import { missionEntries, enrollmentLessons } from '@/features/mission';
+import { Missions } from '@/features/mission/ui';
+export { missionEntries, enrollmentLessons } from '@/features/mission';
+export { Missions } from '@/features/mission/ui';
 import {
   ArrowRight,
   BookOpen,
@@ -62,47 +66,6 @@ const accountGroups = [
   ],
 ] as const;
 const rows = (data: Data, key: string) => data[key] || [];
-export function enrollmentLessons(data: Data, e: Row) {
-  const weeks = new Set(
-    rows(data, "curriculum_weeks")
-      .filter((w) => w.course_id === e.course_id)
-      .map((w) => w.id),
-  );
-  return rows(data, "curriculum_lessons")
-    .filter((l) => weeks.has(t(l, "week_id")))
-    .sort((a, b) => num(a, "day_number") - num(b, "day_number"));
-}
-export function missionEntries(data: Data, enrollments: Row[]) {
-  return enrollments.flatMap((enrollment) => {
-    const lessons = enrollmentLessons(data, enrollment);
-    return rows(data, "curriculum_missions")
-      .filter((m) => lessons.some((l) => l.id === m.lesson_id))
-      .map((mission) => {
-        const submission = rows(data, "mission_submissions")
-          .filter(
-            (s) =>
-              s.mission_id === mission.id && s.enrollment_id === enrollment.id,
-          )
-          .sort(
-            (a, b) => num(b, "attempt_number") - num(a, "attempt_number"),
-          )[0];
-        return {
-          mission,
-          enrollment,
-          submission,
-          lesson: lessons.find((l) => l.id === mission.lesson_id),
-          status: t(submission, "status") || "draft",
-          href:
-            "/learn/" +
-            enrollment.id +
-            "/" +
-            mission.lesson_id +
-            "/mission?mission=" +
-            mission.id,
-        };
-      });
-  });
-}
 function Progress({
   value,
   total,
@@ -479,143 +442,6 @@ function Dashboard({
           </div>
           <ArrowRight />
         </Link>
-      </div>
-    </>
-  );
-}
-function Missions({ data, active }: { data: Data; active: Row[] }) {
-  const [enrollmentId, setEnrollmentId] = useState(""),
-    [status, setStatus] = useState("전체");
-  const entries = missionEntries(
-    data,
-    active.filter((e) => !enrollmentId || e.id === enrollmentId),
-  );
-  const statuses = [
-    "전체",
-    "draft",
-    "submitted",
-    "changes_requested",
-    "approved",
-  ];
-  return (
-    <>
-      <Heading
-        title="내 미션"
-        description="제출부터 피드백, 승인까지 클래스별로 확인하세요."
-      />
-      <div className="member-mission-filter">
-        <label>
-          클래스 · 기수
-          <select
-            value={enrollmentId}
-            onChange={(e) => {
-              setEnrollmentId(e.target.value);
-              setStatus("전체");
-            }}
-          >
-            <option value="">전체 클래스</option>
-            {active.map((e) => (
-              <option key={e.id} value={e.id}>
-                {t(
-                  rows(data, "courses").find((c) => c.id === e.course_id),
-                  "title",
-                )}{" "}
-                ·{" "}
-                {t(
-                  rows(data, "cohorts").find((c) => c.id === e.cohort_id),
-                  "name",
-                )}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="member-mission-summary">
-          <span>
-            전체 <b>{entries.length}</b>
-          </span>
-          <span>
-            승인 완료{" "}
-            <b>{entries.filter((e) => e.status === "approved").length}</b>
-          </span>
-        </div>
-      </div>
-      <div className="chips member-mission-tabs" aria-label="미션 상태">
-        {statuses.map((s) => (
-          <button
-            key={s}
-            className={"chip " + (status === s ? "active" : "")}
-            aria-pressed={status === s}
-            onClick={() => setStatus(s)}
-          >
-            {s === "전체" ? "전체" : s === "draft" ? "제출 전" : labels[s]}{" "}
-            <span>
-              {entries.filter((e) => s === "전체" || e.status === s).length}
-            </span>
-          </button>
-        ))}
-      </div>
-      <div className="member-mission-list">
-        {entries
-          .filter((e) => status === "전체" || e.status === status)
-          .map((x) => (
-            <article
-              className="member-mission-row"
-              key={x.mission.id + x.enrollment.id}
-            >
-              <span className="member-mission-day">
-                DAY
-                <strong>
-                  {String(num(x.lesson, "day_number")).padStart(2, "0")}
-                </strong>
-              </span>
-              <div className="row-text">
-                <div className="flex gap8">
-                  <Badge>
-                    {t(
-                      rows(data, "courses").find(
-                        (c) => c.id === x.enrollment.course_id,
-                      ),
-                      "title",
-                    )}
-                  </Badge>
-                  <Badge
-                    color={
-                      x.status === "approved"
-                        ? "green"
-                        : x.status === "changes_requested"
-                          ? "red"
-                          : x.status === "submitted"
-                            ? "amber"
-                            : ""
-                    }
-                  >
-                    {x.status === "draft" ? "제출 전" : labels[x.status]}
-                  </Badge>
-                </div>
-                <h3>{t(x.mission, "title")}</h3>
-                <p>
-                  {x.submission
-                    ? date(x.submission.submitted_at) + " 제출"
-                    : t(x.mission, "instructions")}
-                </p>
-              </div>
-              <Link
-                className={
-                  "btn small " +
-                  (x.status === "changes_requested" ? "primary" : "")
-                }
-                href={x.href}
-              >
-                {x.status === "draft"
-                  ? "미션 작성"
-                  : x.status === "changes_requested"
-                    ? "피드백 확인"
-                    : "제출 내용"}
-              </Link>
-            </article>
-          ))}
-        {!entries.filter((e) => status === "전체" || e.status === status)
-          .length && <Empty title="이 상태의 미션이 없습니다." />}
       </div>
     </>
   );

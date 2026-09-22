@@ -4,7 +4,7 @@ import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { ArrowLeft, Download, ExternalLink, FileText, Plus, Video as VideoIcon, X } from "lucide-react";
 import { number as num, safeUrl, text as t, type Row } from "@/lib/platform";
-import { validateQuiz, type QuizDefinition, type QuizQuestion } from "@/lib/mission-quiz";
+import { validateQuiz, type QuizDefinition, type QuizQuestion } from "@/features/mission";
 import { UploadField } from "../editor-fields";
 import type { Data, WorkflowSend } from "../learning-workflows";
 import { AdminHeading } from "./admin-shell";
