@@ -9,7 +9,7 @@ const exports = {};
 new Function('exports', ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText)(exports);
-const { createMockJudgment, isEvidenceInScope, evidenceVersions, isRunStale, MOCK_NOTICE } = exports;
+const { createMockJudgment, isEvidenceInScope, evidenceVersions, isRunStale, buildJevCalibrationSummary, calibrationForRun, MOCK_NOTICE } = exports;
 
 const inquiry = {
   id: 'case-1', source_type: 'manual', question_id: null, course_id: 'course-a', cohort_id: 'cohort-a',
@@ -166,4 +166,37 @@ test('support and refund inquiry classification stays visibly within the demo re
   assert.equal(createMockJudgment({ ...inquiry, subject: '로그인 오류', content: '비밀번호 확인 부탁해요.' }, []).inquiry_type, 'support');
   assert.equal(createMockJudgment({ ...inquiry, subject: '환불 문의', content: '결제를 취소하고 싶어요.' }, []).inquiry_type, 'payment_refund');
   assert.equal(createMockJudgment({ ...inquiry, subject: '로그인 오류와 환불', content: '' }, []).inquiry_type, 'mixed');
+});
+
+test('Jev calibration uses the first independent review per run and reports confidence-sensitive disagreements', () => {
+  const result = { ...createMockJudgment(inquiry, [evidence]), mode: 'jev', model: 'jev-test', decision_version: 1, decisions: {
+    purchase_intent: { type: 'choice', choice: 'high', confidence: .9, probabilities: {} },
+    primary_barrier: { type: 'choice', choice: 'price', confidence: .65, probabilities: {} },
+    purchase_readiness: { type: 'score', score: 2.6, confidence: .8, probabilities: {} },
+    next_action: { type: 'choice', choice: 'offer_purchase_info', confidence: .6, probabilities: {} },
+  } };
+  const run = { ...runFor(), provider: 'jev', result };
+  const first = { id: 'review-1', case_id: inquiry.id, run_id: run.id, decision: 'hold', reply_text: '', reason: '독립', actor_id: 'operator', created_at: '2026-09-20T00:00:02.000Z',
+    calibration: { purchase_intent: 'high', primary_barrier: 'trust', purchase_readiness: 3, next_action: 'human_consult' } };
+  const later = { ...first, id: 'review-2', created_at: '2026-09-20T00:00:03.000Z', calibration: { ...first.calibration, primary_barrier: 'price', next_action: 'offer_purchase_info' } };
+  assert.equal(calibrationForRun(run.id, [later, first]).id, first.id);
+  const summary = buildJevCalibrationSummary([run], [later, first]);
+  assert.equal(summary.samples, 1);
+  assert.deepEqual(summary.dimensions.purchase_intent, { matches: 1, total: 1, rate: 1 });
+  assert.deepEqual(summary.dimensions.primary_barrier, { matches: 0, total: 1, rate: 0 });
+  assert.deepEqual(summary.dimensions.purchase_readiness, { matches: 1, total: 1, rate: 1 });
+  assert.equal(summary.low_confidence_disagreements, 2);
+});
+
+test('review payload accepts only a complete closed-set calibration object', () => {
+  const server = {};
+  new Function('exports', 'require', ts.transpileModule(fs.readFileSync(new URL('../lib/conversion-review-server.ts', import.meta.url), 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText)(server, name => { assert.equal(name, 'node:crypto'); return { createHash }; });
+  const id = '11111111-1111-4111-8111-111111111111';
+  const base = { action: 'review', requestId: id, case_id: id, run_id: id, decision: 'hold', reply_text: '', reason: '독립 판정' };
+  const calibration = { purchase_intent: 'high', primary_barrier: 'price', purchase_readiness: 3, next_action: 'offer_purchase_info' };
+  assert.deepEqual(server.conversionPayload({ ...base, calibration }).payload.calibration, calibration);
+  assert.throws(() => server.conversionPayload({ ...base, calibration: { ...calibration, purchase_readiness: 2.5 } }), /독립 판정/);
+  assert.throws(() => server.conversionPayload({ ...base, calibration: { ...calibration, extra: 'field' } }), /독립 판정/);
 });

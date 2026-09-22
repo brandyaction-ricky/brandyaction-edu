@@ -25,7 +25,7 @@ export async function GET() {
       db.from('courses').select('id,title,status').order('created_at', { ascending: false }).limit(500),
       db.from('cohorts').select('id,course_id,name,status').order('created_at', { ascending: false }).limit(500),
       db.from('edu_conversion_runs').select('id,case_id,input_version,provider,result,evidence_versions,input_snapshot,evidence_snapshot,created_at').order('created_at', { ascending: false }).limit(500),
-      db.from('edu_conversion_reviews').select('id,case_id,run_id,decision,reply_text,reason,created_at,actor_id').order('created_at', { ascending: false }).limit(500),
+      db.from('edu_conversion_reviews').select('id,case_id,run_id,decision,reply_text,reason,calibration,created_at,actor_id').order('created_at', { ascending: false }).limit(500),
     ];
     const result = await Promise.all(requests);
     for (const item of result) if (item.error) conversionDatabaseError(item.error);

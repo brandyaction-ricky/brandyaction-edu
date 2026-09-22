@@ -59,6 +59,13 @@ export type JevResult = Omit<MockResult, 'mode'> & {
   };
 };
 
+export type JevCalibration = {
+  purchase_intent: 'high' | 'medium' | 'low' | 'unclear';
+  primary_barrier: 'price' | 'schedule' | 'skill_level' | 'content_fit' | 'trust' | 'none_or_unknown';
+  purchase_readiness: 0 | 1 | 2 | 3 | 4;
+  next_action: 'answer_specific_questions' | 'invite_webinar' | 'offer_purchase_info' | 'human_consult' | 'hold_no_contact';
+};
+
 export type ConversionRun = {
   id: string;
   case_id: string;
@@ -78,8 +85,15 @@ export type ConversionReviewRecord = {
   decision: 'accept' | 'edit' | 'hold' | 'reject';
   reply_text: string;
   reason: string;
+  calibration: JevCalibration | null;
   created_at: string;
   actor_id: string;
+};
+
+export type JevCalibrationSummary = {
+  samples: number;
+  dimensions: Record<keyof JevCalibration, { matches: number; total: number; rate: number | null }>;
+  low_confidence_disagreements: number;
 };
 
 export type ConversionSnapshot = {
@@ -100,6 +114,40 @@ export const topicLabels: Record<ConversionTopic, string> = {
 export const inquiryTypeLabels: Record<InquiryType, string> = {
   prepurchase: '구매 전 상품 질문', support: '이용 지원', payment_refund: '결제·환불', mixed: '혼합', unknown: '판단 불가',
 };
+
+const calibrationKeys = ['purchase_intent', 'primary_barrier', 'purchase_readiness', 'next_action'] as const;
+
+export function calibrationForRun(runId: string, reviews: ConversionReviewRecord[]): ConversionReviewRecord | undefined {
+  return reviews.filter(review => review.run_id === runId && review.calibration)
+    .sort((a, b) => a.created_at.localeCompare(b.created_at))[0];
+}
+
+export function buildJevCalibrationSummary(runs: ConversionRun[], reviews: ConversionReviewRecord[]): JevCalibrationSummary {
+  const dimensions = Object.fromEntries(calibrationKeys.map(key => [key, { matches: 0, total: 0, rate: null }])) as JevCalibrationSummary['dimensions'];
+  let samples = 0;
+  let lowConfidenceDisagreements = 0;
+  for (const run of runs) {
+    if (run.result.mode !== 'jev') continue;
+    const review = calibrationForRun(run.id, reviews);
+    if (!review?.calibration) continue;
+    samples += 1;
+    for (const key of calibrationKeys) {
+      const answer = run.result.decisions[key];
+      const predicted = key === 'purchase_readiness'
+        ? Math.round(run.result.decisions.purchase_readiness.score)
+        : (answer as JevChoiceAnswer).choice;
+      const matched = predicted === review.calibration[key];
+      dimensions[key].total += 1;
+      if (matched) dimensions[key].matches += 1;
+      else if (answer.confidence < 0.7) lowConfidenceDisagreements += 1;
+    }
+  }
+  for (const key of calibrationKeys) {
+    const item = dimensions[key];
+    item.rate = item.total ? item.matches / item.total : null;
+  }
+  return { samples, dimensions, low_confidence_disagreements: lowConfidenceDisagreements };
+}
 
 const topicPatterns: Record<ConversionTopic, RegExp> = {
   price: /가격|수강료|비용|금액|얼마|할인/gu,
