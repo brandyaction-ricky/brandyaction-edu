@@ -18,6 +18,8 @@ export function isProductApplicationLink(href: string, text: string, explicit = 
   // A real internal document destination is not an application merely because
   // its caption mentions applying. Legacy fallback is limited to whole actions.
   if (href.startsWith('/')) return false;
-  const label = text.replace(/\s+/g, '');
+  // Uploaded CTA designs often put an arrow in a separate trailing span.
+  // Ignore only those decorations; keep the whole-action and destination guards.
+  const label = text.replace(/\s+/g, '').replace(/[→↗➜➔»›>]+$/u, '');
   return /^(?:(?:무료로|무료|수강)?신청(?:하기|완료|마감)?|구매하기|결제하기|(?:무료(?:라이브)?강의)?대기방입장|무료(?:라이브)?강의(?:참여|입장)(?:하기)?|지금참여(?:하기)?)$/.test(label);
 }

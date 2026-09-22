@@ -46,6 +46,23 @@ test('RQ-BF04-01 link intent uses structured destinations and complete legacy la
   assert.equal(isProductApplicationLink('https://example.test/enroll', '바로 시작', false, 'https://example.test/enroll'), true);
 });
 
+test('RQ-BF04-03 decorative arrows preserve complete application labels without matching editorial links', () => {
+  const { isProductApplicationLink } = load('lib/product-application-cta.ts');
+  for (const label of ['무료강의 대기방 입장 →', '구매하기 ↗', '신청하기 ›', '결제하기 >']) {
+    assert.equal(isProductApplicationLink('#', label), true, label);
+  }
+  for (const [href, label] of [['#outline', '신청하기 →'], ['/policies/refund', '환불 신청 안내 →'], ['https://example.test/guide', '무료강의 참여 안내 →']]) {
+    assert.equal(isProductApplicationLink(href, label), false, label);
+  }
+  const markup = renderToStaticMarkup(React.createElement(ProductDetailHtml, {
+    html: '<a href="#"><span>무료강의 대기방 입장</span><span>→</span></a>',
+    applicationCta: { href: '', label: '신청 마감', disabled: true, enrolled: false },
+  }));
+  assert.doesNotMatch(markup, /href=/);
+  assert.match(markup, /aria-disabled="true"/);
+  assert.match(markup, /<span>신청 마감<\/span><span>→<\/span>/);
+});
+
 test('RQ-BF04-02 empty and malformed marker values cannot lose their explicit meaning or add attributes', () => {
   for (const marker of ['data-product-cta', 'data-landing-cta']) {
     for (const value of ['', '=""', '="&quot; onclick=&quot;evil()"']) {

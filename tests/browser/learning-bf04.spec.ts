@@ -42,6 +42,7 @@ for (const mode of ['inline', 'iframe']) {
           await expect(scope.locator('#marked-cta > span > strong')).toHaveCount(1);
           await expect(scope.locator('#image-cta img')).toHaveCount(1);
           await expect(scope.locator('#icon-cta span')).toHaveText('★');
+          await expect(scope.locator('#legacy-cta > span').last()).toHaveText('→');
           await expect(scope.locator('#refund-policy')).toHaveAttribute('href', '/policies/refund');
           await expect(scope.locator('#refund-policy')).toHaveText('환불 신청 안내');
           await expect(scope.locator('#guide')).toHaveText('무료강의 참여 안내');
@@ -58,7 +59,7 @@ for (const mode of ['inline', 'iframe']) {
   test(`BF04 ${mode}: disabled mouse, Enter, Tab and editorial clicks never convert`, async ({ page }, testInfo) => {
     await page.goto(`/learning-qa?bf04&state=closed${mode === 'inline' ? '&inline' : ''}`);
     const scope = mode === 'inline' ? page : page.frameLocator('iframe');
-    for (const id of ['marked-cta', 'image-cta', 'icon-cta']) {
+    for (const id of ['marked-cta', 'image-cta', 'icon-cta', 'legacy-cta']) {
       const cta = scope.locator(`#${id}`);
       await cta.click({ force: true });
       await cta.press('Enter');
