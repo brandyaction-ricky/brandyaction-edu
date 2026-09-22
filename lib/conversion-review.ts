@@ -86,12 +86,16 @@ export type ConversionReviewRecord = {
   reply_text: string;
   reason: string;
   calibration: JevCalibration | null;
+  calibration_sample_kind: 'operational' | 'test' | null;
   created_at: string;
   actor_id: string;
 };
 
 export type JevCalibrationSummary = {
   samples: number;
+  test_samples: number;
+  minimum_samples: number;
+  remaining_for_threshold_review: number;
   dimensions: Record<keyof JevCalibration, { matches: number; total: number; rate: number | null }>;
   low_confidence_disagreements: number;
 };
@@ -125,11 +129,14 @@ export function calibrationForRun(runId: string, reviews: ConversionReviewRecord
 export function buildJevCalibrationSummary(runs: ConversionRun[], reviews: ConversionReviewRecord[]): JevCalibrationSummary {
   const dimensions = Object.fromEntries(calibrationKeys.map(key => [key, { matches: 0, total: 0, rate: null }])) as JevCalibrationSummary['dimensions'];
   let samples = 0;
+  let testSamples = 0;
   let lowConfidenceDisagreements = 0;
   for (const run of runs) {
     if (run.result.mode !== 'jev') continue;
     const review = calibrationForRun(run.id, reviews);
     if (!review?.calibration) continue;
+    if (review.calibration_sample_kind === 'test') { testSamples += 1; continue; }
+    if (review.calibration_sample_kind !== 'operational') continue;
     samples += 1;
     for (const key of calibrationKeys) {
       const answer = run.result.decisions[key];
@@ -146,7 +153,10 @@ export function buildJevCalibrationSummary(runs: ConversionRun[], reviews: Conve
     const item = dimensions[key];
     item.rate = item.total ? item.matches / item.total : null;
   }
-  return { samples, dimensions, low_confidence_disagreements: lowConfidenceDisagreements };
+  const minimumSamples = 20;
+  return { samples, test_samples: testSamples, minimum_samples: minimumSamples,
+    remaining_for_threshold_review: Math.max(0, minimumSamples - samples),
+    dimensions, low_confidence_disagreements: lowConfidenceDisagreements };
 }
 
 const topicPatterns: Record<ConversionTopic, RegExp> = {

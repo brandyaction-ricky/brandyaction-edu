@@ -177,15 +177,22 @@ test('Jev calibration uses the first independent review per run and reports conf
   } };
   const run = { ...runFor(), provider: 'jev', result };
   const first = { id: 'review-1', case_id: inquiry.id, run_id: run.id, decision: 'hold', reply_text: '', reason: '독립', actor_id: 'operator', created_at: '2026-09-20T00:00:02.000Z',
-    calibration: { purchase_intent: 'high', primary_barrier: 'trust', purchase_readiness: 3, next_action: 'human_consult' } };
+    calibration: { purchase_intent: 'high', primary_barrier: 'trust', purchase_readiness: 3, next_action: 'human_consult' }, calibration_sample_kind: 'operational' };
   const later = { ...first, id: 'review-2', created_at: '2026-09-20T00:00:03.000Z', calibration: { ...first.calibration, primary_barrier: 'price', next_action: 'offer_purchase_info' } };
   assert.equal(calibrationForRun(run.id, [later, first]).id, first.id);
   const summary = buildJevCalibrationSummary([run], [later, first]);
   assert.equal(summary.samples, 1);
+  assert.equal(summary.test_samples, 0);
+  assert.equal(summary.remaining_for_threshold_review, 19);
   assert.deepEqual(summary.dimensions.purchase_intent, { matches: 1, total: 1, rate: 1 });
   assert.deepEqual(summary.dimensions.primary_barrier, { matches: 0, total: 1, rate: 0 });
   assert.deepEqual(summary.dimensions.purchase_readiness, { matches: 1, total: 1, rate: 1 });
   assert.equal(summary.low_confidence_disagreements, 2);
+  const testRun = { ...run, id: 'run-test' };
+  const testReview = { ...first, id: 'review-test', run_id: testRun.id, calibration_sample_kind: 'test' };
+  const withTest = buildJevCalibrationSummary([run, testRun], [first, testReview]);
+  assert.equal(withTest.samples, 1);
+  assert.equal(withTest.test_samples, 1);
 });
 
 test('review payload accepts only a complete closed-set calibration object', () => {
@@ -196,7 +203,9 @@ test('review payload accepts only a complete closed-set calibration object', () 
   const id = '11111111-1111-4111-8111-111111111111';
   const base = { action: 'review', requestId: id, case_id: id, run_id: id, decision: 'hold', reply_text: '', reason: '독립 판정' };
   const calibration = { purchase_intent: 'high', primary_barrier: 'price', purchase_readiness: 3, next_action: 'offer_purchase_info' };
-  assert.deepEqual(server.conversionPayload({ ...base, calibration }).payload.calibration, calibration);
-  assert.throws(() => server.conversionPayload({ ...base, calibration: { ...calibration, purchase_readiness: 2.5 } }), /독립 판정/);
-  assert.throws(() => server.conversionPayload({ ...base, calibration: { ...calibration, extra: 'field' } }), /독립 판정/);
+  assert.deepEqual(server.conversionPayload({ ...base, calibration, calibration_sample_kind: 'operational' }).payload.calibration, calibration);
+  assert.throws(() => server.conversionPayload({ ...base, calibration }), /표본 용도/);
+  assert.throws(() => server.conversionPayload({ ...base, calibration, calibration_sample_kind: 'practice' }), /표본 용도/);
+  assert.throws(() => server.conversionPayload({ ...base, calibration: { ...calibration, purchase_readiness: 2.5 }, calibration_sample_kind: 'test' }), /독립 판정/);
+  assert.throws(() => server.conversionPayload({ ...base, calibration: { ...calibration, extra: 'field' }, calibration_sample_kind: 'test' }), /독립 판정/);
 });
