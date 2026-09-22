@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getOperatorUser } from '@/lib/operator-permissions';
 import { createMockJudgment, type ConversionCase, type ConversionEvidence } from '@/lib/conversion-review';
+import { createJevJudgment } from '@/lib/conversion-jev';
 import { conversionCapabilities, conversionDatabaseError, conversionError, conversionPayload } from '@/lib/conversion-review-server';
 
 const reply = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
@@ -30,7 +31,7 @@ export async function GET() {
     for (const item of result) if (item.error) conversionDatabaseError(item.error);
     const [cases, evidence, questions, courses, cohorts, runs, reviews] = result.map(item => item.data || []);
     return reply({ cases, evidence, questions, courses, cohorts, runs, reviews,
-      capabilities: { can_manage_evidence: user.permissions.products, can_mock: conversionCapabilities(process.env).can_mock, can_manage_funnel: user.permissions.products && user.permissions.marketing },
+      capabilities: { can_manage_evidence: user.permissions.products, ...conversionCapabilities(process.env), can_manage_funnel: user.permissions.products && user.permissions.marketing },
       limits: { cases: 200, evidence: 500, questions: 200, runs: 500, reviews: 500 } });
   } catch (error) { return failure(error); }
 }
@@ -44,7 +45,8 @@ export async function POST(request: Request) {
     try { decoded = JSON.parse(raw); } catch { return reply({ error: '요청 형식을 확인해 주세요.' }, 400); }
     const { action, requestId, payload, payload_hash } = conversionPayload(decoded);
     if (action === 'save_evidence' && !user.permissions.products) return reply({ error: '설명자료 변경에는 상품 관리 권한도 필요합니다.' }, 403);
-    if (action === 'analyze' && !conversionCapabilities(process.env).can_mock) return reply({ error: '모의 판단은 활성화된 개발·검수 환경에서만 실행할 수 있습니다.' }, 403);
+    const capabilities = conversionCapabilities(process.env);
+    if (action === 'analyze' && !capabilities.can_analyze) return reply({ error: '판정 기능은 활성화된 개발·검수 환경에서만 실행할 수 있습니다.' }, 403);
     const db = createAdminClient();
     let result: unknown = null, evidence_versions: Record<string, number> | null = null, observed_version: number | null = null;
     if (action === 'analyze') {
@@ -57,7 +59,9 @@ export async function POST(request: Request) {
       if (rows.error) conversionDatabaseError(rows.error);
       const evidence = (rows.data as ConversionEvidence[] || []).filter(item => item.cohort_id === null || item.cohort_id === inquiry.cohort_id);
       evidence_versions = Object.fromEntries(evidence.map(item => [item.id, item.version]));
-      result = createMockJudgment(inquiry, evidence);
+      result = capabilities.can_jev
+        ? await createJevJudgment(inquiry, evidence, process.env.TYPESAFE_API_KEY || '')
+        : createMockJudgment(inquiry, evidence);
     }
     const saved = await db.rpc('edu_conversion_mutate', { p_actor: user.id, p_request: requestId, p_action: action, p_payload: payload, p_payload_hash: payload_hash, p_result: result, p_evidence_versions: evidence_versions, p_observed_version: observed_version });
     if (saved.error) conversionDatabaseError(saved.error);

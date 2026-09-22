@@ -10,6 +10,7 @@ import { PGlite } from '@electric-sql/pglite';
 const db = new PGlite();
 const sql = fs.readFileSync(new URL('../supabase/migrations/202609200001_conversion_review.sql', import.meta.url), 'utf8');
 const permissionsSql = fs.readFileSync(new URL('../supabase/migrations/202609200002_conversion_review_permissions.sql', import.meta.url), 'utf8');
+const jevSql = fs.readFileSync(new URL('../supabase/migrations/202609220001_conversion_jev_shadow.sql', import.meta.url), 'utf8');
 const serverSource = fs.readFileSync(new URL('../lib/conversion-review-server.ts', import.meta.url), 'utf8');
 const serverExports = {};
 new Function('exports', 'require', ts.transpileModule(serverSource, {
@@ -44,6 +45,7 @@ before(async () => {
   `);
   await db.exec(sql);
   await db.exec(permissionsSql);
+  await db.exec(jevSql);
   await db.query('insert into profiles(id,role) values ($1,\'admin\'),($2,\'staff\'),($3,\'student\')', [ids.admin, ids.staff, ids.student]);
   await db.query('insert into courses(id) values ($1),($2)', [ids.course, ids.otherCourse]);
   await db.query('insert into cohorts(id,course_id) values ($1,$2),($3,$4)', [ids.cohort, ids.course, ids.otherCohort, ids.otherCourse]);
@@ -154,6 +156,16 @@ test('analysis validates the complete approved candidate snapshot and both input
   await assert.rejects(rpc({ ...analyze, requestId: randomUUID() }, { result: mock, versions, observedVersion: 2 }), /CONVERSION_STALE/);
   await assert.rejects(rpc({ ...analyze, requestId: randomUUID(), expected_version: 2 }, { result: mock, versions, observedVersion: 1 }), /CONVERSION_STALE/);
   assert.equal(await count('edu_conversion_runs'), 2);
+});
+
+test('analysis stores Jev shadow results under the matching provider without weakening review requirements', async () => {
+  const { case: inquiry } = await rpc(manual());
+  const analyze = { action: 'analyze', requestId: randomUUID(), case_id: inquiry.id, expected_version: 1 };
+  const result = { mode: 'jev', model: 'jev-test', requires_human_review: true, proposed_reply: '', decisions: {} };
+  const { run } = await rpc(analyze, { result, versions: {}, observedVersion: 1 });
+  assert.equal(run.provider, 'jev');
+  assert.equal(run.result.mode, 'jev');
+  await assert.rejects(rpc({ ...analyze, requestId: randomUUID() }, { result: { ...result, requires_human_review: false }, versions: {}, observedVersion: 1 }), /CONVERSION_INVALID/);
 });
 
 test('native inquiry edits or archival invalidate analysis and review before any write', async () => {

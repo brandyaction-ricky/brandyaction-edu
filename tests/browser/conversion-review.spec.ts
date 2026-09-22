@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createMockJudgment, evidenceVersions, type ConversionCase, type ConversionSnapshot } from '../../lib/conversion-review';
+import { createMockJudgment, evidenceVersions, type ConversionCase, type ConversionRun, type ConversionSnapshot } from '../../lib/conversion-review';
 
 // Synthetic inquiry and product data only. Route interception cannot reach DB,
 // auth, model or message providers, and the fixture server rejects other writes.
@@ -23,8 +23,9 @@ function initialSnapshot(): ConversionSnapshot {
   };
 }
 
-async function fixture(page: Page) {
+async function fixture(page: Page, provider: 'mock' | 'jev' = 'mock') {
   const snapshot = initialSnapshot();
+  if (provider === 'jev') snapshot.capabilities = { ...snapshot.capabilities, can_jev: true, can_analyze: true, analyze_provider: 'jev' };
   const mutations: Record<string, unknown>[] = [];
   const unexpectedApi: string[] = [];
   let forbidden = false;
@@ -46,9 +47,15 @@ async function fixture(page: Page) {
     }
     if (body.action === 'analyze') {
       const item = snapshot.cases.find(row => row.id === body.case_id)!;
-      const run = { id: `run-${snapshot.runs.length + 1}`, case_id: item.id, input_version: item.input_version,
-        provider: 'mock' as const, result: createMockJudgment(item, snapshot.evidence),
-        evidence_versions: evidenceVersions(item, snapshot.evidence), created_at: timestamp };
+      const mock = createMockJudgment(item, snapshot.evidence);
+      const result = provider === 'jev' ? { ...mock, mode: 'jev' as const, model: 'jev-test', decision_version: 1 as const, decisions: {
+        purchase_intent: { type: 'choice' as const, choice: 'medium', confidence: .97, probabilities: { high: .03, medium: .97, low: 0, unclear: 0 } },
+        primary_barrier: { type: 'choice' as const, choice: 'skill_level', confidence: .82, probabilities: { price: 0, schedule: .1, skill_level: .85, content_fit: .05, trust: 0, none_or_unknown: 0 } },
+        purchase_readiness: { type: 'score' as const, score: 2.8, confidence: .88, probabilities: { 0: 0, 1: .05, 2: .2, 3: .7, 4: .05 } },
+        next_action: { type: 'choice' as const, choice: 'answer_specific_questions', confidence: .99, probabilities: { answer_specific_questions: .99, invite_webinar: .01, offer_purchase_info: 0, human_consult: 0, hold_no_contact: 0 } },
+      } } : mock;
+      const run: ConversionRun = { id: `run-${snapshot.runs.length + 1}`, case_id: item.id, input_version: item.input_version,
+        provider, result, evidence_versions: evidenceVersions(item, snapshot.evidence), created_at: timestamp };
       snapshot.runs.push(run);
       await route.fulfill({ json: { ok: true, run } }); return;
     }
@@ -65,6 +72,20 @@ async function fixture(page: Page) {
   await expect(page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ })).toBeVisible();
   return { snapshot, mutations, unexpectedApi, deny: () => { forbidden = true; } };
 }
+
+test('Jev shadow result shows decisions and confidence without triggering another API', async ({ page }) => {
+  const state = await fixture(page, 'jev');
+  await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
+  await page.getByRole('button', { name: 'Jev 그림자 판정 실행', exact: true }).click();
+  await expect(page.getByText('Jev 그림자 판정 · 운영자 확인 필요', { exact: true })).toBeVisible();
+  const result = page.getByLabel('Jev 전환 판정');
+  await expect(result).toContainText('구매 의도중간신뢰도 97%');
+  await expect(result).toContainText('주요 장애물수강 수준신뢰도 82%');
+  await expect(result).toContainText('구매 준비도2.8 / 4신뢰도 88%');
+  await expect(result).toContainText('권장 다음 행동질문에 구체적으로 답변신뢰도 99%');
+  expect(state.unexpectedApi).toEqual([]);
+  expect(state.mutations.map(item => item.action)).toEqual(['analyze']);
+});
 
 async function selectAndAnalyze(page: Page) {
   await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
