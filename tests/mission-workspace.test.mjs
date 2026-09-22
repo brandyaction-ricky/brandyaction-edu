@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { posix } from 'node:path';
 import ts from 'typescript';
 import { PGlite } from '@electric-sql/pglite';
 import { randomUUID } from 'node:crypto';
@@ -10,6 +11,10 @@ function load(path, dependencies = {}) {
   const exports = {};
   new Function('exports','require',code)(exports, name => {
     if (name in dependencies) return dependencies[name];
+    if (name.startsWith('@/features/') || path.startsWith('features/') && name.startsWith('.')) {
+      const target = name.startsWith('@/') ? name.slice(2) : posix.normalize(posix.join(posix.dirname(path), name));
+      return load(target + '.ts', dependencies);
+    }
     if (name.startsWith('@/lib/')) return load(name.replace('@/', '')+'.ts', dependencies);
     if (name.startsWith('./')) return load('lib/'+name.slice(2)+'.ts', dependencies);
     throw Error(name);

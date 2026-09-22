@@ -14,6 +14,7 @@ const assets = new Map(result.outputFiles.map(file=>['/'+file.path.split('/').at
 const server = createServer((request,response)=>{
   const url=new URL(request.url,'http://localhost');
   if(request.method!=='GET'){response.writeHead(405).end();return;}
+  if(url.pathname==='/api/mission/questions'){response.setHeader('Content-Type','application/json');response.end(JSON.stringify({rows:[],page:1,pageSize:20,total:0}));return;}
   if(url.pathname==='/api/platform/workflows' && url.searchParams.get('kind')==='quiz'){response.setHeader('Content-Type','application/json');response.end(JSON.stringify({quiz:null}));return;}
   if(url.pathname==='/api/landing/performance'){
     response.setHeader('Content-Type','application/json');

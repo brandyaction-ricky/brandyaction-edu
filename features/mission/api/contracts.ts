@@ -1,3 +1,8 @@
+import type { Row } from '@/lib/platform';
+
+export type MissionData = Record<string, Row[]>;
+export type MissionSend = (body: Record<string, unknown>, success?: string) => Promise<Record<string, unknown>>;
+
 export type MissionIdentity = {
   userId: string;
   courseId: string;

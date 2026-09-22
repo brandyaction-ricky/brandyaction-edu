@@ -1,9 +1,9 @@
 import { processRefund } from '@/lib/refunds';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAuthenticatedUser } from '@/lib/server-auth';
-import { hasLearningAccess } from '@/lib/platform-rules';
+import { readMissionQuiz, saveMissionQuiz, reviewMissionSubmissions } from '@/features/mission/server';
 import { uuid, validateMeasurementCode, validateSetting } from '@/lib/edu-workflows';
-import { publicQuiz, validateQuiz, type QuizDefinition } from '@/lib/mission-quiz';
+
 import { safeUrl } from '@/lib/platform';
 import { normalizeOperatorPermissions, permissionsFor } from '@/lib/operator-permissions';
 import { participantMatrix } from '@/lib/participant-matrix';
@@ -37,28 +37,7 @@ export async function GET(request: Request) {
         const params = new URL(request.url).searchParams;
         const kind = params.get('kind');
         const db = createAdminClient();
-        if (kind === 'quiz') {
-            const missionId = params.get('mission');
-            if (!uuid(missionId)) fail('미션을 확인해 주세요.');
-            const { data: mission } = await db.from('curriculum_missions').select('*,curriculum_lessons!inner(is_published,curriculum_weeks!inner(is_published,course_id))').eq('id', missionId).single();
-            if (!mission) fail('미션을 찾을 수 없습니다.', 404);
-            if (user.role !== 'admin') {
-                const lesson = mission.curriculum_lessons;
-                const { data: enrollment } = await db.from('enrollments').select('*').eq('id', params.get('enrollment')).eq('user_id', user.id).eq('course_id', lesson.curriculum_weeks.course_id).maybeSingle();
-                if (!enrollment || !hasLearningAccess(enrollment) || !mission.is_published || !lesson.is_published || !lesson.curriculum_weeks.is_published) fail('수강 권한이 필요합니다.', 403);
-            }
-            const { data: row, error } = await db.from('mission_quizzes').select('*').eq('mission_id', missionId).maybeSingle();
-            if (error) throw error;
-            const quiz = row
-                ? ({
-                      questions: row.questions,
-                      passPercent: row.pass_percent,
-                  } as QuizDefinition)
-                : null;
-            return reply({
-                quiz: quiz ? (user.role === 'admin' ? { ...quiz, revision: row!.revision } : publicQuiz(quiz, row!.revision)) : null,
-            });
-        }
+        if (kind === 'quiz') return await readMissionQuiz(db, user, params);
         const permissions = await permissionsFor(user);
         if (!permissions.members && !permissions.marketing) return reply({ error: '조회 권한이 필요합니다.' }, 403);
         if (kind === 'participants') {
@@ -261,27 +240,9 @@ export async function POST(request: Request) {
                 p_shift: body.shift,
             });
         } else if (body.action === 'quiz') {
-            if (!uuid(body.missionId) || (body.revision && !uuid(body.revision))) fail('미션을 확인해 주세요.');
-            if (body.quiz !== null) {
-                const error = validateQuiz(body.quiz);
-                if (error) fail(error);
-            }
-            result = await db.rpc('edu_save_quiz', {
-                p_actor: user.id,
-                p_mission: body.missionId,
-                p_revision: body.revision || null,
-                p_quiz: body.quiz,
-            });
+            result = await saveMissionQuiz(db, user.id, body);
         } else if (body.action === 'review') {
-            if (!['approved', 'changes_requested', 'rejected'].includes(body.decision)) fail('검토 결과를 선택해 주세요.');
-            const feedback = string(body.feedback, 2000);
-            if (body.decision !== 'approved' && !feedback) fail('보완·반려 사유를 입력해 주세요.');
-            result = await db.rpc('review_mission_submissions', {
-                p_actor: user.id,
-                p_ids: ids(body.ids),
-                p_decision: body.decision,
-                p_feedback: feedback,
-            });
+            result = await reviewMissionSubmissions(db, user.id, body);
         } else if (body.action === 'assign') {
             if (!['tag', 'coupon'].includes(body.kind) || !uuid(body.targetId) || typeof body.remove !== 'boolean') fail('태그 또는 쿠폰을 선택해 주세요.');
             result = await db.rpc('edu_assign_customers', {

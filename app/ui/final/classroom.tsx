@@ -25,6 +25,7 @@ import {
   type WorkflowSend,
 } from "../learning-workflows";
 import { enrollmentLessons, missionEntries } from "./member-views";
+import { MissionDiscussion } from '@/features/mission/ui';
 import { Badge, Empty, Heading, ResourceRow, Video } from "./primitives";
 
 export function Classroom({
@@ -120,6 +121,7 @@ export function Classroom({
                   pending={pending}
                   send={send}
                 />
+                <MissionDiscussion key={entry.mission.id + enrollment.id} missionId={entry.mission.id} enrollmentId={enrollment.id}/>
                 <Link className="link" href={lessonHref}>
                   <ArrowLeft />
                   학습실로

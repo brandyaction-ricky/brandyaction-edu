@@ -1,12 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { posix } from 'node:path';
 import ts from 'typescript';
 
 function load(path, dependencies = {}) {
   const code = ts.transpileModule(fs.readFileSync(new URL('../' + path, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const exports = {};
   new Function('exports', 'require', code)(exports, name => {
+    if (!(name in dependencies) && (name.startsWith('@/features/') || path.startsWith('features/') && (name.startsWith('.') || name.startsWith('@/lib/')))) {
+      const target = name.startsWith('@/') ? name.slice(2) : posix.normalize(posix.join(posix.dirname(path), name));
+      return load(target + '.ts', dependencies);
+    }
     if (!(name in dependencies)) throw Error(name);
     return dependencies[name];
   });

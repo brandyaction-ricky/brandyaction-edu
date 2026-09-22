@@ -1,13 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { posix } from 'node:path';
 import ts from 'typescript';
 
 function load(path, dependencies = {}) {
   const source = fs.readFileSync(new URL('../' + path, import.meta.url), 'utf8');
   const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const exports = {};
-  new Function('exports', 'require', compiled)(exports, name => { if (!(name in dependencies)) throw Error(name); return dependencies[name]; });
+  new Function('exports', 'require', compiled)(exports, name => {
+    if (name in dependencies) return dependencies[name];
+    if (name.startsWith('@/features/') || path.startsWith('features/') && (name.startsWith('.') || name.startsWith('@/lib/'))) {
+      const target = name.startsWith('@/') ? name.slice(2) : posix.normalize(posix.join(posix.dirname(path), name));
+      return load(target + '.ts', dependencies);
+    }
+    throw Error(name);
+  });
   return exports;
 }
 const rules = load('lib/qa-rules.ts');

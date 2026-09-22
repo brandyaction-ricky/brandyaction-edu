@@ -12,7 +12,7 @@ import {
 } from "@/lib/platform";
 import { paidCourseReadinessIssues, recordId } from "@/lib/platform-rules";
 import { archiveValues, cohortPeriod, cohortStatus } from "@/lib/qa-rules";
-import { readMissionForm } from "@/lib/mission-workspace";
+import { readMissionForm } from "@/features/mission";
 import { ArrowRight, BookOpen, ChevronDown, ChevronUp, FileText, Pencil, RotateCcw, Search, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";

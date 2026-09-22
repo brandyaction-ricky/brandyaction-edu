@@ -25,7 +25,7 @@ function load(file) {
     if (name === '@/lib/supabase/client') return { createClient: () => { throw Error('Unexpected authentication mutation during render'); } };
     if (name.startsWith('@/') || name.startsWith('.')) {
       const base = name.startsWith('@/') ? path.join(root, name.slice(2)) : path.resolve(path.dirname(absolute), name);
-      const target = ['', '.ts', '.tsx'].map(extension => base + extension).find(file => fs.existsSync(file) && fs.statSync(file).isFile());
+      const target = ['', '.ts', '.tsx', '/index.ts', '/index.tsx'].map(extension => base + extension).find(file => fs.existsSync(file) && fs.statSync(file).isFile());
       if (!target) throw Error('Cannot resolve ' + name);
       return load(target);
     }

@@ -1,6 +1,48 @@
 import { test, expect } from '@playwright/test';
 
 test.beforeEach(async ({page}) => {await page.goto('/mission-demo');});
+
+test('mission discussion saves once, shows operator answer, retains failed input and clears rows after access loss', async ({page}) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  let rows: Record<string, unknown>[] = [], writes = 0, denied = false, fail = false;
+  await page.route('**/api/mission/questions**', async route => {
+    if (denied) return route.fulfill({status:403,json:{error:'수강 권한이 필요합니다.'}});
+    if (route.request().method() === 'POST') {
+      writes++;
+      if (fail) return route.fulfill({status:503,json:{error:'일시적 저장 실패'}});
+      const body = route.request().postDataJSON();
+      expect(body.missionId).toBe('44444444-4444-4444-8444-444444444444');
+      expect(body.enrollmentId).toBe('55555555-5555-4555-8555-555555555555');
+      expect(body.requestId).toMatch(/^[0-9a-f-]{36}$/);
+      rows = [{id:'question',title:body.title,content:body.content,status:'open'}];
+      return route.fulfill({json:{ok:true,id:'question'}});
+    }
+    return route.fulfill({json:{rows,page:1,pageSize:20,total:rows.length}});
+  });
+  await member(page);
+  const discussion = page.getByRole('region',{name:'이 미션 질문·답변'});
+  await discussion.getByRole('textbox',{name:'미션 질문 제목'}).fill('실행 순서 질문');
+  await discussion.getByRole('textbox',{name:'미션 질문 내용'}).fill('첫 단계를 알려주세요');
+  await discussion.getByRole('button',{name:'미션 질문 등록',exact:true}).click();
+  await expect(discussion.getByRole('heading',{name:'실행 순서 질문'})).toBeVisible();
+  expect(writes).toBe(1);
+  rows[0] = {...rows[0],status:'answered',answer:'먼저 실행 목표를 정하세요'};
+  await discussion.getByRole('button',{name:'답변 새로고침'}).click();
+  await expect(discussion.getByText('먼저 실행 목표를 정하세요')).toBeVisible();
+  fail = true;
+  await discussion.getByRole('textbox',{name:'미션 질문 제목'}).fill('남겨둘 질문');
+  await discussion.getByRole('textbox',{name:'미션 질문 내용'}).fill('저장 실패 시 보존');
+  await discussion.getByRole('button',{name:'미션 질문 등록',exact:true}).click();
+  await expect(discussion.getByRole('alert')).toContainText('일시적 저장 실패');
+  await expect(discussion.getByRole('textbox',{name:'미션 질문 내용'})).toHaveValue('저장 실패 시 보존');
+  denied = true;
+  await discussion.getByRole('button',{name:'답변 새로고침'}).click();
+  await expect(discussion.getByText('먼저 실행 목표를 정하세요')).toHaveCount(0);
+  await expect(discussion.getByRole('textbox',{name:'미션 질문 제목'})).toBeDisabled();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  expect(errors).toEqual([]);
+});
 async function member(page: import('@playwright/test').Page) {
   await page.getByRole('button',{name:'회원 · 내 미션',exact:true}).click();
   await page.getByRole('link',{name:/미션 시작|이어서 작성|보완하기/}).first().click();

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { posix } from 'node:path';
 import ts from 'typescript';
 import { randomUUID } from 'node:crypto';
 import { PGlite } from '@electric-sql/pglite';
@@ -51,6 +52,7 @@ async function database() {
     revoke execute on function submit_learning_mission(uuid,uuid,uuid,jsonb,uuid,jsonb),review_mission_submissions(uuid,uuid[],text,text) from public,anon,authenticated;
     grant execute on function submit_learning_mission(uuid,uuid,uuid,jsonb,uuid,jsonb),review_mission_submissions(uuid,uuid[],text,text) to service_role;`);
   await db.exec(priority);
+  await db.exec(migration('20260922062939_mission_question_context'));
   const ids = Object.fromEntries(['admin','staff','denied','member','other','course','week','lesson','lesson2','enrollment','otherEnrollment'].map(key=>[key,randomUUID()]));
   for (const key of ['admin','staff','denied','member','other']) await db.query('insert into profiles values($1,$2,$3,$4,$5)',[ids[key],key==='admin'?'admin':key==='staff'||key==='denied'?'staff':'student','active','Synthetic '+key,key+'@example.test']);
   await db.query('insert into site_settings values($1,$2)',['edu_staff_permissions_'+ids.staff,{products:true,members:true}]);
@@ -63,6 +65,37 @@ async function database() {
   await db.exec('set role service_role');
   return {db,ids,call,values};
 }
+
+test('mission questions preserve context, ownership, idempotency and private replies without changing general questions',async()=>{
+  const {db,ids,call,values}=await database();try{
+    const mission=await call('save_mission_definition',[ids.admin,randomUUID(),null,null,values]);
+    const request=randomUUID();
+    const args=[ids.member,request,ids.enrollment,mission.id,'실행 질문','어떤 순서인가요?'];
+    const saved=await call('create_mission_question',args);
+    assert.equal((await call('create_mission_question',args)).id,saved.id);
+    await assert.rejects(call('create_mission_question',[...args.slice(0,5),'다른 내용']),/같은 요청/);
+    const row=(await db.query('select * from edu_questions where id=$1',[saved.id])).rows[0];
+    assert.equal(row.course_id,ids.course);assert.equal(row.mission_id,mission.id);assert.equal(row.enrollment_id,ids.enrollment);assert.equal(row.user_id,ids.member);
+    await db.query("update edu_questions set answer='먼저 목표를 정하세요',status='answered' where id=$1",[saved.id]);
+    for(const [actor,expected] of [[ids.member,1],[ids.other,0]]){
+      await db.exec('reset role');await db.query("select set_config('request.jwt.claim.sub',$1,false)",[actor]);await db.exec('set role authenticated');
+      const rows=(await db.query('select * from edu_questions')).rows;assert.equal(rows.length,expected);
+      if(expected)assert.equal(rows[0].answer,'먼저 목표를 정하세요');
+      await assert.rejects(call('create_mission_question',args),/permission denied/);
+      await assert.rejects(db.query('insert into edu_questions(user_id,mission_id,enrollment_id,title,content) values($1,$2,$3,$4,$5)',[actor,mission.id,ids.enrollment,'직접 요청','권한 우회']),/permission denied/);
+      await db.exec('reset role;set role service_role');
+    }
+    for(const [actor,enrollment,mid] of [[ids.other,ids.enrollment,mission.id],[ids.member,ids.otherEnrollment,mission.id],[ids.member,ids.enrollment,randomUUID()]])await assert.rejects(call('create_mission_question',[actor,randomUUID(),enrollment,mid,'제목','내용']),/권한/);
+    await db.query("update enrollments set access_ends_at=now()-interval '1 second' where id=$1",[ids.enrollment]);
+    await assert.rejects(call('create_mission_question',[ids.member,randomUUID(),ids.enrollment,mission.id,'제목','내용']),/권한/);
+    await db.query('update enrollments set access_ends_at=null where id=$1',[ids.enrollment]);
+    await db.query('update curriculum_lessons set is_published=false where id=$1',[ids.lesson]);
+    await assert.rejects(call('create_mission_question',args),/권한/);
+    assert.equal((await db.query('select count(*)::int n from edu_questions')).rows[0].n,1);
+    await db.query("insert into edu_questions(user_id,title,content) values($1,'일반 문의','일반 내용')",[ids.member]);
+    assert.equal((await db.query('select count(*)::int n from edu_questions where mission_id is null')).rows[0].n,1);
+  }finally{await db.close();}
+});
 
 test('mission-only definition RPC permits scoped staff, denies revoked roles and preserves CAS/idempotency',async()=>{
   const {db,ids,call,values}=await database();try{
@@ -170,9 +203,10 @@ test('review query reaches older submissions beyond 1000 with global filtering, 
 });
 
 test('review API authenticates before query, validates filters, and derives actor on the server',async()=>{
-  const load=(path,deps={})=>{const exports={};new Function('exports','require',ts.transpileModule(read(path),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(exports,name=>name in deps?deps[name]:load(name.replace('@/','')+'.ts',deps));return exports;};
+  const load=(path,deps={})=>{const exports={};new Function('exports','require',ts.transpileModule(read(path),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(exports,name=>name in deps?deps[name]:load((name.startsWith('@/')?name.slice(2):posix.normalize(posix.join(posix.dirname(path),name)))+'.ts',deps));return exports;};
   let operator={id:randomUUID()},calls=[];
   const route=load('app/api/mission/reviews/route.ts',{
+    '@/lib/server-auth': {},
     '@/lib/operator-permissions':{getOperatorUser:async scope=>{assert.equal(scope,'members');return operator;}},
     '@/lib/supabase/admin':{createAdminClient:()=>({rpc:async(name,args)=>{calls.push({name,args});return {data:{rows:[]},error:null};}})},
   });

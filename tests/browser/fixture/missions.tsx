@@ -5,6 +5,7 @@ import { AdminCatalog } from '../../../app/ui/final/admin-catalog';
 import { Missions } from '../../../app/ui/final/member-views';
 import { MissionForm, type Data, type WorkflowSend } from '../../../app/ui/learning-workflows';
 import { SubmissionReview } from '../../../app/ui/final/submission-review';
+import { MissionDiscussion } from '../../../features/mission/ui';
 import '../../../app/ui/final/frontend.css';
 import '../../../app/ui/final/admin.css';
 import '../../../app/ui/final/integration.css';
@@ -44,7 +45,7 @@ export function MissionFixture() {
     {message && <p role="status">{message}</p>}
     {mode==='admin'&&<><div className="section-head"><div><span className="eyebrow">LEARNING OPERATIONS</span><h1>미션 관리</h1><p>회원이 배운 것을 실행할 수 있도록 질문과 완료 기준을 설계하세요.</p></div><button className="btn primary" onClick={()=>setEditing(null)}>새 미션 만들기</button></div><AdminCatalog section={sections.find(s=>s.key==='missions')!} data={data} selection={selection} setSelection={setSelection} edit={(_,row)=>setEditing(row||null)} archive={()=>{}} pending={pending} loading={false} pagination={null} setPage={()=>{}} exportCsv={()=>{}}/></>}
     {mode==='member'&&<main className="account-main" onClick={event=>{const link=(event.target as Element).closest('a');if(link?.getAttribute('href')?.startsWith('/learn/')){event.preventDefault();setSelected(new URL(link.href).searchParams.get('mission')||mission);setMode('perform');}}}><Missions data={{...data,curriculum_missions:data.curriculum_missions.filter(m=>m.is_published)}} active={data.enrollments}/></main>}
-    {mode==='perform'&&<><button className="btn" onClick={()=>setMode('member')}>내 미션으로 돌아가기</button><MissionForm key={selected+generation+(submission?.id||'')} mission={target} enrollment={data.enrollments[0]} submission={submission} draft={data.edu_mission_drafts.find(d=>d.mission_id===selected)} pending={pending} send={send}/></>}
+    {mode==='perform'&&<><button className="btn" onClick={()=>setMode('member')}>내 미션으로 돌아가기</button><MissionForm key={selected+generation+(submission?.id||'')} mission={target} enrollment={data.enrollments[0]} submission={submission} draft={data.edu_mission_drafts.find(d=>d.mission_id===selected)} pending={pending} send={send}/><MissionDiscussion key={selected} missionId={selected} enrollmentId={enrollment}/></>}
     {mode==='review'&&<><h1>제출물 검토</h1><SubmissionReview data={data} send={send} pending={pending} remote={new URLSearchParams(location.search).has('remote')}/></>}
     {editing!==undefined&&<MissionEditor row={editing||undefined} data={data} pending={pending} send={send} close={()=>setEditing(undefined)}/>}
   </div>;
