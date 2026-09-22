@@ -18,6 +18,7 @@ import {
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { DigitalContentSection, ProductResource } from "@/lib/product-metadata";
+import { courseOfferLifecycle } from "@/lib/platform-rules";
 
 export function Badge({
   children,
@@ -124,7 +125,10 @@ export function Cover({ course }: { course: Row }) {
     </div>
   );
 }
-export function CourseCard({ course }: { course: Row }) {
+const offerLabels = { recruiting: "모집 중", upcoming: "모집 예정", closed: "모집 종료", cancelled: "운영 취소" } as const;
+
+export function CourseCard({ course, cohorts = [] }: { course: Row; cohorts?: Row[] }) {
+  const lifecycle = courseOfferLifecycle(course, cohorts);
   return (
     <Link className="course-card" href={"/classes/" + t(course, "slug")}>
       <Cover course={course} />
@@ -136,6 +140,7 @@ export function CourseCard({ course }: { course: Row }) {
           {t(course, "duration_label") && (
             <Badge>{t(course, "duration_label")}</Badge>
           )}
+          <Badge color={lifecycle === "recruiting" ? "green" : lifecycle === "closed" || lifecycle === "cancelled" ? "" : "red"}>{offerLabels[lifecycle]}</Badge>
         </div>
         <h3>{t(course, "title")}</h3>
         <p>{t(course, "schedule_label") || t(course, "summary")}</p>
@@ -145,6 +150,7 @@ export function CourseCard({ course }: { course: Row }) {
             : money(num(course, "list_price"))}
           <ArrowRight className="arrow" />
         </div>
+        <span className="course-card-cta">{lifecycle === "recruiting" ? "상세 보고 신청하기" : lifecycle === "upcoming" ? "일정 확인하기" : "상세 보기"}</span>
       </div>
     </Link>
   );

@@ -9,7 +9,7 @@ import {
   type Row,
   type User,
 } from "@/lib/platform";
-import { containsFreeClassCampaign, hasLearningAccess, isPurchasableOffer, paidCourseReadinessIssues } from "@/lib/platform-rules";
+import { containsFreeClassCampaign, courseOfferLifecycle, hasLearningAccess, isPurchasableOffer, isRecruiting, offerLifecycle, paidCourseReadinessIssues, unavailableOfferLabel } from "@/lib/platform-rules";
 import { cohortPeriod } from "@/lib/qa-rules";
 import {
   ArrowLeft,
@@ -115,35 +115,43 @@ export function AuthView({
 }
 
 import type { LandingConfig } from "@/lib/landing";
-import { CampaignFreeClass } from "../landing/free-class";
+import { CampaignFreeClass, LandingTracker } from "../landing/free-class";
 
 export function ProductDetail({ course, data }: { course: Row; data: Data }) {
   const config = num(course, 'list_price') === 0 ? (data.landing_configs || []).find(row => row.id === course.id) : undefined;
-  if (config && productConversion(object(course, 'metadata'), config).url) {
+  const enrolled = (data.enrollments || []).some(item => item.course_id === course.id && hasLearningAccess(item));
+  const acceptingApplications = course.status === 'published' && (data.cohorts || []).some(item => item.course_id === course.id && isRecruiting(item));
+  if (config && productConversion(object(course, 'metadata'), config).url && !enrolled && acceptingApplications) {
     const frozen = object(config, "course_snapshot");
     const currentMetadata = object(course, "metadata");
     const campaignCourse = { ...course, ...frozen, metadata: { ...object(frozen as Row, "metadata"), ...currentMetadata } } as Row;
     return <CampaignFreeClass course={campaignCourse} config={config as unknown as LandingConfig} resources={productResources(currentMetadata)} />;
   }
-  return <StandardProductDetail course={course} data={data} />;
+  const tracking = Boolean(config?.enabled && Number(config.layout_ver) > 0);
+  const detail = <StandardProductDetail course={course} data={data} tracking={tracking} />;
+  return tracking ? <LandingTracker config={config as unknown as LandingConfig}>{detail}</LandingTracker> : detail;
 }
 
 function StandardProductDetail({
   course: c,
   data,
+  tracking = false,
 }: {
   course: Row;
   data: Data;
+  tracking?: boolean;
 }) {
   const type = courseType(c),
     digital = type === "디지털 상품",
     free = type === "무료 클래스";
-  const cohorts = (data.cohorts || []).filter((g) => g.course_id === c.id),
+  const cohorts = (data.cohorts || []).filter((g) => g.course_id === c.id && !g.archived_at),
     [cohortId, setCohortId] = useState("");
-  const purchasable = (cohort: Row) => isPurchasableOffer(c, cohort);
+  const purchasable = (cohort: Row) => c.status === 'published' && (free ? isRecruiting(cohort) : isPurchasableOffer(c, cohort));
   let available =
     cohorts.find((g) => g.id === cohortId && purchasable(g)) ||
     cohorts.find(purchasable);
+  const lifecycle = courseOfferLifecycle(c, cohorts);
+  const displayCohort = available || cohorts.find(item => offerLifecycle(item) === lifecycle) || cohorts[0];
   const enrolled = (data.enrollments || []).find(
     (e) => e.course_id === c.id && hasLearningAccess(e),
   );
@@ -169,31 +177,34 @@ function StandardProductDetail({
   const readinessIssues = paidCourseReadinessIssues(c, cohorts, data.curriculum_weeks || [], data.curriculum_lessons || []);
   const readyForSale = readinessIssues.length === 0;
   if (!readyForSale) available = undefined;
-  const conversion = productConversion(meta);
-  const customCta = !enrolled && readyForSale && !!conversion.url;
-  const price = available ? num(available, "price") : num(c, "list_price");
-  const unavailableFree = free && !enrolled;
+  const landingConfig = free ? (data.landing_configs || []).find(item => item.id === c.id) : undefined;
+  const conversion = productConversion(meta, landingConfig);
+  const customCta = !enrolled && !!available && !!conversion.url;
+  const price = free ? 0 : available ? num(available, "price") : num(c, "list_price");
+  const unavailable = !enrolled && !available;
   const href = enrolled
     ? digital
       ? "/my/resources"
       : "/learn/" + enrolled.id
-    : unavailableFree ? '/classes' : available
+    : available
       ? "/" + (price === 0 ? "apply" : "checkout") + "?cohort=" + available.id
       : "/classes";
   const cta = enrolled
     ? digital
       ? "내 자료실로 이동"
       : "학습 이어가기"
-    : unavailableFree ? '참여 링크 준비 중' : available
+    : available
       ? free
         ? "무료로 신청하기"
         : digital
           ? "구매하기"
           : "수강 신청하기"
-      : "다음 모집 준비 중";
-  const button = customCta ? <ProductCtaLink conversion={conversion} courseId={c.id} position="sidebar_cta" className="btn primary full large" /> : unavailableFree ? <button className="btn primary full large" disabled>참여 링크 준비 중</button> : (
+      : readyForSale ? unavailableOfferLabel(lifecycle) : '판매 준비 중';
+  const applicationCta = { href: unavailable ? '' : customCta ? conversion.url : href, label: customCta ? conversion.label : cta, disabled: unavailable, enrolled: Boolean(enrolled), conversionUrl: conversion.url };
+  const button = customCta ? <ProductCtaLink conversion={conversion} courseId={c.id} position="sidebar_cta" className="btn primary full large" /> : unavailable ? <button className="btn primary full large" disabled>{cta}</button> : (
     <Link
       href={href}
+      data-landing-cta={free && tracking && !enrolled ? "sticky_cta" : undefined}
       aria-disabled={!enrolled && !available}
       className={
         "btn primary full large " + (!enrolled && !available ? "disabled" : "")
@@ -228,9 +239,9 @@ function StandardProductDetail({
       {free ? (
         <>
           <h1 className="sr-only">{t(c, "title")} · 무료 클래스</h1>
-          <div className="free-body">
+          <div className="free-body" data-section="detail">
             <div className="free-sheet">
-              {documentSource || detailHtml ? <ProductDetailHtml html={detailHtml} documentSource={documentSource} /> : detailImage ? (
+              {documentSource || detailHtml ? <ProductDetailHtml html={detailHtml} documentSource={documentSource} applicationCta={applicationCta} /> : detailImage ? (
                 <div className="detail-image-stack">{detailImages.map((image, index) => <img
                   className="detail-image"
                   src={image.path}
@@ -242,7 +253,7 @@ function StandardProductDetail({
                   <Cover course={c} />
                   <h2 className="mt24">{t(c, "title")}</h2>
                   <p className="lead mt16">{t(c, "summary")}</p>
-                  {detailHtml ? <ProductDetailHtml html={detailHtml} className="product-detail-html reading-copy mt24" /> : <div className="reading-copy mt24">{t(c, "description")}</div>}
+                  {detailHtml ? <ProductDetailHtml html={detailHtml} applicationCta={applicationCta} className="product-detail-html reading-copy mt24" /> : <div className="reading-copy mt24">{t(c, "description")}</div>}
                 </section>
               )}
               {hasResources && downloadSection}
@@ -259,7 +270,7 @@ function StandardProductDetail({
             <span>/ {type}</span>
           </div>
           <div className="product-layout">
-            <div className="product-main">
+            <div className="product-main" data-section="detail">
               <Cover course={c} />
               <h1>{t(c, "title")}</h1>
               <p className="lead">{t(c, "summary")}</p>
@@ -275,14 +286,14 @@ function StandardProductDetail({
                     ? "반복 업무를 줄이는 작은 도구."
                     : "이 클래스에서 만들 변화"}
                 </h2>
-                {visibleDocumentSource || visibleDetailHtml ? <ProductDetailHtml html={visibleDetailHtml} documentSource={visibleDocumentSource} /> : detailImage ? (
+                {visibleDocumentSource || visibleDetailHtml ? <ProductDetailHtml html={visibleDetailHtml} documentSource={visibleDocumentSource} applicationCta={applicationCta} /> : detailImage ? (
                   <div className="detail-image-stack">{detailImages.map((image, index) => <img
                     className="detail-image"
                     src={image.path}
                     alt={image.alt || `${t(c, "title")} 상세 안내 ${index + 1}`}
                     key={image.path + index}
                   />)}</div>
-                ) : visibleDetailHtml ? <ProductDetailHtml html={visibleDetailHtml} /> : (
+                ) : visibleDetailHtml ? <ProductDetailHtml html={visibleDetailHtml} applicationCta={applicationCta} /> : (
                   <div className="reading-copy">
                     {t(c, "description") || t(c, "summary")}
                   </div>
@@ -315,6 +326,11 @@ function StandardProductDetail({
                   <p className="muted">커리큘럼 공개를 준비하고 있습니다.</p>
                 )}
               </section>
+              {!digital && displayCohort && (data.cohort_sessions || []).some(session => session.cohort_id === displayCohort.id && session.is_public) && <section className="detail-section" id="class-schedule">
+                <h2>라이브 회차 일정</h2>
+                <p className="muted">입장 주소와 다시보기는 유효한 수강권이 있는 회원에게만 공개됩니다.</p>
+                {(data.cohort_sessions || []).filter(session => session.cohort_id === displayCohort.id && session.is_public).sort((a,b) => num(a,"session_number") - num(b,"session_number")).map(session => <div className="lesson-line" key={session.id}><BookOpen /><span>{num(session,"session_number")}회 · {t(session,"title")}</span><span className="spacer"/><small>{session.scheduled_at ? new Date(String(session.scheduled_at)).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "long", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit" }) : "일정 미정"}</small></div>)}
+              </section>}
               {!digital && (
                 <>
                   <section className="detail-section" id="class-reviews">
@@ -341,7 +357,7 @@ function StandardProductDetail({
                       <p className="muted">아직 공개된 수강 후기가 없습니다.</p>
                     )}
                   </section>
-                  <section className="detail-section">
+                  {meta.instructor_approved === true && <section className="detail-section">
                     <h2>함께할 강사</h2>
                     <div className="instructor">
                       <div className="avatar">
@@ -349,10 +365,10 @@ function StandardProductDetail({
                       </div>
                       <div>
                         <h3>{t(c, "instructor_name") || "브랜디액션"}</h3>
-                        <p>{String(meta.instructorBio || "")}</p>
+                        <p>{String(meta.instructor_bio || meta.instructorBio || "")}</p>
                       </div>
                     </div>
-                  </section>
+                  </section>}
                 </>
               )}
               <section className="detail-section" id="class-guide">
@@ -369,6 +385,8 @@ function StandardProductDetail({
                       : "신청 완료 후 내 클래스에서 기수별 일정과 학습 콘텐츠를 확인하세요."}
                   </div>
                 </details>
+                {String(meta.provided_items || "").trim() && <details className="accordion"><summary>제공 항목</summary><div className="inside reading-copy">{String(meta.provided_items)}</div></details>}
+                {String(meta.usage_notes || "").trim() && <details className="accordion"><summary>이용 유의사항</summary><div className="inside reading-copy">{String(meta.usage_notes)}</div></details>}
                 <details className="accordion">
                   <summary>이용 및 환불 안내</summary>
                   <div className="inside">
@@ -385,6 +403,7 @@ function StandardProductDetail({
                 <h2>{t(c, "title")}</h2>
                 {Number(meta.regular_price) > price && <del className="meta">{money(Number(meta.regular_price))}</del>}
                 <div className="price">{money(price)}</div>
+                {Number(meta.regular_price) > price && <p className="discount-info">{Math.round((1 - price / Number(meta.regular_price)) * 100)}% 할인 · 최종 결제 금액은 선택한 기수 판매가와 적용 쿠폰을 기준으로 계산됩니다.</p>}
                 <dl className="info-lines">
                   <div>
                     <dt>{digital ? "제공 시점" : "학습 기간"}</dt>
@@ -405,8 +424,10 @@ function StandardProductDetail({
                   </div>
                   <div>
                     <dt>모집 마감</dt>
-                    <dd>{date(available?.recruitment_end_at)}</dd>
+                    <dd>{date(displayCohort?.recruitment_end_at)}</dd>
                   </div>
+                  <div><dt>모집 상태</dt><dd>{{ recruiting: "모집 중", upcoming: "모집 예정", closed: "모집 종료", cancelled: "운영 취소" }[lifecycle]}</dd></div>
+                  {num(displayCohort,"capacity") > 0 && <div><dt>정원</dt><dd>{num(displayCohort,"capacity")}명</dd></div>}
                 </dl>
                 {cohorts.filter(purchasable).length > 1 && (
                   <label className="field">
@@ -433,7 +454,7 @@ function StandardProductDetail({
           </div>
         </div>
       )}
-      <aside className={"bottom-cta " + (free ? "single-cta" : "product-mobile-cta")}>
+      <aside className={"bottom-cta " + (free ? "single-cta" : "product-mobile-cta")} data-section="final">
         <div className="wrap">
           {!free && <div>
             <div className="cta-price">
@@ -443,8 +464,9 @@ function StandardProductDetail({
               {t(available, "name") || t(c, "schedule_label")}
             </p>
           </div>}
-          {customCta ? <ProductCtaLink conversion={conversion} courseId={c.id} position="sticky_cta" /> : unavailableFree ? <button className="btn primary large" disabled>참여 링크 준비 중</button> : <Link
+          {customCta ? <ProductCtaLink conversion={conversion} courseId={c.id} position="sticky_cta" /> : unavailable ? <button className="btn primary large" disabled>{cta}</button> : <Link
             href={href}
+            data-landing-cta={free && tracking && !enrolled ? "sticky_cta" : undefined}
             aria-disabled={!enrolled && !available}
             className={
               "btn primary large " + (!enrolled && !available ? "disabled" : "")

@@ -13,7 +13,7 @@ function validProductImage(value: unknown) {
   return /^(?:\/?(?:edu|site|images|assets|courses)\/)[a-z0-9/_\-.]+\.(?:png|jpe?g|webp|gif|avif)(?:\?[^#]*)?$/i.test(value);
 }
 
-export const productMetadataFields = ['thumbnail_url', 'detail_image_url', 'detail_images', 'regular_price', 'seo_title', 'seo_description', 'detail_html', 'detail_html_document', 'cta_price_label', 'cta_label', 'cta_url', 'cta_color', 'meta_pixel_id'] as const;
+export const productMetadataFields = ['thumbnail_url', 'detail_image_url', 'detail_images', 'regular_price', 'public_keywords', 'instructor_bio', 'instructor_approved', 'provided_items', 'usage_notes', 'participation_guide', 'seo_title', 'seo_description', 'detail_html', 'detail_html_document', 'cta_price_label', 'cta_label', 'cta_url', 'cta_color', 'meta_pixel_id'] as const;
 export type ProductDetailImage = { path: string; name: string; alt: string };
 export const productResourceScopes = ['public', 'authenticated', 'enrolled', 'purchaser'] as const;
 export type ProductResourceScope = (typeof productResourceScopes)[number];
@@ -100,6 +100,7 @@ export function productDetailImages(metadata: Record<string, unknown>): ProductD
   return validProductImage(legacy) ? [{ path: legacy, name: '기존 상세 이미지', alt: '' }] : [];
 }
 export type ProductHtmlNode = string | { tag: string; attrs: Record<string, string>; children: ProductHtmlNode[] };
+export const PRODUCT_APPLICATION_MARKERS = ['data-product-cta', 'data-landing-cta'] as const;
 const MAX_PRODUCT_HTML_LENGTH = 3_000_000;
 const allowed = new Set('h1 h2 h3 h4 h5 h6 p div section article span strong b em i u s small blockquote pre code ul ol li dl dt dd figure figcaption a img br hr table thead tbody tfoot tr th td'.split(' '));
 const discarded = new Set('head script style iframe object embed svg math template form button input textarea select option video audio canvas noscript'.split(' '));
@@ -141,10 +142,13 @@ export function parseProductHtml(value: string): ProductHtmlNode[] {
       continue;
     }
     const attrs: Record<string, string> = {};
-    const attrPattern = /([^\s=<>/'"]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g;
+    const attrPattern = /([^\s=<>/'"]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
     for (const attr of attributes.matchAll(attrPattern)) {
       const name = attr[1].toLowerCase(), content = decode(attr[2] ?? attr[3] ?? attr[4] ?? '').trim();
-      if ((tag === 'a' && name === 'href') || (tag === 'img' && name === 'src')) { const url = safeUrl(content); if (url) attrs[name] = url; }
+      if ((tag === 'a' && name === 'href') || (tag === 'img' && name === 'src')) { const url = tag === 'a' && /^#[^\s<>"']*$/.test(content) ? content : safeUrl(content); if (url) attrs[name] = url; }
+      if (name === 'id' && /^[a-z][\w:.-]{0,100}$/i.test(content)) attrs.id = content;
+      // Marker presence is meaningful even with no value; never allow arbitrary data attributes.
+      if (tag === 'a' && PRODUCT_APPLICATION_MARKERS.some(marker => marker === name)) attrs[name] = /^[a-z0-9_-]{1,64}$/i.test(content) ? content : '';
       if (name === 'title' || (tag === 'img' && name === 'alt')) attrs[name] = content.slice(0, 500);
       if ((tag === 'img' && ['width', 'height'].includes(name)) || (['td', 'th'].includes(tag) && ['colspan', 'rowspan'].includes(name)) || (tag === 'ol' && name === 'start')) {
         if (/^\d{1,4}$/.test(content) && Number(content) > 0) attrs[name] = content;
@@ -204,6 +208,14 @@ export function mergeProductMetadata(previous: unknown, values: Record<string, u
     } else if (field === 'detail_html') {
       if (value !== null && typeof value !== 'string') throw new Error('상세페이지 HTML 형식을 확인해 주세요.');
       metadata[field] = sanitizeProductHtml(value || '');
+    } else if (field === 'instructor_approved') {
+      metadata[field] = value === true;
+    } else if (['public_keywords', 'instructor_bio', 'provided_items', 'usage_notes', 'participation_guide'].includes(field)) {
+      if (value !== null && typeof value !== 'string') throw new Error('상품 공개 안내 정보를 확인해 주세요.');
+      const maximum = field === 'public_keywords' ? 500 : 5000;
+      const content = String(value || '').trim();
+      if (content.length > maximum) throw new Error(`상품 공개 안내는 ${maximum}자 이하로 입력해 주세요.`);
+      metadata[field] = content;
     } else if (field === 'seo_title' || field === 'seo_description') {
       if (value !== null && typeof value !== 'string') throw new Error('검색 정보를 확인해 주세요.');
       const content = String(value || '').trim(), maximum = field === 'seo_title' ? 200 : 500;

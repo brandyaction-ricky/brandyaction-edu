@@ -1,0 +1,26 @@
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { ProductDetail } from '../../../app/ui/final/public-views';
+import { Checkout } from '../../../app/ui/final/checkout';
+import { Platform } from '../../../app/ui/platform';
+import { mergeProductMetadata } from '../../../lib/product-metadata';
+import type { Row } from '../../../lib/platform';
+import '../../../app/ui/final/tokens.css';
+import '../../../app/ui/final/frontend.css';
+import '../../../app/ui/final/integration.css';
+import '../../../app/ui/landing/landing.css';
+
+const params = new URLSearchParams(location.search);
+const state = params.get('state') || 'closed', member = params.get('member') || 'guest';
+const category = params.get('category') || 'free';
+const url = 'https://example.test/join';
+const body = `<section style="padding:24px"><h1>모집 상태 검증</h1><p>등록한 디자인과 콘텐츠</p><a id="join-one" href="#"><span>${category === 'free' ? '무료강의 대기방 입장' : '구매하기'}</span></a><p><a id="join-two" href="https://example.test/join">지금 참여</a></p><a id="toc" href="#outline">목차 보기</a><div style="height:120px"></div><h2 id="outline">강의 안내</h2><a id="editorial" href="https://example.test/reference">참고 문서</a></section>`;
+const markedBody = '<section style="padding:24px"><h1>BF-04 잔여 결함 회귀</h1><a id="marked-cta" data-product-cta="hero_cta" href="https://example.test/enroll"><span>바로 <strong>시작</strong></span></a><p><a id="image-cta" data-landing-cta="final_cta" href="https://example.test/enroll"><img src="https://example.test/icon.png" alt="" width="24" height="24"></a></p><p><a id="icon-cta" data-product-cta href="#"><span>★</span></a></p><p><a id="legacy-cta" href="#">무료강의 대기방 입장</a></p><a id="refund-policy" href="/policies/refund">환불 신청 안내</a><p><a id="guide" href="https://example.test/guide">무료강의 참여 안내</a></p><a id="toc" href="#outline">목차 보기</a><h2 id="outline">과정 설명</h2></section>';
+const markedProductBody = category === 'free' ? markedBody : markedBody.replace('무료강의 대기방 입장', '구매하기').replace('무료강의 참여 안내', '자료 이용 안내');
+const metadata = mergeProductMetadata({}, { [params.has('inline') ? 'detail_html' : 'detail_html_document']: params.has('bf04') ? markedProductBody : body, ...(params.has('custom') ? { cta_url: url, cta_label: '외부 신청하기' } : {}) });
+const course: Row = { id: 'course', slug: 'qa-course', title: '모집 상태 클래스', category, status: 'published', list_price: category === 'free' ? 0 : 10000, description: '상세 안내', duration_label: '4주', schedule_label: '매주 화요일', metadata: JSON.parse(JSON.stringify(metadata)) };
+const cohort: Row = { id: 'cohort', course_id: 'course', name: '모집 기수', status: state === 'operation-ended' ? 'upcoming' : state, recruitment_start_at: state === 'recruiting' ? '2020-01-01' : '2098-01-01', recruitment_end_at: '2099-01-01', operation_end_at: state === 'operation-ended' ? '2020-01-01' : null, price: category === 'free' ? 0 : 10000 };
+const user = member === 'guest' ? null : { id: 'member', email: 'member@example.test', full_name: '테스트 회원', phone: null, role: 'member' };
+const data = { courses: [course], cohorts: params.has('multi') ? [{ ...cohort, id: 'old', status: 'closed' }, { ...cohort, status: 'recruiting', recruitment_start_at: '2020-01-01' }] : [cohort], enrollments: ['active', 'expired', 'revoked'].includes(member) ? [{ id: 'enrollment', course_id: 'course', cohort_id: 'cohort', status: 'active', access_ends_at: member === 'expired' ? '2020-01-01' : null, revoked_at: member === 'revoked' ? '2020-01-01' : null }] : [], curriculum_weeks: [{ id: 'week', course_id: 'course', week_number: 1, is_published: true }], curriculum_lessons: [{ id: 'lesson', week_id: 'week', title: '학습 시작', is_published: true }], landing_configs: params.has('landing') ? [{ id: 'course', enabled: false, layout_ver: 1, kakao_url: url, cta_label: '외부 신청하기', custom_sections: false, sections: [] }] : [] };
+window.addEventListener('edu:product-cta', () => { document.documentElement.dataset.conversions = String(Number(document.documentElement.dataset.conversions || 0) + 1); });
+createRoot(document.getElementById('root')!).render(<StrictMode>{params.has('catalogue') ? <Platform path={['classes']} user={null} /> : <main className="edu-front" style={{ minHeight: '100vh' }}>{location.pathname.endsWith('/checkout') ? <Checkout data={data} user={user} pending={false} send={async () => { throw Error('Fixture forbids external orders'); }} /> : <ProductDetail course={course} data={data} />}</main>}</StrictMode>);

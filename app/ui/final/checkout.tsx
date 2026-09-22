@@ -1,6 +1,7 @@
 "use client";
 import { money, number as num, text as t, type User } from "@/lib/platform";
 import { cohortPeriod } from "@/lib/qa-rules";
+import { hasLearningAccess, isPurchasableOffer, isRecruiting, offerLifecycle, unavailableOfferLabel } from "@/lib/platform-rules";
 import { ArrowLeft, ArrowRight, CreditCard, Landmark } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -29,8 +30,14 @@ export function Checkout({
     cohort = (data.cohorts || []).find((c) => c.id === cohortId),
     course = (data.courses || []).find((c) => c.id === cohort?.course_id),
     free = !!cohort && num(cohort, "price") === 0;
+  const enrolled = course && user && (data.enrollments || []).find(item => item.course_id === course.id && hasLearningAccess(item));
+  const accepting = () => !!course && !!cohort && course.status === 'published' && (course.category === 'free' ? isRecruiting(cohort) : isPurchasableOffer(course, cohort));
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!accepting() || enrolled) {
+      setError(enrolled ? '이미 유효한 수강권을 보유하고 있습니다.' : unavailableOfferLabel(offerLifecycle(cohort)));
+      return;
+    }
     if (!agreed) {
       setError("필수 약관에 동의해 주세요.");
       return;
@@ -195,6 +202,8 @@ export function Checkout({
       )}
     </>
   );
+  if (enrolled) return <div className="wrap"><Heading title="클래스 신청" /><Empty title="이미 이용할 수 있는 상품입니다."><Link className="btn primary" href={course.category === 'digital' ? '/my/resources' : '/learn/' + enrolled.id}>{course.category === 'digital' ? '내 자료실로 이동' : '학습 이어가기'}</Link></Empty></div>;
+  if (cohort && course && !accepting()) return <div className="wrap"><Heading title="클래스 신청" /><Empty title={unavailableOfferLabel(offerLifecycle(cohort))}><Link href={'/classes/' + (course.slug || course.id)}>클래스 일정 확인하기</Link></Empty></div>;
   if (!user)
     return (
       <div className="wrap">
@@ -204,7 +213,7 @@ export function Checkout({
             className="btn primary"
             href={
               "/login?next=" +
-              encodeURIComponent("/checkout?cohort=" + cohortId)
+              encodeURIComponent((free ? "/apply?cohort=" : "/checkout?cohort=") + cohortId)
             }
           >
             로그인하기

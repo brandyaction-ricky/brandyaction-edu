@@ -148,3 +148,19 @@ test('F-14 anonymous API selects only public review fields', async () => {
   assert.ok(projection.includes('author_name'));
   for (const key of ['user_id', 'order_id', 'cohort_id', '*']) assert.equal(projection.includes(key), false);
 });
+
+test('learning QA anonymous payload omits live, replay and private resource destinations', async () => {
+  const queried = [];
+  const db = { from(table) {
+    queried.push(table);
+    assert.ok(!['cohort_session_contents', 'lesson_contents', 'enrollments'].includes(table));
+    const data = table === 'courses' ? [{ id: 'course', category: 'digital', list_price: 1000, metadata: { product_resources: [{ id: '11111111-1111-4111-8111-111111111111', name: '교재', scope: 'enrolled', path: 'private/secret.pdf' }] } }] : [];
+    return { select() { return this; }, limit() { return this; }, order() { return this; }, eq() { return this; }, then(resolve) { resolve({ data }); } };
+  } };
+  const response = await handler(null, db).GET(new Request('https://example.com/api/platform'));
+  assert.equal(response.status, 200);
+  const body = await response.text();
+  assert.doesNotMatch(body, /live_url|replay_url|private\/secret.pdf/);
+  assert.match(body, /교재/);
+  assert.ok(queried.includes('cohort_sessions'));
+});

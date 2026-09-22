@@ -302,7 +302,7 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
           <p className="meta product-cohort-hint">{cohort ? `현재 ${t(cohort, "name")}의 모집 일정입니다. 수강·권한 탭에서 기수를 선택할 수 있으며 변경한 기수 일정은 함께 저장됩니다.` : "연결 기수가 없는 무료 클래스는 모집 일정을 비워 두면 기수를 만들지 않습니다. 그 외에는 상품을 저장하면 기본 기수가 생성되고 입력한 모집 일정이 함께 적용됩니다."}</p>
           <h3>상품 썸네일</h3><div className="upload-box product-upload"><Download aria-hidden="true" /><p>썸네일 이미지를 선택하세요.</p><UploadField name="thumbnail_url" value={String(metadata.thumbnail_url || metadata.thumbnailUrl || "")} image disabled={pending} onChange={() => setDirty(true)} /><p className="meta">권장 비율 16:9 · PNG/JPG/WebP</p></div>
           <div className="notice mt16">썸네일과 상세페이지 이미지는 별도로 관리합니다. 디지털 자료도 상품 정보와 제공 자료를 각각 등록해 주세요.</div>
-          <details className="product-extra mt24"><summary>추가 상품 정보</summary><div className="form-grid mt16">{field("instructor_name", "강사명")}{field("schedule_label", "일정 안내")}</div></details>
+          <details className="product-extra mt24"><summary>추가 상품 정보</summary><div className="form-grid mt16">{field("instructor_name", "강사명")}{field("instructor_bio", "강사 소개")}{field("instructor_approved", "강사 소개 공개 승인")}{field("schedule_label", "일정 안내")}{field("public_keywords", "공개 검색 키워드", false, "쉼표로 구분해 입력하면 클래스 목록 검색에 사용됩니다.")}{field("provided_items", "제공 항목")}{field("usage_notes", "이용 유의사항")}{field("participation_guide", "신청 완료 참여 안내")}</div></details>
         </div>
         <div className="section-pad" id="product-panel-detail" data-tab="detail" role="tabpanel" aria-labelledby="product-tab-detail" hidden={tab !== "detail"}>
           <h2 className="mb8">상세페이지 등록</h2><p className="meta detail-upload-intro">이미지 묶음 또는 HTML 파일 중 한 가지 방식을 선택해 등록하세요.</p>

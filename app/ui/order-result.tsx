@@ -5,7 +5,10 @@ import { useCallback, useEffect, useState } from "react";
 import { useSearchParams, usePathname } from "next/navigation";
 import { ArrowRight, Check, CircleAlert } from "lucide-react";
 import { matchingOrder } from "@/lib/platform-rules";
-import { money, labels, type Row } from "@/lib/platform";
+import { money, labels, object, safeUrl, text as t, type Row } from "@/lib/platform";
+import { productResources } from "@/lib/product-metadata";
+import { ProductResourceRow } from "./final/primitives";
+import { timeLabel } from "./learning-workflows";
 
 type VirtualAccount = {
   accountNumber: string | null;
@@ -30,6 +33,14 @@ export function OrderResult({
   const [error, setError] = useState("");
   const [virtualAccount, setVirtualAccount] = useState<VirtualAccount | null>(null);
   const order = matchingOrder(data.orders || [], orderId);
+  const orderItem = (data.order_items || []).find(item => item.order_id === order?.id);
+  const course = (data.courses || []).find(item => item.id === orderItem?.course_id);
+  const cohort = (data.cohorts || []).find(item => item.id === orderItem?.cohort_id);
+  const sessions = (data.cohort_sessions || []).filter(item => item.cohort_id === cohort?.id && item.is_public).sort((a,b) => Number(a.session_number) - Number(b.session_number));
+  const resources = course ? productResources(object(course, "metadata")) : [];
+  const participationGuide = String(object(course, "metadata").participation_guide || "").trim();
+  const landing = (data.landing_configs || []).find(item => item.id === course?.id);
+  const roomUrl = safeUrl(landing?.kakao_url);
   const failed = path === "/payment/fail";
   const complete = !failed && (state === "paid" || order?.status === "paid");
 
@@ -144,6 +155,17 @@ export function OrderResult({
               )}
             </dl>
           )}
+          {complete && (sessions.length > 0 || participationGuide || roomUrl || resources.length > 0) && <div className="application-next-steps">
+            <h2>참여 준비</h2>
+            {participationGuide && <p className="reading-copy">{participationGuide}</p>}
+            {roomUrl && <a className="btn primary" href={roomUrl} target="_blank" rel="noreferrer">참여 안내방 입장</a>}
+            {sessions.map(session => {
+              const start = session.scheduled_at ? new Date(String(session.scheduled_at)) : null;
+              const calendar = start && !Number.isNaN(start.getTime()) ? `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(t(session,"title") || t(course,"title"))}&dates=${start.toISOString().replace(/[-:]|\.\d{3}/g,"")}/${new Date(start.getTime() + 60 * 60 * 1000).toISOString().replace(/[-:]|\.\d{3}/g,"")}&details=${encodeURIComponent(t(session,"description"))}` : "";
+              return <div className="application-session" key={session.id}><div><b>{Number(session.session_number)}회 · {t(session,"title")}</b><p>{timeLabel(session.scheduled_at)}</p></div>{calendar && <a className="btn small" href={calendar} target="_blank" rel="noreferrer">캘린더에 추가</a>}</div>;
+            })}
+            {resources.length > 0 && <div className="application-resources"><h3>제공 자료</h3>{resources.map(resource => <ProductResourceRow key={resource.id} resource={resource} courseId={String(course?.id || "")} />)}</div>}
+          </div>}
           <div className="grid2 mt24">
             {state === "error" && paymentKey && (
               <button className="btn" onClick={() => void confirm()}>

@@ -715,6 +715,7 @@ export async function POST(request: Request) {
             const offer = await db.from('cohorts').select('*,courses!inner(*)').eq('id', body.cohortId).single();
             if (offer.error || !offer.data) fail('상품 모집 정보를 확인해 주세요.', 409);
             const offeredCourse = offer.data.courses as Row;
+            if (offeredCourse.category === 'free' && Number(offer.data.price) !== 0) fail('무료 클래스 기수의 판매가는 0원이어야 합니다.', 409);
             if (offeredCourse.category === 'paid_class') {
                 const weeks = await db.from('curriculum_weeks').select('*').eq('course_id', offeredCourse.id).eq('is_published', true);
                 if (weeks.error) throw weeks.error;

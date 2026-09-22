@@ -7,7 +7,7 @@ const source = fs.readFileSync(new URL('../lib/platform-rules.ts', import.meta.u
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const exports = {};
 new Function('exports', compiled)(exports);
-const { homepageCourses, hasLearningAccess, isPurchasableOffer, isRecruiting, matchingOrder, paidCourseReadinessIssues, recordId } = exports;
+const { homepageCourses, hasLearningAccess, isPurchasableOffer, isRecruiting, matchingOrder, offerLifecycle, courseOfferLifecycle, paidCourseReadinessIssues, recordId } = exports;
 const now = Date.parse('2026-09-11T12:00:00Z');
 
 test('learning access closes at expiry, before release, and after revocation', () => {
@@ -29,13 +29,39 @@ test('scheduled recruitment opens and closes at the stored boundaries', () => {
   assert.equal(isRecruiting({ ...cohort, operation_end_at: '2026-09-11T00:00:00Z' }, now), false);
 });
 
-test('published paid products can sell an upcoming cohort until its actual deadline', () => {
+test('offer lifecycle distinguishes recruiting, upcoming, closed and cancelled products', () => {
+  const now = Date.parse('2026-09-22T00:00:00Z');
+  const course = { id: 'course' };
+  assert.equal(offerLifecycle({ status: 'recruiting', recruitment_start_at: '2026-09-01', recruitment_end_at: '2026-10-01' }, now), 'recruiting');
+  assert.equal(offerLifecycle({ status: 'upcoming', recruitment_start_at: '2026-10-01', recruitment_end_at: '2026-11-01' }, now), 'upcoming');
+  assert.equal(offerLifecycle({ status: 'closed' }, now), 'closed');
+  assert.equal(offerLifecycle({ status: 'cancelled' }, now), 'cancelled');
+  assert.equal(courseOfferLifecycle(course, [{ course_id: 'course', status: 'cancelled' }], now), 'cancelled');
+});
+
+test('BF-01 paid recruitment opens at start and closes exactly at deadline', () => {
   const course = { status: 'published', category: 'paid_class' };
   const upcoming = { status: 'upcoming', recruitment_start_at: '2026-09-28T00:00:00Z', recruitment_end_at: '2026-10-01T00:00:00Z' };
-  assert.equal(isPurchasableOffer(course, upcoming, now), true);
+  const start = Date.parse(upcoming.recruitment_start_at), end = Date.parse(upcoming.recruitment_end_at);
+  assert.equal(isPurchasableOffer(course, upcoming, now), false);
+  for (const [time, expected] of [[start - 1, false], [start, true], [end - 1, true], [end, false]]) {
+    assert.equal(isPurchasableOffer(course, upcoming, time), expected);
+    assert.equal(isRecruiting(upcoming, time), expected);
+  }
   assert.equal(isPurchasableOffer({ ...course, status: 'draft' }, upcoming, now), false);
   assert.equal(isPurchasableOffer({ ...course, category: 'free' }, upcoming, now), false);
   assert.equal(isPurchasableOffer(course, { ...upcoming, recruitment_end_at: '2026-09-11T12:00:00Z' }, now), false);
+});
+
+test('BF-03 terminal and operation-ended cohorts precede future recruitment dates', () => {
+  const future = { course_id: 'course', status: 'upcoming', recruitment_start_at: '2098-01-01', recruitment_end_at: '2099-01-01' };
+  for (const status of ['closed', 'completed', 'cancelled']) {
+    assert.equal(offerLifecycle({ ...future, status }, now), status === 'cancelled' ? 'cancelled' : 'closed');
+  }
+  assert.equal(offerLifecycle({ ...future, operation_end_at: new Date(now).toISOString() }, now), 'closed');
+  assert.equal(courseOfferLifecycle({ id: 'course' }, [{ ...future, status: 'closed' }, future], now), 'upcoming');
+  assert.equal(courseOfferLifecycle({ id: 'course' }, [future, { ...future, status: 'recruiting', recruitment_start_at: '2020-01-01' }], now), 'recruiting');
+  assert.equal(isRecruiting({ ...future, recruitment_start_at: '2020-01-01', archived_at: '2026-01-01' }, now), false);
 });
 
 test('paid products expose missing publication requirements before checkout', () => {

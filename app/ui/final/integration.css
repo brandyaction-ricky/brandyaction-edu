@@ -976,6 +976,16 @@ body {
 .edu-front .detail-image-stack .detail-image { display: block; width: 100%; height: auto; margin: 0; }
 .edu-front .bottom-cta.single-cta .wrap { display: block; }
 .edu-front .bottom-cta.single-cta .btn { width: 100%; min-width: 0; max-width: none; white-space: normal; text-align: center; }
+.edu-front .course-card-cta { display: block; margin-top: var(--space-3); color: var(--ba-red); font-size: var(--type-small); font-weight: 700; }
+.edu-front .compact-field { min-width: 150px; margin: 0; gap: var(--space-1); color: var(--text-secondary); font-size: var(--type-small); }
+.edu-front .compact-field select { min-height: 44px; }
+.edu-front .class-pagination { display: flex; align-items: center; justify-content: center; gap: var(--space-4); padding-bottom: var(--space-16); }
+.edu-front .discount-info { margin: var(--space-2) 0 var(--space-4); color: var(--ba-red); font-size: var(--type-small); }
+.edu-front .application-next-steps { margin-top: var(--space-8); padding: var(--space-6); border: 1px solid var(--line); text-align: left; }
+.edu-front .application-next-steps > h2 { margin-bottom: var(--space-4); }
+.edu-front .application-session { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: var(--space-4) 0; border-bottom: 1px solid var(--line); }
+.edu-front .application-session p { margin: var(--space-1) 0 0; }
+.edu-front .application-resources { margin-top: var(--space-6); }
 @media (max-width: 900px) {
   .edu-admin .detail-gallery-list { grid-template-columns: minmax(0, 1fr); }
 }
