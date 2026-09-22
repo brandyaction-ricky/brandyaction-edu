@@ -12,6 +12,7 @@ const sql = fs.readFileSync(new URL('../supabase/migrations/202609200001_convers
 const permissionsSql = fs.readFileSync(new URL('../supabase/migrations/202609200002_conversion_review_permissions.sql', import.meta.url), 'utf8');
 const jevSql = fs.readFileSync(new URL('../supabase/migrations/202609220001_conversion_jev_shadow.sql', import.meta.url), 'utf8');
 const calibrationSql = fs.readFileSync(new URL('../supabase/migrations/202609220002_conversion_jev_calibration.sql', import.meta.url), 'utf8');
+const sampleScopeSql = fs.readFileSync(new URL('../supabase/migrations/202609220003_conversion_jev_sample_scope.sql', import.meta.url), 'utf8');
 const serverSource = fs.readFileSync(new URL('../lib/conversion-review-server.ts', import.meta.url), 'utf8');
 const serverExports = {};
 new Function('exports', 'require', ts.transpileModule(serverSource, {
@@ -48,6 +49,7 @@ before(async () => {
   await db.exec(permissionsSql);
   await db.exec(jevSql);
   await db.exec(calibrationSql);
+  await db.exec(sampleScopeSql);
   await db.query('insert into profiles(id,role) values ($1,\'admin\'),($2,\'staff\'),($3,\'student\')', [ids.admin, ids.staff, ids.student]);
   await db.query('insert into courses(id) values ($1),($2)', [ids.course, ids.otherCourse]);
   await db.query('insert into cohorts(id,course_id) values ($1,$2),($3,$4)', [ids.cohort, ids.course, ids.otherCohort, ids.otherCourse]);
@@ -176,16 +178,17 @@ test('Jev review requires one independent calibration while mock review rejects 
   const jevResult = { mode: 'jev', model: 'jev-test', requires_human_review: true, proposed_reply: '', decisions: {} };
   const { run } = await rpc(analyze, { result: jevResult, versions: {}, observedVersion: 1 });
   const base = { action: 'review', requestId: randomUUID(), case_id: inquiry.id, run_id: run.id,
-    decision: 'hold', reply_text: '', reason: '독립 판정', calibration: null };
+    decision: 'hold', reply_text: '', reason: '독립 판정', calibration: null, calibration_sample_kind: null };
   await assert.rejects(rpc(base), /CONVERSION_INVALID/);
   const calibration = { purchase_intent: 'high', primary_barrier: 'price', purchase_readiness: 3, next_action: 'offer_purchase_info' };
-  const saved = await rpc({ ...base, requestId: randomUUID(), calibration });
+  const saved = await rpc({ ...base, requestId: randomUUID(), calibration, calibration_sample_kind: 'operational' });
   assert.deepEqual(saved.review.calibration, calibration);
-  await assert.rejects(rpc({ ...base, requestId: randomUUID(), calibration }), /CONVERSION_INVALID/);
+  assert.equal(saved.review.calibration_sample_kind, 'operational');
+  await assert.rejects(rpc({ ...base, requestId: randomUUID(), calibration, calibration_sample_kind: 'operational' }), /CONVERSION_INVALID/);
   assert.ok((await rpc({ ...base, requestId: randomUUID(), reason: '후속 검토' })).review.id);
 
   const mockRun = await setupRun();
-  await assert.rejects(rpc(review(mockRun.inquiry, mockRun.run, { calibration })), /CONVERSION_INVALID/);
+  await assert.rejects(rpc(review(mockRun.inquiry, mockRun.run, { calibration, calibration_sample_kind: 'test' })), /CONVERSION_INVALID/);
 });
 
 test('native inquiry edits or archival invalidate analysis and review before any write', async () => {

@@ -190,7 +190,7 @@ export function ConversionReview({ workspace = false, initialPeriod }: { workspa
         </div>
         <AdminSection title="검토·적용 기록" bordered>
           <p className="conversion-muted">검토 결정과 실제 답변은 별도입니다.</p>
-          {records.map(record => <article className="conversion-record" key={record.id}><strong>{decisionNames[record.decision]}</strong><small>{displayTime(record.created_at)}</small>{record.calibration && <p>독립 판정: 의도 {jevNames[record.calibration.purchase_intent]} · 장애물 {jevNames[record.calibration.primary_barrier]} · 준비도 {record.calibration.purchase_readiness}/4 · 행동 {jevNames[record.calibration.next_action]}</p>}{record.reply_text && <p className="conversion-quote">{record.reply_text}</p>}{record.reason && <p>사유: {record.reason}</p>}<span className="conversion-tag">검토 저장 · 실제 적용 미확인</span></article>)}
+          {records.map(record => <article className="conversion-record" key={record.id}><strong>{decisionNames[record.decision]}</strong><small>{displayTime(record.created_at)}</small>{record.calibration && <p><span className="conversion-tag">{record.calibration_sample_kind === 'test' ? '검수용 표본' : '실제 문의 표본'}</span> 독립 판정: 의도 {jevNames[record.calibration.purchase_intent]} · 장애물 {jevNames[record.calibration.primary_barrier]} · 준비도 {record.calibration.purchase_readiness}/4 · 행동 {jevNames[record.calibration.next_action]}</p>}{record.reply_text && <p className="conversion-quote">{record.reply_text}</p>}{record.reason && <p>사유: {record.reason}</p>}<span className="conversion-tag">검토 저장 · 실제 적용 미확인</span></article>)}
           {!records.length && <AdminEmptyState compact title="아직 검토 기록이 없습니다." />}
           <div className="conversion-next"><strong>구매·환불 결과</strong><p>주문 연결은 준비 중입니다. 현재 화면의 기록으로 구매 성과를 계산하지 않습니다.</p></div>
         </AdminSection>
@@ -214,18 +214,21 @@ function ReviewForm({ runId, caseId, initialReply, stale, pending, mutate, calib
   const [primaryBarrier, setPrimaryBarrier] = useState('');
   const [purchaseReadiness, setPurchaseReadiness] = useState('');
   const [nextAction, setNextAction] = useState('');
+  const [sampleKind, setSampleKind] = useState('');
   const [error, setError] = useState('');
-  const calibrationComplete = !calibrationRequired || Boolean(purchaseIntent && primaryBarrier && purchaseReadiness !== '' && nextAction);
+  const calibrationComplete = !calibrationRequired || Boolean(sampleKind && purchaseIntent && primaryBarrier && purchaseReadiness !== '' && nextAction);
   async function submit(event: FormEvent) {
     event.preventDefault(); setError('');
     try { await mutate({ action: 'review', case_id: caseId, run_id: runId, decision, reply_text: reply, reason,
-      calibration: calibrationRequired ? { purchase_intent: purchaseIntent, primary_barrier: primaryBarrier, purchase_readiness: Number(purchaseReadiness), next_action: nextAction } : null }); }
+      calibration: calibrationRequired ? { purchase_intent: purchaseIntent, primary_barrier: primaryBarrier, purchase_readiness: Number(purchaseReadiness), next_action: nextAction } : null,
+      calibration_sample_kind: calibrationRequired ? sampleKind : null }); }
     catch (cause) { setError((cause as Error).message); }
   }
   return <form onSubmit={submit} className="conversion-form">
     {calibrationRequired && <fieldset className="conversion-calibration-form" disabled={pending || stale}>
       <legend>운영자 독립 판정</legend>
       <p className="conversion-muted">문의 내용만 보고 판단해 주세요. 저장하면 Jev 결과와 비교됩니다.</p>
+      <AdminSelect label="교정 표본 용도" required value={sampleKind} onChange={event => setSampleKind(event.target.value)} helper="실제 고객 문의만 일치율과 기준 검토 표본에 포함됩니다."><option value="">선택</option><option value="operational">실제 고객 문의</option><option value="test">DEV 검수·연습용</option></AdminSelect>
       <AdminSelect label="사람 판단 · 구매 의도" required value={purchaseIntent} onChange={event => setPurchaseIntent(event.target.value)}><option value="">선택</option><option value="high">높음</option><option value="medium">중간</option><option value="low">낮음</option><option value="unclear">판단 보류</option></AdminSelect>
       <AdminSelect label="사람 판단 · 주요 장애물" required value={primaryBarrier} onChange={event => setPrimaryBarrier(event.target.value)}><option value="">선택</option><option value="price">가격</option><option value="schedule">일정</option><option value="skill_level">수강 수준</option><option value="content_fit">내용 적합성</option><option value="trust">신뢰</option><option value="none_or_unknown">불명확</option></AdminSelect>
       <AdminSelect label="사람 판단 · 구매 준비도" required value={purchaseReadiness} onChange={event => setPurchaseReadiness(event.target.value)}><option value="">선택</option><option value="0">0 · 정보 부족</option><option value="1">1 · 관심 탐색</option><option value="2">2 · 비교 검토</option><option value="3">3 · 구매 직전</option><option value="4">4 · 구매 결정</option></AdminSelect>
@@ -244,12 +247,13 @@ function ReviewForm({ runId, caseId, initialReply, stale, pending, mutate, calib
 function CalibrationOverview({ summary }: { summary: ReturnType<typeof buildJevCalibrationSummary> }) {
   const rate = (key: keyof JevCalibration) => summary.dimensions[key].rate === null ? '표본 없음' : `${Math.round(summary.dimensions[key].rate! * 100)}%`;
   return <section className="conversion-calibration-overview" aria-label="Jev 교정 현황">
-    <div><span>독립 판정 표본</span><strong>{summary.samples}건</strong></div>
+    <div><span>실제 문의 표본</span><strong>{summary.samples}건</strong></div>
+    <div><span>검수용 표본</span><strong>{summary.test_samples}건</strong></div>
     <div><span>구매 의도 일치</span><strong>{rate('purchase_intent')}</strong></div>
     <div><span>장애물 일치</span><strong>{rate('primary_barrier')}</strong></div>
     <div><span>준비도 일치</span><strong>{rate('purchase_readiness')}</strong></div>
     <div><span>다음 행동 일치</span><strong>{rate('next_action')}</strong></div>
-    <p>낮은 신뢰도(70% 미만)에서 불일치 {summary.low_confidence_disagreements}건 · 표본이 쌓이기 전에는 자동 기준을 바꾸지 않습니다.</p>
+    <p>낮은 신뢰도(70% 미만)에서 불일치 {summary.low_confidence_disagreements}항목 · 기준 검토까지 실제 문의 {summary.remaining_for_threshold_review}건 남음(최소 {summary.minimum_samples}건). 기준은 자동으로 바뀌지 않습니다.</p>
   </section>;
 }
 
