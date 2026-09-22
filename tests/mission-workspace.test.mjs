@@ -16,7 +16,9 @@ function load(path, dependencies = {}) {
   });
   return exports;
 }
-const rules = load('lib/mission-workspace.ts');
+const domain = load('features/mission/domain/form.ts');
+const application = load('features/mission/application/submission.ts', {'@/features/mission/domain/form': domain});
+const rules = {...domain, ...application};
 const form = {version:1,questions:[{id:'q1',prompt:'실행 결과',kind:'text',required:true},{id:'q2',prompt:'참고 링크',kind:'link',required:false}],checklist:[{id:'c1',label:'직접 실행했습니다',required:true}]};
 test('mission form validates bounds, stable IDs and unsafe links', () => {
   assert.deepEqual(rules.validateMissionForm(form),form);
@@ -37,10 +39,10 @@ test('incomplete drafts save, but submission requires answers and required check
 
 const userId=randomUUID(),enrollmentId=randomUUID(),missionId=randomUUID(),lessonId=randomUUID(),courseId=randomUUID();
 const mission={id:missionId,lesson_id:lessonId,title:'계획 세우기',instructions:'실행해 보세요',submission_type:'text',form_schema:form,updated_at:'2026-09-21T10:00:00Z',is_published:true};
-function harness({user={id:userId,role:'student'},access=true,previous=null,stale=false,rpcError=null}={}) {
+function harness({user={id:userId,role:'student'},access=true,lessonExists=true,previous=null,stale=false,rpcError=null}={}) {
   const writes=[],reads=[];
   const db={from(table){
-    const query={select(){return this},eq(key,value){reads.push({table,key,value});return this},order(){return this},limit(){return this},update(value){writes.push({table,kind:'update',value});return this},upsert(value){writes.push({table,kind:'upsert',value});return this},delete(){writes.push({table,kind:'delete'});return this},then(resolve){return Promise.resolve({data:null,error:null}).then(resolve)},async single(){return this.result()},async maybeSingle(){return this.result()},result(){return {data:table==='enrollments' ? access?{id:enrollmentId,user_id:userId,course_id:courseId,status:'active',access_starts_at:'2020-01-01',access_ends_at:null}:null : table==='curriculum_lessons'?{id:lessonId,curriculum_weeks:{course_id:courseId,is_published:true}} : table==='curriculum_missions'?stale?null:mission : table==='mission_submissions'?previous:null,error:null}}};return query;
+    const query={select(){return this},eq(key,value){reads.push({table,key,value});return this},order(){return this},limit(){return this},update(value){writes.push({table,kind:'update',value});return this},upsert(value){writes.push({table,kind:'upsert',value});return this},delete(){writes.push({table,kind:'delete'});return this},then(resolve){return Promise.resolve({data:null,error:null}).then(resolve)},async single(){return this.result()},async maybeSingle(){return this.result()},result(){return {data:table==='enrollments' ? access?{id:enrollmentId,user_id:userId,course_id:courseId,status:'active',access_starts_at:'2020-01-01',access_ends_at:null}:null : table==='curriculum_lessons'?lessonExists?{id:lessonId,curriculum_weeks:{course_id:courseId,is_published:true}}:null : table==='curriculum_missions'?stale?null:mission : table==='mission_submissions'?previous:null,error:null}}};return query;
   },async rpc(name,args){writes.push({name,args});return {data:{passed:true},error:rpcError}}};
   const route=load('app/api/platform/route.ts',{
     '@/lib/supabase/admin':{createAdminClient:()=>db},'@/lib/supabase/server':{createClient:async()=>db},'@/lib/server-auth':{getAuthenticatedUser:async()=>user},
@@ -50,7 +52,7 @@ function harness({user={id:userId,role:'student'},access=true,previous=null,stal
   return {send,writes,reads};
 }
 test('mission API denies anonymous, cross-origin, wrong enrollment, stale forms and locked attempts before writing', async () => {
-  for (const [options,body,expected] of [[{user:null},{},401],[{access:false},{},403],[{}, {missionVersion:'old'},409],[{previous:{status:'submitted'}},{},409],[{previous:{status:'approved'}},{draft:true},409],[{}, {formAnswers:{}},400],[{}, {checklist:[]},400],[{}, {draft:'true'},400]]) {
+  for (const [options,body,expected] of [[{user:null},{},401],[{access:false},{},403],[{lessonExists:false},{},403],[{}, {missionVersion:'old'},409],[{previous:{status:'submitted'}},{},409],[{previous:{status:'approved'}},{draft:true},409],[{}, {formAnswers:{}},400],[{}, {checklist:[]},400],[{}, {draft:'true'},400]]) {
     const h=harness(options), r=await h.send(body); assert.equal(r.status,expected,await r.text());assert.equal(h.writes.length,0);
   }
   const h=harness();assert.equal((await h.send({},'https://other.test')).status,403);assert.equal(h.writes.length,0);
