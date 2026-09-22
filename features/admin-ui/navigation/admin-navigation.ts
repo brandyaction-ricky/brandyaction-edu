@@ -6,10 +6,10 @@ export type AdminNavigationItem = {
 };
 
 export const adminNavigationGroups = [
-  ['클래스 관리', ['products', 'cohorts', 'learning', 'missions', 'members', 'reviews', 'questions']],
+  ['클래스 관리', ['products', 'cohorts', 'weeks', 'learning', 'contents', 'missions', 'members', 'reviews', 'questions']],
   ['고객 관리', ['customers', 'tags', 'coupons', 'product-reviews']],
   ['콘텐츠 관리', ['banners', 'articles', 'testimonials']],
-  ['매출 관리', ['orders']],
+  ['주문·매출', ['orders']],
   ['마케팅·전환', ['conversion', 'landing', 'analytics', 'campaigns', 'templates', 'automations', 'seo', 'settings']],
 ] as const;
 
@@ -17,6 +17,8 @@ export const adminNavigationTitles: Record<string, string> = {
   conversion: '모집 운영',
   landing: '광고·웨비나 성과',
   learning: '학습 콘텐츠 관리',
+  weeks: '주차 구성',
+  contents: '영상·자료 관리',
   members: '회원 미션관리',
   tags: '고객 태그 관리',
   'product-reviews': '상품 후기 관리',
@@ -29,6 +31,8 @@ export const adminSectionDescriptions: Record<string, string> = {
   products: '상품 정보·상세페이지·제공 자료·판매 조건을 한곳에서 관리합니다.',
   learning: '일차별 학습 본문과 확인 퀴즈를 관리합니다.',
   cohorts: '상품의 판매 정보와 실제 교육 일정·정원을 구분해 운영합니다.',
+  weeks: '상품별 주차 순서·학습 목표·공개 상태를 관리합니다.',
+  contents: '차시별 영상·자료·본문·외부 학습 링크를 관리합니다.',
   missions: '주차별 미션을 구성하고, 학습 자료와 제출 방식을 연결합니다.',
   members: '회원의 진행 상태와 승인 현황을 확인하세요.',
   reviews: '목록을 이동하며 제출 내용을 확인하고 피드백을 남기세요.',
@@ -47,6 +51,10 @@ export const adminSectionDescriptions: Record<string, string> = {
   metrics: '광고·라이브·결제 실측 데이터를 날짜별로 기록하고 관리합니다.',
   seo: '검색 노출 정보와 측정·인증 코드를 안전하게 관리합니다.',
   settings: '교육 운영 규칙과 광고 측정 설정을 구분해 관리합니다.',
+  campaigns: '모집 대상과 발송 결과를 확인하고 캠페인을 운영합니다.',
+  templates: '반복 안내에 사용할 승인된 메시지 문구를 관리합니다.',
+  automations: '조건별 자동 안내의 사용 상태와 실행 결과를 관리합니다.',
+  staff: '운영 스태프별 접근 범위를 확인하고 관리합니다.',
 };
 
 export function normalizeAdminSectionKey(current: string) {

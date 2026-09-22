@@ -25,6 +25,7 @@ import {
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { Data } from "../learning-workflows";
+import { AdminSuccessState } from "@/features/admin-ui";
 
 export { AdminShell } from "@/features/admin-ui";
 
@@ -34,7 +35,9 @@ export const finalAdminGroups = [
     [
       "products",
       "cohorts",
+      "weeks",
       "learning",
+      "contents",
       "missions",
       "members",
       "reviews",
@@ -43,7 +46,7 @@ export const finalAdminGroups = [
   ],
   ["고객 관리", ["customers", "tags", "coupons", "product-reviews"]],
   ["콘텐츠 관리", ["banners", "articles", "testimonials"]],
-  ["매출 관리", ["orders"]],
+  ["주문·매출", ["orders"]],
   ["마케팅·전환", ["conversion", "landing", "analytics", "campaigns", "templates", "automations", "seo", "settings"]],
 ] as const;
 const icons: Record<string, LucideIcon> = {
@@ -74,6 +77,8 @@ export const finalAdminTitles: Record<string, string> = {
   conversion: "모집 운영",
   landing: "광고·웨비나 성과",
   learning: "학습 콘텐츠 관리",
+  weeks: "주차 구성",
+  contents: "영상·자료 관리",
   members: "회원 미션관리",
   tags: "고객 태그 관리",
   "product-reviews": "상품 후기 관리",
@@ -85,6 +90,8 @@ export const sectionDescription: Record<string, string> = {
   products: "상품 정보·상세페이지·제공 자료·판매 조건을 한곳에서 관리합니다.",
   learning: "일차별 학습 본문과 확인 퀴즈를 관리합니다.",
   cohorts: "상품의 판매 정보와 실제 교육 일정·정원을 구분해 운영합니다.",
+  weeks: "상품별 주차 순서·학습 목표·공개 상태를 관리합니다.",
+  contents: "차시별 영상·자료·본문·외부 학습 링크를 관리합니다.",
   missions: "주차별 미션을 구성하고, 학습 자료와 제출 방식을 연결합니다.",
   members: "회원의 진행 상태와 승인 현황을 확인하세요.",
   reviews: "목록을 이동하며 제출 내용을 확인하고 피드백을 남기세요.",
@@ -103,6 +110,10 @@ export const sectionDescription: Record<string, string> = {
   metrics: "광고·라이브·결제 실측 데이터를 날짜별로 기록하고 관리합니다.",
   seo: "검색 노출 정보와 측정·인증 코드를 안전하게 관리합니다.",
   settings: "교육 운영 규칙과 광고 측정 설정을 구분해 관리합니다.",
+  campaigns: "모집 대상과 발송 결과를 확인하고 캠페인을 운영합니다.",
+  templates: "반복 안내에 사용할 승인된 메시지 문구를 관리합니다.",
+  automations: "조건별 자동 안내의 사용 상태와 실행 결과를 관리합니다.",
+  staff: "운영 스태프별 접근 범위를 확인하고 관리합니다.",
 };
 export function AdminHeading({
   title,
@@ -122,7 +133,7 @@ export function AdminHeading({
         <h1>{title}</h1>
         {description && <p>{description}</p>}
       </div>
-      <div className="actions">{children}</div>
+      {children && <div className="actions">{children}</div>}
     </div>
   );
 }
@@ -147,7 +158,7 @@ export function Metric({
     </>
   );
   return href ? (
-    <Link className={"metric " + (highlight ? "highlight" : "")} href={href}>
+    <Link className={"metric " + (highlight ? "highlight" : "")} href={href} aria-label={`${label}: ${typeof value === "string" || typeof value === "number" ? value : "상세 보기"}`}>
       {content}
     </Link>
   ) : (
@@ -344,7 +355,7 @@ export function Overview({
       >
         {can("reviews") && (
           <Link className="btn primary" href="/admin/reviews">
-            검토 시작하기
+            {pending > 0 ? `검토 ${pending}건 시작` : "제출물 보기"}
             <ArrowRight />
           </Link>
         )}
@@ -416,6 +427,14 @@ export function Overview({
             href={can("members") ? "/admin/members" : undefined}
           />
         )}
+        {can("orders") && (
+          <Metric
+            label="순결제액"
+            value={num(summary, "netRevenue").toLocaleString("ko-KR") + "원"}
+            note="결제 승인액에서 환불액을 제외한 금액"
+            href="/admin/orders"
+          />
+        )}
       </div>
       <div className="two-col">
         <div className="stack">
@@ -423,7 +442,7 @@ export function Overview({
             <div className="panel-head">
               <h2>지금 처리할 일</h2>
             </div>
-            {can("reviews") && (
+            {can("reviews") && pending > 0 && (
               <div className="task">
                 <span className="task-icon">
                   <CheckSquare2 />
@@ -437,7 +456,7 @@ export function Overview({
                 </Link>
               </div>
             )}
-            {can("questions") && (
+            {can("questions") && questions > 0 && (
               <div className="task">
                 <span className="task-icon">
                   <MessageCircle />
@@ -449,6 +468,11 @@ export function Overview({
                 <Link className="btn small" href="/admin/questions">
                   답변하기
                 </Link>
+              </div>
+            )}
+            {(!can("reviews") || pending === 0) && (!can("questions") || questions === 0) && (
+              <div className="panel-body">
+                <AdminSuccessState title="대기 중인 검토·질문이 없습니다." compact>새 요청이 들어오면 사이드바 배지와 운영 홈에 표시됩니다.</AdminSuccessState>
               </div>
             )}
             {can("customers") && (
@@ -471,7 +495,7 @@ export function Overview({
               <h2>클래스 운영</h2>
             </div>
             <div className="panel-body">
-              {["products", "cohorts", "learning"].filter(can).map((key) => (
+              {["products", "cohorts", "weeks", "learning", "contents"].filter(can).map((key) => (
                 <Link className="setting-line" href={"/admin/" + key} key={key}>
                   <span>
                     {finalAdminTitles[key] ||
@@ -507,10 +531,8 @@ export function Overview({
                 <h2>주문과 결제</h2>
               </div>
               <div className="panel-body">
-                <div className="metric-label">순결제액 (승인−환불)</div>
-                <div className="metric-value num">
-                  {num(summary, "netRevenue").toLocaleString("ko-KR")}원
-                </div>
+                <h3>결제부터 수강권까지 이어서 확인하세요.</h3>
+                <p className="meta mt16">결제 완료·실패·환불 상태와 생성된 수강 권한을 한 화면에서 확인합니다.</p>
                 <Link className="btn full mt24" href="/admin/orders">
                   주문 결제 확인
                   <ArrowRight />
@@ -540,7 +562,7 @@ export function Overview({
                 ))}
               {!(data.mission_submissions || []).some(
                 (s) => s.status === "approved",
-              ) && <p className="meta">표시할 검토 기록이 없습니다.</p>}
+              ) && <p className="meta">아직 완료된 검토 기록이 없습니다. 제출물 검토를 마치면 이곳에 최근 기록이 표시됩니다.</p>}
             </div>
           </section>
         </div>

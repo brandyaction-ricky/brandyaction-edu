@@ -6,19 +6,26 @@ import {
   CalendarDays,
   CheckSquare2,
   FilePenLine,
+  Film,
   LayoutGrid,
+  Layers3,
   LineChart,
   LogOut,
   Menu,
   MessageCircle,
+  MessagesSquare,
+  ReceiptText,
   Settings,
   ShieldCheck,
+  Tags,
   UsersRound,
+  Workflow,
   X,
   type LucideIcon,
 } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import {
   adminContentWidth,
   adminNavigationGroups,
@@ -33,22 +40,27 @@ const icons: Record<string, LucideIcon> = {
   products: BookOpen,
   cohorts: CalendarDays,
   learning: BookOpen,
+  weeks: Layers3,
+  contents: Film,
   missions: BookOpen,
   members: UsersRound,
   reviews: CheckSquare2,
   questions: MessageCircle,
   customers: UsersRound,
   conversion: MessageCircle,
-  tags: UsersRound,
+  tags: Tags,
   coupons: LayoutGrid,
   'product-reviews': MessageCircle,
   banners: LayoutGrid,
   articles: FilePenLine,
   testimonials: MessageCircle,
-  orders: LayoutGrid,
+  orders: ReceiptText,
   landing: LineChart,
   analytics: LineChart,
   metrics: FilePenLine,
+  campaigns: MessagesSquare,
+  templates: MessageCircle,
+  automations: Workflow,
   seo: Settings,
   settings: Settings,
   staff: ShieldCheck,
@@ -86,6 +98,49 @@ export function AdminShell({
   const byKey = new Map(available.map(item => [item.key, item]));
   const visibility = createAdminMenuVisibility(available);
   const contentWidth = adminContentWidth(selected);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const tablet = window.matchMedia('(max-width: 1024px)');
+    const closePersistentSidebar = (event: MediaQueryListEvent) => {
+      if (!event.matches) setMobile(false);
+    };
+    tablet.addEventListener('change', closePersistentSidebar);
+    return () => tablet.removeEventListener('change', closePersistentSidebar);
+  }, [setMobile]);
+  useEffect(() => {
+    if (!mobile) return;
+    const sidebar = sidebarRef.current;
+    if (!sidebar) return;
+    const restoreFocus = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    const focusable = () => Array.from(sidebar.querySelectorAll<HTMLElement>('a[href],button,summary,[tabindex]:not([tabindex="-1"])')).filter(element => !element.hasAttribute('disabled') && element.getClientRects().length > 0);
+    document.body.style.overflow = 'hidden';
+    focusable()[0]?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setMobile(false);
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const stops = focusable(), first = stops[0], last = stops.at(-1);
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown, true);
+      document.body.style.overflow = previousOverflow;
+      if (restoreFocus?.isConnected) restoreFocus.focus();
+    };
+  }, [mobile, setMobile]);
   const navLink = (key: string) => {
     const item = byKey.get(key);
     if (!visibility.has(key)) return null;
@@ -108,7 +163,8 @@ export function AdminShell({
   return (
     <>
       <a className="skip" href="#admin-content">본문으로 이동</a>
-      <aside className={`sidebar ${mobile ? 'open' : ''}`} id="admin-sidebar">
+      {mobile && <button type="button" className="admin-sidebar-backdrop" aria-label="관리자 메뉴 닫기" onClick={() => setMobile(false)}/>}
+      <aside ref={sidebarRef} className={`sidebar ${mobile ? 'open' : ''}`} id="admin-sidebar" role={mobile ? 'dialog' : undefined} aria-modal={mobile ? 'true' : undefined} aria-label={mobile ? '관리자 메뉴' : undefined}>
         <button
           type="button"
           className="btn ghost sidebar-close"
@@ -119,7 +175,7 @@ export function AdminShell({
           <X aria-hidden="true" />
         </button>
         <Link className="brand" href="/admin">
-          <img className="brand-logo" src="/brandy-action-logo.png" alt="brandyaction" />
+          <Image className="brand-logo" src="/brandy-action-logo.png" alt="BrandyAction" width={164} height={32} priority />
           <span><small>EDU / ADMIN</small></span>
         </Link>
         <div className="workspace-label">
@@ -133,7 +189,7 @@ export function AdminShell({
               key={title + selected}
               open={selected === 'overview' || keys.some(key => key === selected)}
             >
-              <summary>{title}</summary>
+              <summary>{title}<span className="nav-category-count">{keys.filter(key => byKey.has(key)).length}</span></summary>
               {keys.map(navLink)}
             </details>
           ))}
@@ -158,10 +214,11 @@ export function AdminShell({
           </div>
         </div>
       </aside>
-      <div className="app">
+      <div className="app" inert={mobile ? true : undefined}>
         <header className="topbar">
           <div className="crumb">
             <button
+              ref={menuButtonRef}
               className="btn iconbtn ghost mobile-menu"
               aria-controls="admin-sidebar"
               aria-expanded={mobile}

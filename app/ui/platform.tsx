@@ -66,6 +66,12 @@ import { SiteFooter } from "./final/site-footer";
 import { HomeHero } from "./final/home-hero";
 import { MarketingWorkspaceNav } from "./marketing-workspace-nav";
 import { ConversionReview } from "./conversion-review";
+import {
+  AdminEmptyState,
+  AdminInlineError,
+  AdminLoadingState,
+  AdminToast,
+} from "@/features/admin-ui";
 type Data = Record<string, Row[]>;
 // Preserve only the last server-verified operator identity during client-side
 // admin navigation. Every read and write is still authorized by the server.
@@ -635,16 +641,11 @@ export function Platform({
     return <Checkout data={data} user={user} pending={pending} send={send} />;
   }
   function adminView() {
-    if (accessDenied) return <div className="wrap"><Empty title="이 메뉴에 접근할 운영 권한이 없습니다." /><div className="center"><Link className="btn" href="/admin">운영 홈</Link><Link className="btn" href="/my">마이페이지</Link></div></div>;
+    if (accessDenied) return <div className="wrap"><AdminEmptyState title="이 메뉴에 접근할 운영 권한이 없습니다." action={<div className="row wrap"><Link className="btn primary" href="/admin">운영 홈으로</Link><Link className="btn" href="/my">마이페이지</Link></div>}>현재 계정에 부여된 운영 범위에서 다른 메뉴를 선택해 주세요.</AdminEmptyState></div>;
     if (!["admin", "staff"].includes(user?.role || ""))
       return (
         <div className="wrap">
-          <Empty title={loading ? "운영자 권한을 확인하고 있습니다." : error ? "로그인 정보를 확인하지 못했습니다." : "운영자 로그인이 필요합니다."} />
-          {!loading && !error && <div className="center">
-            <Link className="btn primary" href={"/login?next=" + encodeURIComponent("/" + routeKey)}>
-              로그인하기
-            </Link>
-          </div>}
+          {loading ? <AdminLoadingState title="운영자 권한을 확인하고 있습니다." description="활성 계정과 접근 범위를 확인한 뒤 화면을 엽니다."/> : error ? <AdminInlineError onRetry={() => void refresh()}>로그인 정보를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.</AdminInlineError> : <AdminEmptyState title="운영자 로그인이 필요합니다." action={<Link className="btn primary" href={"/login?next=" + encodeURIComponent("/" + routeKey)}>로그인하기</Link>}>관리자 또는 운영 스태프 계정으로 로그인해 주세요.</AdminEmptyState>}
         </div>
       );
     const available = sections.filter(
@@ -693,20 +694,18 @@ export function Platform({
       >
         <MarketingWorkspaceNav current={key} available={available} search={searchParams.toString()} />
         {loadedSection !== adminSection ? (
-          <div className="admin-section-loading" role="status" aria-live="polite" aria-busy={!error}>
-            {error ? <><p>화면 정보를 불러오지 못했습니다.</p><button className="btn" onClick={() => void refresh()}>다시 시도</button></> : <><span className="admin-section-loading-line" /><span className="admin-section-loading-line" /><span className="sr-only">메뉴 내용을 불러오는 중</span></>}
-          </div>
+          error ? <AdminInlineError onRetry={() => void refresh()}>화면 정보를 불러오지 못했습니다. 연결 상태를 확인해 주세요.</AdminInlineError> : <AdminLoadingState title="메뉴 내용을 불러오는 중입니다." description="현재 운영 데이터를 안전하게 확인하고 있습니다."/>
         ) : key === "overview" ? (
           <Overview data={data} available={available} />
         ) : !section ? (
-          <Empty title="이 화면에 접근할 운영 권한이 필요합니다." />
+          <AdminEmptyState title="이 화면에 접근할 운영 권한이 필요합니다.">운영 홈에서 현재 계정에 표시되는 메뉴를 선택해 주세요.</AdminEmptyState>
         ) : key === "conversion" ? (
           <ConversionReview workspace initialPeriod={searchParams.get("recruitment") || undefined} />
         ) : key === "product-editor" || key === "learning-editor" ? (
           loading && id && !edited ? (
-            <p role="status">편집 정보를 불러오고 있습니다.</p>
+            <AdminLoadingState title="편집 정보를 불러오는 중입니다." description="저장된 항목과 공개 상태를 확인하고 있습니다."/>
           ) : id && !edited ? (
-            <Empty title="편집할 항목을 찾을 수 없습니다." />
+            <AdminEmptyState title="편집할 항목을 찾을 수 없습니다." action={<button className="btn" type="button" onClick={back}>목록으로 돌아가기</button>}>삭제되었거나 현재 계정의 운영 범위 밖에 있는 항목일 수 있습니다.</AdminEmptyState>
           ) : key === "product-editor" ? (
             <ProductEditor
               key={edited?.id || "new-product"}
@@ -832,7 +831,7 @@ export function Platform({
           path[0] === "classes" && path.length > 1 ? "with-bottom-cta" : ""
         }
       >
-        {error && (
+        {!admin && error && (
           <div className="error-banner" role="alert">
             {error}
             <button className="btn small" onClick={() => void refresh()}>
@@ -840,17 +839,13 @@ export function Platform({
             </button>
           </div>
         )}
-        {loading && (
+        {!admin && loading && (
           <div className="loading-bar" role="status" aria-label="불러오는 중" />
         )}
         {body}
       </main>
       {!admin && footer}
-      {notice && (
-        <div className="toast" role="status">
-          {notice}
-        </div>
-      )}
+      {notice && (admin ? <AdminToast tone="success">{notice}</AdminToast> : <div className="toast" role="status">{notice}</div>)}
       {editor && (
         <Editor
           key={editor.section.key + (editor.row ? recordId(editor.row) : "new")}

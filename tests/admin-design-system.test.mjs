@@ -34,15 +34,22 @@ test('admin tokens are scoped and do not modify public sizing tokens', () => {
 
 test('common system exports the Phase 0 component inventory', () => {
   const system = load('features/admin-ui.ts');
-  for (const name of ['AdminPage','AdminPageHeader','AdminContent','AdminSection','AdminDivider','AdminStack','AdminGrid','AdminButton','AdminIconButton','AdminInput','AdminSelect','AdminTextarea','AdminCheckbox','AdminDatePicker','AdminSearchField','AdminFilterTrigger','AdminMetricGrid','AdminMetric','AdminDataTable','AdminTableToolbar','AdminPagination','AdminStatusBadge','AdminEmptyState','AdminSkeleton','AdminInlineError','AdminDrawer','AdminModal','AdminConfirmDialog','AdminPopover','AdminToast']) assert.ok(system[name], name);
+  for (const name of ['AdminPage','AdminPageHeader','AdminContent','AdminSection','AdminDivider','AdminStack','AdminGrid','AdminButton','AdminIconButton','AdminInput','AdminSelect','AdminTextarea','AdminCheckbox','AdminDatePicker','AdminSearchField','AdminFilterTrigger','AdminMetricGrid','AdminMetric','AdminDataTable','AdminTableToolbar','AdminPagination','AdminStatusBadge','AdminEmptyState','AdminSuccessState','AdminSkeleton','AdminLoadingState','AdminInlineError','AdminDrawer','AdminModal','AdminConfirmDialog','AdminPopover','AdminToast']) assert.ok(system[name], name);
 });
 
 test('shared status badges translate internal values and tables expose usable semantics', () => {
   const { AdminStatusBadge, AdminDataTable } = load('features/admin-ui.ts');
   const badge = renderToStaticMarkup(React.createElement(AdminStatusBadge, { status: 'not_configured' }));
-  assert.match(badge, /설정 필요/); assert.doesNotMatch(badge, /not_configured/);
+  assert.match(badge, /설정 필요/); assert.match(badge, /aria-label="상태: 설정 필요"/); assert.doesNotMatch(badge, /not_configured/);
   const table = renderToStaticMarkup(React.createElement(AdminDataTable, { label: '테스트 표' }, React.createElement('tbody', null, React.createElement('tr', null, React.createElement('td', null, '값')))));
-  assert.match(table, /role="region"/); assert.match(table, /aria-label="테스트 표"/); assert.match(table, /tabindex="0"/);
+  assert.match(table, /role="region"/); assert.match(table, /aria-label="테스트 표"/); assert.match(table, /aria-describedby/); assert.match(table, /<caption[^>]*>테스트 표<\/caption>/); assert.match(table, /tabindex="0"/);
+});
+
+test('shared pagination exposes edge actions and all operational status labels stay human-readable', () => {
+  const { AdminPagination, adminStatus } = load('features/admin-ui.ts');
+  const pagination = renderToStaticMarkup(React.createElement(AdminPagination, { page: 2, pages: 8, onChange() {} }));
+  for (const label of ['첫 페이지', '이전', '다음', '마지막 페이지']) assert.ok(pagination.includes(label), label);
+  for (const [status, label] of [['paid', '결제 완료'], ['payment_failed', '결제 실패'], ['submitted', '검토 대기'], ['changes_requested', '보완 요청']]) assert.equal(adminStatus(status).label, label);
 });
 
 test('admin feature owns navigation visibility without becoming an authorization source', () => {
@@ -53,6 +60,17 @@ test('admin feature owns navigation visibility without becoming an authorization
   assert.equal(visibility.has('orders'), false);
   assert.deepEqual(visibility.groups(system.adminNavigationGroups).map(([label]) => label), ['클래스 관리']);
   assert.match(fs.readFileSync('features/admin-ui/permissions/menu-visibility.ts', 'utf8'), /server remains authoritative/i);
+});
+
+test('responsive shell includes every class tool and traps the tablet/mobile navigation', () => {
+  const system = load('features/admin-ui.ts');
+  const classKeys = system.adminNavigationGroups.find(([label]) => label === '클래스 관리')[1];
+  for (const key of ['products', 'cohorts', 'weeks', 'learning', 'contents', 'missions', 'members', 'reviews', 'questions']) assert.ok(classKeys.includes(key), key);
+  const shell = fs.readFileSync('features/admin-ui/layouts/admin-shell.tsx', 'utf8');
+  for (const text of ["event.key === 'Escape'", "event.key !== 'Tab'", "document.body.style.overflow = 'hidden'", 'admin-sidebar-backdrop', 'aria-modal']) assert.ok(shell.includes(text), text);
+  const css = fs.readFileSync('features/admin-ui/styles/admin-system.css', 'utf8');
+  assert.match(css, /@media\(max-width:1024px\)/);
+  assert.match(css, /\.edu-admin \.sidebar-close\{display:flex\}/);
 });
 
 test('tracking composition uses shared primitives without reintroducing local generic UI CSS', () => {
