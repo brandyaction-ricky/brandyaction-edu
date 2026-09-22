@@ -1,6 +1,6 @@
 'use client';
 import { createElement, useEffect, useMemo, useRef, type ReactNode } from 'react';
-import { parseProductHtml, type ProductHtmlNode } from '@/lib/product-metadata';
+import { parseProductHtml, PRODUCT_APPLICATION_MARKERS, type ProductHtmlNode } from '@/lib/product-metadata';
 import { buildProductDocument } from '@/lib/product-html-document';
 import { conversionUrl, PRODUCT_CTA_EVENT } from '@/lib/product-conversion';
 import { isProductApplicationLink, type ProductApplicationCta } from '@/lib/product-application-cta';
@@ -18,7 +18,7 @@ function ProductDocumentFrame({ source, applicationCta }: { source: string; appl
       if (!doc?.body || frame.contentWindow?.location.href !== 'about:srcdoc') return;
       if (applicationCta) {
         doc.querySelectorAll<HTMLAnchorElement>('a').forEach(link => {
-          const application = link.dataset.eduApplication === 'true' || isProductApplicationLink(link.getAttribute('href') || '', link.textContent || '', link.hasAttribute('data-product-cta') || link.hasAttribute('data-landing-cta'), applicationCta.conversionUrl);
+          const application = link.dataset.eduApplication === 'true' || isProductApplicationLink(link.getAttribute('href') || '', link.textContent || '', PRODUCT_APPLICATION_MARKERS.some(marker => link.hasAttribute(marker)), applicationCta.conversionUrl);
           if (!application) return;
           link.dataset.eduApplication = 'true';
           link.removeAttribute('data-product-cta');
@@ -29,7 +29,7 @@ function ProductDocumentFrame({ source, applicationCta }: { source: string; appl
           const walker = doc.createTreeWalker(link, NodeFilter.SHOW_TEXT);
           let node: Node | null, first = true;
           while ((node = walker.nextNode())) {
-            if (!node.textContent?.trim()) continue;
+            if (!/[\p{L}\p{N}]/u.test(node.textContent || '')) continue;
             node.textContent = first ? applicationCta.label : '';
             first = false;
           }
@@ -98,23 +98,33 @@ function ProductDocumentFrame({ source, applicationCta }: { source: string; appl
 export function ProductDetailHtml({ html, documentSource = '', className = 'product-detail-html reading-copy', applicationCta }: { html: string; documentSource?: string; className?: string; applicationCta?: ProductApplicationCta }) {
   if (documentSource) return <div className={className}><ProductDocumentFrame source={documentSource} applicationCta={applicationCta} /></div>;
   const text = (nodes: ProductHtmlNode[]): string => nodes.map(node => typeof node === 'string' ? node : text(node.children)).join('');
-  function render(nodes: ProductHtmlNode[]): ReactNode[] {
+  function render(nodes: ProductHtmlNode[], replacement?: { label: string; placed: boolean }): ReactNode[] {
     return nodes.map((node, index) => {
-      if (typeof node === 'string') return node;
+      if (typeof node === 'string') {
+        if (!replacement || !/[\p{L}\p{N}]/u.test(node)) return node;
+        const value = replacement.placed ? '' : replacement.label;
+        replacement.placed = true;
+        return value;
+      }
       const props: Record<string, unknown> = { key: index };
       for (const [key, value] of Object.entries(node.attrs)) props[key === 'colspan' ? 'colSpan' : key === 'rowspan' ? 'rowSpan' : key] = value;
       if (node.tag === 'a') props.rel = 'noopener noreferrer';
       if (node.tag === 'img') { props.loading = 'lazy'; props.alt ||= ''; }
-      if (node.tag === 'a' && applicationCta && isProductApplicationLink(node.attrs.href || '', text(node.children), false, applicationCta.conversionUrl)) {
+      if (node.tag === 'a' && applicationCta && isProductApplicationLink(node.attrs.href || '', text(node.children), PRODUCT_APPLICATION_MARKERS.some(marker => Object.hasOwn(node.attrs, marker)), applicationCta.conversionUrl)) {
         props.href = applicationCta.disabled ? undefined : applicationCta.href;
+        props['aria-label'] = applicationCta.label;
+        if (applicationCta.disabled || applicationCta.enrolled) for (const marker of PRODUCT_APPLICATION_MARKERS) delete props[marker];
         props['aria-disabled'] = applicationCta.disabled || undefined;
         props.role = applicationCta.disabled ? 'link' : undefined;
         props.tabIndex = applicationCta.disabled ? -1 : undefined;
         props.style = applicationCta.disabled ? { opacity: 0.55, cursor: 'not-allowed' } : undefined;
         props.onClick = applicationCta.disabled ? (event: React.MouseEvent) => { event.preventDefault(); event.stopPropagation(); } : undefined;
-        return createElement(node.tag, props, applicationCta.label);
+        const replacement = { label: applicationCta.label, placed: false };
+        const children = render(node.children, replacement);
+        if (!replacement.placed) children.push(applicationCta.label);
+        return createElement(node.tag, props, ...children);
       }
-      return createElement(node.tag, props, ...render(node.children));
+      return createElement(node.tag, props, ...render(node.children, replacement));
     });
   }
   return <div className={className}>{render(parseProductHtml(html))}</div>;

@@ -24,6 +24,74 @@ function load(file, mocks = {}) {
 }
 const { sanitizeProductHtml, mergeProductMetadata, mergeProductResources, productResources } = load('lib/product-metadata.ts');
 const { ProductDetailHtml } = load('app/ui/final/product-detail-html.tsx');
+test('RQ-BF04-02 save sanitizer preserves only explicit application markers through round trips', () => {
+  const source = '<a id="marked" data-product-cta="hero_cta" data-landing-cta="final_cta" data-untrusted="secret" onclick="evil()" href="https://example.test/enroll"><span>바로 시작</span><img src="https://example.test/icon.png" alt="입장"></a>';
+  const metadata = JSON.parse(JSON.stringify(mergeProductMetadata({ thumbnail_url: 'existing.webp' }, { detail_html: source })));
+  for (const marker of ['data-product-cta="hero_cta"', 'data-landing-cta="final_cta"']) assert.ok(metadata.detail_html.includes(marker));
+  assert.doesNotMatch(metadata.detail_html, /onclick|data-untrusted/);
+  assert.equal(metadata.thumbnail_url, 'existing.webp');
+  assert.equal(sanitizeProductHtml(metadata.detail_html), metadata.detail_html);
+  const markup = renderToStaticMarkup(React.createElement(ProductDetailHtml, { html: metadata.detail_html, applicationCta: { href: '', label: '신청 마감', disabled: true, enrolled: false } }));
+  assert.doesNotMatch(markup, /href=|data-product-cta|data-landing-cta/);
+  assert.match(markup, /aria-disabled="true"/);
+  assert.match(markup, /<span>신청 마감<\/span>/);
+  assert.match(markup, /<img/);
+});
+
+test('RQ-BF04-01 link intent uses structured destinations and complete legacy labels, not substrings', () => {
+  const { isProductApplicationLink } = load('lib/product-application-cta.ts');
+  for (const [href, label] of [['/policies/refund', '환불 신청 안내'], ['/docs/apply', '수강 신청 방법'], ['https://example.test/help', '무료강의 참여 안내'], ['#outline', '신청하기'], ['/policies/terms', '신청하기']]) assert.equal(isProductApplicationLink(href, label), false, label);
+  for (const [href, label] of [['/apply?cohort=cohort', '바로 시작'], ['/checkout?cohort=cohort', '계속'], ['#', '무료강의 대기방 입장'], ['https://example.test/enroll', '수강 신청하기'], ['https://open.kakao.com/o/room', '입장']]) assert.equal(isProductApplicationLink(href, label), true, label);
+  assert.equal(isProductApplicationLink('https://example.test/enroll', '바로 시작', true), true);
+  assert.equal(isProductApplicationLink('https://example.test/enroll', '바로 시작', false, 'https://example.test/enroll'), true);
+});
+
+test('RQ-BF04-02 empty and malformed marker values cannot lose their explicit meaning or add attributes', () => {
+  for (const marker of ['data-product-cta', 'data-landing-cta']) {
+    for (const value of ['', '=""', '="&quot; onclick=&quot;evil()"']) {
+      const clean = sanitizeProductHtml(`<a ${marker}${value} data-other="x" href="https://example.test/enroll"><img src="https://example.test/icon.png" alt=""></a>`);
+      assert.match(clean, new RegExp(marker + '=""'));
+      assert.doesNotMatch(clean, /onclick|evil|data-other/);
+      const markup = renderToStaticMarkup(React.createElement(ProductDetailHtml, { html: clean, applicationCta: { href: '', label: '신청 마감', disabled: true, enrolled: false } }));
+      assert.doesNotMatch(markup, /href=/);
+      assert.match(markup, /aria-label="신청 마감"/);
+      assert.match(markup, /<img/);
+    }
+  }
+});
+
+test('RQ-BF04-02 admin save API to public reread preserves marker semantics and existing metadata', async () => {
+  for (const field of ['detail_html', 'detail_html_document']) {
+    let user = { id: 'operator' };
+    let stored = { id: 'product', category: 'free', status: 'published', list_price: 0, metadata: { thumbnail_url: 'https://example.test/kept.png', campaign: { enabled: true } } };
+    const db = { from(table) { return {
+      select() { return this; }, eq() { return this; }, limit() { return this; }, order() { return this; }, in() { return this; },
+      update(values) { stored = { ...stored, ...structuredClone(values) }; return this; },
+      async single() { return { data: structuredClone(stored), error: null }; },
+      then(resolve) { resolve({ data: table === 'courses' ? [structuredClone(stored)] : [], error: null }); },
+    }; } };
+    const route = load('app/api/platform/route.ts', {
+      '@/lib/supabase/admin': { createAdminClient: () => db }, '@/lib/supabase/server': { createClient: async () => db },
+      '@/lib/server-auth': { getAuthenticatedUser: async () => user },
+      '@/lib/operator-permissions': { permissionsFor: async () => ({ products: true }), sectionScopes: { products: 'products' } },
+      '@/lib/edu-settings': { getEduSettings: async () => ({ operations: {} }) }, '@/lib/crm-delivery': {},
+    });
+    const source = '<a data-product-cta="hero_cta" href="https://example.test/enroll"><span>바로 시작</span></a><a data-landing-cta="final_cta" href="#"><img src="https://example.test/icon.png" alt=""></a>';
+    const response = await route.POST(new Request('https://edu.example/api/platform', { method: 'POST', headers: { origin: 'https://edu.example' }, body: JSON.stringify({ action: 'save', section: 'products', id: 'product', values: { [field]: source } }) }));
+    assert.equal(response.status, 200, await response.text());
+    user = null;
+    const read = await route.GET(new Request('https://edu.example/api/platform'));
+    assert.equal(read.status, 200);
+    const metadata = (await read.json()).data.courses[0].metadata;
+    assert.match(metadata[field], /data-product-cta="hero_cta"/);
+    assert.match(metadata[field], /data-landing-cta="final_cta"/);
+    assert.equal(metadata.thumbnail_url, 'https://example.test/kept.png');
+    assert.deepEqual(metadata.campaign, { enabled: true });
+    const markup = renderToStaticMarkup(React.createElement(ProductDetailHtml, { html: metadata.detail_html, applicationCta: { href: '', label: '신청 마감', disabled: true, enrolled: false } }));
+    assert.equal((markup.match(/aria-disabled="true"/g) || []).length, 2);
+    assert.doesNotMatch(markup, /href=/);
+  }
+});
 test('product HTML retains content structure while rejecting executable content and attributes', () => {
   const dirty = '<!doctype html><html><head><style>body{display:none}</style></head><body><h2 onclick="evil()">AI &amp; 실행</h2><p style="color:red">소개 <strong>강조</strong></p><script>alert(1)</script><iframe src="https://evil.test"></iframe><svg><a href="javascript:evil()">x</a></svg><img src="https://cdn.example/image.webp" onerror="evil()" alt="이미지"><a href="java&#x73;cript:evil()">금지 링크</a><a href="https://example.test/class">안전 링크</a></body></html>';
   const clean = sanitizeProductHtml(dirty);
