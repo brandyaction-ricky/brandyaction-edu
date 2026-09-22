@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { migrationAction, migrationBody } from "./dev-migration-plan.mjs";
 
 const DEV_PROJECT_REF = "vjmjhaidlqkmascdjocw";
 const accessToken = process.env.SUPABASE_ACCESS_TOKEN;
@@ -34,13 +35,6 @@ function sqlLiteral(value) {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
-function removeOuterTransactionStatements(sql) {
-  return sql
-    .replace(/^\s*begin\s*;\s*$/gim, "")
-    .replace(/^\s*commit\s*;\s*$/gim, "")
-    .trim();
-}
-
 await runSql(`
   create schema if not exists dev_migrations;
   create table if not exists dev_migrations.schema_migrations (
@@ -55,6 +49,11 @@ const appliedRows = await runSql(
   "select version, checksum from dev_migrations.schema_migrations order by version;",
 );
 const appliedMigrations = new Map(appliedRows.map((row) => [row.version, row.checksum]));
+const [nativeHistory] = await runSql("select to_regclass('supabase_migrations.schema_migrations') is not null as available;");
+const nativeRows = nativeHistory?.available
+  ? await runSql("select version, name, statements from supabase_migrations.schema_migrations;")
+  : [];
+const nativeMigrations = new Map(nativeRows.map(row => [row.version, row]));
 const migrationFiles = (await readdir(migrationsDirectory))
   .filter((fileName) => /^\d+_.+\.sql$/.test(fileName))
   .sort();
@@ -67,15 +66,14 @@ for (const fileName of migrationFiles) {
   const checksum = createHash("sha256").update(sql).digest("hex");
   const appliedChecksum = appliedMigrations.get(version);
 
-  if (appliedChecksum) {
-    if (appliedChecksum !== checksum) {
-      throw new Error(`${fileName} changed after it was applied. Add a new migration instead.`);
-    }
+  const action = migrationAction({ fileName, name, sql, checksum, appliedChecksum,
+    nativeMigration: nativeMigrations.get(version) });
+  if (action === "skip") {
     console.log(`Already applied: ${fileName}`);
     continue;
   }
 
-  const migrationSql = removeOuterTransactionStatements(sql);
+  const migrationSql = action === "apply" ? migrationBody(sql) : "";
   await runSql(`
     begin;
     ${migrationSql}
@@ -83,7 +81,7 @@ for (const fileName of migrationFiles) {
     values (${sqlLiteral(version)}, ${sqlLiteral(name)}, ${sqlLiteral(checksum)});
     commit;
   `);
-  console.log(`Applied: ${fileName}`);
+  console.log(`${action === "apply" ? "Applied" : "Recorded verified existing Supabase migration"}: ${fileName}`);
 }
 
 console.log("DEV Supabase migrations are up to date.");
