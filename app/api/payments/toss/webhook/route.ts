@@ -8,6 +8,14 @@ const MAX_BODY_BYTES = 256 * 1024;
 const TOSS_API = 'https://api.tosspayments.com/v1/payments';
 
 type JsonObject = Record<string, unknown>;
+type PaymentOperation = 'finalize_toss_payment' | 'record_toss_waiting_payment' | 'finalize_toss_refund' | 'record_toss_terminal_payment';
+
+const PAYMENT_STATUSES = new Set(['READY', 'IN_PROGRESS', 'WAITING_FOR_DEPOSIT', 'DONE', 'CANCELED', 'PARTIAL_CANCELED', 'ABORTED', 'EXPIRED']);
+const DATABASE_REASONS = new Set([
+  'ORDER_NOT_FOUND', 'ORDER_USER_MISSING', 'ORDER_NOT_PAYABLE', 'ORDER_ITEM_NOT_FOUND',
+  'PAYMENT_NOT_FOUND', 'PAYMENT_AMOUNT_MISMATCH', 'PAYMENT_KEY_ALREADY_USED',
+  'ORDER_PAYMENT_KEY_MISMATCH', 'COHORT_NOT_FOUND', 'INVALID_REFUND_AMOUNT',
+]);
 
 const reply = (value: unknown, status = 200) => Response.json(value, {
   status,
@@ -28,6 +36,27 @@ function databaseErrorMessage(error: unknown) {
 
 function orderNotFound(error: unknown) {
   return databaseErrorMessage(error) === 'ORDER_NOT_FOUND';
+}
+
+function databaseDiagnostic(
+  operation: PaymentOperation | 'event_lookup' | 'event_recording' | 'unknown',
+  payment: JsonObject,
+  error: unknown,
+) {
+  const code = object(error) ? error.code : null;
+  const reason = databaseErrorMessage(error);
+  // Never log the provider payload, identifiers, free-form DB details or hints.
+  return {
+    operation,
+    paymentStatus: typeof payment.status === 'string' && PAYMENT_STATUSES.has(payment.status) ? payment.status : 'UNKNOWN',
+    databaseCode: typeof code === 'string' && /^(?:[0-9A-Z]{5}|PGRST\d{3})$/.test(code) ? code : 'UNKNOWN',
+    reason: DATABASE_REASONS.has(reason) ? reason : 'UNCLASSIFIED_DATABASE_ERROR',
+  };
+}
+
+async function paymentRpc(db: ReturnType<typeof createAdminClient>, operation: PaymentOperation, args: JsonObject) {
+  const result = await db.rpc(operation, args);
+  return { ...result, operation };
 }
 
 function validToken(received: string | null, expected: string) {
@@ -88,7 +117,7 @@ async function reconcilePayment(db: ReturnType<typeof createAdminClient>, paymen
 
   if (status === 'DONE') {
     if (!nonEmpty(payment.method, 100) || !nonEmpty(payment.approvedAt, 100)) throw new Error('INVALID_PROVIDER_RESPONSE');
-    return db.rpc('finalize_toss_payment', {
+    return paymentRpc(db, 'finalize_toss_payment', {
       ...common,
       p_method: payment.method,
       p_approved_amount: payment.totalAmount,
@@ -98,7 +127,7 @@ async function reconcilePayment(db: ReturnType<typeof createAdminClient>, paymen
   }
 
   if (status === 'WAITING_FOR_DEPOSIT') {
-    return db.rpc('record_toss_waiting_payment', {
+    return paymentRpc(db, 'record_toss_waiting_payment', {
       ...common,
       p_method: typeof payment.method === 'string' ? payment.method : null,
       p_amount: payment.totalAmount,
@@ -117,7 +146,7 @@ async function reconcilePayment(db: ReturnType<typeof createAdminClient>, paymen
     );
     if (completed.length > 0) {
       for (const cancel of completed) {
-        const result = await db.rpc('finalize_toss_refund', {
+        const result = await paymentRpc(db, 'finalize_toss_refund', {
           p_order_number: payment.orderId,
           p_amount: cancel.cancelAmount,
           p_reason: typeof cancel.cancelReason === 'string' && cancel.cancelReason ? cancel.cancelReason : '토스 결제 취소',
@@ -137,7 +166,7 @@ async function reconcilePayment(db: ReturnType<typeof createAdminClient>, paymen
   }
 
   if (['CANCELED', 'ABORTED', 'EXPIRED'].includes(status)) {
-    const result = await db.rpc('record_toss_terminal_payment', {
+    const result = await paymentRpc(db, 'record_toss_terminal_payment', {
       ...common,
       p_status: status,
     });
@@ -216,7 +245,7 @@ export async function POST(request: Request) {
       : createHash('sha256').update(rawBody).digest('hex');
     const existing = await recordedEvent(db, providerEventId);
     if (existing.error) {
-      console.error('toss webhook event lookup failed', existing.error.code);
+      console.error('toss webhook event lookup failed', databaseDiagnostic('event_lookup', payment, existing.error));
       return reply({ error: '결제 이벤트 기록을 확인하지 못했습니다.' }, 503);
     }
     if (existing.data?.processing_status === 'processed' || existing.data?.processing_status === 'ignored') {
@@ -229,19 +258,19 @@ export async function POST(request: Request) {
       if (ignoreMissingOrder && orderNotFound(result.error)) {
         const recorded = await recordEvent(db, providerEventId, event.type, payment, 'ignored', 'ORDER_NOT_FOUND');
         if (recorded.error) {
-          console.error('toss webhook event recording failed', recorded.error.code);
+          console.error('toss webhook event recording failed', databaseDiagnostic('event_recording', payment, recorded.error));
           return reply({ error: '결제 이벤트 기록을 완료하지 못했습니다.' }, 503);
         }
         return reply({ ok: true, ignored: true });
       }
-      console.error('toss webhook reconciliation failed', result.error.code);
+      console.error('toss webhook reconciliation failed', databaseDiagnostic('operation' in result ? result.operation : 'unknown', payment, result.error));
       return reply({ error: '결제 상태 반영을 완료하지 못했습니다.' }, 503);
     }
     const ignored = 'ignored' in result && Boolean(result.ignored);
 
     const recorded = await recordEvent(db, providerEventId, event.type, payment, ignored ? 'ignored' : 'processed');
     if (recorded.error) {
-      console.error('toss webhook event recording failed', recorded.error.code);
+      console.error('toss webhook event recording failed', databaseDiagnostic('event_recording', payment, recorded.error));
       return reply({ error: '결제 이벤트 기록을 완료하지 못했습니다.' }, 503);
     }
     return reply({ ok: true, ignored });
