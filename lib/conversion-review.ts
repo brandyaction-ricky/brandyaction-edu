@@ -45,12 +45,26 @@ export type MockResult = {
   requires_human_review: true;
 };
 
+export type JevChoiceAnswer = { type: 'choice'; choice: string; confidence: number; probabilities: Record<string, number> };
+export type JevScoreAnswer = { type: 'score'; score: number; confidence: number; probabilities: Record<string, number> };
+export type JevResult = Omit<MockResult, 'mode'> & {
+  mode: 'jev';
+  model: string;
+  decision_version: 1;
+  decisions: {
+    purchase_intent: JevChoiceAnswer;
+    primary_barrier: JevChoiceAnswer;
+    purchase_readiness: JevScoreAnswer;
+    next_action: JevChoiceAnswer;
+  };
+};
+
 export type ConversionRun = {
   id: string;
   case_id: string;
   input_version: number;
-  provider: 'mock';
-  result: MockResult;
+  provider: 'mock' | 'jev';
+  result: MockResult | JevResult;
   evidence_versions: Record<string, number>;
   input_snapshot?: Pick<ConversionCase, 'subject' | 'content' | 'course_id' | 'cohort_id' | 'input_version'> & Record<string, unknown>;
   evidence_snapshot?: ConversionEvidence[];
@@ -76,7 +90,7 @@ export type ConversionSnapshot = {
   cohorts: { id: string; course_id: string; name: string }[];
   runs: ConversionRun[];
   reviews: ConversionReviewRecord[];
-  capabilities: { can_manage_evidence: boolean; can_mock: boolean; can_manage_funnel?: boolean };
+  capabilities: { can_manage_evidence: boolean; can_mock: boolean; can_jev?: boolean; can_analyze?: boolean; analyze_provider?: 'mock' | 'jev' | null; can_manage_funnel?: boolean };
 };
 
 export const MOCK_NOTICE = '모의 판단입니다. 단어 일치로 화면과 기록 흐름을 확인하며, 실제 AI 판단이나 답변 정확도를 검증한 결과가 아닙니다. 모든 내용은 운영자가 확인해야 합니다.';

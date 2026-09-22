@@ -17,6 +17,12 @@ import { RecruitmentFunnel } from './recruitment-funnel';
 const topicNames: Record<string, string> = { price: '가격', schedule: '일정', content: '교육 내용', level: '수강 수준', usage: '이용 방법' };
 const inquiryNames: Record<string, string> = { prepurchase: '구매 전 상품 질문', support: '이용 지원', payment_refund: '결제·환불', mixed: '여러 종류의 문의', unknown: '판단 불가' };
 const decisionNames: Record<string, string> = { accept: '채택', edit: '수정', hold: '보류', reject: '사용 안 함' };
+const jevNames: Record<string, string> = {
+  high: '높음', medium: '중간', low: '낮음', unclear: '판단 보류',
+  price: '가격', schedule: '일정', skill_level: '수강 수준', content_fit: '내용 적합성', trust: '신뢰', none_or_unknown: '불명확',
+  answer_specific_questions: '질문에 구체적으로 답변', invite_webinar: '무료 웨비나 안내', offer_purchase_info: '구매 절차 안내', human_consult: '운영자 상담', hold_no_contact: '추가 접촉 보류',
+};
+const confidence = (value: number) => `${Math.round(value * 100)}%`;
 const displayTime = (value: string) => new Date(value).toLocaleString('ko-KR');
 type Mutation = (payload: Record<string, unknown>) => Promise<Record<string, unknown>>;
 
@@ -79,7 +85,7 @@ export function ConversionReview({ workspace = false, initialPeriod }: { workspa
       const notices: Record<string, string> = {
         save_case: '문의 정보를 저장했습니다.',
         save_evidence: '설명자료를 저장했습니다.',
-        analyze: '모의 판단을 저장했습니다. 설명을 확인한 뒤 검토 결정을 남겨 주세요.',
+        analyze: snapshot?.capabilities.analyze_provider === 'jev' ? 'Jev 그림자 판정을 저장했습니다. 결과와 설명을 확인해 주세요.' : '모의 판단을 저장했습니다. 설명을 확인한 뒤 검토 결정을 남겨 주세요.',
         review: '검토 기록을 저장했습니다. 고객에게 전달된 답변은 아닙니다.',
       };
       setNotice(notices[String(payload.action)] || '저장했습니다.');
@@ -94,6 +100,7 @@ export function ConversionReview({ workspace = false, initialPeriod }: { workspa
   };
 
   const selected = snapshot?.cases.find(item => item.id === selectedId);
+  const canAnalyze = snapshot ? (snapshot.capabilities.can_analyze ?? snapshot.capabilities.can_mock) : false;
   const cases = snapshot?.cases.filter(item => (item.subject + ' ' + item.content).toLowerCase().includes(query.toLowerCase())) || [];
   const run = snapshot?.runs.filter(item => item.case_id === selected?.id).sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
   const stale = Boolean(run && selected && snapshot && isRunStale(run, selected, snapshot.evidence));
@@ -144,12 +151,18 @@ export function ConversionReview({ workspace = false, initialPeriod }: { workspa
               <p className="conversion-quote">{selected.content}</p>
               {selected.question_id && <Link href="/admin/questions" className="conversion-link">기존 질문함 열기</Link>}
             </AdminSection>
-            <AdminSection title="설명 추천" bordered actions={<AdminButton tone="primary" disabled={pending || !snapshot.capabilities.can_mock} onClick={() => void mutate({ action: 'analyze', case_id: selected.id, expected_version: selected.input_version }).catch(() => {})}>{pending ? '처리 중' : '모의 판단 실행'}</AdminButton>}>
-              {!snapshot.capabilities.can_mock && <p className="conversion-muted">현재 환경에서는 모의 판단을 실행할 수 없습니다. 설명자료는 직접 검토할 수 있습니다.</p>}
+            <AdminSection title="전환 판정·설명 추천" bordered actions={<AdminButton tone="primary" disabled={pending || !canAnalyze} onClick={() => void mutate({ action: 'analyze', case_id: selected.id, expected_version: selected.input_version }).catch(() => {})}>{pending ? '처리 중' : snapshot.capabilities.analyze_provider === 'jev' ? 'Jev 그림자 판정 실행' : '모의 판단 실행'}</AdminButton>}>
+              {!canAnalyze && <p className="conversion-muted">현재 환경에서는 판정을 실행할 수 없습니다. 설명자료는 직접 검토할 수 있습니다.</p>}
               {run ? <div className="conversion-result">
-                <span className="conversion-tag">모의 판단 · 운영자 확인 필요</span>
+                <span className="conversion-tag">{run.provider === 'jev' ? 'Jev 그림자 판정' : '모의 판단'} · 운영자 확인 필요</span>
                 <p>{run.result.notice}</p>
                 {stale && <p role="alert" className="conversion-alert">문의나 설명자료가 바뀌었습니다. 새로 판단한 뒤 검토 기록을 남겨 주세요.</p>}
+                {run.result.mode === 'jev' && <div className="conversion-jev-grid" aria-label="Jev 전환 판정">
+                  <div><span>구매 의도</span><strong>{jevNames[run.result.decisions.purchase_intent.choice]}</strong><small>신뢰도 {confidence(run.result.decisions.purchase_intent.confidence)}</small></div>
+                  <div><span>주요 장애물</span><strong>{jevNames[run.result.decisions.primary_barrier.choice]}</strong><small>신뢰도 {confidence(run.result.decisions.primary_barrier.confidence)}</small></div>
+                  <div><span>구매 준비도</span><strong>{run.result.decisions.purchase_readiness.score.toFixed(1)} / 4</strong><small>신뢰도 {confidence(run.result.decisions.purchase_readiness.confidence)}</small></div>
+                  <div><span>권장 다음 행동</span><strong>{jevNames[run.result.decisions.next_action.choice]}</strong><small>신뢰도 {confidence(run.result.decisions.next_action.confidence)}</small></div>
+                </div>}
                 <p><strong>문의 구분</strong> · {inquiryNames[run.result.inquiry_type]}</p>
                 <div className="conversion-topics">{run.result.topics.filter(topic => topic.status === 'explicit').map(topic => <span key={topic.topic} className="conversion-tag">{topicNames[topic.topic]}</span>)}</div>
                 {run.result.missing_topics.length > 0 && <p className="conversion-alert">추가 확인 필요: {run.result.missing_topics.map(topic => topicNames[topic]).join(', ')}</p>}
@@ -158,7 +171,7 @@ export function ConversionReview({ workspace = false, initialPeriod }: { workspa
                   return <div key={candidate.evidence_id} className="conversion-evidence"><strong>{evidence?.title || '자료 확인 필요'}</strong><p>{candidate.reason}</p>{evidence && evidence.version === candidate.evidence_version ? <p className="conversion-quote">{evidence.body}</p> : <p className="conversion-muted">판단 이후 자료가 변경됐습니다. 당시 조합한 설명은 아래 검토 내용에 보존됩니다.</p>}</div>;
                 })}
                 <ReviewForm key={run.id} runId={run.id} caseId={selected.id} initialReply={run.result.proposed_reply} stale={stale} pending={pending} mutate={mutate} />
-              </div> : <AdminEmptyState compact title="아직 판단 기록이 없습니다.">아래 설명자료를 확인한 뒤 모의 판단을 실행하세요.</AdminEmptyState>}
+              </div> : <AdminEmptyState compact title="아직 판단 기록이 없습니다.">아래 설명자료를 확인한 뒤 판정을 실행하세요.</AdminEmptyState>}
             </AdminSection>
             <AdminSection title="상품 설명자료" description="승인된 자료만 추천 후보에 포함됩니다." bordered actions={snapshot.capabilities.can_manage_evidence && <AdminButton disabled={pending} onClick={() => openEvidence()}>자료 등록</AdminButton>}>
               {snapshot.evidence.filter(item => item.course_id === selected.course_id && (!item.cohort_id || item.cohort_id === selected.cohort_id)).map(item => <article className="conversion-evidence" key={item.id}>
