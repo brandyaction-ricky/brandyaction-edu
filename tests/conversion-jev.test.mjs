@@ -53,7 +53,9 @@ test('Jev is disabled unless review, key, flag and an explicit non-production en
   const server = load('../lib/conversion-review-server.ts', { 'node:crypto': { createHash() {} } });
   const valid = { EDU_CONVERSION_REVIEW_ENABLED: 'true', EDU_CONVERSION_JEV_ENABLED: 'true', TYPESAFE_API_KEY: 'key', NEXT_PUBLIC_APP_ENV: 'development' };
   assert.equal(server.conversionCapabilities(valid).can_jev, true);
-  for (const env of [{}, { ...valid, TYPESAFE_API_KEY: '' }, { ...valid, EDU_CONVERSION_JEV_ENABLED: 'false' }, { ...valid, NEXT_PUBLIC_APP_ENV: 'production' }, { ...valid, VERCEL_ENV: 'production' }]) {
+  assert.equal(server.conversionCapabilities({ ...valid, VERCEL_ENV: 'production' }).can_jev, true);
+  assert.equal(server.conversionCapabilities({ ...valid, NEXT_PUBLIC_APP_ENV: undefined, VERCEL_ENV: 'preview' }).can_jev, true);
+  for (const env of [{}, { ...valid, TYPESAFE_API_KEY: '' }, { ...valid, EDU_CONVERSION_JEV_ENABLED: 'false' }, { ...valid, NEXT_PUBLIC_APP_ENV: 'production' }, { ...valid, NEXT_PUBLIC_APP_ENV: 'production', VERCEL_ENV: 'preview' }, { ...valid, NEXT_PUBLIC_APP_ENV: undefined, VERCEL_ENV: 'production' }]) {
     assert.equal(server.conversionCapabilities(env).can_jev, false);
   }
 });
