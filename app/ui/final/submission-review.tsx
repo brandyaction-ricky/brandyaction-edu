@@ -7,6 +7,7 @@ import { useState, type FormEvent } from "react";
 import { timeLabel, type Data, type WorkflowSend } from "../learning-workflows";
 import { Badge, Empty } from "./primitives";
 import { MissionResponse } from './mission-questions';
+import { useReviewQueue } from '@/features/mission/ui/use-review-queue';
 
 type Submission = Row & { member?: Row; mission?: Row; course?: Row };
 const name = (row?: Row) =>
@@ -23,10 +24,12 @@ export function SubmissionReview({
   data,
   send,
   pending,
+  remote = true,
 }: {
   data: Data;
   send: WorkflowSend;
   pending: boolean;
+  remote?: boolean;
 }) {
   const params = useSearchParams();
   const [status, setStatus] = useState(
@@ -37,6 +40,11 @@ export function SubmissionReview({
   const [currentId, setCurrentId] = useState(params.get("submission") || "");
   const [selected, setSelected] = useState<string[]>([]);
   const [message, setMessage] = useState("");
+  const [page, setPage] = useState(1);
+  const [focusedSubmission, setFocusedSubmission] = useState(params.get('submission') || '');
+  const request = new URLSearchParams({ status, query, sort, page: String(page) });
+  if (focusedSubmission) request.set('submission', focusedSubmission);
+  const queue = useReviewQueue(remote, request);
   const enriched: Submission[] = (data.mission_submissions || []).map(
     (submission) => {
       const enrollment = (data.enrollments || []).find(
@@ -56,7 +64,7 @@ export function SubmissionReview({
       };
     },
   );
-  const list = enriched
+  const list = remote ? queue.result?.rows || [] : enriched
     .filter(
       (row) =>
         (!status || row.status === status) &&
@@ -79,11 +87,13 @@ export function SubmissionReview({
     );
     setSelected([]);
     setMessage("검토 결과와 피드백을 저장했습니다.");
+    queue.reload();
     if (current && ids.includes(current.id))
       setCurrentId(list.find((row) => !ids.includes(row.id))?.id || "");
   }
   return (
     <>
+      {focusedSubmission && <button className="btn mb16" onClick={() => { setFocusedSubmission(''); setPage(1); setSelected([]); }}>전체 제출 목록으로</button>}
       <div className="tabs" aria-label="제출 상태">
         {states.map((value) => (
           <button
@@ -92,12 +102,13 @@ export function SubmissionReview({
             aria-pressed={status === value}
             onClick={() => {
               setStatus(value);
+              setPage(1);
               setSelected([]);
             }}
           >
             {value ? labels[value] : "전체"}{" "}
             <span>
-              {enriched.filter((row) => !value || row.status === value).length}
+              {remote ? queue.result?.counts[value || 'all'] ?? '—' : enriched.filter((row) => !value || row.status === value).length}
             </span>
           </button>
         ))}
@@ -108,18 +119,28 @@ export function SubmissionReview({
           type="search"
           placeholder="회원명 · 미션명 검색"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          maxLength={200}
+          onChange={(event) => { setQuery(event.target.value); setPage(1); setSelected([]); }}
         />
         <span className="spacer" />
         <select
           aria-label="제출물 정렬"
           value={sort}
-          onChange={(event) => setSort(event.target.value)}
+          onChange={(event) => { setSort(event.target.value); setPage(1); setSelected([]); }}
         >
           <option value="old">오래 기다린 순</option>
           <option value="new">최근 제출순</option>
         </select>
       </div>
+      {remote && <div className="between mb24" aria-label="제출물 페이지">
+        <span>{queue.result ? `전체 ${queue.result.pagination.total}건 · ${queue.result.pagination.page}페이지` : '목록 확인 중'}</span>
+        <div className="row">
+          <button className="btn small" disabled={pending || !queue.result || queue.result.pagination.page <= 1} onClick={() => { setPage(queue.result!.pagination.page - 1); setSelected([]); }}>이전 페이지</button>
+          <button className="btn small" disabled={pending || !queue.result || queue.result.pagination.page * queue.result.pagination.pageSize >= queue.result.pagination.total} onClick={() => { setPage(queue.result!.pagination.page + 1); setSelected([]); }}>다음 페이지</button>
+        </div>
+      </div>}
+      {queue.loading && <p role="status" className="notice">제출물을 불러오는 중입니다.</p>}
+      {queue.error && <p role="alert" className="notice">{queue.error} <button className="btn small" onClick={() => { setSelected([]); queue.reload(); }}>다시 불러오기</button></p>}
       <details className="panel pad mb24">
         <summary>여러 제출물 일괄 검토</summary>
         <div className="mt16">
@@ -133,7 +154,7 @@ export function SubmissionReview({
                   .map((row) => row.id),
               )
             }
-            disabled={pending}
+            disabled={pending || queue.loading || Boolean(queue.error)}
           >
             대기 중인 제출 선택 (최대 50건)
           </button>
@@ -151,7 +172,7 @@ export function SubmissionReview({
           <DecisionForm
             key={"bulk-" + selected.join(",")}
             pending={pending}
-            disabled={!selected.length}
+            disabled={!selected.length || queue.loading || Boolean(queue.error)}
             onSave={(decision, feedback) => save(selected, decision, feedback)}
             bulk
           />

@@ -96,3 +96,47 @@ test('save failure preserves answers and loading failure supports safe draft and
   await page.getByRole('button',{name:'다시 불러오기'}).click();
   await expect(page.getByRole('button',{name:'미션 제출',exact:true})).toBeEnabled();
 });
+
+test('server review pages keep old submissions reachable and clear private data after permission loss',async({page},info)=>{
+  const seen:string[]=[];
+  let denied=false;
+  await page.route('**/api/mission/reviews?*',async route=>{
+    const params=new URL(route.request().url()).searchParams;seen.push(params.toString());
+    if(denied){await route.fulfill({status:403,json:{error:'제출물을 조회할 운영 권한이 필요합니다.'}});return;}
+    const number=Number(params.get('page')||1);
+    const search=params.get('query')||'';
+    await route.fulfill({json:{rows:[{id:'synthetic-'+number,enrollment_id:'enrollment',mission_id:'mission',status:'submitted',attempt_number:number,submitted_at:'2026-09-01T00:00:00Z',response:{text:'검토할 답변 '+number},member:{id:'member',full_name:search||'오래 기다린 회원 '+number},mission:{id:'mission',title:'실행 미션'},course:{id:'course',title:'실전 과정'}}],pagination:{page:number,pageSize:50,total:1051},counts:{all:1051,submitted:1051,approved:0,rejected:0,changes_requested:0}}});
+  });
+  await page.goto('/mission-demo?remote=1');
+  await page.getByRole('button',{name:'운영자 · 제출물 검토',exact:true}).click();
+  await expect(page.getByLabel('제출물 페이지')).toContainText('전체 1051건 · 1페이지');
+  await expect(page.getByText('검토할 답변 1',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'다음 페이지',exact:true}).click();
+  await expect(page.getByLabel('제출물 페이지')).toContainText('2페이지');
+  await expect(page.getByText('검토할 답변 2',{exact:true})).toBeVisible();
+  await page.getByRole('searchbox',{name:'제출물 검색'}).fill('찾을 회원');
+  await expect(page.getByLabel('제출물 페이지')).toContainText('1페이지');
+  expect(seen.some(query=>new URLSearchParams(query).get('query')==='찾을 회원')).toBe(true);
+  await page.screenshot({path:info.outputPath('server-review-page.png'),fullPage:true});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  denied=true;
+  await page.getByRole('combobox',{name:'제출물 정렬'}).selectOption('new');
+  await expect(page.getByRole('alert')).toContainText('운영 권한');
+  await expect(page.getByText('검토할 답변 1',{exact:true})).not.toBeVisible();
+  await expect(page.getByRole('button',{name:'승인 후 다음',exact:true})).not.toBeVisible();
+  denied=false;
+  await page.getByRole('button',{name:'다시 불러오기',exact:true}).click();
+  await expect(page.getByText('검토할 답변 1',{exact:true})).toBeVisible();
+});
+
+test('draft revisions advance across repeated saves without losing current answers',async({page})=>{
+  await member(page);
+  await page.getByRole('textbox',{name:/Q01/}).fill('첫 초안');
+  await page.getByRole('button',{name:'임시저장',exact:true}).click();
+  await expect(page.getByRole('status').filter({hasText:'임시저장했습니다'})).toBeVisible();
+  await page.getByRole('textbox',{name:/Q01/}).fill('두 번째 초안');
+  await page.getByRole('button',{name:'임시저장',exact:true}).click();
+  await expect(page.getByRole('status').filter({hasText:'임시저장했습니다'})).toBeVisible();
+  await page.reload();await member(page);
+  await expect(page.getByRole('textbox',{name:/Q01/})).toHaveValue('두 번째 초안');
+});

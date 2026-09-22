@@ -40,6 +40,8 @@ export async function GET(request: Request) {
         if (adminMode && !Object.hasOwn(adminTables, sectionKey)) return reply({ error: '조회 화면을 확인해 주세요.' }, 400);
         const settings = getEduSettings();
         let tables = adminMode ? adminTables[sectionKey] : ['courses', 'cohorts', 'curriculum_weeks', 'curriculum_lessons', 'articles', 'article_categories', 'review_videos', 'site_banners', 'reviews', 'cohort_sessions'];
+        // Reviews load a scoped, server-filtered page through /api/mission/reviews.
+        if (adminMode && sectionKey === 'reviews') tables = [];
         if (adminMode && sectionKey === 'home' && operator?.role === 'staff') tables = tables.filter((table) => (['courses', 'cohorts'].includes(table) && operator.permissions.products) || (['mission_submissions', 'edu_questions'].includes(table) && operator.permissions.members));
         const data: Record<string, Row[]> = {};
         let pagination: { page: number; pageSize: number; total: number } | null = null;
@@ -432,7 +434,9 @@ export async function POST(request: Request) {
             if (!section || !permissions[sectionScopes[section.key]]) return reply({ error: '이 작업에 필요한 운영 권한이 없습니다.' }, 403);
             const ids = body.ids;
             if (!section || !archiveValues[section.key] || !Array.isArray(ids) || !ids.length || ids.length > 50 || !ids.every(uid)) fail('보관할 항목을 최대 50개까지 선택해 주세요.');
-            const result = await db.rpc('edu_archive_records', {
+            const result = section.key === 'missions' ? await db.rpc('archive_mission_definitions', {
+                p_actor: user.id, p_ids: [...new Set(ids)],
+            }) : await db.rpc('edu_archive_records', {
                 p_actor: user.id,
                 p_section: section.key,
                 p_ids: [...new Set(ids)],
@@ -590,12 +594,14 @@ export async function POST(request: Request) {
             if (section.table === 'lesson_contents') {
                 if (['vod_url', 'resource_storage_path', 'body_text', 'external_url'].filter((k) => values[k]).length !== 1) fail('영상·자료·본문·외부 링크 중 학습 유형에 맞는 하나를 등록해 주세요.');
             }
-            if (section.table === 'curriculum_missions' && 'form_schema' in input) {
+            if (section.table === 'curriculum_missions') {
+                if (!('form_schema' in input)) fail('미션 편집 화면을 다시 열고 저장해 주세요.', 409);
                 try { values.form_schema = validateMissionForm(input.form_schema); } catch (error) { fail((error as Error).message); }
                 if (String(values.title || '').trim().length < 1 || String(values.title).length > 200 || String(values.instructions || '').length > 20000) fail('미션 제목과 안내 길이를 확인해 주세요.');
                 values.title = String(values.title).trim();
                 if (!uid(values.lesson_id)) fail('연결할 학습을 선택해 주세요.');
-                if (body.id && typeof body.expectedUpdatedAt !== 'string') fail('미션을 다시 열고 저장해 주세요.', 409);
+                if (body.id && (typeof body.expectedUpdatedAt !== 'string' || !Number.isFinite(Date.parse(body.expectedUpdatedAt)))) fail('미션을 다시 열고 저장해 주세요.', 409);
+                if (typeof values.is_required !== 'boolean' || typeof values.is_published !== 'boolean') fail('미션 공개·필수 여부를 확인해 주세요.');
                 if (values.submission_type === 'quiz' && (values.form_schema as {questions: unknown[]}).questions.length) fail('퀴즈형 미션은 학습 콘텐츠에서 퀴즈 문항을 구성해 주세요.');
             }
             if (section.table === 'curriculum_missions' && values.submission_type === 'quiz' && values.is_published) {
@@ -616,10 +622,12 @@ export async function POST(request: Request) {
             }
             const key = section.table === 'site_settings' ? 'key' : section.table === 'lesson_contents' ? 'lesson_id' : 'id';
             if (!body.id && !uid(body.requestId)) fail('새 등록 요청을 다시 열고 저장해 주세요.');
-            if (section.table === 'curriculum_missions' && body.id && 'form_schema' in input) {
-                const result = await db.from(section.table).update(values).eq('id', body.id).eq('lesson_id', values.lesson_id).eq('updated_at', body.expectedUpdatedAt).select().maybeSingle();
-                if (result.error) fail(databaseMessage(result.error.code), 409);
-                if (!result.data) fail('다른 작업에서 미션을 변경했습니다. 편집 내용을 보관한 뒤 다시 열어 주세요.', 409);
+            if (section.table === 'curriculum_missions') {
+                const result = await db.rpc('save_mission_definition', {
+                    p_actor: user.id, p_id: body.id || null, p_request: body.requestId || null,
+                    p_expected: body.id ? body.expectedUpdatedAt : null, p_values: values,
+                });
+                if (result.error) fail(result.error.code === 'P0001' ? result.error.message : databaseMessage(result.error.code), 409);
                 return reply({ ok: true, row: result.data });
             }
             const result = body.id
@@ -837,20 +845,15 @@ export async function POST(request: Request) {
             const { data: previous } = await db.from('mission_submissions').select('*').eq('enrollment_id', enrollment.id).eq('mission_id', mission.id).order('attempt_number', { ascending: false }).limit(1).maybeSingle();
             if (previous && ['approved', 'submitted'].includes(previous.status)) fail('이미 제출한 미션입니다. 검토 결과를 확인해 주세요.', 409);
             if (body.draft) {
-                const r = await db.from('edu_mission_drafts').upsert(
-                    {
-                        user_id: user.id,
-                        enrollment_id: enrollment.id,
-                        mission_id: mission.id,
-                        content,
-                        url: String(body.url || ''),
-                        response: { ...formResponse, quiz_answers: body.answers || {}, quiz_revision: uid(body.revision) ? body.revision : null, form_snapshot: mission.form_schema || {} },
-                        updated_at: new Date().toISOString(),
-                    },
-                    { onConflict: 'enrollment_id,mission_id' },
-                );
-                if (r.error) throw r.error;
-                return reply({ ok: true });
+                if (!Object.hasOwn(body, 'draftRevision') || (body.draftRevision !== null && !uid(body.draftRevision))) fail('초안을 다시 열고 저장해 주세요.', 409);
+                const r = await db.rpc('save_mission_draft', {
+                    p_user: user.id, p_enrollment: enrollment.id, p_mission: mission.id,
+                    p_expected: body.draftRevision, p_version: mission.updated_at,
+                    p_content: content, p_url: String(body.url || ''),
+                    p_response: { ...formResponse, quiz_answers: body.answers || {}, quiz_revision: uid(body.revision) ? body.revision : null, form_snapshot: mission.form_schema || {} },
+                });
+                if (r.error) fail(r.error.code === 'P0001' ? r.error.message : '임시저장 상태를 확인해 주세요.', 409);
+                return reply({ ok: true, draftRevision: r.data.draftRevision });
             }
             const { data: quizRow, error: quizError } = await db.from('mission_quizzes').select('*').eq('mission_id', mission.id).maybeSingle();
             if (quizError) throw quizError;
@@ -893,7 +896,7 @@ export async function POST(request: Request) {
                     score: grade!.score,
                     message: `퀴즈 ${grade!.score}점입니다. 통과 기준 ${quizRow!.pass_percent}%를 확인하고 다시 응시해 주세요.`,
                 });
-            await db.from('edu_mission_drafts').delete().eq('enrollment_id', enrollment.id).eq('mission_id', mission.id);
+            // The submission trigger clears the draft in the same transaction.
             return reply({ ok: true, passed: true });
         }
         fail('지원하지 않는 요청입니다.');

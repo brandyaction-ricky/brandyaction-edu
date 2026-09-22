@@ -49,6 +49,8 @@ export function MissionForm({ mission, enrollment, submission, draft, pending, s
   const [retry,setRetry] = useState(0);
   const [answers,setAnswers] = useState<Record<string,number>>({});
   const [dirty, setDirty] = useState(false), [saving, setSaving] = useState(false), [submitted, setSubmitted] = useState(false);
+  // Keep the version that these inputs were based on, not a newer background refresh.
+  const [draftRevision, setDraftRevision] = useState<string | null>(draft?.revision ? String(draft.revision) : null);
   const inFlight = useRef(false);
   const busy = pending || saving, readOnly = locked || submitted;
   const current = useRef('');
@@ -72,8 +74,9 @@ export function MissionForm({ mission, enrollment, submission, draft, pending, s
       if (!isDraft && !form.questions.length && ['text','mixed'].includes(t(mission,'submission_type')) && !content.trim()) throw new Error('실행 기록을 작성해 주세요.');
       if (!isDraft && ['link','mixed'].includes(t(mission,'submission_type')) && !url.trim()) throw new Error('결과물 링크를 입력해 주세요.');
       inFlight.current = true; setSaving(true); const snapshot = current.current;
-      const r=await send({action:'mission',enrollmentId:enrollment.id,lessonId:mission.lesson_id,missionId:mission.id,missionVersion:mission.updated_at,content,url,draft:isDraft,formAnswers,checklist:checked,answers,revision:quiz?.revision},isDraft?'임시저장했습니다.':'미션을 제출했습니다.');
+      const r=await send({action:'mission',enrollmentId:enrollment.id,lessonId:mission.lesson_id,missionId:mission.id,missionVersion:mission.updated_at,content,url,draft:isDraft,draftRevision,formAnswers,checklist:checked,answers,revision:quiz?.revision},isDraft?'임시저장했습니다.':'미션을 제출했습니다.');
       if (r.passed === false) { setError(String(r.message)); return; }
+      if (isDraft && typeof r.draftRevision === 'string') setDraftRevision(r.draftRevision);
       if (snapshot === current.current) setDirty(false);
       if (!isDraft) setSubmitted(true);
       setResult(isDraft ? '임시저장했습니다. 다음에 이어서 작성할 수 있어요.' : '제출했습니다. 운영자의 검토를 기다려 주세요.');

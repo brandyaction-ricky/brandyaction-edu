@@ -43,12 +43,12 @@ function harness({user={id:userId,role:'student'},access=true,lessonExists=true,
   const writes=[],reads=[];
   const db={from(table){
     const query={select(){return this},eq(key,value){reads.push({table,key,value});return this},order(){return this},limit(){return this},update(value){writes.push({table,kind:'update',value});return this},upsert(value){writes.push({table,kind:'upsert',value});return this},delete(){writes.push({table,kind:'delete'});return this},then(resolve){return Promise.resolve({data:null,error:null}).then(resolve)},async single(){return this.result()},async maybeSingle(){return this.result()},result(){return {data:table==='enrollments' ? access?{id:enrollmentId,user_id:userId,course_id:courseId,status:'active',access_starts_at:'2020-01-01',access_ends_at:null}:null : table==='curriculum_lessons'?lessonExists?{id:lessonId,curriculum_weeks:{course_id:courseId,is_published:true}}:null : table==='curriculum_missions'?stale?null:mission : table==='mission_submissions'?previous:null,error:null}}};return query;
-  },async rpc(name,args){writes.push({name,args});return {data:{passed:true},error:rpcError}}};
+  },async rpc(name,args){writes.push({name,args});return {data:{passed:true,draftRevision:missionId},error:rpcError||(stale&&name==='save_mission_definition'?{code:'P0001',message:'다른 작업에서 미션을 변경했습니다.'}:null)}}};
   const route=load('app/api/platform/route.ts',{
     '@/lib/supabase/admin':{createAdminClient:()=>db},'@/lib/supabase/server':{createClient:async()=>db},'@/lib/server-auth':{getAuthenticatedUser:async()=>user},
     '@/lib/edu-settings':{},'@/lib/crm-delivery':{},'@/lib/operator-permissions':{permissionsFor:async()=>({products:user?.role==='admin'}),sectionScopes:{missions:'products'}},
   });
-  const send=(body={},origin='https://example.test')=>route.POST(new Request('https://example.test/api/platform',{method:'POST',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify({action:'mission',enrollmentId,missionId,lessonId,missionVersion:mission.updated_at,formAnswers:{q1:'실행 내용'},checklist:['c1'],...body})}));
+  const send=(body={},origin='https://example.test')=>route.POST(new Request('https://example.test/api/platform',{method:'POST',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify({action:'mission',enrollmentId,missionId,lessonId,missionVersion:mission.updated_at,draftRevision:null,formAnswers:{q1:'실행 내용'},checklist:['c1'],...body})}));
   return {send,writes,reads};
 }
 test('mission API denies anonymous, cross-origin, wrong enrollment, stale forms and locked attempts before writing', async () => {
@@ -59,18 +59,21 @@ test('mission API denies anonymous, cross-origin, wrong enrollment, stale forms 
 });
 test('mission API stores incomplete structured drafts and immutable submission snapshots', async () => {
   const h=harness();assert.equal((await h.send({draft:true,formAnswers:{q2:'https://unfinished'},checklist:[],url:'unfinished'})).status,200);
-  assert.equal(h.writes[0].table,'edu_mission_drafts');assert.equal(h.writes[0].value.response.form_answers.q1,'');
+  assert.equal(h.writes[0].name,'save_mission_draft');assert.equal(h.writes[0].args.p_response.form_answers.q1,'');
+  assert.equal(h.writes[0].args.p_expected,null);
   const submit=harness();const r=await submit.send({formAnswers:{q1:'내용',unknown:'ignored'},role:'admin'});assert.equal(r.status,200,await r.text());
   const rpc=submit.writes.find(w=>w.name==='submit_learning_mission');assert.equal(rpc.args.p_user,userId);assert.deepEqual(rpc.args.p_response.form_snapshot,form);assert.deepEqual(rpc.args.p_response.mission_snapshot,{title:mission.title,instructions:mission.instructions,submission_type:mission.submission_type});assert.equal(rpc.args.p_response.form_answers.unknown,undefined);
-  assert.ok(submit.writes.some(w=>w.kind==='delete'));
+  assert.equal(submit.writes.some(w=>w.kind==='delete'),false); // cleanup is transactional in SQL
   const conflict=harness({rpcError:{message:'미션 구성이 변경되었습니다.'}});assert.equal((await conflict.send()).status,409);assert.equal(conflict.writes.some(w=>w.kind==='delete'),false);
 });
 test('mission editor API enforces product permission, validates schema and guards concurrent edits', async () => {
   const body={action:'save',section:'missions',id:missionId,expectedUpdatedAt:mission.updated_at,values:{title:mission.title,lesson_id:lessonId,instructions:'안내',is_published:true,is_required:true,submission_type:'text',form_schema:form}};
   assert.equal((await harness().send(body)).status,403);
-  const h=harness({user:{id:userId,role:'admin'}});const r=await h.send(body);assert.equal(r.status,200,await r.text());assert.deepEqual(h.writes[0].value.form_schema,form);assert.ok(h.reads.some(x=>x.key==='updated_at'&&x.value===mission.updated_at));
+  const h=harness({user:{id:userId,role:'admin'}});const r=await h.send(body);assert.equal(r.status,200,await r.text());assert.deepEqual(h.writes[0].args.p_values.form_schema,form);assert.equal(h.writes[0].args.p_expected,mission.updated_at);
   const stale=harness({user:{id:userId,role:'admin'},stale:true});assert.equal((await stale.send(body)).status,409);
   const invalid=harness({user:{id:userId,role:'admin'}});assert.equal((await invalid.send({...body,values:{...body.values,form_schema:{}}})).status,400);assert.equal(invalid.writes.length,0);
+  const missing=harness({user:{id:userId,role:'admin'}});const {form_schema: ignored, ...withoutSchema}=body.values;void ignored;
+  assert.equal((await missing.send({...body,values:withoutSchema})).status,409);assert.equal(missing.writes.length,0);
 });
 
 test('migration retains legacy rows, enforces snapshots and required answers, and never changes existing grants', async () => {

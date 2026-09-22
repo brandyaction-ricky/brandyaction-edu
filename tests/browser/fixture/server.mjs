@@ -24,4 +24,5 @@ const server = createServer((request,response)=>{
   if(asset){response.setHeader('Content-Type',url.pathname.endsWith('.css')?'text/css':'text/javascript');response.end(asset);return;}
   response.setHeader('Content-Type','text/html');response.end('<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin focus fixture</title><link rel="stylesheet" href="/app.css"></head><body style="overflow:auto"><div id="root"></div><script type="module" src="/app.js"></script></body></html>');
 });
-server.listen(4173,'127.0.0.1',()=>console.log('Focus fixture ready on port 4173'));
+const port=Number(process.env.EDU_BROWSER_TEST_PORT || 4173);
+server.listen(port,'127.0.0.1',()=>console.log(`Focus fixture ready on port ${port}`));

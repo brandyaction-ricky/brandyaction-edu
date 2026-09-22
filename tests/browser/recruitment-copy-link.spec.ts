@@ -24,7 +24,7 @@ async function setup(page: Page, options: { paused?: boolean; oldRoom?: boolean;
   return activity;
 }
 
-test('copies exact channel links without tracking visits or writes; unsaved edits block copying', async ({ page }) => {
+test('copies exact channel links without tracking visits or writes; unsaved edits block copying', async ({ page, baseURL }) => {
   const activity = await setup(page);
   for (const [label, path] of [
     ['광고용 모집 링크', `/join/${code}/paid`], ['오가닉용 모집 링크', `/join/${code}/organic`],
@@ -33,7 +33,7 @@ test('copies exact channel links without tracking visits or writes; unsaved edit
   ]) {
     await page.getByRole('button', { name: `${label} 복사`, exact: true }).click();
     await expect(page.getByText(`${label}를 복사했습니다. 게시·발송은 직접 진행해 주세요.`, { exact: true })).toBeVisible();
-    expect(await page.locator('html').getAttribute('data-copied-link')).toBe('http://127.0.0.1:4173' + path);
+    expect(await page.locator('html').getAttribute('data-copied-link')).toBe(new URL(path, baseURL).href);
   }
   await expect(page.getByRole('button', { name: '앵콜 라이브 광고방 방송 링크 복사', exact: true })).toBeDisabled();
   await page.getByLabel('첫 웨비나 YouTube 주소', { exact: true }).fill('https://youtube.com/watch?v=zyxwvutsrqp');

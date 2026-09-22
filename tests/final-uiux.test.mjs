@@ -277,7 +277,7 @@ test('catalogues and separate editors render without dropping existing fields', 
 });
 test('submission review keeps queue and inspector, escaping text and unsafe links', () => {
   const { SubmissionReview } = load('app/ui/final/submission-review.tsx');
-  const markup = html(SubmissionReview, { data, send, pending: false });
+  const markup = html(SubmissionReview, { data, send, pending: false, remote: false });
   for (const className of ['review-shell', 'queue', 'review-main', 'answers', 'inspector']) assert.ok(markup.includes(`class="${className}"`));
   assert.match(markup, /&lt;script&gt;/); assert.doesNotMatch(markup, /href="javascript:/);
   assert.match(markup, /승인 후 다음/); assert.match(markup, /최대 50건/);
