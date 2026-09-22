@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { AdminButton, AdminInput, AdminSection } from './final/admin-system';
+import { AdminButton, AdminInput, AdminSection } from '@/features/admin-ui';
 import { liveLabel, type AttendanceReport, type LivePhase, type LiveSession } from '@/lib/webinar-attendance';
 function SessionEditor({code,phase,session,saved}:{code:string;phase:LivePhase;session?:LiveSession;saved:()=>void}) {
  const [url,setUrl]=useState(session?.url??''),[open,setOpen]=useState(session?.open??false),[busy,setBusy]=useState(false),[message,setMessage]=useState('');

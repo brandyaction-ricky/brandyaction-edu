@@ -19,6 +19,13 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { SubmissionReview } from "./final/submission-review";
 import { timeLabel, type Data, type WorkflowSend } from "./learning-workflows";
 import { EnrollmentGrant, RefundAction } from "./operations-actions";
+import {
+  AdminEmptyState,
+  AdminLoadingState,
+  AdminPagination,
+  AdminSearchField,
+  AdminStatusBadge,
+} from "@/features/admin-ui";
 
 export const standaloneAdmin = [
   "staff",
@@ -1853,16 +1860,14 @@ function OrdersPanel({
       </div>
       <section className="panel" aria-label="주문 목록" aria-busy={loading}>
         <div className="filter-row">
-          <label className="search">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><circle cx="10" cy="10" r="7" /><path d="m15 15 6 6" /></svg>
-            <input type="search" value={query} aria-label="주문 검색" placeholder="주문번호 · 회원명 · 상품명 검색" onChange={event => { setQuery(event.target.value); setOpened(""); }} />
-          </label>
+          <AdminSearchField value={query} label="주문 검색" placeholder="주문번호 · 회원명 · 상품명 검색" onChange={event => { setQuery(event.target.value); setOpened(""); }} />
           <span className="spacer" />
           <label className="select-filter"><span>상품</span><select aria-label="상품 필터" value={course} onChange={event => { setCourse(event.target.value); setOpened(""); }}><option value="">전체 상품</option>{registeredCourses.map(item => <option key={item.id} value={item.id}>{named(item)}</option>)}</select></label>
           <select aria-label="결제 상태" value={status} onChange={event => { setStatus(event.target.value); setOpened(""); }}><option value="">전체 상태</option>{["paid", "pending", "payment_failed", "partially_refunded", "refunded", "cancelled"].map(value => <option key={value} value={value}>{labels[value] || value}</option>)}</select>
         </div>
-        <div className="table-scroll mobile-cards" tabIndex={0} role="region" aria-label="주문 데이터 표">
+        <div className="table-scroll mobile-cards admin-legacy-table" tabIndex={0} role="region" aria-label="주문 데이터 표" aria-busy={loading}>
           <table>
+            <caption className="sr-only">주문·결제·환불·수강권 연결 목록</caption>
             <thead>
               <tr>
                 {[
@@ -1905,9 +1910,7 @@ function OrdersPanel({
                     {Number(order.discount_amount) > 0 && <p>할인 {money(Number(order.discount_amount))}</p>}
                   </td>
                   <td data-label="결제 상태">
-                    <span className={"badge " + (order.status === "paid" ? "green" : order.status === "payment_failed" ? "red" : order.status === "pending" ? "amber" : "")}>
-                      {labels[t(order, "status")] || t(order, "status")}
-                    </span>
+                    <AdminStatusBadge status={t(order, "status")} label={labels[t(order, "status")] || t(order, "status")} />
                   </td>
                   <td data-label="환불 상태"><span className={"badge " + (checkingRefund ? "amber" : "")}>{refundLabel}</span>{cancelledAmount > 0 && <p>{money(cancelledAmount)}</p>}</td>
                   <td data-label="수강 권한">{accessLabels.join(" · ") || "부여 내역 없음"}</td>
@@ -1925,8 +1928,8 @@ function OrdersPanel({
             </tbody>
           </table>
         </div>
-        {!orders.length && !loading && <div className="empty"><h3>해당 주문이 없습니다.</h3><p>현재 조회 페이지의 기간·상품·상태 또는 검색어를 확인하세요.</p></div>}
-        {loading && <p className="pad muted" role="status">주문 내역을 불러오고 있습니다.</p>}
+        {!orders.length && !loading && <AdminEmptyState title="해당 주문이 없습니다." action={<button className="btn" type="button" onClick={() => { setQuery(""); setStatus(""); setCourse(""); setFrom(""); setTo(""); setAppliedDates({ from: "", to: "" }); setDateError(""); }}>검색·필터 초기화</button>}>현재 조회 페이지의 기간·상품·상태 또는 검색어를 확인하세요.</AdminEmptyState>}
+        {loading && <div className="pad"><AdminLoadingState title="주문 내역을 불러오는 중입니다." description="결제·환불·수강권 연결 상태를 함께 확인하고 있습니다."/></div>}
         <div className="table-foot"><span>{orders.length}건 표시 · 현재 조회 페이지 내 검색·집계</span><span>정산·회계 매출은 결제액과 별도</span></div>
       </section>
       <dialog
@@ -1993,30 +1996,7 @@ function OrdersPanel({
         )}
       </dialog>
       {pagination && pagination.total > pagination.pageSize && (
-        <div className="workflow-pagination">
-          <button
-            className="btn"
-            disabled={loading || pagination.page <= 1}
-            onClick={() => setPage?.(pagination.page - 1)}
-          >
-            이전
-          </button>
-          <span>
-            {pagination.page} /{" "}
-            {Math.max(1, Math.ceil(pagination.total / pagination.pageSize))}{" "}
-            페이지 · 전체 {pagination.total}건
-          </span>
-          <button
-            className="btn"
-            disabled={
-              loading ||
-              pagination.page * pagination.pageSize >= pagination.total
-            }
-            onClick={() => setPage?.(pagination.page + 1)}
-          >
-            다음
-          </button>
-        </div>
+        <><p className="admin-pagination-total">전체 {pagination.total}건</p><AdminPagination page={pagination.page} pages={Math.ceil(pagination.total / pagination.pageSize)} disabled={loading} onChange={nextPage => setPage?.(nextPage)}/></>
       )}
     </>
   );

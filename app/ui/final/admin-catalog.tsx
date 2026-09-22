@@ -13,9 +13,10 @@ import {
 import { paidCourseReadinessIssues, recordId } from "@/lib/platform-rules";
 import { archiveValues, cohortPeriod, cohortStatus } from "@/lib/qa-rules";
 import { readMissionForm } from "@/features/mission";
-import { ArrowRight, BookOpen, ChevronDown, ChevronUp, FileText, Pencil, RotateCcw, Search, Trash2 } from "lucide-react";
+import { ArrowRight, BookOpen, ChevronDown, ChevronUp, FileText, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { AdminEmptyState, AdminPagination, AdminSearchField } from "@/features/admin-ui";
 import type { Data, WorkflowSend } from "../learning-workflows";
 import { Metric } from "./admin-shell";
 import { Badge, Empty, courseType } from "./primitives";
@@ -518,19 +519,15 @@ export function AdminCatalog({
     { label: "등록일", value: (r: Row) => date(r.created_at) },
   ];
   const search = (
-    <label className="search">
-      <Search />
-      <input
-        type="search"
-        value={query}
-        placeholder={s.key === "customers" ? "이름 · 이메일 · 연락처 · 태그 검색" : s.key === "products" ? "상품명 검색" : s.key === "learning" ? "학습 제목 검색" : s.title + " 검색"}
-        aria-label="목록 검색"
-        onChange={(e) => {
-          setQuery(e.target.value);
-          setSelection([]);
-        }}
-      />
-    </label>
+    <AdminSearchField
+      value={query}
+      placeholder={s.key === "customers" ? "이름 · 이메일 · 연락처 · 태그 검색" : s.key === "products" ? "상품명 검색" : s.key === "learning" ? "학습 제목 검색" : s.title + " 검색"}
+      label={`${s.title} 목록 검색`}
+      onChange={(e) => {
+        setQuery(e.target.value);
+        setSelection([]);
+      }}
+    />
   );
   const statusFilter = (
     <select
@@ -905,8 +902,9 @@ export function AdminCatalog({
               ))}
             </div>
           ) : (
-            <div className="table-scroll mobile-cards">
+            <div className="table-scroll mobile-cards admin-legacy-table" role="region" aria-label={`${s.title} 목록`} aria-busy={loading} tabIndex={0}>
               <table>
+                <caption className="sr-only">{s.title} 목록</caption>
                 <thead>
                   <tr>
                     {bulkMode && <th className="selection-column">{selectAll}</th>}
@@ -977,9 +975,9 @@ export function AdminCatalog({
             </div>
           )}
           {!filtered.length && !loading && (
-            <Empty title="조회된 항목이 없습니다.">
-              검색어 또는 상태 필터를 변경해 보세요.
-            </Empty>
+            <AdminEmptyState title="조회된 항목이 없습니다." action={<button className="btn" type="button" onClick={() => { setQuery(""); setStatus(""); setType(""); setCourse(""); setWeek(""); setSelection([]); }}>검색·필터 초기화</button>}>
+              검색어 또는 상태 필터를 변경하면 전체 목록을 다시 확인할 수 있습니다.
+            </AdminEmptyState>
           )}
           <div className="table-foot">
             {filtered.length}개 표시
@@ -990,36 +988,15 @@ export function AdminCatalog({
         </div>
       </div>
       {pagination && pagination.total > pagination.pageSize && (
-        <div className="workflow-pagination">
-          <button
-            className="btn"
-            disabled={loading || pagination.page <= 1}
-            onClick={() => {
-              setSelection([]);
-              setPage(pagination.page - 1);
-            }}
-          >
-            이전
-          </button>
-          <span>
-            {pagination.page} /{" "}
-            {Math.max(1, Math.ceil(pagination.total / pagination.pageSize))}{" "}
-            페이지
-          </span>
-          <button
-            className="btn"
-            disabled={
-              loading ||
-              pagination.page * pagination.pageSize >= pagination.total
-            }
-            onClick={() => {
-              setSelection([]);
-              setPage(pagination.page + 1);
-            }}
-          >
-            다음
-          </button>
-        </div>
+        <AdminPagination
+          page={pagination.page}
+          pages={Math.ceil(pagination.total / pagination.pageSize)}
+          disabled={loading}
+          onChange={(nextPage) => {
+            setSelection([]);
+            setPage(nextPage);
+          }}
+        />
       )}
       {s.key === "learning" && <div className="row mt24"><Link className="btn" href="/admin/weeks">주차 구성</Link><Link className="btn" href="/admin/contents">영상·자료 등록</Link><Link className="btn" href="/admin/missions">미션·퀴즈 관리</Link></div>}
       {s.key === "missions" && <div className="notice mt16">미션은 연결 학습의 일차 순서로 표시됩니다. 학습 순서는 학습 콘텐츠 편집에서 변경할 수 있습니다. 제출물 검토와 피드백은 <Link className="text-link" href="/admin/reviews">제출물 검토</Link>에서 관리합니다.</div>}

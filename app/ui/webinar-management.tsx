@@ -7,7 +7,7 @@ import { RecruitmentCopyLink } from './recruitment-copy-link';
 import { WebinarFollowup } from './webinar-followup';
 import { RecruitmentReadiness } from './recruitment-readiness';
 import { WebinarBroadcastManagement } from './webinar-broadcast-management';
-import { AdminButton, AdminSection, AdminSelect } from './final/admin-system';
+import { AdminButton, AdminSection, AdminSelect } from '@/features/admin-ui';
 import type { FunnelCourse, FunnelCohort } from '@/lib/recruitment-funnel';
 type Campaign={id:string;freeCourse:string;paidCohort:string|null;enabled:boolean;revision:number};
 type Report={campaign:Campaign|null;registrations:number;purchase_state:string;purchases:null|{orders:number;buyers:number;gross:number;refunds:number;net:number;needs_review:number;as_of:string}};

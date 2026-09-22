@@ -7,7 +7,7 @@ import { WebinarManagement } from './webinar-management';
 import type { FunnelCourse, FunnelCohort } from '@/lib/recruitment-funnel';
 import { RecruitmentLinks } from './recruitment-links';
 import { createMutationGate } from '@/lib/mutation-gate';
-import { AdminButton, AdminInput, AdminSection, AdminSelect } from './final/admin-system';
+import { AdminButton, AdminInput, AdminSection, AdminSelect } from '@/features/admin-ui';
 
 export function RecruitmentRoomSettings({courses,cohorts,expanded=false,initialPeriod}:{courses:FunnelCourse[];cohorts:FunnelCohort[];expanded?:boolean;initialPeriod?:string}) {
   const [showWebinar,setShowWebinar]=useState(expanded);

@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { build } from 'esbuild';
 
@@ -9,15 +10,17 @@ const campaign = {id:'bbbbbbbb-bbbb-4000-8000-000000000002',landing_id:'aaaaaaaa
 const actual = {campaign_id:campaign.id,day:relativeDay(-1),kakao_members:10,new_payments:0,existing_payments:0,memo:null,new_price_snapshot:1000,existing_price_snapshot:500};
 const summary = {has_data:false,sessions:0,visitors:0,cta_click_sessions:0,cta_clicks:0,converted_visitors:0,avg_dwell_ms:0,avg_scroll_depth:0,meta_impressions:0,meta_link_clicks:0,spend:0};
 const report = {campaign,summary_b:summary,summary_a:null,performance:[],daily:[],actuals:[actual],campaign_summary:{live_peak:null,kakao_members:10,kakao_delta:null,new_payments:0,existing_payments:0,revenue:0,spend:0,roas:null},options:{campaigns:[],ad_types:[],adsets:[],creatives:[],devices:[],layouts:[]},data_state:{sessions_exist:false,filtered_sessions_exist:false,meta_exists:false}};
-const result = await build({entryPoints:['tests/browser/fixture/app.tsx'],bundle:true,write:false,outdir:'focus-fixture',platform:'browser',format:'esm',jsx:'automatic',define:{'process.env.NODE_ENV':'"development"'},alias:{'next/link':resolve('tests/browser/fixture/link.tsx'),'next/navigation':resolve('tests/browser/fixture/navigation.ts')}});
+const result = await build({entryPoints:['tests/browser/fixture/app.tsx'],bundle:true,write:false,outdir:'focus-fixture',platform:'browser',format:'esm',jsx:'automatic',define:{'process.env.NODE_ENV':'"development"'},alias:{'next/image':resolve('tests/browser/fixture/image.tsx'),'next/link':resolve('tests/browser/fixture/link.tsx'),'next/navigation':resolve('tests/browser/fixture/navigation.ts')}});
 const assets = new Map(result.outputFiles.map(file=>['/'+file.path.split('/').at(-1),file.contents]));
 const learning = await build({entryPoints:['tests/browser/fixture/learning.tsx'],bundle:true,write:false,outdir:'learning-fixture',platform:'browser',format:'esm',jsx:'automatic',define:{'process.env.NODE_ENV':'"development"','process.env':'{}'},alias:{'next/link':resolve('tests/browser/fixture/link.tsx'),'next/navigation':resolve('tests/browser/fixture/navigation.ts')}});
 for (const file of learning.outputFiles) assets.set('/'+file.path.split('/').at(-1), file.contents);
+const brandLogo = readFileSync(resolve('public/brandy-action-logo.png'));
 const server = createServer((request,response)=>{
   const url=new URL(request.url,'http://localhost');
   if(request.method!=='GET'){response.writeHead(405).end();return;}
   if(url.pathname==='/api/mission/questions'){response.setHeader('Content-Type','application/json');response.end(JSON.stringify({rows:[],page:1,pageSize:20,total:0}));return;}
   if(url.pathname==='/api/platform/workflows' && url.searchParams.get('kind')==='quiz'){response.setHeader('Content-Type','application/json');response.end(JSON.stringify({quiz:null}));return;}
+  if(url.pathname==='/brandy-action-logo.png'){response.setHeader('Content-Type','image/png');response.end(brandLogo);return;}
   if(url.pathname==='/api/landing/performance'){
     response.setHeader('Content-Type','application/json');
     const start=url.searchParams.get('start'),end=url.searchParams.get('end');
