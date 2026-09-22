@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Plus, RefreshCw, Save } from 'lucide-react';
 import { campaignRange, presetRange, type ActualRow, type DashboardReport, type PerformanceCampaign } from '@/lib/landing-performance';
 import { actualPayload, actualRevenue, campaignStatus, count, kstTime, metaStatus, money, signed } from '@/lib/landing-admin-state';
-import { AdminButton, AdminDataTable, AdminDivider, AdminSection, AdminStatusBadge } from '@/app/ui/final/admin-system';
+import { AdminButton, AdminDataTable, AdminDivider, AdminSection, AdminStatusBadge } from '@/features/admin-ui';
 import { OperationsSummary } from './performance-dashboard';
 import { CompactEmpty, DiscardConfirmation, InlineError, TrackingModal } from './tracking-controls';
 

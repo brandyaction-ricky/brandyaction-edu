@@ -686,7 +686,7 @@ export function Platform({
         current={key}
         available={available}
         user={user!}
-        data={data}
+        pendingReviews={Number((data.admin_summary || [])[0]?.pendingReviews || 0)}
         mobile={mobile}
         setMobile={setMobile}
         logout={logout}

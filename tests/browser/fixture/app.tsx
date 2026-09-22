@@ -7,9 +7,9 @@ import { WebinarRegistration } from '../../../app/ui/webinar-registration';
 import { WebinarManagement } from '../../../app/ui/webinar-management';
 import { AdminWorkflows } from '../../../app/ui/admin-workflows';
 import { ConversionFixture } from './conversion';
-import { AdminButton, AdminConfirmDialog, AdminDrawer, AdminInput } from '../../../app/ui/final/admin-system';
+import { AdminButton, AdminConfirmDialog, AdminDrawer, AdminInput } from '../../../features/admin-ui';
 import '../../../app/ui/final/tokens.css';
-import '../../../app/ui/final/admin-system.css';
+import '../../../features/admin-ui/styles/admin-system.css';
 
 function BoundaryFixture() {
   const [open, setOpen] = useState(false), [confirm, setConfirm] = useState(false), [extra, setExtra] = useState(false);

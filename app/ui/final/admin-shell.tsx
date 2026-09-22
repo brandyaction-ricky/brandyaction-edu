@@ -26,6 +26,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import type { Data } from "../learning-workflows";
 
+export { AdminShell } from "@/features/admin-ui";
+
 export const finalAdminGroups = [
   [
     "클래스 관리",
@@ -152,7 +154,7 @@ export function Metric({
     <div className={"metric " + (highlight ? "highlight" : "")}>{content}</div>
   );
 }
-export function AdminShell({
+export function LegacyAdminShell({
   current,
   available,
   user,
