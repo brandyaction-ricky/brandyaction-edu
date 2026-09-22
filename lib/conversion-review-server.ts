@@ -2,8 +2,9 @@ import { createHash } from 'node:crypto';
 
 export function conversionCapabilities(env: Record<string, string | undefined>) {
   const enabled = env.EDU_CONVERSION_REVIEW_ENABLED === 'true';
-  const production = env.NEXT_PUBLIC_APP_ENV === 'production' || env.VERCEL_ENV === 'production';
-  const explicitTest = ['development', 'test'].includes(env.NEXT_PUBLIC_APP_ENV || '') || env.VERCEL_ENV === 'preview';
+  const appEnvironment = env.NEXT_PUBLIC_APP_ENV || '';
+  const production = appEnvironment === 'production';
+  const explicitTest = ['development', 'test'].includes(appEnvironment) || (!appEnvironment && env.VERCEL_ENV === 'preview');
   const can_mock = enabled && env.EDU_CONVERSION_MOCK_ENABLED === 'true' && explicitTest && !production;
   const can_jev = enabled && env.EDU_CONVERSION_JEV_ENABLED === 'true' && Boolean(env.TYPESAFE_API_KEY) && explicitTest && !production;
   return { enabled, can_mock, can_jev, can_analyze: can_jev || can_mock, analyze_provider: can_jev ? 'jev' as const : can_mock ? 'mock' as const : null };
