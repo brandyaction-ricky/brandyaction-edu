@@ -39,13 +39,29 @@ test('offer lifecycle distinguishes recruiting, upcoming, closed and cancelled p
   assert.equal(courseOfferLifecycle(course, [{ course_id: 'course', status: 'cancelled' }], now), 'cancelled');
 });
 
-test('published paid products can sell an upcoming cohort until its actual deadline', () => {
+test('BF-01 paid recruitment opens at start and closes exactly at deadline', () => {
   const course = { status: 'published', category: 'paid_class' };
   const upcoming = { status: 'upcoming', recruitment_start_at: '2026-09-28T00:00:00Z', recruitment_end_at: '2026-10-01T00:00:00Z' };
-  assert.equal(isPurchasableOffer(course, upcoming, now), true);
+  const start = Date.parse(upcoming.recruitment_start_at), end = Date.parse(upcoming.recruitment_end_at);
+  assert.equal(isPurchasableOffer(course, upcoming, now), false);
+  for (const [time, expected] of [[start - 1, false], [start, true], [end - 1, true], [end, false]]) {
+    assert.equal(isPurchasableOffer(course, upcoming, time), expected);
+    assert.equal(isRecruiting(upcoming, time), expected);
+  }
   assert.equal(isPurchasableOffer({ ...course, status: 'draft' }, upcoming, now), false);
   assert.equal(isPurchasableOffer({ ...course, category: 'free' }, upcoming, now), false);
   assert.equal(isPurchasableOffer(course, { ...upcoming, recruitment_end_at: '2026-09-11T12:00:00Z' }, now), false);
+});
+
+test('BF-03 terminal and operation-ended cohorts precede future recruitment dates', () => {
+  const future = { course_id: 'course', status: 'upcoming', recruitment_start_at: '2098-01-01', recruitment_end_at: '2099-01-01' };
+  for (const status of ['closed', 'completed', 'cancelled']) {
+    assert.equal(offerLifecycle({ ...future, status }, now), status === 'cancelled' ? 'cancelled' : 'closed');
+  }
+  assert.equal(offerLifecycle({ ...future, operation_end_at: new Date(now).toISOString() }, now), 'closed');
+  assert.equal(courseOfferLifecycle({ id: 'course' }, [{ ...future, status: 'closed' }, future], now), 'upcoming');
+  assert.equal(courseOfferLifecycle({ id: 'course' }, [future, { ...future, status: 'recruiting', recruitment_start_at: '2020-01-01' }], now), 'recruiting');
+  assert.equal(isRecruiting({ ...future, recruitment_start_at: '2020-01-01', archived_at: '2026-01-01' }, now), false);
 });
 
 test('paid products expose missing publication requirements before checkout', () => {

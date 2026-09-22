@@ -144,7 +144,8 @@ export function parseProductHtml(value: string): ProductHtmlNode[] {
     const attrPattern = /([^\s=<>/'"]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g;
     for (const attr of attributes.matchAll(attrPattern)) {
       const name = attr[1].toLowerCase(), content = decode(attr[2] ?? attr[3] ?? attr[4] ?? '').trim();
-      if ((tag === 'a' && name === 'href') || (tag === 'img' && name === 'src')) { const url = safeUrl(content); if (url) attrs[name] = url; }
+      if ((tag === 'a' && name === 'href') || (tag === 'img' && name === 'src')) { const url = tag === 'a' && /^#[^\s<>"']*$/.test(content) ? content : safeUrl(content); if (url) attrs[name] = url; }
+      if (name === 'id' && /^[a-z][\w:.-]{0,100}$/i.test(content)) attrs.id = content;
       if (name === 'title' || (tag === 'img' && name === 'alt')) attrs[name] = content.slice(0, 500);
       if ((tag === 'img' && ['width', 'height'].includes(name)) || (['td', 'th'].includes(tag) && ['colspan', 'rowspan'].includes(name)) || (tag === 'ol' && name === 'start')) {
         if (/^\d{1,4}$/.test(content) && Number(content) > 0) attrs[name] = content;

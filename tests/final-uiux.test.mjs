@@ -91,13 +91,61 @@ test('three signup methods and product detail variants use the final publishing 
   assert.match(html(ArticlesView, { data, user, loading: false }), /테스트 아티클/);
   assert.match(html(StoriesView, { data, loading: false }), /등록된 고객 이야기/);
 });
-test('a published paid product uses its upcoming cohort for CTA and the actual deadline', () => {
+test('BF-01 a paid product awaiting recruitment has no checkout link', () => {
   const { ProductDetail } = load('app/ui/final/public-views.tsx');
   const upcoming = { ...cohort, id: 'upcoming-cohort', status: 'upcoming', recruitment_start_at: '2098-12-01T00:00:00Z', recruitment_end_at: '2099-01-31T00:00:00Z' };
   const markup = html(ProductDetail, { course, data: { ...data, cohorts: [upcoming], enrollments: [] } });
-  assert.match(markup, /checkout\?cohort=upcoming-cohort/);
+  assert.doesNotMatch(markup, /checkout\?cohort=upcoming-cohort/);
+  assert.match(markup, /<button[^>]*disabled=""[^>]*>모집 예정<\/button>/);
   assert.match(markup, /2099/);
   assert.doesNotMatch(markup, /다음 모집 준비 중|이용·환불 안내/);
+});
+
+test('BF-02 external CTA obeys recruitment and valid access with or without landing config', () => {
+  const { ProductDetail } = load('app/ui/final/public-views.tsx');
+  const free = { ...course, category: 'free', list_price: 0, metadata: { cta_url: 'https://example.test/join' } };
+  for (const landing_configs of [[], [{ id: course.id, enabled: true, layout_ver: 1, kakao_url: 'https://example.test/join' }]]) {
+    for (const [status, label] of [['upcoming', '모집 예정'], ['closed', '신청 마감'], ['cancelled', '운영 취소']]) {
+      const cohorts = [{ ...cohort, status, recruitment_start_at: '2098-01-01' }];
+      for (const enrollments of [[], [{ ...enrollment, access_ends_at: '2020-01-01' }], [{ ...enrollment, revoked_at: '2020-01-01' }]]) {
+        const markup = html(ProductDetail, { course: free, data: { ...data, cohorts, enrollments, landing_configs } });
+        assert.doesNotMatch(markup, /href="https:\/\/example.test\/join"/);
+        assert.match(markup, new RegExp('<button[^>]*disabled=""[^>]*>' + label));
+      }
+    }
+    assert.match(html(ProductDetail, { course: free, data: { ...data, enrollments: [], landing_configs } }), /href="https:\/\/example.test\/join"/);
+    assert.match(html(ProductDetail, { course: free, data: { ...data, landing_configs } }), /href="\/learn\/enrollment"/);
+  }
+});
+
+test('BF-01 direct checkout blocks unavailable cohorts before login and honors existing access', () => {
+  const { Checkout } = load('app/ui/final/checkout.tsx');
+  search = new URLSearchParams('cohort=cohort');
+  for (const viewer of [null, user]) {
+    for (const status of ['upcoming', 'closed', 'cancelled']) {
+      const markup = html(Checkout, { data: { ...data, enrollments: [], cohorts: [{ ...cohort, status, recruitment_start_at: '2098-01-01' }] }, user: viewer, pending: false, send });
+      assert.doesNotMatch(markup, /<form|href="\/login/);
+      assert.match(markup, /모집 예정|신청 마감|운영 취소/);
+    }
+  }
+  assert.match(html(Checkout, { data, user, pending: false, send }), /학습 이어가기/);
+  search = new URLSearchParams();
+});
+
+test('BF-04 inline application CTA reflects parent state and preserves ordinary anchors', () => {
+  const { ProductDetail } = load('app/ui/final/public-views.tsx');
+  const free = { ...course, category: 'free', list_price: 0, metadata: { detail_html: '<a href="#">무료강의 대기방 입장</a><a href="#outline">목차</a><h2 id="outline">안내</h2>' } };
+  const markup = html(ProductDetail, { course: free, data: { ...data, enrollments: [], cohorts: [{ ...cohort, status: 'closed' }] } });
+  assert.match(markup, /aria-disabled="true"/);
+  assert.doesNotMatch(markup, /href="#"/);
+  assert.match(markup, /href="#outline"/);
+  assert.match(markup, /id="outline"/);
+  assert.match(html(ProductDetail, { course: free, data }), /href="\/learn\/enrollment"/);
+  const legacy = { ...free, metadata: { detail_html: '<a href="https://example.test/join">커뮤니티로 이동</a>' } };
+  const landing_configs = [{ id: course.id, kakao_url: 'https://example.test/join' }];
+  const closed = html(ProductDetail, { course: legacy, data: { ...data, landing_configs, enrollments: [], cohorts: [{ ...cohort, status: 'closed' }] } });
+  assert.doesNotMatch(closed, /href="https:\/\/example.test\/join"/);
+  assert.match(closed, /aria-disabled="true"/);
 });
 
 test('paid detail exposes public session schedule, capacity, discount basis and approved instructor only', () => {
@@ -196,7 +244,7 @@ test('classroom, mission, checkout and completion preserve authorized workflow e
   assert.match(resource, /\/api\/platform\/resource\?lesson=lesson/); assert.doesNotMatch(resource, /private\/test/);
   search = new URLSearchParams('cohort=cohort');
   const { Checkout } = load('app/ui/final/checkout.tsx');
-  const checkout = html(Checkout, { data, user, send, pending: false });
+  const checkout = html(Checkout, { data: { ...data, enrollments: [] }, user, send, pending: false });
   assert.match(checkout, /checkout-layout/);
   assert.match(checkout, /<button[^>]*disabled=""[^>]*aria-describedby="checkout-agreement-help"[^>]*>[^<]*결제하기/s);
   assert.match(checkout, /value="CARD"/);
@@ -355,7 +403,7 @@ test('paid products hide mismatched free-class HTML and block checkout until rea
   assert.doesNotMatch(markup, /무료강의 대기방 입장/);
   assert.match(markup, /무료 클래스 안내와 외부 참여 링크는 노출하지 않습니다/);
   assert.match(markup, /학습 기간 · 일정 안내 · 공개 커리큘럼/);
-  assert.match(markup, /aria-disabled="true"/);
+  assert.match(markup, /disabled=""/);
 });
 
 test('landing report separates repeated clicks, missing actuals, direct traffic and per-version reach', () => {

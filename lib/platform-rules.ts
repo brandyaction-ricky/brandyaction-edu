@@ -7,30 +7,31 @@ export function hasLearningAccess(enrollment: Row, now = Date.now()) {
 }
 
 export function isRecruiting(cohort: Row, now = Date.now()) {
-  return (cohort.status === 'recruiting' || (cohort.status === 'upcoming' && Boolean(cohort.recruitment_end_at)))
-    && (!cohort.recruitment_start_at || Date.parse(String(cohort.recruitment_start_at)) <= now)
-    && (!cohort.recruitment_end_at || Date.parse(String(cohort.recruitment_end_at)) > now)
-    && (!cohort.operation_end_at || Date.parse(String(cohort.operation_end_at)) > now);
+  return offerLifecycle(cohort, now) === 'recruiting';
 }
 
 export function isPurchasableOffer(course: Row, cohort: Row, now = Date.now()) {
   if (course.status !== 'published' || course.category === 'free') return false;
-  if (isRecruiting(cohort, now)) return true;
-  if (cohort.status !== 'upcoming') return false;
-  return Boolean(cohort.recruitment_end_at)
-    && Date.parse(String(cohort.recruitment_end_at)) > now
-    && (!cohort.operation_end_at || Date.parse(String(cohort.operation_end_at)) > now);
+  return isRecruiting(cohort, now);
 }
 
 export type OfferLifecycle = 'recruiting' | 'upcoming' | 'closed' | 'cancelled';
 
 export function offerLifecycle(cohort: Row | undefined, now = Date.now()): OfferLifecycle {
-  if (!cohort || cohort.status === 'cancelled') return cohort?.status === 'cancelled' ? 'cancelled' : 'closed';
+  if (!cohort || cohort.archived_at) return 'closed';
+  if (cohort.status === 'cancelled') return 'cancelled';
+  if (!['recruiting', 'upcoming'].includes(String(cohort.status))) return 'closed';
   const starts = cohort.recruitment_start_at ? Date.parse(String(cohort.recruitment_start_at)) : null;
   const ends = cohort.recruitment_end_at ? Date.parse(String(cohort.recruitment_end_at)) : null;
-  if (starts && starts > now) return 'upcoming';
-  if (['closed', 'completed'].includes(String(cohort.status)) || (ends && ends <= now)) return 'closed';
-  return isRecruiting(cohort, now) ? 'recruiting' : cohort.status === 'upcoming' ? 'upcoming' : 'closed';
+  const operationEnds = cohort.operation_end_at ? Date.parse(String(cohort.operation_end_at)) : null;
+  if ([starts, ends, operationEnds].some(value => value !== null && !Number.isFinite(value))) return 'closed';
+  if ((ends !== null && ends <= now) || (operationEnds !== null && operationEnds <= now)) return 'closed';
+  if (starts !== null && starts > now) return 'upcoming';
+  return cohort.status === 'recruiting' || ends !== null ? 'recruiting' : 'upcoming';
+}
+
+export function unavailableOfferLabel(lifecycle: OfferLifecycle) {
+  return lifecycle === 'upcoming' ? '모집 예정' : lifecycle === 'cancelled' ? '운영 취소' : '신청 마감';
 }
 
 export function courseOfferLifecycle(course: Row, cohorts: Row[], now = Date.now()): OfferLifecycle {
