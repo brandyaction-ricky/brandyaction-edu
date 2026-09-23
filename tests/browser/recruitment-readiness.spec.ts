@@ -22,6 +22,7 @@ test('saved-state inspection catches outdated room links and preserves unsaved f
   await page.getByRole('button', { name: '저장된 준비 상태 확인', exact: true }).click();
   const summary = page.getByRole('region', { name: '모집 준비 점검' });
   await expect(summary.getByText(/링크가 이전 방 설정/)).toBeVisible();
+  await expect(summary.getByRole('link', { name: '유료 교육 상품 상품 관리 열기' })).toHaveAttribute('href', '/admin/products');
   await expect(summary.getByText('초안 저장됨 · 검수 필요', { exact: true })).toHaveCount(1);
   await expect(summary.getByText('초안 준비 필요', { exact: true })).toHaveCount(1);
   await expect(summary.getByText(/방송 이동 활성 · 유료 교육 안내 준비 필요/)).toBeVisible();
@@ -75,6 +76,7 @@ test('empty setup is incomplete and does not request campaign-dependent data', a
   await page.getByRole('button', { name: '저장된 준비 상태 확인' }).click();
   const summary = page.getByRole('region', { name: '모집 준비 점검' });
   await expect(summary.getByText('확인 필요', { exact: true })).toHaveCount(5);
+  await expect(summary.getByRole('button', { name: '유료 교육 상품 설정으로 이동' })).toBeVisible();
   await expect(summary.getByText('초안 준비 필요', { exact: true })).toHaveCount(2);
   expect(dependent).toBe(0);
 });
