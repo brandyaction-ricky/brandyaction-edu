@@ -18,16 +18,52 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Verify production promotion source
         if: github.event_name == 'pull_request' && github.base_ref == 'main'
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          BASE_REF: ${{ github.base_ref }}
         shell: bash
         run: |
-          if [ "${{ github.head_ref }}" != "develop" ]; then
+          head_ref="$HEAD_REF"
+          if [ "$head_ref" = "develop" ]; then
+            exit 0
+          fi
+
+          if [ "$head_ref" != "codex/commerce-main-release" ]; then
             echo "Production PRs must promote the develop branch."
             exit 1
           fi
-      - name: Checkout
-        uses: actions/checkout@v4
+
+          changed_files="$(git diff --name-only "origin/${BASE_REF}...HEAD")"
+          if [ -z "$changed_files" ]; then
+            echo "The Commerce release PR has no changed files."
+            exit 1
+          fi
+
+          while IFS= read -r path; do
+            case "$path" in
+              .github/workflows/ci.yml|.env.example|README.md|app/api/payments/toss/webhook/route.ts|package.json|package-lock.json|tests/toss-webhook-idempotency.test.mjs|tests/toss-webhook.test.mjs)
+                ;;
+              *)
+                echo "File is outside the Commerce release allowlist: $path"
+                exit 1
+                ;;
+            esac
+          done <<< "$changed_files"
+
+          for required in app/api/payments/toss/webhook/route.ts tests/toss-webhook.test.mjs tests/toss-webhook-idempotency.test.mjs; do
+            if ! grep -Fxq "$required" <<< "$changed_files"; then
+              echo "Required Commerce release file is missing: $required"
+              exit 1
+            fi
+          done
+
+          echo "Commerce-only production release scope verified."
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
