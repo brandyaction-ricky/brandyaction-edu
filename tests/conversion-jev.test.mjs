@@ -15,7 +15,7 @@ const baseResult = {
   mode: 'mock', notice: 'mock', inquiry_type: 'prepurchase', topics: [], candidates: [], missing_topics: [], proposed_reply: '', requires_human_review: true,
 };
 const jev = load('../lib/conversion-jev.ts', { './conversion-review': { createMockJudgment: () => baseResult } });
-const inquiry = { subject: '연락처 010-1234-5678', content: '메일 me@example.com 문샷 신청 문의', course_id: 'course', cohort_id: null };
+const inquiry = { subject: '연락처 010-1234-5678', content: '메일 me@example.com 링크 https://example.com/customer?id=secret 회사 02-1234-5678 문샷 신청 문의', course_id: 'course', cohort_id: null };
 const answers = {
   purchase_intent: { choice: 'high', confidence: 0.9, probabilities: { high: 0.9, medium: 0.1, low: 0, unclear: 0 } },
   primary_barrier: { choice: 'price', confidence: 0.8, probabilities: { price: 0.8, schedule: 0.1, skill_level: 0.05, content_fit: 0.03, trust: 0.01, none_or_unknown: 0.01 } },
@@ -32,8 +32,8 @@ test('Jev request removes common contact data and returns a validated shadow res
   assert.equal(call.url, 'https://api.typesafe.ai/v1/systemone');
   assert.equal(call.options.headers.Authorization, 'Bearer private-key');
   const body = JSON.parse(call.options.body);
-  assert.doesNotMatch(JSON.stringify(body.state), /010-1234-5678|me@example\.com/);
-  assert.match(JSON.stringify(body.state), /전화번호 제거|이메일 제거/);
+  assert.doesNotMatch(JSON.stringify(body.state), /010-1234-5678|02-1234-5678|me@example\.com|example\.com\/customer/);
+  assert.match(JSON.stringify(body.state), /전화번호 제거|이메일 제거|링크 제거/);
   assert.equal(result.mode, 'jev');
   assert.equal(result.requires_human_review, true);
   assert.equal(result.decisions.purchase_intent.choice, 'high');
