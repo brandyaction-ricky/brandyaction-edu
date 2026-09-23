@@ -116,6 +116,54 @@ test('first Jev review stores blind operator labels then reveals comparison and 
   expect(state.unexpectedApi).toEqual([]);
 });
 
+test('historical Jev inquiries can be independently labeled in one blind batch', async ({ page }) => {
+  const state = await fixture(page, 'jev');
+  for (let index = 1; index <= 2; index++) {
+    const item: ConversionCase = { ...initialCase, id: `legacy-${index}`, sample_origin: 'external_legacy',
+      legacy_course_label: '과거 교육', course_id: null, cohort_id: null,
+      subject: `과거 교육 상담 ${index}`, content: `${index}번 실제 고객의 합성 구매 전 질문입니다.`,
+      received_at: `2026-08-0${index}T01:00:00.000Z` };
+    state.snapshot.cases.push(item);
+    const mock = createMockJudgment(item, []);
+    state.snapshot.runs.push({ id: `legacy-run-${index}`, case_id: item.id, input_version: 1, provider: 'jev',
+      result: { ...mock, mode: 'jev', model: 'jev-test', decision_version: 1, decisions: {
+        purchase_intent: { type: 'choice', choice: 'medium', confidence: .9, probabilities: {} },
+        primary_barrier: { type: 'choice', choice: 'price', confidence: .9, probabilities: {} },
+        purchase_readiness: { type: 'score', score: 3, confidence: .9, probabilities: {} },
+        next_action: { type: 'choice', choice: 'human_consult', confidence: .9, probabilities: {} },
+      } }, evidence_versions: {}, created_at: `2026-08-0${index}T02:00:00.000Z` });
+  }
+  state.snapshot.cases.push({ ...initialCase, id: 'dev-test', sample_origin: 'external_legacy',
+    subject: '[DEV 검증] 합성 사례', legacy_course_label: '과거 교육', course_id: null, cohort_id: null });
+  await page.getByRole('button', { name: '새로고침', exact: true }).click();
+  await page.getByRole('button', { name: '과거 상담 한 번에 판정', exact: true }).click();
+  const batch = page.getByRole('region', { name: '과거 상담 일괄 독립 판정' });
+  await expect(batch).toContainText('판정 대기 2건');
+  await expect(batch).not.toContainText('[DEV 검증]');
+  await expect(page.getByLabel('Jev 교정 현황')).toHaveCount(0);
+  await expect(page.getByLabel('Jev 전환 판정')).toHaveCount(0);
+  await expect(page.getByText('Jev 판단·제안 답변·일치율은 이 화면에 표시하지 않습니다.')).toBeVisible();
+  for (let index = 1; index <= 2; index++) {
+    await batch.getByRole('combobox', { name: `${index}번 · 구매 의도` }).selectOption('high');
+    await batch.getByRole('combobox', { name: `${index}번 · 주요 장애물` }).selectOption('schedule');
+    await batch.getByRole('combobox', { name: `${index}번 · 구매 준비도` }).selectOption('2');
+    await batch.getByRole('combobox', { name: `${index}번 · 다음 행동` }).selectOption('answer_specific_questions');
+  }
+  await batch.getByRole('checkbox', { name: /실제 고객의 구매 전 상담/ }).check();
+  await batch.getByRole('button', { name: '입력 완료 2건 한 번에 저장' }).click();
+  await expect(batch).toContainText('일괄 판정할 상담이 없습니다.');
+  await expect(page.getByText('과거 상담 2건의 독립 판정을 저장했습니다. 고객에게 메시지를 보내지 않았습니다.')).toBeVisible();
+  await expect(page.getByLabel('Jev 교정 현황')).toHaveCount(0);
+  expect(state.mutations.map(item => item.action)).toEqual(['review', 'review']);
+  for (const mutation of state.mutations) expect(mutation).toMatchObject({
+    decision: 'hold', reply_text: '', calibration_sample_kind: 'operational',
+    calibration: { purchase_intent: 'high', primary_barrier: 'schedule', purchase_readiness: 2, next_action: 'answer_specific_questions' },
+  });
+  expect(state.unexpectedApi).toEqual([]);
+  await batch.getByRole('button', { name: '개별 검토로 돌아가기' }).click();
+  await expect(page.getByLabel('Jev 교정 현황')).toContainText('실제 문의 표본2건');
+});
+
 async function selectAndAnalyze(page: Page) {
   await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
   await page.getByRole('button', { name: '모의 판단 실행', exact: true }).click();

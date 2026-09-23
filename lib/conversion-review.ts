@@ -131,6 +131,25 @@ export function calibrationForRun(runId: string, reviews: ConversionReviewRecord
     .sort((a, b) => a.created_at.localeCompare(b.created_at))[0];
 }
 
+/** Only fresh, first-time historical Jev reviews belong in the blind batch queue. */
+export function historicalCalibrationQueue(snapshot: Pick<ConversionSnapshot, 'cases' | 'runs' | 'reviews' | 'evidence'>) {
+  const latestRun = new Map<string, ConversionRun>();
+  for (const run of snapshot.runs) {
+    const previous = latestRun.get(run.case_id);
+    if (!previous || run.created_at > previous.created_at || (run.created_at === previous.created_at && run.id > previous.id)) {
+      latestRun.set(run.case_id, run);
+    }
+  }
+  const calibratedCases = new Set(snapshot.reviews.filter(review => review.calibration).map(review => review.case_id));
+  return snapshot.cases.flatMap(item => {
+    const run = latestRun.get(item.id);
+    if (item.sample_origin !== 'external_legacy' || item.subject.startsWith('[DEV 검증]')
+      || calibratedCases.has(item.id) || !run || run.provider !== 'jev'
+      || isRunStale(run, item, snapshot.evidence)) return [];
+    return [{ inquiry: item, run }];
+  }).sort((a, b) => a.inquiry.received_at.localeCompare(b.inquiry.received_at) || a.inquiry.id.localeCompare(b.inquiry.id));
+}
+
 export function buildJevCalibrationSummary(runs: ConversionRun[], reviews: ConversionReviewRecord[], cases: ConversionCase[] = []): JevCalibrationSummary {
   const emptyDimensions = () => Object.fromEntries(calibrationKeys.map(key => [key, { matches: 0, total: 0, rate: null }])) as JevCalibrationSummary['dimensions'];
   const dimensions = emptyDimensions();
