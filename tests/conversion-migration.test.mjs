@@ -67,7 +67,7 @@ after(async () => { await db.close(); });
 
 function manual(overrides = {}) {
   return { action: 'save_case', requestId: randomUUID(), course_id: ids.course, cohort_id: ids.cohort,
-    subject: '외부 문의', content: '초보자 수강 기준을 알려 주세요.', source_label: '운영자 등록 발췌', received_at: '2026-01-01T00:00:00Z', ...overrides };
+    subject: '외부 문의', content: '초보자 수강 기준을 알려 주세요.', source_label: '운영자 등록 발췌', received_at: '2026-01-01T00:00:00Z', deidentified_confirmed: true, ...overrides };
 }
 function evidence(overrides = {}) {
   return { action: 'save_evidence', requestId: randomUUID(), course_id: ids.course, cohort_id: null,

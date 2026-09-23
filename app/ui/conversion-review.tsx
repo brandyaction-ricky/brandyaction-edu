@@ -276,12 +276,13 @@ function CaseForm({ snapshot, item, pending, mutate, onSaved }: { snapshot: Conv
   const [content, setContent] = useState(item?.content || '');
   const [sourceLabel, setSourceLabel] = useState(item?.source_label || '');
   const [receivedAt, setReceivedAt] = useState(item ? new Date(new Date(item.received_at).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '');
+  const [deidentifiedConfirmed, setDeidentifiedConfirmed] = useState(false);
   const [error, setError] = useState('');
   const question = snapshot.questions.find(row => row.id === questionId);
   async function submit(event: FormEvent) {
     event.preventDefault(); setError('');
     try {
-      const result = await mutate({ action: 'save_case', ...(item ? { id: item.id, expected_version: item.input_version } : {}), question_id: source === 'native' ? questionId : null, course_id: courseId, cohort_id: cohortId || null, ...(source === 'manual' ? { subject, content, source_label: sourceLabel, received_at: new Date(receivedAt).toISOString() } : {}) });
+      const result = await mutate({ action: 'save_case', ...(item ? { id: item.id, expected_version: item.input_version } : {}), question_id: source === 'native' ? questionId : null, course_id: courseId, cohort_id: cohortId || null, ...(source === 'manual' ? { subject, content, source_label: sourceLabel, received_at: new Date(receivedAt).toISOString(), deidentified_confirmed: deidentifiedConfirmed } : {}) });
       onSaved((result.case as ConversionCase).id);
     } catch (cause) { setError((cause as Error).message); }
   }
@@ -293,15 +294,16 @@ function CaseForm({ snapshot, item, pending, mutate, onSaved }: { snapshot: Conv
       {item && <p className="conversion-muted">저장하면 질문함의 최신 원문을 다시 연결합니다.</p>}
     </> : <>
       <AdminInput label="문의 제목" value={subject} onChange={event => setSubject(event.target.value)} required maxLength={200} disabled={pending} />
-      <AdminTextarea label="문의 발췌" value={content} onChange={event => setContent(event.target.value)} required maxLength={10000} rows={5} disabled={pending} helper="이름·연락처 등 개인정보를 제외한 필요한 내용만 입력하세요." />
-      <AdminInput label="출처 설명" value={sourceLabel} onChange={event => setSourceLabel(event.target.value)} required maxLength={200} disabled={pending} placeholder="예: 상담 채널의 구매 문의" />
+      <AdminTextarea label="문의 발췌" value={content} onChange={event => setContent(event.target.value)} required maxLength={10000} rows={5} disabled={pending} helper="대화 전체 대신 구매 판단에 필요한 문장만 남기세요. 고객 이름·별명·연락처·계정 ID·링크·주문번호는 제거해 주세요." />
+      <AdminInput label="출처 설명" value={sourceLabel} onChange={event => setSourceLabel(event.target.value)} required maxLength={200} disabled={pending} placeholder="예: 카카오 채널 1:1 상담" />
       <AdminInput label="문의 접수 시각" type="datetime-local" value={receivedAt} onChange={event => setReceivedAt(event.target.value)} required disabled={pending} />
       <p className="conversion-muted">외부 문의는 고객 미연결로 저장됩니다. 이름이나 유입 경로로 회원을 추정하지 않습니다.</p>
+      <label className="checkline"><input type="checkbox" checked={deidentifiedConfirmed} onChange={event => setDeidentifiedConfirmed(event.target.checked)} required disabled={pending} />고객 식별정보를 제거한 발췌임을 확인했습니다.</label>
     </>}
     <AdminSelect label="대상 상품" required value={courseId} disabled={pending || Boolean(source === 'native' && question?.course_id)} onChange={event => { setCourseId(event.target.value); setCohortId(''); }}><option value="">상품 선택</option>{snapshot.courses.map(course => <option key={course.id} value={course.id}>{course.title}</option>)}</AdminSelect>
     <AdminSelect label="대상 기수" value={cohortId} disabled={pending} onChange={event => setCohortId(event.target.value)}><option value="">기수 미지정</option>{snapshot.cohorts.filter(cohort => cohort.course_id === courseId).map(cohort => <option key={cohort.id} value={cohort.id}>{cohort.name}</option>)}</AdminSelect>
     {error && <p role="alert" className="conversion-alert">{error}</p>}
-    <AdminButton type="submit" tone="primary" disabled={pending || !courseId || (source === 'native' && !questionId)}>문의 저장</AdminButton>
+    <AdminButton type="submit" tone="primary" disabled={pending || !courseId || (source === 'native' && !questionId) || (source === 'manual' && !deidentifiedConfirmed)}>문의 저장</AdminButton>
   </form>;
 }
 

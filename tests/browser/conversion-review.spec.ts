@@ -191,12 +191,14 @@ test('manual inquiry can be entered and saved without inventing a customer ident
   await drawer.getByLabel(/^출처 설명/).fill('합성 외부 문의');
   await drawer.getByLabel(/^문의 접수 시각/).fill('2026-09-20T10:00');
   await drawer.getByLabel(/^대상 상품/).selectOption(courseId);
+  await expect(drawer.getByRole('button', { name: '문의 저장', exact: true })).toBeDisabled();
+  await drawer.getByRole('checkbox', { name: '고객 식별정보를 제거한 발췌임을 확인했습니다.' }).check();
   await drawer.getByRole('button', { name: '문의 저장', exact: true }).click();
   await expect(drawer).toHaveCount(0);
   await expect(page.getByRole('heading', { name: '수강 일정 확인', exact: true })).toBeVisible();
   await expect(page.getByText('미연결 · 개인별 구매 관찰 불가', { exact: true })).toBeVisible();
   expect(state.mutations).toHaveLength(1);
-  expect(state.mutations[0]).toMatchObject({ action: 'save_case', question_id: null, course_id: courseId, cohort_id: null, subject: '수강 일정 확인' });
+  expect(state.mutations[0]).toMatchObject({ action: 'save_case', question_id: null, course_id: courseId, cohort_id: null, subject: '수강 일정 확인', deidentified_confirmed: true });
   expect(state.mutations[0]).not.toHaveProperty('customer_id');
   expect(state.mutations[0].requestId).toMatch(/^[0-9a-f-]{36}$/);
 });

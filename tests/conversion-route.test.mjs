@@ -18,7 +18,7 @@ const server = load('../lib/conversion-review-server.ts', { 'node:crypto': { cre
 const core = load('../lib/conversion-review.ts');
 const ids = { actor: '11111111-1111-4111-8111-111111111111', request: '22222222-2222-4222-8222-222222222222', course: '33333333-3333-4333-8333-333333333333', inquiry: '44444444-4444-4444-8444-444444444444', question: '55555555-5555-4555-8555-555555555555' };
 const env = { EDU_CONVERSION_REVIEW_ENABLED: 'true', EDU_CONVERSION_MOCK_ENABLED: 'true', NEXT_PUBLIC_APP_ENV: 'test' };
-const base = { action: 'save_case', requestId: ids.request, course_id: ids.course, subject: '수강 수준', content: '초보자도 따라갈 수 있나요?', source_label: '외부 문의 발췌', received_at: '2026-01-01T00:00:00Z' };
+const base = { action: 'save_case', requestId: ids.request, course_id: ids.course, subject: '수강 수준', content: '초보자도 따라갈 수 있나요?', source_label: '외부 문의 발췌', received_at: '2026-01-01T00:00:00Z', deidentified_confirmed: true };
 const req = (body = base, origin = 'https://edu.example') => new Request('https://edu.example/api/conversion', { method: 'POST', headers: { ...(origin ? { origin } : {}), 'Content-Type': 'application/json' }, body: typeof body === 'string' ? body : JSON.stringify(body) });
 function harness(options = {}) {
   const calls = [], reads = [], selections = {};
@@ -67,6 +67,22 @@ test('evidence mutation also requires products permission', async () => {
 test('invalid body, ID, timestamps and unsafe source URLs never reach persistence', async () => {
   const malformed = [ '{', { ...base, requestId: 'no' }, { ...base, received_at: 'yesterday' }, { ...base, received_at: '2026-01-01T09:00:00' }, { action: 'save_evidence', requestId: ids.request, course_id: ids.course, title: 'test', body: 'body', source_url: 'javascript:alert(1)', status: 'approved' } ];
   for (const payload of malformed) { const h = harness(); assert.equal((await h.POST(req(payload))).status, 400); assert.deepEqual(h.calls, []); }
+});
+test('manual inquiry requires deidentification confirmation and blocks obvious contact identifiers', async () => {
+  const unsafe = [
+    { ...base, deidentified_confirmed: false },
+    { ...base, content: '010-1234-5678로 연락 주세요' },
+    { ...base, content: '02-1234-5678로 연락 주세요' },
+    { ...base, subject: 'a@example.com의 문의' },
+    { ...base, source_label: 'https://open.kakao.com/o/example' },
+  ];
+  for (const payload of unsafe) {
+    const h = harness();
+    assert.equal((await h.POST(req(payload))).status, 400);
+    assert.deepEqual(h.calls, []);
+  }
+  const h = harness();
+  assert.equal((await h.POST(req({ ...base, content: '문샷 챌린지 4기 가격 1,650,000원이 맞나요?' }))).status, 200);
 });
 test('manual customer identity and native inquiry text cannot be injected', async () => {
   const manual = harness(); await manual.POST(req({ ...base, customer_id: ids.actor }));
