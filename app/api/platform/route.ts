@@ -637,7 +637,10 @@ export async function POST(request: Request) {
                 }
             }
             let scheduledCohort = null;
-            if (section.table === 'courses' && productSchedule) {
+            // A cohortless free webinar must stay cohortless when editing its name or copy.
+            const keepFreeCourseWithoutCohort = section.table === 'courses' && (result.data as Row).category === 'free'
+                && !body.cohortId && !productSchedule?.start && !productSchedule?.end;
+            if (section.table === 'courses' && productSchedule && !keepFreeCourseWithoutCohort) {
                 const course = result.data as Row;
                 const now = Date.now();
                 const publishedPaidProduct = course.status === 'published' && course.category !== 'free';

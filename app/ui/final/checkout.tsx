@@ -1,7 +1,7 @@
 "use client";
 import { money, number as num, text as t, type User } from "@/lib/platform";
 import { cohortPeriod } from "@/lib/qa-rules";
-import { ArrowLeft, ArrowRight, CreditCard } from "lucide-react";
+import { ArrowLeft, ArrowRight, CreditCard, Landmark } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
@@ -62,8 +62,11 @@ export function Checkout({
         "@tosspayments/tosspayments-sdk"
       );
       const toss = await loadTossPayments(key);
-      await toss.payment({ customerKey: user!.id }).requestPayment({
-        method: "CARD",
+      const payment = toss.payment({ customerKey: user!.id });
+      const paymentMethod = f.get("payment") === "VIRTUAL_ACCOUNT"
+        ? "VIRTUAL_ACCOUNT"
+        : "CARD";
+      const paymentRequest = {
         amount: { currency: "KRW", value: Number(result.totalAmount) },
         orderId: String(result.orderNumber),
         orderName: String(result.orderName || t(course, "title")),
@@ -71,7 +74,21 @@ export function Checkout({
         customerEmail: user!.email,
         successUrl: location.origin + "/payment/success",
         failUrl: location.origin + "/payment/fail",
-      });
+      } as const;
+      if (paymentMethod === "VIRTUAL_ACCOUNT") {
+        await payment.requestPayment({
+          ...paymentRequest,
+          method: "VIRTUAL_ACCOUNT",
+          customerMobilePhone: String(f.get("phone")).replace(/\D/g, ""),
+          virtualAccount: {
+            cashReceipt: { type: "미발행" },
+            useEscrow: false,
+            validHours: 24,
+          },
+        });
+      } else {
+        await payment.requestPayment({ ...paymentRequest, method: "CARD" });
+      }
     } catch (cause) {
       setError((cause as Error).message);
     } finally {
@@ -320,7 +337,19 @@ export function Checkout({
                     <CreditCard />
                     신용·체크카드
                   </label>
+                  <label className="radio-card">
+                    <input
+                      type="radio"
+                      name="payment"
+                      value="VIRTUAL_ACCOUNT"
+                    />
+                    <Landmark />
+                    가상계좌
+                  </label>
                 </div>
+                <p className="meta mt8">
+                  가상계좌는 발급 후 24시간 안에 입금해야 하며, 입금 확인 후 수강권이 제공됩니다.
+                </p>
               </div>
             </section>
           </div>

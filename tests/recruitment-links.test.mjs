@@ -1,0 +1,40 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { PGlite } from '@electric-sql/pglite';
+test('recruitment links require activation, pin room revisions, deduplicate clicks and preserve counts after stop',async()=>{
+ const db=new PGlite();
+ try{
+ await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;alter default privileges in schema public grant all on tables to anon,authenticated,service_role;create table profiles(id uuid primary key,role text,status text);create table site_settings(key text primary key,value jsonb);`);
+ for(const name of ['202609210003_recruitment_room_settings.sql','202609210004_recruitment_links.sql']) await db.exec(fs.readFileSync(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
+ const actor=randomUUID(),staff=randomUUID(),event=randomUUID();
+ await db.query("insert into profiles values ($1,'admin','active'),($2,'staff','active')",[actor,staff]);
+ const rooms={label:'Synthetic',paidUrl:'https://open.kakao.com/o/paidTest',organicUrl:'https://open.kakao.com/o/organicTest',paidMode:'undecided'};
+ const save=async(v,settings=rooms)=>db.query('select edu_save_recruitment_rooms($1,$2,$3,$4,$5)',[actor,randomUUID(),'sample',v,settings]);
+ const manage=async(enabled=null,expected=null,version=null,user=actor)=>(await db.query('select edu_manage_recruitment_links($1,$2,$3,$4,$5) as v',[user,'sample',version,expected,enabled])).rows[0].v;
+ const go=async(id,channel='paid',ev=null,v=null)=>(await db.query('select edu_recruitment_destination($1,$2,$3,$4) as v',[id,channel,ev,v])).rows[0].v;
+ await save(0);assert.equal((await manage()).link,null);
+ await assert.rejects(manage(true,0,1,staff),/FORBIDDEN/);
+ const active=await manage(true,0,1),id=active.link.id;
+ assert.equal((await go(id)).url,rooms.paidUrl);assert.deepEqual((await manage()).counts,{paid:0,organic:0});
+ assert.equal((await go(id,'organic')).url,rooms.organicUrl);
+ await go(id,'paid',event,1);await go(id,'paid',event,1);assert.equal((await manage()).counts.paid,1);
+ await assert.rejects(go(id,'organic',event,1),/REQUEST_REUSED/);
+ await assert.rejects(go(id,'unknown'),/INVALID/);
+ await save(1,{...rooms,paidUrl:'https://open.kakao.com/o/newTest'});
+ assert.equal((await go(id)).url,rooms.paidUrl);
+ await assert.rejects(manage(true,1,1),/STALE/);
+ await manage(true,1,2);
+ await assert.rejects(go(id,'paid',randomUUID(),1),/STALE/);
+ assert.equal((await go(id,'paid',randomUUID(),2)).url,'https://open.kakao.com/o/newTest');
+ await assert.rejects(manage(false,1,2),/STALE/);
+ await manage(false,2,2);await assert.rejects(go(id),/NOT_FOUND/);
+ assert.equal((await manage()).counts.paid,2);
+ assert.equal((await db.query('select count(*)::int as n from edu_recruitment_link_history')).rows[0].n,3);
+ assert.equal((await db.query('select room_version from edu_recruitment_clicks where id=$1',[event])).rows[0].room_version,1);
+ await db.query("update profiles set status='inactive' where id=$1",[actor]);await assert.rejects(manage(),/FORBIDDEN/);
+ for(const table of ['edu_recruitment_links','edu_recruitment_link_history','edu_recruitment_clicks']) for(const role of ['anon','authenticated','service_role']) for(const priv of ['SELECT','INSERT','UPDATE','DELETE','TRUNCATE']) assert.equal((await db.query('select has_table_privilege($1,$2,$3) as ok',[role,table,priv])).rows[0].ok,role==='service_role'&&table==='edu_recruitment_links'&&priv==='SELECT');
+ for(const fn of ['edu_manage_recruitment_links(uuid,text,integer,integer,boolean)','edu_recruitment_destination(uuid,text,uuid,integer)']) for(const role of ['anon','authenticated','service_role']) assert.equal((await db.query('select has_function_privilege($1,$2,$3) as ok',[role,fn,'EXECUTE'])).rows[0].ok,role==='service_role');
+ }finally{await db.close();}
+});
