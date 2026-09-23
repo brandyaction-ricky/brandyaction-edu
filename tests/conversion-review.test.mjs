@@ -188,11 +188,36 @@ test('Jev calibration uses the first independent review per run and reports conf
   assert.deepEqual(summary.dimensions.primary_barrier, { matches: 0, total: 1, rate: 0 });
   assert.deepEqual(summary.dimensions.purchase_readiness, { matches: 1, total: 1, rate: 1 });
   assert.equal(summary.low_confidence_disagreements, 2);
-  const testRun = { ...run, id: 'run-test' };
-  const testReview = { ...first, id: 'review-test', run_id: testRun.id, calibration_sample_kind: 'test' };
+  const testRun = { ...run, id: 'run-test', case_id: 'case-test' };
+  const testReview = { ...first, id: 'review-test', case_id: testRun.case_id, run_id: testRun.id, calibration_sample_kind: 'test' };
   const withTest = buildJevCalibrationSummary([run, testRun], [first, testReview]);
   assert.equal(withTest.samples, 1);
   assert.equal(withTest.test_samples, 1);
+});
+
+test('repeated Jev runs for one inquiry count only its earliest independent calibration', () => {
+  const result = { ...createMockJudgment(inquiry, []), mode: 'jev', decisions: {
+    purchase_intent: { choice: 'high', confidence: .9 },
+    primary_barrier: { choice: 'price', confidence: .9 },
+    purchase_readiness: { score: 3, confidence: .9 },
+    next_action: { choice: 'offer_purchase_info', confidence: .9 },
+  } };
+  const firstRun = { ...runFor(), id: 'run-1', provider: 'jev', result };
+  const secondRun = { ...firstRun, id: 'run-2' };
+  const calibration = { purchase_intent: 'high', primary_barrier: 'price', purchase_readiness: 3, next_action: 'offer_purchase_info' };
+  const firstReview = { id: 'review-1', case_id: inquiry.id, run_id: firstRun.id, calibration, calibration_sample_kind: 'operational', created_at: '2026-09-20T00:00:01.000Z' };
+  const secondReview = { ...firstReview, id: 'review-2', run_id: secondRun.id, calibration_sample_kind: 'test', created_at: '2026-09-20T00:00:02.000Z' };
+  const summary = buildJevCalibrationSummary([secondRun, firstRun], [secondReview, firstReview]);
+  assert.equal(summary.samples, 1);
+  assert.equal(summary.test_samples, 0);
+  assert.equal(summary.dimensions.purchase_intent.total, 1);
+  assert.equal(summary.remaining_for_threshold_review, 19);
+  const testFirst = buildJevCalibrationSummary([firstRun, secondRun], [
+    { ...firstReview, calibration_sample_kind: 'test' },
+    { ...secondReview, calibration_sample_kind: 'operational' },
+  ]);
+  assert.equal(testFirst.samples, 0);
+  assert.equal(testFirst.test_samples, 1);
 });
 
 test('review payload accepts only a complete closed-set calibration object', () => {

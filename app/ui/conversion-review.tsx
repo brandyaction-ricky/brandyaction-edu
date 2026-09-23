@@ -253,7 +253,7 @@ function CalibrationOverview({ summary }: { summary: ReturnType<typeof buildJevC
     <div><span>장애물 일치</span><strong>{rate('primary_barrier')}</strong></div>
     <div><span>준비도 일치</span><strong>{rate('purchase_readiness')}</strong></div>
     <div><span>다음 행동 일치</span><strong>{rate('next_action')}</strong></div>
-    <p>낮은 신뢰도(70% 미만)에서 불일치 {summary.low_confidence_disagreements}항목 · 기준 검토까지 실제 문의 {summary.remaining_for_threshold_review}건 남음(최소 {summary.minimum_samples}건). 기준은 자동으로 바뀌지 않습니다.</p>
+    <p>문의별 처음 저장한 독립 판정만 집계합니다. 낮은 신뢰도(70% 미만)에서 불일치 {summary.low_confidence_disagreements}항목 · 기준 검토까지 실제 문의 {summary.remaining_for_threshold_review}건 남음(최소 {summary.minimum_samples}건). 기준은 자동으로 바뀌지 않습니다.</p>
   </section>;
 }
 

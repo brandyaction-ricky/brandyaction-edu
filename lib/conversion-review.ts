@@ -131,10 +131,19 @@ export function buildJevCalibrationSummary(runs: ConversionRun[], reviews: Conve
   let samples = 0;
   let testSamples = 0;
   let lowConfidenceDisagreements = 0;
+  const firstByCase = new Map<string, { run: ConversionRun; review: ConversionReviewRecord }>();
   for (const run of runs) {
     if (run.result.mode !== 'jev') continue;
     const review = calibrationForRun(run.id, reviews);
     if (!review?.calibration) continue;
+    const previous = firstByCase.get(run.case_id);
+    if (!previous || review.created_at < previous.review.created_at
+      || (review.created_at === previous.review.created_at && review.id < previous.review.id)) {
+      firstByCase.set(run.case_id, { run, review });
+    }
+  }
+  for (const { run, review } of firstByCase.values()) {
+    if (!review.calibration || run.result.mode !== 'jev') continue;
     if (review.calibration_sample_kind === 'test') { testSamples += 1; continue; }
     if (review.calibration_sample_kind !== 'operational') continue;
     samples += 1;
