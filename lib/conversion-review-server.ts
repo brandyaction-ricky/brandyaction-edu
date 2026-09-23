@@ -58,6 +58,10 @@ export function conversionPayload(raw: unknown) {
   let payload: Record<string, unknown>;
   if (action === 'save_case') {
     const id = conversionId(body.id, false), question_id = conversionId(body.question_id, false);
+    const sampleOrigin = question_id ? 'current' : (body.sample_origin ?? 'current');
+    if (!['current', 'external_legacy'].includes(String(sampleOrigin))) conversionError('문의 표본 출처를 확인해 주세요.');
+    const legacyCourseLabel = sampleOrigin === 'external_legacy' ? text(body.legacy_course_label, 200) : null;
+    if (sampleOrigin === 'current' && body.legacy_course_label) conversionError('과거 상품명은 과거 교육 상담에만 입력해 주세요.');
     const received = question_id ? null : text(body.received_at, 40);
     if (received && (!/^\d{4}-\d{2}-\d{2}T.+(?:Z|[+-]\d{2}:\d{2})$/.test(received) || !Number.isFinite(Date.parse(received)) || Date.parse(received) > Date.now() + 300000)) conversionError('접수 시각을 확인해 주세요.');
     const subject = question_id ? '' : text(body.subject, 200);
@@ -65,8 +69,12 @@ export function conversionPayload(raw: unknown) {
     const sourceLabel = question_id ? '' : text(body.source_label, 200);
     if (!question_id && body.deidentified_confirmed !== true) conversionError('외부 문의의 고객 식별정보 제거 여부를 확인해 주세요.');
     if (!question_id && containsDirectIdentifier(`${subject}\n${content}\n${sourceLabel}`)) conversionError('전화번호·이메일·링크가 포함되어 있습니다. 식별정보를 제거한 발췌만 저장해 주세요.');
+    const courseId = conversionId(body.course_id, sampleOrigin !== 'external_legacy');
+    const cohortId = conversionId(body.cohort_id, false);
+    if (sampleOrigin === 'external_legacy' && cohortId) conversionError('과거 교육 상담에는 현재 기수를 연결할 수 없습니다.');
+    if (!question_id && legacyCourseLabel && containsDirectIdentifier(legacyCourseLabel)) conversionError('과거 상품명에서 고객 식별정보를 제거해 주세요.');
     payload = { id, expected_version: version(body.expected_version, Boolean(id)), question_id,
-      course_id: conversionId(body.course_id), cohort_id: conversionId(body.cohort_id, false),
+      course_id: courseId, cohort_id: cohortId, sample_origin: sampleOrigin, legacy_course_label: legacyCourseLabel,
       subject, content, source_label: sourceLabel, received_at: received ? new Date(received).toISOString() : null };
   } else if (action === 'save_evidence') {
     const id = conversionId(body.id, false), source_url = text(body.source_url, 2048);

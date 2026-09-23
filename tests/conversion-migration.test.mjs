@@ -13,6 +13,7 @@ const permissionsSql = fs.readFileSync(new URL('../supabase/migrations/202609200
 const jevSql = fs.readFileSync(new URL('../supabase/migrations/202609220001_conversion_jev_shadow.sql', import.meta.url), 'utf8');
 const calibrationSql = fs.readFileSync(new URL('../supabase/migrations/202609220002_conversion_jev_calibration.sql', import.meta.url), 'utf8');
 const sampleScopeSql = fs.readFileSync(new URL('../supabase/migrations/202609220003_conversion_jev_sample_scope.sql', import.meta.url), 'utf8');
+const legacySampleSql = fs.readFileSync(new URL('../supabase/migrations/202609230001_conversion_legacy_samples.sql', import.meta.url), 'utf8');
 const serverSource = fs.readFileSync(new URL('../lib/conversion-review-server.ts', import.meta.url), 'utf8');
 const serverExports = {};
 new Function('exports', 'require', ts.transpileModule(serverSource, {
@@ -50,6 +51,7 @@ before(async () => {
   await db.exec(jevSql);
   await db.exec(calibrationSql);
   await db.exec(sampleScopeSql);
+  await db.exec(legacySampleSql);
   await db.query('insert into profiles(id,role) values ($1,\'admin\'),($2,\'staff\'),($3,\'student\')', [ids.admin, ids.staff, ids.student]);
   await db.query('insert into courses(id) values ($1),($2)', [ids.course, ids.otherCourse]);
   await db.query('insert into cohorts(id,course_id) values ($1,$2),($3,$4)', [ids.cohort, ids.course, ids.otherCohort, ids.otherCourse]);
@@ -108,6 +110,31 @@ test('RPC retry returns one stored result; changed intent with the same request 
   changed.payload_hash = conversionPayload(input).payload_hash;
   await assert.rejects(rpc(null, { normalized: changed }), /CONVERSION_REQUEST_REUSED/);
   assert.equal(await count('edu_conversion_cases'), 1);
+});
+
+test('historical paid-education inquiry can be calibrated without inventing a current product or cohort', async () => {
+  const input = manual({ course_id: null, cohort_id: null, sample_origin: 'external_legacy', legacy_course_label: '과거 온라인 마케팅 교육' });
+  const { case: inquiry } = await rpc(input);
+  assert.equal(inquiry.course_id, null);
+  assert.equal(inquiry.sample_origin, 'external_legacy');
+  assert.equal(inquiry.legacy_course_label, '과거 온라인 마케팅 교육');
+  assert.equal(inquiry.customer_id, null);
+  const runResult = { ...mock, proposed_reply: '' };
+  const { run } = await rpc({ action: 'analyze', requestId: randomUUID(), case_id: inquiry.id, expected_version: inquiry.input_version },
+    { result: runResult, versions: {}, observedVersion: inquiry.input_version });
+  assert.deepEqual(run.evidence_versions, {});
+  assert.deepEqual(run.evidence_snapshot, []);
+  assert.equal(run.input_snapshot.sample_origin, 'external_legacy');
+  assert.equal(run.input_snapshot.legacy_course_label, '과거 온라인 마케팅 교육');
+  await assert.rejects(rpc({ ...input, requestId: randomUUID(), id: inquiry.id, expected_version: inquiry.input_version,
+    sample_origin: 'current', course_id: ids.course, legacy_course_label: null }), /CONVERSION_INVALID/);
+  for (const invalid of [
+    manual({ course_id: null }),
+    manual({ course_id: null, cohort_id: ids.cohort, sample_origin: 'external_legacy', legacy_course_label: '과거 온라인 마케팅 교육' }),
+    manual({ course_id: null, cohort_id: null, sample_origin: 'external_legacy', legacy_course_label: '' }),
+  ]) {
+    await assert.rejects(rpc(invalid));
+  }
 });
 
 test('active staff need members scope and evidence additionally needs products scope', async () => {

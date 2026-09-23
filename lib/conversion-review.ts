@@ -2,8 +2,10 @@
 export type ConversionCase = {
   id: string;
   source_type: 'native' | 'manual';
+  sample_origin: 'current' | 'external_legacy';
+  legacy_course_label: string | null;
   question_id: string | null;
-  course_id: string;
+  course_id: string | null;
   cohort_id: string | null;
   subject: string;
   content: string;
@@ -94,9 +96,12 @@ export type ConversionReviewRecord = {
 export type JevCalibrationSummary = {
   samples: number;
   test_samples: number;
+  current_samples: number;
+  legacy_samples: number;
   minimum_samples: number;
   remaining_for_threshold_review: number;
   dimensions: Record<keyof JevCalibration, { matches: number; total: number; rate: number | null }>;
+  by_origin: Record<'current' | 'external_legacy', Record<keyof JevCalibration, { matches: number; total: number; rate: number | null }>>;
   low_confidence_disagreements: number;
 };
 
@@ -126,10 +131,14 @@ export function calibrationForRun(runId: string, reviews: ConversionReviewRecord
     .sort((a, b) => a.created_at.localeCompare(b.created_at))[0];
 }
 
-export function buildJevCalibrationSummary(runs: ConversionRun[], reviews: ConversionReviewRecord[]): JevCalibrationSummary {
-  const dimensions = Object.fromEntries(calibrationKeys.map(key => [key, { matches: 0, total: 0, rate: null }])) as JevCalibrationSummary['dimensions'];
+export function buildJevCalibrationSummary(runs: ConversionRun[], reviews: ConversionReviewRecord[], cases: ConversionCase[] = []): JevCalibrationSummary {
+  const emptyDimensions = () => Object.fromEntries(calibrationKeys.map(key => [key, { matches: 0, total: 0, rate: null }])) as JevCalibrationSummary['dimensions'];
+  const dimensions = emptyDimensions();
+  const byOrigin = { current: emptyDimensions(), external_legacy: emptyDimensions() };
   let samples = 0;
   let testSamples = 0;
+  let currentSamples = 0;
+  let legacySamples = 0;
   let lowConfidenceDisagreements = 0;
   const firstByCase = new Map<string, { run: ConversionRun; review: ConversionReviewRecord }>();
   for (const run of runs) {
@@ -147,6 +156,11 @@ export function buildJevCalibrationSummary(runs: ConversionRun[], reviews: Conve
     if (review.calibration_sample_kind === 'test') { testSamples += 1; continue; }
     if (review.calibration_sample_kind !== 'operational') continue;
     samples += 1;
+    const origin = cases.find(item => item.id === run.case_id)?.sample_origin
+      ?? run.input_snapshot?.sample_origin;
+    const group = origin === 'external_legacy' ? 'external_legacy' : 'current';
+    if (group === 'external_legacy') legacySamples += 1;
+    else currentSamples += 1;
     for (const key of calibrationKeys) {
       const answer = run.result.decisions[key];
       const predicted = key === 'purchase_readiness'
@@ -154,18 +168,19 @@ export function buildJevCalibrationSummary(runs: ConversionRun[], reviews: Conve
         : (answer as JevChoiceAnswer).choice;
       const matched = predicted === review.calibration[key];
       dimensions[key].total += 1;
-      if (matched) dimensions[key].matches += 1;
+      byOrigin[group][key].total += 1;
+      if (matched) { dimensions[key].matches += 1; byOrigin[group][key].matches += 1; }
       else if (answer.confidence < 0.7) lowConfidenceDisagreements += 1;
     }
   }
-  for (const key of calibrationKeys) {
-    const item = dimensions[key];
+  for (const group of [dimensions, byOrigin.current, byOrigin.external_legacy]) for (const key of calibrationKeys) {
+    const item = group[key];
     item.rate = item.total ? item.matches / item.total : null;
   }
   const minimumSamples = 20;
-  return { samples, test_samples: testSamples, minimum_samples: minimumSamples,
+  return { samples, test_samples: testSamples, current_samples: currentSamples, legacy_samples: legacySamples, minimum_samples: minimumSamples,
     remaining_for_threshold_review: Math.max(0, minimumSamples - samples),
-    dimensions, low_confidence_disagreements: lowConfidenceDisagreements };
+    dimensions, by_origin: byOrigin, low_confidence_disagreements: lowConfidenceDisagreements };
 }
 
 const topicPatterns: Record<ConversionTopic, RegExp> = {

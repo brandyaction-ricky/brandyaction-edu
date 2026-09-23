@@ -19,7 +19,7 @@ export async function GET() {
   try {
     const user = await operator(), db = createAdminClient();
     const requests = [
-      db.from('edu_conversion_cases').select('id,source_type,question_id,course_id,cohort_id,subject,content,source_label,received_at,customer_id,input_version,created_at').order('created_at', { ascending: false }).limit(200),
+      db.from('edu_conversion_cases').select('id,source_type,sample_origin,legacy_course_label,question_id,course_id,cohort_id,subject,content,source_label,received_at,customer_id,input_version,created_at').order('created_at', { ascending: false }).limit(200),
       db.from('edu_conversion_evidence').select('id,course_id,cohort_id,title,body,source_url,version,status').order('created_at', { ascending: false }).limit(500),
       db.from('edu_questions').select('id,title,content,course_id,user_id,created_at,updated_at').eq('is_archived', false).order('created_at', { ascending: false }).limit(200),
       db.from('courses').select('id,title,status').order('created_at', { ascending: false }).limit(500),
@@ -55,9 +55,11 @@ export async function POST(request: Request) {
       if (!found.data) conversionError('문의를 찾을 수 없습니다.', 404);
       const inquiry = found.data as ConversionCase;
       observed_version = inquiry.input_version;
-      const rows = await db.from('edu_conversion_evidence').select('*').eq('course_id', inquiry.course_id).eq('status', 'approved');
-      if (rows.error) conversionDatabaseError(rows.error);
-      const evidence = (rows.data as ConversionEvidence[] || []).filter(item => item.cohort_id === null || item.cohort_id === inquiry.cohort_id);
+      const rows = inquiry.course_id
+        ? await db.from('edu_conversion_evidence').select('*').eq('course_id', inquiry.course_id).eq('status', 'approved')
+        : null;
+      if (rows?.error) conversionDatabaseError(rows.error);
+      const evidence = (rows?.data as ConversionEvidence[] || []).filter(item => item.cohort_id === null || item.cohort_id === inquiry.cohort_id);
       evidence_versions = Object.fromEntries(evidence.map(item => [item.id, item.version]));
       result = capabilities.can_jev
         ? await createJevJudgment(inquiry, evidence, process.env.TYPESAFE_API_KEY || '')

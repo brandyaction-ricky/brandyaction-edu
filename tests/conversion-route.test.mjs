@@ -84,6 +84,34 @@ test('manual inquiry requires deidentification confirmation and blocks obvious c
   const h = harness();
   assert.equal((await h.POST(req({ ...base, content: '문샷 챌린지 4기 가격 1,650,000원이 맞나요?' }))).status, 200);
 });
+test('historical education inquiry keeps its original product label without a current course', async () => {
+  const historical = { ...base, course_id: null, sample_origin: 'external_legacy', legacy_course_label: '과거 온라인 마케팅 교육', cohort_id: null };
+  const h = harness();
+  assert.equal((await h.POST(req(historical))).status, 200);
+  assert.equal(h.calls[0].args.p_payload.sample_origin, 'external_legacy');
+  assert.equal(h.calls[0].args.p_payload.course_id, null);
+  assert.equal(h.calls[0].args.p_payload.legacy_course_label, '과거 온라인 마케팅 교육');
+  for (const invalid of [
+    { ...historical, legacy_course_label: '' },
+    { ...historical, cohort_id: ids.question },
+    { ...historical, question_id: ids.question },
+    { ...historical, legacy_course_label: '010-1234-5678' },
+    { ...base, course_id: null },
+  ]) {
+    const rejected = harness();
+    assert.equal((await rejected.POST(req(invalid))).status, 400);
+    assert.deepEqual(rejected.calls, []);
+  }
+});
+test('historical inquiry without current product does not read current product evidence', async () => {
+  const inquiry = { id: ids.inquiry, course_id: null, cohort_id: null, sample_origin: 'external_legacy', input_version: 1,
+    subject: '교육 신청 조건', content: '예전 마케팅 교육 신청 절차가 궁금합니다.' };
+  const h = harness({ inquiry });
+  assert.equal((await h.POST(req({ action: 'analyze', requestId: ids.request, case_id: ids.inquiry, expected_version: 1 }))).status, 200);
+  assert.equal(h.reads.filter(table => table === 'edu_conversion_evidence').length, 0);
+  assert.deepEqual(h.calls[0].args.p_evidence_versions, {});
+  assert.equal(h.calls[0].args.p_result.proposed_reply, '');
+});
 test('manual customer identity and native inquiry text cannot be injected', async () => {
   const manual = harness(); await manual.POST(req({ ...base, customer_id: ids.actor }));
   assert.equal('customer_id' in manual.calls[0].args.p_payload, false);
