@@ -64,6 +64,8 @@ import {
 import { OrderResult } from "./order-result";
 import { SiteFooter } from "./final/site-footer";
 import { HomeHero } from "./final/home-hero";
+import { MarketingWorkspaceNav } from "./marketing-workspace-nav";
+import { ConversionReview } from "./conversion-review";
 type Data = Record<string, Row[]>;
 // Preserve only the last server-verified operator identity during client-side
 // admin navigation. Every read and write is still authorized by the server.
@@ -86,7 +88,7 @@ export function Platform({
   const account = path[0] === "my";
   const learning = path[0] === "learn";
   const [support, setSupport] = useState({ email: "", url: "" });
-  const [data, setData] = useState<Data>({});
+  const [loadedData, setData] = useState<Data>({});
   const [user, setUser] = useState(() =>
     initialUser || (admin ? cachedAdminUser : null),
   );
@@ -103,6 +105,7 @@ export function Platform({
     pageSize: number;
     total: number;
   } | null>(null);
+  const [loadedSection, setLoadedSection] = useState("");
   const searchParams = useSearchParams();
   const routeKey = path.join("/") + "?" + searchParams.toString();
   const [filters, setFilters] = useState({
@@ -134,6 +137,7 @@ export function Platform({
       : path[1] === "learning-editor"
         ? "learning"
         : path[1] || "home";
+  const data = !admin || loadedSection === adminSection ? loadedData : {};
   const editorRecordId = ["product-editor", "learning-editor"].includes(path[1])
     ? searchParams.get("id") || ""
     : "";
@@ -183,6 +187,7 @@ export function Platform({
       if (!response.ok) throw new Error(result.error);
       if (alive.current) {
         setData(result.data);
+        setLoadedSection(adminSection);
         setSupport(result.support || { email: "", url: "" });
         if (admin) cachedAdminUser = result.user;
         setUser(result.user);
@@ -686,10 +691,17 @@ export function Platform({
         setMobile={setMobile}
         logout={logout}
       >
-        {key === "overview" ? (
+        <MarketingWorkspaceNav current={key} available={available} search={searchParams.toString()} />
+        {loadedSection !== adminSection ? (
+          <div className="admin-section-loading" role="status" aria-live="polite" aria-busy={!error}>
+            {error ? <><p>화면 정보를 불러오지 못했습니다.</p><button className="btn" onClick={() => void refresh()}>다시 시도</button></> : <><span className="admin-section-loading-line" /><span className="admin-section-loading-line" /><span className="sr-only">메뉴 내용을 불러오는 중</span></>}
+          </div>
+        ) : key === "overview" ? (
           <Overview data={data} available={available} />
         ) : !section ? (
           <Empty title="이 화면에 접근할 운영 권한이 필요합니다." />
+        ) : key === "conversion" ? (
+          <ConversionReview workspace initialPeriod={searchParams.get("recruitment") || undefined} />
         ) : key === "product-editor" || key === "learning-editor" ? (
           loading && id && !edited ? (
             <p role="status">편집 정보를 불러오고 있습니다.</p>
@@ -760,6 +772,7 @@ export function Platform({
             </AdminHeading>}
             {standaloneAdmin.includes(section.key) ? (
               <AdminWorkflows
+                key={section.key}
                 section={section.key}
                 data={data}
                 send={send}

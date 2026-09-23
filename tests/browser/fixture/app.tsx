@@ -1,7 +1,14 @@
+import { RecruitmentLinks } from '../../../app/ui/recruitment-links';
+import { RecruitmentDelivery } from '../../../app/ui/recruitment-delivery';
 import { StrictMode, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { LandingAdmin } from '../../../app/ui/landing/admin';
+import { WebinarRegistration } from '../../../app/ui/webinar-registration';
+import { WebinarManagement } from '../../../app/ui/webinar-management';
+import { AdminWorkflows } from '../../../app/ui/admin-workflows';
+import { ConversionFixture } from './conversion';
 import { AdminButton, AdminConfirmDialog, AdminDrawer, AdminInput } from '../../../app/ui/final/admin-system';
+import { ProductDetailHtml } from '../../../app/ui/final/product-detail-html';
 import '../../../app/ui/final/tokens.css';
 import '../../../app/ui/final/admin-system.css';
 
@@ -21,4 +28,8 @@ function BoundaryFixture() {
     {confirm && <AdminConfirmDialog title="중첩 확인" message="상위 Drawer는 유지됩니다." onCancel={() => setConfirm(false)} onConfirm={() => {setConfirm(false);setOpen(false);}}/>}
   </AdminDrawer>}</section>;
 }
-createRoot(document.getElementById('root')!).render(<StrictMode><div className="edu-admin" style={{padding:24,minHeight:'180vh'}}><BoundaryFixture/><LandingAdmin/></div></StrictMode>);
+function ProductHtmlCtaFixture() {
+  const documentSource = '<!doctype html><html><body><a href="#faq">자주 묻는 질문</a><a href="#">무료강의 대기방 입장 →</a><p id="faq">FAQ</p></body></html>';
+  return <ProductDetailHtml html="" documentSource={documentSource} ctaUrl="/join/synthetic/organic" />;
+}
+createRoot(document.getElementById('root')!).render(<StrictMode>{window.location.pathname.startsWith('/product-html-cta-test') ? <ProductHtmlCtaFixture /> : <div className="edu-admin" style={{padding:24,minHeight:'180vh'}}>{window.location.pathname.startsWith('/copy-links-test') ? <><RecruitmentLinks period="sample" version={2}/><WebinarManagement period="sample" courses={[{id:'22222222-2222-4222-8222-222222222222',title:'합성 무료 교육'}]} cohorts={[]}/></> : window.location.pathname.startsWith('/delivery-test') ? <RecruitmentDelivery code="33333333-3333-4333-8333-333333333333"/> : window.location.pathname.startsWith('/templates-admin-test') ? <AdminWorkflows section="templates" data={{crm_templates:[],crm_delivery_state:[{id:'delivery',enabled:false,configured:false}]}} pending={false} send={async body=>{const r=await fetch('/api/platform/workflows',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw Error('저장 실패');return r.json();}}/> : window.location.pathname.startsWith('/webinar-test') ? <WebinarRegistration code="11111111-1111-4111-8111-111111111111" channel="organic"/> : window.location.pathname.startsWith('/webinar-admin-test') ? <WebinarManagement workspace={new URLSearchParams(location.search).has("workspace")} period="sample" courses={[{id:'22222222-2222-4222-8222-222222222222',title:'합성 무료 교육'}]} cohorts={[]}/> : window.location.pathname.startsWith('/admin/conversion') ? <ConversionFixture/> : <><BoundaryFixture/><LandingAdmin/></>}</div>}</StrictMode>);

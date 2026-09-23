@@ -4,7 +4,7 @@ import { parseProductHtml, type ProductHtmlNode } from '@/lib/product-metadata';
 import { buildProductDocument } from '@/lib/product-html-document';
 import { conversionUrl, PRODUCT_CTA_EVENT } from '@/lib/product-conversion';
 
-function ProductDocumentFrame({ source }: { source: string }) {
+function ProductDocumentFrame({ source, ctaUrl }: { source: string; ctaUrl: string }) {
   const ref = useRef<HTMLIFrameElement>(null);
   const srcDoc = useMemo(() => buildProductDocument(source), [source]);
   useEffect(() => {
@@ -30,7 +30,13 @@ function ProductDocumentFrame({ source }: { source: string }) {
         if (!link) return;
         event.preventDefault();
         const href = link.getAttribute('href') || '';
-        if (href.startsWith('#')) {
+        const placeholderUrl = href === '#' && /대기방\s*입장/.test(link.textContent || '') ? conversionUrl(ctaUrl) : '';
+        if (placeholderUrl) {
+          const url = placeholderUrl;
+          window.dispatchEvent(new CustomEvent(PRODUCT_CTA_EVENT, { detail: { href: url, position: 'detail_cta' } }));
+          if (url.startsWith('/')) window.location.assign(url);
+          else window.open(url, '_blank', 'noopener,noreferrer');
+        } else if (href.startsWith('#')) {
           try {
             const target = doc.getElementById(decodeURIComponent(href.slice(1)));
             if (target) window.scrollTo({ top: window.scrollY + frame.getBoundingClientRect().top + target.getBoundingClientRect().top, behavior: 'smooth' });
@@ -53,12 +59,12 @@ function ProductDocumentFrame({ source }: { source: string }) {
     frame.addEventListener('load', attach);
     attach();
     return () => { frame.removeEventListener('load', attach); detach(); };
-  }, [srcDoc]);
+  }, [srcDoc, ctaUrl]);
   return <iframe ref={ref} title="상품 HTML 상세페이지" sandbox="allow-same-origin" referrerPolicy="no-referrer" srcDoc={srcDoc} style={{ display: 'block', width: '100%', height: 640, border: 0 }} />;
 }
 
-export function ProductDetailHtml({ html, documentSource = '', className = 'product-detail-html reading-copy' }: { html: string; documentSource?: string; className?: string }) {
-  if (documentSource) return <div className={className}><ProductDocumentFrame source={documentSource} /></div>;
+export function ProductDetailHtml({ html, documentSource = '', className = 'product-detail-html reading-copy', ctaUrl = '' }: { html: string; documentSource?: string; className?: string; ctaUrl?: string }) {
+  if (documentSource) return <div className={className}><ProductDocumentFrame source={documentSource} ctaUrl={ctaUrl} /></div>;
   function render(nodes: ProductHtmlNode[]): ReactNode[] {
     return nodes.map((node, index) => {
       if (typeof node === 'string') return node;

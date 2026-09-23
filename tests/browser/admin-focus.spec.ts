@@ -12,7 +12,10 @@ async function boundaryCycle(page: Page, first: Locator, last: Locator) {
 }
 async function locked(page: Page, value: string) { expect(await page.evaluate(()=>document.body.style.overflow)).toBe(value); }
 
-test.beforeEach(async({page})=>{await page.goto('/admin/landing');await expect(page.getByRole('combobox',{name:'캠페인',exact:true})).toHaveValue('bbbbbbbb-bbbb-4000-8000-000000000002');});
+test.beforeEach(async({page})=>{
+  await page.goto('/admin/landing');
+  await expect(page.getByRole('checkbox',{name:/포커스 검증 클래스/})).toBeChecked();
+});
 
 test('campaign final input wraps immediately in both directions; Escape restores opener and scrolling',async({page})=>{
   const opener=page.getByRole('region',{name:'무료클래스 조회 조건'}).getByRole('button',{name:'캠페인 설정',exact:true});
