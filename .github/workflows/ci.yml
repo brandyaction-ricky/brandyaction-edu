@@ -47,7 +47,7 @@ jobs:
 
           while IFS= read -r path; do
             case "$path" in
-              .github/workflows/ci.yml|.env.example|README.md|app/api/payments/toss/webhook/route.ts|package.json|tests/toss-webhook-idempotency.test.mjs|tests/toss-webhook.test.mjs)
+              .github/workflows/ci.yml|.env.example|README.md|app/api/payments/toss/webhook/route.ts|package.json|package-lock.json|tests/toss-webhook-idempotency.test.mjs|tests/toss-webhook.test.mjs)
                 ;;
               *)
                 echo "File is outside the Commerce release allowlist: $path"
