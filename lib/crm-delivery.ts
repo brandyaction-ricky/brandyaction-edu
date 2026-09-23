@@ -276,6 +276,10 @@ export async function dispatchDueCrm() {
       }
     }
   }
+  // Older environments can contain queued automation runs before delivery is
+  // connected. Keep those runs held until an operator explicitly enables them.
+  if (process.env.CRM_AUTOMATIONS_ENABLED !== "true")
+    return { disabled: false, campaigns, automations, sent, failed };
   const runResult = await db
     .from("crm_automation_runs")
     .select(
