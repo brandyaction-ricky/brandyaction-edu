@@ -31,11 +31,25 @@ async function fixture(page: Page, provider: 'mock' | 'jev' = 'mock') {
   let forbidden = false;
   await page.route('**/api/**', async route => {
     const pathname = new URL(route.request().url()).pathname;
-    if (!['/api/conversion', '/api/conversion/adjudication'].includes(pathname)) {
+    if (!['/api/conversion', '/api/conversion/adjudication', '/api/conversion/jev-v2'].includes(pathname)) {
       unexpectedApi.push(route.request().url());
       await route.fulfill({ status: 405, json: { error: '검증에 허용되지 않은 API입니다.' } }); return;
     }
     if (forbidden) { await route.fulfill({ status: 403, json: { error: '전환 관리 접근 권한이 없습니다.' } }); return; }
+    if (pathname === '/api/conversion/jev-v2') {
+      const body = route.request().postDataJSON();
+      mutations.push(body);
+      const choice = (value: string) => ({ type: 'choice' as const, choice: value, confidence: .75, probabilities: { [value]: .75 } });
+      const result = { contract_version: 2 as const, model: 'jev-test', decisions: {
+        information_need: choice('skill_requirement'), confirmed_barrier: choice('none_stated'),
+        operational_issue: choice('none_stated'), observable_stage: choice('information_seeking'),
+      } };
+      snapshot.jev_v2_runs ||= [];
+      snapshot.jev_v2_runs.push({ id: `v2-${snapshot.jev_v2_runs.length + 1}`, v1_run_id: body.v1_run_id,
+        case_id: initialCase.id, calibration_review_id: snapshot.reviews[0].id, input_version: 1,
+        status: 'completed', result, created_at: timestamp, updated_at: timestamp });
+      await route.fulfill({ json: { ok: true, result } }); return;
+    }
     if (pathname === '/api/conversion/adjudication') {
       const body = route.request().postDataJSON();
       mutations.push(body);
@@ -148,6 +162,29 @@ test('disagreement review records a separate reason while preserving the first l
   expect(state.snapshot.reviews).toHaveLength(1);
   expect(state.snapshot.adjudications).toHaveLength(1);
   expect(state.unexpectedApi).toEqual([]);
+});
+
+test('v2 experiment runs once and keeps the original human and v1 choices visible', async ({ page }) => {
+  const state = await fixture(page, 'jev');
+  state.snapshot.capabilities.can_jev_v2 = true;
+  await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
+  await page.getByRole('button', { name: 'Jev 그림자 판정 실행', exact: true }).click();
+  await page.getByLabel('교정 표본 용도').selectOption('operational');
+  await page.getByLabel('사람 판단 · 구매 의도').selectOption('medium');
+  await page.getByLabel('사람 판단 · 주요 장애물').selectOption('price');
+  await page.getByLabel('사람 판단 · 구매 준비도').selectOption('3');
+  await page.getByLabel('사람 판단 · 다음 행동').selectOption('answer_specific_questions');
+  await page.getByRole('button', { name: '독립 판정 저장', exact: true }).click();
+  await page.getByRole('button', { name: '판정 차이 재검토', exact: true }).click();
+  const audit = page.getByRole('region', { name: '판정 차이 재검토' });
+  await audit.getByRole('button', { name: '남은 1건 v2 실행' }).click();
+  await expect(audit).toContainText('필요 역량 질문');
+  await expect(audit).toContainText('직접 밝힌 내용 없음');
+  await expect(audit).toContainText('사람 가격Jev 수강 수준');
+  await expect(audit.getByRole('button', { name: 'v2 실행 완료' })).toBeDisabled();
+  expect(state.snapshot.reviews).toHaveLength(1);
+  expect(state.snapshot.runs).toHaveLength(1);
+  expect(state.mutations.filter(item => item.v1_run_id)).toHaveLength(1);
 });
 
 test('historical Jev inquiries can be independently labeled in one blind batch', async ({ page }) => {

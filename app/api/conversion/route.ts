@@ -33,10 +33,13 @@ export async function GET() {
     // Vercel may switch to this code before the develop-branch migration job finishes.
     const pendingMigration = ['42P01', 'PGRST205'].includes(notes.error?.code || '');
     if (notes.error && !pendingMigration) conversionDatabaseError(notes.error);
+    const v2 = await db.from('edu_conversion_jev_v2_runs').select('id,v1_run_id,case_id,calibration_review_id,input_version,status,result,created_at,updated_at').order('created_at', { ascending: false }).limit(500);
+    const pendingV2Migration = ['42P01', 'PGRST205'].includes(v2.error?.code || '');
+    if (v2.error && !pendingV2Migration) conversionDatabaseError(v2.error);
     const [cases, evidence, questions, courses, cohorts, runs, reviews] = result.map(item => item.data || []);
-    return reply({ cases, evidence, questions, courses, cohorts, runs, reviews, adjudications: notes.data || [],
-      capabilities: { can_manage_evidence: user.permissions.products, ...conversionCapabilities(process.env), can_adjudicate: !pendingMigration && conversionCapabilities(process.env).can_jev, can_manage_funnel: user.permissions.products && user.permissions.marketing },
-      limits: { cases: 200, evidence: 500, questions: 200, runs: 500, reviews: 500, adjudications: 500 } });
+    return reply({ cases, evidence, questions, courses, cohorts, runs, reviews, adjudications: notes.data || [], jev_v2_runs: v2.data || [],
+      capabilities: { can_manage_evidence: user.permissions.products, ...conversionCapabilities(process.env), can_adjudicate: !pendingMigration && conversionCapabilities(process.env).can_jev, can_jev_v2: !pendingV2Migration && conversionCapabilities(process.env).can_jev, can_manage_funnel: user.permissions.products && user.permissions.marketing },
+      limits: { cases: 200, evidence: 500, questions: 200, runs: 500, reviews: 500, adjudications: 500, jev_v2_runs: 500 } });
   } catch (error) { return failure(error); }
 }
 export async function POST(request: Request) {
