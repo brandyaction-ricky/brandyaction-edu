@@ -12,7 +12,7 @@ new Function('exports', ts.transpileModule(source, {
 const { createMockJudgment, isEvidenceInScope, evidenceVersions, isRunStale, buildJevCalibrationSummary, calibrationForRun, MOCK_NOTICE } = exports;
 
 const inquiry = {
-  id: 'case-1', source_type: 'manual', question_id: null, course_id: 'course-a', cohort_id: 'cohort-a',
+  id: 'case-1', source_type: 'manual', sample_origin: 'current', legacy_course_label: null, question_id: null, course_id: 'course-a', cohort_id: 'cohort-a',
   subject: '초보도 가능한가요?', content: '실시간 참석이 어려운데 녹화로 다시 볼 수 있나요?',
   source_label: '직접 등록', received_at: '2026-09-20T00:00:00.000Z', customer_id: null,
   input_version: 1, created_at: '2026-09-20T00:00:00.000Z',
@@ -218,6 +218,29 @@ test('repeated Jev runs for one inquiry count only its earliest independent cali
   ]);
   assert.equal(testFirst.samples, 0);
   assert.equal(testFirst.test_samples, 1);
+});
+
+test('historical and current real cases count toward the same threshold but stay separately visible', () => {
+  const result = { ...createMockJudgment(inquiry, []), mode: 'jev', decisions: {
+    purchase_intent: { choice: 'medium', confidence: .9 }, primary_barrier: { choice: 'schedule', confidence: .9 },
+    purchase_readiness: { score: 2, confidence: .9 }, next_action: { choice: 'answer_specific_questions', confidence: .9 },
+  } };
+  const currentRun = { ...runFor(), id: 'run-current', provider: 'jev', result };
+  const legacyRun = { ...currentRun, id: 'run-legacy', case_id: 'case-legacy',
+    input_snapshot: { sample_origin: 'external_legacy' } };
+  const calibration = { purchase_intent: 'medium', primary_barrier: 'schedule', purchase_readiness: 2, next_action: 'answer_specific_questions' };
+  const currentReview = { id: 'review-current', run_id: currentRun.id, case_id: currentRun.case_id,
+    created_at: '2026-09-20T00:00:02Z', calibration, calibration_sample_kind: 'operational' };
+  const legacyReview = { ...currentReview, id: 'review-legacy', run_id: legacyRun.id, case_id: legacyRun.case_id };
+  const summary = buildJevCalibrationSummary([currentRun, legacyRun], [currentReview, legacyReview],
+    [inquiry, { ...inquiry, id: legacyRun.case_id, sample_origin: 'external_legacy', course_id: null, legacy_course_label: '과거 교육' }]);
+  assert.equal(summary.samples, 2);
+  assert.equal(summary.current_samples, 1);
+  assert.equal(summary.legacy_samples, 1);
+  assert.equal(summary.remaining_for_threshold_review, 18);
+  assert.equal(summary.dimensions.purchase_intent.total, 2);
+  assert.equal(summary.by_origin.current.purchase_intent.total, 1);
+  assert.equal(summary.by_origin.external_legacy.purchase_intent.total, 1);
 });
 
 test('review payload accepts only a complete closed-set calibration object', () => {

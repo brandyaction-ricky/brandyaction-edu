@@ -6,7 +6,7 @@ import { createMockJudgment, evidenceVersions, type ConversionCase, type Convers
 const timestamp = '2026-09-20T01:00:00.000Z';
 const courseId = '11111111-1111-4111-8111-111111111111';
 const initialCase: ConversionCase = {
-  id: '22222222-2222-4222-8222-222222222222', source_type: 'manual', question_id: null,
+  id: '22222222-2222-4222-8222-222222222222', source_type: 'manual', sample_origin: 'current', legacy_course_label: null, question_id: null,
   course_id: courseId, cohort_id: null, subject: '초보 수강과 녹화 문의',
   content: '초보자도 따라갈 수 있나요? 실시간 참석이 어려운데 녹화가 있나요?',
   source_label: '합성 상담 예시', received_at: timestamp, customer_id: null, input_version: 1, created_at: timestamp,
@@ -41,7 +41,8 @@ async function fixture(page: Page, provider: 'mock' | 'jev' = 'mock') {
     if (body.action === 'save_case') {
       const item: ConversionCase = { ...initialCase, id: '55555555-5555-4555-8555-555555555555',
         subject: body.subject, content: body.content, source_label: body.source_label,
-        received_at: body.received_at, course_id: body.course_id, cohort_id: body.cohort_id };
+        received_at: body.received_at, course_id: body.course_id, cohort_id: body.cohort_id,
+        sample_origin: body.sample_origin, legacy_course_label: body.legacy_course_label };
       snapshot.cases.push(item);
       await route.fulfill({ json: { ok: true, case: item } }); return;
     }
@@ -186,6 +187,7 @@ test('manual inquiry can be entered and saved without inventing a customer ident
   await page.getByRole('button', { name: '문의 연결', exact: true }).click();
   const drawer = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: '문의 연결', exact: true }) });
   await drawer.getByLabel(/^문의 출처/).selectOption('manual');
+  await drawer.getByLabel(/^표본 출처/).selectOption('current');
   await drawer.getByLabel(/^문의 제목/).fill('수강 일정 확인');
   await drawer.getByLabel(/^문의 발췌/).fill('수업은 언제 진행되나요?');
   await drawer.getByLabel(/^출처 설명/).fill('합성 외부 문의');
@@ -201,6 +203,25 @@ test('manual inquiry can be entered and saved without inventing a customer ident
   expect(state.mutations[0]).toMatchObject({ action: 'save_case', question_id: null, course_id: courseId, cohort_id: null, subject: '수강 일정 확인', deidentified_confirmed: true });
   expect(state.mutations[0]).not.toHaveProperty('customer_id');
   expect(state.mutations[0].requestId).toMatch(/^[0-9a-f-]{36}$/);
+});
+
+test('historical education inquiry can be saved without linking a different current course', async ({ page }) => {
+  const state = await fixture(page);
+  await page.getByRole('button', { name: '문의 연결', exact: true }).click();
+  const drawer = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: '문의 연결', exact: true }) });
+  await drawer.getByLabel(/^문의 출처/).selectOption('manual');
+  await drawer.getByLabel(/^표본 출처/).selectOption('external_legacy');
+  await drawer.getByLabel(/^당시 유료 교육 상품명/).fill('과거 온라인 마케팅 교육');
+  await drawer.getByLabel(/^문의 제목/).fill('교육 신청 방식');
+  await drawer.getByLabel(/^문의 발췌/).fill('교육 신청 전에 수강 조건을 확인하고 싶습니다.');
+  await drawer.getByLabel(/^출처 설명/).fill('카카오 채널 1:1 · 과거 상담');
+  await drawer.getByLabel(/^문의 접수 시각/).fill('2024-04-17T10:00');
+  await expect(drawer.getByLabel(/^대상 상품/)).toHaveValue('');
+  await drawer.getByRole('checkbox', { name: '고객 식별정보를 제거한 발췌임을 확인했습니다.' }).check();
+  await drawer.getByRole('button', { name: '문의 저장', exact: true }).click();
+  await expect(page.getByText('과거 유료 교육 상담 · 이번 모집 성과에서 제외')).toBeVisible();
+  expect(state.mutations[0]).toMatchObject({ action: 'save_case', sample_origin: 'external_legacy',
+    legacy_course_label: '과거 온라인 마케팅 교육', course_id: null, cohort_id: null });
 });
 
 test('mock recommendation can be edited and held as review records without sending any message', async ({ page }) => {
