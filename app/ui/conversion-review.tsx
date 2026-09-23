@@ -302,7 +302,7 @@ function CaseForm({ snapshot, item, pending, mutate, onSaved }: { snapshot: Conv
       {item && <p className="conversion-muted">저장하면 질문함의 최신 원문을 다시 연결합니다.</p>}
     </> : <>
       <AdminSelect label="표본 출처" required value={sampleOrigin} disabled={pending || Boolean(item)} onChange={event => { setSampleOrigin(event.target.value as 'current' | 'external_legacy'); setCourseId(''); setCohortId(''); }} helper="과거 상담은 Jev 교정 표본에 포함되지만 이번 모집 전환율에는 합산하지 않습니다."><option value="">선택</option><option value="current">현재 교육 상담</option><option value="external_legacy">과거 유료 교육 상담</option></AdminSelect>
-      {sampleOrigin === 'external_legacy' && <AdminInput label="당시 유료 교육 상품명" value={legacyCourseLabel} onChange={event => setLegacyCourseLabel(event.target.value)} required maxLength={200} disabled={pending} helper="당시 판매한 상품을 확인한 이름으로 기록하세요. 현재 문샷 챌린지 4기로 추정해 연결하지 않습니다." />}
+      {sampleOrigin === 'external_legacy' && <AdminInput label="당시 유료 교육 상품명" value={legacyCourseLabel} onChange={event => setLegacyCourseLabel(event.target.value)} required maxLength={200} disabled={pending} helper="상품명이 확인되지 않으면 ‘상품명 미확인’으로 기록하세요. 현재 문샷 챌린지 4기로 추정해 연결하지 않습니다." />}
       <AdminInput label="문의 제목" value={subject} onChange={event => setSubject(event.target.value)} required maxLength={200} disabled={pending} />
       <AdminTextarea label="문의 발췌" value={content} onChange={event => setContent(event.target.value)} required maxLength={10000} rows={5} disabled={pending} helper="대화 전체 대신 구매 판단에 필요한 문장만 남기세요. 고객 이름·별명·연락처·계정 ID·링크·주문번호는 제거해 주세요." />
       <AdminInput label="출처 설명" value={sourceLabel} onChange={event => setSourceLabel(event.target.value)} required maxLength={200} disabled={pending} placeholder="예: 카카오 채널 1:1 상담" />
