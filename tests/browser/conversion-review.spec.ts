@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createMockJudgment, evidenceVersions, type ConversionCase, type ConversionRun, type ConversionSnapshot } from '../../lib/conversion-review';
+import { createMockJudgment, evidenceVersions, MOCK_NOTICE, type ConversionCase, type ConversionRun, type ConversionSnapshot } from '../../lib/conversion-review';
 
 // Synthetic inquiry and product data only. Route interception cannot reach DB,
 // auth, model or message providers, and the fixture server rejects other writes.
@@ -81,7 +81,12 @@ test('Jev shadow result shows decisions and confidence without triggering anothe
   await page.getByLabel('교정 표본 용도').selectOption('operational');
   await expect(page.getByText('Jev 그림자 판정 · 운영자 확인 필요', { exact: true })).toBeVisible();
   await expect(page.getByText('운영자 독립 판정을 먼저 저장해 주세요.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Jev 그림자 판정 실행', exact: true })).toBeDisabled();
   await expect(page.getByLabel('Jev 전환 판정')).toHaveCount(0);
+  await expect(page.getByText(MOCK_NOTICE, { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel(/^검토할 설명/)).toHaveCount(0);
+  await expect(page.getByText('추가 확인 필요: 이용 방법', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '검토 기록 저장', exact: true })).toHaveCount(0);
   expect(state.unexpectedApi).toEqual([]);
   expect(state.mutations.map(item => item.action)).toEqual(['analyze']);
 });
@@ -95,8 +100,7 @@ test('first Jev review stores blind operator labels then reveals comparison and 
   await page.getByLabel('사람 판단 · 주요 장애물').selectOption('price');
   await page.getByLabel('사람 판단 · 구매 준비도').selectOption('3');
   await page.getByLabel('사람 판단 · 다음 행동').selectOption('answer_specific_questions');
-  await page.getByLabel(/^검토 사유/).fill('합성 독립 판정');
-  await page.getByRole('button', { name: '검토 기록 저장', exact: true }).click();
+  await page.getByRole('button', { name: '독립 판정 저장', exact: true }).click();
   const result = page.getByLabel('Jev 전환 판정');
   await expect(result).toContainText('구매 의도중간신뢰도 97%');
   await expect(result).toContainText('주요 장애물수강 수준신뢰도 82%');
@@ -105,7 +109,10 @@ test('first Jev review stores blind operator labels then reveals comparison and 
   await expect(page.getByLabel('Jev 교정 현황')).toContainText('검수용 표본0건');
   await expect(page.getByLabel('Jev 교정 현황')).toContainText('기준 검토까지 실제 문의 19건 남음');
   await expect(page.getByLabel('Jev 교정 현황')).toContainText('구매 의도 일치100%');
-  expect(state.mutations[1]).toMatchObject({ action: 'review', calibration_sample_kind: 'operational', calibration: { purchase_intent: 'medium', primary_barrier: 'price', purchase_readiness: 3, next_action: 'answer_specific_questions' } });
+  await expect(page.getByLabel(/^검토할 설명/)).toHaveValue('초보자를 대상으로 기초 개념부터 설명합니다.');
+  await expect(page.getByRole('button', { name: 'Jev 그림자 판정 실행', exact: true })).toBeEnabled();
+  await expect(page.getByText(MOCK_NOTICE, { exact: true })).toBeVisible();
+  expect(state.mutations[1]).toMatchObject({ action: 'review', decision: 'hold', reply_text: '', calibration_sample_kind: 'operational', calibration: { purchase_intent: 'medium', primary_barrier: 'price', purchase_readiness: 3, next_action: 'answer_specific_questions' } });
   expect(state.unexpectedApi).toEqual([]);
 });
 

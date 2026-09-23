@@ -155,13 +155,16 @@ export function ConversionReview({ workspace = false, initialPeriod }: { workspa
               <p className="conversion-quote">{selected.content}</p>
               {selected.question_id && <Link href="/admin/questions" className="conversion-link">기존 질문함 열기</Link>}
             </AdminSection>
-            <AdminSection title="전환 판정·설명 추천" bordered actions={<AdminButton tone="primary" disabled={pending || !canAnalyze} onClick={() => void mutate({ action: 'analyze', case_id: selected.id, expected_version: selected.input_version }).catch(() => {})}>{pending ? '처리 중' : snapshot.capabilities.analyze_provider === 'jev' ? 'Jev 그림자 판정 실행' : '모의 판단 실행'}</AdminButton>}>
+            <AdminSection title="전환 판정·설명 추천" bordered actions={<AdminButton tone="primary" disabled={pending || !canAnalyze || Boolean(run?.provider === 'jev' && !calibrationRecord && !stale)} onClick={() => void mutate({ action: 'analyze', case_id: selected.id, expected_version: selected.input_version }).catch(() => {})}>{pending ? '처리 중' : snapshot.capabilities.analyze_provider === 'jev' ? 'Jev 그림자 판정 실행' : '모의 판단 실행'}</AdminButton>}>
               {!canAnalyze && <p className="conversion-muted">현재 환경에서는 판정을 실행할 수 없습니다. 설명자료는 직접 검토할 수 있습니다.</p>}
               {run ? <div className="conversion-result">
                 <span className="conversion-tag">{run.provider === 'jev' ? 'Jev 그림자 판정' : '모의 판단'} · 운영자 확인 필요</span>
-                <p>{run.result.notice}</p>
                 {stale && <p role="alert" className="conversion-alert">문의나 설명자료가 바뀌었습니다. 새로 판단한 뒤 검토 기록을 남겨 주세요.</p>}
-                {run.result.mode === 'jev' && !calibrationRecord && <div className="conversion-calibration-gate"><strong>운영자 독립 판정을 먼저 저장해 주세요.</strong><p>Jev 결과를 본 뒤 판단하면 비교 표본이 편향될 수 있어 네 가지 판정은 첫 기록 뒤 공개됩니다.</p></div>}
+                {run.result.mode === 'jev' && !calibrationRecord ? <>
+                  <div className="conversion-calibration-gate"><strong>운영자 독립 판정을 먼저 저장해 주세요.</strong><p>Jev가 만든 설명과 판정은 첫 기록을 저장한 뒤 공개됩니다. 위 문의 원문만 보고 판단해 주세요.</p></div>
+                  <CalibrationForm key={run.id} runId={run.id} caseId={selected.id} stale={stale} pending={pending} mutate={mutate} />
+                </> : <>
+                <p>{run.result.notice}</p>
                 {run.result.mode === 'jev' && calibrationRecord?.calibration && <><div className="conversion-jev-grid" aria-label="Jev 전환 판정">
                   <div><span>구매 의도</span><strong>{jevNames[run.result.decisions.purchase_intent.choice]}</strong><small>신뢰도 {confidence(run.result.decisions.purchase_intent.confidence)}</small></div>
                   <div><span>주요 장애물</span><strong>{jevNames[run.result.decisions.primary_barrier.choice]}</strong><small>신뢰도 {confidence(run.result.decisions.primary_barrier.confidence)}</small></div>
@@ -175,7 +178,8 @@ export function ConversionReview({ workspace = false, initialPeriod }: { workspa
                   const evidence = run.evidence_snapshot?.find(item => item.id === candidate.evidence_id) || snapshot.evidence.find(item => item.id === candidate.evidence_id);
                   return <div key={candidate.evidence_id} className="conversion-evidence"><strong>{evidence?.title || '자료 확인 필요'}</strong><p>{candidate.reason}</p>{evidence && evidence.version === candidate.evidence_version ? <p className="conversion-quote">{evidence.body}</p> : <p className="conversion-muted">판단 이후 자료가 변경됐습니다. 당시 조합한 설명은 아래 검토 내용에 보존됩니다.</p>}</div>;
                 })}
-                <ReviewForm key={run.id} runId={run.id} caseId={selected.id} initialReply={run.result.proposed_reply} stale={stale} pending={pending} mutate={mutate} calibrationRequired={run.result.mode === 'jev' && !calibrationRecord} />
+                <ReviewForm key={run.id} runId={run.id} caseId={selected.id} initialReply={run.result.proposed_reply} stale={stale} pending={pending} mutate={mutate} />
+                </>}
               </div> : <AdminEmptyState compact title="아직 판단 기록이 없습니다.">아래 설명자료를 확인한 뒤 판정을 실행하세요.</AdminEmptyState>}
             </AdminSection>
             <AdminSection title="상품 설명자료" description="승인된 자료만 추천 후보에 포함됩니다." bordered actions={snapshot.capabilities.can_manage_evidence && <AdminButton disabled={pending} onClick={() => openEvidence()}>자료 등록</AdminButton>}>
@@ -207,26 +211,23 @@ export function ConversionReview({ workspace = false, initialPeriod }: { workspa
   </AdminPage>;
 }
 
-function ReviewForm({ runId, caseId, initialReply, stale, pending, mutate, calibrationRequired }: { runId: string; caseId: string; initialReply: string; stale: boolean; pending: boolean; mutate: Mutation; calibrationRequired: boolean }) {
-  const [decision, setDecision] = useState('hold');
-  const [reply, setReply] = useState(initialReply);
-  const [reason, setReason] = useState('');
+function CalibrationForm({ runId, caseId, stale, pending, mutate }: { runId: string; caseId: string; stale: boolean; pending: boolean; mutate: Mutation }) {
   const [purchaseIntent, setPurchaseIntent] = useState('');
   const [primaryBarrier, setPrimaryBarrier] = useState('');
   const [purchaseReadiness, setPurchaseReadiness] = useState('');
   const [nextAction, setNextAction] = useState('');
   const [sampleKind, setSampleKind] = useState('');
   const [error, setError] = useState('');
-  const calibrationComplete = !calibrationRequired || Boolean(sampleKind && purchaseIntent && primaryBarrier && purchaseReadiness !== '' && nextAction);
+  const calibrationComplete = Boolean(sampleKind && purchaseIntent && primaryBarrier && purchaseReadiness !== '' && nextAction);
   async function submit(event: FormEvent) {
     event.preventDefault(); setError('');
-    try { await mutate({ action: 'review', case_id: caseId, run_id: runId, decision, reply_text: reply, reason,
-      calibration: calibrationRequired ? { purchase_intent: purchaseIntent, primary_barrier: primaryBarrier, purchase_readiness: Number(purchaseReadiness), next_action: nextAction } : null,
-      calibration_sample_kind: calibrationRequired ? sampleKind : null }); }
+    try { await mutate({ action: 'review', case_id: caseId, run_id: runId, decision: 'hold', reply_text: '', reason: 'Jev 결과 확인 전 독립 판정',
+      calibration: { purchase_intent: purchaseIntent, primary_barrier: primaryBarrier, purchase_readiness: Number(purchaseReadiness), next_action: nextAction },
+      calibration_sample_kind: sampleKind }); }
     catch (cause) { setError((cause as Error).message); }
   }
   return <form onSubmit={submit} className="conversion-form">
-    {calibrationRequired && <fieldset className="conversion-calibration-form" disabled={pending || stale}>
+    <fieldset className="conversion-calibration-form" disabled={pending || stale}>
       <legend>운영자 독립 판정</legend>
       <p className="conversion-muted">문의 내용만 보고 판단해 주세요. 저장하면 Jev 결과와 비교됩니다.</p>
       <AdminSelect label="교정 표본 용도" required value={sampleKind} onChange={event => setSampleKind(event.target.value)} helper="실제 고객 문의만 일치율과 기준 검토 표본에 포함됩니다."><option value="">선택</option><option value="operational">실제 고객 문의</option><option value="test">DEV 검수·연습용</option></AdminSelect>
@@ -234,14 +235,31 @@ function ReviewForm({ runId, caseId, initialReply, stale, pending, mutate, calib
       <AdminSelect label="사람 판단 · 주요 장애물" required value={primaryBarrier} onChange={event => setPrimaryBarrier(event.target.value)}><option value="">선택</option><option value="price">가격</option><option value="schedule">일정</option><option value="skill_level">수강 수준</option><option value="content_fit">내용 적합성</option><option value="trust">신뢰</option><option value="none_or_unknown">불명확</option></AdminSelect>
       <AdminSelect label="사람 판단 · 구매 준비도" required value={purchaseReadiness} onChange={event => setPurchaseReadiness(event.target.value)}><option value="">선택</option><option value="0">0 · 정보 부족</option><option value="1">1 · 관심 탐색</option><option value="2">2 · 비교 검토</option><option value="3">3 · 구매 직전</option><option value="4">4 · 구매 결정</option></AdminSelect>
       <AdminSelect label="사람 판단 · 다음 행동" required value={nextAction} onChange={event => setNextAction(event.target.value)}><option value="">선택</option><option value="answer_specific_questions">질문에 구체적으로 답변</option><option value="invite_webinar">무료 웨비나 안내</option><option value="offer_purchase_info">구매 절차 안내</option><option value="human_consult">운영자 상담</option><option value="hold_no_contact">추가 접촉 보류</option></AdminSelect>
-    </fieldset>}
+    </fieldset>
+    {error && <p role="alert" className="conversion-alert">{error}</p>}
+    <AdminButton type="submit" tone="primary" disabled={pending || stale || !calibrationComplete}>독립 판정 저장</AdminButton>
+  </form>;
+}
+
+function ReviewForm({ runId, caseId, initialReply, stale, pending, mutate }: { runId: string; caseId: string; initialReply: string; stale: boolean; pending: boolean; mutate: Mutation }) {
+  const [decision, setDecision] = useState('hold');
+  const [reply, setReply] = useState(initialReply);
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+  async function submit(event: FormEvent) {
+    event.preventDefault(); setError('');
+    try { await mutate({ action: 'review', case_id: caseId, run_id: runId, decision, reply_text: reply, reason,
+      calibration: null, calibration_sample_kind: null }); }
+    catch (cause) { setError((cause as Error).message); }
+  }
+  return <form onSubmit={submit} className="conversion-form">
     <AdminTextarea label="검토할 설명" value={reply} onChange={event => { setReply(event.target.value); if (decision === 'accept') setDecision('edit'); }} rows={7} maxLength={10000} disabled={pending || stale} helper="고객에게 전달하기 전 상품 조건과 근거를 확인하세요." />
     <AdminSelect label="검토 결정" value={decision} onChange={event => setDecision(event.target.value)} disabled={pending || stale}>
       <option value="hold">보류</option><option value="accept" disabled={!initialReply.trim() || reply !== initialReply}>채택</option><option value="edit" disabled={!reply.trim()}>수정</option><option value="reject">사용 안 함</option>
     </AdminSelect>
     <AdminTextarea label="검토 사유" value={reason} onChange={event => setReason(event.target.value)} maxLength={1000} required={decision !== 'accept'} disabled={pending || stale} />
     {error && <p role="alert" className="conversion-alert">{error}</p>}
-    <AdminButton type="submit" tone="primary" disabled={pending || stale || !calibrationComplete || (['accept', 'edit'].includes(decision) && !reply.trim())}>검토 기록 저장</AdminButton>
+    <AdminButton type="submit" tone="primary" disabled={pending || stale || (['accept', 'edit'].includes(decision) && !reply.trim())}>검토 기록 저장</AdminButton>
   </form>;
 }
 
