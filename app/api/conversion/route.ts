@@ -39,10 +39,13 @@ export async function GET() {
     const v3 = await db.from('edu_conversion_jev_v3_runs').select('id,v1_run_id,case_id,calibration_review_id,input_version,status,result,created_at,updated_at').order('created_at', { ascending: false }).limit(500);
     const pendingV3Migration = ['42P01', 'PGRST205'].includes(v3.error?.code || '');
     if (v3.error && !pendingV3Migration) conversionDatabaseError(v3.error);
+    const v4 = await db.from('edu_conversion_jev_v4_runs').select('id,v1_run_id,case_id,calibration_review_id,input_version,status,result,created_at,updated_at').order('created_at', { ascending: false }).limit(500);
+    const pendingV4Migration = ['42P01', 'PGRST205'].includes(v4.error?.code || '');
+    if (v4.error && !pendingV4Migration) conversionDatabaseError(v4.error);
     const [cases, evidence, questions, courses, cohorts, runs, reviews] = result.map(item => item.data || []);
-    return reply({ cases, evidence, questions, courses, cohorts, runs, reviews, adjudications: notes.data || [], jev_v2_runs: v2.data || [], jev_v3_runs: v3.data || [],
-      capabilities: { can_manage_evidence: user.permissions.products, ...conversionCapabilities(process.env), can_adjudicate: !pendingMigration && conversionCapabilities(process.env).can_jev, can_jev_v2: !pendingV2Migration && conversionCapabilities(process.env).can_jev, can_jev_v3: !pendingV3Migration && conversionCapabilities(process.env).can_jev, can_manage_funnel: user.permissions.products && user.permissions.marketing },
-      limits: { cases: 200, evidence: 500, questions: 200, runs: 500, reviews: 500, adjudications: 500, jev_v2_runs: 500, jev_v3_runs: 500 } });
+    return reply({ cases, evidence, questions, courses, cohorts, runs, reviews, adjudications: notes.data || [], jev_v2_runs: v2.data || [], jev_v3_runs: v3.data || [], jev_v4_runs: v4.data || [],
+      capabilities: { can_manage_evidence: user.permissions.products, ...conversionCapabilities(process.env), can_adjudicate: !pendingMigration && conversionCapabilities(process.env).can_jev, can_jev_v2: !pendingV2Migration && conversionCapabilities(process.env).can_jev, can_jev_v3: !pendingV3Migration && conversionCapabilities(process.env).can_jev, can_jev_v4: !pendingV4Migration && conversionCapabilities(process.env).can_jev, can_manage_funnel: user.permissions.products && user.permissions.marketing },
+      limits: { cases: 200, evidence: 500, questions: 200, runs: 500, reviews: 500, adjudications: 500, jev_v2_runs: 500, jev_v3_runs: 500, jev_v4_runs: 500 } });
   } catch (error) { return failure(error); }
 }
 export async function POST(request: Request) {

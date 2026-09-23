@@ -31,7 +31,7 @@ async function fixture(page: Page, provider: 'mock' | 'jev' = 'mock') {
   let forbidden = false;
   await page.route('**/api/**', async route => {
     const pathname = new URL(route.request().url()).pathname;
-    if (!['/api/conversion', '/api/conversion/adjudication', '/api/conversion/jev-v2', '/api/conversion/jev-v3'].includes(pathname)) {
+    if (!['/api/conversion', '/api/conversion/adjudication', '/api/conversion/jev-v2', '/api/conversion/jev-v3', '/api/conversion/jev-v4'].includes(pathname)) {
       unexpectedApi.push(route.request().url());
       await route.fulfill({ status: 405, json: { error: '검증에 허용되지 않은 API입니다.' } }); return;
     }
@@ -61,6 +61,21 @@ async function fixture(page: Page, provider: 'mock' | 'jev' = 'mock') {
       }, consistency_flags: ['paid_attempt_without_paid_target', 'paid_failure_without_paid_target'] as const };
       snapshot.jev_v3_runs ||= [];
       snapshot.jev_v3_runs.push({ id: `v3-${snapshot.jev_v3_runs.length + 1}`, v1_run_id: body.v1_run_id,
+        case_id: initialCase.id, calibration_review_id: snapshot.reviews[0].id, input_version: 1,
+        status: 'completed', result: { ...result, consistency_flags: [...result.consistency_flags] }, created_at: timestamp, updated_at: timestamp });
+      await route.fulfill({ json: { ok: true, result } }); return;
+    }
+    if (pathname === '/api/conversion/jev-v4') {
+      const body = route.request().postDataJSON();
+      mutations.push(body);
+      const choice = (value: string) => ({ type: 'choice' as const, choice: value, confidence: .75, probabilities: { [value]: .75 } });
+      const result = { contract_version: 4 as const, model: 'jev-test', decisions: {
+        information_need: choice('registration_or_access'), confirmed_barrier: choice('none_stated'),
+        attempted_action_target: choice('free_live_or_replay'), operational_issue: choice('free_content_access_failure'),
+        paid_program_reference: choice('future_consideration_after_free_content'), observable_stage: choice('no_purchase_signal'),
+      }, consistency_flags: ['paid_reference_without_stage'] as const };
+      snapshot.jev_v4_runs ||= [];
+      snapshot.jev_v4_runs.push({ id: `v4-${snapshot.jev_v4_runs.length + 1}`, v1_run_id: body.v1_run_id,
         case_id: initialCase.id, calibration_review_id: snapshot.reviews[0].id, input_version: 1,
         status: 'completed', result: { ...result, consistency_flags: [...result.consistency_flags] }, created_at: timestamp, updated_at: timestamp });
       await route.fulfill({ json: { ok: true, result } }); return;
@@ -223,6 +238,28 @@ test('v3 shows a free-versus-paid contradiction for operator review without chan
   expect(state.snapshot.reviews).toHaveLength(1);
   expect(state.snapshot.runs).toHaveLength(1);
   expect(state.snapshot.jev_v3_runs).toHaveLength(1);
+});
+
+test('v4 makes future paid consideration visible and flags an inconsistent stage without changing the first review', async ({ page }) => {
+  const state = await fixture(page, 'jev');
+  state.snapshot.capabilities.can_jev_v4 = true;
+  await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
+  await page.getByRole('button', { name: 'Jev 그림자 판정 실행', exact: true }).click();
+  await page.getByLabel('교정 표본 용도').selectOption('operational');
+  await page.getByLabel('사람 판단 · 구매 의도').selectOption('medium');
+  await page.getByLabel('사람 판단 · 주요 장애물').selectOption('price');
+  await page.getByLabel('사람 판단 · 구매 준비도').selectOption('3');
+  await page.getByLabel('사람 판단 · 다음 행동').selectOption('answer_specific_questions');
+  await page.getByRole('button', { name: '독립 판정 저장', exact: true }).click();
+  await page.getByRole('button', { name: '판정 차이 재검토', exact: true }).click();
+  const audit = page.getByRole('region', { name: '판정 차이 재검토' });
+  await audit.getByRole('button', { name: '선택한 문의 v4 실행' }).click();
+  await expect(audit).toContainText('무료 교육을 본 뒤 유료 교육 검토 명시');
+  await expect(audit).toContainText('유료 교육 언급이 있으나 행동 단계는 구매 신호 없음');
+  await expect(audit.getByRole('button', { name: 'v4 저장 완료' })).toBeDisabled();
+  expect(state.snapshot.reviews).toHaveLength(1);
+  expect(state.snapshot.runs).toHaveLength(1);
+  expect(state.snapshot.jev_v4_runs).toHaveLength(1);
 });
 
 test('historical Jev inquiries can be independently labeled in one blind batch', async ({ page }) => {

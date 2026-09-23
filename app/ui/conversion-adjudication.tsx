@@ -53,6 +53,18 @@ const v3FlagLabels: Record<string, string> = {
   paid_failure_without_paid_target: '유료 신청·결제 실패 판정과 행동 대상이 다릅니다.',
   free_failure_without_free_target: '무료 콘텐츠 접근 실패 판정과 행동 대상이 다릅니다.',
 };
+const v4Labels: Record<string, string> = {
+  ...v3Labels,
+  future_consideration_after_free_content: '무료 교육을 본 뒤 유료 교육 검토 명시',
+  paid_program_question: '유료 교육 조건 질문',
+  paid_application_or_payment: '유료 신청·결제 시도 명시',
+  no_paid_reference: '유료 교육 언급 없음',
+};
+const v4FlagLabels: Record<string, string> = {
+  ...v3FlagLabels,
+  paid_reference_without_stage: '유료 교육 언급이 있으나 행동 단계는 구매 신호 없음으로 판정했습니다.',
+  paid_stage_without_reference: '유료 교육 언급이 없으나 행동 단계는 구매 신호가 있다고 판정했습니다.',
+};
 
 function compared(result: JevResult, calibration: JevCalibration, dimension: JevDimension) {
   const answer = result.decisions[dimension];
@@ -60,12 +72,13 @@ function compared(result: JevResult, calibration: JevCalibration, dimension: Jev
   return { predicted, human: calibration[dimension], same: predicted === calibration[dimension], confidence: answer.confidence };
 }
 
-export function ConversionAdjudication({ snapshot, pending, onSave, onRunV2, onRunV3, onRefresh, onSingle }: {
+export function ConversionAdjudication({ snapshot, pending, onSave, onRunV2, onRunV3, onRunV4, onRefresh, onSingle }: {
   snapshot: ConversionSnapshot;
   pending: boolean;
   onSave: (payload: Record<string, unknown>) => Promise<void>;
   onRunV2: (runId: string) => Promise<void>;
   onRunV3: (runId: string) => Promise<void>;
+  onRunV4: (runId: string) => Promise<void>;
   onRefresh: () => Promise<void>;
   onSingle: () => void;
 }) {
@@ -87,6 +100,7 @@ export function ConversionAdjudication({ snapshot, pending, onSave, onRunV2, onR
   const [v2Busy, setV2Busy] = useState(false);
   const [v2Progress, setV2Progress] = useState('');
   const [v3Busy, setV3Busy] = useState(false);
+  const [v4Busy, setV4Busy] = useState(false);
   const selected = candidates.find(item => item.inquiry.id === selectedId) || candidates[0];
   const selectedRows = selected ? dimensions.map(item => ({ ...item, ...compared(selected.result, selected.review.calibration!, item.key) })) : [];
   const activeDimension = (selectedId && selectedRows.find(item => item.key === dimension)) || selectedRows.find(item => !item.same) || selectedRows[0];
@@ -102,6 +116,7 @@ export function ConversionAdjudication({ snapshot, pending, onSave, onRunV2, onR
   const remaining = candidates.filter(item => !v2Completed.has(item.run.id));
   const v2Selected = (snapshot.jev_v2_runs || []).find(item => item.v1_run_id === selected?.run.id);
   const v3Selected = (snapshot.jev_v3_runs || []).find(item => item.v1_run_id === selected?.run.id);
+  const v4Selected = (snapshot.jev_v4_runs || []).find(item => item.v1_run_id === selected?.run.id);
 
   async function runV2Batch() {
     if (v2Busy || pending || !snapshot.capabilities.can_jev_v2 || !remaining.length) return;
@@ -128,6 +143,14 @@ export function ConversionAdjudication({ snapshot, pending, onSave, onRunV2, onR
     try { await onRunV3(selected.run.id); await onRefresh(); }
     catch (cause) { setError((cause as Error).message); await onRefresh(); }
     finally { setV3Busy(false); }
+  }
+
+  async function runV4Selected() {
+    if (!selected || v4Busy || pending || !snapshot.capabilities.can_jev_v4 || v4Selected?.status === 'completed') return;
+    setV4Busy(true); setError('');
+    try { await onRunV4(selected.run.id); await onRefresh(); }
+    catch (cause) { setError((cause as Error).message); await onRefresh(); }
+    finally { setV4Busy(false); }
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -193,6 +216,24 @@ export function ConversionAdjudication({ snapshot, pending, onSave, onRunV2, onR
             {v3Selected.result.consistency_flags.length === 0 && <p className="conversion-muted">판정 간 형식적 충돌은 발견되지 않았습니다. 원문과의 일치 여부는 운영자가 확인해야 합니다.</p>}
           </> : <p className="conversion-muted">v3 결과가 아직 없습니다.</p>}
           <p className="conversion-muted">v3도 고객 응대·CRM·상태 변경에 자동 적용되지 않습니다. 기존 v1·사람 첫 의견·v2 결과는 그대로 보존합니다.</p>
+        </div>}
+        {snapshot.capabilities.can_jev_v4 && <div className="conversion-v2-result">
+          <h4>v4 유료 교육 언급 구분 · 실험 {v4Selected?.status === 'completed' ? '· 저장됨' : v4Selected?.status === 'failed' ? '· 재시도 가능' : v4Selected?.status === 'pending' ? '· 진행 중' : '· 실행 전'}</h4>
+          <p className="conversion-muted">무료 영상에 접근한 행동과 영상을 본 뒤 유료 교육을 검토하겠다는 말을 분리합니다. 선택한 문의만 실행합니다.</p>
+          <AdminButton disabled={pending || v4Busy || v2Busy || v3Busy || v4Selected?.status === 'completed'} onClick={() => void runV4Selected()}>{v4Busy ? '실행 중' : v4Selected?.status === 'completed' ? 'v4 저장 완료' : v4Selected?.status === 'pending' || v4Selected?.status === 'failed' ? '선택한 문의 v4 재시도' : '선택한 문의 v4 실행'}</AdminButton>
+          {v4Selected?.status === 'completed' && v4Selected.result ? <>
+            <dl>
+              <dt>명시한 정보 요청</dt><dd>{v4Labels[v4Selected.result.decisions.information_need.choice]}</dd>
+              <dt>직접 밝힌 구매 장애물</dt><dd>{v4Labels[v4Selected.result.decisions.confirmed_barrier.choice]}</dd>
+              <dt>실제로 시도한 행동 대상</dt><dd>{v4Labels[v4Selected.result.decisions.attempted_action_target.choice]}</dd>
+              <dt>겪은 운영 문제</dt><dd>{v4Labels[v4Selected.result.decisions.operational_issue.choice]}</dd>
+              <dt>유료 교육에 대한 직접 언급</dt><dd>{v4Labels[v4Selected.result.decisions.paid_program_reference.choice]}</dd>
+              <dt>관찰된 유료 구매 행동</dt><dd>{v4Labels[v4Selected.result.decisions.observable_stage.choice]}</dd>
+            </dl>
+            {v4Selected.result.consistency_flags.length > 0 && <p role="alert" className="conversion-alert">판정 간 충돌: {v4Selected.result.consistency_flags.map(flag => v4FlagLabels[flag]).join(' ')} 운영자 검토가 필요합니다.</p>}
+            {v4Selected.result.consistency_flags.length === 0 && <p className="conversion-muted">판정 간 형식적 충돌은 발견되지 않았습니다. 원문과의 일치 여부는 운영자가 확인해야 합니다.</p>}
+          </> : <p className="conversion-muted">v4 결과가 아직 없습니다.</p>}
+          <p className="conversion-muted">v4도 고객 응대·CRM·상태 변경에 자동 적용되지 않습니다. 기존 v1·사람 첫 의견·v2·v3 결과는 그대로 보존합니다.</p>
         </div>}
         {activeDimension && <form onSubmit={event => void submit(event)} className="conversion-adjudication-form">
           <h4>{activeDimension.label} 재검토 의견</h4>

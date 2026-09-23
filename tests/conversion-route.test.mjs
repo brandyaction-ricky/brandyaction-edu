@@ -28,7 +28,7 @@ function harness(options = {}) {
       reads.push(table);
       const query = { select(columns) { selections[table] = columns; return this; }, eq() { return this; }, order() { return this; }, limit() { return this; },
         async maybeSingle() { return { data: options.inquiry || { id: ids.inquiry, course_id: ids.course, cohort_id: null, input_version: 1, subject: '초보', content: '난이도 문의' }, error: null }; },
-        then(resolve) { return Promise.resolve({ data: options.rows?.[table] || [], error: table === 'edu_conversion_adjudication_notes' ? options.notesError || null : null }).then(resolve); } };
+        then(resolve) { return Promise.resolve({ data: options.rows?.[table] || [], error: options.errors?.[table] || (table === 'edu_conversion_adjudication_notes' ? options.notesError || null : null) }).then(resolve); } };
       return query;
     },
     async rpc(name, args) { calls.push({ name, args }); return options.rpcResult || { data: { case: { id: ids.inquiry } }, error: null }; },
@@ -167,6 +167,18 @@ test('snapshot stays available while the separate DEV notes migration is pending
   assert.equal(body.capabilities.can_adjudicate, false);
   const failed = harness({ notesError: { code: '42501', message: 'permission denied' } });
   assert.equal((await failed.GET()).status, 503);
+});
+test('snapshot gates v4 until its separate migration is ready without hiding earlier results', async () => {
+  const h = harness({ errors: { edu_conversion_jev_v4_runs: { code: 'PGRST205', message: 'missing relation' } },
+    rows: { edu_conversion_jev_v3_runs: [{ id: 'saved-v3' }] } });
+  const response = await h.GET();
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.capabilities.can_jev_v4, false);
+  assert.deepEqual(body.jev_v4_runs, []);
+  assert.equal(body.jev_v3_runs[0].id, 'saved-v3');
+  const denied = harness({ errors: { edu_conversion_jev_v4_runs: { code: '42501', message: 'permission denied' } } });
+  assert.equal((await denied.GET()).status, 503);
 });
 test('run history returns the original inquiry and evidence snapshots', async () => {
   const run = { id: ids.question, case_id: ids.inquiry, input_snapshot: { subject: '당시 문의', content: '당시 원문', input_version: 1 }, evidence_snapshot: [{ id: ids.course, version: 1, body: '당시 승인자료' }] };

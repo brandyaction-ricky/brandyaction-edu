@@ -156,6 +156,13 @@ export function ConversionReview({ workspace = false, initialPeriod }: { workspa
     await readResponse(response);
   }
 
+  async function runJevV4(runId: string) {
+    const response = await fetch('/api/conversion/jev-v4', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ v1_run_id: runId }),
+    });
+    await readResponse(response);
+  }
+
   const selected = snapshot?.cases.find(item => item.id === selectedId);
   const canAnalyze = snapshot ? (snapshot.capabilities.can_analyze ?? snapshot.capabilities.can_mock) : false;
   const cases = snapshot?.cases.filter(item => (item.subject + ' ' + item.content).toLowerCase().includes(query.toLowerCase())) || [];
@@ -196,7 +203,7 @@ export function ConversionReview({ workspace = false, initialPeriod }: { workspa
         <AdminButton aria-pressed={inquiryView === 'batch'} disabled={pending} onClick={() => { setInquiryView('batch'); setNotice(''); }}>과거 상담 한 번에 판정</AdminButton>
         {snapshot.capabilities.can_adjudicate && snapshot.reviews.some(item => item.calibration && item.calibration_sample_kind === 'operational') && <AdminButton aria-pressed={inquiryView === 'audit'} disabled={pending} onClick={() => { setInquiryView('audit'); setNotice(''); }}>판정 차이 재검토</AdminButton>}
       </div>}
-      {inquiryView === 'batch' && snapshot.capabilities.can_jev ? <ConversionBatchCalibration snapshot={snapshot} pending={pending} onSave={saveBatch} onSingle={() => setInquiryView('single')} /> : inquiryView === 'audit' && snapshot.capabilities.can_adjudicate ? <ConversionAdjudication snapshot={snapshot} pending={pending} onSave={saveAdjudication} onRunV2={runJevV2} onRunV3={runJevV3} onRefresh={refresh} onSingle={() => setInquiryView('single')} /> : <>
+      {inquiryView === 'batch' && snapshot.capabilities.can_jev ? <ConversionBatchCalibration snapshot={snapshot} pending={pending} onSave={saveBatch} onSingle={() => setInquiryView('single')} /> : inquiryView === 'audit' && snapshot.capabilities.can_adjudicate ? <ConversionAdjudication snapshot={snapshot} pending={pending} onSave={saveAdjudication} onRunV2={runJevV2} onRunV3={runJevV3} onRunV4={runJevV4} onRefresh={refresh} onSingle={() => setInquiryView('single')} /> : <>
       {calibrationSummary && snapshot.runs.some(item => item.provider === 'jev') && <CalibrationOverview summary={calibrationSummary} />}
       <div className="conversion-grid" aria-busy={pending || loading}>
         <AdminSection title="문의" description={`불러온 문의 ${snapshot.cases.length}건`} bordered>

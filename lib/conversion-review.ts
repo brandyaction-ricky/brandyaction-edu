@@ -105,6 +105,18 @@ export type ConversionJevV3Run = {
   updated_at: string;
 };
 
+export type ConversionJevV4Run = {
+  id: string;
+  v1_run_id: string;
+  case_id: string;
+  calibration_review_id: string;
+  input_version: number;
+  status: 'pending' | 'completed' | 'failed';
+  result: import('./conversion-jev-v4').JevV4Result | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ConversionRun = {
   id: string;
   case_id: string;
@@ -153,7 +165,8 @@ export type ConversionSnapshot = {
   adjudications?: ConversionAdjudicationNote[];
   jev_v2_runs?: ConversionJevV2Run[];
   jev_v3_runs?: ConversionJevV3Run[];
-  capabilities: { can_manage_evidence: boolean; can_mock: boolean; can_jev?: boolean; can_adjudicate?: boolean; can_jev_v2?: boolean; can_jev_v3?: boolean; can_analyze?: boolean; analyze_provider?: 'mock' | 'jev' | null; can_manage_funnel?: boolean };
+  jev_v4_runs?: ConversionJevV4Run[];
+  capabilities: { can_manage_evidence: boolean; can_mock: boolean; can_jev?: boolean; can_adjudicate?: boolean; can_jev_v2?: boolean; can_jev_v3?: boolean; can_jev_v4?: boolean; can_analyze?: boolean; analyze_provider?: 'mock' | 'jev' | null; can_manage_funnel?: boolean };
 };
 
 export const MOCK_NOTICE = '모의 판단입니다. 단어 일치로 화면과 기록 흐름을 확인하며, 실제 AI 판단이나 답변 정확도를 검증한 결과가 아닙니다. 모든 내용은 운영자가 확인해야 합니다.';
