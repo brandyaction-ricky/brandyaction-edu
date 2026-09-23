@@ -81,6 +81,7 @@ test('Jev shadow result shows decisions and confidence without triggering anothe
   await page.getByLabel('교정 표본 용도').selectOption('operational');
   await expect(page.getByText('Jev 그림자 판정 · 운영자 확인 필요', { exact: true })).toBeVisible();
   await expect(page.getByText('운영자 독립 판정을 먼저 저장해 주세요.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Jev 그림자 판정 실행', exact: true })).toBeDisabled();
   await expect(page.getByLabel('Jev 전환 판정')).toHaveCount(0);
   await expect(page.getByText(MOCK_NOTICE, { exact: true })).toHaveCount(0);
   await expect(page.getByLabel(/^검토할 설명/)).toHaveCount(0);
@@ -109,6 +110,7 @@ test('first Jev review stores blind operator labels then reveals comparison and 
   await expect(page.getByLabel('Jev 교정 현황')).toContainText('기준 검토까지 실제 문의 19건 남음');
   await expect(page.getByLabel('Jev 교정 현황')).toContainText('구매 의도 일치100%');
   await expect(page.getByLabel(/^검토할 설명/)).toHaveValue('초보자를 대상으로 기초 개념부터 설명합니다.');
+  await expect(page.getByRole('button', { name: 'Jev 그림자 판정 실행', exact: true })).toBeEnabled();
   await expect(page.getByText(MOCK_NOTICE, { exact: true })).toBeVisible();
   expect(state.mutations[1]).toMatchObject({ action: 'review', decision: 'hold', reply_text: '', calibration_sample_kind: 'operational', calibration: { purchase_intent: 'medium', primary_barrier: 'price', purchase_readiness: 3, next_action: 'answer_specific_questions' } });
   expect(state.unexpectedApi).toEqual([]);

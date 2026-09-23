@@ -155,7 +155,7 @@ export function ConversionReview({ workspace = false, initialPeriod }: { workspa
               <p className="conversion-quote">{selected.content}</p>
               {selected.question_id && <Link href="/admin/questions" className="conversion-link">기존 질문함 열기</Link>}
             </AdminSection>
-            <AdminSection title="전환 판정·설명 추천" bordered actions={<AdminButton tone="primary" disabled={pending || !canAnalyze} onClick={() => void mutate({ action: 'analyze', case_id: selected.id, expected_version: selected.input_version }).catch(() => {})}>{pending ? '처리 중' : snapshot.capabilities.analyze_provider === 'jev' ? 'Jev 그림자 판정 실행' : '모의 판단 실행'}</AdminButton>}>
+            <AdminSection title="전환 판정·설명 추천" bordered actions={<AdminButton tone="primary" disabled={pending || !canAnalyze || Boolean(run?.provider === 'jev' && !calibrationRecord && !stale)} onClick={() => void mutate({ action: 'analyze', case_id: selected.id, expected_version: selected.input_version }).catch(() => {})}>{pending ? '처리 중' : snapshot.capabilities.analyze_provider === 'jev' ? 'Jev 그림자 판정 실행' : '모의 판단 실행'}</AdminButton>}>
               {!canAnalyze && <p className="conversion-muted">현재 환경에서는 판정을 실행할 수 없습니다. 설명자료는 직접 검토할 수 있습니다.</p>}
               {run ? <div className="conversion-result">
                 <span className="conversion-tag">{run.provider === 'jev' ? 'Jev 그림자 판정' : '모의 판단'} · 운영자 확인 필요</span>
