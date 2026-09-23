@@ -29,10 +29,14 @@ export async function GET() {
     ];
     const result = await Promise.all(requests);
     for (const item of result) if (item.error) conversionDatabaseError(item.error);
+    const notes = await db.from('edu_conversion_adjudication_notes').select('id,run_id,calibration_review_id,dimension,assessment,basis,rationale,actor_id,created_at').order('created_at', { ascending: false }).limit(500);
+    // Vercel may switch to this code before the develop-branch migration job finishes.
+    const pendingMigration = ['42P01', 'PGRST205'].includes(notes.error?.code || '');
+    if (notes.error && !pendingMigration) conversionDatabaseError(notes.error);
     const [cases, evidence, questions, courses, cohorts, runs, reviews] = result.map(item => item.data || []);
-    return reply({ cases, evidence, questions, courses, cohorts, runs, reviews,
-      capabilities: { can_manage_evidence: user.permissions.products, ...conversionCapabilities(process.env), can_manage_funnel: user.permissions.products && user.permissions.marketing },
-      limits: { cases: 200, evidence: 500, questions: 200, runs: 500, reviews: 500 } });
+    return reply({ cases, evidence, questions, courses, cohorts, runs, reviews, adjudications: notes.data || [],
+      capabilities: { can_manage_evidence: user.permissions.products, ...conversionCapabilities(process.env), can_adjudicate: !pendingMigration && conversionCapabilities(process.env).can_jev, can_manage_funnel: user.permissions.products && user.permissions.marketing },
+      limits: { cases: 200, evidence: 500, questions: 200, runs: 500, reviews: 500, adjudications: 500 } });
   } catch (error) { return failure(error); }
 }
 export async function POST(request: Request) {

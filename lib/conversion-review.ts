@@ -68,6 +68,19 @@ export type JevCalibration = {
   next_action: 'answer_specific_questions' | 'invite_webinar' | 'offer_purchase_info' | 'human_consult' | 'hold_no_contact';
 };
 
+export type JevDimension = keyof JevCalibration;
+export type ConversionAdjudicationNote = {
+  id: string;
+  run_id: string;
+  calibration_review_id: string;
+  dimension: JevDimension;
+  assessment: 'human_better_supported' | 'jev_better_supported' | 'both_plausible' | 'neither_supported' | 'insufficient_evidence';
+  basis: 'explicit_signal' | 'interpretation' | 'category_gap' | 'missing_context';
+  rationale: string;
+  actor_id: string;
+  created_at: string;
+};
+
 export type ConversionRun = {
   id: string;
   case_id: string;
@@ -113,7 +126,8 @@ export type ConversionSnapshot = {
   cohorts: { id: string; course_id: string; name: string }[];
   runs: ConversionRun[];
   reviews: ConversionReviewRecord[];
-  capabilities: { can_manage_evidence: boolean; can_mock: boolean; can_jev?: boolean; can_analyze?: boolean; analyze_provider?: 'mock' | 'jev' | null; can_manage_funnel?: boolean };
+  adjudications?: ConversionAdjudicationNote[];
+  capabilities: { can_manage_evidence: boolean; can_mock: boolean; can_jev?: boolean; can_adjudicate?: boolean; can_analyze?: boolean; analyze_provider?: 'mock' | 'jev' | null; can_manage_funnel?: boolean };
 };
 
 export const MOCK_NOTICE = '모의 판단입니다. 단어 일치로 화면과 기록 흐름을 확인하며, 실제 AI 판단이나 답변 정확도를 검증한 결과가 아닙니다. 모든 내용은 운영자가 확인해야 합니다.';

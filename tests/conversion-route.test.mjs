@@ -28,7 +28,7 @@ function harness(options = {}) {
       reads.push(table);
       const query = { select(columns) { selections[table] = columns; return this; }, eq() { return this; }, order() { return this; }, limit() { return this; },
         async maybeSingle() { return { data: options.inquiry || { id: ids.inquiry, course_id: ids.course, cohort_id: null, input_version: 1, subject: '초보', content: '난이도 문의' }, error: null }; },
-        then(resolve) { return Promise.resolve({ data: options.rows?.[table] || [], error: null }).then(resolve); } };
+        then(resolve) { return Promise.resolve({ data: options.rows?.[table] || [], error: table === 'edu_conversion_adjudication_notes' ? options.notesError || null : null }).then(resolve); } };
       return query;
     },
     async rpc(name, args) { calls.push({ name, args }); return options.rpcResult || { data: { case: { id: ids.inquiry } }, error: null }; },
@@ -158,6 +158,15 @@ test('snapshot contains no orders or profile query and is private no-store', asy
   assert.equal(response.headers.get('Cache-Control'), 'private, no-store');
   assert.equal(h.reads.includes('profiles'), false); assert.equal(h.reads.includes('orders'), false); assert.equal(h.reads.includes('payments'), false);
   const body = await response.json(); assert.equal(body.capabilities.can_mock, true); assert.equal(body.capabilities.can_manage_evidence, true);
+});
+test('snapshot stays available while the separate DEV notes migration is pending', async () => {
+  const h = harness({ notesError: { code: 'PGRST205', message: 'missing relation' } });
+  const response = await h.GET(); assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.deepEqual(body.adjudications, []);
+  assert.equal(body.capabilities.can_adjudicate, false);
+  const failed = harness({ notesError: { code: '42501', message: 'permission denied' } });
+  assert.equal((await failed.GET()).status, 503);
 });
 test('run history returns the original inquiry and evidence snapshots', async () => {
   const run = { id: ids.question, case_id: ids.inquiry, input_snapshot: { subject: '당시 문의', content: '당시 원문', input_version: 1 }, evidence_snapshot: [{ id: ids.course, version: 1, body: '당시 승인자료' }] };

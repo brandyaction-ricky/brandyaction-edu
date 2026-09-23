@@ -14,6 +14,7 @@ import './conversion-review.css';
 import { RecruitmentRoomSettings } from './recruitment-rooms';
 import { RecruitmentFunnel } from './recruitment-funnel';
 import { ConversionBatchCalibration, type BatchCalibrationSubmission } from './conversion-batch-calibration';
+import { ConversionAdjudication } from './conversion-adjudication';
 
 const topicNames: Record<string, string> = { price: '가격', schedule: '일정', content: '교육 내용', level: '수강 수준', usage: '이용 방법' };
 const inquiryNames: Record<string, string> = { prepurchase: '구매 전 상품 질문', support: '이용 지원', payment_refund: '결제·환불', mixed: '여러 종류의 문의', unknown: '판단 불가' };
@@ -35,7 +36,7 @@ async function readResponse(response: Response) {
 
 export function ConversionReview({ workspace = false, initialPeriod }: { workspace?: boolean; initialPeriod?: string }) {
   const [workspaceView, setWorkspaceView] = useState<'recruitment' | 'inquiries'>('recruitment');
-  const [inquiryView, setInquiryView] = useState<'single' | 'batch'>('single');
+  const [inquiryView, setInquiryView] = useState<'single' | 'batch' | 'audit'>('single');
   const [snapshot, setSnapshot] = useState<ConversionSnapshot | null>(null);
   const [selectedId, setSelectedId] = useState('');
   const [query, setQuery] = useState('');
@@ -125,6 +126,22 @@ export function ConversionReview({ workspace = false, initialPeriod }: { workspa
     } finally { setPending(false); }
   }
 
+  async function saveAdjudication(payload: Record<string, unknown>) {
+    setPending(true); setError(''); setNotice('');
+    try {
+      await gate.current(payload, async body => readResponse(await fetch('/api/conversion/adjudication', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      })));
+      await refresh();
+      setNotice('재검토 의견을 별도로 저장했습니다. 처음 독립 판정과 Jev 결과는 유지됩니다.');
+    } catch (cause) {
+      const failure = cause as Error & { status?: number };
+      if ([401, 403].includes(failure.status || 0)) setSnapshot(null);
+      if (failure.status === 409) await refresh();
+      throw cause;
+    } finally { setPending(false); }
+  }
+
   const selected = snapshot?.cases.find(item => item.id === selectedId);
   const canAnalyze = snapshot ? (snapshot.capabilities.can_analyze ?? snapshot.capabilities.can_mock) : false;
   const cases = snapshot?.cases.filter(item => (item.subject + ' ' + item.content).toLowerCase().includes(query.toLowerCase())) || [];
@@ -163,8 +180,9 @@ export function ConversionReview({ workspace = false, initialPeriod }: { workspa
       {snapshot.capabilities.can_jev && <div className="funnel-entry" aria-label="문의 판정 방식">
         <AdminButton aria-pressed={inquiryView === 'single'} disabled={pending} onClick={() => { setInquiryView('single'); setNotice(''); }}>개별 문의 검토</AdminButton>
         <AdminButton aria-pressed={inquiryView === 'batch'} disabled={pending} onClick={() => { setInquiryView('batch'); setNotice(''); }}>과거 상담 한 번에 판정</AdminButton>
+        {snapshot.capabilities.can_adjudicate && snapshot.reviews.some(item => item.calibration && item.calibration_sample_kind === 'operational') && <AdminButton aria-pressed={inquiryView === 'audit'} disabled={pending} onClick={() => { setInquiryView('audit'); setNotice(''); }}>판정 차이 재검토</AdminButton>}
       </div>}
-      {inquiryView === 'batch' && snapshot.capabilities.can_jev ? <ConversionBatchCalibration snapshot={snapshot} pending={pending} onSave={saveBatch} onSingle={() => setInquiryView('single')} /> : <>
+      {inquiryView === 'batch' && snapshot.capabilities.can_jev ? <ConversionBatchCalibration snapshot={snapshot} pending={pending} onSave={saveBatch} onSingle={() => setInquiryView('single')} /> : inquiryView === 'audit' && snapshot.capabilities.can_adjudicate ? <ConversionAdjudication snapshot={snapshot} pending={pending} onSave={saveAdjudication} onSingle={() => setInquiryView('single')} /> : <>
       {calibrationSummary && snapshot.runs.some(item => item.provider === 'jev') && <CalibrationOverview summary={calibrationSummary} />}
       <div className="conversion-grid" aria-busy={pending || loading}>
         <AdminSection title="문의" description={`불러온 문의 ${snapshot.cases.length}건`} bordered>
@@ -301,15 +319,16 @@ function CalibrationOverview({ summary }: { summary: ReturnType<typeof buildJevC
     const value = summary.by_origin[origin][key].rate;
     return value === null ? '표본 없음' : `${Math.round(value * 100)}%`;
   };
-  return <section className="conversion-calibration-overview" aria-label="Jev 교정 현황">
+  return <section className="conversion-calibration-overview" aria-label="사람과 Jev 선택 비교">
     <div><span>실제 문의 표본</span><strong>{summary.samples}건</strong><small>현재 {summary.current_samples} · 과거 {summary.legacy_samples}</small></div>
     <div><span>검수용 표본</span><strong>{summary.test_samples}건</strong></div>
-    <div><span>구매 의도 일치</span><strong>{rate('purchase_intent')}</strong></div>
-    <div><span>장애물 일치</span><strong>{rate('primary_barrier')}</strong></div>
-    <div><span>준비도 일치</span><strong>{rate('purchase_readiness')}</strong></div>
-    <div><span>다음 행동 일치</span><strong>{rate('next_action')}</strong></div>
+    <div><span>의도 선택 일치</span><strong>{rate('purchase_intent')}</strong></div>
+    <div><span>장애물 선택 일치</span><strong>{rate('primary_barrier')}</strong></div>
+    <div><span>준비도 선택 일치</span><strong>{rate('purchase_readiness')}</strong></div>
+    <div><span>행동 선택 일치</span><strong>{rate('next_action')}</strong></div>
+    <p>첫 사람 의견과 Jev의 선택이 같은 비율입니다. 한 사람의 판정을 정답으로 삼은 정확도가 아닙니다. Jev 표시 신뢰도도 검증된 정답 확률이 아닙니다.</p>
     {summary.samples > 0 && <p>출처별 일치율 · 현재 교육: 의도 {originRate('current', 'purchase_intent')}, 장애물 {originRate('current', 'primary_barrier')}, 준비도 {originRate('current', 'purchase_readiness')}, 행동 {originRate('current', 'next_action')} · 과거 교육: 의도 {originRate('external_legacy', 'purchase_intent')}, 장애물 {originRate('external_legacy', 'primary_barrier')}, 준비도 {originRate('external_legacy', 'purchase_readiness')}, 행동 {originRate('external_legacy', 'next_action')}</p>}
-    <p>문의별 처음 저장한 독립 판정만 집계합니다. 낮은 신뢰도(70% 미만)에서 불일치 {summary.low_confidence_disagreements}항목 · 기준 검토까지 실제 문의 {summary.remaining_for_threshold_review}건 남음(최소 {summary.minimum_samples}건). 과거 상담을 포함한 합산 표본은 4기 성과 검증을 대신하지 않으며, 기준은 자동으로 바뀌지 않습니다.</p>
+    <p>문의별 처음 저장한 독립 판정만 집계합니다. 신뢰도 70% 미만의 선택 차이 {summary.low_confidence_disagreements}항목 · 기준 검토용 최소 표본까지 {summary.remaining_for_threshold_review}건 남음(최소 {summary.minimum_samples}건). 최소 표본 달성은 성능 통과가 아닙니다. 과거 상담은 4기 성과 검증을 대신하지 않으며, 기준은 자동으로 바뀌지 않습니다.</p>
   </section>;
 }
 

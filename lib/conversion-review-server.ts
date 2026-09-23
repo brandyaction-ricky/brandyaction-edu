@@ -98,6 +98,26 @@ export function conversionPayload(raw: unknown) {
   return { action, requestId, payload, payload_hash };
 }
 
+export function conversionAdjudicationPayload(raw: unknown) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) conversionError('요청 형식을 확인해 주세요.');
+  const body = raw as Record<string, unknown>;
+  const requestId = conversionId(body.requestId)!;
+  const runId = conversionId(body.run_id)!;
+  const calibrationReviewId = conversionId(body.calibration_review_id)!;
+  const dimension = String(body.dimension || '');
+  const assessment = String(body.assessment || '');
+  const basis = String(body.basis || '');
+  const rationale = text(body.rationale, 1000);
+  if (!['purchase_intent', 'primary_barrier', 'purchase_readiness', 'next_action'].includes(dimension)
+    || !['human_better_supported', 'jev_better_supported', 'both_plausible', 'neither_supported', 'insufficient_evidence'].includes(assessment)
+    || !['explicit_signal', 'interpretation', 'category_gap', 'missing_context'].includes(basis)
+    || rationale.length < 10) conversionError('재검토 항목과 근거를 확인해 주세요.');
+  if (containsDirectIdentifier(rationale)) conversionError('재검토 근거에서 연락처·이메일·링크를 제거해 주세요.');
+  const payload = { run_id: runId, calibration_review_id: calibrationReviewId, dimension, assessment, basis, rationale };
+  const payloadHash = createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+  return { requestId, payload, payloadHash };
+}
+
 export function conversionDatabaseError(error: { code?: string; message?: string }) {
   const message = error.message || '';
   if (message.includes('CONVERSION_FORBIDDEN')) conversionError('이 작업에 필요한 운영 권한이 없습니다.', 403);
