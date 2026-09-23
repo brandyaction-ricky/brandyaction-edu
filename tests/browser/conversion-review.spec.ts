@@ -19,22 +19,30 @@ function initialSnapshot(): ConversionSnapshot {
       source_url: 'https://example.test/course-guide', version: 1, status: 'approved' }],
     courses: [{ id: courseId, title: '합성 교육 상품' }],
     cohorts: [{ id: '44444444-4444-4444-8444-444444444444', course_id: courseId, name: '합성 1기' }],
-    questions: [], runs: [], reviews: [], capabilities: { can_manage_evidence: true, can_mock: true },
+    questions: [], runs: [], reviews: [], adjudications: [], capabilities: { can_manage_evidence: true, can_mock: true },
   };
 }
 
 async function fixture(page: Page, provider: 'mock' | 'jev' = 'mock') {
   const snapshot = initialSnapshot();
-  if (provider === 'jev') snapshot.capabilities = { ...snapshot.capabilities, can_jev: true, can_analyze: true, analyze_provider: 'jev' };
+  if (provider === 'jev') snapshot.capabilities = { ...snapshot.capabilities, can_jev: true, can_adjudicate: true, can_analyze: true, analyze_provider: 'jev' };
   const mutations: Record<string, unknown>[] = [];
   const unexpectedApi: string[] = [];
   let forbidden = false;
   await page.route('**/api/**', async route => {
-    if (new URL(route.request().url()).pathname !== '/api/conversion') {
+    const pathname = new URL(route.request().url()).pathname;
+    if (!['/api/conversion', '/api/conversion/adjudication'].includes(pathname)) {
       unexpectedApi.push(route.request().url());
       await route.fulfill({ status: 405, json: { error: '검증에 허용되지 않은 API입니다.' } }); return;
     }
     if (forbidden) { await route.fulfill({ status: 403, json: { error: '전환 관리 접근 권한이 없습니다.' } }); return; }
+    if (pathname === '/api/conversion/adjudication') {
+      const body = route.request().postDataJSON();
+      mutations.push(body);
+      const note = { id: `adjudication-${snapshot.adjudications!.length + 1}`, ...body, actor_id: 'synthetic-operator', created_at: timestamp };
+      snapshot.adjudications!.push(note);
+      await route.fulfill({ json: { ok: true, note } }); return;
+    }
     if (route.request().method() === 'GET') { await route.fulfill({ json: snapshot }); return; }
     const body = route.request().postDataJSON();
     mutations.push(body);
@@ -105,14 +113,39 @@ test('first Jev review stores blind operator labels then reveals comparison and 
   await expect(result).toContainText('구매 의도중간신뢰도 97%');
   await expect(result).toContainText('주요 장애물수강 수준신뢰도 82%');
   await expect(page.getByLabel('사람과 Jev 비교')).toContainText('구매 의도사람 중간Jev 중간일치');
-  await expect(page.getByLabel('Jev 교정 현황')).toContainText('실제 문의 표본1건');
-  await expect(page.getByLabel('Jev 교정 현황')).toContainText('검수용 표본0건');
-  await expect(page.getByLabel('Jev 교정 현황')).toContainText('기준 검토까지 실제 문의 19건 남음');
-  await expect(page.getByLabel('Jev 교정 현황')).toContainText('구매 의도 일치100%');
+  await expect(page.getByLabel('사람과 Jev 선택 비교')).toContainText('실제 문의 표본1건');
+  await expect(page.getByLabel('사람과 Jev 선택 비교')).toContainText('검수용 표본0건');
+  await expect(page.getByLabel('사람과 Jev 선택 비교')).toContainText('기준 검토용 최소 표본까지 19건 남음');
+  await expect(page.getByLabel('사람과 Jev 선택 비교')).toContainText('의도 선택 일치100%');
   await expect(page.getByLabel(/^검토할 설명/)).toHaveValue('초보자를 대상으로 기초 개념부터 설명합니다.');
   await expect(page.getByRole('button', { name: 'Jev 그림자 판정 실행', exact: true })).toBeEnabled();
   await expect(page.getByText(MOCK_NOTICE, { exact: true })).toBeVisible();
   expect(state.mutations[1]).toMatchObject({ action: 'review', decision: 'hold', reply_text: '', calibration_sample_kind: 'operational', calibration: { purchase_intent: 'medium', primary_barrier: 'price', purchase_readiness: 3, next_action: 'answer_specific_questions' } });
+  expect(state.unexpectedApi).toEqual([]);
+});
+
+test('disagreement review records a separate reason while preserving the first labels', async ({ page }) => {
+  const state = await fixture(page, 'jev');
+  await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
+  await page.getByRole('button', { name: 'Jev 그림자 판정 실행', exact: true }).click();
+  await page.getByLabel('교정 표본 용도').selectOption('operational');
+  await page.getByLabel('사람 판단 · 구매 의도').selectOption('medium');
+  await page.getByLabel('사람 판단 · 주요 장애물').selectOption('price');
+  await page.getByLabel('사람 판단 · 구매 준비도').selectOption('3');
+  await page.getByLabel('사람 판단 · 다음 행동').selectOption('answer_specific_questions');
+  await page.getByRole('button', { name: '독립 판정 저장', exact: true }).click();
+  await page.getByRole('button', { name: '판정 차이 재검토', exact: true }).click();
+  const audit = page.getByRole('region', { name: '판정 차이 재검토' });
+  await expect(audit).toContainText('실제 문의 1건 · 의견 차이 1항목');
+  await expect(audit.getByLabel('항목별 첫 의견 비교')).toContainText('사람 가격Jev 수강 수준 · 표시 신뢰도 82%의견 차이');
+  await audit.getByRole('combobox', { name: '재검토 결론' }).selectOption('both_plausible');
+  await audit.getByRole('combobox', { name: '판단의 근거 유형' }).selectOption('category_gap');
+  await audit.getByRole('textbox', { name: '근거와 남은 불확실성' }).fill('문의에는 초보 수준과 녹화 여부가 함께 있어 구매 장애물을 하나로 단정하기 어렵습니다.');
+  await audit.getByRole('button', { name: '재검토 의견 저장' }).click();
+  await expect(audit).toContainText('재검토 의견이 있는 차이 1항목');
+  await expect(audit).toContainText('두 해석 모두 가능');
+  expect(state.snapshot.reviews).toHaveLength(1);
+  expect(state.snapshot.adjudications).toHaveLength(1);
   expect(state.unexpectedApi).toEqual([]);
 });
 
@@ -140,7 +173,7 @@ test('historical Jev inquiries can be independently labeled in one blind batch',
   const batch = page.getByRole('region', { name: '과거 상담 일괄 독립 판정' });
   await expect(batch).toContainText('판정 대기 2건');
   await expect(batch).not.toContainText('[DEV 검증]');
-  await expect(page.getByLabel('Jev 교정 현황')).toHaveCount(0);
+  await expect(page.getByLabel('사람과 Jev 선택 비교')).toHaveCount(0);
   await expect(page.getByLabel('Jev 전환 판정')).toHaveCount(0);
   await expect(page.getByText('Jev 판단·제안 답변·일치율은 이 화면에 표시하지 않습니다.')).toBeVisible();
   for (let index = 1; index <= 2; index++) {
@@ -153,7 +186,7 @@ test('historical Jev inquiries can be independently labeled in one blind batch',
   await batch.getByRole('button', { name: '입력 완료 2건 한 번에 저장' }).click();
   await expect(batch).toContainText('일괄 판정할 상담이 없습니다.');
   await expect(page.getByText('과거 상담 2건의 독립 판정을 저장했습니다. 고객에게 메시지를 보내지 않았습니다.')).toBeVisible();
-  await expect(page.getByLabel('Jev 교정 현황')).toHaveCount(0);
+  await expect(page.getByLabel('사람과 Jev 선택 비교')).toHaveCount(0);
   expect(state.mutations.map(item => item.action)).toEqual(['review', 'review']);
   for (const mutation of state.mutations) expect(mutation).toMatchObject({
     decision: 'hold', reply_text: '', calibration_sample_kind: 'operational',
@@ -161,7 +194,7 @@ test('historical Jev inquiries can be independently labeled in one blind batch',
   });
   expect(state.unexpectedApi).toEqual([]);
   await batch.getByRole('button', { name: '개별 검토로 돌아가기' }).click();
-  await expect(page.getByLabel('Jev 교정 현황')).toContainText('실제 문의 표본2건');
+  await expect(page.getByLabel('사람과 Jev 선택 비교')).toContainText('실제 문의 표본2건');
 });
 
 async function selectAndAnalyze(page: Page) {
