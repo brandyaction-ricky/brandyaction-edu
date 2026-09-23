@@ -138,6 +138,7 @@ test('disagreement review records a separate reason while preserving the first l
   const audit = page.getByRole('region', { name: '판정 차이 재검토' });
   await expect(audit).toContainText('실제 문의 1건 · 의견 차이 1항목');
   await expect(audit.getByLabel('항목별 첫 의견 비교')).toContainText('사람 가격Jev 수강 수준 · 표시 신뢰도 82%의견 차이');
+  await expect(audit.getByLabel('항목별 첫 의견 비교')).toContainText('사람 3/4Jev 2.8/4 (비교 범주 3) · 표시 신뢰도 88%같은 선택');
   await audit.getByRole('combobox', { name: '재검토 결론' }).selectOption('both_plausible');
   await audit.getByRole('combobox', { name: '판단의 근거 유형' }).selectOption('category_gap');
   await audit.getByRole('textbox', { name: '근거와 남은 불확실성' }).fill('문의에는 초보 수준과 녹화 여부가 함께 있어 구매 장애물을 하나로 단정하기 어렵습니다.');

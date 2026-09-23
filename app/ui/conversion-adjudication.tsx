@@ -99,7 +99,7 @@ export function ConversionAdjudication({ snapshot, pending, onSave, onSingle }: 
         {isRunStale(selected.run, selected.inquiry, snapshot.evidence) && <p role="alert" className="conversion-alert">문의나 자료가 변경됐습니다. 이 기록에는 재검토 의견을 저장할 수 없습니다.</p>}
         <div className="conversion-adjudication-rows" aria-label="항목별 첫 의견 비교">
           {selectedRows.map(item => <button type="button" key={item.key} className={activeDimension?.key === item.key ? 'is-selected' : ''} aria-pressed={activeDimension?.key === item.key} onClick={() => { setDimension(item.key); setAssessment(''); setBasis(''); setRationale(''); setError(''); }}>
-            <strong>{item.label}</strong><span>사람 {choiceNames[String(item.human)] || `${item.human}/4`}</span><span>Jev {choiceNames[String(item.predicted)] || `${item.predicted}/4`} · 표시 신뢰도 {Math.round(item.confidence * 100)}%</span><b>{item.same ? '같은 선택' : '의견 차이'}</b>
+            <strong>{item.label}</strong><span>사람 {item.key === 'purchase_readiness' ? `${item.human}/4` : choiceNames[String(item.human)]}</span><span>Jev {item.key === 'purchase_readiness' ? `${selected.result.decisions.purchase_readiness.score.toFixed(1)}/4 (비교 범주 ${item.predicted})` : choiceNames[String(item.predicted)]} · 표시 신뢰도 {Math.round(item.confidence * 100)}%</span><b>{item.same ? '같은 선택' : '의견 차이'}</b>
           </button>)}
         </div>
         {activeDimension && <form onSubmit={event => void submit(event)} className="conversion-adjudication-form">
