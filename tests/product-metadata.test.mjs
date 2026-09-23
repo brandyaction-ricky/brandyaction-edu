@@ -127,6 +127,7 @@ test('CTA settings round-trip without clearing existing codes, metadata or resou
   assert.equal(ctaTextColor('#FFFFFF'), '#111111');
   assert.equal(ctaTextColor('#000000'), '#ffffff');
   assert.equal(productCtaPosition('https://example.com/join', 'sticky_cta'), 'sticky_cta');
+  assert.equal(productCtaPosition('/join/synthetic/organic', 'detail_cta'), 'detail_cta');
   assert.equal(productCtaPosition('https://open.kakao.com/o/testRoom'), 'detail_cta');
   assert.equal(productCtaPosition('https://open.kakao.com.attacker.example/o/testRoom'), '');
   assert.equal(productCtaPosition('javascript:alert(1)'), '');
