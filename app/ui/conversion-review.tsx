@@ -13,6 +13,7 @@ import {
 import './conversion-review.css';
 import { RecruitmentRoomSettings } from './recruitment-rooms';
 import { RecruitmentFunnel } from './recruitment-funnel';
+import { ConversionBatchCalibration, type BatchCalibrationSubmission } from './conversion-batch-calibration';
 
 const topicNames: Record<string, string> = { price: '가격', schedule: '일정', content: '교육 내용', level: '수강 수준', usage: '이용 방법' };
 const inquiryNames: Record<string, string> = { prepurchase: '구매 전 상품 질문', support: '이용 지원', payment_refund: '결제·환불', mixed: '여러 종류의 문의', unknown: '판단 불가' };
@@ -34,6 +35,7 @@ async function readResponse(response: Response) {
 
 export function ConversionReview({ workspace = false, initialPeriod }: { workspace?: boolean; initialPeriod?: string }) {
   const [workspaceView, setWorkspaceView] = useState<'recruitment' | 'inquiries'>('recruitment');
+  const [inquiryView, setInquiryView] = useState<'single' | 'batch'>('single');
   const [snapshot, setSnapshot] = useState<ConversionSnapshot | null>(null);
   const [selectedId, setSelectedId] = useState('');
   const [query, setQuery] = useState('');
@@ -85,7 +87,7 @@ export function ConversionReview({ workspace = false, initialPeriod }: { workspa
       const notices: Record<string, string> = {
         save_case: '문의 정보를 저장했습니다.',
         save_evidence: '설명자료를 저장했습니다.',
-        analyze: snapshot?.capabilities.analyze_provider === 'jev' ? 'Jev 그림자 판정을 저장했습니다. 결과와 설명을 확인해 주세요.' : '모의 판단을 저장했습니다. 설명을 확인한 뒤 검토 결정을 남겨 주세요.',
+        analyze: snapshot?.capabilities.analyze_provider === 'jev' ? 'Jev 그림자 판정을 저장했습니다. 문의 원문만 보고 운영자 독립 판정을 먼저 남겨 주세요.' : '모의 판단을 저장했습니다. 설명을 확인한 뒤 검토 결정을 남겨 주세요.',
         review: '검토 기록을 저장했습니다. 고객에게 전달된 답변은 아닙니다.',
       };
       setNotice(notices[String(payload.action)] || '저장했습니다.');
@@ -98,6 +100,30 @@ export function ConversionReview({ workspace = false, initialPeriod }: { workspa
       throw cause;
     } finally { setPending(false); }
   };
+
+  async function saveBatch(items: BatchCalibrationSubmission[]) {
+    if (pending || !items.length) return;
+    setPending(true); setError(''); setNotice('');
+    let saved = 0;
+    try {
+      for (const item of items) {
+        await gate.current({ action: 'review', case_id: item.caseId, run_id: item.runId,
+          decision: 'hold', reply_text: '', reason: 'Jev 결과 확인 전 독립 판정',
+          calibration: item.calibration, calibration_sample_kind: 'operational' },
+        async body => readResponse(await fetch('/api/conversion', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        })));
+        saved += 1;
+      }
+      await refresh();
+      setNotice(`과거 상담 ${saved}건의 독립 판정을 저장했습니다. 고객에게 메시지를 보내지 않았습니다.`);
+    } catch (cause) {
+      const failure = cause as Error & { status?: number };
+      if ([401, 403].includes(failure.status || 0)) { setSnapshot(null); setDrawer(null); }
+      else if (saved || failure.status === 409) await refresh();
+      throw new Error(`${saved}건 저장 후 중단되었습니다. ${failure.message} 저장된 건은 다시 제출하지 않습니다.`);
+    } finally { setPending(false); }
+  }
 
   const selected = snapshot?.cases.find(item => item.id === selectedId);
   const canAnalyze = snapshot ? (snapshot.capabilities.can_analyze ?? snapshot.capabilities.can_mock) : false;
@@ -134,6 +160,11 @@ export function ConversionReview({ workspace = false, initialPeriod }: { workspa
 </>}
       <div hidden={workspace && workspaceView !== 'inquiries'}>
       <div className="conversion-intro"><span className="conversion-tag">운영자 검토</span><p>설명 추천과 고객 답변을 구분해서 관리합니다. 이 화면에 저장한 내용은 자동 발송되지 않습니다.</p></div>
+      {snapshot.capabilities.can_jev && <div className="funnel-entry" aria-label="문의 판정 방식">
+        <AdminButton aria-pressed={inquiryView === 'single'} disabled={pending} onClick={() => { setInquiryView('single'); setNotice(''); }}>개별 문의 검토</AdminButton>
+        <AdminButton aria-pressed={inquiryView === 'batch'} disabled={pending} onClick={() => { setInquiryView('batch'); setNotice(''); }}>과거 상담 한 번에 판정</AdminButton>
+      </div>}
+      {inquiryView === 'batch' && snapshot.capabilities.can_jev ? <ConversionBatchCalibration snapshot={snapshot} pending={pending} onSave={saveBatch} onSingle={() => setInquiryView('single')} /> : <>
       {calibrationSummary && snapshot.runs.some(item => item.provider === 'jev') && <CalibrationOverview summary={calibrationSummary} />}
       <div className="conversion-grid" aria-busy={pending || loading}>
         <AdminSection title="문의" description={`불러온 문의 ${snapshot.cases.length}건`} bordered>
@@ -200,6 +231,7 @@ export function ConversionReview({ workspace = false, initialPeriod }: { workspa
           <div className="conversion-next"><strong>구매·환불 결과</strong><p>주문 연결은 준비 중입니다. 현재 화면의 기록으로 구매 성과를 계산하지 않습니다.</p></div>
         </AdminSection>
       </div>
+      </>}
       </div>
       {drawer === 'case' && <AdminDrawer title={editingCase ? '문의 정보 수정' : '문의 연결'} onClose={() => { if (!pending) setDrawer(null); }}>
         <CaseForm key={editingCase?.id || 'new'} snapshot={snapshot} item={editingCase} pending={pending} mutate={mutate} onSaved={id => { setSelectedId(id); setDrawer(null); }} />

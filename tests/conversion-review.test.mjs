@@ -9,7 +9,7 @@ const exports = {};
 new Function('exports', ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText)(exports);
-const { createMockJudgment, isEvidenceInScope, evidenceVersions, isRunStale, buildJevCalibrationSummary, calibrationForRun, MOCK_NOTICE } = exports;
+const { createMockJudgment, isEvidenceInScope, evidenceVersions, isRunStale, buildJevCalibrationSummary, calibrationForRun, historicalCalibrationQueue, MOCK_NOTICE } = exports;
 
 const inquiry = {
   id: 'case-1', source_type: 'manual', sample_origin: 'current', legacy_course_label: null, question_id: null, course_id: 'course-a', cohort_id: 'cohort-a',
@@ -160,6 +160,24 @@ test('new approved candidates invalidate a run even when the mock does not selec
   assert.equal(isRunStale(run, inquiry, [evidence, unrelated]), true);
   assert.equal(isRunStale(run, inquiry, [evidence, { ...unrelated, status: 'draft' }]), false);
   assert.equal(isRunStale(run, inquiry, [evidence, { ...unrelated, course_id: 'other' }]), false);
+});
+
+test('blind batch queue includes only latest fresh, uncalibrated historical Jev runs', () => {
+  const historical = { ...inquiry, id: 'legacy-1', sample_origin: 'external_legacy', course_id: null, cohort_id: null, legacy_course_label: '과거 교육' };
+  const second = { ...historical, id: 'legacy-2', received_at: '2026-09-21T00:00:00.000Z' };
+  const old = { ...runFor(historical, []), id: 'run-old', provider: 'jev' };
+  const latest = { ...old, id: 'run-latest', created_at: '2026-09-21T00:00:01.000Z' };
+  const other = { ...runFor(second, []), id: 'run-other', provider: 'jev' };
+  const cases = [inquiry, historical, second, { ...historical, id: 'dev-test', subject: '[DEV 검증] 합성 상담' },
+    { ...historical, id: 'stale', input_version: 2 }, { ...historical, id: 'mock-only' }, { ...historical, id: 'already-reviewed' }];
+  const runs = [runFor(inquiry), old, latest, other,
+    { ...old, id: 'run-dev', case_id: 'dev-test' }, { ...old, id: 'run-stale', case_id: 'stale' },
+    { ...old, id: 'run-mock', case_id: 'mock-only', provider: 'mock' },
+    { ...old, id: 'run-reviewed', case_id: 'already-reviewed' }];
+  const queue = historicalCalibrationQueue({ cases, runs, evidence: [], reviews: [
+    { case_id: 'already-reviewed', run_id: 'run-reviewed', calibration: { purchase_intent: 'high' } },
+  ] });
+  assert.deepEqual(queue.map(item => item.run.id), ['run-latest', 'run-other']);
 });
 
 test('support and refund inquiry classification stays visibly within the demo result', () => {

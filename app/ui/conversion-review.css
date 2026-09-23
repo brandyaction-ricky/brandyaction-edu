@@ -43,3 +43,16 @@
 .conversion-comparison{display:grid;gap:0;margin:16px 0;border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden}.conversion-comparison>strong{padding:14px;background:#f7f8f7}.conversion-comparison>div{display:grid;grid-template-columns:1.1fr 1.4fr 1.4fr auto;gap:10px;align-items:center;padding:11px 14px;border-top:1px solid var(--line);font-size:var(--type-small)}.conversion-comparison b{padding:3px 8px;border-radius:999px}.conversion-comparison .is-match{color:#166534;background:#dcfce7}.conversion-comparison .is-different{color:#92400e;background:#fef3c7}
 @media(max-width:720px){.conversion-jev-grid{grid-template-columns:1fr}}
 @media(max-width:720px){.conversion-calibration-overview{grid-template-columns:repeat(2,minmax(0,1fr))}.conversion-comparison>div{grid-template-columns:1fr}.conversion-comparison b{justify-self:start}}
+.conversion-batch { min-width: 0; }
+.conversion-batch-progress { margin: 16px 0 22px; padding: 12px 16px; border-radius: var(--radius-sm, 8px); background: #f3f7f4; color: #395348; line-height: 1.7; }
+.conversion-batch-list { display: grid; gap: 16px; }
+.conversion-batch-card { min-width: 0; padding: 18px; border: 1px solid var(--admin-border, #e1e6e3); border-radius: var(--radius-sm, 8px); background: #fff; }
+.conversion-batch-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.conversion-batch-heading strong { overflow-wrap: anywhere; }
+.conversion-batch-heading .conversion-muted { margin-left: auto; }
+.conversion-batch-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.conversion-batch-actions { position: sticky; bottom: 12px; z-index: 1; display: grid; justify-items: start; gap: 10px; margin-top: 20px; padding: 18px; border: 1px solid #cfd9d4; border-radius: var(--radius-sm, 8px); background: #f7faf8; box-shadow: 0 8px 24px #20252414; }
+.conversion-batch-actions p { margin: 0; }
+.conversion-batch-confirm { display: flex; align-items: flex-start; gap: 10px; line-height: 1.6; cursor: pointer; }
+.conversion-batch-confirm input { flex: none; margin-top: 5px; }
+@media(max-width:700px){.conversion-batch-fields{grid-template-columns:minmax(0,1fr)}.conversion-batch-card{padding:14px}.conversion-batch-heading .conversion-muted{margin-left:0;width:100%}.conversion-batch-actions{bottom:0;padding:14px}}
