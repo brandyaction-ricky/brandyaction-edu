@@ -230,7 +230,7 @@ function StandardProductDetail({
           <h1 className="sr-only">{t(c, "title")} · 무료 클래스</h1>
           <div className="free-body">
             <div className="free-sheet">
-              {documentSource || detailHtml ? <ProductDetailHtml html={detailHtml} documentSource={documentSource} /> : detailImage ? (
+              {documentSource || detailHtml ? <ProductDetailHtml html={detailHtml} documentSource={documentSource} ctaUrl={conversion.url} /> : detailImage ? (
                 <div className="detail-image-stack">{detailImages.map((image, index) => <img
                   className="detail-image"
                   src={image.path}
