@@ -65,8 +65,75 @@ import { OrderResult } from "./order-result";
 import { SiteFooter } from "./final/site-footer";
 import { HomeHero } from "./final/home-hero";
 import { MarketingWorkspaceNav } from "./marketing-workspace-nav";
-import { ConversionReview } from "./conversion-review";
+import { ConversionReview, prefetchConversionReview } from "./conversion-review";
 type Data = Record<string, Row[]>;
+type AdminRead = {
+  ok: boolean;
+  status: number;
+  result: Record<string, unknown>;
+  serverTiming: string | null;
+};
+const adminNavigationReads = new Map<
+  string,
+  { expiresAt: number; promise: Promise<AdminRead> }
+>();
+
+function readAdminSection(
+  userId: string,
+  section: string,
+  page: number,
+  record = "",
+  forceNetwork = false,
+) {
+  const key = `${userId}:${section}:${page}:${record}`;
+  const cached = adminNavigationReads.get(key);
+  if (!forceNetwork && cached && (!cached.expiresAt || cached.expiresAt > Date.now()))
+    return cached.promise;
+  if (cached) adminNavigationReads.delete(key);
+
+  const query = new URLSearchParams({
+    admin: "1",
+    section,
+    page: String(page),
+  });
+  if (record) query.set("record", record);
+  const entry = {
+    expiresAt: 0,
+    promise: fetch(`/api/platform?${query}`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(10000),
+    }).then(
+      async (response): Promise<AdminRead> => ({
+        ok: response.ok,
+        status: response.status,
+        result: await response.json(),
+        serverTiming: response.headers.get("Server-Timing"),
+      }),
+    ),
+  };
+  adminNavigationReads.set(key, entry);
+  void entry.promise.then(
+    (read) => {
+      if (adminNavigationReads.get(key) !== entry) return;
+      if (!read.ok || (read.result.user as User | null)?.id !== userId) {
+        adminNavigationReads.delete(key);
+        return;
+      }
+      entry.expiresAt = Date.now() + 5000;
+    },
+    () => {
+      if (adminNavigationReads.get(key) === entry)
+        adminNavigationReads.delete(key);
+    },
+  );
+  while (adminNavigationReads.size > 20) {
+    const oldestKey = adminNavigationReads.keys().next().value;
+    if (oldestKey) adminNavigationReads.delete(oldestKey);
+    else break;
+  }
+  return entry.promise;
+}
+
 // Preserve only the last server-verified operator identity during client-side
 // admin navigation. Every read and write is still authorized by the server.
 let cachedAdminUser: User | null = null;
@@ -150,7 +217,7 @@ export function Platform({
           ? update(current.section === adminSection ? current.page : 1)
           : update,
     }));
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (forceNetwork = false) => {
     readRequest.current?.abort();
     const controller = new AbortController();
     readRequest.current = controller;
@@ -159,25 +226,39 @@ export function Platform({
     setAccessDenied(false);
     try {
       const started = performance.now();
-      const response = await fetch(
-        "/api/platform" +
-          (admin
-            ? "?admin=1&section=" +
-              encodeURIComponent(adminSection) +
-              "&page=" +
-              adminPage +
-              (editorRecordId
-                ? "&record=" + encodeURIComponent(editorRecordId)
-                : "")
-            : ""),
-        { cache: "no-store", signal: controller.signal },
-      );
-      const result = await response.json();
+      const response = admin
+        ? await readAdminSection(
+            cachedAdminUser?.id || "anonymous",
+            adminSection,
+            adminPage,
+            editorRecordId,
+            forceNetwork,
+          )
+        : await (async () => {
+            const response = await fetch("/api/platform", {
+              cache: "no-store",
+              signal: controller.signal,
+            });
+            return {
+              ok: response.ok,
+              status: response.status,
+              result: await response.json(),
+              serverTiming: response.headers.get("Server-Timing"),
+            };
+          })();
+      const result = response.result as {
+        user: User | null;
+        data?: Data;
+        support?: { email: string; url: string };
+        pagination?: { page: number; pageSize: number; total: number } | null;
+        error?: string;
+      };
       if (admin && process.env.NEXT_PUBLIC_APP_ENV !== "production") {
-        console.debug("[edu navigation] " + JSON.stringify({ section: adminSection, durationMs: Math.round(performance.now() - started), serverTiming: response.headers.get("Server-Timing") }));
+        console.debug("[edu navigation] " + JSON.stringify({ section: adminSection, durationMs: Math.round(performance.now() - started), serverTiming: response.serverTiming }));
       }
       if (controller.signal.aborted || !alive.current) return;
       if (admin && [401, 403].includes(response.status)) {
+        adminNavigationReads.clear();
         cachedAdminUser = result.user || null;
         setUser(cachedAdminUser);
         setData({});
@@ -186,10 +267,14 @@ export function Platform({
       }
       if (!response.ok) throw new Error(result.error);
       if (alive.current) {
-        setData(result.data);
+        setData(result.data || {});
         setLoadedSection(adminSection);
         setSupport(result.support || { email: "", url: "" });
-        if (admin) cachedAdminUser = result.user;
+        if (admin) {
+          if (cachedAdminUser?.id !== result.user?.id)
+            adminNavigationReads.clear();
+          cachedAdminUser = result.user || null;
+        }
         setUser(result.user);
         setPagination(result.pagination || null);
       }
@@ -199,6 +284,16 @@ export function Platform({
       if (alive.current && !controller.signal.aborted) setLoading(false);
     }
   }, [admin, adminPage, adminSection, editorRecordId]);
+  const prefetchAdminSection = useCallback(
+    (section: string) => {
+      if (!admin || !user?.id || section === adminSection) return;
+      const page =
+        adminPaging.section === section ? adminPaging.page : 1;
+      void readAdminSection(user.id, section, page);
+      if (section === "conversion") prefetchConversionReview(user.id);
+    },
+    [admin, adminPaging, adminSection, user?.id],
+  );
   useEffect(() => {
     alive.current = true;
     const timer = setTimeout(() => void refresh(), 0);
@@ -229,7 +324,8 @@ export function Platform({
         const result = await response.json();
         if (!response.ok) throw new Error(result.error);
         setNotice(result.message || success);
-        await refresh();
+        adminNavigationReads.clear();
+        await refresh(true);
         return result;
       } catch (e) {
         setNotice((e as Error).message);
@@ -325,6 +421,7 @@ export function Platform({
       return;
     }
     cachedAdminUser = null;
+    adminNavigationReads.clear();
     setUser(null);
     router.replace("/login");
     router.refresh();
@@ -690,18 +787,19 @@ export function Platform({
         mobile={mobile}
         setMobile={setMobile}
         logout={logout}
+        prefetchSection={prefetchAdminSection}
       >
-        <MarketingWorkspaceNav current={key} available={available} search={searchParams.toString()} />
+        <MarketingWorkspaceNav current={key} available={available} search={searchParams.toString()} prefetchSection={prefetchAdminSection} />
         {loadedSection !== adminSection ? (
           <div className="admin-section-loading" role="status" aria-live="polite" aria-busy={!error}>
-            {error ? <><p>화면 정보를 불러오지 못했습니다.</p><button className="btn" onClick={() => void refresh()}>다시 시도</button></> : <><span className="admin-section-loading-line" /><span className="admin-section-loading-line" /><span className="admin-visually-hidden">메뉴 내용을 불러오는 중</span></>}
+            {error ? <><p>화면 정보를 불러오지 못했습니다.</p><button className="btn" onClick={() => void refresh(true)}>다시 시도</button></> : <><span className="admin-section-loading-line" /><span className="admin-section-loading-line" /><span className="admin-visually-hidden">메뉴 내용을 불러오는 중</span></>}
           </div>
         ) : key === "overview" ? (
           <Overview data={data} available={available} />
         ) : !section ? (
           <Empty title="이 화면에 접근할 운영 권한이 필요합니다." />
         ) : key === "conversion" ? (
-          <ConversionReview workspace initialPeriod={searchParams.get("recruitment") || undefined} />
+          <ConversionReview workspace initialPeriod={searchParams.get("recruitment") || undefined} userId={user!.id} />
         ) : key === "product-editor" || key === "learning-editor" ? (
           loading && id && !edited ? (
             <p role="status">편집 정보를 불러오고 있습니다.</p>

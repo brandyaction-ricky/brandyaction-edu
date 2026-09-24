@@ -98,16 +98,21 @@ export async function GET(request: Request) {
             banner.image_url = imagePreviewUrl(String(banner.image_path || ''), process.env.NEXT_PUBLIC_SUPABASE_URL || '');
         }
         if (adminMode && sectionKey === 'products') {
-            const [allProducts, publishedProducts, draftProducts, archivedProducts] = await Promise.all([
+            const [allProducts, publishedProducts, draftProducts, archivedProducts, configs] = await Promise.all([
                 db.from('courses').select('id', { count: 'exact' }).is('archived_at', null).limit(1000),
                 db.from('courses').select('id', { count: 'exact', head: true }).is('archived_at', null).eq('status', 'published'),
                 db.from('courses').select('id', { count: 'exact', head: true }).is('archived_at', null).eq('status', 'draft'),
                 db.from('courses').select('id', { count: 'exact', head: true }).not('archived_at', 'is', null),
+                data.courses?.length
+                    ? db.from('landing_configs').select('id,kakao_url,cta_label,pixel_enabled,pixel_id').in('id', data.courses.map(course => course.id))
+                    : Promise.resolve({ data: [], error: null }),
             ]);
             if (allProducts.error) throw allProducts.error;
             if (publishedProducts.error) throw publishedProducts.error;
             if (draftProducts.error) throw draftProducts.error;
             if (archivedProducts.error) throw archivedProducts.error;
+            if (configs.error) throw configs.error;
+            data.landing_configs = (configs.data || []) as Row[];
             const activeProductIds = new Set((allProducts.data || []).map(product => String(product.id)));
             const upcomingProductIds = new Set(
                 (data.cohorts || [])
@@ -122,12 +127,6 @@ export async function GET(request: Request) {
                 draft: draftProducts.count || 0,
                 archived: archivedProducts.count || 0,
             }];
-        }
-        if (adminMode && sectionKey === 'products' && data.courses?.length) {
-            // Preserve existing landing CTA settings until the product explicitly overrides them.
-            const configs = await db.from('landing_configs').select('id,kakao_url,cta_label,pixel_enabled,pixel_id').in('id', data.courses.map(course => course.id));
-            if (configs.error) throw configs.error;
-            data.landing_configs = (configs.data || []) as Row[];
         }
         if (adminMode && sectionKey === 'orders') {
             const orderIds = (data.orders || []).map((row) => row.id).filter(Boolean);
