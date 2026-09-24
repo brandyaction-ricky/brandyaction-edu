@@ -400,6 +400,7 @@ function CrmManager({ section, data, send, pending }: Props) {
                   <option value="lms">LMS</option>
                   <option value="alimtalk">카카오 알림톡</option>
                 </select>
+                <small className="muted">알림톡은 승인된 정보성 템플릿에만 사용합니다. 모집·할인 안내는 광고 문자로 설정해 주세요.</small>
               </Field>
               <Field label="메시지 목적">
                 <select

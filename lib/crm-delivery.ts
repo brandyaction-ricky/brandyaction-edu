@@ -15,6 +15,8 @@ type Member = {
   full_name?: string | null;
   email?: string | null;
   marketing_consent?: boolean;
+  marketing_consent_at?: string | null;
+  marketing_opt_out_at?: string | null;
   status?: string;
 };
 
@@ -55,6 +57,8 @@ function message(
 ): MessageSchema {
   const content = render(template.content, member);
   if (template.channel === "alimtalk") {
+    if (template.purpose === "marketing")
+      throw new Error("마케팅 안내는 정보성 알림톡으로 발송할 수 없습니다. 광고 문자 템플릿을 사용해 주세요.");
     if (!process.env.SOLAPI_KAKAO_PF_ID || !template.alimtalk_template_id)
       throw new Error("알림톡 채널·템플릿 설정이 필요합니다.");
     return {
@@ -65,7 +69,6 @@ function message(
       kakaoOptions: {
         pfId: process.env.SOLAPI_KAKAO_PF_ID,
         templateId: template.alimtalk_template_id,
-        adFlag: template.purpose === "marketing",
       },
     };
   }
@@ -86,6 +89,35 @@ function message(
   };
 }
 
+function hasCurrentMarketingConsent(member: Member, now: number) {
+  if (member.marketing_consent !== true || !member.marketing_consent_at) return false;
+  const consentAt = Date.parse(member.marketing_consent_at);
+  if (!Number.isFinite(consentAt) || consentAt > now) return false;
+  if (!member.marketing_opt_out_at) return true;
+  const optedOutAt = Date.parse(member.marketing_opt_out_at);
+  return Number.isFinite(optedOutAt) && optedOutAt < consentAt;
+}
+
+async function providerOptOuts(service: SolapiMessageService, sender: string) {
+  const blocked = new Set<string>();
+  const visited = new Set<string>();
+  let startKey: string | undefined;
+  for (let page = 0; page < 1000; page += 1) {
+    let result;
+    try {
+      result = await service.getBlacks({ senderNumber: sender, limit: 100, startKey });
+    } catch {
+      throw new Error("080 수신거부 목록을 확인하지 못해 발송을 중단했습니다.");
+    }
+    for (const entry of result.blackList) blocked.add(digits(entry.recipientNumber));
+    if (!result.nextKey) return blocked;
+    if (visited.has(result.nextKey)) break;
+    visited.add(result.nextKey);
+    startKey = result.nextKey;
+  }
+  throw new Error("080 수신거부 목록을 끝까지 확인하지 못해 발송을 중단했습니다.");
+}
+
 async function sendBatch(
   template: Template,
   members: Member[],
@@ -93,15 +125,35 @@ async function sendBatch(
 ) {
   const active = provider();
   if (!active) return { sent: 0, failed: 0, disabled: true };
-  const eligible = members.filter(
-    (member) =>
-      member.status === "active" &&
+  if (template.channel === "alimtalk" && template.purpose === "marketing")
+    throw new Error("마케팅 안내는 정보성 알림톡으로 발송할 수 없습니다.");
+  const db = createAdminClient();
+  let currentMembers = members;
+  if (template.purpose === "marketing" && members.length) {
+    // Recheck current consent and phone after campaign selection or recruitment claims.
+    const latest = await db.from("profiles")
+      .select("id,phone,full_name,email,marketing_consent,marketing_consent_at,marketing_opt_out_at,status")
+      .in("id", members.map((member) => member.id));
+    if (latest.error) throw new Error("최신 수신 동의 상태를 확인하지 못해 발송을 중단했습니다.");
+    const byId = new Map((latest.data || []).map((member) => [member.id, member]));
+    currentMembers = members.flatMap((member) => {
+      const current = byId.get(member.id);
+      return current && digits(current.phone) === digits(member.phone) ? [current] : [];
+    });
+  }
+  const now = Date.now();
+  let eligible = currentMembers.filter(
+    (member) => member.status === "active" &&
       /^0\d{8,10}$/.test(digits(member.phone)) &&
-      (template.purpose !== "marketing" || member.marketing_consent === true),
+      (template.purpose !== "marketing" || hasCurrentMarketingConsent(member, now)),
   );
+  if (template.purpose === "marketing" && eligible.length) {
+    // SOLAPI's 080 list applies to SMS/LMS, while Alimtalk is restricted above.
+    const blocked = await providerOptOuts(active.service, active.sender);
+    eligible = eligible.filter((member) => !blocked.has(digits(member.phone)));
+  }
   if (!eligible.length)
     return { sent: 0, failed: members.length, disabled: false };
-  const db = createAdminClient();
   const logs = eligible.map((member) => ({
     campaign_id: context.campaignId || null,
     automation_run_id: context.automationRuns?.[member.id] || null,
