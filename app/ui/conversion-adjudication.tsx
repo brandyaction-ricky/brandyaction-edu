@@ -69,6 +69,7 @@ const v4FlagLabels: Record<string, string> = {
 };
 const v4UncertaintyLabels: Record<string, string> = {
   unclear_choice: '판단 보류 선택',
+  unresolved_category: '정보 없음·불명확 통합 선택지',
   low_reported_confidence: '표시 신뢰도 70% 미만',
   narrow_probability_margin: '상위 선택지 차이 15%p 미만',
   choice_not_top_probability: '선택값과 최고 확률 항목 불일치',

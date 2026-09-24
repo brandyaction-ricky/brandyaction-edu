@@ -30,6 +30,7 @@ const choices: Record<string, string> = {
 };
 const uncertaintyLabels: Record<JevV4UncertaintyFlag['reason'], string> = {
   unclear_choice: '모델이 판단 보류를 선택함',
+  unresolved_category: '정보 없음과 불명확이 한 선택지에 합쳐짐',
   low_reported_confidence: '모델 표시 신뢰도 70% 미만',
   narrow_probability_margin: '상위 선택지 확률 차이가 15%p 미만',
   choice_not_top_probability: '선택값과 가장 높은 확률 항목이 다름',

@@ -69,7 +69,7 @@ test('v4 marks model-declared ambiguity and inconsistent probability rankings fo
   uncertain.attempted_action_target.probabilities.free_live_or_replay = 0.84;
   const result = await v4.createJevV4Judgment('링크 문의', '링크가 열리지 않습니다.', 'secret', async () => Response.json({ answers: uncertain }));
   assert.deepEqual(result.uncertainty_flags, [
-    { decision: 'information_need', reason: 'unclear_choice' },
+    { decision: 'information_need', reason: 'unresolved_category' },
     { decision: 'confirmed_barrier', reason: 'low_reported_confidence' },
     { decision: 'confirmed_barrier', reason: 'narrow_probability_margin' },
     { decision: 'attempted_action_target', reason: 'choice_not_top_probability' },
