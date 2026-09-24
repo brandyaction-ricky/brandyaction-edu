@@ -58,8 +58,8 @@ test('synthetic v4 endpoint rejects unknown case IDs without a provider call', a
   assert.deepEqual(h.events, []);
 });
 
-test('boundary fixture contains eight synthetic cases with distinct review questions', () => {
-  assert.equal(cases.length, 8);
+test('boundary fixture contains nine synthetic cases with distinct review questions', () => {
+  assert.equal(cases.length, 9);
   assert.equal(new Set(cases.map(item => item.id)).size, cases.length);
   assert.ok(cases.every(item => item.reviewGuide.length > 10));
   assert.ok(cases.some(item => item.id === 'free-replay-plus-future-consideration'));

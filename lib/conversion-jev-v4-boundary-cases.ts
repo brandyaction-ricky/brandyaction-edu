@@ -29,6 +29,13 @@ export const JEV_V4_BOUNDARY_CASES = [
     reviewGuide: '실패한 행동의 대상이 무료 영상이 아니라 유료 신청 양식임을 유지하는지 확인합니다.',
   },
   {
+    id: 'purchase-decision-without-application',
+    title: '신청 결정·조건 질문, 실제 신청 전',
+    subject: '교육 신청 결정 후 결제·시작일 문의',
+    content: '무료 웨비나를 듣고 유료 교육 신청을 결정했습니다. 결제 방법과 시작일을 알려주세요.',
+    reviewGuide: '신청을 결정했다는 말은 구매 의사로 표시하되, 버튼을 누르거나 신청서를 낸 실제 시도로 바꾸지 않습니다. 무료 자료 이용 문제가 없다는 점도 분리합니다.',
+  },
+  {
     id: 'free-access-and-no-paid-interest',
     title: '무료 접근 실패, 유료 관심 부정',
     subject: '무료 강의 영상 재생 오류',

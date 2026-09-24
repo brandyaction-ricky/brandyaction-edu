@@ -25,6 +25,7 @@ test('v4 distinguishes free replay access, paid reference, and attempted paid ap
   assert.ok(v4.JEV_V4_CHOICES.attempted_action_target.includes('free_live_or_replay'));
   assert.ok(v4.JEV_V4_CHOICES.attempted_action_target.includes('paid_application'));
   assert.ok(v4.JEV_V4_CHOICES.paid_program_reference.includes('future_consideration_after_free_content'));
+  assert.ok(v4.JEV_V4_CHOICES.observable_stage.includes('purchase_decision'));
 });
 
 test('free replay access with a payment page remains a free access problem, while paid application failure remains paid', async () => {
@@ -59,6 +60,14 @@ test('v4 flags an explicit future paid consideration that the stage overlooks', 
   assert.equal(result.decisions.observable_stage.choice, 'no_purchase_signal');
 });
 
+test('v4 allows condition review without explicit paid wording but still flags a purchase claim', () => {
+  const reviewing = answers({ paid_program_reference: 'no_paid_reference', observable_stage: 'specific_evaluation' });
+  assert.deepEqual(v4.jevV4ConsistencyFlags(reviewing), []);
+
+  const promising = answers({ paid_program_reference: 'no_paid_reference', observable_stage: 'conditional_purchase_statement' });
+  assert.deepEqual(v4.jevV4ConsistencyFlags(promising), ['paid_stage_without_reference']);
+});
+
 test('v4 marks model-declared ambiguity and inconsistent probability rankings for operator review', async () => {
   const uncertain = answers({ information_need: 'other_or_unclear' });
   uncertain.confirmed_barrier.confidence = 0.62;
@@ -84,6 +93,24 @@ test('v4 prompt keeps free-only and explicitly declined paid interest out of pai
   assert.match(v4.JEV_V4_QUESTIONS.observable_stage.instructions, /검토 의사만 밝힌 표현은 specific_evaluation으로 분류하고 conditional_purchase_statement로 올려 잡지 마세요/);
   assert.match(v4.JEV_V4_QUESTIONS.attempted_action_target.instructions, /대상이 특정되지 않으면 무료 콘텐츠 접근으로 추정하지 말고 unclear/);
   assert.match(v4.JEV_V4_QUESTIONS.operational_issue.instructions, /대상이 불명확하면 무료 접근 실패로 좁혀 추정하지 말고 unclear/);
+  assert.match(v4.JEV_V4_QUESTIONS.attempted_action_target.instructions, /“신청하기로 결정했다”.*실제 신청·결제 시도가 아닙니다/);
+  assert.match(v4.JEV_V4_QUESTIONS.observable_stage.instructions, /실제 행동을 밝히지 않은 경우는 purchase_decision/);
+  assert.match(v4.JEV_V4_QUESTIONS.observable_stage.instructions, /신청 버튼 클릭, 신청서 제출, 결제 완료 등 실제 행동을 직접 밝힌 경우만 paid_application_or_payment_attempt/);
+});
+
+test('a stated decision to apply signals purchase intent without claiming an application attempt', async () => {
+  const decided = answers({
+    attempted_action_target: 'no_attempt_stated',
+    operational_issue: 'none_stated',
+    paid_program_reference: 'purchase_decision',
+    observable_stage: 'purchase_decision',
+  });
+  const result = await v4.createJevV4Judgment('교육 신청 결정 후 결제·시작일 문의', '무료 웨비나를 듣고 유료 교육 신청을 결정했습니다. 결제 방법과 시작일을 알려주세요.', 'secret', async () => Response.json({ answers: decided }));
+  assert.equal(result.decisions.attempted_action_target.choice, 'no_attempt_stated');
+  assert.equal(result.decisions.operational_issue.choice, 'none_stated');
+  assert.equal(result.decisions.paid_program_reference.choice, 'purchase_decision');
+  assert.equal(result.decisions.observable_stage.choice, 'purchase_decision');
+  assert.deepEqual(result.consistency_flags, []);
 });
 
 test('v4 rejects invented choices and malformed probability distributions', async () => {

@@ -39,6 +39,23 @@ test('mock result identifies itself and preserves uncertainty for the unanswered
   assert.equal(result.topics.find(topic => topic.topic === 'price').status, 'not_explicit');
 });
 
+test('common price, start-date, and payment-method wording finds the matching approved facts', () => {
+  const item = { ...inquiry, subject: '문샷 챌린지 신청 문의', content: '무료 웨비나를 듣고 유료 교육 신청을 결정했습니다. 문샷 챌린지 4기 교육 가격과 일정, 결제 방법을 알려주세요.' };
+  const facts = { ...evidence, title: '문샷 챌린지 4기 기본 일정과 판매가', body: '모집 시작 예정: 2026년 9월 28일. 교육 기간: 2026년 10월 5일부터 6주. 판매가: 1,650,000원. 결제 방법은 확인되지 않아 담당자가 확인 후 안내합니다.' };
+  const result = createMockJudgment(item, [facts]);
+  assert.deepEqual(result.topics.filter(topic => topic.status === 'explicit').map(topic => topic.topic).sort(), ['payment', 'price', 'schedule']);
+  assert.equal(result.candidates[0].fit, 'partial');
+  assert.deepEqual(result.candidates[0].matched_topics.sort(), ['payment', 'price', 'schedule']);
+  assert.equal(result.proposed_reply, facts.body);
+  assert.deepEqual(result.missing_topics, []);
+
+  const alternateWording = { ...item, content: '무료 웨비나를 듣고 유료 교육 신청을 결정했습니다. 결제 방법과 시작일을 알려주세요.' };
+  const alternateResult = createMockJudgment(alternateWording, [facts]);
+  assert.equal(alternateResult.candidates[0].fit, 'partial');
+  assert.deepEqual(alternateResult.candidates[0].matched_topics.sort(), ['payment', 'schedule']);
+  assert.equal(alternateResult.proposed_reply, facts.body);
+});
+
 test('source spans are exact UTF-16 slices, including repeated keywords after emoji and line breaks', () => {
   const item = { ...inquiry, subject: '🌱 초보 질문', content: '녹화\n다시 보기와 녹화 가격은요?' };
   const result = createMockJudgment(item, [evidence]);

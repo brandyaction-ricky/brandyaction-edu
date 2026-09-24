@@ -58,6 +58,7 @@ const v4Labels: Record<string, string> = {
   ...v3Labels,
   future_consideration_after_free_content: '무료 교육을 본 뒤 유료 교육 검토 명시',
   paid_program_question: '유료 교육 조건 질문',
+  purchase_decision: '유료 신청·구매 결정',
   paid_application_or_payment: '유료 신청·결제 시도 명시',
   no_paid_reference: '유료 교육 언급 없음',
 };

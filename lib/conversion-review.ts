@@ -27,7 +27,7 @@ export type ConversionEvidence = {
   status: 'draft' | 'approved' | 'retired';
 };
 
-export type ConversionTopic = 'price' | 'schedule' | 'content' | 'level' | 'usage';
+export type ConversionTopic = 'price' | 'schedule' | 'payment' | 'content' | 'level' | 'usage';
 export type InquiryType = 'prepurchase' | 'support' | 'payment_refund' | 'mixed' | 'unknown';
 export type InquirySpan = { field: 'subject' | 'content'; start: number; end: number; text: string };
 export type MockResult = {
@@ -171,7 +171,7 @@ export type ConversionSnapshot = {
 
 export const MOCK_NOTICE = '시험용 결과입니다. 실제 AI가 만든 판단이 아니며, 분류와 답변 초안은 직원이 확인해야 합니다.';
 export const topicLabels: Record<ConversionTopic, string> = {
-  price: '가격', schedule: '일정', content: '내용', level: '수준', usage: '이용 방법',
+  price: '가격', schedule: '일정', payment: '결제 방법', content: '내용', level: '수준', usage: '이용 방법',
 };
 export const inquiryTypeLabels: Record<InquiryType, string> = {
   prepurchase: '구매 전 상품 질문', support: '이용 지원', payment_refund: '결제·환불', mixed: '혼합', unknown: '판단 불가',
@@ -256,8 +256,9 @@ export function buildJevCalibrationSummary(runs: ConversionRun[], reviews: Conve
 }
 
 const topicPatterns: Record<ConversionTopic, RegExp> = {
-  price: /가격|수강료|비용|금액|얼마|할인/gu,
-  schedule: /일정|날짜|언제|요일|몇\s*시|시간표|기간/gu,
+  price: /가격|수강료|판매가|정가|비용|금액|얼마|할인/gu,
+  schedule: /일정|날짜|시작일|시작\s*날짜|교육\s*시작|수강\s*시작|모집\s*시작|개강일|개강|언제|요일|몇\s*시|시간표|교육\s*기간|강의\s*기간|기간/gu,
+  payment: /결제\s*(?:방법|방식|수단)|결제수단|카드\s*결제|계좌\s*이체|무통장|할부/gu,
   content: /커리큘럼|내용|무엇을|뭘\s*배우|어떤\s*(?:것|걸|수업)|실습/gu,
   level: /초보|입문|난이도|수준|선수\s*지식|따라갈|경험이\s*없/gu,
   usage: /녹화|다시\s*보기|다시\s*볼|실시간|참석|이용\s*방법|수강\s*방법|온라인|오프라인/gu,
