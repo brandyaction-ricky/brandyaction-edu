@@ -61,6 +61,20 @@ test('final design styles are isolated, reproducible and exclude prototype runti
   assert.doesNotMatch(layout, /ui\/(design|platform)\.css/);
   for (const file of fs.readdirSync(path.join(root, 'app/ui/final')).filter(file => file.endsWith('.tsx'))) assert.doesNotMatch(read('app/ui/final/' + file), /dangerouslySetInnerHTML|design-reference\/source|data-demo=/);
 });
+test('admin controls, date filters and data tables share consistent sizing', () => {
+  const system = read('app/ui/final/admin-system.css');
+  const admin = read('app/ui/final/admin.css');
+  const tracking = read('app/ui/landing/tracking-admin.css');
+  assert.match(system, /--admin-control-height:40px/);
+  assert.match(system, /--admin-control-height-sm:36px/);
+  assert.match(system, /--admin-table-head-height:44px/);
+  assert.match(system, /--admin-table-row-height:44px/);
+  assert.match(admin, /\.edu-admin \.date-range input\[type=date\]\{[^}]*height:40px;min-height:40px/);
+  assert.match(admin, /\.edu-admin \.date-range>\.btn\{height:40px;min-height:40px/);
+  assert.match(admin, /\.edu-admin button:focus-visible[^}]*outline:2px solid var\(--ba-info\);outline-offset:2px/);
+  assert.match(tracking, /\.edu-admin \.tracking-inline-select\{[^}]*height:40px;min-height:40px/);
+});
+
 test('five admin categories and scoped navigation render from the admin UI feature', () => {
   const { AdminShell, adminNavigationIcon, finalAdminGroups } = load('features/admin-ui.ts');
   const { Overview } = load('app/ui/final/admin-shell.tsx');
@@ -245,6 +259,9 @@ test('catalogues and separate editors render without dropping existing fields', 
   assert.match(learning, /learning-layout/); assert.match(learning, /학습 구성/); assert.match(learning, /lesson-list-item/);
   const missions = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'missions') });
   assert.match(missions, /mission-week-pills/); assert.match(missions, /일차별 미션/); assert.match(missions, /mission-row/);
+  assert.match(missions, /콘텐츠 편집/); assert.match(missions, /learning-editor\?id=lesson/);
+  const questionMarkup = html(AdminCatalog, { ...props, data: { ...data, edu_questions: [{ id: 'question', title: '답변 필요한 질문', content: '질문 내용', answer: null, status: 'open', created_at: '2026-09-24' }] }, section: platform.sections.find(row => row.key === 'questions') });
+  assert.match(questionMarkup, /question-admin-card/); assert.match(questionMarkup, /답변하기/);
   const customers = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'customers') });
   assert.match(customers, /마케팅 수신 동의/); assert.match(customers, /수강 중인 클래스/); assert.match(customers, /전체 클래스/);
   const { ProductEditor } = load('app/ui/final/admin-editors.tsx');
@@ -289,7 +306,13 @@ test('catalogues and separate editors render without dropping existing fields', 
   assert.match(pageSource, /<Platform path=\{path\} user=\{null\}\/>/);
   assert.match(read('design-reference/source/admin/src/experience.css'), /\.metric-value small\{display:inline-block;margin-left:var\(--space-1\)\}/);
   for (const field of platform.sections.find(row => row.key === 'products').fields.filter(field => !['slug', 'course_code', 'seo_title', 'seo_description', 'detail_html'].includes(field.key))) assert.ok(markup.includes(`name="${field.key}"`), field.key);
-  assert.match(html(LearningEditor, { data, row: lesson, pending: false, send, back() {} }), /editor-/);
+  const learningMarkup = html(LearningEditor, { data, row: lesson, pending: false, send, back() {} });
+  assert.match(learningMarkup, /editor-/); assert.doesNotMatch(learningMarkup, /통과 기준|name="pass_percent"/);
+  assert.match(platformSource, /AI 답변 생성/); assert.match(platformSource, /답변 등록/);
+  assert.match(platformSource, /answer-draft/);
+  assert.match(read('app/ui/final/integration.css'), /\.participant-card-summary/);
+  assert.match(read('app/ui/final/integration.css'), /\.question-answer-editor/);
+  assert.match(read('app/ui/admin-workflows.tsx'), /aria-expanded=\{expanded\}[\s\S]*?participant-day-card/);
 });
 test('submission review keeps queue and inspector, escaping text and unsafe links', () => {
   const { SubmissionReview } = load('app/ui/final/submission-review.tsx');

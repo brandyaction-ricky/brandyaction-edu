@@ -169,16 +169,18 @@ export function AdminCatalog({
     .filter((group) => group.missions.length || week);
   const unmatchedMissions = s.key === "missions" ? filtered.filter((mission) => !weeks.some((item) => item.id === lessonById.get(String(mission.lesson_id))?.week_id)) : [];
   const renderMission = (mission: Row) => (
-    <article className="mission-row" key={mission.id}>
+    <article className="mission-row mission-day-row" key={mission.id}>
       <span className="day-no">{lessonById.has(String(mission.lesson_id)) ? String(num(lessonById.get(String(mission.lesson_id)), "day_number")).padStart(2, "0") : "—"}</span>
       <div className="mission-copy">
+        <span className="mission-day-label">Day {lessonById.has(String(mission.lesson_id)) ? num(lessonById.get(String(mission.lesson_id)), "day_number") : "—"}</span>
         <button className="title-btn" onClick={() => edit(s, mission)}><strong>{t(mission, "title")}</strong></button>
         <p>{labels[t(mission, "submission_type")] || t(mission, "submission_type")} · 확인 퀴즈 {quizCount(mission.id)}문항 · {mission.is_required ? "필수 미션" : "선택 미션"}{mission.submission_type === "quiz" ? "" : " · 관리자 승인"}</p>
       </div>
       <Badge color={mission.is_published ? "green" : ""}>{mission.is_published ? "공개" : "비공개"}</Badge>
       <div className="row mission-actions">
+        {lessonById.has(String(mission.lesson_id)) && <Link className="btn small mission-content-edit" href={`/admin/learning-editor?id=${encodeURIComponent(String(mission.lesson_id))}`}><FileText size={15} />콘텐츠 편집</Link>}
         {bulkMode && <input type="checkbox" aria-label={t(mission, "title") + " 선택"} checked={selection.includes(recordId(mission))} onChange={(event) => setSelection(event.target.checked ? [...selection, recordId(mission)] : selection.filter((id) => id !== recordId(mission)))} />}
-        <button className="btn small" onClick={() => edit(s, mission)}>편집</button>
+        <button className="btn small" onClick={() => edit(s, mission)}>미션 설정</button>
       </div>
     </article>
   );
@@ -862,9 +864,9 @@ export function AdminCatalog({
               {!!unmatchedMissions.length && <section className="week-card mission-catalog"><div className="week-head"><strong>학습 연결 확인</strong></div>{unmatchedMissions.map(renderMission)}</section>}
             </div>
           ) : s.key === "questions" ? (
-            <div className="stack">
+            <div className="stack question-admin-list">
               {filtered.map((q) => (
-                <article className="panel" key={q.id}>
+                <article className="panel question-admin-card" key={q.id}>
                   <div className="panel-head">
                     <div>
                       <Badge
@@ -874,7 +876,7 @@ export function AdminCatalog({
                       </Badge>
                       <h2 className="mt8">{t(q, "title")}</h2>
                     </div>
-                    <button className="btn small" onClick={() => edit(s, q)}>
+                    <button className="btn small question-answer-open" onClick={() => edit(s, q)}>
                       {q.answer ? "답변 수정" : "답변하기"}
                     </button>
                   </div>
