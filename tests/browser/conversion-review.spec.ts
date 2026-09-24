@@ -412,4 +412,3 @@ test('integrated workspace separates inquiry review from recruitment and removes
   await page.getByRole('button', { name: '모집 설정·구매·후속 안내', exact: true }).click();
   await expect(page.getByRole('button', { name: '문의 연결', exact: true })).not.toBeVisible();
 });
- tests/browser/conversion-review.spec.ts | 11 ++++++-----
