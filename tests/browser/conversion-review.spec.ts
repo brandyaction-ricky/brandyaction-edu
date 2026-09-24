@@ -119,12 +119,42 @@ async function fixture(page: Page, provider: 'mock' | 'jev' = 'mock') {
       snapshot.reviews.push(review);
       await route.fulfill({ json: { ok: true, review } }); return;
     }
+    if (body.action === 'manage_case') {
+      const item = snapshot.cases.find(row => row.id === body.case_id)!;
+      if (body.operation === 'purchase_outcome') {
+        item.purchase_outcome = body.purchase_outcome;
+        item.purchase_checked_at = body.purchase_outcome === 'unknown' ? null : timestamp;
+        item.purchase_checked_by = body.purchase_outcome === 'unknown' ? null : 'synthetic-operator';
+      } else if (body.operation === 'archive') item.archived_at = timestamp;
+      else item.archived_at = null;
+      await route.fulfill({ json: { ok: true, case: item } }); return;
+    }
     await route.fulfill({ status: 405, json: { error: '등록되지 않은 모의 요청입니다.' } });
   });
   await page.goto('/admin/conversion');
   await expect(page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ })).toBeVisible();
   return { snapshot, mutations, unexpectedApi, deny: () => { forbidden = true; } };
 }
+
+test('employee records a checked purchase result and can remove then restore an inquiry', async ({ page }) => {
+  const state = await fixture(page);
+  await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
+  await page.getByLabel('결제 확인 결과').selectOption('paid');
+  await page.getByRole('button', { name: '결제 여부 저장', exact: true }).click();
+  await expect(page.getByText('결제 여부를 기록했습니다. 사이트 주문을 자동으로 확인한 것은 아닙니다.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ })).toContainText('결제 확인');
+  expect(state.snapshot.cases[0].purchase_checked_by).toBe('synthetic-operator');
+
+  page.on('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: '목록에서 삭제', exact: true }).click();
+  await expect(page.getByRole('button', { name: '진행 중인 문의 보기', exact: true })).toBeVisible();
+  await expect(page.getByText('삭제한 문의 · 복구 가능', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '문의 복구', exact: true }).click();
+  await expect(page.getByText('문의를 복구했습니다.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /삭제한 문의 보기/ })).toBeVisible();
+  expect(state.mutations.map(item => item.action)).toEqual(['manage_case', 'manage_case', 'manage_case']);
+  expect(state.unexpectedApi).toEqual([]);
+});
 
 test('Jev shows its result first and an authorized employee can approve without sending a message', async ({ page }) => {
   const state = await fixture(page, 'jev');
@@ -151,9 +181,9 @@ test('employee can edit a proposed reply before recording approval', async ({ pa
   const state = await fixture(page, 'jev');
   await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
   await page.getByRole('button', { name: 'Jev 결과 보기', exact: true }).click();
+  await page.getByLabel('검토 결정').selectOption('edit');
   await page.getByLabel(/^고객에게 보낼 답변 초안/).fill('수강 수준은 안내 가능하며 녹화 제공 여부는 추가 확인이 필요합니다.');
   await page.getByLabel('검토 사유').fill('녹화 제공 내용을 직원이 확인했습니다.');
-  await page.getByLabel('검토 결정').selectOption('edit');
   await expect(page.getByLabel('검토 결정')).toHaveValue('edit');
   await page.getByRole('button', { name: '직원 승인 기록', exact: true }).click();
   await expect(page.locator('.conversion-record')).toContainText('수정 후 승인');

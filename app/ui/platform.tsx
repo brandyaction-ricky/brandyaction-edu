@@ -66,6 +66,12 @@ import { SiteFooter } from "./final/site-footer";
 import { HomeHero } from "./final/home-hero";
 import { MarketingWorkspaceNav } from "./marketing-workspace-nav";
 import { ConversionReview, prefetchConversionReview } from "./conversion-review";
+import {
+  AdminEmptyState,
+  AdminInlineError,
+  AdminLoadingState,
+  AdminToast,
+} from "@/features/admin-ui";
 type Data = Record<string, Row[]>;
 type AdminRead = {
   ok: boolean;
@@ -730,16 +736,11 @@ export function Platform({
     return <Checkout data={data} user={user} pending={pending} send={send} />;
   }
   function adminView() {
-    if (accessDenied) return <div className="wrap"><Empty title="이 메뉴에 접근할 운영 권한이 없습니다." /><div className="center"><Link className="btn" href="/admin">운영 홈</Link><Link className="btn" href="/my">마이페이지</Link></div></div>;
+    if (accessDenied) return <div className="wrap"><AdminEmptyState title="이 메뉴에 접근할 운영 권한이 없습니다." action={<div className="row wrap"><Link className="btn primary" href="/admin">운영 홈으로</Link><Link className="btn" href="/my">마이페이지</Link></div>}>현재 계정에 부여된 운영 범위에서 다른 메뉴를 선택해 주세요.</AdminEmptyState></div>;
     if (!["admin", "staff"].includes(user?.role || ""))
       return (
         <div className="wrap">
-          <Empty title={loading ? "운영자 권한을 확인하고 있습니다." : error ? "로그인 정보를 확인하지 못했습니다." : "운영자 로그인이 필요합니다."} />
-          {!loading && !error && <div className="center">
-            <Link className="btn primary" href={"/login?next=" + encodeURIComponent("/" + routeKey)}>
-              로그인하기
-            </Link>
-          </div>}
+          {loading ? <AdminLoadingState title="운영자 권한을 확인하고 있습니다." description="활성 계정과 접근 범위를 확인한 뒤 화면을 엽니다."/> : error ? <AdminInlineError onRetry={() => void refresh()}>로그인 정보를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.</AdminInlineError> : <AdminEmptyState title="운영자 로그인이 필요합니다." action={<Link className="btn primary" href={"/login?next=" + encodeURIComponent("/" + routeKey)}>로그인하기</Link>}>관리자 또는 운영 스태프 계정으로 로그인해 주세요.</AdminEmptyState>}
         </div>
       );
     const available = sections.filter(
@@ -781,7 +782,7 @@ export function Platform({
         current={key}
         available={available}
         user={user!}
-        data={data}
+        pendingReviews={Number((data.admin_summary || [])[0]?.pendingReviews || 0)}
         mobile={mobile}
         setMobile={setMobile}
         logout={logout}
@@ -789,20 +790,18 @@ export function Platform({
       >
         <MarketingWorkspaceNav current={key} available={available} search={searchParams.toString()} prefetchSection={prefetchAdminSection} />
         {loadedSection !== adminSection ? (
-          <div className="admin-section-loading" role="status" aria-live="polite" aria-busy={!error}>
-            {error ? <><p>화면 정보를 불러오지 못했습니다.</p><button className="btn" onClick={() => void refresh(true)}>다시 시도</button></> : <><span className="admin-section-loading-line" /><span className="admin-section-loading-line" /><span className="admin-visually-hidden">메뉴 내용을 불러오는 중</span></>}
-          </div>
+          error ? <AdminInlineError onRetry={() => void refresh(true)}>화면 정보를 불러오지 못했습니다. 연결 상태를 확인해 주세요.</AdminInlineError> : <AdminLoadingState title="메뉴 내용을 불러오는 중입니다." description="현재 운영 데이터를 안전하게 확인하고 있습니다."/>
         ) : key === "overview" ? (
           <Overview data={data} available={available} />
         ) : !section ? (
-          <Empty title="이 화면에 접근할 운영 권한이 필요합니다." />
+          <AdminEmptyState title="이 화면에 접근할 운영 권한이 필요합니다.">운영 홈에서 현재 계정에 표시되는 메뉴를 선택해 주세요.</AdminEmptyState>
         ) : key === "conversion" ? (
           <ConversionReview workspace initialPeriod={searchParams.get("recruitment") || undefined} userId={user!.id} />
         ) : key === "product-editor" || key === "learning-editor" ? (
           loading && id && !edited ? (
-            <p role="status">편집 정보를 불러오고 있습니다.</p>
+            <AdminLoadingState title="편집 정보를 불러오는 중입니다." description="저장된 항목과 공개 상태를 확인하고 있습니다."/>
           ) : id && !edited ? (
-            <Empty title="편집할 항목을 찾을 수 없습니다." />
+            <AdminEmptyState title="편집할 항목을 찾을 수 없습니다." action={<button className="btn" type="button" onClick={back}>목록으로 돌아가기</button>}>삭제되었거나 현재 계정의 운영 범위 밖에 있는 항목일 수 있습니다.</AdminEmptyState>
           ) : key === "product-editor" ? (
             <ProductEditor
               key={edited?.id || "new-product"}
@@ -928,7 +927,7 @@ export function Platform({
           path[0] === "classes" && path.length > 1 ? "with-bottom-cta" : ""
         }
       >
-        {error && (
+        {!admin && error && (
           <div className="error-banner" role="alert">
             {error}
             <button className="btn small" onClick={() => void refresh()}>
@@ -936,17 +935,13 @@ export function Platform({
             </button>
           </div>
         )}
-        {loading && (
+        {!admin && loading && (
           <div className="loading-bar" role="status" aria-label="불러오는 중" />
         )}
         {body}
       </main>
       {!admin && footer}
-      {notice && (
-        <div className="toast" role="status">
-          {notice}
-        </div>
-      )}
+      {notice && (admin ? <AdminToast tone="success">{notice}</AdminToast> : <div className="toast" role="status">{notice}</div>)}
       {editor && (
         <Editor
           key={editor.section.key + (editor.row ? recordId(editor.row) : "new")}
@@ -1032,6 +1027,9 @@ function Editor({
   const ref = useRef<HTMLDialogElement>(null);
   const requestId = useRef(crypto.randomUUID());
   const [error, setError] = useState("");
+  const [questionAnswer, setQuestionAnswer] = useState(() => t(row, "answer"));
+  const [questionAiPending, setQuestionAiPending] = useState(false);
+  const [questionAiMessage, setQuestionAiMessage] = useState("");
   const [tagKind, setTagKind] = useState(String(row?.tag_kind || "manual"));
   const [tagRule, setTagRule] = useState(String(row?.rule_key || "free_lesson_1"));
   const [couponDiscountType, setCouponDiscountType] = useState(String(row?.discount_type || "percentage"));
@@ -1107,6 +1105,30 @@ function Editor({
       setError((e as Error).message);
     }
   };
+  const generateQuestionAnswer = async () => {
+    if (!row?.id || questionAiPending || pending) return;
+    setQuestionAiPending(true);
+    setQuestionAiMessage("");
+    try {
+      const response = await fetch("/api/admin/questions/answer-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ questionId: row.id }),
+      });
+      const result = (await response.json()) as {
+        draft?: string;
+        error?: string;
+      };
+      if (!response.ok || !result.draft)
+        throw new Error(result.error || "AI 답변 초안을 생성하지 못했습니다.");
+      setQuestionAnswer(result.draft);
+      setQuestionAiMessage("AI 초안을 작성했습니다. 내용을 확인하고 수정한 뒤 답변을 저장해 주세요.");
+    } catch (cause) {
+      setQuestionAiMessage(cause instanceof Error ? cause.message : "AI 답변 초안을 생성하지 못했습니다.");
+    } finally {
+      setQuestionAiPending(false);
+    }
+  };
   const control = (f: Field) => {
     const value =
       section.table === "courses" &&
@@ -1117,6 +1139,17 @@ function Editor({
           ]
         : row?.[f.key];
     const props = { name: f.key, id: "edit-" + f.key, required: f.required, maxLength: f.maxLength };
+    if (section.key === "questions" && f.key === "answer")
+      return (
+        <textarea
+          {...props}
+          rows={8}
+          value={questionAnswer}
+          onChange={(event) => setQuestionAnswer(event.target.value)}
+          placeholder="회원에게 전달할 답변을 작성해 주세요."
+          disabled={pending}
+        />
+      );
     if (f.type === "blocks") return <BlocksField name={f.key} value={value} />;
     if (["image", "resource"].includes(f.type || ""))
       return (
@@ -1348,6 +1381,22 @@ function Editor({
                   <label className="checkline"><input name="exclude_free" type="checkbox" defaultChecked={row?.exclude_free !== false} />무료 상품 적용 제외</label>
                   <p className="notice">발급 후에도 이미 완료된 주문의 할인 금액은 변경하지 않습니다. 변경된 조건은 이후 쿠폰 적용 요청부터 검증됩니다.</p>
                 </div>
+              ) : section.key === "questions" ? (
+                <div className="question-answer-editor">
+                  <div className="question-answer-heading">
+                    <div><h3>답변 작성</h3><p>AI 초안은 자동 등록되지 않습니다. 사실을 확인하고 내용을 검수해 주세요.</p></div>
+                    <button className="btn question-ai-button" type="button" disabled={pending || questionAiPending || !row?.id} onClick={() => void generateQuestionAnswer()}>
+                      {questionAiPending ? "AI 답변 생성 중…" : "✦ AI 답변 생성"}
+                    </button>
+                  </div>
+                  <div className="field"><label htmlFor="edit-answer">답변 *</label>{control(section.fields.find((field) => field.key === "answer")!)}</div>
+                  {questionAiMessage && <p className="question-ai-message" role="status" aria-live="polite">{questionAiMessage}</p>}
+                  <div className="question-answer-options">
+                    {section.fields.filter((field) => field.key !== "answer").map((field) => (
+                      <div className="field" key={field.key}><label htmlFor={`edit-${field.key}`}>{field.label}</label>{control(field)}</div>
+                    ))}
+                  </div>
+                </div>
               ) : <div className="editor-fields">
                 {section.fields.map((f) => (
                   <div
@@ -1417,7 +1466,7 @@ function Editor({
           </button>
           {!section.readOnly && (
             <button className="btn primary" disabled={pending}>
-              {pending ? "저장 중..." : ["tags", "coupons"].includes(section.key) ? "입력 내용 확인" : "저장하기"}
+              {pending ? "저장 중..." : section.key === "questions" ? row?.answer ? "답변 수정" : "답변 등록" : ["tags", "coupons"].includes(section.key) ? "입력 내용 확인" : "저장하기"}
             </button>
           )}
         </footer>

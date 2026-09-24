@@ -31,6 +31,7 @@ function renderClass({ loading = true, error = '', data = {} } = {}) {
     } },
     '@/lib/supabase/client': {},
     '@/lib/supabase/config': {},
+    '@/features/admin-ui': {},
     'next/navigation': { useRouter: () => ({}), useSearchParams: () => new URLSearchParams() },
     'next/link': { default: ({ children, ...props }) => React.createElement('a', props, children) },
     './final/primitives': {

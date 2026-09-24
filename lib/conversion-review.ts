@@ -13,6 +13,11 @@ export type ConversionCase = {
   received_at: string;
   customer_id: string | null;
   input_version: number;
+  purchase_outcome?: 'unknown' | 'paid' | 'not_paid';
+  purchase_checked_at?: string | null;
+  purchase_checked_by?: string | null;
+  archived_at?: string | null;
+  archived_by?: string | null;
   created_at: string;
 };
 
@@ -166,7 +171,7 @@ export type ConversionSnapshot = {
   jev_v2_runs?: ConversionJevV2Run[];
   jev_v3_runs?: ConversionJevV3Run[];
   jev_v4_runs?: ConversionJevV4Run[];
-  capabilities: { can_manage_evidence: boolean; can_mock: boolean; can_jev?: boolean; can_adjudicate?: boolean; can_jev_v2?: boolean; can_jev_v3?: boolean; can_jev_v4?: boolean; can_analyze?: boolean; analyze_provider?: 'mock' | 'jev' | null; can_manage_funnel?: boolean };
+  capabilities: { can_manage_evidence: boolean; can_manage_cases?: boolean; can_mock: boolean; can_jev?: boolean; can_adjudicate?: boolean; can_jev_v2?: boolean; can_jev_v3?: boolean; can_jev_v4?: boolean; can_analyze?: boolean; analyze_provider?: 'mock' | 'jev' | null; can_manage_funnel?: boolean };
 };
 
 export const MOCK_NOTICE = '시험용 결과입니다. 실제 AI가 만든 판단이 아니며, 분류와 답변 초안은 직원이 확인해야 합니다.';

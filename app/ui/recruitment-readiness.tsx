@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { AdminButton } from './final/admin-system';
+import { AdminButton } from '@/features/admin-ui';
 import type { BroadcastReport } from '@/lib/broadcast-entry';
 import './recruitment-help.css';
 
