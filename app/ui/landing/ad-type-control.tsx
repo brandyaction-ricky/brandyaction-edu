@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { displayDimension, type PerformanceRow } from '@/lib/landing-performance';
-import { AdminButton } from '@/app/ui/final/admin-system';
+import { AdminButton } from '@/features/admin-ui';
 
 const labels = { cold: '콜드', retarget: '리타겟', unclassified: '미분류' };
 export type Classify = (row: PerformanceRow, value: PerformanceRow['ad_type']) => Promise<boolean>;

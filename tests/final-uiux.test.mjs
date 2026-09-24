@@ -57,17 +57,32 @@ test('final design styles are isolated, reproducible and exclude prototype runti
     assert.equal(read(`app/ui/final/${area}.css`), `/* Generated from final UIUX source; run node scripts/build-uiux-css.mjs. */\n${rules.toString()}\n`);
   }
   const layout = read('app/layout.tsx');
-  assert.ok(layout.includes('./ui/final/frontend.css') && layout.includes('./ui/final/admin.css'));
+  assert.ok(layout.includes('./ui/final/frontend.css') && layout.includes('./ui/final/admin.css') && layout.includes('@/features/admin-ui/styles/admin-system.css'));
   assert.doesNotMatch(layout, /ui\/(design|platform)\.css/);
   for (const file of fs.readdirSync(path.join(root, 'app/ui/final')).filter(file => file.endsWith('.tsx'))) assert.doesNotMatch(read('app/ui/final/' + file), /dangerouslySetInnerHTML|design-reference\/source|data-demo=/);
 });
-test('five admin categories and scoped navigation render from the final shell', () => {
-  const { AdminShell, finalAdminGroups, Overview } = load('app/ui/final/admin-shell.tsx');
+test('five admin categories and scoped navigation render from the admin UI feature', () => {
+  const { AdminShell, adminNavigationIcon, finalAdminGroups } = load('features/admin-ui.ts');
+  const { Overview } = load('app/ui/final/admin-shell.tsx');
   assert.equal(finalAdminGroups.length, 5);
-  const props = { current: 'overview', available: platform.sections, user: { ...user, role: 'admin' }, data, mobile: false, setMobile() {}, logout: async () => {} };
+  const props = { current: 'overview', available: platform.sections, user: { ...user, role: 'admin' }, pendingReviews: 1, mobile: false, setMobile() {}, logout: async () => {} };
   const markup = html(AdminShell, { ...props, children: React.createElement(Overview, { data, available: platform.sections }) });
   for (const [label] of finalAdminGroups) assert.ok(markup.includes(label));
   assert.match(markup, /class="nav-group"/); assert.match(markup, /lucide/); assert.match(markup, /category-strip/);
+  const expectedIcons = {
+    products: 'book-open', cohorts: 'calendar-days', learning: 'book-open', weeks: 'book-open',
+    contents: 'film', missions: 'book-open', members: 'users-round', reviews: 'square-check',
+    questions: 'message-circle', customers: 'users-round', tags: 'users-round', coupons: 'layout-grid',
+    'product-reviews': 'message-circle', banners: 'layout-grid', articles: 'file-pen-line',
+    testimonials: 'message-circle', orders: 'receipt-text', conversion: 'message-circle',
+    landing: 'chart-line', analytics: 'chart-line',
+    campaigns: 'layout-grid',
+    templates: 'layout-grid', automations: 'layout-grid', seo: 'settings', settings: 'settings', staff: 'shield-check',
+  };
+  for (const [key, icon] of Object.entries(expectedIcons)) {
+    assert.ok(adminNavigationIcon(key));
+    assert.match(markup, new RegExp(`href="/admin/${key}"[\\s\\S]*?lucide-${icon}`), key);
+  }
   const restricted = html(AdminShell, { ...props, available: platform.sections.filter(row => row.key === 'products') });
   assert.doesNotMatch(restricted, /href="\/admin\/(questions|customers|members|orders)"/);
 });

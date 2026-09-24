@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { RecruitmentHelp } from './recruitment-help';
-import { AdminButton } from './final/admin-system';
+import { AdminButton } from '@/features/admin-ui';
 import type { Row } from '@/lib/platform';
 
 export function FollowupTemplateSource({ blocked, onApply }: { blocked: boolean; onApply: (value: Row) => void }) {
