@@ -122,7 +122,10 @@ export function jevV4ConsistencyFlags(decisions: JevV4Result['decisions']): JevV
   const reference = decisions.paid_program_reference.choice;
   const stage = decisions.observable_stage.choice;
   if (!['no_paid_reference', 'unclear'].includes(reference) && stage === 'no_purchase_signal') flags.push('paid_reference_without_stage');
-  if (reference === 'no_paid_reference' && !['no_purchase_signal', 'unclear'].includes(stage)) flags.push('paid_stage_without_reference');
+  // This answer records whether paid education was named directly. Someone can
+  // ask about participation conditions without saying it is a paid program,
+  // so specific_evaluation alone is not a contradiction.
+  if (reference === 'no_paid_reference' && !['no_purchase_signal', 'specific_evaluation', 'unclear'].includes(stage)) flags.push('paid_stage_without_reference');
   return flags;
 }
 
