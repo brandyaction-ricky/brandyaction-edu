@@ -2062,17 +2062,18 @@ function OrdersPanel({
         ))}
       </div>
       <section className="panel" aria-label="주문 목록" aria-busy={loading}>
-        <div className="filter-row">
+        <div className="filter-row orders-toolbar">
           <label className="search">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><circle cx="10" cy="10" r="7" /><path d="m15 15 6 6" /></svg>
             <input type="search" value={query} aria-label="주문 검색" placeholder="주문번호 · 회원명 · 상품명 검색" onChange={event => { setQuery(event.target.value); setOpened(""); }} />
           </label>
-          <span className="spacer" />
-          <label className="select-filter"><span>상품</span><select aria-label="상품 필터" value={course} onChange={event => { setCourse(event.target.value); setOpened(""); }}><option value="">전체 상품</option>{registeredCourses.map(item => <option key={item.id} value={item.id}>{named(item)}</option>)}</select></label>
-          <select aria-label="결제 상태" value={status} onChange={event => { setStatus(event.target.value); setOpened(""); }}><option value="">전체 상태</option>{["paid", "pending", "payment_failed", "partially_refunded", "refunded", "cancelled"].map(value => <option key={value} value={value}>{labels[value] || value}</option>)}</select>
+          <div className="orders-filters" role="group" aria-label="주문 필터">
+            <label className="select-filter"><span>상품</span><select aria-label="상품 필터" value={course} onChange={event => { setCourse(event.target.value); setOpened(""); }}><option value="">전체 상품</option>{registeredCourses.map(item => <option key={item.id} value={item.id}>{named(item)}</option>)}</select></label>
+            <label className="select-filter"><span>결제 상태</span><select aria-label="결제 상태" value={status} onChange={event => { setStatus(event.target.value); setOpened(""); }}><option value="">전체 상태</option>{["paid", "pending", "payment_failed", "partially_refunded", "refunded", "cancelled"].map(value => <option key={value} value={value}>{labels[value] || value}</option>)}</select></label>
+          </div>
         </div>
-        <div className="table-scroll mobile-cards" tabIndex={0} role="region" aria-label="주문 데이터 표">
-          <table>
+        <div className="table-scroll mobile-cards orders-table-scroll" tabIndex={0} role="region" aria-label="주문 데이터 표">
+          <table className="orders-table">
             <thead>
               <tr>
                 {[
