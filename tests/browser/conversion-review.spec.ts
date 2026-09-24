@@ -131,12 +131,13 @@ test('Jev shows its result first and an authorized employee can approve without 
   await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
   await page.getByRole('button', { name: 'Jev 결과 보기', exact: true }).click();
   await expect(page.getByText('Jev 결과 · 직원 확인 필요', { exact: true })).toBeVisible();
-  await expect(page.getByLabel('Jev 전환 판정')).toContainText('구매 의도중간모델 표시 신뢰도 97%');
+  await expect(page.getByLabel('Jev 전환 판정')).toContainText('구매 의도중간Jev가 표시한 확신 97%');
   await expect(page.getByLabel('사람 판단 · 구매 의도')).toHaveCount(0);
   await expect(page.getByLabel(/^고객에게 보낼 답변 초안/)).toHaveValue('초보자를 대상으로 기초 개념부터 설명합니다.');
   await page.getByRole('button', { name: '무료·유료 구분 결과 보기', exact: true }).click();
+  await expect(page.getByRole('button', { name: '구분 결과 확인 완료', exact: true })).toBeVisible();
   await expect(page.getByLabel('무료 자료 접근과 유료 관심 참고 분류')).toContainText('무료 콘텐츠를 본 뒤 유료 교육 검토');
-  await expect(page.getByLabel('무료 자료 접근과 유료 관심 참고 분류')).toContainText('유료 교육은 언급했지만, 행동 단계에서는 구매 신호가 없다고 봤습니다.');
+  await expect(page.getByText('유료 교육은 언급했지만, 구매 행동은 확인되지 않았다고 봤습니다.')).toBeVisible();
   await page.getByLabel('검토 결정').selectOption('accept');
   await page.getByRole('button', { name: '직원 승인 기록', exact: true }).click();
   await expect(page.locator('.conversion-record')).toContainText('직원 승인');
@@ -236,12 +237,11 @@ test('authorized funnel draft can be saved and reloaded while stale writes requi
 
 test('manual inquiry can be entered and saved without inventing a customer identity', async ({ page }) => {
   const state = await fixture(page);
-  await page.getByRole('button', { name: '문의 연결', exact: true }).click();
-  const drawer = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: '문의 연결', exact: true }) });
-  await drawer.getByLabel(/^문의 출처/).selectOption('manual');
+  await page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true }).click();
+  const drawer = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: '카톡 문의 붙여넣기', exact: true }) });
   await drawer.getByLabel(/^문의 시기/).selectOption('current');
   await drawer.getByLabel(/^문의 제목/).fill('수강 일정 확인');
-  await drawer.getByLabel(/^문의 발췌/).fill('수업은 언제 진행되나요?');
+  await drawer.getByLabel(/^문의 내용/).fill('수업은 언제 진행되나요?');
   await drawer.getByLabel(/^출처 설명/).fill('합성 외부 문의');
   await drawer.getByLabel(/^문의 접수 시각/).fill('2026-09-20T10:00');
   await drawer.getByLabel(/^대상 상품/).selectOption(courseId);
@@ -257,15 +257,34 @@ test('manual inquiry can be entered and saved without inventing a customer ident
   expect(state.mutations[0].requestId).toMatch(/^[0-9a-f-]{36}$/);
 });
 
+test('pasted Kakao inquiry is saved and immediately reviewed by Jev without sending a reply', async ({ page }) => {
+  const state = await fixture(page, 'jev');
+  await page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true }).click();
+  const drawer = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: '카톡 문의 붙여넣기', exact: true }) });
+  await drawer.getByLabel(/^문의 제목/).fill('');
+  await drawer.getByLabel(/^문의 내용/).fill('무료 다시보기 링크가 열리지 않아요. 유료 과정 가격과 시작일도 알려주세요.');
+  await drawer.getByLabel(/^출처 설명/).fill('카카오 채널 1:1 상담');
+  await drawer.getByLabel(/^문의 접수 시각/).fill('2026-09-24T10:00');
+  await drawer.getByLabel(/^대상 상품/).selectOption(courseId);
+  await drawer.getByRole('checkbox', { name: '고객 식별정보를 제거한 발췌임을 확인했습니다.' }).check();
+  await drawer.getByRole('button', { name: '저장하고 Jev로 바로 살펴보기', exact: true }).click();
+  await expect(drawer).toHaveCount(0);
+  await expect(page.getByText('문의가 저장됐고 Jev 분류와 답변 초안을 만들었습니다. 아래 문의 카드에서 확인해 주세요.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '구분 결과 확인 완료', exact: true })).toBeVisible();
+  expect(state.mutations.map(item => item.action || (item.v1_run_id ? 'jev-v4' : 'unknown'))).toEqual(['save_case', 'analyze', 'jev-v4']);
+  expect(state.mutations[0]).toMatchObject({ action: 'save_case', subject: '무료 다시보기 링크가 열리지 않아요. 유료 과정 가격과 시작일도 알려주세요.' });
+  expect(state.unexpectedApi).toEqual([]);
+});
+
 test('historical education inquiry can be saved without linking a different current course', async ({ page }) => {
   const state = await fixture(page);
-  await page.getByRole('button', { name: '문의 연결', exact: true }).click();
-  const drawer = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: '문의 연결', exact: true }) });
+  await page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true }).click();
+  const drawer = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: '카톡 문의 붙여넣기', exact: true }) });
   await drawer.getByLabel(/^문의 출처/).selectOption('manual');
   await drawer.getByLabel(/^문의 시기/).selectOption('external_legacy');
   await drawer.getByLabel(/^당시 유료 교육 상품명/).fill('과거 온라인 마케팅 교육');
   await drawer.getByLabel(/^문의 제목/).fill('교육 신청 방식');
-  await drawer.getByLabel(/^문의 발췌/).fill('교육 신청 전에 수강 조건을 확인하고 싶습니다.');
+  await drawer.getByLabel(/^문의 내용/).fill('교육 신청 전에 수강 조건을 확인하고 싶습니다.');
   await drawer.getByLabel(/^출처 설명/).fill('카카오 채널 1:1 · 과거 상담');
   await drawer.getByLabel(/^문의 접수 시각/).fill('2024-04-17T10:00');
   await expect(drawer.getByLabel(/^대상 상품/)).toHaveValue('');
@@ -319,7 +338,7 @@ test('lost read access clears previously loaded inquiry and draft data', async (
   await expect(page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ })).toHaveCount(0);
   await expect(page.getByLabel(/^고객에게 보낼 답변 초안/)).toHaveCount(0);
   await expect(page.getByText(initialCase.content, { exact: true })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '문의 연결', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true })).toHaveCount(0);
 });
 
 test('review and manual-entry drawer fit the viewport without horizontal overflow', async ({ page }) => {
@@ -329,9 +348,8 @@ test('review and manual-entry drawer fit the viewport without horizontal overflo
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
   };
   await noOverflow();
-  await page.getByRole('button', { name: '문의 연결', exact: true }).click();
-  await page.getByLabel(/^문의 출처/).selectOption('manual');
-  await expect(page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: '문의 연결', exact: true }) })).toBeVisible();
+  await page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true }).click();
+  await expect(page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: '카톡 문의 붙여넣기', exact: true }) })).toBeVisible();
   await noOverflow();
 });
 
@@ -405,10 +423,10 @@ test('integrated workspace separates inquiry review from recruitment and removes
   await page.goto('/admin/conversion?workspace=1');
   await expect(page.getByRole('heading', { name: '모집 운영', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '모집 경로 초안 저장', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '문의 연결', exact: true })).not.toBeVisible();
+  await expect(page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true })).not.toBeVisible();
   await page.getByRole('button', { name: '구매 전 문의 검토', exact: true }).click();
-  await expect(page.getByRole('button', { name: '문의 연결', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true })).toBeVisible();
   await expect(page.getByText('초보 수강과 녹화 문의', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '모집 설정·구매·후속 안내', exact: true }).click();
-  await expect(page.getByRole('button', { name: '문의 연결', exact: true })).not.toBeVisible();
+  await expect(page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true })).not.toBeVisible();
 });
