@@ -76,6 +76,14 @@ test('v4 marks model-declared ambiguity and inconsistent probability rankings fo
   ]);
 });
 
+test('v4 prompt keeps free-only and explicitly declined paid interest out of paid-intent labels', () => {
+  assert.match(v4.JEV_V4_QUESTIONS.paid_program_reference.instructions, /무료 영상이나 자료만 요청한 것은 유료 교육 언급이나 구매 관심이 아닙니다/);
+  assert.match(v4.JEV_V4_QUESTIONS.paid_program_reference.instructions, /유료 관심을 부정하면 no_paid_reference/);
+  assert.match(v4.JEV_V4_QUESTIONS.observable_stage.instructions, /유료 관심을 명시적으로 부정했다면 no_purchase_signal/);
+  assert.match(v4.JEV_V4_QUESTIONS.attempted_action_target.instructions, /대상이 특정되지 않으면 무료 콘텐츠 접근으로 추정하지 말고 unclear/);
+  assert.match(v4.JEV_V4_QUESTIONS.operational_issue.instructions, /대상이 불명확하면 무료 접근 실패로 좁혀 추정하지 말고 unclear/);
+});
+
 test('v4 rejects invented choices and malformed probability distributions', async () => {
   const invalid = answers();
   invalid.attempted_action_target.choice = 'invented';
