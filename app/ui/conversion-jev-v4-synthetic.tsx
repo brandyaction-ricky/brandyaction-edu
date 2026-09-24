@@ -28,6 +28,13 @@ const choices: Record<string, string> = {
   no_purchase_signal: '유료 구매 신호 언급 없음', information_seeking: '유료 정보 탐색', specific_evaluation: '구체 조건 검토',
   conditional_purchase_statement: '조건부 신청·구매 의사', paid_application_or_payment_attempt: '유료 신청·결제 시도 명시',
 };
+const consistencyLabels: Record<string, string> = {
+  paid_attempt_without_paid_target: '유료 신청·결제 단계인데 실제 시도 대상이 유료로 판정되지 않음',
+  paid_failure_without_paid_target: '유료 신청·결제 실패인데 시도 대상이 유료로 판정되지 않음',
+  free_failure_without_free_target: '무료 콘텐츠 실패인데 시도 대상이 무료로 판정되지 않음',
+  paid_reference_without_stage: '유료 언급은 있으나 행동 단계는 구매 신호 없음',
+  paid_stage_without_reference: '유료 언급은 없으나 행동 단계는 유료 신호 있음',
+};
 const uncertaintyLabels: Record<JevV4UncertaintyFlag['reason'], string> = {
   unclear_choice: '모델이 판단 보류를 선택함',
   unresolved_category: '정보 없음과 불명확이 한 선택지에 합쳐짐',
@@ -85,7 +92,7 @@ export function ConversionJevV4Synthetic() {
           const uncertainty = uncertaintyByDecision.get(key) || [];
           return <div key={key}><dt>{labels[key]}</dt><dd>{choices[decision.choice] || decision.choice} · 표시 신뢰도 {Math.round(decision.confidence * 100)}%{uncertainty.length ? ` · 검토 신호: ${uncertainty.map(flag => uncertaintyLabels[flag.reason]).join(', ')}` : ''}</dd></div>;
         })}</dl>
-        {result.consistency_flags.length > 0 && <p role="alert" className="conversion-alert">판정 간 형식 충돌이 {result.consistency_flags.length}개 있습니다. 결과를 사람 판단으로 확정하지 말고 원문 근거를 확인하세요.</p>}
+        {result.consistency_flags.length > 0 && <p role="alert" className="conversion-alert">판정 간 형식 충돌: {result.consistency_flags.map(flag => consistencyLabels[flag] || flag).join(' · ')}. 원문 근거를 확인하세요.</p>}
         {result.uncertainty_flags.length === 0 && result.consistency_flags.length === 0 && <p className="conversion-muted">표시된 불확실성·형식 충돌은 없지만, 원문과의 일치나 정확성을 확인한 것은 아닙니다.</p>}
       </article>;
     })}
