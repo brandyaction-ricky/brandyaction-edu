@@ -68,7 +68,7 @@ export const adminTables: Record<string, string[]> = {
   missions: ['courses', 'curriculum_weeks', 'curriculum_lessons', 'curriculum_missions', 'mission_quizzes'],
   members: ['courses', 'cohorts'],
   reviews: ['courses', 'cohorts', 'enrollments', 'profiles', 'curriculum_missions', 'mission_submissions'],
-  questions: ['courses', 'edu_questions', 'profiles'],
+  questions: ['edu_questions'],
   customers: ['profiles', 'crm_tags', 'crm_member_tags', 'coupons', 'courses', 'cohorts', 'enrollments'],
   staff: ['profiles', 'site_settings'],
   tags: ['crm_tags'], coupons: ['coupons', 'coupon_products', 'coupon_redemptions', 'courses', 'crm_tags'], 'product-reviews': ['courses', 'reviews', 'profiles'],
@@ -78,6 +78,19 @@ export const adminTables: Record<string, string[]> = {
   orders: ['courses', 'cohorts', 'orders', 'order_items', 'payments', 'enrollments', 'edu_refund_requests'],
   landing: [], analytics: [], metrics: ['site_settings'], seo: ['site_settings'], settings: ['site_settings'],
 };
+
+export function adminSelectColumns(section: string, table: string): string {
+  if (section === 'products' && table === 'courses') return '*';
+  if (table === 'courses') return 'id,title,status,category,list_price,archived_at,display_order,created_at,updated_at';
+  if (section === 'questions' && table === 'edu_questions') return 'id,user_id,course_id,title,content,answer,status,created_at,updated_at';
+  if (section === 'orders') {
+    if (table === 'orders') return 'id,order_number,user_id,status,subtotal,discount_amount,total_amount,customer_name,customer_email,customer_phone,created_at';
+    if (table === 'cohorts') return 'id,course_id,name';
+    if (table === 'order_items') return 'id,order_id,course_id,cohort_id,item_name,unit_price';
+    if (table === 'enrollments') return 'id,order_item_id,status';
+  }
+  return '*';
+}
 
 export const archiveValues: Record<string, Record<string, unknown>> = {
   products: { status: 'archived' }, cohorts: { status: 'cancelled' },

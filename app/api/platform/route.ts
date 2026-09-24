@@ -5,7 +5,7 @@ import { bannerTextLimits, sections, safeUrl, type Row } from '@/lib/platform';
 import { containsFreeClassCampaign, hasLearningAccess, paidCourseReadinessIssues } from '@/lib/platform-rules';
 import { getEduSettings } from '@/lib/edu-settings';
 import { gradeQuiz, type QuizDefinition } from '@/lib/mission-quiz';
-import { adminTables, archiveValues, cohortStatus, phoneNumber, validImage, assetPath, imagePreviewUrl, databaseMessage } from '@/lib/qa-rules';
+import { adminSelectColumns, adminTables, archiveValues, cohortStatus, phoneNumber, validImage, assetPath, imagePreviewUrl, databaseMessage } from '@/lib/qa-rules';
 import { POLICY_VERSION } from '@/lib/legal-policies';
 import { getOperatorUser, permissionsFor, sectionScopes } from '@/lib/operator-permissions';
 import { crmDeliveryState } from '@/lib/crm-delivery';
@@ -67,7 +67,17 @@ export async function GET(request: Request) {
                 }
             })(),
             ...tables.filter((table) => !deferredOrderTables.has(table)).map(async (table) => {
-                const columns = table === 'crm_tags' && adminMode && sectionKey === 'tags' ? '*,crm_member_tags(count)' : table === 'payments' ? 'id,order_id,method,status,approved_amount,cancelled_amount,receipt_url,approved_at,created_at' : table === 'edu_refund_requests' ? 'id,payment_id,amount,reason,status,created_at' : table === 'reviews' && !adminMode ? 'id,course_id,author_name,author_nickname,rating,body,is_featured,display_order,published_at,created_at' : '*';
+                const columns = adminMode
+                    ? table === 'crm_tags' && sectionKey === 'tags'
+                        ? '*,crm_member_tags(count)'
+                        : table === 'payments'
+                            ? 'id,order_id,method,status,approved_amount,cancelled_amount,receipt_url,approved_at,created_at'
+                            : table === 'edu_refund_requests'
+                                ? 'id,payment_id,amount,reason,status,created_at'
+                                : adminSelectColumns(sectionKey, table)
+                    : table === 'reviews'
+                        ? 'id,course_id,author_name,author_nickname,rating,body,is_featured,display_order,published_at,created_at'
+                        : '*';
                 const serverPaged = adminMode && table === primaryTable && !['home', 'members', 'reviews', 'analytics', 'metrics', 'seo', 'settings', 'staff', 'templates', 'campaigns', 'automations'].includes(sectionKey);
                 let query = db.from(table).select(columns, serverPaged ? { count: 'exact' } : undefined);
                 if (record && adminMode && table === primaryTable) query = query.eq('id', record);
@@ -136,22 +146,22 @@ export async function GET(request: Request) {
             data.edu_refund_requests = [];
             if (orderIds.length) {
                 const [items, payments] = await Promise.all([
-                    db.from('order_items').select('*').in('order_id', orderIds),
+                    db.from('order_items').select(adminSelectColumns(sectionKey, 'order_items')).in('order_id', orderIds),
                     db.from('payments').select('id,order_id,method,status,approved_amount,cancelled_amount,receipt_url,approved_at,created_at').in('order_id', orderIds),
                 ]);
                 if (items.error) throw items.error;
                 if (payments.error) throw payments.error;
-                data.order_items = (items.data || []) as Row[];
+                data.order_items = (items.data || []) as unknown as Row[];
                 data.payments = (payments.data || []) as Row[];
                 const itemIds = data.order_items.map((row) => row.id).filter(Boolean);
                 const paymentIds = data.payments.map((row) => row.id).filter(Boolean);
                 const [enrollments, refunds] = await Promise.all([
-                    itemIds.length ? db.from('enrollments').select('*').in('order_item_id', itemIds) : Promise.resolve({ data: [], error: null }),
+                    itemIds.length ? db.from('enrollments').select(adminSelectColumns(sectionKey, 'enrollments')).in('order_item_id', itemIds) : Promise.resolve({ data: [], error: null }),
                     paymentIds.length ? db.from('edu_refund_requests').select('id,payment_id,amount,reason,status,created_at').in('payment_id', paymentIds) : Promise.resolve({ data: [], error: null }),
                 ]);
                 if (enrollments.error) throw enrollments.error;
                 if (refunds.error) throw refunds.error;
-                data.enrollments = (enrollments.data || []) as Row[];
+                data.enrollments = (enrollments.data || []) as unknown as Row[];
                 data.edu_refund_requests = (refunds.data || []) as Row[];
             }
         }
