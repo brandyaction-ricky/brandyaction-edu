@@ -7,25 +7,17 @@ import {
 } from "@/lib/platform";
 import {
   ArrowRight,
-  BookOpen,
-  CalendarDays,
   CheckSquare2,
-  FilePenLine,
-  LayoutGrid,
-  LineChart,
   LogOut,
   Menu,
   MessageCircle,
-  Settings,
-  ShieldCheck,
   UsersRound,
   X,
-  type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { Data } from "../learning-workflows";
-import { AdminSuccessState } from "@/features/admin-ui";
+import { AdminSuccessState, adminNavigationIcon } from "@/features/admin-ui";
 
 export { AdminShell } from "@/features/admin-ui";
 
@@ -49,30 +41,6 @@ export const finalAdminGroups = [
   ["주문·매출", ["orders"]],
   ["마케팅·전환", ["conversion", "landing", "analytics", "campaigns", "templates", "automations", "seo", "settings"]],
 ] as const;
-const icons: Record<string, LucideIcon> = {
-  products: BookOpen,
-  cohorts: CalendarDays,
-  learning: BookOpen,
-  missions: BookOpen,
-  members: UsersRound,
-  reviews: CheckSquare2,
-  questions: MessageCircle,
-  customers: UsersRound,
-  conversion: MessageCircle,
-  tags: UsersRound,
-  coupons: LayoutGrid,
-  "product-reviews": MessageCircle,
-  banners: LayoutGrid,
-  articles: FilePenLine,
-  testimonials: MessageCircle,
-  orders: LayoutGrid,
-  landing: LineChart,
-  analytics: LineChart,
-  metrics: FilePenLine,
-  seo: Settings,
-  settings: Settings,
-  staff: ShieldCheck,
-};
 export const finalAdminTitles: Record<string, string> = {
   conversion: "모집 운영",
   landing: "광고·웨비나 성과",
@@ -200,7 +168,7 @@ export function LegacyAdminShell({
   const navLink = (key: string) => {
     const s = byKey.get(key);
     if (!s && key !== "overview") return null;
-    const Icon = icons[key] || LayoutGrid;
+    const Icon = adminNavigationIcon(key);
     return (
       <Link
         key={key}
@@ -363,7 +331,7 @@ export function Overview({
       <div className="category-strip">
         {finalAdminGroups.map(([title, keys]) => {
           const first = keys.find(can),
-            Icon = icons[first || ""] || LayoutGrid;
+            Icon = adminNavigationIcon(first || "");
           return first ? (
             <Link href={"/admin/" + first} key={title}>
               <Icon />

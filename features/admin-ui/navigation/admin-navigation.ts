@@ -1,9 +1,58 @@
 import type { AdminContentWidth } from '../components/admin-system';
+import {
+  BookOpen,
+  CalendarDays,
+  CheckSquare2,
+  FilePenLine,
+  Film,
+  LayoutGrid,
+  LineChart,
+  MessageCircle,
+  ReceiptText,
+  Settings,
+  ShieldCheck,
+  UsersRound,
+  type LucideIcon,
+} from 'lucide-react';
 
 export type AdminNavigationItem = {
   key: string;
   title: string;
 };
+
+const adminNavigationIcons: Record<string, LucideIcon> = {
+  products: BookOpen,
+  cohorts: CalendarDays,
+  learning: BookOpen,
+  weeks: BookOpen,
+  contents: Film,
+  missions: BookOpen,
+  members: UsersRound,
+  reviews: CheckSquare2,
+  questions: MessageCircle,
+  customers: UsersRound,
+  conversion: MessageCircle,
+  tags: UsersRound,
+  coupons: LayoutGrid,
+  'product-reviews': MessageCircle,
+  banners: LayoutGrid,
+  articles: FilePenLine,
+  testimonials: MessageCircle,
+  orders: ReceiptText,
+  landing: LineChart,
+  analytics: LineChart,
+  metrics: FilePenLine,
+  campaigns: LayoutGrid,
+  templates: LayoutGrid,
+  automations: LayoutGrid,
+  seo: Settings,
+  settings: Settings,
+  staff: ShieldCheck,
+};
+
+export function adminNavigationIcon(key: string): LucideIcon {
+  return adminNavigationIcons[key] || LayoutGrid;
+}
 
 export const adminNavigationGroups = [
   ['클래스 관리', ['products', 'cohorts', 'weeks', 'learning', 'contents', 'missions', 'members', 'reviews', 'questions']],

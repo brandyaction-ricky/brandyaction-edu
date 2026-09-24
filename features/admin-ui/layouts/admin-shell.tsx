@@ -2,32 +2,17 @@
 
 import {
   ArrowRight,
-  BookOpen,
-  CalendarDays,
-  CheckSquare2,
-  FilePenLine,
-  Film,
-  LayoutGrid,
-  Layers3,
-  LineChart,
   LogOut,
   Menu,
   MessageCircle,
-  MessagesSquare,
-  ReceiptText,
-  Settings,
-  ShieldCheck,
-  Tags,
-  UsersRound,
-  Workflow,
   X,
-  type LucideIcon,
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef, type ReactNode } from 'react';
 import {
   adminContentWidth,
+  adminNavigationIcon,
   adminNavigationGroups,
   adminNavigationTitles,
   adminSectionTitle,
@@ -35,40 +20,6 @@ import {
   type AdminNavigationItem,
 } from '../navigation/admin-navigation';
 import { createAdminMenuVisibility } from '../permissions/menu-visibility';
-
-const icons: Record<string, LucideIcon> = {
-  products: BookOpen,
-  cohorts: CalendarDays,
-  learning: BookOpen,
-  weeks: Layers3,
-  contents: Film,
-  missions: BookOpen,
-  members: UsersRound,
-  reviews: CheckSquare2,
-  questions: MessageCircle,
-  customers: UsersRound,
-  conversion: MessageCircle,
-  tags: Tags,
-  coupons: LayoutGrid,
-  'product-reviews': MessageCircle,
-  banners: LayoutGrid,
-  articles: FilePenLine,
-  testimonials: MessageCircle,
-  orders: ReceiptText,
-  landing: LineChart,
-  analytics: LineChart,
-  metrics: FilePenLine,
-  campaigns: MessagesSquare,
-  templates: MessageCircle,
-  automations: Workflow,
-  seo: Settings,
-  settings: Settings,
-  staff: ShieldCheck,
-};
-
-export function adminNavigationIcon(key: string) {
-  return icons[key] || LayoutGrid;
-}
 
 export type AdminShellUser = {
   full_name?: string | null;
