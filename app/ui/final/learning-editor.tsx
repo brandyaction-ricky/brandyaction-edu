@@ -25,7 +25,7 @@ function Field({ label, children, wide = false, hint }: { label: string; childre
 
 function LessonQuiz({ mission, current, pending, send }: { mission: Row; current?: Row; pending: boolean; send: WorkflowSend }) {
   const [questions, setQuestions] = useState<QuizQuestion[]>(() => (current?.questions as QuizQuestion[]) || []);
-  const [pass, setPass] = useState(Number(current?.pass_percent || 100));
+  const pass = Number(current?.pass_percent || 100);
   const [message, setMessage] = useState("");
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -59,7 +59,6 @@ function LessonQuiz({ mission, current, pending, send }: { mission: Row; current
   return <form onSubmit={event => void save(event)}>
     <div className="panel-head learning-quiz-head"><div><h2>확인 퀴즈 <span className="muted">{questions.length}문항</span></h2><p>선택지 앞 원을 눌러 정답을 지정합니다.</p></div><button type="button" className="btn small" onClick={addQuestion} disabled={pending || saving || questions.length >= 20}><Plus size={16} />문제 추가</button></div>
     <fieldset className="section-pad learning-editor-fields" disabled={pending || saving}>
-      <div className="learning-quiz-settings"><div><b>{t(mission, "title")}</b><p className="meta">이 미션의 제출 전에 확인 퀴즈를 통과해야 합니다.</p></div><Field label="통과 기준 · %"><input type="number" min={1} max={100} value={pass} onChange={event => { setPass(Number(event.target.value)); setDirty(true); }} required /></Field></div>
       {questions.length ? questions.map((question, index) => <article className="question-editor" key={question.id}>
         <div className="question-title-row"><span>{index + 1}.</span><input type="text" aria-label={`${index + 1}번 문제`} value={question.prompt} placeholder="문제를 입력해 주세요" maxLength={1000} required onChange={event => update(index, { prompt: event.target.value })} /><button type="button" className="btn iconbtn ghost danger" aria-label={`${index + 1}번 문제 삭제`} onClick={() => { setQuestions(previous => previous.filter((_, i) => i !== index)); setDirty(true); }}><X size={16} /></button></div>
         {question.options.map((choice, optionIndex) => <div className={"option-row" + (question.correctIndex === optionIndex ? " correct" : "")} key={optionIndex}>

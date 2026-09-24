@@ -1032,6 +1032,9 @@ function Editor({
   const ref = useRef<HTMLDialogElement>(null);
   const requestId = useRef(crypto.randomUUID());
   const [error, setError] = useState("");
+  const [questionAnswer, setQuestionAnswer] = useState(() => t(row, "answer"));
+  const [questionAiPending, setQuestionAiPending] = useState(false);
+  const [questionAiMessage, setQuestionAiMessage] = useState("");
   const [tagKind, setTagKind] = useState(String(row?.tag_kind || "manual"));
   const [tagRule, setTagRule] = useState(String(row?.rule_key || "free_lesson_1"));
   const [couponDiscountType, setCouponDiscountType] = useState(String(row?.discount_type || "percentage"));
@@ -1107,6 +1110,30 @@ function Editor({
       setError((e as Error).message);
     }
   };
+  const generateQuestionAnswer = async () => {
+    if (!row?.id || questionAiPending || pending) return;
+    setQuestionAiPending(true);
+    setQuestionAiMessage("");
+    try {
+      const response = await fetch("/api/admin/questions/answer-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ questionId: row.id }),
+      });
+      const result = (await response.json()) as {
+        draft?: string;
+        error?: string;
+      };
+      if (!response.ok || !result.draft)
+        throw new Error(result.error || "AI 답변 초안을 생성하지 못했습니다.");
+      setQuestionAnswer(result.draft);
+      setQuestionAiMessage("AI 초안을 작성했습니다. 내용을 확인하고 수정한 뒤 답변을 저장해 주세요.");
+    } catch (cause) {
+      setQuestionAiMessage(cause instanceof Error ? cause.message : "AI 답변 초안을 생성하지 못했습니다.");
+    } finally {
+      setQuestionAiPending(false);
+    }
+  };
   const control = (f: Field) => {
     const value =
       section.table === "courses" &&
@@ -1117,6 +1144,17 @@ function Editor({
           ]
         : row?.[f.key];
     const props = { name: f.key, id: "edit-" + f.key, required: f.required, maxLength: f.maxLength };
+    if (section.key === "questions" && f.key === "answer")
+      return (
+        <textarea
+          {...props}
+          rows={8}
+          value={questionAnswer}
+          onChange={(event) => setQuestionAnswer(event.target.value)}
+          placeholder="회원에게 전달할 답변을 작성해 주세요."
+          disabled={pending}
+        />
+      );
     if (f.type === "blocks") return <BlocksField name={f.key} value={value} />;
     if (["image", "resource"].includes(f.type || ""))
       return (
@@ -1348,6 +1386,22 @@ function Editor({
                   <label className="checkline"><input name="exclude_free" type="checkbox" defaultChecked={row?.exclude_free !== false} />무료 상품 적용 제외</label>
                   <p className="notice">발급 후에도 이미 완료된 주문의 할인 금액은 변경하지 않습니다. 변경된 조건은 이후 쿠폰 적용 요청부터 검증됩니다.</p>
                 </div>
+              ) : section.key === "questions" ? (
+                <div className="question-answer-editor">
+                  <div className="question-answer-heading">
+                    <div><h3>답변 작성</h3><p>AI 초안은 자동 등록되지 않습니다. 사실을 확인하고 내용을 검수해 주세요.</p></div>
+                    <button className="btn question-ai-button" type="button" disabled={pending || questionAiPending || !row?.id} onClick={() => void generateQuestionAnswer()}>
+                      {questionAiPending ? "AI 답변 생성 중…" : "✦ AI 답변 생성"}
+                    </button>
+                  </div>
+                  <div className="field"><label htmlFor="edit-answer">답변 *</label>{control(section.fields.find((field) => field.key === "answer")!)}</div>
+                  {questionAiMessage && <p className="question-ai-message" role="status" aria-live="polite">{questionAiMessage}</p>}
+                  <div className="question-answer-options">
+                    {section.fields.filter((field) => field.key !== "answer").map((field) => (
+                      <div className="field" key={field.key}><label htmlFor={`edit-${field.key}`}>{field.label}</label>{control(field)}</div>
+                    ))}
+                  </div>
+                </div>
               ) : <div className="editor-fields">
                 {section.fields.map((f) => (
                   <div
@@ -1417,7 +1471,7 @@ function Editor({
           </button>
           {!section.readOnly && (
             <button className="btn primary" disabled={pending}>
-              {pending ? "저장 중..." : ["tags", "coupons"].includes(section.key) ? "입력 내용 확인" : "저장하기"}
+              {pending ? "저장 중..." : section.key === "questions" ? row?.answer ? "답변 수정" : "답변 등록" : ["tags", "coupons"].includes(section.key) ? "입력 내용 확인" : "저장하기"}
             </button>
           )}
         </footer>
