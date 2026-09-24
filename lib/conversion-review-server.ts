@@ -100,6 +100,11 @@ export function conversionPayload(raw: unknown) {
       if (!['unknown', 'paid', 'not_paid'].includes(purchase_outcome)) conversionError('결제 확인 상태를 선택해 주세요.');
       payload = { ...common, operation, purchase_outcome };
     } else payload = { ...common, operation };
+  } else if (action === 'manage_case_order') {
+    const operation = String(body.operation || '');
+    if (!['link', 'unlink'].includes(operation)) conversionError('주문 연결 작업을 확인해 주세요.');
+    payload = { case_id: conversionId(body.case_id), expected_version: version(body.expected_version), operation,
+      order_id: conversionId(body.order_id, operation === 'link') };
   } else conversionError('지원하지 않는 작업입니다.');
   // Only validated semantic input is fingerprinted. Generated mock output is not
   // part of the client's intent, so a lost response can be retried unchanged.
