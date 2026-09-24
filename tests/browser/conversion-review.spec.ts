@@ -151,9 +151,9 @@ test('employee can edit a proposed reply before recording approval', async ({ pa
   const state = await fixture(page, 'jev');
   await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
   await page.getByRole('button', { name: 'Jev 결과 보기', exact: true }).click();
+  await page.getByLabel('검토 결정').selectOption('edit');
   await page.getByLabel(/^고객에게 보낼 답변 초안/).fill('수강 수준은 안내 가능하며 녹화 제공 여부는 추가 확인이 필요합니다.');
   await page.getByLabel('검토 사유').fill('녹화 제공 내용을 직원이 확인했습니다.');
-  await page.getByLabel('검토 결정').selectOption('edit');
   await expect(page.getByLabel('검토 결정')).toHaveValue('edit');
   await page.getByRole('button', { name: '직원 승인 기록', exact: true }).click();
   await expect(page.locator('.conversion-record')).toContainText('수정 후 승인');
