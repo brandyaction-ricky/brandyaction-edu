@@ -60,6 +60,14 @@ test('v4 flags an explicit future paid consideration that the stage overlooks', 
   assert.equal(result.decisions.observable_stage.choice, 'no_purchase_signal');
 });
 
+test('v4 allows condition review without explicit paid wording but still flags a purchase claim', () => {
+  const reviewing = answers({ paid_program_reference: 'no_paid_reference', observable_stage: 'specific_evaluation' });
+  assert.deepEqual(v4.jevV4ConsistencyFlags(reviewing), []);
+
+  const promising = answers({ paid_program_reference: 'no_paid_reference', observable_stage: 'conditional_purchase_statement' });
+  assert.deepEqual(v4.jevV4ConsistencyFlags(promising), ['paid_stage_without_reference']);
+});
+
 test('v4 marks model-declared ambiguity and inconsistent probability rankings for operator review', async () => {
   const uncertain = answers({ information_need: 'other_or_unclear' });
   uncertain.confirmed_barrier.confidence = 0.62;
