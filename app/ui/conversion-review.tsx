@@ -292,7 +292,7 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
       </div>
       </div>
       {drawer === 'case' && <AdminDrawer title={editingCase ? '문의 정보 수정' : caseSource === 'manual' ? '카톡 문의 붙여넣기' : '사이트 문의 연결'} onClose={() => { if (!pending) setDrawer(null); }}>
-        <CaseForm key={editingCase?.id || `new-${caseSource}`} snapshot={snapshot} item={editingCase} initialSource={caseSource} pending={pending} mutate={mutate} runJevV4={runJevV4} onSaved={(id, note) => { setSelectedId(id); setDrawer(null); if (note) setNotice(note); }} />
+        <CaseForm key={editingCase?.id || `new-${caseSource}`} snapshot={snapshot} item={editingCase} initialSource={caseSource} pending={pending || v4Pending} mutate={mutate} runJevV4={async runId => { setV4Pending(true); try { await runJevV4(runId); await refresh(); } finally { setV4Pending(false); } }} onSaved={(id, note) => { setSelectedId(id); setDrawer(null); if (note) setNotice(note); }} />
       </AdminDrawer>}
       {drawer === 'evidence' && <AdminDrawer title={editingEvidence ? '설명자료 수정' : '설명자료 등록'} onClose={() => { if (!pending) setDrawer(null); }}>
         <EvidenceForm key={editingEvidence?.id || 'new'} snapshot={snapshot} item={editingEvidence} initialCourse={selected?.course_id || ''} pending={pending} mutate={mutate} onSaved={() => setDrawer(null)} />
