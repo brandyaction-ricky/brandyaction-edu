@@ -135,6 +135,9 @@ export function conversionAdjudicationPayload(raw: unknown) {
 export function conversionDatabaseError(error: { code?: string; message?: string }) {
   const message = error.message || '';
   if (message.includes('CONVERSION_FORBIDDEN')) conversionError('이 작업에 필요한 운영 권한이 없습니다.', 403);
+  if (message.includes('CONVERSION_ORDER_ALREADY_LINKED')) conversionError('이 주문은 이미 다른 문의에 연결돼 있습니다.', 409);
+  if (message.includes('CONVERSION_ORDER_NOT_ELIGIBLE')) conversionError('결제가 완료된 주문만 문의에 연결할 수 있습니다.', 409);
+  if (message.includes('CONVERSION_ORDER_SCOPE')) conversionError('문의와 상품·기수가 일치하는 주문만 연결할 수 있습니다.');
   if (message.includes('CONVERSION_STALE')) conversionError('문의 또는 자료가 변경됐습니다. 최신 내용을 동기화하고 다시 판단해 주세요.', 409);
   if (message.includes('CONVERSION_REQUEST_REUSED')) conversionError('같은 요청 ID로 다른 내용을 저장할 수 없습니다.', 409);
   if (message.includes('CONVERSION_NOT_FOUND')) conversionError('연결된 항목을 찾을 수 없습니다.', 404);

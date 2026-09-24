@@ -13,7 +13,7 @@ new Function('exports', 'require', ts.transpileModule(source, { compilerOptions:
   assert.equal(name, 'node:crypto'); return { createHash };
 });
 const { conversionPayload } = exports;
-const ids = Object.fromEntries(['admin', 'staff', 'course', 'cohort', 'inquiry', 'order', 'otherOrder'].map(key => [key, randomUUID()]));
+const ids = Object.fromEntries(['admin', 'staff', 'course', 'otherCourse', 'cohort', 'otherCohort', 'inquiry', 'order', 'otherOrder'].map(key => [key, randomUUID()]));
 
 before(async () => {
   await db.exec(`
@@ -34,12 +34,13 @@ before(async () => {
   `);
   await db.exec(migration);
   await db.query('insert into profiles(id,role) values($1,\'admin\'),($2,\'staff\')', [ids.admin, ids.staff]);
-  await db.query('insert into courses(id) values($1)', [ids.course]);
+  await db.query('insert into courses(id) values($1),($2)', [ids.course, ids.otherCourse]);
   await db.query('insert into cohorts(id,course_id) values($1,$2)', [ids.cohort, ids.course]);
+  await db.query('insert into cohorts(id,course_id) values($1,$2)', [ids.otherCohort, ids.otherCourse]);
   await db.query(`insert into edu_conversion_cases(id,source_type,sample_origin,course_id,cohort_id,received_at) values($1,'manual','current',$2,$3,'2026-09-20T00:00:00Z')`, [ids.inquiry, ids.course, ids.cohort]);
   await db.query("insert into site_settings(key,value) values($1,$2)", [`edu_staff_permissions_${ids.staff}`, { members: true, orders: true, marketing: true }]);
   await db.query("insert into orders(id,status,paid_at) values($1,'paid','2026-09-21T00:00:00Z'),($2,'paid','2026-09-21T00:00:00Z')", [ids.order, ids.otherOrder]);
-  await db.query('insert into order_items(order_id,course_id,cohort_id) values($1,$2,$3),($4,$2,$3)', [ids.order, ids.course, ids.cohort, ids.otherOrder]);
+  await db.query('insert into order_items(order_id,course_id,cohort_id) values($1,$2,$3),($4,$5,$6)', [ids.order, ids.course, ids.cohort, ids.otherOrder, ids.otherCourse, ids.otherCohort]);
 });
 after(async () => db.close());
 
@@ -73,6 +74,7 @@ test('orders with the wrong product and non-current inquiries cannot be linked',
   await db.query(`insert into edu_conversion_cases(id,source_type,sample_origin,course_id,cohort_id,received_at) values($1,'manual','external_legacy',null,null,'2026-09-20T00:00:00Z')`, [historical]);
   const base = { action: 'manage_case_order', operation: 'link', requestId: randomUUID(), expected_version: 1, order_id: ids.order };
   await assert.rejects(manage({ ...base, case_id: historical }), /CONVERSION_INVALID/);
+  await assert.rejects(manage({ ...base, case_id: ids.inquiry, order_id: ids.otherOrder }), /CONVERSION_ORDER_SCOPE/);
   await assert.rejects(manage({ ...base, case_id: ids.inquiry, order_id: randomUUID() }), /CONVERSION_ORDER_NOT_ELIGIBLE/);
 });
 

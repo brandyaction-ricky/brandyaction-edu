@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getOperatorUser } from '@/lib/operator-permissions';
-import { conversionDatabaseError, conversionError, conversionPayload } from '@/lib/conversion-review-server';
+import { conversionCapabilities, conversionDatabaseError, conversionError, conversionPayload } from '@/lib/conversion-review-server';
 
 const reply = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
 function failure(error: unknown) {
@@ -14,6 +14,7 @@ function requireOrderManager(user: Awaited<ReturnType<typeof getOperatorUser>>) 
 
 export async function GET(request: Request) {
   try {
+    if (!conversionCapabilities(process.env).enabled) conversionError('전환 관리 기능이 활성화되지 않았습니다.', 404);
     requireOrderManager(await getOperatorUser('members'));
     const caseId = new URL(request.url).searchParams.get('case_id');
     const parsed = conversionPayload({ action: 'manage_case_order', requestId: '00000000-0000-4000-8000-000000000001', operation: 'unlink', case_id: caseId, expected_version: 1 });
@@ -44,8 +45,15 @@ export async function GET(request: Request) {
     ]);
     if (candidateRows.error) conversionDatabaseError(candidateRows.error);
     if (linkedRows.error) conversionDatabaseError(linkedRows.error);
+    const candidateIds = (candidateRows.data || []).map(row => row.id);
+    const otherLinks = candidateIds.length
+      ? await db.from('edu_conversion_case_orders').select('order_id,case_id').in('order_id', candidateIds).neq('case_id', inquiry.id)
+      : { data: [], error: null };
+    if (otherLinks.error) conversionDatabaseError(otherLinks.error);
+    const alreadyAttributed = new Set((otherLinks.data || []).map(row => row.order_id));
     const byId = new Map<string, { id: string; status: string; currency: string; total_amount: number; paid_at: string; item_name: string; linked_at: string | null; refund_amount: number; payment_statuses: string[] }>();
     for (const row of [...(candidateRows.data || []), ...(linkedRows.data || [])] as unknown as Array<Record<string, unknown>>) {
+      if (alreadyAttributed.has(String(row.id))) continue;
       const items = row.order_items as Array<Record<string, unknown>>;
       const item = items?.find(value => value.course_id === inquiry.course_id && value.cohort_id === inquiry.cohort_id);
       if (!item || typeof row.paid_at !== 'string') continue;
@@ -66,6 +74,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    if (!conversionCapabilities(process.env).enabled) conversionError('전환 관리 기능이 활성화되지 않았습니다.', 404);
     if (request.headers.get('origin') !== new URL(request.url).origin) return reply({ error: '요청 출처를 확인해 주세요.' }, 403);
     const user = requireOrderManager(await getOperatorUser('members'));
     const raw = await request.text();
