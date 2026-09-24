@@ -29,6 +29,7 @@ export async function GET(request: Request) {
         const sectionKey = params.get('section') || 'home';
         const record = params.get('record');
         if (record && (!uid(record) || !['products', 'learning'].includes(sectionKey))) return reply({ error: '편집할 항목을 확인해 주세요.' }, 400);
+        const productEditorRead = adminMode && sectionKey === 'products' && Boolean(record);
         const page = Math.max(1, Math.min(100000, Number(params.get('page')) || 1));
         const pageSize = sectionKey === 'orders' ? 30 : 100;
         if (adminMode && !user) return reply({ error: '로그인이 필요합니다.', user: null }, 401);
@@ -38,7 +39,7 @@ export async function GET(request: Request) {
         const db = adminMode ? createAdminClient() : await createClient();
         if (adminMode && !Object.hasOwn(adminTables, sectionKey)) return reply({ error: '조회 화면을 확인해 주세요.' }, 400);
         const settings = getEduSettings();
-        let tables = adminMode ? adminTables[sectionKey] : ['courses', 'cohorts', 'curriculum_weeks', 'curriculum_lessons', 'articles', 'article_categories', 'review_videos', 'site_banners', 'reviews', 'cohort_sessions'];
+        let tables = productEditorRead ? ['courses', 'cohorts'] : adminMode ? adminTables[sectionKey] : ['courses', 'cohorts', 'curriculum_weeks', 'curriculum_lessons', 'articles', 'article_categories', 'review_videos', 'site_banners', 'reviews', 'cohort_sessions'];
         if (adminMode && sectionKey === 'home' && operator?.role === 'staff') tables = tables.filter((table) => (['courses', 'cohorts'].includes(table) && operator.permissions.products) || (['mission_submissions', 'edu_questions'].includes(table) && operator.permissions.members));
         const data: Record<string, Row[]> = {};
         let pagination: { page: number; pageSize: number; total: number } | null = null;
@@ -78,10 +79,11 @@ export async function GET(request: Request) {
                     : table === 'reviews'
                         ? 'id,course_id,author_name,author_nickname,rating,body,is_featured,display_order,published_at,created_at'
                         : '*';
-                const serverPaged = adminMode && table === primaryTable && !['home', 'members', 'reviews', 'analytics', 'metrics', 'seo', 'settings', 'staff', 'templates', 'campaigns', 'automations'].includes(sectionKey);
+                const serverPaged = adminMode && !productEditorRead && table === primaryTable && !['home', 'members', 'reviews', 'analytics', 'metrics', 'seo', 'settings', 'staff', 'templates', 'campaigns', 'automations'].includes(sectionKey);
                 let query = db.from(table).select(columns, serverPaged ? { count: 'exact' } : undefined);
                 if (record && adminMode && table === primaryTable) query = query.eq('id', record);
-                query = serverPaged ? query.range((page - 1) * pageSize, page * pageSize - 1) : query.limit(1000);
+                if (record && productEditorRead && table === 'cohorts') query = query.eq('course_id', record);
+                query = serverPaged ? query.range((page - 1) * pageSize, page * pageSize - 1) : query.limit(productEditorRead && table === 'courses' ? 1 : 1000);
                 if (adminMode && sectionKey === 'customers' && table === 'profiles') query = query.neq('status', 'withdrawn');
                 if (table === 'edu_questions' && !adminMode) query = query.eq('is_archived', false);
                 if (table === 'site_settings' && adminMode && operator?.role !== 'admin') query = query.not('key', 'like', 'edu_staff_permissions_%');
@@ -103,11 +105,16 @@ export async function GET(request: Request) {
                 data[table] = (r.data || []) as unknown as Row[];
                 if (serverPaged) pagination = { page, pageSize, total: r.count || 0 };
             }),
+            ...(productEditorRead && record ? [(async () => {
+                const configs = await db.from('landing_configs').select('id,kakao_url,cta_label,pixel_enabled,pixel_id').eq('id', record).limit(1);
+                if (configs.error) throw configs.error;
+                data.landing_configs = (configs.data || []) as Row[];
+            })()] : []),
         ]);
         for (const banner of data.site_banners || []) {
             banner.image_url = imagePreviewUrl(String(banner.image_path || ''), process.env.NEXT_PUBLIC_SUPABASE_URL || '');
         }
-        if (adminMode && sectionKey === 'products') {
+        if (adminMode && sectionKey === 'products' && !productEditorRead) {
             const [allProducts, publishedProducts, draftProducts, archivedProducts, configs] = await Promise.all([
                 db.from('courses').select('id', { count: 'exact' }).is('archived_at', null).limit(1000),
                 db.from('courses').select('id', { count: 'exact', head: true }).is('archived_at', null).eq('status', 'published'),

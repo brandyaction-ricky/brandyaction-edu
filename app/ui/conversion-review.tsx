@@ -10,7 +10,7 @@ import { safeUrl } from '@/lib/platform';
 import {
   AdminButton, AdminDrawer, AdminEmptyState, AdminInput, AdminPage,
   AdminPageHeader, AdminSearchField, AdminSection, AdminSelect, AdminTextarea,
-} from './final/admin-system';
+} from '@/features/admin-ui';
 import './conversion-review.css';
 import { RecruitmentRoomSettings } from './recruitment-rooms';
 import { RecruitmentFunnel } from './recruitment-funnel';

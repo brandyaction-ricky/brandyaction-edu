@@ -13,12 +13,19 @@ import {
   type Row,
 } from "@/lib/platform";
 import { localDateTime } from "@/lib/platform-rules";
-import { CalendarDays, Copy, Plus, Trash2, X } from "lucide-react";
+import { CalendarDays, ChevronDown, Copy, Plus, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { SubmissionReview } from "./final/submission-review";
 import { timeLabel, type Data, type WorkflowSend } from "./learning-workflows";
 import { EnrollmentGrant, RefundAction } from "./operations-actions";
+import {
+  AdminEmptyState,
+  AdminLoadingState,
+  AdminPagination,
+  AdminSearchField,
+  AdminStatusBadge,
+} from "@/features/admin-ui";
 
 export const standaloneAdmin = [
   "staff",
@@ -980,7 +987,7 @@ function QuizEditor({
   const [questions, setQuestions] = useState<QuizQuestion[]>(
     (current?.questions as QuizQuestion[]) || [],
   );
-  const [pass, setPass] = useState(Number(current?.pass_percent || 100));
+  const pass = Number(current?.pass_percent || 100);
   const [message, setMessage] = useState("");
   function update(index: number, patch: Partial<QuizQuestion>) {
     setQuestions(
@@ -1008,22 +1015,10 @@ function QuizEditor({
   }
   return (
     <form onSubmit={submit}>
-      <div className="between">
-        <p className="meta">
-          정답은 운영자와 채점 서버에만 공개됩니다. 미션 제출 전 퀴즈를 통과해야
-          합니다.
-        </p>
-        <Field label="통과 기준 (%)">
-          <input
-            type="number"
-            min={1}
-            max={100}
-            value={pass}
-            onChange={(e) => setPass(Number(e.target.value))}
-            required
-          />
-        </Field>
-      </div>
+      <p className="meta mb16">
+        정답은 운영자와 채점 서버에만 공개됩니다. 통과 기준은 기존 미션 설정을
+        유지합니다.
+      </p>
       {questions.map((q, index) => (
         <fieldset className="quiz-question" key={q.id}>
           <legend>문항 {index + 1}</legend>
@@ -1110,6 +1105,7 @@ function Participants() {
   const [attention, setAttention] = useState(false);
   const [page, setPage] = useState(1);
   const [week, setWeek] = useState("");
+  const [expandedMembers, setExpandedMembers] = useState<Record<string, boolean>>({});
   const params = new URLSearchParams({
     kind: "participants",
     cohort,
@@ -1225,10 +1221,7 @@ function Participants() {
             ))}
           </select>
         </label>
-        <span className="meta">
-          미션 셀을 누르면 제출물 검토로 이동합니다. 필수 미션의 최신 제출
-          기준입니다.
-        </span>
+        <span className="meta">필수 미션의 최신 제출 기준입니다. 검토가 필요한 제출물은 바로 열 수 있습니다.</span>
       </div>
       <div className="metrics mb24">
         {[
@@ -1254,86 +1247,80 @@ function Participants() {
           </button>
         </div>
       ) : (
-        <div className="table-scroll mission-matrix" aria-busy={loading}>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>회원</th>
-                <th>레벨 · 진도</th>
-                {columns.map((row) => (
-                  <th key={row.id} title={t(row, "title")}>
-                    {t(row, "day_number")}일차
-                  </th>
-                ))}
-                <th>전체 승인 · 성취도</th>
-                <th>최근 활동</th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((r) => (
-                <tr key={r.id}>
-                  <td>
-                    <b>{t(r, "full_name") || "회원"}</b>
-                    <small>{t(r, "email")}</small>
-                  </td>
-                  <td>
-                    {r.level === null ? "—" : "LV " + r.level}
-                    <small>학습 {t(r, "learning_percent")}%</small>
-                  </td>
-                  {(matrix[r.id] || []).map((cell) => (
-                    <td key={cell.lessonId}>
-                      {cell.submissionId ? (
-                        <Link
-                          className={"status-cell " + cellClasses[cell.status]}
-                          href={
-                            "/admin/reviews?submission=" + cell.submissionId
-                          }
-                          title={`${cellLabels[cell.status]} · ${cell.approved}/${cell.total} 승인`}
-                          aria-label={`${t(r, "full_name")} · ${t(
-                            columns.find((row) => row.id === cell.lessonId),
-                            "title",
-                          )} · ${cellLabels[cell.status]}`}
-                        >
-                          {cell.status === "approved"
-                            ? "✓"
-                            : cell.status === "submitted"
-                              ? "●"
-                              : "↻"}
-                        </Link>
-                      ) : (
-                        <span
-                          className={"status-cell " + cellClasses[cell.status]}
-                          title={cellLabels[cell.status]}
-                          aria-label={cellLabels[cell.status]}
-                        >
-                          —
-                        </span>
-                      )}
-                    </td>
-                  ))}
-                  <td>
-                    <b>{t(r, "approved")}</b> / {t(r, "mission_total")}
-                    <small>
-                      {r.achievement === null ? "—" : t(r, "achievement") + "%"}
-                    </small>
-                  </td>
-                  <td>
-                    {r.attention ? (
-                      <span className="badge red">활동 확인 필요</span>
-                    ) : null}
-                    <small>
-                      {r.last_activity
-                        ? timeLabel(r.last_activity)
-                        : "활동 기록 없음"}
-                    </small>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {!list.length && !loading && (
-            <p className="pad muted">조건에 맞는 회원이 없습니다.</p>
-          )}
+        <div className="participant-list" aria-busy={loading}>
+          {list.map((r) => {
+            const memberId = String(r.id);
+            const memberCells = matrix[memberId] || [];
+            const reviewCells = memberCells.filter((cell) =>
+              ["submitted", "changes_requested", "rejected", "partial"].includes(cell.status) && cell.submissionId,
+            );
+            const expanded = Boolean(expandedMembers[memberId]);
+            const panelId = `participant-progress-${memberId}`;
+            return (
+              <article className="participant-card" key={memberId}>
+                <div className="participant-card-summary">
+                  <div className="participant-avatar" aria-hidden="true">{(t(r, "full_name") || "회").slice(0, 1)}</div>
+                  <div className="participant-identity">
+                    <div className="participant-name-row">
+                      <h2>{t(r, "full_name") || "회원"}</h2>
+                      {r.level !== null && r.level !== undefined && <span className="badge">LV {String(r.level)}</span>}
+                    </div>
+                    <p>{t(r, "email") || "이메일 정보 없음"}</p>
+                  </div>
+                  <div className="participant-summary-stat">
+                    <span>학습 진도</span><strong>{t(r, "learning_percent")}%</strong>
+                  </div>
+                  <div className="participant-summary-stat">
+                    <span>미션 승인</span><strong>{t(r, "approved")}<small> / {t(r, "mission_total")}</small></strong>
+                  </div>
+                  <div className="participant-activity">
+                    {Boolean(r.attention) && <span className="badge red">활동 확인 필요</span>}
+                    <span>{r.last_activity ? `최근 활동 ${timeLabel(r.last_activity)}` : "활동 기록 없음"}</span>
+                  </div>
+                  {reviewCells.length > 0 && (
+                    <Link className="btn small primary participant-review-cta" href={`/admin/reviews?submission=${reviewCells[0].submissionId}`}>
+                      검토 대기 {reviewCells.length}건
+                    </Link>
+                  )}
+                  <button
+                    className="participant-expand"
+                    type="button"
+                    aria-expanded={expanded}
+                    aria-controls={panelId}
+                    aria-label={`${t(r, "full_name") || "회원"} 미션 진행현황 ${expanded ? "접기" : "펼치기"}`}
+                    onClick={() => setExpandedMembers((current) => ({ ...current, [memberId]: !current[memberId] }))}
+                  ><ChevronDown size={19} aria-hidden="true" /></button>
+                </div>
+                {expanded && (
+                  <div className="participant-card-details" id={panelId}>
+                    <div className="participant-detail-head">
+                      <div><h3>{t(weeks.find((row) => row.id === (week || String(result.weekId || ""))), "week")}주차 미션 진행현황</h3><p>일차별 최신 제출 상태와 미션 승인 수</p></div>
+                      <strong>{r.achievement === null ? "성취도 —" : `성취도 ${t(r, "achievement")}%`}</strong>
+                    </div>
+                    <div className="participant-day-grid">
+                      {memberCells.map((cell) => {
+                        const lesson = columns.find((row) => row.id === cell.lessonId);
+                        const dayLabel = `Day ${t(lesson, "day_number") || "—"}`;
+                        const statusLabel = cellLabels[cell.status] || "상태 확인 필요";
+                        const contents = <><span className="participant-day-number">{t(lesson, "day_number") || "—"}</span><span className="participant-day-copy"><b>{dayLabel} · {t(lesson, "title") || "미션"}</b><small>{statusLabel} · {cell.approved}/{cell.total} 승인</small></span>{cell.submissionId && <span className="participant-day-action">검토 <span aria-hidden="true">›</span></span>}</>;
+                        return cell.submissionId ? (
+                          <Link className={`participant-day-card ${cellClasses[cell.status] || ""}`} key={cell.lessonId} href={`/admin/reviews?submission=${cell.submissionId}`} aria-label={`${t(r, "full_name")} ${dayLabel} ${statusLabel} ${cell.approved}/${cell.total} 승인`}>
+                            {contents}
+                          </Link>
+                        ) : (
+                          <div className={`participant-day-card ${cellClasses[cell.status] || ""}`} key={cell.lessonId}>
+                            {contents}
+                          </div>
+                        );
+                      })}
+                      {!memberCells.length && <p className="meta">선택한 주차에 표시할 미션이 없습니다.</p>}
+                    </div>
+                  </div>
+                )}
+              </article>
+            );
+          })}
+          {!list.length && !loading && <p className="pad muted">조건에 맞는 회원이 없습니다.</p>}
         </div>
       )}
       <div className="workflow-pagination">
@@ -2063,16 +2050,14 @@ function OrdersPanel({
       </div>
       <section className="panel" aria-label="주문 목록" aria-busy={loading}>
         <div className="filter-row">
-          <label className="search">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><circle cx="10" cy="10" r="7" /><path d="m15 15 6 6" /></svg>
-            <input type="search" value={query} aria-label="주문 검색" placeholder="주문번호 · 회원명 · 상품명 검색" onChange={event => { setQuery(event.target.value); setOpened(""); }} />
-          </label>
+          <AdminSearchField value={query} label="주문 검색" placeholder="주문번호 · 회원명 · 상품명 검색" onChange={event => { setQuery(event.target.value); setOpened(""); }} />
           <span className="spacer" />
           <label className="select-filter"><span>상품</span><select aria-label="상품 필터" value={course} onChange={event => { setCourse(event.target.value); setOpened(""); }}><option value="">전체 상품</option>{registeredCourses.map(item => <option key={item.id} value={item.id}>{named(item)}</option>)}</select></label>
           <select aria-label="결제 상태" value={status} onChange={event => { setStatus(event.target.value); setOpened(""); }}><option value="">전체 상태</option>{["paid", "pending", "payment_failed", "partially_refunded", "refunded", "cancelled"].map(value => <option key={value} value={value}>{labels[value] || value}</option>)}</select>
         </div>
-        <div className="table-scroll mobile-cards" tabIndex={0} role="region" aria-label="주문 데이터 표">
+        <div className="table-scroll mobile-cards admin-legacy-table" tabIndex={0} role="region" aria-label="주문 데이터 표" aria-busy={loading}>
           <table>
+            <caption className="sr-only">주문·결제·환불·수강권 연결 목록</caption>
             <thead>
               <tr>
                 {[
@@ -2115,9 +2100,7 @@ function OrdersPanel({
                     {Number(order.discount_amount) > 0 && <p>할인 {money(Number(order.discount_amount))}</p>}
                   </td>
                   <td data-label="결제 상태">
-                    <span className={"badge " + (order.status === "paid" ? "green" : order.status === "payment_failed" ? "red" : order.status === "pending" ? "amber" : "")}>
-                      {labels[t(order, "status")] || t(order, "status")}
-                    </span>
+                    <AdminStatusBadge status={t(order, "status")} label={labels[t(order, "status")] || t(order, "status")} />
                   </td>
                   <td data-label="환불 상태"><span className={"badge " + (checkingRefund ? "amber" : "")}>{refundLabel}</span>{cancelledAmount > 0 && <p>{money(cancelledAmount)}</p>}</td>
                   <td data-label="수강 권한">{accessLabels.join(" · ") || "부여 내역 없음"}</td>
@@ -2135,8 +2118,8 @@ function OrdersPanel({
             </tbody>
           </table>
         </div>
-        {!orders.length && !loading && <div className="empty"><h3>해당 주문이 없습니다.</h3><p>현재 조회 페이지의 기간·상품·상태 또는 검색어를 확인하세요.</p></div>}
-        {loading && <p className="pad muted" role="status">주문 내역을 불러오고 있습니다.</p>}
+        {!orders.length && !loading && <AdminEmptyState title="해당 주문이 없습니다." action={<button className="btn" type="button" onClick={() => { setQuery(""); setStatus(""); setCourse(""); setFrom(""); setTo(""); setAppliedDates({ from: "", to: "" }); setDateError(""); }}>검색·필터 초기화</button>}>현재 조회 페이지의 기간·상품·상태 또는 검색어를 확인하세요.</AdminEmptyState>}
+        {loading && <div className="pad"><AdminLoadingState title="주문 내역을 불러오는 중입니다." description="결제·환불·수강권 연결 상태를 함께 확인하고 있습니다."/></div>}
         <div className="table-foot"><span>{orders.length}건 표시 · 현재 조회 페이지 내 검색·집계</span><span>정산·회계 매출은 결제액과 별도</span></div>
       </section>
       <dialog
@@ -2203,30 +2186,7 @@ function OrdersPanel({
         )}
       </dialog>
       {pagination && pagination.total > pagination.pageSize && (
-        <div className="workflow-pagination">
-          <button
-            className="btn"
-            disabled={loading || pagination.page <= 1}
-            onClick={() => setPage?.(pagination.page - 1)}
-          >
-            이전
-          </button>
-          <span>
-            {pagination.page} /{" "}
-            {Math.max(1, Math.ceil(pagination.total / pagination.pageSize))}{" "}
-            페이지 · 전체 {pagination.total}건
-          </span>
-          <button
-            className="btn"
-            disabled={
-              loading ||
-              pagination.page * pagination.pageSize >= pagination.total
-            }
-            onClick={() => setPage?.(pagination.page + 1)}
-          >
-            다음
-          </button>
-        </div>
+        <><p className="admin-pagination-total">전체 {pagination.total}건</p><AdminPagination page={pagination.page} pages={Math.ceil(pagination.total / pagination.pageSize)} disabled={loading} onChange={nextPage => setPage?.(nextPage)}/></>
       )}
     </>
   );

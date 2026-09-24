@@ -12,9 +12,10 @@ import {
 } from "@/lib/platform";
 import { paidCourseReadinessIssues, recordId } from "@/lib/platform-rules";
 import { archiveValues, cohortPeriod, cohortStatus } from "@/lib/qa-rules";
-import { ArrowRight, BookOpen, ChevronDown, ChevronUp, FileText, Pencil, RotateCcw, Search, Trash2 } from "lucide-react";
+import { ArrowRight, BookOpen, ChevronDown, ChevronUp, FileText, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { AdminEmptyState, AdminPagination, AdminSearchField } from "@/features/admin-ui";
 import type { Data, WorkflowSend } from "../learning-workflows";
 import { Metric } from "./admin-shell";
 import { Badge, Empty, courseType } from "./primitives";
@@ -168,16 +169,18 @@ export function AdminCatalog({
     .filter((group) => group.missions.length || week);
   const unmatchedMissions = s.key === "missions" ? filtered.filter((mission) => !weeks.some((item) => item.id === lessonById.get(String(mission.lesson_id))?.week_id)) : [];
   const renderMission = (mission: Row) => (
-    <article className="mission-row" key={mission.id}>
+    <article className="mission-row mission-day-row" key={mission.id}>
       <span className="day-no">{lessonById.has(String(mission.lesson_id)) ? String(num(lessonById.get(String(mission.lesson_id)), "day_number")).padStart(2, "0") : "—"}</span>
       <div className="mission-copy">
+        <span className="mission-day-label">Day {lessonById.has(String(mission.lesson_id)) ? num(lessonById.get(String(mission.lesson_id)), "day_number") : "—"}</span>
         <button className="title-btn" onClick={() => edit(s, mission)}><strong>{t(mission, "title")}</strong></button>
         <p>{labels[t(mission, "submission_type")] || t(mission, "submission_type")} · 확인 퀴즈 {quizCount(mission.id)}문항 · {mission.is_required ? "필수 미션" : "선택 미션"}{mission.submission_type === "quiz" ? "" : " · 관리자 승인"}</p>
       </div>
       <Badge color={mission.is_published ? "green" : ""}>{mission.is_published ? "공개" : "비공개"}</Badge>
       <div className="row mission-actions">
+        {lessonById.has(String(mission.lesson_id)) && <Link className="btn small mission-content-edit" href={`/admin/learning-editor?id=${encodeURIComponent(String(mission.lesson_id))}`}><FileText size={15} />콘텐츠 편집</Link>}
         {bulkMode && <input type="checkbox" aria-label={t(mission, "title") + " 선택"} checked={selection.includes(recordId(mission))} onChange={(event) => setSelection(event.target.checked ? [...selection, recordId(mission)] : selection.filter((id) => id !== recordId(mission)))} />}
-        <button className="btn small" onClick={() => edit(s, mission)}>편집</button>
+        <button className="btn small" onClick={() => edit(s, mission)}>미션 설정</button>
       </div>
     </article>
   );
@@ -514,19 +517,15 @@ export function AdminCatalog({
     { label: "등록일", value: (r: Row) => date(r.created_at) },
   ];
   const search = (
-    <label className="search">
-      <Search />
-      <input
-        type="search"
-        value={query}
-        placeholder={s.key === "customers" ? "이름 · 이메일 · 연락처 · 태그 검색" : s.key === "products" ? "상품명 검색" : s.key === "learning" ? "학습 제목 검색" : s.title + " 검색"}
-        aria-label="목록 검색"
-        onChange={(e) => {
-          setQuery(e.target.value);
-          setSelection([]);
-        }}
-      />
-    </label>
+    <AdminSearchField
+      value={query}
+      placeholder={s.key === "customers" ? "이름 · 이메일 · 연락처 · 태그 검색" : s.key === "products" ? "상품명 검색" : s.key === "learning" ? "학습 제목 검색" : s.title + " 검색"}
+      label={`${s.title} 목록 검색`}
+      onChange={(e) => {
+        setQuery(e.target.value);
+        setSelection([]);
+      }}
+    />
   );
   const statusFilter = (
     <select
@@ -865,9 +864,9 @@ export function AdminCatalog({
               {!!unmatchedMissions.length && <section className="week-card mission-catalog"><div className="week-head"><strong>학습 연결 확인</strong></div>{unmatchedMissions.map(renderMission)}</section>}
             </div>
           ) : s.key === "questions" ? (
-            <div className="stack">
+            <div className="stack question-admin-list">
               {filtered.map((q) => (
-                <article className="panel" key={q.id}>
+                <article className="panel question-admin-card" key={q.id}>
                   <div className="panel-head">
                     <div>
                       <Badge
@@ -877,7 +876,7 @@ export function AdminCatalog({
                       </Badge>
                       <h2 className="mt8">{t(q, "title")}</h2>
                     </div>
-                    <button className="btn small" onClick={() => edit(s, q)}>
+                    <button className="btn small question-answer-open" onClick={() => edit(s, q)}>
                       {q.answer ? "답변 수정" : "답변하기"}
                     </button>
                   </div>
@@ -895,8 +894,9 @@ export function AdminCatalog({
               ))}
             </div>
           ) : (
-            <div className="table-scroll mobile-cards">
+            <div className="table-scroll mobile-cards admin-legacy-table" role="region" aria-label={`${s.title} 목록`} aria-busy={loading} tabIndex={0}>
               <table>
+                <caption className="sr-only">{s.title} 목록</caption>
                 <thead>
                   <tr>
                     {bulkMode && <th className="selection-column">{selectAll}</th>}
@@ -967,9 +967,9 @@ export function AdminCatalog({
             </div>
           )}
           {!filtered.length && !loading && (
-            <Empty title="조회된 항목이 없습니다.">
-              검색어 또는 상태 필터를 변경해 보세요.
-            </Empty>
+            <AdminEmptyState title="조회된 항목이 없습니다." action={<button className="btn" type="button" onClick={() => { setQuery(""); setStatus(""); setType(""); setCourse(""); setWeek(""); setSelection([]); }}>검색·필터 초기화</button>}>
+              검색어 또는 상태 필터를 변경하면 전체 목록을 다시 확인할 수 있습니다.
+            </AdminEmptyState>
           )}
           <div className="table-foot">
             {filtered.length}개 표시
@@ -980,36 +980,15 @@ export function AdminCatalog({
         </div>
       </div>
       {pagination && pagination.total > pagination.pageSize && (
-        <div className="workflow-pagination">
-          <button
-            className="btn"
-            disabled={loading || pagination.page <= 1}
-            onClick={() => {
-              setSelection([]);
-              setPage(pagination.page - 1);
-            }}
-          >
-            이전
-          </button>
-          <span>
-            {pagination.page} /{" "}
-            {Math.max(1, Math.ceil(pagination.total / pagination.pageSize))}{" "}
-            페이지
-          </span>
-          <button
-            className="btn"
-            disabled={
-              loading ||
-              pagination.page * pagination.pageSize >= pagination.total
-            }
-            onClick={() => {
-              setSelection([]);
-              setPage(pagination.page + 1);
-            }}
-          >
-            다음
-          </button>
-        </div>
+        <AdminPagination
+          page={pagination.page}
+          pages={Math.ceil(pagination.total / pagination.pageSize)}
+          disabled={loading}
+          onChange={(nextPage) => {
+            setSelection([]);
+            setPage(nextPage);
+          }}
+        />
       )}
       {s.key === "learning" && <div className="row mt24"><Link className="btn" href="/admin/weeks">주차 구성</Link><Link className="btn" href="/admin/contents">영상·자료 등록</Link><Link className="btn" href="/admin/missions">미션·퀴즈 관리</Link></div>}
       {s.key === "missions" && <div className="notice mt16">미션은 연결 학습의 일차 순서로 표시됩니다. 학습 순서는 학습 콘텐츠 편집에서 변경할 수 있습니다. 제출물 검토와 피드백은 <Link className="text-link" href="/admin/reviews">제출물 검토</Link>에서 관리합니다.</div>}

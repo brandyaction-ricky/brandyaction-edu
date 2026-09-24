@@ -2,7 +2,7 @@
 import { RecruitmentDetails, RecruitmentHelp } from './recruitment-help';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { AdminButton } from './final/admin-system';
+import { AdminButton } from '@/features/admin-ui';
 type Item={id:string;name:string;start:string;end:string;usesAds:boolean;available?:boolean;valid?:boolean};
 type Mapping={revision:number;freeCourse:string;webinarRevision:number;candidates:Item[];selected:Item[]};
 export function RecruitmentCampaignLinks({period,view}:{period:string;view:string}) {

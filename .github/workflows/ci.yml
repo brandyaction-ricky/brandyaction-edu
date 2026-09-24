@@ -25,16 +25,137 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Verify production promotion source
-        if: github.event_name == 'pull_request' && github.base_ref == 'main'
-        shell: bash
-        run: |
-          if [ "${{ github.head_ref }}" != "develop" ]; then
-            echo "Production PRs must promote the develop branch."
-            exit 1
-          fi
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify production promotion source
+        if: github.event_name == 'pull_request' && github.base_ref == 'main'
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          BASE_REF: ${{ github.base_ref }}
+        shell: bash
+        run: |
+          head_ref="$HEAD_REF"
+          if [ "$head_ref" = "develop" ]; then
+            exit 0
+          fi
+
+          if [ "$head_ref" = "codex/edu-menu-main-release" ]; then
+            changed_files="$(git diff --name-only "origin/${BASE_REF}...HEAD")"
+            if [ -z "$changed_files" ]; then
+              echo "The EDU menu release PR has no changed files."
+              exit 1
+            fi
+
+            while IFS= read -r path; do
+              case "$path" in
+                .github/workflows/ci.yml|app/api/conversion/route.ts|app/api/platform/route.ts|app/ui/conversion-review.tsx|app/ui/final/admin-shell.tsx|app/ui/marketing-workspace-nav.tsx|app/ui/platform.tsx|tests/browser/fixture/conversion.tsx)
+                  ;;
+                *)
+                  echo "File is outside the EDU menu release allowlist: $path"
+                  exit 1
+                  ;;
+              esac
+            done <<< "$changed_files"
+
+            for required in app/api/conversion/route.ts app/api/platform/route.ts app/ui/conversion-review.tsx app/ui/final/admin-shell.tsx app/ui/marketing-workspace-nav.tsx app/ui/platform.tsx tests/browser/fixture/conversion.tsx; do
+              if ! grep -Fxq "$required" <<< "$changed_files"; then
+                echo "Required EDU menu release file is missing: $required"
+                exit 1
+              fi
+            done
+
+            echo "EDU menu performance release scope verified."
+            exit 0
+          fi
+
+          if [ "$head_ref" = "codex/edu-menu-admin-data-release" ]; then
+            changed_files="$(git diff --name-only "origin/${BASE_REF}...HEAD")"
+            if [ -z "$changed_files" ]; then
+              echo "The admin data payload release PR has no changed files."
+              exit 1
+            fi
+
+            while IFS= read -r path; do
+              case "$path" in
+                .github/workflows/ci.yml|app/api/platform/route.ts|lib/qa-rules.ts|tests/qa-regressions.test.mjs)
+                  ;;
+                *)
+                  echo "File is outside the admin data payload release allowlist: $path"
+                  exit 1
+                  ;;
+              esac
+            done <<< "$changed_files"
+
+            for required in app/api/platform/route.ts lib/qa-rules.ts tests/qa-regressions.test.mjs; do
+              if ! grep -Fxq "$required" <<< "$changed_files"; then
+                echo "Required admin data payload release file is missing: $required"
+                exit 1
+              fi
+            done
+
+            echo "Admin data payload release scope verified."
+            exit 0
+          fi
+
+          if [ "$head_ref" = "codex/landing-report-main-release" ]; then
+            changed_files="$(git diff --name-only "origin/${BASE_REF}...HEAD")"
+            if [ -z "$changed_files" ]; then
+              echo "The landing report release PR has no changed files."
+              exit 1
+            fi
+
+            while IFS= read -r path; do
+              case "$path" in
+                .github/workflows/ci.yml|app/ui/landing/admin.tsx)
+                  ;;
+                *)
+                  echo "File is outside the landing report release allowlist: $path"
+                  exit 1
+                  ;;
+              esac
+            done <<< "$changed_files"
+
+            if ! grep -Fxq "app/ui/landing/admin.tsx" <<< "$changed_files"; then
+              echo "The landing report release must change app/ui/landing/admin.tsx."
+              exit 1
+            fi
+
+            echo "Landing report release scope verified."
+            exit 0
+          fi
+
+          if [ "$head_ref" != "codex/commerce-main-release" ]; then
+            echo "Production PRs must promote develop or use an approved scoped release branch."
+            exit 1
+          fi
+
+          changed_files="$(git diff --name-only "origin/${BASE_REF}...HEAD")"
+          if [ -z "$changed_files" ]; then
+            echo "The Commerce release PR has no changed files."
+            exit 1
+          fi
+
+          while IFS= read -r path; do
+            case "$path" in
+              .github/workflows/ci.yml|.env.example|README.md|app/api/payments/toss/webhook/route.ts|package.json|package-lock.json|tests/toss-webhook-idempotency.test.mjs|tests/toss-webhook.test.mjs)
+                ;;
+              *)
+                echo "File is outside the Commerce release allowlist: $path"
+                exit 1
+                ;;
+            esac
+          done <<< "$changed_files"
+
+          for required in app/api/payments/toss/webhook/route.ts tests/toss-webhook.test.mjs tests/toss-webhook-idempotency.test.mjs; do
+            if ! grep -Fxq "$required" <<< "$changed_files"; then
+              echo "Required Commerce release file is missing: $required"
+              exit 1
+            fi
+          done
+
+          echo "Commerce-only production release scope verified."
       - name: Setup Node
         uses: actions/setup-node@v4
         with:

@@ -2,7 +2,7 @@
 import { RecruitmentDetails, RecruitmentHelp } from './recruitment-help';
 import { useEffect, useRef, useState } from 'react';
 import { RecruitmentCopyLink } from './recruitment-copy-link';
-import { AdminButton, AdminSection } from './final/admin-system';
+import { AdminButton, AdminSection } from '@/features/admin-ui';
 type State = { link: {id: string; room_version: number; revision: number; enabled: boolean} | null; counts: {paid: number; organic: number} };
 export function RecruitmentLinks({period, version}: {period: string; version: number}) {
   const busy = useRef(false);
