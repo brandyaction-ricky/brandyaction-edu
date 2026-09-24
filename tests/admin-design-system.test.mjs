@@ -25,7 +25,7 @@ function load(file) {
 test('admin tokens are scoped and do not modify public sizing tokens', () => {
   const admin = fs.readFileSync('app/ui/final/admin-system.css', 'utf8');
   const publicTokens = fs.readFileSync('app/ui/final/tokens.css', 'utf8');
-  for (const token of ['--admin-sidebar-width:224px', '--admin-topbar-height:64px', '--admin-content-wide:1440px', '--admin-content-standard:1280px', '--admin-content-narrow:960px', '--admin-control-height:38px', '--admin-control-height-sm:32px', '--admin-table-row-height:44px', '--admin-table-head-height:40px', '--admin-radius-control:6px', '--admin-radius-surface:8px']) assert.ok(admin.includes(token), token);
+  for (const token of ['--admin-sidebar-width:224px', '--admin-topbar-height:64px', '--admin-content-wide:1440px', '--admin-content-standard:1280px', '--admin-content-narrow:960px', '--admin-control-height:40px', '--admin-control-height-sm:36px', '--admin-table-row-height:44px', '--admin-table-head-height:44px', '--admin-radius-control:6px', '--admin-radius-surface:8px']) assert.ok(admin.includes(token), token);
   assert.match(admin, /^\/\*[^\n]*\*\/\s*\.edu-admin\{/);
   assert.doesNotMatch(admin, /:root/);
   assert.match(publicTokens, /--control-height:\s*48px/);

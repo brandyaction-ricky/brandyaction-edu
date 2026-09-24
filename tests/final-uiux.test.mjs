@@ -61,6 +61,19 @@ test('final design styles are isolated, reproducible and exclude prototype runti
   assert.doesNotMatch(layout, /ui\/(design|platform)\.css/);
   for (const file of fs.readdirSync(path.join(root, 'app/ui/final')).filter(file => file.endsWith('.tsx'))) assert.doesNotMatch(read('app/ui/final/' + file), /dangerouslySetInnerHTML|design-reference\/source|data-demo=/);
 });
+test('admin controls, date filters and data tables share consistent sizing', () => {
+  const system = read('app/ui/final/admin-system.css');
+  const admin = read('app/ui/final/admin.css');
+  const tracking = read('app/ui/landing/tracking-admin.css');
+  assert.match(system, /--admin-control-height:40px/);
+  assert.match(system, /--admin-control-height-sm:36px/);
+  assert.match(system, /--admin-table-head-height:44px/);
+  assert.match(system, /--admin-table-row-height:44px/);
+  assert.match(admin, /\.edu-admin \.date-range input\[type=date\]\{[^}]*height:40px;min-height:40px/);
+  assert.match(admin, /\.edu-admin \.date-range>\.btn\{height:40px;min-height:40px/);
+  assert.match(admin, /\.edu-admin button:focus-visible[^}]*outline:2px solid var\(--ba-info\);outline-offset:2px/);
+  assert.match(tracking, /\.edu-admin \.tracking-inline-select\{[^}]*height:40px;min-height:40px/);
+});
 test('five admin categories and scoped navigation render from the final shell', () => {
   const { AdminShell, finalAdminGroups, Overview } = load('app/ui/final/admin-shell.tsx');
   assert.equal(finalAdminGroups.length, 5);
