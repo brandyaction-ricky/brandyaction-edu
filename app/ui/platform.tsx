@@ -52,9 +52,9 @@ import {
   CourseCard,
   Empty,
   Heading,
-  Story,
   courseType,
 } from "./final/primitives";
+import { StoryCarousel } from "./final/story-carousel";
 import {
   ArticlesView,
   AuthView,
@@ -599,13 +599,7 @@ export function Platform({
                   고객 이야기 <ArrowRight />
                 </Link>
               </div>
-              <div className="grid2">
-                {rows("review_videos")
-                  .slice(0, 2)
-                  .map((s) => (
-                    <Story key={s.id} story={s} />
-                  ))}
-              </div>
+              <StoryCarousel stories={rows("review_videos")} />
             </section>
           )}
         </div>
