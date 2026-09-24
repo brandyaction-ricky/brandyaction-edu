@@ -101,6 +101,7 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
   const [snapshot, setSnapshot] = useState<ConversionSnapshot | null>(null);
   const [selectedId, setSelectedId] = useState('');
   const [query, setQuery] = useState('');
+  const [showArchived, setShowArchived] = useState(false);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
   const [v4Pending, setV4Pending] = useState(false);
@@ -155,6 +156,8 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
         review: payload.decision === 'hold' ? '직원이 보류로 기록했습니다. 고객에게 메시지를 보내지 않았습니다.'
           : payload.decision === 'reject' ? '직원이 이 답변을 사용하지 않기로 했습니다. 고객에게 메시지를 보내지 않았습니다.'
             : '직원이 답변 초안을 승인해 기록했습니다. 고객에게 자동으로 보내지 않았습니다.',
+        manage_case: payload.operation === 'purchase_outcome' ? '결제 여부를 기록했습니다. 사이트 주문을 자동으로 확인한 것은 아닙니다.'
+          : payload.operation === 'archive' ? '문의 목록에서 삭제했습니다. 삭제한 문의 보기에서 복구할 수 있습니다.' : '문의를 복구했습니다.',
       };
       setNotice(notices[String(payload.action)] || '저장했습니다.');
       return result;
@@ -188,7 +191,7 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
 
   const selected = snapshot?.cases.find(item => item.id === selectedId);
   const canAnalyze = snapshot ? (snapshot.capabilities.can_analyze ?? snapshot.capabilities.can_mock) : false;
-  const cases = snapshot?.cases.filter(item => (item.subject + ' ' + item.content).toLowerCase().includes(query.toLowerCase())) || [];
+  const cases = snapshot?.cases.filter(item => Boolean(item.archived_at) === showArchived && (item.subject + ' ' + item.content).toLowerCase().includes(query.toLowerCase())) || [];
   const run = snapshot?.runs.filter(item => item.case_id === selected?.id).sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
   const stale = Boolean(run && selected && snapshot && isRunStale(run, selected, snapshot.evidence));
   const records = snapshot?.reviews.filter(item => item.case_id === selected?.id).sort((a, b) => b.created_at.localeCompare(a.created_at)) || [];
@@ -226,26 +229,42 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
       {snapshot.capabilities.can_jev_v4 && <ConversionJevV4Synthetic />}
       {snapshot.capabilities.can_jev && <p className="conversion-muted">사람이 먼저 별도 점수를 매기지 않아도 Jev 결과를 볼 수 있습니다. 직원의 결정은 고객 응대에 쓰기 전 마지막 확인으로 기록합니다.</p>}
       <div className="conversion-grid" aria-busy={pending || loading}>
-        <AdminSection title="문의" description={`불러온 문의 ${snapshot.cases.length}건`} bordered>
+        <AdminSection title="문의" description={`현재 목록 ${cases.length}건`} bordered>
           <AdminSearchField label="문의 검색" value={query} onChange={event => setQuery(event.target.value)} />
+          <AdminButton disabled={pending} aria-pressed={showArchived} onClick={() => { setShowArchived(value => !value); setSelectedId(''); }}>{showArchived ? '진행 중인 문의 보기' : `삭제한 문의 보기${snapshot.cases.filter(item => item.archived_at).length ? ` (${snapshot.cases.filter(item => item.archived_at).length})` : ''}`}</AdminButton>
           <div className="conversion-case-list">
             {cases.map(item => <button type="button" key={item.id} className={'conversion-case' + (selectedId === item.id ? ' is-selected' : '')} disabled={pending} aria-pressed={selectedId === item.id} onClick={() => { setSelectedId(item.id); setNotice(''); }}>
               <span>{item.sample_origin === 'external_legacy' ? '과거 교육 상담' : item.source_type === 'native' ? '사이트 문의' : '외부 문의'}</span><strong>{item.subject}</strong>
               <small>{item.legacy_course_label || snapshot.courses.find(course => course.id === item.course_id)?.title || '연결 상품'}</small>
+              <small>{item.archived_at ? '삭제한 문의 · 복구 가능' : item.purchase_outcome === 'paid' ? '결제 확인' : item.purchase_outcome === 'not_paid' ? '결제 안 함 확인' : '결제 여부 미확인'}</small>
               <small>{displayTime(item.received_at)}</small>
             </button>)}
-            {!cases.length && <AdminEmptyState compact title={query ? '검색 결과가 없습니다.' : '아직 연결한 문의가 없습니다.'}>문의 연결에서 검토할 문의를 선택하세요.</AdminEmptyState>}
+            {!cases.length && <AdminEmptyState compact title={query ? '검색 결과가 없습니다.' : showArchived ? '복구할 문의가 없습니다.' : '아직 연결한 문의가 없습니다.'}>문의 연결에서 검토할 문의를 선택하세요.</AdminEmptyState>}
           </div>
         </AdminSection>
         <div className="conversion-main">
           {!selected ? <AdminEmptyState title="검토할 문의를 선택하세요.">문의와 상품을 연결하면 설명자료를 함께 검토할 수 있습니다.</AdminEmptyState> : <>
-            <AdminSection title={selected.subject} bordered actions={<AdminButton disabled={pending} onClick={() => openCase(selected)}>문의 정보 수정</AdminButton>}>
+            <AdminSection title={selected.subject} bordered actions={<>
+              {!selected.archived_at && <AdminButton disabled={pending} onClick={() => openCase(selected)}>문의 정보 수정</AdminButton>}
+              {!selected.archived_at
+                ? <AdminButton disabled={pending || snapshot.capabilities.can_manage_cases === false} onClick={async () => {
+                  if (!window.confirm('이 문의를 목록에서 삭제할까요? 삭제한 문의 보기에서 다시 복구할 수 있습니다.')) return;
+                  try { await mutate({ action: 'manage_case', operation: 'archive', case_id: selected.id, expected_version: selected.input_version }); setShowArchived(true); }
+                  catch { /* the shared mutation handler shows the error */ }
+                }}>목록에서 삭제</AdminButton>
+                : <AdminButton disabled={pending || snapshot.capabilities.can_manage_cases === false} onClick={async () => {
+                  try { await mutate({ action: 'manage_case', operation: 'restore', case_id: selected.id, expected_version: selected.input_version }); setShowArchived(false); }
+                  catch { /* the shared mutation handler shows the error */ }
+                }}>문의 복구</AdminButton>}
+            </>}>
+              {selected.archived_at && <p className="conversion-alert">목록에서 삭제된 문의입니다. 다시 되돌릴 수 있습니다.</p>}
               <dl className="conversion-meta"><dt>문의 시기</dt><dd>{selected.sample_origin === 'external_legacy' ? '과거 유료 교육 상담 · 이번 모집 성과에서 제외' : '현재 교육 문의'}</dd><dt>상품</dt><dd>{selected.legacy_course_label || snapshot.courses.find(course => course.id === selected.course_id)?.title || '상품 미확인'}</dd><dt>기수</dt><dd>{snapshot.cohorts.find(cohort => cohort.id === selected.cohort_id)?.name || '미지정'}</dd><dt>회원 연결</dt><dd>{selected.customer_id ? '사이트 회원 정보가 연결됨' : '회원 정보가 연결되지 않아 이후 구매 여부를 알 수 없음'}</dd><dt>문의 출처</dt><dd>{selected.source_label}</dd></dl>
               {selected.sample_origin === 'external_legacy' && <p className="conversion-muted">과거 상품에 대한 문의입니다. 새 성능 점수 계산에는 사용하지 않습니다. 당시 상품 자료가 연결되지 않았다면 현재 상품 설명이나 구매 링크를 답변 근거로 사용하지 마세요.</p>}
               <p className="conversion-quote">{selected.content}</p>
               {selected.question_id && <Link href="/admin/questions" className="conversion-link">기존 질문함 열기</Link>}
             </AdminSection>
-            <AdminSection title="Jev 문의 분류와 답변 초안" bordered actions={<AdminButton tone="primary" disabled={pending || !canAnalyze} onClick={() => void mutate({ action: 'analyze', case_id: selected.id, expected_version: selected.input_version }).catch(() => {})}>{pending ? '처리 중' : snapshot.capabilities.analyze_provider === 'jev' ? 'Jev 결과 보기' : '모의 결과 보기'}</AdminButton>}>
+            <PurchaseOutcomeForm key={`${selected.id}:${selected.purchase_outcome || 'unknown'}:${selected.purchase_checked_at || ''}`} item={selected} pending={pending} enabled={snapshot.capabilities.can_manage_cases !== false} mutate={mutate} />
+            <AdminSection title="Jev 문의 분류와 답변 초안" bordered actions={<AdminButton tone="primary" disabled={pending || !canAnalyze || Boolean(selected.archived_at)} onClick={() => void mutate({ action: 'analyze', case_id: selected.id, expected_version: selected.input_version }).catch(() => {})}>{pending ? '처리 중' : snapshot.capabilities.analyze_provider === 'jev' ? 'Jev 결과 보기' : '모의 결과 보기'}</AdminButton>}>
               {!canAnalyze && <p className="conversion-muted">현재 환경에서는 판정을 실행할 수 없습니다. 설명자료는 직접 검토할 수 있습니다.</p>}
               {run ? <div className="conversion-result">
                 <span className="conversion-tag">{run.provider === 'jev' ? 'Jev 결과 · 직원 확인 필요' : '모의 결과 · 직원 확인 필요'}</span>
@@ -266,10 +285,10 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
                 })}
                 {run.provider === 'jev' && snapshot.capabilities.can_jev_v4 && <JevV4ReviewPanel
                   run={jevV4Run}
-                  disabled={pending || v4Pending || stale}
+                  disabled={pending || v4Pending || stale || Boolean(selected.archived_at)}
                   onRun={() => void runJevV4ForReview(run.id)}
                 />}
-                <ReviewForm key={run.id} runId={run.id} caseId={selected.id} initialReply={run.result.proposed_reply} stale={stale} pending={pending} mutate={mutate} />
+                <ReviewForm key={run.id} runId={run.id} caseId={selected.id} initialReply={run.result.proposed_reply} stale={stale || Boolean(selected.archived_at)} pending={pending} mutate={mutate} />
               </div> : <AdminEmptyState compact title="아직 판단 기록이 없습니다.">아래 설명자료를 확인한 뒤 판정을 실행하세요.</AdminEmptyState>}
             </AdminSection>
             <AdminSection title="상품 설명자료" description="승인된 자료만 추천 후보에 포함됩니다." bordered actions={snapshot.capabilities.can_manage_evidence && <AdminButton disabled={pending} onClick={() => openEvidence()}>자료 등록</AdminButton>}>
@@ -299,6 +318,29 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
       </AdminDrawer>}
     </>}
   </AdminPage>;
+}
+
+function PurchaseOutcomeForm({ item, pending, enabled, mutate }: { item: ConversionCase; pending: boolean; enabled: boolean; mutate: Mutation }) {
+  const [outcome, setOutcome] = useState<ConversionCase['purchase_outcome']>(item.purchase_outcome || 'unknown');
+  const [error, setError] = useState('');
+  async function submit(event: FormEvent) {
+    event.preventDefault(); setError('');
+    try {
+      await mutate({ action: 'manage_case', operation: 'purchase_outcome', case_id: item.id, expected_version: item.input_version, purchase_outcome: outcome });
+    } catch (cause) { setError((cause as Error).message); }
+  }
+  return <AdminSection title="나중에 결제했는지" bordered>
+    <p className="conversion-muted">직원이 확인한 내용을 직접 기록합니다. 확인한 직원과 시각도 남습니다. 결제 내역을 자동으로 조회하지 않으며, 확인하기 전에는 ‘아직 모름’으로 둡니다.</p>
+    {!enabled && <p className="conversion-muted">문의 관리 기능을 준비 중입니다. 잠시 뒤 새로고침해 주세요.</p>}
+    {item.purchase_checked_at && <p>마지막 확인: {displayTime(item.purchase_checked_at)}</p>}
+    <form className="conversion-form" onSubmit={submit}>
+      <AdminSelect label="결제 확인 결과" value={outcome} onChange={event => setOutcome(event.target.value as ConversionCase['purchase_outcome'])} disabled={pending || !enabled || Boolean(item.archived_at)}>
+        <option value="unknown">아직 확인하지 않음</option><option value="paid">결제한 것을 확인함</option><option value="not_paid">결제하지 않은 것을 확인함</option>
+      </AdminSelect>
+      {error && <p role="alert" className="conversion-alert">{error}</p>}
+      <AdminButton type="submit" tone="primary" disabled={pending || !enabled || Boolean(item.archived_at)}>결제 여부 저장</AdminButton>
+    </form>
+  </AdminSection>;
 }
 
 function JevV4ReviewPanel({ run, disabled, onRun }: { run?: ConversionJevV4Run; disabled: boolean; onRun: () => void }) {

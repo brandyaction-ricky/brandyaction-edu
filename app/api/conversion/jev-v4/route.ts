@@ -24,9 +24,10 @@ export async function POST(request: Request) {
     const run = runQuery.data;
     if (!run || run.provider !== 'jev' || run.result?.mode !== 'jev' || run.result?.decision_version !== 1
       || typeof run.input_snapshot?.subject !== 'string' || typeof run.input_snapshot?.content !== 'string') conversionError('다시 살펴볼 Jev 판정과 문의 원문을 찾을 수 없습니다.', 404);
-    const caseQuery = await db.from('edu_conversion_cases').select('id,input_version').eq('id', run.case_id).maybeSingle();
+    const caseQuery = await db.from('edu_conversion_cases').select('id,input_version,archived_at').eq('id', run.case_id).maybeSingle();
     if (caseQuery.error) conversionDatabaseError(caseQuery.error);
     if (!caseQuery.data || caseQuery.data.input_version !== run.input_version) conversionError('문의가 변경됐습니다. 최신 내용을 확인해 주세요.', 409);
+    if (caseQuery.data.archived_at) conversionError('삭제한 문의는 먼저 복구해야 다시 살펴볼 수 있습니다.', 409);
 
     const existingQuery = await db.from('edu_conversion_jev_v4_runs').select('id,status,result,updated_at').eq('v1_run_id', run.id).maybeSingle();
     if (existingQuery.error) conversionDatabaseError(existingQuery.error);
