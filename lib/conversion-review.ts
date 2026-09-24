@@ -171,8 +171,31 @@ export type ConversionSnapshot = {
   jev_v2_runs?: ConversionJevV2Run[];
   jev_v3_runs?: ConversionJevV3Run[];
   jev_v4_runs?: ConversionJevV4Run[];
-  capabilities: { can_manage_evidence: boolean; can_manage_cases?: boolean; can_mock: boolean; can_jev?: boolean; can_adjudicate?: boolean; can_jev_v2?: boolean; can_jev_v3?: boolean; can_jev_v4?: boolean; can_analyze?: boolean; analyze_provider?: 'mock' | 'jev' | null; can_manage_funnel?: boolean };
+  capabilities: { can_manage_evidence: boolean; can_manage_cases?: boolean; can_mock: boolean; can_jev?: boolean; can_adjudicate?: boolean; can_jev_v2?: boolean; can_jev_v3?: boolean; can_jev_v4?: boolean; can_analyze?: boolean; analyze_provider?: 'mock' | 'jev' | null; can_manage_funnel?: boolean; can_copy_aside_match?: boolean };
 };
+
+export function buildAsidePaymentMatchPrompt(input: {
+  receivedAt: string;
+  courseName: string;
+  cohortName: string;
+}) {
+  const receivedAt = new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul', dateStyle: 'medium', timeStyle: 'short',
+  }).format(new Date(input.receivedAt));
+  return [
+    '브랜디에듀 문의자가 나중에 결제했는지 확인할 수 있는 근거를 살펴봐 주세요.',
+    '',
+    `문의가 온 시각: ${receivedAt} (한국 시간)`,
+    `상품: ${input.courseName || '확인 필요'}`,
+    `기수: ${input.cohortName || '지정되지 않음'}`,
+    '',
+    '브랜디에듀 주문 내역의 결제 시각과 카카오 비즈니스의 거래 안내 알림톡 기록을 살펴보고, 원래 카카오 문의와 이어지는 결제 후보가 있는지 비교해 주세요. 테스트 기록, 무료 신청, 결제 실패, 취소·환불은 실제 결제와 구분해 주세요.',
+    '시간이 가깝다는 이유만으로 같은 사람이라고 확정하지 마세요. 카카오 문의와 알림톡 수신자, 상품, 결제 시각이 서로 맞는 근거를 확인하세요. 정보가 겹치거나 수신자를 확인할 수 없으면 “확인 어려움”으로 남겨 주세요.',
+    '',
+    '결과는 “확인 가능한 결제 / 가능성 있는 후보 / 확인 어려움 / 후보 여러 건” 중 하나로 제시하고, 판단 근거와 시간 차이만 간단히 적어 주세요. 이름·전화번호·문의 전문 등 다른 개인정보는 답변에 복사하지 마세요.',
+    '사이트의 문의·결제 기록을 수정하거나 저장하지 말고, 고객에게 메시지도 보내지 마세요. 마지막 기록은 직원이 직접 확인하고 저장합니다.',
+  ].join('\n');
+}
 
 export const MOCK_NOTICE = '시험용 결과입니다. 실제 AI가 만든 판단이 아니며, 분류와 답변 초안은 직원이 확인해야 합니다.';
 export const topicLabels: Record<ConversionTopic, string> = {

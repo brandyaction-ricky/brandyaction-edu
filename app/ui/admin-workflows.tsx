@@ -68,6 +68,56 @@ function Field({
     </label>
   );
 }
+function CrmTemplateFields({ editing }: { editing: Row | null }) {
+  const [channel, setChannel] = useState(String(editing?.channel || "sms"));
+  const [purpose, setPurpose] = useState(String(editing?.purpose || "marketing"));
+  const [templateId, setTemplateId] = useState(String(editing?.alimtalk_template_id || ""));
+  const [isActive, setIsActive] = useState(Boolean(editing ? editing.is_active : true));
+  const hasApprovedTemplate = channel !== "alimtalk" || Boolean(templateId.trim());
+  return <>
+    <div className="grid2 mt24">
+      <Field label="템플릿 이름">
+        <input name="name" required maxLength={100} defaultValue={t(editing || undefined, "name")} />
+      </Field>
+      <Field label="발송 채널">
+        <select name="channel" value={channel} onChange={event => {
+          const next = event.target.value;
+          setChannel(next);
+          if (next === "alimtalk") {
+            setPurpose("transactional");
+            setTemplateId("");
+            setIsActive(false);
+          } else if (channel === "alimtalk") {
+            setTemplateId("");
+            setIsActive(true);
+          }
+        }}>
+          <option value="sms">SMS</option>
+          <option value="lms">LMS</option>
+          <option value="alimtalk">카카오 알림톡</option>
+        </select>
+        <small className="muted">알림톡은 결제 안내 같은 정보성 문구에만 사용합니다. 모집·할인 안내는 광고 문자로 설정해 주세요.</small>
+      </Field>
+      <Field label="메시지 목적">
+        <select name="purpose" value={channel === "alimtalk" ? "transactional" : purpose} disabled={!!editing?._followupKey || channel === "alimtalk"} onChange={event => setPurpose(event.target.value)}>
+          <option value="marketing">마케팅 (수신 동의 회원만)</option>
+          <option value="transactional">정보성·거래 안내</option>
+        </select>
+      </Field>
+      <Field label="카카오 승인 템플릿 번호">
+        <input name="alimtalk_template_id" maxLength={200} value={templateId} disabled={channel !== "alimtalk"} onChange={event => setTemplateId(event.target.value)} />
+      </Field>
+    </div>
+    {channel === "alimtalk" && !templateId.trim() && <p className="meta">카카오 승인 전 문구를 저장하고 고칠 수 있습니다. 승인 번호를 입력하기 전에는 발송용으로 사용할 수 없습니다.</p>}
+    <Field label="메시지 내용">
+      <textarea name="content" required rows={7} maxLength={2000} defaultValue={t(editing || undefined, "content")} placeholder="{{name}} 또는 #{이름} 변수를 사용할 수 있습니다." />
+    </Field>
+    <label className="checkline">
+      <input name="is_active" type="checkbox" checked={isActive && hasApprovedTemplate} disabled={!!editing?._followupKey || !hasApprovedTemplate} onChange={event => setIsActive(event.target.checked)} />
+      {editing?._followupKey ? "준비용 템플릿은 사용 중지 상태로 저장됩니다" : channel === "alimtalk" && !hasApprovedTemplate ? "카카오 승인 번호를 받은 뒤 발송용으로 켤 수 있습니다" : "발송용 템플릿으로 사용"}
+    </label>
+  </>;
+}
 function useReport(url: string) {
   const [result, setResult] = useState<Record<string, unknown>>({});
   const [error, setError] = useState("");
@@ -302,7 +352,7 @@ function CrmManager({ section, data, send, pending }: Props) {
             id: editing?.id || undefined,
             name: form.get("name"),
             channel: form.get("channel"),
-            purpose: editing?._followupKey ? "marketing" : form.get("purpose"),
+            purpose: editing?._followupKey ? "marketing" : form.get("channel") === "alimtalk" ? "transactional" : form.get("purpose"),
             content: form.get("content"),
             alimtalkTemplateId: form.get("alimtalk_template_id"),
             isActive: editing?._followupKey ? false : form.get("is_active") === "on",
@@ -388,67 +438,7 @@ function CrmManager({ section, data, send, pending }: Props) {
           )}
         </div>
         {section === "templates" ? (
-          <>
-            <div className="grid2 mt24">
-              <Field label="템플릿 이름">
-                <input
-                  name="name"
-                  required
-                  maxLength={100}
-                  defaultValue={t(editing || undefined, "name")}
-                />
-              </Field>
-              <Field label="발송 채널">
-                <select
-                  name="channel"
-                  defaultValue={t(editing || undefined, "channel") || "sms"}
-                >
-                  <option value="sms">SMS</option>
-                  <option value="lms">LMS</option>
-                  <option value="alimtalk">카카오 알림톡</option>
-                </select>
-                <small className="muted">알림톡은 승인된 정보성 템플릿에만 사용합니다. 모집·할인 안내는 광고 문자로 설정해 주세요.</small>
-              </Field>
-              <Field label="메시지 목적">
-                <select
-                  name="purpose"
-                  disabled={!!editing?._followupKey}
-                  defaultValue={
-                    t(editing || undefined, "purpose") || "marketing"
-                  }
-                >
-                  <option value="marketing">마케팅 (수신 동의 회원만)</option>
-                  <option value="transactional">정보성·거래 안내</option>
-                </select>
-              </Field>
-              <Field label="알림톡 템플릿 ID">
-                <input
-                  name="alimtalk_template_id"
-                  maxLength={200}
-                  defaultValue={t(editing || undefined, "alimtalk_template_id")}
-                />
-              </Field>
-            </div>
-            <Field label="메시지 내용">
-              <textarea
-                name="content"
-                required
-                rows={7}
-                maxLength={2000}
-                defaultValue={t(editing || undefined, "content")}
-                placeholder="{{name}} 또는 #{이름} 변수를 사용할 수 있습니다."
-              />
-            </Field>
-            <label className="checkline">
-              <input
-                name="is_active"
-                disabled={!!editing?._followupKey}
-                type="checkbox"
-                defaultChecked={editing ? Boolean(editing.is_active) : true}
-              />
-              {editing?._followupKey ? "준비용 템플릿은 사용 중지 상태로 저장됩니다" : "사용 가능한 템플릿"}
-            </label>
-          </>
+          <CrmTemplateFields key={formKey} editing={editing} />
         ) : section === "campaigns" ? (
           <div className="grid2 mt24">
             <Field label="캠페인 이름">
@@ -639,6 +629,13 @@ function CrmManager({ section, data, send, pending }: Props) {
                       ? `${labels[t(item, "status")] || t(item, "status")} · ${item.scheduled_at ? timeLabel(item.scheduled_at) : "예약 미정"}`
                       : `${t(item, "trigger_type")} · ${Number(item.delay_minutes || 0)}분 후`}
                 </p>
+                {section === "templates" && item.channel === "alimtalk" && (
+                  <p className="meta mt8">
+                    {item.is_active && item.alimtalk_template_id
+                      ? "발송용으로 사용 중"
+                      : "준비 중 · 실제 발송 안 됨"}
+                  </p>
+                )}
               </div>
               <button
                 className="btn small"

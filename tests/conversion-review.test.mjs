@@ -9,7 +9,18 @@ const exports = {};
 new Function('exports', ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText)(exports);
-const { createMockJudgment, isEvidenceInScope, evidenceVersions, isRunStale, buildJevCalibrationSummary, calibrationForRun, historicalCalibrationQueue, MOCK_NOTICE } = exports;
+const { createMockJudgment, isEvidenceInScope, evidenceVersions, isRunStale, buildJevCalibrationSummary, calibrationForRun, historicalCalibrationQueue, buildAsidePaymentMatchPrompt, MOCK_NOTICE } = exports;
+
+test('Aside matching prompt uses KST, identifies the offer and leaves the decision with an employee', () => {
+  const prompt = buildAsidePaymentMatchPrompt({ receivedAt: '2026-09-20T00:00:00.000Z', courseName: '문샷 챌린지', cohortName: '4기' });
+  assert.match(prompt, /2026\.\s*9\.\s*20\.\s*오전 9:00/);
+  assert.match(prompt, /문샷 챌린지/);
+  assert.match(prompt, /4기/);
+  assert.match(prompt, /시간이 가깝다는 이유만으로 같은 사람이라고 확정하지 마세요/);
+  assert.match(prompt, /취소·환불/);
+  assert.match(prompt, /사이트의 문의·결제 기록을 수정하거나 저장하지 말고/);
+  assert.doesNotMatch(prompt, /010\d{8}|홍길동|실시간 참석이 어려운데/);
+});
 
 const inquiry = {
   id: 'case-1', source_type: 'manual', sample_origin: 'current', legacy_course_label: null, question_id: null, course_id: 'course-a', cohort_id: 'cohort-a',
