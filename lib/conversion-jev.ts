@@ -27,7 +27,7 @@ export const JEV_QUESTIONS = {
   },
   primary_barrier: {
     type: 'choice',
-    instructions: '유료 교육 전환을 가장 크게 막고 있는 단일 장애물을 고르세요.',
+    instructions: '유료 교육 전환을 가장 크게 막고 있는 단일 장애물을 고르세요. 무료 강의·무료 다시보기 같은 무료 자료를 보려다 생긴 링크·접속·재생 문제는 유료 구매 장애물이 아닙니다. 무료 이용 문제만 말하고 유료 교육 구매 의사가 없거나 드러나지 않으면 none_or_unknown을 고르세요. 결제 화면이 열렸다는 사실만으로 가격 부담이나 유료 결제 문제라고 추정하지 마세요.',
     criteria: {
       price: '가격 또는 지불 부담',
       schedule: '시간, 날짜 또는 참여 일정',
