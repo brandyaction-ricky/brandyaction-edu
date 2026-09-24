@@ -694,7 +694,7 @@ export function Platform({
         <MarketingWorkspaceNav current={key} available={available} search={searchParams.toString()} />
         {loadedSection !== adminSection ? (
           <div className="admin-section-loading" role="status" aria-live="polite" aria-busy={!error}>
-            {error ? <><p>화면 정보를 불러오지 못했습니다.</p><button className="btn" onClick={() => void refresh()}>다시 시도</button></> : <><span className="admin-section-loading-line" /><span className="admin-section-loading-line" /><span className="sr-only">메뉴 내용을 불러오는 중</span></>}
+            {error ? <><p>화면 정보를 불러오지 못했습니다.</p><button className="btn" onClick={() => void refresh()}>다시 시도</button></> : <><span className="admin-section-loading-line" /><span className="admin-section-loading-line" /><span className="admin-visually-hidden">메뉴 내용을 불러오는 중</span></>}
           </div>
         ) : key === "overview" ? (
           <Overview data={data} available={available} />
