@@ -73,7 +73,7 @@ async function fixture(page: Page, provider: 'mock' | 'jev' = 'mock') {
         information_need: choice('registration_or_access'), confirmed_barrier: choice('none_stated'),
         attempted_action_target: choice('free_live_or_replay'), operational_issue: choice('free_content_access_failure'),
         paid_program_reference: choice('future_consideration_after_free_content'), observable_stage: choice('no_purchase_signal'),
-      }, consistency_flags: ['paid_reference_without_stage'] as const };
+      }, consistency_flags: ['paid_reference_without_stage'] as const, uncertainty_flags: [] };
       snapshot.jev_v4_runs ||= [];
       snapshot.jev_v4_runs.push({ id: `v4-${snapshot.jev_v4_runs.length + 1}`, v1_run_id: body.v1_run_id,
         case_id: initialCase.id, calibration_review_id: snapshot.reviews[0].id, input_version: 1,
