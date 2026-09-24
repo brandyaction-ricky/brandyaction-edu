@@ -92,6 +92,33 @@ jobs:
             exit 0
           fi
 
+          if [ "$head_ref" = "codex/landing-report-main-release" ]; then
+            changed_files="$(git diff --name-only "origin/${BASE_REF}...HEAD")"
+            if [ -z "$changed_files" ]; then
+              echo "The landing report release PR has no changed files."
+              exit 1
+            fi
+
+            while IFS= read -r path; do
+              case "$path" in
+                .github/workflows/ci.yml|app/ui/landing/admin.tsx)
+                  ;;
+                *)
+                  echo "File is outside the landing report release allowlist: $path"
+                  exit 1
+                  ;;
+              esac
+            done <<< "$changed_files"
+
+            if ! grep -Fxq "app/ui/landing/admin.tsx" <<< "$changed_files"; then
+              echo "The landing report release must change app/ui/landing/admin.tsx."
+              exit 1
+            fi
+
+            echo "Landing report release scope verified."
+            exit 0
+          fi
+
           if [ "$head_ref" != "codex/commerce-main-release" ]; then
             echo "Production PRs must promote develop or use an approved scoped release branch."
             exit 1
