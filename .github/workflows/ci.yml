@@ -34,8 +34,37 @@ jobs:
             exit 0
           fi
 
+          if [ "$head_ref" = "codex/edu-menu-main-release" ]; then
+            changed_files="$(git diff --name-only "origin/${BASE_REF}...HEAD")"
+            if [ -z "$changed_files" ]; then
+              echo "The EDU menu release PR has no changed files."
+              exit 1
+            fi
+
+            while IFS= read -r path; do
+              case "$path" in
+                .github/workflows/ci.yml|app/api/conversion/route.ts|app/api/platform/route.ts|app/ui/conversion-review.tsx|app/ui/final/admin-shell.tsx|app/ui/marketing-workspace-nav.tsx|app/ui/platform.tsx|tests/browser/fixture/conversion.tsx)
+                  ;;
+                *)
+                  echo "File is outside the EDU menu release allowlist: $path"
+                  exit 1
+                  ;;
+              esac
+            done <<< "$changed_files"
+
+            for required in app/api/conversion/route.ts app/api/platform/route.ts app/ui/conversion-review.tsx app/ui/final/admin-shell.tsx app/ui/marketing-workspace-nav.tsx app/ui/platform.tsx tests/browser/fixture/conversion.tsx; do
+              if ! grep -Fxq "$required" <<< "$changed_files"; then
+                echo "Required EDU menu release file is missing: $required"
+                exit 1
+              fi
+            done
+
+            echo "EDU menu performance release scope verified."
+            exit 0
+          fi
+
           if [ "$head_ref" != "codex/commerce-main-release" ]; then
-            echo "Production PRs must promote the develop branch."
+            echo "Production PRs must promote develop or use an approved scoped release branch."
             exit 1
           fi
 

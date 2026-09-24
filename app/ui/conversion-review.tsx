@@ -34,7 +34,43 @@ async function readResponse(response: Response) {
   return data;
 }
 
-export function ConversionReview({ workspace = false, initialPeriod }: { workspace?: boolean; initialPeriod?: string }) {
+const conversionSnapshots = new Map<
+  string,
+  { expiresAt: number; promise: Promise<ConversionSnapshot> }
+>();
+
+function readConversionSnapshot(userId: string, force = false) {
+  const cached = conversionSnapshots.get(userId);
+  if (!force && cached && (!cached.expiresAt || cached.expiresAt > Date.now()))
+    return cached.promise;
+  if (cached) conversionSnapshots.delete(userId);
+
+  const entry = {
+    expiresAt: 0,
+    promise: fetch('/api/conversion', {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(10000),
+    }).then(readResponse) as Promise<ConversionSnapshot>,
+  };
+  conversionSnapshots.set(userId, entry);
+  void entry.promise.then(
+    () => {
+      if (conversionSnapshots.get(userId) === entry)
+        entry.expiresAt = Date.now() + 5000;
+    },
+    () => {
+      if (conversionSnapshots.get(userId) === entry)
+        conversionSnapshots.delete(userId);
+    },
+  );
+  return entry.promise;
+}
+
+export function prefetchConversionReview(userId: string) {
+  void readConversionSnapshot(userId).catch(() => {});
+}
+
+export function ConversionReview({ workspace = false, initialPeriod, userId }: { workspace?: boolean; initialPeriod?: string; userId: string }) {
   const [workspaceView, setWorkspaceView] = useState<'recruitment' | 'inquiries'>('recruitment');
   const [inquiryView, setInquiryView] = useState<'single' | 'batch' | 'audit'>('single');
   const [snapshot, setSnapshot] = useState<ConversionSnapshot | null>(null);
@@ -52,13 +88,13 @@ export function ConversionReview({ workspace = false, initialPeriod }: { workspa
   const active = useRef(true);
   const read = useRef<AbortController | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (allowPrefetched = false) => {
     read.current?.abort();
     const controller = new AbortController();
     read.current = controller;
     setLoading(true);
     try {
-      const data = await readResponse(await fetch('/api/conversion', { cache: 'no-store', signal: controller.signal }));
+      const data = await readConversionSnapshot(userId, !allowPrefetched);
       if (!active.current || controller.signal.aborted) return;
       setSnapshot(data);
       setError('');
@@ -70,11 +106,11 @@ export function ConversionReview({ workspace = false, initialPeriod }: { workspa
     } finally {
       if (active.current && !controller.signal.aborted) setLoading(false);
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     active.current = true;
-    const timer = setTimeout(() => void refresh(), 0);
+    const timer = setTimeout(() => void refresh(true), 0);
     return () => { active.current = false; clearTimeout(timer); read.current?.abort(); };
   }, [refresh]);
 
