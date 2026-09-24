@@ -19,6 +19,7 @@ const jevV2Sql = fs.readFileSync(new URL('../supabase/migrations/202609230003_co
 const jevV3Sql = fs.readFileSync(new URL('../supabase/migrations/202609230004_conversion_jev_v3_runs.sql', import.meta.url), 'utf8');
 const jevV4Sql = fs.readFileSync(new URL('../supabase/migrations/202609230005_conversion_jev_v4_runs.sql', import.meta.url), 'utf8');
 const jevStaffApprovalSql = fs.readFileSync(new URL('../supabase/migrations/202609240001_conversion_jev_staff_approval.sql', import.meta.url), 'utf8');
+const caseManagementSql = fs.readFileSync(new URL('../supabase/migrations/202609250001_conversion_case_management.sql', import.meta.url), 'utf8');
 const serverSource = fs.readFileSync(new URL('../lib/conversion-review-server.ts', import.meta.url), 'utf8');
 const serverExports = {};
 new Function('exports', 'require', ts.transpileModule(serverSource, {
@@ -62,6 +63,7 @@ before(async () => {
   await db.exec(jevV3Sql);
   await db.exec(jevV4Sql);
   await db.exec(jevStaffApprovalSql);
+  await db.exec(caseManagementSql);
   await db.query('insert into profiles(id,role) values ($1,\'admin\'),($2,\'staff\'),($3,\'student\')', [ids.admin, ids.staff, ids.student]);
   await db.query('insert into courses(id) values ($1),($2)', [ids.course, ids.otherCourse]);
   await db.query('insert into cohorts(id,course_id) values ($1,$2),($3,$4)', [ids.cohort, ids.course, ids.otherCohort, ids.otherCourse]);
@@ -95,6 +97,15 @@ async function rpc(input, options = {}) {
     return result.rows[0].result;
   } finally { await db.exec('reset role'); }
 }
+async function manage(input, actor = ids.admin) {
+  const request = conversionPayload(input);
+  await db.exec('set role service_role');
+  try {
+    const result = await db.query('select public.edu_conversion_case_manage($1::uuid,$2::uuid,$3::jsonb,$4::text) as result',
+      [actor, request.requestId, request.payload, request.payload_hash]);
+    return result.rows[0].result;
+  } finally { await db.exec('reset role'); }
+}
 async function count(table) { return (await db.query(`select count(*)::integer as count from ${table}`)).rows[0].count; }
 async function setupRun(input = manual()) {
   const { case: inquiry } = await rpc(input);
@@ -120,6 +131,34 @@ test('RPC retry returns one stored result; changed intent with the same request 
   changed.payload_hash = conversionPayload(input).payload_hash;
   await assert.rejects(rpc(null, { normalized: changed }), /CONVERSION_REQUEST_REUSED/);
   assert.equal(await count('edu_conversion_cases'), 1);
+});
+
+test('manual purchase tracking distinguishes unknown from checked results and stores who/when', async () => {
+  const { case: inquiry } = await rpc(manual());
+  const input = { action: 'manage_case', operation: 'purchase_outcome', requestId: randomUUID(), case_id: inquiry.id,
+    expected_version: inquiry.input_version, purchase_outcome: 'paid' };
+  const first = await manage(input, ids.staff);
+  assert.equal(first.case.purchase_outcome, 'paid');
+  assert.equal(first.case.purchase_checked_by, ids.staff);
+  assert.ok(first.case.purchase_checked_at);
+  assert.deepEqual(await manage(input, ids.staff), first);
+  const reset = await manage({ ...input, requestId: randomUUID(), purchase_outcome: 'unknown' });
+  assert.equal(reset.case.purchase_outcome, 'unknown');
+  assert.equal(reset.case.purchase_checked_at, null);
+  assert.equal(reset.case.purchase_checked_by, null);
+});
+
+test('inquiry deletion is reversible and keeps its stored runs and review history', async () => {
+  const { inquiry, run } = await setupRun();
+  const archived = await manage({ action: 'manage_case', operation: 'archive', requestId: randomUUID(), case_id: inquiry.id, expected_version: inquiry.input_version });
+  assert.ok(archived.case.archived_at);
+  const missing = await db.query('select count(*)::integer as count from edu_conversion_runs where id=$1', [run.id]);
+  assert.equal(missing.rows[0].count, 1);
+  await assert.rejects(manage({ action: 'manage_case', operation: 'purchase_outcome', requestId: randomUUID(), case_id: inquiry.id,
+    expected_version: inquiry.input_version, purchase_outcome: 'paid' }), /CONVERSION_INVALID/);
+  const restored = await manage({ action: 'manage_case', operation: 'restore', requestId: randomUUID(), case_id: inquiry.id, expected_version: inquiry.input_version });
+  assert.equal(restored.case.archived_at, null);
+  assert.equal(restored.case.archived_by, null);
 });
 
 test('historical paid-education inquiry can be calibrated without inventing a current product or cohort', async () => {
