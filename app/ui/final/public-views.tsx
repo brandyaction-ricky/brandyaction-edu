@@ -123,7 +123,11 @@ export function ProductDetail({ course, data }: { course: Row; data: Data }) {
     const frozen = object(config, "course_snapshot");
     const currentMetadata = object(course, "metadata");
     const campaignCourse = { ...course, ...frozen, metadata: { ...object(frozen as Row, "metadata"), ...currentMetadata } } as Row;
-    return <CampaignFreeClass course={campaignCourse} config={config as unknown as LandingConfig} resources={productResources(currentMetadata)} />;
+    const scheduleDate = (data.cohorts || [])
+      .filter(cohort => cohort.course_id === course.id && !["cancelled", "completed"].includes(String(cohort.status)))
+      .filter(cohort => Boolean(cohort.operation_start_at))
+      .sort((a, b) => Date.parse(String(a.operation_start_at)) - Date.parse(String(b.operation_start_at)))[0]?.operation_start_at;
+    return <CampaignFreeClass course={campaignCourse} config={config as unknown as LandingConfig} resources={productResources(currentMetadata)} scheduleDate={scheduleDate ? String(scheduleDate) : ""} />;
   }
   return <StandardProductDetail course={course} data={data} />;
 }

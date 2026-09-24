@@ -18,7 +18,7 @@ import { homepageCourses, isRecruiting, localDateTime, recordId } from "@/lib/pl
 import { archiveValues } from "@/lib/qa-rules";
 import { createClient } from "@/lib/supabase/client";
 import { getSupabasePublicConfig } from "@/lib/supabase/config";
-import { ArrowRight, BookOpen, Menu, Pencil, Plus, Search, X } from "lucide-react";
+import { ArrowRight, BookOpen, CalendarDays, CreditCard, LayoutDashboard, LogOut, Menu, Pencil, Plus, Search, Ticket, UserRound, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -64,7 +64,6 @@ import {
 import { OrderResult } from "./order-result";
 import { SiteFooter } from "./final/site-footer";
 import { HomeHero } from "./final/home-hero";
-import { MarketingWorkspaceNav } from "./marketing-workspace-nav";
 import { ConversionReview, prefetchConversionReview } from "./conversion-review";
 type Data = Record<string, Row[]>;
 type AdminRead = {
@@ -165,6 +164,8 @@ export function Platform({
   const [notice, setNotice] = useState("");
   const [pending, setPending] = useState(false);
   const [mobile, setMobile] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
   const [adminPaging, setAdminPaging] = useState({ section: "", page: 1 });
   const [pagination, setPagination] = useState<{
@@ -306,6 +307,22 @@ export function Platform({
     const timer = setTimeout(() => setNotice(""), 5000);
     return () => clearTimeout(timer);
   }, [notice]);
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (!profileMenuRef.current?.contains(event.target as Node))
+        setProfileMenuOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setProfileMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [profileMenuOpen]);
   const send = (body: Record<string, unknown>, success = "저장했습니다.") =>
     mutationGate.current(body, async (payload) => {
       setPending(true);
@@ -462,13 +479,32 @@ export function Platform({
                 <Link className="link" href="/my">
                   마이페이지
                 </Link>
-                <Link
-                  className="avatar"
-                  href="/my/profile"
-                  aria-label="회원 정보"
-                >
-                  {(user.full_name || "나").slice(0, 1)}
-                </Link>
+                <div className="profile-menu-wrap" ref={profileMenuRef}>
+                  <button
+                    type="button"
+                    className="avatar profile-menu-trigger"
+                    aria-label="내 프로필 메뉴"
+                    aria-haspopup="true"
+                    aria-expanded={profileMenuOpen}
+                    onClick={() => setProfileMenuOpen((open) => !open)}
+                  >
+                    {(user.full_name || "나").slice(0, 1)}
+                  </button>
+                  {profileMenuOpen && (
+                    <nav className="profile-menu" aria-label="내 프로필 메뉴">
+                      <div className="profile-menu-identity">
+                        <span className="avatar" aria-hidden="true">{(user.full_name || "나").slice(0, 1)}</span>
+                        <span><b>{user.full_name || "회원"}</b><small>{user.email}</small></span>
+                      </div>
+                      <Link href="/my" onClick={() => setProfileMenuOpen(false)}><LayoutDashboard aria-hidden="true" />마이페이지로 이동</Link>
+                      <Link href="/my/profile" onClick={() => setProfileMenuOpen(false)}><UserRound aria-hidden="true" />내 정보 수정</Link>
+                      <Link href="/my/coupons" onClick={() => setProfileMenuOpen(false)}><Ticket aria-hidden="true" />내 쿠폰함</Link>
+                      <Link href="/my/orders" onClick={() => setProfileMenuOpen(false)}><CreditCard aria-hidden="true" />신청·결제 내역</Link>
+                      <Link href="/my/classes" onClick={() => setProfileMenuOpen(false)}><CalendarDays aria-hidden="true" />내 클래스</Link>
+                      <button type="button" onClick={() => void logout()}><LogOut aria-hidden="true" />로그아웃</button>
+                    </nav>
+                  )}
+                </div>
               </>
             ) : (
               <Link className="btn" href="/login">
@@ -787,7 +823,6 @@ export function Platform({
         logout={logout}
         prefetchSection={prefetchAdminSection}
       >
-        <MarketingWorkspaceNav current={key} available={available} search={searchParams.toString()} prefetchSection={prefetchAdminSection} />
         {loadedSection !== adminSection ? (
           <div className="admin-section-loading" role="status" aria-live="polite" aria-busy={!error}>
             {error ? <><p>화면 정보를 불러오지 못했습니다.</p><button className="btn" onClick={() => void refresh(true)}>다시 시도</button></> : <><span className="admin-section-loading-line" /><span className="admin-section-loading-line" /><span className="admin-visually-hidden">메뉴 내용을 불러오는 중</span></>}
@@ -1075,7 +1110,7 @@ function Editor({
         return;
       }
       if (section.key === "coupons") {
-        for (const key of ["name", "code", "discount_type", "discount_value", "max_discount_amount", "minimum_order_amount", "product_scope", "applicable_course_id", "issue_target", "target_tag_id", "starts_at", "ends_at", "usage_limit", "per_user_limit"]) {
+        for (const key of ["name", "description", "code", "discount_type", "discount_value", "max_discount_amount", "minimum_order_amount", "product_scope", "applicable_course_id", "issue_target", "target_tag_id", "starts_at", "ends_at", "usage_limit", "per_user_limit"]) {
           const value = form.get(key);
           values[key] = ["discount_value", "max_discount_amount", "minimum_order_amount", "usage_limit", "per_user_limit"].includes(key) ? (value === "" ? null : Number(value)) : ["starts_at", "ends_at"].includes(key) ? (value ? new Date(String(value)).toISOString() : null) : value || null;
         }
@@ -1328,24 +1363,49 @@ function Editor({
                 </div>
               ) : section.key === "coupons" ? (
                 <div className="coupon-settings-form">
-                  <div className="coupon-preview"><span>BRANDYACTION BENEFIT</span><strong>{couponDiscountType === "percentage" ? `${couponDiscountValue}% 할인` : `${couponDiscountValue.toLocaleString("ko-KR")}원 할인`}</strong><p>적용 가능 여부를 발급 전에 확인하세요.</p></div>
-                  <div className="grid2">
-                    <div className="field"><label htmlFor="coupon-name">쿠폰명 *</label><input id="coupon-name" name="name" required maxLength={100} defaultValue={t(row, "name")} placeholder="운영용 이름" /></div>
-                    <div className="field"><label htmlFor="coupon-code">쿠폰 코드 *</label><input id="coupon-code" name="code" required pattern="[A-Za-z0-9_-]{3,30}" maxLength={30} defaultValue={t(row, "code")} placeholder="영문 대문자·숫자" /></div>
-                    <div className="field"><label htmlFor="coupon-type">할인 방식</label><select id="coupon-type" name="discount_type" value={couponDiscountType} onChange={event => setCouponDiscountType(event.target.value)}><option value="percentage">정률</option><option value="fixed">정액</option></select></div>
-                    <div className="field"><label htmlFor="coupon-value">할인 수치 *</label><input id="coupon-value" name="discount_value" type="number" min={1} max={couponDiscountType === "percentage" ? 100 : undefined} required value={couponDiscountValue} onChange={event => setCouponDiscountValue(Number(event.target.value))} /></div>
-                    <div className="field"><label htmlFor="coupon-max">최대 할인액 · 원</label><input id="coupon-max" name="max_discount_amount" type="number" min={0} defaultValue={row?.max_discount_amount == null ? "" : Number(row.max_discount_amount)} disabled={couponDiscountType === "fixed"} /></div>
-                    <div className="field"><label htmlFor="coupon-minimum">최소 주문 금액 · 원</label><input id="coupon-minimum" name="minimum_order_amount" type="number" min={0} defaultValue={Number(row?.minimum_order_amount || 0)} /></div>
-                    <div className="field"><label htmlFor="coupon-target">발급 대상</label><select id="coupon-target" name="issue_target" value={couponIssueTarget} onChange={event => setCouponIssueTarget(event.target.value)}><option value="all">전체 회원</option><option value="tag">고객 태그 회원</option></select></div>
-                    <div className="field"><label htmlFor="coupon-tag">대상 태그</label><select id="coupon-tag" name="target_tag_id" defaultValue={t(row, "target_tag_id")} disabled={couponIssueTarget !== "tag"} required={couponIssueTarget === "tag"}><option value="">태그 선택</option>{(data.crm_tags || []).map(tag => <option key={tag.id} value={tag.id}>{t(tag, "name")}</option>)}</select></div>
-                    <div className="field"><label htmlFor="coupon-product-scope">적용 상품</label><select id="coupon-product-scope" name="product_scope" value={couponProductScope} onChange={event => setCouponProductScope(event.target.value)}><option value="all">전체 상품</option><option value="paid">유료 클래스</option><option value="specific">특정 상품</option></select></div>
-                    <div className="field"><label htmlFor="coupon-course">특정 상품</label><select id="coupon-course" name="applicable_course_id" defaultValue={couponCourseId} disabled={couponProductScope !== "specific"} required={couponProductScope === "specific"}><option value="">상품 선택</option>{(data.courses || []).filter(course => !course.archived_at).map(course => <option key={course.id} value={course.id}>{t(course, "title")}</option>)}</select></div>
-                    <div className="field"><label htmlFor="coupon-start">시작일 · KST</label><input id="coupon-start" name="starts_at" type="datetime-local" defaultValue={row?.starts_at ? localDateTime(row.starts_at) : ""} /></div>
-                    <div className="field"><label htmlFor="coupon-end">종료일 · KST</label><input id="coupon-end" name="ends_at" type="datetime-local" defaultValue={row?.ends_at ? localDateTime(row.ends_at) : ""} /></div>
-                  </div>
-                  <section className="coupon-limit-group"><div><h3>발급 수량 설정</h3><p className="meta">전체 발급 한도와 회원별 사용 가능 횟수를 관리합니다.</p></div><div className="grid2"><div className="field"><label htmlFor="coupon-limit">총 발급 수량</label><input id="coupon-limit" name="usage_limit" type="number" min={1} defaultValue={row?.usage_limit == null ? "" : Number(row.usage_limit)} placeholder="제한 없음" /></div><div className="field"><label htmlFor="coupon-user-limit">회원당 발급 횟수</label><input id="coupon-user-limit" name="per_user_limit" type="number" min={1} defaultValue={Number(row?.per_user_limit || 1)} /></div></div></section>
-                  <label className="checkline"><input name="is_active" type="checkbox" defaultChecked={row?.is_active !== false} />쿠폰 사용 활성화</label>
-                  <label className="checkline"><input name="exclude_free" type="checkbox" defaultChecked={row?.exclude_free !== false} />무료 상품 적용 제외</label>
+                  <div className="coupon-preview"><span>BRANDYACTION BENEFIT</span><strong>{couponDiscountType === "percentage" ? `${couponDiscountValue}% 할인` : `${couponDiscountValue.toLocaleString("ko-KR")}원 할인`}</strong><p>조건을 저장하면 주문 단계에서 자동으로 검증됩니다.</p></div>
+                  <section className="coupon-form-section" aria-labelledby="coupon-basic-heading">
+                    <div className="coupon-form-heading"><h3 id="coupon-basic-heading">기본 정보</h3><p>관리자가 구분하기 쉬운 이름과 고객에게 보일 설명을 입력합니다.</p></div>
+                    <div className="grid2">
+                      <div className="field"><label htmlFor="coupon-name">쿠폰명 *</label><input id="coupon-name" name="name" required maxLength={100} defaultValue={t(row, "name")} placeholder="예: 신규 가입 환영 쿠폰" /></div>
+                      <div className="field"><label htmlFor="coupon-description">쿠폰 설명 <span className="meta">선택</span></label><input id="coupon-description" name="description" maxLength={200} defaultValue={t(row, "description")} placeholder="예: 신규 가입 회원에게 3,000원 할인 제공" /></div>
+                    </div>
+                  </section>
+                  <section className="coupon-form-section" aria-labelledby="coupon-issue-heading">
+                    <div className="coupon-form-heading"><h3 id="coupon-issue-heading">쿠폰 코드 및 발급 대상</h3><p>현재는 직접 입력한 코드와 회원/태그 대상 지정으로 운영합니다.</p></div>
+                    <div className="grid2">
+                      <div className="field"><label htmlFor="coupon-code">쿠폰 코드 *</label><input id="coupon-code" name="code" required pattern="[A-Za-z0-9_-]{3,30}" maxLength={30} defaultValue={t(row, "code")} placeholder="예: WELCOME-2026" aria-describedby="coupon-code-help" /><small id="coupon-code-help">영문자, 숫자, 하이픈, 밑줄로 3~30자 입력하세요. 저장 시 대문자로 정리됩니다.</small></div>
+                      <div className="field"><label htmlFor="coupon-target">발급 대상</label><select id="coupon-target" name="issue_target" value={couponIssueTarget} onChange={event => setCouponIssueTarget(event.target.value)}><option value="all">전체 회원</option><option value="tag">고객 태그 회원</option></select></div>
+                      <div className="field coupon-field-span"><label htmlFor="coupon-tag">대상 태그</label><select id="coupon-tag" name="target_tag_id" defaultValue={t(row, "target_tag_id")} disabled={couponIssueTarget !== "tag"} required={couponIssueTarget === "tag"}><option value="">태그 선택</option>{(data.crm_tags || []).map(tag => <option key={tag.id} value={tag.id}>{t(tag, "name")}</option>)}</select></div>
+                    </div>
+                  </section>
+                  <section className="coupon-form-section" aria-labelledby="coupon-benefit-heading">
+                    <div className="coupon-form-heading"><h3 id="coupon-benefit-heading">할인 및 사용 조건</h3><p>할인 방식, 적용 상품과 최소 주문 조건을 설정합니다.</p></div>
+                    <div className="grid2">
+                      <div className="field"><label htmlFor="coupon-type">할인 방식</label><select id="coupon-type" name="discount_type" value={couponDiscountType} onChange={event => setCouponDiscountType(event.target.value)}><option value="fixed">정액 할인</option><option value="percentage">정률 할인</option></select></div>
+                      <div className="field"><label htmlFor="coupon-value">할인 수치 *</label><input id="coupon-value" name="discount_value" type="number" min={1} max={couponDiscountType === "percentage" ? 100 : undefined} required value={couponDiscountValue} onChange={event => setCouponDiscountValue(Number(event.target.value))} /></div>
+                      <div className="field"><label htmlFor="coupon-max">최대 할인액 · 원</label><input id="coupon-max" name="max_discount_amount" type="number" min={0} defaultValue={row?.max_discount_amount == null ? "" : Number(row.max_discount_amount)} disabled={couponDiscountType === "fixed"} placeholder="정률 할인에만 적용" /></div>
+                      <div className="field"><label htmlFor="coupon-minimum">최소 주문 금액 · 원</label><input id="coupon-minimum" name="minimum_order_amount" type="number" min={0} defaultValue={Number(row?.minimum_order_amount || 0)} /></div>
+                      <div className="field"><label htmlFor="coupon-product-scope">쿠폰 사용 범위</label><select id="coupon-product-scope" name="product_scope" value={couponProductScope} onChange={event => setCouponProductScope(event.target.value)}><option value="all">전체 상품</option><option value="paid">유료 클래스</option><option value="specific">특정 상품</option></select></div>
+                      <div className="field"><label htmlFor="coupon-course">특정 상품</label><select id="coupon-course" name="applicable_course_id" defaultValue={couponCourseId} disabled={couponProductScope !== "specific"} required={couponProductScope === "specific"}><option value="">상품 선택</option>{(data.courses || []).filter(course => !course.archived_at).map(course => <option key={course.id} value={course.id}>{t(course, "title")}</option>)}</select></div>
+                    </div>
+                  </section>
+                  <section className="coupon-form-section" aria-labelledby="coupon-period-heading">
+                    <div className="coupon-form-heading"><h3 id="coupon-period-heading">사용 기간</h3><p>시작일이나 종료일을 비워두면 해당 방향의 기간 제한을 두지 않습니다. 시간은 한국 표준시 기준입니다.</p></div>
+                    <div className="grid2">
+                      <div className="field"><label htmlFor="coupon-start">사용 시작일 · KST</label><input id="coupon-start" name="starts_at" type="datetime-local" defaultValue={row?.starts_at ? localDateTime(row.starts_at) : ""} /></div>
+                      <div className="field"><label htmlFor="coupon-end">사용 종료일 · KST</label><input id="coupon-end" name="ends_at" type="datetime-local" defaultValue={row?.ends_at ? localDateTime(row.ends_at) : ""} /></div>
+                    </div>
+                  </section>
+                  <section className="coupon-form-section" aria-labelledby="coupon-limit-heading">
+                    <div className="coupon-form-heading"><h3 id="coupon-limit-heading">발급 수량 및 상태</h3><p>전체 발급 수량을 비워두면 제한 없이 사용할 수 있습니다.</p></div>
+                    <div className="grid2">
+                      <div className="field"><label htmlFor="coupon-limit">총 발급 수량</label><input id="coupon-limit" name="usage_limit" type="number" min={1} defaultValue={row?.usage_limit == null ? "" : Number(row.usage_limit)} placeholder="제한 없음" /></div>
+                      <div className="field"><label htmlFor="coupon-user-limit">회원당 발급 횟수</label><input id="coupon-user-limit" name="per_user_limit" type="number" min={1} defaultValue={Number(row?.per_user_limit || 1)} /></div>
+                    </div>
+                    <label className="checkline"><input name="is_active" type="checkbox" defaultChecked={row?.is_active !== false} />쿠폰 사용 활성화</label>
+                    <label className="checkline"><input name="exclude_free" type="checkbox" defaultChecked={row?.exclude_free !== false} />무료 상품 적용 제외</label>
+                  </section>
                   <p className="notice">발급 후에도 이미 완료된 주문의 할인 금액은 변경하지 않습니다. 변경된 조건은 이후 쿠폰 적용 요청부터 검증됩니다.</p>
                 </div>
               ) : <div className="editor-fields">

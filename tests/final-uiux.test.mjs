@@ -71,6 +71,15 @@ test('five admin categories and scoped navigation render from the final shell', 
   const restricted = html(AdminShell, { ...props, available: platform.sections.filter(row => row.key === 'products') });
   assert.doesNotMatch(restricted, /href="\/admin\/(questions|customers|members|orders)"/);
 });
+test('common profile shortcuts, semantic customer icons and one marketing navigation remain consistent', () => {
+  const { AdminShell } = load('app/ui/final/admin-shell.tsx');
+  const markup = html(AdminShell, { current: 'overview', available: platform.sections, user: { ...user, role: 'admin' }, data, mobile: false, setMobile() {}, logout: async () => {}, children: null });
+  assert.match(markup, /lucide-tag/); assert.match(markup, /lucide-ticket/);
+  const platformSource = read('app/ui/platform.tsx');
+  assert.match(platformSource, /aria-label="내 프로필 메뉴"/);
+  for (const href of ['/my', '/my/profile', '/my/coupons', '/my/orders', '/my/classes']) assert.ok(platformSource.includes(`href="${href}"`));
+  assert.doesNotMatch(platformSource, /MarketingWorkspaceNav/);
+});
 test('three signup methods and product detail variants use the final publishing structures', () => {
   const { AuthView, ProductDetail, ArticlesView, StoriesView } = load('app/ui/final/public-views.tsx');
   for (const signup of [false, true]) {
@@ -226,6 +235,7 @@ test('catalogues and separate editors render without dropping existing fields', 
   const pageSource = read('app/[[...path]]/page.tsx');
   assert.match(platformSource, /무료강의 3강 시청[\s\S]*결제 완료[\s\S]*미션 수행[\s\S]*회원가입/);
   assert.match(platformSource, /쿠폰 등록·설정[\s\S]*최소 주문 금액[\s\S]*회원당 발급 횟수/);
+  assert.match(platformSource, /name="description"[\s\S]*쿠폰 코드 및 발급 대상/);
   const learning = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'learning') });
   assert.match(learning, /learning-layout/); assert.match(learning, /학습 구성/); assert.match(learning, /lesson-list-item/);
   const missions = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'missions') });
@@ -306,11 +316,13 @@ test('campaign class keeps published content and one responsive sticky CTA', () 
   assert.doesNotMatch(markup, /data-landing-cta="(?:hero_cta|final_cta)"|data-section="(?:hero|final)"|무료 라이브에서 만나요/);
   assert.equal((markup.match(/href="https:\/\/open.kakao.com\/o\/testRoom"/g) || []).length, 1);
   assert.match(markup, /campaign-layout/); assert.match(markup, /aria-label="무료 클래스 신청"/);
+  assert.match(markup, /campaign-cta-info/); assert.match(markup, /매주 화요일/);
   assert.match(read('lib/landing-browser.ts'), /'autoConfig', false/);
   assert.match(read('app\/ui\/landing\/free-class.tsx'), /ProductConversionClickTracker/);
   assert.match(read('app\/ui\/final\/product-detail-html.tsx'), /dispatchEvent\(new CustomEvent\(PRODUCT_CTA_EVENT/);
   assert.doesNotMatch(markup, /campaign-cta-copy|카카오 오픈채팅으로 이동하며 사이트 수강 내역에는 자동 반영되지 않습니다/);
   const landingCss = read('app/ui/landing/landing.css');
+  assert.match(landingCss, /@media\(max-width:900px\)\{\.edu-front \.campaign-cta-info\{display:none\}\}/);
   assert.match(landingCss, /grid-template-columns:minmax\(0,860px\) 320px/);
   assert.match(landingCss, /\.campaign-sticky\{position:sticky/);
   assert.match(landingCss, /@media\(max-width:900px\)[^{]*\{[^}]*\.edu-front \.campaign-layout\{display:block/);

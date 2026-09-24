@@ -10,13 +10,14 @@ import { ProductResourceRow } from '../final/primitives';
 import { productConversion } from '@/lib/product-conversion';
 import { productDocument } from '@/lib/product-html-document';
 import { ProductConversionClickTracker, ProductCtaLink, ProductPixel } from '../final/product-conversion';
+import { CalendarDays } from 'lucide-react';
 
 export function LandingTracker({ config, children }: { config: LandingConfig; children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { if(ref.current) return startLandingTracking(ref.current,config); },[config]);
   return <div ref={ref} className="landing-campaign">{children}</div>;
 }
-export function CampaignFreeClass({ course, config, resources = [] }: { course: Row; config: LandingConfig; resources?: ProductResource[] }) {
+export function CampaignFreeClass({ course, config, resources = [], scheduleDate = "" }: { course: Row; config: LandingConfig; resources?: ProductResource[]; scheduleDate?: string }) {
   const meta = object(course,'metadata'), images = productDetailImages(meta).map(item => ({ ...item, path: safeUrl(item.path) })).filter(item => item.path), image = images[0]?.path || '';
   const detailHtml = typeof meta.detail_html === 'string' ? meta.detail_html : '';
   const documentSource = productDocument(meta);
@@ -34,7 +35,15 @@ export function CampaignFreeClass({ course, config, resources = [] }: { course: 
         </section>)}
         {resources.length > 0 && <section className="campaign-section" data-section="materials"><h2>무료 제공 자료</h2><p>클래스와 함께 활용할 자료를 내려받아 사용하세요.</p>{resources.map(resource => <ProductResourceRow key={resource.id} resource={resource} courseId={course.id} />)}</section>}
       </div>
-      <aside className="campaign-sticky" aria-label="무료 클래스 신청">{cta('sticky_cta', true)}</aside>
+      <aside className="campaign-sticky" aria-label="무료 클래스 신청">
+        <div className="campaign-cta-info">
+          <span className="campaign-cta-kicker">무료 웨비나</span>
+          <h2>{t(course, 'title') || '무료 클래스'}</h2>
+          {(t(course, 'schedule_label') || scheduleDate) && <p><CalendarDays aria-hidden="true" />{t(course, 'schedule_label') || `웨비나 일정 · ${new Date(scheduleDate).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric' })}`}</p>}
+          {t(course, 'duration_label') && <p>{t(course, 'duration_label')}</p>}
+        </div>
+        {cta('sticky_cta', true)}
+      </aside>
     </div></div>
   </LandingTracker>;
 }
