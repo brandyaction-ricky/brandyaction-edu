@@ -47,8 +47,9 @@ const jevV4Choices: Record<string, string> = {
   conditional_purchase_statement: '조건부 신청·구매 의사', paid_application_or_payment_attempt: '유료 신청·결제 시도 명시',
 };
 const jevV4UncertaintyLabels: Record<string, string> = {
-  unclear_choice: '판단 보류', unresolved_category: '분류가 모호함', low_reported_confidence: '표시 신뢰도가 낮음',
-  narrow_probability_margin: '비슷한 선택지가 있음', choice_not_top_probability: '선택과 확률이 엇갈림',
+  unclear_choice: 'Jev가 답을 고르지 못함', unresolved_category: '정보가 부족해 답을 구분하기 어려움',
+  low_reported_confidence: 'Jev가 확신을 낮게 표시함', narrow_probability_margin: '가능한 답들이 비슷함',
+  choice_not_top_probability: 'Jev가 고른 답과 가장 가능성 높게 본 답이 다름',
 };
 const displayTime = (value: string) => new Date(value).toLocaleString('ko-KR');
 type Mutation = (payload: Record<string, unknown>) => Promise<Record<string, unknown>>;
@@ -106,6 +107,7 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [drawer, setDrawer] = useState<'case' | 'evidence' | null>(null);
+  const [caseSource, setCaseSource] = useState<'native' | 'manual'>('native');
   const [showFunnel, setShowFunnel] = useState(false);
   const [editingCase, setEditingCase] = useState<ConversionCase | undefined>();
   const [editingEvidence, setEditingEvidence] = useState<ConversionEvidence | undefined>();
@@ -191,13 +193,16 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
   const stale = Boolean(run && selected && snapshot && isRunStale(run, selected, snapshot.evidence));
   const records = snapshot?.reviews.filter(item => item.case_id === selected?.id).sort((a, b) => b.created_at.localeCompare(a.created_at)) || [];
   const jevV4Run = run && snapshot ? snapshot.jev_v4_runs?.find(item => item.v1_run_id === run.id) : undefined;
-  const openCase = (item?: ConversionCase) => { setEditingCase(item); setDrawer('case'); };
+  const openCase = (item?: ConversionCase, initialSource: 'native' | 'manual' = 'native') => { setEditingCase(item); setDrawer('case'); setCaseSource(initialSource); };
   const openEvidence = (item?: ConversionEvidence) => { setEditingEvidence(item); setDrawer('evidence'); };
 
   return <AdminPage width="wide" template="review" className="conversion-review">
     <AdminPageHeader title={workspace ? "모집 운영" : "전환 관리"} description={workspace ? "모집별 연결·구매 현황·후속 안내를 한곳에서 관리합니다." : "문의에 필요한 설명을 찾고, 검토한 내용을 기록합니다."} eyebrow="MARKETING" actions={<>
       <AdminButton disabled={pending || loading} onClick={() => void refresh()}>새로고침</AdminButton>
-      {snapshot && (!workspace || workspaceView === 'inquiries') && <AdminButton tone="primary" disabled={pending} onClick={() => openCase()}>문의 연결</AdminButton>}
+      {snapshot && (!workspace || workspaceView === 'inquiries') && <>
+        <AdminButton disabled={pending} onClick={() => openCase(undefined, 'native')}>사이트 문의 연결</AdminButton>
+        <AdminButton tone="primary" disabled={pending} onClick={() => openCase(undefined, 'manual')}>카톡 문의 붙여넣기</AdminButton>
+      </>}
     </>} />
     {error && <div role="alert" className="conversion-alert">{error}</div>}
     {notice && <p role="status" className="conversion-notice">{notice}</p>}
@@ -247,11 +252,11 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
                 {stale && <p role="alert" className="conversion-alert">문의나 설명자료가 바뀌었습니다. 새로 판단한 뒤 검토 기록을 남겨 주세요.</p>}
                 <p>{run.result.notice}</p>
                 {run.result.mode === 'jev' && <><div className="conversion-jev-grid" aria-label="Jev 전환 판정">
-                  <div><span>구매 의도</span><strong>{jevNames[run.result.decisions.purchase_intent.choice]}</strong><small>모델 표시 신뢰도 {confidence(run.result.decisions.purchase_intent.confidence)}</small></div>
-                  <div><span>주요 장애물</span><strong>{jevNames[run.result.decisions.primary_barrier.choice]}</strong><small>모델 표시 신뢰도 {confidence(run.result.decisions.primary_barrier.confidence)}</small></div>
-                  <div><span>구매 준비도</span><strong>{run.result.decisions.purchase_readiness.score.toFixed(1)} / 4</strong><small>모델 표시 신뢰도 {confidence(run.result.decisions.purchase_readiness.confidence)}</small></div>
-                  <div><span>권장 다음 행동</span><strong>{jevNames[run.result.decisions.next_action.choice]}</strong><small>모델 표시 신뢰도 {confidence(run.result.decisions.next_action.confidence)}</small></div>
-                </div><p className="conversion-muted">Jev의 참고 분류입니다. 표시 신뢰도는 사람 판단과의 일치율이나 정확도 점수가 아닙니다.</p></>}
+                  <div><span>구매 의도</span><strong>{jevNames[run.result.decisions.purchase_intent.choice]}</strong><small>Jev가 표시한 확신 {confidence(run.result.decisions.purchase_intent.confidence)}</small></div>
+                  <div><span>주요 장애물</span><strong>{jevNames[run.result.decisions.primary_barrier.choice]}</strong><small>Jev가 표시한 확신 {confidence(run.result.decisions.primary_barrier.confidence)}</small></div>
+                  <div><span>구매 준비도</span><strong>{run.result.decisions.purchase_readiness.score.toFixed(1)} / 4</strong><small>Jev가 표시한 확신 {confidence(run.result.decisions.purchase_readiness.confidence)}</small></div>
+                  <div><span>권장 다음 행동</span><strong>{jevNames[run.result.decisions.next_action.choice]}</strong><small>Jev가 표시한 확신 {confidence(run.result.decisions.next_action.confidence)}</small></div>
+                </div><p className="conversion-muted">이 확신은 Jev가 스스로 표시한 값입니다. 실제로 맞을 확률이나 정확도를 뜻하지 않습니다. 낮은 값이나 ‘다시 볼 부분’이 있으면 문의 내용을 함께 읽어 주세요.</p></>}
                 <p><strong>문의 구분</strong> · {inquiryNames[run.result.inquiry_type]}</p>
                 <div className="conversion-topics">{run.result.topics.filter(topic => topic.status === 'explicit').map(topic => <span key={topic.topic} className="conversion-tag">{topicNames[topic.topic]}</span>)}</div>
                 {run.result.missing_topics.length > 0 && <p className="conversion-alert">추가 확인 필요: {run.result.missing_topics.map(topic => topicNames[topic]).join(', ')}</p>}
@@ -286,8 +291,8 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
         </AdminSection>
       </div>
       </div>
-      {drawer === 'case' && <AdminDrawer title={editingCase ? '문의 정보 수정' : '문의 연결'} onClose={() => { if (!pending) setDrawer(null); }}>
-        <CaseForm key={editingCase?.id || 'new'} snapshot={snapshot} item={editingCase} pending={pending} mutate={mutate} onSaved={id => { setSelectedId(id); setDrawer(null); }} />
+      {drawer === 'case' && <AdminDrawer title={editingCase ? '문의 정보 수정' : caseSource === 'manual' ? '카톡 문의 붙여넣기' : '사이트 문의 연결'} onClose={() => { if (!pending) setDrawer(null); }}>
+        <CaseForm key={editingCase?.id || `new-${caseSource}`} snapshot={snapshot} item={editingCase} initialSource={caseSource} pending={pending || v4Pending} mutate={mutate} runJevV4={async runId => { setV4Pending(true); try { await runJevV4(runId); await refresh(); } finally { setV4Pending(false); } }} onSaved={(id, note) => { setSelectedId(id); setDrawer(null); if (note) setNotice(note); }} />
       </AdminDrawer>}
       {drawer === 'evidence' && <AdminDrawer title={editingEvidence ? '설명자료 수정' : '설명자료 등록'} onClose={() => { if (!pending) setDrawer(null); }}>
         <EvidenceForm key={editingEvidence?.id || 'new'} snapshot={snapshot} item={editingEvidence} initialCourse={selected?.course_id || ''} pending={pending} mutate={mutate} onSaved={() => setDrawer(null)} />
@@ -302,11 +307,11 @@ function JevV4ReviewPanel({ run, disabled, onRun }: { run?: ConversionJevV4Run; 
   const uncertaintyByDecision = new Map<JevV4DecisionKey, string[]>();
   for (const flag of result?.uncertainty_flags || []) uncertaintyByDecision.set(flag.decision, [...(uncertaintyByDecision.get(flag.decision) || []), jevV4UncertaintyLabels[flag.reason] || flag.reason]);
   const consistencyLabels: Record<string, string> = {
-    paid_attempt_without_paid_target: '유료 신청·결제라고 분류했지만, 실제로 시도한 대상이 유료로 확인되지 않았습니다.',
-    paid_failure_without_paid_target: '유료 신청·결제 실패라고 분류했지만, 시도한 대상이 유료로 확인되지 않았습니다.',
-    free_failure_without_free_target: '무료 자료 접근 실패라고 분류했지만, 시도한 대상이 무료로 확인되지 않았습니다.',
-    paid_reference_without_stage: '유료 교육은 언급했지만, 행동 단계에서는 구매 신호가 없다고 봤습니다.',
-    paid_stage_without_reference: '유료 교육은 언급되지 않았지만, 행동 단계에서는 구매 신호가 있다고 봤습니다.',
+    paid_attempt_without_paid_target: '유료 신청·결제로 봤지만, 실제로 시도한 대상이 유료인지 분명하지 않습니다.',
+    paid_failure_without_paid_target: '유료 신청·결제 실패로 봤지만, 실제로 시도한 대상이 유료인지 분명하지 않습니다.',
+    free_failure_without_free_target: '무료 자료 이용 실패로 봤지만, 실제로 이용하려던 대상이 무료인지 분명하지 않습니다.',
+    paid_reference_without_stage: '유료 교육은 언급했지만, 구매 행동은 확인되지 않았다고 봤습니다.',
+    paid_stage_without_reference: '유료 교육은 언급되지 않았지만, 구매 신호가 있다고 봤습니다.',
   };
   return <section className="conversion-v2-result" aria-label="무료 자료 접근과 유료 관심 참고 분류">
     <h4>무료 자료 문제와 유료 관심 구분</h4>
@@ -318,11 +323,11 @@ function JevV4ReviewPanel({ run, disabled, onRun }: { run?: ConversionJevV4Run; 
       <dl>{keys.map(key => {
         const decision = result.decisions[key];
         const flags = uncertaintyByDecision.get(key) || [];
-        return <div key={key}><dt>{jevV4Labels[key]}</dt><dd>{jevV4Choices[decision.choice] || decision.choice} · 모델 표시 신뢰도 {confidence(decision.confidence)}{flags.length ? ` · 다시 볼 부분: ${flags.join(', ')}` : ''}</dd></div>;
+        return <div key={key}><dt>{jevV4Labels[key]}</dt><dd>{jevV4Choices[decision.choice] || decision.choice} · Jev가 표시한 확신 {confidence(decision.confidence)}{flags.length ? ` · 다시 볼 부분: ${flags.join(', ')}` : ''}</dd></div>;
       })}</dl>
-      {result.consistency_flags.length > 0 && <p role="alert" className="conversion-alert">다시 볼 부분: {result.consistency_flags.map(flag => consistencyLabels[flag] || flag).join(' ')}</p>}
-      {result.consistency_flags.length === 0 && result.uncertainty_flags.length === 0 && <p className="conversion-muted">Jev가 따로 표시한 헷갈림 신호는 없습니다. 그래도 문의 원문과 함께 확인해 주세요.</p>}
-      <p className="conversion-muted">화면의 신뢰도 표시는 정확도를 입증한 점수가 아닙니다. 판정 결과는 직원 확인용으로 저장되며 고객에게 보내지지 않습니다.</p>
+      {result.consistency_flags.length > 0 && <p role="alert" className="conversion-alert">결과끼리 맞지 않는 부분이 있습니다. {result.consistency_flags.map(flag => consistencyLabels[flag] || flag).join(' ')} 문의 내용과 함께 확인해 주세요.</p>}
+      {result.consistency_flags.length === 0 && result.uncertainty_flags.length === 0 && <p className="conversion-muted">따로 다시 볼 부분은 표시되지 않았습니다. 그래도 문의 내용과 함께 확인해 주세요.</p>}
+      <p className="conversion-muted">이 확신은 Jev가 스스로 표시한 값이며, 실제로 맞을 확률이나 정확도를 뜻하지 않습니다. 판정 결과는 직원 확인용이며 고객에게 보내지 않습니다.</p>
     </>}
   </section>;
 }
@@ -349,16 +354,16 @@ function ReviewForm({ runId, caseId, initialReply, stale, pending, mutate }: { r
   </form>;
 }
 
-function CaseForm({ snapshot, item, pending, mutate, onSaved }: { snapshot: ConversionSnapshot; item?: ConversionCase; pending: boolean; mutate: Mutation; onSaved: (id: string) => void }) {
-  const [source, setSource] = useState(item?.source_type || 'native');
-  const [sampleOrigin, setSampleOrigin] = useState(item?.sample_origin || (item ? 'current' : ''));
+function CaseForm({ snapshot, item, initialSource, pending, mutate, runJevV4, onSaved }: { snapshot: ConversionSnapshot; item?: ConversionCase; initialSource: 'native' | 'manual'; pending: boolean; mutate: Mutation; runJevV4: (runId: string) => Promise<void>; onSaved: (id: string, note?: string) => void }) {
+  const [source, setSource] = useState(item?.source_type || initialSource);
+  const [sampleOrigin, setSampleOrigin] = useState(item?.sample_origin || (item || initialSource === 'manual' ? 'current' : ''));
   const [legacyCourseLabel, setLegacyCourseLabel] = useState(item?.legacy_course_label || '');
   const [questionId, setQuestionId] = useState(item?.question_id || '');
   const [courseId, setCourseId] = useState(item?.course_id || '');
   const [cohortId, setCohortId] = useState(item?.cohort_id || '');
   const [subject, setSubject] = useState(item?.subject || '');
   const [content, setContent] = useState(item?.content || '');
-  const [sourceLabel, setSourceLabel] = useState(item?.source_label || '');
+  const [sourceLabel, setSourceLabel] = useState(item?.source_label || (initialSource === 'manual' ? '카카오 채널 1:1 상담' : ''));
   const [receivedAt, setReceivedAt] = useState(item ? new Date(new Date(item.received_at).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '');
   const [deidentifiedConfirmed, setDeidentifiedConfirmed] = useState(false);
   const [error, setError] = useState('');
@@ -366,8 +371,21 @@ function CaseForm({ snapshot, item, pending, mutate, onSaved }: { snapshot: Conv
   async function submit(event: FormEvent) {
     event.preventDefault(); setError('');
     try {
-      const result = await mutate({ action: 'save_case', ...(item ? { id: item.id, expected_version: item.input_version } : {}), question_id: source === 'native' ? questionId : null, course_id: courseId || null, cohort_id: cohortId || null, sample_origin: source === 'native' ? 'current' : sampleOrigin, legacy_course_label: sampleOrigin === 'external_legacy' ? legacyCourseLabel : null, ...(source === 'manual' ? { subject, content, source_label: sourceLabel, received_at: new Date(receivedAt).toISOString(), deidentified_confirmed: deidentifiedConfirmed } : {}) });
-      onSaved((result.case as ConversionCase).id);
+      const result = await mutate({ action: 'save_case', ...(item ? { id: item.id, expected_version: item.input_version } : {}), question_id: source === 'native' ? questionId : null, course_id: courseId || null, cohort_id: cohortId || null, sample_origin: source === 'native' ? 'current' : sampleOrigin, legacy_course_label: sampleOrigin === 'external_legacy' ? legacyCourseLabel : null, ...(source === 'manual' ? { subject: subject || content.trim().split(/\r?\n/)[0].slice(0, 200) || '카카오 채널 문의', content, source_label: sourceLabel, received_at: new Date(receivedAt).toISOString(), deidentified_confirmed: deidentifiedConfirmed } : {}) });
+      const savedCase = result.case as ConversionCase;
+      let note = item ? '문의 내용을 수정했습니다.' : '문의 내용을 저장했습니다.';
+      if (!item && source === 'manual' && sampleOrigin === 'current' && snapshot.capabilities.can_jev) {
+        try {
+          const analyzed = await mutate({ action: 'analyze', case_id: savedCase.id, expected_version: savedCase.input_version });
+          const run = analyzed.run as { id?: string } | undefined;
+          if (!run?.id) throw new Error('Jev 결과를 찾을 수 없습니다.');
+          if (snapshot.capabilities.can_jev_v4) await runJevV4(run.id);
+          note = '문의가 저장됐고 Jev 분류와 답변 초안을 만들었습니다. 아래 문의 카드에서 확인해 주세요.';
+        } catch {
+          note = '문의는 저장됐지만 Jev 결과를 만들지 못했습니다. 문의 카드에서 다시 실행해 주세요.';
+        }
+      }
+      onSaved(savedCase.id, note);
     } catch (cause) { setError((cause as Error).message); }
   }
   return <form className="conversion-form admin-dialog-body" onSubmit={submit}>
@@ -379,17 +397,17 @@ function CaseForm({ snapshot, item, pending, mutate, onSaved }: { snapshot: Conv
     </> : <>
       <AdminSelect label="문의 시기" required value={sampleOrigin} disabled={pending || Boolean(item)} onChange={event => { setSampleOrigin(event.target.value as 'current' | 'external_legacy'); setCourseId(''); setCohortId(''); }} helper="과거 문의는 당시 배경을 참고하기 위한 기록입니다. 새 Jev 성능 점수에는 합치지 않습니다."><option value="">선택</option><option value="current">현재 교육 상담</option><option value="external_legacy">과거 유료 교육 상담</option></AdminSelect>
       {sampleOrigin === 'external_legacy' && <AdminInput label="당시 유료 교육 상품명" value={legacyCourseLabel} onChange={event => setLegacyCourseLabel(event.target.value)} required maxLength={200} disabled={pending} helper="상품명이 확인되지 않으면 ‘상품명 미확인’으로 기록하세요. 현재 문샷 챌린지 4기로 추정해 연결하지 않습니다." />}
-      <AdminInput label="문의 제목" value={subject} onChange={event => setSubject(event.target.value)} required maxLength={200} disabled={pending} />
-      <AdminTextarea label="문의 발췌" value={content} onChange={event => setContent(event.target.value)} required maxLength={10000} rows={5} disabled={pending} helper="대화 전체 대신 구매 판단에 필요한 문장만 남기세요. 고객 이름·별명·연락처·계정 ID·링크·주문번호는 제거해 주세요." />
+      <AdminInput label="문의 제목" value={subject} onChange={event => setSubject(event.target.value)} maxLength={200} disabled={pending} placeholder="비워 두면 문의 첫 문장을 제목으로 사용합니다." />
+      <AdminTextarea label="문의 내용" value={content} onChange={event => setContent(event.target.value)} required maxLength={10000} rows={7} disabled={pending} helper="카카오 문의 내용을 그대로 붙여넣어 주세요. 저장 전에 고객 이름·별명·연락처·계정 ID·링크·주문번호를 지워 주세요. 저장이 끝나면 Jev가 바로 분류하고 답변 초안을 만듭니다." />
       <AdminInput label="출처 설명" value={sourceLabel} onChange={event => setSourceLabel(event.target.value)} required maxLength={200} disabled={pending} placeholder="예: 카카오 채널 1:1 상담" />
-      <AdminInput label="문의 접수 시각" type="datetime-local" value={receivedAt} onChange={event => setReceivedAt(event.target.value)} required disabled={pending} />
-      <p className="conversion-muted">외부 문의는 고객 미연결로 저장됩니다. 이름이나 유입 경로로 회원을 추정하지 않습니다.</p>
+      <AdminInput label="문의 접수 시각" type="datetime-local" value={receivedAt} onFocus={() => { if (!receivedAt) setReceivedAt(new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)); }} onChange={event => setReceivedAt(event.target.value)} required disabled={pending} />
+      <p className="conversion-muted">문의는 저장되지만 카카오 계정과 사이트 회원이 자동으로 연결되지는 않습니다. 이름이나 문의 시각으로 회원·결제를 추정하지 않습니다. 연결되지 않은 문의는 나중에 결제 여부를 알 수 없습니다.</p>
       <label className="checkline"><input type="checkbox" checked={deidentifiedConfirmed} onChange={event => setDeidentifiedConfirmed(event.target.checked)} required disabled={pending} />고객 식별정보를 제거한 발췌임을 확인했습니다.</label>
     </>}
     <AdminSelect label="대상 상품" required={sampleOrigin !== 'external_legacy'} value={courseId} disabled={pending || Boolean(source === 'native' && question?.course_id)} onChange={event => { setCourseId(event.target.value); setCohortId(''); }} helper={sampleOrigin === 'external_legacy' ? '당시 상품과 동일한 DEV 상품이 확인된 경우에만 연결합니다. 미확인이면 비워 두세요.' : undefined}><option value="">{sampleOrigin === 'external_legacy' ? '현행 상품 연결 안 함' : '상품 선택'}</option>{snapshot.courses.map(course => <option key={course.id} value={course.id}>{course.title}</option>)}</AdminSelect>
     {sampleOrigin !== 'external_legacy' && <AdminSelect label="대상 기수" value={cohortId} disabled={pending} onChange={event => setCohortId(event.target.value)}><option value="">기수 미지정</option>{snapshot.cohorts.filter(cohort => cohort.course_id === courseId).map(cohort => <option key={cohort.id} value={cohort.id}>{cohort.name}</option>)}</AdminSelect>}
     {error && <p role="alert" className="conversion-alert">{error}</p>}
-    <AdminButton type="submit" tone="primary" disabled={pending || (sampleOrigin !== 'external_legacy' && !courseId) || (source === 'native' && !questionId) || (source === 'manual' && (!sampleOrigin || !deidentifiedConfirmed || (sampleOrigin === 'external_legacy' && !legacyCourseLabel.trim())))}>문의 저장</AdminButton>
+    <AdminButton type="submit" tone="primary" disabled={pending || (sampleOrigin !== 'external_legacy' && !courseId) || (source === 'native' && !questionId) || (source === 'manual' && (!sampleOrigin || !deidentifiedConfirmed || (sampleOrigin === 'external_legacy' && !legacyCourseLabel.trim())))}>{!item && source === 'manual' && sampleOrigin === 'current' && snapshot.capabilities.can_jev ? '저장하고 Jev로 바로 살펴보기' : '문의 저장'}</AdminButton>
   </form>;
 }
 
