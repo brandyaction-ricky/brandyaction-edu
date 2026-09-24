@@ -26,9 +26,12 @@ function harness(options = {}) {
   const db = {
     from(table) {
       reads.push(table);
-      const query = { select(columns) { selections[table] = columns; return this; }, eq() { return this; }, order() { return this; }, limit() { return this; },
+      let selectedColumns = '';
+      const query = { select(columns) { selectedColumns = columns; selections[table] = columns; return this; }, eq() { return this; }, order() { return this; }, limit() { return this; },
         async maybeSingle() { return { data: options.inquiry || { id: ids.inquiry, course_id: ids.course, cohort_id: null, input_version: 1, subject: '초보', content: '난이도 문의' }, error: null }; },
-        then(resolve) { return Promise.resolve({ data: options.rows?.[table] || [], error: options.errors?.[table] || (table === 'edu_conversion_adjudication_notes' ? options.notesError || null : null) }).then(resolve); } };
+        then(resolve) { const caseColumnsPending = table === 'edu_conversion_cases' && selectedColumns.includes('purchase_outcome'); return Promise.resolve({
+          data: options.rows?.[table] || [], error: caseColumnsPending ? options.caseManagementColumnsError || null : options.errors?.[table] || (table === 'edu_conversion_adjudication_notes' ? options.notesError || null : null),
+        }).then(resolve); } };
       return query;
     },
     async rpc(name, args) { calls.push({ name, args }); return options.rpcResult || { data: { case: { id: ids.inquiry } }, error: null }; },
@@ -83,6 +86,31 @@ test('manual inquiry requires deidentification confirmation and blocks obvious c
   }
   const h = harness();
   assert.equal((await h.POST(req({ ...base, content: '문샷 챌린지 4기 가격 1,650,000원이 맞나요?' }))).status, 200);
+});
+test('purchase outcome and reversible inquiry deletion use the dedicated protected management RPC', async () => {
+  const purchase = { action: 'manage_case', operation: 'purchase_outcome', requestId: ids.request, case_id: ids.inquiry,
+    expected_version: 1, purchase_outcome: 'paid' };
+  const h = harness();
+  assert.equal((await h.POST(req(purchase))).status, 200);
+  assert.equal(h.calls[0].name, 'edu_conversion_case_manage');
+  assert.equal(h.calls[0].args.p_payload.purchase_outcome, 'paid');
+  assert.equal(h.calls[0].args.p_payload.operation, 'purchase_outcome');
+  const invalid = harness();
+  assert.equal((await invalid.POST(req({ ...purchase, purchase_outcome: 'guess' }))).status, 400);
+  assert.deepEqual(invalid.calls, []);
+  const archive = harness();
+  assert.equal((await archive.POST(req({ action: 'manage_case', operation: 'archive', requestId: ids.request,
+    case_id: ids.inquiry, expected_version: 1 }))).status, 200);
+  assert.equal(archive.calls[0].args.p_payload.operation, 'archive');
+});
+test('archived inquiries cannot be sent back to Jev for another judgment', async () => {
+  let providerCalls = 0;
+  const h = harness({ inquiry: { id: ids.inquiry, course_id: ids.course, cohort_id: null, input_version: 1, archived_at: '2026-09-25T00:00:00.000Z', subject: '초보 문의', content: '질문' },
+    createJevJudgment: async () => { providerCalls += 1; throw new Error('unexpected'); } });
+  const response = await h.POST(req({ action: 'analyze', requestId: ids.request, case_id: ids.inquiry, expected_version: 1 }));
+  assert.equal(response.status, 409);
+  assert.equal(providerCalls, 0);
+  assert.deepEqual(h.calls, []);
 });
 test('historical education inquiry keeps its original product label without a current course', async () => {
   const historical = { ...base, course_id: null, sample_origin: 'external_legacy', legacy_course_label: '과거 온라인 마케팅 교육', cohort_id: null };
@@ -167,6 +195,16 @@ test('snapshot stays available while the separate DEV notes migration is pending
   assert.equal(body.capabilities.can_adjudicate, false);
   const failed = harness({ notesError: { code: '42501', message: 'permission denied' } });
   assert.equal((await failed.GET()).status, 503);
+});
+test('snapshot stays readable and disables payment management while its migration is pending', async () => {
+  const h = harness({ env, rows: { edu_conversion_cases: [{ id: ids.inquiry, subject: '초보 문의', input_version: 1 }] }, caseManagementColumnsError: { code: '42703', message: 'column pending' } });
+  const response = await h.GET();
+  assert.equal(response.status, 200);
+  const snapshot = await response.json();
+  assert.equal(snapshot.cases[0].purchase_outcome, 'unknown');
+  assert.equal(snapshot.cases[0].archived_at, null);
+  assert.equal(snapshot.capabilities.can_manage_cases, false);
+  assert.deepEqual(h.reads.filter(item => item === 'edu_conversion_cases').length, 2);
 });
 test('snapshot gates v4 until its separate migration is ready without hiding earlier results', async () => {
   const h = harness({ errors: { edu_conversion_jev_v4_runs: { code: 'PGRST205', message: 'missing relation' } },
