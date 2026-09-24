@@ -55,7 +55,7 @@ export const JEV_V4_QUESTIONS = {
     no_paid_reference: '유료 교육에 관한 표현이 없음, 무료 자료만 요청함, 또는 유료 관심을 명시적으로 부정함',
     unclear: '유료 교육에 관한 표현인지 구분할 수 없음',
   } },
-  observable_stage: { type: 'choice', instructions: '유료 교육에 관해 직접 표현된 단계만 고르세요. 무료 자료만 요청했거나 유료 관심을 명시적으로 부정했다면 no_purchase_signal입니다. “무료 영상을 본 뒤 신청할지 결정하겠다”처럼 결정을 미룬 표현은 future_consideration_after_free_content입니다. “내용이 맞으면 신청하겠다”, “일정이 가능하면 구매하겠다”처럼 조건 충족 시 유료 신청·구매 행동을 하겠다는 직접 표현은 conditional_purchase_statement입니다. 두 표현을 혼동하지 마세요. 무료 자료 접근, 유료에 대한 단순 부정 또는 결제창 노출만으로 유료 관심·신청·결제를 추정하지 마세요. 유료 구매 의도·준비도 점수를 만들지 마세요.', criteria: {
+  observable_stage: { type: 'choice', instructions: '유료 교육에 관해 직접 표현된 단계만 고르세요. 무료 자료만 요청했거나 유료 관심을 명시적으로 부정했다면 no_purchase_signal입니다. “무료 영상을 본 뒤 신청할지 결정하겠다”처럼 결정을 미룬 표현은 future_consideration_after_free_content입니다. “내용이 맞으면 신청하겠다”, “일정이 가능하면 구매하겠다”처럼 조건 충족 시 유료 신청·구매를 하겠다는 직접 약속은 conditional_purchase_statement입니다. “일정이 맞으면 참여를 검토하겠다”처럼 검토 의사만 밝힌 표현은 specific_evaluation으로 분류하고 conditional_purchase_statement로 올려 잡지 마세요. 두 표현을 혼동하지 마세요. 무료 자료 접근, 유료에 대한 단순 부정 또는 결제창 노출만으로 유료 관심·신청·결제를 추정하지 마세요. 유료 구매 의도·준비도 점수를 만들지 마세요.', criteria: {
     no_purchase_signal: '유료 교육에 관한 표현이 없음',
     information_seeking: '유료 교육의 일반 정보를 요청함',
     specific_evaluation: '유료 교육 조건을 구체적으로 검토하거나 비교함',

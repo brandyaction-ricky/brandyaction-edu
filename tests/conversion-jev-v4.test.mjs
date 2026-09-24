@@ -81,6 +81,7 @@ test('v4 prompt keeps free-only and explicitly declined paid interest out of pai
   assert.match(v4.JEV_V4_QUESTIONS.paid_program_reference.instructions, /유료 관심을 부정하면 no_paid_reference/);
   assert.match(v4.JEV_V4_QUESTIONS.observable_stage.instructions, /유료 관심을 명시적으로 부정했다면 no_purchase_signal/);
   assert.match(v4.JEV_V4_QUESTIONS.observable_stage.instructions, /조건 충족 시 유료 신청·구매 행동을 하겠다는 직접 표현은 conditional_purchase_statement/);
+  assert.match(v4.JEV_V4_QUESTIONS.observable_stage.instructions, /검토 의사만 밝힌 표현은 specific_evaluation으로 분류하고 conditional_purchase_statement로 올려 잡지 마세요/);
   assert.match(v4.JEV_V4_QUESTIONS.attempted_action_target.instructions, /대상이 특정되지 않으면 무료 콘텐츠 접근으로 추정하지 말고 unclear/);
   assert.match(v4.JEV_V4_QUESTIONS.operational_issue.instructions, /대상이 불명확하면 무료 접근 실패로 좁혀 추정하지 말고 unclear/);
 });
