@@ -29,18 +29,18 @@ const choices: Record<string, string> = {
   conditional_purchase_statement: '조건부 신청·구매 의사', paid_application_or_payment_attempt: '유료 신청·결제 시도 명시',
 };
 const consistencyLabels: Record<string, string> = {
-  paid_attempt_without_paid_target: '유료 신청·결제 단계인데 실제 시도 대상이 유료로 판정되지 않음',
-  paid_failure_without_paid_target: '유료 신청·결제 실패인데 시도 대상이 유료로 판정되지 않음',
-  free_failure_without_free_target: '무료 콘텐츠 실패인데 시도 대상이 무료로 판정되지 않음',
-  paid_reference_without_stage: '유료 언급은 있으나 행동 단계는 구매 신호 없음',
-  paid_stage_without_reference: '유료 언급은 없으나 행동 단계는 유료 신호 있음',
+  paid_attempt_without_paid_target: '유료 신청·결제로 봤지만, 실제로 시도한 대상이 유료인지 분명하지 않습니다.',
+  paid_failure_without_paid_target: '유료 신청·결제 실패로 봤지만, 실제로 시도한 대상이 유료인지 분명하지 않습니다.',
+  free_failure_without_free_target: '무료 콘텐츠 이용 실패로 봤지만, 실제로 이용하려던 대상이 무료인지 분명하지 않습니다.',
+  paid_reference_without_stage: '유료 교육은 언급했지만, 구매 행동은 확인되지 않았다고 봤습니다.',
+  paid_stage_without_reference: '유료 교육은 언급되지 않았지만, 구매 신호가 있다고 봤습니다.',
 };
 const uncertaintyLabels: Record<JevV4UncertaintyFlag['reason'], string> = {
-  unclear_choice: '모델이 판단 보류를 선택함',
-  unresolved_category: '정보 없음과 불명확이 한 선택지에 합쳐짐',
-  low_reported_confidence: '모델 표시 신뢰도 70% 미만',
-  narrow_probability_margin: '상위 선택지 확률 차이가 15%p 미만',
-  choice_not_top_probability: '선택값과 가장 높은 확률 항목이 다름',
+  unclear_choice: 'Jev가 답을 고르지 못함',
+  unresolved_category: '정보가 부족해 답을 구분하기 어려움',
+  low_reported_confidence: 'Jev가 확신을 낮게 표시함',
+  narrow_probability_margin: '가능한 답들이 비슷함',
+  choice_not_top_probability: 'Jev가 고른 답과 가장 가능성 높게 본 답이 다름',
 };
 
 export function ConversionJevV4Synthetic() {
@@ -58,7 +58,7 @@ export function ConversionJevV4Synthetic() {
       if (!casesResponse.ok) throw new Error('합성 사례 목록을 불러오지 못했습니다.');
       const { cases } = await casesResponse.json() as { cases: Array<{ id: JevV4BoundaryCaseId; title: string; subject: string; content: string }> };
       for (const [index, testCase] of cases.entries()) {
-        setProgress(`합성 경계 사례 ${index + 1}/${cases.length} 판정 중`);
+        setProgress(`예시 ${index + 1}/${cases.length}개를 살펴보는 중`);
         const response = await fetch('/api/conversion/jev-v4-synthetic', {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ case_id: testCase.id }),
         });
@@ -74,10 +74,10 @@ export function ConversionJevV4Synthetic() {
     }
   }
 
-  return <section className="conversion-v2-result" aria-label="Jev v4 합성 경계 사례 DEV 시험">
-    <h4>새 합성 경계 사례 · DEV 전용 · 저장하지 않음</h4>
-    <p className="conversion-muted">실제 상담 원문을 쓰지 않습니다. 새로 만든 사례를 Jev에 한 번씩 보내고 결과는 이 화면에만 표시합니다. 기존 20건의 설계 표본은 정확도 분모에서 제외합니다.</p>
-    <AdminButton disabled={busy} onClick={() => void runAll()}>{busy ? '합성 사례 판정 중' : '새 경계 사례 모두 실행'}</AdminButton>
+  return <section className="conversion-v2-result" aria-label="새 예시 확인">
+    <h4>새로 만든 예시 확인 · 개발 화면 · 저장되지 않음</h4>
+    <p className="conversion-muted">실제 고객 문의는 사용하지 않습니다. 새로 만든 예시를 Jev가 분류해 이 화면에 보여줍니다. 기존 상담 20건은 기준을 만드는 데 사용했으므로 정확도 확인에는 쓰지 않습니다.</p>
+    <AdminButton disabled={busy} onClick={() => void runAll()}>{busy ? '예시를 살펴보는 중' : '새 예시 모두 확인'}</AdminButton>
     {progress && <p role="status" className="conversion-muted">{progress}</p>}
     {error && <p role="alert" className="conversion-alert">{error}</p>}
     {results.map(({ case: testCase, result }) => {
@@ -90,12 +90,12 @@ export function ConversionJevV4Synthetic() {
         <dl>{(Object.keys(labels) as JevV4DecisionKey[]).map(key => {
           const decision = result.decisions[key];
           const uncertainty = uncertaintyByDecision.get(key) || [];
-          return <div key={key}><dt>{labels[key]}</dt><dd>{choices[decision.choice] || decision.choice} · 표시 신뢰도 {Math.round(decision.confidence * 100)}%{uncertainty.length ? ` · 검토 신호: ${uncertainty.map(flag => uncertaintyLabels[flag.reason]).join(', ')}` : ''}</dd></div>;
+          return <div key={key}><dt>{labels[key]}</dt><dd>{choices[decision.choice] || decision.choice} · Jev가 표시한 확신 {Math.round(decision.confidence * 100)}%{uncertainty.length ? ` · 다시 볼 부분: ${uncertainty.map(flag => uncertaintyLabels[flag.reason]).join(', ')}` : ''}</dd></div>;
         })}</dl>
-        {result.consistency_flags.length > 0 && <p role="alert" className="conversion-alert">판정 간 형식 충돌: {result.consistency_flags.map(flag => consistencyLabels[flag] || flag).join(' · ')}. 원문 근거를 확인하세요.</p>}
-        {result.uncertainty_flags.length === 0 && result.consistency_flags.length === 0 && <p className="conversion-muted">표시된 불확실성·형식 충돌은 없지만, 원문과의 일치나 정확성을 확인한 것은 아닙니다.</p>}
+        {result.consistency_flags.length > 0 && <p role="alert" className="conversion-alert">결과끼리 맞지 않는 부분이 있습니다: {result.consistency_flags.map(flag => consistencyLabels[flag] || flag).join(' · ')} 문의 내용과 함께 확인해 주세요.</p>}
+        {result.uncertainty_flags.length === 0 && result.consistency_flags.length === 0 && <p className="conversion-muted">따로 다시 볼 부분은 표시되지 않았습니다. 그래도 문의 내용과 함께 확인해 주세요.</p>}
       </article>;
     })}
-    {results.length > 0 && <p className="conversion-muted">모델 표시 신뢰도와 선택 확률은 정답 확률로 검증되지 않았습니다. 사례별 판정은 경계 점검 자료이며 독립된 실제 고객 표본의 정확도 수치가 아닙니다.</p>}
+    {results.length > 0 && <p className="conversion-muted">이 확신은 Jev가 스스로 표시한 값입니다. 실제로 맞을 확률이나 정확도를 뜻하지 않습니다. 이 예시들은 어떤 상황을 구분하는지 살펴보는 용도입니다.</p>}
   </section>;
 }
