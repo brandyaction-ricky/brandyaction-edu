@@ -47,8 +47,9 @@ const jevV4Choices: Record<string, string> = {
   conditional_purchase_statement: '조건부 신청·구매 의사', paid_application_or_payment_attempt: '유료 신청·결제 시도 명시',
 };
 const jevV4UncertaintyLabels: Record<string, string> = {
-  unclear_choice: '판단 보류', unresolved_category: '분류가 모호함', low_reported_confidence: '표시 신뢰도가 낮음',
-  narrow_probability_margin: '비슷한 선택지가 있음', choice_not_top_probability: '선택과 확률이 엇갈림',
+  unclear_choice: 'Jev가 답을 고르지 못함', unresolved_category: '정보가 부족해 답을 구분하기 어려움',
+  low_reported_confidence: 'Jev가 확신을 낮게 표시함', narrow_probability_margin: '가능한 답들이 비슷함',
+  choice_not_top_probability: 'Jev가 고른 답과 가장 가능성 높게 본 답이 다름',
 };
 const displayTime = (value: string) => new Date(value).toLocaleString('ko-KR');
 type Mutation = (payload: Record<string, unknown>) => Promise<Record<string, unknown>>;
@@ -247,11 +248,11 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
                 {stale && <p role="alert" className="conversion-alert">문의나 설명자료가 바뀌었습니다. 새로 판단한 뒤 검토 기록을 남겨 주세요.</p>}
                 <p>{run.result.notice}</p>
                 {run.result.mode === 'jev' && <><div className="conversion-jev-grid" aria-label="Jev 전환 판정">
-                  <div><span>구매 의도</span><strong>{jevNames[run.result.decisions.purchase_intent.choice]}</strong><small>모델 표시 신뢰도 {confidence(run.result.decisions.purchase_intent.confidence)}</small></div>
-                  <div><span>주요 장애물</span><strong>{jevNames[run.result.decisions.primary_barrier.choice]}</strong><small>모델 표시 신뢰도 {confidence(run.result.decisions.primary_barrier.confidence)}</small></div>
-                  <div><span>구매 준비도</span><strong>{run.result.decisions.purchase_readiness.score.toFixed(1)} / 4</strong><small>모델 표시 신뢰도 {confidence(run.result.decisions.purchase_readiness.confidence)}</small></div>
-                  <div><span>권장 다음 행동</span><strong>{jevNames[run.result.decisions.next_action.choice]}</strong><small>모델 표시 신뢰도 {confidence(run.result.decisions.next_action.confidence)}</small></div>
-                </div><p className="conversion-muted">Jev의 참고 분류입니다. 표시 신뢰도는 사람 판단과의 일치율이나 정확도 점수가 아닙니다.</p></>}
+                  <div><span>구매 의도</span><strong>{jevNames[run.result.decisions.purchase_intent.choice]}</strong><small>Jev가 표시한 확신 {confidence(run.result.decisions.purchase_intent.confidence)}</small></div>
+                  <div><span>주요 장애물</span><strong>{jevNames[run.result.decisions.primary_barrier.choice]}</strong><small>Jev가 표시한 확신 {confidence(run.result.decisions.primary_barrier.confidence)}</small></div>
+                  <div><span>구매 준비도</span><strong>{run.result.decisions.purchase_readiness.score.toFixed(1)} / 4</strong><small>Jev가 표시한 확신 {confidence(run.result.decisions.purchase_readiness.confidence)}</small></div>
+                  <div><span>권장 다음 행동</span><strong>{jevNames[run.result.decisions.next_action.choice]}</strong><small>Jev가 표시한 확신 {confidence(run.result.decisions.next_action.confidence)}</small></div>
+                </div><p className="conversion-muted">이 확신은 Jev가 스스로 표시한 값입니다. 실제로 맞을 확률이나 정확도를 뜻하지 않습니다. 낮은 값이나 ‘다시 볼 부분’이 있으면 문의 내용을 함께 읽어 주세요.</p></>}
                 <p><strong>문의 구분</strong> · {inquiryNames[run.result.inquiry_type]}</p>
                 <div className="conversion-topics">{run.result.topics.filter(topic => topic.status === 'explicit').map(topic => <span key={topic.topic} className="conversion-tag">{topicNames[topic.topic]}</span>)}</div>
                 {run.result.missing_topics.length > 0 && <p className="conversion-alert">추가 확인 필요: {run.result.missing_topics.map(topic => topicNames[topic]).join(', ')}</p>}
@@ -302,11 +303,11 @@ function JevV4ReviewPanel({ run, disabled, onRun }: { run?: ConversionJevV4Run; 
   const uncertaintyByDecision = new Map<JevV4DecisionKey, string[]>();
   for (const flag of result?.uncertainty_flags || []) uncertaintyByDecision.set(flag.decision, [...(uncertaintyByDecision.get(flag.decision) || []), jevV4UncertaintyLabels[flag.reason] || flag.reason]);
   const consistencyLabels: Record<string, string> = {
-    paid_attempt_without_paid_target: '유료 신청·결제라고 분류했지만, 실제로 시도한 대상이 유료로 확인되지 않았습니다.',
-    paid_failure_without_paid_target: '유료 신청·결제 실패라고 분류했지만, 시도한 대상이 유료로 확인되지 않았습니다.',
-    free_failure_without_free_target: '무료 자료 접근 실패라고 분류했지만, 시도한 대상이 무료로 확인되지 않았습니다.',
-    paid_reference_without_stage: '유료 교육은 언급했지만, 행동 단계에서는 구매 신호가 없다고 봤습니다.',
-    paid_stage_without_reference: '유료 교육은 언급되지 않았지만, 행동 단계에서는 구매 신호가 있다고 봤습니다.',
+    paid_attempt_without_paid_target: '유료 신청·결제로 봤지만, 실제로 시도한 대상이 유료인지 분명하지 않습니다.',
+    paid_failure_without_paid_target: '유료 신청·결제 실패로 봤지만, 실제로 시도한 대상이 유료인지 분명하지 않습니다.',
+    free_failure_without_free_target: '무료 자료 이용 실패로 봤지만, 실제로 이용하려던 대상이 무료인지 분명하지 않습니다.',
+    paid_reference_without_stage: '유료 교육은 언급했지만, 구매 행동은 확인되지 않았다고 봤습니다.',
+    paid_stage_without_reference: '유료 교육은 언급되지 않았지만, 구매 신호가 있다고 봤습니다.',
   };
   return <section className="conversion-v2-result" aria-label="무료 자료 접근과 유료 관심 참고 분류">
     <h4>무료 자료 문제와 유료 관심 구분</h4>
@@ -318,11 +319,11 @@ function JevV4ReviewPanel({ run, disabled, onRun }: { run?: ConversionJevV4Run; 
       <dl>{keys.map(key => {
         const decision = result.decisions[key];
         const flags = uncertaintyByDecision.get(key) || [];
-        return <div key={key}><dt>{jevV4Labels[key]}</dt><dd>{jevV4Choices[decision.choice] || decision.choice} · 모델 표시 신뢰도 {confidence(decision.confidence)}{flags.length ? ` · 다시 볼 부분: ${flags.join(', ')}` : ''}</dd></div>;
+        return <div key={key}><dt>{jevV4Labels[key]}</dt><dd>{jevV4Choices[decision.choice] || decision.choice} · Jev가 표시한 확신 {confidence(decision.confidence)}{flags.length ? ` · 다시 볼 부분: ${flags.join(', ')}` : ''}</dd></div>;
       })}</dl>
-      {result.consistency_flags.length > 0 && <p role="alert" className="conversion-alert">다시 볼 부분: {result.consistency_flags.map(flag => consistencyLabels[flag] || flag).join(' ')}</p>}
-      {result.consistency_flags.length === 0 && result.uncertainty_flags.length === 0 && <p className="conversion-muted">Jev가 따로 표시한 헷갈림 신호는 없습니다. 그래도 문의 원문과 함께 확인해 주세요.</p>}
-      <p className="conversion-muted">화면의 신뢰도 표시는 정확도를 입증한 점수가 아닙니다. 판정 결과는 직원 확인용으로 저장되며 고객에게 보내지지 않습니다.</p>
+      {result.consistency_flags.length > 0 && <p role="alert" className="conversion-alert">결과끼리 맞지 않는 부분이 있습니다. {result.consistency_flags.map(flag => consistencyLabels[flag] || flag).join(' ')} 문의 내용과 함께 확인해 주세요.</p>}
+      {result.consistency_flags.length === 0 && result.uncertainty_flags.length === 0 && <p className="conversion-muted">따로 다시 볼 부분은 표시되지 않았습니다. 그래도 문의 내용과 함께 확인해 주세요.</p>}
+      <p className="conversion-muted">이 확신은 Jev가 스스로 표시한 값이며, 실제로 맞을 확률이나 정확도를 뜻하지 않습니다. 판정 결과는 직원 확인용이며 고객에게 보내지 않습니다.</p>
     </>}
   </section>;
 }
