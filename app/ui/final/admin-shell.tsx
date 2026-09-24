@@ -160,6 +160,7 @@ export function AdminShell({
   mobile,
   setMobile,
   logout,
+  prefetchSection,
   children,
 }: {
   current: string;
@@ -169,6 +170,7 @@ export function AdminShell({
   mobile: boolean;
   setMobile: (value: boolean) => void;
   logout: () => Promise<void>;
+  prefetchSection: (section: string) => void;
   children: ReactNode;
 }) {
   const selected =
@@ -194,6 +196,8 @@ export function AdminShell({
         href={key === "overview" ? "/admin" : "/admin/" + key}
         className={"nav-link " + (selected === key ? "active" : "")}
         aria-current={selected === key ? "page" : undefined}
+        onPointerEnter={() => prefetchSection(key === "overview" ? "home" : key)}
+        onFocus={() => prefetchSection(key === "overview" ? "home" : key)}
         onClick={() => setMobile(false)}
       >
         <Icon />
