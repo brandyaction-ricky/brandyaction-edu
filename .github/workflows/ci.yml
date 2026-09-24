@@ -5,6 +5,13 @@ on:
     branches: [develop, main]
   push:
     branches: [develop, main]
+  workflow_dispatch:
+    inputs:
+      apply_all_pending_dev_migrations:
+        description: Apply all pending SQL migrations to the DEV Supabase project
+        required: true
+        type: boolean
+        default: false
 
 concurrency:
   group: dev-pipeline-${{ github.ref }}
@@ -170,7 +177,7 @@ jobs:
         run: npm run build
 
   migrate-dev:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/develop' && inputs.apply_all_pending_dev_migrations
     needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 10
