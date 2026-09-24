@@ -151,6 +151,7 @@ export async function POST(request: Request) {
                 const purpose = String(body.purpose || '');
                 const content = string(body.content, 2000);
                 if (!string(body.name, 100) || !content || !['sms', 'lms', 'alimtalk'].includes(channel) || !['marketing', 'transactional'].includes(purpose)) fail('템플릿 이름·채널·내용을 확인해 주세요.');
+                if (channel === 'alimtalk' && purpose === 'marketing') fail('마케팅 안내는 정보성 알림톡으로 설정할 수 없습니다. 광고 문자 템플릿을 사용해 주세요.');
                 if (channel === 'alimtalk' && !string(body.alimtalkTemplateId, 200)) fail('승인된 알림톡 템플릿 ID를 입력해 주세요.');
                 const values = {
                     name: string(body.name, 100),
