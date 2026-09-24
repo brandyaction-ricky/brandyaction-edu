@@ -40,7 +40,7 @@ const jevV4Choices: Record<string, string> = {
   free_content_access_failure: '무료 콘텐츠 접근 실패', paid_application_failure: '유료 신청 실패',
   paid_payment_failure: '유료 결제 실패', other_access_failure: '그 밖의 접근 실패',
   future_consideration_after_free_content: '무료 콘텐츠를 본 뒤 유료 교육 검토',
-  paid_program_question: '유료 교육 조건 질문', paid_application_or_payment: '유료 신청·결제 시도 명시',
+  paid_program_question: '유료 교육 조건 질문', purchase_decision: '유료 신청·구매 결정', paid_application_or_payment: '유료 신청·결제 시도 명시',
   no_paid_reference: '유료 교육 언급 없음', no_purchase_signal: '유료 구매 신호 언급 없음',
   information_seeking: '유료 정보 탐색', specific_evaluation: '구체 조건 검토',
   conditional_purchase_statement: '조건부 신청·구매 의사', paid_application_or_payment_attempt: '유료 신청·결제 시도 명시',

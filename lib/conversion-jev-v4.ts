@@ -8,8 +8,8 @@ export const JEV_V4_CHOICES = {
   confirmed_barrier: ['explicit_price_burden', 'explicit_schedule_conflict', 'explicit_skill_concern', 'explicit_content_mismatch', 'explicit_trust_concern', 'none_stated', 'unclear'],
   attempted_action_target: ['free_live_or_replay', 'paid_application', 'paid_payment', 'other_nonpurchase_action', 'no_attempt_stated', 'unclear'],
   operational_issue: ['free_content_access_failure', 'paid_application_failure', 'paid_payment_failure', 'other_access_failure', 'none_stated', 'unclear'],
-  paid_program_reference: ['future_consideration_after_free_content', 'paid_program_question', 'paid_application_or_payment', 'no_paid_reference', 'unclear'],
-  observable_stage: ['no_purchase_signal', 'information_seeking', 'specific_evaluation', 'future_consideration_after_free_content', 'conditional_purchase_statement', 'paid_application_or_payment_attempt', 'unclear'],
+  paid_program_reference: ['future_consideration_after_free_content', 'paid_program_question', 'purchase_decision', 'paid_application_or_payment', 'no_paid_reference', 'unclear'],
+  observable_stage: ['no_purchase_signal', 'information_seeking', 'specific_evaluation', 'future_consideration_after_free_content', 'conditional_purchase_statement', 'purchase_decision', 'paid_application_or_payment_attempt', 'unclear'],
 } as const;
 
 // Every question concerns what the customer actually said. A free content link
@@ -32,7 +32,7 @@ export const JEV_V4_QUESTIONS = {
     none_stated: '구매를 막는 우려·제약을 직접 밝히지 않음',
     unclear: '직접 밝힌 구매 장애물인지 구분할 수 없음',
   } },
-  attempted_action_target: { type: 'choice', instructions: '고객이 실제로 시도했다고 직접 밝힌 행동의 대상을 고르세요. 향후 유료 교육을 고려한다는 문장과 현재 무료 라이브·다시보기를 열려는 행동을 분리하세요. 단지 결제창이 나타났다는 사실만으로 유료 신청·결제 시도를 선택하지 마세요. 어떤 링크인지 기억나지 않거나 대상이 특정되지 않으면 무료 콘텐츠 접근으로 추정하지 말고 unclear를 선택하세요.', criteria: {
+  attempted_action_target: { type: 'choice', instructions: '고객이 실제로 시도했다고 직접 밝힌 행동의 대상을 고르세요. “신청하기로 결정했다”, “신청할 생각이다”, 가격·결제·시작일 질문은 구매 의사나 정보 탐색이지 실제 신청·결제 시도가 아닙니다. 실제 신청 버튼을 누르거나 양식을 제출·결제한 행동을 직접 밝혀야 paid_application 또는 paid_payment입니다. 향후 유료 교육을 고려한다는 문장과 현재 무료 라이브·다시보기를 열려는 행동을 분리하세요. 단지 결제창이 나타났다는 사실만으로 유료 신청·결제 시도를 선택하지 마세요. 어떤 링크인지 기억나지 않거나 대상이 특정되지 않으면 무료 콘텐츠 접근으로 추정하지 말고 unclear를 선택하세요.', criteria: {
     free_live_or_replay: '무료 웨비나 생방송 또는 다시보기 영상·링크에 접근하려고 시도함',
     paid_application: '유료 교육 신청 버튼 또는 신청 양식을 실제로 시도함',
     paid_payment: '유료 교육 결제를 실제로 시도함',
@@ -48,19 +48,21 @@ export const JEV_V4_QUESTIONS = {
     none_stated: '겪은 운영 실패를 밝히지 않음',
     unclear: '실패 여부나 대상을 구분할 수 없음',
   } },
-  paid_program_reference: { type: 'choice', instructions: '문의 원문에 유료 교육이 직접 언급된 방식을 고르세요. 무료 영상이나 자료만 요청한 것은 유료 교육 언급이나 구매 관심이 아닙니다. “유료 교육은 아직 알아보지 않았다”, “신청할 생각이 없다”처럼 유료 관심을 부정하면 no_paid_reference를 선택하세요. 유료 언급이 실제로 있어도 무료 자료 요청만으로 유료 관심을 추론하지 마세요. 무료 영상을 본 뒤 유료 교육을 결정하겠다는 명시적 표현만 future_consideration_after_free_content입니다. 이는 유료 신청·결제를 이미 시도했다는 뜻이 아닙니다.', criteria: {
+  paid_program_reference: { type: 'choice', instructions: '문의 원문에 유료 교육이 직접 언급된 방식을 고르세요. 무료 영상이나 자료만 요청한 것은 유료 교육 언급이나 구매 관심이 아닙니다. “유료 교육은 아직 알아보지 않았다”, “신청할 생각이 없다”처럼 유료 관심을 부정하면 no_paid_reference를 선택하세요. “신청하기로 결정했다”는 명시적 구매 결정이며, 신청서를 실제로 냈다는 뜻은 아닙니다. 가격·결제·시작일을 묻는 경우 paid_program_question입니다. 실제 신청·결제를 했다고 직접 밝힌 경우에만 paid_application_or_payment입니다. 무료 영상이나 자료만 요청했다는 이유로 유료 관심을 추론하지 마세요. 무료 영상을 본 뒤 유료 교육을 결정하겠다는 명시적 표현은 future_consideration_after_free_content입니다.', criteria: {
     future_consideration_after_free_content: '무료 방송·다시보기를 본 뒤 유료 교육을 결정·검토하겠다고 직접 밝힘',
     paid_program_question: '유료 교육의 가격·일정·내용·신청 방법 등을 직접 질문함',
+    purchase_decision: '유료 교육을 신청·구매하기로 결정했지만 실제 신청·결제 행동은 밝히지 않음',
     paid_application_or_payment: '유료 교육 신청·결제를 실제로 시도했다고 직접 밝힘',
     no_paid_reference: '유료 교육에 관한 표현이 없음, 무료 자료만 요청함, 또는 유료 관심을 명시적으로 부정함',
     unclear: '유료 교육에 관한 표현인지 구분할 수 없음',
   } },
-  observable_stage: { type: 'choice', instructions: '유료 교육에 관해 직접 표현된 단계만 고르세요. 무료 자료만 요청했거나 유료 관심을 명시적으로 부정했다면 no_purchase_signal입니다. “무료 영상을 본 뒤 신청할지 결정하겠다”처럼 결정을 미룬 표현은 future_consideration_after_free_content입니다. “내용이 맞으면 신청하겠다”, “일정이 가능하면 구매하겠다”처럼 조건 충족 시 유료 신청·구매를 하겠다는 직접 약속은 conditional_purchase_statement입니다. “일정이 맞으면 참여를 검토하겠다”처럼 검토 의사만 밝힌 표현은 specific_evaluation으로 분류하고 conditional_purchase_statement로 올려 잡지 마세요. 두 표현을 혼동하지 마세요. 무료 자료 접근, 유료에 대한 단순 부정 또는 결제창 노출만으로 유료 관심·신청·결제를 추정하지 마세요. 유료 구매 의도·준비도 점수를 만들지 마세요.', criteria: {
+  observable_stage: { type: 'choice', instructions: '유료 교육에 관해 직접 표현된 단계만 고르세요. 무료 자료만 요청했거나 유료 관심을 명시적으로 부정했다면 no_purchase_signal입니다. “무료 영상을 본 뒤 신청할지 결정하겠다”처럼 결정을 미룬 표현은 future_consideration_after_free_content입니다. “신청하기로 결정했다”, “신청하기로 했다”처럼 유료 신청·구매를 분명히 결정했지만 실제 행동을 밝히지 않은 경우는 purchase_decision입니다. 신청 버튼 클릭, 신청서 제출, 결제 완료 등 실제 행동을 직접 밝힌 경우만 paid_application_or_payment_attempt입니다. “내용이 맞으면 신청하겠다”, “일정이 가능하면 구매하겠다”처럼 조건 충족 시 유료 신청·구매를 하겠다는 직접 약속은 conditional_purchase_statement입니다. “일정이 맞으면 참여를 검토하겠다”처럼 검토 의사만 밝힌 표현은 specific_evaluation으로 분류하고 conditional_purchase_statement로 올려 잡지 마세요. 이 표현들을 서로 혼동하지 마세요. 무료 자료 접근, 유료에 대한 단순 부정 또는 결제창 노출만으로 유료 관심·신청·결제를 추정하지 마세요. 유료 구매 의도·준비도 점수를 만들지 마세요.', criteria: {
     no_purchase_signal: '유료 교육에 관한 표현이 없음',
     information_seeking: '유료 교육의 일반 정보를 요청함',
     specific_evaluation: '유료 교육 조건을 구체적으로 검토하거나 비교함',
     future_consideration_after_free_content: '무료 콘텐츠를 본 뒤 유료 교육 신청 여부를 결정·검토하겠다고 직접 밝힘',
     conditional_purchase_statement: '조건이 맞으면 유료 교육을 신청·구매하겠다고 직접 밝힘',
+    purchase_decision: '유료 교육을 신청·구매하기로 분명히 결정했지만 실제 신청·결제 행동은 밝히지 않음',
     paid_application_or_payment_attempt: '유료 교육 신청·결제를 실제로 시도했다고 직접 밝힘',
     unclear: '유료 교육 관련 행동 단계를 구분할 수 없음',
   } },

@@ -23,7 +23,7 @@ const choices: Record<string, string> = {
   free_live_or_replay: '무료 방송·다시보기 접근', paid_application: '유료 신청', paid_payment: '유료 결제',
   other_nonpurchase_action: '그 밖의 행동', no_attempt_stated: '시도 언급 없음',
   free_content_access_failure: '무료 콘텐츠 접근 실패', paid_application_failure: '유료 신청 실패', paid_payment_failure: '유료 결제 실패', other_access_failure: '그 밖의 접근 실패',
-  future_consideration_after_free_content: '무료 콘텐츠 이후 유료 교육 검토', paid_program_question: '유료 교육 조건 질문',
+  future_consideration_after_free_content: '무료 콘텐츠 이후 유료 교육 검토', paid_program_question: '유료 교육 조건 질문', purchase_decision: '유료 신청·구매 결정',
   paid_application_or_payment: '유료 신청·결제 시도 명시', no_paid_reference: '유료 언급 없음',
   no_purchase_signal: '유료 구매 신호 언급 없음', information_seeking: '유료 정보 탐색', specific_evaluation: '구체 조건 검토',
   conditional_purchase_statement: '조건부 신청·구매 의사', paid_application_or_payment_attempt: '유료 신청·결제 시도 명시',
@@ -77,7 +77,7 @@ export function ConversionJevV4Synthetic() {
   return <section className="conversion-v2-result" aria-label="Jev v4 합성 경계 사례 DEV 시험">
     <h4>새 합성 경계 사례 · DEV 전용 · 저장하지 않음</h4>
     <p className="conversion-muted">실제 상담 원문을 쓰지 않습니다. 새로 만든 사례를 Jev에 한 번씩 보내고 결과는 이 화면에만 표시합니다. 기존 20건의 설계 표본은 정확도 분모에서 제외합니다.</p>
-    <AdminButton disabled={busy} onClick={() => void runAll()}>{busy ? '합성 사례 판정 중' : '8개 새 경계 사례 실행'}</AdminButton>
+    <AdminButton disabled={busy} onClick={() => void runAll()}>{busy ? '합성 사례 판정 중' : '새 경계 사례 모두 실행'}</AdminButton>
     {progress && <p role="status" className="conversion-muted">{progress}</p>}
     {error && <p role="alert" className="conversion-alert">{error}</p>}
     {results.map(({ case: testCase, result }) => {
