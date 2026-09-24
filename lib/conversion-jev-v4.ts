@@ -68,12 +68,29 @@ export const JEV_V4_QUESTIONS = {
 
 export type JevV4DecisionKey = keyof typeof JEV_V4_CHOICES;
 export type JevV4ConsistencyFlag = 'paid_attempt_without_paid_target' | 'paid_failure_without_paid_target' | 'free_failure_without_free_target' | 'paid_reference_without_stage' | 'paid_stage_without_reference';
+export type JevV4UncertaintyReason = 'unclear_choice' | 'low_reported_confidence' | 'narrow_probability_margin' | 'choice_not_top_probability';
+export type JevV4UncertaintyFlag = { decision: JevV4DecisionKey; reason: JevV4UncertaintyReason };
 export type JevV4Result = {
   contract_version: 4;
   model: string;
   decisions: { [K in JevV4DecisionKey]: JevChoiceAnswer };
   consistency_flags: JevV4ConsistencyFlag[];
+  uncertainty_flags: JevV4UncertaintyFlag[];
 };
+
+export function jevV4UncertaintyFlags(decisions: JevV4Result['decisions']): JevV4UncertaintyFlag[] {
+  const flags: JevV4UncertaintyFlag[] = [];
+  for (const decision of Object.keys(JEV_V4_CHOICES) as JevV4DecisionKey[]) {
+    const value = decisions[decision];
+    const choice = value.choice;
+    const probabilities = Object.entries(value.probabilities).sort((a, b) => b[1] - a[1]);
+    if (choice === 'unclear' || choice === 'other_or_unclear') flags.push({ decision, reason: 'unclear_choice' });
+    if (value.confidence < 0.7) flags.push({ decision, reason: 'low_reported_confidence' });
+    if (probabilities.length > 1 && probabilities[0][1] - probabilities[1][1] < 0.15) flags.push({ decision, reason: 'narrow_probability_margin' });
+    if (probabilities[0]?.[0] !== choice) flags.push({ decision, reason: 'choice_not_top_probability' });
+  }
+  return flags;
+}
 
 type Json = Record<string, unknown>;
 function object(value: unknown): Json {
@@ -127,5 +144,5 @@ export async function createJevV4Judgment(subject: string, content: string, apiK
     observable_stage: answer(answers.observable_stage, JEV_V4_CHOICES.observable_stage),
   };
   return { contract_version: 4, model: typeof raw.model === 'string' ? raw.model.slice(0, 100) : 'jev-latest', decisions,
-    consistency_flags: jevV4ConsistencyFlags(decisions) };
+    consistency_flags: jevV4ConsistencyFlags(decisions), uncertainty_flags: jevV4UncertaintyFlags(decisions) };
 }

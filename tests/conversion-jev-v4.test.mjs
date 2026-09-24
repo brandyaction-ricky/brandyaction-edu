@@ -59,6 +59,23 @@ test('v4 flags an explicit future paid consideration that the stage overlooks', 
   assert.equal(result.decisions.observable_stage.choice, 'no_purchase_signal');
 });
 
+test('v4 marks model-declared ambiguity and inconsistent probability rankings for operator review', async () => {
+  const uncertain = answers({ information_need: 'other_or_unclear' });
+  uncertain.confirmed_barrier.confidence = 0.62;
+  uncertain.confirmed_barrier.probabilities.explicit_price_burden = 0.43;
+  uncertain.confirmed_barrier.probabilities.none_stated = 0.40;
+  uncertain.attempted_action_target.choice = 'no_attempt_stated';
+  uncertain.attempted_action_target.probabilities.no_attempt_stated = 0.10;
+  uncertain.attempted_action_target.probabilities.free_live_or_replay = 0.84;
+  const result = await v4.createJevV4Judgment('링크 문의', '링크가 열리지 않습니다.', 'secret', async () => Response.json({ answers: uncertain }));
+  assert.deepEqual(result.uncertainty_flags, [
+    { decision: 'information_need', reason: 'unclear_choice' },
+    { decision: 'confirmed_barrier', reason: 'low_reported_confidence' },
+    { decision: 'confirmed_barrier', reason: 'narrow_probability_margin' },
+    { decision: 'attempted_action_target', reason: 'choice_not_top_probability' },
+  ]);
+});
+
 test('v4 rejects invented choices and malformed probability distributions', async () => {
   const invalid = answers();
   invalid.attempted_action_target.choice = 'invented';

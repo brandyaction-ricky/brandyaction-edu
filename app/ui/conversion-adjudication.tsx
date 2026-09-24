@@ -3,7 +3,9 @@
 import { useState, type FormEvent } from 'react';
 import type { ConversionAdjudicationNote, ConversionSnapshot, JevCalibration, JevDimension, JevResult } from '@/lib/conversion-review';
 import { isRunStale } from '@/lib/conversion-review';
+import { jevV4UncertaintyFlags } from '@/lib/conversion-jev-v4';
 import { AdminButton, AdminEmptyState, AdminSelect, AdminTextarea } from './final/admin-system';
+import { ConversionJevV4Synthetic } from './conversion-jev-v4-synthetic';
 
 const dimensions: { key: JevDimension; label: string }[] = [
   { key: 'purchase_intent', label: '구매 의도' },
@@ -64,6 +66,12 @@ const v4FlagLabels: Record<string, string> = {
   ...v3FlagLabels,
   paid_reference_without_stage: '유료 교육 언급이 있으나 행동 단계는 구매 신호 없음으로 판정했습니다.',
   paid_stage_without_reference: '유료 교육 언급이 없으나 행동 단계는 구매 신호가 있다고 판정했습니다.',
+};
+const v4UncertaintyLabels: Record<string, string> = {
+  unclear_choice: '판단 보류 선택',
+  low_reported_confidence: '표시 신뢰도 70% 미만',
+  narrow_probability_margin: '상위 선택지 차이 15%p 미만',
+  choice_not_top_probability: '선택값과 최고 확률 항목 불일치',
 };
 
 function compared(result: JevResult, calibration: JevCalibration, dimension: JevDimension) {
@@ -223,17 +231,22 @@ export function ConversionAdjudication({ snapshot, pending, onSave, onRunV2, onR
           <AdminButton disabled={pending || v4Busy || v2Busy || v3Busy || v4Selected?.status === 'completed'} onClick={() => void runV4Selected()}>{v4Busy ? '실행 중' : v4Selected?.status === 'completed' ? 'v4 저장 완료' : v4Selected?.status === 'pending' || v4Selected?.status === 'failed' ? '선택한 문의 v4 재시도' : '선택한 문의 v4 실행'}</AdminButton>
           {v4Selected?.status === 'completed' && v4Selected.result ? <>
             <dl>
-              <dt>명시한 정보 요청</dt><dd>{v4Labels[v4Selected.result.decisions.information_need.choice]}</dd>
-              <dt>직접 밝힌 구매 장애물</dt><dd>{v4Labels[v4Selected.result.decisions.confirmed_barrier.choice]}</dd>
-              <dt>실제로 시도한 행동 대상</dt><dd>{v4Labels[v4Selected.result.decisions.attempted_action_target.choice]}</dd>
-              <dt>겪은 운영 문제</dt><dd>{v4Labels[v4Selected.result.decisions.operational_issue.choice]}</dd>
-              <dt>유료 교육에 대한 직접 언급</dt><dd>{v4Labels[v4Selected.result.decisions.paid_program_reference.choice]}</dd>
-              <dt>관찰된 유료 구매 행동</dt><dd>{v4Labels[v4Selected.result.decisions.observable_stage.choice]}</dd>
+              {([
+                ['information_need', '명시한 정보 요청'], ['confirmed_barrier', '직접 밝힌 구매 장애물'],
+                ['attempted_action_target', '실제로 시도한 행동 대상'], ['operational_issue', '겪은 운영 문제'],
+                ['paid_program_reference', '유료 교육에 대한 직접 언급'], ['observable_stage', '관찰된 유료 구매 행동'],
+              ] as const).map(([key, label]) => {
+                const decision = v4Selected.result!.decisions[key];
+                const uncertainty = jevV4UncertaintyFlags(v4Selected.result!.decisions).filter(flag => flag.decision === key);
+                return <div key={key}><dt>{label}</dt><dd>{v4Labels[decision.choice]} · 표시 신뢰도 {Math.round(decision.confidence * 100)}%{uncertainty.length > 0 ? ` · 검토 필요: ${uncertainty.map(flag => v4UncertaintyLabels[flag.reason]).join(', ')}` : ''}</dd></div>;
+              })}
             </dl>
             {v4Selected.result.consistency_flags.length > 0 && <p role="alert" className="conversion-alert">판정 간 충돌: {v4Selected.result.consistency_flags.map(flag => v4FlagLabels[flag]).join(' ')} 운영자 검토가 필요합니다.</p>}
             {v4Selected.result.consistency_flags.length === 0 && <p className="conversion-muted">판정 간 형식적 충돌은 발견되지 않았습니다. 원문과의 일치 여부는 운영자가 확인해야 합니다.</p>}
+            <p className="conversion-muted">표시 신뢰도는 검증된 정답 확률이 아닙니다. 판단 보류, 낮은 값, 비슷한 선택지 확률 또는 선택값 불일치가 있으면 원문을 확인하세요.</p>
           </> : <p className="conversion-muted">v4 결과가 아직 없습니다.</p>}
           <p className="conversion-muted">v4도 고객 응대·CRM·상태 변경에 자동 적용되지 않습니다. 기존 v1·사람 첫 의견·v2·v3 결과는 그대로 보존합니다.</p>
+          <ConversionJevV4Synthetic />
         </div>}
         {activeDimension && <form onSubmit={event => void submit(event)} className="conversion-adjudication-form">
           <h4>{activeDimension.label} 재검토 의견</h4>
