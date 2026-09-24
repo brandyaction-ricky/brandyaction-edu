@@ -15,6 +15,7 @@ import { RecruitmentRoomSettings } from './recruitment-rooms';
 import { RecruitmentFunnel } from './recruitment-funnel';
 import { ConversionBatchCalibration, type BatchCalibrationSubmission } from './conversion-batch-calibration';
 import { ConversionAdjudication } from './conversion-adjudication';
+import { ConversionJevV4Synthetic } from './conversion-jev-v4-synthetic';
 
 const topicNames: Record<string, string> = { price: '가격', schedule: '일정', content: '교육 내용', level: '수강 수준', usage: '이용 방법' };
 const inquiryNames: Record<string, string> = { prepurchase: '구매 전 상품 질문', support: '이용 지원', payment_refund: '결제·환불', mixed: '여러 종류의 문의', unknown: '판단 불가' };
@@ -34,43 +35,7 @@ async function readResponse(response: Response) {
   return data;
 }
 
-const conversionSnapshots = new Map<
-  string,
-  { expiresAt: number; promise: Promise<ConversionSnapshot> }
->();
-
-function readConversionSnapshot(userId: string, force = false) {
-  const cached = conversionSnapshots.get(userId);
-  if (!force && cached && (!cached.expiresAt || cached.expiresAt > Date.now()))
-    return cached.promise;
-  if (cached) conversionSnapshots.delete(userId);
-
-  const entry = {
-    expiresAt: 0,
-    promise: fetch('/api/conversion', {
-      cache: 'no-store',
-      signal: AbortSignal.timeout(10000),
-    }).then(readResponse) as Promise<ConversionSnapshot>,
-  };
-  conversionSnapshots.set(userId, entry);
-  void entry.promise.then(
-    () => {
-      if (conversionSnapshots.get(userId) === entry)
-        entry.expiresAt = Date.now() + 5000;
-    },
-    () => {
-      if (conversionSnapshots.get(userId) === entry)
-        conversionSnapshots.delete(userId);
-    },
-  );
-  return entry.promise;
-}
-
-export function prefetchConversionReview(userId: string) {
-  void readConversionSnapshot(userId).catch(() => {});
-}
-
-export function ConversionReview({ workspace = false, initialPeriod, userId }: { workspace?: boolean; initialPeriod?: string; userId: string }) {
+export function ConversionReview({ workspace = false, initialPeriod }: { workspace?: boolean; initialPeriod?: string }) {
   const [workspaceView, setWorkspaceView] = useState<'recruitment' | 'inquiries'>('recruitment');
   const [inquiryView, setInquiryView] = useState<'single' | 'batch' | 'audit'>('single');
   const [snapshot, setSnapshot] = useState<ConversionSnapshot | null>(null);
@@ -88,13 +53,13 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
   const active = useRef(true);
   const read = useRef<AbortController | null>(null);
 
-  const refresh = useCallback(async (allowPrefetched = false) => {
+  const refresh = useCallback(async () => {
     read.current?.abort();
     const controller = new AbortController();
     read.current = controller;
     setLoading(true);
     try {
-      const data = await readConversionSnapshot(userId, !allowPrefetched);
+      const data = await readResponse(await fetch('/api/conversion', { cache: 'no-store', signal: controller.signal }));
       if (!active.current || controller.signal.aborted) return;
       setSnapshot(data);
       setError('');
@@ -106,11 +71,11 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
     } finally {
       if (active.current && !controller.signal.aborted) setLoading(false);
     }
-  }, [userId]);
+  }, []);
 
   useEffect(() => {
     active.current = true;
-    const timer = setTimeout(() => void refresh(true), 0);
+    const timer = setTimeout(() => void refresh(), 0);
     return () => { active.current = false; clearTimeout(timer); read.current?.abort(); };
   }, [refresh]);
 
@@ -239,6 +204,7 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
         <AdminButton aria-pressed={inquiryView === 'batch'} disabled={pending} onClick={() => { setInquiryView('batch'); setNotice(''); }}>과거 상담 한 번에 판정</AdminButton>
         {snapshot.capabilities.can_adjudicate && snapshot.reviews.some(item => item.calibration && item.calibration_sample_kind === 'operational') && <AdminButton aria-pressed={inquiryView === 'audit'} disabled={pending} onClick={() => { setInquiryView('audit'); setNotice(''); }}>판정 차이 재검토</AdminButton>}
       </div>}
+      {snapshot.capabilities.can_jev_v4 && <ConversionJevV4Synthetic />}
       {inquiryView === 'batch' && snapshot.capabilities.can_jev ? <ConversionBatchCalibration snapshot={snapshot} pending={pending} onSave={saveBatch} onSingle={() => setInquiryView('single')} /> : inquiryView === 'audit' && snapshot.capabilities.can_adjudicate ? <ConversionAdjudication snapshot={snapshot} pending={pending} onSave={saveAdjudication} onRunV2={runJevV2} onRunV3={runJevV3} onRunV4={runJevV4} onRefresh={refresh} onSingle={() => setInquiryView('single')} /> : <>
       {calibrationSummary && snapshot.runs.some(item => item.provider === 'jev') && <CalibrationOverview summary={calibrationSummary} />}
       <div className="conversion-grid" aria-busy={pending || loading}>
