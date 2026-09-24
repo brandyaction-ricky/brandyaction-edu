@@ -15,6 +15,7 @@ import { RecruitmentRoomSettings } from './recruitment-rooms';
 import { RecruitmentFunnel } from './recruitment-funnel';
 import { ConversionBatchCalibration, type BatchCalibrationSubmission } from './conversion-batch-calibration';
 import { ConversionAdjudication } from './conversion-adjudication';
+import { ConversionJevV4Synthetic } from './conversion-jev-v4-synthetic';
 
 const topicNames: Record<string, string> = { price: '가격', schedule: '일정', content: '교육 내용', level: '수강 수준', usage: '이용 방법' };
 const inquiryNames: Record<string, string> = { prepurchase: '구매 전 상품 질문', support: '이용 지원', payment_refund: '결제·환불', mixed: '여러 종류의 문의', unknown: '판단 불가' };
@@ -239,6 +240,7 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
         <AdminButton aria-pressed={inquiryView === 'batch'} disabled={pending} onClick={() => { setInquiryView('batch'); setNotice(''); }}>과거 상담 한 번에 판정</AdminButton>
         {snapshot.capabilities.can_adjudicate && snapshot.reviews.some(item => item.calibration && item.calibration_sample_kind === 'operational') && <AdminButton aria-pressed={inquiryView === 'audit'} disabled={pending} onClick={() => { setInquiryView('audit'); setNotice(''); }}>판정 차이 재검토</AdminButton>}
       </div>}
+      {snapshot.capabilities.can_jev_v4 && <ConversionJevV4Synthetic />}
       {inquiryView === 'batch' && snapshot.capabilities.can_jev ? <ConversionBatchCalibration snapshot={snapshot} pending={pending} onSave={saveBatch} onSingle={() => setInquiryView('single')} /> : inquiryView === 'audit' && snapshot.capabilities.can_adjudicate ? <ConversionAdjudication snapshot={snapshot} pending={pending} onSave={saveAdjudication} onRunV2={runJevV2} onRunV3={runJevV3} onRunV4={runJevV4} onRefresh={refresh} onSingle={() => setInquiryView('single')} /> : <>
       {calibrationSummary && snapshot.runs.some(item => item.provider === 'jev') && <CalibrationOverview summary={calibrationSummary} />}
       <div className="conversion-grid" aria-busy={pending || loading}>

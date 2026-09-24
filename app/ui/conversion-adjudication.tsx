@@ -5,7 +5,6 @@ import type { ConversionAdjudicationNote, ConversionSnapshot, JevCalibration, Je
 import { isRunStale } from '@/lib/conversion-review';
 import { jevV4UncertaintyFlags } from '@/lib/conversion-jev-v4';
 import { AdminButton, AdminEmptyState, AdminSelect, AdminTextarea } from './final/admin-system';
-import { ConversionJevV4Synthetic } from './conversion-jev-v4-synthetic';
 
 const dimensions: { key: JevDimension; label: string }[] = [
   { key: 'purchase_intent', label: '구매 의도' },
@@ -247,7 +246,6 @@ export function ConversionAdjudication({ snapshot, pending, onSave, onRunV2, onR
             <p className="conversion-muted">표시 신뢰도는 검증된 정답 확률이 아닙니다. 판단 보류, 낮은 값, 비슷한 선택지 확률 또는 선택값 불일치가 있으면 원문을 확인하세요.</p>
           </> : <p className="conversion-muted">v4 결과가 아직 없습니다.</p>}
           <p className="conversion-muted">v4도 고객 응대·CRM·상태 변경에 자동 적용되지 않습니다. 기존 v1·사람 첫 의견·v2·v3 결과는 그대로 보존합니다.</p>
-          <ConversionJevV4Synthetic />
         </div>}
         {activeDimension && <form onSubmit={event => void submit(event)} className="conversion-adjudication-form">
           <h4>{activeDimension.label} 재검토 의견</h4>
