@@ -292,7 +292,7 @@ export function Platform({
       void readAdminSection(user.id, section, page);
       if (section === "conversion") prefetchConversionReview(user.id);
     },
-    [admin, adminPaging, adminSection, user?.id],
+    [admin, adminPaging, adminSection, user],
   );
   useEffect(() => {
     alive.current = true;
