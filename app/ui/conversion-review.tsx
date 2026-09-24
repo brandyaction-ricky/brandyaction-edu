@@ -107,6 +107,7 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [drawer, setDrawer] = useState<'case' | 'evidence' | null>(null);
+  const [caseSource, setCaseSource] = useState<'native' | 'manual'>('native');
   const [showFunnel, setShowFunnel] = useState(false);
   const [editingCase, setEditingCase] = useState<ConversionCase | undefined>();
   const [editingEvidence, setEditingEvidence] = useState<ConversionEvidence | undefined>();
@@ -192,13 +193,16 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
   const stale = Boolean(run && selected && snapshot && isRunStale(run, selected, snapshot.evidence));
   const records = snapshot?.reviews.filter(item => item.case_id === selected?.id).sort((a, b) => b.created_at.localeCompare(a.created_at)) || [];
   const jevV4Run = run && snapshot ? snapshot.jev_v4_runs?.find(item => item.v1_run_id === run.id) : undefined;
-  const openCase = (item?: ConversionCase) => { setEditingCase(item); setDrawer('case'); };
+  const openCase = (item?: ConversionCase, initialSource: 'native' | 'manual' = 'native') => { setEditingCase(item); setDrawer('case'); setCaseSource(initialSource); };
   const openEvidence = (item?: ConversionEvidence) => { setEditingEvidence(item); setDrawer('evidence'); };
 
   return <AdminPage width="wide" template="review" className="conversion-review">
     <AdminPageHeader title={workspace ? "모집 운영" : "전환 관리"} description={workspace ? "모집별 연결·구매 현황·후속 안내를 한곳에서 관리합니다." : "문의에 필요한 설명을 찾고, 검토한 내용을 기록합니다."} eyebrow="MARKETING" actions={<>
       <AdminButton disabled={pending || loading} onClick={() => void refresh()}>새로고침</AdminButton>
-      {snapshot && (!workspace || workspaceView === 'inquiries') && <AdminButton tone="primary" disabled={pending} onClick={() => openCase()}>문의 연결</AdminButton>}
+      {snapshot && (!workspace || workspaceView === 'inquiries') && <>
+        <AdminButton disabled={pending} onClick={() => openCase(undefined, 'native')}>사이트 문의 연결</AdminButton>
+        <AdminButton tone="primary" disabled={pending} onClick={() => openCase(undefined, 'manual')}>카톡 문의 붙여넣기</AdminButton>
+      </>}
     </>} />
     {error && <div role="alert" className="conversion-alert">{error}</div>}
     {notice && <p role="status" className="conversion-notice">{notice}</p>}
@@ -287,8 +291,8 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
         </AdminSection>
       </div>
       </div>
-      {drawer === 'case' && <AdminDrawer title={editingCase ? '문의 정보 수정' : '문의 연결'} onClose={() => { if (!pending) setDrawer(null); }}>
-        <CaseForm key={editingCase?.id || 'new'} snapshot={snapshot} item={editingCase} pending={pending} mutate={mutate} onSaved={id => { setSelectedId(id); setDrawer(null); }} />
+      {drawer === 'case' && <AdminDrawer title={editingCase ? '문의 정보 수정' : caseSource === 'manual' ? '카톡 문의 붙여넣기' : '사이트 문의 연결'} onClose={() => { if (!pending) setDrawer(null); }}>
+        <CaseForm key={editingCase?.id || `new-${caseSource}`} snapshot={snapshot} item={editingCase} initialSource={caseSource} pending={pending} mutate={mutate} runJevV4={runJevV4} onSaved={(id, note) => { setSelectedId(id); setDrawer(null); if (note) setNotice(note); }} />
       </AdminDrawer>}
       {drawer === 'evidence' && <AdminDrawer title={editingEvidence ? '설명자료 수정' : '설명자료 등록'} onClose={() => { if (!pending) setDrawer(null); }}>
         <EvidenceForm key={editingEvidence?.id || 'new'} snapshot={snapshot} item={editingEvidence} initialCourse={selected?.course_id || ''} pending={pending} mutate={mutate} onSaved={() => setDrawer(null)} />
@@ -350,16 +354,16 @@ function ReviewForm({ runId, caseId, initialReply, stale, pending, mutate }: { r
   </form>;
 }
 
-function CaseForm({ snapshot, item, pending, mutate, onSaved }: { snapshot: ConversionSnapshot; item?: ConversionCase; pending: boolean; mutate: Mutation; onSaved: (id: string) => void }) {
-  const [source, setSource] = useState(item?.source_type || 'native');
-  const [sampleOrigin, setSampleOrigin] = useState(item?.sample_origin || (item ? 'current' : ''));
+function CaseForm({ snapshot, item, initialSource, pending, mutate, runJevV4, onSaved }: { snapshot: ConversionSnapshot; item?: ConversionCase; initialSource: 'native' | 'manual'; pending: boolean; mutate: Mutation; runJevV4: (runId: string) => Promise<void>; onSaved: (id: string, note?: string) => void }) {
+  const [source, setSource] = useState(item?.source_type || initialSource);
+  const [sampleOrigin, setSampleOrigin] = useState(item?.sample_origin || (item || initialSource === 'manual' ? 'current' : ''));
   const [legacyCourseLabel, setLegacyCourseLabel] = useState(item?.legacy_course_label || '');
   const [questionId, setQuestionId] = useState(item?.question_id || '');
   const [courseId, setCourseId] = useState(item?.course_id || '');
   const [cohortId, setCohortId] = useState(item?.cohort_id || '');
   const [subject, setSubject] = useState(item?.subject || '');
   const [content, setContent] = useState(item?.content || '');
-  const [sourceLabel, setSourceLabel] = useState(item?.source_label || '');
+  const [sourceLabel, setSourceLabel] = useState(item?.source_label || (initialSource === 'manual' ? '카카오 채널 1:1 상담' : ''));
   const [receivedAt, setReceivedAt] = useState(item ? new Date(new Date(item.received_at).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '');
   const [deidentifiedConfirmed, setDeidentifiedConfirmed] = useState(false);
   const [error, setError] = useState('');
@@ -367,8 +371,21 @@ function CaseForm({ snapshot, item, pending, mutate, onSaved }: { snapshot: Conv
   async function submit(event: FormEvent) {
     event.preventDefault(); setError('');
     try {
-      const result = await mutate({ action: 'save_case', ...(item ? { id: item.id, expected_version: item.input_version } : {}), question_id: source === 'native' ? questionId : null, course_id: courseId || null, cohort_id: cohortId || null, sample_origin: source === 'native' ? 'current' : sampleOrigin, legacy_course_label: sampleOrigin === 'external_legacy' ? legacyCourseLabel : null, ...(source === 'manual' ? { subject, content, source_label: sourceLabel, received_at: new Date(receivedAt).toISOString(), deidentified_confirmed: deidentifiedConfirmed } : {}) });
-      onSaved((result.case as ConversionCase).id);
+      const result = await mutate({ action: 'save_case', ...(item ? { id: item.id, expected_version: item.input_version } : {}), question_id: source === 'native' ? questionId : null, course_id: courseId || null, cohort_id: cohortId || null, sample_origin: source === 'native' ? 'current' : sampleOrigin, legacy_course_label: sampleOrigin === 'external_legacy' ? legacyCourseLabel : null, ...(source === 'manual' ? { subject: subject || content.trim().split(/\r?\n/)[0].slice(0, 200) || '카카오 채널 문의', content, source_label: sourceLabel, received_at: new Date(receivedAt).toISOString(), deidentified_confirmed: deidentifiedConfirmed } : {}) });
+      const savedCase = result.case as ConversionCase;
+      let note = item ? '문의 내용을 수정했습니다.' : '문의 내용을 저장했습니다.';
+      if (!item && source === 'manual' && sampleOrigin === 'current' && snapshot.capabilities.can_jev) {
+        try {
+          const analyzed = await mutate({ action: 'analyze', case_id: savedCase.id, expected_version: savedCase.input_version });
+          const run = analyzed.run as { id?: string } | undefined;
+          if (!run?.id) throw new Error('Jev 결과를 찾을 수 없습니다.');
+          if (snapshot.capabilities.can_jev_v4) await runJevV4(run.id);
+          note = '문의가 저장됐고 Jev 분류와 답변 초안을 만들었습니다. 아래 문의 카드에서 확인해 주세요.';
+        } catch {
+          note = '문의는 저장됐지만 Jev 결과를 만들지 못했습니다. 문의 카드에서 다시 실행해 주세요.';
+        }
+      }
+      onSaved(savedCase.id, note);
     } catch (cause) { setError((cause as Error).message); }
   }
   return <form className="conversion-form admin-dialog-body" onSubmit={submit}>
@@ -380,17 +397,17 @@ function CaseForm({ snapshot, item, pending, mutate, onSaved }: { snapshot: Conv
     </> : <>
       <AdminSelect label="문의 시기" required value={sampleOrigin} disabled={pending || Boolean(item)} onChange={event => { setSampleOrigin(event.target.value as 'current' | 'external_legacy'); setCourseId(''); setCohortId(''); }} helper="과거 문의는 당시 배경을 참고하기 위한 기록입니다. 새 Jev 성능 점수에는 합치지 않습니다."><option value="">선택</option><option value="current">현재 교육 상담</option><option value="external_legacy">과거 유료 교육 상담</option></AdminSelect>
       {sampleOrigin === 'external_legacy' && <AdminInput label="당시 유료 교육 상품명" value={legacyCourseLabel} onChange={event => setLegacyCourseLabel(event.target.value)} required maxLength={200} disabled={pending} helper="상품명이 확인되지 않으면 ‘상품명 미확인’으로 기록하세요. 현재 문샷 챌린지 4기로 추정해 연결하지 않습니다." />}
-      <AdminInput label="문의 제목" value={subject} onChange={event => setSubject(event.target.value)} required maxLength={200} disabled={pending} />
-      <AdminTextarea label="문의 발췌" value={content} onChange={event => setContent(event.target.value)} required maxLength={10000} rows={5} disabled={pending} helper="대화 전체 대신 구매 판단에 필요한 문장만 남기세요. 고객 이름·별명·연락처·계정 ID·링크·주문번호는 제거해 주세요." />
+      <AdminInput label="문의 제목" value={subject} onChange={event => setSubject(event.target.value)} maxLength={200} disabled={pending} placeholder="비워 두면 문의 첫 문장을 제목으로 사용합니다." />
+      <AdminTextarea label="문의 내용" value={content} onChange={event => setContent(event.target.value)} required maxLength={10000} rows={7} disabled={pending} helper="카카오 문의 내용을 그대로 붙여넣어 주세요. 저장 전에 고객 이름·별명·연락처·계정 ID·링크·주문번호를 지워 주세요. 저장이 끝나면 Jev가 바로 분류하고 답변 초안을 만듭니다." />
       <AdminInput label="출처 설명" value={sourceLabel} onChange={event => setSourceLabel(event.target.value)} required maxLength={200} disabled={pending} placeholder="예: 카카오 채널 1:1 상담" />
-      <AdminInput label="문의 접수 시각" type="datetime-local" value={receivedAt} onChange={event => setReceivedAt(event.target.value)} required disabled={pending} />
-      <p className="conversion-muted">외부 문의는 고객 미연결로 저장됩니다. 이름이나 유입 경로로 회원을 추정하지 않습니다.</p>
+      <AdminInput label="문의 접수 시각" type="datetime-local" value={receivedAt} onFocus={() => { if (!receivedAt) setReceivedAt(new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)); }} onChange={event => setReceivedAt(event.target.value)} required disabled={pending} />
+      <p className="conversion-muted">문의는 저장되지만 카카오 계정과 사이트 회원이 자동으로 연결되지는 않습니다. 이름이나 문의 시각으로 회원·결제를 추정하지 않습니다. 연결되지 않은 문의는 나중에 결제 여부를 알 수 없습니다.</p>
       <label className="checkline"><input type="checkbox" checked={deidentifiedConfirmed} onChange={event => setDeidentifiedConfirmed(event.target.checked)} required disabled={pending} />고객 식별정보를 제거한 발췌임을 확인했습니다.</label>
     </>}
     <AdminSelect label="대상 상품" required={sampleOrigin !== 'external_legacy'} value={courseId} disabled={pending || Boolean(source === 'native' && question?.course_id)} onChange={event => { setCourseId(event.target.value); setCohortId(''); }} helper={sampleOrigin === 'external_legacy' ? '당시 상품과 동일한 DEV 상품이 확인된 경우에만 연결합니다. 미확인이면 비워 두세요.' : undefined}><option value="">{sampleOrigin === 'external_legacy' ? '현행 상품 연결 안 함' : '상품 선택'}</option>{snapshot.courses.map(course => <option key={course.id} value={course.id}>{course.title}</option>)}</AdminSelect>
     {sampleOrigin !== 'external_legacy' && <AdminSelect label="대상 기수" value={cohortId} disabled={pending} onChange={event => setCohortId(event.target.value)}><option value="">기수 미지정</option>{snapshot.cohorts.filter(cohort => cohort.course_id === courseId).map(cohort => <option key={cohort.id} value={cohort.id}>{cohort.name}</option>)}</AdminSelect>}
     {error && <p role="alert" className="conversion-alert">{error}</p>}
-    <AdminButton type="submit" tone="primary" disabled={pending || (sampleOrigin !== 'external_legacy' && !courseId) || (source === 'native' && !questionId) || (source === 'manual' && (!sampleOrigin || !deidentifiedConfirmed || (sampleOrigin === 'external_legacy' && !legacyCourseLabel.trim())))}>문의 저장</AdminButton>
+    <AdminButton type="submit" tone="primary" disabled={pending || (sampleOrigin !== 'external_legacy' && !courseId) || (source === 'native' && !questionId) || (source === 'manual' && (!sampleOrigin || !deidentifiedConfirmed || (sampleOrigin === 'external_legacy' && !legacyCourseLabel.trim())))}>{!item && source === 'manual' && sampleOrigin === 'current' && snapshot.capabilities.can_jev ? '저장하고 Jev로 바로 살펴보기' : '문의 저장'}</AdminButton>
   </form>;
 }
 
