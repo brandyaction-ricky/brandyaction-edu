@@ -14,6 +14,7 @@ import {
 import './conversion-review.css';
 import { RecruitmentRoomSettings } from './recruitment-rooms';
 import { RecruitmentFunnel } from './recruitment-funnel';
+import { ConversionJevV4Synthetic } from './conversion-jev-v4-synthetic';
 
 const topicNames: Record<string, string> = { price: '가격', schedule: '일정', content: '교육 내용', level: '수강 수준', usage: '이용 방법' };
 const inquiryNames: Record<string, string> = { prepurchase: '구매 전 상품 질문', support: '이용 지원', payment_refund: '결제·환불', mixed: '여러 종류의 문의', unknown: '판단 불가' };
@@ -217,6 +218,7 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
 </>}
       <div hidden={workspace && workspaceView !== 'inquiries'}>
       <div className="conversion-intro"><span className="conversion-tag">직원 확인 필요</span><p>Jev가 문의를 분류하고 답변 초안을 제안합니다. 직원이 승인·수정·보류를 선택해야 합니다. 여기서 승인해도 고객에게 메시지가 자동으로 나가지는 않습니다.</p></div>
+      {snapshot.capabilities.can_jev_v4 && <ConversionJevV4Synthetic />}
       {snapshot.capabilities.can_jev && <p className="conversion-muted">사람이 먼저 별도 점수를 매기지 않아도 Jev 결과를 볼 수 있습니다. 직원의 결정은 고객 응대에 쓰기 전 마지막 확인으로 기록합니다.</p>}
       <div className="conversion-grid" aria-busy={pending || loading}>
         <AdminSection title="문의" description={`불러온 문의 ${snapshot.cases.length}건`} bordered>
