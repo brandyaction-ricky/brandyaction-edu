@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     const testCase = JEV_V4_BOUNDARY_CASES.find(item => item.id === id as JevV4BoundaryCaseId);
     if (!testCase) conversionError('등록된 합성 경계 사례를 찾을 수 없습니다.', 400);
     const result = await createJevV4Judgment(testCase.subject, testCase.content, process.env.TYPESAFE_API_KEY || '');
-    return reply({ ok: true, case: { id: testCase.id, title: testCase.title, reviewGuide: testCase.reviewGuide }, result });
+    return reply({ ok: true, case: { id: testCase.id, title: testCase.title, subject: testCase.subject, content: testCase.content, reviewGuide: testCase.reviewGuide }, result });
   } catch (error) {
     const status = error && typeof error === 'object' && 'status' in error ? Number(error.status) : 503;
     return reply({ error: error instanceof Error && status !== 503 ? error.message : 'Jev v4 합성 사례 시험을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.' }, status);

@@ -6,7 +6,7 @@ import type { JevV4DecisionKey, JevV4Result, JevV4UncertaintyFlag } from '@/lib/
 import { AdminButton } from './final/admin-system';
 
 type SyntheticCaseResult = {
-  case: { id: JevV4BoundaryCaseId; title: string; reviewGuide: string };
+  case: { id: JevV4BoundaryCaseId; title: string; subject: string; content: string; reviewGuide: string };
   result: JevV4Result;
 };
 
@@ -49,7 +49,7 @@ export function ConversionJevV4Synthetic() {
     try {
       const casesResponse = await fetch('/api/conversion/jev-v4-synthetic/cases', { cache: 'no-store' });
       if (!casesResponse.ok) throw new Error('합성 사례 목록을 불러오지 못했습니다.');
-      const { cases } = await casesResponse.json() as { cases: Array<{ id: JevV4BoundaryCaseId; title: string }> };
+      const { cases } = await casesResponse.json() as { cases: Array<{ id: JevV4BoundaryCaseId; title: string; subject: string; content: string }> };
       for (const [index, testCase] of cases.entries()) {
         setProgress(`합성 경계 사례 ${index + 1}/${cases.length} 판정 중`);
         const response = await fetch('/api/conversion/jev-v4-synthetic', {
@@ -78,6 +78,7 @@ export function ConversionJevV4Synthetic() {
       for (const flag of result.uncertainty_flags) uncertaintyByDecision.set(flag.decision, [...(uncertaintyByDecision.get(flag.decision) || []), flag]);
       return <article key={testCase.id} className="conversion-synthetic-case">
         <h5>{testCase.title}</h5>
+        <p className="conversion-quote">{testCase.subject}<br />{testCase.content}</p>
         <p className="conversion-muted">검토 포인트: {testCase.reviewGuide}</p>
         <dl>{(Object.keys(labels) as JevV4DecisionKey[]).map(key => {
           const decision = result.decisions[key];

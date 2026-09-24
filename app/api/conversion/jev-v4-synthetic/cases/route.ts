@@ -8,7 +8,7 @@ export async function GET(request: Request) {
     if (!conversionCapabilities(process.env).can_jev) conversionError('Jev 실험은 개발·검수 환경에서만 사용할 수 있습니다.', 403);
     const user = await getOperatorUser('members');
     if (!user) conversionError('회원 관리 권한이 필요합니다.', 403);
-    return Response.json({ cases: JEV_V4_BOUNDARY_CASES.map(({ id, title, reviewGuide }) => ({ id, title, reviewGuide })) },
+    return Response.json({ cases: JEV_V4_BOUNDARY_CASES.map(({ id, title, subject, content, reviewGuide }) => ({ id, title, subject, content, reviewGuide })) },
       { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {
     const status = error && typeof error === 'object' && 'status' in error ? Number(error.status) : 503;
