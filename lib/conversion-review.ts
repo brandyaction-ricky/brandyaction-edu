@@ -180,7 +180,8 @@ export function buildAsidePaymentMatchPrompt(input: {
   cohortName: string;
 }) {
   const receivedAt = new Intl.DateTimeFormat('ko-KR', {
-    timeZone: 'Asia/Seoul', dateStyle: 'medium', timeStyle: 'short',
+    timeZone: 'Asia/Seoul', year: 'numeric', month: 'numeric', day: 'numeric',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
   }).format(new Date(input.receivedAt));
   return [
     '브랜디에듀 문의자가 나중에 결제했는지 확인할 수 있는 근거를 살펴봐 주세요.',
