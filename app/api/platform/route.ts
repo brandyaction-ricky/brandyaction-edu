@@ -67,7 +67,17 @@ export async function GET(request: Request) {
                 }
             })(),
             ...tables.filter((table) => !deferredOrderTables.has(table)).map(async (table) => {
-                const columns = adminMode\n                    ? table === 'crm_tags' && sectionKey === 'tags'\n                        ? '*,crm_member_tags(count)'\n                        : table === 'payments'\n                            ? 'id,order_id,method,status,approved_amount,cancelled_amount,receipt_url,approved_at,created_at'\n                            : table === 'edu_refund_requests'\n                                ? 'id,payment_id,amount,reason,status,created_at'\n                                : adminSelectColumns(sectionKey, table)\n                    : table === 'reviews'\n                        ? 'id,course_id,author_name,author_nickname,rating,body,is_featured,display_order,published_at,created_at'\n                        : '*';
+                const columns = adminMode
+                    ? table === 'crm_tags' && sectionKey === 'tags'
+                        ? '*,crm_member_tags(count)'
+                        : table === 'payments'
+                            ? 'id,order_id,method,status,approved_amount,cancelled_amount,receipt_url,approved_at,created_at'
+                            : table === 'edu_refund_requests'
+                                ? 'id,payment_id,amount,reason,status,created_at'
+                                : adminSelectColumns(sectionKey, table)
+                    : table === 'reviews'
+                        ? 'id,course_id,author_name,author_nickname,rating,body,is_featured,display_order,published_at,created_at'
+                        : '*';
                 const serverPaged = adminMode && table === primaryTable && !['home', 'members', 'reviews', 'analytics', 'metrics', 'seo', 'settings', 'staff', 'templates', 'campaigns', 'automations'].includes(sectionKey);
                 let query = db.from(table).select(columns, serverPaged ? { count: 'exact' } : undefined);
                 if (record && adminMode && table === primaryTable) query = query.eq('id', record);
