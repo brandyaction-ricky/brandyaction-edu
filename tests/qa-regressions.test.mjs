@@ -46,7 +46,16 @@ test('F-03 no admin screen downloads raw journey events', () => {
   assert.deepEqual(rules.adminTables.banners, ['site_banners']);
   assert.deepEqual(rules.adminTables.articles, ['articles', 'article_categories', 'site_settings']);
 });
-test('admin list APIs only load screen dependencies and lightweight relation fields', () => {\n  assert.deepEqual(rules.adminTables.questions, ['edu_questions']);\n  assert.equal(rules.adminSelectColumns('questions', 'edu_questions'), 'id,user_id,course_id,title,content,answer,status,created_at,updated_at');\n  assert.equal(rules.adminSelectColumns('orders', 'courses'), 'id,title,status,category,list_price,archived_at,display_order,created_at,updated_at');\n  assert.equal(rules.adminSelectColumns('orders', 'orders'), 'id,order_number,user_id,status,subtotal,discount_amount,total_amount,customer_name,customer_email,customer_phone,created_at');\n  assert.equal(rules.adminSelectColumns('orders', 'order_items'), 'id,order_id,course_id,cohort_id,item_name,unit_price');\n  assert.equal(rules.adminSelectColumns('orders', 'enrollments'), 'id,order_item_id,status');\n  assert.equal(rules.adminSelectColumns('products', 'courses'), '*');\n});\ntest('F-04 status reflects expired recruitment, ended operation, scheduled start and override', () => {
+test('admin list APIs only load screen dependencies and lightweight relation fields', () => {
+  assert.deepEqual(rules.adminTables.questions, ['edu_questions']);
+  assert.equal(rules.adminSelectColumns('questions', 'edu_questions'), 'id,user_id,course_id,title,content,answer,status,created_at,updated_at');
+  assert.equal(rules.adminSelectColumns('orders', 'courses'), 'id,title,status,category,list_price,archived_at,display_order,created_at,updated_at');
+  assert.equal(rules.adminSelectColumns('orders', 'orders'), 'id,order_number,user_id,status,subtotal,discount_amount,total_amount,customer_name,customer_email,customer_phone,created_at');
+  assert.equal(rules.adminSelectColumns('orders', 'order_items'), 'id,order_id,course_id,cohort_id,item_name,unit_price');
+  assert.equal(rules.adminSelectColumns('orders', 'enrollments'), 'id,order_item_id,status');
+  assert.equal(rules.adminSelectColumns('products', 'courses'), '*');
+});
+test('F-04 status reflects expired recruitment, ended operation, scheduled start and override', () => {
   const now = Date.parse('2026-09-11T00:00:00Z');
   assert.equal(rules.cohortStatus({ status: 'recruiting', recruitment_end_at: '2026-09-03' }, now), 'closed');
   assert.equal(rules.cohortStatus({ status: 'in_progress', operation_end_at: '2026-08-23' }, now), 'completed');
