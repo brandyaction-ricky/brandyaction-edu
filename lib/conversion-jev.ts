@@ -128,7 +128,7 @@ export async function createJevJudgment(
   return {
     ...base,
     mode: 'jev',
-    notice: 'Jev 그림자 판정입니다. 자동 발송이나 고객 상태 변경에는 사용하지 않으며 운영자가 결과와 설명자료를 확인해야 합니다.',
+    notice: 'Jev가 문의를 분류하고 답변 초안을 만들었습니다. 직원이 내용을 확인해야 합니다. 이 화면에서는 고객에게 메시지를 보내거나 상담 기록을 바꾸지 않습니다.',
     model: typeof raw.model === 'string' ? raw.model.slice(0, 100) : 'jev-latest',
     decision_version: 1,
     decisions: {

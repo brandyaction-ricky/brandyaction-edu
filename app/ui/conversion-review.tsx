@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
-import type { ConversionCase, ConversionEvidence, ConversionSnapshot, JevCalibration, JevResult } from '@/lib/conversion-review';
-import { buildJevCalibrationSummary, calibrationForRun, isRunStale } from '@/lib/conversion-review';
+import type { ConversionCase, ConversionEvidence, ConversionJevV4Run, ConversionSnapshot } from '@/lib/conversion-review';
+import { isRunStale } from '@/lib/conversion-review';
+import type { JevV4DecisionKey } from '@/lib/conversion-jev-v4';
 import { createMutationGate } from '@/lib/mutation-gate';
 import { safeUrl } from '@/lib/platform';
 import {
@@ -13,19 +14,41 @@ import {
 import './conversion-review.css';
 import { RecruitmentRoomSettings } from './recruitment-rooms';
 import { RecruitmentFunnel } from './recruitment-funnel';
-import { ConversionBatchCalibration, type BatchCalibrationSubmission } from './conversion-batch-calibration';
-import { ConversionAdjudication } from './conversion-adjudication';
-import { ConversionJevV4Synthetic } from './conversion-jev-v4-synthetic';
 
 const topicNames: Record<string, string> = { price: '가격', schedule: '일정', content: '교육 내용', level: '수강 수준', usage: '이용 방법' };
 const inquiryNames: Record<string, string> = { prepurchase: '구매 전 상품 질문', support: '이용 지원', payment_refund: '결제·환불', mixed: '여러 종류의 문의', unknown: '판단 불가' };
-const decisionNames: Record<string, string> = { accept: '채택', edit: '수정', hold: '보류', reject: '사용 안 함' };
+const decisionNames: Record<string, string> = { accept: '직원 승인', edit: '수정 후 승인', hold: '보류', reject: '사용 안 함' };
 const jevNames: Record<string, string> = {
   high: '높음', medium: '중간', low: '낮음', unclear: '판단 보류',
   price: '가격', schedule: '일정', skill_level: '수강 수준', content_fit: '내용 적합성', trust: '신뢰', none_or_unknown: '불명확',
   answer_specific_questions: '질문에 구체적으로 답변', invite_webinar: '무료 웨비나 안내', offer_purchase_info: '구매 절차 안내', human_consult: '운영자 상담', hold_no_contact: '추가 접촉 보류',
 };
 const confidence = (value: number) => `${Math.round(value * 100)}%`;
+const jevV4Labels: Record<JevV4DecisionKey, string> = {
+  information_need: '문의에서 직접 요청한 내용', confirmed_barrier: '직접 밝힌 어려움',
+  attempted_action_target: '실제로 하려 한 일', operational_issue: '겪은 이용 문제',
+  paid_program_reference: '유료 교육 언급', observable_stage: '유료 구매 행동',
+};
+const jevV4Choices: Record<string, string> = {
+  price_or_payment: '가격·결제 질문', schedule_or_deadline: '일정·마감 질문', curriculum_or_fit: '내용·적합성 질문',
+  skill_requirement: '필요 역량 질문', registration_or_access: '신청·접근 질문', other_or_unclear: '그 밖의 질문·불명확',
+  explicit_price_burden: '비용 부담을 직접 밝힘', explicit_schedule_conflict: '일정 충돌을 직접 밝힘',
+  explicit_skill_concern: '역량 우려를 직접 밝힘', explicit_content_mismatch: '내용 불일치를 직접 밝힘',
+  explicit_trust_concern: '신뢰 우려를 직접 밝힘', none_stated: '직접 밝힌 어려움 없음', unclear: '판단 보류',
+  free_live_or_replay: '무료 방송·다시보기 접근', paid_application: '유료 신청', paid_payment: '유료 결제',
+  other_nonpurchase_action: '그 밖의 행동', no_attempt_stated: '시도 언급 없음',
+  free_content_access_failure: '무료 콘텐츠 접근 실패', paid_application_failure: '유료 신청 실패',
+  paid_payment_failure: '유료 결제 실패', other_access_failure: '그 밖의 접근 실패',
+  future_consideration_after_free_content: '무료 콘텐츠를 본 뒤 유료 교육 검토',
+  paid_program_question: '유료 교육 조건 질문', paid_application_or_payment: '유료 신청·결제 시도 명시',
+  no_paid_reference: '유료 교육 언급 없음', no_purchase_signal: '유료 구매 신호 언급 없음',
+  information_seeking: '유료 정보 탐색', specific_evaluation: '구체 조건 검토',
+  conditional_purchase_statement: '조건부 신청·구매 의사', paid_application_or_payment_attempt: '유료 신청·결제 시도 명시',
+};
+const jevV4UncertaintyLabels: Record<string, string> = {
+  unclear_choice: '판단 보류', unresolved_category: '분류가 모호함', low_reported_confidence: '표시 신뢰도가 낮음',
+  narrow_probability_margin: '비슷한 선택지가 있음', choice_not_top_probability: '선택과 확률이 엇갈림',
+};
 const displayTime = (value: string) => new Date(value).toLocaleString('ko-KR');
 type Mutation = (payload: Record<string, unknown>) => Promise<Record<string, unknown>>;
 
@@ -73,12 +96,12 @@ export function prefetchConversionReview(userId: string) {
 
 export function ConversionReview({ workspace = false, initialPeriod, userId }: { workspace?: boolean; initialPeriod?: string; userId: string }) {
   const [workspaceView, setWorkspaceView] = useState<'recruitment' | 'inquiries'>('recruitment');
-  const [inquiryView, setInquiryView] = useState<'single' | 'batch' | 'audit'>('single');
   const [snapshot, setSnapshot] = useState<ConversionSnapshot | null>(null);
   const [selectedId, setSelectedId] = useState('');
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
+  const [v4Pending, setV4Pending] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [drawer, setDrawer] = useState<'case' | 'evidence' | null>(null);
@@ -125,8 +148,10 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
       const notices: Record<string, string> = {
         save_case: '문의 정보를 저장했습니다.',
         save_evidence: '설명자료를 저장했습니다.',
-        analyze: snapshot?.capabilities.analyze_provider === 'jev' ? 'Jev 그림자 판정을 저장했습니다. 문의 원문만 보고 운영자 독립 판정을 먼저 남겨 주세요.' : '모의 판단을 저장했습니다. 설명을 확인한 뒤 검토 결정을 남겨 주세요.',
-        review: '검토 기록을 저장했습니다. 고객에게 전달된 답변은 아닙니다.',
+        analyze: snapshot?.capabilities.analyze_provider === 'jev' ? 'Jev가 문의를 읽고 분류했습니다. 직원이 답변 초안을 확인해 주세요.' : '모의 결과를 만들었습니다. 설명을 확인한 뒤 검토 결정을 남겨 주세요.',
+        review: payload.decision === 'hold' ? '직원이 보류로 기록했습니다. 고객에게 메시지를 보내지 않았습니다.'
+          : payload.decision === 'reject' ? '직원이 이 답변을 사용하지 않기로 했습니다. 고객에게 메시지를 보내지 않았습니다.'
+            : '직원이 답변 초안을 승인해 기록했습니다. 고객에게 자동으로 보내지 않았습니다.',
       };
       setNotice(notices[String(payload.action)] || '저장했습니다.');
       return result;
@@ -139,65 +164,23 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
     } finally { setPending(false); }
   };
 
-  async function saveBatch(items: BatchCalibrationSubmission[]) {
-    if (pending || !items.length) return;
-    setPending(true); setError(''); setNotice('');
-    let saved = 0;
-    try {
-      for (const item of items) {
-        await gate.current({ action: 'review', case_id: item.caseId, run_id: item.runId,
-          decision: 'hold', reply_text: '', reason: 'Jev 결과 확인 전 독립 판정',
-          calibration: item.calibration, calibration_sample_kind: 'operational' },
-        async body => readResponse(await fetch('/api/conversion', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-        })));
-        saved += 1;
-      }
-      await refresh();
-      setNotice(`과거 상담 ${saved}건의 독립 판정을 저장했습니다. 고객에게 메시지를 보내지 않았습니다.`);
-    } catch (cause) {
-      const failure = cause as Error & { status?: number };
-      if ([401, 403].includes(failure.status || 0)) { setSnapshot(null); setDrawer(null); }
-      else if (saved || failure.status === 409) await refresh();
-      throw new Error(`${saved}건 저장 후 중단되었습니다. ${failure.message} 저장된 건은 다시 제출하지 않습니다.`);
-    } finally { setPending(false); }
-  }
-
-  async function saveAdjudication(payload: Record<string, unknown>) {
-    setPending(true); setError(''); setNotice('');
-    try {
-      await gate.current(payload, async body => readResponse(await fetch('/api/conversion/adjudication', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-      })));
-      await refresh();
-      setNotice('재검토 의견을 별도로 저장했습니다. 처음 독립 판정과 Jev 결과는 유지됩니다.');
-    } catch (cause) {
-      const failure = cause as Error & { status?: number };
-      if ([401, 403].includes(failure.status || 0)) setSnapshot(null);
-      if (failure.status === 409) await refresh();
-      throw cause;
-    } finally { setPending(false); }
-  }
-
-  async function runJevV2(runId: string) {
-    const response = await fetch('/api/conversion/jev-v2', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ v1_run_id: runId }),
-    });
-    await readResponse(response);
-  }
-
-  async function runJevV3(runId: string) {
-    const response = await fetch('/api/conversion/jev-v3', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ v1_run_id: runId }),
-    });
-    await readResponse(response);
-  }
-
   async function runJevV4(runId: string) {
     const response = await fetch('/api/conversion/jev-v4', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ v1_run_id: runId }),
     });
     await readResponse(response);
+  }
+
+  async function runJevV4ForReview(runId: string) {
+    if (v4Pending || pending) return;
+    setV4Pending(true); setError(''); setNotice('');
+    try {
+      await runJevV4(runId);
+      await refresh();
+      setNotice('Jev가 문의를 나눠 살펴봤습니다. 직원 확인용 결과로 저장했으며 고객에게 보내지 않았습니다.');
+    } catch (cause) {
+      setError((cause as Error).message);
+    } finally { setV4Pending(false); }
   }
 
   const selected = snapshot?.cases.find(item => item.id === selectedId);
@@ -206,8 +189,7 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
   const run = snapshot?.runs.filter(item => item.case_id === selected?.id).sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
   const stale = Boolean(run && selected && snapshot && isRunStale(run, selected, snapshot.evidence));
   const records = snapshot?.reviews.filter(item => item.case_id === selected?.id).sort((a, b) => b.created_at.localeCompare(a.created_at)) || [];
-  const calibrationRecord = run && snapshot ? calibrationForRun(run.id, snapshot.reviews) : undefined;
-  const calibrationSummary = snapshot ? buildJevCalibrationSummary(snapshot.runs, snapshot.reviews, snapshot.cases) : null;
+  const jevV4Run = run && snapshot ? snapshot.jev_v4_runs?.find(item => item.v1_run_id === run.id) : undefined;
   const openCase = (item?: ConversionCase) => { setEditingCase(item); setDrawer('case'); };
   const openEvidence = (item?: ConversionEvidence) => { setEditingEvidence(item); setDrawer('evidence'); };
 
@@ -234,15 +216,8 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
       {showFunnel && <div id="recruitment-funnel-preparation"><RecruitmentFunnel key={String(snapshot.capabilities.can_manage_funnel)} courses={snapshot.courses} cohorts={snapshot.cohorts} canSave={snapshot.capabilities.can_manage_funnel === true} /></div>}
 </>}
       <div hidden={workspace && workspaceView !== 'inquiries'}>
-      <div className="conversion-intro"><span className="conversion-tag">운영자 검토</span><p>설명 추천과 고객 답변을 구분해서 관리합니다. 이 화면에 저장한 내용은 자동 발송되지 않습니다.</p></div>
-      {snapshot.capabilities.can_jev && <div className="funnel-entry" aria-label="문의 판정 방식">
-        <AdminButton aria-pressed={inquiryView === 'single'} disabled={pending} onClick={() => { setInquiryView('single'); setNotice(''); }}>개별 문의 검토</AdminButton>
-        <AdminButton aria-pressed={inquiryView === 'batch'} disabled={pending} onClick={() => { setInquiryView('batch'); setNotice(''); }}>과거 상담 한 번에 판정</AdminButton>
-        {snapshot.capabilities.can_adjudicate && snapshot.reviews.some(item => item.calibration && item.calibration_sample_kind === 'operational') && <AdminButton aria-pressed={inquiryView === 'audit'} disabled={pending} onClick={() => { setInquiryView('audit'); setNotice(''); }}>판정 차이 재검토</AdminButton>}
-      </div>}
-      {snapshot.capabilities.can_jev_v4 && <ConversionJevV4Synthetic />}
-      {inquiryView === 'batch' && snapshot.capabilities.can_jev ? <ConversionBatchCalibration snapshot={snapshot} pending={pending} onSave={saveBatch} onSingle={() => setInquiryView('single')} /> : inquiryView === 'audit' && snapshot.capabilities.can_adjudicate ? <ConversionAdjudication snapshot={snapshot} pending={pending} onSave={saveAdjudication} onRunV2={runJevV2} onRunV3={runJevV3} onRunV4={runJevV4} onRefresh={refresh} onSingle={() => setInquiryView('single')} /> : <>
-      {calibrationSummary && snapshot.runs.some(item => item.provider === 'jev') && <CalibrationOverview summary={calibrationSummary} />}
+      <div className="conversion-intro"><span className="conversion-tag">직원 확인 필요</span><p>Jev가 문의를 분류하고 답변 초안을 제안합니다. 직원이 승인·수정·보류를 선택해야 합니다. 여기서 승인해도 고객에게 메시지가 자동으로 나가지는 않습니다.</p></div>
+      {snapshot.capabilities.can_jev && <p className="conversion-muted">사람이 먼저 별도 점수를 매기지 않아도 Jev 결과를 볼 수 있습니다. 직원의 결정은 고객 응대에 쓰기 전 마지막 확인으로 기록합니다.</p>}
       <div className="conversion-grid" aria-busy={pending || loading}>
         <AdminSection title="문의" description={`불러온 문의 ${snapshot.cases.length}건`} bordered>
           <AdminSearchField label="문의 검색" value={query} onChange={event => setQuery(event.target.value)} />
@@ -258,27 +233,23 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
         <div className="conversion-main">
           {!selected ? <AdminEmptyState title="검토할 문의를 선택하세요.">문의와 상품을 연결하면 설명자료를 함께 검토할 수 있습니다.</AdminEmptyState> : <>
             <AdminSection title={selected.subject} bordered actions={<AdminButton disabled={pending} onClick={() => openCase(selected)}>문의 정보 수정</AdminButton>}>
-              <dl className="conversion-meta"><dt>표본 구분</dt><dd>{selected.sample_origin === 'external_legacy' ? '과거 유료 교육 상담 · 이번 모집 성과에서 제외' : '현재 교육 문의'}</dd><dt>상품</dt><dd>{selected.legacy_course_label || snapshot.courses.find(course => course.id === selected.course_id)?.title || '상품 미확인'}</dd><dt>기수</dt><dd>{snapshot.cohorts.find(cohort => cohort.id === selected.cohort_id)?.name || '미지정'}</dd><dt>고객 연결</dt><dd>{selected.customer_id ? '사이트 문의의 회원 연결 확인' : '미연결 · 개인별 구매 관찰 불가'}</dd><dt>출처</dt><dd>{selected.source_label}</dd></dl>
-              {selected.sample_origin === 'external_legacy' && <p className="conversion-muted">과거 구매 전 질문의 Jev 교정용입니다. 당시 상품 자료가 연결되지 않았다면 현재 상품 설명·구매 링크를 답변 근거로 사용하지 마세요.</p>}
+              <dl className="conversion-meta"><dt>문의 시기</dt><dd>{selected.sample_origin === 'external_legacy' ? '과거 유료 교육 상담 · 이번 모집 성과에서 제외' : '현재 교육 문의'}</dd><dt>상품</dt><dd>{selected.legacy_course_label || snapshot.courses.find(course => course.id === selected.course_id)?.title || '상품 미확인'}</dd><dt>기수</dt><dd>{snapshot.cohorts.find(cohort => cohort.id === selected.cohort_id)?.name || '미지정'}</dd><dt>회원 연결</dt><dd>{selected.customer_id ? '사이트 회원 정보가 연결됨' : '회원 정보가 연결되지 않아 이후 구매 여부를 알 수 없음'}</dd><dt>문의 출처</dt><dd>{selected.source_label}</dd></dl>
+              {selected.sample_origin === 'external_legacy' && <p className="conversion-muted">과거 상품에 대한 문의입니다. 새 성능 점수 계산에는 사용하지 않습니다. 당시 상품 자료가 연결되지 않았다면 현재 상품 설명이나 구매 링크를 답변 근거로 사용하지 마세요.</p>}
               <p className="conversion-quote">{selected.content}</p>
               {selected.question_id && <Link href="/admin/questions" className="conversion-link">기존 질문함 열기</Link>}
             </AdminSection>
-            <AdminSection title="전환 판정·설명 추천" bordered actions={<AdminButton tone="primary" disabled={pending || !canAnalyze || Boolean(run?.provider === 'jev' && !calibrationRecord && !stale)} onClick={() => void mutate({ action: 'analyze', case_id: selected.id, expected_version: selected.input_version }).catch(() => {})}>{pending ? '처리 중' : snapshot.capabilities.analyze_provider === 'jev' ? 'Jev 그림자 판정 실행' : '모의 판단 실행'}</AdminButton>}>
+            <AdminSection title="Jev 문의 분류와 답변 초안" bordered actions={<AdminButton tone="primary" disabled={pending || !canAnalyze} onClick={() => void mutate({ action: 'analyze', case_id: selected.id, expected_version: selected.input_version }).catch(() => {})}>{pending ? '처리 중' : snapshot.capabilities.analyze_provider === 'jev' ? 'Jev 결과 보기' : '모의 결과 보기'}</AdminButton>}>
               {!canAnalyze && <p className="conversion-muted">현재 환경에서는 판정을 실행할 수 없습니다. 설명자료는 직접 검토할 수 있습니다.</p>}
               {run ? <div className="conversion-result">
-                <span className="conversion-tag">{run.provider === 'jev' ? 'Jev 그림자 판정' : '모의 판단'} · 운영자 확인 필요</span>
+                <span className="conversion-tag">{run.provider === 'jev' ? 'Jev 결과 · 직원 확인 필요' : '모의 결과 · 직원 확인 필요'}</span>
                 {stale && <p role="alert" className="conversion-alert">문의나 설명자료가 바뀌었습니다. 새로 판단한 뒤 검토 기록을 남겨 주세요.</p>}
-                {run.result.mode === 'jev' && !calibrationRecord ? <>
-                  <div className="conversion-calibration-gate"><strong>운영자 독립 판정을 먼저 저장해 주세요.</strong><p>Jev가 만든 설명과 판정은 첫 기록을 저장한 뒤 공개됩니다. 위 문의 원문만 보고 판단해 주세요.</p></div>
-                  <CalibrationForm key={run.id} runId={run.id} caseId={selected.id} stale={stale} pending={pending} mutate={mutate} />
-                </> : <>
                 <p>{run.result.notice}</p>
-                {run.result.mode === 'jev' && calibrationRecord?.calibration && <><div className="conversion-jev-grid" aria-label="Jev 전환 판정">
-                  <div><span>구매 의도</span><strong>{jevNames[run.result.decisions.purchase_intent.choice]}</strong><small>신뢰도 {confidence(run.result.decisions.purchase_intent.confidence)}</small></div>
-                  <div><span>주요 장애물</span><strong>{jevNames[run.result.decisions.primary_barrier.choice]}</strong><small>신뢰도 {confidence(run.result.decisions.primary_barrier.confidence)}</small></div>
-                  <div><span>구매 준비도</span><strong>{run.result.decisions.purchase_readiness.score.toFixed(1)} / 4</strong><small>신뢰도 {confidence(run.result.decisions.purchase_readiness.confidence)}</small></div>
-                  <div><span>권장 다음 행동</span><strong>{jevNames[run.result.decisions.next_action.choice]}</strong><small>신뢰도 {confidence(run.result.decisions.next_action.confidence)}</small></div>
-                </div><CalibrationComparison result={run.result} calibration={calibrationRecord.calibration} /></>}
+                {run.result.mode === 'jev' && <><div className="conversion-jev-grid" aria-label="Jev 전환 판정">
+                  <div><span>구매 의도</span><strong>{jevNames[run.result.decisions.purchase_intent.choice]}</strong><small>모델 표시 신뢰도 {confidence(run.result.decisions.purchase_intent.confidence)}</small></div>
+                  <div><span>주요 장애물</span><strong>{jevNames[run.result.decisions.primary_barrier.choice]}</strong><small>모델 표시 신뢰도 {confidence(run.result.decisions.primary_barrier.confidence)}</small></div>
+                  <div><span>구매 준비도</span><strong>{run.result.decisions.purchase_readiness.score.toFixed(1)} / 4</strong><small>모델 표시 신뢰도 {confidence(run.result.decisions.purchase_readiness.confidence)}</small></div>
+                  <div><span>권장 다음 행동</span><strong>{jevNames[run.result.decisions.next_action.choice]}</strong><small>모델 표시 신뢰도 {confidence(run.result.decisions.next_action.confidence)}</small></div>
+                </div><p className="conversion-muted">Jev의 참고 분류입니다. 표시 신뢰도는 사람 판단과의 일치율이나 정확도 점수가 아닙니다.</p></>}
                 <p><strong>문의 구분</strong> · {inquiryNames[run.result.inquiry_type]}</p>
                 <div className="conversion-topics">{run.result.topics.filter(topic => topic.status === 'explicit').map(topic => <span key={topic.topic} className="conversion-tag">{topicNames[topic.topic]}</span>)}</div>
                 {run.result.missing_topics.length > 0 && <p className="conversion-alert">추가 확인 필요: {run.result.missing_topics.map(topic => topicNames[topic]).join(', ')}</p>}
@@ -286,8 +257,12 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
                   const evidence = run.evidence_snapshot?.find(item => item.id === candidate.evidence_id) || snapshot.evidence.find(item => item.id === candidate.evidence_id);
                   return <div key={candidate.evidence_id} className="conversion-evidence"><strong>{evidence?.title || '자료 확인 필요'}</strong><p>{candidate.reason}</p>{evidence && evidence.version === candidate.evidence_version ? <p className="conversion-quote">{evidence.body}</p> : <p className="conversion-muted">판단 이후 자료가 변경됐습니다. 당시 조합한 설명은 아래 검토 내용에 보존됩니다.</p>}</div>;
                 })}
+                {run.provider === 'jev' && snapshot.capabilities.can_jev_v4 && <JevV4ReviewPanel
+                  run={jevV4Run}
+                  disabled={pending || v4Pending || stale}
+                  onRun={() => void runJevV4ForReview(run.id)}
+                />}
                 <ReviewForm key={run.id} runId={run.id} caseId={selected.id} initialReply={run.result.proposed_reply} stale={stale} pending={pending} mutate={mutate} />
-                </>}
               </div> : <AdminEmptyState compact title="아직 판단 기록이 없습니다.">아래 설명자료를 확인한 뒤 판정을 실행하세요.</AdminEmptyState>}
             </AdminSection>
             <AdminSection title="상품 설명자료" description="승인된 자료만 추천 후보에 포함됩니다." bordered actions={snapshot.capabilities.can_manage_evidence && <AdminButton disabled={pending} onClick={() => openEvidence()}>자료 등록</AdminButton>}>
@@ -301,14 +276,13 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
             </AdminSection>
           </>}
         </div>
-        <AdminSection title="검토·적용 기록" bordered>
-          <p className="conversion-muted">검토 결정과 실제 답변은 별도입니다.</p>
-          {records.map(record => <article className="conversion-record" key={record.id}><strong>{decisionNames[record.decision]}</strong><small>{displayTime(record.created_at)}</small>{record.calibration && <p><span className="conversion-tag">{record.calibration_sample_kind === 'test' ? '검수용 표본' : '실제 문의 표본'}</span> 독립 판정: 의도 {jevNames[record.calibration.purchase_intent]} · 장애물 {jevNames[record.calibration.primary_barrier]} · 준비도 {record.calibration.purchase_readiness}/4 · 행동 {jevNames[record.calibration.next_action]}</p>}{record.reply_text && <p className="conversion-quote">{record.reply_text}</p>}{record.reason && <p>사유: {record.reason}</p>}<span className="conversion-tag">검토 저장 · 실제 적용 미확인</span></article>)}
+        <AdminSection title="직원 확인 기록" bordered>
+          <p className="conversion-muted">직원 승인 여부를 남깁니다. 이 화면에서 승인해도 고객에게 메시지는 보내지지 않습니다.</p>
+          {records.map(record => <article className="conversion-record" key={record.id}><strong>{decisionNames[record.decision]}</strong><small>{displayTime(record.created_at)}</small>{record.reply_text && <p className="conversion-quote">{record.reply_text}</p>}{record.reason && <p>사유: {record.reason}</p>}<span className="conversion-tag">{['accept', 'edit'].includes(record.decision) ? '승인된 답변 초안 · 미발송' : '직원 검토 기록 · 미발송'}</span></article>)}
           {!records.length && <AdminEmptyState compact title="아직 검토 기록이 없습니다." />}
           <div className="conversion-next"><strong>구매·환불 결과</strong><p>주문 연결은 준비 중입니다. 현재 화면의 기록으로 구매 성과를 계산하지 않습니다.</p></div>
         </AdminSection>
       </div>
-      </>}
       </div>
       {drawer === 'case' && <AdminDrawer title={editingCase ? '문의 정보 수정' : '문의 연결'} onClose={() => { if (!pending) setDrawer(null); }}>
         <CaseForm key={editingCase?.id || 'new'} snapshot={snapshot} item={editingCase} pending={pending} mutate={mutate} onSaved={id => { setSelectedId(id); setDrawer(null); }} />
@@ -320,34 +294,35 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
   </AdminPage>;
 }
 
-function CalibrationForm({ runId, caseId, stale, pending, mutate }: { runId: string; caseId: string; stale: boolean; pending: boolean; mutate: Mutation }) {
-  const [purchaseIntent, setPurchaseIntent] = useState('');
-  const [primaryBarrier, setPrimaryBarrier] = useState('');
-  const [purchaseReadiness, setPurchaseReadiness] = useState('');
-  const [nextAction, setNextAction] = useState('');
-  const [sampleKind, setSampleKind] = useState('');
-  const [error, setError] = useState('');
-  const calibrationComplete = Boolean(sampleKind && purchaseIntent && primaryBarrier && purchaseReadiness !== '' && nextAction);
-  async function submit(event: FormEvent) {
-    event.preventDefault(); setError('');
-    try { await mutate({ action: 'review', case_id: caseId, run_id: runId, decision: 'hold', reply_text: '', reason: 'Jev 결과 확인 전 독립 판정',
-      calibration: { purchase_intent: purchaseIntent, primary_barrier: primaryBarrier, purchase_readiness: Number(purchaseReadiness), next_action: nextAction },
-      calibration_sample_kind: sampleKind }); }
-    catch (cause) { setError((cause as Error).message); }
-  }
-  return <form onSubmit={submit} className="conversion-form">
-    <fieldset className="conversion-calibration-form" disabled={pending || stale}>
-      <legend>운영자 독립 판정</legend>
-      <p className="conversion-muted">문의 내용만 보고 판단해 주세요. 저장하면 Jev 결과와 비교됩니다.</p>
-      <AdminSelect label="교정 표본 용도" required value={sampleKind} onChange={event => setSampleKind(event.target.value)} helper="실제 고객 문의만 일치율과 기준 검토 표본에 포함됩니다."><option value="">선택</option><option value="operational">실제 고객 문의</option><option value="test">DEV 검수·연습용</option></AdminSelect>
-      <AdminSelect label="사람 판단 · 구매 의도" required value={purchaseIntent} onChange={event => setPurchaseIntent(event.target.value)}><option value="">선택</option><option value="high">높음</option><option value="medium">중간</option><option value="low">낮음</option><option value="unclear">판단 보류</option></AdminSelect>
-      <AdminSelect label="사람 판단 · 주요 장애물" required value={primaryBarrier} onChange={event => setPrimaryBarrier(event.target.value)}><option value="">선택</option><option value="price">가격</option><option value="schedule">일정</option><option value="skill_level">수강 수준</option><option value="content_fit">내용 적합성</option><option value="trust">신뢰</option><option value="none_or_unknown">불명확</option></AdminSelect>
-      <AdminSelect label="사람 판단 · 구매 준비도" required value={purchaseReadiness} onChange={event => setPurchaseReadiness(event.target.value)}><option value="">선택</option><option value="0">0 · 정보 부족</option><option value="1">1 · 관심 탐색</option><option value="2">2 · 비교 검토</option><option value="3">3 · 구매 직전</option><option value="4">4 · 구매 결정</option></AdminSelect>
-      <AdminSelect label="사람 판단 · 다음 행동" required value={nextAction} onChange={event => setNextAction(event.target.value)}><option value="">선택</option><option value="answer_specific_questions">질문에 구체적으로 답변</option><option value="invite_webinar">무료 웨비나 안내</option><option value="offer_purchase_info">구매 절차 안내</option><option value="human_consult">운영자 상담</option><option value="hold_no_contact">추가 접촉 보류</option></AdminSelect>
-    </fieldset>
-    {error && <p role="alert" className="conversion-alert">{error}</p>}
-    <AdminButton type="submit" tone="primary" disabled={pending || stale || !calibrationComplete}>독립 판정 저장</AdminButton>
-  </form>;
+function JevV4ReviewPanel({ run, disabled, onRun }: { run?: ConversionJevV4Run; disabled: boolean; onRun: () => void }) {
+  const keys: JevV4DecisionKey[] = ['information_need', 'confirmed_barrier', 'attempted_action_target', 'operational_issue', 'paid_program_reference', 'observable_stage'];
+  const result = run?.status === 'completed' ? run.result : null;
+  const uncertaintyByDecision = new Map<JevV4DecisionKey, string[]>();
+  for (const flag of result?.uncertainty_flags || []) uncertaintyByDecision.set(flag.decision, [...(uncertaintyByDecision.get(flag.decision) || []), jevV4UncertaintyLabels[flag.reason] || flag.reason]);
+  const consistencyLabels: Record<string, string> = {
+    paid_attempt_without_paid_target: '유료 신청·결제라고 분류했지만, 실제로 시도한 대상이 유료로 확인되지 않았습니다.',
+    paid_failure_without_paid_target: '유료 신청·결제 실패라고 분류했지만, 시도한 대상이 유료로 확인되지 않았습니다.',
+    free_failure_without_free_target: '무료 자료 접근 실패라고 분류했지만, 시도한 대상이 무료로 확인되지 않았습니다.',
+    paid_reference_without_stage: '유료 교육은 언급했지만, 행동 단계에서는 구매 신호가 없다고 봤습니다.',
+    paid_stage_without_reference: '유료 교육은 언급되지 않았지만, 행동 단계에서는 구매 신호가 있다고 봤습니다.',
+  };
+  return <section className="conversion-v2-result" aria-label="무료 자료 접근과 유료 관심 참고 분류">
+    <h4>무료 자료 문제와 유료 관심 구분</h4>
+    <p className="conversion-muted">Jev가 문의 문장에서 무료 콘텐츠 이용 문제와 유료 교육 관심을 나눠 봅니다. 직원이 상담을 처리할 때 참고하는 내용입니다.</p>
+    <AdminButton disabled={disabled || run?.status === 'completed' || run?.status === 'pending'} onClick={onRun}>
+      {run?.status === 'completed' ? '구분 결과 확인 완료' : run?.status === 'pending' ? '구분 결과를 만드는 중' : run?.status === 'failed' ? '다시 구분하기' : '무료·유료 구분 결과 보기'}
+    </AdminButton>
+    {result && <>
+      <dl>{keys.map(key => {
+        const decision = result.decisions[key];
+        const flags = uncertaintyByDecision.get(key) || [];
+        return <div key={key}><dt>{jevV4Labels[key]}</dt><dd>{jevV4Choices[decision.choice] || decision.choice} · 모델 표시 신뢰도 {confidence(decision.confidence)}{flags.length ? ` · 다시 볼 부분: ${flags.join(', ')}` : ''}</dd></div>;
+      })}</dl>
+      {result.consistency_flags.length > 0 && <p role="alert" className="conversion-alert">다시 볼 부분: {result.consistency_flags.map(flag => consistencyLabels[flag] || flag).join(' ')}</p>}
+      {result.consistency_flags.length === 0 && result.uncertainty_flags.length === 0 && <p className="conversion-muted">Jev가 따로 표시한 헷갈림 신호는 없습니다. 그래도 문의 원문과 함께 확인해 주세요.</p>}
+      <p className="conversion-muted">화면의 신뢰도 표시는 정확도를 입증한 점수가 아닙니다. 판정 결과는 직원 확인용으로 저장되며 고객에게 보내지지 않습니다.</p>
+    </>}
+  </section>;
 }
 
 function ReviewForm({ runId, caseId, initialReply, stale, pending, mutate }: { runId: string; caseId: string; initialReply: string; stale: boolean; pending: boolean; mutate: Mutation }) {
@@ -362,43 +337,14 @@ function ReviewForm({ runId, caseId, initialReply, stale, pending, mutate }: { r
     catch (cause) { setError((cause as Error).message); }
   }
   return <form onSubmit={submit} className="conversion-form">
-    <AdminTextarea label="검토할 설명" value={reply} onChange={event => { setReply(event.target.value); if (decision === 'accept') setDecision('edit'); }} rows={7} maxLength={10000} disabled={pending || stale} helper="고객에게 전달하기 전 상품 조건과 근거를 확인하세요." />
+    <AdminTextarea label="고객에게 보낼 답변 초안" value={reply} onChange={event => { setReply(event.target.value); if (decision === 'accept') setDecision('edit'); }} rows={7} maxLength={10000} disabled={pending || stale} helper="승인하면 직원 확인 기록만 남습니다. 이 화면에서는 고객에게 보내지 않습니다." />
     <AdminSelect label="검토 결정" value={decision} onChange={event => setDecision(event.target.value)} disabled={pending || stale}>
-      <option value="hold">보류</option><option value="accept" disabled={!initialReply.trim() || reply !== initialReply}>채택</option><option value="edit" disabled={!reply.trim()}>수정</option><option value="reject">사용 안 함</option>
+      <option value="hold">보류</option><option value="accept" disabled={!initialReply.trim() || reply !== initialReply}>그대로 승인</option><option value="edit" disabled={!reply.trim()}>수정 후 승인</option><option value="reject">사용 안 함</option>
     </AdminSelect>
     <AdminTextarea label="검토 사유" value={reason} onChange={event => setReason(event.target.value)} maxLength={1000} required={decision !== 'accept'} disabled={pending || stale} />
     {error && <p role="alert" className="conversion-alert">{error}</p>}
-    <AdminButton type="submit" tone="primary" disabled={pending || stale || (['accept', 'edit'].includes(decision) && !reply.trim())}>검토 기록 저장</AdminButton>
+    <AdminButton type="submit" tone="primary" disabled={pending || stale || (['accept', 'edit'].includes(decision) && !reply.trim())}>{decision === 'hold' ? '보류 기록' : decision === 'reject' ? '사용 안 함 기록' : '직원 승인 기록'}</AdminButton>
   </form>;
-}
-
-function CalibrationOverview({ summary }: { summary: ReturnType<typeof buildJevCalibrationSummary> }) {
-  const rate = (key: keyof JevCalibration) => summary.dimensions[key].rate === null ? '표본 없음' : `${Math.round(summary.dimensions[key].rate! * 100)}%`;
-  const originRate = (origin: 'current' | 'external_legacy', key: keyof JevCalibration) => {
-    const value = summary.by_origin[origin][key].rate;
-    return value === null ? '표본 없음' : `${Math.round(value * 100)}%`;
-  };
-  return <section className="conversion-calibration-overview" aria-label="사람과 Jev 선택 비교">
-    <div><span>실제 문의 표본</span><strong>{summary.samples}건</strong><small>현재 {summary.current_samples} · 과거 {summary.legacy_samples}</small></div>
-    <div><span>검수용 표본</span><strong>{summary.test_samples}건</strong></div>
-    <div><span>의도 선택 일치</span><strong>{rate('purchase_intent')}</strong></div>
-    <div><span>장애물 선택 일치</span><strong>{rate('primary_barrier')}</strong></div>
-    <div><span>준비도 선택 일치</span><strong>{rate('purchase_readiness')}</strong></div>
-    <div><span>행동 선택 일치</span><strong>{rate('next_action')}</strong></div>
-    <p>첫 사람 의견과 Jev의 선택이 같은 비율입니다. 한 사람의 판정을 정답으로 삼은 정확도가 아닙니다. Jev 표시 신뢰도도 검증된 정답 확률이 아닙니다.</p>
-    {summary.samples > 0 && <p>출처별 일치율 · 현재 교육: 의도 {originRate('current', 'purchase_intent')}, 장애물 {originRate('current', 'primary_barrier')}, 준비도 {originRate('current', 'purchase_readiness')}, 행동 {originRate('current', 'next_action')} · 과거 교육: 의도 {originRate('external_legacy', 'purchase_intent')}, 장애물 {originRate('external_legacy', 'primary_barrier')}, 준비도 {originRate('external_legacy', 'purchase_readiness')}, 행동 {originRate('external_legacy', 'next_action')}</p>}
-    <p>문의별 처음 저장한 독립 판정만 집계합니다. 신뢰도 70% 미만의 선택 차이 {summary.low_confidence_disagreements}항목 · 기준 검토용 최소 표본까지 {summary.remaining_for_threshold_review}건 남음(최소 {summary.minimum_samples}건). 최소 표본 달성은 성능 통과가 아닙니다. 과거 상담은 4기 성과 검증을 대신하지 않으며, 기준은 자동으로 바뀌지 않습니다.</p>
-  </section>;
-}
-
-function CalibrationComparison({ result, calibration }: { result: JevResult; calibration: JevCalibration }) {
-  const rows = [
-    ['구매 의도', result.decisions.purchase_intent.choice, calibration.purchase_intent],
-    ['주요 장애물', result.decisions.primary_barrier.choice, calibration.primary_barrier],
-    ['구매 준비도', String(Math.round(result.decisions.purchase_readiness.score)), String(calibration.purchase_readiness)],
-    ['다음 행동', result.decisions.next_action.choice, calibration.next_action],
-  ];
-  return <div className="conversion-comparison" aria-label="사람과 Jev 비교"><strong>사람과 Jev 비교</strong>{rows.map(([label, predicted, human]) => <div key={label}><span>{label}</span><span>사람 {jevNames[human] || `${human}/4`}</span><span>Jev {jevNames[predicted] || `${predicted}/4`}</span><b className={predicted === human ? 'is-match' : 'is-different'}>{predicted === human ? '일치' : '다름'}</b></div>)}</div>;
 }
 
 function CaseForm({ snapshot, item, pending, mutate, onSaved }: { snapshot: ConversionSnapshot; item?: ConversionCase; pending: boolean; mutate: Mutation; onSaved: (id: string) => void }) {
@@ -429,7 +375,7 @@ function CaseForm({ snapshot, item, pending, mutate, onSaved }: { snapshot: Conv
       <p className="conversion-quote">{question?.content || item?.content || '선택한 문의의 내용이 표시됩니다.'}</p>
       {item && <p className="conversion-muted">저장하면 질문함의 최신 원문을 다시 연결합니다.</p>}
     </> : <>
-      <AdminSelect label="표본 출처" required value={sampleOrigin} disabled={pending || Boolean(item)} onChange={event => { setSampleOrigin(event.target.value as 'current' | 'external_legacy'); setCourseId(''); setCohortId(''); }} helper="과거 상담은 Jev 교정 표본에 포함되지만 이번 모집 전환율에는 합산하지 않습니다."><option value="">선택</option><option value="current">현재 교육 상담</option><option value="external_legacy">과거 유료 교육 상담</option></AdminSelect>
+      <AdminSelect label="문의 시기" required value={sampleOrigin} disabled={pending || Boolean(item)} onChange={event => { setSampleOrigin(event.target.value as 'current' | 'external_legacy'); setCourseId(''); setCohortId(''); }} helper="과거 문의는 당시 배경을 참고하기 위한 기록입니다. 새 Jev 성능 점수에는 합치지 않습니다."><option value="">선택</option><option value="current">현재 교육 상담</option><option value="external_legacy">과거 유료 교육 상담</option></AdminSelect>
       {sampleOrigin === 'external_legacy' && <AdminInput label="당시 유료 교육 상품명" value={legacyCourseLabel} onChange={event => setLegacyCourseLabel(event.target.value)} required maxLength={200} disabled={pending} helper="상품명이 확인되지 않으면 ‘상품명 미확인’으로 기록하세요. 현재 문샷 챌린지 4기로 추정해 연결하지 않습니다." />}
       <AdminInput label="문의 제목" value={subject} onChange={event => setSubject(event.target.value)} required maxLength={200} disabled={pending} />
       <AdminTextarea label="문의 발췌" value={content} onChange={event => setContent(event.target.value)} required maxLength={10000} rows={5} disabled={pending} helper="대화 전체 대신 구매 판단에 필요한 문장만 남기세요. 고객 이름·별명·연락처·계정 ID·링크·주문번호는 제거해 주세요." />

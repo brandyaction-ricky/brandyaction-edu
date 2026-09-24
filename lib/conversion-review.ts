@@ -109,7 +109,7 @@ export type ConversionJevV4Run = {
   id: string;
   v1_run_id: string;
   case_id: string;
-  calibration_review_id: string;
+  calibration_review_id: string | null;
   input_version: number;
   status: 'pending' | 'completed' | 'failed';
   result: import('./conversion-jev-v4').JevV4Result | null;
@@ -169,7 +169,7 @@ export type ConversionSnapshot = {
   capabilities: { can_manage_evidence: boolean; can_mock: boolean; can_jev?: boolean; can_adjudicate?: boolean; can_jev_v2?: boolean; can_jev_v3?: boolean; can_jev_v4?: boolean; can_analyze?: boolean; analyze_provider?: 'mock' | 'jev' | null; can_manage_funnel?: boolean };
 };
 
-export const MOCK_NOTICE = '모의 판단입니다. 단어 일치로 화면과 기록 흐름을 확인하며, 실제 AI 판단이나 답변 정확도를 검증한 결과가 아닙니다. 모든 내용은 운영자가 확인해야 합니다.';
+export const MOCK_NOTICE = '시험용 결과입니다. 실제 AI가 만든 판단이 아니며, 분류와 답변 초안은 직원이 확인해야 합니다.';
 export const topicLabels: Record<ConversionTopic, string> = {
   price: '가격', schedule: '일정', content: '내용', level: '수준', usage: '이용 방법',
 };
