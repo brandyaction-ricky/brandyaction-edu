@@ -270,11 +270,9 @@ export function Platform({
         setData(result.data || {});
         setLoadedSection(adminSection);
         setSupport(result.support || { email: "", url: "" });
-        if (admin) {
-          if (cachedAdminUser?.id !== result.user?.id)
-            adminNavigationReads.clear();
-          cachedAdminUser = result.user || null;
-        }
+        if (admin && cachedAdminUser?.id !== result.user?.id)
+          adminNavigationReads.clear();
+        if (admin) cachedAdminUser = result.user;
         setUser(result.user);
         setPagination(result.pagination || null);
       }
