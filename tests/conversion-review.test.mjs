@@ -9,10 +9,10 @@ const exports = {};
 new Function('exports', ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText)(exports);
-const { createMockJudgment, isEvidenceInScope, evidenceVersions, isRunStale, buildJevCalibrationSummary, calibrationForRun, MOCK_NOTICE } = exports;
+const { createMockJudgment, isEvidenceInScope, evidenceVersions, isRunStale, buildJevCalibrationSummary, calibrationForRun, historicalCalibrationQueue, MOCK_NOTICE } = exports;
 
 const inquiry = {
-  id: 'case-1', source_type: 'manual', question_id: null, course_id: 'course-a', cohort_id: 'cohort-a',
+  id: 'case-1', source_type: 'manual', sample_origin: 'current', legacy_course_label: null, question_id: null, course_id: 'course-a', cohort_id: 'cohort-a',
   subject: '초보도 가능한가요?', content: '실시간 참석이 어려운데 녹화로 다시 볼 수 있나요?',
   source_label: '직접 등록', received_at: '2026-09-20T00:00:00.000Z', customer_id: null,
   input_version: 1, created_at: '2026-09-20T00:00:00.000Z',
@@ -162,6 +162,24 @@ test('new approved candidates invalidate a run even when the mock does not selec
   assert.equal(isRunStale(run, inquiry, [evidence, { ...unrelated, course_id: 'other' }]), false);
 });
 
+test('blind batch queue includes only latest fresh, uncalibrated historical Jev runs', () => {
+  const historical = { ...inquiry, id: 'legacy-1', sample_origin: 'external_legacy', course_id: null, cohort_id: null, legacy_course_label: '과거 교육' };
+  const second = { ...historical, id: 'legacy-2', received_at: '2026-09-21T00:00:00.000Z' };
+  const old = { ...runFor(historical, []), id: 'run-old', provider: 'jev' };
+  const latest = { ...old, id: 'run-latest', created_at: '2026-09-21T00:00:01.000Z' };
+  const other = { ...runFor(second, []), id: 'run-other', provider: 'jev' };
+  const cases = [inquiry, historical, second, { ...historical, id: 'dev-test', subject: '[DEV 검증] 합성 상담' },
+    { ...historical, id: 'stale', input_version: 2 }, { ...historical, id: 'mock-only' }, { ...historical, id: 'already-reviewed' }];
+  const runs = [runFor(inquiry), old, latest, other,
+    { ...old, id: 'run-dev', case_id: 'dev-test' }, { ...old, id: 'run-stale', case_id: 'stale' },
+    { ...old, id: 'run-mock', case_id: 'mock-only', provider: 'mock' },
+    { ...old, id: 'run-reviewed', case_id: 'already-reviewed' }];
+  const queue = historicalCalibrationQueue({ cases, runs, evidence: [], reviews: [
+    { case_id: 'already-reviewed', run_id: 'run-reviewed', calibration: { purchase_intent: 'high' } },
+  ] });
+  assert.deepEqual(queue.map(item => item.run.id), ['run-latest', 'run-other']);
+});
+
 test('support and refund inquiry classification stays visibly within the demo result', () => {
   assert.equal(createMockJudgment({ ...inquiry, subject: '로그인 오류', content: '비밀번호 확인 부탁해요.' }, []).inquiry_type, 'support');
   assert.equal(createMockJudgment({ ...inquiry, subject: '환불 문의', content: '결제를 취소하고 싶어요.' }, []).inquiry_type, 'payment_refund');
@@ -188,11 +206,59 @@ test('Jev calibration uses the first independent review per run and reports conf
   assert.deepEqual(summary.dimensions.primary_barrier, { matches: 0, total: 1, rate: 0 });
   assert.deepEqual(summary.dimensions.purchase_readiness, { matches: 1, total: 1, rate: 1 });
   assert.equal(summary.low_confidence_disagreements, 2);
-  const testRun = { ...run, id: 'run-test' };
-  const testReview = { ...first, id: 'review-test', run_id: testRun.id, calibration_sample_kind: 'test' };
+  const testRun = { ...run, id: 'run-test', case_id: 'case-test' };
+  const testReview = { ...first, id: 'review-test', case_id: testRun.case_id, run_id: testRun.id, calibration_sample_kind: 'test' };
   const withTest = buildJevCalibrationSummary([run, testRun], [first, testReview]);
   assert.equal(withTest.samples, 1);
   assert.equal(withTest.test_samples, 1);
+});
+
+test('repeated Jev runs for one inquiry count only its earliest independent calibration', () => {
+  const result = { ...createMockJudgment(inquiry, []), mode: 'jev', decisions: {
+    purchase_intent: { choice: 'high', confidence: .9 },
+    primary_barrier: { choice: 'price', confidence: .9 },
+    purchase_readiness: { score: 3, confidence: .9 },
+    next_action: { choice: 'offer_purchase_info', confidence: .9 },
+  } };
+  const firstRun = { ...runFor(), id: 'run-1', provider: 'jev', result };
+  const secondRun = { ...firstRun, id: 'run-2' };
+  const calibration = { purchase_intent: 'high', primary_barrier: 'price', purchase_readiness: 3, next_action: 'offer_purchase_info' };
+  const firstReview = { id: 'review-1', case_id: inquiry.id, run_id: firstRun.id, calibration, calibration_sample_kind: 'operational', created_at: '2026-09-20T00:00:01.000Z' };
+  const secondReview = { ...firstReview, id: 'review-2', run_id: secondRun.id, calibration_sample_kind: 'test', created_at: '2026-09-20T00:00:02.000Z' };
+  const summary = buildJevCalibrationSummary([secondRun, firstRun], [secondReview, firstReview]);
+  assert.equal(summary.samples, 1);
+  assert.equal(summary.test_samples, 0);
+  assert.equal(summary.dimensions.purchase_intent.total, 1);
+  assert.equal(summary.remaining_for_threshold_review, 19);
+  const testFirst = buildJevCalibrationSummary([firstRun, secondRun], [
+    { ...firstReview, calibration_sample_kind: 'test' },
+    { ...secondReview, calibration_sample_kind: 'operational' },
+  ]);
+  assert.equal(testFirst.samples, 0);
+  assert.equal(testFirst.test_samples, 1);
+});
+
+test('historical and current real cases count toward the same threshold but stay separately visible', () => {
+  const result = { ...createMockJudgment(inquiry, []), mode: 'jev', decisions: {
+    purchase_intent: { choice: 'medium', confidence: .9 }, primary_barrier: { choice: 'schedule', confidence: .9 },
+    purchase_readiness: { score: 2, confidence: .9 }, next_action: { choice: 'answer_specific_questions', confidence: .9 },
+  } };
+  const currentRun = { ...runFor(), id: 'run-current', provider: 'jev', result };
+  const legacyRun = { ...currentRun, id: 'run-legacy', case_id: 'case-legacy',
+    input_snapshot: { sample_origin: 'external_legacy' } };
+  const calibration = { purchase_intent: 'medium', primary_barrier: 'schedule', purchase_readiness: 2, next_action: 'answer_specific_questions' };
+  const currentReview = { id: 'review-current', run_id: currentRun.id, case_id: currentRun.case_id,
+    created_at: '2026-09-20T00:00:02Z', calibration, calibration_sample_kind: 'operational' };
+  const legacyReview = { ...currentReview, id: 'review-legacy', run_id: legacyRun.id, case_id: legacyRun.case_id };
+  const summary = buildJevCalibrationSummary([currentRun, legacyRun], [currentReview, legacyReview],
+    [inquiry, { ...inquiry, id: legacyRun.case_id, sample_origin: 'external_legacy', course_id: null, legacy_course_label: '과거 교육' }]);
+  assert.equal(summary.samples, 2);
+  assert.equal(summary.current_samples, 1);
+  assert.equal(summary.legacy_samples, 1);
+  assert.equal(summary.remaining_for_threshold_review, 18);
+  assert.equal(summary.dimensions.purchase_intent.total, 2);
+  assert.equal(summary.by_origin.current.purchase_intent.total, 1);
+  assert.equal(summary.by_origin.external_legacy.purchase_intent.total, 1);
 });
 
 test('review payload accepts only a complete closed-set calibration object', () => {

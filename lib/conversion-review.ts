@@ -2,8 +2,10 @@
 export type ConversionCase = {
   id: string;
   source_type: 'native' | 'manual';
+  sample_origin: 'current' | 'external_legacy';
+  legacy_course_label: string | null;
   question_id: string | null;
-  course_id: string;
+  course_id: string | null;
   cohort_id: string | null;
   subject: string;
   content: string;
@@ -66,6 +68,55 @@ export type JevCalibration = {
   next_action: 'answer_specific_questions' | 'invite_webinar' | 'offer_purchase_info' | 'human_consult' | 'hold_no_contact';
 };
 
+export type JevDimension = keyof JevCalibration;
+export type ConversionAdjudicationNote = {
+  id: string;
+  run_id: string;
+  calibration_review_id: string;
+  dimension: JevDimension;
+  assessment: 'human_better_supported' | 'jev_better_supported' | 'both_plausible' | 'neither_supported' | 'insufficient_evidence';
+  basis: 'explicit_signal' | 'interpretation' | 'category_gap' | 'missing_context';
+  rationale: string;
+  actor_id: string;
+  created_at: string;
+};
+
+export type ConversionJevV2Run = {
+  id: string;
+  v1_run_id: string;
+  case_id: string;
+  calibration_review_id: string;
+  input_version: number;
+  status: 'pending' | 'completed' | 'failed';
+  result: import('./conversion-jev-v2').JevV2Result | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ConversionJevV3Run = {
+  id: string;
+  v1_run_id: string;
+  case_id: string;
+  calibration_review_id: string;
+  input_version: number;
+  status: 'pending' | 'completed' | 'failed';
+  result: import('./conversion-jev-v3').JevV3Result | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ConversionJevV4Run = {
+  id: string;
+  v1_run_id: string;
+  case_id: string;
+  calibration_review_id: string;
+  input_version: number;
+  status: 'pending' | 'completed' | 'failed';
+  result: import('./conversion-jev-v4').JevV4Result | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ConversionRun = {
   id: string;
   case_id: string;
@@ -94,9 +145,12 @@ export type ConversionReviewRecord = {
 export type JevCalibrationSummary = {
   samples: number;
   test_samples: number;
+  current_samples: number;
+  legacy_samples: number;
   minimum_samples: number;
   remaining_for_threshold_review: number;
   dimensions: Record<keyof JevCalibration, { matches: number; total: number; rate: number | null }>;
+  by_origin: Record<'current' | 'external_legacy', Record<keyof JevCalibration, { matches: number; total: number; rate: number | null }>>;
   low_confidence_disagreements: number;
 };
 
@@ -108,7 +162,11 @@ export type ConversionSnapshot = {
   cohorts: { id: string; course_id: string; name: string }[];
   runs: ConversionRun[];
   reviews: ConversionReviewRecord[];
-  capabilities: { can_manage_evidence: boolean; can_mock: boolean; can_jev?: boolean; can_analyze?: boolean; analyze_provider?: 'mock' | 'jev' | null; can_manage_funnel?: boolean };
+  adjudications?: ConversionAdjudicationNote[];
+  jev_v2_runs?: ConversionJevV2Run[];
+  jev_v3_runs?: ConversionJevV3Run[];
+  jev_v4_runs?: ConversionJevV4Run[];
+  capabilities: { can_manage_evidence: boolean; can_mock: boolean; can_jev?: boolean; can_adjudicate?: boolean; can_jev_v2?: boolean; can_jev_v3?: boolean; can_jev_v4?: boolean; can_analyze?: boolean; analyze_provider?: 'mock' | 'jev' | null; can_manage_funnel?: boolean };
 };
 
 export const MOCK_NOTICE = '모의 판단입니다. 단어 일치로 화면과 기록 흐름을 확인하며, 실제 AI 판단이나 답변 정확도를 검증한 결과가 아닙니다. 모든 내용은 운영자가 확인해야 합니다.';
@@ -126,18 +184,55 @@ export function calibrationForRun(runId: string, reviews: ConversionReviewRecord
     .sort((a, b) => a.created_at.localeCompare(b.created_at))[0];
 }
 
-export function buildJevCalibrationSummary(runs: ConversionRun[], reviews: ConversionReviewRecord[]): JevCalibrationSummary {
-  const dimensions = Object.fromEntries(calibrationKeys.map(key => [key, { matches: 0, total: 0, rate: null }])) as JevCalibrationSummary['dimensions'];
+/** Only fresh, first-time historical Jev reviews belong in the blind batch queue. */
+export function historicalCalibrationQueue(snapshot: Pick<ConversionSnapshot, 'cases' | 'runs' | 'reviews' | 'evidence'>) {
+  const latestRun = new Map<string, ConversionRun>();
+  for (const run of snapshot.runs) {
+    const previous = latestRun.get(run.case_id);
+    if (!previous || run.created_at > previous.created_at || (run.created_at === previous.created_at && run.id > previous.id)) {
+      latestRun.set(run.case_id, run);
+    }
+  }
+  const calibratedCases = new Set(snapshot.reviews.filter(review => review.calibration).map(review => review.case_id));
+  return snapshot.cases.flatMap(item => {
+    const run = latestRun.get(item.id);
+    if (item.sample_origin !== 'external_legacy' || item.subject.startsWith('[DEV 검증]')
+      || calibratedCases.has(item.id) || !run || run.provider !== 'jev'
+      || isRunStale(run, item, snapshot.evidence)) return [];
+    return [{ inquiry: item, run }];
+  }).sort((a, b) => a.inquiry.received_at.localeCompare(b.inquiry.received_at) || a.inquiry.id.localeCompare(b.inquiry.id));
+}
+
+export function buildJevCalibrationSummary(runs: ConversionRun[], reviews: ConversionReviewRecord[], cases: ConversionCase[] = []): JevCalibrationSummary {
+  const emptyDimensions = () => Object.fromEntries(calibrationKeys.map(key => [key, { matches: 0, total: 0, rate: null }])) as JevCalibrationSummary['dimensions'];
+  const dimensions = emptyDimensions();
+  const byOrigin = { current: emptyDimensions(), external_legacy: emptyDimensions() };
   let samples = 0;
   let testSamples = 0;
+  let currentSamples = 0;
+  let legacySamples = 0;
   let lowConfidenceDisagreements = 0;
+  const firstByCase = new Map<string, { run: ConversionRun; review: ConversionReviewRecord }>();
   for (const run of runs) {
     if (run.result.mode !== 'jev') continue;
     const review = calibrationForRun(run.id, reviews);
     if (!review?.calibration) continue;
+    const previous = firstByCase.get(run.case_id);
+    if (!previous || review.created_at < previous.review.created_at
+      || (review.created_at === previous.review.created_at && review.id < previous.review.id)) {
+      firstByCase.set(run.case_id, { run, review });
+    }
+  }
+  for (const { run, review } of firstByCase.values()) {
+    if (!review.calibration || run.result.mode !== 'jev') continue;
     if (review.calibration_sample_kind === 'test') { testSamples += 1; continue; }
     if (review.calibration_sample_kind !== 'operational') continue;
     samples += 1;
+    const origin = cases.find(item => item.id === run.case_id)?.sample_origin
+      ?? run.input_snapshot?.sample_origin;
+    const group = origin === 'external_legacy' ? 'external_legacy' : 'current';
+    if (group === 'external_legacy') legacySamples += 1;
+    else currentSamples += 1;
     for (const key of calibrationKeys) {
       const answer = run.result.decisions[key];
       const predicted = key === 'purchase_readiness'
@@ -145,18 +240,19 @@ export function buildJevCalibrationSummary(runs: ConversionRun[], reviews: Conve
         : (answer as JevChoiceAnswer).choice;
       const matched = predicted === review.calibration[key];
       dimensions[key].total += 1;
-      if (matched) dimensions[key].matches += 1;
+      byOrigin[group][key].total += 1;
+      if (matched) { dimensions[key].matches += 1; byOrigin[group][key].matches += 1; }
       else if (answer.confidence < 0.7) lowConfidenceDisagreements += 1;
     }
   }
-  for (const key of calibrationKeys) {
-    const item = dimensions[key];
+  for (const group of [dimensions, byOrigin.current, byOrigin.external_legacy]) for (const key of calibrationKeys) {
+    const item = group[key];
     item.rate = item.total ? item.matches / item.total : null;
   }
   const minimumSamples = 20;
-  return { samples, test_samples: testSamples, minimum_samples: minimumSamples,
+  return { samples, test_samples: testSamples, current_samples: currentSamples, legacy_samples: legacySamples, minimum_samples: minimumSamples,
     remaining_for_threshold_review: Math.max(0, minimumSamples - samples),
-    dimensions, low_confidence_disagreements: lowConfidenceDisagreements };
+    dimensions, by_origin: byOrigin, low_confidence_disagreements: lowConfidenceDisagreements };
 }
 
 const topicPatterns: Record<ConversionTopic, RegExp> = {

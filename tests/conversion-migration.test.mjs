@@ -13,6 +13,11 @@ const permissionsSql = fs.readFileSync(new URL('../supabase/migrations/202609200
 const jevSql = fs.readFileSync(new URL('../supabase/migrations/202609220001_conversion_jev_shadow.sql', import.meta.url), 'utf8');
 const calibrationSql = fs.readFileSync(new URL('../supabase/migrations/202609220002_conversion_jev_calibration.sql', import.meta.url), 'utf8');
 const sampleScopeSql = fs.readFileSync(new URL('../supabase/migrations/202609220003_conversion_jev_sample_scope.sql', import.meta.url), 'utf8');
+const legacySampleSql = fs.readFileSync(new URL('../supabase/migrations/202609230001_conversion_legacy_samples.sql', import.meta.url), 'utf8');
+const adjudicationSql = fs.readFileSync(new URL('../supabase/migrations/202609230002_conversion_adjudication_notes.sql', import.meta.url), 'utf8');
+const jevV2Sql = fs.readFileSync(new URL('../supabase/migrations/202609230003_conversion_jev_v2_runs.sql', import.meta.url), 'utf8');
+const jevV3Sql = fs.readFileSync(new URL('../supabase/migrations/202609230004_conversion_jev_v3_runs.sql', import.meta.url), 'utf8');
+const jevV4Sql = fs.readFileSync(new URL('../supabase/migrations/202609230005_conversion_jev_v4_runs.sql', import.meta.url), 'utf8');
 const serverSource = fs.readFileSync(new URL('../lib/conversion-review-server.ts', import.meta.url), 'utf8');
 const serverExports = {};
 new Function('exports', 'require', ts.transpileModule(serverSource, {
@@ -50,6 +55,11 @@ before(async () => {
   await db.exec(jevSql);
   await db.exec(calibrationSql);
   await db.exec(sampleScopeSql);
+  await db.exec(legacySampleSql);
+  await db.exec(adjudicationSql);
+  await db.exec(jevV2Sql);
+  await db.exec(jevV3Sql);
+  await db.exec(jevV4Sql);
   await db.query('insert into profiles(id,role) values ($1,\'admin\'),($2,\'staff\'),($3,\'student\')', [ids.admin, ids.staff, ids.student]);
   await db.query('insert into courses(id) values ($1),($2)', [ids.course, ids.otherCourse]);
   await db.query('insert into cohorts(id,course_id) values ($1,$2),($3,$4)', [ids.cohort, ids.course, ids.otherCohort, ids.otherCourse]);
@@ -57,7 +67,7 @@ before(async () => {
     values ($1,$2,$3,'원래 제목','초보자도 수강할 수 있나요?','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z')`, [ids.question, ids.student, ids.course]);
 });
 beforeEach(async () => {
-  await db.exec(`truncate ${tables.join(',')};`);
+  await db.exec(`truncate edu_conversion_jev_v4_runs,edu_conversion_jev_v3_runs,edu_conversion_jev_v2_runs,edu_conversion_adjudication_notes,${tables.join(',')};`);
   await db.exec("update profiles set status='active'; delete from site_settings;");
   await db.query('insert into site_settings(key,value) values ($1,$2)', [`edu_staff_permissions_${ids.staff}`, { members: true, products: true }]);
   await db.query(`update edu_questions set title='원래 제목',content='초보자도 수강할 수 있나요?',answer=null,
@@ -67,7 +77,7 @@ after(async () => { await db.close(); });
 
 function manual(overrides = {}) {
   return { action: 'save_case', requestId: randomUUID(), course_id: ids.course, cohort_id: ids.cohort,
-    subject: '외부 문의', content: '초보자 수강 기준을 알려 주세요.', source_label: '운영자 등록 발췌', received_at: '2026-01-01T00:00:00Z', ...overrides };
+    subject: '외부 문의', content: '초보자 수강 기준을 알려 주세요.', source_label: '운영자 등록 발췌', received_at: '2026-01-01T00:00:00Z', deidentified_confirmed: true, ...overrides };
 }
 function evidence(overrides = {}) {
   return { action: 'save_evidence', requestId: randomUUID(), course_id: ids.course, cohort_id: null,
@@ -108,6 +118,125 @@ test('RPC retry returns one stored result; changed intent with the same request 
   changed.payload_hash = conversionPayload(input).payload_hash;
   await assert.rejects(rpc(null, { normalized: changed }), /CONVERSION_REQUEST_REUSED/);
   assert.equal(await count('edu_conversion_cases'), 1);
+});
+
+test('historical paid-education inquiry can be calibrated without inventing a current product or cohort', async () => {
+  const input = manual({ course_id: null, cohort_id: null, sample_origin: 'external_legacy', legacy_course_label: '과거 온라인 마케팅 교육' });
+  const { case: inquiry } = await rpc(input);
+  assert.equal(inquiry.course_id, null);
+  assert.equal(inquiry.sample_origin, 'external_legacy');
+  assert.equal(inquiry.legacy_course_label, '과거 온라인 마케팅 교육');
+  assert.equal(inquiry.customer_id, null);
+  const runResult = { ...mock, proposed_reply: '' };
+  const { run } = await rpc({ action: 'analyze', requestId: randomUUID(), case_id: inquiry.id, expected_version: inquiry.input_version },
+    { result: runResult, versions: {}, observedVersion: inquiry.input_version });
+  assert.deepEqual(run.evidence_versions, {});
+  assert.deepEqual(run.evidence_snapshot, []);
+  assert.equal(run.input_snapshot.sample_origin, 'external_legacy');
+  assert.equal(run.input_snapshot.legacy_course_label, '과거 온라인 마케팅 교육');
+  await assert.rejects(rpc({ ...input, requestId: randomUUID(), id: inquiry.id, expected_version: inquiry.input_version,
+    sample_origin: 'current', course_id: ids.course, legacy_course_label: null }), /CONVERSION_INVALID/);
+  for (const invalid of [
+    manual({ course_id: null }),
+    manual({ course_id: null, cohort_id: ids.cohort, sample_origin: 'external_legacy', legacy_course_label: '과거 온라인 마케팅 교육' }),
+    manual({ course_id: null, cohort_id: null, sample_origin: 'external_legacy', legacy_course_label: '' }),
+  ]) {
+    await assert.rejects(rpc(invalid));
+  }
+});
+
+test('separate adjudication history is append-only for browser roles and linked to the original review', async () => {
+  const { inquiry, run } = await setupRun();
+  const { review: first } = await rpc(review(inquiry, run));
+  const protections = await db.query("select relrowsecurity from pg_class where relname='edu_conversion_adjudication_notes'");
+  assert.equal(protections.rows[0].relrowsecurity, true);
+  for (const role of ['anon', 'authenticated']) {
+    await db.exec(`set role ${role}`);
+    try {
+      await assert.rejects(db.query('select * from edu_conversion_adjudication_notes'), /permission denied/);
+      await assert.rejects(db.query("insert into edu_conversion_adjudication_notes(run_id,calibration_review_id,dimension,assessment,basis,rationale,actor_id,request_id,payload_hash) values (gen_random_uuid(),gen_random_uuid(),'purchase_readiness','both_plausible','interpretation','구체적인 결제 행동은 확인되지 않았습니다.',gen_random_uuid(),gen_random_uuid(),repeat('a',64))"), /permission denied/);
+    } finally { await db.exec('reset role'); }
+  }
+  await db.exec('set role service_role');
+  try {
+    await db.query("insert into edu_conversion_adjudication_notes(run_id,calibration_review_id,dimension,assessment,basis,rationale,actor_id,request_id,payload_hash) values ($1,$2,'purchase_readiness','both_plausible','interpretation','구체적인 결제 행동은 확인되지 않았습니다.',$3,$4,$5)", [run.id, first.id, ids.admin, randomUUID(), 'a'.repeat(64)]);
+  } finally { await db.exec('reset role'); }
+  assert.equal(await count('edu_conversion_adjudication_notes'), 1);
+  assert.equal(await count('edu_conversion_reviews'), 1);
+});
+
+test('v2 experiment rows are separate, unique per v1 run, and inaccessible to browser roles', async () => {
+  const { inquiry, run } = await setupRun();
+  const { review: first } = await rpc(review(inquiry, run));
+  const rls = await db.query("select relrowsecurity from pg_class where relname='edu_conversion_jev_v2_runs'");
+  assert.equal(rls.rows[0].relrowsecurity, true);
+  for (const role of ['anon', 'authenticated']) {
+    await db.exec(`set role ${role}`);
+    try {
+      await assert.rejects(db.query('select * from edu_conversion_jev_v2_runs'), /permission denied/);
+    } finally { await db.exec('reset role'); }
+  }
+  await db.exec('set role service_role');
+  try {
+    const args = [run.id, inquiry.id, first.id, inquiry.input_version, ids.admin];
+    await db.query("insert into edu_conversion_jev_v2_runs(v1_run_id,case_id,calibration_review_id,input_version,status,actor_id) values ($1,$2,$3,$4,'pending',$5)", args);
+    await assert.rejects(db.query("insert into edu_conversion_jev_v2_runs(v1_run_id,case_id,calibration_review_id,input_version,status,actor_id) values ($1,$2,$3,$4,'pending',$5)", args), /unique/);
+    await assert.rejects(db.query("update edu_conversion_jev_v2_runs set status='completed' where v1_run_id=$1", [run.id]), /check constraint/);
+    await db.query("update edu_conversion_jev_v2_runs set status='completed',result=$2 where v1_run_id=$1", [run.id, { contract_version: 2, model: 'jev-test' }]);
+  } finally { await db.exec('reset role'); }
+  assert.equal(await count('edu_conversion_jev_v2_runs'), 1);
+  assert.equal(await count('edu_conversion_runs'), 1);
+  assert.equal(await count('edu_conversion_reviews'), 1);
+});
+
+test('v3 experiment rows preserve v2 and the first review, enforce uniqueness, and deny browser roles', async () => {
+  const { inquiry, run } = await setupRun();
+  const { review: first } = await rpc(review(inquiry, run));
+  const rls = await db.query("select relrowsecurity from pg_class where relname='edu_conversion_jev_v3_runs'");
+  assert.equal(rls.rows[0].relrowsecurity, true);
+  for (const role of ['anon', 'authenticated']) {
+    await db.exec(`set role ${role}`);
+    try { await assert.rejects(db.query('select * from edu_conversion_jev_v3_runs'), /permission denied/); }
+    finally { await db.exec('reset role'); }
+  }
+  await db.exec('set role service_role');
+  try {
+    const args = [run.id, inquiry.id, first.id, inquiry.input_version, ids.admin];
+    await db.query("insert into edu_conversion_jev_v3_runs(v1_run_id,case_id,calibration_review_id,input_version,status,actor_id) values ($1,$2,$3,$4,'pending',$5)", args);
+    await assert.rejects(db.query("insert into edu_conversion_jev_v3_runs(v1_run_id,case_id,calibration_review_id,input_version,status,actor_id) values ($1,$2,$3,$4,'pending',$5)", args), /unique/);
+    await assert.rejects(db.query("update edu_conversion_jev_v3_runs set status='completed' where v1_run_id=$1", [run.id]), /check constraint/);
+    await db.query("update edu_conversion_jev_v3_runs set status='completed',result=$2 where v1_run_id=$1", [run.id, { contract_version: 3, model: 'jev-test' }]);
+    await assert.rejects(db.query("delete from edu_conversion_jev_v3_runs where v1_run_id=$1", [run.id]), /permission denied/);
+  } finally { await db.exec('reset role'); }
+  assert.equal(await count('edu_conversion_jev_v3_runs'), 1);
+  assert.equal(await count('edu_conversion_jev_v2_runs'), 0);
+  assert.equal(await count('edu_conversion_runs'), 1);
+  assert.equal(await count('edu_conversion_reviews'), 1);
+});
+
+test('v4 experiment rows preserve earlier labels, enforce uniqueness, and deny browser roles', async () => {
+  const { inquiry, run } = await setupRun();
+  const { review: first } = await rpc(review(inquiry, run));
+  const rls = await db.query("select relrowsecurity from pg_class where relname='edu_conversion_jev_v4_runs'");
+  assert.equal(rls.rows[0].relrowsecurity, true);
+  for (const role of ['anon', 'authenticated']) {
+    await db.exec(`set role ${role}`);
+    try { await assert.rejects(db.query('select * from edu_conversion_jev_v4_runs'), /permission denied/); }
+    finally { await db.exec('reset role'); }
+  }
+  await db.exec('set role service_role');
+  try {
+    const args = [run.id, inquiry.id, first.id, inquiry.input_version, ids.admin];
+    await db.query("insert into edu_conversion_jev_v4_runs(v1_run_id,case_id,calibration_review_id,input_version,status,actor_id) values ($1,$2,$3,$4,'pending',$5)", args);
+    await assert.rejects(db.query("insert into edu_conversion_jev_v4_runs(v1_run_id,case_id,calibration_review_id,input_version,status,actor_id) values ($1,$2,$3,$4,'pending',$5)", args), /unique/);
+    await assert.rejects(db.query("update edu_conversion_jev_v4_runs set status='completed' where v1_run_id=$1", [run.id]), /check constraint/);
+    await db.query("update edu_conversion_jev_v4_runs set status='completed',result=$2 where v1_run_id=$1", [run.id, { contract_version: 4, model: 'jev-test' }]);
+    await assert.rejects(db.query("delete from edu_conversion_jev_v4_runs where v1_run_id=$1", [run.id]), /permission denied/);
+  } finally { await db.exec('reset role'); }
+  assert.equal(await count('edu_conversion_jev_v4_runs'), 1);
+  assert.equal(await count('edu_conversion_jev_v3_runs'), 0);
+  assert.equal(await count('edu_conversion_runs'), 1);
+  assert.equal(await count('edu_conversion_reviews'), 1);
 });
 
 test('active staff need members scope and evidence additionally needs products scope', async () => {

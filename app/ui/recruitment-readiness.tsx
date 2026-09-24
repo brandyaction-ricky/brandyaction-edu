@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { AdminButton } from '@/features/admin-ui';
 import type { BroadcastReport } from '@/lib/broadcast-entry';
 import './recruitment-help.css';
 
 type Destination = 'settings' | 'broadcast' | 'followup';
-type Check = { title: string; state: string; detail: string; destination?: Destination };
+type Check = { title: string; state: string; detail: string; destination?: Destination; href?: string };
 type Campaign = { id: string; enabled: boolean; paidCohort: string | null };
 type Followup = { drafts: { channel: string; body: string }[]; audienceState: string };
 
@@ -48,7 +49,7 @@ export function RecruitmentReadiness({ period, onNavigate }: { period: string; o
       const next: Check[] = [
         { title: '카톡방 모집 링크', state: links.link?.enabled && currentRooms ? '활성 · 최신 방 설정' : '확인 필요', detail: !rooms.draft ? '상단에서 방 설정을 먼저 저장하세요.' : !links.link?.enabled ? '상단의 광고·오가닉 모집 링크를 활성화해야 합니다.' : !currentRooms ? '링크가 이전 방 설정을 사용합니다. 상단에서 저장된 방으로 다시 활성화하세요.' : '광고·오가닉 링크가 현재 저장된 방 설정을 사용합니다. 실제 방 입장 가능 여부는 직접 확인하세요.' },
         { title: '무료 웨비나 신청', state: campaign?.enabled ? '신청 링크 활성' : '확인 필요', detail: campaign?.enabled ? '저장된 신청 링크가 활성 상태입니다. 상세페이지 버튼과 카톡방 공지에 올바른 링크를 넣었는지 확인하세요.' : '무료 상품을 연결하고 신청 링크를 활성화하세요.', destination: 'settings' },
-        { title: '유료 교육 상품', state: broadcast?.offerReady ? '공개 상품 연결됨' : '확인 필요', detail: !campaign?.paidCohort ? '구매를 확인할 유료 기수를 연결하세요.' : broadcast?.offerReady ? '연결 기수의 유료 상품이 공개 상태입니다. 가격·모집 기간·결제 가능 여부는 상품 관리에서 별도 확인하세요.' : '연결한 기수의 유료 상품이 공개 상태인지 상품 관리에서 확인하세요.', destination: 'settings' },
+        { title: '유료 교육 상품', state: broadcast?.offerReady ? '공개 상품 연결됨' : '확인 필요', detail: !campaign?.paidCohort ? '구매를 확인할 유료 기수를 연결하세요.' : broadcast?.offerReady ? '연결 기수의 유료 상품이 공개 상태입니다. 가격·모집 기간·결제 가능 여부는 상품 관리에서 별도 확인하세요.' : '연결한 기수의 유료 상품이 공개 상태인지 상품 관리에서 확인하세요.', destination: campaign?.paidCohort ? undefined : 'settings', href: campaign?.paidCohort ? '/admin/products' : undefined },
       ];
       for (const phase of ['first', 'encore'] as const) {
         const session = broadcast?.sessions.find(item => item.phase === phase);
@@ -73,7 +74,7 @@ export function RecruitmentReadiness({ period, onNavigate }: { period: string; o
     {pending && <p role="status">최신 저장 상태를 확인하고 있습니다.</p>}
     {checks && <>
       <p role="status">조회 시각 {checkedAt} KST · 설정을 바꾼 뒤에는 다시 점검하세요.</p>
-      <ul className="recruitment-readiness-list">{checks.map(check => <li key={check.title}><div><strong>{check.title}</strong><span className="recruitment-readiness-state">{check.state}</span><p>{check.detail}</p></div>{check.destination && <AdminButton size="sm" onClick={() => onNavigate(check.destination!)} aria-label={`${check.title} 설정으로 이동`}>설정 보기</AdminButton>}</li>)}</ul>
+      <ul className="recruitment-readiness-list">{checks.map(check => <li key={check.title}><div><strong>{check.title}</strong><span className="recruitment-readiness-state">{check.state}</span><p>{check.detail}</p></div>{check.href ? <Link className="admin-button admin-button--tertiary admin-button--sm" href={check.href} aria-label={`${check.title} 상품 관리 열기`}>상품 관리</Link> : check.destination && <AdminButton size="sm" onClick={() => onNavigate(check.destination!)} aria-label={`${check.title} 설정으로 이동`}>설정 보기</AdminButton>}</li>)}</ul>
       <p className="recruitment-readiness-note">일정 확정, 상세페이지 내용·버튼, 카톡방 공지 게시, SOLAPI 연결·기존 자동화·대기 작업, 실제 결제·전달 성공은 이 점검으로 확인하지 않습니다. 초안이 있어도 발송 준비 완료로 판단하지 않습니다.</p>
     </>}
   </section>;

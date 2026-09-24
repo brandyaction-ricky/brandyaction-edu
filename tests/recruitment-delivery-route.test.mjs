@@ -19,17 +19,18 @@ test('dispatch recruitment branch never queries all members; failed claim sends 
  for(const mode of ['accepted','claim-error','provider-error','disabled']){
   const steps=[],updates=[];let state='scheduled';
   const templateRow={id:template,channel:'lms',purpose:'marketing',content:'QA',is_active:true};
-  const member={id:randomUUID(),phone:'01000000000',status:'active',marketing_consent:true};
+  const member={id:randomUUID(),phone:'01000000000',status:'active',marketing_consent:true,marketing_consent_at:'2026-01-01T00:00:00.000Z',marketing_opt_out_at:null};
   const db={rpc:async()=>{steps.push('claim');return mode==='claim-error'?{error:{message:'CONVERSION_STALE'}}:{data:{template:templateRow,members:[member]}};},from:table=>{
    steps.push(table);let operation='read',values;
-   const q={select:()=>q,eq:()=>q,lte:()=>q,order:()=>q,limit:()=>q,in:()=>q,
+   let scoped=false;
+   const q={select:()=>q,eq:()=>q,lte:()=>q,order:()=>q,limit:()=>q,in:(column,ids)=>{if(table==='profiles'){assert.equal(column,'id');assert.deepEqual(ids,[member.id]);scoped=true;}return q;},
     insert:v=>{operation='insert';values=v;return q;},update:v=>{operation='update';values=v;updates.push({table,values:v});return q;},
     maybeSingle:async()=>table==='crm_campaigns'?operation==='update'?{data:{id:code}}:{data:state==='scheduled'?{id:code,recruitment_id:randomUUID(),template:templateRow}:null}:{data:null},
-    then:(resolve,reject)=>Promise.resolve(table==='crm_automation_runs'?{data:[]}:table==='crm_message_logs'&&operation==='insert'?{data:values.map((v,i)=>({id:'log'+i,member_id:v.member_id}))}:{data:null}).then(resolve,reject)};
-   if(table==='profiles'||table==='crm_member_tags')throw Error('unscoped audience access');return q;
+    then:(resolve,reject)=>Promise.resolve(table==='profiles'?{data:scoped?[member]:null,error:scoped?null:Error('unscoped audience access')}:table==='crm_automation_runs'?{data:[]}:table==='crm_message_logs'&&operation==='insert'?{data:values.map((v,i)=>({id:'log'+i,member_id:v.member_id}))}:{data:null}).then(resolve,reject)};
+   if(table==='crm_member_tags')throw Error('unscoped audience access');return q;
   }};
   const env={EDU_CONVERSION_REVIEW_ENABLED:'true',CRM_DELIVERY_ENABLED:mode==='disabled'?'false':'true',SOLAPI_API_KEY:'test',SOLAPI_API_SECRET:'test',SOLAPI_SENDER_PHONE:'0200000000',SOLAPI_OPTOUT_PHONE:'0800000000'};
-  const service=load('../lib/crm-delivery.ts',{'@/lib/supabase/admin':{createAdminClient:()=>db},solapi:{SolapiMessageService:class{async send(){steps.push('provider');if(mode==='provider-error')throw Error('sensitive upstream payload');return{groupInfo:{groupId:'qa',status:'accepted'},failedMessageList:[]};}}}},env);
+  const service=load('../lib/crm-delivery.ts',{'@/lib/supabase/admin':{createAdminClient:()=>db},solapi:{SolapiMessageService:class{async getBlacks(){return{blackList:[],nextKey:null};}async send(){steps.push('provider');if(mode==='provider-error')throw Error('sensitive upstream payload');return{groupInfo:{groupId:'qa',status:'accepted'},failedMessageList:[]};}}}},env);
   await service.dispatchDueCrm();
   if(mode==='disabled')assert.deepEqual(steps,[]);
   else if(mode==='claim-error')assert.equal(steps.includes('provider'),false);

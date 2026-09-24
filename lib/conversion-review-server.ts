@@ -23,6 +23,12 @@ function text(value: unknown, maximum: number, required = true) {
   if (typeof value !== 'string' || value.length > maximum || (required && !value.trim())) conversionError('입력 내용의 필수 항목과 길이를 확인해 주세요.');
   return value.trim();
 }
+function containsDirectIdentifier(value: string) {
+  return /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/iu.test(value)
+    || /(?<!\d)(?:\+?82[-.\s]?)?0?1[016789][-.\s]?\d{3,4}[-.\s]?\d{4}(?!\d)/u.test(value)
+    || /(?<!\d)0(?:2|[3-6]\d|70)[-.\s]?\d{3,4}[-.\s]?\d{4}(?!\d)/u.test(value)
+    || /(?:https?:\/\/|www\.)\S+/iu.test(value);
+}
 function version(value: unknown, required = true) {
   if (!required && value === undefined) return null;
   if (!Number.isSafeInteger(value) || Number(value) < 1) conversionError('최신 버전을 다시 불러와 주세요.', 409);
@@ -52,12 +58,24 @@ export function conversionPayload(raw: unknown) {
   let payload: Record<string, unknown>;
   if (action === 'save_case') {
     const id = conversionId(body.id, false), question_id = conversionId(body.question_id, false);
+    const sampleOrigin = question_id ? 'current' : (body.sample_origin ?? 'current');
+    if (!['current', 'external_legacy'].includes(String(sampleOrigin))) conversionError('문의 표본 출처를 확인해 주세요.');
+    const legacyCourseLabel = sampleOrigin === 'external_legacy' ? text(body.legacy_course_label, 200) : null;
+    if (sampleOrigin === 'current' && body.legacy_course_label) conversionError('과거 상품명은 과거 교육 상담에만 입력해 주세요.');
     const received = question_id ? null : text(body.received_at, 40);
     if (received && (!/^\d{4}-\d{2}-\d{2}T.+(?:Z|[+-]\d{2}:\d{2})$/.test(received) || !Number.isFinite(Date.parse(received)) || Date.parse(received) > Date.now() + 300000)) conversionError('접수 시각을 확인해 주세요.');
+    const subject = question_id ? '' : text(body.subject, 200);
+    const content = question_id ? '' : text(body.content, 10000);
+    const sourceLabel = question_id ? '' : text(body.source_label, 200);
+    if (!question_id && body.deidentified_confirmed !== true) conversionError('외부 문의의 고객 식별정보 제거 여부를 확인해 주세요.');
+    if (!question_id && containsDirectIdentifier(`${subject}\n${content}\n${sourceLabel}`)) conversionError('전화번호·이메일·링크가 포함되어 있습니다. 식별정보를 제거한 발췌만 저장해 주세요.');
+    const courseId = conversionId(body.course_id, sampleOrigin !== 'external_legacy');
+    const cohortId = conversionId(body.cohort_id, false);
+    if (sampleOrigin === 'external_legacy' && cohortId) conversionError('과거 교육 상담에는 현재 기수를 연결할 수 없습니다.');
+    if (!question_id && legacyCourseLabel && containsDirectIdentifier(legacyCourseLabel)) conversionError('과거 상품명에서 고객 식별정보를 제거해 주세요.');
     payload = { id, expected_version: version(body.expected_version, Boolean(id)), question_id,
-      course_id: conversionId(body.course_id), cohort_id: conversionId(body.cohort_id, false),
-      subject: question_id ? '' : text(body.subject, 200), content: question_id ? '' : text(body.content, 10000),
-      source_label: question_id ? '' : text(body.source_label, 200), received_at: received ? new Date(received).toISOString() : null };
+      course_id: courseId, cohort_id: cohortId, sample_origin: sampleOrigin, legacy_course_label: legacyCourseLabel,
+      subject, content, source_label: sourceLabel, received_at: received ? new Date(received).toISOString() : null };
   } else if (action === 'save_evidence') {
     const id = conversionId(body.id, false), source_url = text(body.source_url, 2048);
     try { const url = new URL(source_url); if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) conversionError('자료 출처는 http 또는 https 주소를 사용해 주세요.'); } catch { conversionError('자료 출처 주소를 확인해 주세요.'); }
@@ -78,6 +96,26 @@ export function conversionPayload(raw: unknown) {
   // part of the client's intent, so a lost response can be retried unchanged.
   const payload_hash = createHash('sha256').update(JSON.stringify({ action, payload })).digest('hex');
   return { action, requestId, payload, payload_hash };
+}
+
+export function conversionAdjudicationPayload(raw: unknown) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) conversionError('요청 형식을 확인해 주세요.');
+  const body = raw as Record<string, unknown>;
+  const requestId = conversionId(body.requestId)!;
+  const runId = conversionId(body.run_id)!;
+  const calibrationReviewId = conversionId(body.calibration_review_id)!;
+  const dimension = String(body.dimension || '');
+  const assessment = String(body.assessment || '');
+  const basis = String(body.basis || '');
+  const rationale = text(body.rationale, 1000);
+  if (!['purchase_intent', 'primary_barrier', 'purchase_readiness', 'next_action'].includes(dimension)
+    || !['human_better_supported', 'jev_better_supported', 'both_plausible', 'neither_supported', 'insufficient_evidence'].includes(assessment)
+    || !['explicit_signal', 'interpretation', 'category_gap', 'missing_context'].includes(basis)
+    || rationale.length < 10) conversionError('재검토 항목과 근거를 확인해 주세요.');
+  if (containsDirectIdentifier(rationale)) conversionError('재검토 근거에서 연락처·이메일·링크를 제거해 주세요.');
+  const payload = { run_id: runId, calibration_review_id: calibrationReviewId, dimension, assessment, basis, rationale };
+  const payloadHash = createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+  return { requestId, payload, payloadHash };
 }
 
 export function conversionDatabaseError(error: { code?: string; message?: string }) {

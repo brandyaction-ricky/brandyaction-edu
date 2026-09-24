@@ -92,6 +92,8 @@ export function redactJevText(value: string) {
   return value
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/giu, '[이메일 제거]')
     .replace(/(?:\+?82[-.\s]?)?0?1[016789][-.\s]?\d{3,4}[-.\s]?\d{4}/gu, '[전화번호 제거]')
+    .replace(/(?<!\d)0(?:2|[3-6]\d|70)[-.\s]?\d{3,4}[-.\s]?\d{4}(?!\d)/gu, '[전화번호 제거]')
+    .replace(/(?:https?:\/\/|www\.)[^\s]+/giu, '[링크 제거]')
     .slice(0, 10000);
 }
 

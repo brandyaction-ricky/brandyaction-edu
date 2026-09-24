@@ -32,7 +32,7 @@ export function LandingAdmin() {
   const [sampleMin, setSampleMin] = useState(String(DEFAULT_SAMPLE_MIN));
   const [navigation, setNavigation] = useState<{ proceed: () => void } | null>(null);
   const pendingRef = useRef(false), initialized = useRef(false), actualsRequested = useRef(false);
-  const requestSequence = useRef(0), listSequence = useRef(0);
+  const requestSequence = useRef(0), listSequence = useRef(0), initialAnalyticsRequest = useRef(true);
   const course = courses.find(item => item.id === courseId), campaign = course?.campaigns.find(item => item.id === campaignId);
   const selectedCampaigns = selectedCampaignIds.flatMap(id => courses.flatMap(item => item.campaigns).filter(value => value.id === id));
   const selectionRange = selectedCampaigns.length ? { start_day: selectedCampaigns.map(item => item.start_day).sort().at(-1)!, end_day: selectedCampaigns.map(item => item.end_day).sort()[0] } : campaign;
@@ -70,9 +70,11 @@ export function LandingAdmin() {
     if (!query) return;
     const controller = new AbortController(), sequence = ++requestSequence.current;
     // Update filter checkboxes and URL immediately; coalesce rapid selections.
+    const delay = initialAnalyticsRequest.current ? 0 : 500;
+    initialAnalyticsRequest.current = false;
     const timer = setTimeout(() => {
       fetch('/api/landing/performance?' + query + '&include=ui', { cache: 'no-store', signal: controller.signal }).then(responseJson).then(value => { if (!controller.signal.aborted && sequence === requestSequence.current) setResult({ requestKey, report: value }); }).catch(error => { if (!controller.signal.aborted && sequence === requestSequence.current) setResult(previous => ({ ...previous, requestKey, error: error.message })); });
-    }, 500);
+    }, delay);
     return () => { clearTimeout(timer); controller.abort(); };
   }, [query, requestKey]);
   useEffect(() => {

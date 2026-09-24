@@ -5,7 +5,7 @@ import { bannerTextLimits, sections, safeUrl, type Row } from '@/lib/platform';
 import { containsFreeClassCampaign, hasLearningAccess, paidCourseReadinessIssues } from '@/lib/platform-rules';
 import { getEduSettings } from '@/lib/edu-settings';
 import { gradeQuiz, type QuizDefinition } from '@/lib/mission-quiz';
-import { adminTables, archiveValues, cohortStatus, phoneNumber, validImage, assetPath, imagePreviewUrl, databaseMessage } from '@/lib/qa-rules';
+import { adminSelectColumns, adminTables, archiveValues, cohortStatus, phoneNumber, validImage, assetPath, imagePreviewUrl, databaseMessage } from '@/lib/qa-rules';
 import { POLICY_VERSION } from '@/lib/legal-policies';
 import { getOperatorUser, permissionsFor, sectionScopes } from '@/lib/operator-permissions';
 import { crmDeliveryState } from '@/lib/crm-delivery';
@@ -67,7 +67,17 @@ export async function GET(request: Request) {
                 }
             })(),
             ...tables.filter((table) => !deferredOrderTables.has(table)).map(async (table) => {
-                const columns = table === 'crm_tags' && adminMode && sectionKey === 'tags' ? '*,crm_member_tags(count)' : table === 'payments' ? 'id,order_id,method,status,approved_amount,cancelled_amount,receipt_url,approved_at,created_at' : table === 'edu_refund_requests' ? 'id,payment_id,amount,reason,status,created_at' : table === 'reviews' && !adminMode ? 'id,course_id,author_name,author_nickname,rating,body,is_featured,display_order,published_at,created_at' : '*';
+                const columns = adminMode
+                    ? table === 'crm_tags' && sectionKey === 'tags'
+                        ? '*,crm_member_tags(count)'
+                        : table === 'payments'
+                            ? 'id,order_id,method,status,approved_amount,cancelled_amount,receipt_url,approved_at,created_at'
+                            : table === 'edu_refund_requests'
+                                ? 'id,payment_id,amount,reason,status,created_at'
+                                : adminSelectColumns(sectionKey, table)
+                    : table === 'reviews'
+                        ? 'id,course_id,author_name,author_nickname,rating,body,is_featured,display_order,published_at,created_at'
+                        : '*';
                 const serverPaged = adminMode && table === primaryTable && !['home', 'members', 'reviews', 'analytics', 'metrics', 'seo', 'settings', 'staff', 'templates', 'campaigns', 'automations'].includes(sectionKey);
                 let query = db.from(table).select(columns, serverPaged ? { count: 'exact' } : undefined);
                 if (record && adminMode && table === primaryTable) query = query.eq('id', record);
@@ -98,16 +108,21 @@ export async function GET(request: Request) {
             banner.image_url = imagePreviewUrl(String(banner.image_path || ''), process.env.NEXT_PUBLIC_SUPABASE_URL || '');
         }
         if (adminMode && sectionKey === 'products') {
-            const [allProducts, publishedProducts, draftProducts, archivedProducts] = await Promise.all([
+            const [allProducts, publishedProducts, draftProducts, archivedProducts, configs] = await Promise.all([
                 db.from('courses').select('id', { count: 'exact' }).is('archived_at', null).limit(1000),
                 db.from('courses').select('id', { count: 'exact', head: true }).is('archived_at', null).eq('status', 'published'),
                 db.from('courses').select('id', { count: 'exact', head: true }).is('archived_at', null).eq('status', 'draft'),
                 db.from('courses').select('id', { count: 'exact', head: true }).not('archived_at', 'is', null),
+                data.courses?.length
+                    ? db.from('landing_configs').select('id,kakao_url,cta_label,pixel_enabled,pixel_id').in('id', data.courses.map(course => course.id))
+                    : Promise.resolve({ data: [], error: null }),
             ]);
             if (allProducts.error) throw allProducts.error;
             if (publishedProducts.error) throw publishedProducts.error;
             if (draftProducts.error) throw draftProducts.error;
             if (archivedProducts.error) throw archivedProducts.error;
+            if (configs.error) throw configs.error;
+            data.landing_configs = (configs.data || []) as Row[];
             const activeProductIds = new Set((allProducts.data || []).map(product => String(product.id)));
             const upcomingProductIds = new Set(
                 (data.cohorts || [])
@@ -123,12 +138,6 @@ export async function GET(request: Request) {
                 archived: archivedProducts.count || 0,
             }];
         }
-        if (adminMode && sectionKey === 'products' && data.courses?.length) {
-            // Preserve existing landing CTA settings until the product explicitly overrides them.
-            const configs = await db.from('landing_configs').select('id,kakao_url,cta_label,pixel_enabled,pixel_id').in('id', data.courses.map(course => course.id));
-            if (configs.error) throw configs.error;
-            data.landing_configs = (configs.data || []) as Row[];
-        }
         if (adminMode && sectionKey === 'orders') {
             const orderIds = (data.orders || []).map((row) => row.id).filter(Boolean);
             data.order_items = [];
@@ -137,22 +146,22 @@ export async function GET(request: Request) {
             data.edu_refund_requests = [];
             if (orderIds.length) {
                 const [items, payments] = await Promise.all([
-                    db.from('order_items').select('*').in('order_id', orderIds),
+                    db.from('order_items').select(adminSelectColumns(sectionKey, 'order_items')).in('order_id', orderIds),
                     db.from('payments').select('id,order_id,method,status,approved_amount,cancelled_amount,receipt_url,approved_at,created_at').in('order_id', orderIds),
                 ]);
                 if (items.error) throw items.error;
                 if (payments.error) throw payments.error;
-                data.order_items = (items.data || []) as Row[];
+                data.order_items = (items.data || []) as unknown as Row[];
                 data.payments = (payments.data || []) as Row[];
                 const itemIds = data.order_items.map((row) => row.id).filter(Boolean);
                 const paymentIds = data.payments.map((row) => row.id).filter(Boolean);
                 const [enrollments, refunds] = await Promise.all([
-                    itemIds.length ? db.from('enrollments').select('*').in('order_item_id', itemIds) : Promise.resolve({ data: [], error: null }),
+                    itemIds.length ? db.from('enrollments').select(adminSelectColumns(sectionKey, 'enrollments')).in('order_item_id', itemIds) : Promise.resolve({ data: [], error: null }),
                     paymentIds.length ? db.from('edu_refund_requests').select('id,payment_id,amount,reason,status,created_at').in('payment_id', paymentIds) : Promise.resolve({ data: [], error: null }),
                 ]);
                 if (enrollments.error) throw enrollments.error;
                 if (refunds.error) throw refunds.error;
-                data.enrollments = (enrollments.data || []) as Row[];
+                data.enrollments = (enrollments.data || []) as unknown as Row[];
                 data.edu_refund_requests = (refunds.data || []) as Row[];
             }
         }

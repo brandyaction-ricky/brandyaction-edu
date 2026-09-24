@@ -282,6 +282,8 @@ function CrmManager({ section, data, send, pending }: Props) {
   const [dirty, setDirty] = useState(false);
   const [formVersion, setFormVersion] = useState(0);
   const [message, setMessage] = useState("");
+  const [testPending, setTestPending] = useState(false);
+  const [testMessage, setTestMessage] = useState("");
   const title =
     section === "templates"
       ? "메시지 템플릿"
@@ -405,6 +407,7 @@ function CrmManager({ section, data, send, pending }: Props) {
                   <option value="lms">LMS</option>
                   <option value="alimtalk">카카오 알림톡</option>
                 </select>
+                <small className="muted">알림톡은 승인된 정보성 템플릿에만 사용합니다. 모집·할인 안내는 광고 문자로 설정해 주세요.</small>
               </Field>
               <Field label="메시지 목적">
                 <select
@@ -593,6 +596,36 @@ function CrmManager({ section, data, send, pending }: Props) {
         </button>
         <Status message={message} />
       </form>
+      {section === "campaigns" && delivery?.configured && process.env.NEXT_PUBLIC_APP_ENV === "development" && (
+        <div className="panel pad mb24">
+          <h2>DEV 시험 발송</h2>
+          <p className="meta mt8">
+            설정된 시험번호에만 연결 확인 문자를 1건 보냅니다. 예약 캠페인과 자동 메시지 대기열은 실행하지 않습니다.
+          </p>
+          <button
+            type="button"
+            className="btn small mt16"
+            disabled={testPending}
+            onClick={async () => {
+              setTestPending(true);
+              setTestMessage("");
+              try {
+                const response = await fetch("/api/crm/test-send", { method: "POST" });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || "시험 발송에 실패했습니다.");
+                setTestMessage(`${result.recipient} 번호로 발송 접수했습니다. SOLAPI 발송 내역에서 최종 성공 여부를 확인해 주세요.`);
+              } catch (error) {
+                setTestMessage((error as Error).message);
+              } finally {
+                setTestPending(false);
+              }
+            }}
+          >
+            {testPending ? "발송 확인 중…" : "시험번호로 문자 1건 보내기"}
+          </button>
+          <Status message={testMessage} />
+        </div>
+      )}
       <div className="stack">
         {items.map((item) => (
           <article className="panel pad" key={item.id}>

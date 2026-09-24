@@ -19,7 +19,7 @@ export async function GET() {
   try {
     const user = await operator(), db = createAdminClient();
     const requests = [
-      db.from('edu_conversion_cases').select('id,source_type,question_id,course_id,cohort_id,subject,content,source_label,received_at,customer_id,input_version,created_at').order('created_at', { ascending: false }).limit(200),
+      db.from('edu_conversion_cases').select('id,source_type,sample_origin,legacy_course_label,question_id,course_id,cohort_id,subject,content,source_label,received_at,customer_id,input_version,created_at').order('created_at', { ascending: false }).limit(200),
       db.from('edu_conversion_evidence').select('id,course_id,cohort_id,title,body,source_url,version,status').order('created_at', { ascending: false }).limit(500),
       db.from('edu_questions').select('id,title,content,course_id,user_id,created_at,updated_at').eq('is_archived', false).order('created_at', { ascending: false }).limit(200),
       db.from('courses').select('id,title,status').order('created_at', { ascending: false }).limit(500),
@@ -27,12 +27,27 @@ export async function GET() {
       db.from('edu_conversion_runs').select('id,case_id,input_version,provider,result,evidence_versions,input_snapshot,evidence_snapshot,created_at').order('created_at', { ascending: false }).limit(500),
       db.from('edu_conversion_reviews').select('id,case_id,run_id,decision,reply_text,reason,calibration,calibration_sample_kind,created_at,actor_id').order('created_at', { ascending: false }).limit(500),
     ];
-    const result = await Promise.all(requests);
+    const [result, notes, v2, v3, v4] = await Promise.all([
+      Promise.all(requests),
+      db.from('edu_conversion_adjudication_notes').select('id,run_id,calibration_review_id,dimension,assessment,basis,rationale,actor_id,created_at').order('created_at', { ascending: false }).limit(500),
+      db.from('edu_conversion_jev_v2_runs').select('id,v1_run_id,case_id,calibration_review_id,input_version,status,result,created_at,updated_at').order('created_at', { ascending: false }).limit(500),
+      db.from('edu_conversion_jev_v3_runs').select('id,v1_run_id,case_id,calibration_review_id,input_version,status,result,created_at,updated_at').order('created_at', { ascending: false }).limit(500),
+      db.from('edu_conversion_jev_v4_runs').select('id,v1_run_id,case_id,calibration_review_id,input_version,status,result,created_at,updated_at').order('created_at', { ascending: false }).limit(500),
+    ]);
     for (const item of result) if (item.error) conversionDatabaseError(item.error);
+    // Vercel may switch to this code before the develop-branch migration job finishes.
+    const pendingMigration = ['42P01', 'PGRST205'].includes(notes.error?.code || '');
+    if (notes.error && !pendingMigration) conversionDatabaseError(notes.error);
+    const pendingV2Migration = ['42P01', 'PGRST205'].includes(v2.error?.code || '');
+    if (v2.error && !pendingV2Migration) conversionDatabaseError(v2.error);
+    const pendingV3Migration = ['42P01', 'PGRST205'].includes(v3.error?.code || '');
+    if (v3.error && !pendingV3Migration) conversionDatabaseError(v3.error);
+    const pendingV4Migration = ['42P01', 'PGRST205'].includes(v4.error?.code || '');
+    if (v4.error && !pendingV4Migration) conversionDatabaseError(v4.error);
     const [cases, evidence, questions, courses, cohorts, runs, reviews] = result.map(item => item.data || []);
-    return reply({ cases, evidence, questions, courses, cohorts, runs, reviews,
-      capabilities: { can_manage_evidence: user.permissions.products, ...conversionCapabilities(process.env), can_manage_funnel: user.permissions.products && user.permissions.marketing },
-      limits: { cases: 200, evidence: 500, questions: 200, runs: 500, reviews: 500 } });
+    return reply({ cases, evidence, questions, courses, cohorts, runs, reviews, adjudications: notes.data || [], jev_v2_runs: v2.data || [], jev_v3_runs: v3.data || [], jev_v4_runs: v4.data || [],
+      capabilities: { can_manage_evidence: user.permissions.products, ...conversionCapabilities(process.env), can_adjudicate: !pendingMigration && conversionCapabilities(process.env).can_jev, can_jev_v2: !pendingV2Migration && conversionCapabilities(process.env).can_jev, can_jev_v3: !pendingV3Migration && conversionCapabilities(process.env).can_jev, can_jev_v4: !pendingV4Migration && conversionCapabilities(process.env).can_jev, can_manage_funnel: user.permissions.products && user.permissions.marketing },
+      limits: { cases: 200, evidence: 500, questions: 200, runs: 500, reviews: 500, adjudications: 500, jev_v2_runs: 500, jev_v3_runs: 500, jev_v4_runs: 500 } });
   } catch (error) { return failure(error); }
 }
 export async function POST(request: Request) {
@@ -55,9 +70,11 @@ export async function POST(request: Request) {
       if (!found.data) conversionError('문의를 찾을 수 없습니다.', 404);
       const inquiry = found.data as ConversionCase;
       observed_version = inquiry.input_version;
-      const rows = await db.from('edu_conversion_evidence').select('*').eq('course_id', inquiry.course_id).eq('status', 'approved');
-      if (rows.error) conversionDatabaseError(rows.error);
-      const evidence = (rows.data as ConversionEvidence[] || []).filter(item => item.cohort_id === null || item.cohort_id === inquiry.cohort_id);
+      const rows = inquiry.course_id
+        ? await db.from('edu_conversion_evidence').select('*').eq('course_id', inquiry.course_id).eq('status', 'approved')
+        : null;
+      if (rows?.error) conversionDatabaseError(rows.error);
+      const evidence = (rows?.data as ConversionEvidence[] || []).filter(item => item.cohort_id === null || item.cohort_id === inquiry.cohort_id);
       evidence_versions = Object.fromEntries(evidence.map(item => [item.id, item.version]));
       result = capabilities.can_jev
         ? await createJevJudgment(inquiry, evidence, process.env.TYPESAFE_API_KEY || '')

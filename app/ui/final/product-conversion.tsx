@@ -30,7 +30,10 @@ export function ProductConversionClickTracker({ courseId, pixelId }: { courseId:
       if (!link?.closest('.landing-campaign')) return;
       track(productCtaPosition(link.href, link.dataset.productCta));
     };
-    const frameClick = (event: Event) => track(productCtaPosition((event as CustomEvent<{ href?: unknown }>).detail?.href));
+    const frameClick = (event: Event) => {
+      const detail = (event as CustomEvent<{ href?: unknown; position?: unknown }>).detail;
+      track(productCtaPosition(detail?.href, detail?.position));
+    };
     document.addEventListener('click', click);
     window.addEventListener(PRODUCT_CTA_EVENT, frameClick);
     return () => { document.removeEventListener('click', click); window.removeEventListener(PRODUCT_CTA_EVENT, frameClick); };

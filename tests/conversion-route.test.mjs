@@ -18,7 +18,7 @@ const server = load('../lib/conversion-review-server.ts', { 'node:crypto': { cre
 const core = load('../lib/conversion-review.ts');
 const ids = { actor: '11111111-1111-4111-8111-111111111111', request: '22222222-2222-4222-8222-222222222222', course: '33333333-3333-4333-8333-333333333333', inquiry: '44444444-4444-4444-8444-444444444444', question: '55555555-5555-4555-8555-555555555555' };
 const env = { EDU_CONVERSION_REVIEW_ENABLED: 'true', EDU_CONVERSION_MOCK_ENABLED: 'true', NEXT_PUBLIC_APP_ENV: 'test' };
-const base = { action: 'save_case', requestId: ids.request, course_id: ids.course, subject: '수강 수준', content: '초보자도 따라갈 수 있나요?', source_label: '외부 문의 발췌', received_at: '2026-01-01T00:00:00Z' };
+const base = { action: 'save_case', requestId: ids.request, course_id: ids.course, subject: '수강 수준', content: '초보자도 따라갈 수 있나요?', source_label: '외부 문의 발췌', received_at: '2026-01-01T00:00:00Z', deidentified_confirmed: true };
 const req = (body = base, origin = 'https://edu.example') => new Request('https://edu.example/api/conversion', { method: 'POST', headers: { ...(origin ? { origin } : {}), 'Content-Type': 'application/json' }, body: typeof body === 'string' ? body : JSON.stringify(body) });
 function harness(options = {}) {
   const calls = [], reads = [], selections = {};
@@ -28,7 +28,7 @@ function harness(options = {}) {
       reads.push(table);
       const query = { select(columns) { selections[table] = columns; return this; }, eq() { return this; }, order() { return this; }, limit() { return this; },
         async maybeSingle() { return { data: options.inquiry || { id: ids.inquiry, course_id: ids.course, cohort_id: null, input_version: 1, subject: '초보', content: '난이도 문의' }, error: null }; },
-        then(resolve) { return Promise.resolve({ data: options.rows?.[table] || [], error: null }).then(resolve); } };
+        then(resolve) { return Promise.resolve({ data: options.rows?.[table] || [], error: options.errors?.[table] || (table === 'edu_conversion_adjudication_notes' ? options.notesError || null : null) }).then(resolve); } };
       return query;
     },
     async rpc(name, args) { calls.push({ name, args }); return options.rpcResult || { data: { case: { id: ids.inquiry } }, error: null }; },
@@ -67,6 +67,50 @@ test('evidence mutation also requires products permission', async () => {
 test('invalid body, ID, timestamps and unsafe source URLs never reach persistence', async () => {
   const malformed = [ '{', { ...base, requestId: 'no' }, { ...base, received_at: 'yesterday' }, { ...base, received_at: '2026-01-01T09:00:00' }, { action: 'save_evidence', requestId: ids.request, course_id: ids.course, title: 'test', body: 'body', source_url: 'javascript:alert(1)', status: 'approved' } ];
   for (const payload of malformed) { const h = harness(); assert.equal((await h.POST(req(payload))).status, 400); assert.deepEqual(h.calls, []); }
+});
+test('manual inquiry requires deidentification confirmation and blocks obvious contact identifiers', async () => {
+  const unsafe = [
+    { ...base, deidentified_confirmed: false },
+    { ...base, content: '010-1234-5678로 연락 주세요' },
+    { ...base, content: '02-1234-5678로 연락 주세요' },
+    { ...base, subject: 'a@example.com의 문의' },
+    { ...base, source_label: 'https://open.kakao.com/o/example' },
+  ];
+  for (const payload of unsafe) {
+    const h = harness();
+    assert.equal((await h.POST(req(payload))).status, 400);
+    assert.deepEqual(h.calls, []);
+  }
+  const h = harness();
+  assert.equal((await h.POST(req({ ...base, content: '문샷 챌린지 4기 가격 1,650,000원이 맞나요?' }))).status, 200);
+});
+test('historical education inquiry keeps its original product label without a current course', async () => {
+  const historical = { ...base, course_id: null, sample_origin: 'external_legacy', legacy_course_label: '과거 온라인 마케팅 교육', cohort_id: null };
+  const h = harness();
+  assert.equal((await h.POST(req(historical))).status, 200);
+  assert.equal(h.calls[0].args.p_payload.sample_origin, 'external_legacy');
+  assert.equal(h.calls[0].args.p_payload.course_id, null);
+  assert.equal(h.calls[0].args.p_payload.legacy_course_label, '과거 온라인 마케팅 교육');
+  for (const invalid of [
+    { ...historical, legacy_course_label: '' },
+    { ...historical, cohort_id: ids.question },
+    { ...historical, question_id: ids.question },
+    { ...historical, legacy_course_label: '010-1234-5678' },
+    { ...base, course_id: null },
+  ]) {
+    const rejected = harness();
+    assert.equal((await rejected.POST(req(invalid))).status, 400);
+    assert.deepEqual(rejected.calls, []);
+  }
+});
+test('historical inquiry without current product does not read current product evidence', async () => {
+  const inquiry = { id: ids.inquiry, course_id: null, cohort_id: null, sample_origin: 'external_legacy', input_version: 1,
+    subject: '교육 신청 조건', content: '예전 마케팅 교육 신청 절차가 궁금합니다.' };
+  const h = harness({ inquiry });
+  assert.equal((await h.POST(req({ action: 'analyze', requestId: ids.request, case_id: ids.inquiry, expected_version: 1 }))).status, 200);
+  assert.equal(h.reads.filter(table => table === 'edu_conversion_evidence').length, 0);
+  assert.deepEqual(h.calls[0].args.p_evidence_versions, {});
+  assert.equal(h.calls[0].args.p_result.proposed_reply, '');
 });
 test('manual customer identity and native inquiry text cannot be injected', async () => {
   const manual = harness(); await manual.POST(req({ ...base, customer_id: ids.actor }));
@@ -114,6 +158,27 @@ test('snapshot contains no orders or profile query and is private no-store', asy
   assert.equal(response.headers.get('Cache-Control'), 'private, no-store');
   assert.equal(h.reads.includes('profiles'), false); assert.equal(h.reads.includes('orders'), false); assert.equal(h.reads.includes('payments'), false);
   const body = await response.json(); assert.equal(body.capabilities.can_mock, true); assert.equal(body.capabilities.can_manage_evidence, true);
+});
+test('snapshot stays available while the separate DEV notes migration is pending', async () => {
+  const h = harness({ notesError: { code: 'PGRST205', message: 'missing relation' } });
+  const response = await h.GET(); assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.deepEqual(body.adjudications, []);
+  assert.equal(body.capabilities.can_adjudicate, false);
+  const failed = harness({ notesError: { code: '42501', message: 'permission denied' } });
+  assert.equal((await failed.GET()).status, 503);
+});
+test('snapshot gates v4 until its separate migration is ready without hiding earlier results', async () => {
+  const h = harness({ errors: { edu_conversion_jev_v4_runs: { code: 'PGRST205', message: 'missing relation' } },
+    rows: { edu_conversion_jev_v3_runs: [{ id: 'saved-v3' }] } });
+  const response = await h.GET();
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.capabilities.can_jev_v4, false);
+  assert.deepEqual(body.jev_v4_runs, []);
+  assert.equal(body.jev_v3_runs[0].id, 'saved-v3');
+  const denied = harness({ errors: { edu_conversion_jev_v4_runs: { code: '42501', message: 'permission denied' } } });
+  assert.equal((await denied.GET()).status, 503);
 });
 test('run history returns the original inquiry and evidence snapshots', async () => {
   const run = { id: ids.question, case_id: ids.inquiry, input_snapshot: { subject: '당시 문의', content: '당시 원문', input_version: 1 }, evidence_snapshot: [{ id: ids.course, version: 1, body: '당시 승인자료' }] };

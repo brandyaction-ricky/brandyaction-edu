@@ -1,0 +1,95 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import ts from 'typescript';
+
+const source = fs.readFileSync(new URL('../lib/conversion-jev-v4.ts', import.meta.url), 'utf8');
+const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+const v4 = {};
+new Function('exports', 'require', 'fetch', 'AbortSignal', compiled)(v4, name => {
+  assert.equal(name, './conversion-jev');
+  return { redactJevText: value => value.replace(/\d{3}-\d{4}-\d{4}/g, '[전화번호 제거]') };
+}, () => { throw new Error('unexpected global fetch'); }, AbortSignal);
+
+function answers(overrides = {}) {
+  return Object.fromEntries(Object.entries(v4.JEV_V4_CHOICES).map(([key, choices]) => {
+    const choice = overrides[key] || choices[0];
+    return [key, { choice, confidence: 0.8, probabilities: Object.fromEntries(choices.map(option => [option, option === choice ? 0.8 : 0.2 / (choices.length - 1)])) }];
+  }));
+}
+
+test('v4 distinguishes free replay access, paid reference, and attempted paid application', () => {
+  assert.deepEqual(Object.keys(v4.JEV_V4_QUESTIONS), ['information_need', 'confirmed_barrier', 'attempted_action_target', 'operational_issue', 'paid_program_reference', 'observable_stage']);
+  assert.match(v4.JEV_V4_QUESTIONS.attempted_action_target.instructions, /결제창이 나타났다는 사실만으로 유료 신청·결제 시도를 선택하지 마세요/);
+  assert.match(v4.JEV_V4_QUESTIONS.operational_issue.instructions, /무료 콘텐츠 접근 실패/);
+  assert.ok(v4.JEV_V4_CHOICES.attempted_action_target.includes('free_live_or_replay'));
+  assert.ok(v4.JEV_V4_CHOICES.attempted_action_target.includes('paid_application'));
+  assert.ok(v4.JEV_V4_CHOICES.paid_program_reference.includes('future_consideration_after_free_content'));
+});
+
+test('free replay access with a payment page remains a free access problem, while paid application failure remains paid', async () => {
+  const free = answers({ attempted_action_target: 'free_live_or_replay', operational_issue: 'free_content_access_failure', paid_program_reference: 'future_consideration_after_free_content', observable_stage: 'future_consideration_after_free_content' });
+  const paid = answers({ attempted_action_target: 'paid_application', operational_issue: 'paid_application_failure', paid_program_reference: 'paid_application_or_payment', observable_stage: 'paid_application_or_payment_attempt' });
+  let sent;
+  const result = await v4.createJevV4Judgment('다시보기 문의', '무료 강의를 다시 보려고 했는데 결제창이 뜹니다. 유료 교육은 영상을 본 뒤 결정하겠습니다. 010-1234-5678', 'secret', async (_url, options) => {
+    sent = JSON.parse(options.body);
+    return Response.json({ model: 'jev-test', answers: free });
+  });
+  assert.equal(result.contract_version, 4);
+  assert.deepEqual(result.consistency_flags, []);
+  assert.equal(result.decisions.attempted_action_target.choice, 'free_live_or_replay');
+  assert.equal(result.decisions.observable_stage.choice, 'future_consideration_after_free_content');
+  assert.doesNotMatch(sent.state.inquiry, /010-1234-5678/);
+  assert.deepEqual(sent.questions, v4.JEV_V4_QUESTIONS);
+  const paidResult = await v4.createJevV4Judgment('신청 오류', '유료 교육 신청 버튼을 눌렀지만 신청되지 않습니다.', 'secret', async () => Response.json({ answers: paid }));
+  assert.deepEqual(paidResult.consistency_flags, []);
+});
+
+test('conflicting paid attempt or failure is flagged for human review rather than silently corrected', async () => {
+  const contradictory = answers({ attempted_action_target: 'free_live_or_replay', operational_issue: 'paid_application_failure', paid_program_reference: 'paid_application_or_payment', observable_stage: 'paid_application_or_payment_attempt' });
+  const result = await v4.createJevV4Judgment('무료 영상', '무료 영상 링크를 눌렀습니다.', 'secret', async () => Response.json({ answers: contradictory }));
+  assert.deepEqual(result.consistency_flags, ['paid_attempt_without_paid_target', 'paid_failure_without_paid_target']);
+  assert.equal(result.decisions.observable_stage.choice, 'paid_application_or_payment_attempt');
+});
+
+test('v4 flags an explicit future paid consideration that the stage overlooks', async () => {
+  const contradictory = answers({ attempted_action_target: 'free_live_or_replay', operational_issue: 'free_content_access_failure', paid_program_reference: 'future_consideration_after_free_content', observable_stage: 'no_purchase_signal' });
+  const result = await v4.createJevV4Judgment('무료 다시보기', '영상을 보고 유료 교육을 결정하겠습니다.', 'secret', async () => Response.json({ answers: contradictory }));
+  assert.deepEqual(result.consistency_flags, ['paid_reference_without_stage']);
+  assert.equal(result.decisions.observable_stage.choice, 'no_purchase_signal');
+});
+
+test('v4 marks model-declared ambiguity and inconsistent probability rankings for operator review', async () => {
+  const uncertain = answers({ information_need: 'other_or_unclear' });
+  uncertain.confirmed_barrier.confidence = 0.62;
+  uncertain.confirmed_barrier.probabilities.explicit_price_burden = 0.43;
+  uncertain.confirmed_barrier.probabilities.none_stated = 0.40;
+  uncertain.attempted_action_target.choice = 'no_attempt_stated';
+  uncertain.attempted_action_target.probabilities.no_attempt_stated = 0.10;
+  uncertain.attempted_action_target.probabilities.free_live_or_replay = 0.84;
+  const result = await v4.createJevV4Judgment('링크 문의', '링크가 열리지 않습니다.', 'secret', async () => Response.json({ answers: uncertain }));
+  assert.deepEqual(result.uncertainty_flags, [
+    { decision: 'information_need', reason: 'unresolved_category' },
+    { decision: 'confirmed_barrier', reason: 'low_reported_confidence' },
+    { decision: 'confirmed_barrier', reason: 'narrow_probability_margin' },
+    { decision: 'attempted_action_target', reason: 'choice_not_top_probability' },
+  ]);
+});
+
+test('v4 prompt keeps free-only and explicitly declined paid interest out of paid-intent labels', () => {
+  assert.match(v4.JEV_V4_QUESTIONS.paid_program_reference.instructions, /무료 영상이나 자료만 요청한 것은 유료 교육 언급이나 구매 관심이 아닙니다/);
+  assert.match(v4.JEV_V4_QUESTIONS.paid_program_reference.instructions, /유료 관심을 부정하면 no_paid_reference/);
+  assert.match(v4.JEV_V4_QUESTIONS.observable_stage.instructions, /유료 관심을 명시적으로 부정했다면 no_purchase_signal/);
+  assert.match(v4.JEV_V4_QUESTIONS.observable_stage.instructions, /조건 충족 시 유료 신청·구매 행동을 하겠다는 직접 표현은 conditional_purchase_statement/);
+  assert.match(v4.JEV_V4_QUESTIONS.attempted_action_target.instructions, /대상이 특정되지 않으면 무료 콘텐츠 접근으로 추정하지 말고 unclear/);
+  assert.match(v4.JEV_V4_QUESTIONS.operational_issue.instructions, /대상이 불명확하면 무료 접근 실패로 좁혀 추정하지 말고 unclear/);
+});
+
+test('v4 rejects invented choices and malformed probability distributions', async () => {
+  const invalid = answers();
+  invalid.attempted_action_target.choice = 'invented';
+  await assert.rejects(v4.createJevV4Judgment('문의', '내용', 'secret', async () => Response.json({ answers: invalid })), /JEV_INVALID_RESPONSE/);
+  const missing = answers();
+  delete missing.operational_issue.probabilities.none_stated;
+  await assert.rejects(v4.createJevV4Judgment('문의', '내용', 'secret', async () => Response.json({ answers: missing })), /JEV_INVALID_RESPONSE/);
+});

@@ -26,6 +26,7 @@ function webhook({
   const providerCalls = [];
   const rpcCalls = [];
   const eventWrites = [];
+  const errors = [];
   const storedEvents = new Map(initialEvents.map(event => [event.provider_event_id, event]));
   const db = {
     async rpc(name, args) {
@@ -73,15 +74,16 @@ function webhook({
     providerCalls.push(args);
     return provider(...args);
   };
-  new Function('exports', 'require', 'fetch', 'process', 'Buffer', 'AbortSignal', compiled)(
+  new Function('exports', 'require', 'fetch', 'process', 'Buffer', 'AbortSignal', 'console', compiled)(
     exports,
     require,
     fetch,
     { env },
     Buffer,
     AbortSignal,
+    { error: (...args) => errors.push(args) },
   );
-  return { post: exports.POST, providerCalls, rpcCalls, eventWrites };
+  return { post: exports.POST, providerCalls, rpcCalls, eventWrites, errors };
 }
 
 function request(body, {
@@ -253,4 +255,80 @@ test('event body hash is used when Toss transmission id is absent', async () => 
   assert.equal((await handler.post(request(body, { transmissionId: '' }))).status, 200);
   const expected = createHash('sha256').update(JSON.stringify(body)).digest('hex');
   assert.equal(handler.eventWrites[0].value.provider_event_id, expected);
+});
+
+for (const status of ['CANCELED', 'PARTIAL_CANCELED']) {
+  test(`${status} with a completed refund and missing order stays retryable with safe diagnostics`, async () => {
+    const refunded = {
+      ...payment,
+      status,
+      cancels: [{ cancelAmount: 400, cancelReason: 'private refund reason', cancelStatus: 'DONE', transactionKey: 'private-refund-key' }],
+    };
+    const handler = webhook({
+      provider: async () => Response.json(refunded),
+      rpcError: { code: 'P0001', message: 'ORDER_NOT_FOUND', details: 'private database details', hint: 'private hint' },
+    });
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const response = await handler.post(request(paymentEvent(refunded)));
+      assert.equal(response.status, 503);
+      assert.deepEqual(await response.json(), { error: '결제 상태 반영을 완료하지 못했습니다.' });
+    }
+    assert.equal(handler.eventWrites.length, 0);
+    assert.equal(handler.rpcCalls.length, 2);
+    assert.deepEqual(handler.errors, Array.from({ length: 2 }, () => [
+      'toss webhook reconciliation failed',
+      { operation: 'finalize_toss_refund', paymentStatus: status, databaseCode: 'P0001', reason: 'ORDER_NOT_FOUND' },
+    ]));
+  });
+}
+
+test('missing waiting orders are distinguishable from refund failures without being acknowledged', async () => {
+  const waiting = { ...payment, status: 'WAITING_FOR_DEPOSIT' };
+  const handler = webhook({ provider: async () => Response.json(waiting), rpcError: { code: 'P0001', message: 'ORDER_NOT_FOUND' } });
+  assert.equal((await handler.post(request(paymentEvent(waiting)))).status, 503);
+  assert.equal(handler.eventWrites.length, 0);
+  assert.deepEqual(handler.errors[0][1], {
+    operation: 'record_toss_waiting_payment', paymentStatus: 'WAITING_FOR_DEPOSIT', databaseCode: 'P0001', reason: 'ORDER_NOT_FOUND',
+  });
+});
+
+test('other terminal errors do not inherit the missing-order exception', async () => {
+  const expired = { ...payment, status: 'EXPIRED' };
+  const handler = webhook({ provider: async () => Response.json(expired), rpcError: { code: 'P0001', message: 'PAYMENT_AMOUNT_MISMATCH' } });
+  assert.equal((await handler.post(request(paymentEvent(expired)))).status, 503);
+  assert.equal(handler.eventWrites.length, 0);
+  assert.deepEqual(handler.errors[0][1], {
+    operation: 'record_toss_terminal_payment', paymentStatus: 'EXPIRED', databaseCode: 'P0001', reason: 'PAYMENT_AMOUNT_MISMATCH',
+  });
+});
+
+test('unrecognized error contents are redacted from reconciliation diagnostics', async () => {
+  const handler = webhook({ rpcError: { code: 'private-code', message: 'user@example.test', details: payment, hint: 'secret-token' } });
+  assert.equal((await handler.post(request(paymentEvent()))).status, 503);
+  assert.deepEqual(handler.errors, [[
+    'toss webhook reconciliation failed',
+    { operation: 'finalize_toss_payment', paymentStatus: 'DONE', databaseCode: 'UNKNOWN', reason: 'UNCLASSIFIED_DATABASE_ERROR' },
+  ]]);
+});
+
+test('lookup and recording diagnostics identify the stage without exposing provider data', async () => {
+  const lookup = webhook({ lookupError: { code: '42501', message: 'private database message' } });
+  assert.equal((await lookup.post(request(paymentEvent()))).status, 503);
+  assert.deepEqual(lookup.errors[0][1], {
+    operation: 'event_lookup', paymentStatus: 'DONE', databaseCode: '42501', reason: 'UNCLASSIFIED_DATABASE_ERROR',
+  });
+  const record = webhook({ recordError: { code: '23505', message: 'private database message' } });
+  assert.equal((await record.post(request(paymentEvent()))).status, 503);
+  assert.deepEqual(record.errors[0][1], {
+    operation: 'event_recording', paymentStatus: 'DONE', databaseCode: '23505', reason: 'UNCLASSIFIED_DATABASE_ERROR',
+  });
+});
+
+test('unknown provider statuses are not copied into diagnostic logs', async () => {
+  const unrecognized = { ...payment, status: 'user@example.test' };
+  const handler = webhook({ provider: async () => Response.json(unrecognized), lookupError: { code: 'P0001', message: 'ORDER_NOT_FOUND' } });
+  assert.equal((await handler.post(request(paymentEvent(unrecognized)))).status, 503);
+  assert.deepEqual(handler.errors[0][1], {
+    operation: 'event_lookup', paymentStatus: 'UNKNOWN', databaseCode: 'P0001', reason: 'ORDER_NOT_FOUND',
+  });
 });
