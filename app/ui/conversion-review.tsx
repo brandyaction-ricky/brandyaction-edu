@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import type { ConversionCase, ConversionEvidence, ConversionJevV4Run, ConversionSnapshot } from '@/lib/conversion-review';
-import { isRunStale } from '@/lib/conversion-review';
+import { buildAsidePaymentMatchPrompt, isRunStale } from '@/lib/conversion-review';
 import type { JevV4DecisionKey } from '@/lib/conversion-jev-v4';
 import { createMutationGate } from '@/lib/mutation-gate';
 import { safeUrl } from '@/lib/platform';
@@ -264,6 +264,13 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
               {selected.question_id && <Link href="/admin/questions" className="conversion-link">기존 질문함 열기</Link>}
             </AdminSection>
             <PurchaseOutcomeForm key={`${selected.id}:${selected.purchase_outcome || 'unknown'}:${selected.purchase_checked_at || ''}`} item={selected} pending={pending} enabled={snapshot.capabilities.can_manage_cases !== false} mutate={mutate} />
+            {selected.source_type === 'manual' && selected.sample_origin === 'current' && <AsidePaymentMatchPrompt
+              key={selected.id}
+              item={selected}
+              courseName={selected.legacy_course_label || snapshot.courses.find(course => course.id === selected.course_id)?.title || ''}
+              cohortName={snapshot.cohorts.find(cohort => cohort.id === selected.cohort_id)?.name || ''}
+              enabled={snapshot.capabilities.can_copy_aside_match === true && !selected.archived_at}
+            />}
             <AdminSection title="Jev 문의 분류와 답변 초안" bordered actions={<AdminButton tone="primary" disabled={pending || !canAnalyze || Boolean(selected.archived_at)} onClick={() => void mutate({ action: 'analyze', case_id: selected.id, expected_version: selected.input_version }).catch(() => {})}>{pending ? '처리 중' : snapshot.capabilities.analyze_provider === 'jev' ? 'Jev 결과 보기' : '모의 결과 보기'}</AdminButton>}>
               {!canAnalyze && <p className="conversion-muted">현재 환경에서는 판정을 실행할 수 없습니다. 설명자료는 직접 검토할 수 있습니다.</p>}
               {run ? <div className="conversion-result">
@@ -340,6 +347,21 @@ function PurchaseOutcomeForm({ item, pending, enabled, mutate }: { item: Convers
       {error && <p role="alert" className="conversion-alert">{error}</p>}
       <AdminButton type="submit" tone="primary" disabled={pending || !enabled || Boolean(item.archived_at)}>결제 여부 저장</AdminButton>
     </form>
+  </AdminSection>;
+}
+
+function AsidePaymentMatchPrompt({ item, courseName, cohortName, enabled }: { item: ConversionCase; courseName: string; cohortName: string; enabled: boolean }) {
+  const [prompt, setPrompt] = useState(() => buildAsidePaymentMatchPrompt({ receivedAt: item.received_at, courseName, cohortName }));
+  const [message, setMessage] = useState('');
+  return <AdminSection title="Aside로 결제 여부 확인" bordered>
+    <p className="conversion-muted">이 문구를 복사해 Aside에 붙여넣으면 주문 시각과 카카오 알림톡 기록을 함께 살펴보도록 안내합니다. 이름·연락처·문의 내용은 복사하지 않습니다. 시간만 비슷한 경우에는 확정하지 않고, 결제 여부는 직원이 확인해 직접 저장합니다.</p>
+    {!enabled && <p className="conversion-alert">주문·메시지 기록 확인 권한이 있는 직원만 이 문구를 사용할 수 있습니다.</p>}
+    <AdminTextarea label="Aside에 붙여넣을 문구 · 필요하면 고칠 수 있어요" value={prompt} onChange={event => { setPrompt(event.target.value); setMessage(''); }} rows={11} disabled={!enabled} />
+    <AdminButton disabled={!enabled} onClick={async () => {
+      try { await navigator.clipboard.writeText(prompt); setMessage('Aside에 붙여넣을 문구를 복사했습니다.'); }
+      catch { setMessage('자동 복사에 실패했습니다. 위 문구를 직접 선택해 복사해 주세요.'); }
+    }}>Aside용 문구 복사</AdminButton>
+    {message && <p role="status" className="conversion-muted">{message}</p>}
   </AdminSection>;
 }
 

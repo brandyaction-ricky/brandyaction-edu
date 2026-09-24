@@ -19,7 +19,7 @@ function initialSnapshot(): ConversionSnapshot {
       source_url: 'https://example.test/course-guide', version: 1, status: 'approved' }],
     courses: [{ id: courseId, title: '합성 교육 상품' }],
     cohorts: [{ id: '44444444-4444-4444-8444-444444444444', course_id: courseId, name: '합성 1기' }],
-    questions: [], runs: [], reviews: [], adjudications: [], capabilities: { can_manage_evidence: true, can_mock: true },
+    questions: [], runs: [], reviews: [], adjudications: [], capabilities: { can_manage_evidence: true, can_mock: true, can_copy_aside_match: true },
   };
 }
 
@@ -153,6 +153,22 @@ test('employee records a checked purchase result and can remove then restore an 
   await expect(page.getByText('문의를 복구했습니다.', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /삭제한 문의 보기/ })).toBeVisible();
   expect(state.mutations.map(item => item.action)).toEqual(['manage_case', 'manage_case', 'manage_case']);
+  expect(state.unexpectedApi).toEqual([]);
+});
+
+test('employee can edit and copy the Aside payment-check prompt without changing inquiry records', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (value: string) => { (window as Window & { copiedPrompt?: string }).copiedPrompt = value; } } });
+  });
+  const state = await fixture(page);
+  await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
+  const prompt = page.getByLabel('Aside에 붙여넣을 문구 · 필요하면 고칠 수 있어요');
+  await expect(prompt).toHaveValue(/시간이 가깝다는 이유만으로 같은 사람이라고 확정하지 마세요/);
+  await prompt.fill('직원이 읽고 고친 확인 요청');
+  await page.getByRole('button', { name: 'Aside용 문구 복사', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('문구를 복사했습니다');
+  expect(await page.evaluate(() => (window as Window & { copiedPrompt?: string }).copiedPrompt)).toBe('직원이 읽고 고친 확인 요청');
+  expect(state.mutations).toEqual([]);
   expect(state.unexpectedApi).toEqual([]);
 });
 
