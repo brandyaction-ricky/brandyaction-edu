@@ -79,7 +79,20 @@ export const adminTables: Record<string, string[]> = {
   landing: [], analytics: [], metrics: ['site_settings'], seo: ['site_settings'], settings: ['site_settings'],
 };
 
-export function adminSelectColumns(section: string, table: string): string {\n  if (section === 'products' && table === 'courses') return '*';\n  if (table === 'courses') return 'id,title,status,category,list_price,archived_at,display_order,created_at,updated_at';\n  if (section === 'questions' && table === 'edu_questions') return 'id,user_id,course_id,title,content,answer,status,created_at,updated_at';\n  if (section === 'orders') {\n    if (table === 'orders') return 'id,order_number,user_id,status,subtotal,discount_amount,total_amount,customer_name,customer_email,customer_phone,created_at';\n    if (table === 'cohorts') return 'id,course_id,name';\n    if (table === 'order_items') return 'id,order_id,course_id,cohort_id,item_name,unit_price';\n    if (table === 'enrollments') return 'id,order_item_id,status';\n  }\n  return '*';\n}\n\nexport const archiveValues: Record<string, Record<string, unknown>> = {
+export function adminSelectColumns(section: string, table: string): string {
+  if (section === 'products' && table === 'courses') return '*';
+  if (table === 'courses') return 'id,title,status,category,list_price,archived_at,display_order,created_at,updated_at';
+  if (section === 'questions' && table === 'edu_questions') return 'id,user_id,course_id,title,content,answer,status,created_at,updated_at';
+  if (section === 'orders') {
+    if (table === 'orders') return 'id,order_number,user_id,status,subtotal,discount_amount,total_amount,customer_name,customer_email,customer_phone,created_at';
+    if (table === 'cohorts') return 'id,course_id,name';
+    if (table === 'order_items') return 'id,order_id,course_id,cohort_id,item_name,unit_price';
+    if (table === 'enrollments') return 'id,order_item_id,status';
+  }
+  return '*';
+}
+
+export const archiveValues: Record<string, Record<string, unknown>> = {
   products: { status: 'archived' }, cohorts: { status: 'cancelled' },
   learning: { is_published: false }, weeks: { is_published: false }, missions: { is_published: false },
   coupons: { is_active: false }, 'product-reviews': { status: 'hidden', is_featured: false },
