@@ -34,7 +34,11 @@ jobs:
             exit 0
           fi
 
-          if [ "$head_ref" != "codex/commerce-main-release" ]; then
+          if [ "$head_ref" = "codex/commerce-main-release" ]; then
+            release_scope="commerce"
+          elif [[ "$head_ref" == codex/edu-production-conversion-release-* ]]; then
+            release_scope="edu-conversion"
+          else
             echo "Production PRs must promote the develop branch."
             exit 1
           fi
@@ -46,24 +50,32 @@ jobs:
           fi
 
           while IFS= read -r path; do
-            case "$path" in
-              .github/workflows/ci.yml|.env.example|README.md|app/api/payments/toss/webhook/route.ts|package.json|package-lock.json|tests/toss-webhook-idempotency.test.mjs|tests/toss-webhook.test.mjs)
+            case "$release_scope:$path" in
+              commerce:.github/workflows/ci.yml|commerce:.env.example|commerce:README.md|commerce:app/api/payments/toss/webhook/route.ts|commerce:package.json|commerce:package-lock.json|commerce:tests/toss-webhook-idempotency.test.mjs|commerce:tests/toss-webhook.test.mjs)
+                ;;
+              edu-conversion:.github/workflows/ci.yml|edu-conversion:app/api/conversion/*|edu-conversion:app/ui/conversion-adjudication.tsx|edu-conversion:app/ui/conversion-jev-v4-synthetic.tsx|edu-conversion:app/ui/conversion-review.css|edu-conversion:app/ui/conversion-review.tsx|edu-conversion:app/ui/marketing-workspace-nav.tsx|edu-conversion:app/ui/marketing-workspace.css|edu-conversion:app/ui/platform.tsx|edu-conversion:lib/conversion-jev-v4-boundary-cases.ts|edu-conversion:lib/conversion-jev-v4.ts|edu-conversion:lib/conversion-jev.ts|edu-conversion:lib/conversion-review-server.ts|edu-conversion:lib/conversion-review.ts|edu-conversion:supabase/migrations/202609240001_conversion_jev_staff_approval.sql|edu-conversion:supabase/migrations/202609250001_conversion_case_management.sql|edu-conversion:supabase/migrations/202609250002_conversion_case_order_links.sql|edu-conversion:tests/browser/conversion-review.spec.ts|edu-conversion:tests/browser/fixture/conversion.tsx|edu-conversion:tests/conversion-adjudication.test.mjs|edu-conversion:tests/conversion-jev-v2-route.test.mjs|edu-conversion:tests/conversion-jev-v2.test.mjs|edu-conversion:tests/conversion-jev-v3-route.test.mjs|edu-conversion:tests/conversion-jev-v3.test.mjs|edu-conversion:tests/conversion-jev-v4-route.test.mjs|edu-conversion:tests/conversion-jev-v4-synthetic-route.test.mjs|edu-conversion:tests/conversion-jev-v4.test.mjs|edu-conversion:tests/conversion-jev.test.mjs|edu-conversion:tests/conversion-migration.test.mjs|edu-conversion:tests/conversion-order-links.test.mjs|edu-conversion:tests/conversion-review.test.mjs|edu-conversion:tests/conversion-route.test.mjs)
                 ;;
               *)
-                echo "File is outside the Commerce release allowlist: $path"
+                echo "File is outside the $release_scope release allowlist: $path"
                 exit 1
                 ;;
             esac
           done <<< "$changed_files"
 
-          for required in app/api/payments/toss/webhook/route.ts tests/toss-webhook.test.mjs tests/toss-webhook-idempotency.test.mjs; do
+          if [ "$release_scope" = "commerce" ]; then
+            required_files="app/api/payments/toss/webhook/route.ts tests/toss-webhook.test.mjs tests/toss-webhook-idempotency.test.mjs"
+          else
+            required_files="app/api/conversion/orders/route.ts app/api/conversion/route.ts app/ui/conversion-review.tsx app/ui/marketing-workspace-nav.tsx supabase/migrations/202609240001_conversion_jev_staff_approval.sql supabase/migrations/202609250001_conversion_case_management.sql supabase/migrations/202609250002_conversion_case_order_links.sql"
+          fi
+
+          for required in $required_files; do
             if ! grep -Fxq "$required" <<< "$changed_files"; then
-              echo "Required Commerce release file is missing: $required"
+              echo "Required $release_scope release file is missing: $required"
               exit 1
             fi
           done
 
-          echo "Commerce-only production release scope verified."
+          echo "$release_scope production release scope verified."
       - name: Setup Node
         uses: actions/setup-node@v4
         with:

@@ -18,6 +18,8 @@ const adjudicationSql = fs.readFileSync(new URL('../supabase/migrations/20260923
 const jevV2Sql = fs.readFileSync(new URL('../supabase/migrations/202609230003_conversion_jev_v2_runs.sql', import.meta.url), 'utf8');
 const jevV3Sql = fs.readFileSync(new URL('../supabase/migrations/202609230004_conversion_jev_v3_runs.sql', import.meta.url), 'utf8');
 const jevV4Sql = fs.readFileSync(new URL('../supabase/migrations/202609230005_conversion_jev_v4_runs.sql', import.meta.url), 'utf8');
+const jevStaffApprovalSql = fs.readFileSync(new URL('../supabase/migrations/202609240001_conversion_jev_staff_approval.sql', import.meta.url), 'utf8');
+const caseManagementSql = fs.readFileSync(new URL('../supabase/migrations/202609250001_conversion_case_management.sql', import.meta.url), 'utf8');
 const serverSource = fs.readFileSync(new URL('../lib/conversion-review-server.ts', import.meta.url), 'utf8');
 const serverExports = {};
 new Function('exports', 'require', ts.transpileModule(serverSource, {
@@ -60,6 +62,8 @@ before(async () => {
   await db.exec(jevV2Sql);
   await db.exec(jevV3Sql);
   await db.exec(jevV4Sql);
+  await db.exec(jevStaffApprovalSql);
+  await db.exec(caseManagementSql);
   await db.query('insert into profiles(id,role) values ($1,\'admin\'),($2,\'staff\'),($3,\'student\')', [ids.admin, ids.staff, ids.student]);
   await db.query('insert into courses(id) values ($1),($2)', [ids.course, ids.otherCourse]);
   await db.query('insert into cohorts(id,course_id) values ($1,$2),($3,$4)', [ids.cohort, ids.course, ids.otherCohort, ids.otherCourse]);
@@ -93,6 +97,15 @@ async function rpc(input, options = {}) {
     return result.rows[0].result;
   } finally { await db.exec('reset role'); }
 }
+async function manage(input, actor = ids.admin) {
+  const request = conversionPayload(input);
+  await db.exec('set role service_role');
+  try {
+    const result = await db.query('select public.edu_conversion_case_manage($1::uuid,$2::uuid,$3::jsonb,$4::text) as result',
+      [actor, request.requestId, request.payload, request.payload_hash]);
+    return result.rows[0].result;
+  } finally { await db.exec('reset role'); }
+}
 async function count(table) { return (await db.query(`select count(*)::integer as count from ${table}`)).rows[0].count; }
 async function setupRun(input = manual()) {
   const { case: inquiry } = await rpc(input);
@@ -118,6 +131,34 @@ test('RPC retry returns one stored result; changed intent with the same request 
   changed.payload_hash = conversionPayload(input).payload_hash;
   await assert.rejects(rpc(null, { normalized: changed }), /CONVERSION_REQUEST_REUSED/);
   assert.equal(await count('edu_conversion_cases'), 1);
+});
+
+test('manual purchase tracking distinguishes unknown from checked results and stores who/when', async () => {
+  const { case: inquiry } = await rpc(manual());
+  const input = { action: 'manage_case', operation: 'purchase_outcome', requestId: randomUUID(), case_id: inquiry.id,
+    expected_version: inquiry.input_version, purchase_outcome: 'paid' };
+  const first = await manage(input, ids.staff);
+  assert.equal(first.case.purchase_outcome, 'paid');
+  assert.equal(first.case.purchase_checked_by, ids.staff);
+  assert.ok(first.case.purchase_checked_at);
+  assert.deepEqual(await manage(input, ids.staff), first);
+  const reset = await manage({ ...input, requestId: randomUUID(), purchase_outcome: 'unknown' });
+  assert.equal(reset.case.purchase_outcome, 'unknown');
+  assert.equal(reset.case.purchase_checked_at, null);
+  assert.equal(reset.case.purchase_checked_by, null);
+});
+
+test('inquiry deletion is reversible and keeps its stored runs and review history', async () => {
+  const { inquiry, run } = await setupRun();
+  const archived = await manage({ action: 'manage_case', operation: 'archive', requestId: randomUUID(), case_id: inquiry.id, expected_version: inquiry.input_version });
+  assert.ok(archived.case.archived_at);
+  const missing = await db.query('select count(*)::integer as count from edu_conversion_runs where id=$1', [run.id]);
+  assert.equal(missing.rows[0].count, 1);
+  await assert.rejects(manage({ action: 'manage_case', operation: 'purchase_outcome', requestId: randomUUID(), case_id: inquiry.id,
+    expected_version: inquiry.input_version, purchase_outcome: 'paid' }), /CONVERSION_INVALID/);
+  const restored = await manage({ action: 'manage_case', operation: 'restore', requestId: randomUUID(), case_id: inquiry.id, expected_version: inquiry.input_version });
+  assert.equal(restored.case.archived_at, null);
+  assert.equal(restored.case.archived_by, null);
 });
 
 test('historical paid-education inquiry can be calibrated without inventing a current product or cohort', async () => {
@@ -214,9 +255,9 @@ test('v3 experiment rows preserve v2 and the first review, enforce uniqueness, a
   assert.equal(await count('edu_conversion_reviews'), 1);
 });
 
-test('v4 experiment rows preserve earlier labels, enforce uniqueness, and deny browser roles', async () => {
+test('v4 judgment can be stored without comparison labels, enforces uniqueness, and denies browser roles', async () => {
   const { inquiry, run } = await setupRun();
-  const { review: first } = await rpc(review(inquiry, run));
+  await rpc(review(inquiry, run));
   const rls = await db.query("select relrowsecurity from pg_class where relname='edu_conversion_jev_v4_runs'");
   assert.equal(rls.rows[0].relrowsecurity, true);
   for (const role of ['anon', 'authenticated']) {
@@ -226,7 +267,7 @@ test('v4 experiment rows preserve earlier labels, enforce uniqueness, and deny b
   }
   await db.exec('set role service_role');
   try {
-    const args = [run.id, inquiry.id, first.id, inquiry.input_version, ids.admin];
+    const args = [run.id, inquiry.id, null, inquiry.input_version, ids.admin];
     await db.query("insert into edu_conversion_jev_v4_runs(v1_run_id,case_id,calibration_review_id,input_version,status,actor_id) values ($1,$2,$3,$4,'pending',$5)", args);
     await assert.rejects(db.query("insert into edu_conversion_jev_v4_runs(v1_run_id,case_id,calibration_review_id,input_version,status,actor_id) values ($1,$2,$3,$4,'pending',$5)", args), /unique/);
     await assert.rejects(db.query("update edu_conversion_jev_v4_runs set status='completed' where v1_run_id=$1", [run.id]), /check constraint/);
@@ -301,19 +342,17 @@ test('analysis stores Jev shadow results under the matching provider without wea
   await assert.rejects(rpc({ ...analyze, requestId: randomUUID() }, { result: { ...result, requires_human_review: false }, versions: {}, observedVersion: 1 }), /CONVERSION_INVALID/);
 });
 
-test('Jev review requires one independent calibration while mock review rejects it', async () => {
+test('Jev review can be saved without subjective comparison labels; mock review still rejects labels', async () => {
   const { case: inquiry } = await rpc(manual());
   const analyze = { action: 'analyze', requestId: randomUUID(), case_id: inquiry.id, expected_version: 1 };
   const jevResult = { mode: 'jev', model: 'jev-test', requires_human_review: true, proposed_reply: '', decisions: {} };
   const { run } = await rpc(analyze, { result: jevResult, versions: {}, observedVersion: 1 });
   const base = { action: 'review', requestId: randomUUID(), case_id: inquiry.id, run_id: run.id,
     decision: 'hold', reply_text: '', reason: '독립 판정', calibration: null, calibration_sample_kind: null };
-  await assert.rejects(rpc(base), /CONVERSION_INVALID/);
+  const employeeReview = await rpc(base);
+  assert.equal(employeeReview.review.calibration, null);
+  assert.equal(employeeReview.review.decision, 'hold');
   const calibration = { purchase_intent: 'high', primary_barrier: 'price', purchase_readiness: 3, next_action: 'offer_purchase_info' };
-  const saved = await rpc({ ...base, requestId: randomUUID(), calibration, calibration_sample_kind: 'operational' });
-  assert.deepEqual(saved.review.calibration, calibration);
-  assert.equal(saved.review.calibration_sample_kind, 'operational');
-  await assert.rejects(rpc({ ...base, requestId: randomUUID(), calibration, calibration_sample_kind: 'operational' }), /CONVERSION_INVALID/);
   assert.ok((await rpc({ ...base, requestId: randomUUID(), reason: '후속 검토' })).review.id);
 
   const mockRun = await setupRun();

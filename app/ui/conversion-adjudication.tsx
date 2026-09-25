@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from 'react';
 import type { ConversionAdjudicationNote, ConversionSnapshot, JevCalibration, JevDimension, JevResult } from '@/lib/conversion-review';
 import { isRunStale } from '@/lib/conversion-review';
+import { jevV4UncertaintyFlags } from '@/lib/conversion-jev-v4';
 import { AdminButton, AdminEmptyState, AdminSelect, AdminTextarea } from './final/admin-system';
 
 const dimensions: { key: JevDimension; label: string }[] = [
@@ -57,13 +58,21 @@ const v4Labels: Record<string, string> = {
   ...v3Labels,
   future_consideration_after_free_content: '무료 교육을 본 뒤 유료 교육 검토 명시',
   paid_program_question: '유료 교육 조건 질문',
+  purchase_decision: '유료 신청·구매 결정',
   paid_application_or_payment: '유료 신청·결제 시도 명시',
   no_paid_reference: '유료 교육 언급 없음',
 };
 const v4FlagLabels: Record<string, string> = {
   ...v3FlagLabels,
-  paid_reference_without_stage: '유료 교육 언급이 있으나 행동 단계는 구매 신호 없음으로 판정했습니다.',
-  paid_stage_without_reference: '유료 교육 언급이 없으나 행동 단계는 구매 신호가 있다고 판정했습니다.',
+  paid_reference_without_stage: '유료 교육은 언급했지만, 구매 행동은 확인되지 않았다고 봤습니다.',
+  paid_stage_without_reference: '유료 교육은 언급되지 않았지만, 구매 신호가 있다고 봤습니다.',
+};
+const v4UncertaintyLabels: Record<string, string> = {
+  unclear_choice: 'Jev가 답을 고르지 못함',
+  unresolved_category: '정보가 부족해 답을 구분하기 어려움',
+  low_reported_confidence: 'Jev가 확신을 낮게 표시함',
+  narrow_probability_margin: '가능한 답들이 비슷함',
+  choice_not_top_probability: 'Jev가 고른 답과 가장 가능성 높게 본 답이 다름',
 };
 
 function compared(result: JevResult, calibration: JevCalibration, dimension: JevDimension) {
@@ -169,7 +178,7 @@ export function ConversionAdjudication({ snapshot, pending, onSave, onRunV2, onR
       <div><h2>판정 차이 재검토</h2><p className="conversion-muted">첫 사람 판정과 Jev 판정은 각각 보존합니다. 여기에는 어느 쪽이 정답인지 단정하지 않고 근거와 해석의 한계를 별도 의견으로 남깁니다.</p></div>
       <AdminButton onClick={onSingle}>개별 검토로 돌아가기</AdminButton>
     </div>
-    <div className="conversion-batch-progress" role="status">실제 문의 {candidates.length}건 · 의견 차이 {eligibleNotes}항목 · 재검토 의견이 있는 차이 {coveredDifferences}항목 · Jev 표시 신뢰도 70% 이상인 차이 {highConfidenceDifferences}항목</div>
+    <div className="conversion-batch-progress" role="status">실제 문의 {candidates.length}건 · 의견 차이 {eligibleNotes}항목 · 다시 살펴본 차이 {coveredDifferences}항목 · Jev가 높은 확신(70% 이상)을 표시한 차이 {highConfidenceDifferences}항목</div>
     <p className="conversion-muted">일치율과 Jev의 신뢰도는 정확도가 아닙니다. 같은 선택이어도 둘 다 근거가 약할 수 있습니다. 이 화면은 고객 답변·상태·모집 성과를 바꾸지 않습니다.</p>
     {snapshot.capabilities.can_jev_v2 && <div className="conversion-v2-control">
       <div><strong>Jev 질문 계약 v2 · 실험</strong><p className="conversion-muted">과거 v1 원문만 다시 전송해 정보 요청·명시된 구매 장애물·운영 문제·관찰된 행동을 분리합니다. v1·사람 첫 판정은 수정하지 않습니다. 새 기준을 만든 20건의 결과이므로 정확도 검증으로 해석하지 마세요.</p></div>
@@ -187,7 +196,7 @@ export function ConversionAdjudication({ snapshot, pending, onSave, onRunV2, onR
         {isRunStale(selected.run, selected.inquiry, snapshot.evidence) && <p role="alert" className="conversion-alert">문의나 자료가 변경됐습니다. 이 기록에는 재검토 의견을 저장할 수 없습니다.</p>}
         <div className="conversion-adjudication-rows" aria-label="항목별 첫 의견 비교">
           {selectedRows.map(item => <button type="button" key={item.key} className={activeDimension?.key === item.key ? 'is-selected' : ''} aria-pressed={activeDimension?.key === item.key} onClick={() => { setDimension(item.key); setAssessment(''); setBasis(''); setRationale(''); setError(''); }}>
-            <strong>{item.label}</strong><span>사람 {item.key === 'purchase_readiness' ? `${item.human}/4` : choiceNames[String(item.human)]}</span><span>Jev {item.key === 'purchase_readiness' ? `${selected.result.decisions.purchase_readiness.score.toFixed(1)}/4 (비교 범주 ${item.predicted})` : choiceNames[String(item.predicted)]} · 표시 신뢰도 {Math.round(item.confidence * 100)}%</span><b>{item.same ? '같은 선택' : '의견 차이'}</b>
+            <strong>{item.label}</strong><span>직원 선택 {item.key === 'purchase_readiness' ? `${item.human}/4` : choiceNames[String(item.human)]}</span><span>Jev 선택 {item.key === 'purchase_readiness' ? `${selected.result.decisions.purchase_readiness.score.toFixed(1)}/4 (비교 단계 ${item.predicted})` : choiceNames[String(item.predicted)]} · Jev가 표시한 확신 {Math.round(item.confidence * 100)}%</span><b>{item.same ? '같은 선택' : '의견 차이'}</b>
           </button>)}
         </div>
         {snapshot.capabilities.can_jev_v2 && <div className="conversion-v2-result">
@@ -223,15 +232,19 @@ export function ConversionAdjudication({ snapshot, pending, onSave, onRunV2, onR
           <AdminButton disabled={pending || v4Busy || v2Busy || v3Busy || v4Selected?.status === 'completed'} onClick={() => void runV4Selected()}>{v4Busy ? '실행 중' : v4Selected?.status === 'completed' ? 'v4 저장 완료' : v4Selected?.status === 'pending' || v4Selected?.status === 'failed' ? '선택한 문의 v4 재시도' : '선택한 문의 v4 실행'}</AdminButton>
           {v4Selected?.status === 'completed' && v4Selected.result ? <>
             <dl>
-              <dt>명시한 정보 요청</dt><dd>{v4Labels[v4Selected.result.decisions.information_need.choice]}</dd>
-              <dt>직접 밝힌 구매 장애물</dt><dd>{v4Labels[v4Selected.result.decisions.confirmed_barrier.choice]}</dd>
-              <dt>실제로 시도한 행동 대상</dt><dd>{v4Labels[v4Selected.result.decisions.attempted_action_target.choice]}</dd>
-              <dt>겪은 운영 문제</dt><dd>{v4Labels[v4Selected.result.decisions.operational_issue.choice]}</dd>
-              <dt>유료 교육에 대한 직접 언급</dt><dd>{v4Labels[v4Selected.result.decisions.paid_program_reference.choice]}</dd>
-              <dt>관찰된 유료 구매 행동</dt><dd>{v4Labels[v4Selected.result.decisions.observable_stage.choice]}</dd>
+              {([
+                ['information_need', '명시한 정보 요청'], ['confirmed_barrier', '직접 밝힌 구매 장애물'],
+                ['attempted_action_target', '실제로 시도한 행동 대상'], ['operational_issue', '겪은 운영 문제'],
+                ['paid_program_reference', '유료 교육에 대한 직접 언급'], ['observable_stage', '관찰된 유료 구매 행동'],
+              ] as const).map(([key, label]) => {
+                const decision = v4Selected.result!.decisions[key];
+                const uncertainty = jevV4UncertaintyFlags(v4Selected.result!.decisions).filter(flag => flag.decision === key);
+                return <div key={key}><dt>{label}</dt><dd>{v4Labels[decision.choice]} · Jev가 표시한 확신 {Math.round(decision.confidence * 100)}%{uncertainty.length > 0 ? ` · 다시 볼 부분: ${uncertainty.map(flag => v4UncertaintyLabels[flag.reason]).join(', ')}` : ''}</dd></div>;
+              })}
             </dl>
-            {v4Selected.result.consistency_flags.length > 0 && <p role="alert" className="conversion-alert">판정 간 충돌: {v4Selected.result.consistency_flags.map(flag => v4FlagLabels[flag]).join(' ')} 운영자 검토가 필요합니다.</p>}
-            {v4Selected.result.consistency_flags.length === 0 && <p className="conversion-muted">판정 간 형식적 충돌은 발견되지 않았습니다. 원문과의 일치 여부는 운영자가 확인해야 합니다.</p>}
+            {v4Selected.result.consistency_flags.length > 0 && <p role="alert" className="conversion-alert">결과끼리 맞지 않는 부분이 있습니다. {v4Selected.result.consistency_flags.map(flag => v4FlagLabels[flag]).join(' ')} 문의 내용과 함께 확인해 주세요.</p>}
+            {v4Selected.result.consistency_flags.length === 0 && <p className="conversion-muted">결과끼리 맞지 않는 부분은 표시되지 않았습니다. 그래도 문의 내용과 함께 확인해 주세요.</p>}
+            <p className="conversion-muted">이 확신은 Jev가 스스로 표시한 값이며 실제로 맞을 확률이나 정확도를 뜻하지 않습니다. 낮은 값이나 ‘다시 볼 부분’이 있으면 문의 내용을 함께 읽어 주세요.</p>
           </> : <p className="conversion-muted">v4 결과가 아직 없습니다.</p>}
           <p className="conversion-muted">v4도 고객 응대·CRM·상태 변경에 자동 적용되지 않습니다. 기존 v1·사람 첫 의견·v2·v3 결과는 그대로 보존합니다.</p>
         </div>}

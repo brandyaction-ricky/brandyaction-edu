@@ -701,7 +701,7 @@ export function Platform({
         ) : !section ? (
           <Empty title="이 화면에 접근할 운영 권한이 필요합니다." />
         ) : key === "conversion" ? (
-          <ConversionReview workspace initialPeriod={searchParams.get("recruitment") || undefined} />
+          <ConversionReview workspace initialPeriod={searchParams.get("recruitment") || undefined} userId={user?.id || ""} />
         ) : key === "product-editor" || key === "learning-editor" ? (
           loading && id && !edited ? (
             <p role="status">편집 정보를 불러오고 있습니다.</p>

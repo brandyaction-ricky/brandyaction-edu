@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createMockJudgment, evidenceVersions, MOCK_NOTICE, type ConversionCase, type ConversionRun, type ConversionSnapshot } from '../../lib/conversion-review';
+import { createMockJudgment, evidenceVersions, type ConversionCase, type ConversionRun, type ConversionSnapshot } from '../../lib/conversion-review';
 
 // Synthetic inquiry and product data only. Route interception cannot reach DB,
 // auth, model or message providers, and the fixture server rejects other writes.
@@ -19,23 +19,29 @@ function initialSnapshot(): ConversionSnapshot {
       source_url: 'https://example.test/course-guide', version: 1, status: 'approved' }],
     courses: [{ id: courseId, title: '합성 교육 상품' }],
     cohorts: [{ id: '44444444-4444-4444-8444-444444444444', course_id: courseId, name: '합성 1기' }],
-    questions: [], runs: [], reviews: [], adjudications: [], capabilities: { can_manage_evidence: true, can_mock: true },
+    questions: [], runs: [], reviews: [], adjudications: [], capabilities: { can_manage_evidence: true, can_mock: true, can_copy_aside_match: true },
   };
 }
 
 async function fixture(page: Page, provider: 'mock' | 'jev' = 'mock') {
   const snapshot = initialSnapshot();
-  if (provider === 'jev') snapshot.capabilities = { ...snapshot.capabilities, can_jev: true, can_adjudicate: true, can_analyze: true, analyze_provider: 'jev' };
+  if (provider === 'jev') snapshot.capabilities = { ...snapshot.capabilities, can_jev: true, can_adjudicate: true, can_jev_v4: true, can_analyze: true, analyze_provider: 'jev' };
   const mutations: Record<string, unknown>[] = [];
+  const orderRows: Array<{ id: string; status: 'paid' | 'partially_refunded' | 'refunded'; currency: string; total_amount: number; paid_at: string; item_name: string; linked_at: string | null; refund_amount: number; payment_statuses: string[] }> = [
+    { id: '66666666-6666-4666-8666-666666666666', status: 'paid', currency: 'KRW', total_amount: 1650000, paid_at: '2026-09-22T02:00:00.000Z', item_name: '합성 교육 상품', linked_at: null, refund_amount: 0, payment_statuses: ['done'] },
+  ];
   const unexpectedApi: string[] = [];
   let forbidden = false;
   await page.route('**/api/**', async route => {
     const pathname = new URL(route.request().url()).pathname;
-    if (!['/api/conversion', '/api/conversion/adjudication', '/api/conversion/jev-v2', '/api/conversion/jev-v3', '/api/conversion/jev-v4'].includes(pathname)) {
+    if (!['/api/conversion', '/api/conversion/orders', '/api/conversion/adjudication', '/api/conversion/jev-v2', '/api/conversion/jev-v3', '/api/conversion/jev-v4'].includes(pathname)) {
       unexpectedApi.push(route.request().url());
       await route.fulfill({ status: 405, json: { error: '검증에 허용되지 않은 API입니다.' } }); return;
     }
     if (forbidden) { await route.fulfill({ status: 403, json: { error: '전환 관리 접근 권한이 없습니다.' } }); return; }
+    if (pathname === '/api/conversion/orders') {
+      await route.fulfill({ json: { orders: orderRows, available: true, can_manage: true } }); return;
+    }
     if (pathname === '/api/conversion/jev-v2') {
       const body = route.request().postDataJSON();
       mutations.push(body);
@@ -73,10 +79,10 @@ async function fixture(page: Page, provider: 'mock' | 'jev' = 'mock') {
         information_need: choice('registration_or_access'), confirmed_barrier: choice('none_stated'),
         attempted_action_target: choice('free_live_or_replay'), operational_issue: choice('free_content_access_failure'),
         paid_program_reference: choice('future_consideration_after_free_content'), observable_stage: choice('no_purchase_signal'),
-      }, consistency_flags: ['paid_reference_without_stage'] as const };
+      }, consistency_flags: ['paid_reference_without_stage'] as const, uncertainty_flags: [] };
       snapshot.jev_v4_runs ||= [];
       snapshot.jev_v4_runs.push({ id: `v4-${snapshot.jev_v4_runs.length + 1}`, v1_run_id: body.v1_run_id,
-        case_id: initialCase.id, calibration_review_id: snapshot.reviews[0].id, input_version: 1,
+        case_id: initialCase.id, calibration_review_id: null, input_version: 1,
         status: 'completed', result: { ...result, consistency_flags: [...result.consistency_flags] }, created_at: timestamp, updated_at: timestamp });
       await route.fulfill({ json: { ok: true, result } }); return;
     }
@@ -119,6 +125,21 @@ async function fixture(page: Page, provider: 'mock' | 'jev' = 'mock') {
       snapshot.reviews.push(review);
       await route.fulfill({ json: { ok: true, review } }); return;
     }
+    if (body.action === 'manage_case') {
+      const item = snapshot.cases.find(row => row.id === body.case_id)!;
+      if (body.operation === 'purchase_outcome') {
+        item.purchase_outcome = body.purchase_outcome;
+        item.purchase_checked_at = body.purchase_outcome === 'unknown' ? null : timestamp;
+        item.purchase_checked_by = body.purchase_outcome === 'unknown' ? null : 'synthetic-operator';
+      } else if (body.operation === 'archive') item.archived_at = timestamp;
+      else item.archived_at = null;
+      await route.fulfill({ json: { ok: true, case: item } }); return;
+    }
+    if (body.action === 'manage_case_order') {
+      const item = orderRows.find(order => order.id === body.order_id)!;
+      item.linked_at = body.operation === 'link' ? timestamp : null;
+      await route.fulfill({ json: { ok: true, case_id: body.case_id, order_id: body.order_id, operation: body.operation } }); return;
+    }
     await route.fulfill({ status: 405, json: { error: '등록되지 않은 모의 요청입니다.' } });
   });
   await page.goto('/admin/conversion');
@@ -126,194 +147,95 @@ async function fixture(page: Page, provider: 'mock' | 'jev' = 'mock') {
   return { snapshot, mutations, unexpectedApi, deny: () => { forbidden = true; } };
 }
 
-test('Jev shadow result shows decisions and confidence without triggering another API', async ({ page }) => {
-  const state = await fixture(page, 'jev');
+test('staff can inspect a matching paid order and link it only after checking it', async ({ page }) => {
+  const state = await fixture(page);
   await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
-  await page.getByRole('button', { name: 'Jev 그림자 판정 실행', exact: true }).click();
-  await page.getByLabel('교정 표본 용도').selectOption('operational');
-  await expect(page.getByText('Jev 그림자 판정 · 운영자 확인 필요', { exact: true })).toBeVisible();
-  await expect(page.getByText('운영자 독립 판정을 먼저 저장해 주세요.', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Jev 그림자 판정 실행', exact: true })).toBeDisabled();
-  await expect(page.getByLabel('Jev 전환 판정')).toHaveCount(0);
-  await expect(page.getByText(MOCK_NOTICE, { exact: true })).toHaveCount(0);
-  await expect(page.getByLabel(/^검토할 설명/)).toHaveCount(0);
-  await expect(page.getByText('추가 확인 필요: 이용 방법', { exact: true })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '검토 기록 저장', exact: true })).toHaveCount(0);
-  expect(state.unexpectedApi).toEqual([]);
-  expect(state.mutations.map(item => item.action)).toEqual(['analyze']);
-});
-
-test('first Jev review stores blind operator labels then reveals comparison and aggregate rates', async ({ page }) => {
-  const state = await fixture(page, 'jev');
-  await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
-  await page.getByRole('button', { name: 'Jev 그림자 판정 실행', exact: true }).click();
-  await page.getByLabel('교정 표본 용도').selectOption('operational');
-  await page.getByLabel('사람 판단 · 구매 의도').selectOption('medium');
-  await page.getByLabel('사람 판단 · 주요 장애물').selectOption('price');
-  await page.getByLabel('사람 판단 · 구매 준비도').selectOption('3');
-  await page.getByLabel('사람 판단 · 다음 행동').selectOption('answer_specific_questions');
-  await page.getByRole('button', { name: '독립 판정 저장', exact: true }).click();
-  const result = page.getByLabel('Jev 전환 판정');
-  await expect(result).toContainText('구매 의도중간신뢰도 97%');
-  await expect(result).toContainText('주요 장애물수강 수준신뢰도 82%');
-  await expect(page.getByLabel('사람과 Jev 비교')).toContainText('구매 의도사람 중간Jev 중간일치');
-  await expect(page.getByLabel('사람과 Jev 선택 비교')).toContainText('실제 문의 표본1건');
-  await expect(page.getByLabel('사람과 Jev 선택 비교')).toContainText('검수용 표본0건');
-  await expect(page.getByLabel('사람과 Jev 선택 비교')).toContainText('기준 검토용 최소 표본까지 19건 남음');
-  await expect(page.getByLabel('사람과 Jev 선택 비교')).toContainText('의도 선택 일치100%');
-  await expect(page.getByLabel(/^검토할 설명/)).toHaveValue('초보자를 대상으로 기초 개념부터 설명합니다.');
-  await expect(page.getByRole('button', { name: 'Jev 그림자 판정 실행', exact: true })).toBeEnabled();
-  await expect(page.getByText(MOCK_NOTICE, { exact: true })).toBeVisible();
-  expect(state.mutations[1]).toMatchObject({ action: 'review', decision: 'hold', reply_text: '', calibration_sample_kind: 'operational', calibration: { purchase_intent: 'medium', primary_barrier: 'price', purchase_readiness: 3, next_action: 'answer_specific_questions' } });
+  await expect(page.getByText('같은 상품·기수의 결제 기록을 문의 뒤 90일 동안 찾아 보여줍니다.', { exact: false })).toBeVisible();
+  await expect(page.getByText('1,650,000원')).toBeVisible();
+  await expect(page.getByText('주문자 이름·연락처는 표시하지 않습니다.', { exact: false })).toBeVisible();
+  await page.getByRole('button', { name: '확인한 주문으로 연결' }).click();
+  await expect(page.getByText('직원이 확인한 주문 기록을 문의에 연결했습니다.', { exact: true })).toBeVisible();
+  await expect(page.getByText('연결된 주문 · 결제 완료')).toBeVisible();
+  expect(state.mutations.at(-1)).toMatchObject({ action: 'manage_case_order', operation: 'link', case_id: initialCase.id });
   expect(state.unexpectedApi).toEqual([]);
 });
 
-test('disagreement review records a separate reason while preserving the first labels', async ({ page }) => {
-  const state = await fixture(page, 'jev');
+test('employee records a checked purchase result and can remove then restore an inquiry', async ({ page }) => {
+  const state = await fixture(page);
   await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
-  await page.getByRole('button', { name: 'Jev 그림자 판정 실행', exact: true }).click();
-  await page.getByLabel('교정 표본 용도').selectOption('operational');
-  await page.getByLabel('사람 판단 · 구매 의도').selectOption('medium');
-  await page.getByLabel('사람 판단 · 주요 장애물').selectOption('price');
-  await page.getByLabel('사람 판단 · 구매 준비도').selectOption('3');
-  await page.getByLabel('사람 판단 · 다음 행동').selectOption('answer_specific_questions');
-  await page.getByRole('button', { name: '독립 판정 저장', exact: true }).click();
-  await page.getByRole('button', { name: '판정 차이 재검토', exact: true }).click();
-  const audit = page.getByRole('region', { name: '판정 차이 재검토' });
-  await expect(audit).toContainText('실제 문의 1건 · 의견 차이 1항목');
-  await expect(audit.getByLabel('항목별 첫 의견 비교')).toContainText('사람 가격Jev 수강 수준 · 표시 신뢰도 82%의견 차이');
-  await expect(audit.getByLabel('항목별 첫 의견 비교')).toContainText('사람 3/4Jev 2.8/4 (비교 범주 3) · 표시 신뢰도 88%같은 선택');
-  await audit.getByRole('combobox', { name: '재검토 결론' }).selectOption('both_plausible');
-  await audit.getByRole('combobox', { name: '판단의 근거 유형' }).selectOption('category_gap');
-  await audit.getByRole('textbox', { name: '근거와 남은 불확실성' }).fill('문의에는 초보 수준과 녹화 여부가 함께 있어 구매 장애물을 하나로 단정하기 어렵습니다.');
-  await audit.getByRole('button', { name: '재검토 의견 저장' }).click();
-  await expect(audit).toContainText('재검토 의견이 있는 차이 1항목');
-  await expect(audit).toContainText('두 해석 모두 가능');
-  expect(state.snapshot.reviews).toHaveLength(1);
-  expect(state.snapshot.adjudications).toHaveLength(1);
+  await page.getByLabel('결제 확인 결과').selectOption('paid');
+  await page.getByRole('button', { name: '결제 여부 저장', exact: true }).click();
+  await expect(page.getByText('결제 여부를 기록했습니다. 사이트 주문을 자동으로 확인한 것은 아닙니다.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ })).toContainText('결제 확인');
+  expect(state.snapshot.cases[0].purchase_checked_by).toBe('synthetic-operator');
+
+  page.on('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: '목록에서 삭제', exact: true }).click();
+  await expect(page.getByRole('button', { name: '진행 중인 문의 보기', exact: true })).toBeVisible();
+  await expect(page.getByText('삭제한 문의 · 복구 가능', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '문의 복구', exact: true }).click();
+  await expect(page.getByText('문의를 복구했습니다.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /삭제한 문의 보기/ })).toBeVisible();
+  expect(state.mutations.map(item => item.action)).toEqual(['manage_case', 'manage_case', 'manage_case']);
   expect(state.unexpectedApi).toEqual([]);
 });
 
-test('v2 experiment runs once and keeps the original human and v1 choices visible', async ({ page }) => {
-  const state = await fixture(page, 'jev');
-  state.snapshot.capabilities.can_jev_v2 = true;
-  await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
-  await page.getByRole('button', { name: 'Jev 그림자 판정 실행', exact: true }).click();
-  await page.getByLabel('교정 표본 용도').selectOption('operational');
-  await page.getByLabel('사람 판단 · 구매 의도').selectOption('medium');
-  await page.getByLabel('사람 판단 · 주요 장애물').selectOption('price');
-  await page.getByLabel('사람 판단 · 구매 준비도').selectOption('3');
-  await page.getByLabel('사람 판단 · 다음 행동').selectOption('answer_specific_questions');
-  await page.getByRole('button', { name: '독립 판정 저장', exact: true }).click();
-  await page.getByRole('button', { name: '판정 차이 재검토', exact: true }).click();
-  const audit = page.getByRole('region', { name: '판정 차이 재검토' });
-  await audit.getByRole('button', { name: '남은 1건 v2 실행' }).click();
-  await expect(audit).toContainText('필요 역량 질문');
-  await expect(audit).toContainText('직접 밝힌 내용 없음');
-  await expect(audit).toContainText('사람 가격Jev 수강 수준');
-  await expect(audit.getByRole('button', { name: 'v2 실행 완료' })).toBeDisabled();
-  expect(state.snapshot.reviews).toHaveLength(1);
-  expect(state.snapshot.runs).toHaveLength(1);
-  expect(state.mutations.filter(item => item.v1_run_id)).toHaveLength(1);
-});
-
-test('v3 shows a free-versus-paid contradiction for operator review without changing earlier labels', async ({ page }) => {
-  const state = await fixture(page, 'jev');
-  state.snapshot.capabilities.can_jev_v3 = true;
-  await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
-  await page.getByRole('button', { name: 'Jev 그림자 판정 실행', exact: true }).click();
-  await page.getByLabel('교정 표본 용도').selectOption('operational');
-  await page.getByLabel('사람 판단 · 구매 의도').selectOption('medium');
-  await page.getByLabel('사람 판단 · 주요 장애물').selectOption('price');
-  await page.getByLabel('사람 판단 · 구매 준비도').selectOption('3');
-  await page.getByLabel('사람 판단 · 다음 행동').selectOption('answer_specific_questions');
-  await page.getByRole('button', { name: '독립 판정 저장', exact: true }).click();
-  await page.getByRole('button', { name: '판정 차이 재검토', exact: true }).click();
-  const audit = page.getByRole('region', { name: '판정 차이 재검토' });
-  await audit.getByRole('button', { name: '선택한 문의 v3 실행' }).click();
-  await expect(audit).toContainText('무료 방송·다시보기 접근 시도');
-  await expect(audit).toContainText('판정 간 충돌:');
-  await expect(audit.getByRole('button', { name: 'v3 저장 완료' })).toBeDisabled();
-  await expect(audit).toContainText('사람 가격Jev 수강 수준');
-  expect(state.snapshot.reviews).toHaveLength(1);
-  expect(state.snapshot.runs).toHaveLength(1);
-  expect(state.snapshot.jev_v3_runs).toHaveLength(1);
-});
-
-test('v4 makes future paid consideration visible and flags an inconsistent stage without changing the first review', async ({ page }) => {
-  const state = await fixture(page, 'jev');
-  state.snapshot.capabilities.can_jev_v4 = true;
-  await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
-  await page.getByRole('button', { name: 'Jev 그림자 판정 실행', exact: true }).click();
-  await page.getByLabel('교정 표본 용도').selectOption('operational');
-  await page.getByLabel('사람 판단 · 구매 의도').selectOption('medium');
-  await page.getByLabel('사람 판단 · 주요 장애물').selectOption('price');
-  await page.getByLabel('사람 판단 · 구매 준비도').selectOption('3');
-  await page.getByLabel('사람 판단 · 다음 행동').selectOption('answer_specific_questions');
-  await page.getByRole('button', { name: '독립 판정 저장', exact: true }).click();
-  await page.getByRole('button', { name: '판정 차이 재검토', exact: true }).click();
-  const audit = page.getByRole('region', { name: '판정 차이 재검토' });
-  await audit.getByRole('button', { name: '선택한 문의 v4 실행' }).click();
-  await expect(audit).toContainText('무료 교육을 본 뒤 유료 교육 검토 명시');
-  await expect(audit).toContainText('유료 교육 언급이 있으나 행동 단계는 구매 신호 없음');
-  await expect(audit.getByRole('button', { name: 'v4 저장 완료' })).toBeDisabled();
-  expect(state.snapshot.reviews).toHaveLength(1);
-  expect(state.snapshot.runs).toHaveLength(1);
-  expect(state.snapshot.jev_v4_runs).toHaveLength(1);
-});
-
-test('historical Jev inquiries can be independently labeled in one blind batch', async ({ page }) => {
-  const state = await fixture(page, 'jev');
-  for (let index = 1; index <= 2; index++) {
-    const item: ConversionCase = { ...initialCase, id: `legacy-${index}`, sample_origin: 'external_legacy',
-      legacy_course_label: '과거 교육', course_id: null, cohort_id: null,
-      subject: `과거 교육 상담 ${index}`, content: `${index}번 실제 고객의 합성 구매 전 질문입니다.`,
-      received_at: `2026-08-0${index}T01:00:00.000Z` };
-    state.snapshot.cases.push(item);
-    const mock = createMockJudgment(item, []);
-    state.snapshot.runs.push({ id: `legacy-run-${index}`, case_id: item.id, input_version: 1, provider: 'jev',
-      result: { ...mock, mode: 'jev', model: 'jev-test', decision_version: 1, decisions: {
-        purchase_intent: { type: 'choice', choice: 'medium', confidence: .9, probabilities: {} },
-        primary_barrier: { type: 'choice', choice: 'price', confidence: .9, probabilities: {} },
-        purchase_readiness: { type: 'score', score: 3, confidence: .9, probabilities: {} },
-        next_action: { type: 'choice', choice: 'human_consult', confidence: .9, probabilities: {} },
-      } }, evidence_versions: {}, created_at: `2026-08-0${index}T02:00:00.000Z` });
-  }
-  state.snapshot.cases.push({ ...initialCase, id: 'dev-test', sample_origin: 'external_legacy',
-    subject: '[DEV 검증] 합성 사례', legacy_course_label: '과거 교육', course_id: null, cohort_id: null });
-  await page.getByRole('button', { name: '새로고침', exact: true }).click();
-  await page.getByRole('button', { name: '과거 상담 한 번에 판정', exact: true }).click();
-  const batch = page.getByRole('region', { name: '과거 상담 일괄 독립 판정' });
-  await expect(batch).toContainText('판정 대기 2건');
-  await expect(batch).not.toContainText('[DEV 검증]');
-  await expect(page.getByLabel('사람과 Jev 선택 비교')).toHaveCount(0);
-  await expect(page.getByLabel('Jev 전환 판정')).toHaveCount(0);
-  await expect(page.getByText('Jev 판단·제안 답변·일치율은 이 화면에 표시하지 않습니다.')).toBeVisible();
-  for (let index = 1; index <= 2; index++) {
-    await batch.getByRole('combobox', { name: `${index}번 · 구매 의도` }).selectOption('high');
-    await batch.getByRole('combobox', { name: `${index}번 · 주요 장애물` }).selectOption('schedule');
-    await batch.getByRole('combobox', { name: `${index}번 · 구매 준비도` }).selectOption('2');
-    await batch.getByRole('combobox', { name: `${index}번 · 다음 행동` }).selectOption('answer_specific_questions');
-  }
-  await batch.getByRole('checkbox', { name: /실제 고객의 구매 전 상담/ }).check();
-  await batch.getByRole('button', { name: '입력 완료 2건 한 번에 저장' }).click();
-  await expect(batch).toContainText('일괄 판정할 상담이 없습니다.');
-  await expect(page.getByText('과거 상담 2건의 독립 판정을 저장했습니다. 고객에게 메시지를 보내지 않았습니다.')).toBeVisible();
-  await expect(page.getByLabel('사람과 Jev 선택 비교')).toHaveCount(0);
-  expect(state.mutations.map(item => item.action)).toEqual(['review', 'review']);
-  for (const mutation of state.mutations) expect(mutation).toMatchObject({
-    decision: 'hold', reply_text: '', calibration_sample_kind: 'operational',
-    calibration: { purchase_intent: 'high', primary_barrier: 'schedule', purchase_readiness: 2, next_action: 'answer_specific_questions' },
+test('employee can edit and copy the Aside payment-check prompt without changing inquiry records', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (value: string) => { (window as Window & { copiedPrompt?: string }).copiedPrompt = value; } } });
   });
+  const state = await fixture(page);
+  await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
+  const prompt = page.getByLabel('Aside에 붙여넣을 문구 · 필요하면 고칠 수 있어요');
+  await expect(prompt).toHaveValue(/시간이 가깝다는 이유만으로 같은 사람이라고 확정하지 마세요/);
+  await prompt.fill('직원이 읽고 고친 확인 요청');
+  await page.getByRole('button', { name: 'Aside용 문구 복사', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('문구를 복사했습니다');
+  expect(await page.evaluate(() => (window as Window & { copiedPrompt?: string }).copiedPrompt)).toBe('직원이 읽고 고친 확인 요청');
+  expect(state.mutations).toEqual([]);
   expect(state.unexpectedApi).toEqual([]);
-  await batch.getByRole('button', { name: '개별 검토로 돌아가기' }).click();
-  await expect(page.getByLabel('사람과 Jev 선택 비교')).toContainText('실제 문의 표본2건');
+});
+
+test('Jev shows its result first and an authorized employee can approve without sending a message', async ({ page }) => {
+  const state = await fixture(page, 'jev');
+  await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
+  await page.getByRole('button', { name: 'Jev 결과 보기', exact: true }).click();
+  await expect(page.getByText('Jev 결과 · 직원 확인 필요', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Jev 전환 판정')).toContainText('구매 의도중간Jev가 표시한 확신 97%');
+  await expect(page.getByLabel('사람 판단 · 구매 의도')).toHaveCount(0);
+  await expect(page.getByLabel(/^고객에게 보낼 답변 초안/)).toHaveValue('초보자를 대상으로 기초 개념부터 설명합니다.');
+  await page.getByRole('button', { name: '무료·유료 구분 결과 보기', exact: true }).click();
+  await expect(page.getByRole('button', { name: '구분 결과 확인 완료', exact: true })).toBeVisible();
+  await expect(page.getByLabel('무료 자료 접근과 유료 관심 참고 분류')).toContainText('무료 콘텐츠를 본 뒤 유료 교육 검토');
+  await expect(page.getByText('유료 교육은 언급했지만, 구매 행동은 확인되지 않았다고 봤습니다.')).toBeVisible();
+  await page.getByLabel('검토 결정').selectOption('accept');
+  await page.getByRole('button', { name: '직원 승인 기록', exact: true }).click();
+  await expect(page.locator('.conversion-record')).toContainText('직원 승인');
+  await expect(page.locator('.conversion-record')).toContainText('승인된 답변 초안 · 미발송');
+  await expect(page.getByText('직원이 답변 초안을 승인해 기록했습니다. 고객에게 자동으로 보내지 않았습니다.', { exact: true })).toBeVisible();
+  expect(state.mutations.map(item => item.action || (item.v1_run_id ? 'jev-v4' : 'unknown'))).toEqual(['analyze', 'jev-v4', 'review']);
+  expect(state.unexpectedApi).toEqual([]);
+});
+
+test('employee can edit a proposed reply before recording approval', async ({ page }) => {
+  const state = await fixture(page, 'jev');
+  await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
+  await page.getByRole('button', { name: 'Jev 결과 보기', exact: true }).click();
+  await page.getByLabel('검토 결정').selectOption('edit');
+  await page.getByLabel(/^고객에게 보낼 답변 초안/).fill('수강 수준은 안내 가능하며 녹화 제공 여부는 추가 확인이 필요합니다.');
+  await page.getByLabel('검토 사유').fill('녹화 제공 내용을 직원이 확인했습니다.');
+  await expect(page.getByLabel('검토 결정')).toHaveValue('edit');
+  await page.getByRole('button', { name: '직원 승인 기록', exact: true }).click();
+  await expect(page.locator('.conversion-record')).toContainText('수정 후 승인');
+  await expect(page.locator('.conversion-record')).toContainText('미발송');
+  expect(state.mutations.at(-1)).toMatchObject({ action: 'review', decision: 'edit', calibration: null, calibration_sample_kind: null });
+  expect(state.unexpectedApi).toEqual([]);
 });
 
 async function selectAndAnalyze(page: Page) {
   await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
-  await page.getByRole('button', { name: '모의 판단 실행', exact: true }).click();
-  await expect(page.getByLabel(/^검토할 설명/)).toHaveValue('초보자를 대상으로 기초 개념부터 설명합니다.');
+  await page.getByRole('button', { name: '모의 결과 보기', exact: true }).click();
+  await expect(page.getByLabel(/^고객에게 보낼 답변 초안/)).toHaveValue('초보자를 대상으로 기초 개념부터 설명합니다.');
   await expect(page.getByText('추가 확인 필요: 이용 방법', { exact: true })).toBeVisible();
 }
 
@@ -385,12 +307,11 @@ test('authorized funnel draft can be saved and reloaded while stale writes requi
 
 test('manual inquiry can be entered and saved without inventing a customer identity', async ({ page }) => {
   const state = await fixture(page);
-  await page.getByRole('button', { name: '문의 연결', exact: true }).click();
-  const drawer = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: '문의 연결', exact: true }) });
-  await drawer.getByLabel(/^문의 출처/).selectOption('manual');
-  await drawer.getByLabel(/^표본 출처/).selectOption('current');
+  await page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true }).click();
+  const drawer = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: '카톡 문의 붙여넣기', exact: true }) });
+  await drawer.getByLabel(/^문의 시기/).selectOption('current');
   await drawer.getByLabel(/^문의 제목/).fill('수강 일정 확인');
-  await drawer.getByLabel(/^문의 발췌/).fill('수업은 언제 진행되나요?');
+  await drawer.getByLabel(/^문의 내용/).fill('수업은 언제 진행되나요?');
   await drawer.getByLabel(/^출처 설명/).fill('합성 외부 문의');
   await drawer.getByLabel(/^문의 접수 시각/).fill('2026-09-20T10:00');
   await drawer.getByLabel(/^대상 상품/).selectOption(courseId);
@@ -399,22 +320,41 @@ test('manual inquiry can be entered and saved without inventing a customer ident
   await drawer.getByRole('button', { name: '문의 저장', exact: true }).click();
   await expect(drawer).toHaveCount(0);
   await expect(page.getByRole('heading', { name: '수강 일정 확인', exact: true })).toBeVisible();
-  await expect(page.getByText('미연결 · 개인별 구매 관찰 불가', { exact: true })).toBeVisible();
+  await expect(page.getByText('회원 정보가 연결되지 않아 이후 구매 여부를 알 수 없음', { exact: true })).toBeVisible();
   expect(state.mutations).toHaveLength(1);
   expect(state.mutations[0]).toMatchObject({ action: 'save_case', question_id: null, course_id: courseId, cohort_id: null, subject: '수강 일정 확인', deidentified_confirmed: true });
   expect(state.mutations[0]).not.toHaveProperty('customer_id');
   expect(state.mutations[0].requestId).toMatch(/^[0-9a-f-]{36}$/);
 });
 
+test('pasted Kakao inquiry is saved and immediately reviewed by Jev without sending a reply', async ({ page }) => {
+  const state = await fixture(page, 'jev');
+  await page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true }).click();
+  const drawer = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: '카톡 문의 붙여넣기', exact: true }) });
+  await drawer.getByLabel(/^문의 제목/).fill('');
+  await drawer.getByLabel(/^문의 내용/).fill('무료 다시보기 링크가 열리지 않아요. 유료 과정 가격과 시작일도 알려주세요.');
+  await drawer.getByLabel(/^출처 설명/).fill('카카오 채널 1:1 상담');
+  await drawer.getByLabel(/^문의 접수 시각/).fill('2026-09-24T10:00');
+  await drawer.getByLabel(/^대상 상품/).selectOption(courseId);
+  await drawer.getByRole('checkbox', { name: '고객 식별정보를 제거한 발췌임을 확인했습니다.' }).check();
+  await drawer.getByRole('button', { name: '저장하고 Jev로 바로 살펴보기', exact: true }).click();
+  await expect(drawer).toHaveCount(0);
+  await expect(page.getByText('문의가 저장됐고 Jev 분류와 답변 초안을 만들었습니다. 아래 문의 카드에서 확인해 주세요.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '구분 결과 확인 완료', exact: true })).toBeVisible();
+  expect(state.mutations.map(item => item.action || (item.v1_run_id ? 'jev-v4' : 'unknown'))).toEqual(['save_case', 'analyze', 'jev-v4']);
+  expect(state.mutations[0]).toMatchObject({ action: 'save_case', subject: '무료 다시보기 링크가 열리지 않아요. 유료 과정 가격과 시작일도 알려주세요.' });
+  expect(state.unexpectedApi).toEqual([]);
+});
+
 test('historical education inquiry can be saved without linking a different current course', async ({ page }) => {
   const state = await fixture(page);
-  await page.getByRole('button', { name: '문의 연결', exact: true }).click();
-  const drawer = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: '문의 연결', exact: true }) });
+  await page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true }).click();
+  const drawer = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: '카톡 문의 붙여넣기', exact: true }) });
   await drawer.getByLabel(/^문의 출처/).selectOption('manual');
-  await drawer.getByLabel(/^표본 출처/).selectOption('external_legacy');
+  await drawer.getByLabel(/^문의 시기/).selectOption('external_legacy');
   await drawer.getByLabel(/^당시 유료 교육 상품명/).fill('과거 온라인 마케팅 교육');
   await drawer.getByLabel(/^문의 제목/).fill('교육 신청 방식');
-  await drawer.getByLabel(/^문의 발췌/).fill('교육 신청 전에 수강 조건을 확인하고 싶습니다.');
+  await drawer.getByLabel(/^문의 내용/).fill('교육 신청 전에 수강 조건을 확인하고 싶습니다.');
   await drawer.getByLabel(/^출처 설명/).fill('카카오 채널 1:1 · 과거 상담');
   await drawer.getByLabel(/^문의 접수 시각/).fill('2024-04-17T10:00');
   await expect(drawer.getByLabel(/^대상 상품/)).toHaveValue('');
@@ -428,23 +368,23 @@ test('historical education inquiry can be saved without linking a different curr
 test('mock recommendation can be edited and held as review records without sending any message', async ({ page }) => {
   const state = await fixture(page);
   await selectAndAnalyze(page);
-  await expect(page.getByText('모의 판단 · 운영자 확인 필요', { exact: true })).toBeVisible();
+  await expect(page.getByText('모의 결과 · 직원 확인 필요', { exact: true })).toBeVisible();
   await page.getByLabel(/^검토 결정/).selectOption('edit');
-  await page.getByLabel(/^검토할 설명/).fill('수강 수준은 안내 가능하며 녹화 제공 여부는 추가 확인이 필요합니다.');
+  await page.getByLabel(/^고객에게 보낼 답변 초안/).fill('수강 수준은 안내 가능하며 녹화 제공 여부는 추가 확인이 필요합니다.');
   await page.getByLabel(/^검토 사유/).fill('녹화 제공 자료가 아직 없습니다.');
-  await page.getByRole('button', { name: '검토 기록 저장', exact: true }).click();
+  await page.getByRole('button', { name: '직원 승인 기록', exact: true }).click();
   await expect(page.locator('.conversion-record')).toHaveCount(1);
   await expect(page.locator('.conversion-record')).toContainText('수정');
-  await expect(page.locator('.conversion-record')).toContainText('실제 적용 미확인');
+  await expect(page.locator('.conversion-record')).toContainText('미발송');
   await page.getByLabel(/^검토 결정/).selectOption('hold');
   await page.getByLabel(/^검토 사유/).fill('운영 확인을 기다립니다.');
-  await page.getByRole('button', { name: '검토 기록 저장', exact: true }).click();
+  await page.getByRole('button', { name: '보류 기록', exact: true }).click();
   await expect(page.locator('.conversion-record')).toHaveCount(2);
   expect(state.mutations.map(item => item.action)).toEqual(['analyze', 'review', 'review']);
   expect(state.mutations[1].decision).toBe('edit');
   expect(state.mutations[2].decision).toBe('hold');
   expect(state.unexpectedApi).toEqual([]);
-  await expect(page.getByText('검토 기록을 저장했습니다. 고객에게 전달된 답변은 아닙니다.', { exact: true })).toBeVisible();
+  await expect(page.getByText('직원이 보류로 기록했습니다. 고객에게 메시지를 보내지 않았습니다.', { exact: true })).toBeVisible();
 });
 
 test('changed evidence invalidates the old recommendation and disables review saving', async ({ page }) => {
@@ -454,8 +394,8 @@ test('changed evidence invalidates the old recommendation and disables review sa
   state.snapshot.evidence[0].body = '승인 문구가 변경된 합성 자료입니다.';
   await page.getByRole('button', { name: '새로고침', exact: true }).click();
   await expect(page.getByRole('alert')).toHaveText('문의나 설명자료가 바뀌었습니다. 새로 판단한 뒤 검토 기록을 남겨 주세요.');
-  await expect(page.getByRole('button', { name: '검토 기록 저장', exact: true })).toBeDisabled();
-  await expect(page.getByLabel(/^검토할 설명/)).toBeDisabled();
+  await expect(page.getByRole('button', { name: '보류 기록', exact: true })).toBeDisabled();
+  await expect(page.getByLabel(/^고객에게 보낼 답변 초안/)).toBeDisabled();
   expect(state.mutations.map(item => item.action)).toEqual(['analyze']);
 });
 
@@ -466,9 +406,9 @@ test('lost read access clears previously loaded inquiry and draft data', async (
   await page.getByRole('button', { name: '새로고침', exact: true }).click();
   await expect(page.getByRole('alert')).toHaveText('전환 관리 접근 권한이 없습니다.');
   await expect(page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ })).toHaveCount(0);
-  await expect(page.getByLabel(/^검토할 설명/)).toHaveCount(0);
+  await expect(page.getByLabel(/^고객에게 보낼 답변 초안/)).toHaveCount(0);
   await expect(page.getByText(initialCase.content, { exact: true })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '문의 연결', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true })).toHaveCount(0);
 });
 
 test('review and manual-entry drawer fit the viewport without horizontal overflow', async ({ page }) => {
@@ -478,9 +418,8 @@ test('review and manual-entry drawer fit the viewport without horizontal overflo
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
   };
   await noOverflow();
-  await page.getByRole('button', { name: '문의 연결', exact: true }).click();
-  await page.getByLabel(/^문의 출처/).selectOption('manual');
-  await expect(page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: '문의 연결', exact: true }) })).toBeVisible();
+  await page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true }).click();
+  await expect(page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: '카톡 문의 붙여넣기', exact: true }) })).toBeVisible();
   await noOverflow();
 });
 
@@ -554,10 +493,10 @@ test('integrated workspace separates inquiry review from recruitment and removes
   await page.goto('/admin/conversion?workspace=1');
   await expect(page.getByRole('heading', { name: '모집 운영', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '모집 경로 초안 저장', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '문의 연결', exact: true })).not.toBeVisible();
+  await expect(page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true })).not.toBeVisible();
   await page.getByRole('button', { name: '구매 전 문의 검토', exact: true }).click();
-  await expect(page.getByRole('button', { name: '문의 연결', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true })).toBeVisible();
   await expect(page.getByText('초보 수강과 녹화 문의', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '모집 설정·구매·후속 안내', exact: true }).click();
-  await expect(page.getByRole('button', { name: '문의 연결', exact: true })).not.toBeVisible();
+  await expect(page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true })).not.toBeVisible();
 });
