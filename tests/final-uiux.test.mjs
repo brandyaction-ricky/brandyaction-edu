@@ -100,6 +100,16 @@ test('five admin categories and scoped navigation render from the admin UI featu
   const restricted = html(AdminShell, { ...props, available: platform.sections.filter(row => row.key === 'products') });
   assert.doesNotMatch(restricted, /href="\/admin\/(questions|customers|members|orders)"/);
 });
+test('home customer stories carousel and accessible profile dropdown are present', () => {
+  const platformSource = read('app/ui/platform.tsx');
+  assert.match(platformSource, /<StoryCarousel stories=\{rows\("review_videos"\)\} \/>/);
+  assert.match(platformSource, /aria-label="내 프로필 메뉴"/);
+  assert.match(platformSource, /aria-expanded=\{profileMenuOpen\}/);
+  for (const href of ['/my', '/my/profile', '/my/coupons', '/my/orders', '/my/classes'])
+    assert.ok(platformSource.includes(`href="${href}"`));
+  assert.match(read('app/ui/final/story-carousel.tsx'), /이전 고객 이야기[\s\S]*다음 고객 이야기/);
+  assert.match(read('app/ui/final/frontend.css'), /\.profile-menu\{/);
+});
 test('three signup methods and product detail variants use the final publishing structures', () => {
   const { AuthView, ProductDetail, ArticlesView, StoriesView } = load('app/ui/final/public-views.tsx');
   for (const signup of [false, true]) {
