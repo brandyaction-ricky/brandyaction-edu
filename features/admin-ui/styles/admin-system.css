@@ -171,3 +171,28 @@
 }
 @media(max-width:420px){.edu-admin .admin-metric-grid--2,.edu-admin .admin-metric-grid--4,.edu-admin .admin-metric-grid--8,.edu-admin .category-strip{grid-template-columns:minmax(0,1fr)}}
 @media(prefers-reduced-motion:reduce){.edu-admin .admin-button,.edu-admin :is(.admin-input,.admin-select,.admin-textarea){transition:none}}
+
+/* Shared workspace tabs: scroll within the control, never widen the dialog. */
+.edu-admin .admin-workspace-tabs{min-width:0}
+.edu-admin .admin-workspace-tabs>.tabs{display:flex;flex-wrap:nowrap;gap:20px;max-width:100%;margin-bottom:20px;padding:0 3px;overflow-x:auto;scrollbar-width:thin;overscroll-behavior-inline:contain}
+.edu-admin .admin-workspace-tabs>.tabs .tab{flex:0 0 auto;min-height:48px;white-space:nowrap}
+.edu-admin .admin-workspace-tabs>[role=tabpanel]{min-width:0;outline-offset:4px}
+.edu-admin .admin-workspace-tabs>[role=tabpanel][hidden]{display:none}
+.edu-admin .customer-workspace>.drawer-profile{display:flex;align-items:center;gap:16px;margin-bottom:20px;padding:16px;background:var(--admin-surface-subtle);border:1px solid var(--admin-border);border-radius:var(--admin-radius-surface)}
+.edu-admin .customer-workspace>.drawer-profile>div{min-width:0;overflow-wrap:anywhere}
+.edu-admin .customer-workspace>.drawer-profile .avatar{flex:none;width:48px;height:48px}
+.edu-admin .customer-workspace>.drawer-profile small{display:block;margin-top:6px;color:var(--admin-text-muted);font-size:12px}
+.edu-admin .customer-workspace .customer-account-summary{margin-bottom:20px}
+.edu-admin .member-records{min-width:0;overflow-wrap:anywhere}
+.edu-admin .member-records>.panel{padding:20px}
+.edu-admin .member-records>.row{flex-wrap:wrap;justify-content:flex-end;gap:12px}
+.edu-admin .member-records .text-link{display:inline-flex;min-height:40px;align-items:center}
+.edu-admin .member-records .reading-copy{white-space:pre-wrap}
+.edu-admin .customer-workspace .notice{padding:16px;line-height:1.7}
+@media(max-width:720px){
+  .edu-admin .customer-workspace>.drawer-profile{gap:12px;padding:12px;align-items:flex-start}
+  .edu-admin .customer-workspace>.drawer-profile .avatar{width:36px;height:36px}
+  .edu-admin .member-records>.panel{padding:16px}
+  .edu-admin .member-records>.spread{gap:12px;align-items:flex-start}
+  .edu-admin .member-records>.spread>.btn{width:100%}
+}
