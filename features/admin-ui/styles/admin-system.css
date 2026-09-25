@@ -173,6 +173,35 @@
 @media(prefers-reduced-motion:reduce){.edu-admin .admin-button,.edu-admin :is(.admin-input,.admin-select,.admin-textarea){transition:none}}
 
 /* Shared workspace tabs: scroll within the control, never widen the dialog. */
+.edu-admin .admin-timeline{list-style:none;margin:20px 0;padding:0 0 0 18px;border-left:2px solid var(--admin-border)}
+.edu-admin .admin-timeline>li{position:relative;padding:0 0 24px 4px;min-width:0;overflow-wrap:anywhere}
+.edu-admin .admin-timeline>li:last-child{padding-bottom:0}
+.edu-admin .admin-timeline>li::before{content:"";position:absolute;left:-24px;top:6px;width:8px;height:8px;border:2px solid var(--admin-surface);border-radius:50%;background:var(--text-secondary)}
+.edu-admin .admin-timeline h4{margin:0 0 4px;font-size:15px;line-height:1.5}
+.edu-admin .admin-timeline>li>div{margin-top:12px}
+.edu-admin :is(.review-history,.review-unsaved){margin-top:24px;padding:20px;border:1px solid var(--admin-border);border-radius:var(--admin-radius-surface);background:var(--admin-surface-subtle);overflow-wrap:anywhere}
+.edu-admin :is(.review-history,.review-unsaved)>h3{margin:0 0 8px}
+.edu-admin .review-history :is(.notice,[role=alert],[role=status]){margin-top:16px}
+.edu-admin .review-check-records{list-style:none;padding:0;margin:12px 0 0;display:grid;gap:8px;font-size:13px;line-height:1.6}
+.edu-admin .review-history-pages{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:20px}
+.edu-admin .review-history-pages>span{flex:1 0 100%}
+.edu-admin .review-checks{min-width:0;margin:20px 0 12px;padding:16px;border:1px solid var(--admin-border);border-radius:var(--admin-radius-control)}
+.edu-admin .review-checks legend{padding:0 6px;font-size:14px;font-weight:650}
+.edu-admin .review-checks>.checkline{align-items:center;min-height:40px;margin:8px 0 0;gap:10px;line-height:1.5}
+.edu-admin .review-checks input[type=checkbox]{margin:0;width:18px;height:18px;min-height:18px}
+.edu-admin .review-checks:disabled{color:var(--text-secondary)}
+.edu-admin .review-unsaved textarea{margin-top:16px;width:100%;box-sizing:border-box}
+.edu-admin .review-unsaved ul{padding-left:20px;margin:16px 0;line-height:1.8}
+.edu-admin :is(.review-heading h2,.review-history,.review-result-notice):focus{outline:2px solid var(--ba-info);outline-offset:4px}
+.edu-admin .review-main :is(.notice,.answer-copy){overflow-wrap:anywhere}
+@media(max-width:1100px){.edu-admin .review-grid{grid-template-columns:minmax(0,1fr)}.edu-admin .review-grid>.inspector{border-left:0;border-top:1px solid var(--admin-border)}}
+@media(max-width:720px){
+  .edu-admin :is(.review-history,.review-unsaved){padding:16px}
+  .edu-admin .review-checks{padding:12px}
+  .edu-admin .review-actions{display:flex;flex-wrap:wrap;gap:8px}
+  .edu-admin .review-actions>.btn{flex:1 1 auto;min-height:44px}
+  .edu-admin .review-history-pages>.btn{flex:1;min-height:44px}
+}
 .edu-admin .admin-workspace-tabs{min-width:0}
 .edu-admin .admin-workspace-tabs>.tabs{display:flex;flex-wrap:nowrap;gap:20px;max-width:100%;margin-bottom:20px;padding:0 3px;overflow-x:auto;scrollbar-width:thin;overscroll-behavior-inline:contain}
 .edu-admin .admin-workspace-tabs>.tabs .tab{flex:0 0 auto;min-height:48px;white-space:nowrap}
