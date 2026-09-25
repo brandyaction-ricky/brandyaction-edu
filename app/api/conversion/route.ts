@@ -59,7 +59,7 @@ export async function GET() {
     const cases: ConversionCase[] = ((caseRows.data || []) as unknown as ConversionCase[]).map(item => pendingCaseManagementMigration
       ? { ...item, purchase_outcome: 'unknown' as const, purchase_checked_at: null, purchase_checked_by: null, archived_at: null, archived_by: null } : item);
     return reply({ cases, evidence, questions, courses, cohorts, runs, reviews, adjudications: notes.data || [], jev_v2_runs: v2.data || [], jev_v3_runs: v3.data || [], jev_v4_runs: v4.data || [],
-      capabilities: { can_manage_evidence: user.permissions.products, can_manage_cases: !pendingCaseManagementMigration, ...conversionCapabilities(process.env), can_adjudicate: !pendingMigration && conversionCapabilities(process.env).can_jev, can_jev_v2: !pendingV2Migration && conversionCapabilities(process.env).can_jev, can_jev_v3: !pendingV3Migration && conversionCapabilities(process.env).can_jev, can_jev_v4: !pendingV4Migration && conversionCapabilities(process.env).can_jev, can_manage_funnel: user.permissions.products && user.permissions.marketing },
+      capabilities: { can_manage_evidence: user.permissions.products, can_manage_cases: !pendingCaseManagementMigration, ...conversionCapabilities(process.env), can_adjudicate: !pendingMigration && conversionCapabilities(process.env).can_jev, can_jev_v2: !pendingV2Migration && conversionCapabilities(process.env).can_jev, can_jev_v3: !pendingV3Migration && conversionCapabilities(process.env).can_jev, can_jev_v4: !pendingV4Migration && conversionCapabilities(process.env).can_jev, can_manage_funnel: user.permissions.products && user.permissions.marketing, can_copy_aside_match: user.permissions.orders && user.permissions.marketing },
       limits: { cases: 200, evidence: 500, questions: 200, runs: 500, reviews: 500, adjudications: 500, jev_v2_runs: 500, jev_v3_runs: 500, jev_v4_runs: 500 } });
   } catch (error) { return failure(error); }
 }
@@ -73,6 +73,7 @@ export async function POST(request: Request) {
     try { decoded = JSON.parse(raw); } catch { return reply({ error: '요청 형식을 확인해 주세요.' }, 400); }
     const { action, requestId, payload, payload_hash } = conversionPayload(decoded);
     if (action === 'save_evidence' && !user.permissions.products) return reply({ error: '설명자료 변경에는 상품 관리 권한도 필요합니다.' }, 403);
+    if (action === 'manage_case_order' && (!user.permissions.orders || !user.permissions.marketing)) return reply({ error: '문의와 주문을 연결하려면 주문 및 마케팅 관리 권한이 필요합니다.' }, 403);
     const capabilities = conversionCapabilities(process.env);
     if (action === 'analyze' && !capabilities.can_analyze) return reply({ error: '판정 기능은 활성화된 개발·검수 환경에서만 실행할 수 있습니다.' }, 403);
     const db = createAdminClient();
@@ -96,6 +97,8 @@ export async function POST(request: Request) {
     }
     const saved = action === 'manage_case'
       ? await db.rpc('edu_conversion_case_manage', { p_actor: user.id, p_request: requestId, p_payload: payload, p_payload_hash: payload_hash })
+      : action === 'manage_case_order'
+        ? await db.rpc('edu_conversion_case_order_manage', { p_actor: user.id, p_request: requestId, p_payload: payload, p_payload_hash: payload_hash })
       : await db.rpc('edu_conversion_mutate', { p_actor: user.id, p_request: requestId, p_action: action, p_payload: payload, p_payload_hash: payload_hash, p_result: result, p_evidence_versions: evidence_versions, p_observed_version: observed_version });
     if (saved.error) conversionDatabaseError(saved.error);
     return reply({ ok: true, ...saved.data });

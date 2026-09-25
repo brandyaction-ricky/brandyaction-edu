@@ -19,7 +19,7 @@ function initialSnapshot(): ConversionSnapshot {
       source_url: 'https://example.test/course-guide', version: 1, status: 'approved' }],
     courses: [{ id: courseId, title: '합성 교육 상품' }],
     cohorts: [{ id: '44444444-4444-4444-8444-444444444444', course_id: courseId, name: '합성 1기' }],
-    questions: [], runs: [], reviews: [], adjudications: [], capabilities: { can_manage_evidence: true, can_mock: true },
+    questions: [], runs: [], reviews: [], adjudications: [], capabilities: { can_manage_evidence: true, can_mock: true, can_copy_aside_match: true },
   };
 }
 
@@ -27,15 +27,21 @@ async function fixture(page: Page, provider: 'mock' | 'jev' = 'mock') {
   const snapshot = initialSnapshot();
   if (provider === 'jev') snapshot.capabilities = { ...snapshot.capabilities, can_jev: true, can_adjudicate: true, can_jev_v4: true, can_analyze: true, analyze_provider: 'jev' };
   const mutations: Record<string, unknown>[] = [];
+  const orderRows: Array<{ id: string; status: 'paid' | 'partially_refunded' | 'refunded'; currency: string; total_amount: number; paid_at: string; item_name: string; linked_at: string | null; refund_amount: number; payment_statuses: string[] }> = [
+    { id: '66666666-6666-4666-8666-666666666666', status: 'paid', currency: 'KRW', total_amount: 1650000, paid_at: '2026-09-22T02:00:00.000Z', item_name: '합성 교육 상품', linked_at: null, refund_amount: 0, payment_statuses: ['done'] },
+  ];
   const unexpectedApi: string[] = [];
   let forbidden = false;
   await page.route('**/api/**', async route => {
     const pathname = new URL(route.request().url()).pathname;
-    if (!['/api/conversion', '/api/conversion/adjudication', '/api/conversion/jev-v2', '/api/conversion/jev-v3', '/api/conversion/jev-v4'].includes(pathname)) {
+    if (!['/api/conversion', '/api/conversion/orders', '/api/conversion/adjudication', '/api/conversion/jev-v2', '/api/conversion/jev-v3', '/api/conversion/jev-v4'].includes(pathname)) {
       unexpectedApi.push(route.request().url());
       await route.fulfill({ status: 405, json: { error: '검증에 허용되지 않은 API입니다.' } }); return;
     }
     if (forbidden) { await route.fulfill({ status: 403, json: { error: '전환 관리 접근 권한이 없습니다.' } }); return; }
+    if (pathname === '/api/conversion/orders') {
+      await route.fulfill({ json: { orders: orderRows, available: true, can_manage: true } }); return;
+    }
     if (pathname === '/api/conversion/jev-v2') {
       const body = route.request().postDataJSON();
       mutations.push(body);
@@ -129,12 +135,30 @@ async function fixture(page: Page, provider: 'mock' | 'jev' = 'mock') {
       else item.archived_at = null;
       await route.fulfill({ json: { ok: true, case: item } }); return;
     }
+    if (body.action === 'manage_case_order') {
+      const item = orderRows.find(order => order.id === body.order_id)!;
+      item.linked_at = body.operation === 'link' ? timestamp : null;
+      await route.fulfill({ json: { ok: true, case_id: body.case_id, order_id: body.order_id, operation: body.operation } }); return;
+    }
     await route.fulfill({ status: 405, json: { error: '등록되지 않은 모의 요청입니다.' } });
   });
   await page.goto('/admin/conversion');
   await expect(page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ })).toBeVisible();
   return { snapshot, mutations, unexpectedApi, deny: () => { forbidden = true; } };
 }
+
+test('staff can inspect a matching paid order and link it only after checking it', async ({ page }) => {
+  const state = await fixture(page);
+  await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
+  await expect(page.getByText('같은 상품·기수의 결제 기록을 문의 뒤 90일 동안 찾아 보여줍니다.', { exact: false })).toBeVisible();
+  await expect(page.getByText('1,650,000원')).toBeVisible();
+  await expect(page.getByText('주문자 이름·연락처는 표시하지 않습니다.', { exact: false })).toBeVisible();
+  await page.getByRole('button', { name: '확인한 주문으로 연결' }).click();
+  await expect(page.getByText('직원이 확인한 주문 기록을 문의에 연결했습니다.', { exact: true })).toBeVisible();
+  await expect(page.getByText('연결된 주문 · 결제 완료')).toBeVisible();
+  expect(state.mutations.at(-1)).toMatchObject({ action: 'manage_case_order', operation: 'link', case_id: initialCase.id });
+  expect(state.unexpectedApi).toEqual([]);
+});
 
 test('employee records a checked purchase result and can remove then restore an inquiry', async ({ page }) => {
   const state = await fixture(page);
@@ -153,6 +177,22 @@ test('employee records a checked purchase result and can remove then restore an 
   await expect(page.getByText('문의를 복구했습니다.', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /삭제한 문의 보기/ })).toBeVisible();
   expect(state.mutations.map(item => item.action)).toEqual(['manage_case', 'manage_case', 'manage_case']);
+  expect(state.unexpectedApi).toEqual([]);
+});
+
+test('employee can edit and copy the Aside payment-check prompt without changing inquiry records', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (value: string) => { (window as Window & { copiedPrompt?: string }).copiedPrompt = value; } } });
+  });
+  const state = await fixture(page);
+  await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
+  const prompt = page.getByLabel('Aside에 붙여넣을 문구 · 필요하면 고칠 수 있어요');
+  await expect(prompt).toHaveValue(/시간이 가깝다는 이유만으로 같은 사람이라고 확정하지 마세요/);
+  await prompt.fill('직원이 읽고 고친 확인 요청');
+  await page.getByRole('button', { name: 'Aside용 문구 복사', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('문구를 복사했습니다');
+  expect(await page.evaluate(() => (window as Window & { copiedPrompt?: string }).copiedPrompt)).toBe('직원이 읽고 고친 확인 요청');
+  expect(state.mutations).toEqual([]);
   expect(state.unexpectedApi).toEqual([]);
 });
 

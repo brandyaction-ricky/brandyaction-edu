@@ -7,6 +7,7 @@ type Template = {
   purpose: "marketing" | "transactional";
   content: string;
   alimtalk_template_id?: string | null;
+  is_active?: boolean;
   buttons?: unknown;
 };
 type Member = {
@@ -55,6 +56,8 @@ function message(
   member: Member,
   sender: string,
 ): MessageSchema {
+  if (template.is_active === false)
+    throw new Error("사용 중지된 템플릿은 발송할 수 없습니다.");
   const content = render(template.content, member);
   if (template.channel === "alimtalk") {
     if (template.purpose === "marketing")

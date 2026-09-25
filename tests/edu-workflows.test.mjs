@@ -48,10 +48,11 @@ test('measurement code drafts validate scope, consent and size',()=>{
  assert.throws(()=>rules.validateMeasurementCode({name:'x',location:'head',scope:'landing',code:'x',purpose:'x',confirmed:false}));
 });
 const uid='11111111-1111-4111-8111-111111111111';
-function handler(user) {
+function handler(user, suppliedDb) {
  let calls=[];
+ const db=suppliedDb||{rpc:async(...args)=>{calls.push(args);return {data:1};}};
  const exports=load('app/api/platform/workflows/route.ts',{
- '@/lib/supabase/admin':{createAdminClient:()=>({rpc:async(...args)=>{calls.push(args);return {data:1};}})},
+ '@/lib/supabase/admin':{createAdminClient:()=>db},
  '@/lib/server-auth':{getAuthenticatedUser:async()=>user},
  '@/lib/platform-rules':load('lib/platform-rules.ts'),
  '@/lib/edu-workflows':rules,
@@ -76,6 +77,19 @@ test('all operational writes require admin authentication and same origin',async
   assert.equal((await handler({id:uid,role:'student'}).POST(request({action,role:'admin'}))).status,403);
   assert.equal((await handler({id:uid,role:'admin'}).POST(request({action},'https://other.example'))).status,403);
  }
+});
+
+test('Alimtalk wording can be saved as an inactive draft, while activation requires a Kakao approval number',async()=>{
+ const inserted=[];
+ const db={rpc:async()=>({data:1}),from(table){assert.equal(table,'crm_templates');let values;const query={insert(v){values=v;inserted.push(v);return query;},update(v){values=v;return query;},eq(){return query;},select(){return query;},single:async()=>({data:{id:uid,...values},error:null})};return query;}};
+ const route=handler({id:uid,role:'admin'},db);
+ const draft={action:'crm-save',kind:'template',name:'결제 안내 초안',channel:'alimtalk',purpose:'transactional',content:'수정 가능한 안내',alimtalkTemplateId:'',isActive:false};
+ const saved=await route.POST(request(draft));
+ assert.equal(saved.status,200);
+ assert.equal(inserted[0].alimtalk_template_id,null);
+ assert.equal(inserted[0].is_active,false);
+ assert.equal((await route.POST(request({...draft,isActive:true}))).status,400);
+ assert.equal(inserted.length,1);
 });
 test('bulk review rejects duplicate IDs and missing feedback before a write',async()=>{
  const h=handler({id:uid,role:'admin'});
