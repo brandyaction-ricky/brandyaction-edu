@@ -14,6 +14,7 @@ import { paidCourseReadinessIssues, recordId } from "@/lib/platform-rules";
 import { archiveValues, cohortPeriod, cohortStatus } from "@/lib/qa-rules";
 import { ArrowRight, BookOpen, ChevronDown, ChevronUp, FileText, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { AdminEmptyState, AdminPagination, AdminSearchField } from "@/features/admin-ui";
 import type { Data, WorkflowSend } from "../learning-workflows";
@@ -61,6 +62,7 @@ export function AdminCatalog({
   missionScope,
   onMissionScopeChange,
 }: Props) {
+  const params = useSearchParams(), router = useRouter();
   const [query, setQuery] = useState(""),
     [status, setStatus] = useState(""),
     [type, setType] = useState(""),
@@ -622,6 +624,7 @@ export function AdminCatalog({
   );
   return (
     <>
+      {['customers', 'questions'].includes(s.key) && (params.get('member') || params.get('question')) && <p className="notice mb16">연결된 {params.get('question') ? '질문' : '회원'}만 조회 중입니다. <Link className="text-link" href={`/admin/${s.key}`}>전체 목록 보기</Link></p>}
       {s.key === "products" && (
         <div className="metrics">
           <Metric
@@ -660,7 +663,7 @@ export function AdminCatalog({
       </div>}
       {s.key === "product-reviews" && <div className="ops-callout mb16">상품 후기 → 해당 상품 상세페이지에 표시 · <Link className="text-link" href="/admin/testimonials">고객 후기</Link> → 별도로 선정한 홈페이지 사례</div>}
       {scope}
-      {s.key === "customers" && (
+      {s.key === "customers" && !params.get('member') && (
         <div className="metrics">
           <Metric
             label="전체 회원"
@@ -835,7 +838,7 @@ export function AdminCatalog({
                 {courses.map((item) => <option key={item.id} value={item.id}>{t(item, "title")}</option>)}
               </select></label>
             )}
-            {statusFilter}
+            {s.key === "questions" ? <select aria-label="질문 처리 상태" value={params.has('question') ? 'selected' : params.get('questionState') || 'active'} onChange={event => { const next = new URLSearchParams(params.toString()); next.set('questionState', event.target.value); next.delete('question'); router.push(`/admin/questions?${next}`); }}>{params.has('question') && <option value="selected" disabled>선택한 질문 · 보관 포함</option>}<option value="active">전체 운영 질문</option><option value="open">미답변</option><option value="answered">답변 완료</option><option value="archived">보관</option></select> : statusFilter}
           </div>}
           {s.key === "learning" ? (
             <div className="lesson-list">
@@ -902,10 +905,11 @@ export function AdminCatalog({
                 <article className="panel question-admin-card" key={q.id}>
                   <div className="panel-head">
                     <div>
+                      <p className="meta">{t(object(q, 'profiles') as Row, 'full_name') || '회원 정보 확인 필요'} · {t(object(q, 'profiles') as Row, 'email')} · {t(object(q, 'courses') as Row, 'title') || '일반 질문'}</p>
                       <Badge
                         color={q.status === "answered" ? "green" : "amber"}
                       >
-                        {labels[t(q, "status")]}
+                        {q.is_archived ? '보관' : labels[t(q, "status")]}
                       </Badge>
                       <h2 className="mt8">{t(q, "title")}</h2>
                     </div>
@@ -921,7 +925,8 @@ export function AdminCatalog({
                         <p className="reading-copy">{t(q, "answer")}</p>
                       </div>
                     )}
-                    <p className="meta mt16">{date(q.created_at)}</p>
+                    <p className="meta mt16">접수 {date(q.created_at)} · {q.status === 'open' && !q.is_archived ? '답변 필요' : q.is_archived ? '보관된 질문 · 삭제되지 않음' : '답변 완료'}</p>
+                    {Boolean(q.user_id) && <Link className="text-link" href={`/admin/customers?member=${encodeURIComponent(t(q, 'user_id'))}`}>회원 운영 정보 보기</Link>}
                   </div>
                 </article>
               ))}

@@ -44,6 +44,12 @@ export async function GET(request: Request) {
         const data: Record<string, Row[]> = {};
         let pagination: { page: number; pageSize: number; total: number } | null = null;
         const primaryTable = sections.find((section) => section.key === sectionKey)?.table;
+        const memberScope = params.get('member') || '';
+        const submissionScope = sectionKey === 'reviews' ? params.get('submission') || '' : '';
+        const questionScope = sectionKey === 'questions' ? params.get('question') || '' : '';
+        const questionState = params.get('questionState') || 'active';
+        if (adminMode && sectionKey === 'questions' && !['active', 'open', 'answered', 'archived'].includes(questionState)) return reply({ error: '질문 조회 상태를 확인해 주세요.' }, 400);
+        if (adminMode && [memberScope, submissionScope, questionScope].some(value => value && !uid(value))) return reply({ error: '운영 대상 조회 조건을 확인해 주세요.' }, 400);
         const missionCourse = params.get('course') || '';
         const missionWeek = params.get('week') || '';
         const missionState = params.get('missionState') || 'active';
@@ -111,6 +117,19 @@ export async function GET(request: Request) {
                         : '*';
                 const serverPaged = adminMode && !productEditorRead && table === primaryTable && !['home', 'members', 'reviews', 'analytics', 'metrics', 'seo', 'settings', 'staff', 'templates', 'campaigns', 'automations'].includes(sectionKey);
                 let query = db.from(table).select(columns, serverPaged ? { count: 'exact' } : undefined);
+                if (adminMode && sectionKey === 'customers' && table === 'profiles' && memberScope) query = query.eq('id', memberScope);
+                if (adminMode && sectionKey === 'questions' && table === 'edu_questions') {
+                    if (memberScope) query = query.eq('user_id', memberScope);
+                    if (questionScope) query = query.eq('id', questionScope);
+                    else {
+                        query = query.eq('is_archived', questionState === 'archived');
+                        if (['open', 'answered'].includes(questionState)) query = query.eq('status', questionState);
+                    }
+                }
+                if (adminMode && sectionKey === 'reviews' && table === 'mission_submissions') {
+                    if (memberScope) query = query.eq('enrollments.user_id', memberScope);
+                    if (submissionScope) query = query.eq('id', submissionScope);
+                }
                 if (record && adminMode && table === primaryTable) query = query.eq('id', record);
                 if (record && productEditorRead && table === 'cohorts') query = query.eq('course_id', record);
                 query = serverPaged ? query.range((page - 1) * pageSize, page * pageSize - 1) : query.limit(productEditorRead && table === 'courses' ? 1 : 1000);

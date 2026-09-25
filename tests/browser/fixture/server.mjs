@@ -13,9 +13,28 @@ const report = {campaign,summary_b:summary,summary_a:null,performance:[],daily:[
 const result = await build({entryPoints:['tests/browser/fixture/app.tsx'],bundle:true,write:false,outdir:'focus-fixture',platform:'browser',format:'esm',jsx:'automatic',define:{'process.env.NODE_ENV':'"development"','process.env':'{}'},alias:{'next/image':resolve('tests/browser/fixture/image.tsx'),'next/link':resolve('tests/browser/fixture/link.tsx'),'next/navigation':resolve('tests/browser/fixture/navigation.ts')}});
 const assets = new Map(result.outputFiles.map(file=>['/'+file.path.split('/').at(-1),file.contents]));
 const brandLogo = readFileSync(resolve('public/brandy-action-logo.png'));
+const failedMemberReads = new Set();
 const server = createServer((request,response)=>{
   const url=new URL(request.url,'http://localhost');
   if(request.method!=='GET'){response.writeHead(405).end();return;}
+  if(url.pathname==='/api/platform/workflows'&&url.searchParams.get('kind')==='participants'){
+    const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
+    response.setHeader('Content-Type','application/json');response.end(JSON.stringify({cohortId:id(11),weekId:id(15),cohorts:[{id:id(11),name:'1기',course_id:id(10),course_title:'합성 신규 상품'}],weeks:[{id:id(15),week:1,title:'실행 시작'}],columns:[{id:id(16),day_number:1,title:'첫 학습'}],matrix:{[id(12)]:[{lessonId:id(16),status:'changes_requested',submissionId:id(30),approved:0,total:1}]},rows:[{id:id(12),user_id:id(1),full_name:'운영 동선 QA 회원',email:'operations-fixture@example.test',learning_percent:50,mission_total:1,approved:0,achievement:0,last_activity:'2026-09-24T09:00:00Z'}],total:1,stats:{participants:1,average:0,participation:100,attention:0}}));return;
+  }
+  if(url.pathname==='/api/admin/member-overview'){
+    const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
+    const member=url.searchParams.get('member'),view=url.searchParams.get('view'),page=Number(url.searchParams.get('page')||1);
+    response.setHeader('Content-Type','application/json');
+    if(member===id(3)&&!failedMemberReads.has(view)){setTimeout(()=>{if(response.destroyed)return;failedMemberReads.add(view);response.writeHead(503).end(JSON.stringify({error:'합성 조회 오류: 다시 시도해 주세요.'}));},500);return;}
+    const enrollment={courses:{id:id(10),title:'합성 신규 상품'},cohorts:{id:id(11),name:'1기'},cohort_id:id(11)};
+    const records=view==='enrollments'?[
+      {id:id(12),...enrollment,status:'active',access_starts_at:'2026-01-01',access_ends_at:'2099-01-01'},
+      {id:id(13),...enrollment,status:'active',access_starts_at:'2099-01-01'},
+      {id:id(14),...enrollment,status:'active',access_ends_at:'2025-01-01'},
+    ]:view==='progress'?[]:view==='submissions'?Array.from({length:21},(_,n)=>({id:id(30+n),status:'approved',attempt_number:2,submitted_at:'2026-09-24T09:00:00Z',reviewed_at:'2026-09-24T10:00:00Z',reviewer_feedback:'실행 확인 완료',enrollments:enrollment,curriculum_missions:{id:id(20),title:`첫 실행 미션 ${n+1}`}})):[{id:id(40),courses:enrollment.courses,title:'합성 보관 질문',status:'answered',is_archived:true,created_at:'2026-09-24T09:00:00Z'}];
+    const rows=member===id(4)?[]:records;
+    setTimeout(()=>response.end(JSON.stringify({rows:rows.slice((page-1)*20,page*20),total:rows.length,page,pageSize:20})),500);return;
+  }
   if(url.pathname==='/brandy-action-logo.png'){response.setHeader('Content-Type','image/png');response.end(brandLogo);return;}
   if(url.pathname==='/api/landing/performance'){
     response.setHeader('Content-Type','application/json');

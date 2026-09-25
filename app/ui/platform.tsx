@@ -48,6 +48,7 @@ import {
 import { Checkout } from "./final/checkout";
 import { Classroom } from "./final/classroom";
 import { MemberViews } from "./final/member-views";
+import { CustomerWorkspace } from "./final/customer-workspace";
 import {
   ArticleCard,
   Brand,
@@ -185,6 +186,7 @@ export function Platform({
     total: number;
   } | null>(null);
   const [loadedSection, setLoadedSection] = useState("");
+  const [loadedScope, setLoadedScope] = useState("");
   const searchParams = useSearchParams();
   const routeKey = path.join("/") + "?" + searchParams.toString();
   const [filters, setFilters] = useState({
@@ -202,6 +204,7 @@ export function Platform({
         : "전체";
   const setFilter = (value: string) => setFilters({ route: routeKey, value });
   const [editor, setEditor] = useState<{
+    route: string;
     section: Section;
     row?: Row;
     context?: MissionContext;
@@ -222,18 +225,19 @@ export function Platform({
       : path[1] === "learning-editor"
         ? "learning"
         : path[1] || "home";
-  const data = !admin || loadedSection === adminSection ? loadedData : {};
   const editorRecordId = ["product-editor", "learning-editor"].includes(path[1])
     ? searchParams.get("id") || ""
     : "";
-  const adminPage = adminPaging.section === adminSection ? adminPaging.page : 1;
-  const scopeQuery = adminSection === "missions" ? new URLSearchParams({ course: missionScope.courseId, week: missionScope.weekId, missionState: missionScope.state }).toString() : "";
+  const scopeQuery = adminSection === "missions" ? new URLSearchParams({ course: missionScope.courseId, week: missionScope.weekId, missionState: missionScope.state }).toString() : ["customers", "questions", "reviews"].includes(adminSection) ? new URLSearchParams({ member: searchParams.get("member") || "", submission: searchParams.get("submission") || "", question: searchParams.get("question") || "", questionState: searchParams.get("questionState") || "active" }).toString() : "";
+  const pagingKey = adminSection + "?" + scopeQuery;
+  const adminPage = adminPaging.section === pagingKey ? adminPaging.page : 1;
+  const data = !admin || (loadedSection === adminSection && loadedScope === scopeQuery) ? loadedData : {};
   const setAdminPage = (update: number | ((page: number) => number)) =>
     setAdminPaging((current) => ({
-      section: adminSection,
+      section: pagingKey,
       page:
         typeof update === "function"
-          ? update(current.section === adminSection ? current.page : 1)
+          ? update(current.section === pagingKey ? current.page : 1)
           : update,
     }));
   const refresh = useCallback(async (forceNetwork = false) => {
@@ -289,6 +293,7 @@ export function Platform({
       if (alive.current) {
         setData(result.data || {});
         setLoadedSection(adminSection);
+        setLoadedScope(scopeQuery);
         setSupport(result.support || { email: "", url: "" });
         if (admin && cachedAdminUser?.id !== result.user?.id)
           adminNavigationReads.clear();
@@ -811,7 +816,7 @@ export function Platform({
               : "learning-editor") +
             (row ? "?id=" + row.id : ""),
         );
-      else setEditor({ section, row, context: context || (section.key === "missions" ? missionScope : undefined) });
+      else setEditor({ route: routeKey, section, row, context: context || (section.key === "missions" ? missionScope : undefined) });
     };
     const back = () =>
       router.push(
@@ -910,7 +915,7 @@ export function Platform({
             </AdminHeading>}
             {standaloneAdmin.includes(section.key) ? (
               <AdminWorkflows
-                key={section.key}
+                key={section.key + scopeQuery + (section.key === 'members' ? searchParams.toString() : '')}
                 section={section.key}
                 data={data}
                 send={send}
@@ -923,7 +928,7 @@ export function Platform({
               <>
               {section.key === "articles" && <nav className="article-admin-tabs" aria-label="아티클 관리 구분"><button type="button" className={`btn ${articleAdminTab === "content" ? "dark" : ""}`} aria-pressed={articleAdminTab === "content"} onClick={() => setArticleAdminTab("content")}><Pencil />아티클 콘텐츠</button><button type="button" className={`btn ${articleAdminTab === "banner" ? "dark" : ""}`} aria-pressed={articleAdminTab === "banner"} onClick={() => setArticleAdminTab("banner")}><BookOpen />무료강의 상단 설정</button></nav>}
               {section.key === "articles" && articleAdminTab === "banner" ? <ArticleBannerEditor key={JSON.stringify(object(rows("site_settings").find(row => row.key === "edu_article_banner"), "value"))} settings={rows("site_settings")} send={send} pending={pending} /> : <>{section.key === "articles" && <ArticleCategoryManager categories={rows("article_categories")} articles={rows("articles")} send={send} pending={pending} />}<AdminCatalog
-                key={section.key}
+                key={section.key + scopeQuery}
                 section={section}
                 data={data}
                 selection={selection}
@@ -987,7 +992,7 @@ export function Platform({
       </main>
       {!admin && footer}
       {notice && (admin ? <AdminToast tone="success">{notice}</AdminToast> : <div className="toast" role="status">{notice}</div>)}
-      {editor && (
+      {editor && editor.route === routeKey && (
         <Editor
           key={editor.section.key + (editor.row ? recordId(editor.row) : "new")}
           section={editor.section}
@@ -1074,6 +1079,7 @@ export function Editor({
 }) {
   const ref = useAdminDialog();
   const requestId = useRef(crypto.randomUUID());
+  const [memberTab, setMemberTab] = useState("profile");
   const [error, setError] = useState("");
   useEffect(() => {
     if (error) ref.current?.querySelector<HTMLElement>('[role="alert"]')?.focus();
@@ -1088,10 +1094,6 @@ export function Editor({
   const [couponProductScope, setCouponProductScope] = useState(String(row?.product_scope || "paid"));
   const [couponIssueTarget, setCouponIssueTarget] = useState(String(row?.issue_target || "all"));
   const couponCourseId = String((data.coupon_products || []).find(item => item.coupon_id === row?.id)?.course_id || "");
-  const customerEnrollments =
-    section.key === "customers" && row
-      ? (data.enrollments || []).filter((item) => item.user_id === row.id)
-      : [];
   const customerTags =
     section.key === "customers" && row
       ? (data.crm_member_tags || [])
@@ -1344,41 +1346,26 @@ export function Editor({
                 </div>
               )}
               {section.key === "customers" && row && (
+                <CustomerWorkspace member={row} tab={memberTab} onTabChange={setMemberTab}>
                 <div className="customer-detail">
-                  <div className="drawer-profile">
-                    <span className="avatar red">{(t(row, "full_name") || t(row, "email")).slice(0, 1)}</span>
-                    <div>
-                      <h2>{t(row, "full_name") || "이름 미등록"}</h2>
-                      <p>{t(row, "email")}<br />{t(row, "phone") || "연락처 미등록"}</p>
-                    </div>
-                  </div>
                   <div className="customer-account-summary">
                     <div className="setting-line"><span>계정 상태</span><span className={`badge ${row.status === "suspended" ? "amber" : "green"}`}>{row.status === "suspended" ? "이용 제한" : "정상"}</span></div>
                     <div className="setting-line"><span>마케팅 수신 동의</span><b>{row.marketing_consent ? "동의" : "미동의"}</b></div>
                     <div className="setting-line"><span>가입일</span><b>{row.created_at ? new Date(String(row.created_at)).toLocaleDateString("ko-KR") : "—"}</b></div>
                   </div>
-                  <h3 className="mt24">수강 권한</h3>
-                  {customerEnrollments.length ? customerEnrollments.map((enrollment) => (
-                    <div className="asset-row" key={enrollment.id}>
-                      <span className="square">C</span>
-                      <div>
-                        <b>{t((data.courses || []).find((course) => course.id === enrollment.course_id), "title") || "연결 상품"}</b>
-                        <p>{t((data.cohorts || []).find((cohort) => cohort.id === enrollment.cohort_id), "name") || "기수 미연결"}</p>
-                      </div>
-                      <span className={`badge ${enrollment.status === "active" ? "green" : ""}`}>{labels[t(enrollment, "status")] || t(enrollment, "status")}</span>
-                    </div>
-                  )) : <p className="meta mt8">등록된 수강 권한이 없습니다.</p>}
                   <h3 className="mt24">고객 태그</h3>
                   <div className="tag-list mt8">
                     {customerTags.length ? customerTags.map((tag) => <span className="badge" key={tag.id}>{t(tag, "name")}</span>) : <span className="meta">등록된 태그가 없습니다.</span>}
                   </div>
                   <div className="row mt16 wrap-flex">
                     <Link className="btn small" href="/admin/tags">고객 태그 관리</Link>
-                    <Link className="btn small" href="/admin/members">미션 진행 보기</Link>
+                    <button type="button" className="btn small" onClick={() => setMemberTab("enrollments")}>수강권·미션 진행 보기</button>
                   </div>
                   <div className="divider" />
                   <h3 className="mb16">회원 정보·계정 상태 수정</h3>
+                  <div className="editor-fields">{section.fields.map(field => <div className="field" key={field.key}><label htmlFor={`edit-${field.key}`}>{field.label}</label>{control(field)}</div>)}</div>
                 </div>
+                </CustomerWorkspace>
               )}
               {row &&
                 ["reviews", "mission_submissions", "edu_questions"].includes(
@@ -1448,7 +1435,7 @@ export function Editor({
                     ))}
                   </div>
                 </div>
-              ) : <div className="editor-fields">
+              ) : section.key === "customers" && row ? null : <div className="editor-fields">
                 {section.key === "missions" && <MissionTargetFields data={data} row={row} context={context} />}
                 {section.fields.filter(f => section.key !== "missions" || f.key !== "lesson_id").map((f) => (
                   <div
@@ -1488,7 +1475,7 @@ export function Editor({
           )}
         </div>
         <footer className="dialog-foot">
-          {deleteMember && (
+          {deleteMember && memberTab === "profile" && (
             <button
               type="button"
               className="btn danger"
@@ -1516,7 +1503,7 @@ export function Editor({
           >
             닫기
           </button>
-          {!section.readOnly && (
+          {!section.readOnly && !(section.key === "customers" && row && memberTab !== "profile") && (
             <button className="btn primary" disabled={pending}>
               {pending ? "저장 중..." : section.key === "questions" ? row?.answer ? "답변 수정" : "답변 등록" : ["tags", "coupons"].includes(section.key) ? "입력 내용 확인" : "저장하기"}
             </button>
