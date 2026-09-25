@@ -39,7 +39,7 @@ const guides: Record<string, { heading: string; summary: string; steps: readonly
     heading: '회원에게 보낼 안내를 예약해요',
     summary: '문구와 받을 사람, 보낼 시간을 정한 뒤 실제 안내 발송을 예약합니다.',
     steps: ['캠페인 이름과 보낼 문구를 고르세요.', '받을 사람과 보낼 시간을 확인하세요.', '모든 내용이 맞을 때만 예약을 누르세요.'],
-    caution: '예약하면 실제 회원에게 문자가 갈 수 있어요. 시험 발송은 설정된 시험 번호에 문자 한 건을 보냅니다.',
+    caution: '예약하면 실제 회원에게 문자나 알림톡이 갈 수 있어요. 시험 발송은 설정된 시험 번호에 문자 한 건을 보냅니다.',
   },
   templates: {
     heading: '반복해서 쓸 안내 문구를 만들어요',
