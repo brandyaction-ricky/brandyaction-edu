@@ -108,7 +108,9 @@ test('home customer stories carousel and accessible profile dropdown are present
   for (const href of ['/my', '/my/profile', '/my/coupons', '/my/orders', '/my/classes'])
     assert.ok(platformSource.includes(`href="${href}"`));
   assert.match(read('app/ui/final/story-carousel.tsx'), /이전 고객 이야기[\s\S]*다음 고객 이야기/);
-  assert.match(read('app/ui/final/frontend.css'), /\.profile-menu\{/);
+  const frontendCss = read('app/ui/final/frontend.css');
+  assert.match(frontendCss, /\.edu-front \.profile-menu\{position:absolute;/);
+  assert.doesNotMatch(frontendCss, /\.edu-front \.edu-front \.profile-menu/);
 });
 test('three signup methods and product detail variants use the final publishing structures', () => {
   const { AuthView, ProductDetail, ArticlesView, StoriesView } = load('app/ui/final/public-views.tsx');
