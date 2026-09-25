@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
-import type { ConversionCase, ConversionEvidence, ConversionJevV4Run, ConversionSnapshot } from '@/lib/conversion-review';
+import type { ConversionCase, ConversionEvidence, ConversionJevV4Run, ConversionOrderCandidate, ConversionSnapshot } from '@/lib/conversion-review';
 import { buildAsidePaymentMatchPrompt, isRunStale } from '@/lib/conversion-review';
 import type { JevV4DecisionKey } from '@/lib/conversion-jev-v4';
 import { createMutationGate } from '@/lib/mutation-gate';
@@ -158,6 +158,7 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
             : '직원이 답변 초안을 승인해 기록했습니다. 고객에게 자동으로 보내지 않았습니다.',
         manage_case: payload.operation === 'purchase_outcome' ? '결제 여부를 기록했습니다. 사이트 주문을 자동으로 확인한 것은 아닙니다.'
           : payload.operation === 'archive' ? '문의 목록에서 삭제했습니다. 삭제한 문의 보기에서 복구할 수 있습니다.' : '문의를 복구했습니다.',
+        manage_case_order: payload.operation === 'link' ? '직원이 확인한 주문 기록을 문의에 연결했습니다.' : '주문 기록 연결을 해제했습니다.',
       };
       setNotice(notices[String(payload.action)] || '저장했습니다.');
       return result;
@@ -271,6 +272,7 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
               cohortName={snapshot.cohorts.find(cohort => cohort.id === selected.cohort_id)?.name || ''}
               enabled={snapshot.capabilities.can_copy_aside_match === true && !selected.archived_at}
             />}
+            {selected.source_type === 'manual' && selected.sample_origin === 'current' && <CaseOrderLinkPanel item={selected} enabled={snapshot.capabilities.can_copy_aside_match === true && !selected.archived_at} pending={pending} mutate={mutate} />}
             <AdminSection title="Jev 문의 분류와 답변 초안" bordered actions={<AdminButton tone="primary" disabled={pending || !canAnalyze || Boolean(selected.archived_at)} onClick={() => void mutate({ action: 'analyze', case_id: selected.id, expected_version: selected.input_version }).catch(() => {})}>{pending ? '처리 중' : snapshot.capabilities.analyze_provider === 'jev' ? 'Jev 결과 보기' : '모의 결과 보기'}</AdminButton>}>
               {!canAnalyze && <p className="conversion-muted">현재 환경에서는 판정을 실행할 수 없습니다. 설명자료는 직접 검토할 수 있습니다.</p>}
               {run ? <div className="conversion-result">
@@ -325,6 +327,57 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
       </AdminDrawer>}
     </>}
   </AdminPage>;
+}
+
+const orderStatusLabels: Record<string, string> = { paid: '결제 완료', partially_refunded: '일부 환불', refunded: '전액 환불' };
+function CaseOrderLinkPanel({ item, enabled, pending, mutate }: { item: ConversionCase; enabled: boolean; pending: boolean; mutate: Mutation }) {
+  const [orders, setOrders] = useState<ConversionOrderCandidate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    let active = true;
+    void fetch(`/api/conversion/orders?case_id=${encodeURIComponent(item.id)}`, { cache: 'no-store', signal: AbortSignal.timeout(10000) })
+      .then(readResponse).then(data => {
+        if (!active) return;
+        setOrders(data.orders || []);
+        if (data.message) setError(data.message);
+      }).catch(cause => { if (active) setError((cause as Error).message || '주문 기록을 불러오지 못했습니다.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [item.id, revision]);
+  const linked = orders.filter(order => order.linked_at);
+  const candidates = orders.filter(order => !order.linked_at);
+  async function link(order: ConversionOrderCandidate, operation: 'link' | 'unlink') {
+    if (pending) return;
+    setError('');
+    setError('');
+    try {
+      await mutate({ action: 'manage_case_order', operation, case_id: item.id, expected_version: item.input_version, order_id: order.id });
+      setLoading(true); setRevision(value => value + 1);
+    } catch (cause) { setError((cause as Error).message); }
+  }
+  return <AdminSection title="실제 결제 기록 확인" bordered>
+    <p className="conversion-muted">같은 상품·기수의 결제 기록을 문의 뒤 90일 동안 찾아 보여줍니다. 목록에 있다는 사실만으로 문의자와 같은 사람이라는 뜻은 아닙니다. Aside와 알림톡 기록 등으로 직접 확인한 뒤 연결해 주세요. 주문자 이름·연락처는 표시하지 않습니다.</p>
+    {!enabled && <p className="conversion-muted">주문 기록을 볼 권한이 없거나 삭제된 문의입니다.</p>}
+    {loading && <p className="conversion-muted">주문 기록을 확인하고 있습니다.</p>}
+    {!loading && !error && !orders.length && <p className="conversion-muted">문의 뒤 90일 안에 같은 상품·기수로 결제된 주문이 없습니다.</p>}
+    {error && <p role="alert" className="conversion-alert">{error}</p>}
+    {linked.map(order => <div className="conversion-order-card" key={order.id}>
+      <strong>연결된 주문 · {orderStatusLabels[order.status] || order.status}</strong>
+      <p>{order.item_name} · {displayTime(order.paid_at)} · {Number(order.total_amount).toLocaleString('ko-KR')}원</p>
+      {order.refund_amount > 0 && <p>완료된 환불 {order.refund_amount.toLocaleString('ko-KR')}원</p>}
+      <small>주문 기록은 직원이 직접 연결했습니다.</small>
+      <AdminButton disabled={pending || !enabled} onClick={() => void link(order, 'unlink')}>문의 연결 해제</AdminButton>
+    </div>)}
+    {candidates.map(order => <div className="conversion-order-card" key={order.id}>
+      <strong>{orderStatusLabels[order.status] || order.status}</strong>
+      <p>{order.item_name} · {displayTime(order.paid_at)} · {Number(order.total_amount).toLocaleString('ko-KR')}원</p>
+      {order.refund_amount > 0 && <p>완료된 환불 {order.refund_amount.toLocaleString('ko-KR')}원</p>}
+      <AdminButton disabled={pending || !enabled} onClick={() => void link(order, 'link')}>확인한 주문으로 연결</AdminButton>
+    </div>)}
+    <small className="conversion-muted">주문 연결은 직원이 확인해 직접 하는 기록 작업입니다. Jev가 주문자를 추정하거나, 고객에게 답변을 보내거나, 결제·환불을 처리하지 않습니다.</small>
+  </AdminSection>;
 }
 
 function PurchaseOutcomeForm({ item, pending, enabled, mutate }: { item: ConversionCase; pending: boolean; enabled: boolean; mutate: Mutation }) {

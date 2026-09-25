@@ -21,6 +21,18 @@ export type ConversionCase = {
   created_at: string;
 };
 
+export type ConversionOrderCandidate = {
+  id: string;
+  status: 'paid' | 'partially_refunded' | 'refunded';
+  currency: string;
+  total_amount: number;
+  paid_at: string;
+  item_name: string;
+  linked_at: string | null;
+  refund_amount: number;
+  payment_statuses: string[];
+};
+
 export type ConversionEvidence = {
   id: string;
   course_id: string;

@@ -31,6 +31,9 @@
 .conversion-record { padding: 18px 0; border-bottom: 1px solid #e1e6e3; overflow-wrap: anywhere; }.conversion-record small { display: block; margin-top: 6px; }
 .conversion-muted, .conversion-next { color: #65716a; font-size: 13px; line-height: 1.7; }
 .conversion-next { padding: 20px 0 0; }
+.conversion-order-card { display: grid; gap: 6px; margin: 10px 0; padding: 14px; border: 1px solid var(--admin-border, #e1e6e3); border-radius: 8px; background: #fff; }
+.conversion-order-card p, .conversion-order-card small { margin: 0; line-height: 1.6; }
+.conversion-order-card small { color: #65716a; }
 .conversion-alert { padding: 12px 14px; border-radius: 6px; color: #853d27; background: #fff3eb; line-height: 1.6; overflow-wrap: anywhere; }
 .conversion-notice { padding: 12px 14px; border-radius: 6px; color: #225c42; background: #edf7f0; }
 .conversion-form .admin-button { align-self: flex-start; }.conversion-form textarea { resize: vertical; }

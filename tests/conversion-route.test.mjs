@@ -103,6 +103,20 @@ test('purchase outcome and reversible inquiry deletion use the dedicated protect
     case_id: ids.inquiry, expected_version: 1 }))).status, 200);
   assert.equal(archive.calls[0].args.p_payload.operation, 'archive');
 });
+test('linking a purchase record requires order and marketing permission and uses the separate staff-confirmed RPC', async () => {
+  const requestBody = { action: 'manage_case_order', operation: 'link', requestId: ids.request, case_id: ids.inquiry,
+    expected_version: 1, order_id: ids.question };
+  const denied = harness({ user: { id: ids.actor, permissions: { members: true, orders: false, marketing: true } } });
+  assert.equal((await denied.POST(req(requestBody))).status, 403);
+  assert.deepEqual(denied.calls, []);
+  const allowed = harness({ user: { id: ids.actor, permissions: { members: true, orders: true, marketing: true } } });
+  assert.equal((await allowed.POST(req(requestBody))).status, 200);
+  assert.equal(allowed.calls[0].name, 'edu_conversion_case_order_manage');
+  assert.equal(allowed.calls[0].args.p_payload.order_id, ids.question);
+  const malformed = harness({ user: { id: ids.actor, permissions: { members: true, orders: true, marketing: true } } });
+  assert.equal((await malformed.POST(req({ ...requestBody, order_id: 'not-an-order' }))).status, 400);
+  assert.deepEqual(malformed.calls, []);
+});
 test('archived inquiries cannot be sent back to Jev for another judgment', async () => {
   let providerCalls = 0;
   const h = harness({ inquiry: { id: ids.inquiry, course_id: ids.course, cohort_id: null, input_version: 1, archived_at: '2026-09-25T00:00:00.000Z', subject: '초보 문의', content: '질문' },
