@@ -31,7 +31,9 @@ import {
 } from "react";
 import { AdminWorkflows, standaloneAdmin } from "./admin-workflows";
 import { BlocksField, UploadField } from "./editor-fields";
-import { AdminCatalog } from "./final/admin-catalog";
+import { AdminCatalog, type MissionScope } from "./final/admin-catalog";
+import { MissionTargetFields, type MissionContext } from "./final/mission-target-fields";
+import { useAdminDialog } from "@/features/admin-ui";
 import { ArticleBannerEditor } from "./final/article-banner-editor";
 import { ArticleCategoryManager } from "./final/article-category-manager";
 import { ProductEditor } from "./final/admin-editors";
@@ -90,8 +92,9 @@ function readAdminSection(
   page: number,
   record = "",
   forceNetwork = false,
+  scopeQuery = "",
 ) {
-  const key = `${userId}:${section}:${page}:${record}`;
+  const key = `${userId}:${section}:${page}:${record}:${scopeQuery}`;
   const cached = adminNavigationReads.get(key);
   if (!forceNetwork && cached && (!cached.expiresAt || cached.expiresAt > Date.now()))
     return cached.promise;
@@ -103,6 +106,7 @@ function readAdminSection(
     page: String(page),
   });
   if (record) query.set("record", record);
+  new URLSearchParams(scopeQuery).forEach((value, key) => query.set(key, value));
   const entry = {
     expiresAt: 0,
     promise: fetch(`/api/platform?${query}`, {
@@ -200,7 +204,13 @@ export function Platform({
   const [editor, setEditor] = useState<{
     section: Section;
     row?: Row;
+    context?: MissionContext;
   } | null>(null);
+  const missionScopeSource = `${searchParams.get("course") || ""}:${searchParams.get("week") || ""}`;
+  const initialMissionScope: MissionScope = { courseId: searchParams.get("course") || "", weekId: searchParams.get("week") || "", state: "active" };
+  const [missionFilter, setMissionFilter] = useState({ source: missionScopeSource, scope: initialMissionScope });
+  const missionScope = missionFilter.source === missionScopeSource ? missionFilter.scope : initialMissionScope;
+  const setMissionScope = (scope: MissionScope) => setMissionFilter({ source: missionScopeSource, scope });
   const [selection, setSelection] = useState<string[]>([]);
   const [articleAdminTab, setArticleAdminTab] = useState<"content" | "banner">("content");
   const alive = useRef(true);
@@ -217,6 +227,7 @@ export function Platform({
     ? searchParams.get("id") || ""
     : "";
   const adminPage = adminPaging.section === adminSection ? adminPaging.page : 1;
+  const scopeQuery = adminSection === "missions" ? new URLSearchParams({ course: missionScope.courseId, week: missionScope.weekId, missionState: missionScope.state }).toString() : "";
   const setAdminPage = (update: number | ((page: number) => number)) =>
     setAdminPaging((current) => ({
       section: adminSection,
@@ -241,6 +252,7 @@ export function Platform({
             adminPage,
             editorRecordId,
             forceNetwork,
+            scopeQuery,
           )
         : await (async () => {
             const response = await fetch("/api/platform", {
@@ -289,7 +301,7 @@ export function Platform({
     } finally {
       if (alive.current && !controller.signal.aborted) setLoading(false);
     }
-  }, [admin, adminPage, adminSection, editorRecordId]);
+  }, [admin, adminPage, adminSection, editorRecordId, scopeQuery]);
   const prefetchAdminSection = useCallback(
     (section: string) => {
       if (!admin || !user?.id || section === adminSection) return;
@@ -790,7 +802,7 @@ export function Platform({
             ? "learning"
             : key),
     );
-    const edit = (section: Section, row?: Row) => {
+    const edit = (section: Section, row?: Row, context?: MissionContext) => {
       if (section.key === "products" || section.key === "learning")
         router.push(
           "/admin/" +
@@ -799,7 +811,7 @@ export function Platform({
               : "learning-editor") +
             (row ? "?id=" + row.id : ""),
         );
-      else setEditor({ section, row });
+      else setEditor({ section, row, context: context || (section.key === "missions" ? missionScope : undefined) });
     };
     const back = () =>
       router.push(
@@ -872,7 +884,7 @@ export function Platform({
                   className="btn"
                   onClick={() => downloadCsv(rows("profiles"), "customers")}
                 >
-                  회원 명단 내보내기
+                  현재 페이지 명단 내보내기
                 </button>
               )}
               {section.key === "articles" && <Link className="btn" href="/articles" target="_blank">고객 화면 미리보기</Link>}
@@ -917,6 +929,8 @@ export function Platform({
                 selection={selection}
                 setSelection={setSelection}
                 edit={edit}
+                missionScope={section.key === "missions" ? missionScope : undefined}
+                onMissionScopeChange={next => { setMissionScope(next); setAdminPage(1); setSelection([]); }}
                 archive={(s, ids) => void archive(s, ids)}
                 pending={pending}
                 loading={loading}
@@ -978,6 +992,7 @@ export function Platform({
           key={editor.section.key + (editor.row ? recordId(editor.row) : "new")}
           section={editor.section}
           row={editor.row}
+          context={editor.context}
           data={data}
           pending={pending}
           close={() => setEditor(null)}
@@ -1036,9 +1051,10 @@ function downloadCsv(rows: Row[], name: string) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
-function Editor({
+export function Editor({
   section,
   row,
+  context,
   data,
   pending,
   close,
@@ -1048,6 +1064,7 @@ function Editor({
 }: {
   section: Section;
   row?: Row;
+  context?: MissionContext;
   data: Data;
   pending: boolean;
   close: () => void;
@@ -1055,9 +1072,12 @@ function Editor({
   archive?: () => void;
   deleteMember?: () => void;
 }) {
-  const ref = useRef<HTMLDialogElement>(null);
+  const ref = useAdminDialog();
   const requestId = useRef(crypto.randomUUID());
   const [error, setError] = useState("");
+  useEffect(() => {
+    if (error) ref.current?.querySelector<HTMLElement>('[role="alert"]')?.focus();
+  }, [error, ref]);
   const [questionAnswer, setQuestionAnswer] = useState(() => t(row, "answer"));
   const [questionAiPending, setQuestionAiPending] = useState(false);
   const [questionAiMessage, setQuestionAiMessage] = useState("");
@@ -1079,11 +1099,6 @@ function Editor({
           .map((item) => (data.crm_tags || []).find((tag) => tag.id === item.tag_id))
           .filter(Boolean) as Row[]
       : [];
-  useEffect(() => {
-    ref.current?.showModal();
-    const d = ref.current;
-    return () => d?.close();
-  }, []);
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
@@ -1130,6 +1145,11 @@ function Editor({
             ? new Date(String(value)).toISOString()
             : null;
         else values[field.key] = value || null;
+      }
+      if (section.key === "missions") {
+        values.course_id = form.get("course_id");
+        values.week_id = form.get("week_id");
+        if (!values.course_id || !values.week_id || !values.lesson_id) throw new Error("상품·주차·학습을 순서대로 선택해 주세요.");
       }
       await save(values, row ? undefined : requestId.current);
     } catch (e) {
@@ -1429,7 +1449,8 @@ function Editor({
                   </div>
                 </div>
               ) : <div className="editor-fields">
-                {section.fields.map((f) => (
+                {section.key === "missions" && <MissionTargetFields data={data} row={row} context={context} />}
+                {section.fields.filter(f => section.key !== "missions" || f.key !== "lesson_id").map((f) => (
                   <div
                     className={
                       "field " +
@@ -1459,7 +1480,7 @@ function Editor({
                 </p>
               )}
               {error && (
-                <p className="notice" role="alert">
+                <p className="notice" role="alert" tabIndex={-1}>
                   {error}
                 </p>
               )}

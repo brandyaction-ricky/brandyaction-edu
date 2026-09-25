@@ -1137,7 +1137,7 @@ function Participants() {
     rejected: "반려",
     partial: "일부 승인",
     empty: "미제출",
-    none: "필수 미션 없음",
+    none: "필수 미션 미설정",
   };
   const cellClasses: Record<string, string> = {
     approved: "approved",
@@ -1268,7 +1268,7 @@ function Participants() {
                     <span>학습 진도</span><strong>{t(r, "learning_percent")}%</strong>
                   </div>
                   <div className="participant-summary-stat">
-                    <span>미션 승인</span><strong>{t(r, "approved")}<small> / {t(r, "mission_total")}</small></strong>
+                    <span>상품 전체 미션 승인</span><strong>{Number(r.mission_total) === 0 ? "필수 미션 미설정" : <>{t(r, "approved")}<small> / {t(r, "mission_total")}</small></>}</strong>
                   </div>
                   <div className="participant-activity">
                     {Boolean(r.attention) && <span className="badge red">활동 확인 필요</span>}
@@ -1292,14 +1292,14 @@ function Participants() {
                   <div className="participant-card-details" id={panelId}>
                     <div className="participant-detail-head">
                       <div><h3>{t(weeks.find((row) => row.id === (week || String(result.weekId || ""))), "week")}주차 미션 진행현황</h3><p>일차별 최신 제출 상태와 미션 승인 수</p></div>
-                      <strong>{r.achievement === null ? "성취도 —" : `성취도 ${t(r, "achievement")}%`}</strong>
+                      <strong>{Number(r.mission_total) === 0 ? "필수 미션 미설정" : r.achievement === null ? "상품 전체 성취도 집계 대기" : `상품 전체 성취도 ${t(r, "achievement")}%`}</strong>
                     </div>
                     <div className="participant-day-grid">
                       {memberCells.map((cell) => {
                         const lesson = columns.find((row) => row.id === cell.lessonId);
                         const dayLabel = `Day ${t(lesson, "day_number") || "—"}`;
                         const statusLabel = cellLabels[cell.status] || "상태 확인 필요";
-                        const contents = <><span className="participant-day-number">{t(lesson, "day_number") || "—"}</span><span className="participant-day-copy"><b>{dayLabel} · {t(lesson, "title") || "미션"}</b><small>{statusLabel} · {cell.approved}/{cell.total} 승인</small></span>{cell.submissionId && <span className="participant-day-action">검토 <span aria-hidden="true">›</span></span>}</>;
+                        const contents = <><span className="participant-day-number">{t(lesson, "day_number") || "—"}</span><span className="participant-day-copy"><b>{dayLabel} · {t(lesson, "title") || "미션"}</b><small>{statusLabel}{cell.total > 0 ? ` · ${cell.approved}/${cell.total} 승인` : " · 회원 미참여와 다릅니다"}</small>{cell.total === 0 && !cell.submissionId && <Link className="text-link" href={`/admin/missions?course=${encodeURIComponent(t(cohorts.find(item => item.id === (cohort || String(result.cohortId || ""))), "course_id"))}&week=${encodeURIComponent(week || String(result.weekId || ""))}`}>미션 설정하기</Link>}</span>{cell.submissionId && <span className="participant-day-action">검토 <span aria-hidden="true">›</span></span>}</>;
                         return cell.submissionId ? (
                           <Link className={`participant-day-card ${cellClasses[cell.status] || ""}`} key={cell.lessonId} href={`/admin/reviews?submission=${cell.submissionId}`} aria-label={`${t(r, "full_name")} ${dayLabel} ${statusLabel} ${cell.approved}/${cell.total} 승인`}>
                             {contents}
