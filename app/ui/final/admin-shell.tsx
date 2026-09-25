@@ -382,7 +382,7 @@ export function Overview({
                 <small>명</small>
               </>
             }
-            note="가입 회원 현황"
+            note="탈퇴 제외 · 관리자·스태프 포함"
             href="/admin/customers"
           />
         )}

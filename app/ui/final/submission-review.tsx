@@ -287,7 +287,9 @@ export function SubmissionReview({
                 )}
               </div>
               <aside className="inspector">
-                <h3>승인 전 확인</h3>
+                {current.status === "submitted" ? <>
+                <h3>이번 검토 전 확인</h3>
+                <p className="meta">현재 화면에서만 사용하는 확인 항목입니다. 체크 결과는 저장되지 않습니다.</p>
                 <div className="review-checks" key={current.id}>
                   {[
                     "필수 답변이 모두 작성됨",
@@ -300,6 +302,11 @@ export function SubmissionReview({
                     </label>
                   ))}
                 </div>
+                </> : <>
+                  <h3>검토 기록</h3>
+                  <p>{labels[t(current, "status")]} · {current.reviewed_at ? timeLabel(current.reviewed_at) : "검토 시각 기록 없음"}</p>
+                  <p className="meta">이전 검토의 체크 결과는 저장된 기록이 없습니다. 아래 처리 시각과 저장된 멘토 피드백을 확인하세요.</p>
+                </>}
                 <div className="divider" />
                 <h3>제출 정보</h3>
                 <div className="setting-line">

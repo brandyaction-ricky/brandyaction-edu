@@ -99,3 +99,5 @@ export const archiveValues: Record<string, Record<string, unknown>> = {
   banners: { is_active: false }, articles: { status: 'hidden', is_featured: false },
   testimonials: { is_published: false }, questions: { is_archived: true },
 };
+// Home, member list and exports share this population (all roles, excluding withdrawal).
+export const excludedMemberStatus = 'withdrawn';

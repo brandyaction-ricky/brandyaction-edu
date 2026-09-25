@@ -7,11 +7,13 @@ import { WebinarRegistration } from '../../../app/ui/webinar-registration';
 import { WebinarManagement } from '../../../app/ui/webinar-management';
 import { AdminWorkflows } from '../../../app/ui/admin-workflows';
 import { ConversionFixture } from './conversion';
+import { MissionIntegrityFixture } from './mission-integrity';
 import { AdminButton, AdminConfirmDialog, AdminDrawer, AdminEmptyState, AdminInlineError, AdminInput, AdminPage, AdminPageHeader, AdminShell, AdminSuccessState } from '../../../features/admin-ui';
 import { ProductDetailHtml } from '../../../app/ui/final/product-detail-html';
 import '../../../app/ui/final/tokens.css';
 import '../../../app/ui/final/admin.css';
 import '../../../features/admin-ui/styles/admin-system.css';
+import '../../../app/ui/final/integration.css';
 
 function BoundaryFixture() {
   const [open, setOpen] = useState(false), [confirm, setConfirm] = useState(false), [extra, setExtra] = useState(false);
@@ -45,7 +47,7 @@ function ProductHtmlCtaFixture() {
   return <ProductDetailHtml html="" documentSource={documentSource} ctaUrl="/join/synthetic/organic" />;
 }
 const path = window.location.pathname;
-const fixture = path.startsWith('/admin-shell-test')
+const fixture = path.startsWith('/mission-integrity-test') ? <MissionIntegrityFixture/> : path.startsWith('/admin-shell-test')
   ? <ShellFixture/>
   : path.startsWith('/product-html-cta-test')
     ? <ProductHtmlCtaFixture/>

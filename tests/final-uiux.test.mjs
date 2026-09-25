@@ -333,6 +333,35 @@ test('submission review keeps queue and inspector, escaping text and unsafe link
   assert.match(markup, /&lt;script&gt;/); assert.doesNotMatch(markup, /href="javascript:/);
   assert.match(markup, /승인 후 다음/); assert.match(markup, /최대 50건/);
 });
+
+test('mission ownership controls and archive states remain explicit', () => {
+  const { MissionTargetFields } = load('app/ui/final/mission-target-fields.tsx');
+  const extra = { ...data, courses: [...data.courses, { id: 'other-course', title: '다른 상품' }], curriculum_weeks: [...data.curriculum_weeks, { id: 'other-week', course_id: 'other-course', week_number: 1 }], curriculum_lessons: [...data.curriculum_lessons, { id: 'other-lesson', week_id: 'other-week', title: '다른 상품 학습' }] };
+  const target = html(MissionTargetFields, { data: extra, context: { courseId: 'course', weekId: 'week' } });
+  assert.match(target, /첫 번째 학습/);
+  assert.doesNotMatch(target, /다른 상품 학습/);
+  const edit = html(MissionTargetFields, { data: extra, row: mission });
+  assert.match(edit, /id="mission-course"[^>]*disabled/);
+  const { AdminCatalog } = load('app/ui/final/admin-catalog.tsx');
+  const props = { section: platform.sections.find(item => item.key === 'missions'), data: { ...data, curriculum_missions: [{ ...mission, is_published: false, archived_at: '2026-09-25' }] }, selection: [], setSelection() {}, edit() {}, archive() {}, pending: false, loading: false, pagination: null, setPage() {}, exportCsv() {}, send };
+  const active = html(AdminCatalog, props);
+  assert.match(active, /보관된 미션만 있습니다/);
+  assert.doesNotMatch(active, /class="mission-row/);
+  const archived = html(AdminCatalog, { ...props, missionScope: { courseId: '', weekId: '', state: 'archived' } });
+  assert.match(archived, /비공개로 복구/);
+  assert.doesNotMatch(archived, />미션 설정</);
+});
+
+test('reviewed submissions do not show unchecked temporary approval checks', () => {
+  const { SubmissionReview } = load('app/ui/final/submission-review.tsx');
+  const reviewed = { ...submission, status: 'approved', reviewed_at: '2026-09-25T00:00:00Z', reviewer_feedback: '기존 피드백 유지' };
+  search = new URLSearchParams({ submission: reviewed.id });
+  const markup = html(SubmissionReview, { data: { ...data, mission_submissions: [reviewed] }, pending: false, send });
+  search = new URLSearchParams();
+  assert.match(markup, /이전 검토의 체크 결과는 저장된 기록이 없습니다/);
+  assert.match(markup, /기존 피드백 유지/);
+  assert.doesNotMatch(markup, /이번 검토 전 확인|필수 답변이 모두 작성됨/);
+});
 test('participant matrix uses latest attempts, required missions and enrollment boundaries', () => {
   const { participantMatrix } = load('lib/participant-matrix.ts');
   const missions = [{ id: 'm1', lesson_id: 'l1' }, { id: 'm2', lesson_id: 'l1' }];

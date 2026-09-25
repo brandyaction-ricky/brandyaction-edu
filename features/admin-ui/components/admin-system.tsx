@@ -111,9 +111,8 @@ function dialogTabStops(node: HTMLDialogElement) {
     .filter(element => element.tabIndex >= 0 && !element.matches(':disabled') && !element.closest('[hidden],[inert]') && element.closest('dialog') === node && element.getClientRects().length > 0 && !['hidden', 'collapse'].includes(getComputedStyle(element).visibility))
     .sort((a, b) => (a.tabIndex || Infinity) - (b.tabIndex || Infinity));
 }
-function AdminDialogSurface({ title, onClose, className, children }: { title: string; onClose: () => void; className: string; children: ReactNode }) {
-  const dialog = useRef<HTMLDialogElement>(null), titleId = useId(), closeHandler = useRef(onClose);
-  useEffect(() => { closeHandler.current = onClose; }, [onClose]);
+export function useAdminDialog() {
+  const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const node = dialog.current!, entry = { node, restoreFocus: document.activeElement as HTMLElement | null };
     if (dialogStack.length === 0) savedOverflow = document.body.style.overflow;
@@ -138,6 +137,11 @@ function AdminDialogSurface({ title, onClose, className, children }: { title: st
       if (entry.restoreFocus?.isConnected && (!top || top.node.contains(entry.restoreFocus))) entry.restoreFocus.focus();
     };
   }, []);
+  return dialog;
+}
+function AdminDialogSurface({ title, onClose, className, children }: { title: string; onClose: () => void; className: string; children: ReactNode }) {
+  const dialog = useAdminDialog(), titleId = useId(), closeHandler = useRef(onClose);
+  useEffect(() => { closeHandler.current = onClose; }, [onClose]);
   return <dialog ref={dialog} className={classes('admin-dialog', className)} aria-labelledby={titleId} onCancel={event => { event.preventDefault(); event.stopPropagation(); closeHandler.current(); }} onClick={event => { if (event.target !== event.currentTarget) return; const box = event.currentTarget.getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) closeHandler.current(); }}><header className="admin-dialog-header"><h2 id={titleId}>{title}</h2><AdminIconButton label="닫기" onClick={() => closeHandler.current()}><X size={18}/></AdminIconButton></header>{children}</dialog>;
 }
 export function AdminDrawer({ title, onClose, size = 'default', children, className }: { title: string; onClose: () => void; size?: 'small' | 'default' | 'large'; children: ReactNode; className?: string }) { return <AdminDialogSurface title={title} onClose={onClose} className={classes('admin-drawer', `admin-drawer--${size}`, className)}>{children}</AdminDialogSurface>; }
