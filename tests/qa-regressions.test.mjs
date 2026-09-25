@@ -2,12 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
+import { submissionReview } from './helpers/submission-review.mjs';
 
 function load(path, dependencies = {}) {
   const source = fs.readFileSync(new URL('../' + path, import.meta.url), 'utf8');
   const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const exports = {};
-  new Function('exports', 'require', compiled)(exports, name => { if (!(name in dependencies)) throw Error(name); return dependencies[name]; });
+  new Function('exports', 'require', compiled)(exports, name => { if (name === '@/lib/submission-review') return submissionReview; if (!(name in dependencies)) throw Error(name); return dependencies[name]; });
   return exports;
 }
 const rules = load('lib/qa-rules.ts');
@@ -103,12 +104,19 @@ function handler(user, database) {
     '@/lib/product-metadata': load('lib/product-metadata.ts', { './platform': platform, './product-conversion': load('lib/product-conversion.ts'), './product-html-document': load('lib/product-html-document.ts') }),
     '@/lib/edu-settings': { getEduSettings: async () => ({ operations: {} }) },
     '@/lib/mission-quiz': {}, '@/lib/legal-policies': { POLICY_VERSION: 'test' },
-    '@/lib/operator-permissions': { getOperatorUser: async () => user?.role === 'admin' ? user : null, permissionsFor: async value => ({ products: value?.role === 'admin', members: value?.role === 'admin', orders: value?.role === 'admin', content: value?.role === 'admin', marketing: value?.role === 'admin' }), sectionScopes: { cohorts: 'products', testimonials: 'content', products: 'products' } },
+    '@/lib/operator-permissions': { getOperatorUser: async () => user?.role === 'admin' ? user : null, permissionsFor: async value => ({ products: value?.role === 'admin', members: value?.role === 'admin', orders: value?.role === 'admin', content: value?.role === 'admin', marketing: value?.role === 'admin' }), sectionScopes: { cohorts: 'products', testimonials: 'content', products: 'products', reviews: 'members' } },
     '@/lib/crm-delivery': { crmDeliveryState: () => ({ enabled: false, configured: false }) },
   });
 }
 const request = body => new Request('https://example.com/api/platform', { method: 'POST', headers: { origin: 'https://example.com', 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 const admin = { id: crypto.randomUUID(), role: 'admin' };
+test('generic review save shares the checklist contract and preserves conflict codes', async () => {
+  const calls = [];
+  const h = handler(admin, { rpc: async (name, params) => { calls.push({ name, params }); return { error: { code: 'PT409' } }; } });
+  const response = await h.POST(request({ action: 'save', section: 'reviews', id: crypto.randomUUID(), values: { status: 'approved', reviewer_feedback: '검토' }, reviewMode: 'single', reviewChecks: submissionReview.emptyReviewChecks() }));
+  assert.equal(response.status, 409); assert.equal((await response.json()).code, 'REVIEW_CONFLICT');
+  assert.equal(calls.length, 1); assert.equal(calls[0].name, 'review_mission_submissions_with_checks'); assert.equal(calls[0].params.p_actor, admin.id);
+});
 test('F-06/F-09/F-15 invalid capacity, phone and image are rejected before DB writes', async () => {
   const h = handler(admin, { from: () => { throw Error('must not write'); } });
   for (const body of [

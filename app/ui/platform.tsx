@@ -361,7 +361,7 @@ export function Platform({
           },
         );
         const result = await response.json();
-        if (!response.ok) throw new Error(result.error);
+        if (!response.ok) throw Object.assign(new Error(result.error || '요청을 처리하지 못했습니다.'), { status: response.status, code: result.code });
         setNotice(result.message || success);
         adminNavigationReads.clear();
         await refresh(true);

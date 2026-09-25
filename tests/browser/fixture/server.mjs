@@ -2,8 +2,9 @@ import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { build } from 'esbuild';
+import { reviewFixture } from './submission-review-api.mjs';
 
-// Only synthetic GET responses. This fixture never connects to Auth, DB or Meta.
+// Synthetic responses only, including local in-memory review writes. Never connects to Auth, DB or Meta.
 const today = new Date(Date.now()+9*3600000).toISOString().slice(0,10);
 const relativeDay = days => new Date(Date.parse(today)+days*86400000).toISOString().slice(0,10);
 const campaign = {id:'bbbbbbbb-bbbb-4000-8000-000000000002',landing_id:'aaaaaaaa-aaaa-4000-8000-000000000001',name:'포커스 검증 캠페인',utm_campaign:'focus-fixture',start_day:relativeDay(-30),end_day:relativeDay(30),new_customer_price:1000,existing_customer_price:500,live_peak:null,uses_ads:false,meta_ad_account_id:null,meta_campaign_id:null,meta_campaign_ids:[],meta_sync_status:'not_configured',meta_last_synced_at:null,meta_sync_error:null};
@@ -16,6 +17,7 @@ const brandLogo = readFileSync(resolve('public/brandy-action-logo.png'));
 const failedMemberReads = new Set();
 const server = createServer((request,response)=>{
   const url=new URL(request.url,'http://localhost');
+  if(reviewFixture(request,response,url))return;
   if(request.method!=='GET'){response.writeHead(405).end();return;}
   if(url.pathname==='/api/platform/workflows'&&url.searchParams.get('kind')==='participants'){
     const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
@@ -45,4 +47,5 @@ const server = createServer((request,response)=>{
   if(asset){response.setHeader('Content-Type',url.pathname.endsWith('.css')?'text/css':'text/javascript');response.end(asset);return;}
   response.setHeader('Content-Type','text/html');response.end('<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin focus fixture</title><link rel="stylesheet" href="/app.css"></head><body style="overflow:auto"><div id="root"></div><script type="module" src="/app.js"></script></body></html>');
 });
-server.listen(4173,'127.0.0.1',()=>console.log('Focus fixture ready on port 4173'));
+const port = Number(process.env.FIXTURE_PORT || 4173);
+server.listen(port,'127.0.0.1',()=>console.log(`Focus fixture ready on port ${port}`));

@@ -8,6 +8,7 @@ import { safeUrl } from '@/lib/platform';
 import { normalizeOperatorPermissions, permissionsFor } from '@/lib/operator-permissions';
 import { participantMatrix } from '@/lib/participant-matrix';
 import type { Row } from '@/lib/platform';
+import { reviewMutation, reviewWriteError } from '@/lib/submission-review';
 
 const reply = (value: unknown, status = 200) =>
     Response.json(value, {
@@ -284,15 +285,12 @@ export async function POST(request: Request) {
                 p_quiz: body.quiz,
             });
         } else if (body.action === 'review') {
-            if (!['approved', 'changes_requested', 'rejected'].includes(body.decision)) fail('검토 결과를 선택해 주세요.');
-            const feedback = string(body.feedback, 2000);
-            if (body.decision !== 'approved' && !feedback) fail('보완·반려 사유를 입력해 주세요.');
-            result = await db.rpc('review_mission_submissions', {
-                p_actor: user.id,
-                p_ids: ids(body.ids),
-                p_decision: body.decision,
-                p_feedback: feedback,
-            });
+            const mutation = reviewMutation(user.id, body);
+            result = await db.rpc(mutation.name, mutation.params);
+            if (result.error) {
+                const { status, ...problem } = reviewWriteError(result.error);
+                return reply(problem, status);
+            }
         } else if (body.action === 'assign') {
             if (!['tag', 'coupon'].includes(body.kind) || !uuid(body.targetId) || typeof body.remove !== 'boolean') fail('태그 또는 쿠폰을 선택해 주세요.');
             result = await db.rpc('edu_assign_customers', {

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
+import { submissionReview } from './helpers/submission-review.mjs';
 function load(path, dependencies={}) {
  const source=fs.readFileSync(new URL('../'+path,import.meta.url),'utf8');
  const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
@@ -52,6 +53,7 @@ function handler(user, suppliedDb) {
  let calls=[];
  const db=suppliedDb||{rpc:async(...args)=>{calls.push(args);return {data:1};}};
  const exports=load('app/api/platform/workflows/route.ts',{
+ '@/lib/submission-review':submissionReview,
  '@/lib/supabase/admin':{createAdminClient:()=>db},
  '@/lib/server-auth':{getAuthenticatedUser:async()=>user},
  '@/lib/platform-rules':load('lib/platform-rules.ts'),
@@ -99,6 +101,22 @@ test('bulk review rejects duplicate IDs and missing feedback before a write',asy
  assert.equal((await h.POST(request({action:'review',ids:[uid],decision:'changes_requested',feedback:'출처를 추가해 주세요.'}))).status,200);
  assert.equal(h.calls[0][0],'review_mission_submissions');
  assert.equal(h.calls[0][1].p_actor,uid);
+});
+test('single checklist review derives the actor and invokes the additive RPC once', async () => {
+ const h=handler({id:uid,role:'admin'}), checks=submissionReview.emptyReviewChecks();
+ assert.equal((await h.POST(request({action:'review',ids:[uid],decision:'approved',reviewMode:'single',reviewChecks:checks,actor:'forged'}))).status,200);
+ assert.equal(h.calls[0][0],'review_mission_submissions_with_checks');
+ assert.equal(h.calls[0][1].p_actor,uid); assert.deepEqual(h.calls[0][1].p_checks,checks);
+ assert.equal((await h.POST(request({action:'review',ids:[uid],decision:'approved',reviewMode:'single',reviewChecks:{version:1}}))).status,400);
+ assert.equal(h.calls.length,1);
+});
+test('review API returns conflicts and fails closed before RPC rollout, never falling back to discard checks', async () => {
+ for(const [code,status,expected] of [['PT409',409,'REVIEW_CONFLICT'],['42501',403,'REVIEW_FORBIDDEN'],['PGRST202',503,'REVIEW_UNAVAILABLE']]) {
+  let calls=0;
+  const h=handler({id:uid,role:'admin'},{rpc:async(name)=>{calls++;assert.equal(name,'review_mission_submissions_with_checks');return {error:{code,message:'internal'}};}});
+  const response=await h.POST(request({action:'review',ids:[uid],decision:'approved',reviewMode:'single',reviewChecks:submissionReview.emptyReviewChecks()}));
+  assert.equal(response.status,status); assert.equal((await response.json()).code,expected); assert.equal(calls,1);
+ }
 });
 test('live-session mutation rejects invalid URL and non-integer order',async()=>{
  const h=handler({id:uid,role:'admin'});
