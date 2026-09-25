@@ -3,10 +3,12 @@ import { createHash } from 'node:crypto';
 export function conversionCapabilities(env: Record<string, string | undefined>) {
   const enabled = env.EDU_CONVERSION_REVIEW_ENABLED === 'true';
   const appEnvironment = env.NEXT_PUBLIC_APP_ENV || '';
-  const production = appEnvironment === 'production';
+  const production = appEnvironment === 'production' || env.VERCEL_ENV === 'production';
   const explicitTest = ['development', 'test'].includes(appEnvironment) || (!appEnvironment && env.VERCEL_ENV === 'preview');
   const can_mock = enabled && env.EDU_CONVERSION_MOCK_ENABLED === 'true' && explicitTest && !production;
-  const can_jev = enabled && env.EDU_CONVERSION_JEV_ENABLED === 'true' && Boolean(env.TYPESAFE_API_KEY) && explicitTest && !production;
+  const jevEnvironmentAllowed = (explicitTest && !production)
+    || (production && env.EDU_CONVERSION_JEV_PRODUCTION_ENABLED === 'true');
+  const can_jev = enabled && env.EDU_CONVERSION_JEV_ENABLED === 'true' && Boolean(env.TYPESAFE_API_KEY) && jevEnvironmentAllowed;
   return { enabled, can_mock, can_jev, can_analyze: can_jev || can_mock, analyze_provider: can_jev ? 'jev' as const : can_mock ? 'mock' as const : null };
 }
 

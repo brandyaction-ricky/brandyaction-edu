@@ -56,13 +56,25 @@ test('provider errors and malformed choices never expose upstream bodies or secr
   await assert.rejects(jev.createJevJudgment(inquiry, [], 'top-secret', async () => Response.json({ model: 'jev-test', answers: { ...answers, purchase_intent: { ...answers.purchase_intent, choice: 'invented' } } })), /JEV_INVALID_RESPONSE/);
 });
 
-test('Jev is disabled unless review, key, flag and an explicit non-production environment agree', () => {
+test('Jev requires review, key and an explicit environment-specific switch', () => {
   const server = load('../lib/conversion-review-server.ts', { 'node:crypto': { createHash() {} } });
   const valid = { EDU_CONVERSION_REVIEW_ENABLED: 'true', EDU_CONVERSION_JEV_ENABLED: 'true', TYPESAFE_API_KEY: 'key', NEXT_PUBLIC_APP_ENV: 'development' };
   assert.equal(server.conversionCapabilities(valid).can_jev, true);
-  assert.equal(server.conversionCapabilities({ ...valid, VERCEL_ENV: 'production' }).can_jev, true);
   assert.equal(server.conversionCapabilities({ ...valid, NEXT_PUBLIC_APP_ENV: undefined, VERCEL_ENV: 'preview' }).can_jev, true);
-  for (const env of [{}, { ...valid, TYPESAFE_API_KEY: '' }, { ...valid, EDU_CONVERSION_JEV_ENABLED: 'false' }, { ...valid, NEXT_PUBLIC_APP_ENV: 'production' }, { ...valid, NEXT_PUBLIC_APP_ENV: 'production', VERCEL_ENV: 'preview' }, { ...valid, NEXT_PUBLIC_APP_ENV: undefined, VERCEL_ENV: 'production' }]) {
+  const production = { ...valid, NEXT_PUBLIC_APP_ENV: 'production', VERCEL_ENV: 'production', EDU_CONVERSION_JEV_PRODUCTION_ENABLED: 'true' };
+  assert.equal(server.conversionCapabilities(production).can_jev, true);
+  for (const env of [
+    {},
+    { ...valid, TYPESAFE_API_KEY: '' },
+    { ...valid, EDU_CONVERSION_JEV_ENABLED: 'false' },
+    { ...valid, VERCEL_ENV: 'production' },
+    { ...valid, NEXT_PUBLIC_APP_ENV: 'production' },
+    { ...valid, NEXT_PUBLIC_APP_ENV: 'production', VERCEL_ENV: 'preview' },
+    { ...valid, NEXT_PUBLIC_APP_ENV: undefined, VERCEL_ENV: 'production' },
+    { ...production, TYPESAFE_API_KEY: '' },
+    { ...production, EDU_CONVERSION_JEV_PRODUCTION_ENABLED: 'false' },
+  ]) {
     assert.equal(server.conversionCapabilities(env).can_jev, false);
   }
+  assert.equal(server.conversionCapabilities({ ...production, EDU_CONVERSION_MOCK_ENABLED: 'true' }).can_mock, false);
 });
