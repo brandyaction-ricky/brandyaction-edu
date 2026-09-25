@@ -315,7 +315,7 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
           <p className="conversion-muted">직원 승인 여부를 남깁니다. 이 화면에서 승인해도 고객에게 메시지는 보내지지 않습니다.</p>
           {records.map(record => <article className="conversion-record" key={record.id}><strong>{decisionNames[record.decision]}</strong><small>{displayTime(record.created_at)}</small>{record.reply_text && <p className="conversion-quote">{record.reply_text}</p>}{record.reason && <p>사유: {record.reason}</p>}<span className="conversion-tag">{['accept', 'edit'].includes(record.decision) ? '승인된 답변 초안 · 미발송' : '직원 검토 기록 · 미발송'}</span></article>)}
           {!records.length && <AdminEmptyState compact title="아직 검토 기록이 없습니다." />}
-          <div className="conversion-next"><strong>구매·환불 결과</strong><p>주문 연결은 준비 중입니다. 현재 화면의 기록으로 구매 성과를 계산하지 않습니다.</p></div>
+          <div className="conversion-next"><strong>구매·환불 결과</strong><p>위에서 확인한 주문은 문의와 연결할 수 있습니다. 연결 기록을 구매 성과에 반영하는 기능은 아직 준비 중입니다.</p></div>
         </AdminSection>
       </div>
       </div>
