@@ -27,6 +27,7 @@ function harness({ missions = [], user = admin } = {}) {
     from(table) {
       const filters = []; let start = 0, end = Infinity, head = false, single = false, values;
       function field(row, key) {
+        if (key === 'enrollments.user_id') return row.enrollments?.user_id;
         if (!key.startsWith('curriculum_lessons.')) return row[key];
         const lesson = tables.curriculum_lessons.find(item => item.id === row.lesson_id);
         return key.endsWith('.course_id') ? tables.curriculum_weeks.find(item => item.id === lesson?.week_id)?.course_id : lesson?.week_id;
@@ -120,4 +121,32 @@ test('existing mission cannot move across products; archived restore keeps lesso
   const restored = await (await api.read('section=missions&missionState=hidden')).json();
   assert.equal(restored.pagination.total, 1);
   assert.equal(restored.data.curriculum_missions[0].lesson_id, id(21));
+});
+
+test('member and question context scopes apply before pagination, archived questions remain reachable', async () => {
+  const api = harness();
+  api.tables.edu_questions = [
+    ...Array.from({ length: 101 }, (_, n) => ({ id: id(n + 200), user_id: id(2), status: 'open', is_archived: false })),
+    { id: id(401), user_id: id(2), status: 'answered', is_archived: true },
+    { id: id(402), user_id: id(1), status: 'answered', is_archived: false },
+  ];
+  const scoped = await (await api.read(`section=questions&member=${id(2)}&questionState=open&page=2`)).json();
+  assert.equal(scoped.pagination.total, 101); assert.equal(scoped.data.edu_questions.length, 1);
+  const archived = await (await api.read(`section=questions&member=${id(2)}&questionState=archived`)).json();
+  assert.deepEqual(archived.data.edu_questions.map(row => row.id), [id(401)]);
+  const direct = await (await api.read(`section=questions&question=${id(401)}`)).json();
+  assert.equal(direct.data.edu_questions[0].is_archived, true);
+  const member = await (await api.read(`section=customers&member=${id(2)}`)).json();
+  assert.deepEqual(member.data.profiles.map(row => row.id), [id(2)]);
+  for (const query of ['section=questions&member=bad', 'section=questions&question=bad', 'section=questions&questionState=unknown', 'section=reviews&submission=bad']) assert.equal((await api.read(query)).status, 400);
+});
+test('submission deep links and member scope use inner joins with unambiguous profile FK', async () => {
+  const api = harness();
+  api.tables.mission_submissions = [{ id: id(501), enrollments: { user_id: id(2) } }, { id: id(502), enrollments: { user_id: id(1) } }];
+  for (const query of [`member=${id(2)}`, `submission=${id(501)}`]) {
+    const data = await (await api.read('section=reviews&' + query)).json();
+    assert.deepEqual(data.data.mission_submissions.map(row => row.id), [id(501)]);
+  }
+  assert.match(rules.adminSelectColumns('reviews', 'mission_submissions'), /enrollments!inner.*profiles!enrollments_user_id_fkey/);
+  assert.equal(api.writes.length, 0);
 });

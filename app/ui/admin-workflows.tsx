@@ -15,6 +15,7 @@ import {
 import { localDateTime } from "@/lib/platform-rules";
 import { CalendarDays, ChevronDown, Copy, Plus, Trash2, X } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { SubmissionReview } from "./final/submission-review";
 import { timeLabel, type Data, type WorkflowSend } from "./learning-workflows";
@@ -1096,8 +1097,9 @@ function QuizEditor({
   );
 }
 function Participants() {
-  const [cohort, setCohort] = useState("");
-  const [search, setSearch] = useState("");
+  const routeParams = useSearchParams();
+  const [cohort, setCohort] = useState(routeParams.get('cohort') || "");
+  const [search, setSearch] = useState(routeParams.get('search') || "");
   const [level, setLevel] = useState("");
   const [attention, setAttention] = useState(false);
   const [page, setPage] = useState(1);
@@ -1248,9 +1250,8 @@ function Participants() {
           {list.map((r) => {
             const memberId = String(r.id);
             const memberCells = matrix[memberId] || [];
-            const reviewCells = memberCells.filter((cell) =>
-              ["submitted", "changes_requested", "rejected", "partial"].includes(cell.status) && cell.submissionId,
-            );
+            const reviewCells = memberCells.filter((cell) => cell.status === "submitted" && cell.submissionId);
+            const followupCells = memberCells.filter(cell => ['changes_requested', 'rejected'].includes(cell.status));
             const expanded = Boolean(expandedMembers[memberId]);
             const panelId = `participant-progress-${memberId}`;
             return (
@@ -1263,6 +1264,7 @@ function Participants() {
                       {r.level !== null && r.level !== undefined && <span className="badge">LV {String(r.level)}</span>}
                     </div>
                     <p>{t(r, "email") || "이메일 정보 없음"}</p>
+                    {Boolean(r.user_id) && <Link className="text-link" href={`/admin/customers?member=${encodeURIComponent(t(r, 'user_id'))}`}>회원 운영 정보</Link>}
                   </div>
                   <div className="participant-summary-stat">
                     <span>학습 진도</span><strong>{t(r, "learning_percent")}%</strong>
@@ -1276,9 +1278,10 @@ function Participants() {
                   </div>
                   {reviewCells.length > 0 && (
                     <Link className="btn small primary participant-review-cta" href={`/admin/reviews?submission=${reviewCells[0].submissionId}`}>
-                      검토 대기 {reviewCells.length}건
+                      선택 주차 검토 대기 {reviewCells.length}개 학습
                     </Link>
                   )}
+                  {!reviewCells.length && followupCells.length > 0 && <span className="badge amber">보완·재제출 확인 {followupCells.length}개 학습</span>}
                   <button
                     className="participant-expand"
                     type="button"

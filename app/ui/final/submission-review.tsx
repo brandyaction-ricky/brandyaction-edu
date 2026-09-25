@@ -3,6 +3,7 @@
 import { labels, object, safeUrl, text as t, type Row } from "@/lib/platform";
 import { ArrowRight, Check } from "lucide-react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { timeLabel, type Data, type WorkflowSend } from "../learning-workflows";
 import { Badge, Empty } from "./primitives";
@@ -29,7 +30,7 @@ export function SubmissionReview({
 }) {
   const params = useSearchParams();
   const [status, setStatus] = useState(
-    params.get("submission") ? "" : "submitted",
+    params.get("submission") || params.get("member") ? "" : "submitted",
   );
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("old");
@@ -38,20 +39,20 @@ export function SubmissionReview({
   const [message, setMessage] = useState("");
   const enriched: Submission[] = (data.mission_submissions || []).map(
     (submission) => {
-      const enrollment = (data.enrollments || []).find(
+      const enrollment = (object(submission, 'enrollments').user_id ? object(submission, 'enrollments') : (data.enrollments || []).find(
         (row) => row.id === submission.enrollment_id,
-      );
+      )) as Row | undefined;
       return {
         ...submission,
-        member: (data.profiles || []).find(
+        member: (object(enrollment, 'profiles').id ? object(enrollment, 'profiles') : (data.profiles || []).find(
           (row) => row.id === enrollment?.user_id,
-        ),
-        mission: (data.curriculum_missions || []).find(
+        )) as Row | undefined,
+        mission: (object(submission, 'curriculum_missions').id ? object(submission, 'curriculum_missions') : (data.curriculum_missions || []).find(
           (row) => row.id === submission.mission_id,
-        ),
-        course: (data.courses || []).find(
+        )) as Row | undefined,
+        course: (object(enrollment, 'courses').id ? object(enrollment, 'courses') : (data.courses || []).find(
           (row) => row.id === enrollment?.course_id,
-        ),
+        )) as Row | undefined,
       };
     },
   );
@@ -82,6 +83,7 @@ export function SubmissionReview({
   }
   return (
     <>
+      {(params.get('member') || params.get('submission')) && <p className="notice mb16">연결된 {params.get('submission') ? '제출물' : '회원'}만 조회 중입니다. <Link href="/admin/reviews" className="text-link">전체 검토 목록</Link></p>}
       <div className="tabs" aria-label="제출 상태">
         {states.map((value) => (
           <button
@@ -200,6 +202,7 @@ export function SubmissionReview({
                     <span className="meta">{t(row, "attempt_number")}차</span>
                   </div>
                   <p>{name(row.mission) || "미션"}</p>
+                  <p className="meta">{name(row.course)} · {t(row.member, 'email')}</p>
                   <div className="spread">
                     <Badge
                       color={
@@ -287,6 +290,7 @@ export function SubmissionReview({
                 )}
               </div>
               <aside className="inspector">
+                {current.member?.id && <Link className="btn small mb16" href={`/admin/customers?member=${current.member.id}`}>회원 운영 정보 보기</Link>}
                 {current.status === "submitted" ? <>
                 <h3>이번 검토 전 확인</h3>
                 <p className="meta">현재 화면에서만 사용하는 확인 항목입니다. 체크 결과는 저장되지 않습니다.</p>
