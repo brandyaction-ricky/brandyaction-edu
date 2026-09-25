@@ -1353,3 +1353,102 @@ a.participant-day-card:hover {
   .edu-admin .detail-gallery-actions { grid-column: 2 / -1; flex-direction: row; justify-content: flex-end; }
   .edu-admin .detail-gallery-error { align-items: stretch; flex-direction: column; }
 }
+.edu-front .profile-menu-wrap {
+  position: relative;
+  z-index: 80;
+  flex: none;
+}
+
+.edu-front .profile-menu-trigger {
+  border: 0;
+  color: var(--text-primary);
+}
+
+.edu-front .profile-menu {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  z-index: 100;
+  width: min(296px, calc(100vw - 24px));
+  max-height: calc(100dvh - var(--header-height) - 24px);
+  overflow-y: auto;
+  padding: 8px;
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-float);
+}
+
+.edu-front .profile-menu-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.edu-front .profile-menu-identity > span:last-child {
+  display: grid;
+  min-width: 0;
+}
+
+.edu-front .profile-menu-identity b,
+.edu-front .profile-menu-identity small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.edu-front .profile-menu-identity small {
+  color: var(--text-secondary);
+  font-size: var(--type-small);
+}
+
+.edu-front .profile-menu > a,
+.edu-front .profile-menu > button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--type-small);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.edu-front .profile-menu > button {
+  margin-top: 4px;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+}
+
+.edu-front .profile-menu > a:hover,
+.edu-front .profile-menu > button:hover {
+  background: var(--surface-subtle);
+}
+
+.edu-front .profile-menu svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+@media (max-width: 680px) {
+  .edu-front .profile-menu {
+    right: -4px;
+  }
+
+  .edu-front .profile-menu > a,
+  .edu-front .profile-menu > button {
+    min-height: 48px;
+  }
+}
