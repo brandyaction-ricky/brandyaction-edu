@@ -18,7 +18,7 @@ import { homepageCourses, isRecruiting, localDateTime, recordId } from "@/lib/pl
 import { archiveValues } from "@/lib/qa-rules";
 import { createClient } from "@/lib/supabase/client";
 import { getSupabasePublicConfig } from "@/lib/supabase/config";
-import { ArrowRight, BookOpen, Menu, Pencil, Plus, Search, X } from "lucide-react";
+import { ArrowRight, BookOpen, CalendarDays, CreditCard, LayoutDashboard, LogOut, Menu, Pencil, Plus, Search, Ticket, UserRound, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -52,9 +52,9 @@ import {
   CourseCard,
   Empty,
   Heading,
-  Story,
   courseType,
 } from "./final/primitives";
+import { StoryCarousel } from "./final/story-carousel";
 import {
   ArticlesView,
   AuthView,
@@ -171,6 +171,8 @@ export function Platform({
   const [notice, setNotice] = useState("");
   const [pending, setPending] = useState(false);
   const [mobile, setMobile] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
   const [adminPaging, setAdminPaging] = useState({ section: "", page: 1 });
   const [pagination, setPagination] = useState<{
@@ -312,6 +314,22 @@ export function Platform({
     const timer = setTimeout(() => setNotice(""), 5000);
     return () => clearTimeout(timer);
   }, [notice]);
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (!profileMenuRef.current?.contains(event.target as Node))
+        setProfileMenuOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setProfileMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [profileMenuOpen]);
   const send = (body: Record<string, unknown>, success = "저장했습니다.") =>
     mutationGate.current(body, async (payload) => {
       setPending(true);
@@ -468,13 +486,32 @@ export function Platform({
                 <Link className="link" href="/my">
                   마이페이지
                 </Link>
-                <Link
-                  className="avatar"
-                  href="/my/profile"
-                  aria-label="회원 정보"
-                >
-                  {(user.full_name || "나").slice(0, 1)}
-                </Link>
+                <div className="profile-menu-wrap" ref={profileMenuRef}>
+                  <button
+                    type="button"
+                    className="avatar profile-menu-trigger"
+                    aria-label="내 프로필 메뉴"
+                    aria-haspopup="true"
+                    aria-expanded={profileMenuOpen}
+                    onClick={() => setProfileMenuOpen((open) => !open)}
+                  >
+                    {(user.full_name || "나").slice(0, 1)}
+                  </button>
+                  {profileMenuOpen && (
+                    <nav className="profile-menu" aria-label="내 프로필 메뉴">
+                      <div className="profile-menu-identity">
+                        <span className="avatar" aria-hidden="true">{(user.full_name || "나").slice(0, 1)}</span>
+                        <span><b>{user.full_name || "회원"}</b><small>{user.email}</small></span>
+                      </div>
+                      <Link href="/my" onClick={() => setProfileMenuOpen(false)}><LayoutDashboard aria-hidden="true" />마이페이지로 이동</Link>
+                      <Link href="/my/profile" onClick={() => setProfileMenuOpen(false)}><UserRound aria-hidden="true" />내 정보 수정</Link>
+                      <Link href="/my/coupons" onClick={() => setProfileMenuOpen(false)}><Ticket aria-hidden="true" />내 쿠폰함</Link>
+                      <Link href="/my/orders" onClick={() => setProfileMenuOpen(false)}><CreditCard aria-hidden="true" />신청·결제 내역</Link>
+                      <Link href="/my/classes" onClick={() => setProfileMenuOpen(false)}><CalendarDays aria-hidden="true" />내 클래스</Link>
+                      <button type="button" onClick={() => { setProfileMenuOpen(false); void logout(); }}><LogOut aria-hidden="true" />로그아웃</button>
+                    </nav>
+                  )}
+                </div>
               </>
             ) : (
               <Link className="btn" href="/login">
@@ -605,13 +642,7 @@ export function Platform({
                   고객 이야기 <ArrowRight />
                 </Link>
               </div>
-              <div className="grid2">
-                {rows("review_videos")
-                  .slice(0, 2)
-                  .map((s) => (
-                    <Story key={s.id} story={s} />
-                  ))}
-              </div>
+              <StoryCarousel stories={rows("review_videos")} />
             </section>
           )}
         </div>
