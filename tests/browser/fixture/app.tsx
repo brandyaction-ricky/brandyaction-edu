@@ -8,7 +8,7 @@ import { WebinarManagement } from '../../../app/ui/webinar-management';
 import { AdminWorkflows } from '../../../app/ui/admin-workflows';
 import { ConversionFixture } from './conversion';
 import { MissionIntegrityFixture } from './mission-integrity';
-import { MemberOperationsFixture } from './member-operations';
+import { MemberOperationsFixture, RetainedMemberDialogFixture } from './member-operations';
 import { AdminButton, AdminConfirmDialog, AdminDrawer, AdminEmptyState, AdminInlineError, AdminInput, AdminPage, AdminPageHeader, AdminShell, AdminSuccessState } from '../../../features/admin-ui';
 import { ProductDetailHtml } from '../../../app/ui/final/product-detail-html';
 import '../../../app/ui/final/tokens.css';
@@ -48,7 +48,7 @@ function ProductHtmlCtaFixture() {
   return <ProductDetailHtml html="" documentSource={documentSource} ctaUrl="/join/synthetic/organic" />;
 }
 const path = window.location.pathname;
-const fixture = ['/member-operations-test', '/admin/customers', '/admin/questions', '/admin/reviews', '/admin/members'].includes(path) ? <MemberOperationsFixture/> : path.startsWith('/mission-integrity-test') ? <MissionIntegrityFixture/> : path.startsWith('/admin-shell-test')
+const fixture = path === '/retained-member-dialog-test' ? <RetainedMemberDialogFixture/> : ['/member-operations-test', '/admin/customers', '/admin/questions', '/admin/reviews', '/admin/members'].includes(path) ? <MemberOperationsFixture/> : path.startsWith('/mission-integrity-test') ? <MissionIntegrityFixture/> : path.startsWith('/admin-shell-test')
   ? <ShellFixture/>
   : path.startsWith('/product-html-cta-test')
     ? <ProductHtmlCtaFixture/>

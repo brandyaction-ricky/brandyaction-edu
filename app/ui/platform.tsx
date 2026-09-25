@@ -33,7 +33,7 @@ import { AdminWorkflows, standaloneAdmin } from "./admin-workflows";
 import { BlocksField, UploadField } from "./editor-fields";
 import { AdminCatalog, type MissionScope } from "./final/admin-catalog";
 import { MissionTargetFields, type MissionContext } from "./final/mission-target-fields";
-import { useAdminDialog } from "@/features/admin-ui";
+import { useAdminDialog, useRouteDialog } from "@/features/admin-ui";
 import { ArticleBannerEditor } from "./final/article-banner-editor";
 import { ArticleCategoryManager } from "./final/article-category-manager";
 import { ProductEditor } from "./final/admin-editors";
@@ -203,12 +203,12 @@ export function Platform({
         ? "무료 클래스"
         : "전체";
   const setFilter = (value: string) => setFilters({ route: routeKey, value });
-  const [editor, setEditor] = useState<{
+  const [editor, setEditor] = useRouteDialog<{
     route: string;
     section: Section;
     row?: Row;
     context?: MissionContext;
-  } | null>(null);
+  }>(routeKey);
   const missionScopeSource = `${searchParams.get("course") || ""}:${searchParams.get("week") || ""}`;
   const initialMissionScope: MissionScope = { courseId: searchParams.get("course") || "", weekId: searchParams.get("week") || "", state: "active" };
   const [missionFilter, setMissionFilter] = useState({ source: missionScopeSource, scope: initialMissionScope });

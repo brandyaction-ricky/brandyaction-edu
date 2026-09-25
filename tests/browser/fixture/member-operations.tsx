@@ -6,6 +6,7 @@ import { SubmissionReview } from '../../../app/ui/final/submission-review';
 import { AdminWorkflows } from '../../../app/ui/admin-workflows';
 import { sections, type Row } from '../../../lib/platform';
 import type { Data } from '../../../app/ui/learning-workflows';
+import { useRouteDialog } from '../../../features/admin-ui';
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const member = { id: id(1), full_name: '운영 동선 QA 회원', email: 'operations-fixture@example.test', role: 'student', status: 'active', phone: '01012345678', created_at: '2026-09-20' };
@@ -15,6 +16,23 @@ const mission = { id: id(20), title: '첫 실행 미션', instructions: '실행 
 const submission = { id: id(30), enrollment_id: enrollment.id, mission_id: mission.id, enrollments: enrollment, curriculum_missions: mission, status: 'approved', attempt_number: 2, submitted_at: '2026-09-24T09:00:00Z', reviewed_at: '2026-09-24T10:00:00Z', reviewer_feedback: '실행 확인 완료', response: { text: '합성 제출 답변' } };
 const question = { id: id(40), user_id: member.id, profiles: member, courses: course, title: '합성 보관 질문', content: '다음 학습은 어디에서 보나요?', answer: '학습 기록에서 확인해 주세요.', status: 'answered', is_archived: true, created_at: '2026-09-24T09:00:00Z' };
 const data: Data = { profiles: [member], courses: [course], cohorts: [cohort], enrollments: [enrollment], curriculum_missions: [mission], mission_submissions: [submission], edu_questions: [question] };
+
+// Keep the owner mounted across route changes, as the production Platform layout is.
+export function RetainedMemberDialogFixture() {
+  const [route, setRoute] = useState('/admin/customers');
+  const [editor, setEditor] = useRouteDialog<Row>(route);
+  return <div className="edu-admin" onClick={event => {
+    const link = (event.target as HTMLElement).closest('a[href]');
+    if (link) { event.preventDefault(); setRoute(link.getAttribute('href')!); }
+  }}>
+    <h1>유지되는 레이아웃 왕복 이동 QA</h1><p role="status">{route}</p>
+    <button onClick={() => setRoute(`/admin/customers?member=${member.id}`)}>회원 목록으로 복귀</button>
+    <button onClick={() => setRoute('/admin/customers')}>전체 목록 보기</button>
+    <button onClick={() => setEditor(member)}>첫 회원 열기</button>
+    <button onClick={() => setEditor({ ...member, id: id(4), full_name: '다른 QA 회원' })}>다른 회원 열기</button>
+    {editor && <Editor section={sections.find(item => item.key === 'customers')!} row={editor} data={data} pending={false} close={() => setEditor(null)} save={async () => {}}/>}
+  </div>;
+}
 
 // Only in-memory UI and synthetic GETs. Save never calls the real API.
 export function MemberOperationsFixture() {

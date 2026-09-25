@@ -2,6 +2,22 @@ import { expect, test } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => { await page.goto('/member-operations-test'); });
 
+test('retained layout clears the old member drawer after a round trip, including query-only changes', async ({ page }) => {
+  await page.goto('/retained-member-dialog-test');
+  await page.getByRole('button', { name: '첫 회원 열기', exact: true }).click();
+  await page.getByRole('tab', { name: '수강권', exact: true }).click();
+  await page.getByRole('link', { name: '이 기수에서 회원 진행 찾기', exact: true }).first().click();
+  await expect(page.getByRole('status')).toContainText('/admin/members?cohort=');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.getByRole('button', { name: '회원 목록으로 복귀', exact: true }).click();
+  await page.getByRole('button', { name: '전체 목록 보기', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.getByRole('button', { name: '다른 회원 열기', exact: true }).click();
+  await expect(page.getByLabel('이름', { exact: true })).toHaveValue('다른 QA 회원');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
 test('member tabs retain profile edits, support keyboard activation and restore focus', async ({ page }) => {
   const opener = page.getByRole('button', { name: '회원 상세 열기', exact: true });
   await opener.click();
