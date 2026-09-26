@@ -159,6 +159,17 @@ export async function GET(request: Request) {
                 const configs = await db.from('landing_configs').select('id,kakao_url,cta_label,pixel_enabled,pixel_id').eq('id', record).limit(1);
                 if (configs.error) throw configs.error;
                 data.landing_configs = (configs.data || []) as Row[];
+            })(), (async () => {
+                // A single published week/lesson pair is sufficient for readiness.
+                // Do not reload unrelated courses or heavy lesson content in the editor.
+                const curriculum = await db.from('curriculum_weeks')
+                    .select('id,course_id,is_published,curriculum_lessons!inner(id,week_id,is_published)')
+                    .eq('course_id', record).eq('is_published', true)
+                    .eq('curriculum_lessons.is_published', true).limit(1);
+                if (curriculum.error) throw curriculum.error;
+                const rows = (curriculum.data || []) as unknown as (Row & { curriculum_lessons: Row[] })[];
+                data.curriculum_weeks = rows.map(week => ({ id: week.id, course_id: week.course_id, is_published: week.is_published }));
+                data.curriculum_lessons = rows.flatMap(week => week.curriculum_lessons);
             })()] : []),
         ]);
         for (const banner of data.site_banners || []) {

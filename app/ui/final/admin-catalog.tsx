@@ -10,7 +10,8 @@ import {
   type Row,
   type Section,
 } from "@/lib/platform";
-import { paidCourseReadinessIssues, recordId } from "@/lib/platform-rules";
+import { productSalesStatus, recordId } from "@/lib/platform-rules";
+import { productConversion } from "@/lib/product-conversion";
 import { archiveValues, cohortPeriod, cohortStatus } from "@/lib/qa-rules";
 import { ArrowRight, BookOpen, ChevronDown, ChevronUp, FileText, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import Link from "next/link";
@@ -221,8 +222,10 @@ export function AdminCatalog({
   );
   const badge = (r: Row) => {
     const value = getStatus(r);
-    const publicationIssues = s.key === "products" ? paidCourseReadinessIssues(r, cohorts, weeks, lessons) : [];
-    if (value === "published" && publicationIssues.length) return <Badge color="amber">판매 보류</Badge>;
+    if (s.key === "products") {
+      const sale = productSalesStatus(r, cohorts, weeks, lessons, now, Boolean(productConversion(object(r, "metadata")).url));
+      return <><Badge color={sale.label === "판매 보류" ? "amber" : value === "published" ? "green" : ""}>{sale.label}</Badge>{value === "published" && sale.issues.length > 0 && <small>{sale.issues.join(" · ")}</small>}</>;
+    }
     return (
       <Badge
         color={
@@ -301,12 +304,12 @@ export function AdminCatalog({
         value: (r) =>
           cohorts
             .filter((c) => c.course_id === r.id)
-            .map((c) => t(c, "name"))
+            .map((c) => `${t(c, "name")} · ${labels[t(c, "status")] || t(c, "status")}`)
             .join(", ") || "미연결",
       },
       { label: "자료", value: (r) => productResourceCount(r.id) + "개" },
       { label: "공개 점검", value: (r) => {
-        const issues = paidCourseReadinessIssues(r, cohorts, weeks, lessons);
+        const issues = productSalesStatus(r, cohorts, weeks, lessons, now, Boolean(productConversion(object(r, "metadata")).url)).issues;
         return issues.length ? <><Badge color="red">확인 필요</Badge><small>{issues.join(" · ")}</small></> : <Badge color="green">준비 완료</Badge>;
       } },
       { label: "판매 상태", value: badge },
