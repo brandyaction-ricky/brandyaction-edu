@@ -5,6 +5,7 @@ import { getAuthenticatedUser } from '@/lib/server-auth';
 import { bannerTextLimits, sections, safeUrl, type Row } from '@/lib/platform';
 import { containsFreeClassCampaign, hasLearningAccess, paidCourseReadinessIssues } from '@/lib/platform-rules';
 import { getEduSettings } from '@/lib/edu-settings';
+import { isListedProductLink } from '@/lib/product-visibility';
 import { gradeQuiz, type QuizDefinition } from '@/lib/mission-quiz';
 import { adminSelectColumns, adminTables, archiveValues, cohortStatus, phoneNumber, validImage, assetPath, imagePreviewUrl, databaseMessage, excludedMemberStatus } from '@/lib/qa-rules';
 import { POLICY_VERSION } from '@/lib/legal-policies';
@@ -292,7 +293,8 @@ export async function GET(request: Request) {
         }
         if (!adminMode) {
             const now = Date.now();
-            data.site_banners = (data.site_banners || []).filter((b) => (!b.starts_at || Date.parse(String(b.starts_at)) <= now) && (!b.ends_at || Date.parse(String(b.ends_at)) > now));
+            data.site_banners = (data.site_banners || []).filter((b) => (!b.starts_at || Date.parse(String(b.starts_at)) <= now) && (!b.ends_at || Date.parse(String(b.ends_at)) > now)
+                && isListedProductLink(b.link_url, data.courses || [], new URL(request.url).origin));
             const landingDb = createAdminClient();
             const freeCourseIds = (data.courses || []).filter(c => Number(c.list_price) === 0).map(c => c.id);
             const landingResult = freeCourseIds.length ? await landingDb.from('landing_configs').select('*').in('id', freeCourseIds) : { data: [], error: null };
