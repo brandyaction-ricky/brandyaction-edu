@@ -228,6 +228,7 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
   const [detailMode, setDetailMode] = useState<"image" | "html">(productDocument(metadata) || String(metadata.detail_html || "") ? "html" : "image");
   const conversion = productConversion(metadata, (data.landing_configs || []).find(item => item.id === row?.id));
   const [ctaColor, setCtaColor] = useState(conversion.color);
+  const [showCountdown, setShowCountdown] = useState(metadata.recruitment_countdown_enabled === true);
   const [htmlFilename, setHtmlFilename] = useState("");
   const [detailUploadStatus, setDetailUploadStatus] = useState<"idle" | "uploading" | "error">("idle");
   const [preview, setPreview] = useState({ title: t(row, "title"), summary: t(row, "summary"), price: num(row, "list_price"), regular: Number(metadata.regular_price || 0), status: t(row, "status") || "draft", category: t(row, "category") || "paid_class", slug: t(row, "slug"), seoTitle: String(metadata.seo_title || ""), seoDescription: String(metadata.seo_description || "") });
@@ -354,6 +355,13 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
           <div className="divider" /><div className="notice">수강 권한은 신청·결제 내역과 기수 일정에 따라 부여됩니다. 개별 수강권의 기간·회수 상태는 주문 및 회원 화면에서 확인하세요.</div><div className="row mt16"><Link className="btn" href="/admin/orders">주문·수강 권한 확인</Link><Link className="btn" href="/admin/cohorts">기수·회차 관리</Link></div>
         </div>
         <div className="section-pad" id="product-panel-publish" data-tab="publish" role="tabpanel" aria-labelledby="product-tab-publish" hidden={tab !== "publish"}>
+          <section className="product-conversion-card">
+            <h2>모집 마감 안내</h2>
+            <input type="hidden" name="recruitment_countdown_enabled" value={showCountdown ? 'on' : 'off'} />
+            <label className="row"><input type="checkbox" checked={showCountdown} disabled={pending} onChange={event => setShowCountdown(event.target.checked)} />모집 마감 카운트다운 표시</label>
+            <p className="meta">기본값은 꺼짐입니다. 고객 상세 소개 영역에 선택한 기수의 모집 마감(한국 시간)을 표시하고, 마감 후에는 ‘모집 마감’으로 바뀝니다. 모집 일정이 없으면 타이머 대신 안내를 표시합니다.</p>
+            <p className="meta">HTML 신청 버튼은 <code>{'href="#pp"'}</code> 또는 <code>{'data-cta="apply"'}</code>로 지정하세요. 기존 신청·결제·학습 버튼과 같은 조건으로 연결되며 임의 스크립트·폼은 계속 차단됩니다.</p>
+          </section>
           <h2 className="mb16">공개 점검</h2>
           <ProductSaleCheck sale={sale} cohort={cohort} />
           <section className="product-conversion-card"><h2>Call to Action</h2><p className="meta">고객이 클릭할 주요 버튼과 이동할 페이지를 설정하세요.</p>

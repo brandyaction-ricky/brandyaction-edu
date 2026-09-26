@@ -59,6 +59,26 @@ test('partial product updates preserve existing metadata and validate price and 
   assert.throws(() => mergeProductMetadata(previous, { seo_title: 'a'.repeat(201) }), /200자/);
   assert.deepEqual(mergeProductMetadata(previous, { seo_title: '' }), { ...previous, seo_title: '' });
 });
+
+test('countdown toggle is strictly boolean, opt-in and preserved by partial saves', () => {
+  assert.equal(mergeProductMetadata({}, {}).recruitment_countdown_enabled, undefined);
+  const enabled = mergeProductMetadata({ campaign: true }, { recruitment_countdown_enabled: true });
+  assert.equal(enabled.recruitment_countdown_enabled, true);
+  assert.equal(mergeProductMetadata(enabled, { seo_title: 'title' }).recruitment_countdown_enabled, true);
+  assert.equal(mergeProductMetadata(enabled, { recruitment_countdown_enabled: false }).recruitment_countdown_enabled, false);
+  for (const value of ['true', 'false', 1, null, {}]) assert.throws(() => mergeProductMetadata({}, { recruitment_countdown_enabled: value }), /카운트다운/);
+});
+
+test('countdown uses explicit timezone, clamps expiry and does not invent missing deadlines', () => {
+  const { recruitmentRemaining } = load('lib/product-countdown.ts');
+  const now = Date.parse('2026-10-01T14:58:58Z');
+  assert.deepEqual(recruitmentRemaining('2026-10-01T23:59:00+09:00', now), { expired: false, text: '00:00:02' });
+  assert.deepEqual(recruitmentRemaining('2026-10-03T14:59:00Z', now), { expired: false, text: '2일 00:00:02' });
+  assert.deepEqual(recruitmentRemaining('2026-10-01T14:59:00Z', now + 2000), { expired: true, text: '00:00:00' });
+  assert.equal(recruitmentRemaining(undefined, now), null);
+  assert.equal(recruitmentRemaining('2026-10-01T23:59', now), null);
+  assert.equal(recruitmentRemaining('invalidZ', now), null);
+});
 test('detail image gallery keeps legacy images, validates entries and preserves display order', () => {
   const { productDetailImages } = load('lib/product-metadata.ts');
   assert.deepEqual(productDetailImages({ detail_image_url: 'edu/legacy.webp' }), [{ path: 'edu/legacy.webp', name: '기존 상세 이미지', alt: '' }]);

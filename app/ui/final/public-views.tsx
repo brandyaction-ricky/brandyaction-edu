@@ -21,10 +21,11 @@ import {
   UserRound,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Data } from "../learning-workflows";
 import { EmailAuth } from "../email-auth";
 import { ProductDetailHtml } from './product-detail-html';
+import { RecruitmentCountdown } from './product-countdown';
 import { productDocument } from '@/lib/product-html-document';
 import { productConversion } from '@/lib/product-conversion';
 import { ProductPixel, ProductCtaLink } from './product-conversion';
@@ -140,10 +141,28 @@ function StandardProductDetail({
     free = type === "무료 클래스";
   const cohorts = (data.cohorts || []).filter((g) => g.course_id === c.id),
     [cohortId, setCohortId] = useState("");
-  const purchasable = (cohort: Row) => isPurchasableOffer(c, cohort);
+  const [clock, setClock] = useState<number | undefined>();
+  const deadlineKey = JSON.stringify(cohorts.flatMap(g => [g.recruitment_start_at, g.recruitment_end_at, g.operation_end_at]).filter(Boolean));
+  // Re-evaluate the existing CTA rules when a deadline passes without requiring
+  // a reload. Uploaded HTML is memoized and never executes its own scripts.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const update = () => {
+      const now = Date.now();
+      setClock(now);
+      clearTimeout(timer);
+      const deadlines = (JSON.parse(deadlineKey) as string[]).map(Date.parse).filter(end => Number.isFinite(end) && end > now);
+      if (deadlines.length) timer = setTimeout(update, Math.min(2147483647, Math.max(1, Math.min(...deadlines) - now + 1)));
+    };
+    timer = setTimeout(update, 0);
+    window.addEventListener('focus', update);
+    return () => { clearTimeout(timer); window.removeEventListener('focus', update); };
+  }, [deadlineKey]);
+  const purchasable = (cohort: Row) => isPurchasableOffer(c, cohort, clock);
   let available =
     cohorts.find((g) => g.id === cohortId && purchasable(g)) ||
     cohorts.find(purchasable);
+  const countdownCohort = available || cohorts.find(g => g.id === cohortId) || cohorts.find(g => !g.archived_at && ['recruiting', 'upcoming', 'closed'].includes(t(g, 'status')));
   const enrolled = (data.enrollments || []).find(
     (e) => e.course_id === c.id && hasLearningAccess(e),
   );
@@ -191,6 +210,10 @@ function StandardProductDetail({
           ? "구매하기"
           : "수강 신청하기"
       : "다음 모집 준비 중";
+  const detailCtaUrl = customCta ? conversion.url : !unavailableFree && (enrolled || available) ? href : '';
+  const detailCtaDeadline = !customCta && !enrolled && available ? t(available, 'recruitment_end_at') : undefined;
+  const countdown = meta.recruitment_countdown_enabled === true
+    ? <RecruitmentCountdown endAt={countdownCohort?.recruitment_end_at} /> : null;
   const button = customCta ? <ProductCtaLink conversion={conversion} courseId={c.id} position="sidebar_cta" className="btn primary full large" /> : unavailableFree ? <button className="btn primary full large" disabled>참여 링크 준비 중</button> : (
     <Link
       href={href}
@@ -230,7 +253,8 @@ function StandardProductDetail({
           <h1 className="sr-only">{t(c, "title")} · 무료 클래스</h1>
           <div className="free-body">
             <div className="free-sheet">
-              {documentSource || detailHtml ? <ProductDetailHtml html={detailHtml} documentSource={documentSource} ctaUrl={conversion.url} /> : detailImage ? (
+              {countdown}
+              {documentSource || detailHtml ? <ProductDetailHtml html={detailHtml} documentSource={documentSource} ctaUrl={detailCtaUrl} ctaDeadline={detailCtaDeadline} /> : detailImage ? (
                 <div className="detail-image-stack">{detailImages.map((image, index) => <img
                   className="detail-image"
                   src={image.path}
@@ -270,12 +294,13 @@ function StandardProductDetail({
                 <a href="#class-guide">이용 안내</a>
               </nav>
               <section className="detail-section" id="class-detail">
+                {countdown}
                 <h2>
                   {digital
                     ? "반복 업무를 줄이는 작은 도구."
                     : "이 클래스에서 만들 변화"}
                 </h2>
-                {visibleDocumentSource || visibleDetailHtml ? <ProductDetailHtml html={visibleDetailHtml} documentSource={visibleDocumentSource} /> : detailImage ? (
+                {visibleDocumentSource || visibleDetailHtml ? <ProductDetailHtml html={visibleDetailHtml} documentSource={visibleDocumentSource} ctaUrl={detailCtaUrl} ctaDeadline={detailCtaDeadline} /> : detailImage ? (
                   <div className="detail-image-stack">{detailImages.map((image, index) => <img
                     className="detail-image"
                     src={image.path}
