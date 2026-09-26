@@ -1807,11 +1807,10 @@ function SettingsForm({ section, data, send, pending }: Props) {
   );
 }
 function Analytics() {
-  const today = new Date().toISOString().slice(0, 10);
   const [from, setFrom] = useState(() =>
-    new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10),
+    new Date(Date.now() + 9 * 3600000 - 29 * 86400000).toISOString().slice(0, 10),
   );
-  const [to, setTo] = useState(today);
+  const [to, setTo] = useState(() => new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10));
   const end = Number.isFinite(Date.parse(to))
     ? new Date(Date.parse(to) + 86400000).toISOString()
     : "";
@@ -1825,6 +1824,7 @@ function Analytics() {
   );
   const stages = (result.stages || {}) as Record<string, number>;
   const paths = (result.paths || []) as Row[];
+  const empty = !Number(result.visitors) && !Number(result.events) && !Number(result.paidOrders) && !Number(result.revenue) && !paths.length && !Object.values(stages).some(Number);
   return (
     <>
       <div className="toolbar">
@@ -1846,10 +1846,13 @@ function Analytics() {
           새로고침
         </button>
       </div>
-      {error ? (
-        <Status message={error} />
+      {loading ? (
+        <p className="notice mt16" role="status" aria-live="polite">선택한 기간의 유입 성과를 조회하고 있습니다.</p>
+      ) : error ? (
+        <div className="notice mt16" role="alert"><strong>유입 성과를 불러오지 못했습니다.</strong><p>{error}</p><p>기록이 없는 상태와 다릅니다. 새로고침으로 다시 시도해 주세요.</p></div>
       ) : (
         <>
+          {empty && <p className="notice mb24" role="status">기간 내 기록 없음 · 조회 기간과 운영·트래킹 설정을 확인해 주세요.</p>}
           <div className="metrics mb24">
             {[
               ["방문 세션", result.visitors || 0],
@@ -1910,9 +1913,9 @@ function Analytics() {
                 ))}
               </tbody>
             </table>
-            {!paths.length && !loading && (
+            {!paths.length && (
               <p className="pad muted">
-                수집된 기록이 없습니다. 운영·트래킹 설정에서 수집을 켜 주세요.
+                기간 내 페이지별 참여 기록이 없습니다.
               </p>
             )}
           </div>
