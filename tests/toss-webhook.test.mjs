@@ -112,9 +112,29 @@ test('webhook fails closed when its server token is missing or invalid', async (
   assert.equal((await missing.post(request(paymentEvent()))).status, 503);
   assert.equal(missing.providerCalls.length, 0);
 
+  const nextOnly = webhook({ env: { TOSS_WEBHOOK_TOKEN_NEXT: 'next-webhook-secret', TOSS_SECRET_KEY: 'test_sk_mock' } });
+  assert.equal((await nextOnly.post(request(paymentEvent(), { token: 'next-webhook-secret' }))).status, 503);
+  assert.equal(nextOnly.providerCalls.length, 0);
+
   const invalid = webhook();
   assert.equal((await invalid.post(request(paymentEvent(), { token: 'wrong' }))).status, 401);
   assert.equal(invalid.providerCalls.length, 0);
+});
+
+test('webhook accepts the next token during a staged merchant cutover without disabling the current token', async () => {
+  const handler = webhook({
+    env: {
+      TOSS_WEBHOOK_TOKEN: 'webhook-secret',
+      TOSS_WEBHOOK_TOKEN_NEXT: 'next-webhook-secret',
+      TOSS_SECRET_KEY: 'test_sk_mock',
+    },
+  });
+
+  assert.equal((await handler.post(request({ eventType: 'METHOD_UPDATED' }, { token: 'webhook-secret' }))).status, 200);
+  assert.equal((await handler.post(request({ eventType: 'METHOD_UPDATED' }, { token: 'next-webhook-secret' }))).status, 200);
+  assert.equal((await handler.post(request({ eventType: 'METHOD_UPDATED' }, { token: 'wrong' }))).status, 401);
+  assert.equal(handler.providerCalls.length, 0);
+  assert.equal(handler.rpcCalls.length, 0);
 });
 
 test('unsupported events are acknowledged without provider or database work', async () => {
