@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { reviewMutation, reviewWriteError } from '@/lib/submission-review';
 import { createClient } from '@/lib/supabase/server';
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { bannerTextLimits, sections, safeUrl, type Row } from '@/lib/platform';
@@ -666,13 +667,12 @@ export async function POST(request: Request) {
                 if (values[start] && values[end] && Date.parse(String(values[start])) >= Date.parse(String(values[end]))) fail('종료일은 시작일 이후여야 합니다.');
             }
             if (section.table === 'mission_submissions') {
-                const r = await db.rpc('review_mission_submissions', {
-                    p_actor: user.id,
-                    p_ids: [body.id],
-                    p_decision: values.status,
-                    p_feedback: values.reviewer_feedback || '',
-                });
-                if (r.error) fail('검토 대기 상태와 피드백을 확인해 주세요.', 409);
+                const mutation = reviewMutation(user.id, { ids: [body.id], decision: values.status, feedback: values.reviewer_feedback || '', reviewMode: body.reviewMode, reviewChecks: body.reviewChecks });
+                const r = await db.rpc(mutation.name, mutation.params);
+                if (r.error) {
+                    const { status, ...problem } = reviewWriteError(r.error);
+                    return reply(problem, status);
+                }
                 return reply({ ok: true });
             }
             if (section.table === 'lesson_contents') {

@@ -358,7 +358,7 @@ test('reviewed submissions do not show unchecked temporary approval checks', () 
   search = new URLSearchParams({ submission: reviewed.id });
   const markup = html(SubmissionReview, { data: { ...data, mission_submissions: [reviewed] }, pending: false, send });
   search = new URLSearchParams();
-  assert.match(markup, /이전 검토의 체크 결과는 저장된 기록이 없습니다/);
+  assert.match(markup, /저장하지 않았던 항목은 기록 없음으로 구분/);
   assert.match(markup, /기존 피드백 유지/);
   assert.doesNotMatch(markup, /이번 검토 전 확인|필수 답변이 모두 작성됨/);
 });
