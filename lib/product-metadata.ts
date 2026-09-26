@@ -13,7 +13,7 @@ function validProductImage(value: unknown) {
   return /^(?:\/?(?:edu|site|images|assets|courses)\/)[a-z0-9/_\-.]+\.(?:png|jpe?g|webp|gif|avif)(?:\?[^#]*)?$/i.test(value);
 }
 
-export const productMetadataFields = ['thumbnail_url', 'detail_image_url', 'detail_images', 'regular_price', 'seo_title', 'seo_description', 'detail_html', 'detail_html_document', 'cta_price_label', 'cta_label', 'cta_url', 'cta_color', 'meta_pixel_id'] as const;
+export const productMetadataFields = ['thumbnail_url', 'detail_image_url', 'detail_images', 'regular_price', 'seo_title', 'seo_description', 'detail_html', 'detail_html_document', 'cta_price_label', 'cta_label', 'cta_url', 'cta_color', 'meta_pixel_id', 'is_listed'] as const;
 export type ProductDetailImage = { path: string; name: string; alt: string };
 export const productResourceScopes = ['public', 'authenticated', 'enrolled', 'purchaser'] as const;
 export type ProductResourceScope = (typeof productResourceScopes)[number];
@@ -173,7 +173,10 @@ export function mergeProductMetadata(previous: unknown, values: Record<string, u
   for (const field of productMetadataFields) {
     if (!(field in values)) continue;
     const value = values[field];
-    if (field === 'regular_price') {
+    if (field === 'is_listed') {
+      if (typeof value !== 'boolean') throw new Error('목록 노출 여부를 확인해 주세요.');
+      metadata.is_listed = value;
+    } else if (field === 'regular_price') {
       if (value !== null && value !== '' && (!Number.isSafeInteger(Number(value)) || Number(value) < 0)) throw new Error('정가는 0원 이상의 정수로 입력해 주세요.');
       metadata[field] = value === null || value === '' ? null : Number(value);
     } else if (field === 'detail_images') {
