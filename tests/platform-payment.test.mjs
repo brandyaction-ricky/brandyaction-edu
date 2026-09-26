@@ -99,6 +99,30 @@ test('an already processed payment is fetched and finalized without a second app
   assert.equal(requests[0].options.headers['Idempotency-Key'], 'edu-confirm-order');
   assert.equal(finalized.length, 1);
 });
+
+test('transient, configuration and unknown provider failures do not release coupon reservations', async () => {
+  for (const [status, code] of [[400, 'PROVIDER_ERROR'], [400, 'ALREADY_PROCESSING_REQUEST'], [401, 'UNAUTHORIZED_KEY'], [403, 'FORBIDDEN_CONSECUTIVE_REQUEST'], [408, 'TIMEOUT'], [429, 'TOO_MANY_REQUESTS'], [400, 'NEW_UNKNOWN_ERROR']]) {
+    const updates = [];
+    const handler = paymentHandler({
+      order: { id: 'order', total_amount: 1000, status: 'pending' }, updates,
+      provider: async () => Response.json({ code }, { status }),
+    });
+    assert.equal((await handler(request())).status, 409);
+    assert.deepEqual(updates, [], `${status} ${code} must remain retryable`);
+  }
+});
+
+test('a failed lookup of an already processed payment cannot mark it failed', async () => {
+  let calls = 0;
+  const updates = [];
+  const handler = paymentHandler({
+    order: { id: 'order', total_amount: 1000, status: 'pending' }, updates,
+    provider: async () => Response.json({ code: ++calls === 1 ? 'ALREADY_PROCESSED_PAYMENT' : 'NOT_FOUND_PAYMENT_SESSION' }, { status: 400 }),
+  });
+  assert.equal((await handler(request())).status, 409);
+  assert.equal(calls, 2);
+  assert.deepEqual(updates, []);
+});
 test('a verified payment is finalized with the provider-approved values', async () => {
   const finalized = [];
   const providerData = { orderId: 'BAE-1', totalAmount: 1000, status: 'DONE', currency: 'KRW', paymentKey: 'test-payment', method: 'CARD', approvedAt: '2026-09-11T00:00:00Z' };

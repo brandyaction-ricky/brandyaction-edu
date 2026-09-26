@@ -36,14 +36,22 @@ export async function POST(request: Request) {
         const headers = { 'Authorization': 'Basic ' + Buffer.from(secret + ':').toString('base64'), 'Content-Type': 'application/json', 'Idempotency-Key': 'edu-confirm-' + order.id };
         let response = await fetch('https://api.tosspayments.com/v1/payments/confirm', { method: 'POST', headers, body: JSON.stringify({ paymentKey, orderId, amount: order.total_amount }), signal: AbortSignal.timeout(15000) });
         let payment = await response.json();
+        let checkingProcessedPayment = false;
         if (!response.ok && payment.code === 'ALREADY_PROCESSED_PAYMENT') {
+            checkingProcessedPayment = true;
             response = await fetch('https://api.tosspayments.com/v1/payments/' + encodeURIComponent(paymentKey), { headers, signal: AbortSignal.timeout(15000) });
             payment = await response.json();
         }
         if (!response.ok) {
-            // Transport and provider 5xx failures remain retryable; only a final provider
-            // rejection releases the pending order's coupon reservation.
-            if (response.status >= 400 && response.status < 500) {
+            // HTTP 400 can also mean PROVIDER_ERROR or ALREADY_PROCESSING_REQUEST.
+            // Release a coupon only for a known terminal approval rejection, never
+            // for an ambiguous failure while looking up an already processed payment.
+            const terminalRejections = new Set([
+                'REJECT_ACCOUNT_PAYMENT', 'REJECT_CARD_PAYMENT', 'REJECT_CARD_COMPANY',
+                'INVALID_REJECT_CARD', 'INVALID_STOPPED_CARD', 'INVALID_CARD_LOST_OR_STOLEN',
+                'NOT_FOUND_PAYMENT_SESSION',
+            ]);
+            if (!checkingProcessedPayment && response.status >= 400 && response.status < 500 && terminalRejections.has(payment.code)) {
                 const failed = await db.from('orders').update({ status: 'payment_failed' }).eq('id', order.id).eq('user_id', user.id).eq('status', 'pending');
                 if (failed.error) console.error('payment failure state update failed', failed.error.code);
             }
