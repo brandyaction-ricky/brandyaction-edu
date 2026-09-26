@@ -12,6 +12,9 @@ import { MemberOperationsFixture, RetainedMemberDialogFixture } from './member-o
 import { SubmissionReviewFixture } from './submission-review';
 import { ProductSaleFixture } from './product-sale';
 import { AdminWorkspace } from '../../../app/ui/admin-workspace';
+import { ProductVisibilityFixture } from './product-visibility';
+import { Platform } from '../../../app/ui/platform';
+import '../../../app/ui/final/frontend.css';
 import { AdminButton, AdminConfirmDialog, AdminDrawer, AdminEmptyState, AdminInlineError, AdminInput, AdminPage, AdminPageHeader, AdminShell, AdminSuccessState } from '../../../features/admin-ui';
 import { ProductDetailHtml } from '../../../app/ui/final/product-detail-html';
 import '../../../app/ui/final/tokens.css';
@@ -56,4 +59,5 @@ const fixture = path === '/review-audit-test' ? <SubmissionReviewFixture/> : pat
   : path.startsWith('/product-html-cta-test')
     ? <ProductHtmlCtaFixture/>
     : <div className="edu-admin" style={{padding:24,minHeight:'180vh'}}>{path.startsWith('/copy-links-test') ? <><RecruitmentLinks period="sample" version={2}/><WebinarManagement period="sample" courses={[{id:'22222222-2222-4222-8222-222222222222',title:'합성 무료 교육'}]} cohorts={[]}/></> : path.startsWith('/delivery-test') ? <RecruitmentDelivery code="33333333-3333-4333-8333-333333333333"/> : path.startsWith('/templates-admin-test') ? <AdminWorkflows section="templates" data={{crm_templates:[],crm_delivery_state:[{id:'delivery',enabled:false,configured:false}]}} pending={false} send={async body=>{const r=await fetch('/api/platform/workflows',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw Error('저장 실패');return r.json();}}/> : path.startsWith('/webinar-test') ? <WebinarRegistration code="11111111-1111-4111-8111-111111111111" channel="organic"/> : path.startsWith('/webinar-admin-test') ? <WebinarManagement workspace={new URLSearchParams(location.search).has("workspace")} period="sample" courses={[{id:'22222222-2222-4222-8222-222222222222',title:'합성 무료 교육'}]} cohorts={[]}/> : path.startsWith('/admin/conversion') ? <ConversionFixture/> : <><BoundaryFixture/><LandingAdmin/></>}</div>;
-createRoot(document.getElementById('root')!).render(<StrictMode>{new URLSearchParams(location.search).has('navigationFixture') ? <AdminWorkspace>{null}</AdminWorkspace> : path === '/product-sale-test' ? <ProductSaleFixture /> : fixture}</StrictMode>);
+const publicScreen = new URLSearchParams(location.search).get('publicScreen');
+createRoot(document.getElementById('root')!).render(<StrictMode>{publicScreen ? <Platform path={publicScreen === 'home' ? [] : [publicScreen]} user={null} /> : new URLSearchParams(location.search).has('navigationFixture') ? <AdminWorkspace>{null}</AdminWorkspace> : path === '/product-visibility-test' ? <ProductVisibilityFixture /> : path === '/visibility-home-test' || path.startsWith('/classes') ? <Platform path={path === '/visibility-home-test' ? [] : path.split('/').filter(Boolean)} user={null} /> : path === '/product-sale-test' ? <ProductSaleFixture /> : fixture}</StrictMode>);

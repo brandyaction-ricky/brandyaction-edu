@@ -19,6 +19,7 @@ import type { Data, WorkflowSend } from "../learning-workflows";
 import { AdminHeading } from "./admin-shell";
 import { Badge } from "./primitives";
 import { productDetailImages, productMetadataFields, productResources, sanitizeProductHtml, type ProductResourceScope } from "@/lib/product-metadata";
+import { isProductListed } from "@/lib/product-visibility";
 import { DetailImageGallery } from "./detail-image-gallery";
 import { productConversion, DEFAULT_CTA_COLOR } from "@/lib/product-conversion";
 import { productDocument, validateProductDocument } from "@/lib/product-html-document";
@@ -228,6 +229,7 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
   const [detailMode, setDetailMode] = useState<"image" | "html">(productDocument(metadata) || String(metadata.detail_html || "") ? "html" : "image");
   const conversion = productConversion(metadata, (data.landing_configs || []).find(item => item.id === row?.id));
   const [ctaColor, setCtaColor] = useState(conversion.color);
+  const [listed, setListed] = useState(isProductListed(row));
   const [htmlFilename, setHtmlFilename] = useState("");
   const [detailUploadStatus, setDetailUploadStatus] = useState<"idle" | "uploading" | "error">("idle");
   const [preview, setPreview] = useState({ title: t(row, "title"), summary: t(row, "summary"), price: num(row, "list_price"), regular: Number(metadata.regular_price || 0), status: t(row, "status") || "draft", category: t(row, "category") || "paid_class", slug: t(row, "slug"), seoTitle: String(metadata.seo_title || ""), seoDescription: String(metadata.seo_description || "") });
@@ -356,6 +358,12 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
         <div className="section-pad" id="product-panel-publish" data-tab="publish" role="tabpanel" aria-labelledby="product-tab-publish" hidden={tab !== "publish"}>
           <h2 className="mb16">공개 점검</h2>
           <ProductSaleCheck sale={sale} cohort={cohort} />
+          <section className="product-conversion-card"><h2>목록 노출</h2>
+            <input type="hidden" name="is_listed" value={listed ? "on" : "off"} />
+            <label className="product-visibility-toggle"><input type="checkbox" checked={listed} onChange={event => setListed(event.target.checked)} disabled={pending} aria-describedby="product-visibility-help" />클래스 목록·홈·검색에 노출</label>
+            <p id="product-visibility-help" className="meta">끄면 목록·홈·사이트 검색과 sitemap에서 제외됩니다. 판매 상태와 수강 권한은 바뀌지 않으며, 상품 URL과 모집 링크로는 계속 접근할 수 있습니다. 비밀 자료를 보호하는 설정은 아닙니다.</p>
+            {!listed && <p className="notice mt16" role="status">목록 비노출 · 링크로만 접근할 수 있습니다.</p>}
+          </section>
           <section className="product-conversion-card"><h2>Call to Action</h2><p className="meta">고객이 클릭할 주요 버튼과 이동할 페이지를 설정하세요.</p>
             <ProductField controlId="product-cta-price-label" label="CTA 왼쪽 문구" hint="상세페이지 하단 CTA 왼쪽에 표시됩니다. 비워 두면 ‘무료’로 표시됩니다."><input id="product-cta-price-label" name="cta_price_label" maxLength={40} defaultValue={conversion.priceLabel} placeholder="무료" disabled={pending} /></ProductField>
             <ProductField controlId="product-cta-label" label="Button Label"><input id="product-cta-label" name="cta_label" maxLength={100} defaultValue={conversion.label} placeholder="무료 웨비나 참여하기" disabled={pending} /></ProductField>

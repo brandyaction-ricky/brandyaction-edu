@@ -101,3 +101,5 @@
 .edu-admin .product-sale-check ul{padding-left:20px;margin:8px 0;list-style:disc}
 .edu-admin .product-sale-check .setting-line{gap:12px;flex-wrap:wrap}
 .edu-admin .side-preview .product-sale-check{padding:12px}
+.product-visibility-toggle { display: flex; align-items: center; gap: 12px; min-height: 44px; font-weight: 600; cursor: pointer; }
+.product-visibility-toggle input[type="checkbox"] { width: 20px; height: 20px; flex: 0 0 20px; accent-color: var(--red, #cf202f); }

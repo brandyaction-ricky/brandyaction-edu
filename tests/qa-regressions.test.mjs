@@ -3,12 +3,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
 import { submissionReview } from './helpers/submission-review.mjs';
+import { productVisibility } from './helpers/product-visibility.mjs';
 
 function load(path, dependencies = {}) {
   const source = fs.readFileSync(new URL('../' + path, import.meta.url), 'utf8');
   const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const exports = {};
-  new Function('exports', 'require', compiled)(exports, name => { if (name === '@/lib/submission-review') return submissionReview; if (!(name in dependencies)) throw Error(name); return dependencies[name]; });
+  new Function('exports', 'require', compiled)(exports, name => { if (name === '@/lib/product-visibility') return productVisibility; if (name === '@/lib/submission-review') return submissionReview; if (name === '@/lib/public-platform-data') return { getPublicPlatformData: async () => ({ data: {}, pagination: null }), getPublicSupport: async () => ({}) }; if (name === '@/lib/public-platform-plan') return { PUBLIC_CACHE_TAG: 'test' }; if (name === '@/lib/member-platform-data') return { readMemberPlatformData: async () => ({}) }; if (name === 'next/cache') return { revalidateTag: () => {} }; if (!(name in dependencies)) throw Error(name); return dependencies[name]; });
   return exports;
 }
 const rules = load('lib/qa-rules.ts');
@@ -158,10 +159,9 @@ test('article category fields and server actions use the shared category table',
   assert.match(source, /article-category-save/);
   assert.match(source, /사용 중인 카테고리는 삭제할 수 없습니다/);
 });
-test('F-14 anonymous API selects only public review fields', async () => {
-  let projection;
-  const db = { from(table) { return { select(columns) { if (table === 'reviews') projection = columns; return this; }, limit() { return this; }, order() { return this; }, eq() { return this; }, then(resolve) { resolve({ data: [] }); } }; } };
-  assert.equal((await handler(null, db).GET(new Request('https://example.com/api/platform'))).status, 200);
-  assert.ok(projection.includes('author_name'));
+test('F-14 public product review projection excludes member and order identifiers', () => {
+  const source = fs.readFileSync(new URL('../lib/public-platform-data.ts', import.meta.url), 'utf8');
+  const projection = source.match(/from\('reviews'\)\.select\('([^']+)'\)/)?.[1];
+  assert.ok(projection?.includes('author_name'));
   for (const key of ['user_id', 'order_id', 'cohort_id', '*']) assert.equal(projection.includes(key), false);
 });

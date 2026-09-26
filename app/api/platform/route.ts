@@ -5,17 +5,26 @@ import { getAuthenticatedUser } from '@/lib/server-auth';
 import { bannerTextLimits, sections, safeUrl, type Row } from '@/lib/platform';
 import { containsFreeClassCampaign, hasLearningAccess, paidCourseReadinessIssues } from '@/lib/platform-rules';
 import { getEduSettings } from '@/lib/edu-settings';
+import { isListedProductLink } from '@/lib/product-visibility';
 import { gradeQuiz, type QuizDefinition } from '@/lib/mission-quiz';
 import { adminSelectColumns, adminTables, archiveValues, cohortStatus, phoneNumber, validImage, assetPath, imagePreviewUrl, databaseMessage, excludedMemberStatus } from '@/lib/qa-rules';
 import { POLICY_VERSION } from '@/lib/legal-policies';
 import { getOperatorUser, permissionsFor, sectionScopes } from '@/lib/operator-permissions';
 import { crmDeliveryState } from '@/lib/crm-delivery';
 import { mergeProductDigitalSections, mergeProductMetadata, mergeProductResources, productDigitalSections, productMetadataFields, productResources, productResourceScopes } from '@/lib/product-metadata';
+import { getPublicPlatformData, getPublicSupport } from '@/lib/public-platform-data';
+import { PUBLIC_CACHE_TAG, type PublicView } from '@/lib/public-platform-plan';
+import { revalidateTag } from 'next/cache';
+import { readMemberPlatformData, type MemberView } from '@/lib/member-platform-data';
 const reply = (data: unknown, status = 200) =>
     Response.json(data, {
         status,
         headers: { 'Cache-Control': 'private, no-store' },
     });
+const publicWriteSuccess = (data: unknown) => {
+    revalidateTag(PUBLIC_CACHE_TAG, { expire: 0 });
+    return reply(data);
+};
 const uid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 function fail(message: string, status = 400): never {
     throw Object.assign(new Error(message), { status });
@@ -27,6 +36,73 @@ export async function GET(request: Request) {
         const authenticated = performance.now();
         const params = new URL(request.url).searchParams;
         const adminMode = params.get('admin') === '1';
+        const view = params.get('view') || 'home';
+        if (!adminMode && view === 'member') {
+            if (!user) return reply({ error: '로그인이 필요합니다.', user: null }, 401);
+            const memberSection = params.get('section') || 'dashboard';
+            if (!['dashboard', 'classes', 'missions', 'questions', 'orders', 'coupons', 'resources', 'profile', 'reviews', 'learn', 'order-result'].includes(memberSection)) return reply({ error: '조회 화면을 확인해 주세요.' }, 400);
+            const enrollmentId = params.get('enrollment') || '';
+            const lessonId = params.get('lesson') || '';
+            if (memberSection === 'learn' && !uid(enrollmentId)) return reply({ error: '수강권을 확인해 주세요.' }, 400);
+            if (lessonId && !uid(lessonId)) return reply({ error: '학습 항목을 확인해 주세요.' }, 400);
+            const data = await readMemberPlatformData(user.id, memberSection as MemberView, enrollmentId, lessonId);
+            const support = await getPublicSupport();
+            const response = reply({ user, data, pagination: null, support });
+            response.headers.set('Server-Timing', `auth;dur=${(authenticated - started).toFixed(1)},data;dur=${(performance.now() - authenticated).toFixed(1)},total;dur=${(performance.now() - started).toFixed(1)}`);
+            return response;
+        }
+        if (!adminMode && view !== 'member') {
+            if (view === 'identity') return reply({ user, data: {}, pagination: null, support: {} });
+            if (!['home', 'classes', 'class', 'articles', 'article', 'stories', 'checkout'].includes(view)) return reply({ error: '조회 화면을 확인해 주세요.' }, 400);
+            const slug = params.get('slug') || '';
+            const cohortId = params.get('cohort') || '';
+            if ((view === 'class' || view === 'article') && (!slug || slug.length > 180 || !/^[a-zA-Z0-9_-]+$/.test(slug))) return reply({ error: '콘텐츠 주소를 확인해 주세요.' }, 400);
+            if (view === 'checkout' && !uid(cohortId)) return reply({ error: '신청할 기수를 확인해 주세요.' }, 400);
+            const publicPage = Math.max(1, Math.min(100000, Number(params.get('page')) || 1));
+            const publicQuery = (params.get('q') || '').trim().slice(0, 80);
+            const publicFilter = (params.get('filter') || '').slice(0, 80);
+            const snapshot = await getPublicPlatformData(view as PublicView, slug, cohortId, publicPage, publicQuery, publicFilter);
+            const data = { ...snapshot.data };
+            if (view === 'home' && data.site_banners) {
+                const now = Date.now();
+                data.site_banners = data.site_banners.filter(banner => (!banner.starts_at || Date.parse(String(banner.starts_at)) <= now) && (!banner.ends_at || Date.parse(String(banner.ends_at)) > now)
+                    && isListedProductLink(banner.link_url, snapshot.unlistedBannerCourses || [], new URL(request.url).origin));
+            }
+            if (user && view === 'class' && data.courses?.[0]) {
+                const db = await createClient();
+                const course = data.courses[0];
+                const enrollment = await db.from('enrollments').select('id,course_id,cohort_id,status,access_starts_at,access_ends_at,revoked_at').eq('user_id', user.id).eq('course_id', course.id).limit(20);
+                if (enrollment.error) throw enrollment.error;
+                data.enrollments = (enrollment.data || []) as Row[];
+                if (data.enrollments.some(hasLearningAccess)) {
+                    const lessonIds = (data.curriculum_lessons || []).map(lesson => lesson.id);
+                    if (lessonIds.length) {
+                        const contents = await db.from('lesson_contents').select('lesson_id,resource_name,resource_storage_path').in('lesson_id', lessonIds).limit(200);
+                        if (contents.error) throw contents.error;
+                        data.lesson_contents = (contents.data || []).map(content => ({ ...content, id: content.lesson_id })) as Row[];
+                    }
+                }
+            }
+            if (user && view === 'checkout') {
+                const db = await createClient();
+                const coupons = await db.from('customer_coupons').select('id,coupon_id,user_id,status,expires_at,coupon:coupons(name,code,discount_type,discount_value,ends_at)').eq('user_id', user.id).limit(100);
+                if (coupons.error) throw coupons.error;
+                data.customer_coupons = (coupons.data || []) as unknown as Row[];
+            }
+            if (user && view === 'articles' && data.article_banner?.length) {
+                const setting = await createAdminClient().from('site_settings').select('value').eq('key', 'edu_article_banner').limit(1);
+                if (setting.error) throw setting.error;
+                const value = setting.data?.[0]?.value as Record<string, unknown> | undefined;
+                if (value && Array.isArray(value.videos)) {
+                    const publicValue = data.article_banner[0].value as Record<string, unknown>;
+                    data.article_banner = [{ ...data.article_banner[0], value: { ...publicValue, videos: value.videos.slice(0, 3).map((item: unknown) => ({ title: String((item as Row)?.title || ''), available: Boolean((item as Row)?.url), url: safeUrl((item as Row)?.url) })) } }];
+                }
+            }
+            const support = await getPublicSupport();
+            const response = reply({ user, data, pagination: snapshot.pagination, support });
+            response.headers.set('Server-Timing', `auth;dur=${(authenticated - started).toFixed(1)},data;dur=${(performance.now() - authenticated).toFixed(1)},total;dur=${(performance.now() - started).toFixed(1)}`);
+            return response;
+        }
         const sectionKey = params.get('section') || 'home';
         const record = params.get('record');
         if (record && (!uid(record) || !['products', 'learning'].includes(sectionKey))) return reply({ error: '편집할 항목을 확인해 주세요.' }, 400);
@@ -292,7 +368,8 @@ export async function GET(request: Request) {
         }
         if (!adminMode) {
             const now = Date.now();
-            data.site_banners = (data.site_banners || []).filter((b) => (!b.starts_at || Date.parse(String(b.starts_at)) <= now) && (!b.ends_at || Date.parse(String(b.ends_at)) > now));
+            data.site_banners = (data.site_banners || []).filter((b) => (!b.starts_at || Date.parse(String(b.starts_at)) <= now) && (!b.ends_at || Date.parse(String(b.ends_at)) > now)
+                && isListedProductLink(b.link_url, data.courses || [], new URL(request.url).origin));
             const landingDb = createAdminClient();
             const freeCourseIds = (data.courses || []).filter(c => Number(c.list_price) === 0).map(c => c.id);
             const landingResult = freeCourseIds.length ? await landingDb.from('landing_configs').select('*').in('id', freeCourseIds) : { data: [], error: null };
@@ -427,7 +504,7 @@ export async function POST(request: Request) {
                 if (!uid(resourceId) || !resources.some(item => item.id === resourceId)) fail('삭제할 자료를 확인해 주세요.');
                 const result = await db.from('courses').update({ metadata: mergeProductResources(current.data.metadata, resources.filter(item => item.id !== resourceId)) }).eq('id', courseId);
                 if (result.error) throw result.error;
-                return reply({ ok: true });
+                return publicWriteSuccess({ ok: true });
             }
             const name = String(body.resourceName || '').trim();
             const path = String(body.storagePath || '').trim();
@@ -440,7 +517,7 @@ export async function POST(request: Request) {
             const next = resources.some(resource => resource.id === id) ? resources.map(resource => resource.id === id ? item : resource) : [...resources, item];
             const result = await db.from('courses').update({ metadata: mergeProductResources(current.data.metadata, next) }).eq('id', courseId);
             if (result.error) throw result.error;
-            return reply({ ok: true, resource: item });
+            return publicWriteSuccess({ ok: true, resource: item });
         }
         if (action === 'save-digital-content') {
             const permissions = await permissionsFor(user);
@@ -457,7 +534,7 @@ export async function POST(request: Request) {
             if (productDigitalSections(metadata).some(section => section.items.some(item => item.type === 'file' && !resourceIds.has(item.resourceId)))) fail('연결된 파일 정보를 다시 확인해 주세요.');
             const result = await db.from('courses').update({ metadata }).eq('id', courseId).select('metadata').single();
             if (result.error) throw result.error;
-            return reply({ ok: true, sections: productDigitalSections((result.data.metadata || {}) as Record<string, unknown>) });
+            return publicWriteSuccess({ ok: true, sections: productDigitalSections((result.data.metadata || {}) as Record<string, unknown>) });
         }
         if (action === 'article-banner') {
             const permissions = await permissionsFor(user);
@@ -480,7 +557,7 @@ export async function POST(request: Request) {
             if (!title || title.length > 120) fail('배너 제목을 확인해 주세요.');
             const result = await db.from('site_settings').upsert({ key: 'edu_article_banner', value: { enabled: value?.enabled !== false, eyebrow: String(value?.eyebrow || '').trim().slice(0, 80), title, description: String(value?.description || '').trim().slice(0, 240), signupNotice: String(value?.signupNotice || '').trim().slice(0, 220), signupCTA: String(value?.signupCTA || '').trim().slice(0, 45), memberCTA: String(value?.memberCTA || '').trim().slice(0, 45), videos }, is_public: false }, { onConflict: 'key' });
             if (result.error) throw result.error;
-            return reply({ ok: true });
+            return publicWriteSuccess({ ok: true });
         }
         if (action === 'article-category-save' || action === 'article-category-delete') {
             const permissions = await permissionsFor(user);
@@ -493,7 +570,7 @@ export async function POST(request: Request) {
                 if (used.count) fail('사용 중인 카테고리는 삭제할 수 없습니다. 아티클 카테고리를 먼저 변경해 주세요.', 409);
                 const removed = await db.from('article_categories').delete().eq('id', id);
                 if (removed.error) throw removed.error;
-                return reply({ ok: true });
+                return publicWriteSuccess({ ok: true });
             }
             if (id && !uid(id)) fail('수정할 카테고리를 확인해 주세요.');
             const name = String(body.name || '').trim();
@@ -506,7 +583,7 @@ export async function POST(request: Request) {
             const values = { name, slug, description: description || null, display_order: displayOrder, is_active: body.active !== false };
             const result = id ? await db.from('article_categories').update(values).eq('id', id) : await db.from('article_categories').insert(values);
             if (result.error) fail(databaseMessage(result.error.code), result.error.code === '23505' ? 409 : 400);
-            return reply({ ok: true });
+            return publicWriteSuccess({ ok: true });
         }
         if (action === 'archive') {
             const section = sections.find((s) => s.key === body.section);
@@ -520,7 +597,7 @@ export async function POST(request: Request) {
                 p_ids: [...new Set(ids)],
             });
             if (result.error) throw result.error;
-            return reply({ ok: true, result: result.data });
+            return publicWriteSuccess({ ok: true, result: result.data });
         }
         if (action === 'restore-products') {
             const permissions = await permissionsFor(user);
@@ -536,7 +613,7 @@ export async function POST(request: Request) {
                 fail(result.error.message || '상품을 복원하지 못했습니다.', 409);
             }
             if (!Number(result.data)) fail('이미 복원됐거나 삭제 상태가 아닌 상품입니다.', 409);
-            return reply({ ok: true, result: result.data });
+            return publicWriteSuccess({ ok: true, result: result.data });
         }
         if (action === 'save') {
             const section = sections.find((s) => s.key === body.section);
@@ -684,7 +761,7 @@ export async function POST(request: Request) {
                     const { status, ...problem } = reviewWriteError(r.error);
                     return reply(problem, status);
                 }
-                return reply({ ok: true });
+                return publicWriteSuccess({ ok: true });
             }
             if (section.table === 'lesson_contents') {
                 if (['vod_url', 'resource_storage_path', 'body_text', 'external_url'].filter((k) => values[k]).length !== 1) fail('영상·자료·본문·외부 링크 중 학습 유형에 맞는 하나를 등록해 주세요.');
@@ -776,7 +853,7 @@ export async function POST(request: Request) {
                 }
                 scheduledCohort = cohortResult.data;
             }
-            return reply({ ok: true, row: result.data, cohort: scheduledCohort });
+            return publicWriteSuccess({ ok: true, row: result.data, cohort: scheduledCohort });
         }
         if (action === 'profile') {
             const name = String(body.name || '').trim();

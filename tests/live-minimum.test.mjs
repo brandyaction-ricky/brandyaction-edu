@@ -8,6 +8,8 @@ function load(file, mocks = {}) {
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   new Function('exports', 'require', code)(exports, name => {
     if (mocks[name]) return mocks[name];
+    if (name === 'next/cache') return { revalidateTag: () => {} };
+    if (name === '@/lib/public-platform-plan') return { PUBLIC_CACHE_TAG: 'test' };
     if (name.startsWith('@/')) return load(name.slice(2) + '.ts', mocks);
     if (name.startsWith('.')) return load(path.resolve(path.dirname(file), name) + '.ts', mocks);
     throw Error('Unexpected dependency ' + name);
