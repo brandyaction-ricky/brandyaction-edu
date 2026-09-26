@@ -64,12 +64,12 @@ test('operator checks reuse the already verified request user and preserve denie
   assert.equal(auth.calls(), 1);
 });
 
-function apiHarness(user, failure = null) {
+function apiHarness(user, failure = null, staffPermissions = {}) {
   const calls = { auth: 0, summaries: 0, tables: [] };
   const db = {
     from(table) {
       calls.tables.push(table);
-      const query = new Proxy({}, { get: (_, key) => key === 'then' ? resolve => Promise.resolve({ data: [], error: null, count: 3 }).then(resolve) : () => query });
+      const query = new Proxy({}, { get: (_, key) => key === 'then' ? resolve => Promise.resolve({ data: table === 'site_settings' ? { value: staffPermissions } : [], error: null, count: 3 }).then(resolve) : () => query });
       return query;
     },
     async rpc() { calls.summaries++; return { data: { id: 'summary', pendingReviews: 3 }, error: null }; },
@@ -112,6 +112,18 @@ test('menu reads authenticate once and preserve review badges without full dashb
   assert.equal(api.calls.summaries, 0);
   assert.equal((await response.json()).data.admin_summary[0].pendingReviews, 3);
   assert.deepEqual(api.calls.tables.sort(), ['mission_submissions', 'site_banners']);
+});
+
+test('staff product reads enforce their product permission before querying product records', async () => {
+  const staff = { ...admin, role: 'staff' };
+  for (const permissions of [{}, { products: false }, { learning: true }]) {
+    const api = apiHarness(staff, null, permissions);
+    assert.equal((await api.read('products')).status, 403);
+    assert.deepEqual(api.calls.tables, ['site_settings']);
+  }
+  const allowed = apiHarness(staff, null, { products: true });
+  assert.equal((await allowed.read('products')).status, 200);
+  assert.ok(allowed.calls.tables.includes('courses'));
 });
 
 test('the operating home still returns the full dashboard aggregate', async () => {
