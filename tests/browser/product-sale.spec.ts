@@ -79,3 +79,37 @@ test('new product cohort is created as upcoming and invalid periods never submit
   expect(mutation).toMatchObject({ action: 'save', section: 'cohorts', values: { course_id: 'synthetic-course', name: '합성 5기', cohort_code: 'FIFTH', status: 'upcoming', price: 100000 } });
   await expect(panel.getByRole('button', { name: /합성 5기 · 준비 중 · 100,000원/ })).toBeVisible();
 });
+
+test('product mission tab edits only the scoped existing mission without submitting the product', async ({ page }) => {
+  await page.goto('/product-sale-test');
+  await page.getByRole('tab', { name: '미션' }).click();
+  const panel = page.getByRole('tabpanel', { name: '미션' });
+  await expect(panel.getByRole('region', { name: '1주차 미션' }).getByText(/Day 1 · 기존 합성 학습/)).toBeVisible();
+  await expect(panel.getByText(/기존 합성 미션 · 비공개 · 필수/)).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await panel.getByRole('button', { name: '미션 편집' }).click();
+  const editor = panel.getByRole('region', { name: '기존 미션 편집' });
+  await editor.getByRole('textbox', { name: '미션 제목' }).fill('수정된 합성 미션');
+  await editor.getByRole('checkbox', { name: '공개' }).check();
+  await editor.getByRole('button', { name: '미션 저장' }).click();
+  await expect(page.getByLabel('합성 미션 저장 횟수')).toHaveText('1');
+  await expect(page.getByLabel('합성 저장 횟수')).toHaveText('0');
+  const mutation = JSON.parse(await page.getByLabel('합성 미션 요청').innerText());
+  expect(mutation).toMatchObject({ action: 'save', section: 'missions', id: 'synthetic-mission', values: { course_id: 'synthetic-course', week_id: 'synthetic-week', lesson_id: 'synthetic-lesson', title: '수정된 합성 미션', is_required: true, is_published: true } });
+});
+
+test('new product mission is tied to its lesson and remains hidden until reviewed', async ({ page }) => {
+  await page.goto('/product-sale-test');
+  await page.getByRole('tab', { name: '미션' }).click();
+  const editor = page.getByRole('region', { name: '새 미션 등록' });
+  await editor.getByRole('textbox', { name: '미션 제목' }).fill('새 합성 미션');
+  await editor.getByRole('textbox', { name: '미션 제목' }).press('Enter');
+  await expect(page.getByLabel('합성 저장 횟수')).toHaveText('0');
+  await expect(editor.getByRole('checkbox', { name: /공개/ })).toBeDisabled();
+  await editor.getByRole('checkbox', { name: '필수 미션' }).uncheck();
+  await editor.getByRole('button', { name: '비공개 미션 추가' }).click();
+  await expect(page.getByLabel('합성 미션 저장 횟수')).toHaveText('1');
+  const mutation = JSON.parse(await page.getByLabel('합성 미션 요청').innerText());
+  expect(mutation).toMatchObject({ action: 'save', section: 'missions', values: { course_id: 'synthetic-course', week_id: 'synthetic-week', lesson_id: 'synthetic-lesson', title: '새 합성 미션', is_required: false, is_published: false } });
+  expect(mutation.id).toBeUndefined();
+});

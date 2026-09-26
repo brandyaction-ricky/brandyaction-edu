@@ -26,6 +26,7 @@ import { ProductDetailHtml } from "./product-detail-html";
 import { DigitalContentManager } from "./digital-content-manager";
 import { ProductCurriculumWorkspace } from "./product-curriculum-workspace";
 import { ProductCohortWorkspace } from "./product-cohort-workspace";
+import { ProductMissionWorkspace } from "./product-mission-workspace";
 
 function fieldValue(s: Section, row: Row | undefined, f: Field) {
   return s.table === "courses" &&
@@ -236,7 +237,7 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
   const [draftValues, setDraftValues] = useState<Record<string, unknown>>({});
   const [checkedAt] = useState(Date.now);
   const formRef = useRef<HTMLFormElement>(null);
-  const groups = [["basic", "기본·판매"], ["detail", "상세페이지"], ["resources", preview.category === "digital" ? "콘텐츠 구성" : "제공 자료"], ...(preview.category === "digital" ? [] : [["curriculum", "커리큘럼"], ["cohorts", "기수·회차"]]), ["access", "수강·권한"], ["publish", "공개·검색"]];
+  const groups = [["basic", "기본·판매"], ["detail", "상세페이지"], ["resources", preview.category === "digital" ? "콘텐츠 구성" : "제공 자료"], ...(preview.category === "digital" ? [] : [["curriculum", "커리큘럼"], ["cohorts", "기수·회차"], ["missions", "미션"]]), ["access", "수강·권한"], ["publish", "공개·검색"]];
   const resourceCount = productResources(metadata).length;
   const previewSalePrice = preview.category === "free" ? 0 : cohort ? num(cohort, "price") : preview.price;
   const statusLabels: Record<string, string> = { draft: "작성 중", published: "판매 중", archived: "판매 종료" };
@@ -354,6 +355,9 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
         {preview.category !== "digital" && <div id="product-panel-cohorts" data-tab="cohorts" role="tabpanel" aria-labelledby="product-tab-cohorts" hidden={tab !== "cohorts"} onChange={event => event.stopPropagation()} onKeyDown={event => { if (event.key === "Enter" && event.target instanceof HTMLInputElement) event.preventDefault(); }}>
           {tab === "cohorts" && <ProductCohortWorkspace course={row} cohorts={cohorts} selectedId={cohortId} onSelect={setCohortId} pending={pending} send={send} />}
         </div>}
+        {preview.category !== "digital" && <div id="product-panel-missions" data-tab="missions" role="tabpanel" aria-labelledby="product-tab-missions" hidden={tab !== "missions"} onChange={event => event.stopPropagation()} onKeyDown={event => { if (event.key === "Enter" && event.target instanceof HTMLInputElement) event.preventDefault(); }}>
+          {tab === "missions" && <ProductMissionWorkspace course={row} pending={pending} send={send} />}
+        </div>}
         <div className="section-pad" id="product-panel-access" data-tab="access" role="tabpanel" aria-labelledby="product-tab-access" hidden={tab !== "access"}>
           <ProductSaleCheck sale={sale} cohort={cohort} />
           <h2 className="mb16">수강·기수 연결</h2><ProductField label="연결 기수"><select value={cohortId} onChange={event => setCohortId(event.target.value)} aria-label="연결 기수" disabled={!cohorts.length || pending}>{!cohorts.length && <option value="">미연결</option>}{cohorts.map(item => <option key={item.id} value={item.id}>{t(item, "name")}</option>)}</select></ProductField>
@@ -372,7 +376,7 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
           </section>
           <section className="product-conversion-card"><h2>Tracking integration</h2><p className="meta">상품별 광고 추적을 연결하세요.</p><ProductField controlId="product-pixel-id" label="Meta Pixel ID (Optional)" hint="입력한 상품에만 PageView와 CTA 클릭(Lead)을 전송합니다. 구매 완료 이벤트는 결제 처리와 구분됩니다. 비워 두면 사용하지 않습니다."><input id="product-pixel-id" name="meta_pixel_id" inputMode="numeric" pattern="[0-9]{5,30}" maxLength={30} defaultValue={conversion.pixelId} placeholder="Meta Pixel ID" disabled={pending} /></ProductField></section>
         </div>
-      </section><div className="editor-savebar">{!["curriculum", "cohorts"].includes(tab) && row?.id && !row.archived_at && <button className="btn danger" type="button" onClick={() => void removeProduct()} disabled={pending || detailUploadStatus === "uploading"}>상품 삭제</button>}<span className="dirty-note">{tab === "curriculum" ? "커리큘럼은 항목별로 즉시 저장됩니다." : tab === "cohorts" ? "기수는 항목별로 저장됩니다." : dirty ? "저장하지 않은 변경사항이 있습니다." : "변경 내용을 저장하면 반영됩니다."}</span><button className="btn" type="button" onClick={close} disabled={pending || detailUploadStatus === "uploading"}>목록으로</button>{!["curriculum", "cohorts", "publish"].includes(tab) && <button className="btn" type="button" onClick={() => setTab("publish")} disabled={pending || detailUploadStatus === "uploading"}>공개 전 확인</button>}{!["curriculum", "cohorts"].includes(tab) && <button className="btn primary" type="submit" disabled={pending || detailUploadStatus !== "idle"}>{pending ? "저장 중…" : detailUploadStatus === "uploading" ? "업로드 중…" : "저장하기"}</button>}</div>{error && <p className="notice mt16" role="alert">{error}</p>}</div>
+      </section><div className="editor-savebar">{!["curriculum", "cohorts", "missions"].includes(tab) && row?.id && !row.archived_at && <button className="btn danger" type="button" onClick={() => void removeProduct()} disabled={pending || detailUploadStatus === "uploading"}>상품 삭제</button>}<span className="dirty-note">{tab === "curriculum" ? "커리큘럼은 항목별로 즉시 저장됩니다." : tab === "cohorts" ? "기수는 항목별로 저장됩니다." : tab === "missions" ? "미션은 항목별로 저장됩니다." : dirty ? "저장하지 않은 변경사항이 있습니다." : "변경 내용을 저장하면 반영됩니다."}</span><button className="btn" type="button" onClick={close} disabled={pending || detailUploadStatus === "uploading"}>목록으로</button>{!["curriculum", "cohorts", "missions", "publish"].includes(tab) && <button className="btn" type="button" onClick={() => setTab("publish")} disabled={pending || detailUploadStatus === "uploading"}>공개 전 확인</button>}{!["curriculum", "cohorts", "missions"].includes(tab) && <button className="btn primary" type="submit" disabled={pending || detailUploadStatus !== "idle"}>{pending ? "저장 중…" : detailUploadStatus === "uploading" ? "업로드 중…" : "저장하기"}</button>}</div>{error && <p className="notice mt16" role="alert">{error}</p>}</div>
       <aside className="editor-aside"><div className="side-preview"><span className="section-code">고객에게 보이는 상품</span><div className="preview-cover mt16"><p>BRANDYACTION EDU</p><h3>{preview.title || "상품명"}</h3><p className="accent">{labels[preview.category] || "유료 클래스"}</p></div><div className="preview-meta"><b>{!previewSalePrice ? "무료" : money(previewSalePrice)}</b>{preview.regular > previewSalePrice && <s>{money(preview.regular)}</s>}</div><p className="meta mt8">{cohort ? t(cohort, "name") + " 기수 판매가" : "상품 기본 판매가"}</p><p className="meta mt8">{preview.summary || "상품 소개를 입력해 주세요."}</p><div className="divider" /><ProductSaleCheck sale={sale} cohort={cohort} /><div className="setting-line"><span>저장할 상품 설정</span><b>{statusLabels[preview.status]}</b></div><div className="setting-line"><span>제공 자료</span><b>{resourceCount}개</b></div><Link className="btn full mt16" href="/admin/cohorts">기수·회차 관리</Link></div></aside></div>
     </form>
   </div>;

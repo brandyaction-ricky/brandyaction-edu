@@ -148,6 +148,33 @@ test('product curriculum tab loads on demand behind product permission', async (
   assert.deepEqual(denied.calls.tables, []);
 });
 
+test('product mission tab reads only the selected course lessons and missions', async () => {
+  const record = '12345678-1234-1234-1234-123456789012';
+  const other = '22222222-2222-2222-2222-222222222222';
+  const fixtures = {
+    curriculum_weeks: [{ id: 'week-1', course_id: record }, { id: 'week-other', course_id: other }],
+    curriculum_lessons: [{ id: 'lesson-1', week_id: 'week-1' }, { id: 'lesson-other', week_id: 'week-other' }],
+    curriculum_missions: [{ id: 'mission-1', lesson_id: 'lesson-1' }, { id: 'mission-other', lesson_id: 'lesson-other' }],
+  };
+  const api = apiHarness(admin, null, fixtures);
+  const response = await api.read(`products&record=${record}&part=missions`);
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).data, {
+    curriculum_weeks: [fixtures.curriculum_weeks[0]],
+    curriculum_lessons: [fixtures.curriculum_lessons[0]],
+    curriculum_missions: [fixtures.curriculum_missions[0]],
+  });
+  assert.deepEqual(api.calls.filters, [
+    ['curriculum_weeks', 'eq', 'course_id', record],
+    ['curriculum_lessons', 'in', 'week_id', ['week-1']],
+    ['curriculum_missions', 'in', 'lesson_id', ['lesson-1']],
+  ]);
+  assert.equal(api.calls.auth, 1);
+  const denied = apiHarness({ ...admin, role: 'member' });
+  assert.equal((await denied.read(`products&record=${record}&part=missions`)).status, 403);
+  assert.deepEqual(denied.calls.tables, []);
+});
+
 test('the operating home still returns the full dashboard aggregate', async () => {
   const api = apiHarness(admin);
   assert.equal((await api.read('home')).status, 200);

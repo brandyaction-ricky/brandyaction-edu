@@ -27,6 +27,14 @@ const server = createServer((request,response)=>{
       lesson_contents:[{lesson_id:'synthetic-lesson',body_text:'기존 학습 본문'}],
     }}));return;
   }
+  if(url.pathname==='/api/platform'&&url.searchParams.get('part')==='missions'){
+    response.setHeader('Content-Type','application/json');
+    response.end(JSON.stringify({data:{
+      curriculum_weeks:[{id:'synthetic-week',course_id:'synthetic-course',week_number:1,title:'기존 합성 주차'}],
+      curriculum_lessons:[{id:'synthetic-lesson',week_id:'synthetic-week',day_number:1,title:'기존 합성 학습'}],
+      curriculum_missions:[{id:'synthetic-mission',lesson_id:'synthetic-lesson',title:'기존 합성 미션',instructions:'기존 미션 안내',submission_type:'text',is_required:true,is_published:false}],
+    }}));return;
+  }
   if(url.pathname==='/api/platform/workflows'&&url.searchParams.get('kind')==='participants'){
     const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
     response.setHeader('Content-Type','application/json');response.end(JSON.stringify({cohortId:id(11),weekId:id(15),cohorts:[{id:id(11),name:'1기',course_id:id(10),course_title:'합성 신규 상품'}],weeks:[{id:id(15),week:1,title:'실행 시작'}],columns:[{id:id(16),day_number:1,title:'첫 학습'}],matrix:{[id(12)]:[{lessonId:id(16),status:'changes_requested',submissionId:id(30),approved:0,total:1}]},rows:[{id:id(12),user_id:id(1),full_name:'운영 동선 QA 회원',email:'operations-fixture@example.test',learning_percent:50,mission_total:1,approved:0,achievement:0,last_activity:'2026-09-24T09:00:00Z'}],total:1,stats:{participants:1,average:0,participation:100,attention:0}}));return;

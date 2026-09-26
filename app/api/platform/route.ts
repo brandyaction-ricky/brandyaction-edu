@@ -39,19 +39,25 @@ export async function GET(request: Request) {
         if (adminMode && (!operator || (sectionKey === 'staff' && operator.role !== 'admin'))) return reply({ error: '이 화면에 접근할 운영 권한이 필요합니다.', user }, 403);
         const db = adminMode ? createAdminClient() : await createClient();
         if (adminMode && !Object.hasOwn(adminTables, sectionKey)) return reply({ error: '조회 화면을 확인해 주세요.' }, 400);
-        // Keep the initial product editor read small. Load its curriculum only
-        // when the operator opens that tab, scoped to the selected product.
-        if (productEditorRead && params.get('part') === 'curriculum') {
+        // Keep the initial product editor read small. Load curriculum or missions
+        // only when the operator opens the tab, scoped to the selected product.
+        if (productEditorRead && ['curriculum', 'missions'].includes(params.get('part') || '')) {
+            const part = params.get('part');
             const weekResult = await db.from('curriculum_weeks').select('*').eq('course_id', record!).order('week_number');
             if (weekResult.error) return reply({ error: '상품 주차를 불러오지 못했습니다.' }, 500);
             const weeks = (weekResult.data || []) as Row[];
             const weekIds = weeks.map(week => String(week.id));
-            if (!weekIds.length) return reply({ data: { curriculum_weeks: [], curriculum_lessons: [], lesson_contents: [] } });
+            if (!weekIds.length) return reply({ data: { curriculum_weeks: [], curriculum_lessons: [], [part === 'missions' ? 'curriculum_missions' : 'lesson_contents']: [] } });
             const lessonResult = await db.from('curriculum_lessons').select('*').in('week_id', weekIds).order('day_number');
             if (lessonResult.error) return reply({ error: '상품 일차를 불러오지 못했습니다.' }, 500);
             const lessons = (lessonResult.data || []) as Row[];
             const lessonIds = lessons.map(lesson => String(lesson.id));
-            if (!lessonIds.length) return reply({ data: { curriculum_weeks: weeks, curriculum_lessons: [], lesson_contents: [] } });
+            if (!lessonIds.length) return reply({ data: { curriculum_weeks: weeks, curriculum_lessons: [], [part === 'missions' ? 'curriculum_missions' : 'lesson_contents']: [] } });
+            if (part === 'missions') {
+                const missionResult = await db.from('curriculum_missions').select('*').in('lesson_id', lessonIds).order('created_at');
+                if (missionResult.error) return reply({ error: '상품 미션을 불러오지 못했습니다.' }, 500);
+                return reply({ data: { curriculum_weeks: weeks, curriculum_lessons: lessons, curriculum_missions: missionResult.data || [] } });
+            }
             const contentResult = await db.from('lesson_contents').select('*').in('lesson_id', lessonIds);
             if (contentResult.error) return reply({ error: '학습 콘텐츠를 불러오지 못했습니다.' }, 500);
             return reply({ data: { curriculum_weeks: weeks, curriculum_lessons: lessons, lesson_contents: contentResult.data || [] } });
