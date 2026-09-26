@@ -1035,7 +1035,7 @@ export function AdminCatalog({
       {s.key === "learning" && <div className="row mt24"><Link className="btn" href="/admin/weeks">주차 구성</Link><Link className="btn" href="/admin/contents">영상·자료 등록</Link><Link className="btn" href="/admin/missions">미션·퀴즈 관리</Link></div>}
       {s.key === "missions" && <div className="notice mt16">미션은 연결 학습의 일차 순서로 표시됩니다. 학습 순서는 학습 콘텐츠 편집에서 변경할 수 있습니다. 제출물 검토와 피드백은 <Link className="text-link" href="/admin/reviews">제출물 검토</Link>에서 관리합니다.</div>}
       {s.key === "product-reviews" && <div className="notice mt24">후기 원문과 평점은 유지하며, 검토 화면에서 공개 상태와 상품 대표 노출을 설정합니다.</div>}
-      {!["products", "banners", "customers", "tags", "coupons"].includes(s.key) && <details className="catalog-bulk-tools mt24" onToggle={(event) => { if (!(event.currentTarget as HTMLDetailsElement).open) { setBulkMode(false); setSelection([]); } }}>
+      {!["products", "banners", "customers", "tags", "coupons", "questions"].includes(s.key) && <details className="catalog-bulk-tools mt24" onToggle={(event) => { if (!(event.currentTarget as HTMLDetailsElement).open) { setBulkMode(false); setSelection([]); } }}>
         <summary>목록 내보내기 · 선택 관리</summary>
         <div className="catalog-bulk-body">
           <label className="checkline"><input type="checkbox" checked={bulkMode} onChange={(event) => { setBulkMode(event.target.checked); setSelection([]); }} />목록 선택 표시</label>
