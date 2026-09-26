@@ -14,7 +14,9 @@ export function defaultConfig(id: string): LandingConfig {
 }
 export function decodeLabel(value: unknown): string {
   const raw = String(value || '');
-  try { return decodeURIComponent(raw.replaceAll('+', ' ')); } catch { return raw; }
+  // UTM values are URI components, not form fields: a literal `+` stays `+`.
+  // Decode once, and preserve malformed or already-normalized values safely.
+  try { return decodeURIComponent(raw); } catch { return raw; }
 }
 export function rawAttribution(search: string, referrer: string) {
   const fields: Record<string, string> = {};
@@ -22,7 +24,11 @@ export function rawAttribution(search: string, referrer: string) {
     const at = part.indexOf('=');
     if (at < 0) continue;
     const key = part.slice(0, at);
-    if ((UTM_KEYS as readonly string[]).includes(key) && !(key in fields)) fields[key] = part.slice(at + 1).slice(0, 800);
+    if ((UTM_KEYS as readonly string[]).includes(key) && !(key in fields)) {
+      const raw = part.slice(at + 1).slice(0, 800);
+      fields[key] = raw;
+      fields[`${key}_normalized`] = decodeLabel(raw).slice(0, 800);
+    }
   }
   try { fields.referrer = new URL(referrer).origin; } catch { fields.referrer = ''; }
   return fields;
@@ -74,7 +80,12 @@ export function validatePacket(input: unknown) {
   const b = input as Record<string, unknown>;
   if (!b || !validId(b.landing_id) || !validId(b.session_id) || !validId(b.visitor_id) || !Number.isInteger(b.layout_ver) || Number(b.layout_ver) < 1 || !Array.isArray(b.events) || b.events.length < 1 || b.events.length > 30) throw Error('Invalid packet');
   const raw = (b.attribution || {}) as Record<string, unknown>, attribution: Record<string, unknown> = {};
-  for (const key of UTM_KEYS) attribution[key] = str(raw[key], 800);
+  for (const key of UTM_KEYS) {
+    const value = str(raw[key], 800);
+    attribution[key] = value;
+    // Derive normalized values on the server so clients cannot spoof the join key.
+    attribution[`${key}_normalized`] = decodeLabel(value).slice(0, 800);
+  }
   try { attribution.referrer = new URL(String(raw.referrer || '')).origin; } catch { attribution.referrer = ''; }
   attribution.device = ['mobile','tablet','desktop'].includes(String(raw.device)) ? raw.device : 'desktop';
   attribution.browser = ['Instagram','Facebook','Kakao','Safari','Chrome','Firefox','Edge','Other'].includes(String(raw.browser)) ? raw.browser : 'Other';

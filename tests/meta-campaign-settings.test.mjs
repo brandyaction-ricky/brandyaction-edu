@@ -127,7 +127,7 @@ test('Meta registration count and result cost are copied from action arrays with
     assert.match(url.searchParams.get('fields'),/cost_per_action_type/);
     return Response.json({data:[{date_start:'2026-09-15',campaign_id:id,adset_id:'1',adset_name:'Set',ad_id:'2',ad_name:'Creative',impressions:'100',spend:'7000',actions:[{action_type:'offsite_conversion.fb_pixel_complete_registration',value:'4'}],cost_per_action_type:[{action_type:'offsite_conversion.fb_pixel_complete_registration',value:'1750'}]}]});
   };
-  try{const api=load('lib/meta-marketing.ts');const rows=await api.fetchMetaCampaigns({version:'v99.0',token:'test',accountId:'act_123',campaignIds:[idA],startDay:'2026-09-15',endDay:'2026-09-15'});assert.equal(rows[0].registrations,4);assert.equal(rows[0].registration_cost,1750);assert.equal(api.metaActionValue([{action_type:'complete_registration',value:'9'}],'complete_registration'),9);}
+  try{const api=load('lib/meta-marketing.ts');const rows=await api.fetchMetaCampaigns({version:'v99.0',token:'test',accountId:'act_123',campaignIds:[idA],startDay:'2026-09-15',endDay:'2026-09-15'});assert.equal(rows[0].registrations,4);assert.equal(rows[0].registration_cost,1750);assert.equal(rows[0].registration_available,true);assert.equal(api.metaActionValue([{action_type:'complete_registration',value:'9'}],'complete_registration'),9);assert.equal(api.metaRegistrationValue([{action_type:'unrelated_complete_registration',value:'91'}]),null);}
   finally{global.fetch=original;}
 });
 

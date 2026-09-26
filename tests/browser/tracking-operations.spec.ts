@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 // Exercise the actual React screen with deterministic transport failures and
 // responses. These tests never write to DEV/Production, Auth or Meta.
-async function fixture(page: Page, failClassification = false, metaOnly = false) {
+async function fixture(page: Page, failClassification = false, metaOnly = false, multipleCampaigns = false) {
   let campaign = { id: 'bbbbbbbb-bbbb-4000-8000-000000000002', landing_id: 'aaaaaaaa-aaaa-4000-8000-000000000001', name: '운영 검증 캠페인', utm_campaign: 'qa', start_day: '2026-09-01', end_day: '2026-09-30', new_customer_price: 1650000, existing_customer_price: 1100000, live_peak: null, uses_ads: metaOnly, meta_ad_account_id: metaOnly ? 'act_245402678098216' : null, meta_campaign_ids: metaOnly ? ['120252432290300270'] : [], meta_sync_status: metaOnly ? 'success' : 'not_configured', meta_last_synced_at: null, meta_sync_error: null };
   const sourceRows = metaOnly ? Array.from({ length: 8 }, (_, index) => ({ creative: `cr${String(index + 1).padStart(2, '0')}`, sessions: 0, visitors: 0, cta_click_sessions: 0, cta_clicks: 0 })) : [
     { creative: '소재 60', sessions: 60, visitors: 30, cta_click_sessions: 20, cta_clicks: 60 },
@@ -25,7 +25,8 @@ async function fixture(page: Page, failClassification = false, metaOnly = false)
       await route.fulfill({ status: 405, json: { error: '이 검증에서는 저장하지 않습니다.' } }); return;
     }
     if (!url.searchParams.has('start')) {
-      await route.fulfill({ json: { can_manage_campaign: true, courses: [{ id: campaign.landing_id, title: '운영 검증 클래스', status: 'published', tracking: 'active', campaigns: [campaign] }] } }); return;
+      const second = { ...campaign, id: 'cccccccc-cccc-4000-8000-000000000003', name: '두 번째 캠페인', start_day: '2026-09-10', end_day: '2026-09-24' };
+      await route.fulfill({ json: { can_manage_campaign: true, courses: [{ id: campaign.landing_id, title: '운영 검증 클래스', status: 'published', tracking: 'active', campaigns: multipleCampaigns ? [campaign, second] : [campaign] }] } }); return;
     }
     const devices = url.searchParams.getAll('device'), creatives = url.searchParams.getAll('creative');
     const performance = creatives.length ? rows.filter(row => creatives.includes(row.creative)) : devices.length === 1 ? rows.slice(0, 1) : rows;
@@ -99,6 +100,7 @@ test('filters toggle without reset, update chips and hide non-attributed manual 
   await page.getByRole('button', { name: '기기', exact: true }).click();
   await page.getByRole('checkbox', { name: '모바일', exact: true }).check();
   await page.getByRole('checkbox', { name: '데스크톱', exact: true }).check();
+  await expect(page.getByRole('columnheader', { name: /적용 필터 · 기기:/ })).toBeVisible();
   const done = page.getByRole('button', { name: '선택 완료', exact: true });
   if (await done.isVisible()) await done.click(); else await toggle.click();
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
@@ -110,6 +112,18 @@ test('filters toggle without reset, update chips and hide non-attributed manual 
   await page.getByRole('button', { name: '전체 초기화', exact: true }).click();
   await expect(page).not.toHaveURL(/device=/);
   await expect(funnel).toContainText('CTA → 카톡방');
+});
+
+test('selecting another campaign preserves the custom date range within its available bounds', async ({ page }) => {
+  await fixture(page, false, false, true);
+  await page.getByLabel('B 시작일').fill('2026-09-12');
+  await page.getByLabel('B 종료일').fill('2026-09-18');
+  await page.getByRole('checkbox', { name: /두 번째 캠페인/ }).check();
+  await expect(page.getByLabel('B 시작일')).toHaveValue('2026-09-12');
+  await expect(page.getByLabel('B 종료일')).toHaveValue('2026-09-18');
+  await page.getByRole('checkbox', { name: /운영 검증 클래스/ }).first().uncheck();
+  await expect(page.getByLabel('B 시작일')).toHaveValue('2026-09-12');
+  await expect(page.getByLabel('B 종료일')).toHaveValue('2026-09-18');
 });
 
 test('campaign save updates persisted form and legacy settings URL stays closed after reload', async ({ page }) => {
