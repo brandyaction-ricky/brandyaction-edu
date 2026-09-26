@@ -2049,14 +2049,15 @@ function OrdersPanel({
         ))}
       </div>
       <section className="panel" aria-label="주문 목록" aria-busy={loading}>
-        <div className="filter-row">
-          <AdminSearchField value={query} label="주문 검색" placeholder="주문번호 · 회원명 · 상품명 검색" onChange={event => { setQuery(event.target.value); setOpened(""); }} />
-          <span className="spacer" />
-          <label className="select-filter"><span>상품</span><select aria-label="상품 필터" value={course} onChange={event => { setCourse(event.target.value); setOpened(""); }}><option value="">전체 상품</option>{registeredCourses.map(item => <option key={item.id} value={item.id}>{named(item)}</option>)}</select></label>
-          <select aria-label="결제 상태" value={status} onChange={event => { setStatus(event.target.value); setOpened(""); }}><option value="">전체 상태</option>{["paid", "pending", "payment_failed", "partially_refunded", "refunded", "cancelled"].map(value => <option key={value} value={value}>{labels[value] || value}</option>)}</select>
+        <div className="filter-row orders-toolbar">
+          <AdminSearchField className="search" value={query} label="주문 검색" placeholder="주문번호 · 회원명 · 상품명 검색" onChange={event => { setQuery(event.target.value); setOpened(""); }} />
+          <div className="orders-filters" role="group" aria-label="주문 필터">
+            <label className="select-filter"><span>상품</span><select aria-label="상품 필터" value={course} onChange={event => { setCourse(event.target.value); setOpened(""); }}><option value="">전체 상품</option>{registeredCourses.map(item => <option key={item.id} value={item.id}>{named(item)}</option>)}</select></label>
+            <label className="select-filter"><span>결제 상태</span><select aria-label="결제 상태" value={status} onChange={event => { setStatus(event.target.value); setOpened(""); }}><option value="">전체 상태</option>{["paid", "pending", "payment_failed", "partially_refunded", "refunded", "cancelled"].map(value => <option key={value} value={value}>{labels[value] || value}</option>)}</select></label>
+          </div>
         </div>
-        <div className="table-scroll mobile-cards admin-legacy-table" tabIndex={0} role="region" aria-label="주문 데이터 표" aria-busy={loading}>
-          <table>
+        <div className="table-scroll mobile-cards orders-table-scroll admin-legacy-table" tabIndex={0} role="region" aria-label="주문 데이터 표" aria-busy={loading}>
+          <table className="orders-table">
             <caption className="sr-only">주문·결제·환불·수강권 연결 목록</caption>
             <thead>
               <tr>
