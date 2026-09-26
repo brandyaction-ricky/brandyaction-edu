@@ -39,6 +39,30 @@ test('product curriculum tab loads existing scoped lessons without submitting th
   await expect(page.getByRole('button', { name: '저장하기', exact: true })).toHaveCount(0);
 });
 
+test('existing week and day can be edited and published in product curriculum without product save', async ({ page }) => {
+  await page.goto('/product-sale-test');
+  await page.getByRole('tab', { name: '커리큘럼' }).click();
+  const panel = page.getByRole('tabpanel', { name: '커리큘럼' });
+  const week = panel.getByRole('region', { name: /1주차 기존 합성 주차/ });
+  await week.getByRole('textbox', { name: '주차 제목' }).fill('수정된 주차');
+  await week.getByRole('checkbox', { name: '주차 공개' }).check();
+  await week.getByRole('button', { name: '주차 저장' }).click();
+  await expect(page.getByLabel('합성 커리큘럼 저장 횟수')).toHaveText('1');
+  expect(JSON.parse(await page.getByLabel('합성 커리큘럼 요청').innerText())).toMatchObject({
+    action: 'save', section: 'weeks', id: 'synthetic-week', values: { title: '수정된 주차', is_published: true },
+  });
+  await week.getByRole('button', { name: '콘텐츠 편집' }).click();
+  const lesson = panel.getByRole('region', { name: '일차별 콘텐츠 편집' });
+  await lesson.getByRole('textbox', { name: '일차 제목' }).fill('수정된 일차');
+  await lesson.getByRole('checkbox', { name: '일차 공개' }).check();
+  await lesson.getByRole('button', { name: '일차 저장' }).click();
+  await expect(page.getByLabel('합성 커리큘럼 저장 횟수')).toHaveText('2');
+  expect(JSON.parse(await page.getByLabel('합성 커리큘럼 요청').innerText())).toMatchObject({
+    action: 'save', section: 'learning', id: 'synthetic-lesson', values: { title: '수정된 일차', is_published: true },
+  });
+  await expect(page.getByLabel('합성 저장 횟수')).toHaveText('0');
+});
+
 test('product cohort tab edits only its linked cohort without submitting the product form', async ({ page }) => {
   await page.goto('/product-sale-test');
   await page.getByRole('tab', { name: '기수·회차' }).click();

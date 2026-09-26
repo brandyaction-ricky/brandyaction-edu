@@ -73,6 +73,7 @@
 @media (max-width: 720px) {
   .edu-admin .product-editor .tabs { padding: 0 16px; gap: 20px; }
   .edu-admin .product-editor .section-pad { padding: 20px 16px; }
+  .edu-admin .product-editor .editor-savebar { position: static; }
   .edu-admin .product-editor .form-grid { grid-template-columns: minmax(0, 1fr); }
   .edu-admin .product-editor .upload-box { padding: 24px 16px; }
   .edu-admin .product-editor .product-resource-editor { padding: 16px; }
@@ -119,6 +120,11 @@
 .edu-admin .product-curriculum-week li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
 .edu-admin .product-curriculum-content { display: grid; gap: 14px; }
 .edu-admin .product-curriculum-content > .btn { justify-self: end; }
+.edu-admin .product-curriculum-settings { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; padding: 12px 0 16px; border-bottom: 1px solid var(--line); }
+.edu-admin .product-curriculum-settings > label:first-child { flex: 1 1 220px; min-width: 0; }
+.edu-admin .product-curriculum-settings .product-curriculum-publish { display: flex; align-items: center; gap: 8px; min-height: 44px; white-space: nowrap; }
+.edu-admin .product-curriculum-settings .product-curriculum-publish input { width: 18px; height: 18px; min-height: 18px; margin: 0; }
+.edu-admin .product-curriculum-settings > .notice { flex-basis: 100%; margin: 0; }
 .edu-admin .product-cohort-workspace { display: grid; gap: 18px; }
 .edu-admin .product-cohort-workspace > h2 { margin: 0; }
 .edu-admin .product-cohort-workspace > .meta { margin: -10px 0 0; }
@@ -129,7 +135,7 @@
 .edu-admin .product-cohort-fields label { display: grid; gap: 8px; color: var(--ink); font-size: 13px; font-weight: 600; }
 .edu-admin .product-cohort-fields input, .edu-admin .product-cohort-fields select { width: 100%; min-width: 0; margin: 0; }
 .edu-admin .product-cohort-fields > .btn { justify-self: end; }
-@media (max-width: 720px) { .edu-admin .product-curriculum-create, .edu-admin .product-curriculum-week li { align-items: stretch; flex-direction: column; } .edu-admin .product-curriculum-create > .btn { width: 100%; } }
+@media (max-width: 720px) { .edu-admin .product-curriculum-create, .edu-admin .product-curriculum-week li { align-items: stretch; flex-direction: column; } .edu-admin .product-curriculum-create > .btn, .edu-admin .product-curriculum-settings > .btn { width: 100%; } }
 .edu-admin .product-mission-workspace { display: grid; gap: 18px; }
 .edu-admin .product-mission-workspace > h2 { margin: 0; }
 .edu-admin .product-mission-workspace > .meta { margin: -10px 0 0; }

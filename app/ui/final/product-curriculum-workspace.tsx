@@ -11,6 +11,64 @@ function message(error: unknown) {
   return error instanceof Error ? error.message : "저장하지 못했습니다. 다시 시도해 주세요.";
 }
 
+function WeekSettings({ week, disabled, send, onSaved }: {
+  week: Row;
+  disabled: boolean;
+  send: WorkflowSend;
+  onSaved: () => void;
+}) {
+  const [title, setTitle] = useState(t(week, "title"));
+  const [published, setPublished] = useState(Boolean(week.is_published));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const changed = title.trim() !== t(week, "title") || published !== Boolean(week.is_published);
+  async function save() {
+    if (!title.trim()) { setError("주차 제목을 입력해 주세요."); return; }
+    setBusy(true); setError("");
+    try {
+      await send({ action: "save", section: "weeks", id: week.id, values: { title: title.trim(), is_published: published } }, "주차를 저장했습니다.");
+      onSaved();
+    } catch (cause) { setError(message(cause)); }
+    finally { setBusy(false); }
+  }
+  return <div className="product-curriculum-settings">
+    <label>주차 제목<input value={title} maxLength={300} onChange={event => setTitle(event.target.value)} disabled={disabled || busy} /></label>
+    <label className="product-curriculum-publish"><input type="checkbox" checked={published} onChange={event => setPublished(event.target.checked)} disabled={disabled || busy} />주차 공개</label>
+    <button className="btn small" type="button" onClick={() => void save()} disabled={disabled || busy || !changed || !title.trim()}>{busy ? "저장 중…" : "주차 저장"}</button>
+    {error && <p className="notice warning" role="alert">{error}</p>}
+  </div>;
+}
+
+function LessonSettings({ lesson, hasContent, disabled, send, onSaved }: {
+  lesson: Row;
+  hasContent: boolean;
+  disabled: boolean;
+  send: WorkflowSend;
+  onSaved: () => void;
+}) {
+  const [title, setTitle] = useState(t(lesson, "title"));
+  const [published, setPublished] = useState(Boolean(lesson.is_published));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const changed = title.trim() !== t(lesson, "title") || published !== Boolean(lesson.is_published);
+  async function save() {
+    if (!title.trim()) { setError("일차 제목을 입력해 주세요."); return; }
+    if (published && !hasContent) { setError("콘텐츠를 저장한 뒤 일차를 공개해 주세요."); return; }
+    setBusy(true); setError("");
+    try {
+      await send({ action: "save", section: "learning", id: lesson.id, values: { title: title.trim(), is_published: published } }, "일차를 저장했습니다.");
+      onSaved();
+    } catch (cause) { setError(message(cause)); }
+    finally { setBusy(false); }
+  }
+  return <div className="product-curriculum-settings">
+    <label>일차 제목<input value={title} maxLength={300} onChange={event => setTitle(event.target.value)} disabled={disabled || busy} /></label>
+    <label className="product-curriculum-publish"><input type="checkbox" checked={published} onChange={event => setPublished(event.target.checked)} disabled={disabled || busy} />일차 공개</label>
+    <button className="btn small" type="button" onClick={() => void save()} disabled={disabled || busy || !changed || !title.trim()}>{busy ? "저장 중…" : "일차 저장"}</button>
+    {error && <p className="notice warning" role="alert">{error}</p>}
+  </div>;
+}
+
 export function ProductCurriculumWorkspace({ course, pending, send }: {
   course?: Row;
   pending: boolean;
@@ -151,10 +209,12 @@ export function ProductCurriculumWorkspace({ course, pending, send }: {
     {!weeks.length && <p className="notice">먼저 주차를 추가해 주세요.</p>}
     {weeks.map((week) => <section key={week.id} className="product-curriculum-week" aria-label={`${num(week, "week_number")}주차 ${t(week, "title")}`}>
       <h3>{num(week, "week_number")}주차 · {t(week, "title")}</h3>
+      <WeekSettings key={`${week.id}:${week.updated_at}`} week={week} disabled={saving} send={send} onSaved={() => { setLoading(true); setReadVersion((version) => version + 1); }} />
       {lessons.filter((lesson) => lesson.week_id === week.id).length ? <ul>{lessons.filter((lesson) => lesson.week_id === week.id).map((lesson) => <li key={lesson.id}><span>Day {num(lesson, "day_number")} · {t(lesson, "title")}{lesson.is_published ? " · 공개" : " · 비공개"}</span><button className="btn small" type="button" onClick={() => selectLesson(lesson)} disabled={saving}>콘텐츠 편집</button></li>)}</ul> : <p className="meta">등록된 일차가 없습니다.</p>}
     </section>)}
     {selectedLesson && <section className="product-curriculum-content" aria-label="일차별 콘텐츠 편집">
       <h3>Day {num(selectedLesson, "day_number")} · {t(selectedLesson, "title")}</h3>
+      <LessonSettings key={`${selectedLesson.id}:${selectedLesson.updated_at}`} lesson={selectedLesson} hasContent={Boolean(existingContent)} disabled={saving} send={send} onSaved={() => { setLoading(true); setReadVersion((version) => version + 1); }} />
       <label>콘텐츠 유형<select value={contentType} onChange={(event) => { setContentType(event.target.value as ContentType); setContentValue(""); setUploadStatus("idle"); }} disabled={saving}><option value="text">텍스트</option><option value="vod">영상 URL</option><option value="material">자료 파일</option><option value="link">외부 링크</option></select></label>
       {contentType === "text" ? <label>학습 본문<textarea rows={7} value={contentValue} onChange={(event) => setContentValue(event.target.value)} disabled={saving} /></label> : contentType === "material" ? <><label>자료 이름<input value={resourceName} onChange={(event) => setResourceName(event.target.value)} disabled={saving} /></label><UploadField key={lessonId} name="curriculum_resource" value={contentValue} image={false} disabled={saving} onChange={setContentValue} onStatusChange={setUploadStatus} /></> : <label>{contentType === "vod" ? "영상 URL" : "외부 링크"}<input type="url" value={contentValue} onChange={(event) => setContentValue(event.target.value)} placeholder="https://" disabled={saving} /></label>}
       <button className="btn primary" type="button" onClick={() => void saveContent()} disabled={saving || !contentValue.trim()}>콘텐츠 저장</button>
