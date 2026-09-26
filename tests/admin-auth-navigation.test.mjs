@@ -70,16 +70,16 @@ test('operator checks reuse the already verified request user and preserve denie
   assert.equal(auth.calls(), 1);
 });
 
-function apiHarness(user, failure = null, fixtures = {}) {
+function apiHarness(user, failure = null, fixtures = {}, staffPermissions = {}) {
   const calls = { auth: 0, summaries: 0, tables: [], filters: [] };
   const db = {
     from(table) {
       calls.tables.push(table);
-      let rows = fixtures[table] || [];
+      let rows = table === 'site_settings' ? { value: staffPermissions } : fixtures[table] || [];
       const query = new Proxy({}, { get: (_, key) => {
         if (key === 'then') return resolve => Promise.resolve({ data: rows, error: null, count: 3 }).then(resolve);
-        if (key === 'eq') return (field, value) => { calls.filters.push([table, 'eq', field, value]); rows = rows.filter(row => row[field] === value); return query; };
-        if (key === 'in') return (field, values) => { calls.filters.push([table, 'in', field, values]); rows = rows.filter(row => values.includes(row[field])); return query; };
+        if (key === 'eq') return (field, value) => { calls.filters.push([table, 'eq', field, value]); if (Array.isArray(rows)) rows = rows.filter(row => row[field] === value); return query; };
+        if (key === 'in') return (field, values) => { calls.filters.push([table, 'in', field, values]); if (Array.isArray(rows)) rows = rows.filter(row => values.includes(row[field])); return query; };
         return () => query;
       } });
       return query;
@@ -179,6 +179,18 @@ test('product mission tab reads only the selected course lessons and missions', 
   const denied = apiHarness({ ...admin, role: 'member' });
   assert.equal((await denied.read(`products&record=${record}&part=missions`)).status, 403);
   assert.deepEqual(denied.calls.tables, []);
+});
+
+test('staff product reads enforce their product permission before querying product records', async () => {
+  const staff = { ...admin, role: 'staff' };
+  for (const permissions of [{}, { products: false }, { learning: true }]) {
+    const api = apiHarness(staff, null, {}, permissions);
+    assert.equal((await api.read('products')).status, 403);
+    assert.deepEqual(api.calls.tables, ['site_settings']);
+  }
+  const allowed = apiHarness(staff, null, {}, { products: true });
+  assert.equal((await allowed.read('products')).status, 200);
+  assert.ok(allowed.calls.tables.includes('courses'));
 });
 
 test('the operating home still returns the full dashboard aggregate', async () => {
