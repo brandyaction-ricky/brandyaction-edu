@@ -249,17 +249,44 @@ test('published product metadata drives search and sharing titles while an empty
     '@/lib/edu-settings': { getEduSettings: async () => ({ seo: {} }) },
     '@/lib/supabase/server': { createClient: async () => ({ from: () => query }) },
     '@/app/ui/platform': {}, '@/lib/server-auth': {}, 'next/navigation': {},
+    'next/headers': { headers: async () => new Headers({ host: 'preview.vercel.app' }) },
   });
   const params = Promise.resolve({ path: ['classes', 'my-class'] });
   let metadata = await page.generateMetadata({ params });
   assert.equal(metadata.title, '검색용 제목 | BrandyAction EDU');
   assert.equal(metadata.description, '검색용 설명');
   assert.equal(metadata.openGraph.title, metadata.title);
+  assert.equal(metadata.openGraph.images[0].url, 'https://preview.vercel.app/og');
+  assert.equal(metadata.twitter.card, 'summary_large_image');
+  assert.deepEqual(metadata.twitter.images, ['https://preview.vercel.app/og']);
   assert.ok(filters.some(([key, value]) => key === 'status' && value === 'published'));
   product = { ...product, metadata: { seo_title: '', seo_description: '' } };
   metadata = await page.generateMetadata({ params });
   assert.equal(metadata.title, '상품 이름 | BrandyAction EDU');
   assert.equal(metadata.description, '상품 소개');
+  product.metadata.thumbnail_url = 'https://cdn.example/cover.jpg';
+  metadata = await page.generateMetadata({ params });
+  assert.deepEqual(metadata.openGraph.images, [{url:'https://cdn.example/cover.jpg',alt:metadata.title}]);
+  assert.deepEqual(metadata.twitter.images, ['https://cdn.example/cover.jpg']);
+  product = null;
+  metadata = await page.generateMetadata({ params });
+  assert.equal(metadata.openGraph.images[0].url, 'https://preview.vercel.app/og');
+  assert.deepEqual(await page.generateMetadata({params:Promise.resolve({path:['admin','products']})}), {title:'운영 관리 | BrandyAction EDU',robots:{index:false,follow:false}});
+});
+
+test('sharing thumbnails resolve public storage and legacy paths; invalid images use the site fallback', () => {
+  const { productShareImage, sharingOrigin } = load('lib/product-sharing.ts');
+  const origin = sharingOrigin('brandyaction-edu-dev.vercel.app');
+  const db = 'https://synthetic.supabase.co';
+  assert.equal(origin, 'https://brandyaction-edu-dev.vercel.app');
+  assert.equal(sharingOrigin('127.0.0.1:4192'), 'http://127.0.0.1:4192');
+  for (const host of [null, 'bad/host', 'a@evil.test', 'host:99999']) assert.equal(sharingOrigin(host), 'https://brandyaction-edu.com');
+  assert.equal(productShareImage({thumbnail_url:'edu/cover.webp'},origin,db),db+'/storage/v1/object/public/course-assets/edu/cover.webp');
+  assert.equal(productShareImage({thumbnailUrl:'/images/cover.jpg'},origin,db),origin+'/images/cover.jpg');
+  for (const value of ['', 'javascript:alert(1)', '//evil.test/image.jpg', 'https://user:secret@example.com/image.jpg', '../secret.png', '/api/private']) {
+    assert.equal(productShareImage({thumbnail_url:value},origin,db),origin+'/og');
+  }
+  assert.equal(productShareImage({thumbnail_url:'edu/cover.webp'},origin,''),origin+'/og');
 });
 
 

@@ -50,7 +50,7 @@ function ProductHtmlCtaFixture() {
   return <ProductDetailHtml html="" documentSource={documentSource} ctaUrl="/join/synthetic/organic" />;
 }
 const path = window.location.pathname;
-const fixture = path === '/review-audit-test' ? <SubmissionReviewFixture/> : path === '/retained-member-dialog-test' ? <RetainedMemberDialogFixture/> : ['/member-operations-test', '/admin/customers', '/admin/questions', '/admin/reviews', '/admin/members'].includes(path) ? <MemberOperationsFixture/> : path.startsWith('/mission-integrity-test') ? <MissionIntegrityFixture/> : path.startsWith('/admin-shell-test')
+const fixture = path === '/analytics-test' ? <div className="edu-admin" style={{padding:24}}><AdminWorkflows section="analytics" data={{}} pending={false} send={async()=>({})}/></div> : path === '/review-audit-test' ? <SubmissionReviewFixture/> : path === '/retained-member-dialog-test' ? <RetainedMemberDialogFixture/> : ['/member-operations-test', '/admin/customers', '/admin/questions', '/admin/reviews', '/admin/members'].includes(path) ? <MemberOperationsFixture/> : path.startsWith('/mission-integrity-test') ? <MissionIntegrityFixture/> : path.startsWith('/admin-shell-test')
   ? <ShellFixture/>
   : path.startsWith('/product-html-cta-test')
     ? <ProductHtmlCtaFixture/>
