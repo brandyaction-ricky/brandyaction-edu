@@ -24,6 +24,7 @@ test('embedded CTA uses the existing checkout, custom URL or learning destinatio
     const link = page.frameLocator('iframe').getByRole('button', { name: '신청 버튼', exact: true });
     await expect(link).toHaveAttribute('aria-disabled', 'false');
     await link.click();
+    await expect(page.getByTestId('navigation-destination')).toBeAttached();
     await expect(page).toHaveURL(new RegExp(destination.replace('?', '\\?') + '$'));
   }
 });
