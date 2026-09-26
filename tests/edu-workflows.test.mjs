@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
+import { submissionReview } from './helpers/submission-review.mjs';
 function load(path, dependencies={}) {
  const source=fs.readFileSync(new URL('../'+path,import.meta.url),'utf8');
  const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
@@ -48,10 +49,12 @@ test('measurement code drafts validate scope, consent and size',()=>{
  assert.throws(()=>rules.validateMeasurementCode({name:'x',location:'head',scope:'landing',code:'x',purpose:'x',confirmed:false}));
 });
 const uid='11111111-1111-4111-8111-111111111111';
-function handler(user) {
+function handler(user, suppliedDb) {
  let calls=[];
+ const db=suppliedDb||{rpc:async(...args)=>{calls.push(args);return {data:1};}};
  const exports=load('app/api/platform/workflows/route.ts',{
- '@/lib/supabase/admin':{createAdminClient:()=>({rpc:async(...args)=>{calls.push(args);return {data:1};}})},
+ '@/lib/submission-review':submissionReview,
+ '@/lib/supabase/admin':{createAdminClient:()=>db},
  '@/lib/server-auth':{getAuthenticatedUser:async()=>user},
  '@/lib/platform-rules':load('lib/platform-rules.ts'),
  '@/lib/edu-workflows':rules,
@@ -77,6 +80,19 @@ test('all operational writes require admin authentication and same origin',async
   assert.equal((await handler({id:uid,role:'admin'}).POST(request({action},'https://other.example'))).status,403);
  }
 });
+
+test('Alimtalk wording can be saved as an inactive draft, while activation requires a Kakao approval number',async()=>{
+ const inserted=[];
+ const db={rpc:async()=>({data:1}),from(table){assert.equal(table,'crm_templates');let values;const query={insert(v){values=v;inserted.push(v);return query;},update(v){values=v;return query;},eq(){return query;},select(){return query;},single:async()=>({data:{id:uid,...values},error:null})};return query;}};
+ const route=handler({id:uid,role:'admin'},db);
+ const draft={action:'crm-save',kind:'template',name:'결제 안내 초안',channel:'alimtalk',purpose:'transactional',content:'수정 가능한 안내',alimtalkTemplateId:'',isActive:false};
+ const saved=await route.POST(request(draft));
+ assert.equal(saved.status,200);
+ assert.equal(inserted[0].alimtalk_template_id,null);
+ assert.equal(inserted[0].is_active,false);
+ assert.equal((await route.POST(request({...draft,isActive:true}))).status,400);
+ assert.equal(inserted.length,1);
+});
 test('bulk review rejects duplicate IDs and missing feedback before a write',async()=>{
  const h=handler({id:uid,role:'admin'});
  assert.equal((await h.POST(request({action:'review',ids:[uid,uid],decision:'approved'}))).status,400);
@@ -85,6 +101,22 @@ test('bulk review rejects duplicate IDs and missing feedback before a write',asy
  assert.equal((await h.POST(request({action:'review',ids:[uid],decision:'changes_requested',feedback:'출처를 추가해 주세요.'}))).status,200);
  assert.equal(h.calls[0][0],'review_mission_submissions');
  assert.equal(h.calls[0][1].p_actor,uid);
+});
+test('single checklist review derives the actor and invokes the additive RPC once', async () => {
+ const h=handler({id:uid,role:'admin'}), checks=submissionReview.emptyReviewChecks();
+ assert.equal((await h.POST(request({action:'review',ids:[uid],decision:'approved',reviewMode:'single',reviewChecks:checks,actor:'forged'}))).status,200);
+ assert.equal(h.calls[0][0],'review_mission_submissions_with_checks');
+ assert.equal(h.calls[0][1].p_actor,uid); assert.deepEqual(h.calls[0][1].p_checks,checks);
+ assert.equal((await h.POST(request({action:'review',ids:[uid],decision:'approved',reviewMode:'single',reviewChecks:{version:1}}))).status,400);
+ assert.equal(h.calls.length,1);
+});
+test('review API returns conflicts and fails closed before RPC rollout, never falling back to discard checks', async () => {
+ for(const [code,status,expected] of [['PT409',409,'REVIEW_CONFLICT'],['42501',403,'REVIEW_FORBIDDEN'],['PGRST202',503,'REVIEW_UNAVAILABLE']]) {
+  let calls=0;
+  const h=handler({id:uid,role:'admin'},{rpc:async(name)=>{calls++;assert.equal(name,'review_mission_submissions_with_checks');return {error:{code,message:'internal'}};}});
+  const response=await h.POST(request({action:'review',ids:[uid],decision:'approved',reviewMode:'single',reviewChecks:submissionReview.emptyReviewChecks()}));
+  assert.equal(response.status,status); assert.equal((await response.json()).code,expected); assert.equal(calls,1);
+ }
 });
 test('live-session mutation rejects invalid URL and non-integer order',async()=>{
  const h=handler({id:uid,role:'admin'});

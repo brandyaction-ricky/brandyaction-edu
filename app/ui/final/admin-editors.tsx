@@ -10,7 +10,7 @@ import {
   type Row,
   type Section,
 } from "@/lib/platform";
-import { localDateTime } from "@/lib/platform-rules";
+import { localDateTime, productSalesStatus } from "@/lib/platform-rules";
 import { Check, Code2, Download, Image as ImageIcon } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
@@ -149,6 +149,16 @@ function kstInput(value: unknown) {
   return new Date(Date.parse(String(value)) + 9 * 60 * 60 * 1000).toISOString().slice(0, 16);
 }
 
+function ProductSaleCheck({ sale, cohort }: { sale: ReturnType<typeof productSalesStatus>; cohort?: Row }) {
+  return <section className="product-sale-check" aria-label="판매 가능 여부">
+    <div className="setting-line"><b>실제 판매 상태</b><Badge color={sale.label === "판매 중" ? "green" : "amber"}>{sale.label}</Badge></div>
+    <p className="meta mt8">연결 기수 상태: {cohort ? `${t(cohort, "name")} · ${labels[t(cohort, "status")] || t(cohort, "status")}` : "미연결"}</p>
+    {cohort?.status === "upcoming" && <p className="meta mt8">준비 중 기수도 모집 마감·운영 기간 등 기존 판매 조건을 충족하면 신청할 수 있습니다.</p>}
+    {sale.hasCustomCta && <p className="meta mt8">고객 버튼은 기본 결제 대신 설정한 Destination URL로 이동합니다.</p>}
+    {sale.issues.length > 0 && <div className="notice warning mt8"><b>신청 전 확인할 항목</b><ul>{sale.issues.map(issue => <li key={issue}>{issue}</li>)}</ul><p>상품을 ‘판매 중’으로 저장해도 위 조건이 충족되지 않으면 신청이 열리지 않습니다.</p></div>}
+  </section>;
+}
+
 function ProductResources({ row, pending, send }: { row?: Row; pending: boolean; send: WorkflowSend }) {
   const resources = productResources(object(row, "metadata"));
   const [editing, setEditing] = useState<string | null>(null);
@@ -221,11 +231,19 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
   const [htmlFilename, setHtmlFilename] = useState("");
   const [detailUploadStatus, setDetailUploadStatus] = useState<"idle" | "uploading" | "error">("idle");
   const [preview, setPreview] = useState({ title: t(row, "title"), summary: t(row, "summary"), price: num(row, "list_price"), regular: Number(metadata.regular_price || 0), status: t(row, "status") || "draft", category: t(row, "category") || "paid_class", slug: t(row, "slug"), seoTitle: String(metadata.seo_title || ""), seoDescription: String(metadata.seo_description || "") });
+  const [draftValues, setDraftValues] = useState<Record<string, unknown>>({});
+  const [checkedAt] = useState(Date.now);
   const formRef = useRef<HTMLFormElement>(null);
   const groups = [["basic", "기본·판매"], ["detail", "상세페이지"], ["resources", preview.category === "digital" ? "콘텐츠 구성" : "제공 자료"], ["access", "수강·권한"], ["publish", "공개·검색"]] as const;
   const resourceCount = productResources(metadata).length;
   const previewSalePrice = preview.category === "free" ? 0 : cohort ? num(cohort, "price") : preview.price;
   const statusLabels: Record<string, string> = { draft: "작성 중", published: "판매 중", archived: "판매 종료" };
+  const saleCohorts = cohorts.map(linked => {
+    const draft = cohortDrafts[linked.id];
+    return { ...linked, ...Object.fromEntries(Object.entries(draft || {}).map(([key, value]) => [key, value ? value + ":00+09:00" : null])) };
+  });
+  const saleCourse = { ...row, ...draftValues, id: row?.id || "new-product", status: preview.status, category: preview.category, metadata: { ...metadata, ...Object.fromEntries(productMetadataFields.filter(key => key in draftValues).map(key => [key, draftValues[key]])), detail_html_document: detailMode === "html" ? htmlSource : "", detail_html: "" } } as Row;
+  const sale = productSalesStatus(saleCourse, saleCohorts, data.curriculum_weeks || [], data.curriculum_lessons || [], checkedAt, Boolean(productConversion(object(saleCourse, "metadata")).url));
   function field(key: string, label?: string, wide = false, hint?: string) {
     const definition = section.fields.find(item => item.key === key);
     if (!definition) return null;
@@ -235,6 +253,7 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
     setDirty(true);
     if (!formRef.current) return;
     const values = new FormData(formRef.current);
+    setDraftValues(formValues(section, values));
     setPreview({ title: String(values.get("title") || ""), summary: String(values.get("summary") || ""), price: Number(values.get("list_price") || 0), regular: Number(values.get("regular_price") || 0), status: String(values.get("status") || "draft"), category: String(values.get("category") || "paid_class"), slug: String(values.get("slug") || ""), seoTitle: String(values.get("seo_title") || ""), seoDescription: String(values.get("seo_description") || "") });
   }
   function close() { if (!dirty || window.confirm("저장하지 않은 변경사항이 있습니다. 목록으로 돌아갈까요?")) back(); }
@@ -268,6 +287,13 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
       cohortChanges.push({ id: linked.id, values: changed });
     }
     try {
+      // This is the form submit event, not render: recheck deadlines when saving.
+      // eslint-disable-next-line react-hooks/purity
+      const saveCheck = productSalesStatus(saleCourse, saleCohorts, data.curriculum_weeks || [], data.curriculum_lessons || [], Date.now(), sale.hasCustomCta);
+      if (values.status === "published" && (saveCheck.issues.length > 0 || (cohort && cohort.status !== "recruiting"))) {
+        const warning = saveCheck.issues.length ? `현재 신청이 열리지 않습니다: ${saveCheck.issues.join(" · ")}.` : `연결 기수는 ${labels[t(cohort, "status")] || t(cohort, "status")} 상태입니다. 기존 판매 조건에 따라 신청 가능합니다.`;
+        if (!window.confirm(`${warning}\n기수 상태는 자동 변경되지 않습니다. 상품 정보를 저장할까요?`)) { setTab("publish"); return; }
+      }
       await send({
         action: "save",
         section: "products",
@@ -289,6 +315,7 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
       <div className="editor-layout"><div className="editor-main"><section className="panel">
         <div className="tabs" role="tablist" aria-label="상품 편집 영역">{groups.map(([key, label]) => <button key={key} id={"product-tab-" + key} type="button" role="tab" aria-selected={tab === key} aria-controls={"product-panel-" + key} className={"tab " + (tab === key ? "active" : "")} onClick={() => setTab(key)}>{label}</button>)}</div>
         <div className="section-pad" id="product-panel-basic" data-tab="basic" role="tabpanel" aria-labelledby="product-tab-basic" hidden={tab !== "basic"}>
+          <ProductSaleCheck sale={sale} cohort={cohort} />
           <h2 className="mb16">기본 정보</h2><div className="form-grid">
             {field("title", "상품명", true)}
             {field("category", "상품 유형")}
@@ -299,7 +326,7 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
             <ProductField label="모집 시작 · KST"><input key={cohortId + "-start"} name="recruitment_start_at" aria-label="모집 시작 · KST" type="datetime-local" value={cohortDrafts[cohortId]?.recruitment_start_at ?? kstInput(cohort?.recruitment_start_at)} onChange={event => setCohortDrafts(current => ({ ...current, [cohortId]: { ...current[cohortId], recruitment_start_at: event.target.value } }))} disabled={pending} /></ProductField>
             <ProductField label="모집 마감 · KST"><input key={cohortId + "-end"} name="recruitment_end_at" aria-label="모집 마감 · KST" type="datetime-local" value={cohortDrafts[cohortId]?.recruitment_end_at ?? kstInput(cohort?.recruitment_end_at)} onChange={event => setCohortDrafts(current => ({ ...current, [cohortId]: { ...current[cohortId], recruitment_end_at: event.target.value } }))} disabled={pending} /></ProductField>
           </div>
-          <p className="meta product-cohort-hint">{cohort ? `현재 ${t(cohort, "name")}의 모집 일정입니다. 수강·권한 탭에서 기수를 선택할 수 있으며 변경한 기수 일정은 함께 저장됩니다.` : "상품을 저장하면 기본 기수가 생성되고 입력한 모집 일정이 함께 적용됩니다."}</p>
+          <p className="meta product-cohort-hint">{cohort ? `현재 ${t(cohort, "name")}의 모집 일정입니다. 수강·권한 탭에서 기수를 선택할 수 있으며 변경한 기수 일정은 함께 저장됩니다.` : "연결 기수가 없는 무료 클래스는 모집 일정을 비워 두면 기수를 만들지 않습니다. 그 외에는 상품을 저장하면 기본 기수가 생성되고 입력한 모집 일정이 함께 적용됩니다."}</p>
           <h3>상품 썸네일</h3><div className="upload-box product-upload"><Download aria-hidden="true" /><p>썸네일 이미지를 선택하세요.</p><UploadField name="thumbnail_url" value={String(metadata.thumbnail_url || metadata.thumbnailUrl || "")} image disabled={pending} onChange={() => setDirty(true)} /><p className="meta">권장 비율 16:9 · PNG/JPG/WebP</p></div>
           <div className="notice mt16">썸네일과 상세페이지 이미지는 별도로 관리합니다. 디지털 자료도 상품 정보와 제공 자료를 각각 등록해 주세요.</div>
           <details className="product-extra mt24"><summary>추가 상품 정보</summary><div className="form-grid mt16">{field("instructor_name", "강사명")}{field("schedule_label", "일정 안내")}</div></details>
@@ -320,12 +347,15 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
         </div>
         <div className="section-pad" id="product-panel-resources" data-tab="resources" role="tabpanel" aria-labelledby="product-tab-resources" hidden={tab !== "resources"}>{preview.category === "digital" ? <DigitalContentManager row={row} pending={pending} send={send} /> : <ProductResources row={row} pending={pending} send={send} />}</div>
         <div className="section-pad" id="product-panel-access" data-tab="access" role="tabpanel" aria-labelledby="product-tab-access" hidden={tab !== "access"}>
+          <ProductSaleCheck sale={sale} cohort={cohort} />
           <h2 className="mb16">수강·기수 연결</h2><ProductField label="연결 기수"><select value={cohortId} onChange={event => setCohortId(event.target.value)} aria-label="연결 기수" disabled={!cohorts.length || pending}>{!cohorts.length && <option value="">미연결</option>}{cohorts.map(item => <option key={item.id} value={item.id}>{t(item, "name")}</option>)}</select></ProductField>
           <div className="form-grid"><ProductField label="수강 시작 기준"><div className="product-value">주문별 수강권의 시작일 기준</div></ProductField><ProductField label="연결 기수 운영 종료"><div className="product-value">{cohort?.operation_end_at ? new Date(String(cohort.operation_end_at)).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" }) : "기수에 지정된 종료일 없음"}</div></ProductField>{field("duration_label", "고객에게 보이는 수강 기간", true)}</div>
           <h3 className="mt16">구매 후 제공 항목</h3><ul className="product-entitlements mt16"><li><Check aria-hidden="true" />공개된 학습 콘텐츠·영상·퀴즈</li><li><Check aria-hidden="true" />미션 제출 및 피드백</li><li><Check aria-hidden="true" />등록된 수강생 전용 자료</li></ul>
           <div className="divider" /><div className="notice">수강 권한은 신청·결제 내역과 기수 일정에 따라 부여됩니다. 개별 수강권의 기간·회수 상태는 주문 및 회원 화면에서 확인하세요.</div><div className="row mt16"><Link className="btn" href="/admin/orders">주문·수강 권한 확인</Link><Link className="btn" href="/admin/cohorts">기수·회차 관리</Link></div>
         </div>
         <div className="section-pad" id="product-panel-publish" data-tab="publish" role="tabpanel" aria-labelledby="product-tab-publish" hidden={tab !== "publish"}>
+          <h2 className="mb16">공개 점검</h2>
+          <ProductSaleCheck sale={sale} cohort={cohort} />
           <section className="product-conversion-card"><h2>Call to Action</h2><p className="meta">고객이 클릭할 주요 버튼과 이동할 페이지를 설정하세요.</p>
             <ProductField controlId="product-cta-price-label" label="CTA 왼쪽 문구" hint="상세페이지 하단 CTA 왼쪽에 표시됩니다. 비워 두면 ‘무료’로 표시됩니다."><input id="product-cta-price-label" name="cta_price_label" maxLength={40} defaultValue={conversion.priceLabel} placeholder="무료" disabled={pending} /></ProductField>
             <ProductField controlId="product-cta-label" label="Button Label"><input id="product-cta-label" name="cta_label" maxLength={100} defaultValue={conversion.label} placeholder="무료 웨비나 참여하기" disabled={pending} /></ProductField>
@@ -335,7 +365,7 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
           <section className="product-conversion-card"><h2>Tracking integration</h2><p className="meta">상품별 광고 추적을 연결하세요.</p><ProductField controlId="product-pixel-id" label="Meta Pixel ID (Optional)" hint="입력한 상품에만 PageView와 CTA 클릭(Lead)을 전송합니다. 구매 완료 이벤트는 결제 처리와 구분됩니다. 비워 두면 사용하지 않습니다."><input id="product-pixel-id" name="meta_pixel_id" inputMode="numeric" pattern="[0-9]{5,30}" maxLength={30} defaultValue={conversion.pixelId} placeholder="Meta Pixel ID" disabled={pending} /></ProductField></section>
         </div>
       </section><div className="editor-savebar">{row?.id && !row.archived_at && <button className="btn danger" type="button" onClick={() => void removeProduct()} disabled={pending || detailUploadStatus === "uploading"}>상품 삭제</button>}<span className="dirty-note">{dirty ? "저장하지 않은 변경사항이 있습니다." : "변경 내용을 저장하면 반영됩니다."}</span><button className="btn" type="button" onClick={close} disabled={pending || detailUploadStatus === "uploading"}>목록으로</button>{tab !== "publish" && <button className="btn" type="button" onClick={() => setTab("publish")} disabled={pending || detailUploadStatus === "uploading"}>공개 전 확인</button>}<button className="btn primary" type="submit" disabled={pending || detailUploadStatus !== "idle"}>{pending ? "저장 중…" : detailUploadStatus === "uploading" ? "업로드 중…" : "저장하기"}</button></div>{error && <p className="notice mt16" role="alert">{error}</p>}</div>
-      <aside className="editor-aside"><div className="side-preview"><span className="section-code">고객에게 보이는 상품</span><div className="preview-cover mt16"><p>BRANDYACTION EDU</p><h3>{preview.title || "상품명"}</h3><p className="accent">{labels[preview.category] || "유료 클래스"}</p></div><div className="preview-meta"><b>{!previewSalePrice ? "무료" : money(previewSalePrice)}</b>{preview.regular > previewSalePrice && <s>{money(preview.regular)}</s>}</div><p className="meta mt8">{cohort ? t(cohort, "name") + " 기수 판매가" : "상품 기본 판매가"}</p><p className="meta mt8">{preview.summary || "상품 소개를 입력해 주세요."}</p><div className="divider" /><div className="setting-line"><span>상품 상태</span><Badge color={preview.status === "published" ? "green" : ""}>{statusLabels[preview.status]}</Badge></div><div className="setting-line"><span>연결 기수</span><b>{t(cohort, "name") || "미연결"}</b></div><div className="setting-line"><span>제공 자료</span><b>{resourceCount}개</b></div><Link className="btn full mt16" href="/admin/cohorts">기수·회차 관리</Link></div></aside></div>
+      <aside className="editor-aside"><div className="side-preview"><span className="section-code">고객에게 보이는 상품</span><div className="preview-cover mt16"><p>BRANDYACTION EDU</p><h3>{preview.title || "상품명"}</h3><p className="accent">{labels[preview.category] || "유료 클래스"}</p></div><div className="preview-meta"><b>{!previewSalePrice ? "무료" : money(previewSalePrice)}</b>{preview.regular > previewSalePrice && <s>{money(preview.regular)}</s>}</div><p className="meta mt8">{cohort ? t(cohort, "name") + " 기수 판매가" : "상품 기본 판매가"}</p><p className="meta mt8">{preview.summary || "상품 소개를 입력해 주세요."}</p><div className="divider" /><ProductSaleCheck sale={sale} cohort={cohort} /><div className="setting-line"><span>저장할 상품 설정</span><b>{statusLabels[preview.status]}</b></div><div className="setting-line"><span>제공 자료</span><b>{resourceCount}개</b></div><Link className="btn full mt16" href="/admin/cohorts">기수·회차 관리</Link></div></aside></div>
     </form>
   </div>;
 }

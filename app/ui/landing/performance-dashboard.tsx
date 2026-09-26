@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { delta, displayDimension, rate, type DashboardReport } from '@/lib/landing-performance';
 import { count, money, signed, kstTime } from '@/lib/landing-admin-state';
-import { AdminButton, AdminDataTable, AdminMetric, AdminMetricGrid, AdminSection } from '@/app/ui/final/admin-system';
+import { AdminButton, AdminDataTable, AdminMetric, AdminMetricGrid, AdminSection, AdminStatusBadge } from '@/features/admin-ui';
 import { CompactEmpty, InlineError } from './tracking-controls';
 import { DEFAULT_SAMPLE_MIN, funnelRate, parseSampleMin, sortPerformance, type SortKey } from '@/lib/landing-operations-phase1';
 import { metaCampaignIds } from '@/lib/meta-campaign-settings';
@@ -15,7 +15,8 @@ export { sortPerformance } from '@/lib/landing-operations-phase1';
 function Compare({ current, previous, hasData, unit = '' }: { current: number; previous?: number; hasData: boolean; unit?: string }) {
   if (previous === undefined) return null;
   const change = delta(current, previous, hasData);
-  return <small className="tracking-comparison">{!change ? '비교 못함' : <>A {count(previous)}{unit} → B {count(current)}{unit}<br/>{signed(change.amount)}{unit} · {change.rate === null ? '증감률 계산 불가' : `${signed(change.rate)}%`}</>}</small>;
+  const amountUnit = unit === '%' ? '%p' : unit;
+  return <small className="tracking-comparison">{!change ? '비교 못함' : <>A {count(previous)}{unit} → B {count(current)}{unit}<br/>{signed(change.amount)}{amountUnit} · {change.rate === null ? '증감률 계산 불가' : `${signed(change.rate)}%`}</>}</small>;
 }
 export function OperationsSummary({ report, collection = false }: { report: DashboardReport; collection?: boolean }) {
   const summary = report.campaign_summary, presence = report.ui?.actual_presence;
@@ -28,6 +29,8 @@ export function OperationsSummary({ report, collection = false }: { report: Dash
     ['누적 기존 결제', count(existingCount) + (existingCount == null ? '' : '건')],
     [collection ? '라이브 최대 동시시청' : '누적 매출', collection ? count(summary.live_peak) + (summary.live_peak == null ? '' : '명') : money(newCount == null && existingCount == null ? null : summary.revenue)],
     [collection ? '마지막 데이터 수집' : '라이브 최대 동시시청', collection ? kstTime(report.ui?.last_collected_at) : count(summary.live_peak) + (summary.live_peak == null ? '' : '명')],
+    ['CAC', summary.new_payments + summary.existing_payments > 0 ? money(summary.spend / (summary.new_payments + summary.existing_payments)) : '—'],
+    ['동시시청당 광고비', summary.live_peak && summary.spend > 0 ? money(summary.spend / summary.live_peak) : '—'],
   ];
   return <dl className="tracking-ops-strip">{values.map(([label, value]) => <div key={label} title={label === '마지막 데이터 수집' ? '현재 기간·필터에 해당하는 방문 세션의 마지막 수집 시각 (KST)' : undefined}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>;
 }
@@ -67,7 +70,7 @@ export function TrendChart({ report, compare, onRetry }: { report: DashboardRepo
     </>}
   </AdminSection>;
 }
-const columns: [SortKey, string][] = [['adset', '광고세트'], ['creative', '소재'], ['sessions', '방문'], ['visitors', '고유 방문자'], ['cta_click_sessions', 'CTA 클릭 세션'], ['conversion', '방문 전환율'], ['avg_scroll_depth', '평균 스크롤'], ['avg_dwell_ms', '평균 체류'], ['spend', '광고비'], ['ctr', 'Meta CTR']];
+const columns: [SortKey, string][] = [['adset', '광고세트'], ['creative', '소재'], ['sessions', '방문'], ['visitors', '고유 방문자'], ['cta_click_sessions', 'CTA 클릭 세션'], ['conversion', '방문 전환율'], ['avg_scroll_depth', '평균 스크롤'], ['avg_dwell_ms', '평균 체류'], ['spend', '광고비'], ['ctr', 'Meta CTR'], ['registrations', '등록완료'], ['registration_cost', '등록완료 결과당 비용']];
 export function PerformanceTable({ report, onClassify, pending = false, sampleMin = String(DEFAULT_SAMPLE_MIN), onSampleMin }: { report: DashboardReport; onClassify: Classify; pending?: boolean; sampleMin?: string; onSampleMin?: (value: string) => void }) {
   const [sort, setSort] = useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'sessions', direction: 'desc' });
   const threshold = parseSampleMin(sampleMin) ?? DEFAULT_SAMPLE_MIN;
@@ -77,7 +80,7 @@ export function PerformanceTable({ report, onClassify, pending = false, sampleMi
     {rows.length ? <AdminDataTable label="소재별 성과표" tableClassName="tracking-performance-table"><thead><tr><th scope="col">광고 유형</th>{columns.map(([key, label]) => <th scope="col" data-align={['adset','creative'].includes(key) ? undefined : 'number'} key={key} aria-sort={sort.key === key ? sort.direction === 'desc' ? 'descending' : 'ascending' : 'none'}><button type="button" onClick={() => setSort({ key, direction: sort.key === key && sort.direction === 'desc' ? 'asc' : 'desc' })}>{label}{sort.key === key ? sort.direction === 'desc' ? <ArrowDown size={12} aria-hidden="true"/> : <ArrowUp size={12} aria-hidden="true"/> : <ArrowUpDown size={12} aria-hidden="true"/>}</button></th>)}</tr></thead><tbody>{rows.map(row => <tr key={JSON.stringify([row.campaign, row.adset, row.creative])}>
       <td><AdTypeControl key={row.ad_type} row={row} disabled={pending} onSave={onClassify}/></td>
       <th scope="row" className="tracking-identifier"><span tabIndex={0} title={displayDimension(row.adset)}>{displayDimension(row.adset)}</span></th><td className="tracking-identifier"><span tabIndex={0} title={`${displayDimension(row.creative)} · 캠페인: ${displayDimension(row.campaign)}`}>{displayDimension(row.creative)}</span></td>
-      <td data-align="number">{count(row.sessions)}</td><td data-align="number">{count(row.visitors)}</td><td data-align="number" title={`전체 클릭 ${count(row.cta_clicks)}회`}>{count(row.cta_click_sessions)}</td><td data-align="number" title={row.sessions ? `CTA 클릭 세션 ${count(row.cta_click_sessions)} ÷ 방문 ${count(row.sessions)} = ${rate(row.cta_click_sessions, row.sessions).toFixed(1)}%` : '분모가 0이므로 계산할 수 없습니다.'}>{row.sessions < threshold ? <span className="tracking-low-sample">표본 부족<small>방문 {count(row.sessions)}회</small></span> : `${rate(row.cta_click_sessions, row.sessions).toFixed(1)}%`}</td><td data-align="number">{row.avg_scroll_depth == null ? '—' : `${count(row.avg_scroll_depth)}%`}</td><td data-align="number">{row.avg_dwell_ms == null ? '—' : `${count(row.avg_dwell_ms / 1000)}초`}</td><td data-align="number">{money(row.spend)}</td><td data-align="number" title={`Meta 노출 ${count(row.impressions)} · Meta 링크 클릭 ${count(row.link_clicks)}`}>{row.impressions ? `${rate(row.link_clicks, row.impressions).toFixed(1)}%` : '계산 불가'}</td>
+      <td data-align="number">{count(row.sessions)}</td><td data-align="number">{count(row.visitors)}</td><td data-align="number" title={`전체 클릭 ${count(row.cta_clicks)}회`}>{count(row.cta_click_sessions)}</td><td data-align="number" title={row.sessions ? `CTA 클릭 세션 ${count(row.cta_click_sessions)} ÷ 방문 ${count(row.sessions)} = ${rate(row.cta_click_sessions, row.sessions).toFixed(1)}%` : '분모가 0이므로 계산할 수 없습니다.'}>{row.sessions < threshold ? <span className="tracking-low-sample">표본 부족<small>방문 {count(row.sessions)}회</small></span> : `${rate(row.cta_click_sessions, row.sessions).toFixed(1)}%`}</td><td data-align="number">{row.avg_scroll_depth == null ? '—' : `${count(row.avg_scroll_depth)}%`}</td><td data-align="number">{row.avg_dwell_ms == null ? '—' : `${count(row.avg_dwell_ms / 1000)}초`}</td><td data-align="number">{money(row.spend)}</td><td data-align="number" title={`Meta 노출 ${count(row.impressions)} · Meta 링크 클릭 ${count(row.link_clicks)}`}>{row.impressions ? `${rate(row.link_clicks, row.impressions).toFixed(1)}%` : '계산 불가'}</td><td data-align="number">{count(row.registrations)}</td><td data-align="number" title={row.registration_cost == null && row.registrations > 0 ? '선택 기간의 Meta 결과당 비용 값이 하나로 일치하지 않습니다.' : 'Meta cost_per_action_type 원본값'}>{row.registration_cost == null ? '—' : money(row.registration_cost)}</td>
     </tr>)}</tbody></AdminDataTable> : <CompactEmpty title={report.data_state.sessions_exist ? '조건에 맞는 데이터가 없습니다.' : '선택 기간에 수집된 소재 데이터가 없습니다.'}>{report.data_state.sessions_exist ? '상세 필터를 초기화하거나 조회 기간을 변경해 주세요.' : 'UTM 또는 캠페인 설정의 Meta 연결 상태를 확인해 주세요.'}</CompactEmpty>}</AdminSection>;
 }
 const percentage = (value: number | null) => value === null ? '계산 불가' : `${value.toFixed(1)}%`;
@@ -86,7 +89,7 @@ export function PerformanceDashboard({ report, compare, onClassify, pending, onR
   const hasVisits = report.data_state.sessions_exist, previousHasVisits = Boolean(a?.sessions);
   const presence = report.ui?.actual_presence, hasPayments = presence ? presence.new_payments || presence.existing_payments : !report.ui;
   const visitorRate = rate(b.converted_visitors, b.visitors), sessionRate = rate(b.cta_click_sessions, b.sessions);
-  const actual = report.ui?.period_actuals;
+  const actual = report.ui?.period_actuals, kakaoIncrease = actual?.kakao_delta;
   const visits = hasVisits ? b.sessions : null, clicks = hasVisits ? b.cta_click_sessions : null;
   const linked = !!report.campaign.meta_ad_account_id && metaCampaignIds(report.campaign).length > 0;
   const metaValue = (value: number) => report.data_state.meta_exists ? count(value) : linked ? '—' : '연동 전';
@@ -96,10 +99,10 @@ export function PerformanceDashboard({ report, compare, onClassify, pending, onR
       <AdminMetricGrid columns={4}>
         <AdminMetric label="1. 방문" value={count(visits)} note="세션 수 · 재방문 포함" change={compare && <Compare current={b.sessions} previous={a?.sessions} hasData={previousHasVisits}/>}/>
         <AdminMetric label="2. CTA 클릭" value={count(clicks)} note={`방문 → CTA ${percentage(funnelRate(clicks, visits))}`} change={compare && <><Compare current={b.cta_click_sessions} previous={a?.cta_click_sessions} hasData={previousHasVisits} unit="세션"/><Compare current={sessionRate} previous={a ? rate(a.cta_click_sessions, a.sessions) : undefined} hasData={previousHasVisits} unit="%"/></>}/>
-        <AdminMetric label="3. 카카오톡방" value={count(actual?.kakao_members)} note={filtered ? '캠페인 전체 실측' : `CTA → 카톡방 ${percentage(funnelRate(actual?.kakao_members, clicks))}`} change={<span>{actual?.kakao_day ? `${actual.kakao_day} 최신 입력 · ${report.range.endDay} 이전` : '종료일 이전 입력 없음'}</span>}/>
-        <AdminMetric label="4. 결제" value={count(actual?.payments)} note={filtered ? '캠페인 전체 실측' : `카톡방 → 결제 ${percentage(funnelRate(actual?.payments, actual?.kakao_members))}`} change={<span>선택 기간 신규·기존 결제 합계</span>}/>
+        <AdminMetric label="3. 카카오톡방" value={kakaoIncrease == null ? '입력 전' : count(kakaoIncrease)} note={filtered ? '캠페인 전체 실측' : `CTA → 카톡방 ${percentage(funnelRate(kakaoIncrease, clicks))}`} change={<span>{actual?.kakao_day ? `${actual.baseline_day} 자정 대비 ${actual.kakao_day} 자정 증가분` : `${report.range.endDay} 자정 입력 전`}</span>}/>
+        <AdminMetric label="4. 결제" value={count(actual?.payments)} note={filtered ? '캠페인 전체 실측' : `카톡방 → 결제 ${percentage(funnelRate(actual?.payments, kakaoIncrease))}`} change={<span>선택 기간 신규·기존 결제 합계</span>}/>
       </AdminMetricGrid>
-      <p className="tracking-help">CTA 클릭은 1회 이상 클릭한 세션입니다. 카톡방은 최신 인원 스냅샷으로, 동일 방문자의 전환을 추적한 수치는 아닙니다.</p>
+      <p className="tracking-help">CTA 클릭은 1회 이상 클릭한 세션입니다. 카톡방은 선택 기간 종료일 자정 인원에서 시작일 전날 자정 인원을 뺀 증가분입니다.</p>
       {filtered && <p className="tracking-help" role="status">실측값은 소재·기기 필터가 적용되지 않습니다. 필터 적용 중에는 CTA 이후 실측 전환율을 표시하지 않습니다.</p>}
       {report.ui?.errors.actuals && <InlineError onRetry={onRetry}>{report.ui.errors.actuals}</InlineError>}
     </section>
@@ -117,7 +120,44 @@ export function PerformanceDashboard({ report, compare, onClassify, pending, onR
     </details>
     <p className="tracking-help">마지막 데이터 수집: {kstTime(report.ui?.last_collected_at)}</p>
     {report.ui?.errors.collection && <InlineError onRetry={onRetry}>{report.ui.errors.collection}</InlineError>}
+    <TopMaterials report={report}/>
     <PerformanceTable report={report} onClassify={onClassify} pending={pending} sampleMin={sampleMin} onSampleMin={onSampleMin}/>
     <TrendChart report={report} compare={compare} onRetry={onRetry}/>
   </div>;
+}
+
+export function TopMaterials({ report }: { report: DashboardReport }) {
+  const rows = [...report.performance].sort((a, b) => b.cta_click_sessions - a.cta_click_sessions || b.sessions - a.sessions).slice(0, 3);
+  return <AdminSection bordered title="가장 많이 데려온 TOP 3" description="CTA 클릭 수 기준">
+    {rows.length ? <ol className="tracking-top-materials">{rows.map((row, index) => <li key={JSON.stringify([row.adset,row.creative])}><strong>{index + 1}위</strong><span>{displayDimension(row.creative)}</span><b>{count(row.cta_click_sessions)}건</b></li>)}</ol> : <p className="tracking-help">선택 기간의 소재별 CTA 클릭 데이터가 없습니다.</p>}
+  </AdminSection>;
+}
+
+type SourceReport = DashboardReport & { source_title: string };
+type SourceRow = { label: string; paid: boolean; visits: number; clicks: number; kakao: number | null; payments: number; revenue: number; spend: number };
+const sourceRow = (report: SourceReport): SourceRow => ({
+  label: report.source_title,
+  paid: report.campaign.uses_ads,
+  visits: report.summary_b.sessions,
+  clicks: report.summary_b.cta_click_sessions,
+  kakao: report.ui?.period_actuals?.kakao_delta ?? null,
+  payments: report.ui?.period_actuals?.payments ?? 0,
+  revenue: report.actuals.reduce((sum, row) => sum + row.revenue, 0),
+  spend: report.campaign.uses_ads ? report.summary_b.spend : 0,
+});
+const totalSource = (label: string, paid: boolean, rows: SourceRow[]): SourceRow => ({
+  label, paid,
+  visits: rows.reduce((sum, row) => sum + row.visits, 0), clicks: rows.reduce((sum, row) => sum + row.clicks, 0),
+  kakao: rows.some(row => row.kakao == null) ? null : rows.reduce((sum, row) => sum + (row.kakao || 0), 0),
+  payments: rows.reduce((sum, row) => sum + row.payments, 0), revenue: rows.reduce((sum, row) => sum + row.revenue, 0), spend: rows.reduce((sum, row) => sum + row.spend, 0),
+});
+export function MultiSourceComparison({ reports }: { reports: SourceReport[] }) {
+  const items = reports.map(sourceRow), paid = items.filter(row => row.paid), organic = items.filter(row => !row.paid);
+  const groups = [{ label: '페이드 소계', paid: true, rows: paid }, { label: '오가닉 소계', paid: false, rows: organic }].filter(group => group.rows.length);
+  const total = totalSource('합계', true, items);
+  const render = (row: SourceRow, totalRow = false, overall = false) => <tr key={row.label} className={totalRow ? 'tracking-source-total' : undefined}><th scope="row">{row.label}{!totalRow && <AdminStatusBadge status={row.paid ? 'active' : 'not_configured'} label={row.paid ? '페이드' : '오가닉'}/>}</th><td data-align="number">{count(row.visits)}</td><td data-align="number">{count(row.clicks)}</td><td data-align="number">{count(row.kakao)}</td><td data-align="number">{count(row.payments)}</td><td data-align="number">{money(row.revenue)}</td><td data-align="number">{row.paid || overall ? money(row.spend) : '—'}</td><td data-align="number">{(row.paid || overall) && row.spend > 0 ? `${count(row.revenue / row.spend * 100)}%` : '—'}</td><td data-align="number">{row.paid || overall ? money(row.revenue - row.spend) : '—'}</td></tr>;
+  return <AdminSection bordered title="유입별 성과 비교" description="선택한 무료클래스의 기간 성과 · KST">
+    <AdminDataTable label="유입별 성과 비교표" tableClassName="tracking-source-table"><thead><tr>{['페이지','방문','CTA 클릭','카톡방','결제','매출','광고비','ROAS','광고비 뺀 매출'].map((label,index) => <th scope="col" data-align={index ? 'number' : undefined} key={label}>{label}</th>)}</tr></thead><tbody>{groups.flatMap(group => [...group.rows.map(row => render(row)), render(totalSource(group.label, group.paid, group.rows), true)])}{render(total, true, true)}</tbody></AdminDataTable>
+    <p className="tracking-help">광고비·ROAS·광고비 뺀 매출은 Meta 캠페인 ID로 연결된 페이드 페이지에만 적용합니다. 오가닉은 광고비 차감 지표를 계산하지 않습니다.</p>
+  </AdminSection>;
 }

@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import { getEduSettings } from '@/lib/edu-settings';
 import { createClient } from '@/lib/supabase/server';
 import { Platform } from '@/app/ui/platform';
-import { getAuthenticatedUser } from '@/lib/server-auth';
 import { notFound, redirect } from 'next/navigation';
 import { metricsRedirect } from '@/lib/landing-admin-state';
 import { sections } from '@/lib/platform';
@@ -22,8 +21,9 @@ export default async function Page({params,searchParams}:{params:Promise<{path?:
  if (root === 'admin' && section === 'metrics') redirect(metricsRedirect(await searchParams));
  // The admin API verifies identity, account status and section permissions once.
  // Stream the admin shell immediately instead of repeating Auth + profile queries.
- const user = root === 'admin' ? null : await getAuthenticatedUser();
- return <Platform key={root === 'admin' ? 'admin' : path.join('/')} path={path} user={user}/>;
+ // Platform loads the authenticated user and page data together from /api/platform.
+ // Keeping it mounted across route changes preserves its in-memory state.
+ return <Platform path={path} user={null}/>;
 }
 
 export async function generateMetadata({params}:{params:Promise<{path?:string[]}>}):Promise<Metadata> {

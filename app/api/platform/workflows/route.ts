@@ -8,6 +8,7 @@ import { safeUrl } from '@/lib/platform';
 import { normalizeOperatorPermissions, permissionsFor } from '@/lib/operator-permissions';
 import { participantMatrix } from '@/lib/participant-matrix';
 import type { Row } from '@/lib/platform';
+import { reviewMutation, reviewWriteError } from '@/lib/submission-review';
 
 const reply = (value: unknown, status = 200) =>
     Response.json(value, {
@@ -150,15 +151,18 @@ export async function POST(request: Request) {
                 const channel = String(body.channel || '');
                 const purpose = String(body.purpose || '');
                 const content = string(body.content, 2000);
+                const alimtalkTemplateId = string(body.alimtalkTemplateId, 200);
+                const isActive = body.isActive === true;
                 if (!string(body.name, 100) || !content || !['sms', 'lms', 'alimtalk'].includes(channel) || !['marketing', 'transactional'].includes(purpose)) fail('템플릿 이름·채널·내용을 확인해 주세요.');
-                if (channel === 'alimtalk' && !string(body.alimtalkTemplateId, 200)) fail('승인된 알림톡 템플릿 ID를 입력해 주세요.');
+                if (channel === 'alimtalk' && purpose === 'marketing') fail('마케팅 안내는 정보성 알림톡으로 설정할 수 없습니다. 광고 문자 템플릿을 사용해 주세요.');
+                if (channel === 'alimtalk' && isActive && !alimtalkTemplateId) fail('카카오 승인 번호가 없는 알림톡 문구는 준비 중으로만 저장할 수 있습니다.');
                 const values = {
                     name: string(body.name, 100),
                     channel,
                     purpose,
                     content,
-                    alimtalk_template_id: channel === 'alimtalk' ? string(body.alimtalkTemplateId, 200) : null,
-                    is_active: body.isActive === true,
+                    alimtalk_template_id: channel === 'alimtalk' ? alimtalkTemplateId || null : null,
+                    is_active: channel === 'alimtalk' && !alimtalkTemplateId ? false : isActive,
                 };
                 result = id
                     ? await db.from('crm_templates').update(values).eq('id', id).select().single()
@@ -168,7 +172,16 @@ export async function POST(request: Request) {
                           .select()
                           .single();
             } else if (kind === 'campaign') {
+                if (id) {
+                    const existing = await db.from('crm_campaigns').select('recruitment_id').eq('id', id).single();
+                    if (existing.error) throw existing.error;
+                    if (existing.data.recruitment_id) fail('모집 안내 예약은 모집 운영에서 취소한 뒤 다시 검토해 주세요.');
+                }
                 if (!string(body.name, 100) || !uuid(body.templateId) || (body.tagId && !uuid(body.tagId))) fail('캠페인 이름·템플릿·대상을 확인해 주세요.');
+                const selectedTemplate = await db.from('crm_templates').select('id,channel,purpose,alimtalk_template_id,is_active').eq('id', body.templateId).maybeSingle();
+                if (selectedTemplate.error) throw selectedTemplate.error;
+                if (!selectedTemplate.data?.is_active) fail('사용 가능한 템플릿만 예약할 수 있습니다.');
+                if (selectedTemplate.data.channel === 'alimtalk' && (selectedTemplate.data.purpose !== 'transactional' || !selectedTemplate.data.alimtalk_template_id)) fail('승인된 정보성 알림톡만 사용할 수 있습니다.');
                 const scheduledAt = date(body.scheduledAt);
                 if (Date.parse(scheduledAt) < Date.now() - 60000) fail('예약 시각은 현재 이후로 선택해 주세요.');
                 const values = {
@@ -190,6 +203,10 @@ export async function POST(request: Request) {
                 const trigger = String(body.triggerType || '');
                 const delay = Number(body.delayMinutes);
                 if (!string(body.name, 100) || !uuid(body.templateId) || !['member_joined', 'marketing_consent', 'tag_assigned', 'purchase_completed'].includes(trigger) || !Number.isSafeInteger(delay) || delay < 0 || delay > 525600) fail('자동 메시지 조건을 확인해 주세요.');
+                const selectedTemplate = await db.from('crm_templates').select('id,channel,purpose,alimtalk_template_id,is_active').eq('id', body.templateId).maybeSingle();
+                if (selectedTemplate.error) throw selectedTemplate.error;
+                if (!selectedTemplate.data?.is_active) fail('사용 가능한 템플릿만 자동 메시지에 연결할 수 있습니다.');
+                if (selectedTemplate.data.channel === 'alimtalk' && (selectedTemplate.data.purpose !== 'transactional' || !selectedTemplate.data.alimtalk_template_id)) fail('카카오에서 승인한 정보성 알림톡만 자동 메시지에 연결할 수 있습니다.');
                 if (trigger === 'tag_assigned' && body.tagId && !uuid(body.tagId)) fail('자동화 태그를 확인해 주세요.');
                 if (trigger === 'purchase_completed' && body.courseId && !uuid(body.courseId)) fail('자동화 상품을 확인해 주세요.');
                 const values = {
@@ -268,15 +285,12 @@ export async function POST(request: Request) {
                 p_quiz: body.quiz,
             });
         } else if (body.action === 'review') {
-            if (!['approved', 'changes_requested', 'rejected'].includes(body.decision)) fail('검토 결과를 선택해 주세요.');
-            const feedback = string(body.feedback, 2000);
-            if (body.decision !== 'approved' && !feedback) fail('보완·반려 사유를 입력해 주세요.');
-            result = await db.rpc('review_mission_submissions', {
-                p_actor: user.id,
-                p_ids: ids(body.ids),
-                p_decision: body.decision,
-                p_feedback: feedback,
-            });
+            const mutation = reviewMutation(user.id, body);
+            result = await db.rpc(mutation.name, mutation.params);
+            if (result.error) {
+                const { status, ...problem } = reviewWriteError(result.error);
+                return reply(problem, status);
+            }
         } else if (body.action === 'assign') {
             if (!['tag', 'coupon'].includes(body.kind) || !uuid(body.targetId) || typeof body.remove !== 'boolean') fail('태그 또는 쿠폰을 선택해 주세요.');
             result = await db.rpc('edu_assign_customers', {

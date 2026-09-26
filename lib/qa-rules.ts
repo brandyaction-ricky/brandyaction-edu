@@ -59,6 +59,7 @@ export function databaseMessage(code?: string): string {
 
 // Only dependencies used by the current screen. Analytics is always aggregated by RPC.
 export const adminTables: Record<string, string[]> = {
+  conversion: [],
   home: ['courses', 'cohorts', 'mission_submissions', 'edu_questions'],
   products: ['courses', 'cohorts', 'curriculum_weeks', 'curriculum_lessons', 'lesson_contents'], cohorts: ['courses', 'cohorts', 'cohort_sessions', 'cohort_session_contents'],
   learning: ['courses', 'curriculum_weeks', 'curriculum_lessons', 'lesson_contents', 'curriculum_missions', 'mission_quizzes'],
@@ -67,7 +68,7 @@ export const adminTables: Record<string, string[]> = {
   missions: ['courses', 'curriculum_weeks', 'curriculum_lessons', 'curriculum_missions', 'mission_quizzes'],
   members: ['courses', 'cohorts'],
   reviews: ['courses', 'cohorts', 'enrollments', 'profiles', 'curriculum_missions', 'mission_submissions'],
-  questions: ['courses', 'edu_questions', 'profiles'],
+  questions: ['edu_questions'],
   customers: ['profiles', 'crm_tags', 'crm_member_tags', 'coupons', 'courses', 'cohorts', 'enrollments'],
   staff: ['profiles', 'site_settings'],
   tags: ['crm_tags'], coupons: ['coupons', 'coupon_products', 'coupon_redemptions', 'courses', 'crm_tags'], 'product-reviews': ['courses', 'reviews', 'profiles'],
@@ -78,6 +79,20 @@ export const adminTables: Record<string, string[]> = {
   landing: [], analytics: [], metrics: ['site_settings'], seo: ['site_settings'], settings: ['site_settings'],
 };
 
+export function adminSelectColumns(section: string, table: string): string {
+  if (section === 'products' && table === 'courses') return '*';
+  if (table === 'courses') return 'id,title,status,category,list_price,archived_at,display_order,created_at,updated_at';
+  if (section === 'questions' && table === 'edu_questions') return 'id,user_id,course_id,title,content,answer,status,is_archived,created_at,updated_at,profiles(id,full_name,email),courses(id,title)';
+  if (section === 'reviews' && table === 'mission_submissions') return '*,enrollments!inner(user_id,course_id,cohort_id,profiles!enrollments_user_id_fkey(id,full_name,email),courses(id,title),cohorts(id,name)),curriculum_missions(id,title,instructions)';
+  if (section === 'orders') {
+    if (table === 'orders') return 'id,order_number,user_id,status,subtotal,discount_amount,total_amount,customer_name,customer_email,customer_phone,created_at';
+    if (table === 'cohorts') return 'id,course_id,name';
+    if (table === 'order_items') return 'id,order_id,course_id,cohort_id,item_name,unit_price';
+    if (table === 'enrollments') return 'id,order_item_id,status';
+  }
+  return '*';
+}
+
 export const archiveValues: Record<string, Record<string, unknown>> = {
   products: { status: 'archived' }, cohorts: { status: 'cancelled' },
   learning: { is_published: false }, weeks: { is_published: false }, missions: { is_published: false },
@@ -85,3 +100,5 @@ export const archiveValues: Record<string, Record<string, unknown>> = {
   banners: { is_active: false }, articles: { status: 'hidden', is_featured: false },
   testimonials: { is_published: false }, questions: { is_archived: true },
 };
+// Home, member list and exports share this population (all roles, excluding withdrawal).
+export const excludedMemberStatus = 'withdrawn';

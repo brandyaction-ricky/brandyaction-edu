@@ -1,0 +1,502 @@
+import { expect, test, type Page } from '@playwright/test';
+import { createMockJudgment, evidenceVersions, type ConversionCase, type ConversionRun, type ConversionSnapshot } from '../../lib/conversion-review';
+
+// Synthetic inquiry and product data only. Route interception cannot reach DB,
+// auth, model or message providers, and the fixture server rejects other writes.
+const timestamp = '2026-09-20T01:00:00.000Z';
+const courseId = '11111111-1111-4111-8111-111111111111';
+const initialCase: ConversionCase = {
+  id: '22222222-2222-4222-8222-222222222222', source_type: 'manual', sample_origin: 'current', legacy_course_label: null, question_id: null,
+  course_id: courseId, cohort_id: null, subject: '초보 수강과 녹화 문의',
+  content: '초보자도 따라갈 수 있나요? 실시간 참석이 어려운데 녹화가 있나요?',
+  source_label: '합성 상담 예시', received_at: timestamp, customer_id: null, input_version: 1, created_at: timestamp,
+};
+function initialSnapshot(): ConversionSnapshot {
+  return {
+    cases: [{ ...initialCase }],
+    evidence: [{ id: '33333333-3333-4333-8333-333333333333', course_id: courseId, cohort_id: null,
+      title: '수강 수준 안내', body: '초보자를 대상으로 기초 개념부터 설명합니다.',
+      source_url: 'https://example.test/course-guide', version: 1, status: 'approved' }],
+    courses: [{ id: courseId, title: '합성 교육 상품' }],
+    cohorts: [{ id: '44444444-4444-4444-8444-444444444444', course_id: courseId, name: '합성 1기' }],
+    questions: [], runs: [], reviews: [], adjudications: [], capabilities: { can_manage_evidence: true, can_mock: true, can_copy_aside_match: true },
+  };
+}
+
+async function fixture(page: Page, provider: 'mock' | 'jev' = 'mock') {
+  const snapshot = initialSnapshot();
+  if (provider === 'jev') snapshot.capabilities = { ...snapshot.capabilities, can_jev: true, can_adjudicate: true, can_jev_v4: true, can_analyze: true, analyze_provider: 'jev' };
+  const mutations: Record<string, unknown>[] = [];
+  const orderRows: Array<{ id: string; status: 'paid' | 'partially_refunded' | 'refunded'; currency: string; total_amount: number; paid_at: string; item_name: string; linked_at: string | null; refund_amount: number; payment_statuses: string[] }> = [
+    { id: '66666666-6666-4666-8666-666666666666', status: 'paid', currency: 'KRW', total_amount: 1650000, paid_at: '2026-09-22T02:00:00.000Z', item_name: '합성 교육 상품', linked_at: null, refund_amount: 0, payment_statuses: ['done'] },
+  ];
+  const unexpectedApi: string[] = [];
+  let forbidden = false;
+  await page.route('**/api/**', async route => {
+    const pathname = new URL(route.request().url()).pathname;
+    if (!['/api/conversion', '/api/conversion/orders', '/api/conversion/adjudication', '/api/conversion/jev-v2', '/api/conversion/jev-v3', '/api/conversion/jev-v4'].includes(pathname)) {
+      unexpectedApi.push(route.request().url());
+      await route.fulfill({ status: 405, json: { error: '검증에 허용되지 않은 API입니다.' } }); return;
+    }
+    if (forbidden) { await route.fulfill({ status: 403, json: { error: '전환 관리 접근 권한이 없습니다.' } }); return; }
+    if (pathname === '/api/conversion/orders') {
+      await route.fulfill({ json: { orders: orderRows, available: true, can_manage: true } }); return;
+    }
+    if (pathname === '/api/conversion/jev-v2') {
+      const body = route.request().postDataJSON();
+      mutations.push(body);
+      const choice = (value: string) => ({ type: 'choice' as const, choice: value, confidence: .75, probabilities: { [value]: .75 } });
+      const result = { contract_version: 2 as const, model: 'jev-test', decisions: {
+        information_need: choice('skill_requirement'), confirmed_barrier: choice('none_stated'),
+        operational_issue: choice('none_stated'), observable_stage: choice('information_seeking'),
+      } };
+      snapshot.jev_v2_runs ||= [];
+      snapshot.jev_v2_runs.push({ id: `v2-${snapshot.jev_v2_runs.length + 1}`, v1_run_id: body.v1_run_id,
+        case_id: initialCase.id, calibration_review_id: snapshot.reviews[0].id, input_version: 1,
+        status: 'completed', result, created_at: timestamp, updated_at: timestamp });
+      await route.fulfill({ json: { ok: true, result } }); return;
+    }
+    if (pathname === '/api/conversion/jev-v3') {
+      const body = route.request().postDataJSON();
+      mutations.push(body);
+      const choice = (value: string) => ({ type: 'choice' as const, choice: value, confidence: .75, probabilities: { [value]: .75 } });
+      const result = { contract_version: 3 as const, model: 'jev-test', decisions: {
+        information_need: choice('registration_or_access'), confirmed_barrier: choice('none_stated'),
+        attempted_action_target: choice('free_live_or_replay'), operational_issue: choice('paid_application_failure'),
+        observable_stage: choice('paid_application_or_payment_attempt'),
+      }, consistency_flags: ['paid_attempt_without_paid_target', 'paid_failure_without_paid_target'] as const };
+      snapshot.jev_v3_runs ||= [];
+      snapshot.jev_v3_runs.push({ id: `v3-${snapshot.jev_v3_runs.length + 1}`, v1_run_id: body.v1_run_id,
+        case_id: initialCase.id, calibration_review_id: snapshot.reviews[0].id, input_version: 1,
+        status: 'completed', result: { ...result, consistency_flags: [...result.consistency_flags] }, created_at: timestamp, updated_at: timestamp });
+      await route.fulfill({ json: { ok: true, result } }); return;
+    }
+    if (pathname === '/api/conversion/jev-v4') {
+      const body = route.request().postDataJSON();
+      mutations.push(body);
+      const choice = (value: string) => ({ type: 'choice' as const, choice: value, confidence: .75, probabilities: { [value]: .75 } });
+      const result = { contract_version: 4 as const, model: 'jev-test', decisions: {
+        information_need: choice('registration_or_access'), confirmed_barrier: choice('none_stated'),
+        attempted_action_target: choice('free_live_or_replay'), operational_issue: choice('free_content_access_failure'),
+        paid_program_reference: choice('future_consideration_after_free_content'), observable_stage: choice('no_purchase_signal'),
+      }, consistency_flags: ['paid_reference_without_stage'] as const, uncertainty_flags: [] };
+      snapshot.jev_v4_runs ||= [];
+      snapshot.jev_v4_runs.push({ id: `v4-${snapshot.jev_v4_runs.length + 1}`, v1_run_id: body.v1_run_id,
+        case_id: initialCase.id, calibration_review_id: null, input_version: 1,
+        status: 'completed', result: { ...result, consistency_flags: [...result.consistency_flags] }, created_at: timestamp, updated_at: timestamp });
+      await route.fulfill({ json: { ok: true, result } }); return;
+    }
+    if (pathname === '/api/conversion/adjudication') {
+      const body = route.request().postDataJSON();
+      mutations.push(body);
+      const note = { id: `adjudication-${snapshot.adjudications!.length + 1}`, ...body, actor_id: 'synthetic-operator', created_at: timestamp };
+      snapshot.adjudications!.push(note);
+      await route.fulfill({ json: { ok: true, note } }); return;
+    }
+    if (route.request().method() === 'GET') { await route.fulfill({ json: snapshot }); return; }
+    const body = route.request().postDataJSON();
+    mutations.push(body);
+    if (body.action === 'save_case') {
+      const item: ConversionCase = { ...initialCase, id: '55555555-5555-4555-8555-555555555555',
+        subject: body.subject, content: body.content, source_label: body.source_label,
+        received_at: body.received_at, course_id: body.course_id, cohort_id: body.cohort_id,
+        sample_origin: body.sample_origin, legacy_course_label: body.legacy_course_label };
+      snapshot.cases.push(item);
+      await route.fulfill({ json: { ok: true, case: item } }); return;
+    }
+    if (body.action === 'analyze') {
+      const item = snapshot.cases.find(row => row.id === body.case_id)!;
+      const mock = createMockJudgment(item, snapshot.evidence);
+      const result = provider === 'jev' ? { ...mock, mode: 'jev' as const, model: 'jev-test', decision_version: 1 as const, decisions: {
+        purchase_intent: { type: 'choice' as const, choice: 'medium', confidence: .97, probabilities: { high: .03, medium: .97, low: 0, unclear: 0 } },
+        primary_barrier: { type: 'choice' as const, choice: 'skill_level', confidence: .82, probabilities: { price: 0, schedule: .1, skill_level: .85, content_fit: .05, trust: 0, none_or_unknown: 0 } },
+        purchase_readiness: { type: 'score' as const, score: 2.8, confidence: .88, probabilities: { 0: 0, 1: .05, 2: .2, 3: .7, 4: .05 } },
+        next_action: { type: 'choice' as const, choice: 'answer_specific_questions', confidence: .99, probabilities: { answer_specific_questions: .99, invite_webinar: .01, offer_purchase_info: 0, human_consult: 0, hold_no_contact: 0 } },
+      } } : mock;
+      const run: ConversionRun = { id: `run-${snapshot.runs.length + 1}`, case_id: item.id, input_version: item.input_version,
+        provider, result, evidence_versions: evidenceVersions(item, snapshot.evidence), created_at: timestamp };
+      snapshot.runs.push(run);
+      await route.fulfill({ json: { ok: true, run } }); return;
+    }
+    if (body.action === 'review') {
+      const review = { id: `review-${snapshot.reviews.length + 1}`, case_id: body.case_id, run_id: body.run_id,
+        decision: body.decision, reply_text: body.reply_text, reason: body.reason, calibration: body.calibration, calibration_sample_kind: body.calibration_sample_kind,
+        created_at: timestamp, actor_id: 'synthetic-operator' };
+      snapshot.reviews.push(review);
+      await route.fulfill({ json: { ok: true, review } }); return;
+    }
+    if (body.action === 'manage_case') {
+      const item = snapshot.cases.find(row => row.id === body.case_id)!;
+      if (body.operation === 'purchase_outcome') {
+        item.purchase_outcome = body.purchase_outcome;
+        item.purchase_checked_at = body.purchase_outcome === 'unknown' ? null : timestamp;
+        item.purchase_checked_by = body.purchase_outcome === 'unknown' ? null : 'synthetic-operator';
+      } else if (body.operation === 'archive') item.archived_at = timestamp;
+      else item.archived_at = null;
+      await route.fulfill({ json: { ok: true, case: item } }); return;
+    }
+    if (body.action === 'manage_case_order') {
+      const item = orderRows.find(order => order.id === body.order_id)!;
+      item.linked_at = body.operation === 'link' ? timestamp : null;
+      await route.fulfill({ json: { ok: true, case_id: body.case_id, order_id: body.order_id, operation: body.operation } }); return;
+    }
+    await route.fulfill({ status: 405, json: { error: '등록되지 않은 모의 요청입니다.' } });
+  });
+  await page.goto('/admin/conversion');
+  await expect(page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ })).toBeVisible();
+  return { snapshot, mutations, unexpectedApi, deny: () => { forbidden = true; } };
+}
+
+test('staff can inspect a matching paid order and link it only after checking it', async ({ page }) => {
+  const state = await fixture(page);
+  await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
+  await expect(page.getByText('같은 상품·기수의 결제 기록을 문의 뒤 90일 동안 찾아 보여줍니다.', { exact: false })).toBeVisible();
+  await expect(page.getByText('1,650,000원')).toBeVisible();
+  await expect(page.getByText('주문자 이름·연락처는 표시하지 않습니다.', { exact: false })).toBeVisible();
+  await page.getByRole('button', { name: '확인한 주문으로 연결' }).click();
+  await expect(page.getByText('직원이 확인한 주문 기록을 문의에 연결했습니다.', { exact: true })).toBeVisible();
+  await expect(page.getByText('연결된 주문 · 결제 완료')).toBeVisible();
+  expect(state.mutations.at(-1)).toMatchObject({ action: 'manage_case_order', operation: 'link', case_id: initialCase.id });
+  expect(state.unexpectedApi).toEqual([]);
+});
+
+test('employee records a checked purchase result and can remove then restore an inquiry', async ({ page }) => {
+  const state = await fixture(page);
+  await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
+  await page.getByLabel('결제 확인 결과').selectOption('paid');
+  await page.getByRole('button', { name: '결제 여부 저장', exact: true }).click();
+  await expect(page.getByText('결제 여부를 기록했습니다. 사이트 주문을 자동으로 확인한 것은 아닙니다.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ })).toContainText('결제 확인');
+  expect(state.snapshot.cases[0].purchase_checked_by).toBe('synthetic-operator');
+
+  page.on('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: '목록에서 삭제', exact: true }).click();
+  await expect(page.getByRole('button', { name: '진행 중인 문의 보기', exact: true })).toBeVisible();
+  await expect(page.getByText('삭제한 문의 · 복구 가능', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '문의 복구', exact: true }).click();
+  await expect(page.getByText('문의를 복구했습니다.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /삭제한 문의 보기/ })).toBeVisible();
+  expect(state.mutations.map(item => item.action)).toEqual(['manage_case', 'manage_case', 'manage_case']);
+  expect(state.unexpectedApi).toEqual([]);
+});
+
+test('employee can edit and copy the Aside payment-check prompt without changing inquiry records', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (value: string) => { (window as Window & { copiedPrompt?: string }).copiedPrompt = value; } } });
+  });
+  const state = await fixture(page);
+  await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
+  const prompt = page.getByLabel('Aside에 붙여넣을 문구 · 필요하면 고칠 수 있어요');
+  await expect(prompt).toHaveValue(/시간이 가깝다는 이유만으로 같은 사람이라고 확정하지 마세요/);
+  await prompt.fill('직원이 읽고 고친 확인 요청');
+  await page.getByRole('button', { name: 'Aside용 문구 복사', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('문구를 복사했습니다');
+  expect(await page.evaluate(() => (window as Window & { copiedPrompt?: string }).copiedPrompt)).toBe('직원이 읽고 고친 확인 요청');
+  expect(state.mutations).toEqual([]);
+  expect(state.unexpectedApi).toEqual([]);
+});
+
+test('Jev shows its result first and an authorized employee can approve without sending a message', async ({ page }) => {
+  const state = await fixture(page, 'jev');
+  await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
+  await page.getByRole('button', { name: 'Jev 결과 보기', exact: true }).click();
+  await expect(page.getByText('Jev 결과 · 직원 확인 필요', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Jev 전환 판정')).toContainText('구매 의도중간Jev가 표시한 확신 97%');
+  await expect(page.getByLabel('사람 판단 · 구매 의도')).toHaveCount(0);
+  await expect(page.getByLabel(/^고객에게 보낼 답변 초안/)).toHaveValue('초보자를 대상으로 기초 개념부터 설명합니다.');
+  await page.getByRole('button', { name: '무료·유료 구분 결과 보기', exact: true }).click();
+  await expect(page.getByRole('button', { name: '구분 결과 확인 완료', exact: true })).toBeVisible();
+  await expect(page.getByLabel('무료 자료 접근과 유료 관심 참고 분류')).toContainText('무료 콘텐츠를 본 뒤 유료 교육 검토');
+  await expect(page.getByText('유료 교육은 언급했지만, 구매 행동은 확인되지 않았다고 봤습니다.')).toBeVisible();
+  await page.getByLabel('검토 결정').selectOption('accept');
+  await page.getByRole('button', { name: '직원 승인 기록', exact: true }).click();
+  await expect(page.locator('.conversion-record')).toContainText('직원 승인');
+  await expect(page.locator('.conversion-record')).toContainText('승인된 답변 초안 · 미발송');
+  await expect(page.getByText('직원이 답변 초안을 승인해 기록했습니다. 고객에게 자동으로 보내지 않았습니다.', { exact: true })).toBeVisible();
+  expect(state.mutations.map(item => item.action || (item.v1_run_id ? 'jev-v4' : 'unknown'))).toEqual(['analyze', 'jev-v4', 'review']);
+  expect(state.unexpectedApi).toEqual([]);
+});
+
+test('employee can edit a proposed reply before recording approval', async ({ page }) => {
+  const state = await fixture(page, 'jev');
+  await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
+  await page.getByRole('button', { name: 'Jev 결과 보기', exact: true }).click();
+  await page.getByLabel('검토 결정').selectOption('edit');
+  await page.getByLabel(/^고객에게 보낼 답변 초안/).fill('수강 수준은 안내 가능하며 녹화 제공 여부는 추가 확인이 필요합니다.');
+  await page.getByLabel('검토 사유').fill('녹화 제공 내용을 직원이 확인했습니다.');
+  await expect(page.getByLabel('검토 결정')).toHaveValue('edit');
+  await page.getByRole('button', { name: '직원 승인 기록', exact: true }).click();
+  await expect(page.locator('.conversion-record')).toContainText('수정 후 승인');
+  await expect(page.locator('.conversion-record')).toContainText('미발송');
+  expect(state.mutations.at(-1)).toMatchObject({ action: 'review', decision: 'edit', calibration: null, calibration_sample_kind: null });
+  expect(state.unexpectedApi).toEqual([]);
+});
+
+async function selectAndAnalyze(page: Page) {
+  await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
+  await page.getByRole('button', { name: '모의 결과 보기', exact: true }).click();
+  await expect(page.getByLabel(/^고객에게 보낼 답변 초안/)).toHaveValue('초보자를 대상으로 기초 개념부터 설명합니다.');
+  await expect(page.getByText('추가 확인 필요: 이용 방법', { exact: true })).toBeVisible();
+}
+
+test('funnel preparation rejects cross-product cohorts and never saves or fabricates metrics', async ({ page }) => {
+  const state = await fixture(page);
+  state.snapshot.courses.push({ id: 'paid', title: '합성 유료 교육' });
+  state.snapshot.cohorts.push({ id: 'paid-cohort', course_id: 'paid', name: '합성 유료 기수' });
+  await page.getByRole('button', { name: '새로고침', exact: true }).click();
+  await page.getByRole('button', { name: '모집 경로 준비', exact: true }).click();
+  await page.getByRole('combobox', { name: '무료 교육 상품', exact: true }).selectOption(courseId);
+  await page.getByRole('combobox', { name: '유료 교육 상품', exact: true }).selectOption('paid');
+  await expect(page.getByRole('combobox', { name: '무료 교육 회차·기수', exact: true })).toHaveCount(0);
+  const paidCohort = page.getByRole('combobox', { name: '유료 교육 회차·기수', exact: true });
+  await expect(paidCohort.locator('option')).toHaveCount(2);
+  await paidCohort.selectOption('paid-cohort');
+  await expect(page.getByText('상품·기수 선택 완료 · 무료/유료 판매 조건과 실제 측정 연결은 확인 전입니다.', { exact: true })).toBeVisible();
+  await expect(page.getByText('연결 확인 전', { exact: true })).toHaveCount(10);
+  await page.getByRole('combobox', { name: '유료 교육 상품', exact: true }).selectOption(courseId);
+  await expect(paidCohort).toHaveValue('');
+  await expect(page.getByText('무료 교육과 유료 교육은 서로 다른 상품으로 연결해 주세요.', { exact: true })).toBeVisible();
+  expect(state.mutations).toHaveLength(0);
+  expect(state.unexpectedApi).toHaveLength(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  state.deny();
+  await page.getByRole('button', { name: '새로고침', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: '무료 교육 상품', exact: true })).toHaveCount(0);
+});
+
+test('authorized funnel draft can be saved and reloaded while stale writes require a fresh read', async ({ page }) => {
+  const state = await fixture(page);
+  state.snapshot.capabilities.can_manage_funnel = true;
+  state.snapshot.courses.push({ id: 'paid', title: '합성 유료 교육' });
+  state.snapshot.cohorts.push({ id: 'paid-cohort', course_id: 'paid', name: '합성 유료 기수' });
+  let saved: Record<string, unknown> | null = null;
+  let stale = false;
+  let writes = 0;
+  await page.route('**/api/conversion/funnel', async route => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: { draft: saved, measurement: 'unverified' } });
+    if (stale) return route.fulfill({ status: 409, json: { error: '최신 버전을 다시 불러와 주세요.' } });
+    const body = route.request().postDataJSON();
+    expect(body.requestId).toMatch(/^[a-f0-9-]{36}$/);
+    expect(body.expected_version).toBe(0);
+    expect(body).not.toHaveProperty('freeCohortId');
+    saved = { version: 1, free_course_id: body.freeCourseId, free_cohort_id: body.freeCohortId, paid_course_id: body.paidCourseId, paid_cohort_id: body.paidCohortId };
+    writes++;
+    return route.fulfill({ json: { draft: saved, measurement: 'unverified' } });
+  });
+  await page.getByRole('button', { name: '새로고침', exact: true }).click();
+  await expect(page.getByRole('button', { name: '새로고침', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: '모집 경로 준비', exact: true }).click();
+  await expect(page.getByText('아직 저장된 경로 없음', { exact: true })).toBeVisible();
+  await page.getByRole('combobox', { name: '무료 교육 상품', exact: true }).selectOption(courseId);
+  await page.getByRole('combobox', { name: '유료 교육 상품', exact: true }).selectOption('paid');
+  await page.getByRole('combobox', { name: '유료 교육 회차·기수', exact: true }).selectOption('paid-cohort');
+  await page.getByRole('button', { name: '모집 경로 초안 저장', exact: true }).click();
+  await expect(page.getByText('저장 버전 1', { exact: true })).toBeVisible();
+  expect(writes).toBe(1);
+  await page.getByRole('button', { name: '모집 경로 준비 닫기', exact: true }).click();
+  await page.getByRole('button', { name: '모집 경로 준비', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: '유료 교육 상품', exact: true })).toHaveValue('paid');
+  stale = true;
+  await page.getByRole('button', { name: '모집 경로 초안 저장', exact: true }).click();
+  await expect(page.getByText('최신 버전을 다시 불러와 주세요.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '모집 경로 초안 저장', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: '저장된 경로 다시 불러오기', exact: true }).click();
+  await expect(page.getByRole('button', { name: '모집 경로 초안 저장', exact: true })).toBeEnabled();
+  await expect(page.getByText('연결 확인 전', { exact: true })).toHaveCount(10);
+});
+
+test('manual inquiry can be entered and saved without inventing a customer identity', async ({ page }) => {
+  const state = await fixture(page);
+  await page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true }).click();
+  const drawer = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: '카톡 문의 붙여넣기', exact: true }) });
+  await drawer.getByLabel(/^문의 시기/).selectOption('current');
+  await drawer.getByLabel(/^문의 제목/).fill('수강 일정 확인');
+  await drawer.getByLabel(/^문의 내용/).fill('수업은 언제 진행되나요?');
+  await drawer.getByLabel(/^출처 설명/).fill('합성 외부 문의');
+  await drawer.getByLabel(/^문의 접수 시각/).fill('2026-09-20T10:00');
+  await drawer.getByLabel(/^대상 상품/).selectOption(courseId);
+  await expect(drawer.getByRole('button', { name: '문의 저장', exact: true })).toBeDisabled();
+  await drawer.getByRole('checkbox', { name: '고객 식별정보를 제거한 발췌임을 확인했습니다.' }).check();
+  await drawer.getByRole('button', { name: '문의 저장', exact: true }).click();
+  await expect(drawer).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: '수강 일정 확인', exact: true })).toBeVisible();
+  await expect(page.getByText('회원 정보가 연결되지 않아 이후 구매 여부를 알 수 없음', { exact: true })).toBeVisible();
+  expect(state.mutations).toHaveLength(1);
+  expect(state.mutations[0]).toMatchObject({ action: 'save_case', question_id: null, course_id: courseId, cohort_id: null, subject: '수강 일정 확인', deidentified_confirmed: true });
+  expect(state.mutations[0]).not.toHaveProperty('customer_id');
+  expect(state.mutations[0].requestId).toMatch(/^[0-9a-f-]{36}$/);
+});
+
+test('pasted Kakao inquiry is saved and immediately reviewed by Jev without sending a reply', async ({ page }) => {
+  const state = await fixture(page, 'jev');
+  await page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true }).click();
+  const drawer = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: '카톡 문의 붙여넣기', exact: true }) });
+  await drawer.getByLabel(/^문의 제목/).fill('');
+  await drawer.getByLabel(/^문의 내용/).fill('무료 다시보기 링크가 열리지 않아요. 유료 과정 가격과 시작일도 알려주세요.');
+  await drawer.getByLabel(/^출처 설명/).fill('카카오 채널 1:1 상담');
+  await drawer.getByLabel(/^문의 접수 시각/).fill('2026-09-24T10:00');
+  await drawer.getByLabel(/^대상 상품/).selectOption(courseId);
+  await drawer.getByRole('checkbox', { name: '고객 식별정보를 제거한 발췌임을 확인했습니다.' }).check();
+  await drawer.getByRole('button', { name: '저장하고 Jev로 바로 살펴보기', exact: true }).click();
+  await expect(drawer).toHaveCount(0);
+  await expect(page.getByText('문의가 저장됐고 Jev 분류와 답변 초안을 만들었습니다. 아래 문의 카드에서 확인해 주세요.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '구분 결과 확인 완료', exact: true })).toBeVisible();
+  expect(state.mutations.map(item => item.action || (item.v1_run_id ? 'jev-v4' : 'unknown'))).toEqual(['save_case', 'analyze', 'jev-v4']);
+  expect(state.mutations[0]).toMatchObject({ action: 'save_case', subject: '무료 다시보기 링크가 열리지 않아요. 유료 과정 가격과 시작일도 알려주세요.' });
+  expect(state.unexpectedApi).toEqual([]);
+});
+
+test('historical education inquiry can be saved without linking a different current course', async ({ page }) => {
+  const state = await fixture(page);
+  await page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true }).click();
+  const drawer = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: '카톡 문의 붙여넣기', exact: true }) });
+  await drawer.getByLabel(/^문의 출처/).selectOption('manual');
+  await drawer.getByLabel(/^문의 시기/).selectOption('external_legacy');
+  await drawer.getByLabel(/^당시 유료 교육 상품명/).fill('과거 온라인 마케팅 교육');
+  await drawer.getByLabel(/^문의 제목/).fill('교육 신청 방식');
+  await drawer.getByLabel(/^문의 내용/).fill('교육 신청 전에 수강 조건을 확인하고 싶습니다.');
+  await drawer.getByLabel(/^출처 설명/).fill('카카오 채널 1:1 · 과거 상담');
+  await drawer.getByLabel(/^문의 접수 시각/).fill('2024-04-17T10:00');
+  await expect(drawer.getByLabel(/^대상 상품/)).toHaveValue('');
+  await drawer.getByRole('checkbox', { name: '고객 식별정보를 제거한 발췌임을 확인했습니다.' }).check();
+  await drawer.getByRole('button', { name: '문의 저장', exact: true }).click();
+  await expect(page.getByText('과거 유료 교육 상담 · 이번 모집 성과에서 제외')).toBeVisible();
+  expect(state.mutations[0]).toMatchObject({ action: 'save_case', sample_origin: 'external_legacy',
+    legacy_course_label: '과거 온라인 마케팅 교육', course_id: null, cohort_id: null });
+});
+
+test('mock recommendation can be edited and held as review records without sending any message', async ({ page }) => {
+  const state = await fixture(page);
+  await selectAndAnalyze(page);
+  await expect(page.getByText('모의 결과 · 직원 확인 필요', { exact: true })).toBeVisible();
+  await page.getByLabel(/^검토 결정/).selectOption('edit');
+  await page.getByLabel(/^고객에게 보낼 답변 초안/).fill('수강 수준은 안내 가능하며 녹화 제공 여부는 추가 확인이 필요합니다.');
+  await page.getByLabel(/^검토 사유/).fill('녹화 제공 자료가 아직 없습니다.');
+  await page.getByRole('button', { name: '직원 승인 기록', exact: true }).click();
+  await expect(page.locator('.conversion-record')).toHaveCount(1);
+  await expect(page.locator('.conversion-record')).toContainText('수정');
+  await expect(page.locator('.conversion-record')).toContainText('미발송');
+  await page.getByLabel(/^검토 결정/).selectOption('hold');
+  await page.getByLabel(/^검토 사유/).fill('운영 확인을 기다립니다.');
+  await page.getByRole('button', { name: '보류 기록', exact: true }).click();
+  await expect(page.locator('.conversion-record')).toHaveCount(2);
+  expect(state.mutations.map(item => item.action)).toEqual(['analyze', 'review', 'review']);
+  expect(state.mutations[1].decision).toBe('edit');
+  expect(state.mutations[2].decision).toBe('hold');
+  expect(state.unexpectedApi).toEqual([]);
+  await expect(page.getByText('직원이 보류로 기록했습니다. 고객에게 메시지를 보내지 않았습니다.', { exact: true })).toBeVisible();
+});
+
+test('changed evidence invalidates the old recommendation and disables review saving', async ({ page }) => {
+  const state = await fixture(page);
+  await selectAndAnalyze(page);
+  state.snapshot.evidence[0].version = 2;
+  state.snapshot.evidence[0].body = '승인 문구가 변경된 합성 자료입니다.';
+  await page.getByRole('button', { name: '새로고침', exact: true }).click();
+  await expect(page.getByRole('alert')).toHaveText('문의나 설명자료가 바뀌었습니다. 새로 판단한 뒤 검토 기록을 남겨 주세요.');
+  await expect(page.getByRole('button', { name: '보류 기록', exact: true })).toBeDisabled();
+  await expect(page.getByLabel(/^고객에게 보낼 답변 초안/)).toBeDisabled();
+  expect(state.mutations.map(item => item.action)).toEqual(['analyze']);
+});
+
+test('lost read access clears previously loaded inquiry and draft data', async ({ page }) => {
+  const state = await fixture(page);
+  await selectAndAnalyze(page);
+  state.deny();
+  await page.getByRole('button', { name: '새로고침', exact: true }).click();
+  await expect(page.getByRole('alert')).toHaveText('전환 관리 접근 권한이 없습니다.');
+  await expect(page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ })).toHaveCount(0);
+  await expect(page.getByLabel(/^고객에게 보낼 답변 초안/)).toHaveCount(0);
+  await expect(page.getByText(initialCase.content, { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true })).toHaveCount(0);
+});
+
+test('review and manual-entry drawer fit the viewport without horizontal overflow', async ({ page }) => {
+  await fixture(page);
+  await selectAndAnalyze(page);
+  const noOverflow = async () => {
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  };
+  await noOverflow();
+  await page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true }).click();
+  await expect(page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: '카톡 문의 붙여넣기', exact: true }) })).toBeVisible();
+  await noOverflow();
+});
+
+test('room settings save separately from product mapping and changing recruitment cannot overwrite prior rooms', async ({page}) => {
+  const state=await fixture(page); state.snapshot.capabilities.can_manage_funnel=true;
+  await page.route('**/api/conversion/funnel', route=>route.fulfill({json:{draft:null,measurement:'unverified'}}));
+  await page.route('**/api/conversion/links**',route=>route.fulfill({json:{link:null,counts:{paid:0,organic:0}}}));
+  const records: Record<string, Record<string, unknown>>={};
+  let writes=0;
+  await page.route('**/api/conversion/rooms**', async route=>{
+    if(route.request().method()==='GET') return route.fulfill({json:{draft:records[new URL(route.request().url()).searchParams.get('period')!]??null}});
+    const body=route.request().postDataJSON(); expect(body.requestId).toMatch(/^[a-f0-9-]{36}$/); expect(body.expected_version).toBe(0);
+    records[body.period]={period_id:body.period,version:1,settings:body.settings};writes++;
+    return route.fulfill({json:{draft:records[body.period]}});
+  });
+  await page.getByRole('button',{name:'새로고침',exact:true}).click();
+  await page.getByRole('button',{name:'모집 경로 준비',exact:true}).click();
+  await page.getByRole('button',{name:'모집별 카톡방 관리',exact:true}).click();
+  await page.getByRole('button',{name:'모집 방 설정 불러오기',exact:true}).click();
+  await page.getByLabel('모집 이름',{exact:true}).fill('Synthetic recruitment');
+  await page.getByLabel('오가닉 오픈채팅방 주소',{exact:true}).fill('https://open.kakao.com/o/organicTest');
+  await page.getByLabel('광고 오픈채팅방 주소',{exact:true}).fill('https://open.kakao.com.evil.test/o/paidTest');
+  await page.getByRole('button',{name:'모집 방 설정 저장',exact:true}).click();
+  await expect(page.getByText('https://open.kakao.com/o/... 형식의 방 주소를 입력해 주세요.',{exact:true})).toBeVisible();
+  expect(writes).toBe(0);
+  await page.getByLabel('광고 오픈채팅방 주소',{exact:true}).fill('https://open.kakao.com/o/paidTest');
+  await page.getByRole('button',{name:'모집 방 설정 저장',exact:true}).click();
+  await expect(page.getByText('방 설정 버전 1 · moonshot-4',{exact:true})).toBeVisible();
+  await page.getByRole('textbox',{name:/^모집 구분 코드/}).fill('next-month');
+  await expect(page.getByRole('button',{name:'모집 방 설정 저장',exact:true})).toBeDisabled();
+  await page.getByRole('button',{name:'모집 방 설정 불러오기',exact:true}).click();
+  await expect(page.getByLabel('오가닉 오픈채팅방 주소',{exact:true})).toHaveValue('');
+  await page.getByRole('textbox',{name:/^모집 구분 코드/}).fill('moonshot-4');
+  await page.getByRole('button',{name:'모집 방 설정 불러오기',exact:true}).click();
+  await expect(page.getByLabel('광고 오픈채팅방 주소',{exact:true})).toHaveValue('https://open.kakao.com/o/paidTest');
+  expect(writes).toBe(1);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
+});
+
+
+test('recruitment links activate explicitly, show distinct channel URLs and stop without losing counts',async({page})=>{
+ const state=await fixture(page);state.snapshot.capabilities.can_manage_funnel=true;
+ await page.route('**/api/conversion/funnel',route=>route.fulfill({json:{draft:null}}));
+ await page.route('**/api/conversion/rooms**',route=>route.fulfill({json:{draft:{version:1,settings:{label:'Synthetic',organicUrl:'https://open.kakao.com/o/organicTest',paidUrl:'https://open.kakao.com/o/paidTest',paidMode:'undecided'}}}}));
+ const mutations: Record<string,unknown>[]=[];
+ let link:{id:string;room_version:number;revision:number;enabled:boolean}|null=null;
+ await page.route('**/api/conversion/links**',async route=>{
+  if(route.request().method()==='POST') {const body=route.request().postDataJSON();mutations.push(body);expect(body.period).toBe('moonshot-4');expect(body.version).toBe(1);expect(body.expected).toBe(link?.revision??0);link={id:courseId,room_version:1,revision:(link?.revision??0)+1,enabled:body.enabled};}
+  return route.fulfill({json:{link,counts:{paid:2,organic:1}}});
+ });
+ await page.getByRole('button',{name:'새로고침',exact:true}).click();
+ await page.getByRole('button',{name:'모집 경로 준비',exact:true}).click();
+ await page.getByRole('button',{name:'모집별 카톡방 관리',exact:true}).click();
+ await page.getByRole('button',{name:'모집 방 설정 불러오기',exact:true}).click();
+ await expect(page.getByRole('button',{name:'저장된 방으로 링크 활성화',exact:true})).toBeEnabled();
+ expect(mutations).toHaveLength(0);
+ await page.getByRole('button',{name:'저장된 방으로 링크 활성화',exact:true}).click();
+ await expect(page.getByLabel('광고용 모집 링크',{exact:true})).toHaveValue(new RegExp('/join/'+courseId+'/paid$'));
+ await expect(page.getByLabel('오가닉용 모집 링크',{exact:true})).toHaveValue(new RegExp('/join/'+courseId+'/organic$'));
+ await page.getByRole('button',{name:'모집 링크 중지',exact:true}).click();
+ await expect(page.getByText('링크 상태: 중지 · 연결된 방 버전 1',{exact:true})).toBeVisible();
+ await expect(page.getByText('전체 방 버전의 이동 버튼 클릭 기록 — 광고용 링크 2회 · 오가닉용 링크 1회',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'링크·클릭 기록 새로고침',exact:true}).click();
+ await expect(page.getByRole('button',{name:'모집 링크 중지',exact:true})).toBeDisabled();
+ expect(mutations.map(m=>m.enabled)).toEqual([true,false]);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
+});
+
+test('integrated workspace separates inquiry review from recruitment and removes duplicate mapping draft', async ({ page }) => {
+  await fixture(page);
+  await page.goto('/admin/conversion?workspace=1');
+  await expect(page.getByRole('heading', { name: '모집 운영', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '모집 경로 초안 저장', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true })).not.toBeVisible();
+  await page.getByRole('button', { name: '구매 전 문의 검토', exact: true }).click();
+  await expect(page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true })).toBeVisible();
+  await expect(page.getByText('초보 수강과 녹화 문의', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '모집 설정·구매·후속 안내', exact: true }).click();
+  await expect(page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true })).not.toBeVisible();
+});

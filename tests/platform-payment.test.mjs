@@ -70,6 +70,16 @@ test('a confirmed provider failure marks the pending order failed so its coupon 
   assert.equal((await handler(request())).status, 409);
   assert.deepEqual(updates, [{ status: 'payment_failed' }]);
 });
+test('provider server failure keeps the pending order retryable', async () => {
+  const updates = [];
+  const handler = paymentHandler({
+    order: { id: 'order', total_amount: 1000, status: 'pending' },
+    updates,
+    provider: async () => Response.json({ code: 'PROVIDER_ERROR' }, { status: 503 }),
+  });
+  assert.equal((await handler(request())).status, 409);
+  assert.deepEqual(updates, []);
+});
 test('an already processed payment is fetched and finalized without a second approval', async () => {
   const finalized = [];
   const requests = [];
@@ -107,4 +117,19 @@ test('a database finalization failure is retryable and does not expose provider 
   const response = await handler(request());
   assert.equal(response.status, 503);
   assert.deepEqual(await response.json(), { error: '결제 승인 후 수강권 확인 중입니다. 새로고침해 다시 확인해 주세요.' });
+});
+test('a verified virtual account issuance is recorded without granting enrollment', async () => {
+  const finalized = [];
+  const providerData = {
+    orderId: 'BAE-1', totalAmount: 1000, status: 'WAITING_FOR_DEPOSIT', currency: 'KRW',
+    paymentKey: 'test-payment', method: '가상계좌',
+    virtualAccount: { accountNumber: '1234567890', bankCode: '88', customerName: '테스트', dueDate: '2026-09-21T12:00:00+09:00' },
+  };
+  const handler = paymentHandler({ order: { id: 'order', total_amount: 1000, status: 'pending' }, finalized, provider: async () => Response.json(providerData) });
+  const response = await handler(request());
+  assert.equal(response.status, 200);
+  assert.equal(finalized[0][0], 'record_toss_waiting_payment');
+  assert.equal(finalized[0][1].p_amount, 1000);
+  assert.equal(finalized[0][1].p_expires_at, providerData.virtualAccount.dueDate);
+  assert.equal((await response.json()).status, 'waiting_for_deposit');
 });

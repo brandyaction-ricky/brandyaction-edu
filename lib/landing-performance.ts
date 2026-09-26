@@ -9,20 +9,21 @@ export type PerformanceCourse = {
 export type PerformanceCampaign = {
   id: string; landing_id: string; name: string; utm_campaign: string; start_day: string; end_day: string;
   new_customer_price: number; existing_customer_price: number; live_peak: number | null;
+  uses_ads: boolean;
   meta_ad_account_id: string | null; meta_campaign_id: string | null; meta_campaign_ids?: string[] | null;
   meta_sync_status: 'not_configured' | 'idle' | 'syncing' | 'success' | 'failed';
-  meta_last_synced_at: string | null; meta_sync_error: string | null;
+  meta_last_synced_at: string | null; meta_sync_attempted_at?: string | null; meta_sync_error: string | null;
 };
 export type MetricSummary = {
   has_data: boolean; sessions: number; visitors: number; cta_click_sessions: number; cta_clicks: number;
   converted_visitors: number; avg_dwell_ms: number | null; avg_scroll_depth: number | null;
-  meta_impressions: number; meta_link_clicks: number; spend: number;
+  meta_impressions: number; meta_link_clicks: number; meta_registrations?: number; spend: number;
 };
 export type PerformanceRow = {
   campaign: string; adset: string; creative: string; ad_type: 'cold' | 'retarget' | 'unclassified';
   sessions: number; visitors: number; cta_click_sessions: number; cta_clicks: number;
   avg_scroll_depth: number | null; avg_dwell_ms: number | null;
-  impressions: number; link_clicks: number; spend: number;
+  impressions: number; link_clicks: number; spend: number; registrations: number; registration_cost: number | null;
 };
 export type ActualRow = {
   campaign_id: string; day: string; kakao_members: number | null; new_payments: number | null;
@@ -35,7 +36,7 @@ export type DashboardReport = {
     last_collected_at: string | null;
     actual_presence: { new_payments: boolean; existing_payments: boolean } | null;
     previous_day_members: Record<string, number | null>;
-    period_actuals?: { kakao_members: number | null; kakao_day: string | null; payments: number | null } | null;
+    period_actuals?: { kakao_members: number | null; kakao_delta: number | null; kakao_day: string | null; baseline_day: string; payments: number | null } | null;
     errors: { trend?: string; collection?: string; actuals?: string };
   };
   campaign: PerformanceCampaign; summary_b: MetricSummary; summary_a: MetricSummary | null;

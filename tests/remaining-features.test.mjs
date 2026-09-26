@@ -74,7 +74,8 @@ test("CRM delivery and scheduler are fail-closed without explicit secrets", () =
   const delivery = source("lib/crm-delivery.ts");
   const cron = source("app/api/cron/crm/route.ts");
   assert.match(delivery, /CRM_DELIVERY_ENABLED !== ['"]true['"]/);
-  assert.match(delivery, /marketing_consent === true/);
+  assert.match(delivery, /hasCurrentMarketingConsent\(member, now\)/);
+  assert.match(delivery, /marketing_consent_at/);
   assert.match(delivery, /limit\(501\)/);
   assert.match(source("app/api/platform/workflows/route.ts"), /['"]crm-save['"]/);
   assert.match(cron, /CRON_SECRET/);

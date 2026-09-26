@@ -57,19 +57,60 @@ test('final design styles are isolated, reproducible and exclude prototype runti
     assert.equal(read(`app/ui/final/${area}.css`), `/* Generated from final UIUX source; run node scripts/build-uiux-css.mjs. */\n${rules.toString()}\n`);
   }
   const layout = read('app/layout.tsx');
-  assert.ok(layout.includes('./ui/final/frontend.css') && layout.includes('./ui/final/admin.css'));
+  assert.ok(layout.includes('./ui/final/frontend.css') && layout.includes('./ui/final/admin.css') && layout.includes('@/features/admin-ui/styles/admin-system.css'));
   assert.doesNotMatch(layout, /ui\/(design|platform)\.css/);
   for (const file of fs.readdirSync(path.join(root, 'app/ui/final')).filter(file => file.endsWith('.tsx'))) assert.doesNotMatch(read('app/ui/final/' + file), /dangerouslySetInnerHTML|design-reference\/source|data-demo=/);
 });
-test('five admin categories and scoped navigation render from the final shell', () => {
-  const { AdminShell, finalAdminGroups, Overview } = load('app/ui/final/admin-shell.tsx');
+test('admin controls, date filters and data tables share consistent sizing', () => {
+  const system = read('app/ui/final/admin-system.css');
+  const admin = read('app/ui/final/admin.css');
+  const tracking = read('app/ui/landing/tracking-admin.css');
+  assert.match(system, /--admin-control-height:40px/);
+  assert.match(system, /--admin-control-height-sm:36px/);
+  assert.match(system, /--admin-table-head-height:44px/);
+  assert.match(system, /--admin-table-row-height:44px/);
+  assert.match(admin, /\.edu-admin \.date-range input\[type=date\]\{[^}]*height:40px;min-height:40px/);
+  assert.match(admin, /\.edu-admin \.date-range>\.btn\{height:40px;min-height:40px/);
+  assert.match(admin, /\.edu-admin button:focus-visible[^}]*outline:2px solid var\(--ba-info\);outline-offset:2px/);
+  assert.match(tracking, /\.edu-admin \.tracking-inline-select\{[^}]*height:40px;min-height:40px/);
+});
+
+test('five admin categories and scoped navigation render from the admin UI feature', () => {
+  const { AdminShell, adminNavigationIcon, finalAdminGroups } = load('features/admin-ui.ts');
+  const { Overview } = load('app/ui/final/admin-shell.tsx');
   assert.equal(finalAdminGroups.length, 5);
-  const props = { current: 'overview', available: platform.sections, user: { ...user, role: 'admin' }, data, mobile: false, setMobile() {}, logout: async () => {} };
+  const props = { current: 'overview', available: platform.sections, user: { ...user, role: 'admin' }, pendingReviews: 1, mobile: false, setMobile() {}, logout: async () => {} };
   const markup = html(AdminShell, { ...props, children: React.createElement(Overview, { data, available: platform.sections }) });
   for (const [label] of finalAdminGroups) assert.ok(markup.includes(label));
   assert.match(markup, /class="nav-group"/); assert.match(markup, /lucide/); assert.match(markup, /category-strip/);
+  const expectedIcons = {
+    products: 'book-open', cohorts: 'calendar-days', learning: 'book-open', weeks: 'book-open',
+    contents: 'film', missions: 'book-open', members: 'users-round', reviews: 'square-check',
+    questions: 'message-circle', customers: 'users-round', tags: 'users-round', coupons: 'layout-grid',
+    'product-reviews': 'message-circle', banners: 'layout-grid', articles: 'file-pen-line',
+    testimonials: 'message-circle', orders: 'receipt-text', conversion: 'message-circle',
+    landing: 'chart-line', analytics: 'chart-line',
+    campaigns: 'layout-grid',
+    templates: 'layout-grid', automations: 'layout-grid', seo: 'settings', settings: 'settings', staff: 'shield-check',
+  };
+  for (const [key, icon] of Object.entries(expectedIcons)) {
+    assert.ok(adminNavigationIcon(key));
+    assert.match(markup, new RegExp(`href="/admin/${key}"[\\s\\S]*?lucide-${icon}`), key);
+  }
   const restricted = html(AdminShell, { ...props, available: platform.sections.filter(row => row.key === 'products') });
   assert.doesNotMatch(restricted, /href="\/admin\/(questions|customers|members|orders)"/);
+});
+test('home customer stories carousel and accessible profile dropdown are present', () => {
+  const platformSource = read('app/ui/platform.tsx');
+  assert.match(platformSource, /<StoryCarousel stories=\{rows\("review_videos"\)\} \/>/);
+  assert.match(platformSource, /aria-label="내 프로필 메뉴"/);
+  assert.match(platformSource, /aria-expanded=\{profileMenuOpen\}/);
+  for (const href of ['/my', '/my/profile', '/my/coupons', '/my/orders', '/my/classes'])
+    assert.ok(platformSource.includes(`href="${href}"`));
+  assert.match(read('app/ui/final/story-carousel.tsx'), /이전 고객 이야기[\s\S]*다음 고객 이야기/);
+  const frontendCss = read('app/ui/final/frontend.css');
+  assert.match(frontendCss, /\.edu-front \.profile-menu\{position:absolute;/);
+  assert.doesNotMatch(frontendCss, /\.edu-front \.edu-front \.profile-menu/);
 });
 test('three signup methods and product detail variants use the final publishing structures', () => {
   const { AuthView, ProductDetail, ArticlesView, StoriesView } = load('app/ui/final/public-views.tsx');
@@ -182,6 +223,9 @@ test('classroom, mission, checkout and completion preserve authorized workflow e
   const checkout = html(Checkout, { data, user, send, pending: false });
   assert.match(checkout, /checkout-layout/);
   assert.match(checkout, /<button[^>]*disabled=""[^>]*aria-describedby="checkout-agreement-help"[^>]*>[^<]*결제하기/s);
+  assert.match(checkout, /value="CARD"/);
+  assert.match(checkout, /value="VIRTUAL_ACCOUNT"/);
+  assert.match(checkout, /입금 확인 후 수강권/);
   assert.match(read('app/api/platform/route.ts'), /paidCourseReadinessIssues[\s\S]*판매 준비가 완료되지 않았습니다/);
   search = new URLSearchParams('order=order');
   const { OrderResult } = load('app/ui/order-result.tsx');
@@ -227,6 +271,9 @@ test('catalogues and separate editors render without dropping existing fields', 
   assert.match(learning, /learning-layout/); assert.match(learning, /학습 구성/); assert.match(learning, /lesson-list-item/);
   const missions = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'missions') });
   assert.match(missions, /mission-week-pills/); assert.match(missions, /일차별 미션/); assert.match(missions, /mission-row/);
+  assert.match(missions, /콘텐츠 편집/); assert.match(missions, /learning-editor\?id=lesson/);
+  const questionMarkup = html(AdminCatalog, { ...props, data: { ...data, edu_questions: [{ id: 'question', title: '답변 필요한 질문', content: '질문 내용', answer: null, status: 'open', created_at: '2026-09-24' }] }, section: platform.sections.find(row => row.key === 'questions') });
+  assert.match(questionMarkup, /question-admin-card/); assert.match(questionMarkup, /답변하기/);
   const customers = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'customers') });
   assert.match(customers, /마케팅 수신 동의/); assert.match(customers, /수강 중인 클래스/); assert.match(customers, /전체 클래스/);
   const { ProductEditor } = load('app/ui/final/admin-editors.tsx');
@@ -267,10 +314,17 @@ test('catalogues and separate editors render without dropping existing fields', 
   assert.match(platformSource, /cachedAdminUser: User \| null/);
   assert.match(platformSource, /initialUser \|\| \(admin \? cachedAdminUser : null\)/);
   assert.match(platformSource, /if \(admin\) cachedAdminUser = result\.user/);
-  assert.match(pageSource, /root === 'admin' \? 'admin' : path\.join\('\/'\)/);
+  assert.doesNotMatch(pageSource, /<Platform[^>]*\bkey=/);
+  assert.match(pageSource, /<Platform path=\{path\} user=\{null\}\/>/);
   assert.match(read('design-reference/source/admin/src/experience.css'), /\.metric-value small\{display:inline-block;margin-left:var\(--space-1\)\}/);
   for (const field of platform.sections.find(row => row.key === 'products').fields.filter(field => !['slug', 'course_code', 'seo_title', 'seo_description', 'detail_html'].includes(field.key))) assert.ok(markup.includes(`name="${field.key}"`), field.key);
-  assert.match(html(LearningEditor, { data, row: lesson, pending: false, send, back() {} }), /editor-/);
+  const learningMarkup = html(LearningEditor, { data, row: lesson, pending: false, send, back() {} });
+  assert.match(learningMarkup, /editor-/); assert.doesNotMatch(learningMarkup, /통과 기준|name="pass_percent"/);
+  assert.match(platformSource, /AI 답변 생성/); assert.match(platformSource, /답변 등록/);
+  assert.match(platformSource, /answer-draft/);
+  assert.match(read('app/ui/final/integration.css'), /\.participant-card-summary/);
+  assert.match(read('app/ui/final/integration.css'), /\.question-answer-editor/);
+  assert.match(read('app/ui/admin-workflows.tsx'), /aria-expanded=\{expanded\}[\s\S]*?participant-day-card/);
 });
 test('submission review keeps queue and inspector, escaping text and unsafe links', () => {
   const { SubmissionReview } = load('app/ui/final/submission-review.tsx');
@@ -278,6 +332,35 @@ test('submission review keeps queue and inspector, escaping text and unsafe link
   for (const className of ['review-shell', 'queue', 'review-main', 'answers', 'inspector']) assert.ok(markup.includes(`class="${className}"`));
   assert.match(markup, /&lt;script&gt;/); assert.doesNotMatch(markup, /href="javascript:/);
   assert.match(markup, /승인 후 다음/); assert.match(markup, /최대 50건/);
+});
+
+test('mission ownership controls and archive states remain explicit', () => {
+  const { MissionTargetFields } = load('app/ui/final/mission-target-fields.tsx');
+  const extra = { ...data, courses: [...data.courses, { id: 'other-course', title: '다른 상품' }], curriculum_weeks: [...data.curriculum_weeks, { id: 'other-week', course_id: 'other-course', week_number: 1 }], curriculum_lessons: [...data.curriculum_lessons, { id: 'other-lesson', week_id: 'other-week', title: '다른 상품 학습' }] };
+  const target = html(MissionTargetFields, { data: extra, context: { courseId: 'course', weekId: 'week' } });
+  assert.match(target, /첫 번째 학습/);
+  assert.doesNotMatch(target, /다른 상품 학습/);
+  const edit = html(MissionTargetFields, { data: extra, row: mission });
+  assert.match(edit, /id="mission-course"[^>]*disabled/);
+  const { AdminCatalog } = load('app/ui/final/admin-catalog.tsx');
+  const props = { section: platform.sections.find(item => item.key === 'missions'), data: { ...data, curriculum_missions: [{ ...mission, is_published: false, archived_at: '2026-09-25' }] }, selection: [], setSelection() {}, edit() {}, archive() {}, pending: false, loading: false, pagination: null, setPage() {}, exportCsv() {}, send };
+  const active = html(AdminCatalog, props);
+  assert.match(active, /보관된 미션만 있습니다/);
+  assert.doesNotMatch(active, /class="mission-row/);
+  const archived = html(AdminCatalog, { ...props, missionScope: { courseId: '', weekId: '', state: 'archived' } });
+  assert.match(archived, /비공개로 복구/);
+  assert.doesNotMatch(archived, />미션 설정</);
+});
+
+test('reviewed submissions do not show unchecked temporary approval checks', () => {
+  const { SubmissionReview } = load('app/ui/final/submission-review.tsx');
+  const reviewed = { ...submission, status: 'approved', reviewed_at: '2026-09-25T00:00:00Z', reviewer_feedback: '기존 피드백 유지' };
+  search = new URLSearchParams({ submission: reviewed.id });
+  const markup = html(SubmissionReview, { data: { ...data, mission_submissions: [reviewed] }, pending: false, send });
+  search = new URLSearchParams();
+  assert.match(markup, /저장하지 않았던 항목은 기록 없음으로 구분/);
+  assert.match(markup, /기존 피드백 유지/);
+  assert.doesNotMatch(markup, /이번 검토 전 확인|필수 답변이 모두 작성됨/);
 });
 test('participant matrix uses latest attempts, required missions and enrollment boundaries', () => {
   const { participantMatrix } = load('lib/participant-matrix.ts');

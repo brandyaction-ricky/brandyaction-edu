@@ -3,11 +3,18 @@
 import { labels, object, safeUrl, text as t, type Row } from "@/lib/platform";
 import { ArrowRight, Check } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import Link from "next/link";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useUnsavedWarning } from '@/features/admin-ui';
+import { emptyReviewChecks, reviewCheckItems, type ReviewChecks, type ReviewHistory } from '@/lib/submission-review';
 import { timeLabel, type Data, type WorkflowSend } from "../learning-workflows";
 import { Badge, Empty } from "./primitives";
+import { readReviewHistory, SubmissionReviewHistory } from './submission-review-history';
 
 type Submission = Row & { member?: Row; mission?: Row; course?: Row };
+type Draft = { feedback: string; checks: ReviewChecks };
+const emptyDraft = (): Draft => ({ feedback: '', checks: emptyReviewChecks() });
+const hasDraft = (draft?: Draft) => !!draft && (!!draft.feedback || reviewCheckItems.some(item => draft.checks[item.key]));
 const name = (row?: Row) =>
   t(row, "title") || t(row, "full_name") || t(row, "email");
 const states = [
@@ -29,29 +36,40 @@ export function SubmissionReview({
 }) {
   const params = useSearchParams();
   const [status, setStatus] = useState(
-    params.get("submission") ? "" : "submitted",
+    params.get("submission") || params.get("member") ? "" : "submitted",
   );
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("old");
   const [currentId, setCurrentId] = useState(params.get("submission") || "");
   const [selected, setSelected] = useState<string[]>([]);
   const [message, setMessage] = useState("");
+  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  const [bulkFeedback, setBulkFeedback] = useState('');
+  const [latest, setLatest] = useState<Record<string, Partial<Submission>>>({});
+  const [historyRevision, setHistoryRevision] = useState(0);
+  const [recheckIds, setRecheckIds] = useState<string[]>([]);
+  const [bulkRecheckIds, setBulkRecheckIds] = useState<string[]>([]);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const notice = useRef<HTMLParagraphElement>(null);
+  const focusAfterSave = useRef(false);
+  useUnsavedWarning(pending || !!bulkFeedback || Object.values(drafts).some(hasDraft));
   const enriched: Submission[] = (data.mission_submissions || []).map(
     (submission) => {
-      const enrollment = (data.enrollments || []).find(
+      const enrollment = (object(submission, 'enrollments').user_id ? object(submission, 'enrollments') : (data.enrollments || []).find(
         (row) => row.id === submission.enrollment_id,
-      );
+      )) as Row | undefined;
       return {
         ...submission,
-        member: (data.profiles || []).find(
+        ...latest[submission.id],
+        member: (object(enrollment, 'profiles').id ? object(enrollment, 'profiles') : (data.profiles || []).find(
           (row) => row.id === enrollment?.user_id,
-        ),
-        mission: (data.curriculum_missions || []).find(
+        )) as Row | undefined,
+        mission: (object(submission, 'curriculum_missions').id ? object(submission, 'curriculum_missions') : (data.curriculum_missions || []).find(
           (row) => row.id === submission.mission_id,
-        ),
-        course: (data.courses || []).find(
+        )) as Row | undefined,
+        course: (object(enrollment, 'courses').id ? object(enrollment, 'courses') : (data.courses || []).find(
           (row) => row.id === enrollment?.course_id,
-        ),
+        )) as Row | undefined,
       };
     },
   );
@@ -69,28 +87,66 @@ export function SubmissionReview({
         String(a.submitted_at).localeCompare(String(b.submitted_at)) *
         (sort === "old" ? 1 : -1),
     );
-  const current = list.find((row) => row.id === currentId) || list[0];
-  async function save(ids: string[], decision: string, feedback: string) {
-    await send(
-      { action: "review", ids, decision, feedback },
-      `${ids.length}건을 검토했습니다.`,
-    );
+  // A conflict refresh can move the selected row out of the pending filter.
+  // Keep its saved result and our unsaved draft visible until the operator moves on.
+  const current = enriched.find((row) => row.id === currentId) || list[0];
+  const draft = current ? drafts[current.id] || emptyDraft() : emptyDraft();
+  function updateDraft(id: string, change: Partial<Draft>) {
+    setDrafts(previous => ({ ...previous, [id]: { ...(previous[id] || emptyDraft()), ...change } }));
+  }
+  useEffect(() => {
+    if (focusAfterSave.current && !pending) { (heading.current || notice.current)?.focus(); focusAfterSave.current = false; }
+  }, [current?.id, pending, message]);
+  async function refreshResults(ids: string[]) {
+    const results: ReviewHistory[] = [];
+    for (let offset = 0; offset < ids.length; offset += 5) {
+      results.push(...await Promise.all(ids.slice(offset, offset + 5).map(id => readReviewHistory(id, 1, AbortSignal.timeout(15000)))));
+    }
+    setLatest(previous => ({ ...previous, ...Object.fromEntries(results.map(result => [result.current.id, result.current])) }));
+    setRecheckIds(previous => previous.filter(id => !ids.includes(id)));
+    setBulkRecheckIds(previous => previous.filter(id => !ids.includes(id)));
+    if (ids.length === 1) setCurrentId(ids[0]);
+    focusAfterSave.current = true;
+    setHistoryRevision(value => value + 1);
+    setMessage('최신 저장 결과를 확인했습니다. 내 미저장 내용은 자동으로 다시 저장되지 않습니다.');
+  }
+  async function save(ids: string[], decision: string, feedback: string, bulk = false) {
+    setMessage('');
+    if (ids.some(id => recheckIds.includes(id))) throw new Error('최신 결과를 먼저 확인해 주세요.');
+    try {
+      await send(
+        { action: "review", ids, decision, feedback, reviewMode: bulk ? 'bulk' : 'single', ...(bulk ? {} : { reviewChecks: (drafts[ids[0]] || emptyDraft()).checks }) },
+        `${ids.length}건을 검토했습니다.`,
+      );
+    } catch (error) {
+      setRecheckIds(previous => [...new Set([...previous, ...ids])]);
+      if (bulk) setBulkRecheckIds([...ids]);
+      throw error;
+    }
+    setDrafts(previous => Object.fromEntries(Object.entries(previous).filter(([id]) => !ids.includes(id))));
+    setLatest(previous => Object.fromEntries(Object.entries(previous).filter(([id]) => !ids.includes(id))));
+    if (bulk) setBulkFeedback('');
     setSelected([]);
     setMessage("검토 결과와 피드백을 저장했습니다.");
+    setHistoryRevision(value => value + 1);
+    focusAfterSave.current = true;
     if (current && ids.includes(current.id))
       setCurrentId(list.find((row) => !ids.includes(row.id))?.id || "");
   }
   return (
     <>
+      {(params.get('member') || params.get('submission')) && <p className="notice mb16">연결된 {params.get('submission') ? '제출물' : '회원'}만 조회 중입니다. <Link href="/admin/reviews" className="text-link">전체 검토 목록</Link></p>}
       <div className="tabs" aria-label="제출 상태">
         {states.map((value) => (
           <button
             key={value}
             className={"tab " + (status === value ? "active" : "")}
             aria-pressed={status === value}
+            disabled={pending}
             onClick={() => {
               setStatus(value);
               setSelected([]);
+              setCurrentId('');
             }}
           >
             {value ? labels[value] : "전체"}{" "}
@@ -106,12 +162,14 @@ export function SubmissionReview({
           type="search"
           placeholder="회원명 · 미션명 검색"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          disabled={pending}
+          onChange={(event) => { setQuery(event.target.value); setCurrentId(''); }}
         />
         <span className="spacer" />
         <select
           aria-label="제출물 정렬"
           value={sort}
+          disabled={pending}
           onChange={(event) => setSort(event.target.value)}
         >
           <option value="old">오래 기다린 순</option>
@@ -144,22 +202,26 @@ export function SubmissionReview({
           </button>
           <p className="meta mt16">
             목록에서 선택한 {selected.length}건에 같은 검토 결과와 피드백을
-            적용합니다.
+            적용합니다. 개별 체크는 저장하지 않고 일괄 처리로 기록합니다.
           </p>
           <DecisionForm
-            key={"bulk-" + selected.join(",")}
             pending={pending}
-            disabled={!selected.length}
-            onSave={(decision, feedback) => save(selected, decision, feedback)}
+            disabled={!selected.length || selected.some(id => enriched.find(row => row.id === id)?.status !== 'submitted')}
+            feedback={bulkFeedback}
+            onFeedback={setBulkFeedback}
+            needsRecheck={!!bulkRecheckIds.length || selected.some(id => recheckIds.includes(id))}
+            onRefresh={() => refreshResults(bulkRecheckIds.length ? bulkRecheckIds : selected)}
+            onSave={(decision, feedback) => save(selected, decision, feedback, true)}
             bulk
           />
         </div>
       </details>
       {message && (
-        <p className="notice mb24" role="status">
+        <p ref={notice} tabIndex={-1} className="notice review-result-notice mb24" role="status">
           {message}
         </p>
       )}
+      {(Object.values(drafts).some(hasDraft) || bulkFeedback) && <p className="notice mb16" role="status">저장하지 않은 검토 내용이 있습니다. 다른 제출물을 열어도 이 화면 안에서는 유지되며, 화면을 나가면 사라집니다.</p>}
       {current ? (
         <div className="review-shell">
           <aside className="queue" aria-label="제출물 목록">
@@ -193,6 +255,7 @@ export function SubmissionReview({
                     "queue-item " + (row.id === current.id ? "active" : "")
                   }
                   aria-pressed={row.id === current.id}
+                  disabled={pending}
                   onClick={() => setCurrentId(row.id)}
                 >
                   <div className="spread">
@@ -200,6 +263,7 @@ export function SubmissionReview({
                     <span className="meta">{t(row, "attempt_number")}차</span>
                   </div>
                   <p>{name(row.mission) || "미션"}</p>
+                  <p className="meta">{name(row.course)} · {t(row.member, 'email')}</p>
                   <div className="spread">
                     <Badge
                       color={
@@ -227,7 +291,7 @@ export function SubmissionReview({
                 <b>{name(current.member) || "회원"}</b>
                 <Badge>{labels[t(current, "status")]}</Badge>
               </div>
-              <h2>{name(current.mission) || "미션"}</h2>
+              <h2 ref={heading} tabIndex={-1}>{name(current.mission) || "미션"}</h2>
               <p className="meta mt8">
                 {name(current.course)} · {t(current, "attempt_number")}차 제출 ·{" "}
                 {timeLabel(current.submitted_at)}
@@ -270,11 +334,18 @@ export function SubmissionReview({
                     통과
                   </p>
                 )}
-                <h3>멘토 피드백</h3>
+                <SubmissionReviewHistory key={`history-${current.id}`} id={current.id} revision={historyRevision}/>
+                <h3 className="mt24">{current.status === 'submitted' ? '이번 검토 결정' : '저장된 멘토 피드백'}</h3>
                 {current.status === "submitted" ? (
                   <DecisionForm
                     key={current.id}
                     pending={pending}
+                    feedback={draft.feedback}
+                    onFeedback={feedback => updateDraft(current.id, { feedback })}
+                    checks={draft.checks}
+                    onChecks={checks => updateDraft(current.id, { checks })}
+                    needsRecheck={recheckIds.includes(current.id)}
+                    onRefresh={() => refreshResults([current.id])}
                     onSave={(decision, feedback) =>
                       save([current.id], decision, feedback)
                     }
@@ -285,21 +356,22 @@ export function SubmissionReview({
                       "등록된 피드백이 없습니다."}
                   </div>
                 )}
+                {current.status !== 'submitted' && hasDraft(draft) && <section className="review-unsaved mt24" aria-label="내 미저장 검토 내용">
+                  <h3>내 미저장 검토 내용</h3><p className="meta">저장 응답을 확인하지 못해 보관한 입력 내용입니다. 서버에 저장된 검토 결과를 덮어쓰지 않습니다.</p>
+                  <textarea readOnly rows={4} aria-label="내 미저장 피드백" value={draft.feedback}/>
+                  <ul>{reviewCheckItems.map(item => <li key={item.key}>{item.label} · {draft.checks[item.key] ? '확인' : '미확인'}</li>)}</ul>
+                  <button type="button" className="btn small" onClick={() => { if (window.confirm('내 미저장 검토 내용을 지울까요? 저장된 검토 결과는 바뀌지 않습니다.')) setDrafts(previous => Object.fromEntries(Object.entries(previous).filter(([id]) => id !== current.id))); }}>미저장 내용 지우기</button>
+                </section>}
               </div>
               <aside className="inspector">
-                <h3>승인 전 확인</h3>
-                <div className="review-checks" key={current.id}>
-                  {[
-                    "필수 답변이 모두 작성됨",
-                    "실행 결과와 증빙이 일치함",
-                    "미션의 완료 기준을 충족함",
-                  ].map((label) => (
-                    <label className="checkline" key={label}>
-                      <input type="checkbox" />
-                      <span>{label}</span>
-                    </label>
-                  ))}
-                </div>
+                {current.member?.id && <Link className="btn small mb16" href={`/admin/customers?member=${current.member.id}`}>회원 운영 정보 보기</Link>}
+                {current.status === "submitted" ? <>
+                  <h3>검토 대기</h3><p className="meta">답변과 증빙을 확인한 뒤 체크·피드백·결정을 함께 저장하세요. 확인하지 않은 체크가 승인을 자동으로 막지는 않습니다.</p>
+                </> : <>
+                  <h3>검토 기록</h3>
+                  <p>{labels[t(current, "status")]} · {current.reviewed_at ? timeLabel(current.reviewed_at) : "검토 시각 기록 없음"}</p>
+                  <p className="meta">검토 이력에서 당시 체크 결과를 확인하세요. 저장하지 않았던 항목은 기록 없음으로 구분합니다.</p>
+                </>}
                 <div className="divider" />
                 <h3>제출 정보</h3>
                 <div className="setting-line">
@@ -323,7 +395,7 @@ export function SubmissionReview({
                   </div>
                 </div>
                 <p className="meta">
-                  피드백과 상태는 기존 검토 API를 통해 함께 저장됩니다.
+                  검토 결과는 한 번만 처리되며 완료된 결과를 다시 덮어쓰지 않습니다.
                 </p>
               </aside>
             </div>
@@ -341,16 +413,30 @@ function DecisionForm({
   pending,
   disabled = false,
   bulk = false,
+  feedback,
+  onFeedback,
+  checks,
+  onChecks,
+  onRefresh,
+  needsRecheck,
 }: {
   onSave: (decision: string, feedback: string) => Promise<void>;
   pending: boolean;
   disabled?: boolean;
   bulk?: boolean;
+  feedback: string;
+  onFeedback: (value: string) => void;
+  checks?: ReviewChecks;
+  onChecks?: (value: ReviewChecks) => void;
+  onRefresh: () => Promise<void>;
+  needsRecheck: boolean;
 }) {
-  const [feedback, setFeedback] = useState("");
   const [message, setMessage] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  const saving = useRef(false);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (saving.current || pending || disabled || needsRecheck || refreshing) return;
     const decision =
       ((event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null)
         ?.value || "approved";
@@ -359,22 +445,31 @@ function DecisionForm({
       return;
     }
     setMessage("");
+    saving.current = true;
     try {
       await onSave(decision, feedback);
     } catch (error) {
-      setMessage((error as Error).message);
+      const problem = error as Error & { code?: string };
+      setMessage(problem.code === 'REVIEW_CONFLICT' ? '다른 운영자가 먼저 검토했습니다. 작성한 내용은 유지됩니다.' : problem.message || '저장 결과를 확인하지 못했습니다.');
+    } finally {
+      saving.current = false;
     }
   }
   return (
     <form onSubmit={submit}>
+      {checks && onChecks && <fieldset className="review-checks" disabled={pending || refreshing || needsRecheck}>
+        <legend>이번 검토 전 확인</legend><p className="meta">검토 결과와 함께 저장됩니다. 체크하지 않은 항목은 미확인으로 기록합니다.</p>
+        {reviewCheckItems.map(item => <label className="checkline" key={item.key}><input type="checkbox" checked={checks[item.key]} onChange={event => onChecks({ ...checks, [item.key]: event.target.checked })}/><span>{item.label}</span></label>)}
+      </fieldset>}
       <textarea
         className="mt8"
         rows={4}
         maxLength={2000}
         value={feedback}
+        disabled={pending || refreshing}
         aria-label={bulk ? "일괄 검토 피드백" : "멘토 피드백"}
         placeholder="잘한 점과 보완할 점을 구체적으로 남겨 주세요."
-        onChange={(event) => setFeedback(event.target.value)}
+        onChange={(event) => onFeedback(event.target.value)}
       />
       <p className="meta mt8">보완 요청과 반려 시 사유가 필요합니다.</p>
       {message && (
@@ -382,12 +477,20 @@ function DecisionForm({
           {message}
         </p>
       )}
+      {needsRecheck && <div className="notice mt8"><p>중복 저장을 막기 위해 최신 결과를 먼저 확인하세요. 미저장 내용은 자동으로 다시 전송되지 않습니다.</p>
+        <button type="button" className="btn small" disabled={refreshing || pending} onClick={async () => {
+          setRefreshing(true);
+          try { await onRefresh(); setMessage('최신 결과를 확인했습니다. 이미 처리된 건은 다시 검토할 수 없습니다.'); }
+          catch (error) { setMessage((error as Error).message); }
+          finally { setRefreshing(false); }
+        }}>{refreshing ? '최신 결과 확인 중…' : '최신 결과 확인'}</button>
+      </div>}
       <div className="review-actions">
         <button
           className="btn"
           name="decision"
           value="rejected"
-          disabled={pending || disabled}
+          disabled={pending || disabled || needsRecheck || refreshing}
         >
           반려
         </button>
@@ -395,7 +498,7 @@ function DecisionForm({
           className="btn danger"
           name="decision"
           value="changes_requested"
-          disabled={pending || disabled}
+          disabled={pending || disabled || needsRecheck || refreshing}
         >
           보완 요청
         </button>
@@ -403,7 +506,7 @@ function DecisionForm({
           className="btn primary"
           name="decision"
           value="approved"
-          disabled={pending || disabled}
+          disabled={pending || disabled || needsRecheck || refreshing}
         >
           <Check />
           {bulk ? "선택 제출 승인" : "승인 후 다음"}

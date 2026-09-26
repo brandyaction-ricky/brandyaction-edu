@@ -2,12 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
+import { submissionReview } from './helpers/submission-review.mjs';
 
 function load(path, dependencies = {}) {
   const source = fs.readFileSync(new URL('../' + path, import.meta.url), 'utf8');
   const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const exports = {};
-  new Function('exports', 'require', compiled)(exports, name => { if (!(name in dependencies)) throw Error(name); return dependencies[name]; });
+  new Function('exports', 'require', compiled)(exports, name => { if (name === '@/lib/submission-review') return submissionReview; if (!(name in dependencies)) throw Error(name); return dependencies[name]; });
   return exports;
 }
 const rules = load('lib/qa-rules.ts');
@@ -45,6 +46,15 @@ test('F-03 no admin screen downloads raw journey events', () => {
   assert.deepEqual(rules.adminTables.analytics, []);
   assert.deepEqual(rules.adminTables.banners, ['site_banners']);
   assert.deepEqual(rules.adminTables.articles, ['articles', 'article_categories', 'site_settings']);
+});
+test('admin list APIs only load screen dependencies and lightweight relation fields', () => {
+  assert.deepEqual(rules.adminTables.questions, ['edu_questions']);
+  assert.equal(rules.adminSelectColumns('questions', 'edu_questions'), 'id,user_id,course_id,title,content,answer,status,is_archived,created_at,updated_at,profiles(id,full_name,email),courses(id,title)');
+  assert.equal(rules.adminSelectColumns('orders', 'courses'), 'id,title,status,category,list_price,archived_at,display_order,created_at,updated_at');
+  assert.equal(rules.adminSelectColumns('orders', 'orders'), 'id,order_number,user_id,status,subtotal,discount_amount,total_amount,customer_name,customer_email,customer_phone,created_at');
+  assert.equal(rules.adminSelectColumns('orders', 'order_items'), 'id,order_id,course_id,cohort_id,item_name,unit_price');
+  assert.equal(rules.adminSelectColumns('orders', 'enrollments'), 'id,order_item_id,status');
+  assert.equal(rules.adminSelectColumns('products', 'courses'), '*');
 });
 test('F-04 status reflects expired recruitment, ended operation, scheduled start and override', () => {
   const now = Date.parse('2026-09-11T00:00:00Z');
@@ -94,12 +104,19 @@ function handler(user, database) {
     '@/lib/product-metadata': load('lib/product-metadata.ts', { './platform': platform, './product-conversion': load('lib/product-conversion.ts'), './product-html-document': load('lib/product-html-document.ts') }),
     '@/lib/edu-settings': { getEduSettings: async () => ({ operations: {} }) },
     '@/lib/mission-quiz': {}, '@/lib/legal-policies': { POLICY_VERSION: 'test' },
-    '@/lib/operator-permissions': { getOperatorUser: async () => user?.role === 'admin' ? user : null, permissionsFor: async value => ({ products: value?.role === 'admin', members: value?.role === 'admin', orders: value?.role === 'admin', content: value?.role === 'admin', marketing: value?.role === 'admin' }), sectionScopes: { cohorts: 'products', testimonials: 'content', products: 'products' } },
+    '@/lib/operator-permissions': { getOperatorUser: async () => user?.role === 'admin' ? user : null, permissionsFor: async value => ({ products: value?.role === 'admin', members: value?.role === 'admin', orders: value?.role === 'admin', content: value?.role === 'admin', marketing: value?.role === 'admin' }), sectionScopes: { cohorts: 'products', testimonials: 'content', products: 'products', reviews: 'members' } },
     '@/lib/crm-delivery': { crmDeliveryState: () => ({ enabled: false, configured: false }) },
   });
 }
 const request = body => new Request('https://example.com/api/platform', { method: 'POST', headers: { origin: 'https://example.com', 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 const admin = { id: crypto.randomUUID(), role: 'admin' };
+test('generic review save shares the checklist contract and preserves conflict codes', async () => {
+  const calls = [];
+  const h = handler(admin, { rpc: async (name, params) => { calls.push({ name, params }); return { error: { code: 'PT409' } }; } });
+  const response = await h.POST(request({ action: 'save', section: 'reviews', id: crypto.randomUUID(), values: { status: 'approved', reviewer_feedback: '검토' }, reviewMode: 'single', reviewChecks: submissionReview.emptyReviewChecks() }));
+  assert.equal(response.status, 409); assert.equal((await response.json()).code, 'REVIEW_CONFLICT');
+  assert.equal(calls.length, 1); assert.equal(calls[0].name, 'review_mission_submissions_with_checks'); assert.equal(calls[0].params.p_actor, admin.id);
+});
 test('F-06/F-09/F-15 invalid capacity, phone and image are rejected before DB writes', async () => {
   const h = handler(admin, { from: () => { throw Error('must not write'); } });
   for (const body of [

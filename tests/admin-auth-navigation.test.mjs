@@ -2,17 +2,28 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
+import { submissionReview } from './helpers/submission-review.mjs';
 
 function load(path, dependencies = {}) {
   const code = ts.transpileModule(fs.readFileSync(new URL('../' + path, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const exports = {};
   new Function('exports', 'require', code)(exports, name => {
+    if (name === '@/lib/submission-review') return submissionReview;
     if (!(name in dependencies)) throw Error(name);
     return dependencies[name];
   });
   return exports;
 }
 const platform = load('lib/platform.ts');
+const { isAdminRoute } = load('lib/admin-route.ts', { './platform': platform });
+test('persistent admin workspace accepts registered routes only, including legacy redirect', () => {
+  for (const section of platform.sections) assert.equal(isAdminRoute(['admin', section.key]), true);
+  assert.equal(isAdminRoute(['admin']), true);
+  assert.equal(isAdminRoute(['admin', 'product-editor']), true);
+  assert.equal(isAdminRoute(['admin', 'learning-editor']), true);
+  assert.equal(isAdminRoute(['admin', 'metrics']), true);
+  for (const path of [['my'], ['admin', 'unknown'], ['admin', 'landing', 'extra']]) assert.equal(isAdminRoute(path), false);
+});
 const scopes = load('lib/operator-scopes.ts');
 const admin = { id: '12345678-1234-1234-1234-123456789012', role: 'admin', status: 'active', email: 'admin@example.test' };
 

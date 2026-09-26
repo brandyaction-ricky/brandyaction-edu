@@ -1,11 +1,12 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { reviewMutation, reviewWriteError } from '@/lib/submission-review';
 import { createClient } from '@/lib/supabase/server';
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { bannerTextLimits, sections, safeUrl, type Row } from '@/lib/platform';
 import { containsFreeClassCampaign, hasLearningAccess, paidCourseReadinessIssues } from '@/lib/platform-rules';
 import { getEduSettings } from '@/lib/edu-settings';
 import { gradeQuiz, type QuizDefinition } from '@/lib/mission-quiz';
-import { adminTables, archiveValues, cohortStatus, phoneNumber, validImage, assetPath, imagePreviewUrl, databaseMessage } from '@/lib/qa-rules';
+import { adminSelectColumns, adminTables, archiveValues, cohortStatus, phoneNumber, validImage, assetPath, imagePreviewUrl, databaseMessage, excludedMemberStatus } from '@/lib/qa-rules';
 import { POLICY_VERSION } from '@/lib/legal-policies';
 import { getOperatorUser, permissionsFor, sectionScopes } from '@/lib/operator-permissions';
 import { crmDeliveryState } from '@/lib/crm-delivery';
@@ -29,6 +30,7 @@ export async function GET(request: Request) {
         const sectionKey = params.get('section') || 'home';
         const record = params.get('record');
         if (record && (!uid(record) || !['products', 'learning'].includes(sectionKey))) return reply({ error: '편집할 항목을 확인해 주세요.' }, 400);
+        const productEditorRead = adminMode && sectionKey === 'products' && Boolean(record);
         const page = Math.max(1, Math.min(100000, Number(params.get('page')) || 1));
         const pageSize = sectionKey === 'orders' ? 30 : 100;
         if (adminMode && !user) return reply({ error: '로그인이 필요합니다.', user: null }, 401);
@@ -38,11 +40,31 @@ export async function GET(request: Request) {
         const db = adminMode ? createAdminClient() : await createClient();
         if (adminMode && !Object.hasOwn(adminTables, sectionKey)) return reply({ error: '조회 화면을 확인해 주세요.' }, 400);
         const settings = getEduSettings();
-        let tables = adminMode ? adminTables[sectionKey] : ['courses', 'cohorts', 'curriculum_weeks', 'curriculum_lessons', 'articles', 'article_categories', 'review_videos', 'site_banners', 'reviews', 'cohort_sessions'];
+        let tables = productEditorRead ? ['courses', 'cohorts'] : adminMode ? adminTables[sectionKey] : ['courses', 'cohorts', 'curriculum_weeks', 'curriculum_lessons', 'articles', 'article_categories', 'review_videos', 'site_banners', 'reviews', 'cohort_sessions'];
         if (adminMode && sectionKey === 'home' && operator?.role === 'staff') tables = tables.filter((table) => (['courses', 'cohorts'].includes(table) && operator.permissions.products) || (['mission_submissions', 'edu_questions'].includes(table) && operator.permissions.members));
         const data: Record<string, Row[]> = {};
         let pagination: { page: number; pageSize: number; total: number } | null = null;
         const primaryTable = sections.find((section) => section.key === sectionKey)?.table;
+        const memberScope = params.get('member') || '';
+        const submissionScope = sectionKey === 'reviews' ? params.get('submission') || '' : '';
+        const questionScope = sectionKey === 'questions' ? params.get('question') || '' : '';
+        const questionState = params.get('questionState') || 'active';
+        if (adminMode && sectionKey === 'questions' && !['active', 'open', 'answered', 'archived'].includes(questionState)) return reply({ error: '질문 조회 상태를 확인해 주세요.' }, 400);
+        if (adminMode && [memberScope, submissionScope, questionScope].some(value => value && !uid(value))) return reply({ error: '운영 대상 조회 조건을 확인해 주세요.' }, 400);
+        const missionCourse = params.get('course') || '';
+        const missionWeek = params.get('week') || '';
+        const missionState = params.get('missionState') || 'active';
+        if (adminMode && sectionKey === 'missions' && ((missionCourse && !uid(missionCourse)) || (missionWeek && !uid(missionWeek)) || !['active', 'published', 'hidden', 'archived'].includes(missionState))) return reply({ error: '미션 조회 조건을 확인해 주세요.' }, 400);
+        const missionQuery = (state: string, head = false) => {
+            // Use server-side scope BEFORE pagination; counts and rows use the same joins.
+            const scoped = Boolean(missionCourse || missionWeek);
+            let query = db.from('curriculum_missions').select(scoped ? '*,curriculum_lessons!inner(week_id,curriculum_weeks!inner(course_id))' : '*', { count: 'exact', head });
+            if (missionCourse) query = query.eq('curriculum_lessons.curriculum_weeks.course_id', missionCourse);
+            if (missionWeek) query = query.eq('curriculum_lessons.week_id', missionWeek);
+            query = state === 'archived' ? query.not('archived_at', 'is', null) : query.is('archived_at', null);
+            if (state === 'published' || state === 'hidden') query = query.eq('is_published', state === 'published');
+            return query;
+        };
         const deferredOrderTables = adminMode && sectionKey === 'orders' ? new Set(['order_items', 'payments', 'enrollments', 'edu_refund_requests']) : new Set<string>();
         await Promise.all([
             (async () => {
@@ -51,6 +73,11 @@ export async function GET(request: Request) {
                     const summary = await db.rpc('edu_admin_summary');
                     if (summary.error) throw summary.error;
                     const row = summary.data as Row;
+                    if (operator?.role === 'admin' || operator?.permissions.members) {
+                        const members = await db.from('profiles').select('id', { count: 'exact', head: true }).neq('status', excludedMemberStatus);
+                        if (members.error) throw members.error;
+                        row.members = members.count || 0;
+                    }
                     data.admin_summary = [operator?.role === 'staff' ? {
                         id: 'staff-summary',
                         members: operator.permissions.members ? row.members : 0,
@@ -67,12 +94,47 @@ export async function GET(request: Request) {
                 }
             })(),
             ...tables.filter((table) => !deferredOrderTables.has(table)).map(async (table) => {
-                const columns = table === 'crm_tags' && adminMode && sectionKey === 'tags' ? '*,crm_member_tags(count)' : table === 'payments' ? 'id,order_id,method,status,approved_amount,cancelled_amount,receipt_url,approved_at,created_at' : table === 'edu_refund_requests' ? 'id,payment_id,amount,reason,status,created_at' : table === 'reviews' && !adminMode ? 'id,course_id,author_name,author_nickname,rating,body,is_featured,display_order,published_at,created_at' : '*';
-                const serverPaged = adminMode && table === primaryTable && !['home', 'members', 'reviews', 'analytics', 'metrics', 'seo', 'settings', 'staff', 'templates', 'campaigns', 'automations'].includes(sectionKey);
+                if (adminMode && sectionKey === 'missions' && table === 'curriculum_missions') {
+                    const [result, published, hidden, archived] = await Promise.all([
+                        missionQuery(missionState).order('created_at', { ascending: false }).order('id').range((page - 1) * pageSize, page * pageSize - 1),
+                        missionQuery('published', true), missionQuery('hidden', true), missionQuery('archived', true),
+                    ]);
+                    for (const item of [result, published, hidden, archived]) if (item.error) throw item.error;
+                    data.curriculum_missions = (result.data || []) as unknown as Row[];
+                    data.mission_summary = [{ id: 'mission-summary', active: (published.count || 0) + (hidden.count || 0), published: published.count || 0, hidden: hidden.count || 0, archived: archived.count || 0 }];
+                    pagination = { page, pageSize, total: result.count || 0 };
+                    return;
+                }
+                const columns = adminMode
+                    ? table === 'crm_tags' && sectionKey === 'tags'
+                        ? '*,crm_member_tags(count)'
+                        : table === 'payments'
+                            ? 'id,order_id,method,status,approved_amount,cancelled_amount,receipt_url,approved_at,created_at'
+                            : table === 'edu_refund_requests'
+                                ? 'id,payment_id,amount,reason,status,created_at'
+                                : adminSelectColumns(sectionKey, table)
+                    : table === 'reviews'
+                        ? 'id,course_id,author_name,author_nickname,rating,body,is_featured,display_order,published_at,created_at'
+                        : '*';
+                const serverPaged = adminMode && !productEditorRead && table === primaryTable && !['home', 'members', 'reviews', 'analytics', 'metrics', 'seo', 'settings', 'staff', 'templates', 'campaigns', 'automations'].includes(sectionKey);
                 let query = db.from(table).select(columns, serverPaged ? { count: 'exact' } : undefined);
+                if (adminMode && sectionKey === 'customers' && table === 'profiles' && memberScope) query = query.eq('id', memberScope);
+                if (adminMode && sectionKey === 'questions' && table === 'edu_questions') {
+                    if (memberScope) query = query.eq('user_id', memberScope);
+                    if (questionScope) query = query.eq('id', questionScope);
+                    else {
+                        query = query.eq('is_archived', questionState === 'archived');
+                        if (['open', 'answered'].includes(questionState)) query = query.eq('status', questionState);
+                    }
+                }
+                if (adminMode && sectionKey === 'reviews' && table === 'mission_submissions') {
+                    if (memberScope) query = query.eq('enrollments.user_id', memberScope);
+                    if (submissionScope) query = query.eq('id', submissionScope);
+                }
                 if (record && adminMode && table === primaryTable) query = query.eq('id', record);
-                query = serverPaged ? query.range((page - 1) * pageSize, page * pageSize - 1) : query.limit(1000);
-                if (adminMode && sectionKey === 'customers' && table === 'profiles') query = query.neq('status', 'withdrawn');
+                if (record && productEditorRead && table === 'cohorts') query = query.eq('course_id', record);
+                query = serverPaged ? query.range((page - 1) * pageSize, page * pageSize - 1) : query.limit(productEditorRead && table === 'courses' ? 1 : 1000);
+                if (adminMode && sectionKey === 'customers' && table === 'profiles') query = query.neq('status', excludedMemberStatus);
                 if (table === 'edu_questions' && !adminMode) query = query.eq('is_archived', false);
                 if (table === 'site_settings' && adminMode && operator?.role !== 'admin') query = query.not('key', 'like', 'edu_staff_permissions_%');
                 if (['courses', 'review_videos', 'site_banners', 'curriculum_lessons', 'reviews'].includes(table)) {
@@ -93,21 +155,48 @@ export async function GET(request: Request) {
                 data[table] = (r.data || []) as unknown as Row[];
                 if (serverPaged) pagination = { page, pageSize, total: r.count || 0 };
             }),
+            ...(productEditorRead && record ? [(async () => {
+                const configs = await db.from('landing_configs').select('id,kakao_url,cta_label,pixel_enabled,pixel_id').eq('id', record).limit(1);
+                if (configs.error) throw configs.error;
+                data.landing_configs = (configs.data || []) as Row[];
+            })(), (async () => {
+                // A single published week/lesson pair is sufficient for readiness.
+                // Do not reload unrelated courses or heavy lesson content in the editor.
+                const curriculum = await db.from('curriculum_weeks')
+                    .select('id,course_id,is_published,curriculum_lessons!inner(id,week_id,is_published)')
+                    .eq('course_id', record).eq('is_published', true)
+                    .eq('curriculum_lessons.is_published', true).limit(1);
+                if (curriculum.error) throw curriculum.error;
+                const rows = (curriculum.data || []) as unknown as (Row & { curriculum_lessons: Row[] })[];
+                data.curriculum_weeks = rows.map(week => ({ id: week.id, course_id: week.course_id, is_published: week.is_published }));
+                data.curriculum_lessons = rows.flatMap(week => week.curriculum_lessons);
+            })()] : []),
         ]);
         for (const banner of data.site_banners || []) {
             banner.image_url = imagePreviewUrl(String(banner.image_path || ''), process.env.NEXT_PUBLIC_SUPABASE_URL || '');
         }
-        if (adminMode && sectionKey === 'products') {
-            const [allProducts, publishedProducts, draftProducts, archivedProducts] = await Promise.all([
+        if (adminMode && sectionKey === 'customers') {
+            const memberCount = () => db.from('profiles').select('id', { count: 'exact', head: true }).neq('status', excludedMemberStatus);
+            const [active, suspended, marketing] = await Promise.all([memberCount().eq('status', 'active'), memberCount().eq('status', 'suspended'), memberCount().eq('marketing_consent', true)]);
+            for (const item of [active, suspended, marketing]) if (item.error) throw item.error;
+            data.member_summary = [{ id: 'member-summary', active: active.count || 0, suspended: suspended.count || 0, marketing: marketing.count || 0 }];
+        }
+        if (adminMode && sectionKey === 'products' && !productEditorRead) {
+            const [allProducts, publishedProducts, draftProducts, archivedProducts, configs] = await Promise.all([
                 db.from('courses').select('id', { count: 'exact' }).is('archived_at', null).limit(1000),
                 db.from('courses').select('id', { count: 'exact', head: true }).is('archived_at', null).eq('status', 'published'),
                 db.from('courses').select('id', { count: 'exact', head: true }).is('archived_at', null).eq('status', 'draft'),
                 db.from('courses').select('id', { count: 'exact', head: true }).not('archived_at', 'is', null),
+                data.courses?.length
+                    ? db.from('landing_configs').select('id,kakao_url,cta_label,pixel_enabled,pixel_id').in('id', data.courses.map(course => course.id))
+                    : Promise.resolve({ data: [], error: null }),
             ]);
             if (allProducts.error) throw allProducts.error;
             if (publishedProducts.error) throw publishedProducts.error;
             if (draftProducts.error) throw draftProducts.error;
             if (archivedProducts.error) throw archivedProducts.error;
+            if (configs.error) throw configs.error;
+            data.landing_configs = (configs.data || []) as Row[];
             const activeProductIds = new Set((allProducts.data || []).map(product => String(product.id)));
             const upcomingProductIds = new Set(
                 (data.cohorts || [])
@@ -123,12 +212,6 @@ export async function GET(request: Request) {
                 archived: archivedProducts.count || 0,
             }];
         }
-        if (adminMode && sectionKey === 'products' && data.courses?.length) {
-            // Preserve existing landing CTA settings until the product explicitly overrides them.
-            const configs = await db.from('landing_configs').select('id,kakao_url,cta_label,pixel_enabled,pixel_id').in('id', data.courses.map(course => course.id));
-            if (configs.error) throw configs.error;
-            data.landing_configs = (configs.data || []) as Row[];
-        }
         if (adminMode && sectionKey === 'orders') {
             const orderIds = (data.orders || []).map((row) => row.id).filter(Boolean);
             data.order_items = [];
@@ -137,22 +220,22 @@ export async function GET(request: Request) {
             data.edu_refund_requests = [];
             if (orderIds.length) {
                 const [items, payments] = await Promise.all([
-                    db.from('order_items').select('*').in('order_id', orderIds),
+                    db.from('order_items').select(adminSelectColumns(sectionKey, 'order_items')).in('order_id', orderIds),
                     db.from('payments').select('id,order_id,method,status,approved_amount,cancelled_amount,receipt_url,approved_at,created_at').in('order_id', orderIds),
                 ]);
                 if (items.error) throw items.error;
                 if (payments.error) throw payments.error;
-                data.order_items = (items.data || []) as Row[];
+                data.order_items = (items.data || []) as unknown as Row[];
                 data.payments = (payments.data || []) as Row[];
                 const itemIds = data.order_items.map((row) => row.id).filter(Boolean);
                 const paymentIds = data.payments.map((row) => row.id).filter(Boolean);
                 const [enrollments, refunds] = await Promise.all([
-                    itemIds.length ? db.from('enrollments').select('*').in('order_item_id', itemIds) : Promise.resolve({ data: [], error: null }),
+                    itemIds.length ? db.from('enrollments').select(adminSelectColumns(sectionKey, 'enrollments')).in('order_item_id', itemIds) : Promise.resolve({ data: [], error: null }),
                     paymentIds.length ? db.from('edu_refund_requests').select('id,payment_id,amount,reason,status,created_at').in('payment_id', paymentIds) : Promise.resolve({ data: [], error: null }),
                 ]);
                 if (enrollments.error) throw enrollments.error;
                 if (refunds.error) throw refunds.error;
-                data.enrollments = (enrollments.data || []) as Row[];
+                data.enrollments = (enrollments.data || []) as unknown as Row[];
                 data.edu_refund_requests = (refunds.data || []) as Row[];
             }
         }
@@ -497,6 +580,24 @@ export async function POST(request: Request) {
             if (!body.id) {
                 for (const field of section.fields.filter((f) => f.required)) if (!(field.key in values)) fail(`${field.label}을 입력해 주세요.`);
             }
+            if (section.table === 'curriculum_missions') {
+                const current = body.id ? await db.from('curriculum_missions').select('id,lesson_id').eq('id', body.id).single() : null;
+                if (current?.error || (body.id && !current?.data)) fail('미션을 다시 불러온 뒤 저장해 주세요.', 409);
+                const lessonId = values.lesson_id || current?.data?.lesson_id;
+                if (!uid(lessonId)) fail('연결할 학습을 선택해 주세요.');
+                const lesson = await db.from('curriculum_lessons').select('id,week_id').eq('id', lessonId).single();
+                if (lesson.error || !lesson.data) fail('연결할 학습을 찾을 수 없습니다.');
+                const week = await db.from('curriculum_weeks').select('id,course_id').eq('id', lesson.data.week_id).single();
+                if (week.error || !week.data) fail('학습의 상품·주차 연결을 확인해 주세요.');
+                // course_id/week_id are validation context, never persisted as mission columns.
+                if (input.course_id !== undefined && (!uid(input.course_id) || input.course_id !== week.data.course_id)) fail('선택한 상품에 속한 학습만 연결할 수 있습니다.');
+                if (input.week_id && input.week_id !== lesson.data.week_id) fail('선택한 주차에 속한 학습만 연결할 수 있습니다.');
+                if (current?.data && current.data.lesson_id !== lessonId) {
+                    const previousLesson = await db.from('curriculum_lessons').select('week_id').eq('id', current.data.lesson_id).single();
+                    const previousWeek = previousLesson.data ? await db.from('curriculum_weeks').select('course_id').eq('id', previousLesson.data.week_id).single() : null;
+                    if (previousLesson.error || previousWeek?.error || previousWeek?.data?.course_id !== week.data.course_id) fail('기존 미션은 다른 상품의 학습으로 이동할 수 없습니다.');
+                }
+            }
             if (section.table === 'cohorts' && values.capacity !== undefined && values.capacity !== null && (!Number.isSafeInteger(values.capacity) || Number(values.capacity) < 1)) fail('정원은 1명 이상의 정수로 입력해 주세요.');
             if (section.table === 'site_banners') {
                 for (const [key, limit] of Object.entries(bannerTextLimits)) {
@@ -577,13 +678,12 @@ export async function POST(request: Request) {
                 if (values[start] && values[end] && Date.parse(String(values[start])) >= Date.parse(String(values[end]))) fail('종료일은 시작일 이후여야 합니다.');
             }
             if (section.table === 'mission_submissions') {
-                const r = await db.rpc('review_mission_submissions', {
-                    p_actor: user.id,
-                    p_ids: [body.id],
-                    p_decision: values.status,
-                    p_feedback: values.reviewer_feedback || '',
-                });
-                if (r.error) fail('검토 대기 상태와 피드백을 확인해 주세요.', 409);
+                const mutation = reviewMutation(user.id, { ids: [body.id], decision: values.status, feedback: values.reviewer_feedback || '', reviewMode: body.reviewMode, reviewChecks: body.reviewChecks });
+                const r = await db.rpc(mutation.name, mutation.params);
+                if (r.error) {
+                    const { status, ...problem } = reviewWriteError(r.error);
+                    return reply(problem, status);
+                }
                 return reply({ ok: true });
             }
             if (section.table === 'lesson_contents') {
@@ -637,7 +737,10 @@ export async function POST(request: Request) {
                 }
             }
             let scheduledCohort = null;
-            if (section.table === 'courses' && productSchedule) {
+            // A cohortless free webinar must stay cohortless when editing its name or copy.
+            const keepFreeCourseWithoutCohort = section.table === 'courses' && (result.data as Row).category === 'free'
+                && !body.cohortId && !productSchedule?.start && !productSchedule?.end;
+            if (section.table === 'courses' && productSchedule && !keepFreeCourseWithoutCohort) {
                 const course = result.data as Row;
                 const now = Date.now();
                 const publishedPaidProduct = course.status === 'published' && course.category !== 'free';
