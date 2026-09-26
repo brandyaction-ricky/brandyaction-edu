@@ -185,8 +185,7 @@ export function Platform({
     pageSize: number;
     total: number;
   } | null>(null);
-  const [loadedSection, setLoadedSection] = useState("");
-  const [loadedScope, setLoadedScope] = useState("");
+  const [loadedReadKey, setLoadedReadKey] = useState("");
   const searchParams = useSearchParams();
   const routeKey = path.join("/") + "?" + searchParams.toString();
   const [filters, setFilters] = useState({
@@ -231,7 +230,11 @@ export function Platform({
   const scopeQuery = adminSection === "missions" ? new URLSearchParams({ course: missionScope.courseId, week: missionScope.weekId, missionState: missionScope.state }).toString() : ["customers", "questions", "reviews"].includes(adminSection) ? new URLSearchParams({ member: searchParams.get("member") || "", submission: searchParams.get("submission") || "", question: searchParams.get("question") || "", questionState: searchParams.get("questionState") || "active" }).toString() : "";
   const pagingKey = adminSection + "?" + scopeQuery;
   const adminPage = adminPaging.section === pagingKey ? adminPaging.page : 1;
-  const data = !admin || (loadedSection === adminSection && loadedScope === scopeQuery) ? loadedData : {};
+  // An editor's one-record response is not a catalog response, even though both
+  // belong to the same section. Keep rows, totals and actions behind this key.
+  const adminReadKey = JSON.stringify([adminSection, adminPage, editorRecordId, scopeQuery]);
+  const hasCurrentAdminRead = loadedReadKey === adminReadKey;
+  const data = !admin || hasCurrentAdminRead ? loadedData : {};
   const setAdminPage = (update: number | ((page: number) => number)) =>
     setAdminPaging((current) => ({
       section: pagingKey,
@@ -292,8 +295,7 @@ export function Platform({
       if (!response.ok) throw new Error(result.error);
       if (alive.current) {
         setData(result.data || {});
-        setLoadedSection(adminSection);
-        setLoadedScope(scopeQuery);
+        setLoadedReadKey(adminReadKey);
         setSupport(result.support || { email: "", url: "" });
         if (admin && cachedAdminUser?.id !== result.user?.id)
           adminNavigationReads.clear();
@@ -306,7 +308,7 @@ export function Platform({
     } finally {
       if (alive.current && !controller.signal.aborted) setLoading(false);
     }
-  }, [admin, adminPage, adminSection, editorRecordId, scopeQuery]);
+  }, [admin, adminPage, adminSection, editorRecordId, scopeQuery, adminReadKey]);
   const prefetchAdminSection = useCallback(
     (section: string) => {
       if (!admin || !user?.id || section === adminSection) return;
@@ -837,7 +839,7 @@ export function Platform({
         prefetchSection={prefetchAdminSection}
       >
         <MarketingWorkspaceNav current={key} available={available} search={searchParams.toString()} prefetchSection={prefetchAdminSection} />
-        {loadedSection !== adminSection ? (
+        {!hasCurrentAdminRead ? (
           error ? <AdminInlineError onRetry={() => void refresh(true)}>화면 정보를 불러오지 못했습니다. 연결 상태를 확인해 주세요.</AdminInlineError> : <AdminLoadingState title="메뉴 내용을 불러오는 중입니다." description="현재 운영 데이터를 안전하게 확인하고 있습니다."/>
         ) : key === "overview" ? (
           <Overview data={data} available={available} />
