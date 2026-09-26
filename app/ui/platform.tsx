@@ -16,6 +16,7 @@ import {
 } from "@/lib/platform";
 import { homepageCourses, isRecruiting, localDateTime, recordId } from "@/lib/platform-rules";
 import { listedProducts } from "@/lib/product-visibility";
+import { publicReadParams } from "@/lib/public-platform-plan";
 import { archiveValues } from "@/lib/qa-rules";
 import { createClient } from "@/lib/supabase/client";
 import { getSupabasePublicConfig } from "@/lib/supabase/config";
@@ -180,6 +181,9 @@ export function Platform({
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
+  const [articleFilter, setArticleFilter] = useState("전체");
+  const [publicSearch, setPublicSearch] = useState("");
+  const [publicPage, setPublicPage] = useState(1);
   const [adminPaging, setAdminPaging] = useState({ section: "", page: 1 });
   const [pagination, setPagination] = useState<{
     page: number;
@@ -202,7 +206,7 @@ export function Platform({
       : path[0] === "classes" && searchParams.get("type") === "free"
         ? "무료 클래스"
         : "전체";
-  const setFilter = (value: string) => setFilters({ route: routeKey, value });
+  const setFilter = (value: string) => { setPublicPage(1); setFilters({ route: routeKey, value }); };
   const [editor, setEditor] = useRouteDialog<{
     route: string;
     section: Section;
@@ -235,7 +239,15 @@ export function Platform({
   // belong to the same section. Keep rows, totals and actions behind this key.
   const adminReadKey = JSON.stringify([adminSection, adminPage, editorRecordId, scopeQuery]);
   const hasCurrentAdminRead = loadedReadKey === adminReadKey;
-  const data = !admin || hasCurrentAdminRead ? loadedData : {};
+  const publicParams = publicReadParams(path, searchParams, publicPage, publicSearch, path[0] === "articles" ? articleFilter : filter);
+  const memberParams = new URLSearchParams({ view: "member", section: account ? (path[1] || "dashboard") : learning ? "learn" : "order-result" });
+  if (learning) {
+    memberParams.set("enrollment", path[1] || "");
+    if (path[2]) memberParams.set("lesson", path[2]);
+  }
+  const publicParamsString = publicParams?.toString() || (account || learning || ["order-complete", "applied", "payment"].includes(path[0]) ? memberParams.toString() : "view=identity");
+  const publicReadKey = JSON.stringify([routeKey, publicParamsString]);
+  const data = admin ? (hasCurrentAdminRead ? loadedData : {}) : (loadedReadKey === publicReadKey ? loadedData : {});
   const setAdminPage = (update: number | ((page: number) => number)) =>
     setAdminPaging((current) => ({
       section: pagingKey,
@@ -263,7 +275,7 @@ export function Platform({
             scopeQuery,
           )
         : await (async () => {
-            const response = await fetch("/api/platform", {
+            const response = await fetch(`/api/platform?${publicParamsString}`, {
               cache: "no-store",
               signal: controller.signal,
             });
@@ -296,7 +308,7 @@ export function Platform({
       if (!response.ok) throw new Error(result.error);
       if (alive.current) {
         setData(result.data || {});
-        setLoadedReadKey(adminReadKey);
+        setLoadedReadKey(admin ? adminReadKey : publicReadKey);
         setSupport(result.support || { email: "", url: "" });
         if (admin && cachedAdminUser?.id !== result.user?.id)
           adminNavigationReads.clear();
@@ -309,7 +321,7 @@ export function Platform({
     } finally {
       if (alive.current && !controller.signal.aborted) setLoading(false);
     }
-  }, [admin, adminPage, adminSection, editorRecordId, scopeQuery, adminReadKey]);
+  }, [admin, adminPage, adminSection, editorRecordId, scopeQuery, adminReadKey, publicReadKey, publicParamsString]);
   const prefetchAdminSection = useCallback(
     (section: string) => {
       if (!admin || !user?.id || section === adminSection) return;
@@ -329,6 +341,10 @@ export function Platform({
       readRequest.current?.abort();
     };
   }, [refresh]);
+  useEffect(() => {
+    const timer = setTimeout(() => { setPublicPage(1); setPublicSearch(query); }, 300);
+    return () => clearTimeout(timer);
+  }, [query]);
   useEffect(() => {
     if (!notice) return;
     const timer = setTimeout(() => setNotice(""), 5000);
@@ -630,7 +646,7 @@ export function Platform({
                 <CourseCard key={c.id} course={c} />
               ))}
             </div>
-            {!loading && !availableCourses.length && (
+            {!loading && !error && !availableCourses.length && (
               <Empty title="새로운 클래스를 준비하고 있습니다." />
             )}
           </section>
@@ -713,29 +729,28 @@ export function Platform({
           </label>
         </div>
         <div className="grid3 course-grid pb64">
-          {courses
-            .filter(
-              (c) =>
-                (filter === "전체" || courseType(c) === filter) &&
-                t(c, "title").includes(query),
-            )
-            .map((c) => (
+          {courses.map((c) => (
               <CourseCard key={c.id} course={c} />
             ))}
         </div>
-        {!loading && !courses.length && (
+        {!loading && !error && !courses.length && (
           <Empty title="등록된 클래스가 없습니다." />
         )}
+        {pagination && pagination.total > pagination.pageSize && <div className="row center mt24" aria-label="클래스 페이지">
+          <button className="btn" type="button" disabled={publicPage <= 1} onClick={() => setPublicPage(page => page - 1)}>이전</button>
+          <span>{publicPage} / {Math.ceil(pagination.total / pagination.pageSize)}</span>
+          <button className="btn" type="button" disabled={publicPage >= Math.ceil(pagination.total / pagination.pageSize)} onClick={() => setPublicPage(page => page + 1)}>다음</button>
+        </div>}
       </div>
     );
   else if (path[0] === "classes" && selected)
     body = <ProductDetail key={selected.id} course={selected} data={data} />;
   else if (path[0] === "articles")
     body = (
-      <ArticlesView slug={path[1]} data={data} user={user} loading={loading} />
+      <ArticlesView slug={path[1]} data={data} user={user} loading={loading} error={Boolean(error)} query={query} onQueryChange={setQuery} type={articleFilter} onTypeChange={value => { setArticleFilter(value); setPublicPage(1); }} pagination={pagination} onPageChange={setPublicPage} />
     );
   else if (path[0] === "stories")
-    body = <StoriesView data={data} loading={loading} />;
+    body = <StoriesView data={data} loading={loading} error={Boolean(error)} />;
   else if (account && user)
     body = (
       <MemberViews

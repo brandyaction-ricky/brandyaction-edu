@@ -5,7 +5,6 @@ import { Platform } from '@/app/ui/platform';
 import { notFound, redirect } from 'next/navigation';
 import { metricsRedirect } from '@/lib/landing-admin-state';
 import { sections } from '@/lib/platform';
-import { isProductListed } from '@/lib/product-visibility';
 export const dynamic = 'force-dynamic';
 export default async function Page({params,searchParams}:{params:Promise<{path?:string[]}>;searchParams:Promise<Record<string,string|string[]|undefined>>}) {
  const {path=[]} = await params;
@@ -37,13 +36,12 @@ export async function generateMetadata({params}:{params:Promise<{path?:string[]}
  if(['classes','articles'].includes(path[0])&&path[1]) {
   const db=await createClient();
   const isCourse=path[0]==='classes';
-  const {data}=await db.from(isCourse?'courses':'articles').select(isCourse?'title,summary,metadata':'title,summary').eq('slug',path[1]).eq('status','published').maybeSingle();
+  const {data}=await db.from(isCourse?'courses':'articles').select(isCourse?'title,summary,seo_title:metadata->>seo_title,seo_description:metadata->>seo_description,is_listed:metadata->is_listed':'title,summary').eq('slug',path[1]).eq('status','published').maybeSingle();
   if(data){
-   const row=data as unknown as {title:string;summary?:string;metadata?:Record<string,unknown>};
-   const metadata=isCourse&&row.metadata&&typeof row.metadata==='object'?row.metadata:{};
-   unlisted=isCourse&&!isProductListed({id:path[1],metadata});
-   title=(typeof metadata.seo_title==='string'&&metadata.seo_title.trim()?metadata.seo_title:row.title)+' | BrandyAction EDU';
-   description=String(metadata.seo_description||row.summary||description);
+   const row=data as unknown as {title:string;summary?:string;seo_title?:string;seo_description?:string;is_listed?:boolean|string};
+   unlisted=isCourse&&row.is_listed===false;
+   title=(isCourse&&row.seo_title?.trim()?row.seo_title:row.title)+' | BrandyAction EDU';
+   description=String((isCourse&&row.seo_description)||row.summary||description);
   }
  }
  const privatePage=unlisted||['admin','my','learn','checkout','apply','payment','login','signup','auth'].includes(path[0]);

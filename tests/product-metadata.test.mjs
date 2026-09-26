@@ -14,6 +14,10 @@ function load(file, mocks = {}) {
   const code = ts.transpileModule(fs.readFileSync(absolute, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   new Function('exports', 'require', code)(exports, name => {
     if (name in mocks) return mocks[name];
+    if (name === '@/lib/public-platform-data') return { getPublicPlatformData: async () => ({ data: {}, pagination: null }), getPublicSupport: async () => ({}) };
+    if (name === '@/lib/public-platform-plan') return { PUBLIC_CACHE_TAG: 'test' };
+    if (name === '@/lib/member-platform-data') return { readMemberPlatformData: async () => ({}) };
+    if (name === 'next/cache') return { revalidateTag: () => {} };
     if (name.startsWith('@/') || name.startsWith('.')) {
       const base = name.startsWith('@/') ? path.resolve(root, name.slice(2)) : path.resolve(path.dirname(absolute), name);
       return load(['.ts', '.tsx'].map(extension => base + extension).find(fs.existsSync), mocks);
@@ -278,22 +282,24 @@ test('unlisted detail remains available but is excluded from search indexing', a
   const previousEnv = process.env.NEXT_PUBLIC_APP_ENV;
   process.env.NEXT_PUBLIC_APP_ENV = 'production';
   try {
-    let metadata = { is_listed: false };
-    const query = { select() { return this; }, eq() { return this; }, async maybeSingle() { return { data: { title: '링크 전용', metadata } }; } };
+    let isListed = false;
+    const query = { select() { return this; }, eq() { return this; }, async maybeSingle() { return { data: { title: '링크 전용', is_listed: isListed } }; } };
     const page = load('app/[[...path]]/page.tsx', { '@/lib/edu-settings': { getEduSettings: async () => ({ seo: {} }) }, '@/lib/supabase/server': { createClient: async () => ({ from: () => query }) }, '@/app/ui/platform': {}, 'next/navigation': {} });
     const get = () => page.generateMetadata({ params: Promise.resolve({ path: ['classes', 'unlisted'] }) });
     assert.deepEqual((await get()).robots, { index: false, follow: false });
     assert.match((await get()).title, /링크 전용/);
-    metadata = {};
+    isListed = undefined;
+    assert.equal((await get()).robots, undefined);
+    isListed = 'false';
     assert.equal((await get()).robots, undefined);
   } finally { if (previousEnv === undefined) delete process.env.NEXT_PUBLIC_APP_ENV; else process.env.NEXT_PUBLIC_APP_ENV = previousEnv; }
 });
 
 test('public API keeps direct-link data and removes only home banners pointing to unlisted products', async () => {
   const courses = [{ id: 'hidden', slug: 'hidden', status: 'published', list_price: 100, metadata: { is_listed: false } }, { id: 'visible', slug: 'visible', status: 'published', list_price: 100 }];
-  const db = { from(table) { return { select() { return this; }, eq() { return this; }, in() { return this; }, limit() { return this; }, order() { return this; }, then(resolve, reject) { return Promise.resolve({ data: table === 'courses' ? courses : table === 'site_banners' ? [{ id: 'hidden-banner', link_url: '/classes/hidden?src=organic' }, { id: 'visible-banner', link_url: '/classes/visible' }] : [], error: null }).then(resolve, reject); } }; } };
+  const banners = [{ id: 'hidden-banner', link_url: '/classes/hidden?src=organic' }, { id: 'visible-banner', link_url: '/classes/visible' }];
   const route = load('app/api/platform/route.ts', {
-    '@/lib/supabase/admin': { createAdminClient: () => db }, '@/lib/supabase/server': { createClient: async () => db },
+    '@/lib/public-platform-data': { getPublicPlatformData: async () => ({ data: { courses, site_banners: banners }, pagination: null, unlistedBannerCourses: [courses[0]] }), getPublicSupport: async () => ({}) },
     '@/lib/server-auth': { getAuthenticatedUser: async () => null }, '@/lib/edu-settings': { getEduSettings: async () => ({ operations: {} }) },
   });
   const response = await route.GET(new Request('https://edu.example/api/platform'));
@@ -326,9 +332,10 @@ test('sitemap excludes hidden and non-public products, paginates, and stays empt
 });
 
 test('published product metadata drives search and sharing titles while an empty override falls back', async () => {
-  let product = { title: '상품 이름', summary: '상품 소개', metadata: { seo_title: '검색용 제목', seo_description: '검색용 설명' } };
+  let product = { title: '상품 이름', summary: '상품 소개', seo_title: '검색용 제목', seo_description: '검색용 설명' };
   const filters = [];
-  const query = { select() { return this; }, eq(key, value) { filters.push([key, value]); return this; }, async maybeSingle() { return { data: product }; } };
+  let columns = '';
+  const query = { select(value) { columns = value; return this; }, eq(key, value) { filters.push([key, value]); return this; }, async maybeSingle() { return { data: product }; } };
   const page = load('app/[[...path]]/page.tsx', {
     '@/lib/edu-settings': { getEduSettings: async () => ({ seo: {} }) },
     '@/lib/supabase/server': { createClient: async () => ({ from: () => query }) },
@@ -339,8 +346,10 @@ test('published product metadata drives search and sharing titles while an empty
   assert.equal(metadata.title, '검색용 제목 | BrandyAction EDU');
   assert.equal(metadata.description, '검색용 설명');
   assert.equal(metadata.openGraph.title, metadata.title);
+  assert.match(columns, /seo_title:metadata->>seo_title/);
+  assert.doesNotMatch(columns, /(?:^|,)metadata(?:,|$)/);
   assert.ok(filters.some(([key, value]) => key === 'status' && value === 'published'));
-  product = { ...product, metadata: { seo_title: '', seo_description: '' } };
+  product = { ...product, seo_title: '', seo_description: '' };
   metadata = await page.generateMetadata({ params });
   assert.equal(metadata.title, '상품 이름 | BrandyAction EDU');
   assert.equal(metadata.description, '상품 소개');

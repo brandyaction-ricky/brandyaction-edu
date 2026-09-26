@@ -11,6 +11,10 @@ function load(path, dependencies = {}) {
   new Function('exports', 'require', code)(exports, name => {
     if (name === '@/lib/submission-review') return submissionReview;
     if (name === '@/lib/product-visibility') return productVisibility;
+    if (name === '@/lib/public-platform-data') return { getPublicPlatformData: async () => ({ data: {}, pagination: null }), getPublicSupport: async () => ({}) };
+    if (name === '@/lib/public-platform-plan') return { PUBLIC_CACHE_TAG: 'test' };
+    if (name === '@/lib/member-platform-data') return { readMemberPlatformData: async () => ({}) };
+    if (name === 'next/cache') return { revalidateTag: () => {} };
     if (!(name in dependencies)) throw Error(name);
     return dependencies[name];
   });

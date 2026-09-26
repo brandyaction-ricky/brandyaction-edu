@@ -1,4 +1,6 @@
 import { processRefund } from '@/lib/refunds';
+import { revalidateTag } from 'next/cache';
+import { PUBLIC_CACHE_TAG } from '@/lib/public-platform-plan';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { hasLearningAccess } from '@/lib/platform-rules';
@@ -332,6 +334,7 @@ export async function POST(request: Request) {
             const message = /[가-힣]/.test(result.error.message) ? result.error.message : result.error.code === '23505' ? '이미 사용 중인 코드 또는 회차 순서입니다.' : '저장하지 못했습니다. 입력값을 확인해 주세요.';
             return reply({ error: message }, 409);
         }
+        if (['session', 'clone-cohort', 'quiz'].includes(body.action) || (body.action === 'settings' && body.kind === 'settings')) revalidateTag(PUBLIC_CACHE_TAG, { expire: 0 });
         return reply({ ok: true, result: result.data });
     } catch (e) {
         const error = e as Error & { status?: number };

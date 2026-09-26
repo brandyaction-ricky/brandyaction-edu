@@ -6,7 +6,7 @@ import { submissionReview } from './helpers/submission-review.mjs';
 function load(path, dependencies={}) {
  const source=fs.readFileSync(new URL('../'+path,import.meta.url),'utf8');
  const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
- const exports={};new Function('exports','require',js)(exports,name=>{if(name in dependencies)return dependencies[name];throw Error(name);});return exports;
+ const exports={};new Function('exports','require',js)(exports,name=>{if(name==='next/cache')return{revalidateTag:()=>{}};if(name==='@/lib/public-platform-plan')return{PUBLIC_CACHE_TAG:'test'};if(name in dependencies)return dependencies[name];throw Error(name);});return exports;
 }
 const quiz=load('lib/mission-quiz.ts');
 const rules=load('lib/edu-workflows.ts');
