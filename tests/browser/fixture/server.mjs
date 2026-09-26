@@ -19,6 +19,11 @@ const server = createServer((request,response)=>{
   const url=new URL(request.url,'http://localhost');
   if(reviewFixture(request,response,url))return;
   if(request.method!=='GET'){response.writeHead(405).end();return;}
+  if(url.pathname==='/api/platform'){
+    const courses=[{id:'visible',title:'합성 공개 상품',slug:'visibility-public',category:'free',status:'published',list_price:0,metadata:{}},{id:'hidden',title:'합성 링크 전용 상품',slug:'visibility-hidden',category:'free',status:'published',list_price:0,metadata:{is_listed:false,cta_label:'링크로 신청',cta_url:'/webinar/11111111-1111-4111-8111-111111111111/organic'}}];
+    courses.push({id:'paid-hidden',title:'합성 비노출 유료 상품',slug:'visibility-paid',category:'paid_class',status:'published',list_price:10000,description:'합성 상세',duration_label:'4주',schedule_label:'매주',metadata:{is_listed:false}});
+    response.setHeader('Content-Type','application/json');response.end(JSON.stringify({user:null,data:{courses,cohorts:[{id:'paid-cohort',course_id:'paid-hidden',status:'recruiting',name:'합성 1기',price:10000,recruitment_end_at:'2099-12-31T14:59:00Z'}],curriculum_weeks:[{id:'paid-week',course_id:'paid-hidden',is_published:true}],curriculum_lessons:[{id:'paid-lesson',week_id:'paid-week',is_published:true}]},support:{}}));return;
+  }
   if(url.pathname==='/api/platform/workflows'&&url.searchParams.get('kind')==='participants'){
     const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
     response.setHeader('Content-Type','application/json');response.end(JSON.stringify({cohortId:id(11),weekId:id(15),cohorts:[{id:id(11),name:'1기',course_id:id(10),course_title:'합성 신규 상품'}],weeks:[{id:id(15),week:1,title:'실행 시작'}],columns:[{id:id(16),day_number:1,title:'첫 학습'}],matrix:{[id(12)]:[{lessonId:id(16),status:'changes_requested',submissionId:id(30),approved:0,total:1}]},rows:[{id:id(12),user_id:id(1),full_name:'운영 동선 QA 회원',email:'operations-fixture@example.test',learning_percent:50,mission_total:1,approved:0,achievement:0,last_activity:'2026-09-24T09:00:00Z'}],total:1,stats:{participants:1,average:0,participation:100,attention:0}}));return;

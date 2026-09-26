@@ -5,6 +5,7 @@ import { Platform } from '@/app/ui/platform';
 import { notFound, redirect } from 'next/navigation';
 import { metricsRedirect } from '@/lib/landing-admin-state';
 import { sections } from '@/lib/platform';
+import { isProductListed } from '@/lib/product-visibility';
 export const dynamic = 'force-dynamic';
 export default async function Page({params,searchParams}:{params:Promise<{path?:string[]}>;searchParams:Promise<Record<string,string|string[]|undefined>>}) {
  const {path=[]} = await params;
@@ -32,6 +33,7 @@ export async function generateMetadata({params}:{params:Promise<{path?:string[]}
  const {seo}=await getEduSettings();
  let title=String(seo.title||'BrandyAction EDU | 배운 것을, 내 일의 성과로.');
  let description=String(seo.description||'AI와 마케팅을 배우고 내 업무에 적용하는 실행 중심 교육.');
+ let unlisted=false;
  if(['classes','articles'].includes(path[0])&&path[1]) {
   const db=await createClient();
   const isCourse=path[0]==='classes';
@@ -39,10 +41,11 @@ export async function generateMetadata({params}:{params:Promise<{path?:string[]}
   if(data){
    const row=data as unknown as {title:string;summary?:string;metadata?:Record<string,unknown>};
    const metadata=isCourse&&row.metadata&&typeof row.metadata==='object'?row.metadata:{};
+   unlisted=isCourse&&!isProductListed({id:path[1],metadata});
    title=(typeof metadata.seo_title==='string'&&metadata.seo_title.trim()?metadata.seo_title:row.title)+' | BrandyAction EDU';
    description=String(metadata.seo_description||row.summary||description);
   }
  }
- const privatePage=['admin','my','learn','checkout','apply','payment','login','signup','auth'].includes(path[0]);
+ const privatePage=unlisted||['admin','my','learn','checkout','apply','payment','login','signup','auth'].includes(path[0]);
  return {title,description,openGraph:{title,description},robots:privatePage||process.env.NEXT_PUBLIC_APP_ENV!=='production'?{index:false,follow:false}:undefined,verification:{google:seo.googleVerification?String(seo.googleVerification):undefined,other:seo.naverVerification?{'naver-site-verification':String(seo.naverVerification)}:undefined}};
 }

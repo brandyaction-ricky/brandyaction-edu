@@ -15,6 +15,7 @@ import {
   type User,
 } from "@/lib/platform";
 import { homepageCourses, isRecruiting, localDateTime, recordId } from "@/lib/platform-rules";
+import { listedProducts } from "@/lib/product-visibility";
 import { archiveValues } from "@/lib/qa-rules";
 import { createClient } from "@/lib/supabase/client";
 import { getSupabasePublicConfig } from "@/lib/supabase/config";
@@ -396,7 +397,9 @@ export function Platform({
     } catch {}
   }
   const rows = (key: string) => data[key] || [];
-  const courses = rows("courses");
+  // Keep the full published set for direct URLs, orders and learning access.
+  const allCourses = rows("courses");
+  const courses = listedProducts(allCourses);
   const recruitingCourses = courses.filter((c) =>
     rows("cohorts").some((g) => g.course_id === c.id && isRecruiting(g)),
   );
@@ -405,7 +408,7 @@ export function Platform({
     recruitingCourses.find((c) => t(c, "category") === "free") ||
     courses.find((c) => t(c, "category") === "free");
   const freeOpen = !!free && recruitingCourses.some((c) => c.id === free.id);
-  const selected = courses.find((c) => c.slug === path[1] || c.id === path[1]);
+  const selected = allCourses.find((c) => c.slug === path[1] || c.id === path[1]);
   const freeClassDetail =
     path[0] === "classes" &&
     path.length > 1 &&
