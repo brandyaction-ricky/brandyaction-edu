@@ -38,3 +38,44 @@ test('product curriculum tab loads existing scoped lessons without submitting th
   await expect(page.getByLabel('합성 저장 횟수')).toHaveText('0');
   await expect(page.getByRole('button', { name: '저장하기', exact: true })).toHaveCount(0);
 });
+
+test('product cohort tab edits only its linked cohort without submitting the product form', async ({ page }) => {
+  await page.goto('/product-sale-test');
+  await page.getByRole('tab', { name: '기수·회차' }).click();
+  const panel = page.getByRole('tabpanel', { name: '기수·회차' });
+  const editor = panel.getByRole('region', { name: '합성 4기 편집' });
+  await expect(panel.getByRole('button', { name: /합성 4기 · 준비 중 · 100,000원/ })).toBeVisible();
+  await editor.getByRole('textbox', { name: '기수명' }).fill('합성 4기 수정');
+  await editor.getByRole('button', { name: '기수 저장' }).click();
+  await expect(page.getByLabel('합성 기수 저장 횟수')).toHaveText('1');
+  await expect(page.getByLabel('합성 저장 횟수')).toHaveText('0');
+  const mutation = JSON.parse(await page.getByLabel('합성 기수 요청').innerText());
+  expect(mutation).toMatchObject({ action: 'save', section: 'cohorts', id: 'synthetic-cohort', values: { name: '합성 4기 수정' } });
+  expect(mutation.values.course_id).toBeUndefined();
+});
+
+test('new product cohort is created as upcoming and invalid periods never submit', async ({ page }) => {
+  await page.goto('/product-sale-test');
+  await page.getByRole('tab', { name: '기수·회차' }).click();
+  const panel = page.getByRole('tabpanel', { name: '기수·회차' });
+  await panel.getByRole('button', { name: '+ 새 기수' }).click();
+  await page.getByRole('tab', { name: '수강·권한' }).click();
+  await expect(page.getByRole('combobox', { name: '연결 기수' })).toHaveValue('synthetic-cohort');
+  await page.getByRole('tab', { name: '기수·회차' }).click();
+  await panel.getByRole('button', { name: '+ 새 기수' }).click();
+  const editor = panel.getByRole('region', { name: '새 기수 등록' });
+  await editor.getByRole('textbox', { name: '기수명' }).fill('합성 5기');
+  await editor.getByRole('textbox', { name: '기수 코드' }).fill('FIFTH');
+  await editor.getByLabel('모집 시작 · KST').fill('2099-10-02T10:00');
+  await editor.getByLabel('모집 마감 · KST').fill('2099-10-01T10:00');
+  await editor.getByRole('button', { name: '기수 추가' }).click();
+  await expect(editor.getByRole('alert')).toContainText('종료일은 시작일 이후');
+  await expect(page.getByLabel('합성 기수 저장 횟수')).toHaveText('0');
+  await editor.getByLabel('모집 마감 · KST').fill('2099-10-03T10:00');
+  await editor.getByRole('button', { name: '기수 추가' }).click();
+  await expect(page.getByLabel('합성 기수 저장 횟수')).toHaveText('1');
+  await expect(page.getByLabel('합성 저장 횟수')).toHaveText('0');
+  const mutation = JSON.parse(await page.getByLabel('합성 기수 요청').innerText());
+  expect(mutation).toMatchObject({ action: 'save', section: 'cohorts', values: { course_id: 'synthetic-course', name: '합성 5기', cohort_code: 'FIFTH', status: 'upcoming', price: 100000 } });
+  await expect(panel.getByRole('button', { name: /합성 5기 · 준비 중 · 100,000원/ })).toBeVisible();
+});
