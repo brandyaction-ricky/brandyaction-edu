@@ -60,7 +60,7 @@ test('funnel rates distinguish measured zero, no data, zero denominator and snap
   assert.equal(funnelRate(null, 10), null); assert.equal(funnelRate(1, undefined), null);
   assert.equal(funnelRate(80, 20), 400);
 });
-const row = { campaign: 'qa', adset: '광고세트', creative: '소재', ad_type: 'unclassified', sessions: 2, visitors: 1, cta_click_sessions: 1, cta_clicks: 100, avg_dwell_ms: null, avg_scroll_depth: null, impressions: 0, link_clicks: 0, spend: 0, registrations: 7, registration_cost: 1758 };
+const row = { campaign: 'qa', adset: '광고세트', creative: '소재', ad_type: 'unclassified', sessions: 2, visitors: 1, cta_click_sessions: 1, cta_clicks: 100, avg_dwell_ms: null, avg_scroll_depth: null, impressions: 0, link_clicks: 0, spend: 0, registrations: 7, registration_cost: 1758, registration_available: true };
 const summary = { has_data: true, sessions: 100, visitors: 80, cta_click_sessions: 20, cta_clicks: 200, converted_visitors: 16, spend: 0, meta_impressions: 0, meta_link_clicks: 0 };
 const report = {
   campaign: { meta_campaign_ids: [], meta_ad_account_id: null, uses_ads: true }, summary_b: summary, summary_a: null,
@@ -88,7 +88,7 @@ test('material table exposes sort direction, insufficient count, saved classific
   assert.match(html, /저장됨 · 미분류/); assert.match(html, /1~10,000|원본 수치와 CSV는 유지/);
   assert.match(html, /등록완료/); assert.match(html, /1,758원/);
 });
-test('comparison percentages use percentage points and top three rank absolute CTA click sessions', () => {
+test('comparison percentages use percentage points and the misleading top-three block is removed', () => {
   const { PerformanceDashboard } = load('app/ui/landing/performance-dashboard.tsx');
   const rows = [
     { ...row, creative: 'two', sessions: 100, cta_click_sessions: 29 },
@@ -97,9 +97,9 @@ test('comparison percentages use percentage points and top three rank absolute C
     { ...row, creative: 'four', sessions: 100, cta_click_sessions: 2 },
   ];
   const html = renderToStaticMarkup(React.createElement(PerformanceDashboard, { report: { ...report, performance: rows, summary_a: { ...summary, sessions: 100, cta_click_sessions: 10 } }, compare: true, onClassify: async () => true }));
-  assert.match(html, /\+10%p/); assert.match(html, /CTA 클릭 수 기준/);
-  assert.ok(html.indexOf('one') < html.indexOf('two') && html.indexOf('two') < html.indexOf('three'));
-  assert.doesNotMatch(html.slice(html.indexOf('가장 많이 데려온 TOP 3'), html.indexOf('소재별 성과')), /four/);
+  assert.match(html, /\+10%p/); assert.match(html, /적용 필터 · 적용된 상세 필터 없음/);
+  assert.doesNotMatch(html, /가장 많이 데려온 TOP 3|CTA 클릭 수 기준/);
+  assert.ok(html.indexOf('소재별 성과') < html.indexOf('일별 방문·전환 추이'));
 });
 test('multi-source comparison separates paid and organic rows and never labels margin as profit', () => {
   const { MultiSourceComparison } = load('app/ui/landing/performance-dashboard.tsx');

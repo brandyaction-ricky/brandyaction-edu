@@ -19,6 +19,12 @@ export function metaActionValue(rows: ActionStat[] | undefined, action: string) 
   const exact = rows?.find(row => row.action_type === action), compatible = exact || rows?.find(row => row.action_type.endsWith(action));
   const value = Number(compatible?.value); return Number.isFinite(value) && value >= 0 ? value : null;
 }
+const REGISTRATION_ACTIONS = new Set(['complete_registration', 'offsite_conversion.fb_pixel_complete_registration']);
+export function metaRegistrationValue(rows: ActionStat[] | undefined) {
+  const exact = rows?.find(row => REGISTRATION_ACTIONS.has(row.action_type));
+  const value = Number(exact?.value);
+  return Number.isFinite(value) && value >= 0 ? value : null;
+}
 const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 function classify(error: MetaApiError | undefined, stage: MetaFailureStage, status: number) {
   const code = Number.isInteger(error?.code) ? error!.code! : null, subcode = Number.isInteger(error?.error_subcode) ? error!.error_subcode! : null;
@@ -78,11 +84,12 @@ export async function fetchMetaCampaign(input: { version: string; token: string;
   const insights = await graphPages<MetaInsight>(insightsUrl, input.token, 'insights');
   return insights.map(row => {
     if (row.campaign_id !== input.campaignId) throw new MetaSyncError('invalid_campaign', 'insights', false, null, null, null);
-    const ad = adsById.get(row.ad_id), linkClicks = metaActionValue(row.actions, 'link_click') || 0, registrations = metaActionValue(row.actions, 'complete_registration') || 0;
+    const ad = adsById.get(row.ad_id), linkClicks = metaActionValue(row.actions, 'link_click') || 0, registrationValue = metaRegistrationValue(row.actions);
     return { day: row.date_start, campaign_name: row.campaign_name || identity.name || input.campaignId, adset_name: row.adset_name || row.adset_id,
       creative_name: row.ad_name || ad?.name || row.ad_id, meta_campaign_id: row.campaign_id, meta_adset_id: row.adset_id, meta_ad_id: row.ad_id,
       meta_creative_id: ad?.creative?.id || null, impressions: Math.max(0, Number(row.impressions || 0)), link_clicks: Math.max(0, linkClicks),
-      spend: Math.max(0, Number(row.spend || 0)), registrations: Math.max(0, registrations), registration_cost: metaActionValue(row.cost_per_action_type, 'complete_registration') };
+      spend: Math.max(0, Number(row.spend || 0)), registrations: Math.max(0, registrationValue || 0), registration_available: registrationValue !== null,
+      registration_cost: registrationValue === null ? null : metaRegistrationValue(row.cost_per_action_type) };
   });
 }
 

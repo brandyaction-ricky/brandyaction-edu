@@ -24,6 +24,7 @@ export type PerformanceRow = {
   sessions: number; visitors: number; cta_click_sessions: number; cta_clicks: number;
   avg_scroll_depth: number | null; avg_dwell_ms: number | null;
   impressions: number; link_clicks: number; spend: number; registrations: number; registration_cost: number | null;
+  registration_available?: boolean | null;
 };
 export type ActualRow = {
   campaign_id: string; day: string; kakao_members: number | null; new_payments: number | null;
@@ -68,6 +69,14 @@ export function campaignRange(range: {startDay:string;endDay:string}, campaign: 
   const endDay = clamp(range.endDay), startDay = clamp(range.startDay);
   return { startDay: startDay > endDay ? endDay : startDay, endDay };
 }
+export function preserveCampaignPeriod(period: { preset: PerformancePreset; start: string; end: string; compare: boolean; compareStart: string; compareEnd: string }, campaign: Pick<PerformanceCampaign,'start_day'|'end_day'>) {
+  const fallbackPreset = period.preset === 'custom' ? '7d' : period.preset;
+  const requested = validDay(period.start) && validDay(period.end) && period.start <= period.end
+    ? { startDay: period.start, endDay: period.end }
+    : presetRange(fallbackPreset, campaign);
+  const range = campaignRange(requested, campaign), previous = previousRange(range.startDay, range.endDay);
+  return { ...period, start: range.startDay, end: range.endDay, compareStart: previous.startDay, compareEnd: previous.endDay };
+}
 export function validateDashboardRange(startDay: unknown, endDay: unknown, campaign: Pick<PerformanceCampaign,'start_day'|'end_day'>) {
   if (!validDay(startDay) || !validDay(endDay)) throw Error('조회 날짜를 확인해 주세요.');
   const length = (dateValue(endDay) - dateValue(startDay)) / DAY + 1;
@@ -85,8 +94,9 @@ export function delta(current: number, previous: number, previousHasData: boolea
   return { amount: current - previous, rate: previous === 0 ? null : (current - previous) / previous * 100 };
 }
 export function displayDimension(value: string) {
-  if (!value) return '미분류';
-  try { return decodeURIComponent(value.replace(/\+/g, ' ')); } catch { return value; }
+  // Dashboard RPC values are normalized once before reaching the UI.
+  // Decoding again here corrupts legitimate literal `%xx` names.
+  return value || '미분류';
 }
 export function filterValues(params: URLSearchParams, key: string, max = 50) {
   return params.getAll(key).map(value => value.slice(0, 250)).filter(Boolean).slice(0, max);
