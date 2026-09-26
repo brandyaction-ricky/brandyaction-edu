@@ -27,7 +27,8 @@ function platformRead() {
           const selected = call.filters.some(([column, value]) => (column === 'id' || column === 'course_id') && value === courseId);
           const data = table === 'courses' ? [{ id: courseId, title: '상품' }]
             : table === 'cohorts' ? selected ? [{ id: 'cohort', course_id: courseId }] : [{ id: 'cohort', course_id: courseId }, { id: 'other', course_id: otherId }]
-              : table === 'landing_configs' ? [{ id: courseId, kakao_url: '' }] : [];
+              : table === 'landing_configs' ? [{ id: courseId, kakao_url: '' }]
+                : table === 'curriculum_weeks' && selected ? [{ id: 'week', course_id: courseId, is_published: true, curriculum_lessons: [{ id: 'lesson', week_id: 'week', is_published: true }] }] : [];
           return Promise.resolve({ data, count: data.length, error: null }).then(resolve, reject);
         },
       };
@@ -55,7 +56,7 @@ function platformRead() {
   return { get: exports.GET, calls };
 }
 
-test('product editor reads only its course, cohorts and conversion settings', async () => {
+test('product editor reads its course, cohorts, conversion and minimal readiness pair', async () => {
   const { get, calls } = platformRead();
   const response = await get(new Request(`https://edu.example/api/platform?admin=1&section=products&record=${courseId}`));
   assert.equal(response.status, 200);
@@ -65,10 +66,16 @@ test('product editor reads only its course, cohorts and conversion settings', as
   assert.deepEqual(data.cohorts.map(row => row.course_id), [courseId]);
   assert.deepEqual(data.landing_configs.map(row => row.id), [courseId]);
   assert.equal(data.product_summary, undefined);
-  assert.deepEqual(new Set(calls.map(call => call.table)), new Set(['mission_submissions', 'courses', 'cohorts', 'landing_configs']));
+  assert.deepEqual(new Set(calls.map(call => call.table)), new Set(['mission_submissions', 'courses', 'cohorts', 'landing_configs', 'curriculum_weeks']));
   assert.deepEqual(calls.find(call => call.table === 'courses').filters, [['id', courseId]]);
   assert.equal(calls.find(call => call.table === 'courses').limit, 1);
   assert.deepEqual(calls.find(call => call.table === 'cohorts').filters, [['course_id', courseId]]);
+  const curriculum = calls.find(call => call.table === 'curriculum_weeks');
+  assert.equal(curriculum.limit, 1);
+  assert.deepEqual(curriculum.filters, [['course_id', courseId], ['is_published', true], ['curriculum_lessons.is_published', true]]);
+  assert.doesNotMatch(curriculum.columns, /\*|body|content/);
+  assert.deepEqual(data.curriculum_weeks, [{ id: 'week', course_id: courseId, is_published: true }]);
+  assert.deepEqual(data.curriculum_lessons, [{ id: 'lesson', week_id: 'week', is_published: true }]);
 });
 
 test('product catalog still reads publication checks and summary counts', async () => {

@@ -45,6 +45,19 @@ export function paidCourseReadinessIssues(course: Row, cohorts: Row[], weeks: Ro
   return issues;
 }
 
+// Presentation only: keep the customer's existing offer/publication rules unchanged.
+export function productSalesStatus(course: Row, cohorts: Row[], weeks: Row[], lessons: Row[], now = Date.now(), hasCustomCta = false) {
+  const ownCohorts = cohorts.filter(item => item.course_id === course.id);
+  const issues = paidCourseReadinessIssues(course, cohorts, weeks, lessons);
+  const available = ownCohorts.find(item => isPurchasableOffer(course, item, now));
+  if (course.status === 'published' && course.category !== 'free' && !available && !hasCustomCta) {
+    issues.push(ownCohorts.length ? '신청 가능한 기수 없음 · 기수 상태와 모집·운영 기간 확인' : '연결 기수 없음');
+  }
+  const label = course.status === 'published' ? issues.length ? '판매 보류' : '판매 중'
+    : course.status === 'archived' ? '판매 종료' : '작성 중';
+  return { label, issues, available, hasCustomCta, canApply: course.status === 'published' && !issues.length && Boolean(available || hasCustomCta) };
+}
+
 export function homepageCourses(courses: Row[], cohorts: Row[], now = Date.now()) {
   const recruitingIds = new Set(
     cohorts.filter(cohort => isRecruiting(cohort, now)).map(cohort => cohort.course_id),
