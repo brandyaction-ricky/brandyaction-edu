@@ -1,4 +1,4 @@
-/* Product editor: preserve the uploaded design's five-tab layout. */
+/* Product editor: preserve the established tabs and responsive layout. */
 .edu-admin .product-editor .editor-layout { grid-template-columns: minmax(0, 1fr) 315px; gap: 24px; }
 .edu-admin .product-editor .editor-main > .panel { overflow: hidden; }
 .edu-admin .product-editor .tabs { padding: 0 24px; margin: 0; gap: 24px; }
@@ -101,3 +101,22 @@
 .edu-admin .product-sale-check ul{padding-left:20px;margin:8px 0;list-style:disc}
 .edu-admin .product-sale-check .setting-line{gap:12px;flex-wrap:wrap}
 .edu-admin .side-preview .product-sale-check{padding:12px}
+
+.edu-admin .product-curriculum-workspace { display: grid; gap: 20px; }
+.edu-admin .product-curriculum-workspace > h2 { margin: 0; }
+.edu-admin .product-curriculum-workspace > .meta { margin: -12px 0 0; }
+.edu-admin .product-curriculum-create { display: flex; align-items: end; gap: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-subtle); }
+.edu-admin .product-curriculum-create label { flex: 1; min-width: 0; }
+.edu-admin .product-curriculum-workspace label { display: grid; gap: 8px; color: var(--ink); font-size: 13px; font-weight: 600; }
+.edu-admin .product-curriculum-workspace input,
+.edu-admin .product-curriculum-workspace select,
+.edu-admin .product-curriculum-workspace textarea { width: 100%; min-width: 0; margin: 0; }
+.edu-admin .product-curriculum-week,
+.edu-admin .product-curriculum-content { padding: 18px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.edu-admin .product-curriculum-week h3,
+.edu-admin .product-curriculum-content h3 { margin: 0 0 12px; }
+.edu-admin .product-curriculum-week ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.edu-admin .product-curriculum-week li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.edu-admin .product-curriculum-content { display: grid; gap: 14px; }
+.edu-admin .product-curriculum-content > .btn { justify-self: end; }
+@media (max-width: 720px) { .edu-admin .product-curriculum-create, .edu-admin .product-curriculum-week li { align-items: stretch; flex-direction: column; } .edu-admin .product-curriculum-create > .btn { width: 100%; } }

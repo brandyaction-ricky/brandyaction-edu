@@ -39,6 +39,23 @@ export async function GET(request: Request) {
         if (adminMode && (!operator || (sectionKey === 'staff' && operator.role !== 'admin'))) return reply({ error: '이 화면에 접근할 운영 권한이 필요합니다.', user }, 403);
         const db = adminMode ? createAdminClient() : await createClient();
         if (adminMode && !Object.hasOwn(adminTables, sectionKey)) return reply({ error: '조회 화면을 확인해 주세요.' }, 400);
+        // Keep the initial product editor read small. Load its curriculum only
+        // when the operator opens that tab, scoped to the selected product.
+        if (productEditorRead && params.get('part') === 'curriculum') {
+            const weekResult = await db.from('curriculum_weeks').select('*').eq('course_id', record!).order('week_number');
+            if (weekResult.error) return reply({ error: '상품 주차를 불러오지 못했습니다.' }, 500);
+            const weeks = (weekResult.data || []) as Row[];
+            const weekIds = weeks.map(week => String(week.id));
+            if (!weekIds.length) return reply({ data: { curriculum_weeks: [], curriculum_lessons: [], lesson_contents: [] } });
+            const lessonResult = await db.from('curriculum_lessons').select('*').in('week_id', weekIds).order('day_number');
+            if (lessonResult.error) return reply({ error: '상품 일차를 불러오지 못했습니다.' }, 500);
+            const lessons = (lessonResult.data || []) as Row[];
+            const lessonIds = lessons.map(lesson => String(lesson.id));
+            if (!lessonIds.length) return reply({ data: { curriculum_weeks: weeks, curriculum_lessons: [], lesson_contents: [] } });
+            const contentResult = await db.from('lesson_contents').select('*').in('lesson_id', lessonIds);
+            if (contentResult.error) return reply({ error: '학습 콘텐츠를 불러오지 못했습니다.' }, 500);
+            return reply({ data: { curriculum_weeks: weeks, curriculum_lessons: lessons, lesson_contents: contentResult.data || [] } });
+        }
         const settings = getEduSettings();
         let tables = productEditorRead ? ['courses', 'cohorts'] : adminMode ? adminTables[sectionKey] : ['courses', 'cohorts', 'curriculum_weeks', 'curriculum_lessons', 'articles', 'article_categories', 'review_videos', 'site_banners', 'reviews', 'cohort_sessions'];
         if (adminMode && sectionKey === 'home' && operator?.role === 'staff') tables = tables.filter((table) => (['courses', 'cohorts'].includes(table) && operator.permissions.products) || (['mission_submissions', 'edu_questions'].includes(table) && operator.permissions.members));

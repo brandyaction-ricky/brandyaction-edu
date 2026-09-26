@@ -64,12 +64,18 @@ test('operator checks reuse the already verified request user and preserve denie
   assert.equal(auth.calls(), 1);
 });
 
-function apiHarness(user, failure = null) {
-  const calls = { auth: 0, summaries: 0, tables: [] };
+function apiHarness(user, failure = null, fixtures = {}) {
+  const calls = { auth: 0, summaries: 0, tables: [], filters: [] };
   const db = {
     from(table) {
       calls.tables.push(table);
-      const query = new Proxy({}, { get: (_, key) => key === 'then' ? resolve => Promise.resolve({ data: [], error: null, count: 3 }).then(resolve) : () => query });
+      let rows = fixtures[table] || [];
+      const query = new Proxy({}, { get: (_, key) => {
+        if (key === 'then') return resolve => Promise.resolve({ data: rows, error: null, count: 3 }).then(resolve);
+        if (key === 'eq') return (field, value) => { calls.filters.push([table, 'eq', field, value]); rows = rows.filter(row => row[field] === value); return query; };
+        if (key === 'in') return (field, values) => { calls.filters.push([table, 'in', field, values]); rows = rows.filter(row => values.includes(row[field])); return query; };
+        return () => query;
+      } });
       return query;
     },
     async rpc() { calls.summaries++; return { data: { id: 'summary', pendingReviews: 3 }, error: null }; },
@@ -112,6 +118,34 @@ test('menu reads authenticate once and preserve review badges without full dashb
   assert.equal(api.calls.summaries, 0);
   assert.equal((await response.json()).data.admin_summary[0].pendingReviews, 3);
   assert.deepEqual(api.calls.tables.sort(), ['mission_submissions', 'site_banners']);
+});
+
+test('product curriculum tab loads on demand behind product permission', async () => {
+  const record = '12345678-1234-1234-1234-123456789012';
+  const other = '22222222-2222-2222-2222-222222222222';
+  const fixtures = {
+    curriculum_weeks: [{ id: 'week-1', course_id: record }, { id: 'week-other', course_id: other }],
+    curriculum_lessons: [{ id: 'lesson-1', week_id: 'week-1' }, { id: 'lesson-other', week_id: 'week-other' }],
+    lesson_contents: [{ lesson_id: 'lesson-1', body_text: 'visible' }, { lesson_id: 'lesson-other', body_text: 'hidden' }],
+  };
+  const api = apiHarness(admin, null, fixtures);
+  const response = await api.read(`products&record=${record}&part=curriculum`);
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).data, {
+    curriculum_weeks: [fixtures.curriculum_weeks[0]],
+    curriculum_lessons: [fixtures.curriculum_lessons[0]],
+    lesson_contents: [fixtures.lesson_contents[0]],
+  });
+  assert.deepEqual(api.calls.tables, ['curriculum_weeks', 'curriculum_lessons', 'lesson_contents']);
+  assert.deepEqual(api.calls.filters, [
+    ['curriculum_weeks', 'eq', 'course_id', record],
+    ['curriculum_lessons', 'in', 'week_id', ['week-1']],
+    ['lesson_contents', 'in', 'lesson_id', ['lesson-1']],
+  ]);
+  assert.equal(api.calls.auth, 1);
+  const denied = apiHarness(null);
+  assert.equal((await denied.read(`products&record=${record}&part=curriculum`)).status, 401);
+  assert.deepEqual(denied.calls.tables, []);
 });
 
 test('the operating home still returns the full dashboard aggregate', async () => {

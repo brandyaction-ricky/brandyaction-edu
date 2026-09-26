@@ -23,3 +23,18 @@ test('ready upcoming offer remains available and warns without changing cohort s
   await page.getByRole('button', { name: '저장하기', exact: true }).click();
   await expect(page.getByLabel('합성 저장 횟수')).toHaveText('1');
 });
+
+test('product curriculum tab loads existing scoped lessons without submitting the product form', async ({ page }) => {
+  await page.goto('/product-sale-test');
+  const tab = page.getByRole('tab', { name: '커리큘럼' });
+  await tab.click();
+  const panel = page.getByRole('tabpanel', { name: '커리큘럼' });
+  await expect(panel.getByRole('heading', { name: /1주차 · 기존 합성 주차/ })).toBeVisible();
+  await expect(panel.getByText(/Day 1 · 기존 합성 학습/)).toBeVisible();
+  await panel.getByRole('button', { name: '콘텐츠 편집' }).click();
+  await expect(panel.getByRole('textbox', { name: '학습 본문' })).toHaveValue('기존 학습 본문');
+  await panel.getByRole('textbox', { name: '새 주차 제목' }).fill('새 주차');
+  await panel.getByRole('textbox', { name: '새 주차 제목' }).press('Enter');
+  await expect(page.getByLabel('합성 저장 횟수')).toHaveText('0');
+  await expect(page.getByRole('button', { name: '저장하기', exact: true })).toHaveCount(0);
+});
