@@ -102,8 +102,6 @@
 .edu-admin .product-sale-check ul{padding-left:20px;margin:8px 0;list-style:disc}
 .edu-admin .product-sale-check .setting-line{gap:12px;flex-wrap:wrap}
 .edu-admin .side-preview .product-sale-check{padding:12px}
-.product-visibility-toggle { display: flex; align-items: center; gap: 12px; min-height: 44px; font-weight: 600; cursor: pointer; }
-.product-visibility-toggle input[type="checkbox"] { width: 20px; height: 20px; flex: 0 0 20px; accent-color: var(--red, #cf202f); }
 
 .edu-admin .product-curriculum-workspace { display: grid; gap: 20px; }
 .edu-admin .product-curriculum-workspace > h2 { margin: 0; }
@@ -158,6 +156,8 @@
 .edu-admin .product-mission-options input { width: 18px; height: 18px; min-height: 18px; margin: 0; }
 .edu-admin .product-mission-fields > .btn { justify-self: end; }
 @media (max-width: 720px) { .edu-admin .product-mission-week, .edu-admin .product-mission-fields { padding: 16px; } .edu-admin .product-mission-day li { align-items: stretch; flex-direction: column; } .edu-admin .product-mission-fields > .btn { width: 100%; } }
+.product-visibility-toggle { display: flex; align-items: center; gap: 12px; min-height: 44px; font-weight: 600; cursor: pointer; }
+.product-visibility-toggle input[type="checkbox"] { width: 20px; height: 20px; flex: 0 0 20px; accent-color: var(--red, #cf202f); }
 
 .edu-admin .product-curriculum-guide { padding: 18px 20px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-subtle); font-size: 14px; line-height: 1.7; }
 .edu-admin .product-curriculum-guide h3 { margin: 0 0 8px; font-size: 15px; }
