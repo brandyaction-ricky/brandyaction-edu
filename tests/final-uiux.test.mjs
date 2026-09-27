@@ -414,6 +414,19 @@ test('campaign class keeps published content and one responsive sticky CTA', () 
   assert.doesNotMatch(paid, /href="https:\/\/open.kakao.com\/o\/testRoom"/);
 });
 
+test('paid product offers remain open with no published curriculum', () => {
+  const { ProductDetail } = load('app/ui/final/public-views.tsx');
+  for (const curriculum of [
+    { curriculum_weeks: [], curriculum_lessons: [] },
+    { curriculum_weeks: [{ ...data.curriculum_weeks[0], is_published: false }], curriculum_lessons: [{ ...lesson, is_published: false }] },
+  ]) {
+    const markup = html(ProductDetail, { course, data: { ...data, ...curriculum, enrollments: [], lesson_contents: [] } });
+    assert.match(markup, /href="\/checkout/);
+    assert.doesNotMatch(markup, /수강 신청을 준비하고 있습니다/);
+    assert.doesNotMatch(markup, /등록된 학습 본문/);
+  }
+});
+
 test('paid products hide mismatched free-class HTML and block checkout until ready', () => {
   const { ProductDetail } = load('app/ui/final/public-views.tsx');
   const mismatched = { ...course, duration_label: '', schedule_label: '', metadata: { detail_html_document: '<h1>무료 라이브 강의</h1><a href="https://open.kakao.com/o/room">무료강의 대기방 입장</a>' } };

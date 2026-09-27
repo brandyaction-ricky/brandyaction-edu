@@ -185,7 +185,7 @@ function StandardProductDetail({
   const mismatchedFreeContent = !free && containsFreeClassCampaign(documentSource || detailHtml);
   const visibleDocumentSource = mismatchedFreeContent ? '' : documentSource;
   const visibleDetailHtml = mismatchedFreeContent ? '' : detailHtml;
-  const readinessIssues = paidCourseReadinessIssues(c, cohorts, data.curriculum_weeks || [], data.curriculum_lessons || []);
+  const readinessIssues = paidCourseReadinessIssues(c, cohorts);
   const readyForSale = readinessIssues.length === 0;
   if (!readyForSale) available = undefined;
   const conversion = productConversion(meta);

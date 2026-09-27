@@ -16,6 +16,11 @@ function message(error: unknown) {
   return error instanceof Error ? error.message : "저장하지 못했습니다. 다시 시도해 주세요.";
 }
 
+function lessonVisibility(lesson: Row, week?: Row) {
+  if (!lesson.is_published) return "비공개";
+  return week?.is_published ? "공개" : "주차 비공개로 숨김";
+}
+
 function WeekSettings({ week, disabled, send, onSaved }: {
   week: Row;
   disabled: boolean;
@@ -125,6 +130,16 @@ export function ProductCurriculumWorkspace({ course, pending, send, commonResour
   const [savedContentDraft, setSavedContentDraft] = useState("");
   const [openedLessons, setOpenedLessons] = useState<string[]>([]);
   const contentEditorRef = useRef<HTMLElement>(null);
+  const weekSettingsRefs = useRef(new Map<string, HTMLDetailsElement>());
+  function openWeekSettings(id: string) {
+    const settings = weekSettingsRefs.current.get(id);
+    if (!settings) return;
+    const outline = settings.parentElement;
+    if (outline instanceof HTMLDetailsElement) outline.open = true;
+    settings.open = true;
+    settings.querySelector("summary")?.focus({ preventScroll: true });
+    settings.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
   const [contentType, setContentType] = useState<ContentType>("text");
   const [contentValue, setContentValue] = useState("");
   const [resourceName, setResourceName] = useState("");
@@ -227,9 +242,10 @@ export function ProductCurriculumWorkspace({ course, pending, send, commonResour
   return <div className="section-pad product-curriculum-workspace">
     <h2>상품별 커리큘럼</h2>
     <p className="meta">학습 편집을 선택해 본문·영상·자료와 미션을 함께 관리합니다. 같은 상품의 모든 기수가 이 커리큘럼을 함께 사용합니다.</p>
-    <section className="product-curriculum-guide" aria-label="공개 커리큘럼 준비">
-      <div className="curriculum-readiness"><h3>공개 커리큘럼 준비</h3>{!loading && !readError && <span role="status">공개 주차 <b>{publishedWeeks.length}개</b> · 공개 학습 <b>{publishedLessons.length}개</b></span>}</div>
-      <p>{loading || readError ? "커리큘럼을 정상적으로 불러온 뒤 준비 상태를 확인할 수 있습니다." : publishedWeeks.length && publishedLessons.length ? "커리큘럼 준비 완료 · 나머지 판매 조건은 기본·판매 탭에서 확인하세요." : "유료 클래스는 주차와 그 안의 학습을 하나 이상 공개하면 커리큘럼 조건을 충족합니다."}</p>
+    <section className="product-curriculum-guide" aria-label="학습 공개 상태">
+      <div className="curriculum-readiness"><h3>학습 공개 상태</h3>{!loading && !readError && <span role="status">공개 주차 <b>{publishedWeeks.length}개</b> · 공개 학습 <b>{publishedLessons.length}개</b></span>}</div>
+      <p>{loading || readError ? "커리큘럼을 정상적으로 불러온 뒤 준비 상태를 확인할 수 있습니다." : publishedWeeks.length && publishedLessons.length ? "공개된 학습이 있습니다. 수강생에게 제공할 내용을 확인해 주세요." : "아직 수강생에게 공개되는 학습이 없습니다. 수업 준비가 끝나면 주차와 일차를 각각 공개해 주세요."}</p>
+      <p>커리큘럼이 비공개여도 상품 모집과 결제를 진행할 수 있습니다. 판매 설정은 기본·판매 탭에서 확인하세요.</p>
       <details><summary>공개 범위와 등록 방법</summary><p>주차를 추가하고 학습 내용을 저장한 다음, 주차 공개와 일차 공개를 각각 저장합니다. 상세페이지에 적은 목차는 이 설정에 반영되지 않습니다.</p><p>공개한 제목은 상품 목차에 표시됩니다. 학습 내용은 기존 수강 권한에 따라 열리며, 공개 체크가 무료 미리보기 허용을 뜻하지는 않습니다.</p><p>가격과 모집·교육 일정은 기수·회차 탭에서 관리합니다. 같은 상품의 기수는 커리큘럼을 공유합니다.</p></details>
     </section>
     <details className="curriculum-copy-disclosure"><summary>기존 커리큘럼 불러오기</summary><CurriculumCopyPanel targetId={String(course.id)} eligible={t(course, "status") === "draft" && !(curriculum.curriculum_weeks || []).length && resourceCount === 0} disabled={saving} dirty={productDirty || Boolean(weekTitle.trim()) || Boolean(lessonTitle.trim())} onCopied={() => { setLoading(true); setReadVersion(version => version + 1); }} /></details>
@@ -244,8 +260,8 @@ export function ProductCurriculumWorkspace({ course, pending, send, commonResour
     {!weeks.length && <p className="notice">먼저 주차를 추가해 주세요.</p>}
     {weeks.map((week) => <section key={week.id} className="product-curriculum-week" aria-label={`${num(week, "week_number")}주차 ${t(week, "title")}`}>
       <details open><summary><h3>{num(week, "week_number")}주차 · {t(week, "title")}</h3><span className="meta">{lessons.filter(l=>l.week_id===week.id).length}개 학습 · {week.is_published ? "공개" : "비공개"}</span></summary>
-      <details className="curriculum-week-settings"><summary>주차 설정</summary><WeekSettings key={`${week.id}:${week.updated_at}`} week={week} disabled={saving} send={send} onSaved={() => { setLoading(true); setReadVersion((version) => version + 1); }} /></details>
-      {lessons.filter((lesson) => lesson.week_id === week.id).length ? <ul>{lessons.filter((lesson) => lesson.week_id === week.id).map((lesson) => <li key={lesson.id} className={lesson.id === lessonId ? "selected" : ""}><div><span>Day {num(lesson, "day_number")} · {t(lesson, "title")}</span><small>{({text:"텍스트",vod:"영상",material:"자료",link:"외부 링크"} as Record<string,string>)[t(lesson,"content_type")] || "학습"} · {(curriculum.lesson_contents || []).some(c=>c.lesson_id===lesson.id) ? "내용 등록됨" : "내용 없음"} · {lesson.is_published ? "공개" : "비공개"}</small></div><button className="btn small" type="button" aria-pressed={lesson.id===lessonId} onClick={() => selectLesson(lesson)} disabled={saving}>학습 편집</button></li>)}</ul> : <p className="meta">등록된 학습이 없습니다.</p>}
+      <details className="curriculum-week-settings" ref={element => { if (element) weekSettingsRefs.current.set(String(week.id), element); else weekSettingsRefs.current.delete(String(week.id)); }}><summary>주차 설정</summary><WeekSettings key={`${week.id}:${week.updated_at}`} week={week} disabled={saving} send={send} onSaved={() => { setLoading(true); setReadVersion((version) => version + 1); }} /></details>
+      {lessons.filter((lesson) => lesson.week_id === week.id).length ? <ul>{lessons.filter((lesson) => lesson.week_id === week.id).map((lesson) => <li key={lesson.id} className={lesson.id === lessonId ? "selected" : ""}><div><span>Day {num(lesson, "day_number")} · {t(lesson, "title")}</span><small>{({text:"텍스트",vod:"영상",material:"자료",link:"외부 링크"} as Record<string,string>)[t(lesson,"content_type")] || "학습"} · {(curriculum.lesson_contents || []).some(c=>c.lesson_id===lesson.id) ? "내용 등록됨" : "내용 없음"} · {lessonVisibility(lesson, week)}</small></div><button className="btn small" type="button" aria-pressed={lesson.id===lessonId} onClick={() => selectLesson(lesson)} disabled={saving}>학습 편집</button></li>)}</ul> : <p className="meta">등록된 학습이 없습니다.</p>}
       <button className="btn small curriculum-add-lesson" type="button" disabled={saving} onClick={()=>{setWeekId(String(week.id));setAddingTo(String(week.id));}}>＋ 학습 추가</button>
       {addingTo === week.id && <div className="product-curriculum-create"><label>새 일차 제목<input autoFocus value={lessonTitle} maxLength={300} onChange={event=>setLessonTitle(event.target.value)} disabled={saving}/></label><button type="button" className="btn" disabled={saving || !lessonTitle.trim()} onClick={()=>void createLesson()}>일차 추가</button></div>}
       </details>
@@ -256,6 +272,10 @@ export function ProductCurriculumWorkspace({ course, pending, send, commonResour
     {selectedLesson && <section ref={contentEditorRef} tabIndex={-1} className="product-curriculum-content" aria-label="일차별 콘텐츠 편집">
       <header className="curriculum-editor-heading"><div><p className="meta">{num(weeks.find(w=>w.id===selectedLesson.week_id), "week_number")}주차 · 선택한 학습</p><h3>Day {num(selectedLesson, "day_number")} · {t(selectedLesson, "title")}</h3></div><button className="btn small" type="button" aria-expanded={previewOpen} onClick={()=>setPreviewOpen(value=>!value)}>{previewOpen ? "미리보기 닫기" : "학습 내용 미리보기"}</button></header>
       {previewOpen && <div className="curriculum-lesson-preview" role="region" aria-label="학습 내용 미리보기"><p className="meta">현재 편집 내용의 미리보기입니다. 저장·공개·수강 권한은 변경되지 않습니다.</p>{contentType === "text" ? <p className="reading-copy">{contentValue || "아직 작성한 내용이 없습니다."}</p> : contentType === "vod" && safeUrl(contentValue) ? <Video url={contentValue}/> : <p>{contentType === "material" ? resourceName || "학습 자료" : contentValue}</p>}</div>}
+      <div className="notice" aria-label="저장된 학습 공개 상태">
+        <p><b>{lessonVisibility(selectedLesson, weeks.find(week => week.id === selectedLesson.week_id))}</b> · 저장된 설정 기준</p>
+        {!weeks.find(week => week.id === selectedLesson.week_id)?.is_published && <><p>상위 주차가 비공개입니다. 일차 공개를 저장해도 수강생에게 보이지 않습니다. 주차를 공개하면 그 안의 공개된 학습도 함께 표시되므로 먼저 확인해 주세요.</p><button type="button" className="btn small" onClick={() => openWeekSettings(String(selectedLesson.week_id))}>이 학습의 주차 설정</button></>}
+      </div>
       {openedLessons.map(id => { const draftLesson = lessons.find(item=>item.id===id); return draftLesson && <div key={id} hidden={lessonId!==id}><LessonSettings key={`${draftLesson.id}:${draftLesson.updated_at}`} lesson={draftLesson} hasContent={(curriculum.lesson_contents || []).some(item=>item.lesson_id===id)} disabled={saving} send={send} onSaved={() => { setLoading(true); setReadVersion((version) => version + 1); }} /></div>; })}
       <label>콘텐츠 유형<select value={contentType} onChange={(event) => { setContentType(event.target.value as ContentType); setContentValue(""); setUploadStatus("idle"); }} disabled={saving}><option value="text">텍스트</option><option value="vod">영상 URL</option><option value="material">자료 파일</option><option value="link">외부 링크</option></select></label>
       {contentType === "text" ? <label>학습 본문<textarea rows={7} value={contentValue} onChange={(event) => setContentValue(event.target.value)} disabled={saving} /></label> : contentType === "material" ? <><label>자료 이름<input value={resourceName} onChange={(event) => setResourceName(event.target.value)} disabled={saving} /></label><UploadField key={lessonId} name="curriculum_resource" value={contentValue} image={false} disabled={saving} onChange={setContentValue} onStatusChange={setUploadStatus} /></> : <label>{contentType === "vod" ? "영상 URL" : "외부 링크"}<input type="url" value={contentValue} onChange={(event) => setContentValue(event.target.value)} placeholder="https://" disabled={saving} /></label>}
