@@ -419,8 +419,10 @@ test('paid products hide mismatched free-class HTML and block checkout until rea
   const mismatched = { ...course, duration_label: '', schedule_label: '', metadata: { detail_html_document: '<h1>무료 라이브 강의</h1><a href="https://open.kakao.com/o/room">무료강의 대기방 입장</a>' } };
   const markup = html(ProductDetail, { course: mismatched, data: { ...data, enrollments: [], curriculum_weeks: [], curriculum_lessons: [] } });
   assert.doesNotMatch(markup, /무료강의 대기방 입장/);
-  assert.match(markup, /무료 클래스 안내와 외부 참여 링크는 노출하지 않습니다/);
-  assert.match(markup, /학습 기간 · 일정 안내 · 공개 커리큘럼/);
+  assert.match(markup, /클래스 상세 안내를 준비하고 있습니다/);
+  assert.doesNotMatch(markup, /무료 클래스 안내와 외부 참여 링크는 노출하지 않습니다/);
+  assert.doesNotMatch(markup, /학습 기간 · 일정 안내 · 공개 커리큘럼/);
+  assert.match(markup, /수강 신청을 준비하고 있습니다/);
   assert.match(markup, /aria-disabled="true"/);
 });
 
