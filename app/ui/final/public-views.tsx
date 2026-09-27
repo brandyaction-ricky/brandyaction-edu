@@ -563,14 +563,32 @@ export function ArticlesView({
   data,
   user,
   loading,
+  error = false,
+  query: controlledQuery,
+  onQueryChange,
+  type: controlledType,
+  onTypeChange,
+  pagination,
+  onPageChange,
 }: {
   slug?: string;
   data: Data;
   user: User | null;
   loading: boolean;
+  error?: boolean;
+  query?: string;
+  onQueryChange?: (value: string) => void;
+  type?: string;
+  onTypeChange?: (value: string) => void;
+  pagination?: { page: number; pageSize: number; total: number } | null;
+  onPageChange?: (page: number) => void;
 }) {
-  const [query, setQuery] = useState(""),
-    [type, setType] = useState("전체");
+  const [localQuery, setLocalQuery] = useState(""),
+    [localType, setLocalType] = useState("전체");
+  const query = controlledQuery ?? localQuery;
+  const type = controlledType ?? localType;
+  const setQuery = onQueryChange ?? setLocalQuery;
+  const setType = onTypeChange ?? setLocalType;
   const all = data.articles || [],
     a = all.find((a) => a.slug === slug);
   if (slug)
@@ -614,7 +632,7 @@ export function ArticlesView({
         ) : (
           <Empty
             title={
-              loading ? "불러오는 중입니다." : "아티클을 찾을 수 없습니다."
+              loading ? "불러오는 중입니다." : error ? "아티클을 불러오지 못했습니다." : "아티클을 찾을 수 없습니다."
             }
           />
         )}
@@ -662,12 +680,17 @@ export function ArticlesView({
         {filtered.map((a) => (
           <ArticleCard key={a.id} article={a} />
         ))}
-        {!loading && !filtered.length && (
+        {!loading && !error && !filtered.length && (
           <Empty title="조회된 아티클이 없습니다.">
             <div className="row center mt16"><Link className="btn primary" href="/classes?type=free">무료 클래스 보기</Link><Link className="btn" href="/classes">전체 클래스 보기</Link></div>
           </Empty>
         )}
       </div>
+      {pagination && onPageChange && pagination.total > pagination.pageSize && <div className="row center mt24" aria-label="아티클 페이지">
+        <button className="btn" type="button" disabled={pagination.page <= 1} onClick={() => onPageChange(pagination.page - 1)}>이전</button>
+        <span>{pagination.page} / {Math.ceil(pagination.total / pagination.pageSize)}</span>
+        <button className="btn" type="button" disabled={pagination.page >= Math.ceil(pagination.total / pagination.pageSize)} onClick={() => onPageChange(pagination.page + 1)}>다음</button>
+      </div>}
       </section>
     </div>
   );
@@ -675,9 +698,11 @@ export function ArticlesView({
 export function StoriesView({
   data,
   loading,
+  error = false,
 }: {
   data: Data;
   loading: boolean;
+  error?: boolean;
 }) {
   const stories = data.review_videos || [];
   const [selectedId, setSelectedId] = useState("");
@@ -715,7 +740,7 @@ export function StoriesView({
               <span>{t(s, "reviewer_name")} · {t(s, "reviewer_role")}</span>
             </button>
           ))}
-          {!loading && !stories.length && (
+          {!loading && !error && !stories.length && (
             <Empty title="공개된 고객 이야기가 없습니다.">
               <div className="row center mt16"><Link className="btn primary" href="/classes?type=free">무료 클래스 보기</Link><Link className="btn" href="/my/questions">문의하기</Link></div>
             </Empty>

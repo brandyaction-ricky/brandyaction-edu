@@ -3,12 +3,18 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
 import { submissionReview } from './helpers/submission-review.mjs';
+import { productVisibility } from './helpers/product-visibility.mjs';
 
 function load(path, dependencies = {}) {
   const code = ts.transpileModule(fs.readFileSync(new URL('../' + path, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const exports = {};
   new Function('exports', 'require', code)(exports, name => {
     if (name === '@/lib/submission-review') return submissionReview;
+    if (name === '@/lib/product-visibility') return productVisibility;
+    if (name === '@/lib/public-platform-data') return { getPublicPlatformData: async () => ({ data: {}, pagination: null }), getPublicSupport: async () => ({}) };
+    if (name === '@/lib/public-platform-plan') return { PUBLIC_CACHE_TAG: 'test' };
+    if (name === '@/lib/member-platform-data') return { readMemberPlatformData: async () => ({}) };
+    if (name === 'next/cache') return { revalidateTag: () => {} };
     if (!(name in dependencies)) throw Error(name);
     return dependencies[name];
   });

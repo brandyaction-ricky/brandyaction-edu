@@ -12,6 +12,7 @@ import {
 } from "@/lib/platform";
 import { productSalesStatus, recordId } from "@/lib/platform-rules";
 import { productConversion } from "@/lib/product-conversion";
+import { isProductListed } from "@/lib/product-visibility";
 import { archiveValues, cohortPeriod, cohortStatus } from "@/lib/qa-rules";
 import { ArrowRight, BookOpen, ChevronDown, ChevronUp, FileText, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import Link from "next/link";
@@ -288,6 +289,7 @@ export function AdminCatalog({
               <button className="title-btn" onClick={() => edit(s, r)}>
                 {t(r, "title")}
               </button>
+              {!isProductListed(r) && <Badge>비노출</Badge>}
             </div>
           </div>
         ),
