@@ -308,6 +308,8 @@ async function sendPurchaseEmailWithLog(runId: string, triggerKey: string, membe
 export async function dispatchDueCrm() {
   if (process.env.CRM_DELIVERY_ENABLED !== "true")
     return { disabled: true, campaigns: 0, automations: 0, sent: 0, failed: 0 };
+  // Isolate purchase QA from pre-existing campaign and marketing queues.
+  const purchaseOnly = process.env.CRM_AUTOMATIONS_PURCHASE_ONLY === "true";
   const smsSettings = await loadSmsSettings();
   const smsAvailable = Boolean(provider(smsSettings.senderPhone));
   if (!smsAvailable && !purchaseEmailConfigured())
@@ -317,7 +319,7 @@ export async function dispatchDueCrm() {
     failed = 0,
     campaigns = 0,
     automations = 0;
-  const campaignQuery = smsAvailable ? await db
+  const campaignQuery = smsAvailable && !purchaseOnly ? await db
     .from("crm_campaigns")
     .select("*,template:crm_templates(*)")
     .eq("status", "scheduled")
@@ -428,7 +430,7 @@ export async function dispatchDueCrm() {
     )
     .eq("status", "pending")
     .lte("scheduled_for", new Date().toISOString());
-  if (!smsAvailable) runQuery = runQuery.like("trigger_key", "purchase_completed:%");
+  if (!smsAvailable || purchaseOnly) runQuery = runQuery.like("trigger_key", "purchase_completed:%");
   const runResult = await runQuery
     .order("scheduled_for")
     .limit(100);
@@ -436,6 +438,7 @@ export async function dispatchDueCrm() {
   for (const run of runResult.data) {
     const purchaseRun = run.automation.trigger_type === "purchase_completed" &&
       run.automation.template.purpose === "transactional";
+    if (purchaseOnly && !purchaseRun) continue;
     if (!smsAvailable && !purchaseRun) continue;
     const purpose = run.automation.template.purpose;
     if (purpose === "marketing") {
