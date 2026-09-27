@@ -5,6 +5,7 @@ async function setup(page: import('@playwright/test').Page) {
  await page.route('**/api/platform/curriculum-copy?**',route=>route.fulfill({json:new URL(route.request().url()).searchParams.has('source')?{preview:{sourceId:source,title:'이전 상품',revision:'a'.repeat(32),weeks:6,lessons:12,contents:10,missions:6,quizzes:2,resources:1}}:{sources:[{id:source,title:'이전 상품',course_code:'OLD'}],hasMore:false}}));
  await page.goto('/product-sale-test?draft=1');
  await page.getByRole('tab',{name:'커리큘럼',exact:true}).click();
+ await page.locator('summary').filter({hasText:'기존 커리큘럼 불러오기'}).click();
 }
 test('copy previews scope, retries with same request and stays private without product form submission',async({page})=>{
  await setup(page);
@@ -30,5 +31,6 @@ test('copy is unavailable for existing curriculum and unsaved product changes',a
  await page.getByRole('tab',{name:'커리큘럼',exact:true}).click();
  await expect(page.getByRole('button',{name:'원본 상품 선택'})).toBeDisabled();
  await page.goto('/product-sale-test');await page.getByRole('tab',{name:'커리큘럼',exact:true}).click();
+ await page.locator('summary').filter({hasText:'기존 커리큘럼 불러오기'}).click();
  await expect(page.getByRole('button',{name:'원본 상품 선택'})).toBeDisabled();
 });

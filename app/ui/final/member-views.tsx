@@ -408,6 +408,7 @@ function Dashboard({
                 <div>
                   <Badge color="green">답변 완료</Badge>
                   <h3>{t(q, "title")}</h3>
+          {Boolean(q.learning_context) && <p className="meta">{t(q, "learning_context")}</p>}
                   <p>강사의 답변을 확인해 주세요.</p>
                 </div>
                 <ChevronRight />
@@ -714,6 +715,7 @@ function Questions({
             <span className="meta">{date(q.created_at)}</span>
           </div>
           <h3>{t(q, "title")}</h3>
+          {Boolean(q.learning_context) && <p className="meta">{t(q, "learning_context")}</p>}
           <p className="reading-copy">{t(q, "content")}</p>
           {q.answer ? (
             <div className="answer">
@@ -1252,7 +1254,7 @@ export function MemberViews({
   order?: string | null;
 }) {
   const enrollments = rows(data, "enrollments"),
-    active = enrollments.filter(hasLearningAccess);
+    active = enrollments.filter(enrollment => hasLearningAccess(enrollment));
   let content;
   switch (section) {
     case "":
