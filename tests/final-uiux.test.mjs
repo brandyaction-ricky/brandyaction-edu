@@ -302,8 +302,8 @@ test('catalogues and separate editors render without dropping existing fields', 
   assert.doesNotMatch(markup, /상품 주소 \(slug\)|검색 결과에 표시할 설명|class="snippet"/);
   assert.doesNotMatch(markup, /200,000자|권장 제작 기준/);
   assert.doesNotMatch(markup, /상세 본문 · HTML|본문 미리보기|텍스트 상세 설명|무료 라이브 CTA·이미지 관리/);
-  assert.match(markup, /업로드할 파일 선택하기/);
-  assert.match(markup, /파일별로 공개 범위를 설정/);
+  assert.match(markup, /id="product-tab-curriculum"/);
+  assert.doesNotMatch(markup, /id="product-tab-(?:resources|missions)"/);
   assert.doesNotMatch(markup, /자료를 연결할 학습 만들기/);
   assert.match(markup, /editor-savebar/);
   const productEditorSource = read('app/ui/final/admin-editors.tsx');

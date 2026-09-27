@@ -31,7 +31,7 @@ test('product curriculum tab loads existing scoped lessons without submitting th
   const panel = page.getByRole('tabpanel', { name: '커리큘럼' });
   await expect(panel.getByRole('heading', { name: /1주차 · 기존 합성 주차/ })).toBeVisible();
   await expect(panel.getByText(/Day 1 · 기존 합성 학습/)).toBeVisible();
-  await panel.getByRole('button', { name: '콘텐츠 편집' }).click();
+  await panel.getByRole('button', { name: '학습 편집' }).click();
   await expect(panel.getByRole('textbox', { name: '학습 본문' })).toHaveValue('기존 학습 본문');
   await panel.getByRole('textbox', { name: '새 주차 제목' }).fill('새 주차');
   await panel.getByRole('textbox', { name: '새 주차 제목' }).press('Enter');
@@ -51,7 +51,7 @@ test('existing week and day can be edited and published in product curriculum wi
   expect(JSON.parse(await page.getByLabel('합성 커리큘럼 요청').innerText())).toMatchObject({
     action: 'save', section: 'weeks', id: 'synthetic-week', values: { title: '수정된 주차', is_published: true },
   });
-  await week.getByRole('button', { name: '콘텐츠 편집' }).click();
+  await week.getByRole('button', { name: '학습 편집' }).click();
   const lesson = panel.getByRole('region', { name: '일차별 콘텐츠 편집' });
   await lesson.getByRole('textbox', { name: '일차 제목' }).fill('수정된 일차');
   await lesson.getByRole('checkbox', { name: '일차 공개' }).check();
@@ -104,10 +104,11 @@ test('new product cohort is created as upcoming and invalid periods never submit
   await expect(panel.getByRole('button', { name: /합성 5기 · 준비 중 · 100,000원/ })).toBeVisible();
 });
 
-test('product mission tab edits only the scoped existing mission without submitting the product', async ({ page }) => {
+test('integrated curriculum edits only the selected lesson mission without submitting the product', async ({ page }) => {
   await page.goto('/product-sale-test');
-  await page.getByRole('tab', { name: '미션' }).click();
-  const panel = page.getByRole('tabpanel', { name: '미션' });
+  await page.getByRole('tab', { name: '커리큘럼' }).click();
+  await page.getByRole('button', { name: '학습 편집' }).click();
+  const panel = page.getByRole('tabpanel', { name: '커리큘럼' });
   await expect(panel.getByRole('region', { name: '1주차 미션' }).getByText(/Day 1 · 기존 합성 학습/)).toBeVisible();
   await expect(panel.getByText(/기존 합성 미션 · 비공개 · 필수/)).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
@@ -124,7 +125,8 @@ test('product mission tab edits only the scoped existing mission without submitt
 
 test('new product mission is tied to its lesson and remains hidden until reviewed', async ({ page }) => {
   await page.goto('/product-sale-test');
-  await page.getByRole('tab', { name: '미션' }).click();
+  await page.getByRole('tab', { name: '커리큘럼' }).click();
+  await page.getByRole('button', { name: '학습 편집' }).click();
   const editor = page.getByRole('region', { name: '새 미션 등록' });
   await editor.getByRole('textbox', { name: '미션 제목' }).fill('새 합성 미션');
   await editor.getByRole('textbox', { name: '미션 제목' }).press('Enter');
@@ -158,7 +160,7 @@ test('sale blocker leads to curriculum setup without losing product edits, and p
   await expect(guide.getByRole('status')).toContainText('공개 주차 1개');
   await expect(guide.getByRole('status')).toContainText('공개 주차 안의 공개 학습 0개');
   await expect(page.locator('aside').getByText('판매 보류', { exact: true })).toBeVisible();
-  await panel.getByRole('button', { name: '콘텐츠 편집' }).click();
+  await panel.getByRole('button', { name: '학습 편집' }).click();
   lesson.is_published = true;
   await panel.getByRole('checkbox', { name: '일차 공개' }).check();
   await panel.getByRole('button', { name: '일차 저장' }).click();
@@ -184,4 +186,62 @@ test('curriculum guidance does not count a public lesson under a private week or
   await page.getByRole('tab', { name: '커리큘럼', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('조회 실패 시험');
   await expect(guide.getByRole('status')).toHaveCount(0);
+});
+
+
+test('curriculum contains common materials, preserves permissions and keeps drafts across product tabs', async ({ page }) => {
+  await page.goto('/product-sale-test?resources=1');
+  await expect(page.getByRole('tab', { name: '제공 자료', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('tab', { name: '미션', exact: true })).toHaveCount(0);
+  await page.getByRole('tab', { name: '커리큘럼', exact: true }).click();
+  const panel = page.getByRole('tabpanel', { name: '커리큘럼' });
+  await panel.locator('summary').filter({ hasText: '과정 공통 자료' }).click();
+  await panel.getByRole('button', { name: '설정', exact: true }).click();
+  await expect(panel.getByRole('combobox', { name: '다운로드 권한' })).toHaveValue('purchaser');
+  await panel.getByRole('textbox', { name: '자료 이름' }).fill('수정 중인 교재.pdf');
+  await panel.getByRole('button', { name: '학습 편집' }).click();
+  await panel.getByRole('textbox', { name: '학습 본문' }).fill('저장 전 본문');
+  await panel.getByRole('textbox', { name: '미션 제목' }).fill('저장 전 미션');
+  await page.getByRole('tab', { name: '기본·판매' }).click();
+  await page.getByRole('tab', { name: '커리큘럼' }).click();
+  await expect(panel.getByRole('textbox', { name: '학습 본문' })).toHaveValue('저장 전 본문');
+  await expect(panel.getByRole('textbox', { name: '미션 제목' })).toHaveValue('저장 전 미션');
+  await expect(panel.getByRole('textbox', { name: '자료 이름' })).toHaveValue('수정 중인 교재.pdf');
+  await panel.getByRole('button', { name: '자료 저장', exact: true }).click();
+  const mutation = JSON.parse(await page.getByLabel('합성 자료 요청').innerText());
+  expect(mutation).toMatchObject({ action: 'save-product-resource', courseId: 'synthetic-course', accessScope: 'purchaser', resourceName: '수정 중인 교재.pdf' });
+  await expect(page.getByLabel('합성 저장 횟수')).toHaveText('0');
+  await expect(page.getByLabel('합성 미션 저장 횟수')).toHaveText('0');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test('digital products retain their content manager and entitlement settings', async ({ page }) => {
+  await page.goto('/product-sale-test?digital=1');
+  await expect(page.getByRole('tab', { name: '커리큘럼', exact: true })).toHaveCount(0);
+  await page.getByRole('tab', { name: '콘텐츠 구성', exact: true }).click();
+  await expect(page.getByRole('tabpanel', { name: '콘텐츠 구성' })).toBeVisible();
+  await page.getByRole('tab', { name: '수강·권한', exact: true }).click();
+  await expect(page.getByRole('link', { name: '주문·수강 권한 확인' })).toBeVisible();
+});
+
+
+test('switching lessons scopes missions and preserves unfinished mission drafts', async ({ page }) => {
+  const weeks = [{ id: 'synthetic-week', course_id: 'synthetic-course', week_number: 1, title: '주차' }];
+  const lessons = [1, 2].map(n => ({ id: `lesson-${n}`, week_id: 'synthetic-week', day_number: n, title: `수업 ${n}`, content_type: 'text' }));
+  await page.route('**/api/platform?**part=curriculum', route => route.fulfill({ json: { data: { curriculum_weeks: weeks, curriculum_lessons: lessons, lesson_contents: [] } } }));
+  await page.route('**/api/platform?**part=missions', route => route.fulfill({ json: { data: { curriculum_weeks: weeks, curriculum_lessons: lessons, curriculum_missions: [1, 2].map(n => ({ id: `mission-${n}`, lesson_id: `lesson-${n}`, title: `수업 ${n} 미션`, submission_type: 'text' })) } } }));
+  await page.goto('/product-sale-test');
+  await page.getByRole('tab', { name: '커리큘럼' }).click();
+  const week = page.getByRole('region', { name: '1주차 주차', exact: true });
+  await week.getByRole('listitem').filter({ hasText: '수업 1' }).getByRole('button', { name: '학습 편집' }).click();
+  await expect(page.getByText('수업 1 미션 · 비공개 · 선택')).toBeVisible();
+  await expect(page.getByText('수업 2 미션 · 비공개 · 선택')).toHaveCount(0);
+  await page.getByRole('textbox', { name: '미션 제목' }).fill('첫 수업 임시 미션');
+  await week.getByRole('listitem').filter({ hasText: '수업 2' }).getByRole('button', { name: '학습 편집' }).click();
+  await expect(page.getByText('수업 2 미션 · 비공개 · 선택')).toBeVisible();
+  await page.getByRole('textbox', { name: '미션 제목' }).fill('두 번째 수업 미션');
+  await page.getByRole('button', { name: '비공개 미션 추가' }).click();
+  expect(JSON.parse(await page.getByLabel('합성 미션 요청').innerText()).values.lesson_id).toBe('lesson-2');
+  await week.getByRole('listitem').filter({ hasText: '수업 1' }).getByRole('button', { name: '학습 편집' }).click();
+  await expect(page.getByRole('textbox', { name: '미션 제목' })).toHaveValue('첫 수업 임시 미션');
 });

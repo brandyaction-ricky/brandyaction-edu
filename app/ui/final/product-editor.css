@@ -165,3 +165,13 @@
 .edu-admin .product-curriculum-guide ol { margin: 12px 0; padding-left: 22px; }
 .edu-admin .product-curriculum-guide li + li { margin-top: 6px; }
 .edu-admin .product-curriculum-guide [role=status] { margin-top: 14px; padding-top: 6px; border-top: 1px solid var(--line); }
+
+.edu-admin .product-common-resources { border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.edu-admin .product-common-resources > summary { padding: 18px; cursor: pointer; font-size: 15px; font-weight: 700; }
+.edu-admin .product-common-resources > summary span { margin-left: 8px; color: var(--muted); font-size: 13px; font-weight: 400; }
+.edu-admin .product-common-resources-body { padding: 0 18px 18px; }
+.edu-admin .product-common-resources-body h3 { margin: 0; }
+.edu-admin .product-curriculum-workspace .product-mission-workspace { padding: 0; }
+.edu-admin .product-curriculum-workspace .product-mission-workspace > h3 { margin: 0; }
+.edu-admin .product-common-resources input[type=file] { width: auto; }
+.edu-admin .product-common-resources .row { flex-wrap: wrap; }
