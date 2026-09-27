@@ -18,9 +18,11 @@ test('student asks privately inside the actual classroom, retries without duplic
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 test('question list errors are recoverable and navigation protects an unfinished question',async({page})=>{
- let reads=0;await page.route('**/api/platform/lesson-questions?**',r=>r.fulfill(++reads===1?{status:503,json:{error:'목록 연결 실패'}}:{json:{questions:[],hasMore:false}}));
+ // StrictMode may start and abort its first read. Model an unavailable service
+ // until the explicit user retry, rather than counting transport attempts.
+ let unavailable=true;await page.route('**/api/platform/lesson-questions?**',r=>r.fulfill(unavailable?{status:503,json:{error:'목록 연결 실패'}}:{json:{questions:[],hasMore:false}}));
  await page.goto('/classroom-questions-test');await expect(page.getByRole('alert')).toContainText('목록 연결 실패');
- await page.getByRole('button',{name:'질문 다시 불러오기'}).click();await expect(page.getByText('이 학습에 남긴 질문이 없습니다.')).toBeVisible();
+ unavailable=false;await page.getByRole('button',{name:'질문 다시 불러오기'}).click();await expect(page.getByText('이 학습에 남긴 질문이 없습니다.')).toBeVisible();
  await page.getByRole('button',{name:'이 학습에 질문하기',exact:true}).click();await page.getByRole('textbox',{name:'질문 내용',exact:true}).fill('작성 중 질문');
  page.once('dialog',d=>d.dismiss());await page.getByRole('link',{name:'내 질문 전체 보기'}).click();await expect(page).toHaveURL(/classroom-questions-test/);await expect(page.getByRole('textbox',{name:'질문 내용',exact:true})).toHaveValue('작성 중 질문');
 });
