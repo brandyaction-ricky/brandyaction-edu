@@ -29,14 +29,23 @@ test('email signup validates confirmation and never pre-grants consent or roles'
   assert.equal(email.afterEmailLogin({}, '/classes/live'), '/auth/consent?next=%2Fclasses%2Flive');
   assert.equal(email.afterEmailLogin({ terms_version: 'v1', privacy_version: 'v1' }, '//evil.example'), '/my');
   assert.equal(new URL(email.emailCallback('https://dev.example', 'https://evil.example')).searchParams.get('next'), '/my');
+  assert.equal(new URL(email.emailConfirmRedirect('https://dev.example', '/classes/live')).pathname, '/auth/confirm');
+  assert.equal(new URL(email.emailConfirmRedirect('https://dev.example', 'https://evil.example')).searchParams.get('next'), '/my');
   assert.match(email.emailAuthError({ code: 'email_not_confirmed' }), /인증 메일/);
   assert.match(email.emailAuthError({ code: 'email_address_not_authorized' }), /발송하지 못했습니다/);
 });
 test('email confirmation accepts supported token types and prevents external redirects', async () => {
   let called = 0, error = null;
+  const cookie = { name: 'sb-auth-token', value: 'test-session', options: { httpOnly: true } };
   const route = load('app/auth/confirm/route.ts', {
-    'next/server': { NextResponse: { redirect: url => new Response(null, { status: 307, headers: { location: String(url) } }) } },
-    '@/lib/supabase/server': { createClient: async () => ({ auth: { verifyOtp: async () => { called++; return { error, data: { user: { user_metadata: {} } } }; } } }) },
+    'next/server': { NextResponse: { redirect: url => {
+      const response = new Response(null, { status: 307, headers: { location: String(url) } });
+      response.cookies = { set: (name, value) => response.headers.append('set-cookie', `${name}=${value}`) };
+      return response;
+    } } },
+    '@/lib/supabase/server': { createClient: async onCookies => ({ auth: { verifyOtp: async () => {
+      called++; onCookies?.([cookie]); return { error, data: { user: { user_metadata: {} } } };
+    } } }) },
   });
   const request = query => route.GET(new Request('https://dev.example/auth/confirm?' + query));
   assert.match((await request('token_hash=x&type=invite')).headers.get('location'), /email_confirmation/);
@@ -44,11 +53,13 @@ test('email confirmation accepts supported token types and prevents external red
   const consent = await request('token_hash=x&type=signup&next=https://evil.example');
   assert.equal(consent.headers.get('location'), 'https://dev.example/auth/consent?next=%2Fmy');
   assert.equal(consent.headers.get('Cache-Control'), 'private, no-store');
+  assert.equal(consent.headers.get('set-cookie'), 'sb-auth-token=test-session');
   assert.match((await request('token_hash=x&type=recovery')).headers.get('location'), /\/auth\/reset-password$/);
   error = { message: 'expired secret token' };
   const expired = await request('token_hash=x&type=email');
   assert.match(expired.headers.get('location'), /email_confirmation/);
   assert.doesNotMatch(expired.headers.get('location'), /secret|token_hash/);
+  assert.equal(expired.headers.get('set-cookie'), null);
 });
 test('live publishing requires both permissions, safe assets, and handles concurrent edits', async () => {
   let productAccess = false, rpcError = null;
