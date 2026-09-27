@@ -5,7 +5,7 @@
 ## 통합·설정 순서
 
 1. 리키님의 최종 통합본에 이 변경을 포함하고, DB의 기존 `crm_automation_engine` migration이 적용됐는지 확인한다. 이 변경 자체에는 새 migration이 없다.
-2. DEV Vercel의 SOLAPI 발송 설정과 `CRON_SECRET`, `CRM_DELIVERY_ENABLED`를 확인한다. `CRM_SITE_URL`은 `https://brandyaction-edu-dev.vercel.app`로 설정한다.
+2. DEV Vercel의 SOLAPI 발송 설정과 `CRON_SECRET`, `CRM_DELIVERY_ENABLED`를 확인한다. `CRM_SITE_URL`은 `https://brandyaction-edu-dev.vercel.app`로 설정한다. 발송 스위치를 켜기 전에 기존 활성 자동화·예약 캠페인을 검토한다. 현재 DEV에는 별도의 `무료 클래스 신청 안내` 자동화가 활성 상태로 보인다.
 3. 관리자 **메시지 템플릿**에서 `transactional` 목적의 LMS 템플릿을 만든다. 링크를 포함하면 SMS 길이 제한을 넘을 수 있다. 예: `[브랜디에듀] 문샷 챌린지 결제가 완료됐습니다. 시작 안내: {{purchase_link}}`. 판매·홍보 문구와 텔레그램 초대 링크는 넣지 않는다.
 4. 관리자 **자동 메시지**에서 실행 조건 `결제 완료`, 대상 상품 `문샷 챌린지`, 위 템플릿, 지연 0분을 선택한다. DEV 시험 결제 준비가 끝날 때까지 비활성으로 두고, 시험 직전에 활성화한다.
 5. `CRM_PURCHASE_GUIDE_ENABLED=false`인 동안 링크는 `/my/orders`로 연결된다. #210 안내 화면, DB, 운영 설정이 통합되고 검수된 뒤에만 `true`로 바꿔 주문별 `/purchase-onboarding?order=...` 링크를 사용한다.
