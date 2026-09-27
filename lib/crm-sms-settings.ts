@@ -47,7 +47,7 @@ export async function loadSmsSettings(): Promise<SmsSettings> {
     senderPhone: options.senders[0] || "",
     optoutPhone: options.optouts[0] || "",
     senderName: "브랜디액션",
-    transactionalEnabled: true,
+    transactionalEnabled: false,
     marketingEnabled: false,
   };
   const result = await createAdminClient().from("site_settings")
