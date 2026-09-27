@@ -152,13 +152,13 @@ function kstInput(value: unknown) {
   return new Date(Date.parse(String(value)) + 9 * 60 * 60 * 1000).toISOString().slice(0, 16);
 }
 
-function ProductSaleCheck({ sale, cohort }: { sale: ReturnType<typeof productSalesStatus>; cohort?: Row }) {
+function ProductSaleCheck({ sale, cohort, onOpenCurriculum }: { sale: ReturnType<typeof productSalesStatus>; cohort?: Row; onOpenCurriculum: () => void }) {
   return <section className="product-sale-check" aria-label="판매 가능 여부">
     <div className="setting-line"><b>실제 판매 상태</b><Badge color={sale.label === "판매 중" ? "green" : "amber"}>{sale.label}</Badge></div>
     <p className="meta mt8">연결 기수 상태: {cohort ? `${t(cohort, "name")} · ${labels[t(cohort, "status")] || t(cohort, "status")}` : "미연결"}</p>
     {cohort?.status === "upcoming" && <p className="meta mt8">준비 중 기수도 모집 마감·운영 기간 등 기존 판매 조건을 충족하면 신청할 수 있습니다.</p>}
     {sale.hasCustomCta && <p className="meta mt8">고객 버튼은 기본 결제 대신 설정한 Destination URL로 이동합니다.</p>}
-    {sale.issues.length > 0 && <div className="notice warning mt8"><b>신청 전 확인할 항목</b><ul>{sale.issues.map(issue => <li key={issue}>{issue}</li>)}</ul><p>상품을 ‘판매 중’으로 저장해도 위 조건이 충족되지 않으면 신청이 열리지 않습니다.</p></div>}
+    {sale.issues.length > 0 && <div className="notice warning mt8"><b>신청 전 확인할 항목</b><ul>{sale.issues.map(issue => <li key={issue}>{issue}</li>)}</ul><p>상품을 ‘판매 중’으로 저장해도 위 조건이 충족되지 않으면 신청이 열리지 않습니다.</p>{sale.issues.includes("공개 커리큘럼") && <><p>이 상품의 주차와 그 안의 학습을 각각 하나 이상 공개해 주세요. 커리큘럼 탭에서 내용 등록과 공개 설정을 함께 할 수 있습니다.</p><button type="button" className="btn small" onClick={onOpenCurriculum}>공개 커리큘럼 설정하기</button></>}</div>}
   </section>;
 }
 
@@ -247,6 +247,10 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
   });
   const saleCourse = { ...row, ...draftValues, id: row?.id || "new-product", status: preview.status, category: preview.category, metadata: { ...metadata, ...Object.fromEntries(productMetadataFields.filter(key => key in draftValues).map(key => [key, draftValues[key]])), detail_html_document: detailMode === "html" ? htmlSource : "", detail_html: "" } } as Row;
   const sale = productSalesStatus(saleCourse, saleCohorts, data.curriculum_weeks || [], data.curriculum_lessons || [], checkedAt, Boolean(productConversion(object(saleCourse, "metadata")).url));
+  function openCurriculum() {
+    setTab("curriculum");
+    requestAnimationFrame(() => document.getElementById("product-tab-curriculum")?.focus());
+  }
   function field(key: string, label?: string, wide = false, hint?: string) {
     const definition = section.fields.find(item => item.key === key);
     if (!definition) return null;
@@ -318,7 +322,7 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
       <div className="editor-layout"><div className="editor-main"><section className="panel">
         <div className="tabs" role="tablist" aria-label="상품 편집 영역">{groups.map(([key, label]) => <button key={key} id={"product-tab-" + key} type="button" role="tab" aria-selected={tab === key} aria-controls={"product-panel-" + key} className={"tab " + (tab === key ? "active" : "")} onClick={() => setTab(key)}>{label}</button>)}</div>
         <div className="section-pad" id="product-panel-basic" data-tab="basic" role="tabpanel" aria-labelledby="product-tab-basic" hidden={tab !== "basic"}>
-          <ProductSaleCheck sale={sale} cohort={cohort} />
+          <ProductSaleCheck sale={sale} cohort={cohort} onOpenCurriculum={openCurriculum} />
           <h2 className="mb16">기본 정보</h2><div className="form-grid">
             {field("title", "상품명", true)}
             {field("category", "상품 유형")}
@@ -359,7 +363,7 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
           {tab === "missions" && <ProductMissionWorkspace course={row} pending={pending} send={send} />}
         </div>}
         <div className="section-pad" id="product-panel-access" data-tab="access" role="tabpanel" aria-labelledby="product-tab-access" hidden={tab !== "access"}>
-          <ProductSaleCheck sale={sale} cohort={cohort} />
+          <ProductSaleCheck sale={sale} cohort={cohort} onOpenCurriculum={openCurriculum} />
           <h2 className="mb16">수강·기수 연결</h2><ProductField label="연결 기수"><select value={cohortId} onChange={event => setCohortId(event.target.value)} aria-label="연결 기수" disabled={!cohorts.length || pending}>{!cohorts.length && <option value="">미연결</option>}{cohorts.map(item => <option key={item.id} value={item.id}>{t(item, "name")}</option>)}</select></ProductField>
           <div className="form-grid"><ProductField label="수강 시작 기준"><div className="product-value">주문별 수강권의 시작일 기준</div></ProductField><ProductField label="연결 기수 운영 종료"><div className="product-value">{cohort?.operation_end_at ? new Date(String(cohort.operation_end_at)).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" }) : "기수에 지정된 종료일 없음"}</div></ProductField>{field("duration_label", "고객에게 보이는 수강 기간", true)}</div>
           <h3 className="mt16">구매 후 제공 항목</h3><ul className="product-entitlements mt16"><li><Check aria-hidden="true" />공개된 학습 콘텐츠·영상·퀴즈</li><li><Check aria-hidden="true" />미션 제출 및 피드백</li><li><Check aria-hidden="true" />등록된 수강생 전용 자료</li></ul>
@@ -367,7 +371,7 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
         </div>
         <div className="section-pad" id="product-panel-publish" data-tab="publish" role="tabpanel" aria-labelledby="product-tab-publish" hidden={tab !== "publish"}>
           <h2 className="mb16">공개 점검</h2>
-          <ProductSaleCheck sale={sale} cohort={cohort} />
+          <ProductSaleCheck sale={sale} cohort={cohort} onOpenCurriculum={openCurriculum} />
           <section className="product-conversion-card"><h2>Call to Action</h2><p className="meta">고객이 클릭할 주요 버튼과 이동할 페이지를 설정하세요.</p>
             <ProductField controlId="product-cta-price-label" label="CTA 왼쪽 문구" hint="상세페이지 하단 CTA 왼쪽에 표시됩니다. 비워 두면 ‘무료’로 표시됩니다."><input id="product-cta-price-label" name="cta_price_label" maxLength={40} defaultValue={conversion.priceLabel} placeholder="무료" disabled={pending} /></ProductField>
             <ProductField controlId="product-cta-label" label="Button Label"><input id="product-cta-label" name="cta_label" maxLength={100} defaultValue={conversion.label} placeholder="무료 웨비나 참여하기" disabled={pending} /></ProductField>
@@ -377,7 +381,7 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
           <section className="product-conversion-card"><h2>Tracking integration</h2><p className="meta">상품별 광고 추적을 연결하세요.</p><ProductField controlId="product-pixel-id" label="Meta Pixel ID (Optional)" hint="입력한 상품에만 PageView와 CTA 클릭(Lead)을 전송합니다. 구매 완료 이벤트는 결제 처리와 구분됩니다. 비워 두면 사용하지 않습니다."><input id="product-pixel-id" name="meta_pixel_id" inputMode="numeric" pattern="[0-9]{5,30}" maxLength={30} defaultValue={conversion.pixelId} placeholder="Meta Pixel ID" disabled={pending} /></ProductField></section>
         </div>
       </section><div className="editor-savebar">{!["curriculum", "cohorts", "missions"].includes(tab) && row?.id && !row.archived_at && <button className="btn danger" type="button" onClick={() => void removeProduct()} disabled={pending || detailUploadStatus === "uploading"}>상품 삭제</button>}<span className="dirty-note">{tab === "curriculum" ? "커리큘럼은 항목별로 즉시 저장됩니다." : tab === "cohorts" ? "기수는 항목별로 저장됩니다." : tab === "missions" ? "미션은 항목별로 저장됩니다." : dirty ? "저장하지 않은 변경사항이 있습니다." : "변경 내용을 저장하면 반영됩니다."}</span><button className="btn" type="button" onClick={close} disabled={pending || detailUploadStatus === "uploading"}>목록으로</button>{!["curriculum", "cohorts", "missions", "publish"].includes(tab) && <button className="btn" type="button" onClick={() => setTab("publish")} disabled={pending || detailUploadStatus === "uploading"}>공개 전 확인</button>}{!["curriculum", "cohorts", "missions"].includes(tab) && <button className="btn primary" type="submit" disabled={pending || detailUploadStatus !== "idle"}>{pending ? "저장 중…" : detailUploadStatus === "uploading" ? "업로드 중…" : "저장하기"}</button>}</div>{error && <p className="notice mt16" role="alert">{error}</p>}</div>
-      <aside className="editor-aside"><div className="side-preview"><span className="section-code">고객에게 보이는 상품</span><div className="preview-cover mt16"><p>BRANDYACTION EDU</p><h3>{preview.title || "상품명"}</h3><p className="accent">{labels[preview.category] || "유료 클래스"}</p></div><div className="preview-meta"><b>{!previewSalePrice ? "무료" : money(previewSalePrice)}</b>{preview.regular > previewSalePrice && <s>{money(preview.regular)}</s>}</div><p className="meta mt8">{cohort ? t(cohort, "name") + " 기수 판매가" : "상품 기본 판매가"}</p><p className="meta mt8">{preview.summary || "상품 소개를 입력해 주세요."}</p><div className="divider" /><ProductSaleCheck sale={sale} cohort={cohort} /><div className="setting-line"><span>저장할 상품 설정</span><b>{statusLabels[preview.status]}</b></div><div className="setting-line"><span>제공 자료</span><b>{resourceCount}개</b></div><Link className="btn full mt16" href="/admin/cohorts">기수·회차 관리</Link></div></aside></div>
+      <aside className="editor-aside"><div className="side-preview"><span className="section-code">고객에게 보이는 상품</span><div className="preview-cover mt16"><p>BRANDYACTION EDU</p><h3>{preview.title || "상품명"}</h3><p className="accent">{labels[preview.category] || "유료 클래스"}</p></div><div className="preview-meta"><b>{!previewSalePrice ? "무료" : money(previewSalePrice)}</b>{preview.regular > previewSalePrice && <s>{money(preview.regular)}</s>}</div><p className="meta mt8">{cohort ? t(cohort, "name") + " 기수 판매가" : "상품 기본 판매가"}</p><p className="meta mt8">{preview.summary || "상품 소개를 입력해 주세요."}</p><div className="divider" /><ProductSaleCheck sale={sale} cohort={cohort} onOpenCurriculum={openCurriculum} /><div className="setting-line"><span>저장할 상품 설정</span><b>{statusLabels[preview.status]}</b></div><div className="setting-line"><span>제공 자료</span><b>{resourceCount}개</b></div><Link className="btn full mt16" href="/admin/cohorts">기수·회차 관리</Link></div></aside></div>
     </form>
   </div>;
 }

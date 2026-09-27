@@ -137,3 +137,51 @@ test('new product mission is tied to its lesson and remains hidden until reviewe
   expect(mutation).toMatchObject({ action: 'save', section: 'missions', values: { course_id: 'synthetic-course', week_id: 'synthetic-week', lesson_id: 'synthetic-lesson', title: '새 합성 미션', is_required: false, is_published: false } });
   expect(mutation.id).toBeUndefined();
 });
+
+
+test('sale blocker leads to curriculum setup without losing product edits, and publishing clears the blocker', async ({ page }) => {
+  const week = { id: 'synthetic-week', course_id: 'synthetic-course', week_number: 1, title: '기존 합성 주차', is_published: false };
+  const lesson = { id: 'synthetic-lesson', week_id: week.id, day_number: 1, title: '기존 합성 학습', content_type: 'text', is_published: false };
+  await page.route('**/api/platform?**part=curriculum', route => route.fulfill({ json: { data: {
+    curriculum_weeks: [week], curriculum_lessons: [lesson], lesson_contents: [{ lesson_id: lesson.id, body_text: '기존 학습 본문' }],
+  } } }));
+  await page.goto('/product-sale-test');
+  await page.getByLabel('상품명 *', { exact: true }).fill('저장 전 상품명');
+  await page.getByRole('tabpanel', { name: '기본·판매' }).getByRole('button', { name: '공개 커리큘럼 설정하기' }).click();
+  await expect(page.getByRole('tab', { name: '커리큘럼', exact: true })).toBeFocused();
+  const panel = page.getByRole('tabpanel', { name: '커리큘럼' });
+  const guide = panel.getByRole('region', { name: '공개 커리큘럼 준비' });
+  await expect(guide.getByRole('status')).toContainText('공개 주차 0개');
+  week.is_published = true;
+  await panel.getByRole('checkbox', { name: '주차 공개' }).check();
+  await panel.getByRole('button', { name: '주차 저장' }).click();
+  await expect(guide.getByRole('status')).toContainText('공개 주차 1개');
+  await expect(guide.getByRole('status')).toContainText('공개 주차 안의 공개 학습 0개');
+  await expect(page.locator('aside').getByText('판매 보류', { exact: true })).toBeVisible();
+  await panel.getByRole('button', { name: '콘텐츠 편집' }).click();
+  lesson.is_published = true;
+  await panel.getByRole('checkbox', { name: '일차 공개' }).check();
+  await panel.getByRole('button', { name: '일차 저장' }).click();
+  await expect(guide.getByRole('status')).toContainText('공개 커리큘럼 조건을 충족했습니다');
+  await expect(page.locator('aside').getByText('판매 보류', { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('합성 저장 횟수')).toHaveText('0');
+  await page.getByRole('tab', { name: '기본·판매', exact: true }).click();
+  await expect(page.getByLabel('상품명 *', { exact: true })).toHaveValue('저장 전 상품명');
+  await expect(page.getByRole('tabpanel', { name: '기본·판매' }).getByRole('button', { name: '공개 커리큘럼 설정하기' })).toHaveCount(0);
+});
+
+test('curriculum guidance does not count a public lesson under a private week or hide read failures', async ({ page }) => {
+  await page.route('**/api/platform?**part=curriculum', route => route.fulfill({ json: { data: {
+    curriculum_weeks: [{ id: 'private-week', course_id: 'synthetic-course', week_number: 1, title: '비공개 주차', is_published: false }],
+    curriculum_lessons: [{ id: 'public-lesson', week_id: 'private-week', day_number: 1, title: '공개 학습', is_published: true }], lesson_contents: [],
+  } } }));
+  await page.goto('/product-sale-test');
+  await page.getByRole('tab', { name: '커리큘럼', exact: true }).click();
+  const guide = page.getByRole('region', { name: '공개 커리큘럼 준비' });
+  await expect(guide.getByRole('status')).toContainText('공개 주차 안의 공개 학습 0개');
+  await page.getByRole('tab', { name: '기본·판매', exact: true }).click();
+  await page.route('**/api/platform?**part=curriculum', route => route.fulfill({ status: 500, json: { error: '조회 실패 시험' } }));
+  await page.getByRole('tab', { name: '커리큘럼', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('조회 실패 시험');
+  await expect(guide.getByRole('status')).toHaveCount(0);
+});

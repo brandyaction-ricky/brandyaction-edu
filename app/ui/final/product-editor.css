@@ -156,3 +156,10 @@
 .edu-admin .product-mission-options input { width: 18px; height: 18px; min-height: 18px; margin: 0; }
 .edu-admin .product-mission-fields > .btn { justify-self: end; }
 @media (max-width: 720px) { .edu-admin .product-mission-week, .edu-admin .product-mission-fields { padding: 16px; } .edu-admin .product-mission-day li { align-items: stretch; flex-direction: column; } .edu-admin .product-mission-fields > .btn { width: 100%; } }
+
+.edu-admin .product-curriculum-guide { padding: 18px 20px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-subtle); font-size: 14px; line-height: 1.7; }
+.edu-admin .product-curriculum-guide h3 { margin: 0 0 8px; font-size: 15px; }
+.edu-admin .product-curriculum-guide p { margin: 8px 0 0; }
+.edu-admin .product-curriculum-guide ol { margin: 12px 0; padding-left: 22px; }
+.edu-admin .product-curriculum-guide li + li { margin-top: 6px; }
+.edu-admin .product-curriculum-guide [role=status] { margin-top: 14px; padding-top: 6px; border-top: 1px solid var(--line); }
