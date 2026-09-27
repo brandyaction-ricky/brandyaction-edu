@@ -16,9 +16,16 @@ const offer = { id: '11111111-1111-4111-8111-111111111111', course_id: course.id
 
 function setup(patch = {}, orderError = null) {
   const calls = [];
+  const attribution = [];
   const db = {
     from(table) {
       // A curriculum query would fail: sales must not depend on teaching material availability.
+      if (table === 'orders') return {
+        update(values) { attribution.push(values); return this; },
+        eq() { return this; },
+        select() { return this; },
+        async single() { return { data: { id: 'order' } }; },
+      };
       assert.equal(table, 'cohorts');
       return { select() { return this; }, eq() { return this; }, async single() { return { data: { ...offer, courses: { ...course, ...patch } } }; } };
     },
@@ -36,16 +43,25 @@ function setup(patch = {}, orderError = null) {
     '@/lib/qa-rules': { phoneNumber: () => '01000000000' },
     '@/lib/legal-policies': { POLICY_VERSION: 'test-policy' },
   });
-  return { calls, send: () => POST(new Request('https://edu.example/api/platform', { method: 'POST', headers: { origin: 'https://edu.example', 'content-type': 'application/json' }, body: JSON.stringify({ action: 'order', cohortId: offer.id, agreed: true, name: 'Synthetic', phone: '01000000000' }) })) };
+  return { calls, attribution, send: (entrySource) => POST(new Request('https://edu.example/api/platform', { method: 'POST', headers: { origin: 'https://edu.example', 'content-type': 'application/json' }, body: JSON.stringify({ action: 'order', cohortId: offer.id, agreed: true, name: 'Synthetic', phone: '01000000000', entrySource }) })) };
 }
 
 test('paid order reaches the existing checkout RPC without any curriculum query or publication mutation', async () => {
-  const { calls, send } = setup();
+  const { calls, attribution, send } = setup();
   const response = await send();
   assert.equal(response.status, 200);
   assert.equal((await response.json()).orderId, 'order');
   assert.deepEqual(calls.map(call => call.name), ['create_checkout_order', 'apply_coupon_to_order']);
   assert.equal(calls[0].args.p_user_id, 'member');
+  assert.deepEqual(attribution, [{ entry_src: null }]);
+});
+
+test('checkout stores only the four agreed campaign sources on the order', async () => {
+  for (const source of ['paid', 'organic', 'alumni', 'youtube', 'unknown']) {
+    const { attribution, send } = setup();
+    assert.equal((await send(source)).status, 200);
+    assert.deepEqual(attribution, [{ entry_src: source === 'unknown' ? null : source }]);
+  }
 });
 
 test('missing commercial details still block checkout before any order is created', async () => {

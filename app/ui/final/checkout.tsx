@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
 import { type Data, type WorkflowSend } from "../learning-workflows";
 import { Badge, Empty, Heading, courseType } from "./primitives";
+import { parseEntrySource, withEntrySource } from '@/lib/entry-source';
 
 export function Checkout({
   data,
@@ -19,8 +20,10 @@ export function Checkout({
   pending: boolean;
   send: WorkflowSend;
 }) {
-  const cohortId = useSearchParams().get("cohort") || "",
+  const searchParams = useSearchParams();
+  const cohortId = searchParams.get("cohort") || "",
     router = useRouter();
+  const entrySource = parseEntrySource(searchParams.get('src'));
   const [processing, setProcessing] = useState(false),
     [error, setError] = useState(""),
     [coupon, setCoupon] = useState(""),
@@ -45,6 +48,7 @@ export function Checkout({
         {
           action: "order",
           cohortId,
+          entrySource,
           name: f.get("name"),
           phone: f.get("phone"),
           coupon: f.get("coupon"),
@@ -204,7 +208,7 @@ export function Checkout({
             className="btn primary"
             href={
               "/login?next=" +
-              encodeURIComponent("/checkout?cohort=" + cohortId)
+              encodeURIComponent(withEntrySource("/checkout?cohort=" + cohortId, entrySource))
             }
           >
             로그인하기

@@ -52,7 +52,7 @@ test('admin list APIs only load screen dependencies and lightweight relation fie
   assert.deepEqual(rules.adminTables.questions, ['edu_questions']);
   assert.equal(rules.adminSelectColumns('questions', 'edu_questions'), 'id,user_id,course_id,learning_context,title,content,answer,status,is_archived,created_at,updated_at,profiles(id,full_name,email),courses(id,title)');
   assert.equal(rules.adminSelectColumns('orders', 'courses'), 'id,title,status,category,list_price,archived_at,display_order,created_at,updated_at');
-  assert.equal(rules.adminSelectColumns('orders', 'orders'), 'id,order_number,user_id,status,subtotal,discount_amount,total_amount,customer_name,customer_email,customer_phone,created_at');
+  assert.equal(rules.adminSelectColumns('orders', 'orders'), 'id,order_number,user_id,status,subtotal,discount_amount,total_amount,entry_src,customer_name,customer_email,customer_phone,created_at');
   assert.equal(rules.adminSelectColumns('orders', 'order_items'), 'id,order_id,course_id,cohort_id,item_name,unit_price');
   assert.equal(rules.adminSelectColumns('orders', 'enrollments'), 'id,order_item_id,status');
   assert.equal(rules.adminSelectColumns('products', 'courses'), '*');

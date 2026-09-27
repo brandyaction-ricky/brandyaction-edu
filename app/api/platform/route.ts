@@ -944,6 +944,12 @@ export async function POST(request: Request) {
                 fail(msg.includes('ALREADY_ENROLLED') ? '이미 신청한 클래스입니다.' : msg.includes('RECRUIT') ? '현재 모집 중인 클래스가 아닙니다.' : msg.includes('CAPACITY') ? '모집 정원이 마감되었습니다.' : '주문을 만들지 못했습니다. 상품 모집 설정을 확인해 주세요.', 409);
             }
             const order = r.data as Record<string, unknown>;
+            const entrySource = typeof body.entrySource === 'string' && ['paid', 'organic', 'alumni', 'youtube'].includes(body.entrySource)
+                ? body.entrySource : null;
+            const attribution = await db.from('orders').update({ entry_src: entrySource })
+                .eq('id', order.orderId).eq('user_id', user.id).eq('status', 'pending')
+                .select('id').single();
+            if (attribution.error || !attribution.data) fail('주문 유입경로를 기록하지 못했습니다. 다시 시도해 주세요.', 503);
             const coupon = await db.rpc('apply_coupon_to_order', {
                 p_order_id: order.orderId,
                 p_user_id: user.id,
