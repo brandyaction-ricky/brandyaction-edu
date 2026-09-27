@@ -210,7 +210,12 @@ async function recordEvent(
 export async function POST(request: Request) {
   const webhookToken = process.env.TOSS_WEBHOOK_TOKEN;
   if (!webhookToken) return reply({ error: '웹훅 설정이 완료되지 않았습니다.' }, 503);
-  if (!validToken(new URL(request.url).searchParams.get('token'), webhookToken)) return reply({ error: '허용되지 않은 요청입니다.' }, 401);
+  const receivedToken = new URL(request.url).searchParams.get('token');
+  const nextWebhookToken = process.env.TOSS_WEBHOOK_TOKEN_NEXT;
+  if (!validToken(receivedToken, webhookToken)
+    && (!nextWebhookToken || !validToken(receivedToken, nextWebhookToken))) {
+    return reply({ error: '허용되지 않은 요청입니다.' }, 401);
+  }
 
   const contentType = request.headers.get('content-type')?.toLowerCase() || '';
   if (!contentType.startsWith('application/json')) return reply({ error: 'JSON 요청만 허용됩니다.' }, 415);
