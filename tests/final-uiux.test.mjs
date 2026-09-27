@@ -342,9 +342,12 @@ test('catalogues and separate editors render without dropping existing fields', 
   assert.match(learningMarkup, /editor-/); assert.doesNotMatch(learningMarkup, /통과 기준|name="pass_percent"/);
   assert.match(platformSource, /AI 답변 생성/); assert.match(platformSource, /답변 등록/);
   assert.match(platformSource, /answer-draft/);
-  assert.match(read('app/ui/final/integration.css'), /\.participant-card-summary/);
+  const participantSource = read('app/ui/admin-workflows.tsx');
+  assert.match(participantSource, /aria-label="회원 미션 필터"[\s\S]*?aria-label="빠른 상태 필터"/);
+  assert.match(participantSource, /<table className="participant-table">[\s\S]*?검토 필요[\s\S]*?최근 활동/);
+  assert.match(participantSource, /className="participant-drawer" role="dialog"[\s\S]*?participant-drawer-missions/);
+  assert.match(read('app/ui/final/integration.css'), /\.participant-table thead th \{ position: sticky/);
   assert.match(read('app/ui/final/integration.css'), /\.question-answer-editor/);
-  assert.match(read('app/ui/admin-workflows.tsx'), /aria-expanded=\{expanded\}[\s\S]*?participant-day-card/);
 });
 test('submission review keeps queue and inspector, escaping text and unsafe links', () => {
   const { SubmissionReview } = load('app/ui/final/submission-review.tsx');
