@@ -6,6 +6,7 @@ import { useRef, useState } from "react";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { POLICY_VERSION } from "@/lib/legal-policies";
+import { ConsentPolicy } from "@/app/ui/consent-policy";
 
 import { safeNext } from "@/lib/platform";
 
@@ -95,34 +96,8 @@ export default function SocialConsentPage() {
               </p>
             </div>
             <div className="stack mt32">
-              <label className="checkline">
-                <input
-                  type="checkbox"
-                  checked={terms}
-                  onChange={(event) => setTerms(event.target.checked)}
-                />
-                <span>
-                  [필수]{" "}
-                  <Link href="/policies/terms" target="_blank">
-                    이용약관
-                  </Link>{" "}
-                  동의
-                </span>
-              </label>
-              <label className="checkline">
-                <input
-                  type="checkbox"
-                  checked={privacy}
-                  onChange={(event) => setPrivacy(event.target.checked)}
-                />
-                <span>
-                  [필수]{" "}
-                  <Link href="/policies/privacy" target="_blank">
-                    개인정보처리방침
-                  </Link>{" "}
-                  동의
-                </span>
-              </label>
+              <ConsentPolicy kind="terms" checked={terms} onChange={setTerms} />
+              <ConsentPolicy kind="privacy" checked={privacy} onChange={setPrivacy} />
               <label className="checkline">
                 <input
                   type="checkbox"
