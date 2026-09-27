@@ -1,0 +1,6 @@
+.item { min-width: 0; }
+.details { margin: 8px 0 0 28px; }
+.details summary { width: fit-content; padding: 4px 0; color: var(--muted); font-size: 13px; cursor: pointer; text-underline-offset: 3px; }
+.details summary:hover { text-decoration: underline; }
+.details summary:focus-visible, .copy:focus-visible { outline: 2px solid var(--red); outline-offset: 3px; }
+.copy { max-height: 280px; overflow-y: auto; overscroll-behavior: contain; margin-top: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface, #f8f9fa); color: var(--text, #454952); font-size: 13px; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
