@@ -1,5 +1,6 @@
 import { SolapiMessageService, type MessageSchema } from "solapi";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { purchaseContact, purchaseGuideLink } from "@/lib/crm-purchase-contact";
 
 type Template = {
   id: string;
@@ -84,6 +85,33 @@ function message(
     type: template.channel === "lms" ? "LMS" : "SMS",
     autoTypeDetect: false,
   };
+}
+
+export async function paidOrderRecipient(
+  run: { member_id: string; trigger_key: string },
+  member: Member,
+): Promise<Member | null> {
+  const orderId = /^purchase_completed:([0-9a-f-]{36})$/i.exec(run.trigger_key)?.[1];
+  if (!orderId || !member?.id || member.id !== run.member_id)
+    throw new Error("결제 완료 자동화의 주문·회원 정보가 올바르지 않습니다.");
+  const db = createAdminClient();
+  const result = await db.from("orders")
+    .select("id,user_id,status,customer_name,customer_phone,customer_email")
+    .eq("id", orderId).eq("user_id", run.member_id).maybeSingle();
+  if (result.error) throw result.error;
+  if (!result.data || result.data.status !== "paid") return null;
+  const contact = purchaseContact(result.data, member);
+  return { ...member, ...contact };
+}
+
+export function purchaseTemplateForRun(template: Template, triggerKey: string): Template {
+  const orderId = triggerKey.slice("purchase_completed:".length);
+  const link = purchaseGuideLink(orderId, {
+    siteUrl: process.env.CRM_SITE_URL || (process.env.NEXT_PUBLIC_APP_ENV === "production"
+      ? "https://brandyaction-edu.com" : "https://brandyaction-edu-dev.vercel.app"),
+    guideEnabled: process.env.CRM_PURCHASE_GUIDE_ENABLED === "true",
+  });
+  return { ...template, content: template.content.replaceAll("{{purchase_link}}", link) };
 }
 
 async function sendBatch(
@@ -282,9 +310,17 @@ export async function dispatchDueCrm() {
       .maybeSingle();
     if (!locked.data) continue;
     try {
+      const purchaseRun = run.automation.trigger_type === "purchase_completed" &&
+        run.automation.template.purpose === "transactional";
+      const recipient = purchaseRun
+        ? await paidOrderRecipient(run, run.member as Member)
+        : run.member as Member;
+      const template = purchaseRun
+        ? purchaseTemplateForRun(run.automation.template as Template, run.trigger_key)
+        : run.automation.template as Template;
       const result = await sendBatch(
-        run.automation.template as Template,
-        [run.member as Member],
+        template,
+        recipient ? [recipient] : [],
         { automationRuns: { [run.member_id]: run.id } },
       );
       const status = result.sent ? "accepted" : "skipped";
@@ -294,9 +330,9 @@ export async function dispatchDueCrm() {
           status,
           provider_group_id: result.groupId || null,
           executed_at: new Date().toISOString(),
-          error_message: result.sent
-            ? null
-            : "수신번호·동의 상태를 확인해 주세요.",
+          error_message: result.sent ? null : (recipient
+            ? "주문서·회원 연락처 또는 동의 상태를 확인해 주세요."
+            : "결제 상태가 유효하지 않습니다."),
         })
         .eq("id", run.id);
       sent += result.sent;
