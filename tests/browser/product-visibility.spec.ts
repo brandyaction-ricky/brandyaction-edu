@@ -37,6 +37,6 @@ test('home, classes and search hide unlisted products while direct details keep 
   await expect(page.getByRole('link', { name: '링크로 신청', exact: true }).first()).toHaveAttribute('href', '/webinar/11111111-1111-4111-8111-111111111111/organic');
   await page.goto('/classes/visibility-paid');
   await expect(page.getByRole('heading', { name: '합성 비노출 유료 상품', level: 1, exact: true })).toBeVisible();
-  await expect(page.getByRole('link', { name: '수강 신청하기', exact: true }).first()).toHaveAttribute('href', '/checkout?cohort=paid-cohort');
+  await expect(page.getByRole('link', { name: '수강 신청하기', exact: true }).first()).toHaveAttribute('href', '/login?next=%2Fcheckout%3Fcohort%3Dpaid-cohort');
   expect(errors).toEqual([]);
 });

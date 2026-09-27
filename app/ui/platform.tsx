@@ -745,7 +745,7 @@ export function Platform({
       </div>
     );
   else if (path[0] === "classes" && selected)
-    body = <ProductDetail key={selected.id} course={selected} data={data} />;
+    body = <ProductDetail key={selected.id} course={selected} data={data} user={user} />;
   else if (path[0] === "articles")
     body = (
       <ArticlesView slug={path[1]} data={data} user={user} loading={loading} error={Boolean(error)} query={query} onQueryChange={setQuery} type={articleFilter} onTypeChange={value => { setArticleFilter(value); setPublicPage(1); }} pagination={pagination} onPageChange={setPublicPage} />

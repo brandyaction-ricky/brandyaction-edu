@@ -21,3 +21,14 @@ export function withEntrySource(href: string, source: EntrySource | null): strin
     return href;
   }
 }
+
+export function loginBeforeCheckout(href: string, signedIn: boolean): string {
+  if (signedIn || !href.startsWith('/') || href.startsWith('//')) return href;
+  try {
+    const url = new URL(href, 'https://brandyaction-edu.com');
+    if (!['/checkout', '/apply'].includes(url.pathname)) return href;
+    return '/login?next=' + encodeURIComponent(`${url.pathname}${url.search}${url.hash}`);
+  } catch {
+    return href;
+  }
+}
