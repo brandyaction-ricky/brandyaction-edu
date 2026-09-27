@@ -16,6 +16,8 @@ import { ProductCountdownFixture } from './product-countdown';
 import { AdminWorkspace } from '../../../app/ui/admin-workspace';
 import { ProductVisibilityFixture } from './product-visibility';
 import { Platform } from '../../../app/ui/platform';
+import { AdminCatalog } from '../../../app/ui/final/admin-catalog';
+import { sections } from '../../../lib/platform';
 import '../../../app/ui/final/frontend.css';
 import { AdminButton, AdminConfirmDialog, AdminDrawer, AdminEmptyState, AdminInlineError, AdminInput, AdminPage, AdminPageHeader, AdminShell, AdminSuccessState } from '../../../features/admin-ui';
 import { ProductDetailHtml } from '../../../app/ui/final/product-detail-html';
@@ -50,6 +52,21 @@ function ShellFixture() {
   ];
   return <div className="edu-admin"><AdminShell current="overview" available={available} user={{full_name:'운영자',role:'staff'}} pendingReviews={3} mobile={mobile} setMobile={setMobile} logout={async()=>{}}><AdminPage><AdminPageHeader eyebrow="OPERATIONS" title="오늘의 운영" description="현재 상태를 확인하고 다음 작업을 시작하세요." actions={<AdminButton tone="primary">핵심 작업 시작</AdminButton>}/><AdminSuccessState title="대기 업무를 모두 처리했습니다.">새 요청이 생기면 이 화면과 메뉴 배지에 표시됩니다.</AdminSuccessState><AdminEmptyState title="조회 결과가 없습니다.">검색어 또는 필터를 변경해 보세요.</AdminEmptyState><AdminInlineError onRetry={()=>{}}>화면 정보를 불러오지 못했습니다.</AdminInlineError></AdminPage></AdminShell></div>;
 }
+function WeekCatalogFixture() {
+  const [weeks, setWeeks] = useState([
+    { id: 'week-a-1', course_id: 'course-a', week_number: 1, title: '첫 번째 주차', goal: '목표', is_published: true },
+    { id: 'week-a-2', course_id: 'course-a', week_number: 2, title: '둘째 주차', goal: '목표', is_published: false },
+    { id: 'week-b-1', course_id: 'course-b', week_number: 1, title: '다른 상품 주차', goal: '목표', is_published: true },
+  ]);
+  const send = async (body: Record<string, unknown>) => {
+    if (body.action === 'reorder-weeks' && Array.isArray(body.ids)) {
+      const positions = new Map(body.ids.map((id, index) => [String(id), index + 1]));
+      setWeeks(current => current.map(week => positions.has(week.id) ? { ...week, week_number: positions.get(week.id)! } : week));
+    }
+    return { ok: true };
+  };
+  return <div className="edu-admin"><AdminCatalog section={sections.find(item => item.key === 'weeks')!} data={{ courses: [{ id: 'course-a', title: '합성 상품 A' }, { id: 'course-b', title: '합성 상품 B' }], curriculum_weeks: weeks }} selection={[]} setSelection={() => {}} edit={() => {}} archive={() => {}} pending={false} loading={false} pagination={{ page: 1, pageSize: 1000, total: weeks.length }} setPage={() => {}} exportCsv={() => {}} send={send} /></div>;
+}
 
 function ProductHtmlCtaFixture() {
   const documentSource = '<!doctype html><html><body><a href="#faq">자주 묻는 질문</a><a href="#">무료강의 대기방 입장 →</a><p id="faq">FAQ</p></body></html>';
@@ -58,7 +75,7 @@ function ProductHtmlCtaFixture() {
 const path = window.location.pathname;
 // Destination pages are outside this fixture's scope. Keep them inert so their
 // fallback admin screen cannot rewrite the URL before navigation is asserted.
-const fixture = ['/checkout', '/apply', '/safe-custom', '/learn/enrolled-fixture'].includes(path) ? <main data-testid="navigation-destination" /> : path === '/review-audit-test' ? <SubmissionReviewFixture/> : path === '/retained-member-dialog-test' ? <RetainedMemberDialogFixture/> : ['/member-operations-test', '/admin/customers', '/admin/questions', '/admin/reviews', '/admin/members'].includes(path) ? <MemberOperationsFixture/> : path.startsWith('/mission-integrity-test') ? <MissionIntegrityFixture/> : path.startsWith('/admin-shell-test')
+const fixture = ['/checkout', '/apply', '/safe-custom', '/learn/enrolled-fixture'].includes(path) ? <main data-testid="navigation-destination" /> : path === '/review-audit-test' ? <SubmissionReviewFixture/> : path === '/retained-member-dialog-test' ? <RetainedMemberDialogFixture/> : ['/member-operations-test', '/admin/customers', '/admin/questions', '/admin/reviews', '/admin/members'].includes(path) ? <MemberOperationsFixture/> : path === '/admin-week-order-test' ? <WeekCatalogFixture/> : path.startsWith('/mission-integrity-test') ? <MissionIntegrityFixture/> : path.startsWith('/admin-shell-test')
   ? <ShellFixture/>
   : path.startsWith('/product-html-cta-test')
     ? <ProductHtmlCtaFixture/>

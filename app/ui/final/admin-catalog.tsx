@@ -17,7 +17,7 @@ import { archiveValues, cohortPeriod, cohortStatus } from "@/lib/qa-rules";
 import { ArrowRight, BookOpen, ChevronDown, ChevronUp, FileText, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { AdminEmptyState, AdminPagination, AdminSearchField } from "@/features/admin-ui";
 import type { Data, WorkflowSend } from "../learning-workflows";
 import { Metric } from "./admin-shell";
@@ -184,7 +184,17 @@ export function AdminCatalog({
           ? r.week_id
           : lessons.find((l) => l.id === r.lesson_id)?.week_id) === week) &&
     (s.key === "customers" ? `${JSON.stringify(r)} ${customerTags(r.id).map(named).join(" ")} ${customerCourses(r.id).join(" ")}` : JSON.stringify(r)).toLowerCase().includes(query.toLowerCase()),
-  ).toSorted((a, b) => s.key === "banners" ? num(a, "display_order") - num(b, "display_order") : 0);
+  ).toSorted((a, b) => s.key === "banners" ? num(a, "display_order") - num(b, "display_order") : s.key === "weeks" ? num(a, "week_number") - num(b, "week_number") || named(a).localeCompare(named(b), "ko") : 0);
+  const allCourseWeeks = course ? rows.filter((row) => row.course_id === course).toSorted((a, b) => num(a, "week_number") - num(b, "week_number")) : [];
+  const activeCourseWeeks = allCourseWeeks.filter((row) => !row.archived_at);
+  const weekGroups = s.key === "weeks"
+    ? Array.from(filtered.reduce((groups, row) => {
+        const number = num(row, "week_number");
+        groups.set(number, [...(groups.get(number) || []), row]);
+        return groups;
+      }, new Map<number, Row[]>()).entries()).sort(([a], [b]) => a - b)
+    : [];
+  const weekReorderDisabled = !course || Boolean(query || status || archived) || pagination !== null && pagination.total > rows.length;
   async function moveBanner(row: Row, direction: -1 | 1) {
     if (!send || pending) return;
     const index = filtered.findIndex(item => item.id === row.id);
@@ -194,6 +204,17 @@ export function AdminCatalog({
     const targetOrder = num(target, "display_order");
     await send({ action: "save", section: "banners", id: row.id, values: { display_order: targetOrder } });
     await send({ action: "save", section: "banners", id: target.id, values: { display_order: currentOrder } }, "배너 노출 순서를 변경했습니다.");
+  }
+  async function moveWeek(row: Row, direction: -1 | 1) {
+    if (!send || pending || weekReorderDisabled) return;
+    const index = activeCourseWeeks.findIndex((item) => item.id === row.id);
+    const targetIndex = index + direction;
+    if (index < 0 || targetIndex < 0 || targetIndex >= activeCourseWeeks.length) return;
+    const reorderedActive = [...activeCourseWeeks];
+    [reorderedActive[index], reorderedActive[targetIndex]] = [reorderedActive[targetIndex], reorderedActive[index]];
+    let activeIndex = 0;
+    const ids = allCourseWeeks.map((item) => item.archived_at ? String(item.id) : String(reorderedActive[activeIndex++].id));
+    await send({ action: "reorder-weeks", courseId: course, ids }, "주차 순서를 변경했습니다.");
   }
   const missionGroups = scopedWeeks
     .filter((item) => !week || item.id === week)
@@ -830,6 +851,7 @@ export function AdminCatalog({
               </select>
             )}
             {s.key === "product-reviews" && <label className="catalog-filter-field">상품<select aria-label="후기 상품" value={course} onChange={(event) => { setCourse(event.target.value); setSelection([]); }}><option value="">전체 상품</option>{courses.map((item) => <option key={item.id} value={item.id}>{named(item)}</option>)}</select></label>}
+            {s.key === "weeks" && <label className="catalog-filter-field">상품<select aria-label="주차 상품" value={course} onChange={(event) => { setCourse(event.target.value); setSelection([]); }}><option value="">전체 상품</option>{courses.map((item) => <option key={item.id} value={item.id}>{named(item)}</option>)}</select></label>}
             {s.key === "customers" && (
               <label className="catalog-filter-field">클래스<select
                 aria-label="수강 클래스"
@@ -845,6 +867,7 @@ export function AdminCatalog({
             )}
             {s.key === "questions" ? <select aria-label="질문 처리 상태" value={params.has('question') ? 'selected' : params.get('questionState') || 'active'} onChange={event => { const next = new URLSearchParams(params.toString()); next.set('questionState', event.target.value); next.delete('question'); router.push(`/admin/questions?${next}`); }}>{params.has('question') && <option value="selected" disabled>선택한 질문 · 보관 포함</option>}<option value="active">전체 운영 질문</option><option value="open">미답변</option><option value="answered">답변 완료</option><option value="archived">보관</option></select> : statusFilter}
           </div>}
+          {s.key === "weeks" && <p className="meta week-order-help">상품을 선택하면 해당 상품 안에서 주차 순서를 조정할 수 있습니다. 검색·상태 필터를 해제한 뒤 이동해 주세요.</p>}
           {s.key === "learning" ? (
             <div className="lesson-list">
               {filtered.toSorted((a, b) => num(a, "day_number") - num(b, "day_number")).map((l) => (
@@ -951,7 +974,20 @@ export function AdminCatalog({
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((r) => (
+                  {s.key === "weeks" ? weekGroups.map(([weekNumber, groupRows]) => <Fragment key={weekNumber}>
+                    <tr className="week-group-heading"><th scope="rowgroup" colSpan={cols.length + 1 + Number(bulkMode)}><span>{weekNumber}주차</span><small>{groupRows.length}개 상품</small></th></tr>
+                    {groupRows.map((r) => (
+                      <tr key={recordId(r)}>
+                        {bulkMode && <td data-label="선택" className="selection-column"><input type="checkbox" aria-label={title(r) + " 선택"} checked={selection.includes(recordId(r))} onChange={(e) => setSelection(e.target.checked ? [...selection, recordId(r)] : selection.filter((id) => id !== recordId(r)))} /></td>}
+                        {cols.map((c) => <td data-label={c.label} key={c.label}>{c.value(r)}</td>)}
+                        <td data-label="관리"><div className="catalog-actions week-order-actions">
+                          <button className="btn iconbtn" type="button" title="위로 이동" aria-label={`${t(r, "title")} 위로 이동`} disabled={pending || weekReorderDisabled || Boolean(r.archived_at) || activeCourseWeeks[0]?.id === r.id} onClick={() => void moveWeek(r, -1)}><ChevronUp size={17} aria-hidden="true" /></button>
+                          <button className="btn iconbtn" type="button" title="아래로 이동" aria-label={`${t(r, "title")} 아래로 이동`} disabled={pending || weekReorderDisabled || Boolean(r.archived_at) || activeCourseWeeks.at(-1)?.id === r.id} onClick={() => void moveWeek(r, 1)}><ChevronDown size={17} aria-hidden="true" /></button>
+                          <button className="btn small" onClick={() => edit(s, r)}>수정</button>
+                        </div></td>
+                      </tr>
+                    ))}
+                  </Fragment>) : filtered.map((r) => (
                     <tr key={recordId(r)}>
                       {bulkMode && <td data-label="선택" className="selection-column">
                         <input

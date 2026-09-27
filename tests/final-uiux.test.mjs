@@ -241,6 +241,11 @@ test('catalogues and separate editors render without dropping existing fields', 
     assert.ok(html(AdminCatalog, { section, data, selection: [], setSelection() {}, edit() {}, archive() {}, pending: false, loading: false, pagination: null, setPage() {}, exportCsv() {} }).length > 100, key);
   }
   const props = { data, selection: [], setSelection() {}, edit() {}, archive() {}, pending: false, loading: false, pagination: null, setPage() {}, exportCsv() {} };
+  const weekMarkup = html(AdminCatalog, { ...props, data: { ...data, courses: [...data.courses, { id: 'other-course', title: '다른 상품' }], curriculum_weeks: [...data.curriculum_weeks, { id: 'other-week', course_id: 'other-course', week_number: 1, title: '다른 상품 주차' }, { id: 'third-week', course_id: 'course', week_number: 2, title: '두 번째 주차' }] }, send, section: platform.sections.find(row => row.key === 'weeks') });
+  assert.match(weekMarkup, /aria-label="주차 상품"/);
+  assert.match(weekMarkup, /class="week-group-heading"[\s\S]*?1주차[\s\S]*?2주차/);
+  assert.match(weekMarkup, /다른 상품 주차 아래로 이동/);
+  assert.match(read('app/ui/final/admin.css'), /week-filter|주차 상품/);
   const products = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'products') });
   assert.match(products, /전체 상품/); assert.match(products, /연결 기수/); assert.match(products, /<th>자료<\/th>/);
   assert.match(products, /공개 점검/); assert.match(read('app/api/platform/route.ts'), /archivedProducts/);

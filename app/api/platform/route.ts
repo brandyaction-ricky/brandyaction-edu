@@ -108,7 +108,7 @@ export async function GET(request: Request) {
         if (record && (!uid(record) || !['products', 'learning'].includes(sectionKey))) return reply({ error: '편집할 항목을 확인해 주세요.' }, 400);
         const productEditorRead = adminMode && sectionKey === 'products' && Boolean(record);
         const page = Math.max(1, Math.min(100000, Number(params.get('page')) || 1));
-        const pageSize = sectionKey === 'orders' ? 30 : 100;
+        const pageSize = sectionKey === 'orders' ? 30 : sectionKey === 'weeks' ? 1000 : 100;
         if (adminMode && !user) return reply({ error: '로그인이 필요합니다.', user: null }, 401);
         const operator = adminMode ? await getOperatorUser(sectionScopes[sectionKey], user) : null;
         const authorized = performance.now();
@@ -636,6 +636,23 @@ export async function POST(request: Request) {
                 fail(result.error.message || '상품을 복원하지 못했습니다.', 409);
             }
             if (!Number(result.data)) fail('이미 복원됐거나 삭제 상태가 아닌 상품입니다.', 409);
+            return publicWriteSuccess({ ok: true, result: result.data });
+        }
+        if (action === 'reorder-weeks') {
+            const permissions = await permissionsFor(user);
+            const courseId = String(body.courseId || '');
+            const ids = body.ids;
+            if (!permissions.products) return reply({ error: '상품 관리 권한이 필요합니다.' }, 403);
+            if (!uid(courseId) || !Array.isArray(ids) || !ids.length || ids.length > 1000 || !ids.every(uid) || new Set(ids).size !== ids.length) fail('상품과 주차 목록을 다시 확인해 주세요.');
+            const result = await db.rpc('edu_admin_reorder_weeks', {
+                p_actor: user.id,
+                p_course: courseId,
+                p_ids: ids,
+            });
+            if (result.error) {
+                if (result.error.code !== 'P0001') console.error('week reorder', result.error.code);
+                fail(result.error.message || '주차 순서를 변경하지 못했습니다.', 409);
+            }
             return publicWriteSuccess({ ok: true, result: result.data });
         }
         if (action === 'save') {

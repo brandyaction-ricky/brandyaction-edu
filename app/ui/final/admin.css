@@ -168,3 +168,16 @@
 @media(max-width:980px){.edu-admin .article-category-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.edu-admin .article-category-manager>.article-category-list{grid-template-columns:minmax(0,1fr);padding:16px}.edu-admin .article-category-manager>.article-category-form-wrap{margin:0 16px 16px}.edu-admin .article-category-form{padding:16px}.edu-admin .article-category-form .form-grid{column-gap:0;row-gap:0}}
 
+/* Week configuration uses a clean, consistently aligned filter row and groups records by week. */
+.edu-admin .panel:has(.filter-row select[aria-label="주차 상품"]) .filter-row{gap:var(--space-3);align-items:flex-end}
+.edu-admin .panel:has(.filter-row select[aria-label="주차 상품"]) .filter-row>.spacer{display:none}
+.edu-admin .panel:has(.filter-row select[aria-label="주차 상품"]) .filter-row>.search{margin-left:auto;flex:0 1 320px;max-width:320px}
+.edu-admin .panel:has(.filter-row select[aria-label="주차 상품"]) .filter-row>.catalog-filter-field{display:grid;gap:var(--space-1);width:220px;min-width:180px;color:var(--text-secondary);font-size:var(--type-small)}
+.edu-admin .panel:has(.filter-row select[aria-label="주차 상품"]) .filter-row>.catalog-filter-field select{width:100%;max-width:none;min-height:40px}
+.edu-admin .week-order-help{padding:0 var(--space-4);margin:0;color:var(--text-secondary)}
+.edu-admin .week-group-heading th{padding:var(--space-3) var(--space-4);background:var(--surface-subtle);border-top:1px solid var(--line);text-align:left;font-weight:650}
+.edu-admin .week-group-heading th span{margin-right:var(--space-3)}
+.edu-admin .week-group-heading th small{font-size:var(--type-small);font-weight:400;color:var(--text-secondary)}
+.edu-admin .week-order-actions{justify-content:flex-end}
+@media(max-width:720px){.edu-admin .panel:has(.filter-row select[aria-label="주차 상품"]) .filter-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:end}.edu-admin .panel:has(.filter-row select[aria-label="주차 상품"]) .filter-row>.search{grid-column:1/-1;width:100%;max-width:none;margin:0}.edu-admin .panel:has(.filter-row select[aria-label="주차 상품"]) .filter-row>.catalog-filter-field{width:100%;min-width:0}.edu-admin .panel:has(.filter-row select[aria-label="주차 상품"]) .filter-row>select{width:100%;min-width:0}.edu-admin .mobile-cards .week-group-heading{display:block;padding:0;border:0}.edu-admin .mobile-cards .week-group-heading th{display:block;width:100%;padding:var(--space-3) var(--space-4)}.edu-admin .week-order-help{padding:0 var(--space-3)}.edu-admin .week-order-actions{justify-content:flex-start;flex-wrap:wrap}}
+
