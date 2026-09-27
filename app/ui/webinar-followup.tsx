@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { RecruitmentDelivery } from './recruitment-delivery';
 import { RecruitmentDetails, RecruitmentHelp } from './recruitment-help';
 import { useEffect,useRef,useState } from 'react';
-import { AdminButton,AdminSection,AdminSelect,AdminStack,AdminTextarea } from './final/admin-system';
+import { AdminButton,AdminSection,AdminSelect,AdminStack,AdminTextarea } from '@/features/admin-ui';
 type Draft={channel:'room'|'direct';purpose:'offer'|'encore';body:string;revision:number;updatedAt:string};
 type Counts={total:number;candidate:number;inactive:number;order_hold:number;no_consent:number;no_phone:number};
 type Report={drafts:Draft[];audienceState:'ready'|'forbidden'|'unmapped'|'paused'|'unavailable';counts:Counts|null;asOf:string};

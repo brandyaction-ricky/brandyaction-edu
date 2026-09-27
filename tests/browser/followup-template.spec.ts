@@ -44,3 +44,21 @@ test('denied source and room-only response cannot import a direct message',async
  await expect(page.getByRole('status')).toContainText('접근할 수 없습니다');
  await expect(page.getByLabel('메시지 내용')).toHaveValue('');
 });
+
+test('Alimtalk draft stays editable and off until an approved Kakao template number is entered',async({page})=>{
+ const writes:Record<string,unknown>[]=[];
+ await page.route('**/api/platform/workflows',r=>{writes.push(r.request().postDataJSON());return r.fulfill({json:{ok:true}});});
+ await page.goto('/templates-admin-test');
+ await page.getByLabel('발송 채널').selectOption('alimtalk');
+ await expect(page.getByLabel('메시지 목적')).toHaveValue('transactional');
+ await expect(page.getByLabel('메시지 목적')).toBeDisabled();
+ await expect(page.getByLabel('카카오 승인 템플릿 번호')).toHaveValue('');
+ await expect(page.getByRole('checkbox')).not.toBeChecked();
+ await expect(page.getByRole('checkbox')).toBeDisabled();
+ await page.getByLabel('템플릿 이름').fill('결제 완료 안내 초안');
+ await page.getByLabel('메시지 내용').fill('결제가 확인되었습니다. 안내 문구는 여기서 수정할 수 있습니다.');
+ await page.getByRole('button',{name:'저장하기',exact:true}).click();
+ await expect.poll(()=>writes.length).toBe(1);
+ expect(writes[0]).toMatchObject({action:'crm-save',kind:'template',channel:'alimtalk',purpose:'transactional',name:'결제 완료 안내 초안',content:'결제가 확인되었습니다. 안내 문구는 여기서 수정할 수 있습니다.',alimtalkTemplateId:'',isActive:false});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+});

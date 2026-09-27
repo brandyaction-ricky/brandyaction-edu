@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, Download, X } from 'lucide-react';
 import { displayDimension, type DashboardReport } from '@/lib/landing-performance';
 import { FILTER_LABELS, emptyFilters, type FilterKey, type TrackingFilters } from '@/lib/landing-admin-state';
-import { AdminButton, AdminConfirmDialog, AdminDrawer, AdminEmptyState, AdminFilterTrigger, AdminInlineError, AdminModal, AdminSkeleton, AdminTableToolbar } from '@/app/ui/final/admin-system';
+import { AdminButton, AdminConfirmDialog, AdminDrawer, AdminEmptyState, AdminFilterTrigger, AdminInlineError, AdminModal, AdminSkeleton, AdminTableToolbar } from '@/features/admin-ui';
 
 export function TrackingModal({ title, children, onClose, variant = 'drawer' }: { title: string; children: ReactNode; onClose: () => void; variant?: 'drawer' | 'filters' | 'confirm' }) {
   if (variant === 'confirm') return <AdminModal title={title} onClose={onClose} className="tracking-confirm">{children}</AdminModal>;

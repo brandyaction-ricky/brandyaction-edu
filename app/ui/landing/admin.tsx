@@ -8,7 +8,7 @@ import type { Classify } from './ad-type-control';
 import { RefreshCw, Settings2 } from 'lucide-react';
 import { PERFORMANCE_PRESETS, campaignRange, presetRange, previousRange, validDay, type ActualRow, type DashboardReport, type PerformanceCampaign, type PerformanceCourse, type PerformancePreset } from '@/lib/landing-performance';
 import { appendFilters, campaignStatus, emptyFilters, metaStatus, periodError, readFilters, readPeriod, type TrackingFilters, type TrackingPeriod } from '@/lib/landing-admin-state';
-import { AdminButton, AdminDrawer, AdminPage, AdminPageHeader, AdminStatusBadge, AdminToast } from '@/app/ui/final/admin-system';
+import { AdminButton, AdminDrawer, AdminPage, AdminPageHeader, AdminStatusBadge, AdminToast } from '@/features/admin-ui';
 import { MultiSourceComparison, PerformanceDashboard } from './performance-dashboard';
 import { ActualDrawer, ActualsPanel, CampaignSettings } from './tracking-operations';
 import { CompactEmpty, DiscardConfirmation, InlineError, TrackingFiltersPanel, TrackingSkeleton } from './tracking-controls';

@@ -816,6 +816,314 @@ body {
   flex-wrap: wrap;
   justify-content: flex-end;
 }
+.edu-admin .mission-catalog .mission-day-row {
+  grid-template-columns: 42px minmax(0, 1fr) auto minmax(190px, auto);
+}
+.edu-admin .mission-day-row .mission-day-label {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--text-secondary);
+  font-size: var(--type-small);
+}
+.edu-admin .mission-day-row .mission-copy .title-btn {
+  text-align: left;
+}
+.edu-admin .mission-day-row .mission-content-edit {
+  background: var(--surface-subtle);
+}
+.edu-admin .participant-list {
+  display: grid;
+  gap: var(--space-3);
+}
+.edu-admin .participant-card {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  box-shadow: 0 2px 8px rgb(20 25 35 / 4%);
+}
+.edu-admin .participant-card-summary {
+  display: grid;
+  grid-template-columns: 48px minmax(150px, 1.5fr) repeat(2, minmax(90px, .65fr)) minmax(130px, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 104px;
+  padding: var(--space-4) var(--space-6);
+}
+.edu-admin .participant-avatar {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface-subtle);
+  color: var(--text-primary);
+  font-size: var(--type-h4);
+  font-weight: 650;
+}
+.edu-admin .participant-identity,
+.edu-admin .participant-summary-stat,
+.edu-admin .participant-activity {
+  min-width: 0;
+}
+.edu-admin .participant-name-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.edu-admin .participant-name-row h2 {
+  overflow: hidden;
+  margin: 0;
+  font-size: var(--type-h4);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.edu-admin .participant-identity > p,
+.edu-admin .participant-summary-stat > span,
+.edu-admin .participant-activity > span {
+  display: block;
+  overflow: hidden;
+  margin-top: var(--space-1);
+  color: var(--text-secondary);
+  font-size: var(--type-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.edu-admin .participant-summary-stat strong {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--type-body);
+  font-variant-numeric: tabular-nums;
+}
+.edu-admin .participant-summary-stat strong small {
+  color: var(--text-secondary);
+  font-size: var(--type-small);
+  font-weight: 400;
+}
+.edu-admin .participant-activity .badge {
+  margin-top: var(--space-1);
+}
+.edu-admin .participant-review-cta {
+  white-space: nowrap;
+}
+.edu-admin .participant-expand {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.edu-admin .participant-expand:hover {
+  background: var(--surface-subtle);
+  color: var(--text-primary);
+}
+.edu-admin .participant-expand svg {
+  transition: transform .16s ease;
+}
+.edu-admin .participant-expand[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+.edu-admin .participant-card-details {
+  padding: var(--space-5) var(--space-6) var(--space-6);
+  border-top: 1px solid var(--line);
+  background: var(--surface-subtle);
+}
+.edu-admin .participant-detail-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.edu-admin .participant-detail-head h3 {
+  margin: 0;
+  font-size: var(--type-body);
+}
+.edu-admin .participant-detail-head p,
+.edu-admin .participant-detail-head > strong {
+  margin: var(--space-1) 0 0;
+  color: var(--text-secondary);
+  font-size: var(--type-small);
+}
+.edu-admin .participant-day-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 235px), 1fr));
+  gap: var(--space-2);
+}
+.edu-admin .participant-day-card {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+a.participant-day-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: 0 2px 8px rgb(20 25 35 / 6%);
+}
+.edu-admin .participant-day-number {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
+  color: var(--text-primary);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.edu-admin .participant-day-copy {
+  min-width: 0;
+  flex: 1;
+}
+.edu-admin .participant-day-copy b,
+.edu-admin .participant-day-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.edu-admin .participant-day-copy b {
+  font-size: var(--type-small);
+}
+.edu-admin .participant-day-copy small {
+  margin-top: 3px;
+  color: var(--text-secondary);
+  font-size: var(--type-small);
+}
+.edu-admin .participant-day-action {
+  flex: none;
+  color: var(--text-secondary);
+  font-size: var(--type-small);
+}
+.edu-admin .participant-day-card.approved .participant-day-number {
+  background: #e9f6ed;
+  color: #19753a;
+}
+.edu-admin .participant-day-card.pending .participant-day-number {
+  background: #fff4dc;
+  color: #9b5b00;
+}
+.edu-admin .participant-day-card.returned .participant-day-number {
+  background: #ffeded;
+  color: #bd3333;
+}
+.edu-admin .question-admin-list {
+  display: grid;
+  gap: var(--space-4);
+}
+.edu-admin .question-admin-card {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+.edu-admin .question-admin-card .panel-head {
+  align-items: flex-start;
+  gap: var(--space-4);
+  background: var(--surface-subtle);
+}
+.edu-admin .question-admin-card .panel-head h2 {
+  margin-top: var(--space-3);
+  font-size: var(--type-h4);
+  line-height: 1.5;
+}
+.edu-admin .question-admin-card .panel-body {
+  padding: var(--space-5) var(--space-6);
+}
+.edu-admin .question-admin-card .reading-copy {
+  color: var(--text-primary);
+  font-size: var(--type-body);
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.edu-admin .question-admin-card .answer-block {
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
+}
+.edu-admin .question-admin-card .answer-block > b {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-size: var(--type-small);
+}
+.edu-admin .question-admin-card .meta {
+  color: var(--text-secondary);
+}
+.edu-admin .question-answer-editor {
+  display: grid;
+  gap: var(--space-5);
+}
+.edu-admin .question-answer-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
+}
+.edu-admin .question-answer-heading h3 {
+  margin: 0;
+  font-size: var(--type-body);
+}
+.edu-admin .question-answer-heading p {
+  margin-top: var(--space-1);
+  color: var(--text-secondary);
+  font-size: var(--type-small);
+  line-height: 1.6;
+}
+.edu-admin .question-ai-button {
+  flex: none;
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+  font-weight: 650;
+}
+.edu-admin .question-ai-button:hover:not(:disabled) {
+  border-color: var(--ba-blue-500, #159fc8);
+  background: var(--ba-blue-50, #eefaff);
+  color: var(--ba-blue-700, #08779a);
+}
+.edu-admin .question-answer-editor textarea {
+  width: 100%;
+  min-height: 190px;
+  resize: vertical;
+  padding: var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font: inherit;
+  line-height: 1.75;
+}
+.edu-admin .question-answer-editor textarea:focus-visible {
+  outline: 2px solid var(--ba-blue-500, #159fc8);
+  outline-offset: 2px;
+}
+.edu-admin .question-answer-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+.edu-admin .question-ai-message {
+  margin: calc(-1 * var(--space-3)) 0 0;
+  color: var(--text-secondary);
+  font-size: var(--type-small);
+  line-height: 1.6;
+}
 .edu-admin .upload-dropzone > .upload-zone {
   min-height: 200px;
   display: flex;
@@ -924,6 +1232,9 @@ body {
   .edu-admin .mission-catalog .mission-row {
     grid-template-columns: 32px minmax(0, 1fr);
   }
+  .edu-admin .mission-catalog .mission-day-row {
+    grid-template-columns: 32px minmax(0, 1fr);
+  }
   .edu-admin .mission-catalog .mission-row > .badge,
   .edu-admin .mission-catalog .mission-actions {
     grid-column: 2;
@@ -931,6 +1242,62 @@ body {
   .edu-admin .mission-catalog .mission-actions {
     justify-content: flex-start;
     margin-left: 0;
+  }
+  .edu-admin .mission-catalog .mission-day-row .mission-actions {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+  .edu-admin .participant-card-summary {
+    grid-template-columns: 42px minmax(0, 1fr) auto;
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-4);
+  }
+  .edu-admin .participant-avatar {
+    width: 40px;
+    height: 40px;
+    grid-row: span 2;
+  }
+  .edu-admin .participant-identity {
+    grid-column: 2;
+  }
+  .edu-admin .participant-summary-stat {
+    grid-row: 2;
+  }
+  .edu-admin .participant-summary-stat:nth-child(3) {
+    grid-column: 2;
+  }
+  .edu-admin .participant-summary-stat:nth-child(4) {
+    grid-column: 3;
+  }
+  .edu-admin .participant-activity {
+    grid-column: 2 / 4;
+  }
+  .edu-admin .participant-review-cta {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .edu-admin .participant-expand {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .edu-admin .participant-card-details {
+    padding: var(--space-4);
+  }
+  .edu-admin .participant-detail-head {
+    align-items: flex-start;
+  }
+  .edu-admin .question-admin-card .panel-head {
+    align-items: flex-start;
+  }
+  .edu-admin .question-admin-card .panel-body {
+    padding: var(--space-4);
+  }
+  .edu-admin .question-answer-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .edu-admin .question-answer-options {
+    grid-template-columns: minmax(0, 1fr);
   }
   .edu-admin .upload-dropzone > .upload-zone {
     padding: var(--space-4);

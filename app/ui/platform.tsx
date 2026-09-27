@@ -15,10 +15,12 @@ import {
   type User,
 } from "@/lib/platform";
 import { homepageCourses, isRecruiting, localDateTime, recordId } from "@/lib/platform-rules";
+import { listedProducts } from "@/lib/product-visibility";
+import { publicReadParams } from "@/lib/public-platform-plan";
 import { archiveValues } from "@/lib/qa-rules";
 import { createClient } from "@/lib/supabase/client";
 import { getSupabasePublicConfig } from "@/lib/supabase/config";
-import { ArrowRight, BookOpen, Menu, Pencil, Plus, Search, X } from "lucide-react";
+import { ArrowRight, BookOpen, CalendarDays, CreditCard, LayoutDashboard, LogOut, Menu, Pencil, Plus, Search, Ticket, UserRound, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -31,7 +33,9 @@ import {
 } from "react";
 import { AdminWorkflows, standaloneAdmin } from "./admin-workflows";
 import { BlocksField, UploadField } from "./editor-fields";
-import { AdminCatalog } from "./final/admin-catalog";
+import { AdminCatalog, type MissionScope } from "./final/admin-catalog";
+import { MissionTargetFields, type MissionContext } from "./final/mission-target-fields";
+import { useAdminDialog, useRouteDialog } from "@/features/admin-ui";
 import { ArticleBannerEditor } from "./final/article-banner-editor";
 import { ArticleCategoryManager } from "./final/article-category-manager";
 import { ProductEditor } from "./final/admin-editors";
@@ -46,15 +50,16 @@ import {
 import { Checkout } from "./final/checkout";
 import { Classroom } from "./final/classroom";
 import { MemberViews } from "./final/member-views";
+import { CustomerWorkspace } from "./final/customer-workspace";
 import {
   ArticleCard,
   Brand,
   CourseCard,
   Empty,
   Heading,
-  Story,
   courseType,
 } from "./final/primitives";
+import { StoryCarousel } from "./final/story-carousel";
 import {
   ArticlesView,
   AuthView,
@@ -66,6 +71,12 @@ import { SiteFooter } from "./final/site-footer";
 import { HomeHero } from "./final/home-hero";
 import { MarketingWorkspaceNav } from "./marketing-workspace-nav";
 import { ConversionReview, prefetchConversionReview } from "./conversion-review";
+import {
+  AdminEmptyState,
+  AdminInlineError,
+  AdminLoadingState,
+  AdminToast,
+} from "@/features/admin-ui";
 type Data = Record<string, Row[]>;
 type AdminRead = {
   ok: boolean;
@@ -84,8 +95,9 @@ function readAdminSection(
   page: number,
   record = "",
   forceNetwork = false,
+  scopeQuery = "",
 ) {
-  const key = `${userId}:${section}:${page}:${record}`;
+  const key = `${userId}:${section}:${page}:${record}:${scopeQuery}`;
   const cached = adminNavigationReads.get(key);
   if (!forceNetwork && cached && (!cached.expiresAt || cached.expiresAt > Date.now()))
     return cached.promise;
@@ -97,6 +109,7 @@ function readAdminSection(
     page: String(page),
   });
   if (record) query.set("record", record);
+  new URLSearchParams(scopeQuery).forEach((value, key) => query.set(key, value));
   const entry = {
     expiresAt: 0,
     promise: fetch(`/api/platform?${query}`, {
@@ -165,14 +178,19 @@ export function Platform({
   const [notice, setNotice] = useState("");
   const [pending, setPending] = useState(false);
   const [mobile, setMobile] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
+  const [articleFilter, setArticleFilter] = useState("전체");
+  const [publicSearch, setPublicSearch] = useState("");
+  const [publicPage, setPublicPage] = useState(1);
   const [adminPaging, setAdminPaging] = useState({ section: "", page: 1 });
   const [pagination, setPagination] = useState<{
     page: number;
     pageSize: number;
     total: number;
   } | null>(null);
-  const [loadedSection, setLoadedSection] = useState("");
+  const [loadedReadKey, setLoadedReadKey] = useState("");
   const searchParams = useSearchParams();
   const routeKey = path.join("/") + "?" + searchParams.toString();
   const [filters, setFilters] = useState({
@@ -188,11 +206,18 @@ export function Platform({
       : path[0] === "classes" && searchParams.get("type") === "free"
         ? "무료 클래스"
         : "전체";
-  const setFilter = (value: string) => setFilters({ route: routeKey, value });
-  const [editor, setEditor] = useState<{
+  const setFilter = (value: string) => { setPublicPage(1); setFilters({ route: routeKey, value }); };
+  const [editor, setEditor] = useRouteDialog<{
+    route: string;
     section: Section;
     row?: Row;
-  } | null>(null);
+    context?: MissionContext;
+  }>(routeKey);
+  const missionScopeSource = `${searchParams.get("course") || ""}:${searchParams.get("week") || ""}`;
+  const initialMissionScope: MissionScope = { courseId: searchParams.get("course") || "", weekId: searchParams.get("week") || "", state: "active" };
+  const [missionFilter, setMissionFilter] = useState({ source: missionScopeSource, scope: initialMissionScope });
+  const missionScope = missionFilter.source === missionScopeSource ? missionFilter.scope : initialMissionScope;
+  const setMissionScope = (scope: MissionScope) => setMissionFilter({ source: missionScopeSource, scope });
   const [selection, setSelection] = useState<string[]>([]);
   const [articleAdminTab, setArticleAdminTab] = useState<"content" | "banner">("content");
   const alive = useRef(true);
@@ -204,17 +229,31 @@ export function Platform({
       : path[1] === "learning-editor"
         ? "learning"
         : path[1] || "home";
-  const data = !admin || loadedSection === adminSection ? loadedData : {};
   const editorRecordId = ["product-editor", "learning-editor"].includes(path[1])
     ? searchParams.get("id") || ""
     : "";
-  const adminPage = adminPaging.section === adminSection ? adminPaging.page : 1;
+  const scopeQuery = adminSection === "missions" ? new URLSearchParams({ course: missionScope.courseId, week: missionScope.weekId, missionState: missionScope.state }).toString() : ["customers", "questions", "reviews"].includes(adminSection) ? new URLSearchParams({ member: searchParams.get("member") || "", submission: searchParams.get("submission") || "", question: searchParams.get("question") || "", questionState: searchParams.get("questionState") || "active" }).toString() : "";
+  const pagingKey = adminSection + "?" + scopeQuery;
+  const adminPage = adminPaging.section === pagingKey ? adminPaging.page : 1;
+  // An editor's one-record response is not a catalog response, even though both
+  // belong to the same section. Keep rows, totals and actions behind this key.
+  const adminReadKey = JSON.stringify([adminSection, adminPage, editorRecordId, scopeQuery]);
+  const hasCurrentAdminRead = loadedReadKey === adminReadKey;
+  const publicParams = publicReadParams(path, searchParams, publicPage, publicSearch, path[0] === "articles" ? articleFilter : filter);
+  const memberParams = new URLSearchParams({ view: "member", section: account ? (path[1] || "dashboard") : learning ? "learn" : "order-result" });
+  if (learning) {
+    memberParams.set("enrollment", path[1] || "");
+    if (path[2]) memberParams.set("lesson", path[2]);
+  }
+  const publicParamsString = publicParams?.toString() || (account || learning || ["order-complete", "applied", "payment"].includes(path[0]) ? memberParams.toString() : "view=identity");
+  const publicReadKey = JSON.stringify([routeKey, publicParamsString]);
+  const data = admin ? (hasCurrentAdminRead ? loadedData : {}) : (loadedReadKey === publicReadKey ? loadedData : {});
   const setAdminPage = (update: number | ((page: number) => number)) =>
     setAdminPaging((current) => ({
-      section: adminSection,
+      section: pagingKey,
       page:
         typeof update === "function"
-          ? update(current.section === adminSection ? current.page : 1)
+          ? update(current.section === pagingKey ? current.page : 1)
           : update,
     }));
   const refresh = useCallback(async (forceNetwork = false) => {
@@ -233,9 +272,10 @@ export function Platform({
             adminPage,
             editorRecordId,
             forceNetwork,
+            scopeQuery,
           )
         : await (async () => {
-            const response = await fetch("/api/platform", {
+            const response = await fetch(`/api/platform?${publicParamsString}`, {
               cache: "no-store",
               signal: controller.signal,
             });
@@ -268,7 +308,7 @@ export function Platform({
       if (!response.ok) throw new Error(result.error);
       if (alive.current) {
         setData(result.data || {});
-        setLoadedSection(adminSection);
+        setLoadedReadKey(admin ? adminReadKey : publicReadKey);
         setSupport(result.support || { email: "", url: "" });
         if (admin && cachedAdminUser?.id !== result.user?.id)
           adminNavigationReads.clear();
@@ -281,7 +321,7 @@ export function Platform({
     } finally {
       if (alive.current && !controller.signal.aborted) setLoading(false);
     }
-  }, [admin, adminPage, adminSection, editorRecordId]);
+  }, [admin, adminPage, adminSection, editorRecordId, scopeQuery, adminReadKey, publicReadKey, publicParamsString]);
   const prefetchAdminSection = useCallback(
     (section: string) => {
       if (!admin || !user?.id || section === adminSection) return;
@@ -302,10 +342,31 @@ export function Platform({
     };
   }, [refresh]);
   useEffect(() => {
+    if (query === publicSearch) return;
+    const timer = setTimeout(() => { setPublicPage(1); setPublicSearch(query); }, 300);
+    return () => clearTimeout(timer);
+  }, [query, publicSearch]);
+  useEffect(() => {
     if (!notice) return;
     const timer = setTimeout(() => setNotice(""), 5000);
     return () => clearTimeout(timer);
   }, [notice]);
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (!profileMenuRef.current?.contains(event.target as Node))
+        setProfileMenuOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setProfileMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [profileMenuOpen]);
   const send = (body: Record<string, unknown>, success = "저장했습니다.") =>
     mutationGate.current(body, async (payload) => {
       setPending(true);
@@ -320,7 +381,7 @@ export function Platform({
           },
         );
         const result = await response.json();
-        if (!response.ok) throw new Error(result.error);
+        if (!response.ok) throw Object.assign(new Error(result.error || '요청을 처리하지 못했습니다.'), { status: response.status, code: result.code });
         setNotice(result.message || success);
         adminNavigationReads.clear();
         await refresh(true);
@@ -353,7 +414,9 @@ export function Platform({
     } catch {}
   }
   const rows = (key: string) => data[key] || [];
-  const courses = rows("courses");
+  // Keep the full published set for direct URLs, orders and learning access.
+  const allCourses = rows("courses");
+  const courses = listedProducts(allCourses);
   const recruitingCourses = courses.filter((c) =>
     rows("cohorts").some((g) => g.course_id === c.id && isRecruiting(g)),
   );
@@ -362,7 +425,7 @@ export function Platform({
     recruitingCourses.find((c) => t(c, "category") === "free") ||
     courses.find((c) => t(c, "category") === "free");
   const freeOpen = !!free && recruitingCourses.some((c) => c.id === free.id);
-  const selected = courses.find((c) => c.slug === path[1] || c.id === path[1]);
+  const selected = allCourses.find((c) => c.slug === path[1] || c.id === path[1]);
   const freeClassDetail =
     path[0] === "classes" &&
     path.length > 1 &&
@@ -462,13 +525,32 @@ export function Platform({
                 <Link className="link" href="/my">
                   마이페이지
                 </Link>
-                <Link
-                  className="avatar"
-                  href="/my/profile"
-                  aria-label="회원 정보"
-                >
-                  {(user.full_name || "나").slice(0, 1)}
-                </Link>
+                <div className="profile-menu-wrap" ref={profileMenuRef}>
+                  <button
+                    type="button"
+                    className="avatar profile-menu-trigger"
+                    aria-label="내 프로필 메뉴"
+                    aria-haspopup="true"
+                    aria-expanded={profileMenuOpen}
+                    onClick={() => setProfileMenuOpen((open) => !open)}
+                  >
+                    {(user.full_name || "나").slice(0, 1)}
+                  </button>
+                  {profileMenuOpen && (
+                    <nav className="profile-menu" aria-label="내 프로필 메뉴">
+                      <div className="profile-menu-identity">
+                        <span className="avatar" aria-hidden="true">{(user.full_name || "나").slice(0, 1)}</span>
+                        <span><b>{user.full_name || "회원"}</b><small>{user.email}</small></span>
+                      </div>
+                      <Link href="/my" onClick={() => setProfileMenuOpen(false)}><LayoutDashboard aria-hidden="true" />마이페이지로 이동</Link>
+                      <Link href="/my/profile" onClick={() => setProfileMenuOpen(false)}><UserRound aria-hidden="true" />내 정보 수정</Link>
+                      <Link href="/my/coupons" onClick={() => setProfileMenuOpen(false)}><Ticket aria-hidden="true" />내 쿠폰함</Link>
+                      <Link href="/my/orders" onClick={() => setProfileMenuOpen(false)}><CreditCard aria-hidden="true" />신청·결제 내역</Link>
+                      <Link href="/my/classes" onClick={() => setProfileMenuOpen(false)}><CalendarDays aria-hidden="true" />내 클래스</Link>
+                      <button type="button" onClick={() => { setProfileMenuOpen(false); void logout(); }}><LogOut aria-hidden="true" />로그아웃</button>
+                    </nav>
+                  )}
+                </div>
               </>
             ) : (
               <Link className="btn" href="/login">
@@ -565,7 +647,7 @@ export function Platform({
                 <CourseCard key={c.id} course={c} />
               ))}
             </div>
-            {!loading && !availableCourses.length && (
+            {!loading && !error && !availableCourses.length && (
               <Empty title="새로운 클래스를 준비하고 있습니다." />
             )}
           </section>
@@ -599,13 +681,7 @@ export function Platform({
                   고객 이야기 <ArrowRight />
                 </Link>
               </div>
-              <div className="grid2">
-                {rows("review_videos")
-                  .slice(0, 2)
-                  .map((s) => (
-                    <Story key={s.id} story={s} />
-                  ))}
-              </div>
+              <StoryCarousel stories={rows("review_videos")} />
             </section>
           )}
         </div>
@@ -654,29 +730,28 @@ export function Platform({
           </label>
         </div>
         <div className="grid3 course-grid pb64">
-          {courses
-            .filter(
-              (c) =>
-                (filter === "전체" || courseType(c) === filter) &&
-                t(c, "title").includes(query),
-            )
-            .map((c) => (
+          {courses.map((c) => (
               <CourseCard key={c.id} course={c} />
             ))}
         </div>
-        {!loading && !courses.length && (
+        {!loading && !error && !courses.length && (
           <Empty title="등록된 클래스가 없습니다." />
         )}
+        {pagination && pagination.total > pagination.pageSize && <div className="row center mt24" aria-label="클래스 페이지">
+          <button className="btn" type="button" disabled={publicPage <= 1} onClick={() => setPublicPage(page => page - 1)}>이전</button>
+          <span>{publicPage} / {Math.ceil(pagination.total / pagination.pageSize)}</span>
+          <button className="btn" type="button" disabled={publicPage >= Math.ceil(pagination.total / pagination.pageSize)} onClick={() => setPublicPage(page => page + 1)}>다음</button>
+        </div>}
       </div>
     );
   else if (path[0] === "classes" && selected)
     body = <ProductDetail key={selected.id} course={selected} data={data} />;
   else if (path[0] === "articles")
     body = (
-      <ArticlesView slug={path[1]} data={data} user={user} loading={loading} />
+      <ArticlesView slug={path[1]} data={data} user={user} loading={loading} error={Boolean(error)} query={query} onQueryChange={setQuery} type={articleFilter} onTypeChange={value => { setArticleFilter(value); setPublicPage(1); }} pagination={pagination} onPageChange={setPublicPage} />
     );
   else if (path[0] === "stories")
-    body = <StoriesView data={data} loading={loading} />;
+    body = <StoriesView data={data} loading={loading} error={Boolean(error)} />;
   else if (account && user)
     body = (
       <MemberViews
@@ -730,16 +805,11 @@ export function Platform({
     return <Checkout data={data} user={user} pending={pending} send={send} />;
   }
   function adminView() {
-    if (accessDenied) return <div className="wrap"><Empty title="이 메뉴에 접근할 운영 권한이 없습니다." /><div className="center"><Link className="btn" href="/admin">운영 홈</Link><Link className="btn" href="/my">마이페이지</Link></div></div>;
+    if (accessDenied) return <div className="wrap"><AdminEmptyState title="이 메뉴에 접근할 운영 권한이 없습니다." action={<div className="row wrap"><Link className="btn primary" href="/admin">운영 홈으로</Link><Link className="btn" href="/my">마이페이지</Link></div>}>현재 계정에 부여된 운영 범위에서 다른 메뉴를 선택해 주세요.</AdminEmptyState></div>;
     if (!["admin", "staff"].includes(user?.role || ""))
       return (
         <div className="wrap">
-          <Empty title={loading ? "운영자 권한을 확인하고 있습니다." : error ? "로그인 정보를 확인하지 못했습니다." : "운영자 로그인이 필요합니다."} />
-          {!loading && !error && <div className="center">
-            <Link className="btn primary" href={"/login?next=" + encodeURIComponent("/" + routeKey)}>
-              로그인하기
-            </Link>
-          </div>}
+          {loading ? <AdminLoadingState title="운영자 권한을 확인하고 있습니다." description="활성 계정과 접근 범위를 확인한 뒤 화면을 엽니다."/> : error ? <AdminInlineError onRetry={() => void refresh()}>로그인 정보를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.</AdminInlineError> : <AdminEmptyState title="운영자 로그인이 필요합니다." action={<Link className="btn primary" href={"/login?next=" + encodeURIComponent("/" + routeKey)}>로그인하기</Link>}>관리자 또는 운영 스태프 계정으로 로그인해 주세요.</AdminEmptyState>}
         </div>
       );
     const available = sections.filter(
@@ -758,7 +828,7 @@ export function Platform({
             ? "learning"
             : key),
     );
-    const edit = (section: Section, row?: Row) => {
+    const edit = (section: Section, row?: Row, context?: MissionContext) => {
       if (section.key === "products" || section.key === "learning")
         router.push(
           "/admin/" +
@@ -767,7 +837,7 @@ export function Platform({
               : "learning-editor") +
             (row ? "?id=" + row.id : ""),
         );
-      else setEditor({ section, row });
+      else setEditor({ route: routeKey, section, row, context: context || (section.key === "missions" ? missionScope : undefined) });
     };
     const back = () =>
       router.push(
@@ -781,28 +851,26 @@ export function Platform({
         current={key}
         available={available}
         user={user!}
-        data={data}
+        pendingReviews={Number((data.admin_summary || [])[0]?.pendingReviews || 0)}
         mobile={mobile}
         setMobile={setMobile}
         logout={logout}
         prefetchSection={prefetchAdminSection}
       >
         <MarketingWorkspaceNav current={key} available={available} search={searchParams.toString()} prefetchSection={prefetchAdminSection} />
-        {loadedSection !== adminSection ? (
-          <div className="admin-section-loading" role="status" aria-live="polite" aria-busy={!error}>
-            {error ? <><p>화면 정보를 불러오지 못했습니다.</p><button className="btn" onClick={() => void refresh(true)}>다시 시도</button></> : <><span className="admin-section-loading-line" /><span className="admin-section-loading-line" /><span className="admin-visually-hidden">메뉴 내용을 불러오는 중</span></>}
-          </div>
+        {!hasCurrentAdminRead ? (
+          error ? <AdminInlineError onRetry={() => void refresh(true)}>화면 정보를 불러오지 못했습니다. 연결 상태를 확인해 주세요.</AdminInlineError> : <AdminLoadingState title="메뉴 내용을 불러오는 중입니다." description="현재 운영 데이터를 안전하게 확인하고 있습니다."/>
         ) : key === "overview" ? (
           <Overview data={data} available={available} />
         ) : !section ? (
-          <Empty title="이 화면에 접근할 운영 권한이 필요합니다." />
+          <AdminEmptyState title="이 화면에 접근할 운영 권한이 필요합니다.">운영 홈에서 현재 계정에 표시되는 메뉴를 선택해 주세요.</AdminEmptyState>
         ) : key === "conversion" ? (
           <ConversionReview workspace initialPeriod={searchParams.get("recruitment") || undefined} userId={user!.id} />
         ) : key === "product-editor" || key === "learning-editor" ? (
           loading && id && !edited ? (
-            <p role="status">편집 정보를 불러오고 있습니다.</p>
+            <AdminLoadingState title="편집 정보를 불러오는 중입니다." description="저장된 항목과 공개 상태를 확인하고 있습니다."/>
           ) : id && !edited ? (
-            <Empty title="편집할 항목을 찾을 수 없습니다." />
+            <AdminEmptyState title="편집할 항목을 찾을 수 없습니다." action={<button className="btn" type="button" onClick={back}>목록으로 돌아가기</button>}>삭제되었거나 현재 계정의 운영 범위 밖에 있는 항목일 수 있습니다.</AdminEmptyState>
           ) : key === "product-editor" ? (
             <ProductEditor
               key={edited?.id || "new-product"}
@@ -842,7 +910,7 @@ export function Platform({
                   className="btn"
                   onClick={() => downloadCsv(rows("profiles"), "customers")}
                 >
-                  회원 명단 내보내기
+                  현재 페이지 명단 내보내기
                 </button>
               )}
               {section.key === "articles" && <Link className="btn" href="/articles" target="_blank">고객 화면 미리보기</Link>}
@@ -868,7 +936,7 @@ export function Platform({
             </AdminHeading>}
             {standaloneAdmin.includes(section.key) ? (
               <AdminWorkflows
-                key={section.key}
+                key={section.key + scopeQuery + (section.key === 'members' ? searchParams.toString() : '')}
                 section={section.key}
                 data={data}
                 send={send}
@@ -881,12 +949,14 @@ export function Platform({
               <>
               {section.key === "articles" && <nav className="article-admin-tabs" aria-label="아티클 관리 구분"><button type="button" className={`btn ${articleAdminTab === "content" ? "dark" : ""}`} aria-pressed={articleAdminTab === "content"} onClick={() => setArticleAdminTab("content")}><Pencil />아티클 콘텐츠</button><button type="button" className={`btn ${articleAdminTab === "banner" ? "dark" : ""}`} aria-pressed={articleAdminTab === "banner"} onClick={() => setArticleAdminTab("banner")}><BookOpen />무료강의 상단 설정</button></nav>}
               {section.key === "articles" && articleAdminTab === "banner" ? <ArticleBannerEditor key={JSON.stringify(object(rows("site_settings").find(row => row.key === "edu_article_banner"), "value"))} settings={rows("site_settings")} send={send} pending={pending} /> : <>{section.key === "articles" && <ArticleCategoryManager categories={rows("article_categories")} articles={rows("articles")} send={send} pending={pending} />}<AdminCatalog
-                key={section.key}
+                key={section.key + scopeQuery}
                 section={section}
                 data={data}
                 selection={selection}
                 setSelection={setSelection}
                 edit={edit}
+                missionScope={section.key === "missions" ? missionScope : undefined}
+                onMissionScopeChange={next => { setMissionScope(next); setAdminPage(1); setSelection([]); }}
                 archive={(s, ids) => void archive(s, ids)}
                 pending={pending}
                 loading={loading}
@@ -928,7 +998,7 @@ export function Platform({
           path[0] === "classes" && path.length > 1 ? "with-bottom-cta" : ""
         }
       >
-        {error && (
+        {!admin && error && (
           <div className="error-banner" role="alert">
             {error}
             <button className="btn small" onClick={() => void refresh()}>
@@ -936,22 +1006,19 @@ export function Platform({
             </button>
           </div>
         )}
-        {loading && (
+        {!admin && loading && (
           <div className="loading-bar" role="status" aria-label="불러오는 중" />
         )}
         {body}
       </main>
       {!admin && footer}
-      {notice && (
-        <div className="toast" role="status">
-          {notice}
-        </div>
-      )}
-      {editor && (
+      {notice && (admin ? <AdminToast tone="success">{notice}</AdminToast> : <div className="toast" role="status">{notice}</div>)}
+      {editor && editor.route === routeKey && (
         <Editor
           key={editor.section.key + (editor.row ? recordId(editor.row) : "new")}
           section={editor.section}
           row={editor.row}
+          context={editor.context}
           data={data}
           pending={pending}
           close={() => setEditor(null)}
@@ -1010,9 +1077,10 @@ function downloadCsv(rows: Row[], name: string) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
-function Editor({
+export function Editor({
   section,
   row,
+  context,
   data,
   pending,
   close,
@@ -1022,6 +1090,7 @@ function Editor({
 }: {
   section: Section;
   row?: Row;
+  context?: MissionContext;
   data: Data;
   pending: boolean;
   close: () => void;
@@ -1029,9 +1098,16 @@ function Editor({
   archive?: () => void;
   deleteMember?: () => void;
 }) {
-  const ref = useRef<HTMLDialogElement>(null);
+  const ref = useAdminDialog();
   const requestId = useRef(crypto.randomUUID());
+  const [memberTab, setMemberTab] = useState("profile");
   const [error, setError] = useState("");
+  useEffect(() => {
+    if (error) ref.current?.querySelector<HTMLElement>('[role="alert"]')?.focus();
+  }, [error, ref]);
+  const [questionAnswer, setQuestionAnswer] = useState(() => t(row, "answer"));
+  const [questionAiPending, setQuestionAiPending] = useState(false);
+  const [questionAiMessage, setQuestionAiMessage] = useState("");
   const [tagKind, setTagKind] = useState(String(row?.tag_kind || "manual"));
   const [tagRule, setTagRule] = useState(String(row?.rule_key || "free_lesson_1"));
   const [couponDiscountType, setCouponDiscountType] = useState(String(row?.discount_type || "percentage"));
@@ -1039,10 +1115,6 @@ function Editor({
   const [couponProductScope, setCouponProductScope] = useState(String(row?.product_scope || "paid"));
   const [couponIssueTarget, setCouponIssueTarget] = useState(String(row?.issue_target || "all"));
   const couponCourseId = String((data.coupon_products || []).find(item => item.coupon_id === row?.id)?.course_id || "");
-  const customerEnrollments =
-    section.key === "customers" && row
-      ? (data.enrollments || []).filter((item) => item.user_id === row.id)
-      : [];
   const customerTags =
     section.key === "customers" && row
       ? (data.crm_member_tags || [])
@@ -1050,11 +1122,6 @@ function Editor({
           .map((item) => (data.crm_tags || []).find((tag) => tag.id === item.tag_id))
           .filter(Boolean) as Row[]
       : [];
-  useEffect(() => {
-    ref.current?.showModal();
-    const d = ref.current;
-    return () => d?.close();
-  }, []);
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
@@ -1102,9 +1169,38 @@ function Editor({
             : null;
         else values[field.key] = value || null;
       }
+      if (section.key === "missions") {
+        values.course_id = form.get("course_id");
+        values.week_id = form.get("week_id");
+        if (!values.course_id || !values.week_id || !values.lesson_id) throw new Error("상품·주차·학습을 순서대로 선택해 주세요.");
+      }
       await save(values, row ? undefined : requestId.current);
     } catch (e) {
       setError((e as Error).message);
+    }
+  };
+  const generateQuestionAnswer = async () => {
+    if (!row?.id || questionAiPending || pending) return;
+    setQuestionAiPending(true);
+    setQuestionAiMessage("");
+    try {
+      const response = await fetch("/api/admin/questions/answer-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ questionId: row.id }),
+      });
+      const result = (await response.json()) as {
+        draft?: string;
+        error?: string;
+      };
+      if (!response.ok || !result.draft)
+        throw new Error(result.error || "AI 답변 초안을 생성하지 못했습니다.");
+      setQuestionAnswer(result.draft);
+      setQuestionAiMessage("AI 초안을 작성했습니다. 내용을 확인하고 수정한 뒤 답변을 저장해 주세요.");
+    } catch (cause) {
+      setQuestionAiMessage(cause instanceof Error ? cause.message : "AI 답변 초안을 생성하지 못했습니다.");
+    } finally {
+      setQuestionAiPending(false);
     }
   };
   const control = (f: Field) => {
@@ -1117,6 +1213,17 @@ function Editor({
           ]
         : row?.[f.key];
     const props = { name: f.key, id: "edit-" + f.key, required: f.required, maxLength: f.maxLength };
+    if (section.key === "questions" && f.key === "answer")
+      return (
+        <textarea
+          {...props}
+          rows={8}
+          value={questionAnswer}
+          onChange={(event) => setQuestionAnswer(event.target.value)}
+          placeholder="회원에게 전달할 답변을 작성해 주세요."
+          disabled={pending}
+        />
+      );
     if (f.type === "blocks") return <BlocksField name={f.key} value={value} />;
     if (["image", "resource"].includes(f.type || ""))
       return (
@@ -1260,41 +1367,26 @@ function Editor({
                 </div>
               )}
               {section.key === "customers" && row && (
+                <CustomerWorkspace member={row} tab={memberTab} onTabChange={setMemberTab}>
                 <div className="customer-detail">
-                  <div className="drawer-profile">
-                    <span className="avatar red">{(t(row, "full_name") || t(row, "email")).slice(0, 1)}</span>
-                    <div>
-                      <h2>{t(row, "full_name") || "이름 미등록"}</h2>
-                      <p>{t(row, "email")}<br />{t(row, "phone") || "연락처 미등록"}</p>
-                    </div>
-                  </div>
                   <div className="customer-account-summary">
                     <div className="setting-line"><span>계정 상태</span><span className={`badge ${row.status === "suspended" ? "amber" : "green"}`}>{row.status === "suspended" ? "이용 제한" : "정상"}</span></div>
                     <div className="setting-line"><span>마케팅 수신 동의</span><b>{row.marketing_consent ? "동의" : "미동의"}</b></div>
                     <div className="setting-line"><span>가입일</span><b>{row.created_at ? new Date(String(row.created_at)).toLocaleDateString("ko-KR") : "—"}</b></div>
                   </div>
-                  <h3 className="mt24">수강 권한</h3>
-                  {customerEnrollments.length ? customerEnrollments.map((enrollment) => (
-                    <div className="asset-row" key={enrollment.id}>
-                      <span className="square">C</span>
-                      <div>
-                        <b>{t((data.courses || []).find((course) => course.id === enrollment.course_id), "title") || "연결 상품"}</b>
-                        <p>{t((data.cohorts || []).find((cohort) => cohort.id === enrollment.cohort_id), "name") || "기수 미연결"}</p>
-                      </div>
-                      <span className={`badge ${enrollment.status === "active" ? "green" : ""}`}>{labels[t(enrollment, "status")] || t(enrollment, "status")}</span>
-                    </div>
-                  )) : <p className="meta mt8">등록된 수강 권한이 없습니다.</p>}
                   <h3 className="mt24">고객 태그</h3>
                   <div className="tag-list mt8">
                     {customerTags.length ? customerTags.map((tag) => <span className="badge" key={tag.id}>{t(tag, "name")}</span>) : <span className="meta">등록된 태그가 없습니다.</span>}
                   </div>
                   <div className="row mt16 wrap-flex">
                     <Link className="btn small" href="/admin/tags">고객 태그 관리</Link>
-                    <Link className="btn small" href="/admin/members">미션 진행 보기</Link>
+                    <button type="button" className="btn small" onClick={() => setMemberTab("enrollments")}>수강권·미션 진행 보기</button>
                   </div>
                   <div className="divider" />
                   <h3 className="mb16">회원 정보·계정 상태 수정</h3>
+                  <div className="editor-fields">{section.fields.map(field => <div className="field" key={field.key}><label htmlFor={`edit-${field.key}`}>{field.label}</label>{control(field)}</div>)}</div>
                 </div>
+                </CustomerWorkspace>
               )}
               {row &&
                 ["reviews", "mission_submissions", "edu_questions"].includes(
@@ -1348,8 +1440,25 @@ function Editor({
                   <label className="checkline"><input name="exclude_free" type="checkbox" defaultChecked={row?.exclude_free !== false} />무료 상품 적용 제외</label>
                   <p className="notice">발급 후에도 이미 완료된 주문의 할인 금액은 변경하지 않습니다. 변경된 조건은 이후 쿠폰 적용 요청부터 검증됩니다.</p>
                 </div>
-              ) : <div className="editor-fields">
-                {section.fields.map((f) => (
+              ) : section.key === "questions" ? (
+                <div className="question-answer-editor">
+                  <div className="question-answer-heading">
+                    <div><h3>답변 작성</h3><p>AI 초안은 자동 등록되지 않습니다. 사실을 확인하고 내용을 검수해 주세요.</p></div>
+                    <button className="btn question-ai-button" type="button" disabled={pending || questionAiPending || !row?.id} onClick={() => void generateQuestionAnswer()}>
+                      {questionAiPending ? "AI 답변 생성 중…" : "✦ AI 답변 생성"}
+                    </button>
+                  </div>
+                  <div className="field"><label htmlFor="edit-answer">답변 *</label>{control(section.fields.find((field) => field.key === "answer")!)}</div>
+                  {questionAiMessage && <p className="question-ai-message" role="status" aria-live="polite">{questionAiMessage}</p>}
+                  <div className="question-answer-options">
+                    {section.fields.filter((field) => field.key !== "answer").map((field) => (
+                      <div className="field" key={field.key}><label htmlFor={`edit-${field.key}`}>{field.label}</label>{control(field)}</div>
+                    ))}
+                  </div>
+                </div>
+              ) : section.key === "customers" && row ? null : <div className="editor-fields">
+                {section.key === "missions" && <MissionTargetFields data={data} row={row} context={context} />}
+                {section.fields.filter(f => section.key !== "missions" || f.key !== "lesson_id").map((f) => (
                   <div
                     className={
                       "field " +
@@ -1379,7 +1488,7 @@ function Editor({
                 </p>
               )}
               {error && (
-                <p className="notice" role="alert">
+                <p className="notice" role="alert" tabIndex={-1}>
                   {error}
                 </p>
               )}
@@ -1387,7 +1496,7 @@ function Editor({
           )}
         </div>
         <footer className="dialog-foot">
-          {deleteMember && (
+          {deleteMember && memberTab === "profile" && (
             <button
               type="button"
               className="btn danger"
@@ -1415,9 +1524,9 @@ function Editor({
           >
             닫기
           </button>
-          {!section.readOnly && (
+          {!section.readOnly && !(section.key === "customers" && row && memberTab !== "profile") && (
             <button className="btn primary" disabled={pending}>
-              {pending ? "저장 중..." : ["tags", "coupons"].includes(section.key) ? "입력 내용 확인" : "저장하기"}
+              {pending ? "저장 중..." : section.key === "questions" ? row?.answer ? "답변 수정" : "답변 등록" : ["tags", "coupons"].includes(section.key) ? "입력 내용 확인" : "저장하기"}
             </button>
           )}
         </footer>

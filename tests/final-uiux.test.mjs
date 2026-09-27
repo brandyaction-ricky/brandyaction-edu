@@ -20,6 +20,7 @@ function load(file) {
   const exports = {};
   cache.set(absolute, exports);
   new Function('exports', 'require', compiled)(exports, name => {
+    if (name.endsWith('.css')) return {}; // CSS is bundled separately by Next.js.
     if (name === 'next/link') return function LinkStub(props) { return React.createElement('a', props); };
     if (name === 'next/navigation') return { useSearchParams: () => search, usePathname: () => '/order-complete', useRouter: () => ({ push() {}, replace() {}, refresh() {} }) };
     if (name === '@/lib/supabase/client') return { createClient: () => { throw Error('Unexpected authentication mutation during render'); } };
@@ -57,19 +58,60 @@ test('final design styles are isolated, reproducible and exclude prototype runti
     assert.equal(read(`app/ui/final/${area}.css`), `/* Generated from final UIUX source; run node scripts/build-uiux-css.mjs. */\n${rules.toString()}\n`);
   }
   const layout = read('app/layout.tsx');
-  assert.ok(layout.includes('./ui/final/frontend.css') && layout.includes('./ui/final/admin.css'));
+  assert.ok(layout.includes('./ui/final/frontend.css') && layout.includes('./ui/final/admin.css') && layout.includes('@/features/admin-ui/styles/admin-system.css'));
   assert.doesNotMatch(layout, /ui\/(design|platform)\.css/);
   for (const file of fs.readdirSync(path.join(root, 'app/ui/final')).filter(file => file.endsWith('.tsx'))) assert.doesNotMatch(read('app/ui/final/' + file), /dangerouslySetInnerHTML|design-reference\/source|data-demo=/);
 });
-test('five admin categories and scoped navigation render from the final shell', () => {
-  const { AdminShell, finalAdminGroups, Overview } = load('app/ui/final/admin-shell.tsx');
+test('admin controls, date filters and data tables share consistent sizing', () => {
+  const system = read('app/ui/final/admin-system.css');
+  const admin = read('app/ui/final/admin.css');
+  const tracking = read('app/ui/landing/tracking-admin.css');
+  assert.match(system, /--admin-control-height:40px/);
+  assert.match(system, /--admin-control-height-sm:36px/);
+  assert.match(system, /--admin-table-head-height:44px/);
+  assert.match(system, /--admin-table-row-height:44px/);
+  assert.match(admin, /\.edu-admin \.date-range input\[type=date\]\{[^}]*height:40px;min-height:40px/);
+  assert.match(admin, /\.edu-admin \.date-range>\.btn\{height:40px;min-height:40px/);
+  assert.match(admin, /\.edu-admin button:focus-visible[^}]*outline:2px solid var\(--ba-info\);outline-offset:2px/);
+  assert.match(tracking, /\.edu-admin \.tracking-inline-select\{[^}]*height:40px;min-height:40px/);
+});
+
+test('five admin categories and scoped navigation render from the admin UI feature', () => {
+  const { AdminShell, adminNavigationIcon, finalAdminGroups } = load('features/admin-ui.ts');
+  const { Overview } = load('app/ui/final/admin-shell.tsx');
   assert.equal(finalAdminGroups.length, 5);
-  const props = { current: 'overview', available: platform.sections, user: { ...user, role: 'admin' }, data, mobile: false, setMobile() {}, logout: async () => {} };
+  const props = { current: 'overview', available: platform.sections, user: { ...user, role: 'admin' }, pendingReviews: 1, mobile: false, setMobile() {}, logout: async () => {} };
   const markup = html(AdminShell, { ...props, children: React.createElement(Overview, { data, available: platform.sections }) });
   for (const [label] of finalAdminGroups) assert.ok(markup.includes(label));
   assert.match(markup, /class="nav-group"/); assert.match(markup, /lucide/); assert.match(markup, /category-strip/);
+  const expectedIcons = {
+    products: 'book-open', cohorts: 'calendar-days', learning: 'book-open', weeks: 'book-open',
+    contents: 'film', missions: 'book-open', members: 'users-round', reviews: 'square-check',
+    questions: 'message-circle', customers: 'users-round', tags: 'users-round', coupons: 'layout-grid',
+    'product-reviews': 'message-circle', banners: 'layout-grid', articles: 'file-pen-line',
+    testimonials: 'message-circle', orders: 'receipt-text', conversion: 'message-circle',
+    landing: 'chart-line', analytics: 'chart-line',
+    campaigns: 'layout-grid',
+    templates: 'layout-grid', automations: 'layout-grid', seo: 'settings', settings: 'settings', staff: 'shield-check',
+  };
+  for (const [key, icon] of Object.entries(expectedIcons)) {
+    assert.ok(adminNavigationIcon(key));
+    assert.match(markup, new RegExp(`href="/admin/${key}"[\\s\\S]*?lucide-${icon}`), key);
+  }
   const restricted = html(AdminShell, { ...props, available: platform.sections.filter(row => row.key === 'products') });
   assert.doesNotMatch(restricted, /href="\/admin\/(questions|customers|members|orders)"/);
+});
+test('home customer stories carousel and accessible profile dropdown are present', () => {
+  const platformSource = read('app/ui/platform.tsx');
+  assert.match(platformSource, /<StoryCarousel stories=\{rows\("review_videos"\)\} \/>/);
+  assert.match(platformSource, /aria-label="내 프로필 메뉴"/);
+  assert.match(platformSource, /aria-expanded=\{profileMenuOpen\}/);
+  for (const href of ['/my', '/my/profile', '/my/coupons', '/my/orders', '/my/classes'])
+    assert.ok(platformSource.includes(`href="${href}"`));
+  assert.match(read('app/ui/final/story-carousel.tsx'), /이전 고객 이야기[\s\S]*다음 고객 이야기/);
+  const frontendCss = read('app/ui/final/frontend.css');
+  assert.match(frontendCss, /\.edu-front \.profile-menu\{position:absolute;/);
+  assert.doesNotMatch(frontendCss, /\.edu-front \.edu-front \.profile-menu/);
 });
 test('three signup methods and product detail variants use the final publishing structures', () => {
   const { AuthView, ProductDetail, ArticlesView, StoriesView } = load('app/ui/final/public-views.tsx');
@@ -230,6 +272,9 @@ test('catalogues and separate editors render without dropping existing fields', 
   assert.match(learning, /learning-layout/); assert.match(learning, /학습 구성/); assert.match(learning, /lesson-list-item/);
   const missions = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'missions') });
   assert.match(missions, /mission-week-pills/); assert.match(missions, /일차별 미션/); assert.match(missions, /mission-row/);
+  assert.match(missions, /콘텐츠 편집/); assert.match(missions, /learning-editor\?id=lesson/);
+  const questionMarkup = html(AdminCatalog, { ...props, data: { ...data, edu_questions: [{ id: 'question', title: '답변 필요한 질문', content: '질문 내용', answer: null, status: 'open', created_at: '2026-09-24' }] }, section: platform.sections.find(row => row.key === 'questions') });
+  assert.match(questionMarkup, /question-admin-card/); assert.match(questionMarkup, /답변하기/);
   const customers = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'customers') });
   assert.match(customers, /마케팅 수신 동의/); assert.match(customers, /수강 중인 클래스/); assert.match(customers, /전체 클래스/);
   const { ProductEditor } = load('app/ui/final/admin-editors.tsx');
@@ -258,8 +303,8 @@ test('catalogues and separate editors render without dropping existing fields', 
   assert.doesNotMatch(markup, /상품 주소 \(slug\)|검색 결과에 표시할 설명|class="snippet"/);
   assert.doesNotMatch(markup, /200,000자|권장 제작 기준/);
   assert.doesNotMatch(markup, /상세 본문 · HTML|본문 미리보기|텍스트 상세 설명|무료 라이브 CTA·이미지 관리/);
-  assert.match(markup, /업로드할 파일 선택하기/);
-  assert.match(markup, /파일별로 공개 범위를 설정/);
+  assert.match(markup, /id="product-tab-curriculum"/);
+  assert.doesNotMatch(markup, /id="product-tab-(?:resources|missions)"/);
   assert.doesNotMatch(markup, /자료를 연결할 학습 만들기/);
   assert.match(markup, /editor-savebar/);
   const productEditorSource = read('app/ui/final/admin-editors.tsx');
@@ -274,7 +319,13 @@ test('catalogues and separate editors render without dropping existing fields', 
   assert.match(pageSource, /<Platform path=\{path\} user=\{null\}\/>/);
   assert.match(read('design-reference/source/admin/src/experience.css'), /\.metric-value small\{display:inline-block;margin-left:var\(--space-1\)\}/);
   for (const field of platform.sections.find(row => row.key === 'products').fields.filter(field => !['slug', 'course_code', 'seo_title', 'seo_description', 'detail_html'].includes(field.key))) assert.ok(markup.includes(`name="${field.key}"`), field.key);
-  assert.match(html(LearningEditor, { data, row: lesson, pending: false, send, back() {} }), /editor-/);
+  const learningMarkup = html(LearningEditor, { data, row: lesson, pending: false, send, back() {} });
+  assert.match(learningMarkup, /editor-/); assert.doesNotMatch(learningMarkup, /통과 기준|name="pass_percent"/);
+  assert.match(platformSource, /AI 답변 생성/); assert.match(platformSource, /답변 등록/);
+  assert.match(platformSource, /answer-draft/);
+  assert.match(read('app/ui/final/integration.css'), /\.participant-card-summary/);
+  assert.match(read('app/ui/final/integration.css'), /\.question-answer-editor/);
+  assert.match(read('app/ui/admin-workflows.tsx'), /aria-expanded=\{expanded\}[\s\S]*?participant-day-card/);
 });
 test('submission review keeps queue and inspector, escaping text and unsafe links', () => {
   const { SubmissionReview } = load('app/ui/final/submission-review.tsx');
@@ -282,6 +333,35 @@ test('submission review keeps queue and inspector, escaping text and unsafe link
   for (const className of ['review-shell', 'queue', 'review-main', 'answers', 'inspector']) assert.ok(markup.includes(`class="${className}"`));
   assert.match(markup, /&lt;script&gt;/); assert.doesNotMatch(markup, /href="javascript:/);
   assert.match(markup, /승인 후 다음/); assert.match(markup, /최대 50건/);
+});
+
+test('mission ownership controls and archive states remain explicit', () => {
+  const { MissionTargetFields } = load('app/ui/final/mission-target-fields.tsx');
+  const extra = { ...data, courses: [...data.courses, { id: 'other-course', title: '다른 상품' }], curriculum_weeks: [...data.curriculum_weeks, { id: 'other-week', course_id: 'other-course', week_number: 1 }], curriculum_lessons: [...data.curriculum_lessons, { id: 'other-lesson', week_id: 'other-week', title: '다른 상품 학습' }] };
+  const target = html(MissionTargetFields, { data: extra, context: { courseId: 'course', weekId: 'week' } });
+  assert.match(target, /첫 번째 학습/);
+  assert.doesNotMatch(target, /다른 상품 학습/);
+  const edit = html(MissionTargetFields, { data: extra, row: mission });
+  assert.match(edit, /id="mission-course"[^>]*disabled/);
+  const { AdminCatalog } = load('app/ui/final/admin-catalog.tsx');
+  const props = { section: platform.sections.find(item => item.key === 'missions'), data: { ...data, curriculum_missions: [{ ...mission, is_published: false, archived_at: '2026-09-25' }] }, selection: [], setSelection() {}, edit() {}, archive() {}, pending: false, loading: false, pagination: null, setPage() {}, exportCsv() {}, send };
+  const active = html(AdminCatalog, props);
+  assert.match(active, /보관된 미션만 있습니다/);
+  assert.doesNotMatch(active, /class="mission-row/);
+  const archived = html(AdminCatalog, { ...props, missionScope: { courseId: '', weekId: '', state: 'archived' } });
+  assert.match(archived, /비공개로 복구/);
+  assert.doesNotMatch(archived, />미션 설정</);
+});
+
+test('reviewed submissions do not show unchecked temporary approval checks', () => {
+  const { SubmissionReview } = load('app/ui/final/submission-review.tsx');
+  const reviewed = { ...submission, status: 'approved', reviewed_at: '2026-09-25T00:00:00Z', reviewer_feedback: '기존 피드백 유지' };
+  search = new URLSearchParams({ submission: reviewed.id });
+  const markup = html(SubmissionReview, { data: { ...data, mission_submissions: [reviewed] }, pending: false, send });
+  search = new URLSearchParams();
+  assert.match(markup, /저장하지 않았던 항목은 기록 없음으로 구분/);
+  assert.match(markup, /기존 피드백 유지/);
+  assert.doesNotMatch(markup, /이번 검토 전 확인|필수 답변이 모두 작성됨/);
 });
 test('participant matrix uses latest attempts, required missions and enrollment boundaries', () => {
   const { participantMatrix } = load('lib/participant-matrix.ts');
@@ -334,13 +414,28 @@ test('campaign class keeps published content and one responsive sticky CTA', () 
   assert.doesNotMatch(paid, /href="https:\/\/open.kakao.com\/o\/testRoom"/);
 });
 
+test('paid product offers remain open with no published curriculum', () => {
+  const { ProductDetail } = load('app/ui/final/public-views.tsx');
+  for (const curriculum of [
+    { curriculum_weeks: [], curriculum_lessons: [] },
+    { curriculum_weeks: [{ ...data.curriculum_weeks[0], is_published: false }], curriculum_lessons: [{ ...lesson, is_published: false }] },
+  ]) {
+    const markup = html(ProductDetail, { course, data: { ...data, ...curriculum, enrollments: [], lesson_contents: [] } });
+    assert.match(markup, /href="\/checkout/);
+    assert.doesNotMatch(markup, /수강 신청을 준비하고 있습니다/);
+    assert.doesNotMatch(markup, /등록된 학습 본문/);
+  }
+});
+
 test('paid products hide mismatched free-class HTML and block checkout until ready', () => {
   const { ProductDetail } = load('app/ui/final/public-views.tsx');
   const mismatched = { ...course, duration_label: '', schedule_label: '', metadata: { detail_html_document: '<h1>무료 라이브 강의</h1><a href="https://open.kakao.com/o/room">무료강의 대기방 입장</a>' } };
   const markup = html(ProductDetail, { course: mismatched, data: { ...data, enrollments: [], curriculum_weeks: [], curriculum_lessons: [] } });
   assert.doesNotMatch(markup, /무료강의 대기방 입장/);
-  assert.match(markup, /무료 클래스 안내와 외부 참여 링크는 노출하지 않습니다/);
-  assert.match(markup, /학습 기간 · 일정 안내 · 공개 커리큘럼/);
+  assert.match(markup, /클래스 상세 안내를 준비하고 있습니다/);
+  assert.doesNotMatch(markup, /무료 클래스 안내와 외부 참여 링크는 노출하지 않습니다/);
+  assert.doesNotMatch(markup, /학습 기간 · 일정 안내 · 공개 커리큘럼/);
+  assert.match(markup, /수강 신청을 준비하고 있습니다/);
   assert.match(markup, /aria-disabled="true"/);
 });
 

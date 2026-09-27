@@ -9,11 +9,11 @@ const member = {
   marketing_consent_at: '2026-01-01T00:00:00.000Z', marketing_opt_out_at: null,
 };
 
-function dispatchFixture({ channel = 'lms', current = member, blackPages = [{ blackList: [], nextKey: null }], blackError = false } = {}) {
+function dispatchFixture({ channel = 'lms', current = member, blackPages = [{ blackList: [], nextKey: null }], blackError = false, inactive = false } = {}) {
   const steps = [];
   const updates = [];
   const sentMessages = [];
-  const template = { id: 'template', channel, purpose: 'marketing', content: '모집 안내' };
+  const template = { id: 'template', channel, purpose: 'marketing', content: '모집 안내', ...(inactive ? { is_active: false } : {}) };
   const campaign = { id: 'campaign', recruitment_id: 'recruitment', template };
   let blackPage = 0;
   const db = {
@@ -109,6 +109,15 @@ test('080 lookup errors stop delivery without disclosing provider details', asyn
 test('marketing Alimtalk is rejected before claiming recipients', async () => {
   const qa = dispatchFixture({ channel: 'alimtalk' });
   await qa.dispatch();
+  assert.deepEqual(qa.steps, []);
+  assert.ok(qa.updates.some(row => row.table === 'crm_campaigns' && row.value.status === 'failed'));
+});
+
+test('inactive draft template cannot be sent even if a queue references it', async () => {
+  const qa = dispatchFixture({ inactive: true });
+  const result = await qa.dispatch();
+  assert.equal(result.sent, 0);
+  assert.equal(qa.sentMessages.length, 0);
   assert.deepEqual(qa.steps, []);
   assert.ok(qa.updates.some(row => row.table === 'crm_campaigns' && row.value.status === 'failed'));
 });

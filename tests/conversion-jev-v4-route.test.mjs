@@ -24,6 +24,7 @@ const request = (origin = 'https://edu.example') => new Request('https://edu.exa
 
 function harness(options = {}) {
   const events = [];
+  const reservations = [];
   let stored = options.existing || null;
   const db = { from(table) {
     events.push(`read:${table}`);
@@ -36,7 +37,7 @@ function harness(options = {}) {
         if (table === 'edu_conversion_jev_v4_runs') return { data: stored, error: null };
         throw new Error(`Unexpected ${table}`);
       },
-      insert(value) { events.push('reserve'); stored = { id: '66666666-6666-4666-8666-666666666666', ...value }; return { select: () => ({ single: async () => ({ data: stored, error: null }) }) }; },
+      insert(value) { events.push('reserve'); reservations.push(value); stored = { id: '66666666-6666-4666-8666-666666666666', ...value }; return { select: () => ({ single: async () => ({ data: stored, error: null }) }) }; },
       update(value) { events.push(`update:${value.status}`); stored = { ...stored, ...value }; return {
         eq() { return this; }, select() { return this; }, async maybeSingle() { return { data: { id: stored.id }, error: null }; },
       }; },
@@ -50,7 +51,7 @@ function harness(options = {}) {
     '@/lib/conversion-jev-v4': { createJevV4Judgment: async (...args) => { events.push('provider'); assert.deepEqual(args.slice(0, 2), ['당시 문의', '당시 원문']); if (options.providerFails) throw new Error('private upstream response'); return result; } },
     '@/lib/conversion-review-server': server,
   }, options.env || env);
-  return { ...handlers, events };
+  return { ...handlers, events, reservations };
 }
 
 function awaitlessCrypto() { return { createHash() { throw new Error('not used'); } }; }
@@ -67,14 +68,15 @@ test('v4 requires DEV, same origin, and operator before accessing inquiry data',
   }
 });
 
-test('v4 only sends the unchanged v1 snapshot with an operational first review and stores separately', async () => {
+test('v4 uses the unchanged v1 snapshot without requiring subjective labels and stores separately', async () => {
   const h = harness();
   const response = await h.POST(request());
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('Cache-Control'), 'private, no-store');
-  assert.deepEqual(h.events.filter(event => !event.startsWith('read:')), ['reserve', 'provider', 'update:completed']);
+  assert.deepEqual(h.events, ['read:edu_conversion_runs', 'read:edu_conversion_cases', 'read:edu_conversion_jev_v4_runs', 'read:edu_conversion_jev_v4_runs', 'reserve', 'provider', 'read:edu_conversion_jev_v4_runs', 'update:completed']);
   assert.equal((await response.json()).result.contract_version, 4);
-  for (const options of [{ caseVersion: 2 }, { review: { ...review, calibration_sample_kind: 'test' } }]) {
+  assert.equal(h.reservations[0].calibration_review_id, null);
+  for (const options of [{ caseVersion: 2 }]) {
     const invalid = harness(options);
     assert.equal((await invalid.POST(request())).status, 409);
     assert.equal(invalid.events.includes('provider'), false);

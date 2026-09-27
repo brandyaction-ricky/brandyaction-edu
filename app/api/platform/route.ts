@@ -1,20 +1,30 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { reviewMutation, reviewWriteError } from '@/lib/submission-review';
 import { createClient } from '@/lib/supabase/server';
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { bannerTextLimits, sections, safeUrl, type Row } from '@/lib/platform';
 import { containsFreeClassCampaign, hasLearningAccess, paidCourseReadinessIssues } from '@/lib/platform-rules';
 import { getEduSettings } from '@/lib/edu-settings';
+import { isListedProductLink } from '@/lib/product-visibility';
 import { gradeQuiz, type QuizDefinition } from '@/lib/mission-quiz';
-import { adminSelectColumns, adminTables, archiveValues, cohortStatus, phoneNumber, validImage, assetPath, imagePreviewUrl, databaseMessage } from '@/lib/qa-rules';
+import { adminSelectColumns, adminTables, archiveValues, cohortStatus, phoneNumber, validImage, assetPath, imagePreviewUrl, databaseMessage, excludedMemberStatus } from '@/lib/qa-rules';
 import { POLICY_VERSION } from '@/lib/legal-policies';
 import { getOperatorUser, permissionsFor, sectionScopes } from '@/lib/operator-permissions';
 import { crmDeliveryState } from '@/lib/crm-delivery';
 import { mergeProductDigitalSections, mergeProductMetadata, mergeProductResources, productDigitalSections, productMetadataFields, productResources, productResourceScopes } from '@/lib/product-metadata';
+import { getPublicPlatformData, getPublicSupport } from '@/lib/public-platform-data';
+import { PUBLIC_CACHE_TAG, type PublicView } from '@/lib/public-platform-plan';
+import { revalidateTag } from 'next/cache';
+import { readMemberPlatformData, type MemberView } from '@/lib/member-platform-data';
 const reply = (data: unknown, status = 200) =>
     Response.json(data, {
         status,
         headers: { 'Cache-Control': 'private, no-store' },
     });
+const publicWriteSuccess = (data: unknown) => {
+    revalidateTag(PUBLIC_CACHE_TAG, { expire: 0 });
+    return reply(data);
+};
 const uid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 function fail(message: string, status = 400): never {
     throw Object.assign(new Error(message), { status });
@@ -26,9 +36,77 @@ export async function GET(request: Request) {
         const authenticated = performance.now();
         const params = new URL(request.url).searchParams;
         const adminMode = params.get('admin') === '1';
+        const view = params.get('view') || 'home';
+        if (!adminMode && view === 'member') {
+            if (!user) return reply({ error: '로그인이 필요합니다.', user: null }, 401);
+            const memberSection = params.get('section') || 'dashboard';
+            if (!['dashboard', 'classes', 'missions', 'questions', 'orders', 'coupons', 'resources', 'profile', 'reviews', 'learn', 'order-result'].includes(memberSection)) return reply({ error: '조회 화면을 확인해 주세요.' }, 400);
+            const enrollmentId = params.get('enrollment') || '';
+            const lessonId = params.get('lesson') || '';
+            if (memberSection === 'learn' && !uid(enrollmentId)) return reply({ error: '수강권을 확인해 주세요.' }, 400);
+            if (lessonId && !uid(lessonId)) return reply({ error: '학습 항목을 확인해 주세요.' }, 400);
+            const data = await readMemberPlatformData(user.id, memberSection as MemberView, enrollmentId, lessonId);
+            const support = await getPublicSupport();
+            const response = reply({ user, data, pagination: null, support });
+            response.headers.set('Server-Timing', `auth;dur=${(authenticated - started).toFixed(1)},data;dur=${(performance.now() - authenticated).toFixed(1)},total;dur=${(performance.now() - started).toFixed(1)}`);
+            return response;
+        }
+        if (!adminMode && view !== 'member') {
+            if (view === 'identity') return reply({ user, data: {}, pagination: null, support: {} });
+            if (!['home', 'classes', 'class', 'articles', 'article', 'stories', 'checkout'].includes(view)) return reply({ error: '조회 화면을 확인해 주세요.' }, 400);
+            const slug = params.get('slug') || '';
+            const cohortId = params.get('cohort') || '';
+            if ((view === 'class' || view === 'article') && (!slug || slug.length > 180 || !/^[a-zA-Z0-9_-]+$/.test(slug))) return reply({ error: '콘텐츠 주소를 확인해 주세요.' }, 400);
+            if (view === 'checkout' && !uid(cohortId)) return reply({ error: '신청할 기수를 확인해 주세요.' }, 400);
+            const publicPage = Math.max(1, Math.min(100000, Number(params.get('page')) || 1));
+            const publicQuery = (params.get('q') || '').trim().slice(0, 80);
+            const publicFilter = (params.get('filter') || '').slice(0, 80);
+            const snapshot = await getPublicPlatformData(view as PublicView, slug, cohortId, publicPage, publicQuery, publicFilter);
+            const data = { ...snapshot.data };
+            if (view === 'home' && data.site_banners) {
+                const now = Date.now();
+                data.site_banners = data.site_banners.filter(banner => (!banner.starts_at || Date.parse(String(banner.starts_at)) <= now) && (!banner.ends_at || Date.parse(String(banner.ends_at)) > now)
+                    && isListedProductLink(banner.link_url, snapshot.unlistedBannerCourses || [], new URL(request.url).origin));
+            }
+            if (user && view === 'class' && data.courses?.[0]) {
+                const db = await createClient();
+                const course = data.courses[0];
+                const enrollment = await db.from('enrollments').select('id,course_id,cohort_id,status,access_starts_at,access_ends_at,revoked_at').eq('user_id', user.id).eq('course_id', course.id).limit(20);
+                if (enrollment.error) throw enrollment.error;
+                data.enrollments = (enrollment.data || []) as Row[];
+                if (data.enrollments.some(enrollment => hasLearningAccess(enrollment))) {
+                    const lessonIds = (data.curriculum_lessons || []).map(lesson => lesson.id);
+                    if (lessonIds.length) {
+                        const contents = await db.from('lesson_contents').select('lesson_id,resource_name,resource_storage_path').in('lesson_id', lessonIds).limit(200);
+                        if (contents.error) throw contents.error;
+                        data.lesson_contents = (contents.data || []).map(content => ({ ...content, id: content.lesson_id })) as Row[];
+                    }
+                }
+            }
+            if (user && view === 'checkout') {
+                const db = await createClient();
+                const coupons = await db.from('customer_coupons').select('id,coupon_id,user_id,status,expires_at,coupon:coupons(name,code,discount_type,discount_value,ends_at)').eq('user_id', user.id).limit(100);
+                if (coupons.error) throw coupons.error;
+                data.customer_coupons = (coupons.data || []) as unknown as Row[];
+            }
+            if (user && view === 'articles' && data.article_banner?.length) {
+                const setting = await createAdminClient().from('site_settings').select('value').eq('key', 'edu_article_banner').limit(1);
+                if (setting.error) throw setting.error;
+                const value = setting.data?.[0]?.value as Record<string, unknown> | undefined;
+                if (value && Array.isArray(value.videos)) {
+                    const publicValue = data.article_banner[0].value as Record<string, unknown>;
+                    data.article_banner = [{ ...data.article_banner[0], value: { ...publicValue, videos: value.videos.slice(0, 3).map((item: unknown) => ({ title: String((item as Row)?.title || ''), available: Boolean((item as Row)?.url), url: safeUrl((item as Row)?.url) })) } }];
+                }
+            }
+            const support = await getPublicSupport();
+            const response = reply({ user, data, pagination: snapshot.pagination, support });
+            response.headers.set('Server-Timing', `auth;dur=${(authenticated - started).toFixed(1)},data;dur=${(performance.now() - authenticated).toFixed(1)},total;dur=${(performance.now() - started).toFixed(1)}`);
+            return response;
+        }
         const sectionKey = params.get('section') || 'home';
         const record = params.get('record');
         if (record && (!uid(record) || !['products', 'learning'].includes(sectionKey))) return reply({ error: '편집할 항목을 확인해 주세요.' }, 400);
+        const productEditorRead = adminMode && sectionKey === 'products' && Boolean(record);
         const page = Math.max(1, Math.min(100000, Number(params.get('page')) || 1));
         const pageSize = sectionKey === 'orders' ? 30 : 100;
         if (adminMode && !user) return reply({ error: '로그인이 필요합니다.', user: null }, 401);
@@ -37,12 +115,55 @@ export async function GET(request: Request) {
         if (adminMode && (!operator || (sectionKey === 'staff' && operator.role !== 'admin'))) return reply({ error: '이 화면에 접근할 운영 권한이 필요합니다.', user }, 403);
         const db = adminMode ? createAdminClient() : await createClient();
         if (adminMode && !Object.hasOwn(adminTables, sectionKey)) return reply({ error: '조회 화면을 확인해 주세요.' }, 400);
+        // Keep the initial product editor read small. Load curriculum or missions
+        // only when the operator opens the tab, scoped to the selected product.
+        if (productEditorRead && ['curriculum', 'missions'].includes(params.get('part') || '')) {
+            const part = params.get('part');
+            const weekResult = await db.from('curriculum_weeks').select('*').eq('course_id', record!).order('week_number');
+            if (weekResult.error) return reply({ error: '상품 주차를 불러오지 못했습니다.' }, 500);
+            const weeks = (weekResult.data || []) as Row[];
+            const weekIds = weeks.map(week => String(week.id));
+            if (!weekIds.length) return reply({ data: { curriculum_weeks: [], curriculum_lessons: [], [part === 'missions' ? 'curriculum_missions' : 'lesson_contents']: [] } });
+            const lessonResult = await db.from('curriculum_lessons').select('*').in('week_id', weekIds).order('day_number');
+            if (lessonResult.error) return reply({ error: '상품 일차를 불러오지 못했습니다.' }, 500);
+            const lessons = (lessonResult.data || []) as Row[];
+            const lessonIds = lessons.map(lesson => String(lesson.id));
+            if (!lessonIds.length) return reply({ data: { curriculum_weeks: weeks, curriculum_lessons: [], [part === 'missions' ? 'curriculum_missions' : 'lesson_contents']: [] } });
+            if (part === 'missions') {
+                const missionResult = await db.from('curriculum_missions').select('*').in('lesson_id', lessonIds).order('created_at');
+                if (missionResult.error) return reply({ error: '상품 미션을 불러오지 못했습니다.' }, 500);
+                return reply({ data: { curriculum_weeks: weeks, curriculum_lessons: lessons, curriculum_missions: missionResult.data || [] } });
+            }
+            const contentResult = await db.from('lesson_contents').select('*').in('lesson_id', lessonIds);
+            if (contentResult.error) return reply({ error: '학습 콘텐츠를 불러오지 못했습니다.' }, 500);
+            return reply({ data: { curriculum_weeks: weeks, curriculum_lessons: lessons, lesson_contents: contentResult.data || [] } });
+        }
         const settings = getEduSettings();
-        let tables = adminMode ? adminTables[sectionKey] : ['courses', 'cohorts', 'curriculum_weeks', 'curriculum_lessons', 'articles', 'article_categories', 'review_videos', 'site_banners', 'reviews', 'cohort_sessions'];
+        let tables = productEditorRead ? ['courses', 'cohorts'] : adminMode ? adminTables[sectionKey] : ['courses', 'cohorts', 'curriculum_weeks', 'curriculum_lessons', 'articles', 'article_categories', 'review_videos', 'site_banners', 'reviews', 'cohort_sessions'];
         if (adminMode && sectionKey === 'home' && operator?.role === 'staff') tables = tables.filter((table) => (['courses', 'cohorts'].includes(table) && operator.permissions.products) || (['mission_submissions', 'edu_questions'].includes(table) && operator.permissions.members));
         const data: Record<string, Row[]> = {};
         let pagination: { page: number; pageSize: number; total: number } | null = null;
         const primaryTable = sections.find((section) => section.key === sectionKey)?.table;
+        const memberScope = params.get('member') || '';
+        const submissionScope = sectionKey === 'reviews' ? params.get('submission') || '' : '';
+        const questionScope = sectionKey === 'questions' ? params.get('question') || '' : '';
+        const questionState = params.get('questionState') || 'active';
+        if (adminMode && sectionKey === 'questions' && !['active', 'open', 'answered', 'archived'].includes(questionState)) return reply({ error: '질문 조회 상태를 확인해 주세요.' }, 400);
+        if (adminMode && [memberScope, submissionScope, questionScope].some(value => value && !uid(value))) return reply({ error: '운영 대상 조회 조건을 확인해 주세요.' }, 400);
+        const missionCourse = params.get('course') || '';
+        const missionWeek = params.get('week') || '';
+        const missionState = params.get('missionState') || 'active';
+        if (adminMode && sectionKey === 'missions' && ((missionCourse && !uid(missionCourse)) || (missionWeek && !uid(missionWeek)) || !['active', 'published', 'hidden', 'archived'].includes(missionState))) return reply({ error: '미션 조회 조건을 확인해 주세요.' }, 400);
+        const missionQuery = (state: string, head = false) => {
+            // Use server-side scope BEFORE pagination; counts and rows use the same joins.
+            const scoped = Boolean(missionCourse || missionWeek);
+            let query = db.from('curriculum_missions').select(scoped ? '*,curriculum_lessons!inner(week_id,curriculum_weeks!inner(course_id))' : '*', { count: 'exact', head });
+            if (missionCourse) query = query.eq('curriculum_lessons.curriculum_weeks.course_id', missionCourse);
+            if (missionWeek) query = query.eq('curriculum_lessons.week_id', missionWeek);
+            query = state === 'archived' ? query.not('archived_at', 'is', null) : query.is('archived_at', null);
+            if (state === 'published' || state === 'hidden') query = query.eq('is_published', state === 'published');
+            return query;
+        };
         const deferredOrderTables = adminMode && sectionKey === 'orders' ? new Set(['order_items', 'payments', 'enrollments', 'edu_refund_requests']) : new Set<string>();
         await Promise.all([
             (async () => {
@@ -51,6 +172,11 @@ export async function GET(request: Request) {
                     const summary = await db.rpc('edu_admin_summary');
                     if (summary.error) throw summary.error;
                     const row = summary.data as Row;
+                    if (operator?.role === 'admin' || operator?.permissions.members) {
+                        const members = await db.from('profiles').select('id', { count: 'exact', head: true }).neq('status', excludedMemberStatus);
+                        if (members.error) throw members.error;
+                        row.members = members.count || 0;
+                    }
                     data.admin_summary = [operator?.role === 'staff' ? {
                         id: 'staff-summary',
                         members: operator.permissions.members ? row.members : 0,
@@ -67,6 +193,17 @@ export async function GET(request: Request) {
                 }
             })(),
             ...tables.filter((table) => !deferredOrderTables.has(table)).map(async (table) => {
+                if (adminMode && sectionKey === 'missions' && table === 'curriculum_missions') {
+                    const [result, published, hidden, archived] = await Promise.all([
+                        missionQuery(missionState).order('created_at', { ascending: false }).order('id').range((page - 1) * pageSize, page * pageSize - 1),
+                        missionQuery('published', true), missionQuery('hidden', true), missionQuery('archived', true),
+                    ]);
+                    for (const item of [result, published, hidden, archived]) if (item.error) throw item.error;
+                    data.curriculum_missions = (result.data || []) as unknown as Row[];
+                    data.mission_summary = [{ id: 'mission-summary', active: (published.count || 0) + (hidden.count || 0), published: published.count || 0, hidden: hidden.count || 0, archived: archived.count || 0 }];
+                    pagination = { page, pageSize, total: result.count || 0 };
+                    return;
+                }
                 const columns = adminMode
                     ? table === 'crm_tags' && sectionKey === 'tags'
                         ? '*,crm_member_tags(count)'
@@ -78,11 +215,25 @@ export async function GET(request: Request) {
                     : table === 'reviews'
                         ? 'id,course_id,author_name,author_nickname,rating,body,is_featured,display_order,published_at,created_at'
                         : '*';
-                const serverPaged = adminMode && table === primaryTable && !['home', 'members', 'reviews', 'analytics', 'metrics', 'seo', 'settings', 'staff', 'templates', 'campaigns', 'automations'].includes(sectionKey);
+                const serverPaged = adminMode && !productEditorRead && table === primaryTable && !['home', 'members', 'reviews', 'analytics', 'metrics', 'seo', 'settings', 'staff', 'templates', 'campaigns', 'automations'].includes(sectionKey);
                 let query = db.from(table).select(columns, serverPaged ? { count: 'exact' } : undefined);
+                if (adminMode && sectionKey === 'customers' && table === 'profiles' && memberScope) query = query.eq('id', memberScope);
+                if (adminMode && sectionKey === 'questions' && table === 'edu_questions') {
+                    if (memberScope) query = query.eq('user_id', memberScope);
+                    if (questionScope) query = query.eq('id', questionScope);
+                    else {
+                        query = query.eq('is_archived', questionState === 'archived');
+                        if (['open', 'answered'].includes(questionState)) query = query.eq('status', questionState);
+                    }
+                }
+                if (adminMode && sectionKey === 'reviews' && table === 'mission_submissions') {
+                    if (memberScope) query = query.eq('enrollments.user_id', memberScope);
+                    if (submissionScope) query = query.eq('id', submissionScope);
+                }
                 if (record && adminMode && table === primaryTable) query = query.eq('id', record);
-                query = serverPaged ? query.range((page - 1) * pageSize, page * pageSize - 1) : query.limit(1000);
-                if (adminMode && sectionKey === 'customers' && table === 'profiles') query = query.neq('status', 'withdrawn');
+                if (record && productEditorRead && table === 'cohorts') query = query.eq('course_id', record);
+                query = serverPaged ? query.range((page - 1) * pageSize, page * pageSize - 1) : query.limit(productEditorRead && table === 'courses' ? 1 : 1000);
+                if (adminMode && sectionKey === 'customers' && table === 'profiles') query = query.neq('status', excludedMemberStatus);
                 if (table === 'edu_questions' && !adminMode) query = query.eq('is_archived', false);
                 if (table === 'site_settings' && adminMode && operator?.role !== 'admin') query = query.not('key', 'like', 'edu_staff_permissions_%');
                 if (['courses', 'review_videos', 'site_banners', 'curriculum_lessons', 'reviews'].includes(table)) {
@@ -103,11 +254,33 @@ export async function GET(request: Request) {
                 data[table] = (r.data || []) as unknown as Row[];
                 if (serverPaged) pagination = { page, pageSize, total: r.count || 0 };
             }),
+            ...(productEditorRead && record ? [(async () => {
+                const configs = await db.from('landing_configs').select('id,kakao_url,cta_label,pixel_enabled,pixel_id').eq('id', record).limit(1);
+                if (configs.error) throw configs.error;
+                data.landing_configs = (configs.data || []) as Row[];
+            })(), (async () => {
+                // A single published week/lesson pair is sufficient for readiness.
+                // Do not reload unrelated courses or heavy lesson content in the editor.
+                const curriculum = await db.from('curriculum_weeks')
+                    .select('id,course_id,is_published,curriculum_lessons!inner(id,week_id,is_published)')
+                    .eq('course_id', record).eq('is_published', true)
+                    .eq('curriculum_lessons.is_published', true).limit(1);
+                if (curriculum.error) throw curriculum.error;
+                const rows = (curriculum.data || []) as unknown as (Row & { curriculum_lessons: Row[] })[];
+                data.curriculum_weeks = rows.map(week => ({ id: week.id, course_id: week.course_id, is_published: week.is_published }));
+                data.curriculum_lessons = rows.flatMap(week => week.curriculum_lessons);
+            })()] : []),
         ]);
         for (const banner of data.site_banners || []) {
             banner.image_url = imagePreviewUrl(String(banner.image_path || ''), process.env.NEXT_PUBLIC_SUPABASE_URL || '');
         }
-        if (adminMode && sectionKey === 'products') {
+        if (adminMode && sectionKey === 'customers') {
+            const memberCount = () => db.from('profiles').select('id', { count: 'exact', head: true }).neq('status', excludedMemberStatus);
+            const [active, suspended, marketing] = await Promise.all([memberCount().eq('status', 'active'), memberCount().eq('status', 'suspended'), memberCount().eq('marketing_consent', true)]);
+            for (const item of [active, suspended, marketing]) if (item.error) throw item.error;
+            data.member_summary = [{ id: 'member-summary', active: active.count || 0, suspended: suspended.count || 0, marketing: marketing.count || 0 }];
+        }
+        if (adminMode && sectionKey === 'products' && !productEditorRead) {
             const [allProducts, publishedProducts, draftProducts, archivedProducts, configs] = await Promise.all([
                 db.from('courses').select('id', { count: 'exact' }).is('archived_at', null).limit(1000),
                 db.from('courses').select('id', { count: 'exact', head: true }).is('archived_at', null).eq('status', 'published'),
@@ -218,7 +391,8 @@ export async function GET(request: Request) {
         }
         if (!adminMode) {
             const now = Date.now();
-            data.site_banners = (data.site_banners || []).filter((b) => (!b.starts_at || Date.parse(String(b.starts_at)) <= now) && (!b.ends_at || Date.parse(String(b.ends_at)) > now));
+            data.site_banners = (data.site_banners || []).filter((b) => (!b.starts_at || Date.parse(String(b.starts_at)) <= now) && (!b.ends_at || Date.parse(String(b.ends_at)) > now)
+                && isListedProductLink(b.link_url, data.courses || [], new URL(request.url).origin));
             const landingDb = createAdminClient();
             const freeCourseIds = (data.courses || []).filter(c => Number(c.list_price) === 0).map(c => c.id);
             const landingResult = freeCourseIds.length ? await landingDb.from('landing_configs').select('*').in('id', freeCourseIds) : { data: [], error: null };
@@ -353,7 +527,7 @@ export async function POST(request: Request) {
                 if (!uid(resourceId) || !resources.some(item => item.id === resourceId)) fail('삭제할 자료를 확인해 주세요.');
                 const result = await db.from('courses').update({ metadata: mergeProductResources(current.data.metadata, resources.filter(item => item.id !== resourceId)) }).eq('id', courseId);
                 if (result.error) throw result.error;
-                return reply({ ok: true });
+                return publicWriteSuccess({ ok: true });
             }
             const name = String(body.resourceName || '').trim();
             const path = String(body.storagePath || '').trim();
@@ -366,7 +540,7 @@ export async function POST(request: Request) {
             const next = resources.some(resource => resource.id === id) ? resources.map(resource => resource.id === id ? item : resource) : [...resources, item];
             const result = await db.from('courses').update({ metadata: mergeProductResources(current.data.metadata, next) }).eq('id', courseId);
             if (result.error) throw result.error;
-            return reply({ ok: true, resource: item });
+            return publicWriteSuccess({ ok: true, resource: item });
         }
         if (action === 'save-digital-content') {
             const permissions = await permissionsFor(user);
@@ -383,7 +557,7 @@ export async function POST(request: Request) {
             if (productDigitalSections(metadata).some(section => section.items.some(item => item.type === 'file' && !resourceIds.has(item.resourceId)))) fail('연결된 파일 정보를 다시 확인해 주세요.');
             const result = await db.from('courses').update({ metadata }).eq('id', courseId).select('metadata').single();
             if (result.error) throw result.error;
-            return reply({ ok: true, sections: productDigitalSections((result.data.metadata || {}) as Record<string, unknown>) });
+            return publicWriteSuccess({ ok: true, sections: productDigitalSections((result.data.metadata || {}) as Record<string, unknown>) });
         }
         if (action === 'article-banner') {
             const permissions = await permissionsFor(user);
@@ -406,7 +580,7 @@ export async function POST(request: Request) {
             if (!title || title.length > 120) fail('배너 제목을 확인해 주세요.');
             const result = await db.from('site_settings').upsert({ key: 'edu_article_banner', value: { enabled: value?.enabled !== false, eyebrow: String(value?.eyebrow || '').trim().slice(0, 80), title, description: String(value?.description || '').trim().slice(0, 240), signupNotice: String(value?.signupNotice || '').trim().slice(0, 220), signupCTA: String(value?.signupCTA || '').trim().slice(0, 45), memberCTA: String(value?.memberCTA || '').trim().slice(0, 45), videos }, is_public: false }, { onConflict: 'key' });
             if (result.error) throw result.error;
-            return reply({ ok: true });
+            return publicWriteSuccess({ ok: true });
         }
         if (action === 'article-category-save' || action === 'article-category-delete') {
             const permissions = await permissionsFor(user);
@@ -419,7 +593,7 @@ export async function POST(request: Request) {
                 if (used.count) fail('사용 중인 카테고리는 삭제할 수 없습니다. 아티클 카테고리를 먼저 변경해 주세요.', 409);
                 const removed = await db.from('article_categories').delete().eq('id', id);
                 if (removed.error) throw removed.error;
-                return reply({ ok: true });
+                return publicWriteSuccess({ ok: true });
             }
             if (id && !uid(id)) fail('수정할 카테고리를 확인해 주세요.');
             const name = String(body.name || '').trim();
@@ -432,7 +606,7 @@ export async function POST(request: Request) {
             const values = { name, slug, description: description || null, display_order: displayOrder, is_active: body.active !== false };
             const result = id ? await db.from('article_categories').update(values).eq('id', id) : await db.from('article_categories').insert(values);
             if (result.error) fail(databaseMessage(result.error.code), result.error.code === '23505' ? 409 : 400);
-            return reply({ ok: true });
+            return publicWriteSuccess({ ok: true });
         }
         if (action === 'archive') {
             const section = sections.find((s) => s.key === body.section);
@@ -446,7 +620,7 @@ export async function POST(request: Request) {
                 p_ids: [...new Set(ids)],
             });
             if (result.error) throw result.error;
-            return reply({ ok: true, result: result.data });
+            return publicWriteSuccess({ ok: true, result: result.data });
         }
         if (action === 'restore-products') {
             const permissions = await permissionsFor(user);
@@ -462,7 +636,7 @@ export async function POST(request: Request) {
                 fail(result.error.message || '상품을 복원하지 못했습니다.', 409);
             }
             if (!Number(result.data)) fail('이미 복원됐거나 삭제 상태가 아닌 상품입니다.', 409);
-            return reply({ ok: true, result: result.data });
+            return publicWriteSuccess({ ok: true, result: result.data });
         }
         if (action === 'save') {
             const section = sections.find((s) => s.key === body.section);
@@ -505,6 +679,24 @@ export async function POST(request: Request) {
             }
             if (!body.id) {
                 for (const field of section.fields.filter((f) => f.required)) if (!(field.key in values)) fail(`${field.label}을 입력해 주세요.`);
+            }
+            if (section.table === 'curriculum_missions') {
+                const current = body.id ? await db.from('curriculum_missions').select('id,lesson_id').eq('id', body.id).single() : null;
+                if (current?.error || (body.id && !current?.data)) fail('미션을 다시 불러온 뒤 저장해 주세요.', 409);
+                const lessonId = values.lesson_id || current?.data?.lesson_id;
+                if (!uid(lessonId)) fail('연결할 학습을 선택해 주세요.');
+                const lesson = await db.from('curriculum_lessons').select('id,week_id').eq('id', lessonId).single();
+                if (lesson.error || !lesson.data) fail('연결할 학습을 찾을 수 없습니다.');
+                const week = await db.from('curriculum_weeks').select('id,course_id').eq('id', lesson.data.week_id).single();
+                if (week.error || !week.data) fail('학습의 상품·주차 연결을 확인해 주세요.');
+                // course_id/week_id are validation context, never persisted as mission columns.
+                if (input.course_id !== undefined && (!uid(input.course_id) || input.course_id !== week.data.course_id)) fail('선택한 상품에 속한 학습만 연결할 수 있습니다.');
+                if (input.week_id && input.week_id !== lesson.data.week_id) fail('선택한 주차에 속한 학습만 연결할 수 있습니다.');
+                if (current?.data && current.data.lesson_id !== lessonId) {
+                    const previousLesson = await db.from('curriculum_lessons').select('week_id').eq('id', current.data.lesson_id).single();
+                    const previousWeek = previousLesson.data ? await db.from('curriculum_weeks').select('course_id').eq('id', previousLesson.data.week_id).single() : null;
+                    if (previousLesson.error || previousWeek?.error || previousWeek?.data?.course_id !== week.data.course_id) fail('기존 미션은 다른 상품의 학습으로 이동할 수 없습니다.');
+                }
             }
             if (section.table === 'cohorts' && values.capacity !== undefined && values.capacity !== null && (!Number.isSafeInteger(values.capacity) || Number(values.capacity) < 1)) fail('정원은 1명 이상의 정수로 입력해 주세요.');
             if (section.table === 'site_banners') {
@@ -586,14 +778,13 @@ export async function POST(request: Request) {
                 if (values[start] && values[end] && Date.parse(String(values[start])) >= Date.parse(String(values[end]))) fail('종료일은 시작일 이후여야 합니다.');
             }
             if (section.table === 'mission_submissions') {
-                const r = await db.rpc('review_mission_submissions', {
-                    p_actor: user.id,
-                    p_ids: [body.id],
-                    p_decision: values.status,
-                    p_feedback: values.reviewer_feedback || '',
-                });
-                if (r.error) fail('검토 대기 상태와 피드백을 확인해 주세요.', 409);
-                return reply({ ok: true });
+                const mutation = reviewMutation(user.id, { ids: [body.id], decision: values.status, feedback: values.reviewer_feedback || '', reviewMode: body.reviewMode, reviewChecks: body.reviewChecks });
+                const r = await db.rpc(mutation.name, mutation.params);
+                if (r.error) {
+                    const { status, ...problem } = reviewWriteError(r.error);
+                    return reply(problem, status);
+                }
+                return publicWriteSuccess({ ok: true });
             }
             if (section.table === 'lesson_contents') {
                 if (['vod_url', 'resource_storage_path', 'body_text', 'external_url'].filter((k) => values[k]).length !== 1) fail('영상·자료·본문·외부 링크 중 학습 유형에 맞는 하나를 등록해 주세요.');
@@ -685,7 +876,7 @@ export async function POST(request: Request) {
                 }
                 scheduledCohort = cohortResult.data;
             }
-            return reply({ ok: true, row: result.data, cohort: scheduledCohort });
+            return publicWriteSuccess({ ok: true, row: result.data, cohort: scheduledCohort });
         }
         if (action === 'profile') {
             const name = String(body.name || '').trim();
@@ -725,16 +916,9 @@ export async function POST(request: Request) {
             if (offer.error || !offer.data) fail('상품 모집 정보를 확인해 주세요.', 409);
             const offeredCourse = offer.data.courses as Row;
             if (offeredCourse.category === 'paid_class') {
-                const weeks = await db.from('curriculum_weeks').select('*').eq('course_id', offeredCourse.id).eq('is_published', true);
-                if (weeks.error) throw weeks.error;
-                const weekIds = (weeks.data || []).map((item) => item.id);
-                const lessons = weekIds.length
-                    ? await db.from('curriculum_lessons').select('*').in('week_id', weekIds).eq('is_published', true)
-                    : { data: [], error: null };
-                if (lessons.error) throw lessons.error;
                 const metadata = (offeredCourse.metadata && typeof offeredCourse.metadata === 'object' ? offeredCourse.metadata : {}) as Record<string, unknown>;
                 const source = String(metadata.detail_html_document || metadata.detail_html || '');
-                const issues = paidCourseReadinessIssues(offeredCourse, [offer.data], (weeks.data || []) as Row[], (lessons.data || []) as Row[]);
+                const issues = paidCourseReadinessIssues(offeredCourse, [offer.data]);
                 if (containsFreeClassCampaign(source)) issues.push('유료 전용 상세 콘텐츠');
                 if (issues.length) fail(`판매 준비가 완료되지 않았습니다: ${[...new Set(issues)].join(' · ')}`, 409);
             }

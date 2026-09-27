@@ -27,7 +27,7 @@ export const JEV_QUESTIONS = {
   },
   primary_barrier: {
     type: 'choice',
-    instructions: '유료 교육 전환을 가장 크게 막고 있는 단일 장애물을 고르세요.',
+    instructions: '유료 교육 전환을 가장 크게 막고 있는 단일 장애물을 고르세요. 무료 강의·무료 다시보기 같은 무료 자료를 보려다 생긴 링크·접속·재생 문제는 유료 구매 장애물이 아닙니다. 무료 이용 문제만 말하고 유료 교육 구매 의사가 없거나 드러나지 않으면 none_or_unknown을 고르세요. 결제 화면이 열렸다는 사실만으로 가격 부담이나 유료 결제 문제라고 추정하지 마세요.',
     criteria: {
       price: '가격 또는 지불 부담',
       schedule: '시간, 날짜 또는 참여 일정',
@@ -128,7 +128,7 @@ export async function createJevJudgment(
   return {
     ...base,
     mode: 'jev',
-    notice: 'Jev 그림자 판정입니다. 자동 발송이나 고객 상태 변경에는 사용하지 않으며 운영자가 결과와 설명자료를 확인해야 합니다.',
+    notice: 'Jev가 문의를 분류하고 답변 초안을 만들었습니다. 직원이 내용을 확인해야 합니다. 이 화면에서는 고객에게 메시지를 보내거나 상담 기록을 바꾸지 않습니다.',
     model: typeof raw.model === 'string' ? raw.model.slice(0, 100) : 'jev-latest',
     decision_version: 1,
     decisions: {

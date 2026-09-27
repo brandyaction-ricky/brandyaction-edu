@@ -40,6 +40,13 @@ test('Jev request removes common contact data and returns a validated shadow res
   assert.equal(result.decisions.purchase_readiness.score, 3.2);
 });
 
+test('free-content access failures are not framed as paid-course price barriers', () => {
+  const instructions = jev.JEV_QUESTIONS.primary_barrier.instructions;
+  assert.match(instructions, /무료 강의·무료 다시보기/);
+  assert.match(instructions, /유료 구매 장애물이 아닙니다/);
+  assert.match(instructions, /결제 화면이 열렸다는 사실만으로/);
+});
+
 test('provider errors and malformed choices never expose upstream bodies or secrets', async () => {
   await assert.rejects(jev.createJevJudgment(inquiry, [], 'top-secret', async () => new Response('private upstream body', { status: 500 })), error => {
     assert.equal(error.message, 'JEV_UNAVAILABLE');

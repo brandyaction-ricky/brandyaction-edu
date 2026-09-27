@@ -9,7 +9,18 @@ const exports = {};
 new Function('exports', ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText)(exports);
-const { createMockJudgment, isEvidenceInScope, evidenceVersions, isRunStale, buildJevCalibrationSummary, calibrationForRun, historicalCalibrationQueue, MOCK_NOTICE } = exports;
+const { createMockJudgment, isEvidenceInScope, evidenceVersions, isRunStale, buildJevCalibrationSummary, calibrationForRun, historicalCalibrationQueue, buildAsidePaymentMatchPrompt, MOCK_NOTICE } = exports;
+
+test('Aside matching prompt uses KST, identifies the offer and leaves the decision with an employee', () => {
+  const prompt = buildAsidePaymentMatchPrompt({ receivedAt: '2026-09-20T00:00:00.000Z', courseName: '문샷 챌린지', cohortName: '4기' });
+  assert.match(prompt, /2026\.\s*9\.\s*20\.\s*09:00/);
+  assert.match(prompt, /문샷 챌린지/);
+  assert.match(prompt, /4기/);
+  assert.match(prompt, /시간이 가깝다는 이유만으로 같은 사람이라고 확정하지 마세요/);
+  assert.match(prompt, /취소·환불/);
+  assert.match(prompt, /사이트의 문의·결제 기록을 수정하거나 저장하지 말고/);
+  assert.doesNotMatch(prompt, /010\d{8}|홍길동|실시간 참석이 어려운데/);
+});
 
 const inquiry = {
   id: 'case-1', source_type: 'manual', sample_origin: 'current', legacy_course_label: null, question_id: null, course_id: 'course-a', cohort_id: 'cohort-a',
@@ -37,6 +48,23 @@ test('mock result identifies itself and preserves uncertainty for the unanswered
   assert.equal(result.proposed_reply, evidence.body);
   assert.doesNotMatch(result.proposed_reply, /녹화|실시간|다시/);
   assert.equal(result.topics.find(topic => topic.topic === 'price').status, 'not_explicit');
+});
+
+test('common price, start-date, and payment-method wording finds the matching approved facts', () => {
+  const item = { ...inquiry, subject: '문샷 챌린지 신청 문의', content: '무료 웨비나를 듣고 유료 교육 신청을 결정했습니다. 문샷 챌린지 4기 교육 가격과 일정, 결제 방법을 알려주세요.' };
+  const facts = { ...evidence, title: '문샷 챌린지 4기 기본 일정과 판매가', body: '모집 시작 예정: 2026년 9월 28일. 교육 기간: 2026년 10월 5일부터 6주. 판매가: 1,650,000원. 결제 방법은 확인되지 않아 담당자가 확인 후 안내합니다.' };
+  const result = createMockJudgment(item, [facts]);
+  assert.deepEqual(result.topics.filter(topic => topic.status === 'explicit').map(topic => topic.topic).sort(), ['payment', 'price', 'schedule']);
+  assert.equal(result.candidates[0].fit, 'partial');
+  assert.deepEqual(result.candidates[0].matched_topics.sort(), ['payment', 'price', 'schedule']);
+  assert.equal(result.proposed_reply, facts.body);
+  assert.deepEqual(result.missing_topics, []);
+
+  const alternateWording = { ...item, content: '무료 웨비나를 듣고 유료 교육 신청을 결정했습니다. 결제 방법과 시작일을 알려주세요.' };
+  const alternateResult = createMockJudgment(alternateWording, [facts]);
+  assert.equal(alternateResult.candidates[0].fit, 'partial');
+  assert.deepEqual(alternateResult.candidates[0].matched_topics.sort(), ['payment', 'schedule']);
+  assert.equal(alternateResult.proposed_reply, facts.body);
 });
 
 test('source spans are exact UTF-16 slices, including repeated keywords after emoji and line breaks', () => {

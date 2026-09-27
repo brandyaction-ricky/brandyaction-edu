@@ -2,7 +2,7 @@
 import { RecruitmentCopyLink } from './recruitment-copy-link';
 import { RecruitmentDetails, RecruitmentHelp } from './recruitment-help';
 import { useEffect,useRef,useState } from 'react';
-import { AdminButton,AdminCheckbox,AdminInput,AdminSection } from './final/admin-system';
+import { AdminButton,AdminCheckbox,AdminInput,AdminSection } from '@/features/admin-ui';
 import { liveLabel,type LivePhase } from '@/lib/webinar-attendance';
 import type { BroadcastReport,BroadcastSession } from '@/lib/broadcast-entry';
 function Editor({code,phase,session,offerReady,origin,saved,campaignEnabled}:{code:string;phase:LivePhase;session?:BroadcastSession;offerReady:boolean;origin:string;saved:()=>void;campaignEnabled:boolean}){

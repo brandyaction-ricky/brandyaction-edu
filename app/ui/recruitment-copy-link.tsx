@@ -1,6 +1,6 @@
 'use client';
 import { useRef, useState } from 'react';
-import { AdminButton, AdminInput } from './final/admin-system';
+import { AdminButton, AdminInput } from '@/features/admin-ui';
 import './recruitment-help.css';
 
 export function RecruitmentCopyLink({ label, value, blocked = '', usage }: { label: string; value: string; blocked?: string; usage: string }) {

@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { AdminButton, AdminInput, AdminSection, AdminSelect, AdminStack } from './final/admin-system';
+import { AdminButton, AdminInput, AdminSection, AdminSelect, AdminStack } from '@/features/admin-ui';
 import { RecruitmentDetails, RecruitmentHelp } from './recruitment-help';
 type Setup={state:string;period:string;templates:{id:string;name:string;channel:string}[];reservations:{id:string;name:string;status:string;scheduledAt:string;error?:string}[];delivery:{enabled:boolean}};
 type Review={token:string;asOf:string;counts:Record<string,number>;template:{name:string;content:string;channel:string}};

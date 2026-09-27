@@ -7,7 +7,7 @@ import {
   type FunnelCourse, type FunnelCohort, type FunnelDraft,
 } from '@/lib/recruitment-funnel';
 import { RecruitmentRoomSettings } from './recruitment-rooms';
-import { AdminButton, AdminSection, AdminSelect } from './final/admin-system';
+import { AdminButton, AdminSection, AdminSelect } from '@/features/admin-ui';
 
 export function RecruitmentFunnel({ courses, cohorts, canSave = false }: { courses: FunnelCourse[]; cohorts: FunnelCohort[]; canSave?: boolean }) {
   const [showRooms, setShowRooms] = useState(false);

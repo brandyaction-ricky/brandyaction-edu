@@ -408,6 +408,7 @@ function Dashboard({
                 <div>
                   <Badge color="green">답변 완료</Badge>
                   <h3>{t(q, "title")}</h3>
+          {Boolean(q.learning_context) && <p className="meta">{t(q, "learning_context")}</p>}
                   <p>강사의 답변을 확인해 주세요.</p>
                 </div>
                 <ChevronRight />
@@ -714,6 +715,7 @@ function Questions({
             <span className="meta">{date(q.created_at)}</span>
           </div>
           <h3>{t(q, "title")}</h3>
+          {Boolean(q.learning_context) && <p className="meta">{t(q, "learning_context")}</p>}
           <p className="reading-copy">{t(q, "content")}</p>
           {q.answer ? (
             <div className="answer">
@@ -923,7 +925,7 @@ function Coupons({ data }: { data: Data }) {
       </div>
       {!list.length && <Empty title="해당하는 쿠폰이 없습니다." />}
       <div className="notice mt24">
-        결제 화면에서 코드를 입력하면 서버가 사용 기간과 할인 조건을 확인합니다.
+        결제 화면에서 쿠폰 코드를 입력하세요. 쿠폰마다 사용 기간과 적용 조건이 다를 수 있으니 결제창에서 할인 금액을 확인해 주세요.
       </div>
     </>
   );
@@ -1252,7 +1254,7 @@ export function MemberViews({
   order?: string | null;
 }) {
   const enrollments = rows(data, "enrollments"),
-    active = enrollments.filter(hasLearningAccess);
+    active = enrollments.filter(enrollment => hasLearningAccess(enrollment));
   let content;
   switch (section) {
     case "":

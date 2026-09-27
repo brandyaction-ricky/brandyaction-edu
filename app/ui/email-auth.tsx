@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { PASSWORD_REQUIREMENT } from '@/lib/auth-validation';
-import { afterEmailLogin, emailAddress, emailAuthError, emailCallback, signupValues } from '@/lib/email-auth';
+import { afterEmailLogin, emailAddress, emailAuthError, emailCallback, emailConfirmRedirect, signupValues } from '@/lib/email-auth';
 
 export function EmailAuth({ signup, next, disabled = false }: { signup: boolean; next: string; disabled?: boolean }) {
   const [open, setOpen] = useState(false), [forgot, setForgot] = useState(false);
@@ -23,7 +23,7 @@ export function EmailAuth({ signup, next, disabled = false }: { signup: boolean;
         setNotice('가입된 이메일이라면 비밀번호 재설정 안내가 발송됩니다. 메일함과 스팸함을 확인해 주세요.'); setSeconds(60);
       } else if (signup) {
         const values = signupValues(String(form.get('name') || ''), email, String(form.get('password') || ''), String(form.get('confirm') || ''));
-        const { data, error } = await auth.signUp({ ...values, options: { ...values.options, emailRedirectTo: emailCallback(location.origin, next) } });
+        const { data, error } = await auth.signUp({ ...values, options: { ...values.options, emailRedirectTo: emailConfirmRedirect(location.origin, next) } });
         if (error) throw Error(emailAuthError(error));
         if (data.session) { location.assign(afterEmailLogin(data.user?.user_metadata, next)); return; }
         setNotice('가입 가능한 이메일이라면 인증 메일이 발송됩니다. 메일의 인증 링크를 연 뒤 필수 약관에 동의해 가입을 완료해 주세요. 이미 가입했다면 로그인해 주세요.');
@@ -40,7 +40,7 @@ export function EmailAuth({ signup, next, disabled = false }: { signup: boolean;
     if (busy.current || seconds) return;
     busy.current = true; setPending(true); setError('');
     try {
-      const { error } = await createClient().auth.resend({ type: 'signup', email: emailAddress(email), options: { emailRedirectTo: emailCallback(location.origin, next) } });
+      const { error } = await createClient().auth.resend({ type: 'signup', email: emailAddress(email), options: { emailRedirectTo: emailConfirmRedirect(location.origin, next) } });
       if (error) throw Error(emailAuthError(error));
       setNotice('인증 메일 발송을 요청했습니다. 메일함과 스팸함을 확인해 주세요.'); setSeconds(60);
     } catch (cause) { setError(cause instanceof Error ? cause.message : '메일을 다시 보내지 못했습니다.'); }

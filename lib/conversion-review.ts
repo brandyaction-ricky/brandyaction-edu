@@ -13,7 +13,24 @@ export type ConversionCase = {
   received_at: string;
   customer_id: string | null;
   input_version: number;
+  purchase_outcome?: 'unknown' | 'paid' | 'not_paid';
+  purchase_checked_at?: string | null;
+  purchase_checked_by?: string | null;
+  archived_at?: string | null;
+  archived_by?: string | null;
   created_at: string;
+};
+
+export type ConversionOrderCandidate = {
+  id: string;
+  status: 'paid' | 'partially_refunded' | 'refunded';
+  currency: string;
+  total_amount: number;
+  paid_at: string;
+  item_name: string;
+  linked_at: string | null;
+  refund_amount: number;
+  payment_statuses: string[];
 };
 
 export type ConversionEvidence = {
@@ -27,7 +44,7 @@ export type ConversionEvidence = {
   status: 'draft' | 'approved' | 'retired';
 };
 
-export type ConversionTopic = 'price' | 'schedule' | 'content' | 'level' | 'usage';
+export type ConversionTopic = 'price' | 'schedule' | 'payment' | 'content' | 'level' | 'usage';
 export type InquiryType = 'prepurchase' | 'support' | 'payment_refund' | 'mixed' | 'unknown';
 export type InquirySpan = { field: 'subject' | 'content'; start: number; end: number; text: string };
 export type MockResult = {
@@ -109,7 +126,7 @@ export type ConversionJevV4Run = {
   id: string;
   v1_run_id: string;
   case_id: string;
-  calibration_review_id: string;
+  calibration_review_id: string | null;
   input_version: number;
   status: 'pending' | 'completed' | 'failed';
   result: import('./conversion-jev-v4').JevV4Result | null;
@@ -166,12 +183,36 @@ export type ConversionSnapshot = {
   jev_v2_runs?: ConversionJevV2Run[];
   jev_v3_runs?: ConversionJevV3Run[];
   jev_v4_runs?: ConversionJevV4Run[];
-  capabilities: { can_manage_evidence: boolean; can_mock: boolean; can_jev?: boolean; can_adjudicate?: boolean; can_jev_v2?: boolean; can_jev_v3?: boolean; can_jev_v4?: boolean; can_analyze?: boolean; analyze_provider?: 'mock' | 'jev' | null; can_manage_funnel?: boolean };
+  capabilities: { can_manage_evidence: boolean; can_manage_cases?: boolean; can_mock: boolean; can_jev?: boolean; can_adjudicate?: boolean; can_jev_v2?: boolean; can_jev_v3?: boolean; can_jev_v4?: boolean; can_analyze?: boolean; analyze_provider?: 'mock' | 'jev' | null; can_manage_funnel?: boolean; can_copy_aside_match?: boolean };
 };
 
-export const MOCK_NOTICE = '모의 판단입니다. 단어 일치로 화면과 기록 흐름을 확인하며, 실제 AI 판단이나 답변 정확도를 검증한 결과가 아닙니다. 모든 내용은 운영자가 확인해야 합니다.';
+export function buildAsidePaymentMatchPrompt(input: {
+  receivedAt: string;
+  courseName: string;
+  cohortName: string;
+}) {
+  const receivedAt = new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul', year: 'numeric', month: 'numeric', day: 'numeric',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).format(new Date(input.receivedAt));
+  return [
+    '브랜디에듀 문의자가 나중에 결제했는지 확인할 수 있는 근거를 살펴봐 주세요.',
+    '',
+    `문의가 온 시각: ${receivedAt} (한국 시간)`,
+    `상품: ${input.courseName || '확인 필요'}`,
+    `기수: ${input.cohortName || '지정되지 않음'}`,
+    '',
+    '브랜디에듀 주문 내역의 결제 시각과 카카오 비즈니스의 거래 안내 알림톡 기록을 살펴보고, 원래 카카오 문의와 이어지는 결제 후보가 있는지 비교해 주세요. 테스트 기록, 무료 신청, 결제 실패, 취소·환불은 실제 결제와 구분해 주세요.',
+    '시간이 가깝다는 이유만으로 같은 사람이라고 확정하지 마세요. 카카오 문의와 알림톡 수신자, 상품, 결제 시각이 서로 맞는 근거를 확인하세요. 정보가 겹치거나 수신자를 확인할 수 없으면 “확인 어려움”으로 남겨 주세요.',
+    '',
+    '결과는 “확인 가능한 결제 / 가능성 있는 후보 / 확인 어려움 / 후보 여러 건” 중 하나로 제시하고, 판단 근거와 시간 차이만 간단히 적어 주세요. 이름·전화번호·문의 전문 등 다른 개인정보는 답변에 복사하지 마세요.',
+    '사이트의 문의·결제 기록을 수정하거나 저장하지 말고, 고객에게 메시지도 보내지 마세요. 마지막 기록은 직원이 직접 확인하고 저장합니다.',
+  ].join('\n');
+}
+
+export const MOCK_NOTICE = '시험용 결과입니다. 실제 AI가 만든 판단이 아니며, 분류와 답변 초안은 직원이 확인해야 합니다.';
 export const topicLabels: Record<ConversionTopic, string> = {
-  price: '가격', schedule: '일정', content: '내용', level: '수준', usage: '이용 방법',
+  price: '가격', schedule: '일정', payment: '결제 방법', content: '내용', level: '수준', usage: '이용 방법',
 };
 export const inquiryTypeLabels: Record<InquiryType, string> = {
   prepurchase: '구매 전 상품 질문', support: '이용 지원', payment_refund: '결제·환불', mixed: '혼합', unknown: '판단 불가',
@@ -256,8 +297,9 @@ export function buildJevCalibrationSummary(runs: ConversionRun[], reviews: Conve
 }
 
 const topicPatterns: Record<ConversionTopic, RegExp> = {
-  price: /가격|수강료|비용|금액|얼마|할인/gu,
-  schedule: /일정|날짜|언제|요일|몇\s*시|시간표|기간/gu,
+  price: /가격|수강료|판매가|정가|비용|금액|얼마|할인/gu,
+  schedule: /일정|날짜|시작일|시작\s*날짜|교육\s*시작|수강\s*시작|모집\s*시작|개강일|개강|언제|요일|몇\s*시|시간표|교육\s*기간|강의\s*기간|기간/gu,
+  payment: /결제\s*(?:방법|방식|수단)|결제수단|카드\s*결제|계좌\s*이체|무통장|할부/gu,
   content: /커리큘럼|내용|무엇을|뭘\s*배우|어떤\s*(?:것|걸|수업)|실습/gu,
   level: /초보|입문|난이도|수준|선수\s*지식|따라갈|경험이\s*없/gu,
   usage: /녹화|다시\s*보기|다시\s*볼|실시간|참석|이용\s*방법|수강\s*방법|온라인|오프라인/gu,

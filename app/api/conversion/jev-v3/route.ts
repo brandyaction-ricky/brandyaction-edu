@@ -25,13 +25,14 @@ export async function POST(request: Request) {
     if (!run || run.provider !== 'jev' || run.result?.mode !== 'jev' || run.result?.decision_version !== 1
       || typeof run.input_snapshot?.subject !== 'string' || typeof run.input_snapshot?.content !== 'string') conversionError('비교할 v1 Jev 판정 원문을 찾을 수 없습니다.', 404);
     const [caseQuery, firstQuery] = await Promise.all([
-      db.from('edu_conversion_cases').select('id,input_version').eq('id', run.case_id).maybeSingle(),
+      db.from('edu_conversion_cases').select('id,input_version,archived_at').eq('id', run.case_id).maybeSingle(),
       db.from('edu_conversion_reviews').select('id,run_id,calibration_sample_kind,calibration').eq('case_id', run.case_id).not('calibration', 'is', null)
         .order('created_at', { ascending: true }).order('id', { ascending: true }).limit(1).maybeSingle(),
     ]);
     if (caseQuery.error) conversionDatabaseError(caseQuery.error);
     if (firstQuery.error) conversionDatabaseError(firstQuery.error);
     if (!caseQuery.data || caseQuery.data.input_version !== run.input_version) conversionError('문의가 변경됐습니다. 최신 내용을 확인해 주세요.', 409);
+    if (caseQuery.data.archived_at) conversionError('삭제한 문의는 먼저 복구해야 다시 살펴볼 수 있습니다.', 409);
     const first = firstQuery.data;
     if (!first || first.run_id !== run.id || first.calibration_sample_kind !== 'operational' || !first.calibration) conversionError('첫 실제 문의 독립 판정이 있는 v1 기록만 비교할 수 있습니다.', 409);
 

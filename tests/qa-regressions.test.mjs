@@ -2,12 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
+import { submissionReview } from './helpers/submission-review.mjs';
+import { productVisibility } from './helpers/product-visibility.mjs';
 
 function load(path, dependencies = {}) {
   const source = fs.readFileSync(new URL('../' + path, import.meta.url), 'utf8');
   const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const exports = {};
-  new Function('exports', 'require', compiled)(exports, name => { if (!(name in dependencies)) throw Error(name); return dependencies[name]; });
+  new Function('exports', 'require', compiled)(exports, name => { if (name === '@/lib/product-visibility') return productVisibility; if (name === '@/lib/submission-review') return submissionReview; if (name === '@/lib/public-platform-data') return { getPublicPlatformData: async () => ({ data: {}, pagination: null }), getPublicSupport: async () => ({}) }; if (name === '@/lib/public-platform-plan') return { PUBLIC_CACHE_TAG: 'test' }; if (name === '@/lib/member-platform-data') return { readMemberPlatformData: async () => ({}) }; if (name === 'next/cache') return { revalidateTag: () => {} }; if (!(name in dependencies)) throw Error(name); return dependencies[name]; });
   return exports;
 }
 const rules = load('lib/qa-rules.ts');
@@ -48,7 +50,7 @@ test('F-03 no admin screen downloads raw journey events', () => {
 });
 test('admin list APIs only load screen dependencies and lightweight relation fields', () => {
   assert.deepEqual(rules.adminTables.questions, ['edu_questions']);
-  assert.equal(rules.adminSelectColumns('questions', 'edu_questions'), 'id,user_id,course_id,title,content,answer,status,created_at,updated_at');
+  assert.equal(rules.adminSelectColumns('questions', 'edu_questions'), 'id,user_id,course_id,learning_context,title,content,answer,status,is_archived,created_at,updated_at,profiles(id,full_name,email),courses(id,title)');
   assert.equal(rules.adminSelectColumns('orders', 'courses'), 'id,title,status,category,list_price,archived_at,display_order,created_at,updated_at');
   assert.equal(rules.adminSelectColumns('orders', 'orders'), 'id,order_number,user_id,status,subtotal,discount_amount,total_amount,customer_name,customer_email,customer_phone,created_at');
   assert.equal(rules.adminSelectColumns('orders', 'order_items'), 'id,order_id,course_id,cohort_id,item_name,unit_price');
@@ -103,12 +105,19 @@ function handler(user, database) {
     '@/lib/product-metadata': load('lib/product-metadata.ts', { './platform': platform, './product-conversion': load('lib/product-conversion.ts'), './product-html-document': load('lib/product-html-document.ts') }),
     '@/lib/edu-settings': { getEduSettings: async () => ({ operations: {} }) },
     '@/lib/mission-quiz': {}, '@/lib/legal-policies': { POLICY_VERSION: 'test' },
-    '@/lib/operator-permissions': { getOperatorUser: async () => user?.role === 'admin' ? user : null, permissionsFor: async value => ({ products: value?.role === 'admin', members: value?.role === 'admin', orders: value?.role === 'admin', content: value?.role === 'admin', marketing: value?.role === 'admin' }), sectionScopes: { cohorts: 'products', testimonials: 'content', products: 'products' } },
+    '@/lib/operator-permissions': { getOperatorUser: async () => user?.role === 'admin' ? user : null, permissionsFor: async value => ({ products: value?.role === 'admin', members: value?.role === 'admin', orders: value?.role === 'admin', content: value?.role === 'admin', marketing: value?.role === 'admin' }), sectionScopes: { cohorts: 'products', testimonials: 'content', products: 'products', reviews: 'members' } },
     '@/lib/crm-delivery': { crmDeliveryState: () => ({ enabled: false, configured: false }) },
   });
 }
 const request = body => new Request('https://example.com/api/platform', { method: 'POST', headers: { origin: 'https://example.com', 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 const admin = { id: crypto.randomUUID(), role: 'admin' };
+test('generic review save shares the checklist contract and preserves conflict codes', async () => {
+  const calls = [];
+  const h = handler(admin, { rpc: async (name, params) => { calls.push({ name, params }); return { error: { code: 'PT409' } }; } });
+  const response = await h.POST(request({ action: 'save', section: 'reviews', id: crypto.randomUUID(), values: { status: 'approved', reviewer_feedback: '검토' }, reviewMode: 'single', reviewChecks: submissionReview.emptyReviewChecks() }));
+  assert.equal(response.status, 409); assert.equal((await response.json()).code, 'REVIEW_CONFLICT');
+  assert.equal(calls.length, 1); assert.equal(calls[0].name, 'review_mission_submissions_with_checks'); assert.equal(calls[0].params.p_actor, admin.id);
+});
 test('F-06/F-09/F-15 invalid capacity, phone and image are rejected before DB writes', async () => {
   const h = handler(admin, { from: () => { throw Error('must not write'); } });
   for (const body of [
@@ -150,10 +159,9 @@ test('article category fields and server actions use the shared category table',
   assert.match(source, /article-category-save/);
   assert.match(source, /사용 중인 카테고리는 삭제할 수 없습니다/);
 });
-test('F-14 anonymous API selects only public review fields', async () => {
-  let projection;
-  const db = { from(table) { return { select(columns) { if (table === 'reviews') projection = columns; return this; }, limit() { return this; }, order() { return this; }, eq() { return this; }, then(resolve) { resolve({ data: [] }); } }; } };
-  assert.equal((await handler(null, db).GET(new Request('https://example.com/api/platform'))).status, 200);
-  assert.ok(projection.includes('author_name'));
+test('F-14 public product review projection excludes member and order identifiers', () => {
+  const source = fs.readFileSync(new URL('../lib/public-platform-data.ts', import.meta.url), 'utf8');
+  const projection = source.match(/from\('reviews'\)\.select\('([^']+)'\)/)?.[1];
+  assert.ok(projection?.includes('author_name'));
   for (const key of ['user_id', 'order_id', 'cohort_id', '*']) assert.equal(projection.includes(key), false);
 });
