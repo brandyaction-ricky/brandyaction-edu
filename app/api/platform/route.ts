@@ -11,11 +11,13 @@ import { adminSelectColumns, adminTables, archiveValues, cohortStatus, phoneNumb
 import { POLICY_VERSION } from '@/lib/legal-policies';
 import { getOperatorUser, permissionsFor, sectionScopes } from '@/lib/operator-permissions';
 import { crmDeliveryState } from '@/lib/crm-delivery';
+import { loadSmsSettings, registeredSmsNumbers } from '@/lib/crm-sms-settings';
 import { mergeProductDigitalSections, mergeProductMetadata, mergeProductResources, productDigitalSections, productMetadataFields, productResources, productResourceScopes } from '@/lib/product-metadata';
 import { getPublicPlatformData, getPublicSupport } from '@/lib/public-platform-data';
 import { PUBLIC_CACHE_TAG, type PublicView } from '@/lib/public-platform-plan';
 import { revalidateTag } from 'next/cache';
 import { readMemberPlatformData, type MemberView } from '@/lib/member-platform-data';
+import { couponError } from '@/lib/coupon-rules';
 const reply = (data: unknown, status = 200) =>
     Response.json(data, {
         status,
@@ -108,7 +110,7 @@ export async function GET(request: Request) {
         if (record && (!uid(record) || !['products', 'learning'].includes(sectionKey))) return reply({ error: '편집할 항목을 확인해 주세요.' }, 400);
         const productEditorRead = adminMode && sectionKey === 'products' && Boolean(record);
         const page = Math.max(1, Math.min(100000, Number(params.get('page')) || 1));
-        const pageSize = sectionKey === 'orders' ? 30 : 100;
+        const pageSize = sectionKey === 'orders' ? 30 : sectionKey === 'weeks' ? 1000 : 100;
         if (adminMode && !user) return reply({ error: '로그인이 필요합니다.', user: null }, 401);
         const operator = adminMode ? await getOperatorUser(sectionScopes[sectionKey], user) : null;
         const authorized = performance.now();
@@ -217,6 +219,7 @@ export async function GET(request: Request) {
                         : '*';
                 const serverPaged = adminMode && !productEditorRead && table === primaryTable && !['home', 'members', 'reviews', 'analytics', 'metrics', 'seo', 'settings', 'staff', 'templates', 'campaigns', 'automations'].includes(sectionKey);
                 let query = db.from(table).select(columns, serverPaged ? { count: 'exact' } : undefined);
+                if (adminMode && table === 'coupons' && operator?.role !== 'admin') query = query.neq('discount_type', 'ADMIN_FREE');
                 if (adminMode && sectionKey === 'customers' && table === 'profiles' && memberScope) query = query.eq('id', memberScope);
                 if (adminMode && sectionKey === 'questions' && table === 'edu_questions') {
                     if (memberScope) query = query.eq('user_id', memberScope);
@@ -442,7 +445,10 @@ export async function GET(request: Request) {
             }
         }
         if (adminMode) {
-            if (['templates', 'campaigns', 'automations'].includes(sectionKey)) data.crm_delivery_state = [crmDeliveryState() as unknown as Row];
+            if (['templates', 'campaigns', 'automations'].includes(sectionKey)) {
+                data.crm_delivery_state = [crmDeliveryState() as unknown as Row];
+                data.crm_sms_settings = [{ ...await loadSmsSettings(), ...registeredSmsNumbers(), canConfigure: operator?.role === 'admin' } as unknown as Row];
+            }
         }
         const { operations } = await settings;
         if (adminMode && data.site_settings) {
@@ -614,6 +620,12 @@ export async function POST(request: Request) {
             if (!section || !permissions[sectionScopes[section.key]]) return reply({ error: '이 작업에 필요한 운영 권한이 없습니다.' }, 403);
             const ids = body.ids;
             if (!section || !archiveValues[section.key] || !Array.isArray(ids) || !ids.length || ids.length > 50 || !ids.every(uid)) fail('보관할 항목을 최대 50개까지 선택해 주세요.');
+            if (section.key === 'coupons') {
+                if (user.role !== 'admin') return reply({ error: '관리자 권한이 필요합니다.' }, 403);
+                const result = await db.rpc('edu_set_coupon_active', { p_actor: user.id, p_ids: [...new Set(ids)], p_active: false });
+                if (result.error) fail(couponError(result.error.message), 409);
+                return reply({ ok: true, result: result.data });
+            }
             const result = await db.rpc('edu_archive_records', {
                 p_actor: user.id,
                 p_section: section.key,
@@ -638,14 +650,39 @@ export async function POST(request: Request) {
             if (!Number(result.data)) fail('이미 복원됐거나 삭제 상태가 아닌 상품입니다.', 409);
             return publicWriteSuccess({ ok: true, result: result.data });
         }
+        if (action === 'reorder-weeks') {
+            const permissions = await permissionsFor(user);
+            const courseId = String(body.courseId || '');
+            const ids = body.ids;
+            if (!permissions.products) return reply({ error: '상품 관리 권한이 필요합니다.' }, 403);
+            if (!uid(courseId) || !Array.isArray(ids) || !ids.length || ids.length > 1000 || !ids.every(uid) || new Set(ids).size !== ids.length) fail('상품과 주차 목록을 다시 확인해 주세요.');
+            const result = await db.rpc('edu_admin_reorder_weeks', {
+                p_actor: user.id,
+                p_course: courseId,
+                p_ids: ids,
+            });
+            if (result.error) {
+                if (result.error.code !== 'P0001') console.error('week reorder', result.error.code);
+                fail(result.error.message || '주차 순서를 변경하지 못했습니다.', 409);
+            }
+            return publicWriteSuccess({ ok: true, result: result.data });
+        }
         if (action === 'save') {
             const section = sections.find((s) => s.key === body.section);
             const permissions = await permissionsFor(user);
             if (!section || !permissions[sectionScopes[section.key]]) return reply({ error: '이 작업에 필요한 운영 권한이 없습니다.' }, 403);
             if (!section || section.readOnly) fail('수정할 수 없는 항목입니다.');
             const input = (body.values || {}) as Record<string, unknown>;
+            if (section.table === 'coupons') {
+                if (user.role !== 'admin') return reply({ error: '관리자 권한이 필요합니다.' }, 403);
+                const couponId = body.id || body.requestId;
+                const products = input.applicable_course_ids || (input.applicable_course_id ? [input.applicable_course_id] : []);
+                if (!uid(couponId) || !Array.isArray(products) || products.length > 100 || products.some(id => !uid(id))) fail('쿠폰과 적용 상품을 확인해 주세요.');
+                const result = await db.rpc('edu_save_coupon', { p_actor: user.id, p_id: couponId, p_values: input, p_products: products });
+                if (result.error) fail(result.error.code === '23505' ? '이미 사용 중인 쿠폰 코드입니다.' : couponError(result.error.message), 409);
+                return reply({ ok: true, result: result.data });
+            }
             const values: Record<string, unknown> = {};
-            const couponCourseId = section.table === 'coupons' ? String(input.applicable_course_id || '') : '';
             const productSchedule = section.table === 'courses' && ('recruitmentStartAt' in body || 'recruitmentEndAt' in body) ? {
                 start: body.recruitmentStartAt === null ? null : String(body.recruitmentStartAt || ''),
                 end: body.recruitmentEndAt === null ? null : String(body.recruitmentEndAt || ''),
@@ -750,16 +787,6 @@ export async function POST(request: Request) {
                     if (['image', 'video'].includes(String(block.type)) && !safeUrl(block.url || block.src)) fail('본문의 이미지·영상 주소를 확인해 주세요.');
                 }
             }
-            if (section.table === 'coupons') {
-                if (typeof values.code === 'string') values.code = values.code.trim().toUpperCase();
-                if (values.discount_type === 'percentage' && Number(values.discount_value) > 100) fail('할인율은 100% 이하여야 합니다.');
-                if (values.product_scope === 'specific' && !uid(couponCourseId)) fail('쿠폰을 적용할 상품을 선택해 주세요.');
-                if (values.issue_target === 'tag' && !uid(values.target_tag_id)) fail('쿠폰 발급 대상 태그를 선택해 주세요.');
-                if (values.issue_target !== 'tag') values.target_tag_id = null;
-                for (const key of ['discount_value', 'max_discount_amount', 'minimum_order_amount', 'usage_limit', 'per_user_limit']) {
-                    if (values[key] !== null && values[key] !== undefined && (!Number.isSafeInteger(values[key]) || Number(values[key]) < (key === 'minimum_order_amount' || key === 'max_discount_amount' ? 0 : 1))) fail('쿠폰 금액·수량은 허용 범위의 정수로 입력해 주세요.');
-                }
-            }
             if (section.table === 'crm_tags') {
                 values.name = String(values.name || '').trim();
                 values.description = String(values.description || '').trim() || null;
@@ -823,17 +850,6 @@ export async function POST(request: Request) {
                 if (input.apply_existing === true) {
                     const synced = await db.rpc('crm_resync_all_automatic_tags');
                     if (synced.error) fail('태그 조건은 저장했지만 기존 회원 태그를 다시 계산하지 못했습니다.', 409);
-                }
-            }
-            if (section.table === 'coupons') {
-                const coupon = result.data as Row;
-                const couponId = String(coupon.id || body.id || '');
-                if (!uid(couponId)) fail('저장된 쿠폰을 다시 불러오지 못했습니다.', 409);
-                const removed = await db.from('coupon_products').delete().eq('coupon_id', couponId);
-                if (removed.error) fail('쿠폰 적용 상품을 갱신하지 못했습니다.', 409);
-                if (values.product_scope === 'specific') {
-                    const linked = await db.from('coupon_products').insert({ coupon_id: couponId, course_id: couponCourseId });
-                    if (linked.error) fail('쿠폰 적용 상품을 저장하지 못했습니다.', 409);
                 }
             }
             let scheduledCohort = null;
@@ -929,7 +945,8 @@ export async function POST(request: Request) {
                 fail((e as Error).message);
             }
             if (!phone || !String(body.name || '').trim()) fail('신청자 이름과 연락처를 확인해 주세요.');
-            const r = await db.rpc('create_checkout_order', {
+            if (body.couponId) fail('쿠폰 코드를 입력해 주세요.');
+            const r = await db.rpc('edu_checkout_with_coupon', {
                 p_user_id: user.id,
                 p_cohort_id: body.cohortId,
                 p_customer_name: String(body.name).trim(),
@@ -938,29 +955,26 @@ export async function POST(request: Request) {
                 p_terms_version: POLICY_VERSION,
                 p_privacy_version: POLICY_VERSION,
                 p_refund_policy_version: POLICY_VERSION,
+                p_code: String(body.coupon || '').trim().toUpperCase(),
             });
             if (r.error) {
                 const msg = r.error.message;
+                if (msg.includes('COUPON_')) fail(couponError(msg), 409);
                 fail(msg.includes('ALREADY_ENROLLED') ? '이미 신청한 클래스입니다.' : msg.includes('RECRUIT') ? '현재 모집 중인 클래스가 아닙니다.' : msg.includes('CAPACITY') ? '모집 정원이 마감되었습니다.' : '주문을 만들지 못했습니다. 상품 모집 설정을 확인해 주세요.', 409);
             }
-            const order = r.data as Record<string, unknown>;
-            const coupon = await db.rpc('apply_coupon_to_order', {
-                p_order_id: order.orderId,
-                p_user_id: user.id,
-                p_code: String(body.coupon || '')
-                    .trim()
-                    .toUpperCase(),
-            });
-            if (coupon.error) fail('쿠폰의 사용 기간과 적용 상품을 확인해 주세요.', 409);
-            const result = { ...order, ...coupon.data };
-            if (Number(result.totalAmount) === 0) {
-                const free = await db.rpc('finalize_zero_total_order', {
-                    p_order_id: order.orderId,
-                    p_user_id: user.id,
-                });
-                if (free.error) throw free.error;
-                return reply({ ...result, free: true });
+            const result = r.data as Record<string, unknown>;
+            const entrySource = typeof body.entrySource === 'string' && ['paid', 'organic', 'alumni', 'youtube'].includes(body.entrySource)
+                ? body.entrySource : null;
+            const attribution = await db.from('orders').update({ entry_src: entrySource })
+                .eq('id', result.orderId).eq('user_id', user.id)
+                .select('id').single();
+            if (attribution.error || !attribution.data) {
+                // The checkout RPC may already have finalized a zero-total order.
+                // Do not report payment failure after an entitlement was granted.
+                console.error('Order entry source update failed', attribution.error);
+                result.entrySourceRecorded = false;
             }
+            if (result.free === true && Number(result.totalAmount) === 0) return reply(result);
             if (!process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY) fail('결제 서비스 연결을 확인하고 있습니다.', 503);
             return reply(result);
         }

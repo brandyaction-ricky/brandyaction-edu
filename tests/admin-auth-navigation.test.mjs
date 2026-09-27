@@ -10,7 +10,7 @@ function load(path, dependencies = {}) {
   const exports = {};
   new Function('exports', 'require', code)(exports, name => {
     if (name === '@/lib/submission-review') return submissionReview;
-    if (name === '@/lib/product-visibility') return productVisibility;
+    if (name === '@/lib/coupon-rules') return load('lib/coupon-rules.ts'); if (name === '@/lib/product-visibility') return productVisibility;
     if (name === '@/lib/public-platform-data') return { getPublicPlatformData: async () => ({ data: {}, pagination: null }), getPublicSupport: async () => ({}) };
     if (name === '@/lib/public-platform-plan') return { PUBLIC_CACHE_TAG: 'test' };
     if (name === '@/lib/member-platform-data') return { readMemberPlatformData: async () => ({}) };
@@ -100,6 +100,7 @@ function apiHarness(user, failure = null, fixtures = {}, staffPermissions = {}) 
     '@/lib/mission-quiz': {}, '@/lib/legal-policies': { POLICY_VERSION: 'test' },
     '@/lib/operator-permissions': operators,
     '@/lib/crm-delivery': { crmDeliveryState: () => ({}) },
+    '@/lib/crm-sms-settings': { loadSmsSettings: async () => ({}), registeredSmsNumbers: () => ({ senders: [], optouts: [] }) },
   });
   return { calls, read: section => route.GET(new Request('https://example.test/api/platform?admin=1&section=' + section)) };
 }

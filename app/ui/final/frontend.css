@@ -171,4 +171,12 @@
 .edu-front .profile-menu>a:focus-visible,.edu-front .profile-menu>button:focus-visible,.edu-front .profile-menu-trigger:focus-visible{outline:2px solid var(--ba-red);outline-offset:2px}
 .edu-front .profile-menu svg{width:19px;height:19px;flex:none}
 @media(max-width:680px){.edu-front .profile-menu{right:-4px}.edu-front .profile-menu-identity{padding-inline:8px}.edu-front .profile-menu>a,.edu-front .profile-menu>button{min-height:48px}}
+/* Coupon quote: authoritative discount and final payable amount. */
+.edu-front .checkout-price-breakdown{background:#f6f7f9;border-radius:var(--radius-md);padding:var(--space-3) var(--space-4);margin-top:var(--space-4)}
+.edu-front .checkout-price-breakdown .cost-row{margin:0;padding:var(--space-2) 0;gap:var(--space-3)}
+.edu-front .checkout-discount-amount,.edu-front .checkout-applied-coupon strong{color:#1673a6;font-weight:650;white-space:nowrap}
+.edu-front .checkout-applied-coupon{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);margin-top:var(--space-4)}
+.edu-front .checkout-applied-coupon span{min-width:0;overflow-wrap:anywhere;color:var(--muted)}
+.edu-front .checkout-payment-summary .cost-total{gap:var(--space-3);flex-wrap:wrap}
+.edu-front .checkout-payment-summary .cost-total strong{font-size:clamp(26px,3vw,34px);white-space:nowrap;margin-left:auto;color:var(--ink)}
 

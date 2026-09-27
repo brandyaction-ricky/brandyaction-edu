@@ -10,7 +10,7 @@ function load(path, dependencies = {}) {
   const exports = {};
   new Function('exports', 'require', code)(exports, name => {
     if (name === '@/lib/submission-review') return submissionReview;
-    if (name === '@/lib/product-visibility') return productVisibility;
+    if (name === '@/lib/coupon-rules') return load('lib/coupon-rules.ts'); if (name === '@/lib/product-visibility') return productVisibility;
     if (name === '@/lib/public-platform-data') return { getPublicPlatformData: async () => ({ data: {}, pagination: null }), getPublicSupport: async () => ({}) };
     if (name === '@/lib/public-platform-plan') return { PUBLIC_CACHE_TAG: 'test' };
     if (name === '@/lib/member-platform-data') return { readMemberPlatformData: async () => ({}) };
@@ -69,6 +69,7 @@ function harness({ missions = [], user = admin } = {}) {
     '@/lib/platform': platform, '@/lib/platform-rules': load('lib/platform-rules.ts'), '@/lib/qa-rules': rules,
     '@/lib/product-metadata': {}, '@/lib/edu-settings': { getEduSettings: async () => ({ operations: {} }) },
     '@/lib/mission-quiz': {}, '@/lib/legal-policies': {}, '@/lib/crm-delivery': { crmDeliveryState: () => ({}) },
+    '@/lib/crm-sms-settings': { loadSmsSettings: async () => ({}), registeredSmsNumbers: () => ({ senders: [], optouts: [] }) },
     '@/lib/operator-permissions': { getOperatorUser: async () => user?.role === 'admin' ? user : null, permissionsFor: async () => user?.permissions || {}, sectionScopes: { home: 'members', customers: 'members', missions: 'products' } },
   });
   return {

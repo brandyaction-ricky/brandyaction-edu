@@ -63,7 +63,7 @@ test("large uploads use signed direct storage and retain client-side limits", ()
 test("admin pagination follows each section primary table and scopes order relations", () => {
   const route = source("app/api/platform/route.ts");
   assert.match(route, /sections\.find\(\(section\) => section\.key === sectionKey\)\?\.table/);
-  assert.match(route, /sectionKey === ['"]orders['"] \? 30 : 100/);
+  assert.match(route, /sectionKey === ['"]orders['"] \? 30 : sectionKey === ['"]weeks['"] \? 1000 : 100/);
   assert.match(route, /deferredOrderTables/);
   assert.match(route, /\.in\(['"]order_id['"], orderIds\)/);
   assert.match(route, /\.in\(['"]payment_id['"], paymentIds\)/);

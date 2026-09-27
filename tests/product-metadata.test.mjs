@@ -177,7 +177,7 @@ test('deletion uses the audited archive transaction and never physically removes
     '@/lib/supabase/admin': { createAdminClient: () => ({ async rpc(name, args) { calls.push([name, args]); return { data: args.p_ids.length, error: null }; } }) },
     '@/lib/supabase/server': {}, '@/lib/server-auth': { getAuthenticatedUser: async () => ({ id: 'operator' }) },
     '@/lib/operator-permissions': { permissionsFor: async () => ({ products: allowed }), sectionScopes: { products: 'products' } },
-    '@/lib/edu-settings': {}, '@/lib/crm-delivery': {},
+    '@/lib/edu-settings': {}, '@/lib/crm-delivery': {}, '@/lib/crm-sms-settings': {},
   });
   const id = '11111111-1111-4111-8111-111111111111';
   const send = ids => route.POST(new Request('https://edu.example/api/platform', { method: 'POST', headers: { origin: 'https://edu.example' }, body: JSON.stringify({ action: 'archive', section: 'products', ids }) }));
@@ -209,7 +209,7 @@ test('new product identifiers are stable across retries of the same creation req
     '@/lib/supabase/admin': { createAdminClient: () => ({ async rpc(name, args) { writes.push([name, args]); return { data: { id: 'new' }, error: null }; } }) },
     '@/lib/supabase/server': {}, '@/lib/server-auth': { getAuthenticatedUser: async () => ({ id: 'operator' }) },
     '@/lib/operator-permissions': { permissionsFor: async () => ({ products: true }), sectionScopes: { products: 'products' } },
-    '@/lib/edu-settings': {}, '@/lib/crm-delivery': {},
+    '@/lib/edu-settings': {}, '@/lib/crm-delivery': {}, '@/lib/crm-sms-settings': {},
   });
   const requestId = '11111111-1111-4111-8111-111111111111';
   for (let i = 0; i < 2; i++) {
@@ -238,7 +238,7 @@ test('new product registration creates its default cohort with the submitted KST
     '@/lib/supabase/admin': { createAdminClient: () => db },
     '@/lib/supabase/server': {}, '@/lib/server-auth': { getAuthenticatedUser: async () => ({ id: 'operator' }) },
     '@/lib/operator-permissions': { permissionsFor: async () => ({ products: true }), sectionScopes: { products: 'products' } },
-    '@/lib/edu-settings': {}, '@/lib/crm-delivery': {},
+    '@/lib/edu-settings': {}, '@/lib/crm-delivery': {}, '@/lib/crm-sms-settings': {},
   });
   const response = await route.POST(new Request('https://edu.example/api/platform', { method: 'POST', headers: { origin: 'https://edu.example' }, body: JSON.stringify({
     action: 'save', section: 'products', requestId: '11111111-1111-4111-8111-111111111111',
@@ -266,7 +266,7 @@ test('product save API persists approved editor metadata and stops if existing m
     '@/lib/supabase/server': {},
     '@/lib/server-auth': { getAuthenticatedUser: async () => ({ id: 'operator' }) },
     '@/lib/operator-permissions': { permissionsFor: async () => ({ products: true }), sectionScopes: { products: 'products' } },
-    '@/lib/edu-settings': {}, '@/lib/crm-delivery': {},
+    '@/lib/edu-settings': {}, '@/lib/crm-delivery': {}, '@/lib/crm-sms-settings': {},
   });
   const send = values => route.POST(new Request('https://edu.example/api/platform', { method: 'POST', headers: { origin: 'https://edu.example' }, body: JSON.stringify({ action: 'save', section: 'products', id: 'product', values }) }));
   assert.equal((await send({ title: '새 상품명', detail_html: '<h2>본문</h2><script>evil()</script>', seo_title: '검색 제목', metadata: { campaign: null } })).status, 200);

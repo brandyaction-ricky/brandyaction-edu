@@ -22,7 +22,8 @@ for (const outcome of ['success', 'error', 'denied'] as const) {
       await route.fulfill({ json: { user, data: { courses: rows, cohorts: [], product_summary: [{ id: 'summary', total: 3, draft: 3 }] }, pagination: { page: 1, pageSize: 100, total: 3 } } });
     });
     await page.goto(`/admin/product-editor?id=${id}&navigationFixture=1`);
-    await expect(page.getByRole('textbox', { name: '상품명 *', exact: true })).toHaveValue('합성 상품 1');
+    await expect(page.getByRole('textbox', { name: '상품명', exact: true })).toHaveValue('합성 상품 1');
+    await expect(page.getByRole('textbox', { name: '상품명', exact: true })).toHaveAttribute('required', '');
     await page.getByRole('button', { name: '목록으로', exact: true }).click();
     await expect(page).toHaveURL(/\/admin\/products$/);
     await expect(page.locator('strong').filter({ hasText: '메뉴 내용을 불러오는 중입니다.' })).toBeVisible();
@@ -41,7 +42,7 @@ for (const outcome of ['success', 'error', 'denied'] as const) {
     await expect(page.getByText('3개 표시 · 전체 3개 · 현재 페이지에서 검색', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: '합성 상품 3', exact: true })).toBeVisible();
     await page.getByRole('button', { name: '합성 상품 2 수정', exact: true }).click();
-    await expect(page.getByRole('textbox', { name: '상품명 *', exact: true })).toHaveValue('합성 상품 2');
+    await expect(page.getByRole('textbox', { name: '상품명', exact: true })).toHaveValue('합성 상품 2');
     await page.getByRole('button', { name: '목록으로', exact: true }).click();
     await expect(page.getByText('3개 표시 · 전체 3개 · 현재 페이지에서 검색', { exact: true })).toBeVisible();
   });

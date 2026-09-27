@@ -149,7 +149,7 @@ test('curriculum can be published independently without losing unsaved product e
     curriculum_weeks: [week], curriculum_lessons: [lesson], lesson_contents: [{ lesson_id: lesson.id, body_text: '기존 학습 본문' }],
   } } }));
   await page.goto('/product-sale-test');
-  await page.getByLabel('상품명 *', { exact: true }).fill('저장 전 상품명');
+  await page.getByRole('textbox', { name: '상품명', exact: true }).fill('저장 전 상품명');
   await expect(page.locator('aside').getByText('판매 중', { exact: true }).first()).toBeVisible();
   await page.getByRole('tab', { name: '커리큘럼', exact: true }).click();
   const panel = page.getByRole('tabpanel', { name: '커리큘럼' });
@@ -170,7 +170,7 @@ test('curriculum can be published independently without losing unsaved product e
   await expect(page.locator('aside').getByText('판매 보류', { exact: true })).toHaveCount(0);
   await expect(page.getByLabel('합성 저장 횟수')).toHaveText('0');
   await page.getByRole('tab', { name: '기본·판매', exact: true }).click();
-  await expect(page.getByLabel('상품명 *', { exact: true })).toHaveValue('저장 전 상품명');
+  await expect(page.getByRole('textbox', { name: '상품명', exact: true })).toHaveValue('저장 전 상품명');
   await expect(page.getByRole('tabpanel', { name: '기본·판매' }).getByRole('button', { name: '공개 커리큘럼 설정하기' })).toHaveCount(0);
 });
 

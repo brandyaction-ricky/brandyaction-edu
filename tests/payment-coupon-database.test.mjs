@@ -19,6 +19,7 @@ const migrations = [
   '20260914063811_configurable_tag_thresholds',
   '20260916074606_repair_payment_coupon_consistency',
   '20260916075611_align_zero_total_checkout',
+  '20260927115057_admin_coupon_lifecycle',
 ];
 
 test('payment and coupon SQL smoke passes against isolated PostgreSQL and rolls back fixtures', async () => {
@@ -52,6 +53,7 @@ test('payment and coupon SQL smoke passes against isolated PostgreSQL and rolls 
       ['00000000-0000-4000-8000-000000000001', 'qa@example.invalid', {}],
     );
     await db.exec(readFileSync(new URL('./payment-coupon-database.sql', import.meta.url), 'utf8'));
+    await db.exec(readFileSync(new URL('./admin-coupon-lifecycle.sql', import.meta.url), 'utf8'));
 
     const { rows } = await db.query(`
       select

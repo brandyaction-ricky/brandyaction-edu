@@ -30,7 +30,7 @@ test('dispatch recruitment branch never queries all members; failed claim sends 
    if(table==='crm_member_tags')throw Error('unscoped audience access');return q;
   }};
   const env={EDU_CONVERSION_REVIEW_ENABLED:'true',CRM_DELIVERY_ENABLED:mode==='disabled'?'false':'true',SOLAPI_API_KEY:'test',SOLAPI_API_SECRET:'test',SOLAPI_SENDER_PHONE:'0200000000',SOLAPI_OPTOUT_PHONE:'0800000000'};
-  const service=load('../lib/crm-delivery.ts',{'@/lib/supabase/admin':{createAdminClient:()=>db},solapi:{SolapiMessageService:class{async getBlacks(){return{blackList:[],nextKey:null};}async send(){steps.push('provider');if(mode==='provider-error')throw Error('sensitive upstream payload');return{groupInfo:{groupId:'qa',status:'accepted'},failedMessageList:[]};}}}},env);
+  const service=load('../lib/crm-delivery.ts',{'@/lib/supabase/admin':{createAdminClient:()=>db},'@/lib/crm-purchase-contact':{},'@/lib/crm-purchase-email':{purchaseEmailConfigured:()=>false},'@/lib/crm-sms-settings':{loadSmsSettings:async()=>({senderPhone:'0200000000',optoutPhone:'0800000000',senderName:'브랜디액션',transactionalEnabled:true,marketingEnabled:true}),marketingAllowedNow:()=>true,marketingText:(content,sender,optout)=>`(광고) ${sender}\n${content}\n무료수신거부 ${optout}`},solapi:{SolapiMessageService:class{async getBlacks(){return{blackList:[],nextKey:null};}async send(){steps.push('provider');if(mode==='provider-error')throw Error('sensitive upstream payload');return{groupInfo:{groupId:'qa',status:'accepted'},failedMessageList:[]};}}}},env);
   await service.dispatchDueCrm();
   if(mode==='disabled')assert.deepEqual(steps,[]);
   else if(mode==='claim-error')assert.equal(steps.includes('provider'),false);

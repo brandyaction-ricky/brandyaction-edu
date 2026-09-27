@@ -5,10 +5,9 @@ import { ArrowRight, Check } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useUnsavedWarning } from '@/features/admin-ui';
+import { AdminButton, AdminEmptyState, AdminFilterBar, AdminLinkButton, AdminQuickFilter, AdminSearchField, AdminSelect, AdminStatusBadge, useUnsavedWarning } from '@/features/admin-ui';
 import { emptyReviewChecks, reviewCheckItems, type ReviewChecks, type ReviewHistory } from '@/lib/submission-review';
 import { timeLabel, type Data, type WorkflowSend } from "../learning-workflows";
-import { Badge, Empty } from "./primitives";
 import { readReviewHistory, SubmissionReviewHistory } from './submission-review-history';
 
 type Submission = Row & { member?: Row; mission?: Row; course?: Row };
@@ -136,51 +135,17 @@ export function SubmissionReview({
   return (
     <>
       {(params.get('member') || params.get('submission')) && <p className="notice mb16">연결된 {params.get('submission') ? '제출물' : '회원'}만 조회 중입니다. <Link href="/admin/reviews" className="text-link">전체 검토 목록</Link></p>}
-      <div className="tabs" aria-label="제출 상태">
-        {states.map((value) => (
-          <button
-            key={value}
-            className={"tab " + (status === value ? "active" : "")}
-            aria-pressed={status === value}
-            disabled={pending}
-            onClick={() => {
-              setStatus(value);
-              setSelected([]);
-              setCurrentId('');
-            }}
-          >
-            {value ? labels[value] : "전체"}{" "}
-            <span>
-              {enriched.filter((row) => !value || row.status === value).length}
-            </span>
-          </button>
-        ))}
-      </div>
-      <div className="toolbar">
-        <input
-          aria-label="제출물 검색"
-          type="search"
-          placeholder="회원명 · 미션명 검색"
-          value={query}
-          disabled={pending}
-          onChange={(event) => { setQuery(event.target.value); setCurrentId(''); }}
-        />
-        <span className="spacer" />
-        <select
-          aria-label="제출물 정렬"
-          value={sort}
-          disabled={pending}
-          onChange={(event) => setSort(event.target.value)}
-        >
-          <option value="old">오래 기다린 순</option>
-          <option value="new">최근 제출순</option>
-        </select>
-      </div>
+      <AdminQuickFilter label="제출 상태" disabled={pending} items={states.map(value => ({ value, label: value ? labels[value] : "전체", count: enriched.filter(row => !value || row.status === value).length }))} value={status} onChange={value => { setStatus(value); setSelected([]); setCurrentId(""); }} />
+      <AdminFilterBar
+        className="admin-review-filter"
+        filters={<AdminSelect label="제출물 정렬" labelHidden value={sort} disabled={pending} onChange={event => setSort(event.target.value)}><option value="old">오래 기다린 순</option><option value="new">최근 제출순</option></AdminSelect>}
+        search={<AdminSearchField label="제출물 검색" placeholder="회원명 · 미션명 검색" value={query} disabled={pending} onChange={event => { setQuery(event.target.value); setCurrentId(""); }} />}
+      />
       <details className="panel pad mb24">
         <summary>여러 제출물 일괄 검토</summary>
         <div className="mt16">
-          <button
-            className="btn small"
+          <AdminButton
+            size="sm" variant="outline"
             onClick={() =>
               setSelected(
                 list
@@ -192,14 +157,14 @@ export function SubmissionReview({
             disabled={pending}
           >
             대기 중인 제출 선택 (최대 50건)
-          </button>
-          <button
-            className="btn small"
+          </AdminButton>
+          <AdminButton
+            size="sm" variant="outline"
             onClick={() => setSelected([])}
             disabled={pending}
           >
             선택 해제
-          </button>
+          </AdminButton>
           <p className="meta mt16">
             목록에서 선택한 {selected.length}건에 같은 검토 결과와 피드백을
             적용합니다. 개별 체크는 저장하지 않고 일괄 처리로 기록합니다.
@@ -265,17 +230,7 @@ export function SubmissionReview({
                   <p>{name(row.mission) || "미션"}</p>
                   <p className="meta">{name(row.course)} · {t(row.member, 'email')}</p>
                   <div className="spread">
-                    <Badge
-                      color={
-                        row.status === "approved"
-                          ? "green"
-                          : row.status === "submitted"
-                            ? "red"
-                            : ""
-                      }
-                    >
-                      {labels[t(row, "status")]}
-                    </Badge>
+                    <AdminStatusBadge status={t(row, "status")} label={labels[t(row, "status")]} />
                     <small>{timeLabel(row.submitted_at)}</small>
                   </div>
                 </button>
@@ -289,7 +244,7 @@ export function SubmissionReview({
                   {(name(current.member) || "회원").slice(0, 1)}
                 </span>
                 <b>{name(current.member) || "회원"}</b>
-                <Badge>{labels[t(current, "status")]}</Badge>
+                <AdminStatusBadge status={t(current, "status")} label={labels[t(current, "status")]} />
               </div>
               <h2 ref={heading} tabIndex={-1}>{name(current.mission) || "미션"}</h2>
               <p className="meta mt8">
@@ -317,15 +272,14 @@ export function SubmissionReview({
                 {safeUrl(object(current, "response").url) && (
                   <div className="answer-block">
                     <label>결과 증빙</label>
-                    <a
-                      className="btn"
+                    <AdminLinkButton
                       href={safeUrl(object(current, "response").url)}
                       target="_blank"
                       rel="noreferrer"
                     >
                       제출 결과물 열기
                       <ArrowRight />
-                    </a>
+                    </AdminLinkButton>
                   </div>
                 )}
                 {Boolean(current.quiz_required) && (
@@ -360,11 +314,11 @@ export function SubmissionReview({
                   <h3>내 미저장 검토 내용</h3><p className="meta">저장 응답을 확인하지 못해 보관한 입력 내용입니다. 서버에 저장된 검토 결과를 덮어쓰지 않습니다.</p>
                   <textarea readOnly rows={4} aria-label="내 미저장 피드백" value={draft.feedback}/>
                   <ul>{reviewCheckItems.map(item => <li key={item.key}>{item.label} · {draft.checks[item.key] ? '확인' : '미확인'}</li>)}</ul>
-                  <button type="button" className="btn small" onClick={() => { if (window.confirm('내 미저장 검토 내용을 지울까요? 저장된 검토 결과는 바뀌지 않습니다.')) setDrafts(previous => Object.fromEntries(Object.entries(previous).filter(([id]) => id !== current.id))); }}>미저장 내용 지우기</button>
+                  <AdminButton size="sm" variant="outline" onClick={() => { if (window.confirm('내 미저장 검토 내용을 지울까요? 저장된 검토 결과는 바뀌지 않습니다.')) setDrafts(previous => Object.fromEntries(Object.entries(previous).filter(([id]) => id !== current.id))); }}>미저장 내용 지우기</AdminButton>
                 </section>}
               </div>
               <aside className="inspector">
-                {current.member?.id && <Link className="btn small mb16" href={`/admin/customers?member=${current.member.id}`}>회원 운영 정보 보기</Link>}
+                {current.member?.id && <AdminLinkButton size="sm" className="mb16" href={`/admin/customers?member=${current.member.id}`}>회원 운영 정보 보기</AdminLinkButton>}
                 {current.status === "submitted" ? <>
                   <h3>검토 대기</h3><p className="meta">답변과 증빙을 확인한 뒤 체크·피드백·결정을 함께 저장하세요. 확인하지 않은 체크가 승인을 자동으로 막지는 않습니다.</p>
                 </> : <>
@@ -402,7 +356,7 @@ export function SubmissionReview({
           </section>
         </div>
       ) : (
-        <Empty title="해당 상태의 제출물이 없습니다." />
+        <AdminEmptyState title="해당 상태의 제출물이 없습니다." />
       )}
     </>
   );
@@ -478,39 +432,39 @@ function DecisionForm({
         </p>
       )}
       {needsRecheck && <div className="notice mt8"><p>중복 저장을 막기 위해 최신 결과를 먼저 확인하세요. 미저장 내용은 자동으로 다시 전송되지 않습니다.</p>
-        <button type="button" className="btn small" disabled={refreshing || pending} onClick={async () => {
+        <AdminButton type="button" size="sm" variant="outline" disabled={refreshing || pending} onClick={async () => {
           setRefreshing(true);
           try { await onRefresh(); setMessage('최신 결과를 확인했습니다. 이미 처리된 건은 다시 검토할 수 없습니다.'); }
           catch (error) { setMessage((error as Error).message); }
           finally { setRefreshing(false); }
-        }}>{refreshing ? '최신 결과 확인 중…' : '최신 결과 확인'}</button>
+        }}>{refreshing ? '최신 결과 확인 중…' : '최신 결과 확인'}</AdminButton>
       </div>}
       <div className="review-actions">
-        <button
-          className="btn"
+        <AdminButton
+          variant="outline" type="submit"
           name="decision"
           value="rejected"
           disabled={pending || disabled || needsRecheck || refreshing}
         >
           반려
-        </button>
-        <button
-          className="btn danger"
+        </AdminButton>
+        <AdminButton
+          variant="danger" type="submit"
           name="decision"
           value="changes_requested"
           disabled={pending || disabled || needsRecheck || refreshing}
         >
           보완 요청
-        </button>
-        <button
-          className="btn primary"
+        </AdminButton>
+        <AdminButton
+          variant="primary" type="submit"
           name="decision"
           value="approved"
           disabled={pending || disabled || needsRecheck || refreshing}
         >
           <Check />
           {bulk ? "선택 제출 승인" : "승인 후 다음"}
-        </button>
+        </AdminButton>
       </div>
     </form>
   );
