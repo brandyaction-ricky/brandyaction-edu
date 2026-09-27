@@ -101,6 +101,13 @@ export function AdminCatalog({
   const tags = useMemo(() => data.crm_tags || [], [data.crm_tags]);
   const lessonById = new Map(lessons.map((item) => [item.id, item]));
   const scopedWeeks = weeks.filter((item) => !course || item.course_id === course).toSorted((a, b) => num(a, "week_number") - num(b, "week_number"));
+  const missionWeekGroups = Array.from(scopedWeeks.reduce((groups, item) => {
+    const courseId = String(item.course_id);
+    groups.set(courseId, [...(groups.get(courseId) || []), item]);
+    return groups;
+  }, new Map<string, Row[]>()).entries()).toSorted(([first], [second]) =>
+    named(courses.find((item) => item.id === first)).localeCompare(named(courses.find((item) => item.id === second)), "ko"),
+  );
   const scopedLessons = lessons.filter((item) => scopedWeeks.some((w) => w.id === item.week_id));
   const quizByMission = new Map((data.mission_quizzes || []).map((item) => [String(item.mission_id), item]));
   const quizCount = (missionId: string) => { const quiz = quizByMission.get(missionId); return Array.isArray(quiz?.questions) ? quiz.questions.length : 0; };
@@ -760,20 +767,32 @@ export function AdminCatalog({
           </div>
           <p className="meta">일차별 미션 · 선택한 상품·주차 기준 · 전체 운영 = 공개 + 비공개 · 보관은 별도 집계합니다.</p>
           {restoreError && <p className="notice" role="alert">{restoreError}</p>}
-          <div className="mission-week-pills" aria-label="미션 주차 선택">
-            <button className={!week ? "pill active" : "pill"} aria-pressed={!week} onClick={() => { setWeek(""); setSelection([]); }}>전체 주차</button>
-            {weeks
-              .filter((item) => !course || item.course_id === course)
-              .map((item) => (
-                <button
-                  className={week === item.id ? "pill active" : "pill"}
-                  key={item.id}
-                  aria-pressed={week === item.id}
-                  onClick={() => { setWeek(item.id); setSelection([]); }}
-                >
-                  {!course && `${named(courses.find(c => c.id === item.course_id))} · `}{num(item, "week_number")}주차
-                </button>
-              ))}
+          <div className="mission-week-picker" aria-label="미션 주차 선택">
+            <div className="mission-week-picker-heading">
+              <strong>상품별 주차</strong>
+              <button className={!week ? "pill active" : "pill"} type="button" aria-pressed={!week} onClick={() => { setWeek(""); setSelection([]); }}>전체 주차</button>
+            </div>
+            {missionWeekGroups.map(([courseId, productWeeks]) => (
+              <section className="mission-product-group" key={courseId}>
+                <div className="mission-product-heading">
+                  <strong>{named(courses.find((item) => item.id === courseId))}</strong>
+                  <span>{productWeeks.length}개 주차</span>
+                </div>
+                <div className="mission-week-pills">
+                  {productWeeks.map((item) => (
+                    <button
+                      className={week === item.id ? "pill active" : "pill"}
+                      type="button"
+                      key={item.id}
+                      aria-pressed={week === item.id}
+                      onClick={() => { setWeek(item.id); setSelection([]); }}
+                    >
+                      {num(item, "week_number")}주차
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ))}
           </div>
         </>
       )}
@@ -811,9 +830,9 @@ export function AdminCatalog({
             ["learning", "missions", "questions"].includes(s.key) ? "" : s.key === "weeks" ? "panel weeks-table-workspace" : "panel"
           }
         >
-          {!["missions", "tags"].includes(s.key) && <div className={s.key === "learning" ? "toolbar learning-filter" : "filter-row"}>
-            {search}
-            <span className="spacer" />
+          {!["missions", "tags"].includes(s.key) && <div className={s.key === "learning" ? "toolbar learning-filter" : s.key === "products" ? "filter-row products-filter-row" : "filter-row"}>
+            {s.key !== "products" && search}
+            {s.key !== "products" && <span className="spacer" />}
             {s.key === "products" && (
               <>
                 <select
@@ -866,6 +885,7 @@ export function AdminCatalog({
               </select></label>
             )}
             {s.key === "questions" ? <select aria-label="질문 처리 상태" value={params.has('question') ? 'selected' : params.get('questionState') || 'active'} onChange={event => { const next = new URLSearchParams(params.toString()); next.set('questionState', event.target.value); next.delete('question'); router.push(`/admin/questions?${next}`); }}>{params.has('question') && <option value="selected" disabled>선택한 질문 · 보관 포함</option>}<option value="active">전체 운영 질문</option><option value="open">미답변</option><option value="answered">답변 완료</option><option value="archived">보관</option></select> : statusFilter}
+            {s.key === "products" && search}
             {s.key === "weeks" && <button className="btn primary weeks-create" type="button" onClick={() => edit(s)}><Plus size={16} aria-hidden="true" />새로 등록</button>}
           </div>}
           {s.key === "weeks" && <p className="meta week-order-help">상품을 선택하면 해당 상품 안에서 주차 순서를 조정할 수 있습니다. 검색·상태 필터를 해제한 뒤 이동해 주세요.</p>}
@@ -964,7 +984,7 @@ export function AdminCatalog({
           ) : (
             <div className="table-scroll mobile-cards admin-legacy-table" role="region" aria-label={`${s.title} 목록`} aria-busy={loading} tabIndex={0}>
               <table>
-                <caption className="sr-only">{s.title} 목록</caption>
+                {!["cohorts", "weeks"].includes(s.key) && <caption className="sr-only">{s.title} 목록</caption>}
                 <thead>
                   <tr>
                     {bulkMode && <th className="selection-column">{selectAll}</th>}

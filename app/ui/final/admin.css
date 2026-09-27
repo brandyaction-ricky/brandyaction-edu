@@ -116,6 +116,16 @@
 .edu-admin .mission-week-pills{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;margin:0 0 var(--space-5)}
 .edu-admin .mission-week-pills .pill{min-height:44px;padding:var(--space-2) var(--space-4)}
 .edu-admin .mission-week-pills .pill span{margin-left:var(--space-2);opacity:.72}
+.edu-admin .mission-week-picker{margin:0 0 var(--space-5);border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff}
+.edu-admin .mission-week-picker-heading,.edu-admin .mission-product-heading{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);padding:10px 16px}
+.edu-admin .mission-week-picker-heading{background:#f2f3f5}
+.edu-admin .mission-week-picker-heading strong,.edu-admin .mission-product-heading strong{font-size:var(--type-small);font-weight:650}
+.edu-admin .mission-week-picker-heading .pill{min-height:34px;padding:5px 12px}
+.edu-admin .mission-product-group{border-top:1px solid var(--line)}
+.edu-admin .mission-product-heading{background:#fafafa;border-bottom:1px solid var(--line)}
+.edu-admin .mission-product-heading span{color:var(--text-secondary);font-size:var(--type-small);white-space:nowrap}
+.edu-admin .mission-product-group .mission-week-pills{margin:0;padding:12px 16px}
+.edu-admin .mission-product-group .mission-week-pills .pill{min-height:36px;padding:6px 12px}
 .edu-admin .mission-catalog{margin-top:0}
 .edu-admin .mission-catalog .week-head{padding-bottom:var(--space-4);border-bottom:1px solid var(--line);margin-bottom:var(--space-4)}
 .edu-admin .mission-catalog .mission-row{width:100%}
@@ -198,11 +208,14 @@
 .edu-admin .weeks-table-workspace table{white-space:nowrap}
 .edu-admin .weeks-table-workspace th{height:44px;padding:10px 16px;background:#fafafa;font-size:13px;font-weight:600}
 .edu-admin .weeks-table-workspace td{height:54px;padding:8px 16px;font-size:13px}
-.edu-admin .weeks-table-workspace .week-group-heading th{height:auto;padding:8px 16px;background:#fff;border-top:1px solid #e5e5e5;color:#525252}
+.edu-admin .weeks-table-workspace .week-group-heading th{height:auto;padding:8px 16px;background:#f2f3f5;border-top:1px solid #e5e5e5;border-bottom:1px solid #e5e5e5;color:#404040}
 .edu-admin .weeks-table-workspace .week-order-actions{gap:6px}
 .edu-admin .weeks-table-workspace .week-order-actions .btn{height:32px;min-height:32px;border-radius:6px}
 .edu-admin .weeks-table-workspace .week-order-actions .iconbtn{width:32px;min-width:32px;height:32px;min-height:32px}
 .edu-admin .weeks-table-workspace .table-foot{padding:12px 16px;border-top:1px solid #e5e5e5}
 .edu-admin .weeks-table-workspace tbody tr:hover{background:#fafafa}
 @media(max-width:720px){.edu-admin .weeks-table-workspace>.filter-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center}.edu-admin .weeks-table-workspace>.filter-row>.catalog-filter-field,.edu-admin .weeks-table-workspace>.filter-row>select{width:100%;min-width:0}.edu-admin .weeks-table-workspace>.filter-row>.search{grid-column:1/-1;width:100%;min-width:0}.edu-admin .weeks-table-workspace>.filter-row>.weeks-create{grid-column:1/-1;width:100%}.edu-admin .weeks-table-workspace .table-scroll.mobile-cards{overflow-x:auto;overflow-y:hidden}.edu-admin .weeks-table-workspace .mobile-cards table,.edu-admin .weeks-table-workspace .mobile-cards tbody{display:table;min-width:860px;white-space:nowrap}.edu-admin .weeks-table-workspace .mobile-cards thead{position:static;width:auto;height:auto;padding:0;overflow:visible;clip:auto;white-space:normal}.edu-admin .weeks-table-workspace .mobile-cards tr{display:table-row;padding:0;border-bottom:0;gap:0}.edu-admin .weeks-table-workspace .mobile-cards td{display:table-cell;width:auto!important;min-width:0!important;white-space:nowrap;padding:8px 12px;border-bottom:1px solid #e5e5e5;overflow-wrap:normal}.edu-admin .weeks-table-workspace .mobile-cards td::before{display:none}.edu-admin .weeks-table-workspace .week-group-heading{display:table-row;padding:0;border:0}.edu-admin .weeks-table-workspace .week-group-heading th{display:table-cell;width:auto;padding:8px 12px}.edu-admin .weeks-table-workspace .week-order-actions{justify-content:flex-end;flex-wrap:nowrap}}
+
+.edu-admin .products-filter-row>.admin-search-field{flex:0 1 340px;width:340px;max-width:100%;margin-left:auto}
+@media(max-width:720px){.edu-admin .products-filter-row>.admin-search-field{flex-basis:100%;width:100%;max-width:none;margin-left:0}}
 

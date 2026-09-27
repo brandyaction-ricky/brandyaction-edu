@@ -247,8 +247,14 @@ test('catalogues and separate editors render without dropping existing fields', 
   assert.match(weekMarkup, /다른 상품 주차 아래로 이동/);
   assert.match(weekMarkup, /weeks-create[\s\S]*?새로 등록/);
   assert.match(weekMarkup, /weeks-table-workspace/);
+  assert.doesNotMatch(weekMarkup, /<caption[^>]*>주차 구성 목록<\/caption>/);
   assert.match(read('app/ui/final/admin.css'), /weeks-table-workspace[\s\S]*?flex:1 1 auto[\s\S]*?overflow-x:auto/);
+  assert.match(read('app/ui/final/admin.css'), /weeks-table-workspace \.week-group-heading th\{[^}]*background:#f2f3f5/);
   const products = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'products') });
+  const productToolbar = products.match(/<div class="filter-row products-filter-row">([\s\S]*?)<\/div>/)?.[1];
+  assert.ok(productToolbar);
+  assert.ok(productToolbar.indexOf('aria-label="상태 필터"') < productToolbar.indexOf('placeholder="상품명 검색"'));
+  assert.match(read('app/ui/final/admin.css'), /products-filter-row>\.admin-search-field\{[^}]*margin-left:auto/);
   assert.match(products, /전체 상품/); assert.match(products, /연결 기수/); assert.match(products, /<th>자료<\/th>/);
   assert.match(products, /공개 점검/); assert.match(read('app/api/platform/route.ts'), /archivedProducts/);
   assert.match(products, /상품 표시 범위/); assert.match(products, /삭제된 상품/);
@@ -256,6 +262,8 @@ test('catalogues and separate editors render without dropping existing fields', 
   assert.ok(products.indexOf('등록된 테스트 클래스 수정') < products.indexOf('등록된 테스트 클래스 삭제'));
   assert.doesNotMatch(products, /PRD-|\/classes\/test-course/);
   assert.doesNotMatch(products, />삭제<\/button>|>수정<\/button>/);
+  const cohorts = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'cohorts') });
+  assert.doesNotMatch(cohorts, /<caption[^>]*>기수·회차 관리 목록<\/caption>/);
   const catalogSource = read('app/ui/final/admin-catalog.tsx');
   assert.match(catalogSource, /action: "restore-products"/); assert.match(catalogSource, /복원\s*<\/button>/);
   const countedProducts = html(AdminCatalog, { ...props, data: { ...data, product_summary: [{ id: 'product-summary', total: 12, published: 7, upcoming: 3, draft: 2 }] }, section: platform.sections.find(row => row.key === 'products') });
@@ -279,6 +287,10 @@ test('catalogues and separate editors render without dropping existing fields', 
   assert.match(learning, /learning-layout/); assert.match(learning, /학습 구성/); assert.match(learning, /lesson-list-item/);
   const missions = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'missions') });
   assert.match(missions, /mission-week-pills/); assert.match(missions, /일차별 미션/); assert.match(missions, /mission-row/);
+  const groupedMissions = html(AdminCatalog, { ...props, data: { ...data, courses: [...data.courses, { id: 'other-course', title: '다른 상품' }], curriculum_weeks: [...data.curriculum_weeks, { id: 'other-week', course_id: 'other-course', week_number: 1, title: '다른 상품 주차' }] }, section: platform.sections.find(row => row.key === 'missions') });
+  assert.match(groupedMissions, /mission-week-picker/);
+  assert.equal((groupedMissions.match(/class="mission-product-group"/g) || []).length, 2);
+  assert.match(groupedMissions, /다른 상품[\s\S]*?1개 주차/);
   assert.match(missions, /콘텐츠 편집/); assert.match(missions, /learning-editor\?id=lesson/);
   const questionMarkup = html(AdminCatalog, { ...props, data: { ...data, edu_questions: [{ id: 'question', title: '답변 필요한 질문', content: '질문 내용', answer: null, status: 'open', created_at: '2026-09-24' }] }, section: platform.sections.find(row => row.key === 'questions') });
   assert.match(questionMarkup, /question-admin-card/); assert.match(questionMarkup, /답변하기/);

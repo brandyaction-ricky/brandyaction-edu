@@ -26,6 +26,16 @@ table{font-size:var(--type-small);font-variant-numeric:tabular-nums;white-space:
 .mission-week-pills{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;margin:0 0 var(--space-5)}
 .mission-week-pills .pill{min-height:44px;padding:var(--space-2) var(--space-4)}
 .mission-week-pills .pill span{margin-left:var(--space-2);opacity:.72}
+.mission-week-picker{margin:0 0 var(--space-5);border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff}
+.mission-week-picker-heading,.mission-product-heading{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);padding:10px 16px}
+.mission-week-picker-heading{background:#f2f3f5}
+.mission-week-picker-heading strong,.mission-product-heading strong{font-size:var(--type-small);font-weight:650}
+.mission-week-picker-heading .pill{min-height:34px;padding:5px 12px}
+.mission-product-group{border-top:1px solid var(--line)}
+.mission-product-heading{background:#fafafa;border-bottom:1px solid var(--line)}
+.mission-product-heading span{color:var(--text-secondary);font-size:var(--type-small);white-space:nowrap}
+.mission-product-group .mission-week-pills{margin:0;padding:12px 16px}
+.mission-product-group .mission-week-pills .pill{min-height:36px;padding:6px 12px}
 .mission-catalog{margin-top:0}
 .mission-catalog .week-head{padding-bottom:var(--space-4);border-bottom:1px solid var(--line);margin-bottom:var(--space-4)}
 .mission-catalog .mission-row{width:100%}
@@ -108,10 +118,13 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .weeks-table-workspace table{white-space:nowrap}
 .weeks-table-workspace th{height:44px;padding:10px 16px;background:#fafafa;font-size:13px;font-weight:600}
 .weeks-table-workspace td{height:54px;padding:8px 16px;font-size:13px}
-.weeks-table-workspace .week-group-heading th{height:auto;padding:8px 16px;background:#fff;border-top:1px solid #e5e5e5;color:#525252}
+.weeks-table-workspace .week-group-heading th{height:auto;padding:8px 16px;background:#f2f3f5;border-top:1px solid #e5e5e5;border-bottom:1px solid #e5e5e5;color:#404040}
 .weeks-table-workspace .week-order-actions{gap:6px}
 .weeks-table-workspace .week-order-actions .btn{height:32px;min-height:32px;border-radius:6px}
 .weeks-table-workspace .week-order-actions .iconbtn{width:32px;min-width:32px;height:32px;min-height:32px}
 .weeks-table-workspace .table-foot{padding:12px 16px;border-top:1px solid #e5e5e5}
 .weeks-table-workspace tbody tr:hover{background:#fafafa}
 @media(max-width:720px){.weeks-table-workspace>.filter-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center}.weeks-table-workspace>.filter-row>.catalog-filter-field,.weeks-table-workspace>.filter-row>select{width:100%;min-width:0}.weeks-table-workspace>.filter-row>.search{grid-column:1/-1;width:100%;min-width:0}.weeks-table-workspace>.filter-row>.weeks-create{grid-column:1/-1;width:100%}.weeks-table-workspace .table-scroll.mobile-cards{overflow-x:auto;overflow-y:hidden}.weeks-table-workspace .mobile-cards table,.weeks-table-workspace .mobile-cards tbody{display:table;min-width:860px;white-space:nowrap}.weeks-table-workspace .mobile-cards thead{position:static;width:auto;height:auto;padding:0;overflow:visible;clip:auto;white-space:normal}.weeks-table-workspace .mobile-cards tr{display:table-row;padding:0;border-bottom:0;gap:0}.weeks-table-workspace .mobile-cards td{display:table-cell;width:auto!important;min-width:0!important;white-space:nowrap;padding:8px 12px;border-bottom:1px solid #e5e5e5;overflow-wrap:normal}.weeks-table-workspace .mobile-cards td::before{display:none}.weeks-table-workspace .week-group-heading{display:table-row;padding:0;border:0}.weeks-table-workspace .week-group-heading th{display:table-cell;width:auto;padding:8px 12px}.weeks-table-workspace .week-order-actions{justify-content:flex-end;flex-wrap:nowrap}}
+
+.products-filter-row>.admin-search-field{flex:0 1 340px;width:340px;max-width:100%;margin-left:auto}
+@media(max-width:720px){.products-filter-row>.admin-search-field{flex-basis:100%;width:100%;max-width:none;margin-left:0}}
