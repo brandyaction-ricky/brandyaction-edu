@@ -23,7 +23,7 @@ import {
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { parseEntrySource, withEntrySource } from '@/lib/entry-source';
+import { loginBeforeCheckout, parseEntrySource, withEntrySource } from '@/lib/entry-source';
 import type { Data } from "../learning-workflows";
 import { EmailAuth } from "../email-auth";
 import { ProductDetailHtml } from './product-detail-html';
@@ -120,7 +120,7 @@ export function AuthView({
 import type { LandingConfig } from "@/lib/landing";
 import { CampaignFreeClass } from "../landing/free-class";
 
-export function ProductDetail({ course, data }: { course: Row; data: Data }) {
+export function ProductDetail({ course, data, user }: { course: Row; data: Data; user?: User | null }) {
   const config = num(course, 'list_price') === 0 ? (data.landing_configs || []).find(row => row.id === course.id) : undefined;
   if (config && productConversion(object(course, 'metadata'), config).url) {
     const frozen = object(config, "course_snapshot");
@@ -128,15 +128,17 @@ export function ProductDetail({ course, data }: { course: Row; data: Data }) {
     const campaignCourse = { ...course, ...frozen, metadata: { ...object(frozen as Row, "metadata"), ...currentMetadata } } as Row;
     return <CampaignFreeClass course={campaignCourse} config={config as unknown as LandingConfig} resources={productResources(currentMetadata)} />;
   }
-  return <StandardProductDetail course={course} data={data} />;
+  return <StandardProductDetail course={course} data={data} signedIn={Boolean(user)} />;
 }
 
 function StandardProductDetail({
   course: c,
   data,
+  signedIn,
 }: {
   course: Row;
   data: Data;
+  signedIn: boolean;
 }) {
   const entrySource = parseEntrySource(useSearchParams().get('src'));
   const type = courseType(c),
@@ -192,7 +194,7 @@ function StandardProductDetail({
   const readyForSale = readinessIssues.length === 0;
   if (!readyForSale) available = undefined;
   const originalConversion = productConversion(meta);
-  const conversion = { ...originalConversion, url: withEntrySource(originalConversion.url, entrySource) };
+  const conversion = { ...originalConversion, url: loginBeforeCheckout(withEntrySource(originalConversion.url, entrySource), signedIn) };
   const customCta = !enrolled && readyForSale && !!conversion.url;
   const price = available ? num(available, "price") : num(c, "list_price");
   const unavailableFree = free && !enrolled;
@@ -203,7 +205,7 @@ function StandardProductDetail({
     : unavailableFree ? '/classes' : available
       ? "/" + (price === 0 ? "apply" : "checkout") + "?cohort=" + available.id
       : "/classes";
-  const href = withEntrySource(baseHref, entrySource);
+  const href = loginBeforeCheckout(withEntrySource(baseHref, entrySource), signedIn);
   const cta = enrolled
     ? digital
       ? "내 자료실로 이동"
