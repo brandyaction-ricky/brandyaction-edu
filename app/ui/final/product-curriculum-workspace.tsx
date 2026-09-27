@@ -100,6 +100,9 @@ export function ProductCurriculumWorkspace({ course, pending, send }: {
   const lessons = (curriculum.curriculum_lessons || [])
     .filter((lesson) => weekIds.has(String(lesson.week_id)) && !lesson.archived_at)
     .sort((a, b) => num(a, "day_number") - num(b, "day_number"));
+  const publishedWeeks = weeks.filter(week => week.is_published === true);
+  const publishedWeekIds = new Set(publishedWeeks.map(week => String(week.id)));
+  const publishedLessons = lessons.filter(lesson => lesson.is_published === true && publishedWeekIds.has(String(lesson.week_id)));
   const [weekTitle, setWeekTitle] = useState("");
   const [weekId, setWeekId] = useState("");
   const [lessonTitle, setLessonTitle] = useState("");
@@ -195,6 +198,16 @@ export function ProductCurriculumWorkspace({ course, pending, send }: {
   return <div className="section-pad product-curriculum-workspace">
     <h2>상품별 커리큘럼</h2>
     <p className="meta">이 상품에 연결된 기존 주차와 일차를 그대로 보여 줍니다. 새 항목은 비공개로 등록되며 항목별로 즉시 저장됩니다.</p>
+    <section className="product-curriculum-guide" aria-label="공개 커리큘럼 준비">
+      <h3>공개 커리큘럼 준비</h3>
+      <p>주차는 수업을 묶는 단위이고, 학습은 그 안의 개별 수업입니다. 유료 클래스는 공개 주차와 그 안의 공개 학습이 각각 하나 이상 있어야 신청할 수 있습니다.</p>
+      <ol><li>주차를 추가하고 아래에서 ‘주차 공개’를 선택해 저장합니다.</li><li>그 주차에 학습을 추가하고 ‘콘텐츠 편집’에서 본문·영상·자료 중 필요한 내용을 저장합니다.</li><li>‘일차 공개’를 선택하고 ‘일차 저장’을 누릅니다.</li></ol>
+      <p className="meta">기수·회차 탭에서는 가격과 모집·교육 일정을 설정합니다. 상세페이지에 적은 목차는 이 공개 설정에 반영되지 않습니다.</p>
+      {!loading && !readError && <div role="status">
+        <p>공개 주차 <b>{publishedWeeks.length}개</b> · 공개 주차 안의 공개 학습 <b>{publishedLessons.length}개</b></p>
+        <p>{publishedWeeks.length && publishedLessons.length ? "공개 커리큘럼 조건을 충족했습니다. 기본·판매 탭에서 나머지 판매 조건도 확인해 주세요." : !weeks.length ? "아래에서 이 상품의 첫 주차를 추가해 주세요." : !publishedWeeks.length ? "아래 주차의 ‘주차 공개’를 선택하고 저장해 주세요." : "공개 주차에 학습을 추가하거나 기존 학습의 콘텐츠와 공개 상태를 확인해 주세요."}</p>
+      </div>}
+    </section>
     {loading && <p className="meta" role="status">상품 커리큘럼을 불러오는 중입니다.</p>}
     {readError && <p className="notice warning" role="alert">{readError} <button className="btn small" type="button" onClick={() => { setLoading(true); setReadVersion((version) => version + 1); }}>다시 시도</button></p>}
     <div className="product-curriculum-create">
