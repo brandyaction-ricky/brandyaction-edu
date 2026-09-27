@@ -1254,7 +1254,7 @@ export function MemberViews({
   order?: string | null;
 }) {
   const enrollments = rows(data, "enrollments"),
-    active = enrollments.filter(hasLearningAccess);
+    active = enrollments.filter(enrollment => hasLearningAccess(enrollment));
   let content;
   switch (section) {
     case "":

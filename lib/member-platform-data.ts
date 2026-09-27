@@ -27,7 +27,7 @@ export async function readMemberPlatformData(userId: string, view: MemberView, e
     let query = db.from('enrollments').select('id,user_id,course_id,cohort_id,status,access_starts_at,access_ends_at,revoked_at,created_at').eq('user_id', userId);
     if (view === 'learn') query = query.eq('id', enrollmentId);
     data.enrollments = checked(await query.order('created_at', { ascending: false }).limit(limit), '수강권');
-    if (view === 'learn' && !data.enrollments.some(hasLearningAccess)) return { enrollments: [] };
+    if (view === 'learn' && !data.enrollments.some(enrollment => hasLearningAccess(enrollment))) return { enrollments: [] };
   }
   if (view === 'questions' || view === 'dashboard') {
     data.edu_questions = checked(await db.from('edu_questions').select('id,user_id,course_id,learning_context,title,content,answer,status,created_at').eq('user_id', userId).eq('is_archived', false).order('created_at', { ascending: false }).limit(limit), '질문');
@@ -74,7 +74,7 @@ export async function readMemberPlatformData(userId: string, view: MemberView, e
     const weekIds = data.curriculum_weeks.map(week => week.id);
     if (weekIds.length) data.curriculum_lessons = checked(await admin.from('curriculum_lessons').select('id,week_id,day_number,title,description,content_type,duration_label,is_preview,is_published,display_order').in('week_id', weekIds).eq('is_published', true).order('display_order').limit(limit), '학습');
   }
-  const active = (data.enrollments || []).filter(hasLearningAccess);
+  const active = (data.enrollments || []).filter(enrollment => hasLearningAccess(enrollment));
   const activeIds = active.map(enrollment => enrollment.id);
   if (activeIds.length && (view === 'dashboard' || view === 'classes' || view === 'learn')) {
     data.lesson_progress = checked(await db.from('lesson_progress').select('id,enrollment_id,lesson_id,completed_at,updated_at').in('enrollment_id', activeIds).limit(limit), '학습 진도');
