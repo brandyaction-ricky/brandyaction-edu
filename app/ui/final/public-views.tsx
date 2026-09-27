@@ -21,7 +21,9 @@ import {
   UserRound,
 } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { parseEntrySource, withEntrySource } from '@/lib/entry-source';
 import type { Data } from "../learning-workflows";
 import { EmailAuth } from "../email-auth";
 import { ProductDetailHtml } from './product-detail-html';
@@ -136,6 +138,7 @@ function StandardProductDetail({
   course: Row;
   data: Data;
 }) {
+  const entrySource = parseEntrySource(useSearchParams().get('src'));
   const type = courseType(c),
     digital = type === "디지털 상품",
     free = type === "무료 클래스";
@@ -188,17 +191,19 @@ function StandardProductDetail({
   const readinessIssues = paidCourseReadinessIssues(c, cohorts);
   const readyForSale = readinessIssues.length === 0;
   if (!readyForSale) available = undefined;
-  const conversion = productConversion(meta);
+  const originalConversion = productConversion(meta);
+  const conversion = { ...originalConversion, url: withEntrySource(originalConversion.url, entrySource) };
   const customCta = !enrolled && readyForSale && !!conversion.url;
   const price = available ? num(available, "price") : num(c, "list_price");
   const unavailableFree = free && !enrolled;
-  const href = enrolled
+  const baseHref = enrolled
     ? digital
       ? "/my/resources"
       : "/learn/" + enrolled.id
     : unavailableFree ? '/classes' : available
       ? "/" + (price === 0 ? "apply" : "checkout") + "?cohort=" + available.id
       : "/classes";
+  const href = withEntrySource(baseHref, entrySource);
   const cta = enrolled
     ? digital
       ? "내 자료실로 이동"
