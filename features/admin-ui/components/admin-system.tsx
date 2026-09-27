@@ -13,6 +13,7 @@ import {
   SlidersHorizontal,
   X,
 } from 'lucide-react';
+import Link from 'next/link';
 import {
   forwardRef,
   cloneElement,
@@ -62,11 +63,17 @@ export const AdminButton = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HT
   const appearance = variant ? `admin-button--variant-${variant}` : `admin-button--${tone || 'tertiary'}`;
   return <button ref={ref} type={type} className={classes('admin-button', appearance, `admin-button--${size}`, className)} disabled={disabled || loading} aria-busy={loading || undefined} {...props}>{loading && <LoaderCircle className="admin-button-spinner" size={16} aria-hidden="true"/>}{children}</button>;
 });
+export function AdminLinkButton({ variant = 'outline', size = 'md', className, ...props }: ComponentProps<typeof Link> & { variant?: AdminButtonVariant; size?: AdminControlSize }) {
+  return <Link className={classes('admin-button', `admin-button--variant-${variant}`, `admin-button--${size}`, className)} {...props} />;
+}
 export const AdminIconButton = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement> & { label: string; tone?: AdminButtonTone; variant?: AdminButtonVariant; size?: AdminControlSize; loading?: boolean }>(function AdminIconButton({ label, tone, variant, className, ...props }, ref) {
   return <AdminButton ref={ref} tone={tone} variant={variant} className={classes('admin-icon-button', className)} aria-label={label} title={label} {...props}/>;
 });
 
 type FieldProps = { label: ReactNode; labelHidden?: boolean; helper?: ReactNode; error?: string };
+export function AdminFormField({ label, helper, error, className, children }: { label: ReactNode; helper?: ReactNode; error?: string; className?: string; children: ReactNode }) {
+  return <label className={classes('admin-field', className)}><span className="admin-field-label field-label">{label}</span>{children}{(error || helper) && <small className={classes('admin-field-help field-hint', error && 'admin-field-error')}>{error || helper}</small>}</label>;
+}
 function FieldShell({ label, labelHidden, helper, error, id, children, inline = false }: FieldProps & { id: string; children: ReactNode; inline?: boolean }) {
   const helpId = helper || error ? `${id}-help` : undefined;
   return <label className={classes('admin-field', inline && 'admin-field--inline')} htmlFor={id}><span className={classes('admin-field-label', labelHidden && 'admin-visually-hidden')}>{label}</span>{children}{helpId && <small id={helpId} className={classes('admin-field-help', error && 'admin-field-error')}>{error || helper}</small>}</label>;
@@ -184,7 +191,7 @@ export function AdminDataTable<Row>({ label, children, className, tableClassName
   return <div className={classes('admin-table-frame', `admin-table-density--${density}`, className)}><p className="admin-table-hint" id={hintId}>표는 좌우로 스크롤할 수 있습니다.</p>{selection && selected.length > 0 && <div className="admin-table-bulk" role="status"><span>{selected.length}개 선택</span>{selection.bulkActions}</div>}{error && (!dataMode || ordered.length > 0) && <AdminInlineError>{error}</AdminInlineError>}<div className={classes('admin-table-scroll', sticky && 'admin-table--sticky')} role="region" aria-label={label} aria-describedby={hintId} aria-busy={loading || undefined} tabIndex={0} {...props}><table className={classes('admin-data-table', tableClassName)}><caption className="admin-visually-hidden">{label}</caption>{tableContent}</table></div>{loading && ordered.length > 0 && <p className="admin-table-loading" role="status">{label} 새로 불러오는 중입니다.</p>}{pagination && <AdminPagination {...pagination}/>}</div>;
 }
 export function AdminTableToolbar({ result, chips, className, children }: { result?: ReactNode; chips?: ReactNode; className?: string; children: ReactNode }) { return <div className={classes('admin-table-toolbar-wrap', className)}><div className="admin-table-toolbar">{children}{result && <span className="admin-toolbar-result">{result}</span>}</div>{chips && <div className="admin-toolbar-chips">{chips}</div>}</div>; }
-export function AdminQuickFilter({ items, value, onChange, label = '빠른 필터' }: { items: readonly { value: string; label: string; count?: number }[]; value: string; onChange: (value: string) => void; label?: string }) { return <div className="admin-quick-filter" role="group" aria-label={label}>{items.map(item => <button type="button" key={item.value} className="admin-quick-filter-item" aria-pressed={item.value === value} onClick={() => onChange(item.value)}>{item.label}{item.count !== undefined && <span>{item.count}</span>}</button>)}</div>; }
+export function AdminQuickFilter({ items, value, onChange, label = '빠른 필터', disabled = false }: { items: readonly { value: string; label: string; count?: number }[]; value: string; onChange: (value: string) => void; label?: string; disabled?: boolean }) { return <div className="admin-quick-filter" role="group" aria-label={label}>{items.map(item => <button type="button" key={item.value} className="admin-quick-filter-item" aria-pressed={item.value === value} disabled={disabled} onClick={() => onChange(item.value)}>{item.label}{item.count !== undefined && <span>{item.count}</span>}</button>)}</div>; }
 export function AdminFilterBar({ filters, status, date, search, action, onReset, onApply, appliedSummary, className }: { filters?: ReactNode; status?: ReactNode; date?: ReactNode; search?: ReactNode; action?: ReactNode; onReset?: () => void; onApply?: () => void; appliedSummary?: ReactNode; className?: string }) {
   return <div className={classes('admin-filter-bar', className)}><div className="admin-filter-bar-controls">{filters && <div className="admin-filter-bar-filters">{filters}</div>}{status && <div className="admin-filter-bar-status">{status}</div>}{date && <div className="admin-filter-bar-date">{date}</div>}{search && <div className="admin-filter-bar-search">{search}</div>}{onReset && <AdminButton variant="ghost" onClick={onReset}>초기화</AdminButton>}{onApply && <AdminButton variant="outline" onClick={onApply}>적용</AdminButton>}{action && <div className="admin-filter-bar-action">{action}</div>}</div>{appliedSummary && <div className="admin-filter-bar-summary">{appliedSummary}</div>}</div>;
 }

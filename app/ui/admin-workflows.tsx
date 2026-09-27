@@ -13,10 +13,10 @@ import {
   type Row,
 } from "@/lib/platform";
 import { localDateTime } from "@/lib/platform-rules";
-import { CalendarDays, Copy, Plus, Trash2, X } from "lucide-react";
+import { CalendarDays, Copy, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { SubmissionReview } from "./final/submission-review";
 import { timeLabel, type Data, type WorkflowSend } from "./learning-workflows";
 import { EnrollmentGrant, RefundAction } from "./operations-actions";
@@ -27,7 +27,10 @@ import {
   AdminDatePicker,
   AdminDrawer,
   AdminEmptyState,
+  AdminErrorState,
   AdminFilterBar,
+  AdminFormField,
+  AdminLinkButton,
   AdminLoadingState,
   AdminPagination,
   AdminQuickFilter,
@@ -71,12 +74,7 @@ function Field({
   label: string;
   children: React.ReactNode;
 }) {
-  return (
-    <label className="field">
-      <span>{label}</span>
-      {children}
-    </label>
-  );
+  return <AdminFormField className="field" label={label}>{children}</AdminFormField>;
 }
 function CrmTemplateFields({ editing }: { editing: Row | null }) {
   const [channel, setChannel] = useState(String(editing?.channel || "sms"));
@@ -312,9 +310,9 @@ function StaffPermissions({ data, send, pending }: Props) {
               </label>
             ))}
           </div>
-          <button className="btn primary mt24" disabled={pending}>
+          <AdminButton variant="primary" type="submit" className="mt24" loading={pending}>
             권한 저장
-          </button>
+          </AdminButton>
         </>
       ) : null}
       <Status message={message} />
@@ -425,17 +423,11 @@ function CrmManager({ section, data, send, pending }: Props) {
           <h2>
             {title} {editing?.id ? "수정" : "등록"}
           </h2>
-          <span className={`badge ${delivery?.enabled ? "green" : ""}`}>
-            {delivery?.enabled
-              ? "외부 발송 활성"
-              : delivery?.configured
-                ? "발송 안전 정지"
-                : "SOLAPI 연결 필요"}
-          </span>
+          <AdminStatusBadge status={delivery?.enabled ? "active" : delivery?.configured ? "paused" : "not_configured"} label={delivery?.enabled ? "외부 발송 활성" : delivery?.configured ? "발송 안전 정지" : "SOLAPI 연결 필요"} />
           {(editing || dirty) && (
-            <button
+            <AdminButton
               type="button"
-              className="btn small"
+              size="sm" variant="outline"
               onClick={() => {
                 setEditing(null);
                 setDirty(false);
@@ -444,7 +436,7 @@ function CrmManager({ section, data, send, pending }: Props) {
               }}
             >
               새로 등록
-            </button>
+            </AdminButton>
           )}
         </div>
         {section === "templates" ? (
@@ -591,9 +583,9 @@ function CrmManager({ section, data, send, pending }: Props) {
               ? "마케팅 수신 동의가 없는 회원은 자동 제외됩니다."
               : "발송 키가 없는 환경에서는 저장만 되고 외부 발송은 실행되지 않습니다."}
         </p>
-        <button className="btn primary mt24" disabled={pending}>
+        <AdminButton variant="primary" type="submit" className="mt24" loading={pending}>
           {section === "campaigns" ? "캠페인 예약" : "저장하기"}
-        </button>
+        </AdminButton>
         <Status message={message} />
       </form>
       {section === "campaigns" && delivery?.configured && process.env.NEXT_PUBLIC_APP_ENV === "development" && (
@@ -602,9 +594,10 @@ function CrmManager({ section, data, send, pending }: Props) {
           <p className="meta mt8">
             설정된 시험번호에만 연결 확인 문자를 1건 보냅니다. 예약 캠페인과 자동 메시지 대기열은 실행하지 않습니다.
           </p>
-          <button
-            type="button"
-            className="btn small mt16"
+          <AdminButton
+            size="sm"
+            variant="outline"
+            className="mt16"
             disabled={testPending}
             onClick={async () => {
               setTestPending(true);
@@ -622,73 +615,23 @@ function CrmManager({ section, data, send, pending }: Props) {
             }}
           >
             {testPending ? "발송 확인 중…" : "시험번호로 문자 1건 보내기"}
-          </button>
+          </AdminButton>
           <Status message={testMessage} />
         </div>
       )}
-      <div className="stack">
-        {items.map((item) => (
-          <article className="panel pad" key={item.id}>
-            <div className="between">
-              <div>
-                <b>{named(item)}</b>
-                <p className="meta mt8">
-                  {section === "templates"
-                    ? `${String(item.channel).toUpperCase()} · ${item.purpose === "marketing" ? "마케팅" : "정보성"}`
-                    : section === "campaigns"
-                      ? `${labels[t(item, "status")] || t(item, "status")} · ${item.scheduled_at ? timeLabel(item.scheduled_at) : "예약 미정"}`
-                      : `${t(item, "trigger_type")} · ${Number(item.delay_minutes || 0)}분 후`}
-                </p>
-                {section === "templates" && item.channel === "alimtalk" && (
-                  <p className="meta mt8">
-                    {item.is_active && item.alimtalk_template_id
-                      ? "발송용으로 사용 중"
-                      : "준비 중 · 실제 발송 안 됨"}
-                  </p>
-                )}
-              </div>
-              <button
-                className="btn small"
-                disabled={
-                  section === "campaigns" &&
-                  (!!item.recruitment_id || ["sending", "completed"].includes(t(item, "status")))
-                }
-                onClick={() => {
-                  setEditing(item);
-                  setDirty(false);
-                  setMessage("");
-                }}
-              >
-                수정
-              </button>
-            </div>
-            {section === "templates" && (
-              <p className="reading-copy mt16">{t(item, "content")}</p>
-            )}
-            {section === "campaigns" && (
-              <p className="meta mt16">
-                {item.recruitment_id ? '모집 연결 안내 · ' : ''}대상 {Number(item.recipient_count || 0)} · 성공{" "}
-                {Number(item.success_count || 0)} · 실패{" "}
-                {Number(item.failure_count || 0)}
-              </p>
-            )}
-            {section === "automations" && (
-              <span className="badge mt16">
-                {item.is_active ? "자동 실행 중" : "중지"}
-              </span>
-            )}
-          </article>
-        ))}
-        {!items.length && (
-          <p className="panel pad muted">
-            {section === "templates"
-              ? "등록된 메시지 템플릿이 없습니다."
-              : section === "campaigns"
-                ? "등록된 예약 캠페인이 없습니다."
-                : "등록된 자동 메시지가 없습니다."}
-          </p>
-        )}
-      </div>
+      <AdminDataTable
+        label={`${title} 목록`}
+        rows={items}
+        getRowId={item => item.id}
+        columns={[
+          { id: "name", header: "이름·내용", render: item => <div className="admin-crm-primary"><strong>{named(item)}</strong>{section === "templates" && <small title={t(item, "content")}>{t(item, "content")}</small>}{section === "campaigns" && <small>{item.recruitment_id ? "모집 연결 안내" : "일반 캠페인"}</small>}</div> },
+          { id: "scope", header: section === "templates" ? "채널·목적" : section === "campaigns" ? "예약 시각" : "실행 조건", render: item => section === "templates" ? `${String(item.channel).toUpperCase()} · ${item.purpose === "marketing" ? "마케팅" : "정보성"}` : section === "campaigns" ? item.scheduled_at ? timeLabel(item.scheduled_at) : "예약 미정" : `${t(item, "trigger_type")} · ${Number(item.delay_minutes || 0)}분 후` },
+          ...(section === "campaigns" ? [{ id: "delivery", header: "발송", render: (item: Row) => `대상 ${Number(item.recipient_count || 0)} · 성공 ${Number(item.success_count || 0)} · 실패 ${Number(item.failure_count || 0)}` }] : []),
+          { id: "status", header: "상태", render: item => <AdminStatusBadge status={section === "campaigns" ? t(item, "status") : item.is_active ? "active" : "inactive"} label={section === "templates" && item.channel === "alimtalk" && (!item.is_active || !item.alimtalk_template_id) ? "준비 중 · 미발송" : section === "automations" ? item.is_active ? "자동 실행 중" : "중지" : undefined} /> },
+          { id: "action", header: "관리", align: "action" as const, render: item => <AdminButton size="sm" variant="outline" disabled={section === "campaigns" && (!!item.recruitment_id || ["sending", "completed"].includes(t(item, "status")))} onClick={() => { setEditing(item); setDirty(false); setMessage(""); }}>수정</AdminButton> },
+        ]}
+        empty={<AdminEmptyState title={section === "templates" ? "등록된 메시지 템플릿이 없습니다." : section === "campaigns" ? "등록된 예약 캠페인이 없습니다." : "등록된 자동 메시지가 없습니다."} />}
+      />
     </>
   );
 }
@@ -810,16 +753,16 @@ function CohortTools({ data, send, pending }: Props) {
                   </b>
                   <small>{timeLabel(s.scheduled_at)}</small>
                 </span>
-                <span className="badge">{s.is_public ? "공개" : "비공개"}</span>
+                <AdminStatusBadge status={s.is_public ? 'published' : 'hidden'} label={s.is_public ? '공개' : '비공개'}/>
               </button>
             ))}
             {!sessions.length && (
               <p className="muted">등록된 라이브 회차가 없습니다.</p>
             )}
             {mode === "schedule" && (
-              <button className="btn mt16" onClick={() => setSession(null)}>
+              <AdminButton className="mt16" onClick={() => setSession(null)}>
                 <Plus size={16} />새 회차
-              </button>
+              </AdminButton>
             )}
           </div>
           <form
@@ -927,9 +870,9 @@ function CohortTools({ data, send, pending }: Props) {
                 </p>
               </>
             )}
-            <button className="btn primary mt16" disabled={pending}>
+            <AdminButton variant="primary" type="submit" className="mt16" loading={pending}>
               {mode === "clone" ? "새 기수 복제" : "회차 저장"}
-            </button>
+            </AdminButton>
             <Status message={message} />
           </form>
         </div>
@@ -1038,16 +981,16 @@ function QuizEditor({
                 onChange={(e) => update(index, { prompt: e.target.value })}
               />
             </Field>
-            <button
-              type="button"
-              className="btn small"
+            <AdminButton
+              size="sm"
+              variant="outline"
               onClick={() =>
                 setQuestions(questions.filter((_, i) => i !== index))
               }
             >
               <Trash2 size={16} />
               삭제
-            </button>
+            </AdminButton>
           </div>
           {q.options.map((choice, i) => (
             <div className="quiz-edit-option" key={i}>
@@ -1078,9 +1021,8 @@ function QuizEditor({
         </fieldset>
       ))}
       <div className="flex gap8 mt16">
-        <button
-          type="button"
-          className="btn"
+        <AdminButton
+          variant="outline"
           disabled={questions.length >= 20}
           onClick={() =>
             setQuestions([
@@ -1096,10 +1038,10 @@ function QuizEditor({
         >
           <Plus size={16} />
           문항 추가
-        </button>
-        <button className="btn primary" disabled={pending}>
+        </AdminButton>
+        <AdminButton variant="primary" type="submit" loading={pending}>
           {questions.length ? "퀴즈 저장" : "퀴즈 해제"}
-        </button>
+        </AdminButton>
       </div>
       <Status message={message} />
     </form>
@@ -1284,9 +1226,9 @@ function Participants() {
       {error ? (
         <div className="notice">
           {error}
-          <button className="btn small" onClick={retry}>
+          <AdminButton size="sm" onClick={retry}>
             다시 시도
-          </button>
+          </AdminButton>
         </div>
       ) : (
         <div className="admin-pilot-workspace" aria-busy={loading}>
@@ -1330,8 +1272,8 @@ function Participants() {
             <label>페이지당 <select aria-label="페이지당 회원 수" value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setLocalPage(1); }}><option value={20}>20명</option><option value={50}>50명</option></select></label>
             <span>{displayedStart}–{displayedEnd} / {currentResultTotal}명</span>
             <div>
-              <button type="button" className="btn small" disabled={loading || page === 1 && localPage === 1} onClick={() => { if (localPage > 1) setLocalPage(localPage - 1); else { setPage(page - 1); setLocalPage(1); } }}>이전</button>
-              <button type="button" className="btn small" disabled={loading || page * totalPageSize >= currentResultTotal && localPage >= localPageCount} onClick={() => { if (localPage < localPageCount) setLocalPage(localPage + 1); else { setPage(page + 1); setLocalPage(1); } }}>다음</button>
+              <AdminButton size="sm" disabled={loading || page === 1 && localPage === 1} onClick={() => { if (localPage > 1) setLocalPage(localPage - 1); else { setPage(page - 1); setLocalPage(1); } }}>이전</AdminButton>
+              <AdminButton size="sm" disabled={loading || page * totalPageSize >= currentResultTotal && localPage >= localPageCount} onClick={() => { if (localPage < localPageCount) setLocalPage(localPage + 1); else { setPage(page + 1); setLocalPage(1); } }}>다음</AdminButton>
             </div>
           </div>
         </div>
@@ -1430,12 +1372,13 @@ function CustomerActions({ data, selection = [], send, pending }: Props) {
             태그 해제
           </label>
         )}
-        <button
-          className="btn primary"
+        <AdminButton
+          variant="primary"
+          type="submit"
           disabled={pending || !selection.length || selection.length > 50}
         >
           선택 회원에 적용
-        </button>
+        </AdminButton>
       </div>
       <p className="meta">
         목록에서 활성 회원을 최대 50명까지 선택하세요. 자동 태그는 구매·수강
@@ -1454,7 +1397,6 @@ function SettingsForm({ section, data, send, pending }: Props) {
   const [message, setMessage] = useState("");
   const [seoTab, setSeoTab] = useState<'search' | 'verification' | 'measurement'>('search');
   const [codeOpen, setCodeOpen] = useState(false);
-  const codeDialogRef = useRef<HTMLDialogElement>(null);
   const [seoDraft, setSeoDraft] = useState(() => ({
     title: String(initial.title || 'BrandyAction EDU | 배운 것을, 내 일의 성과로.'),
     description: String(initial.description || 'AI와 마케팅을 배우고 내 업무에 적용하는 실행 중심 교육.'),
@@ -1472,12 +1414,6 @@ function SettingsForm({ section, data, send, pending }: Props) {
         String(object(a, "value").date),
       ),
     );
-  useEffect(() => {
-    const dialog = codeDialogRef.current;
-    if (!dialog) return;
-    if (codeOpen && !dialog.open) dialog.showModal();
-    if (!codeOpen && dialog.open) dialog.close();
-  }, [codeOpen]);
   async function saveMeasurementCode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -1579,12 +1515,12 @@ function SettingsForm({ section, data, send, pending }: Props) {
               </p>
               </div>
               {seoTab === 'measurement' && <>
-                <div className="between wrap-flex"><div><h2>측정·추가 코드 관리</h2><p className="meta mt8">방문 기록과 무료클래스 광고 측정, 검토 전 추가 코드 초안을 관리합니다.</p></div><button className="btn primary" type="button" onClick={() => setCodeOpen(true)}>+ 추가 코드</button></div>
-                <div className="table-scroll mt24"><table className="data-table"><thead><tr><th>항목</th><th>적용 범위</th><th>관리</th></tr></thead><tbody>
-                  <tr><td><strong>공개 페이지 방문 기록</strong><p className="meta">방문·아티클·클래스 조회와 신청 버튼 클릭</p></td><td>사이트 공개 페이지</td><td><Link className="btn small" href="/admin/settings">운영·트래킹 설정</Link></td></tr>
-                  <tr><td><strong>무료클래스 픽셀·이벤트</strong><p className="meta">클래스별 CTA와 광고 이벤트 측정</p></td><td>선택한 무료클래스</td><td><Link className="btn small" href="/admin/landing">무료클래스 트래킹</Link></td></tr>
-                  {measurementCodes.map(code => <tr key={code.id}><td><strong>{t(code, "name")}</strong><p className="meta">{t(code, "purpose")}</p></td><td>{code.scope === "public" ? "사이트 공개 페이지" : "랜딩페이지만"} · {code.location === "body-end" ? "Body 끝" : "Head"}</td><td><span className="badge amber">초안</span></td></tr>)}
-                </tbody></table></div>
+                <div className="between wrap-flex"><div><h2>측정·추가 코드 관리</h2><p className="meta mt8">방문 기록과 무료클래스 광고 측정, 검토 전 추가 코드 초안을 관리합니다.</p></div><AdminButton variant="primary" type="button" onClick={() => setCodeOpen(true)}>+ 추가 코드</AdminButton></div>
+                <AdminDataTable className="mt24" label="측정·추가 코드 목록"><thead><tr><th>항목</th><th>적용 범위</th><th>관리</th></tr></thead><tbody>
+                  <tr><td><strong>공개 페이지 방문 기록</strong><p className="meta">방문·아티클·클래스 조회와 신청 버튼 클릭</p></td><td>사이트 공개 페이지</td><td><AdminLinkButton size="sm" href="/admin/settings">운영·트래킹 설정</AdminLinkButton></td></tr>
+                  <tr><td><strong>무료클래스 픽셀·이벤트</strong><p className="meta">클래스별 CTA와 광고 이벤트 측정</p></td><td>선택한 무료클래스</td><td><AdminLinkButton size="sm" href="/admin/landing">무료클래스 트래킹</AdminLinkButton></td></tr>
+                  {measurementCodes.map(code => <tr key={code.id}><td><strong>{t(code, "name")}</strong><p className="meta">{t(code, "purpose")}</p></td><td>{code.scope === "public" ? "사이트 공개 페이지" : "랜딩페이지만"} · {code.location === "body-end" ? "Body 끝" : "Head"}</td><td><AdminStatusBadge status="draft" label="초안" tone="warning" /></td></tr>)}
+                </tbody></AdminDataTable>
                 <p className="notice mt24">추가 코드는 초안으로만 저장되며 이 화면이나 고객 페이지에서 실행되지 않습니다. 검토·테스트·승인 후 별도 개발 단계에서 적용합니다.</p>
               </>}
             </>
@@ -1625,14 +1561,13 @@ function SettingsForm({ section, data, send, pending }: Props) {
             <>
               {metric && (
                 <div className="between metrics-edit-actions">
-                  <span className="badge">선택 기록 수정 중</span>
-                  <button
-                    type="button"
-                    className="btn small"
+                  <AdminStatusBadge status="info" label="선택 기록 수정 중" tone="info"/>
+                  <AdminButton
+                    size="sm"
                     onClick={() => { setMetric(null); setPaymentDays([{ day: 0, count: 0 }]); }}
                   >
                     새 기록
-                  </button>
+                  </AdminButton>
                 </div>
               )}
               <div className="grid2">
@@ -1687,9 +1622,9 @@ function SettingsForm({ section, data, send, pending }: Props) {
               </p>
             </>
           )}
-          {(section !== 'seo' || seoTab !== 'measurement') && <button className="btn primary mt24" disabled={pending}>
+          {(section !== 'seo' || seoTab !== 'measurement') && <AdminButton variant="primary" type="submit" className="mt24" loading={pending}>
             {section === 'seo' ? seoTab === 'verification' ? '인증 값 저장' : '검색 정보 저장' : '변경사항 저장'}
-          </button>}
+          </AdminButton>}
           <Status message={message} />
         </form>
         {section !== 'metrics' && (section !== 'seo' || seoTab === 'search') && <aside className="stack">
@@ -1724,10 +1659,9 @@ function SettingsForm({ section, data, send, pending }: Props) {
           </section>
         </aside>}
       </div>
-      <dialog className="drawer measurement-code-drawer" ref={codeDialogRef} aria-label="추가 코드 초안" onCancel={event => { event.preventDefault(); setCodeOpen(false); }} onClose={() => setCodeOpen(false)}>
-        <form className="order-detail-shell" onSubmit={saveMeasurementCode}>
-          <header className="dialog-head"><h2>추가 코드 초안</h2><button type="button" className="iconbtn" aria-label="추가 코드 닫기" onClick={() => setCodeOpen(false)}><X /></button></header>
-          <div className="dialog-body">
+      {codeOpen && <AdminDrawer title="추가 코드 초안" onClose={() => setCodeOpen(false)}>
+        <form className="admin-settings-drawer-form" onSubmit={saveMeasurementCode}>
+          <div className="admin-dialog-body">
             <Field label="코드 이름 *"><input name="name" required maxLength={100} placeholder="용도를 알 수 있는 이름" /></Field>
             <div className="grid2">
               <Field label="삽입 위치"><select name="location" defaultValue="head"><option value="head">Head</option><option value="body-end">Body 끝</option></select></Field>
@@ -1738,12 +1672,11 @@ function SettingsForm({ section, data, send, pending }: Props) {
             <label className="checkline"><input name="confirmed" type="checkbox" required />기존 픽셀 중복·개인정보 전송·적용 권한 확인</label>
             <p className="notice mt16">입력한 코드는 텍스트로만 취급합니다. 운영 적용은 검토·테스트·승인 이후 별도 개발 단계입니다.</p>
           </div>
-          <footer className="dialog-foot"><button className="btn" type="button" onClick={() => setCodeOpen(false)}>취소</button><button className="btn primary" disabled={pending}>입력 내용 확인</button></footer>
+          <footer className="admin-dialog-footer"><AdminButton variant="outline" type="button" onClick={() => setCodeOpen(false)}>취소</AdminButton><AdminButton variant="primary" type="submit" loading={pending}>입력 내용 확인</AdminButton></footer>
         </form>
-      </dialog>
+      </AdminDrawer>}
       {section === "metrics" && (
-        <div className="table-scroll mobile-cards mt24">
-          <table className="data-table">
+        <AdminDataTable className="mt24" label="실측 데이터 목록">
             <thead>
               <tr>
                 {[
@@ -1795,8 +1728,8 @@ function SettingsForm({ section, data, send, pending }: Props) {
                     <td data-label="일차별 결제"><div className="metric-payment-summary">{((Array.isArray(v.paymentDays) ? v.paymentDays : [0,1,2,3,4].map(day => ({ day, count: Number(v[`paymentsDay${day}`] || 0) }))) as Array<{ day: number; count: number }>).map(entry => <span key={entry.day}><b>{Number(entry.day) === 0 ? "당일" : `${entry.day}일차`}</b>{Number(entry.count || 0)}건</span>)}</div></td>
                     <td data-label="메모"><span className="metric-note-cell">{String(v.memo || "—")}</span></td>
                     <td data-label="관리">
-                      <div className="row"><button
-                        className="btn small"
+                      <div className="row"><AdminButton
+                        size="sm" variant="outline"
                         onClick={() => {
                           setMetric(m);
                           const value = object(m, "value");
@@ -1807,17 +1740,14 @@ function SettingsForm({ section, data, send, pending }: Props) {
                         }}
                       >
                         수정
-                      </button><button className="icon-btn danger" aria-label={`${String(v.campaign)} 실측 기록 삭제`} disabled={pending} onClick={async () => { if (!window.confirm(`${String(v.date)} · ${String(v.campaign)} 실측 기록을 삭제할까요?`)) return; await send({ action: "delete-metric", key: m.key }, "실측 기록을 삭제했습니다."); if (metric?.key === m.key) setMetric(null); }}><Trash2 /></button></div>
+                      </AdminButton><AdminButton size="sm" variant="danger" aria-label={`${String(v.campaign)} 실측 기록 삭제`} disabled={pending} onClick={async () => { if (!window.confirm(`${String(v.date)} · ${String(v.campaign)} 실측 기록을 삭제할까요?`)) return; await send({ action: "delete-metric", key: m.key }, "실측 기록을 삭제했습니다."); if (metric?.key === m.key) setMetric(null); }}><Trash2 size={16} aria-hidden="true" /></AdminButton></div>
                     </td>
                   </tr>
                 );
               })}
+              {!metrics.length && <tr><td colSpan={9}><AdminEmptyState compact title="저장된 실측 기록이 없습니다." /></td></tr>}
             </tbody>
-          </table>
-          {!metrics.length && (
-            <p className="pad muted">저장된 실측 기록이 없습니다.</p>
-          )}
-        </div>
+        </AdminDataTable>
       )}
     </>
   );
@@ -1843,40 +1773,19 @@ function Analytics() {
   const paths = (result.paths || []) as Row[];
   return (
     <>
-      <div className="toolbar">
-        <Field label="시작일 (한국 시간)">
-          <input
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-          />
-        </Field>
-        <Field label="종료일">
-          <input
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-          />
-        </Field>
-        <button className="btn" onClick={retry} disabled={loading}>
-          새로고침
-        </button>
-      </div>
+      <AdminFilterBar date={<><AdminDatePicker label="시작일 (한국 시간)" value={from} onChange={event => setFrom(event.target.value)} /><AdminDatePicker label="종료일" value={to} onChange={event => setTo(event.target.value)} /></>} action={<AdminButton variant="outline" onClick={retry} disabled={loading}>새로고침</AdminButton>} />
       {error ? (
-        <Status message={error} />
+        <AdminErrorState onRetry={retry}>{error}</AdminErrorState>
       ) : (
         <>
-          <div className="metrics mb24">
+          <div className="admin-pilot-summary mt24">
             {[
               ["방문 세션", result.visitors || 0],
               ["신청 버튼 클릭 세션", stages.application_click || 0],
               ["기간 내 결제 완료", result.paidOrders || 0],
               ["기간 내 결제 완료액", money(Number(result.revenue || 0))],
             ].map(([label, value]) => (
-              <div className="metric" key={String(label)}>
-                <span>{String(label)}</span>
-                <strong>{String(value)}</strong>
-              </div>
+              <AdminSummaryCard compact key={String(label)} label={String(label)} value={String(value)} scope="선택한 기간" />
             ))}
           </div>
           <p className="meta mb24">
@@ -1905,33 +1814,12 @@ function Analytics() {
               ))}
             </div>
           </section>
-          <div className="table-scroll mobile-cards">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>페이지</th>
-                  <th>조회 수</th>
-                  <th>방문 세션</th>
-                  <th>클릭 수</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paths.map((r) => (
-                  <tr key={t(r, "path")}>
-                    <td data-label="페이지">{t(r, "path")}</td>
-                    <td data-label="조회 수">{t(r, "views")}</td>
-                    <td data-label="방문 세션">{t(r, "visitors")}</td>
-                    <td data-label="클릭 수">{t(r, "clicks")}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {!paths.length && !loading && (
-              <p className="pad muted">
-                수집된 기록이 없습니다. 운영·트래킹 설정에서 수집을 켜 주세요.
-              </p>
-            )}
-          </div>
+          <AdminDataTable label="페이지별 유입 성과" rows={paths} getRowId={row => t(row, "path")} loading={loading} columns={[
+            { id: "path", header: "페이지", value: row => t(row, "path") },
+            { id: "views", header: "조회 수", value: row => Number(row.views || 0), align: "number" },
+            { id: "visitors", header: "방문 세션", value: row => Number(row.visitors || 0), align: "number" },
+            { id: "clicks", header: "클릭 수", value: row => Number(row.clicks || 0), align: "number" },
+          ]} empty={<AdminEmptyState compact title="수집된 기록이 없습니다.">운영·트래킹 설정에서 수집을 켜 주세요.</AdminEmptyState>} />
         </>
       )}
     </>
@@ -2117,7 +2005,7 @@ function OrdersPanel({
               );})}
             </tbody>
         </AdminDataTable>
-        {!orders.length && !loading && <AdminEmptyState title="해당 주문이 없습니다." action={<button className="btn" type="button" onClick={() => { setQuery(""); setStatus(""); setCourse(""); setFrom(""); setTo(""); setAppliedDates({ from: "", to: "" }); setDateError(""); }}>검색·필터 초기화</button>}>현재 조회 페이지의 기간·상품·상태 또는 검색어를 확인하세요.</AdminEmptyState>}
+        {!orders.length && !loading && <AdminEmptyState title="해당 주문이 없습니다." action={<AdminButton onClick={() => { setQuery(""); setStatus(""); setCourse(""); setFrom(""); setTo(""); setAppliedDates({ from: "", to: "" }); setDateError(""); }}>검색·필터 초기화</AdminButton>}>현재 조회 페이지의 기간·상품·상태 또는 검색어를 확인하세요.</AdminEmptyState>}
         {loading && <div className="pad"><AdminLoadingState title="주문 내역을 불러오는 중입니다." description="결제·환불·수강권 연결 상태를 함께 확인하고 있습니다."/></div>}
         <div className="table-foot"><span>{orders.length}건 표시 · 현재 조회 페이지 내 검색·집계</span><span>정산·회계 매출은 결제액과 별도</span></div>
       </section>
@@ -2127,9 +2015,9 @@ function OrdersPanel({
               <h3 className="order-detail-number">{t(selectedOrder, "order_number")}</h3>
               <p className="meta mt8">{timeLabel(selectedOrder.created_at)} · {t(selectedOrder, "customer_name") || "이름 미등록"}</p>
               <div className="order-detail-badges mt16">
-                <span className={`badge ${selectedOrder.status === "paid" ? "green" : selectedOrder.status === "payment_failed" ? "red" : selectedOrder.status === "pending" ? "amber" : ""}`}>{labels[t(selectedOrder, "status")] || t(selectedOrder, "status")}</span>
-                <span className="badge">{selectedCancelled > 0 ? (selectedRemaining ? "부분 환불" : "환불 완료") : "환불 없음"}</span>
-                <span className="badge">{selectedEnrollments.some(enrollment => enrollment.status === "active") ? "수강 가능" : "수강 권한 없음"}</span>
+                <AdminStatusBadge status={t(selectedOrder, 'status')} label={labels[t(selectedOrder, 'status')] || t(selectedOrder, 'status')}/>
+                <AdminStatusBadge status={selectedCancelled > 0 ? selectedRemaining ? 'partially_refunded' : 'refunded' : 'neutral'} label={selectedCancelled > 0 ? selectedRemaining ? '부분 환불' : '환불 완료' : '환불 없음'}/>
+                <AdminStatusBadge status={selectedEnrollments.some(enrollment => enrollment.status === 'active') ? 'active' : 'not_configured'} label={selectedEnrollments.some(enrollment => enrollment.status === 'active') ? '수강 가능' : '수강 권한 없음'}/>
               </div>
               <div className="divider" />
               <section className="order-detail-section">
@@ -2159,15 +2047,15 @@ function OrdersPanel({
                 </ol>
               </section>
               <section className="order-detail-section">
-                <div className="between"><h3>수강 권한</h3><span className="badge">{selectedEnrollments.some(enrollment => enrollment.status === "active") ? "수강 가능" : "권한 없음"}</span></div>
+                <div className="between"><h3>수강 권한</h3><AdminStatusBadge status={selectedEnrollments.some(enrollment => enrollment.status === 'active') ? 'active' : 'not_configured'} label={selectedEnrollments.some(enrollment => enrollment.status === 'active') ? '수강 가능' : '권한 없음'}/></div>
                 {selectedEnrollments.map(enrollment => <div className="setting-line mt16" key={enrollment.id}><span>{named(registeredCourses.find(product => product.id === enrollment.course_id)) || "연결 상품"}</span><b>{enrollment.access_ends_at ? timeLabel(enrollment.access_ends_at) : "기한 제한 없음"}</b></div>)}
                 {!selectedEnrollments.length && <p className="order-detail-notice mt16">결제 실패·입금 대기에는 수강 권한을 부여하지 않습니다. 결제 완료와 권한 회수 결과도 각각 확인할 수 있습니다.</p>}
               </section>
               {selectedPayments.map(payment => <RefundAction key={payment.id} payment={payment} requests={rows(data, "edu_refund_requests")} send={send} pending={pending} />)}
             </div>
             <footer className="dialog-foot">
-              {selectedPayments.map(payment => safeUrl(payment.receipt_url) ? <a className="btn" href={safeUrl(payment.receipt_url)} target="_blank" rel="noreferrer" key={payment.id}>영수증</a> : null)}
-              <button type="button" className="btn" onClick={() => setOpened("")}>닫기</button>
+              {selectedPayments.map(payment => safeUrl(payment.receipt_url) ? <AdminLinkButton href={safeUrl(payment.receipt_url)} target="_blank" rel="noreferrer" key={payment.id}>영수증</AdminLinkButton> : null)}
+              <AdminButton variant="outline" onClick={() => setOpened("")}>닫기</AdminButton>
             </footer>
           </div>
       </AdminDrawer>}

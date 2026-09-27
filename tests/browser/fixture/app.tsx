@@ -19,6 +19,8 @@ import { AdminWorkspace } from '../../../app/ui/admin-workspace';
 import { ProductVisibilityFixture } from './product-visibility';
 import { Platform } from '../../../app/ui/platform';
 import { AdminCatalog } from '../../../app/ui/final/admin-catalog';
+import { ArticleBannerEditor } from '../../../app/ui/final/article-banner-editor';
+import { ArticleCategoryManager } from '../../../app/ui/final/article-category-manager';
 import { sections } from '../../../lib/platform';
 import '../../../app/ui/final/frontend.css';
 import { AdminButton, AdminConfirmDialog, AdminDrawer, AdminEmptyState, AdminInlineError, AdminInput, AdminPage, AdminPageHeader, AdminShell, AdminSuccessState } from '../../../features/admin-ui';
@@ -69,6 +71,27 @@ function WeekCatalogFixture() {
   };
   return <div className="edu-admin"><AdminCatalog section={sections.find(item => item.key === 'weeks')!} data={{ courses: [{ id: 'course-a', title: '합성 상품 A' }, { id: 'course-b', title: '합성 상품 B' }], curriculum_weeks: weeks }} selection={[]} setSelection={() => {}} edit={() => {}} archive={() => {}} pending={false} loading={false} pagination={{ page: 1, pageSize: 1000, total: weeks.length }} setPage={() => {}} exportCsv={() => {}} send={send} /></div>;
 }
+function FullMigrationFixture({ screen }: { screen: 'crm' | 'settings' }) {
+  const send = async () => ({ ok: true });
+  return <div className="edu-admin" style={{ padding: 24 }}>
+    {screen === 'crm' ? <AdminWorkflows section="templates" data={{
+      crm_templates: [
+        { id: 'template-active', name: '결제 안내', channel: 'sms', purpose: 'transactional', content: '결제 확인과 수강 안내 문구', is_active: true },
+        { id: 'template-draft', name: '모집 안내 초안', channel: 'lms', purpose: 'marketing', content: '검토 중인 모집 안내', is_active: false },
+      ],
+      crm_delivery_state: [{ id: 'delivery', enabled: false, configured: false }],
+    }} pending={false} send={send} /> : <AdminWorkflows section="seo" data={{ site_settings: [] }} pending={false} send={send} />}
+  </div>;
+}
+function ArticleMigrationFixture() {
+  const [saved, setSaved] = useState(0);
+  const send = async () => { setSaved(value => value + 1); return { ok: true }; };
+  return <div className="edu-admin" style={{ padding: 24 }}>
+    <ArticleCategoryManager categories={[{ id: 'cat-active', name: '마케팅', slug: 'marketing', display_order: 1, is_active: true }, { id: 'cat-idle', name: '기획', slug: 'planning', display_order: 2, is_active: false }]} articles={[{ id: 'article-1', category_id: 'cat-active' }]} pending={false} send={send}/>
+    <ArticleBannerEditor settings={[]} pending={false} send={send}/>
+    <output aria-label="합성 저장 횟수">{saved}</output>
+  </div>;
+}
 
 function ProductHtmlCtaFixture() {
   const documentSource = '<!doctype html><html><body><a href="#faq">자주 묻는 질문</a><a href="#">무료강의 대기방 입장 →</a><p id="faq">FAQ</p></body></html>';
@@ -77,7 +100,7 @@ function ProductHtmlCtaFixture() {
 const path = window.location.pathname;
 // Destination pages are outside this fixture's scope. Keep them inert so their
 // fallback admin screen cannot rewrite the URL before navigation is asserted.
-const fixture = ['/checkout', '/apply', '/safe-custom', '/learn/enrolled-fixture'].includes(path) ? <main data-testid="navigation-destination" /> : path === '/admin-pilot-orders-test' ? <AdminPilotFixture screen="orders"/> : path === '/admin-pilot-products-test' ? <AdminPilotFixture screen="products"/> : path === '/admin-pilot-editor-test' ? <AdminPilotFixture screen="editor"/> : path === '/admin-component-system-test' ? <AdminComponentsFixture/> : path === '/review-audit-test' ? <SubmissionReviewFixture/> : path === '/retained-member-dialog-test' ? <RetainedMemberDialogFixture/> : ['/member-operations-test', '/admin/customers', '/admin/questions', '/admin/reviews', '/admin/members'].includes(path) ? <MemberOperationsFixture/> : path === '/admin-week-order-test' ? <WeekCatalogFixture/> : path.startsWith('/mission-integrity-test') ? <MissionIntegrityFixture/> : path.startsWith('/admin-shell-test')
+const fixture = ['/checkout', '/apply', '/safe-custom', '/learn/enrolled-fixture'].includes(path) ? <main data-testid="navigation-destination" /> : path === '/admin-pilot-orders-test' ? <AdminPilotFixture screen="orders"/> : path === '/admin-pilot-products-test' ? <AdminPilotFixture screen="products"/> : path === '/admin-pilot-editor-test' ? <AdminPilotFixture screen="editor"/> : path === '/admin-component-system-test' ? <AdminComponentsFixture/> : path === '/admin-full-crm-test' ? <FullMigrationFixture screen="crm" /> : path === '/admin-full-settings-test' ? <FullMigrationFixture screen="settings" /> : path === '/admin-full-articles-test' ? <ArticleMigrationFixture/> : path === '/review-audit-test' ? <SubmissionReviewFixture/> : path === '/retained-member-dialog-test' ? <RetainedMemberDialogFixture/> : ['/member-operations-test', '/admin/customers', '/admin/questions', '/admin/reviews', '/admin/members'].includes(path) ? <MemberOperationsFixture/> : path === '/admin-week-order-test' ? <WeekCatalogFixture/> : path.startsWith('/mission-integrity-test') ? <MissionIntegrityFixture/> : path.startsWith('/admin-shell-test')
   ? <ShellFixture/>
   : path.startsWith('/product-html-cta-test')
     ? <ProductHtmlCtaFixture/>

@@ -48,10 +48,10 @@ test('readonly records paginate without losing focus and preserve archived quest
   await page.getByRole('tab', { name: '학습 기록', exact: true }).click();
   await expect(page.getByText('아직 저장된 기록이 없습니다.', { exact: true })).toBeVisible();
   await page.getByRole('tab', { name: '제출물', exact: true }).click();
-  await page.getByRole('button', { name: '다음 기록', exact: true }).click();
+  await page.getByRole('button', { name: '다음', exact: true }).click();
   await expect(page.getByRole('heading', { name: '첫 실행 미션 21', exact: true })).toBeVisible();
   await expect(page.getByRole('tabpanel', { name: '제출물', exact: true })).toBeFocused();
-  await expect(page.getByRole('button', { name: '다음 기록', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '다음', exact: true })).toBeDisabled();
   await page.getByRole('tab', { name: '질문', exact: true }).click();
   await page.getByRole('link', { name: '질문·답변 보기', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/questions\?question=/);

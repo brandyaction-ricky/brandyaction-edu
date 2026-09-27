@@ -20,7 +20,7 @@ import { publicReadParams } from "@/lib/public-platform-plan";
 import { archiveValues } from "@/lib/qa-rules";
 import { createClient } from "@/lib/supabase/client";
 import { getSupabasePublicConfig } from "@/lib/supabase/config";
-import { ArrowRight, BookOpen, CalendarDays, CreditCard, LayoutDashboard, LogOut, Menu, Pencil, Plus, Search, Ticket, UserRound, X } from "lucide-react";
+import { ArrowRight, CalendarDays, CreditCard, LayoutDashboard, LogOut, Menu, Plus, Search, Ticket, UserRound, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -72,9 +72,14 @@ import { HomeHero } from "./final/home-hero";
 import { MarketingWorkspaceNav } from "./marketing-workspace-nav";
 import { ConversionReview, prefetchConversionReview } from "./conversion-review";
 import {
+  AdminButton,
   AdminEmptyState,
+  AdminIconButton,
   AdminInlineError,
+  AdminLinkButton,
   AdminLoadingState,
+  AdminStatusBadge,
+  AdminQuickFilter,
   AdminToast,
 } from "@/features/admin-ui";
 type Data = Record<string, Row[]>;
@@ -870,7 +875,7 @@ export function Platform({
           loading && id && !edited ? (
             <AdminLoadingState title="편집 정보를 불러오는 중입니다." description="저장된 항목과 공개 상태를 확인하고 있습니다."/>
           ) : id && !edited ? (
-            <AdminEmptyState title="편집할 항목을 찾을 수 없습니다." action={<button className="btn" type="button" onClick={back}>목록으로 돌아가기</button>}>삭제되었거나 현재 계정의 운영 범위 밖에 있는 항목일 수 있습니다.</AdminEmptyState>
+            <AdminEmptyState title="편집할 항목을 찾을 수 없습니다." action={<AdminButton onClick={back}>목록으로 돌아가기</AdminButton>}>삭제되었거나 현재 계정의 운영 범위 밖에 있는 항목일 수 있습니다.</AdminEmptyState>
           ) : key === "product-editor" ? (
             <ProductEditor
               key={edited?.id || "new-product"}
@@ -907,14 +912,14 @@ export function Platform({
               }
             >
               {section.key === "customers" && (
-                <button
-                  className="btn"
+                <AdminButton
+                  variant="outline"
                   onClick={() => downloadCsv(rows("profiles"), "customers")}
                 >
                   현재 페이지 명단 내보내기
-                </button>
+                </AdminButton>
               )}
-              {section.key === "articles" && <Link className="btn" href="/articles" target="_blank">고객 화면 미리보기</Link>}
+              {section.key === "articles" && <AdminLinkButton href="/articles" target="_blank">고객 화면 미리보기</AdminLinkButton>}
               {!standaloneAdmin.includes(section.key) &&
                 !section.readOnly &&
                 section.key !== "weeks" &&
@@ -925,7 +930,7 @@ export function Platform({
                   "mission_submissions",
                   "edu_questions",
                 ].includes(section.table) && (
-                  <button className="btn primary" onClick={() => edit(section)}>
+                  <AdminButton variant="primary" onClick={() => edit(section)}>
                     <Plus />
                     {section.key === "products"
                       ? "상품 등록"
@@ -934,7 +939,7 @@ export function Platform({
                         : section.key === "coupons"
                           ? "쿠폰 만들기"
                         : "새로 등록"}
-                  </button>
+                  </AdminButton>
                 )}
             </AdminHeading>}
             {standaloneAdmin.includes(section.key) ? (
@@ -950,7 +955,7 @@ export function Platform({
               />
             ) : (
               <>
-              {section.key === "articles" && <nav className="article-admin-tabs" aria-label="아티클 관리 구분"><button type="button" className={`btn ${articleAdminTab === "content" ? "dark" : ""}`} aria-pressed={articleAdminTab === "content"} onClick={() => setArticleAdminTab("content")}><Pencil />아티클 콘텐츠</button><button type="button" className={`btn ${articleAdminTab === "banner" ? "dark" : ""}`} aria-pressed={articleAdminTab === "banner"} onClick={() => setArticleAdminTab("banner")}><BookOpen />무료강의 상단 설정</button></nav>}
+              {section.key === "articles" && <AdminQuickFilter label="아티클 관리 구분" items={[{ value: 'content', label: '아티클 콘텐츠' }, { value: 'banner', label: '무료강의 상단 설정' }]} value={articleAdminTab} onChange={value => setArticleAdminTab(value as 'content' | 'banner')}/>}
               {section.key === "articles" && articleAdminTab === "banner" ? <ArticleBannerEditor key={JSON.stringify(object(rows("site_settings").find(row => row.key === "edu_article_banner"), "value"))} settings={rows("site_settings")} send={send} pending={pending} /> : <>{section.key === "articles" && <ArticleCategoryManager categories={rows("article_categories")} articles={rows("articles")} send={send} pending={pending} />}<AdminCatalog
                 key={section.key + scopeQuery}
                 section={section}
@@ -1338,15 +1343,7 @@ export function Editor({
                 : `${section.title} · ${row ? "상세" : "등록"}`}
             </h2>
           </div>
-          <button
-            type="button"
-            className="icon-btn"
-            aria-label="닫기"
-            disabled={pending}
-            onClick={close}
-          >
-            <X />
-          </button>
+          <AdminIconButton label="닫기" disabled={pending} onClick={close}><X size={18}/></AdminIconButton>
         </header>
         <div className="dialog-body">
           {section.readOnly ? (
@@ -1373,17 +1370,17 @@ export function Editor({
                 <CustomerWorkspace member={row} tab={memberTab} onTabChange={setMemberTab}>
                 <div className="customer-detail">
                   <div className="customer-account-summary">
-                    <div className="setting-line"><span>계정 상태</span><span className={`badge ${row.status === "suspended" ? "amber" : "green"}`}>{row.status === "suspended" ? "이용 제한" : "정상"}</span></div>
+                    <div className="setting-line"><span>계정 상태</span><AdminStatusBadge status={row.status === 'suspended' ? 'suspended' : 'active'} label={row.status === 'suspended' ? '이용 제한' : '정상'}/></div>
                     <div className="setting-line"><span>마케팅 수신 동의</span><b>{row.marketing_consent ? "동의" : "미동의"}</b></div>
                     <div className="setting-line"><span>가입일</span><b>{row.created_at ? new Date(String(row.created_at)).toLocaleDateString("ko-KR") : "—"}</b></div>
                   </div>
                   <h3 className="mt24">고객 태그</h3>
                   <div className="tag-list mt8">
-                    {customerTags.length ? customerTags.map((tag) => <span className="badge" key={tag.id}>{t(tag, "name")}</span>) : <span className="meta">등록된 태그가 없습니다.</span>}
+                    {customerTags.length ? customerTags.map((tag) => <AdminStatusBadge status="neutral" label={t(tag, 'name')} key={tag.id}/>) : <span className="meta">등록된 태그가 없습니다.</span>}
                   </div>
                   <div className="row mt16 wrap-flex">
-                    <Link className="btn small" href="/admin/tags">고객 태그 관리</Link>
-                    <button type="button" className="btn small" onClick={() => setMemberTab("enrollments")}>수강권·미션 진행 보기</button>
+                    <AdminLinkButton size="sm" href="/admin/tags">고객 태그 관리</AdminLinkButton>
+                    <AdminButton size="sm" onClick={() => setMemberTab("enrollments")}>수강권·미션 진행 보기</AdminButton>
                   </div>
                   <div className="divider" />
                   <h3 className="mb16">회원 정보·계정 상태 수정</h3>
@@ -1500,37 +1497,16 @@ export function Editor({
         </div>
         <footer className="dialog-foot">
           {deleteMember && memberTab === "profile" && (
-            <button
-              type="button"
-              className="btn danger"
-              disabled={pending}
-              onClick={deleteMember}
-            >
-              회원 삭제
-            </button>
+            <AdminButton variant="danger" disabled={pending} onClick={deleteMember}>회원 삭제</AdminButton>
           )}
           {archive && (
-            <button
-              type="button"
-              className="btn"
-              disabled={pending}
-              onClick={archive}
-            >
-              보관·숨김
-            </button>
+            <AdminButton variant="outline" disabled={pending} onClick={archive}>보관·숨김</AdminButton>
           )}
-          <button
-            type="button"
-            className="btn"
-            disabled={pending}
-            onClick={close}
-          >
-            닫기
-          </button>
+          <AdminButton variant="outline" disabled={pending} onClick={close}>닫기</AdminButton>
           {!section.readOnly && !(section.key === "customers" && row && memberTab !== "profile") && (
-            <button className="btn primary" disabled={pending}>
-              {pending ? "저장 중..." : section.key === "questions" ? row?.answer ? "답변 수정" : "답변 등록" : ["tags", "coupons"].includes(section.key) ? "입력 내용 확인" : "저장하기"}
-            </button>
+            <AdminButton variant="primary" type="submit" loading={pending}>
+              {section.key === "questions" ? row?.answer ? "답변 수정" : "답변 등록" : ["tags", "coupons"].includes(section.key) ? "입력 내용 확인" : "저장하기"}
+            </AdminButton>
           )}
         </footer>
       </form>

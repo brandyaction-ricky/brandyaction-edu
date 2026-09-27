@@ -17,7 +17,7 @@ import {
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { Data } from "../learning-workflows";
-import { AdminSuccessState, adminNavigationIcon } from "@/features/admin-ui";
+import { AdminSuccessState, AdminSummaryCard, PageHeader, adminNavigationIcon } from "@/features/admin-ui";
 
 export { AdminShell } from "@/features/admin-ui";
 
@@ -96,16 +96,7 @@ export function AdminHeading({
   className?: string;
   children?: ReactNode;
 }) {
-  return (
-    <div className={className ? `page-head ${className}` : "page-head"}>
-      <div>
-        {eyebrow && <div className="eyebrow">{eyebrow}</div>}
-        <h1>{title}</h1>
-        {description && <p>{description}</p>}
-      </div>
-      {children && <div className="actions">{children}</div>}
-    </div>
-  );
+  return <PageHeader className={className ? `page-head ${className}` : "page-head"} title={title} description={description} eyebrow={eyebrow} actions={children} />;
 }
 export function Metric({
   label,
@@ -120,20 +111,12 @@ export function Metric({
   highlight?: boolean;
   href?: string;
 }) {
-  const content = (
-    <>
-      <div className="metric-label">{label}</div>
-      <div className="metric-value num">{value}</div>
-      {note && <div className="metric-note">{note}</div>}
-    </>
-  );
+  const content = <AdminSummaryCard compact className={highlight ? "admin-pilot-summary-highlight" : undefined} label={label} value={value} scope={note} />;
   return href ? (
-    <Link className={"metric " + (highlight ? "highlight" : "")} href={href} aria-label={`${label}: ${typeof value === "string" || typeof value === "number" ? value : "상세 보기"}`}>
+    <Link className="admin-metric-link" href={href} aria-label={`${label}: ${typeof value === "string" || typeof value === "number" ? value : "상세 보기"}`}>
       {content}
     </Link>
-  ) : (
-    <div className={"metric " + (highlight ? "highlight" : "")}>{content}</div>
-  );
+  ) : content;
 }
 export function LegacyAdminShell({
   current,
