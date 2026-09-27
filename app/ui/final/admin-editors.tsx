@@ -320,7 +320,7 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
     } catch (cause) { setError((cause as Error).message); }
   }
   return <div className={"product-editor" + (tab === "curriculum" ? " curriculum-editing" : "")}>
-    <AdminHeading title={row ? "상품 수정" : "상품 등록"} description={t(row, "title") || "상품 정보·상세페이지·제공 자료·판매 조건을 입력하세요."} eyebrow="PRODUCT EDITOR">{Boolean(row?.slug) && <Link className="btn" href={"/classes/" + t(row, "slug")} target="_blank">고객 화면 미리보기</Link>}</AdminHeading>
+    <AdminHeading title={row ? "상품 수정" : "상품 등록"} description={t(row, "title") || "상품 정보·상세페이지·제공 자료·판매 조건을 입력하세요."} eyebrow="PRODUCT EDITOR">{row && <Link className="btn" href="/admin/purchase-onboarding">결제 후 안내 설정</Link>}{Boolean(row?.slug) && <Link className="btn" href={"/classes/" + t(row, "slug")} target="_blank">고객 화면 미리보기</Link>}</AdminHeading>
     <form ref={formRef} noValidate onSubmit={submit} onChange={updatePreview}>
       <div className="editor-layout"><div className="editor-main"><section className="panel">
         <div className="tabs" role="tablist" aria-label="상품 편집 영역">{groups.map(([key, label]) => <button key={key} id={"product-tab-" + key} type="button" role="tab" aria-selected={tab === key} aria-controls={"product-panel-" + key} className={"tab " + (tab === key ? "active" : "")} onClick={() => setTab(key)}>{label}</button>)}</div>
