@@ -87,15 +87,17 @@ export function AdminHeading({
   title,
   description,
   eyebrow,
+  className,
   children,
 }: {
   title: string;
   description?: string;
   eyebrow?: string;
+  className?: string;
   children?: ReactNode;
 }) {
   return (
-    <div className="page-head">
+    <div className={className ? `page-head ${className}` : "page-head"}>
       <div>
         {eyebrow && <div className="eyebrow">{eyebrow}</div>}
         <h1>{title}</h1>

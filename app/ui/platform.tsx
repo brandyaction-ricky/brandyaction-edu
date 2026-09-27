@@ -893,9 +893,10 @@ export function Platform({
         ) : (
           <>
             {section.key !== "landing" && <AdminHeading
+              className={section.key === "members" ? "member-mission-heading" : undefined}
               title={finalAdminTitles[section.key] || section.title}
-              description={sectionDescription[section.key]}
-              eyebrow={
+              description={section.key === "members" ? "회원별 미션 제출 및 승인 현황을 관리합니다." : sectionDescription[section.key]}
+              eyebrow={section.key === "members" ? undefined :
                 section.group === "클래스 관리"
                   ? "CLASS MANAGEMENT"
                   : section.group === "고객 관리"

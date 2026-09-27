@@ -1353,3 +1353,116 @@ a.participant-day-card:hover {
   .edu-admin .detail-gallery-actions { grid-column: 2 / -1; flex-direction: row; justify-content: flex-end; }
   .edu-admin .detail-gallery-error { align-items: stretch; flex-direction: column; }
 }
+
+/* Member mission operations: compact filters, a scannable table, and a contextual drawer. */
+.edu-admin .member-mission-heading { align-items: flex-start; margin-bottom: 12px; }
+.edu-admin .member-mission-heading .eyebrow { display: none; }
+.edu-admin .member-mission-heading h1 { font-size: 22px; line-height: 1.3; }
+.edu-admin .member-mission-heading p { margin-top: 5px; font-size: 13px; }
+.edu-admin .participant-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; padding: 10px; border: 1px solid var(--line); background: #fff; }
+.edu-admin .participant-toolbar > select { flex: 0 0 auto; width: auto; min-width: 130px; max-width: 245px; height: 40px; min-height: 40px; padding: 0 30px 0 11px; border-radius: 6px; font-size: 13px; }
+.edu-admin .participant-toolbar > select:first-child { min-width: 220px; }
+.edu-admin .participant-toolbar > select[aria-label="미션 필터"] { min-width: 190px; max-width: 280px; }
+.edu-admin .participant-toolbar > input[type="search"] { flex: 1 1 210px; width: auto; min-width: 170px; height: 40px; min-height: 40px; padding: 0 12px; border-radius: 6px; font-size: 13px; }
+.edu-admin .participant-toolbar .checkline { flex: 0 0 auto; min-height: 40px; margin: 0; gap: 7px; font-size: 12px; white-space: nowrap; }
+.edu-admin .participant-toolbar .checkline input { width: 16px; height: 16px; }
+.edu-admin .participant-context { display: flex; align-items: center; gap: 10px; min-width: 0; margin: 0 0 8px; color: var(--text-secondary); font-size: 12px; }
+.edu-admin .participant-context strong { overflow: hidden; color: var(--text-primary); font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.edu-admin .participant-context > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.edu-admin .participant-summary { display: flex; align-items: stretch; flex-wrap: wrap; margin-bottom: 8px; border: 1px solid var(--line); background: #fff; }
+.edu-admin .participant-summary > div { display: flex; align-items: baseline; gap: 8px; min-height: 50px; padding: 8px 16px; border-right: 1px solid var(--line); }
+.edu-admin .participant-summary > div:last-child { border-right: 0; }
+.edu-admin .participant-summary span { color: var(--text-secondary); font-size: 12px; }
+.edu-admin .participant-summary strong { font-size: 17px; line-height: 1; font-variant-numeric: tabular-nums; }
+.edu-admin .participant-summary small { margin-left: 3px; color: var(--text-secondary); font-size: 11px; font-weight: 400; }
+.edu-admin .participant-quick-filters { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 8px; border-bottom: 1px solid var(--line); }
+.edu-admin .participant-quick-filters button { min-height: 36px; padding: 0 10px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--text-secondary); font-size: 12px; }
+.edu-admin .participant-quick-filters button.active { border-bottom-color: var(--ba-red); color: var(--text-primary); font-weight: 650; }
+.edu-admin .participant-quick-filters button span { margin-left: 6px; color: inherit; font-variant-numeric: tabular-nums; }
+.edu-admin .participant-quick-note { margin-left: auto; color: var(--text-secondary); font-size: 11px; }
+.edu-admin .participant-table-wrap { overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: #fff; }
+.edu-admin .participant-table-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; padding: 5px 12px; border-bottom: 1px solid var(--line); color: var(--text-secondary); font-size: 12px; }
+.edu-admin .participant-table-toolbar label { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+.edu-admin .participant-table-toolbar select { min-height: 30px; height: 30px; padding: 2px 26px 2px 8px; border-radius: 5px; font-size: 12px; }
+.edu-admin .participant-table-scroll { max-height: calc(100dvh - 470px); min-height: 300px; overflow: auto; overscroll-behavior: contain; }
+.edu-admin .participant-table { width: 100%; min-width: 980px; border-collapse: separate; border-spacing: 0; font-size: 12px; }
+.edu-admin .participant-table thead th { position: sticky; top: 0; z-index: 2; height: 38px; padding: 8px 12px; border-bottom: 1px solid var(--line); background: #f7f8fa; color: var(--text-secondary); font-size: 11px; font-weight: 600; text-align: left; white-space: nowrap; }
+.edu-admin .participant-table thead th button { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.edu-admin .participant-table th:nth-child(2), .edu-admin .participant-table td:nth-child(2), .edu-admin .participant-table th:nth-child(3), .edu-admin .participant-table td:nth-child(3), .edu-admin .participant-table th:nth-child(4), .edu-admin .participant-table td:nth-child(4), .edu-admin .participant-table th:nth-child(5), .edu-admin .participant-table td:nth-child(5) { width: 100px; text-align: right; font-variant-numeric: tabular-nums; }
+.edu-admin .participant-table th:nth-child(6), .edu-admin .participant-table td:nth-child(6) { width: 150px; }
+.edu-admin .participant-table th:nth-child(7), .edu-admin .participant-table td:nth-child(7) { width: 125px; }
+.edu-admin .participant-table th:last-child, .edu-admin .participant-table td:last-child { width: 120px; text-align: right; }
+.edu-admin .participant-table-row { height: 52px; cursor: pointer; }
+.edu-admin .participant-table-row td { max-width: 240px; height: 52px; padding: 6px 12px; border-bottom: 1px solid #eceef1; color: var(--text-primary); vertical-align: middle; }
+.edu-admin .participant-table-row:hover td, .edu-admin .participant-table-row:focus td { background: #f8f9fa; }
+.edu-admin .participant-table-row.needs-review td:first-child { box-shadow: inset 3px 0 0 var(--ba-red); }
+.edu-admin .participant-member-link { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; max-width: 100%; padding: 0; border: 0; background: transparent; text-align: left; }
+.edu-admin .participant-member-link strong, .edu-admin .participant-member-link span { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.edu-admin .participant-member-link strong { font-size: 12px; }
+.edu-admin .participant-member-link span { color: var(--text-secondary); font-size: 11px; }
+.edu-admin .participant-table-progress { font-weight: 600; font-variant-numeric: tabular-nums; }
+.edu-admin .participant-review-count { display: inline-grid; min-width: 22px; height: 22px; place-items: center; border-radius: 11px; background: var(--ba-red-soft); color: var(--ba-red-hover); font-weight: 700; }
+.edu-admin .participant-last-activity { overflow: hidden; color: var(--text-secondary) !important; text-overflow: ellipsis; white-space: nowrap; }
+.edu-admin .participant-state-badge { display: inline-flex; align-items: center; min-height: 22px; padding: 2px 7px; border-radius: 4px; background: #f0f2f4; color: #626770; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.edu-admin .participant-state-badge.review { background: #fff0f1; color: #a71922; }
+.edu-admin .participant-state-badge.followup { background: #fff6df; color: #865600; }
+.edu-admin .participant-state-badge.submitted, .edu-admin .participant-state-badge.progress { background: #edf3f9; color: #315e8b; }
+.edu-admin .participant-state-badge.done { background: #eaf5ef; color: #176345; }
+.edu-admin .participant-row-action { display: inline-flex; min-height: 30px; align-items: center; justify-content: center; padding: 0 9px; border: 1px solid var(--line); border-radius: 5px; background: #fff; color: var(--text-primary); font-size: 11px; font-weight: 600; white-space: nowrap; }
+.edu-admin .participant-row-action.primary { border-color: var(--ba-red); background: var(--ba-red); color: #fff; }
+.edu-admin .participant-table-empty { padding: 36px 16px; color: var(--text-secondary); font-size: 13px; text-align: center; }
+.edu-admin .participant-table-skeleton { display: grid; }
+.edu-admin .participant-table-skeleton > div { display: grid; grid-template-columns: 2fr repeat(4, 1fr); align-items: center; gap: 20px; height: 52px; padding: 0 12px; border-bottom: 1px solid #eceef1; }
+.edu-admin .participant-table-skeleton span { height: 12px; border-radius: 4px; background: linear-gradient(90deg,#f0f2f4 25%,#e7e9ed 45%,#f0f2f4 65%); background-size: 300% 100%; animation: participant-loading 1.3s ease infinite; }
+@keyframes participant-loading { to { background-position: -150% 0; } }
+.edu-admin .participant-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 10px; min-height: 48px; padding: 6px 12px; color: var(--text-secondary); font-size: 12px; }
+.edu-admin .participant-pagination label { display: flex; align-items: center; gap: 6px; margin-right: auto; }
+.edu-admin .participant-pagination select { min-height: 30px; height: 30px; padding: 2px 24px 2px 8px; font-size: 12px; }
+.edu-admin .participant-pagination > div { display: flex; gap: 6px; }
+.edu-admin .participant-pagination .btn { min-height: 30px; height: 30px; padding: 0 10px; font-size: 11px; }
+.edu-admin .participant-drawer-layer { position: fixed; inset: 0; z-index: 110; }
+.edu-admin .participant-drawer-backdrop { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #16171966; }
+.edu-admin .participant-drawer { position: absolute; inset: 0 0 0 auto; display: flex; width: min(560px, 100vw); height: 100dvh; flex-direction: column; background: #fff; box-shadow: -12px 0 32px #1617191a; }
+.edu-admin .participant-drawer > header { position: sticky; top: 0; z-index: 1; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 20px 22px; border-bottom: 1px solid var(--line); background: #fff; }
+.edu-admin .participant-drawer > header h2 { font-size: 18px; }
+.edu-admin .participant-drawer > header p { margin-top: 3px; color: var(--text-secondary); font-size: 12px; }
+.edu-admin .participant-drawer-body { overflow: auto; padding: 16px 22px 28px; }
+.edu-admin .participant-drawer-summary { display: grid; grid-template-columns: 1fr 1fr; margin-bottom: 18px; border: 1px solid var(--line); }
+.edu-admin .participant-drawer-summary > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 12px; }
+.edu-admin .participant-drawer-summary > div + div { border-left: 1px solid var(--line); }
+.edu-admin .participant-drawer-summary span, .edu-admin .participant-drawer-week span { color: var(--text-secondary); font-size: 12px; }
+.edu-admin .participant-drawer-summary strong { font-size: 16px; font-variant-numeric: tabular-nums; }
+.edu-admin .participant-drawer-week { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.edu-admin .participant-drawer-week strong { font-size: 14px; }
+.edu-admin .participant-drawer-mission { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px 14px; align-items: center; padding: 14px 0; border-bottom: 1px solid #eceef1; }
+.edu-admin .participant-drawer-mission-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.edu-admin .participant-drawer-mission-copy > span { color: var(--text-secondary); font-size: 11px; }
+.edu-admin .participant-drawer-mission-copy strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.edu-admin .participant-drawer-mission-copy small { color: var(--text-secondary); font-size: 11px; }
+.edu-admin .participant-drawer-mission .participant-row-action { grid-column: 1 / -1; justify-self: start; }
+.edu-admin .participant-member-admin-link { display: inline-flex; margin-top: 18px; color: var(--ba-info); font-size: 12px; font-weight: 600; }
+@media (max-width: 1100px) {
+  .edu-admin .participant-toolbar > select:first-child { min-width: 190px; }
+  .edu-admin .participant-table-scroll { max-height: calc(100dvh - 520px); }
+}
+@media (max-width: 720px) {
+  .edu-admin .participant-toolbar { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .edu-admin .participant-toolbar > select, .edu-admin .participant-toolbar > select:first-child, .edu-admin .participant-toolbar > select[aria-label="미션 필터"] { width: 100%; min-width: 0; max-width: none; }
+  .edu-admin .participant-toolbar > input[type="search"] { grid-column: 1 / -1; width: 100%; min-width: 0; }
+  .edu-admin .participant-toolbar .checkline { grid-column: 1 / -1; }
+  .edu-admin .participant-context { flex-wrap: wrap; }
+  .edu-admin .participant-summary > div { flex: 1 1 45%; min-height: 44px; padding: 7px 10px; }
+  .edu-admin .participant-summary > div:nth-child(2) { border-right: 0; }
+  .edu-admin .participant-summary > div:nth-child(n+3) { border-top: 1px solid var(--line); }
+  .edu-admin .participant-quick-note { flex-basis: 100%; margin: 2px 0 6px; }
+  .edu-admin .participant-table-scroll { max-height: 60vh; min-height: 260px; }
+  .edu-admin .participant-table { min-width: 900px; }
+  .edu-admin .participant-table-toolbar { align-items: flex-start; flex-direction: column; padding: 8px 10px; }
+  .edu-admin .participant-pagination { flex-wrap: wrap; }
+  .edu-admin .participant-pagination label { width: 100%; }
+  .edu-admin .participant-drawer { width: 100vw; }
+  .edu-admin .participant-drawer > header, .edu-admin .participant-drawer-body { padding-right: 16px; padding-left: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .edu-admin .participant-table-skeleton span { animation: none; }
+}
