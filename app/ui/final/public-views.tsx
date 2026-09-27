@@ -312,7 +312,7 @@ function StandardProductDetail({
                     {t(c, "description") || t(c, "summary")}
                   </div>
                 )}
-                {mismatchedFreeContent && <p className="notice mt24">유료 클래스 상세 콘텐츠를 준비하고 있습니다. 무료 클래스 안내와 외부 참여 링크는 노출하지 않습니다.</p>}
+                {mismatchedFreeContent && <p className="notice mt24">클래스 상세 안내를 준비하고 있습니다. 잠시 후 다시 확인해 주세요.</p>}
               </section>
               <section className="detail-section" id="curriculum">
                 <h2>{digital ? "구성 자료" : "학습 방식과 커리큘럼"}</h2>
@@ -451,7 +451,7 @@ function StandardProductDetail({
                 {available && (
                   <p className="meta mb24">{t(available, "name")}</p>
                 )}
-                {!enrolled && readinessIssues.length > 0 && <p className="notice mb24">판매 준비 중입니다. {readinessIssues.join(" · ")} 정보를 확인하고 있습니다.</p>}
+                {!enrolled && readinessIssues.length > 0 && <p className="notice mb24">수강 신청을 준비하고 있습니다. 모집이 시작되면 이 페이지에서 신청할 수 있습니다.</p>}
                 {button}
               </div>
             </aside>
