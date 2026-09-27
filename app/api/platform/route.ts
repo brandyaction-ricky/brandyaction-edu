@@ -9,6 +9,7 @@ import { adminTables, archiveValues, cohortStatus, phoneNumber, validImage, asse
 import { POLICY_VERSION } from '@/lib/legal-policies';
 import { getOperatorUser, permissionsFor, sectionScopes } from '@/lib/operator-permissions';
 import { crmDeliveryState } from '@/lib/crm-delivery';
+import { loadSmsSettings, registeredSmsNumbers } from '@/lib/crm-sms-settings';
 import { mergeProductDigitalSections, mergeProductMetadata, mergeProductResources, productDigitalSections, productMetadataFields, productResources, productResourceScopes } from '@/lib/product-metadata';
 const reply = (data: unknown, status = 200) =>
     Response.json(data, {
@@ -259,7 +260,10 @@ export async function GET(request: Request) {
             }
         }
         if (adminMode) {
-            if (['templates', 'campaigns', 'automations'].includes(sectionKey)) data.crm_delivery_state = [crmDeliveryState() as unknown as Row];
+            if (['templates', 'campaigns', 'automations'].includes(sectionKey)) {
+                data.crm_delivery_state = [crmDeliveryState() as unknown as Row];
+                data.crm_sms_settings = [{ ...await loadSmsSettings(), ...registeredSmsNumbers(), canConfigure: operator?.role === 'admin' } as unknown as Row];
+            }
         }
         const { operations } = await settings;
         if (adminMode && data.site_settings) {

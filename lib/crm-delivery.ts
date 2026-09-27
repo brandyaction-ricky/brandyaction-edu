@@ -1,6 +1,8 @@
 import { SolapiMessageService, type MessageSchema } from "solapi";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { purchaseContact, purchaseGuideLink } from "@/lib/crm-purchase-contact";
+import { maskEmail, purchaseEmailConfigured, sendPurchaseEmail } from "@/lib/crm-purchase-email";
+import { loadSmsSettings, marketingAllowedNow, marketingText, nextMarketingWindow, type SmsSettings } from "@/lib/crm-sms-settings";
 
 type Template = {
   id: string;
@@ -28,24 +30,27 @@ const render = (content: string, member: Member) =>
     .replaceAll("{{email}}", member.email || "")
     .replaceAll("#{이름}", member.full_name || "회원");
 
-function provider() {
+function provider(senderPhone = process.env.SOLAPI_SENDER_PHONE) {
   const key = process.env.SOLAPI_API_KEY;
   const secret = process.env.SOLAPI_API_SECRET;
-  const sender = digits(process.env.SOLAPI_SENDER_PHONE);
+  const sender = digits(senderPhone);
   if (process.env.CRM_DELIVERY_ENABLED !== "true" || !key || !secret || !sender)
     return null;
   return { service: new SolapiMessageService(key, secret), sender };
 }
 
 export function crmDeliveryState() {
-  const configured = Boolean(
+  const smsConfigured = Boolean(
     process.env.SOLAPI_API_KEY &&
     process.env.SOLAPI_API_SECRET &&
     digits(process.env.SOLAPI_SENDER_PHONE),
   );
+  const emailConfigured = Boolean(process.env.RESEND_API_KEY && process.env.CRM_EMAIL_FROM);
   return {
-    enabled: process.env.CRM_DELIVERY_ENABLED === "true" && configured,
-    configured,
+    enabled: process.env.CRM_DELIVERY_ENABLED === "true" && (smsConfigured || emailConfigured),
+    configured: smsConfigured || emailConfigured,
+    smsConfigured,
+    emailConfigured,
   };
 }
 
@@ -53,6 +58,7 @@ function message(
   template: Template,
   member: Member,
   sender: string,
+  settings: SmsSettings,
 ): MessageSchema {
   const content = render(template.content, member);
   if (template.channel === "alimtalk") {
@@ -70,18 +76,13 @@ function message(
       },
     };
   }
-  if (template.purpose === "marketing" && !process.env.SOLAPI_OPTOUT_PHONE)
-    throw new Error("광고 메시지 무료수신거부 번호가 설정되지 않았습니다.");
-  const optout =
-    template.purpose === "marketing"
-      ? `\n무료수신거부 ${process.env.SOLAPI_OPTOUT_PHONE}`
-      : "";
-  const advertising =
-    template.purpose === "marketing" ? "(광고) 브랜디액션\n" : "";
+  const text = template.purpose === "marketing"
+    ? marketingText(content, settings.senderName, settings.optoutPhone)
+    : content;
   return {
     to: digits(member.phone),
     from: sender,
-    text: advertising + content + optout,
+    text,
     type: template.channel === "lms" ? "LMS" : "SMS",
     autoTypeDetect: false,
   };
@@ -105,22 +106,32 @@ export async function paidOrderRecipient(
 }
 
 export function purchaseTemplateForRun(template: Template, triggerKey: string): Template {
+  const link = purchaseLinkForRun(triggerKey);
+  return { ...template, content: template.content.replaceAll("{{purchase_link}}", link) };
+}
+
+function purchaseLinkForRun(triggerKey: string) {
   const orderId = triggerKey.slice("purchase_completed:".length);
   const link = purchaseGuideLink(orderId, {
     siteUrl: process.env.CRM_SITE_URL || (process.env.NEXT_PUBLIC_APP_ENV === "production"
       ? "https://brandyaction-edu.com" : "https://brandyaction-edu-dev.vercel.app"),
     guideEnabled: process.env.CRM_PURCHASE_GUIDE_ENABLED === "true",
   });
-  return { ...template, content: template.content.replaceAll("{{purchase_link}}", link) };
+  return link;
 }
 
 async function sendBatch(
   template: Template,
   members: Member[],
   context: { campaignId?: string; automationRuns?: Record<string, string> },
+  settings: SmsSettings,
 ) {
-  const active = provider();
+  const active = provider(settings.senderPhone);
   if (!active) return { sent: 0, failed: 0, disabled: true };
+  if (template.purpose === "marketing" && (!settings.marketingEnabled || !marketingAllowedNow()))
+    throw new Error("광고 문자는 허용 상태이며 한국 시간 오전 8시~오후 9시에만 발송할 수 있습니다.");
+  if (template.purpose === "transactional" && !settings.transactionalEnabled)
+    throw new Error("정보성 문자 발송이 관리자 설정에서 중지됐습니다.");
   const eligible = members.filter(
     (member) =>
       member.status === "active" &&
@@ -145,7 +156,7 @@ async function sendBatch(
   if (inserted.error) throw inserted.error;
   try {
     const response = await active.service.send(
-      eligible.map((member) => message(template, member, active.sender)),
+      eligible.map((member) => message(template, member, active.sender, settings)),
     );
     const groupId = response.groupInfo.groupId;
     const ids = inserted.data.map((log) => log.id);
@@ -203,25 +214,72 @@ async function sendBatch(
   }
 }
 
+async function sendPurchaseEmailWithLog(runId: string, triggerKey: string, member: Member) {
+  const db = createAdminClient();
+  const email = member.email || "";
+  const inserted = await db.from("crm_message_logs").insert({
+    automation_run_id: runId,
+    member_id: member.id,
+    channel: "email",
+    recipient_masked: maskEmail(email),
+    status: "processing",
+  }).select("id").single();
+  if (inserted.error) throw inserted.error;
+  try {
+    const providerId = await sendPurchaseEmail({
+      email,
+      name: member.full_name || "회원",
+      purchaseLink: purchaseLinkForRun(triggerKey),
+      automationRunId: runId,
+    });
+    await db.from("crm_message_logs").update({
+      status: "accepted",
+      provider_status: "accepted",
+      provider_group_id: providerId,
+      sent_at: new Date().toISOString(),
+    }).eq("id", inserted.data.id);
+    return providerId;
+  } catch (error) {
+    await db.from("crm_message_logs").update({
+      status: "failed",
+      provider_status: "failed",
+      error_message: error instanceof Error ? error.message.slice(0, 500) : "이메일 접수 실패",
+    }).eq("id", inserted.data.id);
+    throw error;
+  }
+}
+
 export async function dispatchDueCrm() {
-  if (!provider())
+  if (process.env.CRM_DELIVERY_ENABLED !== "true")
+    return { disabled: true, campaigns: 0, automations: 0, sent: 0, failed: 0 };
+  const smsSettings = await loadSmsSettings();
+  const smsAvailable = Boolean(provider(smsSettings.senderPhone));
+  if (!smsAvailable && !purchaseEmailConfigured())
     return { disabled: true, campaigns: 0, automations: 0, sent: 0, failed: 0 };
   const db = createAdminClient();
   let sent = 0,
     failed = 0,
     campaigns = 0,
     automations = 0;
-  const campaignQuery = await db
+  const campaignQuery = smsAvailable ? await db
     .from("crm_campaigns")
     .select("*,template:crm_templates(*)")
     .eq("status", "scheduled")
     .lte("scheduled_at", new Date().toISOString())
     .order("scheduled_at")
     .limit(1)
-    .maybeSingle();
+    .maybeSingle() : { data: null, error: null };
   if (campaignQuery.error) throw campaignQuery.error;
   const campaign = campaignQuery.data;
-  if (campaign) {
+  const campaignPurpose = campaign ? (campaign.template as Template).purpose : null;
+  const campaignReady = campaign && (campaignPurpose === "marketing"
+    ? smsSettings.marketingEnabled && marketingAllowedNow()
+    : smsSettings.transactionalEnabled);
+  if (campaign && campaignPurpose === "marketing" && smsSettings.marketingEnabled && !marketingAllowedNow()) {
+    await db.from("crm_campaigns").update({ scheduled_at: nextMarketingWindow() })
+      .eq("id", campaign.id).eq("status", "scheduled");
+  }
+  if (campaignReady) {
     const locked = await db
       .from("crm_campaigns")
       .update({ status: "sending", error_message: null })
@@ -261,6 +319,7 @@ export async function dispatchDueCrm() {
           campaign.template as Template,
           memberResult.data,
           { campaignId: campaign.id },
+          smsSettings,
         );
         sent += result.sent;
         failed += result.failed;
@@ -290,17 +349,32 @@ export async function dispatchDueCrm() {
       }
     }
   }
-  const runResult = await db
+  let runQuery = db
     .from("crm_automation_runs")
     .select(
       "*,automation:crm_automations(*,template:crm_templates(*)),member:profiles(id,phone,full_name,email,marketing_consent,status)",
     )
     .eq("status", "pending")
-    .lte("scheduled_for", new Date().toISOString())
+    .lte("scheduled_for", new Date().toISOString());
+  if (!smsAvailable) runQuery = runQuery.like("trigger_key", "purchase_completed:%");
+  const runResult = await runQuery
     .order("scheduled_for")
     .limit(100);
   if (runResult.error) throw runResult.error;
   for (const run of runResult.data) {
+    const purchaseRun = run.automation.trigger_type === "purchase_completed" &&
+      run.automation.template.purpose === "transactional";
+    if (!smsAvailable && !purchaseRun) continue;
+    const purpose = run.automation.template.purpose;
+    if (purpose === "marketing") {
+      if (!smsSettings.marketingEnabled) continue;
+      if (!marketingAllowedNow()) {
+        await db.from("crm_automation_runs").update({ scheduled_for: nextMarketingWindow() })
+          .eq("id", run.id).eq("status", "pending");
+        continue;
+      }
+    }
+    if (purpose === "transactional" && !purchaseRun && !smsSettings.transactionalEnabled) continue;
     const locked = await db
       .from("crm_automation_runs")
       .update({ status: "processing", error_message: null })
@@ -310,18 +384,56 @@ export async function dispatchDueCrm() {
       .maybeSingle();
     if (!locked.data) continue;
     try {
-      const purchaseRun = run.automation.trigger_type === "purchase_completed" &&
-        run.automation.template.purpose === "transactional";
       const recipient = purchaseRun
         ? await paidOrderRecipient(run, run.member as Member)
         : run.member as Member;
       const template = purchaseRun
         ? purchaseTemplateForRun(run.automation.template as Template, run.trigger_key)
         : run.automation.template as Template;
+      if (purchaseRun && recipient) {
+        let smsSent = false;
+        let groupId: string | undefined;
+        let smsError = "문자 수신번호 또는 발송 설정이 없습니다.";
+        if (smsAvailable && smsSettings.transactionalEnabled && /^0\d{8,10}$/.test(digits(recipient.phone))) {
+          try {
+            const sms = await sendBatch(template, [recipient], {
+              automationRuns: { [run.member_id]: run.id },
+            }, smsSettings);
+            smsSent = sms.sent === 1;
+            groupId = sms.groupId;
+            if (!smsSent) smsError = "SOLAPI 문자 접수에 실패했습니다.";
+          } catch (error) {
+            smsError = error instanceof Error ? error.message.slice(0, 500) : "SOLAPI 문자 접수 실패";
+          }
+        }
+        if (smsSent) {
+          await db.from("crm_automation_runs").update({
+            status: "accepted", provider_group_id: groupId || null,
+            executed_at: new Date().toISOString(), error_message: null,
+          }).eq("id", run.id);
+          sent += 1;
+        } else if (purchaseEmailConfigured() && recipient.email) {
+          const emailId = await sendPurchaseEmailWithLog(run.id, run.trigger_key, recipient);
+          await db.from("crm_automation_runs").update({
+            status: "accepted", provider_group_id: emailId,
+            executed_at: new Date().toISOString(), error_message: null,
+          }).eq("id", run.id);
+          sent += 1;
+        } else {
+          await db.from("crm_automation_runs").update({
+            status: "failed", executed_at: new Date().toISOString(),
+            error_message: `${smsError} 이메일 주소 또는 Resend 설정을 확인해 주세요.`.slice(0, 500),
+          }).eq("id", run.id);
+          failed += 1;
+        }
+        automations += 1;
+        continue;
+      }
       const result = await sendBatch(
         template,
         recipient ? [recipient] : [],
         { automationRuns: { [run.member_id]: run.id } },
+        smsSettings,
       );
       const status = result.sent ? "accepted" : "skipped";
       await db

@@ -264,6 +264,7 @@ function CrmManager({ section, data, send, pending }: Props) {
         ? "crm_campaigns"
         : "crm_automations";
   const delivery = rows(data, "crm_delivery_state")[0];
+  const smsSettings = rows(data, "crm_sms_settings")[0];
   const items = rows(data, table);
   const templates = rows(data, "crm_templates").filter(
     (item) => item.is_active,
@@ -345,6 +346,43 @@ function CrmManager({ section, data, send, pending }: Props) {
   const formKey = `${section}-${editing?.id || "new"}`;
   return (
     <>
+      <form className="panel pad mb24" onSubmit={async (event) => {
+        event.preventDefault();
+        const form = new FormData(event.currentTarget);
+        try {
+          await send({ action: "crm-sms-config", values: {
+            senderPhone: form.get("sender_phone"),
+            optoutPhone: form.get("optout_phone"),
+            senderName: form.get("sender_name"),
+            transactionalEnabled: form.get("transactional_enabled") === "on",
+            marketingEnabled: form.get("marketing_enabled") === "on",
+          } }, "문자 발송 설정을 저장했습니다.");
+          setMessage("문자 발송 설정을 저장했습니다.");
+        } catch (error) { setMessage((error as Error).message); }
+      }}>
+        <h2>문자 발송 설정</h2>
+        <p className="meta mt8">발신번호와 080 번호는 SOLAPI에 등록된 번호만 선택할 수 있습니다. 설정한 번호는 발송 전 최종 확인합니다.</p>
+        <div className="grid2 mt24">
+          <Field label="문자 발신번호">
+            <select name="sender_phone" defaultValue={String(smsSettings?.senderPhone || "")} disabled={!smsSettings?.canConfigure}>
+              {(smsSettings?.senders as string[] || []).map((number) => <option key={number} value={number}>{number}</option>)}
+            </select>
+          </Field>
+          <Field label="발신자명 (광고 문자에 표시)">
+            <input name="sender_name" maxLength={40} defaultValue={String(smsSettings?.senderName || "브랜디액션")} disabled={!smsSettings?.canConfigure} />
+          </Field>
+          <Field label="080 무료수신거부 번호">
+            <select name="optout_phone" defaultValue={String(smsSettings?.optoutPhone || "")} disabled={!smsSettings?.canConfigure}>
+              <option value="">등록된 번호 없음</option>
+              {(smsSettings?.optouts as string[] || []).map((number) => <option key={number} value={number}>{number}</option>)}
+            </select>
+          </Field>
+        </div>
+        <label className="checkline mt16"><input type="checkbox" name="transactional_enabled" defaultChecked={Boolean(smsSettings?.transactionalEnabled)} disabled={!smsSettings?.canConfigure} /> 결제·이용 안내 문자 허용</label>
+        <label className="checkline"><input type="checkbox" name="marketing_enabled" defaultChecked={Boolean(smsSettings?.marketingEnabled)} disabled={!smsSettings?.canConfigure} /> 광고 문자 허용 (마케팅 동의·080 번호·오전 8시~오후 9시 적용)</label>
+        <p className="meta mt16">광고 문자는 자동으로 <b>(광고) 발신자명</b>과 <b>무료수신거부 080번호</b>를 붙입니다. 정보성 결제 안내에는 광고 문구를 붙이지 않습니다. 전체 발송은 서버의 안전 스위치가 켜져야 실행됩니다.</p>
+        {Boolean(smsSettings?.canConfigure) && <button className="btn small mt16" disabled={pending || !(smsSettings?.senders as string[] || []).length}>문자 설정 저장</button>}
+      </form>
       <form key={formKey} className="panel pad mb24" onSubmit={submit}>
         <div className="between">
           <h2>

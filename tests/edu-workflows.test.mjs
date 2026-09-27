@@ -59,6 +59,7 @@ function handler(user) {
  '@/lib/mission-quiz':quiz,
  '@/lib/platform':load('lib/platform.ts'),
  '@/lib/refunds':{processRefund:async()=>{throw Error('unexpected refund provider call');}},
+ '@/lib/crm-sms-settings':{SMS_SETTINGS_KEY:'edu_crm_sms_settings',validateSmsSettings:()=>({})},
  '@/lib/operator-permissions':{permissionsFor:async u=>({products:u?.role==='admin',members:u?.role==='admin',orders:u?.role==='admin',content:u?.role==='admin',marketing:u?.role==='admin'}),normalizeOperatorPermissions:v=>v||{}},
  });return {...exports,calls};
 }

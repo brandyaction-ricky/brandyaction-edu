@@ -28,6 +28,8 @@ function deliveryFor(order, filters) {
       return query;
     } }) },
     "@/lib/crm-purchase-contact": contact,
+    "@/lib/crm-purchase-email": { purchaseEmailConfigured: () => false },
+    "@/lib/crm-sms-settings": { loadSmsSettings: async () => ({}) },
   };
   new Function("exports", "require", deliveryCompiled)(delivery, (name) => dependencies[name]);
   return delivery;
