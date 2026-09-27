@@ -44,6 +44,7 @@ test('existing week and day can be edited and published in product curriculum wi
   await page.getByRole('tab', { name: '커리큘럼' }).click();
   const panel = page.getByRole('tabpanel', { name: '커리큘럼' });
   const week = panel.getByRole('region', { name: /1주차 기존 합성 주차/ });
+  await week.locator('summary').filter({hasText:'주차 설정'}).click();
   await week.getByRole('textbox', { name: '주차 제목' }).fill('수정된 주차');
   await week.getByRole('checkbox', { name: '주차 공개' }).check();
   await week.getByRole('button', { name: '주차 저장' }).click();
@@ -154,17 +155,18 @@ test('sale blocker leads to curriculum setup without losing product edits, and p
   const panel = page.getByRole('tabpanel', { name: '커리큘럼' });
   const guide = panel.getByRole('region', { name: '공개 커리큘럼 준비' });
   await expect(guide.getByRole('status')).toContainText('공개 주차 0개');
+  await panel.locator('summary').filter({hasText:'주차 설정'}).click();
   week.is_published = true;
   await panel.getByRole('checkbox', { name: '주차 공개' }).check();
   await panel.getByRole('button', { name: '주차 저장' }).click();
   await expect(guide.getByRole('status')).toContainText('공개 주차 1개');
-  await expect(guide.getByRole('status')).toContainText('공개 주차 안의 공개 학습 0개');
-  await expect(page.locator('aside').getByText('판매 보류', { exact: true })).toBeVisible();
+  await expect(guide.getByRole('status')).toContainText('공개 학습 0개');
+  await expect(page.locator('.editor-aside')).toBeHidden();
   await panel.getByRole('button', { name: '학습 편집' }).click();
   lesson.is_published = true;
   await panel.getByRole('checkbox', { name: '일차 공개' }).check();
   await panel.getByRole('button', { name: '일차 저장' }).click();
-  await expect(guide.getByRole('status')).toContainText('공개 커리큘럼 조건을 충족했습니다');
+  await expect(guide).toContainText('커리큘럼 준비 완료');
   await expect(page.locator('aside').getByText('판매 보류', { exact: true })).toHaveCount(0);
   await expect(page.getByLabel('합성 저장 횟수')).toHaveText('0');
   await page.getByRole('tab', { name: '기본·판매', exact: true }).click();
@@ -180,7 +182,7 @@ test('curriculum guidance does not count a public lesson under a private week or
   await page.goto('/product-sale-test');
   await page.getByRole('tab', { name: '커리큘럼', exact: true }).click();
   const guide = page.getByRole('region', { name: '공개 커리큘럼 준비' });
-  await expect(guide.getByRole('status')).toContainText('공개 주차 안의 공개 학습 0개');
+  await expect(guide.getByRole('status')).toContainText('공개 학습 0개');
   await page.getByRole('tab', { name: '기본·판매', exact: true }).click();
   await page.route('**/api/platform?**part=curriculum', route => route.fulfill({ status: 500, json: { error: '조회 실패 시험' } }));
   await page.getByRole('tab', { name: '커리큘럼', exact: true }).click();

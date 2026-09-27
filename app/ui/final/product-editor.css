@@ -175,3 +175,30 @@
 .edu-admin .product-curriculum-workspace .product-mission-workspace > h3 { margin: 0; }
 .edu-admin .product-common-resources input[type=file] { width: auto; }
 .edu-admin .product-common-resources .row { flex-wrap: wrap; }
+
+/* Curriculum uses the full work area; product pricing stays on the sales tabs. */
+.edu-admin .product-editor.curriculum-editing .editor-layout{grid-template-columns:minmax(0,1fr)}
+.edu-admin .product-editor.curriculum-editing .editor-aside{display:none}
+.edu-admin .curriculum-studio{display:grid;grid-template-columns:minmax(270px,.85fr) minmax(0,1.3fr);gap:24px;align-items:start}
+.edu-admin .curriculum-outline,.edu-admin .curriculum-editor-column{display:grid;gap:14px;min-width:0}
+.edu-admin .curriculum-readiness,.edu-admin .curriculum-editor-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+.edu-admin .curriculum-readiness h3{margin:0}.edu-admin .curriculum-readiness [role=status]{margin:0;padding:0;border:0}
+.edu-admin .product-curriculum-guide summary,.edu-admin .curriculum-copy-disclosure>summary{cursor:pointer;font-size:13px;font-weight:600;margin-top:12px}
+.edu-admin .curriculum-copy-disclosure>summary{margin:0}
+.edu-admin .curriculum-copy-disclosure .product-curriculum-guide{margin-top:12px}
+.edu-admin .product-curriculum-week{padding:14px}
+.edu-admin .product-curriculum-week>details>summary{cursor:pointer;list-style:none;display:flex;flex-direction:column;gap:6px;padding-right:20px;position:relative}
+.edu-admin .product-curriculum-week>details>summary:after{content:'＋';position:absolute;right:0;top:0}
+.edu-admin .product-curriculum-week>details[open]>summary:after{content:'−'}
+.edu-admin .product-curriculum-week summary h3{font-size:15px;line-height:1.5;margin:0;overflow-wrap:anywhere}
+.edu-admin .curriculum-week-settings{margin:12px 0}.edu-admin .curriculum-week-settings>summary{font-size:12px;color:var(--muted);cursor:pointer}
+.edu-admin .product-curriculum-week li{font-size:14px;line-height:1.5;padding:12px 8px;align-items:flex-start}
+.edu-admin .product-curriculum-week li.selected{background:var(--red-soft,#fff3f3);border-radius:6px}
+.edu-admin .product-curriculum-week li>div{min-width:0;overflow-wrap:anywhere}.edu-admin .product-curriculum-week li small{display:block;color:var(--muted);margin-top:5px;font-size:12px}
+.edu-admin .product-curriculum-week li .btn{flex-shrink:0}.edu-admin .curriculum-add-lesson{margin-top:12px}
+.edu-admin .curriculum-editor-empty,.edu-admin .curriculum-lesson-preview{padding:24px;border:1px dashed var(--line);border-radius:8px;background:var(--surface-subtle);line-height:1.7}
+.edu-admin .curriculum-editor-empty p{font-size:14px;color:var(--muted)}.edu-admin .curriculum-lesson-preview .reading-copy{white-space:pre-wrap;overflow-wrap:anywhere}
+.edu-admin .curriculum-editor-heading h3{font-size:18px;line-height:1.5}.edu-admin .curriculum-editor-heading .meta{margin:0 0 6px}
+@media(max-width:1024px){.edu-admin .curriculum-studio{grid-template-columns:minmax(0,1fr)}}
+.edu-admin .product-curriculum-content{scroll-margin-top:100px}
+@media(min-width:1025px){.edu-admin .curriculum-outline{position:sticky;top:96px;max-height:calc(100vh - 190px);overflow:auto;scrollbar-gutter:stable}}

@@ -923,6 +923,7 @@ export function AdminCatalog({
                     </button>
                   </div>
                   <div className="panel-body">
+                    {Boolean(q.learning_context) && <p className="meta">학습 위치: {t(q, "learning_context")}</p>}
                     <p className="reading-copy">{t(q, "content")}</p>
                     {Boolean(q.answer) && (
                       <div className="answer-block mt16">
