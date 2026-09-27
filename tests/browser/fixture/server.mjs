@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { build } from 'esbuild';
+import { lessonQuestionFixture } from './lesson-questions-api.mjs';
 import { reviewFixture } from './submission-review-api.mjs';
 
 // Synthetic responses only, including local in-memory review writes. Never connects to Auth, DB or Meta.
@@ -17,6 +18,7 @@ const brandLogo = readFileSync(resolve('public/brandy-action-logo.png'));
 const failedMemberReads = new Set();
 const server = createServer((request,response)=>{
   const url=new URL(request.url,'http://localhost');
+  if(lessonQuestionFixture(request,response,url))return;
   if(reviewFixture(request,response,url))return;
   if(request.method!=='GET'){response.writeHead(405).end();return;}
   if(url.pathname==='/api/platform'&&url.searchParams.get('part')==='curriculum'){

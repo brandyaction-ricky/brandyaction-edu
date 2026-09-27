@@ -30,7 +30,7 @@ export async function readMemberPlatformData(userId: string, view: MemberView, e
     if (view === 'learn' && !data.enrollments.some(hasLearningAccess)) return { enrollments: [] };
   }
   if (view === 'questions' || view === 'dashboard') {
-    data.edu_questions = checked(await db.from('edu_questions').select('id,user_id,course_id,title,content,answer,status,created_at').eq('user_id', userId).eq('is_archived', false).order('created_at', { ascending: false }).limit(limit), '질문');
+    data.edu_questions = checked(await db.from('edu_questions').select('id,user_id,course_id,learning_context,title,content,answer,status,created_at').eq('user_id', userId).eq('is_archived', false).order('created_at', { ascending: false }).limit(limit), '질문');
   }
   if (view === 'coupons' || view === 'dashboard') {
     data.customer_coupons = checked(await db.from('customer_coupons').select('id,user_id,coupon_id,status,issued_at,used_at,expires_at,coupon:coupons(name,code,discount_type,discount_value,ends_at)').eq('user_id', userId).order('issued_at', { ascending: false }).limit(limit), '쿠폰');

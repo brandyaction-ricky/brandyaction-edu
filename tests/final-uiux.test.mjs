@@ -20,6 +20,7 @@ function load(file) {
   const exports = {};
   cache.set(absolute, exports);
   new Function('exports', 'require', compiled)(exports, name => {
+    if (name.endsWith('.css')) return {}; // CSS is bundled separately by Next.js.
     if (name === 'next/link') return function LinkStub(props) { return React.createElement('a', props); };
     if (name === 'next/navigation') return { useSearchParams: () => search, usePathname: () => '/order-complete', useRouter: () => ({ push() {}, replace() {}, refresh() {} }) };
     if (name === '@/lib/supabase/client') return { createClient: () => { throw Error('Unexpected authentication mutation during render'); } };
