@@ -19,7 +19,7 @@ const migrations = [
   '20260914063811_configurable_tag_thresholds',
   '20260916074606_repair_payment_coupon_consistency',
   '20260916075611_align_zero_total_checkout',
-  '20260927112825_admin_coupon_lifecycle',
+  '20260927115057_admin_coupon_lifecycle',
 ];
 
 test('payment and coupon SQL smoke passes against isolated PostgreSQL and rolls back fixtures', async () => {
