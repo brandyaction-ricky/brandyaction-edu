@@ -3,6 +3,8 @@ import { expect, test } from '@playwright/test';
 const course = (index: number) => ({ id: `course-${index}`, slug: `course-${index}`, title: `실행 클래스 ${index}`, summary: '수업 안내', category: 'paid_class', list_price: 10000, metadata: {} });
 
 test('class cards load in 12-row pages and searching requests only the current view', async ({ page }) => {
+  await page.clock.install();
+  await page.clock.pauseAt(new Date(Date.now() + 1000));
   const reads: URL[] = [];
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -15,8 +17,14 @@ test('class cards load in 12-row pages and searching requests only the current v
     return route.fulfill({ json: { user: null, data: { courses, cohorts: [] }, pagination: { page: pageNumber, pageSize: 12, total: q ? 1 : 13 }, support: {} } });
   });
   await page.goto('/public-data-test?publicScreen=classes');
+  await page.clock.runFor(1);
   await expect(page.locator('.course-card')).toHaveCount(12);
   await page.getByRole('button', { name: '다음' }).click();
+  await page.clock.runFor(1);
+  await expect(page.locator('.course-card')).toHaveCount(1);
+  // Initial empty search must not reset a quickly selected second page.
+  await page.clock.runFor(400);
+  await page.clock.resume();
   await expect(page.locator('.course-card')).toHaveCount(1);
   await page.getByRole('searchbox', { name: '클래스 검색' }).fill('7');
   await expect(page.locator('.course-card')).toHaveCount(1);
