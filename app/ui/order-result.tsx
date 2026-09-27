@@ -29,9 +29,19 @@ export function OrderResult({
   const [state, setState] = useState<"checking" | "paid" | "waiting" | "error">("checking");
   const [error, setError] = useState("");
   const [virtualAccount, setVirtualAccount] = useState<VirtualAccount | null>(null);
+  const [onboardingOrderId, setOnboardingOrderId] = useState<string | null>(null);
   const order = matchingOrder(data.orders || [], orderId);
   const failed = path === "/payment/fail";
   const complete = !failed && (state === "paid" || order?.status === "paid");
+
+  useEffect(() => {
+    if (!complete || !orderId) return;
+    const controller = new AbortController();
+    void fetch(`/api/purchase-onboarding?order=${encodeURIComponent(orderId)}`, { cache: 'no-store', signal: controller.signal })
+      .then(response => { if (!controller.signal.aborted) setOnboardingOrderId(response.ok ? orderId : null); })
+      .catch(() => { if (!controller.signal.aborted) setOnboardingOrderId(null); });
+    return () => controller.abort();
+  }, [complete, orderId]);
 
   const confirm = useCallback(async () => {
     if (!paymentKey || !orderId || failed) return;
@@ -145,6 +155,11 @@ export function OrderResult({
             </dl>
           )}
           <div className="grid2 mt24">
+            {complete && onboardingOrderId === orderId && orderId && (
+              <Link className="btn primary" href={`/purchase-onboarding?order=${encodeURIComponent(orderId)}`}>
+                결제 후 시작 안내 <ArrowRight />
+              </Link>
+            )}
             {state === "error" && paymentKey && (
               <button className="btn" onClick={() => void confirm()}>
                 결제 결과 다시 확인

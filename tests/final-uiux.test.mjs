@@ -89,10 +89,10 @@ test('five admin categories and scoped navigation render from the admin UI featu
     contents: 'film', missions: 'book-open', members: 'users-round', reviews: 'square-check',
     questions: 'message-circle', customers: 'users-round', tags: 'users-round', coupons: 'layout-grid',
     'product-reviews': 'message-circle', banners: 'layout-grid', articles: 'file-pen-line',
-    testimonials: 'message-circle', orders: 'receipt-text', conversion: 'message-circle',
-    landing: 'chart-line', analytics: 'chart-line',
-    campaigns: 'layout-grid',
-    templates: 'layout-grid', automations: 'layout-grid', seo: 'settings', settings: 'settings', staff: 'shield-check',
+    testimonials: 'message-circle', orders: 'receipt-text', conversion: 'megaphone',
+    landing: 'chart-line', analytics: 'chart-no-axes-combined',
+    campaigns: 'send',
+    templates: 'message-square-text', automations: 'workflow', seo: 'search-check', settings: 'settings', staff: 'shield-check',
   };
   for (const [key, icon] of Object.entries(expectedIcons)) {
     assert.ok(adminNavigationIcon(key));
@@ -137,7 +137,7 @@ test('a published paid product uses its upcoming cohort for CTA and the actual d
   const { ProductDetail } = load('app/ui/final/public-views.tsx');
   const upcoming = { ...cohort, id: 'upcoming-cohort', status: 'upcoming', recruitment_start_at: '2098-12-01T00:00:00Z', recruitment_end_at: '2099-01-31T00:00:00Z' };
   const markup = html(ProductDetail, { course, data: { ...data, cohorts: [upcoming], enrollments: [] } });
-  assert.match(markup, /checkout\?cohort=upcoming-cohort/);
+  assert.match(markup, /login\?next=%2Fcheckout%3Fcohort%3Dupcoming-cohort/);
   assert.match(markup, /2099/);
   assert.doesNotMatch(markup, /다음 모집 준비 중|이용·환불 안내/);
 });
@@ -241,7 +241,20 @@ test('catalogues and separate editors render without dropping existing fields', 
     assert.ok(html(AdminCatalog, { section, data, selection: [], setSelection() {}, edit() {}, archive() {}, pending: false, loading: false, pagination: null, setPage() {}, exportCsv() {} }).length > 100, key);
   }
   const props = { data, selection: [], setSelection() {}, edit() {}, archive() {}, pending: false, loading: false, pagination: null, setPage() {}, exportCsv() {} };
+  const weekMarkup = html(AdminCatalog, { ...props, data: { ...data, courses: [...data.courses, { id: 'other-course', title: '다른 상품' }], curriculum_weeks: [...data.curriculum_weeks, { id: 'other-week', course_id: 'other-course', week_number: 1, title: '다른 상품 주차' }, { id: 'third-week', course_id: 'course', week_number: 2, title: '두 번째 주차' }] }, send, section: platform.sections.find(row => row.key === 'weeks') });
+  assert.match(weekMarkup, /aria-label="주차 상품"/);
+  assert.match(weekMarkup, /class="week-group-heading"[\s\S]*?1주차[\s\S]*?2주차/);
+  assert.match(weekMarkup, /다른 상품 주차 아래로 이동/);
+  assert.match(weekMarkup, /weeks-create[\s\S]*?새로 등록/);
+  assert.match(weekMarkup, /weeks-table-workspace/);
+  assert.doesNotMatch(weekMarkup, /<caption[^>]*>주차 구성 목록<\/caption>/);
+  assert.match(read('app/ui/final/admin.css'), /weeks-table-workspace[\s\S]*?flex:1 1 auto[\s\S]*?overflow-x:auto/);
+  assert.match(read('app/ui/final/admin.css'), /weeks-table-workspace \.week-group-heading th\{[^}]*background:#f2f3f5/);
   const products = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'products') });
+  assert.match(products, /admin-filter-bar admin-pilot-filter/);
+  assert.ok(products.indexOf('aria-label="판매 상태"') < products.indexOf('placeholder="상품명 검색"'));
+  assert.match(products, /상품 등록/);
+  assert.match(products, /admin-table-density--standard/);
   assert.match(products, /전체 상품/); assert.match(products, /연결 기수/); assert.match(products, /<th>자료<\/th>/);
   assert.match(products, /공개 점검/); assert.match(read('app/api/platform/route.ts'), /archivedProducts/);
   assert.match(products, /상품 표시 범위/); assert.match(products, /삭제된 상품/);
@@ -249,10 +262,12 @@ test('catalogues and separate editors render without dropping existing fields', 
   assert.ok(products.indexOf('등록된 테스트 클래스 수정') < products.indexOf('등록된 테스트 클래스 삭제'));
   assert.doesNotMatch(products, /PRD-|\/classes\/test-course/);
   assert.doesNotMatch(products, />삭제<\/button>|>수정<\/button>/);
+  const cohorts = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'cohorts') });
+  assert.doesNotMatch(cohorts, /<caption[^>]*>기수·회차 관리 목록<\/caption>/);
   const catalogSource = read('app/ui/final/admin-catalog.tsx');
-  assert.match(catalogSource, /action: "restore-products"/); assert.match(catalogSource, /복원\s*<\/button>/);
+  assert.match(catalogSource, /action: "restore-products"/); assert.match(catalogSource, /복원\s*<\/AdminButton>/);
   const countedProducts = html(AdminCatalog, { ...props, data: { ...data, product_summary: [{ id: 'product-summary', total: 12, published: 7, upcoming: 3, draft: 2 }] }, section: platform.sections.find(row => row.key === 'products') });
-  for (const value of ['12', '7', '3', '2']) assert.match(countedProducts, new RegExp(`>${value}<`));
+  for (const value of ['12', '7', '3', '2']) assert.match(countedProducts, new RegExp(`>${value}개<`));
   assert.doesNotMatch(products, /목록 내보내기 · 선택 관리|삭제 항목 포함|현재 페이지 CSV|상품은 가격·판매·자료의 단위/);
   const bannerData = { ...data, site_banners: [{ id: 'banner-2', title: '두 번째', display_order: 2, is_active: true }, { id: 'banner-1', title: '첫 번째', display_order: 1, is_active: true }] };
   const banners = html(AdminCatalog, { ...props, data: bannerData, send, section: platform.sections.find(row => row.key === 'banners') });
@@ -267,11 +282,17 @@ test('catalogues and separate editors render without dropping existing fields', 
   const platformSource = read('app/ui/platform.tsx');
   const pageSource = read('app/[[...path]]/page.tsx');
   assert.match(platformSource, /무료강의 3강 시청[\s\S]*결제 완료[\s\S]*미션 수행[\s\S]*회원가입/);
-  assert.match(platformSource, /쿠폰 등록·설정[\s\S]*최소 주문 금액[\s\S]*회원당 발급 횟수/);
+  assert.match(platformSource, /쿠폰 등록·설정/);
+  assert.match(platformSource, /<CouponFields/);
+  assert.match(read('app/ui/final/coupon-fields.tsx'), /최소 주문 금액[\s\S]*회원별 사용 횟수/);
   const learning = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'learning') });
   assert.match(learning, /learning-layout/); assert.match(learning, /학습 구성/); assert.match(learning, /lesson-list-item/);
   const missions = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'missions') });
   assert.match(missions, /mission-week-pills/); assert.match(missions, /일차별 미션/); assert.match(missions, /mission-row/);
+  const groupedMissions = html(AdminCatalog, { ...props, data: { ...data, courses: [...data.courses, { id: 'other-course', title: '다른 상품' }], curriculum_weeks: [...data.curriculum_weeks, { id: 'other-week', course_id: 'other-course', week_number: 1, title: '다른 상품 주차' }] }, section: platform.sections.find(row => row.key === 'missions') });
+  assert.match(groupedMissions, /mission-week-picker/);
+  assert.equal((groupedMissions.match(/class="mission-product-group"/g) || []).length, 2);
+  assert.match(groupedMissions, /다른 상품[\s\S]*?1개 주차/);
   assert.match(missions, /콘텐츠 편집/); assert.match(missions, /learning-editor\?id=lesson/);
   const questionMarkup = html(AdminCatalog, { ...props, data: { ...data, edu_questions: [{ id: 'question', title: '답변 필요한 질문', content: '질문 내용', answer: null, status: 'open', created_at: '2026-09-24' }] }, section: platform.sections.find(row => row.key === 'questions') });
   assert.match(questionMarkup, /question-admin-card/); assert.match(questionMarkup, /답변하기/);
@@ -323,9 +344,12 @@ test('catalogues and separate editors render without dropping existing fields', 
   assert.match(learningMarkup, /editor-/); assert.doesNotMatch(learningMarkup, /통과 기준|name="pass_percent"/);
   assert.match(platformSource, /AI 답변 생성/); assert.match(platformSource, /답변 등록/);
   assert.match(platformSource, /answer-draft/);
-  assert.match(read('app/ui/final/integration.css'), /\.participant-card-summary/);
+  const participantSource = read('app/ui/admin-workflows.tsx');
+  assert.match(participantSource, /<AdminFilterBar className="admin-pilot-filter admin-pilot-member-filter"[\s\S]*?label="빠른 상태 필터"/);
+  assert.match(participantSource, /<AdminDataTable label="회원별 미션 현황 표"[\s\S]*?검토 필요[\s\S]*?최근 활동/);
+  assert.match(participantSource, /<AdminDrawer title=\{t\(selectedMember[\s\S]*?participant-drawer-missions/);
+  assert.match(read('app/ui/final/integration.css'), /\.participant-table thead th \{ position: sticky/);
   assert.match(read('app/ui/final/integration.css'), /\.question-answer-editor/);
-  assert.match(read('app/ui/admin-workflows.tsx'), /aria-expanded=\{expanded\}[\s\S]*?participant-day-card/);
 });
 test('submission review keeps queue and inspector, escaping text and unsafe links', () => {
   const { SubmissionReview } = load('app/ui/final/submission-review.tsx');
@@ -421,7 +445,7 @@ test('paid product offers remain open with no published curriculum', () => {
     { curriculum_weeks: [{ ...data.curriculum_weeks[0], is_published: false }], curriculum_lessons: [{ ...lesson, is_published: false }] },
   ]) {
     const markup = html(ProductDetail, { course, data: { ...data, ...curriculum, enrollments: [], lesson_contents: [] } });
-    assert.match(markup, /href="\/checkout/);
+    assert.match(markup, /href="\/login\?next=%2Fcheckout/);
     assert.doesNotMatch(markup, /수강 신청을 준비하고 있습니다/);
     assert.doesNotMatch(markup, /등록된 학습 본문/);
   }

@@ -24,8 +24,12 @@ test('embedded CTA uses the existing checkout, custom URL or learning destinatio
     const link = page.frameLocator('iframe').getByRole('button', { name: '신청 버튼', exact: true });
     await expect(link).toHaveAttribute('aria-disabled', 'false');
     await link.click();
-    await expect(page.getByTestId('navigation-destination')).toBeAttached();
-    await expect(page).toHaveURL(new RegExp(destination.replace('?', '\\?') + '$'));
+    if (destination.startsWith('/checkout') || destination.startsWith('/apply')) {
+      await expect(page).toHaveURL(url => url.pathname === '/login' && url.searchParams.get('next') === destination);
+    } else {
+      await expect(page).toHaveURL(new RegExp(destination.replace('?', '\\?') + '$'));
+      await expect(page.getByTestId('navigation-destination')).toBeAttached();
+    }
   }
 });
 
@@ -50,7 +54,7 @@ test('when one cohort closes, countdown and CTA follow the same remaining offer'
   await page.clock.runFor(2500);
   await expect(page.getByRole('timer')).toHaveText('2일 00:00:00');
   await page.frameLocator('iframe').getByRole('link', { name: '클래스 신청' }).click();
-  await expect(page).toHaveURL(/\/checkout\?cohort=cohort-b$/);
+  await expect(page).toHaveURL(url => url.pathname === '/login' && url.searchParams.get('next') === '/checkout?cohort=cohort-b');
 });
 
 test('cohort selection changes both countdown and embedded checkout; editor can turn toggle off again', async ({ page }) => {
@@ -60,7 +64,7 @@ test('cohort selection changes both countdown and embedded checkout; editor can 
   await page.getByRole('combobox', { name: '기수 선택' }).selectOption('cohort-b');
   await expect(page.getByRole('timer')).toHaveText('2일 00:00:02');
   await page.frameLocator('iframe').getByRole('link', { name: '클래스 신청' }).click();
-  await expect(page).toHaveURL(/\/checkout\?cohort=cohort-b$/);
+  await expect(page).toHaveURL(url => url.pathname === '/login' && url.searchParams.get('next') === '/checkout?cohort=cohort-b');
   await page.goto('/product-sale-test?ready=1');
   await page.getByRole('tab', { name: '공개·검색', exact: true }).click();
   const toggle = page.getByRole('checkbox', { name: '모집 마감 카운트다운 표시', exact: true });

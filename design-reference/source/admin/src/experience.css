@@ -26,6 +26,16 @@ table{font-size:var(--type-small);font-variant-numeric:tabular-nums;white-space:
 .mission-week-pills{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;margin:0 0 var(--space-5)}
 .mission-week-pills .pill{min-height:44px;padding:var(--space-2) var(--space-4)}
 .mission-week-pills .pill span{margin-left:var(--space-2);opacity:.72}
+.mission-week-picker{margin:0 0 var(--space-5);border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff}
+.mission-week-picker-heading,.mission-product-heading{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);padding:10px 16px}
+.mission-week-picker-heading{background:#f2f3f5}
+.mission-week-picker-heading strong,.mission-product-heading strong{font-size:var(--type-small);font-weight:650}
+.mission-week-picker-heading .pill{min-height:34px;padding:5px 12px}
+.mission-product-group{border-top:1px solid var(--line)}
+.mission-product-heading{background:#fafafa;border-bottom:1px solid var(--line)}
+.mission-product-heading span{color:var(--text-secondary);font-size:var(--type-small);white-space:nowrap}
+.mission-product-group .mission-week-pills{margin:0;padding:12px 16px}
+.mission-product-group .mission-week-pills .pill{min-height:36px;padding:6px 12px}
 .mission-catalog{margin-top:0}
 .mission-catalog .week-head{padding-bottom:var(--space-4);border-bottom:1px solid var(--line);margin-bottom:var(--space-4)}
 .mission-catalog .mission-row{width:100%}
@@ -67,6 +77,9 @@ table{font-size:var(--type-small);font-variant-numeric:tabular-nums;white-space:
 .metric-payment-group{display:grid;gap:var(--space-4);margin-top:var(--space-2);padding:var(--space-5);border:1px solid var(--line);background:var(--surface-subtle)}.metric-payment-group h3{font-size:var(--type-h4)}.metric-payment-table{display:grid;border:1px solid var(--line);background:white}.metric-payment-head,.metric-payment-row{display:grid;grid-template-columns:minmax(120px,1fr) minmax(120px,1fr) 54px;align-items:center;gap:var(--space-3);padding:var(--space-3);border-bottom:1px solid var(--line)}.metric-payment-head{font-size:var(--type-small);font-weight:700;background:#f4f5f7}.metric-payment-row:last-child{border-bottom:0}.metric-payment-row input,.metric-payment-row select{width:100%;min-width:0}.metric-payment-summary{display:flex;gap:6px;flex-wrap:wrap;min-width:180px}.metric-payment-summary span{display:grid;gap:2px;padding:5px 8px;border:1px solid var(--line);background:var(--surface-subtle);font-size:12px}.metric-payment-summary b{font-size:11px;color:var(--muted)}
 @media(max-width:520px){.metric-payment-group>.between{align-items:flex-start;flex-direction:column}.metric-payment-head,.metric-payment-row{grid-template-columns:1fr 1fr 44px;gap:8px;padding:10px}}
 
+/* Long coupon history stays in its own scroll area without widening the form. */
+.coupon-settings-form{grid-template-columns:minmax(0,1fr);min-width:0}.coupon-settings-form>*{min-width:0}.coupon-settings-form .table-wrap{max-width:100%}
+
 /* Shared admin controls use one predictable size and a restrained focus ring. */
 .btn{min-height:40px;box-sizing:border-box}
 .btn.small{min-height:36px}
@@ -77,3 +90,44 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .article-category-manager{margin-bottom:var(--space-6)}.article-category-manager>.article-category-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;padding:24px}.article-category-row{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);padding:18px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--surface-subtle)}.article-category-row>div:first-child{min-width:0}.article-category-row b,.article-category-row small{display:block}.article-category-row small{margin-top:var(--space-1);color:var(--text-secondary);font-size:var(--type-small);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.article-category-row .row{flex:none}.article-category-empty{grid-column:1/-1;padding:var(--space-6);text-align:center;color:var(--text-secondary)}.article-category-manager>.article-category-form-wrap{margin:0 24px 24px}.article-category-form{padding:24px;border:1px solid var(--line);border-radius:var(--radius-sm);background:white}.article-category-form .form-grid{column-gap:20px;row-gap:4px}.article-category-form h3{font-size:var(--type-h4)}.article-category-active{display:flex;align-items:center;gap:var(--space-2);align-self:end;min-height:var(--control-height);font-size:var(--type-small)}.article-category-active input{width:18px;height:18px;min-height:0}.article-category-actions{justify-content:flex-end;margin-top:var(--space-5)}
 @media(max-width:980px){.article-category-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.article-category-manager>.article-category-list{grid-template-columns:minmax(0,1fr);padding:16px}.article-category-manager>.article-category-form-wrap{margin:0 16px 16px}.article-category-form{padding:16px}.article-category-form .form-grid{column-gap:0;row-gap:0}}
+
+/* Week configuration uses a clean, consistently aligned filter row and groups records by week. */
+.panel:has(.filter-row select[aria-label="주차 상품"]) .filter-row{gap:var(--space-3);align-items:flex-end}
+.panel:has(.filter-row select[aria-label="주차 상품"]) .filter-row>.spacer{display:none}
+.panel:has(.filter-row select[aria-label="주차 상품"]) .filter-row>.search{margin-left:auto;flex:0 1 320px;max-width:320px}
+.panel:has(.filter-row select[aria-label="주차 상품"]) .filter-row>.catalog-filter-field{display:grid;gap:var(--space-1);width:220px;min-width:180px;color:var(--text-secondary);font-size:var(--type-small)}
+.panel:has(.filter-row select[aria-label="주차 상품"]) .filter-row>.catalog-filter-field select{width:100%;max-width:none;min-height:40px}
+.week-order-help{padding:0 var(--space-4);margin:0;color:var(--text-secondary)}
+.week-group-heading th{padding:var(--space-3) var(--space-4);background:var(--surface-subtle);border-top:1px solid var(--line);text-align:left;font-weight:650}
+.week-group-heading th span{margin-right:var(--space-3)}
+.week-group-heading th small{font-size:var(--type-small);font-weight:400;color:var(--text-secondary)}
+.week-order-actions{justify-content:flex-end}
+@media(max-width:720px){.panel:has(.filter-row select[aria-label="주차 상품"]) .filter-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:end}.panel:has(.filter-row select[aria-label="주차 상품"]) .filter-row>.search{grid-column:1/-1;width:100%;max-width:none;margin:0}.panel:has(.filter-row select[aria-label="주차 상품"]) .filter-row>.catalog-filter-field{width:100%;min-width:0}.panel:has(.filter-row select[aria-label="주차 상품"]) .filter-row>select{width:100%;min-width:0}.mobile-cards .week-group-heading{display:block;padding:0;border:0}.mobile-cards .week-group-heading th{display:block;width:100%;padding:var(--space-3) var(--space-4)}.week-order-help{padding:0 var(--space-3)}.week-order-actions{justify-content:flex-start;flex-wrap:wrap}}
+
+/* Week configuration follows the compact, unified SaaS data-table pattern. */
+.weeks-table-workspace{border-radius:8px;box-shadow:none}
+.weeks-table-workspace>.filter-row{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;padding:12px 16px;margin:0;border-bottom:1px solid #e5e5e5}
+.weeks-table-workspace>.filter-row>.spacer{display:none}
+.weeks-table-workspace>.filter-row>.catalog-filter-field{order:1;display:block;width:190px;min-width:150px;color:inherit;font-size:inherit}
+.weeks-table-workspace>.filter-row>.catalog-filter-field select,.weeks-table-workspace>.filter-row>select{height:40px;min-height:40px;padding:0 14px;border:1px solid #e5e5e5;border-radius:7px;background:#fff;font-size:14px}
+.weeks-table-workspace>.filter-row>select{order:2;width:140px}
+.weeks-table-workspace>.filter-row>.search{order:3;flex:1 1 auto;width:auto;min-width:150px;max-width:none;margin:0}
+.weeks-table-workspace>.filter-row>.search input{height:40px;min-height:40px;padding-left:38px;border-color:#e5e5e5;border-radius:7px;font-size:14px}
+.weeks-table-workspace>.filter-row>.search svg{left:12px;top:11px}
+.weeks-table-workspace>.filter-row>.weeks-create{order:4;flex:0 0 auto;height:40px;min-height:40px;padding:0 14px;border-radius:7px;font-size:14px;white-space:nowrap}
+.weeks-table-workspace>.filter-row select:focus,.weeks-table-workspace>.filter-row input:focus{border-color:#a3a3a3;box-shadow:none}
+.weeks-table-workspace>.week-order-help{padding:8px 16px;margin:0;border-bottom:1px solid #e5e5e5;font-size:12px}
+.weeks-table-workspace .table-scroll{overflow-x:auto}
+.weeks-table-workspace table{white-space:nowrap}
+.weeks-table-workspace th{height:44px;padding:10px 16px;background:#fafafa;font-size:13px;font-weight:600}
+.weeks-table-workspace td{height:54px;padding:8px 16px;font-size:13px}
+.weeks-table-workspace .week-group-heading th{height:auto;padding:8px 16px;background:#f2f3f5;border-top:1px solid #e5e5e5;border-bottom:1px solid #e5e5e5;color:#404040}
+.weeks-table-workspace .week-order-actions{gap:6px}
+.weeks-table-workspace .week-order-actions .btn{height:32px;min-height:32px;border-radius:6px}
+.weeks-table-workspace .week-order-actions .iconbtn{width:32px;min-width:32px;height:32px;min-height:32px}
+.weeks-table-workspace .table-foot{padding:12px 16px;border-top:1px solid #e5e5e5}
+.weeks-table-workspace tbody tr:hover{background:#fafafa}
+@media(max-width:720px){.weeks-table-workspace>.filter-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center}.weeks-table-workspace>.filter-row>.catalog-filter-field,.weeks-table-workspace>.filter-row>select{width:100%;min-width:0}.weeks-table-workspace>.filter-row>.search{grid-column:1/-1;width:100%;min-width:0}.weeks-table-workspace>.filter-row>.weeks-create{grid-column:1/-1;width:100%}.weeks-table-workspace .table-scroll.mobile-cards{overflow-x:auto;overflow-y:hidden}.weeks-table-workspace .mobile-cards table,.weeks-table-workspace .mobile-cards tbody{display:table;min-width:860px;white-space:nowrap}.weeks-table-workspace .mobile-cards thead{position:static;width:auto;height:auto;padding:0;overflow:visible;clip:auto;white-space:normal}.weeks-table-workspace .mobile-cards tr{display:table-row;padding:0;border-bottom:0;gap:0}.weeks-table-workspace .mobile-cards td{display:table-cell;width:auto!important;min-width:0!important;white-space:nowrap;padding:8px 12px;border-bottom:1px solid #e5e5e5;overflow-wrap:normal}.weeks-table-workspace .mobile-cards td::before{display:none}.weeks-table-workspace .week-group-heading{display:table-row;padding:0;border:0}.weeks-table-workspace .week-group-heading th{display:table-cell;width:auto;padding:8px 12px}.weeks-table-workspace .week-order-actions{justify-content:flex-end;flex-wrap:nowrap}}
+
+.products-filter-row>.admin-search-field{flex:0 1 340px;width:340px;max-width:100%;margin-left:auto}
+@media(max-width:720px){.products-filter-row>.admin-search-field{flex-basis:100%;width:100%;max-width:none;margin-left:0}}

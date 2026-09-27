@@ -37,3 +37,11 @@
 .profile-menu>a:focus-visible,.profile-menu>button:focus-visible,.profile-menu-trigger:focus-visible{outline:2px solid var(--ba-red);outline-offset:2px}
 .profile-menu svg{width:19px;height:19px;flex:none}
 @media(max-width:680px){.profile-menu{right:-4px}.profile-menu-identity{padding-inline:8px}.profile-menu>a,.profile-menu>button{min-height:48px}}
+/* Coupon quote: authoritative discount and final payable amount. */
+.checkout-price-breakdown{background:#f6f7f9;border-radius:var(--radius-md);padding:var(--space-3) var(--space-4);margin-top:var(--space-4)}
+.checkout-price-breakdown .cost-row{margin:0;padding:var(--space-2) 0;gap:var(--space-3)}
+.checkout-discount-amount,.checkout-applied-coupon strong{color:#1673a6;font-weight:650;white-space:nowrap}
+.checkout-applied-coupon{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);margin-top:var(--space-4)}
+.checkout-applied-coupon span{min-width:0;overflow-wrap:anywhere;color:var(--muted)}
+.checkout-payment-summary .cost-total{gap:var(--space-3);flex-wrap:wrap}
+.checkout-payment-summary .cost-total strong{font-size:clamp(26px,3vw,34px);white-space:nowrap;margin-left:auto;color:var(--ink)}

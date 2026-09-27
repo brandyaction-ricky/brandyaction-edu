@@ -1,6 +1,7 @@
 "use client";
 
 import { object, text as t, type Row } from "@/lib/platform";
+import { AdminButton, AdminCheckbox, AdminFormField, AdminIconButton, AdminStatusBadge } from "@/features/admin-ui";
 import { ArrowDown, ArrowUp, Grid2X2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
@@ -60,32 +61,32 @@ export function ArticleBannerEditor({ settings, send, pending }: { settings: Row
   return (
     <form className="article-settings-main" onSubmit={submit}>
       <section className="panel">
-        <div className="panel-head"><div><h2>회원 무료강의 상단 영역</h2><p>비회원은 가입 안내를, 회원은 3강 목록과 재생 영역을 봅니다.</p></div><label className="article-visibility-switch"><input type="checkbox" checked={draft.enabled} onChange={event => update("enabled", event.target.checked)} />노출</label></div>
+        <div className="panel-head"><div><h2>회원 무료강의 상단 영역</h2><p>비회원은 가입 안내를, 회원은 3강 목록과 재생 영역을 봅니다.</p></div><AdminCheckbox label="노출" checked={draft.enabled} onChange={event => update("enabled", event.target.checked)} /></div>
         <div className="section-pad">
-          <div className="article-setting-location"><Grid2X2 aria-hidden="true" /><span><b>노출 위치</b> · 아티클 목록 최상단</span><span className="badge">무료 회원 전용</span></div>
+          <div className="article-setting-location"><Grid2X2 aria-hidden="true" /><span><b>노출 위치</b> · 아티클 목록 최상단</span><AdminStatusBadge status="info" label="무료 회원 전용" tone="info"/></div>
           <div className="form-grid mt24">
-            <div className="field"><label htmlFor="article-eyebrow">상단 라벨</label><input id="article-eyebrow" value={draft.eyebrow} maxLength={80} onChange={event => update("eyebrow", event.target.value)} /></div>
-            <div className="field"><label htmlFor="article-title">메인 제목 *</label><textarea id="article-title" value={draft.title} rows={2} maxLength={120} required onChange={event => update("title", event.target.value)} /></div>
-            <div className="field span2"><label htmlFor="article-description">설명</label><textarea id="article-description" value={draft.description} rows={3} maxLength={240} onChange={event => update("description", event.target.value)} /></div>
-            <div className="field span2"><label htmlFor="article-signup-notice">회원가입 안내 문구</label><textarea id="article-signup-notice" value={draft.signupNotice} rows={2} maxLength={220} onChange={event => update("signupNotice", event.target.value)} /></div>
-            <div className="field"><label htmlFor="article-signup-cta">비회원 CTA</label><input id="article-signup-cta" value={draft.signupCTA} maxLength={45} onChange={event => update("signupCTA", event.target.value)} /></div>
-            <div className="field"><label htmlFor="article-member-cta">회원 CTA</label><input id="article-member-cta" value={draft.memberCTA} maxLength={45} onChange={event => update("memberCTA", event.target.value)} /></div>
+            <AdminFormField className="field" label="상단 라벨"><input id="article-eyebrow" value={draft.eyebrow} maxLength={80} onChange={event => update("eyebrow", event.target.value)} /></AdminFormField>
+            <AdminFormField className="field" label="메인 제목 *"><textarea id="article-title" value={draft.title} rows={2} maxLength={120} required onChange={event => update("title", event.target.value)} /></AdminFormField>
+            <AdminFormField className="field span2" label="설명"><textarea id="article-description" value={draft.description} rows={3} maxLength={240} onChange={event => update("description", event.target.value)} /></AdminFormField>
+            <AdminFormField className="field span2" label="회원가입 안내 문구"><textarea id="article-signup-notice" value={draft.signupNotice} rows={2} maxLength={220} onChange={event => update("signupNotice", event.target.value)} /></AdminFormField>
+            <AdminFormField className="field" label="비회원 CTA"><input id="article-signup-cta" value={draft.signupCTA} maxLength={45} onChange={event => update("signupCTA", event.target.value)} /></AdminFormField>
+            <AdminFormField className="field" label="회원 CTA"><input id="article-member-cta" value={draft.memberCTA} maxLength={45} onChange={event => update("memberCTA", event.target.value)} /></AdminFormField>
           </div>
           <div className="article-access-flow"><span>비회원 · 가입 또는 로그인</span><span>→</span><span>같은 아티클 화면 복귀</span><span>→</span><span>무료 3강 시청</span></div>
         </div>
       </section>
       <section className="panel mt24">
-        <div className="panel-head"><div><h2>무료강의 3강 설정</h2><p>강의 제목과 YouTube 주소를 등록하고 노출 순서를 확인합니다.</p></div><span className="badge">{draft.videos.filter(video => video.url.trim()).length}/3 주소 등록</span></div>
+        <div className="panel-head"><div><h2>무료강의 3강 설정</h2><p>강의 제목과 YouTube 주소를 등록하고 노출 순서를 확인합니다.</p></div><AdminStatusBadge status="info" label={`${draft.videos.filter(video => video.url.trim()).length}/3 주소 등록`} tone="info"/></div>
         <div className="article-lessons-editor">
           {draft.videos.map((video, index) => <div className="article-lesson-editor" key={index}>
             <div className="article-lesson-number">{String(index + 1).padStart(2, "0")}</div>
-            <div className="article-lesson-fields"><div className="field"><label htmlFor={`article-video-title-${index}`}>강의 제목 *</label><input id={`article-video-title-${index}`} value={video.title} maxLength={120} required onChange={event => updateVideo(index, "title", event.target.value)} /></div><div className="field"><label htmlFor={`article-video-url-${index}`}>YouTube URL</label><input id={`article-video-url-${index}`} type="url" value={video.url} placeholder="https://youtu.be/..." onChange={event => updateVideo(index, "url", event.target.value)} /></div></div>
-            <div className="article-order-buttons"><button className="btn" type="button" disabled={index === 0} aria-label={`${index + 1}강 위로 이동`} onClick={() => moveVideo(index, -1)}><ArrowUp /></button><button className="btn" type="button" disabled={index === 2} aria-label={`${index + 1}강 아래로 이동`} onClick={() => moveVideo(index, 1)}><ArrowDown /></button></div>
+            <div className="article-lesson-fields"><AdminFormField className="field" label="강의 제목 *"><input id={`article-video-title-${index}`} value={video.title} maxLength={120} required onChange={event => updateVideo(index, "title", event.target.value)} /></AdminFormField><AdminFormField className="field" label="YouTube URL"><input id={`article-video-url-${index}`} type="url" value={video.url} placeholder="https://youtu.be/..." onChange={event => updateVideo(index, "url", event.target.value)} /></AdminFormField></div>
+            <div className="article-order-buttons"><AdminIconButton label={`${index + 1}강 위로 이동`} disabled={index === 0} onClick={() => moveVideo(index, -1)}><ArrowUp size={16}/></AdminIconButton><AdminIconButton label={`${index + 1}강 아래로 이동`} disabled={index === 2} onClick={() => moveVideo(index, 1)}><ArrowDown size={16}/></AdminIconButton></div>
           </div>)}
         </div>
         <div className="section-pad article-video-help">제목은 먼저 작성할 수 있습니다. 영상이 준비되면 각 강의의 주소를 등록하세요. 공개 화면은 저장된 순서와 재생 가능한 YouTube 주소를 그대로 사용합니다.</div>
       </section>
-      <div className="article-settings-save"><div><b>저장된 설정을 편집 중입니다.</b><p>저장하면 실제 DEV 아티클 상단 영역에 반영됩니다.</p></div><div className="row"><button className="btn" type="button" disabled={pending} onClick={() => setDraft(initial)}>변경 취소</button><button className="btn primary" disabled={pending}>{pending ? "저장 중..." : "상단 무료강의 설정 저장"}</button></div></div>
+      <div className="article-settings-save"><div><b>저장된 설정을 편집 중입니다.</b><p>저장하면 실제 DEV 아티클 상단 영역에 반영됩니다.</p></div><div className="row"><AdminButton variant="outline" disabled={pending} onClick={() => setDraft(initial)}>변경 취소</AdminButton><AdminButton variant="primary" type="submit" loading={pending}>상단 무료강의 설정 저장</AdminButton></div></div>
     </form>
   );
 }
