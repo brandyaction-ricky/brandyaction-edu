@@ -342,9 +342,10 @@ export function Platform({
     };
   }, [refresh]);
   useEffect(() => {
+    if (query === publicSearch) return;
     const timer = setTimeout(() => { setPublicPage(1); setPublicSearch(query); }, 300);
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, publicSearch]);
   useEffect(() => {
     if (!notice) return;
     const timer = setTimeout(() => setNotice(""), 5000);
