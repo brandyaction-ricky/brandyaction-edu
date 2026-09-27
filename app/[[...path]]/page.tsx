@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import { getEduSettings } from '@/lib/edu-settings';
 import { createClient } from '@/lib/supabase/server';
 import { Platform } from '@/app/ui/platform';
-import { getAuthenticatedUser } from '@/lib/server-auth';
 import { notFound, redirect } from 'next/navigation';
 import { metricsRedirect } from '@/lib/landing-admin-state';
 import { sections } from '@/lib/platform';
@@ -22,8 +21,9 @@ export default async function Page({params,searchParams}:{params:Promise<{path?:
  if (root === 'admin' && section === 'metrics') redirect(metricsRedirect(await searchParams));
  // The admin API verifies identity, account status and section permissions once.
  // Stream the admin shell immediately instead of repeating Auth + profile queries.
- const user = root === 'admin' ? null : await getAuthenticatedUser();
- return <Platform key={root === 'admin' ? 'admin' : path.join('/')} path={path} user={user}/>;
+ // Platform loads the authenticated user and page data together from /api/platform.
+ // Keeping it mounted across route changes preserves its in-memory state.
+ return <Platform path={path} user={null}/>;
 }
 
 export async function generateMetadata({params}:{params:Promise<{path?:string[]}>}):Promise<Metadata> {
@@ -32,17 +32,18 @@ export async function generateMetadata({params}:{params:Promise<{path?:string[]}
  const {seo}=await getEduSettings();
  let title=String(seo.title||'BrandyAction EDU | 배운 것을, 내 일의 성과로.');
  let description=String(seo.description||'AI와 마케팅을 배우고 내 업무에 적용하는 실행 중심 교육.');
+ let unlisted=false;
  if(['classes','articles'].includes(path[0])&&path[1]) {
   const db=await createClient();
   const isCourse=path[0]==='classes';
-  const {data}=await db.from(isCourse?'courses':'articles').select(isCourse?'title,summary,metadata':'title,summary').eq('slug',path[1]).eq('status','published').maybeSingle();
+  const {data}=await db.from(isCourse?'courses':'articles').select(isCourse?'title,summary,seo_title:metadata->>seo_title,seo_description:metadata->>seo_description,is_listed:metadata->is_listed':'title,summary').eq('slug',path[1]).eq('status','published').maybeSingle();
   if(data){
-   const row=data as unknown as {title:string;summary?:string;metadata?:Record<string,unknown>};
-   const metadata=isCourse&&row.metadata&&typeof row.metadata==='object'?row.metadata:{};
-   title=(typeof metadata.seo_title==='string'&&metadata.seo_title.trim()?metadata.seo_title:row.title)+' | BrandyAction EDU';
-   description=String(metadata.seo_description||row.summary||description);
+   const row=data as unknown as {title:string;summary?:string;seo_title?:string;seo_description?:string;is_listed?:boolean|string};
+   unlisted=isCourse&&row.is_listed===false;
+   title=(isCourse&&row.seo_title?.trim()?row.seo_title:row.title)+' | BrandyAction EDU';
+   description=String((isCourse&&row.seo_description)||row.summary||description);
   }
  }
- const privatePage=['admin','my','learn','checkout','apply','payment','login','signup','auth'].includes(path[0]);
+ const privatePage=unlisted||['admin','my','learn','checkout','apply','payment','login','signup','auth'].includes(path[0]);
  return {title,description,openGraph:{title,description},robots:privatePage||process.env.NEXT_PUBLIC_APP_ENV!=='production'?{index:false,follow:false}:undefined,verification:{google:seo.googleVerification?String(seo.googleVerification):undefined,other:seo.naverVerification?{'naver-site-verification':String(seo.naverVerification)}:undefined}};
 }

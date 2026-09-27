@@ -27,6 +27,7 @@ export const sectionScopes: Record<string, OperatorScope> = {
   reviews: "members",
   questions: "members",
   customers: "members",
+  conversion: "members",
   tags: "members",
   coupons: "members",
   "product-reviews": "members",

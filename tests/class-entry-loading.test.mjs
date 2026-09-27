@@ -27,10 +27,11 @@ function renderClass({ loading = true, error = '', data = {} } = {}) {
   const { Platform } = load('app/ui/platform.tsx', {
     react: { ...React, useState(initial) {
       const index = state++;
-      return React.useState(index === 1 ? data : index === 3 ? loading : index === 4 ? error : initial);
+      return React.useState(index === 1 ? data : index === 3 ? loading : index === 4 ? error : index === 16 && Object.keys(data).length ? JSON.stringify(['classes/test-class?', 'view=class&slug=test-class']) : initial);
     } },
     '@/lib/supabase/client': {},
     '@/lib/supabase/config': {},
+    '@/features/admin-ui': load('features/admin-ui/components/use-route-dialog.ts'),
     'next/navigation': { useRouter: () => ({}), useSearchParams: () => new URLSearchParams() },
     'next/link': { default: ({ children, ...props }) => React.createElement('a', props, children) },
     './final/primitives': {

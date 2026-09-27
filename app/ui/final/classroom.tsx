@@ -13,7 +13,6 @@ import {
   BookOpen,
   Check,
   ChevronDown,
-  MessageCircle,
   Play,
 } from "lucide-react";
 import Link from "next/link";
@@ -25,6 +24,7 @@ import {
   type WorkflowSend,
 } from "../learning-workflows";
 import { enrollmentLessons, missionEntries } from "./member-views";
+import { LessonQuestions } from "./lesson-questions";
 import { Badge, Empty, Heading, ResourceRow, Video } from "./primitives";
 
 export function Classroom({
@@ -259,6 +259,7 @@ export function Classroom({
                   </div>
                   <h1>{t(lesson, "title")}</h1>
                   <p>{t(lesson, "description")}</p>
+                  <a className="link" href="#lesson-questions">이 수업에 개인 질문 남기기</a>
                 </header>
                 {safeUrl(content?.vod_url) && (
                   <Video url={t(content, "vod_url")} />
@@ -376,11 +377,7 @@ export function Classroom({
                     </Link>
                   )}
                 </div>
-                <div className="lesson-question">
-                  <Link className="btn ghost" href="/my/questions">
-                    <MessageCircle />이 학습에 질문하기
-                  </Link>
-                </div>
+                <LessonQuestions key={enrollment.id + ":" + lesson.id} enrollmentId={String(enrollment.id)} lessonId={String(lesson.id)} lessonTitle={t(lesson, "title")} />
               </>
             ) : (
               <Empty title="공개된 학습이 없습니다.">

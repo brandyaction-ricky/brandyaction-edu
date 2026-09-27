@@ -24,7 +24,7 @@ export function productConversion(metadata: Record<string, unknown>, legacy: Rec
   };
 }
 
-const PRODUCT_CTA_POSITIONS = new Set(['hero_cta', 'sticky_cta', 'final_cta']);
+const PRODUCT_CTA_POSITIONS = new Set(['hero_cta', 'sticky_cta', 'final_cta', 'detail_cta']);
 
 export function productCtaPosition(href: unknown, explicitPosition: unknown = '') {
   const explicit = typeof explicitPosition === 'string' ? explicitPosition : '';

@@ -1,8 +1,16 @@
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { getSupabasePublicConfig } from "./config";
 
-export async function createClient() {
+export type ServerCookieMutation = {
+  name: string;
+  value: string;
+  options: CookieOptions;
+};
+
+export async function createClient(
+  onCookies?: (cookies: ServerCookieMutation[]) => void,
+) {
   const cookieStore = await cookies();
   const { publicUrl, publishableKey } = getSupabasePublicConfig();
 
@@ -12,6 +20,7 @@ export async function createClient() {
         return cookieStore.getAll();
       },
       setAll(cookiesToSet) {
+        onCookies?.(cookiesToSet);
         try {
           cookiesToSet.forEach(({ name, value, options }) => {
             cookieStore.set(name, value, options);

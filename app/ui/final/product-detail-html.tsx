@@ -1,10 +1,10 @@
 'use client';
-import { createElement, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { createElement, memo, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { parseProductHtml, type ProductHtmlNode } from '@/lib/product-metadata';
 import { buildProductDocument } from '@/lib/product-html-document';
 import { conversionUrl, PRODUCT_CTA_EVENT } from '@/lib/product-conversion';
 
-function ProductDocumentFrame({ source }: { source: string }) {
+function ProductDocumentFrame({ source, ctaUrl, ctaDeadline }: { source: string; ctaUrl: string; ctaDeadline?: string }) {
   const ref = useRef<HTMLIFrameElement>(null);
   const srcDoc = useMemo(() => buildProductDocument(source), [source]);
   useEffect(() => {
@@ -25,12 +25,22 @@ function ProductDocumentFrame({ source }: { source: string }) {
           frame.style.height = `${Math.max(120, Math.min(200000, height))}px`;
         });
       };
+      const primaryLinks = doc.querySelectorAll('a[href="#pp"], a[data-cta], button[data-cta]');
+      primaryLinks.forEach(link => link.setAttribute('aria-disabled', String(!conversionUrl(ctaUrl))));
       const click = (event: MouseEvent) => {
-        const link = (event.target as Element)?.closest?.('a');
+        const link = (event.target as Element)?.closest?.('a,button[data-cta]');
         if (!link) return;
         event.preventDefault();
         const href = link.getAttribute('href') || '';
-        if (href.startsWith('#')) {
+        const primary = href === '#pp' || link.hasAttribute('data-cta') || (href === '#' && /대기방\s*입장/.test(link.textContent || ''));
+        if (primary) {
+          // Use the parent's validated sale/access decision, never an embedded URL.
+          const url = conversionUrl(ctaUrl);
+          if (!url || (ctaDeadline && Date.parse(ctaDeadline) <= Date.now())) return;
+          window.dispatchEvent(new CustomEvent(PRODUCT_CTA_EVENT, { detail: { href: url, position: 'detail_cta' } }));
+          if (url.startsWith('/')) window.location.assign(url);
+          else window.open(url, '_blank', 'noopener,noreferrer');
+        } else if (href.startsWith('#')) {
           try {
             const target = doc.getElementById(decodeURIComponent(href.slice(1)));
             if (target) window.scrollTo({ top: window.scrollY + frame.getBoundingClientRect().top + target.getBoundingClientRect().top, behavior: 'smooth' });
@@ -53,12 +63,12 @@ function ProductDocumentFrame({ source }: { source: string }) {
     frame.addEventListener('load', attach);
     attach();
     return () => { frame.removeEventListener('load', attach); detach(); };
-  }, [srcDoc]);
+  }, [srcDoc, ctaUrl, ctaDeadline]);
   return <iframe ref={ref} title="상품 HTML 상세페이지" sandbox="allow-same-origin" referrerPolicy="no-referrer" srcDoc={srcDoc} style={{ display: 'block', width: '100%', height: 640, border: 0 }} />;
 }
 
-export function ProductDetailHtml({ html, documentSource = '', className = 'product-detail-html reading-copy' }: { html: string; documentSource?: string; className?: string }) {
-  if (documentSource) return <div className={className}><ProductDocumentFrame source={documentSource} /></div>;
+export const ProductDetailHtml = memo(function ProductDetailHtml({ html, documentSource = '', className = 'product-detail-html reading-copy', ctaUrl = '', ctaDeadline }: { html: string; documentSource?: string; className?: string; ctaUrl?: string; ctaDeadline?: string }) {
+  if (documentSource) return <div className={className}><ProductDocumentFrame source={documentSource} ctaUrl={ctaUrl} ctaDeadline={ctaDeadline} /></div>;
   function render(nodes: ProductHtmlNode[]): ReactNode[] {
     return nodes.map((node, index) => {
       if (typeof node === 'string') return node;
@@ -70,4 +80,4 @@ export function ProductDetailHtml({ html, documentSource = '', className = 'prod
     });
   }
   return <div className={className}>{render(parseProductHtml(html))}</div>;
-}
+});

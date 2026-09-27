@@ -16,6 +16,7 @@ import {
   UserRound,
 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import type { ReactNode } from "react";
 import type { DigitalContentSection, ProductResource } from "@/lib/product-metadata";
 
@@ -173,8 +174,12 @@ export function ArticleCard({ article }: { article: Row }) {
   );
 }
 export function Story({ story }: { story: Row }) {
+  const thumbnail = safeUrl(story.thumbnail_url);
   return (
     <article className="story-card">
+      <div className="story-card-cover">
+        {thumbnail ? <Image src={thumbnail} alt="" width={640} height={360} sizes="(max-width: 680px) 82vw, (max-width: 900px) 50vw, 33vw" unoptimized /> : <span>BRANDYACTION EDU</span>}
+      </div>
       <Badge>고객 이야기</Badge>
       <blockquote>“{t(story, "title")}”</blockquote>
       <p>{t(story, "description")}</p>

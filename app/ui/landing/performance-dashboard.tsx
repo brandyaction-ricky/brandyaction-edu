@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { delta, displayDimension, rate, type DashboardReport } from '@/lib/landing-performance';
 import { count, money, signed, kstTime } from '@/lib/landing-admin-state';
-import { AdminButton, AdminDataTable, AdminMetric, AdminMetricGrid, AdminSection, AdminStatusBadge } from '@/app/ui/final/admin-system';
+import { AdminButton, AdminDataTable, AdminMetric, AdminMetricGrid, AdminSection, AdminStatusBadge } from '@/features/admin-ui';
 import { CompactEmpty, InlineError } from './tracking-controls';
 import { DEFAULT_SAMPLE_MIN, funnelRate, parseSampleMin, sortPerformance, type SortKey } from '@/lib/landing-operations-phase1';
 import { metaCampaignIds } from '@/lib/meta-campaign-settings';

@@ -2,17 +2,34 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
+import { submissionReview } from './helpers/submission-review.mjs';
+import { productVisibility } from './helpers/product-visibility.mjs';
 
 function load(path, dependencies = {}) {
   const code = ts.transpileModule(fs.readFileSync(new URL('../' + path, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const exports = {};
   new Function('exports', 'require', code)(exports, name => {
+    if (name === '@/lib/submission-review') return submissionReview;
+    if (name === '@/lib/product-visibility') return productVisibility;
+    if (name === '@/lib/public-platform-data') return { getPublicPlatformData: async () => ({ data: {}, pagination: null }), getPublicSupport: async () => ({}) };
+    if (name === '@/lib/public-platform-plan') return { PUBLIC_CACHE_TAG: 'test' };
+    if (name === '@/lib/member-platform-data') return { readMemberPlatformData: async () => ({}) };
+    if (name === 'next/cache') return { revalidateTag: () => {} };
     if (!(name in dependencies)) throw Error(name);
     return dependencies[name];
   });
   return exports;
 }
 const platform = load('lib/platform.ts');
+const { isAdminRoute } = load('lib/admin-route.ts', { './platform': platform });
+test('persistent admin workspace accepts registered routes only, including legacy redirect', () => {
+  for (const section of platform.sections) assert.equal(isAdminRoute(['admin', section.key]), true);
+  assert.equal(isAdminRoute(['admin']), true);
+  assert.equal(isAdminRoute(['admin', 'product-editor']), true);
+  assert.equal(isAdminRoute(['admin', 'learning-editor']), true);
+  assert.equal(isAdminRoute(['admin', 'metrics']), true);
+  for (const path of [['my'], ['admin', 'unknown'], ['admin', 'landing', 'extra']]) assert.equal(isAdminRoute(path), false);
+});
 const scopes = load('lib/operator-scopes.ts');
 const admin = { id: '12345678-1234-1234-1234-123456789012', role: 'admin', status: 'active', email: 'admin@example.test' };
 
@@ -53,12 +70,18 @@ test('operator checks reuse the already verified request user and preserve denie
   assert.equal(auth.calls(), 1);
 });
 
-function apiHarness(user, failure = null) {
-  const calls = { auth: 0, summaries: 0, tables: [] };
+function apiHarness(user, failure = null, fixtures = {}, staffPermissions = {}) {
+  const calls = { auth: 0, summaries: 0, tables: [], filters: [] };
   const db = {
     from(table) {
       calls.tables.push(table);
-      const query = new Proxy({}, { get: (_, key) => key === 'then' ? resolve => Promise.resolve({ data: [], error: null, count: 3 }).then(resolve) : () => query });
+      let rows = table === 'site_settings' ? { value: staffPermissions } : fixtures[table] || [];
+      const query = new Proxy({}, { get: (_, key) => {
+        if (key === 'then') return resolve => Promise.resolve({ data: rows, error: null, count: 3 }).then(resolve);
+        if (key === 'eq') return (field, value) => { calls.filters.push([table, 'eq', field, value]); if (Array.isArray(rows)) rows = rows.filter(row => row[field] === value); return query; };
+        if (key === 'in') return (field, values) => { calls.filters.push([table, 'in', field, values]); if (Array.isArray(rows)) rows = rows.filter(row => values.includes(row[field])); return query; };
+        return () => query;
+      } });
       return query;
     },
     async rpc() { calls.summaries++; return { data: { id: 'summary', pendingReviews: 3 }, error: null }; },
@@ -102,6 +125,73 @@ test('menu reads authenticate once and preserve review badges without full dashb
   assert.equal(api.calls.summaries, 0);
   assert.equal((await response.json()).data.admin_summary[0].pendingReviews, 3);
   assert.deepEqual(api.calls.tables.sort(), ['mission_submissions', 'site_banners']);
+});
+
+test('product curriculum tab loads on demand behind product permission', async () => {
+  const record = '12345678-1234-1234-1234-123456789012';
+  const other = '22222222-2222-2222-2222-222222222222';
+  const fixtures = {
+    curriculum_weeks: [{ id: 'week-1', course_id: record }, { id: 'week-other', course_id: other }],
+    curriculum_lessons: [{ id: 'lesson-1', week_id: 'week-1' }, { id: 'lesson-other', week_id: 'week-other' }],
+    lesson_contents: [{ lesson_id: 'lesson-1', body_text: 'visible' }, { lesson_id: 'lesson-other', body_text: 'hidden' }],
+  };
+  const api = apiHarness(admin, null, fixtures);
+  const response = await api.read(`products&record=${record}&part=curriculum`);
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).data, {
+    curriculum_weeks: [fixtures.curriculum_weeks[0]],
+    curriculum_lessons: [fixtures.curriculum_lessons[0]],
+    lesson_contents: [fixtures.lesson_contents[0]],
+  });
+  assert.deepEqual(api.calls.tables, ['curriculum_weeks', 'curriculum_lessons', 'lesson_contents']);
+  assert.deepEqual(api.calls.filters, [
+    ['curriculum_weeks', 'eq', 'course_id', record],
+    ['curriculum_lessons', 'in', 'week_id', ['week-1']],
+    ['lesson_contents', 'in', 'lesson_id', ['lesson-1']],
+  ]);
+  assert.equal(api.calls.auth, 1);
+  const denied = apiHarness(null);
+  assert.equal((await denied.read(`products&record=${record}&part=curriculum`)).status, 401);
+  assert.deepEqual(denied.calls.tables, []);
+});
+
+test('product mission tab reads only the selected course lessons and missions', async () => {
+  const record = '12345678-1234-1234-1234-123456789012';
+  const other = '22222222-2222-2222-2222-222222222222';
+  const fixtures = {
+    curriculum_weeks: [{ id: 'week-1', course_id: record }, { id: 'week-other', course_id: other }],
+    curriculum_lessons: [{ id: 'lesson-1', week_id: 'week-1' }, { id: 'lesson-other', week_id: 'week-other' }],
+    curriculum_missions: [{ id: 'mission-1', lesson_id: 'lesson-1' }, { id: 'mission-other', lesson_id: 'lesson-other' }],
+  };
+  const api = apiHarness(admin, null, fixtures);
+  const response = await api.read(`products&record=${record}&part=missions`);
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).data, {
+    curriculum_weeks: [fixtures.curriculum_weeks[0]],
+    curriculum_lessons: [fixtures.curriculum_lessons[0]],
+    curriculum_missions: [fixtures.curriculum_missions[0]],
+  });
+  assert.deepEqual(api.calls.filters, [
+    ['curriculum_weeks', 'eq', 'course_id', record],
+    ['curriculum_lessons', 'in', 'week_id', ['week-1']],
+    ['curriculum_missions', 'in', 'lesson_id', ['lesson-1']],
+  ]);
+  assert.equal(api.calls.auth, 1);
+  const denied = apiHarness({ ...admin, role: 'member' });
+  assert.equal((await denied.read(`products&record=${record}&part=missions`)).status, 403);
+  assert.deepEqual(denied.calls.tables, []);
+});
+
+test('staff product reads enforce their product permission before querying product records', async () => {
+  const staff = { ...admin, role: 'staff' };
+  for (const permissions of [{}, { products: false }, { learning: true }]) {
+    const api = apiHarness(staff, null, {}, permissions);
+    assert.equal((await api.read('products')).status, 403);
+    assert.deepEqual(api.calls.tables, ['site_settings']);
+  }
+  const allowed = apiHarness(staff, null, {}, { products: true });
+  assert.equal((await allowed.read('products')).status, 200);
+  assert.ok(allowed.calls.tables.includes('courses'));
 });
 
 test('the operating home still returns the full dashboard aggregate', async () => {

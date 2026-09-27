@@ -1,4 +1,4 @@
-/* Product editor: preserve the uploaded design's five-tab layout. */
+/* Product editor: preserve the established tabs and responsive layout. */
 .edu-admin .product-editor .editor-layout { grid-template-columns: minmax(0, 1fr) 315px; gap: 24px; }
 .edu-admin .product-editor .editor-main > .panel { overflow: hidden; }
 .edu-admin .product-editor .tabs { padding: 0 24px; margin: 0; gap: 24px; }
@@ -73,6 +73,7 @@
 @media (max-width: 720px) {
   .edu-admin .product-editor .tabs { padding: 0 16px; gap: 20px; }
   .edu-admin .product-editor .section-pad { padding: 20px 16px; }
+  .edu-admin .product-editor .editor-savebar { position: static; }
   .edu-admin .product-editor .form-grid { grid-template-columns: minmax(0, 1fr); }
   .edu-admin .product-editor .upload-box { padding: 24px 16px; }
   .edu-admin .product-editor .product-resource-editor { padding: 16px; }
@@ -97,3 +98,107 @@
 @media (max-width: 600px) { .edu-admin .product-editor .product-conversion-card { padding: 20px; } }
 .edu-admin .product-editor .digital-content-heading{align-items:flex-start;gap:16px}.edu-admin .product-editor .digital-section-list{display:grid;gap:16px}.edu-admin .product-editor .digital-section-card{overflow:hidden;border:1px solid var(--line);border-radius:10px;background:white}.edu-admin .product-editor .digital-section-card>header{display:flex;align-items:center;gap:10px;min-height:58px;padding:10px 14px;background:var(--surface-subtle);border-bottom:1px solid var(--line)}.edu-admin .product-editor .digital-section-card>header>svg{width:18px;color:var(--muted)}.edu-admin .product-editor .digital-section-card>header>input{flex:1;min-width:120px;border:0;background:transparent;font-weight:700}.edu-admin .product-editor .digital-section-card>header>input:focus{background:white}.edu-admin .product-editor .digital-item-list{display:grid}.edu-admin .product-editor .digital-item-row{display:flex;align-items:center;gap:12px;min-height:64px;padding:10px 14px;border-bottom:1px solid var(--line)}.edu-admin .product-editor .digital-item-row:last-child{border-bottom:0}.edu-admin .product-editor .digital-item-row>svg{width:18px;color:var(--muted)}.edu-admin .product-editor .digital-item-row>div:not(.row){min-width:0}.edu-admin .product-editor .digital-item-row p{margin:3px 0 0;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.edu-admin .product-editor .digital-empty{margin:0;padding:26px;text-align:center;color:var(--muted)}.edu-admin .product-editor .digital-content-actions{justify-content:flex-end;margin-top:20px}.edu-admin .digital-content-drawer{width:min(620px,100vw)}.edu-admin .digital-content-form{display:grid;gap:20px}.edu-admin .digital-content-form .field{margin:0}.edu-admin .digital-content-form .digital-file-upload{padding:18px;border:1px dashed var(--line);background:var(--surface-subtle)}.edu-admin .digital-content-form .upload-field>input[type=text]{display:none}.edu-admin .digital-content-form textarea{resize:vertical}
 @media(max-width:720px){.edu-admin .product-editor .digital-section-card>header{flex-wrap:wrap}.edu-admin .product-editor .digital-section-card>header>input{order:1;flex-basis:calc(100% - 30px)}.edu-admin .product-editor .digital-section-card>header>.row{width:100%;justify-content:flex-end}.edu-admin .product-editor .digital-item-row{align-items:flex-start;flex-wrap:wrap}.edu-admin .product-editor .digital-item-row>.row{width:100%;justify-content:flex-end}}
+.edu-admin .product-sale-check{padding:16px;margin-bottom:20px;border:1px solid var(--line);border-radius:12px;background:var(--surface,#fff);overflow-wrap:anywhere}
+.edu-admin .product-sale-check ul{padding-left:20px;margin:8px 0;list-style:disc}
+.edu-admin .product-sale-check .setting-line{gap:12px;flex-wrap:wrap}
+.edu-admin .side-preview .product-sale-check{padding:12px}
+
+.edu-admin .product-curriculum-workspace { display: grid; gap: 20px; }
+.edu-admin .product-curriculum-workspace > h2 { margin: 0; }
+.edu-admin .product-curriculum-workspace > .meta { margin: -12px 0 0; }
+.edu-admin .product-curriculum-create { display: flex; align-items: end; gap: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-subtle); }
+.edu-admin .product-curriculum-create label { flex: 1; min-width: 0; }
+.edu-admin .product-curriculum-workspace label { display: grid; gap: 8px; color: var(--ink); font-size: 13px; font-weight: 600; }
+.edu-admin .product-curriculum-workspace input,
+.edu-admin .product-curriculum-workspace select,
+.edu-admin .product-curriculum-workspace textarea { width: 100%; min-width: 0; margin: 0; }
+.edu-admin .product-curriculum-week,
+.edu-admin .product-curriculum-content { padding: 18px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.edu-admin .product-curriculum-week h3,
+.edu-admin .product-curriculum-content h3 { margin: 0 0 12px; }
+.edu-admin .product-curriculum-week ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.edu-admin .product-curriculum-week li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.edu-admin .product-curriculum-content { display: grid; gap: 14px; }
+.edu-admin .product-curriculum-content > .btn { justify-self: end; }
+.edu-admin .product-curriculum-settings { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; padding: 12px 0 16px; border-bottom: 1px solid var(--line); }
+.edu-admin .product-curriculum-settings > label:first-child { flex: 1 1 220px; min-width: 0; }
+.edu-admin .product-curriculum-settings .product-curriculum-publish { display: flex; align-items: center; gap: 8px; min-height: 44px; white-space: nowrap; }
+.edu-admin .product-curriculum-settings .product-curriculum-publish input { width: 18px; height: 18px; min-height: 18px; margin: 0; }
+.edu-admin .product-curriculum-settings > .notice { flex-basis: 100%; margin: 0; }
+.edu-admin .product-cohort-workspace { display: grid; gap: 18px; }
+.edu-admin .product-cohort-workspace > h2 { margin: 0; }
+.edu-admin .product-cohort-workspace > .meta { margin: -10px 0 0; }
+.edu-admin .product-cohort-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.edu-admin .product-cohort-fields { display: grid; gap: 16px; padding: 20px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-subtle); }
+.edu-admin .product-cohort-fields > h3, .edu-admin .product-cohort-fields > .meta { margin: 0; }
+.edu-admin .product-cohort-fields .form-grid { gap: 16px; }
+.edu-admin .product-cohort-fields label { display: grid; gap: 8px; color: var(--ink); font-size: 13px; font-weight: 600; }
+.edu-admin .product-cohort-fields input, .edu-admin .product-cohort-fields select { width: 100%; min-width: 0; margin: 0; }
+.edu-admin .product-cohort-fields > .btn { justify-self: end; }
+@media (max-width: 720px) { .edu-admin .product-curriculum-create, .edu-admin .product-curriculum-week li { align-items: stretch; flex-direction: column; } .edu-admin .product-curriculum-create > .btn, .edu-admin .product-curriculum-settings > .btn { width: 100%; } }
+.edu-admin .product-mission-workspace { display: grid; gap: 18px; }
+.edu-admin .product-mission-workspace > h2 { margin: 0; }
+.edu-admin .product-mission-workspace > .meta { margin: -10px 0 0; }
+.edu-admin .product-mission-week, .edu-admin .product-mission-fields { padding: 20px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.edu-admin .product-mission-week h3, .edu-admin .product-mission-fields h3 { margin: 0 0 12px; }
+.edu-admin .product-mission-day { padding: 14px 0; border-top: 1px solid var(--line); }
+.edu-admin .product-mission-day > b { font-size: 14px; }
+.edu-admin .product-mission-day > .meta { margin: 8px 0 0; }
+.edu-admin .product-mission-day ul { display: grid; gap: 8px; margin: 10px 0 0; padding: 0; list-style: none; }
+.edu-admin .product-mission-day li { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.edu-admin .product-mission-fields { display: grid; gap: 16px; background: var(--surface-subtle); }
+.edu-admin .product-mission-fields > .row { justify-content: space-between; }
+.edu-admin .product-mission-fields > .row h3 { margin: 0; }
+.edu-admin .product-mission-fields label { display: grid; gap: 8px; color: var(--ink); font-size: 13px; font-weight: 600; }
+.edu-admin .product-mission-fields input:not([type=checkbox]), .edu-admin .product-mission-fields select, .edu-admin .product-mission-fields textarea { width: 100%; min-width: 0; margin: 0; }
+.edu-admin .product-mission-options { display: flex; flex-wrap: wrap; gap: 20px; }
+.edu-admin .product-mission-options label { display: flex; align-items: center; gap: 8px; }
+.edu-admin .product-mission-options input { width: 18px; height: 18px; min-height: 18px; margin: 0; }
+.edu-admin .product-mission-fields > .btn { justify-self: end; }
+@media (max-width: 720px) { .edu-admin .product-mission-week, .edu-admin .product-mission-fields { padding: 16px; } .edu-admin .product-mission-day li { align-items: stretch; flex-direction: column; } .edu-admin .product-mission-fields > .btn { width: 100%; } }
+.product-visibility-toggle { display: flex; align-items: center; gap: 12px; min-height: 44px; font-weight: 600; cursor: pointer; }
+.product-visibility-toggle input[type="checkbox"] { width: 20px; height: 20px; flex: 0 0 20px; accent-color: var(--red, #cf202f); }
+
+.edu-admin .product-curriculum-guide { padding: 18px 20px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-subtle); font-size: 14px; line-height: 1.7; }
+.edu-admin .product-curriculum-guide h3 { margin: 0 0 8px; font-size: 15px; }
+.edu-admin .product-curriculum-guide p { margin: 8px 0 0; }
+.edu-admin .product-curriculum-guide ol { margin: 12px 0; padding-left: 22px; }
+.edu-admin .product-curriculum-guide li + li { margin-top: 6px; }
+.edu-admin .product-curriculum-guide [role=status] { margin-top: 14px; padding-top: 6px; border-top: 1px solid var(--line); }
+
+.edu-admin .product-common-resources { border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.edu-admin .product-common-resources > summary { padding: 18px; cursor: pointer; font-size: 15px; font-weight: 700; }
+.edu-admin .product-common-resources > summary span { margin-left: 8px; color: var(--muted); font-size: 13px; font-weight: 400; }
+.edu-admin .product-common-resources-body { padding: 0 18px 18px; }
+.edu-admin .product-common-resources-body h3 { margin: 0; }
+.edu-admin .product-curriculum-workspace .product-mission-workspace { padding: 0; }
+.edu-admin .product-curriculum-workspace .product-mission-workspace > h3 { margin: 0; }
+.edu-admin .product-common-resources input[type=file] { width: auto; }
+.edu-admin .product-common-resources .row { flex-wrap: wrap; }
+
+/* Curriculum uses the full work area; product pricing stays on the sales tabs. */
+.edu-admin .product-editor.curriculum-editing .editor-layout{grid-template-columns:minmax(0,1fr)}
+.edu-admin .product-editor.curriculum-editing .editor-aside{display:none}
+.edu-admin .curriculum-studio{display:grid;grid-template-columns:minmax(270px,.85fr) minmax(0,1.3fr);gap:24px;align-items:start}
+.edu-admin .curriculum-outline,.edu-admin .curriculum-editor-column{display:grid;gap:14px;min-width:0}
+.edu-admin .curriculum-readiness,.edu-admin .curriculum-editor-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+.edu-admin .curriculum-readiness h3{margin:0}.edu-admin .curriculum-readiness [role=status]{margin:0;padding:0;border:0}
+.edu-admin .product-curriculum-guide summary,.edu-admin .curriculum-copy-disclosure>summary{cursor:pointer;font-size:13px;font-weight:600;margin-top:12px}
+.edu-admin .curriculum-copy-disclosure>summary{margin:0}
+.edu-admin .curriculum-copy-disclosure .product-curriculum-guide{margin-top:12px}
+.edu-admin .product-curriculum-week{padding:14px}
+.edu-admin .product-curriculum-week>details>summary{cursor:pointer;list-style:none;display:flex;flex-direction:column;gap:6px;padding-right:20px;position:relative}
+.edu-admin .product-curriculum-week>details>summary:after{content:'＋';position:absolute;right:0;top:0}
+.edu-admin .product-curriculum-week>details[open]>summary:after{content:'−'}
+.edu-admin .product-curriculum-week summary h3{font-size:15px;line-height:1.5;margin:0;overflow-wrap:anywhere}
+.edu-admin .curriculum-week-settings{margin:12px 0}.edu-admin .curriculum-week-settings>summary{font-size:12px;color:var(--muted);cursor:pointer}
+.edu-admin .product-curriculum-week li{font-size:14px;line-height:1.5;padding:12px 8px;align-items:flex-start}
+.edu-admin .product-curriculum-week li.selected{background:var(--red-soft,#fff3f3);border-radius:6px}
+.edu-admin .product-curriculum-week li>div{min-width:0;overflow-wrap:anywhere}.edu-admin .product-curriculum-week li small{display:block;color:var(--muted);margin-top:5px;font-size:12px}
+.edu-admin .product-curriculum-week li .btn{flex-shrink:0}.edu-admin .curriculum-add-lesson{margin-top:12px}
+.edu-admin .curriculum-editor-empty,.edu-admin .curriculum-lesson-preview{padding:24px;border:1px dashed var(--line);border-radius:8px;background:var(--surface-subtle);line-height:1.7}
+.edu-admin .curriculum-editor-empty p{font-size:14px;color:var(--muted)}.edu-admin .curriculum-lesson-preview .reading-copy{white-space:pre-wrap;overflow-wrap:anywhere}
+.edu-admin .curriculum-editor-heading h3{font-size:18px;line-height:1.5}.edu-admin .curriculum-editor-heading .meta{margin:0 0 6px}
+@media(max-width:1024px){.edu-admin .curriculum-studio{grid-template-columns:minmax(0,1fr)}}
+.edu-admin .product-curriculum-content{scroll-margin-top:100px}
+@media(min-width:1025px){.edu-admin .curriculum-outline{position:sticky;top:96px;max-height:calc(100vh - 190px);overflow:auto;scrollbar-gutter:stable}}

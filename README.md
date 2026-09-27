@@ -58,10 +58,12 @@ supabase/migrations/202608110002_unlimited_course_access.sql
 
 ## 배포
 
-운영(`main`)과 테스트(`develop`)는 Vercel 프로젝트와 Supabase 프로젝트를 각각 분리합니다. 상세 승격 절차와 검수 기준은 `docs/ENVIRONMENT_OPERATION_KO.md`에 있습니다. Toss 웹훅은 다음 형식으로 등록하며 환경별로 서로 다른 긴 토큰을 사용합니다.
+운영(`main`)과 테스트(`develop`)는 Vercel 프로젝트와 Supabase 프로젝트를 각각 분리합니다. 상세 승격 절차와 검수 기준은 `docs/ENVIRONMENT_OPERATION_KO.md`에 있습니다. Toss 웹훅은 다음 형식으로 등록하며 환경별로 서로 다른 긴 토큰을 사용합니다. 토스 개발자센터에서는 `PAYMENT_STATUS_CHANGED`와 `DEPOSIT_CALLBACK` 이벤트를 이 URL에 등록합니다. 서버는 웹훅 본문을 직접 신뢰하지 않고 Toss 결제 조회 API 결과를 기준으로 상태를 반영합니다.
 
 ```text
 https://<운영도메인>/api/payments/toss/webhook?token=<TOSS_WEBHOOK_TOKEN>
 ```
+
+로컬 `localhost` URL은 웹훅으로 등록할 수 없습니다. 테스트 서버에 `TOSS_SECRET_KEY`, `TOSS_WEBHOOK_TOKEN`, Supabase 서버 전용 환경변수를 설정하고 배포한 뒤 공개 HTTPS URL을 등록해야 합니다.
 
 `develop`은 테스트 서버에만 자동 배포하고, 운영 배포는 검증 후 `main`에 병합된 커밋만 기준으로 수행합니다.

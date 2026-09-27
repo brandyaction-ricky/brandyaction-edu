@@ -21,10 +21,11 @@ import {
   UserRound,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Data } from "../learning-workflows";
 import { EmailAuth } from "../email-auth";
 import { ProductDetailHtml } from './product-detail-html';
+import { RecruitmentCountdown } from './product-countdown';
 import { productDocument } from '@/lib/product-html-document';
 import { productConversion } from '@/lib/product-conversion';
 import { ProductPixel, ProductCtaLink } from './product-conversion';
@@ -73,7 +74,7 @@ export function AuthView({
             ? "클래스와 자료를 한 계정에서 관리하세요."
             : "로그인하고 내 일의 다음 단계를 이어가세요."}
         </p>
-        {authError && ['auth_callback', 'email_confirmation'].includes(authError) && <p className="notice mt16" role="alert">인증 링크가 만료되었거나 인증을 완료하지 못했습니다. 이메일 링크는 요청한 브라우저에서 다시 열거나, 아래에서 로그인·인증 메일 재발송을 진행해 주세요.</p>}
+        {authError && ['auth_callback', 'email_confirmation'].includes(authError) && <p className="notice mt16" role="alert">인증 링크가 만료되었거나 인증을 완료하지 못했습니다. 아래에서 로그인하거나 인증 메일을 다시 요청해 주세요.</p>}
         <div className="social-stack">
           <button
             className="btn kakao full"
@@ -140,10 +141,28 @@ function StandardProductDetail({
     free = type === "무료 클래스";
   const cohorts = (data.cohorts || []).filter((g) => g.course_id === c.id),
     [cohortId, setCohortId] = useState("");
-  const purchasable = (cohort: Row) => isPurchasableOffer(c, cohort);
+  const [clock, setClock] = useState<number | undefined>();
+  const deadlineKey = JSON.stringify(cohorts.flatMap(g => [g.recruitment_start_at, g.recruitment_end_at, g.operation_end_at]).filter(Boolean));
+  // Re-evaluate the existing CTA rules when a deadline passes without requiring
+  // a reload. Uploaded HTML is memoized and never executes its own scripts.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const update = () => {
+      const now = Date.now();
+      setClock(now);
+      clearTimeout(timer);
+      const deadlines = (JSON.parse(deadlineKey) as string[]).map(Date.parse).filter(end => Number.isFinite(end) && end > now);
+      if (deadlines.length) timer = setTimeout(update, Math.min(2147483647, Math.max(1, Math.min(...deadlines) - now + 1)));
+    };
+    timer = setTimeout(update, 0);
+    window.addEventListener('focus', update);
+    return () => { clearTimeout(timer); window.removeEventListener('focus', update); };
+  }, [deadlineKey]);
+  const purchasable = (cohort: Row) => isPurchasableOffer(c, cohort, clock);
   let available =
     cohorts.find((g) => g.id === cohortId && purchasable(g)) ||
     cohorts.find(purchasable);
+  const countdownCohort = available || cohorts.find(g => g.id === cohortId) || cohorts.find(g => !g.archived_at && ['recruiting', 'upcoming', 'closed'].includes(t(g, 'status')));
   const enrolled = (data.enrollments || []).find(
     (e) => e.course_id === c.id && hasLearningAccess(e),
   );
@@ -166,7 +185,7 @@ function StandardProductDetail({
   const mismatchedFreeContent = !free && containsFreeClassCampaign(documentSource || detailHtml);
   const visibleDocumentSource = mismatchedFreeContent ? '' : documentSource;
   const visibleDetailHtml = mismatchedFreeContent ? '' : detailHtml;
-  const readinessIssues = paidCourseReadinessIssues(c, cohorts, data.curriculum_weeks || [], data.curriculum_lessons || []);
+  const readinessIssues = paidCourseReadinessIssues(c, cohorts);
   const readyForSale = readinessIssues.length === 0;
   if (!readyForSale) available = undefined;
   const conversion = productConversion(meta);
@@ -191,6 +210,10 @@ function StandardProductDetail({
           ? "구매하기"
           : "수강 신청하기"
       : "다음 모집 준비 중";
+  const detailCtaUrl = customCta ? conversion.url : !unavailableFree && (enrolled || available) ? href : '';
+  const detailCtaDeadline = !customCta && !enrolled && available ? t(available, 'recruitment_end_at') : undefined;
+  const countdown = meta.recruitment_countdown_enabled === true
+    ? <RecruitmentCountdown endAt={countdownCohort?.recruitment_end_at} /> : null;
   const button = customCta ? <ProductCtaLink conversion={conversion} courseId={c.id} position="sidebar_cta" className="btn primary full large" /> : unavailableFree ? <button className="btn primary full large" disabled>참여 링크 준비 중</button> : (
     <Link
       href={href}
@@ -230,7 +253,8 @@ function StandardProductDetail({
           <h1 className="sr-only">{t(c, "title")} · 무료 클래스</h1>
           <div className="free-body">
             <div className="free-sheet">
-              {documentSource || detailHtml ? <ProductDetailHtml html={detailHtml} documentSource={documentSource} /> : detailImage ? (
+              {countdown}
+              {documentSource || detailHtml ? <ProductDetailHtml html={detailHtml} documentSource={documentSource} ctaUrl={detailCtaUrl} ctaDeadline={detailCtaDeadline} /> : detailImage ? (
                 <div className="detail-image-stack">{detailImages.map((image, index) => <img
                   className="detail-image"
                   src={image.path}
@@ -270,12 +294,13 @@ function StandardProductDetail({
                 <a href="#class-guide">이용 안내</a>
               </nav>
               <section className="detail-section" id="class-detail">
+                {countdown}
                 <h2>
                   {digital
                     ? "반복 업무를 줄이는 작은 도구."
                     : "이 클래스에서 만들 변화"}
                 </h2>
-                {visibleDocumentSource || visibleDetailHtml ? <ProductDetailHtml html={visibleDetailHtml} documentSource={visibleDocumentSource} /> : detailImage ? (
+                {visibleDocumentSource || visibleDetailHtml ? <ProductDetailHtml html={visibleDetailHtml} documentSource={visibleDocumentSource} ctaUrl={detailCtaUrl} ctaDeadline={detailCtaDeadline} /> : detailImage ? (
                   <div className="detail-image-stack">{detailImages.map((image, index) => <img
                     className="detail-image"
                     src={image.path}
@@ -287,7 +312,7 @@ function StandardProductDetail({
                     {t(c, "description") || t(c, "summary")}
                   </div>
                 )}
-                {mismatchedFreeContent && <p className="notice mt24">유료 클래스 상세 콘텐츠를 준비하고 있습니다. 무료 클래스 안내와 외부 참여 링크는 노출하지 않습니다.</p>}
+                {mismatchedFreeContent && <p className="notice mt24">클래스 상세 안내를 준비하고 있습니다. 잠시 후 다시 확인해 주세요.</p>}
               </section>
               <section className="detail-section" id="curriculum">
                 <h2>{digital ? "구성 자료" : "학습 방식과 커리큘럼"}</h2>
@@ -426,7 +451,7 @@ function StandardProductDetail({
                 {available && (
                   <p className="meta mb24">{t(available, "name")}</p>
                 )}
-                {!enrolled && readinessIssues.length > 0 && <p className="notice mb24">판매 준비 중입니다. {readinessIssues.join(" · ")} 정보를 확인하고 있습니다.</p>}
+                {!enrolled && readinessIssues.length > 0 && <p className="notice mb24">수강 신청을 준비하고 있습니다. 모집이 시작되면 이 페이지에서 신청할 수 있습니다.</p>}
                 {button}
               </div>
             </aside>
@@ -563,14 +588,32 @@ export function ArticlesView({
   data,
   user,
   loading,
+  error = false,
+  query: controlledQuery,
+  onQueryChange,
+  type: controlledType,
+  onTypeChange,
+  pagination,
+  onPageChange,
 }: {
   slug?: string;
   data: Data;
   user: User | null;
   loading: boolean;
+  error?: boolean;
+  query?: string;
+  onQueryChange?: (value: string) => void;
+  type?: string;
+  onTypeChange?: (value: string) => void;
+  pagination?: { page: number; pageSize: number; total: number } | null;
+  onPageChange?: (page: number) => void;
 }) {
-  const [query, setQuery] = useState(""),
-    [type, setType] = useState("전체");
+  const [localQuery, setLocalQuery] = useState(""),
+    [localType, setLocalType] = useState("전체");
+  const query = controlledQuery ?? localQuery;
+  const type = controlledType ?? localType;
+  const setQuery = onQueryChange ?? setLocalQuery;
+  const setType = onTypeChange ?? setLocalType;
   const all = data.articles || [],
     a = all.find((a) => a.slug === slug);
   if (slug)
@@ -614,7 +657,7 @@ export function ArticlesView({
         ) : (
           <Empty
             title={
-              loading ? "불러오는 중입니다." : "아티클을 찾을 수 없습니다."
+              loading ? "불러오는 중입니다." : error ? "아티클을 불러오지 못했습니다." : "아티클을 찾을 수 없습니다."
             }
           />
         )}
@@ -662,12 +705,17 @@ export function ArticlesView({
         {filtered.map((a) => (
           <ArticleCard key={a.id} article={a} />
         ))}
-        {!loading && !filtered.length && (
+        {!loading && !error && !filtered.length && (
           <Empty title="조회된 아티클이 없습니다.">
             <div className="row center mt16"><Link className="btn primary" href="/classes?type=free">무료 클래스 보기</Link><Link className="btn" href="/classes">전체 클래스 보기</Link></div>
           </Empty>
         )}
       </div>
+      {pagination && onPageChange && pagination.total > pagination.pageSize && <div className="row center mt24" aria-label="아티클 페이지">
+        <button className="btn" type="button" disabled={pagination.page <= 1} onClick={() => onPageChange(pagination.page - 1)}>이전</button>
+        <span>{pagination.page} / {Math.ceil(pagination.total / pagination.pageSize)}</span>
+        <button className="btn" type="button" disabled={pagination.page >= Math.ceil(pagination.total / pagination.pageSize)} onClick={() => onPageChange(pagination.page + 1)}>다음</button>
+      </div>}
       </section>
     </div>
   );
@@ -675,9 +723,11 @@ export function ArticlesView({
 export function StoriesView({
   data,
   loading,
+  error = false,
 }: {
   data: Data;
   loading: boolean;
+  error?: boolean;
 }) {
   const stories = data.review_videos || [];
   const [selectedId, setSelectedId] = useState("");
@@ -715,7 +765,7 @@ export function StoriesView({
               <span>{t(s, "reviewer_name")} · {t(s, "reviewer_role")}</span>
             </button>
           ))}
-          {!loading && !stories.length && (
+          {!loading && !error && !stories.length && (
             <Empty title="공개된 고객 이야기가 없습니다.">
               <div className="row center mt16"><Link className="btn primary" href="/classes?type=free">무료 클래스 보기</Link><Link className="btn" href="/my/questions">문의하기</Link></div>
             </Empty>

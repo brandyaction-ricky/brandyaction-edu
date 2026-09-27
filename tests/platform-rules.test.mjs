@@ -7,7 +7,7 @@ const source = fs.readFileSync(new URL('../lib/platform-rules.ts', import.meta.u
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const exports = {};
 new Function('exports', compiled)(exports);
-const { homepageCourses, hasLearningAccess, isPurchasableOffer, isRecruiting, matchingOrder, paidCourseReadinessIssues, recordId } = exports;
+const { homepageCourses, hasLearningAccess, isPurchasableOffer, isRecruiting, matchingOrder, paidCourseReadinessIssues, productSalesStatus, recordId } = exports;
 const now = Date.parse('2026-09-11T12:00:00Z');
 
 test('learning access closes at expiry, before release, and after revocation', () => {
@@ -38,11 +38,11 @@ test('published paid products can sell an upcoming cohort until its actual deadl
   assert.equal(isPurchasableOffer(course, { ...upcoming, recruitment_end_at: '2026-09-11T12:00:00Z' }, now), false);
 });
 
-test('paid products expose missing publication requirements before checkout', () => {
+test('paid products expose missing sales requirements before checkout', () => {
   const course = { id: 'course', status: 'published', category: 'paid_class', metadata: {} };
   const cohort = { course_id: 'course', status: 'recruiting', price: 100000, recruitment_end_at: '2026-10-01T00:00:00Z' };
-  assert.deepEqual(paidCourseReadinessIssues(course, [cohort], [], []), ['학습 기간', '일정 안내', '공개 커리큘럼', '상세 콘텐츠']);
-  assert.deepEqual(paidCourseReadinessIssues({ ...course, description: '상세', duration_label: '4주', schedule_label: '화요일' }, [cohort], [{ id: 'week', course_id: 'course', is_published: true }], [{ week_id: 'week', is_published: true }]), []);
+  assert.deepEqual(paidCourseReadinessIssues(course, [cohort]), ['학습 기간', '일정 안내', '상세 콘텐츠']);
+  assert.deepEqual(paidCourseReadinessIssues({ ...course, description: '상세', duration_label: '4주', schedule_label: '화요일' }, [cohort]), []);
   assert.equal(isPurchasableOffer({ ...course, status: 'draft' }, cohort, now), false);
 });
 
@@ -51,6 +51,26 @@ test('homepage shows published courses even when no cohort has been created', ()
   const cohorts = [{ course_id: 'recruiting', status: 'recruiting' }];
   assert.deepEqual(homepageCourses(courses, cohorts, now).map(course => course.id), ['recruiting', 'new']);
   assert.deepEqual(homepageCourses([{ id: 'new' }], [], now).map(course => course.id), ['new']);
+});
+
+test('admin effective sales status mirrors customer readiness and offer rules without changing them', () => {
+  const course = { id: 'course', status: 'published', category: 'paid_class', description: '상세', duration_label: '4주', schedule_label: '화요일' };
+  const cohort = { id: 'cohort', course_id: 'course', status: 'upcoming', price: 100000, recruitment_end_at: '2026-10-01T00:00:00Z' };
+  const inspect = (cohorts, c = course) => productSalesStatus(c, cohorts, now);
+  assert.equal(inspect([cohort]).label, '판매 중');
+  assert.equal(inspect([cohort]).canApply, true, 'upcoming with a future deadline stays purchasable');
+  assert.deepEqual(inspect([cohort]).issues, [], 'sales readiness does not depend on published curriculum');
+  for (const status of ['closed', 'completed', 'cancelled', 'in_progress']) {
+    assert.equal(inspect([{ ...cohort, status }]).canApply, false);
+    assert.match(inspect([{ ...cohort, status }]).issues.join(), /기수 상태와 모집·운영 기간/);
+  }
+  assert.equal(inspect([{ ...cohort, recruitment_end_at: '2026-09-11T12:00:00Z' }]).canApply, false);
+  assert.equal(inspect([{ ...cohort, course_id: 'other' }]).canApply, false);
+  assert.equal(inspect([{ ...cohort, status: 'closed' }, { ...cohort, id: 'open', status: 'recruiting' }]).available.id, 'open');
+  assert.equal(inspect([], { ...course, category: 'free' }).label, '판매 중');
+  assert.equal(inspect([cohort], { ...course, status: 'draft' }).label, '작성 중');
+  assert.equal(productSalesStatus(course, [{ ...cohort, status: 'closed' }], now, true).label, '판매 중', 'custom CTA still opens its configured destination');
+  assert.equal(productSalesStatus({ ...course, description: '' }, [cohort], now, true).label, '판매 보류', 'custom CTA does not bypass missing content');
 });
 
 test('a previous paid order does not make another checkout successful', () => {
