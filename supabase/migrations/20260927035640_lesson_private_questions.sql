@@ -1,11 +1,12 @@
 begin;
 -- Existing questions and owner-only read policies remain intact.
 alter table public.edu_questions
-  add column enrollment_id uuid references public.enrollments(id) on delete set null,
+  add column if not exists enrollment_id uuid references public.enrollments(id) on delete set null,
   add column lesson_id uuid references public.curriculum_lessons(id) on delete set null,
   add column learning_context text;
 create index edu_questions_lesson_owner_idx on public.edu_questions(lesson_id,user_id,enrollment_id,created_at desc) where not is_archived;
-create index edu_questions_enrollment_idx on public.edu_questions(enrollment_id) where enrollment_id is not null;
+-- Mission questions already use this connection in existing DEV databases.
+create index if not exists edu_questions_enrollment_idx on public.edu_questions(enrollment_id) where enrollment_id is not null;
 
 -- Called only by the authenticated server route. Recheck ownership/publication
 -- inside the transaction, so a forged course or another student's enrollment cannot be attached.

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { PGlite } from '@electric-sql/pglite';
 const sql=readFileSync(new URL('../supabase/migrations/20260927035640_lesson_private_questions.sql',import.meta.url),'utf8');
-test('private lesson questions enforce ownership, active access, lesson/course scope, retry integrity and RLS',async()=>{
+for (const hasMissionQuestions of [false, true]) test(`private lesson questions enforce ownership, active access, lesson/course scope, retry integrity and RLS (existing mission context: ${hasMissionQuestions})`,async()=>{
  const db=new PGlite();
  try{
  await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;
@@ -19,6 +19,8 @@ test('private lesson questions enforce ownership, active access, lesson/course s
  alter table edu_questions enable row level security;
  create policy owner_read on edu_questions for select to authenticated using(user_id=current_setting('test.user')::uuid);
  grant select on edu_questions to authenticated;grant all on all tables in schema public to service_role;`);
+ if(hasMissionQuestions) await db.exec(`alter table edu_questions add column enrollment_id uuid references enrollments(id) on delete set null;
+ create index edu_questions_enrollment_idx on edu_questions(enrollment_id) where enrollment_id is not null;`);
  await db.exec(sql);
  const actor=randomUUID(),other=randomUUID(),course=randomUUID(),cohort=randomUUID(),enrollment=randomUUID(),week=randomUUID(),lesson=randomUUID(),request=randomUUID();
  await db.query("insert into profiles values($1,'active'),($2,'active')",[actor,other]);
