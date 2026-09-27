@@ -916,16 +916,9 @@ export async function POST(request: Request) {
             if (offer.error || !offer.data) fail('상품 모집 정보를 확인해 주세요.', 409);
             const offeredCourse = offer.data.courses as Row;
             if (offeredCourse.category === 'paid_class') {
-                const weeks = await db.from('curriculum_weeks').select('*').eq('course_id', offeredCourse.id).eq('is_published', true);
-                if (weeks.error) throw weeks.error;
-                const weekIds = (weeks.data || []).map((item) => item.id);
-                const lessons = weekIds.length
-                    ? await db.from('curriculum_lessons').select('*').in('week_id', weekIds).eq('is_published', true)
-                    : { data: [], error: null };
-                if (lessons.error) throw lessons.error;
                 const metadata = (offeredCourse.metadata && typeof offeredCourse.metadata === 'object' ? offeredCourse.metadata : {}) as Record<string, unknown>;
                 const source = String(metadata.detail_html_document || metadata.detail_html || '');
-                const issues = paidCourseReadinessIssues(offeredCourse, [offer.data], (weeks.data || []) as Row[], (lessons.data || []) as Row[]);
+                const issues = paidCourseReadinessIssues(offeredCourse, [offer.data]);
                 if (containsFreeClassCampaign(source)) issues.push('유료 전용 상세 콘텐츠');
                 if (issues.length) fail(`판매 준비가 완료되지 않았습니다: ${[...new Set(issues)].join(' · ')}`, 409);
             }

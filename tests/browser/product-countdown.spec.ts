@@ -18,7 +18,7 @@ test('native countdown ticks to expiry and closes the embedded application witho
 });
 
 test('embedded CTA uses the existing checkout, custom URL or learning destination', async ({ page }) => {
-  for (const [query, destination] of [['', '/checkout?cohort=cohort-a'], ['&zero=1&digital=1', '/apply?cohort=cohort-a'], ['&custom=1', '/safe-custom'], ['&enrolled=1', '/learn/enrolled-fixture']]) {
+  for (const [query, destination] of [['', '/checkout?cohort=cohort-a'], ['&noCurriculum=1', '/checkout?cohort=cohort-a'], ['&zero=1&digital=1', '/apply?cohort=cohort-a'], ['&custom=1', '/safe-custom'], ['&enrolled=1', '/learn/enrolled-fixture']]) {
     await page.goto('/product-countdown-test?off=1' + query);
     await expect(page.getByRole('timer')).toHaveCount(0);
     const link = page.frameLocator('iframe').getByRole('button', { name: '신청 버튼', exact: true });
@@ -29,7 +29,7 @@ test('embedded CTA uses the existing checkout, custom URL or learning destinatio
   }
 });
 
-test('unready and closed products stay blocked; missing deadlines do not create a fake timer', async ({ page }) => {
+test('missing sales schedule and closed products stay blocked; missing deadlines do not create a fake timer', async ({ page }) => {
   for (const query of ['unready=1', 'closed=1', 'missing=1', 'free=1', 'zero=1']) {
     await page.goto('/product-countdown-test?' + query);
     const frame = page.frameLocator('iframe');

@@ -224,7 +224,7 @@ export function AdminCatalog({
   const badge = (r: Row) => {
     const value = getStatus(r);
     if (s.key === "products") {
-      const sale = productSalesStatus(r, cohorts, weeks, lessons, now, Boolean(productConversion(object(r, "metadata")).url));
+      const sale = productSalesStatus(r, cohorts, now, Boolean(productConversion(object(r, "metadata")).url));
       return <><Badge color={sale.label === "판매 보류" ? "amber" : value === "published" ? "green" : ""}>{sale.label}</Badge>{value === "published" && sale.issues.length > 0 && <small>{sale.issues.join(" · ")}</small>}</>;
     }
     return (
@@ -311,7 +311,7 @@ export function AdminCatalog({
       },
       { label: "자료", value: (r) => productResourceCount(r.id) + "개" },
       { label: "공개 점검", value: (r) => {
-        const issues = productSalesStatus(r, cohorts, weeks, lessons, now, Boolean(productConversion(object(r, "metadata")).url)).issues;
+        const issues = productSalesStatus(r, cohorts, now, Boolean(productConversion(object(r, "metadata")).url)).issues;
         return issues.length ? <><Badge color="red">확인 필요</Badge><small>{issues.join(" · ")}</small></> : <Badge color="green">준비 완료</Badge>;
       } },
       { label: "판매 상태", value: badge },

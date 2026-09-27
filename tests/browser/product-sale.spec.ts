@@ -1,19 +1,19 @@
 import { expect, test } from '@playwright/test';
 
-test('sale hold reason and cohort status agree across editor tabs and preview', async ({ page }) => {
+test('sales stay available before curriculum publication across editor tabs and preview', async ({ page }) => {
   await page.goto('/product-sale-test');
   for (const tab of ['기본·판매', '수강·권한', '공개·검색']) {
     await page.getByRole('tab', { name: tab, exact: true }).click();
     const panel = page.getByRole('tabpanel');
-    await expect(panel.getByText('판매 보류', { exact: true })).toBeVisible();
-    await expect(panel.getByText('공개 커리큘럼', { exact: true })).toBeVisible();
+    await expect(panel.getByText('판매 중', { exact: true }).first()).toBeVisible();
+    await expect(panel.getByText('신청 전 확인할 항목', { exact: true })).toHaveCount(0);
     await expect(panel.getByText(/연결 기수 상태: 합성 4기/)).toBeVisible();
   }
-  await expect(page.locator('aside').getByText('판매 보류', { exact: true })).toBeVisible();
+  await expect(page.locator('aside').getByText('판매 중', { exact: true }).first()).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  page.once('dialog', async dialog => { expect(dialog.message()).toContain('공개 커리큘럼'); await dialog.dismiss(); });
+  page.once('dialog', async dialog => { expect(dialog.message()).toContain('기수 상태는 자동 변경되지 않습니다'); await dialog.accept(); });
   await page.getByRole('button', { name: '저장하기', exact: true }).click();
-  await expect(page.getByLabel('합성 저장 횟수')).toHaveText('0');
+  await expect(page.getByLabel('합성 저장 횟수')).toHaveText('1');
 });
 
 test('ready upcoming offer remains available and warns without changing cohort status', async ({ page }) => {
@@ -142,7 +142,7 @@ test('new product mission is tied to its lesson and remains hidden until reviewe
 });
 
 
-test('sale blocker leads to curriculum setup without losing product edits, and publishing clears the blocker', async ({ page }) => {
+test('curriculum can be published independently without losing unsaved product edits', async ({ page }) => {
   const week = { id: 'synthetic-week', course_id: 'synthetic-course', week_number: 1, title: '기존 합성 주차', is_published: false };
   const lesson = { id: 'synthetic-lesson', week_id: week.id, day_number: 1, title: '기존 합성 학습', content_type: 'text', is_published: false };
   await page.route('**/api/platform?**part=curriculum', route => route.fulfill({ json: { data: {
@@ -150,10 +150,10 @@ test('sale blocker leads to curriculum setup without losing product edits, and p
   } } }));
   await page.goto('/product-sale-test');
   await page.getByLabel('상품명 *', { exact: true }).fill('저장 전 상품명');
-  await page.getByRole('tabpanel', { name: '기본·판매' }).getByRole('button', { name: '공개 커리큘럼 설정하기' }).click();
-  await expect(page.getByRole('tab', { name: '커리큘럼', exact: true })).toBeFocused();
+  await expect(page.locator('aside').getByText('판매 중', { exact: true }).first()).toBeVisible();
+  await page.getByRole('tab', { name: '커리큘럼', exact: true }).click();
   const panel = page.getByRole('tabpanel', { name: '커리큘럼' });
-  const guide = panel.getByRole('region', { name: '공개 커리큘럼 준비' });
+  const guide = panel.getByRole('region', { name: '학습 공개 상태' });
   await expect(guide.getByRole('status')).toContainText('공개 주차 0개');
   await panel.locator('summary').filter({hasText:'주차 설정'}).click();
   week.is_published = true;
@@ -166,7 +166,7 @@ test('sale blocker leads to curriculum setup without losing product edits, and p
   lesson.is_published = true;
   await panel.getByRole('checkbox', { name: '일차 공개' }).check();
   await panel.getByRole('button', { name: '일차 저장' }).click();
-  await expect(guide).toContainText('커리큘럼 준비 완료');
+  await expect(guide).toContainText('공개된 학습이 있습니다.');
   await expect(page.locator('aside').getByText('판매 보류', { exact: true })).toHaveCount(0);
   await expect(page.getByLabel('합성 저장 횟수')).toHaveText('0');
   await page.getByRole('tab', { name: '기본·판매', exact: true }).click();
@@ -181,8 +181,19 @@ test('curriculum guidance does not count a public lesson under a private week or
   } } }));
   await page.goto('/product-sale-test');
   await page.getByRole('tab', { name: '커리큘럼', exact: true }).click();
-  const guide = page.getByRole('region', { name: '공개 커리큘럼 준비' });
+  const guide = page.getByRole('region', { name: '학습 공개 상태' });
   await expect(guide.getByRole('status')).toContainText('공개 학습 0개');
+  await expect(page.locator('li').getByText(/주차 비공개로 숨김/)).toBeVisible();
+  await page.getByRole('button', { name: '학습 편집', exact: true }).click();
+  const editor = page.getByRole('region', { name: '일차별 콘텐츠 편집' });
+  await expect(editor.getByRole('checkbox', { name: '일차 공개' })).toBeChecked();
+  await expect(editor.getByLabel('저장된 학습 공개 상태')).toContainText('주차 비공개로 숨김');
+  await editor.getByRole('textbox', { name: '일차 제목' }).fill('저장 전 제목');
+  await editor.getByRole('button', { name: '이 학습의 주차 설정' }).click();
+  await expect(page.getByRole('checkbox', { name: '주차 공개' })).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: '주차 공개' })).not.toBeChecked();
+  await expect(page.getByLabel('합성 커리큘럼 저장 횟수')).toHaveText('0');
+  await expect(editor.getByRole('textbox', { name: '일차 제목' })).toHaveValue('저장 전 제목');
   await page.getByRole('tab', { name: '기본·판매', exact: true }).click();
   await page.route('**/api/platform?**part=curriculum', route => route.fulfill({ status: 500, json: { error: '조회 실패 시험' } }));
   await page.getByRole('tab', { name: '커리큘럼', exact: true }).click();
