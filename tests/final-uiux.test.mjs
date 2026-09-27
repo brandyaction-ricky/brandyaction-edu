@@ -137,7 +137,7 @@ test('a published paid product uses its upcoming cohort for CTA and the actual d
   const { ProductDetail } = load('app/ui/final/public-views.tsx');
   const upcoming = { ...cohort, id: 'upcoming-cohort', status: 'upcoming', recruitment_start_at: '2098-12-01T00:00:00Z', recruitment_end_at: '2099-01-31T00:00:00Z' };
   const markup = html(ProductDetail, { course, data: { ...data, cohorts: [upcoming], enrollments: [] } });
-  assert.match(markup, /checkout\?cohort=upcoming-cohort/);
+  assert.match(markup, /login\?next=%2Fcheckout%3Fcohort%3Dupcoming-cohort/);
   assert.match(markup, /2099/);
   assert.doesNotMatch(markup, /다음 모집 준비 중|이용·환불 안내/);
 });
@@ -421,7 +421,7 @@ test('paid product offers remain open with no published curriculum', () => {
     { curriculum_weeks: [{ ...data.curriculum_weeks[0], is_published: false }], curriculum_lessons: [{ ...lesson, is_published: false }] },
   ]) {
     const markup = html(ProductDetail, { course, data: { ...data, ...curriculum, enrollments: [], lesson_contents: [] } });
-    assert.match(markup, /href="\/checkout/);
+    assert.match(markup, /href="\/login\?next=%2Fcheckout/);
     assert.doesNotMatch(markup, /수강 신청을 준비하고 있습니다/);
     assert.doesNotMatch(markup, /등록된 학습 본문/);
   }
