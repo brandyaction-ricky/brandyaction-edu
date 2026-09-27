@@ -1,9 +1,11 @@
 "use client";
 
 import { number as num, safeUrl, text as t, type Row } from "@/lib/platform";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { UploadField } from "../editor-fields";
 import type { Data, WorkflowSend } from "../learning-workflows";
+
+import { ProductMissionWorkspace } from "./product-mission-workspace";
 
 type ContentType = "text" | "vod" | "material" | "link";
 
@@ -69,8 +71,11 @@ function LessonSettings({ lesson, hasContent, disabled, send, onSaved }: {
   </div>;
 }
 
-export function ProductCurriculumWorkspace({ course, pending, send }: {
+export function ProductCurriculumWorkspace({ course, pending, send, commonResources, resourceCount = 0, active: isActive = true }: {
   course?: Row;
+  commonResources?: ReactNode;
+  active?: boolean;
+  resourceCount?: number;
   pending: boolean;
   send: WorkflowSend;
 }) {
@@ -79,7 +84,7 @@ export function ProductCurriculumWorkspace({ course, pending, send }: {
   const [loading, setLoading] = useState(true);
   const [readError, setReadError] = useState("");
   useEffect(() => {
-    if (!course?.id) return;
+    if (!course?.id || !isActive) return;
     const controller = new AbortController();
     let active = true;
     fetch(`/api/platform?admin=1&section=products&record=${encodeURIComponent(String(course.id))}&part=curriculum`, { cache: "no-store", signal: controller.signal })
@@ -91,7 +96,7 @@ export function ProductCurriculumWorkspace({ course, pending, send }: {
       .then((result) => { if (active) { setSnapshot(result); setReadError(""); setLoading(false); } })
       .catch((cause) => { if (active && !controller.signal.aborted) { setReadError(message(cause)); setLoading(false); } });
     return () => { active = false; controller.abort(); };
-  }, [course?.id, readVersion]);
+  }, [course?.id, readVersion, isActive]);
   const curriculum: Data = snapshot || {};
   const weeks = (curriculum.curriculum_weeks || [])
     .filter((week) => week.course_id === course?.id && !week.archived_at)
@@ -107,6 +112,8 @@ export function ProductCurriculumWorkspace({ course, pending, send }: {
   const [weekId, setWeekId] = useState("");
   const [lessonTitle, setLessonTitle] = useState("");
   const [lessonId, setLessonId] = useState("");
+  const [openedLessons, setOpenedLessons] = useState<string[]>([]);
+  const contentEditorRef = useRef<HTMLElement>(null);
   const [contentType, setContentType] = useState<ContentType>("text");
   const [contentValue, setContentValue] = useState("");
   const [resourceName, setResourceName] = useState("");
@@ -122,11 +129,13 @@ export function ProductCurriculumWorkspace({ course, pending, send }: {
     const content = (curriculum.lesson_contents || []).find((item) => item.lesson_id === lesson.id);
     const type = (t(lesson, "content_type") || "text") as ContentType;
     setLessonId(String(lesson.id));
+    setOpenedLessons(ids => ids.includes(String(lesson.id)) ? ids : [...ids, String(lesson.id)]);
     setContentType(type);
     setContentValue(type === "text" ? t(content, "body_text") : type === "vod" ? t(content, "vod_url") : type === "material" ? t(content, "resource_storage_path") : t(content, "external_url"));
     setResourceName(t(content, "resource_name"));
     setUploadStatus("idle");
     setError("");
+    requestAnimationFrame(() => contentEditorRef.current?.focus());
   }
 
   async function createWeek() {
@@ -162,7 +171,7 @@ export function ProductCurriculumWorkspace({ course, pending, send }: {
         is_preview: false,
       } }, "상품에 일차별 학습을 추가했습니다. 내용을 이어서 등록해 주세요.");
       const created = result.row as Row | undefined;
-      if (created?.id) { setLessonId(String(created.id)); setContentType("text"); setContentValue(""); }
+      if (created?.id) { setOpenedLessons(ids => [...ids, String(created.id)]); setLessonId(String(created.id)); setContentType("text"); setContentValue(""); }
       setLessonTitle("");
       setLoading(true); setReadVersion((version) => version + 1);
     } catch (cause) { setError(message(cause)); }
@@ -197,11 +206,11 @@ export function ProductCurriculumWorkspace({ course, pending, send }: {
 
   return <div className="section-pad product-curriculum-workspace">
     <h2>상품별 커리큘럼</h2>
-    <p className="meta">이 상품에 연결된 기존 주차와 일차를 그대로 보여 줍니다. 새 항목은 비공개로 등록되며 항목별로 즉시 저장됩니다.</p>
+    <p className="meta">학습 편집을 선택해 본문·영상·자료와 미션을 함께 관리합니다. 같은 상품의 모든 기수가 이 커리큘럼을 함께 사용합니다.</p>
     <section className="product-curriculum-guide" aria-label="공개 커리큘럼 준비">
       <h3>공개 커리큘럼 준비</h3>
       <p>주차는 수업을 묶는 단위이고, 학습은 그 안의 개별 수업입니다. 유료 클래스는 공개 주차와 그 안의 공개 학습이 각각 하나 이상 있어야 신청할 수 있습니다.</p>
-      <ol><li>주차를 추가하고 아래에서 ‘주차 공개’를 선택해 저장합니다.</li><li>그 주차에 학습을 추가하고 ‘콘텐츠 편집’에서 본문·영상·자료 중 필요한 내용을 저장합니다.</li><li>‘일차 공개’를 선택하고 ‘일차 저장’을 누릅니다.</li></ol>
+      <ol><li>주차를 추가하고 아래에서 ‘주차 공개’를 선택해 저장합니다.</li><li>그 주차에 학습을 추가하고 ‘학습 편집’에서 본문·영상·자료 중 필요한 내용을 저장합니다.</li><li>‘일차 공개’를 선택하고 ‘일차 저장’을 누릅니다.</li></ol>
       <p className="meta">기수·회차 탭에서는 가격과 모집·교육 일정을 설정합니다. 상세페이지에 적은 목차는 이 공개 설정에 반영되지 않습니다.</p>
       {!loading && !readError && <div role="status">
         <p>공개 주차 <b>{publishedWeeks.length}개</b> · 공개 주차 안의 공개 학습 <b>{publishedLessons.length}개</b></p>
@@ -223,15 +232,22 @@ export function ProductCurriculumWorkspace({ course, pending, send }: {
     {weeks.map((week) => <section key={week.id} className="product-curriculum-week" aria-label={`${num(week, "week_number")}주차 ${t(week, "title")}`}>
       <h3>{num(week, "week_number")}주차 · {t(week, "title")}</h3>
       <WeekSettings key={`${week.id}:${week.updated_at}`} week={week} disabled={saving} send={send} onSaved={() => { setLoading(true); setReadVersion((version) => version + 1); }} />
-      {lessons.filter((lesson) => lesson.week_id === week.id).length ? <ul>{lessons.filter((lesson) => lesson.week_id === week.id).map((lesson) => <li key={lesson.id}><span>Day {num(lesson, "day_number")} · {t(lesson, "title")}{lesson.is_published ? " · 공개" : " · 비공개"}</span><button className="btn small" type="button" onClick={() => selectLesson(lesson)} disabled={saving}>콘텐츠 편집</button></li>)}</ul> : <p className="meta">등록된 일차가 없습니다.</p>}
+      {lessons.filter((lesson) => lesson.week_id === week.id).length ? <ul>{lessons.filter((lesson) => lesson.week_id === week.id).map((lesson) => <li key={lesson.id}><span>Day {num(lesson, "day_number")} · {t(lesson, "title")}{lesson.is_published ? " · 공개" : " · 비공개"}</span><button className="btn small" type="button" onClick={() => selectLesson(lesson)} disabled={saving}>학습 편집</button></li>)}</ul> : <p className="meta">등록된 일차가 없습니다.</p>}
     </section>)}
-    {selectedLesson && <section className="product-curriculum-content" aria-label="일차별 콘텐츠 편집">
+    {selectedLesson && <section ref={contentEditorRef} tabIndex={-1} className="product-curriculum-content" aria-label="일차별 콘텐츠 편집">
       <h3>Day {num(selectedLesson, "day_number")} · {t(selectedLesson, "title")}</h3>
       <LessonSettings key={`${selectedLesson.id}:${selectedLesson.updated_at}`} lesson={selectedLesson} hasContent={Boolean(existingContent)} disabled={saving} send={send} onSaved={() => { setLoading(true); setReadVersion((version) => version + 1); }} />
       <label>콘텐츠 유형<select value={contentType} onChange={(event) => { setContentType(event.target.value as ContentType); setContentValue(""); setUploadStatus("idle"); }} disabled={saving}><option value="text">텍스트</option><option value="vod">영상 URL</option><option value="material">자료 파일</option><option value="link">외부 링크</option></select></label>
       {contentType === "text" ? <label>학습 본문<textarea rows={7} value={contentValue} onChange={(event) => setContentValue(event.target.value)} disabled={saving} /></label> : contentType === "material" ? <><label>자료 이름<input value={resourceName} onChange={(event) => setResourceName(event.target.value)} disabled={saving} /></label><UploadField key={lessonId} name="curriculum_resource" value={contentValue} image={false} disabled={saving} onChange={setContentValue} onStatusChange={setUploadStatus} /></> : <label>{contentType === "vod" ? "영상 URL" : "외부 링크"}<input type="url" value={contentValue} onChange={(event) => setContentValue(event.target.value)} placeholder="https://" disabled={saving} /></label>}
       <button className="btn primary" type="button" onClick={() => void saveContent()} disabled={saving || !contentValue.trim()}>콘텐츠 저장</button>
     </section>}
+    {openedLessons.map(id => <div key={id} hidden={lessonId !== id}>
+      <ProductMissionWorkspace course={course} pending={pending} send={send} lessonScope={id} />
+    </div>)}
+    {commonResources && <details className="product-common-resources">
+      <summary>과정 공통 자료 <span>{resourceCount}개</span></summary>
+      <div className="product-common-resources-body">{commonResources}</div>
+    </details>}
     {error && <p className="notice warning" role="alert">{error}</p>}
   </div>;
 }
