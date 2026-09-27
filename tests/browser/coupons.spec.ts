@@ -1,7 +1,10 @@
 import { expect, test } from '@playwright/test';
 const cohort='00000000-0000-4000-8000-000000000001';
-test('coupon drawer preserves admin defaults, multiple products and KST after save/reopen',async({page})=>{
-  await page.route('**/api/coupons?history=*',route=>route.fulfill({json:{rows:[],count:0}}));
+test('coupon drawer preserves admin defaults, multiple products and KST after save/reopen',async({page},testInfo)=>{
+  await page.route('**/api/coupons?history=*',route=>route.fulfill({json:{rows:[{
+    id:'history-row',original_amount:1000,discount_amount:1000,final_amount:0,status:'cancelled',used_at:'2026-09-27T12:00:00Z',
+    profiles:{full_name:'QA 관리자'},orders:{order_number:'BAE-20260927120054095-440C869B',status:'cancelled',total_amount:0,order_items:[{item_name:'[DEV QA] 쿠폰 재사용 회귀 검증용 긴 상품명 및 기수 정보'}]},
+  }],count:1}}));
   await page.goto('/coupons-test');await page.getByRole('button',{name:'쿠폰 만들기'}).click();
   await page.getByLabel('쿠폰명 *',{exact:true}).fill('QA 전체 무료');await page.getByLabel('쿠폰 코드 *',{exact:true}).fill('ADMIN_QA');
   await page.getByLabel('할인 방식').selectOption('ADMIN_FREE');
@@ -16,6 +19,15 @@ test('coupon drawer preserves admin defaults, multiple products and KST after sa
   await page.getByRole('button',{name:'쿠폰 만들기'}).click();await expect(page.getByLabel('발급 시작 · KST')).toHaveValue('2026-09-27T20:00');
   await expect(page.getByLabel('합성 유료 상품',{exact:true})).toBeChecked();
   await expect(page.getByLabel('두 번째 합성 상품',{exact:true})).toBeChecked();
+  await expect(page.getByRole('cell',{name:/취소·복원/})).toBeVisible();
+  const drawer=page.getByRole('dialog');
+  expect(await drawer.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+  expect(await page.locator('.coupon-settings-form').evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+  const bounds=await drawer.boundingBox();
+  const endDate=await page.getByLabel('발급 종료 · KST').boundingBox();
+  expect(endDate!.x+endDate!.width).toBeLessThanOrEqual(bounds!.x+bounds!.width);
+  await page.getByRole('heading',{name:'쿠폰 사용 내역',exact:true}).scrollIntoViewIfNeeded();
+  await drawer.screenshot({path:`/private/tmp/edu-coupon-history-${testInfo.project.name}.png`});
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
 });
 
