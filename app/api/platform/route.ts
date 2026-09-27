@@ -11,6 +11,7 @@ import { adminSelectColumns, adminTables, archiveValues, cohortStatus, phoneNumb
 import { POLICY_VERSION } from '@/lib/legal-policies';
 import { getOperatorUser, permissionsFor, sectionScopes } from '@/lib/operator-permissions';
 import { crmDeliveryState } from '@/lib/crm-delivery';
+import { loadSmsSettings, registeredSmsNumbers } from '@/lib/crm-sms-settings';
 import { mergeProductDigitalSections, mergeProductMetadata, mergeProductResources, productDigitalSections, productMetadataFields, productResources, productResourceScopes } from '@/lib/product-metadata';
 import { getPublicPlatformData, getPublicSupport } from '@/lib/public-platform-data';
 import { PUBLIC_CACHE_TAG, type PublicView } from '@/lib/public-platform-plan';
@@ -444,7 +445,10 @@ export async function GET(request: Request) {
             }
         }
         if (adminMode) {
-            if (['templates', 'campaigns', 'automations'].includes(sectionKey)) data.crm_delivery_state = [crmDeliveryState() as unknown as Row];
+            if (['templates', 'campaigns', 'automations'].includes(sectionKey)) {
+                data.crm_delivery_state = [crmDeliveryState() as unknown as Row];
+                data.crm_sms_settings = [{ ...await loadSmsSettings(), ...registeredSmsNumbers(), canConfigure: operator?.role === 'admin' } as unknown as Row];
+            }
         }
         const { operations } = await settings;
         if (adminMode && data.site_settings) {

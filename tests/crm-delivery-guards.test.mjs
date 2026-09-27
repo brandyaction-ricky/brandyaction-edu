@@ -53,6 +53,13 @@ function dispatchFixture({ channel = 'lms', current = member, blackPages = [{ bl
   };
   const modules = {
     '@/lib/supabase/admin': { createAdminClient: () => db },
+    '@/lib/crm-purchase-contact': {},
+    '@/lib/crm-purchase-email': { purchaseEmailConfigured: () => false },
+    '@/lib/crm-sms-settings': {
+      loadSmsSettings: async () => ({ senderPhone: '0200000000', optoutPhone: '0800000000', senderName: '브랜디액션', transactionalEnabled: true, marketingEnabled: true }),
+      marketingAllowedNow: () => true,
+      marketingText: (content, sender, optout) => `(광고) ${sender}\n${content}\n무료수신거부 ${optout}`,
+    },
     solapi: { SolapiMessageService: class {
       async getBlacks() {
         steps.push('080');

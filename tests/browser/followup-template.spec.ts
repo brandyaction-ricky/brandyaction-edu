@@ -12,8 +12,8 @@ test('saved followup requires explicit import and saves only an inactive marketi
  await expect(page.getByLabel('메시지 내용')).toHaveValue('합성 안내 문구');
  await expect(page.getByLabel('메시지 목적')).toHaveValue('marketing');
  await expect(page.getByLabel('메시지 목적')).toBeDisabled();
- await expect(page.getByRole('checkbox')).not.toBeChecked();
- await expect(page.getByRole('checkbox')).toBeDisabled();
+ await expect(page.locator('input[name="is_active"]')).not.toBeChecked();
+ await expect(page.locator('input[name="is_active"]')).toBeDisabled();
  await page.getByRole('button',{name:'저장하기',exact:true}).click();
  await expect.poll(()=>writes.length).toBe(1);
  expect(writes[0]).toMatchObject({action:'crm-save',kind:'template',purpose:'marketing',channel:'lms',isActive:false,content:'합성 안내 문구'});
@@ -53,8 +53,8 @@ test('Alimtalk draft stays editable and off until an approved Kakao template num
  await expect(page.getByLabel('메시지 목적')).toHaveValue('transactional');
  await expect(page.getByLabel('메시지 목적')).toBeDisabled();
  await expect(page.getByLabel('카카오 승인 템플릿 번호')).toHaveValue('');
- await expect(page.getByRole('checkbox')).not.toBeChecked();
- await expect(page.getByRole('checkbox')).toBeDisabled();
+ await expect(page.locator('input[name="is_active"]')).not.toBeChecked();
+ await expect(page.locator('input[name="is_active"]')).toBeDisabled();
  await page.getByLabel('템플릿 이름').fill('결제 완료 안내 초안');
  await page.getByLabel('메시지 내용').fill('결제가 확인되었습니다. 안내 문구는 여기서 수정할 수 있습니다.');
  await page.getByRole('button',{name:'저장하기',exact:true}).click();

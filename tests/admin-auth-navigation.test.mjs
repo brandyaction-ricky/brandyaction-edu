@@ -100,6 +100,7 @@ function apiHarness(user, failure = null, fixtures = {}, staffPermissions = {}) 
     '@/lib/mission-quiz': {}, '@/lib/legal-policies': { POLICY_VERSION: 'test' },
     '@/lib/operator-permissions': operators,
     '@/lib/crm-delivery': { crmDeliveryState: () => ({}) },
+    '@/lib/crm-sms-settings': { loadSmsSettings: async () => ({}), registeredSmsNumbers: () => ({ senders: [], optouts: [] }) },
   });
   return { calls, read: section => route.GET(new Request('https://example.test/api/platform?admin=1&section=' + section)) };
 }

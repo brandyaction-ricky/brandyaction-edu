@@ -69,6 +69,7 @@ function harness({ missions = [], user = admin } = {}) {
     '@/lib/platform': platform, '@/lib/platform-rules': load('lib/platform-rules.ts'), '@/lib/qa-rules': rules,
     '@/lib/product-metadata': {}, '@/lib/edu-settings': { getEduSettings: async () => ({ operations: {} }) },
     '@/lib/mission-quiz': {}, '@/lib/legal-policies': {}, '@/lib/crm-delivery': { crmDeliveryState: () => ({}) },
+    '@/lib/crm-sms-settings': { loadSmsSettings: async () => ({}), registeredSmsNumbers: () => ({ senders: [], optouts: [] }) },
     '@/lib/operator-permissions': { getOperatorUser: async () => user?.role === 'admin' ? user : null, permissionsFor: async () => user?.permissions || {}, sectionScopes: { home: 'members', customers: 'members', missions: 'products' } },
   });
   return {
