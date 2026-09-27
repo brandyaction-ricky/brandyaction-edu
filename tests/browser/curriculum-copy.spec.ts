@@ -27,7 +27,7 @@ test('copy previews scope, retries with same request and stays private without p
 test('copy is unavailable for existing curriculum and unsaved product changes',async({page})=>{
  await setup(page);
  await page.getByRole('tab',{name:'기본·판매',exact:true}).click();
- await page.getByRole('textbox',{name:'상품명 *',exact:true}).fill('아직 저장하지 않은 이름');
+ await page.getByRole('textbox',{name:'상품명',exact:true}).fill('아직 저장하지 않은 이름');
  await page.getByRole('tab',{name:'커리큘럼',exact:true}).click();
  await expect(page.getByRole('button',{name:'원본 상품 선택'})).toBeDisabled();
  await page.goto('/product-sale-test');await page.getByRole('tab',{name:'커리큘럼',exact:true}).click();

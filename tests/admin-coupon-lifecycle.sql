@@ -1,0 +1,64 @@
+begin;
+do $$
+declare actor uuid:=gen_random_uuid(); member uuid:=gen_random_uuid();
+  course uuid:=gen_random_uuid(); cohort uuid:=gen_random_uuid(); another uuid:=gen_random_uuid(); coupon uuid:=gen_random_uuid(); ordinary uuid:=gen_random_uuid();
+  result jsonb; second jsonb; quoted jsonb; settings jsonb;
+begin
+  insert into auth.users(id,email,raw_user_meta_data) values(actor,'coupon-admin@example.invalid','{}');
+  update public.profiles set role='admin' where id=actor;
+  insert into auth.users(id,email,raw_user_meta_data) values(member,'coupon-member@example.invalid','{}');
+  insert into public.courses(id,course_code,slug,title,category,list_price,status) values(course,'COUPON-QA','coupon-qa','Coupon QA','paid_class',100000,'published');
+  insert into public.cohorts(id,course_id,cohort_code,name,price,status,recruitment_start_at,recruitment_end_at)
+    values(cohort,course,'COUPON-QA-1','QA 1',80000,'recruiting',now(),now()+interval '1 day'),(another,course,'COUPON-QA-2','QA 2',80000,'recruiting',now(),now()+interval '1 day');
+  settings:=jsonb_build_object('name','Admin QA','code','ADMIN_QA','discount_type','ADMIN_FREE','discount_value',100,'product_scope','paid','per_user_limit',null,'usage_limit',null);
+  begin perform public.edu_save_coupon(member,coupon,settings,'{}'); raise exception 'QA_NONADMIN_SAVE'; exception when raise_exception then if sqlerrm<>'ADMIN_REQUIRED' then raise; end if; end;
+  perform public.edu_save_coupon(actor,coupon,settings,'{}');
+  perform public.edu_set_coupon_active(actor,array[coupon],false);
+  begin perform public.edu_coupon_quote(actor,cohort,'ADMIN_QA'); raise exception 'QA_INACTIVE'; exception when raise_exception then if sqlerrm<>'COUPON_INACTIVE' then raise; end if; end;
+  perform public.edu_set_coupon_active(actor,array[coupon],true);
+  if (select per_user_limit from public.coupons where id=coupon) is not null then raise exception 'QA_UNLIMITED'; end if;
+  begin perform public.edu_coupon_quote(member,cohort,'ADMIN_QA'); raise exception 'QA_NONADMIN_APPLY'; exception when raise_exception then if sqlerrm<>'COUPON_ADMIN_ONLY' then raise; end if; end;
+  if public.edu_available_coupons(member,cohort)::text like '%ADMIN_QA%' then raise exception 'QA_ADMIN_CODE_LEAK'; end if;
+  quoted:=public.edu_coupon_quote(actor,cohort,'ADMIN_QA');
+  if (quoted->>'totalAmount')::integer<>0 or (quoted->>'couponDiscount')::integer<>80000 then raise exception 'QA_ADMIN_QUOTE'; end if;
+  result:=public.edu_checkout_with_coupon(actor,cohort,'QA','qa@example.invalid','01012345678','qa','qa','qa','ADMIN_QA');
+  if result->>'free'<>'true' then raise exception 'QA_ZERO_BRANCH'; end if;
+  if not exists(select 1 from public.enrollments where user_id=actor and cohort_id=cohort and status='active') then raise exception 'QA_ENTITLEMENT'; end if;
+  if exists(select 1 from public.payments where order_id=(result->>'orderId')::uuid) then raise exception 'QA_ZERO_PROVIDER'; end if;
+  if not exists(select 1 from public.coupon_redemptions where order_id=(result->>'orderId')::uuid and status='used' and original_amount=80000 and discount_amount=80000 and final_amount=0) then raise exception 'QA_HISTORY'; end if;
+  second:=public.edu_checkout_with_coupon(actor,another,'QA','qa@example.invalid','01012345678','qa','qa','qa','ADMIN_QA');
+  perform public.edu_cancel_zero_order(actor,(result->>'orderId')::uuid);
+  perform public.edu_cancel_zero_order(actor,(result->>'orderId')::uuid);
+  if not exists(select 1 from public.coupon_redemptions where order_id=(result->>'orderId')::uuid and status='cancelled' and used_at is not null) then raise exception 'QA_RESTORE_HISTORY'; end if;
+  if exists(select 1 from public.enrollments where user_id=actor and cohort_id=cohort and status='active') then raise exception 'QA_REVOKE'; end if;
+  result:=public.edu_checkout_with_coupon(actor,cohort,'QA','qa@example.invalid','01012345678','qa','qa','qa','ADMIN_QA');
+  settings:=jsonb_build_object('name','Normal QA','code','NORMAL_QA','discount_type','percentage','discount_value',10,'max_discount_amount',5000,'product_scope','specific','per_user_limit',1,'usage_limit',1,'starts_at',now(),'ends_at',now()+interval '1 day');
+  begin perform public.edu_save_coupon(actor,ordinary,settings,array[gen_random_uuid()]); raise exception 'QA_BAD_PRODUCT'; exception when raise_exception then if sqlerrm<>'COUPON_INVALID' then raise; end if; end;
+  if exists(select 1 from public.coupons where id=ordinary) then raise exception 'QA_SAVE_ATOMIC'; end if;
+  perform public.edu_save_coupon(actor,ordinary,settings,array[course]);
+  quoted:=public.edu_coupon_quote(member,cohort,'NORMAL_QA');
+  if (quoted->>'totalAmount')::integer<>75000 then raise exception 'QA_PERCENT_CAP'; end if;
+  update public.coupons set issue_start_at=now()+interval '1 second' where id=ordinary;
+  begin perform public.edu_coupon_quote(member,cohort,'NORMAL_QA'); raise exception 'QA_ISSUE_START'; exception when raise_exception then if sqlerrm<>'COUPON_ISSUE_PERIOD' then raise; end if; end;
+  update public.coupons set issue_start_at=now(),issue_end_at=now()+interval '1 second' where id=ordinary;
+  result:=public.edu_checkout_with_coupon(member,cohort,'QA','member@example.invalid','01012345678','qa','qa','qa','NORMAL_QA');
+  if result->>'free' is not null then raise exception 'QA_POSITIVE_PROVIDER'; end if;
+  if not exists(select 1 from public.coupon_redemptions where order_id=(result->>'orderId')::uuid and status='reserved') then raise exception 'QA_PENDING_NOT_USED'; end if;
+  quoted:=public.edu_coupon_quote(member,cohort,'NORMAL_QA'); -- Own pending reservation does not prevent retry.
+  begin perform public.edu_checkout_with_coupon(member,another,'QA','member@example.invalid','01012345678','qa','qa','qa','NORMAL_QA'); raise exception 'QA_QUANTITY'; exception when raise_exception then if sqlerrm<>'COUPON_SOLD_OUT' then raise; end if; end;
+  if exists(select 1 from public.order_items i join public.orders o on o.id=i.order_id where o.user_id=member and i.cohort_id=another) then raise exception 'QA_CHECKOUT_ATOMIC'; end if;
+  update public.orders set status='payment_failed' where id=(result->>'orderId')::uuid;
+  quoted:=public.edu_coupon_quote(member,another,'NORMAL_QA');
+  result:=public.edu_checkout_with_coupon(member,another,'QA','member@example.invalid','01012345678','qa','qa','qa','NORMAL_QA');
+  update public.orders set status='paid' where id=(result->>'orderId')::uuid;
+  update public.orders set status='partially_refunded' where id=(result->>'orderId')::uuid;
+  if not exists(select 1 from public.coupon_redemptions where order_id=(result->>'orderId')::uuid and status='used') then raise exception 'QA_PARTIAL_RESTORE'; end if;
+  update public.orders set status='refunded' where id=(result->>'orderId')::uuid;
+  if not exists(select 1 from public.customer_coupons where coupon_id=ordinary and user_id=member and status='available') then raise exception 'QA_WALLET_RESTORE'; end if;
+  update public.coupons set issue_start_at=now()-interval '1 day',issue_end_at=now() where id=ordinary;
+  quoted:=public.edu_coupon_quote(member,cohort,'NORMAL_QA'); -- Already issued: use window remains valid.
+  update public.coupons set starts_at=now()-interval '1 day',ends_at=now() where id=ordinary;
+  begin perform public.edu_coupon_quote(member,cohort,'NORMAL_QA'); raise exception 'QA_END_EXCLUSIVE'; exception when raise_exception then if sqlerrm<>'COUPON_EXPIRED' then raise; end if; end;
+  if has_function_privilege('authenticated','public.edu_checkout_with_coupon(uuid,uuid,text,text,text,text,text,text,text)','execute') then raise exception 'QA_PUBLIC_RPC'; end if;
+end; $$;
+rollback;
