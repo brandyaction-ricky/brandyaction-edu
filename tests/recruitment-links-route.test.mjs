@@ -14,7 +14,7 @@ function harness(enabled=true,allowed=true,error=null){
 const context={params:Promise.resolve({id,channel:'paid'})};
 const req=(method='GET',extra={})=>new Request('https://example.test/join/'+id+'/paid',method==='GET'?{}:{method,headers:{origin:'https://example.test',...extra},body:new URLSearchParams({event,version:'1'})});
 test('public GET never records; POST redirects only to DB destination and test mode suppresses recording',async()=>{
- const h=harness();const read=await h.public.GET(req(),context);assert.equal(read.status,200);assert.equal(h.calls[0].args.p_event,null);assert.match(await read.text(),/&lt;script&gt;/);assert.match(read.headers.get('cache-control'),/no-store/);
+ const h=harness();const read=await h.public.GET(req(),context);assert.equal(read.status,200);assert.equal(h.calls[0].args.p_event,null);const markup=await read.text();assert.doesNotMatch(markup,/<script>|&lt;script&gt;|unsafe|버튼 클릭 횟수/);assert.match(markup,/카톡방으로 이동하기/);assert.match(read.headers.get('cache-control'),/no-store/);
  const post=await h.public.POST(req('POST'),context);assert.equal(post.status,303);assert.equal(post.headers.get('location'),'https://open.kakao.com/o/synthetic');assert.equal(h.calls[1].args.p_event,event);
  await h.public.POST(req('POST',{cookie:'test'}),context);assert.equal(h.calls[2].args.p_event,null);
  assert.equal((await h.public.POST(req('POST',{origin:'https://evil.test'}),context)).status,403);assert.equal(h.calls.length,3);

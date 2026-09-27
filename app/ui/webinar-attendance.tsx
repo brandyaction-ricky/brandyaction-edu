@@ -19,7 +19,7 @@ export function WebinarAttendance({code}:{code:string}) {
   }catch(e){setMessage((e as Error).message);}finally{busy.current=false;setPending(false);}
  };
  return <section aria-label="라이브 출석 확인">
-  <h2>라이브 출석 확인</h2><p>방송 중 안내에 따라 출석을 확인해 주세요. 직접 누른 출석 확인 기록이며, 시청 시간을 측정하지 않습니다.</p>
+  <h2>라이브 출석 확인</h2><p>방송 중 출석 안내가 나오면 아래 출석 확인 버튼을 눌러 주세요.</p>
   {(['first','encore'] as const).map(phase=>{
    const s=report?.sessions.find(row=>row.phase===phase);
    return <section key={phase} aria-label={liveLabel(phase)} style={{borderTop:'1px solid #ddd',padding:'16px 0'}}>

@@ -316,8 +316,7 @@ export function Checkout({
                   />
                 </label>
                 <p className="meta">
-                  유효한 쿠폰의 할인은 결제창을 열 때 서버에서 확인하여
-                  반영합니다.
+                  쿠폰 사용 조건에 따라 할인이 적용됩니다. 결제창에서 최종 금액을 확인해 주세요.
                 </p>
               </div>
             </section>
