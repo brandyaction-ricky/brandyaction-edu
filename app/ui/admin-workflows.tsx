@@ -1929,6 +1929,7 @@ function OrdersPanel({
   setPage,
   loading,
 }: Props) {
+  const entrySourceLabels: Record<string, string> = { paid: '광고', organic: '오가닉', alumni: '기존 수강생', youtube: '유튜브' };
   const [opened, setOpened] = useState("");
   const detailRef = useRef<HTMLDialogElement>(null);
   const [query, setQuery] = useState("");
@@ -2063,6 +2064,7 @@ function OrdersPanel({
                 {[
                   "주문",
                   "회원",
+                  "유입",
                   "결제액",
                   "결제 상태",
                   "환불 상태",
@@ -2094,6 +2096,7 @@ function OrdersPanel({
                     <b>{t(order, "customer_name") || "이름 미등록"}</b>
                     <small>{t(order, "customer_email")}</small>
                   </td>
+                  <td data-label="유입">{entrySourceLabels[t(order, 'entry_src')] || '미기록'}</td>
                   <td data-label="결제액">
                     <b>{money(approvedAmount)}</b>
                     <p>{[...new Set(orderPayments.map(payment => t(payment, "method")).filter(Boolean))].join(" · ") || (Number(order.total_amount) === 0 ? "무료 신청" : "승인 내역 없음")}</p>
@@ -2139,6 +2142,7 @@ function OrdersPanel({
             <div className="dialog-body">
               <h3 className="order-detail-number">{t(selectedOrder, "order_number")}</h3>
               <p className="meta mt8">{timeLabel(selectedOrder.created_at)} · {t(selectedOrder, "customer_name") || "이름 미등록"}</p>
+              <p className="meta mt8">유입 경로: {entrySourceLabels[t(selectedOrder, 'entry_src')] || '미기록'}</p>
               <div className="order-detail-badges mt16">
                 <span className={`badge ${selectedOrder.status === "paid" ? "green" : selectedOrder.status === "payment_failed" ? "red" : selectedOrder.status === "pending" ? "amber" : ""}`}>{labels[t(selectedOrder, "status")] || t(selectedOrder, "status")}</span>
                 <span className="badge">{selectedCancelled > 0 ? (selectedRemaining ? "부분 환불" : "환불 완료") : "환불 없음"}</span>
