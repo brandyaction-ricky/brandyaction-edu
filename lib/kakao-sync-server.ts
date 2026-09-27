@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { POLICY_VERSION } from '@/lib/legal-policies';
-import { defaultKakaoSyncConfig, validateKakaoSyncConfig, verifiedKakaoIdentity, kakaoConsentSnapshot } from '@/lib/kakao-sync';
+import { defaultKakaoSyncConfig, validateKakaoSyncConfig, verifiedKakaoIdentity, kakaoConsentSnapshot, kakaoPhoneNumber } from '@/lib/kakao-sync';
 import type { User } from '@supabase/supabase-js';
 
 export async function getKakaoSyncConfig() {
@@ -26,9 +26,10 @@ export async function syncKakaoConsent(user: User, token: string | undefined | n
     };
     const identity = verifiedKakaoIdentity(user, await get('/v1/user/access_token_info'), config);
     if (!identity) return false;
-    const [terms, channels] = await Promise.all([
+    const [terms, channels, details] = await Promise.all([
       get('/v2/user/service_terms?result=app_service_terms'),
       config.readChannel ? get('/v2/api/talk/channels?channel_ids=' + encodeURIComponent(config.channelId)) : Promise.resolve(null),
+      config.readPhone ? get('/v2/user/me') : Promise.resolve(null),
     ]);
     const snapshot = kakaoConsentSnapshot(identity, config, terms, channels);
     const { error } = await createAdminClient().rpc('edu_record_kakao_consent', {
@@ -37,7 +38,14 @@ export async function syncKakaoConsent(user: User, token: string | undefined | n
       p_terms: snapshot.terms, p_channel: config.channelId, p_relation: snapshot.channelRelation,
     });
     // An unavailable audit store must not silently mark required terms accepted.
-    return !error && snapshot.requiredAgreed;
+    if (error || !snapshot.requiredAgreed) return false;
+    const phone = config.readPhone ? kakaoPhoneNumber(details, identity) : null;
+    if (phone) {
+      // A checkout/profile number entered by the member always takes precedence.
+      try { await createAdminClient().from('profiles').update({ phone }).eq('id', user.id).is('phone', null); }
+      catch { /* Phone autofill is optional and must not block sign-in. */ }
+    }
+    return true;
   } catch {
     // Keep normal login/onsite consent available during Kakao or DB outages.
     return false;

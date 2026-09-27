@@ -453,7 +453,9 @@ export function Platform({
           const response = await fetch("/api/auth/kakao-sync", { cache: "no-store", signal: AbortSignal.timeout(2500) });
           if (response.ok) {
             const config = await response.json();
-            if (config.options?.scopes === "plusfriends") syncOptions = { scopes: "plusfriends" };
+            const scopes = String(config.options?.scopes || "").split(",")
+              .filter((scope) => scope === "plusfriends" || scope === "phone_number");
+            if (scopes.length) syncOptions = { scopes: scopes.join(",") };
           }
         } catch { /* Fall back to the existing Kakao login. */ }
       }
