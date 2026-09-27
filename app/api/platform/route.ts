@@ -74,7 +74,7 @@ export async function GET(request: Request) {
                 const enrollment = await db.from('enrollments').select('id,course_id,cohort_id,status,access_starts_at,access_ends_at,revoked_at').eq('user_id', user.id).eq('course_id', course.id).limit(20);
                 if (enrollment.error) throw enrollment.error;
                 data.enrollments = (enrollment.data || []) as Row[];
-                if (data.enrollments.some(hasLearningAccess)) {
+                if (data.enrollments.some(enrollment => hasLearningAccess(enrollment))) {
                     const lessonIds = (data.curriculum_lessons || []).map(lesson => lesson.id);
                     if (lessonIds.length) {
                         const contents = await db.from('lesson_contents').select('lesson_id,resource_name,resource_storage_path').in('lesson_id', lessonIds).limit(200);
