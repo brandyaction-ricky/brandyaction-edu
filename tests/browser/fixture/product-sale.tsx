@@ -16,7 +16,7 @@ export function ProductSaleFixture() {
   const [curriculumMutation, setCurriculumMutation] = useState<Record<string, unknown> | null>(null);
   const [extraCohorts, setExtraCohorts] = useState<Row[]>([]);
   const ready = new URLSearchParams(location.search).has('ready');
-  const course = { id: 'synthetic-course', title: '합성 판매 점검 상품', slug: 'synthetic', category: new URLSearchParams(location.search).has('digital') ? 'digital' : 'paid_class', status: 'published', list_price: 100000, description: '합성 상세', duration_label: '4주', schedule_label: '매주', metadata: { product_resources: resources } };
+  const course = { id: 'synthetic-course', title: '합성 판매 점검 상품', slug: 'synthetic', category: new URLSearchParams(location.search).has('digital') ? 'digital' : 'paid_class', status: new URLSearchParams(location.search).has('draft') ? 'draft' : 'published', list_price: 100000, description: '합성 상세', duration_label: '4주', schedule_label: '매주', metadata: { product_resources: resources } };
   const [weeks, setWeeks] = useState<Row[]>([{ id: 'synthetic-week', course_id: course.id, is_published: ready }]);
   const [lessons, setLessons] = useState<Row[]>([{ id: 'synthetic-lesson', week_id: 'synthetic-week', is_published: ready }]);
   const data = { courses: [course], cohorts: [{ id: 'synthetic-cohort', course_id: course.id, name: '합성 4기', cohort_code: 'FOURTH', status: 'upcoming', price: 100000, recruitment_end_at: '2099-10-01T14:59:00Z' }, ...extraCohorts], curriculum_weeks: weeks, curriculum_lessons: lessons };

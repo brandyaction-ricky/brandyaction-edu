@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { UploadField } from "../editor-fields";
 import type { Data, WorkflowSend } from "../learning-workflows";
 
+import { CurriculumCopyPanel } from "./curriculum-copy-panel";
 import { ProductMissionWorkspace } from "./product-mission-workspace";
 
 type ContentType = "text" | "vod" | "material" | "link";
@@ -71,10 +72,11 @@ function LessonSettings({ lesson, hasContent, disabled, send, onSaved }: {
   </div>;
 }
 
-export function ProductCurriculumWorkspace({ course, pending, send, commonResources, resourceCount = 0, active: isActive = true }: {
+export function ProductCurriculumWorkspace({ course, pending, send, commonResources, resourceCount = 0, active: isActive = true, productDirty = false }: {
   course?: Row;
   commonResources?: ReactNode;
   active?: boolean;
+  productDirty?: boolean;
   resourceCount?: number;
   pending: boolean;
   send: WorkflowSend;
@@ -217,6 +219,7 @@ export function ProductCurriculumWorkspace({ course, pending, send, commonResour
         <p>{publishedWeeks.length && publishedLessons.length ? "공개 커리큘럼 조건을 충족했습니다. 기본·판매 탭에서 나머지 판매 조건도 확인해 주세요." : !weeks.length ? "아래에서 이 상품의 첫 주차를 추가해 주세요." : !publishedWeeks.length ? "아래 주차의 ‘주차 공개’를 선택하고 저장해 주세요." : "공개 주차에 학습을 추가하거나 기존 학습의 콘텐츠와 공개 상태를 확인해 주세요."}</p>
       </div>}
     </section>
+    <CurriculumCopyPanel targetId={String(course.id)} eligible={t(course, "status") === "draft" && !(curriculum.curriculum_weeks || []).length && resourceCount === 0} disabled={saving} dirty={productDirty || Boolean(weekTitle.trim()) || Boolean(lessonTitle.trim())} onCopied={() => { setLoading(true); setReadVersion(version => version + 1); }} />
     {loading && <p className="meta" role="status">상품 커리큘럼을 불러오는 중입니다.</p>}
     {readError && <p className="notice warning" role="alert">{readError} <button className="btn small" type="button" onClick={() => { setLoading(true); setReadVersion((version) => version + 1); }}>다시 시도</button></p>}
     <div className="product-curriculum-create">
