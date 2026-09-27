@@ -27,7 +27,6 @@ import { ProductDetailHtml } from "./product-detail-html";
 import { DigitalContentManager } from "./digital-content-manager";
 import { ProductCurriculumWorkspace } from "./product-curriculum-workspace";
 import { ProductCohortWorkspace } from "./product-cohort-workspace";
-import { ProductMissionWorkspace } from "./product-mission-workspace";
 
 function fieldValue(s: Section, row: Row | undefined, f: Field) {
   return s.table === "courses" &&
@@ -205,12 +204,12 @@ function ProductResources({ row, pending, send }: { row?: Row; pending: boolean;
     catch (cause) { setMessage((cause as Error).message); }
   }
   return <>
-    <h2>제공 자료</h2><p className="meta mt8">업로드할 파일과 다운로드 대상을 지정합니다.</p>
+    <h3>과정 공통 자료</h3><p className="meta mt8">교재·템플릿처럼 과정 전체에 제공할 자료입니다. 특정 수업의 자료는 해당 학습의 콘텐츠에서 등록하세요.</p>
     <div className="product-assets mt16">{resources.map(resource => <div className="asset-row" key={resource.id}><span className="file-icon">{resource.name.split(".").pop()?.slice(0, 4).toUpperCase() || "FILE"}</span><div><b>{resource.name}</b><p>{scopeLabels[resource.scope]}</p></div><button className="btn small" type="button" onClick={() => edit(resource)} disabled={pending || uploadStatus === "uploading"}>설정</button></div>)}</div>
     {editing !== null ? <div className="product-resource-editor">
       <div className="form-grid"><ProductField label="자료 이름"><input value={resourceName} onChange={event => setResourceName(event.target.value)} aria-label="자료 이름" disabled={pending} placeholder="업로드 파일 이름" /></ProductField><ProductField label="다운로드 권한"><select value={accessScope} onChange={event => setAccessScope(event.target.value as ProductResourceScope)} aria-label="다운로드 권한" disabled={pending}>{Object.entries(scopeLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></ProductField></div>
       <div className="upload-box product-upload"><Download aria-hidden="true" /><p>업로드할 파일 선택하기</p><UploadField key={editing} name="product_resource_upload" value={resourcePath} image={false} disabled={pending} onChange={setResourcePath} onStatusChange={setUploadStatus} /></div>
-      <div className="row mt16">{editing !== "new" && <button className="btn danger" type="button" onClick={() => void remove(editing)} disabled={pending || uploadStatus === "uploading"}>삭제</button>}<span className="spacer"/><button className="btn" type="button" onClick={() => setEditing(null)} disabled={pending || uploadStatus === "uploading"}>취소</button><button className="btn primary" type="button" onClick={() => void save()} disabled={pending || uploadStatus !== "idle" || !resourcePath}>무료자료 등록</button></div>
+      <div className="row mt16">{editing !== "new" && <button className="btn danger" type="button" onClick={() => void remove(editing)} disabled={pending || uploadStatus === "uploading"}>삭제</button>}<span className="spacer"/><button className="btn" type="button" onClick={() => setEditing(null)} disabled={pending || uploadStatus === "uploading"}>취소</button><button className="btn primary" type="button" onClick={() => void save()} disabled={pending || uploadStatus !== "idle" || !resourcePath}>자료 저장</button></div>
     </div> : <div className="upload-box"><Download aria-hidden="true" /><p>{resources.length ? "PDF · 문서 · 템플릿 자료 추가" : "등록된 제공 자료가 없습니다."}</p><label className={`btn upload-label${pending || !row?.id ? " disabled" : ""}`}><input type="file" accept=".pdf,.zip,.txt,.csv,.hwp,.doc,.docx,.xls,.xlsx,.ppt,.pptx" disabled={pending || !row?.id} onChange={event => { const input = event.currentTarget; void selectNewFile(input.files?.[0]).finally(() => { input.value = ""; }); }} />{uploadStatus === "uploading" ? "업로드 중…" : "업로드할 파일 선택하기"}</label><p className="meta">파일별로 공개 범위를 설정할 수 있습니다.</p></div>}
     <div className="notice warning mt16">누구나 다운로드부터 구매자 전용까지 파일별 권한을 설정할 수 있습니다.</div>
     {message && <p className="notice mt16" role="status">{message}</p>}
@@ -224,7 +223,12 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
   const cohorts = (data.cohorts || []).filter(cohort => cohort.course_id === row?.id);
   const [cohortId, setCohortId] = useState(cohorts.find(cohort => cohort.status === "recruiting")?.id || cohorts[0]?.id || "");
   const cohort = cohorts.find(item => item.id === cohortId);
-  const [tab, setTab] = useState("basic");
+  const [tab, setCurrentTab] = useState("basic");
+  const [curriculumOpened, setCurriculumOpened] = useState(false);
+  function setTab(value: string) {
+    if (value === "curriculum") setCurriculumOpened(true);
+    setCurrentTab(value);
+  }
   const [error, setError] = useState("");
   const [dirty, setDirty] = useState(false);
   const [cohortDrafts, setCohortDrafts] = useState<Record<string, Record<string, string>>>({});
@@ -240,7 +244,7 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
   const [draftValues, setDraftValues] = useState<Record<string, unknown>>({});
   const [checkedAt] = useState(Date.now);
   const formRef = useRef<HTMLFormElement>(null);
-  const groups = [["basic", "기본·판매"], ["detail", "상세페이지"], ["resources", preview.category === "digital" ? "콘텐츠 구성" : "제공 자료"], ...(preview.category === "digital" ? [] : [["curriculum", "커리큘럼"], ["cohorts", "기수·회차"], ["missions", "미션"]]), ["access", "수강·권한"], ["publish", "공개·검색"]];
+  const groups = [["basic", "기본·판매"], ["detail", "상세페이지"], ...(preview.category === "digital" ? [["resources", "콘텐츠 구성"]] : [["curriculum", "커리큘럼"], ["cohorts", "기수·회차"]]), ["access", "수강·권한"], ["publish", "공개·검색"]];
   const resourceCount = productResources(metadata).length;
   const previewSalePrice = preview.category === "free" ? 0 : cohort ? num(cohort, "price") : preview.price;
   const statusLabels: Record<string, string> = { draft: "작성 중", published: "판매 중", archived: "판매 종료" };
@@ -276,7 +280,7 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
     event.preventDefault(); setError("");
     if (detailUploadStatus !== "idle") { setTab("detail"); setError(detailUploadStatus === "uploading" ? "상세 이미지 업로드가 끝난 뒤 저장해 주세요." : "상세 이미지 업로드 오류를 확인해 주세요."); return; }
     const form = event.currentTarget;
-    const invalid = Array.from(form.elements).find(element => "checkValidity" in element && !(element as HTMLInputElement).checkValidity()) as HTMLInputElement | undefined;
+    const invalid = Array.from(form.elements).find(element => !element.closest("[data-independent-editor]") && "checkValidity" in element && !(element as HTMLInputElement).checkValidity()) as HTMLInputElement | undefined;
     if (invalid) { const panel = invalid.closest("[data-tab]"); if (panel) setTab(panel.getAttribute("data-tab")!); const details = invalid.closest("details"); if (details) details.open = true; requestAnimationFrame(() => { invalid.focus(); invalid.reportValidity(); }); return; }
     const submitted = new FormData(form);
     const values = formValues(section, submitted);
@@ -355,15 +359,12 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
           </>}
           {detailMode === "image" && <DetailImageGallery key={String(row?.id || "new-product")} initial={productDetailImages(metadata)} disabled={pending} onChange={() => setDirty(true)} onStatusChange={setDetailUploadStatus} />}
         </div>
-        <div className="section-pad" id="product-panel-resources" data-tab="resources" role="tabpanel" aria-labelledby="product-tab-resources" hidden={tab !== "resources"}>{preview.category === "digital" ? <DigitalContentManager row={row} pending={pending} send={send} /> : <ProductResources row={row} pending={pending} send={send} />}</div>
-        {preview.category !== "digital" && <div id="product-panel-curriculum" data-tab="curriculum" role="tabpanel" aria-labelledby="product-tab-curriculum" hidden={tab !== "curriculum"} onChange={event => event.stopPropagation()} onKeyDown={event => { if (event.key === "Enter" && event.target instanceof HTMLInputElement) event.preventDefault(); }}>
-          {tab === "curriculum" && <ProductCurriculumWorkspace course={row} pending={pending} send={send} />}
+        {preview.category === "digital" && <div className="section-pad" id="product-panel-resources" data-tab="resources" role="tabpanel" aria-labelledby="product-tab-resources" hidden={tab !== "resources"}><DigitalContentManager row={row} pending={pending} send={send} /></div>}
+        {preview.category !== "digital" && <div id="product-panel-curriculum" data-independent-editor data-tab="curriculum" role="tabpanel" aria-labelledby="product-tab-curriculum" hidden={tab !== "curriculum"} onChange={event => event.stopPropagation()} onKeyDown={event => { if (event.key === "Enter" && event.target instanceof HTMLInputElement) event.preventDefault(); }}>
+          {curriculumOpened && <ProductCurriculumWorkspace course={row} pending={pending} send={send} active={tab === "curriculum"} commonResources={<ProductResources row={row} pending={pending} send={send} />} resourceCount={resourceCount} />}
         </div>}
         {preview.category !== "digital" && <div id="product-panel-cohorts" data-tab="cohorts" role="tabpanel" aria-labelledby="product-tab-cohorts" hidden={tab !== "cohorts"} onChange={event => event.stopPropagation()} onKeyDown={event => { if (event.key === "Enter" && event.target instanceof HTMLInputElement) event.preventDefault(); }}>
           {tab === "cohorts" && <ProductCohortWorkspace course={row} cohorts={cohorts} selectedId={cohortId} onSelect={setCohortId} pending={pending} send={send} />}
-        </div>}
-        {preview.category !== "digital" && <div id="product-panel-missions" data-tab="missions" role="tabpanel" aria-labelledby="product-tab-missions" hidden={tab !== "missions"} onChange={event => event.stopPropagation()} onKeyDown={event => { if (event.key === "Enter" && event.target instanceof HTMLInputElement) event.preventDefault(); }}>
-          {tab === "missions" && <ProductMissionWorkspace course={row} pending={pending} send={send} />}
         </div>}
         <div className="section-pad" id="product-panel-access" data-tab="access" role="tabpanel" aria-labelledby="product-tab-access" hidden={tab !== "access"}>
           <ProductSaleCheck sale={sale} cohort={cohort} onOpenCurriculum={openCurriculum} />
@@ -396,7 +397,7 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
           </section>
           <section className="product-conversion-card"><h2>Tracking integration</h2><p className="meta">상품별 광고 추적을 연결하세요.</p><ProductField controlId="product-pixel-id" label="Meta Pixel ID (Optional)" hint="입력한 상품에만 PageView와 CTA 클릭(Lead)을 전송합니다. 구매 완료 이벤트는 결제 처리와 구분됩니다. 비워 두면 사용하지 않습니다."><input id="product-pixel-id" name="meta_pixel_id" inputMode="numeric" pattern="[0-9]{5,30}" maxLength={30} defaultValue={conversion.pixelId} placeholder="Meta Pixel ID" disabled={pending} /></ProductField></section>
         </div>
-      </section><div className="editor-savebar">{!["curriculum", "cohorts", "missions"].includes(tab) && row?.id && !row.archived_at && <button className="btn danger" type="button" onClick={() => void removeProduct()} disabled={pending || detailUploadStatus === "uploading"}>상품 삭제</button>}<span className="dirty-note">{tab === "curriculum" ? "커리큘럼은 항목별로 즉시 저장됩니다." : tab === "cohorts" ? "기수는 항목별로 저장됩니다." : tab === "missions" ? "미션은 항목별로 저장됩니다." : dirty ? "저장하지 않은 변경사항이 있습니다." : "변경 내용을 저장하면 반영됩니다."}</span><button className="btn" type="button" onClick={close} disabled={pending || detailUploadStatus === "uploading"}>목록으로</button>{!["curriculum", "cohorts", "missions", "publish"].includes(tab) && <button className="btn" type="button" onClick={() => setTab("publish")} disabled={pending || detailUploadStatus === "uploading"}>공개 전 확인</button>}{!["curriculum", "cohorts", "missions"].includes(tab) && <button className="btn primary" type="submit" disabled={pending || detailUploadStatus !== "idle"}>{pending ? "저장 중…" : detailUploadStatus === "uploading" ? "업로드 중…" : "저장하기"}</button>}</div>{error && <p className="notice mt16" role="alert">{error}</p>}</div>
+      </section><div className="editor-savebar">{!["curriculum", "cohorts"].includes(tab) && row?.id && !row.archived_at && <button className="btn danger" type="button" onClick={() => void removeProduct()} disabled={pending || detailUploadStatus === "uploading"}>상품 삭제</button>}<span className="dirty-note">{tab === "curriculum" ? "학습·미션·공통 자료는 각 항목의 저장 버튼으로 반영됩니다." : tab === "cohorts" ? "기수는 항목별로 저장됩니다." : dirty ? "저장하지 않은 변경사항이 있습니다." : "변경 내용을 저장하면 반영됩니다."}</span><button className="btn" type="button" onClick={close} disabled={pending || detailUploadStatus === "uploading"}>목록으로</button>{!["curriculum", "cohorts", "publish"].includes(tab) && <button className="btn" type="button" onClick={() => setTab("publish")} disabled={pending || detailUploadStatus === "uploading"}>공개 전 확인</button>}{!["curriculum", "cohorts"].includes(tab) && <button className="btn primary" type="submit" disabled={pending || detailUploadStatus !== "idle"}>{pending ? "저장 중…" : detailUploadStatus === "uploading" ? "업로드 중…" : "저장하기"}</button>}</div>{error && <p className="notice mt16" role="alert">{error}</p>}</div>
       <aside className="editor-aside"><div className="side-preview"><span className="section-code">고객에게 보이는 상품</span><div className="preview-cover mt16"><p>BRANDYACTION EDU</p><h3>{preview.title || "상품명"}</h3><p className="accent">{labels[preview.category] || "유료 클래스"}</p></div><div className="preview-meta"><b>{!previewSalePrice ? "무료" : money(previewSalePrice)}</b>{preview.regular > previewSalePrice && <s>{money(preview.regular)}</s>}</div><p className="meta mt8">{cohort ? t(cohort, "name") + " 기수 판매가" : "상품 기본 판매가"}</p><p className="meta mt8">{preview.summary || "상품 소개를 입력해 주세요."}</p><div className="divider" /><ProductSaleCheck sale={sale} cohort={cohort} onOpenCurriculum={openCurriculum} /><div className="setting-line"><span>저장할 상품 설정</span><b>{statusLabels[preview.status]}</b></div><div className="setting-line"><span>제공 자료</span><b>{resourceCount}개</b></div><Link className="btn full mt16" href="/admin/cohorts">기수·회차 관리</Link></div></aside></div>
     </form>
   </div>;

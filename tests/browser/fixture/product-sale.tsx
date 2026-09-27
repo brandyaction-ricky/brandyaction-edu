@@ -5,6 +5,8 @@ import '../../../app/ui/final/product-editor.css';
 
 export function ProductSaleFixture() {
   const [saves, setSaves] = useState(0);
+  const [resourceMutation, setResourceMutation] = useState<Record<string, unknown> | null>(null);
+  const [resources, setResources] = useState(new URLSearchParams(location.search).has('resources') ? [{ id: '11111111-1111-4111-8111-111111111111', name: '과정 교재.pdf', path: 'edu/11111111-1111-4111-8111-111111111111.pdf', scope: 'purchaser' }] : []);
   const [savedCountdown, setSavedCountdown] = useState<unknown>();
   const [cohortSaves, setCohortSaves] = useState(0);
   const [cohortMutation, setCohortMutation] = useState<Record<string, unknown> | null>(null);
@@ -14,11 +16,16 @@ export function ProductSaleFixture() {
   const [curriculumMutation, setCurriculumMutation] = useState<Record<string, unknown> | null>(null);
   const [extraCohorts, setExtraCohorts] = useState<Row[]>([]);
   const ready = new URLSearchParams(location.search).has('ready');
-  const course = { id: 'synthetic-course', title: '합성 판매 점검 상품', slug: 'synthetic', category: 'paid_class', status: 'published', list_price: 100000, description: '합성 상세', duration_label: '4주', schedule_label: '매주', metadata: {} };
+  const course = { id: 'synthetic-course', title: '합성 판매 점검 상품', slug: 'synthetic', category: new URLSearchParams(location.search).has('digital') ? 'digital' : 'paid_class', status: 'published', list_price: 100000, description: '합성 상세', duration_label: '4주', schedule_label: '매주', metadata: { product_resources: resources } };
   const [weeks, setWeeks] = useState<Row[]>([{ id: 'synthetic-week', course_id: course.id, is_published: ready }]);
   const [lessons, setLessons] = useState<Row[]>([{ id: 'synthetic-lesson', week_id: 'synthetic-week', is_published: ready }]);
   const data = { courses: [course], cohorts: [{ id: 'synthetic-cohort', course_id: course.id, name: '합성 4기', cohort_code: 'FOURTH', status: 'upcoming', price: 100000, recruitment_end_at: '2099-10-01T14:59:00Z' }, ...extraCohorts], curriculum_weeks: weeks, curriculum_lessons: lessons };
-  return <div className="edu-admin" style={{ padding: 20 }}><output aria-label="저장한 카운트다운 설정">{String(savedCountdown)}</output><output aria-label="합성 저장 횟수">{saves}</output><output aria-label="합성 기수 저장 횟수">{cohortSaves}</output><output aria-label="합성 기수 요청">{JSON.stringify(cohortMutation)}</output><output aria-label="합성 미션 저장 횟수">{missionSaves}</output><output aria-label="합성 미션 요청">{JSON.stringify(missionMutation)}</output><output aria-label="합성 커리큘럼 저장 횟수">{curriculumSaves}</output><output aria-label="합성 커리큘럼 요청">{JSON.stringify(curriculumMutation)}</output><ProductEditor row={course} data={data} pending={false} back={() => {}} send={async body => {
+  return <div className="edu-admin" style={{ padding: 20 }}><output aria-label="합성 자료 요청">{JSON.stringify(resourceMutation)}</output><output aria-label="저장한 카운트다운 설정">{String(savedCountdown)}</output><output aria-label="합성 저장 횟수">{saves}</output><output aria-label="합성 기수 저장 횟수">{cohortSaves}</output><output aria-label="합성 기수 요청">{JSON.stringify(cohortMutation)}</output><output aria-label="합성 미션 저장 횟수">{missionSaves}</output><output aria-label="합성 미션 요청">{JSON.stringify(missionMutation)}</output><output aria-label="합성 커리큘럼 저장 횟수">{curriculumSaves}</output><output aria-label="합성 커리큘럼 요청">{JSON.stringify(curriculumMutation)}</output><ProductEditor row={course} data={data} pending={false} back={() => {}} send={async body => {
+    if (body.action === 'save-product-resource') {
+      setResourceMutation(body);
+      setResources(rows => rows.map(row => row.id === body.resourceId ? { ...row, name: String(body.resourceName), scope: String(body.accessScope) } : row));
+      return {};
+    }
     if (body.section === 'weeks' || body.section === 'learning') {
       setCurriculumSaves(value => value + 1);
       setCurriculumMutation(body);
