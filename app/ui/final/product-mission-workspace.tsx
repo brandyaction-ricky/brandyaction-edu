@@ -19,8 +19,9 @@ function errorText(cause: unknown) {
   return cause instanceof Error ? cause.message : "미션을 처리하지 못했습니다. 다시 시도해 주세요.";
 }
 
-export function ProductMissionWorkspace({ course, pending, send }: {
+export function ProductMissionWorkspace({ course, pending, send, lessonScope }: {
   course?: Row;
+  lessonScope?: string;
   pending: boolean;
   send: WorkflowSend;
 }) {
@@ -55,13 +56,14 @@ export function ProductMissionWorkspace({ course, pending, send }: {
     .sort((a, b) => num(a, "week_number") - num(b, "week_number"));
   const weekIds = new Set(weeks.map((week) => String(week.id)));
   const lessons = (snapshot?.curriculum_lessons || [])
-    .filter((lesson) => weekIds.has(String(lesson.week_id)) && !lesson.archived_at)
+    .filter((lesson) => weekIds.has(String(lesson.week_id)) && !lesson.archived_at && (!lessonScope || lesson.id === lessonScope))
     .sort((a, b) => num(a, "day_number") - num(b, "day_number"));
   const lessonIds = new Set(lessons.map((lesson) => String(lesson.id)));
   const missions = (snapshot?.curriculum_missions || [])
     .filter((mission) => lessonIds.has(String(mission.lesson_id)));
   const selectedMission = missions.find((mission) => mission.id === missionId && !mission.archived_at);
-  const selectedWeekId = weekIds.has(weekId) ? weekId : String(weeks[0]?.id || "");
+  const scopedLesson = lessonScope ? lessons.find(lesson => lesson.id === lessonScope) : undefined;
+  const selectedWeekId = lessonScope ? String(scopedLesson?.week_id || "") : weekIds.has(weekId) ? weekId : String(weeks[0]?.id || "");
   const selectedLessons = lessons.filter((lesson) => lesson.week_id === selectedWeekId);
   const selectedLessonId = selectedLessons.some((lesson) => lesson.id === lessonId) ? lessonId : String(selectedLessons[0]?.id || "");
   const saving = pending || busy || loading || Boolean(readError);
@@ -113,13 +115,13 @@ export function ProductMissionWorkspace({ course, pending, send }: {
   if (!course?.id) return <div className="section-pad"><p className="notice">상품을 먼저 저장하면 같은 화면에서 일차별 미션을 등록할 수 있습니다.</p></div>;
 
   return <div className="section-pad product-mission-workspace">
-    <h2>상품별 미션</h2>
-    <p className="meta">이 상품의 기존 일차와 미션을 그대로 보여 줍니다. 새 미션은 비공개로 등록되며, 공개 여부는 저장 후 변경할 수 있습니다.</p>
+    <h3>{lessonScope ? "이 학습의 미션" : "상품별 미션"}</h3>
+    <p className="meta">선택한 학습에 미션을 추가하거나 기존 미션을 편집합니다. 새 미션은 비공개로 저장됩니다.</p>
     {loading && <p className="meta" role="status">상품 미션을 불러오는 중입니다.</p>}
     {readError && <p className="notice warning" role="alert">{readError} <button className="btn small" type="button" onClick={() => { setLoading(true); setReadVersion((version) => version + 1); }}>다시 시도</button></p>}
     {!weeks.length && !loading && !readError && <p className="notice">등록된 주차가 없습니다. 커리큘럼 탭에서 주차와 일차를 먼저 추가해 주세요.</p>}
-    {weeks.map((week) => <section key={week.id} className="product-mission-week" aria-label={`${num(week, "week_number")}주차 미션`}>
-      <h3>{num(week, "week_number")}주차 · {t(week, "title")}</h3>
+    {weeks.filter(week => !lessonScope || week.id === selectedWeekId).map((week) => <section key={week.id} className="product-mission-week" aria-label={`${num(week, "week_number")}주차 미션`}>
+      {!lessonScope && <h3>{num(week, "week_number")}주차 · {t(week, "title")}</h3>}
       {lessons.filter((lesson) => lesson.week_id === week.id).map((lesson) => <div key={lesson.id} className="product-mission-day">
         <b>Day {num(lesson, "day_number")} · {t(lesson, "title")}</b>
         {missions.filter((mission) => mission.lesson_id === lesson.id).length ? <ul>{missions.filter((mission) => mission.lesson_id === lesson.id).map((mission) => <li key={mission.id}><span>{t(mission, "title")} · {mission.archived_at ? "보관됨" : mission.is_published ? "공개" : "비공개"}{mission.is_required ? " · 필수" : " · 선택"}</span>{!mission.archived_at && <button className="btn small" type="button" disabled={saving} onClick={() => editMission(mission)}>미션 편집</button>}</li>)}</ul> : <p className="meta">연결된 미션이 없습니다.</p>}
@@ -129,8 +131,8 @@ export function ProductMissionWorkspace({ course, pending, send }: {
     {!!lessons.length && <section className="product-mission-fields" aria-label={selectedMission ? "기존 미션 편집" : "새 미션 등록"}>
       <div className="row"><h3>{selectedMission ? "기존 미션 편집" : "새 미션 등록"}</h3>{selectedMission && <button className="btn small" type="button" onClick={newMission} disabled={saving}>+ 새 미션</button>}</div>
       <div className="form-grid">
-        <label>주차<select value={selectedWeekId} onChange={(event) => { setWeekId(event.target.value); setLessonId(""); }} disabled={saving || Boolean(selectedMission)}>{weeks.map((week) => <option key={week.id} value={week.id}>{num(week, "week_number")}주차 · {t(week, "title")}</option>)}</select></label>
-        <label>일차<select value={selectedLessonId} onChange={(event) => setLessonId(event.target.value)} disabled={saving || Boolean(selectedMission)}>{selectedLessons.map((lesson) => <option key={lesson.id} value={lesson.id}>Day {num(lesson, "day_number")} · {t(lesson, "title")}</option>)}</select></label>
+        {!lessonScope && <label>주차<select value={selectedWeekId} onChange={(event) => { setWeekId(event.target.value); setLessonId(""); }} disabled={saving || Boolean(selectedMission)}>{weeks.filter(week => !lessonScope || week.id === selectedWeekId).map((week) => <option key={week.id} value={week.id}>{num(week, "week_number")}주차 · {t(week, "title")}</option>)}</select></label>}
+        {!lessonScope && <label>일차<select value={selectedLessonId} onChange={(event) => setLessonId(event.target.value)} disabled={saving || Boolean(selectedMission)}>{selectedLessons.map((lesson) => <option key={lesson.id} value={lesson.id}>Day {num(lesson, "day_number")} · {t(lesson, "title")}</option>)}</select></label>}
         <label>미션 제목<input value={draft.title} maxLength={300} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} disabled={saving} /></label>
         <label>제출 방식<select value={draft.submission_type} onChange={(event) => setDraft((current) => ({ ...current, submission_type: event.target.value }))} disabled={saving}>{Object.entries(submissionLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
       </div>
