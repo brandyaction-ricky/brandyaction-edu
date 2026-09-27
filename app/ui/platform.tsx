@@ -918,6 +918,7 @@ export function Platform({
               {!standaloneAdmin.includes(section.key) &&
                 !section.readOnly &&
                 section.key !== "weeks" &&
+                section.key !== "products" &&
                 ![
                   "profiles",
                   "reviews",

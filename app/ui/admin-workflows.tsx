@@ -21,11 +21,20 @@ import { SubmissionReview } from "./final/submission-review";
 import { timeLabel, type Data, type WorkflowSend } from "./learning-workflows";
 import { EnrollmentGrant, RefundAction } from "./operations-actions";
 import {
+  AdminButton,
+  AdminCheckbox,
+  AdminDataTable,
+  AdminDatePicker,
+  AdminDrawer,
   AdminEmptyState,
+  AdminFilterBar,
   AdminLoadingState,
   AdminPagination,
+  AdminQuickFilter,
   AdminSearchField,
+  AdminSelect,
   AdminStatusBadge,
+  AdminSummaryCard,
 } from "@/features/admin-ui";
 
 export const standaloneAdmin = [
@@ -1110,9 +1119,6 @@ function Participants() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortKey, setSortKey] = useState<"priority" | "name" | "progress" | "missions">("priority");
   const [selectedMemberId, setSelectedMemberId] = useState("");
-  const drawerRef = useRef<HTMLElement>(null);
-  const drawerCloseRef = useRef<HTMLButtonElement>(null);
-  const returnFocusRef = useRef<HTMLElement | null>(null);
   const totalPageSize = 50;
   const params = new URLSearchParams({
     kind: "participants",
@@ -1170,7 +1176,6 @@ function Participants() {
     return { cells, total, submitted, review, followup, approved, state };
   };
   const stateLabels: Record<string, string> = { review: "검토 필요", missing: "미제출", followup: "재제출 필요", submitted: "제출 완료", done: "승인 완료", progress: "진행 중", unconfigured: "미션 미설정" };
-  const stateClasses: Record<string, string> = { review: "review", missing: "missing", followup: "followup", submitted: "submitted", done: "done", progress: "progress", unconfigured: "unconfigured" };
   const rowStats = new Map(list.map((member) => [String(member.id), memberStats(member)]));
   const quickCounts = list.reduce<Record<string, number>>((counts, member) => {
     const state = rowStats.get(String(member.id))?.state || "unconfigured";
@@ -1210,31 +1215,14 @@ function Participants() {
   };
   const setupHref = `/admin/missions?course=${encodeURIComponent(t(selectedCohort, "course_id"))}&week=${encodeURIComponent(weekId)}`;
   const openMember = (memberId: string, trigger?: HTMLElement) => {
-    returnFocusRef.current = trigger || document.activeElement as HTMLElement;
+    trigger?.focus();
     setSelectedMemberId(memberId);
   };
-  const closeMember = () => {
-    setSelectedMemberId("");
-    window.requestAnimationFrame(() => returnFocusRef.current?.focus());
-  };
-  useEffect(() => {
-    if (!selectedMemberId) return;
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") setSelectedMemberId(""); };
-    const previousOverflow = document.body.style.overflow;
-    document.addEventListener("keydown", onKeyDown);
-    document.body.style.overflow = "hidden";
-    drawerCloseRef.current?.focus();
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = previousOverflow;
-      window.requestAnimationFrame(() => returnFocusRef.current?.focus());
-    };
-  }, [selectedMemberId]);
+  const closeMember = () => setSelectedMemberId("");
   return (
     <>
-      <div className="participant-toolbar" aria-label="회원 미션 필터">
-        <select
-          aria-label="조회 기수"
+      <AdminFilterBar className="admin-pilot-filter admin-pilot-member-filter"
+        filters={<><AdminSelect label="조회 기수" labelHidden
           value={cohortId}
           onChange={(e) => {
             setCohort(e.target.value);
@@ -1247,55 +1235,51 @@ function Participants() {
               {t(c, "course_title")} · {t(c, "name")}
             </option>
           ))}
-        </select>
-        <select aria-label="미션 현황 주차" value={weekId} onChange={(event) => changeWeek(event.target.value)}>
+        </AdminSelect>
+        <AdminSelect label="미션 현황 주차" labelHidden value={weekId} onChange={(event) => changeWeek(event.target.value)}>
           {weeks.map((row) => <option key={row.id} value={row.id}>{t(row, "week")}주차 · {t(row, "title")}</option>)}
-        </select>
-        <select aria-label="미션 필터" value={missionFilter} onChange={(event) => { setMissionFilter(event.target.value); setLocalPage(1); }}>
+        </AdminSelect>
+        <AdminSelect label="미션 필터" labelHidden value={missionFilter} onChange={(event) => { setMissionFilter(event.target.value); setLocalPage(1); }}>
           <option value="">전체 미션</option>
           {columns.map((lesson) => <option key={lesson.id} value={lesson.id}>Day {t(lesson, "day_number")} · {t(lesson, "title")}</option>)}
-        </select>
-        <select aria-label="회원 미션 상태 필터" value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setLocalPage(1); }}>
+        </AdminSelect>
+        <AdminSelect label="회원 미션 상태 필터" labelHidden value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setLocalPage(1); }}>
           <option value="all">전체 상태</option><option value="review">검토 필요</option><option value="followup">재제출 필요</option><option value="missing">미제출</option><option value="progress">진행 중</option><option value="done">완료</option>
-        </select>
-        <select aria-label="레벨 필터" value={level} onChange={(e) => { setLevel(e.target.value); changeServerFilter(); }}>
+        </AdminSelect>
+        <AdminSelect label="레벨 필터" labelHidden value={level} onChange={(e) => { setLevel(e.target.value); changeServerFilter(); }}>
           <option value="">전체 레벨</option>{[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>LEVEL {n}</option>)}
-        </select>
-        <input
-          type="search"
+        </AdminSelect></>}
+        search={<AdminSearchField
           placeholder="회원 이름 또는 이메일 검색"
-          aria-label="회원 검색"
+          label="회원 검색"
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
             changeServerFilter();
           }}
-        />
-        <label className="checkline">
-          <input
-            type="checkbox"
+        />}
+        action={<AdminCheckbox label="3일 이상 활동 없음"
             checked={attention}
             onChange={(e) => { setAttention(e.target.checked); changeServerFilter(); }}
-          />
-          3일 이상 활동 없음
-        </label>
-      </div>
+          />}
+        appliedSummary="회원 검색·레벨·활동은 서버 조회 기준, 미션·상태는 현재 조회한 회원 기준"
+      />
       <div className="participant-context" aria-live="polite">
         <strong>{t(selectedCohort, "course_title")} · {t(selectedCohort, "name")}</strong>
         <span>{selectedWeek ? `${t(selectedWeek, "week")}주차 · ${t(selectedWeek, "title")}` : "주차 미설정"}</span>
       </div>
-      <div className="participant-summary" aria-label="회원 미션 요약">
-        <div><span>전체 회원</span><strong>{Number(stats.participants || 0)}<small>명</small></strong></div>
-        <div><span>제출 회원</span><strong>{submittedMemberCount}<small>명 · 현재 조회</small></strong></div>
-        <div><span>검토 필요</span><strong>{pendingSubmissionCount}<small>건 · 현재 조회</small></strong></div>
-        <div><span>미제출</span><strong>{quickCounts.missing || 0}<small>명 · 현재 조회</small></strong></div>
+      <div className="admin-pilot-summary" aria-label="회원 미션 요약">
+        <AdminSummaryCard compact label="전체 회원" value={`${Number(stats.participants || 0)}명`} scope="현재 기수 · 서버 집계" />
+        <AdminSummaryCard compact label="제출 회원" value={`${submittedMemberCount}명`} scope="현재 조회" />
+        <AdminSummaryCard compact label="검토 필요" value={`${pendingSubmissionCount}건`} scope="현재 조회" />
+        <AdminSummaryCard compact label="미제출" value={`${quickCounts.missing || 0}명`} scope="현재 조회" />
       </div>
-      <div className="participant-quick-filters" role="group" aria-label="빠른 상태 필터">
-        {[
-          ["all", "전체", list.length], ["review", "검토 필요", quickCounts.review || 0], ["missing", "미제출", quickCounts.missing || 0],
-          ["progress", "진행 중", (quickCounts.progress || 0) + (quickCounts.submitted || 0) + (quickCounts.followup || 0)], ["done", "완료", quickCounts.done || 0],
-        ].map(([value, label, count]) => <button key={value} type="button" className={statusFilter === value ? "active" : ""} aria-pressed={statusFilter === value} onClick={() => { setStatusFilter(String(value)); setLocalPage(1); }}>{label}<span>{count}</span></button>)}
-        <span className="participant-quick-note">빠른 상태 건수는 현재 조회한 회원 기준</span>
+      <div className="admin-pilot-quick-row">
+        <AdminQuickFilter label="빠른 상태 필터" value={statusFilter} onChange={value => { setStatusFilter(value); setLocalPage(1); }} items={[
+          { value: "all", label: "전체", count: list.length }, { value: "review", label: "검토 필요", count: quickCounts.review || 0 }, { value: "missing", label: "미제출", count: quickCounts.missing || 0 },
+          { value: "progress", label: "진행 중", count: (quickCounts.progress || 0) + (quickCounts.submitted || 0) + (quickCounts.followup || 0) }, { value: "done", label: "완료", count: quickCounts.done || 0 },
+        ]} />
+        <span className="participant-quick-note">현재 조회한 회원 기준</span>
       </div>
       {error ? (
         <div className="notice">
@@ -1305,18 +1289,17 @@ function Participants() {
           </button>
         </div>
       ) : (
-        <div className="participant-table-wrap" aria-busy={loading}>
+        <div className="admin-pilot-workspace" aria-busy={loading}>
           <div className="participant-table-toolbar">
             <span>{filteredList.length}명 표시 · 전체 {currentResultTotal}명</span>
             <label>정렬 <select aria-label="회원 정렬" value={sortKey} onChange={(event) => setSortKey(event.target.value as typeof sortKey)}><option value="priority">처리 우선순</option><option value="name">이름순</option><option value="progress">학습진도순</option><option value="missions">미션 제출순</option></select></label>
           </div>
           {loading ? <div className="participant-table-skeleton" role="status" aria-label="회원 현황 불러오는 중">{Array.from({ length: 6 }, (_, index) => <div key={index}><span /><span /><span /><span /><span /></div>)}</div> : (
-          <div className="participant-table-scroll" role="region" aria-label="회원별 미션 현황 표" tabIndex={0}>
-          <table className="participant-table">
+          <><AdminDataTable label="회원별 미션 현황 표" density="standard">
             <thead><tr>
-              <th><button type="button" onClick={() => setSortKey("name")}>회원</button></th>
-              <th><button type="button" onClick={() => setSortKey("progress")}>학습진도</button></th>
-              <th><button type="button" onClick={() => setSortKey("missions")}>미션 진행</button></th>
+              <th aria-sort={sortKey === "name" ? "ascending" : undefined}><button type="button" onClick={() => setSortKey("name")}>회원</button></th>
+              <th aria-sort={sortKey === "progress" ? "descending" : undefined}><button type="button" onClick={() => setSortKey("progress")}>학습진도</button></th>
+              <th aria-sort={sortKey === "missions" ? "descending" : undefined}><button type="button" onClick={() => setSortKey("missions")}>미션 진행</button></th>
               <th>제출</th><th>검토 필요</th><th>최근 활동</th><th>상태</th><th>관리</th>
             </tr></thead>
             <tbody>
@@ -1334,15 +1317,15 @@ function Participants() {
                 <td>{statsForMember.submitted}</td>
                 <td>{statsForMember.review ? <span className="participant-review-count">{statsForMember.review}</span> : "—"}</td>
                 <td className="participant-last-activity" title={r.last_activity ? timeLabel(r.last_activity) : "활동 기록 없음"}>{r.last_activity ? timeLabel(r.last_activity) : "활동 없음"}</td>
-                <td><span className={`participant-state-badge ${stateClasses[statsForMember.state]}`}>{stateLabels[statsForMember.state]}</span></td>
+                <td><AdminStatusBadge status={statsForMember.state} label={stateLabels[statsForMember.state]} tone={statsForMember.state === "review" || statsForMember.state === "unconfigured" || statsForMember.state === "followup" ? "warning" : statsForMember.state === "done" ? "success" : statsForMember.state === "progress" || statsForMember.state === "submitted" ? "info" : "neutral"} /></td>
                 <td>{manageHref ? <Link className={`participant-row-action ${statsForMember.state === "review" ? "primary" : ""}`} href={manageHref} onClick={(event) => event.stopPropagation()}>{manageLabel}</Link> : <button type="button" className="participant-row-action" onClick={(event) => { event.stopPropagation(); openMember(memberId, event.currentTarget); }}>{manageLabel}</button>}</td>
               </tr>
             );
           })}
             </tbody>
-          </table>
-          {!filteredList.length && <div className="participant-table-empty">조건에 맞는 회원이 없습니다. 검색어나 상태 필터를 조정해 주세요.</div>}
-          </div>)}
+          </AdminDataTable>
+          {!filteredList.length && <div className="participant-table-empty">조건에 맞는 회원이 없습니다. 검색어나 상태 필터를 조정해 주세요.</div>}</>
+          )}
           <div className="participant-pagination">
             <label>페이지당 <select aria-label="페이지당 회원 수" value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setLocalPage(1); }}><option value={20}>20명</option><option value={50}>50명</option></select></label>
             <span>{displayedStart}–{displayedEnd} / {currentResultTotal}명</span>
@@ -1353,18 +1336,9 @@ function Participants() {
           </div>
         </div>
       )}
-      {selectedMember && selectedStats && <div className="participant-drawer-layer">
-        <button type="button" className="participant-drawer-backdrop" aria-label="회원 상세 닫기" onClick={closeMember} />
-        <aside ref={drawerRef} className="participant-drawer" role="dialog" aria-modal="true" aria-labelledby="participant-drawer-title" tabIndex={-1} onKeyDown={(event) => {
-          if (event.key !== "Tab") return;
-          const focusable = [...(drawerRef.current?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), select:not([disabled]), input:not([disabled])') || [])];
-          const first = focusable[0], last = focusable.at(-1);
-          if (!first || !last) { event.preventDefault(); drawerRef.current?.focus(); }
-          else if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-          else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-        }}>
-          <header><div><h2 id="participant-drawer-title">{t(selectedMember, "full_name") || "회원"}</h2><p>{t(selectedMember, "email") || "이메일 정보 없음"}</p></div><button ref={drawerCloseRef} type="button" className="btn iconbtn" aria-label="상세 닫기" onClick={closeMember}><X size={18} aria-hidden="true" /></button></header>
-          <div className="participant-drawer-body">
+      {selectedMember && selectedStats && <AdminDrawer title={t(selectedMember, "full_name") || "회원"} onClose={closeMember} size="large">
+          <div className="admin-dialog-body participant-drawer-body">
+            <p className="meta">{t(selectedMember, "email") || "이메일 정보 없음"}</p>
             <div className="participant-drawer-summary"><div><span>학습 진도</span><strong>{Number(t(selectedMember, "learning_percent") || 0)}%</strong></div><div><span>선택 주차 미션</span><strong>{selectedStats.approved} / {selectedStats.total}</strong></div></div>
             <div className="participant-drawer-week"><strong>{t(selectedWeek, "week")}주차 · {t(selectedWeek, "title")}</strong><span>필수 미션의 최신 제출 상태</span></div>
             <div className="participant-drawer-missions">
@@ -1374,7 +1348,7 @@ function Participants() {
                 const label = cell.total === 0 ? "필수 미션 미설정" : cellLabels[cell.status] || "상태 확인 필요";
                 return <article key={cell.lessonId} className="participant-drawer-mission">
                   <div className="participant-drawer-mission-copy"><span>Day {t(lesson, "day_number") || "—"}</span><strong title={t(lesson, "title")}>{t(lesson, "title") || "학습 제목 없음"}</strong><small>{cell.total > 0 ? `필수 미션 · ${cell.approved}/${cell.total} 승인` : "운영자가 미션을 등록해야 합니다."}</small></div>
-                  <span className={`participant-state-badge ${stateClasses[state]}`}>{label}</span>
+                  <AdminStatusBadge status={state} label={label} tone={state === "review" || state === "followup" || state === "unconfigured" ? "warning" : state === "done" ? "success" : state === "progress" ? "info" : "neutral"} />
                   {cell.submissionId && <Link className={`participant-row-action ${state === "review" || state === "followup" ? "primary" : ""}`} href={`/admin/reviews?submission=${encodeURIComponent(cell.submissionId)}`}>{state === "review" ? "제출물 검토" : state === "followup" ? "재제출 확인" : "제출물 보기"}</Link>}
                   {!cell.submissionId && cell.total === 0 && <Link className="participant-row-action" href={setupHref}>미션 설정하기</Link>}
                   {!cell.submissionId && cell.total > 0 && cell.status === "empty" && <Link className="participant-row-action" href={setupHref}>미션 설정하기</Link>}
@@ -1384,8 +1358,7 @@ function Participants() {
             </div>
             {Boolean(selectedMember.user_id) && <Link className="participant-member-admin-link" href={`/admin/customers?member=${encodeURIComponent(t(selectedMember, "user_id"))}`}>회원 운영 정보 보기</Link>}
           </div>
-        </aside>
-      </div>}
+      </AdminDrawer>}
     </>
   );
 }
@@ -1973,9 +1946,9 @@ function OrdersPanel({
   loading,
 }: Props) {
   const [opened, setOpened] = useState("");
-  const detailRef = useRef<HTMLDialogElement>(null);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
+  const [quickStatus, setQuickStatus] = useState("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [appliedDates, setAppliedDates] = useState({ from: "", to: "" });
@@ -1999,7 +1972,7 @@ function OrdersPanel({
     setAppliedDates({ from, to });
     setOpened("");
   }
-  const orders = rows(data, "orders").filter(
+  const baseOrders = rows(data, "orders").filter(
     (o) =>
       (!status || o.status === status) &&
       (fromTimestamp === null || Date.parse(String(o.created_at)) >= fromTimestamp) &&
@@ -2020,6 +1993,15 @@ function OrdersPanel({
         .toLowerCase()
         .includes(query.toLowerCase()),
   );
+  const quickCounts = {
+    failed: baseOrders.filter(order => order.status === "payment_failed").length,
+    refund: baseOrders.filter(order => rows(data, "payments").some(payment => payment.order_id === order.id && rows(data, "edu_refund_requests").some(request => request.payment_id === payment.id && request.status === "processing"))).length,
+    access: baseOrders.filter(order => order.status === "paid" && !rows(data, "enrollments").some(enrollment => enrollment.status === "active" && rows(data, "order_items").some(item => item.order_id === order.id && item.id === enrollment.order_item_id))).length,
+  };
+  const orders = baseOrders.filter(order => quickStatus === "all" ||
+    (quickStatus === "failed" && order.status === "payment_failed") ||
+    (quickStatus === "refund" && rows(data, "payments").some(payment => payment.order_id === order.id && rows(data, "edu_refund_requests").some(request => request.payment_id === payment.id && request.status === "processing"))) ||
+    (quickStatus === "access" && order.status === "paid" && !rows(data, "enrollments").some(enrollment => enrollment.status === "active" && rows(data, "order_items").some(item => item.order_id === order.id && item.id === enrollment.order_item_id))));
   const ids = new Set(orders.map((o) => o.id));
   const payments = rows(data, "payments").filter((p) =>
     ids.has(t(p, "order_id")),
@@ -2052,55 +2034,30 @@ function OrdersPanel({
   const selectedApproved = selectedPayments.reduce((sum, payment) => sum + Number(payment.approved_amount || 0), 0);
   const selectedCancelled = selectedPayments.reduce((sum, payment) => sum + Number(payment.cancelled_amount || 0), 0);
   const selectedRemaining = Math.max(0, selectedApproved - selectedCancelled);
-  useEffect(() => {
-    const dialog = detailRef.current;
-    if (!dialog) return;
-    if (opened && !dialog.open) dialog.showModal();
-    if (!opened && dialog.open) dialog.close();
-  }, [opened]);
   return (
     <>
-      <section className="order-date-panel" aria-label="주문 날짜 조회">
-        <form className="date-range" onSubmit={event => { event.preventDefault(); applyDates(); }}>
-          <label className="select-filter">
-            <span>주문일 시작 · KST</span>
-            <input type="date" aria-label="주문일 시작" value={from} onChange={event => setFrom(event.target.value)} />
-          </label>
-          <span className="date-separator" aria-hidden="true">–</span>
-          <label className="select-filter">
-            <span>주문일 종료 · KST</span>
-            <input type="date" aria-label="주문일 종료" value={to} onChange={event => setTo(event.target.value)} />
-          </label>
-          <button className="btn primary" type="submit" disabled={loading}>조회</button>
-          <button className="btn" type="button" onClick={() => { setFrom(""); setTo(""); setAppliedDates({ from: "", to: "" }); setDateError(""); setOpened(""); }}>전체 기간</button>
-        </form>
-        <p className="meta mt8">적용 기간: {appliedDates.from || "전체 시작일"} ~ {appliedDates.to || "전체 종료일"} · 주문일 기준, 종료일 포함 · 현재 조회 페이지 내 검색</p>
-        {dateError && <p className="field-error mt8" role="alert">{dateError}</p>}
-      </section>
-      <div className="metrics" aria-busy={loading}>
+      <AdminFilterBar
+        className="admin-pilot-filter"
+        filters={<><AdminSelect label="상품" labelHidden value={course} onChange={event => { setCourse(event.target.value); setOpened(""); }}><option value="">전체 상품</option>{registeredCourses.map(item => <option key={item.id} value={item.id}>{named(item)}</option>)}</AdminSelect><AdminSelect label="결제 상태" labelHidden value={status} onChange={event => { setStatus(event.target.value); setOpened(""); }}><option value="">전체 상태</option>{["paid", "pending", "payment_failed", "partially_refunded", "refunded", "cancelled"].map(value => <option key={value} value={value}>{labels[value] || value}</option>)}</AdminSelect></>}
+        date={<><AdminDatePicker label="주문일 시작 · KST" value={from} error={dateError || undefined} onChange={event => setFrom(event.target.value)} /><AdminDatePicker label="주문일 종료 · KST" value={to} onChange={event => setTo(event.target.value)} /></>}
+        search={<AdminSearchField value={query} label="주문 검색" placeholder="주문번호 · 회원명 · 상품명 검색" onChange={event => { setQuery(event.target.value); setOpened(""); }} />}
+        onReset={() => { setQuery(""); setStatus(""); setQuickStatus("all"); setCourse(""); setFrom(""); setTo(""); setAppliedDates({ from: "", to: "" }); setDateError(""); setOpened(""); }}
+        action={<AdminButton variant="primary" disabled={loading} onClick={applyDates}>기간 조회</AdminButton>}
+        appliedSummary={`적용 기간: ${appliedDates.from || "전체 시작일"} ~ ${appliedDates.to || "전체 종료일"} · 주문일/KST, 종료일 포함 · 검색·집계는 현재 조회 페이지 기준`}
+      />
+      <div className="admin-pilot-summary" aria-busy={loading}>
         {[
           ["결제 완료액", money(paid), "현재 페이지 조회 조건의 승인 결제 합계"],
           ["환불 완료액", money(refunded), "현재 페이지 결제의 취소 완료액"],
           ["순결제액", money(paid - refunded), "결제 완료 − 환불 완료"],
           ["환불 처리 확인", processingRefunds.length + "건", "현재 페이지의 결과 확인 중인 환불"],
         ].map(([label, value, note], index) => (
-          <div className={"metric" + (index === 2 ? " highlight" : "")} key={label}>
-            <div className="metric-label">{label}</div>
-            <div className="metric-value num">{loading ? "—" : value}</div>
-            <div className="metric-note">{note}</div>
-          </div>
+          <AdminSummaryCard key={label} label={label} value={loading ? "—" : value} scope={note} compact className={index === 2 ? "admin-pilot-summary-highlight" : undefined} />
         ))}
       </div>
-      <section className="panel" aria-label="주문 목록" aria-busy={loading}>
-        <div className="filter-row">
-          <AdminSearchField value={query} label="주문 검색" placeholder="주문번호 · 회원명 · 상품명 검색" onChange={event => { setQuery(event.target.value); setOpened(""); }} />
-          <span className="spacer" />
-          <label className="select-filter"><span>상품</span><select aria-label="상품 필터" value={course} onChange={event => { setCourse(event.target.value); setOpened(""); }}><option value="">전체 상품</option>{registeredCourses.map(item => <option key={item.id} value={item.id}>{named(item)}</option>)}</select></label>
-          <select aria-label="결제 상태" value={status} onChange={event => { setStatus(event.target.value); setOpened(""); }}><option value="">전체 상태</option>{["paid", "pending", "payment_failed", "partially_refunded", "refunded", "cancelled"].map(value => <option key={value} value={value}>{labels[value] || value}</option>)}</select>
-        </div>
-        <div className="table-scroll mobile-cards admin-legacy-table" tabIndex={0} role="region" aria-label="주문 데이터 표" aria-busy={loading}>
-          <table>
-            <caption className="sr-only">주문·결제·환불·수강권 연결 목록</caption>
+      <section className="admin-pilot-workspace" aria-label="주문 목록" aria-busy={loading}>
+        <AdminQuickFilter label="주문 예외 빠른 필터" value={quickStatus} onChange={value => { setQuickStatus(value); setOpened(""); }} items={[{ value: "all", label: "전체", count: baseOrders.length }, { value: "failed", label: "결제 실패", count: quickCounts.failed }, { value: "refund", label: "환불 확인", count: quickCounts.refund }, { value: "access", label: "수강권 확인", count: quickCounts.access }]} />
+        <AdminDataTable label="주문·결제·환불·수강권 연결 목록" density="standard" loading={loading}>
             <thead>
               <tr>
                 {[
@@ -2145,40 +2102,27 @@ function OrdersPanel({
                   <td data-label="결제 상태">
                     <AdminStatusBadge status={t(order, "status")} label={labels[t(order, "status")] || t(order, "status")} />
                   </td>
-                  <td data-label="환불 상태"><span className={"badge " + (checkingRefund ? "amber" : "")}>{refundLabel}</span>{cancelledAmount > 0 && <p>{money(cancelledAmount)}</p>}</td>
+                  <td data-label="환불 상태"><AdminStatusBadge status={checkingRefund ? "pending" : cancelledAmount > 0 ? "refunded" : "inactive"} label={refundLabel} tone={checkingRefund ? "warning" : "neutral"} />{cancelledAmount > 0 && <p>{money(cancelledAmount)}</p>}</td>
                   <td data-label="수강 권한">{accessLabels.join(" · ") || "부여 내역 없음"}</td>
                   <td data-label="관리">
-                    <button
-                      className="btn small"
+                    <AdminButton
+                      variant="outline" size="sm"
                       aria-haspopup="dialog"
                       onClick={() => setOpened(order.id)}
                     >
                       상세
-                    </button>
+                    </AdminButton>
                   </td>
                 </tr>
               );})}
             </tbody>
-          </table>
-        </div>
+        </AdminDataTable>
         {!orders.length && !loading && <AdminEmptyState title="해당 주문이 없습니다." action={<button className="btn" type="button" onClick={() => { setQuery(""); setStatus(""); setCourse(""); setFrom(""); setTo(""); setAppliedDates({ from: "", to: "" }); setDateError(""); }}>검색·필터 초기화</button>}>현재 조회 페이지의 기간·상품·상태 또는 검색어를 확인하세요.</AdminEmptyState>}
         {loading && <div className="pad"><AdminLoadingState title="주문 내역을 불러오는 중입니다." description="결제·환불·수강권 연결 상태를 함께 확인하고 있습니다."/></div>}
         <div className="table-foot"><span>{orders.length}건 표시 · 현재 조회 페이지 내 검색·집계</span><span>정산·회계 매출은 결제액과 별도</span></div>
       </section>
-      <dialog
-        className="drawer order-detail-drawer"
-        ref={detailRef}
-        aria-label="주문 상세"
-        onCancel={event => { event.preventDefault(); setOpened(""); }}
-        onClose={() => setOpened("")}
-        onClick={event => { if (event.target === event.currentTarget) setOpened(""); }}
-      >
-        {selectedOrder && (
+      {selectedOrder && <AdminDrawer title="주문 상세" onClose={() => setOpened("")} size="large" className="order-detail-drawer">
           <div className="order-detail-shell">
-            <header className="dialog-head">
-              <h2>주문 상세</h2>
-              <button type="button" className="iconbtn" aria-label="주문 상세 닫기" onClick={() => setOpened("")}><X /></button>
-            </header>
             <div className="dialog-body">
               <h3 className="order-detail-number">{t(selectedOrder, "order_number")}</h3>
               <p className="meta mt8">{timeLabel(selectedOrder.created_at)} · {t(selectedOrder, "customer_name") || "이름 미등록"}</p>
@@ -2226,8 +2170,7 @@ function OrdersPanel({
               <button type="button" className="btn" onClick={() => setOpened("")}>닫기</button>
             </footer>
           </div>
-        )}
-      </dialog>
+      </AdminDrawer>}
       {pagination && pagination.total > pagination.pageSize && (
         <><p className="admin-pagination-total">전체 {pagination.total}건</p><AdminPagination page={pagination.page} pages={Math.ceil(pagination.total / pagination.pageSize)} disabled={loading} onChange={nextPage => setPage?.(nextPage)}/></>
       )}
