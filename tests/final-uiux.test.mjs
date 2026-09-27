@@ -89,10 +89,10 @@ test('five admin categories and scoped navigation render from the admin UI featu
     contents: 'film', missions: 'book-open', members: 'users-round', reviews: 'square-check',
     questions: 'message-circle', customers: 'users-round', tags: 'users-round', coupons: 'layout-grid',
     'product-reviews': 'message-circle', banners: 'layout-grid', articles: 'file-pen-line',
-    testimonials: 'message-circle', orders: 'receipt-text', conversion: 'message-circle',
-    landing: 'chart-line', analytics: 'chart-line',
-    campaigns: 'layout-grid',
-    templates: 'layout-grid', automations: 'layout-grid', seo: 'settings', settings: 'settings', staff: 'shield-check',
+    testimonials: 'message-circle', orders: 'receipt-text', conversion: 'megaphone',
+    landing: 'chart-line', analytics: 'chart-no-axes-combined',
+    campaigns: 'send',
+    templates: 'message-square-text', automations: 'workflow', seo: 'search-check', settings: 'settings', staff: 'shield-check',
   };
   for (const [key, icon] of Object.entries(expectedIcons)) {
     assert.ok(adminNavigationIcon(key));
