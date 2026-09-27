@@ -946,12 +946,10 @@ export async function POST(request: Request) {
             const order = r.data as Record<string, unknown>;
             const entrySource = typeof body.entrySource === 'string' && ['paid', 'organic', 'alumni', 'youtube'].includes(body.entrySource)
                 ? body.entrySource : null;
-            if (entrySource) {
-                const attribution = await db.from('orders').update({ entry_src: entrySource })
-                    .eq('id', order.orderId).eq('user_id', user.id).eq('status', 'pending')
-                    .select('id').single();
-                if (attribution.error || !attribution.data) fail('주문 유입경로를 기록하지 못했습니다. 다시 시도해 주세요.', 503);
-            }
+            const attribution = await db.from('orders').update({ entry_src: entrySource })
+                .eq('id', order.orderId).eq('user_id', user.id).eq('status', 'pending')
+                .select('id').single();
+            if (attribution.error || !attribution.data) fail('주문 유입경로를 기록하지 못했습니다. 다시 시도해 주세요.', 503);
             const coupon = await db.rpc('apply_coupon_to_order', {
                 p_order_id: order.orderId,
                 p_user_id: user.id,
