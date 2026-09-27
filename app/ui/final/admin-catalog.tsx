@@ -14,7 +14,7 @@ import { productSalesStatus, recordId } from "@/lib/platform-rules";
 import { productConversion } from "@/lib/product-conversion";
 import { isProductListed } from "@/lib/product-visibility";
 import { archiveValues, cohortPeriod, cohortStatus } from "@/lib/qa-rules";
-import { ArrowRight, BookOpen, ChevronDown, ChevronUp, FileText, Pencil, RotateCcw, Trash2 } from "lucide-react";
+import { ArrowRight, BookOpen, ChevronDown, ChevronUp, FileText, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Fragment, useMemo, useState, type CSSProperties, type ReactNode } from "react";
@@ -808,7 +808,7 @@ export function AdminCatalog({
         )}
         <div
           className={
-            ["learning", "missions", "questions"].includes(s.key) ? "" : "panel"
+            ["learning", "missions", "questions"].includes(s.key) ? "" : s.key === "weeks" ? "panel weeks-table-workspace" : "panel"
           }
         >
           {!["missions", "tags"].includes(s.key) && <div className={s.key === "learning" ? "toolbar learning-filter" : "filter-row"}>
@@ -851,7 +851,7 @@ export function AdminCatalog({
               </select>
             )}
             {s.key === "product-reviews" && <label className="catalog-filter-field">상품<select aria-label="후기 상품" value={course} onChange={(event) => { setCourse(event.target.value); setSelection([]); }}><option value="">전체 상품</option>{courses.map((item) => <option key={item.id} value={item.id}>{named(item)}</option>)}</select></label>}
-            {s.key === "weeks" && <label className="catalog-filter-field">상품<select aria-label="주차 상품" value={course} onChange={(event) => { setCourse(event.target.value); setSelection([]); }}><option value="">전체 상품</option>{courses.map((item) => <option key={item.id} value={item.id}>{named(item)}</option>)}</select></label>}
+            {s.key === "weeks" && <label className="catalog-filter-field"><span className="sr-only">상품</span><select aria-label="주차 상품" value={course} onChange={(event) => { setCourse(event.target.value); setSelection([]); }}><option value="">전체 상품</option>{courses.map((item) => <option key={item.id} value={item.id}>{named(item)}</option>)}</select></label>}
             {s.key === "customers" && (
               <label className="catalog-filter-field">클래스<select
                 aria-label="수강 클래스"
@@ -866,6 +866,7 @@ export function AdminCatalog({
               </select></label>
             )}
             {s.key === "questions" ? <select aria-label="질문 처리 상태" value={params.has('question') ? 'selected' : params.get('questionState') || 'active'} onChange={event => { const next = new URLSearchParams(params.toString()); next.set('questionState', event.target.value); next.delete('question'); router.push(`/admin/questions?${next}`); }}>{params.has('question') && <option value="selected" disabled>선택한 질문 · 보관 포함</option>}<option value="active">전체 운영 질문</option><option value="open">미답변</option><option value="answered">답변 완료</option><option value="archived">보관</option></select> : statusFilter}
+            {s.key === "weeks" && <button className="btn primary weeks-create" type="button" onClick={() => edit(s)}><Plus size={16} aria-hidden="true" />새로 등록</button>}
           </div>}
           {s.key === "weeks" && <p className="meta week-order-help">상품을 선택하면 해당 상품 안에서 주차 순서를 조정할 수 있습니다. 검색·상태 필터를 해제한 뒤 이동해 주세요.</p>}
           {s.key === "learning" ? (

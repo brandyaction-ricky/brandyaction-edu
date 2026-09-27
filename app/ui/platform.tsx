@@ -916,6 +916,7 @@ export function Platform({
               {section.key === "articles" && <Link className="btn" href="/articles" target="_blank">고객 화면 미리보기</Link>}
               {!standaloneAdmin.includes(section.key) &&
                 !section.readOnly &&
+                section.key !== "weeks" &&
                 ![
                   "profiles",
                   "reviews",

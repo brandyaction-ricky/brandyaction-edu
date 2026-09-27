@@ -181,3 +181,28 @@
 .edu-admin .week-order-actions{justify-content:flex-end}
 @media(max-width:720px){.edu-admin .panel:has(.filter-row select[aria-label="주차 상품"]) .filter-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:end}.edu-admin .panel:has(.filter-row select[aria-label="주차 상품"]) .filter-row>.search{grid-column:1/-1;width:100%;max-width:none;margin:0}.edu-admin .panel:has(.filter-row select[aria-label="주차 상품"]) .filter-row>.catalog-filter-field{width:100%;min-width:0}.edu-admin .panel:has(.filter-row select[aria-label="주차 상품"]) .filter-row>select{width:100%;min-width:0}.edu-admin .mobile-cards .week-group-heading{display:block;padding:0;border:0}.edu-admin .mobile-cards .week-group-heading th{display:block;width:100%;padding:var(--space-3) var(--space-4)}.edu-admin .week-order-help{padding:0 var(--space-3)}.edu-admin .week-order-actions{justify-content:flex-start;flex-wrap:wrap}}
 
+/* Week configuration follows the compact, unified SaaS data-table pattern. */
+.edu-admin .weeks-table-workspace{border-radius:8px;box-shadow:none}
+.edu-admin .weeks-table-workspace>.filter-row{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;padding:12px 16px;margin:0;border-bottom:1px solid #e5e5e5}
+.edu-admin .weeks-table-workspace>.filter-row>.spacer{display:none}
+.edu-admin .weeks-table-workspace>.filter-row>.catalog-filter-field{order:1;display:block;width:190px;min-width:150px;color:inherit;font-size:inherit}
+.edu-admin .weeks-table-workspace>.filter-row>.catalog-filter-field select,.edu-admin .weeks-table-workspace>.filter-row>select{height:40px;min-height:40px;padding:0 14px;border:1px solid #e5e5e5;border-radius:7px;background:#fff;font-size:14px}
+.edu-admin .weeks-table-workspace>.filter-row>select{order:2;width:140px}
+.edu-admin .weeks-table-workspace>.filter-row>.search{order:3;flex:1 1 auto;width:auto;min-width:150px;max-width:none;margin:0}
+.edu-admin .weeks-table-workspace>.filter-row>.search input{height:40px;min-height:40px;padding-left:38px;border-color:#e5e5e5;border-radius:7px;font-size:14px}
+.edu-admin .weeks-table-workspace>.filter-row>.search svg{left:12px;top:11px}
+.edu-admin .weeks-table-workspace>.filter-row>.weeks-create{order:4;flex:0 0 auto;height:40px;min-height:40px;padding:0 14px;border-radius:7px;font-size:14px;white-space:nowrap}
+.edu-admin .weeks-table-workspace>.filter-row select:focus,.edu-admin .weeks-table-workspace>.filter-row input:focus{border-color:#a3a3a3;box-shadow:none}
+.edu-admin .weeks-table-workspace>.week-order-help{padding:8px 16px;margin:0;border-bottom:1px solid #e5e5e5;font-size:12px}
+.edu-admin .weeks-table-workspace .table-scroll{overflow-x:auto}
+.edu-admin .weeks-table-workspace table{white-space:nowrap}
+.edu-admin .weeks-table-workspace th{height:44px;padding:10px 16px;background:#fafafa;font-size:13px;font-weight:600}
+.edu-admin .weeks-table-workspace td{height:54px;padding:8px 16px;font-size:13px}
+.edu-admin .weeks-table-workspace .week-group-heading th{height:auto;padding:8px 16px;background:#fff;border-top:1px solid #e5e5e5;color:#525252}
+.edu-admin .weeks-table-workspace .week-order-actions{gap:6px}
+.edu-admin .weeks-table-workspace .week-order-actions .btn{height:32px;min-height:32px;border-radius:6px}
+.edu-admin .weeks-table-workspace .week-order-actions .iconbtn{width:32px;min-width:32px;height:32px;min-height:32px}
+.edu-admin .weeks-table-workspace .table-foot{padding:12px 16px;border-top:1px solid #e5e5e5}
+.edu-admin .weeks-table-workspace tbody tr:hover{background:#fafafa}
+@media(max-width:720px){.edu-admin .weeks-table-workspace>.filter-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center}.edu-admin .weeks-table-workspace>.filter-row>.catalog-filter-field,.edu-admin .weeks-table-workspace>.filter-row>select{width:100%;min-width:0}.edu-admin .weeks-table-workspace>.filter-row>.search{grid-column:1/-1;width:100%;min-width:0}.edu-admin .weeks-table-workspace>.filter-row>.weeks-create{grid-column:1/-1;width:100%}.edu-admin .weeks-table-workspace .table-scroll.mobile-cards{overflow-x:auto;overflow-y:hidden}.edu-admin .weeks-table-workspace .mobile-cards table,.edu-admin .weeks-table-workspace .mobile-cards tbody{display:table;min-width:860px;white-space:nowrap}.edu-admin .weeks-table-workspace .mobile-cards thead{position:static;width:auto;height:auto;padding:0;overflow:visible;clip:auto;white-space:normal}.edu-admin .weeks-table-workspace .mobile-cards tr{display:table-row;padding:0;border-bottom:0;gap:0}.edu-admin .weeks-table-workspace .mobile-cards td{display:table-cell;width:auto!important;min-width:0!important;white-space:nowrap;padding:8px 12px;border-bottom:1px solid #e5e5e5;overflow-wrap:normal}.edu-admin .weeks-table-workspace .mobile-cards td::before{display:none}.edu-admin .weeks-table-workspace .week-group-heading{display:table-row;padding:0;border:0}.edu-admin .weeks-table-workspace .week-group-heading th{display:table-cell;width:auto;padding:8px 12px}.edu-admin .weeks-table-workspace .week-order-actions{justify-content:flex-end;flex-wrap:nowrap}}
+

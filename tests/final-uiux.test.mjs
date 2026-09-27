@@ -245,7 +245,9 @@ test('catalogues and separate editors render without dropping existing fields', 
   assert.match(weekMarkup, /aria-label="주차 상품"/);
   assert.match(weekMarkup, /class="week-group-heading"[\s\S]*?1주차[\s\S]*?2주차/);
   assert.match(weekMarkup, /다른 상품 주차 아래로 이동/);
-  assert.match(read('app/ui/final/admin.css'), /week-filter|주차 상품/);
+  assert.match(weekMarkup, /weeks-create[\s\S]*?새로 등록/);
+  assert.match(weekMarkup, /weeks-table-workspace/);
+  assert.match(read('app/ui/final/admin.css'), /weeks-table-workspace[\s\S]*?flex:1 1 auto[\s\S]*?overflow-x:auto/);
   const products = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'products') });
   assert.match(products, /전체 상품/); assert.match(products, /연결 기수/); assert.match(products, /<th>자료<\/th>/);
   assert.match(products, /공개 점검/); assert.match(read('app/api/platform/route.ts'), /archivedProducts/);
