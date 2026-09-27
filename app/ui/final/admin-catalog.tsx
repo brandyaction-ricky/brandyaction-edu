@@ -11,6 +11,7 @@ import {
   type Section,
 } from "@/lib/platform";
 import { productSalesStatus, recordId } from "@/lib/platform-rules";
+import { couponStatus } from "@/lib/coupon-rules";
 import { productConversion } from "@/lib/product-conversion";
 import { isProductListed } from "@/lib/product-visibility";
 import { archiveValues, cohortPeriod, cohortStatus } from "@/lib/qa-rules";
@@ -135,9 +136,8 @@ export function AdminCatalog({
   }, [data.lesson_contents, lessons, weeks]);
   const customerCourses = (memberId: unknown) => [...(customerCourseNames.get(memberId) || [])];
   const customerTags = (memberId: unknown) => memberTags.filter((item) => item.member_id === memberId).flatMap((item) => { const tag = tags.find((tag) => tag.id === item.tag_id); return tag ? [tag] : []; });
-  const couponStatus = (row: Row) => !row.is_active ? "inactive" : row.ends_at && Date.parse(String(row.ends_at)) < now ? "expired" : row.starts_at && Date.parse(String(row.starts_at)) > now ? "upcoming" : "active";
   const bannerStatus = (row: Row) => !row.is_active ? "hidden" : row.ends_at && Date.parse(String(row.ends_at)) < now ? "completed" : row.starts_at && Date.parse(String(row.starts_at)) > now ? "upcoming" : "published";
-  const statusLabel = (value: string) => s.key === "coupons" ? ({ active: "발급 중", upcoming: "발급 예정", expired: "종료", inactive: "사용 중지" }[value] || value) : s.key === "banners" ? ({ published: "게시 중", upcoming: "예약", completed: "노출 종료", hidden: "비공개" }[value] || value) : s.key === "customers" ? ({ active: "정상", suspended: "이용 제한" }[value] || labels[value] || value) : s.key === "products" ? ({ published: "판매 중", draft: "작성 중", archived: "판매 종료" }[value] || labels[value] || value) : value === "hidden" && ["learning", "missions"].includes(s.key) ? "비공개" : labels[value] || value;
+  const statusLabel = (value: string) => s.key === "coupons" ? ({ active: "발급 중", upcoming: "발급 예정", expired: "종료", inactive: "비활성", draft: "임시 저장", admin_test: "관리자 테스트" }[value] || value) : s.key === "banners" ? ({ published: "게시 중", upcoming: "예약", completed: "노출 종료", hidden: "비공개" }[value] || value) : s.key === "customers" ? ({ active: "정상", suspended: "이용 제한" }[value] || labels[value] || value) : s.key === "products" ? ({ published: "판매 중", draft: "작성 중", archived: "판매 종료" }[value] || labels[value] || value) : value === "hidden" && ["learning", "missions"].includes(s.key) ? "비공개" : labels[value] || value;
   const productResourceCount = (productId: unknown) => resourceCounts.get(String(productId)) || 0;
   const getCourse = (r: Row) =>
     r.course_id ||
@@ -166,7 +166,7 @@ export function AdminCatalog({
   const filtered = rows.filter(
     (r) =>
       (s.key === "missions" ? missionState === "archived" ? Boolean(r.archived_at) : !r.archived_at && (missionState === "active" || Boolean(r.is_published) === (missionState === "published")) : s.key === "products" ? productVisibility === "archived" ? Boolean(r.archived_at) : !r.archived_at : archived || !r.archived_at) &&
-      (!status || getStatus(r) === status) &&
+      (!status || (s.key === "coupons" && status === "admin_test" ? r.discount_type === "ADMIN_FREE" : getStatus(r) === status)) &&
       (!tagMode || r.tag_kind === tagMode) &&
       (!type ||
         (s.key === "products" ? courseType(r) : r.content_type) === type) &&
@@ -392,16 +392,17 @@ export function AdminCatalog({
           <>
             <b>{t(r, "name")}</b>
             <small>{t(r, "code")}</small>
+            {r.discount_type === 'ADMIN_FREE' && <Badge>관리자 전용</Badge>}
           </>
         ),
       },
       {
         label: "혜택",
-        value: (r) => <>{r.discount_type === "percentage" ? num(r, "discount_value") + "%" : money(num(r, "discount_value"))}<small>{Number(r.minimum_order_amount || 0) > 0 ? `최소 ${money(num(r, "minimum_order_amount"))}` : "최소 주문 제한 없음"}</small></>,
+        value: (r) => <>{r.discount_type === 'ADMIN_FREE' ? '100% 무료' : r.discount_type === "percentage" ? num(r, "discount_value") + "%" : money(num(r, "discount_value"))}<small>{Number(r.minimum_order_amount || 0) > 0 ? `최소 ${money(num(r, "minimum_order_amount"))}` : "최소 주문 제한 없음"}</small></>,
       },
       {
         label: "적용 대상",
-        value: (r) => { const tag = tags.find(item => item.id === r.target_tag_id); const product = courses.find(item => item.id === (data.coupon_products || []).find(link => link.coupon_id === r.id)?.course_id); return <>{r.issue_target === "tag" ? named(tag) : "전체 회원"}<small>{r.product_scope === "specific" ? named(product) : r.product_scope === "paid" ? "유료 클래스" : "전체 상품"}</small></>; },
+        value: (r) => { const tag = tags.find(item => item.id === r.target_tag_id); const products = courses.filter(item => (data.coupon_products || []).some(link => link.coupon_id === r.id && link.course_id === item.id)); return <>{r.discount_type === "ADMIN_FREE" ? "관리자만" : r.issue_target === "tag" ? named(tag) : "전체 회원"}<small>{r.product_scope === "specific" ? products.map(named).join(", ") : r.product_scope === "paid" ? "유료 클래스" : "전체 상품"}</small></>; },
       },
       {
         label: "사용 / 수량",
@@ -577,7 +578,7 @@ export function AdminCatalog({
       }}
     >
       <option value="">전체 상태</option>
-      {[...new Set(rows.map(getStatus))].map((s) => (
+      {(s.key === 'coupons' ? ['draft','upcoming','active','expired','inactive','admin_test'] : [...new Set(rows.map(getStatus))]).map((s) => (
         <option key={s} value={s}>
           {statusLabel(s)}
         </option>

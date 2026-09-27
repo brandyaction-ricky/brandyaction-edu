@@ -24,8 +24,8 @@ function setup(patch = {}, orderError = null) {
     },
     async rpc(name, args) {
       calls.push({ name, args });
-      if (name === 'create_checkout_order') return orderError ? { error: { message: orderError } } : { data: { orderId: 'order', totalAmount: offer.price } };
-      assert.equal(name, 'apply_coupon_to_order');
+      if (name === 'edu_checkout_with_coupon') return orderError ? { error: { message: orderError } } : { data: { orderId: 'order', totalAmount: offer.price } };
+      assert.fail('Unexpected RPC ' + name);
       return { data: { totalAmount: offer.price } };
     },
   };
@@ -44,7 +44,7 @@ test('paid order reaches the existing checkout RPC without any curriculum query 
   const response = await send();
   assert.equal(response.status, 200);
   assert.equal((await response.json()).orderId, 'order');
-  assert.deepEqual(calls.map(call => call.name), ['create_checkout_order', 'apply_coupon_to_order']);
+  assert.deepEqual(calls.map(call => call.name), ['edu_checkout_with_coupon']);
   assert.equal(calls[0].args.p_user_id, 'member');
 });
 
@@ -60,6 +60,6 @@ test('closed recruitment and capacity checks remain delegated to the transaction
   for (const error of ['RECRUIT_CLOSED', 'CAPACITY_EXCEEDED', 'ALREADY_ENROLLED']) {
     const { calls, send } = setup({}, error);
     assert.equal((await send()).status, 409);
-    assert.deepEqual(calls.map(call => call.name), ['create_checkout_order']);
+    assert.deepEqual(calls.map(call => call.name), ['edu_checkout_with_coupon']);
   }
 });

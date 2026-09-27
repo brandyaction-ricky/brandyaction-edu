@@ -267,7 +267,9 @@ test('catalogues and separate editors render without dropping existing fields', 
   const platformSource = read('app/ui/platform.tsx');
   const pageSource = read('app/[[...path]]/page.tsx');
   assert.match(platformSource, /무료강의 3강 시청[\s\S]*결제 완료[\s\S]*미션 수행[\s\S]*회원가입/);
-  assert.match(platformSource, /쿠폰 등록·설정[\s\S]*최소 주문 금액[\s\S]*회원당 발급 횟수/);
+  assert.match(platformSource, /쿠폰 등록·설정/);
+  assert.match(platformSource, /<CouponFields/);
+  assert.match(read('app/ui/final/coupon-fields.tsx'), /최소 주문 금액[\s\S]*회원별 사용 횟수/);
   const learning = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'learning') });
   assert.match(learning, /learning-layout/); assert.match(learning, /학습 구성/); assert.match(learning, /lesson-list-item/);
   const missions = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'missions') });

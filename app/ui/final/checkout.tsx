@@ -4,7 +4,7 @@ import { cohortPeriod } from "@/lib/qa-rules";
 import { ArrowLeft, ArrowRight, CreditCard, Landmark } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { type Data, type WorkflowSend } from "../learning-workflows";
 import { Badge, Empty, Heading, courseType } from "./primitives";
 
@@ -29,8 +29,35 @@ export function Checkout({
     cohort = (data.cohorts || []).find((c) => c.id === cohortId),
     course = (data.courses || []).find((c) => c.id === cohort?.course_id),
     free = !!cohort && num(cohort, "price") === 0;
+  const [available, setAvailable] = useState<{ couponCode: string; couponName: string }[]>([]);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponNotice, setCouponNotice] = useState('');
+  const [quoteResult, setQuote] = useState<{ scope: string; couponCode: string | null; couponName?: string; originalAmount?: number; couponDiscount: number; totalAmount: number } | null>(null);
+  const scope = `${user?.id || ''}:${cohortId}`;
+  const quote = quoteResult?.scope === scope ? quoteResult : null;
+  const quoteRequest = useRef(0), userId = user?.id;
+  useEffect(() => {
+    if (!userId || !cohortId) return;
+    const controller = new AbortController();
+    fetch(`/api/coupons?cohort=${encodeURIComponent(cohortId)}`, { signal: controller.signal }).then(async response => {
+      const body = await response.json(); if (!response.ok) throw Error(body.error); return body;
+    }).then(body => setAvailable(body.coupons || [])).catch(cause => { if (!controller.signal.aborted) setCouponNotice(cause.message); });
+    return () => controller.abort();
+  }, [cohortId, userId]);
+  function changeCoupon(code: string) { quoteRequest.current++; setCoupon(code); setQuote(null); setCouponLoading(false); setCouponNotice(''); }
+  async function applyCoupon() {
+    const requestId = ++quoteRequest.current;
+    setCouponLoading(true); setCouponNotice('');
+    try {
+      const response = await fetch('/api/coupons', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cohortId, code: coupon }) });
+      const body = await response.json(); if (!response.ok) throw Error(body.error);
+      if (requestId === quoteRequest.current) { setQuote({ ...body, scope }); setCouponNotice('쿠폰을 적용했습니다. 주문 확정 시 조건을 다시 확인합니다.'); }
+    } catch (cause) { if (requestId === quoteRequest.current) { setQuote(null); setCouponNotice((cause as Error).message); } }
+    finally { if (requestId === quoteRequest.current) setCouponLoading(false); }
+  }
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (coupon.trim() && !quote) { setError('쿠폰 적용 버튼으로 할인 금액을 먼저 확인해 주세요.'); return; }
     if (!agreed) {
       setError("필수 약관에 동의해 주세요.");
       return;
@@ -177,12 +204,12 @@ export function Checkout({
     <>
       <button
         className="btn primary full large"
-        disabled={pending || processing || !agreed}
+        disabled={pending || processing || couponLoading || !agreed || (!!coupon.trim() && !quote)}
         aria-describedby="checkout-agreement-help"
       >
         {pending || processing
           ? "처리 중..."
-          : free
+          : free || quote?.totalAmount === 0
             ? "무료로 신청 완료하기"
             : "결제하기"}
         <ArrowRight />
@@ -289,21 +316,10 @@ export function Checkout({
                   사용할 쿠폰
                   <select
                     value={coupon}
-                    onChange={(e) => setCoupon(e.target.value)}
+                    onChange={(e) => changeCoupon(e.target.value)}
                   >
                     <option value="">직접 입력 / 선택하지 않음</option>
-                    {(data.customer_coupons || [])
-                      .filter((c) => c.status === "available")
-                      .map((c) => {
-                        const v = c.coupon as
-                          | Record<string, unknown>
-                          | undefined;
-                        return (
-                          <option key={c.id} value={String(v?.code || "")}>
-                            {String(v?.name || "쿠폰")}
-                          </option>
-                        );
-                      })}
+                    {available.map(c => <option key={c.couponCode} value={c.couponCode}>{c.couponName}</option>)}
                   </select>
                 </label>
                 <label className="field">
@@ -311,16 +327,17 @@ export function Checkout({
                   <input
                     name="coupon"
                     value={coupon}
-                    onChange={(e) => setCoupon(e.target.value)}
+                    onChange={(e) => changeCoupon(e.target.value)}
+                    maxLength={30}
                     placeholder="보유한 쿠폰 코드를 입력하세요."
                   />
                 </label>
-                <p className="meta">
-                  쿠폰 사용 조건에 따라 할인이 적용됩니다. 결제창에서 최종 금액을 확인해 주세요.
-                </p>
+                <div className="actions"><button type="button" className="btn" onClick={() => void applyCoupon()} disabled={couponLoading || !coupon.trim()}>{couponLoading ? '확인 중…' : '쿠폰 적용'}</button><button type="button" className="btn" onClick={() => changeCoupon('')}>적용 취소</button></div>
+                {couponNotice && <p role="status" className="meta">{couponNotice}</p>}
+                {quote && <div className="checkout-applied-coupon"><span>{quote.couponName || quote.couponCode}</span><strong>−{money(quote.couponDiscount)}</strong></div>}
               </div>
             </section>
-            <section className="panel">
+            {quote?.totalAmount === 0 ? <section className="panel"><div className="panel-body">최종 금액 0원 · 결제창 없이 신청을 완료합니다.</div></section> : <section className="panel">
               <div className="panel-head">
                 <h2>결제 수단</h2>
               </div>
@@ -350,22 +367,24 @@ export function Checkout({
                   가상계좌는 발급 후 24시간 안에 입금해야 하며, 입금 확인 후 수강권이 제공됩니다.
                 </p>
               </div>
-            </section>
+            </section>}
           </div>
           <aside className="product-aside">
-            <div className="purchase-card">
+            <div className="purchase-card checkout-payment-summary">
               <h2>결제 금액</h2>
+              <div className="checkout-price-breakdown" aria-live="polite" aria-atomic="true">
               <div className="cost-row">
                 <span className="muted">상품 금액</span>
-                <span>{money(num(cohort, "price"))}</span>
+                <span>{money(quote?.originalAmount ?? num(cohort, "price"))}</span>
               </div>
               <div className="cost-row">
                 <span className="muted">쿠폰 할인</span>
-                <span>{coupon ? "결제창에서 확인" : "적용 안 함"}</span>
+                <span className={quote ? 'checkout-discount-amount' : 'muted'}>{quote ? `−${money(quote.couponDiscount)}` : coupon ? "적용 확인 필요" : "0원"}</span>
               </div>
-              <div className="cost-row cost-total">
-                <span>{coupon ? "할인 전 금액" : "최종 결제 금액"}</span>
-                <strong>{money(num(cohort, "price"))}</strong>
+              </div>
+              <div className="cost-row cost-total" aria-live="polite" aria-atomic="true">
+                <span>최종 결제 금액</span>
+                <strong>{money(quote?.totalAmount ?? num(cohort, "price"))}</strong>
               </div>
               {agreement}
               {submitButton}
