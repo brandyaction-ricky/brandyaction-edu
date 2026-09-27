@@ -74,7 +74,7 @@ export function AuthView({
             ? "클래스와 자료를 한 계정에서 관리하세요."
             : "로그인하고 내 일의 다음 단계를 이어가세요."}
         </p>
-        {authError && ['auth_callback', 'email_confirmation'].includes(authError) && <p className="notice mt16" role="alert">인증 링크가 만료되었거나 인증을 완료하지 못했습니다. 이메일 링크는 요청한 브라우저에서 다시 열거나, 아래에서 로그인·인증 메일 재발송을 진행해 주세요.</p>}
+        {authError && ['auth_callback', 'email_confirmation'].includes(authError) && <p className="notice mt16" role="alert">인증 링크가 만료되었거나 인증을 완료하지 못했습니다. 아래에서 로그인하거나 인증 메일을 다시 요청해 주세요.</p>}
         <div className="social-stack">
           <button
             className="btn kakao full"
