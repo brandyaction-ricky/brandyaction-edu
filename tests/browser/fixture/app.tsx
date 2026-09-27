@@ -13,6 +13,7 @@ import { MemberOperationsFixture, RetainedMemberDialogFixture } from './member-o
 import { SubmissionReviewFixture } from './submission-review';
 import { ProductSaleFixture } from './product-sale';
 import { ProductCountdownFixture } from './product-countdown';
+import { AdminComponentsFixture } from './admin-components';
 import { AdminWorkspace } from '../../../app/ui/admin-workspace';
 import { ProductVisibilityFixture } from './product-visibility';
 import { Platform } from '../../../app/ui/platform';
@@ -75,7 +76,7 @@ function ProductHtmlCtaFixture() {
 const path = window.location.pathname;
 // Destination pages are outside this fixture's scope. Keep them inert so their
 // fallback admin screen cannot rewrite the URL before navigation is asserted.
-const fixture = ['/checkout', '/apply', '/safe-custom', '/learn/enrolled-fixture'].includes(path) ? <main data-testid="navigation-destination" /> : path === '/review-audit-test' ? <SubmissionReviewFixture/> : path === '/retained-member-dialog-test' ? <RetainedMemberDialogFixture/> : ['/member-operations-test', '/admin/customers', '/admin/questions', '/admin/reviews', '/admin/members'].includes(path) ? <MemberOperationsFixture/> : path === '/admin-week-order-test' ? <WeekCatalogFixture/> : path.startsWith('/mission-integrity-test') ? <MissionIntegrityFixture/> : path.startsWith('/admin-shell-test')
+const fixture = ['/checkout', '/apply', '/safe-custom', '/learn/enrolled-fixture'].includes(path) ? <main data-testid="navigation-destination" /> : path === '/admin-component-system-test' ? <AdminComponentsFixture/> : path === '/review-audit-test' ? <SubmissionReviewFixture/> : path === '/retained-member-dialog-test' ? <RetainedMemberDialogFixture/> : ['/member-operations-test', '/admin/customers', '/admin/questions', '/admin/reviews', '/admin/members'].includes(path) ? <MemberOperationsFixture/> : path === '/admin-week-order-test' ? <WeekCatalogFixture/> : path.startsWith('/mission-integrity-test') ? <MissionIntegrityFixture/> : path.startsWith('/admin-shell-test')
   ? <ShellFixture/>
   : path.startsWith('/product-html-cta-test')
     ? <ProductHtmlCtaFixture/>
