@@ -16,6 +16,9 @@ export function signupValues(name: string, email: string, password: string, conf
 export function emailCallback(origin: string, next: string) {
   return new URL('/auth/callback?next=' + encodeURIComponent(safeNext(next)), origin).href;
 }
+export function emailConfirmRedirect(origin: string, next: string) {
+  return new URL('/auth/confirm?next=' + encodeURIComponent(safeNext(next)), origin).href;
+}
 export function afterEmailLogin(metadata: Record<string, unknown> | undefined, next: string) {
   const destination = safeNext(next);
   return metadata?.terms_version && metadata?.privacy_version ? destination : '/auth/consent?next=' + encodeURIComponent(destination);
