@@ -1,4 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { revalidateTag } from 'next/cache';
+import { PUBLIC_CACHE_TAG } from '@/lib/public-platform-plan';
 import { getOperatorUser } from '@/lib/operator-permissions';
 import { validId, validDate, validateConfig, sectionOrder, validateActualsPatch, validateMeta, reportRange } from '@/lib/landing';
 import { assetPath, validImage } from '@/lib/qa-rules';
@@ -57,6 +59,7 @@ export async function POST(request: Request) {
         if (result.error.message.includes('STALE_REVISION')) return reply({ error: '다른 관리자가 수정했습니다. 새로 불러온 뒤 다시 저장해 주세요.' }, 409);
         throw Error('랜딩 발행에 실패했습니다.');
       }
+      revalidateTag(PUBLIC_CACHE_TAG, { expire: 0 });
       return reply({ ok: true, config: result.data });
     }
     if (!validId(body.landing_id)) throw Error('랜딩을 선택해 주세요.');
