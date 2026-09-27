@@ -19,6 +19,22 @@ const server = createServer((request,response)=>{
   const url=new URL(request.url,'http://localhost');
   if(reviewFixture(request,response,url))return;
   if(request.method!=='GET'){response.writeHead(405).end();return;}
+  if(url.pathname==='/api/platform'&&url.searchParams.get('part')==='curriculum'){
+    response.setHeader('Content-Type','application/json');
+    response.end(JSON.stringify({data:{
+      curriculum_weeks:[{id:'synthetic-week',course_id:'synthetic-course',week_number:1,title:'기존 합성 주차'}],
+      curriculum_lessons:[{id:'synthetic-lesson',week_id:'synthetic-week',day_number:1,title:'기존 합성 학습',content_type:'text',is_published:false}],
+      lesson_contents:[{lesson_id:'synthetic-lesson',body_text:'기존 학습 본문'}],
+    }}));return;
+  }
+  if(url.pathname==='/api/platform'&&url.searchParams.get('part')==='missions'){
+    response.setHeader('Content-Type','application/json');
+    response.end(JSON.stringify({data:{
+      curriculum_weeks:[{id:'synthetic-week',course_id:'synthetic-course',week_number:1,title:'기존 합성 주차'}],
+      curriculum_lessons:[{id:'synthetic-lesson',week_id:'synthetic-week',day_number:1,title:'기존 합성 학습'}],
+      curriculum_missions:[{id:'synthetic-mission',lesson_id:'synthetic-lesson',title:'기존 합성 미션',instructions:'기존 미션 안내',submission_type:'text',is_required:true,is_published:false}],
+    }}));return;
+  }
   if(url.pathname==='/api/platform'){
     const courses=[{id:'visible',title:'합성 공개 상품',slug:'visibility-public',category:'free',status:'published',list_price:0,metadata:{}},{id:'hidden',title:'합성 링크 전용 상품',slug:'visibility-hidden',category:'free',status:'published',list_price:0,metadata:{is_listed:false,cta_label:'링크로 신청',cta_url:'/webinar/11111111-1111-4111-8111-111111111111/organic'}}];
     courses.push({id:'paid-hidden',title:'합성 비노출 유료 상품',slug:'visibility-paid',category:'paid_class',status:'published',list_price:10000,description:'합성 상세',duration_label:'4주',schedule_label:'매주',metadata:{is_listed:false}});
