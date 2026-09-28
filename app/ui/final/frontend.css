@@ -180,3 +180,13 @@
 .edu-front .checkout-payment-summary .cost-total{gap:var(--space-3);flex-wrap:wrap}
 .edu-front .checkout-payment-summary .cost-total strong{font-size:clamp(26px,3vw,34px);white-space:nowrap;margin-left:auto;color:var(--ink)}
 
+/* Keep the compact banner indicator visible while giving its button a real hit area. */
+.edu-front .hero-slider-controls>button{width:44px;height:44px;flex:none}
+.edu-front .hero-slider-dots{gap:0}
+.edu-front .hero-slider-dots button{display:grid;place-items:center;width:44px;height:44px;flex:none;background:transparent}
+.edu-front .hero-slider-dots button::after{content:"";display:block;width:22px;height:3px;background:var(--ba-neutral-700)}
+.edu-front .hero-slider-dots button.active{background:transparent}
+.edu-front .hero-slider-dots button.active::after{background:#fff}
+.edu-front .hero-slider-dots button:focus-visible{outline:2px solid #fff;outline-offset:-3px}
+@media(max-width:680px){.edu-front .hero-slider-controls{flex-wrap:wrap}.edu-front .hero-slider-dots button{width:44px}.edu-front .hero-slider-dots button::after{width:16px}}
+

@@ -1433,8 +1433,9 @@ a.participant-day-card:hover {
 .edu-admin .participant-state-badge.followup { background: #fff6df; color: #865600; }
 .edu-admin .participant-state-badge.submitted, .edu-admin .participant-state-badge.progress { background: #edf3f9; color: #315e8b; }
 .edu-admin .participant-state-badge.done { background: #eaf5ef; color: #176345; }
-.edu-admin .participant-row-action { display: inline-flex; min-height: 30px; align-items: center; justify-content: center; padding: 0 9px; border: 1px solid var(--line); border-radius: 5px; background: #fff; color: var(--text-primary); font-size: 11px; font-weight: 600; white-space: nowrap; }
+.edu-admin .participant-row-action { display: inline-flex; min-height: 36px; align-items: center; justify-content: center; padding: 0 10px; border: 1px solid var(--line); border-radius: 5px; background: #fff; color: var(--text-primary); font-size: 12px; font-weight: 600; white-space: nowrap; }
 .edu-admin .participant-row-action.primary { border-color: var(--ba-red); background: var(--ba-red); color: #fff; }
+.edu-admin .participant-row-action:focus-visible { outline: 2px solid var(--ba-red); outline-offset: 2px; }
 .edu-admin .participant-table-empty { padding: 36px 16px; color: var(--text-secondary); font-size: 13px; text-align: center; }
 .edu-admin .participant-table-skeleton { display: grid; }
 .edu-admin .participant-table-skeleton > div { display: grid; grid-template-columns: 2fr repeat(4, 1fr); align-items: center; gap: 20px; height: 52px; padding: 0 12px; border-bottom: 1px solid #eceef1; }
@@ -1465,6 +1466,9 @@ a.participant-day-card:hover {
 .edu-admin .participant-drawer-mission-copy strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .edu-admin .participant-drawer-mission-copy small { color: var(--text-secondary); font-size: 11px; }
 .edu-admin .participant-drawer-mission .participant-row-action { grid-column: 1 / -1; justify-self: start; }
+@media (max-width: 720px) {
+  .edu-admin .participant-row-action { min-height: 44px; font-size: 13px; }
+}
 .edu-admin .participant-member-admin-link { display: inline-flex; margin-top: 18px; color: var(--ba-info); font-size: 12px; font-weight: 600; }
 @media (max-width: 1100px) {
   .edu-admin .participant-toolbar > select:first-child { min-width: 190px; }
