@@ -17,6 +17,7 @@ async function backend(page:Page,options:{operator?:boolean;loseReceipt?:boolean
    if(options.invalidReceipt){options.invalidReceipt=false;await route.fulfill({json:{ok:true}});return;}
    await route.fulfill({json:{requestId:b.requestId,count:b.recipients.length||1,messageIds:b.recipients.length?b.recipients:[uid(3)],createdAt:'2026-09-29T01:00:00Z'}});return;
   }
+  if(q.get('action')==='progress-cohorts'){await route.fulfill({json:{rows:[{id:uid(80),name:'4기',courseTitle:'문샷 챌린지'},{id:uid(81),name:'5기',courseTitle:'다른 기수'}]}});return;}
   if(q.get('action')==='recipients'){
    const isNext=q.has('after'),n=isNext?22:21;
    await route.fulfill({json:{rows:[{id:uid(n),name:`수강생 ${n}`,email:`student${n}@example.test`}],nextCursor:isNext?null:uid(n)}});return;
@@ -33,7 +34,7 @@ test('inbox is private plain text, read is explicit and reply preserves the orig
  await page.getByRole('button',{name:'답장 작성'}).click();await expect(page.getByRole('heading',{name:'담당 멘토에게 답장'})).toBeVisible();
  await page.getByRole('textbox',{name:'메시지 내용'}).fill('확인했습니다');await page.getByRole('button',{name:'메시지 보내기',exact:true}).click();await expect(page.getByText('1명에게 메시지를 보냈습니다.')).toBeVisible();
  expect(h.writes.find(x=>x.action==='send')).toMatchObject({replyTo:uid(1),recipients:[],content:'확인했습니다'});
- await page.getByRole('button',{name:'내용 보기'}).click();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.getByRole('button',{name:'내용 보기'}).click();expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
  await page.screenshot({path:info.outputPath('messages.png'),fullPage:true});
 });
 test('lost send receipt freezes recipient and body and retries the exact same request without a second message',async({page})=>{
@@ -62,4 +63,50 @@ test('late inbox response cannot replace sent view and pagination keeps old mess
  let release!:()=>void;const delay=new Promise<void>(resolve=>{release=resolve;});await backend(page,{delay});await page.goto('/messages-test');await page.getByRole('button',{name:'보낸 메시지',exact:true}).click();await expect(page.getByText('메시지가 없습니다.')).toBeVisible();release();
  await expect(page.getByRole('button',{name:'내용 보기'})).toHaveCount(0);await page.getByRole('button',{name:/받은 메시지/}).click();await page.getByRole('button',{name:'이전 메시지',exact:true}).click();await page.getByRole('button',{name:'내용 보기'}).click();await expect(page.locator('.edu-message-body')).toContainText('메시지 2');
  await page.getByRole('button',{name:'최신 메시지',exact:true}).click();await page.getByRole('button',{name:'내용 보기'}).click();await expect(page.locator('.edu-message-body')).toContainText('메시지 1');
+});
+
+test('progress group selection scopes every page, clears on changes and sends the frozen scope',async({page},info)=>{
+ const h=await backend(page,{operator:true,loseReceipt:true});await page.goto('/messages-test?progress');
+ await page.getByRole('combobox',{name:'진도별 대상 기수'}).selectOption(uid(80));
+ await page.getByRole('combobox',{name:'현재 진행 일차'}).selectOption('5');
+ await page.getByRole('button',{name:'이 조건의 회원 모두 선택'}).click();
+ await expect(page.getByText('선택한 회원 2명 · 한 번에 최대 100명')).toBeVisible();
+ await page.getByRole('combobox',{name:'진도 과정'}).selectOption('learning');
+ await expect(page.getByText('선택한 회원 0명 · 한 번에 최대 100명')).toBeVisible();
+ await page.getByRole('button',{name:'이 조건의 회원 모두 선택'}).click();await expect(page.getByText('선택한 회원 2명 · 한 번에 최대 100명')).toBeVisible();
+ await page.getByRole('textbox',{name:'메시지 내용'}).fill('학습 5일차 안내');
+ await page.getByRole('button',{name:'메시지 보내기',exact:true}).click();
+ await expect(page.getByRole('button',{name:'전송 결과 다시 확인'})).toBeVisible();
+ await expect(page.getByRole('combobox',{name:'진도별 대상 기수'})).toBeDisabled();
+ await expect(page.getByRole('combobox',{name:'현재 진행 일차'})).toBeDisabled();
+ await page.getByRole('button',{name:'전송 결과 다시 확인'}).click();await expect(page.getByText('2명에게 메시지를 보냈습니다.')).toBeVisible();
+ const sends=h.writes.filter(x=>x.action==='send');expect(sends[1]).toEqual(sends[0]);expect(sends[0]).toMatchObject({progress:{cohortId:uid(80),track:'learning',day:5},recipients:[uid(21),uid(22)],ongoingLesson:null});
+ expect(h.queries.some(q=>q.get('after')===uid(21)&&q.get('cohort')===uid(80)&&q.get('track')==='learning'&&q.get('day')==='5')).toBe(true);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
+ await page.screenshot({path:info.outputPath('progress-message-group.png'),fullPage:true});
+});
+
+test('over 100 group recipients are never partially selected and group changes cannot retain an old selection',async({page})=>{
+ await backend(page,{operator:true});await page.route('**/api/member/messages**',async route=>{
+  const q=new URL(route.request().url()).searchParams;
+  if(q.get('action')!=='recipients'||!q.has('cohort')){await route.fallback();return;}
+  const after=Number((q.get('after')||'0').split('-').at(-1)),start=after||100;
+  await route.fulfill({json:{rows:Array.from({length:25},(_,i)=>({id:uid(start+i+1),name:'수강생 '+(start+i+1),email:'test@example.test'})),nextCursor:uid(start+25)}});
+ });
+ await page.goto('/messages-test?progress');await page.getByRole('button',{name:'이 페이지 회원 모두 선택'}).click();
+ await page.getByRole('combobox',{name:'진도별 대상 기수'}).selectOption(uid(80));await expect(page.getByText('선택한 회원 0명 · 한 번에 최대 100명')).toBeVisible();
+ await page.getByRole('button',{name:'이 조건의 회원 모두 선택'}).click();await expect(page.getByRole('alert')).toContainText('100명을 넘습니다');
+ await expect(page.getByText('선택한 회원 0명 · 한 번에 최대 100명')).toBeVisible();
+ await page.getByRole('button',{name:'이 페이지 회원 모두 선택'}).click();await expect(page.getByText('선택한 회원 25명 · 한 번에 최대 100명')).toBeVisible();
+ await page.getByRole('combobox',{name:'진도별 대상 기수'}).selectOption(uid(81));await expect(page.getByText('선택한 회원 0명 · 한 번에 최대 100명')).toBeVisible();
+});
+
+test('recipient group metadata failure can recover without allowing an incomplete scope',async({page})=>{
+ await backend(page,{operator:true});let failed=true;
+ await page.route('**/api/member/messages?action=progress-cohorts',async route=>{if(failed)await route.fulfill({status:503,json:{error:'기수 목록 연결 실패'}});else await route.fallback();});
+ await page.goto('/messages-test?progress');await expect(page.getByRole('alert')).toContainText('기수 목록 연결 실패');
+ await expect(page.getByRole('combobox',{name:'진도별 대상 기수'})).toBeDisabled();await expect(page.getByRole('combobox',{name:'현재 진행 일차'})).toBeDisabled();
+ failed=false;await page.getByRole('button',{name:'기수 목록 다시 확인'}).click();await expect(page.getByRole('combobox',{name:'진도별 대상 기수'})).toBeEnabled();
+ await page.getByRole('combobox',{name:'진도별 대상 기수'}).selectOption(uid(80));
+ await expect(page.getByRole('combobox',{name:'현재 진행 일차'})).toBeEnabled();
 });

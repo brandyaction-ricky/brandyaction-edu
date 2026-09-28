@@ -3,14 +3,17 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
 const id='11111111-1111-4111-8111-111111111111',other='22222222-2222-4222-8222-222222222222';
+const parser={};
+new Function('exports',ts.transpileModule(fs.readFileSync(new URL('../lib/message-progress-filter.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(parser);
 const compiled=ts.transpileModule(fs.readFileSync(new URL('../app/api/member/messages/route.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
-function harness({user={id},enabled=true,error=null,authError=null}={}){
+function harness({user={id},enabled=true,progress=true,error=null,authError=null}={}){
  const calls=[],exports={};
  new Function('exports','require','process',compiled)(exports,name=>({
+  '@/lib/message-progress-filter':parser,
   '@/lib/edu-workflows':{uuid:v=>typeof v==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(v)},
   '@/lib/server-auth':{getAuthenticatedUser:async()=>{if(authError)throw authError;return user;}},
-  '@/lib/supabase/admin':{createAdminClient:()=>({rpc:async(name,args)=>{calls.push({name,args});return{data:{rows:[],unreadCount:0,canSendToMembers:false},error};}})},
- }[name]),{env:{NEXT_PUBLIC_EDU_MESSAGES_ENABLED:enabled?'true':'false'}});
+  '@/lib/supabase/admin':{createAdminClient:()=>({rpc:(name,args)=>{calls.push({name,args});const result=Promise.resolve({data:{rows:[],unreadCount:0,canSendToMembers:false},error});result.abortSignal=()=>result;return result;}})},
+ }[name]),{env:{NEXT_PUBLIC_EDU_MESSAGES_ENABLED:enabled?'true':'false',NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED:progress?'true':'false'}});
  const get=(q={})=>exports.GET(new Request('https://edu.test/api/member/messages?'+new URLSearchParams(q)));
  const post=(body,origin='https://edu.test')=>exports.POST(new Request('https://edu.test/api/member/messages',{method:'POST',headers:{origin,'Content-Type':'application/json'},body:typeof body==='string'?body:JSON.stringify(body)}));
  return{calls,get,post,send:{action:'send',requestId:id,content:'안녕하세요',recipients:[other]}};
@@ -52,4 +55,21 @@ test('known errors have actionable statuses, unknown failures hide database deta
 test('unread count uses the authenticated owner and never fetches message bodies or recipient lists',async()=>{
  const h=harness(),r=await h.get({action:'unread',actor:other});assert.equal(r.status,200);assert.deepEqual(h.calls,[{name:'edu_unread_member_messages',args:{p_actor:id}}]);
  assert.equal(r.headers.get('cache-control'),'private, no-store');
+});
+
+test('progress scope is validated, independently enabled and included in the atomic send',async()=>{
+ const h=harness(),progress={cohortId:other,track:'daily',day:5};
+ assert.equal((await h.get({action:'progress-cohorts'})).status,200);
+ assert.deepEqual(h.calls.at(-1),{name:'edu_message_progress_cohorts',args:{p_actor:id}});
+ assert.equal((await h.get({action:'recipients',cohort:other,track:'daily',day:'5',after:id,search:'가'})).status,200);
+ assert.deepEqual(h.calls.at(-1),{name:'edu_message_progress_recipients',args:{p_actor:id,p_search:'가',p_after:id,p_progress:progress}});
+ assert.equal((await h.post({...h.send,progress})).status,200);
+ assert.deepEqual(h.calls.at(-1),{name:'edu_send_progress_message',args:{p_actor:id,p_request:id,p_content:'안녕하세요',p_recipients:[other],p_progress:progress}});
+ const count=h.calls.length;
+ for(const progress of [{},{cohortId:other,track:'daily',day:0},{cohortId:other,track:'daily',day:31},{cohortId:other,track:'ongoing',day:1},{cohortId:other,track:'daily',day:'1'},{cohortId:other,track:'daily',day:1,actor:other}])assert.equal((await h.post({...h.send,progress})).status,400);
+ for(const q of [{cohort:other},{track:'daily',day:'1'},{cohort:other,track:'daily',day:'1.5'},{cohort:other,track:'daily',day:'1',ongoing:other}])assert.equal((await h.get({action:'recipients',...q})).status,400);
+ assert.equal((await h.post({...h.send,progress,ongoingLesson:other})).status,400);
+ assert.equal((await h.post({...h.send,progress,recipients:[]})).status,400);assert.equal(h.calls.length,count);
+ const off=harness({progress:false});assert.equal((await off.get({action:'progress-cohorts'})).status,404);assert.equal((await off.post({...off.send,progress})).status,404);assert.equal(off.calls.length,0);
+ const changed=harness({error:{message:'MESSAGE_PROGRESS_CHANGED'}});const r=await changed.post({...changed.send,progress});assert.equal(r.status,409);assert.match((await r.json()).error,/보낸 메시지는 없습니다/);
 });

@@ -4,12 +4,14 @@ import './member-messages.css';
 import Link from 'next/link';
 import { learningNoticePath } from '@/lib/learning-notice-path';
 import { PushSettings } from './push-settings';
+import { MessageProgressPicker } from './message-progress-picker';
+import type { MessageProgressFilter } from '@/lib/message-progress-filter';
 
 type Message = { isNotice?: boolean; targetPath?: string | null; id: string; senderId: string; recipientId: string; senderName: string | null; recipientName: string | null; content: string; createdAt: string; readAt: string | null };
 type Inbox = { rows: Message[]; nextCursor: string | null; unreadCount: number; canSendToMembers: boolean };
 type Recipient = { id: string; name: string | null; email: string | null };
 type Recipients = { rows: Recipient[]; nextCursor: string | null };
-type SendRequest = { action: 'send'; requestId: string; content: string; recipients: string[]; replyTo: string | null; ongoingLesson: string | null };
+type SendRequest = { action: 'send'; requestId: string; content: string; recipients: string[]; replyTo: string | null; ongoingLesson: string | null; progress?: MessageProgressFilter | null };
 const endpoint = '/api/member/messages';
 const time = (value: string) => new Date(value).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
 async function get<T>(query: Record<string, string>, signal: AbortSignal): Promise<T> {
@@ -22,20 +24,22 @@ async function post(body: object) {
   if (!response.ok) throw Object.assign(new Error(data.error || '전송 결과를 확인하지 못했습니다.'), { definitive: [400, 401, 403, 404, 409, 413, 429].includes(response.status) });
   return data;
 }
-export function MemberMessages({ ongoingLesson = '', userId }: { ongoingLesson?: string; userId?: string }) {
+export function MemberMessages({ ongoingLesson = '', userId, progressEnabled = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' }: { ongoingLesson?: string; userId?: string; progressEnabled?: boolean }) {
   const [view, setView] = useState({ box: 'inbox', before: '', refresh: 0 });
   const key = JSON.stringify(view), [loaded, setLoaded] = useState<{ key: string; data?: Inbox; error?: string }>();
   const data = loaded?.key === key ? loaded.data : undefined;
   const [expanded, setExpanded] = useState(''), [readError, setReadError] = useState('');
   const [readBusy, setReadBusy] = useState(false), readGate = useRef(false);
   const [search, setSearch] = useState(''), [filter, setFilter] = useState({ search: '', after: '', refresh: 0 });
-  const recipientKey = JSON.stringify({ ...filter, ongoingLesson });
+  const [progress, setProgress] = useState<MessageProgressFilter | null>(null);
+  const recipientKey = JSON.stringify({ ...filter, ongoingLesson, progress });
   const [recipientResult, setRecipientResult] = useState<{ key: string; data?: Recipients; error?: string }>();
   const recipients = recipientResult?.key === recipientKey ? recipientResult.data : undefined;
   const [selected, setSelected] = useState<Recipient[]>([]), [content, setContent] = useState('');
   const [replyTo, setReplyTo] = useState<Message | null>(null), [sendError, setSendError] = useState(''), [notice, setNotice] = useState('');
   const [inFlight, setInFlight] = useState(false), [uncertain, setUncertain] = useState<SendRequest | null>(null), sendGate = useRef(false);
-  const frozen = inFlight || !!uncertain;
+  const [selectingGroup, setSelectingGroup] = useState(false), [groupError, setGroupError] = useState(''), groupAbort = useRef<AbortController | null>(null);
+  const frozen = inFlight || !!uncertain || selectingGroup;
   const canSendToMembers = data?.canSendToMembers;
   useEffect(() => {
     const abort = new AbortController();
@@ -48,16 +52,35 @@ export function MemberMessages({ ongoingLesson = '', userId }: { ongoingLesson?:
   useEffect(() => {
     if (!canSendToMembers) return;
     const abort = new AbortController();
-    void get<Recipients>({ action: 'recipients', search: filter.search, ...(filter.after ? { after: filter.after } : {}), ...(ongoingLesson ? { ongoing: ongoingLesson } : {}) }, abort.signal)
+    void get<Recipients>({ action: 'recipients', search: filter.search, ...(filter.after ? { after: filter.after } : {}), ...(ongoingLesson ? { ongoing: ongoingLesson } : {}), ...(progress ? { cohort: progress.cohortId, track: progress.track, day: String(progress.day) } : {}) }, abort.signal)
       .then(value => { if (!Array.isArray(value.rows)) throw new Error('회원 목록을 확인하지 못했습니다.'); if (!abort.signal.aborted) setRecipientResult({ key: recipientKey, data: value }); })
       .catch(e => { if (!abort.signal.aborted) setRecipientResult({ key: recipientKey, error: e.message }); });
     return () => abort.abort();
-  }, [canSendToMembers, filter, ongoingLesson, recipientKey]);
+  }, [canSendToMembers, filter, ongoingLesson, recipientKey, progress]);
   useEffect(() => {
     if (!uncertain && !content) return;
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
     window.addEventListener('beforeunload', warn); return () => window.removeEventListener('beforeunload', warn);
   }, [uncertain, content]);
+  useEffect(() => () => groupAbort.current?.abort(), []);
+  async function selectGroup() {
+    if (!progress || frozen || groupAbort.current) return;
+    const abort = new AbortController(); groupAbort.current = abort; setSelectingGroup(true); setGroupError('');
+    try {
+      const found = new Map<string, Recipient>(); let after = ''; const cursors = new Set<string>();
+      do {
+        const result = await get<Recipients>({ action: 'recipients', search: filter.search, cohort: progress.cohortId, track: progress.track, day: String(progress.day), ...(after ? { after } : {}) }, abort.signal);
+        if (!Array.isArray(result.rows)) throw new Error('회원 목록을 확인하지 못했습니다.');
+        result.rows.forEach(row => found.set(row.id, row));
+        if (found.size > 100 || (found.size === 100 && result.nextCursor)) throw new Error('대상이 100명을 넘습니다. 이름·이메일 검색으로 범위를 줄이거나 페이지별로 선택해 주세요.');
+        after = result.nextCursor || '';
+        if (after && (cursors.has(after) || cursors.size >= 4)) throw new Error('대상 목록이 변경됐습니다. 다시 선택해 주세요.');
+        cursors.add(after);
+      } while (after);
+      if (!abort.signal.aborted) setSelected([...found.values()]);
+    } catch (e) { if (!abort.signal.aborted) setGroupError((e as Error).message); }
+    finally { groupAbort.current = null; if (!abort.signal.aborted) setSelectingGroup(false); }
+  }
   function changeBox(box: string) { setExpanded(''); setReadError(''); setView(old => ({ box, before: '', refresh: old.refresh + 1 })); }
   async function open(message: Message) {
     setExpanded(message.id); setReadError('');
@@ -72,8 +95,8 @@ export function MemberMessages({ ongoingLesson = '', userId }: { ongoingLesson?:
     finally { readGate.current = false; setReadBusy(false); }
   }
   async function send() {
-    if (sendGate.current || !data || (!uncertain && !content.trim())) return;
-    const request = uncertain || { action: 'send' as const, requestId: crypto.randomUUID(), content, recipients: replyTo ? [] : canSendToMembers ? selected.map(row => row.id).sort() : [], replyTo: replyTo?.id || null, ongoingLesson: !replyTo && canSendToMembers ? ongoingLesson || null : null };
+    if (sendGate.current || selectingGroup || !data || (!uncertain && !content.trim())) return;
+    const request = uncertain || { action: 'send' as const, requestId: crypto.randomUUID(), content, recipients: replyTo ? [] : canSendToMembers ? selected.map(row => row.id).sort() : [], replyTo: replyTo?.id || null, ongoingLesson: !replyTo && canSendToMembers ? ongoingLesson || null : null, ...(!replyTo && canSendToMembers && progress ? { progress } : {}) };
     sendGate.current = true; setInFlight(true); setUncertain(request); setSendError(''); setNotice('');
     try {
       const receipt = await post(request), expected = request.recipients.length || 1;
@@ -105,6 +128,7 @@ export function MemberMessages({ ongoingLesson = '', userId }: { ongoingLesson?:
       {replyTo && <button className="btn small" disabled={frozen} onClick={() => setReplyTo(null)}>답장 대상 해제</button>}
       {canSendToMembers && !replyTo && <fieldset disabled={frozen}>
         <legend>받는 사람 선택</legend>{ongoingLesson && <p>이 챌린지를 한 번이라도 완료한 회원 중 지금 메시지를 받을 수 있는 회원입니다.</p>}
+        {progressEnabled && !ongoingLesson && <MessageProgressPicker value={progress} onChange={value => { setProgress(value); setSelected([]); setGroupError(''); setSendError(''); setNotice(''); setFilter(old => ({ ...old, after: '', refresh: old.refresh + 1 })); }} />}
         <form className="row" onSubmit={e => { e.preventDefault(); setFilter(old => ({ search: search.trim(), after: '', refresh: old.refresh + 1 })); }}>
           <label>이름 또는 이메일<input value={search} maxLength={100} onChange={e => setSearch(e.target.value)} /></label><button className="btn" type="submit">회원 검색</button>
         </form>
@@ -115,13 +139,16 @@ export function MemberMessages({ ongoingLesson = '', userId }: { ongoingLesson?:
           <div className="row"><button className="btn small" type="button" disabled={!filter.after} onClick={() => setFilter(old => ({ ...old, after: '' }))}>첫 회원 목록</button><button className="btn small" type="button" disabled={!recipients.nextCursor} onClick={() => setFilter(old => ({ ...old, after: recipients.nextCursor! }))}>다음 회원 목록</button></div>
         </>}
         <p>선택한 회원 {selected.length}명 · 한 번에 최대 100명</p>
+        {progress && <button className="btn small" type="button" disabled={!recipients || !recipients.rows.length} onClick={() => void selectGroup()}>{selectingGroup ? '대상 전체 확인 중…' : '이 조건의 회원 모두 선택'}</button>}
+        {groupError && <p role="alert">{groupError}</p>}
+        {!!selected.length && <button className="btn small" type="button" onClick={() => setSelected([])}>선택 모두 해제</button>}
         <ul className="edu-message-selected">{selected.map(row => <li key={row.id}>{row.name || '회원'} · {row.email}<button className="btn small" type="button" aria-label={`${row.name || row.email || '회원'} 선택 해제`} onClick={() => setSelected(old => old.filter(item => item.id !== row.id))}>해제</button></li>)}</ul>
       </fieldset>}
       <label>메시지 내용<textarea rows={5} maxLength={5000} value={content} disabled={frozen || !data} onChange={e => { setContent(e.target.value); setNotice(''); }} /></label>
       <p>{content.length}/5,000자</p>{sendError && <p role="alert">{sendError}</p>}
       {uncertain && !inFlight && <p>전송 여부를 확인하는 동안 내용과 받는 사람을 유지합니다. 아래 버튼으로 같은 요청을 다시 확인해 주세요.</p>}
       {notice && <p role="status">{notice}</p>}
-      <button className="btn primary" disabled={inFlight || !data || (!uncertain && (!content.trim() || (canSendToMembers && !replyTo && !selected.length)))} onClick={() => void send()}>{inFlight ? '전송 결과 확인 중…' : uncertain ? '전송 결과 다시 확인' : '메시지 보내기'}</button>
+      <button className="btn primary" disabled={inFlight || selectingGroup || !data || (!uncertain && (!content.trim() || (canSendToMembers && !replyTo && !selected.length)))} onClick={() => void send()}>{inFlight ? '전송 결과 확인 중…' : uncertain ? '전송 결과 다시 확인' : '메시지 보내기'}</button>
     </section>
   </section>;
 }
