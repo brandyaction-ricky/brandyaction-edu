@@ -22,6 +22,29 @@ test('orders surface exceptions, preserve date filtering and open details in a d
   await expect(page.getByRole('dialog', { name: '주문 상세' })).toContainText('PILOT-REFUND');
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.getByLabel('주문 검색').fill('PILOT-ACCESS');
+  await page.getByRole('button', { name: '상세' }).click();
+  const detail = page.getByRole('dialog', { name: '주문 상세' });
+  const detailFooter = detail.locator('.admin-dialog-footer');
+  const refundButton = detail.getByRole('button', { name: '환불 내용 확인' });
+  await refundButton.scrollIntoViewIfNeeded();
+  await expect(refundButton).toBeVisible();
+  await expect(detailFooter.getByRole('button', { name: '닫기' })).toBeVisible();
+  const layout = await detail.evaluate(dialog => {
+    const body = dialog.querySelector<HTMLElement>('.admin-dialog-body')!;
+    const footer = dialog.querySelector<HTMLElement>('.admin-dialog-footer')!;
+    const refund = [...dialog.querySelectorAll<HTMLElement>('button')].find(button => button.textContent?.includes('환불 내용 확인'))!;
+    return {
+      bodyOverflowY: getComputedStyle(body).overflowY,
+      bodyBottom: body.getBoundingClientRect().bottom,
+      footerTop: footer.getBoundingClientRect().top,
+      refundBottom: refund.getBoundingClientRect().bottom,
+    };
+  });
+  expect(layout.bodyOverflowY).toBe('auto');
+  expect(layout.bodyBottom).toBeLessThanOrEqual(layout.footerTop + 1);
+  expect(layout.refundBottom).toBeLessThanOrEqual(layout.bodyBottom + 1);
+  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: '초기화' }).click();
   await page.getByLabel('주문일 시작 · KST').fill('2026-09-25');
   await page.getByLabel('주문일 종료 · KST').fill('2026-09-24');
