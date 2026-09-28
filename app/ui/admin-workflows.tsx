@@ -17,7 +17,7 @@ import { CalendarDays, Copy, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
-import { SubmissionReview } from "./final/submission-review";
+import { SubmissionReviewWorkspace } from "./final/lesson-block-reviews";
 import { timeLabel, type Data, type WorkflowSend } from "./learning-workflows";
 import { EnrollmentGrant, RefundAction } from "./operations-actions";
 import {
@@ -173,7 +173,7 @@ export function AdminWorkflows(props: Props) {
   if (props.section === "cohorts") return <CohortTools {...p} />;
   if (props.section === "missions") return <QuizManager {...p} />;
   if (props.section === "members") return <Participants />;
-  if (props.section === "reviews") return <SubmissionReview {...p} />;
+  if (props.section === "reviews") return <SubmissionReviewWorkspace {...p} />;
   if (props.section === "customers")
     return (
       <>

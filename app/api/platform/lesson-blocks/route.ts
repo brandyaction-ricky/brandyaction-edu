@@ -36,6 +36,7 @@ function failure(error: unknown) {
     BLOCK_REQUEST_REUSED: ['이미 사용한 저장 요청입니다. 내용을 확인한 뒤 다시 저장해 주세요.', 409],
     BLOCK_INVALID: ['저장할 내용을 확인해 주세요.', 400],
     BLOCK_ALREADY_SUBMITTED: ['이미 제출한 답변입니다. 제출 기록을 다시 확인해 주세요.', 409],
+    BLOCK_REVIEW_CHANGED: ['제출 상태가 바뀌었습니다. 최신 답변과 검토 결과를 다시 확인해 주세요.', 409],
     BLOCK_REQUIREMENTS_MISSING: ['필수 질문과 체크리스트를 완료해 주세요.', 422],
     BLOCK_QUIZ_NOT_PASSED: ['시험 통과 기준을 확인하고 다시 풀어 주세요.', 422],
   };
@@ -52,6 +53,13 @@ export async function GET(request: Request) {
     if (!user) return reply({ error: '로그인이 필요합니다.' }, 401);
     const params = new URL(request.url).searchParams;
     const db = createAdminClient();
+    if (params.has('submission')) {
+      const { data, error } = await db.rpc('edu_read_block_submission', {
+        p_actor: user.id, p_submission: requiredId(params.get('submission')), p_enrollment: requiredId(params.get('enrollment')),
+      });
+      if (error) throw error;
+      return reply({ ...data, document: publicLessonBlocks(validateLessonBlocks(data.document)) });
+    }
     const { data, error } = await db.rpc('edu_read_lesson_blocks', {
       p_actor: user.id, p_lesson: requiredId(params.get('lesson')), p_enrollment: optionalId(params.get('enrollment')), p_revision: optionalId(params.get('revision')),
     });
@@ -78,13 +86,22 @@ export async function POST(request: Request) {
       if (error) throw error;
       return reply(data);
     }
-    if (!['draft', 'grade', 'submit'].includes(body.action)) fail('요청 종류를 확인해 주세요.');
+    if (!['draft', 'grade', 'submit', 'reopen'].includes(body.action)) fail('요청 종류를 확인해 주세요.');
     const enrollment = requiredId(body.enrollmentId), revision = requiredId(body.revision);
     const loaded = await db.rpc('edu_read_lesson_blocks', { p_actor: user.id, p_lesson: lesson, p_enrollment: enrollment, p_revision: revision });
     if (loaded.error) throw loaded.error;
     if (!loaded.data?.document) fail('학습 내용을 찾을 수 없습니다.', 404);
     if (loaded.data.currentRevision !== revision) throw new Error('BLOCK_CONTENT_CHANGED');
     const document = validateLessonBlocks(loaded.data.document);
+    if (body.action === 'reopen') {
+      if (loaded.data.submission?.id !== requiredId(body.submissionId)) throw new Error('BLOCK_REVIEW_CHANGED');
+      const { data, error } = await db.rpc('edu_decide_lesson_blocks', {
+        p_actor: user.id, p_submission: body.submissionId, p_expected_state: requiredId(body.expectedStateId),
+        p_request: requiredId(body.requestId), p_decision: 'reopened', p_feedback: '',
+      });
+      if (error) throw error;
+      return reply(data);
+    }
     if (body.action === 'submit') {
       const writeId = requiredId(body.writeId), requestId = requiredId(body.requestId);
       if (loaded.data.draft?.writeId !== writeId) throw new Error('BLOCK_DRAFT_CHANGED');

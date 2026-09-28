@@ -29,3 +29,8 @@
 .lb-session-notice { border:1px solid #e1c679; border-radius:8px; padding:16px; margin-bottom:16px; background:#fff9e9; }
 @media(max-width:540px) { .lesson-blocks .lb-card { padding:14px; } .edu-front .learning-content > .lesson-block-session { padding:16px; } }
 .edu-front .learning-content > .lesson-block-session { padding:32px; margin-top:16px; min-width:0; background:#fff; border:1px solid #d8dde3; border-radius:8px; }
+.lb-review-queue { display: grid; gap: 10px; }
+.lb-review-queue .btn { text-align: left; justify-content: flex-start; white-space: normal; overflow-wrap: anywhere; height: auto; }
+.lb-review-queue .btn[aria-pressed="true"] { border: 2px solid var(--brand, #c8192b); }
+.lb-review-panel .row { flex-wrap: wrap; }
+.lb-review-panel textarea { width: 100%; }

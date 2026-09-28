@@ -20,7 +20,7 @@ async function fixture(doc=document){
  create table lesson_progress(id uuid primary key default gen_random_uuid(),enrollment_id uuid references enrollments,lesson_id uuid references curriculum_lessons,progress_percent integer not null default 0,completed_at timestamptz,updated_at timestamptz default now(),unique(enrollment_id,lesson_id));
  grant select,insert,update on all tables in schema public to service_role;
  grant select,insert,update on lesson_progress to authenticated;`);
- await db.exec(base);await db.exec(migration);
+ await db.exec(base);await db.exec(migration);await db.exec(fs.readFileSync(new URL('20260928161532_lesson_block_mentor_reviews.sql',root),'utf8'));
  await db.query("insert into profiles values($1,'admin','active'),($2,'member','active'),($3,'member','active')",[admin,student,other]);
  await db.query('insert into courses(id) values($1)',[course]);await db.query('insert into curriculum_weeks values($1,$2,true,null)',[week,course]);await db.query('insert into curriculum_lessons values($1,$2,true,null)',[lesson,week]);
  await db.query("insert into enrollments values($1,$2,$3,'active',null,now()-interval '1 day',null)",[enrollment,student,course]);

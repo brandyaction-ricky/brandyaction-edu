@@ -6,8 +6,8 @@ const id='11111111-1111-4111-8111-111111111111',lesson='22222222-2222-4222-8222-
 function compile(file, mocks={}) { const out={};new Function('exports','require',ts.transpileModule(fs.readFileSync(new URL('../'+file,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(out,name=>mocks[name]);return out; }
 const blocks=compile('lib/lesson-blocks.ts',{'./lesson-guided-tools':compile('lib/lesson-guided-tools.ts'),'./lesson-calculators':compile('lib/lesson-calculators.ts')});
 const document={schemaVersion:1,blocks:[{id:'quiz',type:'quiz',quiz:{passPercent:100,questions:[{id:'q',prompt:'시험',options:['가','나'],correctIndex:1}]}},{id:'answer',type:'question',question:{label:'질문',kind:'text',required:true}}],checklist:[]};
-function harness({user={id,role:'member'},editable=false,readError=null,saveError=null,current=revision,savedDraft=null}={}) {
- const calls=[];const db={rpc:async(name,args)=>{calls.push({name,args});return name==='edu_read_lesson_blocks'?{data:{editable,revision,currentRevision:current,document,draft:savedDraft,previousDrafts:[]},error:readError}:{data:{writeId:id,revision},error:saveError};}};
+function harness({user={id,role:'member'},editable=false,readError=null,saveError=null,current=revision,savedDraft=null,savedSubmission=null}={}) {
+ const calls=[];const db={rpc:async(name,args)=>{calls.push({name,args});return ['edu_read_lesson_blocks','edu_read_block_submission'].includes(name)?{data:{editable,revision,currentRevision:current,document,draft:savedDraft,submission:savedSubmission,previousDrafts:[]},error:readError}:{data:{writeId:id,revision},error:saveError};}};
  const route=compile('app/api/platform/lesson-blocks/route.ts',{'@/lib/lesson-blocks':blocks,'@/lib/edu-workflows':{uuid:v=>typeof v==='string'&&/^[a-f\d-]{36}$/.test(v)},'@/lib/supabase/admin':{createAdminClient:()=>db},'@/lib/server-auth':{getAuthenticatedUser:async()=>user}});
  const get=(query=`lesson=${lesson}&enrollment=${id}`)=>route.GET(new Request('https://edu.test/api/platform/lesson-blocks?'+query));
  const post=(body,origin='https://edu.test')=>route.POST(new Request('https://edu.test/api/platform/lesson-blocks',{method:'POST',headers:origin?{origin,'content-type':'application/json'}:{},body:JSON.stringify(body)}));
@@ -54,4 +54,14 @@ test('missing requirements and changed or absent saved drafts cannot be marked c
  for(const savedDraft of [null,{writeId:lesson,values:{blocks:{},checklist:[]}}]){
   const h=harness({savedDraft});assert.equal((await h.post({...h.draft,action:'submit',writeId:id})).status,409);assert.equal(h.calls.length,1);
  }
+});
+
+test('learner submission history requires its enrollment and never exposes quiz keys',async()=>{
+ const h=harness();const result=await h.get(`submission=${id}&enrollment=${id}`);assert.equal(result.status,200);assert.equal(h.calls[0].name,'edu_read_block_submission');assert.equal(h.calls[0].args.p_actor,id);assert.equal(h.calls[0].args.p_enrollment,id);assert.doesNotMatch(await result.text(),/correctIndex/);
+ const missing=harness();assert.equal((await missing.get(`submission=${id}`)).status,400);assert.equal(missing.calls.length,0);
+});
+test('learner reopen is bound to the latest owned submission and cannot impersonate a mentor',async()=>{
+ const h=harness({savedSubmission:{id}});const result=await h.post({...h.draft,action:'reopen',submissionId:id,expectedStateId:id,decision:'approved',p_actor:lesson});
+ assert.equal(result.status,200);assert.equal(h.calls[1].name,'edu_decide_lesson_blocks');assert.equal(h.calls[1].args.p_actor,id);assert.equal(h.calls[1].args.p_decision,'reopened');assert.equal(h.calls[1].args.p_feedback,'');
+ const stale=harness();assert.equal((await stale.post({...stale.draft,action:'reopen',submissionId:id,expectedStateId:id})).status,409);assert.equal(stale.calls.length,1);
 });
