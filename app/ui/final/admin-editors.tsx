@@ -116,7 +116,7 @@ export function FieldControl({
       }
       min={
         f.type === "number"
-          ? ["capacity", "week_number", "day_number", "usage_limit"].includes(
+          ? ["capacity", "day_number", "usage_limit"].includes(
               f.key,
             )
             ? 1
