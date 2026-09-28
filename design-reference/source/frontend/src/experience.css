@@ -45,3 +45,14 @@
 .checkout-applied-coupon span{min-width:0;overflow-wrap:anywhere;color:var(--muted)}
 .checkout-payment-summary .cost-total{gap:var(--space-3);flex-wrap:wrap}
 .checkout-payment-summary .cost-total strong{font-size:clamp(26px,3vw,34px);white-space:nowrap;margin-left:auto;color:var(--ink)}
+.checkout-coupon-entry{display:flex;align-items:center;justify-content:space-between;gap:var(--space-4)}
+.checkout-coupon-entry>div{min-width:0}.checkout-coupon-entry strong{display:block;font-size:var(--type-body)}
+.checkout-coupon-entry .meta{margin-top:var(--space-1)}.checkout-coupon-entry>.btn{flex:none}
+.checkout-coupon-notice{margin-top:var(--space-3);color:#1673a6}
+.checkout-applied-coupon-actions{display:flex;align-items:center;gap:var(--space-3);flex:none}
+.checkout-applied-coupon-actions .link{border:0;background:transparent;padding:0;cursor:pointer}
+.checkout-coupon-dialog{width:min(460px,calc(100vw - 32px))}
+.checkout-coupon-dialog>div{display:flex;min-height:100%;flex-direction:column}
+.checkout-coupon-dialog .field{margin-top:var(--space-4)}
+.checkout-coupon-dialog .form-error{margin-top:var(--space-3)}
+@media(max-width:680px){.checkout-coupon-entry{align-items:stretch;flex-direction:column}.checkout-coupon-entry>.btn{width:100%}.checkout-applied-coupon{align-items:flex-start}.checkout-applied-coupon-actions{align-items:flex-end;flex-direction:column}}
