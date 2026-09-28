@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { PGlite } from '@electric-sql/pglite';
 
 const migration = fs.readFileSync(new URL('../supabase/migrations/20260927050000_admin_week_reorder.sql', import.meta.url), 'utf8');
+const zeroWeekMigration = fs.readFileSync(new URL('../supabase/migrations/20260928120752_allow_curriculum_week_zero.sql', import.meta.url), 'utf8');
 
 test('week reorder is atomic, product-scoped, permission-checked, archived-safe and audited', async () => {
   const db = new PGlite();
@@ -62,6 +63,26 @@ test('week reorder is atomic, product-scoped, permission-checked, archived-safe 
     const unchanged = await db.query('select id,week_number from public.curriculum_weeks where course_id=$1 order by week_number', [course]);
     assert.deepEqual(unchanged.rows.map((row) => [row.id, row.week_number]), [[second, 1], [first, 2], [third, 3], [archived, 4]]);
     assert.equal((await db.query("select count(*)::int as n from public.audit_logs where action='curriculum.weeks_reordered'")).rows[0].n, 1);
+    await db.exec('reset role');
+    // Upgrade an existing course without renumbering or deleting its weeks.
+    await db.exec(zeroWeekMigration);
+    assert.deepEqual((await db.query('select id,week_number from public.curriculum_weeks where course_id=$1 order by week_number', [course])).rows, unchanged.rows);
+    const onboarding = randomUUID();
+    await db.query('insert into public.curriculum_weeks(id,course_id,week_number) values ($1,$2,0)', [onboarding, course]);
+    await assert.rejects(db.query('insert into public.curriculum_weeks(id,course_id,week_number) values ($1,$2,-1)', [randomUUID(), course]), /week_number_check/);
+    await assert.rejects(db.query('insert into public.curriculum_weeks(id,course_id,week_number) values ($1,$2,0)', [randomUUID(), course]), /course_id_week_number_key/);
+    await db.exec('set role service_role');
+    await assert.rejects(reorder(unscopedStaff, [onboarding, first, second, third, archived]), /상품 관리 권한/);
+    await assert.rejects(reorder(admin, [first, onboarding, second, third, archived]), /0주차 온보딩/);
+    await assert.rejects(reorder(admin, [first, second, third, archived]), /주차 목록이 변경/);
+    assert.equal((await db.query('select count(*)::int as n from public.audit_logs')).rows[0].n, 1);
+    assert.equal((await reorder(scopedStaff, [onboarding, first, second, third, archived])).rows[0].changed, 5);
+    const zeroOrder = await db.query('select id,week_number from public.curriculum_weeks where course_id=$1 order by week_number', [course]);
+    assert.deepEqual(zeroOrder.rows.map(row => [row.id, row.week_number]), [[onboarding, 0], [first, 1], [second, 2], [third, 3], [archived, 4]]);
+    assert.equal((await db.query('select count(*)::int as n from public.audit_logs')).rows[0].n, 2);
+    // Courses without onboarding still start at 1 after the upgrade.
+    await reorder(admin, [foreign], otherCourse);
+    assert.equal((await db.query('select week_number from public.curriculum_weeks where id=$1', [foreign])).rows[0].week_number, 1);
     await db.exec('reset role');
     for (const role of ['anon', 'authenticated', 'service_role']) {
       assert.equal((await db.query("select has_function_privilege($1,'public.edu_admin_reorder_weeks(uuid,uuid,uuid[])','EXECUTE') as allowed", [role])).rows[0].allowed, role === 'service_role');

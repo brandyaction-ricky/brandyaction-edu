@@ -195,7 +195,8 @@ export function AdminCatalog({
     (s.key === "customers" ? `${JSON.stringify(r)} ${customerTags(r.id).map(named).join(" ")} ${customerCourses(r.id).join(" ")}` : JSON.stringify(r)).toLowerCase().includes(query.toLowerCase()),
   ).toSorted((a, b) => s.key === "banners" ? num(a, "display_order") - num(b, "display_order") : s.key === "weeks" ? num(a, "week_number") - num(b, "week_number") || named(a).localeCompare(named(b), "ko") : 0);
   const allCourseWeeks = course ? rows.filter((row) => row.course_id === course).toSorted((a, b) => num(a, "week_number") - num(b, "week_number")) : [];
-  const activeCourseWeeks = allCourseWeeks.filter((row) => !row.archived_at);
+  // Onboarding stays at week zero; only the regular weeks can trade places.
+  const activeCourseWeeks = allCourseWeeks.filter((row) => !row.archived_at && num(row, "week_number") > 0);
   const weekGroups = s.key === "weeks"
     ? Array.from(filtered.reduce((groups, row) => {
         const number = num(row, "week_number");
@@ -222,7 +223,7 @@ export function AdminCatalog({
     const reorderedActive = [...activeCourseWeeks];
     [reorderedActive[index], reorderedActive[targetIndex]] = [reorderedActive[targetIndex], reorderedActive[index]];
     let activeIndex = 0;
-    const ids = allCourseWeeks.map((item) => item.archived_at ? String(item.id) : String(reorderedActive[activeIndex++].id));
+    const ids = allCourseWeeks.map((item) => item.archived_at || num(item, "week_number") === 0 ? String(item.id) : String(reorderedActive[activeIndex++].id));
     await send({ action: "reorder-weeks", courseId: course, ids }, "주차 순서를 변경했습니다.");
   }
   const missionGroups = scopedWeeks
@@ -924,8 +925,8 @@ export function AdminCatalog({
                         {bulkMode && <td data-label="선택" className="selection-column"><input type="checkbox" aria-label={title(r) + " 선택"} checked={selection.includes(recordId(r))} onChange={(e) => setSelection(e.target.checked ? [...selection, recordId(r)] : selection.filter((id) => id !== recordId(r)))} /></td>}
                         {cols.map((c) => <td data-label={c.label} key={c.label}>{c.value(r)}</td>)}
                         <td data-label="관리"><div className="catalog-actions week-order-actions">
-          <AdminButton size="sm" variant="outline" type="button" title="위로 이동" aria-label={`${t(r, "title")} 위로 이동`} disabled={pending || weekReorderDisabled || Boolean(r.archived_at) || activeCourseWeeks[0]?.id === r.id} onClick={() => void moveWeek(r, -1)}><ChevronUp size={17} aria-hidden="true" /></AdminButton>
-          <AdminButton size="sm" variant="outline" type="button" title="아래로 이동" aria-label={`${t(r, "title")} 아래로 이동`} disabled={pending || weekReorderDisabled || Boolean(r.archived_at) || activeCourseWeeks.at(-1)?.id === r.id} onClick={() => void moveWeek(r, 1)}><ChevronDown size={17} aria-hidden="true" /></AdminButton>
+          <AdminButton size="sm" variant="outline" type="button" title="위로 이동" aria-label={`${t(r, "title")} 위로 이동`} disabled={pending || weekReorderDisabled || Boolean(r.archived_at) || num(r, "week_number") === 0 || activeCourseWeeks[0]?.id === r.id} onClick={() => void moveWeek(r, -1)}><ChevronUp size={17} aria-hidden="true" /></AdminButton>
+          <AdminButton size="sm" variant="outline" type="button" title="아래로 이동" aria-label={`${t(r, "title")} 아래로 이동`} disabled={pending || weekReorderDisabled || Boolean(r.archived_at) || num(r, "week_number") === 0 || activeCourseWeeks.at(-1)?.id === r.id} onClick={() => void moveWeek(r, 1)}><ChevronDown size={17} aria-hidden="true" /></AdminButton>
           <AdminButton size="sm" variant="outline" onClick={() => edit(s, r)}>수정</AdminButton>
                         </div></td>
                       </tr>

@@ -22,11 +22,11 @@ import { ProductVisibilityFixture } from './product-visibility';
 import { PurchaseOnboarding } from '../../../app/ui/purchase-onboarding';
 import { PurchaseOnboardingAdmin } from '../../../app/ui/purchase-onboarding-admin';
 import { OrderResult } from '../../../app/ui/order-result';
-import { Platform } from '../../../app/ui/platform';
+import { Editor, Platform } from '../../../app/ui/platform';
 import { AdminCatalog } from '../../../app/ui/final/admin-catalog';
 import { ArticleBannerEditor } from '../../../app/ui/final/article-banner-editor';
 import { ArticleCategoryManager } from '../../../app/ui/final/article-category-manager';
-import { sections } from '../../../lib/platform';
+import { sections, type Row } from '../../../lib/platform';
 import '../../../app/ui/final/frontend.css';
 import { AdminButton, AdminConfirmDialog, AdminDrawer, AdminEmptyState, AdminInlineError, AdminInput, AdminPage, AdminPageHeader, AdminShell, AdminSuccessState } from '../../../features/admin-ui';
 import { ProductDetailHtml } from '../../../app/ui/final/product-detail-html';
@@ -62,19 +62,25 @@ function ShellFixture() {
   return <div className="edu-admin"><AdminShell current="overview" available={available} user={{full_name:'운영자',role:'staff'}} pendingReviews={3} mobile={mobile} setMobile={setMobile} logout={async()=>{}}><AdminPage><AdminPageHeader eyebrow="OPERATIONS" title="오늘의 운영" description="현재 상태를 확인하고 다음 작업을 시작하세요." actions={<AdminButton tone="primary">핵심 작업 시작</AdminButton>}/><AdminSuccessState title="대기 업무를 모두 처리했습니다.">새 요청이 생기면 이 화면과 메뉴 배지에 표시됩니다.</AdminSuccessState><AdminEmptyState title="조회 결과가 없습니다.">검색어 또는 필터를 변경해 보세요.</AdminEmptyState><AdminInlineError onRetry={()=>{}}>화면 정보를 불러오지 못했습니다.</AdminInlineError></AdminPage></AdminShell></div>;
 }
 function WeekCatalogFixture() {
+  const withOnboarding = new URLSearchParams(location.search).has('onboarding');
+  const [editing, setEditing] = useState<Row | null>(null);
   const [weeks, setWeeks] = useState([
+    ...(withOnboarding ? [{ id: 'week-a-0', course_id: 'course-a', week_number: 0, title: '온보딩', goal: '시작 안내', is_published: true }] : []),
     { id: 'week-a-1', course_id: 'course-a', week_number: 1, title: '첫 번째 주차', goal: '목표', is_published: true },
     { id: 'week-a-2', course_id: 'course-a', week_number: 2, title: '둘째 주차', goal: '목표', is_published: false },
     { id: 'week-b-1', course_id: 'course-b', week_number: 1, title: '다른 상품 주차', goal: '목표', is_published: true },
   ]);
   const send = async (body: Record<string, unknown>) => {
     if (body.action === 'reorder-weeks' && Array.isArray(body.ids)) {
-      const positions = new Map(body.ids.map((id, index) => [String(id), index + 1]));
+      const hasZero = weeks.some(week => week.course_id === body.courseId && week.week_number === 0);
+      const positions = new Map(body.ids.map((id, index) => [String(id), index + (hasZero ? 0 : 1)]));
       setWeeks(current => current.map(week => positions.has(week.id) ? { ...week, week_number: positions.get(week.id)! } : week));
     }
     return { ok: true };
   };
-  return <div className="edu-admin"><AdminCatalog section={sections.find(item => item.key === 'weeks')!} data={{ courses: [{ id: 'course-a', title: '합성 상품 A' }, { id: 'course-b', title: '합성 상품 B' }], curriculum_weeks: weeks }} selection={[]} setSelection={() => {}} edit={() => {}} archive={() => {}} pending={false} loading={false} pagination={{ page: 1, pageSize: 1000, total: weeks.length }} setPage={() => {}} exportCsv={() => {}} send={send} /></div>;
+  const section = sections.find(item => item.key === 'weeks')!;
+  const data = { courses: [{ id: 'course-a', title: '합성 상품 A' }, { id: 'course-b', title: '합성 상품 B' }], curriculum_weeks: weeks };
+  return <div className="edu-admin"><AdminCatalog section={section} data={data} selection={[]} setSelection={() => {}} edit={(_section, row) => setEditing(row || null)} archive={() => {}} pending={false} loading={false} pagination={{ page: 1, pageSize: 1000, total: weeks.length }} setPage={() => {}} exportCsv={() => {}} send={send} />{editing && <Editor section={section} row={editing} data={data} pending={false} close={() => setEditing(null)} save={async values => { setWeeks(current => current.map(week => week.id === editing.id ? { ...week, ...values } : week)); setEditing(null); }} />}</div>;
 }
 function FullMigrationFixture({ screen }: { screen: 'crm' | 'settings' }) {
   const send = async () => ({ ok: true });
