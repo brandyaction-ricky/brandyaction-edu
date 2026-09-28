@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { hasLearningAccess } from '@/lib/platform-rules';
 import type { Row } from '@/lib/platform';
 
-export type MemberView = 'dashboard' | 'classes' | 'missions' | 'questions' | 'orders' | 'coupons' | 'resources' | 'profile' | 'reviews' | 'learn' | 'order-result';
+export type MemberView = 'dashboard' | 'classes' | 'missions' | 'questions' | 'orders' | 'coupons' | 'resources' | 'profile' | 'messages' | 'reviews' | 'learn' | 'order-result';
 export const MEMBER_ROW_LIMIT = 200;
 const enrollmentViews = new Set<MemberView>(['dashboard', 'classes', 'missions', 'resources', 'reviews', 'learn']);
 const learningViews = new Set<MemberView>(['dashboard', 'classes', 'missions', 'resources', 'learn']);
@@ -22,7 +22,7 @@ export async function readMemberPlatformData(userId: string, view: MemberView, e
   const admin = createAdminClient();
   const data: Record<string, Row[]> = {};
   const limit = MEMBER_ROW_LIMIT + 1;
-  if (view === 'profile') return data;
+  if (view === 'profile' || view === 'messages') return data;
   const readQuestions = async () => checked(await db.from('edu_questions').select('id,user_id,course_id,learning_context,title,content,answer,status,created_at').eq('user_id', userId).eq('is_archived', false).order('created_at', { ascending: false }).limit(limit), '질문');
   const readCoupons = async () => checked(await db.from('customer_coupons').select('id,user_id,coupon_id,status,issued_at,used_at,expires_at,coupon:coupons(name,code,discount_type,discount_value,ends_at)').eq('user_id', userId).order('issued_at', { ascending: false }).limit(limit), '쿠폰');
   if (enrollmentViews.has(view)) {

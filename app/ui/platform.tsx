@@ -798,6 +798,7 @@ export function Platform({
         send={send}
         logout={logout}
         order={searchParams.get("order")}
+        ongoingLesson={searchParams.get("ongoing") || ""}
       />
     );
   else if (learning)

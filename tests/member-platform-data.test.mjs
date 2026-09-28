@@ -42,6 +42,7 @@ function harness(fixtures = {}, waitForRead = () => {}) {
 test('profile has no data prefetch and dashboard omits orders and review bodies', async () => {
   const profile = harness();
   assert.deepEqual(await profile.read('owner', 'profile'), {});
+  assert.deepEqual(await profile.read('owner', 'messages'), {});
   assert.deepEqual(profile.calls, []);
   const dashboard = harness();
   await dashboard.read('owner', 'dashboard');

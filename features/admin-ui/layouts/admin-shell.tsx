@@ -187,6 +187,7 @@ export function AdminShell({
             <span>{adminSectionTitle(current, available)}</span>
           </div>
           <div className="topright">
+            {process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === "true" && <Link className="btn ghost small" href="/my/messages">메시지</Link>}
             {byKey.has('questions') && (
               <Link className="btn iconbtn ghost" href="/admin/questions" aria-label="질문함">
                 <MessageCircle aria-hidden="true" />

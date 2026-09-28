@@ -1,4 +1,5 @@
 "use client";
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import type { LessonBlockAnswers, PublicBlockDocument } from '@/lib/lesson-blocks';
 import { ongoingLabels, ongoingPeriodLabel, type OngoingCadence } from '@/lib/ongoing-lessons';
@@ -46,6 +47,7 @@ export function OngoingLessonReviews() {
    <label>완료 상태<select value={filter.state} onChange={e => change('state', e.target.value)}><option value="">전체</option><option value="completed">완료</option><option value="draft">작성 중</option></select></label>
    <button className="btn small" onClick={() => setFilter(old => ({ ...old, refresh: old.refresh + 1 }))}>참여 목록 새로고침</button>
   </div>
+  {filter.lesson && process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === "true" && <p><Link className="btn small" href={"/my/messages?ongoing=" + encodeURIComponent(filter.lesson)}>완료 참여자에게 메시지 작성</Link></p>}
   {optionError && <p role="alert">{optionError} 목록 새로고침으로 다시 확인해 주세요.</p>}
   {queue?.key === listKey && queue.error ? <p role="alert">{queue.error}</p> : !list ? <p role="status">참여 기록을 불러오고 있습니다.</p> : <>
    <p>기간별 참여 기록 {list.total}건 · {list.page}페이지</p>{!list.rows.length && <p>이 조건에 맞는 참여 기록이 없습니다.</p>}

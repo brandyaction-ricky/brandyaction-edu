@@ -1,4 +1,5 @@
 "use client";
+import { MemberMessages } from './member-messages';
 import { achievement } from "@/lib/edu-workflows";
 import {
   date,
@@ -48,6 +49,7 @@ const accountGroups = [
       ["classes", "내 클래스", BookOpen],
       ["missions", "내 미션", Target],
       ["questions", "내 질문", MessageCircle],
+      ["messages", "메시지", MessageCircle],
       ["resources", "내 자료실", Download],
     ],
   ],
@@ -1248,6 +1250,7 @@ export function MemberViews({
   send,
   logout,
   order,
+  ongoingLesson,
 }: {
   section?: string;
   data: Data;
@@ -1256,6 +1259,7 @@ export function MemberViews({
   send: WorkflowSend;
   logout: () => Promise<void>;
   order?: string | null;
+  ongoingLesson?: string;
 }) {
   const enrollments = rows(data, "enrollments"),
     active = enrollments.filter(enrollment => hasLearningAccess(enrollment));
@@ -1290,6 +1294,9 @@ export function MemberViews({
       break;
     case "missions":
       content = <Missions data={data} active={active} />;
+      break;
+    case "messages":
+      content = process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === "true" ? <MemberMessages key={user.id + (ongoingLesson || "")} ongoingLesson={ongoingLesson} /> : <Empty title="메시지 기능을 준비 중입니다." />;
       break;
     case "questions":
       content = (
@@ -1335,7 +1342,7 @@ export function MemberViews({
             {accountGroups.map(([title, links]) => (
               <div className="member-nav-group" key={title}>
                 <span className="member-nav-label">{title}</span>
-                {links.map(([route, label, Icon]) => (
+                {links.filter(([route]) => route !== "messages" || process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === "true").map(([route, label, Icon]) => (
                   <Link
                     key={route}
                     className={

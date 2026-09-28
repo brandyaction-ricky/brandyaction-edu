@@ -42,7 +42,7 @@ export async function GET(request: Request) {
         if (!adminMode && view === 'member') {
             if (!user) return reply({ error: '로그인이 필요합니다.', user: null }, 401);
             const memberSection = params.get('section') || 'dashboard';
-            if (!['dashboard', 'classes', 'missions', 'questions', 'orders', 'coupons', 'resources', 'profile', 'reviews', 'learn', 'order-result'].includes(memberSection)) return reply({ error: '조회 화면을 확인해 주세요.' }, 400);
+            if (!['dashboard', 'classes', 'missions', 'questions', 'orders', 'coupons', 'resources', 'profile', 'messages', 'reviews', 'learn', 'order-result'].includes(memberSection)) return reply({ error: '조회 화면을 확인해 주세요.' }, 400);
             const enrollmentId = params.get('enrollment') || '';
             const lessonId = params.get('lesson') || '';
             if (memberSection === 'learn' && !uid(enrollmentId)) return reply({ error: '수강권을 확인해 주세요.' }, 400);
