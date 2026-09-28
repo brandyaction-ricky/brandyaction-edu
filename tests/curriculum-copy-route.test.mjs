@@ -22,5 +22,6 @@ test('copy validates IDs and derives actor from session, not body',async()=>{
 test('preview is private and returns summary only; backend errors are sanitized',async()=>{
  const h=harness();const r=await h.get(new Request('https://edu.test/api/platform/curriculum-copy?source='+id));assert.equal(r.headers.get('cache-control'),'private, no-store');assert.deepEqual(await r.json(),{preview:{weeks:2}});
  const stale=harness({error:{message:'COPY_SOURCE_CHANGED'}});assert.equal((await stale.post()).status,409);
+ const media=harness({error:{message:'COPY_MEDIA_INVALID'}});assert.equal((await media.post()).status,409);
  const fail=harness({error:{message:'database password SECRET'}});const failed=await fail.post();assert.equal(failed.status,503);assert.ok(!(await failed.text()).includes('SECRET'));
 });

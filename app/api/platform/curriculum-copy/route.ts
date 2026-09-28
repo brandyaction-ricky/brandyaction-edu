@@ -13,6 +13,7 @@ const errors: Record<string, [string, number]> = {
   COPY_SOURCE_CHANGED: ["원본이 변경되었습니다. 복사 내용을 다시 확인해 주세요.", 409],
   COPY_SOURCE_LIMIT: ["주차가 없거나 복사 가능한 크기를 초과했습니다. 주차 100개·학습 1,000개·내용 10MB까지 지원합니다.", 400],
   COPY_RESOURCE_INVALID: ["원본의 공통 자료 설정을 확인해 주세요. 자료 경로나 다운로드 범위가 올바르지 않습니다.", 400],
+  COPY_MEDIA_INVALID: ["원본 학습의 사진·영상·음성 파일 연결을 확인해 주세요. 확인되지 않은 파일이 있어 복사하지 않았습니다.", 409],
 };
 function failure(error: unknown) {
   const value = error && typeof error === "object" ? error as { message?: string; code?: string } : {};
