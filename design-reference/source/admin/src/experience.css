@@ -131,3 +131,6 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 
 .products-filter-row>.admin-search-field{flex:0 1 340px;width:340px;max-width:100%;margin-left:auto}
 @media(max-width:720px){.products-filter-row>.admin-search-field{flex-basis:100%;width:100%;max-width:none;margin-left:0}}
+
+/* The legacy generic input rules must not move search text over the icon. */
+.admin-search-field input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]){padding-left:40px}

@@ -80,3 +80,21 @@ test('member mission table sorts, opens the common drawer and restores focus', a
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(row).toBeFocused();
 });
+
+test('member search placeholder and entered text clear the search icon', async ({ page }) => {
+  await page.goto('/admin/members');
+  const search = page.getByRole('searchbox', { name: '회원 검색' });
+  await expect(search).toHaveAttribute('placeholder', '회원 이름 또는 이메일 검색');
+  const spacing = await search.evaluate((input) => {
+    const icon = input.closest('.admin-search-field')?.querySelector('svg');
+    if (!icon) throw new Error('회원 검색 아이콘이 없습니다.');
+    return {
+      textStart: input.getBoundingClientRect().left + Number.parseFloat(getComputedStyle(input).paddingLeft),
+      iconEnd: icon.getBoundingClientRect().right,
+    };
+  });
+  expect(spacing.textStart - spacing.iconEnd).toBeGreaterThanOrEqual(6);
+  await search.fill('운영 동선 QA 회원');
+  await expect(search).toHaveValue('운영 동선 QA 회원');
+  await expect(page.getByRole('table', { name: '회원별 미션 현황 표' })).toBeVisible();
+});
