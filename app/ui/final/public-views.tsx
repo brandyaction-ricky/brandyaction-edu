@@ -24,6 +24,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { loginBeforeCheckout, parseEntrySource, withEntrySource } from '@/lib/entry-source';
+import { youtubeThumbnailUrl } from '@/lib/youtube-thumbnail';
 import type { Data } from "../learning-workflows";
 import { EmailAuth } from "../email-auth";
 import { ProductDetailHtml } from './product-detail-html';
@@ -673,23 +674,7 @@ export function ArticlesView({
 function storyThumbnailUrl(story: Row) {
   const savedThumbnail = safeUrl(t(story, "thumbnail_url"));
   if (savedThumbnail) return savedThumbnail;
-
-  const videoUrl = safeUrl(t(story, "video_url"));
-  if (!videoUrl) return "";
-  try {
-    const url = new URL(videoUrl);
-    const hostname = url.hostname.toLowerCase();
-    const videoId = hostname === "youtu.be"
-      ? url.pathname.split("/")[1]
-      : ["youtube.com", "www.youtube.com", "m.youtube.com", "www.youtube-nocookie.com"].includes(hostname)
-        ? url.searchParams.get("v") || url.pathname.match(/^\/(?:embed|shorts|live)\/([^/?]+)/)?.[1]
-        : null;
-    return videoId && /^[\w-]{11}$/.test(videoId)
-      ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
-      : "";
-  } catch {
-    return "";
-  }
+  return youtubeThumbnailUrl(safeUrl(t(story, "video_url")));
 }
 
 export function StoriesView({
