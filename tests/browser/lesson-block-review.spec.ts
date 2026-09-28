@@ -10,7 +10,7 @@ async function backend(context:BrowserContext,options:{lostReview?:boolean;stale
  const records:Record<string,BlockSubmissionDetail>={[receipt.id]:{document:doc,values:structuredClone(draft.values),submission:receipt,history:[]}};
  const decisions:Record<string,unknown>[]=[],reopens:Record<string,unknown>[]=[];
  function change(decision:BlockSubmission['state'],requestId:string,feedback=''){
-  receipt={...receipt,state:decision,stateId:requestId,feedback};records[receipt.id].submission=receipt;
+  receipt={...receipt,state:decision,stateId:requestId,...(feedback?{feedback,feedbackId:requestId}:{})};records[receipt.id].submission=receipt;
   records[receipt.id].history.push({id:requestId,decision:decision!,feedback,createdAt:new Date().toISOString()});
   if(decision!=='approved')draft={...draft,writeId:requestId};
  }
@@ -24,7 +24,12 @@ async function backend(context:BrowserContext,options:{lostReview?:boolean;stale
   }
   const body=route.request().postDataJSON();decisions.push(body);
   if(options.staleReview){change('reopened','77777777-7777-4777-8777-777777777777');options.staleReview=false;await route.fulfill({status:409,json:{error:'검토 상태가 바뀌었습니다.'}});return;}
-  if(receipt.stateId!==body.requestId)change(body.decision,body.requestId,body.feedback);
+  if(body.decision==='feedback'){
+   if(receipt.feedbackId!==body.requestId){
+    receipt={...receipt,feedback:body.feedback,feedbackId:body.requestId};records[receipt.id].submission=receipt;
+    records[receipt.id].history.push({id:body.requestId,decision:'feedback',feedback:body.feedback,createdAt:new Date().toISOString()});
+   }
+  }else if(receipt.stateId!==body.requestId)change(body.decision,body.requestId,body.feedback);
   if(options.lostReview){options.lostReview=false;await route.fulfill({status:503,json:{error:'결과 응답을 확인하지 못했습니다.'}});return;}
   await route.fulfill({json:receipt});
  });
@@ -88,4 +93,24 @@ test('stale decisions require a refresh and never display successful approval',a
 test('list errors remain visible and can be retried without showing an empty success state',async({page,context})=>{
  await backend(context,{failList:true});await page.goto('/lesson-block-review-test');await expect(page.getByRole('alert')).toContainText('검토 목록 조회 실패');await expect(page.getByText('이 상태의 제출물이 없습니다.')).toHaveCount(0);
  await page.getByRole('button',{name:'목록 새로고침'}).click();await expect(page.getByRole('button',{name:/시험 학생/})).toBeVisible();
+});
+test('feedback-only remains pending, survives empty approval, and approved work accepts more advice visible to its learner',async({page,context},info)=>{
+ const server=await backend(context);await page.goto('/lesson-block-review-test');await page.getByRole('button',{name:/시험 학생/}).click();
+ await expect(page.getByRole('button',{name:'피드백만 저장',exact:true})).toBeDisabled();await page.getByRole('textbox',{name:'멘토 피드백'}).fill('실행 과정에 대한 조언');await page.getByRole('button',{name:'피드백만 저장',exact:true}).click();
+ await expect(page.getByText('피드백을 저장했습니다. 승인 상태는 그대로입니다.',{exact:true})).toBeVisible();expect(server.receipt().state).toBe('submitted');expect(server.receipt().stateId).toBe(initialId);expect(server.decisions[0].expectedFeedbackId).toBeNull();
+ await page.getByRole('button',{name:'승인하기',exact:true}).click();await expect(page.getByText('검토 결과를 저장했습니다.',{exact:true})).toBeVisible();const approvedState=server.receipt().stateId;
+ await page.getByRole('textbox',{name:'멘토 피드백'}).fill('승인 후 <script>추가 조언</script>');await page.getByRole('button',{name:'피드백만 저장',exact:true}).click();await expect(page.getByText('피드백을 저장했습니다. 승인 상태는 그대로입니다.',{exact:true})).toBeVisible();
+ expect(server.receipt().stateId).toBe(approvedState);expect(server.receipt().state).toBe('approved');expect(server.records[initialId].values.blocks.q).toBe('처음 제출한 답변');expect(server.records[initialId].history.map(e=>e.decision)).toEqual(['feedback','approved','feedback']);
+ const student=await context.newPage();await student.goto('/lesson-blocks-test');await expect(student.getByText('승인 후 <script>추가 조언</script>',{exact:true})).toBeVisible();await expect(student.getByText('멘토가 승인했습니다. 학습을 완료했습니다.',{exact:true})).toBeVisible();
+ await page.screenshot({path:info.outputPath('feedback-only.png'),fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+test('lost feedback response keeps the draft frozen and retries the same request without duplicate history',async({page,context})=>{
+ const server=await backend(context,{lostReview:true});await page.goto('/lesson-block-review-test');await page.getByRole('button',{name:/시험 학생/}).click();await page.getByRole('textbox',{name:'멘토 피드백'}).fill('다시 확인할 조언');await page.getByRole('button',{name:'피드백만 저장',exact:true}).click();
+ await expect(page.getByRole('textbox',{name:'멘토 피드백'})).toBeDisabled();await expect(page.getByRole('button',{name:'승인하기',exact:true})).toBeDisabled();await page.getByRole('button',{name:'같은 검토 요청 다시 확인'}).click();
+ await expect(page.getByText('피드백을 저장했습니다. 승인 상태는 그대로입니다.',{exact:true})).toBeVisible();expect(server.decisions).toHaveLength(2);expect(server.decisions[1]).toEqual(server.decisions[0]);expect(server.records[initialId].history).toHaveLength(1);expect(server.receipt().state).toBe('submitted');
+});
+test('stale feedback keeps typed content and requires a current-state refresh before resaving',async({page,context})=>{
+ await backend(context,{staleReview:true});await page.goto('/lesson-block-review-test');await page.getByRole('button',{name:/시험 학생/}).click();await page.getByRole('textbox',{name:'멘토 피드백'}).fill('유지해야 할 조언');await page.getByRole('button',{name:'피드백만 저장',exact:true}).click();
+ await expect(page.getByRole('status')).toContainText('상태가 바뀌었습니다');await expect(page.getByRole('textbox',{name:'멘토 피드백'})).toHaveValue('유지해야 할 조언');await expect(page.getByRole('button',{name:'피드백만 저장',exact:true})).toBeDisabled();
+ await page.getByRole('button',{name:'제출 상태 다시 확인'}).click();await expect(page.getByRole('button',{name:'피드백만 저장',exact:true})).toBeEnabled();await page.getByRole('button',{name:'피드백만 저장',exact:true}).click();await expect(page.getByText('피드백을 저장했습니다. 승인 상태는 그대로입니다.',{exact:true})).toBeVisible();
 });

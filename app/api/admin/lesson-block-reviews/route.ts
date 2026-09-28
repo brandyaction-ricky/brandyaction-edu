@@ -58,10 +58,13 @@ export async function POST(request: Request) {
       text += decoder.decode();
     } finally { reader.releaseLock(); }
     let body; try { body = JSON.parse(text); } catch { fail('입력 형식을 확인해 주세요.'); }
-    if (!body || !['approved', 'changes_requested'].includes(body.decision) || typeof body.feedback !== 'string' || body.feedback.length > 2000 || (body.decision === 'changes_requested' && !body.feedback.trim())) fail('수정 요청에는 수정할 내용을 적어 주세요.');
-    const { data, error } = await createAdminClient().rpc('edu_decide_lesson_blocks', {
+    if (!body || !['approved', 'changes_requested', 'feedback'].includes(body.decision) || typeof body.feedback !== 'string' || body.feedback.length > 2000 || (body.decision !== 'approved' && !body.feedback.trim())) fail('피드백 또는 수정할 내용을 적어 주세요.');
+    const feedbackOnly = body.decision === 'feedback';
+    if (feedbackOnly && body.expectedFeedbackId !== null && !uuid(body.expectedFeedbackId)) fail('현재 피드백을 다시 확인해 주세요.');
+    const { data, error } = await createAdminClient().rpc(feedbackOnly ? 'edu_save_block_feedback' : 'edu_decide_lesson_blocks', {
       p_actor: user.id, p_submission: requiredId(body.submissionId), p_expected_state: requiredId(body.expectedStateId),
-      p_request: requiredId(body.requestId), p_decision: body.decision, p_feedback: body.feedback,
+      p_request: requiredId(body.requestId), p_feedback: body.feedback,
+      ...(feedbackOnly ? { p_expected_feedback: body.expectedFeedbackId } : { p_decision: body.decision }),
     });
     if (error) throw error;
     return reply(data);

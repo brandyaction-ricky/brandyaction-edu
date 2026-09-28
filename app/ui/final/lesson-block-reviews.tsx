@@ -28,7 +28,7 @@ export function LessonBlockReviews() {
   const [loaded, setLoaded] = useState<{ key: string; detail?: BlockSubmissionDetail; error?: string } | null>(null);
   const [feedback, setFeedback] = useState(''), [message, setMessage] = useState(''), [pending, setPending] = useState(false);
   const [uncertain, setUncertain] = useState(false), [stale, setStale] = useState(false);
-  const retry = useRef<{ submissionId: string; expectedStateId: string; requestId: string; decision: string; feedback: string } | null>(null);
+  const retry = useRef<{ submissionId: string; expectedStateId: string; expectedFeedbackId?: string | null; requestId: string; decision: string; feedback: string } | null>(null);
   useUnsavedWarning(Boolean(feedback) || pending || uncertain);
   useEffect(() => {
     const abort = new AbortController();
@@ -51,19 +51,24 @@ export function LessonBlockReviews() {
     setSelected(id); setFeedback(''); setMessage(''); setStale(false); retry.current = null;
   }
   async function decide(decision: string) {
-    if (!detail || pending || stale) return;
-    if (!retry.current && decision === 'changes_requested' && !feedback.trim()) { setMessage('수정할 내용을 피드백에 적어 주세요.'); return; }
-    retry.current ??= { submissionId: detail.submission.id, expectedStateId: detail.submission.stateId || detail.submission.id, requestId: crypto.randomUUID(), decision, feedback };
+    if (!detail || pending || stale || (uncertain && !retry.current)) return;
+    if (!retry.current && decision !== 'approved' && !feedback.trim()) { setMessage(decision === 'feedback' ? '저장할 피드백을 적어 주세요.' : '수정할 내용을 피드백에 적어 주세요.'); return; }
+    retry.current ??= { submissionId: detail.submission.id, expectedStateId: detail.submission.stateId || detail.submission.id,
+      ...(decision === 'feedback' ? { expectedFeedbackId: detail.submission.feedbackId || null } : {}), requestId: crypto.randomUUID(), decision, feedback };
     setPending(true); setMessage('');
     try {
       const result = await request<BlockSubmission>('', retry.current);
-      if (result.id !== retry.current.submissionId || result.stateId !== retry.current.requestId || result.state !== retry.current.decision) {
+      const feedbackOnly = retry.current.decision === 'feedback';
+      const confirmed = feedbackOnly
+        ? result.feedbackId === retry.current.requestId && result.stateId === retry.current.expectedStateId
+        : result.stateId === retry.current.requestId && result.state === retry.current.decision;
+      if (result.id !== retry.current.submissionId || !confirmed) {
         // The request may have succeeded before another action. Refresh before
         // making another decision; never report a guessed current state.
         setStale(true); setUncertain(false); setMessage('제출 상태가 다시 바뀌었습니다. 최신 결과를 확인해 주세요.');
       } else {
         setLoaded({ key: detailKey, detail: { ...detail, submission: result } });
-        setFeedback(''); setUncertain(false); setMessage('검토 결과를 저장했습니다.');
+        setFeedback(''); setUncertain(false); setMessage(feedbackOnly ? '피드백을 저장했습니다. 승인 상태는 그대로입니다.' : '검토 결과를 저장했습니다.');
         setReload(value => value + 1); setFilter(value => ({ ...value, refresh: value.refresh + 1 }));
       }
       retry.current = null;
@@ -78,7 +83,7 @@ export function LessonBlockReviews() {
   const list = queue?.key === queueKey ? queue.data : undefined;
   const locked = pending || uncertain;
   return <section aria-label="학습 본문 제출 검토" className="lb-review-panel">
-    <h2>학습 본문 제출 검토</h2><p>질문별 답변과 제출 당시 내용을 확인한 뒤 승인하거나 수정을 요청하세요.</p>
+    <h2>학습 본문 제출 검토</h2><p>제출 당시 답변을 확인하고 피드백을 남기세요. 확인 대기 중인 제출물은 승인하거나 수정을 요청할 수 있습니다.</p>
     <div className="row mb16"><label>검토 상태 <select value={filter.state} disabled={locked} onChange={event => setFilter({ state: event.target.value, page: 1, refresh: 0 })}>
       {['submitted', 'changes_requested', 'reopened', 'approved', ''].map(state => <option key={state} value={state}>{blockReviewLabels[state] || '전체'}</option>)}
     </select></label><button className="btn small" disabled={locked} onClick={() => setFilter(value => ({ ...value, refresh: value.refresh + 1 }))}>목록 새로고침</button></div>
@@ -99,11 +104,13 @@ export function LessonBlockReviews() {
         {detail.isLatest === false && <p className="notice">이후에 다시 제출한 답변이 있습니다. 현재 기록은 읽기만 가능합니다.</p>}
         <LessonBlockView document={detail.document} values={detail.values} submissionId={detail.submission.id} onChange={() => {}} readOnly />
         <BlockReviewHistory detail={detail} />
-        {detail.isLatest !== false && blockSubmissionState(detail.submission) === 'submitted' && <div className="mt24">
+        {detail.isLatest !== false && <div className="mt24">
           <label htmlFor="block-mentor-feedback">멘토 피드백 (수정 요청 시 필수)</label>
           <textarea id="block-mentor-feedback" className="input" maxLength={2000} value={feedback} disabled={locked || stale} onChange={event => setFeedback(event.target.value)} rows={4} />
-          <div className="row mt16"><button className="btn primary" disabled={locked || stale} onClick={() => void decide('approved')}>승인하기</button>
-            <button className="btn" disabled={locked || stale} onClick={() => void decide('changes_requested')}>수정 요청하기</button></div>
+          <p className="sub">피드백만 저장하면 승인 상태와 학습 진도는 바뀌지 않습니다. 이전 피드백은 검토 이력에 남습니다.</p>
+          <div className="row mt16"><button className="btn" disabled={locked || stale || !feedback.trim()} onClick={() => void decide('feedback')}>피드백만 저장</button>
+            {blockSubmissionState(detail.submission) === 'submitted' && <><button className="btn primary" disabled={locked || stale} onClick={() => void decide('approved')}>승인하기</button>
+            <button className="btn" disabled={locked || stale} onClick={() => void decide('changes_requested')}>수정 요청하기</button></>}</div>
         </div>}
         {!!detail.previousSubmissions?.length && <details className="mt24"><summary>같은 학습의 다른 제출 기록</summary>
           {detail.previousSubmissions.map(item => <p key={item.id}><button type="button" className="btn small" disabled={locked} onClick={() => choose(item.id)}>

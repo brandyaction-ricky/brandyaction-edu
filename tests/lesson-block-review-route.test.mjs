@@ -30,3 +30,9 @@ test('conflicts never return guessed success or raw database errors',async()=>{
  const stale=harness({error:{message:'BLOCK_REVIEW_CHANGED'}});assert.equal((await stale.post(stale.body)).status,409);
  const unknown=harness({error:{message:'private answer and credential'}});const res=await unknown.get();assert.equal(res.status,503);assert.doesNotMatch(await res.text(),/private answer and credential/);
 });
+test('feedback-only API uses its own RPC and validates the feedback version while preserving server actor ownership',async()=>{
+ const h=harness();const body={...h.body,decision:'feedback',feedback:'조언',expectedFeedbackId:null};assert.equal((await h.post(body)).status,200);
+ assert.equal(h.calls[0].name,'edu_save_block_feedback');assert.equal(h.calls[0].args.p_expected_feedback,null);assert.equal(h.calls[0].args.p_actor,id);assert.equal(h.calls[0].args.p_decision,undefined);
+ for(const value of ['bad',undefined])assert.equal((await h.post({...body,expectedFeedbackId:value})).status,400);
+ assert.equal((await h.post({...body,feedback:' '})).status,400);assert.equal(h.calls.length,1);
+});
