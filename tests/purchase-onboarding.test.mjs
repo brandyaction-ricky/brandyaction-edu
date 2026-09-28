@@ -7,7 +7,7 @@ const source = fs.readFileSync(new URL('../lib/purchase-onboarding.ts', import.m
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const exports = {};
 new Function('exports', compiled)(exports);
-const { purchaseOnboardingSettings, surveyRoom, telegramPath, telegramInviteUrl } = exports;
+const { purchaseOnboardingSettings, surveyRoom, telegramPath, telegramInviteUrl, isMoonshotFourth, TELEGRAM_IOS_INSTALL_URL, TELEGRAM_ANDROID_INSTALL_URL } = exports;
 
 test('Telegram link is withheld until a valid link is configured and the guide is enabled', () => {
   const draft = purchaseOnboardingSettings({ roomName: 'AI Moonshot project #4기', enabled: false });
@@ -28,4 +28,13 @@ test('survey and path values stay in their fixed allowlists', () => {
   assert.equal(telegramPath('new'), 'new');
   assert.equal(telegramPath('external'), null);
   assert.throws(() => purchaseOnboardingSettings({ roomName: 'room', paidImage: 'https://example.com/photo.png', enabled: false }), /프로필 이미지/);
+});
+
+test('only Moonshot fourth cohort uses the direct Telegram guidance', () => {
+  assert.equal(isMoonshotFourth('문샷 챌린지', '4기'), true);
+  assert.equal(isMoonshotFourth('문샷 챌린지', '3기'), false);
+  assert.equal(isMoonshotFourth('문샷 챌린지', '14기'), false);
+  assert.equal(isMoonshotFourth('다른 클래스', '4기'), false);
+  assert.equal(TELEGRAM_IOS_INSTALL_URL, 'https://telegram.org/dl/ios');
+  assert.equal(TELEGRAM_ANDROID_INSTALL_URL, 'https://telegram.org/dl/android');
 });
