@@ -7,7 +7,7 @@ const ruleExports = {};
 const compiledRules = ts.transpileModule(fs.readFileSync(new URL('../lib/platform-rules.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 new Function('exports', compiledRules)(ruleExports);
 
-function harness(fixtures = {}) {
+function harness(fixtures = {}, waitForRead = () => {}) {
   const calls = [];
   const db = {
     from(table) {
@@ -21,7 +21,7 @@ function harness(fixtures = {}) {
         limit() { return this; },
         then(resolve) {
           const data = (fixtures[table] || []).filter(row => call.filters.every(([key, value]) => Array.isArray(value) ? value.includes(row[key]) : row[key] === value));
-          return Promise.resolve({ data, error: null }).then(resolve);
+          return Promise.resolve(waitForRead(table)).then(() => ({ data, error: null })).then(resolve);
         },
       };
       return query;
@@ -47,6 +47,34 @@ test('profile has no data prefetch and dashboard omits orders and review bodies'
   await dashboard.read('owner', 'dashboard');
   assert.deepEqual(dashboard.calls.map(call => call.table), ['enrollments', 'edu_questions', 'customer_coupons']);
   assert.ok(dashboard.calls.every(call => call.filters.some(([key, value]) => key === 'user_id' && value === 'owner')));
+});
+
+test('dashboard starts independent owner-scoped reads before any one finishes', async () => {
+  let release;
+  const blocked = new Promise(resolve => { release = resolve; });
+  const member = harness({}, () => blocked);
+  const read = member.read('owner', 'dashboard');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(member.calls.map(call => call.table), ['enrollments', 'edu_questions', 'customer_coupons']);
+  release();
+  assert.deepEqual(await read, { enrollments: [], edu_questions: [], customer_coupons: [] });
+});
+
+test('enrolled dashboard starts independent curriculum and progress reads together', async () => {
+  let release;
+  const blocked = new Promise(resolve => { release = resolve; });
+  const enrollment = { id: 'owned', user_id: 'owner', course_id: 'course', cohort_id: 'cohort', status: 'active', access_starts_at: new Date(Date.now() - 86400000).toISOString() };
+  const member = harness({ enrollments: [enrollment] }, table => ['courses', 'cohorts', 'curriculum_weeks', 'lesson_progress', 'mission_submissions', 'cohort_sessions'].includes(table) ? blocked : undefined);
+  const read = member.read('owner', 'dashboard');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(member.calls.map(call => call.table), [
+    'enrollments', 'edu_questions', 'customer_coupons',
+    'courses', 'cohorts', 'curriculum_weeks', 'lesson_progress', 'mission_submissions', 'cohort_sessions',
+  ]);
+  release();
+  const result = await read;
+  assert.equal(result.enrollments[0].id, 'owned');
+  assert.deepEqual(result.lesson_progress, []);
 });
 
 test('learning requires a current owner enrollment before requesting content', async () => {
