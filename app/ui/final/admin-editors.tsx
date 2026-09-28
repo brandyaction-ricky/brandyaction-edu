@@ -27,6 +27,7 @@ import { ProductDetailHtml } from "./product-detail-html";
 import { DigitalContentManager } from "./digital-content-manager";
 import { ProductCurriculumWorkspace } from "./product-curriculum-workspace";
 import { ProductCohortWorkspace } from "./product-cohort-workspace";
+import { LessonBodyEditor } from "./lesson-body-editor";
 import { AdminButton, AdminInlineError, AdminInput, AdminSelect, AdminTextarea, PageHeader, PageSection } from "@/features/admin-ui";
 
 function fieldValue(s: Section, row: Row | undefined, f: Field) {
@@ -37,6 +38,10 @@ function fieldValue(s: Section, row: Row | undefined, f: Field) {
           f.key === "thumbnail_url" ? "thumbnailUrl" : "detailImageUrl"
         ]
     : row?.[f.key];
+}
+function LessonBodyField({ value: initial, disabled }: { value: string; disabled: boolean }) {
+  const [value, setValue] = useState(initial);
+  return <LessonBodyEditor id="edit-body_text" name="body_text" label="학습 본문" showLabel={false} value={value} onChange={setValue} disabled={disabled} />;
 }
 export function FieldControl({
   section,
@@ -53,6 +58,7 @@ export function FieldControl({
 }) {
   const value = fieldValue(section, row, f),
     props = { name: f.key, id: "edit-" + f.key, required: f.required, maxLength: f.maxLength };
+  if (section.table === "lesson_contents" && f.key === "body_text") return <LessonBodyField key={row?.id || "new"} value={String(value || "")} disabled={pending} />;
   if (f.type === "blocks") return <BlocksField name={f.key} value={value} />;
   if (["image", "resource"].includes(f.type || ""))
     return (
