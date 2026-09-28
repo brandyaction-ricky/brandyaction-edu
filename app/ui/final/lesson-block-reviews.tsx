@@ -9,7 +9,7 @@ import { BlockReviewHistory } from './lesson-block-submission-history';
 import { OngoingLessonReviews } from './ongoing-lesson-reviews';
 import { SubmissionReview } from './submission-review';
 
-type QueueRow = { id: string; memberName: string; courseTitle: string; lessonTitle: string; submission: BlockSubmission };
+type QueueRow = { id: string; memberName: string; memberEmail?: string; courseTitle: string; lessonTitle: string; track?: string; dayNumber?: number | null; submission: BlockSubmission };
 type Queue = { rows: QueueRow[]; total: number; page: number; pageSize: number };
 async function request<T>(query = '', body?: unknown, signal?: AbortSignal): Promise<T> {
   const response = await fetch('/api/admin/lesson-block-reviews' + query, { method: body ? 'POST' : 'GET', cache: 'no-store', signal,
@@ -19,7 +19,9 @@ async function request<T>(query = '', body?: unknown, signal?: AbortSignal): Pro
   return result;
 }
 export function LessonBlockReviews() {
-  const [filter, setFilter] = useState({ state: 'submitted', page: 1, refresh: 0 });
+  const routeParams = useSearchParams();
+  const [filter, setFilter] = useState({ state: routeParams.get('member') ? '' : 'submitted', page: 1, refresh: 0, search: '', track: '', day: '', sort: 'latest', member: routeParams.get('member') || '' });
+  const [search, setSearch] = useState('');
   const [queue, setQueue] = useState<{ key: string; data?: Queue; error?: string } | null>(null);
   const queueKey = JSON.stringify(filter);
   const [selected, setSelected] = useState('');
@@ -32,7 +34,7 @@ export function LessonBlockReviews() {
   useUnsavedWarning(Boolean(feedback) || pending || uncertain);
   useEffect(() => {
     const abort = new AbortController();
-    void request<Queue>(`?${new URLSearchParams({ state: filter.state, page: String(filter.page) })}`, undefined, abort.signal)
+    void request<Queue>(`?${new URLSearchParams({ state: filter.state, page: String(filter.page), search: filter.search, track: filter.track, day: filter.day, sort: filter.sort, member: filter.member })}`, undefined, abort.signal)
       .then(data => { if (!abort.signal.aborted) setQueue({ key: queueKey, data }); })
       .catch(error => { if (!abort.signal.aborted) setQueue({ key: queueKey, error: error.message }); });
     return () => abort.abort();
@@ -84,14 +86,23 @@ export function LessonBlockReviews() {
   const locked = pending || uncertain;
   return <section aria-label="학습 본문 제출 검토" className="lb-review-panel">
     <h2>학습 본문 제출 검토</h2><p>제출 당시 답변을 확인하고 피드백을 남기세요. 확인 대기 중인 제출물은 승인하거나 수정을 요청할 수 있습니다.</p>
-    <div className="row mb16"><label>검토 상태 <select value={filter.state} disabled={locked} onChange={event => setFilter({ state: event.target.value, page: 1, refresh: 0 })}>
-      {['submitted', 'changes_requested', 'reopened', 'approved', ''].map(state => <option key={state} value={state}>{blockReviewLabels[state] || '전체'}</option>)}
-    </select></label><button className="btn small" disabled={locked} onClick={() => setFilter(value => ({ ...value, refresh: value.refresh + 1 }))}>목록 새로고침</button></div>
+    <form className="row mb16" onSubmit={event => { event.preventDefault(); setFilter(value => ({ ...value, search: search.trim(), page: 1 })); }}>
+      <label>회원 검색 <input className="input" value={search} maxLength={100} disabled={locked} onChange={event => setSearch(event.target.value)} placeholder="이름 · 이메일 · 전화번호 · 회원 ID"/></label>
+      <button className="btn small" disabled={locked}>검색</button>
+    </form>
+    {filter.member && <p className="mb16">선택한 회원의 제출물만 표시합니다. <button className="btn small" disabled={locked} onClick={() => setFilter(value => ({ ...value, member: '', page: 1 }))}>회원 제한 해제</button></p>}
+    <div className="row mb16"><label>검토 상태 <select value={filter.state} disabled={locked} onChange={event => setFilter(value => ({ ...value, state: event.target.value, page: 1 }))}>
+      {['submitted', 'changes_requested', 'reopened', 'approved', 'completed', ''].map(state => <option key={state} value={state}>{blockReviewLabels[state] || '전체'}</option>)}
+    </select></label>
+      <label>학습 종류 <select value={filter.track} disabled={locked} onChange={event => setFilter(value => ({ ...value, track: event.target.value, page: 1 }))}><option value="">전체</option><option value="daily">데일리 미션</option><option value="learning">학습 &amp; 시험</option><option value="other">일반 학습</option></select></label>
+      <label>일차 <select value={filter.day} disabled={locked} onChange={event => setFilter(value => ({ ...value, day: event.target.value, page: 1 }))}><option value="">전체</option>{Array.from({ length: 31 }, (_, day) => <option key={day} value={String(day)}>DAY {day}</option>)}</select></label>
+      <label>정렬 <select value={filter.sort} disabled={locked} onChange={event => setFilter(value => ({ ...value, sort: event.target.value, page: 1 }))}><option value="latest">최신순</option><option value="oldest">오래된 순</option><option value="day_asc">일차 낮은 순</option><option value="day_desc">일차 높은 순</option></select></label>
+      <button className="btn small" disabled={locked} onClick={() => setFilter(value => ({ ...value, refresh: value.refresh + 1 }))}>목록 새로고침</button></div>
     {queue?.key === queueKey && queue.error ? <p role="alert">{queue.error}</p> : !list ? <p role="status">제출 목록을 불러오고 있습니다.</p> : <>
       <p>{list.total}건 · {list.page}페이지</p>
-      {!list.rows.length && <p>이 상태의 제출물이 없습니다.</p>}
+      {!list.rows.length && <p>조건에 맞는 제출물이 없습니다.</p>}
       <div className="lb-review-queue">{list.rows.map(row => <button className="btn" type="button" disabled={locked} aria-pressed={selected === row.id} key={row.id} onClick={() => choose(row.id)}>
-        {row.memberName || '회원'} · {row.courseTitle} · {row.lessonTitle} · {blockReviewLabels[blockSubmissionState(row.submission)]}
+        {row.memberName || '회원'}{row.memberEmail ? ` (${row.memberEmail})` : ''} · {row.courseTitle} · {row.track === 'daily' ? '데일리 미션 · ' : row.track === 'learning' ? '학습 & 시험 · ' : ''}{row.dayNumber != null ? `DAY ${row.dayNumber} · ` : ''}{row.lessonTitle} · {blockReviewLabels[blockSubmissionState(row.submission)]}
       </button>)}</div>
       <div className="row mt16"><button className="btn small" disabled={locked || list.page <= 1} onClick={() => setFilter(value => ({ ...value, page: value.page - 1 }))}>이전 페이지</button>
         <button className="btn small" disabled={locked || list.page * list.pageSize >= list.total} onClick={() => setFilter(value => ({ ...value, page: value.page + 1 }))}>다음 페이지</button></div>

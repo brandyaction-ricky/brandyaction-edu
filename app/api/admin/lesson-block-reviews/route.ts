@@ -35,8 +35,12 @@ export async function GET(request: Request) {
       return reply({ ...data, document: publicLessonBlocks(validateLessonBlocks(data.document)) });
     }
     const page = Number(params.get('page') || 1), state = params.get('state') ?? 'submitted';
-    if (!Number.isInteger(page) || page < 1 || page > 100000 || !['', 'submitted', 'approved', 'changes_requested', 'reopened'].includes(state)) fail('목록 조건을 확인해 주세요.');
-    const { data, error } = await db.rpc('edu_list_block_submissions', { p_actor: user.id, p_state: state, p_page: page });
+    const query = (params.get('search') || '').trim(), track = params.get('track') || '', sort = params.get('sort') || 'latest';
+    const day = params.get('day') ? Number(params.get('day')) : null, member = params.get('member') || null;
+    if (!Number.isInteger(page) || page < 1 || page > 100000 || !['', 'submitted', 'approved', 'changes_requested', 'reopened', 'completed'].includes(state) ||
+      query.length > 100 || !['', 'daily', 'learning', 'other'].includes(track) || !['latest', 'oldest', 'day_asc', 'day_desc'].includes(sort) ||
+      (day !== null && (!Number.isInteger(day) || day < 0 || day > 30)) || (member !== null && !uuid(member))) fail('목록 조건을 확인해 주세요.');
+    const { data, error } = await db.rpc('edu_search_block_submissions', { p_actor: user.id, p_state: state, p_page: page, p_query: query, p_track: track, p_day: day, p_sort: sort, p_member: member });
     if (error) throw error;
     return reply(data);
   } catch (error) { return failure(error); }

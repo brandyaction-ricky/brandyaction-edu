@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
 import { AdminTabs, AdminButton, AdminLinkButton, AdminLoadingState, AdminInlineError, AdminEmptyState, AdminPagination, AdminStatusBadge } from '@/features/admin-ui';
 import { labels, object, text as t, type Row } from '@/lib/platform';
+import { AdminLearningProgress } from './admin-learning-progress';
 
 const recordDate = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul' });
 function timeLabel(value: unknown) {
@@ -24,14 +25,14 @@ export function enrollmentLabel(row: Row, now = Date.now()) {
   return '수강 가능';
 }
 
-export function CustomerWorkspace({ member, tab, onTabChange, children }: { member: Row; tab: string; onTabChange: (value: string) => void; children: ReactNode }) {
+export function CustomerWorkspace({ member, tab, onTabChange, children, blockLearningEnabled = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' }: { member: Row; tab: string; onTabChange: (value: string) => void; children: ReactNode; blockLearningEnabled?: boolean }) {
   return <div className="customer-workspace">
     <div className="drawer-profile"><span className="avatar red" aria-hidden="true">{(t(member, 'full_name') || '회').slice(0, 1)}</span><div><h2>{t(member, 'full_name') || '이름 미등록'}</h2><p>{t(member, 'email')}</p><small>회원 ID · {member.id}</small></div></div>
-    <AdminTabs label="회원 운영 정보" items={tabs} value={tab} onChange={onTabChange}>{value => value === 'profile' ? children : value === 'history' ? <div className="notice"><h3>확인할 수 있는 기록</h3><p>제출물 탭에서 제출 회차·검토 시각·저장된 피드백을, 질문 탭에서 질문과 답변 상태를 확인할 수 있습니다.</p><p className="mt8">권한 변경 사유·검토 체크 결과·알림 발송 이력은 아직 통합 기록되지 않습니다. 아래 기록을 전체 감사 로그로 간주하지 마세요.</p><AdminButton size="sm" className="mt16" onClick={() => onTabChange('submissions')}>검토 기록 보기</AdminButton></div> : tab === value ? <MemberRecords key={`${member.id}-${value}`} member={member.id} email={t(member, 'email')} view={value}/> : null}</AdminTabs>
+    <AdminTabs label="회원 운영 정보" items={tabs} value={tab} onChange={onTabChange}>{value => value === 'profile' ? children : value === 'history' ? <div className="notice"><h3>확인할 수 있는 기록</h3><p>제출물 탭에서 제출 회차·검토 시각·저장된 피드백을, 질문 탭에서 질문과 답변 상태를 확인할 수 있습니다.</p><p className="mt8">권한 변경 사유·검토 체크 결과·알림 발송 이력은 아직 통합 기록되지 않습니다. 아래 기록을 전체 감사 로그로 간주하지 마세요.</p><AdminButton size="sm" className="mt16" onClick={() => onTabChange('submissions')}>검토 기록 보기</AdminButton></div> : tab === value ? <MemberRecords key={`${member.id}-${value}`} member={member.id} email={t(member, 'email')} view={value} blockLearningEnabled={blockLearningEnabled}/> : null}</AdminTabs>
   </div>;
 }
 
-function MemberRecords({ member, email, view }: { member: string; email: string; view: string }) {
+function MemberRecords({ member, email, view, blockLearningEnabled }: { member: string; email: string; view: string; blockLearningEnabled: boolean }) {
   const [page, setPage] = useState(1), [retry, setRetry] = useState(0);
   const [state, setState] = useState<{ key: string; rows: Row[]; total: number; error?: string } | null>(null);
   const key = `${member}:${view}:${page}:${retry}`;
@@ -51,7 +52,7 @@ function MemberRecords({ member, email, view }: { member: string; email: string;
   const listUrl = view === 'questions' ? `/admin/questions?member=${member}` : view === 'submissions' ? `/admin/reviews?member=${member}` : '';
   return <div className="member-records">
     <div className="spread wrap-flex"><p className="meta">총 {state.total}건 · {page}페이지 · 최근 기록 순</p>{listUrl && <AdminLinkButton size="sm" href={listUrl}>회원의 {view === 'questions' ? '질문함' : '제출물'} 열기</AdminLinkButton>}</div>
-    {view === 'progress' && <p className="notice mt16">실제 저장된 학습 기록입니다. 기록이 없는 학습은 이 목록에 표시되지 않으며, 전체 학습 진도율과는 다릅니다.</p>}
+    {view === 'progress' && <>{blockLearningEnabled && <AdminLearningProgress key={member} member={member}/>}<p className="notice mt16">아래는 실제 저장된 개별 학습 기록입니다. 기록이 없는 학습은 이 목록에 표시되지 않습니다.</p></>}
     {!state.rows.length && <AdminEmptyState title={view === 'enrollments' ? '등록된 수강권이 없습니다.' : '아직 저장된 기록이 없습니다.'}>다른 탭에서 수강권과 회원 상태를 확인해 주세요.</AdminEmptyState>}
     {state.rows.map(row => {
       const enrollment = view === 'enrollments' ? row : related(row, 'enrollments');

@@ -19,6 +19,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { SubmissionReviewWorkspace } from "./final/lesson-block-reviews";
 import { LessonProgressionSettings } from './final/lesson-progression-settings';
+import { AdminLearningProgress } from './final/admin-learning-progress';
 import { timeLabel, type Data, type WorkflowSend } from "./learning-workflows";
 import { EnrollmentGrant, RefundAction } from "./operations-actions";
 import {
@@ -1090,6 +1091,7 @@ function QuizEditor({
 }
 function Participants() {
   const routeParams = useSearchParams();
+  const [progressOpen, setProgressOpen] = useState(false);
   const [cohort, setCohort] = useState(routeParams.get('cohort') || "");
   const [search, setSearch] = useState(routeParams.get('search') || "");
   const [level, setLevel] = useState("");
@@ -1204,6 +1206,10 @@ function Participants() {
   const closeMember = () => setSelectedMemberId("");
   return (
     <>
+      {process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' && <>
+        <AdminButton className="mb16" aria-expanded={progressOpen} onClick={() => setProgressOpen(value => !value)}>과정별 진도 {progressOpen ? '접기' : '보기'}</AdminButton>
+        {progressOpen && <AdminLearningProgress key={cohortId} cohort={cohortId}/>}
+      </>}
       <AdminFilterBar className="admin-pilot-filter admin-pilot-member-filter"
         filters={<><AdminSelect label="조회 기수" labelHidden
           value={cohortId}

@@ -36,3 +36,9 @@ test('feedback-only API uses its own RPC and validates the feedback version whil
  for(const value of ['bad',undefined])assert.equal((await h.post({...body,expectedFeedbackId:value})).status,400);
  assert.equal((await h.post({...body,feedback:' '})).status,400);assert.equal(h.calls.length,1);
 });
+test('queue search validates filters and passes the authenticated actor with member, track, day and sort',async()=>{
+ const h=harness();assert.equal((await h.get('?search=member&track=learning&day=1&sort=day_desc&state=completed&page=2&member='+id)).status,200);
+ assert.deepEqual(h.calls[0],{name:'edu_search_block_submissions',args:{p_actor:id,p_state:'completed',p_page:2,p_query:'member',p_track:'learning',p_day:1,p_sort:'day_desc',p_member:id}});
+ for(const query of ['?search='+ 'a'.repeat(101),'?track=fake','?day=-1','?day=1.5','?day=31','?sort=fake','?member=not-uuid'])assert.equal((await h.get(query)).status,400);
+ assert.equal(h.calls.length,1);
+});

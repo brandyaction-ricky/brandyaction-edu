@@ -45,6 +45,16 @@ const mission = { id: 'mission', lesson_id: 'lesson', title: '실행 미션', in
 const submission = { id: 'submission', enrollment_id: 'enrollment', mission_id: 'mission', status: 'submitted', attempt_number: 1, submitted_at: '2026-09-01T00:00:00Z', response: { text: '<script>unsafe()</script>', url: 'javascript:alert(1)' } };
 const data = { courses: [course], cohorts: [cohort], enrollments: [enrollment], profiles: [user], curriculum_weeks: [{ id: 'week', course_id: 'course', week_number: 1, title: '시작하기', is_published: true }], curriculum_lessons: [lesson], curriculum_missions: [mission], mission_submissions: [submission], lesson_contents: [{ lesson_id: 'lesson', body_text: '등록된 학습 본문', resource_path: 'private/test.pdf', resource_name: '학습 자료.pdf' }], articles: [{ id: 'article', slug: 'test-article', title: '테스트 아티클', content_type: 'text', status: 'published', body: [{ type: 'paragraph', text: '콘텐츠' }] }], review_videos: [{ id: 'story', title: '등록된 고객 이야기', reviewer_name: '고객' }], orders: [], admin_summary: [{ id: 'summary', members: 1, activeEnrollments: 1, pendingReviews: 1, openQuestions: 0 }] };
 const send = async () => { throw Error('Unexpected write during render'); };
+test('member operations expose track progress on demand only when the learning feature is enabled', () => {
+  const { AdminWorkflows } = load('app/ui/admin-workflows.tsx');
+  const previous = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED;
+  try {
+    process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED = 'true';
+    assert.match(html(AdminWorkflows, { section: 'members', data, pending: false, send }), /과정별 진도 보기/);
+    process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED = 'false';
+    assert.doesNotMatch(html(AdminWorkflows, { section: 'members', data, pending: false, send }), /과정별 진도 보기/);
+  } finally { if (previous === undefined) delete process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED; else process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED = previous; }
+});
 
 test('lesson text activates named and bare links while preserving existing copy', () => {
   const { LessonText } = load('app/ui/final/lesson-text.tsx');
