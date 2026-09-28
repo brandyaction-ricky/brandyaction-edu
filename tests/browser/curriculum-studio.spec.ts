@@ -6,9 +6,9 @@ test('compact outline supports contextual creation, preview and protects unsaved
  const week=page.getByRole('region',{name:'1주차 기존 합성 주차'});
  await week.getByRole('button',{name:'학습 편집',exact:true}).nth(0).click();await page.getByRole('textbox',{name:'학습 본문'}).fill('수정 중 본문');
  await page.getByRole('button',{name:'학습 내용 미리보기',exact:true}).click();await expect(page.getByRole('region',{name:'학습 내용 미리보기'})).toContainText('수정 중 본문');
- page.once('dialog',d=>d.dismiss());await week.getByRole('button',{name:'학습 편집',exact:true}).nth(1).click();await expect(page.getByRole('textbox',{name:'학습 본문'})).toHaveValue('수정 중 본문');
+ page.once('dialog',d=>d.dismiss());await week.getByRole('button',{name:'학습 편집',exact:true}).nth(1).click();await expect(page.getByRole('textbox',{name:'학습 본문'})).toHaveText('수정 중 본문');
  page.once('dialog',d=>{expect(d.message()).toContain('저장하지 않은');return d.dismiss();});await page.getByRole('button',{name:'목록으로',exact:true}).click();
- await expect(page.getByRole('textbox',{name:'학습 본문'})).toHaveValue('수정 중 본문');
+ await expect(page.getByRole('textbox',{name:'학습 본문'})).toHaveText('수정 중 본문');
  await week.getByRole('button',{name:'＋ 학습 추가'}).click();await expect(week.getByRole('textbox',{name:'새 일차 제목'})).toBeVisible();
  await expect(page.getByLabel('합성 저장 횟수')).toHaveText('0');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });

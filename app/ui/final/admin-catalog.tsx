@@ -1,4 +1,5 @@
 "use client";
+import { lessonBodyPlainText } from "@/lib/lesson-body";
 import {
   date,
   labels,
@@ -567,7 +568,7 @@ export function AdminCatalog({
       { label: "자료", value: (r) => t(r, "resource_name") || "미등록" },
       {
         label: "본문",
-        value: (r) => <p className="table-excerpt">{t(r, "body_text")}</p>,
+        value: (r) => <p className="table-excerpt">{lessonBodyPlainText(t(r, "body_text"))}</p>,
       },
     ],
   };

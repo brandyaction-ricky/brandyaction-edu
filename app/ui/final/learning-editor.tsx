@@ -10,6 +10,8 @@ import { AdminHeading } from "./admin-shell";
 import { AdminButton, AdminEmptyState, AdminFormField, AdminLinkButton, AdminStatusBadge } from "@/features/admin-ui";
 import { Badge, Video } from "./primitives";
 import { LessonText } from "./lesson-text";
+import { LessonBodyEditor } from "./lesson-body-editor";
+import { lessonBodyHasText } from "@/lib/lesson-body";
 
 type Props = { data: Data; row?: Row; pending: boolean; send: WorkflowSend; back: () => void };
 type ContentType = "text" | "vod" | "material" | "link";
@@ -119,7 +121,7 @@ export function LearningEditor({ data, row, pending, send, back }: Props) {
       requestAnimationFrame(() => form.reportValidity());
       return;
     }
-    const selectedValue = { text: bodyText, vod: videoUrl, material: resourcePath, link: externalUrl }[format].trim();
+    const selectedValue = { text: lessonBodyHasText(bodyText) ? bodyText : "", vod: videoUrl, material: resourcePath, link: externalUrl }[format].trim();
     if (contentExists && !selectedValue) {
       setPreviewOnly(false);
       setMessage("선택한 콘텐츠 유형에 맞는 본문·영상·자료·링크를 입력해 주세요.");
@@ -177,7 +179,7 @@ export function LearningEditor({ data, row, pending, send, back }: Props) {
             <Field label="도입 · 학습 안내"><textarea rows={3} value={basic.description} onChange={event => changeBasic("description", event.target.value)} /></Field>
             <div className="learning-content-tabs" role="tablist" aria-label="학습 콘텐츠 유형">{formats.map(item => <button className={format === item.key ? "active" : ""} type="button" role="tab" aria-selected={format === item.key} aria-controls={`lesson-content-${item.key}`} key={item.key} onClick={() => changeFormat(item.key)}><item.icon size={15} />{item.label}</button>)}</div>
             <div id={`lesson-content-${format}`} role="tabpanel" aria-label={formats.find(item => item.key === format)?.label}>
-              {format === "text" && <Field label="학습 내용" hint="줄바꿈이 유지됩니다. 링크는 [보여줄 글자](https://주소) 또는 https://주소로 입력하세요."><textarea rows={14} value={bodyText} required={contentExists} onChange={event => { setBodyText(event.target.value); setDirty(true); }} placeholder="학습할 내용을 작성해 주세요." /></Field>}
+              {format === "text" && <LessonBodyEditor value={bodyText} disabled={busy} onChange={value => { setBodyText(value); setDirty(true); }} />}
               {format === "vod" && <Field label="영상 URL" hint="공유할 YouTube·Vimeo 또는 동영상 주소를 입력해 주세요."><input type="url" value={videoUrl} required={contentExists} onChange={event => { setVideoUrl(event.target.value); setDirty(true); }} placeholder="https://" /></Field>}
               {format === "material" && <><Field label="자료 이름"><input value={resourceName} onChange={event => { setResourceName(event.target.value); setDirty(true); }} placeholder="다운로드 목록에 표시할 이름" /></Field><div className="upload-box learning-material-upload"><Download aria-hidden="true" /><p>PDF · 문서 · 템플릿 자료 추가</p><UploadField name="learning_resource" value={resourcePath} image={false} disabled={busy} onChange={value => { setResourcePath(value); setDirty(true); }} onStatusChange={setUploadStatus} /><p className="meta">등록한 파일은 수강 권한이 있는 회원에게 제공됩니다.</p></div></>}
               {format === "link" && <Field label="외부 학습 링크"><input type="url" value={externalUrl} required={contentExists} onChange={event => { setExternalUrl(event.target.value); setDirty(true); }} placeholder="https://" /></Field>}

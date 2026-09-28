@@ -553,3 +553,34 @@ test('landing report separates repeated clicks, missing actuals, direct traffic 
   assert.doesNotMatch(markup, /987,654|위너 후보<\/span>|링크클릭 대비 세션 갭이 기준/);
   assert.match(markup, /카카오 누적 입장<\/span><strong>—/);
 });
+
+test('rich lesson format is versioned, preserves legacy whitespace and normalizes empty content', () => {
+  const body = load('lib/lesson-body.ts');
+  const legacy = '첫 줄\n\n1. [링크](https://example.test/guide)\n2. 다음 줄';
+  assert.equal(body.parseLessonDocument(legacy), null);
+  const doc = body.lessonDocumentForEditor(legacy);
+  assert.equal(doc.content.length, 4);
+  assert.equal(doc.content[1].content.length, 0);
+  assert.equal(doc.content[2].content[1].marks[0].attrs.href, 'https://example.test/guide');
+  const saved = body.serializeLessonDocument(doc);
+  assert.deepEqual(body.parseLessonDocument(saved), doc);
+  assert.equal(body.serializeLessonDocument({ type: 'doc', content: [{type:'paragraph'}] }), '');
+  assert.equal(body.lessonBodyHasText(saved), true);
+  assert.equal(body.lessonBodyHasText(body.LESSON_BODY_PREFIX + JSON.stringify({type:'doc',content:[{type:'paragraph'}]})), false);
+});
+
+test('rich lesson renderer allows headings and safe marks but rejects scripts, arbitrary CSS and unsafe links', () => {
+  const { LessonText } = load('app/ui/final/lesson-text.tsx');
+  const { LESSON_BODY_PREFIX } = load('lib/lesson-body.ts');
+  const text = LESSON_BODY_PREFIX + JSON.stringify({type:'doc',content:[
+    {type:'heading',attrs:{level:2,onclick:'unsafe()'},content:[{type:'text',text:'큰 제목'}]},
+    {type:'heading',attrs:{level:3},content:[{type:'text',text:'작은 제목'}]},
+    {type:'paragraph',content:[{type:'text',text:'<script>evil()</script>',marks:[{type:'bold'},{type:'textStyle',attrs:{fontSize:'20px',color:'red',background:'url(evil)'}},{type:'link',attrs:{href:'javascript:alert(1)'}}]}]},
+    {type:'paragraph',content:[{type:'text',text:'bad size',marks:[{type:'textStyle',attrs:{fontSize:'9999px'}}]}]},
+    {type:'image',attrs:{src:'x',onerror:'bad()'}},
+  ]});
+  const markup = html(LessonText, {text});
+  assert.match(markup, /<h2>큰 제목<\/h2>/); assert.match(markup, /<h3>작은 제목<\/h3>/);
+  assert.match(markup, /font-size:20px/); assert.match(markup, /<strong>&lt;script&gt;/);
+  assert.doesNotMatch(markup, /<script|<img|<a |onclick|onerror|9999px|color:red|url\(evil/);
+});
