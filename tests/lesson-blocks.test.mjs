@@ -26,6 +26,7 @@ test('template values are literal, one-pass substitutions with Unicode/whitespac
   const fields = [field('brand'), field('goal'), { ...field('name'), variable: '나의 이름' }];
   assert.equal(fillBlockPrompt('{brand} {{ goal }} {{나의이름}} {missing}', fields, { brand: '$& {goal}', goal: '첫 목표', name: '홍길동' }), '$& {goal} 첫 목표 홍길동 {missing}');
   assert.equal(fillBlockPrompt('{brand}', fields, { brand: '' }), '{brand}');
+  assert.equal(fillBlockPrompt('{constructor}', [field('constructor')], {}), '{constructor}');
 });
 test('draft is bound to block and quiz identifiers; blank text can be saved before submission', () => {
   const answers = { blocks: { q1: '', generator: { brand: '브랜디', goal: '' }, quiz1: { q1: 1 }, quiz2: { q1: 0 } }, checklist: ['c1'] };
@@ -50,6 +51,9 @@ for (const [name, change] of [
   ['unsafe media', d => d.blocks[0] = { id: 'image', type: 'image', url: 'javascript:alert(1)' }],
   ['credential-bearing media', d => d.blocks[0] = { id: 'video', type: 'video', url: 'https://user:password@example.test/v' }],
   ['prototype key', d => d.blocks[0].id = '__proto__'],
+  ['inherited block key', d => d.blocks[0].id = 'constructor'],
+  ['inherited field key', d => d.blocks[2].fields[0].id = 'toString'],
+  ['inherited quiz key', d => d.blocks[3].quiz.questions[0].id = 'hasOwnProperty'],
 ]) test(`rejects ${name}`, () => { const d = sample(); change(d); assert.throws(() => validateLessonBlocks(d)); });
 for (const [name, values] of [
   ['unknown question', { other: 'answer' }],

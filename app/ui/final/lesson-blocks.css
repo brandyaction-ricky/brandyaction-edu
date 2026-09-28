@@ -1,0 +1,30 @@
+.lesson-blocks { display:grid; gap:24px; min-width:0; line-height:1.7; overflow-wrap:anywhere; }
+.lesson-blocks > div { min-width:0; }
+.lesson-blocks h2, .lesson-blocks h3 { margin:0 0 12px; }
+.lesson-blocks .reading-copy { white-space:pre-wrap; }
+.lesson-blocks figure { margin:0; }
+.lesson-blocks img, .lesson-blocks audio { max-width:100%; }
+.lesson-blocks img { height:auto; border-radius:8px; }
+.lesson-blocks audio { width:100%; margin-top:8px; }
+.lesson-blocks hr { border:0; border-top:1px solid #d8dde3; margin:8px 0; }
+.lesson-blocks .lb-card { border:1px solid #d8dde3; border-radius:10px; padding:20px; margin:0; min-width:0; background:#fff; }
+.lesson-blocks fieldset { min-width:0; }
+.lesson-blocks fieldset fieldset { border:0; margin:16px 0; padding:0; }
+.lesson-blocks legend { font-weight:650; }
+.lb-field { display:grid; gap:8px; margin:16px 0; }
+.lb-field > span { font-weight:600; }
+.lb-field input, .lb-field select, .lb-field textarea { width:100%; min-width:0; border:1px solid #adb5bf; border-radius:6px; padding:12px; font:inherit; color:inherit; background:#fff; box-sizing:border-box; }
+.lb-field textarea { resize:vertical; }
+.lb-field :focus-visible, .lesson-blocks button:focus-visible, .lb-choice input:focus-visible { outline:3px solid #507fbe; outline-offset:2px; }
+.lb-field small { color:#586371; }
+.lb-choice { display:flex; align-items:flex-start; gap:10px; padding:10px 0; min-height:44px; cursor:pointer; }
+.lb-choice input { flex:0 0 auto; margin-top:6px; width:18px; height:18px; }
+.lb-prompt { padding:16px; border:1px solid #d8dde3; background:#f5f7fa; border-radius:8px; margin-top:12px; }
+.lb-prompt pre { white-space:pre-wrap; overflow-wrap:anywhere; font:inherit; margin:0 0 16px; }
+.lb-prompt [role=status] { display:block; margin-top:8px; }
+.lesson-blocks .btn { white-space:normal; min-height:44px; }
+.lb-link { color:#1757a1; text-decoration:underline; }
+.lb-save-status { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:12px 0; position:sticky; top:0; z-index:2; background:#fff; border-bottom:1px solid #e0e4e9; margin-bottom:20px; }
+.lb-save-status [role=status] { flex:1 1 180px; }
+.lb-session-notice { border:1px solid #e1c679; border-radius:8px; padding:16px; margin-bottom:16px; background:#fff9e9; }
+@media(max-width:540px) { .lesson-blocks .lb-card { padding:14px; } }

@@ -29,7 +29,7 @@ function text(value: unknown, max = 20000, required = false): string {
   return value;
 }
 function id(value: unknown): string {
-  if (typeof value !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$/.test(value)) invalid('항목 식별자를 확인해 주세요.');
+  if (typeof value !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$/.test(value) || Object.hasOwn(Object.prototype, value) || value === 'prototype') invalid('항목 식별자를 확인해 주세요.');
   return value;
 }
 function bool(value: unknown): boolean { if (typeof value !== 'boolean') invalid('선택 항목을 확인해 주세요.'); return value; }
@@ -143,7 +143,7 @@ export function validateBlockAnswers(input: unknown, doc: LessonBlockDocument): 
 export function fillBlockPrompt(template: string, fields: BlockField[], answers: Record<string, string>) {
   // One pass: replacement text containing $&, braces or another field's name
   // stays literal and is never evaluated or used as a second substitution.
-  const values = new Map(fields.map(f => [f.variable.replace(/\s+/g, ''), answers[f.id]?.trim()]));
+  const values = new Map(fields.map(f => [f.variable.replace(/\s+/g, ''), Object.hasOwn(answers, f.id) && typeof answers[f.id] === 'string' ? answers[f.id].trim() : '']));
   return template.replace(/\{\{([^{}]+)\}\}|\{([^{}]+)\}/g, (match, double: string | undefined, single: string | undefined) => values.get((double ?? single ?? '').replace(/\s+/g, '')) || match);
 }
 
