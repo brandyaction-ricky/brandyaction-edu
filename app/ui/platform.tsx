@@ -760,8 +760,17 @@ export function Platform({
               <CourseCard key={c.id} course={c} />
             ))}
         </div>
-        {!loading && !error && !courses.length && (
-          <Empty title="등록된 클래스가 없습니다." />
+        {!loading && !error && loadedReadKey === publicReadKey && query === publicSearch && !courses.length && (
+          query.trim() || filter !== "전체" ? (
+            <Empty title="검색 조건에 맞는 클래스가 없습니다.">
+              <button className="btn" type="button" onClick={() => {
+                setQuery("");
+                setPublicSearch("");
+                setFilter("전체");
+                if (searchParams.get("type") === "free") router.replace("/classes");
+              }}>검색·필터 초기화</button>
+            </Empty>
+          ) : <Empty title="등록된 클래스가 없습니다." />
         )}
         {pagination && pagination.total > pagination.pageSize && <div className="row center mt24" aria-label="클래스 페이지">
           <button className="btn" type="button" disabled={publicPage <= 1} onClick={() => setPublicPage(page => page - 1)}>이전</button>
