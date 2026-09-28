@@ -11,11 +11,13 @@ import { canRenderLessonBlocks, LessonBlockView } from './lesson-block-view';
 import { LessonMediaUpload } from './lesson-media-upload';
 import type { LessonMediaKind } from '@/lib/lesson-media';
 import type { BlockEditorDraft } from '@/lib/learning-editor-draft';
+import { applyLessonImport, type LessonCardSource, type TextImportResult } from '@/lib/lesson-editor-import';
+import { TextLessonImport, LessonCardImport } from './lesson-editor-import';
 import './lesson-block-author.css';
 
 export type BlockAuthorState = { active: boolean; dirty: boolean; blocked: boolean; uploading?: boolean; draftReady?: boolean };
 export type BlockAuthorHandle = { validate: () => boolean; showPreview: () => void; save: (lessonId: string) => Promise<void>; captureDraft: () => BlockEditorDraft; restoreDraft: (draft: BlockEditorDraft) => void };
-type Props = { lessonId: string; courseId?: string; legacyBlocks: LessonBlock[]; disabled: boolean; onState: (state: BlockAuthorState) => void };
+type Props = { lessonId: string; courseId?: string; sources?: LessonCardSource[]; legacyBlocks: LessonBlock[]; disabled: boolean; onState: (state: BlockAuthorState) => void };
 type Snapshot = { revision: string | null; document: LessonBlockDocument | null; editable: boolean };
 const empty = (): LessonBlockDocument => ({ schemaVersion: 1, blocks: [], checklist: [] });
 const choices: { type: LessonBlockType; label: string }[] = [
@@ -82,11 +84,13 @@ function QuizFields({ block, update }: { block: LessonBlock; update: (patch: Par
   </>;
 }
 
-const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot }>(function LoadedAuthor({ snapshot, legacyBlocks, disabled, onState, courseId, lessonId }, ref) {
+const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot }>(function LoadedAuthor({ snapshot, legacyBlocks, disabled, onState, courseId, lessonId, sources = [] }, ref) {
   const [document, setDocument] = useState<LessonBlockDocument>(() => snapshot.document || empty());
   const [active, setActive] = useState(Boolean(snapshot.document)), [saved, setSaved] = useState(JSON.stringify(snapshot.document));
   const [type, setType] = useState<LessonBlockType>('text'), [preview, setPreview] = useState(false), [message, setMessage] = useState(''), [invalid, setInvalid] = useState(false), [conflict, setConflict] = useState(false);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  const [importMode, setImportMode] = useState<'text' | 'cards' | null>(null);
+  const [importUndo, setImportUndo] = useState<{ before: LessonBlockDocument; after: string } | null>(null);
   const [writer] = useState(() => new LessonDocumentWriter(snapshot.revision, snapshot.document, saveDocument));
   const root = useRef<HTMLDivElement>(null);
   const uploads = useRef(new Set<string>()), [uploading, setUploading] = useState(false);
@@ -127,6 +131,11 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
   function update(index: number, patch: Partial<LessonBlock>) { setDocument(previous => ({ ...previous, blocks: previous.blocks.map((block, i) => i === index ? { ...block, ...patch } : block) })); }
   function move(index: number, offset: number) { setDocument(previous => { const blocks = [...previous.blocks]; [blocks[index], blocks[index + offset]] = [blocks[index + offset], blocks[index]]; return { ...previous, blocks }; }); }
   function download() { const url = URL.createObjectURL(new Blob([JSON.stringify(document, null, 2)], { type: 'application/json' })); const a = window.document.createElement('a'); a.href = url; a.download = '학습-편집내용.json'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
+  function importContent(content: Pick<TextImportResult, 'blocks' | 'checklist'>, mode: 'append' | 'replace' | number) {
+    if (disabled || conflict || uploads.current.size) throw new Error('저장·업로드 상태를 확인한 뒤 가져와 주세요.');
+    const next = applyLessonImport(document, content, mode);
+    setImportUndo({ before: structuredClone(document), after: JSON.stringify(next) }); setDocument(next); setEditingTextId(null); setInvalid(false); setMessage('가져온 내용을 편집 화면에 적용했습니다. 학습 저장을 눌러 반영해 주세요.');
+  }
   if (!snapshot.editable) return <p role="alert">이 학습을 편집할 권한이 없습니다.</p>;
   if (!active) return <div className="lba-intro"><p>본문 사이에 질문·영상·생성기를 넣을 수 있습니다. 기존 내용은 첫 항목으로 가져옵니다.</p><button type="button" className="btn" disabled={disabled} onClick={() => { setDocument({ ...empty(), blocks: structuredClone(legacyBlocks) }); setActive(true); }}>여러 항목으로 구성하기</button></div>;
   return <div ref={root} className={'lb-author' + (invalid ? ' was-validated' : '')}>
@@ -134,6 +143,9 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
     <p className="meta">아래 ‘학습 저장’을 누르면 기본 정보와 함께 저장됩니다. 이전 학생 답변은 해당 수업 버전과 함께 보관됩니다.</p>
     {preview && <div className="lba-preview" aria-label="구성 미리보기"><LessonBlockView document={publicLessonBlocks(document)} values={{ blocks: {}, checklist: [] }} onChange={() => {}} readOnly /></div>}
     <fieldset disabled={disabled || conflict || uploading} hidden={preview} className="lba-main-fields">
+      <div className="lba-actions"><button type="button" className="btn" onClick={() => setImportMode('text')}>텍스트·파일 가져오기</button><button type="button" className="btn" disabled={!sources.length} onClick={() => setImportMode('cards')}>다른 학습 카드 가져오기</button>
+        {importUndo && importUndo.after === JSON.stringify(document) && saved !== importUndo.after && <button type="button" className="btn" onClick={() => { setDocument(importUndo.before); setImportUndo(null); setMessage('가져오기 직전 내용으로 되돌렸습니다.'); }}>마지막 가져오기 되돌리기</button>}
+      </div>
       <section className="lba-block"><h3>학습 완료 기준</h3>
         <Field label="학습 개방 방식"><select value={document.progression?.track || ''} onChange={event => setDocument(previous => {
           const track = event.target.value;
@@ -169,6 +181,8 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
       <div className="lba-actions"><label>추가할 항목 <select value={type} onChange={event => setType(event.target.value as LessonBlockType)}>{choices.map(choice => <option key={choice.type} value={choice.type}>{choice.label}</option>)}</select></label><button type="button" className="btn" disabled={document.blocks.length >= 1000} onClick={() => { const block = newBlock(type); setDocument(previous => ({ ...previous, blocks: [...previous.blocks, block] })); if (type === 'text') setEditingTextId(block.id); }}>항목 추가</button></div>
       <section className="lba-block"><h3>체크리스트</h3>{document.checklist.map((item, index) => <div className="lba-check-edit" key={item.id}><input required maxLength={5000} aria-label={`체크 항목 ${index + 1}`} value={item.label} onChange={event => setDocument(previous => ({ ...previous, checklist: previous.checklist.map((entry, i) => i === index ? { ...entry, label: event.target.value } : entry) }))} /><label><input type="checkbox" checked={item.required} onChange={event => setDocument(previous => ({ ...previous, checklist: previous.checklist.map((entry, i) => i === index ? { ...entry, required: event.target.checked } : entry) }))} />필수</label><button type="button" className="btn small" aria-label={`체크 항목 ${index + 1} 삭제`} onClick={() => setDocument(previous => ({ ...previous, checklist: previous.checklist.filter((_, i) => i !== index) }))}>삭제</button></div>)}<button type="button" className="btn small" disabled={document.checklist.length >= 1000} onClick={() => setDocument(previous => ({ ...previous, checklist: [...previous.checklist, { id: crypto.randomUUID(), label: '', required: true }] }))}>체크 항목 추가</button></section>
     </fieldset>
+    {importMode === 'text' && <TextLessonImport onClose={() => setImportMode(null)} onApply={importContent} />}
+    {importMode === 'cards' && <LessonCardImport currentId={lessonId} current={document} sources={sources} onClose={() => setImportMode(null)} onInsert={importContent} />}
     {message && <p className="notice" role={invalid || conflict ? 'alert' : 'status'}>{message}</p>}
     {conflict && <button type="button" className="btn" onClick={download}>현재 편집 내용 내려받기</button>}
   </div>;

@@ -123,6 +123,11 @@ export function LearningEditor({ data, row, pending, send, back, actorId, blockE
   }
   const week = (data.curriculum_weeks || []).find(item => item.id === basic.week_id);
   const course = (data.courses || []).find(item => item.id === week?.course_id);
+  const cardSources = course ? (data.curriculum_weeks || []).filter(item => item.course_id === course.id)
+    .sort((a, b) => num(a, 'week_number') - num(b, 'week_number'))
+    .flatMap(w => (data.curriculum_lessons || []).filter(item => item.week_id === w.id)
+      .sort((a, b) => num(a, 'day_number') - num(b, 'day_number'))
+      .map(item => ({ id: item.id, label: `${num(w, 'week_number')}주차 · ${num(item, 'day_number')}일차 · ${t(item, 'title')}` }))) : [];
   const missions = (data.curriculum_missions || []).filter(item => item.lesson_id === lessonId);
   const mission = missions.find(item => item.id === selectedMissionId) || missions[0];
   const quiz = (data.mission_quizzes || []).find(item => item.mission_id === mission?.id);
@@ -210,7 +215,7 @@ export function LearningEditor({ data, row, pending, send, back, actorId, blockE
       </section>
       {blockEditingEnabled && <section ref={blockSectionRef} className="panel mt24" hidden={previewOnly}><div className="panel-head"><h2>학습 구성</h2></div><div className="section-pad">
         {resourcePath && <p className="notice">등록된 자료 파일은 학습 본문 아래에서 계속 다운로드할 수 있습니다.</p>}
-        <LessonBlockAuthor key={row?.id || 'new'} ref={blockRef} lessonId={lessonId} courseId={course?.id} legacyBlocks={legacyBlocks} disabled={busy} onState={setBlockState} />
+        <LessonBlockAuthor key={row?.id || 'new'} ref={blockRef} lessonId={lessonId} courseId={course?.id} sources={cardSources} legacyBlocks={legacyBlocks} disabled={busy} onState={setBlockState} />
       </div></section>}
       {blockEditingEnabled && blockState.active && lessonId && <OngoingLessonSettings lessonId={lessonId} disabled={saveBlocked || dirty || blockState.dirty} />}
       {!blockState.active && !(blockEditingEnabled && blockState.blocked) && <section className={"panel" + (previewOnly ? "" : " mt24")}>
