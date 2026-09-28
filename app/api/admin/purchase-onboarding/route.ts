@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getOperatorUser } from '@/lib/operator-permissions';
-import { DEFAULT_ONBOARDING_ROOM_NAME, onboardingSettingsKey, purchaseOnboardingSettings, uuid } from '@/lib/purchase-onboarding';
+import { DEFAULT_ONBOARDING_ROOM_NAME, isMoonshotFourth, onboardingSettingsKey, purchaseOnboardingSettings, uuid } from '@/lib/purchase-onboarding';
 
 const reply = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
 const relatedCourse = (value: unknown): { title?: string; category?: string; list_price?: number } | null => {
@@ -21,14 +21,14 @@ export async function GET(request: Request) {
     const cohorts = await db.from('cohorts').select('id,name,course_id,courses(title,category,list_price)').order('created_at', { ascending: false }).limit(100);
     if (cohorts.error) throw cohorts.error;
     const selected = (cohorts.data || []).find(row => row.id === cohortId);
-    const moonshotFourth = selected && /문샷/.test(relatedCourse(selected.courses)?.title || '') && /4기/.test(selected.name || '');
+    const moonshotFourth = selected && isMoonshotFourth(relatedCourse(selected.courses)?.title, selected.name);
     let settings = { roomName: moonshotFourth ? DEFAULT_ONBOARDING_ROOM_NAME : '', inviteUrl: '', paidImage: '', organicImage: '', enabled: false };
     if (cohortId) {
       const row = await db.from('site_settings').select('value').eq('key', onboardingSettingsKey(cohortId)).eq('is_public', false).maybeSingle();
       if (row.error) throw row.error;
       if (row.data) settings = purchaseOnboardingSettings(row.data.value);
     }
-    return reply({ cohorts: (cohorts.data || []).filter(row => { const course = relatedCourse(row.courses); return course?.category !== 'free' && Number(course?.list_price || 0) > 0; }), settings });
+    return reply({ cohorts: (cohorts.data || []).filter(row => { const course = relatedCourse(row.courses); return course?.category !== 'free' && Number(course?.list_price || 0) > 0; }), settings, telegramOnly: Boolean(moonshotFourth) });
   } catch { return reply({ error: '결제 후 안내 설정을 불러오지 못했습니다.' }, 503); }
 }
 
