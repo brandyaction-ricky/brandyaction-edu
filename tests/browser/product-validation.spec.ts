@@ -101,3 +101,14 @@ test('new published product validates against its automatically created cohort',
   await page.getByRole('button', { name: '저장하기', exact: true }).click();
   await expect(page.getByLabel('합성 저장 횟수')).toHaveText('1');
 });
+
+
+test('a deadline that passes while the editor is open is checked again at save time', async ({ page }) => {
+  await page.clock.install({ time: new Date('2099-10-01T14:58:58Z') });
+  await page.goto('/product-sale-test');
+  await expect(page.locator('aside').getByText('판매 중', { exact: true }).first()).toBeVisible();
+  await page.clock.setFixedTime(new Date('2099-10-01T14:59:01Z'));
+  await page.getByRole('button', { name: '저장하기', exact: true }).click();
+  await expect(page.getByLabel('모집 마감 · KST', { exact: true })).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByLabel('합성 저장 횟수')).toHaveText('0');
+});

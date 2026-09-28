@@ -93,19 +93,20 @@ test('cohort selection changes both countdown and embedded checkout; editor can 
   await expect(page.getByRole('timer')).toHaveText('2일 00:00:02');
   await page.frameLocator('iframe').getByRole('link', { name: '클래스 신청' }).click();
   await expect(page).toHaveURL(url => url.pathname === '/login' && url.searchParams.get('next') === '/checkout?cohort=cohort-b');
+  // The countdown scenario starts two seconds before expiry. Keep editor
+  // toggling independent of elapsed CI time; expiry blocking has its own test.
+  await page.clock.setFixedTime(new Date('2099-09-30T00:00:00Z'));
   await page.goto('/product-sale-test?ready=1');
   await page.getByRole('tab', { name: '공개·검색', exact: true }).click();
   const toggle = page.getByRole('checkbox', { name: '모집 마감 카운트다운 표시', exact: true });
   await expect(toggle).not.toBeChecked();
   await toggle.check();
   await expect(page.locator('input[name="recruitment_countdown_enabled"]')).toHaveValue('on');
-  page.once('dialog', dialog => dialog.accept());
   await page.getByRole('button', { name: '저장하기', exact: true }).click();
   await expect(page.getByLabel('합성 저장 횟수')).toHaveText('1');
   await expect(page.getByLabel('저장한 카운트다운 설정')).toHaveText('true');
   await toggle.uncheck();
   await expect(page.locator('input[name="recruitment_countdown_enabled"]')).toHaveValue('off');
-  page.once('dialog', dialog => dialog.accept());
   await page.getByRole('button', { name: '저장하기', exact: true }).click();
   await expect(page.getByLabel('합성 저장 횟수')).toHaveText('2');
   await expect(page.getByLabel('저장한 카운트다운 설정')).toHaveText('false');
