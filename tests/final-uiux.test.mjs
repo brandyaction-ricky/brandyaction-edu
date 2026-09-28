@@ -46,6 +46,19 @@ const submission = { id: 'submission', enrollment_id: 'enrollment', mission_id: 
 const data = { courses: [course], cohorts: [cohort], enrollments: [enrollment], profiles: [user], curriculum_weeks: [{ id: 'week', course_id: 'course', week_number: 1, title: '시작하기', is_published: true }], curriculum_lessons: [lesson], curriculum_missions: [mission], mission_submissions: [submission], lesson_contents: [{ lesson_id: 'lesson', body_text: '등록된 학습 본문', resource_path: 'private/test.pdf', resource_name: '학습 자료.pdf' }], articles: [{ id: 'article', slug: 'test-article', title: '테스트 아티클', content_type: 'text', status: 'published', body: [{ type: 'paragraph', text: '콘텐츠' }] }], review_videos: [{ id: 'story', title: '등록된 고객 이야기', reviewer_name: '고객' }], orders: [], admin_summary: [{ id: 'summary', members: 1, activeEnrollments: 1, pendingReviews: 1, openQuestions: 0 }] };
 const send = async () => { throw Error('Unexpected write during render'); };
 
+test('shared week field accepts and serializes zero without lowering the lesson day minimum', () => {
+  const { FieldControl, formValues } = load('app/ui/final/admin-editors.tsx');
+  const section = platform.sections.find(item => item.key === 'weeks');
+  const markup = html(FieldControl, { section, row: { week_number: 0 }, field: section.fields.find(item => item.key === 'week_number'), data, pending: false });
+  assert.match(markup, /min="0"/);
+  assert.match(markup, /value="0"/);
+  const form = new FormData();
+  form.set('week_number', '0');
+  assert.equal(formValues(section, form).week_number, 0);
+  const day = html(FieldControl, { section, row: { day_number: 1 }, field: { key: 'day_number', label: '일차', type: 'number' }, data, pending: false });
+  assert.match(day, /min="1"/);
+});
+
 test('final design styles are isolated, reproducible and exclude prototype runtime', () => {
   assert.equal(read('app/ui/final/tokens.css'), read('design-reference/source/shared/tokens.css'));
   for (const [area, scope] of [['frontend', '.edu-front'], ['admin', '.edu-admin']]) {
