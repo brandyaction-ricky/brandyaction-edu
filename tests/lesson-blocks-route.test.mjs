@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import ts from 'typescript';
 const id='11111111-1111-4111-8111-111111111111',lesson='22222222-2222-4222-8222-222222222222',revision='33333333-3333-4333-8333-333333333333';
 function compile(file, mocks={}) { const out={};new Function('exports','require',ts.transpileModule(fs.readFileSync(new URL('../'+file,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(out,name=>mocks[name]);return out; }
-const blocks=compile('lib/lesson-blocks.ts',{'./lesson-guided-tools':compile('lib/lesson-guided-tools.ts')});
+const blocks=compile('lib/lesson-blocks.ts',{'./lesson-guided-tools':compile('lib/lesson-guided-tools.ts'),'./lesson-calculators':compile('lib/lesson-calculators.ts')});
 const document={schemaVersion:1,blocks:[{id:'quiz',type:'quiz',quiz:{passPercent:100,questions:[{id:'q',prompt:'시험',options:['가','나'],correctIndex:1}]}},{id:'answer',type:'question',question:{label:'질문',kind:'text',required:true}}],checklist:[]};
 function harness({user={id,role:'member'},editable=false,readError=null,saveError=null,current=revision}={}) {
  const calls=[];const db={rpc:async(name,args)=>{calls.push({name,args});return name==='edu_read_lesson_blocks'?{data:{editable,revision,currentRevision:current,document,draft:null,previousDrafts:[]},error:readError}:{data:{writeId:id,revision},error:saveError};}};

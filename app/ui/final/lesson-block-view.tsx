@@ -7,12 +7,14 @@ import { LessonText } from './lesson-text';
 import { Video } from './primitives';
 import { hasGuidedDefinition, isGuidedTool } from '@/lib/lesson-guided-tools';
 import { LessonGuidedTool } from './lesson-guided-tool';
+import { hasCalculatorDefinition, isCalculator } from '@/lib/lesson-calculators';
+import { LessonCalculator } from './lesson-calculator';
 import './lesson-blocks.css';
 
 export type BlockGrade = { correct: number; total: number; passed: boolean; results: { id: string; answered: boolean; correct: boolean }[] };
 const supported = new Set(['heading', 'subheading', 'text', 'video', 'audio', 'image', 'question', 'divider', 'link', 'prompt', 'prompt-generator', 'quiz']);
 export function canRenderLessonBlocks(document: PublicBlockDocument) {
-  return document.blocks.every(block => isGuidedTool(block.type) ? hasGuidedDefinition(block) : supported.has(block.type) && (block.type !== 'question' || block.question?.kind === 'text'));
+  return document.blocks.every(block => isGuidedTool(block.type) ? hasGuidedDefinition(block) : isCalculator(block.type) ? hasCalculatorDefinition(block) : supported.has(block.type) && (block.type !== 'question' || block.question?.kind === 'text'));
 }
 function mediaUrl(value?: string) {
   try { const url = new URL(value || ''); return url.protocol === 'https:' && !url.username && !url.password ? url.href : ''; } catch { return ''; }
@@ -92,6 +94,9 @@ export function LessonBlockView({ document, values, onChange, readOnly = false, 
         case 'prompt-generator': content = <PromptGenerator block={block} answer={value} disabled={readOnly} onChange={value => answer(block.id, value)} />; break;
         case 'persona-generator':
         case 'landing-planner': content = <LessonGuidedTool block={block} answer={value} readOnly={readOnly} onChange={value => answer(block.id, value)} />; break;
+        case 'recipe-calculator':
+        case 'margin-calculator':
+        case 'marketing-funnel': content = <LessonCalculator block={block} answer={value} readOnly={readOnly} onChange={value => answer(block.id, value)} />; break;
         case 'quiz': content = <BlockQuiz block={block} answer={value} disabled={readOnly} onChange={value => answer(block.id, value)} grade={grade} />; break;
         default: content = <p role="alert">이 학습 도구의 연결을 확인하고 있습니다.</p>;
       }

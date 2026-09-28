@@ -217,3 +217,17 @@ test('author can add both guided tools, preserve their versions and preview thei
   await expect(page.getByRole('region', { name: '핵심 고객 페르소나 생성기' })).toBeVisible();
   await expect(page.getByRole('region', { name: '랜딩페이지 기획 문답' })).toBeVisible();
 });
+
+test('author adds and saves all three calculators with their input definitions', async ({ page }) => {
+  const server=await backend(page);await page.goto('/lesson-block-author-test');
+  await page.getByRole('button',{name:'여러 항목으로 구성하기'}).click();
+  for(const type of ['recipe-calculator','margin-calculator','marketing-funnel'])await add(page,type);
+  await page.getByRole('button',{name:'학습 저장',exact:true}).click();await expect(page.getByText('학습 기본 정보와 콘텐츠를 저장했습니다.',{exact:true})).toBeVisible();
+  expect(server.getDocument()!.blocks.slice(1).map(b=>b.fields!.length)).toEqual([9,13,1]);
+  expect(server.getDocument()!.blocks.slice(1).map(b=>b.toolVersion)).toEqual(['replit-2026-09-07','replit-2026-09-07','replit-2026-09-07']);
+  await page.getByRole('button',{name:'편집 다시 열기'}).click();await expect(page.locator('[data-author-block]')).toHaveCount(4);
+  await page.getByRole('button',{name:'구성 미리보기',exact:true}).click();
+  await expect(page.getByLabel('구성 미리보기').getByRole('region',{name:'마케팅 퍼널 만들기'})).toBeVisible();
+  await page.getByRole('button',{name:'학생 화면 보기'}).click();
+  for(const name of ['레시피 실행 계산기','마진 계산기','마케팅 퍼널 만들기'])await expect(page.getByRole('region',{name,exact:true})).toBeVisible();
+});

@@ -1,6 +1,7 @@
 // Versioned lesson blocks. Only the authoring/server boundary may hold quiz keys;
 // learner responses must use publicLessonBlocks(), never a cast of stored JSON.
 import { hasGuidedDefinition, isGuidedTool } from './lesson-guided-tools';
+import { hasCalculatorDefinition, isCalculator, validateCalculatorValues } from './lesson-calculators';
 export const lessonBlockTypes = ['heading', 'subheading', 'text', 'video', 'audio', 'image', 'question', 'divider', 'link', 'prompt', 'prompt-generator', 'persona-generator', 'landing-planner', 'recipe-calculator', 'margin-calculator', 'marketing-funnel', 'quiz'] as const;
 export type LessonBlockType = typeof lessonBlockTypes[number];
 export type BlockField = { id: string; label: string; variable: string; placeholder: string; required: boolean; sensitive: boolean; options?: string[] };
@@ -57,7 +58,7 @@ export function validateLessonBlocks(input: unknown): LessonBlockDocument {
     if (mediaTypes.has(type)) allowed.push('url', 'alt');
     if (type === 'question') allowed.push('question');
     if (fieldTypes.has(type)) allowed.push('fields');
-    if (isGuidedTool(type)) allowed.push('toolVersion');
+    if (isGuidedTool(type) || isCalculator(type)) allowed.push('toolVersion');
     if (type === 'quiz') allowed.push('quiz');
     onlyKeys(b, allowed);
     const block: LessonBlock = { id: id(b.id), type };
@@ -83,6 +84,7 @@ export function validateLessonBlocks(input: unknown): LessonBlockDocument {
       unique(block.fields.map(f => f.id)); unique(block.fields.map(f => f.variable.replace(/\s+/g, '')));
     }
     if (isGuidedTool(type) && !hasGuidedDefinition(block)) invalid('학습 도구의 질문과 버전을 확인해 주세요.');
+    if (isCalculator(type) && !hasCalculatorDefinition(block)) invalid('계산기 구성과 버전을 확인해 주세요.');
     if (type === 'quiz') {
       const quiz = object(b.quiz); onlyKeys(quiz, ['questions', 'passPercent']);
       const questions = array(quiz.questions, 100).map(raw => {
@@ -135,6 +137,9 @@ export function validateBlockAnswers(input: unknown, doc: LessonBlockDocument): 
           if (f.options?.length && answer && !f.options.includes(answer)) invalid('목록에 있는 답변을 선택해 주세요.');
           fields[key] = answer;
         }
+      }
+      if (isCalculator(block.type)) {
+        try { validateCalculatorValues(block.type, fields); } catch (error) { invalid((error as Error).message); }
       }
       blocks[blockId] = fields;
     } else invalid('해당 항목의 답변 형식을 확인해 주세요.'); // Attachments require a verified upload binding, not an arbitrary URL.
