@@ -47,6 +47,7 @@ test('template values are literal, one-pass substitutions with Unicode/whitespac
   const fields = [field('brand'), field('goal'), { ...field('name'), variable: '나의 이름' }];
   assert.equal(fillBlockPrompt('{brand} {{ goal }} {{나의이름}} {missing}', fields, { brand: '$& {goal}', goal: '첫 목표', name: '홍길동' }), '$& {goal} 첫 목표 홍길동 {missing}');
   assert.equal(fillBlockPrompt('{brand}', fields, { brand: '' }), '{brand}');
+  assert.equal(fillBlockPrompt('{{ 나 의 이름 }} { goal } {{ unknown }}', fields, { name: '  ' }), '{나의 이름} {goal} {{ unknown }}');
   assert.equal(fillBlockPrompt('{constructor}', [field('constructor')], {}), '{constructor}');
 });
 test('draft is bound to block and quiz identifiers; blank text can be saved before submission', () => {

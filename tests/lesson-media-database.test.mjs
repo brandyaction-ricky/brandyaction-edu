@@ -30,6 +30,17 @@ test('upload retry is idempotent and immutable; foreign owner/course and mismatc
   await assert.rejects(f.db.query('delete from edu_lesson_media where id=$1',[asset.id]),/permission denied/);
  }finally{await f.db.close();}
 });
+test('receipt metadata is restricted to its active uploading author, even when another author can preview the media',async()=>{
+ const f=await fixture();try{
+  const asset=await prepare(f);await complete(f,asset.id);
+  const owned=actor=>f.db.query('select edu_owned_lesson_media($1,$2) as f',[actor,asset.id]);
+  const receipt=(await owned(f.admin)).rows[0].f;assert.equal(receipt.course_id,f.course);assert.equal(receipt.sha256,'a'.repeat(64));assert.ok(receipt.ready_at);
+  await f.db.query("update profiles set role='staff' where id=$1",[f.other]);await f.db.query("insert into site_settings values($1,'{\"products\":true}')",['edu_staff_permissions_'+f.other]);
+  await f.db.query('select edu_read_lesson_media($1,$2)',[f.other,asset.id]);
+  await assert.rejects(owned(f.other),/BLOCK_FORBIDDEN/);await assert.rejects(owned(f.student),/BLOCK_FORBIDDEN/);
+  await f.db.query("update profiles set status='inactive' where id=$1",[f.admin]);await assert.rejects(owned(f.admin),/BLOCK_FORBIDDEN/);
+ }finally{await f.db.close();}
+});
 test('unverified/foreign-course/wrong-kind assets cannot enter revisions; same-course author preview works before saving a lesson',async()=>{
  const f=await fixture();try{
   const a=await prepare(f);await assert.rejects(save(f,a.id),/BLOCK_MEDIA_INVALID/);await complete(f,a.id);

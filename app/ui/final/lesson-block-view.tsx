@@ -38,21 +38,32 @@ function CopyPrompt({ text }: { text: string }) {
 
 function PromptGenerator({ block, answer, disabled, onChange }: { block: PublicLessonBlock; answer?: BlockAnswer; disabled: boolean; onChange: (value: BlockAnswer) => void }) {
   const [privateValues, setPrivateValues] = useState<Record<string, string>>({});
-  const [result, setResult] = useState(''), [error, setError] = useState('');
+  // The source shows the template before applying inputs and keeps the previous
+  // result while editing. Reopened drafts start from their saved public inputs.
+  const [appliedValues, setAppliedValues] = useState(() => stringValues(answer));
+  const [error, setError] = useState('');
   const values = { ...stringValues(answer), ...privateValues };
+  const dirty = (block.fields || []).some(field => (values[field.id] || '') !== (appliedValues[field.id] || ''));
+  const result = fillBlockPrompt(block.content || '', block.fields || [], appliedValues);
+  function changeField(id: string, sensitive: boolean, value: string) {
+    setError('');
+    if (sensitive) setPrivateValues(previous => ({ ...previous, [id]: value }));
+    else onChange({ ...stringValues(answer), [id]: value });
+  }
   function generate() {
     const missing = block.fields?.find(field => field.required && !values[field.id]?.trim());
     if (missing) { setError(`‘${missing.label}’ 항목을 입력해 주세요.`); return; }
-    setError(''); setResult(fillBlockPrompt(block.content || '', block.fields || [], values));
+    setError(''); setAppliedValues({ ...values });
   }
   return <section className="lb-card" aria-label="프롬프트 생성기"><h3>프롬프트 생성기</h3>
     {(block.fields || []).map(field => <label className="lb-field" key={field.id}>
       <span>{field.label}{field.required ? ' (필수)' : ''}</span>
-      {field.options?.length ? <select value={values[field.id] || ''} disabled={disabled} onChange={event => { setResult(''); if (field.sensitive) setPrivateValues(previous => ({ ...previous, [field.id]: event.target.value })); else onChange({ ...stringValues(answer), [field.id]: event.target.value }); }}><option value="">선택해 주세요</option>{field.options.map(option => <option key={option}>{option}</option>)}</select>
-        : <input type={field.sensitive ? 'password' : 'text'} autoComplete="off" maxLength={20000} value={values[field.id] || ''} placeholder={field.placeholder} disabled={disabled} onChange={event => { setResult(''); if (field.sensitive) setPrivateValues(previous => ({ ...previous, [field.id]: event.target.value })); else onChange({ ...stringValues(answer), [field.id]: event.target.value }); }} />}
+      {field.options?.length ? <select value={values[field.id] || ''} disabled={disabled} onChange={event => changeField(field.id, field.sensitive, event.target.value)}><option value="">선택해 주세요</option>{field.options.map(option => <option key={option}>{option}</option>)}</select>
+        : <input type={field.sensitive ? 'password' : 'text'} autoComplete="off" maxLength={20000} value={values[field.id] || ''} placeholder={field.placeholder} disabled={disabled} onChange={event => changeField(field.id, field.sensitive, event.target.value)} />}
       {field.sensitive && <small>이 항목은 저장되지 않으며 화면을 닫으면 지워집니다.</small>}
     </label>)}
     <button type="button" className="btn" onClick={generate} disabled={disabled}>프롬프트 만들기</button>
+    {dirty && <p role="status">입력을 수정했습니다. ‘프롬프트 만들기’를 누르면 아래 결과에 반영됩니다.</p>}
     {error && <p role="alert">{error}</p>}{result && <CopyPrompt key={result} text={result} />}
   </section>;
 }

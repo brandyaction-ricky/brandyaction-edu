@@ -178,7 +178,7 @@ export function validateBlockAnswers(input: unknown, doc: LessonBlockDocument): 
 export function fillBlockPrompt(template: string, fields: BlockField[], answers: Record<string, string>) {
   // One pass: replacement text containing $&, braces or another field's name
   // stays literal and is never evaluated or used as a second substitution.
-  const values = new Map(fields.map(f => [f.variable.replace(/\s+/g, ''), Object.hasOwn(answers, f.id) && typeof answers[f.id] === 'string' ? answers[f.id].trim() : '']));
+  const values = new Map(fields.map(f => [f.variable.replace(/\s+/g, ''), (Object.hasOwn(answers, f.id) && typeof answers[f.id] === 'string' ? answers[f.id].trim() : '') || `{${f.variable}}`]));
   return template.replace(/\{\{([^{}]+)\}\}|\{([^{}]+)\}/g, (match, double: string | undefined, single: string | undefined) => values.get((double ?? single ?? '').replace(/\s+/g, '')) || match);
 }
 

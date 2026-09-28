@@ -7,9 +7,9 @@ const id='11111111-1111-4111-8111-111111111111';
 const png=Uint8Array.from([137,80,78,71,13,10,26,10]);
 function compile(file,mocks={}){const out={};new Function('exports','require',ts.transpileModule(fs.readFileSync(new URL('../'+file,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(out,name=>mocks[name]);return out;}
 const files=compile('lib/lesson-media.ts',{'./lesson-files':compile('lib/lesson-files.ts')});
-function harness({user={id},dbError=null,size=8,mime='image/png',bytes=png,ready=false,kind='image'}={}){
+function harness({user={id},dbError=null,size=8,mime='image/png',bytes=png,ready=false,kind='image',sha256=crypto.createHash('sha256').update(png).digest('hex')}={}){
  const calls=[],storageCalls=[];
- const file={id,owner_id:id,name:'test.png',size:8,kind,content_type:'image/png',extension:'png',path:`${id}/${id}.png`,ready_at:ready?'2026-09-28':null};
+ const file={id,owner_id:id,course_id:id,name:'test.png',size:8,kind,content_type:'image/png',extension:'png',path:`${id}/${id}.png`,sha256,ready_at:ready?'2026-09-28T12:00:00Z':null};
  const storage={createSignedUploadUrl:async(path,options)=>{storageCalls.push({action:'upload',path,options});return{data:{signedUrl:'https://storage.test/signed-upload',token:'private-token'}};},info:async()=>({data:{size,contentType:mime}}),download:async()=>({data:new Blob([bytes])}),createSignedUrl:async(path,seconds,options)=>{storageCalls.push({action:'read',path,seconds,options});return{data:{signedUrl:'https://storage.test/short-lived'}};}};
  const db={rpc:async(name,args)=>{calls.push({name,args});return{data:name==='edu_complete_lesson_media'?{id,name:file.name,kind,size}:file,error:dbError};},storage:{from:bucket=>{assert.equal(bucket,'lesson-content-media');return storage;}}};
  const route=compile('app/api/platform/lesson-media/route.ts',{'node:crypto':crypto,'@/lib/lesson-media':files,'@/lib/edu-workflows':{uuid:v=>typeof v==='string'&&/^[a-f\d-]{36}$/.test(v)},'@/lib/server-auth':{getAuthenticatedUser:async()=>user},'@/lib/supabase/admin':{createAdminClient:()=>db}});
@@ -36,4 +36,17 @@ test('reading verifies media and lesson/submission association before a five-min
 test('malformed and oversized requests never mint upload grants',async()=>{
  const h=harness();for(const body of [null,{}, {...h.body,size:10485761},{...h.body,name:'bad.svg'},{...h.body,courseId:'bad'}])assert.equal((await h.post(body)).status,400);
  assert.equal((await h.post({...h.body,padding:'한'.repeat(1800)})).status,413);assert.equal(h.calls.length,0);assert.equal(h.storageCalls.length,0);
+});
+test('migration receipt uses owner authorization and only returns verified byte identity, never a storage grant',async()=>{
+ const h=harness({ready:true}),response=await h.get(`asset=${id}&receipt=1&p_actor=forged&courseId=forged`);
+ assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'private, no-store');assert.equal(response.headers.get('vary'),'Cookie');
+ assert.deepEqual(h.calls,[{name:'edu_owned_lesson_media',args:{p_actor:id,p_asset:id}}]);
+ assert.deepEqual(await response.json(),{formatVersion:1,assetId:id,courseId:id,kind:'image',sha256:crypto.createHash('sha256').update(png).digest('hex'),bytes:8,mimeType:'image/png',readyAt:'2026-09-28T12:00:00Z'});
+ assert.equal(h.storageCalls.length,0);
+});
+test('migration receipt denies anonymous/foreign authors, pending bytes, missing checksums and invalid asset IDs',async()=>{
+ for(const [options,query,status,calls] of [
+  [{user:null},`asset=${id}`,401,0], [{dbError:{message:'BLOCK_FORBIDDEN'}},`asset=${id}`,403,1],
+  [{},`asset=${id}`,409,1], [{ready:true,sha256:null},`asset=${id}`,409,1], [{ready:true},'asset=bad',400,0],
+ ]) { const h=harness(options),response=await h.get(query+'&receipt=1');assert.equal(response.status,status);assert.equal(h.calls.length,calls);assert.equal(h.storageCalls.length,0);assert.doesNotMatch(await response.text(),/sha256|private-token|storage\.test|test\.png/); }
 });

@@ -30,7 +30,7 @@ async function mock(page: Page, options: { failure?: number; historical?: boolea
       await route.fulfill({ json: {
         editable: false, currentRevision: revision, revision: isOld ? oldRevision : revision,
         document: options.empty ? null : { ...lessonDocument, blocks: options.unsupported ? [...lessonDocument.blocks, { id: 'tool', type: 'persona-generator', fields: [] }] : lessonDocument.blocks },
-        draft: isOld ? { writeId: oldRevision, updatedAt: '2026-09-28T12:00:00Z', values: { blocks: { answer: '예전에 작성한 답변' }, checklist: [] } } : draft,
+        draft: isOld ? { writeId: oldRevision, updatedAt: '2026-09-28T12:00:00Z', values: { blocks: { answer: '예전에 작성한 답변', generator: { customer: '이전 고객', category: '식품' } }, checklist: [] } } : draft,
         previousDrafts: options.historical ? [{ revision: oldRevision, updatedAt: '2026-09-28T12:00:00Z' }] : [],
       } }); return;
     }
@@ -55,16 +55,27 @@ test('mixed lesson answers, generator, quiz and checklist survive reopening; pri
   expect(await page.locator('[data-lesson-block=text] script').count()).toBe(0);
   await expect(page.getByRole('img', { name: '학습 예시 이미지' })).toBeVisible();
   await expect(page.locator('audio')).toHaveAttribute('preload', 'none');
+  await expect(page.locator('.lb-prompt pre')).toHaveText('고객: {고객}\n분야: {분야}\n시험 값: {비공개 값}');
   await page.getByRole('button', { name: '프롬프트 만들기' }).click();
   await expect(page.getByRole('alert')).toContainText('고객');
   await page.getByRole('textbox', { name: '내 사업의 고객은 누구인가요?' }).fill('동네 카페 사장님');
   await page.getByRole('textbox', { name: '고객 (필수)', exact: true }).fill('$& 와 {분야}');
   await page.getByRole('combobox', { name: '분야' }).selectOption('교육');
   await page.getByLabel('비공개 값', { exact: false }).fill('synthetic-secret');
+  await expect(page.locator('.lb-prompt pre')).toContainText('고객: {고객}');
+  await expect(page.getByRole('status').filter({ hasText: '입력을 수정했습니다' })).toBeVisible();
   await page.getByRole('button', { name: '프롬프트 만들기' }).click();
   await expect(page.locator('.lb-prompt pre')).toHaveText('고객: $& 와 {분야}\n분야: 교육\n시험 값: synthetic-secret');
   await page.getByRole('button', { name: '프롬프트 복사' }).click();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('$& 와 {분야}');
+  await page.getByRole('combobox', { name: '분야' }).selectOption('식품');
+  await expect(page.locator('.lb-prompt pre')).toContainText('분야: 교육');
+  await page.getByRole('button', { name: '프롬프트 복사' }).click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('분야: 교육');
+  await page.getByRole('button', { name: '프롬프트 만들기' }).click();
+  await expect(page.locator('.lb-prompt pre')).toContainText('분야: 식품');
+  await page.getByRole('combobox', { name: '분야' }).selectOption('교육');
+  await page.getByRole('button', { name: '프롬프트 만들기' }).click();
   await page.getByRole('radio', { name: '서버', exact: true }).check();
   await page.getByRole('button', { name: '답안 확인' }).click();
   await expect(page.getByRole('status').filter({ hasText: '1문제 중 1문제 정답' })).toBeVisible();
@@ -76,6 +87,7 @@ test('mixed lesson answers, generator, quiz and checklist survive reopening; pri
   await expect(page.getByRole('textbox', { name: '내 사업의 고객은 누구인가요?' })).toHaveValue('동네 카페 사장님');
   await expect(page.getByRole('combobox', { name: '분야' })).toHaveValue('교육');
   await expect(page.getByLabel('비공개 값', { exact: false })).toHaveValue('');
+  await expect(page.locator('.lb-prompt pre')).toHaveText('고객: $& 와 {분야}\n분야: 교육\n시험 값: {비공개 값}');
   await expect(page.getByRole('checkbox', { name: '소개 문장을 정리했습니다.' })).toBeChecked();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('lesson-blocks.png'), fullPage: true });
@@ -123,9 +135,13 @@ test('old answers open with original revision read-only, then return to current 
   const input = page.getByRole('textbox', { name: '내 사업의 고객은 누구인가요?' });
   await expect(input).toHaveValue('예전에 작성한 답변');
   await expect(input).toHaveAttribute('readonly', '');
+  await expect(page.locator('.lb-prompt pre')).toHaveText('고객: 이전 고객\n분야: 식품\n시험 값: {비공개 값}');
+  await expect(page.getByRole('button', { name: '프롬프트 만들기' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '프롬프트 복사' })).toBeEnabled();
   await expect(page.getByRole('button', { name: '답안 확인' })).toHaveCount(0);
   await page.getByRole('button', { name: '현재 수업으로' }).click();
   await expect(input).toHaveValue('');
+  await expect(page.locator('.lb-prompt pre')).toContainText('고객: {고객}');
   expect(backend.writes).toHaveLength(0);
 });
 

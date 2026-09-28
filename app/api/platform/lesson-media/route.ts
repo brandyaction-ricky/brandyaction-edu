@@ -64,6 +64,14 @@ export async function GET(request: Request) {
   try {
     const actor = await getAuthenticatedUser(); if (!actor) fail('로그인이 필요합니다.', 401);
     const params = new URL(request.url).searchParams, db = createAdminClient();
+    if (params.get('receipt') === '1') {
+      // Migration receipts expose no storage path, signed URL or user identifier.
+      // Only the active products author who uploaded the object can obtain one.
+      const { data: file, error } = await db.rpc('edu_owned_lesson_media', { p_actor: actor.id, p_asset: id(params.get('asset')) });
+      if (error) throw error;
+      if (!file.ready_at || !file.sha256) fail('파일 확인이 끝난 뒤 다시 시도해 주세요.', 409);
+      return reply({ formatVersion: 1, assetId: file.id, courseId: file.course_id, kind: file.kind, sha256: file.sha256, bytes: file.size, mimeType: file.content_type, readyAt: file.ready_at });
+    }
     const { data: file, error } = await db.rpc('edu_read_lesson_media', { p_actor: actor.id, p_asset: id(params.get('asset')), p_lesson: params.has('lesson') ? id(params.get('lesson')) : null, p_enrollment: params.has('enrollment') ? id(params.get('enrollment')) : null, p_revision: params.has('revision') ? id(params.get('revision')) : null, p_submission: params.has('submission') ? id(params.get('submission')) : null });
     if (error) throw error;
     if (params.get('metadata') === '1') return reply({ id: file.id, name: file.name, kind: file.kind, size: file.size });
