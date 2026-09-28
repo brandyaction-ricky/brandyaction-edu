@@ -1931,19 +1931,10 @@ function OrdersPanel({
     (quickStatus === "failed" && order.status === "payment_failed") ||
     (quickStatus === "refund" && rows(data, "payments").some(payment => payment.order_id === order.id && rows(data, "edu_refund_requests").some(request => request.payment_id === payment.id && request.status === "processing"))) ||
     (quickStatus === "access" && order.status === "paid" && !rows(data, "enrollments").some(enrollment => enrollment.status === "active" && rows(data, "order_items").some(item => item.order_id === order.id && item.id === enrollment.order_item_id))));
-  const ids = new Set(orders.map((o) => o.id));
-  const payments = rows(data, "payments").filter((p) =>
-    ids.has(t(p, "order_id")),
-  );
-  const paid = payments.reduce(
-    (sum, p) => sum + Number(p.approved_amount || 0),
-    0,
-  );
-  const refunded = payments.reduce(
-    (sum, p) => sum + Number(p.cancelled_amount || 0),
-    0,
-  );
-  const paymentIds = new Set(payments.map(payment => payment.id));
+  const orderSummary = rows(data, "order_summary")[0];
+  const paid = Number(orderSummary?.approvedRevenue || 0);
+  const refunded = Number(orderSummary?.refundedRevenue || 0);
+  const paymentIds = new Set(rows(data, "payments").map(payment => payment.id));
   const processingRefunds = rows(data, "edu_refund_requests").filter(
     request => request.status === "processing" && paymentIds.has(String(request.payment_id)),
   );
@@ -1972,16 +1963,16 @@ function OrdersPanel({
         search={<AdminSearchField value={query} label="주문 검색" placeholder="주문번호 · 회원명 · 상품명 검색" onChange={event => { setQuery(event.target.value); setOpened(""); }} />}
         onReset={() => { setQuery(""); setStatus(""); setQuickStatus("all"); setCourse(""); setFrom(""); setTo(""); setAppliedDates({ from: "", to: "" }); setDateError(""); setOpened(""); }}
         action={<AdminButton variant="primary" disabled={loading} onClick={applyDates}>기간 조회</AdminButton>}
-        appliedSummary={`적용 기간: ${appliedDates.from || "전체 시작일"} ~ ${appliedDates.to || "전체 종료일"} · 주문일/KST, 종료일 포함 · 검색·집계는 현재 조회 페이지 기준`}
+        appliedSummary={`적용 기간: ${appliedDates.from || "전체 시작일"} ~ ${appliedDates.to || "전체 종료일"} · 주문일/KST, 종료일 포함 · 목록 필터는 현재 페이지 기준, 매출 카드는 전체 주문 기준`}
       />
       <div className="admin-pilot-summary" aria-busy={loading}>
         {[
-          ["결제 완료액", money(paid), "현재 페이지 조회 조건의 승인 결제 합계"],
-          ["환불 완료액", money(refunded), "현재 페이지 결제의 취소 완료액"],
-          ["순결제액", money(paid - refunded), "결제 완료 − 환불 완료"],
-          ["환불 처리 확인", processingRefunds.length + "건", "현재 페이지의 결과 확인 중인 환불"],
+          ["결제 완료액", money(paid), "전체 주문의 승인 결제 합계 · 모든 페이지"],
+          ["환불 완료액", money(refunded), "전체 주문의 취소 완료액 · 모든 페이지"],
+          ["순결제액", money(paid - refunded), "전체 결제 완료 − 전체 환불 완료"],
+          ["환불 처리 확인", Number(orderSummary?.processingRefunds || 0) + "건", "전체 주문의 결과 확인 중인 환불"],
         ].map(([label, value, note], index) => (
-          <AdminSummaryCard key={label} label={label} value={loading ? "—" : value} scope={note} compact className={index === 2 ? "admin-pilot-summary-highlight" : undefined} />
+          <AdminSummaryCard key={label} label={label} value={loading || !orderSummary ? "—" : value} scope={note} compact className={index === 2 ? "admin-pilot-summary-highlight" : undefined} />
         ))}
       </div>
       <section className="admin-pilot-workspace" aria-label="주문 목록" aria-busy={loading}>
@@ -2050,7 +2041,7 @@ function OrdersPanel({
         </AdminDataTable>
         {!orders.length && !loading && <AdminEmptyState title="해당 주문이 없습니다." action={<AdminButton onClick={() => { setQuery(""); setStatus(""); setCourse(""); setFrom(""); setTo(""); setAppliedDates({ from: "", to: "" }); setDateError(""); }}>검색·필터 초기화</AdminButton>}>현재 조회 페이지의 기간·상품·상태 또는 검색어를 확인하세요.</AdminEmptyState>}
         {loading && <div className="pad"><AdminLoadingState title="주문 내역을 불러오는 중입니다." description="결제·환불·수강권 연결 상태를 함께 확인하고 있습니다."/></div>}
-        <div className="table-foot"><span>{orders.length}건 표시 · 현재 조회 페이지 내 검색·집계</span><span>정산·회계 매출은 결제액과 별도</span></div>
+        <div className="table-foot"><span>{orders.length}건 표시 · 목록 검색은 현재 페이지 기준, 상단 매출은 전체 주문 기준</span><span>정산·회계 매출은 결제액과 별도</span></div>
       </section>
       {selectedOrder && <AdminDrawer title="주문 상세" onClose={() => setOpened("")} size="large" className="order-detail-drawer">
             <AdminDialogBody>
