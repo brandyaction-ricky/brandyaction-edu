@@ -7,6 +7,7 @@ import {
   text as t,
   type Row,
 } from "@/lib/platform";
+import { youtubeThumbnailUrl } from "@/lib/youtube-thumbnail";
 import {
   ArrowRight,
   BookOpen,
@@ -174,7 +175,7 @@ export function ArticleCard({ article }: { article: Row }) {
   );
 }
 export function Story({ story }: { story: Row }) {
-  const thumbnail = safeUrl(story.thumbnail_url);
+  const thumbnail = safeUrl(story.thumbnail_url) || youtubeThumbnailUrl(safeUrl(story.video_url));
   return (
     <article className="story-card">
       <div className="story-card-cover">
