@@ -84,7 +84,7 @@ function apiHarness(user, failure = null, fixtures = {}, staffPermissions = {}) 
       } });
       return query;
     },
-    async rpc() { calls.summaries++; return { data: { id: 'summary', pendingReviews: 3 }, error: null }; },
+    async rpc() { calls.summaries++; return { data: { id: 'summary', pendingReviews: 3, approvedRevenue: 50_058_000, refundedRevenue: 3_304_000, netRevenue: 46_754_000 }, error: null }; },
   };
   const auth = { async getAuthenticatedUser() { calls.auth++; if (failure) throw failure; return user; } };
   const operators = load('lib/operator-permissions.ts', { '@/lib/server-auth': auth, '@/lib/operator-scopes': scopes, '@/lib/supabase/admin': { createAdminClient: () => db } });
@@ -125,6 +125,18 @@ test('menu reads authenticate once and preserve review badges without full dashb
   assert.equal(api.calls.summaries, 0);
   assert.equal((await response.json()).data.admin_summary[0].pendingReviews, 3);
   assert.deepEqual(api.calls.tables.sort(), ['mission_submissions', 'site_banners']);
+});
+
+test('order revenue summary covers every order page and keeps the navigation badge', async () => {
+  const api = apiHarness(admin, null, { orders: [{ id: 'one', status: 'paid' }] });
+  const first = await (await api.read('orders&page=1')).json();
+  const third = await (await api.read('orders&page=3')).json();
+  const total = { id: 'order-summary', approvedRevenue: 50_058_000, refundedRevenue: 3_304_000, netRevenue: 46_754_000, processingRefunds: 3 };
+  assert.deepEqual(first.data.order_summary[0], total);
+  assert.deepEqual(third.data.order_summary[0], total);
+  assert.equal(third.pagination.page, 3);
+  assert.equal(third.data.admin_summary[0].pendingReviews, 3);
+  assert.equal(api.calls.summaries, 2);
 });
 
 test('product curriculum tab loads on demand behind product permission', async () => {
