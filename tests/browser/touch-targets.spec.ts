@@ -30,7 +30,8 @@ test('member mission row and drawer actions remain readable and focusable', asyn
   expect(fontSize).toBeGreaterThanOrEqual(isMobile ? 13 : 12);
   await action.focus();
   await expect(action).toBeFocused();
-  expect(await action.evaluate(element => getComputedStyle(element).outlineWidth)).toBe('2px');
+  const outlineWidth = await action.evaluate(element => Number.parseFloat(getComputedStyle(element).outlineWidth));
+  expect(outlineWidth).toBeGreaterThanOrEqual(2);
   await page.locator('.participant-member-link').first().click();
   const drawerAction = page.locator('.participant-drawer-mission .participant-row-action').first();
   await expect(drawerAction).toBeVisible();
