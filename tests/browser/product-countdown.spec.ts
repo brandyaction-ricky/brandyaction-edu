@@ -47,6 +47,34 @@ test('missing sales schedule and closed products stay blocked; missing deadlines
   }
 });
 
+test('closed paid offer removes both outer application links from keyboard and navigation', async ({ page }) => {
+  for (const selector of ['.product-aside .btn', '.bottom-cta .btn']) {
+    await page.goto('/product-countdown-test?closed=1');
+    const cta = page.locator(selector);
+    await expect(cta).toBeAttached();
+    await expect(cta).toBeDisabled();
+    await expect(cta).not.toHaveAttribute('href', /.+/);
+    if (await cta.isVisible()) {
+      await cta.focus();
+      await page.keyboard.press('Enter');
+      await expect(page).toHaveURL(/product-countdown-test\?closed=1$/);
+      for (let index = 0; index < 20; index++) {
+        await page.keyboard.press('Tab');
+        expect(await cta.evaluate(element => document.activeElement !== element)).toBe(true);
+      }
+    }
+  }
+});
+
+test('open and enrolled paid offers retain their outer destinations', async ({ page }) => {
+  for (const [query, destination] of [['off=1', /\/login\?next=%2Fcheckout/], ['off=1&enrolled=1', /\/learn\/enrolled-fixture$/]] as const) {
+    await page.goto(`/product-countdown-test?${query}`);
+    const cta = page.locator('.product-aside .btn');
+    await expect(cta).toBeEnabled();
+    await expect(cta).toHaveAttribute('href', destination);
+  }
+});
+
 test('when one cohort closes, countdown and CTA follow the same remaining offer', async ({ page }) => {
   await page.clock.install({ time: new Date('2099-10-01T14:58:58Z') });
   await page.goto('/product-countdown-test?multiple=1');

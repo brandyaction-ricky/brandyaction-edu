@@ -102,3 +102,38 @@ test('search icon spacing does not change iconless admin input padding', async (
   expect(paddings.search).toBeGreaterThanOrEqual(paddings.ordinary + 16);
   expect(paddings.ordinary).toBe(12);
 });
+
+test('question, coupon, tag and article spacing resolves from shared tokens', async ({ page, viewport }) => {
+  const spacing = await page.evaluate(() => {
+    const admin = document.querySelector('.edu-admin');
+    if (!admin) throw new Error('관리자 테스트 화면이 없습니다.');
+    const sample = document.createElement('div');
+    sample.innerHTML = `
+      <section class="question-admin-card"><div class="panel-body"></div></section>
+      <div class="question-answer-editor"><span>질문</span><span>답변</span></div>
+      <div class="tag-rule-box"></div>
+      <div class="coupon-limit-group"></div>
+      <div class="coupon-settings-form"><div></div><div></div></div>
+    `;
+    admin.append(sample);
+    const front = document.createElement('div');
+    front.className = 'edu-front';
+    front.innerHTML = '<div class="article-thumbnail"></div>';
+    document.body.append(front);
+    const css = (selector: string) => getComputedStyle(document.querySelector(selector) as Element);
+    return {
+      questionPadding: css('.question-admin-card .panel-body').paddingTop,
+      answerGap: css('.question-answer-editor').rowGap,
+      tagPadding: css('.tag-rule-box').paddingTop,
+      couponPadding: css('.coupon-limit-group').paddingTop,
+      couponGap: css('.coupon-settings-form').rowGap,
+      articleMargin: css('.article-thumbnail').marginBottom,
+    };
+  });
+  expect(spacing.questionPadding).toBe((viewport?.width || 0) <= 680 ? '16px' : '20px');
+  expect(spacing.answerGap).toBe('20px');
+  expect(spacing.tagPadding).toBe('20px');
+  expect(spacing.couponPadding).toBe('20px');
+  expect(spacing.couponGap).toBe('20px');
+  expect(spacing.articleMargin).toBe('20px');
+});

@@ -312,6 +312,13 @@ export function Platform({
         setAccessDenied(response.status === 403);
         return;
       }
+      if ((account || learning) && response.status === 401) {
+        setUser(null);
+        setData({});
+        setPagination(null);
+        setLoadedReadKey(publicReadKey);
+        return;
+      }
       if (!response.ok) throw new Error(result.error);
       if (alive.current) {
         setData(result.data || {});
@@ -328,7 +335,7 @@ export function Platform({
     } finally {
       if (alive.current && !controller.signal.aborted) setLoading(false);
     }
-  }, [admin, adminPage, adminSection, editorRecordId, scopeQuery, adminReadKey, publicReadKey, publicParamsString]);
+  }, [account, admin, adminPage, adminSection, editorRecordId, learning, scopeQuery, adminReadKey, publicReadKey, publicParamsString]);
   const prefetchAdminSection = useCallback(
     (section: string) => {
       if (!admin || !user?.id || section === adminSection) return;
@@ -617,6 +624,18 @@ export function Platform({
         authError={searchParams.get("error")}
       />
     );
+  else if ((account || learning) && (loading || (!error && loadedReadKey !== publicReadKey)))
+    body = (
+      <div className="wrap">
+        <section className="member-loading-skeleton" role="status" aria-live="polite" aria-busy="true">
+          <span className="sr-only">{learning ? "학습실 정보를 불러오는 중입니다." : "나의 학습 정보를 불러오는 중입니다."}</span>
+          <div className="member-loading-lines" aria-hidden="true"><span /><span /><span /></div>
+          <div className="member-loading-panels" aria-hidden="true"><span /><span /></div>
+        </section>
+      </div>
+    );
+  else if ((account || learning) && error)
+    body = <div className="wrap"><Empty title="학습 정보를 불러오지 못했습니다." /></div>;
   else if ((account || learning) && !user)
     body = (
       <div className="wrap">
@@ -741,8 +760,17 @@ export function Platform({
               <CourseCard key={c.id} course={c} />
             ))}
         </div>
-        {!loading && !error && !courses.length && (
-          <Empty title="등록된 클래스가 없습니다." />
+        {!loading && !error && loadedReadKey === publicReadKey && query === publicSearch && !courses.length && (
+          query.trim() || filter !== "전체" ? (
+            <Empty title="검색 조건에 맞는 클래스가 없습니다.">
+              <button className="btn" type="button" onClick={() => {
+                setQuery("");
+                setPublicSearch("");
+                setFilter("전체");
+                if (searchParams.get("type") === "free") router.replace("/classes");
+              }}>검색·필터 초기화</button>
+            </Empty>
+          ) : <Empty title="등록된 클래스가 없습니다." />
         )}
         {pagination && pagination.total > pagination.pageSize && <div className="row center mt24" aria-label="클래스 페이지">
           <button className="btn" type="button" disabled={publicPage <= 1} onClick={() => setPublicPage(page => page - 1)}>이전</button>
@@ -790,11 +818,11 @@ export function Platform({
   else
     body = (
       <div className="wrap">
-        {loading ? (
+        {loading || (!error && loadedReadKey !== publicReadKey) ? (
           <section className="page-loading" role="status" aria-live="polite" aria-busy="true">
             <span className="page-loading-spinner" aria-hidden="true" />
-            <h1>곧 열립니다</h1>
-            <p>페이지를 준비하고 있어요. 잠시만 기다려 주세요.</p>
+            <h1>{path[0] === "classes" ? "클래스 정보를 불러오는 중입니다." : "페이지 정보를 불러오는 중입니다."}</h1>
+            <p>잠시만 기다려 주세요.</p>
           </section>
         ) : (
           <>

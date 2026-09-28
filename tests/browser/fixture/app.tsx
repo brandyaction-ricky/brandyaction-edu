@@ -14,6 +14,7 @@ import { MemberOperationsFixture, RetainedMemberDialogFixture } from './member-o
 import { SubmissionReviewFixture } from './submission-review';
 import { ProductSaleFixture } from './product-sale';
 import { ProductCountdownFixture } from './product-countdown';
+import { HomeHero } from '../../../app/ui/final/home-hero';
 import { AdminComponentsFixture } from './admin-components';
 import { AdminPilotFixture } from './admin-pilot';
 import { AdminWorkspace } from '../../../app/ui/admin-workspace';
@@ -106,6 +107,16 @@ function OrderCompleteFixture() {
   const [status, setStatus] = useState(params.get('fixtureStatus') || 'paid');
   return <div className="edu-front"><OrderResult data={{ orders: [{ id: '11111111-1111-4111-8111-111111111111', order_number: 'BAE-QA-1', status, total_amount: params.get('free') === '1' ? 0 : 1650000 }] }} refresh={async () => { setStatus('paid'); }} /></div>;
 }
+function HomeHeroTouchFixture() {
+  const banners = [
+    { id: 'touch-one', title: '첫 번째 배너', link_url: '/classes' },
+    { id: 'touch-two', title: '두 번째 배너', link_url: '/classes' },
+    { id: 'touch-three', title: '세 번째 배너', link_url: '/classes' },
+    { id: 'touch-four', title: '네 번째 배너', link_url: '/classes' },
+    { id: 'touch-five', title: '다섯 번째 배너', link_url: '/classes' },
+  ];
+  return <div className="edu-front"><HomeHero banners={new URLSearchParams(location.search).has('many') ? banners : banners.slice(0, 2)} freeOpen={false} /></div>;
+}
 const path = window.location.pathname;
 // Destination pages are outside this fixture's scope. Keep them inert so their
 // fallback admin screen cannot rewrite the URL before navigation is asserted.
@@ -115,4 +126,4 @@ const fixture = ['/checkout', '/apply', '/safe-custom', '/learn/enrolled-fixture
     ? <ProductHtmlCtaFixture/>
     : <div className="edu-admin" style={{padding:24,minHeight:'180vh'}}>{path.startsWith('/copy-links-test') ? <><RecruitmentLinks period="sample" version={2}/><WebinarManagement period="sample" courses={[{id:'22222222-2222-4222-8222-222222222222',title:'합성 무료 교육'}]} cohorts={[]}/></> : path.startsWith('/delivery-test') ? <RecruitmentDelivery code="33333333-3333-4333-8333-333333333333"/> : path.startsWith('/templates-admin-test') ? <AdminWorkflows section="templates" data={{crm_templates:[],crm_delivery_state:[{id:'delivery',enabled:false,configured:false}]}} pending={false} send={async body=>{const r=await fetch('/api/platform/workflows',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw Error('저장 실패');return r.json();}}/> : path.startsWith('/webinar-test') ? <WebinarRegistration code="11111111-1111-4111-8111-111111111111" channel="organic"/> : path.startsWith('/webinar-admin-test') ? <WebinarManagement workspace={new URLSearchParams(location.search).has("workspace")} period="sample" courses={[{id:'22222222-2222-4222-8222-222222222222',title:'합성 무료 교육'}]} cohorts={[]}/> : path.startsWith('/admin/conversion') ? <ConversionFixture/> : <><BoundaryFixture/><LandingAdmin/></>}</div>;
 const publicScreen = new URLSearchParams(location.search).get('publicScreen');
-createRoot(document.getElementById('root')!).render(<StrictMode>{['/coupons-test', '/coupon-checkout-test'].includes(path) ? <CouponsFixture/> : path === '/order-complete-test' ? <OrderCompleteFixture/> : path === '/purchase-onboarding' ? <PurchaseOnboarding order={new URLSearchParams(location.search).get('order') || ''} guideRequested={new URLSearchParams(location.search).get('step') === 'guide'} /> : path === '/admin/purchase-onboarding-test' ? <PurchaseOnboardingAdmin/> : path === '/classroom-questions-test' ? <ClassroomQuestionsFixture/> : path === '/product-countdown-test' ? <ProductCountdownFixture /> : publicScreen ? <Platform path={publicScreen === 'home' ? [] : [publicScreen]} user={null} /> : new URLSearchParams(location.search).has('navigationFixture') ? <AdminWorkspace>{null}</AdminWorkspace> : path === '/product-visibility-test' ? <ProductVisibilityFixture /> : path === '/visibility-home-test' || path.startsWith('/classes') ? <Platform path={path === '/visibility-home-test' ? [] : path.split('/').filter(Boolean)} user={null} /> : path === '/product-sale-test' ? <ProductSaleFixture /> : fixture}</StrictMode>);
+createRoot(document.getElementById('root')!).render(<StrictMode>{['/coupons-test', '/coupon-checkout-test'].includes(path) ? <CouponsFixture/> : path === '/order-complete-test' ? <OrderCompleteFixture/> : path === '/home-hero-touch-test' ? <HomeHeroTouchFixture/> : path === '/purchase-onboarding' ? <PurchaseOnboarding order={new URLSearchParams(location.search).get('order') || ''} guideRequested={new URLSearchParams(location.search).get('step') === 'guide'} /> : path === '/admin/purchase-onboarding-test' ? <PurchaseOnboardingAdmin/> : path === '/classroom-questions-test' ? <ClassroomQuestionsFixture/> : path === '/product-countdown-test' ? <ProductCountdownFixture /> : publicScreen ? <Platform path={publicScreen === 'home' ? [] : publicScreen.split('/')} user={null} /> : new URLSearchParams(location.search).has('navigationFixture') ? <AdminWorkspace>{null}</AdminWorkspace> : path === '/product-visibility-test' ? <ProductVisibilityFixture /> : path === '/visibility-home-test' || path.startsWith('/classes') ? <Platform path={path === '/visibility-home-test' ? [] : path.split('/').filter(Boolean)} user={null} /> : path === '/product-sale-test' ? <ProductSaleFixture /> : fixture}</StrictMode>);

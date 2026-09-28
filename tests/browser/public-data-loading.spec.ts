@@ -44,6 +44,54 @@ test('failed public read shows a retryable error, not a false empty state', asyn
   await expect(page.getByText('등록된 클래스가 없습니다.')).toHaveCount(0);
 });
 
+test('empty catalog is distinct from an empty search result', async ({ page }) => {
+  await page.route('**/api/platform?**', route => route.fulfill({ json: {
+    user: null, data: { courses: [], cohorts: [] }, pagination: { page: 1, pageSize: 12, total: 0 }, support: {},
+  } }));
+  await page.goto('/public-data-test?publicScreen=classes');
+  await expect(page.getByText('등록된 클래스가 없습니다.')).toBeVisible();
+  await expect(page.getByRole('button', { name: '검색·필터 초기화' })).toHaveCount(0);
+});
+
+test('empty class filter and search explain the condition and reset in one action', async ({ page }) => {
+  const reads: URL[] = [];
+  await page.route('**/api/platform?**', route => {
+    const url = new URL(route.request().url());
+    reads.push(url);
+    const filtered = Boolean(url.searchParams.get('filter') || url.searchParams.get('q'));
+    const courses = filtered ? [] : [course(1), course(2)];
+    return route.fulfill({ json: { user: null, data: { courses, cohorts: [] }, pagination: { page: 1, pageSize: 12, total: courses.length }, support: {} } });
+  });
+  await page.goto('/public-data-test?publicScreen=classes');
+  await expect(page.locator('.course-card')).toHaveCount(2);
+  await page.getByRole('button', { name: '무료 클래스' }).click();
+  await expect(page.getByText('검색 조건에 맞는 클래스가 없습니다.')).toBeVisible();
+  await page.getByRole('button', { name: '검색·필터 초기화' }).click();
+  await expect(page.locator('.course-card')).toHaveCount(2);
+  await expect(page.getByRole('button', { name: '전체' })).toHaveClass(/active/);
+  await page.getByRole('searchbox', { name: '클래스 검색' }).fill('없는클래스-QA');
+  await expect(page.getByText('검색 조건에 맞는 클래스가 없습니다.')).toBeVisible();
+  await page.getByRole('button', { name: '검색·필터 초기화' }).click();
+  await expect(page.locator('.course-card')).toHaveCount(2);
+  await expect(page.getByRole('searchbox', { name: '클래스 검색' })).toHaveValue('');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(reads.some(url => url.searchParams.get('filter') === '무료 클래스')).toBe(true);
+  expect(reads.some(url => url.searchParams.get('q') === '없는클래스-QA')).toBe(true);
+});
+
+test('reset from a free-class deep link removes its URL filter', async ({ page }) => {
+  await page.route('**/api/platform?**', route => {
+    const filtered = new URL(route.request().url()).searchParams.get('filter') === '무료 클래스';
+    const courses = filtered ? [] : [course(1)];
+    return route.fulfill({ json: { user: null, data: { courses, cohorts: [] }, pagination: { page: 1, pageSize: 12, total: courses.length }, support: {} } });
+  });
+  await page.goto('/classes?type=free');
+  await expect(page.getByText('검색 조건에 맞는 클래스가 없습니다.')).toBeVisible();
+  await page.getByRole('button', { name: '검색·필터 초기화' }).click();
+  await expect(page).toHaveURL('/classes');
+  await expect(page.locator('.course-card')).toHaveCount(1);
+});
+
 test('article category filter and server page remain aligned', async ({ page }) => {
   const category = '11111111-1111-4111-8111-111111111111';
   const reads: URL[] = [];

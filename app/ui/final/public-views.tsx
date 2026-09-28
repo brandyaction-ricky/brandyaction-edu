@@ -221,13 +221,10 @@ function StandardProductDetail({
   const detailCtaDeadline = !customCta && !enrolled && available ? t(available, 'recruitment_end_at') : undefined;
   const countdown = meta.recruitment_countdown_enabled === true
     ? <RecruitmentCountdown endAt={countdownCohort?.recruitment_end_at} /> : null;
-  const button = customCta ? <ProductCtaLink conversion={conversion} courseId={c.id} position="sidebar_cta" className="btn primary full large" /> : unavailableFree ? <button className="btn primary full large" disabled>참여 링크 준비 중</button> : (
+  const button = customCta ? <ProductCtaLink conversion={conversion} courseId={c.id} position="sidebar_cta" className="btn primary full large" /> : unavailableFree ? <button className="btn primary full large" disabled>참여 링크 준비 중</button> : !enrolled && !available ? <button type="button" className="btn primary full large disabled" disabled>{cta}<ArrowRight /></button> : (
     <Link
       href={href}
-      aria-disabled={!enrolled && !available}
-      className={
-        "btn primary full large " + (!enrolled && !available ? "disabled" : "")
-      }
+      className="btn primary full large"
     >
       {cta}
       <ArrowRight />
@@ -475,12 +472,9 @@ function StandardProductDetail({
               {t(available, "name") || t(c, "schedule_label")}
             </p>
           </div>}
-          {customCta ? <ProductCtaLink conversion={conversion} courseId={c.id} position="sticky_cta" /> : unavailableFree ? <button className="btn primary large" disabled>참여 링크 준비 중</button> : <Link
+          {customCta ? <ProductCtaLink conversion={conversion} courseId={c.id} position="sticky_cta" /> : unavailableFree ? <button className="btn primary large" disabled>참여 링크 준비 중</button> : !enrolled && !available ? <button type="button" className="btn primary large disabled" disabled>{cta}<ArrowRight /></button> : <Link
             href={href}
-            aria-disabled={!enrolled && !available}
-            className={
-              "btn primary large " + (!enrolled && !available ? "disabled" : "")
-            }
+            className="btn primary large"
           >
             {cta}
             <ArrowRight />
