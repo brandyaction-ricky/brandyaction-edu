@@ -6,6 +6,7 @@ import { useUnsavedWarning } from '@/features/admin-ui';
 import { blockReviewLabels, blockSubmissionState, type BlockSubmission, type BlockSubmissionDetail } from '@/lib/lesson-block-review';
 import { LessonBlockView } from './lesson-block-view';
 import { BlockReviewHistory } from './lesson-block-submission-history';
+import { OngoingLessonReviews } from './ongoing-lesson-reviews';
 import { SubmissionReview } from './submission-review';
 
 type QueueRow = { id: string; memberName: string; courseTitle: string; lessonTitle: string; submission: BlockSubmission };
@@ -119,14 +120,16 @@ export function LessonBlockReviews() {
 
 export function SubmissionReviewWorkspace(props: ComponentProps<typeof SubmissionReview>) {
   const params = useSearchParams();
-  const [tab, setTab] = useState(params.get('tab') === 'blocks' ? 'blocks' : 'missions');
+  const [tab, setTab] = useState(params.get('tab') === 'ongoing' ? 'ongoing' : params.get('tab') === 'blocks' ? 'blocks' : 'missions');
   const enabled = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true';
   if (!enabled) return <SubmissionReview {...props} />;
   return <><div className="row mb24" aria-label="제출물 종류">
     <button className="btn" aria-pressed={tab === 'missions'} onClick={() => setTab('missions')}>미션 제출물</button>
     <button className="btn" aria-pressed={tab === 'blocks'} onClick={() => setTab('blocks')}>학습 본문 제출물</button>
+    <button className="btn" aria-pressed={tab === 'ongoing'} onClick={() => setTab('ongoing')}>지속 챌린지 참여 기록</button>
   </div>
     <div hidden={tab !== 'missions'}><SubmissionReview {...props} /></div>
     <div hidden={tab !== 'blocks'}><LessonBlockReviews /></div>
+    {tab === 'ongoing' && <OngoingLessonReviews />}
   </>;
 }

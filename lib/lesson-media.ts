@@ -1,3 +1,4 @@
+import { ongoingReviewFileUrl, type OngoingReviewSelection } from './ongoing-lessons';
 import { answerFileSpec, answerFileTypes, matchesAnswerFile } from './lesson-files';
 export type LessonMediaKind = 'image' | 'audio' | 'video';
 export const lessonMediaTypes: Record<string, { kind: LessonMediaKind; mime: string }> = {
@@ -27,9 +28,10 @@ export function matchesLessonMedia(bytes: Uint8Array, spec: LessonMediaSpec) {
     default: return false;
   }
 }
-export type LessonMediaContext = { lessonId: string; enrollmentId: string; revision: string };
+export type LessonMediaContext = { ongoingReview?: OngoingReviewSelection; lessonId: string; enrollmentId: string; revision: string };
 // Stable same-origin endpoint; signed Storage URLs never enter lesson JSON.
 export function lessonMediaUrl(assetId: string, context?: LessonMediaContext, submissionId?: string) {
+  if (context?.ongoingReview) return ongoingReviewFileUrl(context.lessonId, context.enrollmentId, context.ongoingReview, assetId, 'content');
   const params = new URLSearchParams({ asset: assetId });
   if (submissionId) params.set('submission', submissionId);
   else if (context) { params.set('lesson', context.lessonId); params.set('enrollment', context.enrollmentId); params.set('revision', context.revision); }

@@ -1,3 +1,4 @@
+import type { OngoingReviewSelection } from './ongoing-lessons';
 // Storage metadata is never an answer. Drafts keep only server-issued file IDs.
 export const answerFileLimit = 10 * 1024 * 1024;
 export const answerFileTypes: Record<string, { kind: 'image' | 'file'; mime: string }> = {
@@ -29,4 +30,4 @@ export function matchesAnswerFile(bytes: Uint8Array, spec: AnswerFileSpec): bool
     default: return false;
   }
 }
-export type AnswerFileContext = { lessonId: string; enrollmentId: string; revision: string };
+export type AnswerFileContext = { ongoingReview?: OngoingReviewSelection; lessonId: string; enrollmentId: string; revision: string };

@@ -41,7 +41,6 @@ export async function prepareReplitLessonPlan(source) {
     const mapping = [], blocks = [], questionIds = new Set();
     const add = (block, from, more = {}) => { blocks.push(block); mapping.push({ sourceBlock: from, targetBlock: block.id, ...more }); };
     if (!sourceDoc.title.trim() || sourceDoc.title.trim() === '-') issue('TITLE_REVIEW_PENDING', key);
-    if (sourceDoc.track === 'ongoing') issue('ONGOING_ENGINE_PENDING', key);
     if (sourceDoc.track !== 'ongoing' && (sourceDoc.day < 1 || sourceDoc.day > 30)) issue('DAY_RANGE_REVIEW', key);
     if (sourceDoc.track === 'learning' && sourceDoc.metadata.intro) add({ id: stableId('meta', key, 'intro'), type: 'text', content: sourceDoc.metadata.intro }, 'metadata.intro');
     // Raw order stays in source.json. DayPage renders stable numeric order, not
@@ -94,13 +93,13 @@ export async function prepareReplitLessonPlan(source) {
       } else { out.pendingType = true; issue('BLOCK_TYPE_REVIEW', key, block.sourceId); }
       add(out, block.sourceId, extra);
     }
-    const plannedDocument = { schemaVersion: 1, blocks, checklist: sourceDoc.checklist.map(c => ({ id: stableId('check', key, c.sourceId), label: c.text, required: c.required })), completion: sourceDoc.track === 'learning' ? { mode: 'self', requireAnswers: false, requireQuizPass: true } : { mode: 'mentor', requireAnswers: false, requireQuizPass: false }, ...(sourceDoc.track !== 'ongoing' ? { progression: { track: sourceDoc.track === 'challenge' ? 'daily' : 'learning', dayNumber: sourceDoc.day } } : {}) };
+    const plannedDocument = { schemaVersion: 1, blocks, checklist: sourceDoc.checklist.map(c => ({ id: stableId('check', key, c.sourceId), label: c.text, required: c.required })), completion: sourceDoc.track === 'ongoing' ? { mode: 'self', requireAnswers: false, requireQuizPass: false } : sourceDoc.track === 'learning' ? { mode: 'self', requireAnswers: false, requireQuizPass: true } : { mode: 'mentor', requireAnswers: false, requireQuizPass: false }, ...(sourceDoc.track !== 'ongoing' ? { progression: { track: sourceDoc.track === 'challenge' ? 'daily' : 'learning', dayNumber: sourceDoc.day } } : {}) };
     let document = null;
     if (!blocks.some(b => Object.keys(b).some(k => k.startsWith('pending')))) {
       try { document = contract.validateLessonBlocks(plannedDocument); }
       catch { issue('RUNTIME_VALIDATION_REVIEW', key); }
     }
-    return { key, sourceIndex, title: sourceDoc.title, week: sourceDoc.week, day: sourceDoc.day, track: sourceDoc.track, metadata: structuredClone(sourceDoc.metadata), mapping, checklistMapping: sourceDoc.checklist.map((c,i) => ({ sourceCheck: c.sourceId, targetCheck: plannedDocument.checklist[i].id })), plannedDocument, document, ready: document !== null && issues.length === start, issues: issues.slice(start) };
+    return { key, sourceIndex, ...(sourceDoc.track === 'ongoing' ? { ongoing: sourceDoc.metadata.type } : {}), title: sourceDoc.title, week: sourceDoc.week, day: sourceDoc.day, track: sourceDoc.track, metadata: structuredClone(sourceDoc.metadata), mapping, checklistMapping: sourceDoc.checklist.map((c,i) => ({ sourceCheck: c.sourceId, targetCheck: plannedDocument.checklist[i].id })), plannedDocument, document, ready: document !== null && issues.length === start, issues: issues.slice(start) };
   });
   // Never equate a valid plan made from an old file with verified live content.
   const plan = { formatVersion: 1, sourceCapturedAt: snapshot.capturedAt, sourceDigest: inspected.digest, currentLiveContentVerified: false, configuration: structuredClone(snapshot.configuration), lessons, assets: [...assets.values()], issues, readyForImport: false };

@@ -21,8 +21,20 @@ test('converts all 17 block types in displayed numeric order, preserves payload 
   assert.equal(lesson.document.blocks.find(b=>b.type==='link').url,'https://example.test/resource');
   for(const block of lesson.document.blocks) assert.match(block.id,/^[a-z0-9-]+$/);
   assert.equal(plan.currentLiveContentVerified,false);assert.equal(plan.readyForImport,false);
-  assert.ok(plan.issues.some(i=>i.code==='EXTERNAL_MEDIA_UNVERIFIED'));assert.ok(plan.issues.some(i=>i.code==='ONGOING_ENGINE_PENDING'));
+  assert.ok(plan.issues.some(i=>i.code==='EXTERNAL_MEDIA_UNVERIFIED'));
   assert.deepEqual((await prepareReplitLessonPlan(copy)).plan,plan); // Stable identities and package contents on retry.
+});
+test('ongoing conversion preserves cadence, optional questions, required checks and their original IDs',async()=>{
+ const source=sourceFixture();source.ongoing_challenges[0].blocks.push({id:'q-old',type:'question',questionId:'old-answer',questionType:'text',questionLabel:'실행 기록',order:2});
+ source.ongoing_challenges[0].mission_checks=[{id:'old-check',label:'실행 완료',required:true}];
+ for(const cadence of ['daily','weekly','monthly']){
+  source.ongoing_challenges[0].type=cadence;const {plan}=await prepareReplitLessonPlan(source),lesson=plan.lessons.find(l=>l.track==='ongoing');
+  assert.equal(lesson.ready,true);assert.equal(lesson.ongoing,cadence);assert.equal(lesson.week,0);assert.equal(lesson.document.progression,undefined);
+  assert.equal(lesson.metadata.description,'매주 반복');assert.deepEqual(lesson.document.completion,{mode:'self',requireAnswers:false,requireQuizPass:false});
+  assert.equal(lesson.mapping[1].answerSourceId,'old-answer');assert.equal(lesson.checklistMapping[0].sourceCheck,'old-check');
+  assert.equal(contract.missingBlockRequirements(lesson.document,{blocks:{},checklist:[]}).length,1);
+  assert.deepEqual(contract.missingBlockRequirements(lesson.document,{blocks:{},checklist:[lesson.document.checklist[0].id]}),[]);
+ }
 });
 test('equal order preserves source tie order; renumbering order does not change a block or answer identity', async()=>{
   const source=sourceFixture();source.days[0].blocks[1].order=2;

@@ -9,10 +9,10 @@ export async function prepareReplitImport(bound, placement) {
   if (!placement || Object.keys(placement).some(k=>!['courseId','requestId','lessonKeys','weeks'].includes(k)) || placement.courseId!==bound.courseId || !uuid(placement.requestId)
     || !Array.isArray(placement.lessonKeys) || !placement.lessonKeys.length || new Set(placement.lessonKeys).size!==placement.lessonKeys.length || !Array.isArray(placement.weeks)) fail();
   const selected=placement.lessonKeys.map(key=>bound.lessons.find(l=>l.key===key));
-  if (selected.some(l=>!l || !l.structureReady || l.issues.length || !l.document?.progression || !l.title.trim() || l.title.trim()==='-')) fail();
+  if (selected.some(l=>!l || !l.structureReady || l.issues.length || (!l.document?.progression && !['daily','weekly','monthly'].includes(l.ongoing)) || !l.title.trim() || l.title.trim()==='-')) fail();
   const targets=new Map();
   for(const w of placement.weeks) {
-    if(!w || Object.keys(w).some(k=>!['sourceWeek','id','number','title','goal','existing','startOrder'].includes(k)) || targets.has(w.sourceWeek) || !Number.isInteger(w.sourceWeek) || w.sourceWeek<1 || !Number.isInteger(w.startOrder) || w.startOrder<1) fail();
+    if(!w || Object.keys(w).some(k=>!['sourceWeek','id','number','title','goal','existing','startOrder'].includes(k)) || targets.has(w.sourceWeek) || !Number.isInteger(w.sourceWeek) || w.sourceWeek<0 || !Number.isInteger(w.startOrder) || w.startOrder<1) fail();
     targets.set(w.sourceWeek,w);
   }
   if (selected.some(l=>!targets.has(l.week)) || placement.weeks.some(w=>!selected.some(l=>l.week===w.sourceWeek))) fail();
@@ -21,7 +21,7 @@ export async function prepareReplitImport(bound, placement) {
   // original day number remains in document.progression for each track.
   const lessons=selected.map(l=>{
     const w=targets.get(l.week),order=positions.get(w.id)??w.startOrder;positions.set(w.id,order+1);
-    return {id:stableId(placement.courseId,placement.requestId,l.key,'lesson'),revision:stableId(placement.courseId,placement.requestId,l.key,'revision'),sourceKey:l.key,weekId:w.id,order,title:l.title,description:'',durationLabel:typeof l.metadata.time==='string'?l.metadata.time:'',
+    return {id:stableId(placement.courseId,placement.requestId,l.key,'lesson'),revision:stableId(placement.courseId,placement.requestId,l.key,'revision'),sourceKey:l.key,weekId:w.id,order,title:l.title,description:l.ongoing && typeof l.metadata.description==='string'?l.metadata.description:'',...(l.ongoing?{ongoing:l.ongoing}:{}),durationLabel:typeof l.metadata.time==='string'?l.metadata.time:'',
       provenance:{sourceWeek:l.week,sourceDay:l.day,metadata:structuredClone(l.metadata),mapping:structuredClone(l.mapping),checklistMapping:structuredClone(l.checklistMapping)},document:structuredClone(l.document)};
   });
   const used=new Set(lessons.flatMap(l=>l.document.blocks.flatMap(b=>b.assetId?[b.assetId]:[]))),seen=new Set();

@@ -1,11 +1,12 @@
+import type { OngoingCadence } from './ongoing-lessons';
 import { validateLessonBlocks, type LessonBlockDocument } from './lesson-blocks';
 
 export const lessonImportLimit = 4_000_000;
 export type ImportWeek = { id: string; number: number; title: string; goal: string; existing: boolean };
-export type ImportLesson = { id: string; revision: string; sourceKey: string; weekId: string; order: number; title: string; description: string; durationLabel: string; provenance: Record<string, unknown>; document: LessonBlockDocument };
+export type ImportLesson = { ongoing?: OngoingCadence; id: string; revision: string; sourceKey: string; weekId: string; order: number; title: string; description: string; durationLabel: string; provenance: Record<string, unknown>; document: LessonBlockDocument };
 export type ImportMedia = { assetId: string; kind: 'image' | 'audio' | 'video'; sha256: string; bytes: number; mimeType: string };
 export type LessonImportBatch = { formatVersion: 1; courseId: string; sourceDigest: string; sourceCapturedAt: string; weeks: ImportWeek[]; lessons: ImportLesson[]; media: ImportMedia[] };
-export type LessonImportReceipt = { requestId: string; applied: boolean; weeksCreated: number; lessonsCreated: number; daily: number; learning: number; lessons: { sourceKey: string; lessonId: string; revision: string }[] };
+export type LessonImportReceipt = { requestId: string; applied: boolean; weeksCreated: number; lessonsCreated: number; daily: number; learning: number; ongoing?: number; lessons: { sourceKey: string; lessonId: string; revision: string }[] };
 const invalid = (): never => { throw new Error('가져올 커리큘럼 파일의 형식과 배치를 확인해 주세요.'); };
 function record(value: unknown, keys?: string[]) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) invalid();
@@ -36,16 +37,18 @@ export function validateLessonImportBatch(input: unknown): LessonImportBatch {
   unique(weeks.map(w => w.id)); unique(weeks.map(w => w.number));
   const weekIds = new Set(weeks.map(w => w.id));
   const lessons = list(root.lessons, 200).map(value => {
-    const l = record(value, ['id', 'revision', 'sourceKey', 'weekId', 'order', 'title', 'description', 'durationLabel', 'provenance', 'document']);
+    const l = record(value, ['id', 'revision', 'sourceKey', 'weekId', 'order', 'title', 'description', 'durationLabel', 'provenance', 'document', 'ongoing']);
     const document = validateLessonBlocks(l.document), weekId = id(l.weekId);
-    if (!document.progression || !weekIds.has(weekId)) invalid();
+    const ongoing = l.ongoing as OngoingCadence | undefined;
+    if (Object.hasOwn(l, 'ongoing') && !['daily', 'weekly', 'monthly'].includes(String(ongoing))) invalid();
+    if (!weekIds.has(weekId) || (ongoing ? Boolean(document.progression) || document.completion?.mode !== 'self' : !document.progression)) invalid();
     const provenance = record(l.provenance, ['metadata', 'mapping', 'checklistMapping', 'sourceWeek', 'sourceDay']);
     if (new TextEncoder().encode(JSON.stringify(provenance)).byteLength > 300000) invalid();
-    return { id: id(l.id), revision: id(l.revision), sourceKey: text(l.sourceKey, 200, true), weekId, order: positive(l.order, 100000), title: text(l.title, 300, true), description: text(l.description, 10000), durationLabel: text(l.durationLabel, 100), provenance, document };
+    return { ...(ongoing ? { ongoing } : {}), id: id(l.id), revision: id(l.revision), sourceKey: text(l.sourceKey, 200, true), weekId, order: positive(l.order, 100000), title: text(l.title, 300, true), description: text(l.description, 10000), durationLabel: text(l.durationLabel, 100), provenance, document };
   });
   if (!weeks.length || !lessons.length || weeks.some(w => !lessons.some(l => l.weekId === w.id))) invalid();
   unique(lessons.map(l => l.id)); unique(lessons.map(l => l.revision)); unique(lessons.map(l => l.sourceKey)); unique(lessons.map(l => `${l.weekId}:${l.order}`));
-  unique(lessons.map(l => `${l.document.progression!.track}:${l.document.progression!.dayNumber}`));
+  unique(lessons.filter(l => l.document.progression).map(l => `${l.document.progression!.track}:${l.document.progression!.dayNumber}`));
   const media = list(root.media, 2000).map(value => {
     const m = record(value, ['assetId', 'kind', 'sha256', 'bytes', 'mimeType']);
     if (!['image', 'audio', 'video'].includes(String(m.kind))) invalid();

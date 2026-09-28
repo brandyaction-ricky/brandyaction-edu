@@ -34,5 +34,9 @@
 .lb-review-queue .btn[aria-pressed="true"] { border: 2px solid var(--brand, #c8192b); }
 .lb-review-panel .row { flex-wrap: wrap; }
 .lb-review-panel textarea { width: 100%; }
+.edu-admin .lb-ongoing-review .lb-review-queue { grid-template-columns: minmax(0, 1fr); }
+.edu-admin .lb-ongoing-review .lb-review-queue > .btn { min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; text-align: left; justify-content: flex-start; height: auto; }
+.edu-admin .lb-ongoing-review .row > label { display: grid; gap: 4px; min-width: 0; max-width: 100%; }
+.edu-admin .lb-ongoing-review select { max-width: 100%; }
 
 .lesson-blocks video { display:block; width:100%; height:auto; background:#111; border-radius:8px; }

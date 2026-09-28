@@ -20,8 +20,15 @@ test('placement preserves two day-one tracks, content and original mappings whil
  assert.deepEqual(await prepareReplitImport(bound,placement),out);assert.equal(out.batch.lessons[1].durationLabel,'5분');
 });
 for(const [name,alter] of [
- ['unresolved lessons',b=>{b.lessons[0].issues.push({code:'MEDIA_UPLOAD_PENDING'});}],['different destination',(b,p)=>p.courseId=id()],['unknown lesson',(b,p)=>p.lessonKeys.push('missing')],['ongoing engine',(b,p)=>p.lessonKeys.push(b.lessons[2].key)],['duplicate selection',(b,p)=>p.lessonKeys.push(p.lessonKeys[0])],['missing week',(b,p)=>p.weeks=[]],['missing source title',b=>b.lessons[0].title='-'],['duplicate week mapping',(b,p)=>p.weeks.push({...p.weeks[0]})]
+ ['unresolved lessons',b=>{b.lessons[0].issues.push({code:'MEDIA_UPLOAD_PENDING'});}],['different destination',(b,p)=>p.courseId=id()],['unknown lesson',(b,p)=>p.lessonKeys.push('missing')],['ongoing without destination week',(b,p)=>p.lessonKeys.push(b.lessons[2].key)],['duplicate selection',(b,p)=>p.lessonKeys.push(p.lessonKeys[0])],['missing week',(b,p)=>p.weeks=[]],['missing source title',b=>b.lessons[0].title='-'],['duplicate week mapping',(b,p)=>p.weeks.push({...p.weeks[0]})]
 ])test('placement rejects '+name,async()=>{const {bound,placement}=await prepared();alter(bound,placement);await assert.rejects(prepareReplitImport(bound,placement),/Invalid import placement/);});
+test('ongoing source week zero maps to an explicit destination without inventing daily progression',async()=>{
+ const {bound,placement}=await prepared(),ongoing=bound.lessons[2];placement.lessonKeys.push(ongoing.key);placement.weeks.push({sourceWeek:0,id:id(),number:9,title:'지속 챌린지',goal:'',existing:false,startOrder:1});
+ const out=await prepareReplitImport(bound,placement),lesson=out.batch.lessons[2];assert.equal(lesson.ongoing,'weekly');assert.equal(lesson.document.progression,undefined);
+ assert.equal(lesson.description,ongoing.metadata.description);assert.deepEqual(lesson.document,ongoing.document);assert.deepEqual(lesson.provenance.metadata,ongoing.metadata);
+ const {validateLessonImportBatch}=await lessonImportContract();assert.deepEqual(validateLessonImportBatch(out.batch),out.batch);
+ for(const change of [l=>l.ongoing='bad',l=>l.document.progression={track:'daily',dayNumber:2},l=>l.document.completion.mode='mentor',l=>delete l.ongoing]){const batch=structuredClone(out.batch);change(batch.lessons[2]);assert.throws(()=>validateLessonImportBatch(batch));}
+});
 test('server contract rejects mixed IDs, duplicated days, unsupported provenance and unverified media references',async()=>{
  const {validateLessonImportBatch}=await lessonImportContract();const original=batchFor(id());assert.deepEqual(validateLessonImportBatch(original),original);
  for(const alter of [b=>b.lessons[1].order=b.lessons[0].order,b=>b.lessons[1].document.progression=b.lessons[0].document.progression,b=>b.lessons[0].weekId=id(),b=>b.lessons[0].document.blocks.push({id:'img',type:'image',assetId:id()}),b=>b.lessons[0].provenance.apiKey='forbidden',b=>b.media.push({assetId:id(),kind:'image',bytes:8,mimeType:'image/png',sha256:'a'.repeat(64)}),b=>b.lessons[0].title='',b=>b.sourceCapturedAt='yesterday']){const batch=structuredClone(original);alter(batch);assert.throws(()=>validateLessonImportBatch(batch));}

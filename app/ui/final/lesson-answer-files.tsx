@@ -1,6 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- Private answer images use an authenticated, short-lived redirect. */
 import { useEffect, useRef, useState } from 'react';
+import { ongoingReviewFileUrl } from '@/lib/ongoing-lessons';
 import { answerFileSpec, type AnswerFileContext } from '@/lib/lesson-files';
 import type { BlockAnswer, PublicLessonBlock } from '@/lib/lesson-blocks';
 const endpoint = '/api/platform/lesson-files';
@@ -39,7 +40,7 @@ export function AnswerFiles({ block, answer, onChange, readOnly, context, submis
     finally { if (active.current === abort) active.current = null; if (!abort.signal.aborted) { setPending(false); latest.current.onPending?.(block.id, false); } }
   }
   function remove(key: string) { if (!window.confirm('현재 답변에서 첨부를 뺄까요? 이전 제출물의 첨부는 보관됩니다.')) return; const next = { ...latest.current.files }; delete next[key]; onChange(next); }
-  function url(file: string, download = false) { return endpoint + '?' + new URLSearchParams({ file, ...(submissionId ? { submission: submissionId } : {}), ...(download ? { download: '1' } : {}) }); }
+  function url(file: string, download = false) { if (context?.ongoingReview) return ongoingReviewFileUrl(context.lessonId, context.enrollmentId, context.ongoingReview, file, 'answer') + (download ? '&download=1' : ''); return endpoint + '?' + new URLSearchParams({ file, ...(submissionId ? { submission: submissionId } : {}), ...(download ? { download: '1' } : {}) }); }
   return <section className="lb-field lb-card" aria-label={block.question?.label}>
     <strong>{block.question?.label}</strong>
     {(['image', 'file'] as const).filter(kind => block.question?.kind === 'image' || kind === 'file').map(kind => {

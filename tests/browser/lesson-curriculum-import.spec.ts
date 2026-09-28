@@ -2,7 +2,7 @@ import {test,expect,type Page} from '@playwright/test';
 const uid=(n:number)=>`aaaaaaaa-1111-4111-8111-${String(n).padStart(12,'0')}`;
 const course='aaaaaaaa-1111-4111-8111-111111111111';
 function payload(){return {requestId:uid(1),batch:{formatVersion:1,courseId:course,sourceDigest:'a'.repeat(64),sourceCapturedAt:'2026-09-07T05:18:25.000Z',weeks:[{id:uid(2),number:1,title:'시작하기',goal:'',existing:false}],lessons:['daily','learning'].map((track,i)=>({id:uid(i+10),revision:uid(i+20),sourceKey:track+':1',weekId:uid(2),order:i+1,title:track==='daily'?'오늘의 실습':'오늘의 학습',description:'',durationLabel:'10분',provenance:{sourceWeek:1,sourceDay:1,metadata:{},mapping:[],checklistMapping:[]},document:{schemaVersion:1,blocks:[{id:'t',type:'text',content:'시험용 원문'}],checklist:[],completion:{mode:track==='daily'?'mentor':'self',requireAnswers:false,requireQuizPass:track==='learning'},progression:{track,dayNumber:1}}})),media:[]}};}
-async function choose(page:Page,data=payload()){await page.getByLabel('가져오기 JSON 파일').setInputFiles({name:'import.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(data))});}
+async function choose(page:Page,data:unknown=payload()){await page.getByLabel('가져오기 JSON 파일').setInputFiles({name:'import.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(data))});}
 async function backend(page:Page,options:{lost?:boolean;conflict?:boolean;badJson?:boolean;beforeWrite?:boolean}={}){
  const writes:Record<string,unknown>[]=[],reads:Record<string,unknown>[]=[];let applied=false;
  await page.route('**/api/admin/lesson-curriculum-import',async route=>{
@@ -21,6 +21,10 @@ test('author reviews original date, both tracks and server placement before impo
  await expect(page.getByRole('button',{name:'비공개 수업으로 가져오기'})).toHaveCount(0);await page.getByRole('button',{name:'주차·파일 연결 확인'}).click();
  await expect(page.getByRole('button',{name:'비공개 수업으로 가져오기'})).toBeDisabled();await page.getByRole('checkbox',{name:'원본 날짜와 가져올 학습 목록을 확인했습니다.'}).check();await page.getByRole('button',{name:'비공개 수업으로 가져오기'}).dblclick();
  await expect(page.getByRole('status').filter({hasText:'비공개 학습 2개를 저장했습니다'})).toBeVisible();expect(server.writes).toHaveLength(1);expect(server.writes[0].batch).toEqual(payload().batch);await expect(page.getByText('목록 갱신 1회')).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:info.outputPath('import-private.png'),fullPage:true});
+});
+test('import preview distinguishes repeating practice from one-time day numbers',async({page})=>{
+ await page.goto('/lesson-import-test');const data=payload();const ongoing={...data.batch.lessons[0],id:uid(30),revision:uid(31),sourceKey:'ongoing:1',order:3,title:'매주 반복',ongoing:'weekly',document:{schemaVersion:1,blocks:[{id:'t',type:'text',content:'반복 실습'}],checklist:[],completion:{mode:'self',requireAnswers:false,requireQuizPass:false}}};
+ await choose(page,{...data,batch:{...data.batch,lessons:[...data.batch.lessons,ongoing]}});await expect(page.getByText(/데일리 미션 1개 · 별도 학습 1개 · 지속 챌린지 1개/)).toBeVisible();await page.getByText('가져올 주차·학습 목록 확인',{exact:true}).click();await expect(page.getByText('주간 지속 챌린지 · 매주 반복',{exact:true})).toBeVisible();await expect(page.getByRole('alert')).toHaveCount(0);
 });
 for(const badJson of [false,true])test(`lost import acknowledgment (${badJson?'malformed success':'server failure'}) preserves identity and recovers without a second write`,async({page})=>{
  const server=await backend(page,{lost:!badJson,badJson});await page.goto('/lesson-import-test');await choose(page);await page.getByRole('button',{name:'주차·파일 연결 확인'}).click();await page.getByRole('checkbox').check();await page.getByRole('button',{name:'비공개 수업으로 가져오기'}).click();
