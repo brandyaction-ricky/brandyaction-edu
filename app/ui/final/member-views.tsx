@@ -1,4 +1,5 @@
 "use client";
+import { QuestionAnswerHistory } from './question-thread';
 import { MemberMessages } from './member-messages';
 import { achievement } from "@/lib/edu-workflows";
 import {
@@ -723,7 +724,7 @@ function Questions({
           <h3>{t(q, "title")}</h3>
           {Boolean(q.learning_context) && <p className="meta">{t(q, "learning_context")}</p>}
           <p className="reading-copy">{t(q, "content")}</p>
-          {q.answer ? (
+          {process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED === 'true' ? <QuestionAnswerHistory questionId={String(q.id)} fallback={String(q.answer || '')}/> : q.answer ? (
             <div className="answer">
               <b>운영자 답변</b>
               <p className="reading-copy">{t(q, "answer")}</p>

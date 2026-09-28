@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { date, text as t, type Row } from '@/lib/platform';
 import { useUnsavedLearningChanges } from './use-unsaved-learning-changes';
 import './lesson-questions.css';
+import { QuestionAnswerHistory } from './question-thread';
 
 export function LessonQuestions({ enrollmentId, lessonId, lessonTitle }: { enrollmentId: string; lessonId: string; lessonTitle: string }) {
   const [open, setOpen] = useState(false), [title, setTitle] = useState(''), [content, setContent] = useState('');
@@ -46,7 +47,7 @@ export function LessonQuestions({ enrollmentId, lessonId, lessonTitle }: { enrol
     </form>}
     {notice && <p role="status">{notice}</p>}
     {loading ? <p role="status">내 질문을 불러오고 있습니다.</p> : readError ? <p role="alert">{readError} <button type="button" className="btn small" onClick={()=>{setLoading(true);setVersion(v=>v+1);}}>질문 다시 불러오기</button></p> : <>
-      {questions.map(question=><article className="question-card" key={question.id}><div className="between"><b>{question.status==='answered'?'답변 완료':'답변 대기'}</b><span className="meta">{date(question.created_at)}</span></div><h3>{t(question,'title')}</h3><p className="reading-copy">{t(question,'content')}</p>{Boolean(question.answer) && <div className="answer"><b>운영자 답변</b><p className="reading-copy">{t(question,'answer')}</p></div>}</article>)}
+      {questions.map(question=><article className="question-card" key={question.id}><div className="between"><b>{question.status==='answered'?'답변 완료':'답변 대기'}</b><span className="meta">{date(question.created_at)}</span></div><h3>{t(question,'title')}</h3><p className="reading-copy">{t(question,'content')}</p>{process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED === 'true' ? <QuestionAnswerHistory questionId={String(question.id)} fallback={String(question.answer || '')}/> : Boolean(question.answer) && <div className="answer"><b>운영자 답변</b><p className="reading-copy">{t(question,'answer')}</p></div>}</article>)}
       {!questions.length && <p className="meta">이 학습에 남긴 질문이 없습니다.</p>}
       {(page>0 || hasMore) && <div className="row"><button type="button" className="btn small" disabled={page===0} onClick={()=>{setLoading(true);setPage(p=>p-1);}}>이전 질문</button><span>{page+1}페이지</span><button type="button" className="btn small" disabled={!hasMore} onClick={()=>{setLoading(true);setPage(p=>p+1);}}>다음 질문</button></div>}
     </>}

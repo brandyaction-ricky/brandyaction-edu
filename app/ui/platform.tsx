@@ -1,4 +1,5 @@
 "use client";
+import { QuestionThreadDialog } from './final/question-thread';
 import { UnreadMessageLink } from "./final/unread-message-link";
 import { disableDevicePush, synchronizePushAccount } from "@/lib/web-push-client";
 import { defaultPolicies } from "@/lib/legal-policies";
@@ -33,6 +34,7 @@ import {
   useRef,
   useState,
   type FormEvent,
+  type ComponentProps,
   type ReactNode,
 } from "react";
 import { AdminWorkflows, standaloneAdmin } from "./admin-workflows";
@@ -1061,6 +1063,7 @@ export function Platform({
       {notice && (admin ? <AdminToast tone="success">{notice}</AdminToast> : <div className="toast" role="status">{notice}</div>)}
       {editor && editor.route === routeKey && (
         <Editor
+          onQuestionChanged={() => void refresh()}
           key={editor.section.key + (editor.row ? recordId(editor.row) : "new")}
           section={editor.section}
           row={editor.row}
@@ -1123,7 +1126,13 @@ function downloadCsv(rows: Row[], name: string) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
-export function Editor({
+export function Editor(props: ComponentProps<typeof LegacyEditor> & { onQuestionChanged?: () => void }) {
+  const { onQuestionChanged, ...legacy } = props;
+  if (process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED === 'true' && props.section.key === 'questions' && props.row?.id)
+    return <QuestionThreadDialog questionId={String(props.row.id)} close={props.close} changed={onQuestionChanged} archive={props.archive} pending={props.pending}/>;
+  return <LegacyEditor {...legacy}/>;
+}
+function LegacyEditor({
   section,
   row,
   context,
