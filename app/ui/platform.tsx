@@ -1,4 +1,5 @@
 "use client";
+import { QuestionImage } from './final/question-image';
 import { QuestionThreadDialog } from './final/question-thread';
 import { UnreadMessageLink } from "./final/unread-message-link";
 import { disableDevicePush, synchronizePushAccount } from "@/lib/web-push-client";
@@ -1465,7 +1466,7 @@ function LegacyEditor({
               ) : section.key === "coupons" ? (
                 <CouponFields row={row} data={data} />
               ) : section.key === "questions" ? (
-                <div className="question-answer-editor">
+                <div className="question-answer-editor"><QuestionImage key={String(row?.id)} questionId={String(row?.id)} imageId={row?.image_id}/>
                   <div className="question-answer-heading">
                     <div><h3>답변 작성</h3><p>AI 초안은 자동 등록되지 않습니다. 사실을 확인하고 내용을 검수해 주세요.</p></div>
                     <button className="btn question-ai-button" type="button" disabled={pending || questionAiPending || !row?.id} onClick={() => void generateQuestionAnswer()}>

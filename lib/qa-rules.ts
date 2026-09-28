@@ -84,7 +84,7 @@ export const adminTables: Record<string, string[]> = {
 export function adminSelectColumns(section: string, table: string): string {
   if (section === 'products' && table === 'courses') return '*';
   if (table === 'courses') return 'id,title,status,category,list_price,archived_at,display_order,created_at,updated_at';
-  if (section === 'questions' && table === 'edu_questions') return 'id,user_id,course_id,learning_context,title,content,answer,status,is_archived,created_at,updated_at,profiles(id,full_name,email),courses(id,title)';
+  if (section === 'questions' && table === 'edu_questions') return 'id,user_id,course_id,learning_context,title,content,answer,status,is_archived,created_at,updated_at,profiles(id,full_name,email),courses(id,title)' + (process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED === 'true' ? ',image_id' : '');
   if (section === 'reviews' && table === 'mission_submissions') return '*,enrollments!inner(user_id,course_id,cohort_id,profiles!enrollments_user_id_fkey(id,full_name,email),courses(id,title),cohorts(id,name)),curriculum_missions(id,title,instructions)';
   if (section === 'orders') {
     if (table === 'orders') return 'id,order_number,user_id,status,subtotal,discount_amount,total_amount,entry_src,customer_name,customer_email,customer_phone,created_at';

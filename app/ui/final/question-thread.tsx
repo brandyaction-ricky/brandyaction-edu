@@ -1,8 +1,9 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { QuestionImage } from './question-image';
 import { AdminDrawer, useUnsavedWarning } from '@/features/admin-ui';
 type Answer = { id: string; authorName: string; content: string; createdAt: string };
-type Thread = { question: { id: string; title: string; content: string; learningContext?: string | null; status: string; resolved: boolean; archived: boolean; headId: string | null }; answers: Answer[]; nextCursor: string | null; canAnswer: boolean };
+type Thread = { question: { id: string; title: string; content: string; learningContext?: string | null; status: string; resolved: boolean; archived: boolean; headId: string | null; imageId?: string | null }; answers: Answer[]; nextCursor: string | null; canAnswer: boolean };
 async function request<T>(question: string, body?: unknown, before?: string, signal?: AbortSignal): Promise<T> {
  const response = await fetch('/api/platform/question-thread?' + new URLSearchParams({ question, ...(before ? { before } : {}) }), {
   method: body ? 'POST' : 'GET', cache: 'no-store', signal: signal || AbortSignal.timeout(10000),
@@ -74,7 +75,7 @@ export function QuestionThreadDialog({ questionId, close, changed, archive, pend
  }
  return <AdminDrawer title="질문 답변" onClose={leave}>
   <div className="admin-dialog-body">
-   {state.data && <><h3>{state.data.question.title}</h3>{state.data.question.learningContext && <p className="meta">{state.data.question.learningContext}</p>}<p className="reading-copy">{state.data.question.content}</p>{state.data.question.archived && <p className="notice">보관된 질문입니다. 답변 이력만 확인할 수 있습니다.</p>}</>}
+   {state.data && <><h3>{state.data.question.title}</h3>{state.data.question.learningContext && <p className="meta">{state.data.question.learningContext}</p>}<p className="reading-copy">{state.data.question.content}</p><QuestionImage key={questionId} questionId={questionId} imageId={state.data.question.imageId}/>{state.data.question.archived && <p className="notice">보관된 질문입니다. 답변 이력만 확인할 수 있습니다.</p>}</>}
    <Answers state={state}/>
    {state.data?.canAnswer && <section className="mt24"><h3>답변 추가</h3><p>이전 답변은 남겨 두고 새 답변을 추가합니다.</p><label className="field">새 답변<textarea rows={7} maxLength={10000} value={content} disabled={locked || stale} onChange={e => setContent(e.target.value)}/></label>
     <div className="row mt16"><button type="button" className="btn" disabled={locked || stale || Boolean(content)} onClick={() => void draft()}>{aiBusy ? 'AI 초안 생성 중…' : 'AI 답변 초안'}</button><button type="button" className="btn primary" disabled={locked || stale || !content.trim()} onClick={() => void write('answer')}>답변 추가하기</button></div>

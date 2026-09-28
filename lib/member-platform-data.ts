@@ -23,7 +23,7 @@ export async function readMemberPlatformData(userId: string, view: MemberView, e
   const data: Record<string, Row[]> = {};
   const limit = MEMBER_ROW_LIMIT + 1;
   if (view === 'profile' || view === 'messages') return data;
-  const readQuestions = async () => checked(await db.from('edu_questions').select('id,user_id,course_id,learning_context,title,content,answer,status,created_at').eq('user_id', userId).eq('is_archived', false).order('created_at', { ascending: false }).limit(limit), '질문');
+  const readQuestions = async () => checked(await db.from('edu_questions').select('id,user_id,course_id,learning_context,title,content,answer,status,created_at' + (process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED === 'true' ? ',image_id' : '')).eq('user_id', userId).eq('is_archived', false).order('created_at', { ascending: false }).limit(limit), '질문');
   const readCoupons = async () => checked(await db.from('customer_coupons').select('id,user_id,coupon_id,status,issued_at,used_at,expires_at,coupon:coupons(name,code,discount_type,discount_value,ends_at)').eq('user_id', userId).order('issued_at', { ascending: false }).limit(limit), '쿠폰');
   if (enrollmentViews.has(view)) {
     let query = db.from('enrollments').select('id,user_id,course_id,cohort_id,status,access_starts_at,access_ends_at,revoked_at,created_at').eq('user_id', userId);
