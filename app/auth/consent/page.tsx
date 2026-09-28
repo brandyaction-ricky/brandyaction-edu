@@ -1,4 +1,5 @@
 "use client";
+import { disableDevicePush } from "@/lib/web-push-client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -74,6 +75,7 @@ export default function SocialConsentPage() {
     busy.current = true;
     setPending(true);
     try {
+    await disableDevicePush().catch(() => {});
     await createClient().auth.signOut();
     router.replace("/login");
     router.refresh();

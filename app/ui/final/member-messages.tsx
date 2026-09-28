@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from 'react';
 import './member-messages.css';
+import { PushSettings } from './push-settings';
 
 type Message = { id: string; senderId: string; recipientId: string; senderName: string | null; recipientName: string | null; content: string; createdAt: string; readAt: string | null };
 type Inbox = { rows: Message[]; nextCursor: string | null; unreadCount: number; canSendToMembers: boolean };
@@ -19,7 +20,7 @@ async function post(body: object) {
   if (!response.ok) throw Object.assign(new Error(data.error || '전송 결과를 확인하지 못했습니다.'), { definitive: [400, 401, 403, 404, 409, 413, 429].includes(response.status) });
   return data;
 }
-export function MemberMessages({ ongoingLesson = '' }: { ongoingLesson?: string }) {
+export function MemberMessages({ ongoingLesson = '', userId }: { ongoingLesson?: string; userId?: string }) {
   const [view, setView] = useState({ box: 'inbox', before: '', refresh: 0 });
   const key = JSON.stringify(view), [loaded, setLoaded] = useState<{ key: string; data?: Inbox; error?: string }>();
   const data = loaded?.key === key ? loaded.data : undefined;
@@ -80,6 +81,7 @@ export function MemberMessages({ ongoingLesson = '' }: { ongoingLesson?: string 
     } finally { sendGate.current = false; setInFlight(false); }
   }
   return <section className="edu-messages" aria-label="메시지함">
+    {userId && process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === 'true' && <PushSettings key={userId} userId={userId} />}
     <h1>메시지</h1><p>멘토와 학습에 필요한 이야기를 주고받습니다.</p>
     <div className="row"><button className="btn" aria-pressed={view.box === 'inbox'} onClick={() => changeBox('inbox')}>받은 메시지{data ? ` · 안 읽음 ${data.unreadCount}` : ''}</button><button className="btn" aria-pressed={view.box === 'sent'} onClick={() => changeBox('sent')}>보낸 메시지</button><button className="btn" onClick={() => setView(old => ({ ...old, refresh: old.refresh + 1 }))}>메시지 새로고침</button></div>
     {loaded?.key === key && loaded.error ? <p role="alert">{loaded.error}</p> : !data ? <p role="status">메시지를 불러오고 있습니다.</p> : <>

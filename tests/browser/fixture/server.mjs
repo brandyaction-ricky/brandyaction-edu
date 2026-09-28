@@ -20,6 +20,7 @@ const server = createServer((request,response)=>{
   const url=new URL(request.url,'http://localhost');
   if(lessonQuestionFixture(request,response,url))return;
   if(reviewFixture(request,response,url))return;
+  if(url.pathname==='/edu-push-sw.js'){response.setHeader('Content-Type','application/javascript');response.setHeader('Cache-Control','no-store');response.end(readFileSync(resolve('public/edu-push-sw.js')));return;}
   if(request.method!=='GET'){response.writeHead(405).end();return;}
   if(url.pathname==='/api/platform'&&url.searchParams.get('part')==='curriculum'){
     response.setHeader('Content-Type','application/json');

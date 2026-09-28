@@ -3,5 +3,5 @@
   "framework": "nextjs",
   "git": { "deploymentEnabled": { "codex/edu-release-211-integration-20260927": false, "codex/edu-release-211-ci-fix-20260927": false } },
   "regions": ["icn1"],
-  "crons": [{ "path": "/api/cron/crm", "schedule": "*/5 * * * *" }]
+  "crons": [{ "path": "/api/cron/crm", "schedule": "*/5 * * * *" }, { "path": "/api/cron/push", "schedule": "* * * * *" }]
 }

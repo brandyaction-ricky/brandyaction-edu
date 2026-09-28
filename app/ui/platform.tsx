@@ -1,4 +1,5 @@
 "use client";
+import { disableDevicePush, synchronizePushAccount } from "@/lib/web-push-client";
 import { defaultPolicies } from "@/lib/legal-policies";
 import { createMutationGate } from "@/lib/mutation-gate";
 import { sectionScopes } from "@/lib/operator-scopes";
@@ -381,6 +382,9 @@ export function Platform({
       document.removeEventListener("keydown", closeOnEscape);
     };
   }, [profileMenuOpen]);
+  useEffect(() => {
+    if (!loading && !error) void synchronizePushAccount(user?.id || null).catch(() => {});
+  }, [loading, error, user?.id]);
   const send = (body: Record<string, unknown>, success = "저장했습니다.") =>
     mutationGate.current(body, async (payload) => {
       setPending(true);
@@ -489,6 +493,7 @@ export function Platform({
   }
   const logout = async () => {
     setPending(true);
+    await disableDevicePush().catch(() => {});
     const { error } = await createClient().auth.signOut();
     if (error) {
       setNotice("로그아웃에 실패했습니다.");

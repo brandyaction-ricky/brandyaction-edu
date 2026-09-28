@@ -1296,7 +1296,7 @@ export function MemberViews({
       content = <Missions data={data} active={active} />;
       break;
     case "messages":
-      content = process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === "true" ? <MemberMessages key={user.id + (ongoingLesson || "")} ongoingLesson={ongoingLesson} /> : <Empty title="메시지 기능을 준비 중입니다." />;
+      content = process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === "true" ? <MemberMessages key={user.id + (ongoingLesson || "")} userId={user.id} ongoingLesson={ongoingLesson} /> : <Empty title="메시지 기능을 준비 중입니다." />;
       break;
     case "questions":
       content = (

@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
     ],
   },
   async headers() {
-    return [{
+    return [{ source: "/edu-push-sw.js", headers: [{ key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }] }, {
       source: "/:path*",
       headers: [
         { key: "X-Content-Type-Options", value: "nosniff" },
