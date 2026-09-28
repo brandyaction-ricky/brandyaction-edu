@@ -25,6 +25,32 @@ async function backend(page: Page, failure = 0, denied = false) {
 }
 async function add(page: Page, type: string) { await page.getByRole('combobox', { name: '추가할 항목' }).selectOption(type); await page.getByRole('button', { name: '항목 추가', exact: true }).click(); return page.locator('[data-author-block]').last(); }
 
+test('author preserves image and archive question types and exposes the matching student upload controls', async ({ page }) => {
+  const server = await backend(page);
+  await page.goto('/lesson-block-author-test');
+  await page.getByRole('button', { name: '여러 항목으로 구성하기' }).click();
+  for (const [kind, label] of [['image', '실행 화면'], ['file', '결과물 묶음']]) {
+    const question = await add(page, 'question');
+    await question.getByRole('textbox', { name: '질문 문구' }).fill(label);
+    await question.getByRole('combobox', { name: '답변 유형' }).selectOption(kind);
+  }
+  await page.getByRole('button', { name: '학습 저장', exact: true }).click();
+  await expect(page.getByText('학습 기본 정보와 콘텐츠를 저장했습니다.', { exact: true })).toBeVisible();
+  expect(server.getDocument()?.blocks.slice(1).map(block => block.question?.kind)).toEqual(['image', 'file']);
+  await page.getByRole('button', { name: '편집 다시 열기' }).click();
+  await expect(page.getByRole('combobox', { name: '답변 유형' }).nth(0)).toHaveValue('image');
+  await expect(page.getByRole('combobox', { name: '답변 유형' }).nth(1)).toHaveValue('file');
+  await page.getByRole('button', { name: '구성 미리보기', exact: true }).click();
+  await expect(page.getByLabel('구성 미리보기').locator('input[type=file]')).toHaveCount(0);
+  await page.getByRole('button', { name: '학생 화면 보기' }).click();
+  const image = page.getByRole('region', { name: '실행 화면', exact: true });
+  const archive = page.getByRole('region', { name: '결과물 묶음', exact: true });
+  await expect(image.getByLabel('답변 이미지 선택')).toBeEnabled();
+  await expect(image.getByLabel('압축파일 선택')).toBeEnabled();
+  await expect(archive.getByLabel('압축파일 선택')).toBeEnabled();
+  await expect(archive.getByLabel('답변 이미지 선택')).toHaveCount(0);
+});
+
 test('author saves the learning track and whole-course ordinal with the original quiz completion policy',async({page})=>{
  const server=await backend(page);await page.goto('/lesson-block-author-test');await page.getByRole('button',{name:'여러 항목으로 구성하기'}).click();
  await page.getByRole('combobox',{name:'학습 개방 방식'}).selectOption('learning');await page.getByRole('spinbutton',{name:'전체 과정에서 몇 일차인가요?'}).fill('30');

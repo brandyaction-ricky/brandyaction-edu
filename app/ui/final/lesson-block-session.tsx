@@ -28,6 +28,9 @@ function SessionContent({ snapshot, lessonId, enrollmentId, onSelectRevision, on
   const [status, setStatus] = useState<AutosaveState>({ phase: 'saved', message: '', updatedAt: snapshot.draft?.updatedAt || null });
   const saver = useRef<LessonBlockAutosave | null>(null);
   const valuesRef = useRef(values);
+  const uploadsRef = useRef(new Set<string>());
+  const [uploading, setUploading] = useState(false);
+  function filePending(id: string, pending: boolean) { if (pending) uploadsRef.current.add(id); else uploadsRef.current.delete(id); setUploading(uploadsRef.current.size > 0); }
   const historical = snapshot.revision !== snapshot.currentRevision;
   const [submission, setSubmission] = useState(snapshot.submission || null);
   const [submitting, setSubmitting] = useState(false), [submitError, setSubmitError] = useState('');
@@ -51,11 +54,11 @@ function SessionContent({ snapshot, lessonId, enrollmentId, onSelectRevision, on
     const autosave = new LessonBlockAutosave(snapshot.draft?.values || { blocks: {}, checklist: [] }, snapshot.draft?.writeId || null, write => request('/api/platform/lesson-blocks', { action: 'draft', lessonId, enrollmentId, revision: snapshot.revision, ...write }));
     saver.current = autosave;
     const unsubscribe = autosave.subscribe(() => setStatus(autosave.getSnapshot()));
-    function unload(event: BeforeUnloadEvent) { if (autosave.hasUnsaved()) { event.preventDefault(); event.returnValue = ''; } }
+    function unload(event: BeforeUnloadEvent) { if (autosave.hasUnsaved() || uploadsRef.current.size > 0) { event.preventDefault(); event.returnValue = ''; } }
     function leaving(event: MouseEvent) {
       if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const link = event.target instanceof Element ? event.target.closest('a') : null;
-      if (!link || link.target === '_blank' || link.hasAttribute('download') || !autosave.hasUnsaved()) return;
+      if (!link || link.target === '_blank' || link.hasAttribute('download') || !autosave.hasUnsaved() && !uploadsRef.current.size) return;
       const target = new URL(link.href, location.href);
       if (target.origin === location.origin && target.pathname === location.pathname && target.search === location.search) return;
       if (!window.confirm('저장되지 않은 답변이 있습니다. 이 화면을 나가면 현재 입력을 잃을 수 있습니다. 이동할까요?')) { event.preventDefault(); event.stopPropagation(); }
@@ -66,7 +69,7 @@ function SessionContent({ snapshot, lessonId, enrollmentId, onSelectRevision, on
   }, [snapshot, lessonId, enrollmentId, historical]);
   function change(next: LessonBlockAnswers) { valuesRef.current = next; setValues(next); saver.current?.change(next); }
   function select(revision: string | null) {
-    if (saver.current?.hasUnsaved() && !window.confirm('저장되지 않은 답변이 있습니다. 현재 입력을 보관한 뒤 다른 기록을 열어 주세요. 계속 이동할까요?')) return;
+    if ((saver.current?.hasUnsaved() || uploadsRef.current.size > 0) && !window.confirm('저장되지 않은 답변이 있습니다. 현재 입력을 보관한 뒤 다른 기록을 열어 주세요. 계속 이동할까요?')) return;
     onSelectRevision(revision);
   }
   async function grade(blockId: string): Promise<BlockGrade> {
@@ -74,7 +77,7 @@ function SessionContent({ snapshot, lessonId, enrollmentId, onSelectRevision, on
     return data.result;
   }
   async function submit() {
-    if (submitting || historical || locked || !saver.current) return;
+    if (submitting || historical || locked || uploadsRef.current.size > 0 || !saver.current) return;
     if (missing.length) { setSubmitError('아래 필수 항목을 먼저 완료해 주세요.'); return; }
     setSubmitting(true); setSubmitError('');
     try {
@@ -113,7 +116,7 @@ function SessionContent({ snapshot, lessonId, enrollmentId, onSelectRevision, on
       : <div className="lb-save-status"><span role="status" aria-live="polite">{statusText[status.phase]}</span><button type="button" className="btn small" disabled={status.phase === 'saved' || status.phase === 'saving' || status.phase === 'conflict'} onClick={() => void saver.current?.flush()}>{status.phase === 'error' ? '저장 다시 시도' : '지금 저장'}</button></div>}
     {(status.phase === 'error' || status.phase === 'conflict') && <div className="lb-session-notice" role="alert"><p>{status.message} 현재 입력은 이 화면에 남아 있습니다.</p><button className="btn small" type="button" onClick={downloadAnswers}>현재 답변 내려받기</button>{status.phase === 'conflict' && <button className="btn small" type="button" onClick={() => select(null)}>저장된 답변 다시 확인</button>}</div>}
     {submission?.feedback && <div className="lb-session-notice"><h3>멘토 피드백</h3><p className="reading-copy">{submission.feedback}</p></div>}
-    {snapshot.document && <LessonBlockView document={snapshot.document} values={values} onChange={change} readOnly={historical || submitting || submitUncertain || locked} grade={historical || locked ? undefined : grade} />}
+    {snapshot.document && <LessonBlockView document={snapshot.document} values={values} onChange={change} fileContext={{ lessonId, enrollmentId, revision: snapshot.revision! }} onFilePending={filePending} onAnswerChange={(id, value) => change({ ...valuesRef.current, blocks: { ...valuesRef.current.blocks, [id]: value } })} readOnly={historical || submitting || submitUncertain || locked} grade={historical || locked ? undefined : grade} />}
     {!historical && <section className="lb-session-notice" aria-label="학습 제출">
       {locked ? <>
         <p role="status">{submissionState === 'completed' ? '학습을 완료했습니다.' : submissionState === 'approved' ? submission?.approvalKind === 'automatic' ? '자동승인되어 학습을 완료했습니다.' : '멘토가 승인했습니다. 학습을 완료했습니다.' : '미션을 제출했습니다. 멘토의 확인을 기다려 주세요.'}</p>
@@ -124,7 +127,7 @@ function SessionContent({ snapshot, lessonId, enrollmentId, onSelectRevision, on
         {submission && <p>{submissionState === 'changes_requested' ? '수정 요청을 받았습니다. 피드백을 확인하고 답변을 다시 제출해 주세요.' : '답변을 수정하고 다시 제출할 수 있습니다.'}</p>}
         <p>{policy.mode === 'mentor' ? '제출하면 현재 답변을 보관하고 멘토 확인을 기다립니다.' : '필수 항목을 확인하고 저장된 답변으로 학습을 완료합니다.'}</p>
         {submitError && <div role="alert"><p>{submitError}</p>{missing.length > 0 && <ul>{missing.map((item, index) => <li key={`${item.id}:${index}`}>{item.label}</li>)}</ul>}</div>}
-        <button className="btn primary" type="button" disabled={submitting || status.phase === 'conflict'} onClick={() => void submit()}>{submitting ? '저장·제출 중…' : policy.mode === 'mentor' ? '미션 제출하기' : '학습 완료하기'}</button>
+        <button className="btn primary" type="button" disabled={uploading || submitting || status.phase === 'conflict'} onClick={() => void submit()}>{submitting ? '저장·제출 중…' : policy.mode === 'mentor' ? '미션 제출하기' : '학습 완료하기'}</button>
       </>}
     </section>}
     <BlockSubmissionHistory submissions={submissionHistory} enrollmentId={enrollmentId} />

@@ -27,6 +27,13 @@ test('progression keeps separate tracks and rejects invalid day numbers or incom
  assert.throws(()=>validateLessonBlocks(learning));learning.blocks[3].quiz.passPercent=100;assert.deepEqual(validateLessonBlocks(learning),learning);
  assert.throws(()=>validateLessonBlocks({...learning,completion:{...learning.completion,requireQuizPass:false}}));
 });
+test('attachment answers keep only file IDs and require at least one attachment when marked required',()=>{
+ const doc={schemaVersion:1,blocks:[{id:'proof',type:'question',question:{label:'증빙',kind:'image',required:true}}],checklist:[]};
+ const file='11111111-1111-4111-8111-111111111111';
+ assert.deepEqual(validateBlockAnswers({blocks:{proof:{imageId:file,fileId:file}},checklist:[]},doc).blocks.proof,{imageId:file,fileId:file});
+ for(const proof of [{imageId:'https://bad.test/file'},{url:file},{fileId:file,name:'arbitrary'}])assert.throws(()=>validateBlockAnswers({blocks:{proof},checklist:[]},doc));
+ assert.equal(mod.missingBlockRequirements(doc,{blocks:{proof:{}},checklist:[]}).length,1);assert.equal(mod.missingBlockRequirements(doc,{blocks:{proof:{fileId:file}},checklist:[]}).length,0);
+});
 
 test('keeps block order, stable ids, original text and multiple quizzes; only learners lose answer keys', () => {
   const source = sample(), doc = validateLessonBlocks(source);

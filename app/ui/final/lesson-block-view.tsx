@@ -1,6 +1,8 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- Imported lesson images have author-selected external sources and unknown dimensions; do not proxy them through the Next image optimizer. */
 
+import { AnswerFiles } from './lesson-answer-files';
+import type { AnswerFileContext } from '@/lib/lesson-files';
 import { useState } from 'react';
 import { defaultBlockCompletion, fillBlockPrompt, type BlockAnswer, type LessonBlockAnswers, type PublicBlockDocument, type PublicLessonBlock } from '@/lib/lesson-blocks';
 import { LessonText } from './lesson-text';
@@ -14,7 +16,7 @@ import './lesson-blocks.css';
 export type BlockGrade = { correct: number; total: number; passed: boolean; results: { id: string; answered: boolean; correct: boolean }[] };
 const supported = new Set(['heading', 'subheading', 'text', 'video', 'audio', 'image', 'question', 'divider', 'link', 'prompt', 'prompt-generator', 'quiz']);
 export function canRenderLessonBlocks(document: PublicBlockDocument) {
-  return document.blocks.every(block => isGuidedTool(block.type) ? hasGuidedDefinition(block) : isCalculator(block.type) ? hasCalculatorDefinition(block) : supported.has(block.type) && (block.type !== 'question' || block.question?.kind === 'text'));
+  return document.blocks.every(block => isGuidedTool(block.type) ? hasGuidedDefinition(block) : isCalculator(block.type) ? hasCalculatorDefinition(block) : supported.has(block.type) && (block.type !== 'question' || ['text', 'image', 'file'].includes(block.question?.kind || '')));
 }
 function mediaUrl(value?: string) {
   try { const url = new URL(value || ''); return url.protocol === 'https:' && !url.username && !url.password ? url.href : ''; } catch { return ''; }
@@ -74,8 +76,8 @@ function BlockQuiz({ block, answer, disabled, onChange, grade }: { block: Public
   </section>;
 }
 
-export function LessonBlockView({ document, values, onChange, readOnly = false, grade }: { document: PublicBlockDocument; values: LessonBlockAnswers; onChange: (values: LessonBlockAnswers) => void; readOnly?: boolean; grade?: (blockId: string) => Promise<BlockGrade> }) {
-  function answer(id: string, value: BlockAnswer) { onChange({ ...values, blocks: { ...values.blocks, [id]: value } }); }
+export function LessonBlockView({ document, values, onChange, readOnly = false, grade, fileContext, submissionId, onFilePending, onAnswerChange }: { fileContext?: AnswerFileContext; submissionId?: string; onFilePending?: (blockId: string, pending: boolean) => void; onAnswerChange?: (blockId: string, value: BlockAnswer) => void; document: PublicBlockDocument; values: LessonBlockAnswers; onChange: (values: LessonBlockAnswers) => void; readOnly?: boolean; grade?: (blockId: string) => Promise<BlockGrade> }) {
+  function answer(id: string, value: BlockAnswer) { if (onAnswerChange) { onAnswerChange(id, value); return; } onChange({ ...values, blocks: { ...values.blocks, [id]: value } }); }
   return <div className="lesson-blocks">
     {document.blocks.map(block => {
       const url = mediaUrl(block.url), value = values.blocks[block.id];
@@ -90,7 +92,7 @@ export function LessonBlockView({ document, values, onChange, readOnly = false, 
         case 'video': content = url && <><Video url={url} />{block.content && <p>{block.content}</p>}</>; break;
         case 'link': content = url && <a href={url} target="_blank" rel="noopener noreferrer" className="lb-link">{block.content || url} ↗</a>; break;
         case 'prompt': content = <CopyPrompt text={block.content || ''} />; break;
-        case 'question': content = block.question?.kind === 'text' ? <label className="lb-field lb-card"><span>{block.question.label}{block.question.required && (document.completion || defaultBlockCompletion).requireAnswers ? ' (필수)' : ''}</span><textarea rows={5} maxLength={20000} value={typeof value === 'string' ? value : ''} readOnly={readOnly} onChange={event => answer(block.id, event.target.value)} /></label> : <p role="alert">이 질문의 첨부 기능을 아직 사용할 수 없습니다.</p>; break;
+        case 'question': content = block.question?.kind === 'text' ? <label className="lb-field lb-card"><span>{block.question.label}{block.question.required && (document.completion || defaultBlockCompletion).requireAnswers ? ' (필수)' : ''}</span><textarea rows={5} maxLength={20000} value={typeof value === 'string' ? value : ''} readOnly={readOnly} onChange={event => answer(block.id, event.target.value)} /></label> : <AnswerFiles block={block} answer={value} onChange={value => answer(block.id, value)} readOnly={readOnly} context={fileContext} submissionId={submissionId} onPending={onFilePending} />; break;
         case 'prompt-generator': content = <PromptGenerator block={block} answer={value} disabled={readOnly} onChange={value => answer(block.id, value)} />; break;
         case 'persona-generator':
         case 'landing-planner': content = <LessonGuidedTool block={block} answer={value} readOnly={readOnly} onChange={value => answer(block.id, value)} />; break;

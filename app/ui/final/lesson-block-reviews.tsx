@@ -96,7 +96,7 @@ export function LessonBlockReviews() {
         <p>{detail.courseTitle} · <strong>{blockReviewLabels[blockSubmissionState(detail.submission)]}</strong></p>
         <p>제출 당시의 수업과 답변을 표시합니다.</p>
         {detail.isLatest === false && <p className="notice">이후에 다시 제출한 답변이 있습니다. 현재 기록은 읽기만 가능합니다.</p>}
-        <LessonBlockView document={detail.document} values={detail.values} onChange={() => {}} readOnly />
+        <LessonBlockView document={detail.document} values={detail.values} submissionId={detail.submission.id} onChange={() => {}} readOnly />
         <BlockReviewHistory detail={detail} />
         {detail.isLatest !== false && blockSubmissionState(detail.submission) === 'submitted' && <div className="mt24">
           <label htmlFor="block-mentor-feedback">멘토 피드백 (수정 요청 시 필수)</label>

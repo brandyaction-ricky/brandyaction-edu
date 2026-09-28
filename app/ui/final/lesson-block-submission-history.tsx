@@ -34,7 +34,7 @@ export function BlockSubmissionHistory({ submissions, enrollmentId }: { submissi
       {loaded?.id !== selected ? <p role="status">제출 당시 답변을 불러오고 있습니다.</p> : loaded.error ? <p role="alert">{loaded.error}</p> : loaded.detail && <>
         <p>제출 당시의 질문과 답변입니다. 현재 작성 중인 답변은 바뀌지 않습니다.</p>
         <BlockReviewHistory detail={loaded.detail} />
-        <LessonBlockView document={loaded.detail.document} values={loaded.detail.values} onChange={() => {}} readOnly />
+        <LessonBlockView document={loaded.detail.document} values={loaded.detail.values} submissionId={loaded.detail.submission.id} onChange={() => {}} readOnly />
       </>}
     </section>}
   </details>;

@@ -140,7 +140,11 @@ export function validateBlockAnswers(input: unknown, doc: LessonBlockDocument): 
     const block = doc.blocks.find(b => b.id === blockId);
     if (!block) invalid('수업에 없는 질문에는 답변을 저장할 수 없습니다.');
     if (block.type === 'question' && block.question?.kind === 'text') blocks[blockId] = text(answer);
-    else if (block.fields || block.quiz) {
+    else if (block.type === 'question' && ['image', 'file'].includes(block.question?.kind || '')) {
+      const files = object(answer); onlyKeys(files, block.question?.kind === 'image' ? ['imageId', 'fileId'] : ['fileId']);
+      for (const value of Object.values(files)) if (typeof value !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value)) invalid('업로드를 완료한 첨부파일만 저장할 수 있습니다.');
+      blocks[blockId] = files as Record<string, string>;
+    } else if (block.fields || block.quiz) {
       const values = object(answer), fields: Record<string, string | number> = {};
       for (const [key, raw] of Object.entries(values)) {
         if (block.quiz) {
@@ -159,7 +163,7 @@ export function validateBlockAnswers(input: unknown, doc: LessonBlockDocument): 
         try { validateCalculatorValues(block.type, fields); } catch (error) { invalid((error as Error).message); }
       }
       blocks[blockId] = fields;
-    } else invalid('해당 항목의 답변 형식을 확인해 주세요.'); // Attachments require a verified upload binding, not an arbitrary URL.
+    } else invalid('해당 항목의 답변 형식을 확인해 주세요.'); // File IDs are checked against the owned, verified upload in the DB trigger.
   }
   const checklist = array(value.checklist, 1000).map(key => id(key));
   unique(checklist);
@@ -190,7 +194,7 @@ export function missingBlockRequirements(doc: PublicBlockDocument, values: Lesso
   for (const block of doc.blocks) {
     const answer = values.blocks[block.id];
     if (policy.requireAnswers) {
-      if (block.question?.required && (typeof answer !== 'string' || !answer.trim())) missing.push({ id: block.id, label: block.question.label });
+      if (block.question?.required && (block.question.kind === 'text' ? typeof answer !== 'string' || !answer.trim() : !answer || typeof answer !== 'object' || !Object.keys(answer).length)) missing.push({ id: block.id, label: block.question.label });
       for (const field of block.fields || []) if (field.required && !field.sensitive && (!answer || typeof answer !== 'object' || typeof answer[field.id] !== 'string' || !String(answer[field.id]).trim())) missing.push({ id: block.id, label: field.label });
     }
     if (policy.requireQuizPass && block.quiz) for (const question of block.quiz.questions) {
