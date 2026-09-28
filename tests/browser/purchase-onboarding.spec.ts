@@ -82,7 +82,9 @@ test('free completion and order-history reentry use the same internal order ID',
   await expect(page.getByRole('link', { name: '결제 후 시작 안내' })).toHaveAttribute('href', `/purchase-onboarding?order=${order}`);
   await page.goto(`/order-complete-test?order=${order}`);
   await expect(page.getByRole('link', { name: '결제 후 시작 안내' })).toHaveAttribute('href', `/purchase-onboarding?order=${order}`);
-  expect(lookups).toEqual([order, order]);
+  // StrictMode may replay the effect, so assert the order identity rather than the fetch count.
+  expect(lookups.length).toBeGreaterThanOrEqual(2);
+  expect(lookups.every(value => value === order)).toBe(true);
 });
 
 test('cancelled orders do not request purchase onboarding', async ({ page }) => {
@@ -97,13 +99,13 @@ test('cancelled orders do not request purchase onboarding', async ({ page }) => 
 });
 
 test('onboarding lookup failure is visible and can be retried', async ({ page }) => {
-  let attempts = 0;
+  let retryAllowed = false;
   await page.route('**/api/purchase-onboarding*', route => {
-    attempts += 1;
-    return route.fulfill({ status: attempts === 1 ? 503 : 200, json: attempts === 1 ? { error: '일시적인 오류' } : { available: true, orderId: order } });
+    return route.fulfill({ status: retryAllowed ? 200 : 503, json: retryAllowed ? { available: true, orderId: order } : { error: '일시적인 오류' } });
   });
   await page.goto(`/order-complete-test?order=${order}`);
   await expect(page.getByRole('alert')).toContainText('시작 안내를 불러오지 못했습니다');
+  retryAllowed = true;
   await page.getByRole('button', { name: '시작 안내 다시 확인' }).click();
   await expect(page.getByRole('link', { name: '결제 후 시작 안내' })).toHaveAttribute('href', `/purchase-onboarding?order=${order}`);
 });
