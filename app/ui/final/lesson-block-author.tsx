@@ -121,6 +121,15 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
     {preview && <div className="lba-preview" aria-label="구성 미리보기"><LessonBlockView document={publicLessonBlocks(document)} values={{ blocks: {}, checklist: [] }} onChange={() => {}} readOnly /></div>}
     <fieldset disabled={disabled || conflict} hidden={preview} className="lba-main-fields">
       <section className="lba-block"><h3>학습 완료 기준</h3>
+        <Field label="학습 개방 방식"><select value={document.progression?.track || ''} onChange={event => setDocument(previous => {
+          const track = event.target.value;
+          if (!track) { const next = { ...previous }; delete next.progression; return next; }
+          return { ...previous, progression: { track: track as 'daily' | 'learning', dayNumber: previous.progression?.dayNumber || 1 },
+            completion: { mode: track === 'daily' ? 'mentor' : 'self', requireAnswers: false, requireQuizPass: track === 'learning' },
+            blocks: previous.blocks.map(block => track === 'learning' && block.quiz ? { ...block, quiz: { ...block.quiz, passPercent: 100 } } : block) };
+        })}><option value="">순서 제한 없음</option><option value="daily">데일리 미션 — 승인 후 다음 일차</option><option value="learning">별도 학습 — 이전 학습 통과 후</option></select></Field>
+        {document.progression && <><Field label="전체 과정에서 몇 일차인가요? *"><input type="number" required min={1} max={30} step={1} value={document.progression.dayNumber || ''} onChange={event => setDocument(previous => ({ ...previous, progression: { ...previous.progression!, dayNumber: Number(event.target.value) } }))} /></Field>
+          <p className="meta">주차 안의 번호가 아니라 전체 과정의 1~30일차입니다. 데일리와 별도 학습은 각각 다른 순서로 진행합니다. 자동승인 주차는 기수·회차 관리에서 설정합니다.</p></>}
         <Field label="완료 방식"><select value={(document.completion || defaultBlockCompletion).mode} onChange={event => setDocument(previous => ({ ...previous, completion: { ...(previous.completion || defaultBlockCompletion), mode: event.target.value as 'self' | 'mentor' } }))}><option value="self">조건을 채우면 학습 완료</option><option value="mentor">제출 후 멘토 확인</option></select></Field>
         <label className="lb-choice"><input type="checkbox" checked={(document.completion || defaultBlockCompletion).requireAnswers} onChange={event => setDocument(previous => ({ ...previous, completion: { ...(previous.completion || defaultBlockCompletion), requireAnswers: event.target.checked } }))} />필수 질문·생성기 입력 완료 필요</label>
         <label className="lb-choice"><input type="checkbox" checked={(document.completion || defaultBlockCompletion).requireQuizPass} onChange={event => setDocument(previous => ({ ...previous, completion: { ...(previous.completion || defaultBlockCompletion), requireQuizPass: event.target.checked } }))} />시험 통과 필요</label>

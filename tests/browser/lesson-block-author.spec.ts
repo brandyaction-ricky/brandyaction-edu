@@ -6,6 +6,8 @@ async function backend(page: Page, failure = 0, denied = false) {
   const writes: { requestId: string; expectedRevision: string | null; document: LessonBlockDocument }[] = [];
   await page.route('**/api/platform/lesson-blocks**', async route => {
     if (route.request().method() === 'GET') {
+      if (new URL(route.request().url()).searchParams.get('action') === 'progression') { await route.fulfill({json:{lessons:[{lessonId:'aaaaaaab-1111-4111-8111-000000000004',isUnlocked:true,track:null,dayNumber:null,automaticApproval:false,reason:''}]}}); return; }
+
       if (readError) { await route.fulfill({ status: 503, json: { error: '합성 조회 오류' } }); return; }
       const learner = new URL(route.request().url()).searchParams.has('enrollment');
       const shown = document && structuredClone(document);
@@ -22,6 +24,14 @@ async function backend(page: Page, failure = 0, denied = false) {
   return { writes, getDocument: () => document, setDocument: (value: LessonBlockDocument) => { document = value; revision = 'bbbbbbbc-1111-4111-8111-111111111111'; }, setReadError: (value: boolean) => { readError = value; } };
 }
 async function add(page: Page, type: string) { await page.getByRole('combobox', { name: '추가할 항목' }).selectOption(type); await page.getByRole('button', { name: '항목 추가', exact: true }).click(); return page.locator('[data-author-block]').last(); }
+
+test('author saves the learning track and whole-course ordinal with the original quiz completion policy',async({page})=>{
+ const server=await backend(page);await page.goto('/lesson-block-author-test');await page.getByRole('button',{name:'여러 항목으로 구성하기'}).click();
+ await page.getByRole('combobox',{name:'학습 개방 방식'}).selectOption('learning');await page.getByRole('spinbutton',{name:'전체 과정에서 몇 일차인가요?'}).fill('30');
+ await page.getByRole('button',{name:'학습 저장',exact:true}).click();await expect(page.getByText('학습 기본 정보와 콘텐츠를 저장했습니다.',{exact:true})).toBeVisible();
+ expect(server.getDocument()?.progression).toEqual({track:'learning',dayNumber:30});expect(server.getDocument()?.completion).toEqual({mode:'self',requireAnswers:false,requireQuizPass:true});
+ await page.getByRole('button',{name:'편집 다시 열기'}).click();await expect(page.getByRole('combobox',{name:'학습 개방 방식'})).toHaveValue('learning');await expect(page.getByRole('spinbutton',{name:'전체 과정에서 몇 일차인가요?'})).toHaveValue('30');
+});
 
 test('one lesson save preserves original text, ordered questions/tools and displays them in real classroom', async ({ page }, testInfo) => {
   const server = await backend(page);

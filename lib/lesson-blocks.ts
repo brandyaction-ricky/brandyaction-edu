@@ -14,7 +14,8 @@ export type LessonBlock = {
 };
 export type BlockCompletionPolicy = { mode: 'self' | 'mentor'; requireAnswers: boolean; requireQuizPass: boolean };
 export const defaultBlockCompletion: BlockCompletionPolicy = { mode: 'self', requireAnswers: true, requireQuizPass: true };
-export type LessonBlockDocument = { schemaVersion: 1; blocks: LessonBlock[]; checklist: { id: string; label: string; required: boolean }[]; completion?: BlockCompletionPolicy };
+export type LessonProgression = { track: 'daily' | 'learning'; dayNumber: number };
+export type LessonBlockDocument = { schemaVersion: 1; blocks: LessonBlock[]; checklist: { id: string; label: string; required: boolean }[]; completion?: BlockCompletionPolicy; progression?: LessonProgression };
 export type PublicLessonBlock = Omit<LessonBlock, 'quiz'> & { quiz?: { questions: Omit<BlockQuizQuestion, 'correctIndex'>[]; passPercent: number } };
 export type PublicBlockDocument = Omit<LessonBlockDocument, 'blocks'> & { blocks: PublicLessonBlock[] };
 export type BlockAnswer = string | Record<string, string | number>;
@@ -50,7 +51,7 @@ function httpsUrl(value: unknown) {
 }
 
 export function validateLessonBlocks(input: unknown): LessonBlockDocument {
-  const doc = object(input); onlyKeys(doc, ['schemaVersion', 'blocks', 'checklist', 'completion']);
+  const doc = object(input); onlyKeys(doc, ['schemaVersion', 'blocks', 'checklist', 'completion', 'progression']);
   if (doc.schemaVersion !== 1) invalid('지원하지 않는 수업 버전입니다.');
   if (new TextEncoder().encode(JSON.stringify(input)).byteLength > 2_000_000) invalid('수업 내용이 너무 큽니다. 이미지는 업로드한 주소로 등록해 주세요.');
   const blocks = array(doc.blocks, 1000).map(raw => {
@@ -113,7 +114,15 @@ export function validateLessonBlocks(input: unknown): LessonBlockDocument {
     if (policy.mode !== 'self' && policy.mode !== 'mentor') invalid('학습 완료 방식을 확인해 주세요.');
     completion = { mode: policy.mode, requireAnswers: bool(policy.requireAnswers), requireQuizPass: bool(policy.requireQuizPass) };
   }
-  return { schemaVersion: 1, blocks, checklist, ...(completion ? { completion } : {}) };
+  let progression: LessonProgression | undefined;
+  if (doc.progression !== undefined) {
+    const rule = object(doc.progression); onlyKeys(rule, ['track', 'dayNumber']);
+    if (!['daily', 'learning'].includes(String(rule.track)) || !Number.isInteger(rule.dayNumber) || Number(rule.dayNumber) < 1 || Number(rule.dayNumber) > 30) invalid('학습 종류와 1~30일차 번호를 확인해 주세요.');
+    progression = { track: rule.track as LessonProgression['track'], dayNumber: Number(rule.dayNumber) };
+    if (progression.track === 'daily' && completion?.mode !== 'mentor') invalid('데일리 미션은 멘토 확인 방식으로 설정해 주세요.');
+    if (progression.track === 'learning' && (completion?.mode !== 'self' || !completion.requireQuizPass || blocks.some(block => block.quiz && block.quiz.passPercent !== 100))) invalid('별도 학습은 모든 시험 정답 후 완료하도록 설정해 주세요.');
+  }
+  return { schemaVersion: 1, blocks, checklist, ...(completion ? { completion } : {}), ...(progression ? { progression } : {}) };
 }
 
 export function publicLessonBlocks(doc: LessonBlockDocument): PublicBlockDocument {

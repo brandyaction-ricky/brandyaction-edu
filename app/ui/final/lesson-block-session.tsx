@@ -83,7 +83,6 @@ function SessionContent({ snapshot, lessonId, enrollmentId, onSelectRevision, on
       const result = await request<Submission>('/api/platform/lesson-blocks', { action: 'submit', lessonId, enrollmentId, revision: snapshot.revision, ...submissionRequest.current });
       if (result.revision !== snapshot.revision || result.writeId !== writeId || !['completed', 'submitted'].includes(result.outcome)) throw new Error('제출 결과를 확인하지 못했습니다. 다시 시도해 주세요.');
       setSubmission(result);
-      if (result.outcome === 'completed') onCompleted?.();
     } catch (error) {
       const failure = error as { message: string; status?: number };
       const uncertain = Boolean(submissionRequest.current) && (!failure.status || failure.status >= 500);
@@ -117,7 +116,7 @@ function SessionContent({ snapshot, lessonId, enrollmentId, onSelectRevision, on
     {snapshot.document && <LessonBlockView document={snapshot.document} values={values} onChange={change} readOnly={historical || submitting || submitUncertain || locked} grade={historical || locked ? undefined : grade} />}
     {!historical && <section className="lb-session-notice" aria-label="학습 제출">
       {locked ? <>
-        <p role="status">{submissionState === 'completed' ? '학습을 완료했습니다.' : submissionState === 'approved' ? '멘토가 승인했습니다. 학습을 완료했습니다.' : '미션을 제출했습니다. 멘토의 확인을 기다려 주세요.'}</p>
+        <p role="status">{submissionState === 'completed' ? '학습을 완료했습니다.' : submissionState === 'approved' ? submission?.approvalKind === 'automatic' ? '자동승인되어 학습을 완료했습니다.' : '멘토가 승인했습니다. 학습을 완료했습니다.' : '미션을 제출했습니다. 멘토의 확인을 기다려 주세요.'}</p>
         <button className="btn small" type="button" disabled={reopening} onClick={() => select(null)}>검토 결과 새로고침</button>
         {submission?.outcome === 'submitted' && <button className="btn small" type="button" disabled={reopening} onClick={() => void reopen()}>{reopening ? '답변을 여는 중…' : '답변 수정하기'}</button>}
         {submitError && <p role="alert">{submitError}</p>}

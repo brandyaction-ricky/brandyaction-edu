@@ -18,6 +18,12 @@ test('unauthenticated and cross-site requests cannot read or change private lear
  const noUser=harness({user:null});assert.equal((await noUser.get()).status,401);assert.equal((await noUser.post(noUser.draft)).status,401);assert.equal(noUser.calls.length,0);
  const h=harness();for(const origin of [null,'https://other.test'])assert.equal((await h.post(h.draft,origin)).status,403);assert.equal(h.calls.length,0);
 });
+test('progression reads use the owned enrollment and never trust a caller supplied actor',async()=>{
+ const h=harness();assert.equal((await h.get(`action=progression&enrollment=${id}&p_actor=${lesson}`)).status,200);
+ assert.equal(h.calls[0].name,'edu_read_lesson_progression');assert.deepEqual(h.calls[0].args,{p_actor:id,p_enrollment:id});
+ const bad=harness();assert.equal((await bad.get('action=progression')).status,400);assert.equal(bad.calls.length,0);
+ const locked=harness({readError:{message:'BLOCK_LESSON_LOCKED'}});assert.equal((await locked.get()).status,403);
+});
 test('student JSON omits answer keys; author JSON retains them; responses are never shared-cacheable',async()=>{
  const student=await harness().get();assert.equal(student.headers.get('cache-control'),'private, no-store');assert.doesNotMatch(await student.text(),/correctIndex/);
  const admin=await harness({editable:true,user:{id,role:'admin'}}).get(`lesson=${lesson}`);assert.equal((await admin.json()).document.blocks[0].quiz.questions[0].correctIndex,1);

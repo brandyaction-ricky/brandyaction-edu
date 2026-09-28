@@ -27,6 +27,7 @@ import { enrollmentLessons, missionEntries } from "./member-views";
 import { LessonQuestions } from "./lesson-questions";
 import { LessonText } from "./lesson-text";
 import { LessonBlockSession } from './lesson-block-session';
+import { useLessonProgression } from './use-lesson-progression';
 import { Badge, Empty, Heading, ResourceRow, Video } from "./primitives";
 
 export function Classroom({
@@ -48,6 +49,7 @@ export function Classroom({
 }) {
   const [navOpen, setNavOpen] = useState(false);
   const [completedHere, setCompletedHere] = useState<string[]>([]);
+  const progression = useLessonProgression(path[1], blockLearningEnabled);
   const enrollment = (data.enrollments || []).find(
     (e) => e.id === path[1] && hasLearningAccess(e),
   );
@@ -73,7 +75,10 @@ export function Classroom({
   const weeks = (data.curriculum_weeks || [])
     .filter((w) => w.course_id === course?.id)
     .sort((a, b) => num(a, "week_number") - num(b, "week_number"));
-  const lessons = enrollmentLessons(data, enrollment),
+  const allLessons = enrollmentLessons(data, enrollment);
+  const selectedGate = progression.lessons?.find(item => item.lessonId === (path[2] || allLessons[0]?.id));
+  const lessons = allLessons.filter(item => !selectedGate?.track || progression.lessons?.some(gate => gate.lessonId === item.id && gate.track === selectedGate.track))
+      .sort((a, b) => selectedGate?.track ? (progression.lessons?.find(item => item.lessonId === a.id)?.dayNumber || 0) - (progression.lessons?.find(item => item.lessonId === b.id)?.dayNumber || 0) : 0),
     lesson = lessons.find((l) => l.id === path[2]) || lessons[0],
     content = (data.lesson_contents || []).find(
       (c) => c.lesson_id === lesson?.id,
@@ -87,6 +92,7 @@ export function Classroom({
   ]);
   const done = completedIds.has(String(lesson?.id)),
     current = lessons.findIndex((l) => l.id === lesson?.id);
+  const canOpen = (id: string) => !blockLearningEnabled || progression.lessons?.some(item => item.lessonId === id && item.isUnlocked) === true;
   const entries = missionEntries(data, [enrollment]).filter(
       (x) => x.lesson?.id === lesson?.id,
     ),
@@ -249,6 +255,10 @@ export function Classroom({
             className={"learning-nav " + (navOpen ? "open" : "")}
             aria-label="학습 목록"
           >
+            {blockLearningEnabled && <nav aria-label="학습 종류">{(['daily', 'learning'] as const).map(track => {
+              const first = progression.lessons?.filter(item => item.track === track).sort((a, b) => (a.dayNumber || 0) - (b.dayNumber || 0))[0];
+              return first && <Link className="btn small mb16" key={track} aria-current={selectedGate?.track === track ? 'page' : undefined} href={`/learn/${enrollment.id}/${first.lessonId}`}>{track === 'daily' ? '데일리 미션' : '별도 학습'}</Link>;
+            })}</nav>}
             {weeks.map((w) => (
               <section className="lesson-week" key={w.id}>
                 <div className="lesson-week-title">
@@ -263,8 +273,9 @@ export function Classroom({
                         "lesson-nav " + (l.id === lesson?.id ? "active" : "")
                       }
                       aria-current={l.id === lesson?.id ? "page" : undefined}
+                      aria-disabled={!canOpen(l.id)}
                       href={"/learn/" + enrollment.id + "/" + l.id}
-                      onClick={() => setNavOpen(false)}
+                      onClick={event => { if (!canOpen(l.id)) event.preventDefault(); else setNavOpen(false); }}
                     >
                       {completedIds.has(l.id) ? (
                         <Check />
@@ -272,7 +283,7 @@ export function Classroom({
                         <Play />
                       )}
                       <div>
-                        <span className="meta">DAY {num(l, "day_number")}</span>
+                        <span className="meta">DAY {num(l, "day_number")}{!canOpen(l.id) ? ' · 잠김' : ''}</span>
                         <b>{t(l, "title")}</b>
                       </div>
                     </Link>
@@ -281,7 +292,7 @@ export function Classroom({
             ))}
           </aside>
           <div className="learning-content">
-            {lesson ? (
+            {lesson && canOpen(lesson.id) ? (
               <>
                 <header className="lesson-header">
                   <div className="flex gap8">
@@ -295,7 +306,7 @@ export function Classroom({
                   <p>{t(lesson, "description")}</p>
                   <a className="link" href="#lesson-questions">이 수업에 개인 질문 남기기</a>
                 </header>
-                <LessonContent enabled={blockLearningEnabled} lessonId={lesson.id} enrollmentId={enrollment.id} legacyCompletion={legacyCompletion} onCompleted={() => setCompletedHere(previous => previous.includes(`${enrollment.id}:${lesson.id}`) ? previous : [...previous, `${enrollment.id}:${lesson.id}`])}>
+                <LessonContent enabled={blockLearningEnabled} lessonId={lesson.id} enrollmentId={enrollment.id} legacyCompletion={legacyCompletion} onCompleted={() => { if (!completedIds.has(lesson.id)) { setCompletedHere(previous => previous.includes(`${enrollment.id}:${lesson.id}`) ? previous : [...previous, `${enrollment.id}:${lesson.id}`]); progression.reload(); } }}>
                 {safeUrl(content?.vod_url) && (
                   <Video url={t(content, "vod_url")} />
                 )}
@@ -376,7 +387,7 @@ export function Classroom({
                     <span />
                   )}
                   {!blockLearningEnabled && legacyCompletion}
-                  {current < lessons.length - 1 && (
+                  {current < lessons.length - 1 && (canOpen(lessons[current + 1].id) ? (
                     <Link
                       className="btn"
                       href={
@@ -389,13 +400,14 @@ export function Classroom({
                       다음 학습
                       <ArrowRight />
                     </Link>
-                  )}
+                  ) : <button className="btn" disabled>다음 학습 · 잠김</button>)}
                 </div>
                 <LessonQuestions key={enrollment.id + ":" + lesson.id} enrollmentId={String(enrollment.id)} lessonId={String(lesson.id)} lessonTitle={t(lesson, "title")} />
               </>
             ) : (
-              <Empty title="공개된 학습이 없습니다.">
+              <Empty title={lesson && blockLearningEnabled ? progression.error || selectedGate?.reason || (progression.lessons ? '아직 열리지 않은 학습입니다.' : '학습 개방 상태를 확인하고 있습니다.') : '공개된 학습이 없습니다.'}>
                 <BookOpen />
+                {lesson && blockLearningEnabled && <button className="btn mt16" onClick={progression.reload}>학습 상태 다시 확인</button>}
               </Empty>
             )}
           </div>

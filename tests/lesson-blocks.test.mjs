@@ -18,6 +18,16 @@ const sample = () => ({ schemaVersion: 1, blocks: [
   { id: 'quiz2', type: 'quiz', quiz: { passPercent: 100, questions: [{ id: 'q1', prompt: '다른 시험', options: ['1', '2'], correctIndex: 0 }] } },
 ], checklist: [{ id: 'c1', label: '완료', required: true }] });
 
+test('progression keeps separate tracks and rejects invalid day numbers or incompatible completion rules',()=>{
+ const daily={schemaVersion:1,blocks:[],checklist:[],progression:{track:'daily',dayNumber:1},completion:{mode:'mentor',requireAnswers:false,requireQuizPass:false}};
+ assert.deepEqual(validateLessonBlocks(daily),daily);assert.deepEqual(publicLessonBlocks(daily).progression,daily.progression);
+ for(const value of [0,31,1.2,'1',null])assert.throws(()=>validateLessonBlocks({...daily,progression:{track:'daily',dayNumber:value}}));
+ assert.throws(()=>validateLessonBlocks({...daily,completion:{...daily.completion,mode:'self'}}));
+ const learning={...sample(),progression:{track:'learning',dayNumber:30},completion:{mode:'self',requireAnswers:false,requireQuizPass:true}};
+ assert.throws(()=>validateLessonBlocks(learning));learning.blocks[3].quiz.passPercent=100;assert.deepEqual(validateLessonBlocks(learning),learning);
+ assert.throws(()=>validateLessonBlocks({...learning,completion:{...learning.completion,requireQuizPass:false}}));
+});
+
 test('keeps block order, stable ids, original text and multiple quizzes; only learners lose answer keys', () => {
   const source = sample(), doc = validateLessonBlocks(source);
   assert.deepEqual(doc, source);

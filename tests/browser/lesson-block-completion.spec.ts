@@ -7,7 +7,9 @@ async function backend(page:Page,document=doc,options:{saveFailure?:boolean;lost
  const writes:Record<string,unknown>[]=[],submits:Record<string,unknown>[]=[];let release:()=>void=()=>{};
  const gate=new Promise<void>(resolve=>{release=resolve;});
  await page.route('**/api/platform/lesson-blocks**',async route=>{
-  if(route.request().method()==='GET'){await route.fulfill({json:{document:publicLessonBlocks(document),revision,currentRevision:revision,draft,submission,previousDrafts:[],editable:true}});return;}
+  if(route.request().method()==='GET'){
+      if (new URL(route.request().url()).searchParams.get('action') === 'progression') { await route.fulfill({json:{lessons:[{lessonId:'aaaaaaab-1111-4111-8111-000000000004',isUnlocked:true,track:null,dayNumber:null,automaticApproval:false,reason:''}]}}); return; }
+await route.fulfill({json:{document:publicLessonBlocks(document),revision,currentRevision:revision,draft,submission,previousDrafts:[],editable:true}});return;}
   const body=route.request().postDataJSON();
   if(body.action==='draft'){
    writes.push(body);if(options.delay)await gate;

@@ -1,36 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import { randomUUID as id } from 'node:crypto';
-import { PGlite } from '@electric-sql/pglite';
-const root=new URL('../supabase/migrations/',import.meta.url);
-const base=fs.readFileSync(new URL('20260928141603_lesson_block_documents_and_drafts.sql',root),'utf8');
-const migration=fs.readFileSync(new URL('20260928155416_lesson_block_submissions_and_completion.sql',root),'utf8');
-const document={schemaVersion:1,blocks:[{id:'q',type:'question',question:{label:'필수 질문',kind:'text',required:true}},{id:'quiz',type:'quiz',quiz:{passPercent:100,questions:[{id:'a',prompt:'확인',options:['가','나'],correctIndex:1}]}}],checklist:[{id:'c',label:'실행 확인',required:true}]};
-const answers={blocks:{q:'나의 답변',quiz:{a:1}},checklist:['c']};
-async function fixture(doc=document){
- const db=new PGlite(),admin=id(),student=id(),other=id(),course=id(),week=id(),lesson=id(),enrollment=id(),revision=id();
- await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
- create table profiles(id uuid primary key,role text,status text);
- create table site_settings(key text primary key,value jsonb);
- create table courses(id uuid primary key,archived_at timestamptz);
- create table curriculum_weeks(id uuid primary key,course_id uuid references courses,is_published boolean,archived_at timestamptz);
- create table curriculum_lessons(id uuid primary key,week_id uuid references curriculum_weeks,is_published boolean,archived_at timestamptz);
- create table enrollments(id uuid primary key,user_id uuid references profiles,course_id uuid references courses,status text,revoked_at timestamptz,access_starts_at timestamptz,access_ends_at timestamptz);
- create table lesson_progress(id uuid primary key default gen_random_uuid(),enrollment_id uuid references enrollments,lesson_id uuid references curriculum_lessons,progress_percent integer not null default 0,completed_at timestamptz,updated_at timestamptz default now(),unique(enrollment_id,lesson_id));
- grant select,insert,update on all tables in schema public to service_role;
- grant select,insert,update on lesson_progress to authenticated;`);
- await db.exec(base);await db.exec(migration);await db.exec(fs.readFileSync(new URL('20260928161532_lesson_block_mentor_reviews.sql',root),'utf8'));
- await db.query("insert into profiles values($1,'admin','active'),($2,'member','active'),($3,'member','active')",[admin,student,other]);
- await db.query('insert into courses(id) values($1)',[course]);await db.query('insert into curriculum_weeks values($1,$2,true,null)',[week,course]);await db.query('insert into curriculum_lessons values($1,$2,true,null)',[lesson,week]);
- await db.query("insert into enrollments values($1,$2,$3,'active',null,now()-interval '1 day',null)",[enrollment,student,course]);
- await db.exec('set role service_role');
- await db.query('select edu_save_lesson_blocks($1,$2,null,$3,$4)',[admin,lesson,revision,doc]);
- let currentWrite=null;
- const draft=async(values=answers)=>{const write=id();await db.query('select edu_save_block_draft($1,$2,$3,$4,$5,$6,$7)',[student,lesson,enrollment,revision,currentWrite,write,values]);currentWrite=write;return write;};
- const submit=async(request=id(),values=answers,actor=student,write=currentWrite)=>(await db.query('select edu_submit_lesson_blocks($1,$2,$3,$4,$5,$6,$7) as receipt',[actor,lesson,enrollment,revision,write,request,values])).rows[0].receipt;
- return{db,admin,student,other,lesson,enrollment,revision,draft,submit,getWrite:()=>currentWrite};
-}
+import {fixture,document,answers} from './helpers/lesson-block-review.mjs';
 test('submission atomically preserves the acknowledged answers, grades and progress; repeated requests cannot duplicate or overwrite',async()=>{
  const f=await fixture();const {db}=f;
  try{
@@ -83,7 +54,7 @@ test('content-only completion records an empty saved draft and legacy lessons re
  const f=await fixture({schemaVersion:1,blocks:[],checklist:[]}),values={blocks:{},checklist:[]};
  try{
   await f.draft(values);assert.equal((await f.submit(id(),values)).outcome,'completed');
-  const legacy=id();await f.db.query('insert into curriculum_lessons select $1,week_id,true,null from curriculum_lessons where id=$2',[legacy,f.lesson]);
+  const legacy=id();await f.db.query('insert into curriculum_lessons(id,week_id,is_published,archived_at) select $1,week_id,true,null from curriculum_lessons where id=$2',[legacy,f.lesson]);
   await f.db.exec('set role authenticated');await f.db.query('insert into lesson_progress(enrollment_id,lesson_id,completed_at) values($1,$2,now())',[f.enrollment,legacy]);
  }finally{await f.db.close();}
 });

@@ -37,6 +37,8 @@ function failure(error: unknown) {
     BLOCK_INVALID: ['저장할 내용을 확인해 주세요.', 400],
     BLOCK_ALREADY_SUBMITTED: ['이미 제출한 답변입니다. 제출 기록을 다시 확인해 주세요.', 409],
     BLOCK_REVIEW_CHANGED: ['제출 상태가 바뀌었습니다. 최신 답변과 검토 결과를 다시 확인해 주세요.', 409],
+    BLOCK_LESSON_LOCKED: ['아직 열리지 않은 학습입니다. 이전 학습 완료 또는 운영자의 주차 공개를 기다려 주세요.', 403],
+    BLOCK_PROGRESSION_DUPLICATE: ['같은 상품에 동일한 학습 종류·일차가 이미 있습니다. 학습 번호를 확인해 주세요.', 409],
     BLOCK_REQUIREMENTS_MISSING: ['필수 질문과 체크리스트를 완료해 주세요.', 422],
     BLOCK_QUIZ_NOT_PASSED: ['시험 통과 기준을 확인하고 다시 풀어 주세요.', 422],
   };
@@ -53,6 +55,11 @@ export async function GET(request: Request) {
     if (!user) return reply({ error: '로그인이 필요합니다.' }, 401);
     const params = new URL(request.url).searchParams;
     const db = createAdminClient();
+    if (params.get('action') === 'progression') {
+      const { data, error } = await db.rpc('edu_read_lesson_progression', { p_actor: user.id, p_enrollment: requiredId(params.get('enrollment')) });
+      if (error) throw error;
+      return reply({ lessons: data });
+    }
     if (params.has('submission')) {
       const { data, error } = await db.rpc('edu_read_block_submission', {
         p_actor: user.id, p_submission: requiredId(params.get('submission')), p_enrollment: requiredId(params.get('enrollment')),

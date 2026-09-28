@@ -18,6 +18,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { SubmissionReviewWorkspace } from "./final/lesson-block-reviews";
+import { LessonProgressionSettings } from './final/lesson-progression-settings';
 import { timeLabel, type Data, type WorkflowSend } from "./learning-workflows";
 import { EnrollmentGrant, RefundAction } from "./operations-actions";
 import {
@@ -170,7 +171,7 @@ export function AdminWorkflows(props: Props) {
   const send: WorkflowSend = (body, success) =>
     props.send({ ...body, workflow: true }, success);
   const p = { ...props, send };
-  if (props.section === "cohorts") return <CohortTools {...p} />;
+  if (props.section === "cohorts") return <><CohortTools {...p} />{process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' && <LessonProgressionSettings cohorts={props.data.cohorts || []} />}</>;
   if (props.section === "missions") return <QuizManager {...p} />;
   if (props.section === "members") return <Participants />;
   if (props.section === "reviews") return <SubmissionReviewWorkspace {...p} />;
