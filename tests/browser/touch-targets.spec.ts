@@ -7,8 +7,9 @@ test('home banner indicators have usable hit areas without changing slide naviga
   for (const indicator of await indicators.all()) {
     const bounds = await indicator.boundingBox();
     expect(bounds).not.toBeNull();
-    expect(bounds!.width).toBeGreaterThanOrEqual(44);
-    expect(bounds!.height).toBeGreaterThanOrEqual(44);
+    // Chromium can report a nominal 44px CSS box as 43.99998px on CI.
+    expect(bounds!.width).toBeGreaterThanOrEqual(43.99);
+    expect(bounds!.height).toBeGreaterThanOrEqual(43.99);
   }
   await indicators.nth(1).click();
   await expect(page.getByRole('heading', { name: '두 번째 배너' })).toBeVisible();
