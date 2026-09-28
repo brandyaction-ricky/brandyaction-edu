@@ -84,3 +84,21 @@ test('filter toolbar keeps search flexible and wraps at narrow widths', async ({
     expect(positions.search).toBeGreaterThan(positions.select);
   }
 });
+
+test('search icon spacing does not change iconless admin input padding', async ({ page }) => {
+  const search = page.getByRole('searchbox', { name: '회원 검색' });
+  const ordinary = page.getByRole('textbox', { name: '이름' });
+  const paddings = await page.evaluate(() => {
+    const searchInput = document.querySelector<HTMLInputElement>('.admin-search-field input');
+    const ordinaryInput = document.querySelector<HTMLInputElement>('.admin-input');
+    if (!searchInput || !ordinaryInput) throw new Error('관리자 입력 필드가 없습니다.');
+    return {
+      search: Number.parseFloat(getComputedStyle(searchInput).paddingLeft),
+      ordinary: Number.parseFloat(getComputedStyle(ordinaryInput).paddingLeft),
+    };
+  });
+  await expect(search).toBeVisible();
+  await expect(ordinary).toBeVisible();
+  expect(paddings.search).toBeGreaterThanOrEqual(paddings.ordinary + 16);
+  expect(paddings.ordinary).toBe(12);
+});
