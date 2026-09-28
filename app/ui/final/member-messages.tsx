@@ -1,9 +1,11 @@
 "use client";
 import { useEffect, useRef, useState } from 'react';
 import './member-messages.css';
+import Link from 'next/link';
+import { learningNoticePath } from '@/lib/learning-notice-path';
 import { PushSettings } from './push-settings';
 
-type Message = { id: string; senderId: string; recipientId: string; senderName: string | null; recipientName: string | null; content: string; createdAt: string; readAt: string | null };
+type Message = { isNotice?: boolean; targetPath?: string | null; id: string; senderId: string; recipientId: string; senderName: string | null; recipientName: string | null; content: string; createdAt: string; readAt: string | null };
 type Inbox = { rows: Message[]; nextCursor: string | null; unreadCount: number; canSendToMembers: boolean };
 type Recipient = { id: string; name: string | null; email: string | null };
 type Recipients = { rows: Recipient[]; nextCursor: string | null };
@@ -64,6 +66,7 @@ export function MemberMessages({ ongoingLesson = '', userId }: { ongoingLesson?:
     try {
       const result = await post({ action: 'read', messageId: message.id });
       if (result.id !== message.id || typeof result.readAt !== 'string') throw new Error('읽음 표시를 확인하지 못했습니다.');
+      window.dispatchEvent(new Event('edu-messages-read'));
       setLoaded(old => old?.key === loadedKey && old.data ? { ...old, data: { ...old.data, unreadCount: Math.max(0, old.data.unreadCount - (old.data.rows.find(row => row.id === message.id)?.readAt ? 0 : 1)), rows: old.data.rows.map(row => row.id === message.id ? { ...row, readAt: result.readAt } : row) } } : old);
     } catch (e) { setReadError((e as Error).message); }
     finally { readGate.current = false; setReadBusy(false); }
@@ -88,11 +91,11 @@ export function MemberMessages({ ongoingLesson = '', userId }: { ongoingLesson?:
       <p>{view.box === 'sent' ? '내가 보낸 메시지입니다. 받는 사람이 메시지를 열면 읽음으로 표시됩니다.' : '내용 보기를 누르면 읽음으로 표시됩니다.'}</p>
       {!data.rows.length && <p>메시지가 없습니다.</p>}
       {data.rows.map(message => <article className="panel pad" key={message.id}>
-        <div className="edu-message-heading"><b>{view.box === 'inbox' ? message.senderName || '회원' : message.recipientName || '회원'}</b><span>{message.readAt ? '읽음' : '안 읽음'} · {time(message.createdAt)}</span></div>
+        <div className="edu-message-heading"><b>{view.box === 'inbox' ? message.isNotice ? '브랜디에듀 알림' : message.senderName || '회원' : message.recipientName || '회원'}</b><span>{message.readAt ? '읽음' : '안 읽음'} · {time(message.createdAt)}</span></div>
         <button className="btn small" disabled={readBusy} aria-expanded={expanded === message.id} onClick={() => expanded === message.id ? setExpanded('') : void open(message)}>내용 {expanded === message.id ? '접기' : '보기'}</button>
-        {expanded === message.id && <><p className="edu-message-body">{message.content}</p>{view.box === 'inbox' && <>
+        {expanded === message.id && <><p className="edu-message-body">{message.content}</p>{message.isNotice && learningNoticePath(message.targetPath) && <Link className="btn small" href={learningNoticePath(message.targetPath)!}>해당 내용 확인</Link>}{view.box === 'inbox' && <>
           {readError && <><p role="alert">{readError}</p><button className="btn small" disabled={readBusy} onClick={() => void open(message)}>읽음 표시 다시 확인</button></>}
-          <button className="btn small" disabled={frozen || (!!content && replyTo?.id !== message.id)} onClick={() => { setReplyTo(message); setSelected([]); setNotice(''); }}>답장 작성</button>
+          {!message.isNotice && <button className="btn small" disabled={frozen || (!!content && replyTo?.id !== message.id)} onClick={() => { setReplyTo(message); setSelected([]); setNotice(''); }}>답장 작성</button>}
         </>}</>}
       </article>)}
       <div className="row"><button className="btn small" disabled={!view.before} onClick={() => { setExpanded(''); setView(old => ({ ...old, before: '' })); }}>최신 메시지</button><button className="btn small" disabled={!data.nextCursor} onClick={() => { setExpanded(''); setView(old => ({ ...old, before: data.nextCursor! })); }}>이전 메시지</button></div>

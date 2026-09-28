@@ -48,3 +48,8 @@ test('known errors have actionable statuses, unknown failures hide database deta
   const h=harness(options),r=await h.get();assert.equal(r.status,503);assert.doesNotMatch(await r.text(),/secret credential marker/);
  }
 });
+
+test('unread count uses the authenticated owner and never fetches message bodies or recipient lists',async()=>{
+ const h=harness(),r=await h.get({action:'unread',actor:other});assert.equal(r.status,200);assert.deepEqual(h.calls,[{name:'edu_unread_member_messages',args:{p_actor:id}}]);
+ assert.equal(r.headers.get('cache-control'),'private, no-store');
+});

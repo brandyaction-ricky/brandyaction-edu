@@ -1,5 +1,5 @@
 /* Push only: never intercept or cache authenticated pages or responses. */
-const allowedPaths = new Set(['/my/messages', '/my/questions', '/my/missions', '/admin/questions', '/admin/reviews']);
+const allowedPaths = new Set(['/my/messages', '/my/questions', '/my/missions', '/admin/questions', '/admin/reviews', '/admin/reviews?tab=blocks', '/admin/reviews?tab=missions']);
 const allowedPath = value => typeof value === 'string' && (allowedPaths.has(value) || /^\/learn\/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}\/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value));
 const isId = value => typeof value === 'string' && /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(value);
 async function bindingStore(write, value) {

@@ -33,6 +33,9 @@ async function bodyOf(request: Request) {
 export async function GET(request: Request) {
   try {
     const user = await actor(), q = new URL(request.url).searchParams, db = createAdminClient();
+    if (q.get('action') === 'unread') {
+      const r = await db.rpc('edu_unread_member_messages', { p_actor: user.id }); if (r.error) throw r.error; return reply(r.data);
+    }
     if (q.get('action') === 'recipients') {
       const search = q.get('search') || ''; if (search.length > 100) fail('검색어가 너무 깁니다.');
       const r = await db.rpc('edu_message_recipients', { p_actor: user.id, p_search: search, p_after: optionalId(q.get('after')), p_ongoing: optionalId(q.get('ongoing')) });

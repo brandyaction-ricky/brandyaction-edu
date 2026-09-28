@@ -1,4 +1,5 @@
 "use client";
+import { UnreadMessageLink } from "./final/unread-message-link";
 import { disableDevicePush, synchronizePushAccount } from "@/lib/web-push-client";
 import { defaultPolicies } from "@/lib/legal-policies";
 import { createMutationGate } from "@/lib/mutation-gate";
@@ -541,6 +542,7 @@ export function Platform({
           <div className="header-user">
             {user ? (
               <>
+                {process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === "true" && <UnreadMessageLink key={user.id} userId={user.id}/>}
                 <Link className="link" href="/my">
                   마이페이지
                 </Link>

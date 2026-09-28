@@ -1,5 +1,6 @@
 'use client';
 
+import { UnreadMessageLink } from '@/app/ui/final/unread-message-link';
 import {
   ArrowRight,
   LogOut,
@@ -22,6 +23,7 @@ import {
 import { createAdminMenuVisibility } from '../permissions/menu-visibility';
 
 export type AdminShellUser = {
+  id?: string;
   full_name?: string | null;
   role: string;
 };
@@ -187,7 +189,7 @@ export function AdminShell({
             <span>{adminSectionTitle(current, available)}</span>
           </div>
           <div className="topright">
-            {process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === "true" && <Link className="btn ghost small" href="/my/messages">메시지</Link>}
+            {process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === "true" && <>{user.id ? <UnreadMessageLink key={user.id} userId={user.id} className="btn ghost small"/> : <Link className="btn ghost small" href="/my/messages">메시지</Link>}</>}
             {byKey.has('questions') && (
               <Link className="btn iconbtn ghost" href="/admin/questions" aria-label="질문함">
                 <MessageCircle aria-hidden="true" />
