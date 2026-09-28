@@ -727,6 +727,28 @@ export function ArticlesView({
     </div>
   );
 }
+function storyThumbnailUrl(story: Row) {
+  const savedThumbnail = safeUrl(t(story, "thumbnail_url"));
+  if (savedThumbnail) return savedThumbnail;
+
+  const videoUrl = safeUrl(t(story, "video_url"));
+  if (!videoUrl) return "";
+  try {
+    const url = new URL(videoUrl);
+    const hostname = url.hostname.toLowerCase();
+    const videoId = hostname === "youtu.be"
+      ? url.pathname.split("/")[1]
+      : ["youtube.com", "www.youtube.com", "m.youtube.com", "www.youtube-nocookie.com"].includes(hostname)
+        ? url.searchParams.get("v") || url.pathname.match(/^\/(?:embed|shorts|live)\/([^/?]+)/)?.[1]
+        : null;
+    return videoId && /^[\w-]{11}$/.test(videoId)
+      ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
+      : "";
+  } catch {
+    return "";
+  }
+}
+
 export function StoriesView({
   data,
   loading,
@@ -747,16 +769,18 @@ export function StoriesView({
       />
       {featured && (
         <section className="story-feature">
-          <div>
+          <div className="story-feature-copy">
             <div className="eyebrow">LEARNING IN PRACTICE</div>
             <h2>{t(featured, "title")}</h2>
             <p className="lead mt16">{t(featured, "description")}</p>
-            <div className="who mt24">
-              <span className="avatar">
+            <div className="story-person">
+              <span className="avatar" aria-hidden="true">
                 {t(featured, "reviewer_name").slice(0, 1)}
               </span>
-              <b>{t(featured, "reviewer_name")}</b>
-              <span>{t(featured, "reviewer_role")}</span>
+              <div className="story-person-details">
+                <strong>{t(featured, "reviewer_name")}</strong>
+                {t(featured, "reviewer_role") && <span>{t(featured, "reviewer_role")}</span>}
+              </div>
             </div>
           </div>
           <Video url={t(featured, "video_url")} />
@@ -765,13 +789,16 @@ export function StoriesView({
       <div className="section story-library">
         <div className="section-head"><div><div className="eyebrow">MORE STORIES</div><h2>다양한 실행 후기를 만나보세요.</h2><p>후기를 선택하면 위 영상과 이야기가 바뀝니다.</p></div><b>{stories.length}개의 고객 이야기</b></div>
         <div className="story-video-grid">
-          {stories.map((s, index) => (
-            <button className={"story-video-card " + (s.id === featured?.id ? "active" : "")} key={s.id} onClick={() => setSelectedId(s.id)}>
-              <span className="story-video-thumb">{safeUrl(s.thumbnail_url) ? <img src={safeUrl(s.thumbnail_url)} alt="" /> : <><Play /><small>STORY {String(index + 1).padStart(2, "0")}</small></>}</span>
-              <strong>{t(s, "title")}</strong>
-              <span>{t(s, "reviewer_name")} · {t(s, "reviewer_role")}</span>
-            </button>
-          ))}
+          {stories.map((s, index) => {
+            const thumbnail = storyThumbnailUrl(s);
+            return (
+              <button type="button" className={"story-video-card " + (s.id === featured?.id ? "active" : "")} key={s.id} onClick={() => setSelectedId(s.id)} aria-pressed={s.id === featured?.id}>
+                <span className="story-video-thumb">{thumbnail ? <img src={thumbnail} alt="" loading="lazy" /> : <small>STORY {String(index + 1).padStart(2, "0")}</small>}<span className="story-video-play" aria-hidden="true"><Play /></span></span>
+                <strong>{t(s, "title")}</strong>
+                <span>{t(s, "reviewer_name")} · {t(s, "reviewer_role")}</span>
+              </button>
+            );
+          })}
           {!loading && !error && !stories.length && (
             <Empty title="공개된 고객 이야기가 없습니다.">
               <div className="row center mt16"><Link className="btn primary" href="/classes?type=free">무료 클래스 보기</Link><Link className="btn" href="/my/questions">문의하기</Link></div>
