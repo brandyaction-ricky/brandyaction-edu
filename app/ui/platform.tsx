@@ -928,7 +928,8 @@ export function Platform({
             />
           ) : (
             <LearningEditor
-              key={edited?.id || "new-lesson"}
+              key={`${user!.id}:${edited?.id || "new-lesson"}`}
+              actorId={user!.id}
               data={data}
               row={edited}
               pending={pending}

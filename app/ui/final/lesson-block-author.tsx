@@ -10,10 +10,11 @@ import { LessonText } from './lesson-text';
 import { canRenderLessonBlocks, LessonBlockView } from './lesson-block-view';
 import { LessonMediaUpload } from './lesson-media-upload';
 import type { LessonMediaKind } from '@/lib/lesson-media';
+import type { BlockEditorDraft } from '@/lib/learning-editor-draft';
 import './lesson-block-author.css';
 
-export type BlockAuthorState = { active: boolean; dirty: boolean; blocked: boolean; uploading?: boolean };
-export type BlockAuthorHandle = { validate: () => boolean; showPreview: () => void; save: (lessonId: string) => Promise<void> };
+export type BlockAuthorState = { active: boolean; dirty: boolean; blocked: boolean; uploading?: boolean; draftReady?: boolean };
+export type BlockAuthorHandle = { validate: () => boolean; showPreview: () => void; save: (lessonId: string) => Promise<void>; captureDraft: () => BlockEditorDraft; restoreDraft: (draft: BlockEditorDraft) => void };
 type Props = { lessonId: string; courseId?: string; legacyBlocks: LessonBlock[]; disabled: boolean; onState: (state: BlockAuthorState) => void };
 type Snapshot = { revision: string | null; document: LessonBlockDocument | null; editable: boolean };
 const empty = (): LessonBlockDocument => ({ schemaVersion: 1, blocks: [], checklist: [] });
@@ -81,7 +82,7 @@ function QuizFields({ block, update }: { block: LessonBlock; update: (patch: Par
   </>;
 }
 
-const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot }>(function LoadedAuthor({ snapshot, legacyBlocks, disabled, onState, courseId }, ref) {
+const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot }>(function LoadedAuthor({ snapshot, legacyBlocks, disabled, onState, courseId, lessonId }, ref) {
   const [document, setDocument] = useState<LessonBlockDocument>(() => snapshot.document || empty());
   const [active, setActive] = useState(Boolean(snapshot.document)), [saved, setSaved] = useState(JSON.stringify(snapshot.document));
   const [type, setType] = useState<LessonBlockType>('text'), [preview, setPreview] = useState(false), [message, setMessage] = useState(''), [invalid, setInvalid] = useState(false), [conflict, setConflict] = useState(false);
@@ -92,7 +93,7 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
   function uploadPending(id: string, pending: boolean) { if (pending) uploads.current.add(id); else uploads.current.delete(id); setUploading(uploads.current.size > 0); }
   function attach(id: string, assetId: string) { setDocument(previous => ({ ...previous, blocks: previous.blocks.map(block => { if (block.id !== id) return block; const next = { ...block, assetId }; delete next.url; return next; }) })); }
   const dirty = active && (uploading || JSON.stringify(document) !== saved);
-  useEffect(() => { onState({ active, dirty, blocked: !snapshot.editable || conflict || uploading, uploading }); }, [active, dirty, conflict, snapshot.editable, onState, uploading]);
+  useEffect(() => { onState({ active, dirty, blocked: !snapshot.editable || conflict || uploading, uploading, draftReady: snapshot.editable && !uploading }); }, [active, dirty, conflict, snapshot.editable, onState, uploading]);
   useEffect(() => {
     function guard(event: BeforeUnloadEvent) { if (dirty) { event.preventDefault(); event.returnValue = ''; } }
     window.addEventListener('beforeunload', guard); return () => window.removeEventListener('beforeunload', guard);
@@ -110,7 +111,14 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
       setMessage(''); return true;
     } catch (error) { setMessage((error as Error).message); return false; }
   }
-  useImperativeHandle(ref, () => ({ validate, showPreview: () => setPreview(true), async save(lessonId) {
+  useImperativeHandle(ref, () => ({ validate, showPreview: () => setPreview(true),
+    captureDraft: () => structuredClone({ active, document, writer: writer.checkpoint() }),
+    restoreDraft(draft) {
+      if (!snapshot.editable || disabled || uploads.current.size) throw new Error('학습을 편집할 수 있을 때 다시 불러와 주세요.');
+      writer.restore(draft.writer, lessonId);
+      setDocument(structuredClone(draft.document)); setActive(draft.active); setPreview(false); setEditingTextId(null); setInvalid(false); setMessage('');
+    },
+    async save(lessonId) {
     if (!active) return;
     if (!validate()) throw new Error('학습 구성의 입력 항목을 확인해 주세요.');
     try { await writer.save(lessonId, document); setSaved(JSON.stringify(document)); setInvalid(false); setMessage('학습 구성을 저장했습니다.'); }

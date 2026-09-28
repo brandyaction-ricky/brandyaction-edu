@@ -274,3 +274,114 @@ test('author adds and saves all three calculators with their input definitions',
   await page.getByRole('button',{name:'학생 화면 보기'}).click();
   for(const name of ['레시피 실행 계산기','마진 계산기','마케팅 퍼널 만들기'])await expect(page.getByRole('region',{name,exact:true})).toBeVisible();
 });
+
+const draftKey = (actor = 'aaaaaaab-1111-4111-8111-000000000090', lesson = 'aaaaaaab-1111-4111-8111-000000000004') => `edu:learning-author:v1:${actor}:${lesson || 'new'}`;
+test('author drafts autosave while editing and restore title, unfinished blocks and checklist only on request', async ({ page }, info) => {
+  const server = await backend(page); await page.clock.install(); await page.goto('/lesson-block-author-test');
+  await page.getByRole('button', { name: '여러 항목으로 구성하기' }).click();
+  const q = await add(page, 'question'); await q.getByRole('textbox', { name: '질문 문구' }).fill('작성 중 질문');
+  await page.getByRole('button', { name: '체크 항목 추가' }).click();
+  await page.getByRole('textbox', { name: '제목', exact: false }).fill('복구할 제목');
+  await page.clock.fastForward(20_000); await q.getByRole('textbox', { name: '질문 문구' }).fill('계속 쓰는 질문');
+  await page.clock.fastForward(11_000);
+  await expect(page.getByRole('region', { name: '편집 임시저장' }).getByRole('status')).toContainText('브라우저 임시저장:');
+  expect(server.writes).toHaveLength(0);
+  const stored = await page.evaluate(key => JSON.parse(localStorage.getItem(key)!), draftKey());
+  expect(stored.form.basic.title).toBe('복구할 제목'); expect(stored.blocks.document.checklist[0].label).toBe('');
+  await page.reload(); await expect(page.getByRole('button', { name: '임시저장본 불러오기' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '학습 저장', exact: true })).toBeDisabled();
+  await expect(page.getByRole('textbox', { name: '제목', exact: false })).toHaveValue('구성 편집 검수');
+  await page.getByRole('button', { name: '임시저장본 불러오기' }).click();
+  await expect(page.getByRole('textbox', { name: '제목', exact: false })).toHaveValue('복구할 제목');
+  await expect(page.getByRole('textbox', { name: '질문 문구' })).toHaveValue('계속 쓰는 질문');
+  await expect(page.getByRole('textbox', { name: '체크 항목 1' })).toHaveValue('');
+  await page.getByRole('textbox', { name: '체크 항목 1' }).fill('마무리');
+  await page.getByRole('button', { name: '학습 저장', exact: true }).click();
+  await expect(page.getByText('학습 기본 정보와 콘텐츠를 저장했습니다.', { exact: true })).toBeVisible();
+  expect(await page.evaluate(key => localStorage.getItem(key), draftKey())).toBeNull();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
+  await page.screenshot({ path: info.outputPath('author-draft-restored.png'), fullPage: true });
+});
+
+test('a different account cannot restore the draft and a newer server document is preserved', async ({ page }) => {
+  const server = await backend(page); await page.goto('/lesson-block-author-test');
+  await page.getByRole('button', { name: '여러 항목으로 구성하기' }).click();
+  const heading = await add(page, 'heading'); await heading.getByRole('textbox', { name: '내용' }).fill('내 미저장 내용');
+  await page.getByRole('button', { name: '지금 임시저장' }).click();
+  await page.goto('/lesson-block-author-test?actor=aaaaaaab-1111-4111-8111-000000000091');
+  await expect(page.getByRole('button', { name: '여러 항목으로 구성하기' })).toBeVisible(); await expect(page.getByRole('button', { name: '임시저장본 불러오기' })).toHaveCount(0);
+  server.setDocument({ schemaVersion: 1, blocks: [{ id: 'server-title', type: 'heading', content: '다른 직원의 최신 내용' }], checklist: [] });
+  await page.goto('/lesson-block-author-test'); await page.getByRole('button', { name: '임시저장본 불러오기' }).click();
+  await expect(page.getByRole('alert')).toContainText('서버에 더 새로운');
+  await expect(page.getByRole('textbox', { name: '내용' })).toHaveValue('다른 직원의 최신 내용'); expect(server.writes).toHaveLength(0);
+  const downloadPromise = page.waitForEvent('download'); await page.getByRole('button', { name: '임시저장본 내려받기' }).click();
+  const stream = await (await downloadPromise).createReadStream(); const chunks = []; for await (const chunk of stream!) chunks.push(chunk);
+  expect(Buffer.concat(chunks).toString()).toContain('내 미저장 내용');
+  page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', { name: '임시저장본 버리기' }).click();
+  await expect(page.getByRole('button', { name: '학습 저장', exact: true })).toBeEnabled();
+  expect(server.getDocument()?.blocks[0].content).toBe('다른 직원의 최신 내용');
+});
+
+test('corrupt drafts and unavailable storage are explicit and never replace server content', async ({ page }) => {
+  const server = await backend(page); await page.goto('/lesson-block-author-test');
+  await page.evaluate(key => localStorage.setItem(key, '{broken'), draftKey()); await page.reload();
+  await expect(page.getByRole('alert')).toContainText('임시저장본을 읽지 못했습니다');
+  await expect(page.getByRole('button', { name: '임시저장본 불러오기' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '학습 저장', exact: true })).toBeDisabled();
+  page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', { name: '임시저장본 버리기' }).click();
+  await page.getByRole('button', { name: '여러 항목으로 구성하기' }).click();
+  await page.evaluate(() => { Storage.prototype.setItem = () => { throw new DOMException('full', 'QuotaExceededError'); }; });
+  await page.getByRole('button', { name: '지금 임시저장' }).click();
+  await expect(page.getByRole('alert')).toContainText('임시저장에 실패했습니다'); expect(server.writes).toHaveLength(0);
+  await page.getByRole('button', { name: '학습 저장', exact: true }).click(); await expect(page.getByText('학습 기본 정보와 콘텐츠를 저장했습니다.', { exact: true })).toBeVisible();
+});
+
+test('a successful write with a lost response can be restored without creating a duplicate version', async ({ page }) => {
+  const server = await backend(page, 503); await page.goto('/lesson-block-author-test');
+  await page.getByRole('button', { name: '여러 항목으로 구성하기' }).click();
+  const heading = await add(page, 'heading'); await heading.getByRole('textbox', { name: '내용' }).fill('응답을 놓친 편집');
+  await page.getByRole('button', { name: '학습 저장', exact: true }).click(); await expect(page.getByText('저장 응답을 받지 못했습니다.').first()).toBeVisible();
+  await page.getByRole('button', { name: '지금 임시저장' }).click(); await page.reload();
+  await page.getByRole('button', { name: '임시저장본 불러오기' }).click();
+  await expect(page.getByRole('textbox', { name: '내용' })).toHaveValue('응답을 놓친 편집');
+  await page.getByRole('button', { name: '학습 저장', exact: true }).click(); await expect(page.getByText('학습 기본 정보와 콘텐츠를 저장했습니다.', { exact: true })).toBeVisible();
+  expect(server.writes).toHaveLength(1);
+});
+
+test('another editor tab draft is not overwritten or deleted by this tab', async ({ page, context }) => {
+  await backend(page); await page.goto('/lesson-block-author-test'); await page.getByRole('button', { name: '여러 항목으로 구성하기' }).click();
+  const other = await context.newPage(); await backend(other); await other.goto('/lesson-block-author-test'); await other.getByRole('button', { name: '여러 항목으로 구성하기' }).click();
+  await other.getByRole('textbox', { name: '제목', exact: false }).fill('다른 창 편집'); await other.getByRole('button', { name: '지금 임시저장' }).click();
+  await page.getByRole('button', { name: '지금 임시저장' }).click(); await expect(page.getByRole('alert')).toContainText('다른 창에서');
+  await page.getByRole('button', { name: '학습 저장', exact: true }).click();
+  expect((await page.evaluate(key => JSON.parse(localStorage.getItem(key)!), draftKey())).form.basic.title).toBe('다른 창 편집'); await other.close();
+});
+
+test('new lesson draft restores before creation and partially registered lesson resumes at its assigned id', async ({ page }) => {
+  const server = await backend(page, 503); await page.goto('/lesson-block-author-test?new');
+  await page.getByRole('spinbutton', { name: '일차 (Day)' }).fill('1'); await page.getByRole('combobox', { name: '주차 (Week)' }).selectOption({ index: 1 });
+  await page.getByRole('textbox', { name: '제목', exact: false }).fill('구성 편집 검수'); await page.getByRole('checkbox', { name: '공개', exact: true }).check();
+  await page.getByRole('button', { name: '여러 항목으로 구성하기' }).click();
+  const heading = await add(page, 'heading'); await heading.getByRole('textbox', { name: '내용' }).fill('새 학습의 작성 내용');
+  await page.getByRole('button', { name: '지금 임시저장' }).click(); await page.reload();
+  await page.getByRole('button', { name: '임시저장본 불러오기' }).click(); await expect(page.getByRole('textbox', { name: '내용' })).toHaveValue('새 학습의 작성 내용');
+  await page.getByRole('button', { name: '학습 등록', exact: true }).click(); await expect(page.getByText('저장 응답을 받지 못했습니다.').first()).toBeVisible();
+  await page.getByRole('button', { name: '지금 임시저장' }).click(); await page.reload();
+  await expect(page.getByRole('button', { name: '등록된 학습에서 복구하기' })).toBeVisible();
+  await page.route('**/admin/learning-editor?id=*', route => route.fulfill({ status: 302, headers: { location: '/lesson-block-author-test?created' } }));
+  await page.getByRole('button', { name: '등록된 학습에서 복구하기' }).click();
+  await expect(page).toHaveURL(/lesson-block-author-test\?created/);
+  await page.getByRole('button', { name: '임시저장본 불러오기' }).click(); await expect(page.getByRole('textbox', { name: '내용' })).toHaveValue('새 학습의 작성 내용');
+  await page.getByRole('button', { name: '학습 저장', exact: true }).click(); await expect(page.getByText('학습 기본 정보와 콘텐츠를 저장했습니다.', { exact: true })).toBeVisible();
+  expect(server.writes).toHaveLength(1);
+  expect(await page.evaluate(key => localStorage.getItem(key), draftKey('aaaaaaab-1111-4111-8111-000000000090', ''))).toBeNull();
+  expect(await page.evaluate(key => localStorage.getItem(key), draftKey())).toBeNull();
+});
+
+test('changed server basic information is not silently replaced by a restored draft', async ({ page }) => {
+  const server = await backend(page); await page.goto('/lesson-block-author-test');
+  await page.getByRole('textbox', { name: '제목', exact: false }).fill('내가 쓰던 제목'); await page.getByRole('button', { name: '지금 임시저장' }).click();
+  await page.goto('/lesson-block-author-test?serverTitle=' + encodeURIComponent('직원이 저장한 제목'));
+  await page.getByRole('button', { name: '임시저장본 불러오기' }).click(); await expect(page.getByRole('alert')).toContainText('서버의 기본 정보나 본문이 변경됐습니다');
+  await expect(page.getByRole('textbox', { name: '제목', exact: false })).toHaveValue('직원이 저장한 제목'); expect(server.writes).toHaveLength(0);
+});

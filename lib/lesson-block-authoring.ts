@@ -1,6 +1,7 @@
 import { validateLessonBlocks, type LessonBlockDocument } from './lesson-blocks';
 
 export type LessonDocumentWrite = { action: 'document'; lessonId: string; expectedRevision: string | null; requestId: string; document: LessonBlockDocument };
+export type LessonWriterCheckpoint = { revision: string | null; committed: LessonBlockDocument | null; pending: LessonDocumentWrite | null };
 // A lost response must be retried with the original document and request id
 // before sending any subsequent edits. Never adopt another author's revision.
 export class LessonDocumentWriter {
@@ -10,6 +11,19 @@ export class LessonDocumentWriter {
   private committed: string;
   constructor(private revision: string | null, document: LessonBlockDocument | null, private write: (request: LessonDocumentWrite) => Promise<{ revision: string }>) {
     this.committed = JSON.stringify(document);
+  }
+  checkpoint(): LessonWriterCheckpoint {
+    return structuredClone({ revision: this.revision, committed: JSON.parse(this.committed), pending: this.pending });
+  }
+  restore(checkpoint: LessonWriterCheckpoint, lessonId: string) {
+    if (this.busy || this.conflicted) throw new Error('저장 결과를 확인한 뒤 임시저장본을 불러와 주세요.');
+    if (checkpoint.pending && checkpoint.pending.lessonId !== lessonId) throw new Error('다른 학습의 저장 요청입니다.');
+    const sameBase = this.revision === checkpoint.revision && this.committed === JSON.stringify(checkpoint.committed);
+    const acknowledged = checkpoint.pending && this.revision === checkpoint.pending.requestId && this.committed === JSON.stringify(checkpoint.pending.document);
+    if (!sameBase && !acknowledged) throw new Error('서버에 더 새로운 학습 내용이 있습니다. 임시저장본을 내려받아 비교해 주세요.');
+    // If the previous POST committed but its response was lost, the fresh GET
+    // is the acknowledgment. Otherwise replay that exact write on next save.
+    if (sameBase) this.pending = structuredClone(checkpoint.pending);
   }
   async save(lessonId: string, input: LessonBlockDocument) {
     if (this.busy) throw new Error('학습 내용을 저장하고 있습니다.');
