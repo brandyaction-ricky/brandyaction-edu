@@ -4,10 +4,11 @@ import { cohortPeriod } from "@/lib/qa-rules";
 import { ArrowLeft, ArrowRight, CreditCard, Landmark } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { type Data, type WorkflowSend } from "../learning-workflows";
 import { Badge, Empty, Heading, courseType } from "./primitives";
 import { parseEntrySource, withEntrySource } from '@/lib/entry-source';
+import { CheckoutCouponRegistration, useCheckoutCouponRegistration } from "@/features/commerce/ui";
 
 export function Checkout({
   data,
@@ -26,41 +27,19 @@ export function Checkout({
   const entrySource = parseEntrySource(searchParams.get('src'));
   const [processing, setProcessing] = useState(false),
     [error, setError] = useState(""),
-    [coupon, setCoupon] = useState(""),
     [agreed, setAgreed] = useState(false);
   const lock = useRef(false),
     cohort = (data.cohorts || []).find((c) => c.id === cohortId),
     course = (data.courses || []).find((c) => c.id === cohort?.course_id),
     free = !!cohort && num(cohort, "price") === 0;
-  const [available, setAvailable] = useState<{ couponCode: string; couponName: string }[]>([]);
-  const [couponLoading, setCouponLoading] = useState(false);
-  const [couponNotice, setCouponNotice] = useState('');
-  const [quoteResult, setQuote] = useState<{ scope: string; couponCode: string | null; couponName?: string; originalAmount?: number; couponDiscount: number; totalAmount: number } | null>(null);
   const scope = `${user?.id || ''}:${cohortId}`;
-  const quote = quoteResult?.scope === scope ? quoteResult : null;
-  const quoteRequest = useRef(0), userId = user?.id;
-  useEffect(() => {
-    if (!userId || !cohortId) return;
-    const controller = new AbortController();
-    fetch(`/api/coupons?cohort=${encodeURIComponent(cohortId)}`, { signal: controller.signal }).then(async response => {
-      const body = await response.json(); if (!response.ok) throw Error(body.error); return body;
-    }).then(body => setAvailable(body.coupons || [])).catch(cause => { if (!controller.signal.aborted) setCouponNotice(cause.message); });
-    return () => controller.abort();
-  }, [cohortId, userId]);
-  function changeCoupon(code: string) { quoteRequest.current++; setCoupon(code); setQuote(null); setCouponLoading(false); setCouponNotice(''); }
-  async function applyCoupon() {
-    const requestId = ++quoteRequest.current;
-    setCouponLoading(true); setCouponNotice('');
-    try {
-      const response = await fetch('/api/coupons', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cohortId, code: coupon }) });
-      const body = await response.json(); if (!response.ok) throw Error(body.error);
-      if (requestId === quoteRequest.current) { setQuote({ ...body, scope }); setCouponNotice('쿠폰을 적용했습니다. 주문 확정 시 조건을 다시 확인합니다.'); }
-    } catch (cause) { if (requestId === quoteRequest.current) { setQuote(null); setCouponNotice((cause as Error).message); } }
-    finally { if (requestId === quoteRequest.current) setCouponLoading(false); }
-  }
+  const couponRegistration = useCheckoutCouponRegistration(cohortId, scope);
+  const coupon = couponRegistration.appliedCode;
+  const quote = couponRegistration.quote;
+  const couponLoading = couponRegistration.loading;
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (coupon.trim() && !quote) { setError('쿠폰 적용 버튼으로 할인 금액을 먼저 확인해 주세요.'); return; }
+    if (coupon.trim() && !quote) { setError('쿠폰 등록을 완료해 주세요.'); return; }
     if (!agreed) {
       setError("필수 약관에 동의해 주세요.");
       return;
@@ -316,29 +295,7 @@ export function Checkout({
                 </Link>
               </div>
               <div className="panel-body">
-                <label className="field">
-                  사용할 쿠폰
-                  <select
-                    value={coupon}
-                    onChange={(e) => changeCoupon(e.target.value)}
-                  >
-                    <option value="">직접 입력 / 선택하지 않음</option>
-                    {available.map(c => <option key={c.couponCode} value={c.couponCode}>{c.couponName}</option>)}
-                  </select>
-                </label>
-                <label className="field">
-                  쿠폰 코드
-                  <input
-                    name="coupon"
-                    value={coupon}
-                    onChange={(e) => changeCoupon(e.target.value)}
-                    maxLength={30}
-                    placeholder="보유한 쿠폰 코드를 입력하세요."
-                  />
-                </label>
-                <div className="actions"><button type="button" className="btn" onClick={() => void applyCoupon()} disabled={couponLoading || !coupon.trim()}>{couponLoading ? '확인 중…' : '쿠폰 적용'}</button><button type="button" className="btn" onClick={() => changeCoupon('')}>적용 취소</button></div>
-                {couponNotice && <p role="status" className="meta">{couponNotice}</p>}
-                {quote && <div className="checkout-applied-coupon"><span>{quote.couponName || quote.couponCode}</span><strong>−{money(quote.couponDiscount)}</strong></div>}
+                <CheckoutCouponRegistration controller={couponRegistration} />
               </div>
             </section>
             {quote?.totalAmount === 0 ? <section className="panel"><div className="panel-body">최종 금액 0원 · 결제창 없이 신청을 완료합니다.</div></section> : <section className="panel">
