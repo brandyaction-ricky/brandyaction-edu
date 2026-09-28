@@ -25,6 +25,7 @@ import {
 } from "../learning-workflows";
 import { enrollmentLessons, missionEntries } from "./member-views";
 import { LessonQuestions } from "./lesson-questions";
+import { LessonText } from "./lesson-text";
 import { Badge, Empty, Heading, ResourceRow, Video } from "./primitives";
 
 export function Classroom({
@@ -277,9 +278,9 @@ export function Classroom({
                     </a>
                   )}
                   <div className="reading-copy">
-                    {t(content, "body_text") ||
+                    <LessonText text={t(content, "body_text") ||
                       t(lesson, "description") ||
-                      "학습 콘텐츠를 준비하고 있습니다."}
+                      "학습 콘텐츠를 준비하고 있습니다."} />
                   </div>
                 </section>
                 {content?.resource_storage_path && (

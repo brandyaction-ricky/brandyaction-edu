@@ -9,6 +9,7 @@ import type { Data, WorkflowSend } from "../learning-workflows";
 import { AdminHeading } from "./admin-shell";
 import { AdminButton, AdminEmptyState, AdminFormField, AdminLinkButton, AdminStatusBadge } from "@/features/admin-ui";
 import { Badge, Video } from "./primitives";
+import { LessonText } from "./lesson-text";
 
 type Props = { data: Data; row?: Row; pending: boolean; send: WorkflowSend; back: () => void };
 type ContentType = "text" | "vod" | "material" | "link";
@@ -176,7 +177,7 @@ export function LearningEditor({ data, row, pending, send, back }: Props) {
             <Field label="도입 · 학습 안내"><textarea rows={3} value={basic.description} onChange={event => changeBasic("description", event.target.value)} /></Field>
             <div className="learning-content-tabs" role="tablist" aria-label="학습 콘텐츠 유형">{formats.map(item => <button className={format === item.key ? "active" : ""} type="button" role="tab" aria-selected={format === item.key} aria-controls={`lesson-content-${item.key}`} key={item.key} onClick={() => changeFormat(item.key)}><item.icon size={15} />{item.label}</button>)}</div>
             <div id={`lesson-content-${format}`} role="tabpanel" aria-label={formats.find(item => item.key === format)?.label}>
-              {format === "text" && <Field label="학습 내용" hint="줄바꿈을 포함한 본문이 학습자 화면에 표시됩니다."><textarea rows={14} value={bodyText} required={contentExists} onChange={event => { setBodyText(event.target.value); setDirty(true); }} placeholder="학습할 내용을 작성해 주세요." /></Field>}
+              {format === "text" && <Field label="학습 내용" hint="줄바꿈이 유지됩니다. 링크는 [보여줄 글자](https://주소) 또는 https://주소로 입력하세요."><textarea rows={14} value={bodyText} required={contentExists} onChange={event => { setBodyText(event.target.value); setDirty(true); }} placeholder="학습할 내용을 작성해 주세요." /></Field>}
               {format === "vod" && <Field label="영상 URL" hint="공유할 YouTube·Vimeo 또는 동영상 주소를 입력해 주세요."><input type="url" value={videoUrl} required={contentExists} onChange={event => { setVideoUrl(event.target.value); setDirty(true); }} placeholder="https://" /></Field>}
               {format === "material" && <><Field label="자료 이름"><input value={resourceName} onChange={event => { setResourceName(event.target.value); setDirty(true); }} placeholder="다운로드 목록에 표시할 이름" /></Field><div className="upload-box learning-material-upload"><Download aria-hidden="true" /><p>PDF · 문서 · 템플릿 자료 추가</p><UploadField name="learning_resource" value={resourcePath} image={false} disabled={busy} onChange={value => { setResourcePath(value); setDirty(true); }} onStatusChange={setUploadStatus} /><p className="meta">등록한 파일은 수강 권한이 있는 회원에게 제공됩니다.</p></div></>}
               {format === "link" && <Field label="외부 학습 링크"><input type="url" value={externalUrl} required={contentExists} onChange={event => { setExternalUrl(event.target.value); setDirty(true); }} placeholder="https://" /></Field>}
@@ -185,7 +186,7 @@ export function LearningEditor({ data, row, pending, send, back }: Props) {
           <aside className="preview-window" ref={previewRef}>
             <div className="preview-window-top"><b>학습자 화면</b><span>본문 미리보기</span></div>
             <div className="safe-html-preview"><div className="learning-preview-badges"><Badge>DAY {basic.day_number}</Badge>{basic.duration_label && <Badge>{basic.duration_label}</Badge>}</div><h2>{basic.title || "학습 제목"}</h2>{basic.description && <p className="intro-preview">{basic.description}</p>}
-              {format === "text" && <div className="reading-copy">{bodyText || "학습 내용을 작성하면 이곳에 표시됩니다."}</div>}
+              {format === "text" && <div className="reading-copy"><LessonText text={bodyText || "학습 내용을 작성하면 이곳에 표시됩니다."} /></div>}
               {format === "vod" && (safeUrl(videoUrl) ? <Video url={videoUrl} /> : <div className="learning-content-placeholder"><VideoIcon /><p>영상 URL을 등록해 주세요.</p></div>)}
               {format === "material" && <div className="learning-resource-preview"><Download size={20} /><div><b>{resourceName || "학습 자료"}</b><p className="meta">{resourcePath ? "자료 파일 등록됨 · 수강 회원에게 제공" : "파일을 등록해 주세요."}</p></div></div>}
               {format === "link" && (safeUrl(externalUrl) ? <a className="btn primary" href={safeUrl(externalUrl)} target="_blank" rel="noreferrer">외부 학습 열기<ExternalLink size={16} /></a> : <div className="learning-content-placeholder"><ExternalLink /><p>외부 학습 주소를 등록해 주세요.</p></div>)}

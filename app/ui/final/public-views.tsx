@@ -294,8 +294,6 @@ function StandardProductDetail({
               <nav className="subnav" aria-label="상품 상세 영역">
                 <a href="#class-detail">소개</a>
                 <a href="#curriculum">{digital ? "구성 자료" : "커리큘럼"}</a>
-                {!digital && <a href="#class-reviews">수강 후기</a>}
-                <a href="#class-guide">이용 안내</a>
               </nav>
               <section className="detail-section" id="class-detail">
                 {countdown}
@@ -345,31 +343,6 @@ function StandardProductDetail({
                 )}
               </section>
               {!digital && (
-                <>
-                  <section className="detail-section" id="class-reviews">
-                    <h2>수강생의 실행 경험</h2>
-                    {(data.reviews || [])
-                      .filter((r) => r.course_id === c.id)
-                      .map((r) => (
-                        <article className="review-entry" key={r.id}>
-                          <div
-                            className="stars"
-                            aria-label={num(r, "rating") + "점"}
-                          >
-                            {"★".repeat(
-                              Math.max(0, Math.min(5, num(r, "rating"))),
-                            )}
-                          </div>
-                          <p>{t(r, "body")}</p>
-                          <small>{t(r, "author_name")}</small>
-                        </article>
-                      ))}
-                    {!(data.reviews || []).some(
-                      (r) => r.course_id === c.id,
-                    ) && (
-                      <p className="muted">아직 공개된 수강 후기가 없습니다.</p>
-                    )}
-                  </section>
                   <section className="detail-section">
                     <h2>함께할 강사</h2>
                     <div className="instructor">
@@ -382,31 +355,7 @@ function StandardProductDetail({
                       </div>
                     </div>
                   </section>
-                </>
               )}
-              <section className="detail-section" id="class-guide">
-                <h2>이용 안내</h2>
-                <details className="accordion" open>
-                  <summary>
-                    {digital
-                      ? "구매 후 어디에서 받나요?"
-                      : "학습은 어디에서 시작하나요?"}
-                  </summary>
-                  <div className="inside">
-                    {digital
-                      ? "결제 완료 후 마이페이지의 내 자료실에서 다운로드합니다."
-                      : "신청 완료 후 내 클래스에서 기수별 일정과 학습 콘텐츠를 확인하세요."}
-                  </div>
-                </details>
-                <details className="accordion">
-                  <summary>이용 및 환불 안내</summary>
-                  <div className="inside">
-                    <Link className="text-link" href="/policies/refund">
-                      이용 및 환불 정책 확인하기
-                    </Link>
-                  </div>
-                </details>
-              </section>
             </div>
             <aside className="product-aside">
               <div className="purchase-card">
