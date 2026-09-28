@@ -12,7 +12,9 @@ export type LessonBlock = {
   question?: { label: string; kind: 'text' | 'image' | 'file'; required: boolean };
   fields?: BlockField[]; quiz?: { questions: BlockQuizQuestion[]; passPercent: number };
 };
-export type LessonBlockDocument = { schemaVersion: 1; blocks: LessonBlock[]; checklist: { id: string; label: string; required: boolean }[] };
+export type BlockCompletionPolicy = { mode: 'self' | 'mentor'; requireAnswers: boolean; requireQuizPass: boolean };
+export const defaultBlockCompletion: BlockCompletionPolicy = { mode: 'self', requireAnswers: true, requireQuizPass: true };
+export type LessonBlockDocument = { schemaVersion: 1; blocks: LessonBlock[]; checklist: { id: string; label: string; required: boolean }[]; completion?: BlockCompletionPolicy };
 export type PublicLessonBlock = Omit<LessonBlock, 'quiz'> & { quiz?: { questions: Omit<BlockQuizQuestion, 'correctIndex'>[]; passPercent: number } };
 export type PublicBlockDocument = Omit<LessonBlockDocument, 'blocks'> & { blocks: PublicLessonBlock[] };
 export type BlockAnswer = string | Record<string, string | number>;
@@ -48,7 +50,7 @@ function httpsUrl(value: unknown) {
 }
 
 export function validateLessonBlocks(input: unknown): LessonBlockDocument {
-  const doc = object(input); onlyKeys(doc, ['schemaVersion', 'blocks', 'checklist']);
+  const doc = object(input); onlyKeys(doc, ['schemaVersion', 'blocks', 'checklist', 'completion']);
   if (doc.schemaVersion !== 1) invalid('지원하지 않는 수업 버전입니다.');
   if (new TextEncoder().encode(JSON.stringify(input)).byteLength > 2_000_000) invalid('수업 내용이 너무 큽니다. 이미지는 업로드한 주소로 등록해 주세요.');
   const blocks = array(doc.blocks, 1000).map(raw => {
@@ -105,7 +107,13 @@ export function validateLessonBlocks(input: unknown): LessonBlockDocument {
     return { id: id(item.id), label: text(item.label, 5000, true), required: bool(item.required) };
   });
   unique(checklist.map(item => item.id));
-  return { schemaVersion: 1, blocks, checklist };
+  let completion: BlockCompletionPolicy | undefined;
+  if (doc.completion !== undefined) {
+    const policy = object(doc.completion); onlyKeys(policy, ['mode', 'requireAnswers', 'requireQuizPass']);
+    if (policy.mode !== 'self' && policy.mode !== 'mentor') invalid('학습 완료 방식을 확인해 주세요.');
+    completion = { mode: policy.mode, requireAnswers: bool(policy.requireAnswers), requireQuizPass: bool(policy.requireQuizPass) };
+  }
+  return { schemaVersion: 1, blocks, checklist, ...(completion ? { completion } : {}) };
 }
 
 export function publicLessonBlocks(doc: LessonBlockDocument): PublicBlockDocument {
@@ -162,4 +170,29 @@ export function gradeBlockQuiz(block: LessonBlock, answers: Record<string, strin
   const results = block.quiz.questions.map(q => ({ id: q.id, answered: Object.hasOwn(answers, q.id), correct: answers[q.id] === q.correctIndex }));
   const correct = results.filter(q => q.correct).length;
   return { results, correct, total: results.length, passed: results.every(q => q.answered) && correct * 100 >= results.length * block.quiz.passPercent };
+}
+
+// Shared by the learner checklist and the server. Passing scores are computed
+// only from the private document; the public renderer never receives keys.
+export function missingBlockRequirements(doc: PublicBlockDocument, values: LessonBlockAnswers): { id: string; label: string }[] {
+  const policy = doc.completion || defaultBlockCompletion;
+  const missing: { id: string; label: string }[] = [];
+  for (const item of doc.checklist) if (item.required && !values.checklist.includes(item.id)) missing.push({ id: item.id, label: item.label });
+  for (const block of doc.blocks) {
+    const answer = values.blocks[block.id];
+    if (policy.requireAnswers) {
+      if (block.question?.required && (typeof answer !== 'string' || !answer.trim())) missing.push({ id: block.id, label: block.question.label });
+      for (const field of block.fields || []) if (field.required && !field.sensitive && (!answer || typeof answer !== 'object' || typeof answer[field.id] !== 'string' || !String(answer[field.id]).trim())) missing.push({ id: block.id, label: field.label });
+    }
+    if (policy.requireQuizPass && block.quiz) for (const question of block.quiz.questions) {
+      if (!answer || typeof answer !== 'object' || !Object.hasOwn(answer, question.id)) missing.push({ id: block.id, label: question.prompt });
+    }
+  }
+  return missing;
+}
+export function assessBlockCompletion(doc: LessonBlockDocument, values: LessonBlockAnswers) {
+  const missing = missingBlockRequirements(doc, values);
+  const quizzes = doc.blocks.filter(block => block.quiz).map(block => ({ blockId: block.id, ...gradeBlockQuiz(block, typeof values.blocks[block.id] === 'object' ? values.blocks[block.id] as Record<string, string | number> : {}) }));
+  const policy = doc.completion || defaultBlockCompletion;
+  return { ready: !missing.length && (!policy.requireQuizPass || quizzes.every(quiz => quiz.passed)), missing, quizzes };
 }

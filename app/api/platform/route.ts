@@ -1007,6 +1007,7 @@ export async function POST(request: Request) {
                     },
                     { onConflict: 'enrollment_id,lesson_id' },
                 );
+                if (r.error?.message === 'BLOCK_COMPLETION_REQUIRED') fail('현재 학습 화면에서 필수 항목을 확인하고 제출해 주세요.', 409);
                 if (r.error) throw r.error;
                 return reply({ ok: true });
             }

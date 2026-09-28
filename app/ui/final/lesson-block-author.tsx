@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type ReactNode } from 'react';
-import { publicLessonBlocks, validateLessonBlocks, type BlockField, type LessonBlock, type LessonBlockDocument, type LessonBlockType } from '@/lib/lesson-blocks';
+import { defaultBlockCompletion, publicLessonBlocks, validateLessonBlocks, type BlockField, type LessonBlock, type LessonBlockDocument, type LessonBlockType } from '@/lib/lesson-blocks';
 import { LessonDocumentWriter, type LessonDocumentWrite } from '@/lib/lesson-block-authoring';
 import { isGuidedTool, newGuidedBlock } from '@/lib/lesson-guided-tools';
 import { isCalculator, newCalculatorBlock } from '@/lib/lesson-calculators';
@@ -120,6 +120,12 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
     <p className="meta">아래 ‘학습 저장’을 누르면 기본 정보와 함께 저장됩니다. 이전 학생 답변은 해당 수업 버전과 함께 보관됩니다.</p>
     {preview && <div className="lba-preview" aria-label="구성 미리보기"><LessonBlockView document={publicLessonBlocks(document)} values={{ blocks: {}, checklist: [] }} onChange={() => {}} readOnly /></div>}
     <fieldset disabled={disabled || conflict} hidden={preview} className="lba-main-fields">
+      <section className="lba-block"><h3>학습 완료 기준</h3>
+        <Field label="완료 방식"><select value={(document.completion || defaultBlockCompletion).mode} onChange={event => setDocument(previous => ({ ...previous, completion: { ...(previous.completion || defaultBlockCompletion), mode: event.target.value as 'self' | 'mentor' } }))}><option value="self">조건을 채우면 학습 완료</option><option value="mentor">제출 후 멘토 확인</option></select></Field>
+        <label className="lb-choice"><input type="checkbox" checked={(document.completion || defaultBlockCompletion).requireAnswers} onChange={event => setDocument(previous => ({ ...previous, completion: { ...(previous.completion || defaultBlockCompletion), requireAnswers: event.target.checked } }))} />필수 질문·생성기 입력 완료 필요</label>
+        <label className="lb-choice"><input type="checkbox" checked={(document.completion || defaultBlockCompletion).requireQuizPass} onChange={event => setDocument(previous => ({ ...previous, completion: { ...(previous.completion || defaultBlockCompletion), requireQuizPass: event.target.checked } }))} />시험 통과 필요</label>
+        <p className="meta">필수 체크리스트는 항상 확인합니다. 연습용 시험은 통과 조건을 끌 수 있습니다. 멘토 확인 방식은 제출만으로 학습 완료가 되지 않습니다.</p>
+      </section>
       {document.blocks.map((block, index) => <article className="lba-block" key={block.id} data-author-block={block.id}>
         <div className="lba-actions"><h3>{index + 1}. {choices.find(item => item.type === block.type)?.label || block.type}</h3><button type="button" className="btn small" aria-label={`항목 ${index + 1} 위로`} disabled={index === 0} onClick={() => move(index, -1)}>↑</button><button type="button" className="btn small" aria-label={`항목 ${index + 1} 아래로`} disabled={index === document.blocks.length - 1} onClick={() => move(index, 1)}>↓</button><button type="button" className="btn small" aria-label={`항목 ${index + 1} 삭제`} onClick={() => { if (window.confirm('이 항목을 편집 목록에서 삭제할까요? 저장한 뒤 반영되며 이전 학생 답변은 보관됩니다.')) setDocument(previous => ({ ...previous, blocks: previous.blocks.filter((_, i) => i !== index) })); }}>삭제</button></div>
         {block.type === 'text' ? editingTextId === block.id

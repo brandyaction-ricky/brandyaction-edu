@@ -16,6 +16,7 @@ export class LessonBlockAutosave {
   private disposed = false;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private listeners = new Set<() => void>();
+  private settled = new Set<() => void>();
   private state: AutosaveState = { phase: 'saved', message: '', updatedAt: null };
   constructor(initial: LessonBlockAnswers, writeId: string | null, private save: SaveDraft, private delay = 700) {
     this.values = structuredClone(initial); this.committed = JSON.stringify(initial); this.writeId = writeId;
@@ -55,7 +56,21 @@ export class LessonBlockAutosave {
       if (this.disposed) return;
       const failure = error as { status?: number; message?: string };
       this.publish(failure.status === 409 ? 'conflict' : 'error', failure.message || '답변을 저장하지 못했습니다. 입력 내용은 이 화면에 남아 있습니다.');
-    } finally { this.active = false; }
+    } finally { this.active = false; for (const resolve of this.settled) resolve(); this.settled.clear(); }
   }
-  dispose() { this.disposed = true; clearTimeout(this.timer); this.listeners.clear(); }
+  async finish(): Promise<string> {
+    if (this.disposed || this.state.phase === 'conflict') throw new Error('저장된 답변을 다시 확인해 주세요.');
+    do {
+      if (this.active) await new Promise<void>(resolve => this.settled.add(resolve));
+      else {
+        // Content-only lessons also need an acknowledged empty draft snapshot.
+        if (!this.writeId && !this.pending) this.pending = { requestId: crypto.randomUUID(), expectedWriteId: null, values: structuredClone(this.values) };
+        await this.flush();
+      }
+      const phase = this.getSnapshot().phase;
+      if (this.disposed || phase === 'error' || phase === 'conflict') throw new Error(this.state.message || '답변을 저장한 뒤 다시 제출해 주세요.');
+    } while (this.hasUnsaved());
+    return this.writeId!;
+  }
+  dispose() { this.disposed = true; clearTimeout(this.timer); this.listeners.clear(); for (const resolve of this.settled) resolve(); this.settled.clear(); }
 }

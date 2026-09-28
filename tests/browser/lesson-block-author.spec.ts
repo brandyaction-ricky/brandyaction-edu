@@ -49,6 +49,9 @@ test('one lesson save preserves original text, ordered questions/tools and displ
   await quiz.getByRole('radio', { name: '문제 1 정답 2' }).check();
   await page.getByRole('button', { name: '체크 항목 추가' }).click();
   await page.getByRole('textbox', { name: '체크 항목 1' }).fill('실습했습니다.');
+  await page.getByRole('combobox', { name: '완료 방식' }).selectOption('mentor');
+  await page.getByRole('checkbox', { name: '필수 질문·생성기 입력 완료 필요' }).uncheck();
+  await page.getByRole('checkbox', { name: '시험 통과 필요' }).uncheck();
   await page.getByRole('button', { name: '학습 저장', exact: true }).click();
   await expect(page.getByText('학습 기본 정보와 콘텐츠를 저장했습니다.', { exact: true })).toBeVisible();
   expect(server.getDocument()?.blocks.map(block => block.type)).toEqual(['heading', 'text', 'question', 'prompt-generator', 'quiz']);
@@ -57,6 +60,8 @@ test('one lesson save preserves original text, ordered questions/tools and displ
   const ids = server.getDocument()?.blocks.map(block => block.id);
   await page.getByRole('button', { name: '편집 다시 열기' }).click();
   await expect(page.locator('[data-author-block]')).toHaveCount(5);
+  expect(server.getDocument()?.completion).toEqual({ mode: 'mentor', requireAnswers: false, requireQuizPass: false });
+  await expect(page.getByRole('combobox', { name: '완료 방식' })).toHaveValue('mentor');
   expect(await page.locator('[data-author-block]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-author-block')))).toEqual(ids);
   await page.getByRole('button', { name: '구성 미리보기', exact: true }).click();
   await expect(page.getByLabel('구성 미리보기').getByRole('heading', { name: '오늘의 실습' })).toBeVisible();
@@ -68,6 +73,8 @@ test('one lesson save preserves original text, ordered questions/tools and displ
   await expect(page.getByRole('radio', { name: '고객 이해' })).toBeVisible();
   await expect(page.getByRole('checkbox', { name: '실습했습니다.' })).toBeVisible();
   await expect(page.getByText('기존 자료.pdf', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '미션 제출하기' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '학습 완료하기' })).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('classroom-blocks.png'), fullPage: true });
 });

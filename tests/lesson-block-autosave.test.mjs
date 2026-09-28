@@ -36,3 +36,19 @@ test('no-op edits do not write, invalid receipts remain retryable, and disposed 
  const bad=new LessonBlockAutosave(values(''),null,async()=>({writeId:'wrong',updatedAt:''}),100000);
  try{bad.change(values('unsaved'));await bad.flush();assert.equal(bad.getSnapshot().phase,'error');assert.equal(bad.hasUnsaved(),true);}finally{bad.dispose();}
 });
+test('finish waits for the in-flight and newest queued answers before returning an acknowledged write id',async()=>{
+ const gate=deferred(),calls=[];const controller=new LessonBlockAutosave(values(''),null,async write=>{calls.push(write);if(calls.length===1)await gate.promise;return receipt(write);},100000);
+ try{
+  controller.change(values('first'));const writing=controller.flush();controller.change(values('latest'));
+  let finished=false;const finishing=controller.finish().then(id=>{finished=true;return id;});await Promise.resolve();assert.equal(finished,false);
+  gate.resolve();await writing;assert.equal(await finishing,calls[1].requestId);assert.equal(calls[1].values.blocks.question,'latest');assert.equal(controller.hasUnsaved(),false);
+ }finally{controller.dispose();}
+});
+test('finish persists content-only empty answers and fails without submitting after save errors or conflicts',async()=>{
+ const calls=[];const controller=new LessonBlockAutosave(values(''),null,async write=>{calls.push(write);return receipt(write);},100000);
+ try{const saved=await controller.finish();assert.equal(calls.length,1);assert.equal(await controller.finish(),saved);assert.equal(calls.length,1);}finally{controller.dispose();}
+ for(const status of [503,409]){
+  const bad=new LessonBlockAutosave(values(''),null,async()=>{throw Object.assign(Error('save failed'),{status});},100000);
+  try{await assert.rejects(bad.finish(),/save failed/);}finally{bad.dispose();}
+ }
+});

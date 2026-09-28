@@ -6,8 +6,8 @@ const id='11111111-1111-4111-8111-111111111111',lesson='22222222-2222-4222-8222-
 function compile(file, mocks={}) { const out={};new Function('exports','require',ts.transpileModule(fs.readFileSync(new URL('../'+file,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(out,name=>mocks[name]);return out; }
 const blocks=compile('lib/lesson-blocks.ts',{'./lesson-guided-tools':compile('lib/lesson-guided-tools.ts'),'./lesson-calculators':compile('lib/lesson-calculators.ts')});
 const document={schemaVersion:1,blocks:[{id:'quiz',type:'quiz',quiz:{passPercent:100,questions:[{id:'q',prompt:'시험',options:['가','나'],correctIndex:1}]}},{id:'answer',type:'question',question:{label:'질문',kind:'text',required:true}}],checklist:[]};
-function harness({user={id,role:'member'},editable=false,readError=null,saveError=null,current=revision}={}) {
- const calls=[];const db={rpc:async(name,args)=>{calls.push({name,args});return name==='edu_read_lesson_blocks'?{data:{editable,revision,currentRevision:current,document,draft:null,previousDrafts:[]},error:readError}:{data:{writeId:id,revision},error:saveError};}};
+function harness({user={id,role:'member'},editable=false,readError=null,saveError=null,current=revision,savedDraft=null}={}) {
+ const calls=[];const db={rpc:async(name,args)=>{calls.push({name,args});return name==='edu_read_lesson_blocks'?{data:{editable,revision,currentRevision:current,document,draft:savedDraft,previousDrafts:[]},error:readError}:{data:{writeId:id,revision},error:saveError};}};
  const route=compile('app/api/platform/lesson-blocks/route.ts',{'@/lib/lesson-blocks':blocks,'@/lib/edu-workflows':{uuid:v=>typeof v==='string'&&/^[a-f\d-]{36}$/.test(v)},'@/lib/supabase/admin':{createAdminClient:()=>db},'@/lib/server-auth':{getAuthenticatedUser:async()=>user}});
  const get=(query=`lesson=${lesson}&enrollment=${id}`)=>route.GET(new Request('https://edu.test/api/platform/lesson-blocks?'+query));
  const post=(body,origin='https://edu.test')=>route.POST(new Request('https://edu.test/api/platform/lesson-blocks',{method:'POST',headers:origin?{origin,'content-type':'application/json'}:{},body:JSON.stringify(body)}));
@@ -42,4 +42,16 @@ test('malformed requests and unknown database errors never reveal source content
 });
 test('oversized multibyte bodies are rejected before any database operation',async()=>{
  const h=harness();const r=await h.post({...h.draft,padding:'한'.repeat(710000)});assert.equal(r.status,413);assert.equal(h.calls.length,0);
+});
+test('submission grades saved answers rather than forged client values and uses the session actor',async()=>{
+ const good={blocks:{answer:'저장된 답변',quiz:{q:1}},checklist:[]};
+ const h=harness({savedDraft:{writeId:id,values:good}});const result=await h.post({...h.draft,action:'submit',writeId:id,userId:lesson,values:{blocks:{},checklist:[]},passed:false});
+ assert.equal(result.status,200);assert.equal(h.calls[1].name,'edu_submit_lesson_blocks');assert.equal(h.calls[1].args.p_actor,id);assert.deepEqual(h.calls[1].args.p_values,good);assert.equal(h.calls[1].args.p_request,id);
+});
+test('missing requirements and changed or absent saved drafts cannot be marked complete',async()=>{
+ const blank=harness({savedDraft:{writeId:id,values:{blocks:{},checklist:[]}}});const r=await blank.post({...blank.draft,action:'submit',writeId:id,values:{blocks:{answer:'fake',quiz:{q:1}},checklist:[]},passed:true});
+ assert.equal(r.status,422);assert.equal((await r.json()).assessment.ready,false);assert.equal(blank.calls.length,1);
+ for(const savedDraft of [null,{writeId:lesson,values:{blocks:{},checklist:[]}}]){
+  const h=harness({savedDraft});assert.equal((await h.post({...h.draft,action:'submit',writeId:id})).status,409);assert.equal(h.calls.length,1);
+ }
 });

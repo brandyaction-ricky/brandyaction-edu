@@ -47,6 +47,7 @@ export function Classroom({
   blockLearningEnabled?: boolean;
 }) {
   const [navOpen, setNavOpen] = useState(false);
+  const [completedHere, setCompletedHere] = useState<string[]>([]);
   const enrollment = (data.enrollments || []).find(
     (e) => e.id === path[1] && hasLearningAccess(e),
   );
@@ -79,8 +80,12 @@ export function Classroom({
     );
   const complete = (data.lesson_progress || []).filter(
       (p) => p.enrollment_id === enrollment.id && p.completed_at,
-    ),
-    done = complete.some((p) => p.lesson_id === lesson?.id),
+    );
+  const completedIds = new Set([
+    ...complete.map(p => String(p.lesson_id)),
+    ...completedHere.filter(key => key.startsWith(`${enrollment.id}:`)).map(key => key.slice(enrollment.id.length + 1)),
+  ]);
+  const done = completedIds.has(String(lesson?.id)),
     current = lessons.findIndex((l) => l.id === lesson?.id);
   const entries = missionEntries(data, [enrollment]).filter(
       (x) => x.lesson?.id === lesson?.id,
@@ -88,6 +93,31 @@ export function Classroom({
     entry = entries.find((x) => x.mission.id === missionId) || entries[0];
   const lessonHref =
     "/learn/" + enrollment.id + (lesson ? "/" + lesson.id : "");
+  const legacyCompletion = lesson ? (
+    <button
+      className="btn dark"
+      disabled={pending || done}
+      onClick={() =>
+        void send(
+          {
+            action: "progress",
+            enrollmentId: enrollment.id,
+            lessonId: lesson.id,
+          },
+          "학습을 완료했습니다.",
+        ).catch(() => {})
+      }
+    >
+      {done ? (
+        <>
+          <Check />
+          학습 완료
+        </>
+      ) : (
+        "학습 완료하기"
+      )}
+    </button>
+  ) : null;
   if (path[3] === "mission")
     return (
       <div className="account-bg">
@@ -198,7 +228,7 @@ export function Classroom({
           <div>
             <h1>{t(course, "title")}</h1>
             <p className="meta">
-              {t(cohort, "name")} · {complete.length}개 학습 완료
+              {t(cohort, "name")} · {completedIds.size}개 학습 완료
             </p>
           </div>
           <Link className="btn small" href="/my/classes">
@@ -236,7 +266,7 @@ export function Classroom({
                       href={"/learn/" + enrollment.id + "/" + l.id}
                       onClick={() => setNavOpen(false)}
                     >
-                      {complete.some((p) => p.lesson_id === l.id) ? (
+                      {completedIds.has(l.id) ? (
                         <Check />
                       ) : (
                         <Play />
@@ -265,7 +295,7 @@ export function Classroom({
                   <p>{t(lesson, "description")}</p>
                   <a className="link" href="#lesson-questions">이 수업에 개인 질문 남기기</a>
                 </header>
-                <LessonContent enabled={blockLearningEnabled} lessonId={lesson.id} enrollmentId={enrollment.id}>
+                <LessonContent enabled={blockLearningEnabled} lessonId={lesson.id} enrollmentId={enrollment.id} legacyCompletion={legacyCompletion} onCompleted={() => setCompletedHere(previous => previous.includes(`${enrollment.id}:${lesson.id}`) ? previous : [...previous, `${enrollment.id}:${lesson.id}`])}>
                 {safeUrl(content?.vod_url) && (
                   <Video url={t(content, "vod_url")} />
                 )}
@@ -345,29 +375,7 @@ export function Classroom({
                   ) : (
                     <span />
                   )}
-                  <button
-                    className="btn dark"
-                    disabled={pending || done}
-                    onClick={() =>
-                      void send(
-                        {
-                          action: "progress",
-                          enrollmentId: enrollment.id,
-                          lessonId: lesson.id,
-                        },
-                        "학습을 완료했습니다.",
-                      ).catch(() => {})
-                    }
-                  >
-                    {done ? (
-                      <>
-                        <Check />
-                        학습 완료
-                      </>
-                    ) : (
-                      "학습 완료하기"
-                    )}
-                  </button>
+                  {!blockLearningEnabled && legacyCompletion}
                   {current < lessons.length - 1 && (
                     <Link
                       className="btn"
@@ -397,6 +405,6 @@ export function Classroom({
   );
 }
 
-function LessonContent({ enabled, lessonId, enrollmentId, children }: { enabled: boolean; lessonId: string; enrollmentId: string; children: ReactNode }) {
-  return enabled ? <LessonBlockSession key={`${enrollmentId}:${lessonId}`} lessonId={lessonId} enrollmentId={enrollmentId} fallback={children} /> : <>{children}</>;
+function LessonContent({ enabled, lessonId, enrollmentId, children, legacyCompletion, onCompleted }: { enabled: boolean; lessonId: string; enrollmentId: string; children: ReactNode; legacyCompletion: ReactNode; onCompleted: () => void }) {
+  return enabled ? <LessonBlockSession key={`${enrollmentId}:${lessonId}`} lessonId={lessonId} enrollmentId={enrollmentId} fallback={<>{children}{legacyCompletion}</>} onCompleted={onCompleted} /> : <>{children}</>;
 }

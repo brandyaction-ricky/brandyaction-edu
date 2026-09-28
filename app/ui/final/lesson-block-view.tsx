@@ -2,7 +2,7 @@
 /* eslint-disable @next/next/no-img-element -- Imported lesson images have author-selected external sources and unknown dimensions; do not proxy them through the Next image optimizer. */
 
 import { useState } from 'react';
-import { fillBlockPrompt, type BlockAnswer, type LessonBlockAnswers, type PublicBlockDocument, type PublicLessonBlock } from '@/lib/lesson-blocks';
+import { defaultBlockCompletion, fillBlockPrompt, type BlockAnswer, type LessonBlockAnswers, type PublicBlockDocument, type PublicLessonBlock } from '@/lib/lesson-blocks';
 import { LessonText } from './lesson-text';
 import { Video } from './primitives';
 import { hasGuidedDefinition, isGuidedTool } from '@/lib/lesson-guided-tools';
@@ -90,7 +90,7 @@ export function LessonBlockView({ document, values, onChange, readOnly = false, 
         case 'video': content = url && <><Video url={url} />{block.content && <p>{block.content}</p>}</>; break;
         case 'link': content = url && <a href={url} target="_blank" rel="noopener noreferrer" className="lb-link">{block.content || url} ↗</a>; break;
         case 'prompt': content = <CopyPrompt text={block.content || ''} />; break;
-        case 'question': content = block.question?.kind === 'text' ? <label className="lb-field lb-card"><span>{block.question.label}{block.question.required ? ' (필수)' : ''}</span><textarea rows={5} maxLength={20000} value={typeof value === 'string' ? value : ''} readOnly={readOnly} onChange={event => answer(block.id, event.target.value)} /></label> : <p role="alert">이 질문의 첨부 기능을 아직 사용할 수 없습니다.</p>; break;
+        case 'question': content = block.question?.kind === 'text' ? <label className="lb-field lb-card"><span>{block.question.label}{block.question.required && (document.completion || defaultBlockCompletion).requireAnswers ? ' (필수)' : ''}</span><textarea rows={5} maxLength={20000} value={typeof value === 'string' ? value : ''} readOnly={readOnly} onChange={event => answer(block.id, event.target.value)} /></label> : <p role="alert">이 질문의 첨부 기능을 아직 사용할 수 없습니다.</p>; break;
         case 'prompt-generator': content = <PromptGenerator block={block} answer={value} disabled={readOnly} onChange={value => answer(block.id, value)} />; break;
         case 'persona-generator':
         case 'landing-planner': content = <LessonGuidedTool block={block} answer={value} readOnly={readOnly} onChange={value => answer(block.id, value)} />; break;

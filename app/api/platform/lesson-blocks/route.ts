@@ -1,7 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { uuid } from '@/lib/edu-workflows';
-import { gradeBlockQuiz, publicLessonBlocks, validateBlockAnswers, validateLessonBlocks } from '@/lib/lesson-blocks';
+import { assessBlockCompletion, gradeBlockQuiz, publicLessonBlocks, validateBlockAnswers, validateLessonBlocks } from '@/lib/lesson-blocks';
 
 const reply = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'private, no-store' } });
 function fail(message: string, status = 400): never { throw Object.assign(new Error(message), { status }); }
@@ -35,6 +35,9 @@ function failure(error: unknown) {
     BLOCK_DRAFT_CHANGED: ['다른 화면에서 답변을 저장했습니다. 현재 입력을 보관하고 저장된 답변을 확인해 주세요.', 409],
     BLOCK_REQUEST_REUSED: ['이미 사용한 저장 요청입니다. 내용을 확인한 뒤 다시 저장해 주세요.', 409],
     BLOCK_INVALID: ['저장할 내용을 확인해 주세요.', 400],
+    BLOCK_ALREADY_SUBMITTED: ['이미 제출한 답변입니다. 제출 기록을 다시 확인해 주세요.', 409],
+    BLOCK_REQUIREMENTS_MISSING: ['필수 질문과 체크리스트를 완료해 주세요.', 422],
+    BLOCK_QUIZ_NOT_PASSED: ['시험 통과 기준을 확인하고 다시 풀어 주세요.', 422],
   };
   const match = known[e.message ?? ''];
   if (match) return reply({ error: match[0], code: e.message }, match[1]);
@@ -75,13 +78,28 @@ export async function POST(request: Request) {
       if (error) throw error;
       return reply(data);
     }
-    if (!['draft', 'grade'].includes(body.action)) fail('요청 종류를 확인해 주세요.');
+    if (!['draft', 'grade', 'submit'].includes(body.action)) fail('요청 종류를 확인해 주세요.');
     const enrollment = requiredId(body.enrollmentId), revision = requiredId(body.revision);
     const loaded = await db.rpc('edu_read_lesson_blocks', { p_actor: user.id, p_lesson: lesson, p_enrollment: enrollment, p_revision: revision });
     if (loaded.error) throw loaded.error;
     if (!loaded.data?.document) fail('학습 내용을 찾을 수 없습니다.', 404);
     if (loaded.data.currentRevision !== revision) throw new Error('BLOCK_CONTENT_CHANGED');
     const document = validateLessonBlocks(loaded.data.document);
+    if (body.action === 'submit') {
+      const writeId = requiredId(body.writeId), requestId = requiredId(body.requestId);
+      if (loaded.data.draft?.writeId !== writeId) throw new Error('BLOCK_DRAFT_CHANGED');
+      // Only the acknowledged, server-stored draft is submitted. Client scores,
+      // completion flags and a different values object are never authoritative.
+      const savedValues = validateBlockAnswers(loaded.data.draft.values, document);
+      const assessment = assessBlockCompletion(document, savedValues);
+      if (!assessment.ready) return reply({ error: '필수 항목과 시험 통과 기준을 확인해 주세요.', code: 'BLOCK_REQUIREMENTS_MISSING', assessment }, 422);
+      const { data, error } = await db.rpc('edu_submit_lesson_blocks', {
+        p_actor: user.id, p_lesson: lesson, p_enrollment: enrollment, p_revision: revision,
+        p_write: writeId, p_request: requestId, p_values: savedValues,
+      });
+      if (error) throw error;
+      return reply(data);
+    }
     const values = validateBlockAnswers(body.values, document);
     if (body.action === 'grade') {
       const block = document.blocks.find(block => block.id === body.blockId && block.type === 'quiz');
