@@ -132,7 +132,7 @@
 .edu-admin .product-cohort-fields { display: grid; gap: 16px; padding: 20px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-subtle); }
 .edu-admin .product-cohort-fields > h3, .edu-admin .product-cohort-fields > .meta { margin: 0; }
 .edu-admin .product-cohort-fields .form-grid { gap: 16px; }
-.edu-admin .product-cohort-fields label { display: grid; gap: 8px; color: var(--ink); font-size: 13px; font-weight: 600; }
+.edu-admin .product-cohort-fields label { min-width: 0; display: grid; gap: 8px; color: var(--ink); font-size: 13px; font-weight: 600; }
 .edu-admin .product-cohort-fields input, .edu-admin .product-cohort-fields select { width: 100%; min-width: 0; margin: 0; }
 .edu-admin .product-cohort-fields > .btn { justify-self: end; }
 @media (max-width: 720px) { .edu-admin .product-curriculum-create, .edu-admin .product-curriculum-week li { align-items: stretch; flex-direction: column; } .edu-admin .product-curriculum-create > .btn, .edu-admin .product-curriculum-settings > .btn { width: 100%; } }
@@ -202,3 +202,14 @@
 @media(max-width:1024px){.edu-admin .curriculum-studio{grid-template-columns:minmax(0,1fr)}}
 .edu-admin .product-curriculum-content{scroll-margin-top:100px}
 @media(min-width:1025px){.edu-admin .curriculum-outline{position:sticky;top:96px;max-height:calc(100vh - 190px);overflow:auto;scrollbar-gutter:stable}}
+
+/* Errors stay next to their controls and also identify hidden tabs. */
+.edu-admin .product-editor .tab.has-error { color: #b51c2b; }
+.edu-admin .product-editor .product-error-badge { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; margin-left: 6px; border-radius: 50%; background: #b51c2b; color: #fff; font-size: 12px; }
+.edu-admin .product-editor .product-validation-summary { margin: 20px 24px; padding: 16px; border: 1px solid #b51c2b; border-radius: 6px; color: #961b28; background: #fff6f7; font-size: 13px; }
+.edu-admin .product-editor .product-validation-summary p { margin: 8px 0; }
+.edu-admin .product-editor .product-validation-summary ul { margin: 8px 0 0; padding-left: 20px; }
+.edu-admin .product-editor .product-validation-summary button { padding: 4px 0; border: 0; background: none; color: inherit; text-align: left; text-decoration: underline; cursor: pointer; font: inherit; word-break: keep-all; line-height: 1.6; }
+.edu-admin .product-editor :is(input, select, textarea)[aria-invalid=true] { border-color: #b51c2b; outline-color: #b51c2b; background-color: #fff8f8; }
+.edu-admin .product-editor .product-invalid-group { padding: 16px; border: 2px solid #b51c2b; border-radius: 6px; }
+.edu-admin .product-editor .product-field-error { min-width: 0; white-space: normal; overflow-wrap: anywhere; display: block; margin: 6px 0 12px; color: #b51c2b; font-size: 13px; }
