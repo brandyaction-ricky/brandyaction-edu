@@ -46,6 +46,40 @@ const submission = { id: 'submission', enrollment_id: 'enrollment', mission_id: 
 const data = { courses: [course], cohorts: [cohort], enrollments: [enrollment], profiles: [user], curriculum_weeks: [{ id: 'week', course_id: 'course', week_number: 1, title: '시작하기', is_published: true }], curriculum_lessons: [lesson], curriculum_missions: [mission], mission_submissions: [submission], lesson_contents: [{ lesson_id: 'lesson', body_text: '등록된 학습 본문', resource_path: 'private/test.pdf', resource_name: '학습 자료.pdf' }], articles: [{ id: 'article', slug: 'test-article', title: '테스트 아티클', content_type: 'text', status: 'published', body: [{ type: 'paragraph', text: '콘텐츠' }] }], review_videos: [{ id: 'story', title: '등록된 고객 이야기', reviewer_name: '고객' }], orders: [], admin_summary: [{ id: 'summary', members: 1, activeEnrollments: 1, pendingReviews: 1, openQuestions: 0 }] };
 const send = async () => { throw Error('Unexpected write during render'); };
 
+test('lesson text activates named and bare links while preserving existing copy', () => {
+  const { LessonText } = load('app/ui/final/lesson-text.tsx');
+  const markup = html(LessonText, { text: '[1. 클로드 설치하기]\n\n1. [클로드 다운로드 페이지](https://claude.com/download)를 엽니다.\n2. https://example.test/guide(a(b))?q=1&lang=ko.\n3. [내 클래스](/my)에서 이어갑니다.' });
+  assert.match(markup, /\[1\. 클로드 설치하기\]\n\n1\. <a href="https:\/\/claude.com\/download" target="_blank" rel="noopener noreferrer">클로드 다운로드 페이지<\/a>를 엽니다/);
+  assert.match(markup, /href="https:\/\/example.test\/guide\(a\(b\)\)\?q=1&amp;lang=ko"/);
+  assert.match(markup, /<\/a>\.\n3\./);
+  assert.match(markup, /href="\/my"/);
+  assert.match(html(LessonText, { text: '[자료](https://example.test/guide(a(b)))' }), /href="https:\/\/example.test\/guide\(a\(b\)\)"/);
+  assert.match(html(LessonText, { text: '(https://example.test/download).' }), /<\/a>\)\./);
+});
+
+test('lesson text never turns unsafe destinations or HTML into executable markup', () => {
+  const { LessonText } = load('app/ui/final/lesson-text.tsx');
+  for (const destination of ['javascript:alert(1)', 'data:text/html,<script>alert(1)</script>', '//example.test', '/\\example.test', 'https://', 'https://example.test/\u0001']) {
+    const markup = html(LessonText, { text: `[위험한 링크](${destination})` });
+    assert.doesNotMatch(markup, /<a[\s>]|<script[\s>]/);
+    assert.match(markup, /위험한 링크/);
+  }
+  assert.doesNotMatch(html(LessonText, { text: '<img src=x onerror=alert(1)> <script>alert(1)</script>' }), /<(img|script)[\s>]/);
+  assert.equal(html(LessonText, { text: '[미완성](주소\n기존 본문' }), '<span class="lesson-text-links">[미완성](주소\n기존 본문</span>');
+});
+
+test('saved lesson markdown renders the same clickable link in classroom and editor preview', () => {
+  const bodyText = '1. [클로드 다운로드 페이지](https://claude.com/download)를 엽니다.';
+  const lessonData = { ...data, lesson_contents: [{ lesson_id: 'lesson', body_text: bodyText }] };
+  const { Classroom } = load('app/ui/final/classroom.tsx');
+  const { LearningEditor } = load('app/ui/final/learning-editor.tsx');
+  for (const markup of [
+    html(Classroom, { path: ['learn', 'enrollment', 'lesson'], data: lessonData, pending: false, send, loading: false }),
+    html(LearningEditor, { data: lessonData, row: lesson, pending: false, send, back() {} }),
+  ]) assert.match(markup, /<a href="https:\/\/claude.com\/download" target="_blank" rel="noopener noreferrer">클로드 다운로드 페이지<\/a>/);
+  assert.equal(lessonData.lesson_contents[0].body_text, bodyText);
+});
+
 test('shared week field accepts and serializes zero without lowering the lesson day minimum', () => {
   const { FieldControl, formValues } = load('app/ui/final/admin-editors.tsx');
   const section = platform.sections.find(item => item.key === 'weeks');
