@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { hasLearningAccess } from '@/lib/platform-rules';
 import type { Row } from '@/lib/platform';
+import { readLearningOverviews } from '@/lib/learning-overview';
 
 export type MemberView = 'dashboard' | 'classes' | 'missions' | 'questions' | 'orders' | 'coupons' | 'resources' | 'profile' | 'messages' | 'reviews' | 'learn' | 'order-result';
 export const MEMBER_ROW_LIMIT = 200;
@@ -70,7 +71,7 @@ export async function readMemberPlatformData(userId: string, view: MemberView, e
   const active = (data.enrollments || []).filter(enrollment => hasLearningAccess(enrollment));
   const activeIds = active.map(enrollment => enrollment.id);
   // Once enrollments are known, these reads have no dependencies on each other.
-  const [courses, cohorts, weeks, progress, submissions, drafts, sessions] = await Promise.all([
+  const [courses, cohorts, weeks, progress, submissions, drafts, sessions, overviews] = await Promise.all([
     courseIds.length ? (async () => {
       const columns = view === 'resources'
         ? 'id,title,slug,category,list_price,schedule_label,duration_label,resources:metadata->product_resources,digital_sections:metadata->digital_content_sections'
@@ -83,6 +84,14 @@ export async function readMemberPlatformData(userId: string, view: MemberView, e
     activeIds.length && missionViews.has(view) ? (async () => checked(await db.from('mission_submissions').select('id,enrollment_id,mission_id,attempt_number,status,response,submitted_at,reviewed_at,reviewer_feedback').in('enrollment_id', activeIds).limit(limit), '미션 제출'))() : null,
     activeIds.length && view === 'learn' ? (async () => checked(await db.from('edu_mission_drafts').select('id,enrollment_id,mission_id,content,url,updated_at').eq('user_id', userId).in('enrollment_id', activeIds).limit(limit), '미션 초안'))() : null,
     active.length && scheduleViews.has(view) ? (async () => checked(await admin.from('cohort_sessions').select('id,cohort_id,session_number,title,description,scheduled_at,is_public').in('cohort_id', active.map(enrollment => enrollment.cohort_id)).eq('is_public', true).order('session_number').limit(limit), '일정'))() : null,
+    process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' && active.length && (view === 'dashboard' || view === 'classes') ? (() => {
+      const signal = AbortSignal.timeout(10_000);
+      return readLearningOverviews(active.map(enrollment => enrollment.id), async enrollmentId => {
+        const result = await admin.rpc('edu_read_lesson_progression', { p_actor: userId, p_enrollment: enrollmentId }).abortSignal(signal);
+        if (result.error) throw new Error('학습 진행 상태를 확인하지 못했습니다.');
+        return result.data;
+      });
+    })() : null,
   ]);
   if (courses) data.courses = view === 'resources' ? courses.map(course => {
     const { resources, digital_sections, ...rest } = course;
@@ -94,6 +103,7 @@ export async function readMemberPlatformData(userId: string, view: MemberView, e
   if (submissions) data.mission_submissions = submissions;
   if (drafts) data.edu_mission_drafts = drafts;
   if (sessions) data.cohort_sessions = sessions;
+  if (overviews) data.learning_overviews = overviews;
   const weekIds = (weeks || []).map(week => week.id);
   const sessionIds = (sessions || []).map(session => session.id);
   const [lessons, sessionContents] = await Promise.all([

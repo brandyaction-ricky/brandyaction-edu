@@ -2,6 +2,8 @@
 import { QuestionImage } from './question-image';
 import { QuestionAnswerHistory } from './question-thread';
 import { MemberMessages } from './member-messages';
+import { EnrollmentLearningOverview } from './enrollment-learning-overview';
+import { learningOverview } from '@/lib/learning-overview';
 import { achievement } from "@/lib/edu-workflows";
 import {
   date,
@@ -145,9 +147,11 @@ function Progress({
 function EnrolledCard({
   data,
   enrollment: e,
+  blockLearningEnabled,
 }: {
   data: Data;
   enrollment: Row;
+  blockLearningEnabled: boolean;
 }) {
   const c = rows(data, "courses").find((c) => c.id === e.course_id),
     cohort = rows(data, "cohorts").find((c) => c.id === e.cohort_id),
@@ -178,6 +182,7 @@ function EnrolledCard({
         </div>
       </div>
       <div className="class-footer">
+        {blockLearningEnabled ? <EnrollmentLearningOverview data={data} enrollment={e} compact /> : <>
         <div className="progress-line">
           <span className="meta">
             {complete.length} / {lessons.length}개 학습 완료
@@ -196,6 +201,7 @@ function EnrolledCard({
           {allowed ? "학습 이어가기" : "수강 기간 종료"}
           <ArrowRight />
         </Link>
+        </>}
       </div>
     </article>
   );
@@ -204,10 +210,12 @@ function Dashboard({
   data,
   user,
   active,
+  blockLearningEnabled,
 }: {
   data: Data;
   user: User;
   active: Row[];
+  blockLearningEnabled: boolean;
 }) {
   const e = active[0],
     lessons = e ? enrollmentLessons(data, e) : [],
@@ -231,6 +239,12 @@ function Dashboard({
     coupons = rows(data, "customer_coupons").filter(
       (c) => c.status === "available",
     );
+  const overviews = blockLearningEnabled ? active.map(enrollment => learningOverview(data, enrollment)) : [];
+  const completedCount = blockLearningEnabled
+    ? overviews.every(overview => overview.status === 'ready')
+      ? overviews.reduce((total, overview) => total + overview.groups.reduce((sum, group) => sum + group.completed, 0), 0)
+      : null
+    : active.reduce((total, enrollment) => total + completedLessonProgress(data, enrollment).length, 0);
   return (
     <>
       <Heading
@@ -243,6 +257,7 @@ function Dashboard({
         </Link>
       </Heading>
       <div className="member-focus-grid">
+        {blockLearningEnabled && e ? <section className="member-learning-intro"><h2>{t(c, "title")}</h2><p className="meta">{t(cohort, "name")} · 나의 학습 진행</p><EnrollmentLearningOverview data={data} enrollment={e}/></section> : <>
         <section className="member-continue">
           <div className="member-kicker">
             이어서 학습하기 <span>{t(cohort, "name") || "MY LEARNING"}</span>
@@ -321,19 +336,16 @@ function Dashboard({
             <ArrowRight />
           </Link>
         </section>
+        </>}
       </div>
       <div className="member-stats">
         {[
           ["수강 중", active.length, "개", "클래스별 학습 이어가기", "classes"],
           [
             "학습 완료",
-            active.reduce(
-              (total, enrollment) =>
-                total + completedLessonProgress(data, enrollment).length,
-              0,
-            ),
-            "개",
-            "완료한 학습 기록",
+            completedCount ?? '—',
+            completedCount === null ? '' : '개',
+            completedCount === null ? '학습 상태를 다시 불러와 주세요.' : '완료한 학습 기록',
             "classes",
           ],
           [
@@ -455,7 +467,7 @@ function Dashboard({
           </Link>
         </div>
         {active.slice(0, 2).map((e) => (
-          <EnrolledCard key={e.id} data={data} enrollment={e} />
+          <EnrolledCard key={e.id} data={data} enrollment={e} blockLearningEnabled={blockLearningEnabled} />
         ))}
         {!active.length && (
           <Empty title="신청한 클래스가 없습니다.">
@@ -1253,6 +1265,7 @@ export function MemberViews({
   logout,
   order,
   ongoingLesson,
+  blockLearningEnabled = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true',
 }: {
   section?: string;
   data: Data;
@@ -1262,6 +1275,7 @@ export function MemberViews({
   logout: () => Promise<void>;
   order?: string | null;
   ongoingLesson?: string;
+  blockLearningEnabled?: boolean;
 }) {
   const enrollments = rows(data, "enrollments"),
     active = enrollments.filter(enrollment => hasLearningAccess(enrollment));
@@ -1269,7 +1283,7 @@ export function MemberViews({
   switch (section) {
     case "":
     case "dashboard":
-      content = <Dashboard data={data} user={user} active={active} />;
+      content = <Dashboard data={data} user={user} active={active} blockLearningEnabled={blockLearningEnabled} />;
       break;
     case "classes":
       content = (
@@ -1280,7 +1294,7 @@ export function MemberViews({
           />
           {enrollments.map((e) => (
             <div key={e.id}>
-              <EnrolledCard data={data} enrollment={e} />
+              <EnrolledCard data={data} enrollment={e} blockLearningEnabled={blockLearningEnabled} />
               {hasLearningAccess(e) && (
                 <LiveSchedule data={data} cohortId={t(e, "cohort_id")} />
               )}
