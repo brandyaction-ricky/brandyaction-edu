@@ -460,7 +460,8 @@ test('paid products hide mismatched free-class HTML and block checkout until rea
   assert.doesNotMatch(markup, /무료 클래스 안내와 외부 참여 링크는 노출하지 않습니다/);
   assert.doesNotMatch(markup, /학습 기간 · 일정 안내 · 공개 커리큘럼/);
   assert.match(markup, /수강 신청을 준비하고 있습니다/);
-  assert.match(markup, /aria-disabled="true"/);
+  assert.match(markup, /<button type="button" class="btn primary full large disabled" disabled="">다음 모집 준비 중/);
+  assert.doesNotMatch(markup, /<a[^>]+href="\/classes"[^>]*>다음 모집 준비 중/);
 });
 
 test('landing report separates repeated clicks, missing actuals, direct traffic and per-version reach', () => {
