@@ -21,7 +21,9 @@
 - PC·태블릿·모바일 화면에 치명적 오류가 없는가
 - `/api/health` 응답의 `environment`가 `development`인가
 
-`/api/health`는 환경명뿐 아니라 DEV Supabase 연결, 프로젝트 참조, Toss 키 모드와 웹훅 설정 유무를 비밀값 없이 반환한다. HTTP 200과 `ok: true`, `services.toss.mode: "test"`를 모두 확인한 뒤 DEV 쓰기 검증을 시작한다.
+`/api/health`는 환경명뿐 아니라 DEV Supabase 연결, 프로젝트 참조, Toss 키 모드와 웹훅 설정 유무를 비밀값 없이 반환한다. HTTP 200과 `ok: true`, `services.toss.mode: "test"`, `services.toss.refundsEnabled: true`를 모두 확인한 뒤 DEV 쓰기 검증을 시작한다.
+
+운영 환불은 `NEXT_PUBLIC_APP_ENV=production`, Vercel Production 배포, Toss 공개·서버 키의 `live/live` 일치, `EDU_ALLOW_LIVE_REFUNDS=true`가 모두 충족될 때만 열린다. Preview·DEV·키 모드 불일치에서는 승인 변수가 있어도 닫힌다. 운영 적용 전 `/api/health`의 `services.toss.refundsEnabled`를 확인하고, 실제 환불은 별도 승인된 최소 금액 검증으로만 수행한다.
 
 고정 QA 상품·구매자·E2E 증거 기준은 `docs/dev/QA_DATA_AND_TOSS_E2E_KO.md`를 따른다.
 

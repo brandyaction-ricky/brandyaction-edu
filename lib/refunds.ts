@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { uuid } from '@/lib/edu-workflows';
+import { refundReadiness } from '@/lib/toss-environment';
 
 type Body = Record<string, unknown>;
 const reply = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'private, no-store' } });
@@ -7,9 +8,10 @@ const reply = (value: unknown, status = 200) => Response.json(value, { status, h
 export async function processRefund(actor: string, body: Body) {
   if (!uuid(body.paymentId) || !uuid(body.requestId) || !Number.isSafeInteger(body.amount) || Number(body.amount) < 1 || typeof body.reason !== 'string' || body.reason.trim().length < 2 || body.reason.trim().length > 200)
     return reply({ error: '환불 금액과 사유(2~200자)를 확인해 주세요.' }, 400);
-  const secret = process.env.TOSS_SECRET_KEY || process.env.PG_SECRET_KEY;
-  if (!secret || (!secret.startsWith('test_') && process.env.EDU_ALLOW_LIVE_REFUNDS !== 'true'))
-    return reply({ error: '실결제 환불은 서버 승인 설정이 필요합니다. 테스트 키 또는 운영 환불 승인 설정을 확인해 주세요.' }, 503);
+  const readiness = refundReadiness(process.env);
+  const secret = readiness.secret;
+  if (!readiness.enabled || !secret)
+    return reply({ error: '환불 서버 연결을 확인해 주세요. DEV는 테스트 키, 운영은 Production의 라이브 키와 환불 승인 설정이 모두 필요합니다.' }, 503);
   const db = createAdminClient();
   const { data: payment, error } = await db.from('payments').select('id,order_id,provider,provider_payment_key,approved_amount,cancelled_amount').eq('id', body.paymentId).single();
   if (error || !payment?.provider_payment_key || payment.provider !== 'toss') return reply({ error: '토스 결제 내역을 확인해 주세요.' }, 409);
