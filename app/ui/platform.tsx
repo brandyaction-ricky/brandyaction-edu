@@ -312,6 +312,13 @@ export function Platform({
         setAccessDenied(response.status === 403);
         return;
       }
+      if ((account || learning) && response.status === 401) {
+        setUser(null);
+        setData({});
+        setPagination(null);
+        setLoadedReadKey(publicReadKey);
+        return;
+      }
       if (!response.ok) throw new Error(result.error);
       if (alive.current) {
         setData(result.data || {});
@@ -328,7 +335,7 @@ export function Platform({
     } finally {
       if (alive.current && !controller.signal.aborted) setLoading(false);
     }
-  }, [admin, adminPage, adminSection, editorRecordId, scopeQuery, adminReadKey, publicReadKey, publicParamsString]);
+  }, [account, admin, adminPage, adminSection, editorRecordId, learning, scopeQuery, adminReadKey, publicReadKey, publicParamsString]);
   const prefetchAdminSection = useCallback(
     (section: string) => {
       if (!admin || !user?.id || section === adminSection) return;
@@ -617,6 +624,18 @@ export function Platform({
         authError={searchParams.get("error")}
       />
     );
+  else if ((account || learning) && (loading || (!error && loadedReadKey !== publicReadKey)))
+    body = (
+      <div className="wrap">
+        <section className="member-loading-skeleton" role="status" aria-live="polite" aria-busy="true">
+          <span className="sr-only">{learning ? "학습실 정보를 불러오는 중입니다." : "나의 학습 정보를 불러오는 중입니다."}</span>
+          <div className="member-loading-lines" aria-hidden="true"><span /><span /><span /></div>
+          <div className="member-loading-panels" aria-hidden="true"><span /><span /></div>
+        </section>
+      </div>
+    );
+  else if ((account || learning) && error)
+    body = <div className="wrap"><Empty title="학습 정보를 불러오지 못했습니다." /></div>;
   else if ((account || learning) && !user)
     body = (
       <div className="wrap">
@@ -790,11 +809,11 @@ export function Platform({
   else
     body = (
       <div className="wrap">
-        {loading ? (
+        {loading || (!error && loadedReadKey !== publicReadKey) ? (
           <section className="page-loading" role="status" aria-live="polite" aria-busy="true">
             <span className="page-loading-spinner" aria-hidden="true" />
-            <h1>곧 열립니다</h1>
-            <p>페이지를 준비하고 있어요. 잠시만 기다려 주세요.</p>
+            <h1>{path[0] === "classes" ? "클래스 정보를 불러오는 중입니다." : "페이지 정보를 불러오는 중입니다."}</h1>
+            <p>잠시만 기다려 주세요.</p>
           </section>
         ) : (
           <>
