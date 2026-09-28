@@ -29,6 +29,8 @@ async function readBody(request: Request) {
 function failure(error: unknown) {
   const e = error as { status?: number; message?: string };
   const known: Record<string, [string, number]> = {
+    ONGOING_INVALID: ['지속 챌린지는 자체 완료 방식으로 설정하고 일차 진행 번호를 비워 주세요.', 400],
+    ONGOING_PERIOD_REQUIRED: ['지속 챌린지의 기간별 답변 화면을 다시 열어 주세요.', 409],
     BLOCK_FORBIDDEN: ['이 학습에 접근할 권한이 없습니다.', 403],
     BLOCK_NOT_FOUND: ['학습 내용을 찾을 수 없습니다.', 404],
     BLOCK_CONTENT_CHANGED: ['수업 내용이 변경되었습니다. 작성한 답변은 보관하고 최신 수업을 다시 열어 주세요.', 409],

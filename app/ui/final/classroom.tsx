@@ -27,7 +27,7 @@ import { enrollmentLessons, missionEntries } from "./member-views";
 import { LessonQuestions } from "./lesson-questions";
 import { LessonText } from "./lesson-text";
 import { LessonBlockSession } from './lesson-block-session';
-import { useLessonProgression } from './use-lesson-progression';
+import { useLessonProgression, type LessonGate } from './use-lesson-progression';
 import { Badge, Empty, Heading, ResourceRow, Video } from "./primitives";
 
 export function Classroom({
@@ -79,8 +79,10 @@ export function Classroom({
   const selectedId = allLessons.find(item => item.id === path[2])?.id || allLessons[0]?.id;
   const selectedGate = progression.lessons?.find(item => item.lessonId === selectedId);
   const lessonDay = (id: string, fallback: number) => progression.lessons?.find(item => item.lessonId === id)?.dayNumber ?? fallback;
-  const hasTracks = progression.lessons?.some(item => item.track !== null);
-  const lessons = allLessons.filter(item => !hasTracks || !selectedGate || progression.lessons?.some(gate => gate.lessonId === item.id && gate.track === selectedGate.track))
+  const group = (gate?: LessonGate) => gate?.ongoing ? 'ongoing' : gate?.track;
+  const hasTracks = progression.lessons?.some(item => group(item) != null);
+  const lessonLabel = (id: string, fallback: number) => progression.lessons?.find(item => item.lessonId === id)?.ongoing ? '지속 챌린지' : `DAY ${lessonDay(id, fallback)}`;
+  const lessons = allLessons.filter(item => !hasTracks || !selectedGate || progression.lessons?.some(gate => gate.lessonId === item.id && group(gate) === group(selectedGate)))
       .sort((a, b) => selectedGate?.track ? (progression.lessons?.find(item => item.lessonId === a.id)?.dayNumber || 0) - (progression.lessons?.find(item => item.lessonId === b.id)?.dayNumber || 0) : 0),
     lesson = lessons.find((l) => l.id === path[2]) || lessons[0],
     content = (data.lesson_contents || []).find(
@@ -102,7 +104,7 @@ export function Classroom({
     entry = entries.find((x) => x.mission.id === missionId) || entries[0];
   const lessonHref =
     "/learn/" + enrollment.id + (lesson ? "/" + lesson.id : "");
-  const legacyCompletion = lesson ? (
+  const legacyCompletion = lesson && !selectedGate?.ongoing ? (
     <button
       className="btn dark"
       disabled={pending || done}
@@ -136,7 +138,7 @@ export function Classroom({
             description={[
               t(course, "title"),
               t(cohort, "name"),
-              "DAY " + lessonDay(String(lesson?.id), num(lesson, "day_number")),
+              lessonLabel(String(lesson?.id), num(lesson, "day_number")),
             ]
               .filter(Boolean)
               .join(" · ")}
@@ -258,9 +260,9 @@ export function Classroom({
             className={"learning-nav " + (navOpen ? "open" : "")}
             aria-label="학습 목록"
           >
-            {blockLearningEnabled && hasTracks && <nav aria-label="학습 종류">{(['daily', 'learning', null] as const).map(track => {
-              const first = progression.lessons?.filter(item => item.track === track && allLessons.some(lesson => lesson.id === item.lessonId)).sort((a, b) => (a.dayNumber || 0) - (b.dayNumber || 0))[0];
-              return first && <Link className="btn small mb16" key={track || 'legacy'} aria-current={selectedGate?.track === track ? 'page' : undefined} href={`/learn/${enrollment.id}/${first.lessonId}`}>{track === 'daily' ? '데일리 미션' : track === 'learning' ? '별도 학습' : '기타 학습'}</Link>;
+            {blockLearningEnabled && hasTracks && <nav aria-label="학습 종류">{(['daily', 'learning', 'ongoing', null] as const).map(track => {
+              const first = progression.lessons?.filter(item => group(item) === track && allLessons.some(lesson => lesson.id === item.lessonId)).sort((a, b) => (a.dayNumber || 0) - (b.dayNumber || 0))[0];
+              return first && <Link className="btn small mb16" key={track || 'legacy'} aria-current={group(selectedGate) === track ? 'page' : undefined} href={`/learn/${enrollment.id}/${first.lessonId}`}>{track === 'daily' ? '데일리 미션' : track === 'learning' ? '별도 학습' : track === 'ongoing' ? '지속 챌린지' : '기타 학습'}</Link>;
             })}</nav>}
             {weeks.filter(w => lessons.some(l => l.week_id === w.id)).map((w) => (
               <section className="lesson-week" key={w.id}>
@@ -286,7 +288,7 @@ export function Classroom({
                         <Play />
                       )}
                       <div>
-                        <span className="meta">DAY {lessonDay(l.id, num(l, "day_number"))}{!canOpen(l.id) ? ' · 잠김' : ''}</span>
+                        <span className="meta">{lessonLabel(l.id, num(l, "day_number"))}{!canOpen(l.id) ? ' · 잠김' : ''}</span>
                         <b>{t(l, "title")}</b>
                       </div>
                     </Link>
@@ -299,7 +301,7 @@ export function Classroom({
               <>
                 <header className="lesson-header">
                   <div className="flex gap8">
-                    <Badge>DAY {lessonDay(lesson.id, num(lesson, "day_number"))}</Badge>
+                    <Badge>{lessonLabel(lesson.id, num(lesson, "day_number"))}</Badge>
                     <Badge color={done ? "green" : ""}>
                       {done ? "학습 완료" : "학습 중"}
                     </Badge>

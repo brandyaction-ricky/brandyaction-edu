@@ -5,9 +5,11 @@ import { LessonBlockAutosave, type AutosaveState } from '@/lib/lesson-block-auto
 import { defaultBlockCompletion, missingBlockRequirements, type LessonBlockAnswers, type PublicBlockDocument } from '@/lib/lesson-blocks';
 import { canRenderLessonBlocks, LessonBlockView, type BlockGrade } from './lesson-block-view';
 import { blockSubmissionState, canEditBlockSubmission, type BlockSubmission as Submission } from '@/lib/lesson-block-review';
+import { OngoingLessonSession } from './ongoing-lesson-session';
 import { BlockSubmissionHistory } from './lesson-block-submission-history';
 
 type Snapshot = {
+  ongoing?: string | null;
   document: PublicBlockDocument | null; revision: string | null; currentRevision: string | null;
   draft: { values: LessonBlockAnswers; writeId: string; updatedAt: string } | null;
   previousDrafts: { revision: string; updatedAt: string }[];
@@ -155,6 +157,7 @@ function SessionLoader({ lessonId, enrollmentId, fallback, onCompleted }: Sessio
   function select(revision: string | null) { setSelection(previous => ({ revision, reload: previous.reload + 1 })); }
   if (loaded?.key !== key) return <p role="status">학습 내용과 저장된 답변을 불러오고 있습니다.</p>;
   if (loaded.error) return <div className="lb-session-notice" role="alert"><p>{loaded.error}</p><button type="button" className="btn small" onClick={() => select(selection.revision)}>다시 불러오기</button></div>;
+  if (loaded.snapshot?.ongoing) return <OngoingLessonSession lessonId={lessonId} enrollmentId={enrollmentId} />;
   if (!loaded.snapshot?.document) return <>{fallback}</>;
   if (!canRenderLessonBlocks(loaded.snapshot.document)) return <p role="alert">학습 도구를 준비하고 있습니다. 잠시 후 다시 확인해 주세요.</p>;
   return <SessionContent key={key} snapshot={loaded.snapshot} lessonId={lessonId} enrollmentId={enrollmentId} onSelectRevision={select} onCompleted={onCompleted} />;

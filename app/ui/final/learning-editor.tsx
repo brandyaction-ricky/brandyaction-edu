@@ -12,6 +12,7 @@ import { Badge, Video } from "./primitives";
 import { LessonText } from "./lesson-text";
 import { LessonBodyEditor } from "./lesson-body-editor";
 import { lessonBodyHasText } from "@/lib/lesson-body";
+import { OngoingLessonSettings } from './ongoing-lesson-settings';
 import { LessonBlockAuthor, type BlockAuthorHandle, type BlockAuthorState } from './lesson-block-author';
 import type { LessonBlock } from '@/lib/lesson-blocks';
 
@@ -191,6 +192,7 @@ export function LearningEditor({ data, row, pending, send, back, blockEditingEna
         {resourcePath && <p className="notice">등록된 자료 파일은 학습 본문 아래에서 계속 다운로드할 수 있습니다.</p>}
         <LessonBlockAuthor key={row?.id || 'new'} ref={blockRef} lessonId={lessonId} courseId={course?.id} legacyBlocks={legacyBlocks} disabled={busy} onState={setBlockState} />
       </div></section>}
+      {blockEditingEnabled && blockState.active && lessonId && <OngoingLessonSettings lessonId={lessonId} disabled={saveBlocked || dirty || blockState.dirty} />}
       {!blockState.active && !(blockEditingEnabled && blockState.blocked) && <section className={"panel" + (previewOnly ? "" : " mt24")}>
         <div className="panel-head"><h2>학습 본문</h2><span className="meta">{t(course, "title") || "학습 콘텐츠와 미리보기"}</span></div>
         <div className={"section-pad lesson-body-grid" + (previewOnly ? " learning-preview-only" : "")}>

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from 'react';
-export type LessonGate = { lessonId: string; isUnlocked: boolean; automaticApproval: boolean; track: 'daily' | 'learning' | null; dayNumber: number | null; reason: string };
+export type LessonGate = { lessonId: string; isUnlocked: boolean; automaticApproval: boolean; ongoing?: boolean; track: 'daily' | 'learning' | null; dayNumber: number | null; reason: string };
 export function useLessonProgression(enrollment: string, enabled: boolean) {
   const [refresh, setRefresh] = useState(0);
   const key = `${enrollment}:${refresh}`;

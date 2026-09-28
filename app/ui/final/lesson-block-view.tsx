@@ -5,7 +5,7 @@ import { AnswerFiles } from './lesson-answer-files';
 import { LessonPrivateMedia } from './lesson-private-media';
 import type { LessonMediaKind } from '@/lib/lesson-media';
 import type { AnswerFileContext } from '@/lib/lesson-files';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { defaultBlockCompletion, fillBlockPrompt, type BlockAnswer, type LessonBlockAnswers, type PublicBlockDocument, type PublicLessonBlock } from '@/lib/lesson-blocks';
 import { LessonText } from './lesson-text';
 import { Video } from './primitives';
@@ -36,7 +36,7 @@ function CopyPrompt({ text }: { text: string }) {
   return <div className="lb-prompt"><pre tabIndex={0}>{text}</pre><button type="button" className="btn small" onClick={() => void copy()}>프롬프트 복사</button><span role="status">{message}</span></div>;
 }
 
-function PromptGenerator({ block, answer, disabled, onChange }: { block: PublicLessonBlock; answer?: BlockAnswer; disabled: boolean; onChange: (value: BlockAnswer) => void }) {
+function PromptGenerator({ block, answer, disabled, onChange, live = false }: { live?: boolean; block: PublicLessonBlock; answer?: BlockAnswer; disabled: boolean; onChange: (value: BlockAnswer) => void }) {
   const [privateValues, setPrivateValues] = useState<Record<string, string>>({});
   // The source shows the template before applying inputs and keeps the previous
   // result while editing. Reopened drafts start from their saved public inputs.
@@ -44,7 +44,7 @@ function PromptGenerator({ block, answer, disabled, onChange }: { block: PublicL
   const [error, setError] = useState('');
   const values = { ...stringValues(answer), ...privateValues };
   const dirty = (block.fields || []).some(field => (values[field.id] || '') !== (appliedValues[field.id] || ''));
-  const result = fillBlockPrompt(block.content || '', block.fields || [], appliedValues);
+  const result = fillBlockPrompt(block.content || '', block.fields || [], live ? values : appliedValues);
   function changeField(id: string, sensitive: boolean, value: string) {
     setError('');
     if (sensitive) setPrivateValues(previous => ({ ...previous, [id]: value }));
@@ -62,13 +62,14 @@ function PromptGenerator({ block, answer, disabled, onChange }: { block: PublicL
         : <input type={field.sensitive ? 'password' : 'text'} autoComplete="off" maxLength={20000} value={values[field.id] || ''} placeholder={field.placeholder} disabled={disabled} onChange={event => changeField(field.id, field.sensitive, event.target.value)} />}
       {field.sensitive && <small>이 항목은 저장되지 않으며 화면을 닫으면 지워집니다.</small>}
     </label>)}
-    <button type="button" className="btn" onClick={generate} disabled={disabled}>프롬프트 만들기</button>
-    {dirty && <p role="status">입력을 수정했습니다. ‘프롬프트 만들기’를 누르면 아래 결과에 반영됩니다.</p>}
+    {!live && <button type="button" className="btn" onClick={generate} disabled={disabled}>프롬프트 만들기</button>}
+    {dirty && !live && <p role="status">입력을 수정했습니다. ‘프롬프트 만들기’를 누르면 아래 결과에 반영됩니다.</p>}
     {error && <p role="alert">{error}</p>}{result && <CopyPrompt key={result} text={result} />}
   </section>;
 }
 
 function BlockQuiz({ block, answer, disabled, onChange, grade }: { block: PublicLessonBlock; answer?: BlockAnswer; disabled: boolean; onChange: (value: BlockAnswer) => void; grade?: (blockId: string) => Promise<BlockGrade> }) {
+  const radioGroup = useId();
   const [result, setResult] = useState<BlockGrade | null>(null), [message, setMessage] = useState(''), [pending, setPending] = useState(false);
   const choices = answer && typeof answer === 'object' ? answer : {};
   async function check() {
@@ -81,7 +82,7 @@ function BlockQuiz({ block, answer, disabled, onChange, grade }: { block: Public
   return <section className="lb-card" aria-label={block.content || '확인 문제'}><h3>{block.content || '확인 문제'}</h3>
     {(block.quiz?.questions || []).map((question, index) => <fieldset key={question.id} disabled={disabled || pending}>
       <legend>{index + 1}. {question.prompt}</legend>
-      {question.options.map((option, n) => <label className="lb-choice" key={n}><input type="radio" name={`${block.id}-${question.id}`} checked={choices[question.id] === n} onChange={() => { setResult(null); setMessage(''); onChange({ ...choices, [question.id]: n }); }} />{option}</label>)}
+      {question.options.map((option, n) => <label className="lb-choice" key={n}><input type="radio" name={`${radioGroup}-${block.id}-${question.id}`} checked={choices[question.id] === n} onChange={() => { setResult(null); setMessage(''); onChange({ ...choices, [question.id]: n }); }} />{option}</label>)}
       {result && <p>{result.results.find(item => item.id === question.id)?.correct ? '정답입니다.' : '다시 살펴보세요.'}</p>}
     </fieldset>)}
     {grade && <button type="button" className="btn" disabled={disabled || pending} onClick={() => void check()}>{pending ? '확인 중…' : '답안 확인'}</button>}
@@ -89,7 +90,7 @@ function BlockQuiz({ block, answer, disabled, onChange, grade }: { block: Public
   </section>;
 }
 
-export function LessonBlockView({ document, values, onChange, readOnly = false, grade, fileContext, submissionId, onFilePending, onAnswerChange }: { fileContext?: AnswerFileContext; submissionId?: string; onFilePending?: (blockId: string, pending: boolean) => void; onAnswerChange?: (blockId: string, value: BlockAnswer) => void; document: PublicBlockDocument; values: LessonBlockAnswers; onChange: (values: LessonBlockAnswers) => void; readOnly?: boolean; grade?: (blockId: string) => Promise<BlockGrade> }) {
+export function LessonBlockView({ document, values, onChange, readOnly = false, grade, fileContext, submissionId, onFilePending, onAnswerChange, livePrompts = false }: { livePrompts?: boolean; fileContext?: AnswerFileContext; submissionId?: string; onFilePending?: (blockId: string, pending: boolean) => void; onAnswerChange?: (blockId: string, value: BlockAnswer) => void; document: PublicBlockDocument; values: LessonBlockAnswers; onChange: (values: LessonBlockAnswers) => void; readOnly?: boolean; grade?: (blockId: string) => Promise<BlockGrade> }) {
   function answer(id: string, value: BlockAnswer) { if (onAnswerChange) { onAnswerChange(id, value); return; } onChange({ ...values, blocks: { ...values.blocks, [id]: value } }); }
   return <div className="lesson-blocks">
     {document.blocks.map(block => {
@@ -107,7 +108,7 @@ export function LessonBlockView({ document, values, onChange, readOnly = false, 
         case 'link': content = url && <a href={url} target="_blank" rel="noopener noreferrer" className="lb-link">{block.content || url} ↗</a>; break;
         case 'prompt': content = <CopyPrompt text={block.content || ''} />; break;
         case 'question': content = block.question?.kind === 'text' ? <label className="lb-field lb-card"><span>{block.question.label}{block.question.required && (document.completion || defaultBlockCompletion).requireAnswers ? ' (필수)' : ''}</span><textarea rows={5} maxLength={20000} value={typeof value === 'string' ? value : ''} readOnly={readOnly} onChange={event => answer(block.id, event.target.value)} /></label> : <AnswerFiles block={block} answer={value} onChange={value => answer(block.id, value)} readOnly={readOnly} context={fileContext} submissionId={submissionId} onPending={onFilePending} />; break;
-        case 'prompt-generator': content = <PromptGenerator block={block} answer={value} disabled={readOnly} onChange={value => answer(block.id, value)} />; break;
+        case 'prompt-generator': content = <PromptGenerator live={livePrompts} block={block} answer={value} disabled={readOnly} onChange={value => answer(block.id, value)} />; break;
         case 'persona-generator':
         case 'landing-planner': content = <LessonGuidedTool block={block} answer={value} readOnly={readOnly} onChange={value => answer(block.id, value)} />; break;
         case 'recipe-calculator':
