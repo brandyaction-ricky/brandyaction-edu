@@ -12,7 +12,8 @@ function kstInput(value: unknown) {
   return new Date(Date.parse(String(value)) + 9 * 60 * 60 * 1000).toISOString().slice(0, 16);
 }
 
-function CohortFields({ course, cohort, pending, send, onSaved }: {
+function CohortFields({ course, cohort, pending, send, onSaved, validationErrors }: {
+  validationErrors: Record<string, string>;
   course: Row;
   cohort?: Row;
   pending: boolean;
@@ -34,6 +35,14 @@ function CohortFields({ course, cohort, pending, send, onSaved }: {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const disabled = pending || busy;
+  function validationProps(field: string) {
+    const key = "cohort_" + field;
+    return { "data-validation-field": key, "aria-invalid": Boolean(validationErrors[key]), "aria-describedby": validationErrors[key] ? key + "-error" : undefined };
+  }
+  function validationMessage(field: string) {
+    const key = "cohort_" + field;
+    return validationErrors[key] ? <small id={key + "-error"} className="product-field-error">{validationErrors[key]}</small> : null;
+  }
 
   async function save() {
     setError(""); setMessage("");
@@ -65,10 +74,10 @@ function CohortFields({ course, cohort, pending, send, onSaved }: {
     <div className="form-grid">
       <label>기수명<input value={name} maxLength={120} onChange={event => setName(event.target.value)} disabled={disabled} /></label>
       <label>기수 코드<input value={code} maxLength={40} onChange={event => setCode(event.target.value)} disabled={disabled || Boolean(cohort)} /></label>
-      <label>기수 판매가 · 원<input type="number" min="0" step="1" value={price} onChange={event => setPrice(event.target.value)} disabled={disabled} /></label>
+      <label>기수 판매가 · 원<input aria-label="기수 판매가 · 원" {...validationProps("price")} type="number" min="0" step="1" value={price} onChange={event => setPrice(event.target.value)} disabled={disabled} />{validationMessage("price")}</label>
       <label>정원 · 명<input type="number" min="1" step="1" value={capacity} onChange={event => setCapacity(event.target.value)} placeholder="제한 없음" disabled={disabled} /></label>
-      <label>기수 상태<select value={status} onChange={event => setStatus(event.target.value)} disabled={disabled}>{statuses.map(value => <option key={value} value={value}>{labels[value] || value}</option>)}</select></label>
-      {dateFields.map(field => <label key={field}>{({ recruitment_start_at: "모집 시작 · KST", recruitment_end_at: "모집 마감 · KST", operation_start_at: "운영 시작 · KST", operation_end_at: "운영 종료 · KST" })[field]}<input type="datetime-local" value={dates[field]} onChange={event => setDates(current => ({ ...current, [field]: event.target.value }))} disabled={disabled} /></label>)}
+      <label>기수 상태<select aria-label="기수 상태" {...validationProps("status")} value={status} onChange={event => setStatus(event.target.value)} disabled={disabled}>{statuses.map(value => <option key={value} value={value}>{labels[value] || value}</option>)}</select>{validationMessage("status")}</label>
+      {dateFields.map(field => <label key={field}>{({ recruitment_start_at: "모집 시작 · KST", recruitment_end_at: "모집 마감 · KST", operation_start_at: "운영 시작 · KST", operation_end_at: "운영 종료 · KST" })[field]}<input {...validationProps(field)} type="datetime-local" value={dates[field]} onChange={event => setDates(current => ({ ...current, [field]: event.target.value }))} disabled={disabled} />{validationMessage(field)}</label>)}
     </div>
     {error && <p className="notice warning" role="alert">{error}</p>}
     {message && <p className="notice" role="status">{message}</p>}
@@ -76,7 +85,8 @@ function CohortFields({ course, cohort, pending, send, onSaved }: {
   </section>;
 }
 
-export function ProductCohortWorkspace({ course, cohorts, selectedId, onSelect, pending, send }: {
+export function ProductCohortWorkspace({ course, cohorts, selectedId, onSelect, pending, send, validationErrors = {} }: {
+  validationErrors?: Record<string, string>;
   course?: Row;
   cohorts: Row[];
   selectedId: string;
@@ -94,6 +104,6 @@ export function ProductCohortWorkspace({ course, cohorts, selectedId, onSelect, 
       {cohorts.map(item => <button className={`btn${!creating && item.id === selectedId ? " dark" : ""}`} key={item.id} type="button" onClick={() => { setCreating(false); onSelect(String(item.id)); }} disabled={pending} aria-pressed={!creating && item.id === selectedId}>{t(item, "name")} · {labels[t(item, "status")] || t(item, "status")} · {money(num(item, "price"))}</button>)}
       <button className={`btn${creating || !selected ? " dark" : ""}`} type="button" onClick={() => setCreating(true)} disabled={pending} aria-pressed={creating || !selected}>+ 새 기수</button>
     </div>
-    <CohortFields key={selected?.id || "new"} course={course} cohort={selected} pending={pending} send={send} onSaved={id => { setCreating(false); onSelect(id); }} />
+    <CohortFields key={selected?.id || "new"} course={course} cohort={selected} validationErrors={validationErrors} pending={pending} send={send} onSaved={id => { setCreating(false); onSelect(id); }} />
   </div>;
 }

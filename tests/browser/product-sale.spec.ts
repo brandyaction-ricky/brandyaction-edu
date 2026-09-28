@@ -11,15 +11,15 @@ test('sales stay available before curriculum publication across editor tabs and 
   }
   await expect(page.locator('aside').getByText('판매 중', { exact: true }).first()).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  page.once('dialog', async dialog => { expect(dialog.message()).toContain('기수 상태는 자동 변경되지 않습니다'); await dialog.accept(); });
+  page.on('dialog', async dialog => { await dialog.dismiss(); throw new Error('정상 판매 상품에는 확인창이 필요하지 않습니다.'); });
   await page.getByRole('button', { name: '저장하기', exact: true }).click();
   await expect(page.getByLabel('합성 저장 횟수')).toHaveText('1');
 });
 
-test('ready upcoming offer remains available and warns without changing cohort status', async ({ page }) => {
+test('ready upcoming offer saves without a warning or changing cohort status', async ({ page }) => {
   await page.goto('/product-sale-test?ready=1');
   await expect(page.locator('aside').getByText('판매 중', { exact: true }).first()).toBeVisible();
-  page.once('dialog', async dialog => { expect(dialog.message()).toContain('기수 상태는 자동 변경되지 않습니다'); await dialog.accept(); });
+  page.on('dialog', async dialog => { await dialog.dismiss(); throw new Error('정상 판매 상품에는 확인창이 필요하지 않습니다.'); });
   await page.getByRole('button', { name: '저장하기', exact: true }).click();
   await expect(page.getByLabel('합성 저장 횟수')).toHaveText('1');
 });
