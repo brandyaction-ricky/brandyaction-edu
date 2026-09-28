@@ -1,4 +1,5 @@
 "use client";
+import { QuestionAiBatch } from './question-ai-batch';
 import { lessonBodyPlainText } from "@/lib/lesson-body";
 import {
   date,
@@ -43,6 +44,7 @@ type Props = {
   exportCsv: (rows: Row[], name: string) => void;
   send?: WorkflowSend;
   tools?: ReactNode;
+  onQuestionChanged?: () => void;
 };
 type Column = { label: string; value: (row: Row) => ReactNode };
 function CatalogTable({ label, loading, children }: { label: string; loading: boolean; children: ReactNode }) {
@@ -67,6 +69,7 @@ export function AdminCatalog({
   tools,
   missionScope,
   onMissionScopeChange,
+  onQuestionChanged,
 }: Props) {
   const params = useSearchParams(), router = useRouter();
   const [query, setQuery] = useState(""),
@@ -879,7 +882,7 @@ export function AdminCatalog({
               {!!unmatchedMissions.length && <section className="week-card mission-catalog"><div className="week-head"><strong>학습 연결 확인</strong></div>{unmatchedMissions.map(renderMission)}</section>}
             </div>
           ) : s.key === "questions" ? (
-            <div className="stack question-admin-list">
+            <div className="stack question-admin-list">{process.env.NEXT_PUBLIC_EDU_QUESTION_AI_BATCH_ENABLED === 'true' && process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED === 'true' && <QuestionAiBatch changed={onQuestionChanged}/>}
               {filtered.map((q) => (
                 <article className="panel question-admin-card" key={q.id}>
                   <div className="panel-head">

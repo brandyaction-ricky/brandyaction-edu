@@ -1,5 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import type { QuestionAiReference } from '@/lib/question-ai-context';
+import { QuestionAiReferenceNote } from './question-ai-reference';
 import { QuestionImage } from './question-image';
 import { AdminDrawer, useUnsavedWarning } from '@/features/admin-ui';
 type Answer = { id: string; authorName: string; content: string; createdAt: string };
@@ -46,13 +48,14 @@ export function QuestionAnswerHistory({ questionId, fallback = '' }: { questionI
   <div className="row mt16"><button type="button" className="btn small" onClick={() => setOpen(v => !v)}>{open ? '답변 이력 접기' : '답변 전체 보기'}</button>{open && <button type="button" className="btn small" onClick={state.reload}>최신 답변 확인</button>}</div>
  </div>;
 }
-export function QuestionThreadDialog({ questionId, close, changed, archive, pending = false }: { questionId: string; close: () => void; changed?: () => void; archive?: () => void; pending?: boolean }) {
- const state = useThread(questionId), [content, setContent] = useState(''), [busy, setBusy] = useState(false), [uncertain, setUncertain] = useState(false), [stale, setStale] = useState(false), [notice, setNotice] = useState('');
+export function QuestionThreadDialog({ questionId, close, changed, archive, pending = false, initialDraft = '', initialReference, onDraftChange, onDraftUsed }: { questionId: string; close: () => void; changed?: () => void; archive?: () => void; pending?: boolean; initialDraft?: string; initialReference?: QuestionAiReference; onDraftChange?: (value: string) => void; onDraftUsed?: () => void }) {
+ const state = useThread(questionId), [content, setContent] = useState(initialDraft), [busy, setBusy] = useState(false), [uncertain, setUncertain] = useState(false), [stale, setStale] = useState(false), [notice, setNotice] = useState('');
+ const [aiReference, setAiReference] = useState<QuestionAiReference | null>(initialReference || null);
  const [aiBusy, setAiBusy] = useState(false), gate = useRef(false);
  const retry = useRef<{ action: 'answer' | 'resolve'; questionId: string; content?: string; requestId?: string; expectedHeadId?: string | null } | null>(null);
  useUnsavedWarning(Boolean(content) || busy || uncertain);
  const locked = busy || uncertain || aiBusy || pending;
- function leave() { if (locked) return; if (content && !window.confirm('아직 등록하지 않은 답변을 지우고 닫을까요?')) return; close(); }
+ function leave() { if (locked) return; if (onDraftChange) { onDraftChange(content); close(); return; } if (content && !window.confirm('아직 등록하지 않은 답변을 지우고 닫을까요?')) return; close(); }
  async function write(action: 'answer' | 'resolve') {
   if (gate.current || stale || !state.data || !state.data.canAnswer) return;
   if (!retry.current) { if (action === 'answer' && !content.trim()) return; retry.current = { action, questionId, ...(action === 'answer' ? { content, requestId: crypto.randomUUID(), expectedHeadId: state.data.question.headId } : {}) }; }
@@ -60,7 +63,7 @@ export function QuestionThreadDialog({ questionId, close, changed, archive, pend
   try {
    const sent = retry.current, result = await request<{ id: string; questionId?: string; resolved?: boolean }>(questionId, sent);
    if (sent.action === 'answer' ? result.id !== sent.requestId || result.questionId !== questionId : result.id !== questionId || result.resolved !== true) throw new Error('등록 결과를 확인하지 못했습니다.');
-   setContent(''); setUncertain(false); retry.current = null; setNotice(action === 'answer' ? '답변을 추가했습니다. 이전 답변도 그대로 남아 있습니다.' : '질문을 처리 완료했습니다.'); state.reload(); changed?.();
+   setContent(''); setUncertain(false); retry.current = null; setNotice(action === 'answer' ? '답변을 추가했습니다. 이전 답변도 그대로 남아 있습니다.' : '질문을 처리 완료했습니다.'); state.reload(); changed?.(); if (sent.action === 'answer') onDraftUsed?.();
   } catch (e) {
    const failure = e as { message: string; status?: number }, unknown = !failure.status || failure.status >= 500; setUncertain(unknown); setStale(failure.status === 409); setNotice(failure.message + (unknown ? ' 같은 요청으로 결과를 다시 확인해 주세요.' : '')); if (!unknown) retry.current = null;
   } finally { gate.current = false; setBusy(false); }
@@ -68,9 +71,9 @@ export function QuestionThreadDialog({ questionId, close, changed, archive, pend
  async function draft() {
   if (locked || content) return; setAiBusy(true); setNotice('');
   try {
-   const response = await fetch('/api/admin/questions/answer-draft', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ questionId }), signal: AbortSignal.timeout(30000) });
+   const response = await fetch('/api/admin/questions/answer-draft', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ questionId }), signal: AbortSignal.timeout(60000) });
    const result = await response.json(); if (!response.ok || typeof result.draft !== 'string' || !result.draft.trim()) throw new Error(result.error || 'AI 초안을 확인하지 못했습니다.');
-   setContent(result.draft); setNotice('AI 초안입니다. 사실을 확인하고 수정한 뒤 답변을 등록해 주세요.');
+   setContent(result.draft); setAiReference(result.reference || null); setNotice('AI 초안입니다. 사실을 확인하고 수정한 뒤 답변을 등록해 주세요.');
   } catch (e) { setNotice((e as Error).message); } finally { setAiBusy(false); }
  }
  return <AdminDrawer title="질문 답변" onClose={leave}>
@@ -81,6 +84,7 @@ export function QuestionThreadDialog({ questionId, close, changed, archive, pend
     <div className="row mt16"><button type="button" className="btn" disabled={locked || stale || Boolean(content)} onClick={() => void draft()}>{aiBusy ? 'AI 초안 생성 중…' : 'AI 답변 초안'}</button><button type="button" className="btn primary" disabled={locked || stale || !content.trim()} onClick={() => void write('answer')}>답변 추가하기</button></div>
     {!state.data.question.resolved && !state.data.answers.length && <button type="button" className="btn small mt16" disabled={locked || stale || Boolean(content)} onClick={() => void write('resolve')}>답변 없이 처리 완료</button>}
    </section>}
+   <QuestionAiReferenceNote reference={aiReference}/>
    {notice && <p role="status" className="notice mt16">{notice}</p>}
    {uncertain && <button type="button" className="btn" disabled={busy} onClick={() => void write(retry.current!.action)}>같은 요청 결과 확인</button>}
    {!uncertain && <button type="button" className="btn small mt16" disabled={locked} onClick={() => { state.reload(); setStale(false); }}>최신 답변 확인</button>}

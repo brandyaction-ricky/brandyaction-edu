@@ -1013,6 +1013,7 @@ export function Platform({
                 setPage={setAdminPage}
                 exportCsv={downloadCsv}
                 send={send}
+                onQuestionChanged={() => { adminNavigationReads.clear(); void refresh(true); }}
                 tools={
                   ["cohorts", "missions", "customers"].includes(section.key) ? (
                     <AdminWorkflows
@@ -1064,7 +1065,7 @@ export function Platform({
       {notice && (admin ? <AdminToast tone="success">{notice}</AdminToast> : <div className="toast" role="status">{notice}</div>)}
       {editor && editor.route === routeKey && (
         <Editor
-          onQuestionChanged={() => void refresh()}
+          onQuestionChanged={() => { adminNavigationReads.clear(); void refresh(true); }}
           key={editor.section.key + (editor.row ? recordId(editor.row) : "new")}
           section={editor.section}
           row={editor.row}
