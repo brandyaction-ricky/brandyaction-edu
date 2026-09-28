@@ -72,6 +72,18 @@ export function enrollmentLessons(data: Data, e: Row) {
     .filter((l) => weeks.has(t(l, "week_id")))
     .sort((a, b) => num(a, "day_number") - num(b, "day_number"));
 }
+function completedLessonProgress(
+  data: Data,
+  enrollment: Row,
+  lessons = enrollmentLessons(data, enrollment),
+) {
+  return rows(data, "lesson_progress").filter(
+    (progress) =>
+      progress.enrollment_id === enrollment.id &&
+      progress.completed_at &&
+      lessons.some((lesson) => lesson.id === progress.lesson_id),
+  );
+}
 export function missionEntries(data: Data, enrollments: Row[]) {
   return enrollments.flatMap((enrollment) => {
     const lessons = enrollmentLessons(data, enrollment);
@@ -136,12 +148,7 @@ function EnrolledCard({
   const c = rows(data, "courses").find((c) => c.id === e.course_id),
     cohort = rows(data, "cohorts").find((c) => c.id === e.cohort_id),
     lessons = enrollmentLessons(data, e),
-    complete = rows(data, "lesson_progress").filter(
-      (p) =>
-        p.enrollment_id === e.id &&
-        p.completed_at &&
-        lessons.some((l) => l.id === p.lesson_id),
-    ),
+    complete = completedLessonProgress(data, e, lessons),
     next =
       lessons.find((l) => !complete.some((p) => p.lesson_id === l.id)) ||
       lessons[0],
@@ -200,14 +207,7 @@ function Dashboard({
 }) {
   const e = active[0],
     lessons = e ? enrollmentLessons(data, e) : [],
-    complete = e
-      ? rows(data, "lesson_progress").filter(
-          (p) =>
-            p.enrollment_id === e.id &&
-            p.completed_at &&
-            lessons.some((l) => l.id === p.lesson_id),
-        )
-      : [];
+    complete = e ? completedLessonProgress(data, e, lessons) : [];
   const next =
       lessons.find((l) => !complete.some((p) => p.lesson_id === l.id)) ||
       lessons[0],
@@ -323,7 +323,11 @@ function Dashboard({
           ["수강 중", active.length, "개", "클래스별 학습 이어가기", "classes"],
           [
             "학습 완료",
-            rows(data, "lesson_progress").filter((p) => p.completed_at).length,
+            active.reduce(
+              (total, enrollment) =>
+                total + completedLessonProgress(data, enrollment).length,
+              0,
+            ),
             "개",
             "완료한 학습 기록",
             "classes",
