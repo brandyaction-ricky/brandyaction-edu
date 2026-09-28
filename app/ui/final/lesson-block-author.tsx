@@ -3,6 +3,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type ReactNode } from 'react';
 import { publicLessonBlocks, validateLessonBlocks, type BlockField, type LessonBlock, type LessonBlockDocument, type LessonBlockType } from '@/lib/lesson-blocks';
 import { LessonDocumentWriter, type LessonDocumentWrite } from '@/lib/lesson-block-authoring';
+import { isGuidedTool, newGuidedBlock } from '@/lib/lesson-guided-tools';
 import { LessonBodyEditor } from './lesson-body-editor';
 import { LessonText } from './lesson-text';
 import { canRenderLessonBlocks, LessonBlockView } from './lesson-block-view';
@@ -18,8 +19,10 @@ const choices: { type: LessonBlockType; label: string }[] = [
   { type: 'image', label: '이미지' }, { type: 'audio', label: '음성' }, { type: 'video', label: '영상' },
   { type: 'question', label: '중간 질문' }, { type: 'link', label: '외부 링크' }, { type: 'prompt', label: '복사할 프롬프트' },
   { type: 'prompt-generator', label: '프롬프트 생성기' }, { type: 'quiz', label: '확인 문제' }, { type: 'divider', label: '구분선' },
+  { type: 'persona-generator', label: '페르소나 생성기' }, { type: 'landing-planner', label: '랜딩페이지 기획 문답' },
 ];
 function newBlock(type: LessonBlockType): LessonBlock {
+  if (isGuidedTool(type)) return newGuidedBlock(type, crypto.randomUUID());
   const block: LessonBlock = { id: crypto.randomUUID(), type, content: '' };
   if (['image', 'audio', 'video', 'link'].includes(type)) block.url = '';
   if (type === 'question') block.question = { label: '', kind: 'text', required: true };
@@ -123,6 +126,7 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
         {['image', 'audio', 'video', 'link'].includes(block.type) && <><Field label="주소 *"><input required type="url" pattern="https://.*" maxLength={4000} value={block.url || ''} placeholder="https://" onChange={event => update(index, { url: event.target.value })} /></Field><Field label={block.type === 'link' ? '링크에 표시할 문구' : '설명'}><input value={block.content || ''} maxLength={5000} onChange={event => update(index, { content: event.target.value })} /></Field>{block.type === 'image' && <Field label="이미지 대체 설명"><input maxLength={1000} value={block.alt || ''} onChange={event => update(index, { alt: event.target.value })} /></Field>}</>}
         {block.type === 'question' && <><Field label="질문 문구 *"><textarea required rows={3} maxLength={5000} value={block.question?.label || ''} onChange={event => update(index, { question: { ...block.question!, label: event.target.value } })} /></Field><label className="lb-choice"><input type="checkbox" checked={block.question?.required || false} onChange={event => update(index, { question: { ...block.question!, required: event.target.checked } })} />필수 답변</label>{block.question?.kind !== 'text' && <p role="alert">첨부 답변은 업로드 연결 후 사용할 수 있습니다.</p>}</>}
         {block.type === 'prompt-generator' && <GeneratorFields block={block} update={patch => update(index, patch)} />}
+        {isGuidedTool(block.type) && <div><p>{block.type === 'persona-generator' ? '15개 질문으로 핵심 고객을 정의하고 프롬프트를 만듭니다.' : '10개 질문과 전환 목적별 추가 질문으로 랜딩페이지 기획 프롬프트를 만듭니다.'}</p><details><summary>포함된 질문 보기</summary><ol>{block.fields?.map(field => <li key={field.id}>{field.label}</li>)}</ol></details></div>}
         {block.type === 'quiz' && <QuizFields block={block} update={patch => update(index, patch)} />}
         {!choices.some(choice => choice.type === block.type) && <p role="alert">이 도구의 편집 화면을 연결하고 있습니다. 원래 설정은 그대로 보관됩니다.</p>}
       </article>)}

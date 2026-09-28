@@ -193,3 +193,27 @@ test('a 109-block lesson opens one rich editor at a time and preserves untouched
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('author-large-lesson.png') });
 });
+
+test('author can add both guided tools, preserve their versions and preview their original questions', async ({ page }) => {
+  const server = await backend(page);
+  await page.goto('/lesson-block-author-test');
+  await page.getByRole('button', { name: '여러 항목으로 구성하기' }).click();
+  await add(page, 'persona-generator');
+  await add(page, 'landing-planner');
+  await page.getByRole('button', { name: '학습 저장', exact: true }).click();
+  await expect(page.getByText('학습 기본 정보와 콘텐츠를 저장했습니다.', { exact: true })).toBeVisible();
+  const doc = server.getDocument()!;
+  expect(doc.blocks.map(b => b.type)).toEqual(['text', 'persona-generator', 'landing-planner']);
+  expect(doc.blocks.slice(1).map(b => b.toolVersion)).toEqual(['replit-2026-09-07', 'replit-2026-09-07']);
+  expect(doc.blocks[1].fields).toHaveLength(15);
+  expect(doc.blocks[2].fields).toHaveLength(11);
+  await page.getByRole('button', { name: '편집 다시 열기' }).click();
+  await expect(page.locator('[data-author-block]')).toHaveCount(3);
+  await page.getByRole('button', { name: '구성 미리보기', exact: true }).click();
+  const preview = page.getByLabel('구성 미리보기');
+  await expect(preview.getByText('우리를 선택하는 결정적 이유는?', { exact: true })).toBeVisible();
+  await expect(preview.getByText('이 페이지가 성공했다고 말할 수 있는 숫자는?', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '학생 화면 보기' }).click();
+  await expect(page.getByRole('region', { name: '핵심 고객 페르소나 생성기' })).toBeVisible();
+  await expect(page.getByRole('region', { name: '랜딩페이지 기획 문답' })).toBeVisible();
+});

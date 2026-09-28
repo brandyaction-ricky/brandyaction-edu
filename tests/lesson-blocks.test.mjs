@@ -2,8 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
-const mod = {};
-new Function('exports', ts.transpileModule(fs.readFileSync(new URL('../lib/lesson-blocks.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText)(mod);
+function load(name) {
+  const exports = {};
+  new Function('exports', 'require', ts.transpileModule(fs.readFileSync(new URL(`../lib/${name}.ts`, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText)(exports, request => load(request.replace('./', '')));
+  return exports;
+}
+const mod = load('lesson-blocks');
 const { validateLessonBlocks, validateBlockAnswers, publicLessonBlocks, fillBlockPrompt, gradeBlockQuiz } = mod;
 const field = (id, sensitive = false) => ({ id, label: id, variable: id, placeholder: '', required: false, sensitive });
 const sample = () => ({ schemaVersion: 1, blocks: [

@@ -5,12 +5,14 @@ import { useState } from 'react';
 import { fillBlockPrompt, type BlockAnswer, type LessonBlockAnswers, type PublicBlockDocument, type PublicLessonBlock } from '@/lib/lesson-blocks';
 import { LessonText } from './lesson-text';
 import { Video } from './primitives';
+import { hasGuidedDefinition, isGuidedTool } from '@/lib/lesson-guided-tools';
+import { LessonGuidedTool } from './lesson-guided-tool';
 import './lesson-blocks.css';
 
 export type BlockGrade = { correct: number; total: number; passed: boolean; results: { id: string; answered: boolean; correct: boolean }[] };
 const supported = new Set(['heading', 'subheading', 'text', 'video', 'audio', 'image', 'question', 'divider', 'link', 'prompt', 'prompt-generator', 'quiz']);
 export function canRenderLessonBlocks(document: PublicBlockDocument) {
-  return document.blocks.every(block => supported.has(block.type) && (block.type !== 'question' || block.question?.kind === 'text'));
+  return document.blocks.every(block => isGuidedTool(block.type) ? hasGuidedDefinition(block) : supported.has(block.type) && (block.type !== 'question' || block.question?.kind === 'text'));
 }
 function mediaUrl(value?: string) {
   try { const url = new URL(value || ''); return url.protocol === 'https:' && !url.username && !url.password ? url.href : ''; } catch { return ''; }
@@ -88,6 +90,8 @@ export function LessonBlockView({ document, values, onChange, readOnly = false, 
         case 'prompt': content = <CopyPrompt text={block.content || ''} />; break;
         case 'question': content = block.question?.kind === 'text' ? <label className="lb-field lb-card"><span>{block.question.label}{block.question.required ? ' (필수)' : ''}</span><textarea rows={5} maxLength={20000} value={typeof value === 'string' ? value : ''} readOnly={readOnly} onChange={event => answer(block.id, event.target.value)} /></label> : <p role="alert">이 질문의 첨부 기능을 아직 사용할 수 없습니다.</p>; break;
         case 'prompt-generator': content = <PromptGenerator block={block} answer={value} disabled={readOnly} onChange={value => answer(block.id, value)} />; break;
+        case 'persona-generator':
+        case 'landing-planner': content = <LessonGuidedTool block={block} answer={value} readOnly={readOnly} onChange={value => answer(block.id, value)} />; break;
         case 'quiz': content = <BlockQuiz block={block} answer={value} disabled={readOnly} onChange={value => answer(block.id, value)} grade={grade} />; break;
         default: content = <p role="alert">이 학습 도구의 연결을 확인하고 있습니다.</p>;
       }

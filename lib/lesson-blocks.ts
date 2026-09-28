@@ -1,11 +1,13 @@
 // Versioned lesson blocks. Only the authoring/server boundary may hold quiz keys;
 // learner responses must use publicLessonBlocks(), never a cast of stored JSON.
+import { hasGuidedDefinition, isGuidedTool } from './lesson-guided-tools';
 export const lessonBlockTypes = ['heading', 'subheading', 'text', 'video', 'audio', 'image', 'question', 'divider', 'link', 'prompt', 'prompt-generator', 'persona-generator', 'landing-planner', 'recipe-calculator', 'margin-calculator', 'marketing-funnel', 'quiz'] as const;
 export type LessonBlockType = typeof lessonBlockTypes[number];
 export type BlockField = { id: string; label: string; variable: string; placeholder: string; required: boolean; sensitive: boolean; options?: string[] };
 export type BlockQuizQuestion = { id: string; prompt: string; options: string[]; correctIndex: number };
 export type LessonBlock = {
   id: string; type: LessonBlockType; content?: string; url?: string; alt?: string;
+  toolVersion?: string;
   question?: { label: string; kind: 'text' | 'image' | 'file'; required: boolean };
   fields?: BlockField[]; quiz?: { questions: BlockQuizQuestion[]; passPercent: number };
 };
@@ -55,9 +57,11 @@ export function validateLessonBlocks(input: unknown): LessonBlockDocument {
     if (mediaTypes.has(type)) allowed.push('url', 'alt');
     if (type === 'question') allowed.push('question');
     if (fieldTypes.has(type)) allowed.push('fields');
+    if (isGuidedTool(type)) allowed.push('toolVersion');
     if (type === 'quiz') allowed.push('quiz');
     onlyKeys(b, allowed);
     const block: LessonBlock = { id: id(b.id), type };
+    if (b.toolVersion !== undefined) block.toolVersion = text(b.toolVersion, 100, true);
     if (b.content !== undefined) block.content = text(b.content, 200000);
     if (mediaTypes.has(type)) {
       block.url = httpsUrl(b.url);
@@ -78,6 +82,7 @@ export function validateLessonBlocks(input: unknown): LessonBlockDocument {
       });
       unique(block.fields.map(f => f.id)); unique(block.fields.map(f => f.variable.replace(/\s+/g, '')));
     }
+    if (isGuidedTool(type) && !hasGuidedDefinition(block)) invalid('학습 도구의 질문과 버전을 확인해 주세요.');
     if (type === 'quiz') {
       const quiz = object(b.quiz); onlyKeys(quiz, ['questions', 'passPercent']);
       const questions = array(quiz.questions, 100).map(raw => {
