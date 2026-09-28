@@ -2,7 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { imagePreviewUrl } from '@/lib/qa-rules';
 import { eligiblePurchase } from '@/lib/purchase-onboarding-server';
-import { surveyRoom, telegramPath } from '@/lib/purchase-onboarding';
+import { MOONSHOT_SUPPORT_URL, surveyRoom, telegramPath } from '@/lib/purchase-onboarding';
 import { getPublicSupport } from '@/lib/public-platform-data';
 import { safeUrl } from '@/lib/platform';
 
@@ -18,6 +18,9 @@ export async function GET(request: Request) {
     if (!user) return reply({ error: '로그인이 필요합니다.' }, 401);
     const purchase = await eligiblePurchase(user.id, new URL(request.url).searchParams.get('order'));
     if (!purchase) return reply({ available: false, error: '안내할 결제 완료 주문이 없습니다.' }, 404);
+    if (purchase.telegramOnly) return reply({ available: true, telegramOnly: true, orderId: purchase.orderId,
+      orderNumber: purchase.orderNumber, itemName: purchase.itemName, roomName: '4기 교육생 공지방',
+      supportUrl: MOONSHOT_SUPPORT_URL });
     const row = await createAdminClient().from('edu_purchase_onboarding').select('survey_room,survey_answered_at,tg_path,tg_link_clicked_at').eq('order_id', purchase.orderId).eq('user_id', user.id).maybeSingle();
     if (row.error) throw row.error;
     const selectedImage = row.data?.survey_room === 'paid' ? purchase.settings.paidImage : row.data?.survey_room === 'organic' ? purchase.settings.organicImage : '';
@@ -42,6 +45,10 @@ export async function POST(request: Request) {
     if (!body || typeof body !== 'object' || Array.isArray(body) || typeof body.order !== 'string') return reply({ error: '주문을 확인해 주세요.' }, 400);
     const purchase = await eligiblePurchase(user.id, body.order);
     if (!purchase) return reply({ error: '결제 완료 주문을 확인해 주세요.' }, 404);
+    if (purchase.telegramOnly) {
+      if (body.action !== 'link') return reply({ error: '지원하지 않는 요청입니다.' }, 400);
+      return reply({ ok: true, url: purchase.settings.inviteUrl });
+    }
     const db = createAdminClient();
     const existing = await db.from('edu_purchase_onboarding').select('survey_room,tg_path').eq('order_id', purchase.orderId).eq('user_id', user.id).maybeSingle();
     if (existing.error) throw existing.error;

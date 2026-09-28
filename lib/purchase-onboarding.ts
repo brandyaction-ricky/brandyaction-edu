@@ -10,8 +10,13 @@ export type PurchaseOnboardingSettings = {
 };
 
 export const DEFAULT_ONBOARDING_ROOM_NAME = 'AI Moonshot project #4기';
+export const MOONSHOT_SUPPORT_URL = 'http://pf.kakao.com/_ydxjhxj/chat';
+export const TELEGRAM_IOS_INSTALL_URL = 'https://telegram.org/dl/ios';
+export const TELEGRAM_ANDROID_INSTALL_URL = 'https://telegram.org/dl/android';
 export const onboardingSettingsKey = (cohortId: string) => `edu_purchase_onboarding_${cohortId}`;
 export const uuid = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+export const isMoonshotFourth = (courseTitle: unknown, cohortName: unknown) =>
+  typeof courseTitle === 'string' && /문샷/.test(courseTitle) && typeof cohortName === 'string' && /(^|\D)4기(\D|$)/.test(cohortName);
 
 export function telegramInviteUrl(value: unknown): string {
   if (typeof value !== 'string' || !value.trim()) return '';
