@@ -105,7 +105,7 @@ function ProductHtmlCtaFixture() {
 function OrderCompleteFixture() {
   const params = new URLSearchParams(location.search);
   const [status, setStatus] = useState(params.get('fixtureStatus') || 'paid');
-  return <div className="edu-front"><OrderResult data={{ orders: [{ id: '11111111-1111-4111-8111-111111111111', order_number: 'BAE-QA-1', status, total_amount: params.get('free') === '1' ? 0 : 1650000 }] }} refresh={async () => { setStatus('paid'); }} /></div>;
+  return <div className="edu-front"><OrderResult data={{ orders: [{ id: '11111111-1111-4111-8111-111111111111', order_number: 'BAE-QA-1', status, total_amount: params.get('free') === '1' ? 0 : 1650000 }] }} refresh={async () => { setStatus(params.get('fixtureRefreshStatus') || 'paid'); }} /></div>;
 }
 function HomeHeroTouchFixture() {
   const banners = [
