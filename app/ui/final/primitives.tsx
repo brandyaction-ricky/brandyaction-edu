@@ -92,7 +92,7 @@ export function Cover({ course }: { course: Row }) {
   return (
     <div
       className={
-        "cover " +
+        "cover " + (image ? "has-image " : "") +
         (type === "무료 클래스"
           ? "red"
           : type === "디지털 상품"
