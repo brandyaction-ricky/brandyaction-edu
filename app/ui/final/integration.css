@@ -1466,3 +1466,40 @@ a.participant-day-card:hover {
 @media (prefers-reduced-motion: reduce) {
   .edu-admin .participant-table-skeleton span { animation: none; }
 }
+
+/* Customer stories: keep the featured identity and video aligned, and cards scannable. */
+.edu-front .story-feature {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.06fr);
+  align-items: center;
+  gap: clamp(24px, 4vw, 56px);
+  margin-bottom: 0;
+}
+.edu-front .story-feature-copy { min-width: 0; }
+.edu-front .story-feature-copy h2 { margin-top: 20px; line-height: 1.35; }
+.edu-front .story-feature-copy .lead { max-width: 56ch; }
+.edu-front .story-person { display: flex; align-items: center; gap: 12px; margin-top: 28px; }
+.edu-front .story-person .avatar { width: 44px; height: 44px; font-size: 17px; }
+.edu-front .story-person-details { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.edu-front .story-person-details strong { color: var(--text-primary); font-size: 17px; line-height: 1.35; }
+.edu-front .story-person-details span { color: var(--text-secondary); font-size: 14px; line-height: 1.45; }
+.edu-front .section.story-library { padding-top: 40px; }
+.edu-front .story-video-card { display: flex; flex-direction: column; min-width: 0; height: 100%; }
+.edu-front .story-video-thumb { width: 100%; flex: none; }
+.edu-front .story-video-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.edu-front .story-video-play { position: absolute; inset: 0; display: grid; place-items: center; background: #1113; }
+.edu-front .story-video-play svg { width: 38px; height: 38px; padding: 10px; border-radius: 50%; background: #fff; color: #181818; }
+.edu-front .story-video-card strong { min-height: 3em; font-size: var(--type-body); line-height: 1.5; }
+.edu-front .story-video-card > span:last-child { margin-top: auto; padding-top: 8px; line-height: 1.45; }
+.edu-front .story-video-card:hover .story-video-thumb,
+.edu-front .story-video-card:focus-visible .story-video-thumb { outline: 2px solid var(--ba-red); outline-offset: 2px; }
+@media (max-width: 900px) {
+  .edu-front .story-feature { grid-template-columns: 1fr; }
+}
+@media (max-width: 680px) {
+  .edu-front .section.story-library { padding-top: 28px; }
+  .edu-front .story-video-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .edu-front .story-video-card strong { font-size: var(--type-small); }
+}
+@media (max-width: 480px) {
+  .edu-front .story-video-grid { grid-template-columns: 1fr; }
+}
