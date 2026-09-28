@@ -9,7 +9,7 @@ function load(path, dependencies = {}) {
   const source = fs.readFileSync(new URL('../' + path, import.meta.url), 'utf8');
   const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const exports = {};
-  new Function('exports', 'require', compiled)(exports, name => { if (name === '@/lib/product-visibility') return productVisibility; if (name === '@/lib/submission-review') return submissionReview; if (name === '@/lib/public-platform-data') return { getPublicPlatformData: async () => ({ data: {}, pagination: null }), getPublicSupport: async () => ({}) }; if (name === '@/lib/public-platform-plan') return { PUBLIC_CACHE_TAG: 'test' }; if (name === '@/lib/member-platform-data') return { readMemberPlatformData: async () => ({}) }; if (name === 'next/cache') return { revalidateTag: () => {} }; if (!(name in dependencies)) throw Error(name); return dependencies[name]; });
+  new Function('exports', 'require', compiled)(exports, name => { if (name === '@/lib/coupon-rules') return load('lib/coupon-rules.ts'); if (name === '@/lib/product-visibility') return productVisibility; if (name === '@/lib/submission-review') return submissionReview; if (name === '@/lib/public-platform-data') return { getPublicPlatformData: async () => ({ data: {}, pagination: null }), getPublicSupport: async () => ({}) }; if (name === '@/lib/public-platform-plan') return { PUBLIC_CACHE_TAG: 'test' }; if (name === '@/lib/member-platform-data') return { readMemberPlatformData: async () => ({}) }; if (name === 'next/cache') return { revalidateTag: () => {} }; if (!(name in dependencies)) throw Error(name); return dependencies[name]; });
   return exports;
 }
 const rules = load('lib/qa-rules.ts');
@@ -52,7 +52,7 @@ test('admin list APIs only load screen dependencies and lightweight relation fie
   assert.deepEqual(rules.adminTables.questions, ['edu_questions']);
   assert.equal(rules.adminSelectColumns('questions', 'edu_questions'), 'id,user_id,course_id,learning_context,title,content,answer,status,is_archived,created_at,updated_at,profiles(id,full_name,email),courses(id,title)');
   assert.equal(rules.adminSelectColumns('orders', 'courses'), 'id,title,status,category,list_price,archived_at,display_order,created_at,updated_at');
-  assert.equal(rules.adminSelectColumns('orders', 'orders'), 'id,order_number,user_id,status,subtotal,discount_amount,total_amount,customer_name,customer_email,customer_phone,created_at');
+  assert.equal(rules.adminSelectColumns('orders', 'orders'), 'id,order_number,user_id,status,subtotal,discount_amount,total_amount,entry_src,customer_name,customer_email,customer_phone,created_at');
   assert.equal(rules.adminSelectColumns('orders', 'order_items'), 'id,order_id,course_id,cohort_id,item_name,unit_price');
   assert.equal(rules.adminSelectColumns('orders', 'enrollments'), 'id,order_item_id,status');
   assert.equal(rules.adminSelectColumns('products', 'courses'), '*');
@@ -107,6 +107,7 @@ function handler(user, database) {
     '@/lib/mission-quiz': {}, '@/lib/legal-policies': { POLICY_VERSION: 'test' },
     '@/lib/operator-permissions': { getOperatorUser: async () => user?.role === 'admin' ? user : null, permissionsFor: async value => ({ products: value?.role === 'admin', members: value?.role === 'admin', orders: value?.role === 'admin', content: value?.role === 'admin', marketing: value?.role === 'admin' }), sectionScopes: { cohorts: 'products', testimonials: 'content', products: 'products', reviews: 'members' } },
     '@/lib/crm-delivery': { crmDeliveryState: () => ({ enabled: false, configured: false }) },
+    '@/lib/crm-sms-settings': { loadSmsSettings: async () => ({}), registeredSmsNumbers: () => ({ senders: [], optouts: [] }) },
   });
 }
 const request = body => new Request('https://example.com/api/platform', { method: 'POST', headers: { origin: 'https://example.com', 'Content-Type': 'application/json' }, body: JSON.stringify(body) });

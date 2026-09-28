@@ -11,17 +11,17 @@ import {
   type Section,
 } from "@/lib/platform";
 import { productSalesStatus, recordId } from "@/lib/platform-rules";
+import { couponStatus } from "@/lib/coupon-rules";
 import { productConversion } from "@/lib/product-conversion";
 import { isProductListed } from "@/lib/product-visibility";
 import { archiveValues, cohortPeriod, cohortStatus } from "@/lib/qa-rules";
-import { ArrowRight, BookOpen, ChevronDown, ChevronUp, FileText, Pencil, RotateCcw, Trash2 } from "lucide-react";
+import { ArrowRight, BookOpen, ChevronDown, ChevronUp, FileText, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
-import { AdminEmptyState, AdminPagination, AdminSearchField } from "@/features/admin-ui";
+import { Fragment, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { AdminButton, AdminDataTable, AdminEmptyState, AdminFilterBar, AdminLinkButton, AdminPagination, AdminSearchField, AdminSelect, AdminStatusBadge, AdminSummaryCard } from "@/features/admin-ui";
 import type { Data, WorkflowSend } from "../learning-workflows";
-import { Metric } from "./admin-shell";
-import { Badge, Empty, courseType } from "./primitives";
+import { Empty, courseType } from "./primitives";
 import type { MissionContext } from "./mission-target-fields";
 
 export type MissionScope = MissionContext & { state: "active" | "published" | "hidden" | "archived" };
@@ -44,6 +44,9 @@ type Props = {
   tools?: ReactNode;
 };
 type Column = { label: string; value: (row: Row) => ReactNode };
+function CatalogTable({ label, loading, children }: { label: string; loading: boolean; children: ReactNode }) {
+  return <AdminDataTable label={label} density="standard" loading={loading}>{children}</AdminDataTable>;
+}
 const named = (r?: Row) =>
   t(r, "title") || t(r, "name") || t(r, "full_name") || t(r, "email") || "—";
 const tagRuleLabel = (value: unknown) => ({ free_lesson_1: "무료강의 1강 시청", free_lesson_2: "무료강의 2강 시청", free_lesson_3: "무료강의 3강 시청", paid_customer: "결제 완료", mission_completed: "미션 수행", signed_up: "회원가입" }[String(value)] || "관리자가 직접 부여");
@@ -101,6 +104,13 @@ export function AdminCatalog({
   const tags = useMemo(() => data.crm_tags || [], [data.crm_tags]);
   const lessonById = new Map(lessons.map((item) => [item.id, item]));
   const scopedWeeks = weeks.filter((item) => !course || item.course_id === course).toSorted((a, b) => num(a, "week_number") - num(b, "week_number"));
+  const missionWeekGroups = Array.from(scopedWeeks.reduce((groups, item) => {
+    const courseId = String(item.course_id);
+    groups.set(courseId, [...(groups.get(courseId) || []), item]);
+    return groups;
+  }, new Map<string, Row[]>()).entries()).toSorted(([first], [second]) =>
+    named(courses.find((item) => item.id === first)).localeCompare(named(courses.find((item) => item.id === second)), "ko"),
+  );
   const scopedLessons = lessons.filter((item) => scopedWeeks.some((w) => w.id === item.week_id));
   const quizByMission = new Map((data.mission_quizzes || []).map((item) => [String(item.mission_id), item]));
   const quizCount = (missionId: string) => { const quiz = quizByMission.get(missionId); return Array.isArray(quiz?.questions) ? quiz.questions.length : 0; };
@@ -135,9 +145,8 @@ export function AdminCatalog({
   }, [data.lesson_contents, lessons, weeks]);
   const customerCourses = (memberId: unknown) => [...(customerCourseNames.get(memberId) || [])];
   const customerTags = (memberId: unknown) => memberTags.filter((item) => item.member_id === memberId).flatMap((item) => { const tag = tags.find((tag) => tag.id === item.tag_id); return tag ? [tag] : []; });
-  const couponStatus = (row: Row) => !row.is_active ? "inactive" : row.ends_at && Date.parse(String(row.ends_at)) < now ? "expired" : row.starts_at && Date.parse(String(row.starts_at)) > now ? "upcoming" : "active";
   const bannerStatus = (row: Row) => !row.is_active ? "hidden" : row.ends_at && Date.parse(String(row.ends_at)) < now ? "completed" : row.starts_at && Date.parse(String(row.starts_at)) > now ? "upcoming" : "published";
-  const statusLabel = (value: string) => s.key === "coupons" ? ({ active: "발급 중", upcoming: "발급 예정", expired: "종료", inactive: "사용 중지" }[value] || value) : s.key === "banners" ? ({ published: "게시 중", upcoming: "예약", completed: "노출 종료", hidden: "비공개" }[value] || value) : s.key === "customers" ? ({ active: "정상", suspended: "이용 제한" }[value] || labels[value] || value) : s.key === "products" ? ({ published: "판매 중", draft: "작성 중", archived: "판매 종료" }[value] || labels[value] || value) : value === "hidden" && ["learning", "missions"].includes(s.key) ? "비공개" : labels[value] || value;
+  const statusLabel = (value: string) => s.key === "coupons" ? ({ active: "발급 중", upcoming: "발급 예정", expired: "종료", inactive: "비활성", draft: "임시 저장", admin_test: "관리자 테스트" }[value] || value) : s.key === "banners" ? ({ published: "게시 중", upcoming: "예약", completed: "노출 종료", hidden: "비공개" }[value] || value) : s.key === "customers" ? ({ active: "정상", suspended: "이용 제한" }[value] || labels[value] || value) : s.key === "products" ? ({ published: "판매 중", draft: "작성 중", archived: "판매 종료" }[value] || labels[value] || value) : value === "hidden" && ["learning", "missions"].includes(s.key) ? "비공개" : labels[value] || value;
   const productResourceCount = (productId: unknown) => resourceCounts.get(String(productId)) || 0;
   const getCourse = (r: Row) =>
     r.course_id ||
@@ -166,7 +175,7 @@ export function AdminCatalog({
   const filtered = rows.filter(
     (r) =>
       (s.key === "missions" ? missionState === "archived" ? Boolean(r.archived_at) : !r.archived_at && (missionState === "active" || Boolean(r.is_published) === (missionState === "published")) : s.key === "products" ? productVisibility === "archived" ? Boolean(r.archived_at) : !r.archived_at : archived || !r.archived_at) &&
-      (!status || getStatus(r) === status) &&
+      (!status || (s.key === "coupons" && status === "admin_test" ? r.discount_type === "ADMIN_FREE" : getStatus(r) === status)) &&
       (!tagMode || r.tag_kind === tagMode) &&
       (!type ||
         (s.key === "products" ? courseType(r) : r.content_type) === type) &&
@@ -184,7 +193,17 @@ export function AdminCatalog({
           ? r.week_id
           : lessons.find((l) => l.id === r.lesson_id)?.week_id) === week) &&
     (s.key === "customers" ? `${JSON.stringify(r)} ${customerTags(r.id).map(named).join(" ")} ${customerCourses(r.id).join(" ")}` : JSON.stringify(r)).toLowerCase().includes(query.toLowerCase()),
-  ).toSorted((a, b) => s.key === "banners" ? num(a, "display_order") - num(b, "display_order") : 0);
+  ).toSorted((a, b) => s.key === "banners" ? num(a, "display_order") - num(b, "display_order") : s.key === "weeks" ? num(a, "week_number") - num(b, "week_number") || named(a).localeCompare(named(b), "ko") : 0);
+  const allCourseWeeks = course ? rows.filter((row) => row.course_id === course).toSorted((a, b) => num(a, "week_number") - num(b, "week_number")) : [];
+  const activeCourseWeeks = allCourseWeeks.filter((row) => !row.archived_at);
+  const weekGroups = s.key === "weeks"
+    ? Array.from(filtered.reduce((groups, row) => {
+        const number = num(row, "week_number");
+        groups.set(number, [...(groups.get(number) || []), row]);
+        return groups;
+      }, new Map<number, Row[]>()).entries()).sort(([a], [b]) => a - b)
+    : [];
+  const weekReorderDisabled = !course || Boolean(query || status || archived) || pagination !== null && pagination.total > rows.length;
   async function moveBanner(row: Row, direction: -1 | 1) {
     if (!send || pending) return;
     const index = filtered.findIndex(item => item.id === row.id);
@@ -194,6 +213,17 @@ export function AdminCatalog({
     const targetOrder = num(target, "display_order");
     await send({ action: "save", section: "banners", id: row.id, values: { display_order: targetOrder } });
     await send({ action: "save", section: "banners", id: target.id, values: { display_order: currentOrder } }, "배너 노출 순서를 변경했습니다.");
+  }
+  async function moveWeek(row: Row, direction: -1 | 1) {
+    if (!send || pending || weekReorderDisabled) return;
+    const index = activeCourseWeeks.findIndex((item) => item.id === row.id);
+    const targetIndex = index + direction;
+    if (index < 0 || targetIndex < 0 || targetIndex >= activeCourseWeeks.length) return;
+    const reorderedActive = [...activeCourseWeeks];
+    [reorderedActive[index], reorderedActive[targetIndex]] = [reorderedActive[targetIndex], reorderedActive[index]];
+    let activeIndex = 0;
+    const ids = allCourseWeeks.map((item) => item.archived_at ? String(item.id) : String(reorderedActive[activeIndex++].id));
+    await send({ action: "reorder-weeks", courseId: course, ids }, "주차 순서를 변경했습니다.");
   }
   const missionGroups = scopedWeeks
     .filter((item) => !week || item.id === week)
@@ -208,16 +238,16 @@ export function AdminCatalog({
         {mission.archived_at ? <strong>{t(mission, "title")}</strong> : <button className="title-btn" onClick={() => edit(s, mission)}><strong>{t(mission, "title")}</strong></button>}
         <p>{labels[t(mission, "submission_type")] || t(mission, "submission_type")} · 확인 퀴즈 {quizCount(mission.id)}문항 · {mission.is_required ? "필수 미션" : "선택 미션"}{mission.submission_type === "quiz" ? "" : " · 관리자 승인"}</p>
       </div>
-      <Badge color={!mission.archived_at && mission.is_published ? "green" : ""}>{mission.archived_at ? "보관" : mission.is_published ? "공개" : "비공개"}</Badge>
+      <AdminStatusBadge status={mission.archived_at ? "archived" : mission.is_published ? "published" : "hidden"} label={mission.archived_at ? "보관" : mission.is_published ? "공개" : "비공개"} />
       <div className="row mission-actions">
-        {lessonById.has(String(mission.lesson_id)) && <Link className="btn small mission-content-edit" href={`/admin/learning-editor?id=${encodeURIComponent(String(mission.lesson_id))}`}><FileText size={15} />콘텐츠 편집</Link>}
+        {lessonById.has(String(mission.lesson_id)) && <AdminLinkButton size="sm" className="mission-content-edit" href={`/admin/learning-editor?id=${encodeURIComponent(String(mission.lesson_id))}`}><FileText size={15} />콘텐츠 편집</AdminLinkButton>}
         {bulkMode && <input type="checkbox" aria-label={t(mission, "title") + " 선택"} checked={selection.includes(recordId(mission))} onChange={(event) => setSelection(event.target.checked ? [...selection, recordId(mission)] : selection.filter((id) => id !== recordId(mission)))} />}
-        {!mission.archived_at && <button className="btn small" onClick={() => edit(s, mission)}>미션 설정</button>}
-        {Boolean(mission.archived_at) && send && <button className="btn small" disabled={pending || loading} onClick={async () => {
+        {!mission.archived_at && <AdminButton size="sm" variant="outline" onClick={() => edit(s, mission)}>미션 설정</AdminButton>}
+        {Boolean(mission.archived_at) && send && <AdminButton size="sm" variant="outline" disabled={pending || loading} onClick={async () => {
           setRestoreError("");
           try { await send({ action: "save", section: "missions", id: mission.id, values: { is_published: false } }, "비공개로 복구했습니다. 비공개 목록에서 확인해 주세요."); }
           catch (error) { setRestoreError(error instanceof Error ? error.message : "복구하지 못했습니다. 다시 시도해 주세요."); }
-        }}><RotateCcw size={15} />비공개로 복구</button>}
+        }}><RotateCcw size={15} />비공개로 복구</AdminButton>}
       </div>
     </article>
   );
@@ -225,21 +255,9 @@ export function AdminCatalog({
     const value = getStatus(r);
     if (s.key === "products") {
       const sale = productSalesStatus(r, cohorts, now, Boolean(productConversion(object(r, "metadata")).url));
-      return <><Badge color={sale.label === "판매 보류" ? "amber" : value === "published" ? "green" : ""}>{sale.label}</Badge>{value === "published" && sale.issues.length > 0 && <small>{sale.issues.join(" · ")}</small>}</>;
+      return <><AdminStatusBadge status={value} label={sale.label} tone={sale.label === "판매 보류" ? "warning" : value === "published" ? "success" : "neutral"} />{value === "published" && sale.issues.length > 0 && <small>{sale.issues.join(" · ")}</small>}</>;
     }
-    return (
-      <Badge
-        color={
-          ["published", "approved", "active", "recruiting"].includes(value)
-            ? "green"
-            : value === "upcoming"
-              ? "blue"
-              : value === "suspended" ? "amber" : ""
-        }
-      >
-        {statusLabel(value)}
-      </Badge>
-    );
+    return <AdminStatusBadge status={value} label={statusLabel(value)} />;
   };
   const courseName = (r: Row) =>
     named(courses.find((c) => c.id === getCourse(r)));
@@ -289,7 +307,7 @@ export function AdminCatalog({
               <button className="title-btn" onClick={() => edit(s, r)}>
                 {t(r, "title")}
               </button>
-              {!isProductListed(r) && <Badge>비노출</Badge>}
+              {!isProductListed(r) && <AdminStatusBadge status="hidden" label="비노출" />}
             </div>
           </div>
         ),
@@ -312,7 +330,7 @@ export function AdminCatalog({
       { label: "자료", value: (r) => productResourceCount(r.id) + "개" },
       { label: "공개 점검", value: (r) => {
         const issues = productSalesStatus(r, cohorts, now, Boolean(productConversion(object(r, "metadata")).url)).issues;
-        return issues.length ? <><Badge color="red">확인 필요</Badge><small>{issues.join(" · ")}</small></> : <Badge color="green">준비 완료</Badge>;
+        return issues.length ? <><AdminStatusBadge status="not_configured" label="확인 필요" tone="warning" /><small>{issues.join(" · ")}</small></> : <AdminStatusBadge status="approved" label="준비 완료" />;
       } },
       { label: "판매 상태", value: badge },
     ],
@@ -380,10 +398,10 @@ export function AdminCatalog({
     ],
     tags: [
       { label: "태그", value: (r) => <b className="tag-name"><span className="tag-marker" style={{ "--tag-color": /^#[0-9a-f]{3,8}$/i.test(t(r, "color")) ? t(r, "color") : "#667ca0" } as CSSProperties} />{t(r, "name")}</b> },
-      { label: "분류", value: (r) => <Badge color={r.tag_kind === "automatic" ? "blue" : ""}>{r.tag_kind === "automatic" ? "자동" : "수동"}</Badge> },
+      { label: "분류", value: (r) => <AdminStatusBadge status={String(r.tag_kind)} label={r.tag_kind === "automatic" ? "자동" : "수동"} tone={r.tag_kind === "automatic" ? "info" : "neutral"} /> },
       { label: "부여 조건", value: (r) => <p className="tag-condition">{r.tag_kind === "automatic" ? tagRuleLabel(r.rule_key) : "관리자가 직접 부여"}</p> },
       { label: "회원 수", value: (r) => Array.isArray(r.crm_member_tags) ? String(r.crm_member_tags[0]?.count ?? 0) + "명" : "—" },
-      { label: "상태", value: (r) => <Badge color={r.is_active === false ? "" : "green"}>{r.is_active === false ? "사용 중지" : "사용 중"}</Badge> },
+      { label: "상태", value: (r) => <AdminStatusBadge status={r.is_active === false ? "inactive" : "active"} label={r.is_active === false ? "사용 중지" : "사용 중"} /> },
     ],
     coupons: [
       {
@@ -392,16 +410,17 @@ export function AdminCatalog({
           <>
             <b>{t(r, "name")}</b>
             <small>{t(r, "code")}</small>
+            {r.discount_type === 'ADMIN_FREE' && <AdminStatusBadge status="admin_only" label="관리자 전용" tone="info" />}
           </>
         ),
       },
       {
         label: "혜택",
-        value: (r) => <>{r.discount_type === "percentage" ? num(r, "discount_value") + "%" : money(num(r, "discount_value"))}<small>{Number(r.minimum_order_amount || 0) > 0 ? `최소 ${money(num(r, "minimum_order_amount"))}` : "최소 주문 제한 없음"}</small></>,
+        value: (r) => <>{r.discount_type === 'ADMIN_FREE' ? '100% 무료' : r.discount_type === "percentage" ? num(r, "discount_value") + "%" : money(num(r, "discount_value"))}<small>{Number(r.minimum_order_amount || 0) > 0 ? `최소 ${money(num(r, "minimum_order_amount"))}` : "최소 주문 제한 없음"}</small></>,
       },
       {
         label: "적용 대상",
-        value: (r) => { const tag = tags.find(item => item.id === r.target_tag_id); const product = courses.find(item => item.id === (data.coupon_products || []).find(link => link.coupon_id === r.id)?.course_id); return <>{r.issue_target === "tag" ? named(tag) : "전체 회원"}<small>{r.product_scope === "specific" ? named(product) : r.product_scope === "paid" ? "유료 클래스" : "전체 상품"}</small></>; },
+        value: (r) => { const tag = tags.find(item => item.id === r.target_tag_id); const products = courses.filter(item => (data.coupon_products || []).some(link => link.coupon_id === r.id && link.course_id === item.id)); return <>{r.discount_type === "ADMIN_FREE" ? "관리자만" : r.issue_target === "tag" ? named(tag) : "전체 회원"}<small>{r.product_scope === "specific" ? products.map(named).join(", ") : r.product_scope === "paid" ? "유료 클래스" : "전체 상품"}</small></>; },
       },
       {
         label: "사용 / 수량",
@@ -427,7 +446,7 @@ export function AdminCatalog({
         ),
       },
       { label: "공개 상태", value: badge },
-      { label: "상품 대표 노출", value: (r) => r.is_featured ? <Badge color="red">상품 대표</Badge> : <span className="meta">일반 후기</span> },
+      { label: "상품 대표 노출", value: (r) => r.is_featured ? <AdminStatusBadge status="featured" label="상품 대표" tone="info" /> : <span className="meta">일반 후기</span> },
     ],
     banners: [
       { label: "순서", value: (r) => num(r, "display_order") },
@@ -568,8 +587,9 @@ export function AdminCatalog({
     />
   );
   const statusFilter = (
-    <select
-      aria-label="상태 필터"
+    <AdminSelect
+      label="상태 필터"
+      labelHidden
       value={status}
       onChange={(e) => {
         setStatus(e.target.value);
@@ -577,12 +597,12 @@ export function AdminCatalog({
       }}
     >
       <option value="">전체 상태</option>
-      {[...new Set(rows.map(getStatus))].map((s) => (
+      {(s.key === 'coupons' ? ['draft','upcoming','active','expired','inactive','admin_test'] : [...new Set(rows.map(getStatus))]).map((s) => (
         <option key={s} value={s}>
           {statusLabel(s)}
         </option>
       ))}
-    </select>
+    </AdminSelect>
   );
   const scope = ["learning", "missions", "cohorts"].includes(s.key) ? (
     <div className="scope product-scope">
@@ -611,7 +631,7 @@ export function AdminCatalog({
         {s.key === "cohorts" ? <p>{rows.filter((item) => !course || item.course_id === course).length}개 기수 · {(data.cohort_sessions || []).filter((session) => !course || rows.some((cohort) => cohort.id === session.cohort_id && cohort.course_id === course)).length}개 회차</p> : <p>{scopedWeeks.length}주차 · {scopedLessons.length}개 학습{s.key === "missions" ? ` · 보관 제외 미션 ${num(missionSummary, "active")}개` : course ? ` · ${rows.filter((item) => getCourse(item) === course).length}개 항목` : ""}</p>}
       </div>
       <span className="spacer" />
-      {course && <Badge color={courses.find((item) => item.id === course)?.status === "published" ? "green" : ""}>{labels[t(courses.find((item) => item.id === course), "status")] || "작성 중"}</Badge>}
+      {course && <AdminStatusBadge status={t(courses.find((item) => item.id === course), "status")} label={labels[t(courses.find((item) => item.id === course), "status")] || "작성 중"} />}
     </div>
   ) : null;
   const selectAll = (
@@ -630,91 +650,66 @@ export function AdminCatalog({
   return (
     <>
       {['customers', 'questions'].includes(s.key) && (params.get('member') || params.get('question')) && <p className="notice mb16">연결된 {params.get('question') ? '질문' : '회원'}만 조회 중입니다. <Link className="text-link" href={`/admin/${s.key}`}>전체 목록 보기</Link></p>}
-      {s.key === "products" && (
-        <div className="metrics">
-          <Metric
-            label="전체 상품"
-            value={
-              <>
-                {productSummary ? num(productSummary, "total") : pagination?.total ?? rows.filter((item) => !item.archived_at).length}
-                <small>개</small>
-              </>
-            }
-            note="클래스 · 디지털 자료"
-          />
-          <Metric
-            label="공개 설정"
-            value={<>{productSummary ? num(productSummary, "published") : rows.filter((item) => !item.archived_at && item.status === "published").length}<small>개</small></>}
-            note="DB 공개 상태 · 판매 준비 점검 별도"
-            highlight
-          />
-          <Metric
-            label="모집 예정"
-            value={<>{productSummary ? num(productSummary, "upcoming") : rows.filter((item) => !item.archived_at && cohorts.some((cohort) => cohort.course_id === item.id && cohortStatus(cohort) === "upcoming")).length}<small>개</small></>}
-            note="연결 기수의 모집 일정 기준"
-          />
-          <Metric
-            label="작성 중"
-            value={<>{productSummary ? num(productSummary, "draft") : rows.filter((item) => !item.archived_at && item.status === "draft").length}<small>개</small></>}
-            note="공개 전 필수 정보 확인"
-          />
-        </div>
-      )}
-      {s.key === "coupons" && <div className="metrics">
-        <Metric label="전체 쿠폰" value={<>{pagination?.total ?? rows.length}<small>개</small></>} note="등록된 할인 혜택" />
-        <Metric label="발급 중" value={<>{rows.filter((item) => couponStatus(item) === "active").length}<small>개</small></>} note="현재 기간 내 발급" highlight />
-        <Metric label="발급 예정" value={<>{rows.filter((item) => couponStatus(item) === "upcoming").length}<small>개</small></>} note="시작일 이후 사용 가능" />
-        <Metric label="사용 횟수" value={<>{(data.coupon_redemptions || []).filter(item => item.status === "used").length}<small>회</small></>} note="조회된 쿠폰 전체 합계" />
+      {s.key === "products" && <div className="admin-pilot-summary" aria-label="상품 요약">
+        <AdminSummaryCard compact label="전체 상품" value={`${productSummary ? num(productSummary, "total") : pagination?.total ?? rows.filter(item => !item.archived_at).length}개`} scope="클래스 · 디지털 자료" />
+        <AdminSummaryCard compact label="공개 설정" value={`${productSummary ? num(productSummary, "published") : rows.filter(item => !item.archived_at && item.status === "published").length}개`} scope="DB 공개 상태 · 판매 준비 점검 별도" />
+        <AdminSummaryCard compact label="모집 예정" value={`${productSummary ? num(productSummary, "upcoming") : rows.filter(item => !item.archived_at && cohorts.some(cohort => cohort.course_id === item.id && cohortStatus(cohort) === "upcoming")).length}개`} scope="연결 기수의 모집 일정 기준" />
+        <AdminSummaryCard compact label="작성 중" value={`${productSummary ? num(productSummary, "draft") : rows.filter(item => !item.archived_at && item.status === "draft").length}개`} scope="공개 전 필수 정보 확인" />
+      </div>}
+      {s.key === "coupons" && <div className="admin-pilot-summary">
+        <AdminSummaryCard compact label="전체 쿠폰" value={`${pagination?.total ?? rows.length}개`} scope="등록된 할인 혜택" />
+        <AdminSummaryCard compact label="발급 중" value={`${rows.filter((item) => couponStatus(item) === "active").length}개`} scope="현재 조회 페이지 · 기간 내 발급" />
+        <AdminSummaryCard compact label="발급 예정" value={`${rows.filter((item) => couponStatus(item) === "upcoming").length}개`} scope="현재 조회 페이지 · 시작일 이후" />
+        <AdminSummaryCard compact label="사용 횟수" value={`${(data.coupon_redemptions || []).filter(item => item.status === "used").length}회`} scope="조회된 쿠폰 전체 합계" />
       </div>}
       {s.key === "product-reviews" && <div className="ops-callout mb16">상품 후기 → 해당 상품 상세페이지에 표시 · <Link className="text-link" href="/admin/testimonials">고객 후기</Link> → 별도로 선정한 홈페이지 사례</div>}
       {scope}
       {s.key === "customers" && !params.get('member') && (
-        <div className="metrics">
-          <Metric
+        <div className="admin-pilot-summary">
+          <AdminSummaryCard compact
             label="전체 회원"
-            value={<>{pagination?.total ?? rows.length}<small>명</small></>}
-            note="탈퇴 제외 · 관리자·스태프 포함"
+            value={`${pagination?.total ?? rows.length}명`}
+            scope="탈퇴 제외 · 관리자·스태프 포함"
           />
-          <Metric
+          <AdminSummaryCard compact
             label="정상 회원"
-            value={<>{memberSummary ? num(memberSummary, "active") : rows.filter((r) => r.status === "active").length}<small>명</small></>}
-            note="회원 계정 상태"
+            value={`${memberSummary ? num(memberSummary, "active") : rows.filter((r) => r.status === "active").length}명`}
+            scope="회원 계정 상태"
           />
-          <Metric
+          <AdminSummaryCard compact
             label="이용 제한"
-            value={<>{memberSummary ? num(memberSummary, "suspended") : rows.filter((r) => r.status === "suspended").length}<small>명</small></>}
-            note="계정 상태 기준"
+            value={`${memberSummary ? num(memberSummary, "suspended") : rows.filter((r) => r.status === "suspended").length}명`}
+            scope="계정 상태 기준"
           />
-          <Metric
+          <AdminSummaryCard compact
             label="마케팅 수신 동의"
-            value={<>{memberSummary ? num(memberSummary, "marketing") : rows.filter((r) => r.marketing_consent).length}<small>명</small></>}
-            note="서비스 알림과 구분"
+            value={`${memberSummary ? num(memberSummary, "marketing") : rows.filter((r) => r.marketing_consent).length}명`}
+            scope="서비스 알림과 구분"
           />
         </div>
       )}
       {s.key === "learning" && (
         <>
-          <div className="metrics">
-            <Metric
+          <div className="admin-pilot-summary">
+            <AdminSummaryCard compact
               label="전체 학습"
-              value={<>{course ? scopedLessons.length : pagination?.total ?? rows.length}<small>개</small></>}
-              note="일차별 학습 콘텐츠"
+              value={`${course ? scopedLessons.length : pagination?.total ?? rows.length}개`}
+              scope="일차별 학습 콘텐츠"
             />
-            <Metric
+            <AdminSummaryCard compact
               label="공개"
-              value={<>{scopedLessons.filter((r) => r.is_published).length}<small>개</small></>}
-              note="회원에게 공개되는 학습"
-              highlight
+              value={`${scopedLessons.filter((r) => r.is_published).length}개`}
+              scope="현재 상품의 학습 · 회원 공개"
             />
-            <Metric
+            <AdminSummaryCard compact
               label="비공개"
-              value={<>{scopedLessons.filter((r) => !r.is_published).length}<small>개</small></>}
-              note="작성·검토 후 공개"
+              value={`${scopedLessons.filter((r) => !r.is_published).length}개`}
+              scope="현재 상품의 학습 · 작성·검토"
             />
-            <Metric
+            <AdminSummaryCard compact
               label="확인 퀴즈"
-              value={<>{(data.curriculum_missions || []).filter((mission) => scopedLessons.some((item) => item.id === mission.lesson_id)).reduce((count, mission) => count + quizCount(mission.id), 0)}<small>문항</small></>}
-              note="학습별 문항·정답·해설 관리"
+              value={`${(data.curriculum_missions || []).filter((mission) => scopedLessons.some((item) => item.id === mission.lesson_id)).reduce((count, mission) => count + quizCount(mission.id), 0)}문항`}
+              scope="학습별 문항·정답·해설 관리"
             />
           </div>
 
@@ -739,20 +734,32 @@ export function AdminCatalog({
           </div>
           <p className="meta">일차별 미션 · 선택한 상품·주차 기준 · 전체 운영 = 공개 + 비공개 · 보관은 별도 집계합니다.</p>
           {restoreError && <p className="notice" role="alert">{restoreError}</p>}
-          <div className="mission-week-pills" aria-label="미션 주차 선택">
-            <button className={!week ? "pill active" : "pill"} aria-pressed={!week} onClick={() => { setWeek(""); setSelection([]); }}>전체 주차</button>
-            {weeks
-              .filter((item) => !course || item.course_id === course)
-              .map((item) => (
-                <button
-                  className={week === item.id ? "pill active" : "pill"}
-                  key={item.id}
-                  aria-pressed={week === item.id}
-                  onClick={() => { setWeek(item.id); setSelection([]); }}
-                >
-                  {!course && `${named(courses.find(c => c.id === item.course_id))} · `}{num(item, "week_number")}주차
-                </button>
-              ))}
+          <div className="mission-week-picker" aria-label="미션 주차 선택">
+            <div className="mission-week-picker-heading">
+              <strong>상품별 주차</strong>
+              <button className={!week ? "pill active" : "pill"} type="button" aria-pressed={!week} onClick={() => { setWeek(""); setSelection([]); }}>전체 주차</button>
+            </div>
+            {missionWeekGroups.map(([courseId, productWeeks]) => (
+              <section className="mission-product-group" key={courseId}>
+                <div className="mission-product-heading">
+                  <strong>{named(courses.find((item) => item.id === courseId))}</strong>
+                  <span>{productWeeks.length}개 주차</span>
+                </div>
+                <div className="mission-week-pills">
+                  {productWeeks.map((item) => (
+                    <button
+                      className={week === item.id ? "pill active" : "pill"}
+                      type="button"
+                      key={item.id}
+                      aria-pressed={week === item.id}
+                      onClick={() => { setWeek(item.id); setSelection([]); }}
+                    >
+                      {num(item, "week_number")}주차
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ))}
           </div>
         </>
       )}
@@ -787,64 +794,29 @@ export function AdminCatalog({
         )}
         <div
           className={
-            ["learning", "missions", "questions"].includes(s.key) ? "" : "panel"
+            ["learning", "missions", "questions"].includes(s.key) ? "" : s.key === "weeks" ? "panel weeks-table-workspace" : "panel"
           }
         >
-          {!["missions", "tags"].includes(s.key) && <div className={s.key === "learning" ? "toolbar learning-filter" : "filter-row"}>
-            {search}
-            <span className="spacer" />
-            {s.key === "products" && (
-              <>
-                <select
-                  aria-label="상품 유형"
-                  value={type}
-                  onChange={(e) => setType(e.target.value)}
-                >
-                  <option value="">전체 유형</option>
-                  {["무료 클래스", "유료 클래스", "디지털 상품"].map((v) => (
-                    <option key={v}>{v}</option>
-                  ))}
-                </select>
-                <select
-                  aria-label="상품 표시 범위"
-                  value={productVisibility}
-                  onChange={(event) => {
-                    setProductVisibility(event.target.value as "active" | "archived");
-                    setSelection([]);
-                  }}
-                >
-                  <option value="active">판매 상품</option>
-                  <option value="archived">삭제된 상품</option>
-                </select>
-              </>
-            )}
-            {s.key === "articles" && (
-              <select
-                aria-label="콘텐츠 유형"
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-              >
-                <option value="">전체 유형</option>
-                <option value="column">글</option>
-                <option value="video">영상</option>
-              </select>
-            )}
-            {s.key === "product-reviews" && <label className="catalog-filter-field">상품<select aria-label="후기 상품" value={course} onChange={(event) => { setCourse(event.target.value); setSelection([]); }}><option value="">전체 상품</option>{courses.map((item) => <option key={item.id} value={item.id}>{named(item)}</option>)}</select></label>}
-            {s.key === "customers" && (
-              <label className="catalog-filter-field">클래스<select
-                aria-label="수강 클래스"
-                value={course}
-                onChange={(e) => {
-                  setCourse(e.target.value);
-                  setSelection([]);
-                }}
-              >
-                <option value="">전체 클래스</option>
-                {courses.map((item) => <option key={item.id} value={item.id}>{t(item, "title")}</option>)}
-              </select></label>
-            )}
-            {s.key === "questions" ? <select aria-label="질문 처리 상태" value={params.has('question') ? 'selected' : params.get('questionState') || 'active'} onChange={event => { const next = new URLSearchParams(params.toString()); next.set('questionState', event.target.value); next.delete('question'); router.push(`/admin/questions?${next}`); }}>{params.has('question') && <option value="selected" disabled>선택한 질문 · 보관 포함</option>}<option value="active">전체 운영 질문</option><option value="open">미답변</option><option value="answered">답변 완료</option><option value="archived">보관</option></select> : statusFilter}
-          </div>}
+          {s.key === "products" && <AdminFilterBar
+            className="admin-pilot-filter"
+            filters={<><AdminSelect label="상품 유형" labelHidden value={type} onChange={event => { setType(event.target.value); setSelection([]); }}><option value="">전체 유형</option>{["무료 클래스", "유료 클래스", "디지털 상품"].map(value => <option key={value}>{value}</option>)}</AdminSelect><AdminSelect label="상품 표시 범위" labelHidden value={productVisibility} onChange={event => { setProductVisibility(event.target.value as "active" | "archived"); setSelection([]); }}><option value="active">판매 상품</option><option value="archived">삭제된 상품</option></AdminSelect></>}
+            status={<AdminSelect label="판매 상태" labelHidden value={status} onChange={event => { setStatus(event.target.value); setSelection([]); }}><option value="">전체 상태</option>{["draft", "published", "archived"].map(value => <option value={value} key={value}>{statusLabel(value)}</option>)}</AdminSelect>}
+            search={search}
+            action={<AdminButton variant="primary" onClick={() => edit(s)}><Plus size={16} aria-hidden="true" />상품 등록</AdminButton>}
+          />}
+          {s.key !== "products" && !["missions", "tags"].includes(s.key) && <AdminFilterBar
+            className="admin-catalog-filter"
+            filters={<>
+              {s.key === "articles" && <AdminSelect label="콘텐츠 유형" labelHidden value={type} onChange={(e) => setType(e.target.value)}><option value="">전체 유형</option><option value="column">글</option><option value="video">영상</option></AdminSelect>}
+              {s.key === "product-reviews" && <AdminSelect label="후기 상품" labelHidden value={course} onChange={(event) => { setCourse(event.target.value); setSelection([]); }}><option value="">전체 상품</option>{courses.map((item) => <option key={item.id} value={item.id}>{named(item)}</option>)}</AdminSelect>}
+              {s.key === "weeks" && <AdminSelect label="주차 상품" aria-label="주차 상품" labelHidden value={course} onChange={(event) => { setCourse(event.target.value); setSelection([]); }}><option value="">전체 상품</option>{courses.map((item) => <option key={item.id} value={item.id}>{named(item)}</option>)}</AdminSelect>}
+              {s.key === "customers" && <AdminSelect label="수강 클래스" labelHidden value={course} onChange={(event) => { setCourse(event.target.value); setSelection([]); }}><option value="">전체 클래스</option>{courses.map((item) => <option key={item.id} value={item.id}>{t(item, "title")}</option>)}</AdminSelect>}
+            </>}
+            status={s.key === "questions" ? <AdminSelect label="질문 처리 상태" labelHidden value={params.has('question') ? 'selected' : params.get('questionState') || 'active'} onChange={event => { const next = new URLSearchParams(params.toString()); next.set('questionState', event.target.value); next.delete('question'); router.push(`/admin/questions?${next}`); }}>{params.has('question') && <option value="selected" disabled>선택한 질문 · 보관 포함</option>}<option value="active">전체 운영 질문</option><option value="open">미답변</option><option value="answered">답변 완료</option><option value="archived">보관</option></AdminSelect> : statusFilter}
+            search={search}
+            action={s.key === "weeks" ? <AdminButton className="weeks-create" variant="primary" type="button" onClick={() => edit(s)}><Plus size={16} aria-hidden="true" />새로 등록</AdminButton> : undefined}
+          />}
+          {s.key === "weeks" && <p className="meta week-order-help">상품을 선택하면 해당 상품 안에서 주차 순서를 조정할 수 있습니다. 검색·상태 필터를 해제한 뒤 이동해 주세요.</p>}
           {s.key === "learning" ? (
             <div className="lesson-list">
               {filtered.toSorted((a, b) => num(a, "day_number") - num(b, "day_number")).map((l) => (
@@ -869,10 +841,10 @@ export function AdminCatalog({
                   </div>
                   <div className="lesson-tools">
                     {badge(l)}
-                    <button className="btn small" onClick={() => edit(s, l)}>
+                    <AdminButton size="sm" variant="outline" onClick={() => edit(s, l)}>
                       편집
                       <ArrowRight />
-                    </button>
+                    </AdminButton>
                     {bulkMode && <input
                       type="checkbox"
                       aria-label={title(l) + " 선택"}
@@ -895,7 +867,7 @@ export function AdminCatalog({
                 <section className="week-card mission-catalog" key={group.week.id}>
                   <div className="spread week-head">
                     <div className="row"><span className="week-label">WEEK {num(group.week, "week_number")}</span><strong>{named(group.week)}</strong></div>
-                    <button className="btn small" onClick={() => edit(s, undefined, { courseId: String(group.week.course_id), weekId: group.week.id })}>+ 미션 등록</button>
+                    <AdminButton size="sm" variant="outline" onClick={() => edit(s, undefined, { courseId: String(group.week.course_id), weekId: group.week.id })}>+ 미션 등록</AdminButton>
                   </div>
                   <p className="meta mb16">{!course ? `${named(courses.find((item) => item.id === group.week.course_id))} · ` : ""}현재 페이지 {group.missions.length}개{missionState === "archived" ? " · 보관된 미션" : ""}</p>
                   {group.missions.map(renderMission)}
@@ -911,16 +883,12 @@ export function AdminCatalog({
                   <div className="panel-head">
                     <div>
                       <p className="meta">{t(object(q, 'profiles') as Row, 'full_name') || '회원 정보 확인 필요'} · {t(object(q, 'profiles') as Row, 'email')} · {t(object(q, 'courses') as Row, 'title') || '일반 질문'}</p>
-                      <Badge
-                        color={q.status === "answered" ? "green" : "amber"}
-                      >
-                        {q.is_archived ? '보관' : labels[t(q, "status")]}
-                      </Badge>
+                      <AdminStatusBadge status={q.is_archived ? "archived" : t(q, "status")} label={q.is_archived ? "보관" : labels[t(q, "status")]} />
                       <h2 className="mt8">{t(q, "title")}</h2>
                     </div>
-                    <button className="btn small question-answer-open" onClick={() => edit(s, q)}>
+                    <AdminButton size="sm" variant="outline" className="question-answer-open" onClick={() => edit(s, q)}>
                       {q.answer ? "답변 수정" : "답변하기"}
-                    </button>
+                    </AdminButton>
                   </div>
                   <div className="panel-body">
                     {Boolean(q.learning_context) && <p className="meta">학습 위치: {t(q, "learning_context")}</p>}
@@ -938,9 +906,7 @@ export function AdminCatalog({
               ))}
             </div>
           ) : (
-            <div className="table-scroll mobile-cards admin-legacy-table" role="region" aria-label={`${s.title} 목록`} aria-busy={loading} tabIndex={0}>
-              <table>
-                <caption className="sr-only">{s.title} 목록</caption>
+            <CatalogTable label={["weeks", "cohorts"].includes(s.key) ? `${s.title} 데이터` : `${s.title} 목록`} loading={loading}>
                 <thead>
                   <tr>
                     {bulkMode && <th className="selection-column">{selectAll}</th>}
@@ -951,7 +917,20 @@ export function AdminCatalog({
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((r) => (
+                  {s.key === "weeks" ? weekGroups.map(([weekNumber, groupRows]) => <Fragment key={weekNumber}>
+                    <tr className="week-group-heading"><th scope="rowgroup" colSpan={cols.length + 1 + Number(bulkMode)}><span>{weekNumber}주차</span><small>{groupRows.length}개 상품</small></th></tr>
+                    {groupRows.map((r) => (
+                      <tr key={recordId(r)}>
+                        {bulkMode && <td data-label="선택" className="selection-column"><input type="checkbox" aria-label={title(r) + " 선택"} checked={selection.includes(recordId(r))} onChange={(e) => setSelection(e.target.checked ? [...selection, recordId(r)] : selection.filter((id) => id !== recordId(r)))} /></td>}
+                        {cols.map((c) => <td data-label={c.label} key={c.label}>{c.value(r)}</td>)}
+                        <td data-label="관리"><div className="catalog-actions week-order-actions">
+          <AdminButton size="sm" variant="outline" type="button" title="위로 이동" aria-label={`${t(r, "title")} 위로 이동`} disabled={pending || weekReorderDisabled || Boolean(r.archived_at) || activeCourseWeeks[0]?.id === r.id} onClick={() => void moveWeek(r, -1)}><ChevronUp size={17} aria-hidden="true" /></AdminButton>
+          <AdminButton size="sm" variant="outline" type="button" title="아래로 이동" aria-label={`${t(r, "title")} 아래로 이동`} disabled={pending || weekReorderDisabled || Boolean(r.archived_at) || activeCourseWeeks.at(-1)?.id === r.id} onClick={() => void moveWeek(r, 1)}><ChevronDown size={17} aria-hidden="true" /></AdminButton>
+          <AdminButton size="sm" variant="outline" onClick={() => edit(s, r)}>수정</AdminButton>
+                        </div></td>
+                      </tr>
+                    ))}
+                  </Fragment>) : filtered.map((r) => (
                     <tr key={recordId(r)}>
                       {bulkMode && <td data-label="선택" className="selection-column">
                         <input
@@ -974,13 +953,13 @@ export function AdminCatalog({
                       ))}
                       <td data-label="관리">
                         {s.key === "banners" ? <div className="catalog-actions banner-order-actions">
-                          <button className="btn iconbtn" type="button" title="위로 이동" aria-label={t(r, "title") + " 위로 이동"} disabled={pending || filtered[0]?.id === r.id} onClick={() => void moveBanner(r, -1)}><ChevronUp size={17} aria-hidden="true" /></button>
-                          <button className="btn iconbtn" type="button" title="아래로 이동" aria-label={t(r, "title") + " 아래로 이동"} disabled={pending || filtered.at(-1)?.id === r.id} onClick={() => void moveBanner(r, 1)}><ChevronDown size={17} aria-hidden="true" /></button>
-                          <button className="btn iconbtn" type="button" title="수정" aria-label={t(r, "title") + " 수정"} onClick={() => edit(s, r)}><Pencil size={17} aria-hidden="true" /></button>
+                          <AdminButton size="sm" variant="outline" type="button" title="위로 이동" aria-label={t(r, "title") + " 위로 이동"} disabled={pending || filtered[0]?.id === r.id} onClick={() => void moveBanner(r, -1)}><ChevronUp size={17} aria-hidden="true" /></AdminButton>
+                          <AdminButton size="sm" variant="outline" type="button" title="아래로 이동" aria-label={t(r, "title") + " 아래로 이동"} disabled={pending || filtered.at(-1)?.id === r.id} onClick={() => void moveBanner(r, 1)}><ChevronDown size={17} aria-hidden="true" /></AdminButton>
+                          <AdminButton size="sm" variant="outline" type="button" title="수정" aria-label={t(r, "title") + " 수정"} onClick={() => edit(s, r)}><Pencil size={17} aria-hidden="true" /></AdminButton>
                         </div> : s.key === "products" ? <div className="catalog-actions">
                           {r.archived_at ? (
-                            <button
-                              className="btn small"
+                            <AdminButton
+                              size="sm" variant="outline"
                               type="button"
                               disabled={pending || !send}
                               onClick={() => void send?.(
@@ -990,32 +969,31 @@ export function AdminCatalog({
                             >
                               <RotateCcw size={16} aria-hidden="true" />
                               복원
-                            </button>
+                            </AdminButton>
                           ) : (
                             <>
-                              <button className="btn iconbtn" type="button" title="수정" aria-label={t(r, "title") + " 수정"} onClick={() => edit(s, r)}><Pencil size={17} aria-hidden="true" /></button>
-                              <button className="btn iconbtn danger" type="button" title="삭제" aria-label={t(r, "title") + " 삭제"} disabled={pending} onClick={() => archive(s, [recordId(r)])}><Trash2 size={17} aria-hidden="true" /></button>
+                              <AdminButton size="sm" variant="outline" type="button" title="수정" aria-label={t(r, "title") + " 수정"} onClick={() => edit(s, r)}><Pencil size={17} aria-hidden="true" /></AdminButton>
+                              <AdminButton size="sm" variant="danger" type="button" title="삭제" aria-label={t(r, "title") + " 삭제"} disabled={pending} onClick={() => archive(s, [recordId(r)])}><Trash2 size={17} aria-hidden="true" /></AdminButton>
                             </>
                           )}
-                        </div> : <button
-                            className="btn small"
+                        </div> : <AdminButton
+                            size="sm" variant="outline"
                             onClick={() => edit(s, r)}
                           >
                             {s.key === "customers" || s.readOnly ? "상세" : s.key === "tags" ? "조건설정" : s.key === "coupons" ? "설정" : s.key === "product-reviews" ? "검토" : "수정"}
-                          </button>}
+                          </AdminButton>}
                       </td>
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
+            </CatalogTable>
           )}
           {!filtered.length && !loading && s.key === "missions" ? (
-            <AdminEmptyState title={missionState === "active" && num(missionSummary, "archived") > 0 ? "보관된 미션만 있습니다." : "이 조건에 해당하는 미션이 없습니다."} action={missionState !== "archived" && num(missionSummary, "archived") > 0 ? <button className="btn" onClick={() => changeMissionScope({ state: "archived" })}>보관 미션 보기</button> : <button className="btn" onClick={() => edit(s, undefined, { courseId: course, weekId: week })}>미션 등록</button>}>
+            <AdminEmptyState title={missionState === "active" && num(missionSummary, "archived") > 0 ? "보관된 미션만 있습니다." : "이 조건에 해당하는 미션이 없습니다."} action={missionState !== "archived" && num(missionSummary, "archived") > 0 ? <AdminButton variant="outline" onClick={() => changeMissionScope({ state: "archived" })}>보관 미션 보기</AdminButton> : <AdminButton variant="primary" onClick={() => edit(s, undefined, { courseId: course, weekId: week })}>미션 등록</AdminButton>}>
               보관 미션은 삭제되지 않습니다. 보관 목록에서 비공개로 복구한 뒤 내용을 확인하고 공개하세요.
             </AdminEmptyState>
           ) : !filtered.length && !loading && (
-            <AdminEmptyState title="조회된 항목이 없습니다." action={<button className="btn" type="button" onClick={() => { setQuery(""); setStatus(""); setType(""); setCourse(""); setWeek(""); setSelection([]); }}>검색·필터 초기화</button>}>
+            <AdminEmptyState title="조회된 항목이 없습니다." action={<AdminButton variant="outline" type="button" onClick={() => { setQuery(""); setStatus(""); setType(""); setCourse(""); setWeek(""); setSelection([]); }}>검색·필터 초기화</AdminButton>}>
               검색어 또는 상태 필터를 변경하면 전체 목록을 다시 확인할 수 있습니다.
             </AdminEmptyState>
           )}
@@ -1038,7 +1016,7 @@ export function AdminCatalog({
           }}
         />
       )}
-      {s.key === "learning" && <div className="row mt24"><Link className="btn" href="/admin/weeks">주차 구성</Link><Link className="btn" href="/admin/contents">영상·자료 등록</Link><Link className="btn" href="/admin/missions">미션·퀴즈 관리</Link></div>}
+      {s.key === "learning" && <div className="row mt24"><AdminLinkButton href="/admin/weeks">주차 구성</AdminLinkButton><AdminLinkButton href="/admin/contents">영상·자료 등록</AdminLinkButton><AdminLinkButton href="/admin/missions">미션·퀴즈 관리</AdminLinkButton></div>}
       {s.key === "missions" && <div className="notice mt16">미션은 연결 학습의 일차 순서로 표시됩니다. 학습 순서는 학습 콘텐츠 편집에서 변경할 수 있습니다. 제출물 검토와 피드백은 <Link className="text-link" href="/admin/reviews">제출물 검토</Link>에서 관리합니다.</div>}
       {s.key === "product-reviews" && <div className="notice mt24">후기 원문과 평점은 유지하며, 검토 화면에서 공개 상태와 상품 대표 노출을 설정합니다.</div>}
       {!["products", "banners", "customers", "tags", "coupons"].includes(s.key) && <details className="catalog-bulk-tools mt24" onToggle={(event) => { if (!(event.currentTarget as HTMLDetailsElement).open) { setBulkMode(false); setSelection([]); } }}>
@@ -1058,20 +1036,18 @@ export function AdminCatalog({
               {s.key === "products" ? "삭제 항목 포함" : "보관 항목 포함"}
             </label>}
             <span className="spacer" />
-            <button
-              className="btn small"
-              onClick={() => exportCsv(filtered, s.key)}
-            >
+            <AdminButton size="sm" variant="outline" onClick={() => exportCsv(filtered, s.key)}>
               {pagination ? "현재 페이지 CSV" : "CSV 내보내기"}
-            </button>
+            </AdminButton>
             {archiveValues[s.key] && (
-              <button
-                className="btn small"
+              <AdminButton
+                size="sm"
+                variant="outline"
                 disabled={pending || !selection.length || selection.length > 50 || (s.key === "missions" && missionState === "archived")}
                 onClick={() => archive(s, selection)}
               >
                 선택 {selection.length}개 {s.key === "products" ? "삭제" : "보관·숨김"}
-              </button>
+              </AdminButton>
             )}
           </div>
         </div>

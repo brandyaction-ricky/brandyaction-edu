@@ -1,3 +1,4 @@
+import { CouponsFixture } from './coupons';
 import { ClassroomQuestionsFixture } from './classroom-questions';
 import { RecruitmentLinks } from '../../../app/ui/recruitment-links';
 import { RecruitmentDelivery } from '../../../app/ui/recruitment-delivery';
@@ -13,9 +14,18 @@ import { MemberOperationsFixture, RetainedMemberDialogFixture } from './member-o
 import { SubmissionReviewFixture } from './submission-review';
 import { ProductSaleFixture } from './product-sale';
 import { ProductCountdownFixture } from './product-countdown';
+import { AdminComponentsFixture } from './admin-components';
+import { AdminPilotFixture } from './admin-pilot';
 import { AdminWorkspace } from '../../../app/ui/admin-workspace';
 import { ProductVisibilityFixture } from './product-visibility';
+import { PurchaseOnboarding } from '../../../app/ui/purchase-onboarding';
+import { PurchaseOnboardingAdmin } from '../../../app/ui/purchase-onboarding-admin';
+import { OrderResult } from '../../../app/ui/order-result';
 import { Platform } from '../../../app/ui/platform';
+import { AdminCatalog } from '../../../app/ui/final/admin-catalog';
+import { ArticleBannerEditor } from '../../../app/ui/final/article-banner-editor';
+import { ArticleCategoryManager } from '../../../app/ui/final/article-category-manager';
+import { sections } from '../../../lib/platform';
 import '../../../app/ui/final/frontend.css';
 import { AdminButton, AdminConfirmDialog, AdminDrawer, AdminEmptyState, AdminInlineError, AdminInput, AdminPage, AdminPageHeader, AdminShell, AdminSuccessState } from '../../../features/admin-ui';
 import { ProductDetailHtml } from '../../../app/ui/final/product-detail-html';
@@ -50,18 +60,59 @@ function ShellFixture() {
   ];
   return <div className="edu-admin"><AdminShell current="overview" available={available} user={{full_name:'운영자',role:'staff'}} pendingReviews={3} mobile={mobile} setMobile={setMobile} logout={async()=>{}}><AdminPage><AdminPageHeader eyebrow="OPERATIONS" title="오늘의 운영" description="현재 상태를 확인하고 다음 작업을 시작하세요." actions={<AdminButton tone="primary">핵심 작업 시작</AdminButton>}/><AdminSuccessState title="대기 업무를 모두 처리했습니다.">새 요청이 생기면 이 화면과 메뉴 배지에 표시됩니다.</AdminSuccessState><AdminEmptyState title="조회 결과가 없습니다.">검색어 또는 필터를 변경해 보세요.</AdminEmptyState><AdminInlineError onRetry={()=>{}}>화면 정보를 불러오지 못했습니다.</AdminInlineError></AdminPage></AdminShell></div>;
 }
+function WeekCatalogFixture() {
+  const [weeks, setWeeks] = useState([
+    { id: 'week-a-1', course_id: 'course-a', week_number: 1, title: '첫 번째 주차', goal: '목표', is_published: true },
+    { id: 'week-a-2', course_id: 'course-a', week_number: 2, title: '둘째 주차', goal: '목표', is_published: false },
+    { id: 'week-b-1', course_id: 'course-b', week_number: 1, title: '다른 상품 주차', goal: '목표', is_published: true },
+  ]);
+  const send = async (body: Record<string, unknown>) => {
+    if (body.action === 'reorder-weeks' && Array.isArray(body.ids)) {
+      const positions = new Map(body.ids.map((id, index) => [String(id), index + 1]));
+      setWeeks(current => current.map(week => positions.has(week.id) ? { ...week, week_number: positions.get(week.id)! } : week));
+    }
+    return { ok: true };
+  };
+  return <div className="edu-admin"><AdminCatalog section={sections.find(item => item.key === 'weeks')!} data={{ courses: [{ id: 'course-a', title: '합성 상품 A' }, { id: 'course-b', title: '합성 상품 B' }], curriculum_weeks: weeks }} selection={[]} setSelection={() => {}} edit={() => {}} archive={() => {}} pending={false} loading={false} pagination={{ page: 1, pageSize: 1000, total: weeks.length }} setPage={() => {}} exportCsv={() => {}} send={send} /></div>;
+}
+function FullMigrationFixture({ screen }: { screen: 'crm' | 'settings' }) {
+  const send = async () => ({ ok: true });
+  return <div className="edu-admin" style={{ padding: 24 }}>
+    {screen === 'crm' ? <AdminWorkflows section="templates" data={{
+      crm_templates: [
+        { id: 'template-active', name: '결제 안내', channel: 'sms', purpose: 'transactional', content: '결제 확인과 수강 안내 문구', is_active: true },
+        { id: 'template-draft', name: '모집 안내 초안', channel: 'lms', purpose: 'marketing', content: '검토 중인 모집 안내', is_active: false },
+      ],
+      crm_delivery_state: [{ id: 'delivery', enabled: false, configured: false }],
+    }} pending={false} send={send} /> : <AdminWorkflows section="seo" data={{ site_settings: [] }} pending={false} send={send} />}
+  </div>;
+}
+function ArticleMigrationFixture() {
+  const [saved, setSaved] = useState(0);
+  const send = async () => { setSaved(value => value + 1); return { ok: true }; };
+  return <div className="edu-admin" style={{ padding: 24 }}>
+    <ArticleCategoryManager categories={[{ id: 'cat-active', name: '마케팅', slug: 'marketing', display_order: 1, is_active: true }, { id: 'cat-idle', name: '기획', slug: 'planning', display_order: 2, is_active: false }]} articles={[{ id: 'article-1', category_id: 'cat-active' }]} pending={false} send={send}/>
+    <ArticleBannerEditor settings={[]} pending={false} send={send}/>
+    <output aria-label="합성 저장 횟수">{saved}</output>
+  </div>;
+}
 
 function ProductHtmlCtaFixture() {
   const documentSource = '<!doctype html><html><body><a href="#faq">자주 묻는 질문</a><a href="#">무료강의 대기방 입장 →</a><p id="faq">FAQ</p></body></html>';
   return <ProductDetailHtml html="" documentSource={documentSource} ctaUrl="/join/synthetic/organic" />;
 }
+function OrderCompleteFixture() {
+  const params = new URLSearchParams(location.search);
+  const [status, setStatus] = useState(params.get('fixtureStatus') || 'paid');
+  return <div className="edu-front"><OrderResult data={{ orders: [{ id: '11111111-1111-4111-8111-111111111111', order_number: 'BAE-QA-1', status, total_amount: params.get('free') === '1' ? 0 : 1650000 }] }} refresh={async () => { setStatus('paid'); }} /></div>;
+}
 const path = window.location.pathname;
 // Destination pages are outside this fixture's scope. Keep them inert so their
 // fallback admin screen cannot rewrite the URL before navigation is asserted.
-const fixture = ['/checkout', '/apply', '/safe-custom', '/learn/enrolled-fixture'].includes(path) ? <main data-testid="navigation-destination" /> : path === '/review-audit-test' ? <SubmissionReviewFixture/> : path === '/retained-member-dialog-test' ? <RetainedMemberDialogFixture/> : ['/member-operations-test', '/admin/customers', '/admin/questions', '/admin/reviews', '/admin/members'].includes(path) ? <MemberOperationsFixture/> : path.startsWith('/mission-integrity-test') ? <MissionIntegrityFixture/> : path.startsWith('/admin-shell-test')
+const fixture = ['/checkout', '/apply', '/safe-custom', '/learn/enrolled-fixture'].includes(path) ? <main data-testid="navigation-destination" /> : path === '/admin-pilot-orders-test' ? <AdminPilotFixture screen="orders"/> : path === '/admin-pilot-products-test' ? <AdminPilotFixture screen="products"/> : path === '/admin-pilot-editor-test' ? <AdminPilotFixture screen="editor"/> : path === '/admin-component-system-test' ? <AdminComponentsFixture/> : path === '/admin-full-crm-test' ? <FullMigrationFixture screen="crm" /> : path === '/admin-full-settings-test' ? <FullMigrationFixture screen="settings" /> : path === '/admin-full-articles-test' ? <ArticleMigrationFixture/> : path === '/review-audit-test' ? <SubmissionReviewFixture/> : path === '/retained-member-dialog-test' ? <RetainedMemberDialogFixture/> : ['/member-operations-test', '/admin/customers', '/admin/questions', '/admin/reviews', '/admin/members'].includes(path) ? <MemberOperationsFixture/> : path === '/admin-week-order-test' ? <WeekCatalogFixture/> : path.startsWith('/mission-integrity-test') ? <MissionIntegrityFixture/> : path.startsWith('/admin-shell-test')
   ? <ShellFixture/>
   : path.startsWith('/product-html-cta-test')
     ? <ProductHtmlCtaFixture/>
     : <div className="edu-admin" style={{padding:24,minHeight:'180vh'}}>{path.startsWith('/copy-links-test') ? <><RecruitmentLinks period="sample" version={2}/><WebinarManagement period="sample" courses={[{id:'22222222-2222-4222-8222-222222222222',title:'합성 무료 교육'}]} cohorts={[]}/></> : path.startsWith('/delivery-test') ? <RecruitmentDelivery code="33333333-3333-4333-8333-333333333333"/> : path.startsWith('/templates-admin-test') ? <AdminWorkflows section="templates" data={{crm_templates:[],crm_delivery_state:[{id:'delivery',enabled:false,configured:false}]}} pending={false} send={async body=>{const r=await fetch('/api/platform/workflows',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw Error('저장 실패');return r.json();}}/> : path.startsWith('/webinar-test') ? <WebinarRegistration code="11111111-1111-4111-8111-111111111111" channel="organic"/> : path.startsWith('/webinar-admin-test') ? <WebinarManagement workspace={new URLSearchParams(location.search).has("workspace")} period="sample" courses={[{id:'22222222-2222-4222-8222-222222222222',title:'합성 무료 교육'}]} cohorts={[]}/> : path.startsWith('/admin/conversion') ? <ConversionFixture/> : <><BoundaryFixture/><LandingAdmin/></>}</div>;
 const publicScreen = new URLSearchParams(location.search).get('publicScreen');
-createRoot(document.getElementById('root')!).render(<StrictMode>{path === '/classroom-questions-test' ? <ClassroomQuestionsFixture/> : path === '/product-countdown-test' ? <ProductCountdownFixture /> : publicScreen ? <Platform path={publicScreen === 'home' ? [] : [publicScreen]} user={null} /> : new URLSearchParams(location.search).has('navigationFixture') ? <AdminWorkspace>{null}</AdminWorkspace> : path === '/product-visibility-test' ? <ProductVisibilityFixture /> : path === '/visibility-home-test' || path.startsWith('/classes') ? <Platform path={path === '/visibility-home-test' ? [] : path.split('/').filter(Boolean)} user={null} /> : path === '/product-sale-test' ? <ProductSaleFixture /> : fixture}</StrictMode>);
+createRoot(document.getElementById('root')!).render(<StrictMode>{['/coupons-test', '/coupon-checkout-test'].includes(path) ? <CouponsFixture/> : path === '/order-complete-test' ? <OrderCompleteFixture/> : path === '/purchase-onboarding' ? <PurchaseOnboarding order={new URLSearchParams(location.search).get('order') || ''} guideRequested={new URLSearchParams(location.search).get('step') === 'guide'} /> : path === '/admin/purchase-onboarding-test' ? <PurchaseOnboardingAdmin/> : path === '/classroom-questions-test' ? <ClassroomQuestionsFixture/> : path === '/product-countdown-test' ? <ProductCountdownFixture /> : publicScreen ? <Platform path={publicScreen === 'home' ? [] : [publicScreen]} user={null} /> : new URLSearchParams(location.search).has('navigationFixture') ? <AdminWorkspace>{null}</AdminWorkspace> : path === '/product-visibility-test' ? <ProductVisibilityFixture /> : path === '/visibility-home-test' || path.startsWith('/classes') ? <Platform path={path === '/visibility-home-test' ? [] : path.split('/').filter(Boolean)} user={null} /> : path === '/product-sale-test' ? <ProductSaleFixture /> : fixture}</StrictMode>);

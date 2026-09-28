@@ -76,6 +76,9 @@ test('activating campaigns does not release older automation runs without a sepa
   const modules = {
     'solapi': { SolapiMessageService: class {} },
     '@/lib/supabase/admin': { createAdminClient: () => db },
+    '@/lib/crm-purchase-contact': {},
+    '@/lib/crm-purchase-email': { purchaseEmailConfigured: () => false },
+    '@/lib/crm-sms-settings': { loadSmsSettings: async () => ({ senderPhone: '01098765432', transactionalEnabled: true, marketingEnabled: false }) },
   };
   new Function('exports', 'require', 'process', ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },

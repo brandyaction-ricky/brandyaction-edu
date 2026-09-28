@@ -16,7 +16,6 @@ import Link from "next/link";
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import { BlocksField, UploadField, uploadPlatformFile } from "../editor-fields";
 import type { Data, WorkflowSend } from "../learning-workflows";
-import { AdminHeading } from "./admin-shell";
 import { Badge } from "./primitives";
 import { productDetailImages, productMetadataFields, productResources, sanitizeProductHtml, type ProductResourceScope } from "@/lib/product-metadata";
 import { isProductListed } from "@/lib/product-visibility";
@@ -27,6 +26,7 @@ import { ProductDetailHtml } from "./product-detail-html";
 import { DigitalContentManager } from "./digital-content-manager";
 import { ProductCurriculumWorkspace } from "./product-curriculum-workspace";
 import { ProductCohortWorkspace } from "./product-cohort-workspace";
+import { AdminButton, AdminInlineError, AdminInput, AdminSelect, AdminTextarea, PageHeader, PageSection } from "@/features/admin-ui";
 
 function fieldValue(s: Section, row: Row | undefined, f: Field) {
   return s.table === "courses" &&
@@ -257,7 +257,14 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
   function field(key: string, label?: string, wide = false, hint?: string) {
     const definition = section.fields.find(item => item.key === key);
     if (!definition) return null;
-    return <ProductField controlId={"edit-" + key} label={(label || definition.label) + (definition.required ? " *" : "")} wide={wide} hint={hint}><FieldControl section={section} row={editorRow} field={definition} data={data} pending={pending} /></ProductField>;
+    const props = { id: "edit-" + key, name: key, label: label || definition.label, helper: hint, required: definition.required, maxLength: definition.maxLength, disabled: pending };
+    const value = fieldValue(section, editorRow, definition);
+    let control: ReactNode;
+    if (definition.options) control = <AdminSelect {...props} defaultValue={String(value || definition.options[0])}>{definition.options.map(option => <option key={option} value={option}>{labels[option] || option}</option>)}</AdminSelect>;
+    else if (definition.type === "textarea" || definition.type === "json") control = <AdminTextarea {...props} rows={definition.type === "json" ? 8 : 5} defaultValue={definition.type === "json" ? JSON.stringify(value ?? {}, null, 2) : String(value || "")} />;
+    else if (!definition.type || ["text", "number", "url", "email", "datetime-local"].includes(definition.type)) control = <AdminInput {...props} type={definition.type || "text"} defaultValue={definition.type === "datetime-local" && value ? localDateTime(value) : String(value ?? "")} min={definition.type === "number" ? 0 : undefined} />;
+    else control = <ProductField controlId={props.id} label={props.label + (definition.required ? " *" : "")} hint={hint}><FieldControl section={section} row={editorRow} field={definition} data={data} pending={pending} /></ProductField>;
+    return <div className={wide ? "wide" : undefined}>{control}</div>;
   }
   function updatePreview() {
     setDirty(true);
@@ -320,22 +327,22 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
     } catch (cause) { setError((cause as Error).message); }
   }
   return <div className={"product-editor" + (tab === "curriculum" ? " curriculum-editing" : "")}>
-    <AdminHeading title={row ? "상품 수정" : "상품 등록"} description={t(row, "title") || "상품 정보·상세페이지·제공 자료·판매 조건을 입력하세요."} eyebrow="PRODUCT EDITOR">{Boolean(row?.slug) && <Link className="btn" href={"/classes/" + t(row, "slug")} target="_blank">고객 화면 미리보기</Link>}</AdminHeading>
+    <PageHeader title={row ? "상품 수정" : "상품 등록"} description={t(row, "title") || "상품 정보·상세페이지·제공 자료·판매 조건을 입력하세요."} eyebrow="PRODUCT EDITOR" actions={<>{row && <Link className="btn" href="/admin/purchase-onboarding">결제 후 안내 설정</Link>}{Boolean(row?.slug) && <Link className="btn" href={"/classes/" + t(row, "slug")} target="_blank">고객 화면 미리보기</Link>}</>} />
     <form ref={formRef} noValidate onSubmit={submit} onChange={updatePreview}>
       <div className="editor-layout"><div className="editor-main"><section className="panel">
         <div className="tabs" role="tablist" aria-label="상품 편집 영역">{groups.map(([key, label]) => <button key={key} id={"product-tab-" + key} type="button" role="tab" aria-selected={tab === key} aria-controls={"product-panel-" + key} className={"tab " + (tab === key ? "active" : "")} onClick={() => setTab(key)}>{label}</button>)}</div>
         <div className="section-pad" id="product-panel-basic" data-tab="basic" role="tabpanel" aria-labelledby="product-tab-basic" hidden={tab !== "basic"}>
           <ProductSaleCheck sale={sale} cohort={cohort} />
-          <h2 className="mb16">기본 정보</h2><div className="form-grid">
+          <PageSection title="기본 정보" className="product-basic-section"><div className="form-grid">
             {field("title", "상품명", true)}
             {field("category", "상품 유형")}
-            <ProductField label="판매 상태"><select name="status" aria-label="판매 상태" defaultValue={t(row, "status") || "draft"} disabled={pending}>{Object.entries(statusLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></ProductField>
+            <AdminSelect label="판매 상태" name="status" defaultValue={t(row, "status") || "draft"} disabled={pending}>{Object.entries(statusLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</AdminSelect>
             {field("summary", "상품 한 줄 소개", true)}
             {field("regular_price", "정가 · 원")}
             {field("list_price", "상품 기본 판매가 · 원", false, "무료 클래스는 0원입니다. 기수별 실제 결제 금액은 기수·회차 관리에서 설정합니다.")}
-            <ProductField label="모집 시작 · KST"><input key={cohortId + "-start"} name="recruitment_start_at" aria-label="모집 시작 · KST" type="datetime-local" value={cohortDrafts[cohortId]?.recruitment_start_at ?? kstInput(cohort?.recruitment_start_at)} onChange={event => setCohortDrafts(current => ({ ...current, [cohortId]: { ...current[cohortId], recruitment_start_at: event.target.value } }))} disabled={pending} /></ProductField>
-            <ProductField label="모집 마감 · KST"><input key={cohortId + "-end"} name="recruitment_end_at" aria-label="모집 마감 · KST" type="datetime-local" value={cohortDrafts[cohortId]?.recruitment_end_at ?? kstInput(cohort?.recruitment_end_at)} onChange={event => setCohortDrafts(current => ({ ...current, [cohortId]: { ...current[cohortId], recruitment_end_at: event.target.value } }))} disabled={pending} /></ProductField>
-          </div>
+            <AdminInput label="모집 시작 · KST" key={cohortId + "-start"} name="recruitment_start_at" type="datetime-local" value={cohortDrafts[cohortId]?.recruitment_start_at ?? kstInput(cohort?.recruitment_start_at)} onChange={event => setCohortDrafts(current => ({ ...current, [cohortId]: { ...current[cohortId], recruitment_start_at: event.target.value } }))} disabled={pending} />
+            <AdminInput label="모집 마감 · KST" key={cohortId + "-end"} name="recruitment_end_at" type="datetime-local" value={cohortDrafts[cohortId]?.recruitment_end_at ?? kstInput(cohort?.recruitment_end_at)} onChange={event => setCohortDrafts(current => ({ ...current, [cohortId]: { ...current[cohortId], recruitment_end_at: event.target.value } }))} disabled={pending} />
+          </div></PageSection>
           <p className="meta product-cohort-hint">{cohort ? `현재 ${t(cohort, "name")}의 모집 일정입니다. 수강·권한 탭에서 기수를 선택할 수 있으며 변경한 기수 일정은 함께 저장됩니다.` : "연결 기수가 없는 무료 클래스는 모집 일정을 비워 두면 기수를 만들지 않습니다. 그 외에는 상품을 저장하면 기본 기수가 생성되고 입력한 모집 일정이 함께 적용됩니다."}</p>
           <h3>상품 썸네일</h3><div className="upload-box product-upload"><Download aria-hidden="true" /><p>썸네일 이미지를 선택하세요.</p><UploadField name="thumbnail_url" value={String(metadata.thumbnail_url || metadata.thumbnailUrl || "")} image disabled={pending} onChange={() => setDirty(true)} /><p className="meta">권장 비율 16:9 · PNG/JPG/WebP</p></div>
           <div className="notice mt16">썸네일과 상세페이지 이미지는 별도로 관리합니다. 디지털 자료도 상품 정보와 제공 자료를 각각 등록해 주세요.</div>
@@ -393,7 +400,7 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
           </section>
           <section className="product-conversion-card"><h2>Tracking integration</h2><p className="meta">상품별 광고 추적을 연결하세요.</p><ProductField controlId="product-pixel-id" label="Meta Pixel ID (Optional)" hint="입력한 상품에만 PageView와 CTA 클릭(Lead)을 전송합니다. 구매 완료 이벤트는 결제 처리와 구분됩니다. 비워 두면 사용하지 않습니다."><input id="product-pixel-id" name="meta_pixel_id" inputMode="numeric" pattern="[0-9]{5,30}" maxLength={30} defaultValue={conversion.pixelId} placeholder="Meta Pixel ID" disabled={pending} /></ProductField></section>
         </div>
-      </section><div className="editor-savebar">{!["curriculum", "cohorts"].includes(tab) && row?.id && !row.archived_at && <button className="btn danger" type="button" onClick={() => void removeProduct()} disabled={pending || detailUploadStatus === "uploading"}>상품 삭제</button>}<span className="dirty-note">{tab === "curriculum" ? "학습·미션·공통 자료는 각 항목의 저장 버튼으로 반영됩니다." : tab === "cohorts" ? "기수는 항목별로 저장됩니다." : dirty ? "저장하지 않은 변경사항이 있습니다." : "변경 내용을 저장하면 반영됩니다."}</span><button className="btn" type="button" data-leaves-learning-editor onClick={close} disabled={pending || detailUploadStatus === "uploading"}>목록으로</button>{!["curriculum", "cohorts", "publish"].includes(tab) && <button className="btn" type="button" onClick={() => setTab("publish")} disabled={pending || detailUploadStatus === "uploading"}>공개 전 확인</button>}{!["curriculum", "cohorts"].includes(tab) && <button className="btn primary" type="submit" disabled={pending || detailUploadStatus !== "idle"}>{pending ? "저장 중…" : detailUploadStatus === "uploading" ? "업로드 중…" : "저장하기"}</button>}</div>{error && <p className="notice mt16" role="alert">{error}</p>}</div>
+      </section><div className="editor-savebar">{!["curriculum", "cohorts"].includes(tab) && row?.id && !row.archived_at && <AdminButton variant="danger" type="button" onClick={() => void removeProduct()} disabled={pending || detailUploadStatus === "uploading"}>상품 삭제</AdminButton>}<span className="dirty-note">{tab === "curriculum" ? "학습·미션·공통 자료는 각 항목의 저장 버튼으로 반영됩니다." : tab === "cohorts" ? "기수는 항목별로 저장됩니다." : dirty ? "저장하지 않은 변경사항이 있습니다." : "변경 내용을 저장하면 반영됩니다."}</span><AdminButton variant="outline" type="button" data-leaves-learning-editor onClick={close} disabled={pending || detailUploadStatus === "uploading"}>목록으로</AdminButton>{!["curriculum", "cohorts", "publish"].includes(tab) && <AdminButton variant="secondary" type="button" onClick={() => setTab("publish")} disabled={pending || detailUploadStatus === "uploading"}>공개 전 확인</AdminButton>}{!["curriculum", "cohorts"].includes(tab) && <AdminButton variant="primary" type="submit" loading={pending} disabled={detailUploadStatus !== "idle"}>{pending ? "저장 중…" : detailUploadStatus === "uploading" ? "업로드 중…" : "저장하기"}</AdminButton>}</div>{error && <AdminInlineError>{error}</AdminInlineError>}</div>
       <aside className="editor-aside"><div className="side-preview"><span className="section-code">고객에게 보이는 상품</span><div className="preview-cover mt16"><p>BRANDYACTION EDU</p><h3>{preview.title || "상품명"}</h3><p className="accent">{labels[preview.category] || "유료 클래스"}</p></div><div className="preview-meta"><b>{!previewSalePrice ? "무료" : money(previewSalePrice)}</b>{preview.regular > previewSalePrice && <s>{money(preview.regular)}</s>}</div><p className="meta mt8">{cohort ? t(cohort, "name") + " 기수 판매가" : "상품 기본 판매가"}</p><p className="meta mt8">{preview.summary || "상품 소개를 입력해 주세요."}</p><div className="divider" /><ProductSaleCheck sale={sale} cohort={cohort} /><div className="setting-line"><span>저장할 상품 설정</span><b>{statusLabels[preview.status]}</b></div><div className="setting-line"><span>제공 자료</span><b>{resourceCount}개</b></div><Link className="btn full mt16" href="/admin/cohorts">기수·회차 관리</Link></div></aside></div>
     </form>
   </div>;

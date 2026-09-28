@@ -29,9 +29,26 @@ export function OrderResult({
   const [state, setState] = useState<"checking" | "paid" | "waiting" | "error">("checking");
   const [error, setError] = useState("");
   const [virtualAccount, setVirtualAccount] = useState<VirtualAccount | null>(null);
+  const [onboardingOrderId, setOnboardingOrderId] = useState<string | null>(null);
+  const [onboardingErrorOrderId, setOnboardingErrorOrderId] = useState<string | null>(null);
+  const [onboardingRetry, setOnboardingRetry] = useState(0);
   const order = matchingOrder(data.orders || [], orderId);
+  const paidOrderId = order?.status === "paid" && typeof order.id === "string" ? order.id : null;
   const failed = path === "/payment/fail";
   const complete = !failed && (state === "paid" || order?.status === "paid");
+
+  useEffect(() => {
+    if (!complete || !paidOrderId) return;
+    const controller = new AbortController();
+    void fetch(`/api/purchase-onboarding?order=${encodeURIComponent(paidOrderId)}`, { cache: 'no-store', signal: controller.signal })
+      .then(response => {
+        if (controller.signal.aborted) return;
+        setOnboardingOrderId(response.ok ? paidOrderId : null);
+        setOnboardingErrorOrderId(!response.ok && response.status !== 404 ? paidOrderId : null);
+      })
+      .catch(() => { if (!controller.signal.aborted) { setOnboardingOrderId(null); setOnboardingErrorOrderId(paidOrderId); } });
+    return () => controller.abort();
+  }, [complete, paidOrderId, onboardingRetry]);
 
   const confirm = useCallback(async () => {
     if (!paymentKey || !orderId || failed) return;
@@ -145,6 +162,16 @@ export function OrderResult({
             </dl>
           )}
           <div className="grid2 mt24">
+            {complete && onboardingOrderId === paidOrderId && paidOrderId && (
+              <Link className="btn primary" href={`/purchase-onboarding?order=${encodeURIComponent(paidOrderId)}`}>
+                결제 후 시작 안내 <ArrowRight />
+              </Link>
+            )}
+            {complete && onboardingErrorOrderId === paidOrderId && paidOrderId && (
+              <button className="btn" type="button" onClick={() => { setOnboardingErrorOrderId(null); setOnboardingRetry(value => value + 1); }}>
+                시작 안내 다시 확인
+              </button>
+            )}
             {state === "error" && paymentKey && (
               <button className="btn" onClick={() => void confirm()}>
                 결제 결과 다시 확인
@@ -161,6 +188,7 @@ export function OrderResult({
               클래스 둘러보기
             </Link>
           </div>
+          {complete && onboardingErrorOrderId === paidOrderId && paidOrderId && <p className="form-error" role="alert">시작 안내를 불러오지 못했습니다. 다시 확인하거나 주문 내역에서 열어 주세요.</p>}
         </section>
       </div>
     </div>
