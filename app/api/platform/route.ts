@@ -132,6 +132,14 @@ export async function GET(request: Request) {
             }
             const contentResult = await db.from('lesson_contents').select('*').in('lesson_id', lessonIds);
             if (contentResult.error) return reply({ error: '학습 콘텐츠를 불러오지 못했습니다.' }, 500);
+            if (process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true') {
+                // Only presence is needed here. Full authored bodies and quiz keys
+                // stay in the separate, permission-checked lesson editor endpoint.
+                const heads = await db.from('edu_lesson_block_heads').select('lesson_id').in('lesson_id', lessonIds);
+                if (heads.error) return reply({ error: '학습 구성 상태를 불러오지 못했습니다.' }, 500);
+                const blockIds = new Set((heads.data || []).map(row => String(row.lesson_id)));
+                for (const lesson of lessons) lesson.has_blocks = blockIds.has(String(lesson.id));
+            }
             return reply({ data: { curriculum_weeks: weeks, curriculum_lessons: lessons, lesson_contents: contentResult.data || [] } });
         }
         const settings = getEduSettings();

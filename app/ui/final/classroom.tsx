@@ -76,8 +76,11 @@ export function Classroom({
     .filter((w) => w.course_id === course?.id)
     .sort((a, b) => num(a, "week_number") - num(b, "week_number"));
   const allLessons = enrollmentLessons(data, enrollment);
-  const selectedGate = progression.lessons?.find(item => item.lessonId === (path[2] || allLessons[0]?.id));
-  const lessons = allLessons.filter(item => !selectedGate?.track || progression.lessons?.some(gate => gate.lessonId === item.id && gate.track === selectedGate.track))
+  const selectedId = allLessons.find(item => item.id === path[2])?.id || allLessons[0]?.id;
+  const selectedGate = progression.lessons?.find(item => item.lessonId === selectedId);
+  const lessonDay = (id: string, fallback: number) => progression.lessons?.find(item => item.lessonId === id)?.dayNumber ?? fallback;
+  const hasTracks = progression.lessons?.some(item => item.track !== null);
+  const lessons = allLessons.filter(item => !hasTracks || !selectedGate || progression.lessons?.some(gate => gate.lessonId === item.id && gate.track === selectedGate.track))
       .sort((a, b) => selectedGate?.track ? (progression.lessons?.find(item => item.lessonId === a.id)?.dayNumber || 0) - (progression.lessons?.find(item => item.lessonId === b.id)?.dayNumber || 0) : 0),
     lesson = lessons.find((l) => l.id === path[2]) || lessons[0],
     content = (data.lesson_contents || []).find(
@@ -133,7 +136,7 @@ export function Classroom({
             description={[
               t(course, "title"),
               t(cohort, "name"),
-              "DAY " + num(lesson, "day_number"),
+              "DAY " + lessonDay(String(lesson?.id), num(lesson, "day_number")),
             ]
               .filter(Boolean)
               .join(" · ")}
@@ -255,11 +258,11 @@ export function Classroom({
             className={"learning-nav " + (navOpen ? "open" : "")}
             aria-label="학습 목록"
           >
-            {blockLearningEnabled && <nav aria-label="학습 종류">{(['daily', 'learning'] as const).map(track => {
-              const first = progression.lessons?.filter(item => item.track === track).sort((a, b) => (a.dayNumber || 0) - (b.dayNumber || 0))[0];
-              return first && <Link className="btn small mb16" key={track} aria-current={selectedGate?.track === track ? 'page' : undefined} href={`/learn/${enrollment.id}/${first.lessonId}`}>{track === 'daily' ? '데일리 미션' : '별도 학습'}</Link>;
+            {blockLearningEnabled && hasTracks && <nav aria-label="학습 종류">{(['daily', 'learning', null] as const).map(track => {
+              const first = progression.lessons?.filter(item => item.track === track && allLessons.some(lesson => lesson.id === item.lessonId)).sort((a, b) => (a.dayNumber || 0) - (b.dayNumber || 0))[0];
+              return first && <Link className="btn small mb16" key={track || 'legacy'} aria-current={selectedGate?.track === track ? 'page' : undefined} href={`/learn/${enrollment.id}/${first.lessonId}`}>{track === 'daily' ? '데일리 미션' : track === 'learning' ? '별도 학습' : '기타 학습'}</Link>;
             })}</nav>}
-            {weeks.map((w) => (
+            {weeks.filter(w => lessons.some(l => l.week_id === w.id)).map((w) => (
               <section className="lesson-week" key={w.id}>
                 <div className="lesson-week-title">
                   WEEK {num(w, "week_number")} · {t(w, "title")}
@@ -283,7 +286,7 @@ export function Classroom({
                         <Play />
                       )}
                       <div>
-                        <span className="meta">DAY {num(l, "day_number")}{!canOpen(l.id) ? ' · 잠김' : ''}</span>
+                        <span className="meta">DAY {lessonDay(l.id, num(l, "day_number"))}{!canOpen(l.id) ? ' · 잠김' : ''}</span>
                         <b>{t(l, "title")}</b>
                       </div>
                     </Link>
@@ -296,7 +299,7 @@ export function Classroom({
               <>
                 <header className="lesson-header">
                   <div className="flex gap8">
-                    <Badge>DAY {num(lesson, "day_number")}</Badge>
+                    <Badge>DAY {lessonDay(lesson.id, num(lesson, "day_number"))}</Badge>
                     <Badge color={done ? "green" : ""}>
                       {done ? "학습 완료" : "학습 중"}
                     </Badge>

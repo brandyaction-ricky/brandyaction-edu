@@ -12,3 +12,12 @@ test('compact outline supports contextual creation, preview and protects unsaved
  await week.getByRole('button',{name:'＋ 학습 추가'}).click();await expect(week.getByRole('textbox',{name:'새 일차 제목'})).toBeVisible();
  await expect(page.getByLabel('합성 저장 횟수')).toHaveText('0');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
+
+test('imported block lessons show registered content and open their full editor instead of an empty text field',async({page})=>{
+ await page.route('**/api/platform?**part=curriculum',r=>r.fulfill({json:{data:{curriculum_weeks:[{id:'synthetic-week',course_id:'synthetic-course',week_number:1,title:'가져온 주차',is_published:true}],curriculum_lessons:[{id:'imported',week_id:'synthetic-week',day_number:1,title:'질문과 도구',content_type:'text',has_blocks:true}],lesson_contents:[]}}}));
+ await page.goto('/product-sale-test');await page.getByRole('tab',{name:'커리큘럼',exact:true}).click();
+ const week=page.getByRole('region',{name:'1주차 가져온 주차'});await expect(week).toContainText('내용 등록됨');await expect(week).not.toContainText('내용 없음');await week.getByRole('button',{name:'학습 편집',exact:true}).click();
+ await expect(page.getByRole('link',{name:'학습 구성 편집·미리보기'})).toHaveAttribute('href','/admin/learning-editor?id=imported');await expect(page.getByRole('textbox',{name:'학습 본문'})).toHaveCount(0);
+ await page.getByRole('checkbox',{name:'일차 공개'}).check();await page.getByRole('button',{name:'일차 저장',exact:true}).click();await expect(page.getByLabel('합성 커리큘럼 저장 횟수')).toHaveText('1');
+ const mutation=JSON.parse(await page.getByLabel('합성 커리큘럼 요청').innerText());expect(mutation).toMatchObject({action:'save',section:'learning',id:'imported',values:{is_published:true}});
+});

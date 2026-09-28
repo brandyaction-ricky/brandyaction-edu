@@ -7,7 +7,7 @@ async function studentBackend(page:Page){
   if(route.request().method()==='GET'){
    if(params.get('action')==='progression'){
     if(fail){await route.fulfill({status:503,json:{error:'학습 상태 조회 실패'}});return;}
-    await route.fulfill({json:{lessons:[10,11,12,13].map(n=>({lessonId:id(n),track:n<12?'daily':'learning',dayNumber:n%2+1,isUnlocked:n%2===0||completed.has(id(n-1)),automaticApproval:n<12,reason:n%2===1?'이전 학습을 완료해 주세요.':''}))}});return;
+    await route.fulfill({json:{lessons:[10,11,12,13,14].map(n=>({lessonId:id(n),track:n===14?null:n<12?'daily':'learning',dayNumber:n===14?null:n%2+1,isUnlocked:n%2===0||completed.has(id(n-1)),automaticApproval:n<12,reason:n%2===1?'이전 학습을 완료해 주세요.':''}))}});return;
    }
    const lesson=params.get('lesson')!;reads.push(lesson);const daily=[id(10),id(11)].includes(lesson);
    await route.fulfill({json:{document:{schemaVersion:1,blocks:[{id:'t',type:'text',content:daily?'데일리 미션 본문':'별도 학습 본문'}],checklist:[],completion:{mode:daily?'mentor':'self',requireAnswers:false,requireQuizPass:!daily}},revision:id(99),currentRevision:id(99),draft:drafts.get(lesson)||null,submission:submissions.get(lesson)||null,previousDrafts:[],editable:true}});return;
@@ -30,7 +30,7 @@ test('automatic daily approval opens the next lesson; separate learning has its 
  await page.getByRole('button',{name:'미션 제출하기'}).click();await expect(page.getByText('자동승인되어 학습을 완료했습니다.',{exact:true})).toBeVisible();
  await expect(page.locator('.lesson-header')).toContainText('학습 완료');await page.getByRole('link',{name:'다음 학습',exact:true}).click();await expect(page.locator('.lesson-header')).toContainText('데일리 둘째 날');
  if(info.project.name!=='desktop')await page.getByRole('button',{name:/학습 목차|학습 목록/}).click();
- await page.getByRole('navigation',{name:'학습 종류'}).getByRole('link',{name:'별도 학습',exact:true}).click();await expect(page.getByText('별도 학습 본문',{exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'다음 학습 · 잠김'})).toBeDisabled();
+ await page.getByRole('navigation',{name:'학습 종류'}).getByRole('link',{name:'별도 학습',exact:true}).click();await expect(page.getByText('별도 학습 본문',{exact:true})).toBeVisible();await expect(page.locator('.lesson-header')).toContainText('DAY 1');await expect(page.locator('.lesson-header')).not.toContainText('DAY 11');await expect(page.getByRole('button',{name:'다음 학습 · 잠김'})).toBeDisabled();
  await page.getByRole('button',{name:'학습 완료하기',exact:true}).click();await expect(page.getByRole('link',{name:'다음 학습',exact:true})).toHaveAttribute('href',`/learn/${id(1)}/${id(13)}`);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:info.outputPath('separate-learning.png'),fullPage:true});
 });
@@ -56,4 +56,13 @@ test('settings preserve a conflicting choice until explicit reload and never sav
  await page.goto('/lesson-progression-test?settings');await page.getByRole('combobox',{name:'설정할 기수'}).selectOption(id(3));await expect(page.getByRole('alert')).toContainText('조회 실패');await expect(page.getByRole('button',{name:'자동승인 설정 저장'})).toHaveCount(0);
  readError=false;await page.getByRole('button',{name:'설정 조회 다시 시도'}).click();await page.getByRole('combobox',{name:'데일리 미션 자동승인 범위'}).selectOption('2');await page.getByRole('button',{name:'자동승인 설정 저장'}).click();await expect(page.getByRole('alert')).toContainText('다른 화면');await expect(page.getByRole('combobox',{name:'데일리 미션 자동승인 범위'})).toHaveValue('2');await expect(page.getByRole('button',{name:'자동승인 설정 저장'})).toBeDisabled();
  page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'저장된 설정 다시 불러오기'}).click();await expect(page.getByRole('combobox',{name:'데일리 미션 자동승인 범위'})).toHaveValue('1');expect(writes).toHaveLength(1);
+});
+
+test('legacy orientation stays reachable beside both imported learning tracks',async({page},info)=>{
+ await studentBackend(page);await page.goto('/lesson-progression-test');
+ if(info.project.name!=='desktop')await page.getByRole('button',{name:/학습 목차|학습 목록/}).click();
+ await page.getByRole('navigation',{name:'학습 종류'}).getByRole('link',{name:'기타 학습'}).click();
+ await expect(page.locator('.lesson-header')).toContainText('기존 오리엔테이션');
+ await expect(page.locator('.learning-nav .lesson-nav')).toHaveCount(1);
+ await expect(page.getByRole('link',{name:'다음 학습',exact:true})).toHaveCount(0);
 });
