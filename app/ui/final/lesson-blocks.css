@@ -3,7 +3,7 @@
 .lesson-blocks h2, .lesson-blocks h3 { margin:0 0 12px; }
 .lesson-blocks .reading-copy { white-space:pre-wrap; }
 .lesson-blocks figure { margin:0; }
-.lesson-blocks img, .lesson-blocks audio { max-width:100%; }
+.lesson-blocks img, .lesson-blocks audio, .lesson-blocks video { max-width:100%; }
 .lesson-blocks img { height:auto; border-radius:8px; }
 .lesson-blocks audio { width:100%; margin-top:8px; }
 .lesson-blocks hr { border:0; border-top:1px solid #d8dde3; margin:8px 0; }
@@ -34,3 +34,5 @@
 .lb-review-queue .btn[aria-pressed="true"] { border: 2px solid var(--brand, #c8192b); }
 .lb-review-panel .row { flex-wrap: wrap; }
 .lb-review-panel textarea { width: 100%; }
+
+.lesson-blocks video { display:block; width:100%; height:auto; background:#111; border-radius:8px; }

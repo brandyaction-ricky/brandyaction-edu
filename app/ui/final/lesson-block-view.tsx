@@ -2,6 +2,8 @@
 /* eslint-disable @next/next/no-img-element -- Imported lesson images have author-selected external sources and unknown dimensions; do not proxy them through the Next image optimizer. */
 
 import { AnswerFiles } from './lesson-answer-files';
+import { LessonPrivateMedia } from './lesson-private-media';
+import type { LessonMediaKind } from '@/lib/lesson-media';
 import type { AnswerFileContext } from '@/lib/lesson-files';
 import { useState } from 'react';
 import { defaultBlockCompletion, fillBlockPrompt, type BlockAnswer, type LessonBlockAnswers, type PublicBlockDocument, type PublicLessonBlock } from '@/lib/lesson-blocks';
@@ -82,7 +84,8 @@ export function LessonBlockView({ document, values, onChange, readOnly = false, 
     {document.blocks.map(block => {
       const url = mediaUrl(block.url), value = values.blocks[block.id];
       let content;
-      switch (block.type) {
+      if (block.assetId && ['image', 'audio', 'video'].includes(block.type)) content = <LessonPrivateMedia key={block.assetId} assetId={block.assetId} kind={block.type as LessonMediaKind} alt={block.alt} caption={block.content} context={fileContext} submissionId={submissionId} />;
+      else switch (block.type) {
         case 'heading': content = <h2>{block.content}</h2>; break;
         case 'subheading': content = <h3>{block.content}</h3>; break;
         case 'text': content = <div className="reading-copy"><LessonText text={block.content || ''} /></div>; break;

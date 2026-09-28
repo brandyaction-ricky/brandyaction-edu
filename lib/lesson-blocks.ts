@@ -7,7 +7,7 @@ export type LessonBlockType = typeof lessonBlockTypes[number];
 export type BlockField = { id: string; label: string; variable: string; placeholder: string; required: boolean; sensitive: boolean; options?: string[] };
 export type BlockQuizQuestion = { id: string; prompt: string; options: string[]; correctIndex: number };
 export type LessonBlock = {
-  id: string; type: LessonBlockType; content?: string; url?: string; alt?: string;
+  id: string; type: LessonBlockType; content?: string; url?: string; assetId?: string; alt?: string;
   toolVersion?: string;
   question?: { label: string; kind: 'text' | 'image' | 'file'; required: boolean };
   fields?: BlockField[]; quiz?: { questions: BlockQuizQuestion[]; passPercent: number };
@@ -59,6 +59,7 @@ export function validateLessonBlocks(input: unknown): LessonBlockDocument {
     if (!lessonBlockTypes.includes(type)) invalid('지원하지 않는 수업 항목입니다.');
     const allowed = ['id', 'type', 'content'];
     if (mediaTypes.has(type)) allowed.push('url', 'alt');
+    if (['image', 'audio', 'video'].includes(type)) allowed.push('assetId');
     if (type === 'question') allowed.push('question');
     if (fieldTypes.has(type)) allowed.push('fields');
     if (isGuidedTool(type) || isCalculator(type)) allowed.push('toolVersion');
@@ -68,7 +69,10 @@ export function validateLessonBlocks(input: unknown): LessonBlockDocument {
     if (b.toolVersion !== undefined) block.toolVersion = text(b.toolVersion, 100, true);
     if (b.content !== undefined) block.content = text(b.content, 200000);
     if (mediaTypes.has(type)) {
-      block.url = httpsUrl(b.url);
+      if (b.assetId !== undefined) {
+        if (b.url !== undefined || typeof b.assetId !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(b.assetId)) invalid('파일 연결을 확인해 주세요.');
+        block.assetId = b.assetId;
+      } else block.url = httpsUrl(b.url);
       if (b.alt !== undefined) block.alt = text(b.alt, 1000);
     }
     if (type === 'question') {

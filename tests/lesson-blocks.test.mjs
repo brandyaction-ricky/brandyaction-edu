@@ -86,3 +86,10 @@ for (const [name, values] of [
 ]) test(`does not save ${name}`, () => {
   assert.throws(() => validateBlockAnswers({ blocks: values, checklist: [] }, sample()), error => { assert.doesNotMatch(error.message, /never-store-me/); return true; });
 });
+
+test('private author media uses a UUID instead of URL; links/text cannot smuggle assets and public documents retain only IDs',()=>{
+ const assetId='11111111-1111-4111-8111-111111111111';
+ const doc={schemaVersion:1,blocks:['image','audio','video'].map(type=>({id:type,type,assetId})),checklist:[]};
+ assert.deepEqual(validateLessonBlocks(doc),doc);assert.deepEqual(publicLessonBlocks(doc),doc);
+ for(const block of [{id:'x',type:'link',assetId},{id:'x',type:'text',assetId},{id:'x',type:'image',assetId:'../x'},{id:'x',type:'image',assetId,url:'https://example.test/x'},{id:'x',type:'image',assetId:null}])assert.throws(()=>validateLessonBlocks({...doc,blocks:[block]}));
+});

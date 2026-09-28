@@ -8,11 +8,13 @@ import { isCalculator, newCalculatorBlock } from '@/lib/lesson-calculators';
 import { LessonBodyEditor } from './lesson-body-editor';
 import { LessonText } from './lesson-text';
 import { canRenderLessonBlocks, LessonBlockView } from './lesson-block-view';
+import { LessonMediaUpload } from './lesson-media-upload';
+import type { LessonMediaKind } from '@/lib/lesson-media';
 import './lesson-block-author.css';
 
-export type BlockAuthorState = { active: boolean; dirty: boolean; blocked: boolean };
+export type BlockAuthorState = { active: boolean; dirty: boolean; blocked: boolean; uploading?: boolean };
 export type BlockAuthorHandle = { validate: () => boolean; showPreview: () => void; save: (lessonId: string) => Promise<void> };
-type Props = { lessonId: string; legacyBlocks: LessonBlock[]; disabled: boolean; onState: (state: BlockAuthorState) => void };
+type Props = { lessonId: string; courseId?: string; legacyBlocks: LessonBlock[]; disabled: boolean; onState: (state: BlockAuthorState) => void };
 type Snapshot = { revision: string | null; document: LessonBlockDocument | null; editable: boolean };
 const empty = (): LessonBlockDocument => ({ schemaVersion: 1, blocks: [], checklist: [] });
 const choices: { type: LessonBlockType; label: string }[] = [
@@ -79,20 +81,24 @@ function QuizFields({ block, update }: { block: LessonBlock; update: (patch: Par
   </>;
 }
 
-const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot }>(function LoadedAuthor({ snapshot, legacyBlocks, disabled, onState }, ref) {
+const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot }>(function LoadedAuthor({ snapshot, legacyBlocks, disabled, onState, courseId }, ref) {
   const [document, setDocument] = useState<LessonBlockDocument>(() => snapshot.document || empty());
   const [active, setActive] = useState(Boolean(snapshot.document)), [saved, setSaved] = useState(JSON.stringify(snapshot.document));
   const [type, setType] = useState<LessonBlockType>('text'), [preview, setPreview] = useState(false), [message, setMessage] = useState(''), [invalid, setInvalid] = useState(false), [conflict, setConflict] = useState(false);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [writer] = useState(() => new LessonDocumentWriter(snapshot.revision, snapshot.document, saveDocument));
   const root = useRef<HTMLDivElement>(null);
-  const dirty = active && JSON.stringify(document) !== saved;
-  useEffect(() => { onState({ active, dirty, blocked: !snapshot.editable || conflict }); }, [active, dirty, conflict, snapshot.editable, onState]);
+  const uploads = useRef(new Set<string>()), [uploading, setUploading] = useState(false);
+  function uploadPending(id: string, pending: boolean) { if (pending) uploads.current.add(id); else uploads.current.delete(id); setUploading(uploads.current.size > 0); }
+  function attach(id: string, assetId: string) { setDocument(previous => ({ ...previous, blocks: previous.blocks.map(block => { if (block.id !== id) return block; const next = { ...block, assetId }; delete next.url; return next; }) })); }
+  const dirty = active && (uploading || JSON.stringify(document) !== saved);
+  useEffect(() => { onState({ active, dirty, blocked: !snapshot.editable || conflict || uploading, uploading }); }, [active, dirty, conflict, snapshot.editable, onState, uploading]);
   useEffect(() => {
     function guard(event: BeforeUnloadEvent) { if (dirty) { event.preventDefault(); event.returnValue = ''; } }
     window.addEventListener('beforeunload', guard); return () => window.removeEventListener('beforeunload', guard);
   }, [dirty]);
   function validate() {
+    if (uploads.current.size) { setMessage('파일 업로드가 끝난 뒤 저장해 주세요.'); return false; }
     if (!active) return true;
     setInvalid(true); setPreview(false);
     const input = root.current?.querySelector<HTMLInputElement | HTMLTextAreaElement>('input:invalid,textarea:invalid,select:invalid');
@@ -119,7 +125,7 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
     <div className="lba-actions"><strong>학습 순서 편집</strong><button type="button" className="btn small" onClick={() => setPreview(value => !value)}>{preview ? '편집 화면으로' : '구성 미리보기'}</button><span>항목 {document.blocks.length}개</span></div>
     <p className="meta">아래 ‘학습 저장’을 누르면 기본 정보와 함께 저장됩니다. 이전 학생 답변은 해당 수업 버전과 함께 보관됩니다.</p>
     {preview && <div className="lba-preview" aria-label="구성 미리보기"><LessonBlockView document={publicLessonBlocks(document)} values={{ blocks: {}, checklist: [] }} onChange={() => {}} readOnly /></div>}
-    <fieldset disabled={disabled || conflict} hidden={preview} className="lba-main-fields">
+    <fieldset disabled={disabled || conflict || uploading} hidden={preview} className="lba-main-fields">
       <section className="lba-block"><h3>학습 완료 기준</h3>
         <Field label="학습 개방 방식"><select value={document.progression?.track || ''} onChange={event => setDocument(previous => {
           const track = event.target.value;
@@ -141,7 +147,10 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
           ? <LessonBodyEditor label={`항목 ${index + 1} 본문`} value={block.content || ''} disabled={disabled || conflict} onChange={content => update(index, { content })} />
           : <div><div className="lba-text-preview"><LessonText text={block.content || '본문을 입력해 주세요.'} /></div><button type="button" className="btn small" onClick={() => setEditingTextId(block.id)} aria-label={`항목 ${index + 1} 본문 편집`}>본문 편집</button></div>
           : ['heading', 'subheading', 'prompt'].includes(block.type) ? <Field label="내용 *"><textarea required rows={block.type === 'prompt' ? 5 : 2} maxLength={200000} value={block.content || ''} onChange={event => update(index, { content: event.target.value })} /></Field> : null}
-        {['image', 'audio', 'video', 'link'].includes(block.type) && <><Field label="주소 *"><input required type="url" pattern="https://.*" maxLength={4000} value={block.url || ''} placeholder="https://" onChange={event => update(index, { url: event.target.value })} /></Field><Field label={block.type === 'link' ? '링크에 표시할 문구' : '설명'}><input value={block.content || ''} maxLength={5000} onChange={event => update(index, { content: event.target.value })} /></Field>{block.type === 'image' && <Field label="이미지 대체 설명"><input maxLength={1000} value={block.alt || ''} onChange={event => update(index, { alt: event.target.value })} /></Field>}</>}
+        {['image', 'audio', 'video', 'link'].includes(block.type) && <>
+          {block.type !== 'link' && <LessonMediaUpload courseId={courseId} kind={block.type as LessonMediaKind} assetId={block.assetId} disabled={disabled || conflict} onReady={id => attach(block.id, id)} onPending={pending => uploadPending(block.id, pending)} />}
+          {block.assetId ? <button type="button" className="btn small" onClick={() => { if (window.confirm('파일 연결을 지우고 외부 주소를 입력할까요? 기존 저장본의 파일은 보관됩니다.')) setDocument(previous => ({ ...previous, blocks: previous.blocks.map(item => { if (item.id !== block.id) return item; const next = { ...item, url: '' }; delete next.assetId; return next; }) })); }}>외부 주소로 바꾸기</button>
+            : <Field label="주소 *" hint={block.type !== 'link' ? '파일을 올리거나 HTTPS 주소를 입력해 주세요.' : undefined}><input required type="url" pattern="https://.*" maxLength={4000} value={block.url || ''} placeholder="https://" onChange={event => update(index, { url: event.target.value })} /></Field>}<Field label={block.type === 'link' ? '링크에 표시할 문구' : '설명'}><input value={block.content || ''} maxLength={5000} onChange={event => update(index, { content: event.target.value })} /></Field>{block.type === 'image' && <Field label="이미지 대체 설명"><input maxLength={1000} value={block.alt || ''} onChange={event => update(index, { alt: event.target.value })} /></Field>}</>}
         {block.type === 'question' && <><Field label="질문 문구 *"><textarea required rows={3} maxLength={5000} value={block.question?.label || ''} onChange={event => update(index, { question: { ...block.question!, label: event.target.value } })} /></Field><label className="lb-choice"><input type="checkbox" checked={block.question?.required || false} onChange={event => update(index, { question: { ...block.question!, required: event.target.checked } })} />필수 답변</label><Field label="답변 유형"><select value={block.question?.kind || 'text'} onChange={event => update(index, { question: { ...block.question!, kind: event.target.value as 'text' | 'image' | 'file' } })}><option value="text">텍스트</option><option value="image">이미지 + 압축파일</option><option value="file">압축파일</option></select></Field></>}
         {block.type === 'prompt-generator' && <GeneratorFields block={block} update={patch => update(index, patch)} />}
         {isGuidedTool(block.type) && <div><p>{block.type === 'persona-generator' ? '15개 질문으로 핵심 고객을 정의하고 프롬프트를 만듭니다.' : '10개 질문과 전환 목적별 추가 질문으로 랜딩페이지 기획 프롬프트를 만듭니다.'}</p><details><summary>포함된 질문 보기</summary><ol>{block.fields?.map(field => <li key={field.id}>{field.label}</li>)}</ol></details></div>}

@@ -109,7 +109,7 @@ export function LearningEditor({ data, row, pending, send, back, blockEditingEna
   const missions = (data.curriculum_missions || []).filter(item => item.lesson_id === lessonId);
   const mission = missions.find(item => item.id === selectedMissionId) || missions[0];
   const quiz = (data.mission_quizzes || []).find(item => item.mission_id === mission?.id);
-  const busy = pending || saving || uploadStatus === "uploading";
+  const busy = pending || saving || uploadStatus === "uploading" || Boolean(blockState.uploading);
   const saveBlocked = busy || (blockEditingEnabled && blockState.blocked);
   const legacyBlocks: LessonBlock[] = format === 'text' && bodyText ? [{ id: 'legacy-body', type: 'text', content: bodyText }]
     : format === 'vod' && videoUrl ? [{ id: 'legacy-video', type: 'video', url: videoUrl }]
@@ -189,7 +189,7 @@ export function LearningEditor({ data, row, pending, send, back, blockEditingEna
       </section>
       {blockEditingEnabled && <section ref={blockSectionRef} className="panel mt24" hidden={previewOnly}><div className="panel-head"><h2>학습 구성</h2></div><div className="section-pad">
         {resourcePath && <p className="notice">등록된 자료 파일은 학습 본문 아래에서 계속 다운로드할 수 있습니다.</p>}
-        <LessonBlockAuthor key={row?.id || 'new'} ref={blockRef} lessonId={lessonId} legacyBlocks={legacyBlocks} disabled={busy} onState={setBlockState} />
+        <LessonBlockAuthor key={row?.id || 'new'} ref={blockRef} lessonId={lessonId} courseId={course?.id} legacyBlocks={legacyBlocks} disabled={busy} onState={setBlockState} />
       </div></section>}
       {!blockState.active && !(blockEditingEnabled && blockState.blocked) && <section className={"panel" + (previewOnly ? "" : " mt24")}>
         <div className="panel-head"><h2>학습 본문</h2><span className="meta">{t(course, "title") || "학습 콘텐츠와 미리보기"}</span></div>
@@ -215,7 +215,7 @@ export function LearningEditor({ data, row, pending, send, back, blockEditingEna
           </aside>
         </div>
       </section>}
-      <div className="editor-savebar"><span className="dirty-note">{dirty || blockState.dirty ? "저장하지 않은 변경사항이 있습니다." : "기본 정보와 학습 내용을 함께 저장합니다."}</span><AdminButton variant="outline" type="button" onClick={close} disabled={busy}><ArrowLeft size={16} />목록으로</AdminButton><AdminButton variant="primary" type="submit" disabled={saveBlocked} loading={busy}>{busy ? "저장 중…" : lessonId ? "학습 저장" : "학습 등록"}</AdminButton></div>
+      <div className="editor-savebar"><span className="dirty-note">{dirty || blockState.dirty ? "저장하지 않은 변경사항이 있습니다." : "기본 정보와 학습 내용을 함께 저장합니다."}</span><AdminButton variant="outline" type="button" onClick={close} disabled={busy}><ArrowLeft size={16} />목록으로</AdminButton><AdminButton variant="primary" type="submit" disabled={saveBlocked} loading={busy}>{blockState.uploading ? "파일 업로드 중…" : busy ? "저장 중…" : lessonId ? "학습 저장" : "학습 등록"}</AdminButton></div>
       {message && <p className="notice mt16" role="status">{message}</p>}
     </form>
     <section className="panel mt24 learning-quiz-panel" hidden={previewOnly}>

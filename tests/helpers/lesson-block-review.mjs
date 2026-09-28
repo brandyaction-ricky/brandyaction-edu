@@ -34,6 +34,7 @@ export async function fixture(doc=document){
  await db.exec(base);await db.exec(migration);await db.exec(fs.readFileSync(new URL('20260928161532_lesson_block_mentor_reviews.sql',root),'utf8'));
  await db.exec(fs.readFileSync(new URL('20260928163538_lesson_block_progression_rules.sql',root),'utf8'));
  await db.exec(fs.readFileSync(new URL('20260928170126_lesson_block_private_files.sql',root),'utf8'));
+ await db.exec(fs.readFileSync(new URL('20260928174502_lesson_block_author_media.sql',root),'utf8'));
  await db.query("insert into profiles(id,role,status) values($1,'admin','active'),($2,'member','active'),($3,'member','active')",[admin,student,other]);
  await db.query('insert into courses(id) values($1)',[course]);await db.query('insert into cohorts values($1,$2)',[cohort,course]);await db.query('insert into curriculum_weeks values($1,$2,true,null)',[week,course]);await db.query('insert into curriculum_lessons(id,week_id,is_published,archived_at) values($1,$2,true,null)',[lesson,week]);
  await db.query("insert into enrollments values($1,$2,$3,'active',null,now()-interval '1 day',null,$4)",[enrollment,student,course,cohort]);

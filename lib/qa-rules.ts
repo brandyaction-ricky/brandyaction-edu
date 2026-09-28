@@ -49,7 +49,8 @@ export function imagePreviewUrl(value: string, supabaseUrl: string): string {
   return supabaseUrl ? `${supabaseUrl.replace(/\/$/, '')}/storage/v1/object/public/course-assets/${raw}` : '';
 }
 
-export function databaseMessage(code?: string): string {
+export function databaseMessage(code?: string, message?: string): string {
+  if (message === 'BLOCK_MEDIA_COURSE_MOVE') return '이 학습에는 현재 상품 전용 파일이 있습니다. 다른 상품으로 옮기려면 학습과 파일을 새로 등록해 주세요.';
   if (code === '23505') return '이미 사용 중인 코드·주소·순서입니다. 다른 값을 입력해 주세요.';
   if (code === '23514') return '허용 범위를 벗어난 값입니다. 정원·금액·날짜·상태를 확인해 주세요.';
   if (code === '23503') return '연결된 상품·기수·회원이 없거나 다른 데이터에서 사용 중입니다.';

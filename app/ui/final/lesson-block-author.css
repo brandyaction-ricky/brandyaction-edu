@@ -14,3 +14,6 @@
 .lba-text-preview { white-space:pre-wrap; overflow-wrap:anywhere; margin:12px 0; }
 .lb-author button, .lba-intro button { min-height:44px; }
 @media(max-width:540px) { .lba-block { padding:12px; } .lba-check-edit { flex-wrap:wrap; } }
+
+.lba-media-upload { border:1px dashed #adb5bf; border-radius:8px; padding:12px; margin:12px 0; overflow-wrap:anywhere; }
+.lba-media-upload:focus-visible { outline:3px solid #507fbe; outline-offset:2px; }

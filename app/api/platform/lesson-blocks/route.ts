@@ -34,6 +34,7 @@ function failure(error: unknown) {
     BLOCK_CONTENT_CHANGED: ['수업 내용이 변경되었습니다. 작성한 답변은 보관하고 최신 수업을 다시 열어 주세요.', 409],
     BLOCK_DRAFT_CHANGED: ['다른 화면에서 답변을 저장했습니다. 현재 입력을 보관하고 저장된 답변을 확인해 주세요.', 409],
     BLOCK_REQUEST_REUSED: ['이미 사용한 저장 요청입니다. 내용을 확인한 뒤 다시 저장해 주세요.', 409],
+    BLOCK_MEDIA_INVALID: ['파일 업로드가 끝났는지, 같은 상품의 자료인지 확인해 주세요.', 400],
     BLOCK_INVALID: ['저장할 내용을 확인해 주세요.', 400],
     BLOCK_ALREADY_SUBMITTED: ['이미 제출한 답변입니다. 제출 기록을 다시 확인해 주세요.', 409],
     BLOCK_REVIEW_CHANGED: ['제출 상태가 바뀌었습니다. 최신 답변과 검토 결과를 다시 확인해 주세요.', 409],

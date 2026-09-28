@@ -605,7 +605,7 @@ export async function POST(request: Request) {
             if (description.length > 160 || !Number.isSafeInteger(displayOrder) || displayOrder < 0 || displayOrder > 999) fail('카테고리 설명과 노출 순서를 확인해 주세요.');
             const values = { name, slug, description: description || null, display_order: displayOrder, is_active: body.active !== false };
             const result = id ? await db.from('article_categories').update(values).eq('id', id) : await db.from('article_categories').insert(values);
-            if (result.error) fail(databaseMessage(result.error.code), result.error.code === '23505' ? 409 : 400);
+            if (result.error) fail(databaseMessage(result.error.code, result.error.message), result.error.code === '23505' ? 409 : 400);
             return publicWriteSuccess({ ok: true });
         }
         if (action === 'archive') {
@@ -838,7 +838,7 @@ export async function POST(request: Request) {
                   });
             if (result.error) {
                 if (!['23505', '23514', '23503', '23502', 'P0001'].includes(result.error.code)) console.error('platform save', result.error.code);
-                fail(databaseMessage(result.error.code), 409);
+                fail(databaseMessage(result.error.code, result.error.message), 409);
             }
             if (section.table === 'crm_tags') {
                 if (input.apply_existing === true) {
