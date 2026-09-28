@@ -5,6 +5,7 @@ const cohort = '22222222-2222-4222-8222-222222222222';
 
 test('Moonshot fourth buyer sees install and room guidance without a web survey', async ({ page }) => {
   const actions: string[] = [];
+  await page.route('https://t.me/+ExampleCode123', route => route.fulfill({ body: 'Synthetic Telegram destination' }));
   await page.route('**/api/purchase-onboarding*', route => {
     if (route.request().method() === 'GET') return route.fulfill({ json: { available: true, telegramOnly: true, orderId: order,
       orderNumber: 'QA-4', itemName: '문샷 챌린지 4기', roomName: '4기 교육생 공지방', supportUrl: 'http://pf.kakao.com/_ydxjhxj/chat' } });
@@ -17,11 +18,39 @@ test('Moonshot fourth buyer sees install and room guidance without a web survey'
   await page.getByRole('button', { name: '텔레그램이 처음이에요' }).click();
   await expect(page.getByRole('link', { name: 'iPhone 앱 설치' })).toHaveAttribute('href', 'https://telegram.org/dl/ios');
   await expect(page.getByRole('link', { name: 'Android 앱 설치' })).toHaveAttribute('href', 'https://telegram.org/dl/android');
-  await expect(page.getByText('닉네임/4기')).toBeVisible();
-  await expect(page.getByText(/고정 게시물/)).toBeVisible();
-  await expect(page.getByRole('link', { name: '고객센터 문의' })).toHaveAttribute('href', 'http://pf.kakao.com/_ydxjhxj/chat');
-  await page.getByRole('button', { name: '초대 링크 복사' }).click();
+  await expect(page.getByText('1. 휴대폰에 텔레그램 앱을 설치하세요.')).toBeVisible();
+  await expect(page.getByText('2. 이 안내 화면으로 돌아와 아래 버튼으로 공지방에 입장하세요.')).toBeVisible();
+  await expect(page.getByText(/닉네임\/4기|고정 게시물|휴대폰 번호로 가입/)).toHaveCount(0);
+  await expect(page.getByRole('link', { name: '고객센터 문의' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: '내 클래스 보기' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '초대 링크 복사' })).toHaveCount(0);
+  await page.getByRole('button', { name: '텔레그램 공지방 입장' }).click();
+  await expect(page).toHaveURL('https://t.me/+ExampleCode123');
   expect(actions).toEqual(['link']);
+});
+
+test('existing Telegram users keep only room entry and can retry a failed link request', async ({ page }) => {
+  let fail = true;
+  await page.route('https://t.me/+ExampleCode123', route => route.fulfill({ body: 'Synthetic Telegram destination' }));
+  await page.route('**/api/purchase-onboarding*', route => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: { available: true, telegramOnly: true, orderId: order, itemName: '문샷 챌린지 4기', orderNumber: 'QA-4', supportUrl: 'https://example.com/help' } });
+    expect(route.request().postDataJSON()).toEqual({ action: 'link', order });
+    return route.fulfill({ status: fail ? 503 : 200, json: fail ? { error: '잠시 후 다시 시도해 주세요.' } : { ok: true, url: 'https://t.me/+ExampleCode123' } });
+  });
+  await page.goto(`/purchase-onboarding?order=${order}`);
+  await expect(page.getByRole('button', { name: '텔레그램 공지방 입장' })).toHaveCount(0);
+  await page.getByRole('button', { name: '이미 텔레그램을 사용해요' }).click();
+  await expect(page.getByText('아래 버튼으로 공지방에 입장하세요.')).toBeVisible();
+  await expect(page.locator('.purchase-onboarding a')).toHaveCount(0);
+  await expect(page.getByText(/닉네임\/4기|고정 게시물/)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '초대 링크 복사' })).toHaveCount(0);
+  const enter = page.getByRole('button', { name: '텔레그램 공지방 입장' });
+  await enter.click();
+  await expect(page.getByRole('alert')).toHaveText('잠시 후 다시 시도해 주세요.');
+  await expect(enter).toBeEnabled();
+  fail = false;
+  await enter.click();
+  await expect(page).toHaveURL('https://t.me/+ExampleCode123');
 });
 
 test('customer answers once, then sees the Telegram guide without exposing the invite URL early', async ({ page }) => {
