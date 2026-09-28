@@ -76,3 +76,59 @@ test('paid completion offers onboarding only when the cohort guide is enabled', 
   await page.reload();
   await expect(page.getByRole('link', { name: '결제 후 시작 안내' })).toHaveAttribute('href', `/purchase-onboarding?order=${order}`);
 });
+
+test('Toss order number resolves to the internal order ID before onboarding lookup', async ({ page }) => {
+  const lookups: string[] = [];
+  const confirmations: string[] = [];
+  await page.route('**/api/platform/payment', route => {
+    confirmations.push(route.request().postDataJSON().orderId);
+    return route.fulfill({ json: { status: 'paid' } });
+  });
+  await page.route('**/api/purchase-onboarding*', route => {
+    lookups.push(new URL(route.request().url()).searchParams.get('order') || '');
+    return route.fulfill({ json: { available: true, orderId: order } });
+  });
+  await page.goto('/order-complete-test?orderId=BAE-QA-1&paymentKey=qa-key&amount=1650000&fixtureStatus=pending');
+  await expect(page.getByRole('link', { name: '결제 후 시작 안내' })).toHaveAttribute('href', `/purchase-onboarding?order=${order}`);
+  expect(confirmations).toContain('BAE-QA-1');
+  expect(lookups).toContain(order);
+  expect(lookups).not.toContain('BAE-QA-1');
+});
+
+test('free completion and order-history reentry use the same internal order ID', async ({ page }) => {
+  const lookups: string[] = [];
+  await page.route('**/api/purchase-onboarding*', route => {
+    lookups.push(new URL(route.request().url()).searchParams.get('order') || '');
+    return route.fulfill({ json: { available: true, orderId: order } });
+  });
+  await page.goto(`/order-complete-test?order=${order}&free=1`);
+  await expect(page.getByRole('link', { name: '결제 후 시작 안내' })).toHaveAttribute('href', `/purchase-onboarding?order=${order}`);
+  await page.goto(`/order-complete-test?order=${order}`);
+  await expect(page.getByRole('link', { name: '결제 후 시작 안내' })).toHaveAttribute('href', `/purchase-onboarding?order=${order}`);
+  // StrictMode may replay the effect, so assert the order identity rather than the fetch count.
+  expect(lookups.length).toBeGreaterThanOrEqual(2);
+  expect(lookups.every(value => value === order)).toBe(true);
+});
+
+test('cancelled orders do not request purchase onboarding', async ({ page }) => {
+  const lookups: string[] = [];
+  await page.route('**/api/purchase-onboarding*', route => {
+    lookups.push(route.request().url());
+    return route.fulfill({ status: 404, json: { available: false } });
+  });
+  await page.goto(`/order-complete-test?order=${order}&fixtureStatus=cancelled`);
+  await expect(page.getByRole('link', { name: '결제 후 시작 안내' })).toHaveCount(0);
+  expect(lookups).toHaveLength(0);
+});
+
+test('onboarding lookup failure is visible and can be retried', async ({ page }) => {
+  let retryAllowed = false;
+  await page.route('**/api/purchase-onboarding*', route => {
+    return route.fulfill({ status: retryAllowed ? 200 : 503, json: retryAllowed ? { available: true, orderId: order } : { error: '일시적인 오류' } });
+  });
+  await page.goto(`/order-complete-test?order=${order}`);
+  await expect(page.getByRole('alert')).toContainText('시작 안내를 불러오지 못했습니다');
+  retryAllowed = true;
+  await page.getByRole('button', { name: '시작 안내 다시 확인' }).click();
+  await expect(page.getByRole('link', { name: '결제 후 시작 안내' })).toHaveAttribute('href', `/purchase-onboarding?order=${order}`);
+});
