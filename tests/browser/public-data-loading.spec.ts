@@ -108,3 +108,23 @@ test('article category filter and server page remain aligned', async ({ page }) 
   await expect(page.locator('.article-card')).toHaveCount(1);
   expect(reads.some(url => url.searchParams.get('filter') === category)).toBe(true);
 });
+
+test('customer stories show video thumbnails and aligned reviewer details', async ({ page, isMobile }) => {
+  const stories = [
+    { id: 'story-1', title: '첫 실행 후기', reviewer_name: '김지민', reviewer_role: '미용실 운영', description: '실행한 과정', video_url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', thumbnail_url: '' },
+    { id: 'story-2', title: '한 달 동안 매출과 고객 경험을 함께 개선한 후기', reviewer_name: '박서연', reviewer_role: '디자인업 대표', description: '두 번째 과정', video_url: 'https://youtu.be/9bZkp7q19f0', thumbnail_url: '' },
+  ];
+  await page.route('**/api/platform?**', route => route.fulfill({ json: { user: null, data: { review_videos: stories }, support: {} } }));
+  await page.route('https://i.ytimg.com/**', route => route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="red"/></svg>' }));
+  await page.goto('/public-data-test?publicScreen=stories');
+  await expect(page.locator('.story-video-card')).toHaveCount(2);
+  await expect(page.locator('.story-video-thumb img')).toHaveCount(2);
+  await expect(page.locator('.story-person-details strong')).toHaveText('김지민');
+  await expect(page.locator('.story-person-details span')).toHaveText('미용실 운영');
+  await expect.poll(() => page.locator('.story-video-thumb img').first().evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  await page.getByRole('button', { name: /한 달 동안 매출과 고객 경험/ }).click();
+  await expect(page.locator('.story-person-details strong')).toHaveText('박서연');
+  const cards = await page.locator('.story-video-card').evaluateAll(elements => elements.map(element => element.getBoundingClientRect().top));
+  if (!isMobile) expect(cards[0]).toBe(cards[1]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
+});
