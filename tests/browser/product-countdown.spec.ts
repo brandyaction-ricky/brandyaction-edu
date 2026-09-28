@@ -47,6 +47,34 @@ test('missing sales schedule and closed products stay blocked; missing deadlines
   }
 });
 
+test('closed paid offer removes both outer application links from keyboard and navigation', async ({ page }) => {
+  for (const selector of ['.product-aside .btn', '.bottom-cta .btn']) {
+    await page.goto('/product-countdown-test?closed=1');
+    const cta = page.locator(selector);
+    await expect(cta).toBeAttached();
+    await expect(cta).toBeDisabled();
+    await expect(cta).not.toHaveAttribute('href', /.+/);
+    if (await cta.isVisible()) {
+      await cta.focus();
+      await page.keyboard.press('Enter');
+      await expect(page).toHaveURL(/product-countdown-test\?closed=1$/);
+      for (let index = 0; index < 20; index++) {
+        await page.keyboard.press('Tab');
+        expect(await cta.evaluate(element => document.activeElement !== element)).toBe(true);
+      }
+    }
+  }
+});
+
+test('open and enrolled paid offers retain their outer destinations', async ({ page }) => {
+  for (const [query, destination] of [['off=1', /\/login\?next=%2Fcheckout/], ['off=1&enrolled=1', /\/learn\/enrolled-fixture$/]] as const) {
+    await page.goto(`/product-countdown-test?${query}`);
+    const cta = page.locator('.product-aside .btn');
+    await expect(cta).toBeEnabled();
+    await expect(cta).toHaveAttribute('href', destination);
+  }
+});
+
 test('when one cohort closes, countdown and CTA follow the same remaining offer', async ({ page }) => {
   await page.clock.install({ time: new Date('2099-10-01T14:58:58Z') });
   await page.goto('/product-countdown-test?multiple=1');
@@ -65,19 +93,20 @@ test('cohort selection changes both countdown and embedded checkout; editor can 
   await expect(page.getByRole('timer')).toHaveText('2일 00:00:02');
   await page.frameLocator('iframe').getByRole('link', { name: '클래스 신청' }).click();
   await expect(page).toHaveURL(url => url.pathname === '/login' && url.searchParams.get('next') === '/checkout?cohort=cohort-b');
+  // The countdown scenario starts two seconds before expiry. Keep editor
+  // toggling independent of elapsed CI time; expiry blocking has its own test.
+  await page.clock.setFixedTime(new Date('2099-09-30T00:00:00Z'));
   await page.goto('/product-sale-test?ready=1');
   await page.getByRole('tab', { name: '공개·검색', exact: true }).click();
   const toggle = page.getByRole('checkbox', { name: '모집 마감 카운트다운 표시', exact: true });
   await expect(toggle).not.toBeChecked();
   await toggle.check();
   await expect(page.locator('input[name="recruitment_countdown_enabled"]')).toHaveValue('on');
-  page.once('dialog', dialog => dialog.accept());
   await page.getByRole('button', { name: '저장하기', exact: true }).click();
   await expect(page.getByLabel('합성 저장 횟수')).toHaveText('1');
   await expect(page.getByLabel('저장한 카운트다운 설정')).toHaveText('true');
   await toggle.uncheck();
   await expect(page.locator('input[name="recruitment_countdown_enabled"]')).toHaveValue('off');
-  page.once('dialog', dialog => dialog.accept());
   await page.getByRole('button', { name: '저장하기', exact: true }).click();
   await expect(page.getByLabel('합성 저장 횟수')).toHaveText('2');
   await expect(page.getByLabel('저장한 카운트다운 설정')).toHaveText('false');

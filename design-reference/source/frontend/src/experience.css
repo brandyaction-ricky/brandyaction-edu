@@ -56,3 +56,13 @@
 .checkout-coupon-dialog .field{margin-top:var(--space-4)}
 .checkout-coupon-dialog .form-error{margin-top:var(--space-3)}
 @media(max-width:680px){.checkout-coupon-entry{align-items:stretch;flex-direction:column}.checkout-coupon-entry>.btn{width:100%}.checkout-applied-coupon{align-items:flex-start}.checkout-applied-coupon-actions{align-items:flex-end;flex-direction:column}}
+
+/* Keep the compact banner indicator visible while giving its button a real hit area. */
+.hero-slider-controls>button{width:44px;height:44px;flex:none}
+.hero-slider-dots{gap:0}
+.hero-slider-dots button{display:grid;place-items:center;width:44px;height:44px;flex:none;background:transparent}
+.hero-slider-dots button::after{content:"";display:block;width:22px;height:3px;background:var(--ba-neutral-700)}
+.hero-slider-dots button.active{background:transparent}
+.hero-slider-dots button.active::after{background:#fff}
+.hero-slider-dots button:focus-visible{outline:2px solid #fff;outline-offset:-3px}
+@media(max-width:680px){.hero-slider-controls{flex-wrap:wrap}.hero-slider-dots button{width:44px}.hero-slider-dots button::after{width:16px}}

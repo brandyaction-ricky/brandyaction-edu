@@ -25,6 +25,8 @@ import {
   AdminCheckbox,
   AdminDataTable,
   AdminDatePicker,
+  AdminDialogBody,
+  AdminDialogFooter,
   AdminDrawer,
   AdminEmptyState,
   AdminErrorState,
@@ -2051,8 +2053,7 @@ function OrdersPanel({
         <div className="table-foot"><span>{orders.length}건 표시 · 현재 조회 페이지 내 검색·집계</span><span>정산·회계 매출은 결제액과 별도</span></div>
       </section>
       {selectedOrder && <AdminDrawer title="주문 상세" onClose={() => setOpened("")} size="large" className="order-detail-drawer">
-          <div className="order-detail-shell">
-            <div className="dialog-body">
+            <AdminDialogBody>
               <h3 className="order-detail-number">{t(selectedOrder, "order_number")}</h3>
               <p className="meta mt8">{timeLabel(selectedOrder.created_at)} · {t(selectedOrder, "customer_name") || "이름 미등록"}</p>
               <p className="meta mt8">유입 경로: {entrySourceLabels[t(selectedOrder, 'entry_src')] || '미기록'}</p>
@@ -2094,12 +2095,11 @@ function OrdersPanel({
                 {!selectedEnrollments.length && <p className="order-detail-notice mt16">결제 실패·입금 대기에는 수강 권한을 부여하지 않습니다. 결제 완료와 권한 회수 결과도 각각 확인할 수 있습니다.</p>}
               </section>
               {selectedPayments.map(payment => <RefundAction key={payment.id} payment={payment} requests={rows(data, "edu_refund_requests")} send={send} pending={pending} />)}
-            </div>
-            <footer className="dialog-foot">
+            </AdminDialogBody>
+            <AdminDialogFooter>
               {selectedPayments.map(payment => safeUrl(payment.receipt_url) ? <AdminLinkButton href={safeUrl(payment.receipt_url)} target="_blank" rel="noreferrer" key={payment.id}>영수증</AdminLinkButton> : null)}
               <AdminButton variant="outline" onClick={() => setOpened("")}>닫기</AdminButton>
-            </footer>
-          </div>
+            </AdminDialogFooter>
       </AdminDrawer>}
       {pagination && pagination.total > pagination.pageSize && (
         <><p className="admin-pagination-total">전체 {pagination.total}건</p><AdminPagination page={pagination.page} pages={Math.ceil(pagination.total / pagination.pageSize)} disabled={loading} onChange={nextPage => setPage?.(nextPage)}/></>

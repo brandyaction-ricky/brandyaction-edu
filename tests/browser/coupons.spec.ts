@@ -27,6 +27,13 @@ test('coupon drawer preserves admin defaults, multiple products and KST after sa
   const endDate=await page.getByLabel('발급 종료 · KST').boundingBox();
   expect(endDate!.x+endDate!.width).toBeLessThanOrEqual(bounds!.x+bounds!.width);
   await page.getByRole('heading',{name:'쿠폰 사용 내역',exact:true}).scrollIntoViewIfNeeded();
+  const footer=drawer.locator('.dialog-foot');
+  await footer.scrollIntoViewIfNeeded();
+  const footerBounds=await footer.boundingBox();
+  expect(footerBounds!.x).toBeGreaterThanOrEqual(bounds!.x);
+  expect(footerBounds!.x+footerBounds!.width).toBeLessThanOrEqual(bounds!.x+bounds!.width+1);
+  expect(footerBounds!.y+footerBounds!.height).toBeLessThanOrEqual(testInfo.project.use.viewport!.height+1);
+  await expect(footer.getByRole('button',{name:'닫기'})).toBeVisible();
   await drawer.screenshot({path:testInfo.outputPath('edu-coupon-history.png')});
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
 });

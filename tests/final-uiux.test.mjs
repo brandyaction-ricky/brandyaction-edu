@@ -212,6 +212,37 @@ test('all member screens render real data, with no authentication or payment wri
     assert.doesNotMatch(markup, /href="(?:undefined|null|javascript:)/, section);
   }
 });
+test('dashboard completed lesson count matches visible active-enrollment progress', () => {
+  const { MemberViews } = load('app/ui/final/member-views.tsx');
+  const secondEnrollment = { id: 'enrollment-two', user_id: 'user', course_id: 'course-two', cohort_id: 'cohort-two', status: 'active', access_starts_at: '2020-01-01' };
+  const progressData = {
+    ...data,
+    courses: [...data.courses, { ...course, id: 'course-two', slug: 'second-course', title: '두 번째 테스트 클래스' }],
+    cohorts: [...data.cohorts, { ...cohort, id: 'cohort-two', course_id: 'course-two', name: '두 번째 테스트 기수' }],
+    enrollments: [enrollment, secondEnrollment],
+    curriculum_weeks: [...data.curriculum_weeks, { id: 'week-two', course_id: 'course-two', week_number: 1, title: '두 번째 시작하기' }],
+    curriculum_lessons: [...data.curriculum_lessons, { id: 'lesson-two', week_id: 'week-two', title: '두 번째 학습', day_number: 1, is_published: true }],
+    lesson_progress: [
+      { enrollment_id: 'enrollment', lesson_id: 'lesson', completed_at: '2026-09-20T00:00:00Z' },
+      { enrollment_id: 'enrollment', lesson_id: 'removed-lesson', completed_at: '2026-09-19T00:00:00Z' },
+      { enrollment_id: 'historic-enrollment', lesson_id: 'lesson', completed_at: '2026-09-18T00:00:00Z' },
+      { enrollment_id: 'enrollment-two', lesson_id: 'lesson-two', completed_at: '2026-09-17T00:00:00Z' },
+    ],
+  };
+  const markup = html(MemberViews, {
+    section: 'dashboard',
+    data: progressData,
+    user,
+    pending: false,
+    send,
+    logout: send,
+  });
+  const classesMarkup = html(MemberViews, { section: 'classes', data: progressData, user, pending: false, send, logout: send });
+  assert.equal((classesMarkup.match(/1 \/ 1개 학습 완료/g) || []).length, 2);
+  const completedStat = markup.split('<a class="member-stat"').find((item) => item.includes('<span>학습 완료</span>'));
+  assert.ok(completedStat, '학습 완료 대시보드 통계가 렌더링되어야 합니다.');
+  assert.match(completedStat, /<strong>2<small>개<\/small><\/strong>/);
+});
 test('classroom, mission, checkout and completion preserve authorized workflow entry points', () => {
   const { Classroom } = load('app/ui/final/classroom.tsx');
   assert.match(html(Classroom, { path: ['learn', 'enrollment', 'lesson'], data, pending: false, send, loading: false }), /learning-layout/);
@@ -460,7 +491,8 @@ test('paid products hide mismatched free-class HTML and block checkout until rea
   assert.doesNotMatch(markup, /무료 클래스 안내와 외부 참여 링크는 노출하지 않습니다/);
   assert.doesNotMatch(markup, /학습 기간 · 일정 안내 · 공개 커리큘럼/);
   assert.match(markup, /수강 신청을 준비하고 있습니다/);
-  assert.match(markup, /aria-disabled="true"/);
+  assert.match(markup, /<button type="button" class="btn primary full large disabled" disabled="">다음 모집 준비 중/);
+  assert.doesNotMatch(markup, /<a[^>]+href="\/classes"[^>]*>다음 모집 준비 중/);
 });
 
 test('landing report separates repeated clicks, missing actuals, direct traffic and per-version reach', () => {

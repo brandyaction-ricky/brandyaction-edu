@@ -126,6 +126,35 @@ jobs:
             exit 0
           fi
 
+          if [ "$head_ref" = "codex/commerce-refund-admin-20260928" ]; then
+            changed_files="$(git diff --name-only "origin/${BASE_REF}...HEAD")"
+            if [ -z "$changed_files" ]; then
+              echo "The Commerce refund admin release PR has no changed files."
+              exit 1
+            fi
+
+            while IFS= read -r path; do
+              case "$path" in
+                .github/workflows/ci.yml|app/api/health/route.ts|app/ui/admin-workflows.tsx|docs/ENVIRONMENT_OPERATION_KO.md|lib/refunds.ts|lib/toss-environment.ts|tests/browser/admin-pilot.spec.ts|tests/health.test.mjs|tests/refunds.test.mjs)
+                  ;;
+                *)
+                  echo "File is outside the Commerce refund admin release allowlist: $path"
+                  exit 1
+                  ;;
+              esac
+            done <<< "$changed_files"
+
+            for required in app/api/health/route.ts app/ui/admin-workflows.tsx docs/ENVIRONMENT_OPERATION_KO.md lib/refunds.ts lib/toss-environment.ts tests/browser/admin-pilot.spec.ts tests/health.test.mjs tests/refunds.test.mjs; do
+              if ! grep -Fxq "$required" <<< "$changed_files"; then
+                echo "Required Commerce refund admin release file is missing: $required"
+                exit 1
+              fi
+            done
+
+            echo "Commerce refund admin production release scope verified."
+            exit 0
+          fi
+
           if [ "$head_ref" != "codex/commerce-main-release" ]; then
             echo "Production PRs must promote develop or use an approved scoped release branch."
             exit 1
@@ -139,7 +168,7 @@ jobs:
 
           while IFS= read -r path; do
             case "$path" in
-              .github/workflows/ci.yml|.env.example|AGENTS.md|README.md|app/api/coupons/route.ts|app/api/payments/toss/webhook/route.ts|app/api/platform/route.ts|app/ui/final/checkout.tsx|app/ui/final/frontend.css|design-reference/source/frontend/src/experience.css|features/commerce/api/coupons.ts|features/commerce/api/index.ts|features/commerce/application/coupon-service.ts|features/commerce/domain/coupon.ts|features/commerce/index.ts|features/commerce/infrastructure/coupon-client.ts|features/commerce/infrastructure/coupon-repository.ts|features/commerce/ui/checkout-coupon-registration.tsx|features/commerce/ui/index.ts|package.json|package-lock.json|tests/browser/coupons.spec.ts|tests/coupon-rules.test.mjs|tests/final-uiux.test.mjs|tests/toss-webhook-idempotency.test.mjs|tests/toss-webhook.test.mjs)
+              .github/workflows/ci.yml|.env.example|README.md|app/api/payments/toss/webhook/route.ts|package.json|package-lock.json|tests/toss-webhook-idempotency.test.mjs|tests/toss-webhook.test.mjs)
                 ;;
               *)
                 echo "File is outside the Commerce release allowlist: $path"
@@ -147,18 +176,6 @@ jobs:
                 ;;
             esac
           done <<< "$changed_files"
-
-          if grep -Fxq "app/api/coupons/route.ts" <<< "$changed_files"; then
-            for required in app/api/coupons/route.ts features/commerce/api/coupons.ts features/commerce/application/coupon-service.ts features/commerce/domain/coupon.ts features/commerce/infrastructure/coupon-repository.ts features/commerce/ui/checkout-coupon-registration.tsx tests/browser/coupons.spec.ts tests/coupon-rules.test.mjs; do
-              if ! grep -Fxq "$required" <<< "$changed_files"; then
-                echo "Required Commerce coupon release file is missing: $required"
-                exit 1
-              fi
-            done
-
-            echo "Commerce coupon production release scope verified."
-            exit 0
-          fi
 
           for required in app/api/payments/toss/webhook/route.ts tests/toss-webhook.test.mjs tests/toss-webhook-idempotency.test.mjs; do
             if ! grep -Fxq "$required" <<< "$changed_files"; then
