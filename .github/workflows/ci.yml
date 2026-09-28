@@ -139,7 +139,7 @@ jobs:
 
           while IFS= read -r path; do
             case "$path" in
-              .github/workflows/ci.yml|.env.example|README.md|app/api/payments/toss/webhook/route.ts|package.json|package-lock.json|tests/toss-webhook-idempotency.test.mjs|tests/toss-webhook.test.mjs)
+              .github/workflows/ci.yml|.env.example|AGENTS.md|README.md|app/api/coupons/route.ts|app/api/payments/toss/webhook/route.ts|app/api/platform/route.ts|app/ui/final/checkout.tsx|app/ui/final/frontend.css|design-reference/source/frontend/src/experience.css|features/commerce/api/coupons.ts|features/commerce/api/index.ts|features/commerce/application/coupon-service.ts|features/commerce/domain/coupon.ts|features/commerce/index.ts|features/commerce/infrastructure/coupon-client.ts|features/commerce/infrastructure/coupon-repository.ts|features/commerce/ui/checkout-coupon-registration.tsx|features/commerce/ui/index.ts|package.json|package-lock.json|tests/browser/coupons.spec.ts|tests/coupon-rules.test.mjs|tests/final-uiux.test.mjs|tests/toss-webhook-idempotency.test.mjs|tests/toss-webhook.test.mjs)
                 ;;
               *)
                 echo "File is outside the Commerce release allowlist: $path"
@@ -147,6 +147,18 @@ jobs:
                 ;;
             esac
           done <<< "$changed_files"
+
+          if grep -Fxq "app/api/coupons/route.ts" <<< "$changed_files"; then
+            for required in app/api/coupons/route.ts features/commerce/api/coupons.ts features/commerce/application/coupon-service.ts features/commerce/domain/coupon.ts features/commerce/infrastructure/coupon-repository.ts features/commerce/ui/checkout-coupon-registration.tsx tests/browser/coupons.spec.ts tests/coupon-rules.test.mjs; do
+              if ! grep -Fxq "$required" <<< "$changed_files"; then
+                echo "Required Commerce coupon release file is missing: $required"
+                exit 1
+              fi
+            done
+
+            echo "Commerce coupon production release scope verified."
+            exit 0
+          fi
 
           for required in app/api/payments/toss/webhook/route.ts tests/toss-webhook.test.mjs tests/toss-webhook-idempotency.test.mjs; do
             if ! grep -Fxq "$required" <<< "$changed_files"; then

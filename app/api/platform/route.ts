@@ -85,12 +85,6 @@ export async function GET(request: Request) {
                     }
                 }
             }
-            if (user && view === 'checkout') {
-                const db = await createClient();
-                const coupons = await db.from('customer_coupons').select('id,coupon_id,user_id,status,expires_at,coupon:coupons(name,code,discount_type,discount_value,ends_at)').eq('user_id', user.id).limit(100);
-                if (coupons.error) throw coupons.error;
-                data.customer_coupons = (coupons.data || []) as unknown as Row[];
-            }
             if (user && view === 'articles' && data.article_banner?.length) {
                 const setting = await createAdminClient().from('site_settings').select('value').eq('key', 'edu_article_banner').limit(1);
                 if (setting.error) throw setting.error;
