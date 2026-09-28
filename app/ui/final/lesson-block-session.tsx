@@ -60,7 +60,7 @@ function SessionContent({ snapshot, lessonId, enrollmentId, onSelectRevision }: 
     const url = URL.createObjectURL(new Blob([JSON.stringify({ lessonId, revision: snapshot.revision, values }, null, 2)], { type: 'application/json' }));
     const anchor = document.createElement('a'); anchor.href = url; anchor.download = '내-학습-답변.json'; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
-  return <section aria-label="학습 내용과 내 답변">
+  return <section className="lesson-block-session" aria-label="학습 내용과 내 답변">
     {historical ? <div className="lb-session-notice">이전 수업에서 작성한 답변입니다. 읽기만 할 수 있습니다. <button className="btn small" type="button" onClick={() => select(null)}>현재 수업으로</button></div>
       : <div className="lb-save-status"><span role="status" aria-live="polite">{statusText[status.phase]}</span><button type="button" className="btn small" disabled={status.phase === 'saved' || status.phase === 'saving' || status.phase === 'conflict'} onClick={() => void saver.current?.flush()}>{status.phase === 'error' ? '저장 다시 시도' : '지금 저장'}</button></div>}
     {(status.phase === 'error' || status.phase === 'conflict') && <div className="lb-session-notice" role="alert"><p>{status.message} 현재 입력은 이 화면에 남아 있습니다.</p><button className="btn small" type="button" onClick={downloadAnswers}>현재 답변 내려받기</button>{status.phase === 'conflict' && <button className="btn small" type="button" onClick={() => select(null)}>저장된 답변 다시 확인</button>}</div>}

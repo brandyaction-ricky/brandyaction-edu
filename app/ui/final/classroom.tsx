@@ -16,7 +16,7 @@ import {
   Play,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   LiveSchedule,
   MissionForm,
@@ -26,6 +26,7 @@ import {
 import { enrollmentLessons, missionEntries } from "./member-views";
 import { LessonQuestions } from "./lesson-questions";
 import { LessonText } from "./lesson-text";
+import { LessonBlockSession } from './lesson-block-session';
 import { Badge, Empty, Heading, ResourceRow, Video } from "./primitives";
 
 export function Classroom({
@@ -35,6 +36,7 @@ export function Classroom({
   send,
   loading,
   missionId,
+  blockLearningEnabled = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true',
 }: {
   path: string[];
   data: Data;
@@ -42,6 +44,7 @@ export function Classroom({
   send: WorkflowSend;
   loading: boolean;
   missionId: string | null;
+  blockLearningEnabled?: boolean;
 }) {
   const [navOpen, setNavOpen] = useState(false);
   const enrollment = (data.enrollments || []).find(
@@ -262,6 +265,7 @@ export function Classroom({
                   <p>{t(lesson, "description")}</p>
                   <a className="link" href="#lesson-questions">이 수업에 개인 질문 남기기</a>
                 </header>
+                <LessonContent enabled={blockLearningEnabled} lessonId={lesson.id} enrollmentId={enrollment.id}>
                 {safeUrl(content?.vod_url) && (
                   <Video url={t(content, "vod_url")} />
                 )}
@@ -283,6 +287,7 @@ export function Classroom({
                       "학습 콘텐츠를 준비하고 있습니다."} />
                   </div>
                 </section>
+                </LessonContent>
                 {content?.resource_storage_path && (
                   <section className="reading">
                     <h2>학습 자료</h2>
@@ -390,4 +395,8 @@ export function Classroom({
       </div>
     </div>
   );
+}
+
+function LessonContent({ enabled, lessonId, enrollmentId, children }: { enabled: boolean; lessonId: string; enrollmentId: string; children: ReactNode }) {
+  return enabled ? <LessonBlockSession key={`${enrollmentId}:${lessonId}`} lessonId={lessonId} enrollmentId={enrollmentId} fallback={children} /> : <>{children}</>;
 }
