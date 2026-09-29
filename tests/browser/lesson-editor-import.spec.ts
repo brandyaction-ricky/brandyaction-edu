@@ -1,4 +1,8 @@
+import { detailedAuthor } from './helpers/detailed-author';
 import { expect, test, type Page } from '@playwright/test';
+
+// Existing field-level regressions exercise the retained detailed settings.
+test.beforeEach(async ({ page }) => detailedAuthor(page));
 import type { LessonBlockDocument } from '../../lib/lesson-blocks';
 import { newGuidedBlock } from '../../lib/lesson-guided-tools';
 import { newCalculatorBlock } from '../../lib/lesson-calculators';

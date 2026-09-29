@@ -1,4 +1,8 @@
+import { detailedAuthor } from './helpers/detailed-author';
 import { expect, test, type Page, type Locator } from '@playwright/test';
+
+// Existing field-level regressions exercise the retained detailed settings.
+test.beforeEach(async ({ page }) => detailedAuthor(page));
 import { serializeLessonDocument } from '../../lib/lesson-body';
 import type { LessonBlockDocument } from '../../lib/lesson-blocks';
 

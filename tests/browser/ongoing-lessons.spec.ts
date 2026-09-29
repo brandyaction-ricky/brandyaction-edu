@@ -1,4 +1,8 @@
+import { detailedAuthor } from './helpers/detailed-author';
 import {expect,test,type Page} from '@playwright/test';
+
+// Existing field-level regressions exercise the retained detailed settings.
+test.beforeEach(async ({ page }) => detailedAuthor(page));
 import {publicLessonBlocks,type LessonBlockDocument,type LessonBlockAnswers} from '../../lib/lesson-blocks';
 const revision='44444444-4444-4444-8444-444444444444',period='2026-09-28T15:00:00.000Z',end='2026-09-29T15:00:00.000Z',past='2026-09-27T15:00:00.000Z';
 const document:LessonBlockDocument={schemaVersion:1,blocks:[{id:'q',type:'question',question:{label:'오늘의 실행',kind:'text',required:true}},{id:'generator',type:'prompt-generator',content:'주제: {주제}',fields:[{id:'topic',label:'주제',variable:'주제',required:true,sensitive:false,placeholder:''}]},{id:'quiz',type:'quiz',quiz:{passPercent:100,questions:[{id:'a',prompt:'확인 질문',options:['예','아니오'],correctIndex:0}]}}],checklist:[{id:'c',label:'실행 확인',required:true}],completion:{mode:'self',requireAnswers:true,requireQuizPass:true}};

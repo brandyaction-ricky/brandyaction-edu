@@ -1,0 +1,31 @@
+.ldc-root, .ldc-editor { min-width:0; }
+.edu-admin .ldc-editor { overflow:visible; border:0; box-shadow:none; }
+.edu-admin .ldc-editor:focus-within { box-shadow:none; }
+.edu-admin .panel:has(.ldc-root) { overflow:visible; }
+.ldc-sticky-toolbar { position:sticky; top:64px; z-index:5; background:var(--admin-surface,#fff); }
+.ldc-sticky-toolbar .ldc-insert-menu { max-height:40vh; overflow:auto; }
+.edu-admin .ldc-editor .ldc-document { max-height:none; overflow:visible; min-height:240px; padding:24px 12px; }
+.ldc-text { padding:4px 0; margin:0; border:0; }
+.ldc-text:focus-within { border:0; }
+.ldc-tools, .ldc-insert-menu { display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:8px; border-bottom:1px solid var(--line,#d8dde3); }
+.ldc-insert-menu { background:var(--surface,#f8f9fa); }
+.ldc-activity { margin:24px 0; padding:12px; background:var(--surface,#f8f9fa); border-left:2px solid var(--line,#d8dde3); min-width:0; }
+.ldc-activity-actions { display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-bottom:8px; }
+.ldc-activity .lesson-blocks { gap:0; }
+.ldc-activity .lb-card { background:transparent; border:0; padding:0; }
+.ldc-activity.is-selected { border-left-color:var(--red,#c51e2c); }
+.ldc-drag { cursor:grab; padding:8px; }
+.ldc-settings { border-top:1px solid var(--line,#d8dde3); padding:12px 0; }
+.ldc-settings > summary { padding:12px 0; cursor:pointer; font-weight:600; }
+.ldc-layout { display:grid; grid-template-columns:minmax(0,1fr); gap:20px; align-items:start; }
+.ldc-layout.has-selection { grid-template-columns:minmax(0,1fr) minmax(240px,30%); }
+.ldc-inspector { padding:16px; border:1px solid var(--line,#d8dde3); background:var(--surface,#f8f9fa); min-width:0; }
+.ldc-inspector .lba-block { border:0; padding:0; background:transparent; margin:0; }
+.ldc-inspector .lba-actions h3 { font-size:16px; }
+.ldc-inspector-title { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+.ldc-outline { margin:12px 0; }
+.ldc-outline summary { cursor:pointer; padding:8px 0; }
+.ldc-outline nav { display:flex; flex-wrap:wrap; gap:8px; padding:8px 0; }
+.ldc-outline button { max-width:100%; overflow-wrap:anywhere; }
+@media(max-width:1000px) { .ldc-layout.has-selection { grid-template-columns:minmax(0,1fr); } .ldc-inspector { grid-row:1; } }
+@media(max-width:540px) { .edu-admin .ldc-editor .ldc-document { padding:16px 0; } .ldc-activity { padding:10px; } }
