@@ -32,17 +32,18 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
  try {
   if (request.headers.get('origin') !== new URL(request.url).origin) fail('허용되지 않은 요청입니다.', 403);
-  const user = await actor(); if (!await getOperatorUser('members', user)) fail('질문에 답변할 권한이 없습니다.', 403);
+  const user = await actor();
   const reader = request.body?.getReader(); if (!reader) fail('입력 내용을 확인해 주세요.');
   const decoder = new TextDecoder(); let text = '', size = 0;
   try { for (;;) { const { value, done } = await reader.read(); if (done) break; size += value.byteLength; if (size > 50000) { await reader.cancel(); fail('입력 내용이 너무 큽니다.', 413); } text += decoder.decode(value, { stream: true }); } text += decoder.decode(); } finally { reader.releaseLock(); }
   let body; try { body = JSON.parse(text); } catch { fail('입력 형식을 확인해 주세요.'); }
-  if (!body || !['answer', 'resolve'].includes(body.action)) fail('요청을 확인해 주세요.');
+  if (!body || !['answer', 'resolve', 'followup'].includes(body.action)) fail('요청을 확인해 주세요.');
+  if (body.action !== 'followup' && !await getOperatorUser('members', user)) fail('질문에 답변할 권한이 없습니다.', 403);
   const question = id(body.questionId); let r;
   if (body.action === 'resolve') r = await createAdminClient().rpc('edu_resolve_question', { p_actor: user.id, p_question: question });
   else {
    if (typeof body.content !== 'string' || !body.content.trim() || body.content.length > 10000 || (body.expectedHeadId !== null && !uuid(body.expectedHeadId))) fail('답변 내용과 최신 답변을 확인해 주세요.');
-   r = await createAdminClient().rpc('edu_add_question_answer', { p_actor: user.id, p_question: question, p_expected_head: body.expectedHeadId, p_request: id(body.requestId), p_content: body.content });
+   r = await createAdminClient().rpc(body.action === 'followup' ? 'edu_add_question_followup' : 'edu_add_question_answer', { p_actor: user.id, p_question: question, p_expected_head: body.expectedHeadId, p_request: id(body.requestId), p_content: body.content });
   }
   if (r.error) throw r.error; return reply(r.data);
  } catch (e) { return failure(e); }

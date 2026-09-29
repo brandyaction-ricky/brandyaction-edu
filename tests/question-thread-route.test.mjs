@@ -33,3 +33,10 @@ test('conflicts and missing questions are explicit while unknown database failur
  for(const [message,status] of [['QUESTION_CHANGED',409],['QUESTION_NOT_FOUND',404],['BLOCK_FORBIDDEN',403],['MESSAGE_FORBIDDEN',403]]){const h=harness({error:{message}});assert.equal((await h.get()).status,status);}
  const h=harness({error:{message:'secret SQL private answer'}}),r=await h.post(h.body);assert.equal(r.status,503);assert.doesNotMatch(await r.text(),/secret SQL private answer/);
 });
+test('authenticated learner followups use ownership-checked RPC while operator answers and resolve remain restricted',async()=>{
+ const h=harness({operator:false}),body={...h.body,action:'followup',actor:'forged'};
+ assert.equal((await h.post(body)).status,200);assert.equal(h.calls[0].name,'edu_add_question_followup');assert.equal(h.calls[0].args.p_actor,id);
+ assert.equal((await h.post({...body,action:'resolve'})).status,403);assert.equal((await h.post(h.body)).status,403);assert.equal((await h.post(body,'https://evil.test')).status,403);
+ assert.equal((await h.post({...body,expectedHeadId:undefined})).status,400);assert.equal((await h.post({...body,content:' '})).status,400);assert.equal(h.calls.length,1);
+ assert.equal((await harness({user:null}).post(body)).status,401);assert.equal((await harness({enabled:false}).post(body)).status,404);
+});
