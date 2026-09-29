@@ -24,6 +24,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { loginBeforeCheckout, parseEntrySource, withEntrySource } from '@/lib/entry-source';
+import { youtubeThumbnailUrl } from '@/lib/youtube-thumbnail';
 import type { Data } from "../learning-workflows";
 import { EmailAuth } from "../email-auth";
 import { ProductDetailHtml } from './product-detail-html';
@@ -221,6 +222,9 @@ function StandardProductDetail({
   const detailCtaDeadline = !customCta && !enrolled && available ? t(available, 'recruitment_end_at') : undefined;
   const countdown = meta.recruitment_countdown_enabled === true
     ? <RecruitmentCountdown endAt={countdownCohort?.recruitment_end_at} /> : null;
+  const offerCountdown = !free && !digital && countdownCohort
+    ? <RecruitmentCountdown endAt={countdownCohort.recruitment_end_at} compact />
+    : null;
   const button = customCta ? <ProductCtaLink conversion={conversion} courseId={c.id} position="sidebar_cta" className="btn primary full large" /> : unavailableFree ? <button className="btn primary full large" disabled>참여 링크 준비 중</button> : !enrolled && !available ? <button type="button" className="btn primary full large disabled" disabled>{cta}<ArrowRight /></button> : (
     <Link
       href={href}
@@ -297,11 +301,7 @@ function StandardProductDetail({
               </nav>
               <section className="detail-section" id="class-detail">
                 {countdown}
-                <h2>
-                  {digital
-                    ? "반복 업무를 줄이는 작은 도구."
-                    : "이 클래스에서 만들 변화"}
-                </h2>
+                {digital && <h2>반복 업무를 줄이는 작은 도구.</h2>}
                 {visibleDocumentSource || visibleDetailHtml ? <ProductDetailHtml html={visibleDetailHtml} documentSource={visibleDocumentSource} ctaUrl={detailCtaUrl} ctaDeadline={detailCtaDeadline} /> : detailImage ? (
                   <div className="detail-image-stack">{detailImages.map((image, index) => <img
                     className="detail-image"
@@ -401,9 +401,7 @@ function StandardProductDetail({
                     </select>
                   </label>
                 )}
-                {available && (
-                  <p className="meta mb24">{t(available, "name")}</p>
-                )}
+                {offerCountdown}
                 {!enrolled && readinessIssues.length > 0 && <p className="notice mb24">수강 신청을 준비하고 있습니다. 모집이 시작되면 이 페이지에서 신청할 수 있습니다.</p>}
                 {button}
               </div>
@@ -417,9 +415,7 @@ function StandardProductDetail({
             <div className="cta-price">
               {price === 0 ? conversion.priceLabel : money(price)}
             </div>
-            <p className="meta">
-              {t(available, "name") || t(c, "schedule_label")}
-            </p>
+            {offerCountdown}
           </div>}
           {customCta ? <ProductCtaLink conversion={conversion} courseId={c.id} position="sticky_cta" /> : unavailableFree ? <button className="btn primary large" disabled>참여 링크 준비 중</button> : !enrolled && !available ? <button type="button" className="btn primary large disabled" disabled>{cta}<ArrowRight /></button> : <Link
             href={href}
@@ -673,23 +669,7 @@ export function ArticlesView({
 function storyThumbnailUrl(story: Row) {
   const savedThumbnail = safeUrl(t(story, "thumbnail_url"));
   if (savedThumbnail) return savedThumbnail;
-
-  const videoUrl = safeUrl(t(story, "video_url"));
-  if (!videoUrl) return "";
-  try {
-    const url = new URL(videoUrl);
-    const hostname = url.hostname.toLowerCase();
-    const videoId = hostname === "youtu.be"
-      ? url.pathname.split("/")[1]
-      : ["youtube.com", "www.youtube.com", "m.youtube.com", "www.youtube-nocookie.com"].includes(hostname)
-        ? url.searchParams.get("v") || url.pathname.match(/^\/(?:embed|shorts|live)\/([^/?]+)/)?.[1]
-        : null;
-    return videoId && /^[\w-]{11}$/.test(videoId)
-      ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
-      : "";
-  } catch {
-    return "";
-  }
+  return youtubeThumbnailUrl(safeUrl(t(story, "video_url")));
 }
 
 export function StoriesView({

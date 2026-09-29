@@ -172,10 +172,25 @@ export async function GET(request: Request) {
         await Promise.all([
             (async () => {
                 if (!adminMode) return;
-                if (sectionKey === 'home') {
+                if (sectionKey === 'home' || sectionKey === 'orders') {
                     const summary = await db.rpc('edu_admin_summary');
                     if (summary.error) throw summary.error;
                     const row = summary.data as Row;
+                    if (sectionKey === 'orders') {
+                        const processing = await db.from('edu_refund_requests').select('id', { count: 'exact', head: true }).eq('status', 'processing');
+                        if (processing.error) throw processing.error;
+                        data.order_summary = [{
+                            id: 'order-summary',
+                            approvedRevenue: row.approvedRevenue,
+                            refundedRevenue: row.refundedRevenue,
+                            netRevenue: row.netRevenue,
+                            processingRefunds: processing.count || 0,
+                        }];
+                        if (operator?.role === 'admin' || operator?.permissions.members) {
+                            data.admin_summary = [{ id: 'navigation-summary', pendingReviews: row.pendingReviews }];
+                        }
+                        return;
+                    }
                     if (operator?.role === 'admin' || operator?.permissions.members) {
                         const members = await db.from('profiles').select('id', { count: 'exact', head: true }).neq('status', excludedMemberStatus);
                         if (members.error) throw members.error;
@@ -511,6 +526,51 @@ export async function POST(request: Request) {
         const body = (await request.json()) as Record<string, unknown>;
         const action = String(body.action || '');
         const db = createAdminClient();
+        if (action === 'create-curriculum-week') {
+            const permissions = await permissionsFor(user);
+            if (!permissions.products) return reply({ error: '상품 관리 권한이 필요합니다.' }, 403);
+            const title = String(body.title || '').trim();
+            if (!uid(body.courseId) || !uid(body.requestId) || !title || title.length > 300) fail('상품과 새 주차 제목을 확인해 주세요.');
+            const result = await db.rpc('edu_create_curriculum_week', { p_actor: user.id, p_course: body.courseId, p_request: body.requestId, p_title: title });
+            if (result.error) {
+                if (result.error.message?.includes('CURRICULUM_FORBIDDEN')) fail('상품 관리 권한이 필요합니다.', 403);
+                fail('주차를 등록하지 못했습니다. 목록을 다시 불러온 뒤 재시도해 주세요.', 409);
+            }
+            return publicWriteSuccess({ ok: true, row: result.data });
+        }
+        if (action === 'set-curriculum-archive') {
+            const permissions = await permissionsFor(user);
+            const courseId = String(body.courseId || '');
+            const kind = String(body.kind || '');
+            if (!permissions.products) return reply({ error: '상품 관리 권한이 필요합니다.' }, 403);
+            if (!uid(courseId) || !uid(body.id) || !['week', 'lesson'].includes(kind) || typeof body.archived !== 'boolean') {
+                fail('삭제하거나 복구할 주차·학습을 확인해 주세요.');
+            }
+            const restoringWeek = kind === 'week' && body.archived === false;
+            if (restoringWeek && (!Number.isSafeInteger(body.expectedWeekNumber) || Number(body.expectedWeekNumber) < 0 || (body.moveToWeekNumber != null && (!Number.isSafeInteger(body.moveToWeekNumber) || Number(body.moveToWeekNumber) < 1)))) fail('복구할 주차 번호를 다시 확인해 주세요.');
+            const result = restoringWeek ? await db.rpc('edu_restore_curriculum_week', {
+                p_actor: user.id, p_course: courseId, p_id: body.id,
+                p_expected_week: body.expectedWeekNumber, p_move_to: body.moveToWeekNumber ?? null,
+            }) : await db.rpc('edu_set_curriculum_archive', {
+                p_actor: user.id,
+                p_course: courseId,
+                p_kind: kind,
+                p_id: body.id,
+                p_archived: body.archived,
+            });
+            if (result.error) {
+                const code = String(result.error.message || '');
+                if (code.includes('CURRICULUM_FORBIDDEN')) fail('상품 관리 권한이 필요합니다.', 403);
+                if (code.includes('CURRICULUM_NOT_FOUND')) fail('선택한 상품의 주차·학습이 아니거나 이미 변경되었습니다. 목록을 다시 불러와 주세요.', 409);
+                if (code.includes('CURRICULUM_PARENT_ARCHIVED')) fail('먼저 상위 주차를 복구해 주세요.', 409);
+                if (code.includes('CURRICULUM_CHANGED')) fail('주차 번호가 변경되었습니다. 목록을 새로고침한 뒤 다시 복구해 주세요.', 409);
+                if (code.includes('CURRICULUM_INVALID')) fail('주차·학습 상태를 확인해 주세요.');
+                console.error('curriculum archive', result.error.code || 'unexpected');
+                fail('주차·학습 상태를 변경하지 못했습니다. 목록을 다시 불러온 뒤 재시도해 주세요.', 409);
+            }
+            if (result.data?.needsConfirmation) return reply({ ok: true, result: result.data });
+            return publicWriteSuccess({ ok: true, result: result.data });
+        }
         if (action === 'delete-member') {
             if (user.role !== 'admin') return reply({ error: '관리자만 회원을 삭제할 수 있습니다.' }, 403);
             if (!uid(body.id)) fail('삭제할 회원을 확인해 주세요.');

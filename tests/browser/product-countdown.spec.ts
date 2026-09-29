@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 test('native countdown ticks to expiry and closes the embedded application without running uploaded scripts', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-10-01T14:58:58Z') });
   await page.goto('/product-countdown-test?end=2026-10-01T14:59:00Z');
-  const timer = page.getByRole('timer');
+  const timer = page.locator('#class-detail [role="timer"]');
   await expect(timer).toHaveText('00:00:02');
   const frame = page.frameLocator('iframe');
   await expect(frame.getByRole('link', { name: '클래스 신청' })).toHaveAttribute('aria-disabled', 'false');
@@ -20,7 +20,11 @@ test('native countdown ticks to expiry and closes the embedded application witho
 test('embedded CTA uses the existing checkout, custom URL or learning destination', async ({ page }) => {
   for (const [query, destination] of [['', '/checkout?cohort=cohort-a'], ['&noCurriculum=1', '/checkout?cohort=cohort-a'], ['&zero=1&digital=1', '/apply?cohort=cohort-a'], ['&custom=1', '/safe-custom'], ['&enrolled=1', '/learn/enrolled-fixture']]) {
     await page.goto('/product-countdown-test?off=1' + query);
-    await expect(page.getByRole('timer')).toHaveCount(0);
+    await expect(page.locator('#class-detail [role="timer"]')).toHaveCount(0);
+    if (!query.includes('digital=1') && !query.includes('zero=1')) {
+      await expect(page.locator('.product-aside .product-countdown-compact')).toBeVisible();
+      await expect(page.locator('.product-aside .product-countdown-compact')).toContainText('모집 마감까지');
+    }
     const link = page.frameLocator('iframe').getByRole('button', { name: '신청 버튼', exact: true });
     await expect(link).toHaveAttribute('aria-disabled', 'false');
     await link.click();
@@ -43,7 +47,7 @@ test('missing sales schedule and closed products stay blocked; missing deadlines
     await expect(page).toHaveURL(/product-countdown-test/);
     await frame.getByRole('link', { name: '자주 묻는 질문', exact: true }).click();
     await expect(page).toHaveURL(/product-countdown-test/);
-    if (query === 'missing=1') await expect(page.getByRole('timer')).toHaveText('마감 일정 준비 중');
+    if (query === 'missing=1') await expect(page.locator('#class-detail [role="timer"]')).toHaveText('마감 일정 준비 중');
   }
 });
 
@@ -80,7 +84,8 @@ test('when one cohort closes, countdown and CTA follow the same remaining offer'
   await page.goto('/product-countdown-test?multiple=1');
   await page.getByRole('combobox', { name: '기수 선택' }).selectOption('cohort-a');
   await page.clock.runFor(2500);
-  await expect(page.getByRole('timer')).toHaveText('2일 00:00:00');
+  await expect(page.locator('#class-detail [role="timer"]')).toHaveText('2일 00:00:00');
+  await expect(page.locator('.product-aside .product-countdown-compact')).toContainText('2일 00:00:00');
   await page.frameLocator('iframe').getByRole('link', { name: '클래스 신청' }).click();
   await expect(page).toHaveURL(url => url.pathname === '/login' && url.searchParams.get('next') === '/checkout?cohort=cohort-b');
 });
@@ -88,9 +93,10 @@ test('when one cohort closes, countdown and CTA follow the same remaining offer'
 test('cohort selection changes both countdown and embedded checkout; editor can turn toggle off again', async ({ page }) => {
   await page.clock.install({ time: new Date('2099-10-01T14:58:58Z') });
   await page.goto('/product-countdown-test?multiple=1');
-  await expect(page.getByRole('timer')).toHaveText('00:00:02');
+  await expect(page.locator('#class-detail [role="timer"]')).toHaveText('00:00:02');
   await page.getByRole('combobox', { name: '기수 선택' }).selectOption('cohort-b');
-  await expect(page.getByRole('timer')).toHaveText('2일 00:00:02');
+  await expect(page.locator('#class-detail [role="timer"]')).toHaveText('2일 00:00:02');
+  await expect(page.locator('.product-aside .product-countdown-compact')).toContainText('2일 00:00:02');
   await page.frameLocator('iframe').getByRole('link', { name: '클래스 신청' }).click();
   await expect(page).toHaveURL(url => url.pathname === '/login' && url.searchParams.get('next') === '/checkout?cohort=cohort-b');
   // The countdown scenario starts two seconds before expiry. Keep editor
@@ -110,4 +116,19 @@ test('cohort selection changes both countdown and embedded checkout; editor can 
   await page.getByRole('button', { name: '저장하기', exact: true }).click();
   await expect(page.getByLabel('합성 저장 횟수')).toHaveText('2');
   await expect(page.getByLabel('저장한 카운트다운 설정')).toHaveText('false');
+});
+
+test('compact offer countdown replaces cohort labels in both purchase actions and desktop class art keeps its 16:9 ratio', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-10-01T14:58:58Z') });
+  await page.goto('/product-countdown-test?off=1&withThumbnail=1&end=2026-10-01T14:59:00Z');
+
+  await expect(page.locator('.product-aside .product-countdown-compact')).toContainText('00:00:02');
+  await expect(page.locator('.product-mobile-cta .product-countdown-compact')).toContainText('00:00:02');
+  await expect(page.getByText('합성 1기', { exact: true })).toHaveCount(0);
+
+  const cover = page.locator('.product-main .cover.has-image');
+  await expect(cover).toBeVisible();
+  if (page.viewportSize()!.width >= 901) {
+    await expect(cover).toHaveCSS('aspect-ratio', '16 / 9');
+  }
 });

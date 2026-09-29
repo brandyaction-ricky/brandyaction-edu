@@ -70,8 +70,8 @@ test('operator checks reuse the already verified request user and preserve denie
   assert.equal(auth.calls(), 1);
 });
 
-function apiHarness(user, failure = null, fixtures = {}, staffPermissions = {}) {
-  const calls = { auth: 0, summaries: 0, tables: [], filters: [] };
+function apiHarness(user, failure = null, fixtures = {}, staffPermissions = {}, rpcResult = { data: { archived: true }, error: null }) {
+  const calls = { auth: 0, summaries: 0, tables: [], filters: [], rpcs: [] };
   const db = {
     from(table) {
       calls.tables.push(table);
@@ -84,7 +84,14 @@ function apiHarness(user, failure = null, fixtures = {}, staffPermissions = {}) 
       } });
       return query;
     },
-    async rpc() { calls.summaries++; return { data: { id: 'summary', pendingReviews: 3 }, error: null }; },
+    async rpc(name, args) {
+      calls.rpcs.push([name, args]);
+      if (name === 'edu_admin_summary') {
+        calls.summaries++;
+        return { data: { id: 'summary', pendingReviews: 3, approvedRevenue: 50_058_000, refundedRevenue: 3_304_000, netRevenue: 46_754_000 }, error: null };
+      }
+      return ['edu_set_curriculum_archive', 'edu_restore_curriculum_week', 'edu_create_curriculum_week'].includes(name) ? rpcResult : { data: { id: 'summary', pendingReviews: 3 }, error: null };
+    },
   };
   const auth = { async getAuthenticatedUser() { calls.auth++; if (failure) throw failure; return user; } };
   const operators = load('lib/operator-permissions.ts', { '@/lib/server-auth': auth, '@/lib/operator-scopes': scopes, '@/lib/supabase/admin': { createAdminClient: () => db } });
@@ -102,7 +109,11 @@ function apiHarness(user, failure = null, fixtures = {}, staffPermissions = {}) 
     '@/lib/crm-delivery': { crmDeliveryState: () => ({}) },
     '@/lib/crm-sms-settings': { loadSmsSettings: async () => ({}), registeredSmsNumbers: () => ({ senders: [], optouts: [] }) },
   });
-  return { calls, read: section => route.GET(new Request('https://example.test/api/platform?admin=1&section=' + section)) };
+  return {
+    calls,
+    read: section => route.GET(new Request('https://example.test/api/platform?admin=1&section=' + section)),
+    write: (body, origin = 'https://example.test') => route.POST(new Request('https://example.test/api/platform', { method: 'POST', headers: { 'content-type': 'application/json', origin }, body: JSON.stringify(body) })),
+  };
 }
 
 test('admin API distinguishes sign-in, permission and temporary connection errors before loading data', async () => {
@@ -125,6 +136,18 @@ test('menu reads authenticate once and preserve review badges without full dashb
   assert.equal(api.calls.summaries, 0);
   assert.equal((await response.json()).data.admin_summary[0].pendingReviews, 3);
   assert.deepEqual(api.calls.tables.sort(), ['mission_submissions', 'site_banners']);
+});
+
+test('order revenue summary covers every order page and keeps the navigation badge', async () => {
+  const api = apiHarness(admin, null, { orders: [{ id: 'one', status: 'paid' }] });
+  const first = await (await api.read('orders&page=1')).json();
+  const third = await (await api.read('orders&page=3')).json();
+  const total = { id: 'order-summary', approvedRevenue: 50_058_000, refundedRevenue: 3_304_000, netRevenue: 46_754_000, processingRefunds: 3 };
+  assert.deepEqual(first.data.order_summary[0], total);
+  assert.deepEqual(third.data.order_summary[0], total);
+  assert.equal(third.pagination.page, 3);
+  assert.equal(third.data.admin_summary[0].pendingReviews, 3);
+  assert.equal(api.calls.summaries, 2);
 });
 
 test('product curriculum tab loads on demand behind product permission', async () => {
@@ -194,9 +217,55 @@ test('staff product reads enforce their product permission before querying produ
   assert.ok(allowed.calls.tables.includes('courses'));
 });
 
+test('curriculum archive API requires product permission, validates IDs and calls the reversible archive RPC', async () => {
+  const courseId = '12345678-1234-1234-1234-123456789012';
+  const itemId = '22222222-2222-2222-2222-222222222222';
+  const body = { action: 'set-curriculum-archive', courseId, kind: 'lesson', id: itemId, archived: true };
+  const allowed = apiHarness(admin);
+  const response = await allowed.write(body);
+  assert.equal(response.status, 200);
+  assert.deepEqual(allowed.calls.rpcs, [['edu_set_curriculum_archive', { p_actor: admin.id, p_course: courseId, p_kind: 'lesson', p_id: itemId, p_archived: true }]]);
+
+  const denied = apiHarness({ ...admin, role: 'staff' }, null, {}, { products: false });
+  assert.equal((await denied.write(body)).status, 403);
+  assert.deepEqual(denied.calls.rpcs, []);
+  const invalid = apiHarness(admin);
+  assert.equal((await invalid.write({ ...body, id: 'not-a-uuid' })).status, 400);
+  assert.deepEqual(invalid.calls.rpcs, []);
+  const foreignOrigin = apiHarness(admin);
+  assert.equal((await foreignOrigin.write(body, 'https://attacker.example')).status, 403);
+  assert.deepEqual(foreignOrigin.calls.rpcs, []);
+});
+
+test('curriculum archive API surfaces stale, parent-archived and missing-item conflicts safely', async () => {
+  const body = { action: 'set-curriculum-archive', courseId: '12345678-1234-1234-1234-123456789012', kind: 'lesson', id: '22222222-2222-2222-2222-222222222222', archived: false };
+  for (const [message, expected] of [['CURRICULUM_NOT_FOUND', 409], ['CURRICULUM_PARENT_ARCHIVED', 409], ['CURRICULUM_FORBIDDEN', 403]]) {
+    const api = apiHarness(admin, null, {}, {}, { data: null, error: { message } });
+    assert.equal((await api.write(body)).status, expected);
+  }
+});
+
 test('the operating home still returns the full dashboard aggregate', async () => {
   const api = apiHarness(admin);
   assert.equal((await api.read('home')).status, 200);
   assert.equal(api.calls.summaries, 1);
   assert.equal(api.calls.auth, 1);
+});
+
+test('automatic week creation checks scope and request identity before assigning a number in the DB',async()=>{
+ const body={action:'create-curriculum-week',courseId:admin.id,requestId:'22222222-2222-4222-8222-222222222222',title:' 새로운 주차 '};
+ const api=apiHarness(admin);assert.equal((await api.write(body)).status,200);
+ assert.deepEqual(api.calls.rpcs,[['edu_create_curriculum_week',{p_actor:admin.id,p_course:admin.id,p_request:body.requestId,p_title:'새로운 주차'}]]);
+ const denied=apiHarness({...admin,role:'staff'});assert.equal((await denied.write(body)).status,403);assert.deepEqual(denied.calls.rpcs,[]);
+ const invalid=apiHarness(admin);assert.equal((await invalid.write({...body,requestId:undefined})).status,400);assert.deepEqual(invalid.calls.rpcs,[]);
+});
+
+test('week restore passes the exact confirmed number and returns a non-mutating conflict proposal',async()=>{
+ const body={action:'set-curriculum-archive',courseId:admin.id,kind:'week',id:'22222222-2222-4222-8222-222222222222',archived:false,expectedWeekNumber:1};
+ const proposal={needsConfirmation:true,weekNumber:1,suggestedWeekNumber:2};
+ const api=apiHarness(admin,null,{}, {}, {data:proposal,error:null});
+ const response=await api.write(body);assert.equal(response.status,200);assert.deepEqual((await response.json()).result,proposal);
+ assert.deepEqual(api.calls.rpcs,[['edu_restore_curriculum_week',{p_actor:admin.id,p_course:admin.id,p_id:body.id,p_expected_week:1,p_move_to:null}]]);
+ await api.write({...body,moveToWeekNumber:2});assert.equal(api.calls.rpcs[1][1].p_move_to,2);
+ const invalid=apiHarness(admin);assert.equal((await invalid.write({...body,moveToWeekNumber:-1})).status,400);assert.deepEqual(invalid.calls.rpcs,[]);
 });

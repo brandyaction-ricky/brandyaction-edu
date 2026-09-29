@@ -232,7 +232,7 @@ export function AdminCatalog({
     const reorderedActive = [...activeCourseWeeks];
     [reorderedActive[index], reorderedActive[targetIndex]] = [reorderedActive[targetIndex], reorderedActive[index]];
     let activeIndex = 0;
-    const ids = allCourseWeeks.map((item) => item.archived_at || num(item, "week_number") === 0 ? String(item.id) : String(reorderedActive[activeIndex++].id));
+    const ids = allCourseWeeks.filter(item => !item.archived_at).map((item) => num(item, "week_number") === 0 ? String(item.id) : String(reorderedActive[activeIndex++].id));
     await send({ action: "reorder-weeks", courseId: course, ids }, "주차 순서를 변경했습니다.");
   }
   const missionGroups = scopedWeeks
