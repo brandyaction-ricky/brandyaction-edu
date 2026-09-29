@@ -2,6 +2,7 @@
 import { QuestionImage } from './question-image';
 import { QuestionAnswerHistory } from './question-thread';
 import { MemberMessages } from './member-messages';
+import { EncouragementEditor, EncouragementWall } from './member-encouragement';
 import { EnrollmentLearningOverview } from './enrollment-learning-overview';
 import { learningOverview } from '@/lib/learning-overview';
 import { achievement } from "@/lib/edu-workflows";
@@ -256,6 +257,7 @@ function Dashboard({
           회원 정보
         </Link>
       </Heading>
+      {blockLearningEnabled && <EncouragementWall/>}
       <div className="member-focus-grid">
         {blockLearningEnabled && e ? <section className="member-learning-intro"><h2>{t(c, "title")}</h2><p className="meta">{t(cohort, "name")} · 나의 학습 진행</p><EnrollmentLearningOverview data={data} enrollment={e}/></section> : <>
         <section className="member-continue">
@@ -1109,6 +1111,7 @@ function Profile({
           </p>
         )}
       </form>
+      {process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' && <EncouragementEditor/>}
     </>
   );
 }
