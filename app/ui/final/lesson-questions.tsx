@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { date, text as t, type Row } from '@/lib/platform';
 import { useUnsavedLearningChanges } from './use-unsaved-learning-changes';
 import './lesson-questions.css';
-import { QuestionImage, QuestionImagePicker } from './question-image';
+import { QuestionImage, QuestionImagePicker, type QuestionImagePickerHandle } from './question-image';
 import { QuestionAnswerHistory } from './question-thread';
 
 export function LessonQuestions({ enrollmentId, lessonId, lessonTitle }: { enrollmentId: string; lessonId: string; lessonTitle: string }) {
@@ -15,6 +15,7 @@ export function LessonQuestions({ enrollmentId, lessonId, lessonTitle }: { enrol
   const [image, setImage] = useState<{ id: string | null; busy: boolean; draft: boolean }>({ id: null, busy: false, draft: false });
   const [imageVersion, setImageVersion] = useState(0);
   const requestId = useRef(''), submitting = useRef(false);
+  const imagePicker = useRef<QuestionImagePickerHandle>(null);
   useUnsavedLearningChanges(Boolean(title || content || image.draft));
   useEffect(() => {
     const controller = new AbortController();
@@ -40,11 +41,16 @@ export function LessonQuestions({ enrollmentId, lessonId, lessonTitle }: { enrol
   }
   return <section id="lesson-questions" className="lesson-private-questions" aria-label="이 학습의 개인 질문">
     <div className="lesson-question-heading"><div><h2>이 학습의 개인 질문</h2><p>질문과 답변은 본인과 담당 운영자만 확인합니다.</p></div><button type="button" className="btn" onClick={()=>setOpen(value=>!value)}>{open?'작성 접기':'이 학습에 질문하기'}</button></div>
-    <form onSubmit={submit} className="lesson-question-form" style={open ? undefined : {display:"none"}}>
+    <form onSubmit={submit} className="lesson-question-form" style={open ? undefined : {display:"none"}} onPaste={event => {
+      if (process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED !== 'true') return;
+      const files = Array.from(event.clipboardData.items).filter(item => item.kind === 'file' && item.type.startsWith('image/')).map(item => item.getAsFile()).filter((file): file is File => file !== null);
+      if (!files.length) return;
+      event.preventDefault(); imagePicker.current?.paste(files);
+    }}>
       <p className="meta">질문할 학습: {lessonTitle}</p>
       <label className="field">질문 제목<input required maxLength={200} value={title} onChange={e=>setTitle(e.target.value)} disabled={busy || uncertain}/></label>
       <label className="field">질문 내용<textarea required={!image.id} maxLength={10000} rows={5} value={content} onChange={e=>setContent(e.target.value)} disabled={busy || uncertain} placeholder="궁금한 부분을 적어주세요. 영상의 특정 부분이라면 시간을 함께 적어주시면 좋습니다."/></label>
-      {process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED === 'true' && <QuestionImagePicker key={imageVersion} enrollmentId={enrollmentId} lessonId={lessonId} locked={busy || uncertain} changed={(id, uploading, draft)=>setImage({id,busy:uploading,draft})}/>}
+      {process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED === 'true' && <QuestionImagePicker ref={imagePicker} key={imageVersion} enrollmentId={enrollmentId} lessonId={lessonId} locked={busy || uncertain} changed={(id, uploading, draft)=>setImage({id,busy:uploading,draft})}/>}
       {uncertain && <p className="meta">등록 결과를 확인하지 못했습니다. 같은 내용으로 다시 확인하면 중복 등록되지 않습니다.</p>}
       <button className="btn primary" disabled={busy || image.busy || (image.draft && !image.id) || !title.trim() || (!content.trim() && !image.id)}>{busy?'등록 중…':uncertain?'등록 결과 다시 확인':'질문 등록'}</button>
       {error && <p role="alert" className="form-error">{error}</p>}

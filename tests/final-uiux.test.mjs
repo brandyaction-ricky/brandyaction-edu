@@ -597,3 +597,26 @@ test('rich lesson renderer allows headings and safe marks but rejects scripts, a
   assert.match(markup, /font-size:20px/); assert.match(markup, /<strong>&lt;script&gt;/);
   assert.doesNotMatch(markup, /<script|<img|<a |onclick|onerror|9999px|color:red|url\(evil/);
 });
+
+test('lesson toggles round trip safely with H1, inline summary formatting and nested content', () => {
+  const { LessonText } = load('app/ui/final/lesson-text.tsx');
+  const body = load('lib/lesson-body.ts');
+  const doc = { type: 'doc', content: [
+    { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: '학습 제목' }] },
+    { type: 'details', attrs: { open: true, onclick: 'unsafe()' }, content: [
+      { type: 'detailsSummary', content: [{ type: 'text', text: '자세한 ' }, { type: 'text', text: '안내', marks: [{ type: 'bold' }] }] },
+      { type: 'detailsContent', content: [{ type: 'paragraph', content: [{ type: 'text', text: '<script>안전한 원문</script>' }] }] },
+    ] },
+  ] };
+  const saved = body.serializeLessonDocument(doc), parsed = body.parseLessonDocument(saved);
+  assert.equal(body.serializeLessonDocument(parsed), saved);
+  assert.equal(parsed.content[0].attrs.level, 1);
+  assert.equal(parsed.content[1].attrs, undefined);
+  assert.equal(body.lessonBodyPlainText(saved), '학습 제목\n자세한 안내\n<script>안전한 원문</script>');
+  const markup = html(LessonText, { text: saved });
+  assert.match(markup, /<h1>학습 제목<\/h1>/);
+  assert.match(markup, /<details><summary>자세한 <strong>안내<\/strong><\/summary>/);
+  assert.match(markup, /&lt;script&gt;안전한 원문&lt;\/script&gt;/);
+  assert.doesNotMatch(markup, /onclick| open=|<script>/);
+  assert.equal(body.normalizeLessonDocument({ type: 'doc', content: [{ type: 'details', content: [{ type: 'paragraph' }] }] }), null);
+});

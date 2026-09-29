@@ -5,6 +5,45 @@ const png=readFileSync('public/brandy-action-logo.png');
 async function open(page:import('@playwright/test').Page){
  await page.goto('/classroom-questions-test');await page.getByRole('button',{name:'이 학습에 질문하기',exact:true}).click();await page.getByRole('textbox',{name:'질문 제목',exact:true}).fill('사진으로 질문합니다');
 }
+async function pasteImages(page: import('@playwright/test').Page, files: { name: string; type: string; bytes: number[] }[]) {
+ await page.getByRole('textbox',{name:'질문 내용',exact:true}).evaluate((element, files) => {
+  const clipboardData = new DataTransfer();
+  for (const file of files) clipboardData.items.add(new File([new Uint8Array(file.bytes)],file.name,{type:file.type}));
+  element.dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData}));
+ },files);
+}
+test('pasted question image uses the existing private upload and survives uncertain-submit locking',async({page})=>{
+ let image='',uploads=0;const posts:Record<string,unknown>[]=[];
+ await page.route('**/api/platform/lesson-questions?**',r=>r.fulfill({json:{questions:[]}}));
+ await page.route('**/api/platform/question-images',r=>{const b=r.request().postDataJSON();if(b.action==='prepare'){uploads++;image=b.requestId;return r.fulfill({json:{id:image,signedUrl:'https://storage.test/pasted-image'}});}return r.fulfill({json:{id:image}});});
+ await page.route('https://storage.test/pasted-image',r=>r.fulfill({status:200,headers:{'access-control-allow-origin':'*'},body:''}));
+ await page.route('**/api/platform/lesson-questions',r=>{posts.push(r.request().postDataJSON());return r.fulfill({status:503,json:{error:'등록 결과 확인 실패'}});});
+ await open(page);const body=page.getByRole('textbox',{name:'질문 내용',exact:true});await body.fill('이미지와 함께 보낼 내용');
+ const file={name:'image.png',type:'image/png',bytes:[...png]};
+ await pasteImages(page,[file]);
+ await expect(page.getByText('이미지 준비 완료. 질문을 등록하면 함께 저장됩니다.')).toBeVisible();
+ await expect(body).toHaveValue('이미지와 함께 보낼 내용');
+ await page.getByRole('button',{name:'질문 등록',exact:true}).click();
+ await expect(page.getByRole('alert')).toContainText('등록 결과 확인 실패');
+ expect(posts[0]).toMatchObject({imageId:image,content:'이미지와 함께 보낼 내용'});
+ await pasteImages(page,[file]);
+ await page.getByRole('button',{name:'등록 결과 다시 확인'}).click();
+ expect(posts[1]).toEqual(posts[0]);expect(uploads).toBe(1);
+});
+test('pasting unsupported or multiple images preserves text and does not start upload',async({page})=>{
+ let uploads=0;await page.route('**/api/platform/lesson-questions?**',r=>r.fulfill({json:{questions:[]}}));
+ await page.route('**/api/platform/question-images',r=>{uploads++;return r.fulfill({status:500,json:{error:'unexpected'}});});
+ await open(page);const body=page.getByRole('textbox',{name:'질문 내용',exact:true});await body.fill('원래 질문');
+ await pasteImages(page,[{name:'image.svg',type:'image/svg+xml',bytes:[60,115,118,103,47,62]}]);
+ await expect(page.getByRole('alert')).toContainText('이미지는 JPG');
+ const file={name:'image.png',type:'image/png',bytes:[...png]};await pasteImages(page,[file,file]);
+ await expect(page.getByRole('alert')).toContainText('한 장씩');expect(uploads).toBe(0);
+ await expect(body).toHaveValue('원래 질문');
+ const textNotConsumed=await body.evaluate(element=>{
+  const clipboardData=new DataTransfer();clipboardData.setData('text/plain','일반 텍스트');
+  return element.dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData}));
+ });expect(textNotConsumed).toBe(true);
+});
 test('upload a question image, register without body and retry an uncertain save without duplicates or losing the attachment',async({page},testInfo)=>{
  let image='',saved=false,attempt=0;const posts:Record<string,unknown>[]=[];
  await page.route('**/api/platform/question-images',r=>{const b=r.request().postDataJSON();if(b.action==='prepare'){image=b.requestId;return r.fulfill({json:{id:image,signedUrl:'https://storage.test/question-upload',contentType:'image/png'}});}return r.fulfill({json:{id:image,name:'질문.png',size:png.length}});});

@@ -1,5 +1,68 @@
 import { expect, test } from '@playwright/test';
 
+for (const [shortcut, selector] of [['# ', 'h1'], ['## ', 'h2'], ['### ', 'h3'], ['- ', 'ul li'], ['1. ', 'ol li'], ['" ', 'blockquote']] as const) {
+  test(`line-start shortcut ${JSON.stringify(shortcut)} supports undo, saving and reloading`, async ({ page }) => {
+    await page.goto('/lesson-formatting-test');
+    const editor = page.getByRole('textbox', { name: '학습 내용', exact: true });
+    await editor.fill('');
+    await editor.pressSequentially(shortcut);
+    await expect(editor.locator(selector)).toHaveCount(1);
+    await editor.press('ControlOrMeta+z');
+    await expect(editor.locator(selector)).toHaveCount(0);
+    expect(await editor.textContent()).toBe(shortcut);
+    await editor.fill('');
+    await editor.pressSequentially(shortcut + '작성한 학습 내용');
+    await page.getByRole('button', { name: '학습 저장', exact: true }).click();
+    await expect(page.getByRole('region', { name: '저장된 학습자 화면' }).locator('.reading-copy').locator(selector)).toHaveText('작성한 학습 내용');
+    await page.reload();
+    await expect(editor.locator(selector)).toHaveText('작성한 학습 내용');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  });
+}
+
+test('toggle shortcut preserves nested content and safe links through save/reload and keyboard disclosure', async ({ page }) => {
+  await page.goto('/lesson-formatting-test');
+  const editor = page.getByRole('textbox', { name: '학습 내용', exact: true });
+  await editor.fill('');
+  await editor.pressSequentially('> ');
+  await expect(editor.locator('[data-type=details]')).toHaveCount(1);
+  await page.getByRole('button', { name: '실행 취소', exact: true }).click();
+  expect(await editor.textContent()).toBe('> ');
+  await editor.fill('');
+  await editor.pressSequentially('> 참고 자료');
+  const expand = editor.getByRole('button', { name: '내용 펼치기', exact: true });
+  await expand.focus(); await expand.press('Enter');
+  await expect(editor.getByRole('button', { name: '내용 접기' })).toHaveAttribute('aria-expanded', 'true');
+  await editor.locator('summary').click(); await editor.press('End'); await editor.press('Enter');
+  await editor.pressSequentially('## 자세한 설명');
+  await editor.press('End'); await editor.press('Enter');
+  await editor.pressSequentially('https://example.test/guide');
+  await page.getByRole('button', { name: '학습 저장', exact: true }).click();
+  const learner = page.getByRole('region', { name: '저장된 학습자 화면' });
+  await expect(learner.locator('summary')).toHaveText('참고 자료');
+  await expect(learner.getByRole('heading', { name: '자세한 설명' })).toBeHidden();
+  await learner.locator('summary').focus(); await learner.locator('summary').press('Enter');
+  await expect(learner.getByRole('heading', { name: '자세한 설명', level: 2 })).toBeVisible();
+  await expect(learner.getByRole('link', { name: 'https://example.test/guide' })).toHaveAttribute('href', 'https://example.test/guide');
+  const saved = await page.getByLabel('저장된 본문').textContent();
+  await page.reload();
+  await expect(page.getByLabel('저장된 본문')).toHaveText(saved!);
+  await expect(editor.locator('summary')).toHaveText('참고 자료');
+  await expect(learner.getByRole('heading', { name: '자세한 설명' })).toBeHidden();
+  await editor.getByRole('button', { name: '내용 펼치기' }).click();
+  await expect(editor.getByRole('heading', { name: '자세한 설명', level: 2 })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('typing shortcuts in the middle of a sentence remains literal text', async ({ page }) => {
+  await page.goto('/lesson-formatting-test');
+  const editor = page.getByRole('textbox', { name: '학습 내용', exact: true });
+  await editor.fill('');
+  await editor.pressSequentially('본문 # 제목 > 기호 " 인용 - 목록 1. 번호');
+  await expect(editor.locator('h1,h2,h3,blockquote,ul,ol,[data-type=details]')).toHaveCount(0);
+  await expect(editor).toHaveText('본문 # 제목 > 기호 " 인용 - 목록 1. 번호');
+});
+
 test('opening and saving a legacy lesson preserves text, blank lines, numbering and named links', async ({ page }) => {
   await page.goto('/lesson-formatting-test');
   const editor = page.getByRole('textbox', { name: '학습 내용', exact: true });
