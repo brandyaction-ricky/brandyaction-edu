@@ -97,14 +97,18 @@ function checklistOf(value, path) {
 
 export function normalizeReplitCurriculum(input) {
   record(input, ['export_type', 'source_project', 'exported_at', 'cohorts', 'days', 'learning_lessons', 'ongoing_challenges', 'admin_settings'], 'export');
-  if (input.export_type !== 'curriculum_only') fail('export_type', 'only curriculum-only exports are accepted');
+  if (!['curriculum_only', 'curriculum_bundle'].includes(input.export_type)) fail('export_type', 'only curriculum-only exports are accepted');
   text(input.source_project, 'source_project'); date(input.exported_at, 'exported_at');
   for (const key of ['cohorts', 'days', 'learning_lessons', 'ongoing_challenges', 'admin_settings']) {
     list(input[key], key, 500); uniqueRows(input[key], key);
   }
   for (const c of input.cohorts) {
     record(c, ['id', 'name', 'is_active', 'description', 'created_at'], 'cohorts');
-    text(c.name, 'cohorts.name'); text(c.description, 'cohorts.description'); bool(c.is_active, 'cohorts.is_active'); date(c.created_at, 'cohorts.created_at');
+    text(c.name, 'cohorts.name'); bool(c.is_active, 'cohorts.is_active');
+    // The production folder export omits these two cohort fields. Preserve
+    // their absence explicitly; never fabricate a creation date or description.
+    if (input.export_type !== 'curriculum_bundle' || c.description !== null) text(c.description, 'cohorts.description');
+    if (input.export_type !== 'curriculum_bundle' || c.created_at !== null) date(c.created_at, 'cohorts.created_at');
   }
   const cohortIds = new Set(input.cohorts.map(c => c.id));
   for (const s of input.admin_settings) {

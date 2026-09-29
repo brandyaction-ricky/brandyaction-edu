@@ -12,7 +12,7 @@ function secureUrl(raw) {
   return null;
 }
 
-export async function prepareReplitLessonPlan(source) {
+export async function prepareReplitLessonPlan(source, localMedia = new Map()) {
   const snapshot = normalizeReplitCurriculum(source), inspected = inspectCurriculumSnapshot(snapshot);
   const contract = await lessonImportContract();
   const files = new Map(), assets = new Map(), issues = [];
@@ -27,10 +27,22 @@ export async function prepareReplitLessonPlan(source) {
         const bytes = Buffer.from(match[2], 'base64');
         if (sha(bytes) !== row.sha256 || bytes.length !== row.bytes) throw new Error('Invalid lesson plan: embedded media checksum differs');
         row.path = `assets/${row.sha256}.${mimeExtensions[match[1]]}`; files.set(row.path, bytes);
+      } else if (localMedia.has(raw)) {
+        const local = localMedia.get(raw);
+        const spec = contract.lessonMediaSpec(local.name, local.bytes.length, kind);
+        if (spec.contentType !== local.mimeType || !contract.matchesLessonMedia(local.bytes, spec)) throw new Error('Invalid lesson plan: local media type does not match bytes');
+        row.sha256 = sha(local.bytes); row.bytes = local.bytes.length; row.mimeType = spec.contentType;
+        row.path = `assets/${row.sha256}.${spec.extension}`;
+        row.sourceUrl = raw; // Original reference remains available in the private package.
+        files.set(row.path, local.bytes);
       } else row.sourceUrl = raw; // Private package only. Never put this URL in a report.
       assets.set(assetId, row);
     }
     assets.get(assetId).uses.push({ document, sourceBlock, targetBlock });
+    if (assets.get(assetId).path) {
+      issue('MEDIA_UPLOAD_PENDING', document, sourceBlock);
+      return { pendingAssetId: assetId };
+    }
     const direct = secureUrl(raw);
     if (direct) { issue('EXTERNAL_MEDIA_UNVERIFIED', document, sourceBlock); return { url: direct }; }
     issue(raw.startsWith('data:') ? 'MEDIA_UPLOAD_PENDING' : 'MEDIA_LOCATION_REVIEW', document, sourceBlock);
@@ -103,12 +115,13 @@ export async function prepareReplitLessonPlan(source) {
     return { key, sourceIndex, ...(sourceDoc.track === 'ongoing' ? { ongoing: sourceDoc.metadata.type } : {}), title: sourceDoc.title, week: sourceDoc.week, day: sourceDoc.day, track: sourceDoc.track, metadata: structuredClone(sourceDoc.metadata), mapping, checklistMapping: sourceDoc.checklist.map((c,i) => ({ sourceCheck: c.sourceId, targetCheck: plannedDocument.checklist[i].id })), plannedDocument, document, ready: document !== null && issues.length === start, issues: issues.slice(start) };
   });
   // Never equate a valid plan made from an old file with verified live content.
-  const plan = { formatVersion: 1, sourceCapturedAt: snapshot.capturedAt, sourceDigest: inspected.digest, currentLiveContentVerified: false, configuration: structuredClone(snapshot.configuration), lessons, assets: [...assets.values()], issues, readyForImport: false };
+  const sourceDigest = localMedia.size ? sha(JSON.stringify({ curriculum: inspected.digest, media: [...localMedia].map(([url, value]) => [url, sha(value.bytes), value.mimeType]).sort((a, b) => a[0].localeCompare(b[0])) })) : inspected.digest;
+  const plan = { formatVersion: 1, sourceCapturedAt: snapshot.capturedAt, sourceDigest, currentLiveContentVerified: false, configuration: structuredClone(snapshot.configuration), lessons, assets: [...assets.values()], issues, readyForImport: false };
   return { plan, files };
 }
 
 export function lessonPlanReport(plan) {
   return { sourceCapturedAt: plan.sourceCapturedAt, sourceDigest: plan.sourceDigest, currentLiveContentVerified: false, readyForImport: false,
-    counts: { lessons: plan.lessons.length, sourceBlocks: plan.lessons.reduce((n,l)=>n+l.mapping.filter(m=>!m.sourceBlock.startsWith('metadata.')).length,0), targetBlocks: plan.lessons.reduce((n,l)=>n+l.plannedDocument.blocks.length,0), validDocuments: plan.lessons.filter(l=>l.document).length, readyLessons: plan.lessons.filter(l=>l.ready).length, assets: plan.assets.length, embeddedAssets: plan.assets.filter(a=>a.path).length, externalAssets: plan.assets.filter(a=>!a.path).length },
+    counts: { lessons: plan.lessons.length, sourceBlocks: plan.lessons.reduce((n,l)=>n+l.mapping.filter(m=>!m.sourceBlock.startsWith('metadata.')).length,0), targetBlocks: plan.lessons.reduce((n,l)=>n+l.plannedDocument.blocks.length,0), validDocuments: plan.lessons.filter(l=>l.document).length, readyLessons: plan.lessons.filter(l=>l.ready).length, assets: plan.assets.length, packagedAssets: plan.assets.filter(a=>a.path).length, embeddedAssets: plan.assets.filter(a=>a.path && !a.sourceUrl).length, downloadedAssets: plan.assets.filter(a=>a.path && a.sourceUrl).length, externalAssets: plan.assets.filter(a=>!a.path).length },
     issues: plan.issues };
 }
