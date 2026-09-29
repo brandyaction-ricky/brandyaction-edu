@@ -12,3 +12,13 @@ test('compact outline supports contextual creation, preview and protects unsaved
  await week.getByRole('button',{name:'＋ 학습 추가'}).click();await expect(week.getByRole('textbox',{name:'새 일차 제목'})).toBeVisible();
  await expect(page.getByLabel('합성 저장 횟수')).toHaveText('0');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
+
+test('lesson removal uses a confirmation and the recoverable archive action',async({page})=>{
+ await page.route('**/api/platform?**part=curriculum',r=>r.fulfill({json:{data:{curriculum_weeks:[{id:'synthetic-week',course_id:'synthetic-course',week_number:1,title:'보관 검수 주차'}],curriculum_lessons:[{id:'one',week_id:'synthetic-week',day_number:1,title:'보관 검수 학습',content_type:'text'}],lesson_contents:[{lesson_id:'one',body_text:'기록 보존 대상'}]}}}));
+ await page.goto('/product-sale-test');await page.getByRole('tab',{name:'커리큘럼',exact:true}).click();
+ const week=page.getByRole('region',{name:'1주차 보관 검수 주차'});
+ page.once('dialog',dialog=>{expect(dialog.message()).toContain('학습 진도·미션 제출 기록·자료는 지우지 않고 보관');return dialog.accept();});
+ await week.getByRole('button',{name:'보관 검수 학습 삭제',exact:true}).click();
+ await expect(page.getByLabel('합성 보관 요청')).toContainText('"kind":"lesson"');
+ await expect(page.getByLabel('합성 보관 요청')).toContainText('"archived":true');
+});
