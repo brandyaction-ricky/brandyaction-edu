@@ -32,7 +32,7 @@ test('product curriculum tab loads existing scoped lessons without submitting th
   await expect(panel.getByRole('heading', { name: /1주차 · 기존 합성 주차/ })).toBeVisible();
   await expect(panel.getByText(/Day 1 · 기존 합성 학습/)).toBeVisible();
   await panel.getByRole('button', { name: '학습 편집' }).click();
-  await expect(panel.getByRole('textbox', { name: '학습 본문' })).toHaveValue('기존 학습 본문');
+  await expect(panel.getByRole('textbox', { name: '학습 본문' })).toHaveText('기존 학습 본문');
   await panel.getByRole('textbox', { name: '새 주차 제목' }).fill('새 주차');
   await panel.getByRole('textbox', { name: '새 주차 제목' }).press('Enter');
   await expect(page.getByLabel('합성 저장 횟수')).toHaveText('0');
@@ -217,7 +217,7 @@ test('curriculum contains common materials, preserves permissions and keeps draf
   await panel.getByRole('textbox', { name: '미션 제목' }).fill('저장 전 미션');
   await page.getByRole('tab', { name: '기본·판매' }).click();
   await page.getByRole('tab', { name: '커리큘럼' }).click();
-  await expect(panel.getByRole('textbox', { name: '학습 본문' })).toHaveValue('저장 전 본문');
+  await expect(panel.getByRole('textbox', { name: '학습 본문' })).toHaveText('저장 전 본문');
   await expect(panel.getByRole('textbox', { name: '미션 제목' })).toHaveValue('저장 전 미션');
   await expect(panel.getByRole('textbox', { name: '자료 이름' })).toHaveValue('수정 중인 교재.pdf');
   await panel.getByRole('button', { name: '자료 저장', exact: true }).click();

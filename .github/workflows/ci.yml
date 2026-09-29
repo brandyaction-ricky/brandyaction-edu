@@ -41,6 +41,35 @@ jobs:
             exit 0
           fi
 
+          if [ "$head_ref" = "codex/edu-rich-text-main-release-20260929" ]; then
+            changed_files="$(git diff --name-only "origin/${BASE_REF}...HEAD")"
+            if [ -z "$changed_files" ]; then
+              echo "The EDU rich text release PR has no changed files."
+              exit 1
+            fi
+
+            while IFS= read -r path; do
+              case "$path" in
+                .github/workflows/ci.yml|app/ui/final/admin-catalog.tsx|app/ui/final/admin-editors.tsx|app/ui/final/learning-editor.tsx|app/ui/final/lesson-body-editor.css|app/ui/final/lesson-body-editor.tsx|app/ui/final/lesson-rich-input.tsx|app/ui/final/lesson-text.css|app/ui/final/lesson-text.tsx|app/ui/final/product-curriculum-workspace.tsx|lib/lesson-body.ts|package.json|package-lock.json|tests/browser/curriculum-studio.spec.ts|tests/browser/fixture/app.tsx|tests/browser/fixture/lesson-formatting.tsx|tests/browser/lesson-formatting.spec.ts|tests/browser/product-sale.spec.ts|tests/final-uiux.test.mjs)
+                  ;;
+                *)
+                  echo "File is outside the EDU rich text release allowlist: $path"
+                  exit 1
+                  ;;
+              esac
+            done <<< "$changed_files"
+
+            for required in app/ui/final/lesson-rich-input.tsx lib/lesson-body.ts tests/browser/lesson-formatting.spec.ts; do
+              if ! grep -Fxq "$required" <<< "$changed_files"; then
+                echo "Required EDU rich text release file is missing: $required"
+                exit 1
+              fi
+            done
+
+            echo "EDU rich text production release scope verified."
+            exit 0
+          fi
+
           if [ "$head_ref" = "codex/edu-menu-main-release" ]; then
             changed_files="$(git diff --name-only "origin/${BASE_REF}...HEAD")"
             if [ -z "$changed_files" ]; then
