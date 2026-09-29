@@ -57,3 +57,12 @@ test('only active product authors import; clients cannot invoke the RPC or read 
   for(const role of ['anon','authenticated']){await f.db.exec('reset role;set role '+role);await assert.rejects(f.run(batch),/permission denied/);for(const table of ['edu_curriculum_import_batches','edu_curriculum_import_items'])await assert.rejects(f.db.query('select * from '+table),/permission denied/);}
  }finally{await f.db.close();}
 });
+test('imports reuse an archived week number with a new ID while preserving its old lessons and preventing active collisions',async()=>{
+ const f=await importFixture();try{
+  await f.db.query('update curriculum_weeks set archived_at=now() where id=$1',[f.week]);const batch=batchFor(f.course),oldLesson=(await f.db.query('select * from curriculum_lessons where id=$1',[f.lesson])).rows[0];batch.weeks[0].number=1;
+  const result=await f.run(batch,id(),true);assert.equal(result.weeksCreated,1);assert.deepEqual((await f.db.query('select * from curriculum_lessons where id=$1',[f.lesson])).rows[0],oldLesson);
+  const old=(await f.db.query('select * from curriculum_weeks where id=$1',[f.week])).rows[0];assert.ok(old.archived_at);assert.equal(old.week_number,1);
+  const next=batchFor(f.course);next.weeks[0].number=1;await assert.rejects(f.run(next),/IMPORT_TARGET_CHANGED/);
+  next.weeks[0].id=f.week;next.weeks[0].number=8;next.lessons.forEach(l=>l.weekId=f.week);await assert.rejects(f.run(next),/IMPORT_TARGET_CHANGED/);
+ }finally{await f.db.close();}
+});

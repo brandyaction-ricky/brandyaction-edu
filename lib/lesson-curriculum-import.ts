@@ -42,7 +42,7 @@ export function validateLessonImportBatch(input: unknown): LessonImportBatch {
     const ongoing = l.ongoing as OngoingCadence | undefined;
     if (Object.hasOwn(l, 'ongoing') && !['daily', 'weekly', 'monthly'].includes(String(ongoing))) invalid();
     if (!weekIds.has(weekId) || (ongoing ? Boolean(document.progression) || document.completion?.mode !== 'self' : !document.progression)) invalid();
-    const provenance = record(l.provenance, ['metadata', 'mapping', 'checklistMapping', 'sourceWeek', 'sourceDay']);
+    const provenance = record(l.provenance, ['metadata', 'mapping', 'checklistMapping', 'sourceWeek', 'sourceDay', 'review']);
     if (new TextEncoder().encode(JSON.stringify(provenance)).byteLength > 300000) invalid();
     return { ...(ongoing ? { ongoing } : {}), id: id(l.id), revision: id(l.revision), sourceKey: text(l.sourceKey, 200, true), weekId, order: positive(l.order, 100000), title: text(l.title, 300, true), description: text(l.description, 10000), durationLabel: text(l.durationLabel, 100), provenance, document };
   });

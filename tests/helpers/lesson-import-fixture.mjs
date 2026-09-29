@@ -10,12 +10,13 @@ export function batchFor(courseId,days=2){
 export async function importFixture(){
  const f=await fixture();try{await f.db.exec('reset role');
  await f.db.exec(`alter table curriculum_weeks add column week_number integer not null default 1, add column title text not null default '기존 주차',add column goal text,add column display_order integer default 0;
- alter table curriculum_weeks add unique(course_id,week_number);
+ create unique index fixture_active_week_number on curriculum_weeks(course_id,week_number) where archived_at is null;
  alter table curriculum_lessons add column day_number integer not null default 1,add column description text,add column duration_label text,add column display_order integer default 0,add column content_type text default 'text',add column is_preview boolean default false,add column access_mode text default 'enrolled';
  alter table curriculum_lessons add unique(week_id,day_number);`);
  await f.db.exec(readFileSync(new URL('../../supabase/migrations/20260928181955_lesson_curriculum_import_batches.sql',import.meta.url),'utf8'));
  await f.db.exec(readFileSync(new URL('../../supabase/migrations/20260928184735_ongoing_lesson_periods.sql',import.meta.url),'utf8'));
  await f.db.exec(readFileSync(new URL('../../supabase/migrations/20260928191618_ongoing_curriculum_import_and_review.sql',import.meta.url),'utf8'));
+ await f.db.exec(readFileSync(new URL('../../supabase/migrations/20260929072603_curriculum_import_reuse_archived_week.sql',import.meta.url),'utf8'));
  await f.db.exec('set role service_role');
  return {...f,run:async(batch,request=id(),apply=false,actor=f.admin)=>(await f.db.query('select edu_import_lesson_batch($1,$2,$3,$4) as result',[actor,request,batch,apply])).rows[0].result};
  }catch(error){await f.db.close();throw error;}
