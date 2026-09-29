@@ -198,11 +198,13 @@ export function LessonDocumentCanvas(props: Props) {
     <p className="meta">글을 바로 클릭해 수정하세요. 빈 줄에서 / 또는 ‘현재 위치에 추가’로 질문·자료를 넣습니다.</p>
     {outline.length > 0 && <details className="ldc-outline"><summary>수업 목차 · {outline.length}개</summary><nav aria-label="수업 목차">{outline.map(item => <button type="button" className="btn small" key={`${item.id}-${item.index}`} onClick={() => jump(item.id, item.index)}>{item.label || '제목 입력 전'}</button>)}</nav></details>}
     <div className="lesson-body-editor ldc-editor">
+      <div className="ldc-sticky-toolbar">
       <LessonFormatToolbar editor={editor} disabled={props.disabled} />
       <div className="ldc-tools"><button type="button" className="btn small" disabled={props.disabled || !editor} onClick={() => editor && openMenu(editor)}>+ 현재 위치에 추가</button>
         {selected && <><span>{props.choices.find(choice => choice.type === selected.type)?.label}</span><button type="button" className="btn small" disabled={props.disabled} onClick={() => structural('up')} aria-label="선택 항목 위로">↑</button><button type="button" className="btn small" disabled={props.disabled} onClick={() => structural('down')} aria-label="선택 항목 아래로">↓</button><button type="button" className="btn small" disabled={props.disabled} onClick={() => structural('duplicate')}>항목 복제</button><button type="button" className="btn small" disabled={props.disabled} onClick={() => structural('delete')}>항목 삭제</button></>}
       </div>
       {menu && <div className="ldc-insert-menu" role="group" aria-label="문서에 넣을 항목">{props.choices.map(choice => <button className="btn small" type="button" disabled={props.disabled} key={choice.type} onClick={() => insert(choice.type)}>{choice.label}</button>)}<button className="btn small" type="button" onClick={() => { setMenu(false); editor?.commands.focus(); }}>닫기</button></div>}
+      </div>
       <EditorContent editor={editor} />
       {!props.blocks.length && <button type="button" className="btn" onClick={() => insert('text')} disabled={props.disabled}>글 쓰기 시작</button>}
     </div>

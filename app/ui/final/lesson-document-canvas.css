@@ -1,6 +1,9 @@
 .ldc-root, .ldc-editor { min-width:0; }
 .edu-admin .ldc-editor { overflow:visible; border:0; box-shadow:none; }
 .edu-admin .ldc-editor:focus-within { box-shadow:none; }
+.edu-admin .panel:has(.ldc-root) { overflow:visible; }
+.ldc-sticky-toolbar { position:sticky; top:64px; z-index:5; background:var(--admin-surface,#fff); }
+.ldc-sticky-toolbar .ldc-insert-menu { max-height:40vh; overflow:auto; }
 .edu-admin .ldc-editor .ldc-document { max-height:none; overflow:visible; min-height:240px; padding:24px 12px; }
 .ldc-text { padding:4px 0; margin:0; border:0; }
 .ldc-text:focus-within { border:0; }

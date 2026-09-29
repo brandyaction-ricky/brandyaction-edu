@@ -71,3 +71,11 @@ test('pasting paragraphs and formatting inline preserve activity identity and pr
  await page.screenshot({path:testInfo.outputPath('document-editor.png'),fullPage:true});
  if(testInfo.project.name==='mobile'){await page.setViewportSize({width:320,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
 });
+
+test('format tools remain reachable when editing the bottom of a long lesson',async({page})=>{
+ await backend(page,{...initial,blocks:[initial.blocks[0],...Array.from({length:109},(_,i)=>({id:`paragraph-${i}`,type:'text' as const,content:`연속 문서 ${i+1}번째 문단입니다.`})),initial.blocks[2]]});
+ await page.goto('/lesson-block-author-test');await expect(doc(page)).toBeVisible();
+ await doc(page).locator('[data-author-block="paragraph-90"] p').click();await page.keyboard.press('End');await page.keyboard.type(' 편집');
+ const bar=await page.locator('.ldc-sticky-toolbar').boundingBox();expect(bar).not.toBeNull();expect(bar!.y).toBeGreaterThanOrEqual(0);expect(bar!.y+bar!.height).toBeLessThan((await page.viewportSize())!.height);
+ await page.getByRole('button',{name:'굵게',exact:true}).click();await page.keyboard.type(' 강조');await expect(doc(page).locator('[data-author-block="paragraph-90"] strong')).toContainText('강조');
+});
