@@ -531,7 +531,7 @@ export async function POST(request: Request) {
             if (!permissions.products) return reply({ error: '상품 관리 권한이 필요합니다.' }, 403);
             const title = String(body.title || '').trim();
             if (!uid(body.courseId) || !uid(body.requestId) || !title || title.length > 300) fail('상품과 새 주차 제목을 확인해 주세요.');
-            const result = await db.rpc('edu_create_curriculum_week', { p_actor: user.id, p_course: body.courseId, p_request: body.requestId, p_title: title });
+            const result = await db.rpc('edu_create_curriculum_week', { p_actor: user.id, p_course: body.courseId, p_request: body.requestId, p_title: title, p_goal: null });
             if (result.error) {
                 if (result.error.message?.includes('CURRICULUM_FORBIDDEN')) fail('상품 관리 권한이 필요합니다.', 403);
                 fail('주차를 등록하지 못했습니다. 목록을 다시 불러온 뒤 재시도해 주세요.', 409);
@@ -546,29 +546,25 @@ export async function POST(request: Request) {
             if (!uid(courseId) || !uid(body.id) || !['week', 'lesson'].includes(kind) || typeof body.archived !== 'boolean') {
                 fail('삭제하거나 복구할 주차·학습을 확인해 주세요.');
             }
-            const restoringWeek = kind === 'week' && body.archived === false;
-            if (restoringWeek && (!Number.isSafeInteger(body.expectedWeekNumber) || Number(body.expectedWeekNumber) < 0 || (body.moveToWeekNumber != null && (!Number.isSafeInteger(body.moveToWeekNumber) || Number(body.moveToWeekNumber) < 1)))) fail('복구할 주차 번호를 다시 확인해 주세요.');
-            const result = restoringWeek ? await db.rpc('edu_restore_curriculum_week', {
-                p_actor: user.id, p_course: courseId, p_id: body.id,
-                p_expected_week: body.expectedWeekNumber, p_move_to: body.moveToWeekNumber ?? null,
-            }) : await db.rpc('edu_set_curriculum_archive', {
+            if (body.reassignOnConflict !== undefined && typeof body.reassignOnConflict !== 'boolean') fail('주차 복구 방식을 확인해 주세요.');
+            const result = await db.rpc('edu_set_curriculum_archive', {
                 p_actor: user.id,
                 p_course: courseId,
                 p_kind: kind,
                 p_id: body.id,
                 p_archived: body.archived,
+                p_reassign_on_conflict: body.reassignOnConflict === true,
             });
             if (result.error) {
                 const code = String(result.error.message || '');
                 if (code.includes('CURRICULUM_FORBIDDEN')) fail('상품 관리 권한이 필요합니다.', 403);
                 if (code.includes('CURRICULUM_NOT_FOUND')) fail('선택한 상품의 주차·학습이 아니거나 이미 변경되었습니다. 목록을 다시 불러와 주세요.', 409);
                 if (code.includes('CURRICULUM_PARENT_ARCHIVED')) fail('먼저 상위 주차를 복구해 주세요.', 409);
-                if (code.includes('CURRICULUM_CHANGED')) fail('주차 번호가 변경되었습니다. 목록을 새로고침한 뒤 다시 복구해 주세요.', 409);
+                if (code.includes('CURRICULUM_WEEK_NUMBER_IN_USE')) fail('복구하려는 주차 번호가 이미 사용 중입니다. 다른 빈 번호로 옮겨 복구할지 확인해 주세요.', 409);
                 if (code.includes('CURRICULUM_INVALID')) fail('주차·학습 상태를 확인해 주세요.');
                 console.error('curriculum archive', result.error.code || 'unexpected');
                 fail('주차·학습 상태를 변경하지 못했습니다. 목록을 다시 불러온 뒤 재시도해 주세요.', 409);
             }
-            if (result.data?.needsConfirmation) return reply({ ok: true, result: result.data });
             return publicWriteSuccess({ ok: true, result: result.data });
         }
         if (action === 'delete-member') {
@@ -777,7 +773,15 @@ export async function POST(request: Request) {
                 }
             }
             if (!body.id) {
-                for (const field of section.fields.filter((f) => f.required)) if (!(field.key in values)) fail(`${field.label}을 입력해 주세요.`);
+                for (const field of section.fields.filter((f) => f.required)) {
+                    if (section.table === 'curriculum_weeks' && field.key === 'week_number') continue;
+                    if (!(field.key in values)) fail(`${field.label}을 입력해 주세요.`);
+                }
+            }
+            if (section.table === 'curriculum_weeks' && !body.id) {
+                if (!uid(body.requestId)) fail('새 주차 등록을 다시 열고 저장해 주세요.');
+                if (!uid(values.course_id)) fail('상품을 먼저 선택해 주세요.');
+                if (typeof values.title !== 'string' || !values.title.trim()) fail('주차 제목을 입력해 주세요.');
             }
             if (section.table === 'curriculum_missions') {
                 const current = body.id ? await db.from('curriculum_missions').select('id,lesson_id').eq('id', body.id).single() : null;
@@ -900,6 +904,14 @@ export async function POST(request: Request) {
             if (!body.id && !uid(body.requestId)) fail('새 등록 요청을 다시 열고 저장해 주세요.');
             const result = body.id
                 ? await db.from(section.table).update(values).eq(key, body.id).select().single()
+                : section.table === 'curriculum_weeks'
+                  ? await db.rpc('edu_create_curriculum_week', {
+                        p_actor: user.id,
+                        p_request: body.requestId,
+                        p_course: values.course_id,
+                        p_title: values.title,
+                        p_goal: values.goal ?? null,
+                    })
                 : await db.rpc('edu_create_record', {
                       p_actor: user.id,
                       p_request: body.requestId,
@@ -907,6 +919,10 @@ export async function POST(request: Request) {
                       p_values: values,
                   });
             if (result.error) {
+                const code = String(result.error.message || '');
+                if (section.table === 'curriculum_weeks' && code.includes('CURRICULUM_FORBIDDEN')) fail('상품 관리 권한이 필요합니다.', 403);
+                if (section.table === 'curriculum_weeks' && code.includes('WEEK_COURSE_NOT_FOUND')) fail('선택한 상품을 찾지 못했습니다. 다시 불러와 주세요.', 409);
+                if (section.table === 'curriculum_weeks' && code.includes('WEEK_INVALID')) fail('주차 제목과 학습 목표를 확인해 주세요.');
                 if (!['23505', '23514', '23503', '23502', 'P0001'].includes(result.error.code)) console.error('platform save', result.error.code);
                 fail(databaseMessage(result.error.code, result.error.message), 409);
             }

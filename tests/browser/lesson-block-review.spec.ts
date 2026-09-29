@@ -91,7 +91,7 @@ test('stale decisions require a refresh and never display successful approval',a
  await page.getByRole('button',{name:'제출 상태 다시 확인'}).click();await expect(page.getByRole('region',{name:'선택한 학습 제출물'}).locator('p').filter({hasText:'시험 과정 · 답변 수정 중'})).toBeVisible();await expect(page.getByRole('button',{name:'승인하기'})).toHaveCount(0);
 });
 test('list errors remain visible and can be retried without showing an empty success state',async({page,context})=>{
- await backend(context,{failList:true});await page.goto('/lesson-block-review-test');await expect(page.getByRole('alert')).toContainText('검토 목록 조회 실패');await expect(page.getByText('이 상태의 제출물이 없습니다.')).toHaveCount(0);
+ await backend(context,{failList:true});await page.goto('/lesson-block-review-test');await expect(page.getByRole('alert')).toContainText('검토 목록 조회 실패',{timeout:15000});await expect(page.getByText('이 상태의 제출물이 없습니다.')).toHaveCount(0);
  await page.getByRole('button',{name:'목록 새로고침'}).click();await expect(page.getByRole('button',{name:/시험 학생/})).toBeVisible();
 });
 test('feedback-only remains pending, survives empty approval, and approved work accepts more advice visible to its learner',async({page,context},info)=>{

@@ -32,25 +32,44 @@ test('lesson removal uses a confirmation and the recoverable archive action',asy
  await expect(page.getByLabel('합성 보관 요청')).toContainText('"archived":true');
 });
 
-test('new curriculum requests server-assigned week numbers instead of counting deleted weeks',async({page})=>{
- await page.route('**/api/platform?**part=curriculum',r=>r.fulfill({json:{data:{curriculum_weeks:[{id:'deleted',course_id:'synthetic-course',week_number:1,title:'삭제한 원본',archived_at:'2026-09-29'}],curriculum_lessons:[]}}}));
- await page.goto('/product-sale-test');await page.getByRole('tab',{name:'커리큘럼',exact:true}).click();
- await page.getByRole('textbox',{name:'새 주차 제목',exact:true}).fill('새 내용');await page.getByRole('button',{name:'주차 추가',exact:true}).click();
+test('new week reuses the lowest active number when only deleted week one remains',async({page})=>{
+ await page.route('**/api/platform?**part=curriculum',r=>r.fulfill({json:{data:{curriculum_weeks:[{id:'synthetic-archived-week',course_id:'synthetic-course',week_number:1,title:'삭제된 첫 주차',archived_at:'2026-09-28T00:00:00Z'}],curriculum_lessons:[],lesson_contents:[]}}}));
+ await page.goto('/product-sale-test?archivedFirst=1');await page.getByRole('tab',{name:'커리큘럼',exact:true}).click();
+ await expect(page.getByText('먼저 주차를 추가해 주세요.')).toBeVisible();
+ await page.getByRole('textbox',{name:'새 주차 제목'}).fill('새 첫 주차');
+ await page.getByRole('button',{name:'주차 추가'}).click();
  await expect(page.getByLabel('합성 커리큘럼 저장 횟수')).toHaveText('1');
  const body=JSON.parse(await page.getByLabel('합성 커리큘럼 요청').innerText());
- expect(body).toMatchObject({action:'create-curriculum-week',title:'새 내용',courseId:'synthetic-course'});
+ expect(body).toMatchObject({action:'create-curriculum-week',title:'새 첫 주차',courseId:'synthetic-course'});
  expect(body.requestId).toMatch(/^[0-9a-f-]{36}$/);expect(body.week_number).toBeUndefined();
 });
 
-for(const race of [false,true]) test(`week restore asks before moving an occupied number and handles concurrent changes: ${race}`,async({page})=>{
- await page.route('**/api/platform?**part=curriculum',r=>r.fulfill({json:{data:{curriculum_weeks:[{id:'deleted',course_id:'synthetic-course',week_number:1,title:'기존 학습',archived_at:'2026-09-29'},{id:'new',course_id:'synthetic-course',week_number:1,title:'새 학습'}],curriculum_lessons:[]}}}));
- await page.goto('/product-sale-test?restoreConflict'+(race?'&restoreRace':''));await page.getByRole('tab',{name:'커리큘럼',exact:true}).click();
- await page.getByText('삭제한 주차·학습 보기 (1)',{exact:true}).click();
- page.once('dialog',d=>{expect(d.message()).toContain('2주차로 옮겨 복구');expect(d.message()).toContain('기존 학습 기록과 연결은 그대로');return d.dismiss();});
- await page.getByRole('button',{name:'주차 복구',exact:true}).click();
- await expect(page.getByLabel('합성 보관 시도')).toHaveText('1');expect(JSON.parse(await page.getByLabel('합성 보관 요청').innerText()).moveToWeekNumber).toBeUndefined();
- page.once('dialog',d=>d.accept());await page.getByRole('button',{name:'주차 복구',exact:true}).click();
- await expect(page.getByLabel('합성 보관 시도')).toHaveText('3');
- expect(JSON.parse(await page.getByLabel('합성 보관 요청').innerText())).toMatchObject({expectedWeekNumber:1,moveToWeekNumber:2,archived:false});
- if(race)await expect(page.getByRole('alert')).toContainText('확인하는 동안 주차 번호가 변경');
+test('restoring a reused week number asks before moving the archived week',async({page})=>{
+ await page.route('**/api/platform?**part=curriculum',r=>r.fulfill({json:{data:{curriculum_weeks:[{id:'synthetic-active-week',course_id:'synthetic-course',week_number:1,title:'현재 사용 중인 주차'},{id:'synthetic-archived-week',course_id:'synthetic-course',week_number:1,title:'복구할 기존 주차',archived_at:'2026-09-28T00:00:00Z'}],curriculum_lessons:[],lesson_contents:[]}}}));
+ await page.goto('/product-sale-test?archiveCollision=1');await page.getByRole('tab',{name:'커리큘럼',exact:true}).click();
+ await page.locator('.curriculum-archive > summary').click();
+ page.once('dialog',dialog=>{expect(dialog.message()).toContain('1주차 번호는 이미 사용 중');expect(dialog.message()).toContain('학습 기록과 연결은 그대로 유지');return dialog.accept();});
+ await page.getByRole('button',{name:'주차 복구'}).click();
+ await expect(page.getByLabel('합성 보관 시도')).toHaveText('1');
+ await expect(page.getByLabel('합성 보관 요청')).toContainText('"reassignOnConflict":true');
+});
+
+test('restoring a reused week number can be cancelled without changing it',async({page})=>{
+ await page.route('**/api/platform?**part=curriculum',r=>r.fulfill({json:{data:{curriculum_weeks:[{id:'synthetic-active-week',course_id:'synthetic-course',week_number:1,title:'현재 사용 중인 주차'},{id:'synthetic-archived-week',course_id:'synthetic-course',week_number:1,title:'복구할 기존 주차',archived_at:'2026-09-28T00:00:00Z'}],curriculum_lessons:[],lesson_contents:[]}}}));
+ await page.goto('/product-sale-test?archiveCollision=1');await page.getByRole('tab',{name:'커리큘럼',exact:true}).click();
+ await page.locator('.curriculum-archive > summary').click();
+ page.once('dialog',dialog=>{expect(dialog.message()).toContain('1주차 번호는 이미 사용 중');return dialog.dismiss();});
+ await page.getByRole('button',{name:'주차 복구'}).click();
+ await expect(page.getByRole('button',{name:'주차 복구'})).toBeVisible();
+ await expect(page.getByLabel('합성 보관 요청')).toHaveText('null');
+});
+
+test('a restore conflict discovered during the request asks before retrying in another free slot',async({page})=>{
+ await page.route('**/api/platform?**part=curriculum',r=>r.fulfill({json:{data:{curriculum_weeks:[{id:'synthetic-archived-week',course_id:'synthetic-course',week_number:1,title:'복구할 기존 주차',archived_at:'2026-09-28T00:00:00Z'}],curriculum_lessons:[],lesson_contents:[]}}}));
+ await page.goto('/product-sale-test?archivedFirst=1&restoreRace=1');await page.getByRole('tab',{name:'커리큘럼',exact:true}).click();
+ await page.locator('.curriculum-archive > summary').click();
+ page.once('dialog',dialog=>{expect(dialog.message()).toContain('복구 중 1주차 번호가 다른 주차에 배정');return dialog.accept();});
+ await page.getByRole('button',{name:'주차 복구'}).click();
+ await expect(page.getByLabel('합성 보관 시도')).toHaveText('2');
+ await expect(page.getByLabel('합성 보관 요청')).toContainText('"reassignOnConflict":true');
 });
