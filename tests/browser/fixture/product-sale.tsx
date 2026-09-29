@@ -22,8 +22,17 @@ export function ProductSaleFixture() {
   const [cohortOverrides, setCohortOverrides] = useState<Record<string, unknown>>({});
   const ready = new URLSearchParams(location.search).has('ready');
   const course = { id: 'synthetic-course', title: '합성 판매 점검 상품', slug: 'synthetic', category: new URLSearchParams(location.search).has('digital') ? 'digital' : 'paid_class', status: new URLSearchParams(location.search).has('draft') ? 'draft' : 'published', list_price: 100000, description: missing ? '' : '합성 상세', duration_label: missing ? '' : '4주', schedule_label: missing ? '' : '매주', metadata: { product_resources: resources } };
-  const [weeks, setWeeks] = useState<Row[]>([{ id: 'synthetic-week', course_id: course.id, is_published: ready }]);
-  const [lessons, setLessons] = useState<Row[]>([{ id: 'synthetic-lesson', week_id: 'synthetic-week', is_published: ready }]);
+  const initialWeeks: Row[] = params.has('archiveCollision')
+    ? [
+        { id: 'synthetic-active-week', course_id: course.id, week_number: 1, title: '현재 사용 중인 주차', is_published: false },
+        { id: 'synthetic-archived-week', course_id: course.id, week_number: 1, title: '복구할 기존 주차', archived_at: '2026-09-28T00:00:00Z', is_published: false },
+      ]
+    : params.has('archivedFirst')
+      ? [{ id: 'synthetic-archived-week', course_id: course.id, week_number: 1, title: '삭제된 첫 주차', archived_at: '2026-09-28T00:00:00Z', is_published: false }]
+      : [{ id: 'synthetic-week', course_id: course.id, week_number: 1, title: '기존 합성 주차', is_published: ready }];
+  const [weeks, setWeeks] = useState<Row[]>(initialWeeks);
+  const initialActiveWeek = initialWeeks.find(week => !week.archived_at);
+  const [lessons, setLessons] = useState<Row[]>(initialActiveWeek ? [{ id: 'synthetic-lesson', week_id: String(initialActiveWeek.id), is_published: ready }] : []);
   const data = { courses: [course], cohorts: [{ id: 'synthetic-cohort', course_id: course.id, name: '합성 4기', cohort_code: 'FOURTH', status: 'upcoming', price: 100000, recruitment_end_at: params.has('expired') ? '2020-10-01T14:59:00Z' : '2099-10-01T14:59:00Z', ...(params.has('closed') ? { status: 'closed' } : {}), ...cohortOverrides }, ...extraCohorts], curriculum_weeks: weeks, curriculum_lessons: lessons };
   if (params.has('new')) data.cohorts = [];
   return <div className="edu-admin" style={{ padding: 20, overflowWrap: "anywhere" }}><output aria-label="합성 자료 요청">{JSON.stringify(resourceMutation)}</output><output aria-label="저장한 카운트다운 설정">{String(savedCountdown)}</output><output aria-label="합성 저장 횟수">{saves}</output><output aria-label="합성 기수 저장 횟수">{cohortSaves}</output><output aria-label="합성 기수 요청">{JSON.stringify(cohortMutation)}</output><output aria-label="합성 미션 저장 횟수">{missionSaves}</output><output aria-label="합성 미션 요청">{JSON.stringify(missionMutation)}</output><output aria-label="합성 커리큘럼 저장 횟수">{curriculumSaves}</output><output aria-label="합성 커리큘럼 요청">{JSON.stringify(curriculumMutation)}</output><output aria-label="합성 보관 시도">{archiveAttempts}</output><output aria-label="합성 보관 요청">{JSON.stringify(archiveMutation)}</output><ProductEditor row={params.has('new') ? undefined : course} data={data} pending={false} back={() => {}} send={async body => {
@@ -35,12 +44,25 @@ export function ProductSaleFixture() {
     if (body.action === 'set-curriculum-archive') {
       setArchiveAttempts(value => value + 1);
       setArchiveMutation(body);
-      if (params.has('restoreConflict') && body.kind === 'week' && body.archived === false && (!body.moveToWeekNumber || params.has('restoreRace'))) {
-        return { result: { needsConfirmation: true, weekNumber: 1, suggestedWeekNumber: body.moveToWeekNumber ? 3 : 2 } };
+      if (params.has('restoreRace') && body.kind === 'week' && body.archived === false && body.reassignOnConflict !== true) {
+        setWeeks(rows => rows.some(row => row.id === 'synthetic-racing-week') ? rows : [...rows, {
+          id: 'synthetic-racing-week', course_id: course.id, week_number: 1, title: '동시에 추가된 주차', is_published: false,
+        }]);
+        throw new Error('복구하려는 주차 번호가 이미 사용 중입니다. 다른 빈 번호로 옮겨 복구할지 확인해 주세요.');
       }
       const id = String(body.id);
       const archive = Boolean(body.archived);
-      if (body.kind === 'week') setWeeks(rows => rows.map(row => row.id === id ? { ...row, archived_at: archive ? '2026-09-29T00:00:00Z' : null, is_published: false } : row));
+      if (body.kind === 'week') setWeeks(rows => {
+        const target = rows.find(row => row.id === id);
+        if (!target) return rows;
+        const occupied = new Set(rows.filter(row => row.id !== id && !row.archived_at).map(row => Number(row.week_number)));
+        let number = Number(target.week_number);
+        if (!archive && body.reassignOnConflict === true && occupied.has(number)) {
+          number = 1;
+          while (occupied.has(number)) number += 1;
+        }
+        return rows.map(row => row.id === id ? { ...row, week_number: number, archived_at: archive ? '2026-09-29T00:00:00Z' : null, is_published: false } : row);
+      });
       if (body.kind === 'lesson') setLessons(rows => rows.map(row => row.id === id ? { ...row, archived_at: archive ? '2026-09-29T00:00:00Z' : null, is_published: false } : row));
       return { ok: true };
     }
@@ -53,7 +75,16 @@ export function ProductSaleFixture() {
       setCurriculumSaves(value => value + 1);
       setCurriculumMutation(body);
       const update = (rows: Row[]) => rows.map(row => row.id === body.id ? { ...row, ...(body.values as Record<string, unknown>) } : row);
-      if (body.section === 'weeks') setWeeks(update);
+      if (body.section === 'weeks') {
+        if (body.id) setWeeks(update);
+        else {
+          const occupied = new Set(weeks.filter(row => !row.archived_at).map(row => Number(row.week_number)).filter(number => number > 0));
+          let weekNumber = 1;
+          while (occupied.has(weekNumber)) weekNumber += 1;
+          setWeeks(rows => [...rows, { ...(body.values as Record<string, unknown>), id: 'synthetic-added-week', week_number: weekNumber }]);
+          return { row: { ...(body.values as Record<string, unknown>), id: 'synthetic-added-week', week_number: weekNumber } };
+        }
+      }
       else setLessons(update);
       return { row: { ...(body.values as Record<string, unknown>), id: body.id } };
     }

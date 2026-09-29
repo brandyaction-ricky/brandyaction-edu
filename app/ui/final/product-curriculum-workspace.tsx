@@ -265,24 +265,24 @@ export function ProductCurriculumWorkspace({ course, pending, send, commonResour
     if (archived && selectedIsAffected && contentDirty && !window.confirm("저장하지 않은 학습 내용이 있습니다. 목록에서 삭제하면 이 변경사항은 버려집니다. 계속할까요?")) return;
     const label = kind === "week" ? `${num(row, "week_number")}주차 · ${t(row, "title")}` : `Day ${num(row, "day_number")} · ${t(row, "title")}`;
     if (archived && !window.confirm(`「${label}」을 현재 커리큘럼 목록에서 삭제할까요? 학습 진도·미션 제출 기록·자료는 지우지 않고 보관하며, 삭제한 항목에서 복구할 수 있습니다.${kind === "week" ? " 주차 안의 학습도 함께 숨겨집니다." : ""}`)) return;
+    const numberInUse = kind === "week" && !archived && weeks.some(week => String(week.id) !== String(row.id) && num(week, "week_number") === num(row, "week_number"));
+    const reassignOnConflict = Boolean(numberInUse && window.confirm(`복구하려는 ${num(row, "week_number")}주차 번호는 이미 사용 중입니다. 다른 빈 주차 번호로 옮겨 복구할까요? 학습 기록과 연결은 그대로 유지됩니다.`));
+    if (numberInUse && !reassignOnConflict) return;
     setBusy(true);
     setError("");
     try {
-      const request = { action: "set-curriculum-archive", courseId: course.id, kind, id: row.id, archived,
-        ...(kind === "week" && !archived ? { expectedWeekNumber: num(row, "week_number") } : {}) };
-      let response = await send(request, archived ? "커리큘럼 목록에서 삭제했습니다. 기록은 보관되었습니다." : "");
-      let result = response.result as Record<string, unknown> | undefined;
-      if (result?.needsConfirmation) {
-        const proposed = Number(result.suggestedWeekNumber);
-        if (!Number.isSafeInteger(proposed) || proposed < 1) throw new Error("목록을 새로고침한 뒤 복구해 주세요.");
-        if (!window.confirm(`${num(row, "week_number")}주차는 다른 항목에서 사용 중입니다. 「${t(row, "title")}」을 ${proposed}주차로 옮겨 복구할까요? 기존 학습 기록과 연결은 그대로 유지됩니다.`)) return;
-        response = await send({ ...request, moveToWeekNumber: proposed }, "");
-        result = response.result as Record<string, unknown> | undefined;
-        if (result?.needsConfirmation) {
-          setError("확인하는 동안 주차 번호가 변경되었습니다. 다시 복구를 눌러 새 번호를 확인해 주세요.");
-          setLoading(true); setReadVersion(version => version + 1);
-          return;
-        }
+      const request = (reassign: boolean) => send(
+        { action: "set-curriculum-archive", courseId: course.id, kind, id: row.id, archived, reassignOnConflict: reassign },
+        archived ? "커리큘럼 목록에서 삭제했습니다. 기록은 보관되었습니다." : reassign ? "빈 주차 번호로 옮겨 복구했습니다. 학습 기록 연결은 유지됩니다." : "커리큘럼 항목을 복구했습니다. 비공개 상태로 복구됩니다."
+      );
+      try {
+        await request(reassignOnConflict);
+      } catch (cause) {
+        const racedRestore = kind === "week" && !archived && !reassignOnConflict && cause instanceof Error && cause.message.includes("주차 번호가 이미 사용 중입니다");
+        if (!racedRestore) throw cause;
+        const confirmed = window.confirm(`복구 중 ${num(row, "week_number")}주차 번호가 다른 주차에 배정되었습니다. 다른 빈 주차 번호로 옮겨 복구할까요? 학습 기록과 연결은 그대로 유지됩니다.`);
+        if (!confirmed) { setError("복구를 취소했습니다. 기존 주차와 학습 기록은 보관 상태로 유지됩니다."); return; }
+        await request(true);
       }
       if (archived && selectedIsAffected) clearLessonSelection();
       setLoading(true);

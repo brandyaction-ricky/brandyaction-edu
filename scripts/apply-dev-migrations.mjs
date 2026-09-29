@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { findOfficialMigration } from "./dev-migration-ledger.mjs";
 
 const DEV_PROJECT_REF = "vjmjhaidlqkmascdjocw";
 const accessToken = process.env.SUPABASE_ACCESS_TOKEN;
@@ -55,6 +56,9 @@ const appliedRows = await runSql(
   "select version, checksum from dev_migrations.schema_migrations order by version;",
 );
 const appliedMigrations = new Map(appliedRows.map((row) => [row.version, row.checksum]));
+const officialMigrations = await runSql(
+  "select version, name from supabase_migrations.schema_migrations order by version;",
+);
 const migrationFiles = (await readdir(migrationsDirectory))
   .filter((fileName) => /^\d+_.+\.sql$/.test(fileName))
   .sort();
@@ -72,6 +76,14 @@ for (const fileName of migrationFiles) {
       throw new Error(`${fileName} changed after it was applied. Add a new migration instead.`);
     }
     console.log(`Already applied: ${fileName}`);
+    continue;
+  }
+
+  const officialMigration = findOfficialMigration({ version, name }, officialMigrations);
+  if (officialMigration) {
+    console.log(
+      `Already applied in Supabase ledger: ${fileName} (recorded as ${officialMigration.version})`,
+    );
     continue;
   }
 

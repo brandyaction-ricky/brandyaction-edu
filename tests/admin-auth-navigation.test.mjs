@@ -224,7 +224,15 @@ test('curriculum archive API requires product permission, validates IDs and call
   const allowed = apiHarness(admin);
   const response = await allowed.write(body);
   assert.equal(response.status, 200);
-  assert.deepEqual(allowed.calls.rpcs, [['edu_set_curriculum_archive', { p_actor: admin.id, p_course: courseId, p_kind: 'lesson', p_id: itemId, p_archived: true }]]);
+  assert.deepEqual(allowed.calls.rpcs, [['edu_set_curriculum_archive', { p_actor: admin.id, p_course: courseId, p_kind: 'lesson', p_id: itemId, p_archived: true, p_reassign_on_conflict: false }]]);
+
+  const confirmedRestore = apiHarness(admin);
+  const restoreResponse = await confirmedRestore.write({ ...body, kind: 'week', archived: false, reassignOnConflict: true });
+  assert.equal(restoreResponse.status, 200);
+  assert.equal(confirmedRestore.calls.rpcs[0][1].p_reassign_on_conflict, true);
+  const invalidRestore = apiHarness(admin);
+  assert.equal((await invalidRestore.write({ ...body, kind: 'week', archived: false, reassignOnConflict: 'yes' })).status, 400);
+  assert.deepEqual(invalidRestore.calls.rpcs, []);
 
   const denied = apiHarness({ ...admin, role: 'staff' }, null, {}, { products: false });
   assert.equal((await denied.write(body)).status, 403);
@@ -239,7 +247,7 @@ test('curriculum archive API requires product permission, validates IDs and call
 
 test('curriculum archive API surfaces stale, parent-archived and missing-item conflicts safely', async () => {
   const body = { action: 'set-curriculum-archive', courseId: '12345678-1234-1234-1234-123456789012', kind: 'lesson', id: '22222222-2222-2222-2222-222222222222', archived: false };
-  for (const [message, expected] of [['CURRICULUM_NOT_FOUND', 409], ['CURRICULUM_PARENT_ARCHIVED', 409], ['CURRICULUM_FORBIDDEN', 403]]) {
+  for (const [message, expected] of [['CURRICULUM_NOT_FOUND', 409], ['CURRICULUM_PARENT_ARCHIVED', 409], ['CURRICULUM_WEEK_NUMBER_IN_USE', 409], ['CURRICULUM_FORBIDDEN', 403]]) {
     const api = apiHarness(admin, null, {}, {}, { data: null, error: { message } });
     assert.equal((await api.write(body)).status, expected);
   }
@@ -255,17 +263,19 @@ test('the operating home still returns the full dashboard aggregate', async () =
 test('automatic week creation checks scope and request identity before assigning a number in the DB',async()=>{
  const body={action:'create-curriculum-week',courseId:admin.id,requestId:'22222222-2222-4222-8222-222222222222',title:' 새로운 주차 '};
  const api=apiHarness(admin);assert.equal((await api.write(body)).status,200);
- assert.deepEqual(api.calls.rpcs,[['edu_create_curriculum_week',{p_actor:admin.id,p_course:admin.id,p_request:body.requestId,p_title:'새로운 주차'}]]);
+ assert.deepEqual(api.calls.rpcs,[['edu_create_curriculum_week',{p_actor:admin.id,p_course:admin.id,p_request:body.requestId,p_title:'새로운 주차',p_goal:null}]]);
  const denied=apiHarness({...admin,role:'staff'});assert.equal((await denied.write(body)).status,403);assert.deepEqual(denied.calls.rpcs,[]);
  const invalid=apiHarness(admin);assert.equal((await invalid.write({...body,requestId:undefined})).status,400);assert.deepEqual(invalid.calls.rpcs,[]);
 });
 
-test('week restore passes the exact confirmed number and returns a non-mutating conflict proposal',async()=>{
- const body={action:'set-curriculum-archive',courseId:admin.id,kind:'week',id:'22222222-2222-4222-8222-222222222222',archived:false,expectedWeekNumber:1};
- const proposal={needsConfirmation:true,weekNumber:1,suggestedWeekNumber:2};
- const api=apiHarness(admin,null,{}, {}, {data:proposal,error:null});
- const response=await api.write(body);assert.equal(response.status,200);assert.deepEqual((await response.json()).result,proposal);
- assert.deepEqual(api.calls.rpcs,[['edu_restore_curriculum_week',{p_actor:admin.id,p_course:admin.id,p_id:body.id,p_expected_week:1,p_move_to:null}]]);
- await api.write({...body,moveToWeekNumber:2});assert.equal(api.calls.rpcs[1][1].p_move_to,2);
- const invalid=apiHarness(admin);assert.equal((await invalid.write({...body,moveToWeekNumber:-1})).status,400);assert.deepEqual(invalid.calls.rpcs,[]);
+test('week restore only reassigns after explicit confirmation and exposes number collisions as conflicts',async()=>{
+ const body={action:'set-curriculum-archive',courseId:admin.id,kind:'week',id:'22222222-2222-4222-8222-222222222222',archived:false};
+ const api=apiHarness(admin);assert.equal((await api.write(body)).status,200);
+ assert.deepEqual(api.calls.rpcs,[['edu_set_curriculum_archive',{p_actor:admin.id,p_course:admin.id,p_kind:'week',p_id:body.id,p_archived:false,p_reassign_on_conflict:false}]]);
+ const confirmed=apiHarness(admin);assert.equal((await confirmed.write({...body,reassignOnConflict:true})).status,200);
+ assert.equal(confirmed.calls.rpcs[0][1].p_reassign_on_conflict,true);
+ const collision=apiHarness(admin,null,{}, {}, {data:null,error:{message:'CURRICULUM_WEEK_NUMBER_IN_USE'}});
+ const response=await collision.write(body);assert.equal(response.status,409);assert.match((await response.json()).error,/주차 번호가 이미 사용 중/);
+ assert.equal(collision.calls.rpcs[0][1].p_reassign_on_conflict,false);
+ const invalid=apiHarness(admin);assert.equal((await invalid.write({...body,reassignOnConflict:'yes'})).status,400);assert.deepEqual(invalid.calls.rpcs,[]);
 });
