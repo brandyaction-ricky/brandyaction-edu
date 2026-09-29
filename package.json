@@ -16,6 +16,8 @@
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.0",
+    "@tiptap/extension-blockquote": "3.31.3",
+    "@tiptap/extension-details": "3.31.3",
     "@tiptap/extension-text-style": "3.31.3",
     "@tiptap/pm": "3.31.3",
     "@tiptap/react": "3.31.3",
@@ -23,12 +25,12 @@
     "@tosspayments/tosspayments-sdk": "^2.7.1",
     "lucide-react": "^1.28.0",
     "next": "^16.3.5",
+    "parse5": "8.0.1",
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "sharp": "0.35.4",
     "solapi": "^6.0.1",
-    "web-push": "3.6.7",
-    "parse5": "8.0.1"
+    "web-push": "3.6.7"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",

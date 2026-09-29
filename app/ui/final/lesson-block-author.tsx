@@ -10,7 +10,11 @@ import { LessonBodyEditor } from './lesson-body-editor';
 import { LessonText } from './lesson-text';
 import { canRenderLessonBlocks, LessonBlockView } from './lesson-block-view';
 import { LessonMediaUpload } from './lesson-media-upload';
-import type { LessonMediaKind } from '@/lib/lesson-media';
+import { lessonMediaSpec, type LessonMediaKind } from '@/lib/lesson-media';
+import { uploadLessonMedia } from '@/lib/lesson-media-upload';
+import { positionLessonImage, type LessonImagePosition } from '@/lib/lesson-image-position';
+import { lessonDocumentForEditor, serializeLessonDocument } from '@/lib/lesson-body';
+import { LessonImageLayout } from './lesson-image-layout';
 import type { BlockEditorDraft } from '@/lib/learning-editor-draft';
 import { applyLessonImport, type LessonCardSource, type TextImportResult } from '@/lib/lesson-editor-import';
 import { TextLessonImport, LessonCardImport } from './lesson-editor-import';
@@ -94,9 +98,42 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
   const [importUndo, setImportUndo] = useState<{ before: LessonBlockDocument; after: string } | null>(null);
   const [writer] = useState(() => new LessonDocumentWriter(snapshot.revision, snapshot.document, saveDocument));
   const root = useRef<HTMLDivElement>(null);
-  const uploads = useRef(new Set<string>()), [uploading, setUploading] = useState(false);
-  function uploadPending(id: string, pending: boolean) { if (pending) uploads.current.add(id); else uploads.current.delete(id); setUploading(uploads.current.size > 0); }
+  const uploads = useRef(new Set<string>()), [uploadIds, setUploadIds] = useState<string[]>([]);
+  const uploading = uploadIds.length > 0;
+  function uploadPending(id: string, pending: boolean) { if (pending) uploads.current.add(id); else uploads.current.delete(id); setUploadIds([...uploads.current]); }
   function attach(id: string, assetId: string) { setDocument(previous => ({ ...previous, blocks: previous.blocks.map(block => { if (block.id !== id) return block; const next = { ...block, assetId }; delete next.url; return next; }) })); }
+  const [positionedIds, setPositionedIds] = useState<string[]>([]), mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  function positionImage(image: LessonBlock, position: LessonImagePosition) {
+    try {
+      const blocks = positionLessonImage(document.blocks, image, position, crypto.randomUUID());
+      setDocument(previous => ({ ...previous, blocks })); setEditingTextId(null); setMessage('이미지 위치를 바꿨습니다. 학습 저장을 눌러 반영해 주세요.');
+    } catch (error) { setMessage((error as Error).message); }
+  }
+  async function insertImage(files: File[], position: LessonImagePosition) {
+    if (disabled || conflict) return;
+    if (uploads.current.size) { setMessage('진행 중인 파일 업로드가 끝난 뒤 추가해 주세요.'); return; }
+    if (!courseId) { setMessage('먼저 기본 정보에서 주차를 선택해 주세요.'); return; }
+    if (files.length !== 1) { setMessage('이미지는 한 번에 한 장씩 넣어 주세요.'); return; }
+    const file = files[0], image = newBlock('image');
+    try {
+      lessonMediaSpec(file.name, file.size, 'image');
+      const blocks = positionLessonImage(document.blocks, image, position, crypto.randomUUID());
+      // Reserve the stable block ID now; async completion never reads the caret
+      // or an array index. Other text can be edited while the upload is pending.
+      setPositionedIds(previous => [...previous, image.id]); uploadPending(image.id, true);
+      setDocument(previous => ({ ...previous, blocks })); setEditingTextId(null); setMessage('선택한 위치에 이미지를 올리고 있습니다.');
+    } catch (error) { setMessage((error as Error).message); return; }
+    try {
+      const assetId = await uploadLessonMedia(file, 'image', courseId, crypto.randomUUID());
+      if (mounted.current) { attach(image.id, assetId); setMessage('선택한 위치에 이미지를 넣었습니다. 학습 저장을 눌러 반영해 주세요.'); }
+    } catch (error) {
+      if (mounted.current) {
+        setDocument(previous => ({ ...previous, blocks: previous.blocks.filter(block => block.id !== image.id) }));
+        setMessage(`이미지를 올리지 못했습니다. ${(error as Error).message} 작성한 글은 그대로 유지됩니다.`);
+      }
+    } finally { if (mounted.current) { setPositionedIds(previous => previous.filter(id => id !== image.id)); uploadPending(image.id, false); } }
+  }
   const dirty = active && (uploading || JSON.stringify(document) !== saved);
   useEffect(() => { onState({ active, dirty, blocked: !snapshot.editable || conflict || uploading, uploading, draftReady: snapshot.editable && !uploading }); }, [active, dirty, conflict, snapshot.editable, onState, uploading]);
   useEffect(() => {
@@ -129,7 +166,7 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
     try { await writer.save(lessonId, document); setSaved(JSON.stringify(document)); setInvalid(false); setMessage('학습 구성을 저장했습니다.'); }
     catch (error) { if ((error as { status?: number }).status === 409) setConflict(true); setMessage((error as Error).message); throw error; }
   } }));
-  function update(index: number, patch: Partial<LessonBlock>) { setDocument(previous => ({ ...previous, blocks: previous.blocks.map((block, i) => i === index ? { ...block, ...patch } : block) })); }
+  function update(id: string, patch: Partial<LessonBlock>) { setDocument(previous => ({ ...previous, blocks: previous.blocks.map(block => block.id === id ? { ...block, ...patch } : block) })); }
   function move(index: number, offset: number) { setDocument(previous => { const blocks = [...previous.blocks]; [blocks[index], blocks[index + offset]] = [blocks[index + offset], blocks[index]]; return { ...previous, blocks }; }); }
   function download() { const url = URL.createObjectURL(new Blob([JSON.stringify(document, null, 2)], { type: 'application/json' })); const a = window.document.createElement('a'); a.href = url; a.download = '학습-편집내용.json'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
   function importContent(content: Pick<TextImportResult, 'blocks' | 'checklist'>, mode: 'append' | 'replace' | number) {
@@ -143,8 +180,8 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
     <div className="lba-actions"><strong>학습 순서 편집</strong><button type="button" className="btn small" onClick={() => setPreview(value => !value)}>{preview ? '편집 화면으로' : '구성 미리보기'}</button><span>항목 {document.blocks.length}개</span></div>
     <p className="meta">아래 ‘학습 저장’을 누르면 기본 정보와 함께 저장됩니다. 이전 학생 답변은 해당 수업 버전과 함께 보관됩니다.</p>
     {preview && <div className="lba-preview" aria-label="구성 미리보기"><LessonBlockView document={publicLessonBlocks(document)} values={{ blocks: {}, checklist: [] }} onChange={() => {}} readOnly /></div>}
-    <fieldset disabled={disabled || conflict || uploading} hidden={preview} className="lba-main-fields">
-      <div className="lba-actions"><button type="button" className="btn" onClick={() => setImportMode('text')}>텍스트·파일 가져오기</button><button type="button" className="btn" disabled={!sources.length} onClick={() => setImportMode('cards')}>다른 학습 카드 가져오기</button>
+    <fieldset disabled={disabled || conflict} hidden={preview} className="lba-main-fields">
+      <div className="lba-actions"><button type="button" className="btn" disabled={uploading} onClick={() => setImportMode('text')}>텍스트·파일 가져오기</button><button type="button" className="btn" disabled={uploading || !sources.length} onClick={() => setImportMode('cards')}>다른 학습 카드 가져오기</button>
         {importUndo && importUndo.after === JSON.stringify(document) && saved !== importUndo.after && <button type="button" className="btn" onClick={() => { setDocument(importUndo.before); setImportUndo(null); setMessage('가져오기 직전 내용으로 되돌렸습니다.'); }}>마지막 가져오기 되돌리기</button>}
       </div>
       <section className="lba-block"><h3>학습 태그</h3>
@@ -166,24 +203,33 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
         <label className="lb-choice"><input type="checkbox" checked={(document.completion || defaultBlockCompletion).requireQuizPass} onChange={event => setDocument(previous => ({ ...previous, completion: { ...(previous.completion || defaultBlockCompletion), requireQuizPass: event.target.checked } }))} />시험 통과 필요</label>
         <p className="meta">필수 체크리스트는 항상 확인합니다. 연습용 시험은 통과 조건을 끌 수 있습니다. 멘토 확인 방식은 제출만으로 학습 완료가 되지 않습니다.</p>
       </section>
-      {document.blocks.map((block, index) => <article className="lba-block" key={block.id} data-author-block={block.id}>
-        <div className="lba-actions"><h3>{index + 1}. {choices.find(item => item.type === block.type)?.label || block.type}</h3><button type="button" className="btn small" aria-label={`항목 ${index + 1} 위로`} disabled={index === 0} onClick={() => move(index, -1)}>↑</button><button type="button" className="btn small" aria-label={`항목 ${index + 1} 아래로`} disabled={index === document.blocks.length - 1} onClick={() => move(index, 1)}>↓</button><button type="button" className="btn small" aria-label={`항목 ${index + 1} 삭제`} onClick={() => { if (window.confirm('이 항목을 편집 목록에서 삭제할까요? 저장한 뒤 반영되며 이전 학생 답변은 보관됩니다.')) setDocument(previous => ({ ...previous, blocks: previous.blocks.filter((_, i) => i !== index) })); }}>삭제</button></div>
+      <p className="meta">이미지를 원하는 문단 사이로 끌어 넣으세요. 파란 선 위치에 들어갑니다. 본문에 붙여 넣으면 현재 문단 다음에 들어갑니다. 등록된 이미지는 이동 손잡이나 ↑·↓ 버튼으로 옮길 수 있습니다.</p>
+      <LessonImageLayout blocks={document.blocks} disabled={disabled || conflict} uploading={uploading} onMove={positionImage} onFiles={(files, position) => { void insertImage(files, position); }}>
+      {document.blocks.map((block, index) => <article className="lba-block" key={block.id} data-author-block={block.id} data-block-type={block.type}>
+        <div className="lba-actions"><h3>{index + 1}. {choices.find(item => item.type === block.type)?.label || block.type}</h3><button type="button" className="btn small" aria-label={`항목 ${index + 1} 위로`} disabled={uploadIds.includes(block.id) || index === 0} onClick={() => move(index, -1)}>↑</button><button type="button" className="btn small" aria-label={`항목 ${index + 1} 아래로`} disabled={uploadIds.includes(block.id) || index === document.blocks.length - 1} onClick={() => move(index, 1)}>↓</button><button type="button" className="btn small" aria-label={`항목 ${index + 1} 삭제`} disabled={uploadIds.includes(block.id)} onClick={() => { if (window.confirm('이 항목을 편집 목록에서 삭제할까요? 저장한 뒤 반영되며 이전 학생 답변은 보관됩니다.')) setDocument(previous => ({ ...previous, blocks: previous.blocks.filter((_, i) => i !== index) })); }}>삭제</button></div>
         {block.type === 'text' ? editingTextId === block.id
-          ? <LessonBodyEditor label={`항목 ${index + 1} 본문`} value={block.content || ''} disabled={disabled || conflict} onChange={content => update(index, { content })} />
-          : <div><div className="lba-text-preview"><LessonText text={block.content || '본문을 입력해 주세요.'} /></div><button type="button" className="btn small" onClick={() => setEditingTextId(block.id)} aria-label={`항목 ${index + 1} 본문 편집`}>본문 편집</button></div>
-          : ['heading', 'subheading', 'prompt'].includes(block.type) ? <Field label="내용 *"><textarea required rows={block.type === 'prompt' ? 5 : 2} maxLength={200000} value={block.content || ''} onChange={event => update(index, { content: event.target.value })} /></Field> : null}
-        {['image', 'audio', 'video', 'link'].includes(block.type) && <>
-          {block.type !== 'link' && <LessonMediaUpload courseId={courseId} kind={block.type as LessonMediaKind} assetId={block.assetId} disabled={disabled || conflict} onReady={id => attach(block.id, id)} onPending={pending => uploadPending(block.id, pending)} />}
+          ? <LessonBodyEditor label={`항목 ${index + 1} 본문`} value={block.content || ''} disabled={disabled || conflict} onChange={content => update(block.id, { content })} />
+          : <div><div className="lba-text-preview"><LessonText text={serializeLessonDocument(lessonDocumentForEditor(block.content || '본문을 입력해 주세요.'))} /></div><button type="button" className="btn small" onClick={() => setEditingTextId(block.id)} aria-label={`항목 ${index + 1} 본문 편집`}>본문 편집</button></div>
+          : ['heading', 'subheading', 'prompt'].includes(block.type) ? <Field label="내용 *"><textarea required rows={block.type === 'prompt' ? 5 : 2} maxLength={200000} value={block.content || ''} onChange={event => update(block.id, { content: event.target.value })} /></Field> : null}
+        {block.type === 'image' && <>
+          {positionedIds.includes(block.id) ? <p className="lba-image-placeholder" role="status">이 위치에 이미지를 올리고 있습니다…</p> : <>
+            <button type="button" className="btn small lba-image-handle" draggable={!disabled && !conflict && !uploading} disabled={uploading} data-image-move={block.id} aria-label={`항목 ${index + 1} 이미지 이동 손잡이`}>⠿ 이미지 이동</button>
+            {(block.assetId || block.url) && <div className="lba-image-preview" draggable={!disabled && !conflict && !uploading} data-image-move={block.id}><LessonBlockView document={{ ...empty(), blocks: [block] }} values={{ blocks: {}, checklist: [] }} onChange={() => {}} readOnly /></div>}
+          </>}
+        </>}
+        {['image', 'audio', 'video', 'link'].includes(block.type) && !positionedIds.includes(block.id) && <fieldset className="lba-media-fields" disabled={uploadIds.includes(block.id)}>
+          {block.type !== 'link' && <LessonMediaUpload courseId={courseId} kind={block.type as LessonMediaKind} assetId={block.assetId} disabled={disabled || conflict || uploadIds.includes(block.id)} onReady={id => attach(block.id, id)} onPending={pending => uploadPending(block.id, pending)} />}
           {block.assetId ? <button type="button" className="btn small" onClick={() => { if (window.confirm('파일 연결을 지우고 외부 주소를 입력할까요? 기존 저장본의 파일은 보관됩니다.')) setDocument(previous => ({ ...previous, blocks: previous.blocks.map(item => { if (item.id !== block.id) return item; const next = { ...item, url: '' }; delete next.assetId; return next; }) })); }}>외부 주소로 바꾸기</button>
-            : <Field label="주소 *" hint={block.type !== 'link' ? '파일을 올리거나 HTTPS 주소를 입력해 주세요.' : undefined}><input required type="url" pattern="https://.*" maxLength={4000} value={block.url || ''} placeholder="https://" onChange={event => update(index, { url: event.target.value })} /></Field>}<Field label={block.type === 'link' ? '링크에 표시할 문구' : '설명'}><input value={block.content || ''} maxLength={5000} onChange={event => update(index, { content: event.target.value })} /></Field>{block.type === 'image' && <Field label="이미지 대체 설명"><input maxLength={1000} value={block.alt || ''} onChange={event => update(index, { alt: event.target.value })} /></Field>}</>}
-        {block.type === 'link' && <LessonLinkPreview key={block.id + ':' + (block.url || '')} url={block.url || ''} onApply={content => update(index, { content })}/>}
-        {block.type === 'question' && <><Field label="질문 문구 *"><textarea required rows={3} maxLength={5000} value={block.question?.label || ''} onChange={event => update(index, { question: { ...block.question!, label: event.target.value } })} /></Field><label className="lb-choice"><input type="checkbox" checked={block.question?.required || false} onChange={event => update(index, { question: { ...block.question!, required: event.target.checked } })} />필수 답변</label><Field label="답변 유형"><select value={block.question?.kind || 'text'} onChange={event => update(index, { question: { ...block.question!, kind: event.target.value as 'text' | 'image' | 'file' } })}><option value="text">텍스트</option><option value="image">이미지 + 압축파일</option><option value="file">압축파일</option></select></Field></>}
-        {block.type === 'prompt-generator' && <GeneratorFields block={block} update={patch => update(index, patch)} />}
+            : <Field label="주소 *" hint={block.type !== 'link' ? '파일을 올리거나 HTTPS 주소를 입력해 주세요.' : undefined}><input required type="url" pattern="https://.*" maxLength={4000} value={block.url || ''} placeholder="https://" onChange={event => update(block.id, { url: event.target.value })} /></Field>}<Field label={block.type === 'link' ? '링크에 표시할 문구' : '설명'}><input value={block.content || ''} maxLength={5000} onChange={event => update(block.id, { content: event.target.value })} /></Field>{block.type === 'image' && <Field label="이미지 대체 설명"><input maxLength={1000} value={block.alt || ''} onChange={event => update(block.id, { alt: event.target.value })} /></Field>}</fieldset>}
+        {block.type === 'link' && <LessonLinkPreview key={block.id + ':' + (block.url || '')} url={block.url || ''} onApply={content => update(block.id, { content })}/>}
+        {block.type === 'question' && <><Field label="질문 문구 *"><textarea required rows={3} maxLength={5000} value={block.question?.label || ''} onChange={event => update(block.id, { question: { ...block.question!, label: event.target.value } })} /></Field><label className="lb-choice"><input type="checkbox" checked={block.question?.required || false} onChange={event => update(block.id, { question: { ...block.question!, required: event.target.checked } })} />필수 답변</label><Field label="답변 유형"><select value={block.question?.kind || 'text'} onChange={event => update(block.id, { question: { ...block.question!, kind: event.target.value as 'text' | 'image' | 'file' } })}><option value="text">텍스트</option><option value="image">이미지 + 압축파일</option><option value="file">압축파일</option></select></Field></>}
+        {block.type === 'prompt-generator' && <GeneratorFields block={block} update={patch => update(block.id, patch)} />}
         {isGuidedTool(block.type) && <div><p>{block.type === 'persona-generator' ? '15개 질문으로 핵심 고객을 정의하고 프롬프트를 만듭니다.' : '10개 질문과 전환 목적별 추가 질문으로 랜딩페이지 기획 프롬프트를 만듭니다.'}</p><details><summary>포함된 질문 보기</summary><ol>{block.fields?.map(field => <li key={field.id}>{field.label}</li>)}</ol></details></div>}
         {isCalculator(block.type) && <p>{block.type === 'recipe-calculator' ? '3일간의 플레이스 지표로 일 평균과 연습 목표 달성율을 계산합니다.' : block.type === 'margin-calculator' ? '가격·비용·수수료·부가세 조건을 입력해 예상 마진을 계산합니다.' : '단계를 편집하고 전환율을 확인하며 퍼널 이미지를 내려받을 수 있습니다.'} 학생 입력은 자동저장됩니다.</p>}
-        {block.type === 'quiz' && <QuizFields block={block} update={patch => update(index, patch)} />}
+        {block.type === 'quiz' && <QuizFields block={block} update={patch => update(block.id, patch)} />}
         {!choices.some(choice => choice.type === block.type) && <p role="alert">이 도구의 편집 화면을 연결하고 있습니다. 원래 설정은 그대로 보관됩니다.</p>}
       </article>)}
+      </LessonImageLayout>
       <div className="lba-actions"><label>추가할 항목 <select value={type} onChange={event => setType(event.target.value as LessonBlockType)}>{choices.map(choice => <option key={choice.type} value={choice.type}>{choice.label}</option>)}</select></label><button type="button" className="btn" disabled={document.blocks.length >= 1000} onClick={() => { const block = newBlock(type); setDocument(previous => ({ ...previous, blocks: [...previous.blocks, block] })); if (type === 'text') setEditingTextId(block.id); }}>항목 추가</button></div>
       <section className="lba-block"><h3>체크리스트</h3>{document.checklist.map((item, index) => <div className="lba-check-edit" key={item.id}><input required maxLength={5000} aria-label={`체크 항목 ${index + 1}`} value={item.label} onChange={event => setDocument(previous => ({ ...previous, checklist: previous.checklist.map((entry, i) => i === index ? { ...entry, label: event.target.value } : entry) }))} /><label><input type="checkbox" checked={item.required} onChange={event => setDocument(previous => ({ ...previous, checklist: previous.checklist.map((entry, i) => i === index ? { ...entry, required: event.target.checked } : entry) }))} />필수</label><button type="button" className="btn small" aria-label={`체크 항목 ${index + 1} 삭제`} onClick={() => setDocument(previous => ({ ...previous, checklist: previous.checklist.filter((_, i) => i !== index) }))}>삭제</button></div>)}<button type="button" className="btn small" disabled={document.checklist.length >= 1000} onClick={() => setDocument(previous => ({ ...previous, checklist: [...previous.checklist, { id: crypto.randomUUID(), label: '', required: true }] }))}>체크 항목 추가</button></section>
     </fieldset>

@@ -597,3 +597,49 @@ test('rich lesson renderer allows headings and safe marks but rejects scripts, a
   assert.match(markup, /font-size:20px/); assert.match(markup, /<strong>&lt;script&gt;/);
   assert.doesNotMatch(markup, /<script|<img|<a |onclick|onerror|9999px|color:red|url\(evil/);
 });
+
+test('lesson toggles round trip safely with H1, inline summary formatting and nested content', () => {
+  const { LessonText } = load('app/ui/final/lesson-text.tsx');
+  const body = load('lib/lesson-body.ts');
+  const doc = { type: 'doc', content: [
+    { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: '학습 제목' }] },
+    { type: 'details', attrs: { open: true, onclick: 'unsafe()' }, content: [
+      { type: 'detailsSummary', content: [{ type: 'text', text: '자세한 ' }, { type: 'text', text: '안내', marks: [{ type: 'bold' }] }] },
+      { type: 'detailsContent', content: [{ type: 'paragraph', content: [{ type: 'text', text: '<script>안전한 원문</script>' }] }] },
+    ] },
+  ] };
+  const saved = body.serializeLessonDocument(doc), parsed = body.parseLessonDocument(saved);
+  assert.equal(body.serializeLessonDocument(parsed), saved);
+  assert.equal(parsed.content[0].attrs.level, 1);
+  assert.equal(parsed.content[1].attrs, undefined);
+  assert.equal(body.lessonBodyPlainText(saved), '학습 제목\n자세한 안내\n<script>안전한 원문</script>');
+  const markup = html(LessonText, { text: saved });
+  assert.match(markup, /<h1>학습 제목<\/h1>/);
+  assert.match(markup, /<details><summary>자세한 <strong>안내<\/strong><\/summary>/);
+  assert.match(markup, /&lt;script&gt;안전한 원문&lt;\/script&gt;/);
+  assert.doesNotMatch(markup, /onclick| open=|<script>/);
+  assert.equal(body.normalizeLessonDocument({ type: 'doc', content: [{ type: 'details', content: [{ type: 'paragraph' }] }] }), null);
+});
+
+test('positioning lesson images preserves rich list nodes, stable question IDs and private asset references', () => {
+  const { positionLessonImage } = load('lib/lesson-image-position.ts');
+  const body = load('lib/lesson-body.ts');
+  const nodes = [
+    { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Heading' }] },
+    { type: 'bulletList', content: [{ type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Keep list', marks: [{ type: 'bold' }] }] }] }] },
+    { type: 'paragraph', content: [{ type: 'text', text: 'After' }] },
+  ];
+  const blocks = [{ id: 'body', type: 'text', content: body.serializeLessonDocument({ type: 'doc', content: nodes }) }, { id: 'image', type: 'image', assetId: 'private-asset' }, { id: 'question', type: 'question', question: { label: 'Keep answer ID', kind: 'text' } }];
+  const before = structuredClone(blocks);
+  const result = positionLessonImage(blocks, blocks[1], { blockId: 'body', textBoundary: 2 }, 'after');
+  assert.deepEqual(result.map(block => block.id), ['body', 'image', 'after', 'question']);
+  assert.deepEqual(body.parseLessonDocument(result[0].content).content, nodes.slice(0, 2));
+  assert.deepEqual(body.parseLessonDocument(result[2].content).content, nodes.slice(2));
+  assert.deepEqual(result[1], blocks[1]); assert.deepEqual(result[3], blocks[2]); assert.deepEqual(blocks, before);
+  assert.throws(() => positionLessonImage(blocks, blocks[1], { blockId: 'body', textBoundary: 9 }, 'after'));
+  assert.throws(() => positionLessonImage(blocks, blocks[1], { blockId: 'missing' }, 'after'));
+  assert.throws(() => positionLessonImage(blocks, blocks[1], { blockId: 'body', textBoundary: 1 }, 'question'));
+  assert.equal(positionLessonImage(blocks, blocks[1], { blockId: 'image' }, 'after'), blocks);
+  assert.deepEqual(positionLessonImage(blocks, blocks[1], { blockId: 'body', textBoundary: 0 }, 'after').map(block => block.id), ['image', 'body', 'question']);
+  assert.deepEqual(positionLessonImage(blocks, blocks[1], { blockId: 'body', textBoundary: 3 }, 'after').map(block => block.id), ['body', 'image', 'question']);
+});

@@ -51,7 +51,7 @@ export function lessonTextSegments(text: string): LessonSegment[] {
   return nodes.filter(node => node.text);
 }
 
-const blockTypes = new Set(["doc", "paragraph", "heading", "bulletList", "orderedList", "listItem", "blockquote"]);
+const blockTypes = new Set(["doc", "paragraph", "heading", "bulletList", "orderedList", "listItem", "blockquote", "details", "detailsSummary", "detailsContent"]);
 const simpleMarks = new Set(["bold", "italic", "underline", "strike"]);
 const record = (value: unknown): Record<string, unknown> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 
@@ -76,7 +76,13 @@ export function normalizeLessonDocument(value: unknown): LessonNode | null {
     if (type === "hardBreak") return { type };
     if (!blockTypes.has(type)) return null;
     const content = (Array.isArray(node.content) ? node.content : []).map(child => visit(child, depth + 1)).filter((child): child is LessonNode => Boolean(child));
-    if (type === "heading") return { type, attrs: { level: attrs.level === 3 ? 3 : 2 }, content };
+    if (type === "heading") return { type, attrs: { level: attrs.level === 1 ? 1 : attrs.level === 3 ? 3 : 2 }, content };
+    if (type === "details") {
+      if (content.length !== 2 || content[0].type !== "detailsSummary" || content[1].type !== "detailsContent") throw new Error("Invalid lesson toggle");
+      return { type, content };
+    }
+    if (type === "detailsSummary" && content.some(child => child.type !== "text")) throw new Error("Invalid lesson toggle title");
+    if (type === "detailsContent" && (!content.length || content.some(child => ["text", "hardBreak", "doc", "detailsSummary", "detailsContent"].includes(child.type)))) throw new Error("Invalid lesson toggle content");
     if (type === "orderedList") return { type, attrs: { start: Number.isSafeInteger(attrs.start) && Number(attrs.start) > 0 && Number(attrs.start) <= 10000 ? Number(attrs.start) : 1 }, content };
     return { type, content };
   }
@@ -95,7 +101,7 @@ export function lessonDocumentForEditor(text: string): LessonNode {
 function documentText(node: LessonNode): string {
   if (node.type === "text") return node.text || "";
   if (node.type === "hardBreak") return "\n";
-  return (node.content || []).map(documentText).join(["paragraph", "heading"].includes(node.type) ? "" : "\n");
+  return (node.content || []).map(documentText).join(["paragraph", "heading", "detailsSummary"].includes(node.type) ? "" : "\n");
 }
 export function lessonBodyHasText(text: string): boolean {
   return Boolean(lessonBodyPlainText(text).trim());

@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
+import { EditorContent, useEditor, useEditorState, Extension, InputRule, wrappingInputRule } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import Blockquote from "@tiptap/extension-blockquote";
+import { Details, DetailsContent, DetailsSummary } from "@tiptap/extension-details";
 import { TextStyle, FontSize } from "@tiptap/extension-text-style";
-import { Bold, Italic, Underline, List, ListOrdered, Link2, Undo2, Redo2, RemoveFormatting } from "lucide-react";
+import { Bold, Italic, Underline, List, ListOrdered, Link2, Undo2, Redo2, RemoveFormatting, Quote, ListCollapse } from "lucide-react";
 import { LESSON_FONT_SIZES, lessonDocumentForEditor, serializeLessonDocument } from "@/lib/lesson-body";
 import { safeUrl } from "@/lib/platform";
 import "./lesson-text.css";
@@ -21,6 +23,41 @@ const LessonFontSize = FontSize.extend({
   },
 });
 
+const LessonQuote = Blockquote.extend({
+  addInputRules() { return [wrappingInputRule({ find: /^" $/, type: this.type })]; },
+});
+const LessonDetails = Details.extend({
+  addInputRules() {
+    return [new InputRule({ find: /^> $/, handler: ({ chain, range }) => {
+      if (!chain().deleteRange(range).setDetails().run()) return null;
+    } })];
+  },
+}).configure({
+  // Opening a toggle is a reading preference, not a change to lesson content.
+  persist: false,
+  renderToggleButton: ({ element, isOpen }) => {
+    element.contentEditable = "false";
+    element.setAttribute("aria-label", isOpen ? "내용 접기" : "내용 펼치기");
+    element.setAttribute("aria-expanded", String(isOpen));
+    element.textContent = isOpen ? "▾" : "▸";
+    // ProseMirror's Enter/Space handlers must not consume a focused button.
+    element.onkeydown = event => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault(); event.stopPropagation(); element.click();
+      }
+    };
+  },
+});
+const LessonInputUndo = Extension.create({
+  name: "lessonInputUndo", priority: 1000,
+  addKeyboardShortcuts() {
+    return {
+      "Mod-z": () => this.editor.commands.undoInputRule() || this.editor.commands.undo(),
+      Backspace: () => this.editor.commands.undoInputRule(),
+    };
+  },
+});
+
 export function LessonRichInput({ value, onChange, label = "학습 내용", disabled = false, name, id, showLabel = true }: LessonBodyEditorProps) {
   const generatedId = useId(), editorId = id || `lesson-body-${generatedId}`;
   const lastValue = useRef(value);
@@ -31,9 +68,11 @@ export function LessonRichInput({ value, onChange, label = "학습 내용", disa
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [StarterKit.configure({
-      heading: { levels: [2, 3] }, code: false, codeBlock: false, horizontalRule: false,
+      // An automatic trailing paragraph appends a second transaction after an
+      // input rule and discards its undo state. Enter already creates paragraphs.
+      heading: { levels: [1, 2, 3] }, trailingNode: false, blockquote: false, code: false, codeBlock: false, horizontalRule: false,
       link: { openOnClick: false, HTMLAttributes: { target: "_blank", rel: "noopener noreferrer" }, isAllowedUri: url => Boolean(safeUrl(url)) },
-    }), TextStyle, LessonFontSize],
+    }), TextStyle, LessonFontSize, LessonQuote, LessonDetails, DetailsSummary, DetailsContent, LessonInputUndo],
     content: lessonDocumentForEditor(value),
     editable: !disabled,
     editorProps: { attributes: { id: editorId, role: "textbox", "aria-label": label, "aria-multiline": "true", "aria-describedby": `${editorId}-help`, class: "lesson-rich-body" } },
@@ -51,11 +90,12 @@ export function LessonRichInput({ value, onChange, label = "학습 내용", disa
     }
   }, [editor, value]);
   const state = useEditorState({ editor, selector: ({ editor }) => ({
-    block: editor?.isActive("heading", { level: 2 }) ? "h2" : editor?.isActive("heading", { level: 3 }) ? "h3" : "p",
+    block: editor?.isActive("heading", { level: 1 }) ? "h1" : editor?.isActive("heading", { level: 2 }) ? "h2" : editor?.isActive("heading", { level: 3 }) ? "h3" : "p",
     size: String(editor?.getAttributes("textStyle").fontSize || ""),
     bold: editor?.isActive("bold"), italic: editor?.isActive("italic"), underline: editor?.isActive("underline"),
     bullet: editor?.isActive("bulletList"), ordered: editor?.isActive("orderedList"), link: editor?.isActive("link"),
-    undo: editor?.can().undo(), redo: editor?.can().redo(),
+    quote: editor?.isActive("blockquote"), details: editor?.isActive("details"),
+    undo: editor?.can().undoInputRule() || editor?.can().undo(), redo: editor?.can().redo(),
   }) });
   function toggleLink() {
     if (!editor) return;
@@ -80,9 +120,11 @@ export function LessonRichInput({ value, onChange, label = "학습 내용", disa
     { label: "밑줄", icon: Underline, active: state?.underline, action: () => editor?.chain().focus().toggleUnderline().run() },
     { label: "글머리 목록", icon: List, active: state?.bullet, action: () => editor?.chain().focus().toggleBulletList().run() },
     { label: "번호 목록", icon: ListOrdered, active: state?.ordered, action: () => editor?.chain().focus().toggleOrderedList().run() },
+    { label: "접기·펼치기", icon: ListCollapse, active: state?.details, action: () => editor?.isActive("details") ? editor.chain().focus().unsetDetails().run() : editor?.chain().focus().setDetails().run() },
+    { label: "인용문", icon: Quote, active: state?.quote, action: () => editor?.chain().focus().toggleBlockquote().run() },
     { label: "링크", icon: Link2, active: state?.link || linkOpen, action: toggleLink },
     { label: "서식 지우기", icon: RemoveFormatting, action: () => editor?.chain().focus().unsetAllMarks().clearNodes().run() },
-    { label: "실행 취소", icon: Undo2, unavailable: !state?.undo, action: () => editor?.chain().focus().undo().run() },
+    { label: "실행 취소", icon: Undo2, unavailable: !state?.undo, action: () => editor?.chain().focus().undoInputRule().run() || editor?.chain().focus().undo().run() },
     { label: "다시 실행", icon: Redo2, unavailable: !state?.redo, action: () => editor?.chain().focus().redo().run() },
   ];
   return <div className="lesson-body-field field">
@@ -99,8 +141,8 @@ export function LessonRichInput({ value, onChange, label = "학습 내용", disa
             return true;
           }).unsetFontSize();
           if (event.target.value === "p") chain?.setParagraph().run();
-          else chain?.setHeading({ level: event.target.value === "h2" ? 2 : 3 }).run();
-        }}><option value="p">본문</option><option value="h2">제목 2 · H2</option><option value="h3">제목 3 · H3</option></select>
+          else chain?.setHeading({ level: event.target.value === "h1" ? 1 : event.target.value === "h2" ? 2 : 3 }).run();
+        }}><option value="p">본문</option><option value="h1">제목 1 · H1</option><option value="h2">제목 2 · H2</option><option value="h3">제목 3 · H3</option></select>
         <select aria-label="글자 크기" value={state?.size || ""} disabled={disabled || !editor} onChange={event => event.target.value ? editor?.chain().focus().setFontSize(event.target.value).run() : editor?.chain().focus().unsetFontSize().run()}><option value="">기본 크기</option>{LESSON_FONT_SIZES.map(size => <option key={size} value={`${size}px`}>{size}px</option>)}</select>
         {buttons.map(button => <button type="button" key={button.label} title={button.label} aria-label={button.label} aria-pressed={button.active} disabled={disabled || !editor || button.unavailable} onMouseDown={event => event.preventDefault()} onClick={button.action}><button.icon size={16} aria-hidden="true" /></button>)}
       </div>
@@ -113,6 +155,6 @@ export function LessonRichInput({ value, onChange, label = "학습 내용", disa
       <EditorContent editor={editor} />
     </div>
     {name && <input type="hidden" name={name} value={value} />}
-    <small id={`${editorId}-help`} className="field-hint">글자를 선택한 뒤 서식을 적용하세요. Enter는 새 문단, Shift+Enter는 줄바꿈입니다. 변경 후 학습을 저장해 주세요.</small>
+    <small id={`${editorId}-help`} className="field-hint">줄 맨 앞에 <code>#</code> · <code>##</code> · <code>###</code>와 공백을 입력하면 제목, <code>-</code>는 글머리 목록, <code>1.</code>은 번호 목록, <code>&gt;</code>는 접기·펼치기, <code>&quot;</code>는 인용문이 됩니다. 토글은 화살표로 펼친 뒤 제목에서 Enter를 누르면 안쪽에 글을 쓸 수 있습니다. Shift+Enter는 줄바꿈입니다. 변경 후 학습을 저장해 주세요.</small>
   </div>;
 }

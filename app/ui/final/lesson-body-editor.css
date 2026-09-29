@@ -18,3 +18,12 @@
 .edu-admin .lesson-link-controls p { flex-basis:100%; color:var(--red,#c51e2c); font-size:12px; }
 .edu-admin .lesson-editor-loading { padding:16px; color:var(--muted); }
 .edu-admin .lesson-body-field > small { display:block; margin-top:8px; line-height:1.6; }
+.edu-admin .lesson-body-field > small code { padding:1px 4px; border-radius:3px; background:#f1f3f5; font-size:12px; }
+.edu-admin .lesson-body-editor [data-type=details] { display:flex; gap:6px; margin:.75em 0; }
+.edu-admin .lesson-body-editor [data-type=details] > div { flex:1; min-width:0; }
+.edu-admin .lesson-body-editor [data-type=details] > button { flex:none; width:28px; height:28px; border:0; border-radius:4px; background:#f1f3f5; color:inherit; font-size:18px; line-height:1; cursor:pointer; }
+.edu-admin .lesson-body-editor [data-type=details] > button:focus-visible { outline:2px solid var(--red,#c51e2c); outline-offset:2px; }
+.edu-admin .lesson-body-editor .lesson-rich-body summary { display:block; cursor:text; min-height:1.8em; }
+.edu-admin .lesson-body-editor .lesson-rich-body summary:empty::before { content:'접기·펼치기 제목'; color:#8b8e93; pointer-events:none; }
+.edu-admin .lesson-body-editor [data-type=detailsContent] { padding:.5em 0 .5em 1em; border-left:2px solid #e5e7eb; }
+.edu-admin .lesson-body-editor [data-type=detailsContent][hidden] { display:none; }
