@@ -13,7 +13,8 @@ const actual = {campaign_id:campaign.id,day:relativeDay(-1),kakao_members:10,new
 const summary = {has_data:false,sessions:0,visitors:0,cta_click_sessions:0,cta_clicks:0,converted_visitors:0,avg_dwell_ms:0,avg_scroll_depth:0,meta_impressions:0,meta_link_clicks:0,spend:0};
 const report = {campaign,summary_b:summary,summary_a:null,performance:[],daily:[],actuals:[actual],campaign_summary:{live_peak:null,kakao_members:10,kakao_delta:null,new_payments:0,existing_payments:0,revenue:0,spend:0,roas:null},options:{campaigns:[],ad_types:[],adsets:[],creatives:[],devices:[],layouts:[]},data_state:{sessions_exist:false,filtered_sessions_exist:false,meta_exists:false}};
 const result = await build({entryPoints:['tests/browser/fixture/app.tsx'],bundle:true,write:false,outdir:'focus-fixture',platform:'browser',format:'esm',jsx:'automatic',define:{'process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED':'"true"','process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY':'"test_ck_synthetic_only"','process.env.NODE_ENV':'"development"','process.env':'{}'},alias:{'@tosspayments/tosspayments-sdk':resolve('tests/browser/fixture/toss.ts'),'next/image':resolve('tests/browser/fixture/image.tsx'),'next/link':resolve('tests/browser/fixture/link.tsx'),'next/navigation':resolve('tests/browser/fixture/navigation.ts')}});
-const assets = new Map(result.outputFiles.map(file=>['/'+file.path.split('/').at(-1),file.contents]));
+const consentResult = await build({entryPoints:['tests/browser/fixture/consent-app.tsx'],bundle:true,write:false,outdir:'consent-fixture',platform:'browser',format:'esm',jsx:'automatic',define:{'process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED':'"true"','process.env.NODE_ENV':'"development"','process.env':'{}'},alias:{'@/lib/supabase/client':resolve('tests/browser/fixture/consent-auth.ts'),'next/image':resolve('tests/browser/fixture/image.tsx'),'next/link':resolve('tests/browser/fixture/link.tsx'),'next/navigation':resolve('tests/browser/fixture/consent-navigation.ts')}});
+const assets = new Map([...result.outputFiles,...consentResult.outputFiles].map(file=>['/'+file.path.split('/').at(-1),file.contents]));
 const brandLogo = readFileSync(resolve('public/brandy-action-logo.png'));
 const failedMemberReads = new Set();
 const server = createServer((request,response)=>{
@@ -69,6 +70,9 @@ const server = createServer((request,response)=>{
   }
   const asset=assets.get(url.pathname);
   if(asset){response.setHeader('Content-Type',url.pathname.endsWith('.css')?'text/css':'text/javascript');response.end(asset);return;}
+  if(url.pathname==='/signup-consent-test'){
+    response.setHeader('Content-Type','text/html');response.end('<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Signup consent fixture</title><link rel="stylesheet" href="/consent-app.css"></head><body><div id="root"></div><script type="module" src="/consent-app.js"></script></body></html>');return;
+  }
   response.setHeader('Content-Type','text/html');response.end('<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin focus fixture</title><link rel="stylesheet" href="/app.css"></head><body style="overflow:auto"><div id="root"></div><script type="module" src="/app.js"></script></body></html>');
 });
 const port = Number(process.env.FIXTURE_PORT || 4173);
