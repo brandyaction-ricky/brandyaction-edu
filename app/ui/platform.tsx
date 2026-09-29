@@ -1,4 +1,9 @@
 "use client";
+import { QuestionImage } from './final/question-image';
+import { QuestionThreadDialog } from './final/question-thread';
+import { UnreadMessageLink } from "./final/unread-message-link";
+import { LearningNoticeBar } from './final/learning-notice';
+import { disableDevicePush, synchronizePushAccount } from "@/lib/web-push-client";
 import { defaultPolicies } from "@/lib/legal-policies";
 import { createMutationGate } from "@/lib/mutation-gate";
 import { sectionScopes } from "@/lib/operator-scopes";
@@ -31,6 +36,7 @@ import {
   useRef,
   useState,
   type FormEvent,
+  type ComponentProps,
   type ReactNode,
 } from "react";
 import { AdminWorkflows, standaloneAdmin } from "./admin-workflows";
@@ -53,6 +59,7 @@ import { Checkout } from "./final/checkout";
 import { Classroom } from "./final/classroom";
 import { MemberViews } from "./final/member-views";
 import { CustomerWorkspace } from "./final/customer-workspace";
+import { MemberVisitRecorder } from "./final/member-visit-recorder";
 import {
   ArticleCard,
   Brand,
@@ -381,6 +388,9 @@ export function Platform({
       document.removeEventListener("keydown", closeOnEscape);
     };
   }, [profileMenuOpen]);
+  useEffect(() => {
+    if (!loading && !error) void synchronizePushAccount(user?.id || null).catch(() => {});
+  }, [loading, error, user?.id]);
   const send = (body: Record<string, unknown>, success = "저장했습니다.") =>
     mutationGate.current(body, async (payload) => {
       setPending(true);
@@ -489,6 +499,7 @@ export function Platform({
   }
   const logout = async () => {
     setPending(true);
+    await disableDevicePush().catch(() => {});
     const { error } = await createClient().auth.signOut();
     if (error) {
       setNotice("로그아웃에 실패했습니다.");
@@ -536,6 +547,7 @@ export function Platform({
           <div className="header-user">
             {user ? (
               <>
+                {process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === "true" && <UnreadMessageLink key={user.id} userId={user.id}/>}
                 <Link className="link" href="/my">
                   마이페이지
                 </Link>
@@ -592,6 +604,7 @@ export function Platform({
           </nav>
         )}
       </header>
+      {process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' && <LearningNoticeBar/>}
     </>
   );
   const footer =
@@ -798,6 +811,7 @@ export function Platform({
         send={send}
         logout={logout}
         order={searchParams.get("order")}
+        ongoingLesson={searchParams.get("ongoing") || ""}
       />
     );
   else if (learning)
@@ -917,7 +931,8 @@ export function Platform({
             />
           ) : (
             <LearningEditor
-              key={edited?.id || "new-lesson"}
+              key={`${user!.id}:${edited?.id || "new-lesson"}`}
+              actorId={user!.id}
               data={data}
               row={edited}
               pending={pending}
@@ -1002,6 +1017,7 @@ export function Platform({
                 setPage={setAdminPage}
                 exportCsv={downloadCsv}
                 send={send}
+                onQuestionChanged={() => { adminNavigationReads.clear(); void refresh(true); }}
                 tools={
                   ["cohorts", "missions", "customers"].includes(section.key) ? (
                     <AdminWorkflows
@@ -1030,6 +1046,7 @@ export function Platform({
       }
     >
       {!admin && header}
+      {(account || learning) && user?.role === 'student' && <MemberVisitRecorder member={user.id}/>}
       <main
         id="main"
         className={
@@ -1053,6 +1070,7 @@ export function Platform({
       {notice && (admin ? <AdminToast tone="success">{notice}</AdminToast> : <div className="toast" role="status">{notice}</div>)}
       {editor && editor.route === routeKey && (
         <Editor
+          onQuestionChanged={() => { adminNavigationReads.clear(); void refresh(true); }}
           key={editor.section.key + (editor.row ? recordId(editor.row) : "new")}
           section={editor.section}
           row={editor.row}
@@ -1115,7 +1133,13 @@ function downloadCsv(rows: Row[], name: string) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
-export function Editor({
+export function Editor(props: ComponentProps<typeof LegacyEditor> & { onQuestionChanged?: () => void }) {
+  const { onQuestionChanged, ...legacy } = props;
+  if (process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED === 'true' && props.section.key === 'questions' && props.row?.id)
+    return <QuestionThreadDialog questionId={String(props.row.id)} close={props.close} changed={onQuestionChanged} archive={props.archive} pending={props.pending}/>;
+  return <LegacyEditor {...legacy}/>;
+}
+function LegacyEditor({
   section,
   row,
   context,
@@ -1448,7 +1472,7 @@ export function Editor({
               ) : section.key === "coupons" ? (
                 <CouponFields row={row} data={data} />
               ) : section.key === "questions" ? (
-                <div className="question-answer-editor">
+                <div className="question-answer-editor"><QuestionImage key={String(row?.id)} questionId={String(row?.id)} imageId={row?.image_id}/>
                   <div className="question-answer-heading">
                     <div><h3>답변 작성</h3><p>AI 초안은 자동 등록되지 않습니다. 사실을 확인하고 내용을 검수해 주세요.</p></div>
                     <button className="btn question-ai-button" type="button" disabled={pending || questionAiPending || !row?.id} onClick={() => void generateQuestionAnswer()}>

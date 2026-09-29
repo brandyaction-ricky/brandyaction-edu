@@ -1,0 +1,932 @@
+{
+  "sourceDate": "2026-09-07",
+  "sourceSha256": {
+    "recipe": "ecf56585d05df6e414cf2e7ab1039c14af10c2f7f9bdea189513f24b78a39cb4",
+    "margin": "edf524c0581e6ba251474fe22b0832f783bf88659c9d30315d2729106ef17875",
+    "funnel": "d3f999a8958a37045e479a085d20ee159ea6862e9333af89f05392d6cf9c9ec1"
+  },
+  "recipe": [
+    {
+      "values": {},
+      "expected": {
+        "results": [
+          {
+            "label": "총 유입 획득 수",
+            "value": 0,
+            "unit": "명",
+            "subDesc": "(=오가닉 유입+광고 유입)",
+            "details": [
+              {
+                "label": "오가닉 유입",
+                "value": 0,
+                "desc": "(=(플레이스 유입-광고 클릭)/3)"
+              },
+              {
+                "label": "광고 유입",
+                "value": 0,
+                "desc": "(=광고 클릭/3)"
+              }
+            ]
+          },
+          {
+            "label": "행동 데이터 획득",
+            "value": 0,
+            "unit": "건",
+            "subDesc": "(=쿠폰 다운로드+스마트콜+길찾기)",
+            "details": [
+              {
+                "label": "쿠폰 다운로드 수",
+                "value": 0,
+                "desc": "(=쿠폰 다운로드/3)"
+              },
+              {
+                "label": "스마트콜 횟수",
+                "value": 0,
+                "desc": "(=스마트콜/3)"
+              },
+              {
+                "label": "길찾기 수(추정치)",
+                "value": 0,
+                "desc": "(=플레이스 유입/3×0.03)"
+              }
+            ]
+          },
+          {
+            "label": "결제 전환 획득",
+            "value": 0,
+            "unit": "건",
+            "subDesc": "(=Npayconnect+네이버 페이+영수증 리뷰)",
+            "details": [
+              {
+                "label": "Npayconnect 결제 건",
+                "value": 0,
+                "desc": "(=N pay connect/3)"
+              },
+              {
+                "label": "네이버 페이 결제 건",
+                "value": 0,
+                "desc": "(=네이버 페이/3)"
+              },
+              {
+                "label": "영수증 리뷰 건",
+                "value": 0,
+                "desc": "(=영수증 리뷰/3)"
+              }
+            ]
+          },
+          {
+            "label": "리뷰 전환 획득",
+            "value": 0,
+            "unit": "건",
+            "subDesc": "(=리뷰 전환+블로그 전환)",
+            "details": [
+              {
+                "label": "리뷰 전환",
+                "value": 0,
+                "desc": "(=신규 리뷰/3)"
+              },
+              {
+                "label": "블로그 전환",
+                "value": 0,
+                "desc": "(=신규 블로그 포스팅/3)"
+              }
+            ]
+          }
+        ],
+        "achievements": [
+          {
+            "label": "총 유입",
+            "rate": 0
+          },
+          {
+            "label": "행동 데이터 획득",
+            "rate": 0
+          },
+          {
+            "label": "결제 전환 획득",
+            "rate": 0
+          },
+          {
+            "label": "리뷰 전환 획득",
+            "rate": 0
+          }
+        ]
+      }
+    },
+    {
+      "values": {
+        "adClicks": "90",
+        "placeVisits": "450",
+        "couponDownloads": "15",
+        "smartCalls": "6",
+        "naverPayPayments": "9",
+        "receiptReviews": "3",
+        "nPayConnectPayments": "6",
+        "newReviews": "6",
+        "newBlogPostings": "3"
+      },
+      "expected": {
+        "results": [
+          {
+            "label": "총 유입 획득 수",
+            "value": 150,
+            "unit": "명",
+            "subDesc": "(=오가닉 유입+광고 유입)",
+            "details": [
+              {
+                "label": "오가닉 유입",
+                "value": 120,
+                "desc": "(=(플레이스 유입-광고 클릭)/3)"
+              },
+              {
+                "label": "광고 유입",
+                "value": 30,
+                "desc": "(=광고 클릭/3)"
+              }
+            ]
+          },
+          {
+            "label": "행동 데이터 획득",
+            "value": 11.5,
+            "unit": "건",
+            "subDesc": "(=쿠폰 다운로드+스마트콜+길찾기)",
+            "details": [
+              {
+                "label": "쿠폰 다운로드 수",
+                "value": 5,
+                "desc": "(=쿠폰 다운로드/3)"
+              },
+              {
+                "label": "스마트콜 횟수",
+                "value": 2,
+                "desc": "(=스마트콜/3)"
+              },
+              {
+                "label": "길찾기 수(추정치)",
+                "value": 4.5,
+                "desc": "(=플레이스 유입/3×0.03)"
+              }
+            ]
+          },
+          {
+            "label": "결제 전환 획득",
+            "value": 6,
+            "unit": "건",
+            "subDesc": "(=Npayconnect+네이버 페이+영수증 리뷰)",
+            "details": [
+              {
+                "label": "Npayconnect 결제 건",
+                "value": 2,
+                "desc": "(=N pay connect/3)"
+              },
+              {
+                "label": "네이버 페이 결제 건",
+                "value": 3,
+                "desc": "(=네이버 페이/3)"
+              },
+              {
+                "label": "영수증 리뷰 건",
+                "value": 1,
+                "desc": "(=영수증 리뷰/3)"
+              }
+            ]
+          },
+          {
+            "label": "리뷰 전환 획득",
+            "value": 3,
+            "unit": "건",
+            "subDesc": "(=리뷰 전환+블로그 전환)",
+            "details": [
+              {
+                "label": "리뷰 전환",
+                "value": 2,
+                "desc": "(=신규 리뷰/3)"
+              },
+              {
+                "label": "블로그 전환",
+                "value": 1,
+                "desc": "(=신규 블로그 포스팅/3)"
+              }
+            ]
+          }
+        ],
+        "achievements": [
+          {
+            "label": "총 유입",
+            "rate": 300
+          },
+          {
+            "label": "행동 데이터 획득",
+            "rate": 229.99999999999997
+          },
+          {
+            "label": "결제 전환 획득",
+            "rate": 200
+          },
+          {
+            "label": "리뷰 전환 획득",
+            "rate": 300
+          }
+        ]
+      }
+    },
+    {
+      "values": {
+        "adClicks": "90",
+        "placeVisits": "30"
+      },
+      "expected": {
+        "results": [
+          {
+            "label": "총 유입 획득 수",
+            "value": 10,
+            "unit": "명",
+            "subDesc": "(=오가닉 유입+광고 유입)",
+            "details": [
+              {
+                "label": "오가닉 유입",
+                "value": -20,
+                "desc": "(=(플레이스 유입-광고 클릭)/3)"
+              },
+              {
+                "label": "광고 유입",
+                "value": 30,
+                "desc": "(=광고 클릭/3)"
+              }
+            ]
+          },
+          {
+            "label": "행동 데이터 획득",
+            "value": 0.3,
+            "unit": "건",
+            "subDesc": "(=쿠폰 다운로드+스마트콜+길찾기)",
+            "details": [
+              {
+                "label": "쿠폰 다운로드 수",
+                "value": 0,
+                "desc": "(=쿠폰 다운로드/3)"
+              },
+              {
+                "label": "스마트콜 횟수",
+                "value": 0,
+                "desc": "(=스마트콜/3)"
+              },
+              {
+                "label": "길찾기 수(추정치)",
+                "value": 0.3,
+                "desc": "(=플레이스 유입/3×0.03)"
+              }
+            ]
+          },
+          {
+            "label": "결제 전환 획득",
+            "value": 0,
+            "unit": "건",
+            "subDesc": "(=Npayconnect+네이버 페이+영수증 리뷰)",
+            "details": [
+              {
+                "label": "Npayconnect 결제 건",
+                "value": 0,
+                "desc": "(=N pay connect/3)"
+              },
+              {
+                "label": "네이버 페이 결제 건",
+                "value": 0,
+                "desc": "(=네이버 페이/3)"
+              },
+              {
+                "label": "영수증 리뷰 건",
+                "value": 0,
+                "desc": "(=영수증 리뷰/3)"
+              }
+            ]
+          },
+          {
+            "label": "리뷰 전환 획득",
+            "value": 0,
+            "unit": "건",
+            "subDesc": "(=리뷰 전환+블로그 전환)",
+            "details": [
+              {
+                "label": "리뷰 전환",
+                "value": 0,
+                "desc": "(=신규 리뷰/3)"
+              },
+              {
+                "label": "블로그 전환",
+                "value": 0,
+                "desc": "(=신규 블로그 포스팅/3)"
+              }
+            ]
+          }
+        ],
+        "achievements": [
+          {
+            "label": "총 유입",
+            "rate": 20
+          },
+          {
+            "label": "행동 데이터 획득",
+            "rate": 6
+          },
+          {
+            "label": "결제 전환 획득",
+            "rate": 0
+          },
+          {
+            "label": "리뷰 전환 획득",
+            "rate": 0
+          }
+        ]
+      }
+    },
+    {
+      "values": {
+        "adClicks": "1.23",
+        "placeVisits": "12.34",
+        "couponDownloads": "4.56",
+        "newReviews": "7.89"
+      },
+      "expected": {
+        "results": [
+          {
+            "label": "총 유입 획득 수",
+            "value": 4.11,
+            "unit": "명",
+            "subDesc": "(=오가닉 유입+광고 유입)",
+            "details": [
+              {
+                "label": "오가닉 유입",
+                "value": 3.7,
+                "desc": "(=(플레이스 유입-광고 클릭)/3)"
+              },
+              {
+                "label": "광고 유입",
+                "value": 0.41,
+                "desc": "(=광고 클릭/3)"
+              }
+            ]
+          },
+          {
+            "label": "행동 데이터 획득",
+            "value": 1.64,
+            "unit": "건",
+            "subDesc": "(=쿠폰 다운로드+스마트콜+길찾기)",
+            "details": [
+              {
+                "label": "쿠폰 다운로드 수",
+                "value": 1.52,
+                "desc": "(=쿠폰 다운로드/3)"
+              },
+              {
+                "label": "스마트콜 횟수",
+                "value": 0,
+                "desc": "(=스마트콜/3)"
+              },
+              {
+                "label": "길찾기 수(추정치)",
+                "value": 0.12,
+                "desc": "(=플레이스 유입/3×0.03)"
+              }
+            ]
+          },
+          {
+            "label": "결제 전환 획득",
+            "value": 0,
+            "unit": "건",
+            "subDesc": "(=Npayconnect+네이버 페이+영수증 리뷰)",
+            "details": [
+              {
+                "label": "Npayconnect 결제 건",
+                "value": 0,
+                "desc": "(=N pay connect/3)"
+              },
+              {
+                "label": "네이버 페이 결제 건",
+                "value": 0,
+                "desc": "(=네이버 페이/3)"
+              },
+              {
+                "label": "영수증 리뷰 건",
+                "value": 0,
+                "desc": "(=영수증 리뷰/3)"
+              }
+            ]
+          },
+          {
+            "label": "리뷰 전환 획득",
+            "value": 2.63,
+            "unit": "건",
+            "subDesc": "(=리뷰 전환+블로그 전환)",
+            "details": [
+              {
+                "label": "리뷰 전환",
+                "value": 2.63,
+                "desc": "(=신규 리뷰/3)"
+              },
+              {
+                "label": "블로그 전환",
+                "value": 0,
+                "desc": "(=신규 블로그 포스팅/3)"
+              }
+            ]
+          }
+        ],
+        "achievements": [
+          {
+            "label": "총 유입",
+            "rate": 8.226666666666667
+          },
+          {
+            "label": "행동 데이터 획득",
+            "rate": 32.867999999999995
+          },
+          {
+            "label": "결제 전환 획득",
+            "rate": 0
+          },
+          {
+            "label": "리뷰 전환 획득",
+            "rate": 263
+          }
+        ]
+      }
+    },
+    {
+      "values": {
+        "adClicks": "1e3",
+        "placeVisits": "2e3"
+      },
+      "expected": {
+        "results": [
+          {
+            "label": "총 유입 획득 수",
+            "value": 666.67,
+            "unit": "명",
+            "subDesc": "(=오가닉 유입+광고 유입)",
+            "details": [
+              {
+                "label": "오가닉 유입",
+                "value": 333.33,
+                "desc": "(=(플레이스 유입-광고 클릭)/3)"
+              },
+              {
+                "label": "광고 유입",
+                "value": 333.33,
+                "desc": "(=광고 클릭/3)"
+              }
+            ]
+          },
+          {
+            "label": "행동 데이터 획득",
+            "value": 20,
+            "unit": "건",
+            "subDesc": "(=쿠폰 다운로드+스마트콜+길찾기)",
+            "details": [
+              {
+                "label": "쿠폰 다운로드 수",
+                "value": 0,
+                "desc": "(=쿠폰 다운로드/3)"
+              },
+              {
+                "label": "스마트콜 횟수",
+                "value": 0,
+                "desc": "(=스마트콜/3)"
+              },
+              {
+                "label": "길찾기 수(추정치)",
+                "value": 20,
+                "desc": "(=플레이스 유입/3×0.03)"
+              }
+            ]
+          },
+          {
+            "label": "결제 전환 획득",
+            "value": 0,
+            "unit": "건",
+            "subDesc": "(=Npayconnect+네이버 페이+영수증 리뷰)",
+            "details": [
+              {
+                "label": "Npayconnect 결제 건",
+                "value": 0,
+                "desc": "(=N pay connect/3)"
+              },
+              {
+                "label": "네이버 페이 결제 건",
+                "value": 0,
+                "desc": "(=네이버 페이/3)"
+              },
+              {
+                "label": "영수증 리뷰 건",
+                "value": 0,
+                "desc": "(=영수증 리뷰/3)"
+              }
+            ]
+          },
+          {
+            "label": "리뷰 전환 획득",
+            "value": 0,
+            "unit": "건",
+            "subDesc": "(=리뷰 전환+블로그 전환)",
+            "details": [
+              {
+                "label": "리뷰 전환",
+                "value": 0,
+                "desc": "(=신규 리뷰/3)"
+              },
+              {
+                "label": "블로그 전환",
+                "value": 0,
+                "desc": "(=신규 블로그 포스팅/3)"
+              }
+            ]
+          }
+        ],
+        "achievements": [
+          {
+            "label": "총 유입",
+            "rate": 1333.3333333333333
+          },
+          {
+            "label": "행동 데이터 획득",
+            "rate": 399.9999999999999
+          },
+          {
+            "label": "결제 전환 획득",
+            "rate": 0
+          },
+          {
+            "label": "리뷰 전환 획득",
+            "rate": 0
+          }
+        ]
+      }
+    }
+  ],
+  "margin": [
+    {
+      "values": {},
+      "expected": {
+        "revenue": 0,
+        "categoryFeeAmt": 0,
+        "linkFeeAmt": 0,
+        "deliveryFeeAmt": 0,
+        "totalFee": 0,
+        "settlement": 0,
+        "totalCost": 0,
+        "vat": 0,
+        "netProfit": 0,
+        "marginRate": 0
+      }
+    },
+    {
+      "values": {
+        "salePrice": "10000",
+        "shippingFee": "3000",
+        "purchasePrice": "4000",
+        "purchaseShipping": "500",
+        "etcCost": "100",
+        "freightCost": "2500",
+        "adCost": "300"
+      },
+      "expected": {
+        "revenue": 13000,
+        "categoryFeeAmt": 363,
+        "linkFeeAmt": 300,
+        "deliveryFeeAmt": 108.9,
+        "totalFee": 771.9,
+        "settlement": 12228.1,
+        "totalCost": 7400,
+        "vat": 509.090909090909,
+        "netProfit": 4319.009090909091,
+        "marginRate": 43.19009090909091
+      }
+    },
+    {
+      "values": {
+        "salePrice": "10000",
+        "shippingFee": "3000",
+        "purchasePrice": "4000",
+        "purchaseShipping": "500",
+        "etcCost": "100",
+        "freightCost": "2500",
+        "adCost": "300",
+        "vatType": "면세 사업자"
+      },
+      "expected": {
+        "revenue": 13000,
+        "categoryFeeAmt": 363,
+        "linkFeeAmt": 300,
+        "deliveryFeeAmt": 108.9,
+        "totalFee": 771.9,
+        "settlement": 12228.1,
+        "totalCost": 7400,
+        "vat": 0,
+        "netProfit": 4828.1,
+        "marginRate": 48.281
+      }
+    },
+    {
+      "values": {
+        "salePrice": "0",
+        "purchasePrice": "1000"
+      },
+      "expected": {
+        "revenue": 0,
+        "categoryFeeAmt": 0,
+        "linkFeeAmt": 0,
+        "deliveryFeeAmt": 0,
+        "totalFee": 0,
+        "settlement": 0,
+        "totalCost": 1000,
+        "vat": -90.9090909090909,
+        "netProfit": -909.0909090909091,
+        "marginRate": 0
+      }
+    },
+    {
+      "values": {
+        "salePrice": "10000",
+        "shippingFee": "3000",
+        "purchasePrice": "4000",
+        "purchaseShipping": "500",
+        "etcCost": "100",
+        "freightCost": "2500",
+        "adCost": "300",
+        "channel": "직접 입력",
+        "categoryFee": "1.25",
+        "linkFee": "0.05",
+        "deliveryFeeRate": "2.34",
+        "vatRate": "5"
+      },
+      "expected": {
+        "revenue": 13000,
+        "categoryFeeAmt": 125,
+        "linkFeeAmt": 5,
+        "deliveryFeeAmt": 70.2,
+        "totalFee": 200.2,
+        "settlement": 12799.8,
+        "totalCost": 7400,
+        "vat": 266.66666666666663,
+        "netProfit": 5133.133333333332,
+        "marginRate": 51.33133333333332
+      }
+    },
+    {
+      "values": {
+        "salePrice": "12.34",
+        "shippingFee": "3000",
+        "purchasePrice": "4000",
+        "purchaseShipping": "500",
+        "etcCost": "100",
+        "freightCost": "2500",
+        "adCost": "300",
+        "categoryFee": "100.5"
+      },
+      "expected": {
+        "revenue": 3012.34,
+        "categoryFeeAmt": 12.4017,
+        "linkFeeAmt": 0.3702,
+        "deliveryFeeAmt": 108.9,
+        "totalFee": 121.67190000000001,
+        "settlement": 2890.6681000000003,
+        "totalCost": 7400,
+        "vat": -398.8781818181818,
+        "netProfit": -4110.453718181818,
+        "marginRate": -33309.99771622219
+      }
+    },
+    {
+      "values": {
+        "salePrice": "1e6",
+        "shippingFee": "3000",
+        "purchasePrice": "4000",
+        "purchaseShipping": "500",
+        "etcCost": "100",
+        "freightCost": "2500",
+        "adCost": "300",
+        "vatRate": "0"
+      },
+      "expected": {
+        "revenue": 1003000,
+        "categoryFeeAmt": 36300,
+        "linkFeeAmt": 30000,
+        "deliveryFeeAmt": 108.9,
+        "totalFee": 66408.9,
+        "settlement": 936591.1,
+        "totalCost": 7400,
+        "vat": 0,
+        "netProfit": 929191.1,
+        "marginRate": 92.91910999999999
+      }
+    }
+  ],
+  "funnel": [
+    {
+      "values": [
+        {
+          "id": "s1",
+          "name": "광고 노출",
+          "value": "1000"
+        },
+        {
+          "id": "s2",
+          "name": "클릭",
+          "value": "300"
+        },
+        {
+          "id": "s3",
+          "name": "랜딩페이지 방문",
+          "value": "200"
+        },
+        {
+          "id": "s4",
+          "name": "DB 입력 (신청)",
+          "value": "50"
+        },
+        {
+          "id": "s5",
+          "name": "매장 방문",
+          "value": "20"
+        },
+        {
+          "id": "s6",
+          "name": "업셀링",
+          "value": "8"
+        }
+      ],
+      "expected": [
+        {
+          "id": "s1",
+          "name": "광고 노출",
+          "value": "1000",
+          "number": 1000,
+          "ratio": 1,
+          "overall": 100,
+          "previous": null
+        },
+        {
+          "id": "s2",
+          "name": "클릭",
+          "value": "300",
+          "number": 300,
+          "ratio": 0.3,
+          "overall": 30,
+          "previous": 30
+        },
+        {
+          "id": "s3",
+          "name": "랜딩페이지 방문",
+          "value": "200",
+          "number": 200,
+          "ratio": 0.2,
+          "overall": 20,
+          "previous": 66.66666666666666
+        },
+        {
+          "id": "s4",
+          "name": "DB 입력 (신청)",
+          "value": "50",
+          "number": 50,
+          "ratio": 0.05,
+          "overall": 5,
+          "previous": 25
+        },
+        {
+          "id": "s5",
+          "name": "매장 방문",
+          "value": "20",
+          "number": 20,
+          "ratio": 0.02,
+          "overall": 2,
+          "previous": 40
+        },
+        {
+          "id": "s6",
+          "name": "업셀링",
+          "value": "8",
+          "number": 8,
+          "ratio": 0.008,
+          "overall": 0.8,
+          "previous": 40
+        }
+      ]
+    },
+    {
+      "values": [
+        {
+          "id": "a",
+          "name": "노출",
+          "value": "100"
+        },
+        {
+          "id": "b",
+          "name": "클릭",
+          "value": "20"
+        },
+        {
+          "id": "c",
+          "name": "신청",
+          "value": "5"
+        }
+      ],
+      "expected": [
+        {
+          "id": "a",
+          "name": "노출",
+          "value": "100",
+          "number": 100,
+          "ratio": 1,
+          "overall": 100,
+          "previous": null
+        },
+        {
+          "id": "b",
+          "name": "클릭",
+          "value": "20",
+          "number": 20,
+          "ratio": 0.2,
+          "overall": 20,
+          "previous": 20
+        },
+        {
+          "id": "c",
+          "name": "신청",
+          "value": "5",
+          "number": 5,
+          "ratio": 0.05,
+          "overall": 5,
+          "previous": 25
+        }
+      ]
+    },
+    {
+      "values": [
+        {
+          "id": "a",
+          "name": "기준",
+          "value": "10"
+        },
+        {
+          "id": "b",
+          "name": "증가",
+          "value": "20"
+        }
+      ],
+      "expected": [
+        {
+          "id": "a",
+          "name": "기준",
+          "value": "10",
+          "number": 10,
+          "ratio": 1,
+          "overall": 100,
+          "previous": null
+        },
+        {
+          "id": "b",
+          "name": "증가",
+          "value": "20",
+          "number": 20,
+          "ratio": 1,
+          "overall": 200,
+          "previous": 200
+        }
+      ]
+    },
+    {
+      "values": [
+        {
+          "id": "a",
+          "name": "기준",
+          "value": "0"
+        },
+        {
+          "id": "b",
+          "name": "후속",
+          "value": "20"
+        }
+      ],
+      "expected": [
+        {
+          "id": "a",
+          "name": "기준",
+          "value": "0",
+          "number": 0,
+          "ratio": 0,
+          "overall": 0,
+          "previous": null
+        },
+        {
+          "id": "b",
+          "name": "후속",
+          "value": "20",
+          "number": 20,
+          "ratio": 1,
+          "overall": 2000,
+          "previous": null
+        }
+      ]
+    }
+  ]
+}

@@ -15,6 +15,7 @@ export function ProductSaleFixture() {
   const [curriculumSaves, setCurriculumSaves] = useState(0);
   const [curriculumMutation, setCurriculumMutation] = useState<Record<string, unknown> | null>(null);
   const [archiveMutation, setArchiveMutation] = useState<Record<string, unknown> | null>(null);
+  const [archiveAttempts, setArchiveAttempts] = useState(0);
   const [extraCohorts, setExtraCohorts] = useState<Row[]>([]);
   const params = new URLSearchParams(location.search);
   const missing = params.has("missing");
@@ -25,9 +26,18 @@ export function ProductSaleFixture() {
   const [lessons, setLessons] = useState<Row[]>([{ id: 'synthetic-lesson', week_id: 'synthetic-week', is_published: ready }]);
   const data = { courses: [course], cohorts: [{ id: 'synthetic-cohort', course_id: course.id, name: '합성 4기', cohort_code: 'FOURTH', status: 'upcoming', price: 100000, recruitment_end_at: params.has('expired') ? '2020-10-01T14:59:00Z' : '2099-10-01T14:59:00Z', ...(params.has('closed') ? { status: 'closed' } : {}), ...cohortOverrides }, ...extraCohorts], curriculum_weeks: weeks, curriculum_lessons: lessons };
   if (params.has('new')) data.cohorts = [];
-  return <div className="edu-admin" style={{ padding: 20, overflowWrap: "anywhere" }}><output aria-label="합성 자료 요청">{JSON.stringify(resourceMutation)}</output><output aria-label="저장한 카운트다운 설정">{String(savedCountdown)}</output><output aria-label="합성 저장 횟수">{saves}</output><output aria-label="합성 기수 저장 횟수">{cohortSaves}</output><output aria-label="합성 기수 요청">{JSON.stringify(cohortMutation)}</output><output aria-label="합성 미션 저장 횟수">{missionSaves}</output><output aria-label="합성 미션 요청">{JSON.stringify(missionMutation)}</output><output aria-label="합성 커리큘럼 저장 횟수">{curriculumSaves}</output><output aria-label="합성 커리큘럼 요청">{JSON.stringify(curriculumMutation)}</output><output aria-label="합성 보관 요청">{JSON.stringify(archiveMutation)}</output><ProductEditor row={params.has('new') ? undefined : course} data={data} pending={false} back={() => {}} send={async body => {
+  return <div className="edu-admin" style={{ padding: 20, overflowWrap: "anywhere" }}><output aria-label="합성 자료 요청">{JSON.stringify(resourceMutation)}</output><output aria-label="저장한 카운트다운 설정">{String(savedCountdown)}</output><output aria-label="합성 저장 횟수">{saves}</output><output aria-label="합성 기수 저장 횟수">{cohortSaves}</output><output aria-label="합성 기수 요청">{JSON.stringify(cohortMutation)}</output><output aria-label="합성 미션 저장 횟수">{missionSaves}</output><output aria-label="합성 미션 요청">{JSON.stringify(missionMutation)}</output><output aria-label="합성 커리큘럼 저장 횟수">{curriculumSaves}</output><output aria-label="합성 커리큘럼 요청">{JSON.stringify(curriculumMutation)}</output><output aria-label="합성 보관 시도">{archiveAttempts}</output><output aria-label="합성 보관 요청">{JSON.stringify(archiveMutation)}</output><ProductEditor row={params.has('new') ? undefined : course} data={data} pending={false} back={() => {}} send={async body => {
+    if (body.action === 'create-curriculum-week') {
+      setCurriculumSaves(value => value + 1);
+      setCurriculumMutation(body);
+      return { row: { id: 'synthetic-created-week', course_id: body.courseId, title: body.title, week_number: 1, is_published: false } };
+    }
     if (body.action === 'set-curriculum-archive') {
+      setArchiveAttempts(value => value + 1);
       setArchiveMutation(body);
+      if (params.has('restoreConflict') && body.kind === 'week' && body.archived === false && (!body.moveToWeekNumber || params.has('restoreRace'))) {
+        return { result: { needsConfirmation: true, weekNumber: 1, suggestedWeekNumber: body.moveToWeekNumber ? 3 : 2 } };
+      }
       const id = String(body.id);
       const archive = Boolean(body.archived);
       if (body.kind === 'week') setWeeks(rows => rows.map(row => row.id === id ? { ...row, archived_at: archive ? '2026-09-29T00:00:00Z' : null, is_published: false } : row));

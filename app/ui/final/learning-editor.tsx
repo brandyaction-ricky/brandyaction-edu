@@ -12,8 +12,13 @@ import { Badge, Video } from "./primitives";
 import { LessonText } from "./lesson-text";
 import { LessonBodyEditor } from "./lesson-body-editor";
 import { lessonBodyHasText } from "@/lib/lesson-body";
+import { OngoingLessonSettings } from './ongoing-lesson-settings';
+import { LessonBlockAuthor, type BlockAuthorHandle, type BlockAuthorState } from './lesson-block-author';
+import type { LessonBlock } from '@/lib/lesson-blocks';
+import type { LearningEditorDraft, LearningFormDraft } from '@/lib/learning-editor-draft';
+import { LearningEditorDraftPanel, type LearningDraftHandle } from './learning-editor-draft';
 
-type Props = { data: Data; row?: Row; pending: boolean; send: WorkflowSend; back: () => void };
+type Props = { data: Data; row?: Row; pending: boolean; send: WorkflowSend; back: () => void; blockEditingEnabled?: boolean; actorId?: string };
 type ContentType = "text" | "vod" | "material" | "link";
 const formats: { key: ContentType; label: string; icon: typeof FileText }[] = [
   { key: "text", label: "학습 본문", icon: FileText },
@@ -77,7 +82,7 @@ function LessonQuiz({ mission, current, pending, send }: { mission: Row; current
   </form>;
 }
 
-export function LearningEditor({ data, row, pending, send, back }: Props) {
+export function LearningEditor({ data, row, pending, send, back, actorId, blockEditingEnabled = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' }: Props) {
   const content = (data.lesson_contents || []).find(item => item.lesson_id === row?.id);
   const [lessonId, setLessonId] = useState(row?.id || "");
   const [contentExists, setContentExists] = useState(Boolean(content));
@@ -99,17 +104,45 @@ export function LearningEditor({ data, row, pending, send, back }: Props) {
   const [previewOnly, setPreviewOnly] = useState(false);
   const [selectedMissionId, setSelectedMissionId] = useState("");
   const previewRef = useRef<HTMLElement>(null);
+  const blockRef = useRef<BlockAuthorHandle>(null);
+  const blockSectionRef = useRef<HTMLElement>(null);
+  const [blockState, setBlockState] = useState<BlockAuthorState>({ active: false, dirty: false, blocked: blockEditingEnabled });
+  const draftRef = useRef<LearningDraftHandle>(null), [draftPending, setDraftPending] = useState(Boolean(blockEditingEnabled && actorId));
+  const baseline = useRef<LearningFormDraft>({ basic: { ...basic }, format, bodyText, videoUrl, externalUrl, resourceName, resourcePath });
+  function captureDraft(): LearningEditorDraft {
+    if (!blockRef.current || !actorId) throw new Error('학습 구성과 계정을 확인한 뒤 다시 시도해 주세요.');
+    return structuredClone({ version: 1, actorId, scopeLessonId: row?.id || '', storedLessonId: lessonId, savedAt: new Date().toISOString(), base: baseline.current,
+      form: { basic, format, bodyText, videoUrl, externalUrl, resourceName, resourcePath }, blocks: blockRef.current.captureDraft() });
+  }
+  function restoreDraft(draft: LearningEditorDraft) {
+    if (!blockRef.current) throw new Error('학습 구성을 불러온 뒤 다시 시도해 주세요.');
+    if (JSON.stringify(baseline.current) !== JSON.stringify(draft.base) && JSON.stringify(baseline.current) !== JSON.stringify(draft.form)) throw new Error('서버의 기본 정보나 본문이 변경됐습니다. 임시저장본을 내려받아 비교해 주세요.');
+    blockRef.current.restoreDraft(draft.blocks);
+    setBasic({ ...draft.form.basic }); setFormat(draft.form.format); setBodyText(draft.form.bodyText); setVideoUrl(draft.form.videoUrl); setExternalUrl(draft.form.externalUrl); setResourceName(draft.form.resourceName); setResourcePath(draft.form.resourcePath);
+    setDirty(true); setPreviewOnly(false); setMessage('임시저장본을 불러왔습니다. 내용을 확인한 뒤 학습 저장을 눌러 주세요.');
+  }
   const week = (data.curriculum_weeks || []).find(item => item.id === basic.week_id);
   const course = (data.courses || []).find(item => item.id === week?.course_id);
+  const cardSources = course ? (data.curriculum_weeks || []).filter(item => item.course_id === course.id)
+    .sort((a, b) => num(a, 'week_number') - num(b, 'week_number'))
+    .flatMap(w => (data.curriculum_lessons || []).filter(item => item.week_id === w.id)
+      .sort((a, b) => num(a, 'day_number') - num(b, 'day_number'))
+      .map(item => ({ id: item.id, label: `${num(w, 'week_number')}주차 · ${num(item, 'day_number')}일차 · ${t(item, 'title')}` }))) : [];
   const missions = (data.curriculum_missions || []).filter(item => item.lesson_id === lessonId);
   const mission = missions.find(item => item.id === selectedMissionId) || missions[0];
   const quiz = (data.mission_quizzes || []).find(item => item.mission_id === mission?.id);
-  const busy = pending || saving || uploadStatus === "uploading";
+  const busy = pending || saving || uploadStatus === "uploading" || Boolean(blockState.uploading);
+  const saveBlocked = busy || draftPending || (blockEditingEnabled && blockState.blocked);
+  const legacyBlocks: LessonBlock[] = format === 'text' && bodyText ? [{ id: 'legacy-body', type: 'text', content: bodyText }]
+    : format === 'vod' && videoUrl ? [{ id: 'legacy-video', type: 'video', url: videoUrl }]
+    : format === 'link' && externalUrl ? [{ id: 'legacy-link', type: 'link', url: externalUrl, content: '외부 학습 열기' }] : [];
   function changeBasic<K extends keyof typeof basic>(key: K, value: typeof basic[K]) { setBasic(previous => ({ ...previous, [key]: value })); setDirty(true); }
   function changeFormat(value: ContentType) { setFormat(value); setUploadStatus("idle"); setDirty(true); }
-  function close() { if (!dirty || window.confirm("저장하지 않은 학습 변경사항이 있습니다. 목록으로 이동할까요?")) back(); }
+  function close() { if (!(dirty || blockState.dirty) || window.confirm("저장하지 않은 학습 변경사항이 있습니다. 목록으로 이동할까요?")) { draftRef.current?.saveNow(); back(); } }
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (pending || saving || draftPending || (blockEditingEnabled && blockState.blocked)) return;
+    if (blockState.active && !blockRef.current?.validate()) { setPreviewOnly(false); blockSectionRef.current?.scrollIntoView({ block: 'start' }); return; }
     if (format === "material" && uploadStatus !== "idle") {
       setPreviewOnly(false);
       setMessage(uploadStatus === "uploading" ? "자료 업로드가 완료된 뒤 저장해 주세요." : "자료 업로드 오류를 확인한 뒤 다시 저장해 주세요.");
@@ -122,7 +155,7 @@ export function LearningEditor({ data, row, pending, send, back }: Props) {
       return;
     }
     const selectedValue = { text: lessonBodyHasText(bodyText) ? bodyText : "", vod: videoUrl, material: resourcePath, link: externalUrl }[format].trim();
-    if (contentExists && !selectedValue) {
+    if (!blockState.active && contentExists && !selectedValue) {
       setPreviewOnly(false);
       setMessage("선택한 콘텐츠 유형에 맞는 본문·영상·자료·링크를 입력해 주세요.");
       return;
@@ -135,7 +168,11 @@ export function LearningEditor({ data, row, pending, send, back }: Props) {
       storedId ||= String((result.row as Row | undefined)?.id || "");
       if (!storedId) throw new Error("학습 등록 결과를 확인하지 못했습니다. 목록에서 등록 여부를 확인해 주세요.");
       setLessonId(storedId);
-      if (selectedValue) {
+      baseline.current = { ...baseline.current, basic: { ...basic }, format };
+      if (blockState.active) {
+        if (!blockRef.current) throw new Error('학습 구성을 불러온 뒤 저장해 주세요.');
+        await blockRef.current.save(storedId);
+      } else if (selectedValue) {
         await send({ action: "save", section: "contents", id: contentExists ? storedId : undefined, values: {
           lesson_id: storedId,
           body_text: format === "text" ? bodyText : null,
@@ -147,11 +184,14 @@ export function LearningEditor({ data, row, pending, send, back }: Props) {
         setContentExists(true);
       }
       setDirty(false);
-      setMessage(selectedValue ? "학습 기본 정보와 콘텐츠를 저장했습니다." : "학습 기본 정보를 저장했습니다. 콘텐츠를 이어서 등록해 주세요.");
+      baseline.current = { basic: { ...basic }, format, bodyText, videoUrl, externalUrl, resourceName, resourcePath };
+      draftRef.current?.clear();
+      setMessage(blockState.active || selectedValue ? "학습 기본 정보와 콘텐츠를 저장했습니다." : "학습 기본 정보를 저장했습니다. 콘텐츠를 이어서 등록해 주세요.");
     } catch (cause) { setMessage((cause as Error).message); }
     finally { setSaving(false); }
   }
   function showPreview() {
+    if (blockState.active) { setPreviewOnly(false); blockRef.current?.showPreview(); blockSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
     setPreviewOnly(previous => !previous);
     requestAnimationFrame(() => previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
@@ -160,6 +200,7 @@ export function LearningEditor({ data, row, pending, send, back }: Props) {
       <AdminButton variant="outline" type="button" onClick={showPreview}>{previewOnly ? "편집으로" : "학습자 미리보기"}</AdminButton><AdminStatusBadge status={basic.is_published ? "published" : "hidden"} label={basic.is_published ? "공개" : "비공개"} />
     </AdminHeading>
     <div className="ops-callout mb16"><b>{basic.title || "새 학습"}</b> <span className="muted">· 본문과 확인 퀴즈를 함께 편집합니다.</span></div>
+    {blockEditingEnabled && actorId && <LearningEditorDraftPanel key={`${actorId}:${row?.id || 'new'}`} actorId={actorId} lessonId={row?.id || ''} dirty={dirty || blockState.dirty} ready={!busy && Boolean(blockState.draftReady)} capture={captureDraft} restore={restoreDraft} handleRef={draftRef} onPending={setDraftPending} />}
     <form id="learning-editor-form" noValidate onSubmit={event => void save(event)}>
       <section className="panel" hidden={previewOnly}>
         <div className="panel-head"><h2>기본 정보</h2><label className="review-switch"><input type="checkbox" checked={basic.is_published} onChange={event => changeBasic("is_published", event.target.checked)} disabled={busy} /> 공개</label></div>
@@ -167,12 +208,17 @@ export function LearningEditor({ data, row, pending, send, back }: Props) {
           <Field label="일차 (Day) *"><input type="number" min={1} value={basic.day_number} required onChange={event => changeBasic("day_number", event.target.value)} /></Field>
           <Field label="주차 (Week) *"><select value={basic.week_id} required onChange={event => changeBasic("week_id", event.target.value)}><option value="">주차 선택</option>{(data.curriculum_weeks || []).map(item => <option key={item.id} value={item.id}>{t((data.courses || []).find(entry => entry.id === item.course_id), "title")} · {num(item, "week_number")}주차 · {t(item, "title")}</option>)}</select></Field>
           <Field label="제목 *" wide><input value={basic.title} maxLength={300} required onChange={event => changeBasic("title", event.target.value)} /></Field>
-          <Field label="콘텐츠 유형"><select value={format} onChange={event => changeFormat(event.target.value as ContentType)}>{formats.map(item => <option value={item.key} key={item.key}>{item.label}</option>)}</select></Field>
+          {!blockState.active && <Field label="콘텐츠 유형"><select value={format} onChange={event => changeFormat(event.target.value as ContentType)}>{formats.map(item => <option value={item.key} key={item.key}>{item.label}</option>)}</select></Field>}
           <Field label="소요 시간" hint="예: 20분 · 영상 15분 + 실습 10분"><input value={basic.duration_label} onChange={event => changeBasic("duration_label", event.target.value)} /></Field>
           <div className="field wide"><label className="review-switch"><input type="checkbox" checked={basic.is_preview} onChange={event => changeBasic("is_preview", event.target.checked)} /> 무료 미리보기</label></div>
         </fieldset>
       </section>
-      <section className={"panel" + (previewOnly ? "" : " mt24")}>
+      {blockEditingEnabled && <section ref={blockSectionRef} className="panel mt24" hidden={previewOnly}><div className="panel-head"><h2>학습 구성</h2></div><div className="section-pad">
+        {resourcePath && <p className="notice">등록된 자료 파일은 학습 본문 아래에서 계속 다운로드할 수 있습니다.</p>}
+        <LessonBlockAuthor key={row?.id || 'new'} ref={blockRef} lessonId={lessonId} courseId={course?.id} sources={cardSources} legacyBlocks={legacyBlocks} disabled={busy} onState={setBlockState} />
+      </div></section>}
+      {blockEditingEnabled && blockState.active && lessonId && <OngoingLessonSettings lessonId={lessonId} disabled={saveBlocked || dirty || blockState.dirty} />}
+      {!blockState.active && !(blockEditingEnabled && blockState.blocked) && <section className={"panel" + (previewOnly ? "" : " mt24")}>
         <div className="panel-head"><h2>학습 본문</h2><span className="meta">{t(course, "title") || "학습 콘텐츠와 미리보기"}</span></div>
         <div className={"section-pad lesson-body-grid" + (previewOnly ? " learning-preview-only" : "")}>
           <fieldset className="learning-editor-fields learning-content-fields" disabled={busy} hidden={previewOnly}>
@@ -195,8 +241,8 @@ export function LearningEditor({ data, row, pending, send, back }: Props) {
             </div>
           </aside>
         </div>
-      </section>
-      <div className="editor-savebar"><span className="dirty-note">{dirty ? "저장하지 않은 변경사항이 있습니다." : "기본 정보와 학습 내용을 함께 저장합니다."}</span><AdminButton variant="outline" type="button" onClick={close} disabled={busy}><ArrowLeft size={16} />목록으로</AdminButton><AdminButton variant="primary" type="submit" disabled={busy} loading={busy}>{busy ? "저장 중…" : lessonId ? "학습 저장" : "학습 등록"}</AdminButton></div>
+      </section>}
+      <div className="editor-savebar"><span className="dirty-note">{dirty || blockState.dirty ? "저장하지 않은 변경사항이 있습니다." : "기본 정보와 학습 내용을 함께 저장합니다."}</span><AdminButton variant="outline" type="button" onClick={close} disabled={busy}><ArrowLeft size={16} />목록으로</AdminButton><AdminButton variant="primary" type="submit" disabled={saveBlocked} loading={busy}>{blockState.uploading ? "파일 업로드 중…" : busy ? "저장 중…" : lessonId ? "학습 저장" : "학습 등록"}</AdminButton></div>
       {message && <p className="notice mt16" role="status">{message}</p>}
     </form>
     <section className="panel mt24 learning-quiz-panel" hidden={previewOnly}>

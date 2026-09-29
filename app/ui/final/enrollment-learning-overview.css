@@ -1,0 +1,28 @@
+.edu-front .member-learning-intro { grid-column:1/-1; min-width:0; }
+.edu-front .member-learning-intro > h2 { margin:0 0 6px; }
+.enrollment-learning-overview { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; min-width:0; margin-top:20px; }
+.enrollment-learning-overview .elo-track { min-width:0; padding:24px; border:1px solid #dfe3e8; border-radius:10px; background:#fff; overflow-wrap:anywhere; }
+.elo-heading { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+.elo-heading h3,.elo-heading h4 { margin:0; }
+.elo-heading > span { font-size:14px; color:#505b68; }
+.elo-progress { height:7px; border-radius:4px; overflow:hidden; background:#e9edf1; margin:12px 0; }
+.elo-progress > span { height:100%; display:block; background:#bf1b2c; }
+.elo-current { font-weight:600; margin:16px 0; }
+.enrollment-learning-overview .btn { height:auto; min-height:44px; max-width:100%; white-space:normal; }
+.elo-weeks { margin-top:20px; border-top:1px solid #e1e5e9; padding-top:8px; }
+.elo-weeks > summary { cursor:pointer; padding:12px 0; }
+.elo-week { margin-top:16px; }
+.elo-week ul { list-style:none; padding:0; margin:8px 0; }
+.elo-week li { border-bottom:1px solid #e9edf1; }
+.elo-week li > a,.elo-week li > div { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:12px 0; min-height:44px; }
+.elo-week li > a:hover .elo-title { text-decoration:underline; }
+.elo-day { font-size:12px; color:#59616c; min-width:46px; }
+.elo-title { flex:1 1 150px; min-width:0; }
+.elo-state { display:flex; align-items:center; gap:4px; font-size:12px; }
+.elo-locked { color:#656e7a; }
+.elo-locked > small { flex-basis:100%; line-height:1.6; }
+.elo-compact { width:100%; margin-top:0; }
+.elo-compact .elo-track { padding:16px; }
+.elo-error { padding:16px 0; }
+.elo-weeks summary:focus-visible,.enrollment-learning-overview a:focus-visible { outline:3px solid #507fbe; outline-offset:3px; }
+@media(max-width:650px) { .enrollment-learning-overview { grid-template-columns:minmax(0,1fr); } .enrollment-learning-overview .elo-track { padding:18px; } }

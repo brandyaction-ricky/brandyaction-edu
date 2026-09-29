@@ -49,7 +49,9 @@ export function imagePreviewUrl(value: string, supabaseUrl: string): string {
   return supabaseUrl ? `${supabaseUrl.replace(/\/$/, '')}/storage/v1/object/public/course-assets/${raw}` : '';
 }
 
-export function databaseMessage(code?: string): string {
+export function databaseMessage(code?: string, message?: string): string {
+    if (message === "ONGOING_COURSE_FIXED") return "지속 챌린지는 다른 상품으로 옮길 수 없습니다. 같은 상품의 주차를 선택해 주세요.";
+  if (message === 'BLOCK_MEDIA_COURSE_MOVE') return '이 학습에는 현재 상품 전용 파일이 있습니다. 다른 상품으로 옮기려면 학습과 파일을 새로 등록해 주세요.';
   if (code === '23505') return '이미 사용 중인 코드·주소·순서입니다. 다른 값을 입력해 주세요.';
   if (code === '23514') return '허용 범위를 벗어난 값입니다. 정원·금액·날짜·상태를 확인해 주세요.';
   if (code === '23503') return '연결된 상품·기수·회원이 없거나 다른 데이터에서 사용 중입니다.';
@@ -82,7 +84,7 @@ export const adminTables: Record<string, string[]> = {
 export function adminSelectColumns(section: string, table: string): string {
   if (section === 'products' && table === 'courses') return '*';
   if (table === 'courses') return 'id,title,status,category,list_price,archived_at,display_order,created_at,updated_at';
-  if (section === 'questions' && table === 'edu_questions') return 'id,user_id,course_id,learning_context,title,content,answer,status,is_archived,created_at,updated_at,profiles(id,full_name,email),courses(id,title)';
+  if (section === 'questions' && table === 'edu_questions') return 'id,user_id,course_id,learning_context,title,content,answer,status,is_archived,created_at,updated_at,profiles(id,full_name,email),courses(id,title)' + (process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED === 'true' ? ',image_id' : '');
   if (section === 'reviews' && table === 'mission_submissions') return '*,enrollments!inner(user_id,course_id,cohort_id,profiles!enrollments_user_id_fkey(id,full_name,email),courses(id,title),cohorts(id,name)),curriculum_missions(id,title,instructions)';
   if (section === 'orders') {
     if (table === 'orders') return 'id,order_number,user_id,status,subtotal,discount_amount,total_amount,entry_src,customer_name,customer_email,customer_phone,created_at';

@@ -1,4 +1,11 @@
 "use client";
+import { AppInstallCard } from './app-install';
+import { QuestionImage } from './question-image';
+import { QuestionAnswerHistory } from './question-thread';
+import { MemberMessages } from './member-messages';
+import { EncouragementEditor, EncouragementWall } from './member-encouragement';
+import { EnrollmentLearningOverview } from './enrollment-learning-overview';
+import { learningOverview } from '@/lib/learning-overview';
 import { achievement } from "@/lib/edu-workflows";
 import {
   date,
@@ -48,6 +55,7 @@ const accountGroups = [
       ["classes", "내 클래스", BookOpen],
       ["missions", "내 미션", Target],
       ["questions", "내 질문", MessageCircle],
+      ["messages", "메시지", MessageCircle],
       ["resources", "내 자료실", Download],
     ],
   ],
@@ -141,9 +149,11 @@ function Progress({
 function EnrolledCard({
   data,
   enrollment: e,
+  blockLearningEnabled,
 }: {
   data: Data;
   enrollment: Row;
+  blockLearningEnabled: boolean;
 }) {
   const c = rows(data, "courses").find((c) => c.id === e.course_id),
     cohort = rows(data, "cohorts").find((c) => c.id === e.cohort_id),
@@ -174,6 +184,7 @@ function EnrolledCard({
         </div>
       </div>
       <div className="class-footer">
+        {blockLearningEnabled ? <EnrollmentLearningOverview data={data} enrollment={e} compact /> : <>
         <div className="progress-line">
           <span className="meta">
             {complete.length} / {lessons.length}개 학습 완료
@@ -192,6 +203,7 @@ function EnrolledCard({
           {allowed ? "학습 이어가기" : "수강 기간 종료"}
           <ArrowRight />
         </Link>
+        </>}
       </div>
     </article>
   );
@@ -200,10 +212,12 @@ function Dashboard({
   data,
   user,
   active,
+  blockLearningEnabled,
 }: {
   data: Data;
   user: User;
   active: Row[];
+  blockLearningEnabled: boolean;
 }) {
   const e = active[0],
     lessons = e ? enrollmentLessons(data, e) : [],
@@ -227,6 +241,12 @@ function Dashboard({
     coupons = rows(data, "customer_coupons").filter(
       (c) => c.status === "available",
     );
+  const overviews = blockLearningEnabled ? active.map(enrollment => learningOverview(data, enrollment)) : [];
+  const completedCount = blockLearningEnabled
+    ? overviews.every(overview => overview.status === 'ready')
+      ? overviews.reduce((total, overview) => total + overview.groups.reduce((sum, group) => sum + group.completed, 0), 0)
+      : null
+    : active.reduce((total, enrollment) => total + completedLessonProgress(data, enrollment).length, 0);
   return (
     <>
       <Heading
@@ -238,7 +258,9 @@ function Dashboard({
           회원 정보
         </Link>
       </Heading>
+      {blockLearningEnabled && <EncouragementWall/>}
       <div className="member-focus-grid">
+        {blockLearningEnabled && e ? <section className="member-learning-intro"><h2>{t(c, "title")}</h2><p className="meta">{t(cohort, "name")} · 나의 학습 진행</p><EnrollmentLearningOverview data={data} enrollment={e}/></section> : <>
         <section className="member-continue">
           <div className="member-kicker">
             이어서 학습하기 <span>{t(cohort, "name") || "MY LEARNING"}</span>
@@ -317,19 +339,16 @@ function Dashboard({
             <ArrowRight />
           </Link>
         </section>
+        </>}
       </div>
       <div className="member-stats">
         {[
           ["수강 중", active.length, "개", "클래스별 학습 이어가기", "classes"],
           [
             "학습 완료",
-            active.reduce(
-              (total, enrollment) =>
-                total + completedLessonProgress(data, enrollment).length,
-              0,
-            ),
-            "개",
-            "완료한 학습 기록",
+            completedCount ?? '—',
+            completedCount === null ? '' : '개',
+            completedCount === null ? '학습 상태를 다시 불러와 주세요.' : '완료한 학습 기록',
             "classes",
           ],
           [
@@ -451,7 +470,7 @@ function Dashboard({
           </Link>
         </div>
         {active.slice(0, 2).map((e) => (
-          <EnrolledCard key={e.id} data={data} enrollment={e} />
+          <EnrolledCard key={e.id} data={data} enrollment={e} blockLearningEnabled={blockLearningEnabled} />
         ))}
         {!active.length && (
           <Empty title="신청한 클래스가 없습니다.">
@@ -720,8 +739,8 @@ function Questions({
           </div>
           <h3>{t(q, "title")}</h3>
           {Boolean(q.learning_context) && <p className="meta">{t(q, "learning_context")}</p>}
-          <p className="reading-copy">{t(q, "content")}</p>
-          {q.answer ? (
+          <p className="reading-copy">{t(q, "content")}</p><QuestionImage questionId={String(q.id)} imageId={q.image_id}/>
+          {process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED === 'true' ? <QuestionAnswerHistory questionId={String(q.id)} fallback={String(q.answer || '')}/> : q.answer ? (
             <div className="answer">
               <b>운영자 답변</b>
               <p className="reading-copy">{t(q, "answer")}</p>
@@ -1093,6 +1112,7 @@ function Profile({
           </p>
         )}
       </form>
+      {process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' && <EncouragementEditor/>}
     </>
   );
 }
@@ -1248,6 +1268,8 @@ export function MemberViews({
   send,
   logout,
   order,
+  ongoingLesson,
+  blockLearningEnabled = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true',
 }: {
   section?: string;
   data: Data;
@@ -1256,6 +1278,8 @@ export function MemberViews({
   send: WorkflowSend;
   logout: () => Promise<void>;
   order?: string | null;
+  ongoingLesson?: string;
+  blockLearningEnabled?: boolean;
 }) {
   const enrollments = rows(data, "enrollments"),
     active = enrollments.filter(enrollment => hasLearningAccess(enrollment));
@@ -1263,7 +1287,7 @@ export function MemberViews({
   switch (section) {
     case "":
     case "dashboard":
-      content = <Dashboard data={data} user={user} active={active} />;
+      content = <><Dashboard data={data} user={user} active={active} blockLearningEnabled={blockLearningEnabled} /><AppInstallCard/></>;
       break;
     case "classes":
       content = (
@@ -1274,7 +1298,7 @@ export function MemberViews({
           />
           {enrollments.map((e) => (
             <div key={e.id}>
-              <EnrolledCard data={data} enrollment={e} />
+              <EnrolledCard data={data} enrollment={e} blockLearningEnabled={blockLearningEnabled} />
               {hasLearningAccess(e) && (
                 <LiveSchedule data={data} cohortId={t(e, "cohort_id")} />
               )}
@@ -1290,6 +1314,9 @@ export function MemberViews({
       break;
     case "missions":
       content = <Missions data={data} active={active} />;
+      break;
+    case "messages":
+      content = process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === "true" ? <MemberMessages key={user.id + (ongoingLesson || "")} userId={user.id} ongoingLesson={ongoingLesson} /> : <Empty title="메시지 기능을 준비 중입니다." />;
       break;
     case "questions":
       content = (
@@ -1307,7 +1334,7 @@ export function MemberViews({
       break;
     case "profile":
       content = (
-        <Profile user={user} pending={pending} send={send} logout={logout} />
+        <><Profile user={user} pending={pending} send={send} logout={logout} /><AppInstallCard settings/></>
       );
       break;
     case "reviews":
@@ -1335,7 +1362,7 @@ export function MemberViews({
             {accountGroups.map(([title, links]) => (
               <div className="member-nav-group" key={title}>
                 <span className="member-nav-label">{title}</span>
-                {links.map(([route, label, Icon]) => (
+                {links.filter(([route]) => route !== "messages" || process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === "true").map(([route, label, Icon]) => (
                   <Link
                     key={route}
                     className={

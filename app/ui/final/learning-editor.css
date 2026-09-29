@@ -31,5 +31,9 @@
 .edu-admin .learning-editor .learning-mission-picker{padding-bottom:0}
 .edu-admin .learning-editor .learning-mission-picker>.field{margin:0}
 .edu-admin .learning-editor [hidden]{display:none!important}
+.edu-admin .learning-local-draft { margin:16px 0; overflow-wrap:anywhere; }
+.edu-admin .learning-draft-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+.edu-admin .learning-draft-actions p { flex-basis:100%; }
+.edu-admin .learning-draft-actions .btn { white-space:normal; }
 @media(min-width:1100px){.edu-admin .learning-editor .lesson-body-grid{grid-template-columns:minmax(0,1fr) minmax(280px,.85fr)}.edu-admin .learning-editor .learning-preview-only{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:720px){.edu-admin .learning-editor .learning-content-tabs{gap:16px}.edu-admin .learning-editor .learning-quiz-settings,.edu-admin .learning-editor .learning-section-actions{align-items:stretch;flex-direction:column;gap:16px}.edu-admin .learning-editor .learning-quiz-settings .field{width:100%}.edu-admin .learning-editor .learning-quiz-head{align-items:flex-start;gap:12px}.edu-admin .learning-editor .learning-quiz-head .btn{flex:none}.edu-admin .learning-editor .learning-resource-preview{align-items:flex-start}.edu-admin .learning-editor .editor-savebar .dirty-note{width:100%}}

@@ -1,0 +1,12 @@
+.encouragement-wall,.encouragement-editor{margin:24px 0;min-width:0}
+.encouragement-heading{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.encouragement-heading h2{display:flex;align-items:center;gap:8px;margin:0}
+.encouragement-heading a{font-size:13px;text-decoration:underline;text-underline-offset:3px}
+.encouragement-wall blockquote,.encouragement-preview{margin:20px 0;padding:18px 20px;background:#f8f5f2;border-left:3px solid #ba2433;border-radius:4px;min-width:0}
+.encouragement-wall blockquote p,.encouragement-preview p{white-space:pre-wrap;overflow-wrap:anywhere;font-size:17px;line-height:1.7;margin:0}
+.encouragement-wall blockquote footer,.encouragement-preview footer{margin-top:10px;font-size:13px;color:#666;overflow-wrap:anywhere}
+.encouragement-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0}
+.encouragement-editor>.meta{line-height:1.7;margin:12px 0 20px}
+.encouragement-editor>.field{margin:16px 0}
+.encouragement-editor [role=alert],.encouragement-wall [role=alert]{color:#a9212c;line-height:1.6}
+@media(max-width:600px){.encouragement-wall,.encouragement-editor{padding:18px!important}.encouragement-heading h2{font-size:18px}.encouragement-editor .btn{white-space:normal;height:auto;min-height:42px}.encouragement-wall blockquote,.encouragement-preview{padding:15px}}

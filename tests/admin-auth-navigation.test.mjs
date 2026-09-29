@@ -90,7 +90,7 @@ function apiHarness(user, failure = null, fixtures = {}, staffPermissions = {}, 
         calls.summaries++;
         return { data: { id: 'summary', pendingReviews: 3, approvedRevenue: 50_058_000, refundedRevenue: 3_304_000, netRevenue: 46_754_000 }, error: null };
       }
-      return name === 'edu_set_curriculum_archive' ? rpcResult : { data: { id: 'summary', pendingReviews: 3 }, error: null };
+      return ['edu_set_curriculum_archive', 'edu_restore_curriculum_week', 'edu_create_curriculum_week'].includes(name) ? rpcResult : { data: { id: 'summary', pendingReviews: 3 }, error: null };
     },
   };
   const auth = { async getAuthenticatedUser() { calls.auth++; if (failure) throw failure; return user; } };
@@ -250,4 +250,22 @@ test('the operating home still returns the full dashboard aggregate', async () =
   assert.equal((await api.read('home')).status, 200);
   assert.equal(api.calls.summaries, 1);
   assert.equal(api.calls.auth, 1);
+});
+
+test('automatic week creation checks scope and request identity before assigning a number in the DB',async()=>{
+ const body={action:'create-curriculum-week',courseId:admin.id,requestId:'22222222-2222-4222-8222-222222222222',title:' 새로운 주차 '};
+ const api=apiHarness(admin);assert.equal((await api.write(body)).status,200);
+ assert.deepEqual(api.calls.rpcs,[['edu_create_curriculum_week',{p_actor:admin.id,p_course:admin.id,p_request:body.requestId,p_title:'새로운 주차'}]]);
+ const denied=apiHarness({...admin,role:'staff'});assert.equal((await denied.write(body)).status,403);assert.deepEqual(denied.calls.rpcs,[]);
+ const invalid=apiHarness(admin);assert.equal((await invalid.write({...body,requestId:undefined})).status,400);assert.deepEqual(invalid.calls.rpcs,[]);
+});
+
+test('week restore passes the exact confirmed number and returns a non-mutating conflict proposal',async()=>{
+ const body={action:'set-curriculum-archive',courseId:admin.id,kind:'week',id:'22222222-2222-4222-8222-222222222222',archived:false,expectedWeekNumber:1};
+ const proposal={needsConfirmation:true,weekNumber:1,suggestedWeekNumber:2};
+ const api=apiHarness(admin,null,{}, {}, {data:proposal,error:null});
+ const response=await api.write(body);assert.equal(response.status,200);assert.deepEqual((await response.json()).result,proposal);
+ assert.deepEqual(api.calls.rpcs,[['edu_restore_curriculum_week',{p_actor:admin.id,p_course:admin.id,p_id:body.id,p_expected_week:1,p_move_to:null}]]);
+ await api.write({...body,moveToWeekNumber:2});assert.equal(api.calls.rpcs[1][1].p_move_to,2);
+ const invalid=apiHarness(admin);assert.equal((await invalid.write({...body,moveToWeekNumber:-1})).status,400);assert.deepEqual(invalid.calls.rpcs,[]);
 });
