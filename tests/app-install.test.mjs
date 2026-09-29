@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
 import sharp from 'sharp';
-function load(file){const exports={};new Function('exports',ts.transpileModule(fs.readFileSync(new URL('../'+file,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(exports);return exports;}
-const rules=load('lib/app-install.ts'),manifest=load('app/manifest.ts').default();
+function load(file,mocks={}){const exports={};new Function('exports','require',ts.transpileModule(fs.readFileSync(new URL('../'+file,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(exports,name=>mocks[name]);return exports;}
+const rules=load('lib/app-install.ts'),branding=load('lib/app-branding.ts'),manifest=await load('app/manifest.ts',{'@/lib/app-branding-server':{getPublicAppBranding:async()=>branding.publicAppBranding(branding.defaultBranding)}}).default();
 test('installation instructions distinguish iPhone, desktop-mode iPad, Android and embedded browsers',()=>{
  assert.equal(rules.installDevice('Mozilla iPhone','iPhone',5),'ios');assert.equal(rules.installDevice('Mozilla Macintosh','MacIntel',5),'ios');assert.equal(rules.installDevice('Mozilla Macintosh','MacIntel',0),'desktop');assert.equal(rules.installDevice('Mozilla Android','Linux',5),'android');
  for(const value of ['KAKAOTALK','NAVER','Instagram','FBAN','FBAV','Line/11','Android; wv)'])assert.equal(rules.embeddedBrowser(value),true,value);assert.equal(rules.embeddedBrowser('Chrome Safari'),false);
@@ -17,7 +17,7 @@ test('manifest preserves installation identity and authenticated launch path wit
  assert.equal(manifest.id,'/');assert.equal(manifest.start_url,'/my');assert.equal(manifest.scope,'/');assert.equal(manifest.display,'standalone');assert.equal(manifest.name,'브랜디에듀');
  for(const icon of manifest.icons){assert.match(icon.src,/^\/icons\/edu-[a-z0-9-]+\.png$/);const {width,height,format}=await sharp(new URL('../public'+icon.src,import.meta.url).pathname).metadata();assert.equal(format,'png');assert.equal(icon.sizes,`${width}x${height}`);}
  assert.ok(manifest.icons.some(icon=>icon.sizes==='192x192'&&icon.purpose==='any'));assert.ok(manifest.icons.some(icon=>icon.sizes==='512x512'&&icon.purpose==='maskable'));
- assert.equal((await sharp(new URL('../app/apple-icon.png',import.meta.url).pathname).metadata()).width,180);
+ assert.equal((await sharp(new URL('../public/icons/edu-apple-180.png',import.meta.url).pathname).metadata()).width,180);
 });
 test('maskable artwork fits the 40 percent safe circle and every app tile is opaque',async()=>{
  const {data,info}=await sharp(new URL('../public/icons/edu-maskable-512.png',import.meta.url).pathname).ensureAlpha().raw().toBuffer({resolveWithObject:true});let white=0;

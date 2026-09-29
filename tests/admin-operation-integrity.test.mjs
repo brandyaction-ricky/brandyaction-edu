@@ -80,10 +80,10 @@ function harness({ missions = [], user = admin } = {}) {
 }
 const mission = (n, extras = {}) => ({ id: id(30 + n), lesson_id: id(21), title: '합성 미션', is_published: true, archived_at: null, ...extras });
 
-test('generic settings cannot create, overwrite or rename the protected learning notice', async () => {
+test('generic settings cannot create, overwrite or rename protected learning notices and app icons', async () => {
   for (const user of [admin, { ...admin, role: 'staff' }]) {
     const h = harness({ user });
-    for (const [key, target] of [['edu_learning_notice', undefined], ['edu_learning_notice', 'edu_other'], ['edu_other', 'edu_learning_notice']]) {
+    for (const protectedKey of ['edu_learning_notice', 'edu_app_branding']) for (const [key, target] of [[protectedKey, undefined], [protectedKey, 'edu_other'], ['edu_other', protectedKey]]) {
       assert.equal((await h.save({ key, value: {} }, target, 'settings')).status, 403);
     }
     assert.equal(h.writes.length, 0);

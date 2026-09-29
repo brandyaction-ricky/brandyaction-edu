@@ -59,7 +59,7 @@ export function AppInstallCard({ settings = false }: { settings?: boolean }) {
     catch { setCopied('주소를 길게 누르거나 선택해서 직접 복사해 주세요.'); }
   }
   return <section className="panel pad app-install" aria-label="브랜디에듀 홈 화면 추가">
-    <div className="app-install-heading"><img src="/icons/edu-192.png" width={56} height={56} alt=""/><div><h2>홈 화면에서 바로 학습하세요</h2><p>브랜디에듀 아이콘을 추가하면 앱처럼 열 수 있어요.</p></div></div>
+    <div className="app-install-heading"><img src="/api/app-branding?icon=192" onError={event => { if (!event.currentTarget.src.endsWith('/icons/edu-192.png')) event.currentTarget.src = '/icons/edu-192.png'; }} width={56} height={56} alt=""/><div><h2>홈 화면에서 바로 학습하세요</h2><p>브랜디에듀 아이콘을 추가하면 앱처럼 열 수 있어요.</p></div></div>
     {state.embedded && <div className="notice mt16"><p>지금 보고 있는 앱의 메뉴에서 ‘외부 브라우저로 열기’를 선택해 주세요. 메뉴가 없다면 아래 주소를 복사해 Safari 또는 Chrome에서 열어 주세요.</p><input aria-label="설치할 사이트 주소" readOnly value={state.homeUrl}/><button type="button" className="btn small" onClick={() => void copy()}>사이트 주소 복사</button>{copied && <p role="status">{copied}</p>}</div>}
     {state.available && !state.embedded && <button type="button" className="btn primary mt16" disabled={state.busy} onClick={state.install}>브랜디에듀 설치</button>}
     {state.busy && <p role="status">브라우저의 설치 창에서 선택해 주세요.</p>}

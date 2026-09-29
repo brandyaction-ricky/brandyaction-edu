@@ -22,6 +22,7 @@ import { LessonProgressionSettings } from './final/lesson-progression-settings';
 import { AdminLearningProgress } from './final/admin-learning-progress';
 import { MvpEditor } from './final/member-mvp';
 import { LearningNoticeEditor } from './final/learning-notice';
+import { AppBrandingEditor } from './final/app-branding-editor';
 import { timeLabel, type Data, type WorkflowSend } from "./learning-workflows";
 import { EnrollmentGrant, RefundAction } from "./operations-actions";
 import {
@@ -1505,7 +1506,7 @@ function SettingsForm({ section, data, send, pending }: Props) {
       {section === 'seo' && <nav className="tabs catalog-tabs seo-settings-tabs" aria-label="검색코드 설정 탭">
         {([['search', '검색·공유'], ['verification', '소유 확인'], ['measurement', '측정·추가 코드']] as const).map(([tab, label]) => <button key={tab} type="button" className={seoTab === tab ? 'tab active' : 'tab'} aria-pressed={seoTab === tab} onClick={() => setSeoTab(tab)}>{label}</button>)}
       </nav>}
-      {section === 'settings' && process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' && <><LearningNoticeEditor/><MvpEditor name="미리보기"/></>}
+      {section === 'settings' && process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' && <><AppBrandingEditor/><LearningNoticeEditor/><MvpEditor name="미리보기"/></>}
       <div className={section === 'metrics' ? 'stack metrics-data-layout' : section === 'seo' && seoTab !== 'search' ? 'stack seo-settings-layout' : 'settings-layout'}>
         <form
           key={section + String(metric?.key || "new")}
