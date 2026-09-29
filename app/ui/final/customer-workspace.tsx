@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
 import { AdminTabs, AdminButton, AdminLinkButton, AdminLoadingState, AdminInlineError, AdminEmptyState, AdminPagination, AdminStatusBadge } from '@/features/admin-ui';
 import { labels, object, text as t, type Row } from '@/lib/platform';
+import { MvpEditor } from './member-mvp';
 import { AdminLearningProgress } from './admin-learning-progress';
 
 const recordDate = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul' });
@@ -28,7 +29,7 @@ export function enrollmentLabel(row: Row, now = Date.now()) {
 export function CustomerWorkspace({ member, tab, onTabChange, children, blockLearningEnabled = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' }: { member: Row; tab: string; onTabChange: (value: string) => void; children: ReactNode; blockLearningEnabled?: boolean }) {
   return <div className="customer-workspace">
     <div className="drawer-profile"><span className="avatar red" aria-hidden="true">{(t(member, 'full_name') || '회').slice(0, 1)}</span><div><h2>{t(member, 'full_name') || '이름 미등록'}</h2><p>{t(member, 'email')}</p><small>회원 ID · {member.id}</small></div></div>
-    <AdminTabs label="회원 운영 정보" items={tabs} value={tab} onChange={onTabChange}>{value => value === 'profile' ? children : value === 'history' ? <div className="notice"><h3>확인할 수 있는 기록</h3><p>제출물 탭에서 제출 회차·검토 시각·저장된 피드백을, 질문 탭에서 질문과 답변 상태를 확인할 수 있습니다.</p><p className="mt8">권한 변경 사유·검토 체크 결과·알림 발송 이력은 아직 통합 기록되지 않습니다. 아래 기록을 전체 감사 로그로 간주하지 마세요.</p><AdminButton size="sm" className="mt16" onClick={() => onTabChange('submissions')}>검토 기록 보기</AdminButton></div> : tab === value ? <MemberRecords key={`${member.id}-${value}`} member={member.id} email={t(member, 'email')} view={value} blockLearningEnabled={blockLearningEnabled}/> : null}</AdminTabs>
+    <AdminTabs label="회원 운영 정보" items={tabs} value={tab} onChange={onTabChange}>{value => value === 'profile' ? <>{children}{blockLearningEnabled && <MvpEditor key={member.id} member={member.id} name={t(member, 'full_name') || '회원'}/>}</> : value === 'history' ? <div className="notice"><h3>확인할 수 있는 기록</h3><p>제출물 탭에서 제출 회차·검토 시각·저장된 피드백을, 질문 탭에서 질문과 답변 상태를 확인할 수 있습니다.</p><p className="mt8">권한 변경 사유·검토 체크 결과·알림 발송 이력은 아직 통합 기록되지 않습니다. 아래 기록을 전체 감사 로그로 간주하지 마세요.</p><AdminButton size="sm" className="mt16" onClick={() => onTabChange('submissions')}>검토 기록 보기</AdminButton></div> : tab === value ? <MemberRecords key={`${member.id}-${value}`} member={member.id} email={t(member, 'email')} view={value} blockLearningEnabled={blockLearningEnabled}/> : null}</AdminTabs>
   </div>;
 }
 
