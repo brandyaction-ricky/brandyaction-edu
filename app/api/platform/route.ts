@@ -831,6 +831,7 @@ export async function POST(request: Request) {
                 values.status = 'answered';
             }
             if (section.table === 'site_settings') {
+                if (values.key === 'edu_learning_notice' || body.id === 'edu_learning_notice') fail('전체 학습 공지 설정에서 변경해 주세요.', 403);
                 if (!String(values.key || body.id).startsWith('edu_')) fail('설정 이름은 edu_로 시작해 주세요.');
                 values.is_public = false;
             }

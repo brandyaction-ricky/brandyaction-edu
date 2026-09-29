@@ -2,6 +2,7 @@
 import { QuestionImage } from './final/question-image';
 import { QuestionThreadDialog } from './final/question-thread';
 import { UnreadMessageLink } from "./final/unread-message-link";
+import { LearningNoticeBar } from './final/learning-notice';
 import { disableDevicePush, synchronizePushAccount } from "@/lib/web-push-client";
 import { defaultPolicies } from "@/lib/legal-policies";
 import { createMutationGate } from "@/lib/mutation-gate";
@@ -602,6 +603,7 @@ export function Platform({
           </nav>
         )}
       </header>
+      {process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' && <LearningNoticeBar/>}
     </>
   );
   const footer =

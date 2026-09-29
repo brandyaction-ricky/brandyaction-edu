@@ -1,6 +1,7 @@
 'use client';
 
 import { UnreadMessageLink } from '@/app/ui/final/unread-message-link';
+import { LearningNoticeBar } from '@/app/ui/final/learning-notice';
 import {
   ArrowRight,
   LogOut,
@@ -201,6 +202,7 @@ export function AdminShell({
             <span className="avatar">{(user.full_name || '운영').slice(0, 1)}</span>
           </div>
         </header>
+        {process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' && <LearningNoticeBar/>}
         <div className={`content admin-content-${contentWidth}`} id="admin-content" tabIndex={-1}>
           {children}
         </div>
