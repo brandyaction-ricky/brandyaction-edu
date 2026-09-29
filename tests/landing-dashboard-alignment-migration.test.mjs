@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';
 
-const migration = fs.readFileSync(new URL('../supabase/migrations/20260925130000_free_class_marketing_dashboard_alignment.sql', import.meta.url), 'utf8');
+const migration = fs.readFileSync(new URL('../supabase/migrations/20260929150200_free_class_marketing_dashboard_alignment.sql', import.meta.url), 'utf8');
 
 test('dashboard alignment migration executes and joins web/Meta only by exact ad ID', async () => {
   const db = new PGlite();
