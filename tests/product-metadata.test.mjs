@@ -14,6 +14,10 @@ function load(file, mocks = {}) {
   const code = ts.transpileModule(fs.readFileSync(absolute, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   new Function('exports', 'require', code)(exports, name => {
     if (name in mocks) return mocks[name];
+    if (name === '@/lib/public-platform-data') return { getPublicPlatformData: async () => ({ data: {}, pagination: null }), getPublicSupport: async () => ({}) };
+    if (name === '@/lib/public-platform-plan') return { PUBLIC_CACHE_TAG: 'test' };
+    if (name === '@/lib/member-platform-data') return { readMemberPlatformData: async () => ({}) };
+    if (name === 'next/cache') return { revalidateTag: () => {} };
     if (name.startsWith('@/') || name.startsWith('.')) {
       const base = name.startsWith('@/') ? path.resolve(root, name.slice(2)) : path.resolve(path.dirname(absolute), name);
       return load(['.ts', '.tsx'].map(extension => base + extension).find(fs.existsSync), mocks);
@@ -24,6 +28,19 @@ function load(file, mocks = {}) {
 }
 const { sanitizeProductHtml, mergeProductMetadata, mergeProductResources, productResources } = load('lib/product-metadata.ts');
 const { ProductDetailHtml } = load('app/ui/final/product-detail-html.tsx');
+test('listing opt-out is explicit and partial edits preserve it', () => {
+  const { isProductListed, listedProducts, isListedProductLink } = load('lib/product-visibility.ts');
+  assert.equal(isProductListed(), true);
+  for (const metadata of [{}, { is_listed: true }, { is_listed: null }, { is_listed: 'false' }]) assert.equal(isProductListed({ id: 'legacy', metadata }), true);
+  const course = { id: 'hidden-id', slug: 'hidden-product', metadata: { is_listed: false, campaign: 'keep' } };
+  assert.equal(isProductListed(course), false);
+  assert.deepEqual(listedProducts([course, { id: 'legacy' }]), [{ id: 'legacy' }]);
+  assert.deepEqual(mergeProductMetadata(course.metadata, { seo_title: 'new' }), { ...course.metadata, seo_title: 'new' });
+  assert.equal(mergeProductMetadata(course.metadata, { is_listed: true }).is_listed, true);
+  for (const value of ['false', null, 0]) assert.throws(() => mergeProductMetadata({}, { is_listed: value }), /노출/);
+  for (const href of ['/classes/hidden-product', '/classes/hidden-id/?src=organic', 'https://edu.example/classes/hidden-product#apply']) assert.equal(isListedProductLink(href, [course], 'https://edu.example'), false);
+  for (const href of ['', '/classes', '/articles/story', 'https://other.example/classes/hidden-product']) assert.equal(isListedProductLink(href, [course], 'https://edu.example'), true);
+});
 test('product HTML retains content structure while rejecting executable content and attributes', () => {
   const dirty = '<!doctype html><html><head><style>body{display:none}</style></head><body><h2 onclick="evil()">AI &amp; 실행</h2><p style="color:red">소개 <strong>강조</strong></p><script>alert(1)</script><iframe src="https://evil.test"></iframe><svg><a href="javascript:evil()">x</a></svg><img src="https://cdn.example/image.webp" onerror="evil()" alt="이미지"><a href="java&#x73;cript:evil()">금지 링크</a><a href="https://example.test/class">안전 링크</a></body></html>';
   const clean = sanitizeProductHtml(dirty);
@@ -58,6 +75,26 @@ test('partial product updates preserve existing metadata and validate price and 
   assert.throws(() => mergeProductMetadata(previous, { regular_price: -1 }), /정가/);
   assert.throws(() => mergeProductMetadata(previous, { seo_title: 'a'.repeat(201) }), /200자/);
   assert.deepEqual(mergeProductMetadata(previous, { seo_title: '' }), { ...previous, seo_title: '' });
+});
+
+test('countdown toggle is strictly boolean, opt-in and preserved by partial saves', () => {
+  assert.equal(mergeProductMetadata({}, {}).recruitment_countdown_enabled, undefined);
+  const enabled = mergeProductMetadata({ campaign: true }, { recruitment_countdown_enabled: true });
+  assert.equal(enabled.recruitment_countdown_enabled, true);
+  assert.equal(mergeProductMetadata(enabled, { seo_title: 'title' }).recruitment_countdown_enabled, true);
+  assert.equal(mergeProductMetadata(enabled, { recruitment_countdown_enabled: false }).recruitment_countdown_enabled, false);
+  for (const value of ['true', 'false', 1, null, {}]) assert.throws(() => mergeProductMetadata({}, { recruitment_countdown_enabled: value }), /카운트다운/);
+});
+
+test('countdown uses explicit timezone, clamps expiry and does not invent missing deadlines', () => {
+  const { recruitmentRemaining } = load('lib/product-countdown.ts');
+  const now = Date.parse('2026-10-01T14:58:58Z');
+  assert.deepEqual(recruitmentRemaining('2026-10-01T23:59:00+09:00', now), { expired: false, text: '00:00:02' });
+  assert.deepEqual(recruitmentRemaining('2026-10-03T14:59:00Z', now), { expired: false, text: '2일 00:00:02' });
+  assert.deepEqual(recruitmentRemaining('2026-10-01T14:59:00Z', now + 2000), { expired: true, text: '00:00:00' });
+  assert.equal(recruitmentRemaining(undefined, now), null);
+  assert.equal(recruitmentRemaining('2026-10-01T23:59', now), null);
+  assert.equal(recruitmentRemaining('invalidZ', now), null);
 });
 test('detail image gallery keeps legacy images, validates entries and preserves display order', () => {
   const { productDetailImages } = load('lib/product-metadata.ts');
@@ -140,7 +177,7 @@ test('deletion uses the audited archive transaction and never physically removes
     '@/lib/supabase/admin': { createAdminClient: () => ({ async rpc(name, args) { calls.push([name, args]); return { data: args.p_ids.length, error: null }; } }) },
     '@/lib/supabase/server': {}, '@/lib/server-auth': { getAuthenticatedUser: async () => ({ id: 'operator' }) },
     '@/lib/operator-permissions': { permissionsFor: async () => ({ products: allowed }), sectionScopes: { products: 'products' } },
-    '@/lib/edu-settings': {}, '@/lib/crm-delivery': {},
+    '@/lib/edu-settings': {}, '@/lib/crm-delivery': {}, '@/lib/crm-sms-settings': {},
   });
   const id = '11111111-1111-4111-8111-111111111111';
   const send = ids => route.POST(new Request('https://edu.example/api/platform', { method: 'POST', headers: { origin: 'https://edu.example' }, body: JSON.stringify({ action: 'archive', section: 'products', ids }) }));
@@ -172,7 +209,7 @@ test('new product identifiers are stable across retries of the same creation req
     '@/lib/supabase/admin': { createAdminClient: () => ({ async rpc(name, args) { writes.push([name, args]); return { data: { id: 'new' }, error: null }; } }) },
     '@/lib/supabase/server': {}, '@/lib/server-auth': { getAuthenticatedUser: async () => ({ id: 'operator' }) },
     '@/lib/operator-permissions': { permissionsFor: async () => ({ products: true }), sectionScopes: { products: 'products' } },
-    '@/lib/edu-settings': {}, '@/lib/crm-delivery': {},
+    '@/lib/edu-settings': {}, '@/lib/crm-delivery': {}, '@/lib/crm-sms-settings': {},
   });
   const requestId = '11111111-1111-4111-8111-111111111111';
   for (let i = 0; i < 2; i++) {
@@ -201,7 +238,7 @@ test('new product registration creates its default cohort with the submitted KST
     '@/lib/supabase/admin': { createAdminClient: () => db },
     '@/lib/supabase/server': {}, '@/lib/server-auth': { getAuthenticatedUser: async () => ({ id: 'operator' }) },
     '@/lib/operator-permissions': { permissionsFor: async () => ({ products: true }), sectionScopes: { products: 'products' } },
-    '@/lib/edu-settings': {}, '@/lib/crm-delivery': {},
+    '@/lib/edu-settings': {}, '@/lib/crm-delivery': {}, '@/lib/crm-sms-settings': {},
   });
   const response = await route.POST(new Request('https://edu.example/api/platform', { method: 'POST', headers: { origin: 'https://edu.example' }, body: JSON.stringify({
     action: 'save', section: 'products', requestId: '11111111-1111-4111-8111-111111111111',
@@ -229,7 +266,7 @@ test('product save API persists approved editor metadata and stops if existing m
     '@/lib/supabase/server': {},
     '@/lib/server-auth': { getAuthenticatedUser: async () => ({ id: 'operator' }) },
     '@/lib/operator-permissions': { permissionsFor: async () => ({ products: true }), sectionScopes: { products: 'products' } },
-    '@/lib/edu-settings': {}, '@/lib/crm-delivery': {},
+    '@/lib/edu-settings': {}, '@/lib/crm-delivery': {}, '@/lib/crm-sms-settings': {},
   });
   const send = values => route.POST(new Request('https://edu.example/api/platform', { method: 'POST', headers: { origin: 'https://edu.example' }, body: JSON.stringify({ action: 'save', section: 'products', id: 'product', values }) }));
   assert.equal((await send({ title: '새 상품명', detail_html: '<h2>본문</h2><script>evil()</script>', seo_title: '검색 제목', metadata: { campaign: null } })).status, 200);
@@ -241,10 +278,84 @@ test('product save API persists approved editor metadata and stops if existing m
   assert.equal(writes.length, 1);
 });
 
+test('listing save uses product permission, persists boolean metadata and leaves sale state untouched', async () => {
+  let allowed = true;
+  const writes = [];
+  const db = { from() { let update = false; return { select() { return this; }, eq() { return this; }, update(value) { update = true; writes.push(value); return this; }, async single() { return { data: update ? { id: 'product' } : { metadata: { campaign: 'keep' } }, error: null }; } }; } };
+  const route = load('app/api/platform/route.ts', {
+    '@/lib/supabase/admin': { createAdminClient: () => db }, '@/lib/supabase/server': {},
+    '@/lib/server-auth': { getAuthenticatedUser: async () => ({ id: 'staff' }) },
+    '@/lib/operator-permissions': { permissionsFor: async () => ({ products: allowed }), sectionScopes: { products: 'products' } },
+    '@/lib/edu-settings': {}, '@/lib/crm-delivery': {},
+  });
+  const send = value => route.POST(new Request('https://edu.example/api/platform', { method: 'POST', headers: { origin: 'https://edu.example' }, body: JSON.stringify({ action: 'save', section: 'products', id: 'product', values: { is_listed: value } }) }));
+  for (const value of [false, true]) assert.equal((await send(value)).status, 200);
+  assert.deepEqual(writes.map(value => value.metadata), [{ campaign: 'keep', is_listed: false }, { campaign: 'keep', is_listed: true }]);
+  assert.ok(writes.every(value => !('status' in value) && !('is_listed' in value)));
+  assert.equal((await send('false')).status, 400);
+  allowed = false;
+  assert.equal((await send(false)).status, 403);
+  assert.equal(writes.length, 2);
+});
+
+test('unlisted detail remains available but is excluded from search indexing', async () => {
+  const previousEnv = process.env.NEXT_PUBLIC_APP_ENV;
+  process.env.NEXT_PUBLIC_APP_ENV = 'production';
+  try {
+    let isListed = false;
+    const query = { select() { return this; }, eq() { return this; }, async maybeSingle() { return { data: { title: '링크 전용', is_listed: isListed } }; } };
+    const page = load('app/[[...path]]/page.tsx', { '@/lib/edu-settings': { getEduSettings: async () => ({ seo: {} }) }, '@/lib/supabase/server': { createClient: async () => ({ from: () => query }) }, '@/app/ui/platform': {}, 'next/navigation': {} });
+    const get = () => page.generateMetadata({ params: Promise.resolve({ path: ['classes', 'unlisted'] }) });
+    assert.deepEqual((await get()).robots, { index: false, follow: false });
+    assert.match((await get()).title, /링크 전용/);
+    isListed = undefined;
+    assert.equal((await get()).robots, undefined);
+    isListed = 'false';
+    assert.equal((await get()).robots, undefined);
+  } finally { if (previousEnv === undefined) delete process.env.NEXT_PUBLIC_APP_ENV; else process.env.NEXT_PUBLIC_APP_ENV = previousEnv; }
+});
+
+test('public API keeps direct-link data and removes only home banners pointing to unlisted products', async () => {
+  const courses = [{ id: 'hidden', slug: 'hidden', status: 'published', list_price: 100, metadata: { is_listed: false } }, { id: 'visible', slug: 'visible', status: 'published', list_price: 100 }];
+  const banners = [{ id: 'hidden-banner', link_url: '/classes/hidden?src=organic' }, { id: 'visible-banner', link_url: '/classes/visible' }];
+  const route = load('app/api/platform/route.ts', {
+    '@/lib/public-platform-data': { getPublicPlatformData: async () => ({ data: { courses, site_banners: banners }, pagination: null, unlistedBannerCourses: [courses[0]] }), getPublicSupport: async () => ({}) },
+    '@/lib/server-auth': { getAuthenticatedUser: async () => null }, '@/lib/edu-settings': { getEduSettings: async () => ({ operations: {} }) },
+  });
+  const response = await route.GET(new Request('https://edu.example/api/platform'));
+  assert.equal(response.status, 200);
+  const { data } = await response.json();
+  assert.deepEqual(data.courses.map(row => row.id), ['hidden', 'visible']);
+  assert.deepEqual(data.site_banners.map(row => row.id), ['visible-banner']);
+});
+
+test('sitemap excludes hidden and non-public products, paginates, and stays empty in DEV', async () => {
+  const previousEnv = process.env.NEXT_PUBLIC_APP_ENV;
+  const calls = [];
+  let failed = false;
+  const db = { from(table) { const call = { table, filters: [] }; calls.push(call); return { select() { return this; }, eq(key, value) { call.filters.push([key, value]); return this; }, is(key, value) { call.filters.push([key, value]); return this; }, order() { return this; }, async range(start) { call.start = start; return { error: failed ? {} : null, data: table === 'articles' ? [{ id: 'article', slug: 'article' }] : start === 0 ? Array.from({ length: 500 }, (_, i) => ({ id: String(i), slug: 'hidden-' + i, metadata: { is_listed: false } })) : [{ id: 'visible', slug: 'visible' }] }; } }; } };
+  const route = load('app/sitemap.xml/route.ts', { '@/lib/supabase/server': { createClient: async () => db } });
+  try {
+    process.env.NEXT_PUBLIC_APP_ENV = 'development';
+    assert.doesNotMatch(await (await route.GET(new Request('https://dev.example/sitemap.xml'))).text(), /<url>/);
+    assert.equal(calls.length, 0);
+    process.env.NEXT_PUBLIC_APP_ENV = 'production';
+    const xml = await (await route.GET(new Request('https://edu.example/sitemap.xml'))).text();
+    assert.match(xml, /https:\/\/edu.example\/classes\/visible/);
+    assert.match(xml, /\/articles\/article/);
+    assert.doesNotMatch(xml, /hidden-/);
+    assert.deepEqual(calls.map(call => call.start), [0, 500, 0]);
+    assert.ok(calls.every(call => JSON.stringify(call.filters) === JSON.stringify([['status', 'published'], ['archived_at', null]])));
+    failed = true;
+    assert.equal((await route.GET(new Request('https://edu.example/sitemap.xml'))).status, 503);
+  } finally { if (previousEnv === undefined) delete process.env.NEXT_PUBLIC_APP_ENV; else process.env.NEXT_PUBLIC_APP_ENV = previousEnv; }
+});
+
 test('published product metadata drives search and sharing titles while an empty override falls back', async () => {
-  let product = { title: '상품 이름', summary: '상품 소개', metadata: { seo_title: '검색용 제목', seo_description: '검색용 설명' } };
+  let product = { title: '상품 이름', summary: '상품 소개', seo_title: '검색용 제목', seo_description: '검색용 설명' };
   const filters = [];
-  const query = { select() { return this; }, eq(key, value) { filters.push([key, value]); return this; }, async maybeSingle() { return { data: product }; } };
+  let columns = '';
+  const query = { select(value) { columns = value; return this; }, eq(key, value) { filters.push([key, value]); return this; }, async maybeSingle() { return { data: product }; } };
   const page = load('app/[[...path]]/page.tsx', {
     '@/lib/edu-settings': { getEduSettings: async () => ({ seo: {} }) },
     '@/lib/supabase/server': { createClient: async () => ({ from: () => query }) },
@@ -255,8 +366,10 @@ test('published product metadata drives search and sharing titles while an empty
   assert.equal(metadata.title, '검색용 제목 | BrandyAction EDU');
   assert.equal(metadata.description, '검색용 설명');
   assert.equal(metadata.openGraph.title, metadata.title);
+  assert.match(columns, /seo_title:metadata->>seo_title/);
+  assert.doesNotMatch(columns, /(?:^|,)metadata(?:,|$)/);
   assert.ok(filters.some(([key, value]) => key === 'status' && value === 'published'));
-  product = { ...product, metadata: { seo_title: '', seo_description: '' } };
+  product = { ...product, seo_title: '', seo_description: '' };
   metadata = await page.generateMetadata({ params });
   assert.equal(metadata.title, '상품 이름 | BrandyAction EDU');
   assert.equal(metadata.description, '상품 소개');

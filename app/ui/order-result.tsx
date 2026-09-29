@@ -29,9 +29,32 @@ export function OrderResult({
   const [state, setState] = useState<"checking" | "paid" | "waiting" | "error">("checking");
   const [error, setError] = useState("");
   const [virtualAccount, setVirtualAccount] = useState<VirtualAccount | null>(null);
+  const [onboardingOrderId, setOnboardingOrderId] = useState<string | null>(null);
+  const [onboardingErrorOrderId, setOnboardingErrorOrderId] = useState<string | null>(null);
+  const [onboardingCheckedOrderId, setOnboardingCheckedOrderId] = useState<string | null>(null);
+  const [onboardingRetry, setOnboardingRetry] = useState(0);
   const order = matchingOrder(data.orders || [], orderId);
+  const paidOrderId = order?.status === "paid" && typeof order.id === "string" ? order.id : null;
   const failed = path === "/payment/fail";
   const complete = !failed && (state === "paid" || order?.status === "paid");
+  const onboardingReady = complete && !!paidOrderId && onboardingOrderId === paidOrderId;
+  const onboardingFailed = complete && !!paidOrderId && onboardingErrorOrderId === paidOrderId;
+  const onboardingLoading = complete && !!paidOrderId && onboardingCheckedOrderId !== paidOrderId;
+  const showClassFallback = complete && !onboardingReady && !onboardingFailed && !onboardingLoading;
+
+  useEffect(() => {
+    if (!complete || !paidOrderId) return;
+    const controller = new AbortController();
+    void fetch(`/api/purchase-onboarding?order=${encodeURIComponent(paidOrderId)}`, { cache: 'no-store', signal: controller.signal })
+      .then(response => {
+        if (controller.signal.aborted) return;
+        setOnboardingOrderId(response.ok ? paidOrderId : null);
+        setOnboardingErrorOrderId(!response.ok && response.status !== 404 ? paidOrderId : null);
+        setOnboardingCheckedOrderId(paidOrderId);
+      })
+      .catch(() => { if (!controller.signal.aborted) { setOnboardingOrderId(null); setOnboardingErrorOrderId(paidOrderId); setOnboardingCheckedOrderId(paidOrderId); } });
+    return () => controller.abort();
+  }, [complete, paidOrderId, onboardingRetry]);
 
   const confirm = useCallback(async () => {
     if (!paymentKey || !orderId || failed) return;
@@ -97,7 +120,9 @@ export function OrderResult({
                 ? params.get("message") ||
                   "신청 내역을 확인하고 다시 진행해 주세요."
                 : complete
-                  ? "마이페이지에서 신청한 클래스와 자료를 확인하세요."
+                  ? showClassFallback
+                    ? "내 클래스에서 신청한 클래스와 자료를 확인해 주세요."
+                    : "아래 버튼을 눌러 교육 시작 안내를 확인해 주세요."
                   : "확인된 주문에 한해 수강권이 제공됩니다."}
           </p>
           {order && (
@@ -144,23 +169,39 @@ export function OrderResult({
               )}
             </dl>
           )}
-          <div className="grid2 mt24">
+          <div className="grid2 mt24" style={complete ? { gridTemplateColumns: "1fr" } : undefined}>
+            {onboardingReady && paidOrderId && (
+              <Link className="btn primary" href={`/purchase-onboarding?order=${encodeURIComponent(paidOrderId)}`}>
+                결제 후 시작 안내 <ArrowRight />
+              </Link>
+            )}
+            {onboardingLoading && (
+              <button className="btn primary" type="button" disabled aria-busy="true">
+                시작 안내 확인 중
+              </button>
+            )}
+            {onboardingFailed && !onboardingLoading && (
+              <button className="btn primary" type="button" onClick={() => { setOnboardingErrorOrderId(null); setOnboardingCheckedOrderId(null); setOnboardingRetry(value => value + 1); }}>
+                시작 안내 다시 확인
+              </button>
+            )}
             {state === "error" && paymentKey && (
               <button className="btn" onClick={() => void confirm()}>
                 결제 결과 다시 확인
               </button>
             )}
-            <Link
+            {(!complete || showClassFallback) && <Link
               className="btn primary"
               href={complete ? "/my/classes" : "/my/orders"}
             >
               {complete ? "내 클래스 보기" : "신청 내역 확인"}
               <ArrowRight />
-            </Link>
-            <Link className="btn" href="/classes">
+            </Link>}
+            {!complete && <Link className="btn" href="/classes">
               클래스 둘러보기
-            </Link>
+            </Link>}
           </div>
+          {onboardingFailed && !onboardingLoading && <p className="form-error" role="alert">시작 안내를 불러오지 못했습니다. 위 버튼을 눌러 다시 확인해 주세요.</p>}
         </section>
       </div>
     </div>

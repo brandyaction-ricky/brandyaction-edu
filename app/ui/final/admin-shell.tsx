@@ -17,7 +17,7 @@ import {
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { Data } from "../learning-workflows";
-import { AdminSuccessState, adminNavigationIcon } from "@/features/admin-ui";
+import { AdminSuccessState, AdminSummaryCard, PageHeader, adminNavigationIcon } from "@/features/admin-ui";
 
 export { AdminShell } from "@/features/admin-ui";
 
@@ -27,8 +27,6 @@ export const finalAdminGroups = [
     [
       "products",
       "cohorts",
-      "weeks",
-      "learning",
       "contents",
       "missions",
       "members",
@@ -42,6 +40,7 @@ export const finalAdminGroups = [
   ["마케팅·전환", ["conversion", "landing", "analytics", "campaigns", "templates", "automations", "seo", "settings"]],
 ] as const;
 export const finalAdminTitles: Record<string, string> = {
+  products: "상품·커리큘럼 관리",
   conversion: "모집 운영",
   landing: "광고·웨비나 성과",
   learning: "학습 콘텐츠 관리",
@@ -55,7 +54,7 @@ export const finalAdminTitles: Record<string, string> = {
   testimonials: "고객 후기 관리",
 };
 export const sectionDescription: Record<string, string> = {
-  products: "상품 정보·상세페이지·제공 자료·판매 조건을 한곳에서 관리합니다.",
+  products: "상품 정보·판매 조건과 주차·학습 커리큘럼을 한곳에서 관리합니다.",
   learning: "일차별 학습 본문과 확인 퀴즈를 관리합니다.",
   cohorts: "상품의 판매 정보와 실제 교육 일정·정원을 구분해 운영합니다.",
   weeks: "상품별 주차 순서·학습 목표·공개 상태를 관리합니다.",
@@ -87,23 +86,16 @@ export function AdminHeading({
   title,
   description,
   eyebrow,
+  className,
   children,
 }: {
   title: string;
   description?: string;
   eyebrow?: string;
+  className?: string;
   children?: ReactNode;
 }) {
-  return (
-    <div className="page-head">
-      <div>
-        {eyebrow && <div className="eyebrow">{eyebrow}</div>}
-        <h1>{title}</h1>
-        {description && <p>{description}</p>}
-      </div>
-      {children && <div className="actions">{children}</div>}
-    </div>
-  );
+  return <PageHeader className={className ? `page-head ${className}` : "page-head"} title={title} description={description} eyebrow={eyebrow} actions={children} />;
 }
 export function Metric({
   label,
@@ -118,20 +110,12 @@ export function Metric({
   highlight?: boolean;
   href?: string;
 }) {
-  const content = (
-    <>
-      <div className="metric-label">{label}</div>
-      <div className="metric-value num">{value}</div>
-      {note && <div className="metric-note">{note}</div>}
-    </>
-  );
+  const content = <AdminSummaryCard compact className={highlight ? "admin-pilot-summary-highlight" : undefined} label={label} value={value} scope={note} />;
   return href ? (
-    <Link className={"metric " + (highlight ? "highlight" : "")} href={href} aria-label={`${label}: ${typeof value === "string" || typeof value === "number" ? value : "상세 보기"}`}>
+    <Link className="admin-metric-link" href={href} aria-label={`${label}: ${typeof value === "string" || typeof value === "number" ? value : "상세 보기"}`}>
       {content}
     </Link>
-  ) : (
-    <div className={"metric " + (highlight ? "highlight" : "")}>{content}</div>
-  );
+  ) : content;
 }
 export function LegacyAdminShell({
   current,
@@ -158,8 +142,9 @@ export function LegacyAdminShell({
       current === "product-editor"
         ? "products"
         : current === "learning-editor"
-          ? "learning"
+          ? "products"
           : current,
+    navigationKey = ["weeks", "learning"].includes(selected) ? "products" : selected,
     byKey = new Map(available.map((s) => [s.key, s])),
     pending = num((data.admin_summary || [])[0], "pendingReviews");
   const contentWidth = ["landing", "analytics", "orders", "customers", "conversion", "members", "reviews"].includes(selected)
@@ -175,8 +160,8 @@ export function LegacyAdminShell({
       <Link
         key={key}
         href={key === "overview" ? "/admin" : "/admin/" + key}
-        className={"nav-link " + (selected === key ? "active" : "")}
-        aria-current={selected === key ? "page" : undefined}
+        className={"nav-link " + (navigationKey === key ? "active" : "")}
+        aria-current={navigationKey === key ? "page" : undefined}
         onPointerEnter={() => prefetchSection(key === "overview" ? "home" : key)}
         onFocus={() => prefetchSection(key === "overview" ? "home" : key)}
         onClick={() => setMobile(false)}
@@ -226,7 +211,7 @@ export function LegacyAdminShell({
                 key={title + selected}
                 open={
                   selected === "overview" ||
-                  keys.some((key) => key === selected)
+                  keys.some((key) => key === navigationKey)
                 }
               >
                 <summary>{title}</summary>
@@ -467,7 +452,7 @@ export function Overview({
               <h2>클래스 운영</h2>
             </div>
             <div className="panel-body">
-              {["products", "cohorts", "weeks", "learning", "contents"].filter(can).map((key) => (
+              {["products", "cohorts", "contents"].filter(can).map((key) => (
                 <Link className="setting-line" href={"/admin/" + key} key={key}>
                   <span>
                     {finalAdminTitles[key] ||

@@ -7,7 +7,16 @@ const request = { requestId: id, paymentId: id, amount: 100, reason: '테스트 
 const payment = { id, order_id: id, provider: 'toss', provider_payment_key: 'test-payment', approved_amount: 1000, cancelled_amount: 0 };
 const current = { paymentKey: 'test-payment', orderId: 'BAE-test', currency: 'KRW', totalAmount: 1000, balanceAmount: 1000, status: 'DONE', method: '카드', cancels: [] };
 const cancellation = { cancelReason: `[EDU:${id}] 테스트 환불`, cancelAmount: 100, cancelStatus: 'DONE', transactionKey: 'test-cancel' };
-function handler({ env = { TOSS_SECRET_KEY: 'test_sk_mock' }, claim = { isNew: true, status: 'processing', baseline_cancelled: 0 }, provider, finalizeError = null } = {}) {
+const testEnv = { NEXT_PUBLIC_APP_ENV: 'development', NEXT_PUBLIC_TOSS_CLIENT_KEY: 'test_ck_mock', TOSS_SECRET_KEY: 'test_sk_mock', VERCEL_ENV: 'production' };
+const liveEnv = { NEXT_PUBLIC_APP_ENV: 'production', NEXT_PUBLIC_TOSS_CLIENT_KEY: 'live_ck_mock', TOSS_SECRET_KEY: 'live_sk_mock', VERCEL_ENV: 'production', EDU_ALLOW_LIVE_REFUNDS: 'true' };
+function loadTossEnvironment() {
+  const source = fs.readFileSync(new URL('../lib/toss-environment.ts', import.meta.url), 'utf8');
+  const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const exports = {};
+  new Function('exports', compiled)(exports);
+  return exports;
+}
+function handler({ env = testEnv, claim = { isNew: true, status: 'processing', baseline_cancelled: 0 }, provider, finalizeError = null } = {}) {
   const calls = []; const finalizations = [];
   const db = {
     from(table) { return { select() { return this; }, eq() { return this; }, update() { return this; }, async single() { return { data: table === 'orders' ? { order_number: 'BAE-test' } : payment }; }, then(resolve) { resolve({}); } }; },
@@ -16,12 +25,27 @@ function handler({ env = { TOSS_SECRET_KEY: 'test_sk_mock' }, claim = { isNew: t
   const source = fs.readFileSync(new URL('../lib/refunds.ts', import.meta.url), 'utf8');
   const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const exports = {};
-  new Function('exports', 'require', 'fetch', 'process', 'Buffer', compiled)(exports, name => name.endsWith('supabase/admin') ? { createAdminClient: () => db } : { uuid: value => typeof value === 'string' && /^[0-9a-f-]{36}$/.test(value) }, async (url, options) => { calls.push({ url, ...options }); return provider(url, options); }, { env }, Buffer);
+  new Function('exports', 'require', 'fetch', 'process', 'Buffer', compiled)(exports, name => name.endsWith('supabase/admin') ? { createAdminClient: () => db } : name.endsWith('toss-environment') ? loadTossEnvironment() : { uuid: value => typeof value === 'string' && /^[0-9a-f-]{36}$/.test(value) }, async (url, options) => { calls.push({ url, ...options }); return provider(url, options); }, { env }, Buffer);
   return { run: body => exports.processRefund(id, body || request), calls, finalizations };
 }
 test('live refunds stay blocked without explicit server activation', async () => {
-  const h = handler({ env: { TOSS_SECRET_KEY: 'live_sk_mock' }, provider: () => { throw Error('must not call'); } });
+  const h = handler({ env: { ...liveEnv, EDU_ALLOW_LIVE_REFUNDS: undefined }, provider: () => { throw Error('must not call'); } });
   assert.equal((await h.run()).status, 503); assert.equal(h.calls.length, 0);
+});
+test('live refunds require a production app, production deployment and paired live keys', async () => {
+  for (const env of [
+    { ...liveEnv, NEXT_PUBLIC_APP_ENV: 'development' },
+    { ...liveEnv, VERCEL_ENV: 'preview' },
+    { ...liveEnv, NEXT_PUBLIC_TOSS_CLIENT_KEY: 'test_ck_mock' },
+  ]) {
+    const h = handler({ env, provider: () => { throw Error('must not call'); } });
+    assert.equal((await h.run()).status, 503); assert.equal(h.calls.length, 0);
+  }
+});
+test('explicitly approved paired live keys preserve idempotent production refunds', async () => {
+  const h = handler({ env: liveEnv, provider: async (_, options) => Response.json(options.method === 'POST' ? { ...current, balanceAmount: 900, status: 'PARTIAL_CANCELED', cancels: [cancellation] } : current) });
+  assert.equal((await h.run()).status, 200);
+  assert.equal(h.calls.filter(r => r.method === 'POST').length, 1);
 });
 test('refund validates integer amount and reason before provider work', async () => {
   const h = handler();

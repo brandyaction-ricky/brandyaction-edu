@@ -5,17 +5,28 @@ import { getAuthenticatedUser } from '@/lib/server-auth';
 import { bannerTextLimits, sections, safeUrl, type Row } from '@/lib/platform';
 import { containsFreeClassCampaign, hasLearningAccess, paidCourseReadinessIssues } from '@/lib/platform-rules';
 import { getEduSettings } from '@/lib/edu-settings';
+import { isListedProductLink } from '@/lib/product-visibility';
 import { gradeQuiz, type QuizDefinition } from '@/lib/mission-quiz';
 import { adminSelectColumns, adminTables, archiveValues, cohortStatus, phoneNumber, validImage, assetPath, imagePreviewUrl, databaseMessage, excludedMemberStatus } from '@/lib/qa-rules';
 import { POLICY_VERSION } from '@/lib/legal-policies';
 import { getOperatorUser, permissionsFor, sectionScopes } from '@/lib/operator-permissions';
 import { crmDeliveryState } from '@/lib/crm-delivery';
+import { loadSmsSettings, registeredSmsNumbers } from '@/lib/crm-sms-settings';
 import { mergeProductDigitalSections, mergeProductMetadata, mergeProductResources, productDigitalSections, productMetadataFields, productResources, productResourceScopes } from '@/lib/product-metadata';
+import { getPublicPlatformData, getPublicSupport } from '@/lib/public-platform-data';
+import { PUBLIC_CACHE_TAG, type PublicView } from '@/lib/public-platform-plan';
+import { revalidateTag } from 'next/cache';
+import { readMemberPlatformData, type MemberView } from '@/lib/member-platform-data';
+import { couponError } from '@/lib/coupon-rules';
 const reply = (data: unknown, status = 200) =>
     Response.json(data, {
         status,
         headers: { 'Cache-Control': 'private, no-store' },
     });
+const publicWriteSuccess = (data: unknown) => {
+    revalidateTag(PUBLIC_CACHE_TAG, { expire: 0 });
+    return reply(data);
+};
 const uid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 function fail(message: string, status = 400): never {
     throw Object.assign(new Error(message), { status });
@@ -27,18 +38,102 @@ export async function GET(request: Request) {
         const authenticated = performance.now();
         const params = new URL(request.url).searchParams;
         const adminMode = params.get('admin') === '1';
+        const view = params.get('view') || 'home';
+        if (!adminMode && view === 'member') {
+            if (!user) return reply({ error: '로그인이 필요합니다.', user: null }, 401);
+            const memberSection = params.get('section') || 'dashboard';
+            if (!['dashboard', 'classes', 'missions', 'questions', 'orders', 'coupons', 'resources', 'profile', 'reviews', 'learn', 'order-result'].includes(memberSection)) return reply({ error: '조회 화면을 확인해 주세요.' }, 400);
+            const enrollmentId = params.get('enrollment') || '';
+            const lessonId = params.get('lesson') || '';
+            if (memberSection === 'learn' && !uid(enrollmentId)) return reply({ error: '수강권을 확인해 주세요.' }, 400);
+            if (lessonId && !uid(lessonId)) return reply({ error: '학습 항목을 확인해 주세요.' }, 400);
+            const data = await readMemberPlatformData(user.id, memberSection as MemberView, enrollmentId, lessonId);
+            const support = await getPublicSupport();
+            const response = reply({ user, data, pagination: null, support });
+            response.headers.set('Server-Timing', `auth;dur=${(authenticated - started).toFixed(1)},data;dur=${(performance.now() - authenticated).toFixed(1)},total;dur=${(performance.now() - started).toFixed(1)}`);
+            return response;
+        }
+        if (!adminMode && view !== 'member') {
+            if (view === 'identity') return reply({ user, data: {}, pagination: null, support: {} });
+            if (!['home', 'classes', 'class', 'articles', 'article', 'stories', 'checkout'].includes(view)) return reply({ error: '조회 화면을 확인해 주세요.' }, 400);
+            const slug = params.get('slug') || '';
+            const cohortId = params.get('cohort') || '';
+            if ((view === 'class' || view === 'article') && (!slug || slug.length > 180 || !/^[a-zA-Z0-9_-]+$/.test(slug))) return reply({ error: '콘텐츠 주소를 확인해 주세요.' }, 400);
+            if (view === 'checkout' && !uid(cohortId)) return reply({ error: '신청할 기수를 확인해 주세요.' }, 400);
+            const publicPage = Math.max(1, Math.min(100000, Number(params.get('page')) || 1));
+            const publicQuery = (params.get('q') || '').trim().slice(0, 80);
+            const publicFilter = (params.get('filter') || '').slice(0, 80);
+            const snapshot = await getPublicPlatformData(view as PublicView, slug, cohortId, publicPage, publicQuery, publicFilter);
+            const data = { ...snapshot.data };
+            if (view === 'home' && data.site_banners) {
+                const now = Date.now();
+                data.site_banners = data.site_banners.filter(banner => (!banner.starts_at || Date.parse(String(banner.starts_at)) <= now) && (!banner.ends_at || Date.parse(String(banner.ends_at)) > now)
+                    && isListedProductLink(banner.link_url, snapshot.unlistedBannerCourses || [], new URL(request.url).origin));
+            }
+            if (user && view === 'class' && data.courses?.[0]) {
+                const db = await createClient();
+                const course = data.courses[0];
+                const enrollment = await db.from('enrollments').select('id,course_id,cohort_id,status,access_starts_at,access_ends_at,revoked_at').eq('user_id', user.id).eq('course_id', course.id).limit(20);
+                if (enrollment.error) throw enrollment.error;
+                data.enrollments = (enrollment.data || []) as Row[];
+                if (data.enrollments.some(enrollment => hasLearningAccess(enrollment))) {
+                    const lessonIds = (data.curriculum_lessons || []).map(lesson => lesson.id);
+                    if (lessonIds.length) {
+                        const contents = await db.from('lesson_contents').select('lesson_id,resource_name,resource_storage_path').in('lesson_id', lessonIds).limit(200);
+                        if (contents.error) throw contents.error;
+                        data.lesson_contents = (contents.data || []).map(content => ({ ...content, id: content.lesson_id })) as Row[];
+                    }
+                }
+            }
+            if (user && view === 'articles' && data.article_banner?.length) {
+                const setting = await createAdminClient().from('site_settings').select('value').eq('key', 'edu_article_banner').limit(1);
+                if (setting.error) throw setting.error;
+                const value = setting.data?.[0]?.value as Record<string, unknown> | undefined;
+                if (value && Array.isArray(value.videos)) {
+                    const publicValue = data.article_banner[0].value as Record<string, unknown>;
+                    data.article_banner = [{ ...data.article_banner[0], value: { ...publicValue, videos: value.videos.slice(0, 3).map((item: unknown) => ({ title: String((item as Row)?.title || ''), available: Boolean((item as Row)?.url), url: safeUrl((item as Row)?.url) })) } }];
+                }
+            }
+            const support = await getPublicSupport();
+            const response = reply({ user, data, pagination: snapshot.pagination, support });
+            response.headers.set('Server-Timing', `auth;dur=${(authenticated - started).toFixed(1)},data;dur=${(performance.now() - authenticated).toFixed(1)},total;dur=${(performance.now() - started).toFixed(1)}`);
+            return response;
+        }
         const sectionKey = params.get('section') || 'home';
         const record = params.get('record');
         if (record && (!uid(record) || !['products', 'learning'].includes(sectionKey))) return reply({ error: '편집할 항목을 확인해 주세요.' }, 400);
         const productEditorRead = adminMode && sectionKey === 'products' && Boolean(record);
         const page = Math.max(1, Math.min(100000, Number(params.get('page')) || 1));
-        const pageSize = sectionKey === 'orders' ? 30 : 100;
+        const pageSize = sectionKey === 'orders' ? 30 : sectionKey === 'weeks' ? 1000 : 100;
         if (adminMode && !user) return reply({ error: '로그인이 필요합니다.', user: null }, 401);
         const operator = adminMode ? await getOperatorUser(sectionScopes[sectionKey], user) : null;
         const authorized = performance.now();
         if (adminMode && (!operator || (sectionKey === 'staff' && operator.role !== 'admin'))) return reply({ error: '이 화면에 접근할 운영 권한이 필요합니다.', user }, 403);
         const db = adminMode ? createAdminClient() : await createClient();
         if (adminMode && !Object.hasOwn(adminTables, sectionKey)) return reply({ error: '조회 화면을 확인해 주세요.' }, 400);
+        // Keep the initial product editor read small. Load curriculum or missions
+        // only when the operator opens the tab, scoped to the selected product.
+        if (productEditorRead && ['curriculum', 'missions'].includes(params.get('part') || '')) {
+            const part = params.get('part');
+            const weekResult = await db.from('curriculum_weeks').select('*').eq('course_id', record!).order('week_number');
+            if (weekResult.error) return reply({ error: '상품 주차를 불러오지 못했습니다.' }, 500);
+            const weeks = (weekResult.data || []) as Row[];
+            const weekIds = weeks.map(week => String(week.id));
+            if (!weekIds.length) return reply({ data: { curriculum_weeks: [], curriculum_lessons: [], [part === 'missions' ? 'curriculum_missions' : 'lesson_contents']: [] } });
+            const lessonResult = await db.from('curriculum_lessons').select('*').in('week_id', weekIds).order('day_number');
+            if (lessonResult.error) return reply({ error: '상품 일차를 불러오지 못했습니다.' }, 500);
+            const lessons = (lessonResult.data || []) as Row[];
+            const lessonIds = lessons.map(lesson => String(lesson.id));
+            if (!lessonIds.length) return reply({ data: { curriculum_weeks: weeks, curriculum_lessons: [], [part === 'missions' ? 'curriculum_missions' : 'lesson_contents']: [] } });
+            if (part === 'missions') {
+                const missionResult = await db.from('curriculum_missions').select('*').in('lesson_id', lessonIds).order('created_at');
+                if (missionResult.error) return reply({ error: '상품 미션을 불러오지 못했습니다.' }, 500);
+                return reply({ data: { curriculum_weeks: weeks, curriculum_lessons: lessons, curriculum_missions: missionResult.data || [] } });
+            }
+            const contentResult = await db.from('lesson_contents').select('*').in('lesson_id', lessonIds);
+            if (contentResult.error) return reply({ error: '학습 콘텐츠를 불러오지 못했습니다.' }, 500);
+            return reply({ data: { curriculum_weeks: weeks, curriculum_lessons: lessons, lesson_contents: contentResult.data || [] } });
+        }
         const settings = getEduSettings();
         let tables = productEditorRead ? ['courses', 'cohorts'] : adminMode ? adminTables[sectionKey] : ['courses', 'cohorts', 'curriculum_weeks', 'curriculum_lessons', 'articles', 'article_categories', 'review_videos', 'site_banners', 'reviews', 'cohort_sessions'];
         if (adminMode && sectionKey === 'home' && operator?.role === 'staff') tables = tables.filter((table) => (['courses', 'cohorts'].includes(table) && operator.permissions.products) || (['mission_submissions', 'edu_questions'].includes(table) && operator.permissions.members));
@@ -69,10 +164,25 @@ export async function GET(request: Request) {
         await Promise.all([
             (async () => {
                 if (!adminMode) return;
-                if (sectionKey === 'home') {
+                if (sectionKey === 'home' || sectionKey === 'orders') {
                     const summary = await db.rpc('edu_admin_summary');
                     if (summary.error) throw summary.error;
                     const row = summary.data as Row;
+                    if (sectionKey === 'orders') {
+                        const processing = await db.from('edu_refund_requests').select('id', { count: 'exact', head: true }).eq('status', 'processing');
+                        if (processing.error) throw processing.error;
+                        data.order_summary = [{
+                            id: 'order-summary',
+                            approvedRevenue: row.approvedRevenue,
+                            refundedRevenue: row.refundedRevenue,
+                            netRevenue: row.netRevenue,
+                            processingRefunds: processing.count || 0,
+                        }];
+                        if (operator?.role === 'admin' || operator?.permissions.members) {
+                            data.admin_summary = [{ id: 'navigation-summary', pendingReviews: row.pendingReviews }];
+                        }
+                        return;
+                    }
                     if (operator?.role === 'admin' || operator?.permissions.members) {
                         const members = await db.from('profiles').select('id', { count: 'exact', head: true }).neq('status', excludedMemberStatus);
                         if (members.error) throw members.error;
@@ -118,6 +228,7 @@ export async function GET(request: Request) {
                         : '*';
                 const serverPaged = adminMode && !productEditorRead && table === primaryTable && !['home', 'members', 'reviews', 'analytics', 'metrics', 'seo', 'settings', 'staff', 'templates', 'campaigns', 'automations'].includes(sectionKey);
                 let query = db.from(table).select(columns, serverPaged ? { count: 'exact' } : undefined);
+                if (adminMode && table === 'coupons' && operator?.role !== 'admin') query = query.neq('discount_type', 'ADMIN_FREE');
                 if (adminMode && sectionKey === 'customers' && table === 'profiles' && memberScope) query = query.eq('id', memberScope);
                 if (adminMode && sectionKey === 'questions' && table === 'edu_questions') {
                     if (memberScope) query = query.eq('user_id', memberScope);
@@ -292,7 +403,8 @@ export async function GET(request: Request) {
         }
         if (!adminMode) {
             const now = Date.now();
-            data.site_banners = (data.site_banners || []).filter((b) => (!b.starts_at || Date.parse(String(b.starts_at)) <= now) && (!b.ends_at || Date.parse(String(b.ends_at)) > now));
+            data.site_banners = (data.site_banners || []).filter((b) => (!b.starts_at || Date.parse(String(b.starts_at)) <= now) && (!b.ends_at || Date.parse(String(b.ends_at)) > now)
+                && isListedProductLink(b.link_url, data.courses || [], new URL(request.url).origin));
             const landingDb = createAdminClient();
             const freeCourseIds = (data.courses || []).filter(c => Number(c.list_price) === 0).map(c => c.id);
             const landingResult = freeCourseIds.length ? await landingDb.from('landing_configs').select('*').in('id', freeCourseIds) : { data: [], error: null };
@@ -342,7 +454,10 @@ export async function GET(request: Request) {
             }
         }
         if (adminMode) {
-            if (['templates', 'campaigns', 'automations'].includes(sectionKey)) data.crm_delivery_state = [crmDeliveryState() as unknown as Row];
+            if (['templates', 'campaigns', 'automations'].includes(sectionKey)) {
+                data.crm_delivery_state = [crmDeliveryState() as unknown as Row];
+                data.crm_sms_settings = [{ ...await loadSmsSettings(), ...registeredSmsNumbers(), canConfigure: operator?.role === 'admin' } as unknown as Row];
+            }
         }
         const { operations } = await settings;
         if (adminMode && data.site_settings) {
@@ -403,6 +518,32 @@ export async function POST(request: Request) {
         const body = (await request.json()) as Record<string, unknown>;
         const action = String(body.action || '');
         const db = createAdminClient();
+        if (action === 'set-curriculum-archive') {
+            const permissions = await permissionsFor(user);
+            const courseId = String(body.courseId || '');
+            const kind = String(body.kind || '');
+            if (!permissions.products) return reply({ error: '상품 관리 권한이 필요합니다.' }, 403);
+            if (!uid(courseId) || !uid(body.id) || !['week', 'lesson'].includes(kind) || typeof body.archived !== 'boolean') {
+                fail('삭제하거나 복구할 주차·학습을 확인해 주세요.');
+            }
+            const result = await db.rpc('edu_set_curriculum_archive', {
+                p_actor: user.id,
+                p_course: courseId,
+                p_kind: kind,
+                p_id: body.id,
+                p_archived: body.archived,
+            });
+            if (result.error) {
+                const code = String(result.error.message || '');
+                if (code.includes('CURRICULUM_FORBIDDEN')) fail('상품 관리 권한이 필요합니다.', 403);
+                if (code.includes('CURRICULUM_NOT_FOUND')) fail('선택한 상품의 주차·학습이 아니거나 이미 변경되었습니다. 목록을 다시 불러와 주세요.', 409);
+                if (code.includes('CURRICULUM_PARENT_ARCHIVED')) fail('먼저 상위 주차를 복구해 주세요.', 409);
+                if (code.includes('CURRICULUM_INVALID')) fail('주차·학습 상태를 확인해 주세요.');
+                console.error('curriculum archive', result.error.code || 'unexpected');
+                fail('주차·학습 상태를 변경하지 못했습니다. 목록을 다시 불러온 뒤 재시도해 주세요.', 409);
+            }
+            return publicWriteSuccess({ ok: true, result: result.data });
+        }
         if (action === 'delete-member') {
             if (user.role !== 'admin') return reply({ error: '관리자만 회원을 삭제할 수 있습니다.' }, 403);
             if (!uid(body.id)) fail('삭제할 회원을 확인해 주세요.');
@@ -427,7 +568,7 @@ export async function POST(request: Request) {
                 if (!uid(resourceId) || !resources.some(item => item.id === resourceId)) fail('삭제할 자료를 확인해 주세요.');
                 const result = await db.from('courses').update({ metadata: mergeProductResources(current.data.metadata, resources.filter(item => item.id !== resourceId)) }).eq('id', courseId);
                 if (result.error) throw result.error;
-                return reply({ ok: true });
+                return publicWriteSuccess({ ok: true });
             }
             const name = String(body.resourceName || '').trim();
             const path = String(body.storagePath || '').trim();
@@ -440,7 +581,7 @@ export async function POST(request: Request) {
             const next = resources.some(resource => resource.id === id) ? resources.map(resource => resource.id === id ? item : resource) : [...resources, item];
             const result = await db.from('courses').update({ metadata: mergeProductResources(current.data.metadata, next) }).eq('id', courseId);
             if (result.error) throw result.error;
-            return reply({ ok: true, resource: item });
+            return publicWriteSuccess({ ok: true, resource: item });
         }
         if (action === 'save-digital-content') {
             const permissions = await permissionsFor(user);
@@ -457,7 +598,7 @@ export async function POST(request: Request) {
             if (productDigitalSections(metadata).some(section => section.items.some(item => item.type === 'file' && !resourceIds.has(item.resourceId)))) fail('연결된 파일 정보를 다시 확인해 주세요.');
             const result = await db.from('courses').update({ metadata }).eq('id', courseId).select('metadata').single();
             if (result.error) throw result.error;
-            return reply({ ok: true, sections: productDigitalSections((result.data.metadata || {}) as Record<string, unknown>) });
+            return publicWriteSuccess({ ok: true, sections: productDigitalSections((result.data.metadata || {}) as Record<string, unknown>) });
         }
         if (action === 'article-banner') {
             const permissions = await permissionsFor(user);
@@ -480,7 +621,7 @@ export async function POST(request: Request) {
             if (!title || title.length > 120) fail('배너 제목을 확인해 주세요.');
             const result = await db.from('site_settings').upsert({ key: 'edu_article_banner', value: { enabled: value?.enabled !== false, eyebrow: String(value?.eyebrow || '').trim().slice(0, 80), title, description: String(value?.description || '').trim().slice(0, 240), signupNotice: String(value?.signupNotice || '').trim().slice(0, 220), signupCTA: String(value?.signupCTA || '').trim().slice(0, 45), memberCTA: String(value?.memberCTA || '').trim().slice(0, 45), videos }, is_public: false }, { onConflict: 'key' });
             if (result.error) throw result.error;
-            return reply({ ok: true });
+            return publicWriteSuccess({ ok: true });
         }
         if (action === 'article-category-save' || action === 'article-category-delete') {
             const permissions = await permissionsFor(user);
@@ -493,7 +634,7 @@ export async function POST(request: Request) {
                 if (used.count) fail('사용 중인 카테고리는 삭제할 수 없습니다. 아티클 카테고리를 먼저 변경해 주세요.', 409);
                 const removed = await db.from('article_categories').delete().eq('id', id);
                 if (removed.error) throw removed.error;
-                return reply({ ok: true });
+                return publicWriteSuccess({ ok: true });
             }
             if (id && !uid(id)) fail('수정할 카테고리를 확인해 주세요.');
             const name = String(body.name || '').trim();
@@ -506,7 +647,7 @@ export async function POST(request: Request) {
             const values = { name, slug, description: description || null, display_order: displayOrder, is_active: body.active !== false };
             const result = id ? await db.from('article_categories').update(values).eq('id', id) : await db.from('article_categories').insert(values);
             if (result.error) fail(databaseMessage(result.error.code), result.error.code === '23505' ? 409 : 400);
-            return reply({ ok: true });
+            return publicWriteSuccess({ ok: true });
         }
         if (action === 'archive') {
             const section = sections.find((s) => s.key === body.section);
@@ -514,13 +655,19 @@ export async function POST(request: Request) {
             if (!section || !permissions[sectionScopes[section.key]]) return reply({ error: '이 작업에 필요한 운영 권한이 없습니다.' }, 403);
             const ids = body.ids;
             if (!section || !archiveValues[section.key] || !Array.isArray(ids) || !ids.length || ids.length > 50 || !ids.every(uid)) fail('보관할 항목을 최대 50개까지 선택해 주세요.');
+            if (section.key === 'coupons') {
+                if (user.role !== 'admin') return reply({ error: '관리자 권한이 필요합니다.' }, 403);
+                const result = await db.rpc('edu_set_coupon_active', { p_actor: user.id, p_ids: [...new Set(ids)], p_active: false });
+                if (result.error) fail(couponError(result.error.message), 409);
+                return reply({ ok: true, result: result.data });
+            }
             const result = await db.rpc('edu_archive_records', {
                 p_actor: user.id,
                 p_section: section.key,
                 p_ids: [...new Set(ids)],
             });
             if (result.error) throw result.error;
-            return reply({ ok: true, result: result.data });
+            return publicWriteSuccess({ ok: true, result: result.data });
         }
         if (action === 'restore-products') {
             const permissions = await permissionsFor(user);
@@ -536,7 +683,24 @@ export async function POST(request: Request) {
                 fail(result.error.message || '상품을 복원하지 못했습니다.', 409);
             }
             if (!Number(result.data)) fail('이미 복원됐거나 삭제 상태가 아닌 상품입니다.', 409);
-            return reply({ ok: true, result: result.data });
+            return publicWriteSuccess({ ok: true, result: result.data });
+        }
+        if (action === 'reorder-weeks') {
+            const permissions = await permissionsFor(user);
+            const courseId = String(body.courseId || '');
+            const ids = body.ids;
+            if (!permissions.products) return reply({ error: '상품 관리 권한이 필요합니다.' }, 403);
+            if (!uid(courseId) || !Array.isArray(ids) || !ids.length || ids.length > 1000 || !ids.every(uid) || new Set(ids).size !== ids.length) fail('상품과 주차 목록을 다시 확인해 주세요.');
+            const result = await db.rpc('edu_admin_reorder_weeks', {
+                p_actor: user.id,
+                p_course: courseId,
+                p_ids: ids,
+            });
+            if (result.error) {
+                if (result.error.code !== 'P0001') console.error('week reorder', result.error.code);
+                fail(result.error.message || '주차 순서를 변경하지 못했습니다.', 409);
+            }
+            return publicWriteSuccess({ ok: true, result: result.data });
         }
         if (action === 'save') {
             const section = sections.find((s) => s.key === body.section);
@@ -544,8 +708,16 @@ export async function POST(request: Request) {
             if (!section || !permissions[sectionScopes[section.key]]) return reply({ error: '이 작업에 필요한 운영 권한이 없습니다.' }, 403);
             if (!section || section.readOnly) fail('수정할 수 없는 항목입니다.');
             const input = (body.values || {}) as Record<string, unknown>;
+            if (section.table === 'coupons') {
+                if (user.role !== 'admin') return reply({ error: '관리자 권한이 필요합니다.' }, 403);
+                const couponId = body.id || body.requestId;
+                const products = input.applicable_course_ids || (input.applicable_course_id ? [input.applicable_course_id] : []);
+                if (!uid(couponId) || !Array.isArray(products) || products.length > 100 || products.some(id => !uid(id))) fail('쿠폰과 적용 상품을 확인해 주세요.');
+                const result = await db.rpc('edu_save_coupon', { p_actor: user.id, p_id: couponId, p_values: input, p_products: products });
+                if (result.error) fail(result.error.code === '23505' ? '이미 사용 중인 쿠폰 코드입니다.' : couponError(result.error.message), 409);
+                return reply({ ok: true, result: result.data });
+            }
             const values: Record<string, unknown> = {};
-            const couponCourseId = section.table === 'coupons' ? String(input.applicable_course_id || '') : '';
             const productSchedule = section.table === 'courses' && ('recruitmentStartAt' in body || 'recruitmentEndAt' in body) ? {
                 start: body.recruitmentStartAt === null ? null : String(body.recruitmentStartAt || ''),
                 end: body.recruitmentEndAt === null ? null : String(body.recruitmentEndAt || ''),
@@ -650,16 +822,6 @@ export async function POST(request: Request) {
                     if (['image', 'video'].includes(String(block.type)) && !safeUrl(block.url || block.src)) fail('본문의 이미지·영상 주소를 확인해 주세요.');
                 }
             }
-            if (section.table === 'coupons') {
-                if (typeof values.code === 'string') values.code = values.code.trim().toUpperCase();
-                if (values.discount_type === 'percentage' && Number(values.discount_value) > 100) fail('할인율은 100% 이하여야 합니다.');
-                if (values.product_scope === 'specific' && !uid(couponCourseId)) fail('쿠폰을 적용할 상품을 선택해 주세요.');
-                if (values.issue_target === 'tag' && !uid(values.target_tag_id)) fail('쿠폰 발급 대상 태그를 선택해 주세요.');
-                if (values.issue_target !== 'tag') values.target_tag_id = null;
-                for (const key of ['discount_value', 'max_discount_amount', 'minimum_order_amount', 'usage_limit', 'per_user_limit']) {
-                    if (values[key] !== null && values[key] !== undefined && (!Number.isSafeInteger(values[key]) || Number(values[key]) < (key === 'minimum_order_amount' || key === 'max_discount_amount' ? 0 : 1))) fail('쿠폰 금액·수량은 허용 범위의 정수로 입력해 주세요.');
-                }
-            }
             if (section.table === 'crm_tags') {
                 values.name = String(values.name || '').trim();
                 values.description = String(values.description || '').trim() || null;
@@ -684,7 +846,7 @@ export async function POST(request: Request) {
                     const { status, ...problem } = reviewWriteError(r.error);
                     return reply(problem, status);
                 }
-                return reply({ ok: true });
+                return publicWriteSuccess({ ok: true });
             }
             if (section.table === 'lesson_contents') {
                 if (['vod_url', 'resource_storage_path', 'body_text', 'external_url'].filter((k) => values[k]).length !== 1) fail('영상·자료·본문·외부 링크 중 학습 유형에 맞는 하나를 등록해 주세요.');
@@ -723,17 +885,6 @@ export async function POST(request: Request) {
                 if (input.apply_existing === true) {
                     const synced = await db.rpc('crm_resync_all_automatic_tags');
                     if (synced.error) fail('태그 조건은 저장했지만 기존 회원 태그를 다시 계산하지 못했습니다.', 409);
-                }
-            }
-            if (section.table === 'coupons') {
-                const coupon = result.data as Row;
-                const couponId = String(coupon.id || body.id || '');
-                if (!uid(couponId)) fail('저장된 쿠폰을 다시 불러오지 못했습니다.', 409);
-                const removed = await db.from('coupon_products').delete().eq('coupon_id', couponId);
-                if (removed.error) fail('쿠폰 적용 상품을 갱신하지 못했습니다.', 409);
-                if (values.product_scope === 'specific') {
-                    const linked = await db.from('coupon_products').insert({ coupon_id: couponId, course_id: couponCourseId });
-                    if (linked.error) fail('쿠폰 적용 상품을 저장하지 못했습니다.', 409);
                 }
             }
             let scheduledCohort = null;
@@ -776,7 +927,7 @@ export async function POST(request: Request) {
                 }
                 scheduledCohort = cohortResult.data;
             }
-            return reply({ ok: true, row: result.data, cohort: scheduledCohort });
+            return publicWriteSuccess({ ok: true, row: result.data, cohort: scheduledCohort });
         }
         if (action === 'profile') {
             const name = String(body.name || '').trim();
@@ -816,16 +967,9 @@ export async function POST(request: Request) {
             if (offer.error || !offer.data) fail('상품 모집 정보를 확인해 주세요.', 409);
             const offeredCourse = offer.data.courses as Row;
             if (offeredCourse.category === 'paid_class') {
-                const weeks = await db.from('curriculum_weeks').select('*').eq('course_id', offeredCourse.id).eq('is_published', true);
-                if (weeks.error) throw weeks.error;
-                const weekIds = (weeks.data || []).map((item) => item.id);
-                const lessons = weekIds.length
-                    ? await db.from('curriculum_lessons').select('*').in('week_id', weekIds).eq('is_published', true)
-                    : { data: [], error: null };
-                if (lessons.error) throw lessons.error;
                 const metadata = (offeredCourse.metadata && typeof offeredCourse.metadata === 'object' ? offeredCourse.metadata : {}) as Record<string, unknown>;
                 const source = String(metadata.detail_html_document || metadata.detail_html || '');
-                const issues = paidCourseReadinessIssues(offeredCourse, [offer.data], (weeks.data || []) as Row[], (lessons.data || []) as Row[]);
+                const issues = paidCourseReadinessIssues(offeredCourse, [offer.data]);
                 if (containsFreeClassCampaign(source)) issues.push('유료 전용 상세 콘텐츠');
                 if (issues.length) fail(`판매 준비가 완료되지 않았습니다: ${[...new Set(issues)].join(' · ')}`, 409);
             }
@@ -836,7 +980,8 @@ export async function POST(request: Request) {
                 fail((e as Error).message);
             }
             if (!phone || !String(body.name || '').trim()) fail('신청자 이름과 연락처를 확인해 주세요.');
-            const r = await db.rpc('create_checkout_order', {
+            if (body.couponId) fail('쿠폰 코드를 입력해 주세요.');
+            const r = await db.rpc('edu_checkout_with_coupon', {
                 p_user_id: user.id,
                 p_cohort_id: body.cohortId,
                 p_customer_name: String(body.name).trim(),
@@ -845,29 +990,26 @@ export async function POST(request: Request) {
                 p_terms_version: POLICY_VERSION,
                 p_privacy_version: POLICY_VERSION,
                 p_refund_policy_version: POLICY_VERSION,
+                p_code: String(body.coupon || '').trim().toUpperCase(),
             });
             if (r.error) {
                 const msg = r.error.message;
+                if (msg.includes('COUPON_')) fail(couponError(msg), 409);
                 fail(msg.includes('ALREADY_ENROLLED') ? '이미 신청한 클래스입니다.' : msg.includes('RECRUIT') ? '현재 모집 중인 클래스가 아닙니다.' : msg.includes('CAPACITY') ? '모집 정원이 마감되었습니다.' : '주문을 만들지 못했습니다. 상품 모집 설정을 확인해 주세요.', 409);
             }
-            const order = r.data as Record<string, unknown>;
-            const coupon = await db.rpc('apply_coupon_to_order', {
-                p_order_id: order.orderId,
-                p_user_id: user.id,
-                p_code: String(body.coupon || '')
-                    .trim()
-                    .toUpperCase(),
-            });
-            if (coupon.error) fail('쿠폰의 사용 기간과 적용 상품을 확인해 주세요.', 409);
-            const result = { ...order, ...coupon.data };
-            if (Number(result.totalAmount) === 0) {
-                const free = await db.rpc('finalize_zero_total_order', {
-                    p_order_id: order.orderId,
-                    p_user_id: user.id,
-                });
-                if (free.error) throw free.error;
-                return reply({ ...result, free: true });
+            const result = r.data as Record<string, unknown>;
+            const entrySource = typeof body.entrySource === 'string' && ['paid', 'organic', 'alumni', 'youtube'].includes(body.entrySource)
+                ? body.entrySource : null;
+            const attribution = await db.from('orders').update({ entry_src: entrySource })
+                .eq('id', result.orderId).eq('user_id', user.id)
+                .select('id').single();
+            if (attribution.error || !attribution.data) {
+                // The checkout RPC may already have finalized a zero-total order.
+                // Do not report payment failure after an entitlement was granted.
+                console.error('Order entry source update failed', attribution.error);
+                result.entrySourceRecorded = false;
             }
+            if (result.free === true && Number(result.totalAmount) === 0) return reply(result);
             if (!process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY) fail('결제 서비스 연결을 확인하고 있습니다.', 503);
             return reply(result);
         }

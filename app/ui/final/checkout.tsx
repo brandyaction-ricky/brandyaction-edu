@@ -7,6 +7,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
 import { type Data, type WorkflowSend } from "../learning-workflows";
 import { Badge, Empty, Heading, courseType } from "./primitives";
+import { parseEntrySource, withEntrySource } from '@/lib/entry-source';
+import { CheckoutCouponRegistration, useCheckoutCouponRegistration } from "@/features/commerce/ui";
 
 export function Checkout({
   data,
@@ -19,18 +21,25 @@ export function Checkout({
   pending: boolean;
   send: WorkflowSend;
 }) {
-  const cohortId = useSearchParams().get("cohort") || "",
+  const searchParams = useSearchParams();
+  const cohortId = searchParams.get("cohort") || "",
     router = useRouter();
+  const entrySource = parseEntrySource(searchParams.get('src'));
   const [processing, setProcessing] = useState(false),
     [error, setError] = useState(""),
-    [coupon, setCoupon] = useState(""),
     [agreed, setAgreed] = useState(false);
   const lock = useRef(false),
     cohort = (data.cohorts || []).find((c) => c.id === cohortId),
     course = (data.courses || []).find((c) => c.id === cohort?.course_id),
     free = !!cohort && num(cohort, "price") === 0;
+  const scope = `${user?.id || ''}:${cohortId}`;
+  const couponRegistration = useCheckoutCouponRegistration(cohortId, scope);
+  const coupon = couponRegistration.appliedCode;
+  const quote = couponRegistration.quote;
+  const couponLoading = couponRegistration.loading;
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (coupon.trim() && !quote) { setError('쿠폰 등록을 완료해 주세요.'); return; }
     if (!agreed) {
       setError("필수 약관에 동의해 주세요.");
       return;
@@ -45,6 +54,7 @@ export function Checkout({
         {
           action: "order",
           cohortId,
+          entrySource,
           name: f.get("name"),
           phone: f.get("phone"),
           coupon: f.get("coupon"),
@@ -177,12 +187,12 @@ export function Checkout({
     <>
       <button
         className="btn primary full large"
-        disabled={pending || processing || !agreed}
+        disabled={pending || processing || couponLoading || !agreed || (!!coupon.trim() && !quote)}
         aria-describedby="checkout-agreement-help"
       >
         {pending || processing
           ? "처리 중..."
-          : free
+          : free || quote?.totalAmount === 0
             ? "무료로 신청 완료하기"
             : "결제하기"}
         <ArrowRight />
@@ -204,7 +214,7 @@ export function Checkout({
             className="btn primary"
             href={
               "/login?next=" +
-              encodeURIComponent("/checkout?cohort=" + cohortId)
+              encodeURIComponent(withEntrySource("/checkout?cohort=" + cohortId, entrySource))
             }
           >
             로그인하기
@@ -285,43 +295,10 @@ export function Checkout({
                 </Link>
               </div>
               <div className="panel-body">
-                <label className="field">
-                  사용할 쿠폰
-                  <select
-                    value={coupon}
-                    onChange={(e) => setCoupon(e.target.value)}
-                  >
-                    <option value="">직접 입력 / 선택하지 않음</option>
-                    {(data.customer_coupons || [])
-                      .filter((c) => c.status === "available")
-                      .map((c) => {
-                        const v = c.coupon as
-                          | Record<string, unknown>
-                          | undefined;
-                        return (
-                          <option key={c.id} value={String(v?.code || "")}>
-                            {String(v?.name || "쿠폰")}
-                          </option>
-                        );
-                      })}
-                  </select>
-                </label>
-                <label className="field">
-                  쿠폰 코드
-                  <input
-                    name="coupon"
-                    value={coupon}
-                    onChange={(e) => setCoupon(e.target.value)}
-                    placeholder="보유한 쿠폰 코드를 입력하세요."
-                  />
-                </label>
-                <p className="meta">
-                  유효한 쿠폰의 할인은 결제창을 열 때 서버에서 확인하여
-                  반영합니다.
-                </p>
+                <CheckoutCouponRegistration controller={couponRegistration} />
               </div>
             </section>
-            <section className="panel">
+            {quote?.totalAmount === 0 ? <section className="panel"><div className="panel-body">최종 금액 0원 · 결제창 없이 신청을 완료합니다.</div></section> : <section className="panel">
               <div className="panel-head">
                 <h2>결제 수단</h2>
               </div>
@@ -351,22 +328,24 @@ export function Checkout({
                   가상계좌는 발급 후 24시간 안에 입금해야 하며, 입금 확인 후 수강권이 제공됩니다.
                 </p>
               </div>
-            </section>
+            </section>}
           </div>
           <aside className="product-aside">
-            <div className="purchase-card">
+            <div className="purchase-card checkout-payment-summary">
               <h2>결제 금액</h2>
+              <div className="checkout-price-breakdown" aria-live="polite" aria-atomic="true">
               <div className="cost-row">
                 <span className="muted">상품 금액</span>
-                <span>{money(num(cohort, "price"))}</span>
+                <span>{money(quote?.originalAmount ?? num(cohort, "price"))}</span>
               </div>
               <div className="cost-row">
                 <span className="muted">쿠폰 할인</span>
-                <span>{coupon ? "결제창에서 확인" : "적용 안 함"}</span>
+                <span className={quote ? 'checkout-discount-amount' : 'muted'}>{quote ? `−${money(quote.couponDiscount)}` : coupon ? "적용 확인 필요" : "0원"}</span>
               </div>
-              <div className="cost-row cost-total">
-                <span>{coupon ? "할인 전 금액" : "최종 결제 금액"}</span>
-                <strong>{money(num(cohort, "price"))}</strong>
+              </div>
+              <div className="cost-row cost-total" aria-live="polite" aria-atomic="true">
+                <span>최종 결제 금액</span>
+                <strong>{money(quote?.totalAmount ?? num(cohort, "price"))}</strong>
               </div>
               {agreement}
               {submitButton}

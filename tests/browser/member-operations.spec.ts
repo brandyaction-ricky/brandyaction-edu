@@ -48,10 +48,10 @@ test('readonly records paginate without losing focus and preserve archived quest
   await page.getByRole('tab', { name: '학습 기록', exact: true }).click();
   await expect(page.getByText('아직 저장된 기록이 없습니다.', { exact: true })).toBeVisible();
   await page.getByRole('tab', { name: '제출물', exact: true }).click();
-  await page.getByRole('button', { name: '다음 기록', exact: true }).click();
+  await page.getByRole('button', { name: '다음', exact: true }).click();
   await expect(page.getByRole('heading', { name: '첫 실행 미션 21', exact: true })).toBeVisible();
   await expect(page.getByRole('tabpanel', { name: '제출물', exact: true })).toBeFocused();
-  await expect(page.getByRole('button', { name: '다음 기록', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '다음', exact: true })).toBeDisabled();
   await page.getByRole('tab', { name: '질문', exact: true }).click();
   await page.getByRole('link', { name: '질문·답변 보기', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/questions\?question=/);
@@ -94,8 +94,11 @@ test('enrollment links retain cohort/member context and distinguish follow-up fr
   await page.getByRole('link', { name: '이 기수에서 회원 진행 찾기', exact: true }).first().click();
   await expect(page).toHaveURL(/\/admin\/members\?cohort=.+&search=/);
   await expect(page.getByLabel('회원 검색')).toHaveValue('operations-fixture@example.test');
-  await expect(page.getByText('보완·재제출 확인 1개 학습', { exact: true })).toBeVisible();
-  await expect(page.getByRole('link', { name: /선택 주차 검토 대기/ })).toHaveCount(0);
-  await page.getByRole('link', { name: '회원 운영 정보', exact: true }).click();
+  const memberRow = page.getByRole('row', { name: '운영 동선 QA 회원, 재제출 필요' });
+  await expect(memberRow).toBeVisible();
+  await expect(memberRow.getByRole('link', { name: '재제출 확인' })).toHaveAttribute('href', /\/admin\/reviews\?submission=/);
+  await memberRow.click();
+  await expect(page.getByRole('dialog', { name: '운영 동선 QA 회원' })).toContainText('보완 요청');
+  await page.getByRole('link', { name: '회원 운영 정보 보기', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/customers\?member=/);
 });

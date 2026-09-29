@@ -23,7 +23,7 @@ export function WebinarRegistration({code,channel}:{code:string;channel:string})
  const returnTo=`/webinar/${code}/${channel}`;
  return <main style={{maxWidth:600,margin:'48px auto',padding:'24px',lineHeight:1.7}}>
   <p>BrandyAction EDU · 무료 웨비나</p><h1>AI 에이전트 마케팅 교육</h1>
-  <p>무료 웨비나 신청을 현재 로그인한 회원 계정에 기록합니다. 유료 교육 결제와 수강권 발급은 별도입니다.</p>
+  <p>로그인 후 무료 웨비나를 신청하세요. 유료 교육은 별도 신청이 필요합니다.</p>
   {!data&&!message&&<p role="status">신청 정보를 확인하고 있습니다.</p>}
   {data?.registered?<div role="status"><h2>신청이 완료되었습니다.</h2><p>라이브 일정과 참여 주소는 안내받은 카톡방 공지를 확인해 주세요.</p></div>:data&&!data.authenticated?<Link href={`/login?next=${encodeURIComponent(returnTo)}`}>로그인하고 무료 신청하기</Link>:data&&<form onSubmit={e=>{e.preventDefault();void apply();}}>
    <label style={{display:'block',margin:'20px 0'}}><input type="checkbox" checked={agreed} disabled={pending} onChange={e=>setAgreed(e.target.checked)}/> <Link href="/policies/terms" target="_blank">이용약관</Link>과 <Link href="/policies/privacy" target="_blank">개인정보 처리방침</Link>을 확인하고 무료 신청에 동의합니다.</label>

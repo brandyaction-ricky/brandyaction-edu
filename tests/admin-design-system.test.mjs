@@ -65,7 +65,13 @@ test('admin feature owns navigation visibility without becoming an authorization
 test('responsive shell includes every class tool and traps the tablet/mobile navigation', () => {
   const system = load('features/admin-ui.ts');
   const classKeys = system.adminNavigationGroups.find(([label]) => label === '클래스 관리')[1];
-  for (const key of ['products', 'cohorts', 'weeks', 'learning', 'contents', 'missions', 'members', 'reviews', 'questions']) assert.ok(classKeys.includes(key), key);
+  for (const key of ['products', 'cohorts', 'contents', 'missions', 'members', 'reviews', 'questions']) assert.ok(classKeys.includes(key), key);
+  assert.equal(classKeys.includes('weeks'), false);
+  assert.equal(classKeys.includes('learning'), false);
+  assert.equal(system.adminNavigationTitles.products, '상품·커리큘럼 관리');
+  assert.equal(system.normalizeAdminSectionKey('learning-editor'), 'products');
+  assert.equal(system.normalizeAdminSectionKey('learning'), 'products');
+  assert.equal(system.normalizeAdminSectionKey('weeks'), 'products');
   const shell = fs.readFileSync('features/admin-ui/layouts/admin-shell.tsx', 'utf8');
   for (const text of ["event.key === 'Escape'", "event.key !== 'Tab'", "document.body.style.overflow = 'hidden'", 'admin-sidebar-backdrop', 'aria-modal']) assert.ok(shell.includes(text), text);
   const css = fs.readFileSync('features/admin-ui/styles/admin-system.css', 'utf8');

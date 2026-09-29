@@ -1,14 +1,17 @@
 "use client";
 
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
-import Link from "next/link";
 import { ArrowLeft, Download, ExternalLink, FileText, Plus, Video as VideoIcon, X } from "lucide-react";
 import { number as num, safeUrl, text as t, type Row } from "@/lib/platform";
 import { validateQuiz, type QuizDefinition, type QuizQuestion } from "@/lib/mission-quiz";
 import { UploadField } from "../editor-fields";
 import type { Data, WorkflowSend } from "../learning-workflows";
 import { AdminHeading } from "./admin-shell";
-import { Badge, Empty, Video } from "./primitives";
+import { AdminButton, AdminEmptyState, AdminFormField, AdminLinkButton, AdminStatusBadge } from "@/features/admin-ui";
+import { Badge, Video } from "./primitives";
+import { LessonText } from "./lesson-text";
+import { LessonBodyEditor } from "./lesson-body-editor";
+import { lessonBodyHasText } from "@/lib/lesson-body";
 
 type Props = { data: Data; row?: Row; pending: boolean; send: WorkflowSend; back: () => void };
 type ContentType = "text" | "vod" | "material" | "link";
@@ -20,7 +23,7 @@ const formats: { key: ContentType; label: string; icon: typeof FileText }[] = [
 ];
 
 function Field({ label, children, wide = false, hint }: { label: string; children: ReactNode; wide?: boolean; hint?: string }) {
-  return <label className={"field" + (wide ? " wide" : "")}><span className="field-label">{label}</span>{children}{hint && <small className="field-hint">{hint}</small>}</label>;
+  return <AdminFormField className={"field" + (wide ? " wide" : "")} label={label} helper={hint}>{children}</AdminFormField>;
 }
 
 function LessonQuiz({ mission, current, pending, send }: { mission: Row; current?: Row; pending: boolean; send: WorkflowSend }) {
@@ -67,7 +70,7 @@ function LessonQuiz({ mission, current, pending, send }: { mission: Row; current
           <button type="button" className="btn iconbtn ghost small" aria-label={`${index + 1}번 문제 선택지 ${String.fromCharCode(65 + optionIndex)} 삭제`} disabled={question.options.length <= 2} onClick={() => removeOption(question, index, optionIndex)}><X size={14} /></button>
         </div>)}
         <div className="q-actions"><button type="button" className="btn small ghost" disabled={question.options.length >= 6} onClick={() => update(index, { options: [...question.options, ""] })}>+ 선택지 추가</button><span className="meta">정답: {question.correctIndex < 0 ? "미지정" : String.fromCharCode(65 + question.correctIndex)}</span></div>
-      </article>) : <Empty title="퀴즈가 아직 없습니다.">문제 추가로 첫 번째 확인 퀴즈를 작성해 주세요.</Empty>}
+      </article>) : <AdminEmptyState title="퀴즈가 아직 없습니다.">문제 추가로 첫 번째 확인 퀴즈를 작성해 주세요.</AdminEmptyState>}
       <div className="learning-section-actions"><span className="meta">{dirty ? "저장하지 않은 퀴즈 변경사항이 있습니다." : "정답은 관리자와 채점 서버에만 공개됩니다."}</span><button className="btn primary" disabled={!dirty || pending || saving}>{saving ? "저장 중…" : questions.length ? "퀴즈 저장" : "퀴즈 해제"}</button></div>
       {message && <p className="notice mt16" role="status">{message}</p>}
     </fieldset>
@@ -118,7 +121,7 @@ export function LearningEditor({ data, row, pending, send, back }: Props) {
       requestAnimationFrame(() => form.reportValidity());
       return;
     }
-    const selectedValue = { text: bodyText, vod: videoUrl, material: resourcePath, link: externalUrl }[format].trim();
+    const selectedValue = { text: lessonBodyHasText(bodyText) ? bodyText : "", vod: videoUrl, material: resourcePath, link: externalUrl }[format].trim();
     if (contentExists && !selectedValue) {
       setPreviewOnly(false);
       setMessage("선택한 콘텐츠 유형에 맞는 본문·영상·자료·링크를 입력해 주세요.");
@@ -154,7 +157,7 @@ export function LearningEditor({ data, row, pending, send, back }: Props) {
   }
   return <div className="learning-editor">
     <AdminHeading title="학습 콘텐츠 편집" eyebrow="LEARNING EDITOR" description={lessonId ? `Day ${basic.day_number} · ${t(week, "week_number") || "—"}주차 / ${basic.title}` : "일차별 학습 본문과 확인 퀴즈를 등록합니다."}>
-      <button className="btn" type="button" onClick={showPreview}>{previewOnly ? "편집으로" : "학습자 미리보기"}</button><Badge color={basic.is_published ? "green" : ""}>{basic.is_published ? "공개" : "비공개"}</Badge>
+      <AdminButton variant="outline" type="button" onClick={showPreview}>{previewOnly ? "편집으로" : "학습자 미리보기"}</AdminButton><AdminStatusBadge status={basic.is_published ? "published" : "hidden"} label={basic.is_published ? "공개" : "비공개"} />
     </AdminHeading>
     <div className="ops-callout mb16"><b>{basic.title || "새 학습"}</b> <span className="muted">· 본문과 확인 퀴즈를 함께 편집합니다.</span></div>
     <form id="learning-editor-form" noValidate onSubmit={event => void save(event)}>
@@ -176,7 +179,7 @@ export function LearningEditor({ data, row, pending, send, back }: Props) {
             <Field label="도입 · 학습 안내"><textarea rows={3} value={basic.description} onChange={event => changeBasic("description", event.target.value)} /></Field>
             <div className="learning-content-tabs" role="tablist" aria-label="학습 콘텐츠 유형">{formats.map(item => <button className={format === item.key ? "active" : ""} type="button" role="tab" aria-selected={format === item.key} aria-controls={`lesson-content-${item.key}`} key={item.key} onClick={() => changeFormat(item.key)}><item.icon size={15} />{item.label}</button>)}</div>
             <div id={`lesson-content-${format}`} role="tabpanel" aria-label={formats.find(item => item.key === format)?.label}>
-              {format === "text" && <Field label="학습 내용" hint="줄바꿈을 포함한 본문이 학습자 화면에 표시됩니다."><textarea rows={14} value={bodyText} required={contentExists} onChange={event => { setBodyText(event.target.value); setDirty(true); }} placeholder="학습할 내용을 작성해 주세요." /></Field>}
+              {format === "text" && <LessonBodyEditor value={bodyText} disabled={busy} onChange={value => { setBodyText(value); setDirty(true); }} />}
               {format === "vod" && <Field label="영상 URL" hint="공유할 YouTube·Vimeo 또는 동영상 주소를 입력해 주세요."><input type="url" value={videoUrl} required={contentExists} onChange={event => { setVideoUrl(event.target.value); setDirty(true); }} placeholder="https://" /></Field>}
               {format === "material" && <><Field label="자료 이름"><input value={resourceName} onChange={event => { setResourceName(event.target.value); setDirty(true); }} placeholder="다운로드 목록에 표시할 이름" /></Field><div className="upload-box learning-material-upload"><Download aria-hidden="true" /><p>PDF · 문서 · 템플릿 자료 추가</p><UploadField name="learning_resource" value={resourcePath} image={false} disabled={busy} onChange={value => { setResourcePath(value); setDirty(true); }} onStatusChange={setUploadStatus} /><p className="meta">등록한 파일은 수강 권한이 있는 회원에게 제공됩니다.</p></div></>}
               {format === "link" && <Field label="외부 학습 링크"><input type="url" value={externalUrl} required={contentExists} onChange={event => { setExternalUrl(event.target.value); setDirty(true); }} placeholder="https://" /></Field>}
@@ -185,7 +188,7 @@ export function LearningEditor({ data, row, pending, send, back }: Props) {
           <aside className="preview-window" ref={previewRef}>
             <div className="preview-window-top"><b>학습자 화면</b><span>본문 미리보기</span></div>
             <div className="safe-html-preview"><div className="learning-preview-badges"><Badge>DAY {basic.day_number}</Badge>{basic.duration_label && <Badge>{basic.duration_label}</Badge>}</div><h2>{basic.title || "학습 제목"}</h2>{basic.description && <p className="intro-preview">{basic.description}</p>}
-              {format === "text" && <div className="reading-copy">{bodyText || "학습 내용을 작성하면 이곳에 표시됩니다."}</div>}
+              {format === "text" && <div className="reading-copy"><LessonText text={bodyText || "학습 내용을 작성하면 이곳에 표시됩니다."} /></div>}
               {format === "vod" && (safeUrl(videoUrl) ? <Video url={videoUrl} /> : <div className="learning-content-placeholder"><VideoIcon /><p>영상 URL을 등록해 주세요.</p></div>)}
               {format === "material" && <div className="learning-resource-preview"><Download size={20} /><div><b>{resourceName || "학습 자료"}</b><p className="meta">{resourcePath ? "자료 파일 등록됨 · 수강 회원에게 제공" : "파일을 등록해 주세요."}</p></div></div>}
               {format === "link" && (safeUrl(externalUrl) ? <a className="btn primary" href={safeUrl(externalUrl)} target="_blank" rel="noreferrer">외부 학습 열기<ExternalLink size={16} /></a> : <div className="learning-content-placeholder"><ExternalLink /><p>외부 학습 주소를 등록해 주세요.</p></div>)}
@@ -193,12 +196,12 @@ export function LearningEditor({ data, row, pending, send, back }: Props) {
           </aside>
         </div>
       </section>
-      <div className="editor-savebar"><span className="dirty-note">{dirty ? "저장하지 않은 변경사항이 있습니다." : "기본 정보와 학습 내용을 함께 저장합니다."}</span><button className="btn" type="button" onClick={close} disabled={busy}><ArrowLeft size={16} />목록으로</button><button className="btn primary" disabled={busy}>{busy ? "저장 중…" : lessonId ? "학습 저장" : "학습 등록"}</button></div>
+      <div className="editor-savebar"><span className="dirty-note">{dirty ? "저장하지 않은 변경사항이 있습니다." : "기본 정보와 학습 내용을 함께 저장합니다."}</span><AdminButton variant="outline" type="button" onClick={close} disabled={busy}><ArrowLeft size={16} />목록으로</AdminButton><AdminButton variant="primary" type="submit" disabled={busy} loading={busy}>{busy ? "저장 중…" : lessonId ? "학습 저장" : "학습 등록"}</AdminButton></div>
       {message && <p className="notice mt16" role="status">{message}</p>}
     </form>
     <section className="panel mt24 learning-quiz-panel" hidden={previewOnly}>
       {missions.length > 1 && <div className="section-pad learning-mission-picker"><Field label="퀴즈를 연결할 미션"><select value={mission?.id || ""} onChange={event => setSelectedMissionId(event.target.value)} disabled={busy}>{missions.map(item => <option key={item.id} value={item.id}>{t(item, "title")}</option>)}</select></Field></div>}
-      {mission ? <LessonQuiz key={`${mission.id}-${quiz?.revision || "new"}`} mission={mission} current={quiz} pending={busy} send={send} /> : <><div className="panel-head"><h2>확인 퀴즈</h2><Link className="btn small" href="/admin/missions">미션 관리</Link></div><div className="section-pad"><Empty title={lessonId ? "연결된 미션이 없습니다." : "학습 등록 후 퀴즈를 연결할 수 있습니다."}>미션 관리에서 이 학습에 미션을 등록한 뒤 질문·선택지·정답을 설정하세요.</Empty></div></>}
+      {mission ? <LessonQuiz key={`${mission.id}-${quiz?.revision || "new"}`} mission={mission} current={quiz} pending={busy} send={send} /> : <><div className="panel-head"><h2>확인 퀴즈</h2><AdminLinkButton size="sm" href="/admin/missions">미션 관리</AdminLinkButton></div><div className="section-pad"><AdminEmptyState title={lessonId ? "연결된 미션이 없습니다." : "학습 등록 후 퀴즈를 연결할 수 있습니다."}>미션 관리에서 이 학습에 미션을 등록한 뒤 질문·선택지·정답을 설정하세요.</AdminEmptyState></div></>}
     </section>
   </div>;
 }

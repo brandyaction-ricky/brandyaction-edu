@@ -72,6 +72,18 @@ export function enrollmentLessons(data: Data, e: Row) {
     .filter((l) => weeks.has(t(l, "week_id")))
     .sort((a, b) => num(a, "day_number") - num(b, "day_number"));
 }
+function completedLessonProgress(
+  data: Data,
+  enrollment: Row,
+  lessons = enrollmentLessons(data, enrollment),
+) {
+  return rows(data, "lesson_progress").filter(
+    (progress) =>
+      progress.enrollment_id === enrollment.id &&
+      progress.completed_at &&
+      lessons.some((lesson) => lesson.id === progress.lesson_id),
+  );
+}
 export function missionEntries(data: Data, enrollments: Row[]) {
   return enrollments.flatMap((enrollment) => {
     const lessons = enrollmentLessons(data, enrollment);
@@ -136,12 +148,7 @@ function EnrolledCard({
   const c = rows(data, "courses").find((c) => c.id === e.course_id),
     cohort = rows(data, "cohorts").find((c) => c.id === e.cohort_id),
     lessons = enrollmentLessons(data, e),
-    complete = rows(data, "lesson_progress").filter(
-      (p) =>
-        p.enrollment_id === e.id &&
-        p.completed_at &&
-        lessons.some((l) => l.id === p.lesson_id),
-    ),
+    complete = completedLessonProgress(data, e, lessons),
     next =
       lessons.find((l) => !complete.some((p) => p.lesson_id === l.id)) ||
       lessons[0],
@@ -200,14 +207,7 @@ function Dashboard({
 }) {
   const e = active[0],
     lessons = e ? enrollmentLessons(data, e) : [],
-    complete = e
-      ? rows(data, "lesson_progress").filter(
-          (p) =>
-            p.enrollment_id === e.id &&
-            p.completed_at &&
-            lessons.some((l) => l.id === p.lesson_id),
-        )
-      : [];
+    complete = e ? completedLessonProgress(data, e, lessons) : [];
   const next =
       lessons.find((l) => !complete.some((p) => p.lesson_id === l.id)) ||
       lessons[0],
@@ -323,7 +323,11 @@ function Dashboard({
           ["수강 중", active.length, "개", "클래스별 학습 이어가기", "classes"],
           [
             "학습 완료",
-            rows(data, "lesson_progress").filter((p) => p.completed_at).length,
+            active.reduce(
+              (total, enrollment) =>
+                total + completedLessonProgress(data, enrollment).length,
+              0,
+            ),
             "개",
             "완료한 학습 기록",
             "classes",
@@ -408,6 +412,7 @@ function Dashboard({
                 <div>
                   <Badge color="green">답변 완료</Badge>
                   <h3>{t(q, "title")}</h3>
+          {Boolean(q.learning_context) && <p className="meta">{t(q, "learning_context")}</p>}
                   <p>강사의 답변을 확인해 주세요.</p>
                 </div>
                 <ChevronRight />
@@ -714,6 +719,7 @@ function Questions({
             <span className="meta">{date(q.created_at)}</span>
           </div>
           <h3>{t(q, "title")}</h3>
+          {Boolean(q.learning_context) && <p className="meta">{t(q, "learning_context")}</p>}
           <p className="reading-copy">{t(q, "content")}</p>
           {q.answer ? (
             <div className="answer">
@@ -923,7 +929,7 @@ function Coupons({ data }: { data: Data }) {
       </div>
       {!list.length && <Empty title="해당하는 쿠폰이 없습니다." />}
       <div className="notice mt24">
-        결제 화면에서 코드를 입력하면 서버가 사용 기간과 할인 조건을 확인합니다.
+        결제 화면에서 쿠폰 코드를 입력하세요. 쿠폰마다 사용 기간과 적용 조건이 다를 수 있으니 결제창에서 할인 금액을 확인해 주세요.
       </div>
     </>
   );
@@ -1252,7 +1258,7 @@ export function MemberViews({
   order?: string | null;
 }) {
   const enrollments = rows(data, "enrollments"),
-    active = enrollments.filter(hasLearningAccess);
+    active = enrollments.filter(enrollment => hasLearningAccess(enrollment));
   let content;
   switch (section) {
     case "":

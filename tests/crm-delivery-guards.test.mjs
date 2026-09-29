@@ -9,10 +9,12 @@ const member = {
   marketing_consent_at: '2026-01-01T00:00:00.000Z', marketing_opt_out_at: null,
 };
 
-function dispatchFixture({ channel = 'lms', current = member, blackPages = [{ blackList: [], nextKey: null }], blackError = false, inactive = false } = {}) {
+function dispatchFixture({ channel = 'lms', current = member, blackPages = [{ blackList: [], nextKey: null }], blackError = false, inactive = false, purchaseOnly = false } = {}) {
   const steps = [];
   const updates = [];
   const sentMessages = [];
+  const queriedTables = [];
+  const runFilters = [];
   const template = { id: 'template', channel, purpose: 'marketing', content: '모집 안내', ...(inactive ? { is_active: false } : {}) };
   const campaign = { id: 'campaign', recruitment_id: 'recruitment', template };
   let blackPage = 0;
@@ -22,6 +24,7 @@ function dispatchFixture({ channel = 'lms', current = member, blackPages = [{ bl
       return { data: { template, members: [member] }, error: null };
     },
     from: (table) => {
+      queriedTables.push(table);
       let operation = 'read';
       let values;
       let scoped = false;
@@ -29,6 +32,7 @@ function dispatchFixture({ channel = 'lms', current = member, blackPages = [{ bl
         select: () => query,
         eq: () => query,
         lte: () => query,
+        like: (column, value) => { runFilters.push({ column, value }); return query; },
         order: () => query,
         limit: () => query,
         in: (column, ids) => {
@@ -44,6 +48,7 @@ function dispatchFixture({ channel = 'lms', current = member, blackPages = [{ bl
         maybeSingle: async () => ({ data: table === 'crm_campaigns' ? operation === 'update' ? { id: campaign.id } : campaign : null, error: null }),
         then: (resolve, reject) => Promise.resolve(
           table === 'profiles' ? { data: scoped && current ? [current] : [], error: null }
+            : table === 'crm_automation_runs' ? { data: [], error: null }
             : table === 'crm_message_logs' && operation === 'insert' ? { data: values.map((row, index) => ({ id: `log${index}`, member_id: row.member_id })), error: null }
               : { data: null, error: null },
         ).then(resolve, reject),
@@ -53,6 +58,13 @@ function dispatchFixture({ channel = 'lms', current = member, blackPages = [{ bl
   };
   const modules = {
     '@/lib/supabase/admin': { createAdminClient: () => db },
+    '@/lib/crm-purchase-contact': {},
+    '@/lib/crm-purchase-email': { purchaseEmailConfigured: () => false },
+    '@/lib/crm-sms-settings': {
+      loadSmsSettings: async () => ({ senderPhone: '0200000000', optoutPhone: '0800000000', senderName: '브랜디액션', transactionalEnabled: true, marketingEnabled: true }),
+      marketingAllowedNow: () => true,
+      marketingText: (content, sender, optout) => `(광고) ${sender}\n${content}\n무료수신거부 ${optout}`,
+    },
     solapi: { SolapiMessageService: class {
       async getBlacks() {
         steps.push('080');
@@ -71,13 +83,24 @@ function dispatchFixture({ channel = 'lms', current = member, blackPages = [{ bl
     fs.readFileSync(new URL('../lib/crm-delivery.ts', import.meta.url), 'utf8'),
     { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } },
   ).outputText)(exports, name => modules[name], { env: {
-    CRM_DELIVERY_ENABLED: 'true', CRM_AUTOMATIONS_ENABLED: 'false',
+    CRM_DELIVERY_ENABLED: 'true', CRM_AUTOMATIONS_ENABLED: purchaseOnly ? 'true' : 'false',
+    CRM_AUTOMATIONS_PURCHASE_ONLY: purchaseOnly ? 'true' : 'false',
     EDU_CONVERSION_REVIEW_ENABLED: 'true', SOLAPI_API_KEY: 'test', SOLAPI_API_SECRET: 'test',
     SOLAPI_SENDER_PHONE: '0200000000', SOLAPI_OPTOUT_PHONE: '0800000000',
     SOLAPI_KAKAO_PF_ID: 'pf',
   } });
-  return { dispatch: exports.dispatchDueCrm, steps, updates, sentMessages };
+  return { dispatch: exports.dispatchDueCrm, steps, updates, sentMessages, queriedTables, runFilters };
 }
+
+test('purchase-only mode does not inspect campaigns or queued marketing runs', async () => {
+  const qa = dispatchFixture({ purchaseOnly: true });
+  const result = await qa.dispatch();
+  assert.deepEqual(result, { disabled: false, campaigns: 0, automations: 0, sent: 0, failed: 0 });
+  assert.deepEqual(qa.queriedTables, ['crm_automation_runs']);
+  assert.deepEqual(qa.runFilters, [{ column: 'trigger_key', value: 'purchase_completed:%' }]);
+  assert.deepEqual(qa.steps, []);
+  assert.deepEqual(qa.updates, []);
+});
 
 test('marketing delivery rechecks current consent after recruitment claim', async () => {
   const qa = dispatchFixture({ current: { ...member, marketing_opt_out_at: '2026-02-01T00:00:00.000Z' } });

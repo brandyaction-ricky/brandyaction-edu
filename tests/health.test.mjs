@@ -13,10 +13,18 @@ function health({ env = {}, databaseError = null } = {}) {
     async limit() { return { error: databaseError }; },
   };
   const exports = {};
+  const tossEnvironmentSource = fs.readFileSync(new URL('../lib/toss-environment.ts', import.meta.url), 'utf8');
+  const tossEnvironmentCompiled = ts.transpileModule(tossEnvironmentSource, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  const tossEnvironment = {};
+  new Function('exports', tossEnvironmentCompiled)(tossEnvironment);
   new Function('exports', 'require', 'process', compiled)(
     exports,
     name => name.endsWith('supabase/admin')
       ? { createAdminClient: () => ({ from: () => query }) }
+      : name.endsWith('toss-environment')
+        ? tossEnvironment
       : (() => { throw new Error(`unexpected import: ${name}`); })(),
     { env },
   );
@@ -52,6 +60,7 @@ test('health reports a connected DEV stack without exposing credentials', async 
         secretConfigured: true,
         webhookConfigured: true,
         mode: 'test',
+        refundsEnabled: true,
       },
     },
   });
@@ -69,6 +78,22 @@ test('health rejects a live Toss secret in a non-production app', async () => {
   const body = await response.json();
   assert.equal(response.status, 503);
   assert.equal(body.services.toss.mode, 'mismatch');
+});
+
+test('health reports live refunds ready only after the production approval gate', async () => {
+  const env = {
+    ...completeDevEnv,
+    NEXT_PUBLIC_APP_ENV: 'production',
+    NEXT_PUBLIC_TOSS_CLIENT_KEY: 'live_ck_mock',
+    TOSS_SECRET_KEY: 'live_sk_mock',
+    EDU_ALLOW_LIVE_REFUNDS: 'true',
+  };
+  const production = await health({ env })();
+  assert.equal(production.status, 200);
+  assert.equal((await production.json()).services.toss.refundsEnabled, true);
+
+  const preview = await health({ env: { ...env, VERCEL_ENV: 'preview' } })();
+  assert.equal((await preview.json()).services.toss.refundsEnabled, false);
 });
 
 test('health rejects unknown Toss credential modes in a development app', async () => {

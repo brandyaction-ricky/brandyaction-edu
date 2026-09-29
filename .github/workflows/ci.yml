@@ -126,6 +126,35 @@ jobs:
             exit 0
           fi
 
+          if [ "$head_ref" = "codex/commerce-refund-admin-20260928" ]; then
+            changed_files="$(git diff --name-only "origin/${BASE_REF}...HEAD")"
+            if [ -z "$changed_files" ]; then
+              echo "The Commerce refund admin release PR has no changed files."
+              exit 1
+            fi
+
+            while IFS= read -r path; do
+              case "$path" in
+                .github/workflows/ci.yml|app/api/health/route.ts|app/ui/admin-workflows.tsx|docs/ENVIRONMENT_OPERATION_KO.md|lib/refunds.ts|lib/toss-environment.ts|tests/browser/admin-pilot.spec.ts|tests/health.test.mjs|tests/refunds.test.mjs)
+                  ;;
+                *)
+                  echo "File is outside the Commerce refund admin release allowlist: $path"
+                  exit 1
+                  ;;
+              esac
+            done <<< "$changed_files"
+
+            for required in app/api/health/route.ts app/ui/admin-workflows.tsx docs/ENVIRONMENT_OPERATION_KO.md lib/refunds.ts lib/toss-environment.ts tests/browser/admin-pilot.spec.ts tests/health.test.mjs tests/refunds.test.mjs; do
+              if ! grep -Fxq "$required" <<< "$changed_files"; then
+                echo "Required Commerce refund admin release file is missing: $required"
+                exit 1
+              fi
+            done
+
+            echo "Commerce refund admin production release scope verified."
+            exit 0
+          fi
+
           if [ "$head_ref" != "codex/commerce-main-release" ]; then
             echo "Production PRs must promote develop or use an approved scoped release branch."
             exit 1

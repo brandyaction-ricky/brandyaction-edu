@@ -1,4 +1,6 @@
 import { processRefund } from '@/lib/refunds';
+import { revalidateTag } from 'next/cache';
+import { PUBLIC_CACHE_TAG } from '@/lib/public-platform-plan';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { hasLearningAccess } from '@/lib/platform-rules';
@@ -8,6 +10,7 @@ import { safeUrl } from '@/lib/platform';
 import { normalizeOperatorPermissions, permissionsFor } from '@/lib/operator-permissions';
 import { participantMatrix } from '@/lib/participant-matrix';
 import type { Row } from '@/lib/platform';
+import { SMS_SETTINGS_KEY, validateSmsSettings } from '@/lib/crm-sms-settings';
 import { reviewMutation, reviewWriteError } from '@/lib/submission-review';
 
 const reply = (value: unknown, status = 200) =>
@@ -140,9 +143,16 @@ export async function POST(request: Request) {
                 message: role === 'staff' ? '스태프 권한을 저장했습니다.' : '스태프 권한을 해제했습니다.',
             });
         }
-        const actionScope = ['session', 'clone-cohort', 'quiz'].includes(body.action) ? 'products' : ['review', 'grant-enrollment', 'assign'].includes(body.action) ? 'members' : body.action === 'refund' ? 'orders' : ['settings', 'delete-metric', 'measurement-code', 'crm-save'].includes(body.action) ? 'marketing' : null;
+        const actionScope = ['session', 'clone-cohort', 'quiz'].includes(body.action) ? 'products' : ['review', 'grant-enrollment', 'assign'].includes(body.action) ? 'members' : body.action === 'refund' ? 'orders' : ['settings', 'delete-metric', 'measurement-code', 'crm-save', 'crm-sms-config'].includes(body.action) ? 'marketing' : null;
         if (!actionScope || !permissions[actionScope as keyof typeof permissions]) return reply({ error: '이 작업에 필요한 운영 권한이 없습니다.' }, 403);
         let result;
+        if (body.action === 'crm-sms-config') {
+            if (user.role !== 'admin') return reply({ error: '문자 발송 설정은 관리자만 변경할 수 있습니다.' }, 403);
+            const value = validateSmsSettings(body.values);
+            result = await db.from('site_settings').upsert({ key: SMS_SETTINGS_KEY, value, is_public: false, updated_by: user.id }, { onConflict: 'key' });
+            if (result.error) throw result.error;
+            return reply({ ok: true, message: '문자 발송 설정을 저장했습니다.' });
+        }
         if (body.action === 'crm-save') {
             const kind = String(body.kind || '');
             const id = body.id ? String(body.id) : null;
@@ -332,6 +342,7 @@ export async function POST(request: Request) {
             const message = /[가-힣]/.test(result.error.message) ? result.error.message : result.error.code === '23505' ? '이미 사용 중인 코드 또는 회차 순서입니다.' : '저장하지 못했습니다. 입력값을 확인해 주세요.';
             return reply({ error: message }, 409);
         }
+        if (['session', 'clone-cohort', 'quiz'].includes(body.action) || (body.action === 'settings' && body.kind === 'settings')) revalidateTag(PUBLIC_CACHE_TAG, { expire: 0 });
         return reply({ ok: true, result: result.data });
     } catch (e) {
         const error = e as Error & { status?: number };

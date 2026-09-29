@@ -1,6 +1,7 @@
 "use client";
 
 import { text as t, type Row } from "@/lib/platform";
+import { AdminButton, AdminDataTable, AdminFormField, AdminIconButton, AdminStatusBadge } from "@/features/admin-ui";
 import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
@@ -31,26 +32,26 @@ export function ArticleCategoryManager({ categories, articles, send, pending }: 
     <section className="panel article-category-manager">
       <div className="panel-head">
         <div><h2>아티클 카테고리</h2><p>등록 화면과 고객 화면의 필터에서 같은 카테고리를 사용합니다.</p></div>
-        <button className="btn" type="button" disabled={pending} onClick={() => start()}><Plus />카테고리 추가</button>
+        <AdminButton variant="primary" disabled={pending} onClick={() => start()}><Plus />카테고리 추가</AdminButton>
       </div>
-      <div className="article-category-list">
-        {ordered.map(row => <div className="article-category-row" key={row.id}>
-          <div><b>{t(row, "name")}</b><small>/{t(row, "slug")} · 아티클 {usage(String(row.id))}개{row.is_active === false ? " · 미사용" : ""}</small></div>
-          <div className="row"><button className="icon-btn" type="button" aria-label={`${t(row, "name")} 수정`} onClick={() => start(row)}><Pencil /></button><button className="icon-btn danger" type="button" aria-label={`${t(row, "name")} 삭제`} disabled={pending || usage(String(row.id)) > 0} title={usage(String(row.id)) ? "사용 중인 카테고리는 삭제할 수 없습니다." : undefined} onClick={() => void remove(row)}><Trash2 /></button></div>
-        </div>)}
-        {!ordered.length && <p className="article-category-empty">등록된 카테고리가 없습니다.</p>}
-      </div>
+      <AdminDataTable label="아티클 카테고리" rows={ordered} getRowId={row => String(row.id)} columns={[
+        { id: 'name', header: '카테고리', render: row => <strong>{t(row, 'name')}</strong> },
+        { id: 'slug', header: '주소 이름', render: row => `/${t(row, 'slug')}` },
+        { id: 'usage', header: '아티클', align: 'number', render: row => `${usage(String(row.id))}개` },
+        { id: 'status', header: '상태', render: row => <AdminStatusBadge status={row.is_active === false ? 'inactive' : 'active'}/> },
+        { id: 'actions', header: '관리', align: 'action', render: row => <div className="row"><AdminIconButton label={`${t(row, 'name')} 수정`} onClick={() => start(row)}><Pencil size={16}/></AdminIconButton><AdminIconButton label={`${t(row, 'name')} 삭제`} variant="danger" disabled={pending || usage(String(row.id)) > 0} title={usage(String(row.id)) ? '사용 중인 카테고리는 삭제할 수 없습니다.' : undefined} onClick={() => void remove(row)}><Trash2 size={16}/></AdminIconButton></div> },
+      ]}/>
       {open && <div className="article-category-form-wrap">
         <form className="article-category-form" onSubmit={submit}>
-          <div className="between"><h3>{draft.id ? "카테고리 수정" : "카테고리 등록"}</h3><button className="icon-btn" type="button" aria-label="닫기" onClick={() => setOpen(false)}><X /></button></div>
+          <div className="between"><h3>{draft.id ? "카테고리 수정" : "카테고리 등록"}</h3><AdminIconButton label="닫기" onClick={() => setOpen(false)}><X size={16}/></AdminIconButton></div>
           <div className="form-grid mt16">
-            <div className="field"><label htmlFor="article-category-name">카테고리명 *</label><input id="article-category-name" required maxLength={50} value={draft.name} onChange={event => setDraft(current => ({ ...current, name: event.target.value }))} /></div>
-            <div className="field"><label htmlFor="article-category-slug">주소 이름 *</label><input id="article-category-slug" required pattern="[a-z0-9-]+" placeholder="marketing" value={draft.slug} onChange={event => setDraft(current => ({ ...current, slug: event.target.value.toLowerCase() }))} /></div>
-            <div className="field span2"><label htmlFor="article-category-description">설명</label><input id="article-category-description" maxLength={160} value={draft.description} onChange={event => setDraft(current => ({ ...current, description: event.target.value }))} /></div>
-            <div className="field"><label htmlFor="article-category-order">노출 순서</label><input id="article-category-order" type="number" min={0} max={999} value={draft.displayOrder} onChange={event => setDraft(current => ({ ...current, displayOrder: Number(event.target.value) }))} /></div>
+            <AdminFormField className="field" label="카테고리명 *"><input id="article-category-name" required maxLength={50} value={draft.name} onChange={event => setDraft(current => ({ ...current, name: event.target.value }))} /></AdminFormField>
+            <AdminFormField className="field" label="주소 이름 *"><input id="article-category-slug" required pattern="[a-z0-9-]+" placeholder="marketing" value={draft.slug} onChange={event => setDraft(current => ({ ...current, slug: event.target.value.toLowerCase() }))} /></AdminFormField>
+            <AdminFormField className="field span2" label="설명"><input id="article-category-description" maxLength={160} value={draft.description} onChange={event => setDraft(current => ({ ...current, description: event.target.value }))} /></AdminFormField>
+            <AdminFormField className="field" label="노출 순서"><input id="article-category-order" type="number" min={0} max={999} value={draft.displayOrder} onChange={event => setDraft(current => ({ ...current, displayOrder: Number(event.target.value) }))} /></AdminFormField>
             <label className="article-category-active"><input type="checkbox" checked={draft.active} onChange={event => setDraft(current => ({ ...current, active: event.target.checked }))} />사용 중</label>
           </div>
-          <div className="row article-category-actions"><button className="btn" type="button" onClick={() => setOpen(false)}>취소</button><button className="btn primary" disabled={pending}>{pending ? "저장 중..." : "저장"}</button></div>
+          <div className="row article-category-actions"><AdminButton variant="outline" onClick={() => setOpen(false)}>취소</AdminButton><AdminButton variant="primary" type="submit" loading={pending}>저장</AdminButton></div>
         </form>
       </div>}
     </section>

@@ -6,7 +6,7 @@ import { submissionReview } from './helpers/submission-review.mjs';
 function load(path, dependencies={}) {
  const source=fs.readFileSync(new URL('../'+path,import.meta.url),'utf8');
  const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
- const exports={};new Function('exports','require',js)(exports,name=>{if(name in dependencies)return dependencies[name];throw Error(name);});return exports;
+ const exports={};new Function('exports','require',js)(exports,name=>{if(name==='next/cache')return{revalidateTag:()=>{}};if(name==='@/lib/public-platform-plan')return{PUBLIC_CACHE_TAG:'test'};if(name in dependencies)return dependencies[name];throw Error(name);});return exports;
 }
 const quiz=load('lib/mission-quiz.ts');
 const rules=load('lib/edu-workflows.ts');
@@ -62,6 +62,7 @@ function handler(user, suppliedDb) {
  '@/lib/mission-quiz':quiz,
  '@/lib/platform':load('lib/platform.ts'),
  '@/lib/refunds':{processRefund:async()=>{throw Error('unexpected refund provider call');}},
+ '@/lib/crm-sms-settings':{SMS_SETTINGS_KEY:'edu_crm_sms_settings',validateSmsSettings:()=>({})},
  '@/lib/operator-permissions':{permissionsFor:async u=>({products:u?.role==='admin',members:u?.role==='admin',orders:u?.role==='admin',content:u?.role==='admin',marketing:u?.role==='admin'}),normalizeOperatorPermissions:v=>v||{}},
  });return {...exports,calls};
 }

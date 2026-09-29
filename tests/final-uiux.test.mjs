@@ -20,12 +20,13 @@ function load(file) {
   const exports = {};
   cache.set(absolute, exports);
   new Function('exports', 'require', compiled)(exports, name => {
+    if (name.endsWith('.css')) return {}; // CSS is bundled separately by Next.js.
     if (name === 'next/link') return function LinkStub(props) { return React.createElement('a', props); };
     if (name === 'next/navigation') return { useSearchParams: () => search, usePathname: () => '/order-complete', useRouter: () => ({ push() {}, replace() {}, refresh() {} }) };
     if (name === '@/lib/supabase/client') return { createClient: () => { throw Error('Unexpected authentication mutation during render'); } };
     if (name.startsWith('@/') || name.startsWith('.')) {
       const base = name.startsWith('@/') ? path.join(root, name.slice(2)) : path.resolve(path.dirname(absolute), name);
-      const target = ['', '.ts', '.tsx'].map(extension => base + extension).find(file => fs.existsSync(file) && fs.statSync(file).isFile());
+      const target = ['', '.ts', '.tsx', '/index.ts', '/index.tsx'].map(extension => base + extension).find(file => fs.existsSync(file) && fs.statSync(file).isFile());
       if (!target) throw Error('Cannot resolve ' + name);
       return load(target);
     }
@@ -44,6 +45,53 @@ const mission = { id: 'mission', lesson_id: 'lesson', title: '실행 미션', in
 const submission = { id: 'submission', enrollment_id: 'enrollment', mission_id: 'mission', status: 'submitted', attempt_number: 1, submitted_at: '2026-09-01T00:00:00Z', response: { text: '<script>unsafe()</script>', url: 'javascript:alert(1)' } };
 const data = { courses: [course], cohorts: [cohort], enrollments: [enrollment], profiles: [user], curriculum_weeks: [{ id: 'week', course_id: 'course', week_number: 1, title: '시작하기', is_published: true }], curriculum_lessons: [lesson], curriculum_missions: [mission], mission_submissions: [submission], lesson_contents: [{ lesson_id: 'lesson', body_text: '등록된 학습 본문', resource_path: 'private/test.pdf', resource_name: '학습 자료.pdf' }], articles: [{ id: 'article', slug: 'test-article', title: '테스트 아티클', content_type: 'text', status: 'published', body: [{ type: 'paragraph', text: '콘텐츠' }] }], review_videos: [{ id: 'story', title: '등록된 고객 이야기', reviewer_name: '고객' }], orders: [], admin_summary: [{ id: 'summary', members: 1, activeEnrollments: 1, pendingReviews: 1, openQuestions: 0 }] };
 const send = async () => { throw Error('Unexpected write during render'); };
+
+test('lesson text activates named and bare links while preserving existing copy', () => {
+  const { LessonText } = load('app/ui/final/lesson-text.tsx');
+  const markup = html(LessonText, { text: '[1. 클로드 설치하기]\n\n1. [클로드 다운로드 페이지](https://claude.com/download)를 엽니다.\n2. https://example.test/guide(a(b))?q=1&lang=ko.\n3. [내 클래스](/my)에서 이어갑니다.' });
+  assert.match(markup, /\[1\. 클로드 설치하기\]\n\n1\. <a href="https:\/\/claude.com\/download" target="_blank" rel="noopener noreferrer">클로드 다운로드 페이지<\/a>를 엽니다/);
+  assert.match(markup, /href="https:\/\/example.test\/guide\(a\(b\)\)\?q=1&amp;lang=ko"/);
+  assert.match(markup, /<\/a>\.\n3\./);
+  assert.match(markup, /href="\/my"/);
+  assert.match(html(LessonText, { text: '[자료](https://example.test/guide(a(b)))' }), /href="https:\/\/example.test\/guide\(a\(b\)\)"/);
+  assert.match(html(LessonText, { text: '(https://example.test/download).' }), /<\/a>\)\./);
+});
+
+test('lesson text never turns unsafe destinations or HTML into executable markup', () => {
+  const { LessonText } = load('app/ui/final/lesson-text.tsx');
+  for (const destination of ['javascript:alert(1)', 'data:text/html,<script>alert(1)</script>', '//example.test', '/\\example.test', 'https://', 'https://example.test/\u0001']) {
+    const markup = html(LessonText, { text: `[위험한 링크](${destination})` });
+    assert.doesNotMatch(markup, /<a[\s>]|<script[\s>]/);
+    assert.match(markup, /위험한 링크/);
+  }
+  assert.doesNotMatch(html(LessonText, { text: '<img src=x onerror=alert(1)> <script>alert(1)</script>' }), /<(img|script)[\s>]/);
+  assert.equal(html(LessonText, { text: '[미완성](주소\n기존 본문' }), '<span class="lesson-text-links">[미완성](주소\n기존 본문</span>');
+});
+
+test('saved lesson markdown renders the same clickable link in classroom and editor preview', () => {
+  const bodyText = '1. [클로드 다운로드 페이지](https://claude.com/download)를 엽니다.';
+  const lessonData = { ...data, lesson_contents: [{ lesson_id: 'lesson', body_text: bodyText }] };
+  const { Classroom } = load('app/ui/final/classroom.tsx');
+  const { LearningEditor } = load('app/ui/final/learning-editor.tsx');
+  for (const markup of [
+    html(Classroom, { path: ['learn', 'enrollment', 'lesson'], data: lessonData, pending: false, send, loading: false }),
+    html(LearningEditor, { data: lessonData, row: lesson, pending: false, send, back() {} }),
+  ]) assert.match(markup, /<a href="https:\/\/claude.com\/download" target="_blank" rel="noopener noreferrer">클로드 다운로드 페이지<\/a>/);
+  assert.equal(lessonData.lesson_contents[0].body_text, bodyText);
+});
+
+test('shared week field accepts and serializes zero without lowering the lesson day minimum', () => {
+  const { FieldControl, formValues } = load('app/ui/final/admin-editors.tsx');
+  const section = platform.sections.find(item => item.key === 'weeks');
+  const markup = html(FieldControl, { section, row: { week_number: 0 }, field: section.fields.find(item => item.key === 'week_number'), data, pending: false });
+  assert.match(markup, /min="0"/);
+  assert.match(markup, /value="0"/);
+  const form = new FormData();
+  form.set('week_number', '0');
+  assert.equal(formValues(section, form).week_number, 0);
+  const day = html(FieldControl, { section, row: { day_number: 1 }, field: { key: 'day_number', label: '일차', type: 'number' }, data, pending: false });
+  assert.match(day, /min="1"/);
+});
 
 test('final design styles are isolated, reproducible and exclude prototype runtime', () => {
   assert.equal(read('app/ui/final/tokens.css'), read('design-reference/source/shared/tokens.css'));
@@ -81,17 +129,20 @@ test('five admin categories and scoped navigation render from the admin UI featu
   assert.equal(finalAdminGroups.length, 5);
   const props = { current: 'overview', available: platform.sections, user: { ...user, role: 'admin' }, pendingReviews: 1, mobile: false, setMobile() {}, logout: async () => {} };
   const markup = html(AdminShell, { ...props, children: React.createElement(Overview, { data, available: platform.sections }) });
+  const navigationMarkup = markup.match(/<nav aria-label="관리자 카테고리">[\s\S]*?<\/nav>/)?.[0] || '';
+  assert.match(navigationMarkup, /상품·커리큘럼 관리/);
+  assert.doesNotMatch(navigationMarkup, /href="\/admin\/(?:weeks|learning)"/);
   for (const [label] of finalAdminGroups) assert.ok(markup.includes(label));
   assert.match(markup, /class="nav-group"/); assert.match(markup, /lucide/); assert.match(markup, /category-strip/);
   const expectedIcons = {
-    products: 'book-open', cohorts: 'calendar-days', learning: 'book-open', weeks: 'book-open',
+    products: 'book-open', cohorts: 'calendar-days',
     contents: 'film', missions: 'book-open', members: 'users-round', reviews: 'square-check',
     questions: 'message-circle', customers: 'users-round', tags: 'users-round', coupons: 'layout-grid',
     'product-reviews': 'message-circle', banners: 'layout-grid', articles: 'file-pen-line',
-    testimonials: 'message-circle', orders: 'receipt-text', conversion: 'message-circle',
-    landing: 'chart-line', analytics: 'chart-line',
-    campaigns: 'layout-grid',
-    templates: 'layout-grid', automations: 'layout-grid', seo: 'settings', settings: 'settings', staff: 'shield-check',
+    testimonials: 'message-circle', orders: 'receipt-text', conversion: 'megaphone',
+    landing: 'chart-line', analytics: 'chart-no-axes-combined',
+    campaigns: 'send',
+    templates: 'message-square-text', automations: 'workflow', seo: 'search-check', settings: 'settings', staff: 'shield-check',
   };
   for (const [key, icon] of Object.entries(expectedIcons)) {
     assert.ok(adminNavigationIcon(key));
@@ -136,7 +187,7 @@ test('a published paid product uses its upcoming cohort for CTA and the actual d
   const { ProductDetail } = load('app/ui/final/public-views.tsx');
   const upcoming = { ...cohort, id: 'upcoming-cohort', status: 'upcoming', recruitment_start_at: '2098-12-01T00:00:00Z', recruitment_end_at: '2099-01-31T00:00:00Z' };
   const markup = html(ProductDetail, { course, data: { ...data, cohorts: [upcoming], enrollments: [] } });
-  assert.match(markup, /checkout\?cohort=upcoming-cohort/);
+  assert.match(markup, /login\?next=%2Fcheckout%3Fcohort%3Dupcoming-cohort/);
   assert.match(markup, /2099/);
   assert.doesNotMatch(markup, /다음 모집 준비 중|이용·환불 안내/);
 });
@@ -211,6 +262,37 @@ test('all member screens render real data, with no authentication or payment wri
     assert.doesNotMatch(markup, /href="(?:undefined|null|javascript:)/, section);
   }
 });
+test('dashboard completed lesson count matches visible active-enrollment progress', () => {
+  const { MemberViews } = load('app/ui/final/member-views.tsx');
+  const secondEnrollment = { id: 'enrollment-two', user_id: 'user', course_id: 'course-two', cohort_id: 'cohort-two', status: 'active', access_starts_at: '2020-01-01' };
+  const progressData = {
+    ...data,
+    courses: [...data.courses, { ...course, id: 'course-two', slug: 'second-course', title: '두 번째 테스트 클래스' }],
+    cohorts: [...data.cohorts, { ...cohort, id: 'cohort-two', course_id: 'course-two', name: '두 번째 테스트 기수' }],
+    enrollments: [enrollment, secondEnrollment],
+    curriculum_weeks: [...data.curriculum_weeks, { id: 'week-two', course_id: 'course-two', week_number: 1, title: '두 번째 시작하기' }],
+    curriculum_lessons: [...data.curriculum_lessons, { id: 'lesson-two', week_id: 'week-two', title: '두 번째 학습', day_number: 1, is_published: true }],
+    lesson_progress: [
+      { enrollment_id: 'enrollment', lesson_id: 'lesson', completed_at: '2026-09-20T00:00:00Z' },
+      { enrollment_id: 'enrollment', lesson_id: 'removed-lesson', completed_at: '2026-09-19T00:00:00Z' },
+      { enrollment_id: 'historic-enrollment', lesson_id: 'lesson', completed_at: '2026-09-18T00:00:00Z' },
+      { enrollment_id: 'enrollment-two', lesson_id: 'lesson-two', completed_at: '2026-09-17T00:00:00Z' },
+    ],
+  };
+  const markup = html(MemberViews, {
+    section: 'dashboard',
+    data: progressData,
+    user,
+    pending: false,
+    send,
+    logout: send,
+  });
+  const classesMarkup = html(MemberViews, { section: 'classes', data: progressData, user, pending: false, send, logout: send });
+  assert.equal((classesMarkup.match(/1 \/ 1개 학습 완료/g) || []).length, 2);
+  const completedStat = markup.split('<a class="member-stat"').find((item) => item.includes('<span>학습 완료</span>'));
+  assert.ok(completedStat, '학습 완료 대시보드 통계가 렌더링되어야 합니다.');
+  assert.match(completedStat, /<strong>2<small>개<\/small><\/strong>/);
+});
 test('classroom, mission, checkout and completion preserve authorized workflow entry points', () => {
   const { Classroom } = load('app/ui/final/classroom.tsx');
   assert.match(html(Classroom, { path: ['learn', 'enrollment', 'lesson'], data, pending: false, send, loading: false }), /learning-layout/);
@@ -240,7 +322,20 @@ test('catalogues and separate editors render without dropping existing fields', 
     assert.ok(html(AdminCatalog, { section, data, selection: [], setSelection() {}, edit() {}, archive() {}, pending: false, loading: false, pagination: null, setPage() {}, exportCsv() {} }).length > 100, key);
   }
   const props = { data, selection: [], setSelection() {}, edit() {}, archive() {}, pending: false, loading: false, pagination: null, setPage() {}, exportCsv() {} };
+  const weekMarkup = html(AdminCatalog, { ...props, data: { ...data, courses: [...data.courses, { id: 'other-course', title: '다른 상품' }], curriculum_weeks: [...data.curriculum_weeks, { id: 'other-week', course_id: 'other-course', week_number: 1, title: '다른 상품 주차' }, { id: 'third-week', course_id: 'course', week_number: 2, title: '두 번째 주차' }] }, send, section: platform.sections.find(row => row.key === 'weeks') });
+  assert.match(weekMarkup, /aria-label="주차 상품"/);
+  assert.match(weekMarkup, /class="week-group-heading"[\s\S]*?1주차[\s\S]*?2주차/);
+  assert.match(weekMarkup, /다른 상품 주차 아래로 이동/);
+  assert.match(weekMarkup, /weeks-create[\s\S]*?새로 등록/);
+  assert.match(weekMarkup, /weeks-table-workspace/);
+  assert.doesNotMatch(weekMarkup, /<caption[^>]*>주차 구성 목록<\/caption>/);
+  assert.match(read('app/ui/final/admin.css'), /weeks-table-workspace[\s\S]*?flex:1 1 auto[\s\S]*?overflow-x:auto/);
+  assert.match(read('app/ui/final/admin.css'), /weeks-table-workspace \.week-group-heading th\{[^}]*background:#f2f3f5/);
   const products = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'products') });
+  assert.match(products, /admin-filter-bar admin-pilot-filter/);
+  assert.ok(products.indexOf('aria-label="판매 상태"') < products.indexOf('placeholder="상품명 검색"'));
+  assert.match(products, /상품 등록/);
+  assert.match(products, /admin-table-density--standard/);
   assert.match(products, /전체 상품/); assert.match(products, /연결 기수/); assert.match(products, /<th>자료<\/th>/);
   assert.match(products, /공개 점검/); assert.match(read('app/api/platform/route.ts'), /archivedProducts/);
   assert.match(products, /상품 표시 범위/); assert.match(products, /삭제된 상품/);
@@ -248,10 +343,12 @@ test('catalogues and separate editors render without dropping existing fields', 
   assert.ok(products.indexOf('등록된 테스트 클래스 수정') < products.indexOf('등록된 테스트 클래스 삭제'));
   assert.doesNotMatch(products, /PRD-|\/classes\/test-course/);
   assert.doesNotMatch(products, />삭제<\/button>|>수정<\/button>/);
+  const cohorts = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'cohorts') });
+  assert.doesNotMatch(cohorts, /<caption[^>]*>기수·회차 관리 목록<\/caption>/);
   const catalogSource = read('app/ui/final/admin-catalog.tsx');
-  assert.match(catalogSource, /action: "restore-products"/); assert.match(catalogSource, /복원\s*<\/button>/);
+  assert.match(catalogSource, /action: "restore-products"/); assert.match(catalogSource, /복원\s*<\/AdminButton>/);
   const countedProducts = html(AdminCatalog, { ...props, data: { ...data, product_summary: [{ id: 'product-summary', total: 12, published: 7, upcoming: 3, draft: 2 }] }, section: platform.sections.find(row => row.key === 'products') });
-  for (const value of ['12', '7', '3', '2']) assert.match(countedProducts, new RegExp(`>${value}<`));
+  for (const value of ['12', '7', '3', '2']) assert.match(countedProducts, new RegExp(`>${value}개<`));
   assert.doesNotMatch(products, /목록 내보내기 · 선택 관리|삭제 항목 포함|현재 페이지 CSV|상품은 가격·판매·자료의 단위/);
   const bannerData = { ...data, site_banners: [{ id: 'banner-2', title: '두 번째', display_order: 2, is_active: true }, { id: 'banner-1', title: '첫 번째', display_order: 1, is_active: true }] };
   const banners = html(AdminCatalog, { ...props, data: bannerData, send, section: platform.sections.find(row => row.key === 'banners') });
@@ -266,11 +363,17 @@ test('catalogues and separate editors render without dropping existing fields', 
   const platformSource = read('app/ui/platform.tsx');
   const pageSource = read('app/[[...path]]/page.tsx');
   assert.match(platformSource, /무료강의 3강 시청[\s\S]*결제 완료[\s\S]*미션 수행[\s\S]*회원가입/);
-  assert.match(platformSource, /쿠폰 등록·설정[\s\S]*최소 주문 금액[\s\S]*회원당 발급 횟수/);
+  assert.match(platformSource, /쿠폰 등록·설정/);
+  assert.match(platformSource, /<CouponFields/);
+  assert.match(read('app/ui/final/coupon-fields.tsx'), /최소 주문 금액[\s\S]*회원별 사용 횟수/);
   const learning = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'learning') });
   assert.match(learning, /learning-layout/); assert.match(learning, /학습 구성/); assert.match(learning, /lesson-list-item/);
   const missions = html(AdminCatalog, { ...props, section: platform.sections.find(row => row.key === 'missions') });
   assert.match(missions, /mission-week-pills/); assert.match(missions, /일차별 미션/); assert.match(missions, /mission-row/);
+  const groupedMissions = html(AdminCatalog, { ...props, data: { ...data, courses: [...data.courses, { id: 'other-course', title: '다른 상품' }], curriculum_weeks: [...data.curriculum_weeks, { id: 'other-week', course_id: 'other-course', week_number: 1, title: '다른 상품 주차' }] }, section: platform.sections.find(row => row.key === 'missions') });
+  assert.match(groupedMissions, /mission-week-picker/);
+  assert.equal((groupedMissions.match(/class="mission-product-group"/g) || []).length, 2);
+  assert.match(groupedMissions, /다른 상품[\s\S]*?1개 주차/);
   assert.match(missions, /콘텐츠 편집/); assert.match(missions, /learning-editor\?id=lesson/);
   const questionMarkup = html(AdminCatalog, { ...props, data: { ...data, edu_questions: [{ id: 'question', title: '답변 필요한 질문', content: '질문 내용', answer: null, status: 'open', created_at: '2026-09-24' }] }, section: platform.sections.find(row => row.key === 'questions') });
   assert.match(questionMarkup, /question-admin-card/); assert.match(questionMarkup, /답변하기/);
@@ -302,8 +405,8 @@ test('catalogues and separate editors render without dropping existing fields', 
   assert.doesNotMatch(markup, /상품 주소 \(slug\)|검색 결과에 표시할 설명|class="snippet"/);
   assert.doesNotMatch(markup, /200,000자|권장 제작 기준/);
   assert.doesNotMatch(markup, /상세 본문 · HTML|본문 미리보기|텍스트 상세 설명|무료 라이브 CTA·이미지 관리/);
-  assert.match(markup, /업로드할 파일 선택하기/);
-  assert.match(markup, /파일별로 공개 범위를 설정/);
+  assert.match(markup, /id="product-tab-curriculum"/);
+  assert.doesNotMatch(markup, /id="product-tab-(?:resources|missions)"/);
   assert.doesNotMatch(markup, /자료를 연결할 학습 만들기/);
   assert.match(markup, /editor-savebar/);
   const productEditorSource = read('app/ui/final/admin-editors.tsx');
@@ -322,9 +425,12 @@ test('catalogues and separate editors render without dropping existing fields', 
   assert.match(learningMarkup, /editor-/); assert.doesNotMatch(learningMarkup, /통과 기준|name="pass_percent"/);
   assert.match(platformSource, /AI 답변 생성/); assert.match(platformSource, /답변 등록/);
   assert.match(platformSource, /answer-draft/);
-  assert.match(read('app/ui/final/integration.css'), /\.participant-card-summary/);
+  const participantSource = read('app/ui/admin-workflows.tsx');
+  assert.match(participantSource, /<AdminFilterBar className="admin-pilot-filter admin-pilot-member-filter"[\s\S]*?label="빠른 상태 필터"/);
+  assert.match(participantSource, /<AdminDataTable label="회원별 미션 현황 표"[\s\S]*?검토 필요[\s\S]*?최근 활동/);
+  assert.match(participantSource, /<AdminDrawer title=\{t\(selectedMember[\s\S]*?participant-drawer-missions/);
+  assert.match(read('app/ui/final/integration.css'), /\.participant-table thead th \{ position: sticky/);
   assert.match(read('app/ui/final/integration.css'), /\.question-answer-editor/);
-  assert.match(read('app/ui/admin-workflows.tsx'), /aria-expanded=\{expanded\}[\s\S]*?participant-day-card/);
 });
 test('submission review keeps queue and inspector, escaping text and unsafe links', () => {
   const { SubmissionReview } = load('app/ui/final/submission-review.tsx');
@@ -413,14 +519,30 @@ test('campaign class keeps published content and one responsive sticky CTA', () 
   assert.doesNotMatch(paid, /href="https:\/\/open.kakao.com\/o\/testRoom"/);
 });
 
+test('paid product offers remain open with no published curriculum', () => {
+  const { ProductDetail } = load('app/ui/final/public-views.tsx');
+  for (const curriculum of [
+    { curriculum_weeks: [], curriculum_lessons: [] },
+    { curriculum_weeks: [{ ...data.curriculum_weeks[0], is_published: false }], curriculum_lessons: [{ ...lesson, is_published: false }] },
+  ]) {
+    const markup = html(ProductDetail, { course, data: { ...data, ...curriculum, enrollments: [], lesson_contents: [] } });
+    assert.match(markup, /href="\/login\?next=%2Fcheckout/);
+    assert.doesNotMatch(markup, /수강 신청을 준비하고 있습니다/);
+    assert.doesNotMatch(markup, /등록된 학습 본문/);
+  }
+});
+
 test('paid products hide mismatched free-class HTML and block checkout until ready', () => {
   const { ProductDetail } = load('app/ui/final/public-views.tsx');
   const mismatched = { ...course, duration_label: '', schedule_label: '', metadata: { detail_html_document: '<h1>무료 라이브 강의</h1><a href="https://open.kakao.com/o/room">무료강의 대기방 입장</a>' } };
   const markup = html(ProductDetail, { course: mismatched, data: { ...data, enrollments: [], curriculum_weeks: [], curriculum_lessons: [] } });
   assert.doesNotMatch(markup, /무료강의 대기방 입장/);
-  assert.match(markup, /무료 클래스 안내와 외부 참여 링크는 노출하지 않습니다/);
-  assert.match(markup, /학습 기간 · 일정 안내 · 공개 커리큘럼/);
-  assert.match(markup, /aria-disabled="true"/);
+  assert.match(markup, /클래스 상세 안내를 준비하고 있습니다/);
+  assert.doesNotMatch(markup, /무료 클래스 안내와 외부 참여 링크는 노출하지 않습니다/);
+  assert.doesNotMatch(markup, /학습 기간 · 일정 안내 · 공개 커리큘럼/);
+  assert.match(markup, /수강 신청을 준비하고 있습니다/);
+  assert.match(markup, /<button type="button" class="btn primary full large disabled" disabled="">다음 모집 준비 중/);
+  assert.doesNotMatch(markup, /<a[^>]+href="\/classes"[^>]*>다음 모집 준비 중/);
 });
 
 test('landing report separates repeated clicks, missing actuals, direct traffic and per-version reach', () => {
@@ -433,4 +555,35 @@ test('landing report separates repeated clicks, missing actuals, direct traffic 
   assert.match(markup, /클릭 100회/); assert.match(markup, /클릭 세션 80회/);
   assert.doesNotMatch(markup, /987,654|위너 후보<\/span>|링크클릭 대비 세션 갭이 기준/);
   assert.match(markup, /카카오 누적 입장<\/span><strong>—/);
+});
+
+test('rich lesson format is versioned, preserves legacy whitespace and normalizes empty content', () => {
+  const body = load('lib/lesson-body.ts');
+  const legacy = '첫 줄\n\n1. [링크](https://example.test/guide)\n2. 다음 줄';
+  assert.equal(body.parseLessonDocument(legacy), null);
+  const doc = body.lessonDocumentForEditor(legacy);
+  assert.equal(doc.content.length, 4);
+  assert.equal(doc.content[1].content.length, 0);
+  assert.equal(doc.content[2].content[1].marks[0].attrs.href, 'https://example.test/guide');
+  const saved = body.serializeLessonDocument(doc);
+  assert.deepEqual(body.parseLessonDocument(saved), doc);
+  assert.equal(body.serializeLessonDocument({ type: 'doc', content: [{type:'paragraph'}] }), '');
+  assert.equal(body.lessonBodyHasText(saved), true);
+  assert.equal(body.lessonBodyHasText(body.LESSON_BODY_PREFIX + JSON.stringify({type:'doc',content:[{type:'paragraph'}]})), false);
+});
+
+test('rich lesson renderer allows headings and safe marks but rejects scripts, arbitrary CSS and unsafe links', () => {
+  const { LessonText } = load('app/ui/final/lesson-text.tsx');
+  const { LESSON_BODY_PREFIX } = load('lib/lesson-body.ts');
+  const text = LESSON_BODY_PREFIX + JSON.stringify({type:'doc',content:[
+    {type:'heading',attrs:{level:2,onclick:'unsafe()'},content:[{type:'text',text:'큰 제목'}]},
+    {type:'heading',attrs:{level:3},content:[{type:'text',text:'작은 제목'}]},
+    {type:'paragraph',content:[{type:'text',text:'<script>evil()</script>',marks:[{type:'bold'},{type:'textStyle',attrs:{fontSize:'20px',color:'red',background:'url(evil)'}},{type:'link',attrs:{href:'javascript:alert(1)'}}]}]},
+    {type:'paragraph',content:[{type:'text',text:'bad size',marks:[{type:'textStyle',attrs:{fontSize:'9999px'}}]}]},
+    {type:'image',attrs:{src:'x',onerror:'bad()'}},
+  ]});
+  const markup = html(LessonText, {text});
+  assert.match(markup, /<h2>큰 제목<\/h2>/); assert.match(markup, /<h3>작은 제목<\/h3>/);
+  assert.match(markup, /font-size:20px/); assert.match(markup, /<strong>&lt;script&gt;/);
+  assert.doesNotMatch(markup, /<script|<img|<a |onclick|onerror|9999px|color:red|url\(evil/);
 });

@@ -49,7 +49,7 @@
 .edu-admin .admin-field{display:grid;gap:6px;align-content:start;min-width:0;font-size:13px;line-height:20px;font-weight:600}.edu-admin .admin-field-label{display:block}.edu-admin .admin-field-help{font-size:12px;line-height:18px;font-weight:400;color:var(--text-secondary)}.edu-admin .admin-field-error{color:var(--ba-red-hover)}
 .edu-admin :is(.admin-input,.admin-select,.admin-textarea),.edu-admin .admin-search-field input{width:100%;min-height:var(--admin-control-height);padding:8px 10px;border:1px solid var(--admin-border);border-radius:var(--admin-radius-control);background:var(--admin-surface);font-size:13px;line-height:20px;box-shadow:none}.edu-admin .admin-textarea{resize:vertical}.edu-admin :is(.admin-input,.admin-select,.admin-textarea)[aria-invalid=true]{border-color:var(--ba-red)}
 .edu-admin .admin-checkbox{min-height:var(--admin-control-height);display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:500;cursor:pointer}.edu-admin .admin-checkbox input{width:16px;height:16px}.edu-admin .admin-checkbox small{display:block;font-size:12px;font-weight:400;color:var(--text-secondary)}
-.edu-admin .admin-search-field{position:relative;display:block;min-width:220px}.edu-admin .admin-search-field svg{position:absolute;left:11px;top:11px;color:var(--text-secondary);pointer-events:none}.edu-admin .admin-search-field input{padding-left:34px}
+.edu-admin .admin-search-field{position:relative;display:block;min-width:220px}.edu-admin .admin-search-field svg{position:absolute;left:11px;top:11px;color:var(--text-secondary);pointer-events:none}.edu-admin .admin-search-field input{padding-left:40px}
 .edu-admin .admin-metric-grid{display:grid;gap:12px;min-width:0}.edu-admin .admin-metric-grid--2{grid-template-columns:repeat(2,minmax(0,1fr))}.edu-admin .admin-metric-grid--4{grid-template-columns:repeat(4,minmax(0,1fr))}.edu-admin .admin-metric-grid--8{grid-template-columns:repeat(4,minmax(0,1fr))}
 .edu-admin .admin-metric{min-width:0;padding:18px 20px;border:1px solid var(--admin-border);border-radius:var(--admin-radius-surface);background:var(--admin-surface)}.edu-admin .admin-metric h2{margin:0;font-size:12px;line-height:18px;font-weight:600;color:var(--text-secondary)}.edu-admin .admin-metric-value{margin-top:7px;font-size:28px;line-height:36px;font-weight:700;letter-spacing:-.04em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.edu-admin .admin-metric-note,.edu-admin .admin-metric-change{margin:5px 0 0;font-size:12px;line-height:18px;color:var(--text-secondary)}
 .edu-admin .admin-table-toolbar-wrap{display:grid;gap:10px}.edu-admin .admin-table-toolbar{min-height:var(--admin-control-height);display:flex;align-items:center;gap:var(--admin-control-gap);flex-wrap:wrap}.edu-admin .admin-toolbar-result{margin-left:auto;font-size:12px;color:var(--text-secondary)}.edu-admin .admin-toolbar-chips{display:flex;gap:6px;flex-wrap:wrap}
@@ -202,6 +202,146 @@
   .edu-admin .review-actions>.btn{flex:1 1 auto;min-height:44px}
   .edu-admin .review-history-pages>.btn{flex:1;min-height:44px}
 }
+
+/* Phase 3 component contracts. Tokens are Admin-scoped; legacy page migration is deferred. */
+.edu-admin{
+  --admin-color-primary:#c9232d;--admin-color-primary-hover:#a71922;--admin-color-primary-active:#88121b;
+  --admin-color-background:#f7f8f9;--admin-color-surface:#fff;--admin-color-surface-subtle:#f7f8fa;
+  --admin-color-border:#e2e5e9;--admin-color-border-strong:#c8cdd5;
+  --admin-color-text:#161719;--admin-color-text-secondary:#626770;--admin-color-text-muted:#5f6670;--admin-color-text-inverse:#fff;
+  --admin-color-success:#176345;--admin-color-success-soft:#eaf5ef;
+  --admin-color-warning:#865600;--admin-color-warning-soft:#fff6df;
+  --admin-color-error:#a71922;--admin-color-error-soft:#fff0f1;
+  --admin-color-info:#315e8b;--admin-color-info-soft:#edf3f9;
+  --admin-color-neutral:#50545b;--admin-color-neutral-soft:#f0f2f4;
+  --admin-space-1:4px;--admin-space-2:8px;--admin-space-3:12px;--admin-space-4:16px;
+  --admin-space-6:24px;--admin-space-8:32px;--admin-space-10:40px;--admin-space-12:48px;
+  --admin-radius-sm:4px;--admin-radius-md:6px;--admin-radius-lg:8px;
+  --admin-control-height-lg:48px;--admin-border-width:1px;--admin-shadow-overlay:0 12px 32px #16171916;
+  --admin-type-page:700 24px/32px var(--font-sans);--admin-type-section:600 16px/24px var(--font-sans);
+  --admin-type-body:400 14px/22px var(--font-sans);--admin-type-label:600 13px/20px var(--font-sans);
+  --admin-type-caption:400 12px/18px var(--font-sans);--admin-type-table:500 13px/20px var(--font-sans);
+}
+.edu-admin .admin-button--variant-primary{background:var(--admin-color-primary);border-color:var(--admin-color-primary);color:#fff}
+.edu-admin .admin-section-header h2{font-weight:600}
+.edu-admin .admin-button--variant-primary:hover:not(:disabled){background:var(--admin-color-primary-hover);border-color:var(--admin-color-primary-hover)}
+.edu-admin .admin-button--variant-primary:active:not(:disabled){background:var(--admin-color-primary-active)}
+.edu-admin .admin-button--variant-secondary{background:var(--admin-color-surface);border-color:var(--admin-color-border-strong);color:var(--admin-color-text)}
+.edu-admin .admin-button--variant-secondary:hover:not(:disabled),.edu-admin .admin-button--variant-outline:hover:not(:disabled){background:var(--admin-color-surface-subtle)}
+.edu-admin .admin-button--variant-outline{background:transparent;border-color:var(--admin-color-border);color:var(--admin-color-text)}
+.edu-admin .admin-button--variant-ghost{background:transparent;border-color:transparent;color:var(--admin-color-text-secondary)}
+.edu-admin .admin-button--variant-ghost:hover:not(:disabled){background:var(--admin-color-surface-subtle);border-color:transparent}
+.edu-admin .admin-button--variant-danger{background:var(--admin-color-error-soft);border-color:#edcfd2;color:var(--admin-color-error)}
+.edu-admin .admin-button--variant-danger:hover:not(:disabled){background:#ffe3e5;border-color:var(--admin-color-error)}
+.edu-admin .admin-status-badge--neutral{background:var(--admin-color-neutral-soft);color:var(--admin-color-neutral)}
+.edu-admin .admin-status-badge--info{background:var(--admin-color-info-soft);color:var(--admin-color-info)}
+.edu-admin .admin-status-badge--success{background:var(--admin-color-success-soft);color:var(--admin-color-success)}
+.edu-admin .admin-status-badge--warning{background:var(--admin-color-warning-soft);color:var(--admin-color-warning)}
+.edu-admin :is(.admin-status-badge--error,.admin-status-badge--danger){background:var(--admin-color-error-soft);color:var(--admin-color-error)}
+.edu-admin .admin-toast--error{background:var(--admin-color-error)}
+.edu-admin .admin-button--lg{min-height:var(--admin-control-height-lg);padding-inline:16px;font-size:14px}
+.edu-admin .admin-button-spinner{flex:none;animation:admin-spin 1s linear infinite}
+@keyframes admin-spin{to{transform:rotate(360deg)}}
+.edu-admin :is(.admin-input,.admin-select).admin-control--sm{min-height:var(--admin-control-height-sm)}
+.edu-admin :is(.admin-input,.admin-select).admin-control--lg{min-height:var(--admin-control-height-lg)}
+.edu-admin .admin-search-field--sm input{min-height:var(--admin-control-height-sm)}
+.edu-admin .admin-search-field--lg input{min-height:var(--admin-control-height-lg)}
+.edu-admin .admin-search-field--sm svg{top:10px}.edu-admin .admin-search-field--lg svg{top:16px}
+.edu-admin .admin-search-field input[aria-invalid=true]{border-color:var(--admin-color-error)}
+.edu-admin .admin-search-field .admin-field-error{margin-top:4px;font-size:12px}
+.edu-admin :is(.admin-radio,.admin-switch){min-height:var(--admin-control-height);display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:500;cursor:pointer}
+.edu-admin .admin-switch{position:relative}
+.edu-admin :is(.admin-radio,.admin-switch) small{display:block;color:var(--admin-color-text-secondary);font-size:12px;font-weight:400}
+.edu-admin :is(.admin-checkbox,.admin-radio,.admin-switch) small.admin-field-error{color:var(--admin-color-error)}
+.edu-admin .admin-radio input{width:16px;height:16px;accent-color:var(--admin-color-primary)}
+.edu-admin .admin-switch input{position:absolute;left:0;top:50%;z-index:1;transform:translateY(-50%);width:36px;height:20px;margin:0;opacity:0;cursor:inherit}
+.edu-admin .admin-switch-track{position:relative;display:inline-block;flex:none;width:36px;height:20px;border-radius:999px;background:var(--admin-color-border-strong);pointer-events:none;transition:background .15s ease}
+.edu-admin .admin-switch-track:after{content:'';position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .15s ease}
+.edu-admin .admin-switch input:checked+.admin-switch-track{background:var(--admin-color-primary)}
+.edu-admin .admin-switch input:checked+.admin-switch-track:after{transform:translateX(16px)}
+.edu-admin .admin-switch input:focus-visible+.admin-switch-track{outline:3px solid var(--admin-focus-ring);outline-offset:2px}
+.edu-admin :is(.admin-radio,.admin-switch):has(input:disabled){opacity:.52;cursor:not-allowed}
+.edu-admin .admin-metric--compact{padding:16px;box-shadow:none}.edu-admin .admin-metric--compact .admin-metric-value{font-size:20px;line-height:28px}
+.edu-admin .admin-table-density--standard{--admin-table-row-height:52px}.edu-admin .admin-table-density--comfortable{--admin-table-row-height:60px}
+.edu-admin .admin-data-table :is(th,td){padding-inline:16px}
+.edu-admin .admin-data-table tbody tr.admin-table-row--clickable{cursor:pointer}
+.edu-admin .admin-data-table tbody tr.admin-table-row--selected :is(th,td){background:var(--admin-color-info-soft)}
+.edu-admin .admin-data-table tbody tr.admin-table-row--clickable:focus-visible{outline:2px solid var(--admin-focus-ring);outline-offset:-2px}
+.edu-admin .admin-data-table .admin-table-select-cell{width:48px;text-align:center}.edu-admin .admin-table-select-cell input{width:16px;height:16px;accent-color:var(--admin-color-primary)}
+.edu-admin .admin-table-bulk{min-height:40px;display:flex;align-items:center;gap:12px;padding:8px 16px;border:1px solid var(--admin-color-border);border-bottom:0;border-radius:var(--admin-radius-lg) var(--admin-radius-lg) 0 0;background:var(--admin-color-info-soft);font-size:13px}
+.edu-admin .admin-table-bulk+.admin-table-scroll{border-top-left-radius:0;border-top-right-radius:0}
+.edu-admin .admin-table-loading{margin:8px 0;color:var(--admin-color-text-secondary);font-size:12px}
+.edu-admin .admin-quick-filter{display:flex;align-items:center;gap:4px;max-width:100%;overflow-x:auto;border-bottom:1px solid var(--admin-color-border)}
+.edu-admin .admin-quick-filter-item{min-height:40px;flex:none;display:inline-flex;align-items:center;gap:6px;padding:0 12px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--admin-color-text-secondary);font:var(--admin-type-label);cursor:pointer}
+.edu-admin .admin-quick-filter-item[aria-pressed=true]{border-bottom-color:var(--admin-color-primary);color:var(--admin-color-text)}
+.edu-admin .admin-quick-filter-item span{color:var(--admin-color-text-muted);font-weight:400;font-variant-numeric:tabular-nums}
+.edu-admin .admin-filter-bar{display:grid;gap:8px;min-width:0}.edu-admin .admin-filter-bar-controls{display:flex;align-items:end;gap:8px;min-width:0}
+.edu-admin .admin-filter-bar-filters,.edu-admin .admin-filter-bar-status,.edu-admin .admin-filter-bar-date{display:flex;gap:8px;align-items:end;flex:none;min-width:0}
+.edu-admin .admin-filter-bar-search{flex:1;min-width:160px}.edu-admin .admin-filter-bar-search .admin-search-field{width:100%;min-width:0}
+.edu-admin .admin-filter-bar-action{margin-left:auto;flex:none}.edu-admin .admin-filter-bar-summary{font:var(--admin-type-caption);color:var(--admin-color-text-secondary)}
+.edu-admin .admin-pagination-total-range{margin-right:auto;font-variant-numeric:tabular-nums}
+.edu-admin .admin-pagination-size{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}.edu-admin .admin-pagination-size select{height:36px;border:1px solid var(--admin-color-border);border-radius:var(--admin-radius-md);background:#fff}
+.edu-admin .admin-error-state{display:flex;gap:12px;padding:24px;border:1px solid #edcfd2;border-radius:var(--admin-radius-lg);background:var(--admin-color-error-soft);color:var(--admin-color-error)}
+.edu-admin .admin-error-state strong{display:block;font-size:14px}.edu-admin .admin-error-state p{margin:4px 0 12px;font-size:13px}.edu-admin .admin-alert{display:flex;align-items:baseline;gap:8px;padding:12px 16px;border:1px solid var(--admin-color-border);border-radius:var(--admin-radius-md);font-size:13px}
+.edu-admin .admin-alert--info{background:var(--admin-color-info-soft);color:var(--admin-color-info)}
+.edu-admin .admin-alert--success{background:var(--admin-color-success-soft);color:var(--admin-color-success)}
+.edu-admin .admin-alert--warning{background:var(--admin-color-warning-soft);color:var(--admin-color-warning)}
+.edu-admin .admin-alert--error{background:var(--admin-color-error-soft);color:var(--admin-color-error)}
+.edu-admin .admin-dialog-header h2:focus{outline:none}
+.edu-admin .admin-popover>summary{min-height:var(--admin-control-height);display:inline-flex;align-items:center;padding:0 12px;border:1px solid var(--admin-color-border);border-radius:var(--admin-radius-md);background:var(--admin-color-surface);font:var(--admin-type-label);cursor:pointer}
+.edu-admin .admin-popover>summary:hover{background:var(--admin-color-surface-subtle)}
+.edu-admin .admin-tooltip{position:relative;display:inline-flex}.edu-admin .admin-tooltip-target{display:inline-flex}
+.edu-admin .admin-tooltip-content{position:absolute;z-index:45;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);width:max-content;max-width:240px;padding:6px 8px;border-radius:var(--admin-radius-sm);background:var(--admin-color-text);color:#fff;font:var(--admin-type-caption);box-shadow:var(--admin-shadow-overlay);opacity:0;visibility:hidden;pointer-events:none}
+.edu-admin .admin-tooltip:hover .admin-tooltip-content,.edu-admin .admin-tooltip:focus-within .admin-tooltip-content{opacity:1;visibility:visible}
+@media(max-width:1024px){.edu-admin .admin-filter-bar-controls{flex-wrap:wrap}.edu-admin .admin-filter-bar-search{flex-basis:100%;order:2}.edu-admin .admin-filter-bar-action{order:3}}
+@media(max-width:720px){.edu-admin .admin-filter-bar-filters,.edu-admin .admin-filter-bar-status,.edu-admin .admin-filter-bar-date{flex:1 1 auto}.edu-admin .admin-filter-bar-controls>.admin-button{flex:1}.edu-admin .admin-filter-bar-action{width:100%;margin:0}.edu-admin .admin-filter-bar-action .admin-button{width:100%}.edu-admin .admin-table-bulk{flex-wrap:wrap}.edu-admin .admin-pagination{flex-wrap:wrap}.edu-admin .admin-pagination-total-range{flex-basis:100%}}
+
+/* Pilot compositions use the common tokens and controls without changing legacy pages. */
+.edu-admin .admin-pilot-filter{margin-bottom:var(--admin-space-4)}
+.edu-admin .admin-pilot-filter .admin-filter-bar-controls{flex-wrap:wrap}
+.edu-admin .admin-pilot-filter .admin-filter-bar-search{min-width:min(260px,100%)}
+@media(max-width:1024px){
+  .edu-admin .admin-pilot-member-filter .admin-filter-bar-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;flex:1 1 100%;align-items:end}
+  .edu-admin .admin-pilot-member-filter .admin-filter-bar-filters>.admin-field{min-width:0}
+  .edu-admin .admin-pilot-member-filter .admin-filter-bar-filters>.admin-field:first-child{grid-column:1/-1}
+}
+.edu-admin .admin-pilot-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--admin-space-3);margin-bottom:var(--admin-space-4)}
+.edu-admin .admin-pilot-summary .admin-metric{min-width:0}
+.edu-admin .admin-pilot-quick-row{display:flex;align-items:center;justify-content:space-between;gap:var(--admin-space-3);margin-bottom:var(--admin-space-3)}
+.edu-admin .admin-pilot-workspace{display:grid;gap:var(--admin-space-3);min-width:0}
+.edu-admin .admin-pilot-summary-highlight{border-top:2px solid var(--admin-color-primary)}
+.edu-admin .admin-data-table thead th button{display:inline-flex;align-items:center;gap:var(--admin-space-1);padding:0;border:0;background:transparent;color:inherit;font:inherit;font-weight:inherit;cursor:pointer}
+.edu-admin .admin-data-table thead th button:hover{text-decoration:underline}
+.edu-admin .admin-data-table thead th button:focus-visible{outline:2px solid var(--admin-focus-ring);outline-offset:2px}
+.edu-admin .admin-pilot-workspace .admin-data-table td[data-label="회원"] small{display:block;color:var(--admin-color-text-secondary);font:var(--admin-type-caption)}
+.edu-admin .product-editor .product-basic-section .form-grid{row-gap:var(--admin-space-4)}
+.edu-admin .product-editor .product-basic-section .admin-field{min-width:0}
+@media(max-width:1024px){.edu-admin .admin-pilot-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:720px){.edu-admin .admin-pilot-summary{grid-template-columns:1fr}.edu-admin .admin-pilot-quick-row{display:block}.edu-admin .admin-pilot-filter .admin-filter-bar-search{min-width:100%}}
+/* Catalog migration: one shared toolbar/table contract for all catalog list routes. */
+.edu-admin .admin-catalog-filter{padding:var(--admin-space-3) var(--admin-space-4);border-bottom:1px solid var(--admin-color-border);background:var(--admin-color-surface)}
+.edu-admin .admin-catalog-filter .admin-filter-bar-controls{flex-wrap:wrap}
+.edu-admin .admin-catalog-filter .admin-filter-bar-filters:empty{display:none}
+.edu-admin .admin-catalog-filter .admin-filter-bar-filters .admin-field{min-width:160px;max-width:240px}
+.edu-admin .admin-catalog-filter .admin-filter-bar-search{min-width:min(280px,100%)}
+.edu-admin .admin-catalog-filter .admin-filter-bar-status .admin-field{min-width:140px}
+.edu-admin .admin-catalog-filter .admin-filter-bar-action{margin-left:auto}
+.edu-admin .admin-field> :is(input:not([type=checkbox]):not([type=radio]),select,textarea){width:100%;min-height:var(--admin-control-height);padding:8px 10px;border:1px solid var(--admin-color-border);border-radius:var(--admin-radius-md);background:var(--admin-color-surface);font:var(--admin-type-body);box-shadow:none}
+.edu-admin .admin-field>textarea{resize:vertical}
+.edu-admin .admin-field> :is(input,select,textarea):focus{border-color:var(--admin-color-primary)}
+.edu-admin .admin-metric-link{display:block;min-width:0;text-decoration:none;color:inherit}
+.edu-admin .admin-metric-link:hover .admin-metric{border-color:var(--admin-color-border-strong);background:var(--admin-color-surface-subtle)}
+.edu-admin .metrics>.admin-metric,.edu-admin .metrics>.admin-metric-link{min-width:0}
+.edu-admin .admin-crm-primary{display:grid;gap:3px;min-width:200px;max-width:460px}
+.edu-admin .admin-crm-primary small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--admin-color-text-secondary)}
+.edu-admin .admin-settings-drawer-form{display:flex;flex:1;flex-direction:column;min-height:0}
+.edu-admin .admin-settings-drawer-form .admin-dialog-body{display:grid;align-content:start;gap:var(--admin-space-4)}
+.edu-admin .admin-review-filter{margin:var(--admin-space-3) 0 var(--admin-space-4)}
+.edu-admin .admin-review-filter .admin-filter-bar-search{min-width:min(280px,100%)}
+.edu-admin .admin-data-table .week-group-heading th{height:auto;padding:8px 12px;background:var(--admin-color-surface-subtle);border-block:1px solid var(--admin-color-border);color:var(--admin-color-text-secondary);font-weight:650}
+.edu-admin .admin-data-table .week-group-heading th small{margin-left:var(--admin-space-3);font-weight:400}
+@media(max-width:720px){.edu-admin .admin-catalog-filter .admin-filter-bar-filters,.edu-admin .admin-catalog-filter .admin-filter-bar-status{flex:1 1 auto}.edu-admin .admin-catalog-filter .admin-filter-bar-search{flex:1 1 100%;order:2}.edu-admin .admin-catalog-filter .admin-filter-bar-action{width:100%;order:3}.edu-admin .admin-catalog-filter .admin-filter-bar-action .admin-button{width:100%}}
+@media(prefers-reduced-motion:reduce){.edu-admin .admin-button-spinner{animation:none}.edu-admin .admin-switch-track,.edu-admin .admin-switch-track:after{transition:none}}
 .edu-admin .admin-workspace-tabs{min-width:0}
 .edu-admin .admin-workspace-tabs>.tabs{display:flex;flex-wrap:nowrap;gap:20px;max-width:100%;margin-bottom:20px;padding:0 3px;overflow-x:auto;scrollbar-width:thin;overscroll-behavior-inline:contain}
 .edu-admin .admin-workspace-tabs>.tabs .tab{flex:0 0 auto;min-height:48px;white-space:nowrap}

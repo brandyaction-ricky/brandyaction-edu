@@ -27,7 +27,7 @@ function renderClass({ loading = true, error = '', data = {} } = {}) {
   const { Platform } = load('app/ui/platform.tsx', {
     react: { ...React, useState(initial) {
       const index = state++;
-      return React.useState(index === 1 ? data : index === 3 ? loading : index === 4 ? error : initial);
+      return React.useState(index === 1 ? data : index === 3 ? loading : index === 4 ? error : index === 16 && (!loading || Object.keys(data).length) ? JSON.stringify(['classes/test-class?', 'view=class&slug=test-class']) : initial);
     } },
     '@/lib/supabase/client': {},
     '@/lib/supabase/config': {},
@@ -47,7 +47,8 @@ test('class entry renders a waiting indicator, not the missing-page home action'
   const html = renderClass();
   assert.match(html, /class="page-loading"[^>]*role="status"[^>]*aria-live="polite"[^>]*aria-busy="true"/);
   assert.match(html, /class="page-loading-spinner" aria-hidden="true"/);
-  assert.match(html, /곧 열립니다/);
+  assert.match(html, /클래스 정보를 불러오는 중입니다/);
+  assert.doesNotMatch(html, /곧 열립니다/);
   assert.doesNotMatch(html, /홈으로|페이지를 찾을 수 없습니다/);
 });
 
