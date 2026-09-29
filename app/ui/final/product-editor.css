@@ -135,7 +135,7 @@
 .edu-admin .product-cohort-fields label { min-width: 0; display: grid; gap: 8px; color: var(--ink); font-size: 13px; font-weight: 600; }
 .edu-admin .product-cohort-fields input, .edu-admin .product-cohort-fields select { width: 100%; min-width: 0; margin: 0; }
 .edu-admin .product-cohort-fields > .btn { justify-self: end; }
-@media (max-width: 720px) { .edu-admin .product-curriculum-create, .edu-admin .product-curriculum-week li { align-items: stretch; flex-direction: column; } .edu-admin .product-curriculum-create > .btn, .edu-admin .product-curriculum-settings > .btn { width: 100%; } }
+@media (max-width: 720px) { .edu-admin .product-curriculum-create, .edu-admin .product-curriculum-week li, .edu-admin .curriculum-archive li { align-items: stretch; flex-direction: column; } .edu-admin .product-curriculum-create > .btn, .edu-admin .product-curriculum-settings > .btn { width: 100%; } }
 .edu-admin .product-mission-workspace { display: grid; gap: 18px; }
 .edu-admin .product-mission-workspace > h2 { margin: 0; }
 .edu-admin .product-mission-workspace > .meta { margin: -10px 0 0; }
@@ -196,6 +196,15 @@
 .edu-admin .product-curriculum-week li.selected{background:var(--red-soft,#fff3f3);border-radius:6px}
 .edu-admin .product-curriculum-week li>div{min-width:0;overflow-wrap:anywhere}.edu-admin .product-curriculum-week li small{display:block;color:var(--muted);margin-top:5px;font-size:12px}
 .edu-admin .product-curriculum-week li .btn{flex-shrink:0}.edu-admin .curriculum-add-lesson{margin-top:12px}
+.edu-admin .product-curriculum-week-actions{display:flex;justify-content:flex-end;margin:10px 0 4px}
+.edu-admin .product-curriculum-week .btn.danger{color:var(--danger,#b42318)}
+.edu-admin .curriculum-archive{padding:14px;border:1px solid var(--line);border-radius:8px;background:var(--surface-subtle)}
+.edu-admin .curriculum-archive>summary{cursor:pointer;font-size:13px;font-weight:600}
+.edu-admin .curriculum-archive>.meta{margin:10px 0}
+.edu-admin .curriculum-archive ul{display:grid;gap:4px;margin:0;padding:0;list-style:none}
+.edu-admin .curriculum-archive li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.edu-admin .curriculum-archive li span{min-width:0;overflow-wrap:anywhere}
+.edu-admin .curriculum-archive li small{margin-left:8px;color:var(--muted)}
 .edu-admin .curriculum-editor-empty,.edu-admin .curriculum-lesson-preview{padding:24px;border:1px dashed var(--line);border-radius:8px;background:var(--surface-subtle);line-height:1.7}
 .edu-admin .curriculum-editor-empty p{font-size:14px;color:var(--muted)}.edu-admin .curriculum-lesson-preview .reading-copy{white-space:pre-wrap;overflow-wrap:anywhere}
 .edu-admin .curriculum-editor-heading h3{font-size:18px;line-height:1.5}.edu-admin .curriculum-editor-heading .meta{margin:0 0 6px}

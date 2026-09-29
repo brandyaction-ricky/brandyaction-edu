@@ -518,6 +518,32 @@ export async function POST(request: Request) {
         const body = (await request.json()) as Record<string, unknown>;
         const action = String(body.action || '');
         const db = createAdminClient();
+        if (action === 'set-curriculum-archive') {
+            const permissions = await permissionsFor(user);
+            const courseId = String(body.courseId || '');
+            const kind = String(body.kind || '');
+            if (!permissions.products) return reply({ error: '상품 관리 권한이 필요합니다.' }, 403);
+            if (!uid(courseId) || !uid(body.id) || !['week', 'lesson'].includes(kind) || typeof body.archived !== 'boolean') {
+                fail('삭제하거나 복구할 주차·학습을 확인해 주세요.');
+            }
+            const result = await db.rpc('edu_set_curriculum_archive', {
+                p_actor: user.id,
+                p_course: courseId,
+                p_kind: kind,
+                p_id: body.id,
+                p_archived: body.archived,
+            });
+            if (result.error) {
+                const code = String(result.error.message || '');
+                if (code.includes('CURRICULUM_FORBIDDEN')) fail('상품 관리 권한이 필요합니다.', 403);
+                if (code.includes('CURRICULUM_NOT_FOUND')) fail('선택한 상품의 주차·학습이 아니거나 이미 변경되었습니다. 목록을 다시 불러와 주세요.', 409);
+                if (code.includes('CURRICULUM_PARENT_ARCHIVED')) fail('먼저 상위 주차를 복구해 주세요.', 409);
+                if (code.includes('CURRICULUM_INVALID')) fail('주차·학습 상태를 확인해 주세요.');
+                console.error('curriculum archive', result.error.code || 'unexpected');
+                fail('주차·학습 상태를 변경하지 못했습니다. 목록을 다시 불러온 뒤 재시도해 주세요.', 409);
+            }
+            return publicWriteSuccess({ ok: true, result: result.data });
+        }
         if (action === 'delete-member') {
             if (user.role !== 'admin') return reply({ error: '관리자만 회원을 삭제할 수 있습니다.' }, 403);
             if (!uid(body.id)) fail('삭제할 회원을 확인해 주세요.');

@@ -117,9 +117,15 @@ export function ProductCurriculumWorkspace({ course, pending, send, commonResour
   const weeks = (curriculum.curriculum_weeks || [])
     .filter((week) => week.course_id === course?.id && !week.archived_at)
     .sort((a, b) => num(a, "week_number") - num(b, "week_number"));
+  const archivedWeeks = (curriculum.curriculum_weeks || [])
+    .filter((week) => week.course_id === course?.id && Boolean(week.archived_at))
+    .sort((a, b) => num(a, "week_number") - num(b, "week_number"));
   const weekIds = new Set(weeks.map((week) => String(week.id)));
   const lessons = (curriculum.curriculum_lessons || [])
     .filter((lesson) => weekIds.has(String(lesson.week_id)) && !lesson.archived_at)
+    .sort((a, b) => num(a, "day_number") - num(b, "day_number"));
+  const archivedLessons = (curriculum.curriculum_lessons || [])
+    .filter((lesson) => Boolean(lesson.archived_at))
     .sort((a, b) => num(a, "day_number") - num(b, "day_number"));
   const publishedWeeks = weeks.filter(week => week.is_published === true);
   const publishedWeekIds = new Set(publishedWeeks.map(week => String(week.id)));
@@ -240,6 +246,39 @@ export function ProductCurriculumWorkspace({ course, pending, send, commonResour
     finally { setBusy(false); }
   }
 
+  function clearLessonSelection() {
+    setLessonId("");
+    setContentType("text");
+    setContentValue("");
+    setResourceName("");
+    setSavedContentDraft("");
+    setPreviewOpen(false);
+    setUploadStatus("idle");
+  }
+
+  async function setCurriculumArchived(kind: "week" | "lesson", row: Row, archived: boolean) {
+    if (!course?.id || saving) return;
+    const affectedWeek = kind === "week" ? String(row.id) : String(row.week_id);
+    const selectedIsAffected = Boolean(lessonId) && (kind === "week"
+      ? String(selectedLesson?.week_id) === affectedWeek
+      : String(selectedLesson?.id) === String(row.id));
+    if (archived && selectedIsAffected && contentDirty && !window.confirm("저장하지 않은 학습 내용이 있습니다. 목록에서 삭제하면 이 변경사항은 버려집니다. 계속할까요?")) return;
+    const label = kind === "week" ? `${num(row, "week_number")}주차 · ${t(row, "title")}` : `Day ${num(row, "day_number")} · ${t(row, "title")}`;
+    if (archived && !window.confirm(`「${label}」을 현재 커리큘럼 목록에서 삭제할까요? 학습 진도·미션 제출 기록·자료는 지우지 않고 보관하며, 삭제한 항목에서 복구할 수 있습니다.${kind === "week" ? " 주차 안의 학습도 함께 숨겨집니다." : ""}`)) return;
+    setBusy(true);
+    setError("");
+    try {
+      await send({ action: "set-curriculum-archive", courseId: course.id, kind, id: row.id, archived }, archived ? "커리큘럼 목록에서 삭제했습니다. 기록은 보관되었습니다." : "커리큘럼 항목을 복구했습니다. 비공개 상태로 복구됩니다.");
+      if (archived && selectedIsAffected) clearLessonSelection();
+      setLoading(true);
+      setReadVersion((version) => version + 1);
+    } catch (cause) {
+      setError(message(cause));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!course?.id) return <div className="section-pad"><p className="notice">상품을 먼저 저장하면 같은 화면에서 주차·일차·콘텐츠를 등록할 수 있습니다.</p></div>;
 
   return <div className="section-pad product-curriculum-workspace">
@@ -263,12 +302,31 @@ export function ProductCurriculumWorkspace({ course, pending, send, commonResour
     {!weeks.length && <p className="notice">먼저 주차를 추가해 주세요.</p>}
     {weeks.map((week) => <section key={week.id} className="product-curriculum-week" aria-label={`${num(week, "week_number")}주차 ${t(week, "title")}`}>
       <details open><summary><h3>{num(week, "week_number")}주차 · {t(week, "title")}</h3><span className="meta">{lessons.filter(l=>l.week_id===week.id).length}개 학습 · {week.is_published ? "공개" : "비공개"}</span></summary>
+      <div className="product-curriculum-week-actions"><button className="btn small danger" type="button" onClick={() => void setCurriculumArchived("week", week, true)} disabled={saving}>주차 삭제</button></div>
       <details className="curriculum-week-settings" ref={element => { if (element) weekSettingsRefs.current.set(String(week.id), element); else weekSettingsRefs.current.delete(String(week.id)); }}><summary>주차 설정</summary><WeekSettings key={`${week.id}:${week.updated_at}`} week={week} disabled={saving} send={send} onSaved={() => { setLoading(true); setReadVersion((version) => version + 1); }} /></details>
-      {lessons.filter((lesson) => lesson.week_id === week.id).length ? <ul>{lessons.filter((lesson) => lesson.week_id === week.id).map((lesson) => <li key={lesson.id} className={lesson.id === lessonId ? "selected" : ""}><div><span>Day {num(lesson, "day_number")} · {t(lesson, "title")}</span><small>{({text:"텍스트",vod:"영상",material:"자료",link:"외부 링크"} as Record<string,string>)[t(lesson,"content_type")] || "학습"} · {(curriculum.lesson_contents || []).some(c=>c.lesson_id===lesson.id) ? "내용 등록됨" : "내용 없음"} · {lessonVisibility(lesson, week)}</small></div><button className="btn small" type="button" aria-pressed={lesson.id===lessonId} onClick={() => selectLesson(lesson)} disabled={saving}>학습 편집</button></li>)}</ul> : <p className="meta">등록된 학습이 없습니다.</p>}
+      {lessons.filter((lesson) => lesson.week_id === week.id).length ? <ul>{lessons.filter((lesson) => lesson.week_id === week.id).map((lesson) => <li key={lesson.id} className={lesson.id === lessonId ? "selected" : ""}><div><span>Day {num(lesson, "day_number")} · {t(lesson, "title")}</span><small>{({text:"텍스트",vod:"영상",material:"자료",link:"외부 링크"} as Record<string,string>)[t(lesson,"content_type")] || "학습"} · {(curriculum.lesson_contents || []).some(c=>c.lesson_id===lesson.id) ? "내용 등록됨" : "내용 없음"} · {lessonVisibility(lesson, week)}</small></div><div className="row"><button className="btn small" type="button" aria-pressed={lesson.id===lessonId} onClick={() => selectLesson(lesson)} disabled={saving}>학습 편집</button><button className="btn small danger" type="button" aria-label={`${t(lesson, "title")} 삭제`} onClick={() => void setCurriculumArchived("lesson", lesson, true)} disabled={saving}>삭제</button></div></li>)}</ul> : <p className="meta">등록된 학습이 없습니다.</p>}
       <button className="btn small curriculum-add-lesson" type="button" disabled={saving} onClick={()=>{setWeekId(String(week.id));setAddingTo(String(week.id));}}>＋ 학습 추가</button>
       {addingTo === week.id && <div className="product-curriculum-create"><label>새 일차 제목<input autoFocus value={lessonTitle} maxLength={300} onChange={event=>setLessonTitle(event.target.value)} disabled={saving}/></label><button type="button" className="btn" disabled={saving || !lessonTitle.trim()} onClick={()=>void createLesson()}>일차 추가</button></div>}
       </details>
     </section>)}
+    {(archivedWeeks.length > 0 || archivedLessons.length > 0) && <details className="curriculum-archive">
+      <summary>삭제한 주차·학습 보기 ({archivedWeeks.length + archivedLessons.length})</summary>
+      <p className="meta">삭제한 항목과 연결된 학습 기록·제출물·자료는 보관되어 있습니다. 복구된 항목은 비공개 상태로 돌아옵니다.</p>
+      <ul>
+        {archivedWeeks.map(week => <li key={`week-${week.id}`}>
+          <span>{num(week, "week_number")}주차 · {t(week, "title")} <small>주차</small></span>
+          <button className="btn small" type="button" onClick={() => void setCurriculumArchived("week", week, false)} disabled={saving}>주차 복구</button>
+        </li>)}
+        {archivedLessons.map(lesson => {
+          const parent = (curriculum.curriculum_weeks || []).find(week => String(week.id) === String(lesson.week_id));
+          const parentArchived = Boolean(parent?.archived_at);
+          return <li key={`lesson-${lesson.id}`}>
+            <span>{parent ? `${num(parent, "week_number")}주차 · ` : ""}Day {num(lesson, "day_number")} · {t(lesson, "title")} <small>{parentArchived ? "상위 주차를 먼저 복구하세요" : "학습"}</small></span>
+            <button className="btn small" type="button" onClick={() => void setCurriculumArchived("lesson", lesson, false)} disabled={saving || parentArchived}>학습 복구</button>
+          </li>;
+        })}
+      </ul>
+    </details>}
     </div>
     <div className="curriculum-editor-column">
     {!selectedLesson && <div className="curriculum-editor-empty"><h3>편집할 학습을 선택해 주세요</h3><p>목차의 ‘학습 편집’을 누르면 이곳에서 내용과 미션을 관리할 수 있습니다.</p></div>}
