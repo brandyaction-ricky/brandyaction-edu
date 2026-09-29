@@ -6,12 +6,12 @@ import { metaCampaignIds } from '@/lib/meta-campaign-settings';
 import { DEFAULT_SAMPLE_MIN, parseSampleMin } from '@/lib/landing-operations-phase1';
 import type { Classify } from './ad-type-control';
 import { RefreshCw, Settings2 } from 'lucide-react';
-import { PERFORMANCE_PRESETS, campaignRange, presetRange, previousRange, validDay, type ActualRow, type DashboardReport, type PerformanceCampaign, type PerformanceCourse, type PerformancePreset } from '@/lib/landing-performance';
-import { appendFilters, campaignStatus, emptyFilters, metaStatus, periodError, readFilters, readPeriod, type TrackingFilters, type TrackingPeriod } from '@/lib/landing-admin-state';
+import { PERFORMANCE_PRESETS, campaignRange, preserveCampaignPeriod, presetRange, previousRange, validDay, type ActualRow, type DashboardReport, type PerformanceCampaign, type PerformanceCourse, type PerformancePreset } from '@/lib/landing-performance';
+import { appendFilters, campaignStatus, emptyFilters, FILTER_LABELS, metaStatus, periodError, readFilters, readPeriod, type TrackingFilters, type TrackingPeriod } from '@/lib/landing-admin-state';
 import { AdminButton, AdminDrawer, AdminPage, AdminPageHeader, AdminStatusBadge, AdminToast } from '@/features/admin-ui';
 import { MultiSourceComparison, PerformanceDashboard } from './performance-dashboard';
 import { ActualDrawer, ActualsPanel, CampaignSettings } from './tracking-operations';
-import { CompactEmpty, DiscardConfirmation, InlineError, TrackingFiltersPanel, TrackingSkeleton } from './tracking-controls';
+import { CompactEmpty, DiscardConfirmation, filterLabel, InlineError, TrackingFiltersPanel, TrackingSkeleton } from './tracking-controls';
 import './tracking-admin.css';
 
 const labels = { today: '오늘', yesterday: '어제', '7d': '7일', '14d': '14일', campaign: '캠페인 전체', custom: '직접 기간' };
@@ -109,7 +109,7 @@ export function LandingAdmin() {
       const selected = nextIds.flatMap(value => courses.flatMap(item => item.campaigns).filter(candidate => candidate.id === value));
       const start = selected.map(value => value.start_day).sort().at(-1)!, end = selected.map(value => value.end_day).sort()[0];
       setSelectedCampaignIds(nextIds); setCourseId(nextCourse?.id || ''); setCampaignId(nextPrimaryId); setFilters(emptyFilters()); setDrawer(null); setSettingsOpen(false); setMessage('');
-      if (nextCampaign && start <= end) { const today = presetRange('7d', { start_day: start, end_day: end }); const range = campaignRange(today, { start_day: start, end_day: end }); const previous = previousRange(range.startDay, range.endDay); setPeriod(old => ({ ...old, start: range.startDay, end: range.endDay, compareStart: previous.startDay, compareEnd: previous.endDay })); }
+      if (nextCampaign && start <= end) setPeriod(old => preserveCampaignPeriod(old, { start_day: start, end_day: end }));
     });
   }
   function choosePreset(value: PerformancePreset) {
@@ -168,7 +168,7 @@ export function LandingAdmin() {
       {error && <InlineError onRetry={() => setReload(value => value + 1)}>{error}{report && ' 이전 조회 결과는 아래에 유지됩니다.'}</InlineError>}
       {!campaign ? list.loading ? <TrackingSkeleton/> : <CompactEmpty title={courses.length ? '캠페인이 등록되지 않았습니다.' : '무료클래스가 등록되지 않았습니다.'} action={<Link className="admin-button admin-button--tertiary" href="/admin/products">상품 관리 확인</Link>}>무료클래스와 연결된 캠페인 구성을 확인해 주세요.</CompactEmpty> : !report && !multiReports ? error ? null : <TrackingSkeleton/> : <>
         {loading && <p className="tracking-help" role="status">새 조건을 조회하고 있습니다. 아래는 이전 조회 결과입니다.</p>}
-        <div aria-busy={loading} className={loading ? 'tracking-refreshing' : ''}>{multiReports ? <MultiSourceComparison reports={multiReports}/> : report && <><PerformanceDashboard key={campaign.id} report={report} compare={period.compare} filtered={Object.values(filters).some(values => values.length > 0)} sampleMin={sampleMin} onSampleMin={setSampleMin} pending={pending || loading || !!error} onRetry={() => setReload(value => value + 1)} onClassify={classify}/><ActualsPanel report={report} onEdit={row => setDrawer({ row })} onAdd={() => setDrawer({ row: null })} onSettings={() => setSettingsOpen(true)} onRetry={() => setReload(value => value + 1)}/></>}</div>
+        <div aria-busy={loading} className={loading ? 'tracking-refreshing' : ''}>{multiReports ? <MultiSourceComparison reports={multiReports}/> : report && <><PerformanceDashboard key={campaign.id} report={report} compare={period.compare} filtered={Object.values(filters).some(values => values.length > 0)} filterSummary={Object.entries(filters).flatMap(([key, values]) => values.map(value => `${FILTER_LABELS[key as keyof TrackingFilters]}: ${filterLabel(key as keyof TrackingFilters, value)}`)).join(' · ') || '적용된 상세 필터 없음'} sampleMin={sampleMin} onSampleMin={setSampleMin} pending={pending || loading || !!error} onRetry={() => setReload(value => value + 1)} onClassify={classify}/><ActualsPanel report={report} onEdit={row => setDrawer({ row })} onAdd={() => setDrawer({ row: null })} onSettings={() => setSettingsOpen(true)} onRetry={() => setReload(value => value + 1)}/></>}</div>
       </>}
     </div>
     {drawer && campaign && <ActualDrawer campaign={campaign} initial={drawer.row} pending={pending} onClose={() => setDrawer(null)} onSave={values => post({ action: 'actual', campaign_id: campaign.id, values }, '일별 실측값을 저장했습니다.')}/>}
