@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
+import {loadTs} from './helpers/question-ai.mjs';
+const contextFunctions=loadTs('lib/question-ai-context.ts');
 
 const questionId = '11111111-1111-4111-8111-111111111111';
 
@@ -11,6 +13,7 @@ function routeHarness({ user = { id: 'operator' }, question = { id: questionId, 
   const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const exports = {};
   new Function('exports', 'require', 'process', 'fetch', output)(exports, name => {
+    if (name === '@/lib/question-ai-context') return contextFunctions;
     if (name === '@/lib/operator-permissions') return { getOperatorUser: async scope => { assert.equal(scope, 'members'); return user; } };
     if (name === '@/lib/supabase/admin') return { createAdminClient: () => ({ from(table) {
       assert.equal(table, 'edu_questions');

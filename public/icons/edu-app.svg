@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <title>브랜디에듀</title>
+  <rect width="512" height="512" fill="#c91c2d"/>
+  <g fill="#fff">
+    <path d="M253 112h66l-43 174h-47z"/>
+    <circle cx="240" cy="324" r="27"/>
+    <path d="M183 384h35v9h-24v8h22v9h-22v9h25v9h-36zm45 0h20c15 0 24 8 24 22s-9 22-24 22h-20zm11 10v24h9c8 0 13-4 13-12s-5-12-13-12zm43-10h11v26c0 7 3 10 9 10s9-3 9-10v-26h11v27c0 12-7 19-20 19s-20-7-20-19z"/>
+  </g>
+</svg>

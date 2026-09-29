@@ -1,5 +1,7 @@
 'use client';
 
+import { UnreadMessageLink } from '@/app/ui/final/unread-message-link';
+import { LearningNoticeBar } from '@/app/ui/final/learning-notice';
 import {
   ArrowRight,
   LogOut,
@@ -22,6 +24,7 @@ import {
 import { createAdminMenuVisibility } from '../permissions/menu-visibility';
 
 export type AdminShellUser = {
+  id?: string;
   full_name?: string | null;
   role: string;
 };
@@ -187,6 +190,7 @@ export function AdminShell({
             <span>{adminSectionTitle(current, available)}</span>
           </div>
           <div className="topright">
+            {process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === "true" && <>{user.id ? <UnreadMessageLink key={user.id} userId={user.id} className="btn ghost small"/> : <Link className="btn ghost small" href="/my/messages">메시지</Link>}</>}
             {byKey.has('questions') && (
               <Link className="btn iconbtn ghost" href="/admin/questions" aria-label="질문함">
                 <MessageCircle aria-hidden="true" />
@@ -198,6 +202,7 @@ export function AdminShell({
             <span className="avatar">{(user.full_name || '운영').slice(0, 1)}</span>
           </div>
         </header>
+        {process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' && <LearningNoticeBar/>}
         <div className={`content admin-content-${contentWidth}`} id="admin-content" tabIndex={-1}>
           {children}
         </div>

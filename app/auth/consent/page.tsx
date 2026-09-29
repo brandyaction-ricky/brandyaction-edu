@@ -1,4 +1,5 @@
 "use client";
+import { disableDevicePush } from "@/lib/web-push-client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -7,6 +8,7 @@ import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { POLICY_VERSION } from "@/lib/legal-policies";
 import { ConsentPolicy } from "@/app/ui/consent-policy";
+import { useSignupEncouragement } from "@/app/ui/signup-encouragement";
 
 import { safeNext } from "@/lib/platform";
 
@@ -18,6 +20,7 @@ export default function SocialConsentPage() {
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const busy = useRef(false);
+  const encouragement = useSignupEncouragement(process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true');
 
   const complete = async () => {
     if (busy.current) return;
@@ -29,6 +32,7 @@ export default function SocialConsentPage() {
     busy.current = true;
     setMessage("");
     try {
+    const publishEncouragement = encouragement.prepare();
     const supabase = createClient();
     const { error } = await supabase.auth.updateUser({
       data: {
@@ -57,12 +61,13 @@ export default function SocialConsentPage() {
       setPending(false);
       return;
     }
+    await publishEncouragement();
     router.replace(
       safeNext(new URLSearchParams(window.location.search).get("next")),
     );
     router.refresh();
-    } catch {
-      setMessage("동의를 저장하지 못했습니다. 연결 상태를 확인하고 다시 시도해 주세요.");
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "가입 정보를 저장하지 못했습니다. 연결 상태를 확인하고 다시 시도해 주세요.");
     } finally {
       busy.current = false;
       setPending(false);
@@ -74,6 +79,7 @@ export default function SocialConsentPage() {
     busy.current = true;
     setPending(true);
     try {
+    await disableDevicePush().catch(() => {});
     await createClient().auth.signOut();
     router.replace("/login");
     router.refresh();
@@ -95,7 +101,7 @@ export default function SocialConsentPage() {
                 필수 약관에 동의하면 회원가입이 완료됩니다.
               </p>
             </div>
-            <div className="stack mt32">
+            <fieldset className="stack mt32 email-auth-fields" disabled={pending}>
               <ConsentPolicy kind="terms" checked={terms} onChange={setTerms} />
               <ConsentPolicy kind="privacy" checked={privacy} onChange={setPrivacy} />
               <label className="checkline">
@@ -106,7 +112,8 @@ export default function SocialConsentPage() {
                 />
                 <span>[선택] 클래스·무료강의 등 마케팅 정보 수신 동의</span>
               </label>
-            </div>
+              {encouragement.fields}
+            </fieldset>
             {message && (
               <p className="notice mt16" role="alert">
                 {message}

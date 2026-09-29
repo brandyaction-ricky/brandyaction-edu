@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 type Source = { id: string; title: string; course_code: string };
-type Preview = { sourceId: string; title: string; revision: string; weeks: number; lessons: number; contents: number; missions: number; quizzes: number; resources: number };
+type Preview = { sourceId: string; title: string; revision: string; weeks: number; lessons: number; contents: number; missions: number; quizzes: number; resources: number; interactiveLessons?: number; privateMedia?: number; ongoingLessons?: number };
 const endpoint = "/api/platform/curriculum-copy";
 async function read(response: Response) {
   const result = await response.json();
@@ -87,6 +87,7 @@ export function CurriculumCopyPanel({ targetId, eligible, disabled, dirty, onCop
         {preview && <div className="notice">
           <strong>{preview.title}</strong>
           <p>주차 {preview.weeks}개 · 학습 {preview.lessons}개 (콘텐츠 {preview.contents}개)<br />미션 {preview.missions}개 · 퀴즈 {preview.quizzes}개 · 공통 자료 {preview.resources}개</p>
+          {preview.interactiveLessons !== undefined && <p>활동형 학습 {preview.interactiveLessons}개 · 사진·영상·음성 파일 {preview.privateMedia || 0}개 · 반복 과제 {preview.ongoingLessons || 0}개<br />본문 순서·질문·프롬프트·시험·체크리스트와 완료 조건을 함께 옮깁니다.</p>}
           <p>주차·학습·미션과 미리보기는 모두 비공개로 복사합니다. 영상·파일은 같은 원본 주소를 사용하며, 공통 자료의 다운로드 범위는 유지합니다.</p>
           <p>가격·모집 일정·수강생·학습 진도·제출물·결제 내역은 복사하지 않습니다.</p>
           {preview.weeks === 0 && <p>원본에 복사할 주차가 없습니다.</p>}

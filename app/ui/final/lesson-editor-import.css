@@ -1,0 +1,20 @@
+.lei-modal { width:min(760px,calc(100vw - 32px)); max-width:calc(100vw - 32px); }
+.lei-modal.lei-wide { width:min(1100px,calc(100vw - 32px)); }
+.lei-modal .admin-dialog-body { overflow-wrap:anywhere; min-width:0; }
+.lei-modal .admin-dialog-footer { flex-wrap:wrap; }
+.lei-modal .lb-field select,.lei-modal input[type=file] { width:100%; max-width:100%; }
+.lei-modal button { min-height:44px; }
+.lei-drop { padding:16px; border:1px dashed #aeb6c1; border-radius:8px; margin:16px 0; }
+.lei-drop label,.lei-drop small { display:block; margin:8px 0; }
+.lei-preview { padding-left:24px; }
+.lei-preview li { margin:12px 0; }
+.lei-preview span,.lei-card span span { display:block; white-space:pre-wrap; }
+.lei-columns { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+.lei-columns section { min-width:0; }
+.lei-card { display:flex; gap:10px; align-items:flex-start; border:1px solid #d8dde3; padding:12px; margin:10px 0; border-radius:8px; cursor:grab; }
+.lei-card > input { flex:0 0 auto; margin-top:5px; }
+.lei-card > span { min-width:0; }
+.lei-position { width:100%; padding:10px; border:1px dashed #ae2633; background:#fff8f8; color:#9a1825; border-radius:6px; margin:8px 0; }
+.lei-position:disabled { color:#747a85; border-color:#d8dde3; background:#f8fafc; }
+.lei-target { border:1px solid #d8dde3; padding:10px; border-radius:6px; }
+@media(max-width:650px) { .lei-columns { grid-template-columns:1fr; } }

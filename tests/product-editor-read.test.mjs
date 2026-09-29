@@ -6,7 +6,7 @@ import ts from 'typescript';
 const courseId = '11111111-1111-4111-8111-111111111111';
 const otherId = '22222222-2222-4222-8222-222222222222';
 
-function platformRead() {
+function platformRead({ blocks = false, headError = false } = {}) {
   const source = fs.readFileSync(new URL('../app/api/platform/route.ts', import.meta.url), 'utf8');
   const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const calls = [];
@@ -19,17 +19,19 @@ function platformRead() {
         eq(column, value) { call.filters.push([column, value]); return this; },
         is() { return this; },
         not() { return this; },
-        in() { return this; },
+        in(column, values) { call.filters.push([column, values]); return this; },
         order() { return this; },
         limit(value) { call.limit = value; return this; },
         range(start, end) { call.range = [start, end]; return this; },
         then(resolve, reject) {
           const selected = call.filters.some(([column, value]) => (column === 'id' || column === 'course_id') && value === courseId);
-          const data = table === 'courses' ? [{ id: courseId, title: '상품' }]
+          const data = table === 'edu_lesson_block_heads' ? [{ lesson_id: 'lesson' }]
+            : table === 'curriculum_lessons' ? [{ id: 'lesson', week_id: 'week' }, { id: 'legacy', week_id: 'week' }]
+            : table === 'courses' ? [{ id: courseId, title: '상품' }]
             : table === 'cohorts' ? selected ? [{ id: 'cohort', course_id: courseId }] : [{ id: 'cohort', course_id: courseId }, { id: 'other', course_id: otherId }]
               : table === 'landing_configs' ? [{ id: courseId, kakao_url: '' }]
                 : table === 'curriculum_weeks' && selected ? [{ id: 'week', course_id: courseId, is_published: true, curriculum_lessons: [{ id: 'lesson', week_id: 'week', is_published: true }] }] : [];
-          return Promise.resolve({ data, count: data.length, error: null }).then(resolve, reject);
+          return Promise.resolve({ data, count: data.length, error: headError && table === 'edu_lesson_block_heads' ? { message: 'unavailable' } : null }).then(resolve, reject);
         },
       };
       return query;
@@ -52,7 +54,7 @@ function platformRead() {
     '@/lib/operator-permissions': { getOperatorUser: async () => user, sectionScopes: { products: 'products' } },
   };
   const exports = {};
-  new Function('exports', 'require', 'process', compiled)(exports, name => mocks[name] || {}, { env: {} });
+  new Function('exports', 'require', 'process', compiled)(exports, name => mocks[name] || {}, { env: { NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED: blocks ? 'true' : 'false' } });
   return { get: exports.GET, calls };
 }
 
@@ -89,4 +91,20 @@ test('product catalog still reads publication checks and summary counts', async 
   assert.ok(Array.isArray(data.curriculum_lessons));
   assert.ok(Array.isArray(data.lesson_contents));
   assert.equal(calls.filter(call => call.table === 'courses').length, 5);
+});
+
+test('curriculum inventory marks block content without retrieving bodies or quiz answers', async () => {
+  const { get, calls } = platformRead({ blocks: true });
+  const response = await get(new Request(`https://edu.example/api/platform?admin=1&section=products&record=${courseId}&part=curriculum`));
+  assert.equal(response.status, 200);
+  const { data } = await response.json();
+  assert.deepEqual(data.curriculum_lessons.map(row => [row.id, row.has_blocks]), [['lesson', true], ['legacy', false]]);
+  const heads = calls.find(call => call.table === 'edu_lesson_block_heads');
+  assert.equal(heads.columns, 'lesson_id');
+  assert.deepEqual(heads.filters, [['lesson_id', ['lesson', 'legacy']]]);
+  const off = platformRead();
+  assert.equal((await off.get(new Request(`https://edu.example/api/platform?admin=1&section=products&record=${courseId}&part=curriculum`))).status, 200);
+  assert.ok(!off.calls.some(call => call.table === 'edu_lesson_block_heads'));
+  const failed = platformRead({ blocks: true, headError: true });
+  assert.equal((await failed.get(new Request(`https://edu.example/api/platform?admin=1&section=products&record=${courseId}&part=curriculum`))).status, 500);
 });

@@ -1,0 +1,8 @@
+.learning-notice-banner { display:flex; gap:9px; align-items:flex-start; padding:12px 20px; background:linear-gradient(90deg,#117ea5,#168eb7); color:#fff; font-size:14px; line-height:1.6; overflow-wrap:anywhere; white-space:pre-wrap; }
+.learning-notice-banner svg { flex-shrink:0; margin-top:3px; }
+.learning-notice-banner span { min-width:0; }
+.learning-notice-editor { margin-bottom:24px; }
+.learning-notice-editor .field { margin-top:16px; }
+.learning-notice-editor .row { display:flex; flex-wrap:wrap; margin-top:16px; gap:12px; }
+.learning-notice-preview { margin:16px 0; }
+.learning-notice-editor [role=alert] { color:var(--danger,#b42318); }

@@ -1,0 +1,9 @@
+.alp-panel { min-width:0; margin:20px 0; }
+.alp-panel h3,.alp-panel h4 { margin:0 0 8px; }
+.alp-search { display:flex; align-items:end; gap:12px; flex-wrap:wrap; margin:16px 0; }
+.alp-search label { display:grid; gap:8px; min-width:0; flex:1 1 240px; }
+.alp-search input { width:100%; min-width:0; }
+.alp-member { padding:18px; border:1px solid #dfe3e8; border-radius:8px; margin:12px 0; overflow-wrap:anywhere; }
+.alp-tracks { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin:16px 0; }
+.alp-tracks > div { padding:14px; background:#f5f7f9; border-radius:6px; }
+@media(max-width:600px) { .alp-tracks { grid-template-columns:minmax(0,1fr); } }

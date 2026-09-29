@@ -16,7 +16,7 @@ import {
   Play,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   LiveSchedule,
   MissionForm,
@@ -26,7 +26,10 @@ import {
 import { enrollmentLessons, missionEntries } from "./member-views";
 import { LessonQuestions } from "./lesson-questions";
 import { LessonText } from "./lesson-text";
+import { LessonBlockSession } from './lesson-block-session';
+import { useLessonProgression, type LessonGate } from './use-lesson-progression';
 import { Badge, Empty, Heading, ResourceRow, Video } from "./primitives";
+import { LessonTag } from './lesson-tag';
 
 export function Classroom({
   path,
@@ -35,6 +38,7 @@ export function Classroom({
   send,
   loading,
   missionId,
+  blockLearningEnabled = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true',
 }: {
   path: string[];
   data: Data;
@@ -42,8 +46,11 @@ export function Classroom({
   send: WorkflowSend;
   loading: boolean;
   missionId: string | null;
+  blockLearningEnabled?: boolean;
 }) {
   const [navOpen, setNavOpen] = useState(false);
+  const [completedHere, setCompletedHere] = useState<string[]>([]);
+  const progression = useLessonProgression(path[1], blockLearningEnabled);
   const enrollment = (data.enrollments || []).find(
     (e) => e.id === path[1] && hasLearningAccess(e),
   );
@@ -69,22 +76,60 @@ export function Classroom({
   const weeks = (data.curriculum_weeks || [])
     .filter((w) => w.course_id === course?.id)
     .sort((a, b) => num(a, "week_number") - num(b, "week_number"));
-  const lessons = enrollmentLessons(data, enrollment),
+  const allLessons = enrollmentLessons(data, enrollment);
+  const selectedId = allLessons.find(item => item.id === path[2])?.id || allLessons[0]?.id;
+  const selectedGate = progression.lessons?.find(item => item.lessonId === selectedId);
+  const lessonDay = (id: string, fallback: number) => progression.lessons?.find(item => item.lessonId === id)?.dayNumber ?? fallback;
+  const group = (gate?: LessonGate) => gate?.ongoing ? 'ongoing' : gate?.track;
+  const hasTracks = progression.lessons?.some(item => group(item) != null);
+  const lessonLabel = (id: string, fallback: number) => progression.lessons?.find(item => item.lessonId === id)?.ongoing ? '지속 챌린지' : `DAY ${lessonDay(id, fallback)}`;
+  const lessons = allLessons.filter(item => !hasTracks || !selectedGate || progression.lessons?.some(gate => gate.lessonId === item.id && group(gate) === group(selectedGate)))
+      .sort((a, b) => selectedGate?.track ? (progression.lessons?.find(item => item.lessonId === a.id)?.dayNumber || 0) - (progression.lessons?.find(item => item.lessonId === b.id)?.dayNumber || 0) : 0),
     lesson = lessons.find((l) => l.id === path[2]) || lessons[0],
     content = (data.lesson_contents || []).find(
       (c) => c.lesson_id === lesson?.id,
     );
   const complete = (data.lesson_progress || []).filter(
       (p) => p.enrollment_id === enrollment.id && p.completed_at,
-    ),
-    done = complete.some((p) => p.lesson_id === lesson?.id),
+    );
+  const completedIds = new Set([
+    ...complete.map(p => String(p.lesson_id)),
+    ...completedHere.filter(key => key.startsWith(`${enrollment.id}:`)).map(key => key.slice(enrollment.id.length + 1)),
+  ]);
+  const done = completedIds.has(String(lesson?.id)),
     current = lessons.findIndex((l) => l.id === lesson?.id);
+  const canOpen = (id: string) => !blockLearningEnabled || progression.lessons?.some(item => item.lessonId === id && item.isUnlocked) === true;
   const entries = missionEntries(data, [enrollment]).filter(
       (x) => x.lesson?.id === lesson?.id,
     ),
     entry = entries.find((x) => x.mission.id === missionId) || entries[0];
   const lessonHref =
     "/learn/" + enrollment.id + (lesson ? "/" + lesson.id : "");
+  const legacyCompletion = lesson && !selectedGate?.ongoing ? (
+    <button
+      className="btn dark"
+      disabled={pending || done}
+      onClick={() =>
+        void send(
+          {
+            action: "progress",
+            enrollmentId: enrollment.id,
+            lessonId: lesson.id,
+          },
+          "학습을 완료했습니다.",
+        ).catch(() => {})
+      }
+    >
+      {done ? (
+        <>
+          <Check />
+          학습 완료
+        </>
+      ) : (
+        "학습 완료하기"
+      )}
+    </button>
+  ) : null;
   if (path[3] === "mission")
     return (
       <div className="account-bg">
@@ -94,7 +139,7 @@ export function Classroom({
             description={[
               t(course, "title"),
               t(cohort, "name"),
-              "DAY " + num(lesson, "day_number"),
+              lessonLabel(String(lesson?.id), num(lesson, "day_number")),
             ]
               .filter(Boolean)
               .join(" · ")}
@@ -195,7 +240,7 @@ export function Classroom({
           <div>
             <h1>{t(course, "title")}</h1>
             <p className="meta">
-              {t(cohort, "name")} · {complete.length}개 학습 완료
+              {t(cohort, "name")} · {completedIds.size}개 학습 완료
             </p>
           </div>
           <Link className="btn small" href="/my/classes">
@@ -216,7 +261,11 @@ export function Classroom({
             className={"learning-nav " + (navOpen ? "open" : "")}
             aria-label="학습 목록"
           >
-            {weeks.map((w) => (
+            {blockLearningEnabled && hasTracks && <nav aria-label="학습 종류">{(['daily', 'learning', 'ongoing', null] as const).map(track => {
+              const first = progression.lessons?.filter(item => group(item) === track && allLessons.some(lesson => lesson.id === item.lessonId)).sort((a, b) => (a.dayNumber || 0) - (b.dayNumber || 0))[0];
+              return first && <Link className="btn small mb16" key={track || 'legacy'} aria-current={group(selectedGate) === track ? 'page' : undefined} href={`/learn/${enrollment.id}/${first.lessonId}`}>{track === 'daily' ? '데일리 미션' : track === 'learning' ? '별도 학습' : track === 'ongoing' ? '지속 챌린지' : '기타 학습'}</Link>;
+            })}</nav>}
+            {weeks.filter(w => lessons.some(l => l.week_id === w.id)).map((w) => (
               <section className="lesson-week" key={w.id}>
                 <div className="lesson-week-title">
                   WEEK {num(w, "week_number")} · {t(w, "title")}
@@ -230,17 +279,19 @@ export function Classroom({
                         "lesson-nav " + (l.id === lesson?.id ? "active" : "")
                       }
                       aria-current={l.id === lesson?.id ? "page" : undefined}
+                      aria-disabled={!canOpen(l.id)}
                       href={"/learn/" + enrollment.id + "/" + l.id}
-                      onClick={() => setNavOpen(false)}
+                      onClick={event => { if (!canOpen(l.id)) event.preventDefault(); else setNavOpen(false); }}
                     >
-                      {complete.some((p) => p.lesson_id === l.id) ? (
+                      {completedIds.has(l.id) ? (
                         <Check />
                       ) : (
                         <Play />
                       )}
                       <div>
-                        <span className="meta">DAY {num(l, "day_number")}</span>
+                        <span className="meta">{lessonLabel(l.id, num(l, "day_number"))}{!canOpen(l.id) ? ' · 잠김' : ''}</span>
                         <b>{t(l, "title")}</b>
+                        {blockLearningEnabled && <LessonTag label={progression.lessons?.find(gate => gate.lessonId === l.id)?.tagLabel} />}
                       </div>
                     </Link>
                   ))}
@@ -248,11 +299,11 @@ export function Classroom({
             ))}
           </aside>
           <div className="learning-content">
-            {lesson ? (
+            {lesson && canOpen(lesson.id) ? (
               <>
                 <header className="lesson-header">
                   <div className="flex gap8">
-                    <Badge>DAY {num(lesson, "day_number")}</Badge>
+                    <Badge>{lessonLabel(lesson.id, num(lesson, "day_number"))}</Badge>
                     <Badge color={done ? "green" : ""}>
                       {done ? "학습 완료" : "학습 중"}
                     </Badge>
@@ -262,6 +313,7 @@ export function Classroom({
                   <p>{t(lesson, "description")}</p>
                   <a className="link" href="#lesson-questions">이 수업에 개인 질문 남기기</a>
                 </header>
+                <LessonContent enabled={blockLearningEnabled} lessonId={lesson.id} enrollmentId={enrollment.id} legacyCompletion={legacyCompletion} onCompleted={() => { if (!completedIds.has(lesson.id)) { setCompletedHere(previous => previous.includes(`${enrollment.id}:${lesson.id}`) ? previous : [...previous, `${enrollment.id}:${lesson.id}`]); progression.reload(); } }}>
                 {safeUrl(content?.vod_url) && (
                   <Video url={t(content, "vod_url")} />
                 )}
@@ -283,6 +335,7 @@ export function Classroom({
                       "학습 콘텐츠를 준비하고 있습니다."} />
                   </div>
                 </section>
+                </LessonContent>
                 {content?.resource_storage_path && (
                   <section className="reading">
                     <h2>학습 자료</h2>
@@ -340,30 +393,8 @@ export function Classroom({
                   ) : (
                     <span />
                   )}
-                  <button
-                    className="btn dark"
-                    disabled={pending || done}
-                    onClick={() =>
-                      void send(
-                        {
-                          action: "progress",
-                          enrollmentId: enrollment.id,
-                          lessonId: lesson.id,
-                        },
-                        "학습을 완료했습니다.",
-                      ).catch(() => {})
-                    }
-                  >
-                    {done ? (
-                      <>
-                        <Check />
-                        학습 완료
-                      </>
-                    ) : (
-                      "학습 완료하기"
-                    )}
-                  </button>
-                  {current < lessons.length - 1 && (
+                  {!blockLearningEnabled && legacyCompletion}
+                  {current < lessons.length - 1 && (canOpen(lessons[current + 1].id) ? (
                     <Link
                       className="btn"
                       href={
@@ -376,13 +407,14 @@ export function Classroom({
                       다음 학습
                       <ArrowRight />
                     </Link>
-                  )}
+                  ) : <button className="btn" disabled>다음 학습 · 잠김</button>)}
                 </div>
                 <LessonQuestions key={enrollment.id + ":" + lesson.id} enrollmentId={String(enrollment.id)} lessonId={String(lesson.id)} lessonTitle={t(lesson, "title")} />
               </>
             ) : (
-              <Empty title="공개된 학습이 없습니다.">
+              <Empty title={lesson && blockLearningEnabled ? progression.error || selectedGate?.reason || (progression.lessons ? '아직 열리지 않은 학습입니다.' : '학습 개방 상태를 확인하고 있습니다.') : '공개된 학습이 없습니다.'}>
                 <BookOpen />
+                {lesson && blockLearningEnabled && <button className="btn mt16" onClick={progression.reload}>학습 상태 다시 확인</button>}
               </Empty>
             )}
           </div>
@@ -390,4 +422,8 @@ export function Classroom({
       </div>
     </div>
   );
+}
+
+function LessonContent({ enabled, lessonId, enrollmentId, children, legacyCompletion, onCompleted }: { enabled: boolean; lessonId: string; enrollmentId: string; children: ReactNode; legacyCompletion: ReactNode; onCompleted: () => void }) {
+  return enabled ? <LessonBlockSession key={`${enrollmentId}:${lessonId}`} lessonId={lessonId} enrollmentId={enrollmentId} fallback={<>{children}{legacyCompletion}</>} onCompleted={onCompleted} /> : <>{children}</>;
 }
