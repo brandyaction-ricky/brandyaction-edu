@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { EditorContent, useEditor, useEditorState, Extension, InputRule, wrappingInputRule } from "@tiptap/react";
+import { EditorContent, useEditor, useEditorState, Extension, InputRule, wrappingInputRule, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Blockquote from "@tiptap/extension-blockquote";
 import { Details, DetailsContent, DetailsSummary } from "@tiptap/extension-details";
@@ -58,21 +58,21 @@ const LessonInputUndo = Extension.create({
   },
 });
 
-export function LessonRichInput({ value, onChange, label = "학습 내용", disabled = false, name, id, showLabel = true }: LessonBodyEditorProps) {
-  const generatedId = useId(), editorId = id || `lesson-body-${generatedId}`;
-  const lastValue = useRef(value);
-  const [linkOpen, setLinkOpen] = useState(false);
-  const [linkUrl, setLinkUrl] = useState("");
-  const [linkError, setLinkError] = useState("");
-  const [linkSelection, setLinkSelection] = useState({ from: 1, to: 1 });
-  const editor = useEditor({
-    immediatelyRender: false,
-    extensions: [StarterKit.configure({
+export function lessonRichExtensions() {
+  return [StarterKit.configure({
       // An automatic trailing paragraph appends a second transaction after an
       // input rule and discards its undo state. Enter already creates paragraphs.
       heading: { levels: [1, 2, 3] }, trailingNode: false, blockquote: false, code: false, codeBlock: false, horizontalRule: false,
       link: { openOnClick: false, HTMLAttributes: { target: "_blank", rel: "noopener noreferrer" }, isAllowedUri: url => Boolean(safeUrl(url)) },
-    }), TextStyle, LessonFontSize, LessonQuote, LessonDetails, DetailsSummary, DetailsContent, LessonInputUndo],
+    }), TextStyle, LessonFontSize, LessonQuote, LessonDetails, DetailsSummary, DetailsContent, LessonInputUndo];
+}
+
+export function LessonRichInput({ value, onChange, label = "학습 내용", disabled = false, name, id, showLabel = true }: LessonBodyEditorProps) {
+  const generatedId = useId(), editorId = id || `lesson-body-${generatedId}`;
+  const lastValue = useRef(value);
+  const editor = useEditor({
+    immediatelyRender: false,
+    extensions: lessonRichExtensions(),
     content: lessonDocumentForEditor(value),
     editable: !disabled,
     editorProps: { attributes: { id: editorId, role: "textbox", "aria-label": label, "aria-multiline": "true", "aria-describedby": `${editorId}-help`, class: "lesson-rich-body" } },
@@ -89,6 +89,23 @@ export function LessonRichInput({ value, onChange, label = "학습 내용", disa
       lastValue.current = value;
     }
   }, [editor, value]);
+  return <div className="lesson-body-field field">
+    {showLabel && <label className="field-label" htmlFor={editorId}>{label}</label>}
+    <div className="lesson-body-editor" aria-disabled={disabled}>
+      <LessonFormatToolbar editor={editor} disabled={disabled} />
+      {!editor && <p role="status" className="lesson-editor-loading">편집기를 준비하고 있습니다.</p>}
+      <EditorContent editor={editor} />
+    </div>
+    {name && <input type="hidden" name={name} value={value} />}
+    <small id={`${editorId}-help`} className="field-hint">줄 맨 앞에 <code>#</code> · <code>##</code> · <code>###</code>와 공백을 입력하면 제목, <code>-</code>는 글머리 목록, <code>1.</code>은 번호 목록, <code>&gt;</code>는 접기·펼치기, <code>&quot;</code>는 인용문이 됩니다. 토글은 화살표로 펼친 뒤 제목에서 Enter를 누르면 안쪽에 글을 쓸 수 있습니다. Shift+Enter는 줄바꿈입니다. 변경 후 학습을 저장해 주세요.</small>
+  </div>;
+}
+
+export function LessonFormatToolbar({ editor, disabled = false }: { editor: Editor | null; disabled?: boolean }) {
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkError, setLinkError] = useState("");
+  const [linkSelection, setLinkSelection] = useState({ from: 1, to: 1 });
   const state = useEditorState({ editor, selector: ({ editor }) => ({
     block: editor?.isActive("heading", { level: 1 }) ? "h1" : editor?.isActive("heading", { level: 2 }) ? "h2" : editor?.isActive("heading", { level: 3 }) ? "h3" : "p",
     size: String(editor?.getAttributes("textStyle").fontSize || ""),
@@ -127,9 +144,7 @@ export function LessonRichInput({ value, onChange, label = "학습 내용", disa
     { label: "실행 취소", icon: Undo2, unavailable: !state?.undo, action: () => editor?.chain().focus().undoInputRule().run() || editor?.chain().focus().undo().run() },
     { label: "다시 실행", icon: Redo2, unavailable: !state?.redo, action: () => editor?.chain().focus().redo().run() },
   ];
-  return <div className="lesson-body-field field">
-    {showLabel && <label className="field-label" htmlFor={editorId}>{label}</label>}
-    <div className="lesson-body-editor" aria-disabled={disabled}>
+  return <>
       <div className="lesson-format-controls" role="group" aria-label="본문 서식">
         <select aria-label="문단 스타일" value={state?.block || "p"} disabled={disabled || !editor} onChange={event => {
           const chain = editor?.chain().focus().command(({ tr, state }) => {
@@ -151,10 +166,5 @@ export function LessonRichInput({ value, onChange, label = "학습 내용", disa
         <button type="button" disabled={disabled} onClick={() => applyLink()}>적용</button><button type="button" disabled={disabled} onClick={() => applyLink(true)}>링크 해제</button><button type="button" onClick={() => { setLinkOpen(false); editor?.commands.focus(); }}>닫기</button>
         {linkError && <p role="alert">{linkError}</p>}
       </div>}
-      {!editor && <p role="status" className="lesson-editor-loading">편집기를 준비하고 있습니다.</p>}
-      <EditorContent editor={editor} />
-    </div>
-    {name && <input type="hidden" name={name} value={value} />}
-    <small id={`${editorId}-help`} className="field-hint">줄 맨 앞에 <code>#</code> · <code>##</code> · <code>###</code>와 공백을 입력하면 제목, <code>-</code>는 글머리 목록, <code>1.</code>은 번호 목록, <code>&gt;</code>는 접기·펼치기, <code>&quot;</code>는 인용문이 됩니다. 토글은 화살표로 펼친 뒤 제목에서 Enter를 누르면 안쪽에 글을 쓸 수 있습니다. Shift+Enter는 줄바꿈입니다. 변경 후 학습을 저장해 주세요.</small>
-  </div>;
+  </>;
 }
