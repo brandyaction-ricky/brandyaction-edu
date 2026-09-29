@@ -1,0 +1,20 @@
+.edu-admin .lesson-body-field { min-width:0; width:100%; }
+.edu-admin .lesson-body-field > .field-label { display:block; margin-bottom:8px; }
+.edu-admin .lesson-body-editor { border:1px solid var(--line,#d1d5db); border-radius:6px; overflow:hidden; background:#fff; }
+.edu-admin .lesson-body-editor:focus-within { border-color:var(--red,#c51e2c); box-shadow:0 0 0 1px var(--red,#c51e2c); }
+.edu-admin .lesson-format-controls { display:flex; flex-wrap:wrap; gap:4px; padding:8px; border-bottom:1px solid var(--line,#d1d5db); background:var(--surface,#f8f9fa); }
+.edu-admin .lesson-body-editor .lesson-format-controls select { width:auto; min-width:0; min-height:34px; height:34px; padding:4px 26px 4px 8px; font-size:12px; margin:0; }
+.edu-admin .lesson-format-controls button { display:inline-flex; align-items:center; justify-content:center; flex:none; width:34px; height:34px; min-height:34px; padding:0; border:1px solid transparent; border-radius:4px; background:transparent; color:var(--ink,#202428); cursor:pointer; }
+.edu-admin .lesson-format-controls button:hover { background:#eee; }
+.edu-admin .lesson-format-controls button[aria-pressed=true] { background:#fff0f2; border-color:var(--red,#c51e2c); color:var(--red,#c51e2c); }
+.edu-admin .lesson-format-controls :focus-visible { outline:2px solid var(--red,#c51e2c); outline-offset:1px; }
+.edu-admin .lesson-body-editor button:disabled { opacity:.4; cursor:default; }
+.edu-admin .lesson-body-editor[aria-disabled=true] { opacity:.65; }
+.edu-admin .lesson-body-editor .tiptap { min-height:300px; max-height:600px; overflow-y:auto; padding:16px; outline:none; }
+.edu-admin .lesson-body-editor .tiptap p:only-child:has(br:only-child)::before { content:'학습할 내용을 작성해 주세요.'; float:left; height:0; pointer-events:none; color:#8b8e93; }
+.edu-admin .lesson-link-controls { display:flex; flex-wrap:wrap; gap:6px; padding:8px; border-bottom:1px solid var(--line,#d1d5db); }
+.edu-admin .lesson-link-controls input { flex:1 1 180px; min-width:0; width:auto; }
+.edu-admin .lesson-link-controls button { padding:6px 10px; border:1px solid var(--line,#d1d5db); background:white; border-radius:4px; font-size:12px; cursor:pointer; }
+.edu-admin .lesson-link-controls p { flex-basis:100%; color:var(--red,#c51e2c); font-size:12px; }
+.edu-admin .lesson-editor-loading { padding:16px; color:var(--muted); }
+.edu-admin .lesson-body-field > small { display:block; margin-top:8px; line-height:1.6; }

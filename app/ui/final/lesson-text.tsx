@@ -1,54 +1,40 @@
-import type { ReactNode } from "react";
-import { safeUrl } from "@/lib/platform";
+import { Fragment, type ReactNode } from "react";
+import { lessonTextSegments, parseLessonDocument, type LessonNode } from "@/lib/lesson-body";
 import "./lesson-text.css";
 
-function trimBareUrl(value: string) {
-  let url = value.replace(/[.,!?;:。！？]+$/, "");
-  for (const [open, close] of [["(", ")"], ["[", "]"], ["{", "}"]]) {
-    let unmatched = url.split(close).length - url.split(open).length;
-    while (url.endsWith(close) && unmatched > 0) {
-      url = url.slice(0, -1);
-      unmatched--;
+function RichNode({ node }: { node: LessonNode }): ReactNode {
+  if (node.type === "text") {
+    let text: ReactNode = node.marks?.some(mark => mark.type === "link") ? node.text : <PlainLinks text={node.text || ""} />;
+    for (const mark of node.marks || []) {
+      if (mark.type === "bold") text = <strong>{text}</strong>;
+      if (mark.type === "italic") text = <em>{text}</em>;
+      if (mark.type === "underline") text = <u>{text}</u>;
+      if (mark.type === "strike") text = <s>{text}</s>;
+      if (mark.type === "textStyle") text = <span style={{ fontSize: String(mark.attrs?.fontSize) }}>{text}</span>;
+      if (mark.type === "link") text = <a href={String(mark.attrs?.href)} target="_blank" rel="noopener noreferrer">{text}</a>;
     }
+    return text;
   }
-  return url;
+  if (node.type === "hardBreak") return <br />;
+  const children = node.content?.map((child, index) => <RichNode key={index} node={child} />);
+  switch (node.type) {
+    case "heading": return node.attrs?.level === 3 ? <h3>{children}</h3> : <h2>{children}</h2>;
+    case "paragraph": return <p>{children?.length ? children : <br />}</p>;
+    case "bulletList": return <ul>{children}</ul>;
+    case "orderedList": return <ol start={Number(node.attrs?.start) || 1}>{children}</ol>;
+    case "listItem": return <li>{children}</li>;
+    case "blockquote": return <blockquote>{children}</blockquote>;
+    default: return <>{children}</>;
+  }
 }
 
-// Only links are interpreted; all other text (including HTML) stays React text.
-// Keep saved line breaks and numbering rather than reformatting existing lessons.
 export function LessonText({ text }: { text: string }) {
-  const nodes: ReactNode[] = [];
-  const starts = /\[([^\]\r\n]+)\]\(|https?:\/\/[^\s<>"'\u0000-\u001f]+/g;
-  let cursor = 0;
-  let match: RegExpExecArray | null;
-  while ((match = starts.exec(text))) {
-    const start = match.index;
-    let end = starts.lastIndex;
-    let label = match[0];
-    let url = "";
-    if (match[1] !== undefined) {
-      const destination = end;
-      let depth = 1;
-      while (end < text.length && depth && text[end] !== "\n" && text[end] !== "\r") {
-        if (text[end] === "(") depth++;
-        if (text[end] === ")") depth--;
-        end++;
-      }
-      starts.lastIndex = end;
-      if (depth) continue;
-      label = match[1];
-      url = safeUrl(text.slice(destination, end - 1).trim());
-    } else {
-      label = trimBareUrl(match[0]);
-      end = start + label.length;
-      url = safeUrl(label);
-      starts.lastIndex = end;
-    }
-    if (!url) continue;
-    nodes.push(text.slice(cursor, start));
-    nodes.push(<a key={start} href={url} target="_blank" rel="noopener noreferrer">{label}</a>);
-    cursor = end;
-  }
-  nodes.push(text.slice(cursor));
-  return <span className="lesson-text-links">{nodes}</span>;
+  const doc = parseLessonDocument(text);
+  if (doc) return <div className="lesson-rich-body"><RichNode node={doc} /></div>;
+  return <span className="lesson-text-links"><PlainLinks text={text} /></span>;
+}
+function PlainLinks({ text }: { text: string }) {
+  return <>{lessonTextSegments(text).map((part, index) => part.href
+    ? <a key={index} href={part.href} target="_blank" rel="noopener noreferrer">{part.text}</a>
+    : <Fragment key={index}>{part.text}</Fragment>)}</>;
 }
