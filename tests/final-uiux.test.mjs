@@ -620,3 +620,26 @@ test('lesson toggles round trip safely with H1, inline summary formatting and ne
   assert.doesNotMatch(markup, /onclick| open=|<script>/);
   assert.equal(body.normalizeLessonDocument({ type: 'doc', content: [{ type: 'details', content: [{ type: 'paragraph' }] }] }), null);
 });
+
+test('positioning lesson images preserves rich list nodes, stable question IDs and private asset references', () => {
+  const { positionLessonImage } = load('lib/lesson-image-position.ts');
+  const body = load('lib/lesson-body.ts');
+  const nodes = [
+    { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Heading' }] },
+    { type: 'bulletList', content: [{ type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Keep list', marks: [{ type: 'bold' }] }] }] }] },
+    { type: 'paragraph', content: [{ type: 'text', text: 'After' }] },
+  ];
+  const blocks = [{ id: 'body', type: 'text', content: body.serializeLessonDocument({ type: 'doc', content: nodes }) }, { id: 'image', type: 'image', assetId: 'private-asset' }, { id: 'question', type: 'question', question: { label: 'Keep answer ID', kind: 'text' } }];
+  const before = structuredClone(blocks);
+  const result = positionLessonImage(blocks, blocks[1], { blockId: 'body', textBoundary: 2 }, 'after');
+  assert.deepEqual(result.map(block => block.id), ['body', 'image', 'after', 'question']);
+  assert.deepEqual(body.parseLessonDocument(result[0].content).content, nodes.slice(0, 2));
+  assert.deepEqual(body.parseLessonDocument(result[2].content).content, nodes.slice(2));
+  assert.deepEqual(result[1], blocks[1]); assert.deepEqual(result[3], blocks[2]); assert.deepEqual(blocks, before);
+  assert.throws(() => positionLessonImage(blocks, blocks[1], { blockId: 'body', textBoundary: 9 }, 'after'));
+  assert.throws(() => positionLessonImage(blocks, blocks[1], { blockId: 'missing' }, 'after'));
+  assert.throws(() => positionLessonImage(blocks, blocks[1], { blockId: 'body', textBoundary: 1 }, 'question'));
+  assert.equal(positionLessonImage(blocks, blocks[1], { blockId: 'image' }, 'after'), blocks);
+  assert.deepEqual(positionLessonImage(blocks, blocks[1], { blockId: 'body', textBoundary: 0 }, 'after').map(block => block.id), ['image', 'body', 'question']);
+  assert.deepEqual(positionLessonImage(blocks, blocks[1], { blockId: 'body', textBoundary: 3 }, 'after').map(block => block.id), ['body', 'image', 'question']);
+});

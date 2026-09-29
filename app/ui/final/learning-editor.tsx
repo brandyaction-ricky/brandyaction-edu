@@ -215,7 +215,7 @@ export function LearningEditor({ data, row, pending, send, back, actorId, blockE
       </section>
       {blockEditingEnabled && <section ref={blockSectionRef} className="panel mt24" hidden={previewOnly}><div className="panel-head"><h2>학습 구성</h2></div><div className="section-pad">
         {resourcePath && <p className="notice">등록된 자료 파일은 학습 본문 아래에서 계속 다운로드할 수 있습니다.</p>}
-        <LessonBlockAuthor key={row?.id || 'new'} ref={blockRef} lessonId={lessonId} courseId={course?.id} sources={cardSources} legacyBlocks={legacyBlocks} disabled={busy} onState={setBlockState} />
+        <LessonBlockAuthor key={row?.id || 'new'} ref={blockRef} lessonId={lessonId} courseId={course?.id} sources={cardSources} legacyBlocks={legacyBlocks} disabled={pending || saving || uploadStatus === "uploading"} onState={setBlockState} />
       </div></section>}
       {blockEditingEnabled && blockState.active && lessonId && <OngoingLessonSettings lessonId={lessonId} disabled={saveBlocked || dirty || blockState.dirty} />}
       {!blockState.active && !(blockEditingEnabled && blockState.blocked) && <section className={"panel" + (previewOnly ? "" : " mt24")}>

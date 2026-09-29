@@ -1,13 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from 'react';
 import { lessonMediaSpec, lessonMediaTypes, lessonMediaUrl, type LessonMediaKind } from '@/lib/lesson-media';
+import { uploadLessonMedia } from '@/lib/lesson-media-upload';
 
-async function send(body: object) {
-  const response = await fetch('/api/platform/lesson-media', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const result = await response.json();
-  if (!response.ok) throw new Error(result.error || '파일을 올리지 못했습니다.');
-  return result as { id: string; ready?: boolean; signedUrl?: string; contentType?: string };
-}
 export function LessonMediaUpload({ courseId, kind, assetId, disabled, onReady, onPending }: {
   courseId?: string; kind: LessonMediaKind; assetId?: string; disabled: boolean;
   onReady: (id: string) => void; onPending: (pending: boolean) => void;
@@ -22,15 +17,8 @@ export function LessonMediaUpload({ courseId, kind, assetId, disabled, onReady, 
     const selected = upload.current;
     active.current = true; setPending(true); setRetry(false); setMessage('파일을 올리고 확인하고 있습니다.'); latest.current.onPending(true);
     try {
-      const spec = lessonMediaSpec(selected.file.name, selected.file.size, kind);
-      const prepared = await send({ action: 'prepare', courseId: selected.courseId, requestId: selected.requestId, ...spec });
-      if (!prepared.ready) {
-        // A lost response may still mean the upload succeeded. Completion reads
-        // stored bytes; retries reuse the ID and can never overwrite the object.
-        try { await fetch(prepared.signedUrl!, { method: 'PUT', credentials: 'omit', headers: { 'Content-Type': prepared.contentType!, 'x-upsert': 'false' }, body: selected.file }); } catch { /* Verify with server below. */ }
-        await send({ action: 'complete', assetId: prepared.id });
-      }
-      if (mounted.current) { latest.current.onReady(prepared.id); setMessage('파일을 연결했습니다. 학습 저장을 누르면 반영됩니다.'); upload.current = null; }
+      const id = await uploadLessonMedia(selected.file, kind, selected.courseId, selected.requestId);
+      if (mounted.current) { latest.current.onReady(id); setMessage('파일을 연결했습니다. 학습 저장을 누르면 반영됩니다.'); upload.current = null; }
     } catch (error) { if (mounted.current) { setMessage((error as Error).message + (assetId ? ' 기존 자료는 바뀌지 않았습니다.' : '')); setRetry(true); } }
     finally { active.current = false; if (mounted.current) { setPending(false); latest.current.onPending(false); } }
   }

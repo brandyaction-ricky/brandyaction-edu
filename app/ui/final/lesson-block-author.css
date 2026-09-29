@@ -17,3 +17,13 @@
 
 .lba-media-upload { border:1px dashed #adb5bf; border-radius:8px; padding:12px; margin:12px 0; overflow-wrap:anywhere; }
 .lba-media-upload:focus-visible { outline:3px solid #507fbe; outline-offset:2px; }
+.lba-image-layout { position:relative; min-height:32px; }
+.lba-image-drop-guide { position:absolute; height:4px; margin-top:-2px; background:#2563eb; border-radius:2px; pointer-events:none; z-index:5; box-shadow:0 0 0 2px #fff; }
+.lba-image-drop-guide::before { content:''; display:block; width:9px; height:9px; border:2px solid #2563eb; border-radius:50%; background:#fff; position:absolute; left:0; top:-3px; }
+.lba-image-handle, .lba-image-preview img { cursor:grab; }
+.lba-image-preview { max-width:100%; }
+.lba-image-preview .lesson-blocks { gap:0; }
+.lba-image-preview img { max-height:340px; object-fit:contain; }
+.lba-image-placeholder { min-height:100px; display:grid; place-items:center; border:2px dashed #2563eb; border-radius:8px; background:#eff6ff; color:#1e40af; padding:16px; }
+
+.lba-media-fields { border:0; padding:0; margin:0; min-width:0; }
