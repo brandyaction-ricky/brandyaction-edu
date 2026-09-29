@@ -15,12 +15,13 @@ test('matches original bytes to same-course receipts and replaces every use with
  assert.deepEqual(plan,original);assert.equal(bound.bindings.length,1);assert.equal(bound.lessons[0].appliedMedia.length,2);assert.equal(bound.lessons[0].document.blocks.filter(b=>b.type==='image').length,2);
  assert.ok(bound.lessons[0].document.blocks.filter(b=>b.type==='image').every(b=>b.assetId===input.receipts[0].assetId&&!('url'in b)&&!('pendingAssetId'in b)));
  for(let i=0;i<plan.lessons.length;i++){const a=plan.lessons[i],b=bound.lessons[i];assert.deepEqual(a.mapping,b.mapping);assert.deepEqual(a.metadata,b.metadata);assert.deepEqual(a.checklistMapping,b.checklistMapping);assert.deepEqual(a.plannedDocument.checklist,b.document.checklist);assert.deepEqual(a.plannedDocument.blocks.filter(b=>b.type!=='image'),b.document.blocks.filter(b=>b.type!=='image'));}
- assert.deepEqual(bound.configuration,plan.configuration);assert.ok(!bound.issues.some(i=>i.code==='MEDIA_UPLOAD_PENDING'));assert.ok(bound.issues.some(i=>i.code==='EXTERNAL_MEDIA_UNVERIFIED'));assert.ok(bound.issues.some(i=>i.code==='ONGOING_ENGINE_PENDING'));
+ assert.deepEqual(bound.configuration,plan.configuration);assert.ok(!bound.issues.some(i=>i.code==='MEDIA_UPLOAD_PENDING'));assert.ok(bound.issues.some(i=>i.code==='EXTERNAL_MEDIA_UNVERIFIED'));assert.ok(!bound.issues.some(i=>i.code==='ONGOING_ENGINE_PENDING'));
+ const ongoing=bound.lessons.find(l=>l.track==='ongoing');assert.equal(ongoing.structureReady,true);assert.equal(ongoing.ongoing,'weekly');assert.deepEqual(ongoing.document,plan.lessons.find(l=>l.track==='ongoing').document);
  assert.equal(bound.currentLiveContentVerified,false);assert.equal(bound.serverReceiptsRechecked,false);assert.equal(bound.readyForImport,false);assert.ok(bound.lessons.every(l=>l.ready===false));
  assert.doesNotMatch(JSON.stringify(mediaBindingReport(bound)),/correctIndex|media\.example|base64|assetId|나의 목표/);
 });
 test('partial binding retains unbound media blockers; no external URLs are certified by an unrelated receipt',async()=>{
- const {plan}=await prepareReplitLessonPlan(source()),input=ledger(plan);input.receipts=[];const result=await bindReplitMedia(plan,input);assert.equal(result.lessons[0].document,null);assert.equal(result.bindings.length,0);assert.equal(result.lessons[1].structureReady,true);assert.equal(result.lessons[2].structureReady,false);
+ const {plan}=await prepareReplitLessonPlan(source()),input=ledger(plan);input.receipts=[];const result=await bindReplitMedia(plan,input);assert.equal(result.lessons[0].document,null);assert.equal(result.bindings.length,0);assert.equal(result.lessons[1].structureReady,true);assert.equal(result.lessons[2].structureReady,true);assert.equal(result.lessons[2].ongoing,'weekly');assert.equal(result.lessons[2].ready,false);assert.equal(result.readyForImport,false);
  const ext=ledger(plan);ext.receipts[0].sha256='e'.repeat(64);await assert.rejects(bindReplitMedia(plan,ext),/original asset bytes/);
 });
 for(const [label,alter] of [
