@@ -43,3 +43,6 @@
 .edu-admin .lb-ongoing-review select { max-width: 100%; }
 
 .lesson-blocks video { display:block; width:100%; height:auto; background:#111; border-radius:8px; }
+
+.lb-link-card{display:flex;align-items:center;gap:12px;padding:16px;border:1px solid var(--border,#d6dbe2);border-radius:12px;color:inherit;text-decoration:none;overflow-wrap:anywhere}
+.lb-link-card:hover{background:#f5f7f9}.lb-link-card>span:nth-child(2){min-width:0}.lb-link-card strong,.lb-link-card small{display:block}.lb-link-card small{margin-top:6px;color:var(--muted,#667085)}.lb-link-icon{display:grid;place-items:center;flex-shrink:0;width:40px;height:40px;background:#f0f3f7;border-radius:8px}

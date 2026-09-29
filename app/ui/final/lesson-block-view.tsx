@@ -1,4 +1,5 @@
 "use client";
+import { LessonLinkCard } from './lesson-link-preview';
 /* eslint-disable @next/next/no-img-element -- Imported lesson images have author-selected external sources and unknown dimensions; do not proxy them through the Next image optimizer. */
 
 import { AnswerFiles } from './lesson-answer-files';
@@ -107,7 +108,7 @@ export function LessonBlockView({ document, values, onChange, readOnly = false, 
         case 'image': content = url && <figure>{/* Untrusted imported URLs never become raw HTML. */}<img loading="lazy" src={url} alt={block.alt || ''} />{block.content && <figcaption>{block.content}</figcaption>}</figure>; break;
         case 'audio': content = url && <figure><figcaption>{block.content || '음성 자료'}</figcaption><audio controls preload="none" src={url} aria-label={block.alt || '학습 음성'}><a href={url}>음성 파일 열기</a></audio></figure>; break;
         case 'video': content = url && <><Video url={url} />{block.content && <p>{block.content}</p>}</>; break;
-        case 'link': content = url && <a href={url} target="_blank" rel="noopener noreferrer" className="lb-link">{block.content || url} ↗</a>; break;
+        case 'link': content = url && <LessonLinkCard url={url} title={block.content}/>; break;
         case 'prompt': content = <CopyPrompt text={block.content || ''} />; break;
         case 'question': content = block.question?.kind === 'text' ? <label className="lb-field lb-card"><span>{block.question.label}{block.question.required && (document.completion || defaultBlockCompletion).requireAnswers ? ' (필수)' : ''}</span><textarea rows={5} maxLength={20000} value={typeof value === 'string' ? value : ''} readOnly={readOnly} onChange={event => answer(block.id, event.target.value)} /></label> : <AnswerFiles block={block} answer={value} onChange={value => answer(block.id, value)} readOnly={readOnly} context={fileContext} submissionId={submissionId} onPending={onFilePending} />; break;
         case 'prompt-generator': content = <PromptGenerator live={livePrompts} block={block} answer={value} disabled={readOnly} onChange={value => answer(block.id, value)} />; break;

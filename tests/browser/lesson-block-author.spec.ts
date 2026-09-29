@@ -25,6 +25,28 @@ async function backend(page: Page, failure = 0, denied = false) {
 }
 async function add(page: Page, type: string) { await page.getByRole('combobox', { name: '추가할 항목' }).selectOption(type); await page.getByRole('button', { name: '항목 추가', exact: true }).click(); return page.locator('[data-author-block]').last(); }
 
+test('link titles are explicitly applied, saved and rendered as safe cards in the actual classroom',async({page},info)=>{
+ const server=await backend(page);let lookups=0,fail=false;
+ await page.route('**/api/admin/link-preview**',async route=>{lookups++;await route.fulfill(fail?{status:502,json:{error:'제목 조회 실패 · 직접 입력해 주세요.'}}:{json:{title:'공식 설치 안내 <b>본문</b>',domain:'example.com'}});});
+ await page.goto('/lesson-block-author-test');await page.getByRole('button',{name:'여러 항목으로 구성하기'}).click();const block=await add(page,'link');
+ await block.getByLabel('주소 *',{exact:true}).fill('https://example.com/download');await block.getByLabel('링크에 표시할 문구').fill('내가 작성한 안내');expect(lookups).toBe(0);
+ await block.getByRole('button',{name:'사이트 제목 불러오기'}).click();await expect(block.getByText('공식 설치 안내 <b>본문</b>',{exact:true})).toBeVisible();await expect(block.getByLabel('링크에 표시할 문구')).toHaveValue('내가 작성한 안내');
+ await block.getByLabel('링크에 표시할 문구').fill('조회 중 작성한 안내');await block.getByRole('button',{name:'이 제목 적용'}).click();await expect(block.getByLabel('링크에 표시할 문구')).toHaveValue('공식 설치 안내 <b>본문</b>');
+ fail=true;await block.getByRole('button',{name:'사이트 제목 불러오기'}).click();await expect(block.getByRole('alert')).toContainText('제목 조회 실패');
+ await page.getByRole('button',{name:'학습 저장',exact:true}).click();await expect(page.getByText('학습 기본 정보와 콘텐츠를 저장했습니다.',{exact:true})).toBeVisible();expect(server.getDocument()?.blocks.at(-1)?.content).toBe('공식 설치 안내 <b>본문</b>');
+ await page.getByRole('button',{name:'편집 다시 열기'}).click();await expect(page.getByLabel('링크에 표시할 문구')).toHaveValue('공식 설치 안내 <b>본문</b>');await page.getByRole('button',{name:'학생 화면 보기'}).click();
+ const card=page.locator('.lb-link-card');await expect(card).toContainText('공식 설치 안내 <b>본문</b>');await expect(card).toContainText('example.com');await expect(card).toHaveAttribute('href','https://example.com/download');await expect(card).toHaveAttribute('target','_blank');await expect(card.locator('b')).toHaveCount(0);expect(lookups).toBe(2);
+ await card.scrollIntoViewIfNeeded();await page.screenshot({path:info.outputPath('lesson-link-card.png'),fullPage:false});
+});
+
+test('changing a link address discards a pending title and manual title remains available',async({page})=>{
+ await backend(page);await page.route('**/api/admin/link-preview**',async route=>{await new Promise(resolve=>setTimeout(resolve,200));await route.fulfill({json:{title:'이전 주소 제목'}});});
+ await page.goto('/lesson-block-author-test');await page.getByRole('button',{name:'여러 항목으로 구성하기'}).click();const block=await add(page,'link');
+ await block.getByLabel('주소 *',{exact:true}).fill('https://example.com/old');await block.getByRole('button',{name:'사이트 제목 불러오기'}).click();await block.getByLabel('주소 *',{exact:true}).fill('https://example.com/new');await block.getByLabel('링크에 표시할 문구').fill('새 주소 안내');
+ await expect(block.getByRole('button',{name:'사이트 제목 불러오기'})).toBeEnabled();await expect(block.getByRole('button',{name:'이 제목 적용'})).toHaveCount(0);await expect(block.getByLabel('링크에 표시할 문구')).toHaveValue('새 주소 안내');
+ await page.getByRole('button',{name:'구성 미리보기',exact:true}).click();await expect(page.getByLabel('구성 미리보기').locator('.lb-link-card')).toContainText('새 주소 안내');
+});
+
 test('lesson tags save, reload, preview and display on student content and navigation; clearing hides the label', async ({ page }, info) => {
   const server=await backend(page);await page.goto('/lesson-block-author-test');await page.getByRole('button',{name:'여러 항목으로 구성하기'}).click();
   await page.getByRole('textbox',{name:'학생에게 표시할 태그'}).fill('기초 · AI');await page.getByText('태그 관리용 이름',{exact:true}).click();await page.getByRole('textbox',{name:'태그 내부 키'}).fill('internal-ai-basics');
