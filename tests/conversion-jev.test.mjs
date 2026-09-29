@@ -56,13 +56,24 @@ test('provider errors and malformed choices never expose upstream bodies or secr
   await assert.rejects(jev.createJevJudgment(inquiry, [], 'top-secret', async () => Response.json({ model: 'jev-test', answers: { ...answers, purchase_intent: { ...answers.purchase_intent, choice: 'invented' } } })), /JEV_INVALID_RESPONSE/);
 });
 
-test('Jev is disabled unless review, key, flag and an explicit non-production environment agree', () => {
+test('Jev requires the live permission and both production identities, while DEV keeps its own target', () => {
   const server = load('../lib/conversion-review-server.ts', { 'node:crypto': { createHash() {} } });
   const valid = { EDU_CONVERSION_REVIEW_ENABLED: 'true', EDU_CONVERSION_JEV_ENABLED: 'true', TYPESAFE_API_KEY: 'key', NEXT_PUBLIC_APP_ENV: 'development' };
   assert.equal(server.conversionCapabilities(valid).can_jev, true);
+  // The DEV Vercel project's fixed alias uses a Production deployment target.
   assert.equal(server.conversionCapabilities({ ...valid, VERCEL_ENV: 'production' }).can_jev, true);
   assert.equal(server.conversionCapabilities({ ...valid, NEXT_PUBLIC_APP_ENV: undefined, VERCEL_ENV: 'preview' }).can_jev, true);
-  for (const env of [{}, { ...valid, TYPESAFE_API_KEY: '' }, { ...valid, EDU_CONVERSION_JEV_ENABLED: 'false' }, { ...valid, NEXT_PUBLIC_APP_ENV: 'production' }, { ...valid, NEXT_PUBLIC_APP_ENV: 'production', VERCEL_ENV: 'preview' }, { ...valid, NEXT_PUBLIC_APP_ENV: undefined, VERCEL_ENV: 'production' }]) {
+  const live = { ...valid, NEXT_PUBLIC_APP_ENV: 'production', VERCEL_ENV: 'production', EDU_CONVERSION_JEV_PRODUCTION_ENABLED: 'true' };
+  const liveCapabilities = server.conversionCapabilities(live);
+  assert.equal(liveCapabilities.can_jev, true);
+  assert.equal(liveCapabilities.can_analyze, true);
+  assert.equal(liveCapabilities.can_mock, false);
+  assert.equal(liveCapabilities.can_jev_experiments, false);
+  for (const env of [{}, { ...valid, TYPESAFE_API_KEY: '' }, { ...valid, EDU_CONVERSION_JEV_ENABLED: 'false' },
+    { ...live, TYPESAFE_API_KEY: '' }, { ...live, EDU_CONVERSION_REVIEW_ENABLED: 'false' },
+    { ...live, EDU_CONVERSION_JEV_ENABLED: 'false' }, { ...live, EDU_CONVERSION_JEV_PRODUCTION_ENABLED: 'false' },
+    { ...live, VERCEL_ENV: 'preview' }, { ...live, VERCEL_ENV: undefined },
+    { ...valid, NEXT_PUBLIC_APP_ENV: undefined, VERCEL_ENV: 'production' }]) {
     assert.equal(server.conversionCapabilities(env).can_jev, false);
   }
 });

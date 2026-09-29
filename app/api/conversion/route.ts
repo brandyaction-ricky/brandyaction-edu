@@ -56,10 +56,11 @@ export async function GET() {
     const cohorts = result[4].data || [];
     const runs = result[5].data || [];
     const reviews = result[6].data || [];
+    const capabilities = conversionCapabilities(process.env);
     const cases: ConversionCase[] = ((caseRows.data || []) as unknown as ConversionCase[]).map(item => pendingCaseManagementMigration
       ? { ...item, purchase_outcome: 'unknown' as const, purchase_checked_at: null, purchase_checked_by: null, archived_at: null, archived_by: null } : item);
     return reply({ cases, evidence, questions, courses, cohorts, runs, reviews, adjudications: notes.data || [], jev_v2_runs: v2.data || [], jev_v3_runs: v3.data || [], jev_v4_runs: v4.data || [],
-      capabilities: { can_manage_evidence: user.permissions.products, can_manage_cases: !pendingCaseManagementMigration, ...conversionCapabilities(process.env), can_adjudicate: !pendingMigration && conversionCapabilities(process.env).can_jev, can_jev_v2: !pendingV2Migration && conversionCapabilities(process.env).can_jev, can_jev_v3: !pendingV3Migration && conversionCapabilities(process.env).can_jev, can_jev_v4: !pendingV4Migration && conversionCapabilities(process.env).can_jev, can_manage_funnel: user.permissions.products && user.permissions.marketing, can_copy_aside_match: user.permissions.orders && user.permissions.marketing },
+      capabilities: { can_manage_evidence: user.permissions.products, can_manage_cases: !pendingCaseManagementMigration, ...capabilities, can_adjudicate: !pendingMigration && capabilities.can_jev_experiments, can_jev_v2: !pendingV2Migration && capabilities.can_jev_experiments, can_jev_v3: !pendingV3Migration && capabilities.can_jev_experiments, can_jev_v4: !pendingV4Migration && capabilities.can_jev, can_manage_funnel: user.permissions.products && user.permissions.marketing, can_copy_aside_match: user.permissions.orders && user.permissions.marketing },
       limits: { cases: 200, evidence: 500, questions: 200, runs: 500, reviews: 500, adjudications: 500, jev_v2_runs: 500, jev_v3_runs: 500, jev_v4_runs: 500 } });
   } catch (error) { return failure(error); }
 }
@@ -75,7 +76,7 @@ export async function POST(request: Request) {
     if (action === 'save_evidence' && !user.permissions.products) return reply({ error: '설명자료 변경에는 상품 관리 권한도 필요합니다.' }, 403);
     if (action === 'manage_case_order' && (!user.permissions.orders || !user.permissions.marketing)) return reply({ error: '문의와 주문을 연결하려면 주문 및 마케팅 관리 권한이 필요합니다.' }, 403);
     const capabilities = conversionCapabilities(process.env);
-    if (action === 'analyze' && !capabilities.can_analyze) return reply({ error: '판정 기능은 활성화된 개발·검수 환경에서만 실행할 수 있습니다.' }, 403);
+    if (action === 'analyze' && !capabilities.can_analyze) return reply({ error: '판정 기능이 활성화되지 않았습니다.' }, 403);
     const db = createAdminClient();
     let result: unknown = null, evidence_versions: Record<string, number> | null = null, observed_version: number | null = null;
     if (action === 'analyze') {

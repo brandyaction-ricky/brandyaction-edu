@@ -58,6 +58,7 @@ function awaitlessCrypto() { return { createHash() { throw new Error('not used')
 test('v3 requires DEV, same origin, and operator before accessing inquiry data', async () => {
   for (const [options, origin] of [
     [{ env: { ...env, NEXT_PUBLIC_APP_ENV: 'production' } }, undefined],
+    [{ env: { ...env, NEXT_PUBLIC_APP_ENV: 'production', VERCEL_ENV: 'production', EDU_CONVERSION_JEV_PRODUCTION_ENABLED: 'true' } }, undefined],
     [{}, 'https://other.example'],
     [{ user: null }, undefined],
   ]) {

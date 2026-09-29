@@ -83,6 +83,13 @@ test('v4 uses the unchanged v1 snapshot without requiring subjective labels and 
   }
 });
 
+test('staff can run v4 on production only with the separate live permission', async () => {
+  const h = harness({ env: { ...env, NEXT_PUBLIC_APP_ENV: 'production', VERCEL_ENV: 'production', EDU_CONVERSION_JEV_PRODUCTION_ENABLED: 'true' } });
+  const response = await h.POST(request());
+  assert.equal(response.status, 200);
+  assert.equal(h.events.filter(event => event === 'provider').length, 1);
+});
+
 test('completed v4 result is idempotently returned without a second provider call', async () => {
   const h = harness({ existing: { id: '66666666-6666-4666-8666-666666666666', status: 'completed', result } });
   const response = await h.POST(request());
