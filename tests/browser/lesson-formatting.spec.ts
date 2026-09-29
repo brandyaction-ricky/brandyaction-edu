@@ -67,6 +67,7 @@ test('opening and saving a legacy lesson preserves text, blank lines, numbering 
   await page.goto('/lesson-formatting-test');
   const editor = page.getByRole('textbox', { name: '학습 내용', exact: true });
   await expect(editor).toBeVisible();
+  await expect(editor).toHaveCSS('font-weight', '400');
   await expect(editor.getByRole('link', { name: '클로드 다운로드 페이지' })).toHaveAttribute('href', 'https://claude.com/download');
   await expect(editor.locator('p')).toHaveCount(5);
   await expect(page.getByLabel('본문 저장 횟수')).toHaveText('0');
