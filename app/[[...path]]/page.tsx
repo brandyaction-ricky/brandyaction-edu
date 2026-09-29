@@ -12,7 +12,7 @@ export default async function Page({params,searchParams}:{params:Promise<{path?:
  const valid = path.length === 0
   || (['login','signup','stories','checkout','apply','applied','order-complete'].includes(root) && path.length === 1)
   || (['classes','articles'].includes(root) && path.length <= 2)
-  || (root === 'my' && path.length <= 2 && (!section || ['classes','missions','questions','resources','reviews','orders','coupons','profile'].includes(section)))
+  || (root === 'my' && path.length <= 2 && (!section || ['classes','missions','questions','messages','resources','reviews','orders','coupons','profile'].includes(section)))
   || (root === 'admin' && path.length <= 2 && (!section || ['product-editor','learning-editor'].includes(section) || sections.some(item => item.key === section)))
   || (root === 'learn' && path.length >= 2 && (path.length <= 3 || (path.length === 4 && path[3] === 'mission')))
   || (root === 'payment' && ['success','fail'].includes(section) && path.length === 2)
