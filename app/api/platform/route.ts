@@ -164,10 +164,25 @@ export async function GET(request: Request) {
         await Promise.all([
             (async () => {
                 if (!adminMode) return;
-                if (sectionKey === 'home') {
+                if (sectionKey === 'home' || sectionKey === 'orders') {
                     const summary = await db.rpc('edu_admin_summary');
                     if (summary.error) throw summary.error;
                     const row = summary.data as Row;
+                    if (sectionKey === 'orders') {
+                        const processing = await db.from('edu_refund_requests').select('id', { count: 'exact', head: true }).eq('status', 'processing');
+                        if (processing.error) throw processing.error;
+                        data.order_summary = [{
+                            id: 'order-summary',
+                            approvedRevenue: row.approvedRevenue,
+                            refundedRevenue: row.refundedRevenue,
+                            netRevenue: row.netRevenue,
+                            processingRefunds: processing.count || 0,
+                        }];
+                        if (operator?.role === 'admin' || operator?.permissions.members) {
+                            data.admin_summary = [{ id: 'navigation-summary', pendingReviews: row.pendingReviews }];
+                        }
+                        return;
+                    }
                     if (operator?.role === 'admin' || operator?.permissions.members) {
                         const members = await db.from('profiles').select('id', { count: 'exact', head: true }).neq('status', excludedMemberStatus);
                         if (members.error) throw members.error;
