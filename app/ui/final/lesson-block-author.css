@@ -1,0 +1,19 @@
+.lb-author, .lba-main-fields, .lba-preview { min-width:0; }
+.lba-main-fields { border:0; margin:0; padding:0; }
+.lba-main-fields[hidden] { display:none; }
+.lba-actions { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:12px 0; }
+.lba-actions h3 { margin:0; flex:1 1 160px; }
+.lba-actions select { min-height:44px; padding:8px; margin-left:8px; max-width:100%; }
+.lba-block { border:1px solid #d8dde3; border-radius:10px; padding:18px; margin:20px 0; background:#fff; }
+.lba-fields { border-left:3px solid #e1e5eb; padding:0 0 16px 16px; margin:16px 0; }
+.lba-choice-edit, .lba-check-edit { display:flex; align-items:center; gap:10px; margin:10px 0; }
+.lba-choice-edit > input, .lba-check-edit > input { flex:1 1 130px; min-width:0; padding:10px; border:1px solid #aeb6c1; border-radius:6px; }
+.lba-check-edit > label { white-space:nowrap; }
+.lb-author.was-validated input:invalid, .lb-author.was-validated textarea:invalid { border:2px solid #bc1c2a; background:#fff5f5; }
+.lba-preview { padding:18px; border:1px solid #d8dde3; margin:16px 0; background:#f8fafc; }
+.lba-text-preview { white-space:pre-wrap; overflow-wrap:anywhere; margin:12px 0; }
+.lb-author button, .lba-intro button { min-height:44px; }
+@media(max-width:540px) { .lba-block { padding:12px; } .lba-check-edit { flex-wrap:wrap; } }
+
+.lba-media-upload { border:1px dashed #adb5bf; border-radius:8px; padding:12px; margin:12px 0; overflow-wrap:anywhere; }
+.lba-media-upload:focus-visible { outline:3px solid #507fbe; outline-offset:2px; }

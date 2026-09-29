@@ -1,0 +1,9 @@
+.app-branding-editor{margin-bottom:24px;overflow-wrap:anywhere;min-width:0}
+.app-branding-previews{display:flex;gap:24px;flex-wrap:wrap;margin:20px 0}
+.app-branding-previews figure{margin:0;text-align:center}
+.app-branding-previews img{display:block;width:88px;height:88px;border-radius:18px;object-fit:contain;background:#fff}
+.app-branding-previews figcaption{font-size:12px;margin-top:8px;color:var(--muted)}
+.app-branding-circle{width:88px;height:88px;border-radius:50%;overflow:hidden;background:#fff;outline:1px solid var(--border,#e3e5e8)}
+.app-branding-circle img{border-radius:0}
+.app-branding-circle .app-branding-inset{padding:13px;box-sizing:border-box}
+.app-branding-editor input[type=file]{max-width:100%;min-width:0}

@@ -1,0 +1,8 @@
+.unread-message-link { display:inline-flex; align-items:center; gap:6px; white-space:nowrap; min-height:36px; }
+.unread-message-count { min-width:19px; padding:1px 5px; border-radius:12px; background:#bd192a; color:#fff; font-size:11px; line-height:17px; text-align:center; }
+@media(max-width:540px) { .header-user .message-link-label { display:none; } }
+.edu-front .site-header .header-user > .unread-message-link { display:inline-flex; flex-shrink:0; position:relative; }
+@media(max-width:540px) {
+  .edu-front .site-header .header-user > .unread-message-link { min-width:36px; min-height:40px; justify-content:center; }
+  .header-user .unread-message-count { position:absolute; top:0; right:-3px; font-size:10px; line-height:14px; min-width:16px; padding:0 4px; }
+}
