@@ -85,6 +85,32 @@ test('filter toolbar keeps search flexible and wraps at narrow widths', async ({
   }
 });
 
+test('admin workspace stays inside 1280 and 1440 desktop viewports', async ({ page, viewport }) => {
+  test.skip((viewport?.width || 0) <= 1024, 'desktop width verification');
+  for (const width of [1280, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => resolve(true))));
+    const layout = await page.evaluate(() => {
+      const controls = Array.from(document.querySelectorAll<HTMLElement>('.admin-filter-bar :is(input,select,.admin-button)'));
+      const table = document.querySelector<HTMLElement>('.admin-table-scroll');
+      const action = document.querySelector<HTMLElement>('.admin-data-table thead [data-align="action"]');
+      const tableRect = table?.getBoundingClientRect();
+      const actionRect = action?.getBoundingClientRect();
+      return {
+        pageFits: document.documentElement.scrollWidth <= window.innerWidth,
+        controlSizes: controls.map(control => {
+          const style = getComputedStyle(control);
+          return { name: control.getAttribute('aria-label') || control.textContent?.trim() || control.tagName, className: control.className, height: Math.round(control.getBoundingClientRect().height), cssHeight: style.height, minHeight: style.minHeight, boxSizing: style.boxSizing, padding: style.padding };
+        }),
+        actionVisible: Boolean(tableRect && actionRect && actionRect.right <= tableRect.right + 1 && actionRect.left >= tableRect.left - 1),
+      };
+    });
+    expect(layout.pageFits, `${width}px page overflow`).toBe(true);
+    expect(layout.controlSizes.every(control => control.height === 40), JSON.stringify(layout.controlSizes)).toBe(true);
+    expect(layout.actionVisible, `${width}px action column`).toBe(true);
+  }
+});
+
 test('search icon spacing does not change iconless admin input padding', async ({ page }) => {
   const search = page.getByRole('searchbox', { name: '회원 검색' });
   const ordinary = page.getByRole('textbox', { name: '이름' });

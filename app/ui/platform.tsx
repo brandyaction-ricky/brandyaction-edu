@@ -90,6 +90,7 @@ import {
   AdminStatusBadge,
   AdminQuickFilter,
   AdminToast,
+  adminSectionEyebrow,
 } from "@/features/admin-ui";
 type Data = Record<string, Row[]>;
 type AdminRead = {
@@ -946,15 +947,7 @@ export function Platform({
               className={section.key === "members" ? "member-mission-heading" : undefined}
               title={finalAdminTitles[section.key] || section.title}
               description={section.key === "members" ? "회원별 미션 제출 및 승인 현황을 관리합니다." : sectionDescription[section.key]}
-              eyebrow={section.key === "members" ? undefined :
-                section.group === "클래스 관리"
-                  ? "CLASS MANAGEMENT"
-                  : section.group === "고객 관리"
-                    ? "CUSTOMER MANAGEMENT"
-                    : section.group === "콘텐츠 관리"
-                      ? "CONTENT MANAGEMENT"
-                      : undefined
-              }
+              eyebrow={adminSectionEyebrow(section.group, section.key)}
             >
               {section.key === "customers" && (
                 <AdminButton

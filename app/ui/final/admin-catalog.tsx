@@ -925,7 +925,7 @@ export function AdminCatalog({
                     {cols.map((c) => (
                       <th key={c.label}>{c.label}</th>
                     ))}
-                    <th>관리</th>
+                    <th data-align="action">관리</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -935,7 +935,7 @@ export function AdminCatalog({
                       <tr key={recordId(r)}>
                         {bulkMode && <td data-label="선택" className="selection-column"><input type="checkbox" aria-label={title(r) + " 선택"} checked={selection.includes(recordId(r))} onChange={(e) => setSelection(e.target.checked ? [...selection, recordId(r)] : selection.filter((id) => id !== recordId(r)))} /></td>}
                         {cols.map((c) => <td data-label={c.label} key={c.label}>{c.value(r)}</td>)}
-                        <td data-label="관리"><div className="catalog-actions week-order-actions">
+                        <td data-label="관리" data-align="action"><div className="catalog-actions week-order-actions">
           <AdminButton size="sm" variant="outline" type="button" title="위로 이동" aria-label={`${t(r, "title")} 위로 이동`} disabled={pending || weekReorderDisabled || Boolean(r.archived_at) || num(r, "week_number") === 0 || activeCourseWeeks[0]?.id === r.id} onClick={() => void moveWeek(r, -1)}><ChevronUp size={17} aria-hidden="true" /></AdminButton>
           <AdminButton size="sm" variant="outline" type="button" title="아래로 이동" aria-label={`${t(r, "title")} 아래로 이동`} disabled={pending || weekReorderDisabled || Boolean(r.archived_at) || num(r, "week_number") === 0 || activeCourseWeeks.at(-1)?.id === r.id} onClick={() => void moveWeek(r, 1)}><ChevronDown size={17} aria-hidden="true" /></AdminButton>
           <AdminButton size="sm" variant="outline" onClick={() => edit(s, r)}>수정</AdminButton>
@@ -963,7 +963,7 @@ export function AdminCatalog({
                           {c.value(r)}
                         </td>
                       ))}
-                      <td data-label="관리">
+                      <td data-label="관리" data-align="action">
                         {s.key === "banners" ? <div className="catalog-actions banner-order-actions">
                           <AdminButton size="sm" variant="outline" type="button" title="위로 이동" aria-label={t(r, "title") + " 위로 이동"} disabled={pending || filtered[0]?.id === r.id} onClick={() => void moveBanner(r, -1)}><ChevronUp size={17} aria-hidden="true" /></AdminButton>
                           <AdminButton size="sm" variant="outline" type="button" title="아래로 이동" aria-label={t(r, "title") + " 아래로 이동"} disabled={pending || filtered.at(-1)?.id === r.id} onClick={() => void moveBanner(r, 1)}><ChevronDown size={17} aria-hidden="true" /></AdminButton>

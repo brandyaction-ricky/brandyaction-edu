@@ -1968,7 +1968,7 @@ function OrdersPanel({
   return (
     <>
       <AdminFilterBar
-        className="admin-pilot-filter"
+        className="admin-pilot-filter admin-orders-filter"
         filters={<><AdminSelect label="상품" labelHidden value={course} onChange={event => { setCourse(event.target.value); setOpened(""); }}><option value="">전체 상품</option>{registeredCourses.map(item => <option key={item.id} value={item.id}>{named(item)}</option>)}</AdminSelect><AdminSelect label="결제 상태" labelHidden value={status} onChange={event => { setStatus(event.target.value); setOpened(""); }}><option value="">전체 상태</option>{["paid", "pending", "payment_failed", "partially_refunded", "refunded", "cancelled"].map(value => <option key={value} value={value}>{labels[value] || value}</option>)}</AdminSelect></>}
         date={<><AdminDatePicker label="주문일 시작 · KST" value={from} error={dateError || undefined} onChange={event => setFrom(event.target.value)} /><AdminDatePicker label="주문일 종료 · KST" value={to} onChange={event => setTo(event.target.value)} /></>}
         search={<AdminSearchField value={query} label="주문 검색" placeholder="주문번호 · 회원명 · 상품명 검색" onChange={event => { setQuery(event.target.value); setOpened(""); }} />}
@@ -2001,7 +2001,7 @@ function OrdersPanel({
                   "수강 권한",
                   "관리",
                 ].map((label) => (
-                  <th scope="col" key={label}>{label}</th>
+                  <th scope="col" key={label} data-align={label === "관리" ? "action" : undefined}>{label}</th>
                 ))}
               </tr>
             </thead>
@@ -2037,7 +2037,7 @@ function OrdersPanel({
                   </td>
                   <td data-label="환불 상태"><AdminStatusBadge status={checkingRefund ? "pending" : cancelledAmount > 0 ? "refunded" : "inactive"} label={refundLabel} tone={checkingRefund ? "warning" : "neutral"} />{cancelledAmount > 0 && <p>{money(cancelledAmount)}</p>}</td>
                   <td data-label="수강 권한">{accessLabels.join(" · ") || "부여 내역 없음"}</td>
-                  <td data-label="관리">
+                  <td data-label="관리" data-align="action">
                     <AdminButton
                       variant="outline" size="sm"
                       aria-haspopup="dialog"
