@@ -2,10 +2,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type { QuestionAiReference } from '@/lib/question-ai-context';
 import { QuestionAiReferenceNote } from './question-ai-reference';
+import { useUnsavedLearningChanges } from './use-unsaved-learning-changes';
 import { QuestionImage } from './question-image';
 import { AdminDrawer, useUnsavedWarning } from '@/features/admin-ui';
-type Answer = { id: string; authorName: string; content: string; createdAt: string };
-type Thread = { question: { id: string; title: string; content: string; learningContext?: string | null; status: string; resolved: boolean; archived: boolean; headId: string | null; imageId?: string | null }; answers: Answer[]; nextCursor: string | null; canAnswer: boolean };
+type Answer = { id: string; authorName: string; source?: 'learner' | 'operator' | 'legacy'; content: string; createdAt: string };
+type Thread = { question: { id: string; title: string; content: string; learningContext?: string | null; status: string; resolved: boolean; archived: boolean; headId: string | null; imageId?: string | null }; answers: Answer[]; nextCursor: string | null; canAnswer: boolean; canFollowUp?: boolean };
 async function request<T>(question: string, body?: unknown, before?: string, signal?: AbortSignal): Promise<T> {
  const response = await fetch('/api/platform/question-thread?' + new URLSearchParams({ question, ...(before ? { before } : {}) }), {
   method: body ? 'POST' : 'GET', cache: 'no-store', signal: signal || AbortSignal.timeout(10000),
@@ -38,14 +39,42 @@ function Answers({ state }: { state: ReturnType<typeof useThread> }) {
    {state.data.nextCursor && <button type="button" className="btn small" disabled={state.olderBusy} onClick={() => void state.older()}>이전 답변 더 보기</button>}
    {state.olderError && <p role="alert">{state.olderError}</p>}
    {!state.data.answers.length && <p>{state.data.question.resolved ? '운영자가 처리 완료했습니다.' : '아직 등록된 답변이 없습니다.'}</p>}
-   {state.data.answers.map(answer => <article className="answer mt16" key={answer.id}><b>{answer.authorName}</b><p className="meta">{new Date(answer.createdAt).toLocaleString('ko-KR')}</p><p className="reading-copy">{answer.content}</p></article>)}
+   {state.data.answers.map(answer => <article className="answer mt16" key={answer.id}><b>{answer.source === 'learner' ? '후속 질문 · ' : '답변 · '}{answer.authorName}</b><p className="meta">{new Date(answer.createdAt).toLocaleString('ko-KR')}</p><p className="reading-copy">{answer.content}</p></article>)}
   </>}
  </section>;
 }
-export function QuestionAnswerHistory({ questionId, fallback = '' }: { questionId: string; fallback?: string }) {
+export function QuestionAnswerHistory({ questionId, fallback = '', onStatusChange }: { questionId: string; fallback?: string; onStatusChange?: (status: string) => void }) {
  const [open, setOpen] = useState(false), state = useThread(questionId, open);
- return <div className="mt16">{open ? <Answers state={state}/> : fallback ? <div className="answer"><b>운영자 답변</b><p className="reading-copy">{fallback}</p></div> : <p className="meta">답변이 도착하면 이곳에서 확인해 주세요.</p>}
-  <div className="row mt16"><button type="button" className="btn small" onClick={() => setOpen(v => !v)}>{open ? '답변 이력 접기' : '답변 전체 보기'}</button>{open && <button type="button" className="btn small" onClick={state.reload}>최신 답변 확인</button>}</div>
+ const [content, setContent] = useState(''), [busy, setBusy] = useState(false), [uncertain, setUncertain] = useState(false), [stale, setStale] = useState(false), [notice, setNotice] = useState('');
+ const gate = useRef(false), retry = useRef<{ action: 'followup'; questionId: string; content: string; requestId: string; expectedHeadId: string | null } | null>(null);
+ useUnsavedLearningChanges(Boolean(content) || busy || uncertain);
+ useEffect(() => { if (state.data) onStatusChange?.(state.data.question.status); }, [state.data, onStatusChange]);
+ async function followUp() {
+  if (gate.current || stale || !state.data?.canFollowUp) return;
+  if (!retry.current) {
+   if (!content.trim()) return;
+   retry.current = { action: 'followup', questionId, content, requestId: crypto.randomUUID(), expectedHeadId: state.data.question.headId };
+  }
+  gate.current = true; setBusy(true); setNotice('');
+  try {
+   const sent = retry.current, result = await request<{ id: string; questionId: string }>(questionId, sent);
+   if (result.id !== sent.requestId || result.questionId !== questionId) throw new Error('등록 결과를 확인하지 못했습니다.');
+   retry.current = null; setContent(''); setUncertain(false); setNotice('후속 질문을 등록했습니다. 답변을 기다려 주세요.'); state.reload();
+  } catch (e) {
+   const failure = e as { message: string; status?: number }, unknown = !failure.status || failure.status >= 500;
+   setUncertain(unknown); setStale(failure.status === 409); setNotice(failure.message + (unknown ? ' 같은 요청으로 결과를 다시 확인해 주세요.' : ''));
+   if (!unknown) retry.current = null;
+  } finally { gate.current = false; setBusy(false); }
+ }
+ return <div className="mt16">{open ? <>
+  <Answers state={state}/>
+  {state.data?.canFollowUp && <form className="mt16" onSubmit={event => { event.preventDefault(); void followUp(); }}>
+   <label className="field">후속 질문<textarea rows={4} maxLength={10000} value={content} disabled={busy || uncertain || stale} onChange={event => setContent(event.target.value)} placeholder="답변을 보고 더 궁금한 점을 적어 주세요."/></label>
+   <button className="btn primary small mt16" disabled={busy || stale || !content.trim()}>{busy ? '등록 중…' : uncertain ? '같은 요청 결과 확인' : '후속 질문 등록'}</button>
+  </form>}
+  {notice && <p role="status" className="notice mt16">{notice}</p>}
+ </> : fallback ? <div className="answer"><b>운영자 답변</b><p className="reading-copy">{fallback}</p></div> : <p className="meta">답변이 도착하면 이곳에서 확인해 주세요.</p>}
+  <div className="row mt16"><button type="button" className="btn small" disabled={busy || uncertain} onClick={() => setOpen(v => !v)}>{open ? '답변 이력 접기' : '답변 전체 보기'}</button>{!open && <button type="button" className="btn small" onClick={() => setOpen(true)}>후속 질문하기</button>}{open && <button type="button" className="btn small" disabled={busy || uncertain} onClick={() => { state.reload(); setStale(false); }}>최신 답변 확인</button>}</div>
  </div>;
 }
 export function QuestionThreadDialog({ questionId, close, changed, archive, pending = false, initialDraft = '', initialReference, onDraftChange, onDraftUsed }: { questionId: string; close: () => void; changed?: () => void; archive?: () => void; pending?: boolean; initialDraft?: string; initialReference?: QuestionAiReference; onDraftChange?: (value: string) => void; onDraftUsed?: () => void }) {

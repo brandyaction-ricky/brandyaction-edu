@@ -44,3 +44,13 @@ test('CLI regenerates source/bindings and writes a private immutable import file
   const altered=JSON.parse(readFileSync(join(binding,'bound-plan.json')));altered.lessons[0].document.blocks[0].content='바뀜';writeFileSync(join(binding,'bound-plan.json'),JSON.stringify(altered));assert.equal(run('prepare-replit-import',pkg,binding,config,join(dir,'other')).status,2);
  }finally{rmSync(dir,{recursive:true,force:true});}
 });
+test('reviewed titles and retained external links preserve source data and all unresolved upload gates',async()=>{
+ const {bound,placement}=await prepared(),source=bound.lessons[0],originalTitle=source.title;
+ source.title='-';source.issues=[{code:'TITLE_REVIEW_PENDING',document:source.key},{code:'EXTERNAL_MEDIA_UNVERIFIED',document:source.key,block:'source-video'}];source.structureReady=false;
+ source.mapping.push({sourceBlock:'source-video',targetBlock:'video'});source.document.blocks.push({id:'video',type:'video',url:'https://youtu.be/abcdefghijk'});
+ placement.lessonReviews=[{sourceKey:source.key,title:'AI 활용 결과를 정리합니다.',externalMedia:[{sourceBlock:'source-video',url:'https://youtu.be/abcdefghijk',decision:'retain-unverified'}]}];
+ const original=structuredClone(bound),out=await prepareReplitImport(bound,placement);
+ assert.equal(out.batch.lessons[0].title,'AI 활용 결과를 정리합니다.');assert.equal(out.batch.lessons[0].provenance.review.sourceTitle,'-');assert.equal(out.batch.lessons[0].provenance.review.externalMedia[0].decision,'retain-unverified');assert.deepEqual(bound,original);assert.deepEqual(out.batch.lessons[0].document,source.document);assert.deepEqual(out.batch.lessons[0].provenance.metadata,source.metadata);
+ for(const alter of [p=>p.lessonReviews.push({...p.lessonReviews[0]}),p=>p.lessonReviews[0].sourceKey='missing',p=>p.lessonReviews[0].title='-',p=>p.lessonReviews[0].title='a'.repeat(301),p=>p.lessonReviews[0].externalMedia[0].url='https://evil.test',p=>p.lessonReviews[0].externalMedia[0].decision='verified',p=>p.lessonReviews[0].externalMedia[0].sourceBlock='unknown']){const p=structuredClone(placement);alter(p);await assert.rejects(prepareReplitImport(bound,p),/Invalid import placement/);}
+ source.issues.push({code:'MEDIA_UPLOAD_PENDING',document:source.key,block:'missing-upload'});await assert.rejects(prepareReplitImport(bound,placement),/Invalid import placement/);assert.ok(originalTitle);
+});

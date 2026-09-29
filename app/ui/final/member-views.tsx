@@ -658,6 +658,8 @@ function Questions({
   const [filter, setFilter] = useState("전체"),
     [writing, setWriting] = useState(!!order),
     [error, setError] = useState("");
+  const [threadStatuses, setThreadStatuses] = useState<Record<string, string>>({});
+  const questionStatus = (q: Row) => threadStatuses[String(q.id)] || q.status;
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
@@ -679,7 +681,7 @@ function Questions({
   const list = rows(data, "edu_questions").filter(
     (q) =>
       filter === "전체" ||
-      (q.status === "answered" ? "답변 완료" : "답변 대기") === filter,
+      (questionStatus(q) === "answered" ? "답변 완료" : "답변 대기") === filter,
   );
   return (
     <>
@@ -732,15 +734,15 @@ function Questions({
       {list.map((q) => (
         <article className="question-card" key={q.id}>
           <div className="between">
-            <Badge color={q.status === "answered" ? "green" : "amber"}>
-              {q.status === "answered" ? "답변 완료" : "답변 대기"}
+            <Badge color={questionStatus(q) === "answered" ? "green" : "amber"}>
+              {questionStatus(q) === "answered" ? "답변 완료" : "답변 대기"}
             </Badge>
             <span className="meta">{date(q.created_at)}</span>
           </div>
           <h3>{t(q, "title")}</h3>
           {Boolean(q.learning_context) && <p className="meta">{t(q, "learning_context")}</p>}
           <p className="reading-copy">{t(q, "content")}</p><QuestionImage questionId={String(q.id)} imageId={q.image_id}/>
-          {process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED === 'true' ? <QuestionAnswerHistory questionId={String(q.id)} fallback={String(q.answer || '')}/> : q.answer ? (
+          {process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED === 'true' ? <QuestionAnswerHistory questionId={String(q.id)} fallback={String(q.answer || '')} onStatusChange={status => setThreadStatuses(old => old[String(q.id)] === status ? old : {...old, [String(q.id)]: status})}/> : q.answer ? (
             <div className="answer">
               <b>운영자 답변</b>
               <p className="reading-copy">{t(q, "answer")}</p>

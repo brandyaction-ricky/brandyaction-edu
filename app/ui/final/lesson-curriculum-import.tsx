@@ -43,11 +43,13 @@ export function LessonCurriculumImport({ courseId, disabled = false, onImported 
     } finally { flight.current = false; setBusy(false); }
   }
   const finished = preview?.applied === true, locked = disabled || busy;
+  const externalChecks = input?.batch.lessons.reduce((count, lesson) => count + (Array.isArray((lesson.provenance.review as { externalMedia?: unknown[] } | undefined)?.externalMedia) ? (lesson.provenance.review as { externalMedia: unknown[] }).externalMedia.length : 0), 0) || 0;
   return <section className="product-curriculum-guide" aria-label="외부 커리큘럼 가져오기">
     <h3>외부 커리큘럼 가져오기</h3>
     <p>준비된 파일의 내용을 확인한 뒤 비공개 수업으로 추가합니다. 기존 수업과 학생 기록은 유지됩니다.</p>
     <label>가져오기 JSON 파일<input type="file" accept=".json,application/json" disabled={locked || uncertain || finished} onChange={event => void select(event.target.files?.[0])} /></label>
     {input && <>
+      {externalChecks > 0 && <p className="notice warning">원본 외부 영상 {externalChecks}개는 주소를 그대로 가져옵니다. 수업을 공개하기 전에 재생 여부를 확인해 주세요.</p>}
       <p>원본 내보낸 시각: <time dateTime={input.batch.sourceCapturedAt}>{new Date(input.batch.sourceCapturedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })} (한국 시간)</time></p>
       <p>데일리 미션 {input.batch.lessons.filter(l => l.document.progression?.track === 'daily').length}개 · 별도 학습 {input.batch.lessons.filter(l => l.document.progression?.track === 'learning').length}개 · 지속 챌린지 {input.batch.lessons.filter(l => l.ongoing).length}개</p>
       <details><summary>가져올 주차·학습 목록 확인</summary>{input.batch.weeks.map(w => <div key={w.id}><h4>{w.number}주차 · {w.title} ({w.existing ? '기존 주차에 추가' : '새 비공개 주차'})</h4><ol>{input.batch.lessons.filter(l => l.weekId === w.id).map(l => <li key={l.id}>{l.ongoing ? `${ongoingLabels[l.ongoing]} 지속 챌린지` : `${l.document.progression?.track === 'daily' ? '데일리 미션' : '별도 학습'} ${l.document.progression?.dayNumber}일차`} · {l.title}</li>)}</ol></div>)}</details>
