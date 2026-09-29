@@ -1,7 +1,7 @@
 import {test,expect,type BrowserContext} from '@playwright/test';
 const q='22222222-2222-4222-8222-222222222222',legacy='33333333-3333-4333-8333-333333333333';
 async function backend(context:BrowserContext,options:{lost?:boolean;stale?:boolean;empty?:boolean;failRead?:boolean;older?:boolean;noFollowup?:boolean}={}){
- const replies=options.empty?[]:[{id:legacy,authorName:'운영자',content:'기존 답변',createdAt:'2026-09-01T00:00:00Z'}];
+ const replies=options.empty?[]:[{id:legacy,authorName:'운영자',source:'operator',content:'기존 답변',createdAt:'2026-09-01T00:00:00Z'}];
  let resolved=false;const writes:Record<string,unknown>[]=[];let ai=0;
  await context.route('**/api/platform/question-thread?**',async route=>{
   if(route.request().method()==='GET'){
@@ -9,8 +9,8 @@ async function backend(context:BrowserContext,options:{lost?:boolean;stale?:bool
    const before=new URL(route.request().url()).searchParams.get('before');await route.fulfill({json:{question:{id:q,title:'실행 질문',content:'내 고객을 어떻게 고를까요?',status:replies.length||resolved?'answered':'open',headId:replies.at(-1)?.id||null,resolved,archived:false},canFollowUp:!options.noFollowup,canAnswer:true,answers:before?[{id:'older',authorName:'첫 멘토',content:'더 오래된 답변',createdAt:'2026-08-01T00:00:00Z'}]:replies,nextCursor:options.older&&!before?'10':null}});return;
   }
   const body=route.request().postDataJSON();writes.push(body);
-  if(options.stale){options.stale=false;replies.push({id:'44444444-4444-4444-8444-444444444444',authorName:'다른 멘토',content:'방금 등록된 답변',createdAt:new Date().toISOString()});await route.fulfill({status:409,json:{error:'다른 답변이 등록됐습니다.'}});return;}
-  if(body.action==='resolve')resolved=true;else if(!replies.some(a=>a.id===body.requestId))replies.push({id:body.requestId,authorName:'담당 멘토',content:body.content,createdAt:new Date().toISOString()});
+  if(options.stale){options.stale=false;replies.push({id:'44444444-4444-4444-8444-444444444444',authorName:'다른 멘토',source:'operator',content:'방금 등록된 답변',createdAt:new Date().toISOString()});await route.fulfill({status:409,json:{error:'다른 답변이 등록됐습니다.'}});return;}
+  if(body.action==='resolve')resolved=true;else if(!replies.some(a=>a.id===body.requestId))replies.push({id:body.requestId,authorName:body.action==='followup'?'수강생':'담당 멘토',source:body.action==='followup'?'learner':'operator',content:body.content,createdAt:new Date().toISOString()});
   if(options.lost){options.lost=false;await route.fulfill({status:503,json:{error:'결과를 확인하지 못했습니다.'}});return;}
   await route.fulfill({json:body.action==='resolve'?{id:q,resolved:true}:{id:body.requestId,questionId:q}});
  });
@@ -44,7 +44,7 @@ test('learners add a followup in the same thread, retry uncertain responses with
  const input=page.getByRole('textbox',{name:'후속 질문',exact:true});await input.fill('답변을 보고 더 궁금한 점');await page.getByRole('button',{name:'답변 이력 접기'}).click();await page.getByRole('button',{name:'후속 질문하기',exact:true}).click();await expect(input).toHaveValue('답변을 보고 더 궁금한 점');
  await page.getByRole('button',{name:'후속 질문 등록'}).click();await expect(input).toBeDisabled();await expect(page.getByRole('button',{name:'답변 이력 접기'})).toBeDisabled();await expect(page.getByRole('button',{name:'최신 답변 확인'})).toBeDisabled();
  await page.getByRole('button',{name:'같은 요청 결과 확인'}).click();await expect(page.getByRole('status')).toContainText('후속 질문을 등록했습니다');expect(server.writes[0].action).toBe('followup');expect(server.writes[1]).toEqual(server.writes[0]);expect(server.replies).toHaveLength(2);await expect(input).toHaveValue('');
- await expect(page.getByText('기존 답변',{exact:true})).toBeVisible();await expect(page.getByText('답변을 보고 더 궁금한 점',{exact:true})).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await expect(page.getByText('기존 답변',{exact:true})).toBeVisible();await expect(page.getByText('답변을 보고 더 궁금한 점',{exact:true})).toBeVisible();await expect(page.getByText('후속 질문 · 수강생',{exact:true})).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.screenshot({path:info.outputPath('learner-followup.png'),fullPage:true});
 });
 test('a concurrent reply preserves the followup text until the learner reads the latest thread',async({page,context})=>{
