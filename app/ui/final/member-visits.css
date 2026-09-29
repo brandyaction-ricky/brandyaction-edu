@@ -1,0 +1,9 @@
+.member-visits{margin:16px 0;min-width:0;scroll-margin-top:80px}
+.member-visits-controls{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin:16px 0}
+.member-visits-controls .field{margin:0;max-width:100%}
+.member-visits .member-visit{border-top:1px solid var(--line,#e5e7eb);padding:16px 0;overflow-wrap:anywhere}
+.member-visit-summary{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.member-visit-summary>.avatar{flex-shrink:0}
+.member-visit-summary>div{flex:1;min-width:100px}
+.member-visit-summary>p{margin:0}
+.member-visits-toggle{margin-bottom:16px}

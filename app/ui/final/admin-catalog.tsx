@@ -1,4 +1,5 @@
 "use client";
+import { MemberVisitsToggle } from './member-visits';
 import { MvpBadge, useMemberMvps } from './member-mvp';
 import { QuestionAiBatch } from './question-ai-batch';
 import { lessonBodyPlainText } from "@/lib/lesson-body";
@@ -658,6 +659,7 @@ export function AdminCatalog({
   );
   return (
     <>
+      {s.key === 'customers' && blockLearningEnabled && <MemberVisitsToggle/>}
       {s.key === 'customers' && mvps.error && <p role="alert" className="notice">{mvps.error}</p>}
       {['customers', 'questions'].includes(s.key) && (params.get('member') || params.get('question')) && <p className="notice mb16">연결된 {params.get('question') ? '질문' : '회원'}만 조회 중입니다. <Link className="text-link" href={`/admin/${s.key}`}>전체 목록 보기</Link></p>}
       {s.key === "products" && <div className="admin-pilot-summary" aria-label="상품 요약">

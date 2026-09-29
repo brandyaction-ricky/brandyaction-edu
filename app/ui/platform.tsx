@@ -59,6 +59,7 @@ import { Checkout } from "./final/checkout";
 import { Classroom } from "./final/classroom";
 import { MemberViews } from "./final/member-views";
 import { CustomerWorkspace } from "./final/customer-workspace";
+import { MemberVisitRecorder } from "./final/member-visit-recorder";
 import {
   ArticleCard,
   Brand,
@@ -1045,6 +1046,7 @@ export function Platform({
       }
     >
       {!admin && header}
+      {(account || learning) && user?.role === 'student' && <MemberVisitRecorder member={user.id}/>}
       <main
         id="main"
         className={
