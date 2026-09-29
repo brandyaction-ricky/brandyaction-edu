@@ -55,6 +55,7 @@ self.addEventListener('push', event => {
     await self.registration.showNotification('브랜디에듀', {
       body: '새 학습 알림이 있습니다. 로그인해서 확인해 주세요.',
       tag: 'edu-' + data.eventId, renotify: false,
+      icon: '/icons/edu-192.png', badge: '/icons/edu-badge-96.png',
       data: { binding: data.binding, path: data.path },
     });
   })().catch(() => {}));

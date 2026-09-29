@@ -24,7 +24,7 @@ test('worker requires a same-origin page and matching current account before bin
 });
 test('valid push shows only generic text; wrong-account payload and external destinations cannot notify or navigate',async()=>{
  const h=worker(),owner=randomUUID(),binding=randomUUID(),eventId=randomUUID();await h.command({action:'ACCOUNT',owner});await h.command({action:'BIND',owner,binding});
- await h.push({version:1,binding,eventId,path:'/my/messages',body:'PRIVATE ANSWER',title:'PRIVATE NAME'});assert.equal(h.notifications.length,1);assert.doesNotMatch(JSON.stringify(h.notifications),/PRIVATE/);assert.equal(h.notifications[0].options.renotify,false);
+ await h.push({version:1,binding,eventId,path:'/my/messages',body:'PRIVATE ANSWER',title:'PRIVATE NAME'});assert.equal(h.notifications.length,1);assert.doesNotMatch(JSON.stringify(h.notifications),/PRIVATE/);assert.equal(h.notifications[0].options.renotify,false);assert.equal(h.notifications[0].options.icon,'/icons/edu-192.png');assert.equal(h.notifications[0].options.badge,'/icons/edu-badge-96.png');
  for(const data of [{version:1,binding:randomUUID(),eventId,path:'/my/messages'},{version:1,binding,eventId,path:'https://evil.test'},{version:1,binding,eventId:'x',path:'/my/messages'}])await h.push(data);
  assert.equal(h.notifications.length,1);await h.click(h.notifications[0].options.data);assert.deepEqual(h.navigations,['https://edu.test/my/messages']);await h.click({binding,path:'//evil.test'});assert.equal(h.navigations.length,1);
 });

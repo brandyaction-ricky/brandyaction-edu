@@ -1,4 +1,5 @@
 "use client";
+import { AppInstallCard } from './app-install';
 import { QuestionImage } from './question-image';
 import { QuestionAnswerHistory } from './question-thread';
 import { MemberMessages } from './member-messages';
@@ -1286,7 +1287,7 @@ export function MemberViews({
   switch (section) {
     case "":
     case "dashboard":
-      content = <Dashboard data={data} user={user} active={active} blockLearningEnabled={blockLearningEnabled} />;
+      content = <><Dashboard data={data} user={user} active={active} blockLearningEnabled={blockLearningEnabled} /><AppInstallCard/></>;
       break;
     case "classes":
       content = (
@@ -1333,7 +1334,7 @@ export function MemberViews({
       break;
     case "profile":
       content = (
-        <Profile user={user} pending={pending} send={send} logout={logout} />
+        <><Profile user={user} pending={pending} send={send} logout={logout} /><AppInstallCard settings/></>
       );
       break;
     case "reviews":

@@ -22,6 +22,7 @@ const server = createServer((request,response)=>{
   if(lessonQuestionFixture(request,response,url))return;
   if(reviewFixture(request,response,url))return;
   if(url.pathname==='/edu-push-sw.js'){response.setHeader('Content-Type','application/javascript');response.setHeader('Cache-Control','no-store');response.end(readFileSync(resolve('public/edu-push-sw.js')));return;}
+  if(/^\/icons\/edu-(192|512|maskable-512|badge-96)\.png$/.test(url.pathname)){response.setHeader('Content-Type','image/png');response.end(readFileSync(resolve('public'+url.pathname)));return;}
   if(request.method!=='GET'){response.writeHead(405).end();return;}
   if(url.pathname==='/api/platform'&&url.searchParams.get('part')==='curriculum'){
     response.setHeader('Content-Type','application/json');
