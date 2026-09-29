@@ -94,6 +94,7 @@ export async function prepareReplitLessonPlan(source) {
       add(out, block.sourceId, extra);
     }
     const plannedDocument = { schemaVersion: 1, blocks, checklist: sourceDoc.checklist.map(c => ({ id: stableId('check', key, c.sourceId), label: c.text, required: c.required })), completion: sourceDoc.track === 'ongoing' ? { mode: 'self', requireAnswers: false, requireQuizPass: false } : sourceDoc.track === 'learning' ? { mode: 'self', requireAnswers: false, requireQuizPass: true } : { mode: 'mentor', requireAnswers: false, requireQuizPass: false }, ...(sourceDoc.track !== 'ongoing' ? { progression: { track: sourceDoc.track === 'challenge' ? 'daily' : 'learning', dayNumber: sourceDoc.day } } : {}) };
+    if (sourceDoc.track === 'learning') plannedDocument.presentation = { tag: sourceDoc.metadata.tag, tagLabel: sourceDoc.metadata.tag_label };
     let document = null;
     if (!blocks.some(b => Object.keys(b).some(k => k.startsWith('pending')))) {
       try { document = contract.validateLessonBlocks(plannedDocument); }

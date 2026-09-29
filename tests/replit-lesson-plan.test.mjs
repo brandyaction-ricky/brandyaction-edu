@@ -44,6 +44,7 @@ test('equal order preserves source tie order; renumbering order does not change 
 test('HTML learning keeps intro, entities, paragraph boundaries, bold, links, tip and server-private quiz answers in display order',async()=>{
  const {plan}=await prepareReplitLessonPlan(sourceFixture()),lesson=plan.lessons[1],doc=lesson.document;
  assert.equal(lesson.metadata.is_active,false);assert.deepEqual(doc.blocks.map(b=>b.type),['text','text','text','quiz']);
+ assert.deepEqual(doc.presentation,{tag:'ai',tagLabel:'AI'});
  assert.equal(doc.blocks[0].content,'도입 안내  ');assert.equal(doc.blocks[2].content,'실행 팁\n그대로');
  const rich=contract.parseLessonDocument(doc.blocks[1].content);assert.equal(rich.content[0].content[0].text,'본문 & ');assert.deepEqual(rich.content[0].content[1].marks,[{type:'bold'}]);assert.equal(rich.content[1].type,'heading');
  assert.equal(doc.blocks[3].quiz.questions[0].correctIndex,1);assert.doesNotMatch(JSON.stringify(contract.publicLessonBlocks(doc)),/correctIndex/);

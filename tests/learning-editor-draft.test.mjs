@@ -13,6 +13,7 @@ const storage=()=>{const map=new Map();return{map,getItem:k=>map.get(k)??null,se
 
 test('unfinished questions, generator fields, quiz keys and empty media survive draft parsing unchanged',()=>{
  const d=draft();d.blocks.document.blocks.push({id:'question',type:'question',question:{label:'',kind:'text',required:true}},{id:'quiz',type:'quiz',quiz:{questions:[{id:'q',prompt:'',options:['',''],correctIndex:-1}],passPercent:0}},{id:'image',type:'image',url:''},{id:'generator',type:'prompt-generator',content:'{',fields:[{id:'f',label:'',variable:'',placeholder:'',required:true,sensitive:true}]});
+ d.blocks.document.presentation={tag:'basics',tagLabel:'기초 학습'};
  d.blocks.document.checklist.push({id:'c',label:'',required:true});d.blocks.document.progression={track:'daily',dayNumber:0};
  assert.deepEqual(parseLearningEditorDraft(JSON.stringify(d),actor,lesson),d);
 });

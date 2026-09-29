@@ -14,6 +14,7 @@ import { LessonGuidedTool } from './lesson-guided-tool';
 import { hasCalculatorDefinition, isCalculator } from '@/lib/lesson-calculators';
 import { LessonCalculator } from './lesson-calculator';
 import './lesson-blocks.css';
+import { LessonTag } from './lesson-tag';
 
 export type BlockGrade = { correct: number; total: number; passed: boolean; results: { id: string; answered: boolean; correct: boolean }[] };
 const supported = new Set(['heading', 'subheading', 'text', 'video', 'audio', 'image', 'question', 'divider', 'link', 'prompt', 'prompt-generator', 'quiz']);
@@ -93,6 +94,7 @@ function BlockQuiz({ block, answer, disabled, onChange, grade }: { block: Public
 export function LessonBlockView({ document, values, onChange, readOnly = false, grade, fileContext, submissionId, onFilePending, onAnswerChange, livePrompts = false }: { livePrompts?: boolean; fileContext?: AnswerFileContext; submissionId?: string; onFilePending?: (blockId: string, pending: boolean) => void; onAnswerChange?: (blockId: string, value: BlockAnswer) => void; document: PublicBlockDocument; values: LessonBlockAnswers; onChange: (values: LessonBlockAnswers) => void; readOnly?: boolean; grade?: (blockId: string) => Promise<BlockGrade> }) {
   function answer(id: string, value: BlockAnswer) { if (onAnswerChange) { onAnswerChange(id, value); return; } onChange({ ...values, blocks: { ...values.blocks, [id]: value } }); }
   return <div className="lesson-blocks">
+    <LessonTag label={document.presentation?.tagLabel} />
     {document.blocks.map(block => {
       const url = mediaUrl(block.url), value = values.blocks[block.id];
       let content;

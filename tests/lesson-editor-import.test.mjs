@@ -37,11 +37,12 @@ test('oversized, binary and corrupted text never enter the editor',()=>{
  assert.deepEqual(parseCurriculumText('  \n'),{blocks:[],checklist:[],warnings:[]});
 });
 test('append, insert and replace preserve completion policy, existing IDs and explicit checklist semantics',()=>{
- const current={...empty,blocks:[{id:'old',type:'text',content:'기존 본문'}],checklist:[{id:'old-check',label:'기존 체크',required:true}],completion:{mode:'mentor',requireAnswers:false,requireQuizPass:false},progression:{track:'daily',dayNumber:7}};
+ const current={...empty,presentation:{tag:'basics',tagLabel:'기초 학습'},blocks:[{id:'old',type:'text',content:'기존 본문'}],checklist:[{id:'old-check',label:'기존 체크',required:true}],completion:{mode:'mentor',requireAnswers:false,requireQuizPass:false},progression:{track:'daily',dayNumber:7}};
  const original=JSON.stringify(current),incoming=parseCurriculumText('Q\n새 질문');
  const append=applyLessonImport(current,incoming,'append'),front=applyLessonImport(current,incoming,0),replace=applyLessonImport(current,incoming,'replace');
  assert.equal(append.blocks[0].id,'old');assert.equal(front.blocks[1].id,'old');assert.equal(replace.blocks.length,1);assert.deepEqual(replace.checklist,current.checklist);assert.deepEqual(replace.progression,current.progression);assert.deepEqual(replace.completion,current.completion);
  assert.notEqual(append.blocks[1].id,front.blocks[0].id);assert.equal(JSON.stringify(current),original);
+ assert.deepEqual(replace.presentation,current.presentation);
  const checks=applyLessonImport(current,parseCurriculumText('미션 체크리스트\n새 체크 *'),'replace');assert.equal(checks.checklist[0].label,'새 체크');assert.equal(checks.checklist.length,1);
  assert.throws(()=>applyLessonImport(current,incoming,3));assert.throws(()=>applyLessonImport({...empty,blocks:Array.from({length:1000},(_,n)=>({id:`old-${n}`,type:'divider'}))},incoming,'append'));
 });

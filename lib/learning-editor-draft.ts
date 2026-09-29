@@ -19,7 +19,7 @@ function uniqueIds(v: { id: string }[]) { return new Set(v.map(x => x.id)).size 
 // Drafts deliberately accept unfinished required fields. Publishing continues
 // to use validateLessonBlocks; restoring only verifies safe editor structure.
 export function isBlockEditorDocument(v: unknown): v is LessonBlockDocument {
-  if (!obj(v) || !only(v, ['schemaVersion', 'blocks', 'checklist', 'completion', 'progression']) || v.schemaVersion !== 1 || !list(v.blocks, 1000, b => {
+  if (!obj(v) || !only(v, ['schemaVersion', 'blocks', 'checklist', 'completion', 'progression', 'presentation']) || v.schemaVersion !== 1 || !list(v.blocks, 1000, b => {
     if (!obj(b) || !identity(b.id) || !lessonBlockTypes.includes(b.type as never) || !['content', 'url', 'assetId', 'alt', 'toolVersion'].every(k => optionalString(b[k]))) return false;
     const allowed = ['id', 'type', 'content'];
     if (['image', 'audio', 'video', 'link'].includes(String(b.type))) allowed.push('url', 'alt');
@@ -36,6 +36,7 @@ export function isBlockEditorDocument(v: unknown): v is LessonBlockDocument {
   }) || !list(v.checklist, 1000, c => obj(c) && identity(c.id) && str(c.label) && bool(c.required))) return false;
   if (v.completion !== undefined && (!obj(v.completion) || !['self', 'mentor'].includes(String(v.completion.mode)) || !bool(v.completion.requireAnswers) || !bool(v.completion.requireQuizPass))) return false;
   if (v.progression !== undefined && (!obj(v.progression) || !['daily', 'learning'].includes(String(v.progression.track)) || !Number.isFinite(v.progression.dayNumber))) return false;
+  if (v.presentation !== undefined && (!obj(v.presentation) || !only(v.presentation, ['tag', 'tagLabel']) || !str(v.presentation.tag) || !str(v.presentation.tagLabel))) return false;
   return uniqueIds(v.blocks as { id: string }[]) && uniqueIds(v.checklist as { id: string }[]);
 }
 function isForm(v: unknown): v is LearningFormDraft {

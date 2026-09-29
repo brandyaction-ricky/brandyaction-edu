@@ -6,7 +6,7 @@ async function backend(page: Page, failure = 0, denied = false) {
   const writes: { requestId: string; expectedRevision: string | null; document: LessonBlockDocument }[] = [];
   await page.route('**/api/platform/lesson-blocks**', async route => {
     if (route.request().method() === 'GET') {
-      if (new URL(route.request().url()).searchParams.get('action') === 'progression') { await route.fulfill({json:{lessons:[{lessonId:'aaaaaaab-1111-4111-8111-000000000004',isUnlocked:true,track:null,dayNumber:null,automaticApproval:false,reason:''}]}}); return; }
+      if (new URL(route.request().url()).searchParams.get('action') === 'progression') { await route.fulfill({json:{lessons:[{lessonId:'aaaaaaab-1111-4111-8111-000000000004',isUnlocked:true,track:null,dayNumber:null,automaticApproval:false,reason:'',tagLabel:document?.presentation?.tagLabel || ''}]}}); return; }
 
       if (readError) { await route.fulfill({ status: 503, json: { error: '합성 조회 오류' } }); return; }
       const learner = new URL(route.request().url()).searchParams.has('enrollment');
@@ -24,6 +24,24 @@ async function backend(page: Page, failure = 0, denied = false) {
   return { writes, getDocument: () => document, setDocument: (value: LessonBlockDocument) => { document = value; revision = 'bbbbbbbc-1111-4111-8111-111111111111'; }, setReadError: (value: boolean) => { readError = value; } };
 }
 async function add(page: Page, type: string) { await page.getByRole('combobox', { name: '추가할 항목' }).selectOption(type); await page.getByRole('button', { name: '항목 추가', exact: true }).click(); return page.locator('[data-author-block]').last(); }
+
+test('lesson tags save, reload, preview and display on student content and navigation; clearing hides the label', async ({ page }, info) => {
+  const server=await backend(page);await page.goto('/lesson-block-author-test');await page.getByRole('button',{name:'여러 항목으로 구성하기'}).click();
+  await page.getByRole('textbox',{name:'학생에게 표시할 태그'}).fill('기초 · AI');await page.getByText('태그 관리용 이름',{exact:true}).click();await page.getByRole('textbox',{name:'태그 내부 키'}).fill('internal-ai-basics');
+  await page.getByRole('button',{name:'구성 미리보기',exact:true}).click();await expect(page.getByLabel('구성 미리보기').getByLabel('학습 태그: 기초 · AI')).toBeVisible();await page.getByRole('button',{name:'편집 화면으로',exact:true}).click();
+  await page.getByRole('button',{name:'학습 저장',exact:true}).click();await expect(page.getByText('학습 기본 정보와 콘텐츠를 저장했습니다.',{exact:true})).toBeVisible();expect(server.getDocument()?.presentation).toEqual({tag:'internal-ai-basics',tagLabel:'기초 · AI'});
+  await page.getByRole('button',{name:'편집 다시 열기'}).click();await expect(page.getByRole('textbox',{name:'학생에게 표시할 태그'})).toHaveValue('기초 · AI');
+  await page.getByRole('button',{name:'학생 화면 보기'}).click();await expect(page.locator('.lesson-blocks > .lesson-tag')).toHaveText('기초 · AI');await expect(page.locator('.lesson-nav .lesson-tag')).toHaveText('기초 · AI');await expect(page.getByText('internal-ai-basics',{exact:true})).toHaveCount(0);
+  await page.screenshot({path:info.outputPath('lesson-tag.png'),fullPage:true});
+  await page.getByRole('button',{name:'편집 다시 열기'}).click();await page.getByRole('textbox',{name:'학생에게 표시할 태그'}).fill('');await page.getByRole('button',{name:'학습 저장',exact:true}).click();await expect(page.getByText('학습 기본 정보와 콘텐츠를 저장했습니다.',{exact:true})).toBeVisible();await page.getByRole('button',{name:'학생 화면 보기'}).click();await expect(page.locator('.lesson-tag')).toHaveCount(0);
+});
+
+test('unsaved tags restore with the learning draft and render as text without executing markup',async({page})=>{
+  await page.clock.install();await backend(page);await page.goto('/lesson-block-author-test');await page.getByRole('button',{name:'여러 항목으로 구성하기'}).click();
+  const label='<img src=x onerror=alert(1)> 기초';await page.getByRole('textbox',{name:'학생에게 표시할 태그'}).fill(label);await page.getByRole('button',{name:'지금 임시저장',exact:true}).click();await page.getByRole('button',{name:'편집 다시 열기'}).click();
+  await page.getByRole('button',{name:'임시저장본 불러오기',exact:true}).click();await expect(page.getByRole('textbox',{name:'학생에게 표시할 태그'})).toHaveValue(label);
+  await page.getByRole('button',{name:'구성 미리보기',exact:true}).click();await expect(page.getByLabel('구성 미리보기').locator('.lesson-tag')).toHaveText(label);await expect(page.getByLabel('구성 미리보기').locator('.lesson-tag img')).toHaveCount(0);
+});
 
 test('author preserves image and archive question types and exposes the matching student upload controls', async ({ page }) => {
   const server = await backend(page);

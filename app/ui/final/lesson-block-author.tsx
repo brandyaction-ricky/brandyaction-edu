@@ -146,6 +146,10 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
       <div className="lba-actions"><button type="button" className="btn" onClick={() => setImportMode('text')}>텍스트·파일 가져오기</button><button type="button" className="btn" disabled={!sources.length} onClick={() => setImportMode('cards')}>다른 학습 카드 가져오기</button>
         {importUndo && importUndo.after === JSON.stringify(document) && saved !== importUndo.after && <button type="button" className="btn" onClick={() => { setDocument(importUndo.before); setImportUndo(null); setMessage('가져오기 직전 내용으로 되돌렸습니다.'); }}>마지막 가져오기 되돌리기</button>}
       </div>
+      <section className="lba-block"><h3>학습 태그</h3>
+        <Field label="학생에게 표시할 태그" hint="예: 기초, AI 활용. 비워두면 표시하지 않습니다."><input maxLength={100} value={document.presentation?.tagLabel || ''} onChange={event => setDocument(previous => ({ ...previous, presentation: { tag: previous.presentation?.tag || '', tagLabel: event.target.value } }))} /></Field>
+        <details><summary>태그 관리용 이름</summary><Field label="태그 내부 키" hint="원본 학습의 태그 키를 보관합니다. 학생에게는 위의 표시 문구만 보여줍니다."><input maxLength={100} value={document.presentation?.tag || ''} onChange={event => setDocument(previous => ({ ...previous, presentation: { tagLabel: previous.presentation?.tagLabel || '', tag: event.target.value } }))} /></Field></details>
+      </section>
       <section className="lba-block"><h3>학습 완료 기준</h3>
         <Field label="학습 개방 방식"><select value={document.progression?.track || ''} onChange={event => setDocument(previous => {
           const track = event.target.value;

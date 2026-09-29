@@ -29,6 +29,7 @@ import { LessonText } from "./lesson-text";
 import { LessonBlockSession } from './lesson-block-session';
 import { useLessonProgression, type LessonGate } from './use-lesson-progression';
 import { Badge, Empty, Heading, ResourceRow, Video } from "./primitives";
+import { LessonTag } from './lesson-tag';
 
 export function Classroom({
   path,
@@ -290,6 +291,7 @@ export function Classroom({
                       <div>
                         <span className="meta">{lessonLabel(l.id, num(l, "day_number"))}{!canOpen(l.id) ? ' · 잠김' : ''}</span>
                         <b>{t(l, "title")}</b>
+                        {blockLearningEnabled && <LessonTag label={progression.lessons?.find(gate => gate.lessonId === l.id)?.tagLabel} />}
                       </div>
                     </Link>
                   ))}
