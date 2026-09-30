@@ -90,7 +90,7 @@ export function Checkout({
         orderId: String(result.orderNumber),
         orderName: String(result.orderName || t(course, "title")),
         customerName: String(f.get("name")),
-        customerEmail: user!.email,
+        customerEmail: user!.contact_email || user!.email,
         successUrl: location.origin + "/payment/success",
         failUrl: location.origin + "/payment/fail",
       } as const;
@@ -153,14 +153,14 @@ export function Checkout({
         </label>
       </div>
       <label className="field">
-        이메일
+        안내받을 이메일
         <input
           type="email"
           autoComplete="email"
-          value={user?.email || ""}
+          value={user?.contact_email || user?.email || ""}
           readOnly
         />
-        <small>클래스 참여 안내를 받을 이메일입니다.</small>
+        <small>클래스 참여 안내를 받을 이메일입니다. <Link href="/my/profile">마이페이지에서 변경</Link></small>
       </label>
     </>
   );

@@ -1042,6 +1042,7 @@ function Profile({
         action: "profile",
         name: f.get("name"),
         phone: f.get("phone"),
+        contact_email: f.get("contact_email"),
       });
       setMessage("회원 정보를 저장했습니다.");
     } catch (cause) {
@@ -1091,9 +1092,15 @@ function Profile({
                 />
               </label>
               <label className="field wide">
-                이메일
-                <input type="email" value={user.email} readOnly />
-                <small>로그인에 연결된 이메일입니다.</small>
+                로그인 이메일
+                <input type="email" aria-label="로그인 이메일" value={user.email} readOnly />
+                <small>카카오·구글 로그인에 연결된 주소입니다.</small>
+              </label>
+              <label className="field wide">
+                안내받을 이메일
+                <input name="contact_email" type="email" aria-label="안내받을 이메일" aria-describedby="contact-email-help contact-email-fallback" autoComplete="email" maxLength={254} defaultValue={user.contact_email || ""} placeholder={user.email || "example@email.com"} />
+                <small id="contact-email-help">앞으로 보내는 결제·수강 안내를 이 주소로 받습니다. 기존 결제 건에도 적용되며 로그인 계정은 바뀌지 않습니다.</small>
+                <small id="contact-email-fallback">비워 두면 결제할 때 등록한 이메일 또는 로그인 이메일을 사용합니다. 이미 보낸 메일은 다시 보내지 않습니다.</small>
               </label>
             </div>
           </div>
