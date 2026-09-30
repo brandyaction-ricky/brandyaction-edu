@@ -54,6 +54,8 @@ test('email confirmation accepts supported token types and prevents external red
   assert.equal(consent.headers.get('location'), 'https://dev.example/auth/consent?next=%2Fmy');
   assert.equal(consent.headers.get('Cache-Control'), 'private, no-store');
   assert.equal(consent.headers.get('set-cookie'), 'sb-auth-token=test-session');
+  const changed = await request('token_hash=x&type=email_change&next=%2Fmy%2Fprofile');
+  assert.equal(changed.headers.get('location'), 'https://dev.example/auth/consent?next=%2Fmy%2Fprofile');
   assert.match((await request('token_hash=x&type=recovery')).headers.get('location'), /\/auth\/reset-password$/);
   error = { message: 'expired secret token' };
   const expired = await request('token_hash=x&type=email');

@@ -34,3 +34,8 @@ export function emailAuthError(error: { code?: string; status?: number }) {
   if (['signup_disabled', 'email_provider_disabled', 'email_address_invalid'].includes(error.code || '')) return '이메일 가입을 진행하지 못했습니다. 주소를 확인하거나 카카오·구글로 계속해 주세요.';
   return '요청을 처리하지 못했습니다. 연결 상태를 확인하고 다시 시도해 주세요.';
 }
+export function loginEmailChangeError(error: { code?: string; status?: number }) {
+  if (error.code === 'email_exists' || error.code === 'email_address_not_available' || error.code === 'user_already_exists') return '이미 다른 계정에서 사용하는 이메일입니다. 다른 주소를 입력하거나 고객센터에 문의해 주세요.';
+  if (error.code === 'reauthentication_needed') return '보안을 위해 다시 로그인한 뒤 요청해 주세요.';
+  return emailAuthError(error);
+}

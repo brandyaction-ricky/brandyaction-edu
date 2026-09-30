@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url), hash = url.searchParams.get('token_hash'), type = url.searchParams.get('type');
   let destination = '/login?error=email_confirmation';
   const cookies: ServerCookieMutation[] = [];
-  if (hash && hash.length <= 512 && (type === 'email' || type === 'signup' || type === 'recovery')) {
+  if (hash && hash.length <= 512 && (type === 'email' || type === 'signup' || type === 'recovery' || type === 'email_change')) {
     try {
       const { data, error } = await (await createClient(nextCookies => cookies.push(...nextCookies))).auth.verifyOtp({ token_hash: hash, type });
       if (!error && data.user) destination = type === 'recovery' ? '/auth/reset-password' : afterEmailLogin(data.user.user_metadata, safeNext(url.searchParams.get('next')));
