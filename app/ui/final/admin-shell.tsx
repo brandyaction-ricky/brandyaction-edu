@@ -41,7 +41,7 @@ export const finalAdminGroups = [
 ] as const;
 export const finalAdminTitles: Record<string, string> = {
   products: "상품·커리큘럼 관리",
-  conversion: "모집 운영",
+  conversion: "모집·문의 검토",
   landing: "광고·웨비나 성과",
   learning: "학습 콘텐츠 관리",
   weeks: "주차 구성",
