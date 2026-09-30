@@ -91,3 +91,31 @@
 .edu-admin .curriculum-editor-page .curriculum-archive > summary { display:flex; align-items:center; gap:8px; }
 .edu-admin .curriculum-editor-page .curriculum-archive[open] > summary .studio-chevron svg { transform:rotate(90deg); }
 .edu-admin .curriculum-editor-page .studio-week-title h3, .edu-admin .curriculum-editor-page .studio-lesson-link b { word-break:keep-all; }
+.edu-admin .studio-management-bar { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px 20px; margin:16px 0; background:#fff; border:1px solid #e3e6eb; border-radius:12px; }
+.edu-admin .studio-management-bar > div { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.edu-admin .studio-management-bar span { font-size:13px; color:#697386; }
+.edu-admin .studio-management-bar button { min-height:44px; gap:8px; }
+.edu-admin .studio-control-dialog { color:#272c34; background:#fff; width:min(760px,calc(100vw - 28px)); max-height:90dvh; padding:24px; border:1px solid #e3e6eb; border-radius:14px; box-shadow:0 24px 80px #0003; overflow:auto; }
+.edu-admin .studio-control-dialog::backdrop { background:#15202e66; }
+.edu-admin .studio-control-dialog header { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.edu-admin .studio-control-dialog h2 { font-size:22px; margin:0 0 12px; }
+.edu-admin .studio-control-dialog h3 { font-size:17px; }
+.edu-admin .studio-control-dialog p { font-size:14px; line-height:1.8; }
+.edu-admin .studio-control-dialog button { min-height:44px; }
+.edu-admin .studio-control-dialog footer { position:sticky; bottom:-24px; padding:16px 0; margin-top:20px; background:#fff; border-top:1px solid #e3e6eb; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.edu-admin .studio-control-dialog footer > div { display:flex; gap:8px; flex-wrap:wrap; }
+.edu-admin .studio-visibility-list > section { border:1px solid #e3e6eb; border-radius:10px; margin-top:12px; overflow:hidden; }
+.edu-admin .studio-visibility-list label { min-height:52px; display:flex; align-items:center; gap:12px; padding:12px 16px; margin:0; cursor:pointer; }
+.edu-admin .studio-visibility-list input[type=checkbox] { width:20px; height:20px; min-height:20px; flex:0 0 20px; accent-color:#c91e30; }
+.edu-admin .studio-visibility-week { background:#f6f7f9; font-weight:700; }
+.edu-admin .studio-visibility-list .studio-visibility-lesson { padding-left:32px; border-top:1px solid #edf0f3; }
+.edu-admin .studio-visibility-lesson span { min-width:0; }
+.edu-admin .studio-visibility-lesson b { font-size:14px; line-height:1.6; display:block; overflow-wrap:anywhere; }
+.edu-admin .studio-visibility-lesson small { color:#697386; font-size:12px; line-height:1.8; }
+.edu-admin .studio-visibility-review li, .edu-admin .studio-week-order li { display:flex; gap:12px; align-items:center; padding:12px 0; border-bottom:1px solid #edf0f3; }
+.edu-admin .studio-visibility-review li > b { flex:0 0 auto; white-space:nowrap; }
+.edu-admin .studio-visibility-review ul, .edu-admin .studio-week-order { padding:0; list-style:none; }
+.edu-admin .studio-week-order li span { flex:1; min-width:0; overflow-wrap:anywhere; }
+.edu-admin .studio-week-order small { color:#697386; }
+.edu-admin .curriculum-editor-page .product-curriculum-week-actions { flex-wrap:wrap; gap:4px; }
+@media (max-width:800px) { .edu-admin .studio-management-bar { align-items:stretch; flex-direction:column; padding:16px; } .edu-admin .studio-control-dialog { padding:18px; } .edu-admin .studio-control-dialog footer { bottom:-18px; } .edu-admin .studio-visibility-list .studio-visibility-lesson { padding-left:16px; } }
