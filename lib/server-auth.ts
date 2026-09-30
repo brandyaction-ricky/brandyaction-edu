@@ -9,7 +9,7 @@ export const getAuthenticatedUser = cache(async () => {
       throw error;
     }
     if (!data.user) return null;
-    const { data: profile, error: profileError } = await db.from('profiles').select('id,email,full_name,phone,role,status,marketing_consent').eq('id',data.user.id).maybeSingle();
+    const { data: profile, error: profileError } = await db.from('profiles').select('id,email,contact_email,full_name,phone,role,status,marketing_consent').eq('id',data.user.id).maybeSingle();
     if (profileError) throw profileError;
     if (!profile || profile.status !== 'active') return null;
     return { ...profile, email: data.user.email || profile.email || '', id: data.user.id };

@@ -11,6 +11,7 @@ import { adminSelectColumns, adminTables, archiveValues, cohortStatus, phoneNumb
 import { POLICY_VERSION } from '@/lib/legal-policies';
 import { getOperatorUser, permissionsFor, sectionScopes } from '@/lib/operator-permissions';
 import { crmDeliveryState } from '@/lib/crm-delivery';
+import { contactEmail } from '@/lib/crm-purchase-contact';
 import { loadSmsSettings, registeredSmsNumbers } from '@/lib/crm-sms-settings';
 import { mergeProductDigitalSections, mergeProductMetadata, mergeProductResources, productDigitalSections, productMetadataFields, productResources, productResourceScopes } from '@/lib/product-metadata';
 import { getPublicPlatformData, getPublicSupport } from '@/lib/public-platform-data';
@@ -825,6 +826,10 @@ export async function POST(request: Request) {
                 }
             }
             if (section.table === 'profiles') {
+                if ('contact_email' in values) {
+                    try { values.contact_email = contactEmail(values.contact_email); }
+                    catch (e) { fail((e as Error).message); }
+                }
                 if (!uid(body.id)) fail('기존 회원을 선택해 주세요.');
                 const current = await db.from('profiles').select('id,role,status').eq('id', body.id).single();
                 if (current.error || !current.data) fail('회원 정보를 다시 불러온 뒤 저장해 주세요.', 409);
@@ -992,7 +997,13 @@ export async function POST(request: Request) {
             } catch (e) {
                 fail((e as Error).message);
             }
-            const r = await db.from('profiles').update({ full_name: name, phone }).eq('id', user.id);
+            const values: Record<string, unknown> = { full_name: name, phone };
+            // An older client saving a name/phone must not erase the delivery preference.
+            if ('contact_email' in body) {
+                try { values.contact_email = contactEmail(body.contact_email); }
+                catch (e) { fail((e as Error).message); }
+            }
+            const r = await db.from('profiles').update(values).eq('id', user.id).select('id').single();
             if (r.error) throw r.error;
             return reply({ ok: true });
         }
@@ -1039,7 +1050,7 @@ export async function POST(request: Request) {
                 p_user_id: user.id,
                 p_cohort_id: body.cohortId,
                 p_customer_name: String(body.name).trim(),
-                p_customer_email: user.email,
+                p_customer_email: user.contact_email || user.email,
                 p_customer_phone: phone,
                 p_terms_version: POLICY_VERSION,
                 p_privacy_version: POLICY_VERSION,
