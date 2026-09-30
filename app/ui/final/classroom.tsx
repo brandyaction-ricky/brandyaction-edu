@@ -166,6 +166,7 @@ export function Classroom({
                   pending={pending}
                   send={send}
                 />
+                {process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' && lesson && <LessonQuestions enrollmentId={String(enrollment.id)} lessonId={String(lesson.id)} lessonTitle={t(lesson, "title")}/>}
                 <Link className="link" href={lessonHref}>
                   <ArrowLeft />
                   학습실로
