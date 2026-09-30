@@ -62,6 +62,10 @@ export function AuthView({
   next: string;
   authError?: string | null;
 }) {
+  const googlePreview = useSearchParams().get("google_preview") === "1";
+  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_GIS_CLIENT_ID;
+  const useGoogleId = Boolean(googleClientId) &&
+    (process.env.NEXT_PUBLIC_GOOGLE_GIS_ENABLED === "true" || googlePreview);
   return (
     <div className="form-page">
       <section className="form-card">
@@ -88,10 +92,9 @@ export function AuthView({
             <MessageCircle className="social-mark" />
             카카오로 계속하기
           </button>
-          {process.env.NEXT_PUBLIC_GOOGLE_GIS_ENABLED === "true" &&
-          process.env.NEXT_PUBLIC_GOOGLE_GIS_CLIENT_ID ? (
+          {useGoogleId && googleClientId ? (
             <GoogleIdSignIn
-              clientId={process.env.NEXT_PUBLIC_GOOGLE_GIS_CLIENT_ID}
+              clientId={googleClientId}
               next={next}
               disabled={pending}
               fallback={() => void social("google")}
