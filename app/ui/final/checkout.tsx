@@ -9,6 +9,8 @@ import { type Data, type WorkflowSend } from "../learning-workflows";
 import { Badge, Empty, Heading, courseType } from "./primitives";
 import { parseEntrySource, withEntrySource } from '@/lib/entry-source';
 import { CheckoutCouponRegistration, useCheckoutCouponRegistration } from "@/features/commerce/ui";
+import { MOONSHOT_SUPPORT_URL } from "@/lib/purchase-onboarding";
+import "./checkout.css";
 
 export function Checkout({
   data,
@@ -73,9 +75,6 @@ export function Checkout({
       );
       const toss = await loadTossPayments(key);
       const payment = toss.payment({ customerKey: user!.id });
-      const paymentMethod = f.get("payment") === "VIRTUAL_ACCOUNT"
-        ? "VIRTUAL_ACCOUNT"
-        : "CARD";
       const paymentRequest = {
         amount: { currency: "KRW", value: Number(result.totalAmount) },
         orderId: String(result.orderNumber),
@@ -85,20 +84,8 @@ export function Checkout({
         successUrl: location.origin + "/payment/success",
         failUrl: location.origin + "/payment/fail",
       } as const;
-      if (paymentMethod === "VIRTUAL_ACCOUNT") {
-        await payment.requestPayment({
-          ...paymentRequest,
-          method: "VIRTUAL_ACCOUNT",
-          customerMobilePhone: String(f.get("phone")).replace(/\D/g, ""),
-          virtualAccount: {
-            cashReceipt: { type: "미발행" },
-            useEscrow: false,
-            validHours: 24,
-          },
-        });
-      } else {
-        await payment.requestPayment({ ...paymentRequest, method: "CARD" });
-      }
+      // Resume virtual-account requests only after the live merchant service is activated.
+      await payment.requestPayment({ ...paymentRequest, method: "CARD" });
     } catch (cause) {
       setError((cause as Error).message);
     } finally {
@@ -314,19 +301,30 @@ export function Checkout({
                     <CreditCard />
                     신용·체크카드
                   </label>
-                  <label className="radio-card">
+                  <label className="radio-card checkout-payment-unavailable">
                     <input
                       type="radio"
                       name="payment"
                       value="VIRTUAL_ACCOUNT"
+                      disabled
+                      aria-describedby="checkout-transfer-help"
                     />
                     <Landmark />
-                    가상계좌
+                    가상계좌 · 일시 중단
                   </label>
                 </div>
-                <p className="meta mt8">
-                  가상계좌는 발급 후 24시간 안에 입금해야 하며, 입금 확인 후 수강권이 제공됩니다.
-                </p>
+                <div className="notice checkout-transfer-help" id="checkout-transfer-help">
+                  <h3>계좌이체로 수강하시려면</h3>
+                  <p>계좌이체를 원하시면 아래 국민은행 계좌로 입금해 주세요.</p>
+                  <dl className="checkout-transfer-account">
+                    <div><dt>입금 계좌</dt><dd>KB국민은행 <strong>954201-00-094916</strong></dd></div>
+                    <div><dt>예금주</dt><dd>주식회사 브랜디액션</dd></div>
+                  </dl>
+                  <p>입금 후 카카오톡 채널로 문의해 주시면 계산서 발급과 수강 절차를 안내해 드리겠습니다.</p>
+                  <a className="btn btn-outline" href={MOONSHOT_SUPPORT_URL} target="_blank" rel="noopener noreferrer">
+                    입금 후 카카오톡 채널 문의 <ArrowRight aria-hidden="true" />
+                  </a>
+                </div>
               </div>
             </section>}
           </div>

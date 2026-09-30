@@ -46,6 +46,13 @@ for (const discounted of [false,true]) test(`positive checkout ${discounted?'wit
   await page.route('**/fixture/order',route=>route.fulfill({json:{orderId:'positive-order',orderNumber:'EDU-COUPON-QA',totalAmount:finalAmount}}));
   await page.route('**/fixture/toss',route=>route.fulfill({json:{ok:true}}));
   await page.goto('/coupon-checkout-test?cohort='+cohort);
+  await expect(page.getByRole('radio',{name:'가상계좌 · 일시 중단'})).toBeDisabled();
+  await expect(page.getByRole('radio',{name:'신용·체크카드'})).toBeChecked();
+  await expect(page.getByText('954201-00-094916',{exact:true})).toBeVisible();
+  await expect(page.getByText('주식회사 브랜디액션',{exact:true})).toBeVisible();
+  await expect(page.getByRole('link',{name:'입금 후 카카오톡 채널 문의'})).toHaveAttribute('href','http://pf.kakao.com/_ydxjhxj/chat');
+  await expect(page.getByText('입금 후 카카오톡 채널로 문의해 주시면 계산서 발급과 수강 절차를 안내해 드리겠습니다.')).toBeVisible();
+  if(!discounted) await page.locator('section.panel').filter({has:page.getByRole('heading',{name:'결제 수단',exact:true})}).screenshot({path:testInfo.outputPath('checkout-bank-transfer-help.png')});
   await expect(page.getByLabel('사용할 쿠폰')).toHaveCount(0);await expect(page.getByText('노출되면 안 되는 쿠폰')).toHaveCount(0);expect(couponListReads).toBe(0);
   if(discounted){await page.getByRole('button',{name:'쿠폰 등록하기',exact:true}).click();await page.getByLabel('쿠폰 코드',{exact:true}).fill('normal_qa');await page.getByRole('button',{name:'등록',exact:true}).click();await expect(page.getByRole('dialog')).toBeHidden();await expect(page.getByText('등록한 할인 쿠폰 할인이 자동으로 적용됐습니다.')).toBeVisible();await expect(page.locator('.checkout-payment-summary .checkout-discount-amount')).toHaveText('−8,000원');await expect(page.locator('.checkout-payment-summary .cost-total strong')).toHaveText('72,000원');}
   else await expect(page.locator('.checkout-payment-summary .cost-total strong')).toHaveText('80,000원');
