@@ -1365,6 +1365,12 @@ export function MemberViews({
             </div>
           </div>
           <nav className="account-nav" aria-label="마이페이지">
+            {["admin", "staff"].includes(user.role) && (
+              <Link className="member-mobile-admin-tab" href="/admin">
+                <Settings />
+                운영 관리자
+              </Link>
+            )}
             {accountGroups.map(([title, links]) => (
               <div className="member-nav-group" key={title}>
                 <span className="member-nav-label">{title}</span>

@@ -66,3 +66,6 @@
 .hero-slider-dots button.active::after{background:#fff}
 .hero-slider-dots button:focus-visible{outline:2px solid #fff;outline-offset:-3px}
 @media(max-width:680px){.hero-slider-controls{flex-wrap:wrap}.hero-slider-dots button{width:44px}.hero-slider-dots button::after{width:16px}}
+
+.account-nav .member-mobile-admin-tab{display:none}
+@media(max-width:900px){.account-nav .member-mobile-admin-tab{display:flex;position:sticky;left:0;z-index:2;flex-shrink:0;background:#fff3f1;border:1px solid #e4b6ae;color:#a21c22;font-weight:700}.account-nav .member-mobile-admin-tab svg{display:block}}
