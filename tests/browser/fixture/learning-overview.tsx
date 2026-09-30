@@ -26,5 +26,5 @@ export function LearningOverviewFixture() {
     data.curriculum_lessons.push({ id: 'second-lesson', week_id: 'second-week', day_number: 1, title: '두 번째 과정 시작' });
     data.learning_overviews.push({ id: 'second', status: 'ready', lessons: [{ ...gates[0], lessonId: 'second-lesson' }] });
   }
-  return <main className="edu-front"><MemberViews section={params.get('view') || 'dashboard'} data={data} user={{ id: 'sample-user', full_name: '학습 QA 회원', email: 'learner@example.test', role: 'member', phone: null }} pending={false} send={async () => ({})} logout={async () => {}} blockLearningEnabled={scenario !== 'legacy'}/></main>;
+  return <main className="edu-front"><MemberViews section={params.get('view') || 'dashboard'} data={data} user={{ id: 'sample-user', full_name: '학습 QA 회원', email: 'learner@example.test', role: params.get('role') === 'admin' ? 'admin' : params.get('role') === 'staff' ? 'staff' : 'member', phone: null }} pending={false} send={async () => ({})} logout={async () => {}} blockLearningEnabled={scenario !== 'legacy'}/></main>;
 }

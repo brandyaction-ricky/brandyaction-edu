@@ -1,5 +1,17 @@
 import { expect, test } from '@playwright/test';
 
+test('mobile member navigation keeps admin entry visible only for operators', async ({ page }, info) => {
+  test.skip(info.project.name !== 'mobile', 'mobile navigation');
+  await page.goto('/learning-overview-test?view=profile&role=admin');
+  const adminTab = page.getByRole('navigation', { name: '마이페이지' }).getByRole('link', { name: '운영 관리자' });
+  await expect(adminTab).toBeVisible();
+  await expect(adminTab).toHaveAttribute('href', '/admin');
+  await page.goto('/learning-overview-test?view=profile&role=staff');
+  await expect(adminTab).toBeVisible();
+  await page.goto('/learning-overview-test?view=profile');
+  await expect(adminTab).toHaveCount(0);
+});
+
 test('dashboard separates 30-day tracks and offers review while the next week is locked', async ({ page }, info) => {
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
   await page.goto('/learning-overview-test');
