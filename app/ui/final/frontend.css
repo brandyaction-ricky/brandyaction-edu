@@ -106,8 +106,6 @@
 @media(max-width:680px){.edu-front{--type-display:3.5rem;--type-hero:2.5rem;--type-h1:2rem;--type-h2:1.5rem;--type-h3:1.25rem;--type-h4:1.125rem;--page-gutter:16px;--card-padding:24px;--header-height:64px}}
 
 /* Shared UI language. Layout is owned by the front/admin interface stylesheet. */
-.edu-front .account-nav .member-mobile-admin-tab{display:none}
-@media(max-width:900px){.edu-front .account-nav .member-mobile-admin-tab{display:flex;position:sticky;left:0;z-index:2;flex-shrink:0;background:#fff3f1;border:1px solid #e4b6ae;color:#a21c22;font-weight:700}.edu-front .account-nav .member-mobile-admin-tab svg{display:block}}
 .edu-front{color-scheme:light;scroll-padding-top:calc(var(--header-height) + var(--space-6))}
 .edu-front{font-family:var(--font-sans);font-size:var(--type-body);line-height:var(--leading-ui);letter-spacing:-.025em;color:var(--text-primary);background:var(--surface-page);-webkit-font-smoothing:antialiased}
 .edu-front *,.edu-front *::before,.edu-front *::after{box-sizing:border-box}.edu-front button,.edu-front input,.edu-front textarea,.edu-front select{font:inherit;letter-spacing:inherit}.edu-front button,.edu-front a,.edu-front input,.edu-front textarea,.edu-front select,.edu-front summary{touch-action:manipulation}
@@ -202,3 +200,6 @@
 .edu-front .hero-slider-dots button.active::after{background:#fff}
 .edu-front .hero-slider-dots button:focus-visible{outline:2px solid #fff;outline-offset:-3px}
 @media(max-width:680px){.edu-front .hero-slider-controls{flex-wrap:wrap}.edu-front .hero-slider-dots button{width:44px}.edu-front .hero-slider-dots button::after{width:16px}}
+
+.edu-front .account-nav .member-mobile-admin-tab{display:none}
+@media(max-width:900px){.edu-front .account-nav .member-mobile-admin-tab{display:flex;position:sticky;left:0;z-index:2;flex-shrink:0;background:#fff3f1;border:1px solid #e4b6ae;color:#a21c22;font-weight:700}.edu-front .account-nav .member-mobile-admin-tab svg{display:block}}
