@@ -47,6 +47,7 @@ import { useAdminDialog, useRouteDialog } from "@/features/admin-ui";
 import { ArticleBannerEditor } from "./final/article-banner-editor";
 import { ArticleCategoryManager } from "./final/article-category-manager";
 import { ProductEditor } from "./final/admin-editors";
+import { CurriculumEditor } from "./final/curriculum-editor";
 import { LearningEditor } from "./final/learning-editor";
 import {
   AdminHeading,
@@ -478,7 +479,9 @@ export function Platform({
           const response = await fetch("/api/auth/kakao-sync", { cache: "no-store", signal: AbortSignal.timeout(2500) });
           if (response.ok) {
             const config = await response.json();
-            if (config.options?.scopes === "plusfriends") syncOptions = { scopes: "plusfriends" };
+            const scopes = String(config.options?.scopes || "").split(",")
+              .filter((scope) => scope === "plusfriends" || scope === "phone_number");
+            if (scopes.length) syncOptions = { scopes: scopes.join(",") };
           }
         } catch { /* Fall back to the existing Kakao login. */ }
       }
@@ -915,7 +918,9 @@ export function Platform({
         ) : !section ? (
           <AdminEmptyState title="이 화면에 접근할 운영 권한이 필요합니다.">운영 홈에서 현재 계정에 표시되는 메뉴를 선택해 주세요.</AdminEmptyState>
         ) : key === "conversion" ? (
-          <ConversionReview workspace initialPeriod={searchParams.get("recruitment") || undefined} userId={user!.id} />
+          <ConversionReview workspace initialPeriod={searchParams.get("recruitment") || undefined} initialView={searchParams.get("view") === "inquiries" ? "inquiries" : "recruitment"} userId={user!.id} />
+        ) : key === "learning" ? (
+          <CurriculumEditor actorId={user!.id} data={data} pending={pending} send={send} initialCourseId={searchParams.get("course") || ""} initialLessonId={searchParams.get("lesson") || ""} />
         ) : key === "product-editor" || key === "learning-editor" ? (
           loading && id && !edited ? (
             <AdminLoadingState title="편집 정보를 불러오는 중입니다." description="저장된 항목과 공개 상태를 확인하고 있습니다."/>
@@ -930,9 +935,11 @@ export function Platform({
               send={send}
               back={back}
             />
+          ) : edited ? (
+            <CurriculumEditor key={`${user!.id}:${edited.id}`} actorId={user!.id} data={data} pending={pending} send={send} initialCourseId={String((data.curriculum_weeks || []).find(week => week.id === edited.week_id)?.course_id || "")} initialLessonId={String(edited.id)} />
           ) : (
             <LearningEditor
-              key={`${user!.id}:${edited?.id || "new-lesson"}`}
+              key={`${user!.id}:new-lesson`}
               actorId={user!.id}
               data={data}
               row={edited}

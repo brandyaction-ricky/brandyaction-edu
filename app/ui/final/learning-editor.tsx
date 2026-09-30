@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useImperativeHandle, useRef, useState, type FormEvent, type ReactNode, type Ref } from "react";
 import { ArrowLeft, Download, ExternalLink, FileText, Plus, Video as VideoIcon, X } from "lucide-react";
 import { number as num, safeUrl, text as t, type Row } from "@/lib/platform";
 import { validateQuiz, type QuizDefinition, type QuizQuestion } from "@/lib/mission-quiz";
@@ -18,7 +18,13 @@ import type { LessonBlock } from '@/lib/lesson-blocks';
 import type { LearningEditorDraft, LearningFormDraft } from '@/lib/learning-editor-draft';
 import { LearningEditorDraftPanel, type LearningDraftHandle } from './learning-editor-draft';
 
-type Props = { data: Data; row?: Row; pending: boolean; send: WorkflowSend; back: () => void; blockEditingEnabled?: boolean; actorId?: string };
+import { useUnsavedLearningChanges } from './use-unsaved-learning-changes';
+
+export type LearningEditorSession = { dirty: boolean; busy: boolean; save: () => Promise<boolean> };
+function EditorSettings({ embedded, children }: { embedded?: boolean; children: ReactNode }) {
+  return embedded ? <details className="studio-lesson-settings"><summary>수업 설정 <span>주차 · 일차 · 공개 범위</span></summary>{children}</details> : <>{children}</>;
+}
+type Props = { embedded?: boolean; sessionRef?: Ref<LearningEditorSession>; onSaved?: () => void; data: Data; row?: Row; pending: boolean; send: WorkflowSend; back: () => void; blockEditingEnabled?: boolean; actorId?: string };
 type ContentType = "text" | "vod" | "material" | "link";
 const formats: { key: ContentType; label: string; icon: typeof FileText }[] = [
   { key: "text", label: "학습 본문", icon: FileText },
@@ -31,12 +37,13 @@ function Field({ label, children, wide = false, hint }: { label: string; childre
   return <AdminFormField className={"field" + (wide ? " wide" : "")} label={label} helper={hint}>{children}</AdminFormField>;
 }
 
-function LessonQuiz({ mission, current, pending, send }: { mission: Row; current?: Row; pending: boolean; send: WorkflowSend }) {
+function LessonQuiz({ mission, current, pending, send, onDirty }: { mission: Row; current?: Row; pending: boolean; send: WorkflowSend; onDirty: (dirty: boolean) => void }) {
   const [questions, setQuestions] = useState<QuizQuestion[]>(() => (current?.questions as QuizQuestion[]) || []);
   const pass = Number(current?.pass_percent || 100);
   const [message, setMessage] = useState("");
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  useEffect(() => { onDirty(dirty); return () => onDirty(false); }, [dirty, onDirty]);
   function update(index: number, patch: Partial<QuizQuestion>) {
     setDirty(true);
     setQuestions(previous => previous.map((question, i) => i === index ? { ...question, ...patch } : question));
@@ -82,7 +89,7 @@ function LessonQuiz({ mission, current, pending, send }: { mission: Row; current
   </form>;
 }
 
-export function LearningEditor({ data, row, pending, send, back, actorId, blockEditingEnabled = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' }: Props) {
+export function LearningEditor({ data, row, pending, send, back, actorId, embedded, sessionRef, onSaved, blockEditingEnabled = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' }: Props) {
   const content = (data.lesson_contents || []).find(item => item.lesson_id === row?.id);
   const [lessonId, setLessonId] = useState(row?.id || "");
   const [contentExists, setContentExists] = useState(Boolean(content));
@@ -102,6 +109,8 @@ export function LearningEditor({ data, row, pending, send, back, actorId, blockE
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [previewOnly, setPreviewOnly] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [quizDirty, setQuizDirty] = useState(false);
   const [selectedMissionId, setSelectedMissionId] = useState("");
   const previewRef = useRef<HTMLElement>(null);
   const blockRef = useRef<BlockAuthorHandle>(null);
@@ -138,27 +147,29 @@ export function LearningEditor({ data, row, pending, send, back, actorId, blockE
     : format === 'link' && externalUrl ? [{ id: 'legacy-link', type: 'link', url: externalUrl, content: '외부 학습 열기' }] : [];
   function changeBasic<K extends keyof typeof basic>(key: K, value: typeof basic[K]) { setBasic(previous => ({ ...previous, [key]: value })); setDirty(true); }
   function changeFormat(value: ContentType) { setFormat(value); setUploadStatus("idle"); setDirty(true); }
-  function close() { if (!(dirty || blockState.dirty) || window.confirm("저장하지 않은 학습 변경사항이 있습니다. 목록으로 이동할까요?")) { draftRef.current?.saveNow(); back(); } }
-  async function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (pending || saving || draftPending || (blockEditingEnabled && blockState.blocked)) return;
-    if (blockState.active && !blockRef.current?.validate()) { setPreviewOnly(false); blockSectionRef.current?.scrollIntoView({ block: 'start' }); return; }
+  function close() { if (!(dirty || blockState.dirty || quizDirty) || window.confirm("저장하지 않은 학습 변경사항이 있습니다. 목록으로 이동할까요?")) { draftRef.current?.saveNow(); back(); } }
+  async function save(): Promise<boolean> {
+    if (saveBlocked) return false;
+    if (quizDirty) { setMessage("아래 확인 퀴즈의 변경사항을 먼저 저장해 주세요."); return false; }
+    if (blockState.active && !blockRef.current?.validate()) { setPreviewOnly(false); blockSectionRef.current?.scrollIntoView({ block: 'start' }); return false; }
     if (format === "material" && uploadStatus !== "idle") {
       setPreviewOnly(false);
-      setMessage(uploadStatus === "uploading" ? "자료 업로드가 완료된 뒤 저장해 주세요." : "자료 업로드 오류를 확인한 뒤 다시 저장해 주세요.");
-      return;
+      setMessage("자료 업로드 오류를 확인한 뒤 다시 저장해 주세요.");
+      return false;
     }
-    const form = event.currentTarget;
+    const form = formRef.current;
+    if (!form) return false;
     if (!form.checkValidity()) {
       setPreviewOnly(false);
+      form.querySelectorAll<HTMLDetailsElement>("details").forEach(details => { details.open = true; });
       requestAnimationFrame(() => form.reportValidity());
-      return;
+      return false;
     }
     const selectedValue = { text: lessonBodyHasText(bodyText) ? bodyText : "", vod: videoUrl, material: resourcePath, link: externalUrl }[format].trim();
     if (!blockState.active && contentExists && !selectedValue) {
       setPreviewOnly(false);
       setMessage("선택한 콘텐츠 유형에 맞는 본문·영상·자료·링크를 입력해 주세요.");
-      return;
+      return false;
     }
     setSaving(true);
     setMessage("");
@@ -187,21 +198,26 @@ export function LearningEditor({ data, row, pending, send, back, actorId, blockE
       baseline.current = { basic: { ...basic }, format, bodyText, videoUrl, externalUrl, resourceName, resourcePath };
       draftRef.current?.clear();
       setMessage(blockState.active || selectedValue ? "학습 기본 정보와 콘텐츠를 저장했습니다." : "학습 기본 정보를 저장했습니다. 콘텐츠를 이어서 등록해 주세요.");
-    } catch (cause) { setMessage((cause as Error).message); }
+      onSaved?.();
+      return true;
+    } catch (cause) { setMessage((cause as Error).message); return false; }
     finally { setSaving(false); }
   }
+  useUnsavedLearningChanges(dirty || blockState.dirty || quizDirty);
+  useImperativeHandle(sessionRef, () => ({ dirty: dirty || blockState.dirty || quizDirty, busy, save }));
   function showPreview() {
     if (blockState.active) { setPreviewOnly(false); blockRef.current?.showPreview(); blockSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
     setPreviewOnly(previous => !previous);
     requestAnimationFrame(() => previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
-  return <div className="learning-editor">
-    <AdminHeading title="학습 콘텐츠 편집" eyebrow="LEARNING EDITOR" description={lessonId ? `Day ${basic.day_number} · ${t(week, "week_number") || "—"}주차 / ${basic.title}` : "일차별 학습 본문과 확인 퀴즈를 등록합니다."}>
+  return <div className={"learning-editor" + (embedded ? " learning-editor--embedded" : "")}>
+    {embedded ? <header className="studio-document-header"><div><p className="meta">{num(week, "week_number")}주차 · {basic.day_number}일차</p><label>수업 제목<input form="learning-editor-form" aria-label="수업 제목" required maxLength={300} value={basic.title} onChange={event => changeBasic("title", event.target.value)} disabled={busy} /></label><p className="meta">{row?.is_published && week?.is_published ? "공개 수업 · 저장하면 수강생 화면에도 반영됩니다." : row?.is_published ? "상위 주차가 비공개여서 수강생에게 보이지 않습니다." : "비공개 수업 · 공개 설정을 바꾸지 않으면 계속 비공개입니다."}</p></div><div className="studio-document-actions"><AdminButton variant="outline" onClick={showPreview}>{previewOnly ? "편집으로" : "학습자 미리보기"}</AdminButton><AdminButton variant="primary" type="submit" form="learning-editor-form" disabled={saveBlocked} loading={busy}>학습 저장</AdminButton></div></header> : <AdminHeading title="학습 콘텐츠 편집" eyebrow="LEARNING EDITOR" description={lessonId ? `Day ${basic.day_number} · ${t(week, "week_number") || "—"}주차 / ${basic.title}` : "일차별 학습 본문과 확인 퀴즈를 등록합니다."}>
       <AdminButton variant="outline" type="button" onClick={showPreview}>{previewOnly ? "편집으로" : "학습자 미리보기"}</AdminButton><AdminStatusBadge status={basic.is_published ? "published" : "hidden"} label={basic.is_published ? "공개" : "비공개"} />
-    </AdminHeading>
-    <div className="ops-callout mb16"><b>{basic.title || "새 학습"}</b> <span className="muted">· 본문과 확인 퀴즈를 함께 편집합니다.</span></div>
+    </AdminHeading>}
+    <div hidden={embedded} className="ops-callout mb16"><b>{basic.title || "새 학습"}</b> <span className="muted">· 본문과 확인 퀴즈를 함께 편집합니다.</span></div>
     {blockEditingEnabled && actorId && <LearningEditorDraftPanel key={`${actorId}:${row?.id || 'new'}`} actorId={actorId} lessonId={row?.id || ''} dirty={dirty || blockState.dirty} ready={!busy && Boolean(blockState.draftReady)} capture={captureDraft} restore={restoreDraft} handleRef={draftRef} onPending={setDraftPending} />}
-    <form id="learning-editor-form" noValidate onSubmit={event => void save(event)}>
+    <form ref={formRef} id="learning-editor-form" noValidate onSubmit={event => { event.preventDefault(); void save(); }}>
+      <EditorSettings embedded={embedded}>
       <section className="panel" hidden={previewOnly}>
         <div className="panel-head"><h2>기본 정보</h2><label className="review-switch"><input type="checkbox" checked={basic.is_published} onChange={event => changeBasic("is_published", event.target.checked)} disabled={busy} /> 공개</label></div>
         <fieldset className="section-pad form-grid learning-editor-fields" disabled={busy}>
@@ -213,6 +229,7 @@ export function LearningEditor({ data, row, pending, send, back, actorId, blockE
           <div className="field wide"><label className="review-switch"><input type="checkbox" checked={basic.is_preview} onChange={event => changeBasic("is_preview", event.target.checked)} /> 무료 미리보기</label></div>
         </fieldset>
       </section>
+      </EditorSettings>
       {blockEditingEnabled && <section ref={blockSectionRef} className="panel mt24" hidden={previewOnly}><div className="panel-head"><h2>학습 구성</h2></div><div className="section-pad">
         {resourcePath && <p className="notice">등록된 자료 파일은 학습 본문 아래에서 계속 다운로드할 수 있습니다.</p>}
         <LessonBlockAuthor key={row?.id || 'new'} ref={blockRef} lessonId={lessonId} courseId={course?.id} sources={cardSources} legacyBlocks={legacyBlocks} disabled={pending || saving || uploadStatus === "uploading"} onState={setBlockState} />
@@ -242,12 +259,12 @@ export function LearningEditor({ data, row, pending, send, back, actorId, blockE
           </aside>
         </div>
       </section>}
-      <div className="editor-savebar"><span className="dirty-note">{dirty || blockState.dirty ? "저장하지 않은 변경사항이 있습니다." : "기본 정보와 학습 내용을 함께 저장합니다."}</span><AdminButton variant="outline" type="button" onClick={close} disabled={busy}><ArrowLeft size={16} />목록으로</AdminButton><AdminButton variant="primary" type="submit" disabled={saveBlocked} loading={busy}>{blockState.uploading ? "파일 업로드 중…" : busy ? "저장 중…" : lessonId ? "학습 저장" : "학습 등록"}</AdminButton></div>
+      <div className="editor-savebar"><span className="dirty-note">{dirty || blockState.dirty ? "저장하지 않은 변경사항이 있습니다." : "기본 정보와 학습 내용을 함께 저장합니다."}</span><AdminButton variant="outline" type="button" onClick={close} disabled={busy} hidden={embedded}><ArrowLeft size={16} />목록으로</AdminButton><AdminButton variant="primary" type="submit" disabled={saveBlocked} loading={busy}>{blockState.uploading ? "파일 업로드 중…" : busy ? "저장 중…" : lessonId ? "학습 저장" : "학습 등록"}</AdminButton></div>
       {message && <p className="notice mt16" role="status">{message}</p>}
     </form>
     <section className="panel mt24 learning-quiz-panel" hidden={previewOnly}>
-      {missions.length > 1 && <div className="section-pad learning-mission-picker"><Field label="퀴즈를 연결할 미션"><select value={mission?.id || ""} onChange={event => setSelectedMissionId(event.target.value)} disabled={busy}>{missions.map(item => <option key={item.id} value={item.id}>{t(item, "title")}</option>)}</select></Field></div>}
-      {mission ? <LessonQuiz key={`${mission.id}-${quiz?.revision || "new"}`} mission={mission} current={quiz} pending={busy} send={send} /> : <><div className="panel-head"><h2>확인 퀴즈</h2><AdminLinkButton size="sm" href="/admin/missions">미션 관리</AdminLinkButton></div><div className="section-pad"><AdminEmptyState title={lessonId ? "연결된 미션이 없습니다." : "학습 등록 후 퀴즈를 연결할 수 있습니다."}>미션 관리에서 이 학습에 미션을 등록한 뒤 질문·선택지·정답을 설정하세요.</AdminEmptyState></div></>}
+      {missions.length > 1 && <div className="section-pad learning-mission-picker"><Field label="퀴즈를 연결할 미션"><select value={mission?.id || ""} onChange={event => setSelectedMissionId(event.target.value)} disabled={busy || quizDirty}>{missions.map(item => <option key={item.id} value={item.id}>{t(item, "title")}</option>)}</select></Field></div>}
+      {mission ? <LessonQuiz key={`${mission.id}-${quiz?.revision || "new"}`} mission={mission} current={quiz} pending={busy} send={send} onDirty={setQuizDirty} /> : <><div className="panel-head"><h2>확인 퀴즈</h2><AdminLinkButton size="sm" href="/admin/missions">미션 관리</AdminLinkButton></div><div className="section-pad"><AdminEmptyState title={lessonId ? "연결된 미션이 없습니다." : "학습 등록 후 퀴즈를 연결할 수 있습니다."}>미션 관리에서 이 학습에 미션을 등록한 뒤 질문·선택지·정답을 설정하세요.</AdminEmptyState></div></>}
     </section>
   </div>;
 }

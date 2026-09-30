@@ -55,6 +55,9 @@ export function KakaoSyncSettings() {
         <label className="checkline mt16"><input type="checkbox" checked={config.readChannel} onChange={event => setConfig({ ...config, readChannel: event.target.checked, setupConfirmed: false })} />
           채널 관계 조회 사용 (카카오에서 plusfriends 동의항목 설정을 완료한 경우만)</label>
         <p className="muted small">관계 조회는 로그인 시점의 추가·차단 상태를 확인하는 기능입니다. 채널 추가를 실행하는 기능이 아니며, 실시간 상태는 아닙니다.</p>
+        <label className="checkline mt16"><input type="checkbox" checked={config.readPhone} onChange={event => setConfig({ ...config, readPhone: event.target.checked, setupConfirmed: false })} />
+          카카오 휴대폰 번호 동의 요청 (카카오 앱에서 phone_number 동의항목 설정을 완료한 경우만)</label>
+        <p className="muted small">동의한 회원의 번호가 제공되면 비어 있는 회원 연락처에만 저장합니다. 제공되지 않으면 신청 화면에서 직접 입력받습니다.</p>
         <label className="checkline mt16"><input type="checkbox" checked={config.setupConfirmed} onChange={event => setConfig({ ...config, setupConfirmed: event.target.checked })} />
           기존 비즈 앱, 대표 비즈니스 채널, 간편가입·필수 약관 및 선택 채널 추가 설정을 확인했습니다.</label>
         <label className="checkline mt16"><input type="checkbox" checked={config.enabled} onChange={event => setConfig({ ...config, enabled: event.target.checked })} />

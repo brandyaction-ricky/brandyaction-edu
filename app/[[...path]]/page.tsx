@@ -5,6 +5,8 @@ import { Platform } from '@/app/ui/platform';
 import { notFound, redirect } from 'next/navigation';
 import { metricsRedirect } from '@/lib/landing-admin-state';
 import { sections } from '@/lib/platform';
+import { headers } from 'next/headers';
+import { productShareImage, sharingOrigin } from '@/lib/product-sharing';
 export const dynamic = 'force-dynamic';
 export default async function Page({params,searchParams}:{params:Promise<{path?:string[]}>;searchParams:Promise<Record<string,string|string[]|undefined>>}) {
  const {path=[]} = await params;
@@ -33,17 +35,20 @@ export async function generateMetadata({params}:{params:Promise<{path?:string[]}
  let title=String(seo.title||'BrandyAction EDU | 배운 것을, 내 일의 성과로.');
  let description=String(seo.description||'AI와 마케팅을 배우고 내 업무에 적용하는 실행 중심 교육.');
  let unlisted=false;
+ const origin=sharingOrigin((await headers()).get('host'));
+ let shareImage=productShareImage({},origin,process.env.NEXT_PUBLIC_SUPABASE_URL||'');
  if(['classes','articles'].includes(path[0])&&path[1]) {
   const db=await createClient();
   const isCourse=path[0]==='classes';
-  const {data}=await db.from(isCourse?'courses':'articles').select(isCourse?'title,summary,seo_title:metadata->>seo_title,seo_description:metadata->>seo_description,is_listed:metadata->is_listed':'title,summary').eq('slug',path[1]).eq('status','published').maybeSingle();
+  const {data}=await db.from(isCourse?'courses':'articles').select(isCourse?'title,summary,seo_title:metadata->>seo_title,seo_description:metadata->>seo_description,is_listed:metadata->is_listed,thumbnail_url:metadata->>thumbnail_url,thumbnailUrl:metadata->>thumbnailUrl':'title,summary').eq('slug',path[1]).eq('status','published').maybeSingle();
   if(data){
    const row=data as unknown as {title:string;summary?:string;seo_title?:string;seo_description?:string;is_listed?:boolean|string};
    unlisted=isCourse&&row.is_listed===false;
    title=(isCourse&&row.seo_title?.trim()?row.seo_title:row.title)+' | BrandyAction EDU';
    description=String((isCourse&&row.seo_description)||row.summary||description);
+   if(isCourse) shareImage=productShareImage(data as unknown as Record<string,unknown>,origin,process.env.NEXT_PUBLIC_SUPABASE_URL||'');
   }
  }
  const privatePage=unlisted||['admin','my','learn','checkout','apply','payment','login','signup','auth'].includes(path[0]);
- return {title,description,openGraph:{title,description},robots:privatePage||process.env.NEXT_PUBLIC_APP_ENV!=='production'?{index:false,follow:false}:undefined,verification:{google:seo.googleVerification?String(seo.googleVerification):undefined,other:seo.naverVerification?{'naver-site-verification':String(seo.naverVerification)}:undefined}};
+ return {title,description,openGraph:{title,description,images:[{url:shareImage,alt:title}]},twitter:{card:'summary_large_image',title,description,images:[shareImage]},robots:privatePage||process.env.NEXT_PUBLIC_APP_ENV!=='production'?{index:false,follow:false}:undefined,verification:{google:seo.googleVerification?String(seo.googleVerification):undefined,other:seo.naverVerification?{'naver-site-verification':String(seo.naverVerification)}:undefined}};
 }

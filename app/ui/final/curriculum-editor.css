@@ -1,0 +1,93 @@
+.edu-admin .curriculum-editor-page { --studio-border:#e3e6eb; --studio-muted:#697386; --studio-red:#c91e30; min-width:0; }
+.edu-admin .curriculum-editor-page .studio-product-bar { display:flex; align-items:center; gap:28px; margin-bottom:24px; padding:20px 24px; border:1px solid var(--studio-border); border-radius:12px; background:#fff; }
+.edu-admin .curriculum-editor-page .studio-product-bar label { flex:1; max-width:480px; font-size:12px; font-weight:700; color:var(--studio-muted); }
+.edu-admin .curriculum-editor-page .studio-product-bar select { display:block; width:100%; margin-top:8px; min-height:44px; font-size:16px; color:#22262e; }
+.edu-admin .curriculum-editor-page .studio-product-bar p { margin:0; font-size:13px; line-height:1.8; color:#414a59; }
+.edu-admin .curriculum-editor-page .studio-product-bar p span { color:var(--studio-muted); }
+.edu-admin .curriculum-editor-page .studio-product-picker { padding:32px; border:1px solid var(--studio-border); border-radius:12px; background:#fff; }
+.edu-admin .curriculum-editor-page .studio-product-picker h2 { font-size:22px; margin:0 0 8px; }
+.edu-admin .curriculum-editor-page .studio-product-picker p { color:var(--studio-muted); }
+.edu-admin .curriculum-editor-page .studio-product-picker > div { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr)); gap:12px; margin-top:24px; }
+.edu-admin .curriculum-editor-page .studio-product-picker button { display:flex; align-items:center; gap:16px; min-height:88px; padding:18px; border:1px solid var(--studio-border); border-radius:10px; background:#fff; text-align:left; color:#292e36; }
+.edu-admin .curriculum-editor-page .studio-product-picker button:hover { border-color:var(--studio-red); background:#fff8f8; }
+.edu-admin .curriculum-editor-page .studio-product-picker button span { flex:1; min-width:0; overflow-wrap:anywhere; }
+.edu-admin .curriculum-editor-page .studio-product-picker button small { display:block; margin-top:8px; color:var(--studio-muted); }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct.section-pad { padding:0; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct > .curriculum-copy-disclosure, .edu-admin .curriculum-editor-page .curriculum-workspace--direct > details:not(.studio-add-week) { margin:8px 0; font-size:13px; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct > details > summary { min-height:44px; display:flex; align-items:center; gap:8px; cursor:pointer; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .curriculum-studio { display:grid; grid-template-columns:minmax(250px,300px) minmax(0,1fr); gap:24px; align-items:start; margin-top:16px; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .curriculum-outline { min-width:0; padding:12px; border:1px solid var(--studio-border); border-radius:12px; background:#fff; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .product-curriculum-week { margin:0 0 10px; padding:0; border:0; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .studio-week-disclosure { border:1px solid transparent; border-radius:9px; overflow:hidden; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .studio-week-disclosure[open] { border-color:var(--studio-border); background:#fcfcfd; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .studio-week-disclosure > summary { list-style:none; display:flex; align-items:center; gap:10px; padding:16px 10px; min-height:82px; cursor:pointer; border-radius:8px; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct summary::-webkit-details-marker { display:none; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .studio-week-disclosure > summary::marker { content:''; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .studio-week-disclosure > summary:hover { background:#f4f5f7; }
+.edu-admin .curriculum-editor-page .studio-chevron { display:grid; place-items:center; flex:0 0 32px; height:32px; border-radius:7px; background:#f0f2f5; color:#5b6573; }
+.edu-admin .curriculum-editor-page .studio-week-disclosure[open] > summary .studio-chevron svg { transform:rotate(90deg); }
+.edu-admin .curriculum-editor-page .studio-week-title { flex:1; min-width:0; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .studio-week-title h3 { font-size:15px; line-height:1.5; margin:0 0 4px; overflow-wrap:anywhere; }
+.edu-admin .curriculum-editor-page .studio-week-title .meta { font-size:12px; }
+.edu-admin .curriculum-editor-page .studio-visibility { flex-shrink:0; padding:3px 6px; border-radius:5px; font-size:11px; font-weight:600; color:#626a77; background:#edf0f3; }
+.edu-admin .curriculum-editor-page .studio-visibility.is-public { color:#276855; background:#e9f4ef; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .product-curriculum-week ul { margin:4px 0; padding:0 6px; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .product-curriculum-week li { display:block; border:0; border-left:3px solid transparent; border-radius:5px; padding:4px 8px; background:transparent; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .product-curriculum-week li.selected { background:#fff0f1; border-left-color:var(--studio-red); }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .product-curriculum-week li > div { min-width:0; }
+.edu-admin .curriculum-editor-page .studio-lesson-link { width:100%; min-height:52px; padding:8px 0; display:flex; gap:10px; align-items:center; text-align:left; border:0; background:transparent; color:#303640; cursor:pointer; }
+.edu-admin .curriculum-editor-page .studio-lesson-link svg { flex-shrink:0; color:#7f8794; }
+.edu-admin .curriculum-editor-page .studio-lesson-link span { min-width:0; }
+.edu-admin .curriculum-editor-page .studio-lesson-link small { font-size:11px; margin-bottom:3px; }
+.edu-admin .curriculum-editor-page .studio-lesson-link b { display:block; font-size:13px; font-weight:600; overflow-wrap:anywhere; line-height:1.6; }
+.edu-admin .curriculum-editor-page .studio-lesson-link[aria-current] { color:#b11d2c; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .product-curriculum-week li > div > small { font-size:10px; line-height:1.6; margin:0 0 0 27px; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .product-curriculum-week li .row { justify-content:flex-end; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .product-curriculum-week li .row button { min-height:44px; background:transparent; border:0; color:#717986; font-size:11px; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .product-curriculum-week-actions { display:flex; justify-content:flex-end; padding:0 10px; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .product-curriculum-week-actions button { min-height:44px; font-size:11px; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .curriculum-week-settings { margin:0 10px 8px; font-size:12px; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .curriculum-week-settings summary { cursor:pointer; min-height:44px; display:flex; align-items:center; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .curriculum-add-lesson { display:flex; width:calc(100% - 16px); margin:8px; justify-content:center; min-height:44px; border:1px dashed #d6dbe2; border-radius:6px; background:#fff; }
+.edu-admin .curriculum-editor-page .studio-add-week { border-bottom:1px solid var(--studio-border); padding:0 8px 12px; margin-bottom:12px; }
+.edu-admin .curriculum-editor-page .studio-add-week > summary { display:flex; gap:8px; align-items:center; min-height:44px; cursor:pointer; font-size:13px; font-weight:600; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .product-curriculum-create { display:flex; flex-direction:column; margin:8px; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .product-curriculum-create label { width:100%; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .curriculum-archive { margin-top:16px; padding-top:12px; border-top:1px solid var(--studio-border); }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .curriculum-archive > summary { font-size:12px; min-height:44px; cursor:pointer; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .curriculum-editor-column { min-width:0; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .curriculum-editor-empty, .edu-admin .curriculum-editor-page .studio-loading { padding:64px 24px; text-align:center; border:1px solid var(--studio-border); border-radius:12px; background:#fff; color:var(--studio-muted); }
+.edu-admin .curriculum-editor-page .learning-editor--embedded { min-width:0; }
+.edu-admin .curriculum-editor-page .studio-document-header { background:#fff; border:1px solid var(--studio-border); border-radius:12px; padding:24px; margin-bottom:16px; }
+.edu-admin .curriculum-editor-page .studio-document-header label { display:block; font-size:12px; color:var(--studio-muted); }
+.edu-admin .curriculum-editor-page .studio-document-header input { width:100%; margin-top:8px; font-size:22px; font-weight:700; border:1px solid transparent; background:transparent; padding:8px 0; min-height:44px; color:#20252d; }
+.edu-admin .curriculum-editor-page .studio-document-header input:hover { border-bottom-color:var(--studio-border); }
+.edu-admin .curriculum-editor-page .studio-document-actions { display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; margin-top:16px; }
+.edu-admin .curriculum-editor-page .studio-lesson-settings { border:1px solid var(--studio-border); border-radius:8px; background:#fff; margin-bottom:16px; }
+.edu-admin .curriculum-editor-page .studio-lesson-settings > summary { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:52px; padding:12px 20px; font-size:13px; font-weight:600; cursor:pointer; }
+.edu-admin .curriculum-editor-page .studio-lesson-settings > summary span { font-weight:400; font-size:12px; color:var(--studio-muted); }
+.edu-admin .curriculum-editor-page .learning-editor--embedded .editor-savebar { position:static; margin-top:20px; padding:16px; flex-wrap:wrap; }
+.edu-admin .curriculum-editor-page .learning-editor--embedded .lesson-body-grid { grid-template-columns:minmax(0,1fr); }
+.edu-admin .curriculum-editor-page .learning-editor--embedded .lesson-body-grid:not(.learning-preview-only) > .preview-window { display:none; }
+.edu-admin .curriculum-editor-page .learning-editor--embedded .section-pad { padding:20px; }
+.edu-admin .curriculum-editor-page .learning-editor--embedded .panel { min-width:0; }
+.edu-admin .curriculum-editor-page .learning-editor--embedded .learning-editor-fields { min-width:0; }
+.edu-admin .curriculum-editor-page .studio-navigation-dialog { width:min(440px,calc(100vw - 32px)); padding:28px; border:1px solid #e0e3e8; border-radius:14px; color:#262b33; box-shadow:0 20px 70px #0003; }
+.edu-admin .curriculum-editor-page .studio-navigation-dialog::backdrop { background:#15202e66; }
+.edu-admin .curriculum-editor-page .studio-navigation-dialog h2 { font-size:20px; margin:0 0 12px; }
+.edu-admin .curriculum-editor-page .studio-navigation-dialog p { font-size:14px; line-height:1.8; color:#687282; }
+.edu-admin .curriculum-editor-page .studio-navigation-dialog > div { display:flex; gap:8px; justify-content:flex-end; margin-top:24px; }
+.edu-admin .curriculum-editor-page :is(button,summary,select,input):focus-visible { outline:2px solid var(--studio-red); outline-offset:3px; }
+@media (max-width:1100px) { .edu-admin .curriculum-editor-page .curriculum-workspace--direct .curriculum-studio { grid-template-columns:250px minmax(0,1fr); gap:16px; } .edu-admin .curriculum-editor-page .studio-product-bar { gap:16px; } }
+@media (max-width:800px) { .edu-admin .curriculum-editor-page .curriculum-workspace--direct .curriculum-studio { grid-template-columns:minmax(0,1fr); } .edu-admin .curriculum-editor-page .studio-product-bar { align-items:stretch; flex-direction:column; padding:16px; } .edu-admin .curriculum-editor-page .studio-product-bar label { max-width:none; } .edu-admin .curriculum-editor-page .curriculum-workspace--direct .curriculum-outline { max-height:45vh; overflow:auto; } .edu-admin .curriculum-editor-page .studio-document-header { padding:18px; } .edu-admin .curriculum-editor-page .studio-document-header input { font-size:20px; } .edu-admin .curriculum-editor-page .learning-editor--embedded .section-pad { padding:14px; } .edu-admin .curriculum-editor-page .studio-product-picker { padding:20px; } }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .studio-week-disclosure > summary { flex-direction:row; text-align:left; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .studio-week-disclosure > summary::after { content:none; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .curriculum-outline { display:block; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct > .curriculum-copy-disclosure { padding:0; border:0; background:transparent; }
+.edu-admin .curriculum-editor-page .learning-editor--embedded [hidden], .edu-admin .curriculum-editor-page .curriculum-workspace--direct [hidden] { display:none !important; }
+.edu-admin .curriculum-editor-page .learning-editor--embedded .editor-savebar { inset:auto; width:auto; }
+.edu-admin .curriculum-editor-page .studio-outline-search { display:block; padding:8px; font-size:12px; font-weight:600; color:var(--studio-muted); }
+.edu-admin .curriculum-editor-page .studio-outline-search input { display:block; width:100%; min-height:44px; margin:8px 0; }
+.edu-admin .curriculum-editor-page .curriculum-archive > summary { display:flex; align-items:center; gap:8px; }
+.edu-admin .curriculum-editor-page .curriculum-archive[open] > summary .studio-chevron svg { transform:rotate(90deg); }
+.edu-admin .curriculum-editor-page .studio-week-title h3, .edu-admin .curriculum-editor-page .studio-lesson-link b { word-break:keep-all; }

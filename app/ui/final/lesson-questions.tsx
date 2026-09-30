@@ -5,6 +5,7 @@ import { date, text as t, type Row } from '@/lib/platform';
 import { useUnsavedLearningChanges } from './use-unsaved-learning-changes';
 import './lesson-questions.css';
 import { QuestionImage, QuestionImagePicker, type QuestionImagePickerHandle } from './question-image';
+import { QuestionComposer } from './question-composer';
 import { QuestionAnswerHistory } from './question-thread';
 
 export function LessonQuestions({ enrollmentId, lessonId, lessonTitle }: { enrollmentId: string; lessonId: string; lessonTitle: string }) {
@@ -41,7 +42,7 @@ export function LessonQuestions({ enrollmentId, lessonId, lessonTitle }: { enrol
   }
   return <section id="lesson-questions" className="lesson-private-questions" aria-label="이 학습의 개인 질문">
     <div className="lesson-question-heading"><div><h2>이 학습의 개인 질문</h2><p>질문과 답변은 본인과 담당 운영자만 확인합니다.</p></div><button type="button" className="btn" onClick={()=>setOpen(value=>!value)}>{open?'작성 접기':'이 학습에 질문하기'}</button></div>
-    <form onSubmit={submit} className="lesson-question-form" style={open ? undefined : {display:"none"}} onPaste={event => {
+    {process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' ? <div hidden={!open}><QuestionComposer initialContext={{enrollmentId,lessonId,label:lessonTitle,recent:true}} onCreated={()=>{setOpen(false);setNotice('질문을 등록했습니다. 질문·답변에서도 확인할 수 있습니다.');setPage(0);setLoading(true);setVersion(v=>v+1);}}/></div> : <form onSubmit={submit} className="lesson-question-form" style={open ? undefined : {display:"none"}} onPaste={event => {
       if (process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED !== 'true') return;
       const files = Array.from(event.clipboardData.items).filter(item => item.kind === 'file' && item.type.startsWith('image/')).map(item => item.getAsFile()).filter((file): file is File => file !== null);
       if (!files.length) return;
@@ -54,7 +55,7 @@ export function LessonQuestions({ enrollmentId, lessonId, lessonTitle }: { enrol
       {uncertain && <p className="meta">등록 결과를 확인하지 못했습니다. 같은 내용으로 다시 확인하면 중복 등록되지 않습니다.</p>}
       <button className="btn primary" disabled={busy || image.busy || (image.draft && !image.id) || !title.trim() || (!content.trim() && !image.id)}>{busy?'등록 중…':uncertain?'등록 결과 다시 확인':'질문 등록'}</button>
       {error && <p role="alert" className="form-error">{error}</p>}
-    </form>
+    </form>}
     {notice && <p role="status">{notice}</p>}
     {loading ? <p role="status">내 질문을 불러오고 있습니다.</p> : readError ? <p role="alert">{readError} <button type="button" className="btn small" onClick={()=>{setLoading(true);setVersion(v=>v+1);}}>질문 다시 불러오기</button></p> : <>
       {questions.map(question=><article className="question-card" key={question.id}><div className="between"><b>{question.status==='answered'?'답변 완료':'답변 대기'}</b><span className="meta">{date(question.created_at)}</span></div><h3>{t(question,'title')}</h3><p className="reading-copy">{t(question,'content')}</p><QuestionImage questionId={String(question.id)} imageId={question.image_id}/>{process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED === 'true' ? <QuestionAnswerHistory questionId={String(question.id)} fallback={String(question.answer || '')} onStatusChange={status => setQuestions(old => old.some(row => row.id === question.id && row.status !== status) ? old.map(row => row.id === question.id ? {...row, status} : row) : old)}/> : Boolean(question.answer) && <div className="answer"><b>운영자 답변</b><p className="reading-copy">{t(question,'answer')}</p></div>}</article>)}

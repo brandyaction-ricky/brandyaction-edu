@@ -199,7 +199,7 @@ test('employee can edit and copy the Aside payment-check prompt without changing
 test('Jev shows its result first and an authorized employee can approve without sending a message', async ({ page }) => {
   const state = await fixture(page, 'jev');
   await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
-  await page.getByRole('button', { name: 'Jev 결과 보기', exact: true }).click();
+  await page.getByRole('button', { name: 'Jev 분석 실행', exact: true }).click();
   await expect(page.getByText('Jev 결과 · 직원 확인 필요', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Jev 전환 판정')).toContainText('구매 의도중간Jev가 표시한 확신 97%');
   await expect(page.getByLabel('사람 판단 · 구매 의도')).toHaveCount(0);
@@ -220,7 +220,7 @@ test('Jev shows its result first and an authorized employee can approve without 
 test('employee can edit a proposed reply before recording approval', async ({ page }) => {
   const state = await fixture(page, 'jev');
   await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
-  await page.getByRole('button', { name: 'Jev 결과 보기', exact: true }).click();
+  await page.getByRole('button', { name: 'Jev 분석 실행', exact: true }).click();
   await page.getByLabel('검토 결정').selectOption('edit');
   await page.getByLabel(/^고객에게 보낼 답변 초안/).fill('수강 수준은 안내 가능하며 녹화 제공 여부는 추가 확인이 필요합니다.');
   await page.getByLabel('검토 사유').fill('녹화 제공 내용을 직원이 확인했습니다.');
@@ -234,7 +234,7 @@ test('employee can edit a proposed reply before recording approval', async ({ pa
 
 async function selectAndAnalyze(page: Page) {
   await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
-  await page.getByRole('button', { name: '모의 결과 보기', exact: true }).click();
+  await page.getByRole('button', { name: '모의 분석 실행', exact: true }).click();
   await expect(page.getByLabel(/^고객에게 보낼 답변 초안/)).toHaveValue('초보자를 대상으로 기초 개념부터 설명합니다.');
   await expect(page.getByText('추가 확인 필요: 이용 방법', { exact: true })).toBeVisible();
 }
@@ -494,9 +494,22 @@ test('integrated workspace separates inquiry review from recruitment and removes
   await expect(page.getByRole('heading', { name: '모집 운영', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '모집 경로 초안 저장', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true })).not.toBeVisible();
-  await page.getByRole('button', { name: '구매 전 문의 검토', exact: true }).click();
+  await page.getByRole('button', { name: /문의·Jev 검토/ }).click();
   await expect(page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true })).toBeVisible();
   await expect(page.getByText('초보 수강과 녹화 문의', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '모집 설정·구매·후속 안내', exact: true }).click();
+  await page.getByRole('button', { name: /모집 설정·구매·후속 안내/ }).click();
   await expect(page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true })).not.toBeVisible();
+});
+
+test('Jev inquiry deep link opens the review step and keeps its place in the URL', async ({ page }) => {
+  await fixture(page, 'jev');
+  await page.goto('/admin/conversion?workspace=1&recruitment=moonshot-4&view=inquiries');
+  await expect(page.getByRole('button', { name: /문의·Jev 검토/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: /외부 문의 초보 수강과 녹화 문의/ }).click();
+  await expect(page.getByRole('button', { name: 'Jev 분석 실행', exact: true })).toBeVisible();
+  await expect(page.locator('.conversion-main .admin-section').first()).toContainText('초보 수강과 녹화 문의');
+  await expect(page.locator('.conversion-main .admin-section').nth(1)).toContainText('문의 분류와 답변 초안');
+  await page.getByRole('button', { name: /모집 설정·구매·후속 안내/ }).click();
+  await expect(page).not.toHaveURL(/view=inquiries/);
 });

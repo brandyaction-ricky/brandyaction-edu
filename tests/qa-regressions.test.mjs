@@ -146,7 +146,7 @@ test('member administration exposes explicit roles and protects deletion', async
 });
 test('customer catalog removes unrelated lower management panels', () => {
   const source = fs.readFileSync(new URL('../app/ui/final/admin-catalog.tsx', import.meta.url), 'utf8');
-  assert.match(source, /\["products", "banners", "customers", "tags", "coupons"\]/);
+  assert.match(source, /\["products", "banners", "customers", "tags", "coupons", "questions"\]/);
   assert.match(source, /tools && s\.key !== "customers"/);
   assert.doesNotMatch(source, /s\.key === "customers" && <div className="row mt24"><Link className="btn" href="\/admin\/members"/);
 });

@@ -17,6 +17,7 @@ function load(file, mocks = {}) {
     if (name === '@/lib/public-platform-data') return { getPublicPlatformData: async () => ({ data: {}, pagination: null }), getPublicSupport: async () => ({}) };
     if (name === '@/lib/public-platform-plan') return { PUBLIC_CACHE_TAG: 'test' };
     if (name === '@/lib/member-platform-data') return { readMemberPlatformData: async () => ({}) };
+    if (name === 'next/headers') return { headers: async () => new Headers({ host: 'preview.vercel.app' }) };
     if (name === 'next/cache') return { revalidateTag: () => {} };
     if (name.startsWith('@/') || name.startsWith('.')) {
       const base = name.startsWith('@/') ? path.resolve(root, name.slice(2)) : path.resolve(path.dirname(absolute), name);
@@ -366,6 +367,9 @@ test('published product metadata drives search and sharing titles while an empty
   assert.equal(metadata.title, '검색용 제목 | BrandyAction EDU');
   assert.equal(metadata.description, '검색용 설명');
   assert.equal(metadata.openGraph.title, metadata.title);
+  assert.equal(metadata.openGraph.images[0].url, 'https://preview.vercel.app/og');
+  assert.equal(metadata.twitter.card, 'summary_large_image');
+  assert.match(columns, /thumbnail_url:metadata->>thumbnail_url/);
   assert.match(columns, /seo_title:metadata->>seo_title/);
   assert.doesNotMatch(columns, /(?:^|,)metadata(?:,|$)/);
   assert.ok(filters.some(([key, value]) => key === 'status' && value === 'published'));
@@ -373,6 +377,14 @@ test('published product metadata drives search and sharing titles while an empty
   metadata = await page.generateMetadata({ params });
   assert.equal(metadata.title, '상품 이름 | BrandyAction EDU');
   assert.equal(metadata.description, '상품 소개');
+  product.thumbnail_url = 'https://cdn.example/cover.jpg';
+  metadata = await page.generateMetadata({ params });
+  assert.deepEqual(metadata.openGraph.images, [{url:'https://cdn.example/cover.jpg',alt:metadata.title}]);
+  assert.deepEqual(metadata.twitter.images, ['https://cdn.example/cover.jpg']);
+  product = null;
+  metadata = await page.generateMetadata({ params });
+  assert.equal(metadata.openGraph.images[0].url, 'https://preview.vercel.app/og');
+  assert.deepEqual(await page.generateMetadata({params:Promise.resolve({path:['admin','products']})}), {title:'운영 관리 | BrandyAction EDU',robots:{index:false,follow:false}});
 });
 
 
@@ -413,4 +425,20 @@ test('cohortless free webinar saves do not create a phantom cohort; explicit and
     assert.equal(schedules.length,scenario.expected,JSON.stringify(scenario));
     if(scenario.cohortId)assert.deepEqual(schedules[0],{recruitment_start_at:null,recruitment_end_at:null});
   }
+});
+
+
+test('sharing thumbnails resolve public storage and legacy paths; invalid images use the site fallback', () => {
+  const { productShareImage, sharingOrigin } = load('lib/product-sharing.ts');
+  const origin = sharingOrigin('brandyaction-edu-dev.vercel.app');
+  const db = 'https://synthetic.supabase.co';
+  assert.equal(origin, 'https://brandyaction-edu-dev.vercel.app');
+  assert.equal(sharingOrigin('127.0.0.1:4192'), 'http://127.0.0.1:4192');
+  for (const host of [null, 'bad/host', 'a@evil.test', 'host:99999']) assert.equal(sharingOrigin(host), 'https://brandyaction-edu.com');
+  assert.equal(productShareImage({thumbnail_url:'edu/cover.webp'},origin,db),db+'/storage/v1/object/public/course-assets/edu/cover.webp');
+  assert.equal(productShareImage({thumbnailUrl:'/images/cover.jpg'},origin,db),origin+'/images/cover.jpg');
+  for (const value of ['', 'javascript:alert(1)', '//evil.test/image.jpg', 'https://user:secret@example.com/image.jpg', '../secret.png', '/api/private']) {
+    assert.equal(productShareImage({thumbnail_url:value},origin,db),origin+'/og');
+  }
+  assert.equal(productShareImage({thumbnail_url:'edu/cover.webp'},origin,''),origin+'/og');
 });

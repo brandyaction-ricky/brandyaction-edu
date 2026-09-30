@@ -43,6 +43,7 @@ import {
   type Data,
   type WorkflowSend,
 } from "../learning-workflows";
+import { QuestionHub } from "./question-hub";
 import { Badge, Empty, Heading, ResourceRow } from "./primitives";
 import { DigitalContentOutline, ProductResourceRow } from "./primitives";
 import { productDigitalSections, productResources } from "@/lib/product-metadata";
@@ -54,7 +55,7 @@ const accountGroups = [
       ["", "마이페이지", LayoutDashboard],
       ["classes", "내 클래스", BookOpen],
       ["missions", "내 미션", Target],
-      ["questions", "내 질문", MessageCircle],
+      ["questions", process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === "true" ? "질문·답변" : "내 질문", MessageCircle],
       ["messages", "메시지", MessageCircle],
       ["resources", "내 자료실", Download],
     ],
@@ -644,7 +645,10 @@ function Missions({ data, active }: { data: Data; active: Row[] }) {
     </>
   );
 }
-function Questions({
+function Questions(props: {data: Data; pending: boolean; send: WorkflowSend; order?: string | null}) {
+  return process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' ? <QuestionHub order={props.order}/> : <LegacyQuestions {...props}/>;
+}
+function LegacyQuestions({
   data,
   pending,
   send,
