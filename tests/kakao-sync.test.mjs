@@ -21,12 +21,23 @@ test('Sync defaults off, and only explicitly approved relation scope is requeste
   assert.deepEqual(logic.kakaoOAuthOptions(logic.defaultKakaoSyncConfig), {});
   assert.deepEqual(logic.kakaoOAuthOptions({ ...config, readChannel: false }), {});
   assert.deepEqual(logic.kakaoOAuthOptions(config), { scopes: 'plusfriends' });
+  assert.deepEqual(logic.kakaoOAuthOptions({ ...config, readPhone: true }), { scopes: 'plusfriends,phone_number' });
+  assert.deepEqual(logic.kakaoOAuthOptions({ ...config, readChannel: false, readPhone: true }), { scopes: 'phone_number' });
   assert.throws(() => logic.validateKakaoSyncConfig({ ...logic.defaultKakaoSyncConfig, enabled: true }));
   assert.throws(() => logic.validateKakaoSyncConfig({ ...config, setupConfirmed: false }));
   assert.throws(() => logic.validateKakaoSyncConfig({ ...config, termsTag: 'privacy_v1' }));
   assert.throws(() => logic.validateKakaoSyncConfig({ ...config, channelId: 'https://open.kakao.com/o/x' }));
   assert.throws(() => logic.validateKakaoSyncConfig({ ...config, enabled: 'true' }));
+  assert.throws(() => logic.validateKakaoSyncConfig({ ...config, readPhone: 'true' }));
   assert.equal(logic.validateKakaoSyncConfig({ ...config, serviceRoleToken: 'never-store' }).serviceRoleToken, undefined);
+});
+test('only a consented Kakao mobile number for the authenticated identity is accepted', () => {
+  const response = { id: 456, kakao_account: { phone_number: '+82 10-1234-5678', phone_number_needs_agreement: false } };
+  assert.equal(logic.kakaoPhoneNumber(response, '456'), '01012345678');
+  assert.equal(logic.kakaoPhoneNumber({ ...response, kakao_account: { phone_number: '+82 010-1234-5678' } }, '456'), '01012345678');
+  assert.equal(logic.kakaoPhoneNumber(response, '999'), null);
+  assert.equal(logic.kakaoPhoneNumber({ ...response, kakao_account: { ...response.kakao_account, phone_number_needs_agreement: true } }, '456'), null);
+  assert.equal(logic.kakaoPhoneNumber({ ...response, kakao_account: { phone_number: '+82 2-1234-5678' } }, '456'), null);
 });
 test('Kakao identity is bound to provider identity AND configured application', () => {
   assert.equal(logic.verifiedKakaoIdentity(user, { id: 456, app_id: 123 }, config), '456');
@@ -52,18 +63,25 @@ test('channel refusal or missing relationship is never treated as ADDED or requi
   assert.equal(logic.kakaoConsentSnapshot('456', { ...config, readChannel: false }, terms, channels('ADDED')).channelRelation, 'UNKNOWN');
 });
 
-function mockServer({ value = config, rpcError = null, tokenInfo = { id: 456, app_id: 123 }, termsResponse = terms, channelsResponse = channels('ADDED') } = {}) {
-  const calls = [];
+function mockServer({ value = config, rpcError = null, tokenInfo = { id: 456, app_id: 123 }, termsResponse = terms, channelsResponse = channels('ADDED'), userResponse = { id: 456, kakao_account: { phone_number: '+82 10-1234-5678' } } } = {}) {
+  const calls = [], profileUpdates = [], profileFilters = [];
   const server = load('lib/kakao-sync-server.ts', {
     '@/lib/kakao-sync': logic,
     '@/lib/legal-policies': { POLICY_VERSION: '2026-08-11' },
     '@/lib/supabase/admin': { createAdminClient: () => ({
-      from: table => { assert.equal(table, 'kakao_sync_config'); return { select: () => ({ eq: () => ({ single: async () => ({ data: { value, revision: 0 }, error: null }) }) }) }; },
+      from: table => {
+        if (table === 'profiles') return { update: values => {
+          profileUpdates.push(values);
+          const query = { eq: (...args) => { profileFilters.push(args); return query; }, or: async (value) => { profileFilters.push(['or', value]); return { error: null }; } };
+          return query;
+        } };
+        assert.equal(table, 'kakao_sync_config'); return { select: () => ({ eq: () => ({ single: async () => ({ data: { value, revision: 0 }, error: null }) }) }) };
+      },
       rpc: async (...args) => { calls.push(args); return { error: rpcError }; },
     }) },
   });
-  const fetchMock = async url => ({ ok: true, json: async () => url.includes('access_token_info') ? tokenInfo : url.includes('service_terms') ? termsResponse : channelsResponse });
-  return { server, calls, fetchMock };
+  const fetchMock = async url => ({ ok: true, json: async () => url.includes('access_token_info') ? tokenInfo : url.includes('service_terms') ? termsResponse : url.includes('/v2/user/me') ? userResponse : channelsResponse });
+  return { server, calls, profileUpdates, profileFilters, fetchMock };
 }
 test('server uses verified terms, omits tokens and preserves email/SMS marketing', async () => {
   const s = mockServer(), original = globalThis.fetch;
@@ -74,6 +92,25 @@ test('server uses verified terms, omits tokens and preserves email/SMS marketing
     const payload = JSON.stringify(s.calls[0][1]);
     assert.doesNotMatch(payload, /private-token|marketing|role|email|phone/);
     assert.equal(s.calls[0][1].p_relation, 'ADDED');
+  } finally { globalThis.fetch = original; }
+});
+test('consented Kakao number fills an empty profile without changing consent or sign-in', async () => {
+  const s = mockServer({ value: { ...config, readPhone: true } }), original = globalThis.fetch;
+  globalThis.fetch = s.fetchMock;
+  try {
+    assert.equal(await s.server.syncKakaoConsent(user, 'private-token'), true);
+    assert.deepEqual(s.profileUpdates, [{ phone: '01012345678' }]);
+    assert.deepEqual(s.profileFilters, [['id', 'user'], ['status', 'active'], ['or', 'phone.is.null,phone.eq.']]);
+    assert.doesNotMatch(JSON.stringify(s.calls), /01012345678|private-token/);
+  } finally { globalThis.fetch = original; }
+});
+test('missing Kakao phone keeps login usable and leaves the profile untouched', async () => {
+  const s = mockServer({ value: { ...config, readPhone: true }, userResponse: { id: 456, kakao_account: { phone_number_needs_agreement: true } } });
+  const original = globalThis.fetch;
+  globalThis.fetch = s.fetchMock;
+  try {
+    assert.equal(await s.server.syncKakaoConsent(user, 'private-token'), true);
+    assert.deepEqual(s.profileUpdates, []);
   } finally { globalThis.fetch = original; }
 });
 test('app mismatch does not write, failed audit persistence does not bypass onsite consent', async () => {

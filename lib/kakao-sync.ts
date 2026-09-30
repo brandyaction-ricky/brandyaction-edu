@@ -5,12 +5,13 @@ export type KakaoSyncConfig = {
   termsTag: string;
   privacyTag: string;
   readChannel: boolean;
+  readPhone: boolean;
   setupConfirmed: boolean;
   revision: number;
 };
 export const defaultKakaoSyncConfig: KakaoSyncConfig = {
   enabled: false, appId: '', channelId: '', termsTag: '', privacyTag: '',
-  readChannel: false, setupConfirmed: false, revision: 0,
+  readChannel: false, readPhone: false, setupConfirmed: false, revision: 0,
 };
 export function validateKakaoSyncConfig(input: unknown): KakaoSyncConfig {
   if (!input || typeof input !== 'object') throw Error('설정을 확인해 주세요.');
@@ -21,7 +22,7 @@ export function validateKakaoSyncConfig(input: unknown): KakaoSyncConfig {
     if (value && !pattern.test(value)) throw Error('앱 ID, 채널 ID, 약관 태그 형식을 확인해 주세요.');
     return value;
   };
-  for (const key of ['enabled', 'readChannel', 'setupConfirmed'])
+  for (const key of ['enabled', 'readChannel', 'readPhone', 'setupConfirmed'])
     if (typeof v[key] !== 'boolean') throw Error('활성화 설정을 확인해 주세요.');
   const config: KakaoSyncConfig = {
     enabled: v.enabled === true,
@@ -30,6 +31,7 @@ export function validateKakaoSyncConfig(input: unknown): KakaoSyncConfig {
     termsTag: field('termsTag', /^[a-zA-Z0-9_-]{1,100}$/),
     privacyTag: field('privacyTag', /^[a-zA-Z0-9_-]{1,100}$/),
     readChannel: v.readChannel === true,
+    readPhone: v.readPhone === true,
     setupConfirmed: v.setupConfirmed === true,
     revision: Number(v.revision),
   };
@@ -40,9 +42,11 @@ export function validateKakaoSyncConfig(input: unknown): KakaoSyncConfig {
   return config;
 }
 // Channel-add consent itself is configured on Kakao's consent screen. plusfriends
-// is only an optional permission to READ the relationship, never an add-channel API.
+// only reads the relationship. Phone consent must be configured in Kakao first.
 export function kakaoOAuthOptions(config: KakaoSyncConfig): { scopes?: string } {
-  return config.enabled && config.readChannel ? { scopes: 'plusfriends' } : {};
+  if (!config.enabled) return {};
+  const scopes = [config.readChannel && 'plusfriends', config.readPhone && 'phone_number'].filter(Boolean);
+  return scopes.length ? { scopes: scopes.join(',') } : {};
 }
 type Json = Record<string, unknown>;
 const obj = (value: unknown): Json => value && typeof value === 'object' && !Array.isArray(value) ? value as Json : {};
@@ -53,6 +57,17 @@ export function providerId(value: unknown): string {
 export function verifiedKakaoIdentity(user: { identities?: { provider: string; id: string }[] }, tokenInfo: unknown, config: KakaoSyncConfig) {
   const info = obj(tokenInfo), id = providerId(info.id);
   return id && providerId(info.app_id) === config.appId && user.identities?.some(i => i.provider === 'kakao' && i.id === id) ? id : null;
+}
+export function kakaoPhoneNumber(response: unknown, kakaoId: string): string | null {
+  const info = obj(response);
+  if (providerId(info.id) !== kakaoId) return null;
+  const account = obj(info.kakao_account);
+  if (account.phone_number_needs_agreement === true || typeof account.phone_number !== 'string') return null;
+  const value = account.phone_number.replace(/[\s()-]/g, '');
+  if (!value.startsWith('+82') && !value.startsWith('0')) return null;
+  const domestic = value.startsWith('+82') ? value.slice(3) : value;
+  const phone = domestic.startsWith('0') ? domestic : '0' + domestic;
+  return /^01[016789][0-9]{7,8}$/.test(phone) ? phone : null;
 }
 export function kakaoConsentSnapshot(id: string, config: KakaoSyncConfig, termsResponse: unknown, channelResponse: unknown) {
   const t = obj(termsResponse), c = obj(channelResponse);
