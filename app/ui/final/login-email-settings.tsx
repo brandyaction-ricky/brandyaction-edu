@@ -18,17 +18,19 @@ export function LoginEmailSettings({ email }: { email: string }) {
 
   useEffect(() => {
     let active = true;
-    const auth = createClient().auth;
-    Promise.all([auth.getUser(), auth.getUserIdentities()]).then(([userResult, identityResult]) => {
-      if (!active) return;
-      if (userResult.data.user) {
-        setCurrentEmail(userResult.data.user.email || email);
-        setPendingEmail(userResult.data.user.new_email || "");
-      }
-      if (!identityResult.error) {
-        setSocialProvider(identityResult.data.identities.some(identity => identity.provider === "kakao" || identity.provider === "google"));
-      }
-    }).catch(() => { /* The server-rendered email remains visible. */ });
+    try {
+      const auth = createClient().auth;
+      Promise.all([auth.getUser(), auth.getUserIdentities()]).then(([userResult, identityResult]) => {
+        if (!active) return;
+        if (userResult.data.user) {
+          setCurrentEmail(userResult.data.user.email || email);
+          setPendingEmail(userResult.data.user.new_email || "");
+        }
+        if (!identityResult.error) {
+          setSocialProvider(identityResult.data.identities.some(identity => identity.provider === "kakao" || identity.provider === "google"));
+        }
+      }).catch(() => { /* The server-rendered email remains visible. */ });
+    } catch { /* A temporary client configuration failure must not blank the profile. */ }
     return () => { active = false; };
   }, [email]);
 
