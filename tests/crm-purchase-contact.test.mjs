@@ -89,3 +89,28 @@ test("purchase automation skips a no-longer-paid order", async () => {
     { id: memberId, status: "active" },
   ), null);
 });
+
+
+test("contact email normalizes a preference and rejects invalid recipients", () => {
+  assert.equal(contact.contactEmail("  Notice+edu@Example.COM "), "notice+edu@example.com");
+  for (const value of [null, "", "  "]) assert.equal(contact.contactEmail(value), null);
+  for (const value of [undefined, 123, {}, "invalid", "a@b", "a@example.com,b@example.com", "a@example.com\r\nBcc: other@example.com", "x".repeat(250)+"@example.com"]) {
+    assert.throws(() => contact.contactEmail(value), /이메일/);
+  }
+});
+
+test("a new delivery preference overrides an existing paid order without changing its snapshot", async () => {
+  const memberId = "b034f458-9a4b-4615-83b3-7f0d95ddab82";
+  const orderId = "2d6493c3-8d42-43f3-bb14-a6804855232f";
+  const order = { id: orderId, status: "paid", customer_email: "old-order@example.test" };
+  const delivery = deliveryFor(order, []);
+  const result = await delivery.paidOrderRecipient(
+    { member_id: memberId, trigger_key: `purchase_completed:${orderId}` },
+    { id: memberId, status: "active", email: "login@example.test", contact_email: "new-notice@example.test" },
+  );
+  assert.equal(result.email, "new-notice@example.test");
+  assert.equal(order.customer_email, "old-order@example.test");
+  for (const preference of [null, "", "invalid"]) {
+    assert.equal(contact.purchaseContact(order, { email: "login@example.test", contact_email: preference }).email, "old-order@example.test");
+  }
+});

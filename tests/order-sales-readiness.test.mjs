@@ -39,7 +39,7 @@ function setup(patch = {}, orderError = null, options = {}) {
   };
   const { POST } = compile('../app/api/platform/route.ts', {
     '@/lib/supabase/admin': { createAdminClient: () => db },
-    '@/lib/server-auth': { getAuthenticatedUser: async () => ({ id: 'member', email: 'member@example.test' }) },
+    '@/lib/server-auth': { getAuthenticatedUser: async () => ({ id: 'member', email: 'member@example.test', contact_email: options.contactEmail || null }) },
     '@/lib/platform-rules': rules,
     '@/lib/qa-rules': { phoneNumber: () => '01000000000' },
     '@/lib/legal-policies': { POLICY_VERSION: 'test-policy' },
@@ -95,5 +95,14 @@ test('closed recruitment and capacity checks remain delegated to the transaction
     const { calls, send } = setup({}, error);
     assert.equal((await send()).status, 409);
     assert.deepEqual(calls.map(call => call.name), ['edu_checkout_with_coupon']);
+  }
+});
+
+
+test('checkout uses the saved delivery email and falls back to login when unset', async () => {
+  for (const preference of [null, 'notice@example.test']) {
+    const { calls, send } = setup({}, null, { contactEmail: preference });
+    assert.equal((await send()).status, 200);
+    assert.equal(calls[0].args.p_customer_email, preference || 'member@example.test');
   }
 });
