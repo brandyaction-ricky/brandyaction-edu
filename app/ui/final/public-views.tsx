@@ -27,6 +27,7 @@ import { loginBeforeCheckout, parseEntrySource, withEntrySource } from '@/lib/en
 import { youtubeThumbnailUrl } from '@/lib/youtube-thumbnail';
 import type { Data } from "../learning-workflows";
 import { EmailAuth } from "../email-auth";
+import { GoogleIdSignIn } from "../google-id-signin";
 import { ProductDetailHtml } from './product-detail-html';
 import { RecruitmentCountdown } from './product-countdown';
 import { productDocument } from '@/lib/product-html-document';
@@ -87,13 +88,23 @@ export function AuthView({
             <MessageCircle className="social-mark" />
             카카오로 계속하기
           </button>
-          <button
-            className="btn full"
-            disabled={pending}
-            onClick={() => void social("google")}
-          >
-            <span className="social-mark">G</span>Google로 계속하기
-          </button>
+          {process.env.NEXT_PUBLIC_GOOGLE_GIS_ENABLED === "true" &&
+          process.env.NEXT_PUBLIC_GOOGLE_GIS_CLIENT_ID ? (
+            <GoogleIdSignIn
+              clientId={process.env.NEXT_PUBLIC_GOOGLE_GIS_CLIENT_ID}
+              next={next}
+              disabled={pending}
+              fallback={() => void social("google")}
+            />
+          ) : (
+            <button
+              className="btn full"
+              disabled={pending}
+              onClick={() => void social("google")}
+            >
+              <span className="social-mark">G</span>Google로 계속하기
+            </button>
+          )}
         </div>
         <EmailAuth key={signup ? 'signup' : 'login'} signup={signup} next={next} disabled={pending} />
         <p className="meta">
