@@ -7,7 +7,7 @@ async function post(body: unknown) {
  const result = await response.json(); if (!response.ok) throw new Error(result.error || '이미지를 올리지 못했습니다. 다시 시도해 주세요.'); return result;
 }
 export type QuestionImagePickerHandle = { paste: (files: File[]) => void };
-export function QuestionImagePicker({ enrollmentId, lessonId, locked, changed, ref }: { enrollmentId: string; lessonId: string; locked: boolean; changed: (id: string | null, busy: boolean, hasDraft: boolean) => void; ref?: Ref<QuestionImagePickerHandle> }) {
+export function QuestionImagePicker({ enrollmentId, lessonId, locked, changed, ref }: { enrollmentId: string | null; lessonId: string | null; locked: boolean; changed: (id: string | null, busy: boolean, hasDraft: boolean) => void; ref?: Ref<QuestionImagePickerHandle> }) {
  const [selection, setSelection] = useState<{ file: File; request: string; preview: string } | null>(null), [busy, setBusy] = useState(false), [ready, setReady] = useState(false), [error, setError] = useState('');
  const gate = useRef(false), mounted = useRef(false), notify = useRef(changed);
  useEffect(() => { notify.current = changed; }, [changed]);

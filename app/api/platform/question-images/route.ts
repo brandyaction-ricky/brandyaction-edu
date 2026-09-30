@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     const body = await readBody(request), db = createAdminClient();
     if (body.action === 'prepare') {
       let spec; try { spec = answerFileSpec(body.name, body.size, 'image'); } catch (e) { fail((e as Error).message); }
-      const { data: file, error } = await db.rpc('edu_prepare_question_image', { p_actor: actor.id, p_lesson: id(body.lessonId), p_enrollment: id(body.enrollmentId), p_request: id(body.requestId), p_spec: spec });
+      const { data: file, error } = await db.rpc('edu_prepare_question_image', { p_actor: actor.id, p_lesson: body.lessonId === null && body.enrollmentId === null && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' ? null : id(body.lessonId), p_enrollment: body.lessonId === null && body.enrollmentId === null && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' ? null : id(body.enrollmentId), p_request: id(body.requestId), p_spec: spec });
       if (error) throw error;
       if (file.ready_at) return reply({ id: file.id, name: file.name, size: file.size, ready: true });
       const upload = await db.storage.from(bucket).createSignedUploadUrl(file.path, { upsert: false });
