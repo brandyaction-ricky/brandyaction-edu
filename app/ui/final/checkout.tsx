@@ -12,6 +12,14 @@ import { CheckoutCouponRegistration, useCheckoutCouponRegistration } from "@/fea
 import { MOONSHOT_SUPPORT_URL } from "@/lib/purchase-onboarding";
 import "./checkout.css";
 
+const paymentMethods = [
+  { value: "CARD", label: "신용·체크카드", button: "카드로 결제하기", mark: "" },
+  { value: "KAKAOPAY", label: "카카오페이", button: "카카오페이로 결제하기", mark: "kakao pay" },
+  { value: "TOSSPAY", label: "토스페이", button: "토스페이로 결제하기", mark: "toss pay" },
+  { value: "NAVERPAY", label: "네이버페이", button: "네이버페이로 결제하기", mark: "N pay" },
+] as const;
+type PaymentMethod = typeof paymentMethods[number]["value"];
+
 export function Checkout({
   data,
   user,
@@ -30,6 +38,8 @@ export function Checkout({
   const [processing, setProcessing] = useState(false),
     [error, setError] = useState(""),
     [agreed, setAgreed] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CARD");
+  const selectedPayment = paymentMethods.find((method) => method.value === paymentMethod)!;
   const lock = useRef(false),
     cohort = (data.cohorts || []).find((c) => c.id === cohortId),
     course = (data.courses || []).find((c) => c.id === cohort?.course_id),
@@ -85,7 +95,13 @@ export function Checkout({
         failUrl: location.origin + "/payment/fail",
       } as const;
       // Resume virtual-account requests only after the live merchant service is activated.
-      await payment.requestPayment({ ...paymentRequest, method: "CARD" });
+      await payment.requestPayment({
+        ...paymentRequest,
+        method: "CARD",
+        ...(paymentMethod === "CARD" ? {} : {
+          card: { flowMode: "DIRECT" as const, easyPay: paymentMethod },
+        }),
+      });
     } catch (cause) {
       setError((cause as Error).message);
     } finally {
@@ -181,7 +197,7 @@ export function Checkout({
           ? "처리 중..."
           : free || quote?.totalAmount === 0
             ? "무료로 신청 완료하기"
-            : "결제하기"}
+            : selectedPayment.button}
         <ArrowRight />
       </button>
       {!agreed && <p className="meta mt8" id="checkout-agreement-help">필수 약관에 동의하면 {free ? "신청" : "결제"}할 수 있습니다.</p>}
@@ -290,18 +306,30 @@ export function Checkout({
                 <h2>결제 수단</h2>
               </div>
               <div className="panel-body">
-                <div className="radio-row">
-                  <label className="radio-card">
-                    <input
-                      type="radio"
-                      name="payment"
-                      value="CARD"
-                      defaultChecked
-                    />
-                    <CreditCard />
-                    신용·체크카드
-                  </label>
-                  <label className="radio-card checkout-payment-unavailable">
+                <p className="meta checkout-payment-intro">원하는 결제 방법을 선택해 주세요.</p>
+                <div className="checkout-payment-options" role="radiogroup" aria-label="결제 수단">
+                  {paymentMethods.map((method) => (
+                    <label className="checkout-payment-option" key={method.value} data-method={method.value}>
+                      <input
+                        type="radio"
+                        name="payment"
+                        value={method.value}
+                        aria-label={method.label}
+                        checked={paymentMethod === method.value}
+                        onChange={() => setPaymentMethod(method.value)}
+                        disabled={pending || processing}
+                      />
+                      <span className="checkout-payment-mark" aria-hidden="true">
+                        {method.value === "CARD" ? <CreditCard /> : method.mark}
+                      </span>
+                      <span className="checkout-payment-name">{method.label}</span>
+                    </label>
+                  ))}
+                </div>
+                <p className="meta checkout-payment-next" aria-live="polite">
+                  약관 동의 후 ‘{selectedPayment.button}’를 누르면 {paymentMethod === "CARD" ? "카드 결제창" : `${selectedPayment.label} 결제창`}이 열립니다.
+                </p>
+                <label className="radio-card checkout-payment-unavailable">
                     <input
                       type="radio"
                       name="payment"
@@ -309,10 +337,9 @@ export function Checkout({
                       disabled
                       aria-describedby="checkout-transfer-help"
                     />
-                    <Landmark />
+                    <Landmark aria-hidden="true" />
                     가상계좌 · 일시 중단
-                  </label>
-                </div>
+                </label>
                 <div className="notice checkout-transfer-help" id="checkout-transfer-help">
                   <h3>계좌이체로 수강하시려면</h3>
                   <p>계좌이체를 원하시면 아래 국민은행 계좌로 입금해 주세요.</p>
