@@ -14,9 +14,9 @@ test('shared shell keeps permission-scoped navigation and operational states und
     await page.getByRole('button', { name: '관리자 메뉴 열기' }).click();
   }
 
-  await expect(page.getByRole('link', { name: '상품·커리큘럼 관리' })).toHaveCount(1);
+  await expect(page.getByRole('link', { name: '상품·판매 설정' })).toHaveCount(1);
   await expect(page.getByRole('link', { name: '주차 구성' })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: '학습 콘텐츠 관리' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: '커리큘럼 편집' })).toHaveCount(1);
   await expect(page.getByRole('link', { name: '영상·자료 관리' })).toHaveCount(1);
   await expect(page.getByRole('link', { name: '주문 결제' })).toHaveCount(1);
   await expect(page.getByRole('link', { name: '스태프 권한' })).toHaveCount(0);
