@@ -25,7 +25,7 @@ function initialSnapshot(): ConversionSnapshot {
 
 async function fixture(page: Page, provider: 'mock' | 'jev' = 'mock') {
   const snapshot = initialSnapshot();
-  if (provider === 'jev') snapshot.capabilities = { ...snapshot.capabilities, can_jev: true, can_adjudicate: true, can_jev_v4: true, can_analyze: true, analyze_provider: 'jev' };
+  if (provider === 'jev') snapshot.capabilities = { ...snapshot.capabilities, can_jev: true, can_jev_experiments: true, can_adjudicate: true, can_jev_v4: true, can_analyze: true, analyze_provider: 'jev' };
   const mutations: Record<string, unknown>[] = [];
   const orderRows: Array<{ id: string; status: 'paid' | 'partially_refunded' | 'refunded'; currency: string; total_amount: number; paid_at: string; item_name: string; linked_at: string | null; refund_amount: number; payment_statuses: string[] }> = [
     { id: '66666666-6666-4666-8666-666666666666', status: 'paid', currency: 'KRW', total_amount: 1650000, paid_at: '2026-09-22T02:00:00.000Z', item_name: '합성 교육 상품', linked_at: null, refund_amount: 0, payment_statuses: ['done'] },

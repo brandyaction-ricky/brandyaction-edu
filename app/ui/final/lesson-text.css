@@ -10,8 +10,9 @@
 }
 
 /* The editor and every learner preview share typography, independent of page resets. */
-:is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body { font-size:16px; line-height:1.8; white-space:pre-wrap; overflow-wrap:anywhere; }
+:is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body { font-size:16px; font-weight:400; line-height:1.8; white-space:pre-wrap; overflow-wrap:anywhere; }
 :is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body p { margin:0; padding:0; min-height:1.8em; font-size:inherit; line-height:inherit; color:inherit; }
+:is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body h1 { margin:1em 0 .4em; font-size:32px; font-weight:700; line-height:1.4; }
 :is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body h2 { margin:1em 0 .4em; font-size:28px; font-weight:700; line-height:1.4; }
 :is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body h3 { margin:1em 0 .4em; font-size:22px; font-weight:700; line-height:1.4; }
 :is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body > :first-child { margin-top:0; }
@@ -22,5 +23,9 @@
 :is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body ol { list-style:decimal; margin:.5em 0; padding-left:1.6em; }
 :is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body li { display:list-item; margin:0; padding:0; }
 :is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body blockquote { border-left:3px solid #d1d5db; padding-left:1em; margin:.75em 0; }
+:is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body details { margin:.75em 0; }
+:is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body summary { display:list-item; cursor:pointer; font-weight:600; }
+:is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body summary:focus-visible { outline:2px solid currentColor; outline-offset:3px; }
+:is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body .lesson-toggle-content { padding:.5em 0 .5em 1.4em; border-left:2px solid #e5e7eb; }
 :is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body a { color:var(--ba-info,#2563eb); text-decoration:underline; text-underline-offset:3px; overflow-wrap:anywhere; }
 :is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body a:focus-visible { outline:2px solid currentColor; outline-offset:3px; }

@@ -2,12 +2,12 @@ import { expect, test } from '@playwright/test';
 const source='11111111-1111-4111-8111-111111111111';
 async function setup(page: import('@playwright/test').Page) {
  await page.route('**/api/platform?**part=curriculum',route=>route.fulfill({json:{data:{curriculum_weeks:[],curriculum_lessons:[],lesson_contents:[]}}}));
- await page.route('**/api/platform/curriculum-copy?**',route=>route.fulfill({json:new URL(route.request().url()).searchParams.has('source')?{preview:{sourceId:source,title:'이전 상품',revision:'a'.repeat(32),weeks:6,lessons:12,contents:10,missions:6,quizzes:2,resources:1}}:{sources:[{id:source,title:'이전 상품',course_code:'OLD'}],hasMore:false}}));
+ await page.route('**/api/platform/curriculum-copy?**',route=>route.fulfill({json:new URL(route.request().url()).searchParams.has('source')?{preview:{sourceId:source,title:'이전 상품',revision:'a'.repeat(32),weeks:6,lessons:12,contents:10,missions:6,quizzes:2,resources:1,interactiveLessons:8,privateMedia:3,ongoingLessons:2}}:{sources:[{id:source,title:'이전 상품',course_code:'OLD'}],hasMore:false}}));
  await page.goto('/product-sale-test?draft=1');
  await page.getByRole('tab',{name:'커리큘럼',exact:true}).click();
  await page.locator('summary').filter({hasText:'기존 커리큘럼 불러오기'}).click();
 }
-test('copy previews scope, retries with same request and stays private without product form submission',async({page})=>{
+test('copy previews scope, retries with same request and stays private without product form submission',async({page},info)=>{
  await setup(page);
  const bodies: Record<string,unknown>[]=[];
  await page.route('**/api/platform/curriculum-copy',async route=>{
@@ -18,6 +18,9 @@ test('copy previews scope, retries with same request and stays private without p
  await page.getByRole('button',{name:'원본 상품 선택'}).click();
  await page.getByRole('combobox',{name:'불러올 상품',exact:true}).selectOption(source);
  await expect(page.getByText('주차 6개 · 학습 12개 (콘텐츠 10개)')).toBeVisible();
+ await expect(page.getByText('활동형 학습 8개 · 사진·영상·음성 파일 3개 · 반복 과제 2개',{exact:false})).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.getByRole('region',{name:'기존 커리큘럼 불러오기'}).screenshot({path:info.outputPath('copy-scope.png')});
  const copy=page.getByRole('button',{name:'비공개로 불러오기'});
  await copy.click();await expect(page.getByRole('alert')).toContainText('응답 지연 시험');
  await copy.click();await expect(page.getByRole('button',{name:'복사한 내용 새로고침'})).toBeVisible();

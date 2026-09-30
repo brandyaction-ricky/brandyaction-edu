@@ -22,7 +22,7 @@ function load(path, dependencies = {}) {
 }
 const platform = load('lib/platform.ts'), rules = load('lib/qa-rules.ts');
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
-const admin = { id: id(1), role: 'admin', status: 'active', permissions: { members: true, products: true } };
+const admin = { id: id(1), role: 'admin', status: 'active', permissions: { members: true, products: true, marketing: true } };
 function harness({ missions = [], user = admin } = {}) {
   const tables = {
     profiles: [admin, { id: id(2), role: 'student', status: 'active', marketing_consent: true }, { id: id(3), role: 'student', status: 'withdrawn', marketing_consent: true }],
@@ -70,15 +70,25 @@ function harness({ missions = [], user = admin } = {}) {
     '@/lib/product-metadata': {}, '@/lib/edu-settings': { getEduSettings: async () => ({ operations: {} }) },
     '@/lib/mission-quiz': {}, '@/lib/legal-policies': {}, '@/lib/crm-delivery': { crmDeliveryState: () => ({}) },
     '@/lib/crm-sms-settings': { loadSmsSettings: async () => ({}), registeredSmsNumbers: () => ({ senders: [], optouts: [] }) },
-    '@/lib/operator-permissions': { getOperatorUser: async () => user?.role === 'admin' ? user : null, permissionsFor: async () => user?.permissions || {}, sectionScopes: { home: 'members', customers: 'members', missions: 'products' } },
+    '@/lib/operator-permissions': { getOperatorUser: async () => user?.role === 'admin' ? user : null, permissionsFor: async () => user?.permissions || {}, sectionScopes: { home: 'members', customers: 'members', missions: 'products', settings: 'marketing' } },
   });
   return {
     tables, writes, calls,
     read: query => route.GET(new Request('https://example.test/api/platform?admin=1&' + query)),
-    save: (values, missionId) => route.POST(new Request('https://example.test/api/platform', { method: 'POST', body: JSON.stringify({ action: 'save', section: 'missions', id: missionId, requestId: id(99), values }) })),
+    save: (values, missionId, section = 'missions') => route.POST(new Request('https://example.test/api/platform', { method: 'POST', body: JSON.stringify({ action: 'save', section, id: missionId, requestId: id(99), values }) })),
   };
 }
 const mission = (n, extras = {}) => ({ id: id(30 + n), lesson_id: id(21), title: '합성 미션', is_published: true, archived_at: null, ...extras });
+
+test('generic settings cannot create, overwrite or rename protected learning notices and app icons', async () => {
+  for (const user of [admin, { ...admin, role: 'staff' }]) {
+    const h = harness({ user });
+    for (const protectedKey of ['edu_learning_notice', 'edu_app_branding']) for (const [key, target] of [[protectedKey, undefined], [protectedKey, 'edu_other'], ['edu_other', protectedKey]]) {
+      assert.equal((await h.save({ key, value: {} }, target, 'settings')).status, 403);
+    }
+    assert.equal(h.writes.length, 0);
+  }
+});
 
 test('home, list, exact status totals and export population exclude withdrawal but include admin', async () => {
   const api = harness();

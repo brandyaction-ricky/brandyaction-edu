@@ -183,7 +183,7 @@ export type ConversionSnapshot = {
   jev_v2_runs?: ConversionJevV2Run[];
   jev_v3_runs?: ConversionJevV3Run[];
   jev_v4_runs?: ConversionJevV4Run[];
-  capabilities: { can_manage_evidence: boolean; can_manage_cases?: boolean; can_mock: boolean; can_jev?: boolean; can_adjudicate?: boolean; can_jev_v2?: boolean; can_jev_v3?: boolean; can_jev_v4?: boolean; can_analyze?: boolean; analyze_provider?: 'mock' | 'jev' | null; can_manage_funnel?: boolean; can_copy_aside_match?: boolean };
+  capabilities: { can_manage_evidence: boolean; can_manage_cases?: boolean; can_mock: boolean; can_jev?: boolean; can_jev_experiments?: boolean; can_adjudicate?: boolean; can_jev_v2?: boolean; can_jev_v3?: boolean; can_jev_v4?: boolean; can_analyze?: boolean; analyze_provider?: 'mock' | 'jev' | null; can_manage_funnel?: boolean; can_copy_aside_match?: boolean };
 };
 
 export function buildAsidePaymentMatchPrompt(input: {

@@ -1,4 +1,7 @@
 "use client";
+import { MemberVisitsToggle } from './member-visits';
+import { MvpBadge, useMemberMvps } from './member-mvp';
+import { QuestionAiBatch } from './question-ai-batch';
 import { lessonBodyPlainText } from "@/lib/lesson-body";
 import {
   date,
@@ -43,6 +46,8 @@ type Props = {
   exportCsv: (rows: Row[], name: string) => void;
   send?: WorkflowSend;
   tools?: ReactNode;
+  onQuestionChanged?: () => void;
+  blockLearningEnabled?: boolean;
 };
 type Column = { label: string; value: (row: Row) => ReactNode };
 function CatalogTable({ label, loading, children }: { label: string; loading: boolean; children: ReactNode }) {
@@ -67,6 +72,8 @@ export function AdminCatalog({
   tools,
   missionScope,
   onMissionScopeChange,
+  onQuestionChanged,
+  blockLearningEnabled = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true',
 }: Props) {
   const params = useSearchParams(), router = useRouter();
   const [query, setQuery] = useState(""),
@@ -195,6 +202,7 @@ export function AdminCatalog({
           : lessons.find((l) => l.id === r.lesson_id)?.week_id) === week) &&
     (s.key === "customers" ? `${JSON.stringify(r)} ${customerTags(r.id).map(named).join(" ")} ${customerCourses(r.id).join(" ")}` : JSON.stringify(r)).toLowerCase().includes(query.toLowerCase()),
   ).toSorted((a, b) => s.key === "banners" ? num(a, "display_order") - num(b, "display_order") : s.key === "weeks" ? num(a, "week_number") - num(b, "week_number") || named(a).localeCompare(named(b), "ko") : 0);
+  const mvps = useMemberMvps(s.key === "customers" ? filtered.map(row => row.id) : [], blockLearningEnabled);
   const allCourseWeeks = course ? rows.filter((row) => row.course_id === course).toSorted((a, b) => num(a, "week_number") - num(b, "week_number")) : [];
   // Onboarding stays at week zero; only the regular weeks can trade places.
   const activeCourseWeeks = allCourseWeeks.filter((row) => !row.archived_at && num(row, "week_number") > 0);
@@ -224,7 +232,7 @@ export function AdminCatalog({
     const reorderedActive = [...activeCourseWeeks];
     [reorderedActive[index], reorderedActive[targetIndex]] = [reorderedActive[targetIndex], reorderedActive[index]];
     let activeIndex = 0;
-    const ids = allCourseWeeks.map((item) => item.archived_at || num(item, "week_number") === 0 ? String(item.id) : String(reorderedActive[activeIndex++].id));
+    const ids = allCourseWeeks.filter(item => !item.archived_at).map((item) => num(item, "week_number") === 0 ? String(item.id) : String(reorderedActive[activeIndex++].id));
     await send({ action: "reorder-weeks", courseId: course, ids }, "주차 순서를 변경했습니다.");
   }
   const missionGroups = scopedWeeks
@@ -369,9 +377,9 @@ export function AdminCatalog({
         label: "회원",
         value: (r) => (
           <div className="person">
-            <span className="avatar">{named(r).slice(0, 1)}</span>
+            <span className="avatar" style={mvps.members[r.id]?.isMvp ? { border: `3px solid ${mvps.members[r.id].color || mvps.color}` } : undefined}>{named(r).slice(0, 1)}</span>
             <div>
-              <button className="title-btn" onClick={() => edit(s, r)}>{named(r)}</button>
+              <button className="title-btn" onClick={() => edit(s, r)}>{named(r)}</button>{mvps.members[r.id]?.isMvp && <MvpBadge color={mvps.members[r.id].color || mvps.color}/>}
               <small>{t(r, "email")}</small>
               {Boolean(r.phone) && <small>{t(r, "phone")}</small>}
             </div>
@@ -651,6 +659,8 @@ export function AdminCatalog({
   );
   return (
     <>
+      {s.key === 'customers' && blockLearningEnabled && <MemberVisitsToggle/>}
+      {s.key === 'customers' && mvps.error && <p role="alert" className="notice">{mvps.error}</p>}
       {['customers', 'questions'].includes(s.key) && (params.get('member') || params.get('question')) && <p className="notice mb16">연결된 {params.get('question') ? '질문' : '회원'}만 조회 중입니다. <Link className="text-link" href={`/admin/${s.key}`}>전체 목록 보기</Link></p>}
       {s.key === "products" && <div className="admin-pilot-summary" aria-label="상품 요약">
         <AdminSummaryCard compact label="전체 상품" value={`${productSummary ? num(productSummary, "total") : pagination?.total ?? rows.filter(item => !item.archived_at).length}개`} scope="클래스 · 디지털 자료" />
@@ -879,7 +889,7 @@ export function AdminCatalog({
               {!!unmatchedMissions.length && <section className="week-card mission-catalog"><div className="week-head"><strong>학습 연결 확인</strong></div>{unmatchedMissions.map(renderMission)}</section>}
             </div>
           ) : s.key === "questions" ? (
-            <div className="stack question-admin-list">
+            <div className="stack question-admin-list">{process.env.NEXT_PUBLIC_EDU_QUESTION_AI_BATCH_ENABLED === 'true' && process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED === 'true' && <QuestionAiBatch changed={onQuestionChanged}/>}
               {filtered.map((q) => (
                 <article className="panel question-admin-card" key={q.id}>
                   <div className="panel-head">
@@ -915,7 +925,7 @@ export function AdminCatalog({
                     {cols.map((c) => (
                       <th key={c.label}>{c.label}</th>
                     ))}
-                    <th>관리</th>
+                    <th data-align="action">관리</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -925,7 +935,7 @@ export function AdminCatalog({
                       <tr key={recordId(r)}>
                         {bulkMode && <td data-label="선택" className="selection-column"><input type="checkbox" aria-label={title(r) + " 선택"} checked={selection.includes(recordId(r))} onChange={(e) => setSelection(e.target.checked ? [...selection, recordId(r)] : selection.filter((id) => id !== recordId(r)))} /></td>}
                         {cols.map((c) => <td data-label={c.label} key={c.label}>{c.value(r)}</td>)}
-                        <td data-label="관리"><div className="catalog-actions week-order-actions">
+                        <td data-label="관리" data-align="action"><div className="catalog-actions week-order-actions">
           <AdminButton size="sm" variant="outline" type="button" title="위로 이동" aria-label={`${t(r, "title")} 위로 이동`} disabled={pending || weekReorderDisabled || Boolean(r.archived_at) || num(r, "week_number") === 0 || activeCourseWeeks[0]?.id === r.id} onClick={() => void moveWeek(r, -1)}><ChevronUp size={17} aria-hidden="true" /></AdminButton>
           <AdminButton size="sm" variant="outline" type="button" title="아래로 이동" aria-label={`${t(r, "title")} 아래로 이동`} disabled={pending || weekReorderDisabled || Boolean(r.archived_at) || num(r, "week_number") === 0 || activeCourseWeeks.at(-1)?.id === r.id} onClick={() => void moveWeek(r, 1)}><ChevronDown size={17} aria-hidden="true" /></AdminButton>
           <AdminButton size="sm" variant="outline" onClick={() => edit(s, r)}>수정</AdminButton>
@@ -953,7 +963,7 @@ export function AdminCatalog({
                           {c.value(r)}
                         </td>
                       ))}
-                      <td data-label="관리">
+                      <td data-label="관리" data-align="action">
                         {s.key === "banners" ? <div className="catalog-actions banner-order-actions">
                           <AdminButton size="sm" variant="outline" type="button" title="위로 이동" aria-label={t(r, "title") + " 위로 이동"} disabled={pending || filtered[0]?.id === r.id} onClick={() => void moveBanner(r, -1)}><ChevronUp size={17} aria-hidden="true" /></AdminButton>
                           <AdminButton size="sm" variant="outline" type="button" title="아래로 이동" aria-label={t(r, "title") + " 아래로 이동"} disabled={pending || filtered.at(-1)?.id === r.id} onClick={() => void moveBanner(r, 1)}><ChevronDown size={17} aria-hidden="true" /></AdminButton>

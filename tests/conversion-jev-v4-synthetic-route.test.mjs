@@ -32,6 +32,7 @@ function harness(options = {}) {
 test('synthetic v4 endpoint is DEV-only, same-origin, and requires a member operator', async () => {
   for (const [options, origin] of [
     [{ env: { ...env, NEXT_PUBLIC_APP_ENV: 'production' } }, 'https://edu.example'],
+    [{ env: { ...env, NEXT_PUBLIC_APP_ENV: 'production', VERCEL_ENV: 'production', EDU_CONVERSION_JEV_PRODUCTION_ENABLED: 'true' } }, 'https://edu.example'],
     [{}, 'https://other.example'],
     [{ user: null }, 'https://edu.example'],
   ]) {

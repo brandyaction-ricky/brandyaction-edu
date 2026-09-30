@@ -1,22 +1,32 @@
 import type { AdminContentWidth } from '../components/admin-system';
 import {
-  BookOpen,
   CalendarDays,
   ChartNoAxesCombined,
-  CheckSquare2,
-  FilePenLine,
+  ChartLine,
+  ClipboardCheck,
+  ContactRound,
+  Database,
   Film,
+  FileCheck2,
+  GraduationCap,
   LayoutGrid,
-  Megaphone,
-  LineChart,
-  MessageSquareText,
-  MessageCircle,
+  ListOrdered,
+  MessageCircleQuestion,
+  MessagesSquare,
+  Newspaper,
+  Package,
+  PanelsTopLeft,
+  Quote,
   ReceiptText,
   SearchCheck,
   Send,
-  Settings,
   ShieldCheck,
-  UsersRound,
+  SlidersHorizontal,
+  Star,
+  Tags,
+  Target,
+  TicketPercent,
+  UserRoundCheck,
   Workflow,
   type LucideIcon,
 } from 'lucide-react';
@@ -27,32 +37,32 @@ export type AdminNavigationItem = {
 };
 
 const adminNavigationIcons: Record<string, LucideIcon> = {
-  products: BookOpen,
+  products: Package,
   cohorts: CalendarDays,
-  learning: BookOpen,
-  weeks: BookOpen,
+  learning: GraduationCap,
+  weeks: ListOrdered,
   contents: Film,
-  missions: BookOpen,
-  members: UsersRound,
-  reviews: CheckSquare2,
-  questions: MessageCircle,
-  customers: UsersRound,
-  conversion: Megaphone,
-  tags: UsersRound,
-  coupons: LayoutGrid,
-  'product-reviews': MessageCircle,
-  banners: LayoutGrid,
-  articles: FilePenLine,
-  testimonials: MessageCircle,
+  missions: ClipboardCheck,
+  members: UserRoundCheck,
+  reviews: FileCheck2,
+  questions: MessageCircleQuestion,
+  customers: ContactRound,
+  conversion: Target,
+  tags: Tags,
+  coupons: TicketPercent,
+  'product-reviews': Star,
+  banners: PanelsTopLeft,
+  articles: Newspaper,
+  testimonials: Quote,
   orders: ReceiptText,
-  landing: LineChart,
+  landing: ChartLine,
   analytics: ChartNoAxesCombined,
-  metrics: FilePenLine,
+  metrics: Database,
   campaigns: Send,
-  templates: MessageSquareText,
+  templates: MessagesSquare,
   automations: Workflow,
   seo: SearchCheck,
-  settings: Settings,
+  settings: SlidersHorizontal,
   staff: ShieldCheck,
 };
 
@@ -61,7 +71,7 @@ export function adminNavigationIcon(key: string): LucideIcon {
 }
 
 export const adminNavigationGroups = [
-  ['클래스 관리', ['products', 'cohorts', 'weeks', 'learning', 'contents', 'missions', 'members', 'reviews', 'questions']],
+  ['클래스 관리', ['products', 'cohorts', 'contents', 'missions', 'members', 'reviews', 'questions']],
   ['고객 관리', ['customers', 'tags', 'coupons', 'product-reviews']],
   ['콘텐츠 관리', ['banners', 'articles', 'testimonials']],
   ['주문·매출', ['orders']],
@@ -69,6 +79,7 @@ export const adminNavigationGroups = [
 ] as const;
 
 export const adminNavigationTitles: Record<string, string> = {
+  products: '상품·커리큘럼 관리',
   conversion: '모집 운영',
   landing: '광고·웨비나 성과',
   learning: '학습 콘텐츠 관리',
@@ -82,8 +93,23 @@ export const adminNavigationTitles: Record<string, string> = {
   testimonials: '고객 후기 관리',
 };
 
+const adminGroupEyebrows: Record<string, string> = {
+  '클래스 관리': 'CLASS MANAGEMENT',
+  '고객 관리': 'CUSTOMER MANAGEMENT',
+  '콘텐츠 관리': 'CONTENT MANAGEMENT',
+  '매출 관리': 'ORDER & REVENUE',
+  '주문·매출': 'ORDER & REVENUE',
+  '마케팅 관리': 'MARKETING & CONVERSION',
+  '마케팅·전환': 'MARKETING & CONVERSION',
+};
+
+export function adminSectionEyebrow(group: string, key?: string) {
+  if (key === 'staff') return 'ACCESS MANAGEMENT';
+  return adminGroupEyebrows[group] || 'OPERATIONS';
+}
+
 export const adminSectionDescriptions: Record<string, string> = {
-  products: '상품 정보·상세페이지·제공 자료·판매 조건을 한곳에서 관리합니다.',
+  products: '상품 정보·판매 조건과 주차·학습 커리큘럼을 한곳에서 관리합니다.',
   learning: '일차별 학습 본문과 확인 퀴즈를 관리합니다.',
   cohorts: '상품의 판매 정보와 실제 교육 일정·정원을 구분해 운영합니다.',
   weeks: '상품별 주차 순서·학습 목표·공개 상태를 관리합니다.',
@@ -114,7 +140,7 @@ export const adminSectionDescriptions: Record<string, string> = {
 
 export function normalizeAdminSectionKey(current: string) {
   if (current === 'product-editor') return 'products';
-  if (current === 'learning-editor') return 'learning';
+  if (['learning-editor', 'learning', 'weeks'].includes(current)) return 'products';
   return current;
 }
 

@@ -84,6 +84,9 @@ test('adjudication is disabled outside DEV and requires same origin and operator
   const production = harness({ env: { ...env, NEXT_PUBLIC_APP_ENV: 'production' } });
   assert.equal((await production.POST(request())).status, 403);
   assert.deepEqual(production.reads, []);
+  const liveEnabled = harness({ env: { ...env, NEXT_PUBLIC_APP_ENV: 'production', VERCEL_ENV: 'production', EDU_CONVERSION_JEV_PRODUCTION_ENABLED: 'true' } });
+  assert.equal((await liveEnabled.POST(request())).status, 403);
+  assert.deepEqual(liveEnabled.reads, []);
   const foreign = harness();
   assert.equal((await foreign.POST(request(payload, 'https://other.example'))).status, 403);
   assert.deepEqual(foreign.reads, []);

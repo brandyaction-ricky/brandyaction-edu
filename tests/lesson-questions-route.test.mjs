@@ -19,3 +19,11 @@ test('question inputs are bounded, reads are owner-scoped and failures never exp
  assert.equal((await h.get('&page=-1')).status,400);
  const fail=harness({error:{message:'database SECRET'}});const response=await fail.post();assert.equal(response.status,503);assert.ok(!(await response.text()).includes('SECRET'));
 });
+
+test('enabled images accept an image-only body, pass only server-validated image IDs and reject disabled or invalid attachments',async()=>{
+ const h=harness();assert.equal((await h.post({...h.body,imageId:id})).status,400);
+ process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED='true';
+ try{assert.equal((await h.post({...h.body,content:'',imageId:id})).status,200);assert.equal(h.calls[0].name,'edu_create_lesson_question_with_image');assert.equal(h.calls[0].args.p_image,id);assert.equal(h.calls[0].args.p_content,'');
+ assert.equal((await h.post({...h.body,content:'',imageId:null})).status,400);assert.equal((await h.post({...h.body,imageId:'https://evil.test/a.png'})).status,400);
+ }finally{delete process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED;}
+});

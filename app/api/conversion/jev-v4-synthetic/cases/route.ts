@@ -5,7 +5,7 @@ import { conversionCapabilities, conversionError } from '@/lib/conversion-review
 export async function GET(request: Request) {
   try {
     if (request.headers.get('origin') && request.headers.get('origin') !== new URL(request.url).origin) conversionError('요청 출처를 확인해 주세요.', 403);
-    if (!conversionCapabilities(process.env).can_jev) conversionError('Jev 실험은 개발·검수 환경에서만 사용할 수 있습니다.', 403);
+    if (!conversionCapabilities(process.env).can_jev_experiments) conversionError('Jev 실험은 개발·검수 환경에서만 사용할 수 있습니다.', 403);
     const user = await getOperatorUser('members');
     if (!user) conversionError('회원 관리 권한이 필요합니다.', 403);
     return Response.json({ cases: JEV_V4_BOUNDARY_CASES.map(({ id, title, subject, content, reviewGuide }) => ({ id, title, subject, content, reviewGuide })) },

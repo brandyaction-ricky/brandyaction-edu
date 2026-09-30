@@ -6,8 +6,16 @@ export function conversionCapabilities(env: Record<string, string | undefined>) 
   const production = appEnvironment === 'production';
   const explicitTest = ['development', 'test'].includes(appEnvironment) || (!appEnvironment && env.VERCEL_ENV === 'preview');
   const can_mock = enabled && env.EDU_CONVERSION_MOCK_ENABLED === 'true' && explicitTest && !production;
-  const can_jev = enabled && env.EDU_CONVERSION_JEV_ENABLED === 'true' && Boolean(env.TYPESAFE_API_KEY) && explicitTest && !production;
-  return { enabled, can_mock, can_jev, can_analyze: can_jev || can_mock, analyze_provider: can_jev ? 'jev' as const : can_mock ? 'mock' as const : null };
+  // The DEV Vercel project's fixed URL also has VERCEL_ENV=production. Require
+  // the app's production identity as well as Vercel's production target before
+  // accepting the separate, server-only live permission.
+  const liveAllowed = production && env.VERCEL_ENV === 'production'
+    && env.EDU_CONVERSION_JEV_PRODUCTION_ENABLED === 'true';
+  const can_jev = enabled && env.EDU_CONVERSION_JEV_ENABLED === 'true' && Boolean(env.TYPESAFE_API_KEY)
+    && ((explicitTest && !production) || liveAllowed);
+  const can_jev_experiments = can_jev && !production;
+  return { enabled, can_mock, can_jev, can_jev_experiments, can_analyze: can_jev || can_mock,
+    analyze_provider: can_jev ? 'jev' as const : can_mock ? 'mock' as const : null };
 }
 
 export function conversionError(message: string, status = 400): never {

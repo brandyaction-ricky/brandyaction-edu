@@ -7,9 +7,17 @@ const ruleExports = {};
 const compiledRules = ts.transpileModule(fs.readFileSync(new URL('../lib/platform-rules.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 new Function('exports', compiledRules)(ruleExports);
 
-function harness(fixtures = {}, waitForRead = () => {}) {
-  const calls = [];
+const overviewExports = {};
+const overviewCode = ts.transpileModule(fs.readFileSync(new URL('../lib/learning-overview.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+new Function('exports', 'require', overviewCode)(overviewExports, name => { assert.equal(name, './platform-rules'); return ruleExports; });
+
+function harness(fixtures = {}, waitForRead = () => {}, rpcRead = async () => ({data: [], error: null})) {
+  const calls = [], rpcCalls = [];
   const db = {
+    rpc(name, args) {
+      const call = {name, args}; rpcCalls.push(call);
+      return { abortSignal(signal) { call.signal = signal; return rpcRead(args.p_enrollment); } };
+    },
     from(table) {
       const call = { table, filters: [], columns: '' };
       calls.push(call);
@@ -34,14 +42,16 @@ function harness(fixtures = {}, waitForRead = () => {}) {
     if (name === '@/lib/supabase/server') return { createClient: async () => db };
     if (name === '@/lib/supabase/admin') return { createAdminClient: () => db };
     if (name === '@/lib/platform-rules') return ruleExports;
+    if (name === '@/lib/learning-overview') return overviewExports;
     throw Error(name);
   });
-  return { read: exports.readMemberPlatformData, calls };
+  return { read: exports.readMemberPlatformData, calls, rpcCalls };
 }
 
 test('profile has no data prefetch and dashboard omits orders and review bodies', async () => {
   const profile = harness();
   assert.deepEqual(await profile.read('owner', 'profile'), {});
+  assert.deepEqual(await profile.read('owner', 'messages'), {});
   assert.deepEqual(profile.calls, []);
   const dashboard = harness();
   await dashboard.read('owner', 'dashboard');
@@ -116,3 +126,40 @@ test('real access dates use the current clock rather than an array callback inde
     assert.deepEqual(member.calls.map(call => call.table), ['enrollments']);
   }
 });
+
+const owned = { id: 'owned', user_id: 'owner', course_id: 'course', cohort_id: 'cohort', status: 'active' };
+const gate = { lessonId: 'lesson', track: 'daily', dayNumber: 1, isUnlocked: true, automaticApproval: false, reason: '' };
+async function withFlag(run) {
+  const previous = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED;
+  process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED = 'true';
+  try { await run(); } finally { if(previous === undefined) delete process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED; else process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED=previous; }
+}
+test('gate reads are disabled by default and absent on unrelated member views', async () => {
+  const previous=process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED;
+  delete process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED;
+  try { const f=harness({enrollments:[owned]}); await f.read('owner','dashboard'); assert.deepEqual(f.rpcCalls,[]); }
+  finally { if(previous!==undefined)process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED=previous; }
+  await withFlag(async()=>{for(const view of ['profile','messages','learn','resources','missions']){const f=harness({enrollments:[owned]});await f.read('owner',view,'owned');assert.deepEqual(f.rpcCalls,[]);}});
+});
+test('dashboard and classes read progression only for owned active enrollments and strip extra RPC fields', async () => withFlag(async()=>{
+  for(const view of ['dashboard','classes']){
+    const f=harness({enrollments:[owned,{...owned,id:'other',user_id:'another'},{...owned,id:'revoked',status:'revoked'},{...owned,id:'future',access_starts_at:'2099-01-01'}]},()=>{},async()=>({data:[{...gate,document:{private:'answer'}}],error:null}));
+    const result=await f.read('owner',view);
+    assert.equal(f.rpcCalls.length,1);assert.equal(f.rpcCalls[0].name,'edu_read_lesson_progression');
+    assert.deepEqual(f.rpcCalls[0].args,{p_actor:'owner',p_enrollment:'owned'});assert.ok(f.rpcCalls[0].signal instanceof AbortSignal);
+    assert.deepEqual(result.learning_overviews,[{id:'owned',status:'ready',lessons:[gate]}]);
+  }
+}));
+test('failed and malformed progression reads affect only that enrollment and never expose error details', async () => withFlag(async()=>{
+ const f=harness({enrollments:['owned','failure','malformed'].map(id=>({...owned,id}))},()=>{},async id=>id==='failure'?{error:{message:'private SQL error'},data:null}:{error:null,data:id==='malformed'?[{...gate,isUnlocked:'yes'}]:[gate]});
+ const result=await f.read('owner','classes');
+ assert.deepEqual(result.learning_overviews,[{id:'owned',status:'ready',lessons:[gate]},{id:'failure',status:'error'},{id:'malformed',status:'error'}]);
+ assert.ok(!JSON.stringify(result).includes('private SQL'));assert.equal(new Set(f.rpcCalls.map(call=>call.signal)).size,1);
+}));
+test('progression reads start alongside curriculum reads without an extra serial round trip', async()=>withFlag(async()=>{
+ let release;const blocked=new Promise(resolve=>{release=resolve;});
+ const f=harness({enrollments:[owned]},table=>table==='courses'?blocked:undefined,async()=>{await blocked;return{data:[gate],error:null};});
+ const read=f.read('owner','classes');await new Promise(resolve=>setImmediate(resolve));
+ assert.ok(f.calls.some(call=>call.table==='courses'));assert.equal(f.rpcCalls.length,1);
+ release();assert.equal((await read).learning_overviews[0].status,'ready');
+}));

@@ -45,6 +45,16 @@ const mission = { id: 'mission', lesson_id: 'lesson', title: '실행 미션', in
 const submission = { id: 'submission', enrollment_id: 'enrollment', mission_id: 'mission', status: 'submitted', attempt_number: 1, submitted_at: '2026-09-01T00:00:00Z', response: { text: '<script>unsafe()</script>', url: 'javascript:alert(1)' } };
 const data = { courses: [course], cohorts: [cohort], enrollments: [enrollment], profiles: [user], curriculum_weeks: [{ id: 'week', course_id: 'course', week_number: 1, title: '시작하기', is_published: true }], curriculum_lessons: [lesson], curriculum_missions: [mission], mission_submissions: [submission], lesson_contents: [{ lesson_id: 'lesson', body_text: '등록된 학습 본문', resource_path: 'private/test.pdf', resource_name: '학습 자료.pdf' }], articles: [{ id: 'article', slug: 'test-article', title: '테스트 아티클', content_type: 'text', status: 'published', body: [{ type: 'paragraph', text: '콘텐츠' }] }], review_videos: [{ id: 'story', title: '등록된 고객 이야기', reviewer_name: '고객' }], orders: [], admin_summary: [{ id: 'summary', members: 1, activeEnrollments: 1, pendingReviews: 1, openQuestions: 0 }] };
 const send = async () => { throw Error('Unexpected write during render'); };
+test('member operations expose track progress on demand only when the learning feature is enabled', () => {
+  const { AdminWorkflows } = load('app/ui/admin-workflows.tsx');
+  const previous = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED;
+  try {
+    process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED = 'true';
+    assert.match(html(AdminWorkflows, { section: 'members', data, pending: false, send }), /과정별 진도 보기/);
+    process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED = 'false';
+    assert.doesNotMatch(html(AdminWorkflows, { section: 'members', data, pending: false, send }), /과정별 진도 보기/);
+  } finally { if (previous === undefined) delete process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED; else process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED = previous; }
+});
 
 test('lesson text activates named and bare links while preserving existing copy', () => {
   const { LessonText } = load('app/ui/final/lesson-text.tsx');
@@ -129,17 +139,20 @@ test('five admin categories and scoped navigation render from the admin UI featu
   assert.equal(finalAdminGroups.length, 5);
   const props = { current: 'overview', available: platform.sections, user: { ...user, role: 'admin' }, pendingReviews: 1, mobile: false, setMobile() {}, logout: async () => {} };
   const markup = html(AdminShell, { ...props, children: React.createElement(Overview, { data, available: platform.sections }) });
+  const navigationMarkup = markup.match(/<nav aria-label="관리자 카테고리">[\s\S]*?<\/nav>/)?.[0] || '';
+  assert.match(navigationMarkup, /상품·커리큘럼 관리/);
+  assert.doesNotMatch(navigationMarkup, /href="\/admin\/(?:weeks|learning)"/);
   for (const [label] of finalAdminGroups) assert.ok(markup.includes(label));
   assert.match(markup, /class="nav-group"/); assert.match(markup, /lucide/); assert.match(markup, /category-strip/);
   const expectedIcons = {
-    products: 'book-open', cohorts: 'calendar-days', learning: 'book-open', weeks: 'book-open',
-    contents: 'film', missions: 'book-open', members: 'users-round', reviews: 'square-check',
-    questions: 'message-circle', customers: 'users-round', tags: 'users-round', coupons: 'layout-grid',
-    'product-reviews': 'message-circle', banners: 'layout-grid', articles: 'file-pen-line',
-    testimonials: 'message-circle', orders: 'receipt-text', conversion: 'megaphone',
+    products: 'package', cohorts: 'calendar-days',
+    contents: 'film', missions: 'clipboard-check', members: 'user-round-check', reviews: 'file-check-corner',
+    questions: 'message-circle-question-mark', customers: 'contact-round', tags: 'tags', coupons: 'ticket-percent',
+    'product-reviews': 'star', banners: 'panels-top-left', articles: 'newspaper',
+    testimonials: 'quote', orders: 'receipt-text', conversion: 'target',
     landing: 'chart-line', analytics: 'chart-no-axes-combined',
     campaigns: 'send',
-    templates: 'message-square-text', automations: 'workflow', seo: 'search-check', settings: 'settings', staff: 'shield-check',
+    templates: 'messages-square', automations: 'workflow', seo: 'search-check', settings: 'sliders-horizontal', staff: 'shield-check',
   };
   for (const [key, icon] of Object.entries(expectedIcons)) {
     assert.ok(adminNavigationIcon(key));
@@ -583,4 +596,50 @@ test('rich lesson renderer allows headings and safe marks but rejects scripts, a
   assert.match(markup, /<h2>큰 제목<\/h2>/); assert.match(markup, /<h3>작은 제목<\/h3>/);
   assert.match(markup, /font-size:20px/); assert.match(markup, /<strong>&lt;script&gt;/);
   assert.doesNotMatch(markup, /<script|<img|<a |onclick|onerror|9999px|color:red|url\(evil/);
+});
+
+test('lesson toggles round trip safely with H1, inline summary formatting and nested content', () => {
+  const { LessonText } = load('app/ui/final/lesson-text.tsx');
+  const body = load('lib/lesson-body.ts');
+  const doc = { type: 'doc', content: [
+    { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: '학습 제목' }] },
+    { type: 'details', attrs: { open: true, onclick: 'unsafe()' }, content: [
+      { type: 'detailsSummary', content: [{ type: 'text', text: '자세한 ' }, { type: 'text', text: '안내', marks: [{ type: 'bold' }] }] },
+      { type: 'detailsContent', content: [{ type: 'paragraph', content: [{ type: 'text', text: '<script>안전한 원문</script>' }] }] },
+    ] },
+  ] };
+  const saved = body.serializeLessonDocument(doc), parsed = body.parseLessonDocument(saved);
+  assert.equal(body.serializeLessonDocument(parsed), saved);
+  assert.equal(parsed.content[0].attrs.level, 1);
+  assert.equal(parsed.content[1].attrs, undefined);
+  assert.equal(body.lessonBodyPlainText(saved), '학습 제목\n자세한 안내\n<script>안전한 원문</script>');
+  const markup = html(LessonText, { text: saved });
+  assert.match(markup, /<h1>학습 제목<\/h1>/);
+  assert.match(markup, /<details><summary>자세한 <strong>안내<\/strong><\/summary>/);
+  assert.match(markup, /&lt;script&gt;안전한 원문&lt;\/script&gt;/);
+  assert.doesNotMatch(markup, /onclick| open=|<script>/);
+  assert.equal(body.normalizeLessonDocument({ type: 'doc', content: [{ type: 'details', content: [{ type: 'paragraph' }] }] }), null);
+});
+
+test('positioning lesson images preserves rich list nodes, stable question IDs and private asset references', () => {
+  const { positionLessonImage } = load('lib/lesson-image-position.ts');
+  const body = load('lib/lesson-body.ts');
+  const nodes = [
+    { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Heading' }] },
+    { type: 'bulletList', content: [{ type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Keep list', marks: [{ type: 'bold' }] }] }] }] },
+    { type: 'paragraph', content: [{ type: 'text', text: 'After' }] },
+  ];
+  const blocks = [{ id: 'body', type: 'text', content: body.serializeLessonDocument({ type: 'doc', content: nodes }) }, { id: 'image', type: 'image', assetId: 'private-asset' }, { id: 'question', type: 'question', question: { label: 'Keep answer ID', kind: 'text' } }];
+  const before = structuredClone(blocks);
+  const result = positionLessonImage(blocks, blocks[1], { blockId: 'body', textBoundary: 2 }, 'after');
+  assert.deepEqual(result.map(block => block.id), ['body', 'image', 'after', 'question']);
+  assert.deepEqual(body.parseLessonDocument(result[0].content).content, nodes.slice(0, 2));
+  assert.deepEqual(body.parseLessonDocument(result[2].content).content, nodes.slice(2));
+  assert.deepEqual(result[1], blocks[1]); assert.deepEqual(result[3], blocks[2]); assert.deepEqual(blocks, before);
+  assert.throws(() => positionLessonImage(blocks, blocks[1], { blockId: 'body', textBoundary: 9 }, 'after'));
+  assert.throws(() => positionLessonImage(blocks, blocks[1], { blockId: 'missing' }, 'after'));
+  assert.throws(() => positionLessonImage(blocks, blocks[1], { blockId: 'body', textBoundary: 1 }, 'question'));
+  assert.equal(positionLessonImage(blocks, blocks[1], { blockId: 'image' }, 'after'), blocks);
+  assert.deepEqual(positionLessonImage(blocks, blocks[1], { blockId: 'body', textBoundary: 0 }, 'after').map(block => block.id), ['image', 'body', 'question']);
+  assert.deepEqual(positionLessonImage(blocks, blocks[1], { blockId: 'body', textBoundary: 3 }, 'after').map(block => block.id), ['body', 'image', 'question']);
 });

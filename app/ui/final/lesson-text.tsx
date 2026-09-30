@@ -18,12 +18,15 @@ function RichNode({ node }: { node: LessonNode }): ReactNode {
   if (node.type === "hardBreak") return <br />;
   const children = node.content?.map((child, index) => <RichNode key={index} node={child} />);
   switch (node.type) {
-    case "heading": return node.attrs?.level === 3 ? <h3>{children}</h3> : <h2>{children}</h2>;
+    case "heading": return node.attrs?.level === 1 ? <h1>{children}</h1> : node.attrs?.level === 3 ? <h3>{children}</h3> : <h2>{children}</h2>;
     case "paragraph": return <p>{children?.length ? children : <br />}</p>;
     case "bulletList": return <ul>{children}</ul>;
     case "orderedList": return <ol start={Number(node.attrs?.start) || 1}>{children}</ol>;
     case "listItem": return <li>{children}</li>;
     case "blockquote": return <blockquote>{children}</blockquote>;
+    case "details": return <details>{children}</details>;
+    case "detailsSummary": return <summary>{children?.length ? children : "내용 펼치기"}</summary>;
+    case "detailsContent": return <div className="lesson-toggle-content">{children}</div>;
     default: return <>{children}</>;
   }
 }

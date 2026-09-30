@@ -190,6 +190,24 @@ test('Jev shadow mode takes precedence over mock and persists only the server re
   assert.equal(response.status, 200);
   assert.equal(h.calls[0].args.p_result.mode, 'jev');
 });
+test('production live permission enables only the employee Jev result, not DEV experiments', async () => {
+  let providerCalls = 0;
+  const jev = { ...core.createMockJudgment({ id: ids.inquiry, course_id: ids.course, cohort_id: null, subject: '문의', content: '내용' }, []), mode: 'jev', model: 'jev-test', decision_version: 1, decisions: {} };
+  const liveEnv = { EDU_CONVERSION_REVIEW_ENABLED: 'true', EDU_CONVERSION_JEV_ENABLED: 'true', EDU_CONVERSION_JEV_PRODUCTION_ENABLED: 'true',
+    TYPESAFE_API_KEY: 'test-key', NEXT_PUBLIC_APP_ENV: 'production', VERCEL_ENV: 'production' };
+  const h = harness({ env: liveEnv, createJevJudgment: async () => { providerCalls += 1; return jev; } });
+  const snapshot = await (await h.GET()).json();
+  assert.equal(snapshot.capabilities.can_jev, true);
+  assert.equal(snapshot.capabilities.can_jev_v4, true);
+  assert.equal(snapshot.capabilities.can_jev_experiments, false);
+  assert.equal(snapshot.capabilities.can_adjudicate, false);
+  assert.equal(snapshot.capabilities.can_jev_v2, false);
+  assert.equal(snapshot.capabilities.can_jev_v3, false);
+  const response = await h.POST(req({ action: 'analyze', requestId: ids.request, case_id: ids.inquiry, expected_version: 1 }));
+  assert.equal(response.status, 200);
+  assert.equal(providerCalls, 1);
+  assert.equal(h.calls[0].args.p_result.mode, 'jev');
+});
 test('database stale versions and reused request IDs are returned as conflicts', async () => {
   for (const message of ['CONVERSION_STALE', 'CONVERSION_REQUEST_REUSED']) {
     const h = harness({ rpcResult: { data: null, error: { message } } }); assert.equal((await h.POST(req())).status, 409);

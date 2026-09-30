@@ -1,5 +1,7 @@
 'use client';
 
+import { UnreadMessageLink } from '@/app/ui/final/unread-message-link';
+import { LearningNoticeBar } from '@/app/ui/final/learning-notice';
 import {
   ArrowRight,
   LogOut,
@@ -9,7 +11,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   adminContentWidth,
   adminNavigationIcon,
@@ -22,6 +24,7 @@ import {
 import { createAdminMenuVisibility } from '../permissions/menu-visibility';
 
 export type AdminShellUser = {
+  id?: string;
   full_name?: string | null;
   role: string;
 };
@@ -50,9 +53,13 @@ export function AdminShell({
   const selected = normalizeAdminSectionKey(current);
   const byKey = new Map(available.map(item => [item.key, item]));
   const visibility = createAdminMenuVisibility(available);
+  const groups = visibility.groups(adminNavigationGroups);
   const contentWidth = adminContentWidth(selected);
   const sidebarRef = useRef<HTMLElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const [openGroups, setOpenGroups] = useState(() => new Set(
+    groups.filter(([, keys]) => selected === 'overview' || keys.some(key => key === selected)).map(([title]) => title),
+  ));
   useEffect(() => {
     const tablet = window.matchMedia('(max-width: 1024px)');
     const closePersistentSidebar = (event: MediaQueryListEvent) => {
@@ -61,6 +68,22 @@ export function AdminShell({
     tablet.addEventListener('change', closePersistentSidebar);
     return () => tablet.removeEventListener('change', closePersistentSidebar);
   }, [setMobile]);
+  useEffect(() => {
+    const sidebar = sidebarRef.current;
+    if (!sidebar) return;
+    const active = sidebar.querySelector<HTMLElement>('.nav-link[aria-current="page"]');
+    if (!active) return;
+    const group = active.closest('details');
+    const groupTitle = group?.querySelector('summary')?.textContent?.replace(/\d+$/, '').trim();
+    if (groupTitle) setOpenGroups(current => current.has(groupTitle) ? current : new Set([...current, groupTitle]));
+    const frame = requestAnimationFrame(() => {
+      const top = active.offsetTop;
+      const bottom = top + active.offsetHeight;
+      if (top < sidebar.scrollTop) sidebar.scrollTop = Math.max(0, top - 12);
+      else if (bottom > sidebar.scrollTop + sidebar.clientHeight) sidebar.scrollTop = bottom - sidebar.clientHeight + 12;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [selected]);
   useEffect(() => {
     if (!mobile) return;
     const sidebar = sidebarRef.current;
@@ -138,18 +161,35 @@ export function AdminShell({
         </div>
         <nav aria-label="관리자 카테고리">
           {navLink('overview')}
-          {visibility.groups(adminNavigationGroups).map(([title, keys]) => (
+          {groups.map(([title, keys]) => (
             <details
               className="nav-group"
-              key={title + selected}
-              open={selected === 'overview' || keys.some(key => key === selected)}
+              key={title}
+              open={openGroups.has(title)}
+              onToggle={event => {
+                const isOpen = event.currentTarget.open;
+                setOpenGroups(current => {
+                  if (current.has(title) === isOpen) return current;
+                  const next = new Set(current);
+                  if (isOpen) next.add(title); else next.delete(title);
+                  return next;
+                });
+              }}
             >
               <summary>{title}<span className="nav-category-count">{keys.filter(key => byKey.has(key)).length}</span></summary>
               {keys.map(navLink)}
             </details>
           ))}
           {extra.length > 0 && (
-            <details className="nav-group" open={extra.includes(selected)}>
+            <details className="nav-group" open={openGroups.has('추가 운영 도구')} onToggle={event => {
+              const isOpen = event.currentTarget.open;
+              setOpenGroups(current => {
+                if (current.has('추가 운영 도구') === isOpen) return current;
+                const next = new Set(current);
+                if (isOpen) next.add('추가 운영 도구'); else next.delete('추가 운영 도구');
+                return next;
+              });
+            }}>
               <summary>추가 운영 도구</summary>
               {extra.map(navLink)}
             </details>
@@ -187,6 +227,7 @@ export function AdminShell({
             <span>{adminSectionTitle(current, available)}</span>
           </div>
           <div className="topright">
+            {process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === "true" && <>{user.id ? <UnreadMessageLink key={user.id} userId={user.id} className="btn ghost small"/> : <Link className="btn ghost small" href="/my/messages">메시지</Link>}</>}
             {byKey.has('questions') && (
               <Link className="btn iconbtn ghost" href="/admin/questions" aria-label="질문함">
                 <MessageCircle aria-hidden="true" />
@@ -198,6 +239,7 @@ export function AdminShell({
             <span className="avatar">{(user.full_name || '운영').slice(0, 1)}</span>
           </div>
         </header>
+        {process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' && <LearningNoticeBar/>}
         <div className={`content admin-content-${contentWidth}`} id="admin-content" tabIndex={-1}>
           {children}
         </div>
