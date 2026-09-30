@@ -32,7 +32,7 @@ test('API hides database details and distinguishes missing member',async()=>{
  const result=await harness({error:{message:'private SQL detail'}}).get();assert.equal(result.status,503);assert.doesNotMatch(await result.text(),/private SQL/);
 });
 test('actual catch-all accepts the message inbox and rejects invalid child paths',async()=>{
- const platform=()=>null;const {default:Page}=load('app/[[...path]]/page.tsx',{'react/jsx-runtime':{jsx:(type,props)=>({type,props})},'@/app/ui/platform':{Platform:platform},'next/navigation':{notFound:()=>{throw Error('NOT_FOUND');},redirect:()=>{}},'@/lib/landing-admin-state':{},'@/lib/platform':{sections:[]},'@/lib/edu-settings':{},'@/lib/supabase/server':{}});
+ const platform=()=>null;const {default:Page}=load('app/[[...path]]/page.tsx',{'react/jsx-runtime':{jsx:(type,props)=>({type,props})},'@/app/ui/platform':{Platform:platform},'next/navigation':{notFound:()=>{throw Error('NOT_FOUND');},redirect:()=>{}},'@/lib/landing-admin-state':{},'@/lib/platform':{sections:[]},'@/lib/edu-settings':{},'@/lib/supabase/server':{},'next/headers':{},'@/lib/product-sharing':{}});
  const result=await Page({params:Promise.resolve({path:['my','messages']}),searchParams:Promise.resolve({})});assert.equal(result.type,platform);assert.deepEqual(result.props.path,['my','messages']);
  for(const path of [['my','unknown'],['my','messages','x']])await assert.rejects(Page({params:Promise.resolve({path}),searchParams:Promise.resolve({})}),/NOT_FOUND/);
 });

@@ -1804,11 +1804,10 @@ function SettingsForm({ section, data, send, pending }: Props) {
   );
 }
 function Analytics() {
-  const today = new Date().toISOString().slice(0, 10);
   const [from, setFrom] = useState(() =>
-    new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10),
+    new Date(Date.now() + 9 * 3600000 - 29 * 86400000).toISOString().slice(0, 10),
   );
-  const [to, setTo] = useState(today);
+  const [to, setTo] = useState(() => new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10));
   const end = Number.isFinite(Date.parse(to))
     ? new Date(Date.parse(to) + 86400000).toISOString()
     : "";
@@ -1822,13 +1821,17 @@ function Analytics() {
   );
   const stages = (result.stages || {}) as Record<string, number>;
   const paths = (result.paths || []) as Row[];
+  const empty = !Number(result.visitors) && !Number(result.events) && !Number(result.paidOrders) && !Number(result.revenue) && !paths.length && !Object.values(stages).some(Number);
   return (
     <>
       <AdminFilterBar date={<><AdminDatePicker label="시작일 (한국 시간)" value={from} onChange={event => setFrom(event.target.value)} /><AdminDatePicker label="종료일" value={to} onChange={event => setTo(event.target.value)} /></>} action={<AdminButton variant="outline" onClick={retry} disabled={loading}>새로고침</AdminButton>} />
-      {error ? (
+      {loading ? (
+        <p className="notice mt24" role="status" aria-live="polite">선택한 기간의 유입 성과를 조회하고 있습니다.</p>
+      ) : error ? (
         <AdminErrorState onRetry={retry}>{error}</AdminErrorState>
       ) : (
         <>
+          {empty && <div className="mt24" role="status"><AdminEmptyState compact title="기간 내 기록 없음">조회 기간과 운영·트래킹 설정을 확인해 주세요.</AdminEmptyState></div>}
           <div className="admin-pilot-summary mt24">
             {[
               ["방문 세션", result.visitors || 0],
@@ -1870,7 +1873,7 @@ function Analytics() {
             { id: "views", header: "조회 수", value: row => Number(row.views || 0), align: "number" },
             { id: "visitors", header: "방문 세션", value: row => Number(row.visitors || 0), align: "number" },
             { id: "clicks", header: "클릭 수", value: row => Number(row.clicks || 0), align: "number" },
-          ]} empty={<AdminEmptyState compact title="수집된 기록이 없습니다.">운영·트래킹 설정에서 수집을 켜 주세요.</AdminEmptyState>} />
+          ]} empty={<AdminEmptyState compact title="기간 내 페이지별 참여 기록이 없습니다." />} />
         </>
       )}
     </>
