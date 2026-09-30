@@ -1435,7 +1435,7 @@ function LegacyEditor({
                   </div>
                   <div className="divider" />
                   <h3 className="mb16">회원 정보·계정 상태 수정</h3>
-                  <div className="editor-fields">{section.fields.map(field => <div className="field" key={field.key}><label htmlFor={`edit-${field.key}`}>{field.label}</label>{control(field)}</div>)}</div>
+                  <div className="editor-fields">{section.fields.map(field => <div className="field" key={field.key}><label htmlFor={`edit-${field.key}`}>{field.label}</label>{control(field)}{field.key === 'contact_email' && <small>앞으로 보내는 결제·수강 안내에 적용됩니다. 비워 두면 결제 당시 이메일 또는 로그인 이메일을 사용합니다. 로그인 계정은 바뀌지 않으며, 이미 보낸 메일은 다시 보내지 않습니다.</small>}</div>)}</div>
                 </div>
                 </CustomerWorkspace>
               )}

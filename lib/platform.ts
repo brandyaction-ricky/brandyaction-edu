@@ -5,6 +5,7 @@ export type Row = {
 export type User = {
     id: string;
     email: string;
+    contact_email?: string | null;
     full_name: string | null;
     phone: string | null;
     role: string;
@@ -59,7 +60,7 @@ export const sections: Section[] = [
     { key: 'members', title: '회원 미션', group: '클래스 관리', table: 'mission_submissions', readOnly: true, fields: [] },
     { key: 'reviews', title: '제출물 검토', group: '클래스 관리', table: 'mission_submissions', fields: [f('status', '검토 결과', 'select', true, ['approved', 'changes_requested', 'rejected']), f('reviewer_feedback', '피드백', 'textarea')] },
     { key: 'questions', title: '질문함', group: '클래스 관리', table: 'edu_questions', fields: [f('answer', '답변', 'textarea', true), f('status', '상태', 'select', false, ['open', 'answered']), f('is_archived', '질문 보관', 'checkbox')] },
-    { key: 'customers', title: '회원 관리', group: '고객 관리', table: 'profiles', fields: [f('full_name', '이름'), f('phone', '연락처'), f('role', '계정 권한', 'select', false, ['student', 'staff', 'admin']), f('status', '상태', 'select', false, ['active', 'suspended'])] },
+    { key: 'customers', title: '회원 관리', group: '고객 관리', table: 'profiles', fields: [f('full_name', '이름'), f('phone', '연락처'), { ...f('contact_email', '안내받을 이메일', 'email'), maxLength: 254 }, f('role', '계정 권한', 'select', false, ['student', 'staff', 'admin']), f('status', '상태', 'select', false, ['active', 'suspended'])] },
     { key: 'staff', title: '스태프 권한', group: '고객 관리', table: 'profiles', readOnly: true, fields: [] },
     { key: 'tags', title: '고객 태그', group: '고객 관리', table: 'crm_tags', fields: [f('name', '태그명', 'text', true), f('color', '태그 색상', 'color'), f('description', '설명', 'textarea'), f('tag_kind', '부여 방식', 'select', true, ['automatic', 'manual']), f('rule_key', '조건 행동', 'select', false, ['free_lesson_1', 'free_lesson_2', 'free_lesson_3', 'paid_customer', 'mission_completed', 'signed_up']), f('threshold_percent', '기준 시청률', 'number'), f('is_active', '사용 상태', 'checkbox')] },
     { key: 'coupons', title: '쿠폰 관리', group: '고객 관리', table: 'coupons', fields: [f('name', '쿠폰명', 'text', true), f('code', '쿠폰 코드', 'text', true), f('discount_type', '할인 유형', 'select', true, ['fixed', 'percentage']), f('discount_value', '할인 수치', 'number', true), f('max_discount_amount', '최대 할인액', 'number'), f('minimum_order_amount', '최소 주문 금액', 'number'), f('usage_limit', '총 발급 수량', 'number'), f('per_user_limit', '회원당 발급 횟수', 'number'), f('product_scope', '적용 상품', 'select', true, ['all', 'paid', 'specific']), f('issue_target', '발급 대상', 'select', true, ['all', 'tag']), f('target_tag_id', '대상 태그'), f('exclude_free', '무료 상품 제외', 'checkbox'), f('starts_at', '사용 시작', 'datetime-local'), f('ends_at', '사용 종료', 'datetime-local'), f('is_active', '사용 가능', 'checkbox')] },

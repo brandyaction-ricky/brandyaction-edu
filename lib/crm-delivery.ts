@@ -18,6 +18,7 @@ type Member = {
   phone?: string | null;
   full_name?: string | null;
   email?: string | null;
+  contact_email?: string | null;
   marketing_consent?: boolean;
   marketing_consent_at?: string | null;
   marketing_opt_out_at?: string | null;
@@ -426,7 +427,7 @@ export async function dispatchDueCrm() {
   let runQuery = db
     .from("crm_automation_runs")
     .select(
-      "*,automation:crm_automations(*,template:crm_templates(*)),member:profiles(id,phone,full_name,email,marketing_consent,status)",
+      "*,automation:crm_automations(*,template:crm_templates(*)),member:profiles(id,phone,full_name,email,contact_email,marketing_consent,status)",
     )
     .eq("status", "pending")
     .lte("scheduled_for", new Date().toISOString());
