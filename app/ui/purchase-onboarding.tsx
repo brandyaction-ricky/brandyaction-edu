@@ -16,6 +16,7 @@ export function PurchaseOnboarding({ order, guideRequested }: { order: string; g
   const [copied, setCopied] = useState(false);
   const [selectedPath, setSelectedPath] = useState<TelegramPath | null>(null);
   const [manualUrl, setManualUrl] = useState('');
+  const [roomOpened, setRoomOpened] = useState(false);
   const load = useCallback(async () => {
     const response = await fetch('/api/purchase-onboarding' + (order ? `?order=${encodeURIComponent(order)}` : ''), { cache: 'no-store' });
     const data = await response.json();
@@ -41,11 +42,16 @@ export function PurchaseOnboarding({ order, guideRequested }: { order: string; g
   const answer = async (room: SurveyRoom) => { if (await submit({ action: 'answer', room })) { await load(); router.replace(`/purchase-onboarding?order=${encodeURIComponent(view!.orderId)}&step=guide`); } };
   const choosePath = async (path: TelegramPath) => { if (await submit({ action: 'path', path })) setView(current => current ? { ...current, telegramPath: path } : current); };
   const getLink = async (copy: boolean) => {
+    const roomWindow = !copy && view?.telegramOnly ? window.open('', '_blank') : null;
+    if (roomWindow) roomWindow.opener = null;
     const result = await submit({ action: 'link' });
-    if (!result?.url) return;
+    if (!result?.url) { roomWindow?.close(); return; }
     if (copy) {
       try { await navigator.clipboard.writeText(result.url); setCopied(true); setManualUrl(''); }
       catch { setManualUrl(result.url); setError('자동 복사가 제한됐습니다. 아래 링크를 길게 눌러 복사해 주세요.'); }
+    } else if (view?.telegramOnly) {
+      if (roomWindow) { roomWindow.location.replace(result.url); setRoomOpened(true); }
+      else setManualUrl(result.url);
     } else window.location.assign(result.url);
   };
 
@@ -62,6 +68,13 @@ export function PurchaseOnboarding({ order, guideRequested }: { order: string; g
         <div className="onboarding-actions"><a className="btn" href={TELEGRAM_IOS_INSTALL_URL} target="_blank" rel="noopener noreferrer">iPhone 앱 설치</a><a className="btn" href={TELEGRAM_ANDROID_INSTALL_URL} target="_blank" rel="noopener noreferrer">Android 앱 설치</a></div>
         <p>2. 이 안내 화면으로 돌아와 아래 버튼으로 공지방에 입장하세요.</p></div>}
       {selectedPath && <div className="onboarding-actions"><button type="button" className="btn primary" disabled={pending} onClick={() => void getLink(false)}>텔레그램 공지방 입장</button></div>}
+      {view.telegramOnly && manualUrl && <p className="onboarding-fallback">새 창이 열리지 않았다면 <a href={manualUrl} target="_blank" rel="noopener noreferrer" onClick={() => setRoomOpened(true)}>여기에서 공지방 열기</a>를 눌러 주세요.</p>}
+      {selectedPath && <p className="onboarding-return-hint">공지방에 입장한 뒤 이 화면으로 돌아와 다음 단계를 확인해 주세요.</p>}
+      {roomOpened && <div className="onboarding-next-step" role="status">
+        <h3>공지방에 들어오셨나요?</h3>
+        <p>입장을 마쳤다면 내 클래스에서 학습 일정과 자료를 확인하세요. 수업 공지는 텔레그램 공지방에서 확인할 수 있습니다.</p>
+        <Link className="btn primary" href="/my/classes">내 클래스 확인하기</Link>
+      </div>}
     </section>}
     {view && !view.telegramOnly && !view.surveyRoom && <section className="onboarding-panel"><h2>1. 어떤 경로로 참여하셨나요?</h2><p>결제 후 안내를 위해 한 가지만 선택해 주세요.</p>
       <div className="onboarding-options"><button type="button" disabled={pending} onClick={() => void answer('paid')}>광고 방에서 참여했어요</button><button type="button" disabled={pending} onClick={() => void answer('organic')}>오가닉 방에서 참여했어요</button><button type="button" disabled={pending} onClick={() => void answer('unknown')}>잘 모르겠어요</button></div></section>}
