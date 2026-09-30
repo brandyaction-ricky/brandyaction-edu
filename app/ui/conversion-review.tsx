@@ -96,8 +96,8 @@ export function prefetchConversionReview(userId: string) {
   void readConversionSnapshot(userId).catch(() => {});
 }
 
-export function ConversionReview({ workspace = false, initialPeriod, userId }: { workspace?: boolean; initialPeriod?: string; userId: string }) {
-  const [workspaceView, setWorkspaceView] = useState<'recruitment' | 'inquiries'>('recruitment');
+export function ConversionReview({ workspace = false, initialPeriod, initialView = 'recruitment', userId }: { workspace?: boolean; initialPeriod?: string; initialView?: 'recruitment' | 'inquiries'; userId: string }) {
+  const [workspaceView, setWorkspaceView] = useState<'recruitment' | 'inquiries'>(initialView);
   const [snapshot, setSnapshot] = useState<ConversionSnapshot | null>(null);
   const [selectedId, setSelectedId] = useState('');
   const [query, setQuery] = useState('');
@@ -115,6 +115,7 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
   const gate = useRef(createMutationGate<Record<string, unknown>>());
   const active = useRef(true);
   const read = useRef<AbortController | null>(null);
+  const previousInitialView = useRef(initialView);
 
   const refresh = useCallback(async (allowPrefetched = false) => {
     read.current?.abort();
@@ -141,6 +142,14 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
     const timer = setTimeout(() => void refresh(true), 0);
     return () => { active.current = false; clearTimeout(timer); read.current?.abort(); };
   }, [refresh]);
+
+  useEffect(() => {
+    // A link can change the query without remounting this client screen.
+    if (previousInitialView.current === initialView) return;
+    previousInitialView.current = initialView;
+    const timer = window.setTimeout(() => setWorkspaceView(initialView), 0);
+    return () => window.clearTimeout(timer);
+  }, [initialView]);
 
   const mutate: Mutation = async (payload) => {
     setPending(true); setError(''); setNotice('');
@@ -199,6 +208,13 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
   const jevV4Run = run && snapshot ? snapshot.jev_v4_runs?.find(item => item.v1_run_id === run.id) : undefined;
   const openCase = (item?: ConversionCase, initialSource: 'native' | 'manual' = 'native') => { setEditingCase(item); setDrawer('case'); setCaseSource(initialSource); };
   const openEvidence = (item?: ConversionEvidence) => { setEditingEvidence(item); setDrawer('evidence'); };
+  const showWorkspaceView = (view: 'recruitment' | 'inquiries') => {
+    setWorkspaceView(view);
+    const url = new URL(window.location.href);
+    if (view === 'inquiries') url.searchParams.set('view', 'inquiries');
+    else url.searchParams.delete('view');
+    window.history.replaceState(null, '', url);
+  };
 
   return <AdminPage width="wide" template="review" className="conversion-review">
     <AdminPageHeader title={workspace ? "모집 운영" : "전환 관리"} description={workspace ? "모집별 연결·구매 현황·후속 안내를 한곳에서 관리합니다." : "문의에 필요한 설명을 찾고, 검토한 내용을 기록합니다."} eyebrow="MARKETING" actions={<>
@@ -214,9 +230,9 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
     {!loading && !snapshot && <AdminEmptyState title="전환 관리 정보를 불러오지 못했습니다." action={<AdminButton onClick={() => void refresh()}>다시 불러오기</AdminButton>}>접근 권한과 기능 사용 가능 여부를 확인해 주세요.</AdminEmptyState>}
     {snapshot && <>
       {workspace ? <>
-        <div className="funnel-entry" aria-label="모집 운영 작업">
-          <AdminButton aria-pressed={workspaceView === 'recruitment'} onClick={() => setWorkspaceView('recruitment')}>모집 설정·구매·후속 안내</AdminButton>
-          <AdminButton aria-pressed={workspaceView === 'inquiries'} onClick={() => setWorkspaceView('inquiries')}>구매 전 문의 검토</AdminButton>
+        <div className="funnel-entry conversion-workspace-choices" aria-label="모집 운영 작업">
+          <button type="button" className="conversion-workspace-choice" aria-pressed={workspaceView === 'recruitment'} onClick={() => showWorkspaceView('recruitment')}><strong>모집 설정·구매·후속 안내</strong><span>카톡방 연결, 신청·구매 현황, 방송과 후속 안내</span></button>
+          <button type="button" className="conversion-workspace-choice" aria-pressed={workspaceView === 'inquiries'} onClick={() => showWorkspaceView('inquiries')}><strong>문의·Jev 검토</strong><span>문의 {snapshot.cases.filter(item => !item.archived_at).length}건 · 분석과 직원 답변 확인</span></button>
         </div>
         <div hidden={workspaceView !== 'recruitment'}>
           <p className="conversion-muted">모집 코드를 불러오면 카톡방 → 무료 신청·유료 기수 → 구매 현황 → 방송·후속 안내 순서로 확인합니다. 상품 연결은 아래 실제 모집 설정에서 한 번만 관리합니다.</p>
@@ -226,7 +242,7 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
       {showFunnel && <div id="recruitment-funnel-preparation"><RecruitmentFunnel key={String(snapshot.capabilities.can_manage_funnel)} courses={snapshot.courses} cohorts={snapshot.cohorts} canSave={snapshot.capabilities.can_manage_funnel === true} /></div>}
 </>}
       <div hidden={workspace && workspaceView !== 'inquiries'}>
-      <div className="conversion-intro"><span className="conversion-tag">직원 확인 필요</span><p>Jev가 문의를 분류하고 답변 초안을 제안합니다. 직원이 승인·수정·보류를 선택해야 합니다. 여기서 승인해도 고객에게 메시지가 자동으로 나가지는 않습니다.</p></div>
+      <div className="conversion-intro"><span className="conversion-tag">직원 확인 필요</span><p>{snapshot.capabilities.analyze_provider === 'jev' ? 'Jev가 문의를 분류하고 답변 초안을 제안합니다.' : '문의를 연결하고 분석 결과를 검토합니다.'} 직원이 승인·수정·보류를 선택해야 합니다. 여기서 승인해도 고객에게 메시지가 자동으로 나가지는 않습니다.</p></div>
       {snapshot.capabilities.can_jev_experiments && snapshot.capabilities.can_jev_v4 && <ConversionJevV4Synthetic />}
       {snapshot.capabilities.can_jev && <p className="conversion-muted">사람이 먼저 별도 점수를 매기지 않아도 Jev 결과를 볼 수 있습니다. 직원의 결정은 고객 응대에 쓰기 전 마지막 확인으로 기록합니다.</p>}
       <div className="conversion-grid" aria-busy={pending || loading}>
@@ -240,11 +256,11 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
               <small>{item.archived_at ? '삭제한 문의 · 복구 가능' : item.purchase_outcome === 'paid' ? '결제 확인' : item.purchase_outcome === 'not_paid' ? '결제 안 함 확인' : '결제 여부 미확인'}</small>
               <small>{displayTime(item.received_at)}</small>
             </button>)}
-            {!cases.length && <AdminEmptyState compact title={query ? '검색 결과가 없습니다.' : showArchived ? '복구할 문의가 없습니다.' : '아직 연결한 문의가 없습니다.'}>문의 연결에서 검토할 문의를 선택하세요.</AdminEmptyState>}
+            {!cases.length && <AdminEmptyState compact title={query ? '검색 결과가 없습니다.' : showArchived ? '복구할 문의가 없습니다.' : '아직 연결한 문의가 없습니다.'}>{query ? '검색어를 바꾸거나 지우세요.' : showArchived ? '삭제한 문의가 생기면 여기서 복구할 수 있습니다.' : '위의 ‘카톡 문의 붙여넣기’ 또는 ‘사이트 문의 연결’로 문의를 추가하면 Jev 검토를 시작할 수 있습니다.'}</AdminEmptyState>}
           </div>
         </AdminSection>
         <div className="conversion-main">
-          {!selected ? <AdminEmptyState title="검토할 문의를 선택하세요.">문의와 상품을 연결하면 설명자료를 함께 검토할 수 있습니다.</AdminEmptyState> : <>
+          {!selected ? <AdminEmptyState title="왼쪽 목록에서 문의를 선택하세요.">문의가 없다면 위에서 카톡 문의를 붙여넣거나 사이트 문의를 연결하세요. 문의를 선택하면 Jev 분석과 답변 초안을 확인할 수 있습니다.</AdminEmptyState> : <>
             <AdminSection title={selected.subject} bordered actions={<>
               {!selected.archived_at && <AdminButton disabled={pending} onClick={() => openCase(selected)}>문의 정보 수정</AdminButton>}
               {!selected.archived_at
@@ -264,17 +280,8 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
               <p className="conversion-quote">{selected.content}</p>
               {selected.question_id && <Link href="/admin/questions" className="conversion-link">기존 질문함 열기</Link>}
             </AdminSection>
-            <PurchaseOutcomeForm key={`${selected.id}:${selected.purchase_outcome || 'unknown'}:${selected.purchase_checked_at || ''}`} item={selected} pending={pending} enabled={snapshot.capabilities.can_manage_cases !== false} mutate={mutate} />
-            {selected.source_type === 'manual' && selected.sample_origin === 'current' && <AsidePaymentMatchPrompt
-              key={selected.id}
-              item={selected}
-              courseName={selected.legacy_course_label || snapshot.courses.find(course => course.id === selected.course_id)?.title || ''}
-              cohortName={snapshot.cohorts.find(cohort => cohort.id === selected.cohort_id)?.name || ''}
-              enabled={snapshot.capabilities.can_copy_aside_match === true && !selected.archived_at}
-            />}
-            {selected.source_type === 'manual' && selected.sample_origin === 'current' && <CaseOrderLinkPanel item={selected} enabled={snapshot.capabilities.can_copy_aside_match === true && !selected.archived_at} pending={pending} mutate={mutate} />}
-            <AdminSection title="Jev 문의 분류와 답변 초안" bordered actions={<AdminButton tone="primary" disabled={pending || !canAnalyze || Boolean(selected.archived_at)} onClick={() => void mutate({ action: 'analyze', case_id: selected.id, expected_version: selected.input_version }).catch(() => {})}>{pending ? '처리 중' : snapshot.capabilities.analyze_provider === 'jev' ? 'Jev 결과 보기' : '모의 결과 보기'}</AdminButton>}>
-              {!canAnalyze && <p className="conversion-muted">현재 환경에서는 판정을 실행할 수 없습니다. 설명자료는 직접 검토할 수 있습니다.</p>}
+            <AdminSection title="문의 분류와 답변 초안" description="문의 확인 → 분석 실행 → 직원 검토 기록" bordered actions={<AdminButton tone="primary" disabled={pending || !canAnalyze || Boolean(selected.archived_at)} onClick={() => void mutate({ action: 'analyze', case_id: selected.id, expected_version: selected.input_version }).catch(() => {})}>{pending ? '처리 중' : snapshot.capabilities.analyze_provider === 'jev' ? run ? 'Jev 다시 분석' : 'Jev 분석 실행' : run ? '모의 분석 다시 실행' : '모의 분석 실행'}</AdminButton>}>
+              {!canAnalyze && <p className="conversion-alert">분석 기능이 아직 켜지지 않았습니다. 문의 내용과 설명자료는 확인할 수 있으며, 운영 Jev 활성화 후 여기에서 분석을 실행할 수 있습니다.</p>}
               {run ? <div className="conversion-result">
                 <span className="conversion-tag">{run.provider === 'jev' ? 'Jev 결과 · 직원 확인 필요' : '모의 결과 · 직원 확인 필요'}</span>
                 {stale && <p role="alert" className="conversion-alert">문의나 설명자료가 바뀌었습니다. 새로 판단한 뒤 검토 기록을 남겨 주세요.</p>}
@@ -300,6 +307,15 @@ export function ConversionReview({ workspace = false, initialPeriod, userId }: {
                 <ReviewForm key={run.id} runId={run.id} caseId={selected.id} initialReply={run.result.proposed_reply} stale={stale || Boolean(selected.archived_at)} pending={pending} mutate={mutate} />
               </div> : <AdminEmptyState compact title="아직 판단 기록이 없습니다.">아래 설명자료를 확인한 뒤 판정을 실행하세요.</AdminEmptyState>}
             </AdminSection>
+            <PurchaseOutcomeForm key={`${selected.id}:${selected.purchase_outcome || 'unknown'}:${selected.purchase_checked_at || ''}`} item={selected} pending={pending} enabled={snapshot.capabilities.can_manage_cases !== false} mutate={mutate} />
+            {selected.source_type === 'manual' && selected.sample_origin === 'current' && <AsidePaymentMatchPrompt
+              key={selected.id}
+              item={selected}
+              courseName={selected.legacy_course_label || snapshot.courses.find(course => course.id === selected.course_id)?.title || ''}
+              cohortName={snapshot.cohorts.find(cohort => cohort.id === selected.cohort_id)?.name || ''}
+              enabled={snapshot.capabilities.can_copy_aside_match === true && !selected.archived_at}
+            />}
+            {selected.source_type === 'manual' && selected.sample_origin === 'current' && <CaseOrderLinkPanel item={selected} enabled={snapshot.capabilities.can_copy_aside_match === true && !selected.archived_at} pending={pending} mutate={mutate} />}
             <AdminSection title="상품 설명자료" description="승인된 자료만 추천 후보에 포함됩니다." bordered actions={snapshot.capabilities.can_manage_evidence && <AdminButton disabled={pending} onClick={() => openEvidence()}>자료 등록</AdminButton>}>
               {snapshot.evidence.filter(item => item.course_id === selected.course_id && (!item.cohort_id || item.cohort_id === selected.cohort_id)).map(item => <article className="conversion-evidence" key={item.id}>
                 <div className="conversion-evidence-heading"><strong>{item.title}</strong><span className="conversion-tag">{item.status === 'approved' ? '승인' : item.status === 'retired' ? '철회' : '초안'} · v{item.version}</span></div>

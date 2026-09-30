@@ -6,7 +6,7 @@ import './marketing-workspace.css';
 import type { Section } from '@/lib/platform';
 
 const destinations = [
-  ['conversion', '모집·문의 관리', '모집별 카톡방, 문의 내용, 구매 기록 관리'],
+  ['conversion', '모집·문의 관리', '모집별 카톡방, 문의·Jev 검토, 구매 기록 관리'],
   ['landing', '광고·무료강의 결과', '광고별 방문과 신청 숫자 확인'],
   ['analytics', '사이트 방문 결과', '사이트 전체 방문과 클릭 확인'],
   ['campaigns', '안내 문자 보내기', '회원에게 보낼 문자 예약'],
@@ -18,9 +18,9 @@ const destinations = [
 
 const guides: Record<string, { heading: string; summary: string; steps: readonly string[]; caution?: string }> = {
   conversion: {
-    heading: '모집 정보와 카톡 문의를 여기서 관리해요',
-    summary: '모집별 카톡방 정보를 확인하거나, 카톡 문의를 붙여넣고 답변을 준비할 수 있어요.',
-    steps: ['문의 내용을 붙여넣으려면 ‘구매 전 문의 검토’를 고르세요. 카톡방이나 모집 정보를 보려면 ‘모집 설정·구매·후속 안내’를 고르세요.', '모집 정보에서는 코드(예: moonshot-4)를 넣고 ‘모집 방 설정 불러오기’를 눌러요. 문의 검토에서는 받은 내용을 붙여넣고 문의 이유와 답변 예시를 읽어요.', '확인한 내용을 저장하세요. 결제 여부는 주문 기록을 직원이 직접 확인한 뒤 표시하세요.'],
+    heading: '모집 정보와 문의·Jev 검토를 여기서 관리해요',
+    summary: '카톡방과 구매 현황은 모집 설정에서, 고객 문의와 Jev 답변 초안은 문의 검토에서 확인해요.',
+    steps: ['문의·Jev 검토에서 카톡 문의를 붙여넣거나 사이트 문의를 연결하세요.', '문의 목록에서 한 건을 고르고 Jev 분석을 실행한 뒤 원문과 답변 초안을 함께 확인하세요.', '직원의 검토 결정을 저장하세요. 결제 여부는 주문 기록을 직접 확인한 뒤 표시하세요.'],
     caution: '자동으로 나눈 결과는 참고예요. 고객에게 보낼 답변은 직원이 확인하세요.',
   },
   landing: {
@@ -76,6 +76,8 @@ export function MarketingWorkspaceNav({ current, available, search = "", prefetc
   if (!destinations.some(([key]) => key === current)) return null;
   const guide = guides[current];
   const selectedRecruitment = recruitmentContext(new URLSearchParams(search).get("recruitment"));
+  const conversionHref = marketingContextHref('conversion', search);
+  const inquiryHref = `${conversionHref}${conversionHref.includes('?') ? '&' : '?'}view=inquiries`;
 
   return <section className="marketing-workspace" aria-label="마케팅·전환 작업 공간">
     <strong>마케팅·전환</strong>
@@ -85,6 +87,7 @@ export function MarketingWorkspaceNav({ current, available, search = "", prefetc
       {destinations.filter(([key]) => available.some(section => section.key === key)).map(([key, label, description]) =>
         <Link key={key} prefetch={true} scroll={false} href={key === "conversion" || key === "landing" ? marketingContextHref(key, search) : "/admin/" + key} aria-current={current === key ? 'page' : undefined} title={description} onPointerEnter={() => prefetchSection(key)} onFocus={() => prefetchSection(key)}>{label}<NavigationHint /></Link>)}
     </nav>
+    {current === 'conversion' && <Link className="marketing-workspace-inquiry-link" href={inquiryHref} scroll={false}>문의·Jev 검토 바로가기 →</Link>}
     {guide && <section className="marketing-workspace-guide" aria-labelledby="marketing-workspace-guide-title">
       <h2 id="marketing-workspace-guide-title">{guide.heading}</h2>
       <p>{guide.summary}</p>

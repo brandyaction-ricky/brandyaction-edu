@@ -918,7 +918,7 @@ export function Platform({
         ) : !section ? (
           <AdminEmptyState title="이 화면에 접근할 운영 권한이 필요합니다.">운영 홈에서 현재 계정에 표시되는 메뉴를 선택해 주세요.</AdminEmptyState>
         ) : key === "conversion" ? (
-          <ConversionReview workspace initialPeriod={searchParams.get("recruitment") || undefined} userId={user!.id} />
+          <ConversionReview workspace initialPeriod={searchParams.get("recruitment") || undefined} initialView={searchParams.get("view") === "inquiries" ? "inquiries" : "recruitment"} userId={user!.id} />
         ) : key === "learning" ? (
           <CurriculumEditor actorId={user!.id} data={data} pending={pending} send={send} initialCourseId={searchParams.get("course") || ""} initialLessonId={searchParams.get("lesson") || ""} />
         ) : key === "product-editor" || key === "learning-editor" ? (
