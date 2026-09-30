@@ -731,6 +731,12 @@ export async function POST(request: Request) {
             if (!section || !permissions[sectionScopes[section.key]]) return reply({ error: '이 작업에 필요한 운영 권한이 없습니다.' }, 403);
             if (!section || section.readOnly) fail('수정할 수 없는 항목입니다.');
             const input = (body.values || {}) as Record<string, unknown>;
+            const guardedVisibility = body.expectedUpdatedAt !== undefined;
+            if (guardedVisibility && (!['weeks', 'learning'].includes(section.key) || !uid(body.id)
+                || typeof body.expectedUpdatedAt !== 'string' || !Number.isFinite(Date.parse(body.expectedUpdatedAt))
+                || Object.keys(input).length !== 1 || typeof input.is_published !== 'boolean')) {
+                fail('공개 설정을 다시 불러온 뒤 저장해 주세요.');
+            }
             if (section.table === 'coupons') {
                 if (user.role !== 'admin') return reply({ error: '관리자 권한이 필요합니다.' }, 403);
                 const couponId = body.id || body.requestId;
@@ -902,8 +908,10 @@ export async function POST(request: Request) {
             }
             const key = section.table === 'site_settings' ? 'key' : section.table === 'lesson_contents' ? 'lesson_id' : 'id';
             if (!body.id && !uid(body.requestId)) fail('새 등록 요청을 다시 열고 저장해 주세요.');
-            const result = body.id
-                ? await db.from(section.table).update(values).eq(key, body.id).select().single()
+            let update = body.id ? db.from(section.table).update(values).eq(key, body.id) : null;
+            if (update && guardedVisibility) update = update.eq('updated_at', body.expectedUpdatedAt).is('archived_at', null);
+            const result = update
+                ? await update.select().single()
                 : section.table === 'curriculum_weeks'
                   ? await db.rpc('edu_create_curriculum_week', {
                         p_actor: user.id,
@@ -919,6 +927,7 @@ export async function POST(request: Request) {
                       p_values: values,
                   });
             if (result.error) {
+                if (guardedVisibility && result.error.code === 'PGRST116') fail('다른 관리자가 수정하거나 삭제한 항목입니다. 최신 공개 범위를 다시 확인해 주세요.', 409);
                 const code = String(result.error.message || '');
                 if (section.table === 'curriculum_weeks' && code.includes('CURRICULUM_FORBIDDEN')) fail('상품 관리 권한이 필요합니다.', 403);
                 if (section.table === 'curriculum_weeks' && code.includes('WEEK_COURSE_NOT_FOUND')) fail('선택한 상품을 찾지 못했습니다. 다시 불러와 주세요.', 409);
