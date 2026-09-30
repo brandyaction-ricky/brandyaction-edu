@@ -140,8 +140,10 @@ test('five admin categories and scoped navigation render from the admin UI featu
   const props = { current: 'overview', available: platform.sections, user: { ...user, role: 'admin' }, pendingReviews: 1, mobile: false, setMobile() {}, logout: async () => {} };
   const markup = html(AdminShell, { ...props, children: React.createElement(Overview, { data, available: platform.sections }) });
   const navigationMarkup = markup.match(/<nav aria-label="관리자 카테고리">[\s\S]*?<\/nav>/)?.[0] || '';
-  assert.match(navigationMarkup, /상품·커리큘럼 관리/);
-  assert.doesNotMatch(navigationMarkup, /href="\/admin\/(?:weeks|learning)"/);
+  assert.match(navigationMarkup, /상품·판매 설정/);
+  assert.match(navigationMarkup, /커리큘럼 편집/);
+  assert.doesNotMatch(navigationMarkup, /href="\/admin\/weeks"/);
+  assert.match(navigationMarkup, /href="\/admin\/learning"/);
   for (const [label] of finalAdminGroups) assert.ok(markup.includes(label));
   assert.match(markup, /class="nav-group"/); assert.match(markup, /lucide/); assert.match(markup, /category-strip/);
   const expectedIcons = {
