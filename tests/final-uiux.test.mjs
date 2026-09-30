@@ -318,8 +318,8 @@ test('classroom, mission, checkout and completion preserve authorized workflow e
   assert.match(checkout, /checkout-layout/);
   assert.match(checkout, /<button[^>]*disabled=""[^>]*aria-describedby="checkout-agreement-help"[^>]*>[^<]*결제하기/s);
   assert.match(checkout, /value="CARD"/);
-  assert.match(checkout, /value="VIRTUAL_ACCOUNT"/);
-  assert.match(checkout, /입금 확인 후 수강권/);
+  assert.match(checkout, /<input[^>]*disabled=""[^>]*value="VIRTUAL_ACCOUNT"/);
+  assert.match(checkout, /계산서 발급과 수강 절차를 안내/);
   assert.match(read('app/api/platform/route.ts'), /paidCourseReadinessIssues[\s\S]*판매 준비가 완료되지 않았습니다/);
   search = new URLSearchParams('order=order');
   const { OrderResult } = load('app/ui/order-result.tsx');
