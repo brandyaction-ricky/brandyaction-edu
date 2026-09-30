@@ -365,3 +365,40 @@
   .edu-admin .member-records>.spread{gap:12px;align-items:flex-start}
   .edu-admin .member-records>.spread>.btn{width:100%}
 }
+
+/* UI/UX QA pass — layout-only refinements shared by the existing admin screens. */
+.edu-admin .app{min-width:0;overflow-x:clip}
+.edu-admin .content>*{min-width:0}
+.edu-admin .panel-head h2{font-size:18px;line-height:26px}
+.edu-admin .admin-filter-bar-controls{flex-wrap:wrap}
+.edu-admin .admin-filter-bar input.admin-input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),
+.edu-admin .admin-filter-bar .admin-select,
+.edu-admin .admin-filter-bar .admin-search-field input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),
+.edu-admin .admin-filter-bar .admin-button{box-sizing:border-box;height:var(--admin-control-height);min-height:var(--admin-control-height)}
+.edu-admin .admin-filter-bar-summary{max-width:100%;overflow-wrap:anywhere;line-height:1.55}
+.edu-admin .admin-data-table td>p{display:block;margin:3px 0 0;color:var(--admin-color-text-secondary);font:var(--admin-type-caption);white-space:normal}
+.edu-admin .admin-data-table td>small{display:block;margin-top:3px;color:var(--admin-color-text-secondary);font:var(--admin-type-caption)}
+.edu-admin .admin-data-table :is(th,td)[data-align=action]{position:sticky;right:0;z-index:1;min-width:88px;background:var(--admin-color-surface);box-shadow:-1px 0 0 var(--admin-color-border);text-align:right}
+.edu-admin .admin-data-table thead th[data-align=action]{z-index:3;background:var(--admin-color-surface-subtle)}
+.edu-admin .admin-data-table tbody tr:hover td[data-align=action]{background:var(--admin-surface-hover)}
+.edu-admin .admin-pagination{min-width:0;flex-wrap:wrap;row-gap:8px}
+.edu-admin .admin-pagination-total-range{flex:1 1 128px;min-width:96px}
+.edu-admin .admin-pagination-actions,.edu-admin .admin-pagination-status,.edu-admin .admin-pagination-size{flex:none}
+.edu-admin .admin-loading-state{padding:24px;border:1px solid var(--admin-color-border);border-radius:var(--admin-radius-lg);background:var(--admin-color-surface)}
+
+@media(min-width:1025px){
+  .edu-admin .admin-orders-filter .admin-filter-bar-controls{display:grid;grid-template-columns:auto auto minmax(180px,1fr) auto auto;align-items:end}
+  .edu-admin .admin-orders-filter .admin-filter-bar-filters .admin-field{width:144px}
+  .edu-admin .admin-orders-filter .admin-filter-bar-date .admin-field{width:148px}
+  .edu-admin .admin-orders-filter .admin-filter-bar-search{min-width:180px}
+  .edu-admin .admin-orders-filter .admin-filter-bar-action{margin-left:0}
+}
+@media(max-width:1180px) and (min-width:1025px){
+  .edu-admin .admin-orders-filter .admin-filter-bar-controls{grid-template-columns:auto auto minmax(180px,1fr) auto}
+  .edu-admin .admin-orders-filter .admin-filter-bar-search{grid-column:1/4}
+}
+@media(max-width:720px){
+  .edu-admin .admin-data-table :is(th,td)[data-align=action]{position:static;box-shadow:none}
+  .edu-admin .admin-pagination{justify-content:center}
+  .edu-admin .admin-pagination-total-range{flex-basis:100%;text-align:center;margin:0}
+}

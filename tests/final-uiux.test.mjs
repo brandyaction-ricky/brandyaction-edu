@@ -145,14 +145,14 @@ test('five admin categories and scoped navigation render from the admin UI featu
   for (const [label] of finalAdminGroups) assert.ok(markup.includes(label));
   assert.match(markup, /class="nav-group"/); assert.match(markup, /lucide/); assert.match(markup, /category-strip/);
   const expectedIcons = {
-    products: 'book-open', cohorts: 'calendar-days',
-    contents: 'film', missions: 'book-open', members: 'users-round', reviews: 'square-check',
-    questions: 'message-circle', customers: 'users-round', tags: 'users-round', coupons: 'layout-grid',
-    'product-reviews': 'message-circle', banners: 'layout-grid', articles: 'file-pen-line',
-    testimonials: 'message-circle', orders: 'receipt-text', conversion: 'megaphone',
+    products: 'package', cohorts: 'calendar-days',
+    contents: 'film', missions: 'clipboard-check', members: 'user-round-check', reviews: 'file-check-corner',
+    questions: 'message-circle-question-mark', customers: 'contact-round', tags: 'tags', coupons: 'ticket-percent',
+    'product-reviews': 'star', banners: 'panels-top-left', articles: 'newspaper',
+    testimonials: 'quote', orders: 'receipt-text', conversion: 'target',
     landing: 'chart-line', analytics: 'chart-no-axes-combined',
     campaigns: 'send',
-    templates: 'message-square-text', automations: 'workflow', seo: 'search-check', settings: 'settings', staff: 'shield-check',
+    templates: 'messages-square', automations: 'workflow', seo: 'search-check', settings: 'sliders-horizontal', staff: 'shield-check',
   };
   for (const [key, icon] of Object.entries(expectedIcons)) {
     assert.ok(adminNavigationIcon(key));
