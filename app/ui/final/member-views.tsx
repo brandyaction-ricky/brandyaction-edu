@@ -982,20 +982,15 @@ function Resources({ data }: { data: Data }) {
     ),
     grouped = rows(data, "courses")
       .map((c) => {
-        const enrollment = rows(data, "enrollments").find(entry => entry.course_id === c.id && hasLearningAccess(entry));
-        const weeks = rows(data, "curriculum_weeks").filter(
-            (w) => w.course_id === c.id && enrollment && cohortWeekVisible(data,String(enrollment.cohort_id),w),
-          ),
-          lessons = rows(data, "curriculum_lessons").filter((l) =>
-            weeks.some((w) => w.id === l.week_id) && enrollment && cohortLessonVisible(data,String(enrollment.cohort_id),l),
-          );
-        const digitalSections = enrollment ? productDigitalSections(object(c, "metadata"), false) : [];
-        const productFiles = enrollment ? productResources(object(c, "metadata")) : [];
+        const enrollments = rows(data, "enrollments").filter(entry => entry.course_id === c.id && hasLearningAccess(entry));
+        const lessonIds = new Set(enrollments.flatMap(enrollment =>
+          enrollmentLessons(data, enrollment).map(lesson => lesson.id),
+        ));
+        const digitalSections = enrollments.length ? productDigitalSections(object(c, "metadata"), false) : [];
+        const productFiles = enrollments.length ? productResources(object(c, "metadata")) : [];
         return {
           c,
-          files: contents.filter((r) =>
-            lessons.some((l) => l.id === r.lesson_id),
-          ),
+          files: contents.filter(r => lessonIds.has(t(r, "lesson_id"))),
           digitalSections,
           productFiles,
         };
