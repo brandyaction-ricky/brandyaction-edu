@@ -1,0 +1,12 @@
+.lesson-order-dialog { width: min(660px, calc(100vw - 28px)); }
+.lesson-order-list { list-style: none; padding: 0; margin: 20px 0; display: grid; gap: 10px; }
+.lesson-order-list > li { display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid var(--line, #e2e4e8); border-radius: 10px; background: #fff; }
+.lesson-order-list > li > div:first-child { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.lesson-order-list b { color: var(--brand, #c9212c); font-size: 13px; }
+.lesson-order-list span { overflow-wrap: anywhere; font-weight: 600; }
+.lesson-order-list small { color: #6b7280; }
+.lesson-order-buttons { display: flex; gap: 6px; }
+.lesson-order-buttons .btn { min-width: 44px; min-height: 44px; padding: 10px; }
+.lesson-order-buttons .btn:disabled { opacity: .35; }
+.lesson-order-dialog > footer { justify-content: flex-end; }
+@media(max-width: 600px) { .lesson-order-list > li { padding: 12px; gap: 8px; } .lesson-order-buttons { flex-direction: column; } }

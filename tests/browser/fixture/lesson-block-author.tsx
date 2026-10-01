@@ -17,7 +17,7 @@ export function LessonBlockAuthorFixture() {
   return <main style={{ padding: 20 }}>
     <nav><button type="button" onClick={() => { setView('author'); setVisit(value => value + 1); }}>편집 다시 열기</button><button type="button" onClick={() => setView('learner')}>학생 화면 보기</button></nav>
     <output aria-label="기본 정보 저장 횟수">{saves}</output><output aria-label="기존 본문 변경 횟수">{legacySaves}</output>
-    {view === 'author' ? <div className="edu-admin"><LearningEditor key={visit} data={data} row={newLesson ? undefined : lesson} actorId={new URLSearchParams(location.search).get('actor') || id(90)} blockEditingEnabled pending={false} back={() => setView('closed')} send={async body => { if (body.section === 'learning') setSaves(value => value + 1); if (body.section === 'contents') setLegacySaves(value => value + 1); return { row: lesson }; }} /></div>
+    {view === 'author' ? <div className="edu-admin"><LearningEditor serverDraftsEnabled={new URLSearchParams(location.search).has('serverDraft')} key={visit} data={data} row={newLesson ? undefined : lesson} actorId={new URLSearchParams(location.search).get('actor') || id(90)} blockEditingEnabled pending={false} back={() => setView('closed')} send={async body => { if (body.section === 'learning') setSaves(value => value + 1); if (body.section === 'contents') setLegacySaves(value => value + 1); return { row: lesson }; }} /></div>
       : view === 'learner' ? <div className="edu-front"><Classroom path={['learn', id(1), id(4)]} data={data} pending={false} loading={false} missionId={null} blockLearningEnabled send={async () => ({})} /></div> : <p>목록으로 돌아왔습니다.</p>}
   </main>;
 }

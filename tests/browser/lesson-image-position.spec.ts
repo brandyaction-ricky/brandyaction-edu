@@ -128,7 +128,7 @@ test('pasting inside a rich paragraph inserts the private image after that parag
     const clipboard = new DataTransfer(); clipboard.items.add(new File([Uint8Array.from(bytes)], 'pasted.png', { type: 'image/png' }));
     element.dispatchEvent(new ClipboardEvent('paste', { clipboardData: clipboard, bubbles: true, cancelable: true }));
   }, [...png]);
-  await expect(page.getByText('선택한 위치에 이미지를 넣었습니다. 학습 저장을 눌러 반영해 주세요.', { exact: true })).toBeVisible();
+  await expect(page.getByText('선택한 위치에 이미지를 넣었습니다. 아래 저장 버튼을 눌러 보관해 주세요.', { exact: true })).toBeVisible();
   await save(page); expect(backend.getDocument().blocks[1].assetId).toBe(id(50));
   expect(backend.getDocument().blocks[0].content).toContain('첫 문단');
   expect(backend.getDocument().blocks[2].content).toContain('목록 안 내용');

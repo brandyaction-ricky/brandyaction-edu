@@ -21,8 +21,8 @@ import { TextLessonImport, LessonCardImport } from './lesson-editor-import';
 import './lesson-block-author.css';
 
 export type BlockAuthorState = { active: boolean; dirty: boolean; blocked: boolean; uploading?: boolean; draftReady?: boolean };
-export type BlockAuthorHandle = { validate: () => boolean; showPreview: () => void; save: (lessonId: string) => Promise<void>; captureDraft: () => BlockEditorDraft; restoreDraft: (draft: BlockEditorDraft) => void };
-type Props = { lessonId: string; courseId?: string; sources?: LessonCardSource[]; legacyBlocks: LessonBlock[]; disabled: boolean; onState: (state: BlockAuthorState) => void };
+export type BlockAuthorHandle = { validate: () => boolean; showPreview: () => void; save: (lessonId: string) => Promise<void>; captureDraft: () => BlockEditorDraft; restoreDraft: (draft: BlockEditorDraft, fromServer?: boolean) => void; acknowledgeDraft: (revision: string) => void };
+type Props = { initialSnapshot?: Snapshot; lessonId: string; courseId?: string; sources?: LessonCardSource[]; legacyBlocks: LessonBlock[]; disabled: boolean; onState: (state: BlockAuthorState) => void };
 type Snapshot = { revision: string | null; document: LessonBlockDocument | null; editable: boolean };
 const DocumentCanvas = lazy(() => import('./lesson-document-canvas').then(module => ({ default: module.LessonDocumentCanvas })));
 const empty = (): LessonBlockDocument => ({ schemaVersion: 1, blocks: [], checklist: [] });
@@ -103,7 +103,7 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [importMode, setImportMode] = useState<'text' | 'cards' | null>(null);
   const [importUndo, setImportUndo] = useState<{ before: LessonBlockDocument; after: string } | null>(null);
-  const [writer] = useState(() => new LessonDocumentWriter(snapshot.revision, snapshot.document, saveDocument));
+  const [writer, setWriter] = useState(() => new LessonDocumentWriter(snapshot.revision, snapshot.document, saveDocument));
   const root = useRef<HTMLDivElement>(null);
   const uploads = useRef(new Set<string>()), [uploadIds, setUploadIds] = useState<string[]>([]);
   const uploading = uploadIds.length > 0;
@@ -114,7 +114,7 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
   function positionImage(image: LessonBlock, position: LessonImagePosition) {
     try {
       const blocks = positionLessonImage(document.blocks, image, position, crypto.randomUUID());
-      setDocument(previous => ({ ...previous, blocks })); setEditingTextId(null); setMessage('이미지 위치를 바꿨습니다. 학습 저장을 눌러 반영해 주세요.');
+      setDocument(previous => ({ ...previous, blocks })); setEditingTextId(null); setMessage('이미지 위치를 바꿨습니다. 아래 저장 버튼을 눌러 보관해 주세요.');
     } catch (error) { setMessage((error as Error).message); }
   }
   async function insertImage(files: File[], position: LessonImagePosition) {
@@ -133,7 +133,7 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
     } catch (error) { setMessage((error as Error).message); return; }
     try {
       const assetId = await uploadLessonMedia(file, 'image', courseId, crypto.randomUUID());
-      if (mounted.current) { attach(image.id, assetId); setMessage('선택한 위치에 이미지를 넣었습니다. 학습 저장을 눌러 반영해 주세요.'); }
+      if (mounted.current) { attach(image.id, assetId); setMessage('선택한 위치에 이미지를 넣었습니다. 아래 저장 버튼을 눌러 보관해 주세요.'); }
     } catch (error) {
       if (mounted.current) {
         setDocument(previous => ({ ...previous, blocks: previous.blocks.filter(block => block.id !== image.id) }));
@@ -177,10 +177,12 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
     } catch (error) { setMessage((error as Error).message); return false; }
   }
   useImperativeHandle(ref, () => ({ validate, showPreview: () => setPreview(true),
+    acknowledgeDraft(revision) { setSaved(JSON.stringify(document)); setWriter(new LessonDocumentWriter(revision, active ? document : null, saveDocument)); },
     captureDraft: () => structuredClone({ active, document, writer: writer.checkpoint() }),
-    restoreDraft(draft) {
-      if (!snapshot.editable || disabled || uploads.current.size) throw new Error('학습을 편집할 수 있을 때 다시 불러와 주세요.');
-      writer.restore(draft.writer, lessonId);
+    restoreDraft(draft, fromServer = false) {
+      if (!snapshot.editable || (disabled && !fromServer) || uploads.current.size) throw new Error('학습을 편집할 수 있을 때 다시 불러와 주세요.');
+      if (fromServer) { setWriter(new LessonDocumentWriter(draft.writer.revision, draft.writer.committed, saveDocument)); setSaved(JSON.stringify(draft.writer.committed)); }
+      else writer.restore(draft.writer, lessonId);
       setDocument(structuredClone(draft.document)); setActive(draft.active); setPreview(false); setEditingTextId(null); setInvalid(false); setMessage('');
     },
     async save(lessonId) {
@@ -195,7 +197,7 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
   function importContent(content: Pick<TextImportResult, 'blocks' | 'checklist'>, mode: 'append' | 'replace' | number) {
     if (disabled || conflict || uploads.current.size) throw new Error('저장·업로드 상태를 확인한 뒤 가져와 주세요.');
     const next = applyLessonImport(document, content, mode);
-    setImportUndo({ before: structuredClone(document), after: JSON.stringify(next) }); setDocument(next); setEditingTextId(null); setInvalid(false); setMessage('가져온 내용을 편집 화면에 적용했습니다. 학습 저장을 눌러 반영해 주세요.');
+    setImportUndo({ before: structuredClone(document), after: JSON.stringify(next) }); setDocument(next); setEditingTextId(null); setInvalid(false); setMessage('가져온 내용을 편집 화면에 적용했습니다. 아래 저장 버튼을 눌러 보관해 주세요.');
   }
   function renderBlock(block: LessonBlock, index: number) { return <article className="lba-block" key={block.id} data-author-block={block.id} data-block-type={block.type}>
         <div className="lba-actions"><h3>{index + 1}. {choices.find(item => item.type === block.type)?.label || block.type}</h3><button type="button" className="btn small" aria-label={`항목 ${index + 1} 위로`} disabled={uploadIds.includes(block.id) || index === 0} onClick={() => move(index, -1)}>↑</button><button type="button" className="btn small" aria-label={`항목 ${index + 1} 아래로`} disabled={uploadIds.includes(block.id) || index === document.blocks.length - 1} onClick={() => move(index, 1)}>↓</button><button type="button" className="btn small" aria-label={`항목 ${index + 1} 삭제`} disabled={uploadIds.includes(block.id)} onClick={() => { if (window.confirm('이 항목을 편집 목록에서 삭제할까요? 저장한 뒤 반영되며 이전 학생 답변은 보관됩니다.')) setDocument(previous => ({ ...previous, blocks: previous.blocks.filter((_, i) => i !== index) })); }}>삭제</button></div>
@@ -225,7 +227,7 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
   if (!active) return <div className="lba-intro"><p>본문 사이에 질문·영상·생성기를 넣을 수 있습니다. 기존 내용은 첫 항목으로 가져옵니다.</p><button type="button" className="btn" disabled={disabled} onClick={() => { setDocument({ ...empty(), blocks: structuredClone(legacyBlocks) }); setActive(true); }}>여러 항목으로 구성하기</button></div>;
   return <div ref={root} className={'lb-author' + (invalid ? ' was-validated' : '')}>
     <div className="lba-actions"><strong>수업 문서 편집</strong><button type="button" className="btn small" onClick={() => setPreview(value => !value)}>{preview ? '편집 화면으로' : '구성 미리보기'}</button><span>항목 {document.blocks.length}개</span><button type="button" className="btn small" onClick={() => setDetailed(value => !value)}>{detailed ? '문서로 편집' : '항목별 상세 설정'}</button></div>
-    <p className="meta">아래 ‘학습 저장’을 누르면 기본 정보와 함께 저장됩니다. 이전 학생 답변은 해당 수업 버전과 함께 보관됩니다.</p>
+    <p className="meta">아래 저장 버튼을 누르면 기본 정보와 함께 저장됩니다. 이전 학생 답변은 해당 수업 버전과 함께 보관됩니다.</p>
     {preview && <div className="lba-preview" aria-label="구성 미리보기"><button className="btn small" type="button" onClick={() => setPreviewInteractive(value => !value)}>{previewInteractive ? '전체 구성 보기' : '입력·제출 체험'}</button><LessonBlockView readOnly={!previewInteractive} document={publicLessonBlocks(document)} values={previewValues} onChange={values => { setPreviewValues(values); setPreviewMessage(''); }} grade={async id => { const block = document.blocks.find(item => item.id === id)!; return gradeBlockQuiz(block, typeof previewValues.blocks[id] === 'object' ? previewValues.blocks[id] as Record<string, string | number> : {}); }} /><p className="meta">미리보기 입력은 저장·제출·알림을 만들지 않습니다.</p><button type="button" className="btn" onClick={() => { const result = assessBlockCompletion(document, previewValues); setPreviewMessage(result.ready ? (document.completion?.mode === 'mentor' ? '제출 가능 · 실제 학습에서는 멘토 확인을 기다립니다.' : '학습 완료 조건을 충족했습니다.') : '필수 답변·체크리스트·시험 통과 조건을 확인해 주세요.'); }}>완료 조건 확인</button>{previewMessage && <p role="status">{previewMessage}</p>}</div>}
     <fieldset disabled={disabled || conflict} hidden={preview} className="lba-main-fields">
       <div className="lba-actions"><button type="button" className="btn" disabled={uploading} onClick={() => setImportMode('text')}>텍스트·파일 가져오기</button><button type="button" className="btn" disabled={uploading || !sources.length} onClick={() => setImportMode('cards')}>다른 학습 카드 가져오기</button>
@@ -276,11 +278,11 @@ export const LessonBlockAuthor = forwardRef<BlockAuthorHandle, Props>(function L
   // New lesson: once assigned a server id, preserve this in-progress editor
   // instead of issuing a GET which could reset the just-created document.
   const [initialLessonId] = useState(props.lessonId);
-  const [state, setState] = useState<{ snapshot?: Snapshot; error?: string }>(() => initialLessonId ? {} : { snapshot: { revision: null, document: null, editable: true } });
+  const [state, setState] = useState<{ snapshot?: Snapshot; error?: string }>(() => props.initialSnapshot ? { snapshot: props.initialSnapshot } : initialLessonId ? {} : { snapshot: { revision: null, document: null, editable: true } });
   const [attempt, setAttempt] = useState(0);
   const onState = props.onState;
   useEffect(() => {
-    if (!initialLessonId) return;
+    if (!initialLessonId || props.initialSnapshot) return;
     const abort = new AbortController();
     onState({ active: false, dirty: false, blocked: true });
     void fetch(`/api/platform/lesson-blocks?lesson=${encodeURIComponent(initialLessonId)}`, { credentials: 'same-origin', cache: 'no-store', signal: abort.signal }).then(async response => {
@@ -290,7 +292,7 @@ export const LessonBlockAuthor = forwardRef<BlockAuthorHandle, Props>(function L
       if (!abort.signal.aborted) setState({ snapshot: data });
     }).catch(error => { if (!abort.signal.aborted) setState({ error: (error as Error).message }); });
     return () => abort.abort();
-  }, [initialLessonId, attempt, onState]);
+  }, [initialLessonId, attempt, onState, props.initialSnapshot]);
   if (state.error) return <div role="alert"><p>{state.error}</p><button type="button" className="btn" onClick={() => setAttempt(value => value + 1)}>학습 구성 다시 불러오기</button></div>;
   if (!state.snapshot) return <p role="status">학습 구성을 불러오고 있습니다.</p>;
   return <LoadedAuthor {...props} snapshot={state.snapshot} ref={ref} />;
