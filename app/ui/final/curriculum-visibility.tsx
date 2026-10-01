@@ -44,7 +44,7 @@ export function CurriculumVisibility({ courseId, initial, send, onRefresh, onClo
         accept(fresh); setDraft({}); setReview(false); setError('다른 곳에서 커리큘럼이 변경됐습니다. 최신 내용을 불러왔습니다. 공개 범위를 다시 선택해 주세요.'); return;
       }
       if (visibilityPlan(fresh,courseId,draft).invalid.length) {
-        accept(fresh); setReview(false); setError('본문이 없는 수업은 공개할 수 없습니다. 내용을 저장하거나 해당 수업의 체크를 해제해 주세요.'); return;
+        accept(fresh); setReview(false); setError('본문이 없는 수업은 공개할 수 없습니다. 편집기에서 학생 화면에 반영하거나 해당 수업의 체크를 해제해 주세요.'); return;
       }
       for (const change of plan.changes) {
         started = true;
@@ -66,7 +66,7 @@ export function CurriculumVisibility({ courseId, initial, send, onRefresh, onClo
     <p>주차와 수업을 모두 체크하면 공개됩니다. 같은 상품의 모든 기수에 적용되며, 수강 기간·학습 순서에 따른 접근 조건은 유지됩니다.</p>
     <p className="meta">무료 미리보기 설정은 여기서 바뀌지 않습니다. 체크한 뒤 ‘변경 내용 확인’을 눌러 주세요.</p>
     {error && <p role="alert" className="notice warning">{error}</p>}{notice && <p role="status" className="notice">{notice}</p>}
-    {plan.invalid.length > 0 && <p role="alert" className="notice warning">본문이 없는 수업은 공개할 수 없습니다: {plan.invalid.map(row=>t(row,'title')).join(', ')}. 해당 수업의 체크를 해제하거나 본문을 먼저 저장해 주세요.</p>}
+    {plan.invalid.length > 0 && <p role="alert" className="notice warning">본문이 없는 수업은 공개할 수 없습니다: {plan.invalid.map(row=>t(row,'title')).join(', ')}. 해당 수업의 체크를 해제하거나 편집기에서 본문을 학생 화면에 먼저 반영해 주세요.</p>}
     {uncertain ? <button type="button" className="btn" disabled={busy} onClick={() => void refresh()}>저장 상태 다시 확인</button> : review ? <section aria-label="공개 변경 확인" className="studio-visibility-review">
       <h3>수강생에게 보이는 내용이 이렇게 바뀝니다</h3>
       <p>새로 공개 {plan.impacts.filter(row=>row.after).length}개 · 비공개 전환 {plan.impacts.filter(row=>!row.after).length}개</p>
