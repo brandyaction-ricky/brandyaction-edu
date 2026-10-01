@@ -238,7 +238,7 @@ export function Classroom({
   return (
     <div className="learning-bg">
       <div className="wrap">
-        {graduate && <p className="meta mb16">졸업생 열람 모드 · 최신 공개 커리큘럼을 자유롭게 볼 수 있습니다.</p>}
+        {graduate && <p className="meta mb16">졸업생 모드 · 최신 공개 커리큘럼을 보고 질문할 수 있습니다. 학습 답변과 미션 제출은 종료되었습니다.</p>}
         <div className="learning-top">
           <div>
             <h1>{t(course, "title")}</h1>
