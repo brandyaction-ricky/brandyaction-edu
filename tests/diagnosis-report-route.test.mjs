@@ -9,7 +9,7 @@ function fixture({enabled=true,sessions=true,reports=true,user=actor,error=null}
   const route={},calls=[];
   const mocks={'@/lib/server-auth':{getAuthenticatedUser:async()=>user},'@/lib/supabase/admin':{createAdminClient:()=>({rpc:async()=>({data:null,error:null})})},
     '@/lib/diagnosis-bridge':{DiagnosisBridgeError:BridgeError},'@/lib/diagnosis-report':{sendDiagnosisReportCommand:()=>{}},
-    '@/lib/diagnosis-report-service':{runDiagnosisReport:async(deps,action)=>{calls.push({actor:deps.actor,action});if(error)throw error;return{state:'ready',updatedAt:'2026-10-01T00:00:00Z',canRetry:false,downloadAvailable:true,...(action==='download'?{markdown:'# 합성 N6 결과'}:{})};}}};
+    '@/lib/diagnosis-report-service':{runDiagnosisReport:async(deps,action)=>{calls.push({actor:deps.actor,action});if(error)throw error;return{state:'ready',updatedAt:'2026-10-01T00:00:00Z',canRetry:false,downloadAvailable:true,...(action==='download'?{markdown:'# 합성 N6 결과'}:action==='html'?{html:'<!doctype html><h1>원본 정밀 보고서</h1>'}:{})};}}};
   new Function('exports','require','process',source)(route,n=>mocks[n],{env:{EDU_MYIN_DIAGNOSIS_ENABLED:String(enabled),EDU_MYIN_DIAGNOSIS_SESSIONS_ENABLED:String(sessions),EDU_MYIN_DIAGNOSIS_REPORTS_ENABLED:String(reports)}});
   return{calls,get:(query='')=>route.GET(new Request('https://edu.test/api/platform/diagnosis/report'+query))};
 }
@@ -24,7 +24,14 @@ test('status, safe preview and fixed-name MD attachment are private and non-snif
   assert.deepEqual(h.calls.map(c=>c.action),['status','download','download']);assert.ok(h.calls.every(c=>c.actor===actor));
 });
 test('caller identifiers, duplicate modes, and malformed modes are refused',async()=>{
-  const h=fixture();for(const q of ['?subject=other','?download=0','?preview=1&download=1','?download=1&download=1','?preview=1&reportId=other'])assert.equal((await h.get(q)).status,400);assert.equal(h.calls.length,0);
+  const h=fixture();for(const q of ['?subject=other','?download=0','?preview=1&download=1','?download=1&download=1','?preview=1&reportId=other','?html=0','?html=1&download=1','?html=1&html=1','?html=1&subject=other'])assert.equal((await h.get(q)).status,400);assert.equal(h.calls.length,0);
+});
+test('original HTML is private, downloadable, and sandboxed without changing the issued bytes',async()=>{
+  const h=fixture(),r=await h.get('?html=1');assert.equal(r.status,200);
+  assert.equal(r.headers.get('content-type'),'text/html; charset=utf-8');assert.equal(r.headers.get('cache-control'),'private, no-store');assert.equal(r.headers.get('vary'),'Cookie');assert.equal(r.headers.get('x-content-type-options'),'nosniff');
+  assert.match(r.headers.get('content-disposition'),/^attachment; filename="N6-report.html";/);assert.ok(r.headers.get('content-disposition').includes(encodeURIComponent('N6-정밀보고서.html')));
+  assert.match(r.headers.get('content-security-policy'),/sandbox;.*script-src 'none'.*connect-src 'none'/);
+  assert.equal(await r.text(),'<!doctype html><h1>원본 정밀 보고서</h1>');assert.equal(h.calls[0].action,'html');
 });
 test('revoked or unready reports return safe Korean messages, not backend details',async()=>{
   for(const error of [new BridgeError('FORBIDDEN',403),new BridgeError('NOT_READY',409),Error('secret answer storage path')]){const r=await fixture({error}).get('?download=1');assert.equal(r.status,error.status??503);assert.doesNotMatch(await r.text(),/secret|storage path/);assert.equal(r.headers.get('content-disposition'),null);}

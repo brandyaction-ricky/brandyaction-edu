@@ -43,6 +43,25 @@ test('status does not leak raw internals and remote errors cannot disclose their
   const result=validateDiagnosisReport({...remote,rawScores:{private:true},internalPolicy:'secret'},context,'status');assert.doesNotMatch(JSON.stringify(result),/rawScores|internalPolicy|markdown|sha256/);
   for(const [status,data,code] of [[403,{code:'FORBIDDEN'},'FORBIDDEN'],[409,{code:'NOT_READY'},'NOT_READY'],[500,{error:'customer answer secret'},'UNAVAILABLE']])await assert.rejects(sendDiagnosisReportCommand(context,'download',{env,fetcher:async()=>Response.json(data,{status})}),e=>e.code===code&&!e.message.includes('secret'));
 });
+test('issued HTML preserves its embedded font and original bytes with separate HTML and wire bounds',async()=>{
+  const html='<!doctype html><style>@font-face{font-family:Original;src:url(data:font/woff2;base64,'+'a'.repeat(2743584)+')}</style><h1>나의 정밀 보고서</h1>';
+  const value={...remote,html,sha256:sha(html)};
+  const result=await sendDiagnosisReportCommand(context,'html',{env,fetcher:async()=>Response.json(value)});
+  assert.equal(result.html,html);assert.equal(result.markdown,undefined);assert.equal(result.sha256,sha(html));
+  for(const patch of [{html:html+'changed'},{sha256:'0'.repeat(64)},{subject:id(9)},{state:'queued',reportId:null,downloadAvailable:false}])assert.throws(()=>validateDiagnosisReport({...value,...patch},context,'html'));
+  const tooLarge='x'.repeat(3.5*1024*1024+1);
+  assert.throws(()=>validateDiagnosisReport({...value,html:tooLarge,sha256:sha(tooLarge)},context,'html'));
+  let cancelled=false;const body=new ReadableStream({start(c){c.enqueue(new Uint8Array(4*1024*1024+1));},cancel(){cancelled=true;}});
+  await assert.rejects(sendDiagnosisReportCommand(context,'html',{env,fetcher:async()=>new Response(body)}));assert.equal(cancelled,true);
+  assert.doesNotMatch(JSON.stringify(validateDiagnosisReport(value,context,'status')),/html|markdown|sha256/);
+});
+test('HTML rights are checked again after delivery and only the requested document reaches the browser',async()=>{
+  const html='<!doctype html><h1>정밀 보고서</h1>',value={...remote,html,sha256:sha(html)};let calls=0;
+  const deps={actor:{id:id(2)},rpc:async()=>{calls++;return {data:context,error:null};},send:async(c,action)=>{assert.equal(action,'html');return value;}};
+  const result=await runDiagnosisReport(deps,'html');assert.equal(calls,2);assert.equal(result.html,html);
+  assert.deepEqual(Object.keys(result),['state','updatedAt','canRetry','downloadAvailable','html']);
+  let current=0;await assert.rejects(runDiagnosisReport({...deps,rpc:async()=>++current===1?{data:context,error:null}:{data:null,error:{message:'DIAGNOSIS_FORBIDDEN'}}},'html'),e=>e.code==='FORBIDDEN');
+});
 test('service checks current rights twice and never accepts caller-owned report identifiers',async()=>{
   let contexts=0,sends=0;const rpc=async(name,args)=>{assert.equal(name,'edu_diagnosis_context');assert.deepEqual(args,{p_actor:id(2)});contexts++;return{data:context,error:null};};
   const deps={actor:{id:id(2)},rpc,send:async()=>{sends++;return remote;}};
