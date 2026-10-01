@@ -39,3 +39,16 @@ test('opening a parent cannot expose an empty previously-published child',()=>{
  const data=fixture();data.curriculum_lessons.find(row=>row.id==='empty').is_published=true;
  assert.deepEqual(visibilityPlan(data,'c',{'weeks:w1':true}).invalid.map(row=>row.id),['empty']);
 });
+test('cohort planning starts a new cohort hidden and changes only its own saved state',()=>{
+ const data=fixture();data.curriculum_weeks[1].is_published=true;
+ data.edu_cohort_week_visibility=[{cohort_id:'fourth',week_id:'w0',is_published:true},{cohort_id:'fourth',week_id:'w1',is_published:true}];
+ data.edu_cohort_lesson_visibility=[{cohort_id:'fourth',lesson_id:'a',is_published:true},{cohort_id:'fourth',lesson_id:'b',is_published:true}];
+ const fourth=visibilityPlan(data,'c',{},'fourth');
+ const fifth=visibilityPlan(data,'c',{},'fifth');
+ assert.equal(fourth.impacts.length,0);
+ assert.equal(fifth.impacts.length,0);
+ const plan=visibilityPlan(data,'c',{'weeks:w1':true,'learning:b':true},'fifth');
+ assert.deepEqual(plan.changes.map(change=>change.row.id),['b','w1']);
+ assert.deepEqual(plan.impacts.map(impact=>impact.lesson.id),['b']);
+ assert.notEqual(curriculumFingerprint(data,'c','fourth'),curriculumFingerprint(data,'c','fifth'));
+});

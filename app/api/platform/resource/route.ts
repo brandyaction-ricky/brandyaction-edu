@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { hasLearningAccess } from '@/lib/platform-rules';
 import { productDigitalSections, productResources } from '@/lib/product-metadata';
+import { isLessonVisibleToCohort } from '@/lib/cohort-curriculum-server';
 export async function GET(request: Request) {
     const user = await getAuthenticatedUser();
     const params = new URL(request.url).searchParams;
@@ -47,8 +48,17 @@ export async function GET(request: Request) {
     if (!lesson || !/^[0-9a-f-]{36}$/i.test(lesson))
         return Response.json({ error: '자료를 선택해 주세요.' }, { status: 400 });
     const db = await createClient();
-    const { data: published } = await db.from('curriculum_lessons').select('id,curriculum_weeks!inner(is_published)').eq('id', lesson).eq('is_published', true).eq('curriculum_weeks.is_published', true).single();
+    const { data: published } = await db.from('curriculum_lessons').select('id,curriculum_weeks!inner(course_id,is_published)').eq('id', lesson).eq('is_published', true).eq('curriculum_weeks.is_published', true).single();
     if (!published) return Response.json({ error: '공개된 자료가 아닙니다.' }, { status: 403 });
+    if (user.role !== 'admin') {
+        const courseId = (published.curriculum_weeks as unknown as { course_id: string }).course_id;
+        const enrollments = await createAdminClient().from('enrollments').select('id,cohort_id,status,revoked_at,access_starts_at,access_ends_at')
+            .eq('user_id', user.id).eq('course_id', courseId).limit(20);
+        if (enrollments.error) return Response.json({ error: '수강 권한을 확인하지 못했습니다.' }, { status: 503 });
+        const eligible = (enrollments.data || []).filter(entry => hasLearningAccess(entry));
+        const visible = await Promise.all(eligible.map(entry => isLessonVisibleToCohort(entry.cohort_id, lesson)));
+        if (!visible.some(Boolean)) return Response.json({ error: '이 기수에 공개된 자료가 아닙니다.' }, { status: 403 });
+    }
     const { data: content } = await db.from('lesson_contents').select('resource_storage_path,resource_name').eq('lesson_id', lesson).single();
     if (!content?.resource_storage_path)
         return Response.json({ error: '자료를 이용할 권한이 없습니다.' }, { status: 403 });

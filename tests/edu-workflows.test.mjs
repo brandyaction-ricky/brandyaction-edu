@@ -6,7 +6,7 @@ import { submissionReview } from './helpers/submission-review.mjs';
 function load(path, dependencies={}) {
  const source=fs.readFileSync(new URL('../'+path,import.meta.url),'utf8');
  const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
- const exports={};new Function('exports','require',js)(exports,name=>{if(name==='next/cache')return{revalidateTag:()=>{}};if(name==='@/lib/public-platform-plan')return{PUBLIC_CACHE_TAG:'test'};if(name in dependencies)return dependencies[name];throw Error(name);});return exports;
+ const exports={};new Function('exports','require',js)(exports,name=>{if(name==='@/lib/cohort-curriculum-server')return{isLessonVisibleToCohort:async()=>true};if(name==='next/cache')return{revalidateTag:()=>{}};if(name==='@/lib/public-platform-plan')return{PUBLIC_CACHE_TAG:'test'};if(name in dependencies)return dependencies[name];throw Error(name);});return exports;
 }
 const quiz=load('lib/mission-quiz.ts');
 const rules=load('lib/edu-workflows.ts');
@@ -140,9 +140,9 @@ test('private resource signing only follows a published lesson and authorized co
  }).GET;}
  const req=new Request('https://example.com/api/platform/resource?lesson='+uid);
  assert.equal((await resource(null,{},{})(req)).status,401);
- assert.equal((await resource({id:uid},null,{resource_storage_path:'edu/private.pdf'})(req)).status,403);
- assert.equal((await resource({id:uid},{id:uid},null)(req)).status,403);
+ assert.equal((await resource({id:uid,role:'admin'},null,{resource_storage_path:'edu/private.pdf'})(req)).status,403);
+ assert.equal((await resource({id:uid,role:'admin'},{id:uid},null)(req)).status,403);
  assert.equal(signed,0);
- const response=await resource({id:uid},{id:uid},{resource_storage_path:'edu/private.pdf',resource_name:'자료.pdf'})(req);
+ const response=await resource({id:uid,role:'admin'},{id:uid},{resource_storage_path:'edu/private.pdf',resource_name:'자료.pdf'})(req);
  assert.equal(response.status,303);assert.equal(signed,1);
 });
