@@ -64,7 +64,9 @@ test('graduation unlocks published reading while preserving write gates and owne
       alter table curriculum_lessons add column day_number integer default 1;
       alter table lesson_progress add column if not exists updated_at timestamptz default now();
       create table edu_ongoing_rules(lesson_id uuid primary key, cadence text);
-      create table edu_ongoing_rounds(enrollment_id uuid, lesson_id uuid, revision uuid);
+      create table edu_ongoing_rounds(enrollment_id uuid, lesson_id uuid, period_start timestamptz, period_end timestamptz, revision uuid, values jsonb, write_id uuid, updated_at timestamptz default now());
+      create table edu_ongoing_completions(id uuid,enrollment_id uuid,lesson_id uuid,period_start timestamptz,revision uuid,write_id uuid,values jsonb,assessment jsonb,created_at timestamptz default now());
+      create function edu_ongoing_period(text,timestamptz) returns table(starts_at timestamptz,ends_at timestamptz) language sql as $$ select date_trunc('day',$2),date_trunc('day',$2)+interval '1 day' $$;
       create table edu_lesson_block_feedback(id uuid,submission_id uuid,feedback text,created_at timestamptz,expected_state uuid,source text,sequence integer);
       create table edu_questions(id uuid,enrollment_id uuid,user_id uuid,is_archived boolean,title text,content text,learning_context text,status text,is_resolved boolean,answer_head_id uuid,image_id uuid);
       create table edu_question_answers(id uuid,question_id uuid,sequence bigint,author_name text,source text,content text,created_at timestamptz);
@@ -77,6 +79,9 @@ test('graduation unlocks published reading while preserving write gates and owne
     const initial = (await db.query('select edu_lesson_progression_gate($1,$2) as gate', [enrollment, lockedLesson])).rows[0].gate;
     assert.equal(initial.isUnlocked, false);
     await db.query('insert into lesson_contents(lesson_id,body_text) values($1,$2)', [lockedLesson, '이전 기수도 보는 공개 본문']);
+    const previousPeriod = '2026-09-01T00:00:00Z';
+    await db.query("insert into edu_ongoing_rules(lesson_id,cadence) values($1,'daily')", [lockedLesson]);
+    await db.query("insert into edu_ongoing_rounds(enrollment_id,lesson_id,period_start,period_end,revision,values,write_id) values($1,$2,$3,$3::timestamptz+interval '1 day',$4,$5,$6)", [enrollment, lockedLesson, previousPeriod, lockedRevision, { blocks: { text: '지난 기간의 답변' }, checklist: [] }, randomUUID()]);
     await db.exec('reset role');
     await db.exec(fs.readFileSync(new URL('20261001024207_alumni_read_mode.sql', root), 'utf8'));
     await db.exec('set role service_role');
@@ -86,6 +91,7 @@ test('graduation unlocks published reading while preserving write gates and owne
     await db.query("insert into edu_questions(id,enrollment_id,user_id,is_archived,title,content,status,is_resolved) values($1,$2,$3,false,'이전 질문','내용','answered',false)", [question, enrollment, student]);
     assert.equal((await db.query('select edu_read_question_thread($1,$2) as thread', [student, question])).rows[0].thread.canFollowUp, true);
     await assert.rejects(db.query('select edu_read_lesson_blocks($1,$2,$3)', [student, lockedLesson, enrollment]), /BLOCK_LESSON_LOCKED/);
+    await assert.rejects(db.query('select edu_read_ongoing($1,$2,$3)', [student, lockedLesson, enrollment]), /BLOCK_LESSON_LOCKED/);
     await db.exec('set role authenticated');
     await db.query("select set_config('request.jwt.claim.sub',$1,false)", [student]);
     assert.equal((await db.query('select count(*)::int as total from lesson_contents where lesson_id=$1', [lockedLesson])).rows[0].total, 0);
@@ -102,14 +108,21 @@ test('graduation unlocks published reading while preserving write gates and owne
     assert.equal(read.document.blocks[0].content, '새 학습');
     const history = (await db.query('select edu_read_block_submission($1,$2,$3) as result', [student, oldSubmission, enrollment])).rows[0].result;
     assert.equal(history.values.blocks.text, '이전 답변');
+    const ongoing = (await db.query('select edu_read_ongoing($1,$2,$3,$4) as result', [student, lockedLesson, enrollment, previousPeriod])).rows[0].result;
+    assert.equal(ongoing.draft.values.blocks.text, '지난 기간의 답변');
+    assert.equal(ongoing.history.length, 1);
+    const ongoingHistory = (await db.query('select edu_ongoing_history($1,$2,$3) as result', [student, lockedLesson, enrollment])).rows[0].result;
+    assert.equal(ongoingHistory.items.length, 1);
     await db.exec('set role authenticated');
     assert.equal((await db.query('select count(*)::int as total from lesson_contents where lesson_id=$1', [lockedLesson])).rows[0].total, 1);
     await db.exec('set role service_role');
     await assert.rejects(db.query('select edu_assert_block_access($1,$2,$3)', [student, lockedLesson, enrollment]), /BLOCK_LESSON_LOCKED/);
     await assert.rejects(db.query('select edu_read_lesson_blocks($1,$2,$3)', [other, lockedLesson, enrollment]), /BLOCK_FORBIDDEN/);
+    await assert.rejects(db.query('select edu_read_ongoing($1,$2,$3,$4)', [other, lockedLesson, enrollment, previousPeriod]), /BLOCK_FORBIDDEN/);
     await db.query("update enrollments set status='revoked' where id=$1", [enrollment]);
     assert.equal((await db.query('select edu_is_graduate_enrollment($1) as graduate', [enrollment])).rows[0].graduate, false);
     await assert.rejects(db.query('select edu_read_lesson_blocks($1,$2,$3)', [student, lockedLesson, enrollment]), /BLOCK_FORBIDDEN/);
+    await assert.rejects(db.query('select edu_ongoing_history($1,$2,$3)', [student, lockedLesson, enrollment]), /BLOCK_FORBIDDEN/);
     assert.ok(course && lesson);
   } finally { await f.db.close(); }
 });

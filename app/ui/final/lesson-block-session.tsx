@@ -158,7 +158,7 @@ function SessionLoader({ lessonId, enrollmentId, readOnly = false, fallback, onC
   function select(revision: string | null) { setSelection(previous => ({ revision, reload: previous.reload + 1 })); }
   if (loaded?.key !== key) return <p role="status">학습 내용과 저장된 답변을 불러오고 있습니다.</p>;
   if (loaded.error) return <div className="lb-session-notice" role="alert"><p>{loaded.error}</p><button type="button" className="btn small" onClick={() => select(selection.revision)}>다시 불러오기</button></div>;
-  if (loaded.snapshot?.ongoing && !readOnly) return <OngoingLessonSession lessonId={lessonId} enrollmentId={enrollmentId} />;
+  if (loaded.snapshot?.ongoing) return <OngoingLessonSession lessonId={lessonId} enrollmentId={enrollmentId} readOnly={readOnly} />;
   if (!loaded.snapshot?.document) return <>{fallback}</>;
   if (!canRenderLessonBlocks(loaded.snapshot.document)) return <p role="alert">학습 도구를 준비하고 있습니다. 잠시 후 다시 확인해 주세요.</p>;
   return <SessionContent key={key} snapshot={loaded.snapshot} lessonId={lessonId} enrollmentId={enrollmentId} readOnly={readOnly} onSelectRevision={select} onCompleted={onCompleted} />;

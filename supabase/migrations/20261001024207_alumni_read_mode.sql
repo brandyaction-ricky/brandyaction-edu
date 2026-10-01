@@ -188,4 +188,62 @@ end; $$;
 
 revoke all on function public.edu_read_lesson_progression(uuid,uuid), public.edu_read_lesson_blocks(uuid,uuid,uuid,uuid), public.edu_read_block_submission(uuid,uuid,uuid), public.edu_read_answer_file(uuid,uuid,uuid), public.edu_read_question_thread(uuid,uuid,bigint), public.edu_question_contexts(uuid) from public, anon, authenticated;
 grant execute on function public.edu_read_lesson_progression(uuid,uuid), public.edu_read_lesson_blocks(uuid,uuid,uuid,uuid), public.edu_read_block_submission(uuid,uuid,uuid), public.edu_read_answer_file(uuid,uuid,uuid), public.edu_read_question_thread(uuid,uuid,bigint), public.edu_question_contexts(uuid) to service_role;
+-- Recurring challenges keep their prior period history available to graduates.
+-- The existing access check validates the enrollment owner before it can
+-- raise BLOCK_LESSON_LOCKED; only that progression lock is bypassed for reads.
+create or replace function public.edu_read_ongoing(p_actor uuid,p_lesson uuid,p_enrollment uuid,p_period timestamptz default null)
+returns jsonb language plpgsql stable security invoker set search_path='' as $$
+declare cadence_value text; period_begin timestamptz; period_finish timestamptz; r public.edu_ongoing_rounds%rowtype; doc jsonb; rev uuid; c public.edu_ongoing_completions%rowtype; first_period timestamptz; completed_count integer; opportunities integer;
+begin
+ if p_enrollment is null then raise exception 'BLOCK_FORBIDDEN';end if;
+ begin
+  perform public.edu_assert_block_access(p_actor,p_lesson,p_enrollment);
+ exception when raise_exception then
+  if sqlerrm <> 'BLOCK_LESSON_LOCKED' or not public.edu_is_graduate_enrollment(p_enrollment) then raise; end if;
+ end;
+ select cadence into cadence_value from public.edu_ongoing_rules where lesson_id=p_lesson;
+ if not found then raise exception 'BLOCK_NOT_FOUND';end if;
+ select starts_at,ends_at into period_begin,period_finish from public.edu_ongoing_period(cadence_value,now());
+ select * into r from public.edu_ongoing_rounds where enrollment_id=p_enrollment and lesson_id=p_lesson and period_start=coalesce(p_period,period_begin);
+ if p_period is not null and p_period<>period_begin and r.revision is null then raise exception 'BLOCK_NOT_FOUND';end if;
+ if r.revision is null then select revision into rev from public.edu_lesson_block_heads where lesson_id=p_lesson;
+ else rev:=r.revision;end if;
+ select document into doc from public.edu_lesson_block_versions where id=rev and lesson_id=p_lesson;
+ if doc is null then raise exception 'BLOCK_NOT_FOUND';end if;
+ select * into c from public.edu_ongoing_completions where enrollment_id=p_enrollment and lesson_id=p_lesson and period_start=coalesce(p_period,period_begin);
+ select count(*)::integer,min(period_start) into completed_count,first_period from public.edu_ongoing_completions where enrollment_id=p_enrollment and lesson_id=p_lesson;
+ first_period:=coalesce(first_period,period_begin);
+ opportunities:=case cadence_value when 'daily' then ((period_begin at time zone 'Asia/Seoul')::date-(first_period at time zone 'Asia/Seoul')::date)+1
+ when 'weekly' then ((period_begin at time zone 'Asia/Seoul')::date-(first_period at time zone 'Asia/Seoul')::date)/7+1
+ else (extract(year from period_begin at time zone 'Asia/Seoul')-extract(year from first_period at time zone 'Asia/Seoul'))::integer*12
+   +(extract(month from period_begin at time zone 'Asia/Seoul')-extract(month from first_period at time zone 'Asia/Seoul'))::integer+1 end;
+ return jsonb_build_object('cadence',cadence_value,'periodStart',coalesce(p_period,period_begin),'periodEnd',coalesce(r.period_end,period_finish),
+  'stats',jsonb_build_object('completed',completed_count,'opportunities',opportunities,'rate',round(completed_count*100.0/greatest(1,opportunities))),'currentPeriodStart',period_begin,'revision',rev,'document',doc,'draft',case when r.revision is null then null else jsonb_build_object('values',r.values,'writeId',r.write_id,'updatedAt',r.updated_at) end,
+  'completion',case when c.id is null then null else jsonb_build_object('id',c.id,'writeId',c.write_id,'revision',c.revision,'createdAt',c.created_at,'assessment',c.assessment,'values',c.values) end,
+  'history',coalesce((select jsonb_agg(x order by x->>'periodStart' desc) from (select jsonb_build_object('periodStart',o.period_start,'periodEnd',o.period_end,'updatedAt',o.updated_at,'completed',exists(select 1 from public.edu_ongoing_completions oc where oc.enrollment_id=o.enrollment_id and oc.lesson_id=o.lesson_id and oc.period_start=o.period_start)) as x
+    from public.edu_ongoing_rounds o where o.enrollment_id=p_enrollment and o.lesson_id=p_lesson order by o.period_start desc limit 100) history),'[]'::jsonb));
+end;
+$$;
+
+create or replace function public.edu_ongoing_history(p_actor uuid,p_lesson uuid,p_enrollment uuid,p_before timestamptz default null)
+returns jsonb language plpgsql stable security invoker set search_path='' as $$
+declare items jsonb;
+begin
+ if p_enrollment is null then raise exception 'BLOCK_FORBIDDEN';end if;
+ begin
+  perform public.edu_assert_block_access(p_actor,p_lesson,p_enrollment);
+ exception when raise_exception then
+  if sqlerrm <> 'BLOCK_LESSON_LOCKED' or not public.edu_is_graduate_enrollment(p_enrollment) then raise; end if;
+ end;
+ select coalesce(jsonb_agg(x order by x->>'periodStart' desc),'[]'::jsonb) into items from (
+  select jsonb_build_object('periodStart',r.period_start,'periodEnd',r.period_end,'updatedAt',r.updated_at,'completed',exists(select 1 from public.edu_ongoing_completions c where c.enrollment_id=r.enrollment_id and c.lesson_id=r.lesson_id and c.period_start=r.period_start)) as x
+  from public.edu_ongoing_rounds r where r.enrollment_id=p_enrollment and r.lesson_id=p_lesson and (p_before is null or r.period_start<p_before) order by r.period_start desc limit 101
+ ) page;
+ return jsonb_build_object('items',case when jsonb_array_length(items)=101 then items-100 else items end,'nextBefore',case when jsonb_array_length(items)=101 then items->99->>'periodStart' else null end);
+end;
+$$;
+
+revoke all on function public.edu_read_ongoing(uuid,uuid,uuid,timestamptz), public.edu_ongoing_history(uuid,uuid,uuid,timestamptz) from public, anon, authenticated;
+grant execute on function public.edu_read_ongoing(uuid,uuid,uuid,timestamptz), public.edu_ongoing_history(uuid,uuid,uuid,timestamptz) to service_role;
+
 commit;
