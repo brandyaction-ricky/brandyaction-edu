@@ -115,7 +115,7 @@ export function DiagnosisExperience({ initialCourseId, reportsEnabled = false }:
   return <div className="edu-diagnosis">
     <header className="diagnosis-header"><Image src="/brandy-action-logo.png" alt="Brandy Action EDU" width={164} height={30}/>
       <button type="button" className="diagnosis-exit" onClick={() => void exit()} disabled={pending}><ArrowLeft size={16}/> {session?.state === 'in_progress' ? '저장하고 나가기' : '마이페이지'}</button></header>
-    <main className="diagnosis-main">
+    <main className={`diagnosis-main${phase === 'submitted' && reportsEnabled ? ' diagnosis-report-main' : ''}`}>
       {phase === 'loading' ? <div className="diagnosis-center" role="status"><LoaderCircle className="diagnosis-spin"/><p>검사를 불러오고 있어요.</p></div> : <>
         {(phase === 'intro' || phase === 'preparing') && <section className="diagnosis-intro">
           <span className="diagnosis-eyebrow">나를 이해하는 첫걸음</span><h1 ref={heading} tabIndex={-1}>나는 어떤 순간에<br/>나답게 움직일까요?</h1>

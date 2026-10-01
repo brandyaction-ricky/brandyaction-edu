@@ -1,7 +1,27 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "git": { "deploymentEnabled": { "codex/edu-release-211-integration-20260927": false, "codex/edu-release-211-ci-fix-20260927": false, "codex/edu-curriculum-migration-20260928": false, "codex/edu-diagnosis-package-20261001": false, "codex/edu-cohort-curriculum-visibility-20261001": false } },
-  "regions": ["icn1"],
-  "crons": [{ "path": "/api/cron/crm", "schedule": "*/5 * * * *" }, { "path": "/api/cron/push", "schedule": "* * * * *" }]
+  "git": {
+    "deploymentEnabled": {
+      "codex/edu-release-211-integration-20260927": false,
+      "codex/edu-release-211-ci-fix-20260927": false,
+      "codex/edu-curriculum-migration-20260928": false,
+      "codex/edu-diagnosis-package-20261001": false,
+      "codex/edu-myin-report-html-20261002": false,
+      "codex/edu-cohort-curriculum-visibility-20261001": false
+    }
+  },
+  "regions": [
+    "icn1"
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/crm",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/push",
+      "schedule": "* * * * *"
+    }
+  ]
 }

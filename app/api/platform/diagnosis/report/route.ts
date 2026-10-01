@@ -15,12 +15,15 @@ export async function GET(request: Request) {
     const actor = await getAuthenticatedUser();
     if (!actor) return reply({ error: '로그인이 필요합니다.' }, 401);
     const query = new URL(request.url).searchParams, keys = [...query.keys()];
-    if (keys.length > 1 || keys.some(key => !['preview','download'].includes(key) || query.get(key) !== '1'))
+    if (keys.length > 1 || keys.some(key => !['preview','download','html'].includes(key) || query.get(key) !== '1'))
       return reply({ code: 'INVALID', error: '요청 내용을 확인해 주세요.' }, 400);
-    const download = query.has('download'), preview = query.has('preview');
+    const download = query.has('download'), preview = query.has('preview'), html = query.has('html');
     const db = createAdminClient();
     const result = await runDiagnosisReport({ actor, rpc: async (name, args) => await db.rpc(name, args),
-      send: sendDiagnosisReportCommand }, download || preview ? 'download' : 'status');
+      send: sendDiagnosisReportCommand }, html ? 'html' : download || preview ? 'download' : 'status');
+    if (html) return new Response(result.html, { headers: { ...privateHeaders, 'Content-Type': 'text/html; charset=utf-8',
+      'Content-Security-Policy': "sandbox; default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'",
+      'Content-Disposition': `attachment; filename="N6-report.html"; filename*=UTF-8''${encodeURIComponent('N6-정밀보고서.html')}` } });
     if (download) return new Response(result.markdown, { headers: { ...privateHeaders, 'Content-Type': 'text/markdown; charset=utf-8',
       'Content-Disposition': `attachment; filename="N6-report.md"; filename*=UTF-8''${encodeURIComponent('N6-검사결과.md')}` } });
     return reply(result);

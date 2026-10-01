@@ -3,14 +3,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, CheckCircle2, Download, FileText, LoaderCircle, RefreshCw } from 'lucide-react';
 import type { DiagnosisReportStatus } from '@/lib/diagnosis-report';
-import { DiagnosisReportDocument } from './diagnosis-report-document';
+import { DiagnosisReportReader } from './diagnosis-report-reader';
 import './diagnosis-report.css';
 
 const endpoint = '/api/platform/diagnosis/report';
 const statusCopy = {
-  queued: { title: '답변을 받았어요.', description: '순서대로 검사 결과를 준비하고 있어요. 화면을 닫아도 계속 진행됩니다.' },
-  processing: { title: '나를 이해하는 결과를 만들고 있어요.', description: '제출한 답변을 바탕으로 결과를 정리하고 있어요. 나중에 이곳에서 다시 확인해 주세요.' },
-  ready: { title: '검사 결과가 준비됐어요.', description: '결과를 읽고, 파일로 저장해 나만의 옵시디언 볼트에 넣어 보세요.' },
+  queued: { title: '답변을 받았어요.', description: '순서대로 정밀 보고서를 준비하고 있습니다. 화면을 닫아도 제작은 계속됩니다.' },
+  processing: { title: '정밀 보고서를 만들고 있어요.', description: '제출한 답변을 바탕으로 보고서를 작성하고 확인합니다. 완성되면 이곳에서 읽고 파일로 받을 수 있습니다.' },
+  ready: { title: '정밀 보고서가 준비됐어요.', description: '보고서를 읽고 나의 욕구와 행동 경향을 확인해 보세요. 다음 학습에 사용할 MD 파일도 함께 받을 수 있습니다.' },
   needs_review: { title: '결과를 만들기 전 확인 중이에요.', description: '답변은 안전하게 접수됐어요. 확인이 끝나면 진행됩니다. 다시 검사하거나 추가 결제할 필요는 없어요.' },
   access_denied: { title: '이용 정보를 확인해 주세요.', description: '현재 이 검사 결과를 열 수 없어요. 구매·수강 상태를 확인해 주세요.' },
 };
@@ -76,23 +76,25 @@ export function DiagnosisReportView({ onExit }: { onExit: () => void }) {
   function refresh() {
     setStatus(null); setPreview(null); setError(''); setLoading(true); setPaused(false); setReload(n => n + 1);
   }
-  async function getFile(download: boolean) {
+  async function getFile(mode: 'read' | 'html' | 'markdown') {
+    const download = mode !== 'read';
     const version = ++fileVersion.current;
     fileRequest.current?.abort(); fileRequest.current = new AbortController();
     setError(''); if (download) setDownloading(true); else setFetchingPreview(true);
     try {
-      const response = await fetch(`${endpoint}?${download ? 'download' : 'preview'}=1`, { cache: 'no-store',
+      const response = await fetch(`${endpoint}?${mode === 'markdown' ? 'download' : 'html'}=1`, { cache: 'no-store',
         signal: AbortSignal.any([fileRequest.current.signal, AbortSignal.timeout(15_000)]) });
+      if (!response.ok) await readResponse(response);
       if (download) {
-        if (!response.ok) await readResponse(response);
         const blob = await response.blob(); if (version !== fileVersion.current) return;
         const url = URL.createObjectURL(blob), link = document.createElement('a');
-        link.href = url; link.download = 'N6-검사결과.md'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+        link.href = url; link.download = mode === 'markdown' ? 'N6-검사결과.md' : 'N6-정밀보고서.html'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
       } else {
-        const data = await readResponse(response), markdown: unknown = data?.markdown;
+        if (!response.headers.get('content-type')?.startsWith('text/html')) throw Error('보고서 파일을 확인하지 못했습니다. 다시 확인해 주세요.');
+        const html = await response.text();
         if (version !== fileVersion.current) return;
-        if (!isStatus(data) || data.state !== 'ready' || typeof markdown !== 'string') throw Error('결과 파일을 확인하지 못했어요. 다시 확인해 주세요.');
-        setPreview(markdown);
+        if (!html.trim()) throw Error('보고서 파일을 확인하지 못했습니다. 다시 확인해 주세요.');
+        setPreview(html);
       }
     } catch (reason) {
       if (version !== fileVersion.current) return;
@@ -108,12 +110,12 @@ export function DiagnosisReportView({ onExit }: { onExit: () => void }) {
         {(status?.state === 'queued' || status?.state === 'processing') && <ol className="diagnosis-report-steps" aria-label="검사 진행 단계"><li className="is-complete">답변 접수</li><li aria-current="step">결과 준비</li><li>결과 확인</li></ol>}
       </div>}
       {status?.state === 'ready' && <>
-        <div className="diagnosis-report-actions"><button className="diagnosis-primary" onClick={() => void getFile(false)} disabled={fetchingPreview || downloading}>{fetchingPreview ? <LoaderCircle className="diagnosis-spin" size={18}/> : <FileText size={18}/>}결과 보기</button>
-          <button className="diagnosis-secondary" onClick={() => void getFile(true)} disabled={fetchingPreview || downloading}>{downloading ? <LoaderCircle className="diagnosis-spin" size={18}/> : <Download size={18}/>}MD 파일 받기</button></div>
-        <p className="diagnosis-report-help">받은 파일을 옵시디언의 내 볼트 폴더에 넣으면 언제든 다시 읽을 수 있어요. 파일은 다시 받아도 괜찮아요.</p>
+        <div className="diagnosis-report-actions"><button className="diagnosis-primary" onClick={() => void getFile('read')} disabled={fetchingPreview || downloading}>{fetchingPreview ? <LoaderCircle className="diagnosis-spin" size={18}/> : <FileText size={18}/>}보고서 열기</button>
+          <button className="diagnosis-secondary" onClick={() => void getFile('html')} disabled={fetchingPreview || downloading}><Download size={18}/>HTML 파일 받기</button>
+          <button className="diagnosis-secondary" onClick={() => void getFile('markdown')} disabled={fetchingPreview || downloading}>{downloading ? <LoaderCircle className="diagnosis-spin" size={18}/> : <Download size={18}/>}MD 파일 받기</button></div>
+        <p className="diagnosis-report-help">HTML은 지금 보는 디자인 그대로 보관하는 파일입니다. MD는 다음 날 커리큘럼에서 내 사업에 맞게 정리할 때 사용합니다. 두 파일 모두 다시 받을 수 있습니다.</p>
       </>}
-      {preview !== null && <section className="diagnosis-report-preview" aria-label="검사 결과 미리보기"><div><h2>나의 검사 결과</h2><button className="diagnosis-secondary" onClick={() => setPreview(null)}>미리보기 닫기</button></div>
-        <DiagnosisReportDocument markdown={preview}/></section>}
+      {preview !== null && <DiagnosisReportReader html={preview} onClose={() => setPreview(null)} onError={setError}/>}
       {paused && <p className="diagnosis-report-help">자동 확인을 잠시 멈췄어요. 아래 버튼을 누르면 최신 상태를 확인할 수 있어요.</p>}
       {error && <p className="diagnosis-error" role="alert">{error}</p>}
       <div className="diagnosis-report-footer"><button className="diagnosis-secondary" onClick={refresh} disabled={downloading || fetchingPreview}><RefreshCw size={16}/>진행 상태 다시 확인</button><button className="diagnosis-secondary" onClick={onExit}>학습으로 돌아가기<ArrowRight size={16}/></button></div>
