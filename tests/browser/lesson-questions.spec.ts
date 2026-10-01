@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 const id=(n:number)=>`11111111-1111-4111-8111-${String(n).padStart(12,'0')}`;
 test('student asks privately inside the actual classroom, retries without duplication and reads the answer',async({page})=>{
  const bodies:Record<string,unknown>[]=[];let saved=false;
- await page.route('**/api/platform/lesson-questions?**',r=>r.fulfill({json:{questions:saved?[{id:id(9),title:'실습 질문',content:'이 단계가 궁금해요',answer:'이 순서로 진행해 주세요.',status:'answered'}]:[],hasMore:false}}));
+ await page.route('**/api/platform/lesson-questions?**',r=>r.fulfill({json:{questions:saved?[{id:id(9),title:'실습 질문',content:'이 단계가 궁금해요',answer:'이 순서로 진행해 주세요. https://example.test/guide',status:'answered'}]:[],hasMore:false}}));
  await page.route('**/api/platform/lesson-questions',r=>{bodies.push(r.request().postDataJSON());saved=bodies.length>1;return r.fulfill(saved?{json:{question:{id:id(9)}}}:{status:503,json:{error:'응답 확인 실패'}});});
  await page.goto('/classroom-questions-test');
  await expect(page.getByText('학습하면서 바로 질문합니다.')).toBeVisible();
@@ -14,7 +14,9 @@ test('student asks privately inside the actual classroom, retries without duplic
  await expect(page.getByRole('textbox',{name:'질문 내용',exact:true})).toHaveValue('이 단계가 궁금해요');
  await page.getByRole('button',{name:'등록 결과 다시 확인'}).click();
  expect(bodies).toHaveLength(2);expect(bodies[0]).toEqual(bodies[1]);expect(bodies[0]).toMatchObject({enrollmentId:id(1),lessonId:id(4),title:'실습 질문'});
- await expect(page.getByText('이 순서로 진행해 주세요.')).toBeVisible();await expect(page).toHaveURL(/classroom-questions-test/);
+ await expect(page.getByText('이 순서로 진행해 주세요.',{exact:false})).toBeVisible();
+ await expect(page.getByRole('link',{name:'https://example.test/guide'})).toHaveAttribute('target','_blank');
+ await expect(page).toHaveURL(/classroom-questions-test/);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 test('question list errors are recoverable and navigation protects an unfinished question',async({page})=>{

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { questionCategories, type QuestionCategory, type QuestionContext, type SharedAnswer } from '@/lib/question-hub';
 import { QuestionImagePicker, type QuestionImagePickerHandle } from './question-image';
+import { AnswerText } from './lesson-text';
 import { useUnsavedLearningChanges } from './use-unsaved-learning-changes';
 import './question-hub.css';
 
@@ -13,7 +14,7 @@ export async function questionRequest<T>(url: string, body?: unknown, signal?: A
   return result;
 }
 export function SharedAnswerCard({ answer }: { answer: SharedAnswer }) {
-  return <details className="question-shared-answer"><summary>{answer.title}<span>답변 보기</span></summary><p className="meta">운영자가 확인한 답변 · {answer.context}</p><p className="reading-copy">{answer.answer}</p>{answer.lessonId && answer.enrollmentId && <Link className="link" href={`/learn/${answer.enrollmentId}/${answer.lessonId}`}>관련 수업 보기</Link>}</details>;
+  return <details className="question-shared-answer"><summary>{answer.title}<span>답변 보기</span></summary><p className="meta">운영자가 확인한 답변 · {answer.context}</p><p className="reading-copy"><AnswerText text={answer.answer}/></p>{answer.lessonId && answer.enrollmentId && <Link className="link" href={`/learn/${answer.enrollmentId}/${answer.lessonId}`}>관련 수업 보기</Link>}</details>;
 }
 export function RelatedAnswers({ query, context }: { query: string; context: QuestionContext | null }) {
   const [result, setResult] = useState<{ key: string; answers: SharedAnswer[]; error?: string } | null>(null);

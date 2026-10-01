@@ -3,6 +3,7 @@ import { AppInstallCard } from './app-install';
 import { DiagnosisEntry } from './diagnosis-entry';
 import { QuestionImage } from './question-image';
 import { QuestionAnswerHistory } from './question-thread';
+import { AnswerText } from './lesson-text';
 import { MemberMessages } from './member-messages';
 import { EncouragementEditor, EncouragementWall } from './member-encouragement';
 import { EnrollmentLearningOverview } from './enrollment-learning-overview';
@@ -765,7 +766,7 @@ function LegacyQuestions({
           {process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED === 'true' ? <QuestionAnswerHistory questionId={String(q.id)} fallback={String(q.answer || '')} onStatusChange={status => setThreadStatuses(old => old[String(q.id)] === status ? old : {...old, [String(q.id)]: status})}/> : q.answer ? (
             <div className="answer">
               <b>운영자 답변</b>
-              <p className="reading-copy">{t(q, "answer")}</p>
+              <p className="reading-copy"><AnswerText text={t(q, "answer")}/></p>
             </div>
           ) : (
             <p className="meta mt16">답변이 도착하면 이곳에서 확인해 주세요.</p>

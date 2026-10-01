@@ -5,6 +5,7 @@ import { QuestionAiReferenceNote } from './question-ai-reference';
 import { useUnsavedLearningChanges } from './use-unsaved-learning-changes';
 import { QuestionAdminHub } from './question-admin-hub';
 import { QuestionImage } from './question-image';
+import { AnswerText } from './lesson-text';
 import { AdminDrawer, useUnsavedWarning } from '@/features/admin-ui';
 type Answer = { id: string; authorName: string; source?: 'learner' | 'operator' | 'legacy' | 'faq' | 'aside'; content: string; createdAt: string };
 type Thread = { question: { id: string; title: string; content: string; learningContext?: string | null; status: string; resolved: boolean; archived: boolean; headId: string | null; imageId?: string | null }; answers: Answer[]; nextCursor: string | null; canAnswer: boolean; canFollowUp?: boolean };
@@ -40,7 +41,7 @@ function Answers({ state }: { state: ReturnType<typeof useThread> }) {
    {state.data.nextCursor && <button type="button" className="btn small" disabled={state.olderBusy} onClick={() => void state.older()}>이전 답변 더 보기</button>}
    {state.olderError && <p role="alert">{state.olderError}</p>}
    {!state.data.answers.length && <p>{state.data.question.resolved ? '운영자가 처리 완료했습니다.' : '아직 등록된 답변이 없습니다.'}</p>}
-   {state.data.answers.map(answer => <article className="answer mt16" key={answer.id}><b>{answer.source === 'learner' ? '후속 질문 · ' : '답변 · '}{answer.authorName}</b><p className="meta">{new Date(answer.createdAt).toLocaleString('ko-KR')}</p><p className="reading-copy">{answer.content}</p></article>)}
+   {state.data.answers.map(answer => <article className="answer mt16" key={answer.id}><b>{answer.source === 'learner' ? '후속 질문 · ' : '답변 · '}{answer.authorName}</b><p className="meta">{new Date(answer.createdAt).toLocaleString('ko-KR')}</p><p className="reading-copy"><AnswerText text={answer.content}/></p></article>)}
   </>}
  </section>;
 }
@@ -80,7 +81,7 @@ export function QuestionAnswerHistory({ questionId, fallback = '', onStatusChang
    <button className="btn primary small mt16" disabled={busy || stale || !content.trim()}>{busy ? '등록 중…' : uncertain ? '같은 요청 결과 확인' : '후속 질문 등록'}</button>
   </form>}
   {notice && <p role="status" className="notice mt16">{notice}</p>}
- </> : fallback ? <div className="answer"><b>운영자 답변</b><p className="reading-copy">{fallback}</p></div> : <p className="meta">답변이 도착하면 이곳에서 확인해 주세요.</p>}
+ </> : fallback ? <div className="answer"><b>운영자 답변</b><p className="reading-copy"><AnswerText text={fallback}/></p></div> : <p className="meta">답변이 도착하면 이곳에서 확인해 주세요.</p>}
   <div className="row mt16"><button type="button" className="btn small" disabled={busy || uncertain} onClick={() => setOpen(v => !v)}>{open ? '답변 이력 접기' : '답변 전체 보기'}</button>{!open && !readOnly && <button type="button" className="btn small" onClick={() => setOpen(true)}>후속 질문하기</button>}{open && <button type="button" className="btn small" disabled={busy || uncertain} onClick={() => { state.reload(); setStale(false); }}>최신 답변 확인</button>}</div>
  </div>;
 }

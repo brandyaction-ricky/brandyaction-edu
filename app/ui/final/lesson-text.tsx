@@ -36,6 +36,9 @@ export function LessonText({ text }: { text: string }) {
   if (doc) return <div className="lesson-rich-body"><RichNode node={doc} /></div>;
   return <span className="lesson-text-links"><PlainLinks text={text} /></span>;
 }
+export function AnswerText({ text }: { text: string }) {
+  return <span className="lesson-text-links"><PlainLinks text={text} /></span>;
+}
 function PlainLinks({ text }: { text: string }) {
   return <>{lessonTextSegments(text).map((part, index) => part.href
     ? <a key={index} href={part.href} target="_blank" rel="noopener noreferrer">{part.text}</a>

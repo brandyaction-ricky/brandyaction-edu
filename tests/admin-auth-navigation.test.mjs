@@ -91,7 +91,7 @@ function apiHarness(user, failure = null, fixtures = {}, staffPermissions = {}, 
       calls.rpcs.push([name, args]);
       if (name === 'edu_admin_summary') {
         calls.summaries++;
-        return { data: { id: 'summary', pendingReviews: 3, approvedRevenue: 50_058_000, refundedRevenue: 3_304_000, netRevenue: 46_754_000 }, error: null };
+        return { data: { id: 'summary', pendingReviews: 3, openQuestions: 3, approvedRevenue: 50_058_000, refundedRevenue: 3_304_000, netRevenue: 46_754_000 }, error: null };
       }
       return ['edu_set_curriculum_archive', 'edu_restore_curriculum_week', 'edu_create_curriculum_week'].includes(name) ? rpcResult : { data: { id: 'summary', pendingReviews: 3 }, error: null };
     },
@@ -131,14 +131,18 @@ test('admin API distinguishes sign-in, permission and temporary connection error
   assert.equal((await api.read('products')).status, 503);
 });
 
-test('menu reads authenticate once and preserve review badges without full dashboard aggregation', async () => {
+test('menu reads authenticate once and preserve review and unanswered-question badges without full dashboard aggregation', async () => {
   const api = apiHarness(admin);
   const response = await api.read('banners');
   assert.equal(response.status, 200);
   assert.equal(api.calls.auth, 1);
   assert.equal(api.calls.summaries, 0);
-  assert.equal((await response.json()).data.admin_summary[0].pendingReviews, 3);
-  assert.deepEqual(api.calls.tables.sort(), ['mission_submissions', 'site_banners']);
+  const summary = (await response.json()).data.admin_summary[0];
+  assert.equal(summary.pendingReviews, 3);
+  assert.equal(summary.openQuestions, 3);
+  assert.deepEqual(api.calls.tables.sort(), ['edu_questions', 'mission_submissions', 'site_banners']);
+  assert.ok(api.calls.filters.some(filter => JSON.stringify(filter) === JSON.stringify(['edu_questions', 'eq', 'status', 'open'])));
+  assert.ok(api.calls.filters.some(filter => JSON.stringify(filter) === JSON.stringify(['edu_questions', 'eq', 'is_archived', false])));
 });
 
 test('order revenue summary covers every order page and keeps the navigation badge', async () => {
@@ -150,6 +154,7 @@ test('order revenue summary covers every order page and keeps the navigation bad
   assert.deepEqual(third.data.order_summary[0], total);
   assert.equal(third.pagination.page, 3);
   assert.equal(third.data.admin_summary[0].pendingReviews, 3);
+  assert.equal(third.data.admin_summary[0].openQuestions, 3);
   assert.equal(api.calls.summaries, 2);
 });
 

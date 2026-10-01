@@ -8,6 +8,7 @@ import type { FunnelCourse, FunnelCohort } from '@/lib/recruitment-funnel';
 import { RecruitmentLinks } from './recruitment-links';
 import { createMutationGate } from '@/lib/mutation-gate';
 import { AdminButton, AdminInput, AdminSection, AdminSelect } from '@/features/admin-ui';
+import { RecruitmentAnnouncement } from './recruitment-announcement';
 
 export function RecruitmentRoomSettings({courses,cohorts,expanded=false,initialPeriod}:{courses:FunnelCourse[];cohorts:FunnelCohort[];expanded?:boolean;initialPeriod?:string}) {
   const [showWebinar,setShowWebinar]=useState(expanded);
@@ -64,7 +65,7 @@ export function RecruitmentRoomSettings({courses,cohorts,expanded=false,initialP
       setMessage((e as Error).message);
     } finally { if (active.current) setPending(false); }
   };
-  return <AdminSection className="recruitment-guidance" title="모집별 카톡방 설정" description="같은 방을 유지해도 모집 구분은 따로 관리합니다." bordered>
+  return <><AdminSection className="recruitment-guidance" title="모집별 카톡방 설정" description="같은 방을 유지해도 모집 구분은 따로 관리합니다." bordered>
     <RecruitmentHelp title="카톡방 운영 방법"><p>오가닉은 누적 운영합니다.</p><p>광고 방은 모집마다 새 방 또는 기존 방 재사용을 선택할 수 있으며, 미정으로 저장해도 됩니다.</p></RecruitmentHelp>
     <AdminInput label="모집 구분 코드" value={period} disabled={pending} onChange={e => { setPeriod(e.target.value); setVersion(null); setSettings(EMPTY_RECRUITMENT_ROOMS); setMessage('모집 구분을 바꿨습니다. 먼저 불러오기를 눌러 주세요.'); }} helper="예: moonshot-4. 다음 모집은 새 코드를 쓰고 같은 방 주소를 다시 연결할 수 있습니다. 무료 교육 기수와는 별개입니다." />
     <AdminButton disabled={pending} onClick={() => void load()}>모집 방 설정 불러오기</AdminButton>
@@ -83,5 +84,5 @@ export function RecruitmentRoomSettings({courses,cohorts,expanded=false,initialP
     {version !== null && version > 0 && <RecruitmentLinks key={`${period}:${version}`} period={period} version={version} />}
     {version !== null && version > 0 && <><AdminButton onClick={()=>setShowWebinar(v=>!v)}>{showWebinar?'무료 신청 관리 닫기':'무료 신청·구매 연결 열기'}</AdminButton>{showWebinar&&<WebinarManagement workspace={expanded} key={period} period={period} courses={courses} cohorts={cohorts}/>}</>}
     <p className="conversion-muted">다음 모집에 방을 바꿔도 이전 모집 주소와 저장 이력은 유지됩니다. 월별 집계·방 입장 확인은 별도 연결이 필요합니다. 방 운영 방식 선택만으로 카톡방을 생성하거나 폐쇄하지 않습니다.</p>
-  </AdminSection>;
+  </AdminSection><RecruitmentAnnouncement/></>;
 }

@@ -438,6 +438,13 @@ test('room settings save separately from product mapping and changing recruitmen
   await page.getByRole('button',{name:'새로고침',exact:true}).click();
   await page.getByRole('button',{name:'모집 경로 준비',exact:true}).click();
   await page.getByRole('button',{name:'모집별 카톡방 관리',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'카톡방 공지 만들기'})).toBeVisible();
+  await page.getByRole('textbox',{name:'라이브 날짜'}).fill('10/30 (금)');
+  await page.getByRole('textbox',{name:'즉시 공개 자료'}).fill('새 자료 제목');
+  const preview = await page.getByRole('textbox',{name:'복사할 공지 미리보기'}).inputValue();
+  expect((preview.match(/10\/30 \(금\)/g) || []).length).toBe(4);
+  expect(preview).toContain('새 자료 제목');
+  expect(preview).not.toContain('9/28');
   await page.getByRole('button',{name:'모집 방 설정 불러오기',exact:true}).click();
   await page.getByLabel('모집 이름',{exact:true}).fill('Synthetic recruitment');
   await page.getByLabel('오가닉 오픈채팅방 주소',{exact:true}).fill('https://open.kakao.com/o/organicTest');
