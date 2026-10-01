@@ -308,7 +308,7 @@ export function Classroom({
                   <div className="flex gap8">
                     <Badge>{lessonLabel(lesson.id, num(lesson, "day_number"))}</Badge>
                     <Badge color={done ? "green" : ""}>
-                      {done ? "학습 완료" : "학습 중"}
+                      {done ? "학습 완료" : graduate ? "열람 가능" : "학습 중"}
                     </Badge>
                     <span className="meta">{t(lesson, "duration_label")}</span>
                   </div>

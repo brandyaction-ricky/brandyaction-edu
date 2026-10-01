@@ -188,7 +188,7 @@ function EnrolledCard({
         </div>
       </div>
       <div className="class-footer">
-        {graduate ? <><p className="meta">최신 공개 커리큘럼은 계속 열람할 수 있습니다. 기존 제출·피드백 기록도 보관됩니다.</p><Link className="btn primary" href={'/learn/' + e.id + (next ? '/' + next.id : '')}>최신 커리큘럼 보기 <ArrowRight /></Link></> : blockLearningEnabled ? <EnrollmentLearningOverview data={data} enrollment={e} compact /> : <>
+        {graduate ? <><p className="meta">최신 공개 커리큘럼은 계속 열람할 수 있습니다. 기존 제출·피드백 기록도 보관됩니다.</p><Link className="btn primary" href={'/learn/' + e.id}>최신 커리큘럼 보기 <ArrowRight /></Link></> : blockLearningEnabled ? <EnrollmentLearningOverview data={data} enrollment={e} compact /> : <>
         <div className="progress-line">
           <span className="meta">
             {complete.length} / {lessons.length}개 학습 완료
