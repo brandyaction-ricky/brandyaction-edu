@@ -22,6 +22,7 @@ import {
 } from "@/lib/platform";
 import { hasLearningAccess } from "@/lib/platform-rules";
 import { isGraduate } from '@/lib/alumni-access';
+import { cohortLessonVisible, cohortWeekVisible } from '@/lib/cohort-curriculum-visibility';
 import {
   ArrowRight,
   BookOpen,
@@ -77,11 +78,11 @@ const rows = (data: Data, key: string) => data[key] || [];
 export function enrollmentLessons(data: Data, e: Row) {
   const weeks = new Set(
     rows(data, "curriculum_weeks")
-      .filter((w) => w.course_id === e.course_id)
+      .filter((w) => w.course_id === e.course_id && cohortWeekVisible(data,String(e.cohort_id),w))
       .map((w) => w.id),
   );
   return rows(data, "curriculum_lessons")
-    .filter((l) => weeks.has(t(l, "week_id")))
+    .filter((l) => weeks.has(t(l, "week_id")) && cohortLessonVisible(data,String(e.cohort_id),l))
     .sort((a, b) => num(a, "day_number") - num(b, "day_number"));
 }
 function completedLessonProgress(
@@ -981,20 +982,15 @@ function Resources({ data }: { data: Data }) {
     ),
     grouped = rows(data, "courses")
       .map((c) => {
-        const weeks = rows(data, "curriculum_weeks").filter(
-            (w) => w.course_id === c.id,
-          ),
-          lessons = rows(data, "curriculum_lessons").filter((l) =>
-            weeks.some((w) => w.id === l.week_id),
-          );
-        const enrollment = rows(data, "enrollments").find(entry => entry.course_id === c.id && hasLearningAccess(entry));
-        const digitalSections = enrollment ? productDigitalSections(object(c, "metadata"), false) : [];
-        const productFiles = enrollment ? productResources(object(c, "metadata")) : [];
+        const enrollments = rows(data, "enrollments").filter(entry => entry.course_id === c.id && hasLearningAccess(entry));
+        const lessonIds = new Set(enrollments.flatMap(enrollment =>
+          enrollmentLessons(data, enrollment).map(lesson => lesson.id),
+        ));
+        const digitalSections = enrollments.length ? productDigitalSections(object(c, "metadata"), false) : [];
+        const productFiles = enrollments.length ? productResources(object(c, "metadata")) : [];
         return {
           c,
-          files: contents.filter((r) =>
-            lessons.some((l) => l.id === r.lesson_id),
-          ),
+          files: contents.filter(r => lessonIds.has(t(r, "lesson_id"))),
           digitalSections,
           productFiles,
         };

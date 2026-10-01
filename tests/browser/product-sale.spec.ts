@@ -166,7 +166,7 @@ test('curriculum can be published independently without losing unsaved product e
   lesson.is_published = true;
   await panel.getByRole('checkbox', { name: '일차 공개' }).check();
   await panel.getByRole('button', { name: '일차 저장' }).click();
-  await expect(guide).toContainText('공개된 학습이 있습니다.');
+  await expect(guide).toContainText('본문이 준비된 학습이 있습니다. 실제 수강생 공개 여부는 기수별 공개 범위에서 확인해 주세요.');
   await expect(page.locator('aside').getByText('판매 보류', { exact: true })).toHaveCount(0);
   await expect(page.getByLabel('합성 저장 횟수')).toHaveText('0');
   await page.getByRole('tab', { name: '기본·판매', exact: true }).click();

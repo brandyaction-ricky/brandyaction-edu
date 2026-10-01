@@ -1,6 +1,7 @@
 import { MemberViews } from '../../../app/ui/final/member-views';
 import type { Row } from '../../../lib/platform';
 import type { LessonGate } from '../../../lib/learning-overview';
+import { withExistingCohortVisibility } from './cohort-visibility';
 
 export function LearningOverviewFixture() {
   const params = new URLSearchParams(location.search), scenario = params.get('scenario');
@@ -20,11 +21,12 @@ export function LearningOverviewFixture() {
     learning_overviews: scenario === 'missing' ? [] : [{ id: enrollment.id, status: scenario === 'error' ? 'error' : 'ready', lessons: gates }],
   };
   if (scenario === 'multiple') {
-    data.enrollments.push({ ...enrollment, id: 'second', course_id: 'second-course' }, { ...enrollment, id: 'expired', status: 'revoked' });
+    data.enrollments.push({ ...enrollment, id: 'second', course_id: 'second-course', cohort_id: 'second-cohort' }, { ...enrollment, id: 'expired', status: 'revoked' });
     data.courses.push({ id: 'second-course', title: '독립된 다른 과정' });
-    data.curriculum_weeks.push({ id: 'second-week', course_id: 'second-course', week_number: 1 });
-    data.curriculum_lessons.push({ id: 'second-lesson', week_id: 'second-week', day_number: 1, title: '두 번째 과정 시작' });
+    data.cohorts.push({ id: 'second-cohort', course_id: 'second-course', name: '별도 기수' });
+    data.curriculum_weeks.push({ id: 'second-week', course_id: 'second-course', week_number: 1, is_published: true });
+    data.curriculum_lessons.push({ id: 'second-lesson', week_id: 'second-week', day_number: 1, title: '두 번째 과정 시작', is_published: true });
     data.learning_overviews.push({ id: 'second', status: 'ready', lessons: [{ ...gates[0], lessonId: 'second-lesson' }] });
   }
-  return <main className="edu-front"><MemberViews section={params.get('view') || 'dashboard'} data={data} user={{ id: 'sample-user', full_name: '학습 QA 회원', email: 'learner@example.test', role: params.get('role') === 'admin' ? 'admin' : params.get('role') === 'staff' ? 'staff' : 'member', phone: null }} pending={false} send={async () => ({})} logout={async () => {}} blockLearningEnabled={scenario !== 'legacy'}/></main>;
+  return <main className="edu-front"><MemberViews section={params.get('view') || 'dashboard'} data={withExistingCohortVisibility(data)} user={{ id: 'sample-user', full_name: '학습 QA 회원', email: 'learner@example.test', role: params.get('role') === 'admin' ? 'admin' : params.get('role') === 'staff' ? 'staff' : 'member', phone: null }} pending={false} send={async () => ({})} logout={async () => {}} blockLearningEnabled={scenario !== 'legacy'}/></main>;
 }

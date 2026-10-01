@@ -10,11 +10,12 @@ const compile = (file, require = () => { throw Error('Unexpected import'); }) =>
   new Function('exports', 'require', code)(exports, require); return exports;
 };
 const rules = compile('platform-rules');
-const { learningOverview, parseLessonGates, readLearningOverviews } = compile('learning-overview', name => { assert.equal(name, './platform-rules'); return rules; });
-const enrollment = { id: 'enrollment', course_id: 'course', status: 'active', access_starts_at: '2020-01-01' };
+const cohort = compile('cohort-curriculum-visibility');
+const { learningOverview, parseLessonGates, readLearningOverviews } = compile('learning-overview', name => name === './platform-rules' ? rules : name === './cohort-curriculum-visibility' ? cohort : assert.fail(name));
+const enrollment = { id: 'enrollment', course_id: 'course', cohort_id: 'cohort', status: 'active', access_starts_at: '2020-01-01' };
 const gate = (id, track, day, unlocked = true) => ({ lessonId: id, track, dayNumber: day, isUnlocked: unlocked, automaticApproval: false, reason: unlocked ? '' : '이전 학습을 마치면 열립니다.' });
 function dataFor(gates, complete = []) {
-  return { learning_overviews: [{ id: enrollment.id, status: 'ready', lessons: gates }], curriculum_weeks: [{ id: 'week', course_id: 'course', week_number: 0 }], curriculum_lessons: gates.map((g, i) => ({ id: g.lessonId, week_id: 'week', title: '수업 ' + g.lessonId, day_number: i + 101 })), lesson_progress: complete.map(id => ({ id: 'p-' + id, enrollment_id: enrollment.id, lesson_id: id, completed_at: '2026-01-01' })) };
+  return { learning_overviews: [{ id: enrollment.id, status: 'ready', lessons: gates }], curriculum_weeks: [{ id: 'week', course_id: 'course', week_number: 0, is_published: true }], curriculum_lessons: gates.map((g, i) => ({ id: g.lessonId, week_id: 'week', title: '수업 ' + g.lessonId, day_number: i + 101, is_published: true })), edu_cohort_week_visibility: [{ cohort_id: 'cohort', week_id: 'week', is_published: true }], edu_cohort_lesson_visibility: gates.map(g => ({ cohort_id: 'cohort', lesson_id: g.lessonId, is_published: true })), lesson_progress: complete.map(id => ({ id: 'p-' + id, enrollment_id: enrollment.id, lesson_id: id, completed_at: '2026-01-01' })) };
 }
 test('daily and learning each count 30 lessons, use source ordinals and ignore another enrollment or duplicate progress', () => {
   const gates = ['daily', 'learning'].flatMap(track => Array.from({ length: 30 }, (_, i) => gate(`${track}-${i + 1}`, track, i + 1, i < 2)));
@@ -83,8 +84,8 @@ test('actual progression RPC output produces independent tracks and changes cont
       await f.db.query('insert into curriculum_lessons(id,week_id,is_published) values($1,$2,true)',[id,f.week]);
       await f.db.query('select edu_save_lesson_blocks($1,$2,null,$3,$4)',[f.admin,id,randomUUID(),{...doc,progression:{track,dayNumber:day},completion:{mode:track==='daily'?'mentor':'self',requireAnswers:false,requireQuizPass:track==='learning'}}]);
     }
-    const e={...enrollment,id:f.enrollment,course_id:f.course};
-    const data={curriculum_weeks:[{id:f.week,course_id:f.course,week_number:1}],curriculum_lessons:[f.lesson,daily2,learning1].map((id,index)=>({id,week_id:f.week,title:'합성 '+index,day_number:index+1})),lesson_progress:[]};
+    const e={...enrollment,id:f.enrollment,course_id:f.course,cohort_id:f.cohort};
+    const data={curriculum_weeks:[{id:f.week,course_id:f.course,week_number:1,is_published:true}],curriculum_lessons:[f.lesson,daily2,learning1].map((id,index)=>({id,week_id:f.week,title:'합성 '+index,day_number:index+1,is_published:true})),edu_cohort_week_visibility:[{cohort_id:f.cohort,week_id:f.week,is_published:true}],edu_cohort_lesson_visibility:[f.lesson,daily2,learning1].map(id=>({cohort_id:f.cohort,lesson_id:id,is_published:true})),lesson_progress:[]};
     const read=async()=>{
       data.learning_overviews=await readLearningOverviews([f.enrollment],async id=>(await f.db.query('select edu_read_lesson_progression($1,$2) as gates',[f.student,id])).rows[0].gates);
       return learningOverview(data,e);

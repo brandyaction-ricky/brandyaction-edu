@@ -21,6 +21,8 @@ import { readMemberPlatformData, type MemberView } from '@/lib/member-platform-d
 import { couponError } from '@/lib/coupon-rules';
 import { adminOrderQuery, ORDER_PAGE_SIZE, parseOrderListScope } from '@/lib/admin-order-list';
 import { assertParticipationOpen } from '@/lib/alumni-access-server';
+import { isLessonVisibleToCohort } from '@/lib/cohort-curriculum-server';
+import { cohortLessonVisible, cohortWeekVisible } from '@/lib/cohort-curriculum-visibility';
 const reply = (data: unknown, status = 200) =>
     Response.json(data, {
         status,
@@ -79,7 +81,21 @@ export async function GET(request: Request) {
                 const enrollment = await db.from('enrollments').select('id,course_id,cohort_id,status,access_starts_at,access_ends_at,revoked_at').eq('user_id', user.id).eq('course_id', course.id).limit(20);
                 if (enrollment.error) throw enrollment.error;
                 data.enrollments = (enrollment.data || []) as Row[];
-                if (data.enrollments.some(enrollment => hasLearningAccess(enrollment))) {
+                const activeEnrollments = data.enrollments.filter(enrollment => hasLearningAccess(enrollment));
+                if (activeEnrollments.length) {
+                    const cohortIds = activeEnrollments.map(enrollment => String(enrollment.cohort_id));
+                    const weekIds = (data.curriculum_weeks || []).map(week => week.id);
+                    const allLessonIds = (data.curriculum_lessons || []).map(lesson => lesson.id);
+                    const admin = createAdminClient();
+                    const [weekVisibility, lessonVisibility] = await Promise.all([
+                        weekIds.length ? admin.from('edu_cohort_week_visibility').select('cohort_id,week_id,is_published').in('cohort_id', cohortIds).in('week_id', weekIds).limit(5000) : Promise.resolve({ data: [], error: null }),
+                        allLessonIds.length ? admin.from('edu_cohort_lesson_visibility').select('cohort_id,lesson_id,is_published').in('cohort_id', cohortIds).in('lesson_id', allLessonIds).limit(5000) : Promise.resolve({ data: [], error: null }),
+                    ]);
+                    if (weekVisibility.error || lessonVisibility.error) throw new Error('기수별 공개 상태를 확인하지 못했습니다.');
+                    data.edu_cohort_week_visibility = (weekVisibility.data || []) as Row[];
+                    data.edu_cohort_lesson_visibility = (lessonVisibility.data || []) as Row[];
+                    data.curriculum_lessons = (data.curriculum_lessons || []).filter(lesson => cohortIds.some(id => cohortLessonVisible(data,id,lesson)));
+                    data.curriculum_weeks = (data.curriculum_weeks || []).filter(week => cohortIds.some(id => cohortWeekVisible(data,id,week)));
                     const lessonIds = (data.curriculum_lessons || []).map(lesson => lesson.id);
                     if (lessonIds.length) {
                         const contents = await db.from('lesson_contents').select('lesson_id,resource_name,resource_storage_path').in('lesson_id', lessonIds).limit(200);
@@ -118,20 +134,28 @@ export async function GET(request: Request) {
         // only when the operator opens the tab, scoped to the selected product.
         if (productEditorRead && ['curriculum', 'missions'].includes(params.get('part') || '')) {
             const part = params.get('part');
+            const cohortResult = await db.from('cohorts').select('id,course_id,name,cohort_code,status').eq('course_id', record!).order('created_at');
+            if (cohortResult.error) return reply({ error: '상품 기수를 불러오지 못했습니다.' }, 500);
+            const cohorts = (cohortResult.data || []) as Row[];
+            const cohortIds = cohorts.map(cohort => String(cohort.id));
             const weekResult = await db.from('curriculum_weeks').select('*').eq('course_id', record!).order('week_number');
             if (weekResult.error) return reply({ error: '상품 주차를 불러오지 못했습니다.' }, 500);
             const weeks = (weekResult.data || []) as Row[];
             const weekIds = weeks.map(week => String(week.id));
-            if (!weekIds.length) return reply({ data: { curriculum_weeks: [], curriculum_lessons: [], [part === 'missions' ? 'curriculum_missions' : 'lesson_contents']: [] } });
+            if (!weekIds.length) return reply({ data: { cohorts, curriculum_weeks: [], curriculum_lessons: [], edu_cohort_week_visibility: [], edu_cohort_lesson_visibility: [], [part === 'missions' ? 'curriculum_missions' : 'lesson_contents']: [] } });
+            const weekVisibility = cohortIds.length ? await db.from('edu_cohort_week_visibility').select('cohort_id,week_id,is_published').in('cohort_id', cohortIds).in('week_id', weekIds).limit(5000) : { data: [], error: null };
+            if (weekVisibility.error) return reply({ error: '기수별 주차 공개 상태를 불러오지 못했습니다.' }, 500);
             const lessonResult = await db.from('curriculum_lessons').select('*').in('week_id', weekIds).order('day_number');
             if (lessonResult.error) return reply({ error: '상품 일차를 불러오지 못했습니다.' }, 500);
             const lessons = (lessonResult.data || []) as Row[];
             const lessonIds = lessons.map(lesson => String(lesson.id));
-            if (!lessonIds.length) return reply({ data: { curriculum_weeks: weeks, curriculum_lessons: [], [part === 'missions' ? 'curriculum_missions' : 'lesson_contents']: [] } });
+            if (!lessonIds.length) return reply({ data: { cohorts, curriculum_weeks: weeks, curriculum_lessons: [], edu_cohort_week_visibility: weekVisibility.data || [], edu_cohort_lesson_visibility: [], [part === 'missions' ? 'curriculum_missions' : 'lesson_contents']: [] } });
+            const lessonVisibility = cohortIds.length ? await db.from('edu_cohort_lesson_visibility').select('cohort_id,lesson_id,is_published').in('cohort_id', cohortIds).in('lesson_id', lessonIds).limit(5000) : { data: [], error: null };
+            if (lessonVisibility.error) return reply({ error: '기수별 학습 공개 상태를 불러오지 못했습니다.' }, 500);
             if (part === 'missions') {
                 const missionResult = await db.from('curriculum_missions').select('*').in('lesson_id', lessonIds).order('created_at');
                 if (missionResult.error) return reply({ error: '상품 미션을 불러오지 못했습니다.' }, 500);
-                return reply({ data: { curriculum_weeks: weeks, curriculum_lessons: lessons, curriculum_missions: missionResult.data || [] } });
+                return reply({ data: { cohorts, curriculum_weeks: weeks, curriculum_lessons: lessons, edu_cohort_week_visibility: weekVisibility.data || [], edu_cohort_lesson_visibility: lessonVisibility.data || [], curriculum_missions: missionResult.data || [] } });
             }
             const contentResult = await db.from('lesson_contents').select('*').in('lesson_id', lessonIds);
             if (contentResult.error) return reply({ error: '학습 콘텐츠를 불러오지 못했습니다.' }, 500);
@@ -143,7 +167,7 @@ export async function GET(request: Request) {
                 const blockIds = new Set((heads.data || []).map(row => String(row.lesson_id)));
                 for (const lesson of lessons) lesson.has_blocks = blockIds.has(String(lesson.id));
             }
-            return reply({ data: { curriculum_weeks: weeks, curriculum_lessons: lessons, lesson_contents: contentResult.data || [] } });
+            return reply({ data: { cohorts, curriculum_weeks: weeks, curriculum_lessons: lessons, edu_cohort_week_visibility: weekVisibility.data || [], edu_cohort_lesson_visibility: lessonVisibility.data || [], lesson_contents: contentResult.data || [] } });
         }
         const settings = getEduSettings();
         let tables = productEditorRead ? ['courses', 'cohorts'] : adminMode ? adminTables[sectionKey] : ['courses', 'cohorts', 'curriculum_weeks', 'curriculum_lessons', 'articles', 'article_categories', 'review_videos', 'site_banners', 'reviews', 'cohort_sessions'];
@@ -1121,7 +1145,8 @@ export async function POST(request: Request) {
             }
             const lessonId = String(body.lessonId || '');
             const { data: lesson } = await db.from('curriculum_lessons').select('*,curriculum_weeks!inner(course_id,is_published)').eq('id', lessonId).eq('is_published', true).single();
-            if (!lesson || lesson.curriculum_weeks.course_id !== enrollment.course_id || !lesson.curriculum_weeks.is_published) fail('공개된 학습이 아닙니다.', 403);
+            if (!lesson || lesson.curriculum_weeks.course_id !== enrollment.course_id || !lesson.curriculum_weeks.is_published ||
+                !await isLessonVisibleToCohort(enrollment.cohort_id, lessonId)) fail('이 기수에 공개된 학습이 아닙니다.', 403);
             if (action === 'progress') {
                 const r = await db.from('lesson_progress').upsert(
                     {
