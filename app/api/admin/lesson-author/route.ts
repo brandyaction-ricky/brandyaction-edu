@@ -27,10 +27,17 @@ function failure(error: unknown) {
 export async function GET(request:Request) {
   try {
     const actor=await getOperatorUser('products');if(!actor)return reply({error:'상품 관리 권한이 필요합니다.'},403);
-    const q=new URL(request.url).searchParams,lesson=q.get('lesson'),version=q.get('version');
-    if(!uuid(lesson)||(version!==null&&!uuid(version)))return reply({error:'수업을 확인해 주세요.'},400);
+    const q=new URL(request.url).searchParams,lesson=q.get('lesson'),version=q.get('version'),source=q.get('source');
+    if(!uuid(lesson)||(version!==null&&!uuid(version))||(source!==null&&source!=='public')||(source&&version))return reply({error:'수업을 확인해 주세요.'},400);
+    if(source==='public'){
+      const {data,error}=await createAdminClient().rpc('edu_lesson_author_snapshot',{p_actor:actor.id,p_lesson:lesson}).abortSignal(AbortSignal.timeout(15_000));
+      if(error)throw error;return reply({payload:data.payload,stamp:data.stamp});
+    }
     const {data,error}=await createAdminClient().rpc('edu_read_lesson_author',{p_actor:actor.id,p_lesson:lesson,p_version:version}).abortSignal(AbortSignal.timeout(15_000));
-    if(error)throw error;return reply(data);
+    if(error)throw error;
+    // Fetch one full lesson at a time; duplicating public + draft bodies can exceed
+    // the hosting response limit even when each saved draft is within its limit.
+    return reply(version ? data : {...data,public:{stamp:data.public.stamp,blockRevision:data.public.blockRevision}});
   }catch(error){return failure(error);}
 }
 export async function POST(request:Request) {

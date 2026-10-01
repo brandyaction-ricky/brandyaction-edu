@@ -8,7 +8,7 @@ export type AuthorPayload = { form: LearningFormDraft; blocks: { active: boolean
 export type AuthorSnapshot = {
   lessonId: string; revision: string | null; publishedRevision: string | null; publishedStamp: string | null;
   baseStamp: string; payload: AuthorPayload;
-  public: { stamp: string; payload: AuthorPayload; blockRevision: string | null };
+  public: { stamp: string; payload?: AuthorPayload; blockRevision: string | null };
   history: { revision: string; title: string; createdAt: string; baseline: boolean; published: boolean }[];
 };
 export function validateAuthorPayload(input: unknown, publishing = false): AuthorPayload {

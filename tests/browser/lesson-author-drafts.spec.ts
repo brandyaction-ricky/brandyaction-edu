@@ -4,10 +4,10 @@ import type {AuthorPayload,AuthorSnapshot} from '../../lib/lesson-author-drafts'
 const id=(n:number)=>`aaaaaaab-1111-4111-8111-${String(n).padStart(12,'0')}`;
 const payload=():AuthorPayload=>({form:{basic:{week_id:id(5),day_number:'1',title:'공개된 수업',description:'',duration_label:'10분',is_published:true,is_preview:false},format:'text',bodyText:'원래 본문',videoUrl:'',externalUrl:'',resourceName:'',resourcePath:''},blocks:{active:true,document:{schemaVersion:1,blocks:[{id:'original',type:'text',content:'학생이 보는 원래 본문'}],checklist:[]}}});
 async function backend(page:Page){
- let state:AuthorSnapshot={lessonId:id(4),revision:null,publishedRevision:null,publishedStamp:null,baseStamp:'a'.repeat(32),payload:payload(),public:{stamp:'a'.repeat(32),payload:payload(),blockRevision:id(70)},history:[]};
+ let state:AuthorSnapshot & {public:{payload:AuthorPayload}}={lessonId:id(4),revision:null,publishedRevision:null,publishedStamp:null,baseStamp:'a'.repeat(32),payload:payload(),public:{stamp:'a'.repeat(32),payload:payload(),blockRevision:id(70)},history:[]};
  const versions=new Map<string,AuthorPayload>([[id(71),payload()]]), writes:Record<string,unknown>[]=[];let failSave=0,failPublish=0;
  await page.route('**/api/admin/lesson-author**',async route=>{
-  if(route.request().method()==='GET'){const v=new URL(route.request().url()).searchParams.get('version');await route.fulfill({json:v?{payload:versions.get(v),revision:v}:state});return;}
+  if(route.request().method()==='GET'){const q=new URL(route.request().url()).searchParams,v=q.get('version');await route.fulfill({json:q.get('source')==='public'?state.public:v?{payload:versions.get(v),revision:v}:{...state,public:{stamp:state.public.stamp,blockRevision:state.public.blockRevision}}});return;}
   const body=route.request().postDataJSON();writes.push(body);
   if(body.action==='save'){
    if(failSave===409){failSave=0;await route.fulfill({status:409,json:{error:'다른 화면에서 초안을 저장했습니다.'}});return;}

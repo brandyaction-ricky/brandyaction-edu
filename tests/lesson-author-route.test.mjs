@@ -11,7 +11,7 @@ function harness({user={id:id()},error=null,stored=payload()}={}){
  const out={},calls=[],invalidations=[],revision=id();
  const dependencies={
   '@/lib/operator-permissions':{getOperatorUser:async scope=>{assert.equal(scope,'products');return user;}},
-  '@/lib/supabase/admin':{createAdminClient:()=>({rpc:(name,args)=>({abortSignal:async signal=>{assert.ok(signal instanceof AbortSignal);calls.push({name,args});return{data:name==='edu_read_lesson_author'?{revision,payload:stored}:{revision:args.p_request},error};}})})},
+  '@/lib/supabase/admin':{createAdminClient:()=>({rpc:(name,args)=>({abortSignal:async signal=>{assert.ok(signal instanceof AbortSignal);calls.push({name,args});return{data:name==='edu_lesson_author_snapshot'?{payload:stored,stamp:'a'.repeat(32)}:name==='edu_read_lesson_author'?{revision,payload:stored,public:{stamp:'a'.repeat(32),payload:stored,blockRevision:null}}:{revision:args.p_request},error};}})})},
   '@/lib/edu-workflows':load('edu-workflows'),'@/lib/lesson-author-drafts':contract,
   'next/cache':{revalidateTag:(...v)=>invalidations.push(v)},'@/lib/public-platform-plan':{PUBLIC_CACHE_TAG:'public'}
  };
@@ -41,4 +41,8 @@ test('conflicts are actionable and unexpected SQL errors never expose private co
 });
 test('public drift includes changes made after the last acknowledged publication',()=>{
  const s={revision:'a',publishedRevision:'a',publishedStamp:'published',baseStamp:'before',public:{stamp:'published'}};assert.equal(contract.authorPublicChanged(s),false);assert.equal(contract.authorPublicChanged({...s,public:{stamp:'external edit'}}),true);assert.equal(contract.authorPublicChanged({...s,revision:'new draft'}),true);
+});
+
+test('large lesson reads return one body and retrieve the public copy only on request',async()=>{
+ const stored=payload();stored.form.bodyText='x'.repeat(3000000);const h=harness({stored});const response=await h.get('lesson='+h.body.lessonId);const raw=await response.text();assert.ok(Buffer.byteLength(raw)<3100000);assert.equal(JSON.parse(raw).public.payload,undefined);const current=await h.get('lesson='+h.body.lessonId+'&source=public');assert.equal((await current.json()).payload.form.bodyText.length,3000000);assert.equal(h.calls.at(-1).name,'edu_lesson_author_snapshot');
 });

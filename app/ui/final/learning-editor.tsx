@@ -256,7 +256,7 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
     setSaving(true);
     try {
       const fresh=await readAuthor(publication.snapshot.lessonId) as AuthorSnapshot;
-      const selected=version ? (await readAuthor(fresh.lessonId,version)).payload : latest ? fresh.payload : fresh.public.payload;
+      const selected=latest ? fresh.payload : (await readAuthor(fresh.lessonId,version || 'public')).payload;
       publication.accept(fresh);saveIntent.current=null;setUncertain(false);applyAuthorPayload(selected,fresh,!latest);setMessage('편집 화면에 불러왔습니다. 초안 저장 후 학생 화면에 반영할 수 있습니다.');
     }catch(error){setMessage((error as Error).message);}finally{setSaving(false);}
   }

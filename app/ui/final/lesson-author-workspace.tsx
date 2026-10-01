@@ -10,7 +10,7 @@ export async function authorRequest(body: unknown) {
   return result;
 }
 export async function readAuthor(lessonId: string, version?: string) {
-  const response=await fetch(`/api/admin/lesson-author?lesson=${encodeURIComponent(lessonId)}${version ? `&version=${encodeURIComponent(version)}` : ''}`,{cache:'no-store'});
+  const response=await fetch(`/api/admin/lesson-author?lesson=${encodeURIComponent(lessonId)}${version === 'public' ? '&source=public' : version ? `&version=${encodeURIComponent(version)}` : ''}`,{cache:'no-store'});
   const result=await response.json();if(!response.ok)throw new Error(result.error || '초안을 불러오지 못했습니다.');return result;
 }
 export function LessonAuthorWorkspace({lessonId,initial,children}: {lessonId?:string;initial:AuthorPayload;children:(session:AuthorSession)=>ReactNode}) {
