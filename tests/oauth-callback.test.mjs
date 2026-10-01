@@ -121,3 +121,21 @@ test('consent redirect also preserves the Supabase session cookies', async () =>
   assert.equal(response.redirectUrl, 'https://edu.example/auth/consent?next=%2Fmy');
   assert.deepEqual(response.cookies.values, harness.cookieMutations);
 });
+
+test('older email-change links guide members when their code opened in a different browser', async () => {
+  const source = fs.readFileSync(new URL('../app/auth/callback/route.ts', import.meta.url), 'utf8');
+  const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const exports = {};
+  const require = name => {
+    if (name === '@/lib/platform') return { safeNext: value => value?.startsWith('/') && !value.startsWith('//') ? value : '/my' };
+    if (name === '@/lib/supabase/server') return { createClient: async () => ({ auth: { exchangeCodeForSession: async () => ({ error: { code: 'bad_code_verifier' } }) } }) };
+    if (name === '@/lib/kakao-sync-server') return { syncKakaoConsent: async () => false };
+    if (name === 'next/server') return { NextResponse: { redirect: url => ({ redirectUrl: String(url) }) } };
+    throw new Error(`unexpected import: ${name}`);
+  };
+  new Function('exports', 'require', compiled)(exports, require);
+  const response = await exports.GET(new Request('https://edu.example/auth/callback?code=old-code&next=%2Fmy%2Fprofile'));
+  assert.equal(response.redirectUrl, 'https://edu.example/auth/email-change-help');
+  const oauthFailure = await exports.GET(new Request('https://edu.example/auth/callback?code=oauth-code&next=%2Fmy%2Fprofile&provider=kakao'));
+  assert.equal(oauthFailure.redirectUrl, 'https://edu.example/login?error=auth_callback');
+});

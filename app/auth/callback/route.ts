@@ -37,5 +37,9 @@ export async function GET(request: Request) {
     }
   }
 
+  // Links issued before the email-change flow was updated still land here.
+  // A different browser cannot exchange their PKCE code, even if the address
+  // confirmation itself succeeded. Do not strand the member at generic login.
+  if (next === "/my/profile" && !searchParams.has("provider")) return NextResponse.redirect(`${origin}/auth/email-change-help`);
   return NextResponse.redirect(`${origin}/login?error=auth_callback`);
 }
