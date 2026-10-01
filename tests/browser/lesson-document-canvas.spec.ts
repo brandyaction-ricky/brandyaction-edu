@@ -56,7 +56,7 @@ test('clipboard image stays between paragraphs and survives saving with original
  await page.goto('/lesson-block-author-test');await expect(doc(page)).toBeVisible();await doc(page).locator('[data-author-block="body"] p').first().click();await page.keyboard.press('End');
  const clipboard=await page.evaluateHandle(bytes=>{const transfer=new DataTransfer();transfer.items.add(new File([Uint8Array.from(bytes)],'pasted.png',{type:'image/png'}));return transfer;},[...png]);
  await doc(page).evaluate((element,clipboardData)=>element.dispatchEvent(new ClipboardEvent('paste',{clipboardData,bubbles:true,cancelable:true})),clipboard);await clipboard.dispose();
- await expect(page.getByText('선택한 위치에 이미지를 넣었습니다. 학습 저장을 눌러 반영해 주세요.',{exact:true})).toBeVisible();await save(page);
+ await expect(page.getByText('선택한 위치에 이미지를 넣었습니다. 아래 저장 버튼을 눌러 보관해 주세요.',{exact:true})).toBeVisible();await save(page);
  const blocks=server.get().blocks,index=blocks.findIndex(block=>block.assetId===assetId);expect(blocks[index-1].content).toContain('첫 문단');expect(blocks[index+1].content).toContain('두 번째 문단');expect(blocks.find(block=>block.id==='question')).toEqual(initial.blocks[2]);
  await page.getByRole('button',{name:'편집 다시 열기'}).click();await expect(doc(page).locator('[data-block-type="image"] img')).toBeVisible();
 });
