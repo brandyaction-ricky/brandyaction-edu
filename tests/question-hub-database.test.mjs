@@ -52,11 +52,16 @@ test('graduates keep private lesson questions and images while learning writes r
  assert.equal(thread.answers[0]?.source,'faq');
  const followup=await h.rpc('edu_add_question_followup',[h.student,question.id,thread.question.headId,id(),'졸업 후 추가 질문']);
  assert.equal(followup.questionId,question.id);
+ const job=id(),reply=id();
+ await h.rpc('edu_question_assist',[h.admin,question.id,job,null]);
+ await h.rpc('edu_question_assist',[h.admin,question.id,job,'운영자 검토용 초안']);
+ assert.equal((await h.rpc('edu_answer_from_assist',[h.admin,question.id,job,reply,'운영자가 확인한 답변'])).id,reply);
  const image=id();
  await h.rpc('edu_prepare_question_image',[h.student,h.enrollment,h.lesson,image,{kind:'image',name:'lesson.png',size:10,extension:'png',contentType:'image/png'}]);
  await h.rpc('edu_complete_question_image',[h.student,image,'a'.repeat(64)]);
  assert.ok((await h.create({image,content:'새 이미지 질문'})).id);
  assert.equal((await h.search('',h.student,h.enrollment,h.lesson)).answers.length,1);
+ for(const role of ['anon','authenticated'])assert.equal((await h.db.query("select has_function_privilege($1,'edu_assert_question_access(uuid,uuid,uuid)','EXECUTE') as allowed",[role])).rows[0].allowed,false);
  await assert.rejects(h.create({actor:h.other}),/BLOCK_FORBIDDEN/);
  await h.owner("update enrollments set status='revoked' where id=$1",[h.enrollment]);
  assert.equal((await h.db.query('select * from edu_question_contexts($1)',[h.student])).rows.length,0);
