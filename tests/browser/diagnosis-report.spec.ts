@@ -46,10 +46,30 @@ test('the rollout-off submitted view never calls the report API',async({page})=>
 test('long-running generation pauses after 60 successful checks and can be refreshed manually',async({page},info)=>{
   test.skip(info.project.name!=='desktop','Timer bound is identical across viewports.');
   await page.clock.install();await session(page);let reads=0;
-  await page.route('**/api/platform/diagnosis/report',r=>{reads++;return r.fulfill({json:report('processing')});});
+  // A request arriving does not mean its JSON has been consumed. Wait until
+  // the next poll is scheduled before advancing the browser's virtual clock.
+  await page.addInitScript(()=>{
+    const schedule=window.setTimeout.bind(window);
+    Reflect.set(window,'diagnosisPollTimers',0);
+    window.setTimeout=((handler:TimerHandler,delay?:number,...args:unknown[])=>{
+      const timer=schedule(handler,delay,...args);
+      if(delay===10000)Reflect.set(window,'diagnosisPollTimers',Reflect.get(window,'diagnosisPollTimers')+1);
+      return timer;
+    }) as typeof window.setTimeout;
+  });
+  await page.route('**/api/platform/diagnosis/report',async r=>{
+    reads++;
+    // Exercise a response arriving after the request counter has advanced.
+    await new Promise(resolve=>setTimeout(resolve,25));
+    await r.fulfill({json:report('processing')});
+  });
   await page.goto('/diagnosis-test?reports');await expect(page.getByRole('heading',{name:'나를 이해하는 결과를 만들고 있어요.'})).toBeVisible();
   const initial=reads;
-  for(let i=1;i<60;i++){await page.clock.runFor(10000);await expect.poll(()=>reads).toBe(initial+i);}
+  for(let i=1;i<60;i++){
+    await expect.poll(()=>page.evaluate(()=>Reflect.get(window,'diagnosisPollTimers'))).toBe(i);
+    await page.clock.runFor(10000);
+    await expect.poll(()=>reads).toBe(initial+i);
+  }
   await expect(page.getByText('자동 확인을 잠시 멈췄어요.',{exact:false})).toBeVisible();const stopped=reads;await page.clock.runFor(120000);expect(reads).toBe(stopped);
   await page.getByRole('button',{name:'진행 상태 다시 확인'}).click();await expect.poll(()=>reads).toBe(stopped+1);
 });
