@@ -24,18 +24,16 @@ export async function deliverDiagnosisSessions({enabled=false,rpc,send,limit=5}:
  if(!enabled)return {claimed:0,accepted:0,deferred:0};
  if(!Number.isInteger(limit)||limit<1||limit>20)throw Error('Invalid diagnosis batch size');
  async function call(name:string,args:Record<string,unknown>) {const r=await rpc(name,args);if(r.error)throw Error('Diagnosis delivery storage unavailable');return r.data;}
- const jobs=await call('edu_diagnosis_claim',{p_limit:limit});
- if(!Array.isArray(jobs)||jobs.length>limit)throw Error('Invalid diagnosis claims');
- let accepted=0,deferred=0;
- for(const j of jobs as {id:string;lease:string}[]) {
+ let claimed=0,accepted=0,deferred=0;
+ async function deliver(j:{id:string;lease:string}) {
   if(!uuid(j.id)||!uuid(j.lease))throw Error('Invalid diagnosis lease');
   const fence={p_job:j.id,p_lease:j.lease};
   try {
-   const body=await call('edu_diagnosis_dispatch',fence);if(body===null){deferred++;continue;}
+   const body=await call('edu_diagnosis_dispatch',fence);if(body===null){deferred++;return;}
    if(!validDispatch(body))throw Error('Invalid diagnosis dispatch');
    const result=await send(body,{idempotencyKey:`edu-n6:${body.attemptId}`,signal:AbortSignal.timeout(10_000)});
    if(!result||result.version!==1||result.attemptId!==body.attemptId||result.subject!==body.subject||result.releaseId!==body.releaseId||!uuid(result.responseId)) {
-    await call('edu_diagnosis_retry',{...fence,p_code:'REMOTE_REJECTED'});deferred++;continue;
+    await call('edu_diagnosis_retry',{...fence,p_code:'REMOTE_REJECTED'});deferred++;return;
    }
    const ack=await call('edu_diagnosis_ack',{...fence,p_response:result.responseId});
    if(ack===true)accepted++;else deferred++;
@@ -45,5 +43,15 @@ export async function deliverDiagnosisSessions({enabled=false,rpc,send,limit=5}:
    await call('edu_diagnosis_retry',{...fence,p_code:'REMOTE_UNAVAILABLE'}).catch(()=>null);deferred++;
   }
  }
- return {claimed:jobs.length,accepted,deferred};
+ // Acquire leases only for work that can start immediately. Claiming 20 jobs
+ // then sending them serially could expire the 60-second leases before dispatch.
+ while(claimed<limit) {
+  const size=Math.min(5,limit-claimed);
+  const jobs=await call('edu_diagnosis_claim',{p_limit:size});
+  if(!Array.isArray(jobs)||jobs.length>size)throw Error('Invalid diagnosis claims');
+  claimed+=jobs.length;
+  await Promise.all((jobs as {id:string;lease:string}[]).map(deliver));
+  if(jobs.length<size)break;
+ }
+ return {claimed,accepted,deferred};
 }

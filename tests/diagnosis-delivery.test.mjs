@@ -8,3 +8,22 @@ test('idempotent delivery binds exact subject/release and uses bounded transport
 test('lost local acknowledgement re-delivers same key rather than creating another run',async()=>{const h=harness({ackLost:true});await mod.deliverDiagnosisSessions({...h,enabled:true});await mod.deliverDiagnosisSessions({...h,enabled:true});assert.equal(h.sends[0][1],h.sends[1][1]);assert.equal(h.calls.at(-1)[1].p_code,'REMOTE_UNAVAILABLE');});
 test('revoked grant is never sent remotely',async()=>{const h=harness({revoked:true});await mod.deliverDiagnosisSessions({...h,enabled:true});assert.equal(h.sends.length,0);});
 test('foreign response binding is quarantined without attaching another user report',async()=>{const h=harness();await mod.deliverDiagnosisSessions({...h,enabled:true,send:async()=>({version:1,attemptId:id(3),subject:id(99),releaseId:id(5),responseId:id(6)})});assert.equal(h.calls.at(-1)[1].p_code,'REMOTE_REJECTED');assert.equal(h.calls.some(([n])=>n==='edu_diagnosis_ack'),false);});
+test('large dispatches acquire fresh leases in bounded batches instead of expiring in a serial backlog',async()=>{
+ const batches=[];let claimed=0,active=0,peak=0;
+ const rpc=async(name,args)=>{
+  if(name==='edu_diagnosis_claim'){
+   assert.equal(active,0,'previous delivery batch must finish before more leases are acquired');
+   batches.push(args.p_limit);
+   return {data:Array.from({length:args.p_limit},()=>({id:id(++claimed),lease:id(100+claimed)}))};
+  }
+  if(name==='edu_diagnosis_dispatch')return {data:dispatch};
+  return {data:true};
+ };
+ const send=async body=>{
+  active++;peak=Math.max(peak,active);
+  await new Promise(resolve=>setImmediate(resolve));active--;
+  return {version:1,attemptId:body.attemptId,subject:body.subject,releaseId:body.releaseId,responseId:id(200)};
+ };
+ assert.deepEqual(await mod.deliverDiagnosisSessions({enabled:true,rpc,send,limit:20}),{claimed:20,accepted:20,deferred:0});
+ assert.deepEqual(batches,[5,5,5,5]);assert.equal(peak,5);
+});
