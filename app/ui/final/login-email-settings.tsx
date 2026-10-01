@@ -17,13 +17,18 @@ export function LoginEmailSettings({ email }: { email: string }) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  const refreshEmailStatus = useCallback(async () => {
+  const refreshEmailStatus = useCallback(async (announce = false) => {
     try {
       const auth = createClient().auth;
       const [userResult, identityResult] = await Promise.all([auth.getUser(), auth.getUserIdentities()]);
       if (userResult.data.user) {
-        setCurrentEmail(userResult.data.user.email || email);
-        setPendingEmail(userResult.data.user.new_email || "");
+        const confirmed = userResult.data.user.email || email;
+        const awaiting = userResult.data.user.new_email || "";
+        setCurrentEmail(confirmed);
+        setPendingEmail(awaiting);
+        if (announce) setMessage(awaiting
+          ? "아직 이메일 변경 확인 대기 중입니다. 기존 주소와 새 주소로 온 메일을 모두 확인해 주세요."
+          : `변경 확인 대기 중인 주소가 없습니다. 현재 로그인 이메일은 ${confirmed}입니다.`);
       }
       if (!identityResult.error) {
         setSocialProvider(identityResult.data.identities.some(identity => identity.provider === "kakao" || identity.provider === "google"));
@@ -32,7 +37,7 @@ export function LoginEmailSettings({ email }: { email: string }) {
   }, [email]);
 
   useEffect(() => {
-    void Promise.resolve().then(refreshEmailStatus);
+    void Promise.resolve().then(() => refreshEmailStatus());
     const onFocus = () => { void refreshEmailStatus(); };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
@@ -92,7 +97,7 @@ export function LoginEmailSettings({ email }: { email: string }) {
         {passwordReady && <p className="meta mt8" role="status">비밀번호 준비 완료. 아래에서 이메일 변경을 요청하세요.</p>}
       </div>}
       {pendingEmail && <p className="notice mt16" role="status">변경 확인 대기: {pendingEmail}. 기존 주소에도 확인 메일이 왔다면 함께 확인해야 변경이 완료됩니다. 그전까지 현재 로그인 주소는 {currentEmail}입니다.</p>}
-      <button className="btn mt16" type="button" onClick={() => void refreshEmailStatus()} disabled={busy}>이메일 변경 상태 새로 확인</button>
+      <button className="btn mt16" type="button" onClick={() => void refreshEmailStatus(true)} disabled={busy}>이메일 변경 상태 새로 확인</button>
       <form onSubmit={requestEmailChange} className="mt16">
         <label className="field">새 로그인 이메일
           <input type="email" autoComplete="email" maxLength={254} required value={nextEmail} onChange={event => setNextEmail(event.target.value)} placeholder="자주 사용하는 이메일" disabled={busy} />
