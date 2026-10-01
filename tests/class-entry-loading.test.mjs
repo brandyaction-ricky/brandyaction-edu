@@ -27,7 +27,7 @@ function renderClass({ loading = true, error = '', data = {} } = {}) {
   const { Platform } = load('app/ui/platform.tsx', {
     react: { ...React, useState(initial) {
       const index = state++;
-      return React.useState(index === 1 ? data : index === 3 ? loading : index === 4 ? error : index === 16 && (!loading || Object.keys(data).length) ? JSON.stringify(['classes/test-class?', 'view=class&slug=test-class']) : initial);
+      return React.useState(index === 1 ? data : index === 3 ? loading : index === 4 ? error : index === 17 && (!loading || Object.keys(data).length) ? JSON.stringify(['classes/test-class?', 'view=class&slug=test-class']) : initial);
     } },
     '@/lib/supabase/client': {},
     '@/lib/supabase/config': {},

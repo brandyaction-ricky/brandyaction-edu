@@ -11,10 +11,10 @@ async function backend(page:Page,options:{failList?:boolean;failDetail?:boolean;
   if(q.get('action')==='file'){await route.fulfill({contentType:'image/png',body:png});return;}
   if(q.get('action')==='options'){await route.fulfill({json:{lessons:[{id:uid(1),title:'매일 실습',courseTitle:'시험 과정',cadence:'daily',archived:false}]}});return;}
   if(q.get('action')==='list'){
-   if(options.failList){options.failList=false;await route.fulfill({status:503,json:{error:'목록 연결 실패'}});return;}
+   if(options.failList){await route.fulfill({status:503,json:{error:'목록 연결 실패'}});return;}
    const p=Number(q.get('page'));await route.fulfill({json:{rows:options.empty?[]:p===1?[row(1),row(2)]:[row(3)],total:options.empty?0:21,page:p,pageSize:20}});return;
   }
-  if(options.failDetail){options.failDetail=false;await route.fulfill({status:503,json:{error:'답변 연결 실패'}});return;}
+  if(options.failDetail){await route.fulfill({status:503,json:{error:'답변 연결 실패'}});return;}
   const n=q.get('enrollment')===uid(11)?1:2;
   if(n===1&&options.delay)await options.delay;
   const completed=q.get('snapshot')==='completed';
@@ -41,8 +41,12 @@ test('filters and pages keep the selected record separate and clear stale detail
  await page.getByRole('combobox',{name:'완료 상태'}).selectOption('completed');await expect(page.getByText('기간별 참여 기록 21건 · 1페이지')).toBeVisible();
 });
 test('failed list and detail offer independent retries without showing success or another record',async({page})=>{
- await backend(page,{failList:true,failDetail:true});await page.goto('/ongoing-review-test');await expect(page.getByRole('alert')).toHaveText('목록 연결 실패');
+ // StrictMode may abort an initial request; keep the outage until the user retries.
+ const failures={failList:true,failDetail:true};
+ await backend(page,failures);await page.goto('/ongoing-review-test');await expect(page.getByRole('alert')).toHaveText('목록 연결 실패');
+ failures.failList=false;
  await page.getByRole('button',{name:'참여 목록 새로고침'}).click();await page.getByRole('button',{name:/시험 회원 1/}).click();await expect(page.getByRole('alert')).toHaveText('답변 연결 실패');await expect(page.getByRole('textbox',{name:'오늘의 실행'})).toHaveCount(0);
+ failures.failDetail=false;
  await page.getByRole('button',{name:'답변 다시 확인'}).click();await expect(page.getByRole('textbox',{name:'오늘의 실행'})).toHaveValue('회원 1 마지막 저장');
 });
 test('a delayed previous selection never overwrites the newly selected member',async({page})=>{

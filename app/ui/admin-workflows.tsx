@@ -1,5 +1,6 @@
 "use client";
 import dynamic from "next/dynamic";
+import { emptyOrderListScope, type OrderListScope } from "@/lib/admin-order-list";
 import { FollowupTemplateSource } from "./followup-template-source";
 const LandingAdmin = dynamic(() => import("./landing/admin").then(m => m.LandingAdmin));
 const KakaoSyncSettings = dynamic(() => import("./kakao-sync-settings").then(m => m.KakaoSyncSettings));
@@ -69,6 +70,8 @@ type Props = {
   selection?: string[];
   pagination?: { page: number; pageSize: number; total: number } | null;
   setPage?: (page: number) => void;
+  orderScope?: OrderListScope;
+  onOrderScopeChange?: (scope: OrderListScope) => void;
   loading?: boolean;
 };
 const rows = (data: Data, key: string) => data[key] || [];
@@ -1880,71 +1883,43 @@ function Analytics() {
   );
 }
 function OrdersPanel({
-  data,
-  send,
-  pending,
-  pagination,
-  setPage,
-  loading,
+  data, send, pending, pagination, setPage, loading,
+  orderScope = emptyOrderListScope, onOrderScopeChange,
 }: Props) {
   const entrySourceLabels: Record<string, string> = { paid: '광고', organic: '오가닉', alumni: '기존 수강생', youtube: '유튜브' };
   const [opened, setOpened] = useState("");
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("");
-  const [quickStatus, setQuickStatus] = useState("all");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-  const [appliedDates, setAppliedDates] = useState({ from: "", to: "" });
+  const [query, setQuery] = useState(orderScope.q);
+  const { status, quick: quickStatus, course } = orderScope;
+  const [from, setFrom] = useState(orderScope.from);
+  const [to, setTo] = useState(orderScope.to);
   const [dateError, setDateError] = useState("");
-  const [course, setCourse] = useState("");
   const registeredCourses = rows(data, "courses")
     .filter(item => !item.archived_at && item.status !== "archived")
     .toSorted((a, b) => named(a).localeCompare(named(b), "ko"));
-  const fromTimestamp = appliedDates.from
-    ? Date.parse(appliedDates.from + "T00:00:00+09:00")
-    : null;
-  const toTimestamp = appliedDates.to
-    ? Date.parse(appliedDates.to + "T00:00:00+09:00") + 86400000
-    : null;
+  function changeScope(patch: Partial<OrderListScope>) {
+    onOrderScopeChange?.({ ...orderScope, ...patch });
+    setOpened("");
+  }
+  useEffect(() => {
+    if (query.trim() === orderScope.q) return;
+    const timer = setTimeout(() => onOrderScopeChange?.({ ...orderScope, q: query.trim() }), 300);
+    return () => clearTimeout(timer);
+  }, [query, orderScope, onOrderScopeChange]);
   function applyDates() {
     if (from && to && from > to) {
       setDateError("조회 종료일은 시작일 이후로 선택해 주세요.");
       return;
     }
     setDateError("");
-    setAppliedDates({ from, to });
-    setOpened("");
+    changeScope({ from, to });
   }
-  const baseOrders = rows(data, "orders").filter(
-    (o) =>
-      (!status || o.status === status) &&
-      (fromTimestamp === null || Date.parse(String(o.created_at)) >= fromTimestamp) &&
-      (toTimestamp === null || Date.parse(String(o.created_at)) < toTimestamp) &&
-      (!course ||
-        rows(data, "order_items").some(
-          (i) => i.order_id === o.id && i.course_id === course,
-        )) &&
-      [
-        t(o, "order_number"),
-        t(o, "customer_name"),
-        t(o, "customer_email"),
-        ...rows(data, "order_items")
-          .filter((i) => i.order_id === o.id)
-          .map((i) => t(i, "item_name")),
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(query.toLowerCase()),
-  );
-  const quickCounts = {
-    failed: baseOrders.filter(order => order.status === "payment_failed").length,
-    refund: baseOrders.filter(order => rows(data, "payments").some(payment => payment.order_id === order.id && rows(data, "edu_refund_requests").some(request => request.payment_id === payment.id && request.status === "processing"))).length,
-    access: baseOrders.filter(order => order.status === "paid" && !rows(data, "enrollments").some(enrollment => enrollment.status === "active" && rows(data, "order_items").some(item => item.order_id === order.id && item.id === enrollment.order_item_id))).length,
-  };
-  const orders = baseOrders.filter(order => quickStatus === "all" ||
-    (quickStatus === "failed" && order.status === "payment_failed") ||
-    (quickStatus === "refund" && rows(data, "payments").some(payment => payment.order_id === order.id && rows(data, "edu_refund_requests").some(request => request.payment_id === payment.id && request.status === "processing"))) ||
-    (quickStatus === "access" && order.status === "paid" && !rows(data, "enrollments").some(enrollment => enrollment.status === "active" && rows(data, "order_items").some(item => item.order_id === order.id && item.id === enrollment.order_item_id))));
+  function resetFilters() {
+    setQuery(""); setFrom(""); setTo(""); setDateError(""); setOpened("");
+    onOrderScopeChange?.({ ...emptyOrderListScope });
+    setPage?.(1);
+  }
+  const orders = rows(data, "orders");
+  const quickCounts = rows(data, "order_filter_counts")[0];
   const orderSummary = rows(data, "order_summary")[0];
   const paid = Number(orderSummary?.approvedRevenue || 0);
   const refunded = Number(orderSummary?.refundedRevenue || 0);
@@ -1972,12 +1947,12 @@ function OrdersPanel({
     <>
       <AdminFilterBar
         className="admin-pilot-filter admin-orders-filter"
-        filters={<><AdminSelect label="상품" labelHidden value={course} onChange={event => { setCourse(event.target.value); setOpened(""); }}><option value="">전체 상품</option>{registeredCourses.map(item => <option key={item.id} value={item.id}>{named(item)}</option>)}</AdminSelect><AdminSelect label="결제 상태" labelHidden value={status} onChange={event => { setStatus(event.target.value); setOpened(""); }}><option value="">전체 상태</option>{["paid", "pending", "payment_failed", "partially_refunded", "refunded", "cancelled"].map(value => <option key={value} value={value}>{labels[value] || value}</option>)}</AdminSelect></>}
+        filters={<><AdminSelect label="상품" labelHidden value={course} onChange={event => { changeScope({ course: event.target.value }); }}><option value="">전체 상품</option>{course && !registeredCourses.some(item => item.id === course) && <option value={course}>선택한 상품</option>}{registeredCourses.map(item => <option key={item.id} value={item.id}>{named(item)}</option>)}</AdminSelect><AdminSelect label="결제 상태" labelHidden value={status} onChange={event => { changeScope({ status: event.target.value }); }}><option value="">전체 상태</option>{["paid", "pending", "payment_failed", "partially_refunded", "refunded", "cancelled"].map(value => <option key={value} value={value}>{labels[value] || value}</option>)}</AdminSelect></>}
         date={<><AdminDatePicker label="주문일 시작 · KST" value={from} error={dateError || undefined} onChange={event => setFrom(event.target.value)} /><AdminDatePicker label="주문일 종료 · KST" value={to} onChange={event => setTo(event.target.value)} /></>}
         search={<AdminSearchField value={query} label="주문 검색" placeholder="주문번호 · 회원명 · 상품명 검색" onChange={event => { setQuery(event.target.value); setOpened(""); }} />}
-        onReset={() => { setQuery(""); setStatus(""); setQuickStatus("all"); setCourse(""); setFrom(""); setTo(""); setAppliedDates({ from: "", to: "" }); setDateError(""); setOpened(""); }}
+        onReset={resetFilters}
         action={<AdminButton variant="primary" disabled={loading} onClick={applyDates}>기간 조회</AdminButton>}
-        appliedSummary={`적용 기간: ${appliedDates.from || "전체 시작일"} ~ ${appliedDates.to || "전체 종료일"} · 주문일/KST, 종료일 포함 · 목록 필터는 현재 페이지 기준, 매출 카드는 전체 주문 기준`}
+        appliedSummary={`적용 기간: ${orderScope.from || "전체 시작일"} ~ ${orderScope.to || "전체 종료일"} · 주문일/KST, 종료일 포함 · 목록은 전체 주문에서 검색 · 한 페이지 최대 100건 · 매출 카드는 필터와 관계없이 전체 주문 기준`}
       />
       <div className="admin-pilot-summary" aria-busy={loading}>
         {[
@@ -1990,7 +1965,7 @@ function OrdersPanel({
         ))}
       </div>
       <section className="admin-pilot-workspace" aria-label="주문 목록" aria-busy={loading}>
-        <AdminQuickFilter label="주문 예외 빠른 필터" value={quickStatus} onChange={value => { setQuickStatus(value); setOpened(""); }} items={[{ value: "all", label: "전체", count: baseOrders.length }, { value: "failed", label: "결제 실패", count: quickCounts.failed }, { value: "refund", label: "환불 확인", count: quickCounts.refund }, { value: "access", label: "수강권 확인", count: quickCounts.access }]} />
+        <AdminQuickFilter label="주문 예외 빠른 필터" value={quickStatus} onChange={value => { changeScope({ quick: value }); }} items={[{ value: "all", label: "전체", count: Number(quickCounts?.all || 0) }, { value: "failed", label: "결제 실패", count: Number(quickCounts?.failed || 0) }, { value: "refund", label: "환불 확인", count: Number(quickCounts?.refund || 0) }, { value: "access", label: "수강권 확인", count: Number(quickCounts?.access || 0) }]} />
         <AdminDataTable label="주문·결제·환불·수강권 연결 목록" density="standard" loading={loading}>
             <thead>
               <tr>
@@ -2053,9 +2028,9 @@ function OrdersPanel({
               );})}
             </tbody>
         </AdminDataTable>
-        {!orders.length && !loading && <AdminEmptyState title="해당 주문이 없습니다." action={<AdminButton onClick={() => { setQuery(""); setStatus(""); setCourse(""); setFrom(""); setTo(""); setAppliedDates({ from: "", to: "" }); setDateError(""); }}>검색·필터 초기화</AdminButton>}>현재 조회 페이지의 기간·상품·상태 또는 검색어를 확인하세요.</AdminEmptyState>}
+        {!orders.length && !loading && <AdminEmptyState title="해당 주문이 없습니다." action={<AdminButton onClick={resetFilters}>검색·필터 초기화</AdminButton>}>선택한 기간·상품·상태 또는 검색어를 확인해 주세요. 전체 주문에서 찾은 결과입니다.</AdminEmptyState>}
         {loading && <div className="pad"><AdminLoadingState title="주문 내역을 불러오는 중입니다." description="결제·환불·수강권 연결 상태를 함께 확인하고 있습니다."/></div>}
-        <div className="table-foot"><span>{orders.length}건 표시 · 목록 검색은 현재 페이지 기준, 상단 매출은 전체 주문 기준</span><span>정산·회계 매출은 결제액과 별도</span></div>
+        <div className="table-foot"><span>검색 결과 {pagination?.total ?? orders.length}건 중 {orders.length}건 표시 · 한 페이지 최대 100건</span><span>정산·회계 매출은 결제액과 별도</span></div>
       </section>
       {selectedOrder && <AdminDrawer title="주문 상세" onClose={() => setOpened("")} size="large" className="order-detail-drawer">
             <AdminDialogBody>
