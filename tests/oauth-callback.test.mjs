@@ -136,4 +136,6 @@ test('older email-change links guide members when their code opened in a differe
   new Function('exports', 'require', compiled)(exports, require);
   const response = await exports.GET(new Request('https://edu.example/auth/callback?code=old-code&next=%2Fmy%2Fprofile'));
   assert.equal(response.redirectUrl, 'https://edu.example/auth/email-change-help');
+  const oauthFailure = await exports.GET(new Request('https://edu.example/auth/callback?code=oauth-code&next=%2Fmy%2Fprofile&provider=kakao'));
+  assert.equal(oauthFailure.redirectUrl, 'https://edu.example/login?error=auth_callback');
 });

@@ -44,7 +44,7 @@ test('email confirmation accepts supported token types and prevents external red
       return response;
     } } },
     '@/lib/supabase/server': { createClient: async onCookies => ({ auth: { verifyOtp: async () => {
-      called++; onCookies?.([cookie]); return { error, data: { user: { user_metadata: {} } } };
+      called++; onCookies?.([cookie]); return { error, data: { user: { user_metadata: {} }, session: { access_token: 'test-session' } } };
     } } }) },
   });
   const request = query => route.GET(new Request('https://dev.example/auth/confirm?' + query));
@@ -66,6 +66,7 @@ test('email confirmation accepts supported token types and prevents external red
 test('email-change confirmation returns to the same member or gives a recovery path across browsers', async () => {
   const cookie = { name: 'sb-auth-token', value: 'same-member-session', options: { httpOnly: true } };
   let codeError = null;
+  let partialConfirmation = false;
   const route = load('app/auth/confirm/route.ts', {
     'next/server': { NextResponse: { redirect: url => {
       const response = new Response(null, { status: 307, headers: { location: String(url) } });
@@ -73,7 +74,7 @@ test('email-change confirmation returns to the same member or gives a recovery p
       return response;
     } } },
     '@/lib/supabase/server': { createClient: async onCookies => ({ auth: {
-      async verifyOtp() { onCookies?.([cookie]); return { error: null, data: { user: { user_metadata: { terms_version: 'v1', privacy_version: 'v1' } } } }; },
+      async verifyOtp() { onCookies?.([cookie]); return { error: null, data: partialConfirmation ? { user: null, session: null } : { user: { user_metadata: { terms_version: 'v1', privacy_version: 'v1' } }, session: { access_token: 'same-member-session' } } }; },
       async exchangeCodeForSession() { if (codeError) return { error: codeError }; onCookies?.([cookie]); return { error: null }; },
       async getUser() { return { data: { user: { user_metadata: { terms_version: 'v1', privacy_version: 'v1' } } } }; },
     } }) },
@@ -92,6 +93,12 @@ test('email-change confirmation returns to the same member or gives a recovery p
   const tokenLink = await route.GET(new Request(base + '&token_hash=opaque&type=email_change'));
   assert.equal(tokenLink.headers.get('location'), 'https://dev.example/my/profile');
   assert.equal(tokenLink.headers.get('set-cookie'), 'sb-auth-token=same-member-session');
+
+  partialConfirmation = true;
+  const firstAddress = await route.GET(new Request(base + '&token_hash=first-address&type=email_change'));
+  assert.equal(firstAddress.headers.get('location'), 'https://dev.example/auth/email-change-help?status=pending');
+  assert.equal(firstAddress.headers.get('set-cookie'), null);
+  assert.doesNotMatch(firstAddress.headers.get('location'), /token_hash|first-address/);
 });
 test('live publishing requires both permissions, safe assets, and handles concurrent edits', async () => {
   let productAccess = false, rpcError = null;
