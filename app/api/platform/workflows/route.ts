@@ -12,6 +12,7 @@ import { participantMatrix } from '@/lib/participant-matrix';
 import type { Row } from '@/lib/platform';
 import { SMS_SETTINGS_KEY, validateSmsSettings } from '@/lib/crm-sms-settings';
 import { reviewMutation, reviewWriteError } from '@/lib/submission-review';
+import { isLessonVisibleToCohort } from '@/lib/cohort-curriculum-server';
 
 const reply = (value: unknown, status = 200) =>
     Response.json(value, {
@@ -49,7 +50,8 @@ export async function GET(request: Request) {
             if (user.role !== 'admin') {
                 const lesson = mission.curriculum_lessons;
                 const { data: enrollment } = await db.from('enrollments').select('*').eq('id', params.get('enrollment')).eq('user_id', user.id).eq('course_id', lesson.curriculum_weeks.course_id).maybeSingle();
-                if (!enrollment || !hasLearningAccess(enrollment) || !mission.is_published || !lesson.is_published || !lesson.curriculum_weeks.is_published) fail('수강 권한이 필요합니다.', 403);
+                if (!enrollment || !hasLearningAccess(enrollment) || !mission.is_published || !lesson.is_published || !lesson.curriculum_weeks.is_published ||
+                    !await isLessonVisibleToCohort(enrollment.cohort_id, mission.lesson_id)) fail('수강 권한이 필요합니다.', 403);
             }
             const { data: row, error } = await db.from('mission_quizzes').select('*').eq('mission_id', missionId).maybeSingle();
             if (error) throw error;

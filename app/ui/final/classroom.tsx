@@ -9,6 +9,7 @@ import {
 } from "@/lib/platform";
 import { hasLearningAccess } from "@/lib/platform-rules";
 import { isGraduate } from '@/lib/alumni-access';
+import { cohortWeekVisible } from '@/lib/cohort-curriculum-visibility';
 import {
   ArrowLeft,
   ArrowRight,
@@ -77,7 +78,7 @@ export function Classroom({
     cohort = (data.cohorts || []).find((c) => c.id === enrollment.cohort_id);
   const graduate = isGraduate(enrollment, course, cohort);
   const weeks = (data.curriculum_weeks || [])
-    .filter((w) => w.course_id === course?.id)
+    .filter((w) => w.course_id === course?.id && cohortWeekVisible(data,String(enrollment.cohort_id),w))
     .sort((a, b) => num(a, "week_number") - num(b, "week_number"));
   const allLessons = enrollmentLessons(data, enrollment);
   const selectedId = allLessons.find(item => item.id === path[2])?.id || allLessons[0]?.id;

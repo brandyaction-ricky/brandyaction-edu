@@ -6,10 +6,13 @@ import ts from 'typescript';
 const ruleExports = {};
 const compiledRules = ts.transpileModule(fs.readFileSync(new URL('../lib/platform-rules.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 new Function('exports', compiledRules)(ruleExports);
+const cohortExports = {};
+const cohortCode = ts.transpileModule(fs.readFileSync(new URL('../lib/cohort-curriculum-visibility.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+new Function('exports', cohortCode)(cohortExports);
 
 const overviewExports = {};
 const overviewCode = ts.transpileModule(fs.readFileSync(new URL('../lib/learning-overview.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-new Function('exports', 'require', overviewCode)(overviewExports, name => { assert.equal(name, './platform-rules'); return ruleExports; });
+new Function('exports', 'require', overviewCode)(overviewExports, name => name === './platform-rules' ? ruleExports : name === './cohort-curriculum-visibility' ? cohortExports : assert.fail(name));
 
 function harness(fixtures = {}, waitForRead = () => {}, rpcRead = async () => ({data: [], error: null})) {
   const calls = [], rpcCalls = [];
@@ -44,6 +47,7 @@ function harness(fixtures = {}, waitForRead = () => {}, rpcRead = async () => ({
     if (name === '@/lib/platform-rules') return ruleExports;
     if (name === '@/lib/alumni-access') return { isGraduate: () => false };
     if (name === '@/lib/learning-overview') return overviewExports;
+    if (name === '@/lib/cohort-curriculum-visibility') return cohortExports;
     throw Error(name);
   });
   return { read: exports.readMemberPlatformData, calls, rpcCalls };
@@ -114,6 +118,8 @@ test('real access dates use the current clock rather than an array callback inde
     courses: [{ id: 'course' }], cohorts: [{ id: 'cohort' }],
     curriculum_weeks: [{ id: 'week', course_id: 'course', is_published: true }],
     curriculum_lessons: [{ id: 'lesson', week_id: 'week', is_published: true }],
+    edu_cohort_week_visibility: [{ cohort_id: 'cohort', week_id: 'week', is_published: true }],
+    edu_cohort_lesson_visibility: [{ cohort_id: 'cohort', lesson_id: 'lesson', is_published: true }],
     lesson_contents: [{ lesson_id: 'lesson', body_text: 'owned learning content' }],
   };
   for (const view of ['learn', 'resources']) {
@@ -126,6 +132,24 @@ test('real access dates use the current clock rather than an array callback inde
     assert.deepEqual(await member.read('owner', 'learn', 'owned', 'lesson'), { enrollments: [] });
     assert.deepEqual(member.calls.map(call => call.table), ['enrollments']);
   }
+});
+
+test('a learner never receives another cohort\'s lesson body or resource list', async () => {
+  const enrollment = { id: 'owned', user_id: 'owner', course_id: 'course', cohort_id: 'fourth', status: 'active', access_starts_at: new Date(Date.now() - 86400000).toISOString() };
+  const fixtures = {
+    enrollments: [enrollment], courses: [{ id: 'course' }], cohorts: [{ id: 'fourth' }],
+    curriculum_weeks: [{ id: 'week', course_id: 'course', is_published: true }],
+    curriculum_lessons: [{ id: 'lesson', week_id: 'week', is_published: true }],
+    edu_cohort_week_visibility: [{ cohort_id: 'fifth', week_id: 'week', is_published: true }],
+    edu_cohort_lesson_visibility: [{ cohort_id: 'fifth', lesson_id: 'lesson', is_published: true }],
+    lesson_contents: [{ lesson_id: 'lesson', body_text: 'future cohort lesson' }],
+  };
+  const member = harness(fixtures);
+  const result = await member.read('owner', 'learn', 'owned', 'lesson');
+  assert.deepEqual(result.curriculum_weeks, []);
+  assert.deepEqual(result.curriculum_lessons, undefined);
+  assert.deepEqual(result.lesson_contents, undefined);
+  assert.ok(!member.calls.some(call => call.table === 'lesson_contents'));
 });
 
 const owned = { id: 'owned', user_id: 'owner', course_id: 'course', cohort_id: 'cohort', status: 'active' };
