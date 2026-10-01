@@ -52,3 +52,10 @@ test('after recovering the latest server draft, browser backup still restores la
 test('new lesson keeps one stable identity after saving an unfinished server draft',async({page})=>{
  const server=await backend(page);await page.goto('/lesson-block-author-test?serverDraft=1&new=1');await page.getByRole('combobox',{name:'주차 (Week) *',exact:true}).selectOption(id(5));await save(page).click();await expect(page.getByText('서버에 초안을 저장했습니다. 학생 화면은 바뀌지 않았습니다.',{exact:true})).toBeVisible();expect(server.writes[0].create).toBe(true);const identity=server.writes[0].lessonId;await page.getByLabel('제목 *',{exact:true}).fill('새 초안 제목');await save(page).click();await expect(save(page)).toBeEnabled();expect(server.writes[1].lessonId).toBe(identity);expect(server.writes[1].create).toBe(false);expect(server.writes.filter(x=>x.action==='publish')).toHaveLength(0);
 });
+
+test('continuous document edits remain private in server drafts and retain question identities on publication',async({page})=>{
+ await page.removeLocatorHandler(page.getByRole('button',{name:'항목별 상세 설정',exact:true}));
+ const server=await backend(page);server.get().payload.blocks.document.blocks.push({id:'existing-question',type:'question',question:{label:'기존 질문',kind:'text',required:true}});server.get().public.payload=structuredClone(server.get().payload);
+ await open(page);const document=page.getByRole('textbox',{name:'수업 문서',exact:true});await expect(document).toBeVisible();await document.locator('[data-author-block="original"] p').first().click();await page.keyboard.press('End');await page.keyboard.type(' 이어 쓴 내용');await save(page).click();await expect(save(page)).toBeEnabled();expect(server.get().payload.blocks.document.blocks[0].content).toContain('이어 쓴 내용');expect(server.get().public.payload.blocks.document.blocks[0].content).not.toContain('이어 쓴 내용');
+ await page.getByRole('button',{name:'편집 다시 열기'}).click();await expect(document).toContainText('이어 쓴 내용');await publish(page).click();await expect(page.getByText('학생 화면에 반영했습니다. 공개 범위는 선택한 설정을 따릅니다.',{exact:true})).toBeVisible();expect(server.get().public.payload.blocks.document.blocks[1].id).toBe('existing-question');
+});
