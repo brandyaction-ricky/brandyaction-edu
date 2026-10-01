@@ -13,10 +13,14 @@ export async function GET(request: Request) {
   if (hash && hash.length <= 512 && (type === 'email' || type === 'signup' || type === 'recovery' || type === 'email_change')) {
     try {
       const { data, error } = await (await createClient(nextCookies => cookies.push(...nextCookies))).auth.verifyOtp({ token_hash: hash, type });
-      if (!error && type === 'email_change' && !data.session) {
-        // Secure Email Change accepts the first address without creating a
-        // session. The other address still needs confirmation.
-        destination = '/auth/email-change-help?status=pending';
+      if (!error && type === 'email_change') {
+        // Older two-address requests can remain pending after the first link.
+        // Only claim success when Auth returns the updated user with no
+        // outstanding email change.
+        destination = data.user && !data.user.new_email
+          ? '/auth/email-change-help?status=success'
+          : '/auth/email-change-help?status=pending';
+        authenticated = Boolean(data.session);
       } else if (!error && data.user) {
         authenticated = true;
         destination = type === 'recovery' ? '/auth/reset-password' : afterEmailLogin(data.user.user_metadata, safeNext(url.searchParams.get('next')));
@@ -32,7 +36,9 @@ export async function GET(request: Request) {
         const { data } = await auth.getUser();
         if (data.user) {
           authenticated = true;
-          destination = afterEmailLogin(data.user.user_metadata, safeNext(url.searchParams.get('next')));
+          destination = data.user.new_email
+            ? '/auth/email-change-help?status=pending'
+            : '/auth/email-change-help?status=success';
         }
       }
     } catch { /* Guide the member back to the original account. */ }

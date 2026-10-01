@@ -1,17 +1,26 @@
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function EmailChangeHelpPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
-  const pending = (await searchParams).status === "pending";
+  const status = (await searchParams).status;
+  const { data: { user } } = await (await createClient()).auth.getUser();
+  const success = status === "success";
+  const pending = status === "pending";
+
   return <div className="edu-front"><main className="form-page"><section className="form-card">
-    <h1>{pending ? "이 이메일 주소를 확인했습니다" : "이메일 변경 확인하기"}</h1>
-    <p className="lead">{pending ? "주소 변경을 마치려면 나머지 확인 메일도 열어 주세요. 지금 비밀번호를 입력하거나 새 계정을 만들 필요는 없습니다." : "확인 링크를 연 브라우저에서 로그인 화면이 나와도 새 계정을 만들 필요는 없습니다."}</p>
-    <ol className="mt24">
-      {pending && <li>기존 이메일과 새 이메일 중 아직 확인하지 않은 주소의 메일함을 열고 ‘이메일 주소 확인하기’를 눌러 주세요.</li>}
-      <li>{pending ? "두 메일을 모두 확인한 뒤 원래 열어 둔 회원 정보 화면으로 돌아가세요. 로그인이 필요하면 기존 카카오·구글 계정을 사용하세요." : "기존에 사용하던 카카오·구글 계정으로 로그인하세요."}</li>
-      <li>마이페이지 → 회원 정보에서 현재 로그인 이메일과 변경 확인 대기 상태를 확인하세요. 기존 이메일에도 확인 메일이 왔다면 그 메일까지 확인해야 변경이 끝납니다.</li>
-      <li>새 이메일로 직접 로그인하려면, 회원 정보에서 이메일 로그인 비밀번호를 설정하세요. 카카오·구글 가입 계정에는 비밀번호가 자동으로 생기지 않습니다.</li>
-    </ol>
-    <Link className="btn primary full mt24" href="/login?next=%2Fmy%2Fprofile">기존 계정으로 로그인하고 상태 확인</Link>
-    <p className="meta mt16">현재 회원 정보 화면이 다른 탭에 열려 있다면 그 탭으로 돌아가 ‘이메일 변경 상태 새로 확인’을 눌러도 됩니다.</p>
+    <h1>{success ? "새 이메일 확인 완료" : pending ? "이메일 변경 확인 중" : "이메일 변경 상태 확인"}</h1>
+    {success ? <>
+      <p className="lead">로그인 이메일 변경이 끝났어요. 새 이메일과 방금 정한 <strong>브랜디에듀 비밀번호</strong>로 로그인할 수 있어요.</p>
+      <p className="mt24">기존 주문과 수강 내역은 그대로예요. 카카오·구글 로그인도 계속 사용할 수 있어요.</p>
+      <Link className="btn primary full mt24" href={user ? "/my/classes" : "/login?next=%2Fmy%2Fclasses"}>{user ? "내 수강 내역 보기" : "새 이메일로 로그인하기"}</Link>
+    </> : pending ? <>
+      <p className="lead">메일의 링크는 확인했지만 로그인 이메일 변경이 아직 끝나지 않았어요.</p>
+      <p className="mt24">이전에 받은 확인 메일이라면 기존 이메일에도 확인 메일이 왔는지 확인해 주세요. 회원 정보에서 현재 상태를 확인할 수 있어요.</p>
+      <Link className="btn primary full mt24" href={user ? "/my/profile" : "/login?next=%2Fmy%2Fprofile"}>회원 정보에서 상태 확인하기</Link>
+    </> : <>
+      <p className="lead">이 브라우저에서는 이메일 변경 완료 여부를 확인하지 못했어요. 회원 정보에서 현재 로그인 이메일을 확인해 주세요.</p>
+      <p className="mt24">새 계정을 만들 필요는 없어요.</p>
+      <Link className="btn primary full mt24" href={user ? "/my/profile" : "/login?next=%2Fmy%2Fprofile"}>회원 정보 확인하기</Link>
+    </>}
   </section></main></div>;
 }
