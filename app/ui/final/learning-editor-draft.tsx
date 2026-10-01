@@ -4,7 +4,8 @@ import { useRouter } from 'next/navigation';
 import { LearningDraftStore, learningDraftKey, parseLearningEditorDraft, type LearningEditorDraft } from '@/lib/learning-editor-draft';
 
 export type LearningDraftHandle = { clear: () => void; saveNow: () => void };
-export function LearningEditorDraftPanel({ actorId, lessonId, dirty, ready, capture, restore, handleRef, onPending }: {
+export function LearningEditorDraftPanel({ actorId, lessonId, dirty, ready, capture, restore, handleRef, onPending, serverDrafts = false }: {
+  serverDrafts?: boolean;
   actorId: string; lessonId: string; dirty: boolean; ready: boolean;
   capture: () => LearningEditorDraft; restore: (draft: LearningEditorDraft) => void;
   handleRef: React.RefObject<LearningDraftHandle | null>; onPending: (pending: boolean) => void;
@@ -88,7 +89,7 @@ export function LearningEditorDraftPanel({ actorId, lessonId, dirty, ready, capt
     <button className="btn small" type="button" disabled={!ready} onClick={() => download()}>편집 내용 내려받기</button>
   </>;
   return <section className="learning-local-draft notice" aria-label="편집 임시저장">
-    <p>작성 중인 제목·본문·학습 구성은 이 브라우저에 30초마다 임시저장됩니다. 학생에게 반영하려면 ‘학습 저장’을 눌러 주세요.</p>
+    <p>작성 중인 제목·본문·학습 구성은 이 브라우저에 30초마다 임시저장됩니다. {serverDrafts ? '서버에 보관하려면 ‘초안 저장’, 학생에게 보여 주려면 ‘학생 화면에 반영’을 눌러 주세요.' : '학생에게 반영하려면 ‘학습 저장’을 눌러 주세요.'}</p>
     {savedAt && <p role="status">브라우저 임시저장: {new Date(savedAt).toLocaleString('ko-KR')}</p>}
     {error && <p role="alert">{error}</p>}
     <div className="learning-draft-actions">{actions}</div>

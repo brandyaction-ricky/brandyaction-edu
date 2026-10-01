@@ -39,7 +39,7 @@ export function isBlockEditorDocument(v: unknown): v is LessonBlockDocument {
   if (v.presentation !== undefined && (!obj(v.presentation) || !only(v.presentation, ['tag', 'tagLabel']) || !str(v.presentation.tag) || !str(v.presentation.tagLabel))) return false;
   return uniqueIds(v.blocks as { id: string }[]) && uniqueIds(v.checklist as { id: string }[]);
 }
-function isForm(v: unknown): v is LearningFormDraft {
+export function isLearningFormDraft(v: unknown): v is LearningFormDraft {
   return obj(v) && only(v, ['basic', 'format', 'bodyText', 'videoUrl', 'externalUrl', 'resourceName', 'resourcePath']) && obj(v.basic) && only(v.basic, ['week_id', 'day_number', 'title', 'description', 'duration_label', 'is_published', 'is_preview']) && ['week_id', 'day_number', 'title', 'description', 'duration_label'].every(k => str((v.basic as Record<string, unknown>)[k])) && bool(v.basic.is_published) && bool(v.basic.is_preview) && ['text', 'vod', 'material', 'link'].includes(String(v.format)) && ['bodyText', 'videoUrl', 'externalUrl', 'resourceName', 'resourcePath'].every(k => str(v[k]));
 }
 function checkpoint(v: unknown): v is LessonWriterCheckpoint {
@@ -51,7 +51,7 @@ export function parseLearningEditorDraft(raw: string, actorId: string, scopeLess
   if (raw.length > limit) throw new Error('임시저장본이 너무 큽니다. 내려받아 확인해 주세요.');
   let v: unknown;
   try { v = JSON.parse(raw); } catch { throw new Error('임시저장본을 읽지 못했습니다. 내려받아 확인해 주세요.'); }
-  if (!obj(v) || v.version !== 1 || v.actorId !== actorId || !uuid(v.actorId) || v.scopeLessonId !== scopeLessonId || (v.scopeLessonId !== '' && !uuid(v.scopeLessonId)) || (v.storedLessonId !== '' && !uuid(v.storedLessonId)) || !str(v.savedAt) || !Number.isFinite(Date.parse(v.savedAt)) || !isForm(v.base) || !isForm(v.form) || !obj(v.blocks) || !bool(v.blocks.active) || !isBlockEditorDocument(v.blocks.document) || !checkpoint(v.blocks.writer)) throw new Error('임시저장본의 계정·학습·형식을 확인할 수 없습니다. 내려받아 확인해 주세요.');
+  if (!obj(v) || v.version !== 1 || v.actorId !== actorId || !uuid(v.actorId) || v.scopeLessonId !== scopeLessonId || (v.scopeLessonId !== '' && !uuid(v.scopeLessonId)) || (v.storedLessonId !== '' && !uuid(v.storedLessonId)) || !str(v.savedAt) || !Number.isFinite(Date.parse(v.savedAt)) || !isLearningFormDraft(v.base) || !isLearningFormDraft(v.form) || !obj(v.blocks) || !bool(v.blocks.active) || !isBlockEditorDocument(v.blocks.document) || !checkpoint(v.blocks.writer)) throw new Error('임시저장본의 계정·학습·형식을 확인할 수 없습니다. 내려받아 확인해 주세요.');
   if (v.scopeLessonId && v.storedLessonId !== v.scopeLessonId) throw new Error('다른 학습의 임시저장본입니다.');
   return v as LearningEditorDraft;
 }
