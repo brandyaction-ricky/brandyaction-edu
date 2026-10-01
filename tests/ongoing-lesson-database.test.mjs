@@ -82,8 +82,9 @@ test('weekly and monthly achievement counts calendar periods rather than elapsed
  for(const cadence of ['weekly','monthly']){
  const f=await setup(cadence);try{
   await f.unlock();const current=await f.read();
+  const previous=(await f.db.query("select starts_at from edu_ongoing_period($1,$2::timestamptz-interval '1 second')",[cadence,current.periodStart])).rows[0].starts_at;
   await f.db.query(`insert into edu_ongoing_rounds(enrollment_id,lesson_id,period_start,period_end,revision,values,write_id)
-   values($1,$2,$3::timestamptz-$6::interval,$3,$4,$5,gen_random_uuid())`,[f.enrollment,f.lesson,current.periodStart,f.revision,answers,cadence==='weekly'?'7 days':'1 month']);
+   values($1,$2,$3,$4,$5,$6,gen_random_uuid())`,[f.enrollment,f.lesson,previous,current.periodStart,f.revision,answers]);
   await f.db.exec(`insert into edu_ongoing_completions(id,enrollment_id,lesson_id,period_start,revision,write_id,values,assessment)
    select gen_random_uuid(),enrollment_id,lesson_id,period_start,revision,write_id,values,'{}'::jsonb from edu_ongoing_rounds`);
   assert.deepEqual((await f.read()).stats,{completed:1,opportunities:2,rate:50});
