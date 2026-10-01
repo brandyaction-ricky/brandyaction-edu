@@ -24,7 +24,7 @@ export function LoginEmailSettings({ email }: { email: string }) {
         setCurrentEmail(confirmed);
         setPendingEmail(awaiting);
         if (announce) setEmailMessage(awaiting
-          ? "아직 이메일 변경 확인 대기 중입니다. 기존 주소와 새 주소로 온 메일을 모두 확인해 주세요."
+          ? `아직 확인을 기다리고 있어요. ${awaiting} 메일함에서 ‘새 이메일 확인하기’를 눌러 주세요.`
           : `변경 확인 대기 중인 주소가 없습니다. 현재 로그인 이메일은 ${confirmed}입니다.`);
       }
     } catch { /* A temporary client configuration failure must not blank the profile. */ }
@@ -53,7 +53,7 @@ export function LoginEmailSettings({ email }: { email: string }) {
       if (authError) throw Error(loginEmailChangeError(authError));
       setPendingEmail(data.user.new_email || requested);
       setNextEmail(""); setPassword(""); setConfirmPassword("");
-      setEmailMessage("브랜디에듀 비밀번호를 설정하고 확인 메일을 보냈어요. 기존 이메일과 새 이메일로 온 메일을 모두 확인해 주세요. 확인 전에는 기존 이메일로, 확인 후에는 새 이메일로 방금 정한 비밀번호를 사용합니다.");
+      setEmailMessage(`브랜디에듀 비밀번호를 설정하고 ${requested} 주소로 확인 메일을 보냈어요. 메일의 ‘새 이메일 확인하기’를 누르면 변경이 끝납니다.`);
     } catch (cause) {
       setEmailError(cause instanceof Error ? cause.message : "이메일 변경을 요청하지 못했습니다. 다시 시도해 주세요.");
     } finally { setBusy(false); }
@@ -82,8 +82,8 @@ export function LoginEmailSettings({ email }: { email: string }) {
       {emailMessage && <p className="notice mt16" role="status">{emailMessage}</p>}
       {pendingEmail && <div className="notice mt16" role="status">
         <strong>메일 확인을 기다리고 있어요</strong>
-        <p className="mt8">새 이메일 {pendingEmail}와 기존 이메일 {currentEmail}로 온 메일을 모두 확인해 주세요. 확인을 마치면 새 이메일로 로그인할 수 있어요.</p>
-        <button className="btn mt16" type="button" onClick={() => void refreshEmailStatus(true)} disabled={busy}>두 메일을 확인했어요</button>
+        <p className="mt8"><strong>{pendingEmail}</strong> 메일함에서 ‘새 이메일 확인하기’를 눌러 주세요. 그 뒤 새 이메일과 방금 정한 브랜디에듀 비밀번호로 로그인할 수 있어요.</p>
+        <button className="btn mt16" type="button" onClick={() => void refreshEmailStatus(true)} disabled={busy}>이메일 변경 상태 확인</button>
       </div>}
     </div>
   </section>;
