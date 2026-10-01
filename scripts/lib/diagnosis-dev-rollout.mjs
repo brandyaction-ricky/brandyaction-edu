@@ -12,6 +12,7 @@ const TARGETS = {
     ['20261001063515_n30_markdown_exports.sql', '3715f95c6e514dd2aaf3cab748edfb4a7a73c8adece140b5c0b546d6479e4bc8'],
     ['20261001070448_n30_edu_sessions.sql', 'e21b03a6441571494e3bf42758c482d1b1dfe70d21a574eeea9decd57d88e6c0'],
     ['20261001084740_n30_edu_report_worker.sql', 'b80e7e4946189af9060fff20e7eb876a3092ca4c307f4a643e08007f3cc64237'],
+    ['20261001092815_n30_shared_report_capacity.sql', '6b26535949f2d18cb046fadd931a851c3833cb7ecb843f66f220e1275b15fa2d'],
   ]},
 };
 
