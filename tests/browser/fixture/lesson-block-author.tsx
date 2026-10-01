@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { LearningEditor } from '../../../app/ui/final/learning-editor';
 import { Classroom } from '../../../app/ui/final/classroom';
 import '../../../app/ui/final/learning-editor.css';
+import { withExistingCohortVisibility } from './cohort-visibility';
 
 const id = (n: number) => `aaaaaaab-1111-4111-8111-${String(n).padStart(12, '0')}`;
 export function LessonBlockAuthorFixture() {
@@ -18,6 +19,6 @@ export function LessonBlockAuthorFixture() {
     <nav><button type="button" onClick={() => { setView('author'); setVisit(value => value + 1); }}>편집 다시 열기</button><button type="button" onClick={() => setView('learner')}>학생 화면 보기</button></nav>
     <output aria-label="기본 정보 저장 횟수">{saves}</output><output aria-label="기존 본문 변경 횟수">{legacySaves}</output>
     {view === 'author' ? <div className="edu-admin"><LearningEditor serverDraftsEnabled={new URLSearchParams(location.search).has('serverDraft')} key={visit} data={data} row={newLesson ? undefined : lesson} actorId={new URLSearchParams(location.search).get('actor') || id(90)} blockEditingEnabled pending={false} back={() => setView('closed')} send={async body => { if (body.section === 'learning') setSaves(value => value + 1); if (body.section === 'contents') setLegacySaves(value => value + 1); return { row: lesson }; }} /></div>
-      : view === 'learner' ? <div className="edu-front"><Classroom path={['learn', id(1), id(4)]} data={data} pending={false} loading={false} missionId={null} blockLearningEnabled send={async () => ({})} /></div> : <p>목록으로 돌아왔습니다.</p>}
+      : view === 'learner' ? <div className="edu-front"><Classroom path={['learn', id(1), id(4)]} data={withExistingCohortVisibility(data)} pending={false} loading={false} missionId={null} blockLearningEnabled send={async () => ({})} /></div> : <p>목록으로 돌아왔습니다.</p>}
   </main>;
 }

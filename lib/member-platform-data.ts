@@ -4,6 +4,7 @@ import { hasLearningAccess } from '@/lib/platform-rules';
 import { isGraduate } from '@/lib/alumni-access';
 import type { Row } from '@/lib/platform';
 import { readLearningOverviews } from '@/lib/learning-overview';
+import { cohortLessonVisible, cohortWeekVisible } from '@/lib/cohort-curriculum-visibility';
 
 export type MemberView = 'dashboard' | 'classes' | 'missions' | 'questions' | 'orders' | 'coupons' | 'resources' | 'profile' | 'messages' | 'reviews' | 'learn' | 'order-result';
 export const MEMBER_ROW_LIMIT = 200;
@@ -99,7 +100,13 @@ export async function readMemberPlatformData(userId: string, view: MemberView, e
     return { ...rest, metadata: { product_resources: resources || [], digital_content_sections: digital_sections || [] } };
   }) : courses;
   if (cohorts) data.cohorts = cohorts;
-  if (weeks) data.curriculum_weeks = weeks;
+  if (weeks) {
+    const activeCohorts = [...new Set(active.map(enrollment => String(enrollment.cohort_id)))];
+    const visibility = activeCohorts.length && weeks.length ? checked(await admin.from('edu_cohort_week_visibility')
+      .select('cohort_id,week_id,is_published').in('cohort_id', activeCohorts).in('week_id', weeks.map(week => week.id)).limit(limit), '기수별 주차 공개') : [];
+    data.edu_cohort_week_visibility = visibility;
+    data.curriculum_weeks = weeks.filter(week => activeCohorts.some(cohortId => cohortWeekVisible(data, cohortId, week)));
+  }
   if (progress) data.lesson_progress = progress;
   if (submissions) data.mission_submissions = submissions;
   if (drafts) data.edu_mission_drafts = drafts;
@@ -109,16 +116,21 @@ export async function readMemberPlatformData(userId: string, view: MemberView, e
       (cohorts || []).find(cohort => cohort.id === enrollment.cohort_id))));
   if (sessions) data.cohort_sessions = liveSessions;
   if (overviews) data.learning_overviews = overviews;
-  const weekIds = (weeks || []).map(week => week.id);
+  const weekIds = (data.curriculum_weeks || []).map(week => week.id);
   const sessionIds = liveSessions.map(session => session.id);
   const [lessons, sessionContents] = await Promise.all([
     weekIds.length ? (async () => checked(await admin.from('curriculum_lessons').select('id,week_id,day_number,title,description,content_type,duration_label,is_preview,is_published,display_order').in('week_id', weekIds).eq('is_published', true).order('display_order').limit(limit), '학습'))() : null,
     sessionIds.length ? (async () => checked(await db.from('cohort_session_contents').select('session_id,live_url,replay_url').in('session_id', sessionIds).limit(limit), '라이브 주소'))() : null,
   ]);
-  if (lessons) data.curriculum_lessons = lessons;
+  if (lessons) {
+    const activeCohorts = [...new Set(active.map(enrollment => String(enrollment.cohort_id)))];
+    data.edu_cohort_lesson_visibility = activeCohorts.length && lessons.length ? checked(await admin.from('edu_cohort_lesson_visibility')
+      .select('cohort_id,lesson_id,is_published').in('cohort_id', activeCohorts).in('lesson_id', lessons.map(lesson => lesson.id)).limit(limit), '기수별 학습 공개') : [];
+    data.curriculum_lessons = lessons.filter(lesson => activeCohorts.some(cohortId => cohortLessonVisible(data, cohortId, lesson)));
+  }
   if (sessionContents) data.cohort_session_contents = sessionContents;
   if (activeIds.length && missionViews.has(view)) {
-    const lessonIds = (lessons || []).map(lesson => lesson.id);
+    const lessonIds = (data.curriculum_lessons || []).map(lesson => lesson.id);
     if (lessonIds.length) data.curriculum_missions = checked(await db.from('curriculum_missions').select('id,lesson_id,title,instructions,submission_type,is_required,is_published').in('lesson_id', lessonIds).eq('is_published', true).limit(limit), '미션');
   }
   if (active.length && (view === 'resources' || view === 'learn')) {

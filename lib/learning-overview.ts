@@ -1,5 +1,6 @@
 import type { Row } from './platform';
 import { hasLearningAccess } from './platform-rules';
+import { cohortLessonVisible, cohortWeekVisible } from './cohort-curriculum-visibility';
 
 export type LessonGate = { lessonId: string; isUnlocked: boolean; automaticApproval: boolean; ongoing?: boolean; track: 'daily' | 'learning' | null; dayNumber: number | null; reason: string };
 export type LearningItem = { id: string; title: string; day: number; week: number; done: boolean; unlocked: boolean; reason: string };
@@ -33,8 +34,9 @@ export function learningOverview(data: Record<string, Row[]>, enrollment: Row): 
   if (record?.status !== 'ready') return { status: 'error', groups: [] };
   let gates: LessonGate[];
   try { gates = parseLessonGates(record.lessons); } catch { return { status: 'error', groups: [] }; }
-  const weeks = new Map((data.curriculum_weeks || []).filter(row => row.course_id === enrollment.course_id && row.is_published !== false && !row.archived_at).map(row => [row.id, row]));
-  const lessons = new Map((data.curriculum_lessons || []).filter(row => weeks.has(String(row.week_id)) && row.is_published !== false && !row.archived_at).map(row => [row.id, row]));
+  const cohortId = String(enrollment.cohort_id);
+  const weeks = new Map((data.curriculum_weeks || []).filter(row => row.course_id === enrollment.course_id && cohortWeekVisible(data,cohortId,row)).map(row => [row.id, row]));
+  const lessons = new Map((data.curriculum_lessons || []).filter(row => weeks.has(String(row.week_id)) && cohortLessonVisible(data,cohortId,row)).map(row => [row.id, row]));
   const completed = new Set((data.lesson_progress || []).filter(row => row.enrollment_id === enrollment.id && row.completed_at).map(row => String(row.lesson_id)));
   const groups: LearningGroup[] = [
     { key: 'daily', title: '데일리 미션', items: [], completed: 0 },

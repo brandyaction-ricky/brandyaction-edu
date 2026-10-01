@@ -43,7 +43,7 @@ const enrollment = { id: 'enrollment', user_id: 'user', course_id: 'course', coh
 const lesson = { id: 'lesson', week_id: 'week', title: '첫 번째 학습', day_number: 1, is_published: true };
 const mission = { id: 'mission', lesson_id: 'lesson', title: '실행 미션', instructions: '안전한 안내', is_required: true, is_published: true, submission_type: 'text' };
 const submission = { id: 'submission', enrollment_id: 'enrollment', mission_id: 'mission', status: 'submitted', attempt_number: 1, submitted_at: '2026-09-01T00:00:00Z', response: { text: '<script>unsafe()</script>', url: 'javascript:alert(1)' } };
-const data = { courses: [course], cohorts: [cohort], enrollments: [enrollment], profiles: [user], curriculum_weeks: [{ id: 'week', course_id: 'course', week_number: 1, title: '시작하기', is_published: true }], curriculum_lessons: [lesson], curriculum_missions: [mission], mission_submissions: [submission], lesson_contents: [{ lesson_id: 'lesson', body_text: '등록된 학습 본문', resource_path: 'private/test.pdf', resource_name: '학습 자료.pdf' }], articles: [{ id: 'article', slug: 'test-article', title: '테스트 아티클', content_type: 'text', status: 'published', body: [{ type: 'paragraph', text: '콘텐츠' }] }], review_videos: [{ id: 'story', title: '등록된 고객 이야기', reviewer_name: '고객' }], orders: [], admin_summary: [{ id: 'summary', members: 1, activeEnrollments: 1, pendingReviews: 1, openQuestions: 0 }] };
+const data = { courses: [course], cohorts: [cohort], enrollments: [enrollment], profiles: [user], curriculum_weeks: [{ id: 'week', course_id: 'course', week_number: 1, title: '시작하기', is_published: true }], curriculum_lessons: [lesson], edu_cohort_week_visibility: [{ cohort_id: 'cohort', week_id: 'week', is_published: true }], edu_cohort_lesson_visibility: [{ cohort_id: 'cohort', lesson_id: 'lesson', is_published: true }], curriculum_missions: [mission], mission_submissions: [submission], lesson_contents: [{ lesson_id: 'lesson', body_text: '등록된 학습 본문', resource_path: 'private/test.pdf', resource_name: '학습 자료.pdf' }], articles: [{ id: 'article', slug: 'test-article', title: '테스트 아티클', content_type: 'text', status: 'published', body: [{ type: 'paragraph', text: '콘텐츠' }] }], review_videos: [{ id: 'story', title: '등록된 고객 이야기', reviewer_name: '고객' }], orders: [], admin_summary: [{ id: 'summary', members: 1, activeEnrollments: 1, pendingReviews: 1, openQuestions: 0 }] };
 const send = async () => { throw Error('Unexpected write during render'); };
 test('member operations expose track progress on demand only when the learning feature is enabled', () => {
   const { AdminWorkflows } = load('app/ui/admin-workflows.tsx');
@@ -282,8 +282,10 @@ test('dashboard completed lesson count matches visible active-enrollment progres
     courses: [...data.courses, { ...course, id: 'course-two', slug: 'second-course', title: '두 번째 테스트 클래스' }],
     cohorts: [...data.cohorts, { ...cohort, id: 'cohort-two', course_id: 'course-two', name: '두 번째 테스트 기수' }],
     enrollments: [enrollment, secondEnrollment],
-    curriculum_weeks: [...data.curriculum_weeks, { id: 'week-two', course_id: 'course-two', week_number: 1, title: '두 번째 시작하기' }],
+    curriculum_weeks: [...data.curriculum_weeks, { id: 'week-two', course_id: 'course-two', week_number: 1, title: '두 번째 시작하기', is_published: true }],
     curriculum_lessons: [...data.curriculum_lessons, { id: 'lesson-two', week_id: 'week-two', title: '두 번째 학습', day_number: 1, is_published: true }],
+    edu_cohort_week_visibility: [...data.edu_cohort_week_visibility, { cohort_id: 'cohort-two', week_id: 'week-two', is_published: true }],
+    edu_cohort_lesson_visibility: [...data.edu_cohort_lesson_visibility, { cohort_id: 'cohort-two', lesson_id: 'lesson-two', is_published: true }],
     lesson_progress: [
       { enrollment_id: 'enrollment', lesson_id: 'lesson', completed_at: '2026-09-20T00:00:00Z' },
       { enrollment_id: 'enrollment', lesson_id: 'removed-lesson', completed_at: '2026-09-19T00:00:00Z' },

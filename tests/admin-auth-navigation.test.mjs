@@ -9,6 +9,8 @@ function load(path, dependencies = {}) {
   const code = ts.transpileModule(fs.readFileSync(new URL('../' + path, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const exports = {};
   new Function('exports', 'require', code)(exports, name => {
+    if (name === '@/lib/cohort-curriculum-server') return { isLessonVisibleToCohort: async () => true };
+    if (name === '@/lib/cohort-curriculum-visibility') return { cohortLessonVisible: () => true, cohortWeekVisible: () => true };
     if (name === '@/lib/submission-review') return submissionReview;
     if (name === '@/lib/admin-order-list') return load('lib/admin-order-list.ts'); if (name === '@/lib/crm-purchase-contact') return load('lib/crm-purchase-contact.ts'); if (name === '@/lib/coupon-rules') return load('lib/coupon-rules.ts'); if (name === '@/lib/product-visibility') return productVisibility;
     if (name === '@/lib/public-platform-data') return { getPublicPlatformData: async () => ({ data: {}, pagination: null }), getPublicSupport: async () => ({}) };
@@ -163,12 +165,16 @@ test('product curriculum tab loads on demand behind product permission', async (
   const response = await api.read(`products&record=${record}&part=curriculum`);
   assert.equal(response.status, 200);
   assert.deepEqual((await response.json()).data, {
+    cohorts: [],
     curriculum_weeks: [fixtures.curriculum_weeks[0]],
     curriculum_lessons: [fixtures.curriculum_lessons[0]],
+    edu_cohort_week_visibility: [],
+    edu_cohort_lesson_visibility: [],
     lesson_contents: [fixtures.lesson_contents[0]],
   });
-  assert.deepEqual(api.calls.tables, ['curriculum_weeks', 'curriculum_lessons', 'lesson_contents']);
+  assert.deepEqual(api.calls.tables, ['cohorts', 'curriculum_weeks', 'curriculum_lessons', 'lesson_contents']);
   assert.deepEqual(api.calls.filters, [
+    ['cohorts', 'eq', 'course_id', record],
     ['curriculum_weeks', 'eq', 'course_id', record],
     ['curriculum_lessons', 'in', 'week_id', ['week-1']],
     ['lesson_contents', 'in', 'lesson_id', ['lesson-1']],
@@ -191,11 +197,15 @@ test('product mission tab reads only the selected course lessons and missions', 
   const response = await api.read(`products&record=${record}&part=missions`);
   assert.equal(response.status, 200);
   assert.deepEqual((await response.json()).data, {
+    cohorts: [],
     curriculum_weeks: [fixtures.curriculum_weeks[0]],
     curriculum_lessons: [fixtures.curriculum_lessons[0]],
+    edu_cohort_week_visibility: [],
+    edu_cohort_lesson_visibility: [],
     curriculum_missions: [fixtures.curriculum_missions[0]],
   });
   assert.deepEqual(api.calls.filters, [
+    ['cohorts', 'eq', 'course_id', record],
     ['curriculum_weeks', 'eq', 'course_id', record],
     ['curriculum_lessons', 'in', 'week_id', ['week-1']],
     ['curriculum_missions', 'in', 'lesson_id', ['lesson-1']],
