@@ -315,8 +315,8 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
   }
   function close() { if (!dirty || window.confirm("저장하지 않은 변경사항이 있습니다. 목록으로 돌아갈까요?")) back(); }
   async function removeProduct() {
-    if (!row?.id || pending || !window.confirm(`「${t(row, "title")}」 상품을 삭제할까요? 판매 목록에서 숨겨지며 주문·수강 기록과 파일은 유지됩니다. 삭제 항목 포함에서 다시 열어 저장하면 복구할 수 있습니다.`)) return;
-    try { await send({ action: "archive", section: "products", ids: [row.id] }, "상품을 삭제했습니다. 주문·수강 기록은 유지됩니다."); back(); }
+    if (!row?.id || pending || !window.confirm(`「${t(row, "title")}」 상품을 삭제할까요? 상품·커리큘럼 선택 목록에서 숨겨집니다. 커리큘럼과 주문·수강 기록, 파일은 보관됩니다. 상품·판매 설정에서 ‘삭제된 상품’을 선택한 뒤 ‘복원’을 누르면 다시 편집할 수 있습니다.`)) return;
+    try { await send({ action: "archive", section: "products", ids: [row.id] }, "상품과 커리큘럼을 목록에서 숨겼습니다. 기존 내용과 주문·수강 기록은 보관됩니다."); back(); }
     catch (cause) { setError((cause as Error).message); }
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
