@@ -20,6 +20,7 @@ import { revalidateTag } from 'next/cache';
 import { readMemberPlatformData, type MemberView } from '@/lib/member-platform-data';
 import { couponError } from '@/lib/coupon-rules';
 import { adminOrderQuery, ORDER_PAGE_SIZE, parseOrderListScope } from '@/lib/admin-order-list';
+import { assertParticipationOpen } from '@/lib/alumni-access-server';
 const reply = (data: unknown, status = 200) =>
     Response.json(data, {
         status,
@@ -1099,6 +1100,7 @@ export async function POST(request: Request) {
             if (!uid(body.enrollmentId)) fail('수강 정보를 확인해 주세요.');
             const { data: enrollment, error } = await db.from('enrollments').select('*').eq('id', body.enrollmentId).eq('user_id', user.id).eq('status', 'active').single();
             if (error || !enrollment || !hasLearningAccess(enrollment)) fail('수강 권한이 필요합니다.', 403);
+            if (action !== 'review') await assertParticipationOpen(user.id, enrollment.id);
             if (action === 'review') {
                 const rating = Number(body.rating);
                 const content = String(body.content || '').trim();

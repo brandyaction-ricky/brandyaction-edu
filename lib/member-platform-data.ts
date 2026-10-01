@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { hasLearningAccess } from '@/lib/platform-rules';
+import { isGraduate } from '@/lib/alumni-access';
 import type { Row } from '@/lib/platform';
 import { readLearningOverviews } from '@/lib/learning-overview';
 
@@ -102,10 +103,14 @@ export async function readMemberPlatformData(userId: string, view: MemberView, e
   if (progress) data.lesson_progress = progress;
   if (submissions) data.mission_submissions = submissions;
   if (drafts) data.edu_mission_drafts = drafts;
-  if (sessions) data.cohort_sessions = sessions;
+  const liveSessions = (sessions || []).filter(session => active.some(enrollment =>
+    enrollment.cohort_id === session.cohort_id && !isGraduate(enrollment,
+      (courses || []).find(course => course.id === enrollment.course_id),
+      (cohorts || []).find(cohort => cohort.id === enrollment.cohort_id))));
+  if (sessions) data.cohort_sessions = liveSessions;
   if (overviews) data.learning_overviews = overviews;
   const weekIds = (weeks || []).map(week => week.id);
-  const sessionIds = (sessions || []).map(session => session.id);
+  const sessionIds = liveSessions.map(session => session.id);
   const [lessons, sessionContents] = await Promise.all([
     weekIds.length ? (async () => checked(await admin.from('curriculum_lessons').select('id,week_id,day_number,title,description,content_type,duration_label,is_preview,is_published,display_order').in('week_id', weekIds).eq('is_published', true).order('display_order').limit(limit), '학습'))() : null,
     sessionIds.length ? (async () => checked(await db.from('cohort_session_contents').select('session_id,live_url,replay_url').in('session_id', sessionIds).limit(limit), '라이브 주소'))() : null,

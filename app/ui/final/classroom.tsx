@@ -7,6 +7,7 @@ import {
   text as t,
 } from "@/lib/platform";
 import { hasLearningAccess } from "@/lib/platform-rules";
+import { isGraduate } from '@/lib/alumni-access';
 import {
   ArrowLeft,
   ArrowRight,
@@ -73,6 +74,7 @@ export function Classroom({
       (c) => c.id === enrollment.course_id,
     ),
     cohort = (data.cohorts || []).find((c) => c.id === enrollment.cohort_id);
+  const graduate = isGraduate(enrollment, course, cohort);
   const weeks = (data.curriculum_weeks || [])
     .filter((w) => w.course_id === course?.id)
     .sort((a, b) => num(a, "week_number") - num(b, "week_number"));
@@ -98,14 +100,14 @@ export function Classroom({
   ]);
   const done = completedIds.has(String(lesson?.id)),
     current = lessons.findIndex((l) => l.id === lesson?.id);
-  const canOpen = (id: string) => !blockLearningEnabled || progression.lessons?.some(item => item.lessonId === id && item.isUnlocked) === true;
+  const canOpen = (id: string) => graduate || !blockLearningEnabled || progression.lessons?.some(item => item.lessonId === id && item.isUnlocked) === true;
   const entries = missionEntries(data, [enrollment]).filter(
       (x) => x.lesson?.id === lesson?.id,
     ),
     entry = entries.find((x) => x.mission.id === missionId) || entries[0];
   const lessonHref =
     "/learn/" + enrollment.id + (lesson ? "/" + lesson.id : "");
-  const legacyCompletion = lesson && !selectedGate?.ongoing ? (
+  const legacyCompletion = lesson && !graduate && !selectedGate?.ongoing ? (
     <button
       className="btn dark"
       disabled={pending || done}
@@ -153,7 +155,7 @@ export function Classroom({
           {entry ? (
             <div className="mission-guide">
               <div className="stack">
-                <MissionForm
+                {!graduate ? <MissionForm
                   key={entry.mission.id + ":" + t(entry.submission, "id")}
                   mission={entry.mission}
                   enrollment={enrollment}
@@ -165,8 +167,8 @@ export function Classroom({
                   )}
                   pending={pending}
                   send={send}
-                />
-                {process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' && lesson && <LessonQuestions enrollmentId={String(enrollment.id)} lessonId={String(lesson.id)} lessonTitle={t(lesson, "title")}/>}
+                /> : <section className="panel pad mt32"><h2>{t(entry.mission, 'title')}</h2><p className="reading-copy mt16">{t(entry.mission, 'instructions')}</p><p className="meta mt16">졸업생 열람 모드 · 새 미션 제출은 종료되었습니다.</p>{entry.submission && <div className="mt24"><h3>마지막 제출 내용</h3>{Boolean((entry.submission.response as Record<string, unknown> | null)?.text) && <p className="reading-copy">{String((entry.submission.response as Record<string, unknown>).text)}</p>}{safeUrl((entry.submission.response as Record<string, unknown> | null)?.url) && <a className="link" href={safeUrl((entry.submission.response as Record<string, unknown>).url)} target="_blank" rel="noreferrer">제출한 결과물 링크</a>}{Boolean(entry.submission.reviewer_feedback) && <div className="notice mt16"><b>운영자 피드백</b><p>{t(entry.submission, 'reviewer_feedback')}</p></div>}</div>}</section>}
+                {process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' && lesson && <LessonQuestions readOnly={graduate} enrollmentId={String(enrollment.id)} lessonId={String(lesson.id)} lessonTitle={t(lesson, "title")}/>}
                 <Link className="link" href={lessonHref}>
                   <ArrowLeft />
                   학습실로
@@ -221,8 +223,7 @@ export function Classroom({
                     ))}
                   {!entry.submission && (
                     <p>
-                      아직 제출 전입니다. 작성 중인 내용은 임시저장할 수
-                      있습니다.
+                      {graduate ? '제출 기록이 없습니다.' : '아직 제출 전입니다. 작성 중인 내용은 임시저장할 수 있습니다.'}
                     </p>
                   )}
                 </div>
@@ -237,6 +238,7 @@ export function Classroom({
   return (
     <div className="learning-bg">
       <div className="wrap">
+        {graduate && <p className="meta mb16">졸업생 열람 모드 · 최신 공개 커리큘럼을 자유롭게 볼 수 있습니다.</p>}
         <div className="learning-top">
           <div>
             <h1>{t(course, "title")}</h1>
@@ -248,7 +250,7 @@ export function Classroom({
             <ArrowLeft />내 클래스
           </Link>
         </div>
-        <LiveSchedule data={data} cohortId={t(enrollment, "cohort_id")} />
+        {!graduate && <LiveSchedule data={data} cohortId={t(enrollment, "cohort_id")} />}
         <button
           className="btn learning-mobile-toggle"
           aria-expanded={navOpen}
@@ -306,15 +308,15 @@ export function Classroom({
                   <div className="flex gap8">
                     <Badge>{lessonLabel(lesson.id, num(lesson, "day_number"))}</Badge>
                     <Badge color={done ? "green" : ""}>
-                      {done ? "학습 완료" : "학습 중"}
+                      {done ? "학습 완료" : graduate ? "열람 가능" : "학습 중"}
                     </Badge>
                     <span className="meta">{t(lesson, "duration_label")}</span>
                   </div>
                   <h1>{t(lesson, "title")}</h1>
                   <p>{t(lesson, "description")}</p>
-                  <a className="link" href="#lesson-questions">이 수업에 개인 질문 남기기</a>
+                  {!graduate && <a className="link" href="#lesson-questions">이 수업에 개인 질문 남기기</a>}
                 </header>
-                <LessonContent enabled={blockLearningEnabled} lessonId={lesson.id} enrollmentId={enrollment.id} legacyCompletion={legacyCompletion} onCompleted={() => { if (!completedIds.has(lesson.id)) { setCompletedHere(previous => previous.includes(`${enrollment.id}:${lesson.id}`) ? previous : [...previous, `${enrollment.id}:${lesson.id}`]); progression.reload(); } }}>
+                <LessonContent enabled={blockLearningEnabled} readOnly={graduate} lessonId={lesson.id} enrollmentId={enrollment.id} legacyCompletion={legacyCompletion} onCompleted={() => { if (!completedIds.has(lesson.id)) { setCompletedHere(previous => previous.includes(`${enrollment.id}:${lesson.id}`) ? previous : [...previous, `${enrollment.id}:${lesson.id}`]); progression.reload(); } }}>
                 {safeUrl(content?.vod_url) && (
                   <Video url={t(content, "vod_url")} />
                 )}
@@ -343,7 +345,7 @@ export function Classroom({
                     <ResourceRow content={content} />
                   </section>
                 )}
-                {entries
+                {!graduate && entries
                   .filter((x) => x.mission.submission_type === "quiz")
                   .map((x) => (
                     <section className="reading" key={x.mission.id}>
@@ -368,12 +370,12 @@ export function Classroom({
                         <Badge color={x.status === "approved" ? "green" : ""}>
                           {x.status === "draft" ? "제출 전" : labels[x.status]}
                         </Badge>
-                        <Link className="btn primary" href={x.href}>
+                        {(!graduate || x.submission) && <Link className="btn primary" href={x.href}>
                           {x.status === "draft"
                             ? "미션 작성하기"
                             : "제출·피드백 확인"}
                           <ArrowRight />
-                        </Link>
+                        </Link>}
                       </div>
                     </section>
                   ))}
@@ -410,7 +412,7 @@ export function Classroom({
                     </Link>
                   ) : <button className="btn" disabled>다음 학습 · 잠김</button>)}
                 </div>
-                <LessonQuestions key={enrollment.id + ":" + lesson.id} enrollmentId={String(enrollment.id)} lessonId={String(lesson.id)} lessonTitle={t(lesson, "title")} />
+                <LessonQuestions key={enrollment.id + ":" + lesson.id} readOnly={graduate} enrollmentId={String(enrollment.id)} lessonId={String(lesson.id)} lessonTitle={t(lesson, "title")} />
               </>
             ) : (
               <Empty title={lesson && blockLearningEnabled ? progression.error || selectedGate?.reason || (progression.lessons ? '아직 열리지 않은 학습입니다.' : '학습 개방 상태를 확인하고 있습니다.') : '공개된 학습이 없습니다.'}>
@@ -425,6 +427,6 @@ export function Classroom({
   );
 }
 
-function LessonContent({ enabled, lessonId, enrollmentId, children, legacyCompletion, onCompleted }: { enabled: boolean; lessonId: string; enrollmentId: string; children: ReactNode; legacyCompletion: ReactNode; onCompleted: () => void }) {
-  return enabled ? <LessonBlockSession key={`${enrollmentId}:${lessonId}`} lessonId={lessonId} enrollmentId={enrollmentId} fallback={<>{children}{legacyCompletion}</>} onCompleted={onCompleted} /> : <>{children}</>;
+function LessonContent({ enabled, readOnly, lessonId, enrollmentId, children, legacyCompletion, onCompleted }: { enabled: boolean; readOnly: boolean; lessonId: string; enrollmentId: string; children: ReactNode; legacyCompletion: ReactNode; onCompleted: () => void }) {
+  return enabled ? <LessonBlockSession key={`${enrollmentId}:${lessonId}`} lessonId={lessonId} enrollmentId={enrollmentId} readOnly={readOnly} fallback={<>{children}{legacyCompletion}</>} onCompleted={onCompleted} /> : <>{children}</>;
 }

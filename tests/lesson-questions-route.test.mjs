@@ -3,7 +3,7 @@ const id='11111111-1111-4111-8111-111111111111',other='22222222-2222-4222-8222-2
 function harness({allowed=true,error=null}={}){
  const calls=[],filters=[];const query={select(){return this;},eq(...args){filters.push(args);return this;},order(){return this;},range:async()=>({data:[],error})};
  const db={rpc:async(name,args)=>{calls.push({name,args});return{data:{id},error};},from:()=>query};
- const mocks={'@/lib/server-auth':{getAuthenticatedUser:async()=>allowed?{id}:null},'@/lib/supabase/admin':{createAdminClient:()=>db},'@/lib/supabase/server':{createClient:async()=>db}};
+ const mocks={'@/lib/alumni-access-server':{assertParticipationOpen:async()=>{}},'@/lib/server-auth':{getAuthenticatedUser:async()=>allowed?{id}:null},'@/lib/supabase/admin':{createAdminClient:()=>db},'@/lib/supabase/server':{createClient:async()=>db}};
  const exports={};new Function('exports','require',ts.transpileModule(fs.readFileSync(new URL('../app/api/platform/lesson-questions/route.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(exports,name=>mocks[name]);
  const body={enrollmentId:id,lessonId:other,requestId:id,title:'제목',content:'내용'};
  return {calls,filters,body,post:(value=body,origin='https://edu.test')=>exports.POST(new Request('https://edu.test/api/platform/lesson-questions',{method:'POST',headers:origin?{origin,'content-type':'application/json'}:{},body:JSON.stringify(value)})),get:(extra='')=>exports.GET(new Request(`https://edu.test/api/platform/lesson-questions?enrollment=${id}&lesson=${other}${extra}`))};

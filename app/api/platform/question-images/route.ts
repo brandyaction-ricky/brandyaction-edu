@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { assertParticipationOpen } from '@/lib/alumni-access-server';
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { uuid } from '@/lib/edu-workflows';
 import { answerFileSpec, matchesAnswerFile } from '@/lib/lesson-files';
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
     const actor = await getAuthenticatedUser(); if (!actor) fail('로그인이 필요합니다.', 401);
     const body = await readBody(request), db = createAdminClient();
     if (body.action === 'prepare') {
+      if (body.enrollmentId != null) await assertParticipationOpen(actor.id, id(body.enrollmentId));
       let spec; try { spec = answerFileSpec(body.name, body.size, 'image'); } catch (e) { fail((e as Error).message); }
       const { data: file, error } = await db.rpc('edu_prepare_question_image', { p_actor: actor.id, p_lesson: body.lessonId === null && body.enrollmentId === null && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' ? null : id(body.lessonId), p_enrollment: body.lessonId === null && body.enrollmentId === null && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' ? null : id(body.enrollmentId), p_request: id(body.requestId), p_spec: spec });
       if (error) throw error;
@@ -46,6 +48,7 @@ export async function POST(request: Request) {
     if (body.action !== 'complete') fail('파일 요청을 확인해 주세요.');
     const { data: file, error } = await db.rpc('edu_owned_question_image', { p_actor: actor.id, p_image: id(body.fileId) });
     if (error) throw error;
+    if (file.enrollment_id) await assertParticipationOpen(actor.id, file.enrollment_id);
     if (file.ready_at) return reply({ id: file.id, name: file.name, size: file.size });
     const storage = db.storage.from(bucket), info = await storage.info(file.path);
     if (info.error) throw info.error;
