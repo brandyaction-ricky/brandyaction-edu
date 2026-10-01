@@ -55,7 +55,7 @@ test('email confirmation accepts supported token types and prevents external red
   assert.equal(consent.headers.get('Cache-Control'), 'private, no-store');
   assert.equal(consent.headers.get('set-cookie'), 'sb-auth-token=test-session');
   const changed = await request('token_hash=x&type=email_change&next=%2Fmy%2Fprofile');
-  assert.equal(changed.headers.get('location'), 'https://dev.example/auth/consent?next=%2Fmy%2Fprofile');
+  assert.equal(changed.headers.get('location'), 'https://dev.example/auth/email-change-help?status=success');
   assert.match((await request('token_hash=x&type=recovery')).headers.get('location'), /\/auth\/reset-password$/);
   error = { message: 'expired secret token' };
   const expired = await request('token_hash=x&type=email');
@@ -81,7 +81,7 @@ test('email-change confirmation returns to the same member or gives a recovery p
   });
   const base = 'https://dev.example/auth/confirm?next=%2Fmy%2Fprofile&flow=email_change';
   const sameBrowser = await route.GET(new Request(base + '&code=auth-code'));
-  assert.equal(sameBrowser.headers.get('location'), 'https://dev.example/my/profile');
+  assert.equal(sameBrowser.headers.get('location'), 'https://dev.example/auth/email-change-help?status=success');
   assert.equal(sameBrowser.headers.get('set-cookie'), 'sb-auth-token=same-member-session');
 
   codeError = { code: 'bad_code_verifier' };
@@ -91,7 +91,7 @@ test('email-change confirmation returns to the same member or gives a recovery p
   assert.doesNotMatch(otherBrowser.headers.get('location'), /code=|token_hash=/);
 
   const tokenLink = await route.GET(new Request(base + '&token_hash=opaque&type=email_change'));
-  assert.equal(tokenLink.headers.get('location'), 'https://dev.example/my/profile');
+  assert.equal(tokenLink.headers.get('location'), 'https://dev.example/auth/email-change-help?status=success');
   assert.equal(tokenLink.headers.get('set-cookie'), 'sb-auth-token=same-member-session');
 
   partialConfirmation = true;
@@ -99,6 +99,18 @@ test('email-change confirmation returns to the same member or gives a recovery p
   assert.equal(firstAddress.headers.get('location'), 'https://dev.example/auth/email-change-help?status=pending');
   assert.equal(firstAddress.headers.get('set-cookie'), null);
   assert.doesNotMatch(firstAddress.headers.get('location'), /token_hash|first-address/);
+
+  partialConfirmation = false;
+  const stillPending = load('app/auth/confirm/route.ts', {
+    'next/server': { NextResponse: { redirect: url => {
+      const response = new Response(null, { status: 307, headers: { location: String(url) } });
+      response.cookies = { set() {} };
+      return response;
+    } } },
+    '@/lib/supabase/server': { createClient: async () => ({ auth: { verifyOtp: async () => ({ error: null, data: { user: { new_email: 'pending@example.test' }, session: null } }) } }) },
+  });
+  const pendingLink = await stillPending.GET(new Request(base + '&token_hash=older-request&type=email_change'));
+  assert.equal(pendingLink.headers.get('location'), 'https://dev.example/auth/email-change-help?status=pending');
 });
 test('live publishing requires both permissions, safe assets, and handles concurrent edits', async () => {
   let productAccess = false, rpcError = null;
