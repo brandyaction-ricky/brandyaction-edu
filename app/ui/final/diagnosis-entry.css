@@ -1,0 +1,5 @@
+.diagnosis-entry{display:flex;align-items:center;gap:16px;border:1px solid #e1e4e8;border-radius:12px;padding:20px 24px;margin:0 0 24px;background:#fff}
+.diagnosis-entry-icon{display:grid;place-items:center;flex:none;width:44px;height:44px;border-radius:12px;color:#c91929;background:#fff2f3}
+.diagnosis-entry>div{flex:1;min-width:0}.diagnosis-entry h2{font-size:18px;font-weight:700;margin:0 0 4px}.diagnosis-entry p{color:#606873;font-size:14px;line-height:1.6;margin:0}
+.diagnosis-entry .btn{flex:none;min-height:44px}
+@media(max-width:640px){.diagnosis-entry{flex-wrap:wrap;padding:20px;gap:12px}.diagnosis-entry .btn{width:100%;justify-content:center}}
