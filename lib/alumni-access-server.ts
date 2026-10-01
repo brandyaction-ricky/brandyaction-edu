@@ -22,6 +22,6 @@ export async function isGraduateEnrollment(userId: string, enrollmentId: string)
 
 export async function assertParticipationOpen(userId: string, enrollmentId: string) {
   if (await isGraduateEnrollment(userId, enrollmentId)) {
-    throw Object.assign(new Error('기수 운영이 종료되어 수업과 기존 기록을 열람할 수 있습니다. 새 질문과 미션 제출은 종료되었습니다.'), { status: 403 });
+    throw Object.assign(new Error('기수 운영이 종료되어 수업과 기존 기록을 열람할 수 있습니다. 학습 답변과 미션 제출은 종료되었지만 질문은 계속 남길 수 있습니다.'), { status: 403 });
   }
 }

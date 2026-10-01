@@ -26,3 +26,13 @@ test('question list errors are recoverable and navigation protects an unfinished
  await page.getByRole('button',{name:'이 학습에 질문하기',exact:true}).click();await page.getByRole('textbox',{name:'질문 내용',exact:true}).fill('작성 중 질문');
  page.once('dialog',d=>d.dismiss());await page.getByRole('link',{name:'내 질문 전체 보기'}).click();await expect(page).toHaveURL(/classroom-questions-test/);await expect(page.getByRole('textbox',{name:'질문 내용',exact:true})).toHaveValue('작성 중 질문');
 });
+test('graduate can still open a private lesson question while lesson completion stays closed',async({page})=>{
+ await page.route('**/api/platform/lesson-questions?**',r=>r.fulfill({json:{questions:[],hasMore:false}}));
+ await page.goto('/classroom-questions-test?graduate=1');
+ await expect(page.getByText('졸업생 열람 모드',{exact:false})).toBeVisible();
+ await expect(page.getByRole('link',{name:'이 수업에 개인 질문 남기기'})).toBeVisible();
+ await expect(page.getByRole('button',{name:'학습 완료하기'})).toHaveCount(0);
+ await page.getByRole('button',{name:'이 학습에 질문하기'}).click();
+ await expect(page.getByRole('textbox',{name:'질문 제목'})).toBeVisible();
+ await expect(page.getByText('졸업 후에도 질문할 수 있습니다.',{exact:false})).toBeVisible();
+});
