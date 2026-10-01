@@ -63,7 +63,12 @@ test('pair sentences remain side by side and five choices fit at 320 pixels',asy
   await page.route('**/api/platform/diagnosis/session',route=>route.fulfill({json:data}));await page.goto('/diagnosis-test');await page.getByRole('button',{name:'시작하기',exact:true}).click();
   const left=await page.locator('.pair-card').nth(0).boundingBox(),right=await page.locator('.pair-card').nth(1).boundingBox();expect(left?.y).toBe(right?.y);expect((left?.x??0)+(left?.width??0)).toBeLessThan(right?.x??0);
   const options=await page.getByRole('radio').all();expect(options).toHaveLength(5);for(const option of options){const box=await option.boundingBox();expect(box?.height).toBeGreaterThanOrEqual(44);expect((box?.x??0)+(box?.width??0)).toBeLessThanOrEqual(320);}
+  const sizes=await page.getByRole('radio').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();return {top:r.top,height:r.height,bottom:r.bottom};}));
+  expect(new Set(sizes.map(size=>size.top)).size).toBe(1);expect(new Set(sizes.map(size=>size.height)).size).toBe(1);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:test.info().outputPath('n6-pair-320.png'),fullPage:true});
+  await page.setViewportSize({width:834,height:1112});
+  const tablet=await page.getByRole('radio').evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect().height));expect(new Set(tablet).size).toBe(1);
+  await page.screenshot({path:test.info().outputPath('n6-pair-equal-cards.png'),fullPage:true});
 });
 test('keyboard selection advances once and instruction checks require acknowledgment',async({page})=>{
   const data=fixture();data.survey.questions[0].confirmationOptionId=id(12);data.survey.questions[0].reconfirmInstructions=true;
