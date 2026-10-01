@@ -7,6 +7,7 @@ import { disableDevicePush, synchronizePushAccount } from "@/lib/web-push-client
 import { defaultPolicies } from "@/lib/legal-policies";
 import { createMutationGate } from "@/lib/mutation-gate";
 import { sectionScopes } from "@/lib/operator-scopes";
+import { emptyOrderListScope, type OrderListScope } from "@/lib/admin-order-list";
 import {
   labels,
   object,
@@ -201,6 +202,11 @@ export function Platform({
   const [publicSearch, setPublicSearch] = useState("");
   const [publicPage, setPublicPage] = useState(1);
   const [adminPaging, setAdminPaging] = useState({ section: "", page: 1 });
+  const [orderScope, setOrderScope] = useState<OrderListScope>(emptyOrderListScope);
+  const changeOrderScope = useCallback((scope: OrderListScope) => {
+    setOrderScope(scope);
+    setAdminPaging({ section: '', page: 1 });
+  }, []);
   const [pagination, setPagination] = useState<{
     page: number;
     pageSize: number;
@@ -248,7 +254,7 @@ export function Platform({
   const editorRecordId = ["product-editor", "learning-editor"].includes(path[1])
     ? searchParams.get("id") || ""
     : "";
-  const scopeQuery = adminSection === "missions" ? new URLSearchParams({ course: missionScope.courseId, week: missionScope.weekId, missionState: missionScope.state }).toString() : ["customers", "questions", "reviews"].includes(adminSection) ? new URLSearchParams({ member: searchParams.get("member") || "", submission: searchParams.get("submission") || "", question: searchParams.get("question") || "", questionState: searchParams.get("questionState") || "active" }).toString() : "";
+  const scopeQuery = adminSection === "orders" ? new URLSearchParams(orderScope).toString() : adminSection === "missions" ? new URLSearchParams({ course: missionScope.courseId, week: missionScope.weekId, missionState: missionScope.state }).toString() : ["customers", "questions", "reviews"].includes(adminSection) ? new URLSearchParams({ member: searchParams.get("member") || "", submission: searchParams.get("submission") || "", question: searchParams.get("question") || "", questionState: searchParams.get("questionState") || "active" }).toString() : "";
   const pagingKey = adminSection + "?" + scopeQuery;
   const adminPage = adminPaging.section === pagingKey ? adminPaging.page : 1;
   // An editor's one-record response is not a catalog response, even though both
@@ -272,15 +278,25 @@ export function Platform({
           ? update(current.section === pagingKey ? current.page : 1)
           : update,
     }));
-  const refresh = useCallback(async (forceNetwork = false) => {
+  const refresh = useCallback(async (forceNetwork = false, background = false) => {
     readRequest.current?.abort();
     const controller = new AbortController();
     readRequest.current = controller;
-    setLoading(true);
-    setError("");
-    setAccessDenied(false);
+    if (!background) {
+      setLoading(true);
+      setError("");
+      setAccessDenied(false);
+    }
     try {
       const started = performance.now();
+      if (!admin && (account || learning)) {
+        // Start the browser client's persistent-session/refresh lifecycle and
+        // wait for a stored session to recover before the server read. The
+        // server still verifies the user; never authorize from getSession().
+        const { error: sessionError } = await createClient().auth.getSession();
+        if (sessionError) throw new Error('로그인 정보를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+        if (controller.signal.aborted || !alive.current) return;
+      }
       const response = admin
         ? await readAdminSection(
             cachedAdminUser?.id || "anonymous",
@@ -330,6 +346,7 @@ export function Platform({
       }
       if (!response.ok) throw new Error(result.error);
       if (alive.current) {
+        setError("");
         setData(result.data || {});
         setLoadedReadKey(admin ? adminReadKey : publicReadKey);
         setSupport(result.support || { email: "", url: "" });
@@ -340,9 +357,12 @@ export function Platform({
         setPagination(result.pagination || null);
       }
     } catch (e) {
-      if (alive.current && !controller.signal.aborted) setError((e as Error).message);
+      if (alive.current && !controller.signal.aborted) {
+        if (background) setNotice((e as Error).message);
+        else setError((e as Error).message);
+      }
     } finally {
-      if (alive.current && !controller.signal.aborted) setLoading(false);
+      if (alive.current && !controller.signal.aborted && !background) setLoading(false);
     }
   }, [account, admin, adminPage, adminSection, editorRecordId, learning, scopeQuery, adminReadKey, publicReadKey, publicParamsString]);
   const prefetchAdminSection = useCallback(
@@ -364,6 +384,19 @@ export function Platform({
       readRequest.current?.abort();
     };
   }, [refresh]);
+  useEffect(() => {
+    if ((!account && !learning) || loading) return;
+    // Installed apps can retain a suspended page for hours. Re-read after a
+    // return so an old sign-in screen does not outlive the recovered session.
+    const visible = () => { if (document.visibilityState === 'visible') void refresh(true, true); };
+    const restored = (event: PageTransitionEvent) => { if (event.persisted) void refresh(true, true); };
+    document.addEventListener('visibilitychange', visible);
+    window.addEventListener('pageshow', restored);
+    return () => {
+      document.removeEventListener('visibilitychange', visible);
+      window.removeEventListener('pageshow', restored);
+    };
+  }, [account, learning, loading, refresh]);
   useEffect(() => {
     if (query === publicSearch) return;
     const timer = setTimeout(() => { setPublicPage(1); setPublicSearch(query); }, 300);
@@ -807,7 +840,7 @@ export function Platform({
   else if (account && user)
     body = (
       <MemberViews
-        key={path[1] || "dashboard"}
+        key={user.id + ':' + (path[1] || "dashboard")}
         section={path[1]}
         data={data}
         user={user}
@@ -821,6 +854,7 @@ export function Platform({
   else if (learning)
     body = (
       <Classroom
+        key={user?.id}
         path={path}
         data={data}
         pending={pending}
@@ -911,7 +945,7 @@ export function Platform({
         prefetchSection={prefetchAdminSection}
       >
         <MarketingWorkspaceNav current={key} available={available} search={searchParams.toString()} prefetchSection={prefetchAdminSection} />
-        {!hasCurrentAdminRead ? (
+        {!hasCurrentAdminRead && (key !== 'orders' || error) ? (
           error ? <AdminInlineError onRetry={() => void refresh(true)}>화면 정보를 불러오지 못했습니다. 연결 상태를 확인해 주세요.</AdminInlineError> : <AdminLoadingState title="메뉴 내용을 불러오는 중입니다." description="현재 운영 데이터를 안전하게 확인하고 있습니다."/>
         ) : key === "overview" ? (
           <Overview data={data} available={available} />
@@ -989,14 +1023,16 @@ export function Platform({
             </AdminHeading>}
             {standaloneAdmin.includes(section.key) ? (
               <AdminWorkflows
-                key={section.key + scopeQuery + (section.key === 'members' ? searchParams.toString() : '')}
+                key={section.key + (section.key === 'orders' ? '' : scopeQuery) + (section.key === 'members' ? searchParams.toString() : '')}
                 section={section.key}
                 data={data}
                 send={send}
                 pending={pending}
-                pagination={pagination}
+                pagination={hasCurrentAdminRead ? pagination : null}
                 setPage={setAdminPage}
-                loading={loading}
+                orderScope={orderScope}
+                onOrderScopeChange={changeOrderScope}
+                loading={loading || !hasCurrentAdminRead}
               />
             ) : (
               <>

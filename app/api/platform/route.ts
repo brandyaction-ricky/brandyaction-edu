@@ -19,6 +19,7 @@ import { PUBLIC_CACHE_TAG, type PublicView } from '@/lib/public-platform-plan';
 import { revalidateTag } from 'next/cache';
 import { readMemberPlatformData, type MemberView } from '@/lib/member-platform-data';
 import { couponError } from '@/lib/coupon-rules';
+import { adminOrderQuery, ORDER_PAGE_SIZE, parseOrderListScope } from '@/lib/admin-order-list';
 const reply = (data: unknown, status = 200) =>
     Response.json(data, {
         status,
@@ -105,7 +106,7 @@ export async function GET(request: Request) {
         if (record && (!uid(record) || !['products', 'learning'].includes(sectionKey))) return reply({ error: '편집할 항목을 확인해 주세요.' }, 400);
         const productEditorRead = adminMode && sectionKey === 'products' && Boolean(record);
         const page = Math.max(1, Math.min(100000, Number(params.get('page')) || 1));
-        const pageSize = sectionKey === 'orders' ? 30 : sectionKey === 'weeks' ? 1000 : 100;
+        const pageSize = sectionKey === 'orders' ? ORDER_PAGE_SIZE : sectionKey === 'weeks' ? 1000 : 100;
         if (adminMode && !user) return reply({ error: '로그인이 필요합니다.', user: null }, 401);
         const operator = adminMode ? await getOperatorUser(sectionScopes[sectionKey], user) : null;
         const authorized = performance.now();
@@ -213,6 +214,22 @@ export async function GET(request: Request) {
                 }
             })(),
             ...tables.filter((table) => !deferredOrderTables.has(table)).map(async (table) => {
+                if (adminMode && sectionKey === 'orders' && table === 'orders') {
+                    const scope = parseOrderListScope(params);
+                    const [result, all, failed, refund, access] = await Promise.all([
+                        adminOrderQuery(db, scope).order('created_at', { ascending: false }).order('id').range((page - 1) * pageSize, page * pageSize - 1),
+                        ...['all', 'failed', 'refund', 'access'].map(quick => adminOrderQuery(db, scope, quick, true)),
+                    ]);
+                    for (const item of [result, all, failed, refund, access]) if (item.error) throw item.error;
+                    data.orders = ((result.data || []) as unknown as Row[]).map(row => {
+                        const clean = { ...row };
+                        for (const key of ['course_items', 'search_items', 'refund_payments', 'active_items']) delete clean[key];
+                        return clean;
+                    });
+                    data.order_filter_counts = [{ id: 'order-filter-counts', all: all.count || 0, failed: failed.count || 0, refund: refund.count || 0, access: access.count || 0 }];
+                    pagination = { page, pageSize, total: result.count || 0 };
+                    return;
+                }
                 if (adminMode && sectionKey === 'missions' && table === 'curriculum_missions') {
                     const [result, published, hidden, archived] = await Promise.all([
                         missionQuery(missionState).order('created_at', { ascending: false }).order('id').range((page - 1) * pageSize, page * pageSize - 1),
