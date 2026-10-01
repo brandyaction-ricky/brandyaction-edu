@@ -63,6 +63,36 @@ test('email confirmation accepts supported token types and prevents external red
   assert.doesNotMatch(expired.headers.get('location'), /secret|token_hash/);
   assert.equal(expired.headers.get('set-cookie'), null);
 });
+test('email-change confirmation returns to the same member or gives a recovery path across browsers', async () => {
+  const cookie = { name: 'sb-auth-token', value: 'same-member-session', options: { httpOnly: true } };
+  let codeError = null;
+  const route = load('app/auth/confirm/route.ts', {
+    'next/server': { NextResponse: { redirect: url => {
+      const response = new Response(null, { status: 307, headers: { location: String(url) } });
+      response.cookies = { set: (name, value) => response.headers.append('set-cookie', `${name}=${value}`) };
+      return response;
+    } } },
+    '@/lib/supabase/server': { createClient: async onCookies => ({ auth: {
+      async verifyOtp() { onCookies?.([cookie]); return { error: null, data: { user: { user_metadata: { terms_version: 'v1', privacy_version: 'v1' } } } }; },
+      async exchangeCodeForSession() { if (codeError) return { error: codeError }; onCookies?.([cookie]); return { error: null }; },
+      async getUser() { return { data: { user: { user_metadata: { terms_version: 'v1', privacy_version: 'v1' } } } }; },
+    } }) },
+  });
+  const base = 'https://dev.example/auth/confirm?next=%2Fmy%2Fprofile&flow=email_change';
+  const sameBrowser = await route.GET(new Request(base + '&code=auth-code'));
+  assert.equal(sameBrowser.headers.get('location'), 'https://dev.example/my/profile');
+  assert.equal(sameBrowser.headers.get('set-cookie'), 'sb-auth-token=same-member-session');
+
+  codeError = { code: 'bad_code_verifier' };
+  const otherBrowser = await route.GET(new Request(base + '&code=auth-code'));
+  assert.equal(otherBrowser.headers.get('location'), 'https://dev.example/auth/email-change-help');
+  assert.equal(otherBrowser.headers.get('set-cookie'), null);
+  assert.doesNotMatch(otherBrowser.headers.get('location'), /code=|token_hash=/);
+
+  const tokenLink = await route.GET(new Request(base + '&token_hash=opaque&type=email_change'));
+  assert.equal(tokenLink.headers.get('location'), 'https://dev.example/my/profile');
+  assert.equal(tokenLink.headers.get('set-cookie'), 'sb-auth-token=same-member-session');
+});
 test('live publishing requires both permissions, safe assets, and handles concurrent edits', async () => {
   let productAccess = false, rpcError = null;
   const calls = [];
