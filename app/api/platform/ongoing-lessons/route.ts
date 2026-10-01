@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { assertParticipationOpen } from '@/lib/alumni-access-server';
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { uuid } from '@/lib/edu-workflows';
 import { gradeBlockQuiz, publicLessonBlocks, validateBlockAnswers, validateLessonBlocks } from '@/lib/lesson-blocks';
@@ -38,6 +39,7 @@ export async function POST(request:Request){try{
  if(b.action==='configure'){if(!['daily','weekly','monthly'].includes(b.cadence))fail('반복 주기를 확인해 주세요.');const r=await db.rpc('edu_configure_ongoing',{p_actor:actor.id,p_lesson:lesson,p_cadence:b.cadence,p_request:requiredId(b.requestId)});if(r.error)throw r.error;return reply(r.data);}
  if(!['draft','grade','complete'].includes(b.action))fail('요청을 확인해 주세요.');
  const args={p_actor:actor.id,p_lesson:lesson,p_enrollment:requiredId(b.enrollmentId),p_period:period(b.periodStart)},revision=requiredId(b.revision);
+ await assertParticipationOpen(actor.id,args.p_enrollment);
  if(b.action==='complete'){const r=await db.rpc('edu_complete_ongoing',{...args,p_revision:revision,p_write:requiredId(b.writeId),p_request:requiredId(b.requestId)});if(r.error)throw r.error;return reply(r.data);}
  const loaded=await db.rpc('edu_read_ongoing',args);if(loaded.error)throw loaded.error;if(loaded.data.revision!==revision)throw new Error('BLOCK_CONTENT_CHANGED');
  const document=validateLessonBlocks(loaded.data.document),values=validateBlockAnswers(b.values,document);

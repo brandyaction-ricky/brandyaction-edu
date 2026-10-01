@@ -14,6 +14,7 @@ function load(path, dependencies = {}) {
     if (name === '@/lib/public-platform-data') return { getPublicPlatformData: async () => ({ data: {}, pagination: null }), getPublicSupport: async () => ({}) };
     if (name === '@/lib/public-platform-plan') return { PUBLIC_CACHE_TAG: 'test' };
     if (name === '@/lib/member-platform-data') return { readMemberPlatformData: async () => ({}) };
+    if (name === '@/lib/alumni-access-server') return { assertParticipationOpen: async () => {} };
     if (name === 'next/cache') return { revalidateTag: () => {} };
     if (!(name in dependencies)) throw Error(name);
     return dependencies[name];

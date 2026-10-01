@@ -41,7 +41,7 @@ export function LessonQuestions({ enrollmentId, lessonId, lessonTitle }: { enrol
     finally{submitting.current=false;setBusy(false);}
   }
   return <section id="lesson-questions" className="lesson-private-questions" aria-label="이 학습의 개인 질문">
-    <div className="lesson-question-heading"><div><h2>이 학습의 개인 질문</h2><p>질문과 답변은 본인과 담당 운영자만 확인합니다.</p></div><button type="button" className="btn" onClick={()=>setOpen(value=>!value)}>{open?'작성 접기':'이 학습에 질문하기'}</button></div>
+    <div className="lesson-question-heading"><div><h2>이 학습의 개인 질문</h2><p>졸업 후에도 질문할 수 있습니다. 질문과 답변은 본인과 담당 운영자만 확인합니다.</p></div><button type="button" className="btn" onClick={()=>setOpen(value=>!value)}>{open?'작성 접기':'이 학습에 질문하기'}</button></div>
     {process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' ? <div hidden={!open}><QuestionComposer initialContext={{enrollmentId,lessonId,label:lessonTitle,recent:true}} onCreated={()=>{setOpen(false);setNotice('질문을 등록했습니다. 질문·답변에서도 확인할 수 있습니다.');setPage(0);setLoading(true);setVersion(v=>v+1);}}/></div> : <form onSubmit={submit} className="lesson-question-form" style={open ? undefined : {display:"none"}} onPaste={event => {
       if (process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED !== 'true') return;
       const files = Array.from(event.clipboardData.items).filter(item => item.kind === 'file' && item.type.startsWith('image/')).map(item => item.getAsFile()).filter((file): file is File => file !== null);

@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { uuid } from '@/lib/edu-workflows';
 import { answerFileSpec, matchesAnswerFile } from '@/lib/lesson-files';
+import { assertParticipationOpen } from '@/lib/alumni-access-server';
 const bucket = 'lesson-answer-files';
 const headers = { 'Cache-Control': 'private, no-store', Vary: 'Cookie' };
 const reply = (body: unknown, status = 200) => Response.json(body, { status, headers });
@@ -36,6 +37,7 @@ export async function POST(request: Request) {
     const actor = await getAuthenticatedUser(); if (!actor) fail('로그인이 필요합니다.', 401);
     const body = await readBody(request), db = createAdminClient();
     if (body.action === 'prepare') {
+      await assertParticipationOpen(actor.id, id(body.enrollmentId));
       let spec; try { spec = answerFileSpec(body.name, body.size, body.kind); } catch (e) { fail((e as Error).message); }
       if (typeof body.blockId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$/.test(body.blockId)) fail('질문을 확인해 주세요.');
       const { data: file, error } = await db.rpc('edu_prepare_answer_file', { p_actor: actor.id, p_lesson: id(body.lessonId), p_enrollment: id(body.enrollmentId), p_revision: id(body.revision), p_block: body.blockId, p_request: id(body.requestId), p_spec: spec });
@@ -48,6 +50,7 @@ export async function POST(request: Request) {
     if (body.action !== 'complete') fail('파일 요청을 확인해 주세요.');
     const { data: file, error } = await db.rpc('edu_owned_answer_file', { p_actor: actor.id, p_file: id(body.fileId) });
     if (error) throw error;
+    await assertParticipationOpen(actor.id, file.enrollment_id);
     if (file.ready_at) return reply({ id: file.id, name: file.name, kind: file.kind, size: file.size });
     const storage = db.storage.from(bucket), info = await storage.info(file.path);
     if (info.error) throw info.error;
