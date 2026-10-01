@@ -107,7 +107,7 @@ function handler(user, database) {
     '@/lib/product-metadata': load('lib/product-metadata.ts', { './platform': platform, './product-conversion': load('lib/product-conversion.ts'), './product-html-document': load('lib/product-html-document.ts') }),
     '@/lib/edu-settings': { getEduSettings: async () => ({ operations: {} }) },
     '@/lib/mission-quiz': {}, '@/lib/legal-policies': { POLICY_VERSION: 'test' },
-    '@/lib/operator-permissions': { getOperatorUser: async () => user?.role === 'admin' ? user : null, permissionsFor: async value => ({ products: value?.role === 'admin', members: value?.role === 'admin', orders: value?.role === 'admin', content: value?.role === 'admin', marketing: value?.role === 'admin' }), sectionScopes: { cohorts: 'products', testimonials: 'content', products: 'products', reviews: 'members' } },
+    '@/lib/operator-permissions': { getOperatorUser: async () => user?.role === 'admin' ? user : null, permissionsFor: async value => ({ products: value?.role === 'admin', members: value?.role === 'admin', orders: value?.role === 'admin', content: value?.role === 'admin', marketing: value?.role === 'admin' }), sectionScopes: { cohorts: 'products', testimonials: 'content', products: 'products', reviews: 'members', weeks: 'products', learning: 'products' } },
     '@/lib/crm-delivery': { crmDeliveryState: () => ({ enabled: false, configured: false }) },
     '@/lib/crm-sms-settings': { loadSmsSettings: async () => ({}), registeredSmsNumbers: () => ({ senders: [], optouts: [] }) },
   });
@@ -167,4 +167,21 @@ test('F-14 public product review projection excludes member and order identifier
   const projection = source.match(/from\('reviews'\)\.select\('([^']+)'\)/)?.[1];
   assert.ok(projection?.includes('author_name'));
   for (const key of ['user_id', 'order_id', 'cohort_id', '*']) assert.equal(projection.includes(key), false);
+});
+
+test('curriculum visibility update matches the observed revision and cannot restore deleted rows', async () => {
+ const id=crypto.randomUUID(),timestamp='2026-09-30T01:00:00.123Z',calls=[];
+ const query={update(values){calls.push(['values',values]);return this;},eq(...args){calls.push(['eq',...args]);return this;},is(...args){calls.push(['is',...args]);return this;},select(){return this;},single:async()=>({error:{code:'PGRST116'}})};
+ for(const section of ['weeks','learning']){
+  const response=await handler(admin,{from:()=>query}).POST(request({action:'save',section,id,expectedUpdatedAt:timestamp,values:{is_published:true}}));
+  assert.equal(response.status,409);assert.match((await response.json()).error,/최신 공개 범위/);
+ }
+ assert.ok(calls.some(row=>row[0]==='eq' && row[1]==='updated_at' && row[2]===timestamp));
+ assert.ok(calls.some(row=>row[0]==='is' && row[1]==='archived_at' && row[2]===null));
+});
+test('guarded publication validates input and retains operator permissions',async()=>{
+ const h=handler(admin,{from:()=>{throw Error('must not query');}});
+ const base={action:'save',section:'learning',id:crypto.randomUUID(),expectedUpdatedAt:'2026-09-30T01:00:00Z',values:{is_published:true}};
+ for(const body of [{...base,expectedUpdatedAt:''},{...base,values:{is_published:true,day_number:8}},{...base,section:'products'}])assert.equal((await h.POST(request(body))).status,400);
+ assert.equal((await handler({...admin,role:'student'},{}).POST(request(base))).status,403);
 });

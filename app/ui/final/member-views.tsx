@@ -5,6 +5,7 @@ import { QuestionAnswerHistory } from './question-thread';
 import { MemberMessages } from './member-messages';
 import { EncouragementEditor, EncouragementWall } from './member-encouragement';
 import { EnrollmentLearningOverview } from './enrollment-learning-overview';
+import { LoginEmailSettings } from './login-email-settings';
 import { learningOverview } from '@/lib/learning-overview';
 import { achievement } from "@/lib/edu-workflows";
 import {
@@ -1067,7 +1068,7 @@ function Profile({
               </span>
               <div>
                 <b>{user.full_name || "회원"}</b>
-                <p className="meta">소셜 계정으로 연결됨</p>
+                <p className="meta">내 학습 계정</p>
               </div>
             </div>
             <div className="profile-grid">
@@ -1094,7 +1095,7 @@ function Profile({
               <label className="field wide">
                 로그인 이메일
                 <input type="email" aria-label="로그인 이메일" value={user.email} readOnly />
-                <small>카카오·구글 로그인에 연결된 주소입니다.</small>
+                <small>변경하려면 아래의 로그인 이메일 변경을 이용해 주세요.</small>
               </label>
               <label className="field wide">
                 안내받을 이메일
@@ -1125,6 +1126,7 @@ function Profile({
           </p>
         )}
       </form>
+      <LoginEmailSettings email={user.email} />
       {process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' && <EncouragementEditor/>}
     </>
   );
