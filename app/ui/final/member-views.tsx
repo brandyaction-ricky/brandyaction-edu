@@ -1,5 +1,6 @@
 "use client";
 import { AppInstallCard } from './app-install';
+import { DiagnosisEntry } from './diagnosis-entry';
 import { QuestionImage } from './question-image';
 import { QuestionAnswerHistory } from './question-thread';
 import { MemberMessages } from './member-messages';
@@ -267,6 +268,7 @@ function Dashboard({
         </Link>
       </Heading>
       {blockLearningEnabled && <EncouragementWall/>}
+      <DiagnosisEntry key={user.id}/>
       <div className="member-focus-grid">
         {graduate && e ? <section className="member-learning-intro"><h2>{t(c, 'title')}</h2><p className="meta">{t(cohort, 'name')} · 졸업생</p><p>최신 공개 커리큘럼을 언제든 다시 볼 수 있습니다.</p><Link className="btn primary mt16" href={'/learn/' + e.id}>최신 커리큘럼 보기 <ArrowRight /></Link></section> : blockLearningEnabled && e ? <section className="member-learning-intro"><h2>{t(c, "title")}</h2><p className="meta">{t(cohort, "name")} · 나의 학습 진행</p><EnrollmentLearningOverview data={data} enrollment={e}/></section> : <>
         <section className="member-continue">

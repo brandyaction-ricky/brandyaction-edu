@@ -107,7 +107,8 @@ create function public.edu_diagnosis_has_access(p_user uuid,p_code text,p_course
  where g.user_id=p_user and f.diagnosis_code=p_code and (p_course is null or f.course_id=p_course) and (
    (g.order_item_id is not null and o.user_id=p_user and o.status='paid' and i.course_id=f.course_id)
    or (g.enrollment_id is not null and e.user_id=p_user and e.course_id=f.course_id
-       and e.order_item_id is null and e.status='active' and e.revoked_at is null)
+       and e.order_item_id is null and e.status='active' and e.revoked_at is null
+       and e.access_starts_at<=now() and (e.access_ends_at is null or e.access_ends_at>now()))
  ))
 $$;
 create function public.edu_diagnosis_begin(p_actor uuid,p_course uuid) returns jsonb language plpgsql security invoker set search_path='' as $$

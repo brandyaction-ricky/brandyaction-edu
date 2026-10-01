@@ -11,7 +11,7 @@ async function setup(t,{enabled=true}={}) {
  create table courses(id uuid primary key);
  create table orders(id uuid primary key,user_id uuid references profiles(id),status text);
  create table order_items(id uuid primary key,order_id uuid references orders(id),course_id uuid references courses(id));
- create table enrollments(id uuid primary key,user_id uuid references profiles(id),course_id uuid references courses(id),order_item_id uuid references order_items(id),status text,revoked_at timestamptz);
+ create table enrollments(id uuid primary key,user_id uuid references profiles(id),course_id uuid references courses(id),order_item_id uuid references order_items(id),status text,revoked_at timestamptz,access_starts_at timestamptz default '2000-01-01',access_ends_at timestamptz);
  grant select,insert,update on all tables in schema public to service_role;`);
  await db.exec(migration);
  const user=id(),other=id(),course=id(),offer=id(),release=id(),order=id(),item=id();
@@ -46,11 +46,11 @@ test('same account keeps the first release and response across packages and refu
  await assert.rejects(h.owner("update edu_diagnosis_offers set package_version='changed' where id=$1",[h.offer]),/DIAGNOSIS_OFFER_IMMUTABLE/);
 });
 test('manual enrollment grants work independently of cohort and revoke when source revokes',async t=>{
- const h=await setup(t),enrollment=id();await h.db.query("insert into enrollments values($1,$2,$3,null,'active',null)",[enrollment,h.user,h.course]);await h.begin();
+ const h=await setup(t),enrollment=id();await h.db.query("insert into enrollments(id,user_id,course_id,order_item_id,status,revoked_at) values($1,$2,$3,null,'active',null)",[enrollment,h.user,h.course]);await h.begin();
  await h.db.query("update enrollments set revoked_at=now() where id=$1",[enrollment]);await assert.rejects(h.rpc('edu_diagnosis_read',[h.user]),/DIAGNOSIS_FORBIDDEN/);
 });
 test('paid enrollment cannot bypass refunded order through the manual enrollment path',async t=>{
- const h=await setup(t);await h.pay();await h.db.query("insert into enrollments values($1,$2,$3,$4,'active',null)",[id(),h.user,h.course,h.item]);await h.begin();
+ const h=await setup(t);await h.pay();await h.db.query("insert into enrollments(id,user_id,course_id,order_item_id,status,revoked_at) values($1,$2,$3,$4,'active',null)",[id(),h.user,h.course,h.item]);await h.begin();
  await h.db.query("update orders set status='partially_refunded' where id=$1",[h.order]);await assert.rejects(h.begin(),/DIAGNOSIS_FORBIDDEN/);
 });
 test('stale leases cannot acknowledge after reclaim; retries reuse the same remote identity',async t=>{
