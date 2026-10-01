@@ -13,6 +13,8 @@ function load(file, mocks = {}) {
   const absolute = path.resolve(root, file), exports = {};
   const code = ts.transpileModule(fs.readFileSync(absolute, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   new Function('exports', 'require', code)(exports, name => {
+    if (name === '@/lib/alumni-access-server') return { assertParticipationOpen: async () => {} };
+    if (name === '@/lib/alumni-access') return { isGraduate: () => false };
     if (name === '@/lib/admin-order-list') return load('lib/admin-order-list.ts');
     if (name in mocks) return mocks[name];
     if (name === '@/lib/public-platform-data') return { getPublicPlatformData: async () => ({ data: {}, pagination: null }), getPublicSupport: async () => ({}) };
@@ -20,6 +22,7 @@ function load(file, mocks = {}) {
     if (name === '@/lib/member-platform-data') return { readMemberPlatformData: async () => ({}) };
     if (name === 'next/headers') return { headers: async () => new Headers({ host: 'preview.vercel.app' }) };
     if (name === 'next/cache') return { revalidateTag: () => {} };
+    if (name === 'server-only') return {};
     if (name.startsWith('@/') || name.startsWith('.')) {
       const base = name.startsWith('@/') ? path.resolve(root, name.slice(2)) : path.resolve(path.dirname(absolute), name);
       return load(['.ts', '.tsx'].map(extension => base + extension).find(fs.existsSync), mocks);

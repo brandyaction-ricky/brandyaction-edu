@@ -44,7 +44,7 @@ function Answers({ state }: { state: ReturnType<typeof useThread> }) {
   </>}
  </section>;
 }
-export function QuestionAnswerHistory({ questionId, fallback = '', onStatusChange, onResolved, initiallyOpen = false }: { questionId: string; fallback?: string; onStatusChange?: (status: string) => void; onResolved?: () => void; initiallyOpen?: boolean }) {
+export function QuestionAnswerHistory({ questionId, fallback = '', onStatusChange, onResolved, initiallyOpen = false, readOnly = false }: { questionId: string; fallback?: string; onStatusChange?: (status: string) => void; onResolved?: () => void; initiallyOpen?: boolean; readOnly?: boolean }) {
  const [open, setOpen] = useState(initiallyOpen), state = useThread(questionId, open);
  const [content, setContent] = useState(''), [busy, setBusy] = useState(false), [uncertain, setUncertain] = useState(false), [stale, setStale] = useState(false), [notice, setNotice] = useState('');
  const gate = useRef(false), retry = useRef<{ action: 'followup'; questionId: string; content: string; requestId: string; expectedHeadId: string | null } | null>(null);
@@ -74,14 +74,14 @@ export function QuestionAnswerHistory({ questionId, fallback = '', onStatusChang
  }
  return <div className="mt16">{open ? <>
   <Answers state={state}/>
-  {process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' && state.data?.canFollowUp && state.data.question.status === 'answered' && <p>{state.data.question.resolved ? '해결 완료한 질문입니다.' : <button type="button" className="btn small mt16" disabled={busy || uncertain || Boolean(content)} onClick={()=>void finish()}>해결됐어요</button>}</p>}
-  {state.data?.canFollowUp && <form className="mt16" onSubmit={event => { event.preventDefault(); void followUp(); }}>
+  {process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' && state.data?.canFollowUp && !readOnly && state.data.question.status === 'answered' && <p>{state.data.question.resolved ? '해결 완료한 질문입니다.' : <button type="button" className="btn small mt16" disabled={busy || uncertain || Boolean(content)} onClick={()=>void finish()}>해결됐어요</button>}</p>}
+  {state.data?.canFollowUp && !readOnly && <form className="mt16" onSubmit={event => { event.preventDefault(); void followUp(); }}>
    <label className="field">후속 질문<textarea rows={4} maxLength={10000} value={content} disabled={busy || uncertain || stale} onChange={event => setContent(event.target.value)} placeholder="답변을 보고 더 궁금한 점을 적어 주세요."/></label>
    <button className="btn primary small mt16" disabled={busy || stale || !content.trim()}>{busy ? '등록 중…' : uncertain ? '같은 요청 결과 확인' : '후속 질문 등록'}</button>
   </form>}
   {notice && <p role="status" className="notice mt16">{notice}</p>}
  </> : fallback ? <div className="answer"><b>운영자 답변</b><p className="reading-copy">{fallback}</p></div> : <p className="meta">답변이 도착하면 이곳에서 확인해 주세요.</p>}
-  <div className="row mt16"><button type="button" className="btn small" disabled={busy || uncertain} onClick={() => setOpen(v => !v)}>{open ? '답변 이력 접기' : '답변 전체 보기'}</button>{!open && <button type="button" className="btn small" onClick={() => setOpen(true)}>후속 질문하기</button>}{open && <button type="button" className="btn small" disabled={busy || uncertain} onClick={() => { state.reload(); setStale(false); }}>최신 답변 확인</button>}</div>
+  <div className="row mt16"><button type="button" className="btn small" disabled={busy || uncertain} onClick={() => setOpen(v => !v)}>{open ? '답변 이력 접기' : '답변 전체 보기'}</button>{!open && !readOnly && <button type="button" className="btn small" onClick={() => setOpen(true)}>후속 질문하기</button>}{open && <button type="button" className="btn small" disabled={busy || uncertain} onClick={() => { state.reload(); setStale(false); }}>최신 답변 확인</button>}</div>
  </div>;
 }
 export function QuestionThreadDialog({ questionId, close, changed, archive, pending = false, initialDraft = '', initialReference, onDraftChange, onDraftUsed }: { questionId: string; close: () => void; changed?: () => void; archive?: () => void; pending?: boolean; initialDraft?: string; initialReference?: QuestionAiReference; onDraftChange?: (value: string) => void; onDraftUsed?: () => void }) {

@@ -20,6 +20,7 @@ import {
   type User,
 } from "@/lib/platform";
 import { hasLearningAccess } from "@/lib/platform-rules";
+import { isGraduate } from '@/lib/alumni-access';
 import {
   ArrowRight,
   BookOpen,
@@ -164,7 +165,8 @@ function EnrolledCard({
     next =
       lessons.find((l) => !complete.some((p) => p.lesson_id === l.id)) ||
       lessons[0],
-    allowed = hasLearningAccess(e);
+    allowed = hasLearningAccess(e),
+    graduate = isGraduate(e, c, cohort);
   return (
     <article className="class-enrolled">
       <div className="flex">
@@ -175,7 +177,7 @@ function EnrolledCard({
         <div className="row-text">
           <div className="flex gap8">
             <Badge color={allowed ? "green" : ""}>
-              {allowed ? "수강 중" : labels[t(e, "status")] || "수강 종료"}
+              {graduate ? '졸업생' : allowed ? "수강 중" : labels[t(e, "status")] || "수강 종료"}
             </Badge>
             <Badge>{t(cohort, "name")}</Badge>
           </div>
@@ -186,7 +188,7 @@ function EnrolledCard({
         </div>
       </div>
       <div className="class-footer">
-        {blockLearningEnabled ? <EnrollmentLearningOverview data={data} enrollment={e} compact /> : <>
+        {graduate ? <><p className="meta">최신 공개 커리큘럼은 계속 열람할 수 있습니다. 기존 제출·피드백 기록도 보관됩니다.</p><Link className="btn primary" href={'/learn/' + e.id + (next ? '/' + next.id : '')}>최신 커리큘럼 보기 <ArrowRight /></Link></> : blockLearningEnabled ? <EnrollmentLearningOverview data={data} enrollment={e} compact /> : <>
         <div className="progress-line">
           <span className="meta">
             {complete.length} / {lessons.length}개 학습 완료
@@ -221,7 +223,11 @@ function Dashboard({
   active: Row[];
   blockLearningEnabled: boolean;
 }) {
-  const e = active[0],
+  const participating = active.filter(enrollment => !isGraduate(enrollment,
+    rows(data, 'courses').find(course => course.id === enrollment.course_id),
+    rows(data, 'cohorts').find(cohort => cohort.id === enrollment.cohort_id))),
+    e = participating[0] || active[0],
+    graduate = e ? !participating.some(enrollment => enrollment.id === e.id) : false,
     lessons = e ? enrollmentLessons(data, e) : [],
     complete = e ? completedLessonProgress(data, e, lessons) : [];
   const next =
@@ -229,7 +235,7 @@ function Dashboard({
       lessons[0],
     c = rows(data, "courses").find((c) => c.id === e?.course_id),
     cohort = rows(data, "cohorts").find((c) => c.id === e?.cohort_id),
-    entries = missionEntries(data, active),
+    entries = missionEntries(data, participating),
     result = e
       ? achievement(
           e.id,
@@ -243,12 +249,12 @@ function Dashboard({
     coupons = rows(data, "customer_coupons").filter(
       (c) => c.status === "available",
     );
-  const overviews = blockLearningEnabled ? active.map(enrollment => learningOverview(data, enrollment)) : [];
+  const overviews = blockLearningEnabled ? participating.map(enrollment => learningOverview(data, enrollment)) : [];
   const completedCount = blockLearningEnabled
     ? overviews.every(overview => overview.status === 'ready')
       ? overviews.reduce((total, overview) => total + overview.groups.reduce((sum, group) => sum + group.completed, 0), 0)
       : null
-    : active.reduce((total, enrollment) => total + completedLessonProgress(data, enrollment).length, 0);
+    : participating.reduce((total, enrollment) => total + completedLessonProgress(data, enrollment).length, 0);
   return (
     <>
       <Heading
@@ -262,7 +268,7 @@ function Dashboard({
       </Heading>
       {blockLearningEnabled && <EncouragementWall/>}
       <div className="member-focus-grid">
-        {blockLearningEnabled && e ? <section className="member-learning-intro"><h2>{t(c, "title")}</h2><p className="meta">{t(cohort, "name")} · 나의 학습 진행</p><EnrollmentLearningOverview data={data} enrollment={e}/></section> : <>
+        {graduate && e ? <section className="member-learning-intro"><h2>{t(c, 'title')}</h2><p className="meta">{t(cohort, 'name')} · 졸업생</p><p>최신 공개 커리큘럼을 언제든 다시 볼 수 있습니다.</p><Link className="btn primary mt16" href={'/learn/' + e.id}>최신 커리큘럼 보기 <ArrowRight /></Link></section> : blockLearningEnabled && e ? <section className="member-learning-intro"><h2>{t(c, "title")}</h2><p className="meta">{t(cohort, "name")} · 나의 학습 진행</p><EnrollmentLearningOverview data={data} enrollment={e}/></section> : <>
         <section className="member-continue">
           <div className="member-kicker">
             이어서 학습하기 <span>{t(cohort, "name") || "MY LEARNING"}</span>
@@ -345,7 +351,7 @@ function Dashboard({
       </div>
       <div className="member-stats">
         {[
-          ["수강 중", active.length, "개", "클래스별 학습 이어가기", "classes"],
+          ["수강 중", participating.length, "개", "클래스별 학습 이어가기", "classes"],
           [
             "학습 완료",
             completedCount ?? '—',
@@ -448,11 +454,11 @@ function Dashboard({
             <h2>다가오는 일정</h2>
             <CalendarDays />
           </div>
-          {active.map((e) => (
+          {participating.map((e) => (
             <LiveSchedule key={e.id} data={data} cohortId={t(e, "cohort_id")} />
           ))}
           {!rows(data, "cohort_sessions").some((s) =>
-            active.some((e) => s.cohort_id === e.cohort_id),
+            participating.some((e) => s.cohort_id === e.cohort_id),
           ) && <p className="panel-body muted">등록된 일정이 없습니다.</p>}
           <Link className="member-agenda-link" href="/my/orders">
             신청·주문 내역 확인
@@ -515,7 +521,9 @@ function Missions({ data, active }: { data: Data; active: Row[] }) {
   const entries = missionEntries(
     data,
     active.filter((e) => !enrollmentId || e.id === enrollmentId),
-  );
+  ).filter(entry => Boolean(entry.submission) || !isGraduate(entry.enrollment,
+    rows(data, 'courses').find(course => course.id === entry.enrollment.course_id),
+    rows(data, 'cohorts').find(cohort => cohort.id === entry.enrollment.cohort_id)));
   const statuses = [
     "전체",
     "draft",
@@ -632,7 +640,11 @@ function Missions({ data, active }: { data: Data; active: Row[] }) {
                 }
                 href={x.href}
               >
-                {x.status === "draft"
+                {isGraduate(x.enrollment,
+                  rows(data, 'courses').find(course => course.id === x.enrollment.course_id),
+                  rows(data, 'cohorts').find(cohort => cohort.id === x.enrollment.cohort_id))
+                  ? '기존 제출 보기'
+                  : x.status === "draft"
                   ? "미션 작성"
                   : x.status === "changes_requested"
                     ? "피드백 확인"
@@ -1313,7 +1325,7 @@ export function MemberViews({
           {enrollments.map((e) => (
             <div key={e.id}>
               <EnrolledCard data={data} enrollment={e} blockLearningEnabled={blockLearningEnabled} />
-              {hasLearningAccess(e) && (
+              {hasLearningAccess(e) && !isGraduate(e, rows(data, 'courses').find(course => course.id === e.course_id), rows(data, 'cohorts').find(cohort => cohort.id === e.cohort_id)) && (
                 <LiveSchedule data={data} cohortId={t(e, "cohort_id")} />
               )}
             </div>

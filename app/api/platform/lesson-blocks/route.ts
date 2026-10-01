@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { uuid } from '@/lib/edu-workflows';
 import { assessBlockCompletion, gradeBlockQuiz, publicLessonBlocks, validateBlockAnswers, validateLessonBlocks } from '@/lib/lesson-blocks';
+import { assertParticipationOpen } from '@/lib/alumni-access-server';
 
 const reply = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'private, no-store' } });
 function fail(message: string, status = 400): never { throw Object.assign(new Error(message), { status }); }
@@ -98,6 +99,7 @@ export async function POST(request: Request) {
     }
     if (!['draft', 'grade', 'submit', 'reopen'].includes(body.action)) fail('요청 종류를 확인해 주세요.');
     const enrollment = requiredId(body.enrollmentId), revision = requiredId(body.revision);
+    await assertParticipationOpen(user.id, enrollment);
     const loaded = await db.rpc('edu_read_lesson_blocks', { p_actor: user.id, p_lesson: lesson, p_enrollment: enrollment, p_revision: revision });
     if (loaded.error) throw loaded.error;
     if (!loaded.data?.document) fail('학습 내용을 찾을 수 없습니다.', 404);

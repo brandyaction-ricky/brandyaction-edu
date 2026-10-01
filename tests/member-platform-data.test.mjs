@@ -42,6 +42,7 @@ function harness(fixtures = {}, waitForRead = () => {}, rpcRead = async () => ({
     if (name === '@/lib/supabase/server') return { createClient: async () => db };
     if (name === '@/lib/supabase/admin') return { createAdminClient: () => db };
     if (name === '@/lib/platform-rules') return ruleExports;
+    if (name === '@/lib/alumni-access') return { isGraduate: () => false };
     if (name === '@/lib/learning-overview') return overviewExports;
     throw Error(name);
   });

@@ -6,7 +6,8 @@ const id='11111111-1111-4111-8111-111111111111';
 function harness({enabled=true,user={id},operator=true,error=null}={}){
  const calls=[],out={};const source=ts.transpileModule(fs.readFileSync(new URL('../app/api/platform/question-thread/route.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
  new Function('exports','require','process',source)(out,name=>({
-  '@/lib/supabase/admin':{createAdminClient:()=>({rpc:async(name,args)=>{calls.push({name,args});return{data:{ok:true},error};}})},
+  '@/lib/supabase/admin':{createAdminClient:()=>({rpc:async(name,args)=>{calls.push({name,args});return{data:{ok:true},error};},from:()=>({select(){return this;},eq(){return this;},maybeSingle:async()=>({data:{enrollment_id:null},error:null})})})},
+  '@/lib/alumni-access-server':{assertParticipationOpen:async()=>{}},
   '@/lib/server-auth':{getAuthenticatedUser:async()=>user},'@/lib/operator-permissions':{getOperatorUser:async scope=>{assert.equal(scope,'members');return operator?user:null;}},
   '@/lib/edu-workflows':{uuid:v=>typeof v==='string'&&/^[a-f0-9-]{36}$/.test(v)},
  })[name],{env:{NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED:enabled?'true':'false'}});

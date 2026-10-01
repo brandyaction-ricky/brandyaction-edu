@@ -1,6 +1,7 @@
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
+import { assertParticipationOpen } from '@/lib/alumni-access-server';
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const validId = (value: unknown): value is string => typeof value === 'string' && uuid.test(value);
 const reply = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
@@ -43,6 +44,7 @@ export async function POST(request: Request) {
     const images = process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED === 'true';
     if (!body || (body.imageId != null && (!images || !validId(body.imageId))) || ![body.enrollmentId,body.lessonId,body.requestId].every(validId) || typeof body.title !== 'string' || typeof body.content !== 'string'
       || !body.title.trim() || body.title.trim().length > 200 || (!body.content.trim() && !body.imageId) || body.content.trim().length > 10000) return reply({ error: '질문 제목과 내용을 확인해 주세요.' }, 400);
+    await assertParticipationOpen(user.id, body.enrollmentId);
     const { data, error } = await createAdminClient().rpc(images ? 'edu_create_lesson_question_with_image' : 'edu_create_lesson_question', {
       p_actor: user.id, p_request: body.requestId, p_enrollment: body.enrollmentId, p_lesson: body.lessonId, p_title: body.title.trim(), p_content: body.content.trim(), ...(images ? { p_image: body.imageId || null } : {}),
     });
