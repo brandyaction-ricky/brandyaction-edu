@@ -13,6 +13,7 @@ function load(file, mocks = {}) {
   const absolute = path.resolve(root, file), exports = {};
   const code = ts.transpileModule(fs.readFileSync(absolute, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   new Function('exports', 'require', code)(exports, name => {
+    if (name === '@/lib/admin-order-list') return load('lib/admin-order-list.ts');
     if (name in mocks) return mocks[name];
     if (name === '@/lib/public-platform-data') return { getPublicPlatformData: async () => ({ data: {}, pagination: null }), getPublicSupport: async () => ({}) };
     if (name === '@/lib/public-platform-plan') return { PUBLIC_CACHE_TAG: 'test' };

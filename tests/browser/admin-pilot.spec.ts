@@ -18,11 +18,13 @@ test('orders surface exceptions, preserve date filtering and open details in a d
   await page.getByRole('button', { name: '전체 3' }).click();
   await page.getByLabel('주문 검색').fill('PILOT-REFUND');
   await expect(page.getByRole('row')).toHaveCount(2);
+  await expect(page.getByRole('table').getByText('PILOT-REFUND', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '상세' }).click();
   await expect(page.getByRole('dialog', { name: '주문 상세' })).toContainText('PILOT-REFUND');
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.getByLabel('주문 검색').fill('PILOT-ACCESS');
+  await expect(page.getByRole('table').getByText('PILOT-ACCESS', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '상세' }).click();
   const detail = page.getByRole('dialog', { name: '주문 상세' });
   const detailFooter = detail.locator('.admin-dialog-footer');
