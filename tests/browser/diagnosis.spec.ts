@@ -93,5 +93,7 @@ test('a submitted questionnaire under review preserves completion and does not a
   await page.route('**/api/platform/diagnosis/session',async route=>{const body=route.request().method()==='POST'?route.request().postDataJSON():{};if(body.action==='save')latest=body.answers;await route.fulfill({json:{...data,revision:body.action==='save'?body.revision+1:0,answers:latest}});});
   await page.clock.install();await page.goto('/diagnosis-test');await page.getByRole('button',{name:'시작하기',exact:true}).click();await page.clock.fastForward(17000);
   await page.keyboard.press('1');await page.keyboard.press('2');await page.clock.fastForward(300);await expect(page.getByRole('heading',{name:'두 번째 합성 비교 문항'})).toBeVisible();await expect(page.locator('.timer')).toContainText('18초');
-  await page.getByRole('button',{name:'이전 문항'}).click();await expect(page.getByRole('radio',{name:'1 A에 더 가까워요'})).toBeChecked();await page.clock.fastForward(600);expect(latest.find(a=>a.questionId===id(10))?.optionId).toBe(id(11));expect(latest.find(a=>a.questionId===id(10))?.ms).toBeGreaterThanOrEqual(17000);expect(latest.find(a=>a.questionId===id(40))).toBeUndefined();
+  await page.getByRole('button',{name:'이전 문항'}).click();await expect(page.getByRole('radio',{name:'1 A에 더 가까워요'})).toBeChecked();await page.clock.fastForward(600);
+  // The virtual clock advances debounce timers, not the HTTP request to the fixture.
+  await expect.poll(()=>latest.find(a=>a.questionId===id(10))?.optionId).toBe(id(11));expect(latest.find(a=>a.questionId===id(10))?.ms).toBeGreaterThanOrEqual(17000);expect(latest.find(a=>a.questionId===id(40))).toBeUndefined();
  });
