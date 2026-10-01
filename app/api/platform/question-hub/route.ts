@@ -2,7 +2,6 @@ import { getAuthenticatedUser } from '@/lib/server-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { hubBody, hubEnabled, hubError, hubFail, hubId, hubReply } from '@/lib/question-hub-server';
 import { questionCategories, questionTitle } from '@/lib/question-hub';
-import { assertParticipationOpen } from '@/lib/alumni-access-server';
 async function actor() { hubEnabled(); const user = await getAuthenticatedUser(); if (!user) hubFail('로그인이 필요합니다.', 401); return user; }
 export async function GET(request: Request) {
   try {
@@ -29,11 +28,6 @@ export async function POST(request: Request) {
     const user = await actor(), body = await hubBody(request);
     if (typeof body.content !== 'string' || body.content.length > 10000 || typeof body.title !== 'string' || body.title.length > 200 || !Object.hasOwn(questionCategories, body.category) || typeof body.share !== 'boolean') hubFail('질문 내용을 확인해 주세요.');
     if (body.imageId && process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED !== 'true') hubFail('이미지 첨부를 사용할 수 없습니다.');
-    if (body.enrollmentId != null) {
-      const enrollmentId = hubId(body.enrollmentId);
-      if (!enrollmentId) hubFail('수강권을 확인해 주세요.');
-      await assertParticipationOpen(user.id, enrollmentId);
-    }
     const r = await createAdminClient().rpc('edu_create_hub_question', { p_actor: user.id, p_request: hubId(body.requestId), p_enrollment: hubId(body.enrollmentId, true), p_lesson: hubId(body.lessonId, true), p_title: questionTitle(body.content, body.title), p_content: body.content, p_image: hubId(body.imageId, true), p_category: body.category, p_share: body.share });
     if (r.error) throw r.error; return hubReply({ question: r.data });
   } catch (e) { return hubError(e); }

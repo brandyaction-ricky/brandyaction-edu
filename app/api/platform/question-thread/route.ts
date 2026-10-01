@@ -2,7 +2,6 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { getOperatorUser } from '@/lib/operator-permissions';
 import { uuid } from '@/lib/edu-workflows';
-import { assertParticipationOpen } from '@/lib/alumni-access-server';
 const reply = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store', Vary: 'Cookie' } });
 function fail(message: string, status = 400): never { throw Object.assign(new Error(message), { status }); }
 function id(value: unknown) { if (!uuid(value)) fail('질문 정보를 확인해 주세요.'); return value as string; }
@@ -42,11 +41,6 @@ export async function POST(request: Request) {
   if (body.action === 'finish' && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED !== 'true') fail('준비 중인 기능입니다.', 404);
   if (!['followup', 'finish'].includes(body.action) && !await getOperatorUser('members', user)) fail('질문에 답변할 권한이 없습니다.', 403);
   const question = id(body.questionId); let r;
-  if (body.action === 'followup' || body.action === 'finish') {
-   const owned = await createAdminClient().from('edu_questions').select('enrollment_id').eq('id', question).eq('user_id', user.id).maybeSingle();
-   if (owned.error) throw owned.error;
-   if (owned.data?.enrollment_id) await assertParticipationOpen(user.id, owned.data.enrollment_id);
-  }
   if (body.action === 'finish') {
    if (body.expectedHeadId !== null && !uuid(body.expectedHeadId)) fail('최신 답변을 확인해 주세요.');
    r = await createAdminClient().rpc('edu_finish_own_question', { p_actor: user.id, p_question: question, p_expected_head: body.expectedHeadId });
