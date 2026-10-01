@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, CloudCheck, LoaderCircle, ShieldCheck } from 'lucide-react';
 import { createDiagnosisAutosave } from '@/lib/diagnosis-autosave';
 import { diagnosisMissingQuestions, diagnosisQuestionAnswered, type DiagnosisAnswer, type DiagnosisOffer, type DiagnosisQuestion, type DiagnosisSession } from '@/lib/diagnosis-session';
+import { DiagnosisReportView } from './diagnosis-report';
 import './diagnosis.css';
 
 const endpoint = '/api/platform/diagnosis/session';
@@ -15,7 +16,7 @@ async function request(body?: Record<string, unknown>) {
   return data;
 }
 type SaveStatus = 'unsaved' | 'saving' | 'saved' | 'error';
-export function DiagnosisExperience({ initialCourseId }: { initialCourseId?: string }) {
+export function DiagnosisExperience({ initialCourseId, reportsEnabled = false }: { initialCourseId?: string; reportsEnabled?: boolean }) {
   const router = useRouter();
   const [session, setSession] = useState<DiagnosisSession | null>(null);
   const [offers, setOffers] = useState<DiagnosisOffer[]>([]), [course, setCourse] = useState(initialCourseId || '');
@@ -136,7 +137,8 @@ export function DiagnosisExperience({ initialCourseId }: { initialCourseId?: str
           </section>}
           {phase === 'review' && <section className="diagnosis-review"><span className="diagnosis-eyebrow">마지막 확인</span><h1 ref={heading} tabIndex={-1}>답변을 제출할까요?</h1><p>제출하면 이 답변으로 검사 결과를 만들어요.<br/>제출한 뒤에는 답변을 바꿀 수 없습니다.</p><div className="diagnosis-review-count"><span>필수 문항</span><strong>{missing.length ? `${missing.length}개 남음` : '모두 답했어요'}</strong></div><div className="diagnosis-navigation"><button className="diagnosis-secondary" onClick={() => move(0)} disabled={pending}>답변 다시 보기</button><button className="diagnosis-primary" onClick={() => void submit()} disabled={pending || conflict}>{pending ? '제출 확인 중…' : missing.length ? '빠진 문항 확인' : '답변 제출하기'}<Check size={18}/></button></div></section>}
         </>}
-        {phase === 'submitted' && <section className="diagnosis-submitted"><span className="diagnosis-complete-icon"><CheckCircle2 size={32}/></span><h1 ref={heading} tabIndex={-1}>답변을 제출했어요.</h1>{session?.needsReview ? <p>답변은 안전하게 접수됐어요. 결과를 만들기 전 확인이 필요합니다.<br/>추가 결제나 재검사 없이 이곳에서 진행 상태를 확인해 주세요.</p> : <p>검사 결과가 준비되면 이곳에서 확인할 수 있어요.<br/>화면을 닫아도 괜찮고, 다시 제출하지 않아도 됩니다.</p>}<button className="diagnosis-primary" onClick={() => void exit()}>학습으로 돌아가기<ArrowRight size={18}/></button></section>}
+        {phase === 'submitted' && reportsEnabled && <DiagnosisReportView onExit={() => void exit()}/>}
+        {phase === 'submitted' && !reportsEnabled && <section className="diagnosis-submitted"><span className="diagnosis-complete-icon"><CheckCircle2 size={32}/></span><h1 ref={heading} tabIndex={-1}>답변을 제출했어요.</h1>{session?.needsReview ? <p>답변은 안전하게 접수됐어요. 결과를 만들기 전 확인이 필요합니다.<br/>추가 결제나 재검사 없이 이곳에서 진행 상태를 확인해 주세요.</p> : <p>검사 결과가 준비되면 이곳에서 확인할 수 있어요.<br/>화면을 닫아도 괜찮고, 다시 제출하지 않아도 됩니다.</p>}<button className="diagnosis-primary" onClick={() => void exit()}>학습으로 돌아가기<ArrowRight size={18}/></button></section>}
         {error && <div className="diagnosis-error" role="alert"><p>{error}</p>
           {conflict ? <button className="diagnosis-secondary" onClick={() => { if (window.confirm('최신 답변을 불러오면 이 화면에서 아직 저장되지 않은 수정 내용은 없어집니다. 불러올까요?')) void load(); }}>최신 답변 불러오기</button>
             : saveStatus === 'error' ? <button className="diagnosis-secondary" onClick={() => void autosave.current?.flush().catch(() => {})}>저장 다시 시도</button>

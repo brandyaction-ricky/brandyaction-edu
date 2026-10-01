@@ -9,5 +9,5 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
   const user = await getAuthenticatedUser();
   if (!user) redirect('/login?next=%2Fmy%2Fdiagnosis');
   const query = await searchParams;
-  return <DiagnosisExperience initialCourseId={typeof query.course === 'string' ? query.course : undefined}/>;
+  return <DiagnosisExperience reportsEnabled={process.env.EDU_MYIN_DIAGNOSIS_REPORTS_ENABLED === 'true'} initialCourseId={typeof query.course === 'string' ? query.course : undefined}/>;
 }
