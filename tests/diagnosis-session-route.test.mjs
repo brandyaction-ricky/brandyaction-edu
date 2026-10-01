@@ -2,13 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import ts from 'typescript';
 import { readFileSync } from 'node:fs';
-const actor = { id: '00000000-0000-4000-8000-000000000001' };
+const audience = {};
+new Function('exports','process',ts.transpileModule(readFileSync(new URL('../lib/diagnosis-audience.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(audience,{env:{}});
+const actor = { role: 'admin', id: '00000000-0000-4000-8000-000000000001' };
 const source = ts.transpileModule(readFileSync(new URL('../app/api/platform/diagnosis/session/route.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
 class BridgeError extends Error { constructor(code,status) { super(code);this.code=code;this.status=status; } }
 function fixture({enabled=true,sessions=true,user=actor,error=null}={}) {
   const route={},calls=[];
   const mocks={
-    '@/lib/server-auth':{getAuthenticatedUser:async()=>user},
+    '@/lib/diagnosis-audience':audience,'@/lib/server-auth':{getAuthenticatedUser:async()=>user},
     '@/lib/supabase/admin':{createAdminClient:()=>({rpc:async()=>({data:null,error:null})})},
     '@/lib/diagnosis-bridge':{DiagnosisBridgeError:BridgeError,sendDiagnosisCommand:()=>{}},
     '@/lib/diagnosis-session-service':{runDiagnosisSession:async(deps,input)=>{calls.push({actor:deps.actor,input});if(error)throw error;return {state:'in_progress'};}},
@@ -33,3 +35,5 @@ test('bridge errors preserve recoverable states without leaking raw answers or i
     const h=fixture({error});const r=await h.post();assert.equal(r.status,error.status??503);assert.doesNotMatch(await r.text(),/database|secret|raw answer/);
   }
 });
+
+test('student and staff cannot read or mutate sessions',async()=>{for(const role of ['student','staff',undefined]){const h=fixture({user:{...actor,role}});assert.equal((await h.get()).status,403);assert.equal((await h.post()).status,403);assert.equal(h.calls.length,0);}});

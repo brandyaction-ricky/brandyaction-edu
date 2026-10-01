@@ -97,3 +97,13 @@ test('a submitted questionnaire under review preserves completion and does not a
   // The virtual clock advances debounce timers, not the HTTP request to the fixture.
   await expect.poll(()=>latest.find(a=>a.questionId===id(10))?.optionId).toBe(id(11));expect(latest.find(a=>a.questionId===id(10))?.ms).toBeGreaterThanOrEqual(17000);expect(latest.find(a=>a.questionId===id(40))).toBeUndefined();
  });
+
+
+test('admin pilot introduction is explicit and exit returns to administration', async ({page}) => {
+  await api(page);
+  await page.goto('/diagnosis-test?admin');
+  await expect(page.getByText('관리자 전용 · 수강생에게 공개되지 않습니다', {exact:true})).toBeVisible();
+  await expect(page.getByRole('button', {name:'검사 시작하기',exact:true})).toBeEnabled();
+  await page.getByRole('button', {name:'관리자 화면',exact:true}).click();
+  await expect(page).toHaveURL(/\/admin$/);
+});
