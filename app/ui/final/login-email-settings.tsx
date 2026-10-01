@@ -103,7 +103,7 @@ export function LoginEmailSettings({ email }: { email: string }) {
       {socialProvider && <details className="accordion mt24">
         <summary>새 이메일로 비밀번호 로그인도 사용하기 (선택)</summary>
         <div className="inside">
-          <p>카카오·구글 로그인은 계속 사용할 수 있습니다. 새 이메일과 비밀번호로도 로그인하려는 경우에만 설정하세요.</p>
+          <p>카카오·구글 로그인은 계속 사용할 수 있습니다. 새 이메일과 비밀번호로도 로그인하려는 경우에만 설정하세요. 이미 비밀번호를 설정했다면 다시 만들 필요가 없습니다.</p>
           {!passwordReady && <form onSubmit={addEmailPassword} className="mt16">
             <label className="field">새 비밀번호<input type="password" autoComplete="new-password" minLength={8} maxLength={128} required value={password} onChange={event => setPassword(event.target.value)} disabled={busy} /></label>
             <label className="field mt16">새 비밀번호 확인<input type="password" autoComplete="new-password" minLength={8} maxLength={128} required value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} disabled={busy} /></label>
