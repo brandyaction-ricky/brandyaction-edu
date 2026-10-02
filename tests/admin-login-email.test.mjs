@@ -15,6 +15,8 @@ function load(file, mocks = {}) {
   return exports;
 }
 const helpers = load('lib/admin-login-email.ts');
+process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://dev-auth.example.test';
+const newAddressToken = 'a'.repeat(64);
 const member = 'aaaaaaaa-aaaa-4000-8000-000000000001';
 const valid = { email: 'new@example.test', confirmEmail: 'new@example.test', reason: '회원 요청', confirmed: true };
 function database(options = {}) {
@@ -28,7 +30,7 @@ function database(options = {}) {
         then(resolve) { return Promise.resolve({ data: options.recent ? [{ id: 11 }] : [], error: null }).then(resolve); },
       }; return query;
     },
-    auth: { admin: { async getUserById() { return { data: { user: { id: member, email: 'old@example.test' } }, error: null }; }, async generateLink(value) { generated.push(value); return { data: { user: { id: options.otherUser ? 'other-member' : member }, properties: { hashed_token: 'synthetic-only-token' } }, error: options.duplicate ? { code: 'email_exists' } : null }; } } },
+    auth: { admin: { async getUserById() { return { data: { user: { id: member, email: 'old@example.test' } }, error: null }; }, async generateLink(value) { generated.push(value); return { data: { user: { id: options.otherUser ? 'other-member' : member }, properties: { hashed_token: 'synthetic-current-address-token', action_link: options.actionLink || `https://dev-auth.example.test/auth/v1/verify?type=email_change&token=${newAddressToken}` } }, error: options.duplicate ? { code: 'email_exists' } : null }; } } },
   };
   return { db, calls, writes, generated };
 }
@@ -51,10 +53,18 @@ test('confirmation goes only to the new address, keeps the original account and 
   assert.deepEqual(h.generated, [{ type: 'email_change_new', email: 'old@example.test', newEmail: valid.email }]);
   assert.equal(deliveries.length, 1); assert.equal(deliveries[0][0], valid.email);
   const link = new URL(deliveries[0][1]); assert.equal(link.pathname, '/auth/confirm'); assert.equal(link.searchParams.get('flow'), 'admin_email_change');
+  assert.equal(link.searchParams.get('token_hash'), newAddressToken);
   assert.doesNotMatch(JSON.stringify(result), /synthetic-only-token/);
   assert.equal(h.writes[0].actor_user_id, 'actor'); assert.equal(h.writes[0].before_data.email, 'old@example.test');
   assert.equal(h.writes.at(-1).after_data.status, 'waiting');
   assert.doesNotMatch(JSON.stringify(h.writes), /synthetic-only-token|password/);
+});
+test('new email verification rejects action links outside the configured Auth server', async () => {
+  for (const actionLink of [`https://evil.example/auth/v1/verify?type=email_change&token=${newAddressToken}`, `http://dev-auth.example.test/auth/v1/verify?type=email_change&token=${newAddressToken}`, `https://dev-auth.example.test/other?type=email_change&token=${newAddressToken}`, `https://dev-auth.example.test/auth/v1/verify?type=recovery&token=${newAddressToken}`, 'invalid']) {
+    const h = database({ actionLink }); let sent = false;
+    await assert.rejects(helpers.requestAdminEmailChange(h.db, 'actor', member, valid, 'https://brandyaction-edu-dev.vercel.app', async () => { sent = true; }));
+    assert.equal(sent, false); assert.equal(h.writes.at(-1).after_data.status, 'failed');
+  }
 });
 test('duplicate addresses and mail failures are audited without changing or exposing passwords', async () => {
   for (const [options, send, expected] of [[{ duplicate: true }, async () => { throw Error('Must not send'); }, /이미/], [{}, async () => { throw Error('provider secret'); }, /완료하지 못/], [{ otherUser: true }, async () => { throw Error('Must not send'); }, /완료하지 못/]]) {

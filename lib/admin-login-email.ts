@@ -59,9 +59,15 @@ export async function requestAdminEmailChange(db: SupabaseClient, actor: string,
     // password operation, email_confirm override, or direct identity edit.
     const generated = await db.auth.admin.generateLink({ type: 'email_change_new', email: current, newEmail: email });
     if (generated.error) fail(loginEmailChangeError(generated.error));
-    if (generated.data.user?.id !== member || !generated.data.properties?.hashed_token) fail('인증 정보를 확인하지 못했습니다.', 503);
+    if (generated.data.user?.id !== member) fail('인증 정보를 확인하지 못했습니다.', 503);
+    // email_change_new's top-level hashed_token may hash the current address.
+    // Use the new-address token from Auth's action link, after checking its origin.
+    const authLink = new URL(generated.data.properties?.action_link || '');
+    const authOrigin = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || '').origin;
+    const token = authLink.searchParams.get('token');
+    if (authLink.protocol !== 'https:' || authLink.origin !== authOrigin || authLink.pathname !== '/auth/v1/verify' || authLink.searchParams.get('type') !== 'email_change' || !token || !/^[a-zA-Z0-9_-]{32,256}$/.test(token)) fail('인증 정보를 확인하지 못했습니다.', 503);
     const link = new URL('/auth/confirm', origin);
-    link.searchParams.set('token_hash', generated.data.properties.hashed_token);
+    link.searchParams.set('token_hash', token);
     link.searchParams.set('type', 'email_change'); link.searchParams.set('flow', 'admin_email_change'); link.searchParams.set('change', id);
     await send(email, link.toString(), id);
     const saved = await db.from('audit_logs').update({ after_data: { ...detail, status: 'waiting', sent_at: new Date().toISOString() } }).eq('id', id);
