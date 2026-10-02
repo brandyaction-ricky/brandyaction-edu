@@ -24,6 +24,10 @@
 .edu-admin .sidebar{width:var(--admin-sidebar-width)}
 .edu-admin .app{margin-left:var(--admin-sidebar-width)}
 .edu-admin .topbar{height:var(--admin-topbar-height)}
+.edu-admin .admin-profile-link{color:inherit;text-decoration:none;cursor:pointer;transition:background .15s}
+.edu-admin .admin-profile-link:hover{background:var(--admin-surface-subtle)}
+.edu-admin .admin-profile-link:focus-visible{outline:2px solid var(--ba-red);outline-offset:-3px}
+.edu-admin .topright .admin-profile-link{min-width:40px;min-height:40px}
 .edu-admin .nav-link{min-height:38px}
 .edu-admin .content{width:100%;max-width:calc(var(--admin-content-wide) + var(--admin-page-gutter) * 2);padding:var(--admin-page-gap) var(--admin-page-gutter) 48px}
 .edu-admin .content.admin-content-standard{max-width:calc(var(--admin-content-standard) + var(--admin-page-gutter) * 2)}

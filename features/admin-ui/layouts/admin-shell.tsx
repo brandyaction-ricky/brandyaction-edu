@@ -206,13 +206,13 @@ export function AdminShell({
             <ArrowRight aria-hidden="true" />
           </Link>
         </div>
-        <div className="profile">
+        <Link className="profile admin-profile-link" href="/my/profile" aria-label="내 회원 정보" onClick={() => setMobile(false)}>
           <span className="avatar">{(user.full_name || '운영').slice(0, 1)}</span>
           <div>
             <b>{user.full_name || '운영자'}</b>
             <div className="meta">{user.role === 'admin' ? '관리자' : '스태프'}</div>
           </div>
-        </div>
+        </Link>
       </aside>
       <div className="app" inert={mobile ? true : undefined}>
         <header className="topbar">
@@ -242,7 +242,7 @@ export function AdminShell({
             <button className="btn iconbtn ghost" onClick={() => void logout()} aria-label="로그아웃">
               <LogOut aria-hidden="true" />
             </button>
-            <span className="avatar">{(user.full_name || '운영').slice(0, 1)}</span>
+            <Link className="avatar admin-profile-link" href="/my/profile" aria-label="내 회원 정보" title="내 회원 정보">{(user.full_name || '운영').slice(0, 1)}</Link>
           </div>
         </header>
         {process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' && <LearningNoticeBar/>}

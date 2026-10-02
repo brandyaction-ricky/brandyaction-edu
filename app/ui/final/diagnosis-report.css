@@ -11,12 +11,43 @@
 .diagnosis-report-loading{display:grid;justify-items:center;gap:12px;padding:48px 16px}
 .diagnosis-report-icon{display:flex;width:64px;height:64px;align-items:center;justify-content:center;margin:0 auto 24px;border-radius:20px;background:#f1f2f4;color:#626974}
 .diagnosis-report-icon.is-ready{background:#e8f5ee;color:#34765c}
-.diagnosis-report-summary h1{font-size:clamp(24px,4vw,32px);line-height:1.45;margin:12px 0 16px;letter-spacing:-.04em;outline:none}
+.edu-diagnosis .diagnosis-report-summary h1{width:fit-content;max-width:min(600px,100%);font-size:clamp(24px,4vw,32px);line-height:1.45;margin:12px auto 24px;padding:12px 20px;border:1px solid #e3b5ba;border-radius:12px;background:#fff;letter-spacing:-.04em;word-break:keep-all;outline:none}
+.edu-diagnosis .diagnosis-report-summary h1:focus-visible{outline:none}
 .diagnosis-report-summary p{max-width:510px;margin:0 auto;color:#5d6470;line-height:1.8;word-break:keep-all}
-.diagnosis-report-steps{display:flex;list-style:none;justify-content:center;padding:0;margin:32px 0;gap:12px;color:#7c828b;font-size:14px}
-.diagnosis-report-steps li{padding:10px 12px;border-bottom:2px solid #e4e6ea}
-.diagnosis-report-steps li[aria-current]{color:#c92232;border-color:#c92232;font-weight:700}
-.diagnosis-report-steps .is-complete{color:#34765c;border-color:#9cc4b0}
+.diagnosis-report-description span{display:block;text-wrap:pretty}
+.diagnosis-report-description span+span{margin-top:8px}
+.diagnosis-report-description strong{font-weight:600;color:#343a43}
+.diagnosis-report-details{width:calc(100% - 40px);max-width:510px;box-sizing:border-box;margin:24px auto 0;background:#fff;border:1px solid #e2e5e9;border-radius:12px;text-align:left;color:#59616c}
+.diagnosis-report-details summary{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:56px;box-sizing:border-box;padding:14px 20px;border-radius:12px;list-style:none;cursor:pointer;font-size:15px;font-weight:600;color:#343a43}
+.diagnosis-report-details summary::-webkit-details-marker{display:none}
+.diagnosis-report-details summary:hover{background:#f8f9fb}
+.diagnosis-report-details summary:focus-visible{outline:2px solid #b61e2c;outline-offset:3px}
+.diagnosis-report-details summary svg{flex:none;color:#777f8c;transition:transform .15s}
+.diagnosis-report-details[open] summary svg{transform:rotate(180deg)}
+.diagnosis-report-details[open] summary{border-radius:12px 12px 0 0}
+.diagnosis-report-details-body{padding:0 20px 20px;border-top:1px solid #edf0f3}
+.diagnosis-report-details-body>div{padding-top:18px}
+.diagnosis-report-details-body h2{margin:0 0 6px;font-size:14px;line-height:1.6;font-weight:600;color:#343a43}
+.diagnosis-report-details-body p{margin:0;font-size:14px;line-height:1.8;word-break:keep-all;text-wrap:pretty}
+.diagnosis-report-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));list-style:none;padding:24px 12px;margin:0 auto 36px;width:calc(100% - 40px);max-width:640px;border:1px solid #e2e5e9;border-radius:14px;background:#fff;color:#707783;font-size:14px;box-sizing:border-box}
+.diagnosis-report-steps li{position:relative;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;line-height:1.5;word-break:keep-all;min-width:0}
+.diagnosis-report-steps li+li:before{content:"";position:absolute;top:17px;right:calc(50% + 23px);width:calc(100% - 46px);height:2px;background:#e4e6ea}
+.diagnosis-step-marker{display:flex;align-items:center;justify-content:center;position:relative;width:36px;height:36px;border-radius:50%;background:#f0f2f5;color:#727986;font-size:14px;font-weight:700;flex-shrink:0}
+.diagnosis-report-steps li[aria-current]{color:#b61e2c;font-weight:700}
+.diagnosis-report-steps li[aria-current] .diagnosis-step-marker{background:#fff0f2;color:#b61e2c;box-shadow:0 0 0 4px #fff7f8}
+.diagnosis-report-steps .is-complete{color:#256449;font-weight:600}
+.diagnosis-report-steps li.is-complete[aria-current]{color:#256449}
+.diagnosis-report-steps .is-complete .diagnosis-step-marker{background:#e8f5ee;color:#256449;box-shadow:none}
+.diagnosis-report-steps .is-complete+li:before{background:#a8cdbb}
+.diagnosis-report-steps li.is-review{color:#8b5b13}
+.diagnosis-report-steps li.is-review .diagnosis-step-marker{background:#fff5df;color:#8b5b13;box-shadow:0 0 0 4px #fffaf0}
+.diagnosis-report-steps small{font-size:12px;font-weight:500;margin-top:-6px}
+.diagnosis-report-timing{display:flex;align-items:flex-start;gap:12px;margin:26px auto 0;padding:18px 20px;box-sizing:border-box;width:calc(100% - 40px);max-width:600px;background:#fff;border:1px solid #e2e5e9;border-radius:12px;text-align:left;color:#59616c}
+.diagnosis-report-timing>svg{flex:none;margin-top:3px;color:#b61e2c}
+.diagnosis-report-timing p{margin:0;font-size:14px;line-height:1.75;word-break:keep-all}
+.diagnosis-report-timing p:first-child{color:#252a31;font-weight:500;margin-bottom:4px}
+.diagnosis-report-timing strong{display:inline-block;font-size:16px;margin-left:6px;font-weight:700}
+.diagnosis-report-timing span{display:block;margin-top:8px;font-size:12px;line-height:1.7}
 .diagnosis-report-actions,.diagnosis-report-footer{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:28px}
 .diagnosis-report-actions>*{flex:1;max-width:260px;justify-content:center}
 .diagnosis-report-help{font-size:14px;color:#686f7b;line-height:1.8;text-align:center;margin:18px auto;max-width:520px;word-break:keep-all}

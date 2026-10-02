@@ -29,6 +29,9 @@ test('MYIN guide, pair choice, story, aspirations and explicit submission work o
   const state=await api(page);await page.goto('/diagnosis-test');await expect(page.getByRole('heading',{name:'나를 움직이는 마음을 알아보는 시간'})).toBeVisible();
   await page.getByRole('button',{name:'검사 시작하기',exact:true}).click();
   await expect(page.getByRole('heading',{name:'두 문장 중 지금의 나에 더 가까운 쪽을 고릅니다'})).toBeVisible();
+  await expect(page.locator('.choice-reminder strong')).toHaveText('‘비슷하다’는 정말 고르기 어려울 때만 골라 주세요.');
+  await expect(page.locator('.choice-reminder')).toHaveCSS('font-size','15px');
+  await page.screenshot({path:test.info().outputPath('diagnosis-choice-reminder.png'),fullPage:true});
   await expect(page.getByText('1문항',{exact:true})).toBeVisible();await page.getByRole('button',{name:'시작하기',exact:true}).click();
   await expect(page.locator('.timer')).toContainText('18초');await page.getByRole('radio',{name:'1 A에 더 가까워요'}).click();
   await expect(page.getByRole('heading',{name:'이번엔, 직접 들려주세요'})).toBeVisible();
@@ -88,7 +91,7 @@ test('entry uses only eligible courses and an existing account test always resum
 test('a submitted questionnaire under review preserves completion and does not ask for payment or resubmission',async({page})=>{
   await page.route('**/api/platform/diagnosis/session',route=>route.fulfill({json:{...fixture(),state:'submitted',submittedAt:'2026-10-01T00:00:00Z',needsReview:true}}));
   await page.goto('/diagnosis-test');await expect(page.getByRole('heading',{name:'답변을 제출했어요.'})).toBeVisible();
-  await expect(page.getByText('답변은 안전하게 접수됐어요.',{exact:false})).toContainText('추가 결제나 재검사 없이');
+  await expect(page.getByText('답변은 안전하게 접수됐어요.',{exact:false})).toContainText('보고서 발급 전 운영팀의 확인이 필요합니다.');
   await expect(page.getByRole('button',{name:'답변 제출하기'})).toHaveCount(0);
 });
 

@@ -186,7 +186,7 @@ export function DiagnosisQuestionnaire({initial,save,submit,onReload,onExit}:Pro
             <li><b>같은 마음을 여러 번 비교</b><span>한두 문항이 애매해도 결과는 크게 달라지지 않아요.</span></li>
           </ul></details>
         <button className="cta-btn" onClick={() => void move(page + 1)} disabled={busy || conflict}>시작하기</button>
-        <p className="panel-note">‘비슷하다’는 정말 고르기 어려울 때만 골라 주세요.</p>
+        <p className="panel-note choice-reminder"><strong>‘비슷하다’는 정말 고르기 어려울 때만 골라 주세요.</strong></p>
       </div>}
 
       {!completed && screen.kind === 'essay' && <div className="sheet">
