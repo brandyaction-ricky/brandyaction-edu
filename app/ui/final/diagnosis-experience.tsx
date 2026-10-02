@@ -23,7 +23,7 @@ export function DiagnosisExperience({ initialCourseId, reportsEnabled = false, a
   const [phase, setPhase] = useState<'loading'|'intro'|'preparing'|'questions'|'submitted'|'error'>('loading');
   const [error, setError] = useState(''), [pending, setPending] = useState(false), [generation, setGeneration] = useState(0);
   const [preparingId, setPreparingId] = useState<string>(), [preparingRestart, setPreparingRestart] = useState(false);
-  const canRestart = adminPilot && (session?.canRestart === true || preparingRestart);
+  const canRestart = adminPilot && (session ? session.canRestart === true : preparingRestart);
   const attemptId = session?.attemptId || preparingId;
   const saveAnswers = useCallback((revision: number, answers: DiagnosisAnswer[]) => request({ action: 'save', revision, answers, ...(attemptId ? { attemptId } : {}) }), [attemptId]);
   const loadVersion = useRef(0), starting = useRef(false);
