@@ -22,7 +22,7 @@ export function MemberConversation({ member }: { member: string }) {
   const focus = () => document.activeElement?.closest<HTMLElement>('.member-conversation')?.focus();
   return <section className="member-conversation" aria-label="회원 대화 기록" tabIndex={-1}>
     <h3>회원 대화 기록</h3><p className="meta">회원의 질문·답변과 내 계정이 주고받은 개인 메시지입니다. 최근 기록부터 표시하며, 여기에서 확인해도 메시지의 읽음 표시는 바뀌지 않습니다.</p>
-    <div className="row wrap-flex mt16"><button className="btn small" onClick={() => { focus(); setCursors([null]); setRetry(value => value + 1); }}>최신 대화 새로고침</button><Link className="text-link" href="/my/messages">내 메시지함 열기</Link></div>
+    <div className="row wrap-flex mt16"><button className="btn small" onClick={() => { focus(); setCursors([null]); setRetry(value => value + 1); }}>최신 대화 새로고침</button><Link className="text-link" href="/admin/questions">질문·답변 관리</Link></div>
     {state?.key === key && state.error ? <AdminInlineError onRetry={() => { focus(); setRetry(value => value + 1); }}>{state.error}</AdminInlineError> : !data ? <AdminLoadingState title="대화 기록을 불러오는 중입니다."/> : <>
       {!data.rows.length && <AdminEmptyState title="확인할 대화 기록이 없습니다."/>}
       {data.rows.map(row => <article key={`${row.kind}:${row.id}`} className="panel pad conversation-item">

@@ -24,12 +24,12 @@ test('worker requires a same-origin page and matching current account before bin
 });
 test('valid push shows only generic text; wrong-account payload and external destinations cannot notify or navigate',async()=>{
  const h=worker(),owner=randomUUID(),binding=randomUUID(),eventId=randomUUID();await h.command({action:'ACCOUNT',owner});await h.command({action:'BIND',owner,binding});
- await h.push({version:1,binding,eventId,path:'/my/messages',body:'PRIVATE ANSWER',title:'PRIVATE NAME'});assert.equal(h.notifications.length,1);assert.doesNotMatch(JSON.stringify(h.notifications),/PRIVATE/);assert.equal(h.notifications[0].options.renotify,false);assert.equal(h.notifications[0].options.icon,'/api/app-branding?icon=192');assert.equal(h.notifications[0].options.badge,'/icons/edu-badge-96.png');
- for(const data of [{version:1,binding:randomUUID(),eventId,path:'/my/messages'},{version:1,binding,eventId,path:'https://evil.test'},{version:1,binding,eventId:'x',path:'/my/messages'}])await h.push(data);
- assert.equal(h.notifications.length,1);await h.click(h.notifications[0].options.data);assert.deepEqual(h.navigations,['https://edu.test/my/messages']);await h.click({binding,path:'//evil.test'});assert.equal(h.navigations.length,1);
+ await h.push({version:1,binding,eventId,path:'/my/questions',body:'PRIVATE ANSWER',title:'PRIVATE NAME'});assert.equal(h.notifications.length,1);assert.doesNotMatch(JSON.stringify(h.notifications),/PRIVATE/);assert.equal(h.notifications[0].options.renotify,false);assert.equal(h.notifications[0].options.icon,'/api/app-branding?icon=192');assert.equal(h.notifications[0].options.badge,'/icons/edu-badge-96.png');
+ for(const data of [{version:1,binding:randomUUID(),eventId,path:'/my/questions'},{version:1,binding,eventId,path:'https://evil.test'},{version:1,binding,eventId:'x',path:'/my/questions'}])await h.push(data);
+ assert.equal(h.notifications.length,1);await h.click(h.notifications[0].options.data);assert.deepEqual(h.navigations,['https://edu.test/my/questions']);await h.click({binding,path:'//evil.test'});assert.equal(h.navigations.length,1);
 });
 test('account change clears displayed notifications, unsubscribes the old device and rejects stale notification clicks',async()=>{
  const h=worker(),owner=randomUUID(),binding=randomUUID();await h.command({action:'ACCOUNT',owner});await h.command({action:'BIND',owner,binding});
- await h.command({action:'ACCOUNT',owner:randomUUID()});assert.equal(h.binding.binding,null);assert.equal(h.unsubscribed,1);assert.ok(h.closed>0);await h.click({binding,path:'/my/messages'});assert.equal(h.navigations.length,0);
+ await h.command({action:'ACCOUNT',owner:randomUUID()});assert.equal(h.binding.binding,null);assert.equal(h.unsubscribed,1);assert.ok(h.closed>0);await h.click({binding,path:'/my/questions'});assert.equal(h.navigations.length,0);
  await h.command({action:'ACCOUNT',owner:null});assert.equal(h.binding,null);
 });

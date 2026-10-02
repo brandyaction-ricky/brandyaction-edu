@@ -1,6 +1,5 @@
 'use client';
 
-import { UnreadMessageLink } from '@/app/ui/final/unread-message-link';
 import { LearningNoticeBar } from '@/app/ui/final/learning-notice';
 import {
   ArrowRight,
@@ -232,7 +231,6 @@ export function AdminShell({
             <span>{adminSectionTitle(current, available)}</span>
           </div>
           <div className="topright">
-            {process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === "true" && <>{user.id ? <UnreadMessageLink key={user.id} userId={user.id} className="btn ghost small"/> : <Link className="btn ghost small" href="/my/messages">메시지</Link>}</>}
             {byKey.has('questions') && (
               <Link className="btn ghost small" href="/admin/questions">
                 <MessageCircle aria-hidden="true" />

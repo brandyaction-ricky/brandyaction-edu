@@ -1,13 +1,12 @@
 "use client";
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
-import { date, text as t, type Row } from '@/lib/platform';
+import { type Row } from '@/lib/platform';
 import { useUnsavedLearningChanges } from './use-unsaved-learning-changes';
 import './lesson-questions.css';
-import { QuestionImage, QuestionImagePicker, type QuestionImagePickerHandle } from './question-image';
+import { QuestionImagePicker, type QuestionImagePickerHandle } from './question-image';
 import { QuestionComposer } from './question-composer';
-import { QuestionAnswerHistory } from './question-thread';
-import { AnswerText } from './lesson-text';
+import { QuestionCard } from './question-hub';
 
 export function LessonQuestions({ enrollmentId, lessonId, lessonTitle }: { enrollmentId: string; lessonId: string; lessonTitle: string }) {
   const [open, setOpen] = useState(false), [title, setTitle] = useState(''), [content, setContent] = useState('');
@@ -41,8 +40,8 @@ export function LessonQuestions({ enrollmentId, lessonId, lessonTitle }: { enrol
     }catch(cause){setError(cause instanceof Error ? cause.message : '연결을 확인하고 다시 시도해 주세요.');if(requestId.current)setUncertain(true);}
     finally{submitting.current=false;setBusy(false);}
   }
-  return <section id="lesson-questions" className="lesson-private-questions" aria-label="이 학습의 개인 질문">
-    <div className="lesson-question-heading"><div><h2>이 학습의 개인 질문</h2><p>졸업 후에도 질문할 수 있습니다. 질문과 답변은 본인과 담당 운영자만 확인합니다.</p></div><button type="button" className="btn" onClick={()=>setOpen(value=>!value)}>{open?'작성 접기':'이 학습에 질문하기'}</button></div>
+  return <section id="lesson-questions" className="lesson-private-questions" aria-label="이 학습의 질문·답변">
+    <div className="lesson-question-heading"><div><h2>이 학습의 질문·답변</h2><p>졸업 후에도 질문할 수 있습니다. 같은 기수의 공개 질문을 함께 보고, 개인적인 내용은 비밀 질문으로 남겨 주세요.</p></div><button type="button" className="btn" onClick={()=>setOpen(value=>!value)}>{open?'작성 접기':'이 학습에 질문하기'}</button></div>
     {process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' ? <div hidden={!open}><QuestionComposer initialContext={{enrollmentId,lessonId,label:lessonTitle,recent:true}} onCreated={()=>{setOpen(false);setNotice('질문을 등록했습니다. 질문·답변에서도 확인할 수 있습니다.');setPage(0);setLoading(true);setVersion(v=>v+1);}}/></div> : <form onSubmit={submit} className="lesson-question-form" style={open ? undefined : {display:"none"}} onPaste={event => {
       if (process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED !== 'true') return;
       const files = Array.from(event.clipboardData.items).filter(item => item.kind === 'file' && item.type.startsWith('image/')).map(item => item.getAsFile()).filter((file): file is File => file !== null);
@@ -58,11 +57,11 @@ export function LessonQuestions({ enrollmentId, lessonId, lessonTitle }: { enrol
       {error && <p role="alert" className="form-error">{error}</p>}
     </form>}
     {notice && <p role="status">{notice}</p>}
-    {loading ? <p role="status">내 질문을 불러오고 있습니다.</p> : readError ? <p role="alert">{readError} <button type="button" className="btn small" onClick={()=>{setLoading(true);setVersion(v=>v+1);}}>질문 다시 불러오기</button></p> : <>
-      {questions.map(question=><article className="question-card" key={question.id}><div className="between"><b>{question.status==='answered'?'답변 완료':'답변 대기'}</b><span className="meta">{date(question.created_at)}</span></div><h3>{t(question,'title')}</h3><p className="reading-copy">{t(question,'content')}</p><QuestionImage questionId={String(question.id)} imageId={question.image_id}/>{process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED === 'true' ? <QuestionAnswerHistory questionId={String(question.id)} fallback={String(question.answer || '')} onStatusChange={status => setQuestions(old => old.some(row => row.id === question.id && row.status !== status) ? old.map(row => row.id === question.id ? {...row, status} : row) : old)}/> : Boolean(question.answer) && <div className="answer"><b>운영자 답변</b><p className="reading-copy"><AnswerText text={t(question,'answer')}/></p></div>}</article>)}
+    {loading ? <p role="status">질문을 불러오고 있습니다.</p> : readError ? <p role="alert">{readError} <button type="button" className="btn small" onClick={()=>{setLoading(true);setVersion(v=>v+1);}}>질문 다시 불러오기</button></p> : <>
+      {questions.map(question => <QuestionCard key={question.id} question={question} changed={() => setVersion(v => v + 1)}/>)}
       {!questions.length && <p className="meta">이 학습에 남긴 질문이 없습니다.</p>}
       {(page>0 || hasMore) && <div className="row"><button type="button" className="btn small" disabled={page===0} onClick={()=>{setLoading(true);setPage(p=>p-1);}}>이전 질문</button><span>{page+1}페이지</span><button type="button" className="btn small" disabled={!hasMore} onClick={()=>{setLoading(true);setPage(p=>p+1);}}>다음 질문</button></div>}
     </>}
-    <div className="lesson-question-footer"><button type="button" className="btn small" disabled={loading || busy} onClick={()=>{setLoading(true);setVersion(v=>v+1);}}>답변 새로고침</button><Link className="link" href="/my/questions">내 질문 전체 보기</Link></div>
+    <div className="lesson-question-footer"><button type="button" className="btn small" disabled={loading || busy} onClick={()=>{setLoading(true);setVersion(v=>v+1);}}>답변 새로고침</button><Link className="link" href="/my/questions">질문·답변 전체 보기</Link></div>
   </section>;
 }

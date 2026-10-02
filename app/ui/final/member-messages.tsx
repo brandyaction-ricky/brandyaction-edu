@@ -24,7 +24,7 @@ async function post(body: object) {
   if (!response.ok) throw Object.assign(new Error(data.error || '전송 결과를 확인하지 못했습니다.'), { definitive: [400, 401, 403, 404, 409, 413, 429].includes(response.status) });
   return data;
 }
-export function MemberMessages({ ongoingLesson = '', userId, progressEnabled = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' }: { ongoingLesson?: string; userId?: string; progressEnabled?: boolean }) {
+export function MemberMessages({ ongoingLesson = '', userId, readOnly = false, progressEnabled = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' }: { ongoingLesson?: string; userId?: string; readOnly?: boolean; progressEnabled?: boolean }) {
   const [view, setView] = useState({ box: 'inbox', before: '', refresh: 0 });
   const key = JSON.stringify(view), [loaded, setLoaded] = useState<{ key: string; data?: Inbox; error?: string }>();
   const data = loaded?.key === key ? loaded.data : undefined;
@@ -40,7 +40,7 @@ export function MemberMessages({ ongoingLesson = '', userId, progressEnabled = p
   const [inFlight, setInFlight] = useState(false), [uncertain, setUncertain] = useState<SendRequest | null>(null), sendGate = useRef(false);
   const [selectingGroup, setSelectingGroup] = useState(false), [groupError, setGroupError] = useState(''), groupAbort = useRef<AbortController | null>(null);
   const frozen = inFlight || !!uncertain || selectingGroup;
-  const canSendToMembers = data?.canSendToMembers;
+  const canSendToMembers = !readOnly && data?.canSendToMembers;
   useEffect(() => {
     const abort = new AbortController();
     void get<Inbox>({ box: view.box, ...(view.before ? { before: view.before } : {}) }, abort.signal).then(value => {
@@ -107,8 +107,8 @@ export function MemberMessages({ ongoingLesson = '', userId, progressEnabled = p
     } finally { sendGate.current = false; setInFlight(false); }
   }
   return <section className="edu-messages" aria-label="메시지함">
-    {userId && process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === 'true' && <PushSettings key={userId} userId={userId} />}
-    <h1>메시지</h1><p>멘토와 학습에 필요한 이야기를 주고받습니다.</p>
+    {!readOnly && userId && process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === 'true' && <PushSettings key={userId} userId={userId} />}
+    <h2>{readOnly ? '이전 메시지 기록' : '메시지'}</h2><p>{readOnly ? '주고받은 내용은 보관됩니다. 새 문의와 답변은 질문·답변에서 이어가 주세요.' : '멘토와 학습에 필요한 이야기를 주고받습니다.'}</p>
     <div className="row"><button className="btn" aria-pressed={view.box === 'inbox'} onClick={() => changeBox('inbox')}>받은 메시지{data ? ` · 안 읽음 ${data.unreadCount}` : ''}</button><button className="btn" aria-pressed={view.box === 'sent'} onClick={() => changeBox('sent')}>보낸 메시지</button><button className="btn" onClick={() => setView(old => ({ ...old, refresh: old.refresh + 1 }))}>메시지 새로고침</button></div>
     {loaded?.key === key && loaded.error ? <p role="alert">{loaded.error}</p> : !data ? <p role="status">메시지를 불러오고 있습니다.</p> : <>
       <p>{view.box === 'sent' ? '내가 보낸 메시지입니다. 받는 사람이 메시지를 열면 읽음으로 표시됩니다.' : '내용 보기를 누르면 읽음으로 표시됩니다.'}</p>
@@ -118,12 +118,12 @@ export function MemberMessages({ ongoingLesson = '', userId, progressEnabled = p
         <button className="btn small" disabled={readBusy} aria-expanded={expanded === message.id} onClick={() => expanded === message.id ? setExpanded('') : void open(message)}>내용 {expanded === message.id ? '접기' : '보기'}</button>
         {expanded === message.id && <><p className="edu-message-body">{message.content}</p>{message.isNotice && learningNoticePath(message.targetPath) && <Link className="btn small" href={learningNoticePath(message.targetPath)!}>해당 내용 확인</Link>}{view.box === 'inbox' && <>
           {readError && <><p role="alert">{readError}</p><button className="btn small" disabled={readBusy} onClick={() => void open(message)}>읽음 표시 다시 확인</button></>}
-          {!message.isNotice && <button className="btn small" disabled={frozen || (!!content && replyTo?.id !== message.id)} onClick={() => { setReplyTo(message); setSelected([]); setNotice(''); }}>답장 작성</button>}
+          {!readOnly && !message.isNotice && <button className="btn small" disabled={frozen || (!!content && replyTo?.id !== message.id)} onClick={() => { setReplyTo(message); setSelected([]); setNotice(''); }}>답장 작성</button>}
         </>}</>}
       </article>)}
       <div className="row"><button className="btn small" disabled={!view.before} onClick={() => { setExpanded(''); setView(old => ({ ...old, before: '' })); }}>최신 메시지</button><button className="btn small" disabled={!data.nextCursor} onClick={() => { setExpanded(''); setView(old => ({ ...old, before: data.nextCursor! })); }}>이전 메시지</button></div>
     </>}
-    <section className="panel pad mt24" aria-label="메시지 작성">
+    {!readOnly && <section className="panel pad mt24" aria-label="메시지 작성">
       <h2>{replyTo ? `${replyTo.senderName || '회원'}에게 답장` : canSendToMembers ? '회원에게 보내기' : '멘토에게 문의하기'}</h2>
       {replyTo && <button className="btn small" disabled={frozen} onClick={() => setReplyTo(null)}>답장 대상 해제</button>}
       {canSendToMembers && !replyTo && <fieldset disabled={frozen}>
@@ -149,6 +149,6 @@ export function MemberMessages({ ongoingLesson = '', userId, progressEnabled = p
       {uncertain && !inFlight && <p>전송 여부를 확인하는 동안 내용과 받는 사람을 유지합니다. 아래 버튼으로 같은 요청을 다시 확인해 주세요.</p>}
       {notice && <p role="status">{notice}</p>}
       <button className="btn primary" disabled={inFlight || selectingGroup || !data || (!uncertain && (!content.trim() || (canSendToMembers && !replyTo && !selected.length)))} onClick={() => void send()}>{inFlight ? '전송 결과 확인 중…' : uncertain ? '전송 결과 다시 확인' : '메시지 보내기'}</button>
-    </section>
+    </section>}
   </section>;
 }

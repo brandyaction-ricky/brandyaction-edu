@@ -54,7 +54,7 @@ export function AppInstallCard({ settings = false }: { settings?: boolean }) {
   const state = useContext(InstallContext), [copied, setCopied] = useState('');
   const [guideOpen, setGuideOpen] = useState(false), guideId = useId();
   if (!state || !settings && (state.installed || state.dismissed)) return null;
-  if (state.installed) return <section className="panel pad app-install" aria-label="앱 사용 상태"><h2>브랜디에듀 설치가 확인되었습니다</h2><p>홈 화면이나 앱 목록의 아이콘으로 학습을 이어가세요.</p>{process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === 'true' && <Link href="/my/messages" className="text-link">메시지·앱 알림 설정 열기</Link>}</section>;
+  if (state.installed) return <section className="panel pad app-install" aria-label="앱 사용 상태"><h2>브랜디에듀 설치가 확인되었습니다</h2><p>홈 화면이나 앱 목록의 아이콘으로 학습을 이어가세요.</p>{process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' && <Link href="/my/questions" className="text-link">질문·답변 알림 설정 열기</Link>}</section>;
   async function copy() {
     try { await navigator.clipboard.writeText(state!.homeUrl); setCopied('복사했어요. 사파리나 크롬을 열고, 맨 위나 아래의 주소 칸을 길게 눌러 ‘붙여넣기’를 선택해 주세요.'); }
     catch { setCopied('주소를 길게 누르거나 선택해서 직접 복사해 주세요.'); }

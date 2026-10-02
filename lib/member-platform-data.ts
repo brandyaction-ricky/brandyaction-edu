@@ -72,10 +72,11 @@ export async function readMemberPlatformData(userId: string, view: MemberView, e
   const cohortIds = [...new Set((data.enrollments || []).filter(enrollment => view !== 'resources' || hasLearningAccess(enrollment)).map(enrollment => String(enrollment.cohort_id)))];
   const active = (data.enrollments || []).filter(enrollment => hasLearningAccess(enrollment));
   const activeIds = active.map(enrollment => enrollment.id);
+  const resourceEntry = view === 'dashboard' || view === 'classes';
   // Once enrollments are known, these reads have no dependencies on each other.
   const [courses, cohorts, weeks, progress, submissions, drafts, sessions, overviews] = await Promise.all([
     courseIds.length ? (async () => {
-      const columns = view === 'resources'
+      const columns = view === 'resources' || resourceEntry
         ? 'id,title,slug,category,list_price,schedule_label,duration_label,resources:metadata->product_resources,digital_sections:metadata->digital_content_sections'
         : 'id,title,slug,category,list_price,schedule_label,duration_label';
       return checked(await admin.from('courses').select(columns).in('id', courseIds).limit(limit), '상품');
@@ -98,6 +99,10 @@ export async function readMemberPlatformData(userId: string, view: MemberView, e
   if (courses) data.courses = view === 'resources' ? courses.map(course => {
     const { resources, digital_sections, ...rest } = course;
     return { ...rest, metadata: { product_resources: resources || [], digital_content_sections: digital_sections || [] } };
+  }) : resourceEntry ? courses.map(course => {
+    const { resources, digital_sections, ...rest } = course;
+    return { ...rest, has_resources: active.some(enrollment => enrollment.course_id === course.id) &&
+      ((Array.isArray(resources) && resources.length > 0) || (Array.isArray(digital_sections) && digital_sections.length > 0)) };
   }) : courses;
   if (cohorts) data.cohorts = cohorts;
   if (weeks) {

@@ -1,7 +1,6 @@
 "use client";
 import { QuestionImage } from './final/question-image';
 import { QuestionThreadDialog } from './final/question-thread';
-import { UnreadMessageLink } from "./final/unread-message-link";
 import { LearningNoticeBar } from './final/learning-notice';
 import { disableDevicePush, synchronizePushAccount } from "@/lib/web-push-client";
 import { defaultPolicies } from "@/lib/legal-policies";
@@ -584,7 +583,7 @@ export function Platform({
           <div className="header-user">
             {user ? (
               <>
-                {process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === "true" && <UnreadMessageLink key={user.id} userId={user.id}/>}
+                <Link className="link" href={admin ? "/admin/questions" : "/my/questions"}>질문·답변</Link>
                 <Link className="link" href="/my">
                   마이페이지
                 </Link>
@@ -650,7 +649,6 @@ export function Platform({
         <div className="wrap">
           <span>BRANDYACTION EDU · 나의 배움과 실행</span>
           <nav className="learning-footer-links" aria-label="마이페이지 푸터 안내">
-            {support.email && <a href={"mailto:" + support.email}>이메일 문의</a>}
             {safeUrl(support.url) && (
               <a target="_blank" rel="noreferrer" href={safeUrl(support.url)}>
                 고객센터
