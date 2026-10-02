@@ -29,3 +29,8 @@
 :is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body .lesson-toggle-content { padding:.5em 0 .5em 1.4em; border-left:2px solid #e5e7eb; }
 :is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body a { color:var(--ba-info,#2563eb); text-decoration:underline; text-underline-offset:3px; overflow-wrap:anywhere; }
 :is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body a:focus-visible { outline:2px solid currentColor; outline-offset:3px; }
+:is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body .lesson-callout { display:flex; align-items:flex-start; gap:12px; margin:16px 0; padding:16px; border:1px solid #eadbad; border-radius:8px; background:#fff9e8; color:#343027; }
+:is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body .lesson-callout-icon { flex:none; font-size:20px; line-height:1.5; user-select:none; }
+:is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body .lesson-callout-content { flex:1; min-width:0; }
+:is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body .lesson-callout-content > :first-child { margin-top:0; }
+:is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body .lesson-callout-content > :last-child { margin-bottom:0; }

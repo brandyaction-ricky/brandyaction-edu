@@ -51,7 +51,7 @@ export function lessonTextSegments(text: string): LessonSegment[] {
   return nodes.filter(node => node.text);
 }
 
-const blockTypes = new Set(["doc", "paragraph", "heading", "bulletList", "orderedList", "listItem", "blockquote", "details", "detailsSummary", "detailsContent"]);
+const blockTypes = new Set(["doc", "paragraph", "heading", "bulletList", "orderedList", "listItem", "blockquote", "details", "detailsSummary", "detailsContent", "callout"]);
 const simpleMarks = new Set(["bold", "italic", "underline", "strike"]);
 const record = (value: unknown): Record<string, unknown> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 
@@ -77,6 +77,7 @@ export function normalizeLessonDocument(value: unknown): LessonNode | null {
     if (!blockTypes.has(type)) return null;
     const content = (Array.isArray(node.content) ? node.content : []).map(child => visit(child, depth + 1)).filter((child): child is LessonNode => Boolean(child));
     if (type === "heading") return { type, attrs: { level: attrs.level === 1 ? 1 : attrs.level === 3 ? 3 : 2 }, content };
+    if (type === "callout" && (!content.length || content.some(child => ["text", "hardBreak", "doc", "detailsSummary", "detailsContent"].includes(child.type)))) throw new Error("Invalid lesson callout");
     if (type === "details") {
       if (content.length !== 2 || content[0].type !== "detailsSummary" || content[1].type !== "detailsContent") throw new Error("Invalid lesson toggle");
       return { type, content };

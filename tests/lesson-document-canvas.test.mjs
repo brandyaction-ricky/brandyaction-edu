@@ -13,7 +13,7 @@ function load(name) {
 const {lessonCanvasNodes,blocksFromCanvas,duplicateLessonBlock} = load('lesson-document-canvas');
 const {newGuidedBlock} = load('lesson-guided-tools');
 const {newCalculatorBlock} = load('lesson-calculators');
-const {lessonDocumentForEditor} = load('lesson-body');
+const {lessonDocumentForEditor, serializeLessonDocument, parseLessonDocument, normalizeLessonDocument, lessonBodyPlainText} = load('lesson-body');
 const blocks = [
   {id:'raw',type:'text',content:'원문\n\n[링크](https://example.com)'}, {id:'h',type:'heading',content:'한 제목'},
   {id:'s',type:'subheading',content:'작은 제목'}, {id:'q',type:'question',question:{label:'기존 질문',kind:'image',required:true}},
@@ -23,6 +23,19 @@ const blocks = [
   newGuidedBlock('persona-generator','persona'),newGuidedBlock('landing-planner','landing'),
   newCalculatorBlock('recipe-calculator','recipe'),newCalculatorBlock('margin-calculator','margin'),newCalculatorBlock('marketing-funnel','funnel'),
 ];
+test('callout content persists through the canvas without changing activities or keeping unsafe attributes',()=>{
+ const notice={type:'callout',attrs:{style:'position:fixed',onclick:'alert(1)'},content:[
+  {type:'paragraph',content:[{type:'text',text:'필독 안내',marks:[{type:'bold'}]}]},
+  {type:'bulletList',content:[{type:'listItem',content:[{type:'paragraph',content:[{type:'text',text:'수강 전에 확인',marks:[{type:'link',attrs:{href:'https://example.com/notice'}}]}]}]}]},
+ ]};
+ const saved=serializeLessonDocument({type:'doc',content:[notice]});
+ assert.equal(parseLessonDocument(saved).content[0].type,'callout');
+ assert.equal(parseLessonDocument(saved).content[0].attrs,undefined);
+ assert.match(lessonBodyPlainText(saved),/필독 안내/);
+ const next=[{id:'notice',type:'text',content:saved},...blocks];
+ assert.deepEqual(blocksFromCanvas(lessonCanvasNodes(next)),next);
+ for(const content of [[],[{type:'text',text:'잘못된 본문'}],[{type:'doc',content:[]}]])assert.equal(normalizeLessonDocument({type:'doc',content:[{type:'callout',content}]}),null);
+});
 test('whole lesson projection round-trips every opaque tool and untouched legacy text exactly',()=>{
   assert.deepEqual(blocksFromCanvas(lessonCanvasNodes(blocks)),blocks);
 });
