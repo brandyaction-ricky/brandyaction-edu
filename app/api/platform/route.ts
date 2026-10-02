@@ -384,6 +384,7 @@ export async function GET(request: Request) {
             data.payments = [];
             data.enrollments = [];
             data.edu_refund_requests = [];
+            data.refunds = [];
             if (orderIds.length) {
                 const [items, payments] = await Promise.all([
                     db.from('order_items').select(adminSelectColumns(sectionKey, 'order_items')).in('order_id', orderIds),
@@ -395,14 +396,17 @@ export async function GET(request: Request) {
                 data.payments = (payments.data || []) as Row[];
                 const itemIds = data.order_items.map((row) => row.id).filter(Boolean);
                 const paymentIds = data.payments.map((row) => row.id).filter(Boolean);
-                const [enrollments, refunds] = await Promise.all([
+                const [enrollments, refunds, completedRefunds] = await Promise.all([
                     itemIds.length ? db.from('enrollments').select(adminSelectColumns(sectionKey, 'enrollments')).in('order_item_id', itemIds) : Promise.resolve({ data: [], error: null }),
                     paymentIds.length ? db.from('edu_refund_requests').select('id,payment_id,amount,reason,status,created_at').in('payment_id', paymentIds) : Promise.resolve({ data: [], error: null }),
+                    paymentIds.length ? db.from('refunds').select('id,payment_id,amount,reason,status,requested_at,completed_at').in('payment_id', paymentIds) : Promise.resolve({ data: [], error: null }),
                 ]);
                 if (enrollments.error) throw enrollments.error;
                 if (refunds.error) throw refunds.error;
+                if (completedRefunds.error) throw completedRefunds.error;
                 data.enrollments = (enrollments.data || []) as unknown as Row[];
                 data.edu_refund_requests = (refunds.data || []) as Row[];
+                data.refunds = (completedRefunds.data || []) as Row[];
             }
         }
         if (user && !adminMode) {

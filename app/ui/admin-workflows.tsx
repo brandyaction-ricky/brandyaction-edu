@@ -1941,6 +1941,7 @@ function OrdersPanel({
     selectedPayments.some(payment => payment.id === request.payment_id),
   );
   const selectedApproved = selectedPayments.reduce((sum, payment) => sum + Number(payment.approved_amount || 0), 0);
+  const selectedRefundResults = rows(data, "refunds").filter(refund => selectedPayments.some(payment => payment.id === refund.payment_id));
   const selectedCancelled = selectedPayments.reduce((sum, payment) => sum + Number(payment.cancelled_amount || 0), 0);
   const selectedRemaining = Math.max(0, selectedApproved - selectedCancelled);
   return (
@@ -2066,6 +2067,7 @@ function OrdersPanel({
                   <li><b>주문 생성</b><time>{timeLabel(selectedOrder.created_at)}</time><p>{t(selectedOrder, "customer_email")}{t(selectedOrder, "customer_phone") ? ` · ${t(selectedOrder, "customer_phone")}` : ""}</p></li>
                   {selectedPayments.map(payment => <li key={payment.id}><b>결제 {payment.status === "paid" ? "완료" : labels[t(payment, "status")] || t(payment, "status")}</b><time>{timeLabel(payment.approved_at || payment.created_at)}</time><p>{t(payment, "method") || "결제수단 미확인"} · {money(Number(payment.approved_amount || 0))}</p></li>)}
                   {selectedRefunds.map(refund => <li key={refund.id}><b>환불 {refund.status === "processing" ? "요청" : labels[t(refund, "status")] || t(refund, "status")}</b><time>{timeLabel(refund.created_at)}</time><p>{money(Number(refund.amount || 0))}{t(refund, "reason") ? ` · ${t(refund, "reason")}` : ""}</p></li>)}
+                  {selectedRefundResults.map(refund => <li key={`result-${refund.id}`}><b>결제 취소·환불 {refund.status === 'done' ? '완료' : refund.status === 'failed' ? '실패' : '처리 중'}</b><time>{timeLabel(refund.completed_at || refund.requested_at)}</time><p>{money(Number(refund.amount || 0))}{t(refund, 'reason') ? ` · ${t(refund, 'reason')}` : ''}</p></li>)}
                   {selectedEnrollments.map(enrollment => <li key={enrollment.id}><b>수강 권한 {labels[t(enrollment, "status")] || t(enrollment, "status")}</b><time>{timeLabel(enrollment.created_at)}</time><p>{enrollment.access_ends_at ? `${timeLabel(enrollment.access_ends_at)}까지` : "기한 제한 없음"}</p></li>)}
                 </ol>
               </section>
