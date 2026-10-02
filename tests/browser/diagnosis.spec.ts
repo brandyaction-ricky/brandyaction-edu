@@ -33,7 +33,7 @@ test('MYIN guide, pair choice, story, aspirations and explicit submission work o
   await expect(page.locator('.choice-reminder')).toHaveCSS('font-size','15px');
   await page.screenshot({path:test.info().outputPath('diagnosis-choice-reminder.png'),fullPage:true});
   await expect(page.getByText('1문항',{exact:true})).toBeVisible();await page.getByRole('button',{name:'시작하기',exact:true}).click();
-  await expect(page.locator('.timer')).toContainText('18초');await page.getByRole('radio',{name:'1 A에 더 가까워요'}).click();
+  await expect(page.locator('.timer')).toContainText('18초');await expect(page.locator('.timer')).not.toContainText('18초');await page.getByRole('radio',{name:'1 A에 더 가까워요'}).click();
   await expect(page.getByRole('heading',{name:'이번엔, 직접 들려주세요'})).toBeVisible();
   await page.getByRole('textbox').fill('합성 사업자의 실제 경험');await page.getByRole('button',{name:'다음 단계로',exact:true}).click();
   await page.getByRole('checkbox',{name:'합성 모습 하나'}).click();await page.getByRole('checkbox',{name:'합성 모습 둘'}).click();await expect(page.getByRole('checkbox',{name:'합성 모습 셋'})).toBeDisabled();
@@ -46,13 +46,13 @@ test('MYIN guide, pair choice, story, aspirations and explicit submission work o
 });
 test('failed boundary save keeps the answer and allows an explicit retry without losing story input',async({page})=>{
   const state=await api(page,{started:true,failSave:true});await page.goto('/diagnosis-test');await page.getByRole('button',{name:'시작하기',exact:true}).click();
-  await page.getByRole('radio',{name:'1 A에 더 가까워요'}).click();await expect(page.getByRole('alert')).toContainText('이 창을 닫지 마세요');
+  await expect(page.locator('.timer')).not.toContainText('18초');await page.getByRole('radio',{name:'1 A에 더 가까워요'}).click();await expect(page.getByRole('alert')).toContainText('이 창을 닫지 마세요');
   await expect(page.getByRole('radio',{name:'1 A에 더 가까워요'})).toBeChecked();await page.getByRole('button',{name:'저장 다시 시도'}).click();await expect.poll(()=>state.current.answers.length).toBeGreaterThan(0);await expect(page.getByRole('alert')).toHaveCount(0);
   await page.reload();await expect(page.getByRole('heading',{name:'이번엔, 직접 들려주세요'})).toBeVisible();
   const input=page.getByRole('textbox');await input.fill('저장하고 이어갈 합성 답변');await expect.poll(()=>state.current.answers.find(a=>a.questionId===id(20))?.value).toContain('합성 답변');
 });
 test('conflicting edits stop further writes and reloading requires a deliberate choice',async({page})=>{
-  const state=await api(page,{started:true,conflict:true});await page.goto('/diagnosis-test');await page.getByRole('button',{name:'시작하기',exact:true}).click();await page.getByRole('radio',{name:'2 B에 더 가까워요'}).click();
+  const state=await api(page,{started:true,conflict:true});await page.goto('/diagnosis-test');await page.getByRole('button',{name:'시작하기',exact:true}).click();await expect(page.locator('.timer')).not.toContainText('18초');await page.getByRole('radio',{name:'2 B에 더 가까워요'}).click();
   await expect(page.getByRole('alert')).toContainText('다른 화면');await expect(page.getByRole('radio',{name:'2 B에 더 가까워요'})).toBeChecked();await expect(page.getByRole('radio').first()).toBeDisabled();
   await page.getByRole('button',{name:'서버 응답 다시 불러오기'}).click();await page.getByRole('button',{name:'취소',exact:true}).click();expect(state.writes).toBe(1);await expect(page.getByRole('radio',{name:'2 B에 더 가까워요'})).toBeChecked();
 });
@@ -107,7 +107,7 @@ test('instruction band is not clickable, choice numbers align, and question tran
   await expect(page.locator('.pair-vs')).toHaveText('VS');await expect(page.locator('.pair-card').first()).toHaveCSS('border-top-width','0px');
   await page.locator('.pair-card').first().click();await expect(page.locator('.q-no')).toHaveText('Q 001');await expect(page.getByRole('radio',{checked:true})).toHaveCount(0);
   const positions=await page.locator('.opt .num').evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect().top));expect(new Set(positions).size).toBe(1);
-  const previous=await page.locator('.qwrap').elementHandle();await page.keyboard.press('1');await expect(page.locator('.q-no')).toHaveText('Q 002');
+  const previous=await page.locator('.qwrap').elementHandle();await expect(page.locator('.timer')).not.toContainText('18초');await page.keyboard.press('1');await expect(page.locator('.q-no')).toHaveText('Q 002');
   expect(await previous!.evaluate(node=>node.isConnected)).toBe(false);
   await page.emulateMedia({reducedMotion:'reduce'});await page.getByRole('button',{name:'이전 문항'}).click();
   await expect(page.locator('.qwrap')).toHaveCSS('animation-name','none');
@@ -116,7 +116,7 @@ test('instruction band is not clickable, choice numbers align, and question tran
 test('keyboard selection advances once and instruction checks require acknowledgment',async({page})=>{
   const data=fixture();data.survey.questions[0].confirmationOptionId=id(12);data.survey.questions[0].reconfirmInstructions=true;
   await page.route('**/api/platform/diagnosis/session',async route=>{const body=route.request().method()==='POST'?route.request().postDataJSON():{};await route.fulfill({json:body.action==='save'?{...data,revision:1,answers:body.answers}:data});});
-  await page.goto('/diagnosis-test');await page.getByRole('button',{name:'시작하기',exact:true}).click();await page.keyboard.press('1');await expect(page.getByRole('button',{name:'안내를 읽었습니다'})).toBeVisible();await expect(page.getByRole('heading',{name:'이번엔, 직접 들려주세요'})).toHaveCount(0);
+  await page.goto('/diagnosis-test');await page.getByRole('button',{name:'시작하기',exact:true}).click();await expect(page.locator('.timer')).not.toContainText('18초');await page.keyboard.press('1');await expect(page.getByRole('button',{name:'안내를 읽었습니다'})).toBeVisible();await expect(page.getByRole('heading',{name:'이번엔, 직접 들려주세요'})).toHaveCount(0);
   await page.getByRole('button',{name:'안내를 읽었습니다'}).click();await expect(page.getByRole('heading',{name:'이번엔, 직접 들려주세요'})).toBeVisible();
 });
 test('entry uses only eligible courses and an existing account test always resumes',async({page})=>{

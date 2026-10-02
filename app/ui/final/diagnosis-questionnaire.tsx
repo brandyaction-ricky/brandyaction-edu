@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createDiagnosisAutosave } from '@/lib/diagnosis-autosave';
+import { diagnosisNeutralResponses, diagnosisResponseTooFast } from '@/lib/diagnosis-response-guards';
 import { diagnosisMissingQuestions, diagnosisQuestionAnswered, type DiagnosisAnswer as N30Answer, type DiagnosisQuestion as N30Question, type DiagnosisSession } from '@/lib/diagnosis-session';
 import { DiagnosisRestart } from './diagnosis-restart';
 import './diagnosis-questionnaire.css';
@@ -38,6 +39,7 @@ export function DiagnosisQuestionnaire({initial,save,submit,onReload,onExit,onRe
   const [conflict,setConflict]=useState(false),[confirmReload,setConfirmReload]=useState(false),[confirmSubmit,setConfirmSubmit]=useState(false);
   const [confirmedInstructions,setConfirmedInstructions]=useState(false),[timerLeft,setTimerLeft]=useState(PAIR_SECONDS);
   const [checkMiss,setCheckMiss]=useState<string|null>(null);
+  const [speedMiss,setSpeedMiss]=useState<string|null>(null),[neutralBlock,setNeutralBlock]=useState(false);
   const latest=useRef(answers),alive=useRef(true),advancing=useRef(false),locked=useRef(false),shownAt=useRef(0);
   const advanceTimer=useRef<ReturnType<typeof setTimeout>|null>(null), dlgRef=useRef<HTMLDialogElement>(null),heading=useRef<HTMLHeadingElement>(null),submitHeading=useRef<HTMLHeadingElement>(null);
   const saver=useRef<ReturnType<typeof createDiagnosisAutosave>|null>(null);
@@ -51,6 +53,7 @@ export function DiagnosisQuestionnaire({initial,save,submit,onReload,onExit,onRe
   }});},[initial.revision,save]);
   const screen=screens[page],find=(q?:N30Question)=>answers.find(a=>a.questionId===q?.id);
   const coreTotal=questions.filter(q=>q.core).length,answered=questions.filter(q=>q.core&&diagnosisQuestionAnswered(q,find(q))).length;
+  const neutral=diagnosisNeutralResponses(questions,answers);
   const textQuestions=questions.filter(q=>q.type==='text'),aspireQuestion=questions.find(q=>q.pickExactly!==null);
   const aspireValues=find(aspireQuestion)?.values??[],aspireTotal=aspireQuestion?.pickExactly??0;
   const dirty=saveStatus!=='saved',firstMissing=screens.findIndex(s=>s.kind==='q'&&!diagnosisQuestionAnswered(s.q,find(s.q)));
@@ -58,7 +61,7 @@ export function DiagnosisQuestionnaire({initial,save,submit,onReload,onExit,onRe
   useEffect(()=>{if(!dirty||conflict||busy||saveStatus==='saving')return;const timer=setTimeout(()=>void saver.current!.flush().catch(()=>{}),saveStatus==='error'?5000:500);return()=>clearTimeout(timer);},[answers,dirty,conflict,busy,saveStatus,saver]);
   async function persist(){await saver.current!.flush();return saver.current!.revision;}
   function change(answer:N30Answer){const next=[...latest.current.filter(a=>a.questionId!==answer.questionId),answer];latest.current=next;setAnswers(next);setError('');saver.current!.update(next);}
-  function navigateToPage(next:number){if(next<0||next>=screens.length)return;if(advanceTimer.current)clearTimeout(advanceTimer.current);advancing.current=false;setConfirmedInstructions(false);setCheckMiss(null);setConfirmSubmit(false);setPage(next);setTimerLeft(PAIR_SECONDS);setError('');window.scrollTo({top:0});}
+  function navigateToPage(next:number){if(next<0||next>=screens.length)return;if(advanceTimer.current)clearTimeout(advanceTimer.current);advancing.current=false;setConfirmedInstructions(false);setCheckMiss(null);setSpeedMiss(null);setNeutralBlock(false);setConfirmSubmit(false);setPage(next);setTimerLeft(PAIR_SECONDS);setError('');window.scrollTo({top:0});}
   async function move(next:number,saveBefore=false,instructionsConfirmed=false){
     if(locked.current||conflict)return;
     if(next>page&&screen.kind==='q'){
@@ -74,8 +77,10 @@ export function DiagnosisQuestionnaire({initial,save,submit,onReload,onExit,onRe
     if(locked.current||conflict||advancing.current)return;
     if(q.requiredOptionId&&optionId!==q.requiredOptionId){setCheckMiss(q.id);return;}
     setCheckMiss(null);
-    const ms=Math.round(readClock()-shownAt.current);
-    change(q.pair?{questionId:q.id,optionId,ms:Math.min(600000,Math.max(0,ms))}:{questionId:q.id,optionId});
+    const ms=readClock()-shownAt.current;
+    if(diagnosisResponseTooFast(q,ms,initial.adminTest===true)){setSpeedMiss(q.id);return;}
+    setSpeedMiss(null);
+    change(q.pair?{questionId:q.id,optionId,ms:Math.min(600000,Math.max(0,Math.round(ms)))}:{questionId:q.id,optionId});
     if(q.confirmationOptionId&&optionId!==q.confirmationOptionId&&!confirmedInstructions)return;
     advancing.current=true;advanceTimer.current=setTimeout(()=>{advancing.current=false;if(alive.current)void move(page+1,screens[page+1]?.kind!=='q');},240);
   }
@@ -87,7 +92,7 @@ export function DiagnosisQuestionnaire({initial,save,submit,onReload,onExit,onRe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[page,conflict,confirmedInstructions]);
   useEffect(()=>{shownAt.current=performance.now();heading.current?.focus({preventScroll:true});},[page]);
-  useEffect(()=>{if(confirmSubmit)submitHeading.current?.focus();},[confirmSubmit]);
+  useEffect(()=>{if(confirmSubmit||neutralBlock)submitHeading.current?.focus();},[confirmSubmit,neutralBlock]);
   const pairScreen=screen.kind==='q'&&screen.q.type==='pair_choice'?screen.q:null;
   const pairAnswered=!!pairScreen&&present(find(pairScreen));
   useEffect(()=>{
@@ -96,9 +101,14 @@ export function DiagnosisQuestionnaire({initial,save,submit,onReload,onExit,onRe
     // Changing screens or answering resets the nudge. Expiry never submits an answer.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[page,pairAnswered]);
+  function checkNeutralResponses(){
+    if(!diagnosisNeutralResponses(questions,latest.current).shouldBlock)return true;
+    setConfirmSubmit(false);setNeutralBlock(true);return false;
+  }
   async function finish(){
     if(locked.current||conflict)return;
     const missing=diagnosisMissingQuestions(initial,latest.current);if(missing.length){const target=screens.findIndex(s=>s.kind==='q'&&s.q.id===missing[0].id);if(target>=0)navigateToPage(target);setError('아직 답하지 않은 문항이 있습니다.');return;}
+    if(!checkNeutralResponses())return;
     locked.current=true;setBusy(true);setError('');try{const revision=await persist();await submit(revision);}catch(cause){if(alive.current){setError(cause instanceof Error?cause.message:'제출 상태를 확인하지 못했습니다. 다시 시도해 주세요.');if((cause as {code?:string})?.code==='CONFLICT')setConflict(true);}}finally{locked.current=false;if(alive.current)setBusy(false);}
   }
   async function exit(){if(locked.current||conflict)return;dlgRef.current?.close();locked.current=true;setBusy(true);try{await persist();if(alive.current)onExit();}catch{/* Stay with unsaved answers. */}finally{locked.current=false;if(alive.current)setBusy(false);}}
@@ -176,6 +186,8 @@ export function DiagnosisQuestionnaire({initial,save,submit,onReload,onExit,onRe
                 })}
               </ul>
             </div>
+            {speedMiss===q.id && <div className="intro-note check-miss" role="alert"><span>두 문장을 모두 읽고 골라 주세요. 너무 빨리 고르면 결과가 정확하지 않아요.</span></div>}
+            {q.pair&&!q.requiredOptionId&&neutral.shouldNudge && <p className="neutral-nudge" role="status">‘비슷하다’를 많이 고르고 있어요. 조금이라도 더 가까운 쪽이 있다면 그쪽을 골라 주세요.</p>}
             {checkMiss===q.id && <div className="intro-note check-miss" role="alert"><span>안내와 다른 답을 골랐어요. 문항을 다시 읽고 안내된 답을 골라 주세요.</span></div>}
             {wrongInstruction && <div className="intro-note"><span>잘하는 정도나 실제 행동 횟수가 아니라, 나에게 얼마나 중요한 바람인지 답하는 문진입니다. 안내를 다시 확인해 주세요.</span>
               <button type="button" className="cta-btn" onClick={() => { setConfirmedInstructions(true); void move(page + 1, true, true); }}>안내를 읽었습니다</button></div>}
@@ -249,7 +261,7 @@ export function DiagnosisQuestionnaire({initial,save,submit,onReload,onExit,onRe
           </div></div>
           <div className="cta-block">
             {answered === coreTotal
-              ? <button className="cta-btn" onClick={() => setConfirmSubmit(true)} disabled={busy || conflict || !aspireReady}>{busy ? '처리 중…' : '문진 완료하기'}</button>
+              ? <button className="cta-btn" onClick={() => {if(checkNeutralResponses())setConfirmSubmit(true);}} disabled={busy || conflict || !aspireReady}>{busy ? '처리 중…' : '문진 완료하기'}</button>
               : <button className="cta-btn" onClick={() => void move(firstMissing)} disabled={busy || conflict}>미응답 핵심 문항 {coreTotal - answered}개로 이동</button>}
             <p className="cta-hint">{aspireReady ? '제출 전까지 언제든 바꿀 수 있어요' : `${aspireTotal - aspireValues.length}개 더 골라 주세요`}</p>
           </div>
@@ -257,6 +269,12 @@ export function DiagnosisQuestionnaire({initial,save,submit,onReload,onExit,onRe
         <div className="sheet-foot">{prevButton()}<span className="foot-note">제출 전까지 언제든 바꿀 수 있어요</span></div>
       </div>}
 
+      {neutralBlock&&neutral.shouldBlock && <div className="panel neutral-review" role="alert">
+        <h2 className="view-title" ref={submitHeading} tabIndex={-1}>‘비슷하다’로 고른 문항을 다시 확인해 주세요</h2>
+        <p className="panel-sub">두 문장 문항의 <strong>{Math.round(neutral.share*100)}%</strong>를 ‘비슷하다’로 골랐어요.<br/>이대로는 나를 움직이는 욕구가 드러나지 않아 정밀 보고서를 만들 수 없어요.</p>
+        <p className="panel-sub">조금이라도 더 가까운 쪽이 있는 문항을 다시 골라 주세요.<br/>지금까지 고른 답변은 그대로 남아 있어요.</p>
+        <button type="button" className="cta-btn" disabled={busy||conflict} onClick={()=>{const first=screens.findIndex(s=>s.kind==='q'&&neutral.questionIds.includes(s.q.id));if(first>=0)navigateToPage(first);}}>‘비슷하다’ 문항 다시 보기</button>
+      </div>}
       {confirmSubmit && <div className="panel" role="region" aria-label="제출 전 확인"><h2 className="panel-title" ref={submitHeading} tabIndex={-1}>답변을 제출할까요?</h2><p className="panel-sub">제출하면 정밀 보고서 제작이 시작되고 답변을 바꿀 수 없습니다. 보고서와 MD 파일이 준비되면 이곳에서 받을 수 있어요.</p><button className="cta-btn" disabled={busy || conflict} onClick={() => void finish()}>{busy ? '제출 확인 중…' : '답변 제출하기'}</button><button className="prev-btn" disabled={busy} onClick={() => setConfirmSubmit(false)}>계속 수정하기</button></div>}
       {error && <p role="alert">{error}</p>}
       {saveError && <div role="alert" className="save-toast">{saveError}{!conflict && <button className="dlg-btn" onClick={() => void persist().catch(() => {})}>저장 다시 시도</button>}</div>}
