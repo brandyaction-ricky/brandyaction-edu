@@ -8,7 +8,7 @@ export const diagnosisStatus:Record<DiagnosisState,{title:string;description:str
  ready:{title:'검사 결과가 준비됐어요',description:'결과를 읽고 MD 파일을 내려받아 옵시디언에 넣어 보세요.'},
  needs_review:{title:'검사 준비 상태를 확인하고 있어요',description:'추가 결제나 재검사는 필요하지 않아요. 운영팀 확인 후 이어서 이용할 수 있어요.'},
 };
-export type DiagnosisDispatch={version:1;kind:'ensure_session';attemptId:string;subject:string;diagnosis:'myin-n6';releaseId:string;packageVersion:string};
+export type DiagnosisDispatch={version:1;kind:'ensure_session';adminTest?:boolean;attemptId:string;subject:string;diagnosis:'myin-n6';releaseId:string;packageVersion:string};
 export type DiagnosisReceipt={version:1;attemptId:string;subject:string;releaseId:string;responseId:string};
 type Rpc=(name:string,args:Record<string,unknown>)=>Promise<{data:unknown;error:unknown}>;
 const uuid=(v:unknown):v is string=>typeof v==='string'&&/^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(v);
