@@ -214,7 +214,7 @@ export async function GET(request: Request) {
                             processingRefunds: processing.count || 0,
                         }];
                         if (operator?.role === 'admin' || operator?.permissions.members) {
-                            data.admin_summary = [{ id: 'navigation-summary', pendingReviews: row.pendingReviews }];
+                            data.admin_summary = [{ id: 'navigation-summary', pendingReviews: row.pendingReviews, openQuestions: row.openQuestions }];
                         }
                         return;
                     }
@@ -233,9 +233,13 @@ export async function GET(request: Request) {
                     } : row];
                 } else if (operator?.role === 'admin' || operator?.permissions.members) {
                     // The sidebar needs only this badge, not full revenue/member aggregates.
-                    const pending = await db.from('mission_submissions').select('id', { count: 'exact', head: true }).eq('status', 'submitted');
+                    const [pending, questions] = await Promise.all([
+                        db.from('mission_submissions').select('id', { count: 'exact', head: true }).eq('status', 'submitted'),
+                        db.from('edu_questions').select('id', { count: 'exact', head: true }).eq('status', 'open').eq('is_archived', false),
+                    ]);
                     if (pending.error) throw pending.error;
-                    data.admin_summary = [{ id: 'navigation-summary', pendingReviews: pending.count || 0 }];
+                    if (questions.error) throw questions.error;
+                    data.admin_summary = [{ id: 'navigation-summary', pendingReviews: pending.count || 0, openQuestions: questions.count || 0 }];
                 }
             })(),
             ...tables.filter((table) => !deferredOrderTables.has(table)).map(async (table) => {

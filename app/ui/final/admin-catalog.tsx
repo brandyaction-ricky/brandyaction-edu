@@ -1,5 +1,6 @@
 "use client";
 import { MemberVisitsToggle } from './member-visits';
+import { AnswerText } from './lesson-text';
 import { MvpBadge, useMemberMvps } from './member-mvp';
 import { QuestionAiBatch } from './question-ai-batch';
 import { lessonBodyPlainText } from "@/lib/lesson-body";
@@ -908,7 +909,7 @@ export function AdminCatalog({
                     {Boolean(q.answer) && (
                       <div className="answer-block mt16">
                         <b>운영자 답변</b>
-                        <p className="reading-copy">{t(q, "answer")}</p>
+                        <p className="reading-copy"><AnswerText text={t(q, "answer")}/></p>
                       </div>
                     )}
                     <p className="meta mt16">접수 {date(q.created_at)} · {q.status === 'open' && !q.is_archived ? '답변 필요' : q.is_archived ? '보관된 질문 · 삭제되지 않음' : '답변 완료'}</p>

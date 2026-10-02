@@ -939,6 +939,7 @@ export function Platform({
         available={available}
         user={user!}
         pendingReviews={Number((data.admin_summary || [])[0]?.pendingReviews || 0)}
+        openQuestions={Number((data.admin_summary || [])[0]?.openQuestions || 0)}
         mobile={mobile}
         setMobile={setMobile}
         logout={logout}

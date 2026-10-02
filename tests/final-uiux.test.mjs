@@ -67,6 +67,15 @@ test('lesson text activates named and bare links while preserving existing copy'
   assert.match(html(LessonText, { text: '(https://example.test/download).' }), /<\/a>\)\./);
 });
 
+test('question answers activate safe links without executing HTML', () => {
+  const { AnswerText } = load('app/ui/final/lesson-text.tsx');
+  const markup = html(AnswerText, { text: '문의: http://example.test/help. <script>alert(1)</script> [다음 단계](https://example.test/next)' });
+  assert.match(markup, /<a href="http:\/\/example\.test\/help" target="_blank" rel="noopener noreferrer">http:\/\/example\.test\/help<\/a>\./);
+  assert.match(markup, /href="https:\/\/example\.test\/next"/);
+  assert.doesNotMatch(markup, /<script>/);
+  assert.doesNotMatch(html(AnswerText, { text: '[위험](javascript:alert(1))' }), /<a /);
+});
+
 test('lesson text never turns unsafe destinations or HTML into executable markup', () => {
   const { LessonText } = load('app/ui/final/lesson-text.tsx');
   for (const destination of ['javascript:alert(1)', 'data:text/html,<script>alert(1)</script>', '//example.test', '/\\example.test', 'https://', 'https://example.test/\u0001']) {
@@ -137,13 +146,15 @@ test('five admin categories and scoped navigation render from the admin UI featu
   const { AdminShell, adminNavigationIcon, finalAdminGroups } = load('features/admin-ui.ts');
   const { Overview } = load('app/ui/final/admin-shell.tsx');
   assert.equal(finalAdminGroups.length, 5);
-  const props = { current: 'overview', available: platform.sections, user: { ...user, role: 'admin' }, pendingReviews: 1, mobile: false, setMobile() {}, logout: async () => {} };
+  const props = { current: 'overview', available: platform.sections, user: { ...user, role: 'admin' }, pendingReviews: 1, openQuestions: 2, mobile: false, setMobile() {}, logout: async () => {} };
   const markup = html(AdminShell, { ...props, children: React.createElement(Overview, { data, available: platform.sections }) });
   const navigationMarkup = markup.match(/<nav aria-label="관리자 카테고리">[\s\S]*?<\/nav>/)?.[0] || '';
   assert.match(navigationMarkup, /상품·판매 설정/);
   assert.match(navigationMarkup, /커리큘럼 편집/);
   assert.doesNotMatch(navigationMarkup, /href="\/admin\/weeks"/);
   assert.match(navigationMarkup, /href="\/admin\/learning"/);
+  assert.match(navigationMarkup, /href="\/admin\/questions"[\s\S]*?미답변 2건[\s\S]*?>2<\/span>/);
+  assert.match(markup, /href="\/admin\/questions"[^>]*>[\s\S]*?질문함<\/a>/);
   for (const [label] of finalAdminGroups) assert.ok(markup.includes(label));
   assert.match(markup, /class="nav-group"/); assert.match(markup, /lucide/); assert.match(markup, /category-strip/);
   const expectedIcons = {

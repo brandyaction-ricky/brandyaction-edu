@@ -1,0 +1,7 @@
+.recruitment-announcement { margin-top: 24px; }
+.recruitment-announcement-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 20px; }
+.recruitment-announcement-preview { display: grid; gap: 8px; margin-top: 20px; font-weight: 600; }
+.recruitment-announcement-preview textarea { width: 100%; min-height: 360px; padding: 16px; border: 1px solid #d9dce1; border-radius: 8px; background: #f8f9fb; color: #1d2025; font: inherit; font-weight: 400; line-height: 1.6; resize: vertical; }
+.recruitment-announcement-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 12px; }
+.recruitment-announcement-actions span { color: #626975; font-size: .875rem; }
+@media (max-width: 700px) { .recruitment-announcement-fields { grid-template-columns: minmax(0, 1fr); } }

@@ -35,6 +35,7 @@ export function AdminShell({
   available,
   user,
   pendingReviews = 0,
+  openQuestions = 0,
   mobile,
   setMobile,
   logout,
@@ -45,6 +46,7 @@ export function AdminShell({
   available: AdminNavigationItem[];
   user: AdminShellUser;
   pendingReviews?: number;
+  openQuestions?: number;
   mobile: boolean;
   setMobile: (value: boolean) => void;
   logout: () => Promise<void>;
@@ -135,6 +137,7 @@ export function AdminShell({
         <Icon aria-hidden="true" />
         {item ? adminNavigationTitles[key] || item.title : '운영 홈'}
         {key === 'reviews' && pendingReviews > 0 && <span className="nav-count">{pendingReviews}</span>}
+        {key === 'questions' && openQuestions > 0 && <span className="nav-count" aria-label={`미답변 ${openQuestions}건`}>{openQuestions}</span>}
       </Link>
     );
   };
@@ -231,8 +234,9 @@ export function AdminShell({
           <div className="topright">
             {process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === "true" && <>{user.id ? <UnreadMessageLink key={user.id} userId={user.id} className="btn ghost small"/> : <Link className="btn ghost small" href="/my/messages">메시지</Link>}</>}
             {byKey.has('questions') && (
-              <Link className="btn iconbtn ghost" href="/admin/questions" aria-label="질문함">
+              <Link className="btn ghost small" href="/admin/questions">
                 <MessageCircle aria-hidden="true" />
+                질문함
               </Link>
             )}
             <button className="btn iconbtn ghost" onClick={() => void logout()} aria-label="로그아웃">

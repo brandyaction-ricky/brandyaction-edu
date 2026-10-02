@@ -68,7 +68,7 @@ test('product editor reads its course, cohorts, conversion and minimal readiness
   assert.deepEqual(data.cohorts.map(row => row.course_id), [courseId]);
   assert.deepEqual(data.landing_configs.map(row => row.id), [courseId]);
   assert.equal(data.product_summary, undefined);
-  assert.deepEqual(new Set(calls.map(call => call.table)), new Set(['mission_submissions', 'courses', 'cohorts', 'landing_configs', 'curriculum_weeks']));
+  assert.deepEqual(new Set(calls.map(call => call.table)), new Set(['mission_submissions', 'edu_questions', 'courses', 'cohorts', 'landing_configs', 'curriculum_weeks']));
   assert.deepEqual(calls.find(call => call.table === 'courses').filters, [['id', courseId]]);
   assert.equal(calls.find(call => call.table === 'courses').limit, 1);
   assert.deepEqual(calls.find(call => call.table === 'cohorts').filters, [['course_id', courseId]]);
