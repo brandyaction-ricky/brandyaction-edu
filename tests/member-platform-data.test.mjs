@@ -188,3 +188,17 @@ test('progression reads start alongside curriculum reads without an extra serial
  assert.ok(f.calls.some(call=>call.table==='courses'));assert.equal(f.rpcCalls.length,1);
  release();assert.equal((await read).learning_overviews[0].status,'ready');
 }));
+
+test('dashboard and classes expose only availability of owned purchase files, never resource URLs', async () => {
+  for (const view of ['dashboard', 'classes']) {
+    const fixtures = {
+      enrollments: [{ id:'owned',user_id:'owner',course_id:'course',cohort_id:'cohort',status:'active' },{ id:'old',user_id:'owner',course_id:'expired',cohort_id:'cohort',status:'revoked' }],
+      courses: [{ id:'course',title:'Purchased package',resources:[{url:'https://private.example.test/file'}],digital_sections:[{items:[{videoUrl:'https://private.example.test/video'}]}] },{ id:'expired',resources:[{url:'https://private.example.test/expired'}] }],
+    };
+    const h=harness(fixtures),data=await h.read('owner',view);
+    assert.equal(data.courses.find(c=>c.id==='course').has_resources,true);
+    assert.equal(data.courses.find(c=>c.id==='expired').has_resources,false);
+    assert.doesNotMatch(JSON.stringify(data.courses),/private\.example|videoUrl|digital_sections|"resources"/);
+    assert.match(h.calls.find(c=>c.table==='courses').columns,/resources:metadata->product_resources/);
+  }
+});

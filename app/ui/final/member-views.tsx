@@ -986,7 +986,7 @@ function hasMemberResources(data: Data) {
     if (!hasLearningAccess(e)) return false;
     const course = rows(data, 'courses').find(c => c.id === e.course_id);
     const ids = new Set(enrollmentLessons(data, e).map(l => l.id));
-    return rows(data, 'lesson_contents').some(c => c.resource_storage_path && ids.has(t(c, 'lesson_id'))) || Boolean(course && (productDigitalSections(object(course, 'metadata'), false).length || productResources(object(course, 'metadata')).length));
+    return rows(data, 'lesson_contents').some(c => c.resource_storage_path && ids.has(t(c, 'lesson_id'))) || Boolean(course && (course.has_resources === true || productDigitalSections(object(course, 'metadata'), false).length || productResources(object(course, 'metadata')).length));
   });
 }
 function Resources({ data }: { data: Data }) {
