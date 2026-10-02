@@ -29,6 +29,9 @@ test('MYIN guide, pair choice, story, aspirations and explicit submission work o
   const state=await api(page);await page.goto('/diagnosis-test');await expect(page.getByRole('heading',{name:'나를 움직이는 마음을 알아보는 시간'})).toBeVisible();
   await page.getByRole('button',{name:'검사 시작하기',exact:true}).click();
   await expect(page.getByRole('heading',{name:'두 문장 중 지금의 나에 더 가까운 쪽을 고릅니다'})).toBeVisible();
+  await expect(page.locator('.choice-reminder strong')).toHaveText('‘비슷하다’는 정말 고르기 어려울 때만 골라 주세요.');
+  await expect(page.locator('.choice-reminder')).toHaveCSS('font-size','15px');
+  await page.screenshot({path:test.info().outputPath('diagnosis-choice-reminder.png'),fullPage:true});
   await expect(page.getByText('1문항',{exact:true})).toBeVisible();await page.getByRole('button',{name:'시작하기',exact:true}).click();
   await expect(page.locator('.timer')).toContainText('18초');await page.getByRole('radio',{name:'1 A에 더 가까워요'}).click();
   await expect(page.getByRole('heading',{name:'이번엔, 직접 들려주세요'})).toBeVisible();

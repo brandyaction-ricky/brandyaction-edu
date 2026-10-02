@@ -31,7 +31,7 @@ test('tablet and mobile navigation traps focus, closes with Escape and restores 
   await expect(navigation).toBeVisible();
   await expect(navigation.getByRole('button', { name: '관리자 메뉴 닫기' })).toBeFocused();
   await page.keyboard.press('Shift+Tab');
-  await expect(navigation.getByRole('link', { name: /고객 화면 보기/ })).toBeFocused();
+  await expect(navigation.getByRole('link', { name: '내 회원 정보', exact: true })).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(navigation).toBeHidden();
   await expect(opener).toBeFocused();
@@ -49,4 +49,19 @@ test('desktop keeps the persistent sidebar and current-page context', async ({ p
   await expect(page.getByRole('button', { name: '관리자 메뉴 열기' })).toBeHidden();
   await expect(page.locator('#admin-sidebar')).toBeVisible();
   await expect(page.getByRole('link', { name: '운영 홈' })).toHaveAttribute('aria-current', 'page');
+});
+
+test('profile links open the operators own member information from header and sidebar', async ({page,viewport}) => {
+  if ((viewport?.width || 0) > 680) {
+    const header=page.locator('.topright').getByRole('link',{name:'내 회원 정보',exact:true});
+    await expect(header).toHaveAttribute('href','/my/profile');
+    await header.focus();await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/\/my\/profile$/);
+    await page.goto('/admin-shell-test');
+  }
+  if ((viewport?.width || 0) <= 1024) await page.getByRole('button',{name:'관리자 메뉴 열기'}).click();
+  const sidebar=page.locator('#admin-sidebar').getByRole('link',{name:'내 회원 정보',exact:true});
+  await expect(sidebar).toHaveAttribute('href','/my/profile');
+  await expect(sidebar).toContainText('스태프');
+  await sidebar.click();await expect(page).toHaveURL(/\/my\/profile$/);
 });

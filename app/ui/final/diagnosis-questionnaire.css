@@ -269,6 +269,8 @@
       .edu-n6 .panel-sub{ font-size:15.5px; color:var(--ink-soft); line-height:1.7; word-break:keep-all; max-width:430px; margin:0 auto 36px; }
       .edu-n6 .panel-sub strong{ color:var(--ink); font-weight:700; }
       .edu-n6 .panel-note{ margin-top:18px; font-size:12.5px; color:var(--ink-faint); }
+      .edu-n6 .panel-note.choice-reminder{ margin:20px auto 0; padding:14px 18px; max-width:440px; border:1px solid #ebc9cc; border-radius:10px; background:#fff4f5; color:#a71929; font-size:15px; line-height:1.65; word-break:keep-all; }
+      .edu-n6 .choice-reminder strong{ font-weight:700; }
       .edu-n6 dialog{ border:none; border-radius:18px; padding:32px 30px 26px; max-width:360px; width:calc(100vw - 48px); background:var(--card); box-shadow:0 20px 60px rgba(27,24,22,.18); color:var(--ink); }
       .edu-n6 dialog::backdrop{ background:rgba(27,24,22,.4); }
       .edu-n6 .dlg-title{ font-size:17px; font-weight:700; margin-bottom:8px; word-break:keep-all; }
