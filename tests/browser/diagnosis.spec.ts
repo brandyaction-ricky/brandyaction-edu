@@ -91,7 +91,7 @@ test('entry uses only eligible courses and an existing account test always resum
 test('a submitted questionnaire under review preserves completion and does not ask for payment or resubmission',async({page})=>{
   await page.route('**/api/platform/diagnosis/session',route=>route.fulfill({json:{...fixture(),state:'submitted',submittedAt:'2026-10-01T00:00:00Z',needsReview:true}}));
   await page.goto('/diagnosis-test');await expect(page.getByRole('heading',{name:'답변을 제출했어요.'})).toBeVisible();
-  await expect(page.getByText('답변은 안전하게 접수됐어요.',{exact:false})).toContainText('추가 결제나 재검사 없이');
+  await expect(page.getByText('답변은 안전하게 접수됐어요.',{exact:false})).toContainText('보고서 발급 전 운영팀의 확인이 필요합니다.');
   await expect(page.getByRole('button',{name:'답변 제출하기'})).toHaveCount(0);
 });
 
