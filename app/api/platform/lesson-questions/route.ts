@@ -22,6 +22,11 @@ export async function GET(request: Request) {
     if (!validId(enrollment) || !validId(lesson)) return reply({ error: '학습 정보를 확인해 주세요.' }, 400);
     const page = Number(params.get('page') || 0);
     if (!Number.isInteger(page) || page < 0 || page > 10000) return reply({ error: '페이지를 확인해 주세요.' }, 400);
+    if (process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true') {
+      const result = await createAdminClient().rpc('edu_read_cohort_questions', { p_actor: user.id, p_query: '', p_enrollment: enrollment, p_lesson: lesson, p_page: page, p_include_own: true });
+      if (result.error) return failure(result.error);
+      return reply(result.data);
+    }
     const images = process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED === 'true';
     // Authenticated client retains RLS even if a student forges the URL.
     const db = await createClient();

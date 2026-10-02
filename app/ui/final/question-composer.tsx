@@ -32,7 +32,7 @@ export function RelatedAnswers({ query, context }: { query: string; context: Que
 }
 export function QuestionComposer({ initialContext, order, onCreated }: { initialContext?: QuestionContext; order?: string | null; onCreated: () => void }) {
   const [contexts, setContexts] = useState<QuestionContext[]>(initialContext ? [initialContext] : []), [context, setContext] = useState<QuestionContext | null>(initialContext || null);
-  const [category, setCategory] = useState<QuestionCategory>(order ? 'payment' : 'learning'), [title, setTitle] = useState(order ? '주문 ' + order + ' 문의' : ''), [content, setContent] = useState(''), [share, setShare] = useState(false);
+  const [category, setCategory] = useState<QuestionCategory>(order ? 'payment' : 'learning'), [title, setTitle] = useState(order ? '주문 ' + order + ' 문의' : ''), [content, setContent] = useState(''), [visibility, setVisibility] = useState<'cohort' | 'private'>('cohort');
   const [image, setImage] = useState<{ id: string | null; busy: boolean; draft: boolean }>({ id: null, busy: false, draft: false }), [imageKey, setImageKey] = useState(0);
   const [busy, setBusy] = useState(false), [uncertain, setUncertain] = useState(false), [error, setError] = useState(''), [contextError, setContextError] = useState(''), [contextVersion, setContextVersion] = useState(0);
   const gate = useRef(false), retry = useRef<Record<string, unknown> | null>(null), imagePicker = useRef<QuestionImagePickerHandle>(null), touchedContext = useRef(Boolean(initialContext || order));
@@ -42,22 +42,22 @@ export function QuestionComposer({ initialContext, order, onCreated }: { initial
     const abort = new AbortController(); let alive = true;
     void questionRequest<{ contexts: QuestionContext[] }>('/api/platform/question-hub?mode=contexts', undefined, abort.signal).then(data => {
       if (!alive) return; setContexts(data.contexts); setContextError('');
-      if (!touchedContext.current) { setContext(data.contexts.find(c => c.recent) || null); touchedContext.current = true; }
+      if (!touchedContext.current) { setContext(data.contexts.find(c => c.recent) || data.contexts[0] || null); touchedContext.current = true; }
     }).catch(() => { if (alive) setContextError('학습 목록을 불러오지 못했습니다. 일반 문의로 등록하거나 다시 불러올 수 있어요.'); });
     return () => { alive = false; abort.abort(); };
   }, [contextVersion]);
   function changeContext(next: QuestionContext | null) {
     if (image.draft && !window.confirm('학습을 바꾸면 첨부 이미지를 다시 올려야 합니다. 바꿀까요?')) return false;
-    touchedContext.current = true; setContext(next); setShare(false); setImage({ id: null, busy: false, draft: false }); setImageKey(v => v + 1); return true;
+    touchedContext.current = true; setContext(next); setVisibility('cohort'); setImage({ id: null, busy: false, draft: false }); setImageKey(v => v + 1); return true;
   }
   async function submit(event: FormEvent) {
     event.preventDefault(); if (gate.current || image.busy || (image.draft && !image.id) || (!content.trim() && !image.id)) return;
-    if (!retry.current) retry.current = { requestId: crypto.randomUUID(), enrollmentId: context?.enrollmentId || null, lessonId: context?.lessonId || null, title, content, imageId: image.id, category, share: Boolean(share && context && category === 'learning') };
+    if (!retry.current) retry.current = { requestId: crypto.randomUUID(), enrollmentId: context?.enrollmentId || null, lessonId: context?.lessonId || null, title, content, imageId: image.id, category, visibility: context && category === 'learning' ? visibility : 'private', share: false };
     gate.current = true; setBusy(true); setError('');
     try {
       const result = await questionRequest<{ question: { id: string } }>('/api/platform/question-hub', retry.current);
       if (!result.question?.id) throw new Error('등록 결과를 확인하지 못했습니다.');
-      retry.current = null; setUncertain(false); setContent(''); setTitle(''); setShare(false); setImage({ id: null, busy: false, draft: false }); setImageKey(v => v + 1); onCreated();
+      retry.current = null; setUncertain(false); setContent(''); setTitle(''); setVisibility('cohort'); setImage({ id: null, busy: false, draft: false }); setImageKey(v => v + 1); onCreated();
     } catch (cause) { const e = cause as { message: string; status?: number }; const unknown = !e.status || e.status >= 500; setUncertain(unknown); if (!unknown) retry.current = null; setError(e.message); }
     finally { gate.current = false; setBusy(false); }
   }
@@ -66,14 +66,14 @@ export function QuestionComposer({ initialContext, order, onCreated }: { initial
     const files = Array.from(event.clipboardData.items).filter(i => i.kind === 'file' && i.type.startsWith('image/')).map(i => i.getAsFile()).filter((f): f is File => f !== null);
     if (files.length) { event.preventDefault(); imagePicker.current?.paste(files); }
   }}>
-    <div className="question-context-fields"><label className="field">문의 종류<select value={category} disabled={locked || image.busy} onChange={e => { const next = e.target.value as QuestionCategory; if (next === 'learning' || changeContext(null)) { setCategory(next); setShare(false); } }}>{Object.entries(questionCategories).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+    <label className="field">질문 제목 (선택)<input maxLength={200} value={title} onChange={e => setTitle(e.target.value)} disabled={locked} placeholder="비워 두면 질문 내용으로 제목을 만들어요"/></label>
+    <div className="question-context-fields"><label className="field">문의 종류<select value={category} disabled={locked || image.busy} onChange={e => { const next = e.target.value as QuestionCategory; if (next === 'learning' || changeContext(null)) { setCategory(next); setVisibility('cohort'); } }}>{Object.entries(questionCategories).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
     {category === 'learning' && <label className="field">관련 학습<select value={context ? context.enrollmentId + ':' + context.lessonId : ''} disabled={locked || image.busy} onChange={e => changeContext(contexts.find(c => c.enrollmentId + ':' + c.lessonId === e.target.value) || null)}><option value="">학습 선택 없이 질문하기</option>{contexts.map(c => <option key={c.enrollmentId + c.lessonId} value={c.enrollmentId + ':' + c.lessonId}>{c.label}</option>)}</select></label>}</div>
     {contextError && <p role="status" className="meta">{contextError} <button type="button" className="link" disabled={locked} onClick={() => setContextVersion(v => v + 1)}>목록 다시 불러오기</button></p>}
     <label className="field">질문 내용<textarea required={!image.id} rows={6} maxLength={10000} disabled={locked} value={content} onChange={e => setContent(e.target.value)} placeholder="어느 부분에서 막혔나요? 지금 하고 있는 일과 궁금한 점을 편하게 적어 주세요."/></label>
     {category === 'learning' && <RelatedAnswers query={content} context={context}/>}
-    <details className="question-title-option"><summary>질문 제목 직접 쓰기 (선택)</summary><label className="field">질문 제목<input maxLength={200} value={title} onChange={e => setTitle(e.target.value)} disabled={locked}/></label><small>비워 두면 질문 내용에서 제목을 만들어 드려요.</small></details>
-    {imagesEnabled && <QuestionImagePicker key={imageKey} ref={imagePicker} enrollmentId={context?.enrollmentId || null} lessonId={context?.lessonId || null} locked={locked} changed={(id, uploading, draft) => setImage({ id, busy: uploading, draft })}/>}
-    <div className="question-privacy"><b>{share ? '함께 보기 요청' : '나와 담당 운영자만 볼 수 있어요'}</b>{context && category === 'learning' && <label><input type="checkbox" checked={share} disabled={locked} onChange={e => setShare(e.target.checked)}/> 운영자가 내용을 정리한 뒤 같은 기수 수강생과 답변을 공유해도 좋아요.</label>}<small>이름·첨부 이미지·추가 질문은 공유되지 않아요. 기존 질문의 공개 범위는 바뀌지 않습니다.</small></div>
+    {imagesEnabled && <QuestionImagePicker key={imageKey} ref={imagePicker} enrollmentId={context?.enrollmentId || null} lessonId={context?.lessonId || null} locked={locked} publicQuestion={Boolean(context && category === 'learning' && visibility === 'cohort')} changed={(id, uploading, draft) => setImage({ id, busy: uploading, draft })}/>}
+    <fieldset className="question-privacy" disabled={locked}><legend>공개 범위</legend>{context && category === 'learning' ? <><div className="question-visibility-options"><label><input type="radio" name="question-visibility" value="cohort" checked={visibility === 'cohort'} onChange={() => setVisibility('cohort')}/> 전체 공개</label><label><input type="radio" name="question-visibility" value="private" checked={visibility === 'private'} onChange={() => setVisibility('private')}/> 비밀 질문</label></div><small>{visibility === 'cohort' ? '같은 기수 수강생이 질문·첨부 이미지·답변·후속 질문을 함께 볼 수 있어요. 개인정보가 포함되면 비밀 질문을 선택해 주세요.' : '나와 담당 운영자만 질문과 답변을 볼 수 있어요.'}</small></> : <><b>비밀 질문</b><small>{category === 'learning' ? '관련 학습을 선택하면 같은 기수에 공개할 수 있어요.' : '일반·결제·계정 문의는 나와 담당 운영자만 볼 수 있어요.'}</small></>}</fieldset>
     {uncertain && <p role="status">등록 결과를 확인하지 못했습니다. 같은 요청으로 다시 확인하면 중복 등록되지 않습니다.</p>}
     {error && <p role="alert" className="form-error">{error}</p>}
     <button className="btn primary" disabled={busy || image.busy || (image.draft && !image.id) || (!content.trim() && !image.id)}>{busy ? '등록 중…' : uncertain ? '등록 결과 다시 확인' : '질문 등록'}</button>

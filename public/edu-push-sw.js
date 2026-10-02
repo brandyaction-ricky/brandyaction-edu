@@ -1,6 +1,6 @@
 /* Push only: never intercept or cache authenticated pages or responses. */
-const allowedPaths = new Set(['/my/messages', '/my/questions', '/my/missions', '/admin/questions', '/admin/reviews', '/admin/reviews?tab=blocks', '/admin/reviews?tab=missions']);
-const allowedPath = value => typeof value === 'string' && (allowedPaths.has(value) || /^\/my\/questions\?question=[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value) || /^\/learn\/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}\/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value));
+const allowedPaths = new Set(['/my/questions', '/admin/questions']);
+const allowedPath = value => typeof value === 'string' && (allowedPaths.has(value) || /^\/my\/questions\?question=[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value));
 const isId = value => typeof value === 'string' && /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(value);
 async function bindingStore(write, value) {
   const db = await new Promise((resolve, reject) => {
@@ -53,7 +53,7 @@ self.addEventListener('push', event => {
     await changes.catch(() => {}); const stored = await bindingStore(false);
     if (!stored || stored.binding !== data.binding) return;
     await self.registration.showNotification('브랜디에듀', {
-      body: '새 학습 알림이 있습니다. 로그인해서 확인해 주세요.',
+      body: '질문·답변 소식이 있습니다. 로그인해서 확인해 주세요.',
       tag: 'edu-' + data.eventId, renotify: false,
       icon: '/api/app-branding?icon=192', badge: '/icons/edu-badge-96.png',
       data: { binding: data.binding, path: data.path },

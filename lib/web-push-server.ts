@@ -3,10 +3,10 @@ import { createECDH, ECDH } from 'node:crypto';
 import webpush from 'web-push';
 import { createAdminClient } from '@/lib/supabase/admin';
 
-const paths = new Set(['/my/messages', '/my/questions', '/my/missions', '/admin/questions', '/admin/reviews', '/admin/reviews?tab=blocks', '/admin/reviews?tab=missions']);
-const allowedPath = (value: string) => paths.has(value) || /^\/my\/questions\?question=[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value) || /^\/learn\/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}\/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value);
+const paths = new Set(['/my/questions', '/admin/questions']);
+const allowedPath = (value: string) => paths.has(value) || /^\/my\/questions\?question=[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value);
 export function pushConfiguration() {
-  if (process.env.EDU_WEB_PUSH_ENABLED !== 'true' || process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED !== 'true') return null;
+  if (process.env.EDU_WEB_PUSH_ENABLED !== 'true' || process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED !== 'true') return null;
   const publicKey = process.env.EDU_WEB_PUSH_PUBLIC_KEY || '', privateKey = process.env.EDU_WEB_PUSH_PRIVATE_KEY || '', subject = process.env.EDU_WEB_PUSH_SUBJECT || '';
   try {
     if (!/^[A-Za-z0-9_-]{87}$/.test(publicKey) || !/^[A-Za-z0-9_-]{43}$/.test(privateKey)) return null;

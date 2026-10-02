@@ -1,4 +1,6 @@
 "use client";
+import { PushSettings } from './push-settings';
+import { LearningProgress } from './learning-progress';
 import { AppInstallCard } from './app-install';
 import { DiagnosisEntry } from './diagnosis-entry';
 import { QuestionImage } from './question-image';
@@ -61,8 +63,6 @@ const accountGroups = [
       ["classes", "내 클래스", BookOpen],
       ["missions", "내 미션", Target],
       ["questions", process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === "true" ? "질문·답변" : "내 질문", MessageCircle],
-      ["messages", "메시지", MessageCircle],
-      ["resources", "내 자료실", Download],
     ],
   ],
   [
@@ -84,7 +84,11 @@ export function enrollmentLessons(data: Data, e: Row) {
   );
   return rows(data, "curriculum_lessons")
     .filter((l) => weeks.has(t(l, "week_id")) && cohortLessonVisible(data,String(e.cohort_id),l))
-    .sort((a, b) => num(a, "day_number") - num(b, "day_number"));
+    .sort((a, b) => {
+      const weekA = rows(data, 'curriculum_weeks').find(w => w.id === a.week_id);
+      const weekB = rows(data, 'curriculum_weeks').find(w => w.id === b.week_id);
+      return num(weekA, 'week_number') - num(weekB, 'week_number') || num(a, 'day_number') - num(b, 'day_number') || a.id.localeCompare(b.id);
+    });
 }
 function completedLessonProgress(
   data: Data,
@@ -491,14 +495,14 @@ function Dashboard({
         )}
       </section>
       <div className="member-shortcuts">
-        <Link href="/my/resources">
+        {hasMemberResources(data) && <Link href="/my/resources">
           <Download />
           <div>
-            <b>내 자료실</b>
-            <span>수강 자료와 구매한 파일</span>
+            <b>수강 자료·구매 파일</b>
+            <span>등록된 자료 내려받기</span>
           </div>
           <ArrowRight />
-        </Link>
+        </Link>}
         <Link href="/articles">
           <Play />
           <div>
@@ -541,6 +545,7 @@ function Missions({ data, active }: { data: Data; active: Row[] }) {
         title="내 미션"
         description="제출부터 피드백, 승인까지 클래스별로 확인하세요."
       />
+      <LearningProgress complete={entries.filter(entry => entry.status === "approved").length} total={entries.length} label="미션 완료율"/>
       <div className="member-mission-filter">
         <label>
           클래스 · 기수
@@ -976,6 +981,14 @@ function Coupons({ data }: { data: Data }) {
     </>
   );
 }
+function hasMemberResources(data: Data) {
+  return rows(data, 'enrollments').some(e => {
+    if (!hasLearningAccess(e)) return false;
+    const course = rows(data, 'courses').find(c => c.id === e.course_id);
+    const ids = new Set(enrollmentLessons(data, e).map(l => l.id));
+    return rows(data, 'lesson_contents').some(c => c.resource_storage_path && ids.has(t(c, 'lesson_id'))) || Boolean(course && (productDigitalSections(object(course, 'metadata'), false).length || productResources(object(course, 'metadata')).length));
+  });
+}
 function Resources({ data }: { data: Data }) {
   const [course, setCourse] = useState("");
   const contents = rows(data, "lesson_contents").filter(
@@ -1000,7 +1013,7 @@ function Resources({ data }: { data: Data }) {
   return (
     <>
       <Heading
-        title="내 자료실"
+        title="수강 자료·구매 파일"
         description="신청한 클래스의 자료와 구매한 파일을 한곳에서."
       />
       <div className="filter-row">
@@ -1293,7 +1306,6 @@ export function MemberViews({
   send,
   logout,
   order,
-  ongoingLesson,
   blockLearningEnabled = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true',
 }: {
   section?: string;
@@ -1329,6 +1341,7 @@ export function MemberViews({
               )}
             </div>
           ))}
+          {hasMemberResources(data) && <Link className="btn mb24" href="/my/resources"><Download/> 수강 자료·구매 파일 받기</Link>}
           {!enrollments.length && (
             <Empty title="신청한 클래스가 없습니다.">
               <Link href="/classes">클래스 찾아보기</Link>
@@ -1341,11 +1354,9 @@ export function MemberViews({
       content = <Missions data={data} active={active} />;
       break;
     case "messages":
-      content = process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === "true" ? <MemberMessages key={user.id + (ongoingLesson || "")} userId={user.id} ongoingLesson={ongoingLesson} /> : <Empty title="메시지 기능을 준비 중입니다." />;
-      break;
     case "questions":
       content = (
-        <Questions data={data} pending={pending} send={send} order={order} />
+        <><Questions data={data} pending={pending} send={send} order={order} /><details className="panel pad mt24"><summary>질문·답변 알림 설정</summary><PushSettings userId={user.id}/></details>{process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === "true" && <details className="panel pad mt24" open={section === "messages"}><summary>이전 메시지 기록</summary><MemberMessages userId={user.id} readOnly /></details>}</>
       );
       break;
     case "orders":
@@ -1393,16 +1404,16 @@ export function MemberViews({
             {accountGroups.map(([title, links]) => (
               <div className="member-nav-group" key={title}>
                 <span className="member-nav-label">{title}</span>
-                {links.filter(([route]) => route !== "messages" || process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === "true").map(([route, label, Icon]) => (
+                {links.map(([route, label, Icon]) => (
                   <Link
                     key={route}
                     className={
-                      (section === "dashboard" ? "" : section) === route
+                      (section === "dashboard" ? "" : section === "messages" ? "questions" : section) === route
                         ? "active"
                         : ""
                     }
                     aria-current={
-                      (section === "dashboard" ? "" : section) === route
+                      (section === "dashboard" ? "" : section === "messages" ? "questions" : section) === route
                         ? "page"
                         : undefined
                     }
@@ -1416,10 +1427,6 @@ export function MemberViews({
             ))}
           </nav>
           <div className="member-help">
-            <Link className="btn ghost small" href="/my/questions">
-              <MessageCircle />
-              이용 문의
-            </Link>
             <button
               className="btn ghost small"
               disabled={pending}

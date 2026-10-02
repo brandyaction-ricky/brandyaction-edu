@@ -8,7 +8,7 @@ import { QuestionImage } from './question-image';
 import { AnswerText } from './lesson-text';
 import { AdminDrawer, useUnsavedWarning } from '@/features/admin-ui';
 type Answer = { id: string; authorName: string; source?: 'learner' | 'operator' | 'legacy' | 'faq' | 'aside'; content: string; createdAt: string };
-type Thread = { question: { id: string; title: string; content: string; learningContext?: string | null; status: string; resolved: boolean; archived: boolean; headId: string | null; imageId?: string | null }; answers: Answer[]; nextCursor: string | null; canAnswer: boolean; canFollowUp?: boolean };
+type Thread = { question: { id: string; title: string; content: string; learningContext?: string | null; status: string; resolved: boolean; archived: boolean; headId: string | null; imageId?: string | null; visibility?: 'cohort' | 'private' }; answers: Answer[]; nextCursor: string | null; canAnswer: boolean; canFollowUp?: boolean };
 async function request<T>(question: string, body?: unknown, before?: string, signal?: AbortSignal): Promise<T> {
  const response = await fetch('/api/platform/question-thread?' + new URLSearchParams({ question, ...(before ? { before } : {}) }), {
   method: body ? 'POST' : 'GET', cache: 'no-store', signal: signal || AbortSignal.timeout(10000),
@@ -77,6 +77,7 @@ export function QuestionAnswerHistory({ questionId, fallback = '', onStatusChang
   <Answers state={state}/>
   {process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' && state.data?.canFollowUp && !readOnly && state.data.question.status === 'answered' && <p>{state.data.question.resolved ? '해결 완료한 질문입니다.' : <button type="button" className="btn small mt16" disabled={busy || uncertain || Boolean(content)} onClick={()=>void finish()}>해결됐어요</button>}</p>}
   {state.data?.canFollowUp && !readOnly && <form className="mt16" onSubmit={event => { event.preventDefault(); void followUp(); }}>
+   <p className="meta">{state.data.question.visibility === "cohort" ? "이 후속 질문도 같은 기수 수강생에게 공개됩니다." : "나와 담당 운영자만 볼 수 있어요."}</p>
    <label className="field">후속 질문<textarea rows={4} maxLength={10000} value={content} disabled={busy || uncertain || stale} onChange={event => setContent(event.target.value)} placeholder="답변을 보고 더 궁금한 점을 적어 주세요."/></label>
    <button className="btn primary small mt16" disabled={busy || stale || !content.trim()}>{busy ? '등록 중…' : uncertain ? '같은 요청 결과 확인' : '후속 질문 등록'}</button>
   </form>}
@@ -117,7 +118,7 @@ export function QuestionThreadDialog({ questionId, close, changed, archive, pend
  }
  return <AdminDrawer title="질문 답변" onClose={leave}>
   <div className="admin-dialog-body">
-   {state.data && <><h3>{state.data.question.title}</h3>{state.data.question.learningContext && <p className="meta">{state.data.question.learningContext}</p>}<p className="reading-copy">{state.data.question.content}</p><QuestionImage key={questionId} questionId={questionId} imageId={state.data.question.imageId}/>{state.data.question.archived && <p className="notice">보관된 질문입니다. 답변 이력만 확인할 수 있습니다.</p>}</>}
+   {state.data && <><h3>{state.data.question.title}</h3>{state.data.question.learningContext && <p className="meta">{state.data.question.learningContext}</p>}<p className="meta">{state.data.question.visibility === "cohort" ? "전체 공개 · 답변과 후속 질문도 같은 기수에 공개됩니다." : "비밀 질문 · 질문자와 담당 운영자만 볼 수 있습니다."}</p><p className="reading-copy">{state.data.question.content}</p><QuestionImage key={questionId} questionId={questionId} imageId={state.data.question.imageId}/>{state.data.question.archived && <p className="notice">보관된 질문입니다. 답변 이력만 확인할 수 있습니다.</p>}</>}
    <Answers state={state}/>
    {state.data?.canAnswer && <section className="mt24"><h3>답변 추가</h3><p>이전 답변은 남겨 두고 새 답변을 추가합니다.</p><label className="field">새 답변<textarea rows={7} maxLength={10000} value={content} disabled={locked || stale} onChange={e => setContent(e.target.value)}/></label>
     <div className="row mt16"><button type="button" className="btn" disabled={locked || stale || Boolean(content)} onClick={() => void draft()}>{aiBusy ? 'AI 초안 생성 중…' : 'AI 답변 초안'}</button><button type="button" className="btn primary" disabled={locked || stale || !content.trim()} onClick={() => void write('answer')}>답변 추가하기</button></div>

@@ -223,7 +223,7 @@ function StandardProductDetail({
   const href = loginBeforeCheckout(withEntrySource(baseHref, entrySource), signedIn);
   const cta = enrolled
     ? digital
-      ? "내 자료실로 이동"
+      ? "수강 자료·구매 파일로 이동"
       : "학습 이어가기"
     : unavailableFree ? '참여 링크 준비 중' : available
       ? free
@@ -261,8 +261,8 @@ function StandardProductDetail({
       ) : (
         <p className="notice">
           {enrolled
-            ? "등록된 자료는 내 자료실에 표시됩니다."
-            : "신청·구매 후 제공되는 자료는 내 자료실에서 확인할 수 있습니다."}
+            ? "등록된 자료는 수강 자료·구매 파일에 표시됩니다."
+            : "신청·구매 후 제공되는 자료는 수강 자료·구매 파일에서 확인할 수 있습니다."}
         </p>
       )}
     </section>

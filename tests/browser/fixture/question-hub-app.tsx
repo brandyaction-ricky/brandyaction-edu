@@ -1,5 +1,6 @@
 import { StrictMode } from 'react';
 import {createRoot} from 'react-dom/client';
+import {MemberViews} from '../../../app/ui/final/member-views';
 import {QuestionHub} from '../../../app/ui/final/question-hub';
 import {QuestionThreadDialog} from '../../../app/ui/final/question-thread';
 import {LessonQuestions} from '../../../app/ui/final/lesson-questions';
@@ -10,4 +11,4 @@ import '../../../features/admin-ui/styles/admin-system.css';
 import '../../../app/ui/final/integration.css';
 const id=(n:number)=>`11111111-1111-4111-8111-${String(n).padStart(12,'0')}`;
 const params=new URLSearchParams(location.search);
-createRoot(document.getElementById('root')!).render(<StrictMode><main className={params.has('admin')?'edu-admin':'edu-front'}><div className="wrap" style={{padding:'24px 16px'}}>{params.has('admin')?<QuestionThreadDialog questionId={id(9)} close={()=>{}}/>:params.has('lesson')?<LessonQuestions enrollmentId={id(1)} lessonId={id(4)} lessonTitle="문샷 4기 · 1일차"/>:<QuestionHub/>}</div></main></StrictMode>);
+createRoot(document.getElementById('root')!).render(<StrictMode><main className={params.has('admin')?'edu-admin':'edu-front'}><div className="wrap" style={{padding:'24px 16px'}}>{params.has('member')?<MemberViews section="questions" data={{}} user={{id:id(1),email:'synthetic@example.test',role:'member',full_name:'검수 회원',phone:null}} pending={false} send={async()=>({})} logout={async()=>{}}/>:params.has('admin')?<QuestionThreadDialog questionId={id(9)} close={()=>{}}/>:params.has('lesson')?<LessonQuestions enrollmentId={id(1)} lessonId={id(4)} lessonTitle="문샷 4기 · 1일차"/>:<QuestionHub/>}</div></main></StrictMode>);

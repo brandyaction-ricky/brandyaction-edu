@@ -1,4 +1,5 @@
 "use client";
+import { LearningProgress } from './learning-progress';
 import { DiagnosisEntry } from './diagnosis-entry';
 import {
   date,
@@ -102,7 +103,7 @@ export function Classroom({
   ]);
   const done = completedIds.has(String(lesson?.id)),
     current = lessons.findIndex((l) => l.id === lesson?.id);
-  const canOpen = (id: string) => graduate || !blockLearningEnabled || progression.lessons?.some(item => item.lessonId === id && item.isUnlocked) === true;
+  const canOpen = (id: string) => graduate || (blockLearningEnabled ? progression.lessons?.some(item => item.lessonId === id && item.isUnlocked) === true : completedIds.has(id) || allLessons.slice(0, allLessons.findIndex(item => item.id === id)).every(item => completedIds.has(item.id)));
   const entries = missionEntries(data, [enrollment]).filter(
       (x) => x.lesson?.id === lesson?.id,
     ),
@@ -305,6 +306,7 @@ export function Classroom({
             ))}
           </aside>
           <div className="learning-content">
+            <LearningProgress complete={lessons.filter(l => completedIds.has(l.id)).length} total={lessons.length}/>
             {lesson && canOpen(lesson.id) ? (
               <>
                 <header className="lesson-header">
@@ -317,7 +319,7 @@ export function Classroom({
                   </div>
                   <h1>{t(lesson, "title")}</h1>
                   <p>{t(lesson, "description")}</p>
-                  <a className="link" href="#lesson-questions">이 수업에 개인 질문 남기기</a>
+                  <a className="link" href="#lesson-questions">이 수업에 질문 남기기</a>
                 </header>
                 <LessonContent enabled={blockLearningEnabled} readOnly={graduate} lessonId={lesson.id} enrollmentId={enrollment.id} legacyCompletion={legacyCompletion} onCompleted={() => { if (!completedIds.has(lesson.id)) { setCompletedHere(previous => previous.includes(`${enrollment.id}:${lesson.id}`) ? previous : [...previous, `${enrollment.id}:${lesson.id}`]); progression.reload(); } }}>
                 {safeUrl(content?.vod_url) && (
@@ -400,7 +402,7 @@ export function Classroom({
                     <span />
                   )}
                   {!blockLearningEnabled && legacyCompletion}
-                  {current < lessons.length - 1 && (canOpen(lessons[current + 1].id) ? (
+                  {current < lessons.length - 1 && ((graduate || done || selectedGate?.ongoing) && canOpen(lessons[current + 1].id) ? (
                     <Link
                       className="btn"
                       href={
@@ -413,7 +415,7 @@ export function Classroom({
                       다음 학습
                       <ArrowRight />
                     </Link>
-                  ) : <button className="btn" disabled>다음 학습 · 잠김</button>)}
+                  ) : <button className="btn" disabled>{!done && !graduate && !selectedGate?.ongoing ? "학습 완료 후 다음 학습" : "다음 학습 · 잠김"}</button>)}
                 </div>
                 <LessonQuestions key={enrollment.id + ":" + lesson.id} enrollmentId={String(enrollment.id)} lessonId={String(lesson.id)} lessonTitle={t(lesson, "title")} />
               </>
