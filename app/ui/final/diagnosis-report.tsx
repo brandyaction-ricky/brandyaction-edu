@@ -48,6 +48,7 @@ export function DiagnosisReportView({ onExit, exitLabel = '학습으로 돌아�
   const [reload, setReload] = useState(0), [preview, setPreview] = useState<string | null>(null);
   const [fetchingPreview, setFetchingPreview] = useState(false), [downloading, setDownloading] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null), fileRequest = useRef<AbortController | null>(null);
+  const openReport = useRef<HTMLButtonElement>(null), readerWasOpen = useRef(false);
   const fileVersion = useRef(0);
 
   useEffect(() => {
@@ -87,6 +88,10 @@ export function DiagnosisReportView({ onExit, exitLabel = '학습으로 돌아�
     };
   }, [reload]);
   useEffect(() => { heading.current?.focus(); }, [status?.state]);
+  useEffect(() => {
+    if (preview === null && readerWasOpen.current && document.visibilityState === 'visible') openReport.current?.focus({ preventScroll: true });
+    readerWasOpen.current = preview !== null;
+  }, [preview]);
 
   function refresh() {
     setStatus(null); setPreview(null); setError(''); setLoading(true); setPaused(false); setReload(n => n + 1);
@@ -138,15 +143,15 @@ export function DiagnosisReportView({ onExit, exitLabel = '학습으로 돌아�
         </div>
       </div>}
       {status?.state === 'ready' && <>
-        <div className="diagnosis-report-actions"><button className="diagnosis-primary" onClick={() => void getFile('read')} disabled={fetchingPreview || downloading}>{fetchingPreview ? <LoaderCircle className="diagnosis-spin" size={18}/> : <FileText size={18}/>}보고서 열기</button>
+        <div className="diagnosis-report-actions"><button ref={openReport} className="diagnosis-primary" onClick={() => void getFile('read')} disabled={fetchingPreview || downloading}>{fetchingPreview ? <LoaderCircle className="diagnosis-spin" size={18}/> : <FileText size={18}/>}보고서 열기</button>
           <button className="diagnosis-secondary" onClick={() => void getFile('html')} disabled={fetchingPreview || downloading}><Download size={18}/>HTML 파일 받기</button>
           <button className="diagnosis-secondary" onClick={() => void getFile('markdown')} disabled={fetchingPreview || downloading}>{downloading ? <LoaderCircle className="diagnosis-spin" size={18}/> : <Download size={18}/>}MD 파일 받기</button></div>
         <p className="diagnosis-report-help">HTML은 지금 보는 디자인 그대로 보관하는 파일입니다. MD는 다음 날 커리큘럼에서 내 사업에 맞게 정리할 때 사용합니다. 두 파일 모두 다시 받을 수 있습니다.</p>
       </>}
-      {preview !== null && <DiagnosisReportReader html={preview} onClose={() => setPreview(null)} onError={setError}/>}
+      {preview !== null && <DiagnosisReportReader html={preview} error={error} onClose={() => setPreview(null)} onError={setError}/>}
       {paused && <p className="diagnosis-report-help">자동 확인을 잠시 멈췄어요. 아래 버튼을 누르면 최신 상태를 확인할 수 있어요.</p>}
-      {error && <p className="diagnosis-error" role="alert">{error}</p>}
-      <div className="diagnosis-report-footer">{(error || paused) && <button className="diagnosis-secondary" onClick={refresh} disabled={downloading || fetchingPreview}><RefreshCw size={16}/>{error ? '다시 연결하기' : '최신 상태 확인'}</button>}<button className="diagnosis-secondary" onClick={onExit}>{exitLabel}<ArrowRight size={16}/></button></div>
+      {preview === null && error && <p className="diagnosis-error" role="alert">{error}</p>}
+      {preview === null && <div className="diagnosis-report-footer">{(error || paused) && <button className="diagnosis-secondary" onClick={refresh} disabled={downloading || fetchingPreview}><RefreshCw size={16}/>{error ? '다시 연결하기' : '최신 상태 확인'}</button>}<button className="diagnosis-secondary" onClick={onExit}>{exitLabel}<ArrowRight size={16}/></button></div>}
     </>}
   </section>;
 }
