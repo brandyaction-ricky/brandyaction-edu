@@ -1,3 +1,4 @@
+import { diagnosisAudienceAllows } from '@/lib/diagnosis-audience';
 import {getAuthenticatedUser} from '@/lib/server-auth';
 import {createAdminClient} from '@/lib/supabase/admin';
 import {uuid} from '@/lib/edu-workflows';
@@ -23,6 +24,7 @@ export async function GET() {
  if(process.env.EDU_MYIN_DIAGNOSIS_ENABLED!=='true')return reply({error:'검사 기능을 준비하고 있습니다.'},404);
  try {
   const user=await getAuthenticatedUser();if(!user)return reply({error:'로그인이 필요합니다.'},401);
+  if(!diagnosisAudienceAllows(user))return reply({error:'현재 관리자만 이용할 수 있습니다.'},403);
   const {data,error}=await createAdminClient().rpc('edu_diagnosis_read',{p_actor:user.id});if(error)throw error;
   return reply(data);
  } catch(error){return failure(error);}
@@ -32,6 +34,7 @@ export async function POST(request:Request) {
  try {
   if(request.headers.get('origin')!==new URL(request.url).origin)return reply({error:'요청 출처를 확인해 주세요.'},403);
   const user=await getAuthenticatedUser();if(!user)return reply({error:'로그인이 필요합니다.'},401);
+  if(!diagnosisAudienceAllows(user))return reply({error:'현재 관리자만 이용할 수 있습니다.'},403);
   const body=await readSmallJson(request);
   if(!body||Array.isArray(body)||Object.keys(body).some(key=>key!=='courseId')||!uuid(body.courseId))return reply({error:'검사를 시작할 상품을 확인해 주세요.'},400);
   const {data,error}=await createAdminClient().rpc('edu_diagnosis_begin',{p_actor:user.id,p_course:body.courseId});if(error)throw error;
