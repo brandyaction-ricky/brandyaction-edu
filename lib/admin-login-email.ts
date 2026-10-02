@@ -28,7 +28,7 @@ export async function sendAdminEmailChange(email: string, link: string, id: stri
   const result = await request('https://api.resend.com/emails', {
     method: 'POST', headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json', 'Idempotency-Key': `edu-member-email-${id}` },
     body: JSON.stringify({ from: process.env.CRM_EMAIL_FROM, to: [email], subject: '[브랜디에듀] 새 로그인 이메일을 확인해 주세요',
-      text: `관리자가 회원님의 요청에 따라 로그인 이메일 변경을 신청했습니다.\n\n아래 링크를 누르면 이 주소로 변경됩니다. 기존 수강권과 학습 기록은 그대로 유지됩니다.\n${link}\n\n확인 후 브랜디에듀 로그인 비밀번호를 직접 설정할 수 있습니다. 네이버·구글 메일의 비밀번호와는 별개입니다.\n요청한 적이 없다면 링크를 누르지 말고 고객센터로 알려 주세요.` }),
+      text: `관리자가 회원님의 요청에 따라 로그인 이메일 변경을 신청했습니다.\n\n아래 링크를 누르면 이 주소로 변경됩니다. 기존 수강권과 학습 기록은 그대로 유지됩니다.\n\n이 메일을 보낸 뒤 1시간 안에 아래 링크를 눌러 주세요. 시간이 지났다면 관리자에게 새 확인 메일을 요청해 주세요.\n${link}\n\n확인 후 브랜디에듀 로그인 비밀번호를 직접 설정할 수 있습니다. 네이버·구글 메일의 비밀번호와는 별개입니다.\n설정을 마치면 나중에도 새 이메일과 브랜디에듀 비밀번호로 로그인할 수 있습니다.\n요청한 적이 없다면 링크를 누르지 말고 고객센터로 알려 주세요.` }),
     signal: AbortSignal.timeout(10000),
   });
   if (!result.ok) fail('메일을 보내지 못했습니다. 잠시 후 새로 신청해 주세요.', 503);
