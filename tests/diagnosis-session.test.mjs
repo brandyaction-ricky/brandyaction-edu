@@ -14,6 +14,7 @@ function load(name) {
 const {createDiagnosisAutosave}=load('diagnosis-autosave');
 const {sendDiagnosisCommand,diagnosisBridgeHeaders,validateDiagnosisSession}=load('diagnosis-bridge');
 const {runDiagnosisSession}=load('diagnosis-session-service');
+const {diagnosisQuestionAnswered,diagnosisMissingQuestions}=load('diagnosis-session');
 const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 const context={attemptId:id(1),subject:id(2),releaseId:id(3),responseId:null,packageVersion:'v1',state:'preparing'};
 const survey={code:'needs6_n30',version:'fixture',title:'합성 검사',coreQuestionCount:1,questions:[{id:id(10),code:'fixture',text:'합성 문항',type:'single_choice',section:'합성',required:true,core:true,pickExactly:null,exclusiveOptionIds:[],confirmationOptionId:null,reconfirmInstructions:false,placeholder:'',pair:null,options:[{id:id(11),label:'합성 선택'}]}]};
@@ -50,6 +51,23 @@ test('the public bridge DTO strips scoring extras and rejects mixed answers and 
   const extra=structuredClone(remote);extra.survey.rawScores={private:true};extra.survey.questions[0].facetId='private';extra.survey.questions[0].options[0].score=5;
   assert.doesNotMatch(JSON.stringify(validateDiagnosisSession(extra,context)),/rawScores|facetId|score/);
   for(const change of [{answers:[{questionId:id(10),optionId:id(99)}]},{answers:[{questionId:id(10),optionId:id(11),rawScore:5}]},{state:'submitted',submittedAt:null},{needsReview:true}])assert.throws(()=>validateDiagnosisSession({...remote,...change},context));
+});
+
+test('bridge preserves only a valid instructed option and resumed wrong checks remain unanswered',()=>{
+  const data=structuredClone(remote),question=data.survey.questions[0];
+  question.requiredOptionId=id(11);
+  const session=validateDiagnosisSession(data,context);
+  assert.equal(session.survey.questions[0].requiredOptionId,id(11));
+  assert.equal(validateDiagnosisSession(remote,context).survey.questions[0].requiredOptionId,null);
+  assert.equal(diagnosisQuestionAnswered(question,{questionId:question.id,optionId:id(12)}),false);
+  assert.equal(diagnosisQuestionAnswered(question,{questionId:question.id,optionId:id(11)}),true);
+  assert.equal(diagnosisMissingQuestions(session,[{questionId:question.id,optionId:id(12)}])[0].id,question.id);
+  for(const invalid of [id(99),false,0,'',{}]){
+    question.requiredOptionId=invalid;
+    assert.throws(()=>validateDiagnosisSession(data,context));
+  }
+  question.requiredOptionId=id(11);question.type='multi_choice';
+  assert.throws(()=>validateDiagnosisSession(data,context));
 });
 
 async function database(t) {

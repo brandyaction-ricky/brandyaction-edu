@@ -48,6 +48,7 @@ export function validateDiagnosisSession(value: unknown, context: DiagnosisConte
       || new Set(q.options.map(o => o.id)).size !== q.options.length
       || q.exclusiveOptionIds.some(id => !q.options.some(o => o.id === id))
       || (q.confirmationOptionId !== null && !q.options.some(o => o.id === q.confirmationOptionId))
+      || (q.requiredOptionId != null && (!['pair_choice','single_choice'].includes(q.type) || !q.options.some(o => o.id === q.requiredOptionId)))
       || (q.type === 'pair_choice' && (!q.pair || typeof q.pair.left !== 'string' || typeof q.pair.right !== 'string'))) return fail();
     seen.add(q.id);
   }
@@ -67,7 +68,7 @@ export function validateDiagnosisSession(value: unknown, context: DiagnosisConte
   const publicSurvey = { code: survey.code, version: survey.version, title: survey.title, coreQuestionCount: survey.coreQuestionCount,
     questions: survey.questions.map(q => ({ id:q.id,code:q.code,text:q.text,type:q.type,section:q.section,core:q.core,required:q.required,
       pickExactly:q.pickExactly,exclusiveOptionIds:q.exclusiveOptionIds,reconfirmInstructions:q.reconfirmInstructions,
-      confirmationOptionId:q.confirmationOptionId,placeholder:q.placeholder,pair:q.pair ? {left:q.pair.left,right:q.pair.right} : null,
+      confirmationOptionId:q.confirmationOptionId,requiredOptionId:q.requiredOptionId ?? null,placeholder:q.placeholder,pair:q.pair ? {left:q.pair.left,right:q.pair.right} : null,
       options:q.options.map(o => ({id:o.id,label:o.label})) })) };
   return { responseId: v.responseId, state: v.state as DiagnosisSession['state'], revision: Number(v.revision),
     answers: v.answers, submittedAt: v.submittedAt as string | null, needsReview: v.needsReview, survey: publicSurvey };
