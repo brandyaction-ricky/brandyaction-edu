@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createDiagnosisAutosave } from '@/lib/diagnosis-autosave';
 import { diagnosisMissingQuestions, diagnosisQuestionAnswered, type DiagnosisAnswer as N30Answer, type DiagnosisQuestion as N30Question, type DiagnosisSession } from '@/lib/diagnosis-session';
+import { DiagnosisRestart } from './diagnosis-restart';
 import './diagnosis-questionnaire.css';
 
 const present = (a?: N30Answer) => !!a && (!!a.optionId || !!a.values?.length || !!a.value?.trim());
@@ -20,8 +21,8 @@ function buildScreens(questions:N30Question[]):Screen[]{
 }
 const Back = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>;
 const Tick = () => <svg viewBox="0 0 24 24" fill="none" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>;
-type Props={initial:DiagnosisSession;save:(revision:number,answers:N30Answer[])=>Promise<{revision:number}>;submit:(revision:number)=>Promise<void>;onReload:()=>Promise<void>;onExit:()=>void};
-export function DiagnosisQuestionnaire({initial,save,submit,onReload,onExit}:Props){
+type Props={initial:DiagnosisSession;save:(revision:number,answers:N30Answer[])=>Promise<{revision:number}>;submit:(revision:number)=>Promise<void>;onReload:()=>Promise<void>;onExit:()=>void;onRestart?:()=>Promise<void>};
+export function DiagnosisQuestionnaire({initial,save,submit,onReload,onExit,onRestart}:Props){
   const questions=initial.survey.questions, screens=useMemo(()=>buildScreens(questions),[questions]);
   const parts=PARTS, completed=false;
   const [answers,setAnswers]=useState(initial.answers);
@@ -77,7 +78,7 @@ export function DiagnosisQuestionnaire({initial,save,submit,onReload,onExit}:Pro
   }
   useEffect(()=>{
     if(screen.kind!=='q'||screen.q.type==='multi_choice')return;
-    const q=screen.q;const onKey=(event:KeyboardEvent)=>{if(event.repeat||event.metaKey||event.ctrlKey||event.altKey||locked.current)return;const target=event.target as HTMLElement;if(target.closest('input,textarea,select,[contenteditable=true]')||dlgRef.current?.open)return;const n=Number(event.key);if(!Number.isInteger(n)||n<1||n>q.options.length)return;event.preventDefault();pick(q,q.options[n-1].id);};
+    const q=screen.q;const onKey=(event:KeyboardEvent)=>{if(event.repeat||event.metaKey||event.ctrlKey||event.altKey||locked.current)return;const target=event.target as HTMLElement;if(target.closest('input,textarea,select,[contenteditable=true]')||document.querySelector('dialog[open]'))return;const n=Number(event.key);if(!Number.isInteger(n)||n<1||n>q.options.length)return;event.preventDefault();pick(q,q.options[n-1].id);};
     window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey);
     // Event handlers read refs for the latest answer and saving lock.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -98,6 +99,13 @@ export function DiagnosisQuestionnaire({initial,save,submit,onReload,onExit}:Pro
     locked.current=true;setBusy(true);setError('');try{const revision=await persist();await submit(revision);}catch(cause){if(alive.current){setError(cause instanceof Error?cause.message:'제출 상태를 확인하지 못했습니다. 다시 시도해 주세요.');if((cause as {code?:string})?.code==='CONFLICT')setConflict(true);}}finally{locked.current=false;if(alive.current)setBusy(false);}
   }
   async function exit(){if(locked.current||conflict)return;dlgRef.current?.close();locked.current=true;setBusy(true);try{await persist();if(alive.current)onExit();}catch{/* Stay with unsaved answers. */}finally{locked.current=false;if(alive.current)setBusy(false);}}
+  async function restart() {
+    if (locked.current || conflict || !onRestart) throw Error('저장 상태를 확인한 뒤 다시 시도해 주세요.');
+    locked.current = true; setBusy(true);
+    if (advanceTimer.current) clearTimeout(advanceTimer.current);
+    try { await persist(); await onRestart(); }
+    finally { locked.current = false; if (alive.current) setBusy(false); }
+  }
   async function reloadSaved(){if(locked.current)return;locked.current=true;setBusy(true);try{await onReload();}catch(cause){setError(cause instanceof Error?cause.message:'저장된 답변을 불러오지 못했습니다.');}finally{locked.current=false;if(alive.current)setBusy(false);}}
   const cur=screen.kind==='q'||screen.kind==='intro'?0:screen.kind==='essay'?1:2;
   const q=screen.kind==='q'?screen.q:null,answer=find(q??undefined),multi=q?.type==='multi_choice',likert=q?.options.length===5&&!multi;
@@ -123,6 +131,7 @@ export function DiagnosisQuestionnaire({initial,save,submit,onReload,onExit}:Pro
       </div>
     </header>
 
+    {onRestart && <aside className="diagnosis-admin-tools"><span>관리자 검수용{initial.adminTest ? ' · 빠른 응답 허용' : ''}</span><DiagnosisRestart disabled={busy || conflict} onRestart={restart}/></aside>}
     <main className="stage">
       {!completed && q && <div className="sheet">
           <div className="sheet-head">

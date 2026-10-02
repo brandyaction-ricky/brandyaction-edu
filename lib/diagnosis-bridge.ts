@@ -1,7 +1,7 @@
 import { createHash, createHmac } from 'node:crypto';
 import type { DiagnosisSession } from './diagnosis-session';
 
-export type DiagnosisContext = { attemptId: string; subject: string; releaseId: string; packageVersion: string; responseId: string | null; state: string };
+export type DiagnosisContext = { attemptId: string; subject: string; releaseId: string; packageVersion: string; responseId: string | null; state: string; adminTest?: boolean; canRestart?: boolean };
 export class DiagnosisBridgeError extends Error {
   constructor(public code: string, public status: number) { super(code); }
 }

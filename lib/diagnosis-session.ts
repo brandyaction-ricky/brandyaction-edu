@@ -6,6 +6,7 @@ export type DiagnosisQuestion = {
   placeholder: string; pair: { left: string; right: string } | null; options: { id: string; label: string }[];
 };
 export type DiagnosisSession = {
+  attemptId?: string; adminTest?: boolean; canRestart?: boolean;
   state: 'in_progress' | 'submitted'; revision: number; answers: DiagnosisAnswer[]; submittedAt: string | null; needsReview: boolean;
   survey: { code: string; version: string; title: string; coreQuestionCount: number; questions: DiagnosisQuestion[] };
 };

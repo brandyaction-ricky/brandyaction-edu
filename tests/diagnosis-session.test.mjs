@@ -94,3 +94,29 @@ test('manual access cannot start early or outlive its enrollment window',async t
   await h.db.exec("update enrollments set access_starts_at='2000-01-01'");await h.run({action:'ensure',courseId:id(5)});
   await h.db.exec("update enrollments set access_ends_at='2000-01-02'");await assert.rejects(h.run({action:'read'}),e=>e.code==='FORBIDDEN');
 });
+
+test('admin restart is server-owned and stale tabs cannot write to a new attempt',async()=>{
+ let current={...context,responseId:id(4),adminTest:true,canRestart:true},writes=0;
+ const actor={id:id(2),role:'admin',full_name:'관리자 검수'};
+ const rpc=async(name,args)=>{
+  if(name==='edu_diagnosis_context')return{data:current};
+  if(name==='edu_diagnosis_restart'){
+   assert.equal(args.p_attempt,id(1));current={...current,attemptId:id(80),responseId:null};return{data:{id:id(80)}};
+  }
+  return{data:true};
+ };
+ const send=async(ctx,cmd)=>{writes++;if(cmd.action==='ensure')assert.equal(cmd.adminTest,true);return{...remote};};
+ const run=(input,owner=actor)=>runDiagnosisSession({actor:owner,rpc,send},input);
+ for(const role of ['student','staff'])await assert.rejects(run({action:'restart',attemptId:id(1)},{...actor,role}),e=>e.code==='FORBIDDEN');
+ await assert.rejects(run({action:'ensure',adminTest:true}),e=>e.code==='INVALID');assert.equal(writes,0);
+ const fresh=await run({action:'restart',attemptId:id(1)});assert.equal(fresh.attemptId,id(80));assert.equal(fresh.adminTest,true);assert.equal(fresh.canRestart,true);
+ for(const action of ['save','submit'])for(const attemptId of [id(1),undefined]){
+  await assert.rejects(run({action,revision:0,...(action==='save'?{answers:[]}:{}),...(attemptId?{attemptId}:{})}),e=>e.code==='CONFLICT');
+ }
+ assert.equal(writes,1);
+ await run({action:'save',revision:0,answers:[],attemptId:id(80)});assert.equal(writes,2);
+ await assert.rejects(run({action:'read'},{...actor,role:'staff'}),e=>e.code==='FORBIDDEN');
+ const before=writes;
+ await assert.rejects(runDiagnosisSession({actor,send,rpc:async name=>name==='edu_diagnosis_restart'?{data:{id:id(99)}}:{data:current}},{action:'restart',attemptId:id(80)}),e=>e.code==='CONFLICT');
+ assert.equal(writes,before);
+});
