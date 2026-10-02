@@ -14,13 +14,23 @@ test('original HTML keeps its design and contents links while scripts and remote
   await page.getByRole('button',{name:'보고서 열기',exact:true}).click();
   const preview=page.getByRole('region',{name:'나의 정밀 보고서',exact:true}),frame=page.frameLocator('iframe[title="나의 N6 정밀 보고서"]');
   await expect(frame.getByRole('heading',{name:'합성 정밀 보고서'})).toBeVisible();
+  await expect(page.getByRole('dialog',{name:'보고서 읽기'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'학습으로 돌아가기'})).toHaveCount(0);
+  const readerBox=(await preview.boundingBox())!,frameBox=(await page.locator('iframe').boundingBox())!,viewport=page.viewportSize()!;
+  expect(readerBox.y).toBe(0);expect(readerBox.height).toBe(viewport.height);
+  expect(frameBox.y+frameBox.height).toBe(viewport.height);
+  expect(frameBox.height).toBeGreaterThan(viewport.height*.85);
   await expect(frame.locator('body')).toHaveCSS('color','rgb(27, 38, 52)');await expect(frame.locator('h1')).toHaveCSS('font-size','32px');
   await expect(frame.locator('.print-btn')).toBeHidden();
   expect(await frame.locator('body').evaluate(()=>Object.hasOwn(window,'reportExecuted'))).toBe(false);
   expect(await page.evaluate(()=>Object.hasOwn(window,'reportExecuted'))).toBe(false);expect(remoteRequests).toBe(0);
   await frame.getByRole('link',{name:'나의 행동 경향'}).click();
   expect(await frame.locator('#details').evaluate(el=>Math.abs(el.getBoundingClientRect().top))).toBeLessThan(2);
+  await expect(page.getByRole('button',{name:'보고서 닫기'})).toBeInViewport();
+  await page.screenshot({path:test.info().outputPath('diagnosis-report-reading.png')});
   await page.getByRole('button',{name:'보고서 닫기'}).click();await expect(preview).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'보고서 열기',exact:true})).toBeFocused();
+  await expect(page.getByRole('button',{name:'학습으로 돌아가기'})).toBeVisible();
   for(const [button,name,body] of [['HTML 파일 받기','N6-정밀보고서.html',html],['MD 파일 받기','N6-검사결과.md',markdown]]){
     const pending=page.waitForEvent('download');await page.getByRole('button',{name:button}).click();const download=await pending;
     expect(download.suggestedFilename()).toBe(name);expect(await readFile((await download.path())!,'utf8')).toBe(body);
@@ -90,8 +100,29 @@ test('printing opens the same original document without an opener and explains b
   const pending=page.waitForEvent('popup');await page.getByRole('button',{name:'PDF로 저장 · 인쇄'}).click();const popup=await pending;
   await expect.poll(()=>page.evaluate(()=>Reflect.get(window,'printedReport'))).toMatchObject({opener:true,text:'인쇄할 원본 보고서',color:'rgb(12, 34, 56)'});
   expect((await page.evaluate(()=>Reflect.get(window,'printedReport'))).policy).toContain("script-src 'none'");await popup.close();
+  await page.getByRole('button',{name:'보고서 닫기'}).click();
   await page.getByRole('button',{name:'보고서 열기',exact:true}).click();await page.evaluate(()=>{window.open=()=>null;});
   await page.getByRole('button',{name:'PDF로 저장 · 인쇄'}).click();await expect(page.getByRole('alert')).toContainText('팝업이 차단');
+  await expect(page.getByRole('dialog').getByRole('alert')).toBeInViewport();
+});
+test('reader keeps the footer out of a small screen and Escape returns focus from inside the report',async({page})=>{
+  await session(page);
+  await page.route('**/api/platform/diagnosis/report*',r=>r.fulfill(new URL(r.request().url()).search?{contentType:'text/html',body:'<h1>작은 화면 보고서</h1><p style="height:2000px">긴 보고서 본문</p>'}:{json:report('ready')}));
+  await page.goto('/diagnosis-test?reports&admin');
+  const open=page.getByRole('button',{name:'보고서 열기',exact:true});await open.click();
+  await page.setViewportSize({width:320,height:568});
+  const dialog=page.getByRole('dialog',{name:'보고서 읽기'});
+  await expect(page.getByRole('button',{name:'관리자 화면으로 돌아가기'})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'보고서 닫기'})).toBeInViewport();
+  expect((await dialog.boundingBox())!.height).toBe(568);
+  expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
+  const frameBox=(await page.locator('iframe').boundingBox())!;
+  expect(frameBox.height).toBeGreaterThan(460);expect(frameBox.y+frameBox.height).toBe(568);
+  await page.screenshot({path:test.info().outputPath('diagnosis-report-small-screen.png')});
+  await page.frameLocator('iframe').getByRole('heading').press('Escape');
+  await expect(dialog).toHaveCount(0);await expect(open).toBeFocused();
+  await expect(page.getByRole('button',{name:'관리자 화면으로 돌아가기'})).toBeVisible();
+  expect(await page.evaluate(()=>document.body.style.overflow)).toBe('');
 });
 test('network failure stops automatic reads until the learner explicitly refreshes',async({page})=>{
   await page.clock.install();await session(page);let failing=true,reads=0;
