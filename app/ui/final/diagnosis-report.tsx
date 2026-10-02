@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, Check, CheckCircle2, Clock3, Download, FileText, LoaderCircle, RefreshCw } from 'lucide-react';
+import { ArrowRight, Check, CheckCircle2, ChevronDown, Clock3, Download, FileText, LoaderCircle, RefreshCw } from 'lucide-react';
 import type { DiagnosisReportStatus } from '@/lib/diagnosis-report';
 import { DiagnosisReportReader } from './diagnosis-report-reader';
 import './diagnosis-report.css';
@@ -11,7 +11,7 @@ const statusCopy = {
   queued: { title: '검사가 완료됐어요.', description: ['답변이 안전하게 접수됐어요.', '지금은 분석 순서를 기다리고 있습니다.', '화면을 닫아도 괜찮아요. 나중에 이곳에서 결과를 확인해 주세요.'] },
   processing: { title: '정밀 보고서를 만들고 있어요.', description: ['제출한 답변을 분석하고 보고서 내용을 확인하고 있습니다.', '완성되면 이곳에서 보고서를 읽고', 'HTML·MD 파일로 받을 수 있습니다.'] },
   ready: { title: '정밀 보고서가 준비됐어요.', description: ['보고서를 읽고 나의 욕구와 행동 경향을 확인해 보세요.', '다음 학습에 사용할 MD 파일도 함께 받을 수 있습니다.'] },
-  needs_review: { title: '결과를 만들기 전 확인 중이에요.', description: ['답변은 안전하게 접수됐어요.', '확인이 끝나면 보고서 작성을 시작합니다.', '다시 검사하거나 추가 결제할 필요는 없어요.'] },
+  needs_review: { title: '보고서 발급 전 확인이 필요해요.', description: ['답변은 안전하게 접수됐어요.', '확인할 항목이 있어 보고서 발급이 보류됐어요.', '운영팀에 현재 화면을 알려 주세요.'] },
   access_denied: { title: '이용 정보를 확인해 주세요.', description: ['현재 이 검사 결과를 열 수 없어요.', '구매·수강 상태를 확인해 주세요.'] },
 };
 
@@ -19,12 +19,12 @@ function ReportProgress({ state }: { state: DiagnosisReportStatus['state'] }) {
   if (state === 'access_denied') return null;
   const ready = state === 'ready', review = state === 'needs_review';
   return <ol className="diagnosis-report-steps" aria-label="검사 진행 단계">
-    {['검사 완료', '결과 분석 중', '분석 완료'].map((label, index) => {
+    {['검사 완료', review ? '확인 필요' : '결과 분석 중', '분석 완료'].map((label, index) => {
       const complete = ready || index === 0, current = index === (ready ? 2 : 1);
       return <li key={label} className={complete ? 'is-complete' : current && review ? 'is-review' : undefined} aria-current={current ? 'step' : undefined}>
         <span className="diagnosis-step-marker" aria-hidden="true">{complete ? <Check size={18}/> : current ? state === 'processing' ? <LoaderCircle size={18} className="diagnosis-spin"/> : <Clock3 size={18}/> : index + 1}</span>
         <span>{label}</span>
-        {current && !ready && <small>{review ? '답변 확인 중' : state === 'queued' ? '분석 대기' : '보고서 작성 중'}</small>}
+        {current && !ready && <small>{review ? '보고서 발급 보류' : state === 'queued' ? '분석 대기' : '보고서 작성 중'}</small>}
       </li>;
     })}
   </ol>;
@@ -122,11 +122,18 @@ export function DiagnosisReportView({ onExit, exitLabel = '학습으로 돌아�
       {status && <ReportProgress state={status.state}/>}
       {copy && <div className="diagnosis-report-summary">
         <span className={`diagnosis-report-icon${status?.state === 'ready' ? ' is-ready' : ''}`} aria-hidden="true">{status?.state === 'ready' ? <CheckCircle2 size={30}/> : <FileText size={30}/>}</span>
-        <span className="diagnosis-eyebrow">나의 N6 검사</span><h1 ref={heading} tabIndex={-1}>{copy.title}</h1><p className="diagnosis-report-description">{copy.description.map(line => <span key={line}>{line}</span>)}</p>
+        <span className="diagnosis-eyebrow">나의 N6 검사</span><h1 ref={heading} tabIndex={-1}>{copy.title}</h1><p className="diagnosis-report-description">{copy.description.map((line, index) => <span key={line}>{index === 0 ? <strong>{line}</strong> : line}</span>)}</p>
       </div>}
-      {status && ['queued', 'processing', 'needs_review'].includes(status.state) && <div className={`diagnosis-report-timing${status.state === 'needs_review' ? ' is-review' : ''}`}>
+      {status?.state === 'needs_review' && <details className="diagnosis-report-details">
+        <summary><span>자세한 안내</span><ChevronDown size={20} aria-hidden="true"/></summary>
+        <div className="diagnosis-report-details-body">
+          <div><h2>얼마나 기다리면 되나요?</h2><p>운영팀의 확인이 필요한 상태예요.<br/>지금은 완료 시간을 안내하기 어렵습니다.</p></div>
+          <div><h2>화면을 닫아도 되나요?</h2><p>네. 제출한 답변은 그대로 보관돼요.<br/>추가 결제 없이 운영팀 안내를 확인해 주세요.</p></div>
+        </div>
+      </details>}
+      {status && ['queued', 'processing'].includes(status.state) && <div className="diagnosis-report-timing">
         <Clock3 size={20} aria-hidden="true"/><div><p>보고서 준비 예상 시간 <strong>약 30분~1일</strong></p>
-          <p>{status.state === 'needs_review' ? <>지금은 답변 확인이 먼저 필요해요.<br/>확인 상황에 따라 안내 시간보다 더 걸릴 수 있습니다.</> : <>검사 제출 후부터 예상한 시간입니다.<br/>신청이 몰리면 더 걸릴 수 있어요.</>}</p>
+          <p>검사 제출 후부터 예상한 시간입니다.<br/>신청이 몰리면 더 걸릴 수 있어요.</p>
           {!paused && <span>이 화면에서 진행 상태가 자동으로 바뀝니다.</span>}
         </div>
       </div>}

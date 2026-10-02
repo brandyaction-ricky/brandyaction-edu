@@ -48,23 +48,35 @@ test('processing polls every 10 seconds and stops once ready',async({page})=>{
   await expect(page.getByText('약 30분~1일',{exact:true})).toHaveCount(0);
 });
 
-test('review is clearly marked and automatically moves to a ready report without resubmitting',async({page})=>{
+test('review explains the hold with keyboard-accessible details and reflects a later ready status',async({page})=>{
   await page.clock.install();await session(page);let state='needs_review';
   await page.route('**/api/platform/diagnosis/report',r=>r.fulfill({json:report(state)}));
   await page.goto('/diagnosis-test?reports&admin');
   const progress=page.getByRole('list',{name:'검사 진행 단계'});
-  await expect(progress.locator('[aria-current="step"]')).toContainText('답변 확인 중');
-  await expect(page.getByText('약 30분~1일',{exact:true})).toBeVisible();
-  await expect(page.getByText('확인 상황에 따라 안내 시간보다 더 걸릴 수 있습니다.',{exact:false})).toBeVisible();
+  await expect(progress.locator('[aria-current="step"]')).toContainText('확인 필요');
+  await expect(progress).not.toContainText('결과 분석 중');
+  await expect(page.getByText('약 30분~1일',{exact:true})).toHaveCount(0);
+  await expect(page.getByText('확인할 항목이 있어 보고서 발급이 보류됐어요.',{exact:true})).toBeVisible();
   await expect(page.getByRole('button',{name:'MD 파일 받기'})).toHaveCount(0);
   await expect(page.getByRole('button',{name:'최신 상태 확인'})).toHaveCount(0);
   const description=page.locator('.diagnosis-report-description span');
   await expect(description).toHaveCount(3);
   expect((await description.nth(1).boundingBox())!.y).toBeGreaterThan((await description.first().boundingBox())!.y);
-  const title=page.getByRole('heading',{name:'결과를 만들기 전 확인 중이에요.'});
+  const title=page.getByRole('heading',{name:'보고서 발급 전 확인이 필요해요.'});
   expect((await title.boundingBox())!.width).toBeLessThanOrEqual(600);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await page.screenshot({path:test.info().outputPath('diagnosis-progress-review.png'),fullPage:true});
+  const toggle=page.locator('summary').filter({hasText:'자세한 안내'});
+  await expect(page.getByRole('heading',{name:'얼마나 기다리면 되나요?'})).toBeHidden();
+  expect((await toggle.boundingBox())!.height).toBeGreaterThanOrEqual(48);
+  await toggle.focus();await page.keyboard.press('Enter');
+  await expect(page.getByText('지금은 완료 시간을 안내하기 어렵습니다.',{exact:false})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'화면을 닫아도 되나요?'})).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.screenshot({path:test.info().outputPath('diagnosis-progress-review-expanded.png'),fullPage:true});
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading',{name:'얼마나 기다리면 되나요?'})).toBeHidden();
+  await expect(page.getByText('운영팀에 현재 화면을 알려 주세요.',{exact:true})).toBeVisible();
   state='ready';await page.clock.runFor(10000);
   await expect(page.getByRole('button',{name:'MD 파일 받기'})).toBeVisible();
   await page.getByRole('button',{name:'관리자 화면으로 돌아가기'}).click();
@@ -85,8 +97,8 @@ test('network failure stops automatic reads until the learner explicitly refresh
   await page.clock.install();await session(page);let failing=true,reads=0;
   await page.route('**/api/platform/diagnosis/report',r=>{reads++;return r.fulfill(failing?{status:503,json:{error:'연결을 확인해 주세요.'}}:{json:report('needs_review')});});
   await page.goto('/diagnosis-test?reports');await expect(page.getByRole('alert')).toContainText('연결을 확인');const failedReads=reads;await page.clock.runFor(60000);expect(reads).toBe(failedReads);
-  failing=false;await page.getByRole('button',{name:'다시 연결하기'}).click();await expect(page.getByRole('heading',{name:'결과를 만들기 전 확인 중이에요.'})).toBeVisible();
-  await expect(page.getByRole('button',{name:'답변 제출하기'})).toHaveCount(0);await expect(page.getByRole('button',{name:'MD 파일 받기'})).toHaveCount(0);await expect(page.getByText('다시 검사하거나 추가 결제할 필요는 없어요.',{exact:false})).toBeVisible();
+  failing=false;await page.getByRole('button',{name:'다시 연결하기'}).click();await expect(page.getByRole('heading',{name:'보고서 발급 전 확인이 필요해요.'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'답변 제출하기'})).toHaveCount(0);await expect(page.getByRole('button',{name:'MD 파일 받기'})).toHaveCount(0);await expect(page.getByText('답변은 안전하게 접수됐어요.',{exact:true})).toBeVisible();
 });
 test('hidden pages pause polling and do not retain an open result preview',async({page})=>{
   await page.clock.install();await session(page);let reads=0;
