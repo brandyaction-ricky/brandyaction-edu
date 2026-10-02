@@ -10,6 +10,7 @@ async function loadSnapshot(member: string, signal?: AbortSignal): Promise<Snaps
   if (result.status === 403) return null;
   const data = await result.json();
   if (!result.ok) throw Error(data.error || '로그인 정보를 불러오지 못했습니다.');
+  if (!data || typeof data.currentEmail !== 'string' || typeof data.pendingEmail !== 'string' || !Array.isArray(data.history)) throw Error('로그인 정보 응답을 확인하지 못했습니다. 다시 시도해 주세요.');
   return data;
 }
 export function AdminLoginEmailChange({ member }: { member: string }) {

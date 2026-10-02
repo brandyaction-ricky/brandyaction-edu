@@ -32,3 +32,15 @@ test('staff cannot see the administrator email form', async ({ page }) => {
   await page.goto('/member-operations-test'); await page.getByRole('button', { name: '회원 상세 열기', exact: true }).click();
   await expect(page.getByRole('region', { name: '관리자 로그인 이메일 변경' })).toHaveCount(0);
 });
+test('malformed email response leaves member details usable and can be retried', async ({ page }) => {
+  let valid = false;
+  await page.route('**/api/admin/member-login-email**', route => route.fulfill({ json: valid ? { currentEmail: 'old@example.test', pendingEmail: '', history: [] } : { rows: [], total: 0 } }));
+  await page.goto('/member-operations-test'); await page.getByRole('button', { name: '회원 상세 열기', exact: true }).click();
+  const area = page.getByRole('region', { name: '관리자 로그인 이메일 변경' });
+  await expect(area.getByRole('alert')).toContainText('다시 시도');
+  await expect(page.getByRole('tab', { name: '프로필', exact: true })).toBeVisible();
+  await expect(page.getByTestId('saved-member')).toHaveText('{}');
+  valid = true; await area.getByRole('button', { name: '다시 시도', exact: true }).click();
+  await expect(area.getByText('old@example.test', { exact: true })).toBeVisible();
+  await expect(area.getByRole('alert')).toHaveCount(0);
+});
