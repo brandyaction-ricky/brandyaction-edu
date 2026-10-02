@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from 'react';
-import { AdminButton, AdminCheckbox, AdminInlineError } from '@/features/admin-ui';
+import { AdminAlert, AdminButton, AdminCheckbox, AdminInlineError } from '@/features/admin-ui';
 
 type History = { id: number; created_at: string; actor_user_id: string; before_data: { email: string }; after_data: { new_email: string; reason: string; status: string; error?: string } };
 type Snapshot = { currentEmail: string; pendingEmail: string; history: History[] };
@@ -17,6 +17,10 @@ export function AdminLoginEmailChange({ member }: { member: string }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null), [hidden, setHidden] = useState(false), [error, setError] = useState(''), [message, setMessage] = useState('');
   const [email, setEmail] = useState(''), [confirmEmail, setConfirmEmail] = useState(''), [reason, setReason] = useState(''), [confirmed, setConfirmed] = useState(false), [pending, setPending] = useState(false);
   const busy = useRef(false);
+  const errorFeedback = useRef<HTMLDivElement>(null);
+  const latestRequest = snapshot?.history[0];
+  const latestFailure = latestRequest?.after_data?.status === 'failed' ? latestRequest.after_data : null;
+  useEffect(() => { if (error) errorFeedback.current?.focus(); }, [error]);
   async function refresh(signal?: AbortSignal) {
     const data = await loadSnapshot(member, signal);
     if (!signal?.aborted) { setHidden(!data); setSnapshot(data); setError(''); }
@@ -42,10 +46,11 @@ export function AdminLoginEmailChange({ member }: { member: string }) {
   return <section className="notice mt24" aria-label="관리자 로그인 이메일 변경">
     <h3>로그인 이메일 변경</h3>
     <p className="meta mt8">관리자 전용 · 회원이 새 이메일로 온 확인 링크를 눌러야 변경됩니다. 수강권과 학습 기록은 유지됩니다.</p>
-    {error && <AdminInlineError onRetry={() => void refresh().catch(cause => setError(cause.message))}>{error}</AdminInlineError>}
+    {error && <div ref={errorFeedback} tabIndex={-1} data-email-error-feedback><AdminInlineError onRetry={() => void refresh().catch(cause => setError(cause.message))}>{error}</AdminInlineError></div>}
     {!snapshot ? <p className="meta mt16">현재 로그인 이메일을 확인하고 있습니다.</p> : <>
       <p className="mt16">현재 로그인 이메일: <b>{snapshot.currentEmail}</b></p>
-      {snapshot.pendingEmail && <p role="status" className="meta mt8">확인 대기: {snapshot.pendingEmail} · 확인이 끝나기 전에는 현재 주소를 사용합니다.</p>}
+      {latestFailure && !error && <AdminAlert tone="error" title="최근 이메일 변경 요청이 실패했어요"><p className="mt8">요청한 새 이메일: <b>{latestFailure.new_email}</b></p><p className="mt8">실패 사유: {latestFailure.error || '요청을 완료하지 못했습니다. 상태를 확인하고 다시 신청해 주세요.'}</p><p className="meta mt8">아래 입력한 주소를 확인하고 다시 신청해 주세요.</p></AdminAlert>}
+      {snapshot.pendingEmail && <p role="status" className="meta mt8">{latestFailure ? '앞선 요청의 확인 대기' : '확인 대기'}: {snapshot.pendingEmail} · 확인이 끝나기 전에는 현재 주소를 사용합니다.</p>}
       <div className="field mt16"><label htmlFor={`admin-new-email-${member}`}>1. 회원이 사용할 새 이메일</label><input id={`admin-new-email-${member}`} type="email" autoComplete="off" maxLength={254} value={email} disabled={pending} onChange={e => { setEmail(e.target.value); setConfirmed(false); }}/></div>
       <div className="field"><label htmlFor={`admin-confirm-email-${member}`}>새 이메일 한 번 더 입력</label><input id={`admin-confirm-email-${member}`} type="email" autoComplete="off" maxLength={254} value={confirmEmail} disabled={pending} onChange={e => { setConfirmEmail(e.target.value); setConfirmed(false); }}/></div>
       <div className="field"><label htmlFor={`admin-email-reason-${member}`}>2. 변경 사유</label><textarea id={`admin-email-reason-${member}`} maxLength={500} rows={2} value={reason} disabled={pending} onChange={e => setReason(e.target.value)} placeholder="예: 회원 요청으로 자주 사용하는 이메일로 변경"/></div>
