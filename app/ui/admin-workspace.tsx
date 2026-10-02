@@ -8,5 +8,5 @@ import { Platform } from './platform';
 // validation, legacy redirects and not-found handling.
 export function AdminWorkspace({ children }: { children: React.ReactNode }) {
   const path = usePathname().split('/').filter(Boolean);
-  return <>{isAdminRoute(path) && path[1] !== 'metrics' && <Platform path={path} user={null} />}{children}</>;
+  return <>{isAdminRoute(path) && !['metrics', 'diagnosis'].includes(path[1]) && <Platform path={path} user={null} />}{children}</>;
 }

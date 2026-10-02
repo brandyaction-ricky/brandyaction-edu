@@ -4,6 +4,7 @@ import { UnreadMessageLink } from '@/app/ui/final/unread-message-link';
 import { LearningNoticeBar } from '@/app/ui/final/learning-notice';
 import {
   ArrowRight,
+  Compass,
   LogOut,
   Menu,
   MessageCircle,
@@ -161,6 +162,7 @@ export function AdminShell({
         </div>
         <nav aria-label="관리자 카테고리">
           {navLink('overview')}
+          {user.role === 'admin' && <Link href="/admin/diagnosis" className="nav-link" onClick={() => setMobile(false)}><Compass aria-hidden="true"/>N6 진단 검수</Link>}
           {groups.map(([title, keys]) => (
             <details
               className="nav-group"
