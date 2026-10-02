@@ -2,12 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import ts from 'typescript';
 import { readFileSync } from 'node:fs';
-const actor={id:'00000000-0000-4000-8000-000000000001'};
+const audience = {};
+new Function('exports','process',ts.transpileModule(readFileSync(new URL('../lib/diagnosis-audience.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(audience,{env:{}});
+const actor={role:'admin',id:'00000000-0000-4000-8000-000000000001'};
 const source=ts.transpileModule(readFileSync(new URL('../app/api/platform/diagnosis/report/route.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
 class BridgeError extends Error{constructor(code,status){super(code);this.code=code;this.status=status;}}
 function fixture({enabled=true,sessions=true,reports=true,user=actor,error=null}={}){
   const route={},calls=[];
-  const mocks={'@/lib/server-auth':{getAuthenticatedUser:async()=>user},'@/lib/supabase/admin':{createAdminClient:()=>({rpc:async()=>({data:null,error:null})})},
+  const mocks={'@/lib/diagnosis-audience':audience,'@/lib/server-auth':{getAuthenticatedUser:async()=>user},'@/lib/supabase/admin':{createAdminClient:()=>({rpc:async()=>({data:null,error:null})})},
     '@/lib/diagnosis-bridge':{DiagnosisBridgeError:BridgeError},'@/lib/diagnosis-report':{sendDiagnosisReportCommand:()=>{}},
     '@/lib/diagnosis-report-service':{runDiagnosisReport:async(deps,action)=>{calls.push({actor:deps.actor,action});if(error)throw error;return{state:'ready',updatedAt:'2026-10-01T00:00:00Z',canRetry:false,downloadAvailable:true,...(action==='download'?{markdown:'# 합성 N6 결과'}:action==='html'?{html:'<!doctype html><h1>원본 정밀 보고서</h1>'}:{})};}}};
   new Function('exports','require','process',source)(route,n=>mocks[n],{env:{EDU_MYIN_DIAGNOSIS_ENABLED:String(enabled),EDU_MYIN_DIAGNOSIS_SESSIONS_ENABLED:String(sessions),EDU_MYIN_DIAGNOSIS_REPORTS_ENABLED:String(reports)}});
@@ -36,3 +38,5 @@ test('original HTML is private, downloadable, and sandboxed without changing the
 test('revoked or unready reports return safe Korean messages, not backend details',async()=>{
   for(const error of [new BridgeError('FORBIDDEN',403),new BridgeError('NOT_READY',409),Error('secret answer storage path')]){const r=await fixture({error}).get('?download=1');assert.equal(r.status,error.status??503);assert.doesNotMatch(await r.text(),/secret|storage path/);assert.equal(r.headers.get('content-disposition'),null);}
 });
+
+test('student and staff cannot get report status, HTML or Markdown',async()=>{for(const role of ['student','staff',undefined]){const h=fixture({user:{...actor,role}});for(const query of ['', '?html=1','?download=1','?preview=1'])assert.equal((await h.get(query)).status,403);assert.equal(h.calls.length,0);}});

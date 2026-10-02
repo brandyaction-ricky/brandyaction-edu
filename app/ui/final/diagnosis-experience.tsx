@@ -16,7 +16,7 @@ async function request(body?: Record<string, unknown>) {
   return data;
 }
 const saveAnswers = (revision: number, answers: DiagnosisAnswer[]) => request({ action: 'save', revision, answers });
-export function DiagnosisExperience({ initialCourseId, reportsEnabled = false }: { initialCourseId?: string; reportsEnabled?: boolean }) {
+export function DiagnosisExperience({ initialCourseId, reportsEnabled = false, adminPilot = false, exitHref = '/my', exitLabel = '마이페이지' }: { initialCourseId?: string; reportsEnabled?: boolean; adminPilot?: boolean; exitHref?: string; exitLabel?: string }) {
   const router = useRouter();
   const [session, setSession] = useState<DiagnosisSession | null>(null);
   const [offers, setOffers] = useState<DiagnosisOffer[]>([]), [course, setCourse] = useState(initialCourseId || '');
@@ -56,20 +56,20 @@ export function DiagnosisExperience({ initialCourseId, reportsEnabled = false }:
   if (phase === 'questions' && session) return <DiagnosisQuestionnaire key={generation} initial={session}
     save={saveAnswers}
     submit={async revision => accept(await request({action:'submit',revision}))}
-    onReload={async () => accept(await request())} onExit={() => router.push('/my')}/>;
+    onReload={async () => accept(await request())} onExit={() => router.push(exitHref)}/>;
   if (phase === 'intro' || phase === 'preparing') return <div className="edu-n6">
-    <header className="bar"><span className="brand"><Image src="/brandy-action-logo.png" alt="Brandy Action EDU" width={142} height={26}/></span><button className="exit-btn" onClick={() => router.push('/my')}>마이페이지</button></header>
-    <main className="stage"><section className="panel intro-panel"><p className="panel-eyebrow">N6 진단</p><h1 className="panel-title">나를 움직이는 마음을<br/>알아보는 시간</h1><p className="panel-sub">두 문장을 비교하며 지금의 나와 더 가까운 쪽을 고릅니다. 나의 이야기와 원하는 모습을 함께 담아 정밀 보고서를 준비합니다.</p>
+    <header className="bar"><span className="brand"><Image src="/brandy-action-logo.png" alt="Brandy Action EDU" width={142} height={26}/></span><button className="exit-btn" onClick={() => router.push(exitHref)}>{exitLabel}</button></header>
+    <main className="stage"><section className="panel intro-panel"><p className="panel-eyebrow">{adminPilot ? '관리자 전용 · 수강생에게 공개되지 않습니다' : 'N6 진단'}</p><h1 className="panel-title">나를 움직이는 마음을<br/>알아보는 시간</h1><p className="panel-sub">두 문장을 비교하며 지금의 나와 더 가까운 쪽을 고릅니다. 나의 이야기와 원하는 모습을 함께 담아 정밀 보고서를 준비합니다.</p>
       <p className="intro-chips"><span>약 20분</span><span>자동 저장</span><span>계정당 1회</span></p>
       {offers.length > 1 && <label className="course-choice">검사가 포함된 상품<select value={course} onChange={e => setCourse(e.target.value)}>{offers.map(o => <option key={o.courseId} value={o.courseId}>{o.title}</option>)}</select></label>}
       {phase === 'intro' && !offers.length ? <p className="panel-sub">현재 계정에 이용 가능한 N6 검사가 없습니다. 구매·수강 정보를 확인해 주세요.</p> : <><button className="cta-btn" onClick={() => void start()} disabled={pending}>{pending ? '검사 준비 중…' : phase === 'preparing' ? '검사 준비 다시 확인' : '검사 시작하기'}<ArrowRight size={18}/></button><p className="panel-note">제출 전까지 답변을 바꿀 수 있고, 중간에 나가도 이어서 진행할 수 있어요.</p></>}
       {error && <p role="alert">{error}</p>}
     </section></main></div>;
-  return <div className="edu-diagnosis"><header className="diagnosis-header"><Image src="/brandy-action-logo.png" alt="Brandy Action EDU" width={164} height={30}/><button className="diagnosis-exit" onClick={() => router.push('/my')}><ArrowLeft size={16}/>마이페이지</button></header>
+  return <div className="edu-diagnosis"><header className="diagnosis-header"><Image src="/brandy-action-logo.png" alt="Brandy Action EDU" width={164} height={30}/><button className="diagnosis-exit" onClick={() => router.push(exitHref)}><ArrowLeft size={16}/>{exitLabel}</button></header>
     <main className={`diagnosis-main${phase === 'submitted' && reportsEnabled ? ' diagnosis-report-main' : ''}`}>
       {phase === 'loading' && <div className="diagnosis-center" role="status"><LoaderCircle className="diagnosis-spin"/><p>검사를 불러오고 있어요.</p></div>}
-      {phase === 'submitted' && reportsEnabled && <DiagnosisReportView onExit={() => router.push('/my')}/>}
-      {phase === 'submitted' && !reportsEnabled && <section className="diagnosis-submitted"><span className="diagnosis-complete-icon"><CheckCircle2 size={32}/></span><h1>답변을 제출했어요.</h1>{session?.needsReview ? <p>답변은 안전하게 접수됐어요. 결과를 만들기 전 확인이 필요합니다.<br/>추가 결제나 재검사 없이 이곳에서 진행 상태를 확인해 주세요.</p> : <p>검사 결과가 준비되면 이곳에서 확인할 수 있어요.<br/>화면을 닫아도 괜찮고, 다시 제출하지 않아도 됩니다.</p>}<button className="diagnosis-primary" onClick={() => router.push('/my')}>학습으로 돌아가기<ArrowRight size={18}/></button></section>}
+      {phase === 'submitted' && reportsEnabled && <DiagnosisReportView onExit={() => router.push(exitHref)}/>}
+      {phase === 'submitted' && !reportsEnabled && <section className="diagnosis-submitted"><span className="diagnosis-complete-icon"><CheckCircle2 size={32}/></span><h1>답변을 제출했어요.</h1>{session?.needsReview ? <p>답변은 안전하게 접수됐어요. 결과를 만들기 전 확인이 필요합니다.<br/>추가 결제나 재검사 없이 이곳에서 진행 상태를 확인해 주세요.</p> : <p>검사 결과가 준비되면 이곳에서 확인할 수 있어요.<br/>화면을 닫아도 괜찮고, 다시 제출하지 않아도 됩니다.</p>}<button className="diagnosis-primary" onClick={() => router.push(exitHref)}>{adminPilot ? '관리자 화면으로 돌아가기' : '학습으로 돌아가기'}<ArrowRight size={18}/></button></section>}
       {phase === 'error' && <div className="diagnosis-error" role="alert"><p>{error}</p><button className="diagnosis-secondary" onClick={() => void load()}>다시 불러오기</button></div>}
     </main></div>;
 }

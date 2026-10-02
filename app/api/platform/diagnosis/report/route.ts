@@ -1,3 +1,4 @@
+import { diagnosisAudienceAllows } from '@/lib/diagnosis-audience';
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { DiagnosisBridgeError } from '@/lib/diagnosis-bridge';
@@ -14,6 +15,7 @@ export async function GET(request: Request) {
   try {
     const actor = await getAuthenticatedUser();
     if (!actor) return reply({ error: '로그인이 필요합니다.' }, 401);
+    if (!diagnosisAudienceAllows(actor)) return reply({ error: '현재 관리자만 이용할 수 있습니다.' }, 403);
     const query = new URL(request.url).searchParams, keys = [...query.keys()];
     if (keys.length > 1 || keys.some(key => !['preview','download','html'].includes(key) || query.get(key) !== '1'))
       return reply({ code: 'INVALID', error: '요청 내용을 확인해 주세요.' }, 400);
