@@ -15,6 +15,26 @@ async function backend(page:Page, input=initial){
 }
 const doc=(page:Page)=>page.getByRole('textbox',{name:'수업 문서',exact:true});
 async function save(page:Page){await page.getByRole('button',{name:'학습 저장',exact:true}).click();await expect(page.getByText('학습 기본 정보와 콘텐츠를 저장했습니다.',{exact:true})).toBeVisible();}
+test('top notice persists alongside existing activities without changing their identities',async({page})=>{
+ const server=await backend(page);await page.goto('/lesson-block-author-test');await expect(doc(page)).toBeVisible();
+ await page.getByRole('button',{name:'필독 공지 추가',exact:true}).click();
+ await page.keyboard.type('질문 제출 전에 읽어 주세요.');
+ await expect(doc(page).locator('[data-lesson-callout]')).toHaveCount(1);
+ await save(page);
+ const saved=server.get();expect(saved.blocks[0].id).toBe('heading');expect(saved.blocks[0].type).toBe('text');expect(saved.blocks[0].content).toContain('callout');
+ expect(saved.blocks.find(b=>b.id==='question')).toEqual(initial.blocks[2]);expect(saved.blocks.slice(1)).toEqual(initial.blocks.slice(1));
+ await page.getByRole('button',{name:'편집 다시 열기'}).click();await expect(doc(page).locator('[data-lesson-callout]')).toContainText('질문 제출 전에 읽어 주세요.');
+ await page.getByRole('button',{name:'필독 공지 추가',exact:true}).click();await expect(doc(page).locator('[data-lesson-callout]')).toHaveCount(1);
+ await page.getByRole('button',{name:'구성 미리보기',exact:true}).click();await expect(page.getByLabel('구성 미리보기').locator('[data-lesson-callout]')).toContainText('질문 제출 전에 읽어 주세요.');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+test('notice before a question gets a fresh text identity and can be undone safely',async({page})=>{
+ const input={...initial,blocks:[initial.blocks[2]]};const server=await backend(page,input);await page.goto('/lesson-block-author-test');await expect(doc(page)).toBeVisible();
+ await page.getByRole('button',{name:'필독 공지 추가',exact:true}).click();await page.keyboard.type('첫 질문 안내');await save(page);
+ const saved=server.get();expect(saved.blocks).toHaveLength(2);expect(saved.blocks[0].type).toBe('text');expect(saved.blocks[0].id).not.toBe('question');expect(saved.blocks[1]).toEqual(input.blocks[0]);
+ await page.getByRole('button',{name:'실행 취소',exact:true}).click();await expect(doc(page)).toContainText('어떤 업무인가요?');
+ await expect(doc(page).locator('[data-author-block="question"]')).toBeVisible();
+});
 test('one continuous editor preserves the whole lesson on save and edits text without a body-edit button',async({page})=>{
  const server=await backend(page);await page.goto('/lesson-block-author-test');await expect(doc(page)).toBeVisible();
  await expect(page.getByRole('button',{name:/본문 편집/})).toHaveCount(0);await expect(page.locator('.ProseMirror')).toHaveCount(1);

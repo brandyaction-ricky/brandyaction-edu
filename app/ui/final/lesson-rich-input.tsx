@@ -6,7 +6,8 @@ import StarterKit from "@tiptap/starter-kit";
 import Blockquote from "@tiptap/extension-blockquote";
 import { Details, DetailsContent, DetailsSummary } from "@tiptap/extension-details";
 import { TextStyle, FontSize } from "@tiptap/extension-text-style";
-import { Bold, Italic, Underline, List, ListOrdered, Link2, Undo2, Redo2, RemoveFormatting, Quote, ListCollapse } from "lucide-react";
+import { Bold, Italic, Underline, List, ListOrdered, Link2, Undo2, Redo2, RemoveFormatting, Quote, ListCollapse, Lightbulb } from "lucide-react";
+import { LessonCallout, insertLessonNotice } from "./lesson-callout";
 import { LESSON_FONT_SIZES, lessonDocumentForEditor, serializeLessonDocument } from "@/lib/lesson-body";
 import { safeUrl } from "@/lib/platform";
 import "./lesson-text.css";
@@ -64,7 +65,7 @@ export function lessonRichExtensions() {
       // input rule and discards its undo state. Enter already creates paragraphs.
       heading: { levels: [1, 2, 3] }, trailingNode: false, blockquote: false, code: false, codeBlock: false, horizontalRule: false,
       link: { openOnClick: false, HTMLAttributes: { target: "_blank", rel: "noopener noreferrer" }, isAllowedUri: url => Boolean(safeUrl(url)) },
-    }), TextStyle, LessonFontSize, LessonQuote, LessonDetails, DetailsSummary, DetailsContent, LessonInputUndo];
+    }), TextStyle, LessonFontSize, LessonQuote, LessonDetails, DetailsSummary, DetailsContent, LessonCallout, LessonInputUndo];
 }
 
 export function LessonRichInput({ value, onChange, label = "학습 내용", disabled = false, name, id, showLabel = true }: LessonBodyEditorProps) {
@@ -111,7 +112,7 @@ export function LessonFormatToolbar({ editor, disabled = false }: { editor: Edit
     size: String(editor?.getAttributes("textStyle").fontSize || ""),
     bold: editor?.isActive("bold"), italic: editor?.isActive("italic"), underline: editor?.isActive("underline"),
     bullet: editor?.isActive("bulletList"), ordered: editor?.isActive("orderedList"), link: editor?.isActive("link"),
-    quote: editor?.isActive("blockquote"), details: editor?.isActive("details"),
+    quote: editor?.isActive("blockquote"), details: editor?.isActive("details"), callout: editor?.isActive("callout"),
     undo: editor?.can().undoInputRule() || editor?.can().undo(), redo: editor?.can().redo(),
   }) });
   function toggleLink() {
@@ -139,6 +140,7 @@ export function LessonFormatToolbar({ editor, disabled = false }: { editor: Edit
     { label: "번호 목록", icon: ListOrdered, active: state?.ordered, action: () => editor?.chain().focus().toggleOrderedList().run() },
     { label: "접기·펼치기", icon: ListCollapse, active: state?.details, action: () => editor?.isActive("details") ? editor.chain().focus().unsetDetails().run() : editor?.chain().focus().setDetails().run() },
     { label: "인용문", icon: Quote, active: state?.quote, action: () => editor?.chain().focus().toggleBlockquote().run() },
+    { label: "콜아웃", icon: Lightbulb, active: state?.callout, action: () => editor?.chain().focus().toggleWrap("callout").run() },
     { label: "링크", icon: Link2, active: state?.link || linkOpen, action: toggleLink },
     { label: "서식 지우기", icon: RemoveFormatting, action: () => editor?.chain().focus().unsetAllMarks().clearNodes().run() },
     { label: "실행 취소", icon: Undo2, unavailable: !state?.undo, action: () => editor?.chain().focus().undoInputRule().run() || editor?.chain().focus().undo().run() },
@@ -146,6 +148,7 @@ export function LessonFormatToolbar({ editor, disabled = false }: { editor: Edit
   ];
   return <>
       <div className="lesson-format-controls" role="group" aria-label="본문 서식">
+        <button type="button" className="lesson-notice-add" disabled={disabled || !editor} onMouseDown={event => event.preventDefault()} onClick={() => editor && insertLessonNotice(editor)}><Lightbulb size={16} aria-hidden="true" />필독 공지 추가</button>
         <select aria-label="문단 스타일" value={state?.block || "p"} disabled={disabled || !editor} onChange={event => {
           const chain = editor?.chain().focus().command(({ tr, state }) => {
             // Heading size applies to the entire affected paragraph, including

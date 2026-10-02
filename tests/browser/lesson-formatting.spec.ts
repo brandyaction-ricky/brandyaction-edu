@@ -1,5 +1,29 @@
 import { expect, test } from '@playwright/test';
 
+test('top notice edits inline and survives learner rendering and reopening', async ({ page }) => {
+  await page.goto('/lesson-formatting-test');
+  const editor = page.getByRole('textbox', { name: '학습 내용', exact: true });
+  await expect(editor).toBeVisible();
+  await page.getByRole('button', { name: '필독 공지 추가', exact: true }).click();
+  const callout = editor.locator('[data-lesson-callout]');
+  await expect(callout).toHaveCount(1);
+  await page.keyboard.type('강의를 시작하기 전에 안내를 확인하세요.');
+  await page.getByRole('button', { name: '필독 공지 추가', exact: true }).click();
+  await expect(callout).toHaveCount(1);
+  await expect(editor.locator(':scope > :first-child')).toHaveAttribute('data-lesson-callout', '');
+  await expect(editor).toContainText('내 사업에서 일할 AI팀');
+  await page.getByRole('button', { name: '학습 저장', exact: true }).click();
+  const learner = page.getByRole('region', { name: '저장된 학습자 화면' });
+  await expect(learner.getByRole('complementary', { name: '학습 안내' })).toContainText('강의를 시작하기 전에 안내를 확인하세요.');
+  await expect(learner.locator('[data-lesson-callout]')).toHaveCSS('background-color', 'rgb(255, 249, 232)');
+  await page.getByRole('button', { name: '저장한 학습 다시 열기' }).click();
+  await expect(callout).toContainText('강의를 시작하기 전에 안내를 확인하세요.');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await callout.locator('p').last().click();
+  await page.getByRole('button', { name: '콜아웃', exact: true }).click();
+  await expect(editor).toContainText('강의를 시작하기 전에 안내를 확인하세요.');
+});
+
 for (const [shortcut, selector] of [['# ', 'h1'], ['## ', 'h2'], ['### ', 'h3'], ['- ', 'ul li'], ['1. ', 'ol li'], ['" ', 'blockquote']] as const) {
   test(`line-start shortcut ${JSON.stringify(shortcut)} supports undo, saving and reloading`, async ({ page }) => {
     await page.goto('/lesson-formatting-test');

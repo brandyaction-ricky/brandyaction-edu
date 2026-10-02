@@ -6,6 +6,7 @@
 .edu-admin .lesson-body-editor .lesson-format-controls select { width:auto; min-width:0; min-height:34px; height:34px; padding:4px 26px 4px 8px; font-size:12px; margin:0; }
 .edu-admin .lesson-format-controls button { display:inline-flex; align-items:center; justify-content:center; flex:none; width:34px; height:34px; min-height:34px; padding:0; border:1px solid transparent; border-radius:4px; background:transparent; color:var(--ink,#202428); cursor:pointer; }
 .edu-admin .lesson-format-controls button:hover { background:#eee; }
+.edu-admin .lesson-format-controls button.lesson-notice-add { width:auto; min-height:44px; height:auto; gap:6px; padding:6px 10px; border-color:#eadbad; background:#fff9e8; font-size:13px; font-weight:600; }
 .edu-admin .lesson-format-controls button[aria-pressed=true] { background:#fff0f2; border-color:var(--red,#c51e2c); color:var(--red,#c51e2c); }
 .edu-admin .lesson-format-controls :focus-visible { outline:2px solid var(--red,#c51e2c); outline-offset:1px; }
 .edu-admin .lesson-body-editor button:disabled { opacity:.4; cursor:default; }
