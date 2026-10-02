@@ -10,12 +10,18 @@ export async function GET(request: Request) {
   const url = new URL(request.url), hash = url.searchParams.get('token_hash'), type = url.searchParams.get('type');
   const adminChange = url.searchParams.get('flow') === 'admin_email_change' && type === 'email_change';
   const emailChange = adminChange || url.searchParams.get('flow') === 'email_change' || type === 'email_change';
-  let destination = emailChange ? '/auth/email-change-help' : '/login?error=email_confirmation';
+  const emailChangeHelp = adminChange ? '/auth/email-change-help?flow=admin_email_change' : '/auth/email-change-help';
+  let destination = emailChange ? emailChangeHelp : '/login?error=email_confirmation';
   let authenticated = false;
   const cookies: ServerCookieMutation[] = [];
   if (hash && hash.length <= 512 && (type === 'email' || type === 'signup' || type === 'recovery' || type === 'email_change')) {
     try {
       const { data, error } = await (await createClient(nextCookies => cookies.push(...nextCookies))).auth.verifyOtp({ token_hash: hash, type });
+      if (error?.code === 'otp_expired' && type === 'email_change') {
+        // Auth also uses otp_expired for invalid or already-used email tokens.
+        // Preserve only the flow, never the token or member/audit identifiers.
+        destination = `${emailChangeHelp}${adminChange ? '&' : '?'}status=expired`;
+      }
       if (!error && type === 'email_change') {
         // Older two-address requests can remain pending after the first link.
         // Only claim success when Auth returns the updated user with no

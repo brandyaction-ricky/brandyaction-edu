@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
+import * as jsxRuntime from 'react/jsx-runtime';
+import { renderToStaticMarkup } from 'react-dom/server';
 function load(file, mocks = {}) {
   const exports = {};
-  const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { fileName: file, compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   new Function('exports', 'require', code)(exports, name => {
     if (mocks[name]) return mocks[name];
     if (name.startsWith('.')) return load(path.resolve(path.dirname(file), name) + '.ts', mocks);
@@ -109,5 +111,49 @@ test('failed verification cannot complete an administrator change or create a me
     '@/lib/supabase/admin': { createAdminClient() { throw Error('Must not open the admin database'); } },
   });
   const response = await route.GET(new Request('https://brandyaction-edu-dev.vercel.app/auth/confirm?token_hash=expired&type=email_change&flow=admin_email_change&change=12'));
-  assert.equal(response.headers.get('location'), 'https://brandyaction-edu-dev.vercel.app/auth/email-change-help');
+  assert.equal(response.headers.get('location'), 'https://brandyaction-edu-dev.vercel.app/auth/email-change-help?flow=admin_email_change&status=expired');
+  assert.doesNotMatch(response.headers.get('location'), /token_hash|change=12/);
+  assert.equal(response.headers.get('Cache-Control'), 'private, no-store');
+  assert.equal(response.headers.get('Referrer-Policy'), 'no-referrer');
+});
+test('administrator mail explains the one-hour confirmation deadline and later normal login', async () => {
+  let delivery;
+  await helpers.sendAdminEmailChange(valid.email, 'https://example.test/confirm', '12', async (_url, options) => {
+    delivery = JSON.parse(options.body);
+    return Response.json({ id: 'synthetic-delivery' });
+  });
+  assert.deepEqual(delivery.to, [valid.email]);
+  assert.match(delivery.text, /1시간 안에/);
+  assert.match(delivery.text, /관리자에게 새 확인 메일을 요청/);
+  assert.match(delivery.text, /나중에도 새 이메일과 브랜디에듀 비밀번호로 로그인/);
+});
+test('invalid administrator links retain the resend guidance without trusting identifiers or setting a session', async () => {
+  const route = load('app/auth/confirm/route.ts', {
+    'next/server': { NextResponse: { redirect(url) { const response = new Response(null, { status: 307, headers: { location: String(url) } }); response.cookies = { set() { throw Error('Must not set a session'); } }; return response; } } },
+    '@/lib/supabase/server': { createClient: async () => ({ auth: { verifyOtp: async () => { throw Error('private-provider-error'); } } }) },
+    '@/lib/supabase/admin': { createAdminClient() { throw Error('Must not open the admin database'); } },
+  });
+  for (const query of ['token_hash=invalid&type=email_change&flow=admin_email_change&change=999', 'type=email_change&flow=admin_email_change']) {
+    const response = await route.GET(new Request('https://brandyaction-edu-dev.vercel.app/auth/confirm?' + query));
+    assert.equal(response.headers.get('location'), 'https://brandyaction-edu-dev.vercel.app/auth/email-change-help?flow=admin_email_change');
+    assert.equal(response.headers.get('set-cookie'), null);
+  }
+});
+test('expired admin help is available without login and reuses support settings, while self-service stays in profile', async () => {
+  let settingsReads = 0;
+  const page = load('app/auth/email-change-help/page.tsx', {
+    'react/jsx-runtime': jsxRuntime,
+    'next/link': { default: ({ children, ...props }) => jsxRuntime.jsx('a', { ...props, children }) },
+    '@/lib/supabase/server': { createClient: async () => ({ auth: { getUser: async () => ({ data: { user: null } }) } }) },
+    '@/lib/edu-settings': { getEduSettings: async () => { settingsReads++; return { operations: { supportUrl: 'https://support.example.test/chat' } }; } },
+  }).default;
+  const html = renderToStaticMarkup(await page({ searchParams: Promise.resolve({ status: 'expired', flow: 'admin_email_change' }) }));
+  assert.match(html, /1시간이 지났거나 이미 확인/);
+  assert.match(html, /href="https:\/\/support.example.test\/chat"[^>]*>확인 메일 다시 요청하기/);
+  assert.match(html, /새 계정을 만들 필요는 없어요/);
+  assert.match(html, /이미 변경했다면 로그인하기/);
+  const self = renderToStaticMarkup(await page({ searchParams: Promise.resolve({ status: 'expired' }) }));
+  assert.match(self, /새 확인 메일 받으러 가기/);
+  assert.doesNotMatch(self, /support.example.test/);
+  assert.equal(settingsReads, 1);
 });
