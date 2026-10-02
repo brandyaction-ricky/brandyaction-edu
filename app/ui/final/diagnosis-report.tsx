@@ -8,8 +8,8 @@ import './diagnosis-report.css';
 
 const endpoint = '/api/platform/diagnosis/report';
 const statusCopy = {
-  queued: { title: '답변을 받았어요.', description: '순서대로 정밀 보고서를 준비하고 있습니다. 화면을 닫아도 제작은 계속됩니다.' },
-  processing: { title: '정밀 보고서를 만들고 있어요.', description: '제출한 답변을 바탕으로 보고서를 작성하고 확인합니다. 완성되면 이곳에서 읽고 파일로 받을 수 있습니다.' },
+  queued: { title: '답변을 받았어요.', description: '보고서 준비에는 약 30분~1일이 걸립니다. 화면을 닫아도 제작은 계속되니, 나중에 이곳에서 확인해 주세요.' },
+  processing: { title: '정밀 보고서를 만들고 있어요.', description: '제출한 답변으로 보고서를 작성하고 확인하는 중입니다. 약 30분~1일이 걸리며, 완성되면 이곳에서 보고서를 읽고 HTML·MD 파일로 받을 수 있습니다.' },
   ready: { title: '정밀 보고서가 준비됐어요.', description: '보고서를 읽고 나의 욕구와 행동 경향을 확인해 보세요. 다음 학습에 사용할 MD 파일도 함께 받을 수 있습니다.' },
   needs_review: { title: '결과를 만들기 전 확인 중이에요.', description: '답변은 안전하게 접수됐어요. 확인이 끝나면 진행됩니다. 다시 검사하거나 추가 결제할 필요는 없어요.' },
   access_denied: { title: '이용 정보를 확인해 주세요.', description: '현재 이 검사 결과를 열 수 없어요. 구매·수강 상태를 확인해 주세요.' },
