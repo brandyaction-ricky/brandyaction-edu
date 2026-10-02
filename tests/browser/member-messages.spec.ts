@@ -22,7 +22,9 @@ async function backend(page:Page,options:{operator?:boolean;loseReceipt?:boolean
    const isNext=q.has('after'),n=isNext?22:21;
    await route.fulfill({json:{rows:[{id:uid(n),name:`수강생 ${n}`,email:`student${n}@example.test`}],nextCursor:isNext?null:uid(n)}});return;
   }
-  if(options.failList){options.failList=false;await route.fulfill({status:503,json:{error:'메시지 목록 연결 실패'}});return;}
+  // StrictMode may abort the first GET and issue another. Keep the simulated
+  // outage until the test explicitly restores the backend before retrying.
+  if(options.failList){await route.fulfill({status:503,json:{error:'메시지 목록 연결 실패'}});return;}
   if(q.get('box')==='inbox'&&options.delay)await options.delay;
   await route.fulfill({json:{rows:q.get('box')==='sent'?(sent?[row(3)]:[]):q.has('before')?[row(2)]:[row(1)],nextCursor:q.get('box')==='inbox'&&!q.has('before')?'1':null,unreadCount:1,canSendToMembers:!!options.operator}});
  });return{writes,queries};
@@ -50,7 +52,8 @@ test('operator selects exact recipients across pages and applies the historical 
  expect(h.writes.find(x=>x.action==='send')).toMatchObject({recipients:[uid(21),uid(22)],ongoingLesson:uid(80)});expect(h.queries.filter(q=>q.get('action')==='recipients').every(q=>q.get('ongoing')===uid(80))).toBe(true);
 });
 test('list and read failures remain retryable without claiming a successful read',async({page})=>{
- await backend(page,{failList:true,failRead:true});await page.goto('/messages-test');await expect(page.getByRole('alert')).toHaveText('메시지 목록 연결 실패');await expect(page.getByRole('button',{name:'메시지 보내기',exact:true})).toBeDisabled();
+ const options={failList:true,failRead:true};await backend(page,options);await page.goto('/messages-test');await expect(page.getByRole('alert')).toHaveText('메시지 목록 연결 실패');await expect(page.getByRole('button',{name:'메시지 보내기',exact:true})).toBeDisabled();
+ options.failList=false;
  await page.getByRole('button',{name:'메시지 새로고침'}).click();await page.getByRole('button',{name:'내용 보기'}).click();await expect(page.getByRole('alert')).toHaveText('읽음 연결 실패');await expect(page.getByRole('button',{name:'받은 메시지 · 안 읽음 1'})).toBeVisible();
  await page.getByRole('button',{name:'읽음 표시 다시 확인'}).click();await expect(page.getByRole('button',{name:'받은 메시지 · 안 읽음 0'})).toBeVisible();
 });
