@@ -73,6 +73,46 @@ test('pair sentences remain side by side and five choices fit at 320 pixels',asy
   const tablet=await page.getByRole('radio').evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect().height));expect(new Set(tablet).size).toBe(1);
   await page.screenshot({path:test.info().outputPath('n6-pair-equal-cards.png'),fullPage:true});
 });
+test('instructed checks reject mouse and keyboard mistakes before saving, then accept the instructed answer',async({page})=>{
+  const data=fixture();data.survey.questions[0].requiredOptionId=id(12);
+  let saved:Record<string,unknown>[]=[];let writes=0;
+  await page.route('**/api/platform/diagnosis/session',route=>{
+    const body=route.request().method()==='POST'?route.request().postDataJSON():{};
+    if(body.action==='save'){writes++;saved=body.answers;}
+    return route.fulfill({json:{...data,revision:writes,answers:saved}});
+  });
+  await page.clock.install();await page.goto('/diagnosis-test');await page.getByRole('button',{name:'시작하기',exact:true}).click();
+  await page.getByRole('radio').first().click();
+  await expect(page.getByRole('alert')).toHaveText('안내와 다른 답을 골랐어요. 문항을 다시 읽고 안내된 답을 골라 주세요.');
+  await page.clock.fastForward(1000);expect(writes).toBe(0);await expect(page.getByRole('radio').first()).not.toBeChecked();
+  await page.keyboard.press('1');await page.clock.fastForward(1000);expect(writes).toBe(0);
+  await expect(page.locator('.q-no')).toHaveText('Q 001');
+  await page.keyboard.press('2');await page.clock.fastForward(600);
+  await expect(page.getByRole('heading',{name:'이번엔, 직접 들려주세요'})).toBeVisible();
+  await expect(page.locator('.check-miss')).toHaveCount(0);expect(writes).toBe(1);expect(saved[0].optionId).toBe(id(12));
+  await page.getByRole('button',{name:'이전 문항'}).click();
+  await expect(page.getByRole('radio').nth(1)).toBeChecked();
+  await page.getByRole('radio').first().click();await page.clock.fastForward(1000);
+  expect(writes).toBe(1);await expect(page.getByRole('radio').nth(1)).toBeChecked();expect(saved[0].optionId).toBe(id(12));
+});
+
+test('instruction band is not clickable, choice numbers align, and question transitions respect reduced motion',async({page})=>{
+  const data=fixture();data.survey.questions[0].text='두 문장 중 지금의 나에 더 가까운 쪽은?';
+  data.survey.questions[0].options=['왼쪽이 훨씬 나','왼쪽이 조금 더 나','비슷하다','오른쪽이 조금 더 나','오른쪽이 훨씬 나'].map((label,i)=>({id:id(11+i),label}));
+  data.survey.questions.splice(1,0,{...data.survey.questions[0],id:id(40),code:'pair-two'});data.survey.coreQuestionCount=2;
+  await page.route('**/api/platform/diagnosis/session',route=>route.fulfill({json:data}));
+  await page.emulateMedia({reducedMotion:'no-preference'});await page.goto('/diagnosis-test');await page.getByRole('button',{name:'시작하기',exact:true}).click();
+  await expect(page.locator('.q-no')).toHaveCSS('font-size','20px');
+  await expect(page.locator('.qwrap')).toHaveCSS('animation-duration','0.32s');
+  await expect(page.locator('.pair-vs')).toHaveText('VS');await expect(page.locator('.pair-card').first()).toHaveCSS('border-top-width','0px');
+  await page.locator('.pair-card').first().click();await expect(page.locator('.q-no')).toHaveText('Q 001');await expect(page.getByRole('radio',{checked:true})).toHaveCount(0);
+  const positions=await page.locator('.opt .num').evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect().top));expect(new Set(positions).size).toBe(1);
+  const previous=await page.locator('.qwrap').elementHandle();await page.keyboard.press('1');await expect(page.locator('.q-no')).toHaveText('Q 002');
+  expect(await previous!.evaluate(node=>node.isConnected)).toBe(false);
+  await page.emulateMedia({reducedMotion:'reduce'});await page.getByRole('button',{name:'이전 문항'}).click();
+  await expect(page.locator('.qwrap')).toHaveCSS('animation-name','none');
+  await page.screenshot({path:test.info().outputPath('n6-myin-parity.png'),fullPage:true});
+});
 test('keyboard selection advances once and instruction checks require acknowledgment',async({page})=>{
   const data=fixture();data.survey.questions[0].confirmationOptionId=id(12);data.survey.questions[0].reconfirmInstructions=true;
   await page.route('**/api/platform/diagnosis/session',async route=>{const body=route.request().method()==='POST'?route.request().postDataJSON():{};await route.fulfill({json:body.action==='save'?{...data,revision:1,answers:body.answers}:data});});

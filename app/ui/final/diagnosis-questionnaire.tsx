@@ -1,5 +1,5 @@
 'use client';
-// MYIN client 9255626: preserve its questionnaire markup/layout; use EDU's revision-safe APIs.
+// MYIN client 86a259c: preserve its questionnaire markup/layout; use EDU's revision-safe APIs.
 import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createDiagnosisAutosave } from '@/lib/diagnosis-autosave';
@@ -37,6 +37,7 @@ export function DiagnosisQuestionnaire({initial,save,submit,onReload,onExit,onRe
   const [saveStatus,setSaveStatus]=useState<'unsaved'|'saving'|'saved'|'error'>('saved');
   const [conflict,setConflict]=useState(false),[confirmReload,setConfirmReload]=useState(false),[confirmSubmit,setConfirmSubmit]=useState(false);
   const [confirmedInstructions,setConfirmedInstructions]=useState(false),[timerLeft,setTimerLeft]=useState(PAIR_SECONDS);
+  const [checkMiss,setCheckMiss]=useState<string|null>(null);
   const latest=useRef(answers),alive=useRef(true),advancing=useRef(false),locked=useRef(false),shownAt=useRef(0);
   const advanceTimer=useRef<ReturnType<typeof setTimeout>|null>(null), dlgRef=useRef<HTMLDialogElement>(null),heading=useRef<HTMLHeadingElement>(null),submitHeading=useRef<HTMLHeadingElement>(null);
   const saver=useRef<ReturnType<typeof createDiagnosisAutosave>|null>(null);
@@ -57,7 +58,7 @@ export function DiagnosisQuestionnaire({initial,save,submit,onReload,onExit,onRe
   useEffect(()=>{if(!dirty||conflict||busy||saveStatus==='saving')return;const timer=setTimeout(()=>void saver.current!.flush().catch(()=>{}),saveStatus==='error'?5000:500);return()=>clearTimeout(timer);},[answers,dirty,conflict,busy,saveStatus,saver]);
   async function persist(){await saver.current!.flush();return saver.current!.revision;}
   function change(answer:N30Answer){const next=[...latest.current.filter(a=>a.questionId!==answer.questionId),answer];latest.current=next;setAnswers(next);setError('');saver.current!.update(next);}
-  function navigateToPage(next:number){if(next<0||next>=screens.length)return;if(advanceTimer.current)clearTimeout(advanceTimer.current);advancing.current=false;setConfirmedInstructions(false);setConfirmSubmit(false);setPage(next);setTimerLeft(PAIR_SECONDS);setError('');window.scrollTo({top:0});}
+  function navigateToPage(next:number){if(next<0||next>=screens.length)return;if(advanceTimer.current)clearTimeout(advanceTimer.current);advancing.current=false;setConfirmedInstructions(false);setCheckMiss(null);setConfirmSubmit(false);setPage(next);setTimerLeft(PAIR_SECONDS);setError('');window.scrollTo({top:0});}
   async function move(next:number,saveBefore=false,instructionsConfirmed=false){
     if(locked.current||conflict)return;
     if(next>page&&screen.kind==='q'){
@@ -71,6 +72,8 @@ export function DiagnosisQuestionnaire({initial,save,submit,onReload,onExit,onRe
   function selectMulti(q:N30Question,optionId:string){const old=latest.current.find(a=>a.questionId===q.id)?.values??[];const values=old.includes(optionId)?old.filter(id=>id!==optionId):q.exclusiveOptionIds.includes(optionId)?[optionId]:[...old.filter(id=>!q.exclusiveOptionIds.includes(id)),optionId];if(q.pickExactly&&values.length>q.pickExactly)return;change({questionId:q.id,values});}
   function pick(q:N30Question,optionId:string){
     if(locked.current||conflict||advancing.current)return;
+    if(q.requiredOptionId&&optionId!==q.requiredOptionId){setCheckMiss(q.id);return;}
+    setCheckMiss(null);
     const ms=Math.round(readClock()-shownAt.current);
     change(q.pair?{questionId:q.id,optionId,ms:Math.min(600000,Math.max(0,ms))}:{questionId:q.id,optionId});
     if(q.confirmationOptionId&&optionId!==q.confirmationOptionId&&!confirmedInstructions)return;
@@ -138,7 +141,7 @@ export function DiagnosisQuestionnaire({initial,save,submit,onReload,onExit,onRe
             <span className="part-pill"><span className="en">{parts[cur]!.en}</span><span>{parts[cur]!.ko}</span></span>
             {screen.kind === 'q' && <span className="head-right">문항 <strong>{screen.no}</strong> / {screen.of}</span>}
           </div>
-          <div className="sheet-body"><div className="qwrap">
+          <div className="sheet-body"><div className="qwrap" key={page}>
             <div className="q-index">
               <span className="q-no">Q {String(screen.kind === 'q' ? screen.no : 0).padStart(3, '0')}</span>
               <span className="q-guide">{multi ? '해당하는 것을 모두 골라 주세요' : q.pair ? '상황이 달라도 괜찮아요. 어느 쪽 마음이 지금의 나에 더 가까운지 바로 골라 주세요 · 숫자키 1~5' : likert ? '이 문장이 나와 얼마나 맞나요? 오래 고민하지 말고, 바로 떠오르는 대로 골라 주세요 · 숫자키 1~5' : q.options.length === 2 ? '둘 중 나와 더 가까운 쪽을 바로 골라 주세요 · 숫자키 1·2' : `숫자키 1~${q.options.length}`}</span>
@@ -157,6 +160,7 @@ export function DiagnosisQuestionnaire({initial,save,submit,onReload,onExit,onRe
             {q.pair && q.text !== PAIR_STEM && <div className="pair-check" role="note"><small>확인 문항</small>{q.text}</div>}
             {q.pair && <div className="pair-cards">
               <div className={'pair-card' + (answer?.optionId && q.options.findIndex(o => o.id === answer.optionId) < 2 ? ' lean' : '')}><small>왼쪽</small>{q.pair.left}</div>
+              <span className="pair-vs" aria-hidden="true">VS</span>
               <div className={'pair-card' + (answer?.optionId && q.options.findIndex(o => o.id === answer.optionId) > 2 ? ' lean' : '')}><small>오른쪽</small>{q.pair.right}</div>
             </div>}
             <div className="options" style={q.pair ? { marginTop: 18 } : undefined}>
@@ -172,6 +176,7 @@ export function DiagnosisQuestionnaire({initial,save,submit,onReload,onExit,onRe
                 })}
               </ul>
             </div>
+            {checkMiss===q.id && <div className="intro-note check-miss" role="alert"><span>안내와 다른 답을 골랐어요. 문항을 다시 읽고 안내된 답을 골라 주세요.</span></div>}
             {wrongInstruction && <div className="intro-note"><span>잘하는 정도나 실제 행동 횟수가 아니라, 나에게 얼마나 중요한 바람인지 답하는 문진입니다. 안내를 다시 확인해 주세요.</span>
               <button type="button" className="cta-btn" onClick={() => { setConfirmedInstructions(true); void move(page + 1, true, true); }}>안내를 읽었습니다</button></div>}
             {multi && <div className="cta-block"><button className="cta-btn" disabled={busy || conflict || !present(answer)} onClick={() => void move(page + 1, true)}>다음</button></div>}
