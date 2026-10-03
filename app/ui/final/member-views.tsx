@@ -1423,6 +1423,7 @@ export function MemberViews({
                     {label}
                   </Link>
                 ))}
+                {title === '나의 학습' && <DiagnosisEntry navigation/>}
               </div>
             ))}
           </nav>

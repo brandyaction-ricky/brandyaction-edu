@@ -1,4 +1,4 @@
-import { diagnosisAudienceAllows } from '@/lib/diagnosis-audience';
+import { resolveDiagnosisAudience } from '@/lib/diagnosis-audience';
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { DiagnosisBridgeError, sendDiagnosisCommand } from '@/lib/diagnosis-bridge';
@@ -13,7 +13,7 @@ async function handle(request: Request, write: boolean) {
     if (write && request.headers.get('origin') !== new URL(request.url).origin) return reply({ error: '요청 출처를 확인해 주세요.' }, 403);
     const actor = await getAuthenticatedUser();
     if (!actor) return reply({ error: '로그인이 필요합니다.' }, 401);
-    if (!diagnosisAudienceAllows(actor)) return reply({ error: '현재 관리자만 이용할 수 있습니다.' }, 403);
+    if (!await resolveDiagnosisAudience(actor, async (name, args) => await createAdminClient().rpc(name, args))) return reply({ error: '현재 계정에는 진단이 공개되지 않았습니다.' }, 403);
     let input: unknown = { action: new URL(request.url).searchParams.get('view') === 'catalog' ? 'catalog' : 'read' };
     if (write) {
       const reader = request.body?.getReader(); if (!reader) return reply({ error: '입력 내용을 확인해 주세요.' }, 400);

@@ -7,7 +7,7 @@ import './diagnosis-entry.css';
 
 type Entry = { state: string; courseId?: string };
 /** Hidden until the complete questionnaire/report rollout is explicitly enabled. */
-export function DiagnosisEntry({ courseId }: { courseId?: string }) {
+export function DiagnosisEntry({ courseId, navigation=false }: { courseId?: string; navigation?: boolean }) {
   const [entry, setEntry] = useState<Entry | null>(null);
   useEffect(() => {
     if (process.env.NEXT_PUBLIC_EDU_MYIN_DIAGNOSIS_ENABLED !== 'true') return;
@@ -23,6 +23,7 @@ export function DiagnosisEntry({ courseId }: { courseId?: string }) {
     return () => controller.abort();
   }, [courseId]);
   if (!entry || (courseId && entry.courseId !== courseId)) return null;
+  if (navigation) return <Link href="/my/diagnosis"><Compass size={20} aria-hidden="true"/>N6 진단 받기</Link>;
   const submitted = ['submitted', 'processing', 'ready'].includes(entry.state);
   const label = entry.state === 'not_started' ? '검사 시작하기' : submitted ? '제출한 검사 확인' : '검사 이어하기';
   return <section className="diagnosis-entry" aria-label="N6 검사">
