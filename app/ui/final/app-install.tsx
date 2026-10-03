@@ -109,10 +109,25 @@ function AppInstallGuide({ device }: { device: InstallDevice }) {
       </ol> : <ol>
         <li><strong>{browser === 'edge' ? '엣지(Edge)' : '크롬(Chrome)'}로 이 사이트를 열어요.</strong></li>
         <li><strong>오른쪽 위 점 3개({browser === 'edge' ? '…' : '⋮'})를 눌러요.</strong></li>
-        {browser === 'edge' ? <li><strong>‘앱’ → ‘이 사이트를 앱으로 설치’를 눌러요.</strong><span>‘앱’이 안 보이면 ‘추가 도구’ 안에서 찾아 주세요.</span></li> : <li><strong>‘전송, 저장 및 공유’ → ‘페이지를 앱으로 설치’를 눌러요.</strong><span>‘브랜디에듀 설치’라고 표시될 수도 있어요.</span></li>}
-        <li><strong>새 창에서 ‘설치’를 누르면 끝이에요.</strong><span>다음부터 컴퓨터의 앱 목록에서 ‘브랜디에듀’를 찾아 열어 주세요.</span></li>
+        {browser === 'edge' ? <li><strong>‘앱’ → ‘이 사이트를 앱으로 설치’를 눌러요.</strong><span>‘앱’이 안 보이면 ‘추가 도구’ 안에서 찾아 주세요.</span></li> : <li><strong>‘캐스팅, 저장, 공유’ 또는 ‘전송, 저장 및 공유’ → ‘페이지를 앱으로 설치’를 눌러요.</strong><span>‘브랜디에듀 설치’라고 표시될 수도 있어요.</span><InstallScreenshot src="/installation-guide/chrome-menu.webp" width={1100} height={699} caption="Chrome에서 ‘페이지를 앱으로 설치’ 찾기" alt="실제 컴퓨터 Chrome 메뉴. 캐스팅, 저장, 공유 하위 메뉴의 페이지를 앱으로 설치 항목"/></li>}
+        <li><strong>사이트 이름을 확인하고 ‘다음’ 또는 ‘설치’를 눌러요.</strong><span>추가 안내가 나오면 따라 진행하세요. 다음부터 컴퓨터의 앱 목록에서 ‘브랜디에듀’를 찾아 열어 주세요.</span>{browser === 'chrome' && <InstallScreenshot src="/installation-guide/chrome-confirm.webp" width={905} height={700} caption="Chrome 설치 창에서 사이트 확인하기" alt="실제 컴퓨터 Chrome의 이 페이지를 앱으로 설치 창. 사이트 이름과 주소 아래에 취소와 다음 버튼"/>}</li>
       </ol>}
     </>}
     <p className="meta mt16">메뉴 이름은 기기에 따라 조금 다를 수 있어요. 찾기 어렵다면 지금처럼 사이트에서 학습해도 괜찮아요.</p>
   </div>;
+}
+
+function InstallScreenshot({src,width,height,caption,alt}:{src:string;width:number;height:number;caption:string;alt:string}) {
+  const dialog=useRef<HTMLDialogElement>(null),label=useId();
+  return <figure className="app-install-shot">
+    <button type="button" className="app-install-shot-button" aria-label={caption+' 크게 보기'} onClick={()=>dialog.current?.showModal()}>
+      <img src={src} width={width} height={height} alt={alt} loading="lazy" decoding="async"/>
+      <span aria-hidden="true">사진 크게 보기 ↗</span>
+    </button>
+    <figcaption>{caption} · 실제 Mac Chrome 화면<span>메뉴 이름과 예시 주소는 기기·버전에 따라 다를 수 있어요.</span></figcaption>
+    <dialog ref={dialog} className="app-install-photo-dialog" aria-labelledby={label}>
+      <div className="app-install-photo-heading"><strong id={label}>{caption}</strong><button type="button" className="btn small" onClick={()=>dialog.current?.close()}>사진 닫기</button></div>
+      <img src={src} width={width} height={height} alt={alt}/>
+    </dialog>
+  </figure>;
 }

@@ -15,3 +15,15 @@
 .app-install-existing{font-size:14px}
 .app-install input{display:block;width:100%;min-width:0;margin:12px 0;padding:10px;border:1px solid var(--border,#e3e5e8);border-radius:6px;font-size:14px}
 @media(max-width:480px){.app-install-heading{gap:12px}.app-install-heading img{width:48px;height:48px}.edu-front .app-install h2{font-size:17px}}
+
+.app-install-shot{margin:12px 0 0;max-width:620px;min-width:0}
+.app-install-shot-button{display:block;width:100%;padding:0;border:1px solid var(--border,#e3e5e8);border-radius:10px;overflow:hidden;background:#fff;color:inherit;cursor:zoom-in;text-align:left}
+.app-install-shot-button:focus-visible{outline:3px solid #bb1e2f;outline-offset:3px}
+.app-install-shot img{display:block;width:100%;height:auto}
+.app-install-shot-button span{padding:8px 12px;background:#f5f6f8;font-weight:600}
+.app-install-shot figcaption{margin-top:8px;font-size:13px;line-height:1.6;color:var(--muted,#687080)}
+.app-install-photo-dialog{width:min(96vw,1100px);max-width:96vw;max-height:92vh;padding:16px;border:1px solid #dce0e5;border-radius:12px;background:#fff;color:#17191d}
+.app-install-photo-dialog::backdrop{background:rgba(0,0,0,.65)}
+.app-install-photo-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.app-install-photo-heading strong{font-size:16px;line-height:1.5}
+.app-install-photo-dialog img{display:block;width:100%;height:auto;max-height:75vh;object-fit:contain}

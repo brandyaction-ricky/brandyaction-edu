@@ -25,6 +25,7 @@ const server = createServer((request,response)=>{
   if(reviewFixture(request,response,url))return;
   if(url.pathname==='/edu-push-sw.js'){response.setHeader('Content-Type','application/javascript');response.setHeader('Cache-Control','no-store');response.end(readFileSync(resolve('public/edu-push-sw.js')));return;}
   if(/^\/icons\/edu-(192|512|maskable-512|badge-96|apple-180)\.png$/.test(url.pathname)){response.setHeader('Content-Type','image/png');response.end(readFileSync(resolve('public'+url.pathname)));return;}
+  if(/^\/installation-guide\/chrome-(menu|confirm)\.webp$/.test(url.pathname)){response.setHeader('Content-Type','image/webp');response.end(readFileSync(resolve('public'+url.pathname)));return;}
   if(url.pathname==='/api/app-branding'&&url.searchParams.get('icon')==='192'){response.writeHead(307,{Location:'/icons/edu-192.png'}).end();return;}
   if(request.method!=='GET'){response.writeHead(405).end();return;}
   if(url.pathname==='/synthetic-auth/session'){response.setHeader('Content-Type','application/json');response.end('{}');return;}

@@ -92,3 +92,19 @@ test('manual guide remains reachable without an install event, supports each dev
   expect(await page.evaluate(() => (window as TestWindow).eduPermissionCalls)).toBe(0);
   await expect(page.getByRole('region', { name: '앱 사용 상태' })).toHaveCount(0);
 });
+
+test('actual Chrome screenshots load, enlarge with keyboard, close with Escape and never prompt installation',async({page},info)=>{
+ await setup(page);await page.goto('/app-install-test');await panel(page).getByRole('button',{name:'앱 추가 방법 보기'}).click();
+ const photos=panel(page).locator('.app-install-shot-button img');await expect(photos).toHaveCount(2);
+ for(const photo of await photos.all()){await photo.scrollIntoViewIfNeeded();await expect.poll(()=>photo.evaluate((el:HTMLImageElement)=>el.complete&&el.naturalWidth>0)).toBe(true);}
+ const enlarge=panel(page).getByRole('button',{name:'Chrome에서 ‘페이지를 앱으로 설치’ 찾기 크게 보기',exact:true});
+ await enlarge.focus();await page.keyboard.press('Enter');
+ const dialog=page.getByRole('dialog',{name:'Chrome에서 ‘페이지를 앱으로 설치’ 찾기',exact:true});await expect(dialog).toBeVisible();
+ expect(await dialog.locator('img').getAttribute('alt')).toContain('실제 컴퓨터 Chrome');
+ await page.screenshot({path:info.outputPath('actual-chrome-menu-enlarged.png'),fullPage:false});
+ await page.keyboard.press('Escape');await expect(dialog).not.toBeVisible();await expect(enlarge).toBeFocused();
+ await panel(page).getByRole('button',{name:'Chrome 설치 창에서 사이트 확인하기 크게 보기',exact:true}).click();await page.getByRole('button',{name:'사진 닫기'}).click();
+ await panel(page).getByRole('button',{name:'아이폰·아이패드'}).click();await expect(panel(page).locator('.app-install-shot')).toHaveCount(0);
+ expect(await page.evaluate(()=>(window as TestWindow).eduPromptCalls)).toBe(0);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
