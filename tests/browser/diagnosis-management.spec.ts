@@ -2,14 +2,31 @@ import{test,expect}from'@playwright/test';
 const id=(n:number)=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`,version='a'.repeat(64);
 const report={state:'needs_review',updatedAt:'2026-10-03T00:00:00Z',checkedAt:'2026-10-03T00:01:00Z',errorCode:'JOB_DEADLINE_REACHED',canRetry:true,version,details:[{at:'2026-10-03T00:00:00Z',code:'JOB_DEADLINE_REACHED'}]};
 const data={enabled:true,allPublished:false,revision:0,eligibleCount:103,startedCount:2,nextCursor:id(90),remoteAvailable:true,rows:[{id:id(1),name:'학생 A',published:false,attemptId:id(10),state:'submitted',startedAt:'2026-10-03T00:00:00Z',updatedAt:'2026-10-03T00:00:00Z',report,statusAvailable:true},{id:id(2),name:'학생 B',published:false,attemptId:null,state:'not_started',startedAt:null,updatedAt:null,report:null,statusAvailable:true},{id:id(3),name:'학생 C',published:true,attemptId:id(11),state:'submitted',report:{...report,state:'ready',errorCode:null,canRetry:false,details:[]},statusAvailable:true}]};
+test.beforeEach(async({page})=>{
+ await page.route('**/api/platform?**',route=>route.fulfill({json:{user:{id:id(99),full_name:'합성 관리자',role:'admin'},data:{admin_summary:[{pendingReviews:0,openQuestions:0}]}}}));
+});
 test('admin can find direct diagnosis, confirm whole or individual publication and see progress without document overflow',async({page},info)=>{
  const writes:unknown[]=[];let latest=data;
  await page.route('**/api/admin/diagnosis**',async route=>{if(route.request().method()==='POST'){const b=route.request().postDataJSON();writes.push(b);latest={...latest,revision:latest.revision+1,allPublished:b.action==='publish_all'?b.enabled:latest.allPublished,rows:latest.rows.map(r=>b.action==='publish_all'||b.userId===r.id?{...r,published:b.enabled}:r)};await route.fulfill({json:{revision:latest.revision}});return;}await route.fulfill({json:latest});});
- await page.goto('/diagnosis-test?manage');await expect(page.getByRole('heading',{name:'N6 진단 관리',exact:true})).toBeVisible();await expect(page.getByRole('link',{name:'N6 진단 받기'})).toHaveAttribute('href','/admin/diagnosis');
+ await page.goto('/diagnosis-test?manage');await expect(page.getByRole('heading',{name:'N6 진단 관리',exact:true})).toBeVisible();await expect(page.locator('.diagnosis-management').getByRole('link',{name:'N6 진단 받기'})).toHaveAttribute('href','/admin/diagnosis');
  await page.getByRole('button',{name:'한 번에 모두 공개'}).click();await expect(page.getByRole('dialog')).toContainText('103명');await page.getByRole('button',{name:'취소',exact:true}).click();expect(writes).toHaveLength(0);
  await page.getByRole('button',{name:'학생 B 진단 공개'}).click();await expect(page.getByRole('dialog')).toContainText('학생 B');await page.getByRole('button',{name:'공개하기',exact:true}).click();await expect(page.getByRole('button',{name:'학생 B 진단 닫기'})).toBeVisible();expect(writes[0]).toMatchObject({action:'publish_member',userId:id(2),revision:0,enabled:true});
  await page.getByRole('button',{name:'한 번에 모두 공개'}).click();await page.getByRole('button',{name:'공개하기',exact:true}).click();await expect(page.getByRole('status').filter({hasText:'진단 공개 설정을 저장했습니다.'})).toBeVisible();expect(writes[1]).toMatchObject({action:'publish_all',revision:1});
  await page.screenshot({path:info.outputPath('diagnosis-management.png'),fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+test('diagnosis management retains admin navigation and mobile menu without changing publication',async({page},info)=>{
+ const writes:unknown[]=[];
+ await page.route('**/api/admin/diagnosis**',async route=>{if(route.request().method()==='POST')writes.push(route.request().postDataJSON());await route.fulfill({json:data});});
+ await page.goto('/diagnosis-test?manage');await expect(page.getByRole('heading',{name:'N6 진단 관리',exact:true})).toBeVisible();
+ const sidebar=page.locator('#admin-sidebar');
+ if(info.project.name!=='desktop')await page.getByRole('button',{name:'관리자 메뉴 열기'}).click();
+ await expect(sidebar).toBeVisible();await expect(sidebar.getByRole('link',{name:'N6 진단 관리',exact:true})).toHaveAttribute('aria-current','page');
+ await sidebar.locator('summary').filter({hasText:'고객 관리'}).click();await expect(sidebar.getByRole('link',{name:'회원 관리',exact:true})).toHaveAttribute('href','/admin/customers');
+ await sidebar.getByRole('link',{name:'회원 관리',exact:true}).click();await expect(page).toHaveURL(/\/admin\/customers$/);
+ await page.goBack();await expect(page.getByRole('heading',{name:'N6 진단 관리',exact:true})).toBeVisible();
+ if(info.project.name!=='desktop'){const opener=page.getByRole('button',{name:'관리자 메뉴 열기'});await opener.click();await page.keyboard.press('Escape');await expect(sidebar).not.toBeVisible();await expect(opener).toBeFocused();}
+ expect(writes).toHaveLength(0);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:info.outputPath('diagnosis-management-navigation.png'),fullPage:true});
 });
 test('retry confirms frozen answers and uses same request after lost acknowledgment; ready reports never offer regeneration',async({page})=>{
  const writes:Record<string,unknown>[]=[];let lost=true;
