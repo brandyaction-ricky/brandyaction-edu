@@ -42,6 +42,6 @@ test('actual administrator member conversation tab exposes delete only for own o
  });
  await page.goto('/member-conversation-test');await page.getByRole('tab',{name:'대화 기록'}).click();const panel=page.getByRole('region',{name:'회원 대화 기록'});
  await expect(panel.getByRole('button',{name:'메시지 삭제'})).toHaveCount(1);await panel.getByRole('button',{name:'메시지 삭제'}).click();await page.screenshot({path:info.outputPath('member-conversation-delete.png'),fullPage:true});
- await panel.getByRole('button',{name:'삭제하기'}).click();await expect(panel.getByRole('status')).toContainText('메시지를 삭제했습니다');await expect(panel).not.toContainText('내가 보낸 안내');await expect(panel).toContainText('수강생 메시지');
+ await panel.getByRole('button',{name:'삭제하기'}).click();await expect(panel.getByRole('status').filter({hasText:'메시지를 삭제했습니다'})).toBeVisible();await expect(panel).not.toContainText('내가 보낸 안내');await expect(panel).toContainText('수강생 메시지');
  expect(writes).toEqual([{action:'delete',messageId:message}]);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
