@@ -18,8 +18,13 @@ export function QuestionCard({ question: q, initiallyOpen = false, changed }: { 
   </article>;
 }
 export function QuestionHub({ order }: { order?: string | null }) {
+  const params = useSearchParams();
+  // A second notification must open its own question even while this page is mounted.
+  return <QuestionHubContent key={params.get('question') || ''} order={order}/>;
+}
+function QuestionHubContent({ order }: { order?: string | null }) {
   const params = useSearchParams(), [showAll, setShowAll] = useState(false);
-  const candidate = params.get('question'), target = !showAll && candidate && /^[a-f0-9-]{36}$/.test(candidate) ? candidate : null;
+  const candidate = params.get('question'), target = !showAll && candidate && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(candidate) ? candidate : null;
   const [tab, setTab] = useState<'write' | 'mine' | 'public'>(order ? 'write' : target ? 'mine' : 'public');
   const [page, setPage] = useState(0), [version, setVersion] = useState(0), [query, setQuery] = useState('');
   const [notice, setNotice] = useState(''), [filter, setFilter] = useState('전체');
@@ -39,12 +44,12 @@ export function QuestionHub({ order }: { order?: string | null }) {
     <div className="question-hub-tabs" role="tablist" aria-label="질문 메뉴">{([['public','전체 질문'],['mine','내 질문'],['write','질문하기']] as const).map(([value,label]) => <button type="button" key={value} role="tab" aria-selected={tab === value} onClick={() => select(value)}>{label}</button>)}</div>
     {notice && <p role="status" className="notice mb24">{notice}</p>}
     <div hidden={tab !== 'write'} className="panel pad mb24"><QuestionComposer order={order} onCreated={() => { setNotice('질문을 등록했습니다. 답변은 이곳에서 확인할 수 있어요.'); setVersion(v => v + 1); select('mine'); }}/></div>
-    {target && tab === 'mine' && <button className="btn small mb24" onClick={()=>setShowAll(true)}>내 질문 전체 보기</button>}
+    {target && tab === 'mine' && <button className="btn small mb24" onClick={()=>{setShowAll(true); setPage(0); setFilter('전체');}}>내 질문 전체 보기</button>}
     {tab === 'public' && <><p className="meta mb16">같은 기수에 공개한 학습 질문입니다. 비밀 질문은 ‘내 질문’에서 확인하세요.</p><label className="field mb24">질문 검색<input type="search" maxLength={500} value={query} onChange={e => { setQuery(e.target.value); setPage(0); }} placeholder="궁금한 내용을 검색해 보세요"/></label><RelatedAnswers query={query} context={null}/></>}
     {tab !== 'write' && (!data ? <p role="status">불러오고 있습니다.</p> : data.error ? <p role="alert">{data.error} <button className="btn small" onClick={() => setVersion(v => v + 1)}>다시 불러오기</button></p> : <>
       {tab === 'mine' && <div className="chips mb24">{['전체','답변 대기','답변 도착','해결 완료'].map(f => <button className={'chip ' + (filter === f ? 'active' : '')} key={f} aria-pressed={filter === f} onClick={() => setFilter(f)}>{f}</button>)}</div>}
       {questions.map(q => <QuestionCard key={q.id} question={q} initiallyOpen={target === q.id} changed={() => setVersion(v => v + 1)}/>)}
-      {!questions.length && <p className="notice">{tab === 'public' ? '아직 공개된 질문이 없어요. 첫 질문을 남겨 보세요.' : filter === '전체' ? '아직 남긴 질문이 없어요. 질문하기에서 편하게 물어보세요.' : '이 페이지에는 해당 상태의 질문이 없습니다.'}</p>}
+      {!questions.length && <p className="notice">{tab === 'public' ? '아직 공개된 질문이 없어요. 첫 질문을 남겨 보세요.' : target && !data.questions?.length ? '이 질문은 삭제됐거나 현재 계정에서 볼 수 없습니다. 위의 ‘내 질문 전체 보기’를 눌러 다른 질문을 확인하세요.' : filter === '전체' ? '아직 남긴 질문이 없어요. 질문하기에서 편하게 물어보세요.' : '이 페이지에는 해당 상태의 질문이 없습니다.'}</p>}
       {(page > 0 || data.hasMore) && <div className="question-hub-pages"><button className="btn small" disabled={!page} onClick={() => setPage(p => p - 1)}>이전</button><span>{page + 1}페이지</span><button className="btn small" disabled={!data.hasMore} onClick={() => setPage(p => p + 1)}>다음</button></div>}
     </>)}
   </>;

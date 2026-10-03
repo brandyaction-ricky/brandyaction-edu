@@ -110,3 +110,15 @@ for (const screen of ['my/missions', 'learn/synthetic-enrollment']) {
     await expect(page.getByText('로그인하고 학습을 이어가세요.')).toHaveCount(0);
   });
 }
+
+test('expired notification session keeps the question in both login links',async({page})=>{
+ await page.route('**/api/platform?**',r=>r.fulfill({status:401,json:{user:null,error:'로그인이 필요합니다.'}}));
+ const question='11111111-1111-4111-8111-111111111111';
+ await page.goto('/public-data-test?publicScreen=my/questions&question='+question);
+ const callToAction=page.getByRole('link',{name:/로그인·회원가입/});await expect(callToAction).toBeVisible();
+ for(const link of [callToAction,page.locator('.site-header a').filter({hasText:'로그인'}).first()]){
+  const href=await link.getAttribute('href'),next=new URL(href!,'https://edu.test').searchParams.get('next');
+  expect(new URL(next!,'https://edu.test').pathname).toBe('/my/questions');
+  expect(new URL(next!,'https://edu.test').searchParams.get('question')).toBe(question);
+ }
+});

@@ -17,7 +17,7 @@ const compiledModule = { exports: {} };
 new Function("exports", compiled)(compiledModule.exports);
 const { oauthCallbackRecoveryPath } = compiledModule.exports;
 
-function callbackHarness({ metadata = { terms_version: '2026', privacy_version: '2026' } } = {}) {
+function callbackHarness({ metadata = { terms_version: '2026', privacy_version: '2026' }, exchangeFails = false } = {}) {
   const source = fs.readFileSync(
     new URL('../app/auth/callback/route.ts', import.meta.url),
     'utf8',
@@ -40,7 +40,7 @@ function callbackHarness({ metadata = { terms_version: '2026', privacy_version: 
         auth: {
           async exchangeCodeForSession() {
             onCookies(cookieMutations);
-            return { data: { session: { provider_token: 'provider-token' } }, error: null };
+            return { data: { session: { provider_token: 'provider-token' } }, error: exchangeFails ? { message: 'expired' } : null };
           },
           async getUser() {
             return { data: { user: { id: 'member-1', user_metadata: metadata } } };
@@ -137,5 +137,19 @@ test('older email-change links guide members when their code opened in a differe
   const response = await exports.GET(new Request('https://edu.example/auth/callback?code=old-code&next=%2Fmy%2Fprofile'));
   assert.equal(response.redirectUrl, 'https://edu.example/auth/email-change-help');
   const oauthFailure = await exports.GET(new Request('https://edu.example/auth/callback?code=oauth-code&next=%2Fmy%2Fprofile&provider=kakao'));
-  assert.equal(oauthFailure.redirectUrl, 'https://edu.example/login?error=auth_callback');
+  assert.equal(oauthFailure.redirectUrl, 'https://edu.example/login?error=auth_callback&next=%2Fmy%2Fprofile');
 });
+
+for (const provider of ['google', 'kakao']) {
+  test(`${provider} callback keeps the notification question through consent and retry`, async () => {
+    const next='/my/questions?question=11111111-1111-4111-8111-111111111111';
+    const url='https://edu.test/auth/callback?'+new URLSearchParams({code:'test',provider,next});
+    const successful=await callbackHarness().get(new Request(url));
+    assert.equal(successful.redirectUrl,'https://edu.test'+next);
+    const consent=await callbackHarness({metadata:{}}).get(new Request(url));
+    assert.equal(new URL(consent.redirectUrl).searchParams.get('next'),next);
+    const failed=await callbackHarness({exchangeFails:true}).get(new Request(url));
+    assert.equal(new URL(failed.redirectUrl).pathname,'/login');
+    assert.equal(new URL(failed.redirectUrl).searchParams.get('next'),next);
+  });
+}

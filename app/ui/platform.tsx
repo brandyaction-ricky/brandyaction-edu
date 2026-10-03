@@ -549,7 +549,7 @@ export function Platform({
     router.refresh();
     setPending(false);
   };
-  const loginHref = "/login?next=" + encodeURIComponent("/" + path.join("/"));
+  const loginHref = "/login?next=" + encodeURIComponent(safeNext("/" + routeKey));
   const header = (
     <>
       <a className="skip" href="#main">
@@ -615,7 +615,7 @@ export function Platform({
                 </div>
               </>
             ) : (
-              <Link className="btn" href="/login">
+              <Link className="btn" href={account || learning ? loginHref : "/login"}>
                 로그인
               </Link>
             )}

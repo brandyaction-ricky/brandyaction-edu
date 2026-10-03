@@ -68,3 +68,22 @@ test('member navigation uses Q&A only and preserves old messages as read-only hi
  await page.locator('summary').filter({hasText:'이전 메시지 기록'}).click();await page.getByRole('button',{name:'내용 보기',exact:true}).click();await expect(page.getByText('이전 개인 대화')).toBeVisible();await expect(page.getByRole('button',{name:'답장 작성'})).toHaveCount(0);await expect(page.getByRole('textbox',{name:'메시지 내용'})).toHaveCount(0);
  await page.screenshot({path:info.outputPath('unified-member-questions.png'),fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
+
+test('notification opens its answer; missing target explains and returns to own questions',async({page},info)=>{
+ await backend(page);
+ const requests:string[]=[];
+ await page.route('**/api/platform/question-hub?mode=mine**',r=>{
+  const target=new URL(r.request().url()).searchParams.get('question');requests.push(target||'all');
+  return r.fulfill({json:{questions:target===id(8)?[]:[{id:id(9),title:'알림으로 받은 내 질문',content:'질문 본문',answer:'해당 질문의 답변',status:'answered',visibility:'private'}],hasMore:false}});
+ });
+ await page.route('**/api/platform/question-thread?**',r=>r.fulfill({json:{question:{id:id(9),headId:id(10),status:'answered'},answers:[{id:id(10),content:'해당 질문의 답변',authorName:'운영자'}],canFollowUp:true,nextCursor:null}}));
+ await page.goto('/question-hub-test?question='+id(9));
+ await expect(page.getByRole('tab',{name:'내 질문',exact:true})).toHaveAttribute('aria-selected','true');
+ await expect(page.getByText('해당 질문의 답변',{exact:true})).toBeVisible();expect(requests).toContain(id(9));
+ await page.screenshot({path:info.outputPath('notification-answer.png'),fullPage:true});
+ await page.goto('/question-hub-test?question='+id(8));
+ await expect(page.getByText(/이 질문은 삭제됐거나 현재 계정에서 볼 수 없습니다/)).toBeVisible();
+ await page.getByRole('button',{name:'내 질문 전체 보기',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'알림으로 받은 내 질문'})).toBeVisible();expect(requests).toContain('all');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
