@@ -83,6 +83,7 @@ function AppInstallGuide({ device }: { device: InstallDevice }) {
     <div className="app-install-devices mt8" role="group" aria-label="앱을 추가할 기기">
       {([['ios', '아이폰·아이패드'], ['android', '갤럭시·안드로이드'], ['desktop', '컴퓨터']] as const).map(([value, label]) => <button key={value} type="button" className="btn small" aria-pressed={selected === value} onClick={() => setSelected(value)}>{label}</button>)}
     </div>
+    {(selected !== 'desktop' || browser !== 'chrome') && <p className="meta mt16">이 기기의 설치 사진은 준비 중이에요. 지금은 아래 글을 따라 추가해 주세요.</p>}
     {selected === 'ios' ? <>
       <ol>
         <li><strong>사파리(Safari)로 이 사이트를 열어요.</strong><span>아이폰의 파란 나침반 모양 앱이에요.</span></li>

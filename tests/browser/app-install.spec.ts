@@ -104,7 +104,7 @@ test('actual Chrome screenshots load, enlarge with keyboard, close with Escape a
  await page.screenshot({path:info.outputPath('actual-chrome-menu-enlarged.png'),fullPage:false});
  await page.keyboard.press('Escape');await expect(dialog).not.toBeVisible();await expect(enlarge).toBeFocused();
  await panel(page).getByRole('button',{name:'Chrome 설치 창에서 사이트 확인하기 크게 보기',exact:true}).click();await page.getByRole('button',{name:'사진 닫기'}).click();
- await panel(page).getByRole('button',{name:'아이폰·아이패드'}).click();await expect(panel(page).locator('.app-install-shot')).toHaveCount(0);
+ await panel(page).getByRole('button',{name:'아이폰·아이패드'}).click();await expect(panel(page).locator('.app-install-shot')).toHaveCount(0);await expect(panel(page).getByText('이 기기의 설치 사진은 준비 중이에요. 지금은 아래 글을 따라 추가해 주세요.')).toBeVisible();
  expect(await page.evaluate(()=>(window as TestWindow).eduPromptCalls)).toBe(0);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
