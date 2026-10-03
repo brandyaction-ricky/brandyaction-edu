@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 const member = '11111111-1111-4111-8111-111111111111';
 async function backend(page: Page, fail = false) {
   const queries: URLSearchParams[] = [];
+  await page.route('**/api/admin/learning-usage**', r => r.fulfill({json:{rows:[],total:0,page:1,pageSize:10}}));
   await page.route('**/api/admin/member-overview**', route => route.fulfill({ json: { rows: [], total: 0, page: 1, pageSize: 20 } }));
   await page.route('**/api/admin/learning-progress**', async route => {
     const query = new URL(route.request().url()).searchParams; queries.push(query);
