@@ -1,6 +1,6 @@
 export type ConversationKind = 'message' | 'question' | 'answer';
 export type ConversationCursor = { at: string; kind: ConversationKind; id: string };
-export type ConversationItem = { id: string; kind: ConversationKind; at: string; title: string; content: string; author: string; direction: 'incoming' | 'outgoing'; readAt: string | null; question: string | null; archived: boolean };
+export type ConversationItem = { canDelete?: boolean; id: string; kind: ConversationKind; at: string; title: string; content: string; author: string; direction: 'incoming' | 'outgoing'; readAt: string | null; question: string | null; archived: boolean };
 export type MemberConversationResult = { rows: ConversationItem[]; nextCursor: ConversationCursor | null };
 export function parseConversationCursor(value: string | null): ConversationCursor | null {
   if (value === null) return null;

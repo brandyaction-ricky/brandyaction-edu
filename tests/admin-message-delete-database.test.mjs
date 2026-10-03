@@ -3,13 +3,15 @@ import assert from 'node:assert/strict';
 import {randomUUID as id} from 'node:crypto';
 import {communityFixture,read} from './helpers/question-community.mjs';
 const migration=read('20261003054513_admin_sent_message_delete.sql');
-async function fixture(t){const h=await communityFixture(t);await h.owner(migration);return h;}
+async function fixture(t){const h=await communityFixture(t);await h.owner(migration);await h.owner(read('20260929013847_member_conversation_history.sql'));await h.owner(read('20261003062544_conversation_deleted_content_filter.sql'));return h;}
 test('operator deletes only own manual message; inbox, unread, read and reply exclude it and replay never restores it',async t=>{
  const h=await fixture(t),request=id(),args=[h.admin,request,'잘못 보낸 안내',[h.student,h.other],null,null];
  const sent=await h.rpc('edu_send_member_message',args),message=sent.messageIds[0];
  const row=(await h.db.query('select recipient_id from edu_member_messages where id=$1',[message])).rows[0];
  await assert.rejects(()=>h.rpc('edu_delete_member_message',[h.student,message]),/MESSAGE_FORBIDDEN/);
+ assert.equal((await h.rpc('edu_member_conversation',[h.admin,row.recipient_id,null])).rows.find(r=>r.id===message).canDelete,true);
  const deleted=await h.rpc('edu_delete_member_message',[h.admin,message]);assert.equal(typeof deleted.deletedAt,'string');assert.deepEqual(await h.rpc('edu_delete_member_message',[h.admin,message]),deleted);
+ assert.equal((await h.rpc('edu_member_conversation',[h.admin,row.recipient_id,null])).rows.some(r=>r.id===message),false);
  assert.equal((await h.inbox(row.recipient_id)).rows.length,0);assert.equal((await h.unread(row.recipient_id)).count,0);
  await assert.rejects(()=>h.rpc('edu_mark_member_message_read',[row.recipient_id,message]),/MESSAGE_NOT_FOUND/);
  await assert.rejects(()=>h.rpc('edu_send_member_message',[row.recipient_id,id(),'삭제된 메시지에 답장',[],message,null]),/MESSAGE_NOT_FOUND/);
@@ -31,6 +33,7 @@ test('answer deletion repairs summary without duplicate answers/notices, cancels
  await assert.rejects(()=>h.rpc('edu_answer_from_assist',[h.admin,q.id,assist,id(),'이전 초안 사용']),/QUESTION_CHANGED/);
  const page=await h.rpc('edu_read_question_thread',[h.student,q.id,null]);assert.deepEqual(page.answers.map(a=>a.content),['첫 답변']);assert.equal(page.answers[0].canDelete,false);
  assert.equal((await h.db.query('select answer,status from edu_questions where id=$1',[q.id])).rows[0].answer,'첫 답변');assert.equal(await h.count('edu_question_answers'),before);
+ assert.equal((await h.rpc('edu_member_conversation',[h.admin,h.student,null])).rows.some(r=>r.id===b),false);
  assert.equal((await h.feed()).questions.find(x=>x.id===q.id).answer,'첫 답변');
  assert.equal((await h.db.query('select published from edu_shared_answers where source_question_id=$1',[q.id])).rows[0].published,false);
  assert.equal((await h.inbox()).rows.some(r=>r.content.includes('삭제할 답변')),false);

@@ -30,3 +30,18 @@ test('operator answer removal hides content for learner and keeps the answer for
  await learner.getByRole('button',{name:'최신 답변 확인'}).click();await expect(learner.getByText('삭제 대상 답변',{exact:true})).toHaveCount(0);await expect(page.getByRole('textbox',{name:'새 답변'})).toBeEnabled();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
+
+test('actual administrator member conversation tab exposes delete only for own outgoing message',async({page},info)=>{
+ let deleted=false;const writes:unknown[]=[];
+ await page.route('**/api/**',async route=>{
+  const request=route.request(),url=new URL(request.url());
+  if(request.method()==='POST'&&url.pathname==='/api/member/messages'){writes.push(request.postDataJSON());deleted=true;await route.fulfill({json:{id:message,deletedAt:'2026-10-03T00:00:00Z'}});return;}
+  if(url.pathname!=='/api/admin/member-conversation'){await route.fulfill({json:{rows:[],total:0}});return;}
+  const row={kind:'message',at:'2026-10-03T00:00:00Z',title:'',author:'운영자',direction:'outgoing',readAt:null,question:null,archived:false};
+  await route.fulfill({json:{rows:[{...row,id:actor,author:'수강생',direction:'incoming',content:'수강생 메시지',canDelete:false},...(!deleted?[{...row,id:message,content:'내가 보낸 안내',canDelete:true}]:[])],nextCursor:null}});
+ });
+ await page.goto('/member-conversation-test');await page.getByRole('tab',{name:'대화 기록'}).click();const panel=page.getByRole('region',{name:'회원 대화 기록'});
+ await expect(panel.getByRole('button',{name:'메시지 삭제'})).toHaveCount(1);await panel.getByRole('button',{name:'메시지 삭제'}).click();await page.screenshot({path:info.outputPath('member-conversation-delete.png'),fullPage:true});
+ await panel.getByRole('button',{name:'삭제하기'}).click();await expect(panel.getByRole('status')).toContainText('메시지를 삭제했습니다');await expect(panel).not.toContainText('내가 보낸 안내');await expect(panel).toContainText('수강생 메시지');
+ expect(writes).toEqual([{action:'delete',messageId:message}]);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
