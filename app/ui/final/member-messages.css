@@ -19,3 +19,8 @@
 .edu-message-progress .row > label { flex:1 1 150px; min-width:0; }
 .edu-message-progress select { width:100%; max-width:100%; margin-top:6px; }
 @media(max-width:600px) { .edu-messages .panel { padding:16px; } .edu-messages .row>* { max-width:100%; } .edu-messages input:not([type=checkbox]) { max-width:100%; } }
+
+.edu-message-delete { margin-top:12px; }
+.edu-message-delete-button { color:#b4232b; border-color:#edc7cb; }
+.edu-message-delete-confirm { border:1px solid #edc7cb; background:#fff8f8; border-radius:8px; padding:16px; }
+.edu-message-delete-confirm p { line-height:1.7; margin:0 0 12px; }
