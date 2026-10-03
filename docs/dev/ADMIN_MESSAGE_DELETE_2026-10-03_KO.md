@@ -22,3 +22,9 @@
 2. DEV Preview 또는 고정 DEV에서 새 커밋 검수. 공유 DEV 변경 전 다른 채팅의 검수 순서를 확인한다.
 3. 운영 DB migration과 고정 커밋의 운영 배포는 별도 명시 승인 후 진행한다.
 4. 코드 rollback 기준은 7239016bf666f0b3a6d1f67a456c1e661aeb0ef5. DB의 삭제 표시·읽기 필터·영수증은 보존한다. 삭제 필터를 되돌리면 삭제된 내용이 다시 노출될 수 있으므로 DB를 자동 역마이그레이션하지 않는다.
+
+## DEV 적용 확인
+
+- DEV Supabase vjmjhaidlqkmascdjocw에 위 migration 1개 적용. 원장 checksum 6ad9da97f2cc37cd3d141ee169e6f937a701b1dd72c772b256d523165e60a795 확인. 삭제 RPC 둘 다 존재하며 service_role 실행 가능, anon/authenticated 실행 불가, SECURITY INVOKER 유지. 실제 삭제된 메시지·답변은 0건.
+- 첫 Preview는 자동 로컬 Git 작성자의 계정 연결이 없어 Vercel에서 차단됐다. 연결된 GitHub·Vercel 본인 계정 brandyaction-basic과 기존 정상 커밋의 작성자 일치를 읽기 확인한 뒤, 본인 정보로 검수 기록 커밋을 추가한다. 기존 커밋은 재작성하거나 강제 push하지 않는다.
+- 새 커밋의 Preview READY·health와 CI 완료를 따로 확인한다. 운영 DB·운영 코드 반영은 아직 미실행이다.
