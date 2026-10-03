@@ -432,9 +432,9 @@ export async function GET(request: Request) {
             const cohortIds = (data.enrollments || []).filter((e) => hasLearningAccess(e)).map((e) => e.cohort_id);
             const sessionIds = (data.cohort_sessions || []).filter((s) => cohortIds.includes(s.cohort_id)).map((s) => s.id);
             if (sessionIds.length) {
-                const r = await db.from('cohort_session_contents').select('session_id,live_url,replay_url').in('session_id', sessionIds);
+                const r = await db.from('cohort_session_contents').select('session_id,live_url,replay_url,resource_storage_path').in('session_id', sessionIds);
                 if (r.error) throw r.error;
-                data.cohort_session_contents = r.data as unknown as Row[];
+                data.cohort_session_contents = (r.data || []).map(({ resource_storage_path, ...row }) => ({ ...row, resource_available: Boolean(resource_storage_path) })) as unknown as Row[];
             }
             const ids = (data.enrollments || []).filter((e) => hasLearningAccess(e)).map((e) => e.id);
             if (ids.length) {
