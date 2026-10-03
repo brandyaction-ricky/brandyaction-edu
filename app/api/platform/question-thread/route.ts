@@ -37,11 +37,15 @@ export async function POST(request: Request) {
   const decoder = new TextDecoder(); let text = '', size = 0;
   try { for (;;) { const { value, done } = await reader.read(); if (done) break; size += value.byteLength; if (size > 50000) { await reader.cancel(); fail('입력 내용이 너무 큽니다.', 413); } text += decoder.decode(value, { stream: true }); } text += decoder.decode(); } finally { reader.releaseLock(); }
   let body; try { body = JSON.parse(text); } catch { fail('입력 형식을 확인해 주세요.'); }
-  if (!body || !['answer', 'resolve', 'followup', 'finish'].includes(body.action)) fail('요청을 확인해 주세요.');
+  if (!body || !['answer', 'resolve', 'followup', 'finish', 'delete'].includes(body.action)) fail('요청을 확인해 주세요.');
   if (body.action === 'finish' && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED !== 'true') fail('준비 중인 기능입니다.', 404);
   if (!['followup', 'finish'].includes(body.action) && !await getOperatorUser('members', user)) fail('질문에 답변할 권한이 없습니다.', 403);
   const question = id(body.questionId); let r;
-  if (body.action === 'finish') {
+  if (body.action === 'delete') {
+   if (body.expectedHeadId !== null && !uuid(body.expectedHeadId)) fail('최신 답변을 확인해 주세요.');
+   r = await createAdminClient().rpc('edu_delete_question_answer', { p_actor: user.id, p_question: question, p_answer: id(body.answerId), p_expected_head: body.expectedHeadId });
+  }
+  else if (body.action === 'finish') {
    if (body.expectedHeadId !== null && !uuid(body.expectedHeadId)) fail('최신 답변을 확인해 주세요.');
    r = await createAdminClient().rpc('edu_finish_own_question', { p_actor: user.id, p_question: question, p_expected_head: body.expectedHeadId });
   }

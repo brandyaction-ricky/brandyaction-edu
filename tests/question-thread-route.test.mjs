@@ -41,3 +41,11 @@ test('authenticated learner followups use ownership-checked RPC while operator a
  assert.equal((await h.post({...body,expectedHeadId:undefined})).status,400);assert.equal((await h.post({...body,content:' '})).status,400);assert.equal(h.calls.length,1);
  assert.equal((await harness({user:null}).post(body)).status,401);assert.equal((await harness({enabled:false}).post(body)).status,404);
 });
+
+test('answer deletion requires operator, same origin, IDs and head; never trusts supplied actor',async()=>{
+ const h=harness(),body={action:'delete',questionId:id,answerId:id,expectedHeadId:id,actor:'forged'};
+ assert.equal((await h.post(body)).status,200);assert.deepEqual(h.calls,[{name:'edu_delete_question_answer',args:{p_actor:id,p_question:id,p_answer:id,p_expected_head:id}}]);
+ assert.equal((await harness({operator:false}).post(body)).status,403);
+ for(const b of [{...body,answerId:'bad'},{...body,expectedHeadId:undefined}])assert.equal((await h.post(b)).status,400);
+ assert.equal((await h.post(body,'https://evil.test')).status,403);assert.equal(h.calls.length,1);
+});

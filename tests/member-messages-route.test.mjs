@@ -73,3 +73,10 @@ test('progress scope is validated, independently enabled and included in the ato
  const off=harness({progress:false});assert.equal((await off.get({action:'progress-cohorts'})).status,404);assert.equal((await off.post({...off.send,progress})).status,404);assert.equal(off.calls.length,0);
  const changed=harness({error:{message:'MESSAGE_PROGRESS_CHANGED'}});const r=await changed.post({...changed.send,progress});assert.equal(r.status,409);assert.match((await r.json()).error,/보낸 메시지는 없습니다/);
 });
+
+test('delete uses only authenticated actor and validated message id with origin/feature guards',async()=>{
+ const h=harness();assert.equal((await h.post({action:'delete',messageId:other,actor:other})).status,200);
+ assert.deepEqual(h.calls,[{name:'edu_delete_member_message',args:{p_actor:id,p_message:other}}]);
+ assert.equal((await h.post({action:'delete',messageId:'bad'})).status,400);
+ assert.equal((await h.post({action:'delete',messageId:other},'https://evil.test')).status,403);assert.equal(h.calls.length,1);
+});

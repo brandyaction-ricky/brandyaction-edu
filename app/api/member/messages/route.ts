@@ -68,6 +68,9 @@ export async function POST(request: Request) {
   try {
     if (request.headers.get('origin') !== new URL(request.url).origin) fail('허용되지 않은 요청입니다.', 403);
     const user = await actor(), body = await bodyOf(request), db = createAdminClient();
+    if (body.action === 'delete') {
+      const r = await db.rpc('edu_delete_member_message', { p_actor: user.id, p_message: requiredId(body.messageId) }); if (r.error) throw r.error; return reply(r.data);
+    }
     if (body.action === 'read') {
       const r = await db.rpc('edu_mark_member_message_read', { p_actor: user.id, p_message: requiredId(body.messageId) }); if (r.error) throw r.error; return reply(r.data);
     }
