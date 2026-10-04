@@ -113,6 +113,7 @@
       .edu-n6 .neutral-review .panel-sub{ font-size:15px; line-height:1.8; word-break:keep-all; }
       .edu-n6 .check-miss{ background:#fdecea; border-color:#f3b4ae; color:#b42318; font-weight:600; }
       .edu-n6 .pair-scale .opt{ padding:14px 6px 12px; gap:8px; }
+      .edu-n6 .pair-scale .opt:hover{ transform:none; }
       .edu-n6 .pair-scale .opt .lab{ font-size:12.5px; }
       .edu-n6 .opt-b{ width:100%; background:var(--card-soft); border:1px solid var(--line); border-radius:16px; padding:22px 24px; display:flex; align-items:center; gap:16px; text-align:left; font-size:16.5px; font-weight:500; line-height:1.5; word-break:keep-all; transition:border-color .15s, background .15s, transform .15s var(--ease); }
       .edu-n6 .opt-b:hover{ border-color:var(--line-strong); transform:translateY(-1px); background:#FFFDF8; }

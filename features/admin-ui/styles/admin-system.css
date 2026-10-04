@@ -608,3 +608,7 @@
   .adm.edu-admin .content.adm-page{padding:var(--adm-space-5) var(--adm-space-4)}
   .adm.edu-admin :is(.page-head,.admin-page-header){padding-bottom:var(--adm-space-3)}
 }
+@media(max-width:640px){
+  .adm.edu-admin .diagnosis-management-table table tbody :is(th,td){height:auto;min-height:0;padding:0;border:0;background:transparent}
+  .adm.edu-admin .diagnosis-management-table table tbody tr:hover>:is(th,td){background:transparent}
+}
