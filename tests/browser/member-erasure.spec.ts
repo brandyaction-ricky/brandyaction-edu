@@ -26,7 +26,7 @@ test('partial storage retry keeps the ID and confirmed counts and shows completi
   await expect(area).toContainText('삭제 완료');await expect(area).toContainText('진단 기록 6건');await expect(area).toContainText('파일 2개');await expect(area).toContainText('확인된 건수입니다.');
   await expect(area.getByRole('button',{name:'같은 요청으로 다시 시도'})).toHaveCount(0);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-  if(info.project.name==='mobile')await page.screenshot({path:'/private/tmp/edu-erasure-local-mobile.png',fullPage:true});
+  if(info.project.name==='mobile')await area.screenshot({path:info.outputPath('erasure-records-mobile.png')});
 });
 test('staff does not see administrator erasure records',async({page})=>{
   let reads=0;
