@@ -182,7 +182,7 @@ export function LegacyAdminShell({
       <a className="skip" href="#admin-content">
         본문으로 이동
       </a>
-      <aside className={"sidebar " + (mobile ? "open" : "")} id="admin-sidebar">
+      <aside className={"sidebar adm-sidebar " + (mobile ? "open" : "")} id="admin-sidebar">
         <button
           type="button"
           className="btn ghost sidebar-close"
@@ -243,8 +243,8 @@ export function LegacyAdminShell({
           </div>
         </div>
       </aside>
-      <div className="app">
-        <header className="topbar">
+      <div className="app adm-main">
+        <header className="topbar adm-topbar">
           <div className="crumb">
             <button
               className="btn iconbtn ghost mobile-menu"
@@ -285,7 +285,7 @@ export function LegacyAdminShell({
             </span>
           </div>
         </header>
-        <div className={`content admin-content-${contentWidth}`} id="admin-content" tabIndex={-1}>
+        <div className={`content adm-page admin-content-${contentWidth}`} id="admin-content" tabIndex={-1}>
           {children}
         </div>
       </div>

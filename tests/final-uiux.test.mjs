@@ -121,7 +121,7 @@ test('final design styles are isolated, reproducible and exclude prototype runti
       if (rule.parent.type === 'atrule' && /keyframes$/.test(rule.parent.name)) return;
       rule.selectors = rule.selectors.map(selector => [':root', 'body', 'html'].includes(selector) ? scope : /^(?:body|html)(?=[.\s:#[])/.test(selector) ? selector.replace(/^(body|html)/, scope) : `${scope} ${selector}`);
     });
-    assert.equal(read(`app/ui/final/${area}.css`), `/* Generated from final UIUX source; run node scripts/build-uiux-css.mjs. */\n${rules.toString()}\n`);
+    assert.equal(read(`app/ui/final/${area}.css`), `/* Generated from final UIUX source; run node scripts/build-uiux-css.mjs. */\n${rules.toString().trimEnd()}\n`);
   }
   const layout = read('app/layout.tsx');
   assert.ok(layout.includes('./ui/final/frontend.css') && layout.includes('./ui/final/admin.css') && layout.includes('@/features/admin-ui/styles/admin-system.css'));
@@ -189,9 +189,12 @@ test('home customer stories carousel and accessible profile dropdown are present
 test('three signup methods and product detail variants use the final publishing structures', () => {
   const { AuthView, ProductDetail, ArticlesView, StoriesView } = load('app/ui/final/public-views.tsx');
   const authCss = read('app/ui/google-id-signin.css');
-  assert.match(authCss, /\.auth-social-stack\{width:min\(100%,400px\);margin-inline:auto\}/);
-  assert.match(authCss, /\.form-card>\.email-auth\{width:min\(100%,400px\);margin-inline:auto;margin-bottom:16px\}/);
-  assert.match(authCss, /\.auth-card>h1,[^}]*\.auth-card>\.lead\{text-align:center\}/);
+  const frontendCss = read('app/ui/final/frontend.css');
+  assert.match(frontendCss, /\.form-card\.auth-card>\.auth-social-stack,[^}]*\.form-card\.auth-card>\.email-auth\{width:100%;max-width:400px;margin-inline:auto\}/);
+  assert.match(frontendCss, /\.form-card\.auth-card>\.email-auth\{margin-bottom:16px\}/);
+  assert.match(frontendCss, /\.auth-social-stack>\.btn,[^}]*\.auth-social-stack>\.google-id-signin,[^}]*\.email-auth>\.btn\{width:100%;max-width:400px;box-sizing:border-box\}/);
+  assert.match(frontendCss, /\.auth-card>h1,[^}]*\.auth-card>\.lead\{text-align:center\}/);
+  assert.match(authCss, /\.google-id-button\{display:flex;justify-content:center;overflow:hidden\}/);
   for (const signup of [false, true]) {
     const markup = html(AuthView, { signup, pending: false, social: send, next: '/my' });
     assert.match(markup, /form-card auth-card/); assert.match(markup, /카카오로 계속하기/); assert.match(markup, /Google로 계속하기/); assert.doesNotMatch(markup, /type="password"/);

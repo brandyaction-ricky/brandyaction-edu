@@ -583,3 +583,28 @@
   .adm-filterbar .admin-filter-bar-action{order:4}
   .adm-filterbar .admin-filter-bar-action{margin-left:0}
 }
+
+/* Compatibility migration: legacy admin pages consume the same adm-* contract. */
+.adm.edu-admin .content.adm-page{width:100%;max-width:calc(var(--adm-page-max) + var(--adm-space-6) * 2);margin-inline:auto;padding:var(--adm-space-6);background:var(--adm-bg)}
+.adm.edu-admin :is(.page-head,.admin-page-header){margin:0;padding-bottom:var(--adm-space-4);border-bottom:1px solid var(--adm-border)}
+.adm.edu-admin :is(.page-head,.admin-page-header) h1{font-size:var(--adm-font-20);line-height:1.4}
+.adm.edu-admin :is(.page-head,.admin-page-header) p{color:var(--adm-text-sub);font-size:var(--adm-font-13);line-height:1.6}
+.adm.edu-admin :is(.panel,.card,.admin-section--bordered,.metric,.admin-metric){border-color:var(--adm-border);border-radius:var(--adm-radius-lg);background:var(--adm-surface);box-shadow:none}
+.adm.edu-admin :is(.panel-head,.admin-section-header){padding:var(--adm-space-3) var(--adm-space-4);border-bottom-color:var(--adm-border)}
+.adm.edu-admin :is(.filter-row,.toolbar,.admin-filter-bar){gap:var(--adm-space-2);border-color:var(--adm-border);background:var(--adm-surface)}
+.adm.edu-admin :is(.table-scroll,.table-wrap,.participant-table-wrap,.diagnosis-management-table,.admin-table-scroll){max-width:100%;overflow:auto;border:1px solid var(--adm-border);border-radius:var(--adm-radius-lg);background:var(--adm-surface);box-shadow:none}
+.adm.edu-admin :is(.admin-data-table,.table-scroll table,.table-wrap table,.participant-table,.diagnosis-management-table table){width:100%;border-collapse:separate;border-spacing:0;color:var(--adm-text);font-size:var(--adm-font-13);line-height:1.5;font-variant-numeric:tabular-nums}
+.adm.edu-admin :is(.admin-data-table,.table-scroll table,.table-wrap table,.participant-table,.diagnosis-management-table table) thead th{height:40px;padding:var(--adm-space-2) var(--adm-space-4);border-bottom:1px solid var(--adm-border);background:var(--adm-surface-subtle);color:var(--adm-text-sub);font-size:var(--adm-font-12);font-weight:600;text-align:left;white-space:nowrap}
+.adm.edu-admin :is(.admin-data-table,.table-scroll table,.table-wrap table,.participant-table,.diagnosis-management-table table) tbody :is(th,td){height:44px;min-height:44px;padding:var(--adm-space-2) var(--adm-space-4);border-bottom:1px solid var(--adm-border);background:var(--adm-surface);color:var(--adm-text);font-size:var(--adm-font-13);line-height:1.5;vertical-align:middle}
+.adm.edu-admin :is(.admin-data-table,.table-scroll table,.table-wrap table,.participant-table,.diagnosis-management-table table) tbody tr:last-child>:is(th,td){border-bottom:0}
+.adm.edu-admin :is(.admin-data-table,.table-scroll table,.table-wrap table,.participant-table,.diagnosis-management-table table) tbody tr:hover>:is(th,td){background:var(--adm-surface-subtle)}
+.adm.edu-admin .participant-table-row{height:44px}
+.adm.edu-admin .participant-table-row td{height:44px;max-width:240px}
+.adm.edu-admin .participant-table-toolbar{min-height:40px;padding:var(--adm-space-1) var(--adm-space-4);border-bottom-color:var(--adm-border);color:var(--adm-text-sub);font-size:var(--adm-font-12)}
+.adm.edu-admin .participant-table-toolbar select{height:var(--adm-control-sm);min-height:var(--adm-control-sm);border-radius:var(--adm-radius-md)}
+.adm.edu-admin .diagnosis-management-table{border-radius:var(--adm-radius-lg)}
+.adm.edu-admin .diagnosis-management :is(th,td){padding:var(--adm-space-2) var(--adm-space-4)}
+@media(max-width:720px){
+  .adm.edu-admin .content.adm-page{padding:var(--adm-space-5) var(--adm-space-4)}
+  .adm.edu-admin :is(.page-head,.admin-page-header){padding-bottom:var(--adm-space-3)}
+}

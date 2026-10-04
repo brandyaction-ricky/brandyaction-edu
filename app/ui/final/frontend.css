@@ -203,3 +203,9 @@
 
 .edu-front .account-nav .member-mobile-admin-tab{display:none}
 @media(max-width:900px){.edu-front .account-nav .member-mobile-admin-tab{display:flex;position:sticky;left:0;z-index:2;flex-shrink:0;background:#fff3f1;border:1px solid #e4b6ae;color:#a21c22;font-weight:700}.edu-front .account-nav .member-mobile-admin-tab svg{display:block}}
+
+/* Keep every login method aligned with the Google Identity Services width limit. */
+.edu-front .auth-card>h1,.edu-front .auth-card>.lead{text-align:center}
+.edu-front .form-card.auth-card>.auth-social-stack,.edu-front .form-card.auth-card>.email-auth{width:100%;max-width:400px;margin-inline:auto}
+.edu-front .form-card.auth-card>.email-auth{margin-bottom:16px}
+.edu-front .auth-social-stack>.btn,.edu-front .auth-social-stack>.google-id-signin,.edu-front .form-card.auth-card>.email-auth>.btn{width:100%;max-width:400px;box-sizing:border-box}

@@ -56,8 +56,8 @@ import { AdminButton, AdminConfirmDialog, AdminDrawer, AdminEmptyState, AdminInl
 import { ProductDetailHtml } from '../../../app/ui/final/product-detail-html';
 import '../../../app/ui/final/tokens.css';
 import '../../../app/ui/final/admin.css';
-import '../../../features/admin-ui/styles/admin-system.css';
 import '../../../app/ui/final/integration.css';
+import '../../../features/admin-ui/styles/admin-system.css';
 
 function BoundaryFixture() {
   const [open, setOpen] = useState(false), [confirm, setConfirm] = useState(false), [extra, setExtra] = useState(false);

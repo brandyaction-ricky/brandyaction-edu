@@ -39,7 +39,16 @@ test('product picker opens scoped document editing, full week rows work by keybo
   await expect(page.getByRole('textbox',{name:'학습 내용',exact:true})).toBeVisible();
   const header=page.locator('.studio-week-disclosure > summary').first();await header.focus();await page.keyboard.press('Enter');await expect(page.getByRole('button',{name:'1일차 학습 목적 이해하기'})).toBeHidden();await page.keyboard.press('Enter');
   const bounds=await header.boundingBox();expect(bounds!.height).toBeGreaterThanOrEqual(44);
-  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  const layout=await page.evaluate(()=>{
+    const workspace=document.querySelector<HTMLElement>('.curriculum-studio');
+    const outline=document.querySelector<HTMLElement>('.curriculum-outline');
+    const select=document.querySelector<HTMLElement>('.studio-product-bar select');
+    const panel=document.querySelector<HTMLElement>('.studio-document-header');
+    const style=workspace?getComputedStyle(workspace):null;
+    return {fits:document.documentElement.scrollWidth<=innerWidth,columns:style?.gridTemplateColumns||'',gap:style?.columnGap||'',outlineWidth:Math.round(outline?.getBoundingClientRect().width||0),controlHeight:Math.round(select?.getBoundingClientRect().height||0),radius:panel?getComputedStyle(panel).borderRadius:''};
+  });
+  expect(layout.fits).toBe(true);expect(layout.controlHeight).toBe(36);expect(layout.radius).toBe('10px');
+  if(info.project.name==='desktop'){expect(layout.outlineWidth).toBe(320);expect(layout.gap).toBe('16px');expect(layout.columns.split(' ')).toHaveLength(2);}else{expect(layout.columns.split(' ')).toHaveLength(1);}
   await page.screenshot({path:info.outputPath('curriculum-studio.png'),fullPage:true});
 });
 

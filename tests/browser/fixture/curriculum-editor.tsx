@@ -14,7 +14,7 @@ export function CurriculumEditorFixture() {
     ] : []),
   ]);
   const [pending, setPending] = useState(false);
-  return <main className="edu-admin" style={{ padding: 16 }}>
+  return <main className="edu-admin adm adm-shell" style={{ padding: 16 }}>
     {params.has('productArchive') && <button type="button" onClick={() => setCourses(current => current.map(course => course.id === 'course-archived' ? { ...course, archived_at: null, status: 'draft' } : course))}>합성 삭제 상품 복원</button>}
     <CurriculumEditor actorId={params.get('actor') || 'editor-one'} initialCourseId={params.get('course') || ''} initialLessonId={params.get('lesson') || ''} blockEditingEnabled={params.has('blocks')} data={{ courses }} pending={pending} send={async body => {
     setPending(true);

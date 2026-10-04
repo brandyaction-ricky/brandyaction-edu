@@ -36,12 +36,25 @@ test('all admin routes share the adm token and class contract without changing p
   const admin = fs.readFileSync('features/admin-ui/styles/admin-system.css', 'utf8');
   const platform = fs.readFileSync('app/ui/platform.tsx', 'utf8');
   const components = fs.readFileSync('features/admin-ui/components/admin-system.tsx', 'utf8');
+  const shell = fs.readFileSync('app/ui/final/admin-shell.tsx', 'utf8');
   for (const token of ['--adm-bg:#F5F6F8', '--adm-surface:#FFFFFF', '--adm-border:#E3E5E9', '--adm-text:#15171A', '--adm-primary:#C9232D', '--adm-control:36px', '--adm-control-sm:30px', '--adm-sidebar-width:210px', '--adm-tree-width:320px', '--adm-page-max:1440px']) assert.ok(admin.includes(token), token);
   for (const selector of ['.adm-shell', '.adm-sidebar', '.adm-main', '.adm-topbar', '.adm-page', '.adm-page-head', '.adm-btn', '.adm-field', '.adm-table-wrap', '.adm-table', '.adm-filterbar', '.adm-tabs', '.adm-modal', '.adm-stats']) assert.ok(admin.includes(selector), selector);
   assert.match(platform, /"edu-admin adm adm-shell"/);
+  for (const className of ['adm-sidebar', 'adm-main', 'adm-topbar', 'adm-page']) assert.ok(shell.includes(className), className);
   for (const className of ['adm-page-head', 'adm-btn', 'adm-input', 'adm-select', 'adm-textarea', 'adm-check', 'adm-choice', 'adm-table-wrap', 'adm-table', 'adm-filterbar', 'adm-pagination', 'adm-badge', 'adm-empty', 'adm-notice', 'adm-modal']) assert.ok(components.includes(className), className);
   assert.doesNotMatch(admin, /:root/);
   assert.doesNotMatch(admin, /!important/);
+});
+
+test('legacy admin tables and curriculum editor are normalized by the adm contract', () => {
+  const admin = fs.readFileSync('features/admin-ui/styles/admin-system.css', 'utf8');
+  const curriculum = fs.readFileSync('app/ui/final/curriculum-editor.css', 'utf8');
+  for (const className of ['.table-scroll', '.table-wrap', '.participant-table', '.diagnosis-management-table']) assert.ok(admin.includes(className), className);
+  assert.match(admin, /\.adm\.edu-admin :is\(\.admin-data-table,[^}]*\.participant-table,[^}]*\.diagnosis-management-table table\) thead th\{height:40px/);
+  assert.match(admin, /tbody :is\(th,td\)\{height:44px;min-height:44px/);
+  assert.match(curriculum, /grid-template-columns:var\(--adm-tree-width\) minmax\(0,1fr\)/);
+  assert.match(curriculum, /\.adm\.edu-admin \.curriculum-editor-page/);
+  assert.doesNotMatch(curriculum, /!important/);
 });
 
 test('common system exports the Phase 0 component inventory', () => {

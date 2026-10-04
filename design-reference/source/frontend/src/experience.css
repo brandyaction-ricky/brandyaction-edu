@@ -69,3 +69,9 @@
 
 .account-nav .member-mobile-admin-tab{display:none}
 @media(max-width:900px){.account-nav .member-mobile-admin-tab{display:flex;position:sticky;left:0;z-index:2;flex-shrink:0;background:#fff3f1;border:1px solid #e4b6ae;color:#a21c22;font-weight:700}.account-nav .member-mobile-admin-tab svg{display:block}}
+
+/* Keep every login method aligned with the Google Identity Services width limit. */
+.auth-card>h1,.auth-card>.lead{text-align:center}
+.form-card.auth-card>.auth-social-stack,.form-card.auth-card>.email-auth{width:100%;max-width:400px;margin-inline:auto}
+.form-card.auth-card>.email-auth{margin-bottom:16px}
+.auth-social-stack>.btn,.auth-social-stack>.google-id-signin,.form-card.auth-card>.email-auth>.btn{width:100%;max-width:400px;box-sizing:border-box}
