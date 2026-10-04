@@ -21,12 +21,16 @@ test('partial storage retry keeps the ID and confirmed counts and shows completi
     else await route.fulfill({json:{enabled:true,rows:[retried?{...row,state:'complete',storageRemoved:2,storageFailedCount:0,lastCode:null,completedAt:'2026-10-04T00:06:00Z',uncertainAttempts:1}:row]}});
   });
   await page.goto(screen);const area=page.getByRole('region',{name:'탈퇴 요청·진단 삭제 기록'});
-  await expect(area).toContainText('남은 파일 1개');await expect(area).not.toContainText('삭제 완료');
+  await expect(area).toContainText('남은 파일 1개');await expect(area.getByText('삭제 완료',{exact:true})).toHaveCount(0);
   await area.getByRole('button',{name:'같은 요청으로 다시 시도'}).click();
-  await expect(area).toContainText('삭제 완료');await expect(area).toContainText('진단 기록 6건');await expect(area).toContainText('파일 2개');await expect(area).toContainText('확인된 건수입니다.');
+  await expect(area).toContainText('삭제 완료');await expect(area).toContainText('진단 기록 6건');await expect(area).toContainText('파일 2개');await expect(area).toContainText('실제 삭제 건수는 더 많을 수 있습니다.');
+  await expect(area.getByText(requestId,{exact:true})).not.toBeVisible();
+  await area.getByText('요청 상세 보기',{exact:true}).click();
+  await expect(area.getByText(requestId,{exact:true})).toBeVisible();await expect(area).toContainText('확인된 건수입니다.');
+  await area.getByText('요청 상세 보기',{exact:true}).click();
   await expect(area.getByRole('button',{name:'같은 요청으로 다시 시도'})).toHaveCount(0);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-  if(info.project.name==='mobile')await area.screenshot({path:info.outputPath('erasure-records-mobile.png')});
+  await area.screenshot({path:info.outputPath(`erasure-records-${info.project.name}.png`)});
 });
 test('staff does not see administrator erasure records',async({page})=>{
   let reads=0;
