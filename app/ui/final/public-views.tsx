@@ -68,7 +68,7 @@ export function AuthView({
     (process.env.NEXT_PUBLIC_GOOGLE_GIS_ENABLED === "true" || googlePreview);
   return (
     <div className="form-page">
-      <section className="form-card">
+      <section className="form-card auth-card">
         {signup ? (
           <div className="eyebrow">Welcome to Brandyaction</div>
         ) : (
