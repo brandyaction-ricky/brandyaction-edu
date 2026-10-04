@@ -27,6 +27,8 @@ async function api(page:Page,{started=false,failSave=false,conflict=false}={}) {
 }
 test('MYIN guide, pair choice, story, aspirations and explicit submission work on every viewport',async({page})=>{
   const state=await api(page);await page.goto('/diagnosis-test');await expect(page.getByRole('heading',{name:'나를 움직이는 마음을 알아보는 시간'})).toBeVisible();
+  await expect(page.getByText('결과 보고서는 AI(Anthropic)가 작성합니다', {exact:true})).toBeVisible();
+  await page.screenshot({path:test.info().outputPath('n6-ai-disclosure.png'),fullPage:true});
   await page.getByRole('button',{name:'검사 시작하기',exact:true}).click();
   await expect(page.getByRole('heading',{name:'두 문장 중 지금의 나에 더 가까운 쪽을 고릅니다'})).toBeVisible();
   await expect(page.locator('.choice-reminder strong')).toHaveText('‘비슷하다’는 정말 고르기 어려울 때만 골라 주세요.');
