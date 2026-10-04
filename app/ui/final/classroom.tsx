@@ -1,5 +1,6 @@
 "use client";
 import { LearningProgress } from './learning-progress';
+import { DiagnosisEntry } from './diagnosis-entry';
 import {
   date,
   labels,
@@ -253,6 +254,7 @@ export function Classroom({
           </Link>
         </div>
         {!graduate && <LiveSchedule data={data} cohortId={t(enrollment, "cohort_id")} />}
+        <DiagnosisEntry key={enrollment.id} courseId={t(enrollment, 'course_id')}/>
         <button
           className="btn learning-mobile-toggle"
           aria-expanded={navOpen}
