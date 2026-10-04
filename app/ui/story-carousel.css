@@ -6,7 +6,6 @@
 .results-section .story-slide .story-card{height:100%;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:var(--radius-sm);padding:0 0 var(--space-5,20px);overflow:hidden}
 .story-card-cover{position:relative;aspect-ratio:16/9;background:var(--ba-neutral-100);display:grid;place-items:center;color:var(--text-secondary);font-size:var(--type-small);letter-spacing:.12em;overflow:hidden}
 .story-card-cover img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.story-card-cover--youtube img{object-position:center bottom}
 .results-section .story-slide .story-card>.badge,.results-section .story-slide .story-card>blockquote,.results-section .story-slide .story-card>p,.results-section .story-slide .story-card>.who,.results-section .story-slide .story-card>.link{margin-left:var(--space-5,20px);margin-right:var(--space-5,20px)}
 .results-section .story-slide .story-card>.badge{margin-top:var(--space-4)}
 .results-section .story-slide .story-card>blockquote{font-size:var(--type-h4);line-height:1.45;margin-top:var(--space-3);margin-bottom:var(--space-2);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
