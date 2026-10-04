@@ -6,6 +6,7 @@ import { useSearchParams, usePathname } from "next/navigation";
 import { ArrowRight, Check, CircleAlert } from "lucide-react";
 import { matchingOrder } from "@/lib/platform-rules";
 import { money, labels, type Row } from "@/lib/platform";
+import "./order-result.css";
 
 type VirtualAccount = {
   accountNumber: string | null;
@@ -102,16 +103,52 @@ export function OrderResult({
         : paymentKey
           ? "결제 결과를 확인하고 있습니다."
           : "신청 내역을 확인해 주세요.";
+  const statusLabel = complete
+    ? order?.total_amount === 0
+      ? "신청 완료"
+      : "결제 완료"
+    : state === "waiting"
+      ? "입금 대기"
+      : state === "checking"
+        ? "확인 중"
+        : "확인 필요";
+  const firstStepLabel = complete
+    ? "1단계 · 완료"
+    : state === "waiting"
+      ? "1단계 · 입금 대기"
+      : "1단계 · 진행 중";
 
   return (
-    <div className="form-page">
-      <div className="wrap">
-        <section className="completion">
-          <div className={"success-icon " + (complete ? "" : "fail")}>
-            {complete ? <Check /> : <CircleAlert />}
-          </div>
-          <h1>{title}</h1>
-          <p className="lead" role={state === "error" ? "alert" : "status"}>
+    <div className="form-page order-complete-page">
+      <div className="wrap order-complete-shell">
+        <header className="order-complete-intro">
+          <span>BrandyAction EDU</span>
+          <h1>{complete ? "클래스 시작 준비" : "신청 상태 확인"}</h1>
+          <p>{complete ? "결제 확인부터 첫 학습까지 순서대로 안내해 드릴게요." : "주문 상태를 확인한 뒤 다음 단계로 안내해 드릴게요."}</p>
+        </header>
+        <ol className="order-complete-steps" aria-label="클래스 시작 단계">
+          <li className={complete ? "complete" : "active"} aria-current={complete ? undefined : "step"}>
+            <span>{firstStepLabel}</span>
+            <strong>{state === "waiting" ? "입금 확인" : "결제 확인"}</strong>
+          </li>
+          <li className={complete ? "active" : ""} aria-current={complete ? "step" : undefined}>
+            <span>2단계{complete ? " · 다음" : ""}</span>
+            <strong>공지방 입장</strong>
+          </li>
+          <li>
+            <span>3단계</span>
+            <strong>첫 학습 시작</strong>
+          </li>
+        </ol>
+        <section className={"completion order-complete-card " + (complete ? "is-complete" : "needs-attention")}>
+          <div className="order-complete-summary">
+            <div className={"success-icon " + (complete ? "" : "fail")} aria-hidden="true">
+              {complete ? <Check /> : <CircleAlert />}
+            </div>
+            <div>
+              <span className="order-complete-status">{statusLabel}</span>
+              <h2>{title}</h2>
+              <p className="lead" role={state === "error" ? "alert" : "status"}>
             {state === "error"
               ? error
               : state === "waiting"
@@ -124,9 +161,11 @@ export function OrderResult({
                     ? "내 클래스에서 신청한 클래스와 자료를 확인해 주세요."
                     : "아래 버튼을 눌러 교육 시작 안내를 확인해 주세요."
                   : "확인된 주문에 한해 수강권이 제공됩니다."}
-          </p>
+              </p>
+            </div>
+          </div>
           {order && (
-            <dl className="info-lines">
+            <dl className="info-lines order-complete-details">
               <div>
                 <dt>주문 번호</dt>
                 <dd>{String(order.order_number || order.id)}</dd>
@@ -142,7 +181,7 @@ export function OrderResult({
             </dl>
           )}
           {state === "waiting" && virtualAccount && (
-            <dl className="info-lines">
+            <dl className="info-lines order-complete-details order-complete-account">
               {virtualAccount.bankCode && (
                 <div>
                   <dt>은행 코드</dt>
@@ -169,7 +208,12 @@ export function OrderResult({
               )}
             </dl>
           )}
-          <div className="grid2 mt24" style={complete ? { gridTemplateColumns: "1fr" } : undefined}>
+          {complete && <div className="order-complete-next-copy">
+            <span>다음 · 2단계</span>
+            <h3>{onboardingReady ? "교육 시작 안내를 확인하세요" : "내 클래스에서 바로 시작하세요"}</h3>
+            <p>{onboardingReady ? "공지방 입장 방법과 이어지는 학습 순서를 한 번에 확인할 수 있어요." : "신청한 클래스와 제공 자료를 내 클래스에서 확인할 수 있어요."}</p>
+          </div>}
+          <div className="grid2 mt24 order-complete-actions" style={complete ? { gridTemplateColumns: "1fr" } : undefined}>
             {onboardingReady && paidOrderId && (
               <Link className="btn primary" href={`/purchase-onboarding?order=${encodeURIComponent(paidOrderId)}`}>
                 결제 후 시작 안내 <ArrowRight />

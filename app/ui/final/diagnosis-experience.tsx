@@ -71,7 +71,6 @@ export function DiagnosisExperience({ initialCourseId, reportsEnabled = false, a
   if (phase === 'intro' || phase === 'preparing') return <div className="edu-n6">
     <header className="bar"><span className="brand"><Image src="/brandy-action-logo.png" alt="Brandy Action EDU" width={142} height={26}/></span><button className="exit-btn" onClick={() => router.push(exitHref)}>{exitLabel}</button></header>
     <main className="stage"><section className="panel intro-panel"><p className="panel-eyebrow">{adminPilot ? '관리자 전용 · 수강생에게 공개되지 않습니다' : 'N6 진단'}</p><h1 className="panel-title">나를 움직이는 마음을<br/>알아보는 시간</h1><p className="panel-sub">두 문장을 비교하며 지금의 나와 더 가까운 쪽을 고릅니다. 나의 이야기와 원하는 모습을 함께 담아 정밀 보고서를 준비합니다.</p>
-      <p className="panel-note">결과 보고서는 AI(Anthropic)가 작성합니다</p>
       <p className="intro-chips"><span>약 20분</span><span>자동 저장</span><span>{adminPilot ? '반복 검수 가능' : '계정당 1회'}</span></p>
       {offers.length > 1 && <label className="course-choice">검사가 포함된 상품<select value={course} onChange={e => setCourse(e.target.value)}>{offers.map(o => <option key={o.courseId} value={o.courseId}>{o.title}</option>)}</select></label>}
       {phase === 'intro' && !offers.length ? <p className="panel-sub">현재 계정에 이용 가능한 N6 검사가 없습니다. 구매·수강 정보를 확인해 주세요.</p> : <><button className="cta-btn" onClick={() => void start()} disabled={pending}>{pending ? '검사 준비 중…' : phase === 'preparing' ? '검사 준비 다시 확인' : '검사 시작하기'}<ArrowRight size={18}/></button><p className="panel-note">제출 전까지 답변을 바꿀 수 있고, 중간에 나가도 이어서 진행할 수 있어요.</p></>}

@@ -39,7 +39,16 @@ test('product picker opens scoped document editing, full week rows work by keybo
   await expect(page.getByRole('textbox',{name:'학습 내용',exact:true})).toBeVisible();
   const header=page.locator('.studio-week-disclosure > summary').first();await header.focus();await page.keyboard.press('Enter');await expect(page.getByRole('button',{name:'1일차 학습 목적 이해하기'})).toBeHidden();await page.keyboard.press('Enter');
   const bounds=await header.boundingBox();expect(bounds!.height).toBeGreaterThanOrEqual(44);
-  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  const layout=await page.evaluate(()=>{
+    const workspace=document.querySelector<HTMLElement>('.curriculum-studio');
+    const outline=document.querySelector<HTMLElement>('.curriculum-outline');
+    const select=document.querySelector<HTMLElement>('.studio-product-bar select');
+    const panel=document.querySelector<HTMLElement>('.studio-document-header');
+    const style=workspace?getComputedStyle(workspace):null;
+    return {fits:document.documentElement.scrollWidth<=innerWidth,columns:style?.gridTemplateColumns||'',gap:style?.columnGap||'',outlineWidth:Math.round(outline?.getBoundingClientRect().width||0),controlHeight:Math.round(select?.getBoundingClientRect().height||0),radius:panel?getComputedStyle(panel).borderRadius:''};
+  });
+  expect(layout.fits).toBe(true);expect(layout.controlHeight).toBe(36);expect(layout.radius).toBe('10px');
+  if(info.project.name==='desktop'){expect(layout.outlineWidth).toBe(320);expect(layout.gap).toBe('16px');expect(layout.columns.split(' ')).toHaveLength(2);}else{expect(layout.columns.split(' ')).toHaveLength(1);}
   await page.screenshot({path:info.outputPath('curriculum-studio.png'),fullPage:true});
 });
 
@@ -71,6 +80,8 @@ test('new lesson keeps chosen week and is private; recent selection opens direct
 
 test('continuous document opens directly and saving keeps question, generator and mentor-review identity',async({page},info)=>{
  const {blockWrites}=await setup(page,{blocks:true});await page.goto('/curriculum-editor-test?blocks=1');await openLesson(page,true);
+ await expect(page.getByText('1 · 수업 정보',{exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:'2 · 학습 구성'})).toBeVisible();
+ await expect(page.getByText('3 · 반복 학습 운영',{exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:'4 · 확인 퀴즈'})).toBeVisible();await expect(page.getByRole('heading',{name:'버전·임시저장'})).toBeVisible();
  const editorDocument=page.getByRole('textbox',{name:'수업 문서',exact:true});await expect(editorDocument).toBeVisible();await expect(editorDocument).toContainText('오늘의 목표는?');
  await expect(page.getByRole('link',{name:'학습 구성 편집·미리보기'})).toHaveCount(0);
  await editorDocument.locator('[data-author-block="intro"] p').click();await page.keyboard.press('End');await page.keyboard.type(' 수정한 문장');

@@ -54,7 +54,7 @@ export function AdminPilotFixture({ screen }: { screen: 'orders' | 'products' | 
   };
   const visibleOrders = quickResults[orderScope.quick as keyof typeof quickResults];
   const filteredOrderData = { ...orderData, orders: visibleOrders, order_filter_counts: [{ id: 'pilot-counts', ...Object.fromEntries(Object.entries(quickResults).map(([key, values]) => [key, values.length])) }] };
-  return <div className="edu-admin admin-pilot-fixture" style={{ padding: 24, minHeight: '100vh' }}>
+  return <div className="edu-admin adm admin-pilot-fixture" style={{ padding: 24, minHeight: '100vh' }}>
     <h1>{screen === 'orders' ? '주문 결제' : '상품 관리'}</h1>
     <p>합성 데이터 · 외부 인증/DB/결제 연결 없음</p>
     {notice && <p role="status">{notice}</p>}

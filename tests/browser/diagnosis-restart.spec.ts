@@ -25,13 +25,13 @@ test('admin can cancel or restart held and ongoing tests, preserving the old att
  await page.screenshot({path:test.info().outputPath('admin-restart-dialog.png'),fullPage:true});
  fail=true;await dialog.getByRole('button',{name:'새 검사 시작',exact:true}).click();await expect(dialog.getByRole('alert')).toContainText('준비하지 못했습니다');expect(restarts).toBe(0);
  fail=false;await dialog.getByRole('button',{name:'새 검사 시작',exact:true}).click();
- await expect(page.getByRole('button',{name:'시작하기',exact:true})).toBeVisible();expect(restarts).toBe(1);
- await page.getByRole('button',{name:'시작하기',exact:true}).click();
+ await expect(page.getByRole('button',{name:'두 문장 비교 시작하기',exact:true})).toBeVisible();expect(restarts).toBe(1);
+ await page.getByRole('button',{name:'두 문장 비교 시작하기',exact:true}).click();
  await page.getByRole('radio').first().click();
  await expect.poll(()=>writes.filter(b=>b.action==='save').length).toBeGreaterThan(0);
  await page.getByRole('button',{name:'다시 진단하기',exact:true}).click();await page.keyboard.press('2');
  await dialog.getByRole('button',{name:'새 검사 시작',exact:true}).click();
- await expect(page.getByRole('button',{name:'시작하기',exact:true})).toBeVisible();expect(restarts).toBe(2);
+ await expect(page.getByRole('button',{name:'두 문장 비교 시작하기',exact:true})).toBeVisible();expect(restarts).toBe(2);
 });
 test('student and disabled-pilot screens never offer an admin restart',async({page})=>{
  await page.route('**/api/platform/diagnosis/session',r=>r.fulfill({json:{...session,adminTest:false,canRestart:false}}));

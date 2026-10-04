@@ -2,6 +2,7 @@
 // MYIN client 86a259c: preserve its questionnaire markup/layout; use EDU's revision-safe APIs.
 import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowRight, Clock3 } from 'lucide-react';
 import { createDiagnosisAutosave } from '@/lib/diagnosis-autosave';
 import { diagnosisNeutralResponses, diagnosisResponseTooFast } from '@/lib/diagnosis-response-guards';
 import { diagnosisMissingQuestions, diagnosisQuestionAnswered, type DiagnosisAnswer as N30Answer, type DiagnosisQuestion as N30Question, type DiagnosisSession } from '@/lib/diagnosis-session';
@@ -197,22 +198,28 @@ export function DiagnosisQuestionnaire({initial,save,submit,onReload,onExit,onRe
         </div>}
 
       {!completed && screen.kind === 'intro' && <div className="panel intro-panel">
-        <p className="panel-eyebrow">시작하기 전에</p>
-        <h1 className="panel-title" ref={heading} tabIndex={-1}>두 문장 중 <em>지금의 나</em>에<br />더 가까운 쪽을 고릅니다</h1>
-        <p className="intro-chips"><span>약 20분</span><span>{coreTotal}문항</span><span>자동 저장</span></p>
-        <ol className="intro-rules">
-          <li><b>되고 싶은 나 말고, 지금의 나</b><span>정답은 없어요. 평소의 나를 떠올리며 골라 주세요.</span></li>
-          <li><b>고민하지 말고, {PAIR_SECONDS}초 안에 바로 골라 주세요</b><span>문항마다 {PAIR_SECONDS}초 타이머가 돌아요.<br />직관적인 선택이 가장 정확해요.<br />시간이 지나도 넘어가지 않고, 고를 수 있어요.</span></li>
-          <li><b>두 문장의 상황이 달라도 괜찮아요</b><span>어느 쪽 마음이 더 끌리는지만 보세요.</span></li>
-        </ol>
-        <details className="intro-why" open><summary>왜 두 문장의 상황이 다른가요?</summary>
+        <p className="panel-eyebrow">STEP 1 · 두 문장 비교</p>
+        <h1 className="panel-title" ref={heading} tabIndex={-1}>평소의 나와 더 가까운<br />문장을 골라주세요</h1>
+        <p className="panel-sub">두 문장을 읽고, 나에게 더 가까운 쪽을 선택하면 됩니다.</p>
+        <p className="intro-meta"><Clock3 size={16} aria-hidden="true"/><span>전체 약 20분</span><i aria-hidden="true"/><span>응답 자동 저장</span></p>
+        <section className="intro-guide-card" aria-labelledby="intro-guide-title">
+          <h2 id="intro-guide-title">선택할 때는 이것만 기억해 주세요</h2>
+          <ul className="intro-rules">
+            <li><span className="intro-rule-icon" aria-hidden="true"><Tick /></span><p><b>되고 싶은 나보다 평소의 나를</b><span>기준으로 골라주세요.</span></p></li>
+            <li><span className="intro-rule-icon" aria-hidden="true"><Tick /></span><p><b>상황이 달라도</b><span>문장 속 나의 반응을 비교해 주세요.</span></p></li>
+            <li><span className="intro-rule-icon" aria-hidden="true"><Tick /></span><p><b>오래 고민되면</b><span>먼저 마음이 가는 쪽을 골라주세요.</span></p></li>
+          </ul>
+          <div className="intro-guide-action">
+            <button className="cta-btn" onClick={() => void move(page + 1)} disabled={busy || conflict}>두 문장 비교 시작하기<ArrowRight size={18} aria-hidden="true"/></button>
+            <p>답은 진행 중 자동으로 저장됩니다.</p>
+          </div>
+        </section>
+        <details className="intro-why"><summary>두 문장 모두 비슷하게 느껴진다면?</summary>
           <ul className="intro-why-body">
             <li><b>강제 선택 비교 방식</b><span>상황이 아니라, 두 마음 중 더 큰 쪽만 비교해요.</span></li>
             <li><b>상황은 일부러 다르게</b><span>상황에 익숙한지가 답을 좌우하지 않도록요.</span></li>
             <li><b>같은 마음을 여러 번 비교</b><span>한두 문항이 애매해도 결과는 크게 달라지지 않아요.</span></li>
           </ul></details>
-        <button className="cta-btn" onClick={() => void move(page + 1)} disabled={busy || conflict}>시작하기</button>
-        <p className="panel-note choice-reminder"><strong>‘비슷하다’는 정말 고르기 어려울 때만 골라 주세요.</strong></p>
       </div>}
 
       {!completed && screen.kind === 'essay' && <div className="sheet">

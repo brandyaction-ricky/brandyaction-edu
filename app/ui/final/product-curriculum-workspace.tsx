@@ -372,13 +372,15 @@ export function ProductCurriculumWorkspace({ course, pending, send, commonResour
       <p>커리큘럼이 비공개여도 상품 모집과 결제를 진행할 수 있습니다. 판매 설정은 기본·판매 탭에서 확인하세요.</p>
       <details><summary>공개 범위와 등록 방법</summary><p>주차와 학습 본문을 저장·공개한 다음, ‘공개 범위 확인’에서 기수를 골라 수강생에게 보여 줄 항목을 체크합니다.</p><p>본문 공개 설정은 모든 기수의 콘텐츠 준비 상태입니다. 기수별 공개 범위를 끄면 해당 기수의 수강생에게 보이지 않습니다. 무료 미리보기는 별도 설정입니다.</p><p>가격과 모집·교육 일정은 기수·회차 탭에서 관리합니다. 같은 상품의 기수는 본문을 공유합니다.</p></details>
     </section>
-    <details className="curriculum-copy-disclosure"><summary>기존 커리큘럼 불러오기</summary><CurriculumCopyPanel targetId={String(course.id)} eligible={t(course, "status") === "draft" && !(curriculum.curriculum_weeks || []).length && resourceCount === 0} disabled={saving} dirty={productDirty || Boolean(weekTitle.trim()) || Boolean(lessonTitle.trim())} onCopied={() => { setLoading(true); setReadVersion(version => version + 1); }} /></details>
-    {process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' && <details><summary>외부 커리큘럼 가져오기</summary><LessonCurriculumImport key={String(course.id)} courseId={String(course.id)} disabled={saving || productDirty || contentDirty || Boolean(weekTitle.trim()) || Boolean(lessonTitle.trim())} onImported={() => { setLoading(true); setReadVersion(version => version + 1); }} /></details>}
+    <div className={studio ? "studio-import-actions" : undefined}>
+      <details className="curriculum-copy-disclosure"><summary>기존 커리큘럼 불러오기</summary><CurriculumCopyPanel targetId={String(course.id)} eligible={t(course, "status") === "draft" && !(curriculum.curriculum_weeks || []).length && resourceCount === 0} disabled={saving} dirty={productDirty || Boolean(weekTitle.trim()) || Boolean(lessonTitle.trim())} onCopied={() => { setLoading(true); setReadVersion(version => version + 1); }} /></details>
+      {process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' && <details><summary>외부 커리큘럼 가져오기</summary><LessonCurriculumImport key={String(course.id)} courseId={String(course.id)} disabled={saving || productDirty || contentDirty || Boolean(weekTitle.trim()) || Boolean(lessonTitle.trim())} onImported={() => { setLoading(true); setReadVersion(version => version + 1); }} /></details>}
+    </div>
     {loading && <p className="meta" role="status">상품 커리큘럼을 불러오는 중입니다.</p>}
     {readError && <p className="notice warning" role="alert">{readError} <button className="btn small" type="button" onClick={() => { setLoading(true); setReadVersion((version) => version + 1); }}>다시 시도</button></p>}
-    {studio && <div className="studio-management-bar"><div><b>본문 준비 {publishedLessons.length}개</b><span>전체 {lessons.length}개 수업 · 기수별 공개는 별도 설정</span></div><div><button type="button" className="btn" disabled={saving} onClick={()=>requestNavigation(()=>setVisibilityOpen(true))}><Eye size={18}/> 기수별 공개 범위</button><button type="button" className="btn" disabled={saving} onClick={()=>{if(archivePanel.current){archivePanel.current.open=true;archivePanel.current.querySelector('summary')?.focus();archivePanel.current.scrollIntoView({block:'center'});}}}><ArchiveRestore size={18}/> 삭제한 항목 복구</button></div></div>}
-    <div className="curriculum-studio">
-    <div className="curriculum-outline" aria-label="커리큘럼 목차">
+    {studio && <div className="studio-management-bar adm-box"><div><b>본문 준비 {publishedLessons.length}개</b><span>전체 {lessons.length}개 수업 · 기수별 공개는 별도 설정</span></div><div><button type="button" className="btn" disabled={saving} onClick={()=>requestNavigation(()=>setVisibilityOpen(true))}><Eye size={18}/> 기수별 공개 범위</button><button type="button" className="btn" disabled={saving} onClick={()=>{if(archivePanel.current){archivePanel.current.open=true;archivePanel.current.querySelector('summary')?.focus();archivePanel.current.scrollIntoView({block:'center'});}}}><ArchiveRestore size={18}/> 삭제한 항목 복구</button></div></div>}
+    <div className="curriculum-studio adm-split">
+    <div className="curriculum-outline adm-tree" aria-label="커리큘럼 목차">
     {studio && <label className="studio-outline-search">수업 찾기<input type="search" value={outlineSearch} onChange={event => setOutlineSearch(event.target.value)} placeholder="주차 또는 수업 제목" /></label>}
     <details className="studio-add-week" open={!studio || undefined}><summary><Plus size={18} /> 주차 추가</summary><div className="product-curriculum-create">
       <label>새 주차 제목<input value={weekTitle} maxLength={300} onChange={(event) => setWeekTitle(event.target.value)} placeholder="예: 시작하기" disabled={saving} /></label>
@@ -416,7 +418,7 @@ export function ProductCurriculumWorkspace({ course, pending, send, commonResour
     </details>}
     </div>
     <div className="curriculum-editor-column">
-    {!selectedLesson && <div className="curriculum-editor-empty"><h3>편집할 학습을 선택해 주세요</h3><p>목차에서 수업 제목을 누르면 바로 내용을 작성할 수 있습니다.</p></div>}
+    {!selectedLesson && <div className="curriculum-editor-empty adm-empty"><h3>편집할 학습을 선택해 주세요</h3><p>목차에서 수업 제목을 누르면 바로 내용을 작성할 수 있습니다.</p></div>}
     {studio && selectedLesson && course && <CurriculumLessonPane key={`${selectedLesson.id}:${controlsRevision}`} lesson={selectedLesson} course={course} curriculum={curriculum} pending={pending} send={send} actorId={studio.actorId} sessionRef={editorSession} blockEditingEnabled={studio.blockEditingEnabled} onSaved={() => { setReadVersion(version => version + 1); }} />}
     {!studio && selectedLesson && <section ref={contentEditorRef} tabIndex={-1} className="product-curriculum-content" aria-label="일차별 콘텐츠 편집">
       <header className="curriculum-editor-heading"><div><p className="meta">{num(weeks.find(w=>w.id===selectedLesson.week_id), "week_number")}주차 · 선택한 학습</p><h3>Day {num(selectedLesson, "day_number")} · {t(selectedLesson, "title")}</h3></div><button className="btn small" type="button" hidden={Boolean(selectedLesson.has_blocks)} aria-expanded={previewOpen} onClick={()=>setPreviewOpen(value=>!value)}>{previewOpen ? "미리보기 닫기" : "학습 내용 미리보기"}</button></header>

@@ -27,14 +27,15 @@ async function api(page:Page,{started=false,failSave=false,conflict=false}={}) {
 }
 test('MYIN guide, pair choice, story, aspirations and explicit submission work on every viewport',async({page})=>{
   const state=await api(page);await page.goto('/diagnosis-test');await expect(page.getByRole('heading',{name:'나를 움직이는 마음을 알아보는 시간'})).toBeVisible();
-  await expect(page.getByText('결과 보고서는 AI(Anthropic)가 작성합니다', {exact:true})).toBeVisible();
+  await expect(page.getByText('결과 보고서는 AI(Anthropic)가 작성합니다', {exact:true})).toHaveCount(0);
   await page.screenshot({path:test.info().outputPath('n6-ai-disclosure.png'),fullPage:true});
   await page.getByRole('button',{name:'검사 시작하기',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'두 문장 중 지금의 나에 더 가까운 쪽을 고릅니다'})).toBeVisible();
-  await expect(page.locator('.choice-reminder strong')).toHaveText('‘비슷하다’는 정말 고르기 어려울 때만 골라 주세요.');
-  await expect(page.locator('.choice-reminder')).toHaveCSS('font-size','15px');
+  await expect(page.getByRole('heading',{name:'평소의 나와 더 가까운 문장을 골라주세요'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'선택할 때는 이것만 기억해 주세요'})).toBeVisible();
+  await expect(page.getByText('응답 자동 저장',{exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'두 문장 비교 시작하기',exact:true})).toBeVisible();
   await page.screenshot({path:test.info().outputPath('diagnosis-choice-reminder.png'),fullPage:true});
-  await expect(page.getByText('1문항',{exact:true})).toBeVisible();await page.getByRole('button',{name:'시작하기',exact:true}).click();
+  await page.getByRole('button',{name:'두 문장 비교 시작하기',exact:true}).click();
   await expect(page.locator('.timer')).toContainText('18초');await expect(page.locator('.timer')).not.toContainText('18초');await page.getByRole('radio',{name:'1 A에 더 가까워요'}).click();
   await expect(page.getByRole('heading',{name:'이번엔, 직접 들려주세요'})).toBeVisible();
   await page.getByRole('textbox').fill('합성 사업자의 실제 경험');await page.getByRole('button',{name:'다음 단계로',exact:true}).click();
@@ -47,25 +48,25 @@ test('MYIN guide, pair choice, story, aspirations and explicit submission work o
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 test('failed boundary save keeps the answer and allows an explicit retry without losing story input',async({page})=>{
-  const state=await api(page,{started:true,failSave:true});await page.goto('/diagnosis-test');await page.getByRole('button',{name:'시작하기',exact:true}).click();
+  const state=await api(page,{started:true,failSave:true});await page.goto('/diagnosis-test');await page.getByRole('button',{name:'두 문장 비교 시작하기',exact:true}).click();
   await expect(page.locator('.timer')).not.toContainText('18초');await page.getByRole('radio',{name:'1 A에 더 가까워요'}).click();await expect(page.getByRole('alert')).toContainText('이 창을 닫지 마세요');
   await expect(page.getByRole('radio',{name:'1 A에 더 가까워요'})).toBeChecked();await page.getByRole('button',{name:'저장 다시 시도'}).click();await expect.poll(()=>state.current.answers.length).toBeGreaterThan(0);await expect(page.getByRole('alert')).toHaveCount(0);
   await page.reload();await expect(page.getByRole('heading',{name:'이번엔, 직접 들려주세요'})).toBeVisible();
   const input=page.getByRole('textbox');await input.fill('저장하고 이어갈 합성 답변');await expect.poll(()=>state.current.answers.find(a=>a.questionId===id(20))?.value).toContain('합성 답변');
 });
 test('conflicting edits stop further writes and reloading requires a deliberate choice',async({page})=>{
-  const state=await api(page,{started:true,conflict:true});await page.goto('/diagnosis-test');await page.getByRole('button',{name:'시작하기',exact:true}).click();await expect(page.locator('.timer')).not.toContainText('18초');await page.getByRole('radio',{name:'2 B에 더 가까워요'}).click();
+  const state=await api(page,{started:true,conflict:true});await page.goto('/diagnosis-test');await page.getByRole('button',{name:'두 문장 비교 시작하기',exact:true}).click();await expect(page.locator('.timer')).not.toContainText('18초');await page.getByRole('radio',{name:'2 B에 더 가까워요'}).click();
   await expect(page.getByRole('alert')).toContainText('다른 화면');await expect(page.getByRole('radio',{name:'2 B에 더 가까워요'})).toBeChecked();await expect(page.getByRole('radio').first()).toBeDisabled();
   await page.getByRole('button',{name:'서버 응답 다시 불러오기'}).click();await page.getByRole('button',{name:'취소',exact:true}).click();expect(state.writes).toBe(1);await expect(page.getByRole('radio',{name:'2 B에 더 가까워요'})).toBeChecked();
 });
 test('18-second expiry never answers or advances automatically and still accepts a response',async({page})=>{
-  await api(page,{started:true});await page.clock.install();await page.goto('/diagnosis-test');await page.getByRole('button',{name:'시작하기',exact:true}).click();
+  await api(page,{started:true});await page.clock.install();await page.goto('/diagnosis-test');await page.getByRole('button',{name:'두 문장 비교 시작하기',exact:true}).click();
   await page.clock.fastForward(19000);await expect(page.locator('.timer')).toContainText('0초');await expect(page.getByText('괜찮아요 — 먼저 떠오른 쪽으로 골라 주세요')).toBeVisible();await expect(page.getByRole('radio').first()).not.toBeChecked();
   await page.getByRole('radio').first().click();await page.clock.fastForward(300);await expect(page.getByRole('heading',{name:'이번엔, 직접 들려주세요'})).toBeVisible();
 });
 test('pair sentences remain side by side and five choices fit at 320 pixels',async({page})=>{
   await page.setViewportSize({width:320,height:740});const data=fixture();data.survey.questions[0].options=['왼쪽이 훨씬 나','왼쪽이 조금 더 나','비슷하다','오른쪽이 조금 더 나','오른쪽이 훨씬 나'].map((label,i)=>({id:id(11+i),label}));
-  await page.route('**/api/platform/diagnosis/session',route=>route.fulfill({json:data}));await page.goto('/diagnosis-test');await page.getByRole('button',{name:'시작하기',exact:true}).click();
+  await page.route('**/api/platform/diagnosis/session',route=>route.fulfill({json:data}));await page.goto('/diagnosis-test');await page.getByRole('button',{name:'두 문장 비교 시작하기',exact:true}).click();
   const left=await page.locator('.pair-card').nth(0).boundingBox(),right=await page.locator('.pair-card').nth(1).boundingBox();expect(left?.y).toBe(right?.y);expect((left?.x??0)+(left?.width??0)).toBeLessThan(right?.x??0);
   const options=await page.getByRole('radio').all();expect(options).toHaveLength(5);for(const option of options){const box=await option.boundingBox();expect(box?.height).toBeGreaterThanOrEqual(44);expect((box?.x??0)+(box?.width??0)).toBeLessThanOrEqual(320);}
   const sizes=await page.getByRole('radio').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();return {top:r.top,height:r.height,bottom:r.bottom};}));
@@ -83,7 +84,7 @@ test('instructed checks reject mouse and keyboard mistakes before saving, then a
     if(body.action==='save'){writes++;saved=body.answers;}
     return route.fulfill({json:{...data,revision:writes,answers:saved}});
   });
-  await page.clock.install();await page.goto('/diagnosis-test');await page.getByRole('button',{name:'시작하기',exact:true}).click();
+  await page.clock.install();await page.goto('/diagnosis-test');await page.getByRole('button',{name:'두 문장 비교 시작하기',exact:true}).click();
   await page.getByRole('radio').first().click();
   await expect(page.getByRole('alert')).toHaveText('안내와 다른 답을 골랐어요. 문항을 다시 읽고 안내된 답을 골라 주세요.');
   await page.clock.fastForward(1000);expect(writes).toBe(0);await expect(page.getByRole('radio').first()).not.toBeChecked();
@@ -103,7 +104,7 @@ test('instruction band is not clickable, choice numbers align, and question tran
   data.survey.questions[0].options=['왼쪽이 훨씬 나','왼쪽이 조금 더 나','비슷하다','오른쪽이 조금 더 나','오른쪽이 훨씬 나'].map((label,i)=>({id:id(11+i),label}));
   data.survey.questions.splice(1,0,{...data.survey.questions[0],id:id(40),code:'pair-two'});data.survey.coreQuestionCount=2;
   await page.route('**/api/platform/diagnosis/session',route=>route.fulfill({json:data}));
-  await page.emulateMedia({reducedMotion:'no-preference'});await page.goto('/diagnosis-test');await page.getByRole('button',{name:'시작하기',exact:true}).click();
+  await page.emulateMedia({reducedMotion:'no-preference'});await page.goto('/diagnosis-test');await page.getByRole('button',{name:'두 문장 비교 시작하기',exact:true}).click();
   await expect(page.locator('.q-no')).toHaveCSS('font-size','20px');
   await expect(page.locator('.qwrap')).toHaveCSS('animation-duration','0.32s');
   await expect(page.locator('.pair-vs')).toHaveText('VS');await expect(page.locator('.pair-card').first()).toHaveCSS('border-top-width','0px');
@@ -118,7 +119,7 @@ test('instruction band is not clickable, choice numbers align, and question tran
 test('keyboard selection advances once and instruction checks require acknowledgment',async({page})=>{
   const data=fixture();data.survey.questions[0].confirmationOptionId=id(12);data.survey.questions[0].reconfirmInstructions=true;
   await page.route('**/api/platform/diagnosis/session',async route=>{const body=route.request().method()==='POST'?route.request().postDataJSON():{};await route.fulfill({json:body.action==='save'?{...data,revision:1,answers:body.answers}:data});});
-  await page.goto('/diagnosis-test');await page.getByRole('button',{name:'시작하기',exact:true}).click();await expect(page.locator('.timer')).not.toContainText('18초');await page.keyboard.press('1');await expect(page.getByRole('button',{name:'안내를 읽었습니다'})).toBeVisible();await expect(page.getByRole('heading',{name:'이번엔, 직접 들려주세요'})).toHaveCount(0);
+  await page.goto('/diagnosis-test');await page.getByRole('button',{name:'두 문장 비교 시작하기',exact:true}).click();await expect(page.locator('.timer')).not.toContainText('18초');await page.keyboard.press('1');await expect(page.getByRole('button',{name:'안내를 읽었습니다'})).toBeVisible();await expect(page.getByRole('heading',{name:'이번엔, 직접 들려주세요'})).toHaveCount(0);
   await page.getByRole('button',{name:'안내를 읽었습니다'}).click();await expect(page.getByRole('heading',{name:'이번엔, 직접 들려주세요'})).toBeVisible();
 });
 test('entry uses only eligible courses and an existing account test always resumes',async({page})=>{
@@ -141,7 +142,7 @@ test('a submitted questionnaire under review preserves completion and does not a
   const data=fixture();const second={...data.survey.questions[0],id:id(40),code:'pair-two',text:'두 번째 합성 비교 문항',options:[{id:id(41),label:'두 번째 왼쪽'},{id:id(42),label:'두 번째 오른쪽'}]};data.survey.questions.splice(1,0,second);data.survey.coreQuestionCount=2;
   let latest:Record<string,unknown>[]=[];
   await page.route('**/api/platform/diagnosis/session',async route=>{const body=route.request().method()==='POST'?route.request().postDataJSON():{};if(body.action==='save')latest=body.answers;await route.fulfill({json:{...data,revision:body.action==='save'?body.revision+1:0,answers:latest}});});
-  await page.clock.install();await page.goto('/diagnosis-test');await page.getByRole('button',{name:'시작하기',exact:true}).click();await page.clock.fastForward(17000);
+  await page.clock.install();await page.goto('/diagnosis-test');await page.getByRole('button',{name:'두 문장 비교 시작하기',exact:true}).click();await page.clock.fastForward(17000);
   await page.keyboard.press('1');await page.keyboard.press('2');await page.clock.fastForward(300);await expect(page.getByRole('heading',{name:'두 번째 합성 비교 문항'})).toBeVisible();await expect(page.locator('.timer')).toContainText('18초');
   await page.getByRole('button',{name:'이전 문항'}).click();await expect(page.getByRole('radio',{name:'1 A에 더 가까워요'})).toBeChecked();await page.clock.fastForward(600);
   // The virtual clock advances debounce timers, not the HTTP request to the fixture.
