@@ -6,6 +6,7 @@ import { AdminTabs, AdminButton, AdminLinkButton, AdminLoadingState, AdminInline
 import { labels, object, text as t, type Row } from '@/lib/platform';
 import { MvpEditor } from './member-mvp';
 import { AdminLearningProgress } from './admin-learning-progress';
+import { AdminLearningUsage } from './admin-learning-usage';
 import { MemberVisits } from './member-visits';
 import { MemberConversation } from './member-conversation';
 import { AdminLoginEmailChange } from './admin-login-email-change';
@@ -57,8 +58,8 @@ function MemberRecords({ member, email, view, blockLearningEnabled }: { member: 
   const listUrl = view === 'questions' ? `/admin/questions?member=${member}` : view === 'submissions' ? `/admin/reviews?member=${member}` : '';
   return <div className="member-records">
     <div className="spread wrap-flex"><p className="meta">총 {state.total}건 · {page}페이지 · 최근 기록 순</p>{listUrl && <AdminLinkButton size="sm" href={listUrl}>회원의 {view === 'questions' ? '질문함' : '제출물'} 열기</AdminLinkButton>}</div>
-    {view === 'progress' && <>{blockLearningEnabled && <AdminLearningProgress key={member} member={member}/>}<p className="notice mt16">아래는 실제 저장된 개별 학습 기록입니다. 기록이 없는 학습은 이 목록에 표시되지 않습니다.</p></>}
-    {!state.rows.length && <AdminEmptyState title={view === 'enrollments' ? '등록된 수강권이 없습니다.' : '아직 저장된 기록이 없습니다.'}>다른 탭에서 수강권과 회원 상태를 확인해 주세요.</AdminEmptyState>}
+    {view === 'progress' && <><AdminLearningUsage key={`usage-${member}`} member={member}/>{blockLearningEnabled && <AdminLearningProgress key={member} member={member}/>}<p className="notice mt16">아래는 실제 저장된 개별 학습 기록입니다. 기록이 없는 학습은 이 목록에 표시되지 않습니다.</p></>}
+    {!state.rows.length && <AdminEmptyState title={view === 'enrollments' ? '등록된 수강권이 없습니다.' : view === 'progress' ? '저장된 개별 학습 완료 기록이 없습니다.' : '아직 저장된 기록이 없습니다.'}>다른 탭에서 수강권과 회원 상태를 확인해 주세요.</AdminEmptyState>}
     {state.rows.map(row => {
       const enrollment = view === 'enrollments' ? row : related(row, 'enrollments');
       const course = related(view === 'questions' ? row : enrollment, 'courses');
