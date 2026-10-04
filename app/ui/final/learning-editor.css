@@ -46,3 +46,16 @@
 
 .edu-admin .learning-editor .learning-save-status { margin:16px 0; overflow-wrap:anywhere; line-height:1.7; }
 .edu-admin .learning-editor .editor-savebar .dirty-note { overflow-wrap:anywhere; line-height:1.6; }
+
+.edu-admin .learning-editor .learning-save-feedback { margin:16px 0; padding:16px 20px; display:flex; flex-direction:column; gap:6px; line-height:1.7; overflow-wrap:anywhere; scroll-margin-top:90px; }
+.edu-admin .learning-editor .learning-draft-conflict { margin:16px 0; padding:20px; }
+.edu-admin .learning-editor .learning-draft-conflict h2 { font-size:18px; margin-bottom:8px; }
+.edu-admin .learning-editor .learning-draft-conflict fieldset { border:0; margin:20px 0; padding:0; min-width:0; }
+.edu-admin .learning-editor .learning-draft-conflict legend { font-weight:700; overflow-wrap:anywhere; }
+.edu-admin .learning-editor .learning-conflict-options { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:8px; }
+.edu-admin .learning-editor .learning-conflict-options label { min-width:0; padding:14px; background:white; border:1px solid var(--line); border-radius:8px; }
+.edu-admin .learning-editor .learning-conflict-options label:has(input:checked) { border-color:var(--red); }
+.edu-admin .learning-editor .learning-conflict-options label>span { display:flex; gap:8px; align-items:center; font-weight:600; }
+.edu-admin .learning-editor .learning-conflict-options input { width:18px; height:18px; min-height:0; accent-color:var(--red); }
+.edu-admin .learning-editor .learning-conflict-options pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:220px; overflow:auto; margin:12px 0 0; font:inherit; line-height:1.6; }
+@media(max-width:720px){.edu-admin .learning-editor .learning-conflict-options { grid-template-columns:minmax(0,1fr); }}
