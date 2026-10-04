@@ -122,14 +122,15 @@ export function DiagnosisReportView({ onExit, exitLabel = '학습으로 돌아�
     } finally { if (version === fileVersion.current) { setDownloading(false); setFetchingPreview(false); } }
   }
   const copy = status ? statusCopy[status.state] : null;
-  return <section className="diagnosis-report" aria-label="N6 검사 결과">
+  return <section className={`diagnosis-report${status ? ` is-${status.state}` : ''}`} aria-label="N6 검사 결과">
     {loading ? <div role="status" className="diagnosis-report-loading"><LoaderCircle className="diagnosis-spin"/><p>검사 결과를 확인하고 있어요.</p></div> : <>
       {status && <ReportProgress state={status.state}/>}
       {copy && <div className="diagnosis-report-summary">
         <span className={`diagnosis-report-icon${status?.state === 'ready' ? ' is-ready' : ''}`} aria-hidden="true">{status?.state === 'ready' ? <CheckCircle2 size={30}/> : <FileText size={30}/>}</span>
         <span className="diagnosis-eyebrow">나의 N6 검사</span><h1 ref={heading} tabIndex={-1}>{copy.title}</h1><p className="diagnosis-report-description">{copy.description.map((line, index) => <span key={line}>{index === 0 ? <strong>{line}</strong> : line}</span>)}</p>
+        {status?.state === 'needs_review' && <button className="diagnosis-primary diagnosis-review-return" onClick={onExit}>{exitLabel}<ArrowRight size={16}/></button>}
       </div>}
-      {status?.state === 'needs_review' && <details className="diagnosis-report-details">
+      {status?.state === 'needs_review' && <details className="diagnosis-report-details" open>
         <summary><span>자세한 안내</span><ChevronDown size={20} aria-hidden="true"/></summary>
         <div className="diagnosis-report-details-body">
           <div><h2>얼마나 기다리면 되나요?</h2><p>운영팀의 확인이 필요한 상태예요.<br/>지금은 완료 시간을 안내하기 어렵습니다.</p></div>
@@ -151,7 +152,7 @@ export function DiagnosisReportView({ onExit, exitLabel = '학습으로 돌아�
       {preview !== null && <DiagnosisReportReader html={preview} error={error} onClose={() => setPreview(null)} onError={setError}/>}
       {paused && <p className="diagnosis-report-help">자동 확인을 잠시 멈췄어요. 아래 버튼을 누르면 최신 상태를 확인할 수 있어요.</p>}
       {preview === null && error && <p className="diagnosis-error" role="alert">{error}</p>}
-      {preview === null && <div className="diagnosis-report-footer">{(error || paused) && <button className="diagnosis-secondary" onClick={refresh} disabled={downloading || fetchingPreview}><RefreshCw size={16}/>{error ? '다시 연결하기' : '최신 상태 확인'}</button>}<button className="diagnosis-secondary" onClick={onExit}>{exitLabel}<ArrowRight size={16}/></button></div>}
+      {preview === null && <div className="diagnosis-report-footer">{(error || paused) && <button className="diagnosis-secondary" onClick={refresh} disabled={downloading || fetchingPreview}><RefreshCw size={16}/>{error ? '다시 연결하기' : '최신 상태 확인'}</button>}{status?.state !== 'needs_review' && <button className="diagnosis-secondary" onClick={onExit}>{exitLabel}<ArrowRight size={16}/></button>}</div>}
     </>}
   </section>;
 }
