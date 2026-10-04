@@ -1351,7 +1351,7 @@ a.participant-day-card:hover {
 .edu-admin .detail-gallery-upload > .upload-label { align-self: center; margin-bottom: var(--space-6); }
 .edu-admin .detail-gallery-error { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-4); }
 .edu-admin .detail-gallery-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
-.edu-admin .detail-gallery-item { display: grid; grid-template-columns: 20px 100px minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); min-width: 0; padding: var(--space-3); border: 1px solid var(--line); background: var(--surface-raised); }
+.edu-admin .detail-gallery-item { display: grid; grid-template-columns: 32px 100px minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); min-width: 0; padding: var(--space-3); border: 1px solid var(--line); background: var(--surface-raised); }
 .edu-admin .detail-gallery-item.is-dragging { opacity: .48; border-color: var(--ba-red); }
 .edu-admin .detail-gallery-grip { width: 16px; color: var(--text-tertiary); }
 .edu-admin .detail-gallery-item > img,

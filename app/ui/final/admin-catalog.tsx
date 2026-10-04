@@ -28,6 +28,7 @@ import { AdminButton, AdminDataTable, AdminEmptyState, AdminFilterBar, AdminLink
 import type { Data, WorkflowSend } from "../learning-workflows";
 import { Empty, courseType } from "./primitives";
 import type { MissionContext } from "./mission-target-fields";
+import { moveOrderedItem, useReorderDrag } from './reorder-drag';
 
 export type MissionScope = MissionContext & { state: "active" | "published" | "hidden" | "archived" };
 
@@ -215,6 +216,15 @@ export function AdminCatalog({
       }, new Map<number, Row[]>()).entries()).sort(([a], [b]) => a - b)
     : [];
   const weekReorderDisabled = !course || Boolean(query || status || archived) || pagination !== null && pagination.total > rows.length;
+  const bannerReorderDisabled = pagination !== null && pagination.total > rows.length;
+  async function moveBannerTo(from: number, to: number) {
+    if (!send || pending || bannerReorderDisabled || from === to) return;
+    const ordered = moveOrderedItem(filtered, from, to);
+    for (let index = 0; index < ordered.length; index++) {
+      if (ordered[index].id === filtered[index].id) continue;
+      await send({ action: 'save', section: 'banners', id: ordered[index].id, values: { display_order: num(filtered[index], 'display_order') } }, index === ordered.length - 1 ? '배너 노출 순서를 변경했습니다.' : undefined);
+    }
+  }
   async function moveBanner(row: Row, direction: -1 | 1) {
     if (!send || pending) return;
     const index = filtered.findIndex(item => item.id === row.id);
@@ -226,16 +236,19 @@ export function AdminCatalog({
     await send({ action: "save", section: "banners", id: target.id, values: { display_order: currentOrder } }, "배너 노출 순서를 변경했습니다.");
   }
   async function moveWeek(row: Row, direction: -1 | 1) {
-    if (!send || pending || weekReorderDisabled) return;
     const index = activeCourseWeeks.findIndex((item) => item.id === row.id);
-    const targetIndex = index + direction;
+    await moveWeekTo(index, index + direction);
+  }
+  async function moveWeekTo(index: number, targetIndex: number) {
+    if (!send || pending || weekReorderDisabled) return;
     if (index < 0 || targetIndex < 0 || targetIndex >= activeCourseWeeks.length) return;
-    const reorderedActive = [...activeCourseWeeks];
-    [reorderedActive[index], reorderedActive[targetIndex]] = [reorderedActive[targetIndex], reorderedActive[index]];
+    const reorderedActive = moveOrderedItem(activeCourseWeeks, index, targetIndex);
     let activeIndex = 0;
     const ids = allCourseWeeks.filter(item => !item.archived_at).map((item) => num(item, "week_number") === 0 ? String(item.id) : String(reorderedActive[activeIndex++].id));
     await send({ action: "reorder-weeks", courseId: course, ids }, "주차 순서를 변경했습니다.");
   }
+  const weekDrag = useReorderDrag(activeCourseWeeks.map(row => String(row.id)), (from, to) => { void moveWeekTo(from, to); }, pending || weekReorderDisabled);
+  const bannerDrag = useReorderDrag(s.key === 'banners' ? filtered.map(row => String(row.id)) : [], (from, to) => { void moveBannerTo(from, to); }, pending || bannerReorderDisabled);
   const missionGroups = scopedWeeks
     .filter((item) => !week || item.id === week)
     .map((item) => ({ week: item, missions: filtered.filter((mission) => lessonById.get(String(mission.lesson_id))?.week_id === item.id).toSorted((a, b) => num(lessonById.get(String(a.lesson_id)), "day_number") - num(lessonById.get(String(b.lesson_id)), "day_number")) }))
@@ -933,10 +946,11 @@ export function AdminCatalog({
                   {s.key === "weeks" ? weekGroups.map(([weekNumber, groupRows]) => <Fragment key={weekNumber}>
                     <tr className="week-group-heading"><th scope="rowgroup" colSpan={cols.length + 1 + Number(bulkMode)}><span>{weekNumber}주차</span><small>{groupRows.length}개 상품</small></th></tr>
                     {groupRows.map((r) => (
-                      <tr key={recordId(r)}>
+                      <tr key={recordId(r)} {...weekDrag.row(String(r.id))} className={weekDrag.overId === r.id ? 'reorder-item-over' : ''}>
                         {bulkMode && <td data-label="선택" className="selection-column"><input type="checkbox" aria-label={title(r) + " 선택"} checked={selection.includes(recordId(r))} onChange={(e) => setSelection(e.target.checked ? [...selection, recordId(r)] : selection.filter((id) => id !== recordId(r)))} /></td>}
                         {cols.map((c) => <td data-label={c.label} key={c.label}>{c.value(r)}</td>)}
                         <td data-label="관리" data-align="action"><div className="catalog-actions week-order-actions">
+          {num(r, 'week_number') > 0 && !r.archived_at && weekDrag.handle(String(r.id), t(r, 'title'))}
           <AdminButton size="sm" variant="outline" type="button" title="위로 이동" aria-label={`${t(r, "title")} 위로 이동`} disabled={pending || weekReorderDisabled || Boolean(r.archived_at) || num(r, "week_number") === 0 || activeCourseWeeks[0]?.id === r.id} onClick={() => void moveWeek(r, -1)}><ChevronUp size={17} aria-hidden="true" /></AdminButton>
           <AdminButton size="sm" variant="outline" type="button" title="아래로 이동" aria-label={`${t(r, "title")} 아래로 이동`} disabled={pending || weekReorderDisabled || Boolean(r.archived_at) || num(r, "week_number") === 0 || activeCourseWeeks.at(-1)?.id === r.id} onClick={() => void moveWeek(r, 1)}><ChevronDown size={17} aria-hidden="true" /></AdminButton>
           <AdminButton size="sm" variant="outline" onClick={() => edit(s, r)}>수정</AdminButton>
@@ -944,7 +958,7 @@ export function AdminCatalog({
                       </tr>
                     ))}
                   </Fragment>) : filtered.map((r) => (
-                    <tr key={recordId(r)}>
+                    <tr key={recordId(r)} {...(s.key === 'banners' ? bannerDrag.row(String(r.id)) : {})} className={bannerDrag.overId === r.id ? 'reorder-item-over' : ''}>
                       {bulkMode && <td data-label="선택" className="selection-column">
                         <input
                           type="checkbox"
@@ -966,6 +980,7 @@ export function AdminCatalog({
                       ))}
                       <td data-label="관리" data-align="action">
                         {s.key === "banners" ? <div className="catalog-actions banner-order-actions">
+                          {bannerDrag.handle(String(r.id), t(r, 'title'))}
                           <AdminButton size="sm" variant="outline" type="button" title="위로 이동" aria-label={t(r, "title") + " 위로 이동"} disabled={pending || filtered[0]?.id === r.id} onClick={() => void moveBanner(r, -1)}><ChevronUp size={17} aria-hidden="true" /></AdminButton>
                           <AdminButton size="sm" variant="outline" type="button" title="아래로 이동" aria-label={t(r, "title") + " 아래로 이동"} disabled={pending || filtered.at(-1)?.id === r.id} onClick={() => void moveBanner(r, 1)}><ChevronDown size={17} aria-hidden="true" /></AdminButton>
                           <AdminButton size="sm" variant="outline" type="button" title="수정" aria-label={t(r, "title") + " 수정"} onClick={() => edit(s, r)}><Pencil size={17} aria-hidden="true" /></AdminButton>

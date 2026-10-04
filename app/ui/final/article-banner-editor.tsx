@@ -4,6 +4,7 @@ import { object, text as t, type Row } from "@/lib/platform";
 import { AdminButton, AdminCheckbox, AdminFormField, AdminIconButton, AdminStatusBadge } from "@/features/admin-ui";
 import { ArrowDown, ArrowUp, Grid2X2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
+import { moveOrderedItem, useReorderDrag } from './reorder-drag';
 
 type Send = (body: Record<string, unknown>, success?: string) => Promise<unknown>;
 type VideoDraft = { title: string; url: string };
@@ -45,15 +46,15 @@ function initialDraft(settings: Row[]): BannerDraft {
 export function ArticleBannerEditor({ settings, send, pending }: { settings: Row[]; send: Send; pending: boolean }) {
   const initial = initialDraft(settings);
   const [draft, setDraft] = useState<BannerDraft>(initial);
+  const [videoIds, setVideoIds] = useState(['article-video-0', 'article-video-1', 'article-video-2']);
   const update = <K extends keyof BannerDraft>(key: K, value: BannerDraft[K]) => setDraft(current => ({ ...current, [key]: value }));
   const updateVideo = (index: number, key: keyof VideoDraft, value: string) => update("videos", draft.videos.map((video, position) => position === index ? { ...video, [key]: value } : video));
-  const moveVideo = (index: number, direction: -1 | 1) => {
-    const target = index + direction;
+  const moveVideo = (index: number, target: number) => {
     if (target < 0 || target >= draft.videos.length) return;
-    const videos = [...draft.videos];
-    [videos[index], videos[target]] = [videos[target], videos[index]];
-    update("videos", videos);
+    update("videos", moveOrderedItem(draft.videos, index, target));
+    setVideoIds(moveOrderedItem(videoIds, index, target));
   };
+  const videoDrag = useReorderDrag(videoIds, moveVideo, pending);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await send({ action: "article-banner", value: draft }, "아티클 무료강의 상단 설정을 저장했습니다.");
@@ -78,10 +79,11 @@ export function ArticleBannerEditor({ settings, send, pending }: { settings: Row
       <section className="panel mt24">
         <div className="panel-head"><div><h2>무료강의 3강 설정</h2><p>강의 제목과 YouTube 주소를 등록하고 노출 순서를 확인합니다.</p></div><AdminStatusBadge status="info" label={`${draft.videos.filter(video => video.url.trim()).length}/3 주소 등록`} tone="info"/></div>
         <div className="article-lessons-editor">
-          {draft.videos.map((video, index) => <div className="article-lesson-editor" key={index}>
+          {draft.videos.map((video, index) => <div className={`article-lesson-editor${videoDrag.overId === videoIds[index] ? ' reorder-item-over' : ''}`} key={videoIds[index]} {...videoDrag.row(videoIds[index])}>
+            {videoDrag.handle(videoIds[index], video.title || `${index + 1}강`)}
             <div className="article-lesson-number">{String(index + 1).padStart(2, "0")}</div>
             <div className="article-lesson-fields"><AdminFormField className="field" label="강의 제목 *"><input id={`article-video-title-${index}`} value={video.title} maxLength={120} required onChange={event => updateVideo(index, "title", event.target.value)} /></AdminFormField><AdminFormField className="field" label="YouTube URL"><input id={`article-video-url-${index}`} type="url" value={video.url} placeholder="https://youtu.be/..." onChange={event => updateVideo(index, "url", event.target.value)} /></AdminFormField></div>
-            <div className="article-order-buttons"><AdminIconButton label={`${index + 1}강 위로 이동`} disabled={index === 0} onClick={() => moveVideo(index, -1)}><ArrowUp size={16}/></AdminIconButton><AdminIconButton label={`${index + 1}강 아래로 이동`} disabled={index === 2} onClick={() => moveVideo(index, 1)}><ArrowDown size={16}/></AdminIconButton></div>
+            <div className="article-order-buttons"><AdminIconButton label={`${index + 1}강 위로 이동`} disabled={index === 0} onClick={() => moveVideo(index, index - 1)}><ArrowUp size={16}/></AdminIconButton><AdminIconButton label={`${index + 1}강 아래로 이동`} disabled={index === 2} onClick={() => moveVideo(index, index + 1)}><ArrowDown size={16}/></AdminIconButton></div>
           </div>)}
         </div>
         <div className="section-pad article-video-help">제목은 먼저 작성할 수 있습니다. 영상이 준비되면 각 강의의 주소를 등록하세요. 공개 화면은 저장된 순서와 재생 가능한 YouTube 주소를 그대로 사용합니다.</div>

@@ -22,10 +22,10 @@ function Track({ group, enrollmentId, compact }: { group: LearningGroup; enrollm
   return <section className="elo-track" aria-label={group.title}>
     <div className="elo-heading"><h3>{group.title}</h3>{!ongoing && <span>{Math.round(group.completed / group.items.length * 100)}%</span>}</div>
     {ongoing ? <p className="meta">기간마다 다시 참여하는 챌린지입니다.</p> : <>
-      <p className="meta">{group.completed} / {group.items.length}개 학습 완료</p>
-      <Progress completed={group.completed} total={group.items.length} label={`${group.title} 진도`}/>
+      <p className="meta">현재 공개된 학습 {group.completed} / {group.items.length}개 완료</p>
+      <Progress completed={group.completed} total={group.items.length} label={`${group.title} 현재 공개된 학습 진도`}/>
     </>}
-    <p className="elo-current">{complete ? '모든 학습을 완료했습니다.' : waiting ? '다음 학습 공개 대기' : ongoing ? target?.title : `현재 DAY ${target?.day} · ${target?.title}`}</p>
+    <p className="elo-current">{complete ? '현재 공개된 학습을 완료했습니다.' : waiting ? '다음 학습 공개 대기' : ongoing ? target?.title : `현재 DAY ${target?.day} · ${target?.title}`}</p>
     {waiting && <p className="meta">{group.items.find(item => !item.done)?.reason || '운영자의 학습 공개를 기다려 주세요.'}</p>}
     {target && <Link className="btn primary" href={`/learn/${enrollmentId}/${target.id}`} aria-label={`${group.title} ${label}`}>{label}<ArrowRight size={16}/></Link>}
     {!compact && <details className="elo-weeks"><summary>{ongoing ? '챌린지 목록 보기' : '주차별 학습 보기'}</summary>

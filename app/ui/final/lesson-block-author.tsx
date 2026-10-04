@@ -18,6 +18,7 @@ import { LessonImageLayout } from './lesson-image-layout';
 import type { BlockEditorDraft } from '@/lib/learning-editor-draft';
 import { applyLessonImport, type LessonCardSource, type TextImportResult } from '@/lib/lesson-editor-import';
 import { TextLessonImport, LessonCardImport } from './lesson-editor-import';
+import { moveOrderedItem, useReorderDrag } from './reorder-drag';
 import './lesson-block-author.css';
 
 export type BlockAuthorState = { active: boolean; dirty: boolean; blocked: boolean; blockedReason?: string; uploading?: boolean; draftReady?: boolean };
@@ -197,15 +198,17 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
     catch (error) { if ((error as { status?: number }).status === 409) setConflict(true); setMessage((error as Error).message); throw error; }
   } }));
   function update(id: string, patch: Partial<LessonBlock>) { setDocument(previous => ({ ...previous, blocks: previous.blocks.map(block => block.id === id ? { ...block, ...patch } : block) })); }
-  function move(index: number, offset: number) { setDocument(previous => { const blocks = [...previous.blocks]; [blocks[index], blocks[index + offset]] = [blocks[index + offset], blocks[index]]; return { ...previous, blocks }; }); }
+  function move(index: number, offset: number) { moveTo(index, index + offset); }
+  function moveTo(index: number, target: number) { setDocument(previous => ({ ...previous, blocks: moveOrderedItem(previous.blocks, index, target) })); }
+  const blockDrag = useReorderDrag(document.blocks.map(block => block.id), moveTo, disabled || conflict || uploading);
   function download() { const url = URL.createObjectURL(new Blob([JSON.stringify(document, null, 2)], { type: 'application/json' })); const a = window.document.createElement('a'); a.href = url; a.download = '학습-편집내용.json'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
   function importContent(content: Pick<TextImportResult, 'blocks' | 'checklist'>, mode: 'append' | 'replace' | number) {
     if (disabled || conflict || uploads.current.size) throw new Error('저장·업로드 상태를 확인한 뒤 가져와 주세요.');
     const next = applyLessonImport(document, content, mode);
     setImportUndo({ before: structuredClone(document), after: JSON.stringify(next) }); setDocument(next); setEditingTextId(null); setInvalid(false); setMessage('가져온 내용을 편집 화면에 적용했습니다. 아래 저장 버튼을 눌러 보관해 주세요.');
   }
-  function renderBlock(block: LessonBlock, index: number) { return <article className="lba-block" key={block.id} data-author-block={block.id} data-block-type={block.type}>
-        <div className="lba-actions"><h3>{index + 1}. {choices.find(item => item.type === block.type)?.label || block.type}</h3><button type="button" className="btn small" aria-label={`항목 ${index + 1} 위로`} disabled={uploadIds.includes(block.id) || index === 0} onClick={() => move(index, -1)}>↑</button><button type="button" className="btn small" aria-label={`항목 ${index + 1} 아래로`} disabled={uploadIds.includes(block.id) || index === document.blocks.length - 1} onClick={() => move(index, 1)}>↓</button><button type="button" className="btn small" aria-label={`항목 ${index + 1} 삭제`} disabled={uploadIds.includes(block.id)} onClick={() => { if (window.confirm('이 항목을 편집 목록에서 삭제할까요? 저장한 뒤 반영되며 이전 학생 답변은 보관됩니다.')) setDocument(previous => ({ ...previous, blocks: previous.blocks.filter((_, i) => i !== index) })); }}>삭제</button></div>
+  function renderBlock(block: LessonBlock, index: number) { return <article className={`lba-block${blockDrag.overId === block.id ? ' reorder-item-over' : ''}`} key={block.id} data-author-block={block.id} data-block-type={block.type} {...blockDrag.row(block.id)}>
+        <div className="lba-actions">{blockDrag.handle(block.id, `항목 ${index + 1}`)}<h3>{index + 1}. {choices.find(item => item.type === block.type)?.label || block.type}</h3><button type="button" className="btn small" aria-label={`항목 ${index + 1} 위로`} disabled={uploadIds.includes(block.id) || index === 0} onClick={() => move(index, -1)}>↑</button><button type="button" className="btn small" aria-label={`항목 ${index + 1} 아래로`} disabled={uploadIds.includes(block.id) || index === document.blocks.length - 1} onClick={() => move(index, 1)}>↓</button><button type="button" className="btn small" aria-label={`항목 ${index + 1} 삭제`} disabled={uploadIds.includes(block.id)} onClick={() => { if (window.confirm('이 항목을 편집 목록에서 삭제할까요? 저장한 뒤 반영되며 이전 학생 답변은 보관됩니다.')) setDocument(previous => ({ ...previous, blocks: previous.blocks.filter((_, i) => i !== index) })); }}>삭제</button></div>
         {block.type === 'text' ? editingTextId === block.id
           ? <LessonBodyEditor label={`항목 ${index + 1} 본문`} value={block.content || ''} disabled={disabled || conflict} onChange={content => update(block.id, { content })} />
           : <div><div className="lba-text-preview"><LessonText text={serializeLessonDocument(lessonDocumentForEditor(block.content || '본문을 입력해 주세요.'))} /></div><button type="button" className="btn small" onClick={() => setEditingTextId(block.id)} aria-label={`항목 ${index + 1} 본문 편집`}>본문 편집</button></div>
