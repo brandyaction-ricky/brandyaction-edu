@@ -176,9 +176,11 @@ const nav = [
 export function Platform({
   path,
   user: initialUser,
+  adminContent,
 }: {
   path: string[];
   user: User | null;
+  adminContent?: ReactNode;
 }) {
   const router = useRouter();
   const admin = path[0] === "admin";
@@ -246,11 +248,13 @@ export function Platform({
   const readRequest = useRef<AbortController | null>(null);
   const mutationGate = useRef(createMutationGate<Record<string, unknown>>());
   const adminSection =
-    path[1] === "product-editor"
-      ? "products"
-      : path[1] === "learning-editor"
-        ? "learning"
-        : path[1] || "home";
+    adminContent !== undefined
+      ? "home"
+      : path[1] === "product-editor"
+        ? "products"
+        : path[1] === "learning-editor"
+          ? "learning"
+          : path[1] || "home";
   const editorRecordId = ["product-editor", "learning-editor"].includes(path[1])
     ? searchParams.get("id") || ""
     : "";
@@ -891,7 +895,7 @@ export function Platform({
     return <Checkout data={data} user={user} pending={pending} send={send} />;
   }
   function adminView() {
-    if (accessDenied) return <div className="wrap"><AdminEmptyState title="이 메뉴에 접근할 운영 권한이 없습니다." action={<div className="row wrap"><Link className="btn primary" href="/admin">운영 홈으로</Link><Link className="btn" href="/my">마이페이지</Link></div>}>현재 계정에 부여된 운영 범위에서 다른 메뉴를 선택해 주세요.</AdminEmptyState></div>;
+    if (accessDenied || (adminContent !== undefined && user?.role === 'staff')) return <div className="wrap"><AdminEmptyState title="이 메뉴에 접근할 운영 권한이 없습니다." action={<div className="row wrap"><Link className="btn primary" href="/admin">운영 홈으로</Link><Link className="btn" href="/my">마이페이지</Link></div>}>현재 계정에 부여된 운영 범위에서 다른 메뉴를 선택해 주세요.</AdminEmptyState></div>;
     if (!["admin", "staff"].includes(user?.role || ""))
       return (
         <div className="wrap">
@@ -904,7 +908,7 @@ export function Platform({
         (s.key !== "staff" &&
           user!.permissions?.[sectionScopes[s.key]] === true),
     );
-    const key = path[1] || "overview";
+    const key = adminContent !== undefined ? 'diagnosis-management' : path[1] || "overview";
     const section = available.find(
       (s) =>
         s.key ===
@@ -947,6 +951,8 @@ export function Platform({
         <MarketingWorkspaceNav current={key} available={available} search={searchParams.toString()} prefetchSection={prefetchAdminSection} />
         {!hasCurrentAdminRead && (key !== 'orders' || error) ? (
           error ? <AdminInlineError onRetry={() => void refresh(true)}>화면 정보를 불러오지 못했습니다. 연결 상태를 확인해 주세요.</AdminInlineError> : <AdminLoadingState title="메뉴 내용을 불러오는 중입니다." description="현재 운영 데이터를 안전하게 확인하고 있습니다."/>
+        ) : adminContent !== undefined ? (
+          adminContent
         ) : key === "overview" ? (
           <Overview data={data} available={available} />
         ) : !section ? (
