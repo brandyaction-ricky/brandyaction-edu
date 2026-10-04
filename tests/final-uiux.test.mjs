@@ -188,6 +188,9 @@ test('home customer stories carousel and accessible profile dropdown are present
 });
 test('three signup methods and product detail variants use the final publishing structures', () => {
   const { AuthView, ProductDetail, ArticlesView, StoriesView } = load('app/ui/final/public-views.tsx');
+  const authCss = read('app/ui/google-id-signin.css');
+  assert.match(authCss, /\.auth-social-stack\{width:min\(100%,400px\);margin-inline:auto\}/);
+  assert.match(authCss, /\.form-card>\.email-auth\{width:min\(100%,400px\);margin-inline:auto\}/);
   for (const signup of [false, true]) {
     const markup = html(AuthView, { signup, pending: false, social: send, next: '/my' });
     assert.match(markup, /form-card/); assert.match(markup, /카카오로 계속하기/); assert.match(markup, /Google로 계속하기/); assert.doesNotMatch(markup, /type="password"/);

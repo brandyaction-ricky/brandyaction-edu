@@ -1,4 +1,5 @@
 .edu-front .auth-social-stack{width:min(100%,400px);margin-inline:auto}
+.edu-front .form-card>.email-auth{width:min(100%,400px);margin-inline:auto}
 .edu-front .auth-social-stack>.btn,.edu-front .google-id-button,.edu-front .google-id-loading{height:40px;min-height:40px}
 .edu-front .google-id-signin{position:relative;width:100%}
 .edu-front .google-id-button{display:flex;justify-content:center;overflow:hidden}
