@@ -34,7 +34,7 @@ test('install prompt waits for an explicit click, survives menu changes, and com
 for (const device of ['ios', 'ipad'] as const) test(`${device} gets manual Home Screen instructions and no automatic permission prompt`, async ({ page }, info) => {
   await setup(page, { [device]: true }); await page.goto('/app-install-test'); await panel(page).getByRole('button', { name: '앱 추가 방법 보기' }).click(); await expect(panel(page)).toContainText('Safari'); await expect(panel(page)).toContainText('동작 편집'); await expect(panel(page)).toContainText('웹 앱으로 열기');
   await expect(panel(page)).toContainText('인터넷 연결'); await expect(page.getByRole('button', { name: '앱 설치하기' })).toHaveCount(0);
-  await expect(panel(page).locator('img')).toHaveJSProperty('naturalWidth', 192); await panel(page).scrollIntoViewIfNeeded(); await page.screenshot({ path: info.outputPath('app-install-apple.png'), fullPage: false });
+  await expect(panel(page).locator('.app-install-heading img')).toHaveJSProperty('naturalWidth', 192); await panel(page).scrollIntoViewIfNeeded(); await page.screenshot({ path: info.outputPath('app-install-apple.png'), fullPage: false });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(await page.evaluate(() => innerWidth)); expect(await page.evaluate(() => (window as TestWindow).eduPermissionCalls)).toBe(0);
 });
 test('embedded browser shows a clean launch URL and copy failure leaves manual instructions available', async ({ page }) => {
@@ -104,7 +104,15 @@ test('actual Chrome screenshots load, enlarge with keyboard, close with Escape a
  await page.screenshot({path:info.outputPath('actual-chrome-menu-enlarged.png'),fullPage:false});
  await page.keyboard.press('Escape');await expect(dialog).not.toBeVisible();await expect(enlarge).toBeFocused();
  await panel(page).getByRole('button',{name:'Chrome 설치 창에서 사이트 확인하기 크게 보기',exact:true}).click();await page.getByRole('button',{name:'사진 닫기'}).click();
- await panel(page).getByRole('button',{name:'아이폰·아이패드'}).click();await expect(panel(page).locator('.app-install-shot')).toHaveCount(0);await expect(panel(page).getByText('이 기기의 설치 사진은 준비 중이에요. 지금은 아래 글을 따라 추가해 주세요.')).toBeVisible();
+ await panel(page).getByRole('button',{name:'아이폰·아이패드'}).click();await expect(panel(page).locator('.app-install-shot')).toHaveCount(2);await expect(panel(page)).toContainText('설명용 그림');
  expect(await page.evaluate(()=>(window as TestWindow).eduPromptCalls)).toBe(0);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
+for (const device of ['아이폰·아이패드', '갤럭시·안드로이드']) test(`${device} illustrations load and zoom without pretending to be device photos`, async ({page},info)=>{
+ await setup(page);await page.goto('/app-install-test');await panel(page).getByRole('button',{name:'앱 추가 방법 보기'}).click();await panel(page).getByRole('button',{name:device}).click();
+ const figures=panel(page).locator('.app-install-shot');await expect(figures).toHaveCount(2);
+ for(const figure of await figures.all()){await expect(figure.locator('figcaption')).toContainText('설명용 그림');const image=figure.locator('button img');await image.scrollIntoViewIfNeeded();await expect.poll(()=>image.evaluate((el:HTMLImageElement)=>el.complete&&el.naturalWidth===600)).toBe(true);await expect(image).toHaveAttribute('alt',/설명용 그림/);}
+ const zoom=figures.first().getByRole('button');await zoom.focus();await page.keyboard.press('Enter');const dialog=page.getByRole('dialog');await expect(dialog).toBeVisible();await page.keyboard.press('Escape');await expect(dialog).not.toBeVisible();await expect(zoom).toBeFocused();await zoom.click();await page.getByRole('button',{name:'그림 닫기',exact:true}).click();await expect(dialog).not.toBeVisible();
+ await panel(page).screenshot({path:info.outputPath(device==='아이폰·아이패드'?'install-iphone-illustration.png':'install-android-illustration.png'),animations:'disabled'});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect(await page.evaluate(()=>(window as TestWindow).eduPromptCalls)).toBe(0);
 });
