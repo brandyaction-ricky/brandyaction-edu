@@ -3,3 +3,75 @@
 .onboarding-manual-link{display:block;width:100%;margin-top:16px;padding:12px;border:1px solid #cdd0d4;border-radius:8px;background:#fff;color:#222}
 .onboarding-return-hint,.onboarding-fallback{margin-top:16px;font-size:14px}.onboarding-fallback a{font-weight:700;text-decoration:underline}.onboarding-next-step{margin-top:24px;padding:22px;border:1px solid #d9dce0;border-radius:12px;background:#f7f8f9}.onboarding-next-step h3{margin:0 0 8px;font-size:18px}.onboarding-next-step p{margin:0 0 18px}.onboarding-next-step .btn{display:inline-flex;justify-content:center}
 @media(max-width:600px){.onboarding-next-step .btn{width:100%}}
+
+/* Customer purchase onboarding — compact, guided completion flow. */
+.purchase-onboarding-user{padding:0 0 var(--space-16);background:var(--surface-subtle)}
+.purchase-onboarding-user .onboarding-header{height:64px;border-bottom:1px solid var(--line);background:var(--surface-raised)}
+.purchase-onboarding-user .onboarding-header-inner{height:100%;display:flex;align-items:center;justify-content:space-between;gap:var(--space-6)}
+.purchase-onboarding-user .onboarding-brand{display:flex;align-items:baseline;gap:var(--space-2);font-size:var(--type-body);font-weight:800;letter-spacing:-.04em}
+.purchase-onboarding-user .onboarding-brand span{font-size:var(--type-eyebrow);font-weight:650;letter-spacing:.08em;color:var(--text-secondary)}
+.purchase-onboarding-user .onboarding-header-link{font-size:var(--type-small);font-weight:650}
+.purchase-onboarding-user .onboarding-shell{max-width:760px;padding-top:var(--space-8)}
+.purchase-onboarding-user .onboarding-title-block h1{font-size:var(--type-h2)}
+.purchase-onboarding-user .onboarding-title-block p{margin-top:var(--space-1);font-size:var(--type-small);color:var(--text-secondary)}
+.purchase-onboarding-user .onboarding-title-block>span{display:block;margin-top:var(--space-2);font-size:var(--type-caption);color:var(--text-tertiary)}
+.purchase-onboarding-user .onboarding-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--space-2);margin:var(--space-4) 0 0;padding:0;list-style:none}
+.purchase-onboarding-user .onboarding-steps li{display:grid;gap:2px;min-height:58px;padding:var(--space-3);border:1px solid var(--line);border-radius:var(--radius-md);background:var(--surface-raised)}
+.purchase-onboarding-user .onboarding-steps li span{font-size:var(--type-eyebrow);color:var(--text-secondary)}
+.purchase-onboarding-user .onboarding-steps li strong{font-size:var(--type-small)}
+.purchase-onboarding-user .onboarding-steps li.active,.purchase-onboarding-user .onboarding-steps li.complete{border-color:var(--ba-red);background:var(--ba-red);color:var(--text-inverse)}
+.purchase-onboarding-user .onboarding-steps li.active span,.purchase-onboarding-user .onboarding-steps li.complete span{color:#ffe8ea}
+.purchase-onboarding-user .onboarding-panel{margin-top:var(--space-4);padding:var(--space-6);border-radius:var(--radius-lg)}
+.purchase-onboarding-user .onboarding-guide>h2{font-size:var(--type-h3)}
+.purchase-onboarding-user .onboarding-guide>p{margin-top:var(--space-2);font-size:var(--type-small);line-height:1.75}
+.purchase-onboarding-user .onboarding-device-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);margin-top:var(--space-5)}
+.purchase-onboarding-user .onboarding-device-card{min-width:0;padding:var(--space-4);border:1px solid var(--line);border-radius:var(--radius-md);background:var(--surface-raised)}
+.purchase-onboarding-user .onboarding-device-title{display:flex;align-items:flex-start;gap:var(--space-3)}
+.purchase-onboarding-user .onboarding-device-title>svg{width:22px;height:22px;margin-top:1px;color:var(--text-secondary)}
+.purchase-onboarding-user .onboarding-device-title h3{font-size:var(--type-body)}
+.purchase-onboarding-user .onboarding-device-title p,.purchase-onboarding-user .onboarding-pc-card>p{margin-top:var(--space-1);font-size:var(--type-small);line-height:1.65;color:var(--text-secondary)}
+.purchase-onboarding-user .onboarding-options{gap:var(--space-2);margin-top:var(--space-4)}
+.purchase-onboarding-user .onboarding-options button{min-height:44px;padding:var(--space-3);border-radius:var(--radius-sm);font-size:var(--type-small)}
+.purchase-onboarding-user .onboarding-instruction{margin-top:var(--space-4);font-size:var(--type-small)}
+.purchase-onboarding-user .onboarding-instruction p{font-size:var(--type-small);line-height:1.7}
+.purchase-onboarding-user .onboarding-install-actions{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2);margin:var(--space-3) 0}
+.purchase-onboarding-user .onboarding-install-actions .btn{padding-inline:var(--space-2)}
+.purchase-onboarding-user .onboarding-enter-button{width:100%;margin-top:var(--space-4)}
+.purchase-onboarding-user .onboarding-enter-button svg{width:17px;height:17px}
+.purchase-onboarding-user .onboarding-pc-guide{display:flex;align-items:center;justify-content:center;gap:var(--space-3);min-height:108px;margin-top:var(--space-4);border:1px dashed var(--border-strong);border-radius:var(--radius-sm);color:var(--text-tertiary);background:var(--surface-subtle)}
+.purchase-onboarding-user .onboarding-pc-guide svg{width:24px;height:24px}
+.purchase-onboarding-user .onboarding-pc-guide svg:nth-child(2){width:17px;height:17px}
+.purchase-onboarding-user .onboarding-confirm{display:flex;align-items:center;gap:var(--space-3);margin-top:var(--space-4);padding:var(--space-3) var(--space-4);border:1px solid var(--line);border-radius:var(--radius-md);background:var(--surface-subtle);cursor:pointer}
+.purchase-onboarding-user .onboarding-confirm input{margin:0;width:20px;min-height:20px}
+.purchase-onboarding-user .onboarding-confirm span{display:grid;gap:2px;min-width:0}
+.purchase-onboarding-user .onboarding-confirm strong{font-size:var(--type-small)}
+.purchase-onboarding-user .onboarding-confirm small{font-size:var(--type-caption);font-weight:400;color:var(--text-secondary)}
+.purchase-onboarding-user .onboarding-confirm>svg{margin-left:auto;width:18px;height:18px;color:var(--ba-success)}
+.purchase-onboarding-user .onboarding-fallback{padding:var(--space-3);border-radius:var(--radius-sm);background:var(--ba-warning-soft)}
+.purchase-onboarding-user .onboarding-next-preview{display:flex;align-items:center;justify-content:space-between;gap:var(--space-6);margin-top:var(--space-4);padding:var(--space-5) var(--space-6);border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--surface-raised)}
+.purchase-onboarding-user .onboarding-next-preview>div{min-width:0}
+.purchase-onboarding-user .onboarding-next-preview span{font-size:var(--type-eyebrow);color:var(--text-tertiary)}
+.purchase-onboarding-user .onboarding-next-preview h2{margin-top:2px;font-size:var(--type-body)}
+.purchase-onboarding-user .onboarding-next-preview p{margin-top:2px;font-size:var(--type-small);color:var(--text-secondary)}
+.purchase-onboarding-user .onboarding-next-preview:not(.ready){background:#fafafa;color:var(--text-secondary)}
+.purchase-onboarding-user .onboarding-next-preview .btn{flex-shrink:0}
+.purchase-onboarding-user .onboarding-next-preview .btn svg{width:17px;height:17px}
+
+@media(max-width:680px){
+  .purchase-onboarding-user{padding-bottom:var(--space-8)}
+  .purchase-onboarding-user .onboarding-header{height:56px}
+  .purchase-onboarding-user .onboarding-shell{padding-top:var(--space-6)}
+  .purchase-onboarding-user .onboarding-title-block h1{font-size:var(--type-h3)}
+  .purchase-onboarding-user .onboarding-steps{grid-template-columns:1fr;gap:var(--space-2)}
+  .purchase-onboarding-user .onboarding-steps li{display:flex;align-items:center;justify-content:space-between;min-height:48px;padding:var(--space-2) var(--space-3)}
+  .purchase-onboarding-user .onboarding-panel{padding:var(--space-4)}
+  .purchase-onboarding-user .onboarding-device-grid{grid-template-columns:1fr}
+  .purchase-onboarding-user .onboarding-pc-card{display:none}
+  .purchase-onboarding-user .onboarding-next-preview{align-items:stretch;flex-direction:column;padding:var(--space-4)}
+  .purchase-onboarding-user .onboarding-next-preview .btn{width:100%}
+}
+
+@media(max-width:380px){
+  .purchase-onboarding-user .onboarding-header-link{display:none}
+  .purchase-onboarding-user .onboarding-install-actions{grid-template-columns:1fr}
+}

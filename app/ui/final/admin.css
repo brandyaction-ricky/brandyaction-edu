@@ -224,4 +224,3 @@
 
 /* The legacy generic input rules must not move search text over the icon. */
 .edu-admin .admin-search-field input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]){padding-left:40px}
-

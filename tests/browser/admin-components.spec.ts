@@ -4,7 +4,7 @@ test.beforeEach(async ({ page }) => { await page.goto('/admin-component-system-t
 
 test('tokens, controls and feedback expose default, focus, disabled, loading and error states', async ({ page, viewport }) => {
   await expect(page.getByRole('heading', { name: '컴포넌트 검증' })).toBeVisible();
-  await expect(page.locator('.edu-admin')).toHaveCSS('--admin-control-height', '40px');
+  await expect(page.locator('.edu-admin')).toHaveCSS('--adm-control', '36px');
   await expect(page.getByRole('button', { name: 'disabled' })).toBeDisabled();
   await expect(page.getByRole('button', { name: '전체 2' })).toHaveCSS('font-size', '13px');
   await expect(page.locator('.admin-button[aria-busy=true]')).toBeDisabled();
@@ -106,7 +106,7 @@ test('admin workspace stays inside 1280 and 1440 desktop viewports', async ({ pa
       };
     });
     expect(layout.pageFits, `${width}px page overflow`).toBe(true);
-    expect(layout.controlSizes.every(control => control.height === 40), JSON.stringify(layout.controlSizes)).toBe(true);
+    expect(layout.controlSizes.every(control => control.height === 36), JSON.stringify(layout.controlSizes)).toBe(true);
     expect(layout.actionVisible, `${width}px action column`).toBe(true);
   }
 });

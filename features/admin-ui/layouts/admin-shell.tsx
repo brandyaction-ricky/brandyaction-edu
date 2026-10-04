@@ -145,7 +145,7 @@ export function AdminShell({
     <>
       <a className="skip" href="#admin-content">본문으로 이동</a>
       {mobile && <button type="button" className="admin-sidebar-backdrop" aria-label="관리자 메뉴 닫기" onClick={() => setMobile(false)}/>}
-      <aside ref={sidebarRef} className={`sidebar ${mobile ? 'open' : ''}`} id="admin-sidebar" role={mobile ? 'dialog' : undefined} aria-modal={mobile ? 'true' : undefined} aria-label={mobile ? '관리자 메뉴' : undefined}>
+      <aside ref={sidebarRef} className={`sidebar adm-sidebar ${mobile ? 'open' : ''}`} id="admin-sidebar" role={mobile ? 'dialog' : undefined} aria-modal={mobile ? 'true' : undefined} aria-label={mobile ? '관리자 메뉴' : undefined}>
         <button
           type="button"
           className="btn ghost sidebar-close"
@@ -214,8 +214,8 @@ export function AdminShell({
           </div>
         </Link>
       </aside>
-      <div className="app" inert={mobile ? true : undefined}>
-        <header className="topbar">
+      <div className="app adm-main" inert={mobile ? true : undefined}>
+        <header className="topbar adm-topbar">
           <div className="crumb">
             <button
               ref={menuButtonRef}
@@ -245,7 +245,7 @@ export function AdminShell({
           </div>
         </header>
         {process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' && <LearningNoticeBar/>}
-        <div className={`content admin-content-${contentWidth}`} id="admin-content" tabIndex={-1}>
+        <div className={`content adm-page admin-content-${contentWidth}`} id="admin-content" tabIndex={-1}>
           {children}
         </div>
       </div>

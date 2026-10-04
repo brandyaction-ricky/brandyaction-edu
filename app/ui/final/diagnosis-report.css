@@ -75,3 +75,40 @@
 .diagnosis-report-table th,.diagnosis-report-table td{padding:12px 14px;text-align:left;border:1px solid #e4e6ea;vertical-align:top}
 .diagnosis-report-table th{background:#f5f6f8;font-weight:700}
 @media(max-width:520px){.edu-diagnosis .diagnosis-report{padding:16px 0}.diagnosis-report-actions{flex-direction:column}.diagnosis-report-actions>*{max-width:none;width:100%;min-height:48px}.diagnosis-report-preview>div:first-child{padding:14px;flex-wrap:wrap}.diagnosis-report-document{padding:20px 16px}.diagnosis-report-document h2{font-size:22px}.diagnosis-report-footer>*{width:100%;justify-content:center}.diagnosis-report-steps{gap:6px;font-size:13px}}
+
+/* Review state: uploaded N6 reference, preserving polling and exit behavior. */
+.edu-diagnosis .diagnosis-report.is-needs_review{padding:0 20px 64px}
+.diagnosis-report.is-needs_review .diagnosis-report-steps{max-width:720px;margin-bottom:48px;padding:22px 16px 24px;border:0;border-radius:0;background:transparent}
+.diagnosis-report.is-needs_review .diagnosis-report-steps li{gap:7px;color:#959ca7}
+.diagnosis-report.is-needs_review .diagnosis-report-steps li+li:before{background:#e1e4e9}
+.diagnosis-report.is-needs_review .diagnosis-report-steps .is-complete{color:#d4162f}
+.diagnosis-report.is-needs_review .diagnosis-report-steps .is-complete .diagnosis-step-marker{background:#fde9ec;color:#d4162f}
+.diagnosis-report.is-needs_review .diagnosis-report-steps .is-complete+li:before{background:#ee7d8d}
+.diagnosis-report.is-needs_review .diagnosis-report-steps li.is-review{color:#d4162f}
+.diagnosis-report.is-needs_review .diagnosis-report-steps li.is-review .diagnosis-step-marker{background:#fff;color:#d4162f;box-shadow:0 0 0 4px #fff0f2;border:1px solid #f4a6b0}
+.diagnosis-report.is-needs_review .diagnosis-report-summary,.diagnosis-report.is-needs_review .diagnosis-report-details{width:100%;max-width:710px;box-sizing:border-box;margin-left:auto;margin-right:auto;border:1px solid #dfe3e8;border-radius:18px;background:#fff;text-align:left}
+.diagnosis-report.is-needs_review .diagnosis-report-summary{padding:38px 44px 34px}
+.diagnosis-report.is-needs_review .diagnosis-report-icon{display:inline-flex;width:34px;height:34px;margin:0 10px 18px 0;border-radius:9px;background:#fff0f2;color:#d4162f;vertical-align:middle}
+.diagnosis-report.is-needs_review .diagnosis-report-icon svg{width:18px;height:18px}
+.diagnosis-report.is-needs_review .diagnosis-eyebrow{display:inline-block;vertical-align:middle;color:#d4162f}
+.edu-diagnosis .diagnosis-report.is-needs_review .diagnosis-report-summary h1{width:auto;max-width:none;margin:0 0 24px;padding:0;border:0;border-radius:0;background:transparent;font-size:32px;line-height:1.35;text-align:left}
+.diagnosis-report.is-needs_review .diagnosis-report-description{max-width:none;margin:0;padding:20px 22px;border-left:4px solid #d4162f;border-radius:0 12px 12px 0;background:#fff6f7;color:#737b87;text-align:left}
+.diagnosis-report.is-needs_review .diagnosis-report-description span+span{margin-top:5px}
+.diagnosis-report.is-needs_review .diagnosis-review-return{width:100%;margin-top:26px;min-height:56px;border-radius:10px}
+.diagnosis-report.is-needs_review .diagnosis-report-details{margin-top:16px;padding:0 30px}
+.diagnosis-report.is-needs_review .diagnosis-report-details summary{padding:20px 0 14px;cursor:pointer}
+.diagnosis-report.is-needs_review .diagnosis-report-details summary:hover{background:transparent}
+.diagnosis-report.is-needs_review .diagnosis-report-details-body{padding:0 0 24px;border-top:0}
+.diagnosis-report.is-needs_review .diagnosis-report-details-body>div{padding:18px 0}
+.diagnosis-report.is-needs_review .diagnosis-report-details-body>div+div{border-top:1px solid #e5e8ec}
+.diagnosis-report.is-needs_review .diagnosis-report-details-body h2{font-size:14px}
+.diagnosis-report.is-needs_review .diagnosis-report-footer{max-width:710px;margin:18px auto 0;padding-top:0;border:0}
+.diagnosis-report.is-needs_review .diagnosis-report-footer:empty{display:none}
+@media(max-width:600px){
+  .edu-diagnosis .diagnosis-report.is-needs_review{padding:0 16px 40px}
+  .diagnosis-report.is-needs_review .diagnosis-report-steps{width:100%;margin-bottom:28px;padding-inline:0;font-size:12px}
+  .diagnosis-report.is-needs_review .diagnosis-report-summary{padding:28px 22px 24px;border-radius:14px}
+  .edu-diagnosis .diagnosis-report.is-needs_review .diagnosis-report-summary h1{font-size:27px}
+  .diagnosis-report.is-needs_review .diagnosis-report-description{padding:16px}
+  .diagnosis-report.is-needs_review .diagnosis-report-details{padding:0 20px;border-radius:14px}
+}

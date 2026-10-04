@@ -41,7 +41,7 @@ function Field({ label, children, wide = false, hint }: { label: string; childre
   return <AdminFormField className={"field" + (wide ? " wide" : "")} label={label} helper={hint}>{children}</AdminFormField>;
 }
 
-function LessonQuiz({ mission, current, pending, send, onDirty }: { mission: Row; current?: Row; pending: boolean; send: WorkflowSend; onDirty: (dirty: boolean) => void }) {
+function LessonQuiz({ mission, current, pending, send, onDirty, stepLabel }: { mission: Row; current?: Row; pending: boolean; send: WorkflowSend; onDirty: (dirty: boolean) => void; stepLabel?: string }) {
   const [questions, setQuestions] = useState<QuizQuestion[]>(() => (current?.questions as QuizQuestion[]) || []);
   const pass = Number(current?.pass_percent || 100);
   const [message, setMessage] = useState("");
@@ -76,7 +76,7 @@ function LessonQuiz({ mission, current, pending, send, onDirty }: { mission: Row
     finally { setSaving(false); }
   }
   return <form onSubmit={event => void save(event)}>
-    <div className="panel-head learning-quiz-head"><div><h2>확인 퀴즈 <span className="muted">{questions.length}문항</span></h2><p>선택지 앞 원을 눌러 정답을 지정합니다.</p></div><button type="button" className="btn small" onClick={addQuestion} disabled={pending || saving || questions.length >= 20}><Plus size={16} />문제 추가</button></div>
+    <div className="panel-head learning-quiz-head"><div><h2>{stepLabel && `${stepLabel} · `}확인 퀴즈 <span className="muted">{questions.length}문항</span></h2><p>선택지 앞 원을 눌러 정답을 지정합니다.</p></div><button type="button" className="btn small" onClick={addQuestion} disabled={pending || saving || questions.length >= 20}><Plus size={16} />문제 추가</button></div>
     <fieldset className="section-pad learning-editor-fields" disabled={pending || saving}>
       {questions.length ? questions.map((question, index) => <article className="question-editor" key={question.id}>
         <div className="question-title-row"><span>{index + 1}.</span><input type="text" aria-label={`${index + 1}번 문제`} value={question.prompt} placeholder="문제를 입력해 주세요" maxLength={1000} required onChange={event => update(index, { prompt: event.target.value })} /><button type="button" className="btn iconbtn ghost danger" aria-label={`${index + 1}번 문제 삭제`} onClick={() => { setQuestions(previous => previous.filter((_, i) => i !== index)); setDirty(true); }}><X size={16} /></button></div>
@@ -330,7 +330,7 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
     requestAnimationFrame(() => previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
   return <div className={"learning-editor" + (embedded ? " learning-editor--embedded" : "")}>
-    {embedded ? <header className="studio-document-header"><div><p className="meta">{num(week, "week_number")}주차 · {basic.day_number}일차</p><label>수업 제목<input form={formId} aria-label="수업 제목" required maxLength={300} value={basic.title} onChange={event => changeBasic("title", event.target.value)} disabled={busy} /></label><p className="meta">{row?.is_published && week?.is_published ? (publication ? "초안 저장 후 학생 화면에 반영할 수 있습니다." : "공개 수업 · 저장하면 수강생 화면에도 반영됩니다.") : row?.is_published ? "상위 주차가 비공개여서 수강생에게 보이지 않습니다." : "비공개 수업 · 공개 설정을 바꾸지 않으면 계속 비공개입니다."}</p></div><div className="studio-document-actions"><AdminButton variant="outline" onClick={showPreview}>{previewOnly ? "편집으로" : "학습자 미리보기"}</AdminButton><AdminButton variant="primary" type="button" onClick={() => void save()} disabled={saveBlocked} aria-describedby={saveBlocked ? saveStatusId : undefined} loading={busy}>{publication ? "초안 저장" : "학습 저장"}</AdminButton></div></header> : <AdminHeading title="학습 콘텐츠 편집" eyebrow="LEARNING EDITOR" description={lessonId ? `Day ${basic.day_number} · ${t(week, "week_number") || "—"}주차 / ${basic.title}` : "일차별 학습 본문과 확인 퀴즈를 등록합니다."}>
+    {embedded ? <header className="studio-document-header adm-box"><div><p className="studio-step-label">1 · 수업 정보</p><p className="meta">{num(week, "week_number")}주차 · {basic.day_number}일차</p><label>수업 제목<input form={formId} aria-label="수업 제목" required maxLength={300} value={basic.title} onChange={event => changeBasic("title", event.target.value)} disabled={busy} /></label><p className="meta">{row?.is_published && week?.is_published ? (publication ? "초안 저장 후 학생 화면에 반영할 수 있습니다." : "공개 수업 · 저장하면 수강생 화면에도 반영됩니다.") : row?.is_published ? "상위 주차가 비공개여서 수강생에게 보이지 않습니다." : "비공개 수업 · 공개 설정을 바꾸지 않으면 계속 비공개입니다."}</p></div><div className="studio-document-actions"><AdminButton variant="outline" onClick={showPreview}>{previewOnly ? "편집으로" : "학습자 미리보기"}</AdminButton><AdminButton variant="primary" type="button" onClick={() => void save()} disabled={saveBlocked} aria-describedby={saveBlocked ? saveStatusId : undefined} loading={busy}>{publication ? "초안 저장" : "학습 저장"}</AdminButton></div></header> : <AdminHeading title="학습 콘텐츠 편집" eyebrow="LEARNING EDITOR" description={lessonId ? `Day ${basic.day_number} · ${t(week, "week_number") || "—"}주차 / ${basic.title}` : "일차별 학습 본문과 확인 퀴즈를 등록합니다."}>
       <AdminButton variant="outline" type="button" onClick={showPreview}>{previewOnly ? "편집으로" : "학습자 미리보기"}</AdminButton><AdminStatusBadge status={basic.is_published ? "published" : "hidden"} label={basic.is_published ? "공개" : "비공개"} />
     </AdminHeading>}
     {message && <div ref={saveFeedbackRef} className="notice learning-save-feedback" role="status" aria-live="polite"><strong>저장 안내</strong><span>{message}</span></div>}
@@ -342,14 +342,6 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
     </section>}
     {saveBlockedReason && <p id={saveStatusId} className="notice learning-save-status" role="status"><strong>저장 대기</strong> {saveBlockedReason}</p>}
     <div hidden={embedded} className="ops-callout mb16"><b>{basic.title || "새 학습"}</b> <span className="muted">· 본문과 확인 퀴즈를 함께 편집합니다.</span></div>
-    {publication && <section className="notice lesson-publication-panel" aria-label="초안과 학생 공개본">
-      <b>{publication.snapshot.revision === publication.snapshot.publishedRevision && publication.snapshot.publishedStamp === publication.snapshot.public.stamp ? '저장한 초안이 학생 화면에 반영됐습니다.' : publication.snapshot.revision ? '학생 화면에 반영하지 않은 초안이 있습니다.' : '편집 내용은 먼저 초안으로 저장합니다.'}</b>
-      <p>제목·본문·질문·영상은 초안으로 함께 보관합니다. 학생 화면에 반영을 누르기 전까지 기존 수업이 유지됩니다.</p>
-      {(uncertain || authorPublicChanged(publication.snapshot)) && <p role="alert">{uncertain ? '저장 상태를 다시 확인해야 합니다. 현재 내용을 내려받아 보관한 뒤 서버 초안을 다시 불러와 주세요.' : '다른 곳에서 학생 화면의 내용이나 공개 설정을 바꿨습니다. 공개본을 불러와 비교한 뒤 다시 편집해 주세요.'}</p>}
-      <div className="learning-draft-actions"><button type="button" className="btn" onClick={downloadAuthor} disabled={busy}>편집 내용 내려받기</button>{(!publication.isNew || uncertain) && <button type="button" className="btn" onClick={()=>void recoverAuthor(undefined,true)} disabled={busy || Boolean(blockEditingEnabled && !blockState.draftReady)}>서버 초안 다시 불러오기</button>}{!publication.isNew && <button type="button" className="btn" onClick={()=>void recoverAuthor()} disabled={busy || Boolean(blockEditingEnabled && !blockState.draftReady)}>현재 공개본 불러오기</button>}</div>
-      {publication.snapshot.history.length>0 && <details><summary>이전 초안·반영 이력 ({publication.snapshot.history.length}개)</summary><p>최근 20개 기록입니다. 불러오면 편집 화면만 바뀌며, 학생 화면은 직접 반영할 때 바뀝니다.</p>{publication.snapshot.history.map(item=><div key={item.revision} className="lesson-author-history"><span>{new Date(item.createdAt).toLocaleString('ko-KR')} · {item.baseline ? '기존 공개본' : item.published ? '반영한 내용' : '초안'} · {item.title || '제목 없음'}</span><button className="btn small" type="button" disabled={busy || Boolean(blockEditingEnabled && !blockState.draftReady)} onClick={()=>void recoverAuthor(item.revision)}>이 내용 불러오기</button></div>)}</details>}
-    </section>}
-    {blockEditingEnabled && actorId && <LearningEditorDraftPanel serverDrafts={Boolean(publication)} key={`${actorId}:${publication?.isNew ? 'new' : row?.id || 'new'}`} actorId={actorId} lessonId={publication?.isNew ? '' : row?.id || ''} dirty={dirty || blockState.dirty} ready={!busy && Boolean(blockState.draftReady)} capture={captureDraft} restore={restoreDraft} handleRef={draftRef} onPending={setDraftPending} />}
     <form ref={formRef} id={formId} noValidate onSubmit={event => { event.preventDefault(); void save(); }}>
       <EditorSettings embedded={embedded}>
       <section className="panel" hidden={previewOnly}>
@@ -364,11 +356,11 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
         </fieldset>
       </section>
       </EditorSettings>
-      {blockEditingEnabled && <section ref={blockSectionRef} className="panel mt24" hidden={previewOnly}><div className="panel-head"><h2>학습 구성</h2></div><div className="section-pad">
+      {blockEditingEnabled && <section ref={blockSectionRef} className="panel mt24 studio-learning-section" hidden={previewOnly}><div className="panel-head"><h2>{embedded && "2 · "}학습 구성</h2></div><div className="section-pad">
         {resourcePath && <p className="notice">등록된 자료 파일은 학습 본문 아래에서 계속 다운로드할 수 있습니다.</p>}
         <LessonBlockAuthor key={row?.id || 'new'} ref={blockRef} lessonId={lessonId} initialSnapshot={publication ? {revision:publication.snapshot.revision,document:publication.snapshot.payload.blocks.active ? publication.snapshot.payload.blocks.document : null,editable:true} : undefined} courseId={course?.id} sources={cardSources} legacyBlocks={legacyBlocks} disabled={pending || saving || uploadStatus === "uploading"} onState={setBlockState} />
       </div></section>}
-      {blockEditingEnabled && blockState.active && lessonId && (!publication || !publication.isNew) && <>{publication && <p className="notice">반복 학습 운영 설정은 아래에서 별도로 저장하며 바로 적용됩니다.</p>}<OngoingLessonSettings lessonId={lessonId} disabled={saveBlocked || dirty || blockState.dirty || Boolean(publication && publication.snapshot.revision !== publication.snapshot.publishedRevision)} /></>}
+      {blockEditingEnabled && blockState.active && lessonId && (!publication || !publication.isNew) && <section className="studio-ongoing-section"><p className="studio-step-label">{embedded && "3 · "}반복 학습 운영</p>{publication && <p className="notice">반복 학습 운영 설정은 아래에서 별도로 저장하며 바로 적용됩니다.</p>}<OngoingLessonSettings lessonId={lessonId} disabled={saveBlocked || dirty || blockState.dirty || Boolean(publication && publication.snapshot.revision !== publication.snapshot.publishedRevision)} /></section>}
       {!blockState.active && !(blockEditingEnabled && blockState.blocked) && <section className={"panel" + (previewOnly ? "" : " mt24")}>
         <div className="panel-head"><h2>학습 본문</h2><span className="meta">{t(course, "title") || "학습 콘텐츠와 미리보기"}</span></div>
         <div className={"section-pad lesson-body-grid" + (previewOnly ? " learning-preview-only" : "")}>
@@ -393,12 +385,25 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
           </aside>
         </div>
       </section>}
-      <div className="editor-savebar"><span id={`${saveStatusId}-bottom`} className="dirty-note" role="status">{saveBlockedReason || (dirty || blockState.dirty ? "저장하지 않은 변경사항이 있습니다." : "기본 정보와 학습 내용을 함께 저장합니다.")}</span><AdminButton variant="outline" type="button" onClick={close} disabled={busy} hidden={embedded}><ArrowLeft size={16} />목록으로</AdminButton><AdminButton variant="primary" type="submit" disabled={saveBlocked} aria-describedby={`${saveStatusId}-bottom`} loading={busy}>{blockState.uploading ? "파일 업로드 중…" : busy ? "저장 중…" : publication ? "초안 저장" : lessonId ? "학습 저장" : "학습 등록"}</AdminButton>{publication && <AdminButton variant="primary" type="button" disabled={saveBlocked} aria-describedby={`${saveStatusId}-bottom`} onClick={()=>void save(true)}>학생 화면에 반영</AdminButton>}</div>
+      <div className="editor-savebar adm-savebar"><span id={`${saveStatusId}-bottom`} className="dirty-note" role="status">{saveBlockedReason || (dirty || blockState.dirty ? "저장하지 않은 변경사항이 있습니다." : "기본 정보와 학습 내용을 함께 저장합니다.")}</span><AdminButton variant="outline" type="button" onClick={close} disabled={busy} hidden={embedded}><ArrowLeft size={16} />목록으로</AdminButton><AdminButton variant="primary" type="submit" disabled={saveBlocked} aria-describedby={`${saveStatusId}-bottom`} loading={busy}>{blockState.uploading ? "파일 업로드 중…" : busy ? "저장 중…" : publication ? "초안 저장" : lessonId ? "학습 저장" : "학습 등록"}</AdminButton>{publication && <AdminButton variant="primary" type="button" disabled={saveBlocked} aria-describedby={`${saveStatusId}-bottom`} onClick={()=>void save(true)}>학생 화면에 반영</AdminButton>}</div>
     </form>
-    <section className="panel mt24 learning-quiz-panel" hidden={previewOnly}>
+    <section className="panel mt24 learning-quiz-panel studio-quiz-section" hidden={previewOnly}>
       {publication && <p className="notice">아래 미션 확인 퀴즈는 별도 저장됩니다. 퀴즈 저장을 누르면 학생 화면에도 바로 반영됩니다. 본문 안에 넣은 확인 문제는 위 초안에 포함됩니다.</p>}
       {missions.length > 1 && <div className="section-pad learning-mission-picker"><Field label="퀴즈를 연결할 미션"><select value={mission?.id || ""} onChange={event => setSelectedMissionId(event.target.value)} disabled={busy || quizDirty}>{missions.map(item => <option key={item.id} value={item.id}>{t(item, "title")}</option>)}</select></Field></div>}
-      {mission ? <LessonQuiz key={`${mission.id}-${quiz?.revision || "new"}`} mission={mission} current={quiz} pending={busy} send={send} onDirty={setQuizDirty} /> : <><div className="panel-head"><h2>확인 퀴즈</h2><AdminLinkButton size="sm" href="/admin/missions">미션 관리</AdminLinkButton></div><div className="section-pad"><AdminEmptyState title={lessonId ? "연결된 미션이 없습니다." : "학습 등록 후 퀴즈를 연결할 수 있습니다."}>미션 관리에서 이 학습에 미션을 등록한 뒤 질문·선택지·정답을 설정하세요.</AdminEmptyState></div></>}
+      {mission ? <LessonQuiz key={`${mission.id}-${quiz?.revision || "new"}`} mission={mission} current={quiz} pending={busy} send={send} onDirty={setQuizDirty} stepLabel={embedded ? "4" : undefined} /> : <><div className="panel-head"><h2>{embedded && "4 · "}확인 퀴즈</h2><AdminLinkButton size="sm" href="/admin/missions">미션 관리</AdminLinkButton></div><div className="section-pad"><AdminEmptyState title={lessonId ? "연결된 미션이 없습니다." : "학습 등록 후 퀴즈를 연결할 수 있습니다."}>미션 관리에서 이 학습에 미션을 등록한 뒤 질문·선택지·정답을 설정하세요.</AdminEmptyState></div></>}
     </section>
+    {(publication || (blockEditingEnabled && actorId)) && <section className="studio-version-section" aria-label="버전과 임시저장">
+      {embedded && <header className="studio-section-heading"><span>5</span><div><h2>버전·임시저장</h2><p>초안, 공개본, 브라우저 임시저장을 한곳에서 관리합니다.</p></div></header>}
+      <div className="studio-version-grid">
+        {publication && <section className="notice lesson-publication-panel" aria-label="초안과 학생 공개본">
+          <b>{publication.snapshot.revision === publication.snapshot.publishedRevision && publication.snapshot.publishedStamp === publication.snapshot.public.stamp ? '저장한 초안이 학생 화면에 반영됐습니다.' : publication.snapshot.revision ? '학생 화면에 반영하지 않은 초안이 있습니다.' : '편집 내용은 먼저 초안으로 저장합니다.'}</b>
+          <p>제목·본문·질문·영상은 초안으로 함께 보관합니다. 학생 화면에 반영을 누르기 전까지 기존 수업이 유지됩니다.</p>
+          {(uncertain || authorPublicChanged(publication.snapshot)) && <p role="alert">{uncertain ? '저장 상태를 다시 확인해야 합니다. 현재 내용을 내려받아 보관한 뒤 서버 초안을 다시 불러와 주세요.' : '다른 곳에서 학생 화면의 내용이나 공개 설정을 바꿨습니다. 공개본을 불러와 비교한 뒤 다시 편집해 주세요.'}</p>}
+          <div className="learning-draft-actions"><button type="button" className="btn" onClick={downloadAuthor} disabled={busy}>편집 내용 내려받기</button>{(!publication.isNew || uncertain) && <button type="button" className="btn" onClick={()=>void recoverAuthor(undefined,true)} disabled={busy || Boolean(blockEditingEnabled && !blockState.draftReady)}>서버 초안 다시 불러오기</button>}{!publication.isNew && <button type="button" className="btn" onClick={()=>void recoverAuthor()} disabled={busy || Boolean(blockEditingEnabled && !blockState.draftReady)}>현재 공개본 불러오기</button>}</div>
+          {publication.snapshot.history.length>0 && <details><summary>이전 초안·반영 이력 ({publication.snapshot.history.length}개)</summary><p>최근 20개 기록입니다. 불러오면 편집 화면만 바뀌며, 학생 화면은 직접 반영할 때 바뀝니다.</p>{publication.snapshot.history.map(item=><div key={item.revision} className="lesson-author-history"><span>{new Date(item.createdAt).toLocaleString('ko-KR')} · {item.baseline ? '기존 공개본' : item.published ? '반영한 내용' : '초안'} · {item.title || '제목 없음'}</span><button className="btn small" type="button" disabled={busy || Boolean(blockEditingEnabled && !blockState.draftReady)} onClick={()=>void recoverAuthor(item.revision)}>이 내용 불러오기</button></div>)}</details>}
+        </section>}
+        {blockEditingEnabled && actorId && <LearningEditorDraftPanel serverDrafts={Boolean(publication)} key={`${actorId}:${publication?.isNew ? 'new' : row?.id || 'new'}`} actorId={actorId} lessonId={publication?.isNew ? '' : row?.id || ''} dirty={dirty || blockState.dirty} ready={!busy && Boolean(blockState.draftReady)} capture={captureDraft} restore={restoreDraft} handleRef={draftRef} onPending={setDraftPending} />}
+      </div>
+    </section>}
   </div>;
 }

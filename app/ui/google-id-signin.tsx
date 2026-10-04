@@ -4,6 +4,7 @@ import { googleIdDestination } from "@/lib/google-id-login";
 import { createClient } from "@/lib/supabase/client";
 import Script from "next/script";
 import { useCallback, useEffect, useRef, useState } from "react";
+import "./google-id-signin.css";
 
 type CredentialResponse = { credential?: string };
 type GoogleId = {

@@ -22,6 +22,6 @@ for (const area of ['frontend', 'admin']) {
       return `${scope} ${selector}`;
     });
   });
-  fs.writeFileSync(path.join(target, `${area}.css`), `/* Generated from final UIUX source; run node scripts/build-uiux-css.mjs. */\n${ast.toString()}\n`);
+  fs.writeFileSync(path.join(target, `${area}.css`), `/* Generated from final UIUX source; run node scripts/build-uiux-css.mjs. */\n${ast.toString().trimEnd()}\n`);
 }
 console.log('Final frontend/admin CSS generated with isolated scopes.');

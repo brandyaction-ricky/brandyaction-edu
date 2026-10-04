@@ -1,0 +1,5 @@
+.edu-front .auth-social-stack>.btn,.edu-front .google-id-button,.edu-front .google-id-loading{height:40px;min-height:40px}
+.edu-front .google-id-signin{position:relative;width:100%}
+.edu-front .google-id-button{display:flex;justify-content:center;overflow:hidden}
+.edu-front .google-id-button>div{max-width:100%}
+.edu-front .google-id-loading{position:absolute;inset:0;display:grid;place-items:center;color:var(--text-secondary);font-size:var(--type-small)}

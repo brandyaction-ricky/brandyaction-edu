@@ -14,12 +14,13 @@ test('Moonshot fourth buyer sees install and room guidance without a web survey'
   });
   await page.goto(`/purchase-onboarding?order=${order}`);
   await expect(page.getByRole('heading', { name: '4기 교육생 공지방에 입장해 주세요' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '캘린더에 추가' })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: '어떤 경로로 참여하셨나요?' })).toHaveCount(0);
   await page.getByRole('button', { name: '텔레그램이 처음이에요' }).click();
   await expect(page.getByRole('link', { name: 'iPhone 앱 설치' })).toHaveAttribute('href', 'https://telegram.org/dl/ios');
   await expect(page.getByRole('link', { name: 'Android 앱 설치' })).toHaveAttribute('href', 'https://telegram.org/dl/android');
-  await expect(page.getByText('1. 휴대폰에 텔레그램 앱을 설치하세요.')).toBeVisible();
-  await expect(page.getByText('2. 이 안내 화면으로 돌아와 아래 버튼으로 공지방에 입장하세요.')).toBeVisible();
+  await expect(page.getByText('앱이 없다면 먼저 설치해 주세요.')).toBeVisible();
+  await expect(page.getByText('설치와 가입을 마친 뒤 아래 버튼으로 입장하세요.')).toBeVisible();
   await expect(page.getByText(/닉네임\/4기|고정 게시물|휴대폰 번호로 가입/)).toHaveCount(0);
   await expect(page.getByRole('link', { name: '고객센터 문의' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: '내 클래스 보기' })).toHaveCount(0);
@@ -27,7 +28,7 @@ test('Moonshot fourth buyer sees install and room guidance without a web survey'
   const [room] = await Promise.all([page.waitForEvent('popup'), page.getByRole('button', { name: '텔레그램 공지방 입장' }).click()]);
   await expect(room).toHaveURL('https://t.me/+ExampleCode123');
   await expect(page).toHaveURL(`/purchase-onboarding?order=${order}`);
-  await expect(page.getByRole('heading', { name: '공지방에 들어오셨나요?' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'OT 일정과 참여 방법을 확인하세요' })).toBeVisible();
   await expect(page.getByRole('link', { name: '내 클래스 확인하기' })).toHaveAttribute('href', '/my/classes');
   expect(actions).toEqual(['link']);
 });
@@ -43,8 +44,8 @@ test('existing Telegram users keep only room entry and can retry a failed link r
   await page.goto(`/purchase-onboarding?order=${order}`);
   await expect(page.getByRole('button', { name: '텔레그램 공지방 입장' })).toHaveCount(0);
   await page.getByRole('button', { name: '이미 텔레그램을 사용해요' }).click();
-  await expect(page.getByText('아래 버튼으로 공지방에 입장하세요.')).toBeVisible();
-  await expect(page.locator('.purchase-onboarding a')).toHaveCount(0);
+  await expect(page.getByText('아래 버튼으로 공지방을 열어 주세요.')).toBeVisible();
+  await expect(page.getByText('여기에서 공지방 열기')).toHaveCount(0);
   await expect(page.getByText(/닉네임\/4기|고정 게시물/)).toHaveCount(0);
   await expect(page.getByRole('button', { name: '초대 링크 복사' })).toHaveCount(0);
   const enter = page.getByRole('button', { name: '텔레그램 공지방 입장' });

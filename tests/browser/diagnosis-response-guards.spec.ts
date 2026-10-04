@@ -27,7 +27,7 @@ async function frozenClock(page:Page){
 
 test('sub-second mouse and keyboard responses never save or advance; a one-second response does',async({page})=>{
   const state=await api(page,fixture({count:1,answered:0}));await frozenClock(page);
-  await page.goto('/diagnosis-test');await page.getByRole('button',{name:'시작하기',exact:true}).click();
+  await page.goto('/diagnosis-test');await page.getByRole('button',{name:'두 문장 비교 시작하기',exact:true}).click();
   await page.getByRole('radio').first().click();await expect(page.getByRole('alert')).toContainText('두 문장을 모두 읽고');
   await page.clock.fastForward(999);await page.keyboard.press('2');
   expect(state.writes).toBe(0);await expect(page.getByRole('radio',{checked:true})).toHaveCount(0);await expect(page.locator('.q-no')).toHaveText('Q 001');
@@ -40,16 +40,16 @@ test('sub-second mouse and keyboard responses never save or advance; a one-secon
 
 test('server-designated admin tests retain fast responses; the admin URL alone does not bypass the guard',async({page})=>{
   await frozenClock(page);const state=await api(page,fixture({count:1,answered:0,adminTest:true}));
-  await page.goto('/diagnosis-test?admin');await page.getByRole('button',{name:'시작하기',exact:true}).click();await page.keyboard.press('1');await page.clock.fastForward(600);
+  await page.goto('/diagnosis-test?admin');await page.getByRole('button',{name:'두 문장 비교 시작하기',exact:true}).click();await page.keyboard.press('1');await page.clock.fastForward(600);
   await expect.poll(()=>state.writes).toBe(1);expect(state.current.answers[0].ms).toBe(0);
   await page.unroute('**/api/platform/diagnosis/session');const ordinary=await api(page,fixture({count:1,answered:0}));
-  await page.goto('/diagnosis-test?admin');await page.getByRole('button',{name:'시작하기',exact:true}).click();await page.keyboard.press('1');
+  await page.goto('/diagnosis-test?admin');await page.getByRole('button',{name:'두 문장 비교 시작하기',exact:true}).click();await page.keyboard.press('1');
   await expect(page.getByRole('alert')).toContainText('두 문장을 모두 읽고');expect(ordinary.writes).toBe(0);
 });
 
 test('instructed check answers are still validated without the one-second restriction',async({page})=>{
   const state=await api(page,fixture({count:1,answered:0,check:true}));await frozenClock(page);
-  await page.goto('/diagnosis-test');await page.getByRole('button',{name:'시작하기',exact:true}).click();await page.keyboard.press('2');
+  await page.goto('/diagnosis-test');await page.getByRole('button',{name:'두 문장 비교 시작하기',exact:true}).click();await page.keyboard.press('2');
   await expect(page.getByRole('alert')).toContainText('안내와 다른 답');expect(state.writes).toBe(0);
   await page.keyboard.press('1');await page.clock.fastForward(600);await expect.poll(()=>state.writes).toBe(1);
 });
