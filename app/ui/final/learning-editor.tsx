@@ -22,6 +22,7 @@ import { authorPublicChanged, validateAuthorPayload, type AuthorPayload, type Au
 import { uuid } from '@/lib/edu-workflows';
 import { LessonAuthorWorkspace, authorRequest, readAuthor, type AuthorSession } from './lesson-author-workspace';
 import { useUnsavedLearningChanges } from './use-unsaved-learning-changes';
+import { authorValuesEqual, mergeAuthorDraft, type AuthorChoices, type AuthorConflict } from '@/lib/lesson-author-merge';
 
 export type LearningEditorSession = { dirty: boolean; busy: boolean; save: () => Promise<boolean> };
 function EditorSettings({ embedded, children }: { embedded?: boolean; children: ReactNode }) {
@@ -127,6 +128,10 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
   const [saving, setSaving] = useState(false);
   const [previewOnly, setPreviewOnly] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
+  const formId = useId();
+  const saveFeedbackRef = useRef<HTMLDivElement>(null);
+  const [draftConflict, setDraftConflict] = useState<{base:AuthorPayload;mine:AuthorPayload;latest:AuthorSnapshot;conflicts:AuthorConflict[]}|null>(null);
+  const [conflictChoices, setConflictChoices] = useState<AuthorChoices>({});
   const [quizDirty, setQuizDirty] = useState(false);
   const [selectedMissionId, setSelectedMissionId] = useState("");
   const previewRef = useRef<HTMLElement>(null);
@@ -142,7 +147,7 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
   }
   function restoreDraft(draft: LearningEditorDraft) {
     if (!blockRef.current) throw new Error('학습 구성을 불러온 뒤 다시 시도해 주세요.');
-    if (JSON.stringify(baseline.current) !== JSON.stringify(draft.base) && JSON.stringify(baseline.current) !== JSON.stringify(draft.form)) throw new Error('서버의 기본 정보나 본문이 변경됐습니다. 임시저장본을 내려받아 비교해 주세요.');
+    if (!authorValuesEqual(baseline.current, draft.base) && !authorValuesEqual(baseline.current, draft.form)) throw new Error('서버의 기본 정보나 본문이 변경됐습니다. 임시저장본을 내려받아 비교해 주세요.');
     blockRef.current.restoreDraft(draft.blocks);
     setBasic({ ...draft.form.basic }); setFormat(draft.form.format); setBodyText(draft.form.bodyText); setVideoUrl(draft.form.videoUrl); setExternalUrl(draft.form.externalUrl); setResourceName(draft.form.resourceName); setResourcePath(draft.form.resourcePath);
     setDirty(true); setPreviewOnly(false); setMessage(publication ? '임시저장본을 불러왔습니다. 내용을 확인한 뒤 초안 저장을 눌러 주세요.' : '임시저장본을 불러왔습니다. 내용을 확인한 뒤 학습 저장을 눌러 주세요.');
@@ -173,18 +178,22 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
   function changeBasic<K extends keyof typeof basic>(key: K, value: typeof basic[K]) { setBasic(previous => ({ ...previous, [key]: value })); setDirty(true); }
   function changeFormat(value: ContentType) { setFormat(value); setUploadStatus("idle"); setDirty(true); }
   function close() { if (!(dirty || blockState.dirty || quizDirty) || window.confirm("저장하지 않은 학습 변경사항이 있습니다. 목록으로 이동할까요?")) { draftRef.current?.saveNow(); back(); } }
-  async function save(publishing = false): Promise<boolean> {
-    if (saveBlocked) return false;
-    if (quizDirty) { setMessage("아래 확인 퀴즈의 변경사항을 먼저 저장해 주세요."); return false; }
-    if ((!publication || publishing) && blockState.active && !blockRef.current?.validate()) { setPreviewOnly(false); blockSectionRef.current?.scrollIntoView({ block: 'start' }); return false; }
-    if (format === "material" && uploadStatus !== "idle") {
+  function captureAuthorPayload() {
+    return validateAuthorPayload({form:{basic:{...basic},format,bodyText,videoUrl,externalUrl,resourceName,resourcePath},blocks:blockEditingEnabled ? {active:blockState.active,document:blockRef.current?.captureDraft().document || {schemaVersion:1,blocks:[],checklist:[]}} : publication!.snapshot.payload.blocks});
+  }
+  async function save(publishing = false, prepared?: {payload:AuthorPayload;snapshot:AuthorSnapshot}): Promise<boolean> {
+    if (saveBlocked) { setMessage(saveBlockedReason); return false; }
+    if (quizDirty && (!publication || publishing)) { setMessage("아래 확인 퀴즈의 변경사항을 먼저 저장해 주세요."); return false; }
+    if ((!publication || publishing) && blockState.active && !blockRef.current?.validate()) { setMessage('학생 화면에 반영하기 전에 학습 구성의 표시된 항목을 확인해 주세요.'); setPreviewOnly(false); blockSectionRef.current?.scrollIntoView({ block: 'start' }); return false; }
+    if ((!publication || publishing) && format === "material" && uploadStatus !== "idle") {
       setPreviewOnly(false);
       setMessage("자료 업로드 오류를 확인한 뒤 다시 저장해 주세요.");
       return false;
     }
     const form = formRef.current;
-    if (!form) return false;
+    if (!form) { setMessage("편집 화면을 준비하고 있습니다. 잠시 후 다시 저장해 주세요."); return false; }
     if ((!publication || publishing) && !form.checkValidity()) {
+      setMessage("학생 화면에 반영하기 전에 수업 제목·주차와 표시된 입력 항목을 확인해 주세요.");
       setPreviewOnly(false);
       form.querySelectorAll<HTMLDetailsElement>("details").forEach(details => { details.open = true; });
       requestAnimationFrame(() => form.reportValidity());
@@ -202,26 +211,51 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
     let attempted = false;
     try {
       if (publication) {
-        const payload=validateAuthorPayload({form:{basic:{...basic},format,bodyText,videoUrl,externalUrl,resourceName,resourcePath},blocks:blockEditingEnabled ? {active:blockState.active,document:blockRef.current?.captureDraft().document || {schemaVersion:1,blocks:[],checklist:[]}} : publication.snapshot.payload.blocks},publishing);
-        const snap=publication.snapshot;
+        const payload=validateAuthorPayload(prepared?.payload || captureAuthorPayload(),publishing);
+        const snap=prepared?.snapshot || publication.snapshot;
         if (publishing && !window.confirm(`저장한 내용을 학생 화면에 반영할까요? 같은 상품의 모든 기수에 적용됩니다.\n${basic.is_published ? '수업 공개: 켜짐' : '수업 공개: 꺼짐'}${week?.is_published ? '' : '\n상위 주차는 비공개라 학생에게 보이지 않습니다.'}`)) return false;
         saveIntent.current ??= {requestId:crypto.randomUUID(),payload,expectedRevision:snap.revision,stamp:snap.public.stamp || null,create:publication.isNew,rebase:rebasing};
-        const intent=saveIntent.current;
+        let intent=saveIntent.current;
         attempted=true;
-        const receipt=await authorRequest({action:'save',lessonId:snap.lessonId,...intent});
+        let receipt, merged=false;
+        try { receipt=await authorRequest({action:'save',lessonId:snap.lessonId,...intent}); }
+        catch(error) {
+          if(publishing || (error as {status?:number}).status !== 409)throw error;
+          saveIntent.current=null;
+          const latest=await readAuthor(snap.lessonId) as AuthorSnapshot;
+          // Public changes require the existing publication comparison. Only
+          // draft-head conflicts with an unchanged public baseline auto-merge.
+          if(authorPublicChanged(latest) || latest.public.stamp !== snap.public.stamp) { publication.accept(latest); throw error; }
+          const result=mergeAuthorDraft(snap.payload,intent.payload,latest.payload);
+          if(result.conflicts.length) {
+            setDraftConflict({base:snap.payload,mine:intent.payload,latest,conflicts:result.conflicts});setConflictChoices({});
+            setMessage('다른 분이 같은 부분을 수정했습니다. 작성한 내용은 그대로 있습니다. 아래에서 저장할 내용을 골라 주세요.');
+            return false;
+          }
+          intent={requestId:crypto.randomUUID(),payload:validateAuthorPayload(result.payload),expectedRevision:latest.revision,stamp:latest.public.stamp,create:false,rebase:false};
+          saveIntent.current=intent;
+          receipt=await authorRequest({action:'save',lessonId:snap.lessonId,...intent});merged=true;
+        }
         if(receipt.revision!==intent.requestId)throw new Error('초안 저장 결과를 확인하지 못했습니다.');
         saveIntent.current=null;
         const fresh=await readAuthor(snap.lessonId) as AuthorSnapshot;
-        if(fresh.revision!==receipt.revision)throw new Error('다른 화면에서 더 최신 초안을 저장했습니다. 작성 내용을 보관하고 다시 열어 주세요.');
-        publication.accept(fresh);setRebasing(false);blockRef.current?.acknowledgeDraft(receipt.revision);
-        setDirty(false);baseline.current={basic:{...basic},format,bodyText,videoUrl,externalUrl,resourceName,resourcePath};draftRef.current?.clear();
+        if(fresh.revision!==receipt.revision) {
+          if(publishing)throw Object.assign(new Error('내 초안은 저장됐지만 다른 분이 이어서 수정했습니다. 최신 내용을 확인한 뒤 학생 화면에 반영해 주세요.'),{status:409});
+          // The receipt already proves this version was stored. A newer head
+          // after that acknowledgement is collaboration, not a lost save.
+          publication.accept(fresh);applyAuthorPayload(fresh.payload,fresh,false);setDirty(false);baseline.current=structuredClone(fresh.payload.form);draftRef.current?.clear();setDraftConflict(null);setConflictChoices({});
+          setMessage('서버에 초안을 저장했습니다. 이어서 다른 분이 저장한 최신 내용도 불러왔습니다. 내 저장 내용은 초안 이력에 보관됩니다.');onSaved?.();return true;
+        }
+        publication.accept(fresh);setRebasing(false);
+        if(merged || prepared)applyAuthorPayload(fresh.payload,fresh,false);else blockRef.current?.acknowledgeDraft(receipt.revision);
+        setDraftConflict(null);setConflictChoices({});setDirty(false);baseline.current=structuredClone(intent.payload.form);draftRef.current?.clear();
         if (publishing) {
           await authorRequest({action:'publish',lessonId:snap.lessonId,revision:receipt.revision,requestId:crypto.randomUUID()});
           const published=await readAuthor(snap.lessonId) as AuthorSnapshot;
           if(published.revision!==receipt.revision)throw new Error('다른 화면에서 더 최신 초안을 저장했습니다. 다시 확인해 주세요.');
           publication.accept(published);
         }
-        setMessage(publishing ? '학생 화면에 반영했습니다. 공개 범위는 선택한 설정을 따릅니다.' : '서버에 초안을 저장했습니다. 학생 화면은 바뀌지 않았습니다.');
+        setMessage(publishing ? '학생 화면에 반영했습니다. 공개 범위는 선택한 설정을 따릅니다.' : merged ? '서버에 초안을 저장했습니다. 다른 분의 수정도 함께 보관했습니다. 학생 화면은 바뀌지 않았습니다.' : '서버에 초안을 저장했습니다. 학생 화면은 바뀌지 않았습니다.');
         onSaved?.();return true;
       }
       const result = await send({ action: "save", section: "learning", id: storedId || undefined, values: { ...basic, day_number: Number(basic.day_number), content_type: format } }, "학습 기본 정보를 저장했습니다.");
@@ -249,8 +283,23 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
       setMessage(blockState.active || selectedValue ? "학습 기본 정보와 콘텐츠를 저장했습니다." : "학습 기본 정보를 저장했습니다. 콘텐츠를 이어서 등록해 주세요.");
       onSaved?.();
       return true;
-    } catch (cause) { if(publication && Number((cause as {status?:number}).status)>=400 && Number((cause as {status?:number}).status)<500) saveIntent.current=null; if(publication && attempted && ((cause as {status?:number}).status === 409 || !(cause as {status?:number}).status || Number((cause as {status?:number}).status)>=500)) setUncertain(true); setMessage((cause as Error).message); return false; }
+    } catch (cause) { if(publication && Number((cause as {status?:number}).status)>=400 && Number((cause as {status?:number}).status)<500) saveIntent.current=null; if(publication && attempted && ((publishing && (cause as {status?:number}).status === 409) || !(cause as {status?:number}).status || Number((cause as {status?:number}).status)>=500)) setUncertain(true); setMessage((cause as Error).message); return false; }
     finally { setSaving(false); }
+  }
+  async function saveChosenConflict() {
+    if(!draftConflict || busy || draftConflict.conflicts.some(item=>!conflictChoices[item.key]))return;
+    try {
+      const current=captureAuthorPayload();
+      if(!authorValuesEqual(current,draftConflict.mine)) {
+        const result=mergeAuthorDraft(draftConflict.base,current,draftConflict.latest.payload);
+        setDraftConflict({...draftConflict,mine:current,conflicts:result.conflicts});setConflictChoices({});
+        setMessage('비교하는 동안 작성 내용이 바뀌었습니다. 지금 작성한 내용으로 다시 확인해 주세요.');return;
+      }
+      const result=mergeAuthorDraft(draftConflict.base,current,draftConflict.latest.payload,conflictChoices);
+      publication?.accept(draftConflict.latest);saveIntent.current=null;setUncertain(false);
+      applyAuthorPayload(result.payload,draftConflict.latest,false);
+      await save(false,{payload:result.payload,snapshot:draftConflict.latest});
+    }catch(error){setMessage((error as Error).message);}
   }
   function applyAuthorPayload(payload: AuthorPayload, server: AuthorSnapshot, rebase = true) {
     const old=blockRef.current?.captureDraft();
@@ -265,13 +314,14 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
     try {
       const fresh=await readAuthor(publication.snapshot.lessonId) as AuthorSnapshot;
       const selected=latest ? fresh.payload : (await readAuthor(fresh.lessonId,version || 'public')).payload;
-      publication.accept(fresh);saveIntent.current=null;setUncertain(false);applyAuthorPayload(selected,fresh,!latest);setMessage('편집 화면에 불러왔습니다. 초안 저장 후 학생 화면에 반영할 수 있습니다.');
+      publication.accept(fresh);saveIntent.current=null;setUncertain(false);setDraftConflict(null);setConflictChoices({});applyAuthorPayload(selected,fresh,!latest);setMessage('편집 화면에 불러왔습니다. 초안 저장 후 학생 화면에 반영할 수 있습니다.');
     }catch(error){setMessage((error as Error).message);}finally{setSaving(false);}
   }
   function downloadAuthor() {
     const payload={form:{basic,format,bodyText,videoUrl,externalUrl,resourceName,resourcePath},blocks:blockRef.current?.captureDraft()};
     const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download='수업-편집내용.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
+  useEffect(() => { if (message) saveFeedbackRef.current?.scrollIntoView({ block: 'nearest' }); }, [message]);
   useUnsavedLearningChanges(dirty || blockState.dirty || quizDirty);
   useImperativeHandle(sessionRef, () => ({ dirty: dirty || blockState.dirty || quizDirty, busy, save }));
   function showPreview() {
@@ -280,9 +330,16 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
     requestAnimationFrame(() => previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
   return <div className={"learning-editor" + (embedded ? " learning-editor--embedded" : "")}>
-    {embedded ? <header className="studio-document-header"><div><p className="meta">{num(week, "week_number")}주차 · {basic.day_number}일차</p><label>수업 제목<input form="learning-editor-form" aria-label="수업 제목" required maxLength={300} value={basic.title} onChange={event => changeBasic("title", event.target.value)} disabled={busy} /></label><p className="meta">{row?.is_published && week?.is_published ? (publication ? "초안 저장 후 학생 화면에 반영할 수 있습니다." : "공개 수업 · 저장하면 수강생 화면에도 반영됩니다.") : row?.is_published ? "상위 주차가 비공개여서 수강생에게 보이지 않습니다." : "비공개 수업 · 공개 설정을 바꾸지 않으면 계속 비공개입니다."}</p></div><div className="studio-document-actions"><AdminButton variant="outline" onClick={showPreview}>{previewOnly ? "편집으로" : "학습자 미리보기"}</AdminButton><AdminButton variant="primary" type="submit" form="learning-editor-form" disabled={saveBlocked} aria-describedby={saveBlocked ? saveStatusId : undefined} loading={busy}>{publication ? "초안 저장" : "학습 저장"}</AdminButton></div></header> : <AdminHeading title="학습 콘텐츠 편집" eyebrow="LEARNING EDITOR" description={lessonId ? `Day ${basic.day_number} · ${t(week, "week_number") || "—"}주차 / ${basic.title}` : "일차별 학습 본문과 확인 퀴즈를 등록합니다."}>
+    {embedded ? <header className="studio-document-header"><div><p className="meta">{num(week, "week_number")}주차 · {basic.day_number}일차</p><label>수업 제목<input form={formId} aria-label="수업 제목" required maxLength={300} value={basic.title} onChange={event => changeBasic("title", event.target.value)} disabled={busy} /></label><p className="meta">{row?.is_published && week?.is_published ? (publication ? "초안 저장 후 학생 화면에 반영할 수 있습니다." : "공개 수업 · 저장하면 수강생 화면에도 반영됩니다.") : row?.is_published ? "상위 주차가 비공개여서 수강생에게 보이지 않습니다." : "비공개 수업 · 공개 설정을 바꾸지 않으면 계속 비공개입니다."}</p></div><div className="studio-document-actions"><AdminButton variant="outline" onClick={showPreview}>{previewOnly ? "편집으로" : "학습자 미리보기"}</AdminButton><AdminButton variant="primary" type="button" onClick={() => void save()} disabled={saveBlocked} aria-describedby={saveBlocked ? saveStatusId : undefined} loading={busy}>{publication ? "초안 저장" : "학습 저장"}</AdminButton></div></header> : <AdminHeading title="학습 콘텐츠 편집" eyebrow="LEARNING EDITOR" description={lessonId ? `Day ${basic.day_number} · ${t(week, "week_number") || "—"}주차 / ${basic.title}` : "일차별 학습 본문과 확인 퀴즈를 등록합니다."}>
       <AdminButton variant="outline" type="button" onClick={showPreview}>{previewOnly ? "편집으로" : "학습자 미리보기"}</AdminButton><AdminStatusBadge status={basic.is_published ? "published" : "hidden"} label={basic.is_published ? "공개" : "비공개"} />
     </AdminHeading>}
+    {message && <div ref={saveFeedbackRef} className="notice learning-save-feedback" role="status" aria-live="polite"><strong>저장 안내</strong><span>{message}</span></div>}
+    {draftConflict && <section className="notice learning-draft-conflict" aria-label="함께 편집한 내용 비교">
+      <h2>같은 부분을 수정했어요</h2><p>서로 다른 부분은 함께 보관합니다. 겹친 부분만 선택해 주세요. 학생 화면은 바뀌지 않습니다.</p>
+      {draftConflict.conflicts.length>1 && <div className="learning-draft-actions">{(['mine','latest'] as const).map(choice=><AdminButton key={choice} variant="outline" disabled={busy} onClick={()=>setConflictChoices(Object.fromEntries(draftConflict.conflicts.map(item=>[item.key,choice])))}>{choice==='mine'?'겹친 부분 모두 내 내용 선택':'겹친 부분 모두 다른 분 내용 선택'}</AdminButton>)}</div>}
+      {draftConflict.conflicts.map(item=><fieldset key={item.key} disabled={busy}><legend>{item.label}</legend><div className="learning-conflict-options">{(['mine','latest'] as const).map(choice=><label key={choice}><span><input type="radio" name={`${formId}-${item.key}`} checked={conflictChoices[item.key]===choice} onChange={()=>setConflictChoices(previous=>({...previous,[item.key]:choice}))}/>{choice==='mine'?'내가 작성한 내용':'다른 분이 저장한 내용'}</span><pre>{item[choice]}</pre></label>)}</div></fieldset>)}
+      <AdminButton variant="primary" onClick={()=>void saveChosenConflict()} disabled={busy || draftConflict.conflicts.some(item=>!conflictChoices[item.key])}>선택한 내용으로 초안 저장</AdminButton>
+    </section>}
     {saveBlockedReason && <p id={saveStatusId} className="notice learning-save-status" role="status"><strong>저장 대기</strong> {saveBlockedReason}</p>}
     <div hidden={embedded} className="ops-callout mb16"><b>{basic.title || "새 학습"}</b> <span className="muted">· 본문과 확인 퀴즈를 함께 편집합니다.</span></div>
     {publication && <section className="notice lesson-publication-panel" aria-label="초안과 학생 공개본">
@@ -293,7 +350,7 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
       {publication.snapshot.history.length>0 && <details><summary>이전 초안·반영 이력 ({publication.snapshot.history.length}개)</summary><p>최근 20개 기록입니다. 불러오면 편집 화면만 바뀌며, 학생 화면은 직접 반영할 때 바뀝니다.</p>{publication.snapshot.history.map(item=><div key={item.revision} className="lesson-author-history"><span>{new Date(item.createdAt).toLocaleString('ko-KR')} · {item.baseline ? '기존 공개본' : item.published ? '반영한 내용' : '초안'} · {item.title || '제목 없음'}</span><button className="btn small" type="button" disabled={busy || Boolean(blockEditingEnabled && !blockState.draftReady)} onClick={()=>void recoverAuthor(item.revision)}>이 내용 불러오기</button></div>)}</details>}
     </section>}
     {blockEditingEnabled && actorId && <LearningEditorDraftPanel serverDrafts={Boolean(publication)} key={`${actorId}:${publication?.isNew ? 'new' : row?.id || 'new'}`} actorId={actorId} lessonId={publication?.isNew ? '' : row?.id || ''} dirty={dirty || blockState.dirty} ready={!busy && Boolean(blockState.draftReady)} capture={captureDraft} restore={restoreDraft} handleRef={draftRef} onPending={setDraftPending} />}
-    <form ref={formRef} id="learning-editor-form" noValidate onSubmit={event => { event.preventDefault(); void save(); }}>
+    <form ref={formRef} id={formId} noValidate onSubmit={event => { event.preventDefault(); void save(); }}>
       <EditorSettings embedded={embedded}>
       <section className="panel" hidden={previewOnly}>
         <div className="panel-head"><h2>기본 정보</h2><label className="review-switch"><input type="checkbox" checked={basic.is_published} onChange={event => changeBasic("is_published", event.target.checked)} disabled={busy} /> 공개</label></div>
@@ -337,7 +394,6 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
         </div>
       </section>}
       <div className="editor-savebar"><span id={`${saveStatusId}-bottom`} className="dirty-note" role="status">{saveBlockedReason || (dirty || blockState.dirty ? "저장하지 않은 변경사항이 있습니다." : "기본 정보와 학습 내용을 함께 저장합니다.")}</span><AdminButton variant="outline" type="button" onClick={close} disabled={busy} hidden={embedded}><ArrowLeft size={16} />목록으로</AdminButton><AdminButton variant="primary" type="submit" disabled={saveBlocked} aria-describedby={`${saveStatusId}-bottom`} loading={busy}>{blockState.uploading ? "파일 업로드 중…" : busy ? "저장 중…" : publication ? "초안 저장" : lessonId ? "학습 저장" : "학습 등록"}</AdminButton>{publication && <AdminButton variant="primary" type="button" disabled={saveBlocked} aria-describedby={`${saveStatusId}-bottom`} onClick={()=>void save(true)}>학생 화면에 반영</AdminButton>}</div>
-      {message && <p className="notice mt16" role="status">{message}</p>}
     </form>
     <section className="panel mt24 learning-quiz-panel" hidden={previewOnly}>
       {publication && <p className="notice">아래 미션 확인 퀴즈는 별도 저장됩니다. 퀴즈 저장을 누르면 학생 화면에도 바로 반영됩니다. 본문 안에 넣은 확인 문제는 위 초안에 포함됩니다.</p>}
