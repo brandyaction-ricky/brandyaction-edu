@@ -83,20 +83,22 @@ function AppInstallGuide({ device }: { device: InstallDevice }) {
     <div className="app-install-devices mt8" role="group" aria-label="앱을 추가할 기기">
       {([['ios', '아이폰·아이패드'], ['android', '갤럭시·안드로이드'], ['desktop', '컴퓨터']] as const).map(([value, label]) => <button key={value} type="button" className="btn small" aria-pressed={selected === value} onClick={() => setSelected(value)}>{label}</button>)}
     </div>
+    {(selected === 'desktop' && browser !== 'chrome') && <p className="meta mt16">이 기기의 설치 사진은 준비 중이에요. 지금은 아래 글을 따라 추가해 주세요.</p>}
+    {selected !== 'desktop' && <p className="meta mt16">아래는 버튼을 찾기 쉽게 그린 설명용 그림이에요. 실제 화면의 위치·메뉴 이름은 다를 수 있어요.</p>}
     {selected === 'ios' ? <>
       <ol>
         <li><strong>사파리(Safari)로 이 사이트를 열어요.</strong><span>아이폰의 파란 나침반 모양 앱이에요.</span></li>
-        <li><strong>공유 버튼을 눌러요.</strong><span>네모 위로 화살표가 올라가는 모양이에요. 안 보이면 메뉴(…)를 먼저 눌러 보세요.</span></li>
+        <li><strong>공유 버튼을 눌러요.</strong><span>네모 위로 화살표가 올라가는 모양이에요. 안 보이면 메뉴(…)를 먼저 눌러 보세요.</span><InstallScreenshot src="/installation-guide/ios-share.svg" width={600} height={420} caption="아이폰에서 공유 버튼 찾기" alt="설명용 그림. 사파리 공유 버튼은 네모 위로 화살표가 올라가는 모양이며 메뉴 안에 있을 수도 있습니다" illustration/></li>
         <li><strong>아래로 내려 ‘홈 화면에 추가’를 눌러요.</strong><span>없으면 목록 맨 아래 ‘동작 편집’에서 ‘홈 화면에 추가’를 찾아 주세요.</span></li>
-        <li><strong>‘추가’를 누르면 끝이에요.</strong><span>‘웹 앱으로 열기’가 보이면 켜 둔 채로 추가해 주세요.</span></li>
+        <li><strong>‘추가’를 누르면 끝이에요.</strong><span>‘웹 앱으로 열기’가 보이면 켜 둔 채로 추가해 주세요.</span><InstallScreenshot src="/installation-guide/ios-add.svg" width={600} height={420} caption="아이폰 홈 화면에 추가하기" alt="설명용 그림. 공유 목록에서 홈 화면에 추가를 선택한 뒤 추가 버튼을 누르는 순서" illustration/></li>
       </ol>
       <p className="app-install-done">이제 휴대폰 홈 화면에서 ‘브랜디에듀’ 아이콘을 눌러 보세요.</p>
     </> : selected === 'android' ? <>
       <ol>
         <li><strong>크롬(Chrome)으로 이 사이트를 열어요.</strong><span>빨강·노랑·초록색 동그라미 모양 앱이에요.</span></li>
         <li><strong>오른쪽 위 점 3개(⋮)를 눌러요.</strong></li>
-        <li><strong>‘홈 화면에 추가’ 또는 ‘앱 설치’를 눌러요.</strong></li>
-        <li><strong>새 창에서 ‘설치’ 또는 ‘추가’를 눌러요.</strong><span>한 번 더 물어보면 ‘추가’를 눌러 주세요.</span></li>
+        <li><strong>‘설치 및 바로가기 만들기’ → ‘설치’를 눌러요.</strong><span>‘홈 화면에 추가’ 또는 ‘앱 설치’라고 보일 수도 있어요.</span><InstallScreenshot src="/installation-guide/android-menu.svg" width={600} height={420} caption="갤럭시 크롬에서 설치 메뉴 찾기" alt="설명용 그림. 크롬 주소창 오른쪽 점 세 개를 누른 뒤 설치 및 바로가기 만들기에서 설치를 선택" illustration/></li>
+        <li><strong>새 창에서 ‘설치’ 또는 ‘추가’를 눌러요.</strong><span>한 번 더 물어보면 ‘추가’를 눌러 주세요.</span><InstallScreenshot src="/installation-guide/android-confirm.svg" width={600} height={420} caption="갤럭시 설치 창에서 확인하기" alt="설명용 그림. 설치 확인 창에서 브랜디에듀 이름을 확인하고 설치 또는 추가 버튼을 선택" illustration/></li>
       </ol>
       <p className="app-install-done">이제 휴대폰 홈 화면이나 앱 목록에서 ‘브랜디에듀’ 아이콘을 눌러 보세요.</p>
     </> : <>
@@ -109,10 +111,25 @@ function AppInstallGuide({ device }: { device: InstallDevice }) {
       </ol> : <ol>
         <li><strong>{browser === 'edge' ? '엣지(Edge)' : '크롬(Chrome)'}로 이 사이트를 열어요.</strong></li>
         <li><strong>오른쪽 위 점 3개({browser === 'edge' ? '…' : '⋮'})를 눌러요.</strong></li>
-        {browser === 'edge' ? <li><strong>‘앱’ → ‘이 사이트를 앱으로 설치’를 눌러요.</strong><span>‘앱’이 안 보이면 ‘추가 도구’ 안에서 찾아 주세요.</span></li> : <li><strong>‘전송, 저장 및 공유’ → ‘페이지를 앱으로 설치’를 눌러요.</strong><span>‘브랜디에듀 설치’라고 표시될 수도 있어요.</span></li>}
-        <li><strong>새 창에서 ‘설치’를 누르면 끝이에요.</strong><span>다음부터 컴퓨터의 앱 목록에서 ‘브랜디에듀’를 찾아 열어 주세요.</span></li>
+        {browser === 'edge' ? <li><strong>‘앱’ → ‘이 사이트를 앱으로 설치’를 눌러요.</strong><span>‘앱’이 안 보이면 ‘추가 도구’ 안에서 찾아 주세요.</span></li> : <li><strong>‘캐스팅, 저장, 공유’ 또는 ‘전송, 저장 및 공유’ → ‘페이지를 앱으로 설치’를 눌러요.</strong><span>‘브랜디에듀 설치’라고 표시될 수도 있어요.</span><InstallScreenshot src="/installation-guide/chrome-menu.webp" width={1100} height={699} caption="Chrome에서 ‘페이지를 앱으로 설치’ 찾기" alt="실제 컴퓨터 Chrome 메뉴. 캐스팅, 저장, 공유 하위 메뉴의 페이지를 앱으로 설치 항목"/></li>}
+        <li><strong>사이트 이름을 확인하고 ‘다음’ 또는 ‘설치’를 눌러요.</strong><span>추가 안내가 나오면 따라 진행하세요. 다음부터 컴퓨터의 앱 목록에서 ‘브랜디에듀’를 찾아 열어 주세요.</span>{browser === 'chrome' && <InstallScreenshot src="/installation-guide/chrome-confirm.webp" width={905} height={700} caption="Chrome 설치 창에서 사이트 확인하기" alt="실제 컴퓨터 Chrome의 이 페이지를 앱으로 설치 창. 사이트 이름과 주소 아래에 취소와 다음 버튼"/>}</li>
       </ol>}
     </>}
     <p className="meta mt16">메뉴 이름은 기기에 따라 조금 다를 수 있어요. 찾기 어렵다면 지금처럼 사이트에서 학습해도 괜찮아요.</p>
   </div>;
+}
+
+function InstallScreenshot({src,width,height,caption,alt,illustration=false}:{src:string;width:number;height:number;caption:string;alt:string;illustration?:boolean}) {
+  const dialog=useRef<HTMLDialogElement>(null),label=useId();
+  return <figure className="app-install-shot">
+    <button type="button" className="app-install-shot-button" aria-label={caption+' 크게 보기'} onClick={()=>dialog.current?.showModal()}>
+      <img src={src} width={width} height={height} alt={alt} loading="lazy" decoding="async"/>
+      <span aria-hidden="true">{illustration?'그림':'사진'} 크게 보기 ↗</span>
+    </button>
+    <figcaption>{caption} · {illustration?'설명용 그림':'실제 Mac Chrome 화면'}<span>메뉴 이름과 예시 주소는 기기·버전에 따라 다를 수 있어요.</span></figcaption>
+    <dialog ref={dialog} className="app-install-photo-dialog" aria-labelledby={label}>
+      <div className="app-install-photo-heading"><strong id={label}>{caption}</strong><button type="button" className="btn small" onClick={()=>dialog.current?.close()}>{illustration?'그림':'사진'} 닫기</button></div>
+      <img src={src} width={width} height={height} alt={alt}/>
+    </dialog>
+  </figure>;
 }
