@@ -32,6 +32,18 @@ test('admin tokens are scoped and do not modify public sizing tokens', () => {
   assert.match(publicTokens, /--table-row-height:\s*64px/);
 });
 
+test('all admin routes share the adm token and class contract without changing public pages', () => {
+  const admin = fs.readFileSync('features/admin-ui/styles/admin-system.css', 'utf8');
+  const platform = fs.readFileSync('app/ui/platform.tsx', 'utf8');
+  const components = fs.readFileSync('features/admin-ui/components/admin-system.tsx', 'utf8');
+  for (const token of ['--adm-bg:#F5F6F8', '--adm-surface:#FFFFFF', '--adm-border:#E3E5E9', '--adm-text:#15171A', '--adm-primary:#C9232D', '--adm-control:36px', '--adm-control-sm:30px', '--adm-sidebar-width:210px', '--adm-tree-width:320px', '--adm-page-max:1440px']) assert.ok(admin.includes(token), token);
+  for (const selector of ['.adm-shell', '.adm-sidebar', '.adm-main', '.adm-topbar', '.adm-page', '.adm-page-head', '.adm-btn', '.adm-field', '.adm-table-wrap', '.adm-table', '.adm-filterbar', '.adm-tabs', '.adm-modal', '.adm-stats']) assert.ok(admin.includes(selector), selector);
+  assert.match(platform, /"edu-admin adm adm-shell"/);
+  for (const className of ['adm-page-head', 'adm-btn', 'adm-input', 'adm-select', 'adm-textarea', 'adm-check', 'adm-choice', 'adm-table-wrap', 'adm-table', 'adm-filterbar', 'adm-pagination', 'adm-badge', 'adm-empty', 'adm-notice', 'adm-modal']) assert.ok(components.includes(className), className);
+  assert.doesNotMatch(admin, /:root/);
+  assert.doesNotMatch(admin, /!important/);
+});
+
 test('common system exports the Phase 0 component inventory', () => {
   const system = load('features/admin-ui.ts');
   for (const name of ['AdminPage','AdminPageHeader','AdminContent','AdminSection','AdminDivider','AdminStack','AdminGrid','AdminButton','AdminIconButton','AdminInput','AdminSelect','AdminTextarea','AdminCheckbox','AdminDatePicker','AdminSearchField','AdminFilterTrigger','AdminMetricGrid','AdminMetric','AdminDataTable','AdminTableToolbar','AdminPagination','AdminStatusBadge','AdminEmptyState','AdminSuccessState','AdminSkeleton','AdminLoadingState','AdminInlineError','AdminDrawer','AdminModal','AdminConfirmDialog','AdminPopover','AdminToast']) assert.ok(system[name], name);

@@ -1084,7 +1084,7 @@ export function Platform({
     <div
       className={
         admin
-          ? "edu-admin"
+          ? "edu-admin adm adm-shell"
           : "edu-front" + (freeClassDetail ? " free-class-detail-page" : "")
       }
     >
