@@ -622,12 +622,13 @@ export async function POST(request: Request) {
             if (user.role !== 'admin') return reply({ error: '관리자만 회원을 삭제할 수 있습니다.' }, 403);
             if (!uid(body.id)) fail('삭제할 회원을 확인해 주세요.');
             if (body.id === user.id) fail('현재 로그인한 관리자 계정은 삭제할 수 없습니다.');
-            const result = await db.rpc('edu_delete_member', { p_actor: user.id, p_member: body.id });
+            const environment = process.env.NEXT_PUBLIC_APP_ENV === 'production' ? 'production' : 'dev';
+            const result = await db.rpc('edu_request_member_erasure', { p_actor: user.id, p_member: body.id, p_environment: environment });
             if (result.error) {
                 if (result.error.code !== 'P0001') console.error('member delete', result.error.code);
-                fail(result.error.message || '회원을 삭제하지 못했습니다.', 409);
+                fail('탈퇴 요청을 접수하지 못했습니다. 관리자 권한과 회원 상태를 확인해 주세요.', 409);
             }
-            return reply({ ok: true, result: result.data });
+            return reply({ ok: true, result: result.data, message: '탈퇴 요청을 접수했습니다. 진단 삭제 기록에서 처리 상태를 확인해 주세요.' });
         }
         if (action === 'save-product-resource' || action === 'delete-product-resource') {
             const permissions = await permissionsFor(user);
