@@ -1,4 +1,5 @@
 "use client";
+import { MemberErasureQueue } from './final/member-erasure-queue';
 import { QuestionImage } from './final/question-image';
 import { QuestionThreadDialog } from './final/question-thread';
 import { LearningNoticeBar } from './final/learning-notice';
@@ -1069,6 +1070,7 @@ export function Platform({
             )}
           </>
         )}
+        {key === 'customers' && user?.role === 'admin' && <MemberErasureQueue key={notice} />}
       </AdminShell>
     );
   }
@@ -1122,10 +1124,10 @@ export function Platform({
             editor.row && editor.section.key === "customers"
               ? () => {
                   const member = editor.row!;
-                  if (!window.confirm(`${t(member, "full_name") || t(member, "email")} 회원을 삭제할까요? 로그인과 서비스 이용은 차단되며 주문·결제·수강 이력은 보존됩니다.`)) return;
+                  if (!window.confirm(`${t(member, "full_name") || t(member, "email")} 회원의 탈퇴를 접수할까요? 처리 시 로그인·수강 접근이 차단되고 마이인 진단 기록도 삭제됩니다. 삭제 연동이 꺼져 있으면 접수만 기록합니다. 주문·결제 이력은 보존됩니다.`)) return;
                   void send(
                     { action: "delete-member", id: recordId(member) },
-                    "회원을 삭제했습니다. 주문·결제·수강 이력은 유지됩니다.",
+                    "탈퇴 요청을 접수했습니다. 진단 삭제 기록에서 처리 상태를 확인해 주세요.",
                   ).then(() => setEditor(null)).catch(() => undefined);
                 }
               : undefined
@@ -1563,7 +1565,7 @@ function LegacyEditor({
         </div>
         <footer className="dialog-foot">
           {deleteMember && memberTab === "profile" && (
-            <AdminButton variant="danger" disabled={pending} onClick={deleteMember}>회원 삭제</AdminButton>
+            <AdminButton variant="danger" disabled={pending} onClick={deleteMember}>탈퇴 요청 접수</AdminButton>
           )}
           {archive && (
             <AdminButton variant="outline" disabled={pending} onClick={archive}>{section.key === "coupons" ? "비활성화" : "보관·숨김"}</AdminButton>
