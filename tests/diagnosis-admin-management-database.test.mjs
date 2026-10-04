@@ -8,18 +8,29 @@ test('publication requires current admin, only eligible students open, receipts 
  create table order_items(id uuid primary key,order_id uuid references orders(id),course_id uuid references courses(id));
  create table enrollments(id uuid primary key,user_id uuid references profiles(id),course_id uuid references courses(id),order_item_id uuid,status text,revoked_at timestamptz,access_starts_at timestamptz default '2000-01-01',access_ends_at timestamptz);
  grant select,insert,update on all tables in schema public to service_role;`);
- for(const f of['20261001062935_edu_diagnosis_entitlements.sql','20261001070447_edu_diagnosis_session_bridge.sql','20261001084748_edu_diagnosis_report_access.sql','20261001230818_edu_diagnosis_admin_pilot.sql','20261002072505_edu_admin_diagnosis_retests.sql','20261003070134_diagnosis_admin_management.sql'])await db.exec(readFileSync(new URL('../supabase/migrations/'+f,import.meta.url),'utf8'));
+ for(const f of['20261001062935_edu_diagnosis_entitlements.sql','20261001070447_edu_diagnosis_session_bridge.sql','20261001084748_edu_diagnosis_report_access.sql','20261001230818_edu_diagnosis_admin_pilot.sql','20261002072505_edu_admin_diagnosis_retests.sql','20261003070134_diagnosis_admin_management.sql','20261004094000_diagnosis_publication_safeupdate.sql'])await db.exec(readFileSync(new URL('../supabase/migrations/'+f,import.meta.url),'utf8'));
  const admin=id(),a=id(),b=id(),outsider=id(),course=id(),offer=id(),release=id(),order=id(),item=id(),enrol=id();
  await db.query("insert into profiles(id,role,full_name) values($1,'admin','관리자'),($2,'student','학생 A'),($3,'student','학생 B'),($4,'student','외부 회원')",[admin,a,b,outsider]);
  await db.query("insert into courses values($1,'문샷')",[course]);await db.query("insert into edu_diagnosis_offers(id,course_id,package_version,release_id,enabled) values($1,$2,'pilot',$3,true)",[offer,course,release]);
  await db.exec('update edu_diagnosis_control set enabled=true,admin_only=true');await db.query("insert into orders values($1,$2,'paid')",[order,a]);await db.query('insert into order_items values($1,$2,$3)',[item,order,course]);await db.query("insert into enrollments(id,user_id,course_id,status) values($1,$2,$3,'active')",[enrol,b,course]);await db.exec('set role service_role');
  const call=async(fn,args)=>Object.values((await db.query('select '+fn+'('+args.map((_,i)=>'$'+(i+1)).join(',')+')',args)).rows[0])[0];
+ // Production loads safeupdate for PostgREST. PGlite cannot load that native module,
+ // so guard every UPDATE in the deployed function as well as testing its real SQL effects.
+ const publicationSource=(await db.query("select prosrc from pg_proc where oid='public.edu_diagnosis_admin_publication(uuid,uuid,text,uuid,boolean,bigint)'::regprocedure")).rows[0].prosrc;
+ const updates=publicationSource.match(/\bupdate\s+public\.[^;]+;/gi);
+ assert.equal(updates.length,3);
+ for(const update of updates)assert.match(update,/\bwhere\b/i,'safeupdate rejects an UPDATE with no WHERE, even when there are zero overrides');
  const list=()=>call('edu_diagnosis_admin_list',[admin,null,'',100]);let initial=await list();assert.equal(initial.eligibleCount,2);assert.equal(initial.allPublished,false);assert.equal(await call('edu_diagnosis_actor_allowed',[a]),false);
  await assert.rejects(call('edu_diagnosis_admin_list',[a,null,'',100]),/DIAGNOSIS_FORBIDDEN/);await assert.rejects(call('edu_diagnosis_begin',[a,course]),/DIAGNOSIS_FORBIDDEN/);
  const req=id(),args=[admin,req,'publish_member',a,true,0];let receipt=await call('edu_diagnosis_admin_publication',args);assert.deepEqual(await call('edu_diagnosis_admin_publication',args),receipt);assert.equal(await call('edu_diagnosis_actor_allowed',[a]),true);assert.equal(await call('edu_diagnosis_actor_allowed',[b]),false);
  await assert.rejects(call('edu_diagnosis_admin_publication',[admin,id(),'publish_member',outsider,true,1]),/DIAGNOSIS_FORBIDDEN/);await assert.rejects(call('edu_diagnosis_admin_publication',[admin,id(),'publish_all',null,true,0]),/DIAGNOSIS_CONFLICT/);
  const attempt=await call('edu_diagnosis_begin',[a,course]);assert.equal((await call('edu_diagnosis_begin',[a,course])).id,attempt.id);
- await call('edu_diagnosis_admin_publication',[admin,id(),'publish_all',null,true,1]);assert.equal(await call('edu_diagnosis_actor_allowed',[b]),true);assert.equal(await call('edu_diagnosis_actor_allowed',[outsider]),false);
+ // Opposite existing overrides must both follow the explicit bulk choice.
+ await db.query('insert into edu_diagnosis_publication_overrides(user_id,enabled,updated_by) values($1,true,$3),($2,false,$3) on conflict(user_id) do update set enabled=excluded.enabled',[a,b,admin]);
+ const allRequest=id(),allArgs=[admin,allRequest,'publish_all',null,true,1];
+ const allReceipt=await call('edu_diagnosis_admin_publication',allArgs);
+ assert.deepEqual(await call('edu_diagnosis_admin_publication',allArgs),allReceipt);
+ assert.equal((await db.query('select count(*)::int as n from edu_diagnosis_publication_overrides where enabled')).rows[0].n,2);assert.equal(await call('edu_diagnosis_actor_allowed',[b]),true);assert.equal(await call('edu_diagnosis_actor_allowed',[outsider]),false);
  await call('edu_diagnosis_admin_publication',[admin,id(),'publish_all',null,false,2]);assert.equal(await call('edu_diagnosis_actor_allowed',[a]),true);assert.equal(await call('edu_diagnosis_actor_allowed',[b]),false);assert.equal((await call('edu_diagnosis_read',[a])).id,attempt.id);assert.equal((await list()).startedCount,1);
  const response=id();await db.query('update edu_diagnosis_attempts set remote_response_id=$1,state=\'submitted\' where id=$2',[response,attempt.id]);
  const observed={subject:a,attemptId:attempt.id,responseId:response,releaseId:release,packageVersion:'pilot',state:'needs_review',updatedAt:new Date().toISOString(),errorCode:'JOB_DEADLINE_REACHED',canRetry:true,version:'a'.repeat(64),details:[]};
