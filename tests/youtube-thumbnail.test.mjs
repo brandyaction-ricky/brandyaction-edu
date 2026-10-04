@@ -101,6 +101,7 @@ test('landing story cards use the YouTube thumbnail when no saved thumbnail exis
   }));
 
   assert.match(markup, /src="https:\/\/i\.ytimg\.com\/vi\/6TM-qyfubj4\/hqdefault\.jpg"/);
+  assert.match(markup, /story-card-cover--youtube/);
   assert.doesNotMatch(markup, /BRANDYACTION EDU/);
 });
 
@@ -117,5 +118,6 @@ test('landing story cards prefer an explicitly saved thumbnail', () => {
   }));
 
   assert.match(markup, /src="https:\/\/cdn\.example\/story\.jpg"/);
+  assert.doesNotMatch(markup, /story-card-cover--youtube/);
   assert.doesNotMatch(markup, /i\.ytimg\.com/);
 });

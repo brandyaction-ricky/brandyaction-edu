@@ -117,6 +117,7 @@
 .edu-admin .studio-visibility-review ul, .edu-admin .studio-week-order { padding:0; list-style:none; }
 .edu-admin .studio-week-order li span { flex:1; min-width:0; overflow-wrap:anywhere; }
 .edu-admin .studio-week-order small { color:#697386; }
+.edu-admin .studio-week-order .studio-week-fixed { display:inline-grid; flex:none; place-items:center; width:32px; color:#c8cdd5; }
 .edu-admin .curriculum-editor-page .product-curriculum-week-actions { flex-wrap:wrap; gap:4px; }
 @media (max-width:800px) { .edu-admin .studio-management-bar { align-items:stretch; flex-direction:column; padding:16px; } .edu-admin .studio-control-dialog { padding:18px; } .edu-admin .studio-control-dialog footer { bottom:-18px; } .edu-admin .studio-visibility-list .studio-visibility-lesson { padding-left:16px; } }
 
@@ -325,6 +326,14 @@
 .adm.edu-admin .curriculum-editor-page .studio-document-header{gap:var(--adm-space-5);padding:var(--adm-space-4);border-color:var(--adm-border);border-radius:var(--adm-radius-lg);background:var(--adm-surface)}
 .adm.edu-admin .curriculum-editor-page .studio-document-header input{min-height:var(--adm-control);font-size:18px}
 .adm.edu-admin .curriculum-editor-page .studio-document-actions .btn{min-height:var(--adm-control)}
+.adm.edu-admin .curriculum-editor-page .studio-document-header{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;align-items:stretch}
+.adm.edu-admin .curriculum-editor-page .studio-document-heading{display:grid;gap:4px;min-width:0}
+.adm.edu-admin .curriculum-editor-page .studio-document-heading :is(p,.meta){margin:0}
+.adm.edu-admin .curriculum-editor-page .studio-document-title-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:16px;min-width:0}
+.adm.edu-admin .curriculum-editor-page .studio-document-title-row label{min-width:0}
+.adm.edu-admin .curriculum-editor-page .studio-document-title-row input{width:100%;margin-top:6px;border:1px solid var(--adm-border);border-radius:var(--adm-radius-md);background:#fff;padding:8px 12px}
+.adm.edu-admin .curriculum-editor-page .studio-document-actions{align-self:end;margin:0 0 1px;white-space:nowrap}
+.adm.edu-admin .curriculum-editor-page .studio-document-note{margin:0}
 .adm.edu-admin .curriculum-editor-page .learning-editor--embedded .panel,.adm.edu-admin .curriculum-editor-page .studio-lesson-settings,.adm.edu-admin .curriculum-editor-page .studio-ongoing-section,.adm.edu-admin .curriculum-editor-page .studio-version-section{border-color:var(--adm-border);border-radius:var(--adm-radius-lg);background:var(--adm-surface);box-shadow:none}
 .adm.edu-admin .curriculum-editor-page .learning-editor--embedded .panel-head{min-height:48px;padding:var(--adm-space-3) var(--adm-space-4)}
 .adm.edu-admin .curriculum-editor-page .learning-editor--embedded .section-pad,.adm.edu-admin .curriculum-editor-page .studio-ongoing-section,.adm.edu-admin .curriculum-editor-page .studio-version-section{padding:var(--adm-space-4)}
@@ -333,6 +342,6 @@
 .adm.edu-admin .curriculum-editor-page .studio-navigation-dialog,.adm.edu-admin .studio-control-dialog{border-color:var(--adm-border);border-radius:var(--adm-radius-lg);background:var(--adm-surface)}
 @media(max-width:1180px){.adm.edu-admin .curriculum-editor-page .curriculum-workspace--direct .curriculum-studio{grid-template-columns:260px minmax(0,1fr)}}
 @media(max-width:1024px){
-  .adm.edu-admin .curriculum-editor-page .studio-product-bar,.adm.edu-admin .curriculum-editor-page .curriculum-workspace--direct .curriculum-studio,.adm.edu-admin .curriculum-editor-page .studio-document-header{grid-template-columns:minmax(0,1fr)}
+  .adm.edu-admin .curriculum-editor-page .studio-product-bar,.adm.edu-admin .curriculum-editor-page .curriculum-workspace--direct .curriculum-studio,.adm.edu-admin .curriculum-editor-page .studio-document-header,.adm.edu-admin .curriculum-editor-page .studio-document-title-row{grid-template-columns:minmax(0,1fr)}
   .adm.edu-admin .curriculum-editor-page .curriculum-workspace--direct .curriculum-outline{position:static;max-height:52dvh}
 }

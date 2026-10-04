@@ -764,7 +764,7 @@ export function Platform({
             </section>
           )}
         </div>
-        <section className="final-offer">
+        {free && <section className="final-offer">
           <div className="wrap">
             <div>
               <div className="eyebrow">YOUR NEXT ACTION</div>
@@ -775,7 +775,7 @@ export function Platform({
               무료 클래스 살펴보기 <ArrowRight />
             </Link>
           </div>
-        </section>
+        </section>}
       </>
     );
   else if (path[0] === "classes" && path.length === 1)

@@ -176,9 +176,10 @@ export function ArticleCard({ article }: { article: Row }) {
 }
 export function Story({ story }: { story: Row }) {
   const thumbnail = safeUrl(story.thumbnail_url) || youtubeThumbnailUrl(safeUrl(story.video_url));
+  const isYouTubeThumbnail = /^https:\/\/(?:i\.ytimg\.com|img\.youtube\.com)\/vi\/[^/]+\/hqdefault\.jpg(?:\?.*)?$/i.test(thumbnail);
   return (
     <article className="story-card">
-      <div className="story-card-cover">
+      <div className={`story-card-cover${isYouTubeThumbnail ? " story-card-cover--youtube" : ""}`}>
         {thumbnail ? <Image src={thumbnail} alt="" width={640} height={360} sizes="(max-width: 680px) 82vw, (max-width: 900px) 50vw, 33vw" unoptimized /> : <span>BRANDYACTION EDU</span>}
       </div>
       <Badge>고객 이야기</Badge>

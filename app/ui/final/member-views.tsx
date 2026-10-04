@@ -54,6 +54,7 @@ import { QuestionHub } from "./question-hub";
 import { Badge, Empty, Heading, ResourceRow } from "./primitives";
 import { DigitalContentOutline, ProductResourceRow } from "./primitives";
 import { productDigitalSections, productResources } from "@/lib/product-metadata";
+import './member-learning-ux.css';
 
 const accountGroups = [
   [
@@ -198,7 +199,7 @@ function EnrolledCard({
         {graduate ? <><p className="meta">최신 공개 커리큘럼은 계속 열람할 수 있습니다. 기존 제출·피드백 기록도 보관됩니다.</p><Link className="btn primary" href={'/learn/' + e.id}>최신 커리큘럼 보기 <ArrowRight /></Link></> : blockLearningEnabled ? <EnrollmentLearningOverview data={data} enrollment={e} compact /> : <>
         <div className="progress-line">
           <span className="meta">
-            {complete.length} / {lessons.length}개 학습 완료
+            {complete.length} / {lessons.length}개 학습 완료 · 현재 공개된 학습 기준
           </span>
           <Progress
             value={complete.length}
@@ -262,6 +263,12 @@ function Dashboard({
       ? overviews.reduce((total, overview) => total + overview.groups.reduce((sum, group) => sum + group.completed, 0), 0)
       : null
     : participating.reduce((total, enrollment) => total + completedLessonProgress(data, enrollment).length, 0);
+  const primaryOverview = e && blockLearningEnabled ? learningOverview(data, e) : null;
+  const nextAvailableItem = primaryOverview?.status === 'ready' ? primaryOverview.groups.find(group => group.next)?.next : null;
+  const visibleWeeks = e ? rows(data, 'curriculum_weeks')
+    .filter(week => week.course_id === e.course_id && cohortWeekVisible(data, String(e.cohort_id), week) && lessons.some(lesson => lesson.week_id === week.id))
+    .sort((a, b) => num(a, 'week_number') - num(b, 'week_number')) : [];
+  const upcomingLesson = blockLearningEnabled ? lessons.find(lesson => lesson.id === nextAvailableItem?.id) : lessons.find(lesson => !complete.some(progress => progress.lesson_id === lesson.id));
   return (
     <>
       <Heading
@@ -273,10 +280,8 @@ function Dashboard({
           회원 정보
         </Link>
       </Heading>
-      {blockLearningEnabled && <EncouragementWall/>}
-      <DiagnosisEntry key={user.id}/>
       <div className="member-focus-grid">
-        {graduate && e ? <section className="member-learning-intro"><h2>{t(c, 'title')}</h2><p className="meta">{t(cohort, 'name')} · 졸업생</p><p>최신 공개 커리큘럼을 언제든 다시 볼 수 있습니다.</p><Link className="btn primary mt16" href={'/learn/' + e.id}>최신 커리큘럼 보기 <ArrowRight /></Link></section> : blockLearningEnabled && e ? <section className="member-learning-intro"><h2>{t(c, "title")}</h2><p className="meta">{t(cohort, "name")} · 나의 학습 진행</p><EnrollmentLearningOverview data={data} enrollment={e}/></section> : <>
+        {graduate && e ? <section className="member-learning-intro"><h2>{t(c, 'title')}</h2><p className="meta">{t(cohort, 'name')} · 졸업생</p><p>최신 공개 커리큘럼을 언제든 다시 볼 수 있습니다.</p><Link className="btn primary mt16" href={'/learn/' + e.id}>최신 커리큘럼 보기 <ArrowRight /></Link></section> : blockLearningEnabled && e ? <section className="member-learning-intro"><div className="member-journey-head"><div><span className="member-journey-eyebrow">나의 학습</span><h2>{t(c, "title")}</h2><p className="meta">{t(cohort, "name")} · 현재 공개된 학습을 이어가세요.</p></div><Link className="btn primary" href={'/learn/' + e.id + (upcomingLesson ? '/' + upcomingLesson.id : '')}>{upcomingLesson ? '이어서 학습하기' : '공개된 학습 보기'} <ArrowRight /></Link></div><div className="member-next-lesson"><span>다음 학습</span><b>{upcomingLesson ? `${nextAvailableItem?.day ? `DAY ${nextAvailableItem.day} · ` : ''}${t(upcomingLesson, 'title')}` : lessons.length && complete.length === lessons.length ? '현재 공개된 학습을 완료했습니다.' : lessons.length ? '다음 학습을 기다리고 있습니다.' : '공개된 학습을 준비하고 있습니다.'}</b><small>{upcomingLesson ? '이어보기를 눌러 학습을 시작하세요.' : '다음 학습이 열리면 이곳에서 확인할 수 있습니다.'}</small></div>{visibleWeeks.length > 0 && <div className="member-week-journey" aria-label="현재 공개된 주차">{visibleWeeks.map(week => { const weekLessons = lessons.filter(lesson => lesson.week_id === week.id); const weekDone = weekLessons.filter(lesson => complete.some(progress => progress.lesson_id === lesson.id)).length; return <div className="member-week-step" key={week.id}><span>{num(week, 'week_number') === 0 ? 'W0' : `W${num(week, 'week_number')}`}</span><b>{t(week, 'title')}</b><small>{weekDone} / {weekLessons.length}개 완료</small></div>; })}</div>}<EnrollmentLearningOverview data={data} enrollment={e}/></section> : <>
         <section className="member-continue">
           <div className="member-kicker">
             이어서 학습하기 <span>{t(cohort, "name") || "MY LEARNING"}</span>
@@ -294,7 +299,7 @@ function Dashboard({
               : "내 업무에 필요한 클래스를 찾아보세요."}
           </p>
           <div className="member-progress-caption">
-            <span>전체 학습 진도</span>
+            <span>현재 공개된 학습 진도</span>
             <b>
               {lessons.length
                 ? Math.round((complete.length / lessons.length) * 100)
@@ -309,7 +314,7 @@ function Dashboard({
           />
           <div className="member-continue-foot">
             <span>
-              {complete.length}개 완료 / 전체 {lessons.length}개
+              {complete.length}개 완료 / 공개된 {lessons.length}개
             </span>
             <Link
               className="btn primary"
@@ -357,6 +362,7 @@ function Dashboard({
         </section>
         </>}
       </div>
+      <DiagnosisEntry key={user.id}/>
       <div className="member-stats">
         {[
           ["수강 중", participating.length, "개", "클래스별 학습 이어가기", "classes"],
@@ -467,14 +473,14 @@ function Dashboard({
           ))}
           {!rows(data, "cohort_sessions").some((s) =>
             participating.some((e) => s.cohort_id === e.cohort_id),
-          ) && <p className="panel-body muted">등록된 일정이 없습니다.</p>}
+          ) && <p className="panel-body muted">지금 확인할 일정이 없습니다. 새 일정이 등록되면 이곳에서 확인할 수 있습니다.</p>}
           <Link className="member-agenda-link" href="/my/orders">
             신청·주문 내역 확인
             <ArrowRight />
           </Link>
         </section>
       </div>
-      <section className="member-classes">
+      {(!blockLearningEnabled || active.length !== 1) && <section className="member-classes">
         <div className="section-head">
           <div>
             <h2>내 클래스</h2>
@@ -485,7 +491,7 @@ function Dashboard({
             <ArrowRight />
           </Link>
         </div>
-        {active.slice(0, 2).map((e) => (
+        {(blockLearningEnabled ? active.filter(enrollment => enrollment.id !== e?.id) : active).slice(0, 2).map((e) => (
           <EnrolledCard key={e.id} data={data} enrollment={e} blockLearningEnabled={blockLearningEnabled} />
         ))}
         {!active.length && (
@@ -493,7 +499,8 @@ function Dashboard({
             <Link href="/classes?type=free">무료 클래스부터 시작하기</Link>
           </Empty>
         )}
-      </section>
+      </section>}
+      {blockLearningEnabled && <EncouragementWall/>}
       <div className="member-shortcuts">
         {hasMemberResources(data) && <Link href="/my/resources">
           <Download />
@@ -543,9 +550,10 @@ function Missions({ data, active }: { data: Data; active: Row[] }) {
     <>
       <Heading
         title="내 미션"
-        description="제출부터 피드백, 승인까지 클래스별로 확인하세요."
+        description="공개된 미션의 제출 상태와 다음에 할 일을 확인하세요."
       />
-      <LearningProgress complete={entries.filter(entry => entry.status === "approved").length} total={entries.length} label="미션 완료율"/>
+      <section className="member-mission-journey" aria-label="미션 진행 안내"><div><b>1. 미션 작성</b><span>공개된 수업에서 제출</span></div><div><b>2. 검토·보완</b><span>피드백을 확인하고 수정</span></div><div><b>3. 승인 완료</b><span>완료 기록 확인</span></div></section>
+      <LearningProgress complete={entries.filter(entry => entry.status === "approved").length} total={entries.length} label="현재 공개된 미션 승인"/>
       <div className="member-mission-filter">
         <label>
           클래스 · 기수
@@ -572,15 +580,7 @@ function Missions({ data, active }: { data: Data; active: Row[] }) {
             ))}
           </select>
         </label>
-        <div className="member-mission-summary">
-          <span>
-            전체 <b>{entries.length}</b>
-          </span>
-          <span>
-            승인 완료{" "}
-            <b>{entries.filter((e) => e.status === "approved").length}</b>
-          </span>
-        </div>
+        <p className="member-mission-filter-note">공개 전 미션은 수업이 열리면 목록에 나타납니다.</p>
       </div>
       <div className="chips member-mission-tabs" aria-label="미션 상태">
         {statuses.map((s) => (
@@ -641,6 +641,7 @@ function Missions({ data, active }: { data: Data; active: Row[] }) {
                     ? date(x.submission.submitted_at) + " 제출"
                     : t(x.mission, "instructions")}
                 </p>
+                <p className="member-mission-format">제출 방식 · {labels[t(x.mission, 'submission_type')] || '텍스트'} · {x.status === 'approved' ? '승인 완료' : x.status === 'submitted' ? '검토 중' : x.status === 'changes_requested' ? '보완 필요' : '제출 후 검토'}</p>
               </div>
               <Link
                 className={
@@ -662,7 +663,7 @@ function Missions({ data, active }: { data: Data; active: Row[] }) {
             </article>
           ))}
         {!entries.filter((e) => status === "전체" || e.status === status)
-          .length && <Empty title="이 상태의 미션이 없습니다." />}
+          .length && <Empty title={status === '전체' ? '현재 공개된 미션이 없습니다.' : '이 상태의 미션이 없습니다.'}><p>새 미션은 해당 수업이 공개되면 확인할 수 있습니다.</p></Empty>}
       </div>
     </>
   );
