@@ -247,7 +247,7 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
           setMessage('서버에 초안을 저장했습니다. 이어서 다른 분이 저장한 최신 내용도 불러왔습니다. 내 저장 내용은 초안 이력에 보관됩니다.');onSaved?.();return true;
         }
         publication.accept(fresh);setRebasing(false);
-        if(merged || prepared)applyAuthorPayload(intent.payload,fresh,false);else blockRef.current?.acknowledgeDraft(receipt.revision);
+        if(merged || prepared)applyAuthorPayload(fresh.payload,fresh,false);else blockRef.current?.acknowledgeDraft(receipt.revision);
         setDraftConflict(null);setConflictChoices({});setDirty(false);baseline.current=structuredClone(intent.payload.form);draftRef.current?.clear();
         if (publishing) {
           await authorRequest({action:'publish',lessonId:snap.lessonId,revision:receipt.revision,requestId:crypto.randomUUID()});

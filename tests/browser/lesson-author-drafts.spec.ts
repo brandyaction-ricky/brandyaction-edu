@@ -33,6 +33,7 @@ test('concurrent changes to different fields save automatically and retain both 
  const server=await backend(page);await open(page);await page.getByLabel('학생에게 표시할 태그').fill('내 태그');server.get().revision=id(81);server.get().payload.form.basic.title='다른 분의 새 제목';
  await save(page).click();await expect(page.locator('.learning-save-feedback')).toContainText('다른 분의 수정도 함께 보관했습니다.');
  expect(server.get().payload.form.basic.title).toBe('다른 분의 새 제목');expect(server.get().payload.blocks.document.presentation?.tagLabel).toBe('내 태그');await expect(page.getByLabel('제목 *',{exact:true})).toHaveValue('다른 분의 새 제목');
+ await expect(page.locator('.editor-savebar .dirty-note')).toHaveText('기본 정보와 학습 내용을 함께 저장합니다.');await expect(page.getByRole('button',{name:'지금 임시저장',exact:true})).toBeDisabled();
  expect(server.writes.filter(x=>x.action==='save')).toHaveLength(2);expect(server.writes[1].expectedRevision).toBe(id(81));expect(server.writes.filter(x=>x.action==='publish')).toHaveLength(0);
 });
 
