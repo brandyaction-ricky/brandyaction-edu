@@ -43,3 +43,6 @@
 .edu-admin .lesson-author-history { display:flex; gap:12px; align-items:center; justify-content:space-between; padding:12px 0; border-top:1px solid #e5e7eb; }
 .edu-admin .lesson-author-history .btn { flex-shrink:0; min-height:44px; }
 @media(max-width:600px) { .edu-admin .lesson-author-history { align-items:flex-start; flex-direction:column; } }
+
+.edu-admin .learning-editor .learning-save-status { margin:16px 0; overflow-wrap:anywhere; line-height:1.7; }
+.edu-admin .learning-editor .editor-savebar .dirty-note { overflow-wrap:anywhere; line-height:1.6; }

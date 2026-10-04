@@ -40,7 +40,20 @@ test('unfinished questions can be saved and reopened, but cannot be published',a
 });
 test('lost save response prevents blind overwrite and latest server draft can be recovered',async({page})=>{
  const server=await backend(page);await open(page);server.failSave(503);await page.getByLabel('제목 *',{exact:true}).fill('응답 전에 저장된 내용');await save(page).click();await expect(save(page)).toBeDisabled();await expect(publish(page)).toBeDisabled();await expect(page.getByRole('region',{name:'초안과 학생 공개본'}).getByRole('button',{name:'편집 내용 내려받기',exact:true})).toBeEnabled();expect(server.writes).toHaveLength(1);
+ await expect(page.locator('.editor-savebar')).toContainText('저장 결과를 확인해야 합니다.');await expect(page.locator('.editor-savebar')).toContainText('서버 초안 다시 불러오기');
  await page.getByRole('button',{name:'서버 초안 다시 불러오기'}).click();await expect(page.getByLabel('제목 *',{exact:true})).toHaveValue('응답 전에 저장된 내용');await expect(save(page)).toBeEnabled();await page.getByLabel('제목 *',{exact:true}).fill('복구 후 이어 쓴 내용');await save(page).click();await expect(page.getByText('서버에 초안을 저장했습니다. 학생 화면은 바뀌지 않았습니다.',{exact:true})).toBeVisible();expect(server.get().payload.form.basic.title).toBe('복구 후 이어 쓴 내용');expect(server.get().public.payload.form.basic.title).toBe('공개된 수업');
+});
+
+test('reopening a browser backup explains disabled save buttons and restoring retains the unsaved content',async({page},info)=>{
+ const server=await backend(page);await open(page);await page.getByLabel('제목 *',{exact:true}).fill('보관된 편집 제목');await page.getByRole('textbox',{name:'학생에게 표시할 태그'}).fill('보관된 태그');await page.getByRole('button',{name:'지금 임시저장',exact:true}).click();
+ await page.getByRole('button',{name:'편집 다시 열기'}).click();await expect(save(page)).toBeDisabled();await expect(publish(page)).toBeDisabled();await expect(page.locator('.editor-savebar')).toContainText('이 브라우저에 남은 임시저장본을 확인해야 합니다.');await expect(page.getByRole('button',{name:'임시저장본 내려받기',exact:true})).toBeEnabled();expect(server.writes).toHaveLength(0);await page.locator('.editor-savebar').scrollIntoViewIfNeeded();await page.screenshot({path:info.outputPath('save-backup-guidance.png')});
+ await page.getByRole('button',{name:'임시저장본 불러오기',exact:true}).click();await expect(save(page)).toBeEnabled();await expect(publish(page)).toBeEnabled();await expect(page.getByLabel('제목 *',{exact:true})).toHaveValue('보관된 편집 제목');await expect(page.getByRole('textbox',{name:'학생에게 표시할 태그'})).toHaveValue('보관된 태그');await expect(page.locator('.learning-save-status')).toHaveCount(0);
+ await save(page).click();await expect(page.getByText('서버에 초안을 저장했습니다. 학생 화면은 바뀌지 않았습니다.',{exact:true})).toBeVisible();expect(server.get().payload.form.basic.title).toBe('보관된 편집 제목');expect(server.get().public.payload.form.basic.title).toBe('공개된 수업');
+});
+
+test('changed publication explains the comparison step without discarding the existing draft',async({page})=>{
+ const server=await backend(page);server.get().revision=id(80);server.get().public.stamp='c'.repeat(32);await page.goto('/lesson-block-author-test?serverDraft=1');await expect(save(page)).toBeDisabled();await expect(publish(page)).toBeDisabled();await expect(page.locator('.editor-savebar')).toContainText('다른 화면에서 학생 공개본을 변경했습니다.');await expect(page.locator('.editor-savebar')).toContainText('현재 공개본 불러오기');
+ await page.getByRole('button',{name:'현재 공개본 불러오기',exact:true}).click();await expect(save(page)).toBeEnabled();await expect(page.locator('.learning-save-status')).toHaveCount(0);expect(server.writes).toHaveLength(0);expect(server.get().public.payload.form.basic.title).toBe('공개된 수업');
 });
 test('rejected publication retains acknowledged draft so correcting it does not cause a false conflict',async({page})=>{
  const server=await backend(page);await open(page);server.failPublish(400);await publish(page).click();await expect(page.getByText('파일 연결을 확인해 주세요.',{exact:true})).toBeVisible();await page.getByLabel('제목 *',{exact:true}).fill('수정 후 다시 반영');await publish(page).click();await expect(page.getByText('학생 화면에 반영했습니다. 공개 범위는 선택한 설정을 따릅니다.',{exact:true})).toBeVisible();expect(server.get().public.payload.form.basic.title).toBe('수정 후 다시 반영');

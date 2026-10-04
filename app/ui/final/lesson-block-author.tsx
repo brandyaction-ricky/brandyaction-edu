@@ -20,7 +20,7 @@ import { applyLessonImport, type LessonCardSource, type TextImportResult } from 
 import { TextLessonImport, LessonCardImport } from './lesson-editor-import';
 import './lesson-block-author.css';
 
-export type BlockAuthorState = { active: boolean; dirty: boolean; blocked: boolean; uploading?: boolean; draftReady?: boolean };
+export type BlockAuthorState = { active: boolean; dirty: boolean; blocked: boolean; blockedReason?: string; uploading?: boolean; draftReady?: boolean };
 export type BlockAuthorHandle = { validate: () => boolean; showPreview: () => void; save: (lessonId: string) => Promise<void>; captureDraft: () => BlockEditorDraft; restoreDraft: (draft: BlockEditorDraft, fromServer?: boolean) => void; acknowledgeDraft: (revision: string) => void };
 type Props = { initialSnapshot?: Snapshot; lessonId: string; courseId?: string; sources?: LessonCardSource[]; legacyBlocks: LessonBlock[]; disabled: boolean; onState: (state: BlockAuthorState) => void };
 type Snapshot = { revision: string | null; document: LessonBlockDocument | null; editable: boolean };
@@ -142,7 +142,12 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
     } finally { if (mounted.current) { setPositionedIds(previous => previous.filter(id => id !== image.id)); uploadPending(image.id, false); } }
   }
   const dirty = active && (uploading || JSON.stringify(document) !== saved);
-  useEffect(() => { onState({ active, dirty, blocked: !snapshot.editable || conflict || uploading || Boolean(canvasError), uploading, draftReady: snapshot.editable && !uploading && !canvasError }); }, [active, dirty, conflict, snapshot.editable, onState, uploading, canvasError]);
+  useEffect(() => { onState({ active, dirty, blocked: !snapshot.editable || conflict || uploading || Boolean(canvasError),
+    blockedReason: !snapshot.editable ? '이 수업을 편집할 권한이 없습니다. 운영자에게 권한을 확인해 주세요.'
+      : conflict ? '다른 화면에서 학습 구성을 저장했습니다. 편집 내용을 내려받아 보관한 뒤 저장된 내용과 비교해 주세요.'
+      : uploading ? '파일을 올리고 있습니다. 업로드가 끝나면 저장할 수 있습니다.'
+      : canvasError ? `본문 서식을 확인해야 합니다. ${canvasError} 현재 편집 화면을 닫지 말고 본문 안내를 확인해 주세요.` : undefined,
+    uploading, draftReady: snapshot.editable && !uploading && !canvasError }); }, [active, dirty, conflict, snapshot.editable, onState, uploading, canvasError]);
   useEffect(() => {
     function guard(event: BeforeUnloadEvent) { if (dirty) { event.preventDefault(); event.returnValue = ''; } }
     window.addEventListener('beforeunload', guard); return () => window.removeEventListener('beforeunload', guard);
@@ -284,13 +289,13 @@ export const LessonBlockAuthor = forwardRef<BlockAuthorHandle, Props>(function L
   useEffect(() => {
     if (!initialLessonId || props.initialSnapshot) return;
     const abort = new AbortController();
-    onState({ active: false, dirty: false, blocked: true });
+    onState({ active: false, dirty: false, blocked: true, blockedReason: '학습 구성을 불러오고 있습니다. 잠시 기다려 주세요.' });
     void fetch(`/api/platform/lesson-blocks?lesson=${encodeURIComponent(initialLessonId)}`, { credentials: 'same-origin', cache: 'no-store', signal: abort.signal }).then(async response => {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || '학습 구성을 불러오지 못했습니다.');
       if (data.document) data.document = validateLessonBlocks(data.document);
       if (!abort.signal.aborted) setState({ snapshot: data });
-    }).catch(error => { if (!abort.signal.aborted) setState({ error: (error as Error).message }); });
+    }).catch(error => { if (!abort.signal.aborted) { setState({ error: (error as Error).message }); onState({ active: false, dirty: false, blocked: true, blockedReason: '학습 구성을 불러오지 못했습니다. ‘학습 구성 다시 불러오기’를 눌러 주세요.' }); } });
     return () => abort.abort();
   }, [initialLessonId, attempt, onState, props.initialSnapshot]);
   if (state.error) return <div role="alert"><p>{state.error}</p><button type="button" className="btn" onClick={() => setAttempt(value => value + 1)}>학습 구성 다시 불러오기</button></div>;
