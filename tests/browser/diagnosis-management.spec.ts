@@ -25,6 +25,7 @@ test('diagnosis management retains admin navigation and mobile menu without chan
  await sidebar.getByRole('link',{name:'회원 관리',exact:true}).click();await expect(page).toHaveURL(/\/admin\/customers$/);
  await page.goBack();await expect(page.getByRole('heading',{name:'N6 진단 관리',exact:true})).toBeVisible();
  if(info.project.name!=='desktop'){const opener=page.getByRole('button',{name:'관리자 메뉴 열기'});await opener.click();await page.keyboard.press('Escape');await expect(sidebar).not.toBeVisible();await expect(opener).toBeFocused();}
+ await expect(page.getByRole('button',{name:'한 번에 모두 공개'})).toBeEnabled();
  expect(writes).toHaveLength(0);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.screenshot({path:info.outputPath('diagnosis-management-navigation.png'),fullPage:true});
 });
