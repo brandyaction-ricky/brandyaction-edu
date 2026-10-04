@@ -1,4 +1,5 @@
 "use client";
+import { MemberErasureQueue } from './final/member-erasure-queue';
 import { QuestionImage } from './final/question-image';
 import { QuestionThreadDialog } from './final/question-thread';
 import { LearningNoticeBar } from './final/learning-notice';
@@ -175,9 +176,11 @@ const nav = [
 export function Platform({
   path,
   user: initialUser,
+  adminContent,
 }: {
   path: string[];
   user: User | null;
+  adminContent?: ReactNode;
 }) {
   const router = useRouter();
   const admin = path[0] === "admin";
@@ -245,11 +248,13 @@ export function Platform({
   const readRequest = useRef<AbortController | null>(null);
   const mutationGate = useRef(createMutationGate<Record<string, unknown>>());
   const adminSection =
-    path[1] === "product-editor"
-      ? "products"
-      : path[1] === "learning-editor"
-        ? "learning"
-        : path[1] || "home";
+    adminContent !== undefined
+      ? "home"
+      : path[1] === "product-editor"
+        ? "products"
+        : path[1] === "learning-editor"
+          ? "learning"
+          : path[1] || "home";
   const editorRecordId = ["product-editor", "learning-editor"].includes(path[1])
     ? searchParams.get("id") || ""
     : "";
@@ -890,7 +895,7 @@ export function Platform({
     return <Checkout data={data} user={user} pending={pending} send={send} />;
   }
   function adminView() {
-    if (accessDenied) return <div className="wrap"><AdminEmptyState title="이 메뉴에 접근할 운영 권한이 없습니다." action={<div className="row wrap"><Link className="btn primary" href="/admin">운영 홈으로</Link><Link className="btn" href="/my">마이페이지</Link></div>}>현재 계정에 부여된 운영 범위에서 다른 메뉴를 선택해 주세요.</AdminEmptyState></div>;
+    if (accessDenied || (adminContent !== undefined && user?.role === 'staff')) return <div className="wrap"><AdminEmptyState title="이 메뉴에 접근할 운영 권한이 없습니다." action={<div className="row wrap"><Link className="btn primary" href="/admin">운영 홈으로</Link><Link className="btn" href="/my">마이페이지</Link></div>}>현재 계정에 부여된 운영 범위에서 다른 메뉴를 선택해 주세요.</AdminEmptyState></div>;
     if (!["admin", "staff"].includes(user?.role || ""))
       return (
         <div className="wrap">
@@ -903,7 +908,7 @@ export function Platform({
         (s.key !== "staff" &&
           user!.permissions?.[sectionScopes[s.key]] === true),
     );
-    const key = path[1] || "overview";
+    const key = adminContent !== undefined ? 'diagnosis-management' : path[1] || "overview";
     const section = available.find(
       (s) =>
         s.key ===
@@ -946,6 +951,8 @@ export function Platform({
         <MarketingWorkspaceNav current={key} available={available} search={searchParams.toString()} prefetchSection={prefetchAdminSection} />
         {!hasCurrentAdminRead && (key !== 'orders' || error) ? (
           error ? <AdminInlineError onRetry={() => void refresh(true)}>화면 정보를 불러오지 못했습니다. 연결 상태를 확인해 주세요.</AdminInlineError> : <AdminLoadingState title="메뉴 내용을 불러오는 중입니다." description="현재 운영 데이터를 안전하게 확인하고 있습니다."/>
+        ) : adminContent !== undefined ? (
+          adminContent
         ) : key === "overview" ? (
           <Overview data={data} available={available} />
         ) : !section ? (
@@ -1069,6 +1076,7 @@ export function Platform({
             )}
           </>
         )}
+        {key === 'customers' && user?.role === 'admin' && <MemberErasureQueue key={notice} />}
       </AdminShell>
     );
   }
@@ -1122,10 +1130,10 @@ export function Platform({
             editor.row && editor.section.key === "customers"
               ? () => {
                   const member = editor.row!;
-                  if (!window.confirm(`${t(member, "full_name") || t(member, "email")} 회원을 삭제할까요? 로그인과 서비스 이용은 차단되며 주문·결제·수강 이력은 보존됩니다.`)) return;
+                  if (!window.confirm(`${t(member, "full_name") || t(member, "email")} 회원의 탈퇴를 접수할까요? 처리 시 로그인·수강 접근이 차단되고 마이인 진단 기록도 삭제됩니다. 삭제 연동이 꺼져 있으면 접수만 기록합니다. 주문·결제 이력은 보존됩니다.`)) return;
                   void send(
                     { action: "delete-member", id: recordId(member) },
-                    "회원을 삭제했습니다. 주문·결제·수강 이력은 유지됩니다.",
+                    "탈퇴 요청을 접수했습니다. 진단 삭제 기록에서 처리 상태를 확인해 주세요.",
                   ).then(() => setEditor(null)).catch(() => undefined);
                 }
               : undefined
@@ -1563,7 +1571,7 @@ function LegacyEditor({
         </div>
         <footer className="dialog-foot">
           {deleteMember && memberTab === "profile" && (
-            <AdminButton variant="danger" disabled={pending} onClick={deleteMember}>회원 삭제</AdminButton>
+            <AdminButton variant="danger" disabled={pending} onClick={deleteMember}>탈퇴 요청 접수</AdminButton>
           )}
           {archive && (
             <AdminButton variant="outline" disabled={pending} onClick={archive}>{section.key === "coupons" ? "비활성화" : "보관·숨김"}</AdminButton>

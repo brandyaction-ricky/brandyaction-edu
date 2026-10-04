@@ -142,7 +142,7 @@ test('member administration exposes explicit roles and protects deletion', async
   assert.equal((await handler({ ...admin, role: 'student' }, db).POST(request({ action: 'delete-member', id: memberId }))).status, 403);
   assert.equal((await handler(admin, db).POST(request({ action: 'delete-member', id: admin.id }))).status, 400);
   assert.equal((await handler(admin, db).POST(request({ action: 'delete-member', id: memberId }))).status, 200);
-  assert.deepEqual(calls[0], ['edu_delete_member', { p_actor: admin.id, p_member: memberId }]);
+  assert.deepEqual(calls[0], ['edu_request_member_erasure', { p_actor: admin.id, p_member: memberId, p_environment: process.env.NEXT_PUBLIC_APP_ENV === 'production' ? 'production' : 'dev' }]);
 });
 test('customer catalog removes unrelated lower management panels', () => {
   const source = fs.readFileSync(new URL('../app/ui/final/admin-catalog.tsx', import.meta.url), 'utf8');

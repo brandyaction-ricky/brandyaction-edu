@@ -1,6 +1,9 @@
 import { expect, test } from '@playwright/test';
 
-test.beforeEach(async ({ page }) => { await page.goto('/member-operations-test'); });
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/admin/learning-usage**', r => r.fulfill({ json: { rows: [], total: 0, page: 1, pageSize: 10 } }));
+  await page.goto('/member-operations-test');
+});
 
 test('retained layout clears the old member drawer after a round trip, including query-only changes', async ({ page }) => {
   await page.goto('/retained-member-dialog-test');
@@ -46,7 +49,7 @@ test('member tabs retain profile edits, support keyboard activation and restore 
 test('readonly records paginate without losing focus and preserve archived question deep links', async ({ page }) => {
   await page.getByRole('button', { name: '회원 상세 열기', exact: true }).click();
   await page.getByRole('tab', { name: '학습 기록', exact: true }).click();
-  await expect(page.getByText('아직 저장된 기록이 없습니다.', { exact: true })).toBeVisible();
+  await expect(page.getByText('저장된 개별 학습 완료 기록이 없습니다.', { exact: true })).toBeVisible();
   await page.getByRole('tab', { name: '제출물', exact: true }).click();
   await page.getByRole('button', { name: '다음', exact: true }).click();
   await expect(page.getByRole('heading', { name: '첫 실행 미션 21', exact: true })).toBeVisible();
