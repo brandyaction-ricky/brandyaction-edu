@@ -1,0 +1,48 @@
+/* Scoped to the erasure queue; shared admin panels keep their existing layout. */
+.edu-admin .erasure-queue { margin-top:24px; min-width:0; }
+.edu-admin .erasure-heading { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:24px; }
+.edu-admin .erasure-heading h2 { margin:0; font-size:18px; line-height:1.5; }
+.edu-admin .erasure-heading p { margin:6px 0 0; font-size:13px; color:var(--muted,#626b76); }
+.edu-admin .erasure-heading .btn { flex-shrink:0; }
+.edu-admin .erasure-overview { display:flex; align-items:center; flex-wrap:wrap; gap:12px 24px; padding:14px 24px; background:var(--surface-subtle,#f7f8fa); border-block:1px solid var(--line,#e1e4e8); font-size:13px; }
+.edu-admin .erasure-overview strong { font-size:16px; color:var(--ink,#23262b); }
+.edu-admin .erasure-help { margin-left:auto; }
+.edu-admin .erasure-help summary,.edu-admin .erasure-details summary { cursor:pointer; min-height:44px; display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:var(--muted,#626b76); }
+.edu-admin .erasure-help summary::after,.edu-admin .erasure-details summary::after { content:'+'; font-size:18px; font-weight:400; }
+.edu-admin .erasure-help[open] summary::after,.edu-admin .erasure-details[open] summary::after { content:'−'; }
+.edu-admin .erasure-help[open] { flex-basis:100%; margin-left:0; }
+.edu-admin .erasure-help p { margin:0 0 8px; max-width:640px; font-size:13px; line-height:1.7; }
+.edu-admin .erasure-list { list-style:none; margin:0; padding:0 24px; }
+.edu-admin .erasure-card { padding:24px 0; min-width:0; }
+.edu-admin .erasure-card+.erasure-card { border-top:1px solid var(--line,#e1e4e8); }
+.edu-admin .erasure-card-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.edu-admin .erasure-status { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:6px; font-size:13px; font-weight:600; }
+.edu-admin .erasure-status--complete { background:#eaf5ef; color:#256446; }
+.edu-admin .erasure-status--pending { background:#f2f4f7; color:#525f70; }
+.edu-admin .erasure-status--blocked { background:#fff0ed; color:#a5382f; }
+.edu-admin .erasure-results { display:flex; flex-wrap:wrap; gap:12px 28px; margin:18px 0 12px; font-size:14px; color:var(--muted,#626b76); }
+.edu-admin .erasure-results strong { margin-left:6px; color:var(--ink,#23262b); font-size:20px; font-weight:650; }
+.edu-admin .erasure-results .erasure-remaining,.edu-admin .erasure-results .erasure-remaining strong { color:#9b5324; }
+.edu-admin .erasure-card-footer { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+.edu-admin .erasure-details { flex:1; min-width:0; }
+.edu-admin .erasure-details dl { display:grid; gap:12px; margin:8px 0 16px; padding:16px; background:var(--surface-subtle,#f7f8fa); border-radius:6px; font-size:13px; }
+.edu-admin .erasure-details dl>div { display:grid; grid-template-columns:76px minmax(0,1fr); gap:12px; }
+.edu-admin .erasure-details dt { color:var(--muted,#626b76); }
+.edu-admin .erasure-details dd { margin:0; overflow-wrap:anywhere; }
+.edu-admin .erasure-details p { margin:0 0 8px; font-size:12px; color:var(--muted,#626b76); line-height:1.6; }
+.edu-admin .erasure-note,.edu-admin .erasure-warning { display:flex; align-items:flex-start; gap:8px; margin:12px 0; padding:12px 14px; border-radius:6px; font-size:13px; line-height:1.7; background:#fff8ed; color:#865425; }
+.edu-admin .erasure-note svg { flex-shrink:0; margin-top:3px; }
+.edu-admin .erasure-queue>.erasure-note,.edu-admin .erasure-queue>.erasure-warning { margin:16px 24px; }
+.edu-admin .erasure-empty { padding:32px 24px; margin:0; text-align:center; font-size:14px; color:var(--muted,#626b76); }
+.edu-admin .erasure-queue summary:focus-visible { outline:2px solid var(--ink,#23262b); outline-offset:2px; border-radius:4px; }
+@media(max-width:600px) {
+  .edu-admin .erasure-heading { align-items:flex-start; flex-direction:column; gap:12px; padding:20px 16px; }
+  .edu-admin .erasure-overview { padding:12px 16px; gap:8px 20px; }
+  .edu-admin .erasure-list { padding:0 16px; }
+  .edu-admin .erasure-card { padding:20px 0; }
+  .edu-admin .erasure-results { column-gap:20px; }
+  .edu-admin .erasure-card-footer { flex-direction:column; gap:8px; }
+  .edu-admin .erasure-details { width:100%; }
+  .edu-admin .erasure-card-footer>.btn { width:100%; }
+  .edu-admin .erasure-queue>.erasure-note,.edu-admin .erasure-queue>.erasure-warning { margin:16px; }
+}

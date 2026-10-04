@@ -79,6 +79,7 @@ export const adminNavigationGroups = [
 ] as const;
 
 export const adminNavigationTitles: Record<string, string> = {
+  'diagnosis-management': 'N6 진단 관리',
   products: '상품·판매 설정',
   conversion: '모집·문의 검토',
   landing: '광고·웨비나 성과',
@@ -146,7 +147,7 @@ export function normalizeAdminSectionKey(current: string) {
 }
 
 export function adminContentWidth(section: string): AdminContentWidth {
-  if (['learning', 'learning-editor', 'landing', 'analytics', 'orders', 'customers', 'conversion', 'members', 'reviews'].includes(section)) return 'wide';
+  if (['diagnosis-management', 'learning', 'learning-editor', 'landing', 'analytics', 'orders', 'customers', 'conversion', 'members', 'reviews'].includes(section)) return 'wide';
   if (['seo', 'settings', 'staff'].includes(section)) return 'narrow';
   return 'standard';
 }
