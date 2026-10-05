@@ -1,3 +1,4 @@
+import { diagnosisReadyPushEnabled } from '@/lib/diagnosis-ready-push';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { resolveDiagnosisAudience } from '@/lib/diagnosis-audience';
 import { notFound, redirect } from 'next/navigation';
@@ -12,5 +13,5 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
   if (!user) redirect('/login?next=%2Fmy%2Fdiagnosis');
   if (!await resolveDiagnosisAudience(user, async (name, args) => await createAdminClient().rpc(name, args))) notFound();
   const query = await searchParams;
-  return <DiagnosisExperience reportsEnabled={process.env.EDU_MYIN_DIAGNOSIS_REPORTS_ENABLED === 'true'} initialCourseId={typeof query.course === 'string' ? query.course : undefined}/>;
+  return <DiagnosisExperience userId={user.id} readyPushEnabled={diagnosisReadyPushEnabled()} reportsEnabled={process.env.EDU_MYIN_DIAGNOSIS_REPORTS_ENABLED === 'true'} initialCourseId={typeof query.course === 'string' ? query.course : undefined}/>;
 }

@@ -53,3 +53,20 @@ test('a configuration outage still lets the member turn off this device locally'
  await expect(page.getByRole('alert')).toHaveText('알림 설정 연결 실패');await page.getByRole('button',{name:'이 기기 알림 끄기'}).click();await expect(page.getByRole('alert')).toHaveCount(0);
  expect(await page.evaluate(()=>Reflect.get(window,'pushFixture').commands)).toContainEqual({action:'CLEAR'});
 });
+
+test('pending report offers opt-in without permission prompts and shows completion promise only after enable',async({page},info)=>{
+ const h=await fixture(page);
+ await page.route('**/api/platform/diagnosis/session',r=>r.fulfill({json:{state:'submitted',revision:1,answers:[],submittedAt:'2026-10-05T00:00:00Z',needsReview:false,survey:{code:'test',version:'1',title:'합성 검사',coreQuestionCount:0,questions:[]}}}));
+ await page.route('**/api/platform/diagnosis/report',r=>r.fulfill({json:{state:'processing',updatedAt:'2026-10-05T00:00:00Z',canRetry:false,downloadAvailable:false}}));
+ await page.setViewportSize({width:375,height:812});await page.goto('/diagnosis-test?reports&push');
+ await expect(page.getByRole('heading',{name:'보고서 완성 알림'})).toBeVisible();
+ await expect(page.getByText('이 기기 알림 꺼짐',{exact:true})).toBeVisible();
+ expect(await page.evaluate(()=>Reflect.get(window,'pushFixture').asks)).toBe(0);
+ await expect(page.getByText('알림이 켜져 있어요. 완성되면 이 기기로 알려드릴게요.',{exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'이 기기 알림 켜기'}).click();
+ await expect(page.getByText('알림이 켜져 있어요. 완성되면 이 기기로 알려드릴게요.',{exact:true})).toBeVisible();
+ expect(h.writes.filter(x=>x.action==='subscribe')).toHaveLength(1);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:info.outputPath('diagnosis-ready-push-mobile.png'),fullPage:true});
+ await page.setViewportSize({width:1280,height:900});await page.screenshot({path:info.outputPath('diagnosis-ready-push-desktop.png'),fullPage:true});
+});

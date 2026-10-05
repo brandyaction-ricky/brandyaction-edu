@@ -1,5 +1,5 @@
 /* Push only: never intercept or cache authenticated pages or responses. */
-const allowedPaths = new Set(['/my/questions', '/admin/questions']);
+const allowedPaths = new Set(['/my/questions', '/admin/questions', '/my/diagnosis', '/admin/diagnosis']);
 const allowedPath = value => typeof value === 'string' && (allowedPaths.has(value) || /^\/my\/questions\?question=[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value));
 const isId = value => typeof value === 'string' && /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(value);
 async function bindingStore(write, value) {
@@ -53,7 +53,9 @@ self.addEventListener('push', event => {
     await changes.catch(() => {}); const stored = await bindingStore(false);
     if (!stored || stored.binding !== data.binding) return;
     await self.registration.showNotification('브랜디에듀', {
-      body: '질문·답변 소식이 있습니다. 로그인해서 확인해 주세요.',
+      body: data.path === '/my/diagnosis' || data.path === '/admin/diagnosis'
+        ? 'N6 보고서가 완성됐어요. 눌러서 보고서를 확인해 주세요.'
+        : '질문·답변 소식이 있습니다. 로그인해서 확인해 주세요.',
       tag: 'edu-' + data.eventId, renotify: false,
       icon: '/api/app-branding?icon=192', badge: '/icons/edu-badge-96.png',
       data: { binding: data.binding, path: data.path },

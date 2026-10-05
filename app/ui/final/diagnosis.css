@@ -19,3 +19,15 @@
 .diagnosis-restart dialog.diagnosis-restart-dialog{box-sizing:border-box;width:calc(100vw - 40px);max-width:430px;padding:28px;border:1px solid #e1e4e8;border-radius:16px;background:#fff;color:#24282e;box-shadow:0 20px 60px #0002}
 .diagnosis-restart-dialog::backdrop{background:#12182166}.diagnosis-restart-dialog h2{font-size:21px;line-height:1.5;word-break:keep-all;margin:0 0 14px}.diagnosis-restart-dialog p{font-size:14px;line-height:1.8;word-break:keep-all;margin:0 0 16px;color:#636a75}.diagnosis-restart-dialog .diagnosis-restart-eyebrow{color:#b4232d;font-weight:700;font-size:12px;margin-bottom:8px}.diagnosis-restart-dialog [role=alert]{color:#b4232d}
 .diagnosis-restart-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:24px}.diagnosis-restart-actions button{min-height:44px;padding:10px 16px;border-radius:8px;border:1px solid #dce0e5;background:#fff;font-size:14px;cursor:pointer}.diagnosis-restart-actions button.confirm{background:#c9232d;color:#fff;border-color:#c9232d}
+
+.diagnosis-report-notifications { width: calc(100% - 40px); max-width: 600px; margin: 24px auto; text-align: left; }
+.diagnosis-report-notifications .panel { border: 1px solid var(--border, #e2e5e9); border-radius: 16px; background: white; padding: 24px; }
+.diagnosis-report-notifications h2 { font-size: 20px; margin: 0 0 12px; }
+.diagnosis-report-notifications p { line-height: 1.7; margin: 12px 0; word-break: keep-all; }
+.diagnosis-report-notifications .row { display: flex; flex-wrap: wrap; gap: 8px; }
+.diagnosis-report-notifications .btn { white-space: normal; min-height: 44px; border: 1px solid #d9dde3; border-radius: 10px; padding: 10px 14px; background: #fff; color: #252a34; font: inherit; font-size: 14px; cursor: pointer; }
+.diagnosis-report-notifications .btn:hover:not(:disabled) { background: #f5f6f8; }
+.diagnosis-report-notifications .btn:focus-visible { outline: 2px solid #c82032; outline-offset: 3px; }
+.diagnosis-report-notifications .btn:disabled { opacity: .5; cursor: default; }
+.diagnosis-report-notifications [role="status"] { padding: 12px 14px; border-radius: 10px; background: #f5f6f8; font-weight: 600; }
+@media (max-width: 480px) { .diagnosis-report-notifications .panel { padding: 20px; } .diagnosis-report-notifications .btn { flex: 1 1 140px; } }

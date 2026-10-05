@@ -95,13 +95,12 @@ export function DiagnosisQuestionnaire({initial,save,submit,onReload,onExit,onRe
   useEffect(()=>{shownAt.current=performance.now();heading.current?.focus({preventScroll:true});},[page]);
   useEffect(()=>{if(confirmSubmit||neutralBlock)submitHeading.current?.focus();},[confirmSubmit,neutralBlock]);
   const pairScreen=screen.kind==='q'&&screen.q.type==='pair_choice'?screen.q:null;
-  const pairAnswered=!!pairScreen&&present(find(pairScreen));
   useEffect(()=>{
-    if(!pairScreen||pairAnswered)return;
-    const started=Date.now();const timer=setInterval(()=>{const left=Math.max(0,PAIR_SECONDS-(Date.now()-started)/1000);setTimerLeft(left);if(left<=0)clearInterval(timer);},100);return()=>clearInterval(timer);
-    // Changing screens or answering resets the nudge. Expiry never submits an answer.
+    if(!pairScreen)return;
+    const started=readClock();const timer=setInterval(()=>{const left=Math.max(0,PAIR_SECONDS-(readClock()-started)/1000);setTimerLeft(left);if(left<=0)clearInterval(timer);},100);return()=>clearInterval(timer);
+    // Every visit starts a fresh nudge, including an already answered question. Expiry never submits an answer.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[page,pairAnswered]);
+  },[page]);
   function checkNeutralResponses(){
     if(!diagnosisNeutralResponses(questions,latest.current).shouldBlock)return true;
     setConfirmSubmit(false);setNeutralBlock(true);return false;

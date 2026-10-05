@@ -1,3 +1,4 @@
+import { diagnosisReadyPushEnabled } from '@/lib/diagnosis-ready-push';
 import { resolveDiagnosisAudience } from '@/lib/diagnosis-audience';
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -22,7 +23,10 @@ export async function GET(request: Request) {
     const download = query.has('download'), preview = query.has('preview'), html = query.has('html');
     const db = createAdminClient();
     const result = await runDiagnosisReport({ actor, rpc: async (name, args) => await db.rpc(name, args),
-      send: sendDiagnosisReportCommand }, html ? 'html' : download || preview ? 'download' : 'status');
+      send: sendDiagnosisReportCommand, ...(diagnosisReadyPushEnabled() ? { watch: async (context: { attemptId: string }) => {
+        // An unavailable notification queue must not hide the customer's report. Cron retries existing watches.
+        await db.rpc('edu_watch_diagnosis_report', { p_actor: actor.id, p_attempt: context.attemptId });
+      } } : {}) }, html ? 'html' : download || preview ? 'download' : 'status');
     if (html) return new Response(result.html, { headers: { ...privateHeaders, 'Content-Type': 'text/html; charset=utf-8',
       'Content-Security-Policy': "sandbox; default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'",
       'Content-Disposition': `attachment; filename="N6-report.html"; filename*=UTF-8''${encodeURIComponent('N6-정밀보고서.html')}` } });

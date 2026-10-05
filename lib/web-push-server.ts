@@ -3,7 +3,7 @@ import { createECDH, ECDH } from 'node:crypto';
 import webpush from 'web-push';
 import { createAdminClient } from '@/lib/supabase/admin';
 
-const paths = new Set(['/my/questions', '/admin/questions']);
+const paths = new Set(['/my/questions', '/admin/questions', '/my/diagnosis', '/admin/diagnosis']);
 const allowedPath = (value: string) => paths.has(value) || /^\/my\/questions\?question=[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value);
 export function pushConfiguration() {
   if (process.env.EDU_WEB_PUSH_ENABLED !== 'true' || process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED !== 'true') return null;

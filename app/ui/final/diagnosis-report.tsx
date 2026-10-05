@@ -1,4 +1,5 @@
 'use client';
+import { PushSettings } from './push-settings';
 
 import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, Check, CheckCircle2, ChevronDown, Clock3, Download, FileText, LoaderCircle, RefreshCw } from 'lucide-react';
@@ -42,7 +43,7 @@ function isStatus(value: unknown): value is DiagnosisReportStatus {
     && v.downloadAvailable === (v.state === 'ready');
 }
 
-export function DiagnosisReportView({ onExit, exitLabel = '학습으로 돌아가기' }: { onExit: () => void; exitLabel?: string }) {
+export function DiagnosisReportView({ userId, readyPushEnabled = false, onExit, exitLabel = '학습으로 돌아가기' }: { userId?: string; readyPushEnabled?: boolean; onExit: () => void; exitLabel?: string }) {
   const [status, setStatus] = useState<DiagnosisReportStatus | null>(null);
   const [error, setError] = useState(''), [loading, setLoading] = useState(true), [paused, setPaused] = useState(false);
   const [reload, setReload] = useState(0), [preview, setPreview] = useState<string | null>(null);
@@ -138,11 +139,12 @@ export function DiagnosisReportView({ onExit, exitLabel = '학습으로 돌아�
         </div>
       </details>}
       {status && ['queued', 'processing'].includes(status.state) && <div className="diagnosis-report-timing">
-        <Clock3 size={20} aria-hidden="true"/><div><p>보고서 준비 예상 시간 <strong>약 30분~1일</strong></p>
-          <p>검사 제출 후부터 예상한 시간입니다.<br/>신청이 몰리면 더 걸릴 수 있어요.</p>
+        <Clock3 size={20} aria-hidden="true"/><div><p><strong>완성될 때까지 이 화면을 켜 두지 않아도 돼요.</strong></p>
+          <p>답변 분석과 보고서 내용 확인을 차례로 진행하고 있어요.<br/>신청이 몰리면 준비 시간이 더 길어질 수 있습니다.</p>
           {!paused && <span>이 화면에서 진행 상태가 자동으로 바뀝니다.</span>}
         </div>
       </div>}
+      {userId && readyPushEnabled && status && ['queued', 'processing', 'needs_review'].includes(status.state) && <div className="diagnosis-report-notifications"><PushSettings key={userId} userId={userId} diagnosis/></div>}
       {status?.state === 'ready' && <>
         <div className="diagnosis-report-actions"><button ref={openReport} className="diagnosis-primary" onClick={() => void getFile('read')} disabled={fetchingPreview || downloading}>{fetchingPreview ? <LoaderCircle className="diagnosis-spin" size={18}/> : <FileText size={18}/>}보고서 열기</button>
           <button className="diagnosis-secondary" onClick={() => void getFile('html')} disabled={fetchingPreview || downloading}><Download size={18}/>HTML 파일 받기</button>

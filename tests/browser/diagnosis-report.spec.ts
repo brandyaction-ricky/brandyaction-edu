@@ -47,7 +47,8 @@ test('processing polls every 10 seconds and stops once ready',async({page})=>{
   await expect(progress.getByRole('listitem')).toHaveCount(3);
   await expect(progress.locator('[aria-current="step"]')).toContainText('결과 분석 중');
   await expect(progress).toContainText('분석 대기');
-  await expect(page.getByText('약 30분~1일',{exact:true})).toBeVisible();
+  await expect(page.getByText('약 30분~1일',{exact:true})).toHaveCount(0);
+  await expect(page.getByText('완성될 때까지 이 화면을 켜 두지 않아도 돼요.',{exact:true})).toBeVisible();
   await expect(page.getByRole('button',{name:'진행 상태 다시 확인'})).toHaveCount(0);
   expect((await progress.boundingBox())!.y).toBeLessThan((await page.getByRole('heading').boundingBox())!.y);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);

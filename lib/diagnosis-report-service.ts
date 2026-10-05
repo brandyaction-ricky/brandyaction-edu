@@ -1,11 +1,11 @@
 import { DiagnosisBridgeError, type DiagnosisContext } from './diagnosis-bridge';
 import { validDiagnosisReportContext, validateDiagnosisReport, type DiagnosisReport, type DiagnosisReportContext, type DiagnosisReportStatus, type DiagnosisReportAction } from './diagnosis-report';
 
-type Dependencies = { actor: { id: string };
+type Dependencies = { watch?: (context: DiagnosisReportContext) => Promise<void>; actor: { id: string };
   rpc: (name: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
   send: (context: DiagnosisReportContext, action: DiagnosisReportAction) => Promise<DiagnosisReport> };
 
-export async function runDiagnosisReport({ actor, rpc, send }: Dependencies, action: DiagnosisReportAction):
+export async function runDiagnosisReport({ actor, rpc, send, watch }: Dependencies, action: DiagnosisReportAction):
   Promise<DiagnosisReportStatus & { markdown?: string; html?: string }> {
   if (!['status','download','html'].includes(action)) throw new DiagnosisBridgeError('INVALID', 400);
   async function currentContext() {
@@ -26,6 +26,7 @@ export async function runDiagnosisReport({ actor, rpc, send }: Dependencies, act
     || before.releaseId !== after.releaseId || before.packageVersion !== after.packageVersion)
     throw new DiagnosisBridgeError('FORBIDDEN', 403);
   validateDiagnosisReport(report, after, action);
+  if (watch && ['queued','processing','needs_review'].includes(report.state)) await watch(after);
   // Lost submit acknowledgments may leave the EDU revision behind MYIN's frozen revision; no new attempt is needed.
   return { state: report.state, updatedAt: report.updatedAt, canRetry: false, downloadAvailable: report.downloadAvailable,
     ...(action === 'download' ? { markdown: report.markdown } : action === 'html' ? { html: report.html } : {}) };
