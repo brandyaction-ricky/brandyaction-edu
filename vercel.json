@@ -3,6 +3,7 @@
   "framework": "nextjs",
   "git": {
     "deploymentEnabled": {
+      "codex/edu-simple-install-20261005": false,
       "codex/edu-draft-save-recovery-20261004": false,
       "codex/edu-lesson-save-feedback-20261004": false,
       "codex/edu-release-211-integration-20260927": false,
