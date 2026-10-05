@@ -57,6 +57,7 @@ test('profile links open the operators own member information from header and si
     await expect(header).toHaveAttribute('href','/my/profile');
     await header.focus();await page.keyboard.press('Enter');
     await expect(page).toHaveURL(/\/my\/profile$/);
+    await expect(page.getByTestId('navigation-destination')).toBeAttached();
     await page.goto('/admin-shell-test');
   }
   if ((viewport?.width || 0) <= 1024) await page.getByRole('button',{name:'관리자 메뉴 열기'}).click();
@@ -64,4 +65,5 @@ test('profile links open the operators own member information from header and si
   await expect(sidebar).toHaveAttribute('href','/my/profile');
   await expect(sidebar).toContainText('스태프');
   await sidebar.click();await expect(page).toHaveURL(/\/my\/profile$/);
+  await expect(page.getByTestId('navigation-destination')).toBeAttached();
 });
