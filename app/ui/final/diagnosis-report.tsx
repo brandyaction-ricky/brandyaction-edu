@@ -48,6 +48,7 @@ export function DiagnosisReportView({ userId, readyPushEnabled = false, onExit, 
   const [error, setError] = useState(''), [loading, setLoading] = useState(true), [paused, setPaused] = useState(false);
   const [reload, setReload] = useState(0), [preview, setPreview] = useState<string | null>(null);
   const [fetchingPreview, setFetchingPreview] = useState(false), [downloading, setDownloading] = useState(false);
+  const [downloadFormat, setDownloadFormat] = useState<'html' | 'markdown' | null>(null);
   const heading = useRef<HTMLHeadingElement>(null), fileRequest = useRef<AbortController | null>(null);
   const openReport = useRef<HTMLButtonElement>(null), readerWasOpen = useRef(false);
   const fileVersion = useRef(0);
@@ -95,21 +96,29 @@ export function DiagnosisReportView({ userId, readyPushEnabled = false, onExit, 
   }, [preview]);
 
   function refresh() {
-    setStatus(null); setPreview(null); setError(''); setLoading(true); setPaused(false); setReload(n => n + 1);
+    setStatus(null); setPreview(null); setDownloadFormat(null); setError(''); setLoading(true); setPaused(false); setReload(n => n + 1);
   }
   async function getFile(mode: 'read' | 'html' | 'markdown') {
     const download = mode !== 'read';
     const version = ++fileVersion.current;
     fileRequest.current?.abort(); fileRequest.current = new AbortController();
-    setError(''); if (download) setDownloading(true); else setFetchingPreview(true);
+    setError(''); setDownloadFormat(null); if (download) setDownloading(true); else setFetchingPreview(true);
     try {
       const response = await fetch(`${endpoint}?${mode === 'markdown' ? 'download' : 'html'}=1`, { cache: 'no-store',
         signal: AbortSignal.any([fileRequest.current.signal, AbortSignal.timeout(15_000)]) });
       if (!response.ok) await readResponse(response);
       if (download) {
-        const blob = await response.blob(); if (version !== fileVersion.current) return;
-        const url = URL.createObjectURL(blob), link = document.createElement('a');
-        link.href = url; link.download = mode === 'markdown' ? 'N6-검사결과.md' : 'N6-정밀보고서.html'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+        const type = mode === 'markdown' ? 'text/markdown' : 'text/html';
+        if (!response.headers.get('content-type')?.startsWith(type) || !(await response.text()).trim())
+          throw Error('보고서 파일을 확인하지 못했습니다. 다시 확인해 주세요.');
+        if (version !== fileVersion.current) return;
+        // Validate the private file first; let the browser handle the server attachment.
+        // Some embedded browsers silently ignore generated blob downloads.
+        const link = document.createElement('a');
+        link.href = `${endpoint}?${mode === 'markdown' ? 'download' : 'html'}=1`;
+        link.download = mode === 'markdown' ? 'N6-검사결과.md' : 'N6-정밀보고서.html';
+        document.body.appendChild(link); link.click(); link.remove();
+        setDownloadFormat(mode === 'markdown' ? 'markdown' : 'html');
       } else {
         if (!response.headers.get('content-type')?.startsWith('text/html')) throw Error('보고서 파일을 확인하지 못했습니다. 다시 확인해 주세요.');
         const html = await response.text();
@@ -149,6 +158,7 @@ export function DiagnosisReportView({ userId, readyPushEnabled = false, onExit, 
         <div className="diagnosis-report-actions"><button ref={openReport} className="diagnosis-primary" onClick={() => void getFile('read')} disabled={fetchingPreview || downloading}>{fetchingPreview ? <LoaderCircle className="diagnosis-spin" size={18}/> : <FileText size={18}/>}보고서 열기</button>
           <button className="diagnosis-secondary" onClick={() => void getFile('html')} disabled={fetchingPreview || downloading}><Download size={18}/>HTML 파일 받기</button>
           <button className="diagnosis-secondary" onClick={() => void getFile('markdown')} disabled={fetchingPreview || downloading}>{downloading ? <LoaderCircle className="diagnosis-spin" size={18}/> : <Download size={18}/>}MD 파일 받기</button></div>
+        {downloadFormat && <p className="diagnosis-report-help" role="status">파일 저장 창을 확인해 주세요. 창이 안 뜨면 <a href={`${endpoint}?${downloadFormat === 'markdown' ? 'download' : 'html'}=1`} download={downloadFormat === 'markdown' ? 'N6-검사결과.md' : 'N6-정밀보고서.html'}>저장 창 다시 열기</a>를 눌러 주세요. 계속 안 되면 Safari·Chrome에서 이 화면을 열어 받아 주세요.</p>}
         <p className="diagnosis-report-help">HTML은 지금 보는 디자인 그대로 보관하는 파일입니다. MD는 다음 날 커리큘럼에서 내 사업에 맞게 정리할 때 사용합니다. 두 파일 모두 다시 받을 수 있습니다.</p>
       </>}
       {preview !== null && <DiagnosisReportReader html={preview} error={error} onClose={() => setPreview(null)} onError={setError}/>}

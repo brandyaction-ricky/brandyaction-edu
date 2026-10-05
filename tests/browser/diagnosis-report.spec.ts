@@ -1,15 +1,16 @@
 import { test, expect, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
+import { reportFiles } from './fixture/diagnosis-report-files.mjs';
 const submitted={state:'submitted',revision:8,answers:[],submittedAt:'2026-10-01T00:00:00Z',needsReview:false,survey:{code:'needs6_n30',version:'synthetic',title:'합성 N6 검사',coreQuestionCount:0,questions:[]}};
 const report=(state='queued')=>({state,updatedAt:'2026-10-01T00:00:00.000Z',canRetry:false,downloadAvailable:state==='ready'});
 async function session(page:Page){await page.route('**/api/platform/diagnosis/session',r=>r.fulfill({json:submitted}));}
 
-test('original HTML keeps its design and contents links while scripts and remote requests are blocked',async({page})=>{
+test('original HTML keeps its design and contents links while scripts and remote requests are blocked',async({page,context})=>{
   await session(page);
-  const html='<!doctype html><html lang="ko"><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;color:rgb(27,38,52)}h1{font:700 32px serif}.gap{height:1200px}#details{min-height:1400px}.print-btn{display:block}</style></head><body><h1>합성 정밀 보고서</h1><a href="#details">나의 행동 경향</a><button class="print-btn">기존 인쇄</button><script>window.reportExecuted=true;parent.reportExecuted=true</script><img src="https://invalid.test/image" onerror="window.reportExecuted=true"><div class="gap"></div><section id="details"><h2>나의 행동 경향</h2></section></body></html>';
-  const markdown='# 합성 검사 결과\n\n다음 학습에서 사용합니다.',files:string[]=[];let remoteRequests=0;
+  const {html,markdown}=reportFiles.original,files:string[]=[];let remoteRequests=0;
+  await context.addCookies([{name:'diagnosis_download_fixture',value:'original',url:`http://127.0.0.1:${process.env.FIXTURE_PORT || 4173}`}]);
   await page.route('https://invalid.test/**',r=>{remoteRequests++;return r.abort();});
-  await page.route('**/api/platform/diagnosis/report*',r=>{const url=new URL(r.request().url());if(url.searchParams.has('html')){files.push('html');return r.fulfill({contentType:'text/html; charset=utf-8',body:html});}if(url.searchParams.has('download')){files.push('download');return r.fulfill({contentType:'text/markdown; charset=utf-8',body:markdown});}return r.fulfill({json:report('ready')});});
+  await context.route('**/api/platform/diagnosis/report*',r=>{const url=new URL(r.request().url());if(url.searchParams.has('html')){files.push('html');return r.fulfill({contentType:'text/html; charset=utf-8',body:html});}if(url.searchParams.has('download')){files.push('download');return r.fulfill({contentType:'text/markdown; charset=utf-8',body:markdown});}return r.fulfill({json:report('ready')});});
   await page.goto('/diagnosis-test?reports');await expect(page.getByRole('heading',{name:'정밀 보고서가 준비됐어요.'})).toBeVisible();
   await page.getByRole('button',{name:'보고서 열기',exact:true}).click();
   const preview=page.getByRole('region',{name:'나의 정밀 보고서',exact:true}),frame=page.frameLocator('iframe[title="나의 N6 정밀 보고서"]');
@@ -202,4 +203,33 @@ test('mobile report contents and back-top scroll only within the reader',async({
   expect(await page.locator('dialog').evaluate(el=>el.scrollTop)).toBe(0);
  }
  await page.screenshot({path:test.info().outputPath('mobile-report-navigation.png')});
+});
+
+test('HTML and MD downloads still work when the in-app browser ignores blob links', async ({page,context}) => {
+  await session(page);
+  const {html,markdown}=reportFiles.embedded;
+  await context.addCookies([{name:'diagnosis_download_fixture',value:'embedded',url:`http://127.0.0.1:${process.env.FIXTURE_PORT || 4173}`}]);
+  await page.addInitScript(() => {
+    const click=HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click=function(){if(this.protocol==='blob:')return;click.call(this);};
+  });
+  await context.route('**/api/platform/diagnosis/report*',r=>{
+    const url=new URL(r.request().url());
+    if(!url.search)return r.fulfill({json:report('ready')});
+    const isHtml=url.searchParams.has('html');
+    return r.fulfill({contentType:isHtml?'text/html; charset=utf-8':'text/markdown; charset=utf-8',body:isHtml?html:markdown});
+  });
+  await page.goto('/diagnosis-test?reports');
+  await expect(page.getByRole('heading',{name:'정밀 보고서가 준비됐어요.'})).toBeVisible();
+  for(const [label,name,body] of [['HTML 파일 받기','N6-정밀보고서.html',html],['MD 파일 받기','N6-검사결과.md',markdown]]){
+    const pending=page.waitForEvent('download',{timeout:6000});
+    await page.getByRole('button',{name:label,exact:true}).click();
+    const download=await pending;
+    expect(download.suggestedFilename().normalize('NFC')).toBe(name);
+    expect(await readFile((await download.path())!,'utf8')).toBe(body);
+    await expect(page.getByRole('status')).toContainText('파일 저장 창을 확인');
+    const again=page.getByRole('link',{name:'저장 창 다시 열기',exact:true});
+    await expect(again).toHaveAttribute('href',/\/api\/platform\/diagnosis\/report\?(html|download)=1$/);
+    await expect(page.getByRole('heading',{name:'정밀 보고서가 준비됐어요.'})).toBeVisible();
+  }
 });
