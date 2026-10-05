@@ -3,6 +3,7 @@
   "framework": "nextjs",
   "git": {
     "deploymentEnabled": {
+      "codex/edu-curriculum-autosave-20261005": false,
       "codex/edu-b14-transition-20261005": false,
       "codex/edu-lesson-question-dialog-20261005": false,
       "codex/edu-draft-save-recovery-20261004": false,
