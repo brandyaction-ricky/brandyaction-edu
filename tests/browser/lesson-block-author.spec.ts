@@ -90,7 +90,7 @@ test('author preserves image and archive question types and exposes the matching
   const image = page.getByRole('region', { name: '실행 화면', exact: true });
   const archive = page.getByRole('region', { name: '결과물 묶음', exact: true });
   await expect(image.getByLabel('답변 이미지 선택')).toBeEnabled();
-  await expect(image.getByLabel('압축파일 선택')).toBeEnabled();
+  await expect(image.getByLabel('압축파일 선택')).toHaveCount(0);
   await expect(archive.getByLabel('압축파일 선택')).toBeEnabled();
   await expect(archive.getByLabel('답변 이미지 선택')).toHaveCount(0);
 });
