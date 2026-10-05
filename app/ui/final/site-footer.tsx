@@ -18,6 +18,10 @@ export function SiteFooter({ supportEmail, supportUrl }: { supportEmail?: string
             <Link href={supportUrl || '/my/questions'}>문의하기</Link>
           </nav>
         </div>
+        <div className="site-footer-ad-notice">
+          <p>이 사이트에서는 Meta가 쿠키로 방문 기록을 수집합니다(광고 측정·맞춤형 광고).</p>
+          <Link href="/policies/privacy#advertising">맞춤형 광고 설정</Link>
+        </div>
         <div className="site-footer-company">
           <dl className="site-footer-business">
             <div><dt>상호</dt><dd>주식회사 브랜디액션</dd></div>

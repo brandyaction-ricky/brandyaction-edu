@@ -81,6 +81,7 @@ import {
 } from "./final/public-views";
 import { OrderResult } from "./order-result";
 import { SiteFooter } from "./final/site-footer";
+import { PrivacyPolicy } from "./privacy-policy";
 import { HomeHero } from "./final/home-hero";
 import { MarketingWorkspaceNav } from "./marketing-workspace-nav";
 import { ConversionReview, prefetchConversionReview } from "./conversion-review";
@@ -875,7 +876,7 @@ export function Platform({
   else if (path[0] === "checkout" || path[0] === "apply") body = checkout();
   else if (["order-complete", "applied", "payment"].includes(path[0]))
     body = <OrderResult data={data} refresh={refresh} />;
-  else if (path[0] === "policies") body = <Policy kind={path[1]} />;
+  else if (path[0] === "policies") body = path[1] === "privacy" ? <PrivacyPolicy version={path[2]}/> : <Policy kind={path[1]} />;
   else
     body = (
       <div className="wrap">
