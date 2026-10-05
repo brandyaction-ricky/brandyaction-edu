@@ -18,6 +18,9 @@ test('orders filter the full set before paging and retain filters across 100-row
   await page.goto('/public-data-test?publicScreen=admin/orders');
   const table = page.getByRole('table', { name: '주문·결제·환불·수강권 연결 목록' });
   await expect(table.locator('tbody tr')).toHaveCount(100);
+  const failureBadge = table.getByLabel('상태: 결제 실패').first();
+  await expect(failureBadge).toHaveCSS('color', 'rgb(167, 25, 34)');
+  await expect(failureBadge).toHaveCSS('background-color', 'rgb(255, 240, 241)');
   await page.getByRole('combobox', { name: '결제 상태', exact: true }).selectOption('paid');
   await expect(page.getByText('검색 결과 120건 중 100건 표시 · 한 페이지 최대 100건')).toBeVisible();
   await expect(table.getByText('QA-30', { exact: true })).toBeVisible();

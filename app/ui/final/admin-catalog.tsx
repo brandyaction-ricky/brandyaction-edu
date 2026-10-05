@@ -52,8 +52,8 @@ type Props = {
   blockLearningEnabled?: boolean;
 };
 type Column = { label: string; value: (row: Row) => ReactNode };
-function CatalogTable({ label, loading, children }: { label: string; loading: boolean; children: ReactNode }) {
-  return <AdminDataTable label={label} density="standard" loading={loading}>{children}</AdminDataTable>;
+function CatalogTable({ label, loading, wide = false, children }: { label: string; loading: boolean; wide?: boolean; children: ReactNode }) {
+  return <AdminDataTable label={label} density="standard" loading={loading} className={wide ? 'admin-wide-table' : undefined}>{children}</AdminDataTable>;
 }
 const named = (r?: Row) =>
   t(r, "title") || t(r, "name") || t(r, "full_name") || t(r, "email") || "—";
@@ -932,7 +932,7 @@ export function AdminCatalog({
               ))}
             </div>
           ) : (
-            <CatalogTable label={["weeks", "cohorts"].includes(s.key) ? `${s.title} 데이터` : `${s.title} 목록`} loading={loading}>
+            <CatalogTable label={["weeks", "cohorts"].includes(s.key) ? `${s.title} 데이터` : `${s.title} 목록`} loading={loading} wide={s.key === 'products'}>
                 <thead>
                   <tr>
                     {bulkMode && <th className="selection-column">{selectAll}</th>}

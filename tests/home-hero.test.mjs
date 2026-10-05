@@ -88,6 +88,17 @@ test('managed banner fields become the homepage hero slide data', () => {
   assert.equal(unsafe[0].linkUrl, '/classes/free-class');
 });
 
+test('placeholder hero copy and free-class CTA do not point to the unfiltered catalog', () => {
+  const [slide] = homeHeroSlides([{
+    id: 'placeholder', title: '이미지 배너', link_label: '무료 클래스부터 시작하기',
+    link_url: '/classes', image_url: 'https://cdn.example/hero.webp',
+  }], '/classes/free-class');
+  assert.equal(slide.title, '배운 것을,\n내 일의 성과로.');
+  assert.equal(slide.linkUrl, '/classes?type=free');
+  assert.equal(slide.imageUrl, 'https://cdn.example/hero.webp');
+  assert.equal(homeHeroSlides([{ ...banners[0], link_label: '전체 클래스 보기', link_url: '/classes' }], '/classes/free-class')[0].linkUrl, '/classes');
+});
+
 test('two or more managed banners render carousel controls and only one main CTA', () => {
   const markup = renderToStaticMarkup(React.createElement(HomeHero, {
     banners,
