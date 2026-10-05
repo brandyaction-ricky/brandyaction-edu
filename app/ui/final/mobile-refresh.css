@@ -1,0 +1,18 @@
+.mobile-page-refresh{display:none}
+@media(max-width:720px){
+  .edu-front .site-header .mobile-page-refresh,.edu-admin .topbar .mobile-page-refresh{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;flex-shrink:0;min-width:48px;min-height:44px;padding:4px;border:0;border-radius:8px;background:transparent;color:var(--muted,#62656b);font:inherit;cursor:pointer}
+  .mobile-page-refresh span{font-size:10px;line-height:1.2;white-space:nowrap}
+  .mobile-page-refresh:hover,.mobile-page-refresh:active{background:#f2f3f5}
+  .mobile-page-refresh:focus-visible{outline:2px solid #c9212d;outline-offset:2px}
+  .edu-admin .adm-topbar .crumb{min-width:0;flex:1;gap:8px}
+  .edu-admin .adm-topbar .crumb>span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .edu-admin .adm-topbar .topright{flex-shrink:0}
+}
+@media(max-width:680px){
+  .edu-front .site-header .brand img{width:120px;height:auto}
+  .edu-front .site-header .brand small{display:none}
+}
+@media(max-width:380px){
+  .edu-front .site-header .brand img{width:92px}
+  .edu-front .site-header .header-user{gap:4px}
+}

@@ -1,4 +1,5 @@
 "use client";
+import { MobileRefresh } from './final/mobile-refresh';
 import { contentVisibility } from '@/lib/content-visibility';
 import { MemberErasureQueue } from './final/member-erasure-queue';
 import { QuestionImage } from './final/question-image';
@@ -593,6 +594,7 @@ export function Platform({
             </nav>
           )}
           <div className="header-user">
+            <MobileRefresh />
             {user ? (
               <>
                 {learning && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' ? <LearningQuestionShortcut key={routeKey} context={questionContext}/> : <Link className="link header-questions" href={admin ? "/admin/questions" : "/my/questions"}>질문·답변</Link>}
