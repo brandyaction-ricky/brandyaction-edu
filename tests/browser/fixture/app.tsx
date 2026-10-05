@@ -85,6 +85,7 @@ function QuestionThreadFixture() {
 function ShellFixture() {
   const [mobile, setMobile] = useState(false);
   const available = [
+    ...(new URLSearchParams(location.search).has('refresh') ? [{ key: 'questions', title: '질문함' }] : []),
     { key: 'products', title: '상품 관리' },
     { key: 'weeks', title: '주차 구성' },
     { key: 'learning', title: '커리큘럼 편집' },

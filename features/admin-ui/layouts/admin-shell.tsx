@@ -1,4 +1,5 @@
 'use client';
+import { MobileRefresh } from '@/app/ui/final/mobile-refresh';
 
 import { LearningNoticeBar } from '@/app/ui/final/learning-notice';
 import {
@@ -232,6 +233,7 @@ export function AdminShell({
             <span>{adminSectionTitle(current, available)}</span>
           </div>
           <div className="topright">
+            <MobileRefresh />
             {byKey.has('questions') && (
               <Link className="btn ghost small" href="/admin/questions">
                 <MessageCircle aria-hidden="true" />
