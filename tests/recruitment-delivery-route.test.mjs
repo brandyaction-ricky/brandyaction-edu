@@ -1,4 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import ts from 'typescript';import {createHash,randomUUID} from 'node:crypto';
+
+const entryRulesE2 = {}; new Function('exports', ts.transpileModule(fs.readFileSync(new URL('../lib/entry-source.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(entryRulesE2);
 function load(path,modules={},env={}){const exports={};new Function('exports','require','process',ts.transpileModule(fs.readFileSync(new URL(path,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(exports,name=>{assert.ok(modules[name],name);return modules[name];},{env});return exports;}
 const server=load('../lib/conversion-review-server.ts',{'node:crypto':{createHash}}),actor=randomUUID(),code=randomUUID(),template=randomUUID();
 test('recruitment delivery endpoint requires full authority and origin; reads never schedule and body cannot choose actor or recipients',async()=>{
@@ -30,7 +32,8 @@ test('dispatch recruitment branch never queries all members; failed claim sends 
    if(table==='crm_member_tags')throw Error('unscoped audience access');return q;
   }};
   const env={EDU_CONVERSION_REVIEW_ENABLED:'true',CRM_DELIVERY_ENABLED:mode==='disabled'?'false':'true',SOLAPI_API_KEY:'test',SOLAPI_API_SECRET:'test',SOLAPI_SENDER_PHONE:'0200000000',SOLAPI_OPTOUT_PHONE:'0800000000'};
-  const service=load('../lib/crm-delivery.ts',{'@/lib/supabase/admin':{createAdminClient:()=>db},'@/lib/crm-purchase-contact':{},'@/lib/crm-purchase-email':{purchaseEmailConfigured:()=>false},'@/lib/crm-sms-settings':{loadSmsSettings:async()=>({senderPhone:'0200000000',optoutPhone:'0800000000',senderName:'브랜디액션',transactionalEnabled:true,marketingEnabled:true}),marketingAllowedNow:()=>true,marketingText:(content,sender,optout)=>`(광고) ${sender}\n${content}\n무료수신거부 ${optout}`},solapi:{SolapiMessageService:class{async getBlacks(){return{blackList:[],nextKey:null};}async send(){steps.push('provider');if(mode==='provider-error')throw Error('sensitive upstream payload');return{groupInfo:{groupId:'qa',status:'accepted'},failedMessageList:[]};}}}},env);
+  const service=load('../lib/crm-delivery.ts',{'@/lib/supabase/admin':{createAdminClient:()=>db},'@/lib/crm-purchase-contact':{},'@/lib/crm-purchase-email':{purchaseEmailConfigured:()=>false},'@/lib/entry-source': entryRulesE2,
+    '@/lib/crm-sms-settings':{loadSmsSettings:async()=>({senderPhone:'0200000000',optoutPhone:'0800000000',senderName:'브랜디액션',transactionalEnabled:true,marketingEnabled:true}),marketingAllowedNow:()=>true,marketingText:(content,sender,optout)=>`(광고) ${sender}\n${content}\n무료수신거부 ${optout}`},solapi:{SolapiMessageService:class{async getBlacks(){return{blackList:[],nextKey:null};}async send(){steps.push('provider');if(mode==='provider-error')throw Error('sensitive upstream payload');return{groupInfo:{groupId:'qa',status:'accepted'},failedMessageList:[]};}}}},env);
   await service.dispatchDueCrm();
   if(mode==='disabled')assert.deepEqual(steps,[]);
   else if(mode==='claim-error')assert.equal(steps.includes('provider'),false);

@@ -3,25 +3,27 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
 
+const entryRulesE2 = {}; new Function('exports', ts.transpileModule(fs.readFileSync(new URL('../lib/entry-source.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(entryRulesE2);
+
 const member = {
   id: '11111111-1111-4111-8111-111111111111',
   phone: '01012345678', status: 'active', marketing_consent: true,
   marketing_consent_at: '2026-01-01T00:00:00.000Z', marketing_opt_out_at: null,
 };
 
-function dispatchFixture({ channel = 'lms', current = member, blackPages = [{ blackList: [], nextKey: null }], blackError = false, inactive = false, purchaseOnly = false } = {}) {
+function dispatchFixture({ channel = 'lms', current = member, blackPages = [{ blackList: [], nextKey: null }], blackError = false, inactive = false, purchaseOnly = false, entryChannel, content = '모집 안내' } = {}) {
   const steps = [];
   const updates = [];
   const sentMessages = [];
   const queriedTables = [];
   const runFilters = [];
-  const template = { id: 'template', channel, purpose: 'marketing', content: '모집 안내', ...(inactive ? { is_active: false } : {}) };
+  const template = { id: 'template', channel, purpose: 'marketing', content, ...(inactive ? { is_active: false } : {}) };
   const campaign = { id: 'campaign', recruitment_id: 'recruitment', template };
   let blackPage = 0;
   const db = {
     rpc: async () => {
       steps.push('claim');
-      return { data: { template, members: [member] }, error: null };
+      return { data: { template, members: [{...member, entry_channel: entryChannel}] }, error: null };
     },
     from: (table) => {
       queriedTables.push(table);
@@ -60,6 +62,7 @@ function dispatchFixture({ channel = 'lms', current = member, blackPages = [{ bl
     '@/lib/supabase/admin': { createAdminClient: () => db },
     '@/lib/crm-purchase-contact': {},
     '@/lib/crm-purchase-email': { purchaseEmailConfigured: () => false },
+    '@/lib/entry-source': entryRulesE2,
     '@/lib/crm-sms-settings': {
       loadSmsSettings: async () => ({ senderPhone: '0200000000', optoutPhone: '0800000000', senderName: '브랜디액션', transactionalEnabled: true, marketingEnabled: true }),
       marketingAllowedNow: () => true,
@@ -152,4 +155,13 @@ test('consented and unblocked marketing SMS can be submitted with ad and opt-out
   assert.deepEqual(qa.steps, ['claim', '080', 'log', 'send']);
   assert.match(qa.sentMessages[0].text, /^\(광고\)/);
   assert.match(qa.sentMessages[0].text, /무료수신거부/);
+});
+
+test('recruitment room links survive the fresh consent lookup before provider submission',async()=>{
+ for(const channel of ['paid','organic',undefined]){
+  const qa=dispatchFixture({entryChannel:channel,content:'https://brandyaction-edu.com/classes/product?src=youtube'});
+  await qa.dispatch();assert.equal(qa.sentMessages.length,1);
+  const text=qa.sentMessages[0].text;
+  if(channel) assert.match(text,new RegExp('src='+channel)); else assert.doesNotMatch(text,/src=/);
+ }
 });
