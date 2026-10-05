@@ -31,6 +31,8 @@ export async function synchronizePushAccount(owner: string | null) {
 export async function pushDeviceStatus(owner: string) {
   const version = accountVersion(owner);
   const item = await registration(); current(version); if (!item) return false;
+  // Existing subscribers also need the updated completion-notification handler, without re-subscribing.
+  if (typeof item.update === 'function') void item.update().catch(() => {});
   await command(item, { action: 'ACCOUNT', owner }); current(version);
   const sub = await item.pushManager.getSubscription(); if (!sub) return false;
   const data = await api({ action: 'status', endpoint: sub.endpoint });
