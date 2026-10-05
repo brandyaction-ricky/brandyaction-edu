@@ -32,6 +32,7 @@ async function handle(request: Request, write: boolean) {
       INCOMPLETE: '빠진 문항과 안내 확인 문항을 확인해 주세요. 원하는 모습은 5개를 선택해 주세요.',
       CONFLICT: '다른 화면에서 답변이 변경되었습니다. 최신 답변을 불러와 주세요.',
       FORBIDDEN: '검사를 이용할 수 있는 구매·수강 정보를 확인해 주세요.',
+      STARTS_PAUSED: '검사 업데이트 중입니다. 잠시 후 새 검사를 시작해 주세요. 진행 중인 검사는 계속할 수 있습니다.',
       UNAVAILABLE: '검사 정보를 확인하지 못했습니다. 답변을 유지한 채 잠시 후 다시 시도해 주세요.',
     };
     return reply({ code, error: messages[code] || messages.UNAVAILABLE }, error instanceof DiagnosisBridgeError ? error.status : 503);
