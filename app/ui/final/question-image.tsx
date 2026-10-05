@@ -7,9 +7,10 @@ async function post(body: unknown) {
  const result = await response.json(); if (!response.ok) throw new Error(result.error || '이미지를 올리지 못했습니다. 다시 시도해 주세요.'); return result;
 }
 export type QuestionImagePickerHandle = { paste: (files: File[]) => void };
-export function QuestionImagePicker({ enrollmentId, lessonId, locked, publicQuestion = false, changed, ref }: { enrollmentId: string | null; lessonId: string | null; locked: boolean; publicQuestion?: boolean; changed: (id: string | null, busy: boolean, hasDraft: boolean) => void; ref?: Ref<QuestionImagePickerHandle> }) {
+export function QuestionImagePicker({ enrollmentId, lessonId, locked, publicQuestion = false, compact = false, changed, ref }: { enrollmentId: string | null; lessonId: string | null; locked: boolean; publicQuestion?: boolean; compact?: boolean; changed: (id: string | null, busy: boolean, hasDraft: boolean) => void; ref?: Ref<QuestionImagePickerHandle> }) {
  const [selection, setSelection] = useState<{ file: File; request: string; preview: string } | null>(null), [busy, setBusy] = useState(false), [ready, setReady] = useState(false), [error, setError] = useState('');
  const gate = useRef(false), mounted = useRef(false), notify = useRef(changed);
+ const input = useRef<HTMLInputElement>(null);
  useEffect(() => { notify.current = changed; }, [changed]);
  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
  useEffect(() => () => { if (selection) URL.revokeObjectURL(selection.preview); }, [selection]);
@@ -40,7 +41,7 @@ export function QuestionImagePicker({ enrollmentId, lessonId, locked, publicQues
   if (files.length !== 1) { setError('질문 이미지는 한 장씩 붙여넣어 주세요.'); return; }
   choose(files[0]);
  } }));
- return <div className="field question-image-picker"><label>질문 이미지 (선택)<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" disabled={locked || busy} onChange={e => { choose(e.target.files?.[0]); e.target.value = ''; }}/></label><small>JPG·PNG·WEBP·GIF 한 장, 최대 10MB. 복사한 이미지는 질문 입력란에 붙여넣을 수 있습니다. {publicQuestion ? '전체 공개 질문의 이미지는 같은 기수 수강생도 볼 수 있습니다.' : '본인과 담당 운영자만 볼 수 있습니다.'}</small>
+ return <div className="field question-image-picker"><label>질문 이미지 (선택)<input ref={input} hidden={compact} type="file" accept="image/png,image/jpeg,image/webp,image/gif" disabled={locked || busy} onChange={e => { choose(e.target.files?.[0]); e.target.value = ''; }}/></label>{compact && <button type="button" className="btn" disabled={locked || busy} onClick={() => input.current?.click()}>사진·화면 캡처 첨부</button>}<small>{compact ? '이미지 한 장, 최대 10MB. 복사한 화면은 질문 입력란에 붙여 넣어도 됩니다.' : <>JPG·PNG·WEBP·GIF 한 장, 최대 10MB. 복사한 이미지는 질문 입력란에 붙여넣을 수 있습니다. {publicQuestion ? '전체 공개 질문의 이미지는 같은 기수 수강생도 볼 수 있습니다.' : '본인과 담당 운영자만 볼 수 있습니다.'}</>}</small>
   {selection && <figure><img src={selection.preview} alt="첨부할 질문 이미지" style={{ maxWidth: '100%', maxHeight: 280, objectFit: 'contain' }}/><figcaption style={{ overflowWrap: 'anywhere' }}>{selection.file.name}</figcaption><div className="row mt16"><button type="button" className="btn small" disabled={locked || busy} onClick={remove}>이미지 빼기</button>{!ready && !busy && <button type="button" className="btn small" disabled={locked} onClick={() => void upload(selection)}>이미지 다시 올리기</button>}</div></figure>}
   {busy && <p role="status">이미지를 올리고 있습니다.</p>}{ready && <p role="status">이미지 준비 완료. 질문을 등록하면 함께 저장됩니다.</p>}{error && <p role="alert" className="form-error">{error}</p>}
  </div>;
