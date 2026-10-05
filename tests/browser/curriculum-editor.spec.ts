@@ -81,7 +81,7 @@ test('new lesson keeps chosen week and is private; recent selection opens direct
 test('continuous document opens directly and saving keeps question, generator and mentor-review identity',async({page},info)=>{
  const {blockWrites}=await setup(page,{blocks:true});await page.goto('/curriculum-editor-test?blocks=1');await openLesson(page,true);
  await expect(page.getByText('1 · 수업 정보',{exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:'2 · 학습 구성'})).toBeVisible();
- await expect(page.getByText('3 · 반복 학습 운영',{exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:'4 · 확인 퀴즈'})).toBeVisible();await expect(page.getByRole('heading',{name:'버전·임시저장'})).toBeVisible();
+ await expect(page.getByText('3 · 반복 학습 운영',{exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:'4 · 확인 퀴즈'})).toBeVisible();await expect(page.getByText('저장 기록 · 이전 편집본 복구',{exact:true})).toBeVisible();
  const editorDocument=page.getByRole('textbox',{name:'수업 문서',exact:true});await expect(editorDocument).toBeVisible();await expect(editorDocument).toContainText('오늘의 목표는?');
  await expect(page.getByRole('link',{name:'학습 구성 편집·미리보기'})).toHaveCount(0);
  await editorDocument.locator('[data-author-block="intro"] p').click();await page.keyboard.press('End');await page.keyboard.type(' 수정한 문장');

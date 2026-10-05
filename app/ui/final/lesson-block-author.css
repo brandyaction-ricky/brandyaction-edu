@@ -9,7 +9,7 @@
 .lba-choice-edit, .lba-check-edit { display:flex; align-items:center; gap:10px; margin:10px 0; }
 .lba-choice-edit > input, .lba-check-edit > input { flex:1 1 130px; min-width:0; padding:10px; border:1px solid #aeb6c1; border-radius:6px; }
 .lba-check-edit > label { white-space:nowrap; }
-.lb-author.was-validated input:invalid, .lb-author.was-validated textarea:invalid { border:2px solid #bc1c2a; background:#fff5f5; }
+.lb-author.was-validated input:invalid, .lb-author.was-validated textarea:invalid, .adm .lb-author.was-validated :is(input,textarea):invalid:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]) { border:2px solid #bc1c2a; background:#fff5f5; }
 .lba-preview { padding:18px; border:1px solid #d8dde3; margin:16px 0; background:#f8fafc; }
 .lba-text-preview { white-space:pre-wrap; overflow-wrap:anywhere; margin:12px 0; }
 .lb-author button, .lba-intro button { min-height:44px; }
