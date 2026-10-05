@@ -18,7 +18,7 @@ test('only campaign source codes survive into checkout links and direct visitors
   assert.equal(parseEntrySource(null), null);
   assert.equal(withEntrySource('/checkout?cohort=abc', null), '/checkout?cohort=abc');
   assert.equal(withEntrySource('https://open.kakao.com/o/example', 'paid'), 'https://open.kakao.com/o/example');
-  assert.equal(withEntrySource('/classes/product?cohort=abc', 'paid'), '/classes/product?cohort=abc');
+  assert.equal(withEntrySource('/classes/product?cohort=abc', 'paid'), '/classes/product?cohort=abc&src=paid');
   assert.equal(withEntrySource('/checkout?cohort=abc&src=organic', 'paid'), '/checkout?cohort=abc&src=paid');
 });
 

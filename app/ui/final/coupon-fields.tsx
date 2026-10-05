@@ -37,6 +37,8 @@ export function CouponFields({ row, data }: { row?: Row; data: Record<string, Ro
       <label className="field">총 발급 수량<input name="usage_limit" type="number" min={1} max={2147483647} value={limit} onChange={e => setLimit(e.target.value)} placeholder="제한 없음" /></label>
       <label className="field">회원별 사용 횟수<input name="per_user_limit" type="number" min={1} max={2147483647} value={memberLimit} onChange={e => setMemberLimit(e.target.value)} placeholder="제한 없음" /></label>
     </div><p className="meta">빈 값은 제한 없음입니다. 결제 대기 수량은 잠시 예약하고 완료 후 사용 횟수에 반영합니다.</p></section>
+    <label className="checkline"><input name="is_alumni" type="checkbox" defaultChecked={!!row?.is_alumni} />기존 수강생 전용 쿠폰 · 이후 주문의 유입을 ‘동문’으로 기록</label>
+    <p className="meta">실제로 기존 수강생에게 주는 쿠폰에만 선택해 주세요. 기존 주문의 유입은 바뀌지 않습니다.</p>
     <label className="checkline"><input name="is_draft" type="checkbox" defaultChecked={!!row?.is_draft} />임시 저장 · 발급 및 사용 차단</label>
     <label className="checkline"><input name="is_active" type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} />쿠폰 사용 활성화</label>
     <label className="checkline"><input name="exclude_free" type="checkbox" checked={excludeFree} onChange={e => setExcludeFree(e.target.checked)} disabled={admin} />무료 상품 적용 제외</label>

@@ -18,6 +18,10 @@ test('recruitment review, reservation and claim isolate recipients and suppress 
  create table crm_templates(id uuid primary key,name text,channel text,purpose text,content text,is_active boolean);
  create table crm_campaigns(id uuid primary key default gen_random_uuid(),name text,template_id uuid,status text,scheduled_at timestamptz,created_by uuid,recipient_count int,target_tag_id uuid,error_message text,created_at timestamptz default now());`);
  for(const file of ['202609210005_webinar_registration.sql','202609210006_webinar_attendance.sql','202609210007_broadcast_entry.sql','202609210008_webinar_followup.sql','202609210010_recruitment_delivery.sql'])await db.exec(fs.readFileSync(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
+ const e2=fs.readFileSync(new URL('../supabase/migrations/20261005024620_edu_entry_source_e2.sql',import.meta.url),'utf8');
+ const claimStart=e2.indexOf('create or replace function public.edu_claim_recruitment_delivery(');
+ const claimEnd=e2.indexOf('-- All eligible paid orders',claimStart);
+ await db.exec(e2.slice(claimStart,claimEnd));
  const admin=randomUUID(),staff=randomUUID(),free=randomUUID(),paid=randomUUID(),cohort=randomUUID(),template=randomUUID();
  await db.query("insert into profiles(id,role,status) values($1,'admin','active'),($2,'staff','active')",[admin,staff]);
  await db.query("insert into courses values($1,'free',0,'published'),($2,'paid_class',1650000,'draft')",[free,paid]);
@@ -62,7 +66,7 @@ test('recruitment review, reservation and claim isolate recipients and suppress 
  // Newly registered eligible people cannot expand the reviewed snapshot.
  const later=randomUUID();await db.query("insert into profiles values($1,'member','active','01099999999',true,now()-interval '1 day',null,'QA','qa@example.invalid')",[later]);
  await db.query("insert into edu_webinar_registrations(period_id,user_id,channel,policy_version) values('sample',$1,'organic','2026-08-11')",[later]);
- const batch=await claim(id);assert.deepEqual(batch.members.map(m=>m.id),[members[7]]);assert.equal(batch.excluded,1);
+ const batch=await claim(id);assert.deepEqual(batch.members.map(m=>m.id),[members[7]]);assert.equal(batch.excluded,1);assert.equal(batch.members[0].entry_channel,'organic');
  assert.deepEqual((await claim(id)).members,[]); // Lost provider response never auto-retries.
  await db.query("update crm_campaigns set status='failed' where id=$1",[id]);await assert.rejects(db.query("update crm_campaigns set status='scheduled' where id=$1",[id]),/INVALID/);
  assert.equal((await call()).counts.duplicate,1);

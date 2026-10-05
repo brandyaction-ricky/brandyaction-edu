@@ -3,7 +3,7 @@ function load(path,modules={},env={}){const exports={};new Function('exports','r
 const server=load('../lib/conversion-review-server.ts',{'node:crypto':{createHash}}),rules=load('../lib/webinar-attendance.ts'),entry=load('../lib/broadcast-entry.ts'),errors=load('../lib/webinar-attendance-server.ts',{'./conversion-review-server':server});
 const code=randomUUID(),actor=randomUUID();
 function harness({enabled=true,allowed=true,url='https://www.youtube.com/watch?v=abcdefghijk',error=null}={}){
- const calls=[];const modules={'@/lib/conversion-review-server':server,'@/lib/webinar-attendance':rules,'@/lib/broadcast-entry':entry,'@/lib/webinar-attendance-server':errors,'@/lib/operator-permissions':{getOperatorUser:async()=>({id:actor,permissions:{products:allowed}})},'@/lib/supabase/admin':{createAdminClient:()=>({rpc:async(name,args)=>{calls.push({name,args});return{error,data:{url}};}})}};
+ const calls=[];const modules={'@/lib/conversion-review-server':server,'@/lib/webinar-attendance':rules,'@/lib/broadcast-entry':entry,'@/lib/entry-source':load('../lib/entry-source.ts'),'@/lib/webinar-attendance-server':errors,'@/lib/operator-permissions':{getOperatorUser:async()=>({id:actor,permissions:{products:allowed}})},'@/lib/supabase/admin':{createAdminClient:()=>({rpc:async(name,args)=>{calls.push({name,args});return{error,data:{url}};}})}};
  return {calls,route:load('../app/go/[code]/[phase]/[channel]/[target]/route.ts',modules,enabled?{EDU_CONVERSION_REVIEW_ENABLED:'true'}:{}),admin:load('../app/api/conversion/broadcast/route.ts',modules,enabled?{EDU_CONVERSION_REVIEW_ENABLED:'true'}:{})};
 }
 const context=(target='live')=>({params:Promise.resolve({code,phase:'first',channel:'organic',target})});
@@ -20,4 +20,14 @@ test('broadcast configuration derives actor, restricts origin and validates URL 
  const post=(value=body,origin='https://example.test')=>new Request('https://example.test/api/conversion/broadcast',{method:'POST',headers:{origin},body:JSON.stringify(value)});
  const h=harness();assert.equal((await h.admin.POST(post())).status,200);assert.equal(h.calls[0].args.p_actor,actor);assert.equal(h.calls[0].args.p_settings.url,'https://www.youtube.com/watch?v=abcdefghijk');
  assert.equal((await h.admin.POST(post(body,'https://evil.test'))).status,403);assert.equal((await h.admin.POST(post({...body,url:null}))).status,400);assert.equal((await harness({allowed:false}).admin.POST(post())).status,403);
+});
+
+test('offer redirects retain room src and internal test clicks are not recorded',async()=>{
+ const url='/classes/'+randomUUID();const h=harness({url});
+ const response=await h.route.GET(req(),context('offer'));
+ assert.equal(response.headers.get('location'),url+'?src=organic');
+ await h.route.GET(req('GET',{cookie:'other=1; edu_landing_test=1'}),context('offer'));
+ assert.equal(h.calls.at(-1).args.p_record,false);
+ const unknown={params:Promise.resolve({code,phase:'encore',channel:'unknown',target:'offer'})};
+ assert.equal((await h.route.GET(req(),unknown)).headers.get('location'),url);
 });
