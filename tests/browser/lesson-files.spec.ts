@@ -1,9 +1,12 @@
 import {expect,test,type Page} from '@playwright/test';
+import {readFileSync} from 'node:fs';
 import type {LessonBlockAnswers,LessonBlockDocument} from '../../lib/lesson-blocks';
 const revision='44444444-4444-4444-8444-444444444444';
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');
 const document:LessonBlockDocument={schemaVersion:1,blocks:[{id:'proof',type:'question',question:{label:'실행 증빙',kind:'image',required:true}},{id:'archive',type:'question',question:{label:'결과물 묶음',kind:'file',required:false}},{id:'memo',type:'question',question:{label:'내 설명',kind:'text',required:false}}],checklist:[],completion:{mode:'mentor',requireAnswers:true,requireQuizPass:false}};
-async function backend(page:Page,{delay=false,lost=false,legacy=false}={}){
+async function backend(page:Page,{delay=false,lost=false,legacy=false,changeAt=''}:{delay?:boolean;lost?:boolean;legacy?:boolean;changeAt?:''|'prepare'|'complete'}={}){
+ let currentRevision=revision;
+ const conflict=()=>({status:409,json:{code:'BLOCK_CONTENT_CHANGED',error:'수업이 업데이트되어 현재 화면에서는 첨부할 수 없습니다.'}});
  let draft:{writeId:string;values:LessonBlockAnswers;updatedAt:string}|null=null,submission:Record<string,unknown>|null=null;
  if(legacy)draft={writeId:revision,values:{blocks:{proof:{imageId:'11111111-1111-4111-8111-111111111111',fileId:'22222222-2222-4222-8222-222222222222'}},checklist:[]},updatedAt:new Date().toISOString()};
  const prepared:Record<string,unknown>[]=[],fileRows=new Map<string,{id:string;name:string;kind:string;size:number;ready:boolean}>(),writes:Record<string,unknown>[]=[];let release=()=>{};
@@ -11,15 +14,16 @@ async function backend(page:Page,{delay=false,lost=false,legacy=false}={}){
  await page.route('**/api/platform/lesson-files**',async route=>{
   if(route.request().method()==='GET'){await route.fulfill({contentType:'image/png',body:png});return;}
   const body=route.request().postDataJSON();
-  if(body.action==='prepare'){prepared.push(body);let row=fileRows.get(body.requestId);if(!row){row={id:body.requestId,name:body.name,kind:body.kind,size:body.size,ready:false};fileRows.set(row.id,row);}await route.fulfill({json:{...row,signedUrl:'https://storage.test/upload/'+row.id,contentType:row.kind==='image'?'image/png':'application/zip'}});return;}
+  if(body.action==='prepare'){prepared.push(body);if(changeAt==='prepare'){currentRevision='55555555-5555-4555-8555-555555555555';changeAt='';}if(body.revision!==currentRevision){await route.fulfill(conflict());return;}let row=fileRows.get(body.requestId);if(!row){row={id:body.requestId,name:body.name,kind:body.kind,size:body.size,ready:false};fileRows.set(row.id,row);}await route.fulfill({json:{...row,signedUrl:'https://storage.test/upload/'+row.id,contentType:row.kind==='image'?'image/png':'application/zip'}});return;}
+  if(changeAt==='complete'){currentRevision='55555555-5555-4555-8555-555555555555';changeAt='';await route.fulfill(conflict());return;}
   if(delay)await wait;
   const row=fileRows.get(body.fileId)!;row.ready=true;
   if(lost){lost=false;await route.fulfill({status:503,json:{error:'파일 확인 응답을 받지 못했습니다.'}});return;}await route.fulfill({json:row});
  });
  await page.route('https://storage.test/upload/**',route=>{expect(route.request().method()).toBe('PUT');expect(route.request().headers()['x-upsert']).toBe('false');expect(route.request().headers()['cookie']).toBeUndefined();return route.fulfill({json:{Key:'stored'}});});
  await page.route('**/api/platform/lesson-blocks**',async route=>{
-  if(route.request().method()==='GET'){await route.fulfill({json:{document,revision,currentRevision:revision,draft,submission,previousDrafts:[],editable:true}});return;}
-  const body=route.request().postDataJSON();if(body.action==='draft'){writes.push(body);draft={writeId:body.requestId,values:body.values,updatedAt:new Date().toISOString()};await route.fulfill({json:draft});return;}
+  if(route.request().method()==='GET'){await route.fulfill({json:{document,revision:currentRevision,currentRevision,draft:currentRevision===revision?draft:null,submission,previousDrafts:[],editable:true}});return;}
+  const body=route.request().postDataJSON();if(body.action==='draft'){if(body.revision!==currentRevision){await route.fulfill(conflict());return;}writes.push(body);draft={writeId:body.requestId,values:body.values,updatedAt:new Date().toISOString()};await route.fulfill({json:draft});return;}
   expect(body.action).toBe('submit');submission={id:body.requestId,stateId:body.requestId,revision,writeId:body.writeId,outcome:'submitted',state:'submitted',createdAt:new Date().toISOString()};await route.fulfill({json:submission});
  });
  return{prepared,writes,release,draft:()=>draft};
@@ -49,4 +53,35 @@ test('lost file confirmation retries its exact request ID and removal changes on
 test('invalid files never request upload permission and pending uploads warn before navigation',async({page})=>{
  const server=await backend(page,{delay:true});await page.goto('/lesson-blocks-test');await page.getByLabel('답변 이미지 선택').setInputFiles({name:'unsafe.svg',mimeType:'image/svg+xml',buffer:Buffer.from('<svg/>')});await expect(page.getByRole('alert')).toContainText('JPG');expect(server.prepared).toHaveLength(0);
  await page.getByLabel('답변 이미지 선택').setInputFiles({name:'실행.png',mimeType:'image/png',buffer:png});await expect(page.getByRole('button',{name:'미션 제출하기'})).toBeDisabled();page.once('dialog',dialog=>dialog.dismiss());await page.getByRole('link',{name:'내 클래스로 이동'}).click();expect(new URL(page.url()).pathname).toBe('/lesson-blocks-test');server.release();await expect(page.getByRole('link',{name:'첨부 이미지 열기'})).toBeVisible();
+});
+for(const changeAt of ['prepare','complete'] as const)test(`lesson changed during ${changeAt} offers answer backup and reloads before a fresh upload`,async({page},info)=>{
+ const server=await backend(page,{changeAt});await page.goto('/lesson-blocks-test');
+ await page.getByRole('textbox',{name:'내 설명'}).fill('이전 수업에 작성한 답변');
+ await expect.poll(()=>server.draft()?.values.blocks.memo).toBe('이전 수업에 작성한 답변');
+ await page.getByLabel('답변 이미지 선택').setInputFiles({name:'실행.png',mimeType:'image/png',buffer:png});
+ const alert=page.getByRole('region',{name:'실행 증빙',exact:true}).getByRole('alert');
+ await expect(alert).toContainText('수업이 업데이트');
+ expect(await page.evaluate(()=>window.document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:info.outputPath('upload-conflict-recovery.png'),fullPage:true});
+ await expect(page.getByRole('button',{name:'첨부 다시 시도'})).toHaveCount(0);
+ await expect(page.getByLabel('답변 이미지 선택')).toBeDisabled();
+ await expect(page.getByRole('textbox',{name:'내 설명'})).toHaveValue('이전 수업에 작성한 답변');
+ const downloaded=page.waitForEvent('download');await alert.getByRole('button',{name:'현재 답변 내려받기'}).click();
+ const backup=JSON.parse(readFileSync((await(await downloaded).path())!,'utf8'));
+ expect(backup.revision).toBe(revision);expect(backup.values.blocks.memo).toBe('이전 수업에 작성한 답변');
+ await alert.getByRole('button',{name:'최신 수업 다시 열기'}).click();
+ await expect(page.getByLabel('답변 이미지 선택')).toBeEnabled();
+ await page.getByLabel('답변 이미지 선택').setInputFiles({name:'실행.png',mimeType:'image/png',buffer:png});
+ await expect(page.getByRole('link',{name:'첨부 이미지 열기'})).toBeVisible();
+ expect(server.prepared.at(-1)?.revision).toBe('55555555-5555-4555-8555-555555555555');
+ expect(server.prepared.at(-1)?.requestId).not.toBe(server.prepared[0].requestId);
+});
+test('cancelling the latest lesson reload preserves unsaved answers after an upload conflict',async({page})=>{
+ await backend(page,{changeAt:'prepare'});await page.goto('/lesson-blocks-test');
+ await page.getByLabel('답변 이미지 선택').setInputFiles({name:'실행.png',mimeType:'image/png',buffer:png});
+ await expect(page.getByRole('button',{name:'최신 수업 다시 열기'})).toBeVisible();
+ await page.getByRole('textbox',{name:'내 설명'}).fill('아직 서버에 저장되지 않은 답변');
+ page.once('dialog',dialog=>dialog.dismiss());await page.getByRole('button',{name:'최신 수업 다시 열기'}).click();
+ await expect(page.getByRole('textbox',{name:'내 설명'})).toHaveValue('아직 서버에 저장되지 않은 답변');
+ await expect(page.getByRole('button',{name:'최신 수업 다시 열기'})).toBeVisible();
 });

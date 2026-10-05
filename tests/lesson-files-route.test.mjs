@@ -37,3 +37,11 @@ test('malformed and oversized requests never mint upload grants',async()=>{
  const h=harness();for(const body of [null,{}, {...h.body,size:10485761},{...h.body,name:'bad.svg'},{...h.body,blockId:'../q'},{...h.body,revision:'bad'}])assert.equal((await h.post(body)).status,400);
  assert.equal((await h.post({...h.body,padding:'한'.repeat(1800)})).status,413);assert.equal(h.calls.length,0);assert.equal(h.storageCalls.length,0);
 });
+test('stale lesson and submitted answer errors expose only a known recovery code, before minting a grant',async()=>{
+ for(const code of ['BLOCK_CONTENT_CHANGED','BLOCK_ALREADY_SUBMITTED']){
+  const h=harness({dbError:{message:code}}),result=await h.post(h.body);
+  assert.equal(result.status,409);assert.equal((await result.json()).code,code);assert.equal(h.storageCalls.length,0);
+ }
+ const unknown=harness({dbError:{message:'private database details'}}),result=await unknown.post(unknown.body);
+ assert.equal(result.status,503);assert.equal((await result.json()).code,undefined);
+});

@@ -14,13 +14,13 @@ function failure(error: unknown) {
   if (e.status && e.status < 500) return reply({ error: e.message }, e.status);
   const known: Record<string, [string, number]> = {
     BLOCK_FORBIDDEN: ['첨부파일을 이용할 권한이 없습니다.', 403], BLOCK_NOT_FOUND: ['첨부파일을 찾지 못했습니다.', 404],
-    BLOCK_CONTENT_CHANGED: ['수업이 바뀌었습니다. 작성한 답변을 보관하고 수업을 다시 열어 주세요.', 409],
+    BLOCK_CONTENT_CHANGED: ['수업이 업데이트되어 현재 화면에서는 첨부할 수 없습니다. 작성 중인 답변을 내려받은 뒤 최신 수업을 열고 파일을 다시 선택해 주세요.', 409],
     BLOCK_ALREADY_SUBMITTED: ['제출한 답변입니다. 답변 수정하기를 누른 뒤 첨부해 주세요.', 409],
     BLOCK_LESSON_LOCKED: ['아직 열리지 않은 학습입니다.', 403], BLOCK_REQUEST_REUSED: ['다른 파일에 사용한 요청입니다. 파일을 다시 선택해 주세요.', 409],
     BLOCK_UPLOAD_LIMIT: ['첨부 횟수가 많습니다. 잠시 후 다시 시도해 주세요.', 429], BLOCK_INVALID: ['첨부할 질문과 파일 형식을 확인해 주세요.', 400],
   };
   const result = known[e.message || ''];
-  return result ? reply({ error: result[0] }, result[1]) : reply({ error: '파일을 처리하지 못했습니다. 다시 시도해 주세요.' }, 503);
+  return result ? reply({ error: result[0], code: e.message }, result[1]) : reply({ error: '파일을 처리하지 못했습니다. 다시 시도해 주세요.' }, 503);
 }
 async function readBody(request: Request) {
   const reader = request.body?.getReader(); if (!reader) fail('파일 정보를 확인해 주세요.');
