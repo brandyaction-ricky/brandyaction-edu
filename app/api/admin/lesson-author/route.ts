@@ -48,8 +48,14 @@ export async function POST(request:Request) {
     const chunks:string[]=[],decoder=new TextDecoder();let size=0;
     try {for(;;){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>4_100_000){await reader.cancel();return reply({error:'초안이 너무 큽니다.'},413);}chunks.push(decoder.decode(value,{stream:true}));}chunks.push(decoder.decode());}finally{reader.releaseLock();}
     let body;try{body=JSON.parse(chunks.join(''));}catch{return reply({error:'요청 형식을 확인해 주세요.'},400);}
-    if(!body||!uuid(body.lessonId)||!uuid(body.requestId)||!['save','publish'].includes(body.action))return reply({error:'저장할 수업을 확인해 주세요.'},400);
+    if(!body||!uuid(body.lessonId)||!uuid(body.requestId)||!['save','publish','backup'].includes(body.action))return reply({error:'저장할 수업을 확인해 주세요.'},400);
     const db=createAdminClient();
+    if(body.action==='backup'){
+      if(typeof body.stamp!=='string'||!/^[a-f0-9]{32}$/.test(body.stamp))return reply({error:'보관할 초안 버전을 확인해 주세요.'},400);
+      let payload;try{payload=validateAuthorPayload(body.payload);}catch(error){return reply({error:(error as Error).message},400);}
+      const {data,error}=await db.rpc('edu_backup_lesson_author',{p_actor:actor.id,p_lesson:body.lessonId,p_request:body.requestId,p_stamp:body.stamp,p_payload:payload}).abortSignal(AbortSignal.timeout(15_000));
+      if(error)throw error;return reply(data);
+    }
     if(body.action==='save'){
       if((body.expectedRevision!==null&&!uuid(body.expectedRevision))||(body.stamp!==null&&(typeof body.stamp!=='string'||!/^[a-f0-9]{32}$/.test(body.stamp)))||typeof body.create!=='boolean'||typeof body.rebase!=='boolean')return reply({error:'초안 버전을 확인해 주세요.'},400);
       let payload;try{payload=validateAuthorPayload(body.payload);}catch(error){return reply({error:(error as Error).message},400);}

@@ -2,7 +2,10 @@ import { detailedAuthor } from './helpers/detailed-author';
 import { expect, test, type Page } from '@playwright/test';
 
 // Existing field-level regressions exercise the retained detailed settings.
-test.beforeEach(async ({ page }) => detailedAuthor(page));
+async function openHistoryWhenNeeded(page: Page) {
+  await page.addLocatorHandler(page.locator('details.studio-version-section:not([open]) > summary'), async summary => { await summary.click(); });
+}
+test.beforeEach(async ({ page }) => { await detailedAuthor(page); await openHistoryWhenNeeded(page); });
 import type { LessonBlockDocument } from '../../lib/lesson-blocks';
 
 async function backend(page: Page, failure = 0, denied = false) {
@@ -394,7 +397,7 @@ test('a successful write with a lost response can be restored without creating a
 
 test('another editor tab draft is not overwritten or deleted by this tab', async ({ page, context }) => {
   await backend(page); await page.goto('/lesson-block-author-test'); await page.getByRole('button', { name: '여러 항목으로 구성하기' }).click();
-  const other = await context.newPage(); await backend(other); await other.goto('/lesson-block-author-test'); await other.getByRole('button', { name: '여러 항목으로 구성하기' }).click();
+  const other = await context.newPage(); await openHistoryWhenNeeded(other); await backend(other); await other.goto('/lesson-block-author-test'); await other.getByRole('button', { name: '여러 항목으로 구성하기' }).click();
   await other.getByRole('textbox', { name: '제목', exact: false }).fill('다른 창 편집'); await other.getByRole('button', { name: '지금 임시저장' }).click();
   await page.getByRole('button', { name: '지금 임시저장' }).click(); await expect(page.getByRole('alert')).toContainText('다른 창에서');
   await page.getByRole('button', { name: '학습 저장', exact: true }).click();
