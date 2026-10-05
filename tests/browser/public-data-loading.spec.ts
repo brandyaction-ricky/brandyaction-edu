@@ -124,6 +124,12 @@ test('customer stories show video thumbnails and aligned reviewer details', asyn
   await expect.poll(() => page.locator('.story-video-thumb img').first().evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
   await page.getByRole('button', { name: /한 달 동안 매출과 고객 경험/ }).click();
   await expect(page.locator('.story-person-details strong')).toHaveText('박서연');
+  await expect(page.locator('.story-player')).toBeFocused();
+  await expect(page.locator('.story-player iframe')).toBeInViewport();
+  await expect(page.locator('.story-player iframe')).toHaveAttribute('src', /9bZkp7q19f0/);
+  await page.locator('.story-video-card').last().locator('strong').click();
+  await expect(page.locator('.story-player iframe')).toBeInViewport();
+  await expect(page.getByRole('link',{name:'원본 영상 열기'})).toHaveAttribute('href', stories[1].video_url);
   const cards = await page.locator('.story-video-card').evaluateAll(elements => elements.map(element => element.getBoundingClientRect().top));
   if (!isMobile) expect(cards[0]).toBe(cards[1]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);

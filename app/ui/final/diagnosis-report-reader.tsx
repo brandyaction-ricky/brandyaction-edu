@@ -7,7 +7,9 @@ import { Printer, X } from 'lucide-react';
 // scripts and external requests must not run inside the EDU account origin.
 const policy = "default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'";
 export function diagnosisReaderDocument(html: string) {
-  return `<!doctype html><meta http-equiv="Content-Security-Policy" content="${policy}"><meta name="referrer" content="no-referrer"><style>.print-btn{display:none!important}</style>${html}`;
+  return `<!doctype html><meta http-equiv="Content-Security-Policy" content="${policy}"><meta name="referrer" content="no-referrer"><style>.print-btn{display:none!important}
+@media screen and (max-width:900px){.report-topbar .topbar-inner{height:auto!important;min-height:60px;flex-wrap:wrap;gap:8px!important;padding-top:12px;padding-bottom:10px}.report-topbar .topbar-links{display:flex!important;flex:0 0 100%;overflow-x:auto;gap:18px!important;margin:0!important;padding:4px 0}.report-topbar .topbar-links a{white-space:nowrap;display:flex;align-items:center;min-height:36px}}
+</style>${html}`;
 }
 
 export function DiagnosisReportReader({ html, error, onClose, onError }: { html: string; error?: string; onClose: () => void; onError: (message: string) => void }) {
@@ -22,6 +24,13 @@ export function DiagnosisReportReader({ html, error, onClose, onError }: { html:
   }, []);
   function connectContents() {
     const document = frame.current?.contentDocument;
+    // WebKit suppresses JS listeners in a script-disabled sandbox. Native
+    // fragment links must address srcdoc itself, not the parent page URL.
+    if (document) document.documentElement.style.setProperty('scroll-padding-top', `${document.querySelector('.report-topbar')?.getBoundingClientRect().height || 0}px`);
+    document?.querySelectorAll<HTMLAnchorElement>('a[href^="#"]').forEach(link => {
+      const fragment = link.getAttribute('href');
+      link.href = 'about:srcdoc' + (fragment === '#top' ? '#' : fragment);
+    });
     // Keyboard events in the isolated report do not bubble to the parent page.
     document?.addEventListener('keydown', event => {
       if (event.key === 'Escape') { event.preventDefault(); onClose(); }
@@ -31,8 +40,20 @@ export function DiagnosisReportReader({ html, error, onClose, onError }: { html:
       if (!link) return;
       event.preventDefault();
       const href = link.getAttribute('href') || '';
-      if (href.startsWith('#')) {
-        try { document.getElementById(decodeURIComponent(href.slice(1)))?.scrollIntoView({ block: 'start' }); } catch { /* Invalid fragments do not navigate out of the report. */ }
+      if (href.startsWith('#') || href.startsWith('about:srcdoc#')) {
+        try {
+          const id = decodeURIComponent(href.slice(href.indexOf('#') + 1));
+          const target = document.getElementById(id);
+          const view = document.defaultView;
+          if (view && (target || !id || id === 'top')) {
+            const header = document.querySelector('.report-topbar');
+            const offset = header?.getBoundingClientRect().height || 0;
+            // Scroll only the frame. scrollIntoView can also move the outer
+            // dialog on iOS, leaving a blank area above the report.
+            const top = !id || id === 'top' ? 0 : target!.getBoundingClientRect().top + view.scrollY - offset;
+            view.scrollTo({ top: Math.max(0, top), behavior: 'instant' });
+          }
+        } catch { /* Invalid fragments do not navigate out of the report. */ }
       } else if (/^https?:\/\//.test(href)) window.open(href, '_blank', 'noopener,noreferrer');
     });
   }

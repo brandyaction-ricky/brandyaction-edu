@@ -1,4 +1,5 @@
 "use client";
+import { contentVisibility } from '@/lib/content-visibility';
 import { MemberErasureQueue } from './final/member-erasure-queue';
 import { QuestionImage } from './final/question-image';
 import { QuestionThreadDialog } from './final/question-thread';
@@ -574,7 +575,7 @@ export function Platform({
             </div>
           ) : (
             <nav className="main-nav" aria-label="주 메뉴">
-              {nav.map(([href, label]) => (
+              {nav.filter(([href]) => href !== "/articles" || contentVisibility(data).articles || contentVisibility(data).lectures).map(([href, label]) => (
                 <Link
                   href={href}
                   key={href}
@@ -588,7 +589,7 @@ export function Platform({
           <div className="header-user">
             {user ? (
               <>
-                <Link className="link" href={admin ? "/admin/questions" : "/my/questions"}>질문·답변</Link>
+                <Link className="link header-questions" href={admin ? "/admin/questions" : "/my/questions"}>질문·답변</Link>
                 <Link className="link" href="/my">
                   마이페이지
                 </Link>
@@ -636,7 +637,7 @@ export function Platform({
         </div>
         {mobile && (
           <nav className="mobile-nav open">
-            {nav.map(([href, label]) => (
+            {nav.filter(([href]) => href !== "/articles" || contentVisibility(data).articles || contentVisibility(data).lectures).map(([href, label]) => (
               <Link href={href} key={href}>
                 {label}
               </Link>
@@ -730,7 +731,7 @@ export function Platform({
               <Empty title="새로운 클래스를 준비하고 있습니다." />
             )}
           </section>
-          <section className="section">
+          {contentVisibility(data).articles && <section className="section">
             <div className="section-head">
               <div>
                 <div className="eyebrow">03 / INSIGHT TO ACTION</div>
@@ -748,7 +749,7 @@ export function Platform({
                   <ArticleCard key={a.id} article={a} />
                 ))}
             </div>
-          </section>
+          </section>}
           {rows("review_videos").length > 0 && (
             <section className="section results-section">
               <div className="section-head">
@@ -1042,7 +1043,7 @@ export function Platform({
               />
             ) : (
               <>
-              {section.key === "articles" && <AdminQuickFilter label="아티클 관리 구분" items={[{ value: 'content', label: '아티클 콘텐츠' }, { value: 'banner', label: '무료강의 상단 설정' }]} value={articleAdminTab} onChange={value => setArticleAdminTab(value as 'content' | 'banner')}/>}
+              {section.key === "articles" && <AdminQuickFilter label="아티클 관리 구분" items={[{ value: 'content', label: '아티클 콘텐츠' }, { value: 'banner', label: '노출·무료강의 설정' }]} value={articleAdminTab} onChange={value => setArticleAdminTab(value as 'content' | 'banner')}/>}
               {section.key === "articles" && articleAdminTab === "banner" ? <ArticleBannerEditor key={JSON.stringify(object(rows("site_settings").find(row => row.key === "edu_article_banner"), "value"))} settings={rows("site_settings")} send={send} pending={pending} /> : <>{section.key === "articles" && <ArticleCategoryManager categories={rows("article_categories")} articles={rows("articles")} send={send} pending={pending} />}<AdminCatalog
                 key={section.key + scopeQuery}
                 section={section}

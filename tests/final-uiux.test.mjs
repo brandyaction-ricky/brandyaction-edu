@@ -280,7 +280,7 @@ test('article management renders the connected three-video banner editor', () =>
   assert.match(markup, /회원 무료강의 상단 영역/);
   assert.match(markup, /무료강의 3강 설정/);
   assert.equal((markup.match(/YouTube URL/g) || []).length, 3);
-  assert.match(read('app/ui/platform.tsx'), /아티클 콘텐츠[\s\S]*무료강의 상단 설정/);
+  assert.match(read('app/ui/platform.tsx'), /아티클 콘텐츠[\s\S]*노출·무료강의 설정/);
   assert.match(read('app/api/platform/route.ts'), /if \(!bannerResult\.error\)[\s\S]*사업자를 위한 마케팅·AI 매출 진단/);
   assert.ok(platform.sections.find(row => row.key === 'articles').fields.some(field => field.key === 'cover_image_path'));
 });

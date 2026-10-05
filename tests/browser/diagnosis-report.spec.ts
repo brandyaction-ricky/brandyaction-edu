@@ -33,7 +33,7 @@ test('original HTML keeps its design and contents links while scripts and remote
   await expect(page.getByRole('button',{name:'학습으로 돌아가기'})).toBeVisible();
   for(const [button,name,body] of [['HTML 파일 받기','N6-정밀보고서.html',html],['MD 파일 받기','N6-검사결과.md',markdown]]){
     const pending=page.waitForEvent('download');await page.getByRole('button',{name:button}).click();const download=await pending;
-    expect(download.suggestedFilename()).toBe(name);expect(await readFile((await download.path())!,'utf8')).toBe(body);
+    expect(download.suggestedFilename().normalize('NFC')).toBe(name);expect(await readFile((await download.path())!,'utf8')).toBe(body);
   }
   expect(files).toEqual(['html','html','download']);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await page.screenshot({path:test.info().outputPath('diagnosis-report-ready.png'),fullPage:true});
@@ -108,7 +108,7 @@ test('printing opens the same original document without an opener and explains b
   await page.getByRole('button',{name:'PDF로 저장 · 인쇄'}).click();await expect(page.getByRole('alert')).toContainText('팝업이 차단');
   await expect(page.getByRole('dialog').getByRole('alert')).toBeInViewport();
 });
-test('reader keeps the footer out of a small screen and Escape returns focus from inside the report',async({page})=>{
+test('reader keeps the footer out of a small screen and closing restores focus',async({page,browserName})=>{
   await session(page);
   await page.route('**/api/platform/diagnosis/report*',r=>r.fulfill(new URL(r.request().url()).search?{contentType:'text/html',body:'<h1>작은 화면 보고서</h1><p style="height:2000px">긴 보고서 본문</p>'}:{json:report('ready')}));
   await page.goto('/diagnosis-test?reports&admin');
@@ -122,7 +122,9 @@ test('reader keeps the footer out of a small screen and Escape returns focus fro
   const frameBox=(await page.locator('iframe').boundingBox())!;
   expect(frameBox.height).toBeGreaterThan(460);expect(frameBox.y+frameBox.height).toBe(568);
   await page.screenshot({path:test.info().outputPath('diagnosis-report-small-screen.png')});
-  await page.frameLocator('iframe').getByRole('heading').press('Escape');
+  // WebKit suppresses key listeners inside a script-disabled sandbox; mobile uses the persistent close control.
+  if(browserName==='webkit') await page.getByRole('button',{name:'보고서 닫기'}).click();
+  else await page.frameLocator('iframe').getByRole('heading').press('Escape');
   await expect(dialog).toHaveCount(0);await expect(open).toBeFocused();
   await expect(page.getByRole('button',{name:'관리자 화면으로 돌아가기'})).toBeVisible();
   expect(await page.evaluate(()=>document.body.style.overflow)).toBe('');
@@ -178,4 +180,26 @@ test('long-running generation pauses after 60 successful checks and can be refre
   }
   await expect(page.getByText('자동 확인을 잠시 멈췄어요.',{exact:false})).toBeVisible();const stopped=reads;await page.clock.runFor(120000);expect(reads).toBe(stopped);
   await page.getByRole('button',{name:'최신 상태 확인'}).click();await expect.poll(()=>reads).toBe(stopped+1);
+});
+
+
+test('mobile report contents and back-top scroll only within the reader',async({page})=>{
+ await page.setViewportSize({width:390,height:844});await session(page);
+ const html=`<!doctype html><html><head><style>body{margin:0}.report-topbar{position:sticky;top:0;background:white}.topbar-inner{display:flex;height:68px}.topbar-links{display:flex;gap:28px}.back-top{position:fixed;right:16px;bottom:16px}section{height:1500px}@media(max-width:900px){.topbar-links{display:none}}</style></head><body><nav class="report-topbar"><div class="topbar-inner"><b>MYIN</b><div class="topbar-links"><a href="#part1">욕구 구조</a><a href="#part2">행동 패턴</a></div></div></nav><section id="top"><h1>합성 보고서 시작</h1></section><section id="part1"><h2>욕구 구조 본문</h2></section><section id="part2"><h2>행동 패턴 본문</h2></section><a class="back-top" href="#top" aria-label="맨 위로">↑</a></body></html>`;
+ await page.route('**/api/platform/diagnosis/report*',r=>new URL(r.request().url()).searchParams.has('html')?r.fulfill({contentType:'text/html',body:html}):r.fulfill({json:report('ready')}));
+ await page.goto('/diagnosis-test?reports');await page.getByRole('button',{name:'보고서 열기',exact:true}).click();
+ const frame=page.frameLocator('iframe[title="나의 N6 정밀 보고서"]');
+ const before=await page.locator('iframe').boundingBox();
+ for(let i=0;i<3;i++){
+  await expect(frame.getByRole('link',{name:'행동 패턴',exact:true})).toBeVisible();
+  await frame.getByRole('link',{name:'행동 패턴',exact:true}).click();
+  await expect(frame.getByRole('heading',{name:'행동 패턴 본문'})).toBeInViewport();
+  expect(await frame.locator('body').evaluate(()=>window.scrollY)).toBeGreaterThan(2000);
+  await frame.getByRole('link',{name:'맨 위로'}).click();
+  await expect.poll(()=>frame.locator('body').evaluate(()=>window.scrollY)).toBe(0);
+  await expect(frame.getByRole('heading',{name:'합성 보고서 시작'})).toBeInViewport();
+  expect(await page.locator('iframe').boundingBox()).toEqual(before);
+  expect(await page.locator('dialog').evaluate(el=>el.scrollTop)).toBe(0);
+ }
+ await page.screenshot({path:test.info().outputPath('mobile-report-navigation.png')});
 });

@@ -1,4 +1,5 @@
 "use client";
+import { contentVisibility } from '@/lib/content-visibility';
 import { PushSettings } from './push-settings';
 import { LearningProgress } from './learning-progress';
 import { AppInstallCard } from './app-install';
@@ -510,14 +511,14 @@ function Dashboard({
           </div>
           <ArrowRight />
         </Link>}
-        <Link href="/articles">
+        {(contentVisibility(data).articles || contentVisibility(data).lectures) && <Link href="/articles">
           <Play />
           <div>
-            <b>무료강의와 아티클</b>
+            <b>{contentVisibility(data).articles ? contentVisibility(data).lectures ? "무료강의와 아티클" : "아티클" : "무료강의"}</b>
             <span>업무에 적용할 인사이트</span>
           </div>
           <ArrowRight />
-        </Link>
+        </Link>}
         <Link href="/my/reviews">
           <Star />
           <div>

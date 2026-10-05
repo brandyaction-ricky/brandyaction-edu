@@ -42,8 +42,8 @@ test('article category table and banner form retain category edit and saved expo
   await page.getByRole('button', { name: '기획 수정' }).click();
   await expect(page.getByRole('textbox', { name: '카테고리명 *' })).toHaveValue('기획');
   await page.getByRole('button', { name: '닫기' }).click();
-  await page.getByRole('checkbox', { name: '노출' }).uncheck();
-  await page.getByRole('button', { name: '상단 무료강의 설정 저장' }).click();
+  await page.getByRole('checkbox', { name: '무료강의 노출', exact: true }).uncheck();
+  await page.getByRole('button', { name: '노출·무료강의 설정 저장' }).click();
   await expect(page.getByLabel('합성 저장 횟수')).toHaveText('1');
   expect(errors).toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
