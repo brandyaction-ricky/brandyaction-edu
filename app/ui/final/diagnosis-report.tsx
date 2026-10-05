@@ -139,9 +139,9 @@ export function DiagnosisReportView({ userId, readyPushEnabled = false, onExit, 
         </div>
       </details>}
       {status && ['queued', 'processing'].includes(status.state) && <div className="diagnosis-report-timing">
-        <Clock3 size={20} aria-hidden="true"/><div><p><strong>완성될 때까지 이 화면을 켜 두지 않아도 돼요.</strong></p>
-          <p>답변 분석과 보고서 내용 확인을 차례로 진행하고 있어요.<br/>신청이 몰리면 준비 시간이 더 길어질 수 있습니다.</p>
-          {!paused && <span>이 화면에서 진행 상태가 자동으로 바뀝니다.</span>}
+        <Clock3 size={20} aria-hidden="true"/><div><p>보고서 준비 예상 시간 <strong>약 30분~3시간</strong></p>
+          <p>검사 제출 후부터 예상한 시간입니다.<br/>신청이 몰리거나 추가 확인이 필요하면 더 걸릴 수 있어요.</p>
+          {!paused && <span>화면을 닫아도 보고서는 계속 준비됩니다.</span>}
         </div>
       </div>}
       {userId && readyPushEnabled && status && ['queued', 'processing', 'needs_review'].includes(status.state) && <div className="diagnosis-report-notifications"><PushSettings key={userId} userId={userId} diagnosis/></div>}
