@@ -77,6 +77,10 @@ const policies = load('lib/legal-policies.ts');
 test('notice preparation retains the current consent version and N6 wording; the new document is upcoming', () => {
   assert.equal(policies.POLICY_VERSION, '2026-08-11');
   assert.equal(policies.UPCOMING_PRIVACY_VERSION, '2026-10-20');
+  assert.equal(policies.ARCHIVED_PRIVACY_VERSION, '2026-08-11');
+  assert.equal(policies.defaultPolicies.privacy, policies.archivedPrivacyPolicy);
+  assert.match(policies.archivedPrivacyPolicy, /시행일: 2026년 8월 11일/);
+  assert.doesNotMatch(policies.archivedPrivacyPolicy, /2026년 10월 20일/);
   assert.match(policies.defaultPolicies.privacy, /N6 진단 관련 추가 안내/);
   for (const copy of [policies.defaultPolicies.privacy, policies.upcomingPrivacyPolicy]) {
     assert.match(copy, /Anthropic, PBC/); assert.match(copy, /privacy@anthropic.com/);
@@ -86,6 +90,25 @@ test('notice preparation retains the current consent version and N6 wording; the
   assert.match(policies.upcomingPrivacyPolicy, /TypeSafe AI, Inc\.\(미국, privacy@typesafe.ai\)/);
   assert.doesNotMatch(policies.upcomingPrivacyPolicy, /〔|정식 법인명|\(연락처\)/);
   assert.deepEqual([...policies.upcomingPrivacyPolicy.matchAll(/^(\d+)\. /gm)].map(x => Number(x[1])), Array.from({ length: 17 }, (_, i) => i + 1));
+});
+test('the archived page keeps the original text after the active policy is replaced', () => {
+  const jsx = (type, props) => ({ type, props });
+  const { PrivacyPolicy } = load('app/ui/privacy-policy.tsx', {
+    'react/jsx-runtime': { jsx, jsxs: jsx }, 'next/link': 'link',
+    '@/lib/legal-policies': { ...policies, POLICY_VERSION: '2026-10-20', defaultPolicies: { privacy: '새로 적용된 방침' } },
+    './ad-preferences': {}, './privacy-policy.css': {},
+  });
+  const copy = node => {
+    if (!node || typeof node !== 'object') return typeof node === 'string' ? node : '';
+    if (Array.isArray(node)) return node.map(copy).join('\n');
+    return copy(node.props?.children);
+  };
+  const current = copy(PrivacyPolicy({}));
+  const archived = copy(PrivacyPolicy({ version: '2026-08-11' }));
+  assert.match(current, /새로 적용된 방침/);
+  assert.doesNotMatch(archived, /새로 적용된 방침/);
+  assert.match(archived, /시행일: 2026년 8월 11일/);
+  assert.match(archived, /N6 진단 관련 추가 안내 \(2026년 10월 4일\)/);
 });
 test('only the known policy versions route successfully; unknown versions and extra segments return 404', async () => {
   const route = load('app/[[...path]]/page.tsx', {

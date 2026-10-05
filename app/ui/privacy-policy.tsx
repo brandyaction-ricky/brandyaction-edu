@@ -1,11 +1,11 @@
 import Link from 'next/link';
-import { defaultPolicies, POLICY_VERSION, PRIVACY_REVISION_NOTICE, upcomingPrivacyPolicy, UPCOMING_PRIVACY_VERSION } from '@/lib/legal-policies';
+import { archivedPrivacyPolicy, ARCHIVED_PRIVACY_VERSION, defaultPolicies, PRIVACY_REVISION_NOTICE, upcomingPrivacyPolicy, UPCOMING_PRIVACY_VERSION } from '@/lib/legal-policies';
 import { AdPreferences } from './ad-preferences';
 import './privacy-policy.css';
 
 export function PrivacyPolicy({ version }: { version?: string }) {
   const upcoming = version === UPCOMING_PRIVACY_VERSION;
-  const copy = upcoming ? upcomingPrivacyPolicy : defaultPolicies.privacy;
+  const copy = upcoming ? upcomingPrivacyPolicy : version === ARCHIVED_PRIVACY_VERSION ? archivedPrivacyPolicy : defaultPolicies.privacy;
   const sections = copy.split(/\n\n(?=\d+\. )/);
   return <div className="wrap"><article className="article-detail privacy-policy">
     <h1>개인정보 처리방침</h1>
@@ -23,7 +23,7 @@ export function PrivacyPolicy({ version }: { version?: string }) {
     </div>
     <nav className="privacy-version-links" aria-label="처리방침 버전">
       <Link href="/policies/privacy">현재 적용 중인 처리방침</Link>
-      <Link href={`/policies/privacy/${POLICY_VERSION}`}>2026년 8월 11일 버전 · N6 추가 안내 포함</Link>
+      <Link href={`/policies/privacy/${ARCHIVED_PRIVACY_VERSION}`}>2026년 8월 11일 버전 · N6 추가 안내 포함</Link>
       <Link href={`/policies/privacy/${UPCOMING_PRIVACY_VERSION}`}>2026년 10월 20일 시행 예정</Link>
     </nav>
   </article></div>;
