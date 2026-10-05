@@ -21,7 +21,7 @@ export async function runDiagnosisSession({ actor, rpc, send }: Dependencies, in
     const r = await rpc(name, args);
     if (r.error) {
       const message = (r.error as { message?: string }).message;
-      const code = message === 'DIAGNOSIS_FORBIDDEN' ? 'FORBIDDEN' : message === 'DIAGNOSIS_CONFLICT' ? 'CONFLICT' : message === 'DIAGNOSIS_STARTS_PAUSED' ? 'STARTS_PAUSED' : 'UNAVAILABLE';
+      const code = message === 'DIAGNOSIS_FORBIDDEN' ? 'FORBIDDEN' : message === 'DIAGNOSIS_CONFLICT' ? 'CONFLICT' : 'UNAVAILABLE';
       throw new DiagnosisBridgeError(code, code === 'FORBIDDEN' ? 403 : code === 'CONFLICT' ? 409 : 503);
     }
     return r.data;

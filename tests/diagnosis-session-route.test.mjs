@@ -37,9 +37,3 @@ test('bridge errors preserve recoverable states without leaking raw answers or i
 });
 
 test('student and staff cannot read or mutate sessions',async()=>{for(const role of ['student','staff',undefined]){const h=fixture({user:{...actor,role}});assert.equal((await h.get()).status,403);assert.equal((await h.post()).status,403);assert.equal(h.calls.length,0);}});
-
-test('release pause tells users new starts are temporarily unavailable while ongoing tests continue',async()=>{
- const h=fixture({error:new BridgeError('STARTS_PAUSED',503)}),response=await h.post();
- assert.equal(response.status,503);const body=await response.json();assert.equal(body.code,'STARTS_PAUSED');
- assert.match(body.error,/업데이트 중/);assert.match(body.error,/진행 중인 검사는 계속/);
-});
