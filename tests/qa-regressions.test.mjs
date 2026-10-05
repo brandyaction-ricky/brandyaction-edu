@@ -54,7 +54,7 @@ test('admin list APIs only load screen dependencies and lightweight relation fie
   process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED='true';
   try { assert.match(rules.adminSelectColumns('questions', 'edu_questions'), /,image_id$/); } finally { delete process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED; }
   assert.equal(rules.adminSelectColumns('orders', 'courses'), 'id,title,status,category,list_price,archived_at,display_order,created_at,updated_at');
-  assert.equal(rules.adminSelectColumns('orders', 'orders'), 'id,order_number,user_id,status,subtotal,discount_amount,total_amount,entry_src,customer_name,customer_email,customer_phone,created_at');
+  assert.equal(rules.adminSelectColumns('orders', 'orders'), 'id,order_number,user_id,status,subtotal,discount_amount,total_amount,entry_src,is_test_order,customer_name,customer_email,customer_phone,created_at');
   assert.equal(rules.adminSelectColumns('orders', 'order_items'), 'id,order_id,course_id,cohort_id,item_name,unit_price');
   assert.equal(rules.adminSelectColumns('orders', 'enrollments'), 'id,order_item_id,status');
   assert.equal(rules.adminSelectColumns('products', 'courses'), '*');

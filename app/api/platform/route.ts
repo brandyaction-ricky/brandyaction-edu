@@ -19,7 +19,7 @@ import { PUBLIC_CACHE_TAG, type PublicView } from '@/lib/public-platform-plan';
 import { revalidateTag } from 'next/cache';
 import { readMemberPlatformData, type MemberView } from '@/lib/member-platform-data';
 import { couponError } from '@/lib/coupon-rules';
-import { adminOrderQuery, ORDER_PAGE_SIZE, parseOrderListScope } from '@/lib/admin-order-list';
+import { adminOrderQuery, ORDER_PAGE_SIZE, parseOrderListScope, orderExclusionLabel } from '@/lib/admin-order-list';
 import { assertParticipationOpen } from '@/lib/alumni-access-server';
 import { isLessonVisibleToCohort } from '@/lib/cohort-curriculum-server';
 import { cohortLessonVisible, cohortWeekVisible } from '@/lib/cohort-curriculum-visibility';
@@ -251,8 +251,9 @@ export async function GET(request: Request) {
                     ]);
                     for (const item of [result, all, failed, refund, access]) if (item.error) throw item.error;
                     data.orders = ((result.data || []) as unknown as Row[]).map(row => {
-                        const clean = { ...row };
-                        for (const key of ['course_items', 'search_items', 'refund_payments', 'active_items']) delete clean[key];
+                        const member = Array.isArray(row.analytics_member) ? row.analytics_member[0] : row.analytics_member;
+                        const clean: Row = { ...row, analytics_exclusion: orderExclusionLabel(row, member as Row | null) };
+                        for (const key of ['course_items', 'search_items', 'refund_payments', 'active_items', 'analytics_member']) delete clean[key];
                         return clean;
                     });
                     data.order_filter_counts = [{ id: 'order-filter-counts', all: all.count || 0, failed: failed.count || 0, refund: refund.count || 0, access: access.count || 0 }];
