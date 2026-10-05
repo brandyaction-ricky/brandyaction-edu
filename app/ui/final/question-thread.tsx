@@ -70,12 +70,12 @@ export function QuestionAnswerHistory({ questionId, fallback = '', onStatusChang
  }
  async function finish() {
   if (gate.current || !state.data || content || uncertain) return; gate.current = true; setBusy(true); setNotice('');
-  try { await request(questionId, {action:'finish',questionId,expectedHeadId:state.data.question.headId}); setNotice('해결 완료로 표시했습니다. 다시 궁금한 점이 생기면 추가로 질문할 수 있어요.'); state.reload(); onResolved?.(); }
+  try { await request(questionId, {action:'finish',questionId,expectedHeadId:state.data.question.headId}); setNotice('질문을 종료했습니다. 다시 궁금한 점이 생기면 추가로 질문할 수 있어요.'); state.reload(); onResolved?.(); }
   catch(e) {setNotice((e as Error).message);} finally {gate.current=false;setBusy(false);}
  }
  return <div className="mt16">{open ? <>
   <Answers state={state}/>
-  {process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' && state.data?.canFollowUp && !readOnly && state.data.question.status === 'answered' && <p>{state.data.question.resolved ? '해결 완료한 질문입니다.' : <button type="button" className="btn small mt16" disabled={busy || uncertain || Boolean(content)} onClick={()=>void finish()}>해결됐어요</button>}</p>}
+  {process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' && state.data?.canFollowUp && !readOnly && state.data.question.status === 'answered' && <p>{state.data.question.resolved ? '종료한 질문입니다.' : <button type="button" className="btn small mt16" disabled={busy || uncertain || Boolean(content)} onClick={()=>void finish()}>해결됐어요 · 질문 종료</button>}</p>}
   {state.data?.canFollowUp && !readOnly && <form className="mt16" onSubmit={event => { event.preventDefault(); void followUp(); }}>
    <p className="meta">{state.data.question.visibility === "cohort" ? "이 후속 질문도 같은 기수 수강생에게 공개됩니다." : "나와 담당 운영자만 볼 수 있어요."}</p>
    <label className="field">후속 질문<textarea rows={4} maxLength={10000} value={content} disabled={busy || uncertain || stale} onChange={event => setContent(event.target.value)} placeholder="답변을 보고 더 궁금한 점을 적어 주세요."/></label>

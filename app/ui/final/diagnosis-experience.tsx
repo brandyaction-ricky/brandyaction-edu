@@ -16,7 +16,7 @@ async function request(body?: Record<string, unknown>) {
   if (!response.ok) throw Object.assign(Error(data.error || '잠시 후 다시 시도해 주세요.'), { code: data.code, status: response.status });
   return data;
 }
-export function DiagnosisExperience({ initialCourseId, reportsEnabled = false, adminPilot = false, exitHref = '/my', exitLabel = '마이페이지' }: { initialCourseId?: string; reportsEnabled?: boolean; adminPilot?: boolean; exitHref?: string; exitLabel?: string }) {
+export function DiagnosisExperience({ userId, readyPushEnabled = false, initialCourseId, reportsEnabled = false, adminPilot = false, exitHref = '/my', exitLabel = '마이페이지' }: { userId?: string; readyPushEnabled?: boolean; initialCourseId?: string; reportsEnabled?: boolean; adminPilot?: boolean; exitHref?: string; exitLabel?: string }) {
   const router = useRouter();
   const [session, setSession] = useState<DiagnosisSession | null>(null);
   const [offers, setOffers] = useState<DiagnosisOffer[]>([]), [course, setCourse] = useState(initialCourseId || '');
@@ -80,7 +80,7 @@ export function DiagnosisExperience({ initialCourseId, reportsEnabled = false, a
   return <div className="edu-diagnosis"><header className="diagnosis-header"><Image src="/brandy-action-logo.png" alt="Brandy Action EDU" width={164} height={30}/><button className="diagnosis-exit" onClick={() => router.push(exitHref)}><ArrowLeft size={16}/>{exitLabel}</button></header>
     <main className={`diagnosis-main${phase === 'submitted' && reportsEnabled ? ' diagnosis-report-main' : ''}`}>
       {phase === 'loading' && <div className="diagnosis-center" role="status"><LoaderCircle className="diagnosis-spin"/><p>검사를 불러오고 있어요.</p></div>}
-      {phase === 'submitted' && reportsEnabled && <DiagnosisReportView onExit={() => router.push(exitHref)} exitLabel={adminPilot ? '관리자 화면으로 돌아가기' : '학습으로 돌아가기'}/>}
+      {phase === 'submitted' && reportsEnabled && <DiagnosisReportView userId={userId} readyPushEnabled={readyPushEnabled} onExit={() => router.push(exitHref)} exitLabel={adminPilot ? '관리자 화면으로 돌아가기' : '학습으로 돌아가기'}/>}
       {phase === 'submitted' && !reportsEnabled && <section className="diagnosis-submitted"><span className="diagnosis-complete-icon"><CheckCircle2 size={32}/></span><h1>답변을 제출했어요.</h1>{session?.needsReview ? <p>답변은 안전하게 접수됐어요.<br/>보고서 발급 전 운영팀의 확인이 필요합니다.<br/>운영팀에 현재 화면을 알려 주세요.</p> : <p>검사 결과가 준비되면 이곳에서 확인할 수 있어요.<br/>화면을 닫아도 괜찮고, 다시 제출하지 않아도 됩니다.</p>}<button className="diagnosis-primary" onClick={() => router.push(exitHref)}>{adminPilot ? '관리자 화면으로 돌아가기' : '학습으로 돌아가기'}<ArrowRight size={18}/></button></section>}
       {phase === 'submitted' && canRestart && attemptId && <aside className="diagnosis-admin-tools"><span>관리자 검수</span><DiagnosisRestart onRestart={restart}/></aside>}
       {phase === 'error' && <div className="diagnosis-error" role="alert"><p>{error}</p><button className="diagnosis-secondary" onClick={() => void load()}>다시 불러오기</button></div>}

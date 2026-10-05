@@ -45,30 +45,30 @@ function harness(fixtures = {}) {
 test('home and customer stories never fetch whole course metadata or personal tables', async () => {
   const home = harness({ courses: [{ id: 'course', title: '수업', thumb: 'site/thumb.png', product_type: 'digital' }] });
   const result = await home.read('home', '', '', 1, '', '');
-  assert.deepEqual(home.calls.map(call => call.table), ['courses', 'articles', 'review_videos', 'site_banners', 'cohorts']);
-  assert.ok(home.calls[0].columns.includes('metadata->>thumbnailUrl'));
-  assert.equal(home.calls[0].columns.includes(',metadata,'), false);
+  assert.deepEqual(home.calls.map(call => call.table), ['site_settings', 'courses', 'articles', 'review_videos', 'site_banners', 'cohorts']);
+  assert.ok(home.calls[1].columns.includes('metadata->>thumbnailUrl'));
+  assert.equal(home.calls[1].columns.includes(',metadata,'), false);
   assert.deepEqual(result.data.courses[0].metadata, { thumbnailUrl: 'site/thumb.png', productType: 'digital' });
   assert.equal(home.cache.revalidate, 30);
   assert.deepEqual(home.cache.tags, ['edu-public-content']);
   const stories = harness({ review_videos: [{ id: 'story' }] });
   await stories.read('stories', '', '', 1, '', '');
-  assert.deepEqual(stories.calls.map(call => call.table), ['review_videos']);
+  assert.deepEqual(stories.calls.map(call => call.table), ['site_settings', 'review_videos']);
 });
 
 test('public lists are 12-row server pages and omit heavy body fields', async () => {
   const classes = harness();
   const classResult = await classes.read('classes', '', '', 3, '실행', '유료 클래스');
-  assert.deepEqual(classes.calls.map(call => call.table), ['courses']);
-  assert.deepEqual(classes.calls[0].range, [24, 35]);
-  assert.ok(classes.calls[0].filters.some(([key]) => key === 'title'));
-  assert.ok(classes.calls[0].filters.some(([key, value]) => key === 'or' && value.includes('metadata->is_listed.neq.false')));
+  assert.deepEqual(classes.calls.map(call => call.table), ['site_settings', 'courses']);
+  assert.deepEqual(classes.calls[1].range, [24, 35]);
+  assert.ok(classes.calls[1].filters.some(([key]) => key === 'title'));
+  assert.ok(classes.calls[1].filters.some(([key, value]) => key === 'or' && value.includes('metadata->is_listed.neq.false')));
   assert.deepEqual(classResult.pagination, { page: 3, pageSize: 12, total: 0 });
   const articles = harness();
   await articles.read('articles', '', '', 2, '', '');
-  assert.deepEqual(articles.calls.map(call => call.table), ['articles', 'article_categories', 'site_settings']);
-  assert.deepEqual(articles.calls[0].range, [12, 23]);
-  assert.equal(articles.calls[0].columns.includes('content_blocks'), false);
+  assert.deepEqual(articles.calls.map(call => call.table), ['site_settings', 'articles', 'article_categories']);
+  assert.deepEqual(articles.calls[1].range, [12, 23]);
+  assert.equal(articles.calls[1].columns.includes('content_blocks'), false);
 });
 
 test('home checks only banner target products and keeps unlisted targets out of shared response data', async () => {
@@ -86,8 +86,8 @@ test('home checks only banner target products and keeps unlisted targets out of 
 test('class detail reads only selected course and redacts private resource paths before sharing', async () => {
   const detail = harness({ courses: [{ id: 'course', slug: 'one', list_price: 10000, private_token: 'top-secret', metadata: { detail_html: '<p>소개</p>', private_note: 'secret', product_resources: [{ id: 'r', path: 'private/file.pdf' }], digital_content_sections: [{ items: [{ videoUrl: 'https://private.example' }] }] } }] });
   const result = await detail.read('class', 'one', '', 1, '', '');
-  assert.deepEqual(detail.calls.map(call => call.table), ['courses', 'cohorts', 'curriculum_weeks', 'reviews']);
-  assert.ok(detail.calls[0].filters.some(([key, value]) => key === 'slug' && value === 'one'));
+  assert.deepEqual(detail.calls.map(call => call.table), ['site_settings', 'courses', 'cohorts', 'curriculum_weeks', 'reviews']);
+  assert.ok(detail.calls[1].filters.some(([key, value]) => key === 'slug' && value === 'one'));
   assert.equal(result.data.courses[0].metadata.detail_html, '<p>소개</p>');
   assert.equal(JSON.stringify(result).includes('secret'), false);
   assert.equal(JSON.stringify(result).includes('private/file.pdf'), false);
@@ -98,6 +98,17 @@ test('class detail accepts existing UUID-based product links without requesting 
   const id = '7bd94b59-7c31-45eb-9b04-1592a608e20d';
   const detail = harness({ courses: [{ id, slug: 'published-product', list_price: 10000, metadata: {} }] });
   await detail.read('class', id, '', 1, '', '');
-  assert.ok(detail.calls[0].filters.some(([key, value]) => key === 'id' && value === id));
-  assert.equal(detail.calls[0].limit, 1);
+  assert.ok(detail.calls[1].filters.some(([key, value]) => key === 'id' && value === id));
+  assert.equal(detail.calls[1].limit, 1);
+});
+
+
+test('disabled articles are absent from public lists, home and direct article reads', async () => {
+ for(const view of ['home','articles','article']){
+  const h=harness({site_settings:[{key:'edu_article_banner',value:{enabled:false,articlesEnabled:false,videos:[{url:'https://private.example/video'}]}}],articles:[{id:'article',slug:'one',title:'Hidden'}]});
+  const result=await h.read(view,'one','',1,'','');
+  assert.deepEqual(result.data.articles,[]);
+  assert.equal(result.data.article_banner[0].value.articlesEnabled,false);
+  assert.equal(JSON.stringify(result).includes('https://private.example/video'),false);
+ }
 });

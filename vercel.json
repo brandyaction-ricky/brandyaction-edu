@@ -3,9 +3,6 @@
   "framework": "nextjs",
   "git": {
     "deploymentEnabled": {
-      "codex/edu-report-timeline-only-20261005": false,
-      "codex/edu-e1-internal-orders-20261005": false,
-      "codex/edu-simple-install-20261005": false,
       "codex/edu-draft-save-recovery-20261004": false,
       "codex/edu-lesson-save-feedback-20261004": false,
       "codex/edu-release-211-integration-20260927": false,
@@ -25,6 +22,10 @@
       "codex/edu-erasure-queue-ux-20261004": false,
       "codex/edu-integrated-erasure-release-20261004": false,
       "codex/edu-app-install-screens-20261004": false,
+      "codex/edu-diagnosis-timer-ready-push-20261005": false,
+      "codex/edu-report-timeline-only-20261005": false,
+      "codex/edu-e1-internal-orders-20261005": false,
+      "codex/edu-simple-install-20261005": false,
       "codex/edu-e2-entry-source-20261005": false
     }
   },
@@ -42,6 +43,10 @@
     },
     {
       "path": "/api/cron/push",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/diagnosis-notifications",
       "schedule": "* * * * *"
     }
   ]

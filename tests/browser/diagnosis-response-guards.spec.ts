@@ -36,6 +36,11 @@ test('sub-second mouse and keyboard responses never save or advance; a one-secon
   await expect(page.getByRole('heading',{name:'앞으로 챙기고 싶은 모습'})).toBeVisible();
   await page.getByRole('button',{name:'이전 문항'}).click();await page.keyboard.press('2');
   await expect(page.getByRole('radio').first()).toBeChecked();expect(state.writes).toBe(1);
+  await expect(page.locator('.timer')).toContainText('18초');
+  await page.clock.fastForward(3000);await expect(page.locator('.timer')).toContainText('15초');
+  await page.clock.fastForward(15000);await expect(page.locator('.timer')).toContainText('0초');
+  await expect(page.locator('.q-no')).toHaveText('Q 001');
+  await expect(page.getByRole('radio').first()).toBeChecked();expect(state.writes).toBe(1);
 });
 
 test('server-designated admin tests retain fast responses; the admin URL alone does not bypass the guard',async({page})=>{

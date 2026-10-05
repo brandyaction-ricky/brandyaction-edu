@@ -1,4 +1,5 @@
 "use client";
+import { contentVisibility } from '@/lib/content-visibility';
 import {
   date,
   money,
@@ -22,7 +23,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { loginBeforeCheckout, parseEntrySource, withEntrySource } from '@/lib/entry-source';
 import { youtubeThumbnailUrl } from '@/lib/youtube-thumbnail';
 import type { Data } from "../learning-workflows";
@@ -460,12 +461,12 @@ export function ArticleBanner({
     ? configured.videos.slice(0, 3).map((item, i) => {
         const video = item as Record<string, unknown>;
         return { id: `configured-${i}`, title: String(video.title || `무료 강의 ${i + 1}`), url: safeUrl(video.url), available: video.available === true };
-      })
+      }).filter(video => video.url || video.available)
     : [];
   const candidates = (data.curriculum_lessons || []).filter(
     (l) => l.is_preview,
   );
-  const lessons = configuredVideos.length ? configuredVideos : candidates.slice(0, 3),
+  const lessons = Array.isArray(configured.videos) ? configuredVideos : candidates.slice(0, 3),
     lesson = lessons[index] || lessons[0];
   const content = (data.lesson_contents || []).find(
     (c) => c.lesson_id === lesson?.id,
@@ -525,7 +526,7 @@ export function ArticleBanner({
             </button>
           ))}
         </div>
-        <div className="ab-actions mt24">
+        {(!user || contentVisibility(data).articles) && <div className="ab-actions mt24">
           <Link
             className="ab-primary"
             href={user ? "#article-library" : "/signup?next=/articles"}
@@ -538,7 +539,7 @@ export function ArticleBanner({
               이미 회원이라면 로그인
             </Link>
           )}
-        </div>
+        </div>}
       </div>
     </section>
   );
@@ -576,6 +577,7 @@ export function ArticlesView({
   const setType = onTypeChange ?? setLocalType;
   const all = data.articles || [],
     a = all.find((a) => a.slug === slug);
+  if (!contentVisibility(data).articles && (slug || !contentVisibility(data).lectures)) return <div className="wrap"><Empty title="콘텐츠를 준비하고 있습니다."><Link className="btn" href="/my">나의 학습으로 돌아가기</Link></Empty></div>;
   if (slug)
     return (
       <div className="wrap">
@@ -632,7 +634,7 @@ export function ArticlesView({
   return (
     <div className="wrap">
       <ArticleBanner data={data} user={user} />
-      <section className="article-library" id="article-library">
+      {contentVisibility(data).articles && <section className="article-library" id="article-library">
       <Heading
         title="일하는 방식을 바꾸는 인사이트"
         description="읽고, 배우고, 내 일에 적용해 보세요."
@@ -676,7 +678,7 @@ export function ArticlesView({
         <span>{pagination.page} / {Math.ceil(pagination.total / pagination.pageSize)}</span>
         <button className="btn" type="button" disabled={pagination.page >= Math.ceil(pagination.total / pagination.pageSize)} onClick={() => onPageChange(pagination.page + 1)}>다음</button>
       </div>}
-      </section>
+      </section>}
     </div>
   );
 }
@@ -697,6 +699,14 @@ export function StoriesView({
 }) {
   const stories = data.review_videos || [];
   const [selectedId, setSelectedId] = useState("");
+  const player = useRef<HTMLDivElement>(null);
+  function selectStory(id: string) {
+    setSelectedId(id);
+    requestAnimationFrame(() => {
+      player.current?.scrollIntoView({ block: 'start', behavior: 'instant' });
+      player.current?.focus({ preventScroll: true });
+    });
+  }
   const featured = stories.find((story) => story.id === selectedId) || stories[0];
   return (
     <div className="wrap">
@@ -720,16 +730,19 @@ export function StoriesView({
               </div>
             </div>
           </div>
-          <Video url={t(featured, "video_url")} />
+          <div ref={player} tabIndex={-1} className="story-player" aria-label={`${t(featured, "title")} 영상`} style={{scrollMarginTop:90}}>
+            <Video key={featured.id} url={t(featured, "video_url")} />
+            {safeUrl(featured.video_url) && <a className="link" href={safeUrl(featured.video_url)} target="_blank" rel="noopener noreferrer">원본 영상 열기 <ArrowRight size={16}/></a>}
+          </div>
         </section>
       )}
       <div className="section story-library">
-        <div className="section-head"><div><div className="eyebrow">MORE STORIES</div><h2>다양한 실행 후기를 만나보세요.</h2><p>후기를 선택하면 위 영상과 이야기가 바뀝니다.</p></div><b>{stories.length}개의 고객 이야기</b></div>
+        <div className="section-head"><div><div className="eyebrow">MORE STORIES</div><h2>다양한 실행 후기를 만나보세요.</h2><p>썸네일이나 제목을 누르면 선택한 영상으로 이동합니다.</p></div><b>{stories.length}개의 고객 이야기</b></div>
         <div className="story-video-grid">
           {stories.map((s, index) => {
             const thumbnail = storyThumbnailUrl(s);
             return (
-              <button type="button" className={"story-video-card " + (s.id === featured?.id ? "active" : "")} key={s.id} onClick={() => setSelectedId(s.id)} aria-pressed={s.id === featured?.id}>
+              <button type="button" className={"story-video-card " + (s.id === featured?.id ? "active" : "")} key={s.id} onClick={() => selectStory(s.id)} aria-pressed={s.id === featured?.id}>
                 <span className="story-video-thumb">{thumbnail ? <img src={thumbnail} alt="" loading="lazy" /> : <small>STORY {String(index + 1).padStart(2, "0")}</small>}<span className="story-video-play" aria-hidden="true"><Play /></span></span>
                 <strong>{t(s, "title")}</strong>
                 <span>{t(s, "reviewer_name")} · {t(s, "reviewer_role")}</span>

@@ -31,6 +31,8 @@ export async function synchronizePushAccount(owner: string | null) {
 export async function pushDeviceStatus(owner: string) {
   const version = accountVersion(owner);
   const item = await registration(); current(version); if (!item) return false;
+  // Existing subscribers also need the updated completion-notification handler, without re-subscribing.
+  if (typeof item.update === 'function') void item.update().catch(() => {});
   await command(item, { action: 'ACCOUNT', owner }); current(version);
   const sub = await item.pushManager.getSubscription(); if (!sub) return false;
   const data = await api({ action: 'status', endpoint: sub.endpoint });
@@ -78,4 +80,17 @@ export async function disableDevicePush() {
   // Local revocation or server revocation must succeed even if device storage fails.
   const revoked = !sub ? results[0].status === 'fulfilled' : results.slice(1).some(result => result.status === 'fulfilled' && result.value !== false);
   if (!revoked) throw new Error('알림 연결 해제를 다시 확인해 주세요.');
+}
+
+
+// Local display check only. This does not send an answer or exercise server delivery.
+export async function testDevicePush(owner: string) {
+  const version = accountVersion(owner);
+  const item = await registration(); current(version);
+  if (!item || Notification.permission !== 'granted') throw new Error('이 기기의 알림을 먼저 켜 주세요.');
+  await item.showNotification('브랜디에듀 알림 확인', {
+    body: '이 알림이 보이면 이 기기의 알림 표시가 허용되어 있습니다.',
+    tag: 'edu-device-display-test', icon: '/api/app-branding?icon=192',
+  });
+  current(version);
 }

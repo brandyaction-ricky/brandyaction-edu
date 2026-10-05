@@ -35,7 +35,7 @@ test('learner resolves an answered question without adding an answer',async({pag
  await backend(page);let resolved=false;const writes:Record<string,unknown>[]=[];
  await page.route('**/api/platform/question-hub?mode=mine**',r=>r.fulfill({json:{questions:[{id:id(9),title:'내 질문',content:'질문 본문',answer:'운영자 답변',status:'answered',is_resolved:resolved}],hasMore:false}}));
  await page.route('**/api/platform/question-thread?**',r=>{if(r.request().method()==='POST'){writes.push(r.request().postDataJSON());resolved=true;return r.fulfill({json:{id:id(9),resolved:true}});}return r.fulfill({json:{question:{id:id(9),title:'내 질문',content:'질문 본문',headId:id(10),status:'answered',resolved},answers:[{id:id(10),content:'운영자 답변',authorName:'운영자',source:'operator'}],canFollowUp:true,nextCursor:null}});});
- await page.goto('/question-hub-test');await page.getByRole('tab',{name:'내 질문',exact:true}).click();await page.getByRole('button',{name:'답변 전체 보기'}).click();await page.getByRole('button',{name:'해결됐어요',exact:true}).click();await expect(page.getByText('해결 완료',{exact:true}).last()).toBeVisible();expect(writes).toEqual([{action:'finish',questionId:id(9),expectedHeadId:id(10)}]);
+ await page.goto('/question-hub-test');await page.getByRole('tab',{name:'내 질문',exact:true}).click();await page.getByRole('button',{name:'답변 전체 보기'}).click();await page.getByRole('button',{name:'해결됐어요 · 질문 종료',exact:true}).click();await expect(page.getByText('질문 종료',{exact:true}).last()).toBeVisible();expect(writes).toEqual([{action:'finish',questionId:id(9),expectedHeadId:id(10)}]);
 });
 test('operator shares only separately reviewed text and can prepare/import an Aside draft without sending it',async({page})=>{
  let sharedSaved=false,job:Record<string,unknown>|null=null;const answers:Record<string,unknown>[]=[];
@@ -67,4 +67,17 @@ test('member navigation uses Q&A only and preserves old messages as read-only hi
  await expect(nav.getByRole('link',{name:'질문·답변',exact:true})).toBeVisible();await expect(nav.getByRole('link',{name:'메시지',exact:true})).toHaveCount(0);await expect(nav.getByRole('link',{name:'내 자료실',exact:true})).toHaveCount(0);await expect(page.getByRole('link',{name:'이용 문의',exact:true})).toHaveCount(0);
  await page.locator('summary').filter({hasText:'이전 메시지 기록'}).click();await page.getByRole('button',{name:'내용 보기',exact:true}).click();await expect(page.getByText('이전 개인 대화')).toBeVisible();await expect(page.getByRole('button',{name:'답장 작성'})).toHaveCount(0);await expect(page.getByRole('textbox',{name:'메시지 내용'})).toHaveCount(0);
  await page.screenshot({path:info.outputPath('unified-member-questions.png'),fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
+
+test('answered and closed questions explain their different meanings',async({page})=>{
+ await backend(page);
+ await page.route('**/api/platform/question-hub?mode=mine**',r=>r.fulfill({json:{questions:[{id:id(90),title:'답변을 받은 질문',content:'합성',status:'answered',is_resolved:false},{id:id(91),title:'종료한 질문',content:'합성',status:'answered',is_resolved:true}],hasMore:false}}));
+ await page.goto('/question-hub-test');await page.getByRole('tab',{name:'내 질문',exact:true}).click();
+ await expect(page.getByText('‘답변 있음’은 운영자가 답변을 남긴 질문', {exact:false})).toBeVisible();
+ await page.getByRole('button',{name:'답변 있음',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'답변을 받은 질문'})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'종료한 질문'})).toHaveCount(0);
+ await page.getByRole('button',{name:'질문 종료',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'종료한 질문'})).toBeVisible();
 });

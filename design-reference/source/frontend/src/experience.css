@@ -75,3 +75,8 @@
 .form-card.auth-card>.auth-social-stack,.form-card.auth-card>.email-auth{width:100%;max-width:400px;margin-inline:auto}
 .form-card.auth-card>.email-auth{margin-bottom:16px}
 .auth-social-stack>.btn,.auth-social-stack>.google-id-signin,.form-card.auth-card>.email-auth>.btn{width:100%;max-width:400px;box-sizing:border-box}
+
+/* Keep the primary learning help action reachable on small screens. */
+.header-questions{white-space:nowrap;min-height:44px;align-items:center}
+@media(max-width:680px){.header-user>.header-questions{display:inline-flex;font-size:12px}.header-user{gap:6px}.header-inner,.learning-chrome{gap:8px}.story-feature{scroll-margin-top:90px}}
+@media(max-width:380px){.site-header .brand img{max-width:112px}.site-header .brand small{display:none}.header-user .avatar{width:32px;height:32px}.header-user .icon-btn{width:36px;min-width:36px}}

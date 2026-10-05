@@ -67,6 +67,9 @@ function safeCourse(row: Row): Row {
 export async function readPublicPlatformDataUncached(view: PublicView, slug: string, cohortId: string, page: number, query: string, filter: string): Promise<PublicResult> {
   const db = publicDb();
   const data: Record<string, Row[]> = {};
+  const bannerSettings = rows(await createAdminClient().from('site_settings').select('key,value').eq('key', 'edu_article_banner').limit(1));
+  const display = bannerSettings[0]?.value as Record<string, unknown> | undefined;
+  data.article_banner = [{ id: 'edu_article_banner', value: { enabled: display?.enabled !== false, articlesEnabled: display?.articlesEnabled !== false } }];
   let pagination: PublicResult['pagination'] = null;
   let unlistedBannerCourses: Row[] = [];
   if (view === 'home') {
@@ -145,7 +148,7 @@ export async function readPublicPlatformDataUncached(view: PublicView, slug: str
     const [result, categories, setting] = await Promise.all([
       articles.order('published_at', { ascending: false }).range((page - 1) * PUBLIC_PAGE_SIZE, page * PUBLIC_PAGE_SIZE - 1),
       db.from('article_categories').select('id,name,slug,display_order,is_active').eq('is_active', true).order('display_order').limit(100),
-      createAdminClient().from('site_settings').select('key,value').eq('key', 'edu_article_banner').limit(1),
+      Promise.resolve({ data: bannerSettings, error: null }),
     ]);
     data.articles = rows(result).map(article);
     data.article_categories = rows(categories);
@@ -153,7 +156,7 @@ export async function readPublicPlatformDataUncached(view: PublicView, slug: str
     const value = rows(setting)[0]?.value as Record<string, unknown> | undefined;
     const banner = value || { enabled: true, eyebrow: 'FREE CLASS · 사업자 무료 3강', title: '사업자를 위한 마케팅·AI 매출 진단', description: '광고비를 더 쓰기 전에 고객 유입, 콘텐츠, 전환, 재구매 중 어디에서 매출이 막히는지 먼저 확인합니다.', signupNotice: '무료 회원가입을 완료하면 사업자용 3강 전체를 바로 볼 수 있습니다. 별도 결제는 필요 없습니다.', signupCTA: '무료 회원가입하고 3강 보기', memberCTA: '아티클 읽으러 가기', videos: [{ title: '매출을 막는 마케팅 병목 찾기', url: '' }, { title: 'AI로 줄일 일과 사람이 결정할 일', url: '' }, { title: '7일 안에 실행할 매출 실험 설계', url: '' }] };
     data.article_banner = [{ id: 'edu_article_banner', value: {
-      enabled: banner.enabled !== false,
+      enabled: banner.enabled !== false, articlesEnabled: banner.articlesEnabled !== false,
       eyebrow: String(banner.eyebrow || '').slice(0, 80), title: String(banner.title || '').slice(0, 120),
       description: String(banner.description || '').slice(0, 240), signupNotice: String(banner.signupNotice || '').slice(0, 220),
       signupCTA: String(banner.signupCTA || '').slice(0, 45), memberCTA: String(banner.memberCTA || '').slice(0, 45),
@@ -176,6 +179,10 @@ export async function readPublicPlatformDataUncached(view: PublicView, slug: str
       const course = await db.from('courses').select('id,slug,title,summary,category,list_price,duration_label,schedule_label,status').eq('id', data.cohorts[0].course_id).eq('status', 'published').limit(1);
       data.courses = rows(course);
     }
+  }
+  if (display?.articlesEnabled === false) {
+    data.articles = []; data.article_categories = [];
+    if (pagination && view === 'articles') pagination.total = 0;
   }
   return { data, pagination, unlistedBannerCourses };
 }

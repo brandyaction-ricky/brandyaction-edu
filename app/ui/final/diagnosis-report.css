@@ -9,7 +9,7 @@
 .diagnosis-report-reader-tools>div{display:flex;gap:8px;flex-wrap:wrap}
 .diagnosis-report-reader-tools .diagnosis-secondary{min-height:44px;padding:8px 12px;font-size:14px;white-space:nowrap}
 .diagnosis-reader-error{flex:none;margin:0;padding:10px 16px;background:#fff4f4;color:#a71922;font-size:14px;line-height:1.6}
-.diagnosis-report-reader iframe{display:block;flex:1;min-height:0;width:100%;height:100%;border:0;background:white}
+.diagnosis-report-reader iframe{display:block;flex:1;min-height:0;width:100%;height:0;border:0;background:white}
 @media(max-width:600px){.diagnosis-report-reader-tools{gap:4px;flex-wrap:wrap;padding-inline:12px}.diagnosis-report-reader-tools h2{font-size:14px;width:100%}.diagnosis-report-reader-tools>div{width:100%;justify-content:space-between}.diagnosis-report-reader-tools .diagnosis-secondary{font-size:13px;padding:6px 10px;gap:6px}}
 .diagnosis-report-loading,.diagnosis-report-summary{text-align:center}
 .diagnosis-report-loading{display:grid;justify-items:center;gap:12px;padding:48px 16px}

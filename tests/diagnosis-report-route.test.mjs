@@ -9,7 +9,7 @@ const source=ts.transpileModule(readFileSync(new URL('../app/api/platform/diagno
 class BridgeError extends Error{constructor(code,status){super(code);this.code=code;this.status=status;}}
 function fixture({enabled=true,sessions=true,reports=true,user=actor,error=null}={}){
   const route={},calls=[];
-  const mocks={'@/lib/diagnosis-audience':audience,'@/lib/server-auth':{getAuthenticatedUser:async()=>user},'@/lib/supabase/admin':{createAdminClient:()=>({rpc:async()=>({data:null,error:null})})},
+  const mocks={'@/lib/diagnosis-ready-push':{diagnosisReadyPushEnabled:()=>false},'@/lib/diagnosis-audience':audience,'@/lib/server-auth':{getAuthenticatedUser:async()=>user},'@/lib/supabase/admin':{createAdminClient:()=>({rpc:async()=>({data:null,error:null})})},
     '@/lib/diagnosis-bridge':{DiagnosisBridgeError:BridgeError},'@/lib/diagnosis-report':{sendDiagnosisReportCommand:()=>{}},
     '@/lib/diagnosis-report-service':{runDiagnosisReport:async(deps,action)=>{calls.push({actor:deps.actor,action});if(error)throw error;return{state:'ready',updatedAt:'2026-10-01T00:00:00Z',canRetry:false,downloadAvailable:true,...(action==='download'?{markdown:'# 합성 N6 결과'}:action==='html'?{html:'<!doctype html><h1>원본 정밀 보고서</h1>'}:{})};}}};
   new Function('exports','require','process',source)(route,n=>mocks[n],{env:{EDU_MYIN_DIAGNOSIS_ENABLED:String(enabled),EDU_MYIN_DIAGNOSIS_SESSIONS_ENABLED:String(sessions),EDU_MYIN_DIAGNOSIS_REPORTS_ENABLED:String(reports)}});

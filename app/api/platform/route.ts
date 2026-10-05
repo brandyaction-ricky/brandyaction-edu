@@ -510,8 +510,11 @@ export async function GET(request: Request) {
                     const url = safeUrl(video.url);
                     return { title: String(video.title || '').slice(0, 120), available: Boolean(url), url: user ? url : '' };
                 }) : [];
-                data.article_banner = [{ id: 'edu_article_banner', key: 'edu_article_banner', value: { enabled: value?.enabled !== false, eyebrow: String(value?.eyebrow || '').slice(0, 80), title: String(value?.title || '').slice(0, 120), description: String(value?.description || '').slice(0, 240), signupNotice: String(value?.signupNotice || '').slice(0, 220), signupCTA: String(value?.signupCTA || '').slice(0, 45), memberCTA: String(value?.memberCTA || '').slice(0, 45), videos } }];
+                data.article_banner = [{ id: 'edu_article_banner', key: 'edu_article_banner', value: { enabled: value?.enabled !== false, articlesEnabled: value?.articlesEnabled !== false, eyebrow: String(value?.eyebrow || '').slice(0, 80), title: String(value?.title || '').slice(0, 120), description: String(value?.description || '').slice(0, 240), signupNotice: String(value?.signupNotice || '').slice(0, 220), signupCTA: String(value?.signupCTA || '').slice(0, 45), memberCTA: String(value?.memberCTA || '').slice(0, 45), videos } }];
             }
+        }
+        if (!adminMode && (data.article_banner?.[0]?.value as Record<string, unknown> | undefined)?.articlesEnabled === false) {
+            data.articles = []; data.article_categories = [];
         }
         if (adminMode) {
             if (['templates', 'campaigns', 'automations'].includes(sectionKey)) {
@@ -695,7 +698,7 @@ export async function POST(request: Request) {
                 return { title: String(video.title || '').trim().slice(0, 120), url };
             }) : [];
             if (!title || title.length > 120) fail('배너 제목을 확인해 주세요.');
-            const result = await db.from('site_settings').upsert({ key: 'edu_article_banner', value: { enabled: value?.enabled !== false, eyebrow: String(value?.eyebrow || '').trim().slice(0, 80), title, description: String(value?.description || '').trim().slice(0, 240), signupNotice: String(value?.signupNotice || '').trim().slice(0, 220), signupCTA: String(value?.signupCTA || '').trim().slice(0, 45), memberCTA: String(value?.memberCTA || '').trim().slice(0, 45), videos }, is_public: false }, { onConflict: 'key' });
+            const result = await db.from('site_settings').upsert({ key: 'edu_article_banner', value: { enabled: value?.enabled !== false, articlesEnabled: value?.articlesEnabled !== false, eyebrow: String(value?.eyebrow || '').trim().slice(0, 80), title, description: String(value?.description || '').trim().slice(0, 240), signupNotice: String(value?.signupNotice || '').trim().slice(0, 220), signupCTA: String(value?.signupCTA || '').trim().slice(0, 45), memberCTA: String(value?.memberCTA || '').trim().slice(0, 45), videos }, is_public: false }, { onConflict: 'key' });
             if (result.error) throw result.error;
             return publicWriteSuccess({ ok: true });
         }

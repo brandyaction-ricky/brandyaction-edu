@@ -209,3 +209,8 @@
 .edu-front .form-card.auth-card>.auth-social-stack,.edu-front .form-card.auth-card>.email-auth{width:100%;max-width:400px;margin-inline:auto}
 .edu-front .form-card.auth-card>.email-auth{margin-bottom:16px}
 .edu-front .auth-social-stack>.btn,.edu-front .auth-social-stack>.google-id-signin,.edu-front .form-card.auth-card>.email-auth>.btn{width:100%;max-width:400px;box-sizing:border-box}
+
+/* Keep the primary learning help action reachable on small screens. */
+.edu-front .header-questions{white-space:nowrap;min-height:44px;align-items:center}
+@media(max-width:680px){.edu-front .header-user>.header-questions{display:inline-flex;font-size:12px}.edu-front .header-user{gap:6px}.edu-front .header-inner,.edu-front .learning-chrome{gap:8px}.edu-front .story-feature{scroll-margin-top:90px}}
+@media(max-width:380px){.edu-front .site-header .brand img{max-width:112px}.edu-front .site-header .brand small{display:none}.edu-front .header-user .avatar{width:32px;height:32px}.edu-front .header-user .icon-btn{width:36px;min-width:36px}}

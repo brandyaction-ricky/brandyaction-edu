@@ -33,3 +33,9 @@ test('account change clears displayed notifications, unsubscribes the old device
  await h.command({action:'ACCOUNT',owner:randomUUID()});assert.equal(h.binding.binding,null);assert.equal(h.unsubscribed,1);assert.ok(h.closed>0);await h.click({binding,path:'/my/questions'});assert.equal(h.navigations.length,0);
  await h.command({action:'ACCOUNT',owner:null});assert.equal(h.binding,null);
 });
+
+test('report push opens only the authenticated diagnosis route with generic completion copy',async()=>{
+ const h=worker(),owner=randomUUID(),binding=randomUUID();await h.command({action:'ACCOUNT',owner});await h.command({action:'BIND',owner,binding});
+ for(const path of ['/my/diagnosis','/admin/diagnosis']){await h.push({version:1,binding,eventId:randomUUID(),path,body:'SECRET SCORES'});const n=h.notifications.at(-1);assert.match(n.options.body,/N6 보고서가 완성/);assert.doesNotMatch(JSON.stringify(n),/SECRET/);await h.click(n.options.data);assert.equal(h.navigations.at(-1),'https://edu.test'+path);}
+ await h.push({version:1,binding,eventId:randomUUID(),path:'/my/diagnosis?user=other'});assert.equal(h.notifications.length,2);
+});
