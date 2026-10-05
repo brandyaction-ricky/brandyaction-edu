@@ -93,7 +93,7 @@ test('review explains the hold with keyboard-accessible details and reflects a l
   state='ready';await page.clock.runFor(10000);
   await expect(page.getByRole('button',{name:'MD 파일 받기'})).toBeVisible();
   await page.getByRole('button',{name:'관리자 화면으로 돌아가기'}).click();
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(url => url.pathname === '/admin');
 });
 test('printing opens the same original document without an opener and explains blocked popups',async({page})=>{
   await session(page);await page.route('**/api/platform/diagnosis/report*',r=>r.fulfill(new URL(r.request().url()).search?{contentType:'text/html',body:'<!doctype html><style>h1{color:rgb(12,34,56)}</style><h1>인쇄할 원본 보고서</h1>'}:{json:report('ready')}));
