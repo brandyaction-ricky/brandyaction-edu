@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { build } from 'esbuild';
+import { reportFiles } from './diagnosis-report-files.mjs';
 import { lessonQuestionFixture } from './lesson-questions-api.mjs';
 import { reviewFixture } from './submission-review-api.mjs';
 
@@ -83,7 +84,21 @@ const server = createServer((request,response)=>{
   }
   const asset=assets.get(url.pathname);
   if(asset){response.setHeader('Content-Type',url.pathname.endsWith('.css')?'text/css':'text/javascript');response.end(asset);return;}
+  if(url.pathname==='/api/platform/diagnosis/report'){
+    const key=(request.headers.cookie || '').match(/(?:^|;\s*)diagnosis_download_fixture=(original|embedded)(?:;|$)/)?.[1];
+    const files=key && reportFiles[key],format=url.searchParams.has('html')?'html':'markdown';
+    if(!files){response.writeHead(404).end();return;}
+    if(!url.search){response.setHeader('Content-Type','application/json');response.end(JSON.stringify({state:'ready',updatedAt:'2026-10-01T00:00:00.000Z',canRetry:false,downloadAvailable:true}));return;}
+    const name=format==='html'?'N6-정밀보고서.html':'N6-검사결과.md';
+    response.setHeader('Content-Type',format==='html'?'text/html; charset=utf-8':'text/markdown; charset=utf-8');
+    response.setHeader('Content-Disposition',`attachment; filename*=UTF-8''${encodeURIComponent(name)}`);
+    response.end(files[format]);return;
+  }
+  if(url.pathname==='/api/platform/diagnosis/session' && /diagnosis_download_fixture=(original|embedded)/.test(request.headers.cookie || '')){
+    response.setHeader('Content-Type','application/json');response.end(JSON.stringify({state:'submitted',revision:8,answers:[],submittedAt:'2026-10-01T00:00:00Z',needsReview:false,survey:{code:'needs6_n30',version:'synthetic',title:'합성 N6 검사',coreQuestionCount:0,questions:[]}}));return;
+  }
   if(url.pathname==='/diagnosis-test'){
+    if(url.searchParams.has('file-qa'))response.setHeader('Set-Cookie','diagnosis_download_fixture=embedded; Path=/; SameSite=Lax');
     response.setHeader('Content-Type','text/html');response.end('<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Diagnosis fixture</title><link rel="stylesheet" href="/diagnosis-app.css"></head><body style="margin:0"><div id="root"></div><script type="module" src="/diagnosis-app.js"></script></body></html>');return;
   }
   if(url.pathname==='/question-hub-test'){
