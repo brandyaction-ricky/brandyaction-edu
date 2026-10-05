@@ -7,6 +7,7 @@ import { metricsRedirect } from '@/lib/landing-admin-state';
 import { sections } from '@/lib/platform';
 import { headers } from 'next/headers';
 import { productShareImage, sharingOrigin } from '@/lib/product-sharing';
+import { isPolicyPath } from '@/lib/legal-policies';
 export const dynamic = 'force-dynamic';
 export default async function Page({params,searchParams}:{params:Promise<{path?:string[]}>;searchParams:Promise<Record<string,string|string[]|undefined>>}) {
  const {path=[]} = await params;
@@ -18,7 +19,7 @@ export default async function Page({params,searchParams}:{params:Promise<{path?:
   || (root === 'admin' && path.length <= 2 && (!section || ['product-editor','learning-editor'].includes(section) || sections.some(item => item.key === section)))
   || (root === 'learn' && path.length >= 2 && (path.length <= 3 || (path.length === 4 && path[3] === 'mission')))
   || (root === 'payment' && ['success','fail'].includes(section) && path.length === 2)
-  || (root === 'policies' && ['terms','privacy','refund'].includes(section) && path.length === 2);
+  || isPolicyPath(path);
  if (!valid) notFound();
  if (root === 'admin' && section === 'metrics') redirect(metricsRedirect(await searchParams));
  // The admin API verifies identity, account status and section permissions once.
