@@ -5,6 +5,17 @@ const data={enabled:true,allPublished:false,revision:0,eligibleCount:103,started
 test.beforeEach(async({page})=>{
  await page.route('**/api/platform?**',route=>route.fulfill({json:{user:{id:id(99),full_name:'합성 관리자',role:'admin'},data:{admin_summary:[{pendingReviews:0,openQuestions:0}]}}}));
 });
+test('timeline separates start, submit, issue in Korea time and keeps polling time inside history',async({page})=>{
+ const row={...data.rows[2],report:{...report,state:'ready',canRetry:false,errorCode:null,startedAt:'2026-10-04T11:24:00Z',submittedAt:'2026-10-04T23:30:00Z',issuedAt:'2026-10-05T00:40:00Z',checkedAt:'2026-10-06T00:00:00Z'}};
+ await page.route('**/api/admin/diagnosis**',r=>r.fulfill({json:{...data,rows:[row]}}));
+ await page.goto('/diagnosis-test?manage');const item=page.getByRole('row',{name:/학생 C/});
+ await expect(item.getByText(/검사 시작 2026\. 10\. 4\. 오후 08:24/)).toBeVisible();
+ await expect(item.getByText(/제출 완료 2026\. 10\. 5\. 오전 08:30/)).toBeVisible();
+ await expect(item.getByText(/보고서 발급 2026\. 10\. 5\. 오전 09:40/)).toBeVisible();
+ await expect(item.getByText(/상태 조회:/)).not.toBeVisible();await item.getByText('진행·오류 기록 보기').click();
+ await expect(item.getByText(/상태 조회: 2026\. 10\. 6\./)).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
 test('admin can find direct diagnosis, confirm whole or individual publication and see progress without document overflow',async({page},info)=>{
  const writes:unknown[]=[];let latest=data;
  await page.route('**/api/admin/diagnosis**',async route=>{if(route.request().method()==='POST'){const b=route.request().postDataJSON();writes.push(b);latest={...latest,revision:latest.revision+1,allPublished:b.action==='publish_all'?b.enabled:latest.allPublished,rows:latest.rows.map(r=>b.action==='publish_all'||b.userId===r.id?{...r,published:b.enabled}:r)};await route.fulfill({json:{revision:latest.revision}});return;}await route.fulfill({json:latest});});

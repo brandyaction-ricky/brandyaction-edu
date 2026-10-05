@@ -7,7 +7,7 @@ import type { DiagnosisAdminList, DiagnosisAdminRow } from '@/lib/diagnosis-admi
 import './diagnosis-management.css';
 
 type Change={title:string;description:string;body:Record<string,unknown>;label:string};
-const date=(v:string|null|undefined)=>v?new Date(v).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+const date=(v:string|null|undefined)=>v?new Date(v).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',year:'numeric',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
 const reportLabels:Record<string,string>={not_submitted:'검사 진행 중',queued:'발급 대기',processing:'보고서 작성 중',ready:'발급 완료',needs_review:'확인 필요',access_denied:'이용 권한 확인 필요'};
 const errorLabels:Record<string,string>={JOB_DEADLINE_REACHED:'처리 시간이 초과되었습니다.',PROVIDER_RECONCILIATION_REQUIRED:'AI 요청의 처리·비용 확인이 필요합니다.',ANSWERS_REQUIRE_REVIEW:'제출한 답변의 확인이 필요합니다.',ISSUED_ARTIFACT_REQUIRES_REVIEW:'발급 파일의 확인이 필요합니다.',ADMIN_RETRY_REQUESTED:'관리자가 저장된 답변으로 재발급을 요청했습니다.',PROVIDER_RATE_LIMIT:'AI 공급자 처리 한도에 도달했습니다.'};
 export function DiagnosisManagement(){
@@ -56,7 +56,7 @@ export function DiagnosisManagement(){
     <form className="diagnosis-management-toolbar" onSubmit={e=>{e.preventDefault();setCursors([null]);setQuery(search.trim());}}>
       <AdminInput label="수강생 이름" value={search} maxLength={100} onChange={e=>setSearch(e.target.value)} placeholder="이름으로 검색"/>
       <AdminButton type="submit" disabled={saving}>검색</AdminButton><AdminButton onClick={()=>void load()} loading={loading} disabled={saving}><RefreshCw size={16}/>새로고침</AdminButton>
-      <span>페이지당 최대 100명 · 30초마다 자동 확인</span>
+      <span>한국 시간(KST) · 페이지당 최대 100명 · 30초마다 자동 확인</span>
     </form>
     {error&&<AdminInlineError onRetry={()=>void load()}>{error} 현재 상태를 다시 확인한 후 변경해 주세요.</AdminInlineError>}
     {notice&&<p className="diagnosis-management-notice" role="status">{notice}</p>}
@@ -67,10 +67,10 @@ export function DiagnosisManagement(){
         <tbody>{data.rows.map(row=>{const r=row.report;return <tr key={row.id}>
           <th scope="row">{row.name}</th>
           <td data-label="공개 설정"><AdminButton size="sm" disabled={loading||saving||!!error||!data.enabled} onClick={()=>publication(!row.published,row)} aria-label={`${row.name} 진단 ${row.published?'닫기':'공개'}`}>{row.published?'공개 중 · 닫기':'비공개 · 공개'}</AdminButton></td>
-          <td data-label="검사 진행"><span>{!row.attemptId?'시작 전':row.state==='in_progress'?'검사 중':row.state==='preparing'?'검사 연결 중':'제출 완료'}</span>{row.startedAt&&<small>시작 {date(row.startedAt)}</small>}</td>
-          <td data-label="보고서 발급"><AdminStatusBadge status="active" label={!row.attemptId?'검사 시작 전':!r?'상태 확인 대기':reportLabels[r.state]??'확인 필요'} tone={r?.state==='ready'?'success':r?.state==='needs_review'?'warning':'neutral'}/>{r&&<small>{row.statusAvailable?'확인':'마지막 확인'} {date(r.checkedAt)}</small>}</td>
+          <td data-label="검사 진행"><span>{!row.attemptId?'시작 전':row.state==='in_progress'?'검사 중':row.state==='preparing'?'검사 연결 중':'제출 완료'}</span>{row.attemptId&&<><small>검사 시작 {date(r?.startedAt??row.startedAt)}</small><small>제출 완료 {r?.submittedAt?date(r.submittedAt):row.state==='submitted'?'시각 확인 필요':'—'}</small></>}</td>
+          <td data-label="보고서 발급"><AdminStatusBadge status="active" label={!row.attemptId?'검사 시작 전':!r?'상태 확인 대기':reportLabels[r.state]??'확인 필요'} tone={r?.state==='ready'?'success':r?.state==='needs_review'?'warning':'neutral'}/>{r?.state==='ready'&&<small>보고서 발급 {r.issuedAt?date(r.issuedAt):'시각 확인 필요'}</small>}</td>
           <td data-label="기록·재발급"><details><summary>진행·오류 기록 보기</summary><div className="diagnosis-management-history">
-            <p>검사 정보 갱신: {date(row.updatedAt)}</p><p>보고서 상태 갱신: {date(r?.updatedAt)}</p>
+            <p>상태 조회: {date(r?.checkedAt)} (발급 시각과 다릅니다)</p><p>검사 정보 갱신: {date(row.updatedAt)}</p><p>보고서 상태 갱신: {date(r?.updatedAt)}</p>
             {r?.errorCode&&<p className="diagnosis-management-warning">{errorLabels[r.errorCode]??'보고서 처리 중 확인이 필요한 오류가 기록되었습니다.'}<code>{r.errorCode}</code></p>}
             {r?.details?.length?<ul>{r.details.map((d,i)=><li key={`${d.at}-${i}`}><time>{date(d.at)}</time> {errorLabels[d.code]??'보고서 처리 기록'}<code>{d.code}</code></li>)}</ul>:<p>기록된 오류가 없습니다.</p>}
             {r?.errorCode&&!r.canRetry&&<p>이미 처리 중이거나 답변·발급 파일·AI 요청 비용의 확인이 필요하면 자동 재발급을 막습니다.</p>}
