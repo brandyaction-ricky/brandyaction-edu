@@ -43,11 +43,15 @@ export function AnswerFiles({ block, answer, onChange, readOnly, context, submis
   function url(file: string, download = false) { if (context?.ongoingReview) return ongoingReviewFileUrl(context.lessonId, context.enrollmentId, context.ongoingReview, file, 'answer') + (download ? '&download=1' : ''); return endpoint + '?' + new URLSearchParams({ file, ...(submissionId ? { submission: submissionId } : {}), ...(download ? { download: '1' } : {}) }); }
   return <section className="lb-field lb-card" aria-label={block.question?.label}>
     <strong>{block.question?.label}</strong>
-    {(['image', 'file'] as const).filter(kind => block.question?.kind === 'image' || kind === 'file').map(kind => {
+    {(['image', 'file'] as const).map(kind => {
       const key = kind === 'image' ? 'imageId' : 'fileId', fileId = typeof files[key] === 'string' ? files[key] as string : '';
+      const acceptsUpload = block.question?.kind === kind;
+      // Older image answers may also contain an archive. Keep its download
+      // available without offering a second upload field for new answers.
+      if (!acceptsUpload && !fileId) return null;
       return <div key={kind}>
         {fileId && <>{kind === 'image' && <img src={url(fileId)} alt="제출할 답변 이미지" loading="lazy" />}<a className="link" href={url(fileId, true)} target="_blank" rel="noopener noreferrer">{kind === 'image' ? '첨부 이미지 열기' : '압축파일 다운로드'}</a>{!readOnly && <button type="button" className="btn small" disabled={pending} onClick={() => remove(key)}>{kind === 'image' ? '이미지 빼기' : '압축파일 빼기'}</button>}</>}
-        {!readOnly && <label className="lb-field">{kind === 'image' ? '답변 이미지 선택' : '압축파일 선택'}<input type="file" disabled={pending || !context} accept={kind === 'image' ? '.png,.jpg,.jpeg,.webp,.gif' : '.zip,.rar,.7z,.tar,.gz,.tgz'} onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void upload(file, kind); }} /></label>}
+        {!readOnly && acceptsUpload && <label className="lb-field">{kind === 'image' ? '답변 이미지 선택' : '압축파일 선택'}<input type="file" disabled={pending || !context} accept={kind === 'image' ? '.png,.jpg,.jpeg,.webp,.gif' : '.zip,.rar,.7z,.tar,.gz,.tgz'} onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void upload(file, kind); }} /></label>}
       </div>;
     })}
     {!readOnly && <small>파일당 최대 10MB. 업로드가 끝나면 답변에 자동저장됩니다.</small>}
