@@ -33,7 +33,9 @@
       "codex/edu-simple-install-20261005": false,
       "codex/edu-e2-entry-source-20261005": false,
       "codex/edu-report-http-download-20261005": false,
-      "codex/edu-autosave-image-release-20261005": false
+      "codex/edu-autosave-image-release-20261005": false,
+      "codex/edu-mobile-refresh-20261005": false,
+      "codex/edu-mobile-refresh-release-20261005": false
     }
   },
   "regions": [
