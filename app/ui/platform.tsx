@@ -1038,6 +1038,7 @@ export function Platform({
                 setPage={setAdminPage}
                 orderScope={orderScope}
                 onOrderScopeChange={changeOrderScope}
+                onAnalyticsChanged={() => { adminNavigationReads.clear(); void refresh(true); }}
                 loading={loading || !hasCurrentAdminRead}
               />
             ) : (
