@@ -77,3 +77,9 @@ test('disabled feature preserves the existing member dashboard', async ({ page }
   await expect(page.getByRole('heading', { name: '나의 실행 레벨' })).toBeVisible();
   await expect(page.locator('.enrollment-learning-overview')).toHaveCount(0);
 });
+
+test('an empty learning plan communicates preparation only once on my page', async ({ page }) => {
+  await page.goto('/learning-overview-test?scenario=empty');
+  const overview = page.locator('.member-learning-intro');
+  await expect(overview.getByText('공개된 학습을 준비하고 있습니다.', { exact: true })).toHaveCount(1);
+});

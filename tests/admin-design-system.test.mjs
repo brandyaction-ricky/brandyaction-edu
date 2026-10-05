@@ -70,6 +70,15 @@ test('shared status badges translate internal values and tables expose usable se
   assert.match(table, /role="region"/); assert.match(table, /aria-label="테스트 표"/); assert.match(table, /aria-describedby/); assert.match(table, /<caption[^>]*>테스트 표<\/caption>/); assert.match(table, /tabindex="0"/);
 });
 
+test('admin status tones remain visible after the adm badge base style', () => {
+  const admin = fs.readFileSync('features/admin-ui/styles/admin-system.css', 'utf8');
+  const baseIndex = admin.indexOf('.adm-badge,.adm :is(.badge,.admin-status-badge)');
+  const dangerIndex = admin.indexOf('.adm.edu-admin :is(.admin-status-badge--error,.admin-status-badge--danger)');
+  assert.ok(baseIndex > 0 && dangerIndex > baseIndex);
+  assert.match(admin.slice(dangerIndex), /background:var\(--admin-color-error-soft\);color:var\(--admin-color-error\)/);
+  assert.match(admin, /\.edu-admin \.admin-wide-table \.admin-table-hint\{display:block\}/);
+});
+
 test('shared pagination exposes edge actions and all operational status labels stay human-readable', () => {
   const { AdminPagination, adminStatus } = load('features/admin-ui.ts');
   const pagination = renderToStaticMarkup(React.createElement(AdminPagination, { page: 2, pages: 8, onChange() {} }));

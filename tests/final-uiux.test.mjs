@@ -146,6 +146,7 @@ test('five admin categories and scoped navigation render from the admin UI featu
   const { AdminShell, adminNavigationIcon, finalAdminGroups } = load('features/admin-ui.ts');
   const { Overview } = load('app/ui/final/admin-shell.tsx');
   assert.equal(finalAdminGroups.length, 5);
+  assert.equal(finalAdminGroups[0][1].length, 8);
   const props = { current: 'overview', available: platform.sections, user: { ...user, role: 'admin' }, pendingReviews: 1, openQuestions: 2, mobile: false, setMobile() {}, logout: async () => {} };
   const markup = html(AdminShell, { ...props, children: React.createElement(Overview, { data, available: platform.sections }) });
   const navigationMarkup = markup.match(/<nav aria-label="관리자 카테고리">[\s\S]*?<\/nav>/)?.[0] || '';

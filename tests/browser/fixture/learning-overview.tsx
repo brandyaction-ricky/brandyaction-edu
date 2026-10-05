@@ -20,6 +20,11 @@ export function LearningOverviewFixture() {
     lesson_progress: progress,
     learning_overviews: scenario === 'missing' ? [] : [{ id: enrollment.id, status: scenario === 'error' ? 'error' : 'ready', lessons: gates }],
   };
+  if (scenario === 'empty') {
+    data.curriculum_weeks = [];
+    data.curriculum_lessons = [];
+    data.learning_overviews = [{ id: enrollment.id, status: 'ready', lessons: [] }];
+  }
   if (scenario === 'multiple') {
     data.enrollments.push({ ...enrollment, id: 'second', course_id: 'second-course', cohort_id: 'second-cohort' }, { ...enrollment, id: 'expired', status: 'revoked' });
     data.courses.push({ id: 'second-course', title: '독립된 다른 과정' });

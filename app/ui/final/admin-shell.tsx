@@ -27,6 +27,7 @@ export const finalAdminGroups = [
     [
       "products",
       "cohorts",
+      "learning",
       "contents",
       "missions",
       "members",
