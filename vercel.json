@@ -4,6 +4,8 @@
   "git": {
     "deploymentEnabled": {
       "codex/edu-curriculum-autosave-20261005": false,
+      "codex/edu-admin-question-images-20261005": false,
+      "codex/edu-admin-question-images-release-20261005": false,
       "codex/edu-image-answer-only-20261005": false,
       "codex/edu-lesson-question-dialog-20261005": false,
       "codex/edu-draft-save-recovery-20261004": false,

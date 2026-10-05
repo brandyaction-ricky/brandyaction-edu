@@ -3,6 +3,7 @@ import { MemberVisitsToggle } from './member-visits';
 import { AnswerText } from './lesson-text';
 import { MvpBadge, useMemberMvps } from './member-mvp';
 import { QuestionAiBatch } from './question-ai-batch';
+import { QuestionImage } from './question-image';
 import { lessonBodyPlainText } from "@/lib/lesson-body";
 import {
   date,
@@ -919,6 +920,7 @@ export function AdminCatalog({
                   <div className="panel-body">
                     {Boolean(q.learning_context) && <p className="meta">학습 위치: {t(q, "learning_context")}</p>}
                     <p className="reading-copy">{t(q, "content")}</p>
+                    <QuestionImage key={String(q.image_id || q.id)} questionId={String(q.id)} imageId={q.image_id}/>
                     {Boolean(q.answer) && (
                       <div className="answer-block mt16">
                         <b>운영자 답변</b>
