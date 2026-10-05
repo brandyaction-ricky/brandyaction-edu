@@ -26,7 +26,7 @@ export function adminOrderQuery(db: SupabaseClient, scope: OrderListScope, quick
   if (scope.q) embeds.push('search_items:order_items()');
   if (quick === 'refund') embeds.push('refund_payments:payments(edu_refund_requests!inner())');
   if (quick === 'access') embeds.push('active_items:order_items(enrollments!inner())');
-  const columns = 'id,order_number,user_id,status,subtotal,discount_amount,total_amount,entry_src,customer_name,customer_email,customer_phone,created_at';
+  const columns = 'id,order_number,user_id,status,subtotal,discount_amount,total_amount,entry_src,is_test_order,customer_name,customer_email,customer_phone,created_at,analytics_member:profiles!orders_user_id_fkey(role,status,is_internal,deleted_at)';
   let query = db.from('orders').select([head ? 'id' : columns, ...embeds].join(','), { count: 'exact', head });
   if (scope.status) query = query.eq('status', scope.status);
   if (scope.from) query = query.gte('created_at', scope.from + 'T00:00:00+09:00');
@@ -46,4 +46,13 @@ export function adminOrderQuery(db: SupabaseClient, scope: OrderListScope, quick
   if (quick === 'refund') query = query.eq('refund_payments.edu_refund_requests.status', 'processing').not('refund_payments', 'is', null);
   if (quick === 'access') query = query.eq('status', 'paid').eq('active_items.enrollments.status', 'active').is('active_items', null);
   return query;
+}
+
+// Only describes the operational row. SQL views own analytics eligibility.
+export function orderExclusionLabel(order: Record<string, unknown>, member?: Record<string, unknown> | null) {
+  if (order.is_test_order === true) return '시험 주문 · 집계 제외';
+  if (!order.user_id || !member || member.status === 'withdrawn' || member.deleted_at) return '탈퇴·미연결 회원 · 집계 제외';
+  if (member.is_internal === true || ['admin', 'staff'].includes(String(member.role))) return '내부 계정 · 집계 제외';
+  if (Number(order.total_amount) === 0) return '무료 주문 · 집계 제외';
+  return '';
 }

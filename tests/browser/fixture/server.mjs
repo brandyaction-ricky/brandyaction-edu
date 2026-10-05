@@ -69,6 +69,9 @@ const server = createServer((request,response)=>{
     const rows=member===id(4)?[]:records;
     setTimeout(()=>response.end(JSON.stringify({rows:rows.slice((page-1)*20,page*20),total:rows.length,page,pageSize:20})),500);return;
   }
+  if(url.pathname==='/api/admin/analytics-exclusions'){
+    response.setHeader('Content-Type','application/json');response.writeHead(403).end(JSON.stringify({error:'합성 환경: 전용 집계 표시 검수에서만 허용'}));return;
+  }
   if(url.pathname==='/api/admin/member-login-email'){
     response.setHeader('Content-Type','application/json');response.writeHead(403).end(JSON.stringify({error:'합성 환경: 관리자 변경 테스트에서만 허용'}));return;
   }
