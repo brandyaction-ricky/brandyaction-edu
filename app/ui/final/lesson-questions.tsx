@@ -7,6 +7,7 @@ import './lesson-questions.css';
 import { QuestionImagePicker, type QuestionImagePickerHandle } from './question-image';
 import { QuestionComposer } from './question-composer';
 import { QuestionCard } from './question-hub';
+import { learningQuestionCreatedEvent } from './learning-question-dialog';
 
 export function LessonQuestions({ enrollmentId, lessonId, lessonTitle }: { enrollmentId: string; lessonId: string; lessonTitle: string }) {
   const [open, setOpen] = useState(false), [title, setTitle] = useState(''), [content, setContent] = useState('');
@@ -18,6 +19,11 @@ export function LessonQuestions({ enrollmentId, lessonId, lessonTitle }: { enrol
   const requestId = useRef(''), submitting = useRef(false);
   const imagePicker = useRef<QuestionImagePickerHandle>(null);
   useUnsavedLearningChanges(Boolean(title || content || image.draft));
+  useEffect(() => {
+    const refresh = (event: Event) => { const context = (event as CustomEvent).detail; if (context?.enrollmentId === enrollmentId && context?.lessonId === lessonId) { setPage(0); setLoading(true); setVersion(value => value + 1); } };
+    window.addEventListener(learningQuestionCreatedEvent, refresh);
+    return () => window.removeEventListener(learningQuestionCreatedEvent, refresh);
+  }, [enrollmentId, lessonId]);
   useEffect(() => {
     const controller = new AbortController();
     fetch(`/api/platform/lesson-questions?enrollment=${encodeURIComponent(enrollmentId)}&lesson=${encodeURIComponent(lessonId)}&page=${page}`, { cache:'no-store', signal:controller.signal })

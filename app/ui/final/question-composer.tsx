@@ -30,7 +30,7 @@ export function RelatedAnswers({ query, context }: { query: string; context: Que
   if (query.trim().length < 2 || result?.key !== key) return null;
   return <aside className="question-related" aria-label="비슷한 질문의 답변"><b>먼저 확인해 보세요</b>{result.error ? <p role="status" className="meta">{result.error}</p> : !result.answers.length ? <p className="meta">아직 비슷한 답변이 없어요. 아래에서 질문을 등록해 주세요.</p> : result.answers.map(a => <SharedAnswerCard key={a.id} answer={a}/>)}</aside>;
 }
-export function QuestionComposer({ initialContext, order, onCreated }: { initialContext?: QuestionContext; order?: string | null; onCreated: () => void }) {
+export function QuestionComposer({ initialContext, order, onCreated, quick = false, onStateChange }: { initialContext?: QuestionContext; order?: string | null; onCreated: () => void; quick?: boolean; onStateChange?: (state: { dirty: boolean; locked: boolean }) => void }) {
   const [contexts, setContexts] = useState<QuestionContext[]>(initialContext ? [initialContext] : []), [context, setContext] = useState<QuestionContext | null>(initialContext || null);
   const [category, setCategory] = useState<QuestionCategory>(order ? 'payment' : 'learning'), [title, setTitle] = useState(order ? '주문 ' + order + ' 문의' : ''), [content, setContent] = useState(''), [visibility, setVisibility] = useState<'cohort' | 'private'>('cohort');
   const [image, setImage] = useState<{ id: string | null; busy: boolean; draft: boolean }>({ id: null, busy: false, draft: false }), [imageKey, setImageKey] = useState(0);
@@ -38,6 +38,7 @@ export function QuestionComposer({ initialContext, order, onCreated }: { initial
   const gate = useRef(false), retry = useRef<Record<string, unknown> | null>(null), imagePicker = useRef<QuestionImagePickerHandle>(null), touchedContext = useRef(Boolean(initialContext || order));
   const locked = busy || uncertain, imagesEnabled = process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED === 'true';
   useUnsavedLearningChanges(Boolean(content || title || image.draft) || busy || uncertain);
+  useEffect(() => { onStateChange?.({ dirty: Boolean(content || title || image.draft), locked: busy || uncertain || image.busy }); }, [content, title, image.draft, image.busy, busy, uncertain, onStateChange]);
   useEffect(() => {
     const abort = new AbortController(); let alive = true;
     void questionRequest<{ contexts: QuestionContext[] }>('/api/platform/question-hub?mode=contexts', undefined, abort.signal).then(data => {
@@ -61,18 +62,22 @@ export function QuestionComposer({ initialContext, order, onCreated }: { initial
     } catch (cause) { const e = cause as { message: string; status?: number }; const unknown = !e.status || e.status >= 500; setUncertain(unknown); if (!unknown) retry.current = null; setError(e.message); }
     finally { gate.current = false; setBusy(false); }
   }
-  return <form className="question-composer" onSubmit={submit} onPaste={event => {
+  const options = <>
+    <label className="field">질문 제목 (선택)<input maxLength={200} value={title} onChange={e => setTitle(e.target.value)} disabled={locked} placeholder="비워 두면 질문 내용으로 제목을 만들어요"/></label>
+    <div className="question-context-fields"><label className="field">문의 종류<select value={category} disabled={locked || image.busy} onChange={e => { const next = e.target.value as QuestionCategory; if (next === 'learning' || changeContext(null)) { setCategory(next); setVisibility('cohort'); } }}>{Object.entries(questionCategories).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+    {category === 'learning' && <label className="field">관련 학습<select value={context ? context.enrollmentId + ':' + context.lessonId : ''} disabled={locked || image.busy} onChange={e => changeContext(contexts.find(c => c.enrollmentId + ':' + c.lessonId === e.target.value) || null)}><option value="">학습 선택 없이 질문하기</option>{contexts.map(c => <option key={c.enrollmentId + c.lessonId} value={c.enrollmentId + ':' + c.lessonId}>{c.label}</option>)}</select></label>}</div>
+  </>;
+  return <form className={'question-composer' + (quick ? ' question-composer-quick' : '')} onSubmit={submit} onPaste={event => {
     if (!imagesEnabled) return;
     const files = Array.from(event.clipboardData.items).filter(i => i.kind === 'file' && i.type.startsWith('image/')).map(i => i.getAsFile()).filter((f): f is File => f !== null);
     if (files.length) { event.preventDefault(); imagePicker.current?.paste(files); }
   }}>
-    <label className="field">질문 제목 (선택)<input maxLength={200} value={title} onChange={e => setTitle(e.target.value)} disabled={locked} placeholder="비워 두면 질문 내용으로 제목을 만들어요"/></label>
-    <div className="question-context-fields"><label className="field">문의 종류<select value={category} disabled={locked || image.busy} onChange={e => { const next = e.target.value as QuestionCategory; if (next === 'learning' || changeContext(null)) { setCategory(next); setVisibility('cohort'); } }}>{Object.entries(questionCategories).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-    {category === 'learning' && <label className="field">관련 학습<select value={context ? context.enrollmentId + ':' + context.lessonId : ''} disabled={locked || image.busy} onChange={e => changeContext(contexts.find(c => c.enrollmentId + ':' + c.lessonId === e.target.value) || null)}><option value="">학습 선택 없이 질문하기</option>{contexts.map(c => <option key={c.enrollmentId + c.lessonId} value={c.enrollmentId + ':' + c.lessonId}>{c.label}</option>)}</select></label>}</div>
+    {!quick && options}
     {contextError && <p role="status" className="meta">{contextError} <button type="button" className="link" disabled={locked} onClick={() => setContextVersion(v => v + 1)}>목록 다시 불러오기</button></p>}
-    <label className="field">질문 내용<textarea required={!image.id} rows={6} maxLength={10000} disabled={locked} value={content} onChange={e => setContent(e.target.value)} placeholder="어느 부분에서 막혔나요? 지금 하고 있는 일과 궁금한 점을 편하게 적어 주세요."/></label>
+    <label className="field">질문 내용<textarea autoFocus={quick} required={!image.id} rows={quick ? 4 : 6} maxLength={10000} disabled={locked} value={content} onChange={e => setContent(e.target.value)} placeholder={quick ? '어디에서 막혔나요? 짧게 적거나 화면을 붙여 넣어 주세요.' : '어느 부분에서 막혔나요? 지금 하고 있는 일과 궁금한 점을 편하게 적어 주세요.'}/></label>
     {category === 'learning' && <RelatedAnswers query={content} context={context}/>}
-    {imagesEnabled && <QuestionImagePicker key={imageKey} ref={imagePicker} enrollmentId={context?.enrollmentId || null} lessonId={context?.lessonId || null} locked={locked} publicQuestion={Boolean(context && category === 'learning' && visibility === 'cohort')} changed={(id, uploading, draft) => setImage({ id, busy: uploading, draft })}/>}
+    {imagesEnabled && <QuestionImagePicker key={imageKey} ref={imagePicker} enrollmentId={context?.enrollmentId || null} lessonId={context?.lessonId || null} locked={locked} compact={quick} publicQuestion={Boolean(context && category === 'learning' && visibility === 'cohort')} changed={(id, uploading, draft) => setImage({ id, busy: uploading, draft })}/>}
+    {quick && <details className="question-quick-options"><summary>제목·관련 수업 변경 (선택)</summary>{options}</details>}
     <fieldset className="question-privacy" disabled={locked}><legend>공개 범위</legend>{context && category === 'learning' ? <><div className="question-visibility-options"><label><input type="radio" name="question-visibility" value="cohort" checked={visibility === 'cohort'} onChange={() => setVisibility('cohort')}/> 전체 공개</label><label><input type="radio" name="question-visibility" value="private" checked={visibility === 'private'} onChange={() => setVisibility('private')}/> 비밀 질문</label></div><small>{visibility === 'cohort' ? '같은 기수 수강생이 질문·첨부 이미지·답변·후속 질문을 함께 볼 수 있어요. 개인정보가 포함되면 비밀 질문을 선택해 주세요.' : '나와 담당 운영자만 질문과 답변을 볼 수 있어요.'}</small></> : <><b>비밀 질문</b><small>{category === 'learning' ? '관련 학습을 선택하면 같은 기수에 공개할 수 있어요.' : '일반·결제·계정 문의는 나와 담당 운영자만 볼 수 있어요.'}</small></>}</fieldset>
     {uncertain && <p role="status">등록 결과를 확인하지 못했습니다. 같은 요청으로 다시 확인하면 중복 등록되지 않습니다.</p>}
     {error && <p role="alert" className="form-error">{error}</p>}

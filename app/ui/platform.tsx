@@ -21,7 +21,7 @@ import {
   type Section,
   type User,
 } from "@/lib/platform";
-import { homepageCourses, isRecruiting, localDateTime, recordId } from "@/lib/platform-rules";
+import { homepageCourses, isRecruiting, localDateTime, recordId, hasLearningAccess } from "@/lib/platform-rules";
 import { listedProducts } from "@/lib/product-visibility";
 import { publicReadParams } from "@/lib/public-platform-plan";
 import { archiveValues } from "@/lib/qa-rules";
@@ -60,7 +60,8 @@ import {
 } from "./final/admin-shell";
 import { Checkout } from "./final/checkout";
 import { Classroom } from "./final/classroom";
-import { MemberViews } from "./final/member-views";
+import { MemberViews, enrollmentLessons } from "./final/member-views";
+import { LearningQuestionShortcut } from './final/learning-question-dialog';
 import { CustomerWorkspace } from "./final/customer-workspace";
 import { MemberVisitRecorder } from "./final/member-visit-recorder";
 import {
@@ -275,6 +276,10 @@ export function Platform({
   const publicParamsString = publicParams?.toString() || (account || learning || ["order-complete", "applied", "payment"].includes(path[0]) ? memberParams.toString() : "view=identity");
   const publicReadKey = JSON.stringify([routeKey, publicParamsString]);
   const data = admin ? (hasCurrentAdminRead ? loadedData : {}) : (loadedReadKey === publicReadKey ? loadedData : {});
+  const questionEnrollment = learning ? (data.enrollments || []).find(row => row.id === path[1] && hasLearningAccess(row)) : undefined;
+  const questionLessons = questionEnrollment ? enrollmentLessons(data, questionEnrollment) : [];
+  const questionLesson = questionLessons.find(row => row.id === path[2]) || questionLessons[0];
+  const questionContext = questionEnrollment && questionLesson ? { enrollmentId: String(questionEnrollment.id), lessonId: String(questionLesson.id), label: t(questionLesson, 'title'), recent: true } : undefined;
   const setAdminPage = (update: number | ((page: number) => number)) =>
     setAdminPaging((current) => ({
       section: pagingKey,
@@ -589,7 +594,7 @@ export function Platform({
           <div className="header-user">
             {user ? (
               <>
-                <Link className="link header-questions" href={admin ? "/admin/questions" : "/my/questions"}>질문·답변</Link>
+                {learning && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' ? <LearningQuestionShortcut key={routeKey} context={questionContext}/> : <Link className="link header-questions" href={admin ? "/admin/questions" : "/my/questions"}>질문·답변</Link>}
                 <Link className="link" href="/my">
                   마이페이지
                 </Link>

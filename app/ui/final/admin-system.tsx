@@ -92,13 +92,15 @@ function dialogTabStops(node: HTMLDialogElement) {
     .filter(element => element.tabIndex >= 0 && !element.matches(':disabled') && !element.closest('[hidden],[inert]') && element.closest('dialog') === node && element.getClientRects().length > 0 && !['hidden', 'collapse'].includes(getComputedStyle(element).visibility))
     .sort((a, b) => (a.tabIndex || Infinity) - (b.tabIndex || Infinity));
 }
-function AdminDialogSurface({ title, onClose, className, children }: { title: string; onClose: () => void; className: string; children: ReactNode }) {
+function AdminDialogSurface({ title, onClose, className, children, initialFocus }: { title: string; onClose: () => void; className: string; children: ReactNode; initialFocus?: string }) {
   const dialog = useRef<HTMLDialogElement>(null), titleId = useId(), closeHandler = useRef(onClose);
+  const focusSelector = useRef(initialFocus);
   useEffect(() => { closeHandler.current = onClose; }, [onClose]);
   useEffect(() => {
     const node = dialog.current!, entry = { node, restoreFocus: document.activeElement as HTMLElement | null };
     if (dialogStack.length === 0) savedOverflow = document.body.style.overflow;
     dialogStack.push(entry); node.showModal(); document.body.style.overflow = 'hidden';
+    if (focusSelector.current) node.querySelector<HTMLElement>(focusSelector.current)?.focus({ preventScroll: true });
     function trapTab(event: KeyboardEvent) {
       if (event.key !== 'Tab' || event.defaultPrevented || dialogStack.at(-1) !== entry) return;
       // Recompute on each key: saving, validation and nested dialogs can change
@@ -126,7 +128,7 @@ function AdminDialogSurface({ title, onClose, className, children }: { title: st
   return <dialog ref={dialog} className={classes('admin-dialog', className)} aria-labelledby={titleId} onCancel={event => { event.preventDefault(); event.stopPropagation(); closeHandler.current(); }} onClick={event => { if (event.target !== event.currentTarget) return; const box = event.currentTarget.getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) closeHandler.current(); }}><header className="admin-dialog-header"><h2 id={titleId}>{title}</h2><AdminIconButton label="닫기" onClick={() => closeHandler.current()}><X size={18}/></AdminIconButton></header>{children}</dialog>;
 }
 export function AdminDrawer({ title, onClose, size = 'default', children, className }: { title: string; onClose: () => void; size?: 'small' | 'default' | 'large'; children: ReactNode; className?: string }) { return <AdminDialogSurface title={title} onClose={onClose} className={classes('admin-drawer', `admin-drawer--${size}`, className)}>{children}</AdminDialogSurface>; }
-export function AdminModal({ title, onClose, children, className }: { title: string; onClose: () => void; children: ReactNode; className?: string }) { return <AdminDialogSurface title={title} onClose={onClose} className={classes('admin-modal', className)}>{children}</AdminDialogSurface>; }
+export function AdminModal({ title, onClose, children, className, initialFocus }: { title: string; onClose: () => void; children: ReactNode; className?: string; initialFocus?: string }) { return <AdminDialogSurface title={title} onClose={onClose} initialFocus={initialFocus} className={classes('admin-modal', className)}>{children}</AdminDialogSurface>; }
 export function AdminConfirmDialog({ title = '변경사항 확인', message, confirmLabel = '확인', cancelLabel = '취소', destructive = false, onConfirm, onCancel }: { title?: string; message: ReactNode; confirmLabel?: string; cancelLabel?: string; destructive?: boolean; onConfirm: () => void; onCancel: () => void }) { return <AdminModal title={title} onClose={onCancel}><div className="admin-dialog-body"><p>{message}</p></div><footer className="admin-dialog-footer"><AdminButton onClick={onCancel}>{cancelLabel}</AdminButton><AdminButton tone={destructive ? 'destructive' : 'primary'} onClick={onConfirm}>{confirmLabel}</AdminButton></footer></AdminModal>; }
 export function AdminPopover({ label, children, className }: { label: ReactNode; children: ReactNode; className?: string }) { return <details className={classes('admin-popover', className)}><summary>{label}</summary><div className="admin-popover-panel">{children}</div></details>; }
 export function AdminToast({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'neutral' | 'success' | 'danger' }) { return <div className={classes('admin-toast', `admin-toast--${tone}`)} role={tone === 'danger' ? 'alert' : 'status'}>{children}</div>; }
