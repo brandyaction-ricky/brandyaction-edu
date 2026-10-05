@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { purchaseContact, purchaseGuideLink } from "@/lib/crm-purchase-contact";
 import { maskEmail, purchaseEmailConfigured, sendPurchaseEmail } from "@/lib/crm-purchase-email";
 import { loadSmsSettings, marketingAllowedNow, marketingText, nextMarketingWindow, type SmsSettings } from "@/lib/crm-sms-settings";
+import { recruitmentMessageLinks } from "@/lib/entry-source";
 
 type Template = {
   id: string;
@@ -23,6 +24,8 @@ type Member = {
   marketing_consent_at?: string | null;
   marketing_opt_out_at?: string | null;
   status?: string;
+  entry_channel?: string;
+  recruitment?: boolean;
 };
 
 const digits = (value: unknown) => String(value || "").replace(/\D/g, "");
@@ -66,7 +69,7 @@ function message(
 ): MessageSchema {
   if (template.is_active === false)
     throw new Error("사용 중지된 템플릿은 발송할 수 없습니다.");
-  const content = render(template.content, member);
+  const content = render(member.recruitment ? recruitmentMessageLinks(template.content, member.entry_channel) : template.content, member);
   if (template.channel === "alimtalk") {
     if (template.purpose === "marketing")
       throw new Error("마케팅 안내는 정보성 알림톡으로 발송할 수 없습니다. 광고 문자 템플릿을 사용해 주세요.");
@@ -181,7 +184,8 @@ async function sendBatch(
     const byId = new Map((latest.data || []).map((member) => [member.id, member]));
     currentMembers = members.flatMap((member) => {
       const current = byId.get(member.id);
-      return current && digits(current.phone) === digits(member.phone) ? [current] : [];
+      return current && digits(current.phone) === digits(member.phone)
+        ? [{ ...current, entry_channel: member.entry_channel, recruitment: member.recruitment }] : [];
     });
   }
   const now = Date.now();
@@ -359,7 +363,7 @@ export async function dispatchDueCrm() {
           if (claim.error) throw new Error('모집 안내 발송 전 검토가 중단됐습니다. 모집·문구·권한을 다시 확인해 주세요.');
           if (!claim.data || !Array.isArray(claim.data.members) || !claim.data.template)
             throw new Error('모집 안내 대상 응답을 확인하지 못했습니다.');
-          selectedMembers = claim.data.members;
+          selectedMembers = claim.data.members.map((member: Member) => ({ ...member, recruitment: true }));
           selectedTemplate = claim.data.template;
         } else {
           let ids: string[] | null = null;

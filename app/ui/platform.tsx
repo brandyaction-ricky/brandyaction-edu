@@ -1039,6 +1039,7 @@ export function Platform({
                 setPage={setAdminPage}
                 orderScope={orderScope}
                 onOrderScopeChange={changeOrderScope}
+                onAnalyticsChanged={() => { adminNavigationReads.clear(); void refresh(true); }}
                 loading={loading || !hasCurrentAdminRead}
               />
             ) : (
@@ -1249,6 +1250,7 @@ function LegacyEditor({
         }
         values.applicable_course_ids = form.getAll("applicable_course_ids");
         values.is_draft = form.get("is_draft") === "on";
+        values.is_alumni = form.get("is_alumni") === "on";
         values.is_active = form.get("is_active") === "on";
         values.exclude_free = form.get("discount_type") === "ADMIN_FREE" || form.get("exclude_free") === "on";
         await save(values, row ? undefined : requestId.current);

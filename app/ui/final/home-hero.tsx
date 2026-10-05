@@ -28,13 +28,17 @@ export function homeHeroSlides(banners: Row[], freeHref: string): HomeHeroSlide[
     const title = t(banner, "title").trim();
     const description = t(banner, "description").trim();
     const linkLabel = t(banner, "link_label").trim();
+    const linkUrl = safeUrl(banner.link_url);
+    const effectiveLabel = linkLabel || DEFAULT_BANNER.linkLabel;
     return {
       id: String(banner.id),
       eyebrow: eyebrow || DEFAULT_BANNER.eyebrow,
-      title: title || DEFAULT_BANNER.title,
+      title: title && title !== "이미지 배너" ? title : DEFAULT_BANNER.title,
       description: description || DEFAULT_BANNER.description,
-      linkLabel: linkLabel || DEFAULT_BANNER.linkLabel,
-      linkUrl: safeUrl(banner.link_url) || freeHref || DEFAULT_BANNER.linkUrl,
+      linkLabel: effectiveLabel,
+      linkUrl: effectiveLabel === DEFAULT_BANNER.linkLabel && linkUrl === "/classes"
+        ? DEFAULT_BANNER.linkUrl
+        : linkUrl || freeHref || DEFAULT_BANNER.linkUrl,
       imageUrl: safeUrl(banner.image_url || banner.image_path),
     };
   });

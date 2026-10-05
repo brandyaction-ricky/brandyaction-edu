@@ -121,6 +121,7 @@
 .edu-admin :is(.admin-input,.admin-select,.admin-textarea):focus,.edu-admin .admin-search-field input:focus{border-color:var(--admin-focus-ring);box-shadow:0 0 0 3px #315f9a1a;outline:0}
 .edu-admin .admin-field-error{display:flex;align-items:center;gap:5px;font-weight:550}
 .edu-admin .admin-table-frame{min-width:0}.edu-admin .admin-table-hint{display:none;margin:0 0 8px;color:var(--admin-text-muted);font-size:12px}
+.edu-admin .admin-wide-table .admin-table-hint{display:block}
 .edu-admin .admin-table-scroll:focus-visible{outline-offset:3px}
 .edu-admin .admin-legacy-table:focus-visible{outline:3px solid var(--admin-focus-ring);outline-offset:3px}
 .edu-admin .admin-data-table tbody tr:focus-within :is(th,td){background:#f5f7fa}
@@ -530,6 +531,11 @@
 .adm-check,.adm-choice{display:inline-flex;align-items:flex-start;gap:var(--adm-space-2);min-height:var(--adm-control);font-size:var(--adm-font-13);font-weight:500}
 .adm-check input,.adm-choice input{width:16px;height:16px;min-height:16px;margin-top:2px;accent-color:var(--adm-primary)}
 .adm-badge,.adm :is(.badge,.admin-status-badge){display:inline-flex;align-items:center;min-height:22px;padding:2px var(--adm-space-2);border:0;border-radius:999px;background:var(--adm-neutral-soft);color:var(--adm-neutral);font-size:var(--adm-font-11);font-weight:650;line-height:1.5;white-space:nowrap}
+.adm.edu-admin .admin-status-badge--neutral{background:var(--admin-color-neutral-soft);color:var(--admin-color-neutral)}
+.adm.edu-admin .admin-status-badge--info{background:var(--admin-color-info-soft);color:var(--admin-color-info)}
+.adm.edu-admin .admin-status-badge--success{background:var(--admin-color-success-soft);color:var(--admin-color-success)}
+.adm.edu-admin .admin-status-badge--warning{background:var(--admin-color-warning-soft);color:var(--admin-color-warning)}
+.adm.edu-admin :is(.admin-status-badge--error,.admin-status-badge--danger){background:var(--admin-color-error-soft);color:var(--admin-color-error)}
 .adm-notice,.adm :is(.notice,.admin-alert){padding:var(--adm-space-3) var(--adm-space-4);border:1px solid var(--adm-border);border-radius:var(--adm-radius-md);background:var(--adm-surface-subtle);color:var(--adm-text-sub);font-size:var(--adm-font-13);line-height:1.6}
 .adm-anchors{display:flex;align-items:center;gap:var(--adm-space-4);overflow-x:auto;border-bottom:1px solid var(--adm-border)}
 .adm-table-wrap,.adm :is(.table-scroll,.admin-table-scroll){width:100%;overflow:auto;border:1px solid var(--adm-border);border-radius:var(--adm-radius-lg);background:var(--adm-surface);box-shadow:none}

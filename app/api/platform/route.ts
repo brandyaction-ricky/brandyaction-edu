@@ -19,7 +19,7 @@ import { PUBLIC_CACHE_TAG, type PublicView } from '@/lib/public-platform-plan';
 import { revalidateTag } from 'next/cache';
 import { readMemberPlatformData, type MemberView } from '@/lib/member-platform-data';
 import { couponError } from '@/lib/coupon-rules';
-import { adminOrderQuery, ORDER_PAGE_SIZE, parseOrderListScope } from '@/lib/admin-order-list';
+import { adminOrderQuery, ORDER_PAGE_SIZE, parseOrderListScope, orderExclusionLabel } from '@/lib/admin-order-list';
 import { assertParticipationOpen } from '@/lib/alumni-access-server';
 import { isLessonVisibleToCohort } from '@/lib/cohort-curriculum-server';
 import { cohortLessonVisible, cohortWeekVisible } from '@/lib/cohort-curriculum-visibility';
@@ -251,8 +251,9 @@ export async function GET(request: Request) {
                     ]);
                     for (const item of [result, all, failed, refund, access]) if (item.error) throw item.error;
                     data.orders = ((result.data || []) as unknown as Row[]).map(row => {
-                        const clean = { ...row };
-                        for (const key of ['course_items', 'search_items', 'refund_payments', 'active_items']) delete clean[key];
+                        const member = Array.isArray(row.analytics_member) ? row.analytics_member[0] : row.analytics_member;
+                        const clean: Row = { ...row, analytics_exclusion: orderExclusionLabel(row, member as Row | null) };
+                        for (const key of ['course_items', 'search_items', 'refund_payments', 'active_items', 'analytics_member']) delete clean[key];
                         return clean;
                     });
                     data.order_filter_counts = [{ id: 'order-filter-counts', all: all.count || 0, failed: failed.count || 0, refund: refund.count || 0, access: access.count || 0 }];
@@ -1100,7 +1101,7 @@ export async function POST(request: Request) {
             }
             if (!phone || !String(body.name || '').trim()) fail('신청자 이름과 연락처를 확인해 주세요.');
             if (body.couponId) fail('쿠폰 코드를 입력해 주세요.');
-            const r = await db.rpc('edu_checkout_with_coupon', {
+            const r = await db.rpc('edu_checkout_with_source', {
                 p_user_id: user.id,
                 p_cohort_id: body.cohortId,
                 p_customer_name: String(body.name).trim(),
@@ -1110,6 +1111,7 @@ export async function POST(request: Request) {
                 p_privacy_version: POLICY_VERSION,
                 p_refund_policy_version: POLICY_VERSION,
                 p_code: String(body.coupon || '').trim().toUpperCase(),
+                p_entry_src: typeof body.entrySource === 'string' && ['paid','organic','alumni','youtube'].includes(body.entrySource) ? body.entrySource : null,
             });
             if (r.error) {
                 const msg = r.error.message;
@@ -1117,17 +1119,6 @@ export async function POST(request: Request) {
                 fail(msg.includes('ALREADY_ENROLLED') ? '이미 신청한 클래스입니다.' : msg.includes('RECRUIT') ? '현재 모집 중인 클래스가 아닙니다.' : msg.includes('CAPACITY') ? '모집 정원이 마감되었습니다.' : '주문을 만들지 못했습니다. 상품 모집 설정을 확인해 주세요.', 409);
             }
             const result = r.data as Record<string, unknown>;
-            const entrySource = typeof body.entrySource === 'string' && ['paid', 'organic', 'alumni', 'youtube'].includes(body.entrySource)
-                ? body.entrySource : null;
-            const attribution = await db.from('orders').update({ entry_src: entrySource })
-                .eq('id', result.orderId).eq('user_id', user.id)
-                .select('id').single();
-            if (attribution.error || !attribution.data) {
-                // The checkout RPC may already have finalized a zero-total order.
-                // Do not report payment failure after an entitlement was granted.
-                console.error('Order entry source update failed', attribution.error);
-                result.entrySourceRecorded = false;
-            }
             if (result.free === true && Number(result.totalAmount) === 0) return reply(result);
             if (!process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY) fail('결제 서비스 연결을 확인하고 있습니다.', 503);
             return reply(result);

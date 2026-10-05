@@ -23,6 +23,7 @@ import { LessonProgressionSettings } from './final/lesson-progression-settings';
 import { AdminLearningProgress } from './final/admin-learning-progress';
 import { MvpEditor } from './final/member-mvp';
 import { LearningNoticeEditor } from './final/learning-notice';
+import { AnalyticsExclusion } from './final/analytics-exclusion';
 import { AppBrandingEditor } from './final/app-branding-editor';
 import { timeLabel, type Data, type WorkflowSend } from "./learning-workflows";
 import { EnrollmentGrant, RefundAction } from "./operations-actions";
@@ -72,6 +73,7 @@ type Props = {
   setPage?: (page: number) => void;
   orderScope?: OrderListScope;
   onOrderScopeChange?: (scope: OrderListScope) => void;
+  onAnalyticsChanged?: () => void;
   loading?: boolean;
 };
 const rows = (data: Data, key: string) => data[key] || [];
@@ -1884,7 +1886,7 @@ function Analytics() {
 }
 function OrdersPanel({
   data, send, pending, pagination, setPage, loading,
-  orderScope = emptyOrderListScope, onOrderScopeChange,
+  orderScope = emptyOrderListScope, onOrderScopeChange, onAnalyticsChanged,
 }: Props) {
   const entrySourceLabels: Record<string, string> = { paid: '광고', organic: '오가닉', alumni: '기존 수강생', youtube: '유튜브' };
   const [opened, setOpened] = useState("");
@@ -1953,18 +1955,19 @@ function OrdersPanel({
         search={<AdminSearchField value={query} label="주문 검색" placeholder="주문번호 · 회원명 · 상품명 검색" onChange={event => { setQuery(event.target.value); setOpened(""); }} />}
         onReset={resetFilters}
         action={<AdminButton variant="primary" disabled={loading} onClick={applyDates}>기간 조회</AdminButton>}
-        appliedSummary={`적용 기간: ${orderScope.from || "전체 시작일"} ~ ${orderScope.to || "전체 종료일"} · 주문일/KST, 종료일 포함 · 목록은 전체 주문에서 검색 · 한 페이지 최대 100건 · 매출 카드는 필터와 관계없이 전체 주문 기준`}
+        appliedSummary={`적용 기간: ${orderScope.from || "전체 시작일"} ~ ${orderScope.to || "전체 종료일"} · 주문일/KST, 종료일 포함 · 목록은 전체 주문에서 검색 · 한 페이지 최대 100건 · 매출 카드는 검색 조건과 관계없이 고객 결제 기준`}
       />
       <div className="admin-pilot-summary" aria-busy={loading}>
         {[
-          ["결제 완료액", money(paid), "전체 주문의 승인 결제 합계 · 모든 페이지"],
-          ["환불 완료액", money(refunded), "전체 주문의 취소 완료액 · 모든 페이지"],
-          ["순결제액", money(paid - refunded), "전체 결제 완료 − 전체 환불 완료"],
+          ["결제 완료액", money(paid), "고객 주문의 승인 결제 합계"],
+          ["환불 완료액", money(refunded), "고객 주문의 취소 완료액"],
+          ["순결제액", money(paid - refunded), "고객 결제 완료 − 고객 환불 완료"],
           ["환불 처리 확인", Number(orderSummary?.processingRefunds || 0) + "건", "전체 주문의 결과 확인 중인 환불"],
         ].map(([label, value, note], index) => (
           <AdminSummaryCard key={label} label={label} value={loading || !orderSummary ? "—" : value} scope={note} compact className={index === 2 ? "admin-pilot-summary-highlight" : undefined} />
         ))}
       </div>
+      <p className="meta mt8 mb16">매출·유입 통계는 시험·내부·무료 주문과 탈퇴·미연결 회원을 제외합니다. 아래 주문 목록에는 모두 표시됩니다.</p>
       <section className="admin-pilot-workspace" aria-label="주문 목록" aria-busy={loading}>
         <AdminQuickFilter label="주문 예외 빠른 필터" value={quickStatus} onChange={value => { changeScope({ quick: value }); }} items={[{ value: "all", label: "전체", count: Number(quickCounts?.all || 0) }, { value: "failed", label: "결제 실패", count: Number(quickCounts?.failed || 0) }, { value: "refund", label: "환불 확인", count: Number(quickCounts?.refund || 0) }, { value: "access", label: "수강권 확인", count: Number(quickCounts?.access || 0) }]} />
         <AdminDataTable label="주문·결제·환불·수강권 연결 목록" density="standard" loading={loading}>
@@ -2000,6 +2003,7 @@ function OrdersPanel({
                     <b>{t(order, "order_number")}</b>
                     {orderItems.map(item => <p className="table-excerpt" key={item.id}>{t(item, "item_name")}</p>)}
                     <p>{timeLabel(order.created_at)}</p>
+                    {Boolean(order.analytics_exclusion) && <small>{t(order, "analytics_exclusion")}</small>}
                   </td>
                   <td data-label="회원">
                     <b>{t(order, "customer_name") || "이름 미등록"}</b>
@@ -2061,6 +2065,7 @@ function OrdersPanel({
                   <div className="total"><dt>남은 결제액</dt><dd>{money(selectedRemaining)}</dd></div>
                 </dl>
               </section>
+              <AnalyticsExclusion key={selectedOrder.id} kind="order" id={selectedOrder.id} onChanged={onAnalyticsChanged}/>
               <section className="order-detail-section">
                 <h3>처리 이력</h3>
                 <ol className="order-timeline mt16">
