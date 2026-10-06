@@ -39,7 +39,9 @@
       "codex/edu-autosave-image-release-20261005": false,
       "codex/edu-mobile-refresh-20261005": false,
       "codex/edu-mobile-refresh-release-20261005": false,
-      "codex/edu-member-payment-release-20261006": false
+      "codex/edu-member-payment-release-20261006": false,
+      "codex/edu-floating-audio-20261006": false,
+      "codex/edu-floating-audio-release-20261006": false
     }
   },
   "regions": [
