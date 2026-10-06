@@ -2,9 +2,9 @@ import { createHash, createHmac } from 'node:crypto';
 import { DiagnosisBridgeError } from './diagnosis-bridge';
 
 export type AdminDiagnosisBinding = { subject: string; attemptId: string; responseId: string; releaseId: string; packageVersion: string };
-export type AdminReportStatus = { startedAt?: string|null; submittedAt?: string|null; issuedAt?: string|null; state: 'not_submitted'|'queued'|'processing'|'ready'|'needs_review'; updatedAt: string; errorCode: string|null; canRetry: boolean; version: string; details: {at: string; code: string}[] };
+export type AdminReportStatus = { queuePosition?: number|null; queuedAt?: string|null; queueObservedAt?: string|null; retryMode?: 'resume'|'rewrite'|null; rewritesRemaining?: number|null; startedAt?: string|null; submittedAt?: string|null; issuedAt?: string|null; state: 'not_submitted'|'queued'|'processing'|'ready'|'needs_review'; updatedAt: string; errorCode: string|null; canRetry: boolean; version: string; details: {at: string; code: string}[] };
 export type AdminReportObservation = AdminDiagnosisBinding & AdminReportStatus;
-export type AdminRetryReceipt = {state: 'queued'; requestId: string; attemptId: string; responseId: string; acceptedAt: string};
+export type AdminRetryReceipt = {state: 'queued'; requestId: string; attemptId: string; responseId: string; acceptedAt: string; retryMode?: 'resume'|'rewrite'};
 const path = '/api/integrations/edu/diagnosis/manage';
 const uuid = (v: unknown): v is string => typeof v === 'string' && /^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(v);
 const date = (v: unknown): v is string => typeof v === 'string' && v.length < 60 && Number.isFinite(Date.parse(v));
@@ -35,15 +35,21 @@ export function validateAdminReportRows(value: unknown, bindings: AdminDiagnosis
       || [r.startedAt,r.submittedAt,r.issuedAt].some(t=>t!=null&&(!date(t)||!/(?:Z|[+-]\d{2}:\d{2})$/.test(t)))
       || (r.issuedAt!=null&&r.state!=='ready')
       || (r.state === 'ready' && r.canRetry)) return fail();
+    if (r.retryMode != null && !['resume','rewrite'].includes(r.retryMode)) return fail();
+    if (r.rewritesRemaining != null && (!Number.isSafeInteger(r.rewritesRemaining) || r.rewritesRemaining < 0 || r.rewritesRemaining > 2)) return fail();
+    // Queue position is a point-in-time observation, never an ETA or a fallback to updatedAt.
+    const queue = [r.queuePosition,r.queuedAt,r.queueObservedAt];
+    if (queue.some(v=>v!=null) && (!Number.isSafeInteger(r.queuePosition) || r.queuePosition! < 1
+      || ![r.queuedAt,r.queueObservedAt].every(t=>date(t)&&/(?:Z|[+-]\d{2}:\d{2})$/.test(t!)))) return fail();
     pending.delete(r.attemptId);
     // Do not forward extra provider fields, raw answers or report content to the browser.
-    return {...b,startedAt:r.startedAt??null,submittedAt:r.submittedAt??null,issuedAt:r.issuedAt??null,state:r.state,updatedAt:r.updatedAt,errorCode:r.errorCode,canRetry:r.canRetry,version:r.version,details:r.details.map(d=>({at:d.at,code:d.code}))};
+    return {...b,queuePosition:r.queuePosition??null,queuedAt:r.queuedAt??null,queueObservedAt:r.queueObservedAt??null,retryMode:r.retryMode??null,rewritesRemaining:r.rewritesRemaining??null,startedAt:r.startedAt??null,submittedAt:r.submittedAt??null,issuedAt:r.issuedAt??null,state:r.state,updatedAt:r.updatedAt,errorCode:r.errorCode,canRetry:r.canRetry,version:r.version,details:r.details.map(d=>({at:d.at,code:d.code}))};
   });
 }
-export function validateAdminRetry(value: unknown, binding: AdminDiagnosisBinding, requestId: string): AdminRetryReceipt {
+export function validateAdminRetry(value: unknown, binding: AdminDiagnosisBinding, requestId: string, expectedMode: 'resume'|'rewrite' = 'resume'): AdminRetryReceipt {
   const v = value as AdminRetryReceipt;
-  if (!v || v.state !== 'queued' || v.requestId !== requestId || v.attemptId !== binding.attemptId || v.responseId !== binding.responseId || !date(v.acceptedAt)) return fail();
-  return {state:'queued',requestId,attemptId:v.attemptId,responseId:v.responseId,acceptedAt:v.acceptedAt};
+  if (!v || v.state !== 'queued' || v.requestId !== requestId || v.attemptId !== binding.attemptId || v.responseId !== binding.responseId || !date(v.acceptedAt) || (v.retryMode ?? 'resume') !== expectedMode) return fail();
+  return {state:'queued',requestId,attemptId:v.attemptId,responseId:v.responseId,acceptedAt:v.acceptedAt,...(v.retryMode ? {retryMode:v.retryMode} : {})};
 }
 export async function sendAdminDiagnosis(input: Record<string,unknown>, {env=process.env,fetcher=fetch}: {env?:NodeJS.ProcessEnv;fetcher?:typeof fetch}={}) {
   const environment = env.EDU_MYIN_BRIDGE_ENVIRONMENT;

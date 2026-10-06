@@ -42,7 +42,10 @@
       "codex/edu-member-payment-release-20261006": false,
       "codex/edu-floating-audio-20261006": false,
       "codex/edu-floating-audio-release-20261006": false,
-      "codex/edu-completion-help-20261006": false
+      "codex/edu-completion-help-20261006": false,
+      "codex/edu-n6-review-queue-20261006": false,
+      "codex/edu-n6-rewrite-count-20261006": false,
+      "codex/edu-n6-rewrite-release-20261006": false
     }
   },
   "regions": [
