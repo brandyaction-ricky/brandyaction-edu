@@ -81,7 +81,7 @@ export function LearningAutosaveBackup({actorId,lessonId,dirty,ready,capture,res
   const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='수업-편집내용.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
  }
  return <section className="learning-local-draft notice" aria-label="편집 임시저장">
-  <p>입력한 내용은 이 브라우저에도 자동 보관합니다. 인터넷이 끊겨도 이어서 작성할 수 있어요.</p>
+  <strong>기기 복구 옵션</strong><p>인터넷이 끊길 때를 대비해 이 기기에도 보관합니다. 서버에 직접 저장하려면 위의 ‘지금 저장’을 누르세요.</p>
   {savedAt&&<p role="status">이 기기에 보관됨 · {new Date(savedAt).toLocaleTimeString('ko-KR')}</p>}
   {message&&<p role="status">{message}</p>}
   <button type="button" className="btn small" onClick={saveNow} disabled={!ready}>지금 임시저장</button>{' '}
