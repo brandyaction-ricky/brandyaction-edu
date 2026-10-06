@@ -3,6 +3,7 @@
   "framework": "nextjs",
   "git": {
     "deploymentEnabled": {
+      "codex/edu-n6-rewrite-count-20261006": false,
       "codex/edu-n6-review-queue-20261006": false,
       "codex/edu-floating-audio-20261006": false,
       "codex/edu-curriculum-history-20261006": false,
