@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { MemberPaymentIdentity } from './member-payment-identity';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowRight, Compass, RefreshCw } from 'lucide-react';
 import { AdminButton, AdminEmptyState, AdminInlineError, AdminInput, AdminLinkButton, AdminModal, AdminPage, AdminPageHeader, AdminStatusBadge, AdminSummaryCard } from '@/features/admin-ui';
@@ -54,7 +55,7 @@ export function DiagnosisManagement(){
         <AdminButton disabled={!data||!data.enabled||!!error||loading||saving} onClick={()=>publication(false)}>한 번에 모두 닫기</AdminButton></div>
     </section>
     <form className="diagnosis-management-toolbar" onSubmit={e=>{e.preventDefault();setCursors([null]);setQuery(search.trim());}}>
-      <AdminInput label="수강생 이름" value={search} maxLength={100} onChange={e=>setSearch(e.target.value)} placeholder="이름으로 검색"/>
+      <AdminInput label="수강생 검색" value={search} maxLength={100} onChange={e=>setSearch(e.target.value)} placeholder="가입·결제 이름 / 이메일 / 연락처 / 주문번호"/>
       <AdminButton type="submit" disabled={saving}>검색</AdminButton><AdminButton onClick={()=>void load()} loading={loading} disabled={saving}><RefreshCw size={16}/>새로고침</AdminButton>
       <span>한국 시간(KST) · 페이지당 최대 100명 · 30초마다 자동 확인</span>
     </form>
@@ -65,7 +66,7 @@ export function DiagnosisManagement(){
     {data&&<div className="diagnosis-management-table" role="region" aria-label="수강생 진단 현황" tabIndex={0}>
       <table><thead><tr><th>수강생</th><th>공개 설정</th><th>검사 진행</th><th>보고서 발급</th><th>기록·재발급</th></tr></thead>
         <tbody>{data.rows.map(row=>{const r=row.report;return <tr key={row.id}>
-          <th scope="row">{row.name}</th>
+          <th scope="row"><Link href={`/admin/customers?member=${row.id}`}>{row.name}</Link>{row.email&&<small style={{overflowWrap:"anywhere"}}>가입 이메일: {row.email}</small>}<MemberPaymentIdentity contacts={row.paymentContacts}/></th>
           <td data-label="공개 설정"><AdminButton size="sm" disabled={loading||saving||!!error||!data.enabled} onClick={()=>publication(!row.published,row)} aria-label={`${row.name} 진단 ${row.published?'닫기':'공개'}`}>{row.published?'공개 중 · 닫기':'비공개 · 공개'}</AdminButton></td>
           <td data-label="검사 진행"><span>{!row.attemptId?'시작 전':row.state==='in_progress'?'검사 중':row.state==='preparing'?'검사 연결 중':'제출 완료'}</span>{row.attemptId&&<><small>검사 시작 {date(r?.startedAt??row.startedAt)}</small><small>제출 완료 {r?.submittedAt?date(r.submittedAt):row.state==='submitted'?'시각 확인 필요':'—'}</small></>}</td>
           <td data-label="보고서 발급"><AdminStatusBadge status="active" label={!row.attemptId?'검사 시작 전':!r?'상태 확인 대기':reportLabels[r.state]??'확인 필요'} tone={r?.state==='ready'?'success':r?.state==='needs_review'?'warning':'neutral'}/>{r?.state==='ready'&&<small>보고서 발급 {r.issuedAt?date(r.issuedAt):'시각 확인 필요'}</small>}</td>
