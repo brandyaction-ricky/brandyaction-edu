@@ -96,6 +96,7 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
   const [active, setActive] = useState(Boolean(snapshot.document)), [saved, setSaved] = useState(JSON.stringify(snapshot.document));
   const [type, setType] = useState<LessonBlockType>('text'), [preview, setPreview] = useState(false), [message, setMessage] = useState(''), [invalid, setInvalid] = useState(false), [conflict, setConflict] = useState(false);
   const [detailed, setDetailed] = useState(false), [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  const selectedBlock = document.blocks.find(block => block.id === selectedBlockId);
   const [canvasError, setCanvasError] = useState('');
   const [invalidItems, setInvalidItems] = useState<{ id: string; label: string }[]>([]);
   const [previewInteractive, setPreviewInteractive] = useState(false);
@@ -262,8 +263,8 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
         <p className="meta">필수 체크리스트는 항상 확인합니다. 연습용 시험은 통과 조건을 끌 수 있습니다. 멘토 확인 방식은 제출만으로 학습 완료가 되지 않습니다.</p>
       </section>
       </details>
-      {!detailed && <div className={"ldc-layout" + (selectedBlockId ? " has-selection" : "")}><Suspense fallback={<p role="status">문서 편집기를 준비하고 있습니다.</p>}><DocumentCanvas blocks={document.blocks} disabled={disabled || conflict || uploading} choices={choices} create={newBlock} onChange={blocks => setDocument(previous => ({ ...previous, blocks }))} onError={setCanvasError} onSettings={setSelectedBlockId} onImage={(files, position) => { void insertImage(files, position); }} /></Suspense>
-        {selectedBlockId && <aside className="ldc-inspector" aria-label="선택 항목 설정"><div className="ldc-inspector-title"><strong>항목 설정</strong><button type="button" className="btn small" onClick={() => setSelectedBlockId(null)}>설정 닫기</button></div>{document.blocks.filter(block => block.id === selectedBlockId).map(block => renderBlock(block, document.blocks.indexOf(block)))}</aside>}
+      {!detailed && <div className={"ldc-layout" + (selectedBlock ? " has-selection" : "")}><Suspense fallback={<p role="status">문서 편집기를 준비하고 있습니다.</p>}><DocumentCanvas blocks={document.blocks} disabled={disabled || conflict || uploading} choices={choices} create={newBlock} onChange={blocks => setDocument(previous => ({ ...previous, blocks }))} onError={setCanvasError} onSettings={setSelectedBlockId} onImage={(files, position) => { void insertImage(files, position); }} /></Suspense>
+        {selectedBlock && <aside className="ldc-inspector" aria-label="선택 항목 설정" onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); setSelectedBlockId(null); } }}><div className="ldc-inspector-title"><strong>항목 설정</strong><button type="button" className="btn small" onClick={() => setSelectedBlockId(null)}>설정 닫기</button></div><div className="ldc-inspector-body">{renderBlock(selectedBlock, document.blocks.indexOf(selectedBlock))}</div></aside>}
       </div>}
       {detailed && <>
       <p className="meta">이미지를 원하는 문단 사이로 끌어 넣으세요. 파란 선 위치에 들어갑니다. 본문에 붙여 넣으면 현재 문단 다음에 들어갑니다. 등록된 이미지는 이동 손잡이나 ↑·↓ 버튼으로 옮길 수 있습니다.</p>
