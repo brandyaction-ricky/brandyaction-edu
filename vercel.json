@@ -4,6 +4,8 @@
   "git": {
     "deploymentEnabled": {
       "codex/edu-member-payment-search-20261006": false,
+      "codex/edu-curriculum-history-20261006": false,
+      "codex/edu-history-release-20261006": false,
       "codex/edu-curriculum-autosave-20261005": false,
       "codex/edu-admin-question-images-20261005": false,
       "codex/edu-admin-question-images-release-20261005": false,

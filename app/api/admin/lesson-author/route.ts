@@ -29,6 +29,13 @@ export async function GET(request:Request) {
     const actor=await getOperatorUser('products');if(!actor)return reply({error:'상품 관리 권한이 필요합니다.'},403);
     const q=new URL(request.url).searchParams,lesson=q.get('lesson'),version=q.get('version'),source=q.get('source');
     if(!uuid(lesson)||(version!==null&&!uuid(version))||(source!==null&&source!=='public')||(source&&version))return reply({error:'수업을 확인해 주세요.'},400);
+    if(q.get('history')==='1'){
+      const at=q.get('beforeAt'),id=q.get('beforeId'),mode=q.get('mode')||'important',from=q.get('from'),to=q.get('to'),editor=q.get('editor')||'';
+      const validDate=(v:string|null)=>v===null||(/^\d{4}-\d{2}-\d{2}$/.test(v)&&Number.isFinite(Date.parse(v))&&new Date(v).toISOString().slice(0,10)===v);
+      if(version||source||!['important','all'].includes(mode)||editor.length>100||!validDate(from)||!validDate(to)||(from&&to&&from>to)||(at===null)!==(id===null)||(id!==null&&!uuid(id))||(at!==null&&(at.length>60||!Number.isFinite(Date.parse(at))||!/(?:Z|[+-]\d{2}:\d{2})$/.test(at))))return reply({error:'기록 조회 조건을 확인해 주세요.'},400);
+      const {data,error}=await createAdminClient().rpc('edu_lesson_author_history',{p_actor:actor.id,p_lesson:lesson,p_before_at:at,p_before_id:id,p_mode:mode,p_from:from,p_to:to,p_editor:editor.trim()}).abortSignal(AbortSignal.timeout(15_000));
+      if(error)throw error;return reply(data);
+    }
     if(source==='public'){
       const {data,error}=await createAdminClient().rpc('edu_lesson_author_snapshot',{p_actor:actor.id,p_lesson:lesson}).abortSignal(AbortSignal.timeout(15_000));
       if(error)throw error;return reply({payload:data.payload,stamp:data.stamp});
@@ -53,13 +60,15 @@ export async function POST(request:Request) {
     if(body.action==='backup'){
       if(typeof body.stamp!=='string'||!/^[a-f0-9]{32}$/.test(body.stamp))return reply({error:'보관할 초안 버전을 확인해 주세요.'},400);
       let payload;try{payload=validateAuthorPayload(body.payload);}catch(error){return reply({error:(error as Error).message},400);}
-      const {data,error}=await db.rpc('edu_backup_lesson_author',{p_actor:actor.id,p_lesson:body.lessonId,p_request:body.requestId,p_stamp:body.stamp,p_payload:payload}).abortSignal(AbortSignal.timeout(15_000));
+      const {data,error}=await db.rpc('edu_save_lesson_author_recorded',{p_actor:actor.id,p_lesson:body.lessonId,p_expected:null,p_request:body.requestId,p_stamp:body.stamp,p_payload:payload,p_create:false,p_rebase:false,p_source:'backup',p_note:''}).abortSignal(AbortSignal.timeout(15_000));
       if(error)throw error;return reply(data);
     }
     if(body.action==='save'){
+      const source=body.saveSource??'manual',note=body.saveNote??'';
+      if(!['manual','autosave'].includes(source)||typeof note!=='string'||note.length>160||(source==='autosave'&&note!==''))return reply({error:'저장 메모를 확인해 주세요.'},400);
       if((body.expectedRevision!==null&&!uuid(body.expectedRevision))||(body.stamp!==null&&(typeof body.stamp!=='string'||!/^[a-f0-9]{32}$/.test(body.stamp)))||typeof body.create!=='boolean'||typeof body.rebase!=='boolean')return reply({error:'초안 버전을 확인해 주세요.'},400);
       let payload;try{payload=validateAuthorPayload(body.payload);}catch(error){return reply({error:(error as Error).message},400);}
-      const {data,error}=await db.rpc('edu_save_lesson_author',{p_actor:actor.id,p_lesson:body.lessonId,p_expected:body.expectedRevision,p_request:body.requestId,p_stamp:body.stamp,p_payload:payload,p_create:body.create,p_rebase:body.rebase}).abortSignal(AbortSignal.timeout(15_000));
+      const {data,error}=await db.rpc('edu_save_lesson_author_recorded',{p_actor:actor.id,p_lesson:body.lessonId,p_expected:body.expectedRevision,p_request:body.requestId,p_stamp:body.stamp,p_payload:payload,p_create:body.create,p_rebase:body.rebase,p_source:source,p_note:note}).abortSignal(AbortSignal.timeout(15_000));
       if(error)throw error;return reply(data);
     }
     if(!uuid(body.revision))return reply({error:'저장한 초안을 확인해 주세요.'},400);
