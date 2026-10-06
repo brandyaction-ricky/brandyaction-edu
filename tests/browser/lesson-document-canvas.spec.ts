@@ -99,3 +99,23 @@ test('format tools remain reachable when editing the bottom of a long lesson',as
  const bar=await page.locator('.ldc-sticky-toolbar').boundingBox();expect(bar).not.toBeNull();expect(bar!.y).toBeGreaterThanOrEqual(0);expect(bar!.y+bar!.height).toBeLessThan((await page.viewportSize())!.height);
  await page.getByRole('button',{name:'굵게',exact:true}).click();await page.keyboard.type(' 강조');await expect(doc(page).locator('[data-author-block="paragraph-90"] strong')).toContainText('강조');
 });
+
+test('image and link settings stay reachable beside a long embedded lesson and deletion closes the panel',async({page},info)=>{
+ const blocks:LessonBlockDocument['blocks']=[...Array.from({length:80},(_,i)=>({id:`long-${i}`,type:'text' as const,content:`긴 수업 안내 ${i+1}. 본문을 보면서 자료를 수정합니다.`})),{id:'photo',type:'image',url:'https://example.test/preview.png',content:'설명 이미지',alt:'원래 설명'},{id:'reference',type:'link',url:'https://example.test/guide',content:'참고 링크'},...Array.from({length:12},(_,i)=>({id:`after-${i}`,type:'text' as const,content:`아래 안내 ${i+1}`}))];
+ const server=await backend(page,{...initial,blocks});
+ await page.route('https://example.test/preview.png',route=>route.fulfill({contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aMwoAAAAASUVORK5CYII=','base64')}));
+ await page.goto('/lesson-block-author-test?embedded');await expect(doc(page)).toBeVisible();
+ const photo=doc(page).locator('[data-author-block="photo"]');await photo.getByRole('button',{name:'이미지 설정',exact:true}).click();
+ const panel=page.getByRole('complementary',{name:'선택 항목 설정'});
+ async function onScreen(){await expect.poll(async()=>{const b=await panel.boundingBox();return !!b&&b.y>=60&&b.y+b.height<=(page.viewportSize()!.height-70)&&b.x>=0&&b.x+b.width<=page.viewportSize()!.width;}).toBe(true);}
+ await onScreen();expect(await page.evaluate(()=>scrollY)).toBeGreaterThan(1000);
+ await page.evaluate(()=>window.scrollBy(0,180));await onScreen();
+ await panel.getByLabel('이미지 대체 설명',{exact:true}).fill('수정한 이미지 설명');await onScreen();expect(await page.evaluate(()=>scrollY)).toBeGreaterThan(1000);
+ await page.screenshot({path:info.outputPath('floating-image-settings.png')});
+ page.once('dialog',dialog=>dialog.accept());await panel.getByRole('button',{name:/항목 \d+ 삭제/,exact:true}).click();await expect(panel).toHaveCount(0);await expect(doc(page).locator('[data-author-block="photo"]')).toHaveCount(0);
+ await doc(page).locator('[data-author-block="reference"]').getByRole('button',{name:'외부 링크 설정',exact:true}).click();await onScreen();
+ await panel.getByLabel('주소 *',{exact:true}).fill('https://example.test/updated');await panel.getByLabel('링크에 표시할 문구',{exact:true}).fill('수정한 참고 링크');
+ await panel.getByRole('button',{name:'설정 닫기',exact:true}).click();await page.getByRole('button',{name:'학습 저장',exact:true}).last().click();await expect.poll(()=>server.writes.length).toBe(1);
+ expect(server.get().blocks.some(b=>b.id==='photo')).toBe(false);expect(server.get().blocks.find(b=>b.id==='reference')).toMatchObject({url:'https://example.test/updated',content:'수정한 참고 링크'});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
