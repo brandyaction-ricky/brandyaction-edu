@@ -1,5 +1,6 @@
 "use client";
 
+import { LessonAuthorHistory } from './lesson-author-history';
 import { useEffect, useId, useImperativeHandle, useRef, useState, type FormEvent, type ReactNode, type Ref } from "react";
 import { ArrowLeft, Download, ExternalLink, FileText, Plus, Video as VideoIcon, X } from "lucide-react";
 import { number as num, safeUrl, text as t, type Row } from "@/lib/platform";
@@ -122,13 +123,14 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
   const [resourceName, setResourceName] = useState(t(content, "resource_name"));
   const [resourcePath, setResourcePath] = useState(t(content, "resource_storage_path"));
   const [backupError,setBackupError]=useState('');
+  const [saveNote,setSaveNote]=useState('');
   const [autosaving,setAutosaving]=useState(false),[autoStatus,setAutoStatus]=useState('변경 내용은 자동저장됩니다');
   const inFlight=useRef(false),live=useRef<()=>AuthorPayload>(()=>captureAuthorPayload());
   const lastBackedUp=useRef(''),retryBlocked=useRef(false),autoLatest=useRef<()=>void>(()=>{});
   const saveEditorPayload=useRef<AuthorPayload|null>(null);
   const backupIntent=useRef<{requestId:string;payload:AuthorPayload;stamp:string}|null>(null);
   const [uncertain, setUncertain] = useState(false), [rebasing, setRebasing] = useState(false);
-  const saveIntent = useRef<{requestId:string;payload:AuthorPayload;expectedRevision:string|null;stamp:string|null;create:boolean;rebase:boolean}|null>(null);
+  const saveIntent = useRef<{requestId:string;payload:AuthorPayload;expectedRevision:string|null;stamp:string|null;create:boolean;rebase:boolean;saveSource?:'manual'|'autosave';saveNote?:string}|null>(null);
   const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "error">("idle");
   const [message, setMessage] = useState("");
   const [dirty, setDirty] = useState(false);
@@ -248,7 +250,7 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
         }
         if(!saveIntent.current)saveEditorPayload.current=structuredClone(payload);
         const submittedPayload=saveEditorPayload.current || payload;
-        saveIntent.current ??= {requestId:crypto.randomUUID(),payload,expectedRevision:snap.revision,stamp:snap.public.stamp || null,create:publication.isNew,rebase:rebasing};
+        saveIntent.current ??= {requestId:crypto.randomUUID(),payload,expectedRevision:snap.revision,stamp:snap.public.stamp || null,create:publication.isNew,rebase:rebasing,saveSource:automatic?'autosave':'manual',saveNote:automatic?'':saveNote.trim()};
         let intent=saveIntent.current;
         attempted=true;
         let receipt, merged=false;
@@ -268,7 +270,7 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
             setMessage('다른 분이 같은 부분을 수정했습니다. 두 편집본 모두 보관했습니다. 학생에게 반영하기 전에 아래에서 내용을 골라 주세요.');
             return false;
           }
-          intent={requestId:crypto.randomUUID(),payload:validateAuthorPayload(result.payload),expectedRevision:latest.revision,stamp:latest.public.stamp,create:false,rebase:false};
+          intent={requestId:crypto.randomUUID(),payload:validateAuthorPayload(result.payload),expectedRevision:latest.revision,stamp:latest.public.stamp,create:false,rebase:false,saveSource:intent.saveSource,saveNote:intent.saveNote};
           saveIntent.current=intent;
           receipt=await authorRequest({action:'save',lessonId:snap.lessonId,...intent});merged=true;
         }
@@ -298,8 +300,8 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
           if(published.revision!==receipt.revision)throw new Error('다른 화면에서 더 최신 초안을 저장했습니다. 다시 확인해 주세요.');
           publication.accept(published);
         }
-        if(!automatic)setMessage(publishing ? '학생 화면에 반영했습니다. 공개 범위는 선택한 설정을 따릅니다.' : merged ? '서버에 초안을 저장했습니다. 다른 분의 수정도 함께 보관했습니다. 학생 화면은 바뀌지 않았습니다.' : '서버에 초안을 저장했습니다. 학생 화면은 바뀌지 않았습니다.');
-        if(!automatic)onSaved?.();return true;
+        if(!automatic)setMessage(publishing ? '학생 화면에 반영했습니다. 공개 범위는 선택한 설정을 따릅니다.' : intent.saveSource==='autosave' ? '이전 자동저장을 복구했습니다. 직접 저장한 버전과 메모를 남기려면 ‘지금 저장’을 한 번 더 눌러 주세요.' : merged ? '서버에 초안을 저장했습니다. 다른 분의 수정도 함께 보관했습니다. 학생 화면은 바뀌지 않았습니다.' : '서버에 초안을 저장했습니다. 학생 화면은 바뀌지 않았습니다.');
+        if(!automatic){setSaveNote(current=>current.trim()===intent.saveNote?'':current);onSaved?.();}return true;
       }
       const result = await send({ action: "save", section: "learning", id: storedId || undefined, values: { ...basic, day_number: Number(basic.day_number), content_type: format } }, "학습 기본 정보를 저장했습니다.");
       storedId ||= String((result.row as Row | undefined)?.id || "");
@@ -359,7 +361,7 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
     const f=payload.form;setBasic({...f.basic});setFormat(f.format);setBodyText(f.bodyText);setVideoUrl(f.videoUrl);setExternalUrl(f.externalUrl);setResourceName(f.resourceName);setResourcePath(f.resourcePath);setDirty(true);setPreviewOnly(false);setRebasing(rebase);
   }
   async function recoverAuthor(version?:string, latest = false) {
-    if(!publication || busy)return;
+    if(!publication || busy || inFlight.current)return;
     if(!window.confirm('현재 편집 내용을 내려받거나 초안으로 저장했는지 확인해 주세요. 선택한 내용으로 편집 화면을 바꿀까요? 학생 화면은 그대로입니다.'))return;
     setSaving(true);
     try {
@@ -446,6 +448,7 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
           </aside>
         </div>
       </section>}
+      {publication&&<details className="author-save-note"><summary>저장 메모 남기기 (선택)</summary><label>이번 수정 메모<input maxLength={160} value={saveNote} onChange={e=>setSaveNote(e.target.value)} placeholder="예: 설치 설명 보완"/></label><small>‘지금 저장’을 누르면 이 메모와 함께 중요한 버전으로 남습니다. 학생 화면은 바뀌지 않습니다.</small></details>}
       <div className="editor-savebar adm-savebar"><span id={`${saveStatusId}-bottom`} className="dirty-note" role="status">{saveBlockedReason || (publication ? autoStatus : dirty || blockState.dirty ? "저장하지 않은 변경사항이 있습니다." : "기본 정보와 학습 내용을 함께 저장합니다.")}</span><AdminButton variant="outline" type="button" onClick={close} disabled={busy} hidden={embedded}><ArrowLeft size={16} />목록으로</AdminButton><AdminButton variant="primary" type="submit" disabled={saveBlocked} aria-describedby={`${saveStatusId}-bottom`} loading={busy}>{blockState.uploading ? "파일 업로드 중…" : busy || autosaving ? "저장 중…" : publication ? "지금 저장" : lessonId ? "학습 저장" : "학습 등록"}</AdminButton>{publication && <AdminButton variant="primary" type="button" disabled={publishBlocked} aria-describedby={`${saveStatusId}-bottom`} onClick={()=>void save(true)}>학생 화면에 반영</AdminButton>}</div>
     </form>
     <section className="panel mt24 learning-quiz-panel studio-quiz-section" hidden={previewOnly}>
@@ -454,14 +457,14 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
       {mission ? <LessonQuiz key={`${mission.id}-${quiz?.revision || "new"}`} mission={mission} current={quiz} pending={busy} send={send} onDirty={setQuizDirty} stepLabel={embedded ? "4" : undefined} /> : <><div className="panel-head"><h2>{embedded && "4 · "}확인 퀴즈</h2><AdminLinkButton size="sm" href="/admin/missions">미션 관리</AdminLinkButton></div><div className="section-pad"><AdminEmptyState title={lessonId ? "연결된 미션이 없습니다." : "학습 등록 후 퀴즈를 연결할 수 있습니다."}>미션 관리에서 이 학습에 미션을 등록한 뒤 질문·선택지·정답을 설정하세요.</AdminEmptyState></div></>}
     </section>
     {(publication || (blockEditingEnabled && actorId)) && <details id={`${formId}-history`} className="studio-version-section" aria-label="버전과 임시저장"><summary>저장 기록 · 이전 편집본 복구</summary>
-      {embedded && <header className="studio-section-heading"><span>5</span><div><h2>버전·임시저장</h2><p>초안, 공개본, 브라우저 임시저장을 한곳에서 관리합니다.</p></div></header>}
+      {embedded && <header className="studio-section-heading"><span>5</span><div><h2>버전·임시저장</h2><p>저장 기록과 기기 복구 옵션을 확인합니다.</p></div></header>}
       <div className="studio-version-grid">
         {publication && <section className="notice lesson-publication-panel" aria-label="초안과 학생 공개본">
           <b>{publication.snapshot.revision === publication.snapshot.publishedRevision && publication.snapshot.publishedStamp === publication.snapshot.public.stamp ? '저장한 초안이 학생 화면에 반영됐습니다.' : publication.snapshot.revision ? '학생 화면에 반영하지 않은 초안이 있습니다.' : '편집 내용은 먼저 초안으로 저장합니다.'}</b>
           <p>제목·본문·질문·영상은 자동저장됩니다. ‘학생 화면에 반영’을 누르기 전까지 학생에게는 기존 수업이 보입니다. 같은 상품의 기수별 공개 설정은 유지됩니다.</p>
           {(uncertain || authorPublicChanged(publication.snapshot)) && <p role="alert">{uncertain ? '서버 저장을 다시 시도하고 있습니다. 계속 작성할 수 있습니다.' : '다른 곳에서 학생 화면의 내용이나 공개 설정을 바꿨습니다. 공개본을 불러와 비교한 뒤 다시 편집해 주세요.'}</p>}
           <div className="learning-draft-actions"><button type="button" className="btn" onClick={downloadAuthor} disabled={busy}>편집 내용 내려받기</button>{(!publication.isNew || uncertain) && <button type="button" className="btn" onClick={()=>void recoverAuthor(undefined,true)} disabled={busy || Boolean(blockEditingEnabled && !blockState.draftReady)}>서버 초안 다시 불러오기</button>}{!publication.isNew && <button type="button" className="btn" onClick={()=>void recoverAuthor()} disabled={busy || Boolean(blockEditingEnabled && !blockState.draftReady)}>현재 공개본 불러오기</button>}</div>
-          {publication.snapshot.history.length>0 && <details><summary>이전 초안·반영 이력 ({publication.snapshot.history.length}개)</summary><p>최근 20개 기록입니다. 불러오면 편집 화면만 바뀌며, 학생 화면은 직접 반영할 때 바뀝니다.</p>{publication.snapshot.history.map(item=><div key={item.revision} className="lesson-author-history"><span>{new Date(item.createdAt).toLocaleString('ko-KR')} · {item.baseline ? '기존 공개본' : item.published ? '반영한 내용' : '초안'} · {item.title || '제목 없음'}</span><button className="btn small" type="button" disabled={busy || Boolean(blockEditingEnabled && !blockState.draftReady)} onClick={()=>void recoverAuthor(item.revision)}>이 내용 불러오기</button></div>)}</details>}
+          <LessonAuthorHistory key={publication.snapshot.lessonId} lessonId={publication.snapshot.lessonId} revision={publication.snapshot.revision} disabled={busy || autosaving || Boolean(blockEditingEnabled && !blockState.draftReady)} onRestore={revision=>void recoverAuthor(revision)}/>
         </section>}
         {blockEditingEnabled && actorId && (publication ? <LearningAutosaveBackup actorId={actorId} lessonId={draftScope} dirty={dirty || blockState.dirty} ready={Boolean(blockState.draftReady)} changeKey={changeKey} capture={captureDraft} restore={restoreDraft} handleRef={draftRef} onPending={setDraftPending} onError={setBackupError} /> : <LearningEditorDraftPanel serverDrafts={false} key={`${actorId}:${row?.id || 'new'}`} actorId={actorId} lessonId={row?.id || ''} dirty={dirty || blockState.dirty} ready={!busy && Boolean(blockState.draftReady)} capture={captureDraft} restore={restoreDraft} handleRef={draftRef} onPending={setDraftPending} />)}
       </div>

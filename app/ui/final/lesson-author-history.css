@@ -1,0 +1,13 @@
+.author-history-browser { margin-top:16px; }
+.author-history-browser summary,.author-history-group summary { cursor:pointer; font-weight:650; padding:12px 0; }
+.author-history-filters { display:flex; flex-wrap:wrap; gap:10px; align-items:end; margin:16px 0; }
+.author-history-filters label { display:grid; gap:5px; font-size:13px; flex:1 1 130px; min-width:0; }
+.author-history-filters input,.author-history-filters select { min-width:0; width:100%; padding:9px; border:1px solid #d8dce1; border-radius:6px; background:white; }
+.author-history-browser .lesson-author-history { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:14px 0; border-bottom:1px solid #e7e9ec; }
+.author-history-browser .lesson-author-history>div { display:grid; gap:5px; min-width:0; overflow-wrap:anywhere; }
+.author-history-browser .lesson-author-history span { font-size:13px; }
+.author-history-browser .lesson-author-history button { flex-shrink:0; }
+.author-history-group { background:#f7f8fa; border:1px solid #e7e9ec; border-radius:8px; padding:0 14px; margin:10px 0; }
+.author-save-note { margin:12px 0; }
+.author-save-note input { width:100%; padding:10px; border:1px solid #d8dce1; border-radius:6px; margin:8px 0; }
+@media(max-width:600px){.author-history-browser .lesson-author-history{align-items:flex-start;flex-direction:column}.author-history-filters label{flex-basis:calc(50% - 10px)}}
