@@ -11,6 +11,7 @@ function load(path, dependencies = {}) {
   new Function('exports', 'require', code)(exports, name => {
     if (name === '@/lib/cohort-curriculum-server') return { isLessonVisibleToCohort: async () => true };
     if (name === '@/lib/cohort-curriculum-visibility') return { cohortLessonVisible: () => true, cohortWeekVisible: () => true };
+    if (name === '@/lib/member-directory') return load('lib/member-directory.ts');
     if (name === '@/lib/submission-review') return submissionReview;
     if (name === '@/lib/admin-order-list') return load('lib/admin-order-list.ts'); if (name === '@/lib/crm-purchase-contact') return load('lib/crm-purchase-contact.ts'); if (name === '@/lib/coupon-rules') return load('lib/coupon-rules.ts'); if (name === '@/lib/product-visibility') return productVisibility;
     if (name === '@/lib/public-platform-data') return { getPublicPlatformData: async () => ({ data: {}, pagination: null }), getPublicSupport: async () => ({}) };
@@ -61,6 +62,7 @@ function harness({ missions = [], user = admin } = {}) {
       return query;
     },
     async rpc(name, args) {
+      if (name === 'edu_admin_member_directory') { calls.push({rpc:name,args}); const rows=tables.profiles.filter(r=>r.status!=='withdrawn'&&(!args.p_member||r.id===args.p_member)); return {data:{rows,total:rows.length},error:null}; }
       if (name === 'edu_admin_summary') return { data: { id: 'summary', members: 3 }, error: null };
       if (name === 'edu_create_record') { writes.push({ table: args.p_table, values: args.p_values }); return { data: { id: id(99), ...args.p_values }, error: null }; }
       throw Error(name);
@@ -171,4 +173,11 @@ test('submission deep links and member scope use inner joins with unambiguous pr
   }
   assert.match(rules.adminSelectColumns('reviews', 'mission_submissions'), /enrollments!inner.*profiles!enrollments_user_id_fkey/);
   assert.equal(api.writes.length, 0);
+});
+
+test('member directory API forwards validated filters and uses the authenticated actor',async()=>{
+ const api=harness();const query=new URLSearchParams({section:'customers',memberQuery:' 결제자 샘플 ',memberStatus:'active',memberCourse:id(101),member:id(2),page:'2',p_actor:id(99)});
+ const res=await api.read(query);assert.equal(res.status,200);assert.deepEqual(api.calls.find(c=>c.rpc==='edu_admin_member_directory').args,{p_actor:admin.id,p_query:'결제자 샘플',p_status:'active',p_course:id(101),p_member:id(2),p_page:2,p_limit:100});
+ for(const invalid of ['memberQuery='+encodeURIComponent('x'.repeat(101)),'memberStatus=withdrawn','memberCourse=bad'])assert.equal((await api.read('section=customers&'+invalid)).status,400);
+ const denied=harness({user:{id:id(2),role:'student'}});assert.equal((await denied.read('section=customers')).status,403);assert.equal(denied.calls.length,0);
 });
