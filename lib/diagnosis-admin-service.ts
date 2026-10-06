@@ -36,11 +36,14 @@ export async function runDiagnosisAdmin(deps:Dependencies,input:Record<string,un
   if(input.action==='publish_all'||input.action==='publish_member')return call('edu_diagnosis_admin_publication',{p_request:input.requestId,p_action:input.action,p_user:input.userId??null,p_enabled:input.enabled,p_revision:input.revision});
   if(input.action!=='retry')throw new DiagnosisBridgeError('INVALID',400);
   const args={p_request:input.requestId,p_attempt:input.attemptId,p_expected:input.expectedVersion};
-  const saved=await call('edu_diagnosis_admin_retry_receipt',{...args,p_result:null});if(saved)return saved;
+  const mode=input.retryMode==='rewrite'?'rewrite':'resume';
+  // Legacy receipts predate rewrite and therefore always mean resume.
+  const checkReceipt=(receipt:unknown)=>{const savedMode=(receipt as {retryMode?:string})?.retryMode??'resume';if(savedMode!==mode)throw new DiagnosisBridgeError('CONFLICT',409);return receipt;};
+  const saved=await call('edu_diagnosis_admin_retry_receipt',{...args,p_result:null});if(saved)return checkReceipt(saved);
   const binding=await call('edu_diagnosis_admin_context',{p_attempt:input.attemptId});
   if(!validAdminDiagnosisBinding(binding))throw new DiagnosisBridgeError('FORBIDDEN',403);
   // MYIN validates expectedVersion/mode atomically after checking its request receipt.
   // A status preflight here would prevent replay after a lost successful response.
-  const result=validateAdminRetry(await send({action:'retry',actorId:actor.id,binding,requestId:input.requestId,expectedVersion:input.expectedVersion,...(input.retryMode?{retryMode:input.retryMode}:{})}),binding,String(input.requestId));
-  return call('edu_diagnosis_admin_retry_receipt',{...args,p_result:result});
+  const result=validateAdminRetry(await send({action:'retry',actorId:actor.id,binding,requestId:input.requestId,expectedVersion:input.expectedVersion,...(input.retryMode?{retryMode:input.retryMode}:{})}),binding,String(input.requestId),mode);
+  return checkReceipt(await call('edu_diagnosis_admin_retry_receipt',{...args,p_result:result}));
 }
