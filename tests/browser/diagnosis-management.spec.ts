@@ -53,3 +53,28 @@ test('temporary remote outage shows last check and disables retry; failed reads 
 test('pagination and search use bounded server pages; 320px layout keeps controls readable',async({page},info)=>{
  const queries:string[]=[];await page.route('**/api/admin/diagnosis**',async route=>{queries.push(route.request().url());await route.fulfill({json:data});});await page.setViewportSize({width:320,height:844});await page.goto('/diagnosis-test?manage');await page.getByRole('button',{name:'다음',exact:true}).click();await expect.poll(()=>queries.at(-1)).toContain('before=');await page.getByRole('textbox',{name:'수강생 이름'}).fill('학생 A');await page.getByRole('button',{name:'검색',exact:true}).click();await expect.poll(()=>queries.at(-1)).toContain('query=');expect(new URL(queries.at(-1)!).searchParams.has('before')).toBe(false);await page.screenshot({path:info.outputPath('diagnosis-management-320.png'),fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
+test('queue observation is visible but stale positions disappear when live lookup fails',async({page})=>{
+ let available=true;const queue={queuePosition:3,queuedAt:'2026-10-06T00:00:00Z',queueObservedAt:'2026-10-06T01:00:00Z'};
+ await page.route('**/api/admin/diagnosis**',r=>r.fulfill({json:{...data,remoteAvailable:available,rows:[{...data.rows[0],statusAvailable:available,report:{...report,state:'queued',canRetry:false,...queue}}]}}));
+ await page.goto('/diagnosis-test?manage');await expect(page.getByText('대기 3번째')).toBeVisible();await expect(page.getByText('접수 2026. 10. 6. 오전 09:00')).toBeVisible();
+ await expect(page.getByText(/완료 예정 시간을 뜻하지/)).toBeVisible();available=false;await page.locator('#admin-content').getByRole('button',{name:'새로고침',exact:true}).click();await expect(page.getByText('대기 3번째')).toHaveCount(0);
+});
+test('review without a code explains disabled action instead of silently hiding the reason',async({page})=>{
+ await page.route('**/api/admin/diagnosis**',r=>r.fulfill({json:{...data,rows:[{...data.rows[0],report:{...report,errorCode:null,canRetry:false,details:[]}}]}}));
+ await page.goto('/diagnosis-test?manage');await expect(page.getByText(/보고서 검토가 필요해 발급이 보류/)).toBeVisible();await expect(page.getByRole('button',{name:'보고서 재발급'})).toBeDisabled();
+ await page.getByText('진행·오류 기록 보기').click();await expect(page.getByText('서버에서 상세 사유를 아직 제공하지 않았습니다.')).toBeVisible();
+});
+test('rewrite requires explicit capability and confirmation, preserves request after lost response',async({page},info)=>{
+ const writes:Record<string,unknown>[]=[];let permitted=false;
+ await page.route('**/api/admin/diagnosis**',r=>{if(r.request().method()==='POST'){writes.push(r.request().postDataJSON());return writes.length===1?r.abort():r.fulfill({json:{state:'queued'}});}return r.fulfill({json:{...data,rows:[{...data.rows[0],report:{...report,errorCode:'COMPLETION_REVIEW_REQUIRED',retryMode:permitted?'rewrite':null}}]}});});
+ await page.goto('/diagnosis-test?manage');await expect(page.getByRole('button',{name:'보고서 재발급'})).toBeDisabled();permitted=true;await page.locator('#admin-content').getByRole('button',{name:'새로고침',exact:true}).click();
+ await page.getByRole('button',{name:'보고서 새로 작성'}).click();const modal=page.getByRole('dialog');await expect(modal).toContainText('약 1.3달러');await expect(modal).toContainText('1회만');expect(writes).toHaveLength(0);
+ await page.screenshot({path:info.outputPath('n6-rewrite-confirmation.png'),fullPage:true});
+ await modal.getByRole('button',{name:'비용 확인 후 새로 작성'}).click();await expect(modal.getByRole('alert')).toBeVisible();await modal.getByRole('button',{name:'비용 확인 후 새로 작성'}).click();await expect(modal).toHaveCount(0);expect(writes[1]).toEqual(writes[0]);expect(writes[0]).toMatchObject({retryMode:'rewrite',expectedVersion:version});
+});
+test('member link selects exact member outside the first page without offering bulk publication',async({page})=>{
+ const requests:string[]=[];await page.route('**/api/admin/diagnosis**',r=>{requests.push(r.request().url());return r.fulfill({json:{...data,nextCursor:null,rows:[data.rows[0]]}});});
+ await page.goto(`/diagnosis-test?manage&member=${id(1)}`);await expect(page.getByText('알림에서 선택한 수강생의 진단입니다.')).toBeVisible();expect(new URL(requests.at(-1)!).searchParams.get('member')).toBe(id(1));
+ await expect(page.getByRole('button',{name:'한 번에 모두 공개'})).toHaveCount(0);await expect(page.getByRole('link',{name:'이 수강생 바로가기'})).toHaveAttribute('href',`/admin/diagnosis/manage?member=${id(1)}`);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});

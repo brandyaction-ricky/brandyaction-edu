@@ -13,16 +13,16 @@ async function handle(request:Request,write:boolean){
     if(write&&request.headers.get('origin')!==new URL(request.url).origin)return reply({error:'요청 출처를 확인해 주세요.'},403);
     const actor=await getAuthenticatedUser();if(!actor)return reply({error:'로그인이 필요합니다.'},401);if(actor.role!=='admin')return reply({error:'관리자만 이용할 수 있습니다.'},403);
     let input:Record<string,unknown>;
-    if(!write){const query=new URL(request.url).searchParams;const before=query.get('before'),search=query.get('query')??'';
-      if((before&&!uuid(before))||search.length>100)return reply({error:'조회 조건을 확인해 주세요.'},400);input={action:'list',before,query:search};
+    if(!write){const query=new URL(request.url).searchParams;const before=query.get('before'),member=query.get('member'),search=query.get('query')??'';
+      if((before&&!uuid(before))||(member!==null&&!uuid(member))||search.length>100)return reply({error:'조회 조건을 확인해 주세요.'},400);input={action:'list',before,query:search,...(member?{member}:{})};
     }else{
       const reader=request.body?.getReader();if(!reader)return reply({error:'입력 내용을 확인해 주세요.'},400);let size=0;const parts:Uint8Array[]=[];
       try{for(;;){const p=await reader.read();if(p.done)break;size+=p.value.length;if(size>4096){await reader.cancel();return reply({error:'입력 내용이 너무 깁니다.'},413);}parts.push(p.value);}}finally{reader.releaseLock();}
       try{input=JSON.parse(Buffer.concat(parts).toString('utf8'));}catch{return reply({error:'입력 내용을 확인해 주세요.'},400);}
       if(!input||Array.isArray(input)||!uuid(input.requestId))return reply({error:'입력 내용을 확인해 주세요.'},400);
       const publish=['publish_all','publish_member'].includes(String(input.action));
-      const keys=publish?['action','requestId','userId','enabled','revision']:['action','requestId','attemptId','expectedVersion'];
-      if(Object.keys(input).some(k=>!keys.includes(k))||(publish?(typeof input.enabled!=='boolean'||!Number.isSafeInteger(input.revision)||Number(input.revision)<0||(input.action==='publish_member'?!uuid(input.userId):input.userId!=null)):(input.action!=='retry'||!uuid(input.attemptId)||typeof input.expectedVersion!=='string'||!/^[a-f0-9]{64}$/.test(input.expectedVersion))))return reply({error:'입력 내용을 확인해 주세요.'},400);
+      const keys=publish?['action','requestId','userId','enabled','revision']:['action','requestId','attemptId','expectedVersion','retryMode'];
+      if(Object.keys(input).some(k=>!keys.includes(k))||(publish?(typeof input.enabled!=='boolean'||!Number.isSafeInteger(input.revision)||Number(input.revision)<0||(input.action==='publish_member'?!uuid(input.userId):input.userId!=null)):(input.action!=='retry'||(input.retryMode!==undefined&&!['resume','rewrite'].includes(String(input.retryMode)))||!uuid(input.attemptId)||typeof input.expectedVersion!=='string'||!/^[a-f0-9]{64}$/.test(input.expectedVersion))))return reply({error:'입력 내용을 확인해 주세요.'},400);
     }
     const db=createAdminClient();const result=await runDiagnosisAdmin({actor,rpc:async(name,args)=>await db.rpc(name,args).abortSignal(AbortSignal.timeout(10_000)),send:sendAdminDiagnosis},input);
     return reply(result,write&&input.action==='retry'?202:200);
