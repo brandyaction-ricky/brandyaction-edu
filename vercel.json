@@ -4,6 +4,7 @@
   "git": {
     "deploymentEnabled": {
       "codex/edu-n6-review-queue-20261006": false,
+      "codex/edu-floating-audio-20261006": false,
       "codex/edu-curriculum-history-20261006": false,
       "codex/edu-curriculum-autosave-20261005": false,
       "codex/edu-image-answer-only-20261005": false,
