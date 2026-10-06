@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { LessonDocumentCanvas } from '../../../app/ui/final/lesson-document-canvas';
 import { LessonBlockView } from '../../../app/ui/final/lesson-block-view';
+import { LessonBlockSession } from '../../../app/ui/final/lesson-block-session';
 import type { LessonBlock } from '../../../lib/lesson-blocks';
 
 const initial: LessonBlock[] = [
@@ -13,9 +14,9 @@ const initial: LessonBlock[] = [
 export function FloatingAudioFixture(){
   const [blocks,setBlocks]=useState(initial),[lesson,setLesson]=useState(0);
   const learner=new URLSearchParams(location.search).has('learner');
-  return <main className="edu-admin" style={{padding:'70px 16px 20px',maxWidth:900,margin:'auto'}}>
-    <header className="adm-topbar" style={{position:'fixed',top:0,left:0,right:0,height:56,zIndex:40,background:'white'}}>편집 검수 <button onClick={()=>{setLesson(x=>x+1);setBlocks(initial);}}>다른 수업 열기</button></header>
-    {learner?<LessonBlockView document={{schemaVersion:1,blocks,checklist:[]}} values={{blocks:{},checklist:[]}} onChange={()=>{}} readOnly/>:
+  return <main className={learner?"edu-front":"edu-admin"} style={{padding:'70px 16px 20px',maxWidth:900,margin:'auto'}}>
+    <header className={learner?"site-header":"adm-topbar"} style={{position:'fixed',top:0,left:0,right:0,height:56,zIndex:40,background:'white'}}>편집 검수 <button onClick={()=>{setLesson(x=>x+1);setBlocks(initial);}}>다른 수업 열기</button></header>
+    {learner?<LessonBlockSession lessonId={`22222222-2222-4222-8222-${String(lesson).padStart(12,'0')}`} enrollmentId="33333333-3333-4333-8333-333333333333"/>:new URLSearchParams(location.search).has('inline')?<LessonBlockView document={{schemaVersion:1,blocks,checklist:[]}} values={{blocks:{},checklist:[]}} onChange={()=>{}} readOnly/>:
     <LessonDocumentCanvas key={lesson} blocks={blocks} onChange={setBlocks} disabled={false} choices={[{type:'audio',label:'음성'}]} onSettings={()=>{}} onError={()=>{}} onImage={()=>{}} create={type=>({id:crypto.randomUUID(),type})}/>}
   </main>;
 }

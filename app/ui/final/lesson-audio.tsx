@@ -26,7 +26,7 @@ export function LessonAudio({ floating = false, ...props }: AudioHTMLAttributes<
     const root = anchor.current;
     const editor = root?.closest('.ldc-editor');
     const toolbar = editor?.querySelector('.ldc-sticky-toolbar');
-    const header = document.querySelector('.adm-topbar');
+    const header = document.querySelector('.adm-topbar, .edu-front .site-header');
     const measure = () => {
       frame = 0;
       if (!root || !player.current) return;

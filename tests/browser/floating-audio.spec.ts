@@ -49,8 +49,34 @@ test('only the latest audio floats, including uploaded media, and changing lesso
   await expect(page.locator('.lesson-audio-player.is-floating')).toHaveCount(0);
   expect(await page.locator('audio').last().evaluate((a:HTMLAudioElement)=>a.paused)).toBe(true);
 });
-test('student media remains inline unless floating is explicitly enabled',async({page})=>{
-  await page.goto('/floating-audio-test?learner');
+test('other previews remain inline unless floating is explicitly enabled',async({page})=>{
+  await page.goto('/floating-audio-test?inline');
   await page.locator('audio').first().evaluate((a:HTMLAudioElement)=>a.play());await page.evaluate(()=>window.scrollTo(0,1300));
   await expect(page.locator('.lesson-audio-player.is-floating')).toHaveCount(0);
+});
+
+for (const ongoing of [false, true]) test(`student ${ongoing ? 'ongoing challenge' : 'lesson'} floats under the header and stops on lesson navigation`,async({page},info)=>{
+  const revision='44444444-4444-4444-8444-444444444444';
+  const document={schemaVersion:1,blocks:[
+    {id:'voice',type:'audio',assetId:'11111111-1111-4111-8111-111111111111',alt:'학습 안내 음성'},
+    {id:'body',type:'text',content:Array.from({length:80},()=> '음성을 들으며 본문을 읽습니다.').join('\n\n')},
+  ],checklist:[]};
+  await page.route('**/api/platform/lesson-blocks**',r=>r.fulfill({json:{ongoing:ongoing?'daily':null,document,revision,currentRevision:revision,draft:null,previousDrafts:[]}}));
+  await page.route('**/api/platform/ongoing-lessons**',r=>r.fulfill({json:{document,revision,cadence:'daily',periodStart:'2026-10-05T15:00:00Z',periodEnd:'2026-10-06T15:00:00Z',currentPeriodStart:'2026-10-05T15:00:00Z',draft:null,completion:null,history:[],stats:{completed:0,opportunities:1}}}));
+  await page.goto('/floating-audio-test?learner');
+  const audio=page.locator('audio');
+  await audio.evaluate((a:HTMLAudioElement)=>a.play());
+  await expect.poll(()=>audio.evaluate((a:HTMLAudioElement)=>a.currentTime)).toBeGreaterThan(0.5);
+  const elapsed=await audio.evaluate((a:HTMLAudioElement)=>a.currentTime);
+  await page.evaluate(()=>window.scrollTo(0,1500));
+  await expect(page.locator('.lesson-audio-player.is-floating')).toHaveCount(1);
+  const bar=await page.locator('.lesson-audio-player.is-floating').boundingBox(),header=await page.locator('.site-header').boundingBox();
+  expect(bar!.y).toBeGreaterThanOrEqual(header!.y+header!.height);
+  expect(bar!.x).toBeGreaterThanOrEqual(0);expect(bar!.x+bar!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  expect(await audio.evaluate((a:HTMLAudioElement)=>a.currentTime)).toBeGreaterThanOrEqual(elapsed);
+  await page.screenshot({path:info.outputPath('student-floating-audio.png')});
+  const playing=await audio.elementHandle();
+  await page.getByRole('button',{name:'다른 수업 열기'}).click();
+  await expect(page.locator('.lesson-audio-player.is-floating')).toHaveCount(0);
+  expect(await playing!.evaluate((a:HTMLAudioElement)=>a.paused)).toBe(true);
 });
