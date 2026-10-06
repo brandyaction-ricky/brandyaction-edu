@@ -1,4 +1,6 @@
 "use client";
+import { MemberPaymentIdentity } from './member-payment-identity';
+import type { MemberDirectoryScope, MemberPaymentContact } from '@/lib/member-directory';
 import { MemberVisitsToggle } from './member-visits';
 import { AnswerText } from './lesson-text';
 import { MvpBadge, useMemberMvps } from './member-mvp';
@@ -39,6 +41,8 @@ type Props = {
   selection: string[];
   setSelection: (ids: string[]) => void;
   edit: (section: Section, row?: Row, context?: MissionContext) => void;
+  memberScope?: MemberDirectoryScope;
+  onMemberScopeChange?: (scope: MemberDirectoryScope) => void;
   missionScope?: MissionScope;
   onMissionScopeChange?: (scope: MissionScope) => void;
   archive: (section: Section, ids: string[]) => void;
@@ -73,14 +77,16 @@ export function AdminCatalog({
   exportCsv,
   send,
   tools,
+  memberScope,
+  onMemberScopeChange,
   missionScope,
   onMissionScopeChange,
   onQuestionChanged,
   blockLearningEnabled = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true',
 }: Props) {
   const params = useSearchParams(), router = useRouter();
-  const [query, setQuery] = useState(""),
-    [status, setStatus] = useState(""),
+  const [query, setQuery] = useState(memberScope?.query || ""),
+    [status, setStatus] = useState(memberScope?.status || ""),
     [type, setType] = useState(""),
     [localCourse, setLocalCourse] = useState(""),
     [localWeek, setLocalWeek] = useState(""),
@@ -91,7 +97,7 @@ export function AdminCatalog({
     [now] = useState(Date.now);
   const [localMissionState, setLocalMissionState] = useState<MissionScope["state"]>("active");
   const [restoreError, setRestoreError] = useState("");
-  const course = missionScope?.courseId ?? localCourse, week = missionScope?.weekId ?? localWeek;
+  const course = memberScope?.course ?? missionScope?.courseId ?? localCourse, week = missionScope?.weekId ?? localWeek;
   const missionState = missionScope?.state ?? localMissionState;
   const changeMissionScope = (next: Partial<MissionScope>) => {
     const scope = { courseId: course, weekId: week, state: missionState, ...next };
@@ -100,7 +106,7 @@ export function AdminCatalog({
     setSelection([]);
     setRestoreError("");
   };
-  const setCourse = (value: string) => s.key === "missions" ? changeMissionScope({ courseId: value, weekId: "" }) : setLocalCourse(value);
+  const setCourse = (value: string) => memberScope && onMemberScopeChange ? onMemberScopeChange({ ...memberScope, course: value }) : s.key === "missions" ? changeMissionScope({ courseId: value, weekId: "" }) : setLocalCourse(value);
   const setWeek = (value: string) => s.key === "missions" ? changeMissionScope({ weekId: value }) : setLocalWeek(value);
   const rows = data[s.table] || [];
   const productSummary = data.product_summary?.[0];
@@ -185,6 +191,7 @@ export function AdminCatalog({
   const memberSummary = data.member_summary?.[0];
   const filtered = rows.filter(
     (r) =>
+      Boolean(memberScope) || (
       (s.key === "missions" ? missionState === "archived" ? Boolean(r.archived_at) : !r.archived_at && (missionState === "active" || Boolean(r.is_published) === (missionState === "published")) : s.key === "products" ? productVisibility === "archived" ? Boolean(r.archived_at) : !r.archived_at : archived || !r.archived_at) &&
       (!status || (s.key === "coupons" && status === "admin_test" ? r.discount_type === "ADMIN_FREE" : getStatus(r) === status)) &&
       (!tagMode || r.tag_kind === tagMode) &&
@@ -203,7 +210,7 @@ export function AdminCatalog({
         (s.key === "learning"
           ? r.week_id
           : lessons.find((l) => l.id === r.lesson_id)?.week_id) === week) &&
-    (s.key === "customers" ? `${JSON.stringify(r)} ${customerTags(r.id).map(named).join(" ")} ${customerCourses(r.id).join(" ")}` : JSON.stringify(r)).toLowerCase().includes(query.toLowerCase()),
+    (s.key === "customers" ? `${JSON.stringify(r)} ${customerTags(r.id).map(named).join(" ")} ${customerCourses(r.id).join(" ")}` : JSON.stringify(r)).toLowerCase().includes(query.toLowerCase())),
   ).toSorted((a, b) => s.key === "banners" ? num(a, "display_order") - num(b, "display_order") : s.key === "weeks" ? num(a, "week_number") - num(b, "week_number") || named(a).localeCompare(named(b), "ko") : 0);
   const mvps = useMemberMvps(s.key === "customers" ? filtered.map(row => row.id) : [], blockLearningEnabled);
   const allCourseWeeks = course ? rows.filter((row) => row.course_id === course).toSorted((a, b) => num(a, "week_number") - num(b, "week_number")) : [];
@@ -395,7 +402,8 @@ export function AdminCatalog({
             <span className="avatar" style={mvps.members[r.id]?.isMvp ? { border: `3px solid ${mvps.members[r.id].color || mvps.color}` } : undefined}>{named(r).slice(0, 1)}</span>
             <div>
               <button className="title-btn" onClick={() => edit(s, r)}>{named(r)}</button>{mvps.members[r.id]?.isMvp && <MvpBadge color={mvps.members[r.id].color || mvps.color}/>}
-              <small>{t(r, "email")}</small>
+              <small>가입 이메일: {t(r, "email")}</small>
+              <MemberPaymentIdentity contacts={r.paymentContacts as MemberPaymentContact[] | undefined}/>
               {Boolean(r.phone) && <small>{t(r, "phone")}</small>}
             </div>
           </div>
@@ -600,10 +608,11 @@ export function AdminCatalog({
     { label: "상태", value: badge },
     { label: "등록일", value: (r: Row) => date(r.created_at) },
   ];
-  const search = (
+  const searchField = (
     <AdminSearchField
       value={query}
-      placeholder={s.key === "customers" ? "이름 · 이메일 · 연락처 · 태그 검색" : s.key === "products" ? "상품명 검색" : s.key === "learning" ? "학습 제목 검색" : s.title + " 검색"}
+      maxLength={memberScope ? 100 : undefined}
+      placeholder={s.key === "customers" ? "가입·결제 이름 / 이메일 / 연락처 / 주문번호" : s.key === "products" ? "상품명 검색" : s.key === "learning" ? "학습 제목 검색" : s.title + " 검색"}
       label={`${s.title} 목록 검색`}
       onChange={(e) => {
         setQuery(e.target.value);
@@ -611,18 +620,20 @@ export function AdminCatalog({
       }}
     />
   );
+  const search = memberScope ? <form style={{display:"flex",flexWrap:"wrap",gap:8}} onSubmit={event => { event.preventDefault(); onMemberScopeChange?.({...memberScope,query:query.trim()}); }}>{searchField}<AdminButton type="submit">전체 회원 검색</AdminButton><AdminButton type="button" onClick={()=>onMemberScopeChange?.({query:"",status:"",course:""})}>검색 초기화</AdminButton></form> : searchField;
   const statusFilter = (
     <AdminSelect
       label="상태 필터"
       labelHidden
       value={status}
       onChange={(e) => {
+        if(memberScope)onMemberScopeChange?.({...memberScope,status:e.target.value});
         setStatus(e.target.value);
         setSelection([]);
       }}
     >
       <option value="">전체 상태</option>
-      {(s.key === 'coupons' ? ['draft','upcoming','active','expired','inactive','admin_test'] : [...new Set(rows.map(getStatus))]).map((s) => (
+      {(s.key === 'coupons' ? ['draft','upcoming','active','expired','inactive','admin_test'] : s.key === 'customers' ? ['active','suspended'] : [...new Set(rows.map(getStatus))]).map((s) => (
         <option key={s} value={s}>
           {statusLabel(s)}
         </option>
@@ -691,10 +702,11 @@ export function AdminCatalog({
       </div>}
       {s.key === "product-reviews" && <div className="ops-callout mb16">상품 후기 → 해당 상품 상세페이지에 표시 · <Link className="text-link" href="/admin/testimonials">고객 후기</Link> → 별도로 선정한 홈페이지 사례</div>}
       {scope}
+      {s.key === "customers" && <p className="meta">가입 정보와 연결된 결제 정보를 함께 확인하세요. 결제자 이름이 달라도 같은 회원일 수 있습니다.</p>}
       {s.key === "customers" && !params.get('member') && (
         <div className="admin-pilot-summary">
           <AdminSummaryCard compact
-            label="전체 회원"
+            label={memberScope && (memberScope.query || memberScope.status || memberScope.course) ? "검색된 회원" : "전체 회원"}
             value={`${pagination?.total ?? rows.length}명`}
             scope="탈퇴 제외 · 관리자·스태프 포함"
           />
@@ -1023,14 +1035,14 @@ export function AdminCatalog({
               보관 미션은 삭제되지 않습니다. 보관 목록에서 비공개로 복구한 뒤 내용을 확인하고 공개하세요.
             </AdminEmptyState>
           ) : !filtered.length && !loading && (
-            <AdminEmptyState title="조회된 항목이 없습니다." action={<AdminButton variant="outline" type="button" onClick={() => { setQuery(""); setStatus(""); setType(""); setCourse(""); setWeek(""); setSelection([]); }}>검색·필터 초기화</AdminButton>}>
+            <AdminEmptyState title="조회된 항목이 없습니다." action={<AdminButton variant="outline" type="button" onClick={() => { if(memberScope)onMemberScopeChange?.({query:"",status:"",course:""}); else {setQuery(""); setStatus(""); setType(""); setCourse(""); setWeek("");} setSelection([]); }}>검색·필터 초기화</AdminButton>}>
               검색어 또는 상태 필터를 변경하면 전체 목록을 다시 확인할 수 있습니다.
             </AdminEmptyState>
           )}
           <div className="table-foot">
             {filtered.length}개 표시
             {pagination
-              ? ` · 전체 ${s.key === "products" && productSummary ? (productVisibility === "archived" ? num(productSummary, "archived") : num(productSummary, "total")) : pagination.total}개 · ${s.key === "missions" ? "선택한 상품·주차·상태 기준" : "현재 페이지에서 검색"}`
+              ? ` · 전체 ${s.key === "products" && productSummary ? (productVisibility === "archived" ? num(productSummary, "archived") : num(productSummary, "total")) : pagination.total}개 · ${memberScope ? "전체 회원에서 검색" : s.key === "missions" ? "선택한 상품·주차·상태 기준" : "현재 페이지에서 검색"}`
               : ""}
           </div>
         </div>
