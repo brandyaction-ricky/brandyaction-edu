@@ -25,7 +25,7 @@ function Activity({ node, extension, editor, selected }: NodeViewProps) {
   if (!block) return <NodeViewWrapper />;
   return <NodeViewWrapper className={'ldc-activity' + (selected ? ' is-selected' : '')} data-author-block={block.id} data-block-type={block.type} contentEditable={false}>
     <div className="ldc-activity-actions"><span data-drag-handle className="ldc-drag" aria-label="드래그하여 항목 순서 변경" title="드래그하여 순서 변경"><GripVertical size={18} aria-hidden="true" /></span><button type="button" className="btn small" disabled={!editor.isEditable} onClick={() => extension.options.onSettings(block.id)}>{extension.options.labels[block.type] || '항목'} 설정</button></div>
-    <LessonBlockView document={publicLessonBlocks({ schemaVersion: 1, blocks: [block], checklist: [] })} values={emptyValues} onChange={() => {}} readOnly />
+    <LessonBlockView floatingAudio document={publicLessonBlocks({ schemaVersion: 1, blocks: [block], checklist: [] })} values={emptyValues} onChange={() => {}} readOnly />
   </NodeViewWrapper>;
 }
 

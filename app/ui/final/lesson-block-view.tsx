@@ -3,6 +3,7 @@ import { LessonLinkCard } from './lesson-link-preview';
 /* eslint-disable @next/next/no-img-element -- Imported lesson images have author-selected external sources and unknown dimensions; do not proxy them through the Next image optimizer. */
 
 import { AnswerFiles } from './lesson-answer-files';
+import { LessonAudio } from './lesson-audio';
 import { LessonPrivateMedia } from './lesson-private-media';
 import type { LessonMediaKind } from '@/lib/lesson-media';
 import type { AnswerFileContext } from '@/lib/lesson-files';
@@ -92,21 +93,21 @@ function BlockQuiz({ block, answer, disabled, onChange, grade }: { block: Public
   </section>;
 }
 
-export function LessonBlockView({ document, values, onChange, readOnly = false, grade, fileContext, submissionId, onFilePending, onAnswerChange, livePrompts = false }: { livePrompts?: boolean; fileContext?: AnswerFileContext; submissionId?: string; onFilePending?: (blockId: string, pending: boolean) => void; onAnswerChange?: (blockId: string, value: BlockAnswer) => void; document: PublicBlockDocument; values: LessonBlockAnswers; onChange: (values: LessonBlockAnswers) => void; readOnly?: boolean; grade?: (blockId: string) => Promise<BlockGrade> }) {
+export function LessonBlockView({ document, values, onChange, readOnly = false, grade, fileContext, submissionId, onFilePending, onAnswerChange, livePrompts = false, floatingAudio = false }: { floatingAudio?: boolean; livePrompts?: boolean; fileContext?: AnswerFileContext; submissionId?: string; onFilePending?: (blockId: string, pending: boolean) => void; onAnswerChange?: (blockId: string, value: BlockAnswer) => void; document: PublicBlockDocument; values: LessonBlockAnswers; onChange: (values: LessonBlockAnswers) => void; readOnly?: boolean; grade?: (blockId: string) => Promise<BlockGrade> }) {
   function answer(id: string, value: BlockAnswer) { if (onAnswerChange) { onAnswerChange(id, value); return; } onChange({ ...values, blocks: { ...values.blocks, [id]: value } }); }
   return <div className="lesson-blocks">
     <LessonTag label={document.presentation?.tagLabel} />
     {document.blocks.map(block => {
       const url = mediaUrl(block.url), value = values.blocks[block.id];
       let content;
-      if (block.assetId && ['image', 'audio', 'video'].includes(block.type)) content = <LessonPrivateMedia key={block.assetId} assetId={block.assetId} kind={block.type as LessonMediaKind} alt={block.alt} caption={block.content} context={fileContext} submissionId={submissionId} />;
+      if (block.assetId && ['image', 'audio', 'video'].includes(block.type)) content = <LessonPrivateMedia key={block.assetId} assetId={block.assetId} floatingAudio={floatingAudio} kind={block.type as LessonMediaKind} alt={block.alt} caption={block.content} context={fileContext} submissionId={submissionId} />;
       else switch (block.type) {
         case 'heading': content = <h2>{block.content}</h2>; break;
         case 'subheading': content = <h3>{block.content}</h3>; break;
         case 'text': content = <div className="reading-copy"><LessonText text={block.content || ''} /></div>; break;
         case 'divider': content = <hr />; break;
         case 'image': content = url && <figure>{/* Untrusted imported URLs never become raw HTML. */}<img loading="lazy" src={url} alt={block.alt || ''} />{block.content && <figcaption>{block.content}</figcaption>}</figure>; break;
-        case 'audio': content = url && <figure><figcaption>{block.content || '음성 자료'}</figcaption><audio controls preload="none" src={url} aria-label={block.alt || '학습 음성'}><a href={url}>음성 파일 열기</a></audio></figure>; break;
+        case 'audio': content = url && <figure><figcaption>{block.content || '음성 자료'}</figcaption><LessonAudio key={url} floating={floatingAudio} src={url} aria-label={block.alt || '학습 음성'}><a href={url}>음성 파일 열기</a></LessonAudio></figure>; break;
         case 'video': content = url && <><Video url={url} />{block.content && <p>{block.content}</p>}</>; break;
         case 'link': content = url && <LessonLinkCard url={url} title={block.content}/>; break;
         case 'prompt': content = <CopyPrompt text={block.content || ''} />; break;
