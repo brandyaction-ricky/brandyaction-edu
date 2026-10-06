@@ -59,3 +59,16 @@ test('cached retry receipts reject mode changes and preserve legacy resume',asyn
  await assert.rejects(runDiagnosisAdmin(mismatch,{...input,retryMode:'rewrite'}),e=>e.code==='UNAVAILABLE');
  assert.equal(mismatch.calls.filter(([n,a])=>n==='edu_diagnosis_admin_retry_receipt'&&a.p_result).length,0);
 });
+
+test('rewrite allowance preserves 2, 1 and 0 through status allowlists without exposing guidance',async()=>{
+ for(const remaining of [2,1,0]){
+  const h=fixture();h.send=async()=>({version:1,rows:[{...report,errorCode:'COMPLETION_REVIEW_REQUIRED',canRetry:remaining>0,retryMode:remaining>0?'rewrite':null,rewritesRemaining:remaining,reviewFindings:[{quote:'private'}],rewrite_guidance:'private'}]});
+  const result=await runDiagnosisAdmin(h,{action:'list'});
+  assert.equal(result.rows[0].report.rewritesRemaining,remaining);
+  assert.equal(result.rows[0].report.canRetry,remaining>0);
+  assert.doesNotMatch(JSON.stringify(result),/private|reviewFindings|rewrite_guidance/);
+  assert.equal(h.calls.find(([n])=>n==='edu_diagnosis_admin_observe')[1].p_rows[0].rewritesRemaining,remaining);
+ }
+ for(const invalid of [-1,3,1.5,'1',true,NaN,Infinity])assert.throws(()=>validateAdminReportRows({version:1,rows:[{...report,rewritesRemaining:invalid}]},[binding]),e=>e.code==='UNAVAILABLE');
+ for(const missing of [undefined,null])assert.equal(validateAdminReportRows({version:1,rows:[{...report,rewritesRemaining:missing}]},[binding])[0].rewritesRemaining,null);
+});
