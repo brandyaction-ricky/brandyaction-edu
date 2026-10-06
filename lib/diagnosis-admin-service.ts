@@ -32,7 +32,7 @@ export async function runDiagnosisAdmin(deps:Dependencies,input:Record<string,un
         const prior=r.report;
         return {id:r.id,name:r.name,email:r.email,phone:r.phone,paymentContacts:r.paymentContacts,published:r.published,attemptId:r.attemptId,state:r.state,startedAt:r.startedAt,updatedAt:r.updatedAt,
           statusAvailable:!r.binding||remoteAvailable,
-          report:fresh?{queuePosition:fresh.queuePosition,queuedAt:fresh.queuedAt,queueObservedAt:fresh.queueObservedAt,retryMode:fresh.retryMode,startedAt:fresh.startedAt,submittedAt:fresh.submittedAt,issuedAt:fresh.issuedAt,state:fresh.state,updatedAt:fresh.updatedAt,errorCode:fresh.errorCode,canRetry:fresh.canRetry,version:fresh.version,details:fresh.details,checkedAt}:prior?{...prior,canRetry:false}:null};})} satisfies DiagnosisAdminList;
+          report:fresh?{queuePosition:fresh.queuePosition,queuedAt:fresh.queuedAt,queueObservedAt:fresh.queueObservedAt,retryMode:fresh.retryMode,rewritesRemaining:fresh.rewritesRemaining,startedAt:fresh.startedAt,submittedAt:fresh.submittedAt,issuedAt:fresh.issuedAt,state:fresh.state,updatedAt:fresh.updatedAt,errorCode:fresh.errorCode,canRetry:fresh.canRetry,version:fresh.version,details:fresh.details,checkedAt}:prior?{...prior,canRetry:false}:null};})} satisfies DiagnosisAdminList;
   }
   if(input.action==='publish_all'||input.action==='publish_member')return call('edu_diagnosis_admin_publication',{p_request:input.requestId,p_action:input.action,p_user:input.userId??null,p_enabled:input.enabled,p_revision:input.revision});
   if(input.action!=='retry')throw new DiagnosisBridgeError('INVALID',400);
