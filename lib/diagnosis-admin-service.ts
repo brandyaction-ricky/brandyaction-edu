@@ -14,7 +14,7 @@ export async function runDiagnosisAdmin(deps:Dependencies,input:Record<string,un
     return result.data;
   };
   if(input.action==='list'){
-    const data=await call('edu_diagnosis_admin_list',{p_before:input.before??null,p_query:input.query??'',p_limit:100}) as Omit<DiagnosisAdminList,'rows'> & {rows:InternalRow[]};
+    const data=await call(input.member?'edu_diagnosis_admin_member':'edu_diagnosis_admin_list',input.member?{p_member:input.member}:{p_before:input.before??null,p_query:input.query??'',p_limit:100}) as Omit<DiagnosisAdminList,'rows'> & {rows:InternalRow[]};
     if(!data||!Array.isArray(data.rows)||data.rows.length>100)throw new DiagnosisBridgeError('UNAVAILABLE',503);
     const bindings=data.rows.map(r=>r.binding).filter((b):b is AdminDiagnosisBinding=>validAdminDiagnosisBinding(b));
     const checkedAt=new Date(now()).toISOString();let remoteAvailable=true;
@@ -32,14 +32,19 @@ export async function runDiagnosisAdmin(deps:Dependencies,input:Record<string,un
         const prior=r.report;
         return {id:r.id,name:r.name,email:r.email,phone:r.phone,paymentContacts:r.paymentContacts,published:r.published,attemptId:r.attemptId,state:r.state,startedAt:r.startedAt,updatedAt:r.updatedAt,
           statusAvailable:!r.binding||remoteAvailable,
-          report:fresh?{startedAt:fresh.startedAt,submittedAt:fresh.submittedAt,issuedAt:fresh.issuedAt,state:fresh.state,updatedAt:fresh.updatedAt,errorCode:fresh.errorCode,canRetry:fresh.canRetry,version:fresh.version,details:fresh.details,checkedAt}:prior?{...prior,canRetry:false}:null};})} satisfies DiagnosisAdminList;
+          report:fresh?{queuePosition:fresh.queuePosition,queuedAt:fresh.queuedAt,queueObservedAt:fresh.queueObservedAt,retryMode:fresh.retryMode,startedAt:fresh.startedAt,submittedAt:fresh.submittedAt,issuedAt:fresh.issuedAt,state:fresh.state,updatedAt:fresh.updatedAt,errorCode:fresh.errorCode,canRetry:fresh.canRetry,version:fresh.version,details:fresh.details,checkedAt}:prior?{...prior,canRetry:false}:null};})} satisfies DiagnosisAdminList;
   }
   if(input.action==='publish_all'||input.action==='publish_member')return call('edu_diagnosis_admin_publication',{p_request:input.requestId,p_action:input.action,p_user:input.userId??null,p_enabled:input.enabled,p_revision:input.revision});
   if(input.action!=='retry')throw new DiagnosisBridgeError('INVALID',400);
   const args={p_request:input.requestId,p_attempt:input.attemptId,p_expected:input.expectedVersion};
-  const saved=await call('edu_diagnosis_admin_retry_receipt',{...args,p_result:null});if(saved)return saved;
+  const mode=input.retryMode==='rewrite'?'rewrite':'resume';
+  // Legacy receipts predate rewrite and therefore always mean resume.
+  const checkReceipt=(receipt:unknown)=>{const savedMode=(receipt as {retryMode?:string})?.retryMode??'resume';if(savedMode!==mode)throw new DiagnosisBridgeError('CONFLICT',409);return receipt;};
+  const saved=await call('edu_diagnosis_admin_retry_receipt',{...args,p_result:null});if(saved)return checkReceipt(saved);
   const binding=await call('edu_diagnosis_admin_context',{p_attempt:input.attemptId});
   if(!validAdminDiagnosisBinding(binding))throw new DiagnosisBridgeError('FORBIDDEN',403);
-  const result=validateAdminRetry(await send({action:'retry',actorId:actor.id,binding,requestId:input.requestId,expectedVersion:input.expectedVersion}),binding,String(input.requestId));
-  return call('edu_diagnosis_admin_retry_receipt',{...args,p_result:result});
+  // MYIN validates expectedVersion/mode atomically after checking its request receipt.
+  // A status preflight here would prevent replay after a lost successful response.
+  const result=validateAdminRetry(await send({action:'retry',actorId:actor.id,binding,requestId:input.requestId,expectedVersion:input.expectedVersion,...(input.retryMode?{retryMode:input.retryMode}:{})}),binding,String(input.requestId),mode);
+  return checkReceipt(await call('edu_diagnosis_admin_retry_receipt',{...args,p_result:result}));
 }
