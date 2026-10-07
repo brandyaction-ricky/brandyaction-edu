@@ -156,10 +156,11 @@ export function aggregateExport(dataset: ExportDataset, source: ExportSource, da
     const actuals = rows('actuals').filter(r => r.campaign_id === c.id).sort((a, b) => str(a, 'day').localeCompare(str(b, 'day')));
     actuals.forEach((a, i) => {
       const day = str(a, 'day');
-      if (!daySet.has(day)) return;
+      // The first cumulative snapshot has no measured baseline, so it is not a daily join count.
+      if (!daySet.has(day) || i === 0) return;
       const t = total(day, str(c, 'paid_cohort_id') || null);
       // A drop in cumulative room members records exits, not negative new joins.
-      t.funnel.chat_joined_manual = (t.funnel.chat_joined_manual || 0) + Math.max(0, num(a, 'kakao_members') - (i ? num(actuals[i - 1], 'kakao_members') : 0));
+      t.funnel.chat_joined_manual = (t.funnel.chat_joined_manual || 0) + Math.max(0, num(a, 'kakao_members') - num(actuals[i - 1], 'kakao_members'));
     });
   }
   const productSessions = new Set<string>();
