@@ -74,7 +74,8 @@ test('rewrite requires explicit capability and confirmation, preserves request a
 });
 test('member link selects exact member outside the first page without offering bulk publication',async({page})=>{
  const requests:string[]=[];await page.route('**/api/admin/diagnosis**',r=>{requests.push(r.request().url());return r.fulfill({json:{...data,nextCursor:null,rows:[data.rows[0]]}});});
- await page.goto(`/diagnosis-test?manage&member=${id(1)}`);await expect(page.getByText('알림에서 선택한 수강생의 진단입니다.')).toBeVisible();expect(new URL(requests.at(-1)!).searchParams.get('member')).toBe(id(1));
+ await page.goto(`/diagnosis-test?manage&member=${id(1)}`);await expect(page.getByText('알림에서 선택한 수강생의 진단입니다.')).toBeVisible();
+ await expect.poll(()=>{const url=requests.at(-1);return url?new URL(url).searchParams.get('member'):null;}).toBe(id(1));
  await expect(page.getByRole('button',{name:'한 번에 모두 공개'})).toHaveCount(0);await expect(page.getByRole('link',{name:'이 수강생 바로가기'})).toHaveAttribute('href',`/admin/diagnosis/manage?member=${id(1)}`);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });

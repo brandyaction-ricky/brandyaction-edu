@@ -30,6 +30,8 @@ const server = createServer((request,response)=>{
   if(/^\/icons\/edu-(192|512|maskable-512|badge-96|apple-180)\.png$/.test(url.pathname)){response.setHeader('Content-Type','image/png');response.end(readFileSync(resolve('public'+url.pathname)));return;}
   if(/^\/installation-guide\/(ios-share|ios-add|android-menu|android-confirm)\.svg$/.test(url.pathname)){response.setHeader('Content-Type','image/svg+xml');response.end(readFileSync(resolve('public'+url.pathname)));return;}
   if(/^\/installation-guide\/chrome-(menu|confirm)\.webp$/.test(url.pathname)){response.setHeader('Content-Type','image/webp');response.end(readFileSync(resolve('public'+url.pathname)));return;}
+  if(/^\/installation-guide\/iphone-chrome-(address|share|more|home-add|icon)\.png$/.test(url.pathname)||/^\/installation-guide\/iphone-chrome-(login|confirm)\.jpg$/.test(url.pathname)){response.setHeader('Content-Type',url.pathname.endsWith('.png')?'image/png':'image/jpeg');response.end(readFileSync(resolve('public'+url.pathname)));return;}
+  if(/^\/installation-guide\/android-google-(menu|choices|confirm)\.png$/.test(url.pathname)){response.setHeader('Content-Type','image/png');response.end(readFileSync(resolve('public'+url.pathname)));return;}
   if(url.pathname==='/api/app-branding'&&url.searchParams.get('icon')==='192'){response.writeHead(307,{Location:'/icons/edu-192.png'}).end();return;}
   if(url.pathname==='/api/account/marketing-consent'){
     response.setHeader('Content-Type','application/json');
