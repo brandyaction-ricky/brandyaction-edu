@@ -49,3 +49,11 @@ test('stale profile settings never silently overwrite another tab',async({page})
  const b=await backend(page,{conflict:true});await page.goto('/optional-consent-test');await page.getByRole('checkbox',{name:'맞춤 소식에 내 정보를 사용하는 데 동의해요',exact:true}).check();await expect(page.getByRole('alert')).toContainText('다른 화면');
  await page.getByRole('button',{name:'저장된 설정 다시 불러오기'}).click();await expect(page.getByRole('checkbox',{name:'맞춤 소식에 내 정보를 사용하는 데 동의해요',exact:true})).not.toBeChecked();expect(b.writes).toHaveLength(1);
 });
+
+test('lost signup opt-in followed by deselection revokes the actual stored choice before finishing',async({page})=>{
+ const b=await backend(page,{lost:true});await page.goto('/optional-signup-test');await required(page);
+ await page.getByRole('checkbox',{name:'[선택] 교육·할인·행사 소식 받기 (광고)',exact:true}).check();await page.getByRole('button',{name:'동의하고 가입 완료'}).click();await expect(page.getByRole('alert')).toBeVisible();
+ await page.getByRole('checkbox',{name:'[선택] 교육·할인·행사 소식 받기 (광고)',exact:true}).uncheck();await page.getByRole('button',{name:'동의하고 가입 완료'}).click();
+ await expect(page.getByRole('status')).toContainText('동의 철회');expect(b.writes).toHaveLength(2);expect(b.writes[1].choices).toEqual(no);expect(b.writes[1].expectedRevision).toBe(b.writes[0].requestId);
+ await page.getByRole('button',{name:'계속하기',exact:true}).click();await expect(page.getByRole('heading',{name:'가입 완료 목적지'})).toBeVisible();
+});

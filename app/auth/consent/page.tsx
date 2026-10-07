@@ -8,7 +8,7 @@ import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { POLICY_VERSION } from "@/lib/legal-policies";
 import { OptionalConsent } from '@/app/ui/optional-consent';
-import { consentReceipt, emptyConsent, OPTIONAL_CONSENT_VERSION, validateConsentChoices, type ConsentChoices } from '@/lib/optional-consent';
+import { consentReceipt, emptyConsent, OPTIONAL_CONSENT_VERSION, validateConsentChoices, type ConsentChoices, type ConsentSnapshot } from '@/lib/optional-consent';
 import { ConsentPolicy } from "@/app/ui/consent-policy";
 import { useSignupEncouragement } from "@/app/ui/signup-encouragement";
 
@@ -22,6 +22,7 @@ export default function SocialConsentPage() {
   const optionalEnabled = process.env.NEXT_PUBLIC_EDU_OPTIONAL_CONSENT_ENABLED === 'true';
   const [choices, setChoices] = useState<ConsentChoices>({ ...emptyConsent });
   const [receipt, setReceipt] = useState('');
+  const [optionalUnresolved, setOptionalUnresolved] = useState(false);
   const consentAttempt = useRef<{ requestId: string; choices: ConsentChoices } | null>(null);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
@@ -59,23 +60,36 @@ export default function SocialConsentPage() {
       return;
     }
     let savedReceipt = '';
-    if (!optionalEnabled || choices.marketingUse || choices.kakao || choices.email) {
+    let expectedRevision: string | null = null;
+    let reconcileWithdrawal = false;
+    // A lost opt-in response may already have committed. Never silently skip a
+    // subsequent opt-out: read and revoke the server state before claiming success.
+    if (optionalEnabled && consentAttempt.current && !choices.marketingUse && !choices.kakao && !choices.email) {
+      const current = await fetch('/api/account/marketing-consent', { cache: 'no-store' });
+      if (!current.ok) throw new Error('소식 설정을 확인하지 못했어요. 다시 시도하거나 가입을 계속한 뒤 회원 정보에서 확인해 주세요.');
+      const snapshot = await current.json() as ConsentSnapshot;
+      expectedRevision = snapshot.revision;
+      reconcileWithdrawal = Object.values(snapshot.choices).some(Boolean);
+      if (!reconcileWithdrawal) { consentAttempt.current = null; setOptionalUnresolved(false); }
+    }
+    if (!optionalEnabled || choices.marketingUse || choices.kakao || choices.email || reconcileWithdrawal) {
       if (optionalEnabled && (!consentAttempt.current || JSON.stringify(consentAttempt.current.choices) !== JSON.stringify(choices))) {
         consentAttempt.current = { requestId: crypto.randomUUID(), choices };
       }
+      if (optionalEnabled) setOptionalUnresolved(true);
       const consentResponse = await fetch("/api/account/marketing-consent", {
         method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(optionalEnabled ? { ...consentAttempt.current, expectedRevision: null, surface: 'signup', wordingVersion: OPTIONAL_CONSENT_VERSION } : { consent: marketing }),
+        body: JSON.stringify(optionalEnabled ? { ...consentAttempt.current, expectedRevision, surface: 'signup', wordingVersion: OPTIONAL_CONSENT_VERSION } : { consent: marketing }),
       });
       if (!consentResponse.ok) {
         setMessage("마케팅 수신 동의 정보를 저장하지 못했습니다. 다시 시도하거나 선택 항목을 해제하고 가입할 수 있어요.");
         return;
       }
-      if (optionalEnabled) savedReceipt = consentReceipt(await consentResponse.json());
+      if (optionalEnabled) { savedReceipt = consentReceipt(await consentResponse.json()); setOptionalUnresolved(false); }
     }
     await publishEncouragement();
     if (savedReceipt) setReceipt(savedReceipt);
-    if (!optionalEnabled || (!choices.marketingUse && !choices.kakao && !choices.email)) goNext();
+    if (!savedReceipt) goNext();
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "가입 정보를 저장하지 못했습니다. 연결 상태를 확인하고 다시 시도해 주세요.");
     } finally {
@@ -85,6 +99,13 @@ export default function SocialConsentPage() {
   };
 
   const goNext = () => { router.replace(safeNext(new URLSearchParams(window.location.search).get("next"))); router.refresh(); };
+  const continueWithPendingNews = async () => {
+    if (busy.current || !terms || !privacy) return;
+    busy.current = true; setPending(true);
+    try { await encouragement.prepare()(); goNext(); }
+    catch (cause) { setMessage(cause instanceof Error ? cause.message : '가입을 완료하지 못했어요. 다시 시도해 주세요.'); }
+    finally { busy.current = false; setPending(false); }
+  };
   const cancel = async () => {
     if (busy.current) return;
     busy.current = true;
@@ -126,6 +147,7 @@ export default function SocialConsentPage() {
                 {message}
               </p>
             )}
+            {optionalEnabled && optionalUnresolved && message && <button className="btn ghost full mt16" type="button" disabled={pending || !terms || !privacy} onClick={continueWithPendingNews}>가입 계속하기 · 수신 설정은 회원 정보에서 확인</button>}
             {receipt && <p className="notice mt16" role="status">{receipt}</p>}
             <button
               className="btn primary full mt24"
