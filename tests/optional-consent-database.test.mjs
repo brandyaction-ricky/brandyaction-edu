@@ -1,0 +1,53 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { PGlite } from '@electric-sql/pglite';
+const migration = readFileSync(new URL('../supabase/migrations/20261007011925_edu_optional_consent_e6.sql', import.meta.url), 'utf8');
+test('E6 consent is atomic, append-only, scoped to active members, retry-safe and never converts Kakao into SMS', async t => {
+ const db=new PGlite();t.after(()=>db.close());
+ await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
+ create table profiles(id uuid primary key,status text default 'active',full_name text,marketing_consent boolean default false,marketing_consent_at timestamptz,marketing_opt_out_at timestamptz);
+ grant select on profiles to authenticated;grant update(full_name) on profiles to authenticated;`);
+ const a=randomUUID(),b=randomUUID(),inactive=randomUUID();
+ await db.query("insert into profiles(id,marketing_consent,marketing_consent_at) values($1,true,now()-interval '1 day'),($2,false,null)",[a,b]);
+ await db.query("insert into profiles(id,status) values($1,'suspended')",[inactive]);
+ await db.exec(migration);
+ let old=(await db.query('select * from edu_consent_events where member_id=$1',[a])).rows;
+ assert.equal(old.length,1);assert.equal(old[0].legacy_snapshot.marketing_consent,true);
+ assert.equal((await db.query('select marketing_consent from profiles where id=$1',[a])).rows[0].marketing_consent,false);
+ await db.exec(migration);assert.equal((await db.query('select count(*)::int n from edu_consent_events')).rows[0].n,1);
+ const read=async member=>(await db.query('select edu_account_consent($1) v',[member])).rows[0].v;
+ const save=async(member,request,choices,expected=null)=>(await db.query("select edu_account_consent($1,$2,$3,'profile','2026-10-20',$4) v",[member,request,choices,expected])).rows[0].v;
+ await db.exec('set role service_role');
+ const no={marketingUse:false,sms:false,kakao:false,email:false};
+ assert.deepEqual((await read(a)).choices,no);assert.equal((await read(a)).legacyRetired,true);
+ await assert.rejects(read(inactive),/CONSENT_FORBIDDEN/);
+ const invalid={...no,kakao:true};await assert.rejects(save(a,randomUUID(),invalid),/CONSENT_INVALID/);
+ const req=randomUUID(),choices={...no,marketingUse:true,kakao:true};
+ const first=await save(a,req,choices);assert.deepEqual(first.choices,choices);assert.equal(first.changed.length,3);assert.ok(first.updatedAt);
+ assert.deepEqual(await save(a,req,choices),first);assert.deepEqual((await read(b)).choices,no);
+ await assert.rejects(save(a,req,{...choices,email:true}),/CONSENT_CONFLICT/);
+ await assert.rejects(save(a,randomUUID(),no),/CONSENT_CONFLICT/);
+ const withdrawn=await save(a,randomUUID(),no,req);assert.deepEqual(withdrawn.changed,[{kind:'marketingUse',action:'withdrawal'},{kind:'kakao',action:'withdrawal'}]);
+ await assert.rejects(save(a,req,choices),/CONSENT_CONFLICT/);
+ let sms=await save(a,randomUUID(),{...no,marketingUse:true,sms:true},withdrawn.revision);
+ await db.exec('reset role');
+ assert.equal((await db.query('select marketing_consent from profiles where id=$1',[a])).rows[0].marketing_consent,true);
+ // An update of only an unrelated channel keeps the original explicit SMS timestamp.
+ const at=sms.dates.sms;await db.exec('set role service_role');sms=await save(a,randomUUID(),{...sms.choices,kakao:true},sms.revision);assert.equal(sms.dates.sms,at);
+ await save(a,randomUUID(),{...no,marketingUse:true,kakao:true},sms.revision);
+ await db.exec('reset role');
+ const profile=(await db.query('select * from profiles where id=$1',[a])).rows[0];assert.equal(profile.marketing_consent,false);assert.ok(profile.marketing_opt_out_at);
+ const history=(await db.query('select count(*)::int n from edu_consent_events')).rows[0].n;
+ for(const role of ['anon','authenticated']) {
+  await db.exec('set role '+role);
+  for(const query of ['select * from edu_consent_events','select * from edu_consent_requests','select edu_account_consent(\''+a+'\')']) await assert.rejects(db.query(query),/permission denied/);
+  await assert.rejects(db.query('update profiles set ad_kakao_consent_at=now() where id=$1',[a]),/permission denied/);
+  await db.exec('reset role');
+ }
+ for(const table of ['edu_consent_events','edu_consent_requests'])for(const privilege of ['UPDATE','DELETE'])assert.equal((await db.query('select has_table_privilege(\'service_role\',$1,$2) allowed',[table,privilege])).rows[0].allowed,false);
+ await assert.rejects(db.query('update profiles set marketing_consent=true where id=$1',[b]),/CONSENT_MIGRATION_REQUIRED/);
+ const cached=randomUUID();await db.query('insert into profiles(id,marketing_consent) values($1,true)',[cached]);assert.equal((await read(cached)).choices.sms,false);
+ assert.equal((await db.query('select count(*)::int n from edu_consent_events')).rows[0].n,history);
+});
