@@ -3,6 +3,7 @@
 import { forwardRef, lazy, Suspense, useEffect, useImperativeHandle, useRef, useState, type ReactNode } from 'react';
 import { defaultBlockCompletion, gradeBlockQuiz, assessBlockCompletion, publicLessonBlocks, validateLessonBlocks, type BlockField, type LessonBlock, type LessonBlockDocument, type LessonBlockType } from '@/lib/lesson-blocks';
 import { LessonDocumentWriter, type LessonDocumentWrite } from '@/lib/lesson-block-authoring';
+import { authorValuesEqual } from '@/lib/lesson-author-merge';
 import { isGuidedTool, newGuidedBlock } from '@/lib/lesson-guided-tools';
 import { isCalculator, newCalculatorBlock } from '@/lib/lesson-calculators';
 import { LessonLinkPreview } from './lesson-link-preview';
@@ -93,7 +94,7 @@ function QuizFields({ block, update }: { block: LessonBlock; update: (patch: Par
 
 const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot }>(function LoadedAuthor({ autosave = false, snapshot, legacyBlocks, disabled, onState, courseId, lessonId, sources = [] }, ref) {
   const [document, setDocument] = useState<LessonBlockDocument>(() => snapshot.document || empty());
-  const [active, setActive] = useState(Boolean(snapshot.document)), [saved, setSaved] = useState(JSON.stringify(snapshot.document));
+  const [active, setActive] = useState(Boolean(snapshot.document)), [saved, setSaved] = useState<LessonBlockDocument | null>(snapshot.document);
   const [type, setType] = useState<LessonBlockType>('text'), [preview, setPreview] = useState(false), [message, setMessage] = useState(''), [invalid, setInvalid] = useState(false), [conflict, setConflict] = useState(false);
   const [detailed, setDetailed] = useState(false), [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const selectedBlock = document.blocks.find(block => block.id === selectedBlockId);
@@ -143,7 +144,8 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
       }
     } finally { if (mounted.current) { setPositionedIds(previous => previous.filter(id => id !== image.id)); uploadPending(image.id, false); } }
   }
-  const dirty = active && (uploading || JSON.stringify(document) !== saved);
+  // Server JSON may reorder object keys; only content changes need another save.
+  const dirty = active && (uploading || !authorValuesEqual(document, saved));
   useEffect(() => { onState({ active, dirty, blocked: !snapshot.editable || conflict || uploading || Boolean(canvasError),
     blockedReason: !snapshot.editable ? '이 수업을 편집할 권한이 없습니다. 운영자에게 권한을 확인해 주세요.'
       : conflict ? '다른 화면에서 학습 구성을 저장했습니다. 편집 내용을 내려받아 보관한 뒤 저장된 내용과 비교해 주세요.'
@@ -184,18 +186,18 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
     } catch (error) { setMessage((error as Error).message); return false; }
   }
   useImperativeHandle(ref, () => ({ validate, showPreview: () => setPreview(true),
-    acknowledgeDraft(revision, committed = active ? document : null) { setSaved(JSON.stringify(committed)); setWriter(new LessonDocumentWriter(revision, committed, saveDocument)); },
+    acknowledgeDraft(revision, committed = active ? document : null) { setSaved(structuredClone(committed)); setWriter(new LessonDocumentWriter(revision, committed, saveDocument)); },
     captureDraft: () => structuredClone({ active, document, writer: writer.checkpoint() }),
     restoreDraft(draft, fromServer = false) {
       if (!snapshot.editable || (disabled && !fromServer) || uploads.current.size) throw new Error('학습을 편집할 수 있을 때 다시 불러와 주세요.');
-      if (fromServer) { setWriter(new LessonDocumentWriter(draft.writer.revision, draft.writer.committed, saveDocument)); setSaved(JSON.stringify(draft.writer.committed)); }
+      if (fromServer) { setWriter(new LessonDocumentWriter(draft.writer.revision, draft.writer.committed, saveDocument)); setSaved(structuredClone(draft.writer.committed)); }
       else writer.restore(draft.writer, lessonId);
       setDocument(structuredClone(draft.document)); setActive(draft.active); setPreview(false); setEditingTextId(null); setInvalid(false); setMessage('');
     },
     async save(lessonId) {
     if (!active) return;
     if (!validate()) throw new Error('학습 구성의 입력 항목을 확인해 주세요.');
-    try { await writer.save(lessonId, document); setSaved(JSON.stringify(document)); setInvalid(false); setMessage('학습 구성을 저장했습니다.'); }
+    try { await writer.save(lessonId, document); setSaved(structuredClone(document)); setInvalid(false); setMessage('학습 구성을 저장했습니다.'); }
     catch (error) { if ((error as { status?: number }).status === 409) setConflict(true); setMessage((error as Error).message); throw error; }
   } }));
   function update(id: string, patch: Partial<LessonBlock>) { setDocument(previous => ({ ...previous, blocks: previous.blocks.map(block => block.id === id ? { ...block, ...patch } : block) })); }
@@ -240,7 +242,7 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
     {preview && <div className="lba-preview" aria-label="구성 미리보기"><button className="btn small" type="button" onClick={() => setPreviewInteractive(value => !value)}>{previewInteractive ? '전체 구성 보기' : '입력·제출 체험'}</button><LessonBlockView readOnly={!previewInteractive} document={publicLessonBlocks(document)} values={previewValues} onChange={values => { setPreviewValues(values); setPreviewMessage(''); }} grade={async id => { const block = document.blocks.find(item => item.id === id)!; return gradeBlockQuiz(block, typeof previewValues.blocks[id] === 'object' ? previewValues.blocks[id] as Record<string, string | number> : {}); }} /><p className="meta">미리보기 입력은 저장·제출·알림을 만들지 않습니다.</p><button type="button" className="btn" onClick={() => { const result = assessBlockCompletion(document, previewValues); setPreviewMessage(result.ready ? (document.completion?.mode === 'mentor' ? '제출 가능 · 실제 학습에서는 멘토 확인을 기다립니다.' : '학습 완료 조건을 충족했습니다.') : '필수 답변·체크리스트·시험 통과 조건을 확인해 주세요.'); }}>완료 조건 확인</button>{previewMessage && <p role="status">{previewMessage}</p>}</div>}
     <fieldset disabled={disabled || conflict} hidden={preview} className="lba-main-fields">
       <div className="lba-actions"><button type="button" className="btn" disabled={uploading} onClick={() => setImportMode('text')}>텍스트·파일 가져오기</button><button type="button" className="btn" disabled={uploading || !sources.length} onClick={() => setImportMode('cards')}>다른 학습 카드 가져오기</button>
-        {importUndo && importUndo.after === JSON.stringify(document) && saved !== importUndo.after && <button type="button" className="btn" onClick={() => { setDocument(importUndo.before); setImportUndo(null); setMessage('가져오기 직전 내용으로 되돌렸습니다.'); }}>마지막 가져오기 되돌리기</button>}
+        {importUndo && importUndo.after === JSON.stringify(document) && !authorValuesEqual(document, saved) && <button type="button" className="btn" onClick={() => { setDocument(importUndo.before); setImportUndo(null); setMessage('가져오기 직전 내용으로 되돌렸습니다.'); }}>마지막 가져오기 되돌리기</button>}
       </div>
       <details className="ldc-settings" open={detailed || undefined}><summary>수업 설정 · 태그·완료 기준</summary>
       <section className="lba-block"><h3>학습 태그</h3>
