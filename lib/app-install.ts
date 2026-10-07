@@ -11,3 +11,8 @@ export const installDismissMs = 7 * 24 * 60 * 60 * 1000;
 export function installDismissed(value: string | null, now: number) {
   const until = Number(value); return Number.isFinite(until) && until > now && until <= now + installDismissMs;
 }
+
+// Chromium-based browsers can emit an install prompt too. Only offer our Chrome path.
+export function chromeInstallBrowser(userAgent: string) {
+  return /(?:Chrome|CriOS)\//i.test(userAgent) && !/Whale|Edg(?:e|A|iOS)?\/|OPR\/|Opera|SamsungBrowser|Vivaldi|YaBrowser|DuckDuckGo|GSA\//i.test(userAgent) && !embeddedBrowser(userAgent);
+}
