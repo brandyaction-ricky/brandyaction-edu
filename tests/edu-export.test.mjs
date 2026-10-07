@@ -89,3 +89,17 @@ test('API re-reads kill switch and hash, separates MYIN, returns only short erro
   h.breakDb();r=await h.get();assert.equal(r.status,503);assert.deepEqual(await r.json(),{error:'unavailable'});
   assert.equal(r.headers.get('cache-control'),'no-store');assert.equal(r.headers.get('x-contract-version'),'1.0');
 });
+test('generic administrator save cannot rename or overwrite the server integration setting',async()=>{
+  const mocks={
+    '@/lib/server-auth':{getAuthenticatedUser:async()=>({id:'admin',role:'admin'})},
+    '@/lib/supabase/admin':{createAdminClient:()=>({from:()=>{throw Error('must not write database');}})},
+    '@/lib/operator-permissions':{permissionsFor:async()=>({settings:true}),sectionScopes:{settings:'settings'}},
+    '@/lib/platform':{sections:[{key:'settings',table:'site_settings',fields:[{key:'key',type:'text'},{key:'value',type:'text'}]}]},
+    '@/lib/qa-rules':{archiveValues:{}}
+  };
+  const route=compileExport('app/api/platform/route.ts',new Proxy(mocks,{has:(target,key)=>key in target||String(key).startsWith('@/'),get:(target,key)=>target[key]||{}}));
+  for(const values of [{key:'export_v1',value:{}},{key:'edu_renamed',value:{}}]){
+    const r=await route.POST(new Request('https://edu.test/api/platform',{method:'POST',headers:{origin:'https://edu.test'},body:JSON.stringify({action:'save',section:'settings',id:'export_v1',values})}));
+    assert.equal(r.status,403);assert.match((await r.json()).error,/서버 연동 설정/);
+  }
+});
