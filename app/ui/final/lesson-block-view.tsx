@@ -36,7 +36,7 @@ function CopyPrompt({ text }: { text: string }) {
     try { await navigator.clipboard.writeText(text); setMessage('복사했습니다. 사용할 AI에 붙여 넣어 주세요.'); }
     catch { setMessage('자동 복사가 되지 않았습니다. 아래 내용을 선택해 복사해 주세요.'); }
   }
-  return <div className="lb-prompt"><pre tabIndex={0}>{text}</pre><button type="button" className="btn small" onClick={() => void copy()}>프롬프트 복사</button><span role="status">{message}</span></div>;
+  return <div className="lb-prompt"><pre tabIndex={0} role="region" aria-label="프롬프트 내용">{text}</pre><button type="button" className="btn small" onClick={() => void copy()}>프롬프트 복사</button><span role="status">{message}</span></div>;
 }
 
 function PromptGenerator({ block, answer, disabled, onChange, live = false }: { live?: boolean; block: PublicLessonBlock; answer?: BlockAnswer; disabled: boolean; onChange: (value: BlockAnswer) => void }) {
