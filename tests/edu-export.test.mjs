@@ -67,6 +67,11 @@ test('consent uses latest purpose AND channel events at day end, not legacy cons
   const rows=envelope('daily_totals',s).rows;assert.equal(rows[0].consent_pool.marketing_email,1);assert.equal(rows[1].consent_pool.marketing_email,0);
   s.consentEnabled=false;assert.equal(envelope('daily_totals',s).rows[0].consent_pool.marketing_email,null);
 });
+test('the first cumulative room count is unmeasured until a previous snapshot exists',()=>{
+  const s=emptySource();s.campaigns=[{id:'ca',uses_ads:true,paid_cohort_id:null}];
+  s.actuals=[{campaign_id:'ca',day:'2026-10-20',kakao_members:10},{campaign_id:'ca',day:'2026-10-21',kakao_members:12}];
+  const r=envelope('daily_totals',s).rows;assert.equal(r[0].funnel.chat_joined_manual,null);assert.equal(r[1].funnel.chat_joined_manual,2);
+});
 function harness(){
   let config={enabled:true,tokenHash:hash('edu-test-token')},gate='ok',data=emptySource(),failure=false;const calls=[];
   const chain=value=>({abortSignal:async()=>{if(failure)throw Error('database private detail');return value;}});
