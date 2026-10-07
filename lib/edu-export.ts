@@ -1,4 +1,5 @@
 import { kstDay, type ExportDataset } from './edu-export-contract';
+import { exportedAdControl, type AdEvidence } from './edu-ad-controls';
 
 type Row = Record<string, unknown>;
 export type ExportSource = Record<string, Row[] | Row | boolean>;
@@ -225,7 +226,9 @@ export function aggregateExport(dataset: ExportDataset, source: ExportSource, da
       crm_info_n: crm.filter(r => ['sms', 'lms', 'alimtalk'].includes(str(r, 'channel')) && r.purpose === 'transactional').length,
       crm_ad_n: crm.filter(r => ['sms', 'lms', 'alimtalk'].includes(str(r, 'channel')) && r.purpose === 'marketing').length,
       mail_n: crm.filter(r => r.channel === 'email').length,
-      push_n: rows('push').filter(r => dayOf(r, 'finished_at') === day).length, controls: null, matured: oldDay(day) };
+      push_n: rows('push').filter(r => dayOf(r, 'finished_at') === day).length,
+      controls: Array.isArray(source.ad_controls) ? exportedAdControl(source.ad_controls as unknown as AdEvidence[], day, now) : null,
+      matured: oldDay(day) };
   });
   return { tenant: 'brandyaction_edu', contract_version: '1.0', metric_version: 'edu_web@1',
     generated_at: now.toISOString(), rows: dataset === 'daily_totals' ? totalRows : dataset === 'ops_daily' ? ops :

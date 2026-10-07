@@ -11,7 +11,8 @@ export function compileExport(file, mocks = {}) {
   return exports;
 }
 export const contract = compileExport('lib/edu-export-contract.ts');
-export const logic = compileExport('lib/edu-export.ts', { './edu-export-contract': contract });
+export const adControls = compileExport('lib/edu-ad-controls.ts', { './edu-export-contract': contract });
+export const logic = compileExport('lib/edu-export.ts', { './edu-export-contract': contract, './edu-ad-controls': adControls });
 export function emptySource() {
   return Object.fromEntries(['cohorts','orders','items','payments','refunds','enrollments','usage','catalog','visits','campaigns','dimensions','meta','funnel','actuals','clicks','registrations','broadcasts','products','questions','refund_requests','crm','push','consent']
     .map(key => [key, []]).concat([['settings', { learningUsageSince: '2026-10-04', productTrackingSince: null }], ['consentEnabled', true]]));
