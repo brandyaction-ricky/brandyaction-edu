@@ -33,8 +33,9 @@ export function AppInstallGuide({ device, homeUrl }: { device: InstallDevice; ho
       : selected === 'android'
         ? { title: '아이콘을 추가하는 메뉴를 눌러요', action: <><strong>‘설치 및 바로가기 만들기’ → ‘설치’</strong>를 누르세요.</>, help: <>버전에 따라 ‘홈 화면에 추가’ 또는 ‘앱 설치’라고 보일 수 있어요. ‘앱에서 열기’가 보이면 이미 추가된 아이콘을 열 수 있어요.</> }
         : { title: '‘페이지를 앱으로 설치’를 눌러요', action: <><strong>① ‘캐스팅, 저장, 공유’ → ② ‘페이지를 앱으로 설치’</strong>를 누르세요.</>, help: <>‘전송, 저장 및 공유’라고 보일 수도 있어요. ‘브랜디에듀에서 열기’가 보이면 이미 설치된 상태예요. 그 메뉴를 눌러 열어보세요.</> },
-    { title: selected === 'ios' ? '오른쪽 위 ‘추가’를 눌러요' : '설치 창의 ‘설치’를 눌러요', action: <>브랜디에듀 이름과 사이트 주소를 확인하고 <strong>{selected === 'ios' ? '‘추가’' : '‘설치’ 또는 ‘추가’'}</strong>를 누르세요.</>, help: selected === 'desktop' ? <>‘다음’ 버튼이 먼저 보이면 누른 뒤 남은 안내를 끝내세요.</> : selected === 'ios' ? <>‘웹 앱으로 열기’가 보이면 켜 둔 채로 추가하세요.</> : <>휴대폰에서 한 번 더 물어보면 ‘추가’를 누르세요.</> },
+    { title: selected === 'ios' ? '오른쪽 위 ‘추가’를 눌러요' : '설치 창의 ‘설치’를 눌러요', action: <>{selected === 'ios' ? <>이름 칸을 <strong>‘브랜디에듀’</strong>로 바꾸면 아이콘 이름이 잘리지 않아요. 주소를 확인한 뒤 오른쪽 위 </> : <>브랜디에듀 이름과 사이트 주소를 확인하고 </>}<strong>{selected === 'ios' ? '‘추가’' : '‘설치’ 또는 ‘추가’'}</strong>를 누르세요.</>, help: selected === 'desktop' ? <>‘다음’ 버튼이 먼저 보이면 누른 뒤 남은 안내를 끝내세요.</> : selected === 'ios' ? <>‘웹 앱으로 열기’가 보이면 켜 둔 채로 추가하세요.</> : <>휴대폰에서 한 번 더 물어보면 ‘추가’를 누르세요.</> },
   ];
+  if (selected === 'ios') steps.splice(3, 0, { title: '공유 창에서 ‘더 보기’를 눌러요', action: <>공유 창 오른쪽 아래의 <strong>‘더 보기’ ∨</strong>를 누르세요.</>, help: <>연락처나 텔레그램을 고르지 않아도 돼요. ‘홈 화면에 추가’가 이미 보이면 다음 단계로 가세요.</> });
   const finished = index === steps.length, step = steps[index];
   return <div className="app-install-guide mt16">
     <p className="app-install-picker-label">지금 사용하는 기기를 골라 주세요</p>
@@ -43,7 +44,7 @@ export function AppInstallGuide({ device, homeUrl }: { device: InstallDevice; ho
     <div className="app-install-step" aria-labelledby={stepId}>
       <div className="app-install-progress" aria-label={finished ? '아이콘 열어보기' : `총 ${steps.length}단계 중 ${index + 1}단계`}>{steps.map((_, i) => <span key={i} className={i <= index ? 'active' : ''} aria-hidden="true"/>)}<span>{finished ? '마지막으로 열어보기' : `${index + 1} / ${steps.length}`}</span></div>
       <div className="app-install-step-heading"><span className="app-install-step-icon" aria-hidden="true">{finished ? <Check/> : index + 1}</span><h3 id={stepId} ref={heading} tabIndex={-1}>{finished ? '아이콘을 눌러 내 강의를 열어보세요' : step.title}</h3></div>
-      {finished ? <><div className="app-install-finish"><img src="/icons/edu-192.png" width={64} height={64} alt="빨간색 브랜디에듀 아이콘"/><div><strong>브랜디에듀</strong><p>{selected === 'desktop' ? 'Windows는 시작 메뉴, Mac은 앱 목록이나 Dock에서 찾아보세요.' : '휴대폰 홈 화면에서 찾아보세요.'}</p></div></div><p>아이콘을 누른 뒤 <strong>‘내 클래스’</strong>에서 강의를 열어보세요. 로그인 화면이 나오면 평소 쓰던 계정으로 로그인하면 돼요.</p><p className="app-install-step-help">{selected === 'android' ? '아이콘이 안 보이면 첫 화면을 아래에서 위로 쓸어 앱 목록에서도 찾아보세요.' : selected === 'ios' ? '아이콘이 안 보이면 홈 화면을 옆으로 넘겨 보세요. 앱 보관함에서도 찾을 수 있어요.' : '바탕화면에 없어도 설치에 실패한 것은 아니에요. 아래 ‘컴퓨터 바탕화면에도 두고 싶어요’를 확인하세요.'}</p><p className="app-install-step-help">기존 아이콘이 열리지 않아 새로 추가했다면, <strong>새 아이콘으로 강의가 열리는지 확인한 뒤</strong> 예전 아이콘을 정리하세요.</p><button type="button" className="btn small" onClick={() => changeStep(0)}>처음부터 다시 보기</button></> : <><div className="app-install-step-action">{step.action}</div>{selected === 'desktop' && index === 3 ? <InstallScreenshot/> : <InstallVisual device={selected} step={index} homeUrl={homeUrl}/>} {step.help && <p className="app-install-step-help">{step.help}</p>}<div className="app-install-step-nav"><button type="button" className="btn" disabled={index === 0} onClick={() => changeStep(index - 1)}><ArrowLeft size={16} aria-hidden="true"/>이전</button><button type="button" className="btn primary" onClick={() => changeStep(index + 1)}>{index === steps.length - 1 ? '아이콘 찾는 법 보기' : '다음 단계'}<ArrowRight size={16} aria-hidden="true"/></button></div></>}
+      {finished ? <><div className="app-install-finish"><img src="/icons/edu-192.png" width={64} height={64} alt="빨간색 브랜디에듀 아이콘"/><div><strong>브랜디에듀</strong><p>{selected === 'desktop' ? 'Windows는 시작 메뉴, Mac은 앱 목록이나 Dock에서 찾아보세요.' : '휴대폰 홈 화면에서 찾아보세요.'}</p></div></div>{selected === 'ios' && <IphoneScreenshot step={6}/>}<p>아이콘을 누른 뒤 <strong>‘내 클래스’</strong>에서 강의를 열어보세요. 로그인 화면이 나오면 평소 쓰던 계정으로 로그인하면 돼요.</p><p className="app-install-step-help">{selected === 'android' ? '아이콘이 안 보이면 첫 화면을 아래에서 위로 쓸어 앱 목록에서도 찾아보세요.' : selected === 'ios' ? '아이콘이 안 보이면 홈 화면을 옆으로 넘겨 보세요. 앱 보관함에서도 찾을 수 있어요.' : '바탕화면에 없어도 설치에 실패한 것은 아니에요. 아래 ‘컴퓨터 바탕화면에도 두고 싶어요’를 확인하세요.'}</p><p className="app-install-step-help">기존 아이콘이 열리지 않아 새로 추가했다면, <strong>새 아이콘으로 강의가 열리는지 확인한 뒤</strong> 예전 아이콘을 정리하세요.</p><button type="button" className="btn small" onClick={() => changeStep(0)}>처음부터 다시 보기</button></> : <><div className="app-install-step-action">{step.action}</div>{selected === 'ios' ? <IphoneScreenshot step={index}/> : selected === 'desktop' && index === 3 ? <InstallScreenshot/> : <InstallVisual device={selected} step={index} homeUrl={homeUrl}/>} {step.help && <p className="app-install-step-help">{step.help}</p>}<div className="app-install-step-nav"><button type="button" className="btn" disabled={index === 0} onClick={() => changeStep(index - 1)}><ArrowLeft size={16} aria-hidden="true"/>이전</button><button type="button" className="btn primary" onClick={() => changeStep(index + 1)}>{index === steps.length - 1 ? '아이콘 찾는 법 보기' : '다음 단계'}<ArrowRight size={16} aria-hidden="true"/></button></div></>}
     </div>
     <div className="app-install-faq" aria-label="자주 묻는 질문">
       <details><summary>크롬이 없어요</summary><p>컴퓨터는 <a href="https://www.google.com/chrome/" target="_blank" rel="noopener noreferrer">구글 공식 사이트</a>, 휴대폰은 앱스토어·플레이스토어에서 <strong>Google Chrome</strong>을 찾아 설치하세요. 스토어에서 찾는 것은 크롬이에요. 브랜디에듀는 크롬으로 열어 아이콘을 추가해요.</p></details>
@@ -60,4 +61,32 @@ function InstallScreenshot() {
   const dialog = useRef<HTMLDialogElement>(null), label = useId();
   const picture = <div className="app-install-photo-marked"><img src="/installation-guide/chrome-menu.webp" width={1100} height={699} alt="실제 Mac 크롬 메뉴: 오른쪽 캐스팅, 저장, 공유를 고르면 왼쪽에 페이지를 앱으로 설치가 나타납니다." loading="lazy"/><span className="app-install-photo-target first" aria-hidden="true"><b>1</b></span><span className="app-install-photo-target second" aria-hidden="true"><b>2</b></span></div>;
   return <figure className="app-install-shot"><button type="button" className="app-install-shot-button" aria-label="크롬 설치 메뉴 사진 크게 보기" onClick={() => dialog.current?.showModal()}>{picture}<span className="app-install-photo-zoom">사진 크게 보기 ↗</span></button><figcaption>실제 Mac 크롬 화면 · 빨간 ① → ② 순서로 눌러요.</figcaption><dialog ref={dialog} className="app-install-photo-dialog" aria-labelledby={label}><div className="app-install-photo-heading"><strong id={label}>크롬 설치 메뉴</strong><button type="button" className="btn small" onClick={() => dialog.current?.close()}>사진 닫기</button></div>{picture}</dialog></figure>;
+}
+
+// Only flattened, privacy-reviewed assets belong here; never publish the original captures.
+const iphonePhotos = [
+  { file: 'address.png', title: '크롬 주소 칸', alt: '크롬 주소 칸에 브랜디에듀 주소를 입력한 화면', top: 0, ratio: '589 / 170', target: [2, 48, 88, 40] },
+  { file: 'login.jpg', title: '브랜디에듀 로그인', alt: '카카오, Google 계정, 이메일 로그인 버튼이 있는 브랜디에듀 화면', top: -75, ratio: '683 / 380', target: [7, 12, 85, 72] },
+  { file: 'share.png', title: '주소 칸 오른쪽 공유 버튼', alt: '크롬 주소 칸 오른쪽의 네모 위 화살표 공유 버튼', top: 0, ratio: '594 / 155', target: [88, 49, 9, 30] },
+  { file: 'more.png', title: '공유 창의 더 보기', alt: '공유 창 오른쪽 아래 더 보기 버튼. 연락처와 개인 화면은 가려져 있습니다.', top: -78, ratio: '589 / 365', target: [73, 52, 21, 38] },
+  { file: 'home-add.png', title: '홈 화면에 추가 메뉴', alt: '공유 메뉴의 홈 화면에 추가 항목', top: -58, ratio: '589 / 270', target: [5, 72, 89, 23] },
+  { file: 'confirm.jpg', title: '이름 확인 후 추가', alt: '홈 화면에 추가 창의 이름 칸, 웹 앱으로 열기 스위치와 오른쪽 위 추가 버튼', top: -13, ratio: '589 / 445', target: [80, 8, 17, 17] },
+  { file: 'icon.png', title: '홈 화면의 EDU 아이콘', alt: '개인 배경화면을 가린 빨간색 EDU 아이콘', top: 0, ratio: '313 / 390', target: null },
+];
+function IphoneScreenshot({ step }: { step: number }) {
+  const dialog = useRef<HTMLDialogElement>(null), label = useId(), photo = iphonePhotos[step];
+  const src = `/installation-guide/iphone-chrome-${photo.file}`;
+  return <figure className="app-install-shot app-install-iphone-shot">
+    <button type="button" className="app-install-shot-button" aria-label={`${photo.title} 사진 크게 보기`} onClick={() => dialog.current?.showModal()}>
+      <div className="app-install-iphone-crop" style={{ aspectRatio: photo.ratio }}>
+        <img src={src} alt={photo.alt} style={{ marginTop: `${photo.top}%` }} loading="lazy"/>
+        {photo.target && <span className="app-install-photo-target" aria-hidden="true" style={{ left: `${photo.target[0]}%`, top: `${photo.target[1]}%`, width: `${photo.target[2]}%`, height: `${photo.target[3]}%` }}/>}
+      </div><span className="app-install-photo-zoom">전체 사진 크게 보기 ↗</span>
+    </button>
+    <figcaption>제공된 아이폰 Chrome 캡처 · 개인정보 가림 편집{step !== 6 && ' · 빨간 테두리 안을 눌러요.'}</figcaption>
+    <dialog ref={dialog} className="app-install-photo-dialog app-install-iphone-dialog" aria-labelledby={label}>
+      <div className="app-install-photo-heading"><strong id={label}>{photo.title}</strong><button type="button" className="btn small" onClick={() => dialog.current?.close()}>사진 닫기</button></div>
+      <img src={src} alt={photo.alt}/>
+    </dialog>
+  </figure>;
 }

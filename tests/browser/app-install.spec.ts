@@ -32,7 +32,8 @@ test('install prompt waits for an explicit click, survives menu changes, and com
   expect(await page.evaluate(() => (window as TestWindow).eduPermissionCalls)).toBe(0); expect(writes).toHaveLength(0);
 });
 for (const device of ['ios', 'ipad'] as const) test(`${device} gets manual Home Screen instructions and no automatic permission prompt`, async ({ page }, info) => {
-  await setup(page, { [device]: true }); await page.goto('/app-install-test'); await panel(page).getByRole('button', { name: '그림 보며 따라 하기' }).click(); await expect(panel(page)).toContainText('Chrome'); await panel(page).getByRole('button', { name: '다음 단계' }).click(); await expect(panel(page)).toContainText('평소 쓰던 계정'); await panel(page).getByRole('button', { name: '다음 단계' }).click(); await expect(panel(page)).toContainText('공유 버튼'); await panel(page).getByRole('button', { name: '다음 단계' }).click(); await expect(panel(page)).toContainText('동작 편집'); await panel(page).getByRole('button', { name: '다음 단계' }).click(); await expect(panel(page)).toContainText('웹 앱으로 열기');
+  const nextIosStep = () => panel(page).getByRole('button', { name: '다음 단계' }).click();
+  await setup(page, { [device]: true }); await page.goto('/app-install-test'); await panel(page).getByRole('button', { name: '그림 보며 따라 하기' }).click(); await expect(panel(page)).toContainText('Chrome'); await panel(page).getByRole('button', { name: '다음 단계' }).click(); await expect(panel(page)).toContainText('평소 쓰던 계정'); await panel(page).getByRole('button', { name: '다음 단계' }).click(); await expect(panel(page)).toContainText('공유 버튼'); await panel(page).getByRole('button', { name: '다음 단계' }).click(); await expect(panel(page)).toContainText('공유 창에서 ‘더 보기’'); await nextIosStep(); await expect(panel(page)).toContainText('동작 편집'); await panel(page).getByRole('button', { name: '다음 단계' }).click(); await expect(panel(page)).toContainText('웹 앱으로 열기');
   await expect(panel(page)).toContainText('인터넷 연결'); await expect(page.getByRole('button', { name: '아이콘 추가하기' })).toHaveCount(0);
   await expect(panel(page).locator('.app-install-heading img')).toHaveJSProperty('naturalWidth', 192); await panel(page).scrollIntoViewIfNeeded(); await page.screenshot({ path: info.outputPath('app-install-apple.png'), fullPage: false });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(await page.evaluate(() => innerWidth)); expect(await page.evaluate(() => (window as TestWindow).eduPermissionCalls)).toBe(0);
@@ -73,8 +74,8 @@ test('one action at a time, device changes restart and completion explains findi
   await expect(panel(page).getByRole('heading', { level: 3 })).toBeFocused();
   await panel(page).screenshot({ path: info.outputPath('simple-iphone-share.png'), animations: 'disabled' });
   await panel(page).getByRole('button', { name: '이전', exact: true }).click(); await panel(page).getByRole('button', { name: '이전', exact: true }).click();
-  await expect(panel(page)).toContainText('1 / 5');
-  await next.click(); await next.click(); await next.click(); await expect(panel(page)).toContainText('동작 편집');
+  await expect(panel(page)).toContainText('1 / 6');
+  await next.click(); await next.click(); await next.click(); await expect(panel(page)).toContainText('공유 창에서 ‘더 보기’'); await next.click(); await expect(panel(page)).toContainText('동작 편집');
   await panel(page).getByRole('button', { name: '갤럭시·안드로이드' }).click();
   await expect(panel(page)).toContainText('1 / 5'); await expect(panel(page)).toContainText('Chrome(크롬)');
   for (let i = 0; i < 4; i++) await next.click();
@@ -130,4 +131,20 @@ for (const ua of ['Mozilla/5.0 Chrome/140.0 Whale/4.0 Safari/537.36', 'Mozilla/5
  await panel(page).getByRole('button',{name:'그림 보며 따라 하기'}).click();
  await panel(page).getByText('기존 아이콘을 누르면 브라우저에 로그인하래요',{exact:true}).click();
  await expect(panel(page)).toContainText('새 아이콘으로 강의가 열리는지 확인한 뒤');
+});
+
+
+test('iPhone captures load across six steps and completion, enlarge and return focus', async ({ page }, info) => {
+  await setup(page, { ios: true }); await page.goto('/app-install-test');
+  await panel(page).getByRole('button', { name: '그림 보며 따라 하기' }).click();
+  for (let step = 0; step < 7; step++) {
+    const photo = panel(page).locator('.app-install-iphone-shot .app-install-shot-button');
+    await expect.poll(() => photo.locator('img').evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
+    await photo.focus(); await page.keyboard.press('Enter');
+    const dialog = page.getByRole('dialog'); await expect(dialog).toBeVisible();
+    await page.keyboard.press('Escape'); await expect(dialog).toBeHidden(); await expect(photo).toBeFocused();
+    await panel(page).locator('.app-install-step').screenshot({ path: info.outputPath(`iphone-step-${step + 1}.png`), animations: 'disabled' });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    if (step < 6) await panel(page).getByRole('button', { name: step === 5 ? '아이콘 찾는 법 보기' : '다음 단계' }).click();
+  }
 });
