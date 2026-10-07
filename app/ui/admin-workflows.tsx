@@ -3,6 +3,7 @@ import dynamic from "next/dynamic";
 import { emptyOrderListScope, type OrderListScope } from "@/lib/admin-order-list";
 import { FollowupTemplateSource } from "./followup-template-source";
 const LandingAdmin = dynamic(() => import("./landing/admin").then(m => m.LandingAdmin));
+const AdControlSettings = dynamic(() => import("./ad-control-settings").then(m => m.AdControlSettings));
 const KakaoSyncSettings = dynamic(() => import("./kakao-sync-settings").then(m => m.KakaoSyncSettings));
 import { type QuizDefinition, type QuizQuestion } from "@/lib/mission-quiz";
 import {
@@ -180,7 +181,7 @@ export function AdminWorkflows(props: Props) {
   const send: WorkflowSend = (body, success) =>
     props.send({ ...body, workflow: true }, success);
   const p = { ...props, send };
-  if (props.section === "cohorts") return <><CohortTools {...p} />{process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' && <LessonProgressionSettings cohorts={props.data.cohorts || []} />}</>;
+  if (props.section === "cohorts") return <><CohortTools {...p} /><AdControlSettings cohorts={props.data.cohorts || []} />{process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' && <LessonProgressionSettings cohorts={props.data.cohorts || []} />}</>;
   if (props.section === "missions") return <QuizManager {...p} />;
   if (props.section === "members") return <Participants />;
   if (props.section === "reviews") return <SubmissionReviewWorkspace {...p} />;
