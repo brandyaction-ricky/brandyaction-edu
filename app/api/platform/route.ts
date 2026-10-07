@@ -284,6 +284,8 @@ export async function GET(request: Request) {
                         : '*';
                 const serverPaged = adminMode && !productEditorRead && table === primaryTable && !['home', 'members', 'reviews', 'analytics', 'metrics', 'seo', 'settings', 'staff', 'templates', 'campaigns', 'automations'].includes(sectionKey);
                 let query = db.from(table).select(columns, serverPaged ? { count: 'exact' } : undefined);
+                // Export credentials belong only to the server integration, including admin reads.
+                if (table === 'site_settings') query = query.neq('key', 'export_v1');
                 if (adminMode && table === 'coupons' && operator?.role !== 'admin') query = query.neq('discount_type', 'ADMIN_FREE');
                 if (adminMode && sectionKey === 'customers' && table === 'profiles' && memberScope) query = query.eq('id', memberScope);
                 if (adminMode && sectionKey === 'questions' && table === 'edu_questions') {
