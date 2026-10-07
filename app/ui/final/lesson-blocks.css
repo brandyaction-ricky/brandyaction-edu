@@ -20,7 +20,9 @@
 .lb-choice { display:flex; align-items:flex-start; gap:10px; padding:10px 0; min-height:44px; cursor:pointer; }
 .lb-choice input { flex:0 0 auto; margin-top:6px; width:18px; height:18px; }
 .lb-prompt { padding:16px; border:1px solid #d8dde3; background:#f5f7fa; border-radius:8px; margin-top:12px; }
-.lb-prompt pre { white-space:pre-wrap; overflow-wrap:anywhere; font:inherit; margin:0 0 16px; }
+.lb-prompt pre { white-space:pre-wrap; overflow-wrap:anywhere; font:inherit; margin:0 0 16px; max-height:min(28rem, 50vh); max-height:min(28rem, 50dvh); overflow:auto; scrollbar-gutter:stable; }
+.lb-prompt pre:focus-visible { outline:3px solid #507fbe; outline-offset:3px; }
+@media print { .lb-prompt pre { max-height:none; overflow:visible; } }
 .lb-prompt [role=status] { display:block; margin-top:8px; }
 .lesson-blocks .btn { white-space:normal; min-height:44px; }
 .lb-link { color:#1757a1; text-decoration:underline; }
