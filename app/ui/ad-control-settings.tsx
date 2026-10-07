@@ -57,7 +57,7 @@ export function AdControlSettings({ cohorts }: { cohorts: Row[] }) {
     {selected && <>
       <div className="notice mt16" role="status" style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
         {control.freeze ? <ShieldAlert size={24} aria-hidden /> : <ShieldCheck size={24} aria-hidden />}
-        <div><strong>{loading ? '현재 상태 확인 중…' : !enabled && loaded ? '아직 판단을 시작하지 않았어요' : control.freeze ? '광고비를 더 늘리지 않아요' : '광고비 증액 제한을 풀었어요'}</strong>
+        <div><strong>{loading ? '현재 상태 확인 중…' : !enabled && loaded ? '아직 판단을 시작하지 않았어요' : control.freeze ? '광고비를 더 늘리지 않아요' : control.freeze_source === 'manual' ? '광고비 증액 제한을 풀었어요' : '광고비 증액을 검토할 수 있어요'}</strong>
           {!loading && enabled && <div className="small mt8">{control.freeze_source === 'manual' && !control.freeze && <p>대표가 기한까지 제한을 풀었어요. 자동 기준은 아래와 같습니다.</p>}{control.freeze_reasons.map(r => <p key={r}>{freezeLabels[r]}</p>)}
             {control.freeze_source === 'manual' && <><p>대표 설정 · {time(control.override_until!)}까지</p><p>{evidence?.policy.reason}</p></>}
             {control.cohort_budget_krw !== null && <p>기수 예산 {control.cohort_budget_krw.toLocaleString('ko-KR')}원</p>}
