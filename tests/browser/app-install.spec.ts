@@ -77,14 +77,14 @@ test('one action at a time, device changes restart and completion explains findi
   await expect(panel(page)).toContainText('1 / 6');
   await next.click(); await next.click(); await next.click(); await expect(panel(page)).toContainText('공유 창에서 ‘더 보기’'); await next.click(); await expect(panel(page)).toContainText('동작 편집');
   await panel(page).getByRole('button', { name: '갤럭시·안드로이드' }).click();
-  await expect(panel(page)).toContainText('1 / 5'); await expect(panel(page)).toContainText('Chrome(크롬)');
-  for (let i = 0; i < 4; i++) await next.click();
+  await expect(panel(page)).toContainText('1 / 6'); await expect(panel(page)).toContainText('Chrome(크롬)');
+  for (let i = 0; i < 5; i++) await next.click();
   await expect(panel(page)).toContainText('설치 창의 ‘설치’를 눌러요');
   await panel(page).getByRole('button', { name: '아이콘 찾는 법 보기' }).click();
   await expect(panel(page)).toContainText('‘내 클래스’에서 강의를');
   await expect(panel(page)).toContainText('앱 목록에서도 찾아보세요');
   await expect(page.getByRole('region', { name: '앱 사용 상태' })).toHaveCount(0);
-  await panel(page).getByRole('button', { name: '처음부터 다시 보기' }).click(); await expect(panel(page)).toContainText('1 / 5');
+  await panel(page).getByRole('button', { name: '처음부터 다시 보기' }).click(); await expect(panel(page)).toContainText('1 / 6');
   await help.click(); await expect(help).toHaveAttribute('aria-expanded', 'false');
   expect(await page.evaluate(() => (window as TestWindow).eduPromptCalls)).toBe(0);
   expect(await page.evaluate(() => (window as TestWindow).eduPermissionCalls)).toBe(0);
@@ -147,4 +147,28 @@ test('iPhone captures load across six steps and completion, enlarge and return f
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     if (step < 6) await panel(page).getByRole('button', { name: step === 5 ? '아이콘 찾는 법 보기' : '다음 단계' }).click();
   }
+});
+
+test('Android separates menu, install choice and confirmation with attributed official examples', async ({ page }, info) => {
+  await setup(page, { ua: 'Mozilla/5.0 (Linux; Android 15; SM-S921N) AppleWebKit/537.36 Chrome/140.0.0.0 Mobile Safari/537.36' });
+  await page.goto('/app-install-test'); await panel(page).getByRole('button', { name: '그림 보며 따라 하기' }).click();
+  await expect(panel(page).getByRole('button', { name: '갤럭시·안드로이드' })).toHaveAttribute('aria-pressed', 'true');
+  for (let step = 0; step < 6; step++) {
+    await expect(panel(page)).toContainText(`${step + 1} / 6`);
+    await expect(panel(page)).toContainText('Google 공식 안내를 바탕으로 구성한 한글 예시');
+    if ([2, 4, 5].includes(step)) {
+      const examples = panel(page).locator('.install-android-reference');
+      await examples.locator('summary').click();
+      await expect.poll(() => examples.locator('img').evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth === 738)).toBe(true);
+      await expect(examples).toContainText('CC BY 4.0');
+      await examples.locator('summary').click();
+    }
+    if (step === 3) await expect(panel(page).getByRole('heading', { level: 3 })).toHaveText('‘설치 및 바로가기 만들기’를 눌러요');
+    if (step === 4) await expect(panel(page)).toContainText('‘설치’가 없고 ‘바로가기 만들기’만 보이면');
+    await panel(page).locator('.app-install-step').screenshot({ path: info.outputPath(`android-step-${step + 1}.png`), animations: 'disabled' });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await panel(page).getByRole('button', { name: step === 5 ? '아이콘 찾는 법 보기' : '다음 단계' }).click();
+  }
+  await expect(panel(page)).toContainText('앱 목록에서도 찾아보세요');
+  expect(await page.evaluate(() => (window as TestWindow).eduPromptCalls)).toBe(0);
 });
