@@ -20,6 +20,32 @@ test('share projection contains aggregates only and deduplicates student counts 
  const a=logic.careAggregate([{memberId:'private-id',name:'private-name',email:'private-email',cells:[cell('completed')]},{memberId:'private-id',cells:[cell('submitted')]}],asOf);
  assert.equal(a.members,1);assert.equal(a.enrollments,2);assert.equal(a.pending,1);assert.equal(a.recent,1);assert.doesNotMatch(JSON.stringify(a),/private/);
 });
+const thirty=(done=0)=>Array.from({length:30},(_,i)=>({...cell(i<done?'completed':'not_submitted'),lessonId:'day-'+(i+1),day:i+1}));
+test('30-day reference uses exact 10/80 thresholds, separates unpublished denominator, and refuses ambiguous days',()=>{
+ for(const [done,band] of [[0,'starting'],[2,'starting'],[3,'progressing'],[23,'progressing'],[24,'finishing'],[30,'finishing']]){
+  const result=logic.careThirtyDayProgress(thirty(done));assert.equal(result.band,band);assert.equal(result.done,done);assert.equal(result.total,30);
+ }
+ const opening=thirty(1).map((c,i)=>i?{...c,state:'scheduled',published:false}:c);
+ assert.equal(logic.careThirtyDayProgress(opening).percent,3);assert.equal(logic.careProgress(opening,'daily').percent,100);
+ assert.equal(logic.careThirtyDayProgress([opening[0]]).percent,3);
+ assert.equal(logic.careThirtyDayProgress([]).band,'unknown');
+ assert.equal(logic.careThirtyDayProgress([opening[0],{...opening[0],lessonId:'duplicate'}]).percent,null);
+ assert.equal(logic.careThirtyDayProgress([{...opening[0],state:'error'}]).percent,null);
+});
+test('attention flags never infer delay from overall color, future/locked missions or review waiting alone',()=>{
+ const old='2026-10-01T00:00:00Z';
+ for(const state of ['completed','submitted','locked','scheduled'])assert.equal(logic.careAttention({cells:[cell(state)],lastVisitAt:old},asOf).needsAttention,false);
+ assert.equal(logic.careAttention({cells:[cell('not_submitted')],lastVisitAt:asOf},asOf).needsAttention,false);
+ assert.equal(logic.careAttention({cells:[cell('not_submitted')],lastVisitAt:null},asOf).needsAttention,false);
+ assert.equal(logic.careAttention({cells:[cell('not_submitted')],lastVisitAt:old},asOf).followUp,true);
+ assert.equal(logic.careAttention({cells:[cell('changes_requested')],lastVisitAt:asOf},asOf).returned,1);
+});
+test('DAY drill-down excludes unpublished students and keeps review and locked states distinct',()=>{
+ const rows=['completed','submitted','changes_requested','not_submitted','locked','scheduled'].map(state=>({cells:[{...cell(state,'daily',state!=='scheduled'),day:1}]}));
+ const [day,next]=logic.careDaySummaries(rows);assert.equal(day.available,5);assert.equal(day.percent,20);
+ assert.deepEqual([day.done,day.pending,day.returned,day.missing,day.locked],[1,1,1,1,1]);assert.equal(next.registered,false);
+ rows[0].cells.push({...rows[0].cells[0],lessonId:'different'});assert.equal(logic.careDaySummaries(rows)[0].lessonId,null);
+});
 const uuid='11111111-1111-4111-8111-111111111111';
 function harness({user={id:uuid},allowed=true,error=null,member=false}={}){
  const calls=[],mocks={
