@@ -138,3 +138,13 @@ test('admin restart is server-owned and stale tabs cannot write to a new attempt
  await assert.rejects(runDiagnosisSession({actor,send,rpc:async name=>name==='edu_diagnosis_restart'?{data:{id:id(99)}}:{data:current}},{action:'restart',attemptId:id(80)}),e=>e.code==='CONFLICT');
  assert.equal(writes,before);
 });
+
+test('release pause is reported without creating a remote session',async()=>{
+ let sent=0;
+ for(const action of ['ensure','restart']){
+  const rpc=async name=>name==='edu_diagnosis_context'?{data:action==='restart'?{...context,adminTest:true}:null}:{data:null,error:{message:'DIAGNOSIS_STARTS_PAUSED'}};
+  await assert.rejects(runDiagnosisSession({actor:{id:id(2),role:'admin'},rpc,send:async()=>{sent++;}},
+   action==='ensure'?{action,courseId:id(9)}:{action,attemptId:id(1)}),e=>e.code==='STARTS_PAUSED'&&e.status===503);
+ }
+ assert.equal(sent,0);
+});
