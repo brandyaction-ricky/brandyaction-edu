@@ -6,7 +6,7 @@ export type PersonalCare = { asOf: string; rows: { enrollmentId: string; courseT
 export const careLabels: Record<CareState, string> = { completed: '완료', submitted: '검토 대기', changes_requested: '보완 요청', not_submitted: '미제출', locked: '앞 단계 대기', scheduled: '공개 예정', error: '설정 확인' };
 export const careSymbols: Record<CareState, string> = { completed: '✓', submitted: '◷', changes_requested: '↻', not_submitted: '·', locked: '—', scheduled: '○', error: '!' };
 export const careTime = (value: string | null) => value ? new Date(value).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '기록 없음';
-export const careLessonLabel = (cell: CareCell) => `${cell.track === 'daily' ? '미션' : '학습'} · W${cell.week} DAY ${cell.day}`;
+export const careLessonLabel = (cell: CareCell) => `${cell.track === 'daily' ? '미션' : '학습'} · ${cell.week}주차 ${cell.day}일차`;
 export function careProgress(cells: CareCell[], track?: string) {
   const available = cells.filter(c => c.published && (!track || (track === 'daily' ? c.track === 'daily' : c.track !== 'daily')));
   const total = available.length, done = available.filter(c => c.state === 'completed').length;
@@ -35,7 +35,7 @@ export function careAggregate(rows: CareRow[], asOf: string) {
 
 export const careMissionTarget = 30;
 export type CareBand = 'starting' | 'progressing' | 'finishing' | 'unknown';
-export const careBandLabels: Record<CareBand, string> = { starting: '시작 단계', progressing: '진행 중', finishing: '완주에 가까움', unknown: '집계 준비' };
+export const careBandLabels: Record<CareBand, string> = { starting: '시작 단계', progressing: '진행 중', finishing: '완주에 가까움', unknown: '미션 확인 필요' };
 // The agreed 30-day reference is separate from the currently published denominator.
 export function careThirtyDayProgress(cells: CareCell[]) {
   const missions = cells.filter(c => c.track === 'daily' && Number.isInteger(c.day) && c.day >= 1 && c.day <= careMissionTarget);
