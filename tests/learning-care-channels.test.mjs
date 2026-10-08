@@ -72,16 +72,18 @@ test('new delivery cron requires exact configured authentication',async()=>{
  assert.equal(n,0);assert.equal((await api.GET(new Request('https://edu.test/api/cron/learning-care-delivery',{headers:{authorization:'Bearer synthetic'}}))).status,200);assert.equal(n,1);
 });
 test('send API accepts only server-ready channels and binds exact reviewed routes to the authenticated actor',async()=>{
- const calls=[];let active=config;
+ const calls=[];let active=config,track='learning';
  const uuid=v=>typeof v==='string'&&/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(v);
  const api=load('app/api/admin/learning-care/route.ts',{
- '@/lib/server-auth':{getAuthenticatedUser:async()=>({id:actor})},'@/lib/operator-permissions':{getOperatorUser:async(_scope,user)=>user},'@/lib/edu-workflows':{uuid},'@/lib/learning-care-delivery-server':{careDeliveryConfiguration:async()=>active},'@/lib/supabase/admin':{createAdminClient:()=>({rpc:(name,args)=>({abortSignal:async()=>{calls.push({name,args});return{data:{count:1,deliveries:[]},error:null};}})})}
+ '@/lib/learning-care':load('lib/learning-care.ts'),
+ '@/lib/server-auth':{getAuthenticatedUser:async()=>({id:actor})},'@/lib/operator-permissions':{getOperatorUser:async(_scope,user)=>user},'@/lib/edu-workflows':{uuid},'@/lib/learning-care-delivery-server':{careDeliveryConfiguration:async()=>active},'@/lib/supabase/admin':{createAdminClient:()=>({rpc:(name,args)=>({abortSignal:async()=>{calls.push({name,args});return{data:name==='edu_admin_learning_care'?{rows:[{cells:[{lessonId:member,track,published:true,state:'not_submitted'}]}]}:{count:1,deliveries:[]},error:null};}})})}
  },{NEXT_PUBLIC_EDU_MESSAGES_ENABLED:'true'});
  const payload={actor:'forged',requestId:member,cohortId:member,lessonId:member,recipients:[member],content:'학습 안내',delivery:{mode:'push_first',channels:['push','email','alimtalk'],routes:[{memberId:member,channels:['push']}]}};
  const post=body=>api.POST(new Request('https://edu.test/api/admin/learning-care',{method:'POST',headers:{origin:'https://edu.test'},body:JSON.stringify(body)}));
- assert.equal((await post(payload)).status,200);assert.equal(calls[0].name,'edu_send_learning_care_channels');assert.equal(calls[0].args.p_actor,actor);assert.equal(calls[0].args.p_template,config.alimtalkTemplateId);
+ assert.equal((await post(payload)).status,200);assert.equal(calls[1].name,'edu_send_learning_care_channels');assert.equal(calls[1].args.p_actor,actor);assert.equal(calls[1].args.p_template,config.alimtalkTemplateId);
  for(const d of [{...payload.delivery,channels:['fax']},{...payload.delivery,mode:'bogus'},{...payload.delivery,routes:[]},{...payload.delivery,routes:[{memberId:'bad',channels:['push']}]}])assert.equal((await post({...payload,delivery:d})).status,400);
- active={...config,alimtalk:false};assert.equal((await post(payload)).status,409);active={...config,enabled:false};assert.equal((await post(payload)).status,409);assert.equal(calls.length,1);
+ active={...config,alimtalk:false};assert.equal((await post(payload)).status,409);active={...config,enabled:false};assert.equal((await post(payload)).status,409);assert.equal(calls.length,2);
+ active=config;track="daily";assert.equal((await post(payload)).status,409);assert.equal(calls.length,3);assert.equal(calls.at(-1).name,"edu_admin_learning_care");
 });
 test('SMS uses a short notification with the inbox link, without LMS upgrade, and requires the registered sender',async()=>{
  const {api,providerCalls}=server({env:environment});assert.equal((await api.deliverCareSms({...job,channel:'sms'})).status,'accepted');
