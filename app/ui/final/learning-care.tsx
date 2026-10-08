@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { ArrowRight, ChartNoAxesCombined, RefreshCw, Users, Download } from 'lucide-react';
 import { careCohortStatus, careLabels, careSymbols, careTime, careLessonLabel, careProgress, canCareContact, recentlyContacted, careAggregate, nextCareCell, type CareCell, type CareSnapshot, type PersonalCare } from '@/lib/learning-care';
 import './learning-care.css';
+import { CareChannels, CareDeliveryResults } from './learning-care-channels';
+import type { CareDeliveryReceipt, CareDeliverySelection } from '@/lib/learning-care-channels';
 import { CareStudentDetail } from './learning-care-detail';
 import { AdminDrawer } from '@/features/admin-ui';
 import { CareOverview } from './learning-care-overview';
@@ -51,7 +53,9 @@ export function AdminLearningCare({ actorId, messagesEnabled = process.env.NEXT_
   const { data, error, reload } = useCare<CareSnapshot>('/api/admin/learning-care' + (cohort ? '?cohort=' + cohort : ''), actorId);
   const [tab, setTab] = useState('overview'), [search, setSearch] = useState(''), [filter, setFilter] = useState('all'), [lessonId, setLessonId] = useState(''), [selected, setSelected] = useState<string[]>([]), [detailId, setDetailId] = useState(''), [compose, setCompose] = useState(false), [content, setContent] = useState(''), [sending, setSending] = useState(false), [notice, setNotice] = useState('');
   const [composerTarget, setComposerTarget] = useState<{ cohortId: string; lessonId: string; recipients: string[]; names: string[] } | null>(null);
-  const [retry, setRetry] = useState<{ requestId: string; cohortId: string; lessonId: string; recipients: string[]; content: string } | null>(null);
+  const [retry, setRetry] = useState<{ requestId: string; cohortId: string; lessonId: string; recipients: string[]; content: string; delivery?: CareDeliverySelection } | null>(null);
+  const [delivery, setDelivery] = useState<CareDeliverySelection|null|undefined>(null);
+  const [deliveryReceipt, setDeliveryReceipt] = useState<CareDeliveryReceipt|null>(null);
   const sendGate = useRef(false);
   const lessons = data?.rows[0]?.cells || [];
   const chosenLesson = lessons.find(c => c.lessonId === lessonId) || lessons.find(c => c.track === 'daily') || lessons[0];
@@ -69,20 +73,21 @@ export function AdminLearningCare({ actorId, messagesEnabled = process.env.NEXT_
   const selectedCohort = data?.cohorts.find(c => c.id === data.cohortId);
   function resetSelection() { setSelected([]); setDetailId(''); setNotice(''); }
   async function send() {
-    if (!data || sendGate.current || !composerTarget) return;
+    if (!data || sendGate.current || !composerTarget || (!retry && delivery === null)) return;
     sendGate.current = true;
     clearAdminCare();
     const { cohortId, lessonId, recipients } = composerTarget;
-    const payload = retry || { requestId: crypto.randomUUID(), cohortId, lessonId, recipients, content: content.trim() };
+    const payload = retry || { requestId: crypto.randomUUID(), cohortId, lessonId, recipients, content: content.trim(), ...(delivery ? {delivery} : {}) };
     setRetry(payload); setSending(true); setNotice('');
     try {
-      const response = await fetch('/api/admin/learning-care', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const prior = retry?.delivery ? await fetch('/api/admin/learning-care/channels?request='+retry.requestId,{cache:'no-store'}) : null;
+      const response = prior && prior.status !== 404 ? prior : await fetch('/api/admin/learning-care', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const result = await response.json();
       if (!response.ok) { if (response.status < 500 && response.status !== 429) setRetry(null); throw new Error(result.error || '발송 결과를 확인하지 못했습니다.'); }
-      setRetry(null); setCompose(false); setSelected([]); reload(); setNotice(`${result.count}명에게 학습 안내를 보냈습니다. 메시지함에서 발송 내역을 확인할 수 있습니다.`);
+      setRetry(null); setCompose(false); setSelected([]); reload(); setDeliveryReceipt(result.deliveries ? result : null); setNotice(`${result.count}명의 사이트 메시지함에 학습 안내를 저장했습니다.${result.deliveries?.length ? ' 외부 알림은 아래에서 결과를 확인해 주세요.' : ''}`);
     } catch (error) { setNotice(error instanceof Error ? error.message : '발송 결과를 다시 확인해 주세요.'); } finally { sendGate.current = false; setSending(false); }
   }
-  function prepare() { if (!data?.cohortId) return; setComposerTarget({ cohortId: data.cohortId, lessonId: currentLesson, recipients: [...selected], names: data.rows.filter(r => selected.includes(r.memberId)).map(r => r.name || '이름 미등록') }); setContent(`[학습 안내] ${chosenLesson?.title || ''}\n\n지금 할 수 있는 한 단계부터 함께 이어가요. 마이페이지의 ‘지금 할 일’에서 이어갈 수 있어요. 막히는 부분은 질문·답변에 남겨 주세요.\nhttps://brandyaction-edu.com/my`); setCompose(true); }
+  function prepare() { if (!data?.cohortId) return; setDelivery(null); setComposerTarget({ cohortId: data.cohortId, lessonId: currentLesson, recipients: [...selected], names: selected.map(id => data.rows.find(r=>r.memberId===id)?.name || '이름 미등록') }); setContent(`[학습 안내] ${chosenLesson?.title || ''}\n\n지금 할 수 있는 한 단계부터 함께 이어가요. 마이페이지의 ‘지금 할 일’에서 이어갈 수 있어요. 막히는 부분은 질문·답변에 남겨 주세요.\nhttps://brandyaction-edu.com/my`); setCompose(true); }
   return <div className="learning-care">
     <fieldset className="care-workspace" disabled={compose}>
     <header className="care-header"><div><span className="care-eyebrow">수강생 관리</span><h1>수강생 현황</h1><p>한 사람의 다음 걸음까지, 함께 확인합니다.</p></div><div className="care-header-actions">{data && <div className="care-controls"><label>기수<select value={data.cohortId || ''} onChange={e => { setCohort(e.target.value); setLessonId(''); setSearch(''); setFilter('all'); resetSelection(); }}>{data.cohorts.map(c => <option value={c.id} key={c.id}>{c.courseTitle} · {c.name}{c.status ? ' · ' + careCohortStatus[c.status] : ''}{c.memberCount !== undefined ? ` (${c.memberCount}명)` : ''}</option>)}</select></label><small>{careTime(data.asOf)} 기준 · 한국 시간</small></div>}<button className="btn" onClick={() => { resetSelection(); reload(); }}><RefreshCw/> 새로고침</button></div></header>
@@ -106,11 +111,12 @@ export function AdminLearningCare({ actorId, messagesEnabled = process.env.NEXT_
     </>}
     </fieldset>
     {notice && !compose && <p role="status" aria-label="안내 발송 결과" className="care-notice">{notice}</p>}
+    {deliveryReceipt && <CareDeliveryResults key={deliveryReceipt.requestId} initial={deliveryReceipt} names={Object.fromEntries((data?.rows || []).map(r=>[r.memberId,r.name || '회원']))}/>}
     {detail && data && <CareStudentDetail key={detail.enrollmentId} row={detail} asOf={data.asOf} messagesEnabled={messagesEnabled} onClose={() => setDetailId('')} onEncourage={(row, cell) => {
-      setDetailId(''); setComposerTarget({ cohortId: data.cohortId!, lessonId: cell.lessonId, recipients: [row.memberId], names: [row.name || '회원'] });
+      setDetailId(''); setDelivery(null); setComposerTarget({ cohortId: data.cohortId!, lessonId: cell.lessonId, recipients: [row.memberId], names: [row.name || '회원'] });
       setContent(`[학습 안내] ${cell.title}\n\n${row.name || '회원'}님, 지금 할 수 있는 한 단계부터 함께 이어가요. 막히는 부분은 질문·답변에 남겨 주세요.\nhttps://brandyaction-edu.com/my`); setNotice(''); setCompose(true);
     }}/>}
-    {compose && data && <AdminDrawer title="학습 안내 확인" onClose={() => { if (!sending && !retry) setCompose(false); }}><section className="admin-dialog-body care-compose" aria-label="학습 안내 확인"><h2>{composerTarget?.recipients.length}명에게 학습 안내</h2>{notice && <p role="alert">{notice}</p>}<p>받는 사람: {composerTarget?.names.join(', ')}</p><label htmlFor="care-message-content">안내 내용</label><textarea id="care-message-content" rows={6} maxLength={5000} value={content} disabled={sending || !!retry} onChange={e => setContent(e.target.value)}/><p className="care-note">완료·검토 대기·공개 전·24시간 내 안내한 회원은 제외합니다. 발송 직전 다시 확인하며, 조건이 바뀌면 전체 발송을 멈춥니다. 메시지함에 저장되며 푸시는 수신 설정에 따라 달라질 수 있습니다.</p><div className="care-controls"><button className="btn primary" disabled={sending || !content.trim()} onClick={() => void send()}>{sending ? '결과 확인 중…' : retry ? '발송 결과 다시 확인' : '확인한 대상에게 보내기'}</button><button className="btn" disabled={sending || !!retry} onClick={() => setCompose(false)}>취소</button><Link href="/my/messages">보낸 메시지 보기</Link></div></section></AdminDrawer>}
+    {compose && data && <AdminDrawer title="학습 안내 확인" onClose={() => { if (!sending && !retry) setCompose(false); }}><section className="admin-dialog-body care-compose" aria-label="학습 안내 확인"><h2>{composerTarget?.recipients.length}명에게 학습 안내</h2>{notice && <p role="alert">{notice}</p>}<p>받는 사람: {composerTarget?.names.slice(0,3).join(', ')}{composerTarget && composerTarget.names.length>3 ? ` 외 ${composerTarget.names.length-3}명` : ''}</p><CareChannels names={composerTarget?.names || []} members={composerTarget?.recipients || []} disabled={sending || !!retry} onChange={setDelivery}/><label htmlFor="care-message-content">안내 내용</label><textarea id="care-message-content" rows={6} maxLength={5000} value={content} disabled={sending || !!retry} onChange={e => setContent(e.target.value)}/><p className="care-note">완료·검토 대기·공개 전·24시간 내 안내한 회원은 제외합니다. 발송 직전 다시 확인하며, 조건이 바뀌면 전체 발송을 멈춥니다. 학습 진행 안내용으로만 사용해 주세요. 상품·할인 등 광고 내용은 넣지 않습니다.</p><div className="care-controls"><button className="btn primary" disabled={sending || !content.trim() || (!retry && delivery === null)} onClick={() => void send()}>{sending ? '결과 확인 중…' : retry ? '발송 결과 다시 확인' : '확인한 대상에게 보내기'}</button><button className="btn" disabled={sending || !!retry} onClick={() => setCompose(false)}>취소</button><Link href="/my/messages">보낸 메시지 보기</Link></div></section></AdminDrawer>}
   </div>;
 }
 

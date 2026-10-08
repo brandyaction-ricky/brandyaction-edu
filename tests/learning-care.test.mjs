@@ -50,6 +50,7 @@ test('DAY drill-down excludes unpublished students and keeps review and locked s
 const uuid='11111111-1111-4111-8111-111111111111';
 function harness({user={id:uuid},allowed=true,error=null,member=false}={}){
  const calls=[],mocks={
+ '@/lib/learning-care-delivery-server':{careDeliveryConfiguration:async()=>({enabled:false})},
  '@/lib/server-auth':{getAuthenticatedUser:async()=>user},
  '@/lib/operator-permissions':{getOperatorUser:async(scope,actor)=>{assert.equal(scope,'members');assert.equal(actor,user);return allowed?actor:null;}},
  '@/lib/edu-workflows':{uuid:v=>typeof v==='string'&&/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(v)},
