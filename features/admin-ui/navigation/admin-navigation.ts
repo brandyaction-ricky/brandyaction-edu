@@ -37,6 +37,7 @@ export type AdminNavigationItem = {
 };
 
 const adminNavigationIcons: Record<string, LucideIcon> = {
+  'learning-care': ChartNoAxesCombined,
   products: Package,
   cohorts: CalendarDays,
   learning: GraduationCap,
@@ -71,7 +72,7 @@ export function adminNavigationIcon(key: string): LucideIcon {
 }
 
 export const adminNavigationGroups = [
-  ['클래스 관리', ['learning', 'products', 'cohorts', 'contents', 'missions', 'members', 'reviews', 'questions']],
+  ['클래스 관리', ['learning-care', 'learning', 'products', 'cohorts', 'contents', 'missions', 'members', 'reviews', 'questions']],
   ['고객 관리', ['customers', 'tags', 'coupons', 'product-reviews']],
   ['콘텐츠 관리', ['banners', 'articles', 'testimonials']],
   ['주문·매출', ['orders']],
@@ -80,6 +81,7 @@ export const adminNavigationGroups = [
 
 export const adminNavigationTitles: Record<string, string> = {
   'diagnosis-management': 'N6 진단 관리',
+  'learning-care': '수강생 현황',
   products: '상품·판매 설정',
   conversion: '모집·문의 검토',
   landing: '광고·웨비나 성과',
@@ -147,7 +149,7 @@ export function normalizeAdminSectionKey(current: string) {
 }
 
 export function adminContentWidth(section: string): AdminContentWidth {
-  if (['diagnosis-management', 'learning', 'learning-editor', 'landing', 'analytics', 'orders', 'customers', 'conversion', 'members', 'reviews'].includes(section)) return 'wide';
+  if (['learning-care', 'diagnosis-management', 'learning', 'learning-editor', 'landing', 'analytics', 'orders', 'customers', 'conversion', 'members', 'reviews'].includes(section)) return 'wide';
   if (['seo', 'settings', 'staff'].includes(section)) return 'narrow';
   return 'standard';
 }
