@@ -295,6 +295,8 @@ export async function GET(request: Request) {
                         : '*';
                 const serverPaged = adminMode && !productEditorRead && table === primaryTable && !['home', 'members', 'reviews', 'analytics', 'metrics', 'seo', 'settings', 'staff', 'templates', 'campaigns', 'automations'].includes(sectionKey);
                 let query = db.from(table).select(columns, serverPaged ? { count: 'exact' } : undefined);
+                // Export credentials belong only to the server integration, including admin reads.
+                if (table === 'site_settings') query = query.neq('key', 'export_v1');
                 if (adminMode && table === 'coupons' && operator?.role !== 'admin') query = query.neq('discount_type', 'ADMIN_FREE');
                 if (adminMode && sectionKey === 'customers' && table === 'profiles' && memberScope) query = query.eq('id', memberScope);
                 if (adminMode && sectionKey === 'questions' && table === 'edu_questions') {
@@ -972,6 +974,7 @@ export async function POST(request: Request) {
                 values.status = 'answered';
             }
             if (section.table === 'site_settings') {
+                if (values.key === 'export_v1' || body.id === 'export_v1') fail('서버 연동 설정은 이 화면에서 변경할 수 없습니다.', 403);
                 if (values.key === 'edu_app_branding' || body.id === 'edu_app_branding') fail('앱 아이콘 설정에서 변경해 주세요.', 403);
                 if (values.key === 'edu_learning_notice' || body.id === 'edu_learning_notice') fail('전체 학습 공지 설정에서 변경해 주세요.', 403);
                 if (!String(values.key || body.id).startsWith('edu_')) fail('설정 이름은 edu_로 시작해 주세요.');
