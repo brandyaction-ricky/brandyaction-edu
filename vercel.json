@@ -62,7 +62,10 @@
       "codex/edu-care-navigation-speed-20261008": false,
       "codex/edu-robots-txt-20261008": false,
       "codex/edu-care-robots-release-20261008": false,
-      "codex/edu-b14-release-20261008": false
+      "codex/edu-b14-release-20261008": false,
+      "codex/edu-care-followup-dev-20261008": false,
+      "codex/edu-care-delivery-channels-20261008": false,
+      "codex/edu-care-learning-release-20261008": false
     }
   },
   "regions": [
@@ -83,6 +86,10 @@
     },
     {
       "path": "/api/cron/diagnosis-notifications",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/learning-care-delivery",
       "schedule": "* * * * *"
     }
   ]

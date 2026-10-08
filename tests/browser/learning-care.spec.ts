@@ -7,6 +7,7 @@ async function backend(page:Page,fail=false) {
  const sent: Record<string,unknown>[]=[];
  await page.route('**/api/admin/member-conversation**',r=>r.fulfill({json:{rows:[],nextCursor:null}}));
  await page.route('**/api/admin/learning-care**',async r=>{
+  if(new URL(r.request().url()).pathname.endsWith('/channels')){await r.fulfill({json:{config:{enabled:false},reach:[]}});return;}
   if(r.request().method()==='POST'){sent.push(r.request().postDataJSON());await r.fulfill({json:{count:1}});return;}
   await r.fulfill({status:fail?503:200,json:fail?{error:'합성 조회 실패'}:snapshot});
  });
@@ -22,7 +23,7 @@ test('student and DAY views show actual statuses, safe recipient selection and r
  await page.getByRole('checkbox',{name:'가상 지민 안내 선택'}).check();await page.getByRole('button',{name:'선택한 1명 안내 내용 작성'}).click();
  await expect(page.getByRole('region',{name:'학습 안내 확인'})).toContainText('가상 지민');expect(sent).toHaveLength(0);
  await expect(page.getByRole('tab',{name:'수강생별'})).toBeDisabled();
- await page.getByRole('button',{name:'확인한 대상에게 보내기'}).click();await expect(page.getByRole('status',{name:'안내 발송 결과'})).toContainText('1명에게 학습 안내를 보냈습니다');expect(sent).toHaveLength(1);expect(sent[0].recipients).toEqual([rows[0].memberId]);expect(sent[0].lessonId).toBe(lesson);
+ await page.getByRole('button',{name:'확인한 대상에게 보내기'}).click();await expect(page.getByRole('status',{name:'안내 발송 결과'})).toContainText('1명의 사이트 메시지함에 학습 안내를 저장했습니다');expect(sent).toHaveLength(1);expect(sent[0].recipients).toEqual([rows[0].memberId]);expect(sent[0].lessonId).toBe(lesson);
 });
 test('search and filters cover full cohort, share view and saved PNG omit private data',async({page})=>{
  await backend(page);await page.goto('/learning-care-test');await page.getByRole('tab',{name:'수강생별',exact:true}).click();await page.getByPlaceholder('이름 또는 이메일').fill('수빈');await expect(page.getByText('1개 수강 기록')).toBeVisible();
@@ -42,7 +43,7 @@ test('uncertain send retains its exact request and disables edits until the rece
   attempts.push(route.request().postDataJSON());await route.fulfill(attempts.length===1?{status:503,json:{error:'발송 결과를 확인하지 못했습니다.'}}:{json:{count:1}});
  });
  await page.goto('/learning-care-test');await page.getByRole('tab',{name:'일차별'}).click();await page.getByRole('button',{name:'안내할 수강생 선택 · 최대 100명'}).click();await page.getByRole('button',{name:'선택한 1명 안내 내용 작성'}).click();await page.getByRole('button',{name:'확인한 대상에게 보내기'}).click();
- await expect(page.getByRole('alert')).toContainText('발송 결과를 확인하지 못했습니다');await expect(page.getByRole('textbox',{name:'안내 내용',exact:true})).toBeDisabled();await page.getByRole('button',{name:'발송 결과 다시 확인'}).click();await expect(page.getByRole('status',{name:'안내 발송 결과'})).toContainText('1명에게');expect(attempts).toHaveLength(2);expect(attempts[0]).toEqual(attempts[1]);
+ await expect(page.getByRole('alert')).toContainText('발송 결과를 확인하지 못했습니다');await expect(page.getByRole('textbox',{name:'안내 내용',exact:true})).toBeDisabled();await page.getByRole('button',{name:'발송 결과 다시 확인'}).click();await expect(page.getByRole('status',{name:'안내 발송 결과'})).toContainText('1명의');expect(attempts).toHaveLength(2);expect(attempts[0]).toEqual(attempts[1]);
 });
 test('30-day tiles distinguish completion from support needs and DAY cards open the exact filtered roster',async({page})=>{
  await backend(page);
@@ -67,7 +68,7 @@ test('learning completions remain visible before mission release; detail actions
  const {sent}=await backend(page);
  const activeRow={...rows[0],cells:[cell('completed',1),cell('not_submitted',2),...Array.from({length:30},(_,i)=>({...cell('scheduled',i+3),track:'daily',title:'아주 긴 미션 제목 '.repeat(20)}))]};
  await page.route('**/api/admin/learning-care**',async route=>{
-  if(route.request().method()==='POST'){await route.fallback();return;}
+  if(route.request().method()==='POST'||new URL(route.request().url()).pathname.endsWith('/channels')){await route.fallback();return;}
   await route.fulfill({json:{...snapshot,rows:[activeRow]}});
  });
  await page.goto('/learning-care-test');
