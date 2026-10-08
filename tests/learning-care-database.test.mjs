@@ -10,7 +10,7 @@ async function setup(t) {
  await f.db.exec(`reset role;
  alter table profiles add column email text; alter table profiles add column phone text;
  alter table courses add column category text default 'paid_class';
- alter table cohorts add column name text default '가상 기수'; alter table cohorts add column status text default 'active'; alter table cohorts add column operation_end_at timestamptz;
+ alter table cohorts add column name text default '가상 기수'; alter table cohorts add column status text default 'active'; alter table cohorts add column operation_end_at timestamptz; alter table cohorts add column operation_start_at timestamptz;
  alter table curriculum_weeks add column week_number integer default 1;
  alter table curriculum_lessons add column day_number integer default 1;
  create table edu_ongoing_rules(lesson_id uuid primary key);
@@ -28,6 +28,7 @@ async function setup(t) {
  const original=read('20261008052124_learning_care_dashboard.sql').split('create function public.edu_admin_learning_care')[0];
  await f.db.exec(original.replaceAll('edu_learning_care_cells','edu_learning_care_cells_reference')+'commit;');
  await f.db.exec(read('20261008073102_learning_care_batch_projection.sql'));
+ await f.db.exec(read('20261008084305_learning_care_cohort_history.sql'));
  f.parity=async()=>{const result=await f.db.query('select edu_private.edu_learning_care_cells($1) as actual, edu_private.edu_learning_care_cells_reference($1) as expected',[f.enrollment]);assert.deepEqual(result.rows[0].actual,result.rows[0].expected);};
  await f.db.exec('set role service_role');
  f.snapshot = async(actor=f.admin,cohort=f.cohort)=>{await f.parity();return(await f.db.query('select edu_admin_learning_care($1,$2) as r',[actor,cohort])).rows[0].r;};
@@ -56,7 +57,7 @@ test('care handles change requests, daily cap and corrupt mappings without false
  await f.db.query('update curriculum_lessons set archived_at=now() where id=$1',[f.lesson]);await f.add('daily',1);await f.db.query('update curriculum_lessons set archived_at=null where id=$1',[f.lesson]);
  assert.equal((await f.snapshot()).rows[0].cells.find(c=>c.lessonId===f.lesson).state,'error');await assert.rejects(f.send(),/CARE_RECIPIENT_CHANGED/);
 });
-test('snapshot excludes revoked, expired, withdrawn and operators, and keeps complete cohort beyond 100 rows',async t=>{
+test('snapshot excludes revoked, withdrawn and operators, retains expired history, and keeps cohort beyond 100 rows',async t=>{
  const f=await setup(t);
  for(let n=0;n<105;n++){const member=id();await f.db.query("insert into profiles(id,role,status,full_name) values($1,'student','active',$2)",[member,'합성 '+n]);await f.db.query("insert into enrollments values($1,$2,$3,'active',null,now()-interval '1 day',null,$4)",[id(),member,f.course,f.cohort]);}
  assert.equal((await f.snapshot()).rows.length,106);
@@ -65,6 +66,30 @@ test('snapshot excludes revoked, expired, withdrawn and operators, and keeps com
  await f.db.query("update enrollments set access_ends_at=null where id=$1",[f.enrollment]);await f.db.query("update profiles set role='admin' where id=$1",[f.student]);assert.equal((await f.snapshot()).rows.length,105);
  await f.db.query("update profiles set role='member',status='withdrawn' where id=$1",[f.student]);await assert.rejects(f.personal(),/CARE_FORBIDDEN/);
  assert.equal((await f.snapshot(f.admin,id())).rows.length,0);
+});
+test('cohort choices include empty new cohorts and completed cohorts; default prefers the current cohort',async t=>{
+ const f=await setup(t),next=id(),past=id();
+ await f.db.query("update cohorts set status='in_progress',operation_start_at=now()-interval '3 days' where id=$1",[f.cohort]);
+ await f.db.query("insert into cohorts(id,course_id,name,status,operation_start_at) values($1,$2,'5기','upcoming',now()+interval '30 days')",[next,f.course]);
+ await f.db.query("insert into cohorts(id,course_id,name,status,operation_start_at,operation_end_at) values($1,$2,'3기','completed',now()-interval '90 days',now()-interval '30 days')",[past,f.course]);
+ const initial=await f.snapshot(f.admin,null);
+ assert.equal(initial.cohortId,f.cohort);assert.equal(initial.cohorts.length,3);
+ assert.equal(initial.cohorts.find(c=>c.id===next).memberCount,0);
+ assert.equal(initial.cohorts.find(c=>c.id===past).status,'completed');
+ assert.equal((await f.snapshot(f.admin,next)).rows.length,0);
+ await f.db.query('update enrollments set cohort_id=$1 where id=$2',[past,f.enrollment]);
+ assert.equal((await f.snapshot(f.admin,f.cohort)).rows.length,0);
+ const history=await f.snapshot(f.admin,past);
+ assert.equal(history.rows.length,1);assert.equal(history.rows[0].memberId,f.student);
+ assert.equal(history.rows[0].contactEligible,true); // cohort end never revokes lifetime access
+});
+test('expired access remains in admin history, never becomes a send target or learner access grant',async t=>{
+ const f=await setup(t);await f.approve(await f.submitCell());
+ await f.db.query("update enrollments set status='expired',access_ends_at=now()-interval '1 day' where id=$1",[f.enrollment]);
+ const snapshot=await f.snapshot();assert.equal(snapshot.rows.length,1);
+ assert.equal(snapshot.rows[0].cells[0].state,'completed');assert.equal(snapshot.rows[0].contactEligible,false);
+ assert.equal((await f.personal()).rows.length,0);await assert.rejects(f.send(),/CARE_RECIPIENT_CHANGED/);
+ await f.db.query("update enrollments set status='refunded' where id=$1",[f.enrollment]);assert.equal((await f.snapshot()).rows.length,0);
 });
 test('send rechecks recipients, rolls back changed group, and replays receipt without duplicate delivery',async t=>{
  const f=await setup(t), request=id();

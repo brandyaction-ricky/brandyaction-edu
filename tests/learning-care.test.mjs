@@ -14,6 +14,7 @@ test('contact safety excludes pending, completed, locked, recent contact; next s
  for(const state of ['completed','submitted','locked','scheduled','error'])assert.equal(logic.canCareContact({cells:[cell(state)]},'lesson',asOf),false);
  const row={cells:[cell('not_submitted')],lastContactAt:'2026-10-08T07:00:00Z'};
  assert.equal(logic.canCareContact(row,'lesson',asOf),false);row.lastContactAt='2026-10-06T07:00:00Z';assert.equal(logic.canCareContact(row,'lesson',asOf),true);
+ assert.equal(logic.canCareContact({...row,contactEligible:false},'lesson',asOf),false);
  assert.equal(logic.nextCareCell([cell('not_submitted'),cell('submitted'),cell('changes_requested')]).state,'changes_requested');
 });
 test('share projection contains aggregates only and deduplicates student counts across enrollments',()=>{

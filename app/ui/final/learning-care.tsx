@@ -1,23 +1,25 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, ChartNoAxesCombined, RefreshCw, Users, Download, X } from 'lucide-react';
-import { careLabels, careSymbols, careTime, careLessonLabel, careProgress, canCareContact, recentlyContacted, careAggregate, nextCareCell, type CareCell, type CareSnapshot, type PersonalCare } from '@/lib/learning-care';
+import { ArrowRight, ChartNoAxesCombined, RefreshCw, Users, Download } from 'lucide-react';
+import { careCohortStatus, careLabels, careSymbols, careTime, careLessonLabel, careProgress, canCareContact, recentlyContacted, careAggregate, nextCareCell, type CareCell, type CareSnapshot, type PersonalCare } from '@/lib/learning-care';
 import './learning-care.css';
-import { MemberConversation } from './member-conversation';
+import { CareStudentDetail } from './learning-care-detail';
 import { AdminDrawer } from '@/features/admin-ui';
 import { CareOverview } from './learning-care-overview';
+import { clearAdminCare, readAdminCare } from '@/lib/learning-care-client';
 
-function useCare<T>(url: string) {
+function useCare<T>(url: string, actorId?: string) {
   const [snapshot, setSnapshot] = useState<{ key: string; data: T } | null>(null), [error, setError] = useState(''), [revision, setRevision] = useState(0);
-  const key = url + ':' + revision;
+  const key = (actorId || '') + ':' + url + ':' + revision;
   useEffect(() => {
     const controller = new AbortController();
-    fetch(url, { cache: 'no-store', signal: controller.signal }).then(async response => { const data = await response.json(); if (!response.ok) throw new Error(data.error); return data as T; })
+    const request = actorId ? readAdminCare(actorId, url, revision > 0) as Promise<T> : fetch(url, { cache: 'no-store', signal: controller.signal }).then(async response => { const data = await response.json(); if (!response.ok) throw new Error(data.error); return data as T; });
+    request
       .then(data => { if (!controller.signal.aborted) { setSnapshot({ key, data }); setError(''); } })
       .catch(error => { if (!controller.signal.aborted) setError(error.message || '다시 불러와 주세요.'); });
     return () => controller.abort();
-  }, [url, key]);
+  }, [url, key, actorId, revision]);
   return { data: snapshot?.key === key ? snapshot.data : null, error, reload: () => { setError(''); setRevision(n => n + 1); } };
 }
 function StatePill({ cell }: { cell: CareCell }) { return <span className={'care-state care-' + cell.state}>{careSymbols[cell.state]} {careLabels[cell.state]}</span>; }
@@ -44,9 +46,9 @@ function ShareSummary({ data }: { data: CareSnapshot }) {
   return <><section className="care-share" aria-label="개인정보 없는 공유용 요약"><span className="care-eyebrow">BRANDYACTION EDU · 함께 쌓는 실행</span><h2>배움이 실행으로<br/>이어지고 있습니다.</h2><p>{title}</p><div className="care-share-stats"><div><strong>{a.members}<small>명</small></strong><span>함께하는 수강생</span></div><div><strong>{a.learning}<small>건</small></strong><span>학습 완료</span></div><div><strong>{a.missions}<small>건</small></strong><span>미션 완료</span></div></div><div className="care-share-growth">최근 7일, <b>{a.recent}개의 새로운 완료</b>가 쌓였습니다.</div><small>{careTime(data.asOf)} 기준 · 현재 공개된 학습·미션의 완료 기록</small></section><p className="care-note">공유 이미지에는 이름·이메일·개인별 진도가 들어가지 않습니다. 전체 기수 기준이며 검색 필터는 적용하지 않습니다.</p><button className="btn" onClick={() => exportSummary(title, a, data.asOf)}><Download/> 공유 이미지 저장</button></>;
 }
 
-export function AdminLearningCare({ messagesEnabled = process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === 'true' }: { messagesEnabled?: boolean } = {}) {
+export function AdminLearningCare({ actorId, messagesEnabled = process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === 'true' }: { actorId?: string; messagesEnabled?: boolean } = {}) {
   const [cohort, setCohort] = useState('');
-  const { data, error, reload } = useCare<CareSnapshot>('/api/admin/learning-care' + (cohort ? '?cohort=' + cohort : ''));
+  const { data, error, reload } = useCare<CareSnapshot>('/api/admin/learning-care' + (cohort ? '?cohort=' + cohort : ''), actorId);
   const [tab, setTab] = useState('overview'), [search, setSearch] = useState(''), [filter, setFilter] = useState('all'), [lessonId, setLessonId] = useState(''), [selected, setSelected] = useState<string[]>([]), [detailId, setDetailId] = useState(''), [compose, setCompose] = useState(false), [content, setContent] = useState(''), [sending, setSending] = useState(false), [notice, setNotice] = useState('');
   const [composerTarget, setComposerTarget] = useState<{ cohortId: string; lessonId: string; recipients: string[]; names: string[] } | null>(null);
   const [retry, setRetry] = useState<{ requestId: string; cohortId: string; lessonId: string; recipients: string[]; content: string } | null>(null);
@@ -64,10 +66,12 @@ export function AdminLearningCare({ messagesEnabled = process.env.NEXT_PUBLIC_ED
     return filter === 'all' || cells.some(c => c.state === filter);
   });
   const aggregate = data ? careAggregate(data.rows, data.asOf) : null;
+  const selectedCohort = data?.cohorts.find(c => c.id === data.cohortId);
   function resetSelection() { setSelected([]); setDetailId(''); setNotice(''); }
   async function send() {
     if (!data || sendGate.current || !composerTarget) return;
     sendGate.current = true;
+    clearAdminCare();
     const { cohortId, lessonId, recipients } = composerTarget;
     const payload = retry || { requestId: crypto.randomUUID(), cohortId, lessonId, recipients, content: content.trim() };
     setRetry(payload); setSending(true); setNotice('');
@@ -81,10 +85,12 @@ export function AdminLearningCare({ messagesEnabled = process.env.NEXT_PUBLIC_ED
   function prepare() { if (!data?.cohortId) return; setComposerTarget({ cohortId: data.cohortId, lessonId: currentLesson, recipients: [...selected], names: data.rows.filter(r => selected.includes(r.memberId)).map(r => r.name || '이름 미등록') }); setContent(`[학습 안내] ${chosenLesson?.title || ''}\n\n지금 할 수 있는 한 단계부터 함께 이어가요. 마이페이지의 ‘지금 할 일’에서 이어갈 수 있어요. 막히는 부분은 질문·답변에 남겨 주세요.\nhttps://brandyaction-edu.com/my`); setCompose(true); }
   return <div className="learning-care">
     <fieldset className="care-workspace" disabled={compose}>
-    <header className="care-header"><div><span className="care-eyebrow">수강생 관리</span><h1>수강생 현황</h1><p>한 사람의 다음 걸음까지, 함께 확인합니다.</p></div><div className="care-header-actions">{data && <div className="care-controls"><label>기수<select value={data.cohortId || ''} onChange={e => { setCohort(e.target.value); setLessonId(''); resetSelection(); }}>{data.cohorts.map(c => <option value={c.id} key={c.id}>{c.courseTitle} · {c.name}</option>)}</select></label><small>{careTime(data.asOf)} 기준 · 한국 시간</small></div>}<button className="btn" onClick={() => { resetSelection(); reload(); }}><RefreshCw/> 새로고침</button></div></header>
+    <header className="care-header"><div><span className="care-eyebrow">수강생 관리</span><h1>수강생 현황</h1><p>한 사람의 다음 걸음까지, 함께 확인합니다.</p></div><div className="care-header-actions">{data && <div className="care-controls"><label>기수<select value={data.cohortId || ''} onChange={e => { setCohort(e.target.value); setLessonId(''); setSearch(''); setFilter('all'); resetSelection(); }}>{data.cohorts.map(c => <option value={c.id} key={c.id}>{c.courseTitle} · {c.name}{c.status ? ' · ' + careCohortStatus[c.status] : ''}{c.memberCount !== undefined ? ` (${c.memberCount}명)` : ''}</option>)}</select></label><small>{careTime(data.asOf)} 기준 · 한국 시간</small></div>}<button className="btn" onClick={() => { resetSelection(); reload(); }}><RefreshCw/> 새로고침</button></div></header>
     {error && <div role="alert" className="care-error">{error} <button className="btn" onClick={reload}>다시 불러오기</button></div>}
     {!data ? !error && <p role="status">수강생 현황을 불러오는 중입니다.</p> : <>
       
+      {selectedCohort && <p className="care-cohort-context"><b>{selectedCohort.courseTitle} · {selectedCohort.name}</b>{selectedCohort.status && <span>{careCohortStatus[selectedCohort.status]}</span>}<span>수강생 {data.rows.length}명</span>{selectedCohort.status === 'completed' && <small>기수가 종료되어도 수강생과 완료 기록을 계속 확인할 수 있습니다.</small>}</p>}
+      {!data.rows.length && <p role="status" className="care-empty">이 기수에 등록된 수강생이 아직 없습니다. 수강생이 등록되면 여기에 자동으로 나타납니다.</p>}
       <div className="care-tabs" role="tablist" aria-label="현황 보기">{[['overview', '한눈에 보기'], ['students', '수강생별'], ['days', '일차별'], ['share', '공유용 요약']].map(([value, label]) => <button role="tab" aria-selected={tab === value} key={value} onClick={() => { setTab(value); setFilter('all'); resetSelection(); }}>{label}</button>)}</div>
       {tab === 'share' ? <ShareSummary data={data}/> : <>
         {tab !== 'overview' && <div className="care-stats"><div><Users/><span>수강생</span><b>{aggregate!.members}<small>명</small></b></div><div><ChartNoAxesCombined/><span>공개된 학습·미션 진행률</span><b>{aggregate!.percent === null ? '—' : aggregate!.percent + '%'}</b><small>{aggregate!.completed} / {aggregate!.available}건</small></div><div><span>운영자 검토 대기</span><b>{aggregate!.pending}<small>건</small></b><Link href="/admin/reviews?tab=blocks">검토하러 가기 →</Link></div><div><span>최근 7일 완료한 학습·미션</span><b>+{aggregate!.recent}<small>건</small></b></div></div>}
@@ -95,13 +101,16 @@ export function AdminLearningCare({ messagesEnabled = process.env.NEXT_PUBLIC_ED
         <div className="care-legend" aria-label="진행 상태 색상 안내">{(['completed', 'submitted', 'changes_requested', 'not_submitted', 'locked', 'scheduled'] as const).map(state => <span key={state}><i className={'care-' + state}>{careSymbols[state]}</i>{careLabels[state]}</span>)}</div>
         <div className="care-table-scroll"><table className="care-table"><thead><tr><th>수강생</th>{tab === 'days' ? <><th>미션·학습 상태</th><th>마지막 안내</th><th>안내 선택</th></> : <><th>학습 / 미션</th><th>일차별 진행</th><th>최근 방문 · 안내</th></>}</tr></thead><tbody>{filtered.map(row => { const cell = row.cells.find(c => c.lessonId === currentLesson); return <tr key={row.enrollmentId}><th><button className="care-name" onClick={() => setDetailId(row.enrollmentId)}>{row.name || '이름 미등록'} <ArrowRight/></button><small>{row.email || '이메일 미등록'}</small>{row.openQuestions > 0 && <span className="care-question">미답변 {row.openQuestions}건</span>}</th>{tab === 'days' ? <><td>{cell ? <StatePill cell={cell}/> : '대상 아님'}</td><td>{careTime(row.lastContactAt)}</td><td><label><input type="checkbox" aria-label={`${row.name || '회원'} 안내 선택`} checked={selected.includes(row.memberId)} disabled={!canCareContact(row, currentLesson, data.asOf) || (!selected.includes(row.memberId) && selected.length >= 100)} onChange={e => setSelected(ids => e.target.checked ? [...new Set([...ids, row.memberId])] : ids.filter(id => id !== row.memberId))}/> {recentlyContacted(row, data.asOf) ? '최근 안내' : canCareContact(row, currentLesson, data.asOf) ? '선택' : '안내 제외'}</label></td></> : <><td><Meter cells={row.cells} track="learning" label="학습"/><Meter cells={row.cells} track="daily" label="미션"/></td><td><div className="care-grid">{row.cells.map(c => <button className={'care-cell care-' + c.state} key={c.lessonId} title={`${careLessonLabel(c)} ${c.title}: ${careLabels[c.state]}`} aria-label={`${row.name} ${careLessonLabel(c)} ${careLabels[c.state]}`} onClick={() => setDetailId(row.enrollmentId)}>{careSymbols[c.state]}<small>{c.day}</small></button>)}</div></td><td><span>방문 {careTime(row.lastVisitAt)}</span><small>안내 {careTime(row.lastContactAt)}</small></td></>}</tr>; })}</tbody></table></div>
         {!filtered.length && <div className="care-empty">조건에 맞는 수강 기록이 없습니다.</div>}
-        <p className="care-note">진행률은 이 기수에 공개된 학습·미션 기준입니다. 미제출은 제출 기록이 없다는 뜻이며 실제 미실행을 단정하지 않습니다. 방문 기록 없음은 미접속과 다를 수 있습니다. 수강권이 만료·회수된 회원과 운영자는 제외됩니다.</p></>}
+        <p className="care-note">진행률은 이 기수에 공개된 학습·미션 기준입니다. 미제출은 제출 기록이 없다는 뜻이며 실제 미실행을 단정하지 않습니다. 방문 기록 없음은 미접속과 다를 수 있습니다. 종료된 기수의 기록도 포함합니다. 수강권이 회수·환불된 회원, 탈퇴 회원과 운영자는 제외됩니다. 수강권이 만료된 기록은 조회만 가능합니다.</p></>}
       </>}
     </>}
     </fieldset>
     {notice && !compose && <p role="status" aria-label="안내 발송 결과" className="care-notice">{notice}</p>}
-    {detail && <AdminDrawer title="수강생 상세" size="large" onClose={() => setDetailId('')}><section className="care-detail" aria-label="수강생 상세"><header><div><span className="care-eyebrow">한 사람의 학습 여정</span><h2>{detail.name || '회원'}님의 현재 위치</h2></div><button className="btn" aria-label="상세 닫기" onClick={() => setDetailId('')}><X/></button></header><p>최근 방문 {careTime(detail.lastVisitAt)} · 마지막 안내 {careTime(detail.lastContactAt)}</p><div className="care-detail-list">{detail.cells.map(c => <article key={c.lessonId}><div><small>{careLessonLabel(c)}</small><b>{c.title}</b><small>{c.reason}</small></div><StatePill cell={c}/><small>{c.state === 'completed' ? careTime(c.completedAt) : c.submittedAt ? '제출 ' + careTime(c.submittedAt) : ''}</small></article>)}</div><div className="care-controls"><Link className="btn" href={'/admin/reviews?tab=blocks&member=' + detail.memberId}>제출물 검토</Link><Link className="btn" href={'/admin/customers?member=' + detail.memberId}>회원 운영 정보</Link><Link className="btn" href="/my/messages">메시지함</Link></div><details><summary>이 회원과 나눈 질문·메시지 이력</summary><MemberConversation key={detail.memberId} member={detail.memberId}/></details></section></AdminDrawer>}
-    {compose && data && <AdminDrawer title="학습 안내 확인" onClose={() => { if (!sending && !retry) setCompose(false); }}><section className="care-compose" aria-label="학습 안내 확인"><h2>{composerTarget?.recipients.length}명에게 학습 안내</h2>{notice && <p role="alert">{notice}</p>}<p>받는 사람: {composerTarget?.names.join(', ')}</p><label htmlFor="care-message-content">안내 내용</label><textarea id="care-message-content" rows={6} maxLength={5000} value={content} disabled={sending || !!retry} onChange={e => setContent(e.target.value)}/><p className="care-note">완료·검토 대기·공개 전·24시간 내 안내한 회원은 제외합니다. 발송 직전 다시 확인하며, 조건이 바뀌면 전체 발송을 멈춥니다. 메시지함에 저장되며 푸시는 수신 설정에 따라 달라질 수 있습니다.</p><div className="care-controls"><button className="btn primary" disabled={sending || !content.trim()} onClick={() => void send()}>{sending ? '결과 확인 중…' : retry ? '발송 결과 다시 확인' : '확인한 대상에게 보내기'}</button><button className="btn" disabled={sending || !!retry} onClick={() => setCompose(false)}>취소</button><Link href="/my/messages">보낸 메시지 보기</Link></div></section></AdminDrawer>}
+    {detail && data && <CareStudentDetail key={detail.enrollmentId} row={detail} asOf={data.asOf} messagesEnabled={messagesEnabled} onClose={() => setDetailId('')} onEncourage={(row, cell) => {
+      setDetailId(''); setComposerTarget({ cohortId: data.cohortId!, lessonId: cell.lessonId, recipients: [row.memberId], names: [row.name || '회원'] });
+      setContent(`[학습 안내] ${cell.title}\n\n${row.name || '회원'}님, 지금 할 수 있는 한 단계부터 함께 이어가요. 막히는 부분은 질문·답변에 남겨 주세요.\nhttps://brandyaction-edu.com/my`); setNotice(''); setCompose(true);
+    }}/>}
+    {compose && data && <AdminDrawer title="학습 안내 확인" onClose={() => { if (!sending && !retry) setCompose(false); }}><section className="admin-dialog-body care-compose" aria-label="학습 안내 확인"><h2>{composerTarget?.recipients.length}명에게 학습 안내</h2>{notice && <p role="alert">{notice}</p>}<p>받는 사람: {composerTarget?.names.join(', ')}</p><label htmlFor="care-message-content">안내 내용</label><textarea id="care-message-content" rows={6} maxLength={5000} value={content} disabled={sending || !!retry} onChange={e => setContent(e.target.value)}/><p className="care-note">완료·검토 대기·공개 전·24시간 내 안내한 회원은 제외합니다. 발송 직전 다시 확인하며, 조건이 바뀌면 전체 발송을 멈춥니다. 메시지함에 저장되며 푸시는 수신 설정에 따라 달라질 수 있습니다.</p><div className="care-controls"><button className="btn primary" disabled={sending || !content.trim()} onClick={() => void send()}>{sending ? '결과 확인 중…' : retry ? '발송 결과 다시 확인' : '확인한 대상에게 보내기'}</button><button className="btn" disabled={sending || !!retry} onClick={() => setCompose(false)}>취소</button><Link href="/my/messages">보낸 메시지 보기</Link></div></section></AdminDrawer>}
   </div>;
 }
 
