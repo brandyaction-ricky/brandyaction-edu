@@ -23,6 +23,7 @@ export const sectionScopes: Record<string, OperatorScope> = {
   weeks: "products",
   contents: "products",
   missions: "products",
+  "learning-care": "members",
   members: "members",
   reviews: "members",
   questions: "members",

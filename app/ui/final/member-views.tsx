@@ -1,4 +1,5 @@
 "use client";
+import { MemberLearningCare } from "./learning-care";
 import { ConsentSettings } from '../consent-settings';
 import { contentVisibility } from '@/lib/content-visibility';
 import { PushSettings } from './push-settings';
@@ -364,6 +365,7 @@ function Dashboard({
         </section>
         </>}
       </div>
+      {blockLearningEnabled && <MemberLearningCare key={user.id}/>}
       <DiagnosisEntry key={user.id}/>
       <div className="member-stats">
         {[

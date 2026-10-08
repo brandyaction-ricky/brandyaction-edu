@@ -44,6 +44,7 @@ import {
 } from "react";
 import { AdminWorkflows, standaloneAdmin } from "./admin-workflows";
 import { BlocksField, UploadField } from "./editor-fields";
+import { AdminLearningCare } from "./final/learning-care";
 import { AdminCatalog, type MissionScope } from "./final/admin-catalog";
 import { MissionTargetFields, type MissionContext } from "./final/mission-target-fields";
 import { useAdminDialog, useRouteDialog } from "@/features/admin-ui";
@@ -966,6 +967,8 @@ export function Platform({
           <Overview data={data} available={available} />
         ) : !section ? (
           <AdminEmptyState title="이 화면에 접근할 운영 권한이 필요합니다.">운영 홈에서 현재 계정에 표시되는 메뉴를 선택해 주세요.</AdminEmptyState>
+        ) : key === "learning-care" ? (
+          <AdminLearningCare/>
         ) : key === "conversion" ? (
           <ConversionReview workspace initialPeriod={searchParams.get("recruitment") || undefined} initialView={searchParams.get("view") === "inquiries" ? "inquiries" : "recruitment"} userId={user!.id} />
         ) : key === "learning" ? (
