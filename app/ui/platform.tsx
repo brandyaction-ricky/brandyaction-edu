@@ -45,6 +45,7 @@ import {
 import { AdminWorkflows, standaloneAdmin } from "./admin-workflows";
 import { BlocksField, UploadField } from "./editor-fields";
 import { AdminLearningCare } from "./final/learning-care";
+import { clearAdminCare, prefetchAdminCare } from '@/lib/learning-care-client';
 import { AdminCatalog, type MissionScope } from "./final/admin-catalog";
 import { MissionTargetFields, type MissionContext } from "./final/mission-target-fields";
 import { useAdminDialog, useRouteDialog } from "@/features/admin-ui";
@@ -120,6 +121,12 @@ function readAdminSection(
   scopeQuery = "",
 ) {
   const key = `${userId}:${section}:${page}:${record}:${scopeQuery}`;
+  // Start the independently authorized dashboard read alongside the menu read,
+  // including hover/focus prefetch, instead of waiting for the shell to mount.
+  if (section === 'learning-care' && userId !== 'anonymous') {
+    if (forceNetwork) clearAdminCare();
+    prefetchAdminCare(userId);
+  }
   const cached = adminNavigationReads.get(key);
   if (!forceNetwork && cached && (!cached.expiresAt || cached.expiresAt > Date.now()))
     return cached.promise;
@@ -344,6 +351,7 @@ export function Platform({
       if (controller.signal.aborted || !alive.current) return;
       if (admin && [401, 403].includes(response.status)) {
         adminNavigationReads.clear();
+        clearAdminCare();
         cachedAdminUser = result.user || null;
         setUser(cachedAdminUser);
         setData({});
@@ -363,8 +371,10 @@ export function Platform({
         setData(result.data || {});
         setLoadedReadKey(admin ? adminReadKey : publicReadKey);
         setSupport(result.support || { email: "", url: "" });
-        if (admin && cachedAdminUser?.id !== result.user?.id)
+        if (admin && cachedAdminUser?.id !== result.user?.id) {
           adminNavigationReads.clear();
+          clearAdminCare();
+        }
         if (admin) cachedAdminUser = result.user;
         setUser(result.user);
         setPagination(result.pagination || null);
@@ -456,6 +466,7 @@ export function Platform({
         if (!response.ok) throw Object.assign(new Error(result.error || '요청을 처리하지 못했습니다.'), { status: response.status, code: result.code });
         setNotice(result.message || success);
         adminNavigationReads.clear();
+        clearAdminCare();
         await refresh(true);
         return result;
       } catch (e) {
@@ -558,6 +569,7 @@ export function Platform({
     }
     cachedAdminUser = null;
     adminNavigationReads.clear();
+    clearAdminCare();
     setUser(null);
     router.replace("/login");
     router.refresh();
@@ -968,7 +980,7 @@ export function Platform({
         ) : !section ? (
           <AdminEmptyState title="이 화면에 접근할 운영 권한이 필요합니다.">운영 홈에서 현재 계정에 표시되는 메뉴를 선택해 주세요.</AdminEmptyState>
         ) : key === "learning-care" ? (
-          <AdminLearningCare/>
+          <AdminLearningCare key={user!.id} actorId={user!.id}/>
         ) : key === "conversion" ? (
           <ConversionReview workspace initialPeriod={searchParams.get("recruitment") || undefined} initialView={searchParams.get("view") === "inquiries" ? "inquiries" : "recruitment"} userId={user!.id} />
         ) : key === "learning" ? (
