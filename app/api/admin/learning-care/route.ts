@@ -10,7 +10,7 @@ export async function GET(request: Request) {
     const cohort = new URL(request.url).searchParams.get('cohort') || null;
     if (cohort && !uuid(cohort)) return reply({ error: '기수를 확인해 주세요.' }, 400);
     const { data, error } = await createAdminClient().rpc('edu_admin_learning_care', { p_actor: user.id, p_cohort: cohort }).abortSignal(AbortSignal.timeout(20000));
-    if (error) throw error; return reply(data);
+    if (error) throw error; return reply({ ...data, actorId: user.id });
   } catch { return reply({ error: '현황을 불러오지 못했습니다. 다시 시도해 주세요.' }, 503); }
 }
 export async function POST(request: Request) {
