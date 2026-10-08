@@ -39,7 +39,9 @@
       "codex/edu-mobile-refresh-20261005": false,
       "codex/edu-e6-consent-settings-20261007": false,
       "codex/edu-ad-controls-e5-20261007": false,
-      "codex/edu-learning-care-dev-20261008": false
+      "codex/edu-learning-care-dev-20261008": false,
+      "codex/edu-personalization-consent-20261008": false,
+      "codex/edu-consent-reward-dev-20261008": false
     }
   },
   "regions": [
