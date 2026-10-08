@@ -68,7 +68,8 @@
       "codex/edu-care-learning-release-20261008": false,
       "codex/edu-care-learning-only-20261008": false,
       "codex/edu-personalization-consent-20261008": false,
-      "codex/edu-consent-prod-20261008": false
+      "codex/edu-consent-prod-20261008": false,
+      "codex/edu-consent-b14-release-20261008": false
     }
   },
   "regions": [
