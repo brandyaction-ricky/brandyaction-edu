@@ -1,4 +1,5 @@
 "use client";
+import { PersonalizationSettings } from '../personalization-settings';
 import { ConsentSettings } from '../consent-settings';
 import { contentVisibility } from '@/lib/content-visibility';
 import { PushSettings } from './push-settings';
@@ -1154,6 +1155,7 @@ function Profile({
         )}
       </form>
       <LoginEmailSettings email={user.email} />
+      {process.env.NEXT_PUBLIC_EDU_PERSONALIZATION_CONSENT_ENABLED === 'true' && <PersonalizationSettings/>}
       {process.env.NEXT_PUBLIC_EDU_OPTIONAL_CONSENT_ENABLED === 'true' && <ConsentSettings/>}
       {process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' && <EncouragementEditor/>}
     </>
