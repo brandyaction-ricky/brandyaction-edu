@@ -17,7 +17,7 @@ test('student and DAY views show actual statuses, safe recipient selection and r
  const {sent}=await backend(page);await page.goto('/learning-care-test');
  await expect(page.getByRole('heading',{name:'수강생 현황'})).toBeVisible();await expect(page.getByText('4개 수강 기록')).toBeVisible();
  await page.getByRole('tab',{name:'수강생별',exact:true}).click();await page.getByRole('button',{name:'가상 지민',exact:true}).click();await expect(page.getByRole('region',{name:'수강생 상세'})).toContainText('나의 첫 미션');
- await page.getByRole('button',{name:'상세 닫기'}).click();await page.getByRole('tab',{name:'일차별'}).click();
+ await page.getByRole('dialog',{name:'수강생 상세',exact:true}).getByRole('button',{name:'닫기',exact:true}).click();await page.getByRole('tab',{name:'일차별'}).click();
  await expect(page.getByRole('checkbox',{name:'가상 수빈 안내 선택'})).toBeDisabled();await expect(page.getByRole('checkbox',{name:'가상 민준 안내 선택'})).toBeDisabled();await expect(page.getByRole('checkbox',{name:'가상 유나 안내 선택'})).toBeDisabled();
  await page.getByRole('checkbox',{name:'가상 지민 안내 선택'}).check();await page.getByRole('button',{name:'선택한 1명 안내 내용 작성'}).click();
  await expect(page.getByRole('region',{name:'학습 안내 확인'})).toContainText('가상 지민');expect(sent).toHaveLength(0);
@@ -50,6 +50,7 @@ test('30-day tiles distinguish completion from support needs and DAY cards open 
  await page.route('**/api/admin/learning-care**',r=>r.fulfill({json:{...snapshot,rows:cohortRows}}));
  await page.goto('/learning-care-test');
  await expect(page.getByRole('tab',{name:'한눈에 보기'})).toHaveAttribute('aria-selected','true');
+ await page.getByRole('button',{name:'30일 미션 목표',exact:true}).click();
  await expect(page.getByRole('button',{name:'완주 테스트 0 상세 · 전체 30일 7%'})).toHaveClass(/care-band-starting/);
  await expect(page.getByRole('button',{name:'완주 테스트 1 상세 · 전체 30일 10%'})).toHaveClass(/care-band-progressing/);
  await expect(page.getByRole('button',{name:'완주 테스트 2 상세 · 전체 30일 77%'})).toHaveClass(/care-band-progressing/);
@@ -59,6 +60,48 @@ test('30-day tiles distinguish completion from support needs and DAY cards open 
  // Student filters must not alter the cohort-wide DAY denominator.
  await expect(page.getByRole('button',{name:'4일차 명단 보기',exact:true})).toContainText('3/5명 완료');
  await page.getByRole('button',{name:'4일차 보완 요청 1명',exact:true}).click();await expect(page.getByRole('tab',{name:'일차별',exact:true})).toHaveAttribute('aria-selected','true');await expect(page.getByText('1개 수강 기록')).toBeVisible();await expect(page.getByRole('button',{name:'완주 테스트 1',exact:true})).toBeVisible();
- await page.getByRole('tab',{name:'한눈에 보기'}).click();await page.getByRole('button',{name:'완주 테스트 0 상세 · 전체 30일 7%'}).click();await expect(page.getByRole('region',{name:'수강생 상세'})).toContainText('완주 테스트 0님의 현재 위치');await page.getByRole('button',{name:'상세 닫기'}).click();
+ await page.getByRole('tab',{name:'한눈에 보기'}).click();await page.getByRole('button',{name:'30일 미션 목표',exact:true}).click();await page.getByRole('button',{name:'완주 테스트 0 상세 · 전체 30일 7%'}).click();await expect(page.getByRole('region',{name:'수강생 상세'})).toContainText('완주 테스트 0님의 현재 위치');await page.getByRole('dialog',{name:'수강생 상세',exact:true}).getByRole('button',{name:'닫기',exact:true}).click();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+});
+test('learning completions remain visible before mission release; detail actions stay above its scroll and send only after confirmation',async({page})=>{
+ const {sent}=await backend(page);
+ const activeRow={...rows[0],cells:[cell('completed',1),cell('not_submitted',2),...Array.from({length:30},(_,i)=>({...cell('scheduled',i+3),track:'daily',title:'아주 긴 미션 제목 '.repeat(20)}))]};
+ await page.route('**/api/admin/learning-care**',async route=>{
+  if(route.request().method()==='POST'){await route.fallback();return;}
+  await route.fulfill({json:{...snapshot,rows:[activeRow]}});
+ });
+ await page.goto('/learning-care-test');
+ const tile=page.getByRole('button',{name:'가상 지민 상세 · 공개 학습 50%',exact:true});
+ await expect(tile).toBeVisible();await expect(tile).toContainText('미션 공개 전');
+ await tile.click();const dialog=page.getByRole('dialog',{name:'수강생 상세',exact:true});
+ await expect(dialog.getByRole('button',{name:'학습 독려하기',exact:true})).toBeEnabled();
+ await expect(dialog.getByRole('link',{name:'회원 운영 정보'})).toHaveCount(0);
+ await dialog.getByText('앞으로 공개할 학습·미션 30개').click();
+ await dialog.locator('.care-detail-body').evaluate(el=>{el.scrollTop=el.scrollHeight;});
+ const layout=await dialog.evaluate(el=>{
+  const d=el.getBoundingClientRect(),body=el.querySelector('.care-detail-body')!,action=el.querySelector('.care-detail-actions')!.getBoundingClientRect();
+  return {fits:el.scrollWidth<=el.clientWidth+1&&body.scrollWidth<=body.clientWidth+1,actionVisible:action.top>=d.top&&action.bottom<=d.bottom,bodyScrolled:body.scrollTop>0};
+ });
+ expect(layout).toEqual({fits:true,actionVisible:true,bodyScrolled:true});
+ await dialog.getByRole('button',{name:'학습 독려하기',exact:true}).click();
+ const compose=page.getByRole('region',{name:'학습 안내 확인'});
+ await expect(compose).toContainText('가상 지민');await expect(page.getByLabel('안내 내용',{exact:true})).toContainText('학습 2');expect(sent).toHaveLength(0);
+ await page.getByRole('button',{name:'확인한 대상에게 보내기'}).click();
+ await expect.poll(()=>sent.length).toBe(1);expect(sent[0].lessonId).toBe('learning-2');expect(sent[0].recipients).toEqual([activeRow.memberId]);
+});
+test('cohort switching distinguishes completed members and an empty new cohort without carrying filters across cohorts',async({page})=>{
+ await backend(page);
+ const options=[{id:cohort,name:'4기',courseTitle:'문샷',status:'in_progress',memberCount:4},{id:'old',name:'3기',courseTitle:'문샷',status:'completed',memberCount:1},{id:'next',name:'5기',courseTitle:'문샷',status:'upcoming',memberCount:0}];
+ await page.route('**/api/admin/learning-care**',route=>{
+  const selected=new URL(route.request().url()).searchParams.get('cohort')||cohort;
+  return route.fulfill({json:{...snapshot,cohorts:options,cohortId:selected,rows:selected==='next'?[]:selected==='old'?[{...rows[3],name:'이전 기수 수강생'}]:rows}});
+ });
+ await page.goto('/learning-care-test');await page.getByRole('tab',{name:'수강생별',exact:true}).click();
+ await page.getByPlaceholder('이름 또는 이메일').fill('없는 이름');
+ await page.getByRole('combobox',{name:'기수',exact:true}).selectOption('old');
+ await expect(page.getByRole('button',{name:'이전 기수 수강생',exact:true})).toBeVisible();
+ await expect(page.getByText('기수가 종료되어도 수강생과 완료 기록을 계속 확인할 수 있습니다.')).toBeVisible();
+ await page.getByRole('combobox',{name:'기수',exact:true}).selectOption('next');
+ await expect(page.getByRole('status')).toContainText('이 기수에 등록된 수강생이 아직 없습니다');
+ await expect(page.getByRole('button',{name:'이전 기수 수강생',exact:true})).toHaveCount(0);
 });

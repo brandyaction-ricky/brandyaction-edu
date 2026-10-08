@@ -1,7 +1,7 @@
 export type CareState = 'completed' | 'submitted' | 'changes_requested' | 'not_submitted' | 'locked' | 'scheduled' | 'error';
 export type CareCell = { lessonId: string; title: string; week: number; day: number; track: string; state: CareState; published: boolean; completedAt: string | null; submittedAt: string | null; reviewedAt: string | null; submissionId: string | null; reason: string };
-export type CareRow = { enrollmentId: string; memberId: string; name: string | null; email: string | null; cells: CareCell[]; lastVisitAt: string | null; lastContactAt: string | null; openQuestions: number };
-export type CareSnapshot = { cohorts: { id: string; name: string; courseTitle: string }[]; cohortId: string | null; rows: CareRow[]; asOf: string };
+export type CareRow = { enrollmentId: string; memberId: string; name: string | null; email: string | null; cells: CareCell[]; lastVisitAt: string | null; lastContactAt: string | null; openQuestions: number; contactEligible?: boolean };
+export type CareSnapshot = { cohorts: { id: string; name: string; courseTitle: string; status?: 'in_progress' | 'upcoming' | 'completed'; startsAt?: string | null; endsAt?: string | null; memberCount?: number }[]; cohortId: string | null; rows: CareRow[]; asOf: string };
 export type PersonalCare = { asOf: string; rows: { enrollmentId: string; courseTitle: string; cohortName: string; cells: CareCell[] }[] };
 export const careLabels: Record<CareState, string> = { completed: '완료', submitted: '검토 대기', changes_requested: '보완 요청', not_submitted: '미제출', locked: '앞 단계 대기', scheduled: '공개 예정', error: '설정 확인' };
 export const careSymbols: Record<CareState, string> = { completed: '✓', submitted: '◷', changes_requested: '↻', not_submitted: '·', locked: '—', scheduled: '○', error: '!' };
@@ -16,7 +16,7 @@ export function recentlyContacted(row: CareRow, asOf: string) {
   return !!row.lastContactAt && Date.parse(row.lastContactAt) > Date.parse(asOf) - 86400000;
 }
 export function canCareContact(row: CareRow, lessonId: string, asOf: string) {
-  return !recentlyContacted(row, asOf) && row.cells.some(c => c.lessonId === lessonId && ['not_submitted', 'changes_requested'].includes(c.state));
+  return row.contactEligible !== false && !recentlyContacted(row, asOf) && row.cells.some(c => c.lessonId === lessonId && ['not_submitted', 'changes_requested'].includes(c.state));
 }
 export function nextCareCell(cells: CareCell[]) {
   return cells.find(c => c.state === 'changes_requested') || cells.find(c => c.state === 'not_submitted') || cells.find(c => c.state === 'submitted');
@@ -34,6 +34,12 @@ export function careAggregate(rows: CareRow[], asOf: string) {
 }
 
 export const careMissionTarget = 30;
+export function careLearningProgress(cells: CareCell[]) {
+  const p = careProgress(cells);
+  const invalid = cells.some(c => c.published && c.state === 'error');
+  const band: CareBand = p.percent === null ? 'unknown' : p.done / p.total < .1 ? 'starting' : p.done / p.total < .8 ? 'progressing' : 'finishing';
+  return { ...p, band, invalid };
+}
 export type CareBand = 'starting' | 'progressing' | 'finishing' | 'unknown';
 export const careBandLabels: Record<CareBand, string> = { starting: '시작 단계', progressing: '진행 중', finishing: '완주에 가까움', unknown: '미션 확인 필요' };
 // The agreed 30-day reference is separate from the currently published denominator.
@@ -70,3 +76,5 @@ export function careDaySummaries(rows: CareRow[]) {
       locked: published.filter(c => c.state === 'locked').length };
   });
 }
+
+export const careCohortStatus = { in_progress: '진행 중', upcoming: '시작 전', completed: '종료' };
