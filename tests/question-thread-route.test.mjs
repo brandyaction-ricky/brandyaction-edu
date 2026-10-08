@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
 const id='11111111-1111-4111-8111-111111111111';
-function harness({enabled=true,user={id},operator=true,error=null}={}){
+function harness({enabled=true,images=false,hub=false,user={id},operator=true,error=null}={}){
  const calls=[],out={};const source=ts.transpileModule(fs.readFileSync(new URL('../app/api/platform/question-thread/route.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
  new Function('exports','require','process',source)(out,name=>({
   '@/lib/supabase/admin':{createAdminClient:()=>({rpc:async(name,args)=>{calls.push({name,args});return{data:{ok:true},error};},from:()=>({select(){return this;},eq(){return this;},maybeSingle:async()=>({data:{enrollment_id:null},error:null})})})},
   '@/lib/alumni-access-server':{assertParticipationOpen:async()=>{}},
   '@/lib/server-auth':{getAuthenticatedUser:async()=>user},'@/lib/operator-permissions':{getOperatorUser:async scope=>{assert.equal(scope,'members');return operator?user:null;}},
   '@/lib/edu-workflows':{uuid:v=>typeof v==='string'&&/^[a-f0-9-]{36}$/.test(v)},
- })[name],{env:{NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED:enabled?'true':'false'}});
+ })[name],{env:{NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED:enabled?'true':'false',NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED:images?'true':'false',NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED:hub?'true':'false'}});
  const get=(q='question='+id)=>out.GET(new Request('https://edu.test/api/platform/question-thread?'+q));
  const post=(body,origin='https://edu.test')=>out.POST(new Request('https://edu.test/api/platform/question-thread',{method:'POST',headers:origin?{origin}:{},body:JSON.stringify(body)}));
  return{calls,get,post,body:{action:'answer',questionId:id,requestId:id,expectedHeadId:null,content:'새 답변'}};
@@ -48,4 +48,12 @@ test('answer deletion requires operator, same origin, IDs and head; never trusts
  assert.equal((await harness({operator:false}).post(body)).status,403);
  for(const b of [{...body,answerId:'bad'},{...body,expectedHeadId:undefined}])assert.equal((await h.post(b)).status,400);
  assert.equal((await h.post(body,'https://evil.test')).status,403);assert.equal(h.calls.length,1);
+});
+
+test('answer attachments require image capability, remain operator-only, and use atomic image RPC for manual and assist replies',async()=>{
+ const off=harness();assert.equal((await off.post({...off.body,imageId:id})).status,400);assert.equal(off.calls.length,0);
+ const h=harness({images:true,hub:true});await h.get();assert.equal(h.calls[0].name,'edu_read_question_thread_with_images');
+ for(const extra of [{},{assistJobId:id}]){assert.equal((await h.post({...h.body,imageId:id,...extra})).status,200);assert.equal(h.calls.at(-1).name,'edu_add_question_answer_with_image');assert.equal(h.calls.at(-1).args.p_image,id);assert.equal(h.calls.at(-1).args.p_assist_job,extra.assistJobId||null);}
+ const student=harness({images:true,operator:false});assert.equal((await student.post({...student.body,imageId:id})).status,403);assert.equal((await student.post({...student.body,action:'followup',imageId:id})).status,400);assert.equal(student.calls.length,0);
+ const invalid=harness({images:true});for(const extra of [{imageId:'bad'},{imageId:id,action:'resolve'},{imageId:id,assistJobId:id}])assert.equal((await invalid.post({...invalid.body,...extra})).status,400);assert.equal(invalid.calls.length,0);
 });
