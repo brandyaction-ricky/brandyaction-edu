@@ -7,7 +7,9 @@ async function post(body: unknown) {
  const result = await response.json(); if (!response.ok) throw new Error(result.error || '이미지를 올리지 못했습니다. 다시 시도해 주세요.'); return result;
 }
 export type QuestionImagePickerHandle = { paste: (files: File[]) => void };
-export function QuestionImagePicker({ enrollmentId, lessonId, locked, publicQuestion = false, compact = false, changed, ref }: { enrollmentId: string | null; lessonId: string | null; locked: boolean; publicQuestion?: boolean; compact?: boolean; changed: (id: string | null, busy: boolean, hasDraft: boolean) => void; ref?: Ref<QuestionImagePickerHandle> }) {
+export function QuestionImagePicker({ enrollmentId, lessonId, locked, publicQuestion = false, compact = false, answerQuestionId, changed, ref }: { enrollmentId: string | null; lessonId: string | null; locked: boolean; publicQuestion?: boolean; compact?: boolean; answerQuestionId?: string; changed: (id: string | null, busy: boolean, hasDraft: boolean) => void; ref?: Ref<QuestionImagePickerHandle> }) {
+ const noun = answerQuestionId ? '답변' : '질문';
+ const scope = answerQuestionId ? { purpose: 'answer', questionId: answerQuestionId } : {};
  const [selection, setSelection] = useState<{ file: File; request: string; preview: string } | null>(null), [busy, setBusy] = useState(false), [ready, setReady] = useState(false), [error, setError] = useState('');
  const gate = useRef(false), mounted = useRef(false), notify = useRef(changed);
  const input = useRef<HTMLInputElement>(null);
@@ -18,12 +20,12 @@ export function QuestionImagePicker({ enrollmentId, lessonId, locked, publicQues
   if (gate.current || locked) return; gate.current = true; setBusy(true); setReady(false); setError(''); notify.current(null, true, true);
   try {
    const spec = answerFileSpec(next.file.name, next.file.size, 'image');
-   const prepared = await post({ action: 'prepare', enrollmentId, lessonId, requestId: next.request, name: spec.name, size: spec.size });
+   const prepared = await post({ ...scope, action: 'prepare', enrollmentId, lessonId, requestId: next.request, name: spec.name, size: spec.size });
    if (!prepared.ready) {
     // The upload may have succeeded even when its response was lost. Completion
     // verifies the immutable object; retries never overwrite a prior upload.
     try { await fetch(prepared.signedUrl, { method: 'PUT', headers: { 'Content-Type': spec.contentType }, body: next.file, signal: AbortSignal.timeout(60000) }); } catch { /* verify below */ }
-    const done = await post({ action: 'complete', fileId: prepared.id });
+    const done = await post({ ...scope, action: 'complete', fileId: prepared.id });
     if (done.id !== next.request) throw new Error('이미지 등록 결과를 확인하지 못했습니다.');
    } else if (prepared.id !== next.request) throw new Error('이미지 등록 결과를 확인하지 못했습니다.');
    if (mounted.current) { setReady(true); notify.current(next.request, false, true); }
@@ -38,17 +40,18 @@ export function QuestionImagePicker({ enrollmentId, lessonId, locked, publicQues
  function remove() { if (locked || gate.current) return; setSelection(null); setReady(false); setError(''); notify.current(null, false, false); }
  useImperativeHandle(ref, () => ({ paste(files) {
   if (locked || gate.current || !files.length) return;
-  if (files.length !== 1) { setError('질문 이미지는 한 장씩 붙여넣어 주세요.'); return; }
+  if (files.length !== 1) { setError(`${noun} 이미지는 한 장씩 붙여넣어 주세요.`); return; }
   choose(files[0]);
  } }));
- return <div className="field question-image-picker"><label>질문 이미지 (선택)<input ref={input} hidden={compact} type="file" accept="image/png,image/jpeg,image/webp,image/gif" disabled={locked || busy} onChange={e => { choose(e.target.files?.[0]); e.target.value = ''; }}/></label>{compact && <button type="button" className="btn" disabled={locked || busy} onClick={() => input.current?.click()}>사진·화면 캡처 첨부</button>}<small>{compact ? '이미지 한 장, 최대 10MB. 복사한 화면은 질문 입력란에 붙여 넣어도 됩니다.' : <>JPG·PNG·WEBP·GIF 한 장, 최대 10MB. 복사한 이미지는 질문 입력란에 붙여넣을 수 있습니다. {publicQuestion ? '전체 공개 질문의 이미지는 같은 기수 수강생도 볼 수 있습니다.' : '본인과 담당 운영자만 볼 수 있습니다.'}</>}</small>
-  {selection && <figure><img src={selection.preview} alt="첨부할 질문 이미지" style={{ maxWidth: '100%', maxHeight: 280, objectFit: 'contain' }}/><figcaption style={{ overflowWrap: 'anywhere' }}>{selection.file.name}</figcaption><div className="row mt16"><button type="button" className="btn small" disabled={locked || busy} onClick={remove}>이미지 빼기</button>{!ready && !busy && <button type="button" className="btn small" disabled={locked} onClick={() => void upload(selection)}>이미지 다시 올리기</button>}</div></figure>}
-  {busy && <p role="status">이미지를 올리고 있습니다.</p>}{ready && <p role="status">이미지 준비 완료. 질문을 등록하면 함께 저장됩니다.</p>}{error && <p role="alert" className="form-error">{error}</p>}
+ return <div className="field question-image-picker"><label>{noun} 이미지 (선택)<input ref={input} hidden={compact} type="file" accept="image/png,image/jpeg,image/webp,image/gif" disabled={locked || busy} onChange={e => { choose(e.target.files?.[0]); e.target.value = ''; }}/></label>{compact && <button type="button" className="btn" disabled={locked || busy} onClick={() => input.current?.click()}>사진·화면 캡처 첨부</button>}<small>{compact ? `이미지 한 장, 최대 10MB. 복사한 화면은 ${noun} 입력란에 붙여 넣어도 됩니다.` : <>JPG·PNG·WEBP·GIF 한 장, 최대 10MB. 복사한 이미지는 {noun} 입력란에 붙여넣을 수 있습니다. {publicQuestion ? '전체 공개 질문의 이미지는 같은 기수 수강생도 볼 수 있습니다.' : '본인과 담당 운영자만 볼 수 있습니다.'}</>}</small>
+  {selection && <figure><img src={selection.preview} alt={`첨부할 ${noun} 이미지`} style={{ maxWidth: '100%', maxHeight: 280, objectFit: 'contain' }}/><figcaption style={{ overflowWrap: 'anywhere' }}>{selection.file.name}</figcaption><div className="row mt16"><button type="button" className="btn small" disabled={locked || busy} onClick={remove}>이미지 빼기</button>{!ready && !busy && <button type="button" className="btn small" disabled={locked} onClick={() => void upload(selection)}>이미지 다시 올리기</button>}</div></figure>}
+  {busy && <p role="status">이미지를 올리고 있습니다.</p>}{ready && <p role="status">이미지 준비 완료. {noun}을 등록하면 함께 저장됩니다.</p>}{error && <p role="alert" className="form-error">{error}</p>}
  </div>;
 }
-export function QuestionImage({ questionId, imageId }: { questionId: string; imageId?: unknown }) {
+export function QuestionImage({ questionId, imageId, answerId }: { questionId: string; imageId?: unknown; answerId?: string }) {
+ const noun = answerId ? '답변' : '질문';
  const [attempt, setAttempt] = useState(0), [failed, setFailed] = useState(false);
  if (process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED !== 'true' || !imageId) return null;
- const src = '/api/platform/question-images?' + new URLSearchParams({ question: questionId, attempt: String(attempt) });
- return <figure className="mt16" style={{ marginInline: 0 }}>{failed ? <p role="alert">질문 이미지를 불러오지 못했습니다. <button type="button" className="btn small" onClick={() => { setAttempt(v => v + 1); setFailed(false); }}>이미지 다시 보기</button></p> : <><a href={src} target="_blank" rel="noopener noreferrer" aria-label="질문 이미지 크게 보기"><img src={src} alt="질문 첨부 이미지" loading="lazy" onError={() => setFailed(true)} style={{ maxWidth: '100%', maxHeight: 400, objectFit: 'contain' }}/></a><figcaption className="meta">이미지를 누르면 크게 볼 수 있습니다.</figcaption></>}</figure>;
+ const src = '/api/platform/question-images?' + new URLSearchParams({ question: questionId, ...(answerId ? { answer: answerId } : {}), attempt: String(attempt) });
+ return <figure className="mt16" style={{ marginInline: 0 }}>{failed ? <p role="alert">{noun} 이미지를 불러오지 못했습니다. <button type="button" className="btn small" onClick={() => { setAttempt(v => v + 1); setFailed(false); }}>이미지 다시 보기</button></p> : <><a href={src} target="_blank" rel="noopener noreferrer" aria-label={`${noun} 이미지 크게 보기`}><img src={src} alt={`${noun} 첨부 이미지`} loading="lazy" onError={() => setFailed(true)} style={{ maxWidth: '100%', maxHeight: 400, objectFit: 'contain' }}/></a><figcaption className="meta">이미지를 누르면 크게 볼 수 있습니다.</figcaption></>}</figure>;
 }
