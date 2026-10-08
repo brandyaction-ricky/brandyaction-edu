@@ -35,7 +35,7 @@ export async function PUT(request: Request) {
       const raw = await request.text();
       if (raw.length > 4000) return reply({ error: '입력 내용이 너무 깁니다.' }, 413);
       policy = validateAdPolicy(JSON.parse(raw));
-    } catch { return reply({ error: '기수·예산·날짜·변경 사유와 1~72시간 기한을 확인해 주세요.' }, 400); }
+    } catch { return reply({ error: '기수·예산·판단 기준·변경 사유를 확인해 주세요. 임시 해제 기한은 1~72시간입니다.' }, 400); }
     const saved = await createAdminClient().rpc('edu_ad_control_save', { p_actor: user.id, p_policy: policy }).abortSignal(AbortSignal.timeout(5000));
     if (saved.error?.message?.includes('AD_CONTROL_CHANGED')) return reply({ error: '다른 변경이 먼저 저장됐습니다. 새로 확인한 뒤 다시 입력해 주세요.' }, 409);
     if (saved.error || !saved.data) return unavailable();

@@ -21,6 +21,7 @@ test('E5 exact SQL audits atomic changes, protects browser roles and computes ma
  create function public.edu_export_v1_source(date,date,timestamptz) returns jsonb language sql security invoker as 'select ''{}''::jsonb';`);
  const e1=read('20261005020515_edu_internal_order_analytics_e1.sql');for(const name of ['edu_analytics_members','edu_analytics_orders'])await db.exec(e1.match(new RegExp('create view public\\.'+name+'[\\s\\S]*?;'))[0]);
  await db.exec(read('20261007104040_edu_ad_controls_e5.sql'));
+ await db.exec(read('20261008015249_edu_ad_control_policy_settings.sql'));
  const admin=id(),student=id(),internal=id(),course=id(),cohort=id(),campaign=id();
  await db.query("insert into profiles values($1,'admin','active',true,null),($2,'student','active',false,null),($3,'student','active',true,null)",[admin,student,internal]);
  await db.query("insert into courses values($1,'moonshot')",[course]);await db.query("insert into cohorts values($1,$2,'5',now()+interval '30 days')",[cohort,course]);
@@ -75,6 +76,19 @@ test('E5 exact SQL audits atomic changes, protects browser roles and computes ma
  await db.exec('set role service_role');source=(await db.query('select edu_ad_control_source($1,$1,statement_timestamp()) v',[yesterday])).rows[0].v;
  assert.equal(source[0].cpr_today,5000);assert.equal(source[0].cpr_previous,5000);assert.equal(a.exportedAdControl(source,yesterday,new Date()).freeze,true);
  assert.deepEqual(a.exportedAdControl(source,yesterday,new Date()).freeze_reasons,['cpr_high']);
+ const configured=await save({...policy,revision:1,mode:'freeze',hours:null,cpr_limit_krw:6000,roas_floor:4.5,refund_request_limit:8});
+ assert.equal(configured.override_until,null);assert.equal(configured.cpr_limit_krw,6000);assert.equal(configured.roas_floor,4.5);
+ const latest=(await db.query('select policy from edu_ad_control_history where revision=2')).rows[0].policy;
+ assert.equal(latest.refund_request_limit,8);
+ const stillFrozen=a.evaluateAdControl({...fixtureEvidence(configured),cpr_today:1,cpr_previous:1},new Date(configured.updated_at));
+ assert.equal(stillFrozen.freeze_source,'manual');assert.equal(stillFrozen.override_until,null);
+ await assert.rejects(save({...policy,revision:2,mode:'release',hours:null}),/INVALID/);
+ await assert.rejects(save({...policy,revision:2,mode:'freeze',hours:undefined}),/INVALID/);
+ await assert.rejects(save({...policy,revision:2,cpr_limit_krw:0}),/check constraint/);
+ assert.equal((await db.query('select revision from edu_ad_control_policies')).rows[0].revision,2);
+ // The old automatic history remains at its old defaults; current settings do not overwrite history.
+ assert.equal(a.adThresholds((await db.query('select policy from edu_ad_control_history where revision=0')).rows[0].policy).cpr_limit_krw,4500);
+ function fixtureEvidence(p){return {policy:p,date_kst:today,cohort_code:'moonshot:5',cohort_id:cohort,spend_krw:1,cpr_today:1,cpr_previous:1,net_krw:10,reserve_krw:0,refund_requests:0};}
  for(const role of['authenticated','anon']){
  await db.exec('reset role;set role '+role);
  for(const sql of["select * from edu_ad_control_policies","select * from edu_ad_control_history","select edu_ad_control_source(current_date,current_date,now())","select edu_ad_control_save(null,'{}')","select edu_export_v1_source_e5(current_date,current_date,now())"])await assert.rejects(db.query(sql),/permission denied/);

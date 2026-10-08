@@ -32,11 +32,16 @@ export async function GET(request: Request, context: { params: Promise<{ dataset
     if (params.getAll('from').length !== 1 || params.getAll('to').length !== 1) return error('invalid_range', 400);
     const days = exportRange(params.get('from'), params.get('to'), now);
     if (!days) return error('invalid_range', 400);
-    const snapshot = await db.rpc(process.env.EDU_AD_CONTROLS_ENABLED === 'true' ? 'edu_export_v1_source_e5' : 'edu_export_v1_source',
-      { p_from: days[0], p_to: days.at(-1), p_asof: now.toISOString() }).abortSignal(signal);
+    const snapshot = await db.rpc('edu_export_v1_guarded_source',
+      { p_dataset: dataset, p_from: days[0], p_to: days.at(-1), p_asof: now.toISOString(),
+        p_controls: process.env.EDU_AD_CONTROLS_ENABLED === 'true' }).abortSignal(signal);
     if (snapshot.error || !snapshot.data) return error('unavailable', 503);
-    if (process.env.EDU_AD_CONTROLS_ENABLED === 'true' && !Array.isArray(snapshot.data.ad_controls)) return error('unavailable', 503);
-    const response = aggregateExport(dataset as ExportDataset, { ...snapshot.data,
+    if (snapshot.data.status === 'invalid_range' || snapshot.data.status === 'backfill_window') return error(snapshot.data.status, 400);
+    if (snapshot.data.status === 'backfill_busy') return error('backfill_busy', 429);
+    if (snapshot.data.status !== 'ok' || !snapshot.data.source) return error('unavailable', 503);
+    const source = snapshot.data.source;
+    if (process.env.EDU_AD_CONTROLS_ENABLED === 'true' && !Array.isArray(source.ad_controls)) return error('unavailable', 503);
+    const response = aggregateExport(dataset as ExportDataset, { ...source,
       consentEnabled: process.env.EDU_OPTIONAL_CONSENT_ENABLED === 'true' }, days, now);
     if (!validExport(dataset as ExportDataset, response) || signal.aborted || performance.now() - started >= 5000) return error('unavailable', 503);
     return Response.json(response, { headers });
