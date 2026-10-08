@@ -8,3 +8,6 @@
 .care-legend{display:flex;flex-wrap:wrap;gap:12px;font-size:10px;color:#64776b;margin:10px 0}.care-legend span{display:flex;gap:5px;align-items:center}.care-legend i{font-style:normal;border-radius:3px;padding:2px 5px}.care-list-caption{flex-wrap:wrap;gap:8px}
 
 .care-header-actions{display:flex;align-items:center;gap:12px}.care-header-actions .care-controls{display:grid;gap:5px;margin:0}.care-header-actions small{font-size:10px;color:#728277}.care-header-actions select{max-width:360px}.care-legend{font-size:11px}@media(max-width:760px){.care-header{flex-wrap:wrap}.care-header-actions{width:100%;align-items:center}.care-header-actions .care-controls{flex:1;min-width:0}.care-header-actions select{width:100%;max-width:100%}}
+
+/* Preserve readable text on the dark share card inside the admin shell. */
+.learning-care .care-share>p,.learning-care .care-share small{color:#c5e4cf}
