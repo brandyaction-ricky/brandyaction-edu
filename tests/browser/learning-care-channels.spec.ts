@@ -4,17 +4,20 @@ const cohort=id(1),lesson=id(2),asOf='2026-10-08T08:00:00Z';
 const rows=Array.from({length:4},(_,n)=>({memberId:id(n+10),enrollmentId:id(n+20),name:['푸시 수강생','이메일·알림톡 수강생','이메일 수강생','연락처 없는 수강생'][n],email:n===3?null:`qa${n}@example.test`,lastVisitAt:null,lastContactAt:null,openQuestions:0,cells:[{lessonId:lesson,title:'첫 학습 시작하기',week:0,day:1,track:'learning',state:'not_submitted',published:true}]}));
 const snapshot={cohorts:[{id:cohort,name:'4기',courseTitle:'검수 클래스'}],cohortId:cohort,rows,asOf};
 const reach=rows.map((r,n)=>({memberId:r.memberId,push:n===0,email:n!==3,alimtalk:n<2,sms:n<2,emailMasked:n===3?null:`q***@example.test`,phoneMasked:n<2?'010****5678':null}));
-async function backend(page:Page,{alimtalk=true,fail=false,uncertain=false}={}){
- const sent:Record<string,unknown>[]=[],reads:string[]=[];let receipt:unknown=null;
+async function backend(page:Page,{alimtalk=true,fail=false,uncertain=false,changed=false}={}){
+ const sent:Record<string,unknown>[]=[],reads:string[]=[];let receipt:unknown=null;let reachReads=0;
  await page.route('**/api/admin/learning-care**',async route=>{
   const url=new URL(route.request().url());
   if(url.pathname.endsWith('/channels')){
    reads.push(url.search);
    if(url.searchParams.has('request'))return route.fulfill(receipt?{json:receipt}:{status:404,json:{error:'없음'}});
-   return route.fulfill(fail?{status:503,json:{error:'연락 수단을 확인하지 못했습니다.'}}:{json:{config:{enabled:true,push:true,email:true,alimtalk,sms:true},reach}});
+   reachReads++;
+   if(changed&&reachReads>1)await new Promise(resolve=>setTimeout(resolve,250));
+   return route.fulfill(fail?{status:503,json:{error:'연락 수단을 확인하지 못했습니다.'}}:{json:{config:{enabled:true,push:true,email:true,alimtalk,sms:true},reach:changed&&reachReads>1?reach.map(r=>({...r,push:false})):reach}});
   }
   if(route.request().method()==='POST'){
    const body=route.request().postDataJSON();sent.push(body);
+   if(changed&&sent.length===1)return route.fulfill({status:409,json:{error:'알림 수신 설정이 바뀌어 발송하지 않았습니다. 채널을 새로 확인해 주세요.'}});
    receipt={requestId:body.requestId,count:4,deliveries:body.delivery.routes.flatMap((r:{memberId:string;channels:string[]})=>r.channels.map(channel=>({memberId:r.memberId,channel,status:'pending'})))};
    return route.fulfill(uncertain?{status:503,json:{error:'발송 결과를 확인하지 못했습니다.'}}:{json:receipt});
   }
@@ -51,4 +54,22 @@ test('missing Alimtalk template routes phone recipients to the explicitly select
  await expect(page.getByRole('checkbox',{name:/문자/})).toBeChecked();await expect(page.getByRole('checkbox',{name:/문자/})).toHaveAccessibleName(/1명/);
  await page.getByText('수강생별 발송 채널 확인',{exact:true}).click();await expect(page.locator('.care-sms-preview')).toContainText('https://brandyaction-edu.com/my/messages');
  await page.getByRole('button',{name:'확인한 대상에게 보내기'}).click();expect(api.sent[0].delivery).toEqual({mode:'push_first',channels:['push','email','sms'],routes:[{memberId:id(10),channels:['push']},{memberId:id(11),channels:['email','sms']},{memberId:id(12),channels:['email']},{memberId:id(13),channels:[]}]});
+});
+
+test('changed contact routes can be refreshed without losing the draft or selected channels',async({page})=>{
+ const api=await backend(page,{changed:true});await compose(page);
+ await page.getByLabel('안내 내용',{exact:true}).fill('작성한 안내를 그대로 보관합니다.');
+ await page.getByRole('checkbox',{name:/문자/}).uncheck();
+ await page.getByRole('button',{name:'확인한 대상에게 보내기'}).click();
+ await expect(page.getByRole('alert')).toContainText('수신 설정이 바뀌어');
+ await page.getByRole('button',{name:'연락 수단 다시 확인',exact:true}).click();
+ await expect(page.getByRole('button',{name:'확인한 대상에게 보내기'})).toBeDisabled();
+ await expect(page.getByRole('checkbox',{name:/앱 푸시/})).toHaveAccessibleName(/0명/);
+ await expect(page.getByLabel('안내 내용',{exact:true})).toHaveValue('작성한 안내를 그대로 보관합니다.');
+ await expect(page.getByRole('checkbox',{name:/문자/})).not.toBeChecked();
+ expect(api.sent).toHaveLength(1);
+ await page.getByRole('button',{name:'확인한 대상에게 보내기'}).click();
+ await expect(page.getByRole('region',{name:'채널별 발송 결과'})).toBeVisible();
+ expect(api.sent).toHaveLength(2);
+ expect(api.sent[1].delivery).toMatchObject({channels:['push','email','alimtalk'],routes:[{memberId:id(10),channels:['alimtalk','email']},{memberId:id(11),channels:['alimtalk','email']},{memberId:id(12),channels:['email']},{memberId:id(13),channels:[]}]});
 });
