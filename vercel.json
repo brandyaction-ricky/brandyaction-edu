@@ -58,7 +58,9 @@
       "codex/edu-answer-images-production-20261008": false,
       "codex/edu-tips-contract-hardening-20261008": false,
       "codex/edu-learning-care-20261008": false,
-      "codex/edu-video-preview-20261008": false
+      "codex/edu-video-preview-20261008": false,
+      "codex/edu-personalization-consent-20261008": false,
+      "codex/edu-consent-prod-20261008": false
     }
   },
   "regions": [
