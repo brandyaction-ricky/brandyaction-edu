@@ -20,7 +20,7 @@ export function CareStudentDetail({ row, asOf, messagesEnabled, onClose, onEncou
     <section className="care-detail" aria-label="수강생 상세">
       <div className="care-detail-top">
         <h2>{row.name || '회원'}님의 현재 위치</h2>
-        <p>공개된 학습·미션 <b>{progress.done}/{progress.total}개 완료 · {progress.percent === null ? '공개 전' : progress.percent + '%'}</b></p>
+        <p>공개된 학습 <b>{progress.done}/{progress.total}개 완료 · {progress.percent === null ? '공개 전' : progress.percent + '%'}</b></p>
         {target && <label className="care-detail-target">독려할 학습<select aria-label="독려할 학습" value={target.lessonId} onChange={e => setLesson(e.target.value)}>{available.map(c => <option key={c.lessonId} value={c.lessonId}>{careLessonLabel(c)} · {c.title}</option>)}</select></label>}
         <div className="care-detail-actions">
           <button className="btn primary" disabled={!!unavailable} onClick={() => target && onEncourage(row, target)}>학습 독려하기</button>
@@ -34,7 +34,7 @@ export function CareStudentDetail({ row, asOf, messagesEnabled, onClose, onEncou
           <p className="care-note">최근 방문 {careTime(row.lastVisitAt)} · 마지막 안내 {careTime(row.lastContactAt)}</p>
           <div className="care-detail-list">{items(published)}</div>
           {!published.length && <p className="care-empty">아직 공개된 학습이 없습니다.</p>}
-          {upcoming.length > 0 && <details className="care-upcoming"><summary>앞으로 공개할 학습·미션 {upcoming.length}개</summary><div className="care-detail-list">{items(upcoming)}</div></details>}
+          {upcoming.length > 0 && <details className="care-upcoming"><summary>앞으로 공개할 학습 {upcoming.length}개</summary><div className="care-detail-list">{items(upcoming)}</div></details>}
         </>}
       </div>
     </section>
