@@ -30,6 +30,6 @@ export function exportRange(from: string | null, to: string | null, now: Date): 
     Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value);
   if (!date(from) || !date(to) || from! > to! || to! > kstDay(now)) return null;
   const length = (Date.parse(to!) - Date.parse(from!)) / 86400_000 + 1;
-  if (length > 31) return null;
+  if (length > 31 || Date.parse(kstDay(now)) - Date.parse(from!) > 180 * 86400_000) return null;
   return Array.from({ length }, (_, i) => new Date(Date.parse(from!) + i * 86400_000).toISOString().slice(0, 10));
 }
