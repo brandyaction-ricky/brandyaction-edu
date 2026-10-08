@@ -59,6 +59,7 @@ returns boolean language sql stable security invoker set search_path='' as $$
  and public.edu_message_operator(m.sender_id) and p.status='active' and p.role not in ('admin','staff')
  and c.archived_at is null and e.status='active' and e.revoked_at is null
  and (e.access_starts_at is null or e.access_starts_at<=now()) and (e.access_ends_at is null or e.access_ends_at>now())
+ and cell->>'track' is distinct from 'daily'
  and cell->>'lessonId'=b.lesson_id::text and cell->>'state' in ('not_submitted','changes_requested'));
 $$;
 create function public.edu_care_delivery_receipt(p_actor uuid,p_request uuid)
@@ -97,6 +98,7 @@ begin
  perform public.edu_send_learning_care(p_actor,p_request,p_cohort,p_lesson,p_recipients,p_content);
  insert into public.edu_care_delivery_batches values(p_actor,p_request,p_mode,channels,p_template);
  for m in select * from public.edu_member_messages where sender_id=p_actor and request_id=p_request order by recipient_id loop
+  if not edu_private.care_delivery_allowed(m.id) then raise exception 'CARE_RECIPIENT_CHANGED'; end if;
   select * into c from edu_private.care_contacts(m.recipient_id);
   chosen:='{}';
   if 'push'=any(channels) and c.push then chosen:=array['push']; end if;

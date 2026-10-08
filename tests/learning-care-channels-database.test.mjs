@@ -6,6 +6,7 @@ import {setup as care} from './helpers/learning-care.mjs';
 const read=n=>fs.readFileSync(new URL('../supabase/migrations/'+n,import.meta.url),'utf8');
 async function setup(t,{push=false}={}) {
  const f=await care(t);
+ Object.assign(f,await f.add("learning",1));
  await f.db.exec(`reset role; alter table profiles add column contact_email text; alter table edu_member_messages add column deleted_at timestamptz; grant update(deleted_at) on edu_member_messages to service_role; alter table edu_questions add column answer text;`);
  await f.db.exec(read('20260928200320_edu_web_push_delivery.sql'));
  const latest=read('20261005005414_diagnosis_report_ready_push.sql');
@@ -60,7 +61,7 @@ test('read rechecks completion, revocation, deleted message and actor permission
  await check(true);await f.db.query('update enrollments set revoked_at=now() where id=$1',[f.enrollment]);await check(false);await f.db.query('update enrollments set revoked_at=null where id=$1',[f.enrollment]);
  await f.db.exec('update edu_member_messages set deleted_at=now()');await check(false);await f.db.exec('update edu_member_messages set deleted_at=null');
  await f.db.query("update profiles set status='withdrawn' where id=$1",[f.admin]);await check(false);await f.db.query("update profiles set status='active' where id=$1",[f.admin]);
- await f.approve(await f.submitCell());await check(false);
+ await f.submitCell();await check(false);
 });
 test('disabled providers skip pending jobs; recipients without contacts still get the inbox; role boundary',async t=>{
  const f=await setup(t),request=id();await f.send({request});assert.deepEqual(await f.rpc('edu_claim_care_channels',[false,false,null,false]),[]);
@@ -81,4 +82,18 @@ test('SMS is queued when Alimtalk is not selected; contact change invalidates th
 });
 test('Alimtalk wins over SMS unless all channels were explicitly selected',async t=>{
  const f=await setup(t);const r=await f.send({channels:['email','alimtalk','sms'],routes:[{memberId:f.student,channels:['alimtalk','email']}]});assert.deepEqual(r.deliveries.map(d=>d.channel),['alimtalk','email']);
+});
+
+test('mission conversion cancels queued delivery and rejects new channel requests atomically',async t=>{
+ const f=await setup(t);await f.send();const [job]=await f.claim();assert.ok(await f.rpc('edu_read_care_channel',[job.id,job.lease]));
+ await f.db.exec('reset role');
+ await f.db.query("update edu_lesson_block_versions set document=jsonb_set(document,'{progression,track}','\"daily\"'::jsonb) where id=$1",[f.revision]);
+ await f.db.exec('set role service_role');
+ assert.equal(await f.rpc('edu_read_care_channel',[job.id,job.lease]),null);
+ const other=await setup(t);
+ await other.db.exec('reset role');
+ await other.db.query("update edu_lesson_block_versions set document=jsonb_set(document,'{progression,track}','\"daily\"'::jsonb) where id=$1",[other.revision]);
+ await other.db.exec('set role service_role');
+ await assert.rejects(other.send(),/CARE_RECIPIENT_CHANGED/);
+ assert.equal((await other.db.query('select count(*)::int n from edu_member_messages')).rows[0].n,0);
 });
