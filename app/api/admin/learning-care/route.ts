@@ -1,3 +1,4 @@
+import { careLearningSnapshot, type CareSnapshot } from '@/lib/learning-care';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { getOperatorUser } from '@/lib/operator-permissions';
@@ -10,7 +11,7 @@ export async function GET(request: Request) {
     const cohort = new URL(request.url).searchParams.get('cohort') || null;
     if (cohort && !uuid(cohort)) return reply({ error: '기수를 확인해 주세요.' }, 400);
     const { data, error } = await createAdminClient().rpc('edu_admin_learning_care', { p_actor: user.id, p_cohort: cohort }).abortSignal(AbortSignal.timeout(20000));
-    if (error) throw error; return reply({ ...data, actorId: user.id });
+    if (error) throw error; return reply({ ...careLearningSnapshot(data as CareSnapshot), actorId: user.id });
   } catch { return reply({ error: '현황을 불러오지 못했습니다. 다시 시도해 주세요.' }, 503); }
 }
 export async function POST(request: Request) {
@@ -33,7 +34,12 @@ export async function POST(request: Request) {
       if(!config.enabled || d.channels.some((c:'push'|'email'|'alimtalk'|'sms')=>!config[c])) return reply({error:'발송 설정이 바뀌었습니다. 이미 보낸 안내는 발송 결과에서 확인하고, 새 안내는 채널을 다시 선택해 주세요.'},409);
       channelArgs={...args,p_mode:d.mode,p_channels:[...new Set(d.channels)].sort(),p_template:config.alimtalkTemplateId,p_routes:d.routes.map((r:{memberId:string;channels:string[]})=>({memberId:r.memberId,channels:[...new Set(r.channels)].sort()})).sort((a:{memberId:string},b:{memberId:string})=>a.memberId.localeCompare(b.memberId))};
     }
-    const { data, error } = await createAdminClient().rpc(channelArgs?'edu_send_learning_care_channels':'edu_send_learning_care', channelArgs || args).abortSignal(AbortSignal.timeout(20000));
+    const db = createAdminClient();
+    const scope = await db.rpc('edu_admin_learning_care', { p_actor: user.id, p_cohort: body.cohortId }).abortSignal(AbortSignal.timeout(20000));
+    if (scope.error) throw scope.error;
+    const current = careLearningSnapshot(scope.data as CareSnapshot);
+    if (!current.rows.some(row => row.cells.some(cell => cell.lessonId === body.lessonId))) return reply({ error: '현황에서 안내할 수 있는 학습이 아닙니다. 새로고침한 뒤 학습을 다시 선택해 주세요.' }, 409);
+    const { data, error } = await db.rpc(channelArgs?'edu_send_learning_care_channels':'edu_send_learning_care', channelArgs || args).abortSignal(AbortSignal.timeout(20000));
     if (error) {
       if (error.message === 'CARE_CHANNELS_CHANGED') return reply({error:'알림 수신 설정이 바뀌어 발송하지 않았습니다. 채널을 새로 확인해 주세요.'},409);
       if (error.message === 'CARE_RECIPIENT_CHANGED') return reply({ error: '완료·검토 대기·최근 안내 등 대상 상태가 바뀌었습니다. 발송하지 않았습니다. 현황을 새로고침한 뒤 다시 선택해 주세요.' }, 409);

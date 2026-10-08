@@ -65,7 +65,8 @@
       "codex/edu-b14-release-20261008": false,
       "codex/edu-care-followup-dev-20261008": false,
       "codex/edu-care-delivery-channels-20261008": false,
-      "codex/edu-care-learning-release-20261008": false
+      "codex/edu-care-learning-release-20261008": false,
+      "codex/edu-care-learning-only-20261008": false
     }
   },
   "regions": [
