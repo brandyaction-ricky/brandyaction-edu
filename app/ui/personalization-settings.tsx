@@ -61,8 +61,8 @@ export function PersonalizationSettings() {
         <details><summary>사용하는 정보와 보관 기간</summary><p>{snapshot.terms?.analysis ?? '안내 내용을 준비 중이에요.'}</p></details>
       </div>
       <div className={styles.option}>
-        <label><input type="checkbox" checked={choices.overseas} disabled={busy || !snapshot.accepting} onChange={e => { setChoices({ ...choices, overseas: e.target.checked }); setNotice(''); }}/><span><strong>[선택] 분석 정보의 국외 이전</strong><small>해외 서버에서 고객별 구매·학습 기록을 처리해요.</small></span></label>
-        <details><summary>이전 국가·업체·정보 확인</summary><p>{snapshot.terms?.overseas ?? '실제 처리 국가와 업체가 확정된 뒤 동의를 받을 수 있어요.'}</p></details>
+        <label><input type="checkbox" checked={choices.overseas} disabled={busy || !snapshot.accepting} onChange={e => { setChoices({ ...choices, overseas: e.target.checked }); setNotice(''); }}/><span><strong>[선택] AI 맞춤 혜택을 위한 해외 분석 서버 이용</strong><small>나에게 맞는 교육·혜택을 추천하기 위해 구매·학습 기록을 해외 분석 서버에서 처리해요.</small></span></label>
+        <details><summary>개인정보 국외 이전 상세 안내</summary><p>{snapshot.terms?.overseas ?? '실제 처리 국가와 업체가 확정된 뒤 동의를 받을 수 있어요.'}</p></details>
       </div>
       <p className={styles.help}>현재 맞춤 안내는 위 두 항목에 모두 동의한 경우에만 이용할 수 있어요. 광고 소식을 받는 것은 아래 ‘소식 수신 설정’에서 따로 선택해요.</p>
       <div className={styles.actions}>
