@@ -26,10 +26,10 @@ export async function POST(request: Request) {
     const { data, error } = await createAdminClient().rpc('edu_send_learning_care', { p_actor: user.id, p_request: body.requestId, p_cohort: body.cohortId, p_lesson: body.lessonId, p_recipients: [...new Set(body.recipients)].sort(), p_content: body.content.trim() }).abortSignal(AbortSignal.timeout(20000));
     if (error) {
       if (error.message === 'CARE_RECIPIENT_CHANGED') return reply({ error: '완료·검토 대기·최근 안내 등 대상 상태가 바뀌었습니다. 발송하지 않았습니다. 현황을 새로고침한 뒤 다시 선택해 주세요.' }, 409);
-      if (error.message === 'MESSAGE_REQUEST_REUSED') return reply({ error: '이미 사용한 요청입니다. 보낸 메시지를 확인해 주세요.' }, 409);
-      if (error.message === 'MESSAGE_RATE_LIMIT') return reply({ error: '잠시 후 같은 요청으로 다시 확인해 주세요.' }, 429);
+      if (error.message === 'MESSAGE_REQUEST_REUSED') return reply({ error: '이 안내는 이미 처리되었습니다. 보낸 메시지를 확인해 주세요.' }, 409);
+      if (error.message === 'MESSAGE_RATE_LIMIT') return reply({ error: '잠시 후 발송 결과를 다시 확인해 주세요.' }, 429);
       throw error;
     }
     return reply(data);
-  } catch { return reply({ error: '발송 결과를 확인하지 못했습니다. 같은 요청으로 다시 확인해 주세요.' }, 503); }
+  } catch { return reply({ error: '발송 결과를 확인하지 못했습니다. ‘발송 결과 다시 확인’을 눌러 주세요.' }, 503); }
 }
