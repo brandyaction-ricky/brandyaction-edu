@@ -1,3 +1,4 @@
+import { learningCareFixture } from './learning-care.mjs';
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -25,6 +26,7 @@ const brandLogo = readFileSync(resolve('public/brandy-action-logo.png'));
 const failedMemberReads = new Set();
 const server = createServer((request,response)=>{
   const url=new URL(request.url,'http://localhost');
+  if(learningCareFixture(request,response,url))return;
   if(lessonQuestionFixture(request,response,url))return;
   if(reviewFixture(request,response,url))return;
   if(url.pathname==='/ad-controls-test'){

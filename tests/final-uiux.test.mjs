@@ -146,12 +146,13 @@ test('five admin categories and scoped navigation render from the admin UI featu
   const { AdminShell, adminNavigationIcon, finalAdminGroups } = load('features/admin-ui.ts');
   const { Overview } = load('app/ui/final/admin-shell.tsx');
   assert.equal(finalAdminGroups.length, 5);
-  assert.equal(finalAdminGroups[0][1].length, 8);
+  assert.equal(finalAdminGroups[0][1].length, 9);
   const props = { current: 'overview', available: platform.sections, user: { ...user, role: 'admin' }, pendingReviews: 1, openQuestions: 2, mobile: false, setMobile() {}, logout: async () => {} };
   const markup = html(AdminShell, { ...props, children: React.createElement(Overview, { data, available: platform.sections }) });
   const navigationMarkup = markup.match(/<nav aria-label="관리자 카테고리">[\s\S]*?<\/nav>/)?.[0] || '';
   assert.match(navigationMarkup, /상품·판매 설정/);
   assert.match(navigationMarkup, /커리큘럼 편집/);
+  assert.match(navigationMarkup, /수강생 현황/);
   assert.doesNotMatch(navigationMarkup, /href="\/admin\/weeks"/);
   assert.match(navigationMarkup, /href="\/admin\/learning"/);
   assert.match(navigationMarkup, /href="\/admin\/questions"[\s\S]*?미답변 2건[\s\S]*?>2<\/span>/);
