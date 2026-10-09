@@ -123,7 +123,7 @@ const server = createServer((request,response)=>{
   if(url.pathname==='/question-hub-test'){
     response.setHeader('Content-Type','text/html');response.end('<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Question hub fixture</title><link rel="stylesheet" href="/question-hub-app.css"></head><body><div id="root"></div><script type="module" src="/question-hub-app.js"></script></body></html>');return;
   }
-  if(url.pathname==='/optional-consent-test'||url.pathname==='/optional-signup-test'){
+  if(['/consent-reward-test','/optional-consent-test','/personalization-consent-test','/optional-signup-test'].includes(url.pathname)){
     response.setHeader('Content-Type','text/html');response.end('<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>소식 수신 설정 · 합성 검수</title><link rel="stylesheet" href="/optional-consent-app.css"></head><body style="margin:0"><div id="root"></div><script type="module" src="/optional-consent-app.js"></script></body></html>');return;
   }
   if(url.pathname==='/signup-consent-test'){

@@ -71,7 +71,12 @@
       "codex/edu-image-row-release-20261009": false,
       "codex/edu-text-colors-20261009": false,
       "codex/edu-text-colors-release-20261009": false,
-      "codex/edu-care-day-layout-20261009": false
+      "codex/edu-care-day-layout-20261009": false,
+      "codex/edu-b14-transition-20261005": false,
+      "codex/edu-learning-care-dev-20261008": false,
+      "codex/edu-personalization-consent-20261008": false,
+      "codex/edu-consent-reward-dev-20261008": false,
+      "codex/edu-dev-prod-reconcile-20261009": false
     }
   },
   "regions": [
