@@ -4,6 +4,16 @@ import { safeUrl } from "./platform";
 // and is only converted when the author changes the document.
 export const LESSON_BODY_PREFIX = "edu-lesson:v1\n";
 export const LESSON_FONT_SIZES = [12, 14, 16, 18, 20, 24, 28, 32] as const;
+// Keep CSS values finite and deterministic across pasted HTML, storage and rendering.
+export function normalizeLessonColor(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const color = value.trim().toLowerCase();
+  if (/^#[0-9a-f]{6}$/.test(color)) return color;
+  if (/^#[0-9a-f]{3}$/.test(color)) return "#" + [...color.slice(1)].map(c => c + c).join("");
+  const rgb = /^rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/.exec(color);
+  if (rgb && rgb.slice(1).every(c => Number(c) <= 255)) return "#" + rgb.slice(1).map(c => Number(c).toString(16).padStart(2, "0")).join("");
+  return null;
+}
 export type LessonMark = { type: string; attrs?: Record<string, string | number> };
 export type LessonNode = { type: string; text?: string; attrs?: Record<string, string | number>; marks?: LessonMark[]; content?: LessonNode[] };
 export type LessonSegment = { text: string; href?: string };
@@ -69,7 +79,15 @@ export function normalizeLessonDocument(value: unknown): LessonNode | null {
         const mark = record(raw), markAttrs = record(mark.attrs);
         if (simpleMarks.has(String(mark.type))) marks.push({ type: String(mark.type) });
         if (mark.type === "link" && safeUrl(markAttrs.href)) marks.push({ type: "link", attrs: { href: safeUrl(markAttrs.href) } });
-        if (mark.type === "textStyle" && LESSON_FONT_SIZES.some(size => `${size}px` === markAttrs.fontSize)) marks.push({ type: "textStyle", attrs: { fontSize: String(markAttrs.fontSize) } });
+        if (mark.type === "textStyle") {
+          const style: Record<string, string> = {};
+          if (LESSON_FONT_SIZES.some(size => `${size}px` === markAttrs.fontSize)) style.fontSize = String(markAttrs.fontSize);
+          for (const key of ["color", "backgroundColor"] as const) {
+            const color = normalizeLessonColor(markAttrs[key]);
+            if (color) style[key] = color;
+          }
+          if (Object.keys(style).length) marks.push({ type: "textStyle", attrs: style });
+        }
       }
       return { type, text: node.text, ...(marks.length ? { marks } : {}) };
     }
