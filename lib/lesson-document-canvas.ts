@@ -36,6 +36,7 @@ export function blocksFromCanvas(nodes: CanvasNode[]): LessonBlock[] {
 
 export function duplicateLessonBlock(block: LessonBlock, id: () => string): LessonBlock {
   const copy = structuredClone(block); copy.id = id();
+  delete copy.imageGroup;
   if (copy.fields) copy.fields = copy.fields.map(field => ({ ...field, id: id() }));
   if (copy.quiz) copy.quiz.questions = copy.quiz.questions.map(question => ({ ...question, id: id() }));
   return copy;

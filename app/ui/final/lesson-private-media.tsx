@@ -1,6 +1,6 @@
 "use client";
-/* eslint-disable @next/next/no-img-element -- Authenticated media must not use a public image optimizer. */
 import { LessonAudio } from './lesson-audio';
+import { LessonImage } from './lesson-image';
 import { useRef, useState } from 'react';
 import { lessonMediaUrl, type LessonMediaContext, type LessonMediaKind } from '@/lib/lesson-media';
 export function LessonPrivateMedia({ assetId, kind, alt, caption, context, submissionId, floatingAudio = false }: { floatingAudio?: boolean; assetId: string; kind: LessonMediaKind; alt?: string; caption?: string; context?: LessonMediaContext; submissionId?: string }) {
@@ -8,7 +8,7 @@ export function LessonPrivateMedia({ assetId, kind, alt, caption, context, submi
   const position = useRef(0);
   const url = lessonMediaUrl(assetId, context, submissionId) + '&attempt=' + attempt;
   return <figure>
-    {kind === 'image' ? <img key={url} src={url} loading="lazy" alt={alt || ''} onError={() => setFailed(true)} />
+    {kind === 'image' ? <LessonImage key={url} src={url} alt={alt} onError={() => setFailed(true)} />
       : kind === 'audio' ? <LessonAudio key={url} floating={floatingAudio} src={url} aria-label={alt || '학습 음성'} onTimeUpdate={event => { position.current = event.currentTarget.currentTime; }} onLoadedMetadata={event => { event.currentTarget.currentTime = position.current; }} onError={() => setFailed(true)} />
         : <video key={url} controls playsInline preload="metadata" src={url} aria-label={alt || '학습 영상'} style={{ aspectRatio: 'auto 16 / 9', objectFit: 'contain' }} onTimeUpdate={event => { position.current = event.currentTarget.currentTime; }} onLoadedMetadata={event => {
           const video = event.currentTarget;
