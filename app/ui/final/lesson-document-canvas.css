@@ -31,11 +31,3 @@
 .ldc-outline button { max-width:100%; overflow-wrap:anywhere; }
 @media(max-width:1000px) { .ldc-layout.has-selection { grid-template-columns:minmax(0,1fr); } .ldc-inspector { position:fixed; top:auto; right:16px; bottom:calc(88px + env(safe-area-inset-bottom,0px)); width:min(400px,calc(100vw - 32px)); max-height:min(48dvh,calc(100dvh - 172px)); z-index:12; } }
 @media(max-width:540px) { .edu-admin .ldc-editor .ldc-document { padding:16px 0; } .ldc-activity { padding:10px; } }
-
-.ldc-document:has(> [data-image-columns]) { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); column-gap:12px; }
-.ldc-document > * { grid-column:1 / -1; min-width:0; }
-.ldc-document > [data-image-columns] .ldc-activity { margin-block:12px; padding:6px; }
-.ldc-document > [data-image-columns] .ldc-activity-actions { flex-wrap:wrap; gap:0; }
-.ldc-document > [data-image-columns] img { width:100%; }
-.lba-image-row-settings { padding:12px; border:1px solid var(--line,#d8dde3); border-radius:8px; margin-bottom:12px; }
-@media(max-width:540px) { .ldc-document { column-gap:6px; } }
