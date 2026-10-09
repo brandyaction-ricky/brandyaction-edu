@@ -10,7 +10,7 @@ function RichNode({ node }: { node: LessonNode }): ReactNode {
       if (mark.type === "italic") text = <em>{text}</em>;
       if (mark.type === "underline") text = <u>{text}</u>;
       if (mark.type === "strike") text = <s>{text}</s>;
-      if (mark.type === "textStyle") text = <span style={{ fontSize: String(mark.attrs?.fontSize) }}>{text}</span>;
+      if (mark.type === "textStyle") text = <span style={{ fontSize: mark.attrs?.fontSize ? String(mark.attrs.fontSize) : undefined, color: mark.attrs?.color ? String(mark.attrs.color) : undefined, backgroundColor: mark.attrs?.backgroundColor ? String(mark.attrs.backgroundColor) : undefined }}>{text}</span>;
       if (mark.type === "link") text = <a href={String(mark.attrs?.href)} target="_blank" rel="noopener noreferrer">{text}</a>;
     }
     return text;

@@ -56,3 +56,14 @@ test('invalid document identity is rejected, never silently rebound to existing 
  const nodes=lessonCanvasNodes(blocks);assert.throws(()=>blocksFromCanvas([...nodes,nodes[0]]),/연결/);
  assert.throws(()=>blocksFromCanvas([{type:'lessonActivity'}]),/연결/);
 });
+test('text colors round-trip canvas and reject injected or unsupported styles',()=>{
+ const style={fontSize:'20px',color:'#C51E2C',backgroundColor:'rgb(254, 240, 138)',position:'fixed'};
+ const saved=serializeLessonDocument({type:'doc',content:[{type:'paragraph',content:[{type:'text',text:'색상 안내',marks:[{type:'textStyle',attrs:style}]}]}]});
+ assert.deepEqual(parseLessonDocument(saved).content[0].content[0].marks,[{type:'textStyle',attrs:{fontSize:'20px',color:'#c51e2c',backgroundColor:'#fef08a'}}]);
+ const doc=[{id:'colors',type:'text',content:saved},...blocks];
+ assert.deepEqual(blocksFromCanvas(lessonCanvasNodes(doc)),doc);
+ for(const invalid of ['red;position:fixed','url(https://example.test/pixel)','var(--unsafe)','expression(alert(1))','rgb(999,0,0)','#ffffffff','transparent']) {
+  const clean=normalizeLessonDocument({type:'doc',content:[{type:'paragraph',content:[{type:'text',text:'안내',marks:[{type:'textStyle',attrs:{color:invalid,backgroundColor:invalid,fontSize:'20px'}}]}]}]});
+  assert.deepEqual(clean.content[0].content[0].marks,[{type:'textStyle',attrs:{fontSize:'20px'}}]);
+ }
+});

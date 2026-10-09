@@ -5,10 +5,10 @@ import { EditorContent, useEditor, useEditorState, Extension, InputRule, wrappin
 import StarterKit from "@tiptap/starter-kit";
 import Blockquote from "@tiptap/extension-blockquote";
 import { Details, DetailsContent, DetailsSummary } from "@tiptap/extension-details";
-import { TextStyle, FontSize } from "@tiptap/extension-text-style";
-import { Bold, Italic, Underline, List, ListOrdered, Link2, Undo2, Redo2, RemoveFormatting, Quote, ListCollapse, Lightbulb } from "lucide-react";
+import { TextStyle, FontSize, Color, BackgroundColor } from "@tiptap/extension-text-style";
+import { Bold, Italic, Underline, List, ListOrdered, Link2, Undo2, Redo2, RemoveFormatting, Quote, ListCollapse, Lightbulb, Baseline, Highlighter } from "lucide-react";
 import { LessonCallout, insertLessonNotice } from "./lesson-callout";
-import { LESSON_FONT_SIZES, lessonDocumentForEditor, serializeLessonDocument } from "@/lib/lesson-body";
+import { LESSON_FONT_SIZES, normalizeLessonColor, lessonDocumentForEditor, serializeLessonDocument } from "@/lib/lesson-body";
 import { safeUrl } from "@/lib/platform";
 import "./lesson-text.css";
 import "./lesson-body-editor.css";
@@ -23,6 +23,27 @@ const LessonFontSize = FontSize.extend({
     } }));
   },
 });
+
+const LessonColor = Color.extend({
+  addGlobalAttributes() {
+    return (this.parent?.() || []).map(group => ({ ...group, attributes: {
+      ...group.attributes, color: { ...group.attributes.color, parseHTML: (element: HTMLElement) => normalizeLessonColor(element.style.color) },
+    } }));
+  },
+});
+const LessonBackgroundColor = BackgroundColor.extend({
+  addGlobalAttributes() {
+    return (this.parent?.() || []).map(group => ({ ...group, attributes: {
+      ...group.attributes, backgroundColor: { ...group.attributes.backgroundColor, parseHTML: (element: HTMLElement) => normalizeLessonColor(element.style.backgroundColor) },
+    } }));
+  },
+});
+const LESSON_COLORS = [
+  ["검정", "#202428"], ["회색", "#6b7280"], ["흰색", "#ffffff"], ["빨강", "#c51e2c"],
+  ["주황", "#c2410c"], ["노랑", "#facc15"], ["초록", "#15803d"], ["파랑", "#1d4ed8"],
+  ["보라", "#7e22ce"], ["분홍", "#be185d"], ["연한 노랑", "#fef08a"], ["연한 초록", "#dcfce7"],
+  ["연한 파랑", "#dbeafe"], ["연한 보라", "#f3e8ff"], ["연한 분홍", "#fce7f3"], ["연한 회색", "#f3f4f6"],
+] as const;
 
 const LessonQuote = Blockquote.extend({
   addInputRules() { return [wrappingInputRule({ find: /^" $/, type: this.type })]; },
@@ -65,7 +86,7 @@ export function lessonRichExtensions() {
       // input rule and discards its undo state. Enter already creates paragraphs.
       heading: { levels: [1, 2, 3] }, trailingNode: false, blockquote: false, code: false, codeBlock: false, horizontalRule: false,
       link: { openOnClick: false, HTMLAttributes: { target: "_blank", rel: "noopener noreferrer" }, isAllowedUri: url => Boolean(safeUrl(url)) },
-    }), TextStyle, LessonFontSize, LessonQuote, LessonDetails, DetailsSummary, DetailsContent, LessonCallout, LessonInputUndo];
+    }), TextStyle, LessonFontSize, LessonColor, LessonBackgroundColor, LessonQuote, LessonDetails, DetailsSummary, DetailsContent, LessonCallout, LessonInputUndo];
 }
 
 export function LessonRichInput({ value, onChange, label = "학습 내용", disabled = false, name, id, showLabel = true }: LessonBodyEditorProps) {
@@ -103,6 +124,9 @@ export function LessonRichInput({ value, onChange, label = "학습 내용", disa
 }
 
 export function LessonFormatToolbar({ editor, disabled = false }: { editor: Editor | null; disabled?: boolean }) {
+  const [colorOpen, setColorOpen] = useState<"color" | "backgroundColor" | null>(null);
+  const [customColor, setCustomColor] = useState("#c51e2c");
+  const colorPanelId = useId();
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [linkError, setLinkError] = useState("");
@@ -110,13 +134,30 @@ export function LessonFormatToolbar({ editor, disabled = false }: { editor: Edit
   const state = useEditorState({ editor, selector: ({ editor }) => ({
     block: editor?.isActive("heading", { level: 1 }) ? "h1" : editor?.isActive("heading", { level: 2 }) ? "h2" : editor?.isActive("heading", { level: 3 }) ? "h3" : "p",
     size: String(editor?.getAttributes("textStyle").fontSize || ""),
+    color: normalizeLessonColor(editor?.getAttributes("textStyle").color), backgroundColor: normalizeLessonColor(editor?.getAttributes("textStyle").backgroundColor),
     bold: editor?.isActive("bold"), italic: editor?.isActive("italic"), underline: editor?.isActive("underline"),
     bullet: editor?.isActive("bulletList"), ordered: editor?.isActive("orderedList"), link: editor?.isActive("link"),
     quote: editor?.isActive("blockquote"), details: editor?.isActive("details"), callout: editor?.isActive("callout"),
     undo: editor?.can().undoInputRule() || editor?.can().undo(), redo: editor?.can().redo(),
   }) });
+  function toggleColor(kind: "color" | "backgroundColor") {
+    if (!editor || disabled) return;
+    setLinkOpen(false);
+    setCustomColor(normalizeLessonColor(editor.getAttributes("textStyle")[kind]) || (kind === "color" ? "#c51e2c" : "#fef08a"));
+    setColorOpen(colorOpen === kind ? null : kind);
+  }
+  function applyColor(value: string | null) {
+    if (!editor || disabled || !colorOpen) return;
+    const color = normalizeLessonColor(value);
+    if (value !== null && !color) return;
+    const chain = editor.chain().focus();
+    if (colorOpen === "color") { if (color) chain.setColor(color).run(); else chain.unsetColor().run(); }
+    else { if (color) chain.setBackgroundColor(color).run(); else chain.unsetBackgroundColor().run(); }
+    setColorOpen(null);
+  }
   function toggleLink() {
     if (!editor) return;
+    setColorOpen(null);
     setLinkSelection({ from: editor.state.selection.from, to: editor.state.selection.to });
     setLinkUrl(String(editor.getAttributes("link").href || ""));
     setLinkError(""); setLinkOpen(!linkOpen);
@@ -154,7 +195,13 @@ export function LessonFormatToolbar({ editor, disabled = false }: { editor: Edit
             // Heading size applies to the entire affected paragraph, including
             // when only the caret (rather than its text) is selected.
             tr.doc.nodesBetween(tr.selection.from, tr.selection.to, (node, pos) => {
-              if (node.isTextblock) tr.removeMark(pos + 1, pos + node.nodeSize - 1, state.schema.marks.textStyle);
+              if (node.isTextblock) node.descendants((child, offset) => {
+                const mark = child.marks.find(mark => mark.type === state.schema.marks.textStyle);
+                if (!child.isText || !mark?.attrs.fontSize) return;
+                const attrs = { ...mark.attrs, fontSize: null };
+                tr.removeMark(pos + 1 + offset, pos + 1 + offset + child.nodeSize, mark.type);
+                if (Object.values(attrs).some(Boolean)) tr.addMark(pos + 1 + offset, pos + 1 + offset + child.nodeSize, mark.type.create(attrs));
+              });
             });
             return true;
           }).unsetFontSize();
@@ -162,8 +209,22 @@ export function LessonFormatToolbar({ editor, disabled = false }: { editor: Edit
           else chain?.setHeading({ level: event.target.value === "h1" ? 1 : event.target.value === "h2" ? 2 : 3 }).run();
         }}><option value="p">본문</option><option value="h1">제목 1 · H1</option><option value="h2">제목 2 · H2</option><option value="h3">제목 3 · H3</option></select>
         <select aria-label="글자 크기" value={state?.size || ""} disabled={disabled || !editor} onChange={event => event.target.value ? editor?.chain().focus().setFontSize(event.target.value).run() : editor?.chain().focus().unsetFontSize().run()}><option value="">기본 크기</option>{LESSON_FONT_SIZES.map(size => <option key={size} value={`${size}px`}>{size}px</option>)}</select>
+        <button type="button" className="lesson-color-trigger" title="글자색" aria-label="글자색" aria-expanded={colorOpen === "color"} aria-controls={colorPanelId} disabled={disabled || !editor} onMouseDown={event => event.preventDefault()} onClick={() => toggleColor("color")}><Baseline size={16} aria-hidden="true" /><span style={{ backgroundColor: state?.color || "#202428" }} /></button>
+        <button type="button" className="lesson-color-trigger" title="배경색" aria-label="배경색" aria-expanded={colorOpen === "backgroundColor"} aria-controls={colorPanelId} disabled={disabled || !editor} onMouseDown={event => event.preventDefault()} onClick={() => toggleColor("backgroundColor")}><Highlighter size={16} aria-hidden="true" /><span style={{ backgroundColor: state?.backgroundColor || "#fef08a" }} /></button>
         {buttons.map(button => <button type="button" key={button.label} title={button.label} aria-label={button.label} aria-pressed={button.active} disabled={disabled || !editor || button.unavailable} onMouseDown={event => event.preventDefault()} onClick={button.action}><button.icon size={16} aria-hidden="true" /></button>)}
       </div>
+      {colorOpen && <div id={colorPanelId} className="lesson-color-panel" role="group" aria-label={colorOpen === "color" ? "글자색 선택" : "배경색 선택"} onKeyDown={event => { if (event.key === "Escape") { event.preventDefault(); setColorOpen(null); editor?.commands.focus(); } }}>
+        <strong>{colorOpen === "color" ? "글자색" : "배경색 (형광펜)"}</strong>
+        <div className="lesson-color-swatches">
+          {LESSON_COLORS.map(([name, color]) => <button key={color} type="button" title={name} aria-label={name} aria-pressed={state?.[colorOpen] === color} disabled={disabled || !editor} style={{ backgroundColor: color }} onMouseDown={event => event.preventDefault()} onClick={() => applyColor(color)} />)}
+        </div>
+        <div className="lesson-color-actions">
+          <label>직접 선택<input type="color" aria-label="사용자 지정 색상" value={customColor} disabled={disabled || !editor} onChange={event => setCustomColor(event.target.value)} /></label>
+          <button type="button" disabled={disabled || !editor} onClick={() => applyColor(customColor)}>색상 적용</button>
+          <button type="button" disabled={disabled || !editor} onMouseDown={event => event.preventDefault()} onClick={() => applyColor(null)}>{colorOpen === "color" ? "기본 글자색" : "배경색 없애기"}</button>
+          <button type="button" onClick={() => { setColorOpen(null); editor?.commands.focus(); }}>닫기</button>
+        </div>
+      </div>}
       {linkOpen && <div className="lesson-link-controls" role="group" aria-label="링크 편집">
         <input aria-label="링크 주소" value={linkUrl} placeholder="https://" autoFocus disabled={disabled} onChange={event => setLinkUrl(event.target.value)} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); applyLink(); } if (event.key === "Escape") { event.preventDefault(); setLinkOpen(false); editor?.commands.focus(); } }} />
         <button type="button" disabled={disabled} onClick={() => applyLink()}>적용</button><button type="button" disabled={disabled} onClick={() => applyLink(true)}>링크 해제</button><button type="button" onClick={() => { setLinkOpen(false); editor?.commands.focus(); }}>닫기</button>
