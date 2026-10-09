@@ -1,3 +1,4 @@
+import { memberDirectoryScope } from '@/lib/member-directory';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { reviewMutation, reviewWriteError } from '@/lib/submission-review';
 import { createClient } from '@/lib/supabase/server';
@@ -169,6 +170,8 @@ export async function GET(request: Request) {
             }
             return reply({ data: { cohorts, curriculum_weeks: weeks, curriculum_lessons: lessons, edu_cohort_week_visibility: weekVisibility.data || [], edu_cohort_lesson_visibility: lessonVisibility.data || [], lesson_contents: contentResult.data || [] } });
         }
+        const directoryScope = adminMode && sectionKey === 'customers' ? memberDirectoryScope(params) : { query: '', status: '', course: '' };
+        if (adminMode && sectionKey === 'customers' && (directoryScope.query.length > 100 || !['', 'active', 'suspended'].includes(directoryScope.status) || (directoryScope.course && !uid(directoryScope.course)))) return reply({ error: '회원 검색 조건을 확인해 주세요.' }, 400);
         const settings = getEduSettings();
         let tables = productEditorRead ? ['courses', 'cohorts'] : adminMode ? adminTables[sectionKey] : ['courses', 'cohorts', 'curriculum_weeks', 'curriculum_lessons', 'articles', 'article_categories', 'review_videos', 'site_banners', 'reviews', 'cohort_sessions'];
         if (adminMode && sectionKey === 'home' && operator?.role === 'staff') tables = tables.filter((table) => (['courses', 'cohorts'].includes(table) && operator.permissions.products) || (['mission_submissions', 'edu_questions'].includes(table) && operator.permissions.members));
@@ -243,6 +246,14 @@ export async function GET(request: Request) {
                 }
             })(),
             ...tables.filter((table) => !deferredOrderTables.has(table)).map(async (table) => {
+                if (adminMode && sectionKey === 'customers' && table === 'profiles') {
+                    const scope = directoryScope;
+                    const result = await db.rpc('edu_admin_member_directory', { p_actor: user!.id, p_query: scope.query.trim(), p_status: scope.status, p_course: scope.course || null, p_member: memberScope || null, p_page: Math.floor(page), p_limit: pageSize });
+                    if (result.error) throw result.error;
+                    data.profiles = result.data.rows;
+                    pagination = { page: Math.floor(page), pageSize, total: result.data.total };
+                    return;
+                }
                 if (adminMode && sectionKey === 'orders' && table === 'orders') {
                     const scope = parseOrderListScope(params);
                     const [result, all, failed, refund, access] = await Promise.all([

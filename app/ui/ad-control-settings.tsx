@@ -1,13 +1,13 @@
 "use client";
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ShieldCheck, ShieldAlert, RefreshCw } from 'lucide-react';
-import { freezeLabels, missingControl, type AdControl, type AdEvidence, type AdPolicy } from '@/lib/edu-ad-controls';
+import { freezeReasonLabel, adThresholds, defaultAdThresholds, missingControl, type AdControl, type AdEvidence, type AdPolicy } from '@/lib/edu-ad-controls';
 import type { Row } from '@/lib/platform';
 
 type History = { cohort_id: string; revision: number; occurred_at: string; policy: AdPolicy };
 type Loaded = { enabled: boolean; canManage: boolean; policies: AdPolicy[]; evidence: (AdEvidence & { control: AdControl })[]; history: History[]; checkedAt?: string };
-type Draft = { budget_krw: string; ads_start: string; ads_end: string; sales_end: string; mode: AdPolicy['mode']; reason: string; hours: number; enabled: boolean };
-const emptyDraft: Draft = { budget_krw: '', ads_start: '', ads_end: '', sales_end: '', mode: 'auto', reason: '', hours: 72, enabled: true };
+type Draft = { budget_krw: string; ads_start: string; ads_end: string; sales_end: string; mode: AdPolicy['mode']; reason: string; hours: number | null; cpr_limit_krw: number; roas_floor: number; refund_request_limit: number; enabled: boolean };
+const emptyDraft: Draft = { budget_krw: '', ads_start: '', ads_end: '', sales_end: '', mode: 'auto', reason: '', hours: 72, enabled: true, ...defaultAdThresholds };
 const time = (value: string) => new Date(value).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
 export function AdControlSettings({ cohorts }: { cohorts: Row[] }) {
   const [selected, setSelected] = useState(''), [loaded, setLoaded] = useState<Loaded | null>(null);
@@ -28,7 +28,8 @@ export function AdControlSettings({ cohorts }: { cohorts: Row[] }) {
   const enabled = !!loaded?.enabled, editable = enabled && !!loaded?.canManage && !loading;
   const draft = edited?.cohort === selected && edited.revision === (policy?.revision || 0) ? edited.draft :
     policy ? { ...emptyDraft, budget_krw: String(policy.budget_krw), ads_start: policy.ads_start,
-      ads_end: policy.ads_end, sales_end: policy.sales_end, enabled: policy.enabled, mode: policy.mode } : { ...emptyDraft };
+      ads_end: policy.ads_end, sales_end: policy.sales_end, enabled: policy.enabled, mode: policy.mode, ...adThresholds(policy),
+      hours: policy.mode === 'freeze' && policy.override_until === null ? null : 72 } : { ...emptyDraft };
   const setDraft = (value: Draft) => setEdited({ cohort: selected, revision: policy?.revision || 0, draft: value });
   const reload = () => { setLoading(true); setRefresh(n => n + 1); };
   async function save(event: FormEvent) {
@@ -58,8 +59,8 @@ export function AdControlSettings({ cohorts }: { cohorts: Row[] }) {
       <div className="notice mt16" role="status" style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
         {control.freeze ? <ShieldAlert size={24} aria-hidden /> : <ShieldCheck size={24} aria-hidden />}
         <div><strong>{loading ? '현재 상태 확인 중…' : !enabled && loaded ? '아직 판단을 시작하지 않았어요' : control.freeze ? '광고비를 더 늘리지 않아요' : control.freeze_source === 'manual' ? '광고비 증액 제한을 풀었어요' : '광고비 증액을 검토할 수 있어요'}</strong>
-          {!loading && enabled && <div className="small mt8">{control.freeze_source === 'manual' && !control.freeze && <p>대표가 기한까지 제한을 풀었어요. 자동 기준은 아래와 같습니다.</p>}{control.freeze_reasons.map(r => <p key={r}>{freezeLabels[r]}</p>)}
-            {control.freeze_source === 'manual' && <><p>대표 설정 · {time(control.override_until!)}까지</p><p>{evidence?.policy.reason}</p></>}
+          {!loading && enabled && <div className="small mt8">{control.freeze_source === 'manual' && !control.freeze && <p>대표가 기한까지 제한을 풀었어요. 자동 기준은 아래와 같습니다.</p>}{control.freeze_reasons.map(r => <p key={r}>{freezeReasonLabel(r, evidence?.policy)}</p>)}
+            {control.freeze_source === 'manual' && <><p>대표 설정 · {control.override_until ? `${time(control.override_until)}까지` : '직접 해제할 때까지'}</p><p>{evidence?.policy.reason}</p></>}
             {control.cohort_budget_krw !== null && <p>기수 예산 {control.cohort_budget_krw.toLocaleString('ko-KR')}원</p>}
             {loaded?.checkedAt && <p className="muted">확인 시각 {time(loaded.checkedAt)}</p>}</div>}
         </div>
@@ -70,11 +71,17 @@ export function AdControlSettings({ cohorts }: { cohorts: Row[] }) {
         <form onSubmit={save} className="mt16"><fieldset disabled={!editable || pending} style={{ padding: 0, margin: 0, border: 0, minWidth: 0 }}>
           <div className="form-grid">{field('budget_krw', '기수 전체 광고 예산 (원)', 'number')}{field('ads_start', '광고 시작일', 'date')}
             {field('ads_end', '광고 종료일', 'date')}{field('sales_end', '판매 마감일', 'date')}</div>
-          <div className="field mt16"><label htmlFor="ad-control-mode">판단 방식</label><select id="ad-control-mode" value={draft.mode} onChange={e => setDraft({ ...draft, mode: e.target.value as Draft['mode'] })}>
+          <div className="field mt16"><label htmlFor="ad-control-mode">판단 방식</label><select id="ad-control-mode" value={draft.mode} onChange={e => setDraft({ ...draft, mode: e.target.value as Draft['mode'], hours: e.target.value === 'freeze' ? null : 72 })}>
             <option value="auto">자동 판단으로 돌아가기</option><option value="freeze">직접 증액 막기</option><option value="release">잠시 증액 제한 풀기</option>
           </select></div>
-          {draft.mode !== 'auto' && <><label className="field mt16"><span>유지 시간 (최대 72시간)</span><input type="number" min={1} max={72} required value={draft.hours} onChange={e => setDraft({ ...draft, hours: Number(e.target.value) })} /></label>
+          {draft.mode === 'freeze' && <label className="checkline mt16"><input type="checkbox" checked={draft.hours === null} onChange={e => setDraft({ ...draft, hours: e.target.checked ? null : 72 })} /> 직접 해제할 때까지 증액 막기</label>}
+          {draft.mode !== 'auto' && draft.hours !== null && <><label className="field mt16"><span>유지 시간 (최대 72시간)</span><input type="number" min={1} max={72} required value={draft.hours} onChange={e => setDraft({ ...draft, hours: Number(e.target.value) })} /></label>
             <p className="muted small">기한이 지나면 자동 판단으로 돌아갑니다. 값이 없으면 다시 증액을 막습니다.</p></>}
+          <details className="mt16"><summary>자동 동결 기준 변경</summary><div className="form-grid mt16">
+            <label className="field"><span>카톡방 입장 비용 기준 (원)</span><input type="number" required min={1} max={1000000} value={draft.cpr_limit_krw} onChange={e => setDraft({ ...draft, cpr_limit_krw: Number(e.target.value) })} /></label>
+            <label className="field"><span>기수 전체 ROAS 기준 (배)</span><input type="number" required min={0.1} max={100} step="any" value={draft.roas_floor} onChange={e => setDraft({ ...draft, roas_floor: Number(e.target.value) })} /></label>
+            <label className="field"><span>하루 환불 요청 기준 (건)</span><input type="number" required min={1} max={10000} value={draft.refund_request_limit} onChange={e => setDraft({ ...draft, refund_request_limit: Number(e.target.value) })} /></label>
+          </div><p className="muted small">기준을 바꾸면 변경 사유와 함께 기록됩니다. 지난 날짜의 판단에는 당시 기준이 적용됩니다.</p></details>
           <label className="field mt16"><span>변경 사유</span><textarea required minLength={3} maxLength={500} rows={3} value={draft.reason}
             placeholder="확인한 내용과 변경 이유를 남겨 주세요. 고객 개인정보는 적지 마세요." onChange={e => setDraft({ ...draft, reason: e.target.value })} /></label>
           <label className="checkline mt16"><input type="checkbox" checked={draft.enabled} onChange={e => setDraft({ ...draft, enabled: e.target.checked })} /> 이 기수를 팁스 판단 대상으로 사용</label>
@@ -83,8 +90,8 @@ export function AdControlSettings({ cohorts }: { cohorts: Row[] }) {
         </fieldset></form>
       </details>
       <details className="mt24"><summary>판단 기준·입력값 보기</summary><div className="small muted mt16">
-        <p>판매 마감 전: 카톡방 입장 비용이 이틀 연속 4,500원을 넘으면 증액을 막습니다.</p>
-        <p>판매 마감 후: 환불 예상액을 뺀 기수 전체 ROAS가 5배 미만이거나 환불 요청이 하루 5건 이상이면 증액을 막습니다.</p>
+        <p>판매 마감 전: 카톡방 입장 비용이 이틀 연속 {adThresholds(policy).cpr_limit_krw.toLocaleString('ko-KR')}원을 넘으면 증액을 막습니다.</p>
+        <p>판매 마감 후: 환불 예상액을 뺀 기수 전체 ROAS가 {adThresholds(policy).roas_floor}배 미만이거나 환불 요청이 하루 {adThresholds(policy).refund_request_limit}건 이상이면 증액을 막습니다.</p>
         <p>어느 유입으로 구매했든 기수 전체 매출을 봅니다. 내부·시험 주문은 제외합니다.</p>
         <p>환불 예상액의 근거가 아직 없으면 ROAS를 확정하지 않고 증액을 막습니다.</p>
         {evidence && <><p>입장 비용: 최근일 {evidence.cpr_today === null ? '미확인' : `${Math.round(evidence.cpr_today).toLocaleString()}원`} · 전날 {evidence.cpr_previous === null ? '미확인' : `${Math.round(evidence.cpr_previous).toLocaleString()}원`}</p>
@@ -93,7 +100,7 @@ export function AdControlSettings({ cohorts }: { cohorts: Row[] }) {
       <details className="mt24"><summary>변경 기록</summary><div className="small mt16">
         {(loaded?.history || []).filter(h => h.cohort_id === selected).map(h => <div key={h.revision} className="notice mt8">
           <strong>{time(h.occurred_at)} · {h.policy.mode === 'auto' ? '자동 판단' : h.policy.mode === 'freeze' ? '직접 동결' : '임시 해제'}</strong>
-          <p style={{ overflowWrap: 'anywhere' }}>{h.policy.reason}</p>{h.policy.override_until && <p className="muted">기한 {time(h.policy.override_until)}</p>}
+          <p style={{ overflowWrap: 'anywhere' }}>{h.policy.reason}</p>{h.policy.override_until ? <p className="muted">기한 {time(h.policy.override_until)}</p> : h.policy.mode === 'freeze' && <p className="muted">직접 해제할 때까지</p>}<p className="muted">입장 비용 {adThresholds(h.policy).cpr_limit_krw.toLocaleString('ko-KR')}원 · ROAS {adThresholds(h.policy).roas_floor}배 · 환불 요청 {adThresholds(h.policy).refund_request_limit}건</p>
         </div>)}{!loaded?.history.some(h => h.cohort_id === selected) && <p className="muted">아직 변경 기록이 없습니다.</p>}
       </div></details>
     </>}

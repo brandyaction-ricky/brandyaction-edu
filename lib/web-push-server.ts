@@ -3,7 +3,7 @@ import { createECDH, ECDH } from 'node:crypto';
 import webpush from 'web-push';
 import { createAdminClient } from '@/lib/supabase/admin';
 
-const paths = new Set(['/my/questions', '/admin/questions', '/my/diagnosis', '/admin/diagnosis']);
+const paths = new Set(['/my/messages', '/my/questions', '/admin/questions', '/my/diagnosis', '/admin/diagnosis']);
 const allowedPath = (value: string) => paths.has(value) || /^\/my\/questions\?question=[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value);
 export function pushConfiguration() {
   if (process.env.EDU_WEB_PUSH_ENABLED !== 'true' || process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED !== 'true') return null;
@@ -54,6 +54,7 @@ export async function dispatchWebPush(dependencies?: { rpc: Rpc; send: typeof we
       const job = jobs[index++];
       const finish = (outcome: string, code: string) => call('edu_finish_push', { p_id: job.id, p_lease: job.lease, p_outcome: outcome, p_code: code });
       const delivery = await call('edu_read_push_delivery', { p_id: job.id, p_lease: job.lease }) as Delivery | null;
+      if (delivery?.path === '/my/messages' && process.env.EDU_CARE_DELIVERY_ENABLED !== 'true') { await finish('skipped', 'CARE_DISABLED'); continue; }
       if (!delivery) { await finish('skipped', 'NO_LONGER_ELIGIBLE'); continue; }
       let subscription;
       try {

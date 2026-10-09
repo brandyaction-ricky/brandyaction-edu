@@ -1,7 +1,8 @@
+import type { MemberPaymentContact } from './member-directory';
 import { DiagnosisBridgeError } from './diagnosis-bridge';
 import { validAdminDiagnosisBinding, validateAdminReportRows, validateAdminRetry, type AdminDiagnosisBinding, type AdminReportStatus } from './diagnosis-admin-bridge';
 
-export type DiagnosisAdminRow = {id:string; name:string; published:boolean; attemptId:string|null; state:string; startedAt:string|null; updatedAt:string|null; report:(AdminReportStatus & {checkedAt:string})|null; statusAvailable:boolean};
+export type DiagnosisAdminRow = {id:string; name:string; email?:string|null; phone?:string|null; paymentContacts?:MemberPaymentContact[]; published:boolean; attemptId:string|null; state:string; startedAt:string|null; updatedAt:string|null; report:(AdminReportStatus & {checkedAt:string})|null; statusAvailable:boolean};
 export type DiagnosisAdminList = {enabled:boolean; allPublished:boolean; revision:number; eligibleCount:number; startedCount:number; nextCursor:string|null; rows:DiagnosisAdminRow[]; remoteAvailable:boolean};
 type InternalRow = DiagnosisAdminRow & {binding: AdminDiagnosisBinding|null};
 type Dependencies = {actor:{id:string};rpc:(name:string,args:Record<string,unknown>)=>PromiseLike<{data:unknown;error:unknown}>;send:(input:Record<string,unknown>)=>Promise<unknown>;now?:()=>number};
@@ -29,7 +30,7 @@ export async function runDiagnosisAdmin(deps:Dependencies,input:Record<string,un
     return {enabled:data.enabled,allPublished:data.allPublished,revision:data.revision,eligibleCount:data.eligibleCount,startedCount:data.startedCount,nextCursor:data.nextCursor,remoteAvailable,
       rows:data.rows.map(r=>{const fresh=r.attemptId?reports.get(r.attemptId):undefined;
         const prior=r.report;
-        return {id:r.id,name:r.name,published:r.published,attemptId:r.attemptId,state:r.state,startedAt:r.startedAt,updatedAt:r.updatedAt,
+        return {id:r.id,name:r.name,email:r.email,phone:r.phone,paymentContacts:r.paymentContacts,published:r.published,attemptId:r.attemptId,state:r.state,startedAt:r.startedAt,updatedAt:r.updatedAt,
           statusAvailable:!r.binding||remoteAvailable,
           report:fresh?{queuePosition:fresh.queuePosition,queuedAt:fresh.queuedAt,queueObservedAt:fresh.queueObservedAt,retryMode:fresh.retryMode,rewritesRemaining:fresh.rewritesRemaining,startedAt:fresh.startedAt,submittedAt:fresh.submittedAt,issuedAt:fresh.issuedAt,state:fresh.state,updatedAt:fresh.updatedAt,errorCode:fresh.errorCode,canRetry:fresh.canRetry,version:fresh.version,details:fresh.details,checkedAt}:prior?{...prior,canRetry:false}:null};})} satisfies DiagnosisAdminList;
   }

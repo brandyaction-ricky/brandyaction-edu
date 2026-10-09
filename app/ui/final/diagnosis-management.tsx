@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { MemberPaymentIdentity } from './member-payment-identity';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowRight, Compass, RefreshCw } from 'lucide-react';
 import { AdminButton, AdminEmptyState, AdminInlineError, AdminInput, AdminLinkButton, AdminModal, AdminPage, AdminPageHeader, AdminStatusBadge, AdminSummaryCard } from '@/features/admin-ui';
@@ -55,7 +56,7 @@ export function DiagnosisManagement({member}:{member?:string}={}){
         <AdminButton disabled={!data||!data.enabled||!!error||loading||saving} onClick={()=>publication(false)}>한 번에 모두 닫기</AdminButton></div>
     </section>}
     {!member&&<form className="diagnosis-management-toolbar" onSubmit={e=>{e.preventDefault();setCursors([null]);setQuery(search.trim());}}>
-      <AdminInput label="수강생 이름" value={search} maxLength={100} onChange={e=>setSearch(e.target.value)} placeholder="이름으로 검색"/>
+      <AdminInput label="수강생 검색" value={search} maxLength={100} onChange={e=>setSearch(e.target.value)} placeholder="가입·결제 이름 / 이메일 / 연락처 / 주문번호"/>
       <AdminButton type="submit" disabled={saving}>검색</AdminButton><AdminButton onClick={()=>void load()} loading={loading} disabled={saving}><RefreshCw size={16}/>새로고침</AdminButton>
       <span>한국 시간(KST) · 페이지당 최대 100명 · 30초마다 자동 확인</span>
     </form>}
@@ -67,7 +68,7 @@ export function DiagnosisManagement({member}:{member?:string}={}){
     {data&&<div className="diagnosis-management-table" role="region" aria-label="수강생 진단 현황" tabIndex={0}>
       <table><thead><tr><th>수강생</th><th>공개 설정</th><th>검사 진행</th><th>보고서 발급</th><th>기록·재발급</th></tr></thead>
         <tbody>{data.rows.map(row=>{const r=row.report;const rewrite=r?.retryMode==='rewrite';const reviewHold=r?.state==='needs_review'&&r.errorCode==='COMPLETION_REVIEW_REQUIRED';const count=r?.rewritesRemaining;const remaining=row.statusAvailable&&data.remoteAvailable&&!error&&typeof count==='number'&&Number.isInteger(count)&&count>=0&&count<=2?count:null;const retryAllowed=!!r?.canRetry&&(rewrite?reviewHold&&remaining!==null&&remaining>0:r?.errorCode!=='COMPLETION_REVIEW_REQUIRED');return <tr key={row.id}>
-          <th scope="row">{row.name}<small><Link href={`/admin/diagnosis/manage?member=${row.id}`}>이 수강생 바로가기</Link></small></th>
+          <th scope="row"><Link href={`/admin/customers?member=${row.id}`}>{row.name}</Link>{row.email&&<small style={{overflowWrap:"anywhere"}}>가입 이메일: {row.email}</small>}<MemberPaymentIdentity contacts={row.paymentContacts}/><small><Link href={`/admin/diagnosis/manage?member=${row.id}`}>이 수강생 바로가기</Link></small></th>
           <td data-label="공개 설정"><AdminButton size="sm" disabled={loading||saving||!!error||!data.enabled} onClick={()=>publication(!row.published,row)} aria-label={`${row.name} 진단 ${row.published?'닫기':'공개'}`}>{row.published?'공개 중 · 닫기':'비공개 · 공개'}</AdminButton></td>
           <td data-label="검사 진행"><span>{!row.attemptId?'시작 전':row.state==='in_progress'?'검사 중':row.state==='preparing'?'검사 연결 중':'제출 완료'}</span>{row.attemptId&&<><small>검사 시작 {date(r?.startedAt??row.startedAt)}</small><small>제출 완료 {r?.submittedAt?date(r.submittedAt):row.state==='submitted'?'시각 확인 필요':'—'}</small></>}</td>
           <td data-label="보고서 발급"><AdminStatusBadge status="active" label={!row.attemptId?'검사 시작 전':!r?'상태 확인 대기':reportLabels[r.state]??'확인 필요'} tone={r?.state==='ready'?'success':r?.state==='needs_review'?'warning':'neutral'}/>{r?.queuePosition!=null&&row.statusAvailable&&data.remoteAvailable&&!error&&<div className="diagnosis-management-queue"><strong>대기 {r.queuePosition}번째</strong><small>접수 {date(r.queuedAt)}</small><small>{date(r.queueObservedAt)} 확인 기준</small><small>순서는 바뀔 수 있으며, 완료 예정 시간을 뜻하지 않습니다.</small></div>}{r?.state==='needs_review'&&<p className="diagnosis-management-review">{r.errorCode?errorLabels[r.errorCode]??'보고서 처리 중 추가 확인이 필요합니다.':'보고서 검토가 필요해 발급이 보류됐습니다.'}{reviewHold&&<small>{remaining===null?'남은 횟수를 확인하지 못했습니다. 새로고침 후 다시 확인해 주세요.':`새로 작성 최대 2회 · 남은 ${remaining}회`}</small>}{!retryAllowed&&<span>{reviewHold&&remaining===0?'새로 작성 기회를 모두 사용했습니다. 운영 담당자의 확인이 필요합니다.':reviewHold&&remaining===null?'횟수를 확인할 때까지 새로 작성할 수 없습니다.':'현재 다시 처리할 수 없는 상태입니다. 운영 담당자가 확인 중입니다.'}</span>}</p>}{r?.state==='ready'&&<small>보고서 발급 {r.issuedAt?date(r.issuedAt):'시각 확인 필요'}</small>}</td>

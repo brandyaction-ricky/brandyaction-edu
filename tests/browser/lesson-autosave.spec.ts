@@ -89,3 +89,50 @@ test('browser storage failure is visible without opening history and server savi
  await title(page).fill('브라우저 보관 불가 시 서버 저장');await expect(page.getByRole('alert')).toContainText('브라우저 보관에 실패했습니다.');
  await expect.poll(()=>server.get().payload.form.basic.title).toBe('브라우저 보관 불가 시 서버 저장');await expect(page.locator('.editor-savebar')).toContainText('자동저장 완료');
 });
+
+test('canvas image insertion and upload stop saving once acknowledged, and later edits still save',async({page})=>{
+ const server=await backend(page),assetId=id(95);
+ const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aMwoAAAAASUVORK5CYII=','base64');
+ await page.route('**/api/platform/lesson-media**',async route=>{
+  if(route.request().method()==='GET'){await route.fulfill({contentType:'image/png',body:png});return;}
+  await route.fulfill({json:route.request().postDataJSON().action==='prepare'?{id:assetId,signedUrl:'/autosave-image-upload',contentType:'image/png'}:{id:assetId,ready:true}});
+ });
+ await page.route('**/autosave-image-upload',route=>route.fulfill({json:{}}));
+ await page.goto('/lesson-block-author-test?serverDraft=1');
+ await expect(page.getByRole('textbox',{name:'수업 문서',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'+ 현재 위치에 추가',exact:true}).click();
+ await page.getByRole('group',{name:'문서에 넣을 항목'}).getByRole('button',{name:'이미지',exact:true}).click();
+ await expect.poll(()=>server.get().payload.blocks.document.blocks.filter(b=>b.type==='image').length).toBe(1);
+ await expect(page.locator('.editor-savebar')).toContainText('자동저장 완료');
+ const saved=server.writes.filter(w=>w.action==='save').length;
+ // Observe both the debounced save and periodic retry after acknowledgement.
+ await page.waitForTimeout(6500);
+ expect(server.writes.filter(w=>w.action==='save')).toHaveLength(saved);
+ await page.getByRole('complementary',{name:'선택 항목 설정'}).getByLabel('설명',{exact:true}).fill('이미지 설명 수정');
+ await expect.poll(()=>server.get().payload.blocks.document.blocks.find(b=>b.type==='image')?.content).toBe('이미지 설명 수정');
+ await page.getByLabel('이미지 파일 선택',{exact:true}).setInputFiles({name:'image.png',mimeType:'image/png',buffer:png});
+ await expect.poll(()=>server.get().payload.blocks.document.blocks.find(b=>b.type==='image')?.assetId).toBe(assetId);
+ await expect(page.locator('.editor-savebar')).toContainText('자동저장 완료');
+ const uploaded=server.writes.filter(w=>w.action==='save').length;
+ await page.waitForTimeout(6500);
+ expect(server.writes.filter(w=>w.action==='save')).toHaveLength(uploaded);
+ await page.getByRole('button',{name:'편집 다시 열기'}).click();
+ await expect(page.locator('[data-block-type="image"] img')).toBeVisible();
+ await expect(page.getByRole('textbox',{name:'수업 문서',exact:true})).toContainText('학생이 보는 원래 본문');
+ expect(server.get().public.payload.blocks.document.blocks).toHaveLength(1);
+ expect(server.writes.filter(w=>w.action==='publish')).toHaveLength(0);
+});
+
+
+test('an acknowledged block save preserves edits made while that save is in flight',async({page})=>{
+ const server=await backend(page);await open(page);const resume=server.pauseNextSave();
+ const tag=page.getByLabel('학생에게 표시할 태그');await tag.fill('먼저 보낸 태그');
+ await expect.poll(()=>server.writes.filter(w=>w.action==='save').length).toBe(1);
+ await tag.fill('전송 중 이어 쓴 태그');resume();
+ await expect.poll(()=>server.get().payload.blocks.document.presentation?.tagLabel).toBe('전송 중 이어 쓴 태그');
+ await expect(page.locator('.editor-savebar')).toContainText('자동저장 완료');
+ const saved=server.writes.filter(w=>w.action==='save').length;
+ await page.waitForTimeout(6500);
+ expect(server.writes.filter(w=>w.action==='save')).toHaveLength(saved);
+ await expect(tag).toHaveValue('전송 중 이어 쓴 태그');
+});

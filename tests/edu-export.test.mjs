@@ -73,12 +73,12 @@ test('the first cumulative room count is unmeasured until a previous snapshot ex
   const r=envelope('daily_totals',s).rows;assert.equal(r[0].funnel.chat_joined_manual,null);assert.equal(r[1].funnel.chat_joined_manual,2);
 });
 function harness(){
-  let config={enabled:true,tokenHash:hash('edu-test-token')},gate='ok',data=emptySource(),failure=false;const calls=[];
+  let config={enabled:true,tokenHash:hash('edu-test-token')},gate='ok',data=emptySource(),failure=false,snapshotStatus='ok';const calls=[];
   const chain=value=>({abortSignal:async()=>{if(failure)throw Error('database private detail');return value;}});
   const db={from:()=>({select:()=>({eq:()=>({eq:()=>({abortSignal:()=>({maybeSingle:async()=>{if(failure)throw Error('database private detail');return{data:{value:config},error:null};}})})})})}),
-    rpc:(fn,args)=>{calls.push([fn,args]);return chain({data:fn==='edu_export_v1_gate'?gate:data,error:null});}};
+    rpc:(fn,args)=>{calls.push([fn,args]);return chain({data:fn==='edu_export_v1_gate'?gate:{status:snapshotStatus,source:data},error:null});}};
   const route=compileExport('app/api/internal/export/v1/[dataset]/route.ts',{'@/lib/supabase/admin':{createAdminClient:()=>db},'@/lib/edu-export-contract':contract,'@/lib/edu-export':logic});
-  return{calls,setConfig:v=>config=v,setGate:v=>gate=v,setData:v=>data=v,breakDb:()=>failure=true,
+  return{calls,setSnapshotStatus:v=>snapshotStatus=v,setConfig:v=>config=v,setGate:v=>gate=v,setData:v=>data=v,breakDb:()=>failure=true,
     get:(dataset='daily_totals',token='edu-test-token',query='from=2026-10-01&to=2026-10-02')=>route.GET(new Request('https://edu.test/api/internal/export/v1/'+dataset+'?'+query,{headers:token?{authorization:'Bearer '+token}:{}}),{params:Promise.resolve({dataset})})};
 }
 test('API re-reads kill switch and hash, separates MYIN, returns only short errors and no-store headers',async()=>{
@@ -91,7 +91,9 @@ test('API re-reads kill switch and hash, separates MYIN, returns only short erro
   h.setGate('disabled');assert.equal((await h.get()).status,503);h.setGate('unauthorized');assert.equal((await h.get()).status,401);h.setGate('ok');
   for(const ds of ['ad_changes','unknown'])assert.equal((await h.get(ds)).status,404);
   for(const query of ['from=2026-02-30&to=2026-03-01','from=2026-10-01&from=2026-10-02&to=2026-10-03'])assert.equal((await h.get('daily_totals','edu-test-token',query)).status,400);
-  h.breakDb();r=await h.get();assert.equal(r.status,503);assert.deepEqual(await r.json(),{error:'unavailable'});
+  for(const [state,status]of [['backfill_window',400],['backfill_busy',429],['invalid_range',400]]){h.setSnapshotStatus(state);const failed=await h.get();assert.equal(failed.status,status);assert.deepEqual(await failed.json(),{error:state});}
+ h.setSnapshotStatus('ok');
+ h.breakDb();r=await h.get();assert.equal(r.status,503);assert.deepEqual(await r.json(),{error:'unavailable'});
   assert.equal(r.headers.get('cache-control'),'no-store');assert.equal(r.headers.get('x-contract-version'),'1.0');
 });
 test('generic administrator save cannot rename or overwrite the server integration setting',async()=>{

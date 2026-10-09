@@ -129,6 +129,10 @@ function SessionContent({ snapshot, lessonId, enrollmentId, readOnly, onSelectRe
       </> : <>
         {submission && <p>{submissionState === 'changes_requested' ? '수정 요청을 받았습니다. 피드백을 확인하고 답변을 다시 제출해 주세요.' : '답변을 수정하고 다시 제출할 수 있습니다.'}</p>}
         <p>{policy.mode === 'mentor' ? '제출하면 현재 답변을 보관하고 멘토 확인을 기다립니다.' : '필수 항목을 확인하고 저장된 답변으로 학습을 완료합니다.'}</p>
+        <p>아래 {policy.mode === 'mentor' ? '미션 제출하기' : '학습 완료하기'} 버튼이 눌리지 않으면, 위에 아직 제출하지 않은 미션이나 빠뜨린 필수 답변·체크 항목이 없는지 확인해 주세요. 모두 완료했다면 답변이 저장되었는지 확인한 뒤 새로고침해 주세요.</p>
+        {uploading ? <p role="status">파일을 업로드하고 있습니다. 업로드가 끝나면 버튼을 누를 수 있습니다.</p>
+          : submitting ? <p role="status">답변을 저장하고 제출하고 있습니다. 완료될 때까지 잠시 기다려 주세요.</p>
+          : status.phase === 'conflict' ? <div role="status"><p>{status.message || '수업 내용 또는 저장된 답변이 변경되어 완료할 수 없습니다.'} 현재 입력을 잃지 않도록 답변을 먼저 내려받고 학습 화면을 다시 확인해 주세요.</p><button className="btn small" type="button" onClick={downloadAnswers}>답변 보관하기</button><button className="btn small" type="button" onClick={() => select(null)}>학습 화면 다시 확인</button></div> : null}
         {submitError && <div role="alert"><p>{submitError}</p>{missing.length > 0 && <ul>{missing.map((item, index) => <li key={`${item.id}:${index}`}>{item.label}</li>)}</ul>}</div>}
         <button className="btn primary" type="button" disabled={uploading || submitting || status.phase === 'conflict'} onClick={() => void submit()}>{submitting ? '저장·제출 중…' : policy.mode === 'mentor' ? '미션 제출하기' : '학습 완료하기'}</button>
       </>}

@@ -4,10 +4,10 @@ import type { QuestionAiReference } from '@/lib/question-ai-context';
 import { QuestionAiReferenceNote } from './question-ai-reference';
 import { useUnsavedLearningChanges } from './use-unsaved-learning-changes';
 import { QuestionAdminHub } from './question-admin-hub';
-import { QuestionImage } from './question-image';
+import { QuestionImage, QuestionImagePicker, type QuestionImagePickerHandle } from './question-image';
 import { AnswerText } from './lesson-text';
 import { AdminDrawer, useUnsavedWarning } from '@/features/admin-ui';
-type Answer = { canDelete?: boolean; id: string; authorName: string; source?: 'learner' | 'operator' | 'legacy' | 'faq' | 'aside'; content: string; createdAt: string };
+type Answer = { imageId?: string | null; canDelete?: boolean; id: string; authorName: string; source?: 'learner' | 'operator' | 'legacy' | 'faq' | 'aside'; content: string; createdAt: string };
 type Thread = { question: { id: string; title: string; content: string; learningContext?: string | null; status: string; resolved: boolean; archived: boolean; headId: string | null; imageId?: string | null; visibility?: 'cohort' | 'private' }; answers: Answer[]; nextCursor: string | null; canAnswer: boolean; canFollowUp?: boolean };
 async function request<T>(question: string, body?: unknown, before?: string, signal?: AbortSignal): Promise<T> {
  const response = await fetch('/api/platform/question-thread?' + new URLSearchParams({ question, ...(before ? { before } : {}) }), {
@@ -41,12 +41,12 @@ function Answers({ state, onDelete, locked = false }: { state: ReturnType<typeof
    {state.data.nextCursor && <button type="button" className="btn small" disabled={state.olderBusy} onClick={() => void state.older()}>이전 답변 더 보기</button>}
    {state.olderError && <p role="alert">{state.olderError}</p>}
    {!state.data.answers.length && <p>{state.data.question.resolved ? '운영자가 처리 완료했습니다.' : '아직 등록된 답변이 없습니다.'}</p>}
-   {state.data.answers.map(answer => <article className="answer mt16" key={answer.id}><b>{answer.source === 'learner' ? '후속 질문 · ' : '답변 · '}{answer.authorName}</b><p className="meta">{new Date(answer.createdAt).toLocaleString('ko-KR')}</p><p className="reading-copy"><AnswerText text={answer.content}/></p>{onDelete && answer.canDelete && <button type="button" className="btn small" disabled={locked} onClick={() => onDelete(answer)}>답변 삭제</button>}</article>)}
+   {state.data.answers.map(answer => <article className="answer mt16" key={answer.id}><b>{answer.source === 'learner' ? '후속 질문 · ' : '답변 · '}{answer.authorName}</b><p className="meta">{new Date(answer.createdAt).toLocaleString('ko-KR')}</p><p className="reading-copy"><AnswerText text={answer.content}/></p><QuestionImage questionId={state.data!.question.id} answerId={answer.id} imageId={answer.imageId}/>{onDelete && answer.canDelete && <button type="button" className="btn small" disabled={locked} onClick={() => onDelete(answer)}>답변 삭제</button>}</article>)}
   </>}
  </section>;
 }
 export function QuestionAnswerHistory({ questionId, fallback = '', onStatusChange, onResolved, initiallyOpen = false, readOnly = false }: { questionId: string; fallback?: string; onStatusChange?: (status: string) => void; onResolved?: () => void; initiallyOpen?: boolean; readOnly?: boolean }) {
- const [open, setOpen] = useState(initiallyOpen), state = useThread(questionId, open);
+ const [open, setOpen] = useState(initiallyOpen), state = useThread(questionId, open || Boolean(fallback));
  const [content, setContent] = useState(''), [busy, setBusy] = useState(false), [uncertain, setUncertain] = useState(false), [stale, setStale] = useState(false), [notice, setNotice] = useState('');
  const gate = useRef(false), retry = useRef<{ action: 'followup'; questionId: string; content: string; requestId: string; expectedHeadId: string | null } | null>(null);
  useUnsavedLearningChanges(Boolean(content) || busy || uncertain);
@@ -82,29 +82,31 @@ export function QuestionAnswerHistory({ questionId, fallback = '', onStatusChang
    <button className="btn primary small mt16" disabled={busy || stale || !content.trim()}>{busy ? '등록 중…' : uncertain ? '같은 요청 결과 확인' : '후속 질문 등록'}</button>
   </form>}
   {notice && <p role="status" className="notice mt16">{notice}</p>}
- </> : fallback ? <div className="answer"><b>운영자 답변</b><p className="reading-copy"><AnswerText text={fallback}/></p></div> : <p className="meta">답변이 도착하면 이곳에서 확인해 주세요.</p>}
+ </> : fallback ? <div className="answer"><b>운영자 답변</b><p className="reading-copy"><AnswerText text={fallback}/></p>{state.data?.answers.filter(a => a.id === state.data?.question.headId).map(a => <QuestionImage key={a.id} questionId={questionId} answerId={a.id} imageId={a.imageId}/>)}</div> : <p className="meta">답변이 도착하면 이곳에서 확인해 주세요.</p>}
   <div className="row mt16"><button type="button" className="btn small" disabled={busy || uncertain} onClick={() => setOpen(v => !v)}>{open ? '답변 이력 접기' : '답변 전체 보기'}</button>{!open && !readOnly && <button type="button" className="btn small" onClick={() => setOpen(true)}>후속 질문하기</button>}{open && <button type="button" className="btn small" disabled={busy || uncertain} onClick={() => { state.reload(); setStale(false); }}>최신 답변 확인</button>}</div>
  </div>;
 }
 export function QuestionThreadDialog({ questionId, close, changed, archive, pending = false, initialDraft = '', initialReference, onDraftChange, onDraftUsed }: { questionId: string; close: () => void; changed?: () => void; archive?: () => void; pending?: boolean; initialDraft?: string; initialReference?: QuestionAiReference; onDraftChange?: (value: string) => void; onDraftUsed?: () => void }) {
  const state = useThread(questionId), [content, setContent] = useState(initialDraft), [busy, setBusy] = useState(false), [uncertain, setUncertain] = useState(false), [stale, setStale] = useState(false), [notice, setNotice] = useState('');
+ const [image, setImage] = useState<{ id: string | null; busy: boolean; draft: boolean }>({ id: null, busy: false, draft: false }), [imageKey, setImageKey] = useState(0);
+ const imagePicker = useRef<QuestionImagePickerHandle>(null), imagesEnabled = process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED === 'true';
  const [deleteTarget, setDeleteTarget] = useState<Answer | null>(null), [deleteError, setDeleteError] = useState(''), [deleteBusy, setDeleteBusy] = useState(false);
  const [hubDirty, setHubDirty] = useState(false), [hubBusy, setHubBusy] = useState(false);
  const [assistJob, setAssistJob] = useState<string | null>(null);
  const [aiReference, setAiReference] = useState<QuestionAiReference | null>(initialReference || null);
  const [aiBusy, setAiBusy] = useState(false), gate = useRef(false);
- const retry = useRef<{ action: 'answer' | 'resolve'; questionId: string; content?: string; requestId?: string; expectedHeadId?: string | null; assistJobId?: string } | null>(null);
- useUnsavedWarning(Boolean(content) || busy || uncertain);
- const locked = busy || uncertain || aiBusy || pending || hubBusy || deleteBusy;
- function leave() { if (locked) return; if ((hubDirty || (content && !onDraftChange)) && !window.confirm('아직 저장하지 않은 내용을 지우고 닫을까요?')) return; onDraftChange?.(content); close(); }
+ const retry = useRef<{ action: 'answer' | 'resolve'; questionId: string; content?: string; requestId?: string; expectedHeadId?: string | null; assistJobId?: string; imageId?: string } | null>(null);
+ useUnsavedWarning(Boolean(content) || image.draft || busy || uncertain);
+ const locked = busy || uncertain || aiBusy || pending || hubBusy || deleteBusy || image.busy;
+ function leave() { if (locked) return; if ((hubDirty || image.draft || (content && !onDraftChange)) && !window.confirm('아직 저장하지 않은 내용을 지우고 닫을까요?')) return; onDraftChange?.(content); close(); }
  async function write(action: 'answer' | 'resolve') {
-  if (gate.current || stale || !state.data || !state.data.canAnswer) return;
-  if (!retry.current) { if (action === 'answer' && !content.trim()) return; retry.current = { action, questionId, ...(action === 'answer' ? { content, requestId: crypto.randomUUID(), expectedHeadId: state.data.question.headId, ...(assistJob ? {assistJobId:assistJob} : {}) } : {}) }; }
+  if (gate.current || image.busy || (image.draft && !image.id) || stale || !state.data || !state.data.canAnswer) return;
+  if (!retry.current) { if (action === 'answer' && !content.trim() && !image.id) return; retry.current = { action, questionId, ...(action === 'answer' ? { content: content.trim() ? content : '첨부 이미지를 확인해 주세요.', ...(image.id ? {imageId:image.id} : {}), requestId: crypto.randomUUID(), expectedHeadId: state.data.question.headId, ...(assistJob ? {assistJobId:assistJob} : {}) } : {}) }; }
   gate.current = true; setBusy(true); setNotice('');
   try {
    const sent = retry.current, result = await request<{ id: string; questionId?: string; resolved?: boolean }>(questionId, sent);
    if (sent.action === 'answer' ? result.id !== sent.requestId || result.questionId !== questionId : result.id !== questionId || result.resolved !== true) throw new Error('등록 결과를 확인하지 못했습니다.');
-   setContent(''); setAssistJob(null); setUncertain(false); retry.current = null; setNotice(action === 'answer' ? '답변을 추가했습니다. 이전 답변도 그대로 남아 있습니다.' : '질문을 처리 완료했습니다.'); state.reload(); changed?.(); if (sent.action === 'answer') onDraftUsed?.();
+   setContent(''); setImage({id:null,busy:false,draft:false}); setImageKey(v=>v+1); setAssistJob(null); setUncertain(false); retry.current = null; setNotice(action === 'answer' ? '답변을 추가했습니다. 이전 답변도 그대로 남아 있습니다.' : '질문을 처리 완료했습니다.'); state.reload(); changed?.(); if (sent.action === 'answer') onDraftUsed?.();
   } catch (e) {
    const failure = e as { message: string; status?: number }, unknown = !failure.status || failure.status >= 500; setUncertain(unknown); setStale(failure.status === 409); setNotice(failure.message + (unknown ? ' 같은 요청으로 결과를 다시 확인해 주세요.' : '')); if (!unknown) retry.current = null;
   } finally { gate.current = false; setBusy(false); }
@@ -131,18 +133,19 @@ export function QuestionThreadDialog({ questionId, close, changed, archive, pend
  return <AdminDrawer title="질문 답변" onClose={leave}>
   <div className="admin-dialog-body">
    {state.data && <><h3>{state.data.question.title}</h3>{state.data.question.learningContext && <p className="meta">{state.data.question.learningContext}</p>}<p className="meta">{state.data.question.visibility === "cohort" ? "전체 공개 · 답변과 후속 질문도 같은 기수에 공개됩니다." : "비밀 질문 · 질문자와 담당 운영자만 볼 수 있습니다."}</p><p className="reading-copy">{state.data.question.content}</p><QuestionImage key={questionId} questionId={questionId} imageId={state.data.question.imageId}/>{state.data.question.archived && <p className="notice">보관된 질문입니다. 답변 이력만 확인할 수 있습니다.</p>}</>}
-   <Answers state={state} locked={locked || hubDirty || Boolean(content)} onDelete={answer => { setDeleteTarget(answer); setDeleteError(''); }}/>
-   {deleteTarget && <section className="notice mt16" role="group" aria-label="답변 삭제 확인"><b>이 답변을 삭제할까요?</b><p>수강생의 답변 이력에서 숨겨집니다.<br/>이 질문의 공유 답변도 공개가 해제되고, 발송 대기 중인 알림은 취소됩니다.<br/>이미 받은 기기 알림은 취소되지 않습니다.</p>{deleteError && <p role="alert">{deleteError}</p>}<div className="row"><button type="button" className="btn small" disabled={deleteBusy} onClick={() => setDeleteTarget(null)}>취소</button><button type="button" className="btn small" disabled={locked || hubDirty || Boolean(content) || !state.data} onClick={() => void removeAnswer()}>{deleteBusy ? '삭제 확인 중…' : '삭제하기'}</button></div></section>}
-   {state.data?.canAnswer && <section className="mt24"><h3>답변 추가</h3><p>이전 답변은 남겨 두고 새 답변을 추가합니다.</p><label className="field">새 답변<textarea rows={7} maxLength={10000} value={content} disabled={locked || stale} onChange={e => setContent(e.target.value)}/></label>
-    <div className="row mt16"><button type="button" className="btn" disabled={locked || stale || Boolean(content)} onClick={() => void draft()}>{aiBusy ? 'AI 초안 생성 중…' : 'AI 답변 초안'}</button><button type="button" className="btn primary" disabled={locked || stale || !content.trim()} onClick={() => void write('answer')}>답변 추가하기</button></div>
-    {!state.data.question.resolved && !state.data.answers.length && <button type="button" className="btn small mt16" disabled={locked || stale || Boolean(content)} onClick={() => void write('resolve')}>답변 없이 처리 완료</button>}
+   <Answers state={state} locked={locked || hubDirty || Boolean(content) || image.draft} onDelete={answer => { setDeleteTarget(answer); setDeleteError(''); }}/>
+   {deleteTarget && <section className="notice mt16" role="group" aria-label="답변 삭제 확인"><b>이 답변을 삭제할까요?</b><p>수강생의 답변 이력에서 숨겨집니다.<br/>이 질문의 공유 답변도 공개가 해제되고, 발송 대기 중인 알림은 취소됩니다.<br/>이미 받은 기기 알림은 취소되지 않습니다.</p>{deleteError && <p role="alert">{deleteError}</p>}<div className="row"><button type="button" className="btn small" disabled={deleteBusy} onClick={() => setDeleteTarget(null)}>취소</button><button type="button" className="btn small" disabled={locked || hubDirty || Boolean(content) || image.draft || !state.data} onClick={() => void removeAnswer()}>{deleteBusy ? '삭제 확인 중…' : '삭제하기'}</button></div></section>}
+   {state.data?.canAnswer && <section className="mt24"><h3>답변 추가</h3><p>이전 답변은 남겨 두고 새 답변을 추가합니다.</p><label className="field">새 답변<textarea onPaste={event => { if (!imagesEnabled || locked || stale) return; const files = Array.from(event.clipboardData.items).filter(i => i.kind === 'file' && i.type.startsWith('image/')).map(i => i.getAsFile()).filter((f): f is File => f !== null); if (files.length) { event.preventDefault(); imagePicker.current?.paste(files); } }} rows={7} maxLength={10000} value={content} disabled={locked || stale} onChange={e => setContent(e.target.value)}/></label>
+    {imagesEnabled && <QuestionImagePicker key={imageKey} ref={imagePicker} enrollmentId={null} lessonId={null} answerQuestionId={questionId} compact publicQuestion={state.data.question.visibility === 'cohort'} locked={locked || stale} changed={(id, busy, draft) => setImage({id,busy,draft})}/>}
+    <div className="row mt16"><button type="button" className="btn" disabled={locked || stale || Boolean(content) || image.draft} onClick={() => void draft()}>{aiBusy ? 'AI 초안 생성 중…' : 'AI 답변 초안'}</button><button type="button" className="btn primary" disabled={locked || stale || (image.draft && !image.id) || (!content.trim() && !image.id)} onClick={() => void write('answer')}>답변 추가하기</button></div>
+    {!state.data.question.resolved && !state.data.answers.length && <button type="button" className="btn small mt16" disabled={locked || stale || Boolean(content) || image.draft} onClick={() => void write('resolve')}>답변 없이 처리 완료</button>}
    </section>}
-   {process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' && state.data?.canAnswer && !onDraftChange && <QuestionAdminHub questionId={questionId} headId={state.data.question.headId} locked={locked || stale || Boolean(content)} onDirtyChange={setHubDirty} onBusyChange={setHubBusy} onUseDraft={(value,jobId)=>{setAssistJob(jobId);setContent(value);setNotice('어사이드 초안입니다. 내용과 근거를 확인한 뒤 답변을 등록해 주세요.');}}/>}
+   {process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' && state.data?.canAnswer && !onDraftChange && <QuestionAdminHub questionId={questionId} headId={state.data.question.headId} locked={locked || stale || Boolean(content) || image.draft} onDirtyChange={setHubDirty} onBusyChange={setHubBusy} onUseDraft={(value,jobId)=>{setAssistJob(jobId);setContent(value);setNotice('어사이드 초안입니다. 내용과 근거를 확인한 뒤 답변을 등록해 주세요.');}}/>}
    <QuestionAiReferenceNote reference={aiReference}/>
    {notice && <p role="status" className="notice mt16">{notice}</p>}
    {uncertain && <button type="button" className="btn" disabled={busy} onClick={() => void write(retry.current!.action)}>같은 요청 결과 확인</button>}
    {!uncertain && <button type="button" className="btn small mt16" disabled={locked || hubDirty} onClick={() => { state.reload(); setStale(false); }}>최신 답변 확인</button>}
   </div>
-  <footer className="admin-dialog-footer">{archive && <button type="button" className="btn" disabled={locked || hubDirty || Boolean(content)} onClick={archive}>보관·숨김</button>}<button type="button" className="btn" disabled={locked} onClick={leave}>닫기</button></footer>
+  <footer className="admin-dialog-footer">{archive && <button type="button" className="btn" disabled={locked || hubDirty || Boolean(content) || image.draft} onClick={archive}>보관·숨김</button>}<button type="button" className="btn" disabled={locked} onClick={leave}>닫기</button></footer>
  </AdminDrawer>;
 }

@@ -51,3 +51,11 @@ test('cron requires an exact configured secret and never discloses queue/transpo
  const get=token=>api.GET(new Request('https://edu.test/api/cron/push',{headers:{authorization:token}}));
  assert.equal((await get('Bearer wrong')).status,401);assert.equal(calls,0);const r=await get('Bearer synthetic-only');assert.equal(r.status,503);assert.doesNotMatch(await r.text(),/SECRET ENDPOINT/);assert.equal(calls,1);
 });
+test('care push dispatch is separately gated while question delivery remains unchanged',async()=>{
+ for(const enabled of ['false','true']){
+  const h=dispatcher([201]),rpc=h.dependencies.rpc;
+  h.dependencies.rpc=async(name,args)=>{const result=await rpc(name,args);if(name==='edu_read_push_delivery')result.data.path='/my/messages';return result;};
+  await load({...env,EDU_CARE_DELIVERY_ENABLED:enabled}).dispatchWebPush(h.dependencies);
+  assert.equal(h.sent.length,enabled==='true'?1:0);assert.equal(h.calls.at(-1).args.p_outcome,enabled==='true'?'sent':'skipped');
+ }
+});

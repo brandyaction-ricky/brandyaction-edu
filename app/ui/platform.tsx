@@ -1,4 +1,5 @@
 "use client";
+import { memberDirectoryScope } from '@/lib/member-directory';
 import { MobileRefresh } from './final/mobile-refresh';
 import { contentVisibility } from '@/lib/content-visibility';
 import { MemberErasureQueue } from './final/member-erasure-queue';
@@ -270,7 +271,8 @@ export function Platform({
   const editorRecordId = ["product-editor", "learning-editor"].includes(path[1])
     ? searchParams.get("id") || ""
     : "";
-  const scopeQuery = adminSection === "orders" ? new URLSearchParams(orderScope).toString() : adminSection === "missions" ? new URLSearchParams({ course: missionScope.courseId, week: missionScope.weekId, missionState: missionScope.state }).toString() : ["customers", "questions", "reviews"].includes(adminSection) ? new URLSearchParams({ member: searchParams.get("member") || "", submission: searchParams.get("submission") || "", question: searchParams.get("question") || "", questionState: searchParams.get("questionState") || "active" }).toString() : "";
+  const customerScope = memberDirectoryScope(searchParams);
+  const scopeQuery = adminSection === "customers" ? new URLSearchParams({ member: searchParams.get("member") || "", memberQuery: customerScope.query, memberStatus: customerScope.status, memberCourse: customerScope.course }).toString() : adminSection === "orders" ? new URLSearchParams(orderScope).toString() : adminSection === "missions" ? new URLSearchParams({ course: missionScope.courseId, week: missionScope.weekId, missionState: missionScope.state }).toString() : ["customers", "questions", "reviews"].includes(adminSection) ? new URLSearchParams({ member: searchParams.get("member") || "", submission: searchParams.get("submission") || "", question: searchParams.get("question") || "", questionState: searchParams.get("questionState") || "active" }).toString() : "";
   const pagingKey = adminSection + "?" + scopeQuery;
   const adminPage = adminPaging.section === pagingKey ? adminPaging.page : 1;
   // An editor's one-record response is not a catalog response, even though both
@@ -1075,6 +1077,8 @@ export function Platform({
                 selection={selection}
                 setSelection={setSelection}
                 edit={edit}
+                memberScope={section.key === "customers" ? customerScope : undefined}
+                onMemberScopeChange={next => { const params = new URLSearchParams(searchParams.toString()); params.delete("member"); for (const [key,value] of Object.entries({ memberQuery: next.query, memberStatus: next.status, memberCourse: next.course })) { if(value)params.set(key,value);else params.delete(key); } setSelection([]); router.replace(`/admin/customers?${params}`); }}
                 missionScope={section.key === "missions" ? missionScope : undefined}
                 onMissionScopeChange={next => { setMissionScope(next); setAdminPage(1); setSelection([]); }}
                 archive={(s, ids) => void archive(s, ids)}

@@ -1,0 +1,97 @@
+import { expect, test, type Page } from '@playwright/test';
+import type { LessonBlockDocument } from '../../lib/lesson-blocks';
+async function color(page: Page, kind: '글자색' | '배경색', name: string) {
+  await page.getByRole('button', { name: kind, exact: true }).click();
+  await page.getByRole('group', { name: `${kind} 선택`, exact: true }).getByRole('button', { name, exact: true }).click();
+}
+test('selected text colors survive save/reload, headings, undo and independent reset', async ({ page }) => {
+  await page.goto('/lesson-formatting-test');
+  const editor = page.getByRole('textbox', { name: '학습 내용', exact: true });
+  await editor.fill('앞 문장 강조할 문장');
+  await editor.press('End');
+  for (let i=0;i<'강조할 문장'.length;i++) await editor.press('Shift+ArrowLeft');
+  await color(page, '글자색', '빨강');
+  await color(page, '배경색', '연한 노랑');
+  const span=editor.locator('span[style*="color"]').filter({hasText:'강조할 문장'});
+  await expect(span).toHaveText('강조할 문장');
+  await expect(span).toHaveCSS('color','rgb(197, 30, 44)');
+  await expect(span).toHaveCSS('background-color','rgb(254, 240, 138)');
+  await page.getByRole('combobox',{name:'글자 크기'}).selectOption('24px');
+  await page.getByRole('combobox',{name:'문단 스타일'}).selectOption('h2');
+  await expect(span).toHaveCSS('font-size','28px');
+  await expect(span).toHaveCSS('color','rgb(197, 30, 44)');
+  await page.getByRole('button',{name:'학습 저장',exact:true}).click();
+  await page.reload();
+  await expect(span).toHaveCSS('background-color','rgb(254, 240, 138)');
+  const learner=page.getByRole('region',{name:'저장된 학습자 화면'}).getByText('강조할 문장',{exact:true});
+  await expect(learner).toHaveCSS('color','rgb(197, 30, 44)');
+  await expect(learner).toHaveCSS('background-color','rgb(254, 240, 138)');
+  await editor.click(); await editor.press('ControlOrMeta+a');
+  await color(page,'배경색','배경색 없애기');
+  await expect(span).toHaveCSS('background-color','rgba(0, 0, 0, 0)');
+  await expect(span).toHaveCSS('color','rgb(197, 30, 44)');
+  await page.getByRole('button',{name:'실행 취소',exact:true}).click();
+  await expect(span).toHaveCSS('background-color','rgb(254, 240, 138)');
+  await page.getByRole('button',{name:'다시 실행',exact:true}).click();
+  await color(page,'글자색','기본 글자색');
+  await expect(editor.locator('span[style*="color"]')).toHaveCount(0);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+test('custom color, keyboard controls and format removal keep the selection', async ({ page }) => {
+  await page.goto('/lesson-formatting-test');
+  const editor=page.getByRole('textbox',{name:'학습 내용',exact:true});
+  await editor.fill('직접 선택'); await editor.press('ControlOrMeta+a');
+  await page.getByRole('button',{name:'글자색',exact:true}).focus();
+  await page.keyboard.press('Enter');
+  const picker=page.getByRole('group',{name:'글자색 선택',exact:true});
+  await picker.getByLabel('사용자 지정 색상').fill('#123456');
+  await picker.getByRole('button',{name:'색상 적용'}).click();
+  await expect(editor.locator('span')).toHaveCSS('color','rgb(18, 52, 86)');
+  await page.getByRole('button',{name:'배경색',exact:true}).click();
+  await page.getByRole('group',{name:'배경색 선택',exact:true}).getByRole('button',{name:'연한 노랑',exact:true}).focus();
+  await page.keyboard.press('Enter');
+  await expect(editor.locator('span')).toHaveCSS('background-color','rgb(254, 240, 138)');
+  await page.getByRole('button',{name:'서식 지우기',exact:true}).click();
+  await expect(editor.locator('span')).toHaveCount(0);
+  await expect(editor).toHaveText('직접 선택');
+});
+test('curriculum canvas saves colors without changing questions and renders them in learner preview', async ({page})=>{
+  const question: LessonBlockDocument['blocks'][number]={id:'question',type:'question',question:{label:'기존 질문',kind:'text',required:true}};
+  let lessonDoc: LessonBlockDocument={schemaVersion:1,blocks:[{id:'body',type:'text',content:'학습 안내'},question],checklist:[]};
+  await page.route('**/api/platform/lesson-blocks**',async route=>{
+    if(route.request().method()==='GET') return route.fulfill({json:{document:lessonDoc,revision:'aaaaaaaa-1111-4111-8111-111111111111',editable:true}});
+    const body=route.request().postDataJSON();lessonDoc=body.document;await route.fulfill({json:{revision:body.requestId}});
+  });
+  await page.goto('/lesson-block-author-test');
+  const editor=page.getByRole('textbox',{name:'수업 문서',exact:true});
+  await editor.locator('[data-author-block="body"] p').click({clickCount:3});
+  await expect.poll(()=>page.evaluate(()=>window.getSelection()?.toString().trim())).toBe('학습 안내');
+  await color(page,'글자색','빨강'); await color(page,'배경색','연한 노랑');
+  await page.getByRole('button',{name:'학습 저장',exact:true}).click();
+  await expect(page.getByText('학습 기본 정보와 콘텐츠를 저장했습니다.',{exact:true})).toBeVisible();
+  expect(lessonDoc.blocks[1]).toEqual(question);
+  expect(lessonDoc.blocks[0].id).toBe('body');
+  expect(lessonDoc.blocks[0].content).toContain('backgroundColor');
+  await page.getByRole('button',{name:'편집 다시 열기'}).click();
+  await expect(editor.getByText('학습 안내',{exact:true})).toHaveCSS('color','rgb(197, 30, 44)');
+  await page.getByRole('button',{name:'구성 미리보기',exact:true}).click();
+  await expect(page.getByLabel('구성 미리보기').getByText('학습 안내',{exact:true})).toHaveCSS('background-color','rgb(254, 240, 138)');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+test('pasted colors and colored links remain consistent between editor and learner', async ({page})=>{
+  await page.goto('/lesson-formatting-test');
+  const editor=page.getByRole('textbox',{name:'학습 내용',exact:true});
+  await editor.fill('');
+  await editor.evaluate(element=>{
+    const data=new DataTransfer();
+    data.setData('text/html','<p><a href="https://example.test/guide"><span style="color:rgb(197,30,44);background-color:#fef08a;position:fixed">참고 안내</span></a></p>');
+    element.dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData:data}));
+  });
+  await expect(editor.getByText('참고 안내',{exact:true})).toHaveCSS('color','rgb(197, 30, 44)');
+  await expect(editor.locator('[style*="fixed"]')).toHaveCount(0);
+  await page.getByRole('button',{name:'학습 저장',exact:true}).click();
+  const learner=page.getByRole('region',{name:'저장된 학습자 화면'});
+  await expect(learner.getByRole('link',{name:'참고 안내'})).toHaveCSS('color','rgb(197, 30, 44)');
+  await page.reload();
+  await expect(editor.getByText('참고 안내',{exact:true})).toHaveCSS('background-color','rgb(254, 240, 138)');
+});

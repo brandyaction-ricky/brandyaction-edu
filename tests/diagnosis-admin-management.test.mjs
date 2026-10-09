@@ -72,3 +72,9 @@ test('rewrite allowance preserves 2, 1 and 0 through status allowlists without e
  for(const invalid of [-1,3,1.5,'1',true,NaN,Infinity])assert.throws(()=>validateAdminReportRows({version:1,rows:[{...report,rewritesRemaining:invalid}]},[binding]),e=>e.code==='UNAVAILABLE');
  for(const missing of [undefined,null])assert.equal(validateAdminReportRows({version:1,rows:[{...report,rewritesRemaining:missing}]},[binding])[0].rewritesRemaining,null);
 });
+
+test('local account/payment contacts remain visible to EDU admins without going to MYIN',async()=>{
+ const h=fixture(),rpc=h.rpc,contacts=[{orderId:id(10),orderNumber:'BAE-SYNTHETIC',name:'결제자 샘플',email:'buyer@example.test',phone:'01000000000',status:'paid'}];
+ h.rpc=async(...args)=>{const r=await rpc(...args);if(args[0]==='edu_diagnosis_admin_list')Object.assign(r.data.rows[0],{email:'account@example.test',paymentContacts:contacts});return r;};
+ const result=await runDiagnosisAdmin(h,{action:'list',query:'buyer@example.test'});assert.equal(result.rows[0].email,'account@example.test');assert.deepEqual(result.rows[0].paymentContacts,contacts);assert.doesNotMatch(JSON.stringify(h.sends),/example.test|paymentContacts|결제자/);
+});

@@ -45,12 +45,13 @@ export function MemberOperationsFixture() {
   const openMember = (row: Row) => { setEditorSection(sections.find(item => item.key === 'customers')!); setEditor(row); };
   const params = new URLSearchParams(location.search);
   const questionVisible = params.has('question') || params.get('questionState') === 'archived';
+  const questions = params.has('questionImage') ? [{ ...question, image_id: id(41) }] : data.edu_questions;
   return <div className="edu-admin" style={{ padding: 20, minHeight: '100vh' }}>
     <h1>회원 운영 동선 QA</h1><p>합성 데이터 · 외부 DB/인증 연결 없음</p>
     <nav className="row wrap-flex mt16"><Link className="btn" href="/admin/customers">회원 관리</Link><Link className="btn" href="/admin/questions">질문함</Link><Link className="btn" href="/admin/reviews">제출물 검토</Link></nav>
     <div className="row wrap-flex mt16"><button className="btn" onClick={() => openMember(savedMember)}>회원 상세 열기</button><button className="btn" onClick={() => openMember({ ...member, id: id(3) })}>조회 오류 회원</button><button className="btn" onClick={() => openMember({ ...member, id: id(4) })}>기록 없는 회원</button></div>
     {notice && <p role="status">{notice}</p>}<pre data-testid="saved-member" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{JSON.stringify(lastSaved)}</pre>
-    {section.key === 'members' ? <AdminWorkflows section="members" data={data} pending={false} send={async()=>({})}/> : section.key === 'reviews' ? <SubmissionReview data={data} pending={false} send={async () => { setNotice('합성 검토 저장'); return {}; }}/> : <AdminCatalog section={section} data={{ ...data, edu_questions: questionVisible ? data.edu_questions : [] }} selection={[]} setSelection={() => {}} edit={(selected, row) => { setEditorSection(selected); setEditor(row || member); }} archive={() => {}} pending={false} loading={false} pagination={null} setPage={() => {}} exportCsv={() => {}} send={async () => ({})}/>}
+    {section.key === 'members' ? <AdminWorkflows section="members" data={data} pending={false} send={async()=>({})}/> : section.key === 'reviews' ? <SubmissionReview data={data} pending={false} send={async () => { setNotice('합성 검토 저장'); return {}; }}/> : <AdminCatalog section={section} data={{ ...data, edu_questions: questionVisible ? questions : [] }} selection={[]} setSelection={() => {}} edit={(selected, row) => { setEditorSection(selected); setEditor(row || member); }} archive={() => {}} pending={false} loading={false} pagination={null} setPage={() => {}} exportCsv={() => {}} send={async () => ({})}/>}
     {editor && <Editor section={editorSection} row={editor} data={data} pending={false} close={() => setEditor(null)} save={async values => { setLastSaved(values); if (editorSection.key === 'customers') setSavedMember({ ...editor, ...values }); setNotice(`합성 저장 완료: ${values.full_name || values.answer}`); setEditor(null); }}/>}
   </div>;
 }

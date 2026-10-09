@@ -6,8 +6,8 @@ const reply=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cach
 function failure(error:unknown) {
  const message=(error as {message?:string})?.message;
  const errors:Record<string,[string,number]>={
-  DIAGNOSIS_DISABLED:['검사 기능을 준비하고 있습니다.',503],
   DIAGNOSIS_STARTS_PAUSED:['검사 업데이트 중입니다. 잠시 후 새 검사를 시작해 주세요. 진행 중인 검사는 계속할 수 있습니다.',503],
+  DIAGNOSIS_DISABLED:['검사 기능을 준비하고 있습니다.',503],
   DIAGNOSIS_UNAVAILABLE:['이 상품에는 아직 검사가 연결되지 않았습니다.',404],
   DIAGNOSIS_FORBIDDEN:['검사를 이용할 수 있는 구매·수강 정보를 확인해 주세요.',403],
  };

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';
 const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
-const migration='20261005163000_diagnosis_release_transition.sql';
+const migration='20261008063228_diagnosis_release_transition_from_prod_gate.sql';
 
 test('release transition preserves started bindings and reconciles only unused entitlements',async t=>{
  const db=new PGlite();t.after(()=>db.close());
@@ -16,6 +16,7 @@ test('release transition preserves started bindings and reconciles only unused e
  grant select,insert,update on all tables in schema public to service_role;`);
  for(const file of ['20261001062935_edu_diagnosis_entitlements.sql','20261001070447_edu_diagnosis_session_bridge.sql','20261001084748_edu_diagnosis_report_access.sql','20261001230818_edu_diagnosis_admin_pilot.sql','20261002072505_edu_admin_diagnosis_retests.sql','20261003070134_diagnosis_admin_management.sql'])
   await db.exec(readFileSync(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('./fixtures/diagnosis-production-start-gate.sql',import.meta.url),'utf8'));
  const scalar=async(sql,args=[])=>Object.values((await db.query(sql,args)).rows[0])[0];
  const call=(fn,args)=>scalar(`select ${fn}(${args.map((_,i)=>'$'+(i+1)).join(',')})`,args);
  const begin=actor=>call('edu_diagnosis_begin',[id(actor),id(100)]);
@@ -49,6 +50,10 @@ test('release transition preserves started bindings and reconciles only unused e
  });
  await db.exec('reset role');
  await db.exec(readFileSync(new URL('../supabase/migrations/'+migration,import.meta.url),'utf8'));
+ await db.exec('update edu_diagnosis_control set new_starts_enabled=false');
+ await db.exec(readFileSync(new URL('../supabase/migrations/'+migration,import.meta.url),'utf8'));
+ assert.equal(await scalar('select new_starts_enabled from edu_diagnosis_control'),false);
+ await db.exec('update edu_diagnosis_control set new_starts_enabled=true');
  await db.exec('set role service_role');
  await t.test('migration defaults to allowing starts and browser roles cannot change the gate',async()=>{
   assert.equal(await scalar('select new_starts_enabled from edu_diagnosis_control'),true);

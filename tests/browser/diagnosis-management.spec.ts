@@ -51,7 +51,7 @@ test('temporary remote outage shows last check and disables retry; failed reads 
  await page.goto('/diagnosis-test?manage');await expect(page.getByText(/마지막 확인 기록/)).toBeVisible();for(const b of await page.getByRole('button',{name:'보고서 재발급'}).all())await expect(b).toBeDisabled();failed=true;await page.locator('#admin-content').getByRole('button',{name:'새로고침',exact:true}).click();await expect(page.getByRole('alert')).toContainText('조회할 수 없습니다');await expect(page.getByRole('button',{name:'한 번에 모두 공개'})).toBeDisabled();
 });
 test('pagination and search use bounded server pages; 320px layout keeps controls readable',async({page},info)=>{
- const queries:string[]=[];await page.route('**/api/admin/diagnosis**',async route=>{queries.push(route.request().url());await route.fulfill({json:data});});await page.setViewportSize({width:320,height:844});await page.goto('/diagnosis-test?manage');await page.getByRole('button',{name:'다음',exact:true}).click();await expect.poll(()=>queries.at(-1)).toContain('before=');await page.getByRole('textbox',{name:'수강생 이름'}).fill('학생 A');await page.getByRole('button',{name:'검색',exact:true}).click();await expect.poll(()=>queries.at(-1)).toContain('query=');expect(new URL(queries.at(-1)!).searchParams.has('before')).toBe(false);await page.screenshot({path:info.outputPath('diagnosis-management-320.png'),fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ const queries:string[]=[];await page.route('**/api/admin/diagnosis**',async route=>{queries.push(route.request().url());await route.fulfill({json:data});});await page.setViewportSize({width:320,height:844});await page.goto('/diagnosis-test?manage');await page.getByRole('button',{name:'다음',exact:true}).click();await expect.poll(()=>queries.at(-1)).toContain('before=');await page.getByRole('textbox',{name:'수강생 검색'}).fill('학생 A');await page.getByRole('button',{name:'검색',exact:true}).click();await expect.poll(()=>queries.at(-1)).toContain('query=');expect(new URL(queries.at(-1)!).searchParams.has('before')).toBe(false);await page.screenshot({path:info.outputPath('diagnosis-management-320.png'),fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 test('queue observation is visible but stale positions disappear when live lookup fails',async({page})=>{
  let available=true;const queue={queuePosition:3,queuedAt:'2026-10-06T00:00:00Z',queueObservedAt:'2026-10-06T01:00:00Z'};
@@ -74,7 +74,8 @@ test('rewrite requires explicit capability and confirmation, preserves request a
 });
 test('member link selects exact member outside the first page without offering bulk publication',async({page})=>{
  const requests:string[]=[];await page.route('**/api/admin/diagnosis**',r=>{requests.push(r.request().url());return r.fulfill({json:{...data,nextCursor:null,rows:[data.rows[0]]}});});
- await page.goto(`/diagnosis-test?manage&member=${id(1)}`);await expect(page.getByText('알림에서 선택한 수강생의 진단입니다.')).toBeVisible();expect(new URL(requests.at(-1)!).searchParams.get('member')).toBe(id(1));
+ await page.goto(`/diagnosis-test?manage&member=${id(1)}`);await expect(page.getByText('알림에서 선택한 수강생의 진단입니다.')).toBeVisible();
+ await expect.poll(()=>{const url=requests.at(-1);return url?new URL(url).searchParams.get('member'):null;}).toBe(id(1));
  await expect(page.getByRole('button',{name:'한 번에 모두 공개'})).toHaveCount(0);await expect(page.getByRole('link',{name:'이 수강생 바로가기'})).toHaveAttribute('href',`/admin/diagnosis/manage?member=${id(1)}`);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });

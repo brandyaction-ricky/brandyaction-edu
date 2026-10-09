@@ -3,13 +3,13 @@
   "framework": "nextjs",
   "git": {
     "deploymentEnabled": {
-      "codex/edu-n6-rewrite-count-20261006": false,
-      "codex/edu-n6-review-queue-20261006": false,
-      "codex/edu-floating-audio-20261006": false,
+      "codex/edu-member-payment-search-20261006": false,
       "codex/edu-curriculum-history-20261006": false,
+      "codex/edu-history-release-20261006": false,
       "codex/edu-curriculum-autosave-20261005": false,
+      "codex/edu-admin-question-images-20261005": false,
+      "codex/edu-admin-question-images-release-20261005": false,
       "codex/edu-image-answer-only-20261005": false,
-      "codex/edu-b14-transition-20261005": false,
       "codex/edu-lesson-question-dialog-20261005": false,
       "codex/edu-draft-save-recovery-20261004": false,
       "codex/edu-lesson-save-feedback-20261004": false,
@@ -36,14 +36,47 @@
       "codex/edu-simple-install-20261005": false,
       "codex/edu-e2-entry-source-20261005": false,
       "codex/edu-report-http-download-20261005": false,
+      "codex/edu-autosave-image-release-20261005": false,
       "codex/edu-mobile-refresh-20261005": false,
+      "codex/edu-mobile-refresh-release-20261005": false,
+      "codex/edu-member-payment-release-20261006": false,
+      "codex/edu-floating-audio-20261006": false,
+      "codex/edu-floating-audio-release-20261006": false,
+      "codex/edu-completion-help-20261006": false,
+      "codex/edu-n6-review-queue-20261006": false,
+      "codex/edu-n6-rewrite-count-20261006": false,
+      "codex/edu-n6-rewrite-release-20261006": false,
+      "codex/edu-floating-inspector-release-20261006": false,
+      "codex/edu-image-autosave-loop-20261007": false,
+      "codex/edu-prompt-scroll-20261007": false,
       "codex/edu-e6-consent-settings-20261007": false,
+      "codex/edu-e6-production-prep-20261007": false,
+      "codex/edu-chrome-install-guide-20261007": false,
       "codex/edu-ad-controls-e5-20261007": false,
+      "codex/edu-e4-e5-production-prep-20261008": false,
+      "codex/edu-answer-images-20261008": false,
+      "codex/edu-answer-images-production-20261008": false,
+      "codex/edu-tips-contract-hardening-20261008": false,
+      "codex/edu-learning-care-20261008": false,
+      "codex/edu-video-preview-20261008": false,
+      "codex/edu-care-navigation-speed-20261008": false,
+      "codex/edu-robots-txt-20261008": false,
+      "codex/edu-care-robots-release-20261008": false,
+      "codex/edu-b14-release-20261008": false,
+      "codex/edu-care-followup-dev-20261008": false,
+      "codex/edu-care-delivery-channels-20261008": false,
+      "codex/edu-care-learning-release-20261008": false,
+      "codex/edu-care-learning-only-20261008": false,
+      "codex/edu-curriculum-image-row-20261009": false,
+      "codex/edu-image-row-release-20261009": false,
+      "codex/edu-text-colors-20261009": false,
+      "codex/edu-text-colors-release-20261009": false,
+      "codex/edu-care-day-layout-20261009": false,
+      "codex/edu-b14-transition-20261005": false,
       "codex/edu-learning-care-dev-20261008": false,
       "codex/edu-personalization-consent-20261008": false,
       "codex/edu-consent-reward-dev-20261008": false,
-      "codex/edu-care-navigation-speed-20261008": false,
-      "codex/edu-care-followup-dev-20261008": false
+      "codex/edu-dev-prod-reconcile-20261009": false
     }
   },
   "regions": [
@@ -64,6 +97,10 @@
     },
     {
       "path": "/api/cron/diagnosis-notifications",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/learning-care-delivery",
       "schedule": "* * * * *"
     }
   ]
