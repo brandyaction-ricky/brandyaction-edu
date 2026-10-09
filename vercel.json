@@ -76,7 +76,8 @@
       "codex/edu-learning-care-dev-20261008": false,
       "codex/edu-personalization-consent-20261008": false,
       "codex/edu-consent-reward-dev-20261008": false,
-      "codex/edu-dev-prod-reconcile-20261009": false
+      "codex/edu-dev-prod-reconcile-20261009": false,
+      "codex/edu-tips-erasure-outbox-20261009": false
     }
   },
   "regions": [
