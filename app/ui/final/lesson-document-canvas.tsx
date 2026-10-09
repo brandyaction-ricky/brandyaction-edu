@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { EditorContent, useEditor, Node, Extension, ReactNodeViewRenderer, NodeViewWrapper, type NodeViewProps, type JSONContent, type Editor } from '@tiptap/react';
 import { Plugin, TextSelection } from '@tiptap/pm/state';
+import { Decoration, DecorationSet } from '@tiptap/pm/view';
+import { lessonImageColumns } from '@/lib/lesson-image-row';
 import { Fragment } from '@tiptap/pm/model';
 import { isHistoryTransaction } from '@tiptap/pm/history';
 import { publicLessonBlocks, type LessonBlock, type LessonBlockType } from '@/lib/lesson-blocks';
@@ -71,11 +73,21 @@ export function LessonDocumentCanvas(props: Props) {
         addNodeView: () => ReactNodeViewRenderer(Activity),
       }),
       // Plugin callbacks run on editor transactions, never during React render.
-      // eslint-disable-next-line react-hooks/refs
       Extension.create({
         name: 'lessonDocumentIntegrity',
         addProseMirrorPlugins() {
           return [new Plugin({
+            props: {
+              decorations(state) {
+                const blocks: LessonBlock[] = []; state.doc.forEach(node => { if (node.attrs.block) blocks.push(node.attrs.block); });
+                const columns = lessonImageColumns(blocks), decorations: Decoration[] = [];
+                state.doc.forEach((node, pos) => {
+                  const column = columns.get(node.attrs.block?.id);
+                  if (column) decorations.push(Decoration.node(pos, pos + node.nodeSize, { 'data-image-columns': String(column.count), style: `grid-column:${column.start} / span ${6 / column.count}` }));
+                });
+                return DecorationSet.create(state.doc, decorations);
+              },
+            },
             filterTransaction(tr, state) {
               if (!tr.docChanged || tr.getMeta('lessonStructure') || isHistoryTransaction(tr)) return true;
               const activityIds = new Set<string>(); tr.doc.forEach(node => { if (node.type.name === 'lessonActivity') activityIds.add(node.attrs.block?.id); });

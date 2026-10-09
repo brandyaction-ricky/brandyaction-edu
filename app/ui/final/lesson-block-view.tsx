@@ -1,6 +1,7 @@
 "use client";
+import { lessonImageColumns } from '@/lib/lesson-image-row';
+import { LessonImage } from './lesson-image';
 import { LessonLinkCard } from './lesson-link-preview';
-/* eslint-disable @next/next/no-img-element -- Imported lesson images have author-selected external sources and unknown dimensions; do not proxy them through the Next image optimizer. */
 
 import { AnswerFiles } from './lesson-answer-files';
 import { LessonAudio } from './lesson-audio';
@@ -95,7 +96,8 @@ function BlockQuiz({ block, answer, disabled, onChange, grade }: { block: Public
 
 export function LessonBlockView({ document, values, onChange, readOnly = false, grade, fileContext, submissionId, onFilePending, onAnswerChange, livePrompts = false, floatingAudio = false }: { floatingAudio?: boolean; livePrompts?: boolean; fileContext?: AnswerFileContext; submissionId?: string; onFilePending?: (blockId: string, pending: boolean) => void; onAnswerChange?: (blockId: string, value: BlockAnswer) => void; document: PublicBlockDocument; values: LessonBlockAnswers; onChange: (values: LessonBlockAnswers) => void; readOnly?: boolean; grade?: (blockId: string) => Promise<BlockGrade> }) {
   function answer(id: string, value: BlockAnswer) { if (onAnswerChange) { onAnswerChange(id, value); return; } onChange({ ...values, blocks: { ...values.blocks, [id]: value } }); }
-  return <div className="lesson-blocks">
+  const imageColumns = lessonImageColumns(document.blocks);
+  return <div className={'lesson-blocks' + (imageColumns.size ? ' has-image-rows' : '')}>
     <LessonTag label={document.presentation?.tagLabel} />
     {document.blocks.map(block => {
       const url = mediaUrl(block.url), value = values.blocks[block.id];
@@ -106,7 +108,7 @@ export function LessonBlockView({ document, values, onChange, readOnly = false, 
         case 'subheading': content = <h3>{block.content}</h3>; break;
         case 'text': content = <div className="reading-copy"><LessonText text={block.content || ''} /></div>; break;
         case 'divider': content = <hr />; break;
-        case 'image': content = url && <figure>{/* Untrusted imported URLs never become raw HTML. */}<img loading="lazy" src={url} alt={block.alt || ''} />{block.content && <figcaption>{block.content}</figcaption>}</figure>; break;
+        case 'image': content = url && <figure><LessonImage src={url} alt={block.alt}/>{block.content && <figcaption>{block.content}</figcaption>}</figure>; break;
         case 'audio': content = url && <figure><figcaption>{block.content || '음성 자료'}</figcaption><LessonAudio key={url} floating={floatingAudio} src={url} aria-label={block.alt || '학습 음성'}><a href={url}>음성 파일 열기</a></LessonAudio></figure>; break;
         case 'video': content = url && <><Video url={url} />{block.content && <p>{block.content}</p>}</>; break;
         case 'link': content = url && <LessonLinkCard url={url} title={block.content}/>; break;
@@ -121,7 +123,8 @@ export function LessonBlockView({ document, values, onChange, readOnly = false, 
         case 'quiz': content = <BlockQuiz block={block} answer={value} disabled={readOnly} onChange={value => answer(block.id, value)} grade={grade} />; break;
         default: content = <p role="alert">이 학습 도구의 연결을 확인하고 있습니다.</p>;
       }
-      return <div key={block.id} data-lesson-block={block.id}>{content}</div>;
+      const column = imageColumns.get(block.id);
+      return <div key={block.id} data-lesson-block={block.id} data-image-columns={column?.count} style={column ? { gridColumn: `${column.start} / span ${6 / column.count}` } : undefined}>{content}</div>;
     })}
     {document.checklist.length > 0 && <fieldset className="lb-card" disabled={readOnly}><legend>오늘의 체크리스트</legend>{document.checklist.map(item => <label className="lb-choice" key={item.id}><input type="checkbox" checked={values.checklist.includes(item.id)} onChange={event => onChange({ ...values, checklist: event.target.checked ? [...values.checklist, item.id] : values.checklist.filter(id => id !== item.id) })} />{item.label}{item.required ? ' (필수)' : ''}</label>)}</fieldset>}
   </div>;

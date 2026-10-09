@@ -8,7 +8,7 @@ export type BlockField = { id: string; label: string; variable: string; placehol
 export type BlockQuizQuestion = { id: string; prompt: string; options: string[]; correctIndex: number };
 export type LessonBlock = {
   id: string; type: LessonBlockType; content?: string; url?: string; assetId?: string; alt?: string;
-  toolVersion?: string;
+  toolVersion?: string; imageGroup?: string;
   question?: { label: string; kind: 'text' | 'image' | 'file'; required: boolean };
   fields?: BlockField[]; quiz?: { questions: BlockQuizQuestion[]; passPercent: number };
 };
@@ -61,12 +61,14 @@ export function validateLessonBlocks(input: unknown): LessonBlockDocument {
     const allowed = ['id', 'type', 'content'];
     if (mediaTypes.has(type)) allowed.push('url', 'alt');
     if (['image', 'audio', 'video'].includes(type)) allowed.push('assetId');
+    if (type === 'image') allowed.push('imageGroup');
     if (type === 'question') allowed.push('question');
     if (fieldTypes.has(type)) allowed.push('fields');
     if (isGuidedTool(type) || isCalculator(type)) allowed.push('toolVersion');
     if (type === 'quiz') allowed.push('quiz');
     onlyKeys(b, allowed);
     const block: LessonBlock = { id: id(b.id), type };
+    if (b.imageGroup !== undefined) block.imageGroup = id(b.imageGroup);
     if (b.toolVersion !== undefined) block.toolVersion = text(b.toolVersion, 100, true);
     if (b.content !== undefined) block.content = text(b.content, 200000);
     if (mediaTypes.has(type)) {
