@@ -21,7 +21,7 @@ function preview(value: unknown): string {
   const row = value as Record<string, unknown>;
   if (!row) return '(비어 있음)';
   const labels: Record<string, string> = { content:'내용', url:'주소', alt:'파일 설명', label:'문구', variable:'입력 이름', placeholder:'입력 예시', required:'필수 입력', sensitive:'개인 정보', kind:'답변 방식', passPercent:'통과 점수', prompt:'문제', options:'선택지', correctIndex:'정답 번호', mode:'완료 방식', requireAnswers:'답변 필요', requireQuizPass:'퀴즈 통과 필요', track:'학습 분류', dayNumber:'진행 일차', tag:'태그', tagLabel:'태그 이름', toolVersion:'도구 버전' };
-  return Object.entries(row).flatMap(([key,item]) => key === 'id' || key === 'type' ? [] : key === 'imageGroup' ? ['이미지 나란히 배치'] : key === 'assetId' ? ['첨부 파일이 등록되어 있습니다.'] : [labels[key] ? `${labels[key]}: ${key==='correctIndex' ? Number(item)<0 ? '미지정' : String(Number(item)+1) : preview(item)}` : preview(item)]).join('\n') || '등록된 학습 항목';
+  return Object.entries(row).flatMap(([key,item]) => key === 'id' || key === 'type' ? [] : key === 'assetId' ? ['첨부 파일이 등록되어 있습니다.'] : [labels[key] ? `${labels[key]}: ${key==='correctIndex' ? Number(item)<0 ? '미지정' : String(Number(item)+1) : preview(item)}` : preview(item)]).join('\n') || '등록된 학습 항목';
 }
 
 // Three-way comparison uses the editor's acknowledged baseline, never a last-

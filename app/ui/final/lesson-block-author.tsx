@@ -14,7 +14,6 @@ import { LessonMediaUpload } from './lesson-media-upload';
 import { lessonMediaSpec, type LessonMediaKind } from '@/lib/lesson-media';
 import { uploadLessonMedia } from '@/lib/lesson-media-upload';
 import { positionLessonImage, type LessonImagePosition } from '@/lib/lesson-image-position';
-import { joinNextImageRow, splitImageRow, lessonImageRows, nextImageRowSize } from '@/lib/lesson-image-row';
 import { lessonDocumentForEditor, serializeLessonDocument } from '@/lib/lesson-body';
 import { LessonImageLayout } from './lesson-image-layout';
 import type { BlockEditorDraft } from '@/lib/learning-editor-draft';
@@ -218,13 +217,6 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
           : <div><div className="lba-text-preview"><LessonText text={serializeLessonDocument(lessonDocumentForEditor(block.content || '본문을 입력해 주세요.'))} /></div><button type="button" className="btn small" onClick={() => setEditingTextId(block.id)} aria-label={`항목 ${index + 1} 본문 편집`}>본문 편집</button></div>
           : ['heading', 'subheading', 'prompt'].includes(block.type) ? <Field label="내용 *"><textarea required rows={block.type === 'prompt' ? 5 : 2} maxLength={200000} value={block.content || ''} onChange={event => update(block.id, { content: event.target.value })} /></Field> : null}
         {block.type === 'image' && <>
-          <fieldset className="lba-image-row-settings" disabled={disabled || conflict || uploading}>
-            <legend>이미지 배치</legend>
-            <p className="meta">{lessonImageRows(document.blocks).find(row => row.some(item => item.id === block.id))!.length > 1 ? '나란히 배치 중 · 이미지별 ↑·↓로 순서를 바꿀 수 있습니다.' : '바로 다음 이미지와 한 줄로 묶을 수 있습니다. 최대 3장까지, 원본 비율을 유지합니다.'}</p>
-            <div className="lba-actions"><button type="button" className="btn small" disabled={!nextImageRowSize(document.blocks, block.id) || nextImageRowSize(document.blocks, block.id) > 3} onClick={() => setDocument(previous => ({ ...previous, blocks: joinNextImageRow(previous.blocks, block.id, crypto.randomUUID()) }))}>다음 이미지와 나란히</button>
-            {block.imageGroup && <button type="button" className="btn small" onClick={() => setDocument(previous => ({ ...previous, blocks: splitImageRow(previous.blocks, block.id) }))}>이미지 묶음 풀기</button>}</div>
-            {nextImageRowSize(document.blocks, block.id) > 3 && <small>한 줄에 최대 3장까지 배치할 수 있습니다.</small>}
-          </fieldset>
           {positionedIds.includes(block.id) ? <p className="lba-image-placeholder" role="status">이 위치에 이미지를 올리고 있습니다…</p> : <>
             <button type="button" className="btn small lba-image-handle" draggable={!disabled && !conflict && !uploading} disabled={uploading} data-image-move={block.id} aria-label={`항목 ${index + 1} 이미지 이동 손잡이`}>⠿ 이미지 이동</button>
             {(block.assetId || block.url) && <div className="lba-image-preview" draggable={!disabled && !conflict && !uploading} data-image-move={block.id}><LessonBlockView document={{ ...empty(), blocks: [block] }} values={{ blocks: {}, checklist: [] }} onChange={() => {}} readOnly /></div>}
