@@ -219,7 +219,7 @@ export function LessonFormatToolbar({ editor, disabled = false }: { editor: Edit
           {LESSON_COLORS.map(([name, color]) => <button key={color} type="button" title={name} aria-label={name} aria-pressed={state?.[colorOpen] === color} disabled={disabled || !editor} style={{ backgroundColor: color }} onMouseDown={event => event.preventDefault()} onClick={() => applyColor(color)} />)}
         </div>
         <div className="lesson-color-actions">
-          <label>직접 선택<input type="color" aria-label="사용자 지정 색상" value={customColor} disabled={disabled || !editor} onChange={event => setCustomColor(event.target.value)} /></label>
+          <label>직접 선택<input type="color" style={{ width: 40, minWidth: 40, height: 34, padding: 2, flex: "none" }} aria-label="사용자 지정 색상" value={customColor} disabled={disabled || !editor} onChange={event => setCustomColor(event.target.value)} /></label>
           <button type="button" disabled={disabled || !editor} onClick={() => applyColor(customColor)}>색상 적용</button>
           <button type="button" disabled={disabled || !editor} onMouseDown={event => event.preventDefault()} onClick={() => applyColor(null)}>{colorOpen === "color" ? "기본 글자색" : "배경색 없애기"}</button>
           <button type="button" onClick={() => { setColorOpen(null); editor?.commands.focus(); }}>닫기</button>
