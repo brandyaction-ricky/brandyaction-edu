@@ -94,3 +94,12 @@ test('private author media uses a UUID instead of URL; links/text cannot smuggle
  assert.deepEqual(validateLessonBlocks(doc),doc);assert.deepEqual(publicLessonBlocks(doc),doc);
  for(const block of [{id:'x',type:'link',assetId},{id:'x',type:'text',assetId},{id:'x',type:'image',assetId:'../x'},{id:'x',type:'image',assetId,url:'https://example.test/x'},{id:'x',type:'image',assetId:null}])assert.throws(()=>validateLessonBlocks({...doc,blocks:[block]}));
 });
+
+
+test('image layout metadata remains readable and writable when presentation is rolled back', () => {
+ const document={schemaVersion:1,blocks:[1,2,3].map(n=>({id:'image-'+n,type:'image',assetId:'aaaaaaaa-1111-4111-8111-11111111111'+n,imageGroup:'row',alt:'단계 '+n})),checklist:[]};
+ assert.deepEqual(validateLessonBlocks(document),document);
+ assert.deepEqual(publicLessonBlocks(validateLessonBlocks(document)),document);
+ assert.deepEqual(validateBlockAnswers({blocks:{},checklist:[]},document),{blocks:{},checklist:[]});
+ assert.throws(()=>validateLessonBlocks({...document,blocks:[{id:'text',type:'text',content:'본문',imageGroup:'row'}]}));
+});
