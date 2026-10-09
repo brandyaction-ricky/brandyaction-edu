@@ -78,3 +78,20 @@ test('curriculum canvas saves colors without changing questions and renders them
   await expect(page.getByLabel('구성 미리보기').getByText('학습 안내',{exact:true})).toHaveCSS('background-color','rgb(254, 240, 138)');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
+test('pasted colors and colored links remain consistent between editor and learner', async ({page})=>{
+  await page.goto('/lesson-formatting-test');
+  const editor=page.getByRole('textbox',{name:'학습 내용',exact:true});
+  await editor.fill('');
+  await editor.evaluate(element=>{
+    const data=new DataTransfer();
+    data.setData('text/html','<p><a href="https://example.test/guide"><span style="color:rgb(197,30,44);background-color:#fef08a;position:fixed">참고 안내</span></a></p>');
+    element.dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData:data}));
+  });
+  await expect(editor.getByText('참고 안내',{exact:true})).toHaveCSS('color','rgb(197, 30, 44)');
+  await expect(editor.locator('[style*="fixed"]')).toHaveCount(0);
+  await page.getByRole('button',{name:'학습 저장',exact:true}).click();
+  const learner=page.getByRole('region',{name:'저장된 학습자 화면'});
+  await expect(learner.getByRole('link',{name:'참고 안내'})).toHaveCSS('color','rgb(197, 30, 44)');
+  await page.reload();
+  await expect(editor.getByText('참고 안내',{exact:true})).toHaveCSS('background-color','rgb(254, 240, 138)');
+});
