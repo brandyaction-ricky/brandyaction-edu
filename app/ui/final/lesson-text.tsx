@@ -4,14 +4,16 @@ import "./lesson-text.css";
 
 function RichNode({ node }: { node: LessonNode }): ReactNode {
   if (node.type === "text") {
-    let text: ReactNode = node.marks?.some(mark => mark.type === "link") ? node.text : <PlainLinks text={node.text || ""} />;
+    const color = node.marks?.find(mark => mark.type === "textStyle" && mark.attrs?.color)?.attrs?.color;
+    const linkColor = typeof color === "string" ? color : undefined;
+    let text: ReactNode = node.marks?.some(mark => mark.type === "link") ? node.text : <PlainLinks text={node.text || ""} color={linkColor} />;
     for (const mark of node.marks || []) {
       if (mark.type === "bold") text = <strong>{text}</strong>;
       if (mark.type === "italic") text = <em>{text}</em>;
       if (mark.type === "underline") text = <u>{text}</u>;
       if (mark.type === "strike") text = <s>{text}</s>;
-      if (mark.type === "textStyle") text = <span style={{ fontSize: String(mark.attrs?.fontSize) }}>{text}</span>;
-      if (mark.type === "link") text = <a href={String(mark.attrs?.href)} target="_blank" rel="noopener noreferrer">{text}</a>;
+      if (mark.type === "textStyle") text = <span style={{ fontSize: mark.attrs?.fontSize ? String(mark.attrs.fontSize) : undefined, color: mark.attrs?.color ? String(mark.attrs.color) : undefined, backgroundColor: mark.attrs?.backgroundColor ? String(mark.attrs.backgroundColor) : undefined }}>{text}</span>;
+      if (mark.type === "link") text = <a href={String(mark.attrs?.href)} style={linkColor ? { color: linkColor } : undefined} target="_blank" rel="noopener noreferrer">{text}</a>;
     }
     return text;
   }
@@ -40,8 +42,8 @@ export function LessonText({ text }: { text: string }) {
 export function AnswerText({ text }: { text: string }) {
   return <span className="lesson-text-links"><PlainLinks text={text} /></span>;
 }
-function PlainLinks({ text }: { text: string }) {
+function PlainLinks({ text, color }: { text: string; color?: string }) {
   return <>{lessonTextSegments(text).map((part, index) => part.href
-    ? <a key={index} href={part.href} target="_blank" rel="noopener noreferrer">{part.text}</a>
+    ? <a key={index} href={part.href} style={color ? { color } : undefined} target="_blank" rel="noopener noreferrer">{part.text}</a>
     : <Fragment key={index}>{part.text}</Fragment>)}</>;
 }
