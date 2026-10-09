@@ -667,3 +667,16 @@ test('positioning lesson images preserves rich list nodes, stable question IDs a
   assert.deepEqual(positionLessonImage(blocks, blocks[1], { blockId: 'body', textBoundary: 0 }, 'after').map(block => block.id), ['image', 'body', 'question']);
   assert.deepEqual(positionLessonImage(blocks, blocks[1], { blockId: 'body', textBoundary: 3 }, 'after').map(block => block.id), ['body', 'image', 'question']);
 });
+
+test('colored lesson links honor the selected color for both explicit and automatic links', () => {
+  const { LessonText } = load('app/ui/final/lesson-text.tsx');
+  const { serializeLessonDocument } = load('lib/lesson-body.ts');
+  const style = {type:'textStyle',attrs:{color:'#c51e2c',backgroundColor:'#fef08a'}};
+  const text = serializeLessonDocument({type:'doc',content:[{type:'paragraph',content:[
+    {type:'text',text:'참고 자료',marks:[{type:'link',attrs:{href:'https://example.test'}},style]},
+    {type:'text',text:' https://example.test/guide',marks:[style]},
+  ]}]});
+  const markup = html(LessonText,{text});
+  assert.equal((markup.match(/<a [^>]*style="color:#c51e2c"/g)||[]).length,2);
+  assert.match(markup,/background-color:#fef08a/);
+});
