@@ -1,3 +1,4 @@
+import { days } from './helpers/curriculum-days.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -11,7 +12,7 @@ const compile = (file, require = () => { throw Error('Unexpected import'); }) =>
 };
 const rules = compile('platform-rules');
 const cohort = compile('cohort-curriculum-visibility');
-const { learningOverview, parseLessonGates, readLearningOverviews } = compile('learning-overview', name => name === './platform-rules' ? rules : name === './cohort-curriculum-visibility' ? cohort : assert.fail(name));
+const { learningOverview, parseLessonGates, readLearningOverviews } = compile('learning-overview', name => name === './curriculum-days' ? days : name === './platform-rules' ? rules : name === './cohort-curriculum-visibility' ? cohort : assert.fail(name));
 const enrollment = { id: 'enrollment', course_id: 'course', cohort_id: 'cohort', status: 'active', access_starts_at: '2020-01-01' };
 const gate = (id, track, day, unlocked = true) => ({ lessonId: id, track, dayNumber: day, isUnlocked: unlocked, automaticApproval: false, reason: unlocked ? '' : '이전 학습을 마치면 열립니다.' });
 function dataFor(gates, complete = []) {

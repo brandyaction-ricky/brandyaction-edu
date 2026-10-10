@@ -1,4 +1,5 @@
 "use client";
+import { curriculumDay } from '@/lib/curriculum-days';
 import { LearningProgress } from './learning-progress';
 import { DiagnosisEntry } from './diagnosis-entry';
 import {
@@ -84,7 +85,7 @@ export function Classroom({
   const allLessons = enrollmentLessons(data, enrollment);
   const selectedId = allLessons.find(item => item.id === path[2])?.id || allLessons[0]?.id;
   const selectedGate = progression.lessons?.find(item => item.lessonId === selectedId);
-  const lessonDay = (id: string, fallback: number) => progression.lessons?.find(item => item.lessonId === id)?.dayNumber ?? fallback;
+  const lessonDay = (id: string, fallback: number) => progression.lessons?.find(item => item.lessonId === id)?.dayNumber ?? (allLessons.some(item => item.id === id) ? curriculumDay(data, allLessons.find(item => item.id === id)) : fallback);
   const group = (gate?: LessonGate) => gate?.ongoing ? 'ongoing' : gate?.track;
   const hasTracks = progression.lessons?.some(item => group(item) != null);
   const lessonLabel = (id: string, fallback: number) => progression.lessons?.find(item => item.lessonId === id)?.ongoing ? '지속 챌린지' : `DAY ${lessonDay(id, fallback)}`;

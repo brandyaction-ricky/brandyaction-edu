@@ -78,7 +78,9 @@
       "codex/edu-consent-b14-release-20261008": false,
       "codex/edu-consent-ads-release-20261010": false,
       "codex/edu-care-channel-status-release-20261010": false,
-      "codex/edu-session-care-production-20261010": false
+      "codex/edu-session-care-production-20261010": false,
+      "codex/edu-cumulative-days-20261010": false,
+      "codex/edu-cumulative-days-production-20261010": false
     }
   },
   "regions": [

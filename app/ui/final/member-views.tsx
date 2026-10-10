@@ -1,4 +1,5 @@
 "use client";
+import { curriculumDay } from '@/lib/curriculum-days';
 import { MemberLearningCare } from "./learning-care";
 import { ConsentRewardCard } from "../consent-reward-card";
 import { PersonalizationSettings } from '../personalization-settings';
@@ -300,7 +301,7 @@ function Dashboard({
           </h2>
           <p className="member-lesson-meta">
             {next
-              ? `DAY ${String(num(next, "day_number")).padStart(2, "0")} · ${t(next, "duration_label")}`
+              ? `DAY ${String(curriculumDay(data, next)).padStart(2, "0")} · ${t(next, "duration_label")}`
               : "내 업무에 필요한 클래스를 찾아보세요."}
           </p>
           <div className="member-progress-caption">
@@ -615,7 +616,7 @@ function Missions({ data, active }: { data: Data; active: Row[] }) {
               <span className="member-mission-day">
                 DAY
                 <strong>
-                  {String(num(x.lesson, "day_number")).padStart(2, "0")}
+                  {String(curriculumDay(data, x.lesson)).padStart(2, "0")}
                 </strong>
               </span>
               <div className="row-text">
