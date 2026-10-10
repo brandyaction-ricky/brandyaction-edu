@@ -1,4 +1,4 @@
-import {test,expect,type Page} from '@playwright/test';
+import {test,expect,type Page,type Locator} from '@playwright/test';
 import type {LessonBlockDocument} from '../../lib/lesson-blocks';
 const initial:LessonBlockDocument={schemaVersion:1,blocks:[
  {id:'heading',type:'heading',content:'오늘의 실행 목표'},
@@ -118,4 +118,48 @@ test('image and link settings stay reachable beside a long embedded lesson and d
  await panel.getByRole('button',{name:'설정 닫기',exact:true}).click();await page.getByRole('button',{name:'학습 저장',exact:true}).last().click();await expect.poll(()=>server.writes.length).toBe(1);
  expect(server.get().blocks.some(b=>b.id==='photo')).toBe(false);expect(server.get().blocks.find(b=>b.id==='reference')).toMatchObject({url:'https://example.test/updated',content:'수정한 참고 링크'});
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
+async function startCalloutDrag(page:Page,handle:Locator){
+ await handle.hover();const box=await handle.boundingBox();
+ await page.mouse.down();await page.mouse.move(box!.x+box!.width/2+10,box!.y+box!.height/2,{steps:5});
+}
+async function dropCallout(page:Page,target:Locator){
+ // Bring the destination past the fixed save bar while the native drag is active.
+ await target.evaluate(el=>el.scrollIntoView({block:'center'}));const box=await target.boundingBox();
+ await page.mouse.move(box!.x+30,box!.y+10,{steps:15});await page.mouse.move(box!.x+30,box!.y+10);await page.mouse.up();
+}
+test('callout handle moves only the notice past an activity and preserves content through undo and save',async({page},testInfo)=>{
+ test.skip(Boolean(testInfo.project.use.hasTouch),'Native mouse drag is covered on desktop.');
+ const server=await backend(page);await page.goto('/lesson-block-author-test');await expect(doc(page)).toBeVisible();
+ await page.getByRole('button',{name:'필독 공지 추가',exact:true}).click();await page.keyboard.type('이동할 안내 문구');
+ const handle=doc(page).getByRole('button',{name:'안내 박스 이동',exact:true});
+ const target=doc(page).locator('[data-author-block="end"] p');
+ await startCalloutDrag(page,handle);await dropCallout(page,target);
+ await expect(doc(page).locator('[data-author-block="end"] [data-lesson-callout]')).toContainText('이동할 안내 문구');
+ await expect(doc(page).locator('[data-lesson-callout]')).toHaveCount(1);
+ await expect(doc(page).locator('[data-author-block="heading"]')).toContainText('오늘의 실행 목표');
+ await expect(doc(page).locator('[data-author-block="question"]')).toContainText('어떤 업무인가요?');
+ await page.getByRole('button',{name:'실행 취소',exact:true}).click();
+ await expect(doc(page).locator('[data-author-block="heading"] [data-lesson-callout]')).toContainText('이동할 안내 문구');
+ await page.getByRole('button',{name:'다시 실행',exact:true}).click();
+ await expect(doc(page).locator('[data-author-block="end"] [data-lesson-callout]')).toContainText('이동할 안내 문구');
+ await save(page);expect(server.get().blocks.find(b=>b.id==='question')).toEqual(initial.blocks[2]);
+ expect(server.get().blocks.find(b=>b.id==='end')?.content).toContain('이동할 안내 문구');
+ expect(server.get().blocks.map(b=>b.content||'').join('')).not.toContain('안내 박스 이동');
+ await page.getByRole('button',{name:'편집 다시 열기'}).click();
+ await expect(doc(page).locator('[data-author-block="end"] [data-lesson-callout]')).toContainText('이동할 안내 문구');
+ await expect(doc(page).locator('[data-author-block="end"] [data-lesson-callout] strong')).toHaveText('필독 안내');
+ // An aborted drag must neither remove the notice nor alter the saved lesson.
+ await startCalloutDrag(page,handle);await page.keyboard.press('Escape');await page.mouse.up();
+ await expect(doc(page).locator('[data-author-block="end"] [data-lesson-callout]')).toContainText('이동할 안내 문구');
+ // Move upwards as well, then undo: source text, notice formatting and question IDs survive.
+ await startCalloutDrag(page,handle);await dropCallout(page,doc(page).locator('[data-author-block="body"] p').first());
+ await expect(doc(page).locator('[data-author-block="body"] [data-lesson-callout]')).toContainText('이동할 안내 문구');
+ await page.getByRole('button',{name:'실행 취소',exact:true}).click();
+ await expect(doc(page).locator('[data-author-block="end"] [data-lesson-callout]')).toContainText('이동할 안내 문구');
+ await doc(page).locator('[data-author-block="end"] [data-lesson-callout]').evaluate(el=>el.scrollIntoView({block:'center'}));
+ await page.screenshot({path:testInfo.outputPath('callout-moved.png')});
+ await page.getByRole('button',{name:'구성 미리보기',exact:true}).click();
+ await expect(page.getByLabel('구성 미리보기').getByRole('button',{name:'안내 박스 이동'})).toHaveCount(0);
 });
