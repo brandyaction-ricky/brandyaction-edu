@@ -123,3 +123,26 @@ test('service cannot create consumers or rewrite receipt history; browser roles 
   for(const sql of ['select * from edu_tips_private.erasure_receipts','select * from edu_tips_private.erasure_consumers','select edu_tips_publish_erasures(null)',"select edu_tips_accept_erasure_receipt(null,'{}')",'select edu_tips_ack_erasures(null,null)'])await assert.rejects(db.exec(sql),/permission denied/);
  }
 });
+
+test('backup retention expiry is not erasure evidence and reported completion cannot reopen analysis',async t=>{
+ const {publish,deliveries,accept,ack,owner,value} = await fixture(t);
+ await publish();const [d]=await deliveries();
+ const pending=receipt(d,200,'model_resolved');
+ pending.models='done';pending.residuals='pending';pending.error_code='residual_pending';
+ await accept(pending);
+ await assert.rejects(ack(d.delivery_id),/TIPS_ACK_GAP/);
+ // Even after the promised residual deadline, elapsed time is not deletion proof.
+ await owner("update edu_tips_private.erasure_outbox set residual_due_at='2026-01-01T00:00:04Z' where request_id=$1",[d.request_id]);
+ const overdue={...pending,receipt_id:id(201),receipt_revision:2,observed_at:'2026-01-01T00:00:06Z'};
+ await accept(overdue);
+ assert.equal((await deliveries())[0].deadline_breached,true);
+ await assert.rejects(ack(d.delivery_id),/TIPS_ACK_GAP/);
+ await assert.rejects(accept({...overdue,receipt_id:id(202),receipt_revision:3,phase:'completed'}),/TIPS_INVALID_RECEIPT/);
+ // Only a new completion receipt with an actual residual timestamp can advance ACK.
+ const completed={...overdue,receipt_id:id(203),receipt_revision:3,phase:'completed',residuals:'done',
+  residual_erased_at:'2026-01-01T00:00:07Z',observed_at:'2026-01-01T00:00:08Z',error_code:null};
+ await accept(completed);assert.equal(await ack(d.delivery_id),d.delivery_id);
+ assert.equal((await deliveries())[0].deadline_breached,true);
+ // Consumer claims are not independent verification and never clear the global gate.
+ assert.equal(await value('select count(*)::int as v from edu_tips_private.erasure_outbox where completed_at is not null'),0);
+});
