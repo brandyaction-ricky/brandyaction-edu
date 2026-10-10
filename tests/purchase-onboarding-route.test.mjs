@@ -10,9 +10,10 @@ const inviteUrl = 'https://t.me/+ExampleCode123';
 
 function handler({ user = { id: 'buyer' }, purchase = { telegramOnly: true, orderId, orderNumber: 'QA-4', itemName: '문샷 챌린지 4기', settings: { inviteUrl } } } = {}) {
   const calls = [];
+  const progressCalls = [];
   const dependencies = {
     '@/lib/supabase/admin': { createAdminClient: () => { throw Error('direct guidance must not read or write survey data'); } },
-    '@/lib/purchase-onboarding-progress-server': { readOnboardingProgress: async () => ({ telegram: false }), confirmOnboardingStep: async () => ({ ok: true }) },
+    '@/lib/purchase-onboarding-progress-server': { readOnboardingProgress: async (...args) => { progressCalls.push(['read', ...args]); return { telegram: false }; }, confirmOnboardingStep: async (...args) => { progressCalls.push(['confirm', ...args]); return { ok: true }; } },
     '@/lib/server-auth': { getAuthenticatedUser: async () => user },
     '@/lib/qa-rules': { imagePreviewUrl: () => '' },
     '@/lib/purchase-onboarding-server': { eligiblePurchase: async (userId, requested) => { calls.push([userId, requested]); return purchase; } },
@@ -22,7 +23,7 @@ function handler({ user = { id: 'buyer' }, purchase = { telegramOnly: true, orde
   };
   const route = {};
   new Function('exports', 'require', compiled)(route, name => dependencies[name]);
-  return { route, calls };
+  return { route, calls, progressCalls };
 }
 
 test('fourth-cohort guide requires an authenticated paid order and does not return invite link on GET', async () => {
@@ -47,4 +48,20 @@ test('fourth-cohort link action returns the configured link without creating a w
   assert.equal((await response.json()).url, inviteUrl);
   assert.equal((await route.POST(request('answer'))).status, 400);
   assert.equal((await handler({ purchase: null }).route.POST(request('link'))).status, 404);
+});
+
+
+test('only opted-in cohorts can read and confirm the four-step checklist', async () => {
+  for (const enabled of [false, true]) {
+    const { route, progressCalls } = handler({ purchase: { telegramOnly: true, orderId,
+      orderNumber: 'QA', itemName: '문샷', settings: { inviteUrl, checklistEnabled: enabled } } });
+    const body = await (await route.GET(new Request(`https://edu.test/api/purchase-onboarding?order=${orderId}`))).json();
+    assert.equal(Boolean(body.progress), enabled);
+    const response = await route.POST(new Request('https://edu.test/api/purchase-onboarding', {
+      method: 'POST', headers: { origin: 'https://edu.test', 'content-type': 'application/json' },
+      body: JSON.stringify({ order: orderId, action: 'confirm', step: 'telegram' }),
+    }));
+    assert.equal(response.status, enabled ? 200 : 400);
+    assert.deepEqual(progressCalls.map(call => call[0]), enabled ? ['read', 'confirm'] : []);
+  }
 });

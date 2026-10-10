@@ -12,5 +12,5 @@ export function onboardingStep(progress: OnboardingProgress) {
   return 4;
 }
 export function orientationLabel(value: string) {
-  return new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric', weekday: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(value));
+  return new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric', weekday: 'short', ...(value.length === 10 ? {} : { hour: 'numeric', minute: '2-digit' } as const) }).format(new Date(value));
 }

@@ -43,7 +43,10 @@ export function purchaseOnboardingSettings(value: unknown): PurchaseOnboardingSe
   const enabled = item.enabled === true;
   if (enabled && !inviteUrl) throw new Error('안내를 켜려면 텔레그램 초대 링크를 입력해 주세요.');
   const orientationAt = typeof item.orientationAt === 'string' ? item.orientationAt.trim() : '';
-  if (orientationAt && (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00\+09:00$/.test(orientationAt) || !Number.isFinite(Date.parse(orientationAt)) || new Date(Date.parse(orientationAt) + 9 * 3600000).toISOString().slice(0, 16) !== orientationAt.slice(0, 16))) throw new Error('OT 일정을 올바르게 입력해 주세요.');
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(orientationAt);
+  const validDate = dateOnly ? Number.isFinite(Date.parse(orientationAt)) && new Date(orientationAt).toISOString().slice(0,10) === orientationAt
+    : /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00\+09:00$/.test(orientationAt) && Number.isFinite(Date.parse(orientationAt)) && new Date(Date.parse(orientationAt) + 9 * 3600000).toISOString().slice(0,16) === orientationAt.slice(0,16);
+  if (orientationAt && !validDate) throw new Error('OT 일정을 올바르게 입력해 주세요.');
   const firstLessonId = typeof item.firstLessonId === 'string' ? item.firstLessonId : '';
   if (firstLessonId && !uuid(firstLessonId)) throw new Error('첫 학습을 선택해 주세요.');
   const checklistEnabled = item.checklistEnabled === true;
