@@ -50,6 +50,32 @@ test('four steps persist across reload and require schedule, real learning and c
   expect(actions).toContain('confirm');
 });
 
+test('Telegram return instructions survive reload and date-only OT does not invent a time', async ({ page }) => {
+ const progress = {...initialProgress(), orientationAt: '2026-11-09'};
+ await page.route('**/api/purchase-onboarding*', route => route.fulfill({json:{available:true,telegramOnly:true,orderId:order,itemName:'합성 5기',roomName:'공지방',supportUrl:'',progress}}));
+ await page.goto(`/purchase-onboarding?order=${order}`);
+ await page.getByRole('button',{name:'텔레그램이 처음이에요'}).click();
+ await expect(page.getByText('설치 후, 이 안내로 다시 돌아와 주세요')).toBeVisible();
+ await page.getByRole('button',{name:'이 안내 주소 복사'}).click();
+ await expect(page.getByRole('textbox',{name:'돌아올 안내 주소'})).toHaveValue(new RegExp('/purchase-onboarding\\?order='+order));
+ await page.evaluate(orderId=>sessionStorage.setItem(`edu-onboarding-telegram-return:${orderId}`,'1'),order);
+ await page.reload();
+ await expect(page.getByText(/다시 돌아오셨네요!/)).toBeVisible();
+ await expect(page.getByRole('button',{name:'텔레그램 공지방 입장'})).toBeVisible();
+ progress.telegram=true;progress.app=true;await page.reload();
+ await expect(page.getByText(/2026년 11월 9일/)).toBeVisible();
+ await expect(page.getByText('예정 · 시간은 추후 안내합니다')).toBeVisible();
+ await expect(page.getByText(/오전|오후/)).toHaveCount(0);
+});
+
+test('existing fourth cohort without checklist flag retains its existing Telegram flow', async ({ page }) => {
+ await page.route('**/api/purchase-onboarding*', route => route.fulfill({json:{available:true,telegramOnly:true,orderId:order,itemName:'문샷 4기',roomName:'4기 공지방',supportUrl:''}}));
+ await page.goto(`/purchase-onboarding?order=${order}`);
+ await expect(page.getByRole('heading',{name:'4기 공지방에 입장해 주세요'})).toBeVisible();
+ await expect(page.getByText('3단계 · 약 5분', {exact:false})).toBeVisible();
+ await expect(page.getByText('4단계를 마치면 수업 준비 끝!', {exact:false})).toHaveCount(0);
+});
+
 test('missing OT date stays pending instead of pretending onboarding is complete', async ({ page }) => {
  const progress = {...initialProgress(), telegram: true, app: true, orientationAt: ''};
  await page.route('**/api/purchase-onboarding*', route => route.fulfill({json:{available:true,telegramOnly:true,orderId:order,itemName:'합성 기수',roomName:'공지방',supportUrl:'',progress}}));

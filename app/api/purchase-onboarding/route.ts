@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     if (!purchase) return reply({ available: false, error: '안내할 결제 완료 주문이 없습니다.' }, 404);
     if (purchase.telegramOnly) return reply({ available: true, telegramOnly: true, orderId: purchase.orderId,
       orderNumber: purchase.orderNumber, itemName: purchase.itemName, roomName: purchase.settings.roomName || '교육생 공지방',
-      progress: await readOnboardingProgress(user.id, purchase),
+      ...(purchase.settings.checklistEnabled ? { progress: await readOnboardingProgress(user.id, purchase) } : {}),
       supportUrl: MOONSHOT_SUPPORT_URL });
     const row = await createAdminClient().from('edu_purchase_onboarding').select('survey_room,survey_answered_at,tg_path,tg_link_clicked_at').eq('order_id', purchase.orderId).eq('user_id', user.id).maybeSingle();
     if (row.error) throw row.error;
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     const purchase = await eligiblePurchase(user.id, body.order);
     if (!purchase) return reply({ error: '결제 완료 주문을 확인해 주세요.' }, 404);
     if (purchase.telegramOnly) {
-      if (body.action === 'confirm') return reply(await confirmOnboardingStep(user.id, purchase, body));
+      if (body.action === 'confirm' && purchase.settings.checklistEnabled) return reply(await confirmOnboardingStep(user.id, purchase, body));
       if (body.action !== 'link') return reply({ error: '지원하지 않는 요청입니다.' }, 400);
       return reply({ ok: true, url: purchase.settings.inviteUrl });
     }
