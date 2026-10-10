@@ -75,9 +75,9 @@ test('withdrawal and outbox are atomic, idempotent, scoped to the member and blo
   assert.equal(rows.length, 1);
   assert.equal(rows[0].reason, 'consent_withdrawn');
   assert.equal(rows[0].completed_at, null);
-  assert.ok(Math.abs(new Date(rows[0].active_due_at) - new Date(rows[0].requested_at) - 72 * 3600000) < 10);
-  assert.ok(Math.abs(new Date(rows[0].model_due_at) - new Date(rows[0].requested_at) - 7 * 86400000) < 10);
-  assert.ok(Math.abs(new Date(rows[0].residual_due_at) - new Date(rows[0].requested_at) - 30 * 86400000) < 10);
+  assert.equal(new Date(rows[0].active_due_at) - new Date(rows[0].requested_at), 5 * 86400000);
+  assert.equal(new Date(rows[0].model_due_at) - new Date(rows[0].requested_at), 30 * 86400000);
+  assert.equal(new Date(rows[0].residual_due_at) - new Date(rows[0].requested_at), 30 * 86400000);
   assert.equal(await value('select retired_at is null as v from edu_tips_private.subjects where member_id=$1', [id(2)]), true);
   await consent(1, 15, true, true, 14);
   await assert.rejects(register(1, 15, 8), /TIPS_ERASURE_PENDING/);
@@ -145,6 +145,11 @@ test('worker lease fencing, backoff and stable request IDs; delivery never means
   const row = (await queue())[0];
   assert.ok(row.delivered_at);
   assert.equal(row.completed_at, null);
+  for (const field of ['active_due_at','model_due_at','residual_due_at']) {
+    assert.equal(second[field], first[field]);
+    assert.equal(third[field], first[field]);
+    assert.equal(new Date(row[field]).getTime(), new Date(first[field]).getTime());
+  }
   await consent(1, 13, true, true, 12);
   await assert.rejects(register(1, 13, 8), /TIPS_ERASURE_PENDING/);
 });
