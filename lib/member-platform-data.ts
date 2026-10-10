@@ -1,3 +1,4 @@
+import { curriculumDayNumbers } from '@/lib/curriculum-days';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { hasLearningAccess } from '@/lib/platform-rules';
@@ -18,6 +19,17 @@ function checked(result: { data: unknown; error: { message: string } | null }, t
   const rows = (result.data || []) as Row[];
   if (rows.length > MEMBER_ROW_LIMIT) throw new Error(`${table} 자료가 한 화면의 조회 한도를 초과했습니다. 지원팀에 문의해 주세요.`);
   return rows;
+}
+
+// Hidden curriculum positions can outnumber the member-facing row limit.
+// Page the server-only snapshot; the response still enforces the visible limit.
+async function readCurriculumRows(readPage: (from: number, to: number) => PromiseLike<{ data: unknown; error: { message: string } | null }>, table: string): Promise<Row[]> {
+  const rows: Row[] = [];
+  for (let from = 0; ; from += MEMBER_ROW_LIMIT) {
+    const page = checked(await readPage(from, from + MEMBER_ROW_LIMIT - 1), table);
+    rows.push(...page);
+    if (page.length < MEMBER_ROW_LIMIT) return rows;
+  }
 }
 
 export async function readMemberPlatformData(userId: string, view: MemberView, enrollmentId = '', lessonId = ''): Promise<Record<string, Row[]>> {
@@ -82,7 +94,7 @@ export async function readMemberPlatformData(userId: string, view: MemberView, e
       return checked(await admin.from('courses').select(columns).in('id', courseIds).limit(limit), '상품');
     })() : null,
     cohortIds.length && learningViews.has(view) ? (async () => checked(await admin.from('cohorts').select('id,course_id,name,status,operation_start_at,operation_end_at').in('id', cohortIds).limit(limit), '기수'))() : null,
-    courseIds.length && learningViews.has(view) ? (async () => checked(await admin.from('curriculum_weeks').select('id,course_id,week_number,title,goal,is_published,display_order').in('course_id', courseIds).eq('is_published', true).order('week_number').limit(limit), '커리큘럼 주차'))() : null,
+    courseIds.length && learningViews.has(view) ? (async () => readCurriculumRows((from, to) => admin.from('curriculum_weeks').select('id,course_id,week_number,title,goal,is_published,display_order,archived_at').in('course_id', courseIds).order('week_number').order('id').range(from, to), '커리큘럼 주차'))() : null,
     activeIds.length && (view === 'dashboard' || view === 'classes' || view === 'learn') ? (async () => checked(await db.from('lesson_progress').select('id,enrollment_id,lesson_id,completed_at,updated_at').in('enrollment_id', activeIds).limit(limit), '학습 진도'))() : null,
     activeIds.length && missionViews.has(view) ? (async () => checked(await db.from('mission_submissions').select('id,enrollment_id,mission_id,attempt_number,status,response,submitted_at,reviewed_at,reviewer_feedback').in('enrollment_id', activeIds).limit(limit), '미션 제출'))() : null,
     activeIds.length && view === 'learn' ? (async () => checked(await db.from('edu_mission_drafts').select('id,enrollment_id,mission_id,content,url,updated_at').eq('user_id', userId).in('enrollment_id', activeIds).limit(limit), '미션 초안'))() : null,
@@ -106,11 +118,12 @@ export async function readMemberPlatformData(userId: string, view: MemberView, e
   }) : courses;
   if (cohorts) data.cohorts = cohorts;
   if (weeks) {
+    const publishedWeeks = weeks.filter(week => week.is_published && !week.archived_at);
     const activeCohorts = [...new Set(active.map(enrollment => String(enrollment.cohort_id)))];
-    const visibility = activeCohorts.length && weeks.length ? checked(await admin.from('edu_cohort_week_visibility')
-      .select('cohort_id,week_id,is_published').in('cohort_id', activeCohorts).in('week_id', weeks.map(week => week.id)).limit(limit), '기수별 주차 공개') : [];
+    const visibility = activeCohorts.length && publishedWeeks.length ? checked(await admin.from('edu_cohort_week_visibility')
+      .select('cohort_id,week_id,is_published').in('cohort_id', activeCohorts).in('week_id', publishedWeeks.map(week => week.id)).limit(limit), '기수별 주차 공개') : [];
     data.edu_cohort_week_visibility = visibility;
-    data.curriculum_weeks = weeks.filter(week => activeCohorts.some(cohortId => cohortWeekVisible(data, cohortId, week)));
+    data.curriculum_weeks = checked({ data: publishedWeeks.filter(week => activeCohorts.some(cohortId => cohortWeekVisible(data, cohortId, week))), error: null }, '커리큘럼 주차');
   }
   if (progress) data.lesson_progress = progress;
   if (submissions) data.mission_submissions = submissions;
@@ -121,17 +134,22 @@ export async function readMemberPlatformData(userId: string, view: MemberView, e
       (cohorts || []).find(cohort => cohort.id === enrollment.cohort_id))));
   if (sessions) data.cohort_sessions = liveSessions;
   if (overviews) data.learning_overviews = overviews;
-  const weekIds = (data.curriculum_weeks || []).map(week => week.id);
+  // Include unpublished positions for stable numbering, but never return their rows.
+  const weekIds = (data.curriculum_weeks || []).length ? (weeks || []).filter(week => !week.archived_at).map(week => week.id) : [];
   const sessionIds = liveSessions.map(session => session.id);
   const [lessons, sessionContents] = await Promise.all([
-    weekIds.length ? (async () => checked(await admin.from('curriculum_lessons').select('id,week_id,day_number,title,description,content_type,duration_label,is_preview,is_published,display_order').in('week_id', weekIds).eq('is_published', true).order('display_order').limit(limit), '학습'))() : null,
+    weekIds.length ? (async () => readCurriculumRows((from, to) => admin.from('curriculum_lessons').select('id,week_id,day_number,title,description,content_type,duration_label,is_preview,is_published,display_order,archived_at').in('week_id', weekIds).order('display_order').order('id').range(from, to), '학습'))() : null,
     sessionIds.length ? (async () => checked(await db.from('cohort_session_contents').select('session_id,live_url,replay_url').in('session_id', sessionIds).limit(limit), '라이브 주소'))() : null,
   ]);
   if (lessons) {
+    const days = curriculumDayNumbers({ curriculum_weeks: weeks || [], curriculum_lessons: lessons });
+    const visibleWeeks = new Set((data.curriculum_weeks || []).map(week => week.id));
+    const publishedLessons = lessons.filter(lesson => visibleWeeks.has(String(lesson.week_id)) && lesson.is_published && !lesson.archived_at);
     const activeCohorts = [...new Set(active.map(enrollment => String(enrollment.cohort_id)))];
-    data.edu_cohort_lesson_visibility = activeCohorts.length && lessons.length ? checked(await admin.from('edu_cohort_lesson_visibility')
-      .select('cohort_id,lesson_id,is_published').in('cohort_id', activeCohorts).in('lesson_id', lessons.map(lesson => lesson.id)).limit(limit), '기수별 학습 공개') : [];
-    data.curriculum_lessons = lessons.filter(lesson => activeCohorts.some(cohortId => cohortLessonVisible(data, cohortId, lesson)));
+    data.edu_cohort_lesson_visibility = activeCohorts.length && publishedLessons.length ? checked(await admin.from('edu_cohort_lesson_visibility')
+      .select('cohort_id,lesson_id,is_published').in('cohort_id', activeCohorts).in('lesson_id', publishedLessons.map(lesson => lesson.id)).limit(limit), '기수별 학습 공개') : [];
+    data.curriculum_lessons = checked({ data: publishedLessons.filter(lesson => activeCohorts.some(cohortId => cohortLessonVisible(data, cohortId, lesson)))
+      .map(lesson => ({ ...lesson, curriculum_day_number: days.get(lesson.id) })), error: null }, '학습');
   }
   if (sessionContents) data.cohort_session_contents = sessionContents;
   if (activeIds.length && missionViews.has(view)) {

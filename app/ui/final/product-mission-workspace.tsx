@@ -1,4 +1,5 @@
 "use client";
+import { curriculumDay } from '@/lib/curriculum-days';
 
 import { number as num, text as t, type Row } from "@/lib/platform";
 import { useEffect, useState } from "react";
@@ -123,7 +124,7 @@ export function ProductMissionWorkspace({ course, pending, send, lessonScope }: 
     {weeks.filter(week => !lessonScope || week.id === selectedWeekId).map((week) => <section key={week.id} className="product-mission-week" aria-label={`${num(week, "week_number")}주차 미션`}>
       {!lessonScope && <h3>{num(week, "week_number")}주차 · {t(week, "title")}</h3>}
       {lessons.filter((lesson) => lesson.week_id === week.id).map((lesson) => <div key={lesson.id} className="product-mission-day">
-        <b>Day {num(lesson, "day_number")} · {t(lesson, "title")}</b>
+        <b>Day {curriculumDay(snapshot || {}, lesson)} · {t(lesson, "title")}</b>
         {missions.filter((mission) => mission.lesson_id === lesson.id).length ? <ul>{missions.filter((mission) => mission.lesson_id === lesson.id).map((mission) => <li key={mission.id}><span>{t(mission, "title")} · {mission.archived_at ? "보관됨" : mission.is_published ? "공개" : "비공개"}{mission.is_required ? " · 필수" : " · 선택"}</span>{!mission.archived_at && <button className="btn small" type="button" disabled={saving} onClick={() => editMission(mission)}>미션 편집</button>}</li>)}</ul> : <p className="meta">연결된 미션이 없습니다.</p>}
       </div>)}
       {!lessons.some((lesson) => lesson.week_id === week.id) && <p className="meta">일차별 학습을 먼저 추가해 주세요.</p>}
@@ -132,7 +133,7 @@ export function ProductMissionWorkspace({ course, pending, send, lessonScope }: 
       <div className="row"><h3>{selectedMission ? "기존 미션 편집" : "새 미션 등록"}</h3>{selectedMission && <button className="btn small" type="button" onClick={newMission} disabled={saving}>+ 새 미션</button>}</div>
       <div className="form-grid">
         {!lessonScope && <label>주차<select value={selectedWeekId} onChange={(event) => { setWeekId(event.target.value); setLessonId(""); }} disabled={saving || Boolean(selectedMission)}>{weeks.filter(week => !lessonScope || week.id === selectedWeekId).map((week) => <option key={week.id} value={week.id}>{num(week, "week_number")}주차 · {t(week, "title")}</option>)}</select></label>}
-        {!lessonScope && <label>일차<select value={selectedLessonId} onChange={(event) => setLessonId(event.target.value)} disabled={saving || Boolean(selectedMission)}>{selectedLessons.map((lesson) => <option key={lesson.id} value={lesson.id}>Day {num(lesson, "day_number")} · {t(lesson, "title")}</option>)}</select></label>}
+        {!lessonScope && <label>일차<select value={selectedLessonId} onChange={(event) => setLessonId(event.target.value)} disabled={saving || Boolean(selectedMission)}>{selectedLessons.map((lesson) => <option key={lesson.id} value={lesson.id}>Day {curriculumDay(snapshot || {}, lesson)} · {t(lesson, "title")}</option>)}</select></label>}
         <label>미션 제목<input value={draft.title} maxLength={300} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} disabled={saving} /></label>
         <label>제출 방식<select value={draft.submission_type} onChange={(event) => setDraft((current) => ({ ...current, submission_type: event.target.value }))} disabled={saving}>{Object.entries(submissionLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
       </div>

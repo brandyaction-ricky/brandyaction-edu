@@ -1,3 +1,4 @@
+import { days } from './helpers/curriculum-days.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -12,7 +13,7 @@ new Function('exports', cohortCode)(cohortExports);
 
 const overviewExports = {};
 const overviewCode = ts.transpileModule(fs.readFileSync(new URL('../lib/learning-overview.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-new Function('exports', 'require', overviewCode)(overviewExports, name => name === './platform-rules' ? ruleExports : name === './cohort-curriculum-visibility' ? cohortExports : assert.fail(name));
+new Function('exports', 'require', overviewCode)(overviewExports, name => name === './curriculum-days' ? days : name === './platform-rules' ? ruleExports : name === './cohort-curriculum-visibility' ? cohortExports : assert.fail(name));
 
 function harness(fixtures = {}, waitForRead = () => {}, rpcRead = async () => ({data: [], error: null})) {
   const calls = [], rpcCalls = [];
@@ -29,10 +30,11 @@ function harness(fixtures = {}, waitForRead = () => {}, rpcRead = async () => ({
         eq(key, value) { call.filters.push([key, value]); return this; },
         in(key, value) { call.filters.push([key, value]); return this; },
         order() { return this; },
+        range(from, to) { call.range = [from, to]; return this; },
         limit() { return this; },
         then(resolve) {
           const data = (fixtures[table] || []).filter(row => call.filters.every(([key, value]) => Array.isArray(value) ? value.includes(row[key]) : row[key] === value));
-          return Promise.resolve(waitForRead(table)).then(() => ({ data, error: null })).then(resolve);
+          return Promise.resolve(waitForRead(table)).then(() => ({ data: call.range ? data.slice(call.range[0], call.range[1]+1) : data, error: null })).then(resolve);
         },
       };
       return query;
@@ -46,6 +48,7 @@ function harness(fixtures = {}, waitForRead = () => {}, rpcRead = async () => ({
     if (name === '@/lib/supabase/admin') return { createAdminClient: () => db };
     if (name === '@/lib/platform-rules') return ruleExports;
     if (name === '@/lib/alumni-access') return { isGraduate: () => false };
+    if (name === '@/lib/curriculum-days') return days;
     if (name === '@/lib/learning-overview') return overviewExports;
     if (name === '@/lib/cohort-curriculum-visibility') return cohortExports;
     throw Error(name);
@@ -201,4 +204,23 @@ test('dashboard and classes expose only availability of owned purchase files, ne
     assert.doesNotMatch(JSON.stringify(data.courses),/private\.example|videoUrl|digital_sections|"resources"/);
     assert.match(h.calls.find(c=>c.table==='courses').columns,/resources:metadata->product_resources/);
   }
+});
+
+test('cumulative days count hidden positions without exposing hidden curriculum or visibility identifiers', async () => {
+ const enrollment = { id:'owned',user_id:'owner',course_id:'course',cohort_id:'cohort',status:'active' };
+ const weeks = [{id:'intro',course_id:'course',week_number:0,is_published:true},{id:'w1',course_id:'course',week_number:1,is_published:false},{id:'w2',course_id:'course',week_number:2,is_published:true},{id:'gone',course_id:'course',week_number:1,is_published:true,archived_at:'2026-01-01'}];
+ const lessons = [{id:'preparation',week_id:'intro',day_number:1,is_published:true},...Array.from({length:5},(_,i)=>({id:'private-'+i,week_id:'w1',day_number:i+1,is_published:true,title:'hidden-'+i})),{id:'six',week_id:'w2',day_number:1,is_published:true},{id:'hidden-seven',week_id:'w2',day_number:2,is_published:false},{id:'eight',week_id:'w2',day_number:3,is_published:true},{id:'removed',week_id:'gone',day_number:1,is_published:true}];
+ const member=harness({enrollments:[enrollment],curriculum_weeks:weeks,curriculum_lessons:lessons,edu_cohort_week_visibility:weeks.map(w=>({cohort_id:'cohort',week_id:w.id,is_published:true})),edu_cohort_lesson_visibility:lessons.map(l=>({cohort_id:'cohort',lesson_id:l.id,is_published:true}))});
+ const result=await member.read('owner','learn','owned','six');
+ assert.deepEqual(result.curriculum_lessons.map(l=>[l.id,l.curriculum_day_number]),[['preparation',1],['six',6],['eight',8]]);
+ for(const text of ['private-','hidden-','removed','gone','w1']) assert.equal(JSON.stringify(result).includes(text),false,text);
+ assert.equal(result.curriculum_lessons.find(l=>l.id==='six').day_number,1);
+});
+
+test('a large hidden curriculum is paginated without blocking a small visible lesson list', async () => {
+ const weeks=[{id:'private-week',course_id:'course',week_number:1,is_published:false},{id:'public-week',course_id:'course',week_number:2,is_published:true}];
+ const lessons=[...Array.from({length:205},(_,i)=>({id:'private-'+i,week_id:'private-week',day_number:i+1,is_published:false})),{id:'visible',week_id:'public-week',day_number:1,is_published:true}];
+ const member=harness({enrollments:[{id:'owned',user_id:'owner',course_id:'course',cohort_id:'cohort',status:'active'}],curriculum_weeks:weeks,curriculum_lessons:lessons,edu_cohort_week_visibility:[{cohort_id:'cohort',week_id:'public-week',is_published:true}],edu_cohort_lesson_visibility:[{cohort_id:'cohort',lesson_id:'visible',is_published:true}]});
+ const result=await member.read('owner','learn','owned');assert.equal(result.curriculum_lessons.length,1);assert.equal(result.curriculum_lessons[0].curriculum_day_number,206);
+ assert.deepEqual(member.calls.filter(c=>c.table==='curriculum_lessons').map(c=>c.range),[[0,199],[200,399]]);
 });

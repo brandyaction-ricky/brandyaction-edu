@@ -25,7 +25,7 @@ async function open(page:Page) {
   const dialog=page.getByRole('dialog',{name:'수업 순서 바꾸기',exact:true});
   await expect(dialog.getByRole('listitem')).toHaveCount(3);return dialog;
 }
-test('reorder previews existing day slots, supports touch-sized controls, and cancel writes nothing',async({page})=>{
+test('reorder previews cumulative days, supports touch-sized controls, and cancel writes nothing',async({page})=>{
   const h=await setup(page), dialog=await open(page);
   await expect(dialog.getByRole('button',{name:'우리 회사 소개하기 위로',exact:true})).toBeDisabled();
   await expect(dialog.getByRole('button',{name:'실행 결과 정리하기 아래로',exact:true})).toBeDisabled();
@@ -33,7 +33,7 @@ test('reorder previews existing day slots, supports touch-sized controls, and ca
   const down=dialog.getByRole('button',{name:'우리 회사 소개하기 아래로',exact:true});
   const box=await down.boundingBox();expect(box!.height).toBeGreaterThanOrEqual(44);expect(box!.width).toBeGreaterThanOrEqual(44);
   await down.click();await expect(dialog.getByRole('listitem').first()).toContainText('나만의 프롬프트 만들기');
-  await expect(dialog.getByRole('listitem').first()).toContainText('현재 8일차 → 6일차');
+  await expect(dialog.getByRole('listitem').first()).toContainText('현재 2일차 → 1일차');
   await expect(dialog).not.toContainText('삭제된 이전 수업');expect(h.writes).toHaveLength(0);
   await dialog.screenshot({path:test.info().outputPath('lesson-order.png')});
   expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
@@ -48,7 +48,7 @@ test('save sends the complete expected snapshot once and refreshes outline witho
   expect(h.lessons[0].is_published).toBe(true);expect(h.lessons[1].is_published).toBe(false);expect(h.lessons[3].day_number).toBe(7);
   await expect(dialog.getByRole('button',{name:'이 순서로 저장'})).toBeDisabled();
   await dialog.getByRole('button',{name:'닫기',exact:true}).click();
-  await expect(page.getByRole('button',{name:'6일차 나만의 프롬프트 만들기',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'1일차 나만의 프롬프트 만들기',exact:true})).toBeVisible();
 });
 test('stale data reloads latest titles instead of replaying the old order',async({page})=>{
   const h=await setup(page,{conflict:true}),dialog=await open(page);
@@ -69,7 +69,7 @@ test('uncertain save disables further changes until current state has been fetch
 });
 test('opening order controls cannot discard the current lesson draft',async({page})=>{
   const h=await setup(page);
-  await page.getByRole('button',{name:'6일차 우리 회사 소개하기',exact:true}).click();
+  await page.getByRole('button',{name:'1일차 우리 회사 소개하기',exact:true}).click();
   await page.getByRole('textbox',{name:'수업 제목',exact:true}).fill('작성 중인 수업 제목');
   await page.getByRole('button',{name:'회사의 두뇌 만들기 수업 순서 바꾸기',exact:true}).click();
   await expect(page.getByRole('dialog',{name:'수업 순서 바꾸기',exact:true})).toHaveCount(0);
