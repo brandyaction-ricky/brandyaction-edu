@@ -75,6 +75,9 @@ const LessonInputUndo = Extension.create({
   addKeyboardShortcuts() {
     return {
       "Mod-z": () => this.editor.commands.undoInputRule() || this.editor.commands.undo(),
+      // Keep redo in this higher-priority keymap: on Ctrl-based platforms,
+      // ProseMirror can otherwise fall back from Shift+z to our undo binding.
+      "Shift-Mod-z": () => { this.editor.commands.redo(); return true; },
       Backspace: () => this.editor.commands.undoInputRule(),
     };
   },

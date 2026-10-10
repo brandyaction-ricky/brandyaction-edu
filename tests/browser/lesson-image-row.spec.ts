@@ -65,8 +65,10 @@ test('moving images within a row preserves grouping and non-image content', asyn
 });
 
 
-test('native image drag groups, reorders, limits three, splits and survives save/undo', async ({ page }, testInfo) => {
+for (const platform of ['MacIntel', 'Linux x86_64', 'Win32']) test(`native image drag groups, reorders, limits three, splits and survives save/undo (${platform})`, async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'Native HTML drag uses a mouse; touch retains image settings.');
+  await page.addInitScript(value => Object.defineProperty(navigator, 'platform', { get: () => value }), platform);
+  const modifier = platform === 'MacIntel' ? 'Meta' : 'Control';
   const runtime = await page.context().newCDPSession(page);
   await runtime.send('Emulation.setCPUThrottlingRate', { rate: 4 });
   const nativeInitial = structuredClone(initial);
@@ -104,12 +106,15 @@ test('native image drag groups, reorders, limits three, splits and survives save
   await save(page); expect(saved()).toEqual(nativeInitial);
   await drag(2, 1, 'right'); await sameRow(block(1), block(2));
   await canvas.locator('[data-block-type="text"] > p').first().click();
+  // With no redo available, this shortcut must not fall back to undo.
+  await page.keyboard.press(`${modifier}+Shift+z`);
+  await expect(block(1).locator('..')).toHaveAttribute('data-image-columns', '2');
   await page.keyboard.press('End'); await page.keyboard.insertText(' 추가');
-  await page.keyboard.press('ControlOrMeta+z'); await sameRow(block(1), block(2));
+  await page.keyboard.press(`${modifier}+z`); await sameRow(block(1), block(2));
   await expect(canvas.locator('[data-block-type="text"]')).not.toContainText('추가');
-  await page.keyboard.press('ControlOrMeta+z');
+  await page.keyboard.press(`${modifier}+z`);
   await expect(block(1).locator('..')).not.toHaveAttribute('data-image-columns');
-  await page.keyboard.press('ControlOrMeta+Shift+z'); await sameRow(block(1), block(2));
+  await page.keyboard.press(`${modifier}+Shift+z`); await sameRow(block(1), block(2));
   await drag(3, 2, 'right'); await sameRow(block(1), block(3));
   await save(page);
   const triple = structuredClone(saved());
@@ -120,13 +125,13 @@ test('native image drag groups, reorders, limits three, splits and survives save
   await save(page); expect(saved().blocks.slice(1,4).map(b=>b.id)).toEqual(['image-3','image-1','image-2']);
   await drag(1, 2, 'below');
   await expect(block(1).locator('..')).not.toHaveAttribute('data-image-columns');
-  await canvas.click({ position: { x: 10, y: 10 } }); await page.keyboard.press('ControlOrMeta+z');
+  await canvas.click({ position: { x: 10, y: 10 } }); await page.keyboard.press(`${modifier}+z`);
   // Images 3 and 2 share a row both before and after undo. Check the moved
   // image itself so redo cannot race the unfinished undo render.
   await expect(block(1).locator('..')).toHaveAttribute('data-image-columns', '3');
   await sameRow(block(3), block(1));
   await expect(canvas).toBeFocused();
-  await page.keyboard.press('ControlOrMeta+Shift+z');
+  await page.keyboard.press(`${modifier}+Shift+z`);
   await expect(block(1).locator('..')).not.toHaveAttribute('data-image-columns');
   await save(page);
   expect(saved().blocks.find(b=>b.id==='image-1')?.imageGroup).toBeUndefined();
