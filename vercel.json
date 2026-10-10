@@ -75,7 +75,8 @@
       "codex/edu-personalization-consent-20261008": false,
       "codex/edu-consent-prod-20261008": false,
       "codex/edu-consent-b14-release-20261008": false,
-      "codex/edu-consent-ads-release-20261010": false
+      "codex/edu-consent-ads-release-20261010": false,
+      "codex/edu-care-channel-status-release-20261010": false
     }
   },
   "regions": [

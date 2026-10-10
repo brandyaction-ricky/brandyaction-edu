@@ -4,7 +4,7 @@ const cohort=id(1),lesson=id(2),asOf='2026-10-08T08:00:00Z';
 const rows=Array.from({length:4},(_,n)=>({memberId:id(n+10),enrollmentId:id(n+20),name:['푸시 수강생','이메일·알림톡 수강생','이메일 수강생','연락처 없는 수강생'][n],email:n===3?null:`qa${n}@example.test`,lastVisitAt:null,lastContactAt:null,openQuestions:0,cells:[{lessonId:lesson,title:'첫 학습 시작하기',week:0,day:1,track:'learning',state:'not_submitted',published:true}]}));
 const snapshot={cohorts:[{id:cohort,name:'4기',courseTitle:'검수 클래스'}],cohortId:cohort,rows,asOf};
 const reach=rows.map((r,n)=>({memberId:r.memberId,push:n===0,email:n!==3,alimtalk:n<2,sms:n<2,emailMasked:n===3?null:`q***@example.test`,phoneMasked:n<2?'010****5678':null}));
-async function backend(page:Page,{alimtalk=true,fail=false,uncertain=false,changed=false}={}){
+async function backend(page:Page,{enabled=true,alimtalk=true,fail=false,uncertain=false,changed=false}={}){
  const sent:Record<string,unknown>[]=[],reads:string[]=[];let receipt:unknown=null;let reachReads=0;
  await page.route('**/api/admin/learning-care**',async route=>{
   const url=new URL(route.request().url());
@@ -13,10 +13,11 @@ async function backend(page:Page,{alimtalk=true,fail=false,uncertain=false,chang
    if(url.searchParams.has('request'))return route.fulfill(receipt?{json:receipt}:{status:404,json:{error:'없음'}});
    reachReads++;
    if(changed&&reachReads>1)await new Promise(resolve=>setTimeout(resolve,250));
-   return route.fulfill(fail?{status:503,json:{error:'연락 수단을 확인하지 못했습니다.'}}:{json:{config:{enabled:true,push:true,email:true,alimtalk,sms:true},reach:changed&&reachReads>1?reach.map(r=>({...r,push:false})):reach}});
+   return route.fulfill(fail?{status:503,json:{error:'연락 수단을 확인하지 못했습니다.'}}:{json:{config:{enabled,push:enabled,email:enabled,alimtalk:enabled&&alimtalk,sms:enabled},reach:!enabled?[]:changed&&reachReads>1?reach.map(r=>({...r,push:false})):reach}});
   }
   if(route.request().method()==='POST'){
    const body=route.request().postDataJSON();sent.push(body);
+   if(!body.delivery)return route.fulfill({json:{count:4}});
    if(changed&&sent.length===1)return route.fulfill({status:409,json:{error:'알림 수신 설정이 바뀌어 발송하지 않았습니다. 채널을 새로 확인해 주세요.'}});
    receipt={requestId:body.requestId,count:4,deliveries:body.delivery.routes.flatMap((r:{memberId:string;channels:string[]})=>r.channels.map(channel=>({memberId:r.memberId,channel,status:'pending'})))};
    return route.fulfill(uncertain?{status:503,json:{error:'발송 결과를 확인하지 못했습니다.'}}:{json:receipt});
@@ -26,6 +27,21 @@ async function backend(page:Page,{alimtalk=true,fail=false,uncertain=false,chang
  return {sent,reads};
 }
 async function compose(page:Page){await page.goto('/learning-care-test');await page.getByRole('tab',{name:'일차별',exact:true}).click();await page.getByRole('button',{name:'안내할 수강생 선택 · 최대 100명'}).click();await page.getByRole('button',{name:'선택한 4명 안내 내용 작성'}).click();}
+test('disabled external delivery shows all four channels and explicitly saves only to inbox',async({page},testInfo)=>{
+ const api=await backend(page,{enabled:false});await compose(page);
+ const status=page.getByRole('region',{name:'학습 안내 발송 상태'});
+ await expect(status).toContainText('지금은 사이트 메시지함에만 저장돼요');
+ for(const label of ['앱 푸시','이메일','알림톡','문자'])await expect(status.getByText(label,{exact:true})).toBeVisible();
+ await expect(status.getByText('발송 꺼짐',{exact:true})).toHaveCount(4);
+ await expect(page.getByRole('combobox',{name:'발송 방식'})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'확인한 대상에게 보내기'})).toHaveCount(0);
+ const save=page.getByRole('button',{name:'메시지함에만 저장',exact:true});await expect(save).toBeEnabled();
+ await save.scrollIntoViewIfNeeded();await page.screenshot({path:testInfo.outputPath('care-inbox-only.png'),fullPage:true});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+ expect(api.sent).toHaveLength(0);await save.click();
+ await expect(page.getByRole('status',{name:'안내 발송 결과'})).toContainText('4명의 사이트 메시지함');
+ expect(api.sent).toHaveLength(1);expect(api.sent[0]).not.toHaveProperty('delivery');
+});
 test('push-first previews disjoint recipients and a visible inbox-only warning before any send',async({page},testInfo)=>{
  const api=await backend(page);await compose(page);
  await expect(page.getByRole('combobox',{name:'발송 방식'})).toHaveValue('push_first');

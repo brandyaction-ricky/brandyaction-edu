@@ -23,7 +23,7 @@ test('student and DAY views show actual statuses, safe recipient selection and r
  await page.getByRole('checkbox',{name:'가상 지민 안내 선택'}).check();await page.getByRole('button',{name:'선택한 1명 안내 내용 작성'}).click();
  await expect(page.getByRole('region',{name:'학습 안내 확인'})).toContainText('가상 지민');expect(sent).toHaveLength(0);
  await expect(page.getByRole('tab',{name:'수강생별'})).toBeDisabled();
- await page.getByRole('button',{name:'확인한 대상에게 보내기'}).click();await expect(page.getByRole('status',{name:'안내 발송 결과'})).toContainText('1명의 사이트 메시지함에 학습 안내를 저장했습니다');expect(sent).toHaveLength(1);expect(sent[0].recipients).toEqual([rows[0].memberId]);expect(sent[0].lessonId).toBe(lesson);
+ await page.getByRole('button',{name:'메시지함에만 저장'}).click();await expect(page.getByRole('status',{name:'안내 발송 결과'})).toContainText('1명의 사이트 메시지함에 학습 안내를 저장했습니다');expect(sent).toHaveLength(1);expect(sent[0].recipients).toEqual([rows[0].memberId]);expect(sent[0].lessonId).toBe(lesson);
 });
 test('search and filters cover full cohort, share view and saved PNG omit private data',async({page})=>{
  await backend(page);await page.goto('/learning-care-test');await page.getByRole('tab',{name:'수강생별',exact:true}).click();await page.getByPlaceholder('이름 또는 이메일').fill('수빈');await expect(page.getByText('1개 수강 기록')).toBeVisible();
@@ -42,7 +42,7 @@ test('uncertain send retains its exact request and disables edits until the rece
   if(route.request().method()==='GET'){await route.fulfill({json:snapshot});return;}
   attempts.push(route.request().postDataJSON());await route.fulfill(attempts.length===1?{status:503,json:{error:'발송 결과를 확인하지 못했습니다.'}}:{json:{count:1}});
  });
- await page.goto('/learning-care-test');await page.getByRole('tab',{name:'일차별'}).click();await page.getByRole('button',{name:'안내할 수강생 선택 · 최대 100명'}).click();await page.getByRole('button',{name:'선택한 1명 안내 내용 작성'}).click();await page.getByRole('button',{name:'확인한 대상에게 보내기'}).click();
+ await page.goto('/learning-care-test');await page.getByRole('tab',{name:'일차별'}).click();await page.getByRole('button',{name:'안내할 수강생 선택 · 최대 100명'}).click();await page.getByRole('button',{name:'선택한 1명 안내 내용 작성'}).click();await page.getByRole('button',{name:'메시지함에만 저장'}).click();
  await expect(page.getByRole('alert')).toContainText('발송 결과를 확인하지 못했습니다');await expect(page.getByRole('textbox',{name:'안내 내용',exact:true})).toBeDisabled();await page.getByRole('button',{name:'발송 결과 다시 확인'}).click();await expect(page.getByRole('status',{name:'안내 발송 결과'})).toContainText('1명의');expect(attempts).toHaveLength(2);expect(attempts[0]).toEqual(attempts[1]);
 });
 test('learning tiles distinguish completion from support needs and DAY cards open the exact filtered roster',async({page})=>{
@@ -87,7 +87,7 @@ test('learning completions remain visible before mission release; detail actions
  await dialog.getByRole('button',{name:'학습 독려하기',exact:true}).click();
  const compose=page.getByRole('region',{name:'학습 안내 확인'});
  await expect(compose).toContainText('가상 지민');await expect(page.getByLabel('안내 내용',{exact:true})).toContainText('학습 2');expect(sent).toHaveLength(0);
- await page.getByRole('button',{name:'확인한 대상에게 보내기'}).click();
+ await page.getByRole('button',{name:'메시지함에만 저장'}).click();
  await expect.poll(()=>sent.length).toBe(1);expect(sent[0].lessonId).toBe('learning-2');expect(sent[0].recipients).toEqual([activeRow.memberId]);
 });
 test('cohort switching distinguishes completed members and an empty new cohort without carrying filters across cohorts',async({page})=>{
