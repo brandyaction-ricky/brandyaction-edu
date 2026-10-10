@@ -3,60 +3,60 @@ import { expect, test } from '@playwright/test';
 const order = '11111111-1111-4111-8111-111111111111';
 const cohort = '22222222-2222-4222-8222-222222222222';
 
-test('Moonshot fourth buyer sees install and room guidance without a web survey', async ({ page }) => {
+const initialProgress = () => ({ telegram: false, app: false, orientation: false, learning: false,
+  orientationAt: '2026-11-06T20:00:00+09:00', lesson: { id: 'guide', title: '운영 가이드와 규정', url: '/learn/enrollment/guide', completed: false }, comment: '' });
+test('four steps persist across reload and require schedule, real learning and comment', async ({ page }, testInfo) => {
+  const progress = initialProgress();
+  let fail = false;
   const actions: string[] = [];
   await page.route('https://t.me/+ExampleCode123', route => route.fulfill({ body: 'Synthetic Telegram destination' }));
   await page.route('**/api/purchase-onboarding*', route => {
-    if (route.request().method() === 'GET') return route.fulfill({ json: { available: true, telegramOnly: true, orderId: order,
-      orderNumber: 'QA-4', itemName: '문샷 챌린지 4기', roomName: '4기 교육생 공지방', supportUrl: 'http://pf.kakao.com/_ydxjhxj/chat' } });
-    actions.push(route.request().postDataJSON().action);
-    return route.fulfill({ json: { ok: true, url: 'https://t.me/+ExampleCode123' } });
+    if (route.request().method() === 'GET') return route.fulfill({ json: { available: true, telegramOnly: true, orderId: order, itemName: '문샷 챌린지 4기', roomName: '4기 교육생 공지방', supportUrl: '', progress } });
+    const body = route.request().postDataJSON(); actions.push(body.action);
+    if (body.action === 'link') return route.fulfill({ json: { ok: true, url: 'https://t.me/+ExampleCode123' } });
+    if (fail) return route.fulfill({ status: 503, json: { error: '저장하지 못했습니다.' } });
+    if (body.step === 'learning') { progress.learning = true; progress.comment = body.comment; }
+    else if (body.step === 'orientation') { expect(body.orientationAt).toBe(progress.orientationAt); progress.orientation = true; }
+    else if (body.step === 'telegram') progress.telegram = true;
+    else if (body.step === 'app') progress.app = true;
+    return route.fulfill({ json: { ok: true } });
   });
   await page.goto(`/purchase-onboarding?order=${order}`);
-  await expect(page.getByRole('heading', { name: '4기 교육생 공지방에 입장해 주세요' })).toBeVisible();
-  await expect(page.getByRole('button', { name: '캘린더에 추가' })).toHaveCount(0);
-  await expect(page.getByRole('heading', { name: '어떤 경로로 참여하셨나요?' })).toHaveCount(0);
   await page.getByRole('button', { name: '텔레그램이 처음이에요' }).click();
   await expect(page.getByRole('link', { name: 'iPhone 앱 설치' })).toHaveAttribute('href', 'https://telegram.org/dl/ios');
-  await expect(page.getByRole('link', { name: 'Android 앱 설치' })).toHaveAttribute('href', 'https://telegram.org/dl/android');
-  await expect(page.getByText('앱이 없다면 먼저 설치해 주세요.')).toBeVisible();
-  await expect(page.getByText('설치와 가입을 마친 뒤 아래 버튼으로 입장하세요.')).toBeVisible();
-  await expect(page.getByText(/닉네임\/4기|고정 게시물|휴대폰 번호로 가입/)).toHaveCount(0);
-  await expect(page.getByRole('link', { name: '고객센터 문의' })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: '내 클래스 보기' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '초대 링크 복사' })).toHaveCount(0);
   const [room] = await Promise.all([page.waitForEvent('popup'), page.getByRole('button', { name: '텔레그램 공지방 입장' }).click()]);
-  await expect(room).toHaveURL('https://t.me/+ExampleCode123');
-  await expect(page).toHaveURL(`/purchase-onboarding?order=${order}`);
-  await expect(page.getByRole('heading', { name: 'OT 일정과 참여 방법을 확인하세요' })).toBeVisible();
-  await expect(page.getByRole('link', { name: '내 클래스 확인하기' })).toHaveAttribute('href', '/my/classes');
-  expect(actions).toEqual(['link']);
+  await expect(room).toHaveURL('https://t.me/+ExampleCode123'); await room.close();
+  await expect(page.getByRole('checkbox', { name: /공지방에 입장했어요/ })).not.toBeChecked();
+  fail = true; await page.getByRole('checkbox', { name: /공지방에 입장했어요/ }).click();
+  await expect(page.getByRole('alert')).toContainText('저장하지 못했습니다');
+  fail = false; await page.getByRole('checkbox', { name: /공지방에 입장했어요/ }).click();
+  await expect(page.getByRole('heading', { name: '브랜디에듀 앱을 설치해 주세요' })).toBeVisible();
+  await page.reload(); await expect(page.getByRole('heading', { name: '브랜디에듀 앱을 설치해 주세요' })).toBeVisible();
+  await page.getByRole('button', { name: '그림 보며 따라 하기' }).click();
+  await page.getByRole('checkbox', { name: /브랜디에듀 아이콘을 추가하고 열어 봤어요/ }).click();
+  await expect(page.getByText(/2026년 11월 6일/)).toBeVisible();
+  await expect(page.getByText(/OT 시청은 필요하지 않아요/)).toBeVisible();
+  await page.screenshot({path: `/tmp/edu-onboarding-${testInfo.project.name}.png`, fullPage: true});
+  await page.getByRole('checkbox', { name: 'OT 일정을 확인했어요' }).click();
+  const save = page.getByRole('button', { name: '댓글 저장하고 시작 준비 완료' });
+  await page.getByRole('textbox', { name: '확인 댓글' }).fill('운영 가이드와 규정을 읽고 확인했습니다.');
+  await expect(save).toBeDisabled();
+  await expect(page.getByRole('link', { name: '운영 가이드 학습 열기' })).toHaveAttribute('href', '/learn/enrollment/guide');
+  progress.lesson.completed = true; await page.getByRole('button', { name: '학습 완료 다시 확인' }).click();
+  await expect(save).toBeEnabled(); await save.click();
+  await expect(page.getByRole('heading', { name: '시작 준비를 모두 마쳤어요!' })).toBeVisible();
+  await page.reload(); await expect(page.getByText('저장한 댓글: 운영 가이드와 규정을 읽고 확인했습니다.')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(actions).toContain('confirm');
 });
 
-test('existing Telegram users keep only room entry and can retry a failed link request', async ({ page }) => {
-  let fail = true;
-  await page.route('https://t.me/+ExampleCode123', route => route.fulfill({ body: 'Synthetic Telegram destination' }));
-  await page.route('**/api/purchase-onboarding*', route => {
-    if (route.request().method() === 'GET') return route.fulfill({ json: { available: true, telegramOnly: true, orderId: order, itemName: '문샷 챌린지 4기', orderNumber: 'QA-4', supportUrl: 'https://example.com/help' } });
-    expect(route.request().postDataJSON()).toEqual({ action: 'link', order });
-    return route.fulfill({ status: fail ? 503 : 200, json: fail ? { error: '잠시 후 다시 시도해 주세요.' } : { ok: true, url: 'https://t.me/+ExampleCode123' } });
-  });
-  await page.goto(`/purchase-onboarding?order=${order}`);
-  await expect(page.getByRole('button', { name: '텔레그램 공지방 입장' })).toHaveCount(0);
-  await page.getByRole('button', { name: '이미 텔레그램을 사용해요' }).click();
-  await expect(page.getByText('아래 버튼으로 공지방을 열어 주세요.')).toBeVisible();
-  await expect(page.getByText('여기에서 공지방 열기')).toHaveCount(0);
-  await expect(page.getByText(/닉네임\/4기|고정 게시물/)).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '초대 링크 복사' })).toHaveCount(0);
-  const enter = page.getByRole('button', { name: '텔레그램 공지방 입장' });
-  const [failedRoom] = await Promise.all([page.waitForEvent('popup'), enter.click()]);
-  await expect(page.getByRole('alert')).toHaveText('잠시 후 다시 시도해 주세요.');
-  await expect.poll(() => failedRoom.isClosed()).toBe(true);
-  await expect(enter).toBeEnabled();
-  fail = false;
-  const [room] = await Promise.all([page.waitForEvent('popup'), enter.click()]);
-  await expect(room).toHaveURL('https://t.me/+ExampleCode123');
-  await expect(page.getByRole('link', { name: '내 클래스 확인하기' })).toBeVisible();
+test('missing OT date stays pending instead of pretending onboarding is complete', async ({ page }) => {
+ const progress = {...initialProgress(), telegram: true, app: true, orientationAt: ''};
+ await page.route('**/api/purchase-onboarding*', route => route.fulfill({json:{available:true,telegramOnly:true,orderId:order,itemName:'합성 기수',roomName:'공지방',supportUrl:'',progress}}));
+ await page.goto(`/purchase-onboarding?order=${order}`);
+ await expect(page.getByText(/운영자가 OT 일정을 준비 중/)).toBeVisible();
+ await expect(page.getByRole('checkbox')).toHaveCount(0);
+ await expect(page.getByRole('button', {name:/4단계/})).toBeDisabled();
 });
 
 test('customer answers once, then sees the Telegram guide without exposing the invite URL early', async ({ page }) => {

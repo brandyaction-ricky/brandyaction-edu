@@ -7,6 +7,9 @@ export type PurchaseOnboardingSettings = {
   paidImage: string;
   organicImage: string;
   enabled: boolean;
+  orientationAt?: string;
+  firstLessonId?: string;
+  checklistEnabled?: boolean;
 };
 
 export const DEFAULT_ONBOARDING_ROOM_NAME = 'AI Moonshot project #4기';
@@ -39,7 +42,13 @@ export function purchaseOnboardingSettings(value: unknown): PurchaseOnboardingSe
   }
   const enabled = item.enabled === true;
   if (enabled && !inviteUrl) throw new Error('안내를 켜려면 텔레그램 초대 링크를 입력해 주세요.');
-  return { roomName, inviteUrl, paidImage, organicImage, enabled };
+  const orientationAt = typeof item.orientationAt === 'string' ? item.orientationAt.trim() : '';
+  if (orientationAt && (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00\+09:00$/.test(orientationAt) || !Number.isFinite(Date.parse(orientationAt)) || new Date(Date.parse(orientationAt) + 9 * 3600000).toISOString().slice(0, 16) !== orientationAt.slice(0, 16))) throw new Error('OT 일정을 올바르게 입력해 주세요.');
+  const firstLessonId = typeof item.firstLessonId === 'string' ? item.firstLessonId : '';
+  if (firstLessonId && !uuid(firstLessonId)) throw new Error('첫 학습을 선택해 주세요.');
+  const checklistEnabled = item.checklistEnabled === true;
+  if (enabled && checklistEnabled && (!orientationAt || !firstLessonId)) throw new Error('4단계 안내를 켜려면 OT 일정과 첫 학습을 설정해 주세요.');
+  return { roomName, inviteUrl, paidImage, organicImage, enabled, orientationAt, firstLessonId, checklistEnabled };
 }
 
 export function surveyRoom(value: unknown): SurveyRoom | null {
