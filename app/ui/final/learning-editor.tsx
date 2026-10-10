@@ -1,4 +1,5 @@
 "use client";
+import { curriculumDay } from '@/lib/curriculum-days';
 
 import { LessonAuthorHistory } from './lesson-author-history';
 import { useEffect, useId, useImperativeHandle, useRef, useState, type FormEvent, type ReactNode, type Ref } from "react";
@@ -171,12 +172,14 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
     setDirty(true); setPreviewOnly(false); setMessage('임시저장본을 불러왔습니다. 내용을 확인한 뒤 학습 저장을 눌러 주세요.');
   }
   const week = (data.curriculum_weeks || []).find(item => item.id === basic.week_id);
+  const displayData = { ...data, curriculum_lessons: [...(data.curriculum_lessons || []).filter(item => item.id !== lessonId), { ...row, id: lessonId || '__new_lesson__', week_id: basic.week_id, day_number: Number(basic.day_number) }] };
+  const displayDay = curriculumDay(displayData, displayData.curriculum_lessons.at(-1));
   const course = (data.courses || []).find(item => item.id === week?.course_id);
   const cardSources = course ? (data.curriculum_weeks || []).filter(item => item.course_id === course.id)
     .sort((a, b) => num(a, 'week_number') - num(b, 'week_number'))
     .flatMap(w => (data.curriculum_lessons || []).filter(item => item.week_id === w.id)
       .sort((a, b) => num(a, 'day_number') - num(b, 'day_number'))
-      .map(item => ({ id: item.id, label: `${num(w, 'week_number')}주차 · ${num(item, 'day_number')}일차 · ${t(item, 'title')}` }))) : [];
+      .map(item => ({ id: item.id, label: `${num(w, 'week_number')}주차 · ${curriculumDay(data, item)}일차 · ${t(item, 'title')}` }))) : [];
   const missions = (data.curriculum_missions || []).filter(item => item.lesson_id === lessonId);
   const mission = missions.find(item => item.id === selectedMissionId) || missions[0];
   const quiz = (data.mission_quizzes || []).find(item => item.mission_id === mission?.id);
@@ -390,7 +393,7 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
     requestAnimationFrame(() => previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
   return <div className={"learning-editor" + (embedded ? " learning-editor--embedded" : "")}>
-    {embedded ? <header className="studio-document-header adm-box"><div className="studio-document-heading"><p className="studio-step-label">1 · 수업 정보</p><p className="meta">{num(week, "week_number")}주차 · {basic.day_number}일차</p></div><div className="studio-document-title-row"><label>수업 제목<input form={formId} aria-label="수업 제목" required maxLength={300} value={basic.title} onChange={event => changeBasic("title", event.target.value)} disabled={busy} /></label><div className="studio-document-actions"><AdminButton variant="outline" onClick={showPreview}>{previewOnly ? "편집으로" : "학습자 미리보기"}</AdminButton><AdminButton variant="primary" type="button" onClick={() => void save()} disabled={saveBlocked} aria-describedby={saveBlocked ? saveStatusId : undefined} loading={busy}>{publication ? "지금 저장" : "학습 저장"}</AdminButton></div></div><p className="meta studio-document-note" role="status">{publication ? `${autosaving ? "서버에 저장 중…" : autoStatus} · 완성되면 ‘학생 화면에 반영’을 눌러 주세요.` : row?.is_published && week?.is_published ? "공개 수업 · 저장하면 수강생 화면에도 반영됩니다." : row?.is_published ? "상위 주차가 비공개여서 수강생에게 보이지 않습니다." : "비공개 수업 · 공개 설정을 바꾸지 않으면 계속 비공개입니다."}</p></header> : <AdminHeading title="학습 콘텐츠 편집" eyebrow="LEARNING EDITOR" description={lessonId ? `Day ${basic.day_number} · ${t(week, "week_number") || "—"}주차 / ${basic.title}` : "일차별 학습 본문과 확인 퀴즈를 등록합니다."}>
+    {embedded ? <header className="studio-document-header adm-box"><div className="studio-document-heading"><p className="studio-step-label">1 · 수업 정보</p><p className="meta">{num(week, "week_number")}주차 · {displayDay}일차</p></div><div className="studio-document-title-row"><label>수업 제목<input form={formId} aria-label="수업 제목" required maxLength={300} value={basic.title} onChange={event => changeBasic("title", event.target.value)} disabled={busy} /></label><div className="studio-document-actions"><AdminButton variant="outline" onClick={showPreview}>{previewOnly ? "편집으로" : "학습자 미리보기"}</AdminButton><AdminButton variant="primary" type="button" onClick={() => void save()} disabled={saveBlocked} aria-describedby={saveBlocked ? saveStatusId : undefined} loading={busy}>{publication ? "지금 저장" : "학습 저장"}</AdminButton></div></div><p className="meta studio-document-note" role="status">{publication ? `${autosaving ? "서버에 저장 중…" : autoStatus} · 완성되면 ‘학생 화면에 반영’을 눌러 주세요.` : row?.is_published && week?.is_published ? "공개 수업 · 저장하면 수강생 화면에도 반영됩니다." : row?.is_published ? "상위 주차가 비공개여서 수강생에게 보이지 않습니다." : "비공개 수업 · 공개 설정을 바꾸지 않으면 계속 비공개입니다."}</p></header> : <AdminHeading title="학습 콘텐츠 편집" eyebrow="LEARNING EDITOR" description={lessonId ? `Day ${displayDay} · ${t(week, "week_number") || "—"}주차 / ${basic.title}` : "일차별 학습 본문과 확인 퀴즈를 등록합니다."}>
       <AdminButton variant="outline" type="button" onClick={showPreview}>{previewOnly ? "편집으로" : "학습자 미리보기"}</AdminButton><AdminStatusBadge status={basic.is_published ? "published" : "hidden"} label={basic.is_published ? "공개" : "비공개"} />
     </AdminHeading>}
     {backupError && <p className="notice" role="alert">{backupError}</p>}
@@ -410,7 +413,7 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
       <section className="panel" hidden={previewOnly}>
         <div className="panel-head"><h2>기본 정보</h2><label className="review-switch"><input type="checkbox" checked={basic.is_published} onChange={event => changeBasic("is_published", event.target.checked)} disabled={busy} /> 공개</label></div>
         <fieldset className="section-pad form-grid learning-editor-fields" disabled={busy}>
-          <Field label="일차 (Day) *"><input type="number" min={1} value={basic.day_number} required onChange={event => changeBasic("day_number", event.target.value)} /></Field>
+          <Field label="주차 안 수업 순서 *" hint="표시 일차는 앞 주차의 수업 수를 합산해 자동으로 계산합니다. 0주차는 제외합니다."><input type="number" min={1} value={basic.day_number} required onChange={event => changeBasic("day_number", event.target.value)} /></Field>
           <Field label="주차 (Week) *"><select value={basic.week_id} required onChange={event => changeBasic("week_id", event.target.value)}><option value="">주차 선택</option>{(data.curriculum_weeks || []).filter(item=>!publication || publication.isNew || item.course_id === course?.id).map(item => <option key={item.id} value={item.id}>{t((data.courses || []).find(entry => entry.id === item.course_id), "title")} · {num(item, "week_number")}주차 · {t(item, "title")}</option>)}</select></Field>
           <Field label="제목 *" wide><input value={basic.title} maxLength={300} required onChange={event => changeBasic("title", event.target.value)} /></Field>
           {!blockState.active && <Field label="콘텐츠 유형"><select value={format} onChange={event => changeFormat(event.target.value as ContentType)}>{formats.map(item => <option value={item.key} key={item.key}>{item.label}</option>)}</select></Field>}
@@ -439,7 +442,7 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
           </fieldset>
           <aside className="preview-window" ref={previewRef}>
             <div className="preview-window-top"><b>학습자 화면</b><span>본문 미리보기</span></div>
-            <div className="safe-html-preview"><div className="learning-preview-badges"><Badge>DAY {basic.day_number}</Badge>{basic.duration_label && <Badge>{basic.duration_label}</Badge>}</div><h2>{basic.title || "학습 제목"}</h2>{basic.description && <p className="intro-preview">{basic.description}</p>}
+            <div className="safe-html-preview"><div className="learning-preview-badges"><Badge>DAY {displayDay}</Badge>{basic.duration_label && <Badge>{basic.duration_label}</Badge>}</div><h2>{basic.title || "학습 제목"}</h2>{basic.description && <p className="intro-preview">{basic.description}</p>}
               {format === "text" && <div className="reading-copy"><LessonText text={bodyText || "학습 내용을 작성하면 이곳에 표시됩니다."} /></div>}
               {format === "vod" && (safeUrl(videoUrl) ? <Video url={videoUrl} /> : <div className="learning-content-placeholder"><VideoIcon /><p>영상 URL을 등록해 주세요.</p></div>)}
               {format === "material" && <div className="learning-resource-preview"><Download size={20} /><div><b>{resourceName || "학습 자료"}</b><p className="meta">{resourcePath ? "자료 파일 등록됨 · 수강 회원에게 제공" : "파일을 등록해 주세요."}</p></div></div>}
