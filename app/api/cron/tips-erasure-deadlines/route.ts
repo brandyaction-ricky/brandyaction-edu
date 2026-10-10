@@ -1,4 +1,4 @@
-import { monitorErasureDeadlines } from '@/lib/edu-tips-erasure-monitor';
+import { scheduledErasureMonitor } from '@/lib/edu-tips-erasure-scheduled-monitor';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export const runtime = 'nodejs';
@@ -10,7 +10,7 @@ export async function HEAD() {
 }
 
 export function GET(request: Request) {
-  return monitorErasureDeadlines(request, {
+  return scheduledErasureMonitor(request, {
     env: process.env,
     rpc: async (name, args, signal) => {
       const { data, error } = await createAdminClient().rpc(name, args).abortSignal(signal);
