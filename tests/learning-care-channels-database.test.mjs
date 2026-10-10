@@ -42,7 +42,8 @@ test('no push uses email and alimtalk; contact changes prevent external send; ac
  for(const job of jobs){const data=await f.rpc('edu_read_care_channel',[job.id,job.lease]);assert.ok(data.destination);assert.equal(data.content,'함께 이어가요');}
  await f.db.query("update profiles set phone='01099998888' where id=$1",[f.student]);
  for(const job of jobs){const data=await f.rpc('edu_read_care_channel',[job.id,job.lease]);await f.rpc('edu_finish_care_channel',[job.id,job.lease,data?'accepted':'skipped',data?'ACCEPTED':'RECIPIENT_CHANGED','provider-receipt']);}
- const receipt=await f.rpc('edu_care_delivery_receipt',[f.admin,request]);assert.deepEqual(receipt.deliveries.map(d=>d.status),['skipped','accepted']);assert.doesNotMatch(JSON.stringify(receipt),/learner@example|010|provider-receipt/);
+ // Match the actual old/new phone values, not random UUIDs that happen to contain "010".
+ const receipt=await f.rpc('edu_care_delivery_receipt',[f.admin,request]);assert.deepEqual(receipt.deliveries.map(d=>d.status),['skipped','accepted']);assert.doesNotMatch(JSON.stringify(receipt),/learner@example|010-?1234-?5678|010-?9999-?8888|provider-receipt/);
 });
 test('changed channel route rolls back inbox and all queues; no retroactive delivery for legacy sends',async t=>{
  const f=await setup(t);await assert.rejects(f.send({routes:[{memberId:f.student,channels:['push']}]}),/CARE_CHANNELS_CHANGED/);
