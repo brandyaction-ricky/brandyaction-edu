@@ -1,8 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 const no={marketingUse:false,sms:false,kakao:false,email:false};
 const at='2026-10-19T16:10:00Z';
-async function backend(page:Page,options:{failure?:boolean;lost?:boolean;existing?:boolean;conflict?:boolean}={}){
- let stored={choices:options.existing?{...no,marketingUse:true,kakao:true}:no,revision:options.existing?'11111111-1111-4111-8111-111111111111':null as string|null,dates:{marketingUse:options.existing?at:null,sms:null,kakao:options.existing?at:null,email:null},updatedAt:options.existing?at:null,legacyRetired:true};
+async function backend(page:Page,options:{failure?:boolean;lost?:boolean;existing?:boolean;conflict?:boolean;legacy?:boolean}={}){
+ let stored={choices:options.existing?{...no,marketingUse:true,kakao:true}:no,revision:options.existing?'11111111-1111-4111-8111-111111111111':null as string|null,dates:{marketingUse:options.existing?at:null,sms:null,kakao:options.existing?at:null,email:null},updatedAt:options.existing?at:null,legacyRetired:!options.legacy,legacyActive:!!options.legacy};
  let failure=options.failure,lost=options.lost;const writes:Record<string,unknown>[]=[],auth:Record<string,unknown>[]=[];
  const receipts=new Map<string,unknown>();
  await page.route('**/api/account/marketing-consent',async route=>{
@@ -12,7 +12,7 @@ async function backend(page:Page,options:{failure?:boolean;lost?:boolean;existin
   if(options.conflict){await route.fulfill({status:409,json:{error:'다른 화면에서 수신 설정을 바꿨어요. 저장된 설정을 다시 불러와 주세요.'}});return;}
   if(!receipts.has(body.requestId)){
    const changed=Object.entries(body.choices).flatMap(([kind,value])=>stored.revision&&stored.choices[kind as keyof typeof no]===value?[]:[{kind,action:value?'consent':stored.choices[kind as keyof typeof no]?'withdrawal':'refusal'}]);
-   stored={...stored,choices:body.choices,revision:body.requestId,updatedAt:at,dates:Object.fromEntries(Object.entries(body.choices).map(([k,v])=>[k,v?at:null])) as typeof stored.dates};
+   stored={...stored,legacyActive:false,choices:body.choices,revision:body.requestId,updatedAt:at,dates:Object.fromEntries(Object.entries(body.choices).map(([k,v])=>[k,v?at:null])) as typeof stored.dates};
    receipts.set(body.requestId,{...stored,changed});
   }
   if(lost){lost=false;await route.abort();return;}await route.fulfill({json:receipts.get(body.requestId)});
@@ -56,4 +56,12 @@ test('lost signup opt-in followed by deselection revokes the actual stored choic
  await page.getByRole('checkbox',{name:'[선택] 교육·할인·행사 소식 받기 (광고)',exact:true}).uncheck();await page.getByRole('button',{name:'동의하고 가입 완료'}).click();
  await expect(page.getByRole('status')).toContainText('동의 철회');expect(b.writes).toHaveLength(2);expect(b.writes[1].choices).toEqual(no);expect(b.writes[1].expectedRevision).toBe(b.writes[0].requestId);
  await page.getByRole('button',{name:'계속하기',exact:true}).click();await expect(page.getByRole('heading',{name:'가입 완료 목적지'})).toBeVisible();
+});
+
+test('legacy news remains visible and can be withdrawn before the scheduled cutoff',async({page})=>{
+ const b=await backend(page,{legacy:true});await page.goto('/optional-consent-test');
+ const cancel=page.getByRole('button',{name:'이전 혜택 소식 받기 취소'});
+ await expect(cancel).toBeVisible();await cancel.click();
+ expect(b.writes).toHaveLength(1);expect(b.writes[0].choices).toEqual(no);
+ await expect(cancel).toHaveCount(0);await expect(page.getByRole('status')).toBeVisible();
 });
