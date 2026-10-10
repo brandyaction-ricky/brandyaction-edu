@@ -58,7 +58,7 @@ test('cron authentication, disabled and incomplete configuration never claim a s
 test('HEAD cannot invoke the observing RPC, including the actual Next route export', async () => {
   assert.equal((await call({ method: 'HEAD', rpc: noRpc })).status, 405);
   const route = load('../app/api/cron/tips-erasure-deadlines/route.ts', name =>
-    name.endsWith('edu-tips-erasure-monitor') ? { monitorErasureDeadlines: noRpc } : { createAdminClient: noRpc });
+    name.endsWith('edu-tips-erasure-scheduled-monitor') ? { scheduledErasureMonitor: noRpc } : { createAdminClient: noRpc });
   const r = await route.HEAD(); assert.equal(r.status, 405); assert.equal(r.headers.get('allow'), 'GET');
 });
 
