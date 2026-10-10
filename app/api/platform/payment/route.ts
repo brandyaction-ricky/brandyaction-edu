@@ -4,10 +4,10 @@ export async function POST(request: Request) {
     const origin = request.headers.get('origin');
     if (origin && origin !== new URL(request.url).origin)
         return Response.json({ error: '허용되지 않은 요청입니다.' }, { status: 403 });
-    const user = await getAuthenticatedUser();
-    if (!user)
-        return Response.json({ error: '로그인이 필요합니다.' }, { status: 401 });
     try {
+        const user = await getAuthenticatedUser();
+        if (!user)
+            return Response.json({ error: '로그인이 필요합니다.' }, { status: 401 });
         const body = await request.json();
         if (
             typeof body.paymentKey !== 'string' ||
@@ -23,7 +23,8 @@ export async function POST(request: Request) {
         const paymentKey = body.paymentKey.trim();
         const orderId = body.orderId.trim();
         const db = createAdminClient();
-        const { data: order } = await db.from('orders').select('id,status,total_amount').eq('order_number', orderId).eq('user_id', user.id).single();
+        const { data: order, error: orderError } = await db.from('orders').select('id,status,total_amount').eq('order_number', orderId).eq('user_id', user.id).maybeSingle();
+        if (orderError) throw orderError;
         if (!order || order.total_amount !== body.amount)
             return Response.json({ error: '주문 금액이 일치하지 않습니다.' }, { status: 409 });
         if (order.status === 'paid')
