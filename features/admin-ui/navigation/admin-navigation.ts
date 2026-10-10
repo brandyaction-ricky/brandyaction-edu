@@ -85,6 +85,12 @@ export const adminNavigationTitles: Record<string, string> = {
   products: '상품·판매 설정',
   conversion: '모집·문의 검토',
   landing: '광고·웨비나 성과',
+  analytics: '전체 유입 성과',
+  campaigns: '캠페인 발송',
+  templates: '메시지 템플릿',
+  automations: '자동 메시지',
+  seo: '검색코드 설정',
+  settings: '운영·트래킹 설정',
   learning: '커리큘럼 편집',
   weeks: '주차 구성',
   contents: '영상·자료 관리',
@@ -94,6 +100,22 @@ export const adminNavigationTitles: Record<string, string> = {
   banners: '메인 배너 관리',
   articles: '아티클 관리',
   testimonials: '고객 후기 관리',
+};
+
+// Operators often remember the task rather than the name of the menu.
+export const adminNavigationSearchTerms: Record<string, string> = {
+  'learning-care': '진도 진행률 학습 독려 알림 푸시',
+  learning: '수업 편집 이미지 본문 자동저장',
+  products: '상품 가격 판매 모집',
+  cohorts: '기수 회차 일정',
+  customers: '회원 수강생 연락처 수강권',
+  questions: '문의 질문 답변 상담',
+  reviews: '제출물 검토 승인 피드백',
+  orders: '결제 주문 환불 매출',
+  campaigns: '문자 알림톡 발송 예약',
+  templates: '문자 알림톡 문구 양식 템플릿',
+  automations: '자동 안내 메시지 발송',
+  seo: '검색 공유 제목 설명 인증',
 };
 
 const adminGroupEyebrows: Record<string, string> = {

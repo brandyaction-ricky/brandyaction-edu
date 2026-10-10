@@ -83,7 +83,8 @@
       "codex/edu-session-care-production-20261010": false,
       "codex/edu-cumulative-days-20261010": false,
       "codex/edu-cumulative-days-production-20261010": false,
-      "codex/edu-callout-drag-20261010": false
+      "codex/edu-callout-drag-20261010": false,
+      "codex/edu-admin-ux-audit-20261010": false
     }
   },
   "regions": [
