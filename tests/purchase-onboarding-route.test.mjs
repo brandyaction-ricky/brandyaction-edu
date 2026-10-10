@@ -12,6 +12,7 @@ function handler({ user = { id: 'buyer' }, purchase = { telegramOnly: true, orde
   const calls = [];
   const dependencies = {
     '@/lib/supabase/admin': { createAdminClient: () => { throw Error('direct guidance must not read or write survey data'); } },
+    '@/lib/purchase-onboarding-progress-server': { readOnboardingProgress: async () => ({ telegram: false }), confirmOnboardingStep: async () => ({ ok: true }) },
     '@/lib/server-auth': { getAuthenticatedUser: async () => user },
     '@/lib/qa-rules': { imagePreviewUrl: () => '' },
     '@/lib/purchase-onboarding-server': { eligiblePurchase: async (userId, requested) => { calls.push([userId, requested]); return purchase; } },
