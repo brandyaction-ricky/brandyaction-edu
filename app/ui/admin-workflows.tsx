@@ -1,5 +1,6 @@
 "use client";
 import dynamic from "next/dynamic";
+import { CareTemplateContext, type CareTemplateChannel } from "./care-template-navigation";
 import { emptyOrderListScope, type OrderListScope } from "@/lib/admin-order-list";
 import { FollowupTemplateSource } from "./followup-template-source";
 const LandingAdmin = dynamic(() => import("./landing/admin").then(m => m.LandingAdmin));
@@ -18,7 +19,7 @@ import { localDateTime } from "@/lib/platform-rules";
 import { CalendarDays, Copy, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { SubmissionReviewWorkspace } from "./final/lesson-block-reviews";
 import { LessonProgressionSettings } from './final/lesson-progression-settings';
 import { AdminLearningProgress } from './final/admin-learning-progress';
@@ -89,11 +90,11 @@ function Field({
 }) {
   return <AdminFormField className="field" label={label}>{children}</AdminFormField>;
 }
-function CrmTemplateFields({ editing }: { editing: Row | null }) {
-  const [channel, setChannel] = useState(String(editing?.channel || "sms"));
-  const [purpose, setPurpose] = useState(String(editing?.purpose || "marketing"));
+function CrmTemplateFields({ editing, careChannel }: { editing: Row | null; careChannel?: CareTemplateChannel }) {
+  const [channel, setChannel] = useState(String(editing?.channel || careChannel || "sms"));
+  const [purpose, setPurpose] = useState(String(editing?.purpose || (careChannel ? "transactional" : "marketing")));
   const [templateId, setTemplateId] = useState(String(editing?.alimtalk_template_id || ""));
-  const [isActive, setIsActive] = useState(Boolean(editing ? editing.is_active : true));
+  const [isActive, setIsActive] = useState(Boolean(editing ? editing.is_active : !careChannel));
   const hasApprovedTemplate = channel !== "alimtalk" || Boolean(templateId.trim());
   return <>
     <div className="grid2 mt24">
@@ -333,6 +334,12 @@ function StaffPermissions({ data, send, pending }: Props) {
   );
 }
 function CrmManager({ section, data, send, pending }: Props) {
+  const searchParams = useSearchParams();
+  const requestedChannel = searchParams.get("channel");
+  const careChannel: CareTemplateChannel | undefined = section === "templates" && searchParams.get("from") === "learning-care" && (requestedChannel === "sms" || requestedChannel === "alimtalk") ? requestedChannel : undefined;
+  const [channelFilter, setChannelFilter] = useState<string>(careChannel || "all");
+  const templateEditor = useRef<HTMLFormElement>(null);
+  const [settingsDirty, setSettingsDirty] = useState(false);
   const [defaultSchedule] = useState(() =>
     new Date(Date.now() + 15 * 60000).toISOString(),
   );
@@ -344,7 +351,7 @@ function CrmManager({ section, data, send, pending }: Props) {
         : "crm_automations";
   const delivery = rows(data, "crm_delivery_state")[0];
   const smsSettings = rows(data, "crm_sms_settings")[0];
-  const items = rows(data, table);
+  const items = rows(data, table).filter(item => section !== "templates" || channelFilter === "all" || (channelFilter === "sms" ? ["sms", "lms"].includes(String(item.channel)) : item.channel === channelFilter));
   const templates = rows(data, "crm_templates").filter(
     (item) => item.is_active,
   );
@@ -428,10 +435,29 @@ function CrmManager({ section, data, send, pending }: Props) {
   const selectedTemplate = templates.find(
     (item) => item.id === editing?.template_id,
   );
-  const formKey = `${section}-${editing?.id || editing?._followupKey || "new"}-${formVersion}`;
+  const formKey = `${section}-${careChannel || "default"}-${editing?.id || editing?._followupKey || "new"}-${formVersion}`;
+  const templateList = <>
+      {section === "templates" && <label className="care-template-filter">템플릿 목록 채널<select value={channelFilter} onChange={event=>setChannelFilter(event.target.value)}><option value="all">전체 채널</option><option value="sms">문자 (SMS·LMS)</option><option value="alimtalk">알림톡</option></select><span>{items.length}개</span></label>}
+      <AdminDataTable
+        label={`${title} 목록`}
+        rows={items}
+        getRowId={item => item.id}
+        columns={[
+          { id: "name", header: "이름·내용", render: item => <div className="admin-crm-primary"><strong>{named(item)}</strong>{section === "templates" && <small title={t(item, "content")}>{t(item, "content")}</small>}{section === "campaigns" && <small>{item.recruitment_id ? "모집 연결 안내" : "일반 캠페인"}</small>}</div> },
+          { id: "scope", header: section === "templates" ? "채널·목적" : section === "campaigns" ? "예약 시각" : "실행 조건", render: item => section === "templates" ? `${String(item.channel).toUpperCase()} · ${item.purpose === "marketing" ? "마케팅" : "정보성"}` : section === "campaigns" ? item.scheduled_at ? timeLabel(item.scheduled_at) : "예약 미정" : `${t(item, "trigger_type")} · ${Number(item.delay_minutes || 0)}분 후` },
+          ...(section === "campaigns" ? [{ id: "delivery", header: "발송", render: (item: Row) => `대상 ${Number(item.recipient_count || 0)} · 성공 ${Number(item.success_count || 0)} · 실패 ${Number(item.failure_count || 0)}` }] : []),
+          { id: "status", header: "상태", render: item => <AdminStatusBadge status={section === "campaigns" ? t(item, "status") : item.is_active ? "active" : "inactive"} label={section === "templates" && item.channel === "alimtalk" && (!item.is_active || !item.alimtalk_template_id) ? "준비 중 · 미발송" : section === "automations" ? item.is_active ? "자동 실행 중" : "중지" : undefined} /> },
+          { id: "action", header: "관리", align: "action" as const, render: item => <AdminButton size="sm" variant="outline" disabled={section === "campaigns" && (!!item.recruitment_id || ["sending", "completed"].includes(t(item, "status")))} onClick={() => { setEditing(item); setDirty(false); setMessage(""); if(careChannel) requestAnimationFrame(()=>templateEditor.current?.querySelector<HTMLInputElement>('[name="name"]')?.focus()); }}>수정</AdminButton> },
+        ]}
+        empty={<AdminEmptyState title={section === "templates" ? "등록된 메시지 템플릿이 없습니다." : section === "campaigns" ? "등록된 예약 캠페인이 없습니다." : "등록된 자동 메시지가 없습니다."} />}
+      />
+  </>;
   return (
     <>
-      <form className="panel pad mb24" onSubmit={async (event) => {
+      {careChannel && <CareTemplateContext channel={careChannel} dirty={dirty || settingsDirty} pending={pending}/>}
+      {careChannel && <section className="panel pad mb24" aria-label="등록된 템플릿"><div className="care-template-context-top"><h2>등록된 {careChannel === "sms" ? "문자" : "알림톡"} 템플릿</h2><a className="btn" href="#care-template-editor">템플릿 작성으로 이동</a></div>{templateList}</section>}
+      <details open={!careChannel} className="panel pad mb24"><summary>발신번호·문자 발송 설정</summary>
+      <form onChange={()=>setSettingsDirty(true)} onSubmit={async (event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
         try {
@@ -443,6 +469,7 @@ function CrmManager({ section, data, send, pending }: Props) {
             marketingEnabled: form.get("marketing_enabled") === "on",
           } }, "문자 발송 설정을 저장했습니다.");
           setMessage("문자 발송 설정을 저장했습니다.");
+          setSettingsDirty(false);
         } catch (error) { setMessage((error as Error).message); }
       }}>
         <h2>문자 발송 설정</h2>
@@ -467,9 +494,9 @@ function CrmManager({ section, data, send, pending }: Props) {
         <label className="checkline"><input type="checkbox" name="marketing_enabled" defaultChecked={Boolean(smsSettings?.marketingEnabled)} disabled={!smsSettings?.canConfigure} /> 광고 문자 허용 (마케팅 동의·080 번호·오전 8시~오후 9시 적용)</label>
         <p className="meta mt16">광고 문자는 자동으로 <b>(광고) 발신자명</b>과 <b>무료수신거부 080번호</b>를 붙입니다. 정보성 결제 안내에는 광고 문구를 붙이지 않습니다. 전체 발송은 서버의 안전 스위치가 켜져야 실행됩니다.</p>
         {Boolean(smsSettings?.canConfigure) && <button className="btn small mt16" disabled={pending || !(smsSettings?.senders as string[] || []).length}>문자 설정 저장</button>}
-      </form>
-      {section === "templates" && <FollowupTemplateSource blocked={pending || dirty || !!editing} onApply={value => { setEditing(value); setMessage(""); }}/>}
-      <form key={formKey} className="panel pad mb24" onChange={()=>setDirty(true)} onSubmit={submit}>
+      </form></details>
+      {section === "templates" && !careChannel && <FollowupTemplateSource blocked={pending || dirty || !!editing} onApply={value => { setEditing(value); setMessage(""); }}/>}
+      <form ref={templateEditor} id="care-template-editor" key={formKey} className="panel pad mb24" onChange={()=>setDirty(true)} onSubmit={submit}>
         <div className="between">
           <h2>
             {title} {editing?.id ? "수정" : "등록"}
@@ -491,7 +518,7 @@ function CrmManager({ section, data, send, pending }: Props) {
           )}
         </div>
         {section === "templates" ? (
-          <CrmTemplateFields key={formKey} editing={editing} />
+          <CrmTemplateFields key={formKey} editing={editing} careChannel={careChannel} />
         ) : section === "campaigns" ? (
           <div className="grid2 mt24">
             <Field label="캠페인 이름">
@@ -670,19 +697,7 @@ function CrmManager({ section, data, send, pending }: Props) {
           <Status message={testMessage} />
         </div>
       )}
-      <AdminDataTable
-        label={`${title} 목록`}
-        rows={items}
-        getRowId={item => item.id}
-        columns={[
-          { id: "name", header: "이름·내용", render: item => <div className="admin-crm-primary"><strong>{named(item)}</strong>{section === "templates" && <small title={t(item, "content")}>{t(item, "content")}</small>}{section === "campaigns" && <small>{item.recruitment_id ? "모집 연결 안내" : "일반 캠페인"}</small>}</div> },
-          { id: "scope", header: section === "templates" ? "채널·목적" : section === "campaigns" ? "예약 시각" : "실행 조건", render: item => section === "templates" ? `${String(item.channel).toUpperCase()} · ${item.purpose === "marketing" ? "마케팅" : "정보성"}` : section === "campaigns" ? item.scheduled_at ? timeLabel(item.scheduled_at) : "예약 미정" : `${t(item, "trigger_type")} · ${Number(item.delay_minutes || 0)}분 후` },
-          ...(section === "campaigns" ? [{ id: "delivery", header: "발송", render: (item: Row) => `대상 ${Number(item.recipient_count || 0)} · 성공 ${Number(item.success_count || 0)} · 실패 ${Number(item.failure_count || 0)}` }] : []),
-          { id: "status", header: "상태", render: item => <AdminStatusBadge status={section === "campaigns" ? t(item, "status") : item.is_active ? "active" : "inactive"} label={section === "templates" && item.channel === "alimtalk" && (!item.is_active || !item.alimtalk_template_id) ? "준비 중 · 미발송" : section === "automations" ? item.is_active ? "자동 실행 중" : "중지" : undefined} /> },
-          { id: "action", header: "관리", align: "action" as const, render: item => <AdminButton size="sm" variant="outline" disabled={section === "campaigns" && (!!item.recruitment_id || ["sending", "completed"].includes(t(item, "status")))} onClick={() => { setEditing(item); setDirty(false); setMessage(""); }}>수정</AdminButton> },
-        ]}
-        empty={<AdminEmptyState title={section === "templates" ? "등록된 메시지 템플릿이 없습니다." : section === "campaigns" ? "등록된 예약 캠페인이 없습니다." : "등록된 자동 메시지가 없습니다."} />}
-      />
+      {!careChannel && templateList}
     </>
   );
 }
