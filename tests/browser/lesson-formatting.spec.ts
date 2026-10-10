@@ -10,7 +10,7 @@ test('top notice edits inline and survives learner rendering and reopening', asy
   await page.keyboard.type('강의를 시작하기 전에 안내를 확인하세요.');
   await page.getByRole('button', { name: '필독 공지 추가', exact: true }).click();
   await expect(callout).toHaveCount(1);
-  await expect(editor.locator(':scope > :first-child')).toHaveAttribute('data-lesson-callout', '');
+  await expect(editor.locator(':scope > :first-child [data-lesson-callout]')).toHaveAttribute('data-lesson-callout', '');
   await expect(editor).toContainText('내 사업에서 일할 AI팀');
   await page.getByRole('button', { name: '학습 저장', exact: true }).click();
   const learner = page.getByRole('region', { name: '저장된 학습자 화면' });

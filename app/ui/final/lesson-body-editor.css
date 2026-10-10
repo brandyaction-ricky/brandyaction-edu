@@ -42,3 +42,17 @@
 .edu-admin .lesson-color-actions input[type=color] { width:40px; height:34px; min-height:34px; padding:2px; cursor:pointer; }
 .edu-admin .lesson-color-actions button { padding:6px 10px; border:1px solid var(--line,#d1d5db); background:#fff; border-radius:4px; font-size:12px; cursor:pointer; }
 @media (max-width:480px) { .edu-admin .lesson-color-swatches { grid-template-columns:repeat(6,32px); } }
+
+/* Editor-only handle: stored and learner callout markup stays unchanged. */
+.lesson-rich-body .lesson-callout { position: relative; }
+.lesson-rich-body .lesson-callout > .lesson-callout-drag {
+  display: inline-flex; align-items: center; justify-content: center; align-self: flex-start;
+  flex: none; width: 24px; min-height: 32px; padding: 0; border: 0;
+  border-radius: 4px; background: transparent; color: #756342;
+  font-size: 22px; line-height: 1; cursor: grab; user-select: none;
+}
+.lesson-rich-body .lesson-callout > .lesson-callout-drag:hover,
+.lesson-rich-body .lesson-callout > .lesson-callout-drag:focus-visible { background: #f0e5c9; outline: 2px solid #b48734; }
+.lesson-rich-body .lesson-callout > .lesson-callout-drag:active { cursor: grabbing; }
+.lesson-rich-body[contenteditable="false"] .lesson-callout-drag { display: none; }
+.lesson-rich-body .node-callout.ProseMirror-selectednode > .lesson-callout { outline: 2px solid #b48734; }

@@ -1,13 +1,28 @@
-import { Node, type Editor } from "@tiptap/react";
-import { TextSelection } from "@tiptap/pm/state";
+import { Node, ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent, type NodeViewProps, type Editor } from "@tiptap/react";
+import { GripVertical } from "lucide-react";
+import { closeHistory } from "@tiptap/pm/history";
+import { NodeSelection, TextSelection } from "@tiptap/pm/state";
+
+function CalloutView({ editor, getPos }: NodeViewProps) {
+  const select = () => {
+    const pos = getPos();
+    if (editor.isEditable && typeof pos === "number") editor.view.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, pos)));
+  };
+  return <NodeViewWrapper as="aside" data-lesson-callout="" className="lesson-callout" aria-label="학습 안내" onDragStartCapture={() => editor.view.dispatch(closeHistory(editor.state.tr))}>
+    <span role="button" tabIndex={0} draggable data-drag-handle className="lesson-callout-drag" contentEditable={false} aria-label="안내 박스 이동" title="드래그하여 안내 박스 이동" onClick={select} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); select(); } }}><GripVertical size={18} aria-hidden="true" /></span>
+    <span className="lesson-callout-icon" contentEditable={false} aria-hidden="true">💡</span>
+    <NodeViewContent className="lesson-callout-content" />
+  </NodeViewWrapper>;
+}
 
 // Fixed markup keeps pasted/stored HTML attributes out of the lesson DOM.
 export const LessonCallout = Node.create({
-  name: "callout", group: "block", content: "block+", defining: true,
+  name: "callout", group: "block", content: "block+", defining: true, draggable: true,
   parseHTML: () => [{ tag: "aside[data-lesson-callout]", contentElement: ".lesson-callout-content" }],
   renderHTML: () => ["aside", { "data-lesson-callout": "", class: "lesson-callout", "aria-label": "학습 안내" },
     ["span", { class: "lesson-callout-icon", "aria-hidden": "true", contenteditable: "false" }, "💡"],
     ["div", { class: "lesson-callout-content" }, 0]],
+  addNodeView: () => ReactNodeViewRenderer(CalloutView),
 });
 
 export function insertLessonNotice(editor: Editor) {
