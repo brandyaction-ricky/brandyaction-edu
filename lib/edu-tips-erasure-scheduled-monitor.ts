@@ -15,14 +15,17 @@ export async function scheduledErasureMonitor(request: Request, deps: Dependenci
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 5_000);
   try {
-    const { error } = await deps.rpc('edu_tips_record_erasure_monitor_run', {
+    const { data, error } = await deps.rpc('edu_tips_record_erasure_monitor_run', {
       p_environment: environment,
       p_status: body.status,
       p_checked_consumers: result.ok ? body.checked_consumers : 0,
       p_pending_overdue_requests: result.ok ? body.summary.pending_overdue_requests : 0,
       p_oldest_overdue_at: result.ok ? body.summary.oldest_overdue_at : null,
     }, controller.signal);
-    if (error) throw new Error('Heartbeat failed');
+    if (error || !data || typeof data !== 'object' || Array.isArray(data)
+      || !('status' in data) || data.status !== body.status
+      || !('recorded_at' in data) || typeof data.recorded_at !== 'string'
+      || !Number.isFinite(Date.parse(data.recorded_at))) throw new Error('Heartbeat failed');
   } catch {
     return Response.json({ status: 'check_unavailable', checked: false }, {
       status: 503, headers: { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' },

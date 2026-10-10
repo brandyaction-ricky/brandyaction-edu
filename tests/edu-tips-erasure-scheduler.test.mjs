@@ -24,7 +24,7 @@ test('scheduled scan persists a summary but fails closed if heartbeat is unavail
   const request = new Request('https://synthetic.invalid/api/cron/tips-erasure-deadlines');
   const env = { NEXT_PUBLIC_APP_ENV: 'development' };
   const ok = await scheduled(request, { env, rpc: async (name, args) => {
-    captured = { name, args }; return { error: null };
+    captured = { name, args }; return { data: { status: 'overdue', recorded_at: '2026-10-10T10:00:00Z' }, error: null };
   } });
   assert.equal(ok.status, 200);
   assert.equal(captured.name, 'edu_tips_record_erasure_monitor_run');
@@ -33,6 +33,8 @@ test('scheduled scan persists a summary but fails closed if heartbeat is unavail
   const failed = await scheduled(request, { env, rpc: async () => ({ error: { message: 'private SQL error' } }) });
   assert.equal(failed.status, 503);
   assert(!JSON.stringify(await failed.json()).includes('private SQL error'));
+  const ambiguous = await scheduled(request, { env, rpc: async () => ({ data: null, error: null }) });
+  assert.equal(ambiguous.status, 503);
 });
 
 test('missing runs, expired run, failure and overdue are distinct operator states', () => {
