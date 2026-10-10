@@ -67,6 +67,8 @@ test('moving images within a row preserves grouping and non-image content', asyn
 
 test('native image drag groups, reorders, limits three, splits and survives save/undo', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'Native HTML drag uses a mouse; touch retains image settings.');
+  const runtime = await page.context().newCDPSession(page);
+  await runtime.send('Emulation.setCPUThrottlingRate', { rate: 4 });
   const nativeInitial = structuredClone(initial);
   nativeInitial.blocks[0].content = serializeLessonDocument({ type: 'doc', content: [
     { type: 'paragraph', content: [{ type: 'text', text: '이미지 안내를 순서대로 확인해 주세요.' }] },
@@ -119,7 +121,11 @@ test('native image drag groups, reorders, limits three, splits and survives save
   await drag(1, 2, 'below');
   await expect(block(1).locator('..')).not.toHaveAttribute('data-image-columns');
   await canvas.click({ position: { x: 10, y: 10 } }); await page.keyboard.press('ControlOrMeta+z');
-  await sameRow(block(3), block(2));
+  // Images 3 and 2 share a row both before and after undo. Check the moved
+  // image itself so redo cannot race the unfinished undo render.
+  await expect(block(1).locator('..')).toHaveAttribute('data-image-columns', '3');
+  await sameRow(block(3), block(1));
+  await expect(canvas).toBeFocused();
   await page.keyboard.press('ControlOrMeta+Shift+z');
   await expect(block(1).locator('..')).not.toHaveAttribute('data-image-columns');
   await save(page);
