@@ -9,14 +9,14 @@ test('member search resets pagination, keeps submitted query across reload and s
  await page.goto('/admin/customers?navigationFixture&memberDirectoryFixture');
  await page.getByRole('button',{name:'다음',exact:true}).click();
  await expect.poll(()=>reads.filter(u=>u.searchParams.get('section')==='customers').at(-1)?.searchParams.get('page')).toBe('2');
- const search=page.getByRole('searchbox');await search.fill('buyer@example.test');await search.press('Enter');
+ const search=page.getByRole('searchbox',{name:'회원 관리 목록 검색',exact:true});await search.fill('buyer@example.test');await search.press('Enter');
  await expect(page).toHaveURL(/memberQuery=buyer/);await expect.poll(()=>reads.filter(u=>u.searchParams.get('section')==='customers').at(-1)?.searchParams.get('page')).toBe('1');
  await expect(page.getByRole('button',{name:'가입자 샘플',exact:true})).toBeVisible();await expect(page.getByText('가입 이메일: account@example.test')).toBeVisible();
  await page.getByText('결제자: 결제자 샘플 (1건)',{exact:true}).click();await expect(page.getByText('결제 이메일: buyer@example.test')).toBeVisible();await expect(page.getByText('BAE-SYNTHETIC-001 · 결제 완료')).toBeVisible();
  await page.screenshot({path:info.outputPath('member-identities.png'),fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
- await page.reload();await expect(page.getByRole('searchbox')).toHaveValue('buyer@example.test');await expect(page.getByRole('button',{name:'가입자 샘플',exact:true})).toBeVisible();
- await page.getByRole('searchbox').fill('missing');await page.getByRole('button',{name:'전체 회원 검색',exact:true}).click();await expect(page.getByText('조회된 항목이 없습니다.',{exact:true})).toBeVisible();
- await page.getByRole('button',{name:'검색·필터 초기화',exact:true}).click();await expect(page.getByRole('searchbox')).toHaveValue('');expect(new URL(page.url()).searchParams.has('memberQuery')).toBe(false);
+ await page.reload();await expect(page.getByRole('searchbox',{name:'회원 관리 목록 검색',exact:true})).toHaveValue('buyer@example.test');await expect(page.getByRole('button',{name:'가입자 샘플',exact:true})).toBeVisible();
+ await page.getByRole('searchbox',{name:'회원 관리 목록 검색',exact:true}).fill('missing');await page.getByRole('button',{name:'전체 회원 검색',exact:true}).click();await expect(page.getByText('조회된 항목이 없습니다.',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'검색·필터 초기화',exact:true}).click();await expect(page.getByRole('searchbox',{name:'회원 관리 목록 검색',exact:true})).toHaveValue('');expect(new URL(page.url()).searchParams.has('memberQuery')).toBe(false);
 });
 test('N6 search supports payment email, displays identities and links to the exact member',async({page})=>{
  await page.route('**/api/platform?**',r=>r.fulfill({json:{user:{id:id(99),role:'admin'},data:{}}}));const queries:string[]=[];
