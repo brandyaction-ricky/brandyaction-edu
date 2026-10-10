@@ -1,12 +1,13 @@
 import { test, expect, type Page, type Locator } from '@playwright/test';
+import { serializeLessonDocument } from '../../lib/lesson-body';
 import type { LessonBlockDocument } from '../../lib/lesson-blocks';
 const initial: LessonBlockDocument = { schemaVersion: 1, blocks: [
   { id: 'title', type: 'text', content: '이미지 안내를 순서대로 확인해 주세요.' },
   ...[1, 2, 3, 4].map(n => ({ id: `image-${n}`, type: 'image' as const, assetId: `aaaaaaaa-1111-4111-8111-11111111111${n}`, alt: `단계 ${n}`, content: `${n}단계 설명` })),
   { id: 'question', type: 'question', question: { label: '이해한 내용을 적어 주세요.', kind: 'text', required: true } },
 ], checklist: [] };
-async function setup(page: Page, compact = false) {
-  let document = structuredClone(initial), revision = 'aaaaaaaa-1111-4111-8111-111111111111';
+async function setup(page: Page, compact = false, seed = initial) {
+  let document = structuredClone(seed), revision = 'aaaaaaaa-1111-4111-8111-111111111111';
   await page.route('**/api/platform/lesson-blocks**', async route => {
     if (route.request().method() === 'POST') { const body = route.request().postDataJSON(); document = body.document; revision = body.requestId; }
     await route.fulfill({ json: { document, revision, editable: true } });
@@ -66,7 +67,12 @@ test('moving images within a row preserves grouping and non-image content', asyn
 
 test('native image drag groups, reorders, limits three, splits and survives save/undo', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'Native HTML drag uses a mouse; touch retains image settings.');
-  const saved = await setup(page, true), canvas = page.getByRole('textbox', { name: '수업 문서', exact: true });
+  const nativeInitial = structuredClone(initial);
+  nativeInitial.blocks[0].content = serializeLessonDocument({ type: 'doc', content: [
+    { type: 'paragraph', content: [{ type: 'text', text: '이미지 안내를 순서대로 확인해 주세요.' }] },
+    { type: 'callout', content: [{ type: 'paragraph', content: [{ type: 'text', text: '보존할 안내 박스' }] }] },
+  ] });
+  const saved = await setup(page, true, nativeInitial), canvas = page.getByRole('textbox', { name: '수업 문서', exact: true });
   const block = (n: number) => canvas.locator(`[data-author-block="image-${n}"]`);
   async function drag(from: number, to: number, side: 'left' | 'right' | 'above' | 'below', handle = false, cancel = false) {
     const target = block(to), source = handle ? block(from).locator('[data-drag-handle]') : block(from).locator('img');
@@ -93,9 +99,9 @@ test('native image drag groups, reorders, limits three, splits and survives save
     await expect(page.locator('[data-image-drop]')).toHaveCount(0);
   }
   await drag(2, 1, 'right', false, true);
-  await save(page); expect(saved()).toEqual(initial);
+  await save(page); expect(saved()).toEqual(nativeInitial);
   await drag(2, 1, 'right'); await sameRow(block(1), block(2));
-  await canvas.locator('[data-block-type="text"] p').click();
+  await canvas.locator('[data-block-type="text"] > p').first().click();
   await page.keyboard.press('End'); await page.keyboard.insertText(' 추가');
   await page.keyboard.press('ControlOrMeta+z'); await sameRow(block(1), block(2));
   await expect(canvas.locator('[data-block-type="text"]')).not.toContainText('추가');
@@ -118,8 +124,10 @@ test('native image drag groups, reorders, limits three, splits and survives save
   await expect(block(1).locator('..')).not.toHaveAttribute('data-image-columns');
   await save(page);
   expect(saved().blocks.find(b=>b.id==='image-1')?.imageGroup).toBeUndefined();
-  expect(saved().blocks.map(block=>{ const copy = {...block}; delete copy.imageGroup; return copy; }).sort((a,b)=>a.id.localeCompare(b.id))).toEqual(initial.blocks.toSorted((a,b)=>a.id.localeCompare(b.id)));
+  expect(saved().blocks.map(block=>{ const copy = {...block}; delete copy.imageGroup; return copy; }).sort((a,b)=>a.id.localeCompare(b.id))).toEqual(nativeInitial.blocks.toSorted((a,b)=>a.id.localeCompare(b.id)));
   await page.getByRole('button', { name: '편집 다시 열기', exact: true }).click();
   await sameRow(block(3), block(2)); await expect(block(1).locator('..')).not.toHaveAttribute('data-image-columns');
+  await expect(canvas.locator('[data-lesson-callout]')).toContainText('보존할 안내 박스');
+  await expect(canvas.getByRole('button', { name: '안내 박스 이동' })).toBeVisible();
   await canvas.screenshot({ path: testInfo.outputPath('dragged-image-layout.png') });
 });
