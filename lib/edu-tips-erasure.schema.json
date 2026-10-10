@@ -1,0 +1,448 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "Deletion-only definitions copied unchanged from unified EDU v2 2.0.0-rc.2 contract (2026-10-10).",
+  "$defs": {
+    "Tombstone": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "customer_id": {
+          "type": "string",
+          "pattern": "^k[1-9][0-9]*:[A-Za-z0-9_-]{43}$"
+        },
+        "consent_epoch": {
+          "type": "string",
+          "pattern": "^ce_[A-Za-z0-9_-]{32}$"
+        },
+        "reason": {
+          "enum": [
+            "consent_withdrawn",
+            "account_deleted",
+            "identity_retired"
+          ]
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "cursor": {
+          "type": "string",
+          "pattern": "^(ev|lu|ts|rc)_[A-Za-z0-9_-]{20,512}$"
+        },
+        "active_due_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$",
+          "description": "Exactly 5 elapsed UTC days after original at; retries must not extend. Enforced by semantic validation, not date-time format alone."
+        },
+        "model_due_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$",
+          "description": "Exactly 30 elapsed UTC days after original at; retries must not extend. Enforced by semantic validation, not date-time format alone."
+        },
+        "residual_due_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$",
+          "description": "Exactly 30 elapsed UTC days after original at; retries must not extend. Enforced by semantic validation, not date-time format alone."
+        }
+      },
+      "required": [
+        "requestId",
+        "customer_id",
+        "consent_epoch",
+        "reason",
+        "at",
+        "cursor",
+        "active_due_at",
+        "model_due_at",
+        "residual_due_at"
+      ],
+      "additionalProperties": false
+    },
+    "TombstonePage": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "const": "brandyaction_edu"
+        },
+        "tenant_id": {
+          "const": "brandyaction"
+        },
+        "brand_id": {
+          "const": "brandyaction_edu"
+        },
+        "contract_version": {
+          "const": "2.0.0-rc.2"
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "stream_generation": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "snapshot_upper": {
+          "type": "string",
+          "pattern": "^(ev|lu|ts|rc)_[A-Za-z0-9_-]{20,512}$"
+        },
+        "next_cursor": {
+          "type": "string",
+          "pattern": "^(ev|lu|ts|rc)_[A-Za-z0-9_-]{20,512}$"
+        },
+        "has_more": {
+          "type": "boolean"
+        },
+        "tombstones": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Tombstone"
+          },
+          "maxItems": 500
+        },
+        "acked_through": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^(ev|lu|ts|rc)_[A-Za-z0-9_-]{20,512}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "source",
+        "tenant_id",
+        "brand_id",
+        "contract_version",
+        "generated_at",
+        "stream_generation",
+        "snapshot_upper",
+        "next_cursor",
+        "has_more",
+        "tombstones",
+        "acked_through"
+      ],
+      "additionalProperties": false
+    },
+    "ReceiptRequest": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "receipt_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "receipt_revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "customer_id": {
+          "type": "string",
+          "pattern": "^k[1-9][0-9]*:[A-Za-z0-9_-]{43}$"
+        },
+        "consent_epoch": {
+          "type": "string",
+          "pattern": "^ce_[A-Za-z0-9_-]{32}$"
+        },
+        "phase": {
+          "enum": [
+            "blocked",
+            "active_erased",
+            "model_resolved",
+            "completed"
+          ]
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "blocked_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "active_erased_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "model_resolved_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "residual_erased_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "counts": {
+          "type": "object",
+          "properties": {
+            "events": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "learning_rows": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "profiles": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "predictions": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "files": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "models": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "events",
+            "learning_rows",
+            "profiles",
+            "predictions",
+            "files",
+            "models"
+          ],
+          "additionalProperties": false
+        },
+        "models": {
+          "enum": [
+            "pending",
+            "done",
+            "not_applicable"
+          ]
+        },
+        "residuals": {
+          "enum": [
+            "pending",
+            "done",
+            "not_applicable"
+          ]
+        },
+        "evidence_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "error_code": {
+          "anyOf": [
+            {
+              "enum": [
+                "delete_retry",
+                "model_retry",
+                "residual_pending",
+                "verification_failed"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "requestId",
+        "receipt_id",
+        "receipt_revision",
+        "customer_id",
+        "consent_epoch",
+        "phase",
+        "observed_at",
+        "blocked_at",
+        "active_erased_at",
+        "model_resolved_at",
+        "residual_erased_at",
+        "counts",
+        "models",
+        "residuals",
+        "evidence_sha256",
+        "error_code"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "enum": [
+                  "active_erased",
+                  "model_resolved",
+                  "completed"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "active_erased_at": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "enum": [
+                  "model_resolved",
+                  "completed"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "model_resolved_at": {
+                "type": "string"
+              },
+              "models": {
+                "enum": [
+                  "done",
+                  "not_applicable"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "enum": [
+                  "completed"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "residual_erased_at": {
+                "type": "string"
+              },
+              "residuals": {
+                "enum": [
+                  "done",
+                  "not_applicable"
+                ]
+              },
+              "error_code": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ReceiptResponse": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "receipt_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "accepted_revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "phase": {
+          "enum": [
+            "blocked",
+            "active_erased",
+            "model_resolved",
+            "completed"
+          ]
+        }
+      },
+      "required": [
+        "requestId",
+        "receipt_id",
+        "accepted_revision",
+        "phase"
+      ],
+      "additionalProperties": false
+    },
+    "AckRequest": {
+      "type": "object",
+      "properties": {
+        "through": {
+          "type": "string",
+          "pattern": "^(ev|lu|ts|rc)_[A-Za-z0-9_-]{20,512}$"
+        }
+      },
+      "required": [
+        "through"
+      ],
+      "additionalProperties": false
+    },
+    "AckResponse": {
+      "type": "object",
+      "properties": {
+        "acked_through": {
+          "type": "string",
+          "pattern": "^(ev|lu|ts|rc)_[A-Za-z0-9_-]{20,512}$"
+        }
+      },
+      "required": [
+        "acked_through"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
