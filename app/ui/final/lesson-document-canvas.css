@@ -39,3 +39,13 @@
 .ldc-document > [data-image-columns] img { width:100%; }
 .lba-image-row-settings { padding:12px; border:1px solid var(--line,#d8dde3); border-radius:8px; margin-bottom:12px; }
 @media(max-width:540px) { .ldc-document { column-gap:6px; } }
+
+.ldc-activity[data-block-type="image"] img { cursor:grab; }
+.ldc-image-drag-help { margin-block:6px 12px; }
+.ldc-image-drop-hint { position:fixed; z-index:50; pointer-events:none; background:#26785b; border-radius:4px; box-shadow:0 0 0 3px #26785b25; }
+.ldc-image-drop-hint span { position:absolute; top:8px; left:8px; width:max-content; max-width:min(240px,70vw); padding:7px 10px; border-radius:6px; background:#1c513f; color:#fff; font-size:13px; font-weight:600; box-shadow:0 2px 8px #0002; }
+.ldc-image-drop-hint[data-image-drop="right"] span { left:auto; right:8px; }
+.ldc-image-drop-hint.is-blocked { background:#b42318; box-shadow:0 0 0 3px #b4231825; }
+.ldc-image-drop-hint.is-blocked span { background:#912018; }
+
+.ldc-image-drop-hint[data-image-drop="below"] span { top:auto; bottom:8px; }

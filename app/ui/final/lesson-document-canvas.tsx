@@ -12,6 +12,7 @@ import { blocksFromCanvas, canvasTextContent, duplicateLessonBlock, isCanvasText
 import { LessonBlockView } from './lesson-block-view';
 import { GripVertical } from 'lucide-react';
 import { lessonRichExtensions, LessonFormatToolbar } from './lesson-rich-input';
+import { useLessonImageDrag } from './lesson-image-drag';
 import './lesson-document-canvas.css';
 
 type Props = {
@@ -26,7 +27,7 @@ function Activity({ node, extension, editor, selected }: NodeViewProps) {
   const block = node.attrs.block as LessonBlock;
   if (!block) return <NodeViewWrapper />;
   return <NodeViewWrapper className={'ldc-activity' + (selected ? ' is-selected' : '')} data-author-block={block.id} data-block-type={block.type} contentEditable={false}>
-    <div className="ldc-activity-actions"><span data-drag-handle className="ldc-drag" aria-label="드래그하여 항목 순서 변경" title="드래그하여 순서 변경"><GripVertical size={18} aria-hidden="true" /></span><button type="button" className="btn small" disabled={!editor.isEditable} onClick={() => extension.options.onSettings(block.id)}>{extension.options.labels[block.type] || '항목'} 설정</button></div>
+    <div className="ldc-activity-actions"><span data-drag-handle draggable={block.type === 'image' && editor.isEditable ? true : undefined} className="ldc-drag" aria-label="드래그하여 항목 순서 변경" title="드래그하여 순서 변경"><GripVertical size={18} aria-hidden="true" /></span><button type="button" className="btn small" disabled={!editor.isEditable} onClick={() => extension.options.onSettings(block.id)}>{extension.options.labels[block.type] || '항목'} 설정</button></div>
     <LessonBlockView floatingAudio document={publicLessonBlocks({ schemaVersion: 1, blocks: [block], checklist: [] })} values={emptyValues} onChange={() => {}} readOnly />
   </NodeViewWrapper>;
 }
@@ -198,6 +199,7 @@ export function LessonDocumentCanvas(props: Props) {
     editor.view.dispatch(editor.state.tr.replaceWith(0, editor.state.doc.content.size, nodes.map(node => editor.schema.nodeFromJSON(node))).setMeta('lessonStructure', true));
   }
   const selected = props.blocks.find(block => block.id === selectedId);
+  const imageDrag = useLessonImageDrag(editor, props.disabled, setMessage);
   const outline = useMemo(() => props.blocks.flatMap(block => isCanvasText(block) ? canvasTextContent(block).filter(node => node.type === 'heading').map((node, index) => ({ id: block.id, index, label: (node.content || []).map(child => child.text || '').join('') })) : []), [props.blocks]);
   function jump(id: string, index: number) {
     if (!editor) return;
@@ -207,8 +209,9 @@ export function LessonDocumentCanvas(props: Props) {
       item.forEach((node, offset) => { if (node.type.name === 'heading' && heading++ === index) editor.chain().focus().setTextSelection(pos + offset + 2).scrollIntoView().run(); });
     });
   }
-  return <div className="ldc-root" ref={root}>
+  return <div className="ldc-root" ref={root} {...imageDrag.handlers}>
     <p className="meta">글을 바로 클릭해 수정하세요. 빈 줄에서 / 또는 ‘현재 위치에 추가’로 질문·자료를 넣습니다.</p>
+    {props.blocks.some(block => block.type === 'image') && <p className="meta ldc-image-drag-help">이미지나 이동 손잡이를 끌어 다른 이미지 옆에 놓으면 최대 3장까지 나란히 붙어요. 위·아래에 놓으면 한 장씩 배치합니다. 이미지 설정에서도 묶을 수 있어요.</p>}
     {outline.length > 0 && <details className="ldc-outline"><summary>수업 목차 · {outline.length}개</summary><nav aria-label="수업 목차">{outline.map(item => <button type="button" className="btn small" key={`${item.id}-${item.index}`} onClick={() => jump(item.id, item.index)}>{item.label || '제목 입력 전'}</button>)}</nav></details>}
     <div className="lesson-body-editor ldc-editor">
       <div className="ldc-sticky-toolbar">
@@ -222,5 +225,6 @@ export function LessonDocumentCanvas(props: Props) {
       {!props.blocks.length && <button type="button" className="btn" onClick={() => insert('text')} disabled={props.disabled}>글 쓰기 시작</button>}
     </div>
     {message && <p className="notice" role="alert">{message}</p>}
+    {imageDrag.hint}
   </div>;
 }
