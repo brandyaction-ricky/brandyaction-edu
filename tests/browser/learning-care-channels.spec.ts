@@ -89,3 +89,49 @@ test('changed contact routes can be refreshed without losing the draft or select
  expect(api.sent).toHaveLength(2);
  expect(api.sent[1].delivery).toMatchObject({channels:['push','email','alimtalk'],routes:[{memberId:id(10),channels:['alimtalk','email']},{memberId:id(11),channels:['alimtalk','email']},{memberId:id(12),channels:['email']},{memberId:id(13),channels:[]}]});
 });
+
+for (const channel of ['sms','alimtalk'] as const) test(`template management round trip preserves the composer (${channel})`, async({page},testInfo)=>{
+ const api=await backend(page,{alimtalk:false});await compose(page);
+ await page.getByLabel('안내 내용',{exact:true}).fill('수강생에게 이어서 보낼 안내 초안');
+ await page.getByRole('combobox',{name:'발송 방식'}).selectOption('all');
+ await page.getByRole('checkbox',{name:/문자/}).uncheck();
+ const name=channel==='sms'?'문자 템플릿 관리':'알림톡 템플릿 관리';
+ const link=page.getByRole('link',{name,exact:true});
+ await expect(link).toHaveAttribute('rel','noopener noreferrer');
+ const popupPromise=page.waitForEvent('popup');await link.click();const manager=await popupPromise;
+ await expect(manager).toHaveURL(new RegExp(`/admin/templates\\?from=learning-care&channel=${channel}$`));
+ await expect(manager.getByRole('region',{name:'학습 안내에서 연 템플릿 관리'})).toBeVisible();
+ await expect(manager.getByRole('combobox',{name:/^발송 채널/})).toHaveValue(channel);
+ await expect(manager.getByLabel('템플릿 목록 채널')).toHaveValue(channel);
+ await expect(manager.getByLabel('발송용 템플릿으로 사용')).toHaveCount(channel==='sms'?1:0);
+ await manager.getByText(`현재 학습 안내에 사용하는 ${channel==='sms'?'문자':'알림톡'} 문구`,{exact:true}).click();
+ await expect(manager.getByText(/저장.*(바뀌지는|켜지지는)/)).toBeVisible();
+ await manager.screenshot({path:testInfo.outputPath(`template-manager-${channel}.png`),fullPage:true});
+ expect(await manager.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+ await manager.getByRole('button',{name:'관리 창 닫고 돌아가기',exact:true}).click();
+ await expect.poll(()=>manager.isClosed()).toBe(true);
+ await expect(page.getByRole('dialog',{name:'학습 안내 확인'})).toContainText('4명에게 학습 안내');
+ await expect(page.getByLabel('안내 내용',{exact:true})).toHaveValue('수강생에게 이어서 보낼 안내 초안');
+ await expect(page.getByRole('combobox',{name:'발송 방식'})).toHaveValue('all');
+ await expect(page.getByRole('checkbox',{name:/문자/})).not.toBeChecked();
+ await expect(page.getByRole('button',{name:'확인한 대상에게 보내기'})).toBeDisabled();
+ await page.getByRole('button',{name:'설정 확인하고 이어서 작성'}).click();
+ await expect(page.getByRole('button',{name:'확인한 대상에게 보내기'})).toBeEnabled();
+ await expect(page.getByLabel('안내 내용',{exact:true})).toHaveValue('수강생에게 이어서 보낼 안내 초안');
+ await expect(page.getByRole('checkbox',{name:/문자/})).not.toBeChecked();
+ expect(api.sent).toHaveLength(0);
+ await page.screenshot({path:testInfo.outputPath(`composer-return-${channel}.png`),fullPage:true});
+});
+
+test('template links work when delivery is off; dirty template must be saved before returning', async({page})=>{
+ const api=await backend(page,{enabled:false});await compose(page);
+ const popupPromise=page.waitForEvent('popup');await page.getByRole('link',{name:'문자 템플릿 관리',exact:true}).click();const manager=await popupPromise;
+ await manager.getByLabel('템플릿 이름',{exact:true}).fill('시험 안내 문구');
+ await expect(manager.getByRole('button',{name:'관리 창 닫고 돌아가기'})).toBeDisabled();
+ await expect(manager.getByText('수정한 템플릿을 먼저 저장해 주세요.',{exact:false})).toBeVisible();
+ await manager.close();
+ await expect(page.getByRole('button',{name:'메시지함에만 저장',exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'설정 확인하고 이어서 작성'}).click();
+ await expect(page.getByRole('button',{name:'메시지함에만 저장',exact:true})).toBeEnabled();
+ expect(api.sent).toHaveLength(0);
+});
