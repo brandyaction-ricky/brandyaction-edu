@@ -20,7 +20,12 @@ export function CareChannels({ members, names, disabled, onChange }: {members:st
   function refresh(){onChange(null);setSnapshot(null);setError('');setRevision(n=>n+1);}
   if(error)return <div role="alert" className="care-error">{error}<button className="btn" disabled={disabled} onClick={refresh}>다시 확인</button></div>;
   if(!snapshot)return <p role="status">연락 수단을 확인하고 있습니다.</p>;
-  if(!snapshot.config.enabled)return <p className="care-note">외부 알림을 준비 중입니다. 지금은 사이트 메시지함에만 저장됩니다.</p>;
+  if(!snapshot.config.enabled)return <section className="care-channel-unavailable" aria-label="학습 안내 발송 상태">
+    <strong>지금은 사이트 메시지함에만 저장돼요</strong>
+    <p>수강생이 브랜디에듀에 로그인한 뒤 메시지함에서 확인할 수 있습니다.</p>
+    <ul className="care-channel-statuses">{channels.map(channel=><li key={channel}><span>{careChannelLabels[channel]}</span><small>발송 꺼짐</small></li>)}</ul>
+    <p>아래에 안내를 작성해 저장해도 휴대전화나 이메일로 알림이 가지 않습니다. 외부 발송이 활성화되면 여기서 채널과 받는 사람을 확인할 수 있습니다.</p>
+  </section>;
   const routes=careChannelRoutes(snapshot.reach,snapshot.config,selected,mode),inboxOnly=routes.filter(r=>!r.channels.length).length;
   return <fieldset disabled={disabled} className="care-channel-picker"><legend>어떻게 안내할까요?</legend><button type="button" className="btn" onClick={refresh}>연락 수단 다시 확인</button>
     <label>발송 방식<select value={mode} onChange={e=>setMode(e.target.value as CareDeliveryMode)}><option value="push_first">푸시 우선 · 이메일·알림톡·문자</option><option value="all">선택한 모든 채널로 보내기</option></select></label>

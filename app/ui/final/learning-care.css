@@ -70,3 +70,11 @@
 .care-channel-members li>span small{display:block;color:#6d7d78;margin-top:3px}
 
 .care-sms-preview{white-space:pre-wrap;overflow-wrap:anywhere;padding:10px;border-radius:8px;background:#f5f8f7;font-family:inherit;font-size:12px;line-height:1.6}
+
+.care-channel-unavailable{margin:16px 0;padding:16px;border:1px solid #d7e1df;border-radius:12px;background:#f6f8f7}
+.care-channel-unavailable>strong{font-size:14px;color:#234438}
+.care-channel-unavailable>p{font-size:12px;line-height:1.65;color:#586b62;margin:10px 0 0}
+.care-channel-statuses{list-style:none;margin:14px 0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.care-channel-statuses li{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px;border:1px solid #dce4df;border-radius:8px;background:#fff;font-size:13px}
+.care-channel-statuses small{white-space:nowrap;border-radius:12px;padding:3px 6px;background:#edf0ee;color:#53665d;font-size:11px}
+@media(max-width:360px){.care-channel-statuses{grid-template-columns:1fr}}
