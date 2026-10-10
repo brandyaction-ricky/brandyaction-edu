@@ -4,6 +4,7 @@ import Link, { useLinkStatus } from 'next/link';
 import { marketingContextHref, recruitmentContext } from '@/lib/marketing-context';
 import './marketing-workspace.css';
 import type { Section } from '@/lib/platform';
+import { adminNavigationTitles } from '@/features/admin-ui/navigation/admin-navigation';
 
 const destinations = [
   ['conversion', '모집·문의 관리', '모집별 카톡방, 문의·Jev 검토, 구매 기록 관리'],
@@ -81,19 +82,25 @@ export function MarketingWorkspaceNav({ current, available, search = "", prefetc
 
   return <section className="marketing-workspace" aria-label="마케팅·전환 작업 공간">
     <strong>마케팅·전환</strong>
-    <p>아래에서 할 일을 고르면, 그 화면에서 무엇을 하면 되는지 알려드려요.</p>
     {selectedRecruitment && <p>지금 보고 있는 모집: <strong>{selectedRecruitment}</strong></p>}
+    <details className="marketing-workspace-menus" key={`menus-${current}`}>
+    <summary>관련 메뉴 보기</summary>
     <nav aria-label="마케팅·전환 메뉴">
       {destinations.filter(([key]) => available.some(section => section.key === key)).map(([key, label, description]) =>
-        <Link key={key} prefetch={true} scroll={false} href={key === "conversion" || key === "landing" ? marketingContextHref(key, search) : "/admin/" + key} aria-current={current === key ? 'page' : undefined} title={description} onPointerEnter={() => prefetchSection(key)} onFocus={() => prefetchSection(key)}>{label}<NavigationHint /></Link>)}
+        <Link key={key} prefetch={true} scroll={false} href={key === "conversion" || key === "landing" ? marketingContextHref(key, search) : "/admin/" + key} aria-current={current === key ? 'page' : undefined} title={description} onPointerEnter={() => prefetchSection(key)} onFocus={() => prefetchSection(key)}>{adminNavigationTitles[key] || label}<NavigationHint /></Link>)}
     </nav>
+    </details>
     {current === 'conversion' && <Link className="marketing-workspace-inquiry-link" href={inquiryHref} scroll={false}>문의·Jev 검토 바로가기 →</Link>}
-    {guide && <section className="marketing-workspace-guide" aria-labelledby="marketing-workspace-guide-title">
+    {guide && <details className="marketing-workspace-help" key={current} id="marketing-workspace-help">
+      <summary>이 화면 사용법</summary>
+      <section className="marketing-workspace-guide" aria-labelledby="marketing-workspace-guide-title">
       <h2 id="marketing-workspace-guide-title">{guide.heading}</h2>
       <p>{guide.summary}</p>
       <ol>{guide.steps.map((step) => <li key={step}>{step}</li>)}</ol>
       {guide.caution && <p className="marketing-workspace-guide-caution">{guide.caution}</p>}
-    </section>}
-    <p className="meta">광고 결과와 문의 뒤의 결제는 따로 확인합니다. 문의 화면의 답변 초안은 발송 예약에 자동으로 들어가지 않으니, 보낼 문구는 다시 확인해 주세요.</p>
+      </section>
+      {current === 'conversion' && <p className="meta">광고 결과와 문의 뒤의 결제는 따로 확인합니다. 문의 화면의 답변 초안은 발송 예약에 자동으로 들어가지 않으니, 보낼 문구는 다시 확인해 주세요.</p>}
+    </details>}
+    {['campaigns', 'automations'].includes(current) && <p className="marketing-workspace-live-notice">{guide?.caution}</p>}
   </section>;
 }

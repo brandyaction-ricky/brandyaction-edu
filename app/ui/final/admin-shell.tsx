@@ -41,10 +41,10 @@ export const finalAdminGroups = [
   ["마케팅·전환", ["conversion", "landing", "analytics", "campaigns", "templates", "automations", "seo", "settings"]],
 ] as const;
 export const finalAdminTitles: Record<string, string> = {
-  products: "상품·커리큘럼 관리",
+  products: "상품·판매 설정",
   conversion: "모집·문의 검토",
   landing: "광고·웨비나 성과",
-  learning: "학습 콘텐츠 관리",
+  learning: "커리큘럼 편집",
   weeks: "주차 구성",
   contents: "영상·자료 관리",
   members: "회원 미션관리",
