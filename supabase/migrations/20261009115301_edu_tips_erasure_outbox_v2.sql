@@ -24,10 +24,12 @@ create table edu_tips_private.erasure_outbox (
  request_id uuid primary key default gen_random_uuid(),
  subject_id uuid not null unique references edu_tips_private.subjects(id),
  reason text not null check(reason in ('consent_withdrawn','account_deleted','identity_retired')),
- requested_at timestamptz not null default clock_timestamp(),
- active_due_at timestamptz not null default clock_timestamp()+interval '72 hours',
- model_due_at timestamptz not null default clock_timestamp()+interval '7 days',
- residual_due_at timestamptz not null default clock_timestamp()+interval '30 days',
+ -- 2026-10-10 conditional candidate; pending TIPS feasibility confirmation.
+ -- One statement timestamp, fixed elapsed UTC hours; retries never extend deadlines.
+ requested_at timestamptz not null default statement_timestamp(),
+ active_due_at timestamptz not null default statement_timestamp()+interval '120 hours',
+ model_due_at timestamptz not null default statement_timestamp()+interval '720 hours',
+ residual_due_at timestamptz not null default statement_timestamp()+interval '720 hours',
  attempt_count integer not null default 0 check(attempt_count>=0),
  next_attempt_at timestamptz not null default clock_timestamp(),
  lease_token uuid,
