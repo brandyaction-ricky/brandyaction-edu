@@ -100,3 +100,13 @@ test('push-first uses SMS only when Alimtalk is unavailable or not selected; all
 test('SMS configuration is available independently of the Alimtalk template',async()=>{
  const c=await server({env:{...environment,EDU_CARE_ALIMTALK_TEMPLATE_ID:''}}).api.careDeliveryConfiguration();assert.equal(c.sms,true);assert.equal(c.alimtalk,false);
 });
+
+test('Kakao routing excludes email/push and chooses one reviewed mobile channel in either mode',()=>{
+ const r={...reach,mobileOnly:true};
+ for(const mode of ['push_first','all']){
+  assert.deepEqual(logic.careChannelsFor(r,config,['push','email','alimtalk','sms'],mode),['alimtalk']);
+  assert.deepEqual(logic.careChannelsFor(r,{...config,alimtalk:false},['push','email','alimtalk','sms'],mode),['sms']);
+  assert.deepEqual(logic.careChannelsFor({...r,sms:false,alimtalk:false},config,['push','email','alimtalk','sms'],mode),[]);
+  assert.deepEqual(logic.careChannelsFor(r,config,['email','push'],mode),[]);
+ }
+});

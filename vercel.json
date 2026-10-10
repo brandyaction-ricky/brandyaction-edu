@@ -3,6 +3,7 @@
   "framework": "nextjs",
   "git": {
     "deploymentEnabled": {
+      "codex/edu-session-care-routing-20261010": false,
       "codex/edu-member-payment-search-20261006": false,
       "codex/edu-curriculum-history-20261006": false,
       "codex/edu-history-release-20261006": false,
@@ -76,7 +77,8 @@
       "codex/edu-consent-prod-20261008": false,
       "codex/edu-consent-b14-release-20261008": false,
       "codex/edu-consent-ads-release-20261010": false,
-      "codex/edu-care-channel-status-release-20261010": false
+      "codex/edu-care-channel-status-release-20261010": false,
+      "codex/edu-session-care-production-20261010": false
     }
   },
   "regions": [

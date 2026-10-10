@@ -112,7 +112,7 @@ export default function SocialConsentPage() {
     setPending(true);
     try {
     await disableDevicePush().catch(() => {});
-    await createClient().auth.signOut();
+    await createClient().auth.signOut({ scope: "local" });
     router.replace("/login");
     router.refresh();
     } catch { setMessage("로그아웃하지 못했습니다. 다시 시도해 주세요."); }
