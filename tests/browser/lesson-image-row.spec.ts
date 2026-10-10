@@ -70,7 +70,10 @@ test('native image drag groups, reorders, limits three, splits and survives save
   const block = (n: number) => canvas.locator(`[data-author-block="image-${n}"]`);
   async function drag(from: number, to: number, side: 'left' | 'right' | 'above' | 'below', handle = false, cancel = false) {
     const target = block(to), source = handle ? block(from).locator('[data-drag-handle]') : block(from).locator('img');
-    await source.scrollIntoViewIfNeeded();
+    // A redo can leave the source underneath the sticky editor/save bars.
+    // Center it, then let Playwright verify pointer hit-testing and stability.
+    await source.evaluate(el => el.scrollIntoView({ block: 'center', behavior: 'instant' }));
+    await source.hover();
     const sourceRect = await source.boundingBox(); expect(sourceRect).not.toBeNull();
     await page.mouse.move(sourceRect!.x + sourceRect!.width / 2, sourceRect!.y + sourceRect!.height / 2);
     await page.mouse.down();
