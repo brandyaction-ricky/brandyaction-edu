@@ -563,7 +563,7 @@ export function Platform({
   const logout = async () => {
     setPending(true);
     await disableDevicePush().catch(() => {});
-    const { error } = await createClient().auth.signOut();
+    const { error } = await createClient().auth.signOut({ scope: "local" });
     if (error) {
       setNotice("로그아웃에 실패했습니다.");
       setPending(false);
