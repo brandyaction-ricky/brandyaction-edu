@@ -77,7 +77,12 @@
       "codex/edu-personalization-consent-20261008": false,
       "codex/edu-consent-reward-dev-20261008": false,
       "codex/edu-dev-prod-reconcile-20261009": false,
-      "codex/edu-care-channel-visibility-20261010": false
+      "codex/edu-care-channel-visibility-20261010": false,
+      "codex/edu-tips-erasure-outbox-20261009": false,
+      "codex/edu-tips-erasure-receipts-20261010": false,
+      "codex/edu-tips-erasure-monitor-20261010": false,
+      "codex/edu-tips-erasure-scheduler-20261010": false,
+      "codex/edu-tips-erasure-integration-20261010": false
     }
   },
   "regions": [
@@ -103,6 +108,10 @@
     {
       "path": "/api/cron/learning-care-delivery",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/tips-erasure-deadlines",
+      "schedule": "0 * * * *"
     }
   ]
 }
