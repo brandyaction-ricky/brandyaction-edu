@@ -14,3 +14,19 @@
 .edu-admin .marketing-workspace-guide li{padding-left:var(--space-1)}
 .edu-admin .marketing-workspace-guide .marketing-workspace-guide-caution{padding:var(--space-2) var(--space-3);border-left:3px solid #d39a20;background:#fffaf0}
 @media(max-width:640px){.edu-admin .marketing-workspace-guide{padding:var(--space-3)}}
+
+/* Keep the task in view; instructions stay available on demand. */
+.edu-admin .marketing-workspace{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 12px}
+.edu-admin .marketing-workspace>:is(strong,p,a),.edu-admin .marketing-workspace>details[open]{grid-column:1/-1}
+.edu-admin .marketing-workspace :is(.marketing-workspace-help,.marketing-workspace-menus)>summary{cursor:pointer;min-height:44px;display:flex;align-items:center;gap:8px;font-weight:600;color:var(--muted)}
+.edu-admin .marketing-workspace :is(.marketing-workspace-help,.marketing-workspace-menus)>summary::before{content:'+';font-size:18px}
+.edu-admin .marketing-workspace :is(.marketing-workspace-help,.marketing-workspace-menus)[open]>summary::before{content:'−'}
+.edu-admin .marketing-workspace :is(.marketing-workspace-help,.marketing-workspace-menus)>summary:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+.edu-admin .marketing-workspace :is(.marketing-workspace-help,.marketing-workspace-menus)>summary::-webkit-details-marker{display:none}
+.edu-admin .marketing-workspace-help .marketing-workspace-guide{margin:0 0 8px}
+.edu-admin .marketing-workspace .marketing-workspace-live-notice{font-size:13px;color:var(--ink)}
+@media(max-width:720px){
+  .edu-admin .marketing-workspace{padding:12px;margin-bottom:20px;min-width:0}
+  .edu-admin .marketing-workspace nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:8px 0}
+  .edu-admin .marketing-workspace nav a{min-width:0;min-height:44px;display:flex;align-items:center;padding:8px;font-size:13px;overflow-wrap:anywhere}
+}

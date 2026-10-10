@@ -498,7 +498,7 @@ test('recruitment links activate explicitly, show distinct channel URLs and stop
 test('integrated workspace separates inquiry review from recruitment and removes duplicate mapping draft', async ({ page }) => {
   await fixture(page);
   await page.goto('/admin/conversion?workspace=1');
-  await expect(page.getByRole('heading', { name: '모집 운영', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '모집·문의 검토', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '모집 경로 초안 저장', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true })).not.toBeVisible();
   await page.getByRole('button', { name: /문의·Jev 검토/ }).click();

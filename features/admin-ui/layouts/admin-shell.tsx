@@ -8,6 +8,7 @@ import {
   LogOut,
   Menu,
   MessageCircle,
+  Search,
   X,
 } from 'lucide-react';
 import Image from 'next/image';
@@ -18,6 +19,7 @@ import {
   adminNavigationIcon,
   adminNavigationGroups,
   adminNavigationTitles,
+  adminNavigationSearchTerms,
   adminSectionTitle,
   normalizeAdminSectionKey,
   type AdminNavigationItem,
@@ -60,6 +62,11 @@ export function AdminShell({
   const contentWidth = adminContentWidth(selected);
   const sidebarRef = useRef<HTMLElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const menuSearchRef = useRef<HTMLInputElement>(null);
+  const [menuQuery, setMenuQuery] = useState('');
+  const query = menuQuery.trim().replace(/\s+/g, '').toLocaleLowerCase();
+  const matchesMenu = (key: string, fallback?: string) => !query || `${adminNavigationTitles[key] || byKey.get(key)?.title || fallback || key} ${adminNavigationSearchTerms[key] || ''}`.replace(/\s+/g, '').toLocaleLowerCase().includes(query);
+  const matchingGroups = groups.map(([title, keys]) => [title, keys.filter(key => matchesMenu(key))] as const).filter(([, keys]) => keys.length > 0);
   const [openGroups, setOpenGroups] = useState(() => new Set(
     groups.filter(([, keys]) => selected === 'overview' || keys.some(key => key === selected)).map(([title]) => title),
   ));
@@ -93,7 +100,7 @@ export function AdminShell({
     if (!sidebar) return;
     const restoreFocus = document.activeElement as HTMLElement | null;
     const previousOverflow = document.body.style.overflow;
-    const focusable = () => Array.from(sidebar.querySelectorAll<HTMLElement>('a[href],button,summary,[tabindex]:not([tabindex="-1"])')).filter(element => !element.hasAttribute('disabled') && element.getClientRects().length > 0);
+    const focusable = () => Array.from(sidebar.querySelectorAll<HTMLElement>('a[href],button,input,summary,[tabindex]:not([tabindex="-1"])')).filter(element => !element.hasAttribute('disabled') && element.getClientRects().length > 0);
     document.body.style.overflow = 'hidden';
     focusable()[0]?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
@@ -141,7 +148,8 @@ export function AdminShell({
       </Link>
     );
   };
-  const extra = ['staff'].filter(key => byKey.has(key));
+  const extra = ['staff'].filter(key => byKey.has(key) && matchesMenu(key));
+  const matchingDirect = (matchesMenu('overview', '운영 홈') ? 1 : 0) + (user.role === 'admin' ? Number(matchesMenu('diagnosis-management')) + Number(matchesMenu('diagnosis', 'N6 진단 받기')) : 0);
   return (
     <>
       <a className="skip" href="#admin-content">본문으로 이동</a>
@@ -163,16 +171,23 @@ export function AdminShell({
         <div className="workspace-label">
           <span className="square">B</span>클래스 운영 워크스페이스
         </div>
+        <div className="admin-menu-search">
+          <Search aria-hidden="true" />
+          <input ref={menuSearchRef} type="search" aria-label="관리자 메뉴 찾기" placeholder="메뉴 찾기" value={menuQuery} onChange={event => setMenuQuery(event.target.value)} />
+          {menuQuery && <button type="button" aria-label="메뉴 검색 지우기" onClick={() => { setMenuQuery(''); menuSearchRef.current?.focus(); }}><X aria-hidden="true" /></button>}
+        </div>
         <nav aria-label="관리자 카테고리">
-          {navLink('overview')}
-          {user.role === 'admin' && <Link href="/admin/diagnosis/manage" className={`nav-link${selected === 'diagnosis-management' ? ' active' : ''}`} aria-current={selected === 'diagnosis-management' ? 'page' : undefined} onClick={() => setMobile(false)}><Compass aria-hidden="true"/>N6 진단 관리</Link>}
-          {user.role === 'admin' && <Link href="/admin/diagnosis" className="nav-link" onClick={() => setMobile(false)}><Compass aria-hidden="true"/>N6 진단 받기</Link>}
-          {groups.map(([title, keys]) => (
+          {matchesMenu('overview', '운영 홈') && navLink('overview')}
+          {user.role === 'admin' && matchesMenu('diagnosis-management') && <Link href="/admin/diagnosis/manage" className={`nav-link${selected === 'diagnosis-management' ? ' active' : ''}`} aria-current={selected === 'diagnosis-management' ? 'page' : undefined} onClick={() => setMobile(false)}><Compass aria-hidden="true"/>N6 진단 관리</Link>}
+          {user.role === 'admin' && matchesMenu('diagnosis', 'N6 진단 받기') && <Link href="/admin/diagnosis" className="nav-link" onClick={() => setMobile(false)}><Compass aria-hidden="true"/>N6 진단 받기</Link>}
+          {query && <p className="admin-menu-search-result" role="status">{matchingGroups.reduce((count, [, keys]) => count + keys.length, extra.length + matchingDirect)}개 메뉴 · 검색어를 지우면 전체 메뉴가 보입니다.</p>}
+          {matchingGroups.map(([title, keys]) => (
             <details
               className="nav-group"
               key={title}
-              open={openGroups.has(title)}
+              open={!!query || openGroups.has(title)}
               onToggle={event => {
+                if (query) return;
                 const isOpen = event.currentTarget.open;
                 setOpenGroups(current => {
                   if (current.has(title) === isOpen) return current;
@@ -187,7 +202,8 @@ export function AdminShell({
             </details>
           ))}
           {extra.length > 0 && (
-            <details className="nav-group" open={openGroups.has('추가 운영 도구')} onToggle={event => {
+            <details className="nav-group" open={!!query || openGroups.has('추가 운영 도구')} onToggle={event => {
+              if (query) return;
               const isOpen = event.currentTarget.open;
               setOpenGroups(current => {
                 if (current.has('추가 운영 도구') === isOpen) return current;

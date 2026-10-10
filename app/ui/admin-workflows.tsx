@@ -18,7 +18,7 @@ import { localDateTime } from "@/lib/platform-rules";
 import { CalendarDays, Copy, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { SubmissionReviewWorkspace } from "./final/lesson-block-reviews";
 import { LessonProgressionSettings } from './final/lesson-progression-settings';
 import { AdminLearningProgress } from './final/admin-learning-progress';
@@ -352,6 +352,13 @@ function CrmManager({ section, data, send, pending }: Props) {
   const courses = rows(data, "courses");
   const [editing, setEditing] = useState<Row | null>(null);
   const [dirty, setDirty] = useState(false);
+  const editorRef = useRef<HTMLFormElement>(null);
+  const focusEditor = () => requestAnimationFrame(() => {
+    const form = editorRef.current;
+    if (!form) return;
+    form.scrollIntoView({ block: "start", behavior: "auto" });
+    form.querySelector<HTMLInputElement>('input[name="name"]')?.focus({ preventScroll: true });
+  });
   const [formVersion, setFormVersion] = useState(0);
   const [message, setMessage] = useState("");
   const [testPending, setTestPending] = useState(false);
@@ -431,7 +438,26 @@ function CrmManager({ section, data, send, pending }: Props) {
   const formKey = `${section}-${editing?.id || editing?._followupKey || "new"}-${formVersion}`;
   return (
     <>
-      <form className="panel pad mb24" onSubmit={async (event) => {
+      <div className="admin-crm-workspace-actions">
+        <p className="meta">목록에서 수정할 항목을 고르거나 아래에서 새로 작성하세요.</p>
+        <AdminButton type="button" variant="outline" onClick={focusEditor}>{editing ? "작성 중인 내용으로 이동" : "새 안내 작성"}</AdminButton>
+      </div>
+      <AdminDataTable
+        label={`${title} 목록`}
+        rows={items}
+        getRowId={item => item.id}
+        columns={[
+          { id: "name", header: "이름·내용", render: item => <div className="admin-crm-primary"><strong>{named(item)}</strong>{section === "templates" && <small title={t(item, "content")}>{t(item, "content")}</small>}{section === "campaigns" && <small>{item.recruitment_id ? "모집 연결 안내" : "일반 캠페인"}</small>}</div> },
+          { id: "scope", header: section === "templates" ? "채널·목적" : section === "campaigns" ? "예약 시각" : "실행 조건", render: item => section === "templates" ? `${String(item.channel).toUpperCase()} · ${item.purpose === "marketing" ? "마케팅" : "정보성"}` : section === "campaigns" ? item.scheduled_at ? timeLabel(item.scheduled_at) : "예약 미정" : `${t(item, "trigger_type")} · ${Number(item.delay_minutes || 0)}분 후` },
+          ...(section === "campaigns" ? [{ id: "delivery", header: "발송", render: (item: Row) => `대상 ${Number(item.recipient_count || 0)} · 성공 ${Number(item.success_count || 0)} · 실패 ${Number(item.failure_count || 0)}` }] : []),
+          { id: "status", header: "상태", render: item => <AdminStatusBadge status={section === "campaigns" ? t(item, "status") : item.is_active ? "active" : "inactive"} label={section === "templates" && item.channel === "alimtalk" && (!item.is_active || !item.alimtalk_template_id) ? "준비 중 · 미발송" : section === "automations" ? item.is_active ? "자동 실행 중" : "중지" : undefined} /> },
+          { id: "action", header: "관리", align: "action" as const, render: item => <AdminButton size="sm" variant="outline" disabled={pending || (section === "campaigns" && (!!item.recruitment_id || ["sending", "completed"].includes(t(item, "status"))))} onClick={() => { if (pending || (dirty && !window.confirm("저장하지 않은 변경사항을 버리고 다른 항목을 수정할까요?"))) return; setEditing(item); setDirty(false); setMessage(""); focusEditor(); }}>수정</AdminButton> },
+        ]}
+        empty={<AdminEmptyState title={section === "templates" ? "등록된 메시지 템플릿이 없습니다." : section === "campaigns" ? "등록된 예약 캠페인이 없습니다." : "등록된 자동 메시지가 없습니다."} />}
+      />
+      <details className="panel admin-crm-settings mb24">
+        <summary>문자 발송 설정 <span>발신번호·수신거부 번호 확인</span></summary>
+      <form className="pad" onSubmit={async (event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
         try {
@@ -468,8 +494,9 @@ function CrmManager({ section, data, send, pending }: Props) {
         <p className="meta mt16">광고 문자는 자동으로 <b>(광고) 발신자명</b>과 <b>무료수신거부 080번호</b>를 붙입니다. 정보성 결제 안내에는 광고 문구를 붙이지 않습니다. 전체 발송은 서버의 안전 스위치가 켜져야 실행됩니다.</p>
         {Boolean(smsSettings?.canConfigure) && <button className="btn small mt16" disabled={pending || !(smsSettings?.senders as string[] || []).length}>문자 설정 저장</button>}
       </form>
-      {section === "templates" && <FollowupTemplateSource blocked={pending || dirty || !!editing} onApply={value => { setEditing(value); setMessage(""); }}/>}
-      <form key={formKey} className="panel pad mb24" onChange={()=>setDirty(true)} onSubmit={submit}>
+      </details>
+      {section === "templates" && <FollowupTemplateSource blocked={pending || dirty || !!editing} onApply={value => { setEditing(value); setMessage(""); focusEditor(); }}/>}
+      <form ref={editorRef} key={formKey} className="panel pad mb24 admin-crm-editor" onChange={()=>setDirty(true)} onSubmit={submit}>
         <div className="between">
           <h2>
             {title} {editing?.id ? "수정" : "등록"}
@@ -480,10 +507,12 @@ function CrmManager({ section, data, send, pending }: Props) {
               type="button"
               size="sm" variant="outline"
               onClick={() => {
+                if (pending || (dirty && !window.confirm("저장하지 않은 변경사항을 버리고 새로 등록할까요?"))) return;
                 setEditing(null);
                 setDirty(false);
                 setFormVersion(value=>value+1);
                 setMessage("");
+                focusEditor();
               }}
             >
               새로 등록
@@ -670,19 +699,7 @@ function CrmManager({ section, data, send, pending }: Props) {
           <Status message={testMessage} />
         </div>
       )}
-      <AdminDataTable
-        label={`${title} 목록`}
-        rows={items}
-        getRowId={item => item.id}
-        columns={[
-          { id: "name", header: "이름·내용", render: item => <div className="admin-crm-primary"><strong>{named(item)}</strong>{section === "templates" && <small title={t(item, "content")}>{t(item, "content")}</small>}{section === "campaigns" && <small>{item.recruitment_id ? "모집 연결 안내" : "일반 캠페인"}</small>}</div> },
-          { id: "scope", header: section === "templates" ? "채널·목적" : section === "campaigns" ? "예약 시각" : "실행 조건", render: item => section === "templates" ? `${String(item.channel).toUpperCase()} · ${item.purpose === "marketing" ? "마케팅" : "정보성"}` : section === "campaigns" ? item.scheduled_at ? timeLabel(item.scheduled_at) : "예약 미정" : `${t(item, "trigger_type")} · ${Number(item.delay_minutes || 0)}분 후` },
-          ...(section === "campaigns" ? [{ id: "delivery", header: "발송", render: (item: Row) => `대상 ${Number(item.recipient_count || 0)} · 성공 ${Number(item.success_count || 0)} · 실패 ${Number(item.failure_count || 0)}` }] : []),
-          { id: "status", header: "상태", render: item => <AdminStatusBadge status={section === "campaigns" ? t(item, "status") : item.is_active ? "active" : "inactive"} label={section === "templates" && item.channel === "alimtalk" && (!item.is_active || !item.alimtalk_template_id) ? "준비 중 · 미발송" : section === "automations" ? item.is_active ? "자동 실행 중" : "중지" : undefined} /> },
-          { id: "action", header: "관리", align: "action" as const, render: item => <AdminButton size="sm" variant="outline" disabled={section === "campaigns" && (!!item.recruitment_id || ["sending", "completed"].includes(t(item, "status")))} onClick={() => { setEditing(item); setDirty(false); setMessage(""); }}>수정</AdminButton> },
-        ]}
-        empty={<AdminEmptyState title={section === "templates" ? "등록된 메시지 템플릿이 없습니다." : section === "campaigns" ? "등록된 예약 캠페인이 없습니다." : "등록된 자동 메시지가 없습니다."} />}
-      />
+
     </>
   );
 }
@@ -1575,7 +1592,7 @@ function SettingsForm({ section, data, send, pending }: Props) {
                 <div className="between wrap-flex"><div><h2>측정·추가 코드 관리</h2><p className="meta mt8">방문 기록과 무료클래스 광고 측정, 검토 전 추가 코드 초안을 관리합니다.</p></div><AdminButton variant="primary" type="button" onClick={() => setCodeOpen(true)}>+ 추가 코드</AdminButton></div>
                 <AdminDataTable className="mt24" label="측정·추가 코드 목록"><thead><tr><th>항목</th><th>적용 범위</th><th>관리</th></tr></thead><tbody>
                   <tr><td><strong>공개 페이지 방문 기록</strong><p className="meta">방문·아티클·클래스 조회와 신청 버튼 클릭</p></td><td>사이트 공개 페이지</td><td><AdminLinkButton size="sm" href="/admin/settings">운영·트래킹 설정</AdminLinkButton></td></tr>
-                  <tr><td><strong>무료클래스 픽셀·이벤트</strong><p className="meta">클래스별 CTA와 광고 이벤트 측정</p></td><td>선택한 무료클래스</td><td><AdminLinkButton size="sm" href="/admin/landing">무료클래스 트래킹</AdminLinkButton></td></tr>
+                  <tr><td><strong>무료클래스 픽셀·이벤트</strong><p className="meta">클래스별 CTA와 광고 이벤트 측정</p></td><td>선택한 무료클래스</td><td><AdminLinkButton size="sm" href="/admin/landing">광고·웨비나 성과</AdminLinkButton></td></tr>
                   {measurementCodes.map(code => <tr key={code.id}><td><strong>{t(code, "name")}</strong><p className="meta">{t(code, "purpose")}</p></td><td>{code.scope === "public" ? "사이트 공개 페이지" : "랜딩페이지만"} · {code.location === "body-end" ? "Body 끝" : "Head"}</td><td><AdminStatusBadge status="draft" label="초안" tone="warning" /></td></tr>)}
                 </tbody></AdminDataTable>
                 <p className="notice mt24">추가 코드는 초안으로만 저장되며 이 화면이나 고객 페이지에서 실행되지 않습니다. 검토·테스트·승인 후 별도 개발 단계에서 적용합니다.</p>
