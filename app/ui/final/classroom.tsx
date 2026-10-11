@@ -1,4 +1,5 @@
 "use client";
+import './classroom-surface.css';
 import { curriculumDay } from '@/lib/curriculum-days';
 import { LearningProgress } from './learning-progress';
 import { DiagnosisEntry } from './diagnosis-entry';

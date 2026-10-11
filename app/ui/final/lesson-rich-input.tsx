@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { EditorContent, useEditor, useEditorState, Extension, InputRule, wrappingInputRule, type Editor } from "@tiptap/react";
+import { EditorContent, useEditor, useEditorState, Extension, InputRule, wrappingInputRule, Node, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Blockquote from "@tiptap/extension-blockquote";
 import { Details, DetailsContent, DetailsSummary } from "@tiptap/extension-details";
@@ -61,7 +61,7 @@ const LessonDetails = Details.extend({
     element.contentEditable = "false";
     element.setAttribute("aria-label", isOpen ? "내용 접기" : "내용 펼치기");
     element.setAttribute("aria-expanded", String(isOpen));
-    element.textContent = isOpen ? "▾" : "▸";
+    element.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>';
     // ProseMirror's Enter/Space handlers must not consume a focused button.
     element.onkeydown = event => {
       if (event.key === "Enter" || event.key === " ") {
@@ -89,7 +89,8 @@ export function lessonRichExtensions() {
       // input rule and discards its undo state. Enter already creates paragraphs.
       heading: { levels: [1, 2, 3] }, trailingNode: false, blockquote: false, code: false, codeBlock: false, horizontalRule: false,
       link: { openOnClick: false, HTMLAttributes: { target: "_blank", rel: "noopener noreferrer" }, isAllowedUri: url => Boolean(safeUrl(url)) },
-    }), TextStyle, LessonFontSize, LessonColor, LessonBackgroundColor, LessonQuote, LessonDetails, DetailsSummary, DetailsContent, LessonCallout, LessonInputUndo];
+    }), TextStyle, LessonFontSize, LessonColor, LessonBackgroundColor, LessonQuote, LessonDetails, DetailsSummary, DetailsContent, LessonCallout, LessonInputUndo,
+    Node.create({ name: 'lessonImage', group: 'block', atom: true, addAttributes: () => ({ blockId: { default: null } }), renderHTML: () => ['div', { 'data-lesson-image-reference': '' }, '이미지 · 문서 편집 화면에서 확인'] })];
 }
 
 export function LessonRichInput({ value, onChange, label = "학습 내용", disabled = false, name, id, showLabel = true }: LessonBodyEditorProps) {

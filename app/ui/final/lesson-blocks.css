@@ -4,33 +4,33 @@
 .lesson-blocks .reading-copy { white-space:pre-wrap; }
 .lesson-blocks figure { margin:0; }
 .lesson-blocks img, .lesson-blocks audio, .lesson-blocks video { max-width:100%; }
-.lesson-blocks img { height:auto; border-radius:8px; }
+.lesson-blocks img { height:auto; border-radius:12px; }
 .lesson-blocks audio { width:100%; margin-top:8px; }
 .lesson-blocks hr { border:0; border-top:1px solid #d8dde3; margin:8px 0; }
-.lesson-blocks .lb-card { border:1px solid #d8dde3; border-radius:10px; padding:20px; margin:0; min-width:0; background:#fff; }
+.lesson-blocks .lb-card { border:1px solid #e2e6ec; border-radius:16px; padding:24px; margin:0; min-width:0; background:#fff; box-shadow:0 2px 8px #17223804; }
 .lesson-blocks fieldset { min-width:0; }
 .lesson-blocks fieldset fieldset { border:0; margin:16px 0; padding:0; }
 .lesson-blocks legend { font-weight:650; }
 .lb-field { display:grid; gap:8px; margin:16px 0; }
 .lb-field > span { font-weight:600; }
-.lb-field input, .lb-field select, .lb-field textarea { width:100%; min-width:0; border:1px solid #adb5bf; border-radius:6px; padding:12px; font:inherit; color:inherit; background:#fff; box-sizing:border-box; }
+.lb-field input, .lb-field select, .lb-field textarea { width:100%; min-width:0; border:1px solid #c7d0dd; border-radius:10px; padding:12px 14px; font:inherit; color:inherit; background:#fff; box-sizing:border-box; }
 .lb-field textarea { resize:vertical; }
 .lb-field :focus-visible, .lesson-blocks button:focus-visible, .lb-choice input:focus-visible { outline:3px solid #507fbe; outline-offset:2px; }
 .lb-field small { color:#586371; }
 .lb-choice { display:flex; align-items:flex-start; gap:10px; padding:10px 0; min-height:44px; cursor:pointer; }
 .lb-choice input { flex:0 0 auto; margin-top:6px; width:18px; height:18px; }
-.lb-prompt { padding:16px; border:1px solid #d8dde3; background:#f5f7fa; border-radius:8px; margin-top:12px; }
+.lb-prompt { padding:20px; border:1px solid #e2e8f0; background:#f8fafc; border-radius:14px; margin-top:12px; }
 .lb-prompt pre { white-space:pre-wrap; overflow-wrap:anywhere; font:inherit; margin:0 0 16px; max-height:min(28rem, 50vh); max-height:min(28rem, 50dvh); overflow:auto; scrollbar-gutter:stable; }
 .lb-prompt pre:focus-visible { outline:3px solid #507fbe; outline-offset:3px; }
 @media print { .lb-prompt pre { max-height:none; overflow:visible; } }
 .lb-prompt [role=status] { display:block; margin-top:8px; }
-.lesson-blocks .btn { white-space:normal; min-height:44px; }
+.lesson-blocks .btn { white-space:normal; min-height:44px; border-radius:10px; }
 .lb-link { color:#1757a1; text-decoration:underline; }
 .lb-save-status { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:12px 0; position:sticky; top:0; z-index:2; background:#fff; border-bottom:1px solid #e0e4e9; margin-bottom:20px; }
 .lb-save-status [role=status] { flex:1 1 180px; }
 .lb-session-notice { border:1px solid #e1c679; border-radius:8px; padding:16px; margin-bottom:16px; background:#fff9e9; }
 @media(max-width:540px) { .lesson-blocks .lb-card { padding:14px; } .edu-front .learning-content > .lesson-block-session { padding:16px; } }
-.edu-front .learning-content > .lesson-block-session { padding:32px; margin-top:16px; min-width:0; background:#fff; border:1px solid #d8dde3; border-radius:8px; }
+.edu-front .learning-content > .lesson-block-session { padding:32px; margin-top:16px; min-width:0; background:#fff; border:1px solid #e2e6ec; border-radius:18px; box-shadow:0 4px 18px #17223804; }
 .lb-review-queue { display: grid; gap: 10px; }
 .lb-review-queue .btn { text-align: left; justify-content: flex-start; white-space: normal; overflow-wrap: anywhere; height: auto; }
 .lb-review-queue .btn[aria-pressed="true"] { border: 2px solid var(--brand, #c8192b); }
@@ -63,3 +63,11 @@
 .lb-image-dialog .lb-image-zoom img { display:block; width:auto; max-width:100%; height:auto; margin:auto; }
 .lb-image-dialog .lb-image-zoom.is-original img { width:auto; max-width:none; margin:0; }
 @media(max-width:540px) { .lesson-blocks.has-image-rows { column-gap:8px; } }
+.lesson-blocks .lb-choice { border-radius:10px; padding:12px; margin:6px 0; background:#f8fafc; border:1px solid transparent; }
+.lesson-blocks .lb-choice:has(input:checked) { background:#fff5f6; border-color:#f0c9d0; }
+.lesson-blocks .lb-choice:focus-within { border-color:#8da4c4; }
+.lesson-blocks .lb-choice input { accent-color:var(--brand,#c51e2c); }
+.lesson-blocks figcaption { margin-top:10px; color:#69758a; font-size:14px; line-height:1.7; }
+.lesson-blocks .lb-link-card { border-color:#e2e6ec; border-radius:14px; }
+.lb-image-dialog { border-radius:18px; border-color:#e2e6ec; box-shadow:0 24px 80px #1722382e; }
+@media(max-width:540px) { .edu-front .learning-content > .lesson-block-session { padding:18px; border-radius:14px; } }
