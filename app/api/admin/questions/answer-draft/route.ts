@@ -45,6 +45,9 @@ export async function POST(request: Request) {
    draft = await generate(true);
    if (outsideBeginnerScope.test(draft)) draft = '해당 수업 자료만으로는 정확한 방법을 확인하기 어렵습니다. 어느 화면에서 어떤 버튼을 누른 뒤 막혔는지 알려주시면, 수업 내용 안에서 확인해 안내해 드릴게요.';
   }
+  const active = await db.from('edu_questions').select('id').eq('id', questionId).eq('is_archived', false).maybeSingle();
+  if (active.error) throw active.error;
+  if (!active.data) return reply({error:'질문이 삭제되거나 보관되어 초안을 사용할 수 없습니다.'},404);
   if (enhanced) {
    const current = await getOperatorUser('members'); if (!current || current.id !== operator.id) return reply({error:'회원 관리 권한이 변경되었습니다. 다시 로그인해 주세요.'},403);
    // A long generation may overlap another operator's reply. Never auto-publish it.

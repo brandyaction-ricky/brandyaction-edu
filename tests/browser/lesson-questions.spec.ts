@@ -38,3 +38,15 @@ test('graduate can still open a private lesson question while lesson completion 
  await expect(page.getByRole('textbox',{name:'질문 제목'})).toBeVisible();
  await expect(page.getByText('졸업 후에도 질문할 수 있습니다.',{exact:false})).toBeVisible();
 });
+test('student can delete their lesson question without leaving the classroom',async({page})=>{
+ let deleted=false;
+ await page.route('**/api/platform/lesson-questions?**',r=>r.fulfill({json:{questions:deleted?[]:[{id:id(9),title:'해결된 수업 질문',content:'질문 본문',status:'answered',mine:true,visibility:'private'}],hasMore:false}}));
+ await page.route('**/api/platform/question-delete?**',r=>r.fulfill({json:{supported:true,canDelete:true,headId:null}}));
+ await page.route('**/api/platform/question-delete',r=>{deleted=true;return r.fulfill({json:{id:id(9),deletedAt:new Date().toISOString()}});});
+ await page.goto('/classroom-questions-test');
+ await page.getByRole('button',{name:'질문 삭제',exact:true}).click();
+ await page.getByRole('dialog').getByRole('button',{name:'질문 삭제',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'해결된 수업 질문'})).toHaveCount(0);
+ await expect(page.getByRole('status')).toContainText('질문을 삭제했습니다.');
+ await expect(page).toHaveURL(/classroom-questions-test/);
+});

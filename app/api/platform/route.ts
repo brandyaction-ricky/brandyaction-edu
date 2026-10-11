@@ -1,4 +1,5 @@
 import { memberDirectoryScope } from '@/lib/member-directory';
+import { questionDeletionReady } from '@/lib/question-deletion-server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { reviewMutation, reviewWriteError } from '@/lib/submission-review';
 import { createClient } from '@/lib/supabase/server';
@@ -295,6 +296,7 @@ export async function GET(request: Request) {
                         : '*';
                 const serverPaged = adminMode && !productEditorRead && table === primaryTable && !['home', 'members', 'reviews', 'analytics', 'metrics', 'seo', 'settings', 'staff', 'templates', 'campaigns', 'automations'].includes(sectionKey);
                 let query = db.from(table).select(columns, serverPaged ? { count: 'exact' } : undefined);
+                if (adminMode && table === 'edu_questions' && await questionDeletionReady(db)) query = query.is('deleted_at', null);
                 // Export credentials belong only to the server integration, including admin reads.
                 if (table === 'site_settings') query = query.neq('key', 'export_v1');
                 if (adminMode && table === 'coupons' && operator?.role !== 'admin') query = query.neq('discount_type', 'ADMIN_FREE');

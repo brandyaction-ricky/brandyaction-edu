@@ -11,6 +11,7 @@ import { AppInstallCard } from './app-install';
 import { DiagnosisEntry } from './diagnosis-entry';
 import { QuestionImage } from './question-image';
 import { QuestionAnswerHistory } from './question-thread';
+import { QuestionDeleteControl } from './question-delete-control';
 import { AnswerText } from './lesson-text';
 import { MemberMessages } from './member-messages';
 import { EncouragementEditor, EncouragementWall } from './member-encouragement';
@@ -694,6 +695,7 @@ function LegacyQuestions({
     [writing, setWriting] = useState(!!order),
     [error, setError] = useState("");
   const [threadStatuses, setThreadStatuses] = useState<Record<string, string>>({});
+  const [deletedQuestions, setDeletedQuestions] = useState<string[]>([]);
   const questionStatus = (q: Row) => threadStatuses[String(q.id)] || q.status;
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -715,8 +717,8 @@ function LegacyQuestions({
   }
   const list = rows(data, "edu_questions").filter(
     (q) =>
-      filter === "전체" ||
-      (questionStatus(q) === "answered" ? "답변 완료" : "답변 대기") === filter,
+      !deletedQuestions.includes(String(q.id)) && (filter === "전체" ||
+      (questionStatus(q) === "answered" ? "답변 완료" : "답변 대기") === filter),
   );
   return (
     <>
@@ -766,6 +768,7 @@ function LegacyQuestions({
           </button>
         ))}
       </div>
+      {deletedQuestions.length > 0 && <p className="meta" role="status">질문을 삭제했습니다.</p>}
       {list.map((q) => (
         <article className="question-card" key={q.id}>
           <div className="between">
@@ -785,6 +788,7 @@ function LegacyQuestions({
           ) : (
             <p className="meta mt16">답변이 도착하면 이곳에서 확인해 주세요.</p>
           )}
+          {process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED === 'true' && <div className="question-card-actions"><QuestionDeleteControl questionId={String(q.id)} onDeleted={() => setDeletedQuestions(old => [...old, String(q.id)])}/></div>}
         </article>
       ))}
       {!list.length && <Empty title="이 상태의 질문이 없습니다." />}

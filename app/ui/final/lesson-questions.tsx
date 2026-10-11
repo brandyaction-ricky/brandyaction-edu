@@ -64,7 +64,7 @@ export function LessonQuestions({ enrollmentId, lessonId, lessonTitle }: { enrol
     </form>}
     {notice && <p role="status">{notice}</p>}
     {loading ? <p role="status">질문을 불러오고 있습니다.</p> : readError ? <p role="alert">{readError} <button type="button" className="btn small" onClick={()=>{setLoading(true);setVersion(v=>v+1);}}>질문 다시 불러오기</button></p> : <>
-      {questions.map(question => <QuestionCard key={question.id} question={question} changed={() => setVersion(v => v + 1)}/>)}
+      {questions.map(question => <QuestionCard key={question.id} question={question} changed={() => setVersion(v => v + 1)} deleted={() => { setNotice('질문을 삭제했습니다.'); setLoading(true); setVersion(v => v + 1); }}/>) }
       {!questions.length && <p className="meta">이 학습에 남긴 질문이 없습니다.</p>}
       {(page>0 || hasMore) && <div className="row"><button type="button" className="btn small" disabled={page===0} onClick={()=>{setLoading(true);setPage(p=>p-1);}}>이전 질문</button><span>{page+1}페이지</span><button type="button" className="btn small" disabled={!hasMore} onClick={()=>{setLoading(true);setPage(p=>p+1);}}>다음 질문</button></div>}
     </>}
