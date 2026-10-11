@@ -58,8 +58,9 @@ test('learner confirms deletion of only their question and the list updates',asy
  await page.getByRole('button',{name:'질문 삭제',exact:true}).click();
  await dialog.getByRole('button',{name:'질문 삭제',exact:true}).click();
  expect(writes).toEqual([{questionId:id(9),expectedHeadId:id(10)}]);
+ await expect(page.getByRole('status').filter({hasText:'질문을 삭제했습니다.'})).toBeVisible();
+ await expect(page.getByRole('status').filter({hasText:'불러오고 있습니다.'})).toHaveCount(0);
  await expect(page.getByRole('heading',{name:'정리할 질문'})).toHaveCount(0);
- await expect(page.getByRole('status')).toContainText('질문을 삭제했습니다.');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 test('operator shares only separately reviewed text and can prepare/import an Aside draft without sending it',async({page})=>{
