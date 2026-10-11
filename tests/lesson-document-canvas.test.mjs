@@ -14,6 +14,23 @@ const {lessonCanvasNodes,blocksFromCanvas,duplicateLessonBlock} = load('lesson-d
 const {newGuidedBlock} = load('lesson-guided-tools');
 const {newCalculatorBlock} = load('lesson-calculators');
 const {lessonDocumentForEditor, serializeLessonDocument, parseLessonDocument, normalizeLessonDocument, lessonBodyPlainText} = load('lesson-body');
+const {positionLessonImage} = load('lesson-image-position');
+const {lessonEmbeddedImageIds, removeLessonImageReference} = load('lesson-toggle-images');
+const {cloneLessonCards} = load('lesson-editor-import');
+test('toggle images keep authorized flat assets through projection, copying and moving back out',()=>{
+ const image={id:'photo',type:'image',assetId:'aaaaaaaa-1111-4111-8111-111111111111',alt:'파일 안내',content:'원본 설명'};
+ const owner={id:'toggle',type:'text',content:serializeLessonDocument({type:'doc',content:[{type:'details',content:[{type:'detailsSummary',content:[{type:'text',text:'자료'}]},{type:'detailsContent',content:[{type:'paragraph'}]}]}]})};
+ const original=[owner,image,blocks[3]], moved=positionLessonImage(original,image,{blockId:'toggle',togglePath:[0,1]},'unused');
+ assert.deepEqual(moved.slice(1),original.slice(1)); assert.deepEqual([...lessonEmbeddedImageIds(moved)],['photo']);
+ assert.deepEqual(blocksFromCanvas(lessonCanvasNodes(moved)),moved);
+ const doc=parseLessonDocument(moved[0].content);assert.deepEqual(doc.content[0].content[1].content[1],{type:'lessonImage',attrs:{blockId:'photo'}});
+ const copied=cloneLessonCards(moved);assert.deepEqual([...lessonEmbeddedImageIds(copied)],[copied[1].id]);assert.equal(copied[1].assetId,image.assetId);
+ assert.throws(()=>cloneLessonCards([moved[0]]),/이미지도 함께/);
+ assert.deepEqual(positionLessonImage(moved,image,{blockId:'toggle',after:true},'unused'),original);
+ assert.equal(lessonEmbeddedImageIds(removeLessonImageReference(moved,'photo')).size,0);
+ const unsafe={type:'doc',content:[{type:'lessonImage',attrs:{blockId:'photo',src:'javascript:bad',style:'position:fixed',block:{quiz:{privateKey:1}}}}]};
+ assert.deepEqual(parseLessonDocument(serializeLessonDocument(unsafe)).content,[{type:'lessonImage',attrs:{blockId:'photo'}}]);
+});
 const blocks = [
   {id:'raw',type:'text',content:'원문\n\n[링크](https://example.com)'}, {id:'h',type:'heading',content:'한 제목'},
   {id:'s',type:'subheading',content:'작은 제목'}, {id:'q',type:'question',question:{label:'기존 질문',kind:'image',required:true}},

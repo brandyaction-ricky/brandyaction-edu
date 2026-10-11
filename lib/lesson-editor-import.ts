@@ -1,4 +1,5 @@
 import { isCalculator } from './lesson-calculators';
+import { remapLessonImages } from './lesson-toggle-images';
 import { isGuidedTool } from './lesson-guided-tools';
 import type { LessonBlock, LessonBlockDocument, LessonBlockType } from './lesson-blocks';
 
@@ -148,7 +149,9 @@ export function parseCurriculumText(raw: string): TextImportResult {
 // Block identity scopes all learner answers. Fresh block/quiz IDs make copies
 // independent; built-in tool field IDs are semantic contracts, so retain them.
 export function cloneLessonCards(blocks: LessonBlock[]): LessonBlock[] {
-  return structuredClone(blocks).map(block => ({ ...block, id: uid(),
+  const ids = new Map(blocks.map(block => [block.id, uid()]));
+  return structuredClone(blocks).map(block => ({ ...block, id: ids.get(block.id)!,
+    ...(block.type === 'text' && block.content ? { content: remapLessonImages(block.content, ids) } : {}),
     ...(block.fields && !isGuidedTool(block.type) && !isCalculator(block.type) ? { fields: block.fields.map(field => ({ ...field, id: uid() })) } : {}),
     ...(block.quiz ? { quiz: { ...block.quiz, questions: block.quiz.questions.map(q => ({ ...q, id: uid() })) } } : {}),
   }));

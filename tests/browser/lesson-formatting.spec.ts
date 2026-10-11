@@ -15,7 +15,7 @@ test('top notice edits inline and survives learner rendering and reopening', asy
   await page.getByRole('button', { name: '학습 저장', exact: true }).click();
   const learner = page.getByRole('region', { name: '저장된 학습자 화면' });
   await expect(learner.getByRole('complementary', { name: '학습 안내' })).toContainText('강의를 시작하기 전에 안내를 확인하세요.');
-  await expect(learner.locator('[data-lesson-callout]')).toHaveCSS('background-color', 'rgb(255, 249, 232)');
+  await expect(learner.locator('[data-lesson-callout]')).toHaveCSS('background-color', 'rgb(255, 251, 240)');
   await page.getByRole('button', { name: '저장한 학습 다시 열기' }).click();
   await expect(callout).toContainText('강의를 시작하기 전에 안내를 확인하세요.');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
