@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { getOperatorUser } from '@/lib/operator-permissions';
 import { uuid } from '@/lib/edu-workflows';
+import { questionDeletionReady } from '@/lib/question-deletion-server';
 
 const reply = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'private, no-store' } });
 // A read-only projection of existing records. No progress or access rules live here.
@@ -23,7 +24,10 @@ export async function GET(request: Request) {
     if (view === 'enrollments') query = db.from('enrollments').select('id,course_id,cohort_id,status,access_starts_at,access_ends_at,created_at,courses(id,title),cohorts(id,name)', { count: 'exact' }).eq('user_id', member).order('created_at', { ascending: false });
     else if (view === 'progress') query = db.from('lesson_progress').select(`id,lesson_id,enrollment_id,progress_percent,completed_at,updated_at,curriculum_lessons(id,title,day_number),${enrollment}`, { count: 'exact' }).eq('enrollments.user_id', member).order('updated_at', { ascending: false });
     else if (view === 'submissions') query = db.from('mission_submissions').select(`id,enrollment_id,status,attempt_number,submitted_at,reviewed_at,reviewer_feedback,curriculum_missions(id,title),${enrollment}`, { count: 'exact' }).eq('enrollments.user_id', member).order('submitted_at', { ascending: false });
-    else query = db.from('edu_questions').select('id,title,status,is_archived,created_at,updated_at,courses(id,title)', { count: 'exact' }).eq('user_id', member).order('created_at', { ascending: false });
+    else {
+      query = db.from('edu_questions').select('id,title,status,is_archived,created_at,updated_at,courses(id,title)', { count: 'exact' }).eq('user_id', member).order('created_at', { ascending: false });
+      if (await questionDeletionReady(db)) query = query.is('deleted_at', null);
+    }
     const result = await query.order('id').range((page - 1) * pageSize, page * pageSize - 1);
     if (result.error) throw result.error;
     return reply({ rows: result.data || [], total: result.count || 0, page, pageSize });

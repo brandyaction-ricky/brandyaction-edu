@@ -9,6 +9,7 @@ type DeleteResult = { id: string; deletedAt: string };
 export function QuestionDeleteControl({ questionId, onDeleted }: { questionId: string; onDeleted: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const requestNumber = useRef(0);
+  const deleting = useRef(false);
   const requestBody = useRef<{ questionId: string; expectedHeadId: string | null } | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'busy' | 'uncertain' | 'unsupported'>('loading');
   const [error, setError] = useState('');
@@ -39,7 +40,8 @@ export function QuestionDeleteControl({ questionId, onDeleted }: { questionId: s
   }
 
   async function remove() {
-    if (!requestBody.current || !['ready', 'uncertain'].includes(state)) return;
+    if (deleting.current || !requestBody.current || !['ready', 'uncertain'].includes(state)) return;
+    deleting.current = true;
     const current = requestNumber.current;
     setState('busy');
     setError('');
@@ -53,12 +55,14 @@ export function QuestionDeleteControl({ questionId, onDeleted }: { questionId: s
       if (current !== requestNumber.current) return;
       const failure = cause as Error & { status?: number };
       setError(failure.message);
-      setState(failure.status === 409 ? 'loading' : 'uncertain');
+      setState(failure.status && failure.status < 500 ? 'loading' : 'uncertain');
+    } finally {
+      deleting.current = false;
     }
   }
 
   function close() {
-    if (state === 'busy') return;
+    if (deleting.current) return;
     ++requestNumber.current;
     requestBody.current = null;
     dialog.current?.close();
