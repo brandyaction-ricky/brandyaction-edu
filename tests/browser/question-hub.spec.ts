@@ -37,6 +37,30 @@ test('learner resolves an answered question without adding an answer',async({pag
  await page.route('**/api/platform/question-thread?**',r=>{if(r.request().method()==='POST'){writes.push(r.request().postDataJSON());resolved=true;return r.fulfill({json:{id:id(9),resolved:true}});}return r.fulfill({json:{question:{id:id(9),title:'내 질문',content:'질문 본문',headId:id(10),status:'answered',resolved},answers:[{id:id(10),content:'운영자 답변',authorName:'운영자',source:'operator'}],canFollowUp:true,nextCursor:null}});});
  await page.goto('/question-hub-test');await page.getByRole('tab',{name:'내 질문',exact:true}).click();await page.getByRole('button',{name:'답변 전체 보기'}).click();await page.getByRole('button',{name:'해결됐어요 · 질문 종료',exact:true}).click();await expect(page.getByText('질문 종료',{exact:true}).last()).toBeVisible();expect(writes).toEqual([{action:'finish',questionId:id(9),expectedHeadId:id(10)}]);
 });
+test('learner confirms deletion of only their question and the list updates',async({page})=>{
+ await backend(page);
+ let deleted=false;
+ const writes:Record<string,unknown>[]=[];
+ await page.route('**/api/platform/question-hub?mode=mine**',r=>r.fulfill({json:{questions:deleted?[]:[{id:id(9),title:'정리할 질문',content:'질문 본문',status:'answered',is_resolved:true,visibility:'private'}],hasMore:false}}));
+ await page.route('**/api/platform/question-hub?mode=public**',r=>r.fulfill({json:{questions:[{id:id(19),title:'다른 수강생 질문',content:'공개 본문',status:'open',mine:false,visibility:'cohort'}],hasMore:false}}));
+ await page.route('**/api/platform/question-delete?**',r=>r.fulfill({json:{supported:true,canDelete:true,headId:id(10)}}));
+ await page.route('**/api/platform/question-delete',r=>{writes.push(r.request().postDataJSON());deleted=true;return r.fulfill({json:{id:id(9),deletedAt:new Date().toISOString()}});});
+ await page.goto('/question-hub-test');
+ await expect(page.getByRole('heading',{name:'다른 수강생 질문'})).toBeVisible();
+ await expect(page.getByRole('button',{name:'질문 삭제'})).toHaveCount(0);
+ await page.getByRole('tab',{name:'내 질문',exact:true}).click();
+ await page.getByRole('button',{name:'질문 삭제',exact:true}).click();
+ const dialog=page.getByRole('dialog');
+ await expect(dialog).toContainText('질문과 답변이 사라집니다');
+ await dialog.getByRole('button',{name:'취소'}).click();
+ expect(writes).toHaveLength(0);
+ await page.getByRole('button',{name:'질문 삭제',exact:true}).click();
+ await dialog.getByRole('button',{name:'질문 삭제',exact:true}).click();
+ expect(writes).toEqual([{questionId:id(9),expectedHeadId:id(10)}]);
+ await expect(page.getByRole('heading',{name:'정리할 질문'})).toHaveCount(0);
+ await expect(page.getByRole('status')).toContainText('질문을 삭제했습니다.');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
 test('operator shares only separately reviewed text and can prepare/import an Aside draft without sending it',async({page})=>{
  let sharedSaved=false,job:Record<string,unknown>|null=null;const answers:Record<string,unknown>[]=[];
  await page.route('**/api/platform/question-thread?**',r=>r.request().method()==='POST'?(answers.push(r.request().postDataJSON()),r.fulfill({json:{id:answers.at(-1)!.requestId,questionId:id(9)}})):r.fulfill({json:{question:{id:id(9),title:'학생 원문',content:'개인 사업 정보 원문',headId:null,status:'open',resolved:false},answers:[],canAnswer:true,nextCursor:null}}));
