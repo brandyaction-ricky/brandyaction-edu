@@ -37,7 +37,7 @@ test('learner resolves an answered question without adding an answer',async({pag
  await page.route('**/api/platform/question-thread?**',r=>{if(r.request().method()==='POST'){writes.push(r.request().postDataJSON());resolved=true;return r.fulfill({json:{id:id(9),resolved:true}});}return r.fulfill({json:{question:{id:id(9),title:'내 질문',content:'질문 본문',headId:id(10),status:'answered',resolved},answers:[{id:id(10),content:'운영자 답변',authorName:'운영자',source:'operator'}],canFollowUp:true,nextCursor:null}});});
  await page.goto('/question-hub-test');await page.getByRole('tab',{name:'내 질문',exact:true}).click();await page.getByRole('button',{name:'답변 전체 보기'}).click();await page.getByRole('button',{name:'해결됐어요 · 질문 종료',exact:true}).click();await expect(page.getByText('질문 종료',{exact:true}).last()).toBeVisible();expect(writes).toEqual([{action:'finish',questionId:id(9),expectedHeadId:id(10)}]);
 });
-test('learner confirms deletion of only their question and the list updates',async({page})=>{
+test('learner confirms deletion of only their question and the list updates',async({page},info)=>{
  await backend(page);
  let deleted=false;
  const writes:Record<string,unknown>[]=[];
@@ -52,6 +52,7 @@ test('learner confirms deletion of only their question and the list updates',asy
  await page.getByRole('button',{name:'질문 삭제',exact:true}).click();
  const dialog=page.getByRole('dialog');
  await expect(dialog).toContainText('질문과 답변이 사라집니다');
+ await dialog.screenshot({path:info.outputPath('question-delete-confirm.png')});
  await dialog.getByRole('button',{name:'취소'}).click();
  expect(writes).toHaveLength(0);
  await page.getByRole('button',{name:'질문 삭제',exact:true}).click();
