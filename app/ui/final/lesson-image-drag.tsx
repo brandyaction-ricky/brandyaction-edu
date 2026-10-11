@@ -6,8 +6,9 @@ import { closeHistory } from '@tiptap/pm/history';
 import { blocksFromCanvas, lessonCanvasNodes, type CanvasNode } from '@/lib/lesson-document-canvas';
 import { lessonImageRows, moveLessonImage, type ImageDropPlacement } from '@/lib/lesson-image-row';
 import type { LessonBlock } from '@/lib/lesson-blocks';
+import { removeLessonImageReference } from '@/lib/lesson-toggle-images';
 
-type Hint = { target: string; placement: ImageDropPlacement; label: string; blocked: boolean; left: number; top: number; width: number; height: number };
+type Hint = { target: string; placement: ImageDropPlacement | 'inside'; position?: number; label: string; blocked: boolean; left: number; top: number; width: number; height: number };
 const mime = 'application/x-edu-lesson-image';
 
 export function useLessonImageDrag(editor: Editor | null, disabled: boolean, onError: (message: string) => void) {
@@ -21,10 +22,21 @@ export function useLessonImageDrag(editor: Editor | null, disabled: boolean, onE
   }, []);
 
   function targetAt(event: DragEvent<HTMLDivElement>): Hint | null {
+    const toggle = (event.target as Element).closest<HTMLElement>('[data-type="detailsContent"]');
+    if (toggle && editor?.view.dom.contains(toggle) && !toggle.hidden) {
+      const hit = editor.view.posAtCoords({ left: event.clientX, top: event.clientY });
+      const $pos = editor.state.doc.resolve(hit?.pos ?? editor.view.posAtDOM(toggle, 0));
+      for (let depth = $pos.depth; depth > 0; depth--) {
+        if ($pos.node(depth).type.name !== 'detailsContent') continue;
+        const position = $pos.depth > depth ? $pos.after(depth + 1) : $pos.pos;
+        const rect = toggle.getBoundingClientRect();
+        return { target: '', placement: 'inside', position, blocked: false, left: rect.left, top: event.clientY, width: rect.width, height: 4, label: '토글 안에 이미지 넣기' };
+      }
+    }
     const element = (event.target as Element).closest<HTMLElement>('[data-author-block]');
     if (!element || !editor?.view.dom.contains(element) || element.dataset.authorBlock === source.current) return null;
     const blocks: LessonBlock[] = [];
-    editor.state.doc.forEach(node => { if (node.attrs.block) blocks.push(node.attrs.block); });
+    editor.state.doc.descendants(node => { if (node.attrs.block) blocks.push(node.attrs.block); });
     const row = lessonImageRows(blocks).find(items => items.some(block => block.id === element.dataset.authorBlock));
     if (!row) return null;
     const rect = element.getBoundingClientRect(), x = event.clientX - rect.left, y = event.clientY - rect.top;
@@ -86,8 +98,22 @@ export function useLessonImageDrag(editor: Editor | null, disabled: boolean, onE
           const target = targetAt(event);
           if (!target) return;
           if (target.blocked) { onError(target.label); return; }
+          if (target.placement === 'inside') {
+            let sourcePos = -1, sourceNode: typeof editor.state.doc | null = null;
+            editor.state.doc.descendants((node, pos) => { if (node.attrs.block?.id === id) { sourcePos = pos; sourceNode = node; } });
+            if (!sourceNode || sourcePos < 0 || target.position === undefined) return;
+            const node = sourceNode as typeof editor.state.doc;
+            const block = { ...node.attrs.block }; delete block.imageGroup;
+            const $source = editor.state.doc.resolve(sourcePos);
+            const replacement = $source.parent.type.name === 'detailsContent' && $source.parent.childCount === 1 ? editor.schema.nodes.paragraph.create() : [];
+            const tr = editor.state.tr.replaceWith(sourcePos, sourcePos + node.nodeSize, replacement).setMeta('lessonStructure', true);
+            const position = tr.mapping.map(target.position);
+            tr.insert(position, editor.schema.nodes.lessonImage.create({ blockId: id, block }));
+            editor.view.dispatch(closeHistory(tr)); editor.view.dispatch(closeHistory(editor.state.tr));
+            return;
+          }
           const blocks = blocksFromCanvas((editor.getJSON().content || []) as CanvasNode[]);
-          const moved = moveLessonImage(blocks, id, target.target, target.placement, crypto.randomUUID());
+          const moved = moveLessonImage(removeLessonImageReference(blocks, id), id, target.target, target.placement, crypto.randomUUID());
           const nodes = lessonCanvasNodes(moved).map(node => editor.schema.nodeFromJSON(node));
           editor.view.dispatch(closeHistory(editor.state.tr.replaceWith(0, editor.state.doc.content.size, nodes).setMeta('lessonStructure', true)));
           // Keep typing immediately after a move in its own undo step.

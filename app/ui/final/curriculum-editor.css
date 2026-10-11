@@ -345,3 +345,10 @@
   .adm.edu-admin .curriculum-editor-page .studio-product-bar,.adm.edu-admin .curriculum-editor-page .curriculum-workspace--direct .curriculum-studio,.adm.edu-admin .curriculum-editor-page .studio-document-header,.adm.edu-admin .curriculum-editor-page .studio-document-title-row{grid-template-columns:minmax(0,1fr)}
   .adm.edu-admin .curriculum-editor-page .curriculum-workspace--direct .curriculum-outline{position:static;max-height:52dvh}
 }
+.edu-admin .curriculum-editor-page .studio-product-bar,
+.edu-admin .curriculum-editor-page .studio-document-header,
+.edu-admin .curriculum-editor-page .studio-lesson-settings { border-color:#e2e6ec; border-radius:16px; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .product-curriculum-week li { border-radius:10px; margin:4px 0; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .product-curriculum-week li.selected { background:#fff1f3; }
+.edu-admin .curriculum-editor-page .curriculum-workspace--direct .curriculum-add-lesson { border-radius:10px; background:#fafbfc; }
+.edu-admin .curriculum-editor-page .studio-lesson-link { padding-inline:4px; }

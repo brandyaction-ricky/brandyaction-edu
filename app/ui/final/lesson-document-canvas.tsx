@@ -13,6 +13,7 @@ import { LessonBlockView } from './lesson-block-view';
 import { GripVertical } from 'lucide-react';
 import { lessonRichExtensions, LessonFormatToolbar } from './lesson-rich-input';
 import { useLessonImageDrag } from './lesson-image-drag';
+import type { LessonImagePosition } from '@/lib/lesson-image-position';
 import './lesson-document-canvas.css';
 
 type Props = {
@@ -20,23 +21,32 @@ type Props = {
   onChange: (blocks: LessonBlock[]) => void; onSettings: (id: string) => void;
   onError: (message: string) => void;
   create: (type: LessonBlockType) => LessonBlock;
-  onImage: (files: File[], position: { blockId: string | null; after?: boolean; textBoundary?: number }) => void;
+  onImage: (files: File[], position: LessonImagePosition) => void;
 };
 const emptyValues = { blocks: {}, checklist: [] };
-function Activity({ node, extension, editor, selected }: NodeViewProps) {
+function Activity({ node, extension, editor, selected, getPos }: NodeViewProps) {
   const block = node.attrs.block as LessonBlock;
   if (!block) return <NodeViewWrapper />;
   return <NodeViewWrapper className={'ldc-activity' + (selected ? ' is-selected' : '')} data-author-block={block.id} data-block-type={block.type} contentEditable={false}>
-    <div className="ldc-activity-actions"><span data-drag-handle draggable={block.type === 'image' && editor.isEditable ? true : undefined} className="ldc-drag" aria-label="드래그하여 항목 순서 변경" title="드래그하여 순서 변경"><GripVertical size={18} aria-hidden="true" /></span><button type="button" className="btn small" disabled={!editor.isEditable} onClick={() => extension.options.onSettings(block.id)}>{extension.options.labels[block.type] || '항목'} 설정</button></div>
+    <div className="ldc-activity-actions"><span data-drag-handle draggable={block.type === 'image' && editor.isEditable ? true : undefined} className="ldc-drag" aria-label="드래그하여 항목 순서 변경" title="드래그하여 순서 변경"><GripVertical size={18} aria-hidden="true" /></span><button type="button" className="btn small" disabled={!editor.isEditable} onClick={() => { const pos = getPos(); if (typeof pos === 'number') editor.commands.setNodeSelection(pos); extension.options.onSettings(block.id); }}>{extension.options.labels[block.type] || '항목'} 설정</button></div>
     <LessonBlockView floatingAudio document={publicLessonBlocks({ schemaVersion: 1, blocks: [block], checklist: [] })} values={emptyValues} onChange={() => {}} readOnly />
   </NodeViewWrapper>;
 }
 
 function itemAt(editor: Editor) {
   const { $from } = editor.state.selection;
+  for (let depth = $from.depth; depth > 1; depth--) if ($from.node(depth).attrs.block) return { node: $from.node(depth), pos: $from.before(depth), index: $from.index(depth - 1) };
+  const at = editor.state.doc.nodeAt($from.pos);
+  if (at?.type.name === 'lessonImage') return { node: at, pos: $from.pos, index: $from.index() };
   if ($from.depth) return { node: $from.node(1), pos: $from.before(1), index: $from.index(0) };
   const node = editor.state.doc.nodeAt($from.pos);
   return node ? { node, pos: $from.pos, index: $from.index(0) } : null;
+}
+function imagePosition($pos: Editor['state']['selection']['$from']): LessonImagePosition {
+  for (let depth = $pos.depth; depth > 1; depth--) {
+    if ($pos.node(depth).type.name === 'detailsContent') return { blockId: $pos.node(1).attrs.block?.id || null, togglePath: Array.from({ length: depth - 1 }, (_, i) => $pos.index(i + 1)), toggleBoundary: $pos.index(depth) + ($pos.depth > depth ? 1 : 0) };
+  }
+  return { blockId: $pos.depth ? $pos.node(1).attrs.block?.id || null : null, ...($pos.depth > 1 && $pos.node(1).attrs.block?.type === 'text' ? { textBoundary: $pos.index(1) + 1 } : { after: true }) };
 }
 
 export function LessonDocumentCanvas(props: Props) {
@@ -54,7 +64,7 @@ export function LessonDocumentCanvas(props: Props) {
   const editor = useEditor({
     immediatelyRender: false, shouldRerenderOnTransaction: false,
     extensions: [
-      ...lessonRichExtensions().filter(extension => extension.name !== 'starterKit'),
+      ...lessonRichExtensions().filter(extension => !['starterKit', 'lessonImage'].includes(extension.name)),
       // Same text schema and input rules as the existing body editor, with one
       // document root for the whole lesson rather than one editor per paragraph.
       lessonRichExtensions()[0].configure({ document: false }),
@@ -71,6 +81,13 @@ export function LessonDocumentCanvas(props: Props) {
         addAttributes: () => ({ block: { default: null, rendered: false } }),
         // Clipboard HTML never carries private quiz keys or arbitrary widgets.
         renderHTML: () => ['div', { 'data-lesson-activity': '' }, '학습 항목'],
+        addNodeView: () => ReactNodeViewRenderer(Activity),
+      }),
+      Node.create({
+        name: 'lessonImage', group: 'block', atom: true, draggable: true,
+        addOptions: () => ({ onSettings: (id: string) => latest.current.onSettings(id), labels: { image: '이미지' } }),
+        addAttributes: () => ({ blockId: { default: null }, block: { default: null, rendered: false } }),
+        renderHTML: () => ['div', { 'data-lesson-image-reference': '' }, '학습 이미지'],
         addNodeView: () => ReactNodeViewRenderer(Activity),
       }),
       // Plugin callbacks run on editor transactions, never during React render.
@@ -91,19 +108,20 @@ export function LessonDocumentCanvas(props: Props) {
             },
             filterTransaction(tr, state) {
               if (!tr.docChanged || tr.getMeta('lessonStructure') || isHistoryTransaction(tr)) return true;
-              const activityIds = new Set<string>(); tr.doc.forEach(node => { if (node.type.name === 'lessonActivity') activityIds.add(node.attrs.block?.id); });
-              let lost = false; state.doc.forEach(node => { if (node.type.name === 'lessonActivity' && !activityIds.has(node.attrs.block?.id)) lost = true; });
+              const activityIds = new Set<string>(); tr.doc.descendants(node => { if (['lessonActivity', 'lessonImage'].includes(node.type.name)) activityIds.add(node.attrs.block?.id); });
+              let lost = false; state.doc.descendants(node => { if (['lessonActivity', 'lessonImage'].includes(node.type.name) && !activityIds.has(node.attrs.block?.id)) lost = true; });
               if (lost) queueMicrotask(() => setMessage('질문·자료가 포함된 영역입니다. 해당 항목을 선택한 뒤 ‘항목 삭제’를 사용해 주세요.'));
               return !lost;
             },
             appendTransaction(transactions, _old, state) {
               if (!transactions.some(tr => tr.docChanged)) return null;
               const tr = state.tr, ids = new Set<string>();
-              state.doc.forEach((node, pos) => {
+              state.doc.descendants((node, pos) => {
+                if (!['lessonText', 'lessonActivity', 'lessonImage'].includes(node.type.name)) return;
                 const block = node.attrs.block as LessonBlock | null;
                 if (!block || ids.has(block.id)) {
                   const next = block ? duplicateLessonBlock(block, () => crypto.randomUUID()) : latest.current.create('text');
-                  tr.setNodeMarkup(pos, undefined, { block: next }); ids.add(next.id);
+                  tr.setNodeMarkup(pos, undefined, { ...node.attrs, block: next, ...(node.type.name === 'lessonImage' ? { blockId: next.id } : {}) }); ids.add(next.id);
                 } else ids.add(block.id);
               });
               return tr.docChanged ? tr : null;
@@ -127,15 +145,21 @@ export function LessonDocumentCanvas(props: Props) {
       },
       handlePaste(view, event) {
         if (!event.clipboardData?.files.length) return false;
-        const { $from } = view.state.selection;
+        let { $from } = view.state.selection;
+        // Selectionchange can arrive after paste, especially on touch devices.
+        // Use the current DOM caret rather than the previous editor selection.
+        const selection = view.dom.ownerDocument.getSelection();
+        if (selection?.anchorNode && selection.focusNode && view.dom.contains(selection.anchorNode) && view.dom.contains(selection.focusNode)) {
+          try { $from = view.state.doc.resolve(Math.min(view.posAtDOM(selection.anchorNode, selection.anchorOffset), view.posAtDOM(selection.focusNode, selection.focusOffset))); } catch { /* Keep the editor selection if the DOM is being replaced. */ }
+        }
         if (!$from.depth) return false;
-        latest.current.onImage([...event.clipboardData.files], { blockId: $from.node(1).attrs.block?.id || null, ...($from.depth > 1 && $from.node(1).attrs.block?.type === 'text' ? { textBoundary: $from.index(1) + 1 } : { after: true }) });
+        latest.current.onImage([...event.clipboardData.files], imagePosition($from));
         return true;
       },
       handleDrop(view, event) {
         if (!event.dataTransfer?.files.length) return false;
         const hit = view.posAtCoords({ left: event.clientX, top: event.clientY }), pos = view.state.doc.resolve(hit?.pos || 0);
-        latest.current.onImage([...event.dataTransfer.files], { blockId: pos.depth ? pos.node(1).attrs.block?.id : null, ...(pos.depth > 1 && pos.node(1).attrs.block?.type === 'text' ? { textBoundary: pos.index(1) + 1 } : { after: true }) });
+        latest.current.onImage([...event.dataTransfer.files], imagePosition(pos));
         return true;
       },
     },
@@ -152,9 +176,12 @@ export function LessonDocumentCanvas(props: Props) {
   useEffect(() => { editor?.setEditable(!props.disabled, false); }, [editor, props.disabled]);
   useEffect(() => {
     if (!editor || JSON.stringify(props.blocks) === last.current) return;
+    const open = [...editor.view.dom.querySelectorAll<HTMLElement>('[data-type="details"]')].map((element, index) => element.classList.contains('is-open') ? index : -1).filter(index => index >= 0);
     const nodes = lessonCanvasNodes(props.blocks).map(node => editor.schema.nodeFromJSON(node));
     const tr = editor.state.tr.replaceWith(0, editor.state.doc.content.size, nodes).setMeta('lessonStructure', true);
     last.current = JSON.stringify(props.blocks); editor.view.dispatch(tr);
+    const toggles = editor.view.dom.querySelectorAll<HTMLElement>('[data-type="details"]');
+    open.forEach(index => { const toggle = toggles[index]; if (toggle && !toggle.classList.contains('is-open')) toggle.querySelector<HTMLButtonElement>(':scope > button')?.click(); });
   }, [editor, props.blocks]);
 
   function insert(type: LessonBlockType) {
@@ -164,6 +191,14 @@ export function LessonDocumentCanvas(props: Props) {
     const block = props.create(type), newNode = editor.schema.nodeFromJSON(lessonCanvasNodes([block])[0]);
     const tr = editor.state.tr.setMeta('lessonStructure', true);
     let focus = 0;
+    const inside = type === 'image' && imagePosition($pos).togglePath;
+    if (inside) {
+      for (let depth = $pos.depth; depth > 1; depth--) if ($pos.node(depth).type.name === 'detailsContent') {
+        const at = $pos.depth > depth ? $pos.after(depth + 1) : $pos.pos;
+        tr.insert(at, editor.schema.nodes.lessonImage.create({ blockId: block.id, block }));
+        editor.view.dispatch(tr); props.onSettings(block.id); setMenu(false); insertRange.current = null; return;
+      }
+    }
     if ($pos.depth && $pos.node(1).type.name === 'lessonText') {
       const old = $pos.node(1), offset = $pos.pos - $pos.start(1), before = old.content.cut(0, offset), after = old.content.cut(offset);
       const parts = [];
@@ -184,17 +219,30 @@ export function LessonDocumentCanvas(props: Props) {
   }
   function structural(action: 'up' | 'down' | 'duplicate' | 'delete') {
     if (!editor || props.disabled) return;
-    const nodes = (editor.getJSON().content || []) as CanvasNode[], index = nodes.findIndex(node => node.attrs?.block?.id === selectedId);
+    const nodes = (editor.getJSON().content || []) as CanvasNode[];
+    function find(items: CanvasNode[]): CanvasNode[] | null {
+      if (items.some(node => node.attrs?.block?.id === selectedId)) return items;
+      for (const node of items) { const found = node.content && find(node.content); if (found) return found; }
+      return null;
+    }
+    const items = find(nodes); if (!items) return;
+    const index = items.findIndex(node => node.attrs?.block?.id === selectedId);
     if (index < 0) return;
     if (action === 'delete') {
       if (!window.confirm('선택한 항목을 삭제할까요? 실행 취소로 되돌릴 수 있고, 이전 학생 제출본은 보관됩니다.')) return;
-      nodes.splice(index, 1);
+      items.splice(index, 1); if (!items.length && items !== nodes) items.push({ type: 'paragraph' });
     } else if (action === 'duplicate') {
       if (nodes.length >= 1000) return;
-      const copy = structuredClone(nodes[index]); copy.attrs = { block: duplicateLessonBlock(copy.attrs!.block!, () => crypto.randomUUID()) }; nodes.splice(index + 1, 0, copy);
+      function copyNode(node: CanvasNode): CanvasNode {
+        const copy = structuredClone(node);
+        if (copy.attrs?.block) { const block = duplicateLessonBlock(copy.attrs.block, () => crypto.randomUUID()); copy.attrs = { ...copy.attrs, block, ...(copy.type === 'lessonImage' ? { blockId: block.id } : {}) }; }
+        if (copy.content) copy.content = copy.content.map(copyNode);
+        return copy;
+      }
+      items.splice(index + 1, 0, copyNode(items[index]));
     } else {
-      const next = index + (action === 'up' ? -1 : 1); if (next < 0 || next >= nodes.length) return;
-      [nodes[index], nodes[next]] = [nodes[next], nodes[index]];
+      const next = index + (action === 'up' ? -1 : 1); if (next < 0 || next >= items.length) return;
+      [items[index], items[next]] = [items[next], items[index]];
     }
     editor.view.dispatch(editor.state.tr.replaceWith(0, editor.state.doc.content.size, nodes.map(node => editor.schema.nodeFromJSON(node))).setMeta('lessonStructure', true));
   }
@@ -211,7 +259,7 @@ export function LessonDocumentCanvas(props: Props) {
   }
   return <div className="ldc-root" ref={root} {...imageDrag.handlers}>
     <p className="meta">글을 바로 클릭해 수정하세요. 빈 줄에서 / 또는 ‘현재 위치에 추가’로 질문·자료를 넣습니다.</p>
-    {props.blocks.some(block => block.type === 'image') && <p className="meta ldc-image-drag-help">이미지나 이동 손잡이를 끌어 다른 이미지 옆에 놓으면 최대 3장까지 나란히 붙어요. 위·아래에 놓으면 한 장씩 배치합니다. 이미지 설정에서도 묶을 수 있어요.</p>}
+    {props.blocks.some(block => block.type === 'image') && <p className="meta ldc-image-drag-help">이미지를 펼친 토글 안에 끌어 넣을 수 있어요. 이미지 설정의 ‘토글 안으로 이동’도 사용할 수 있습니다. 다른 이미지 옆에 놓으면 최대 3장까지 나란히 붙어요.</p>}
     {outline.length > 0 && <details className="ldc-outline"><summary>수업 목차 · {outline.length}개</summary><nav aria-label="수업 목차">{outline.map(item => <button type="button" className="btn small" key={`${item.id}-${item.index}`} onClick={() => jump(item.id, item.index)}>{item.label || '제목 입력 전'}</button>)}</nav></details>}
     <div className="lesson-body-editor ldc-editor">
       <div className="ldc-sticky-toolbar">

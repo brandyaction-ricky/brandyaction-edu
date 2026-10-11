@@ -3,18 +3,19 @@
 .edu-admin .ldc-editor:focus-within { box-shadow:none; }
 .edu-admin .panel:has(.ldc-root) { overflow:visible; }
 .edu-admin .curriculum-editor-page .learning-editor--embedded .panel:has(.ldc-layout) { overflow:visible; }
-.ldc-sticky-toolbar { position:sticky; top:64px; z-index:5; background:var(--admin-surface,#fff); }
+.ldc-sticky-toolbar { position:sticky; top:64px; z-index:5; border:1px solid #e2e6ec; border-radius:14px; background:#fff; box-shadow:0 4px 16px #17223808; }
+.ldc-sticky-toolbar .lesson-format-controls { border-radius:14px 14px 0 0; }
 .ldc-sticky-toolbar .ldc-insert-menu { max-height:40vh; overflow:auto; }
 .edu-admin .ldc-editor .ldc-document { max-height:none; overflow:visible; min-height:240px; padding:24px 12px; }
 .ldc-text { padding:4px 0; margin:0; border:0; }
 .ldc-text:focus-within { border:0; }
 .ldc-tools, .ldc-insert-menu { display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:8px; border-bottom:1px solid var(--line,#d8dde3); }
 .ldc-insert-menu { background:var(--surface,#f8f9fa); }
-.ldc-activity { margin:24px 0; padding:12px; background:var(--surface,#f8f9fa); border-left:2px solid var(--line,#d8dde3); min-width:0; }
+.ldc-activity { margin:20px 0; padding:16px; background:#fafbfc; border:1px solid #e5eaf1; border-radius:14px; min-width:0; }
 .ldc-activity-actions { display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-bottom:8px; }
 .ldc-activity .lesson-blocks { gap:0; }
 .ldc-activity .lb-card { background:transparent; border:0; padding:0; }
-.ldc-activity.is-selected { border-left-color:var(--red,#c51e2c); }
+.ldc-activity.is-selected { border-color:#e8b9c2; box-shadow:0 0 0 3px #c51e2c08; }
 .ldc-drag { cursor:grab; padding:8px; }
 .ldc-settings { border-top:1px solid var(--line,#d8dde3); padding:12px 0; }
 .ldc-settings > summary { padding:12px 0; cursor:pointer; font-weight:600; }
@@ -49,3 +50,11 @@
 .ldc-image-drop-hint.is-blocked span { background:#912018; }
 
 .ldc-image-drop-hint[data-image-drop="below"] span { top:auto; bottom:8px; }
+.ldc-tools { border-bottom:0; padding:10px; }
+.ldc-tools .btn, .ldc-insert-menu .btn, .ldc-activity-actions .btn, .ldc-inspector .btn { border-radius:9px; }
+.ldc-insert-menu { border-bottom:0; border-top:1px solid #e8edf3; border-radius:0 0 14px 14px; padding:12px; background:#fafbfc; }
+.ldc-inspector { border-color:#e2e6ec; border-radius:16px; background:#fff; box-shadow:0 8px 32px #1722380c; }
+.ldc-inspector-title { padding:14px 16px; }
+.ldc-inspector .lba-image-row-settings { border-color:#e5eaf1; border-radius:12px; background:#fafbfc; }
+.ldc-document [data-type=detailsContent] .ldc-activity { margin:12px 0; padding:12px; }
+.ldc-document [data-type=detailsContent] .ldc-activity:first-child { margin-top:0; }

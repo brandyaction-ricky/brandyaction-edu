@@ -59,3 +59,11 @@
 .edu-admin .learning-editor .learning-conflict-options input { width:18px; height:18px; min-height:0; accent-color:var(--red); }
 .edu-admin .learning-editor .learning-conflict-options pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:220px; overflow:auto; margin:12px 0 0; font:inherit; line-height:1.6; }
 @media(max-width:720px){.edu-admin .learning-editor .learning-conflict-options { grid-template-columns:minmax(0,1fr); }}
+.edu-admin .learning-editor .panel { border-color:#e2e6ec; border-radius:16px; box-shadow:0 3px 16px #17223804; }
+.edu-admin .learning-editor .btn { border-radius:10px; }
+.edu-admin .learning-editor .learning-resource-preview,
+.edu-admin .learning-editor .learning-content-placeholder { border-color:#e2e6ec; border-radius:14px; }
+.edu-admin .learning-editor .learning-content-tabs { border:1px solid #e2e6ec; padding:4px; border-radius:12px; background:#f6f8fb; gap:4px; }
+.edu-admin .learning-editor .learning-content-tabs button { border:0; border-radius:8px; padding:9px 12px; }
+.edu-admin .learning-editor .learning-content-tabs button.active { background:#fff; box-shadow:0 2px 6px #1722380c; }
+.edu-admin .learning-editor .editor-savebar { border-color:#e2e6ec; border-radius:14px; box-shadow:0 -4px 20px #17223806; }
