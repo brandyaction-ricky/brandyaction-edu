@@ -50,7 +50,12 @@ export function QuestionAnswerHistory({ questionId, fallback = '', onStatusChang
  const [content, setContent] = useState(''), [busy, setBusy] = useState(false), [uncertain, setUncertain] = useState(false), [stale, setStale] = useState(false), [notice, setNotice] = useState('');
  const gate = useRef(false), retry = useRef<{ action: 'followup'; questionId: string; content: string; requestId: string; expectedHeadId: string | null } | null>(null);
  useUnsavedLearningChanges(Boolean(content) || busy || uncertain);
- useEffect(() => { if (state.data) onStatusChange?.(state.data.question.status); }, [state.data, onStatusChange]);
+ const statusChange = useRef(onStatusChange);
+ useEffect(() => { statusChange.current = onStatusChange; }, [onStatusChange]);
+ const status = state.data?.question.status;
+ // Parent list reads are asynchronous. A new callback after each parent render
+ // must not report the same status again and repeatedly abort that list read.
+ useEffect(() => { if (status) statusChange.current?.(status); }, [questionId, status]);
  async function followUp() {
   if (gate.current || stale || !state.data?.canFollowUp) return;
   if (!retry.current) {
