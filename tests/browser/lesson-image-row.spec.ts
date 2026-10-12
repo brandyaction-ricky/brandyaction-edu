@@ -105,7 +105,7 @@ for (const platform of ['MacIntel', 'Linux x86_64', 'Win32']) test(`native image
   await drag(2, 1, 'right', false, true);
   await save(page); expect(saved()).toEqual(nativeInitial);
   await drag(2, 1, 'right'); await sameRow(block(1), block(2));
-  await canvas.locator('[data-block-type="text"] > p').first().click();
+  await canvas.locator('[data-block-type="text"] p').first().click();
   // With no redo available, this shortcut must not fall back to undo.
   await page.keyboard.press(`${modifier}+Shift+z`);
   await expect(block(1).locator('..')).toHaveAttribute('data-image-columns', '2');
