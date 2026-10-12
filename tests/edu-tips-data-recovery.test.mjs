@@ -29,6 +29,7 @@ async function setup(t){
  grant select on courses,cohorts,orders,order_items,payments,refunds,enrollments,learning_usage_events,edu_analytics_orders to service_role;
  `);
  await owner(sql);
+ await owner(readFileSync(new URL('../supabase/migrations/20261012041637_edu_tips_expired_revision_guard.sql',import.meta.url),'utf8'));
  await owner('delete from edu_tips_private.erasure_outbox');
  await owner("update edu_tips_private.feed_state set capture_enabled=true,serving_enabled=true;update edu_tips_private.feed_state set capture_since=date_trunc('day',now() at time zone 'Asia/Seoul') at time zone 'Asia/Seoul'");
  await owner("insert into edu_tips_private.data_keys values($1,$2,array['edu.events.read','edu.learning.read','edu.recovery'],'2099-01-01',null)",[hash(key),id(90)]);
@@ -217,4 +218,33 @@ test('partial first KST day and collection gaps are unmeasured rather than false
  await f.owner('update edu_tips_private.feed_state set capture_enabled=false;update edu_tips_private.feed_state set capture_enabled=true');
  assert.equal(await f.value('select generation as v from edu_tips_private.feed_state'),prior+1);
  assert.equal((await f.call('events',{after:r.body.event_cursor})).body.error,'recovery_required');
+});
+
+test('a correction moving the original payment outside retention removes its earlier analysis copy',async t=>{
+ const f=await setup(t),r=await f.recover();
+ const mappingCount=await f.value('select count(*)::int as v from edu_tips_private.opaque_refs');
+ await f.owner("update payments set approved_at=now()-interval '400 days' where id=$1",[id(125)]);
+ assert.equal(await f.value('select count(*)::int as v from edu_tips_private.feed_facts where record_key=$1',['payment:'+id(125)]),0);
+ assert.equal(await f.value('select count(*)::int as v from edu_tips_private.fact_versions where subject_id=(select id from edu_tips_private.subjects where customer_id=$1)',[customer(5)]),0);
+ assert.equal(await f.value('select count(*)::int as v from edu_tips_private.feed_outbox where subject_id=(select id from edu_tips_private.subjects where customer_id=$1) and payload is not null',[customer(5)]),0);
+ assert.equal(await f.value('select count(*)::int as v from edu_tips_private.recovery_rows where subject_id=(select id from edu_tips_private.subjects where customer_id=$1) and payload is not null',[customer(5)]),0);
+ assert.equal(await f.value('select count(*)::int as v from edu_tips_private.opaque_refs'),mappingCount);
+ assert.equal((await f.call('events',{after:r.body.event_cursor})).body.error,'recovery_required');
+ const next=await f.recover(id(902));const rows=await snapshot(f,'events',next.body.event_cursor);
+ assert.equal(rows.rows.length,1);assert.equal(rows.rows[0].customer_id,customer(6));
+});
+
+
+test('expired learning revisions clear staged copies while retaining the other stream and opaque mappings',async t=>{
+ const f=await setup(t);
+ await f.owner("insert into learning_usage_events values($1,$2,'material_download',$3,now(),now(),'signed_file_issued')",[id(401),id(135),id(410)]);
+ const r=await f.recover();
+ const count=await f.value('select count(*)::int as v from edu_tips_private.opaque_refs');
+ await f.owner("select edu_tips_private.put_fact(subject_id,stream,record_key,occurred_at,statement_timestamp()-interval '1 second',payload) from edu_tips_private.feed_facts where stream='learning'");
+ assert.equal(await f.value("select count(*)::int as v from edu_tips_private.feed_facts where stream='learning'"),0);
+ assert.equal(await f.value("select count(*)::int as v from edu_tips_private.recovery_rows where stream='learning' and payload is not null"),0);
+ assert.equal(await f.value("select count(*)::int as v from edu_tips_private.feed_outbox where stream='learning' and payload is not null"),0);
+ assert.equal(await f.value("select count(*)::int as v from edu_tips_private.feed_facts where stream='events'"),2);
+ assert.equal(await f.value('select count(*)::int as v from edu_tips_private.opaque_refs'),count);
+ assert.equal((await f.call('learning',{after:r.body.learning_cursor})).body.error,'recovery_required');
 });
