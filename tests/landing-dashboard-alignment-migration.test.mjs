@@ -95,6 +95,29 @@ test('dashboard alignment migration executes and joins web/Meta only by exact ad
       assert.equal(ui.actual_presence.existing_payments,false);
       assert.deepEqual(ui.daily_a,[]);
     }
+    // Repeated encoded historical values are decoded once; cached normalized values
+    // (including empty strings) and raw-key matching must keep their precedence.
+    await db.query(`insert into public.funnel_sessions(landing_id,created_at,visitor_id,clicks,layout_ver,attribution)
+      select $1,'2026-09-10 03:00:00+00',md5(('encoded-'||i)::text)::uuid,i%2,1,
+      case when i%3=0 then '{"utm_campaign":"META%20Campaign","utm_campaign_normalized":"","utm_term":"%E1%84%8F%E1%85%A9%E1%86%AF%E1%84%83%E1%85%B3","utm_content":"image%25201"}'::jsonb
+      when i%3=1 then '{"utm_campaign":"META%20Campaign","utm_term":"%E1%84%8F%E1%85%A9%E1%86%AF%E1%84%83%E1%85%B3","utm_content":"image%25201"}'::jsonb
+      else '{"utm_campaign":"%ZZ+literal","utm_term_normalized":"광고 세트 이름","utm_content_normalized":"소재 이름"}'::jsonb end
+      from generate_series(1,4000)i`,[landingId]);
+    const wideReport = async (filters = [null,null,null,null,null,null]) => (await db.query(
+      `select public.edu_marketing_dashboard($1,'2026-09-09','2026-09-15','2026-09-02','2026-09-08',$2::text[],$3::text[],$4::text[],$5::text[],$6::text[],$7::integer[]) report`,
+      [campaignId,...filters])).rows[0].report;
+    const filterCases = [
+      [null,null,null,null,null,null], [['META Campaign'],null,null,null,null,null],
+      [[''],null,null,null,null,null], [null,['cold'],null,null,null,null],
+      [null,null,['콜드'],null,null,null], [null,null,null,['image%201'],null,null],
+      [null,null,null,null,['unknown'],[1]], [['%ZZ+literal'],null,null,null,null,null],
+    ];
+    const previousReports = [];
+    for (const filters of filterCases) previousReports.push(await wideReport(filters));
+    await db.exec(fs.readFileSync(new URL('../supabase/migrations/20261012042500_edu_marketing_distinct_utm_decoding.sql', import.meta.url),'utf8'));
+    for (let i=0;i<filterCases.length;i++) assert.deepEqual(await wideReport(filterCases[i]),previousReports[i],`distinct decoding preserves the entire report: case ${i}`);
+    assert.equal((await db.query(`select has_function_privilege('anon','public.edu_marketing_dashboard(uuid,date,date,date,date,text[],text[],text[],text[],text[],integer[])','EXECUTE') allowed`)).rows[0].allowed,false);
+
     const noData=(await db.query(`select public.edu_marketing_dashboard($1,'2026-09-16','2026-09-16') report`,[campaignId])).rows[0].report;
     assert.equal(noData.ui.period_actuals.payments,null,'missing payments do not become zero');
     assert.equal(noData.ui.last_collected_at,null);
