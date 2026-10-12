@@ -30,6 +30,7 @@ async function setup(t){
  `);
  await owner(sql);
  await owner(readFileSync(new URL('../supabase/migrations/20261012041637_edu_tips_expired_revision_guard.sql',import.meta.url),'utf8'));
+ await owner(readFileSync(new URL('../supabase/migrations/20261012052049_edu_tips_rest_safe_updates.sql',import.meta.url),'utf8'));
  await owner('delete from edu_tips_private.erasure_outbox');
  await owner("update edu_tips_private.feed_state set capture_enabled=true,serving_enabled=true;update edu_tips_private.feed_state set capture_since=date_trunc('day',now() at time zone 'Asia/Seoul') at time zone 'Asia/Seoul'");
  await owner("insert into edu_tips_private.data_keys values($1,$2,array['edu.events.read','edu.learning.read','edu.recovery'],'2099-01-01',null)",[hash(key),id(90)]);
@@ -247,4 +248,21 @@ test('expired learning revisions clear staged copies while retaining the other s
  assert.equal(await f.value("select count(*)::int as v from edu_tips_private.feed_facts where stream='events'"),2);
  assert.equal(await f.value('select count(*)::int as v from edu_tips_private.opaque_refs'),count);
  assert.equal((await f.call('learning',{after:r.body.learning_cursor})).body.error,'recovery_required');
+});
+
+
+test('all feed singleton updates retain an explicit predicate under the REST safeupdate boundary',async t=>{
+ const f=await setup(t);
+ for(const signature of ['edu_tips_private.put_fact(uuid,text,text,timestamptz,timestamptz,jsonb)','edu_tips_private.capture_member(uuid)','edu_tips_private.publish_feed()']){
+  const definition=await f.value('select pg_get_functiondef($1::regprocedure) as v',[signature]);
+  const statements=definition.match(/update edu_tips_private\.feed_state[^;]+;/gi);
+  assert.ok(statements?.length,signature);
+  for(const statement of statements)assert.match(statement,/where singleton;/i);
+  assert.doesNotMatch(definition,/safeupdate\s*[=:]\s*(off|false|0)/i);
+ }
+ assert.equal((await f.call('events')).body.error,'recovery_required');
+ const r=await f.recover();assert.equal(r.status,200);
+ await f.owner("update payments set approved_at=now()-interval '400 days' where id=$1",[id(125)]);
+ assert.equal(await f.value('select count(*)::int as v from edu_tips_private.feed_quarantine'),0);
+ assert.equal((await f.call('events',{after:r.body.event_cursor})).body.error,'recovery_required');
 });
