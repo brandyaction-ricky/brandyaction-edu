@@ -203,3 +203,18 @@ test('the same confirmation can succeed after authentication or order lookup rec
     assert.deepEqual(updates, []);
   }
 });
+
+// Quick transfer uses the existing confirmation/finalization path, never the deposit-wait path.
+test('quick transfer completion finalizes the verified amount and provider method', async () => {
+  const finalized = [];
+  const payment = { orderId: 'BAE-1', totalAmount: 1000, status: 'DONE', currency: 'KRW', paymentKey: 'test-payment', method: '계좌이체', approvedAt: '2026-10-12T00:00:00Z', transfer: { bankCode: '88', settlementStatus: 'INCOMPLETED' } };
+  const response = await paymentHandler({
+    order: { id: 'order', total_amount: 1000, status: 'pending' }, finalized,
+    provider: async () => Response.json(payment),
+  })(request());
+  assert.equal(response.status, 200);
+  assert.equal(finalized.length, 1);
+  assert.equal(finalized[0][0], 'finalize_toss_payment');
+  assert.equal(finalized[0][1].p_method, '계좌이체');
+  assert.equal(finalized[0][1].p_approved_amount, 1000);
+});

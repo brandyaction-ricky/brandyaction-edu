@@ -1,7 +1,7 @@
 "use client";
 import { money, number as num, text as t, type User } from "@/lib/platform";
 import { cohortPeriod } from "@/lib/qa-rules";
-import { ArrowLeft, ArrowRight, CreditCard, Landmark } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, CreditCard, Landmark } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
@@ -13,10 +13,8 @@ import { MOONSHOT_SUPPORT_URL } from "@/lib/purchase-onboarding";
 import "./checkout.css";
 
 const paymentMethods = [
-  { value: "CARD", label: "신용·체크카드", button: "카드로 결제하기", mark: "" },
-  { value: "KAKAOPAY", label: "카카오페이", button: "카카오페이로 결제하기", mark: "kakao pay" },
-  { value: "TOSSPAY", label: "토스페이", button: "토스페이로 결제하기", mark: "toss pay" },
-  { value: "NAVERPAY", label: "네이버페이", button: "네이버페이로 결제하기", mark: "N pay" },
+  { value: "TRANSFER", label: "퀵계좌이체", button: "퀵계좌이체로 결제하기", description: "카드 번호 입력 없이 계좌 인증 한 번으로 결제" },
+  { value: "CARD", label: "카드·간편결제", button: "카드·간편결제로 결제하기", description: "신용·체크카드, 카카오페이, 토스페이, 네이버페이" },
 ] as const;
 type PaymentMethod = typeof paymentMethods[number]["value"];
 
@@ -38,7 +36,7 @@ export function Checkout({
   const [processing, setProcessing] = useState(false),
     [error, setError] = useState(""),
     [agreed, setAgreed] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CARD");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("TRANSFER");
   const selectedPayment = paymentMethods.find((method) => method.value === paymentMethod)!;
   const lock = useRef(false),
     cohort = (data.cohorts || []).find((c) => c.id === cohortId),
@@ -94,14 +92,11 @@ export function Checkout({
         successUrl: location.origin + "/payment/success",
         failUrl: location.origin + "/payment/fail",
       } as const;
-      // Resume virtual-account requests only after the live merchant service is activated.
-      await payment.requestPayment({
-        ...paymentRequest,
-        method: "CARD",
-        ...(paymentMethod === "CARD" ? {} : {
-          card: { flowMode: "DIRECT" as const, easyPay: paymentMethod },
-        }),
-      });
+      if (paymentMethod === "TRANSFER") {
+        await payment.requestPayment({ ...paymentRequest, method: "TRANSFER" });
+      } else {
+        await payment.requestPayment({ ...paymentRequest, method: "CARD" });
+      }
     } catch (cause) {
       setError((cause as Error).message);
     } finally {
@@ -319,27 +314,22 @@ export function Checkout({
                         onChange={() => setPaymentMethod(method.value)}
                         disabled={pending || processing}
                       />
+                      {method.value === "TRANSFER" && <span className="checkout-payment-recommended">추천</span>}
                       <span className="checkout-payment-mark" aria-hidden="true">
-                        {method.value === "CARD" ? <CreditCard /> : method.mark}
+                        {method.value === "TRANSFER" ? <Landmark /> : <CreditCard />}
                       </span>
-                      <span className="checkout-payment-name">{method.label}</span>
+                      <span className="checkout-payment-copy">
+                        <span className="checkout-payment-name">{method.label}</span>
+                        <span className="checkout-payment-description">{method.description}</span>
+                      </span>
+                      <Check className="checkout-payment-check" aria-hidden="true" />
                     </label>
                   ))}
                 </div>
-                <p className="meta checkout-payment-next" aria-live="polite">
-                  약관 동의 후 ‘{selectedPayment.button}’를 누르면 {paymentMethod === "CARD" ? "카드 결제창" : `${selectedPayment.label} 결제창`}이 열립니다.
-                </p>
-                <label className="radio-card checkout-payment-unavailable">
-                    <input
-                      type="radio"
-                      name="payment"
-                      value="VIRTUAL_ACCOUNT"
-                      disabled
-                      aria-describedby="checkout-transfer-help"
-                    />
-                    <Landmark aria-hidden="true" />
-                    가상계좌 · 일시 중단
-                </label>
+                <div className="notice checkout-payment-next" aria-live="polite">
+                  <h3>결제 수단은 결제창에서 최종 선택합니다</h3>
+                  <p>약관 동의 후 ‘{selectedPayment.button}’를 누르면 선택한 결제 수단의 토스페이먼츠 결제창이 열립니다. 퀵계좌이체는 처음 한 번 계좌를 등록하면 다음부터 비밀번호로 결제합니다. 현금영수증도 결제창에서 신청할 수 있어요.</p>
+                </div>
                 <div className="notice checkout-transfer-help" id="checkout-transfer-help">
                   <h3>계좌이체로 수강하시려면</h3>
                   <p>계좌이체를 원하시면 아래 국민은행 계좌로 입금해 주세요.</p>
