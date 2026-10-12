@@ -1,5 +1,5 @@
-export type FunnelCourse = { id: string; title: string };
-export type FunnelCohort = { id: string; course_id: string; name: string };
+export type FunnelCourse = { id: string; title: string; category?: string; list_price?: number; status?: string; archived_at?: string | null };
+export type FunnelCohort = { id: string; course_id: string; name: string; price?: number; status?: string };
 export type FunnelDraft = {
   freeCourseId: string;
   paidCourseId: string;

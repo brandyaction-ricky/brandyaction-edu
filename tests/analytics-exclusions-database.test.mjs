@@ -24,6 +24,7 @@ test('E1 explicit exclusions preserve the ledger and agree across revenue, journ
   const read = file => readFileSync(new URL('../supabase/migrations/'+file, import.meta.url), 'utf8');
   await db.exec(read('202609210005_webinar_registration.sql'));
   await db.exec(read('20261005020515_edu_internal_order_analytics_e1.sql'));
+  await db.exec(read('20261012063301_edu_webinar_purchase_scopes.sql'));
   await db.exec('alter table customer_journey_events enable row level security; revoke select on customer_journey_events from service_role; set role service_role');
   await assert.rejects(db.query("select edu_analytics_report('2009-01-01','2011-01-01')"), /permission denied for table customer_journey_events/);
   await db.exec('reset role');
@@ -76,6 +77,17 @@ test('E1 explicit exclusions preserve the ledger and agree across revenue, journ
   await mark('order',flagged,true,false); assert.deepEqual(money(await summary()),[7000,1000,6000]);
   assert.deepEqual((await db.query('select id,order_id,status,approved_amount,cancelled_amount from payments order by id')).rows,ledgerBefore);
   assert.equal((await db.query("select count(*)::int as n from audit_logs where actor_user_id=$1 and after_data->>'reason'='합성 검수 주문'",[admin])).rows[0].n,11);
+  // A non-applicant belongs to the cohort total only; refunds never change population.
+  const outsider=id(); await db.query("insert into profiles(id,role,status) values($1,'student','active')",[outsider]);
+  await order(outsider,3000,700);
+  const scopes=await manage();
+  assert.equal(scopes.cohortPurchases.orders,2);assert.equal(scopes.cohortPurchases.buyers,2);
+  assert.equal(scopes.cohortPurchases.gross,4000);assert.equal(scopes.cohortPurchases.refunds,700);assert.equal(scopes.cohortPurchases.net,3300);
+  assert.equal(scopes.cohortPurchases.needs_review,1);assert.equal(scopes.purchases.orders,1);assert.equal(scopes.purchases.net,1000);
+  assert.equal(scopes.cohortPurchases.as_of,scopes.purchases.as_of);
+  await db.query("insert into site_settings values($1,$2)",['edu_staff_permissions_'+staff,{marketing:true,products:true,orders:false}]);
+  const denied=await call('edu_manage_webinar',[staff,'synthetic',null]);assert.equal(denied.purchases,null);assert.equal(denied.cohortPurchases,null);
+  for(const role of ['anon','authenticated'])assert.equal((await db.query("select has_function_privilege($1,'edu_manage_webinar(uuid,text,jsonb)','execute') as ok",[role])).rows[0].ok,false);
   await db.exec('reset role; grant select,update,insert on profiles,orders to authenticated; set role authenticated');
   await assert.rejects(db.query('update profiles set is_internal=false where id=$1',[internal]),/FORBIDDEN/);
   await assert.rejects(db.query('update orders set is_test_order=false where id=$1',[flagged]),/FORBIDDEN/);

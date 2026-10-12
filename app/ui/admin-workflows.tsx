@@ -1,5 +1,6 @@
 "use client";
 import dynamic from "next/dynamic";
+import { kstInput, kstToIso, kstLabel, overlappingAutomations } from "@/lib/marketing-qa";
 import { emptyOrderListScope, type OrderListScope } from "@/lib/admin-order-list";
 import { FollowupTemplateSource } from "./followup-template-source";
 const LandingAdmin = dynamic(() => import("./landing/admin").then(m => m.LandingAdmin));
@@ -402,12 +403,14 @@ function CrmManager({ section, data, send, pending }: Props) {
             templateId: form.get("template_id"),
             tagId: form.get("target_tag_id"),
             scheduledAt: form.get("scheduled_at")
-              ? new Date(String(form.get("scheduled_at"))).toISOString()
+              ? kstToIso(form.get("scheduled_at"))
               : null,
           },
           "캠페인을 예약했습니다.",
         );
       } else {
+        const overlap = overlappingAutomations({ id: editing?.id, is_active: form.get("is_active") === "on", trigger_type: form.get("trigger_type"), trigger_tag_id: form.get("trigger_tag_id"), trigger_course_id: form.get("trigger_course_id") }, items);
+        if (overlap.length && !window.confirm(`같은 대상에게 실행될 수 있는 자동 메시지 ${overlap.length}개가 있습니다. 중복 발송 가능성을 확인했으며 저장할까요?`)) return;
         await send(
           {
             action: "crm-save",
@@ -446,20 +449,23 @@ function CrmManager({ section, data, send, pending }: Props) {
         <label className="marketing-list-search"><input type="search" className="admin-input" aria-label={`${title} 검색`} placeholder="이름·내용 검색" value={listSearch} onChange={event => setListSearch(event.target.value)}/><span className="meta">{visibleItems.length}건</span></label>
         <AdminButton type="button" tone="primary" onClick={focusEditor}>{editing ? "작성 중인 내용으로 이동" : section === "templates" ? "템플릿 만들기" : section === "campaigns" ? "발송 예약 만들기" : "자동 안내 만들기"}</AdminButton>
       </div>
+      {section === "automations" && items.some(item => overlappingAutomations(item, items).length > 0) && <div className="notice mb24" role="alert"><strong>중복 발송 가능성이 있습니다</strong><p>같은 실행 조건에서 대상이 겹치는 자동 메시지를 확인해 주세요. 중지 상태는 발송하지 않습니다.</p></div>}
       <AdminDataTable
         label={`${title} 목록`}
         rows={visibleItems}
         getRowId={item => item.id}
         columns={[
           { id: "name", header: "이름·내용", render: item => <div className="admin-crm-primary"><strong>{named(item)}</strong>{section === "templates" && <small title={t(item, "content")}>{t(item, "content")}</small>}{section === "campaigns" && <small>{item.recruitment_id ? "모집 연결 안내" : "일반 캠페인"}</small>}</div> },
-          { id: "scope", header: section === "templates" ? "채널·목적" : section === "campaigns" ? "예약 시각" : "실행 조건", render: item => section === "templates" ? `${String(item.channel).toUpperCase()} · ${item.purpose === "marketing" ? "마케팅" : "정보성"}` : section === "campaigns" ? item.scheduled_at ? timeLabel(item.scheduled_at) : "예약 미정" : `${crmTriggerLabels[t(item, "trigger_type")] || "조건 확인 필요"} · ${Number(item.delay_minutes || 0) === 0 ? "즉시" : `${Number(item.delay_minutes)}분 후`}` },
+          { id: "scope", header: section === "templates" ? "채널·목적" : section === "campaigns" ? "예약 시각" : "실행 조건", render: item => section === "templates" ? `${String(item.channel).toUpperCase()} · ${item.purpose === "marketing" ? "마케팅" : "정보성"}` : section === "campaigns" ? item.scheduled_at ? kstLabel(item.scheduled_at) : "예약 미정" : `${crmTriggerLabels[t(item, "trigger_type")] || "조건 확인 필요"} · ${Number(item.delay_minutes || 0) === 0 ? "즉시" : `${Number(item.delay_minutes)}분 후`}` },
           ...(section === "campaigns" ? [{ id: "delivery", header: "발송", render: (item: Row) => `대상 ${Number(item.recipient_count || 0)} · 성공 ${Number(item.success_count || 0)} · 실패 ${Number(item.failure_count || 0)}` }] : []),
+          ...(section === "automations" ? [{ id: "recent", header: "최근 실행 기록", render: (item: Row) => { const runs = rows(data, "crm_automation_runs").filter(run => run.automation_id === item.id); const last = runs.filter(run => run.executed_at).map(run => String(run.executed_at)).sort().at(-1); return <div><span>처리 완료 {runs.filter(run => run.status === "completed").length} · 접수 {runs.filter(run => run.status === "accepted").length} · 실패 {runs.filter(run => run.status === "failed").length}</span><small className="meta">{last ? kstLabel(last) : "실행 기록 없음"}</small>{overlappingAutomations(item, items).length > 0 && <small className="meta">조건 중복 확인 필요</small>}</div>; } }] : []),
           { id: "status", header: "상태", render: item => <AdminStatusBadge status={section === "campaigns" ? t(item, "status") : item.is_active ? "active" : "inactive"} label={section === "templates" && item.channel === "alimtalk" && (!item.is_active || !item.alimtalk_template_id) ? "준비 중 · 미발송" : section === "automations" ? item.is_active ? "자동 실행 중" : "중지" : undefined} /> },
           { id: "action", header: "관리", align: "action" as const, render: item => <AdminButton size="sm" variant="outline" disabled={pending || (section === "campaigns" && (!!item.recruitment_id || ["sending", "completed"].includes(t(item, "status"))))} onClick={() => { if (pending || (dirty && !window.confirm("저장하지 않은 변경사항을 버리고 다른 항목을 수정할까요?"))) return; setEditing(item); setDirty(false); setMessage(""); focusEditor(); }}>수정</AdminButton> },
         ]}
         empty={<AdminEmptyState title={listSearch.trim() ? "검색 결과가 없습니다." : section === "templates" ? "등록된 메시지 템플릿이 없습니다." : section === "campaigns" ? "등록된 예약 캠페인이 없습니다." : "등록된 자동 메시지가 없습니다."} />}
       />
-      <details className="panel admin-crm-settings mb24">
+      {section === "automations" && <p className="meta mb24">화면에 불러온 최근 실행 최대 1,000건 기준입니다. 접수는 전송업체 접수이며 최종 수신 성공과 다릅니다.</p>}
+      {section === "campaigns" ? <details id="sms-settings" className="panel admin-crm-settings mb24" open={typeof location !== "undefined" && location.hash === "#sms-settings"}>
         <summary>문자 발송 설정 <span>발신번호·수신거부 번호 확인</span></summary>
       <form className="pad" onSubmit={async (event) => {
         event.preventDefault();
@@ -498,7 +504,7 @@ function CrmManager({ section, data, send, pending }: Props) {
         <p className="meta mt16">광고 문자는 자동으로 <b>(광고) 발신자명</b>과 <b>무료수신거부 080번호</b>를 붙입니다. 정보성 결제 안내에는 광고 문구를 붙이지 않습니다. 전체 발송은 서버의 안전 스위치가 켜져야 실행됩니다.</p>
         {Boolean(smsSettings?.canConfigure) && <button className="btn small mt16" disabled={pending || !(smsSettings?.senders as string[] || []).length}>문자 설정 저장</button>}
       </form>
-      </details>
+      </details> : <p className="meta mb24"><Link className="conversion-link" href="/admin/campaigns#sms-settings">문자 발송 설정 관리 →</Link> · 모든 메시지에 같은 발신번호·수신거부 설정을 사용합니다.</p>}
       {section === "templates" && <FollowupTemplateSource blocked={pending || dirty || !!editing} onApply={value => { setEditing(value); setMessage(""); focusEditor(); }}/>}
       <form ref={editorRef} key={formKey} className="panel pad mb24 admin-crm-editor" onChange={()=>setDirty(true)} onSubmit={submit}>
         <div className="between">
@@ -562,12 +568,12 @@ function CrmManager({ section, data, send, pending }: Props) {
                 ))}
               </select>
             </Field>
-            <Field label="예약 시각 (현재 기기 시간)">
+            <Field label="예약 시각 (한국시간 KST)">
               <input
                 name="scheduled_at"
                 type="datetime-local"
                 required
-                defaultValue={localDateTime(
+                defaultValue={kstInput(
                   editing?.scheduled_at || defaultSchedule,
                 )}
               />
