@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://edu.brandyaction.com/contracts/eligibility/2.0.0-rc.2",
+  "$defs": {
+    "EligibilitySubject": {
+      "type": "object",
+      "properties": {
+        "customer_id": {
+          "type": "string",
+          "pattern": "^k[1-9][0-9]*:[A-Za-z0-9_-]{43}$"
+        },
+        "consent_epoch": {
+          "type": "string",
+          "pattern": "^ce_[A-Za-z0-9_-]{32}$"
+        }
+      },
+      "required": [
+        "customer_id",
+        "consent_epoch"
+      ],
+      "additionalProperties": false
+    },
+    "EligibilityRequest": {
+      "type": "object",
+      "properties": {
+        "subjects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EligibilitySubject"
+          },
+          "minItems": 1,
+          "maxItems": 100
+        }
+      },
+      "required": [
+        "subjects"
+      ],
+      "additionalProperties": false
+    },
+    "EligibilityResult": {
+      "type": "object",
+      "properties": {
+        "customer_id": {
+          "type": "string",
+          "pattern": "^k[1-9][0-9]*:[A-Za-z0-9_-]{43}$"
+        },
+        "consent_epoch": {
+          "type": "string",
+          "pattern": "^ce_[A-Za-z0-9_-]{32}$"
+        },
+        "eligible": {
+          "type": "boolean"
+        },
+        "reason": {
+          "enum": [
+            "allowed",
+            "not_eligible"
+          ]
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "customer_id",
+        "consent_epoch",
+        "eligible",
+        "reason",
+        "generation"
+      ],
+      "additionalProperties": false
+    },
+    "EligibilityResponse": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "const": "brandyaction_edu"
+        },
+        "tenant_id": {
+          "const": "brandyaction"
+        },
+        "brand_id": {
+          "const": "brandyaction_edu"
+        },
+        "contract_version": {
+          "const": "2.0.0-rc.2"
+        },
+        "checked_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EligibilityResult"
+          },
+          "maxItems": 100
+        }
+      },
+      "required": [
+        "source",
+        "tenant_id",
+        "brand_id",
+        "contract_version",
+        "checked_at",
+        "results"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
