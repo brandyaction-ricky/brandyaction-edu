@@ -28,12 +28,12 @@ export async function GET(request: Request) {
     const account = await commonMetaAccountId(db);
     if (!landingId && !campaignId) {
       const [courses, configs, campaigns] = await Promise.all([
-        db.from('courses').select('id,title,slug,status,category').eq('category', 'free').is('archived_at', null).order('created_at', { ascending: false }),
+        db.from('courses').select('id,title,slug,status,category,archived_at').order('created_at', { ascending: false }),
         db.from('landing_configs').select('id,enabled,layout_ver'),
         db.from('landing_campaigns').select('*').order('start_day', { ascending: false }),
       ]);
       if (courses.error || configs.error || campaigns.error) throw Error('무료클래스와 캠페인 목록을 불러오지 못했습니다.');
-      return reply({ can_manage_campaign: user.role === 'admin', courses: (courses.data || []).map(course => {
+      return reply({ can_manage_campaign: user.role === 'admin', courses: (courses.data || []).filter(course => (course.category === 'free' && !course.archived_at) || campaigns.data?.some(campaign => campaign.landing_id === course.id)).map(course => {
         const config = configs.data?.find(value => value.id === course.id);
         return { ...course, tracking: !config?.layout_ver ? 'not_configured' : config.enabled ? 'active' : 'paused', campaigns: (campaigns.data?.filter(value => value.landing_id === course.id) || []).map(value => ({ ...value, meta_ad_account_id: account || null })) };
       }) });

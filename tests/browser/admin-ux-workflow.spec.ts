@@ -6,9 +6,10 @@ test('message workspace starts with work, keeps help available and uses the same
   await expect(title).toBeVisible();
   expect((await title.boundingBox())!.y).toBeLessThan(520);
   const list = page.getByRole('table', { name: '메시지 템플릿 목록' });
-  const settings = page.locator('.admin-crm-settings');
+  const settings = page.getByRole('link', { name: '문자 발송 설정 관리 →', exact: true });
   expect((await list.boundingBox())!.y).toBeLessThan((await settings.boundingBox())!.y);
-  await expect(settings.getByRole('combobox', { name: '문자 발신번호' })).toBeHidden();
+  await expect(settings).toHaveAttribute('href', '/admin/campaigns#sms-settings');
+  await expect(page.getByRole('combobox', { name: '문자 발신번호' })).toHaveCount(0);
   const nav = page.getByRole('navigation', { name: '마케팅 작업 빠른 이동' });
   await expect(nav.getByRole('link', { name: '메시지 템플릿', exact: true })).toHaveAttribute('aria-current', 'page');
   await expect(nav.getByRole('link', { name: '캠페인 발송', exact: true })).toBeVisible();
@@ -59,6 +60,7 @@ test('marketing search narrows templates without losing the editor draft',async(
   await expect(list.locator('tbody tr')).toHaveCount(1);
   await list.getByRole('button',{name:'수정',exact:true}).click();
   const form=page.locator('.admin-crm-editor');
+  await expect(form.locator('input[name=name]')).toBeFocused();
   await form.locator('input[name=name]').fill('작성 중 문구');
   await page.getByRole('searchbox',{name:'메시지 템플릿 검색'}).fill('찾을 수 없는 문구');
   await expect(list).toContainText('검색 결과가 없습니다.');

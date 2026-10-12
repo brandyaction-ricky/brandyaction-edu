@@ -22,7 +22,7 @@ const settings = load('lib/meta-campaign-settings.ts');
 const idA='120000000000000001', idB='120000000000000003';
 const campaign={id:'bbbbbbbb-bbbb-4000-8000-000000000002',landing_id:'aaaaaaaa-aaaa-4000-8000-000000000001',name:'Fixture campaign',utm_campaign:'fixture',start_day:'2026-09-01',end_day:'2036-09-01',new_customer_price:1200,existing_customer_price:900,live_peak:null,meta_ad_account_id:null,meta_campaign_id:null,meta_campaign_ids:[],meta_sync_status:'not_configured',meta_sync_error:null,updated_at:'2026-09-01T00:00:00.000Z'};
 const commonAccount='act_123456789';
-function setup({initial=campaign,role='admin',fetchRows=async()=>[],account=commonAccount,accountError=null,ui}={}) {
+function setup({initial=campaign,role='admin',fetchRows=async()=>[],account=commonAccount,accountError=null,ui,catalog}={}) {
   let row=structuredClone(initial), writes=0; const rpcCalls=[];
   const db={from(table){let patch=null,filters=[];const query={
     select(){return query},eq(key,value){filters.push([key,value]);return query},is(){return query},order(){return query},
@@ -30,7 +30,7 @@ function setup({initial=campaign,role='admin',fetchRows=async()=>[],account=comm
     async maybeSingle(){return run(false)},async single(){return run(false)},then(resolve,reject){return Promise.resolve(run(true)).then(resolve,reject)}
   };function run(list){
     if(table==='site_settings')return{data:account==null?null:{value:{adAccountId:account}},error:accountError};
-    if(table==='courses')return{data:[{id:row.landing_id,title:'Fixture',category:'free'}],error:null};
+    if(table==='courses')return{data:catalog||[{id:row.landing_id,title:'Fixture',category:'free'}],error:null};
     if(table==='landing_configs')return{data:[],error:null};
     if(filters.some(([key,value])=>row[key]!==value))return{data:null,error:null};
     if(patch){row={...row,...patch};writes++;}
@@ -156,3 +156,12 @@ test('shared setting query failure leaves stored campaign values untouched',asyn
 });
 
 test('optimized dashboard UI comes from the RPC snapshot without supplemental reads or GET writes',async()=>{const ui={errors:{},daily_a:[],last_collected_at:null,actual_presence:{new_payments:false,existing_payments:false},previous_day_members:{},period_actuals:null}; const h=setup({ui}); const response=await h.api.GET(new Request(`https://fixture.test/api/landing/performance?landing=${campaign.landing_id}&campaign=${campaign.id}&start=2026-09-15&end=2026-09-15&include=ui`)); assert.equal(response.status,200);assert.deepEqual((await response.json()).ui,ui);assert.equal(h.writes(),0);assert.equal(h.rpcCalls.length,1);});
+
+test('historical recruitment links retain archived or recategorized campaign courses without unrelated paid products',async()=>{
+ const h=setup({catalog:[{id:campaign.landing_id,title:'Archived webinar',category:'paid_class',archived_at:'2026-10-01'},{id:'unrelated',category:'paid_class'},{id:'free-new',category:'free',archived_at:null}]});
+ const response=await h.api.GET(new Request('https://fixture.test/api/landing/performance'));
+ assert.equal(response.status,200);const value=await response.json();
+ assert.deepEqual(value.courses.map(c=>c.id),[campaign.landing_id,'free-new']);
+ assert.equal(value.courses[0].campaigns[0].id,campaign.id);
+ assert.equal((await setup({role:null}).api.GET(new Request('https://fixture.test/api/landing/performance'))).status,403);
+});

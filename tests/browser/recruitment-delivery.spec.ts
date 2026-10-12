@@ -9,13 +9,13 @@ test('review is read-only; scheduling requires explicit review and confirmation;
  await page.getByLabel('발송에 사용할 템플릿').selectOption(template);await page.getByRole('button',{name:'발송 대상·문구 검토',exact:true}).click();
  await expect(page.getByText('검토 결과 · 2명')).toBeVisible();expect(writes).toHaveLength(0);
  await page.getByLabel('모집 안내 예약 이름',{exact:true}).fill('QA 합성 예약');
- await page.getByLabel('모집 안내 예약 시각 (현재 기기 시간)',{exact:true}).fill('2030-01-01T12:00');
+ await page.getByLabel('모집 안내 예약 시각 (한국시간 KST)',{exact:true}).fill('2030-01-01T12:00');
  await expect(page.getByRole('button',{name:'검토한 모집 안내 예약',exact:true})).toBeDisabled();
  await page.getByRole('checkbox').check();await page.getByRole('combobox',{name:'개별 안내 목적',exact:true}).selectOption('offer');
  await expect(page.getByText('검토 결과 · 2명')).toHaveCount(0);
  await page.getByRole('button',{name:'발송 대상·문구 검토',exact:true}).click();await page.getByRole('checkbox').check();
  await page.getByRole('button',{name:'검토한 모집 안내 예약',exact:true}).click();
- await expect.poll(()=>writes.length).toBe(1);expect(writes[0]).toMatchObject({code,template,purpose:'offer',token:review.token});expect(writes[0].recipientIds).toBeUndefined();
+ await expect.poll(()=>writes.length).toBe(1);expect(writes[0]).toMatchObject({code,template,purpose:'offer',token:review.token,at:'2030-01-01T03:00:00.000Z'});expect(writes[0].recipientIds).toBeUndefined();
  await expect(page.getByRole('status')).toContainText('예약을 저장했습니다');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
 });
 test('unpublished paid course blocks review and reservation; denied read gives no form',async({page})=>{
