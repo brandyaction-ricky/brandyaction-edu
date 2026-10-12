@@ -65,5 +65,5 @@ test('marketing search narrows templates without losing the editor draft',async(
   await expect(form.locator('input[name=name]')).toHaveValue('작성 중 문구');
   await page.getByRole('searchbox',{name:'메시지 템플릿 검색'}).fill('');
   await page.evaluate(()=>window.scrollTo(0,0));
-  await page.screenshot({path:`/private/tmp/edu-marketing-${testInfo.project.name}.png`});
+  await page.screenshot({path:testInfo.outputPath('edu-marketing.png')});
 });

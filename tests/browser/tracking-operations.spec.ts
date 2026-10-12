@@ -149,6 +149,6 @@ test('performance shows core columns first and lets operators reveal supporting 
   await expect(table.getByRole('columnheader',{name:'평균 체류',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'핵심 항목만 보기',exact:true}).click();
   await page.evaluate(()=>window.scrollTo(0,0));
-  await page.screenshot({path:`/private/tmp/edu-performance-${testInfo.project.name}.png`});
+  await page.screenshot({path:testInfo.outputPath('edu-performance.png')});
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
