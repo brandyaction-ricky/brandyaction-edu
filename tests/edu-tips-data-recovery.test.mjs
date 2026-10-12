@@ -30,7 +30,7 @@ async function setup(t){
  `);
  await owner(sql);
  await owner('delete from edu_tips_private.erasure_outbox');
- await owner("update edu_tips_private.feed_state set capture_enabled=true,serving_enabled=true");
+ await owner("update edu_tips_private.feed_state set capture_enabled=true,serving_enabled=true;update edu_tips_private.feed_state set capture_since=date_trunc('day',now() at time zone 'Asia/Seoul') at time zone 'Asia/Seoul'");
  await owner("insert into edu_tips_private.data_keys values($1,$2,array['edu.events.read','edu.learning.read','edu.recovery'],'2099-01-01',null)",[hash(key),id(90)]);
  await owner('insert into courses values($1,\'moonshot\');',[id(200)]);
  await owner('insert into cohorts values($1,\'4\');',[id(201)]);
@@ -38,6 +38,7 @@ async function setup(t){
   await owner('insert into profiles(id) values($1)',[id(n)]);
   await owner("insert into edu_personalization_preferences(member_id,wording_version,analysis,overseas,revision) values($1,'v1',true,true,$2)",[id(n),id(n+10)]);
   await f.value("select edu_tips_register_subject($1,$2,$3,'v1',$4) as v",[id(n),customer(n),epoch(n),id(n+10)]);
+  await owner("update edu_tips_private.subjects set created_at=date_trunc('day',now() at time zone 'Asia/Seoul') at time zone 'Asia/Seoul' where member_id=$1",[id(n)]);
   await owner("insert into orders values($1,$2,false,100000,'paid','alumni')",[id(n+100),id(n)]);
   await owner('insert into order_items values($1,$2,$3,$4)',[id(n+110),id(n+100),id(200),id(201)]);
   await owner("insert into payments values($1,$2,'done',100000,0,statement_timestamp()-interval '1 day')",[id(n+120),id(n+100)]);
@@ -205,4 +206,15 @@ test('non-consenting daily evidence is not collected; failed response schema and
  assert.equal(await f.value('select count(*)::int as v from edu_tips_private.learning_days where enrollment_id=$1',[id(135)]),0);
  const wrong=async(name,a)=>name==='edu_tips_data_gate'?f.rpc(name,a):{data:{items:[{email:'synthetic@example.invalid'}],has_more:false,stream_generation:1},error:null};
  const page=await f.call('events',{after:r.body.event_cursor,rpcOverride:wrong});assert.equal(page.status,503);
+});
+
+test('partial first KST day and collection gaps are unmeasured rather than false daily zero counts',async t=>{
+ const f=await setup(t);
+ await f.owner("update edu_tips_private.subjects set created_at=now() where member_id=$1",[id(5)]);
+ await f.owner("insert into learning_usage_events values($1,$2,'material_download',$3,now(),now(),'signed_file_issued')",[id(401),id(135),id(410)]);
+ const r=await f.recover(),l=await snapshot(f,'learning',r.body.learning_cursor);assert.equal(l.rows.length,0);
+ const prior=await f.value('select generation as v from edu_tips_private.feed_state');
+ await f.owner('update edu_tips_private.feed_state set capture_enabled=false;update edu_tips_private.feed_state set capture_enabled=true');
+ assert.equal(await f.value('select generation as v from edu_tips_private.feed_state'),prior+1);
+ assert.equal((await f.call('events',{after:r.body.event_cursor})).body.error,'recovery_required');
 });

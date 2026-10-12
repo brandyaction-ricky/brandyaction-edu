@@ -12,7 +12,7 @@ This adds `GET /api/internal/export/v2/events`, `GET /api/internal/export/v2/lea
 
 ## Learning coverage
 
-`learning_usage_events` is a per-item first/last/count aggregate. It does **not** prove every historical day. New exact observed KST-day evidence is recorded only during enabled capture for an eligible subject, with the matching E3a evidence source. Repeat use of the same kind/item/day is deduplicated. Historical aggregate gaps are not filled with fake events or zeros. No activity-free rows are created.
+`learning_usage_events` is a per-item first/last/count aggregate. It does **not** prove every historical day. New exact observed KST-day evidence is recorded only during enabled capture for an eligible subject, with the matching E3a evidence source. Repeat use of the same kind/item/day is deduplicated. Historical aggregate gaps are not filled with fake events or zeros. No activity-free rows are created. The first partial KST day after source capture or subject registration is unmeasured and is not emitted. Restarting capture after a gap resets coverage time and generation; previously unproven history is conservatively omitted.
 
 No immutable dated curriculum denominator is available. Therefore `completed_items`, `total_items`, `curriculum_version`, `usage_ratio` are null, and historical availability/cohort state are unknown. Current registered curriculum is not substituted for past composition. Learning expires at KST-day start + 2160 hours. Null/absence is unmeasured, not disengagement. This change cannot provide complete learning history before capture starts.
 

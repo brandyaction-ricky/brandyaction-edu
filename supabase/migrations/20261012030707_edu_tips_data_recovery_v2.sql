@@ -8,6 +8,14 @@ create table edu_tips_private.feed_state (
  last_seq bigint not null default 0 check(last_seq>=0), capture_since timestamptz not null default statement_timestamp()
 );
 insert into edu_tips_private.feed_state(singleton) values(true);
+create function edu_tips_private.reset_capture_coverage()
+returns trigger language plpgsql security invoker set search_path='' as $$
+begin
+ if new.capture_enabled and not old.capture_enabled then new.capture_since:=clock_timestamp();new.generation:=old.generation+1;end if;
+ return new;
+end$$;
+revoke all on function edu_tips_private.reset_capture_coverage() from public,anon,authenticated,service_role;
+create trigger edu_tips_capture_coverage before update of capture_enabled on edu_tips_private.feed_state for each row execute function edu_tips_private.reset_capture_coverage();
 create table edu_tips_private.data_keys (
  key_hash text primary key check(key_hash ~ '^[0-9a-f]{64}$'),
  consumer_id uuid not null references edu_tips_private.erasure_consumers(id),
@@ -173,6 +181,7 @@ begin
    join public.courses c on c.id=e.course_id join public.cohorts h on h.id=e.cohort_id
    where e.user_id=p_member and e.source='purchase' and o.status in ('paid','partially_refunded','refunded')
     and d.date_kst>=((statement_timestamp()-interval '2160 hours') at time zone 'Asia/Seoul')::date
+    and (d.date_kst::timestamp at time zone 'Asia/Seoul')>=greatest(s.created_at,(select capture_since from edu_tips_private.feed_state))
    group by e.cohort_id,d.date_kst,c.course_code,h.cohort_code loop
    k:='learning:'||r.cohort_id||':'||r.date_kst;used_keys:=array_append(used_keys,k);
    at:=r.date_kst::timestamp at time zone 'Asia/Seoul';cid:=r.course_code||':'||r.cohort_code;
