@@ -438,6 +438,8 @@ test('room settings save separately from product mapping and changing recruitmen
   await page.getByRole('button',{name:'새로고침',exact:true}).click();
   await page.getByRole('button',{name:'모집 경로 준비',exact:true}).click();
   await page.getByRole('button',{name:'모집별 카톡방 관리',exact:true}).click();
+  await expect(page.getByRole('textbox',{name:'즉시 공개 자료'})).toBeHidden();
+  await page.locator('.recruitment-announcement-disclosure > summary').click();
   await expect(page.getByRole('heading',{name:'카톡방 공지 만들기'})).toBeVisible();
   await page.getByRole('textbox',{name:'라이브 날짜'}).fill('10/30 (금)');
   await page.getByRole('textbox',{name:'즉시 공개 자료'}).fill('새 자료 제목');

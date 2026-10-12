@@ -53,3 +53,19 @@
 .edu-admin .tracking-inline-select{width:auto;min-width:96px;height:40px;min-height:40px;padding:8px 10px;font-size:13px;line-height:20px;box-sizing:border-box}
 .edu-admin .tracking-performance-table td:first-child{width:132px;min-width:132px}.edu-admin .tracking-performance-table .tracking-ad-type{min-width:116px}.edu-admin .tracking-performance-table .tracking-inline-select{min-width:116px}.edu-admin .tracking-performance-table thead th{position:sticky;top:36px;z-index:2;background:var(--admin-surface-subtle)}.edu-admin .tracking-performance-table thead tr:first-child th{top:0;z-index:4;height:36px;text-align:left;font-size:12px;color:var(--text-secondary);box-shadow:0 1px 0 var(--admin-border)}.edu-admin .tracking-performance-table thead tr:nth-child(2) th:nth-child(2){z-index:5}.edu-admin .tracking-performance-table thead th:nth-child(2){left:0}.edu-admin .tracking-performance-table .tracking-performance-context th{max-width:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media(max-width:720px){.edu-admin .tracking-inline-select{height:44px;min-height:44px}}
+
+.edu-admin .tracking-toolbar{border-radius:16px;box-shadow:none}
+.edu-admin .tracking-periods{padding:6px;background:var(--admin-surface-subtle,#f5f6f8);border-radius:12px;border:0}
+.edu-admin .tracking-periods>.admin-button{border:0;background:transparent;box-shadow:none;border-radius:8px}
+.edu-admin .tracking-periods>.admin-button[aria-pressed=true]{background:var(--admin-surface,#fff);color:var(--ba-red-hover,#a92525);box-shadow:0 1px 4px #17203312}
+.edu-admin .tracking-detail-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.edu-admin .tracking-detail-heading h2{font-size:16px;margin:0}
+.edu-admin .tracking-detail-heading p{margin:4px 0 0}
+.edu-admin .tracking-stack[data-metric-detail=false] .tracking-performance-table :is(th,td):is(:nth-child(5),:nth-child(8),:nth-child(9),:nth-child(11),:nth-child(12)){display:none}
+.edu-admin .tracking-stack[data-metric-detail=false] .tracking-performance-context th{display:table-cell}
+.edu-admin .tracking-metric-details{border:1px solid var(--admin-border);border-radius:12px;padding:4px 16px;background:var(--admin-surface,#fff)}
+.edu-admin .tracking-funnel .admin-metric{border-radius:14px;box-shadow:0 2px 8px #17203304}
+.edu-admin .tracking-performance-table thead th{white-space:nowrap}
+@media(max-width:720px){.edu-admin .tracking-detail-heading{align-items:flex-start}.edu-admin .tracking-detail-heading>.admin-button{flex-shrink:0}.edu-admin .tracking-periods>.admin-button{min-height:40px}}
+
+.edu-admin .tracking-priority-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}@media(max-width:640px){.edu-admin .tracking-priority-metrics{grid-template-columns:1fr}.edu-admin .tracking-priority-metrics .admin-metric{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:12px 16px}.edu-admin .tracking-priority-metrics .admin-metric .admin-metric-value{font-size:20px}}

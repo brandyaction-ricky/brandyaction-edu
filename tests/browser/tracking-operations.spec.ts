@@ -139,3 +139,16 @@ test('campaign save updates persisted form and legacy settings URL stays closed 
   await expect(page.getByRole('checkbox', { name: /운영 검증 클래스/ })).toBeChecked();
   await expect(drawer).toHaveCount(0); await expect(page).toHaveURL(/tab=dashboard/);
 });
+
+test('performance shows core columns first and lets operators reveal supporting metrics',async({page},testInfo)=>{
+  await fixture(page);
+  const table=page.getByRole('table',{name:'소재별 성과표'});
+  await expect(table.getByRole('columnheader',{name:'평균 체류',exact:true})).toBeHidden();
+  await expect(table.getByRole('columnheader',{name:'광고비',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'상세 항목 보기',exact:true}).click();
+  await expect(table.getByRole('columnheader',{name:'평균 체류',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'핵심 항목만 보기',exact:true}).click();
+  await page.evaluate(()=>window.scrollTo(0,0));
+  await page.screenshot({path:testInfo.outputPath('edu-performance.png')});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});

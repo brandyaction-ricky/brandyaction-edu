@@ -85,6 +85,7 @@ export function PerformanceTable({ report, onClassify, pending = false, sampleMi
 }
 const percentage = (value: number | null) => value === null ? '계산 불가' : `${value.toFixed(1)}%`;
 export function PerformanceDashboard({ report, compare, onClassify, pending, onRetry, filtered = false, sampleMin, onSampleMin, filterSummary }: { report: DashboardReport; compare: boolean; onClassify: Classify; pending?: boolean; onRetry?: () => void; filtered?: boolean; sampleMin?: string; onSampleMin?: (value: string) => void; filterSummary?: string }) {
+  const [details, setDetails] = useState(false);
   const b = report.summary_b, a = report.summary_a, summary = report.campaign_summary;
   const hasVisits = report.data_state.sessions_exist, previousHasVisits = Boolean(a?.sessions);
   const presence = report.ui?.actual_presence, hasPayments = presence ? presence.new_payments || presence.existing_payments : !report.ui;
@@ -93,33 +94,39 @@ export function PerformanceDashboard({ report, compare, onClassify, pending, onR
   const visits = hasVisits ? b.sessions : null, clicks = hasVisits ? b.cta_click_sessions : null;
   const linked = !!report.campaign.meta_ad_account_id && metaCampaignIds(report.campaign).length > 0;
   const metaValue = (value: number) => report.data_state.meta_exists ? count(value) : linked ? '—' : '연동 전';
-  return <div className="tracking-stack">
+  return <div className="tracking-stack" data-metric-detail={details}>
     <section aria-label="선택 기간 전환 퍼널" className="tracking-funnel">
-      <div className="tracking-subsection-head"><h2>전환 퍼널</h2><span className="tracking-help">{report.range.startDay} — {report.range.endDay} · KST</span></div>
+      <div className="tracking-subsection-head"><h2>한눈에 보는 모집 성과</h2><span className="tracking-help">{report.range.startDay} — {report.range.endDay} · KST</span></div>
       <AdminMetricGrid columns={4}>
         <AdminMetric label="1. 방문" value={count(visits)} note="세션 수 · 재방문 포함" change={compare && <Compare current={b.sessions} previous={a?.sessions} hasData={previousHasVisits}/>}/>
         <AdminMetric label="2. CTA 클릭" value={count(clicks)} note={`방문 → CTA ${percentage(funnelRate(clicks, visits))}`} change={compare && <><Compare current={b.cta_click_sessions} previous={a?.cta_click_sessions} hasData={previousHasVisits} unit="세션"/><Compare current={sessionRate} previous={a ? rate(a.cta_click_sessions, a.sessions) : undefined} hasData={previousHasVisits} unit="%"/></>}/>
-        <AdminMetric label="3. 카카오톡방" value={kakaoIncrease == null ? '입력 전' : count(kakaoIncrease)} note={filtered ? '캠페인 전체 실측' : `CTA → 카톡방 ${percentage(funnelRate(kakaoIncrease, clicks))}`} change={<span>{actual?.kakao_day ? `${actual.baseline_day} 자정 대비 ${actual.kakao_day} 자정 증가분` : `${report.range.endDay} 자정 입력 전`}</span>}/>
+        <AdminMetric label="3. 카카오톡방" value={kakaoIncrease == null ? '입력 전' : count(kakaoIncrease)} note={filtered ? '캠페인 전체 실측' : `CTA → 카톡방 ${percentage(funnelRate(kakaoIncrease, clicks))}`} change={<span>{actual?.kakao_day && actual.baseline_day ? `${actual.baseline_day} 자정 대비 ${actual.kakao_day} 자정 증가분` : `${report.range.endDay} 자정 입력 전`}</span>}/>
         <AdminMetric label="4. 결제" value={count(actual?.payments)} note={filtered ? '캠페인 전체 실측' : `카톡방 → 결제 ${percentage(funnelRate(actual?.payments, kakaoIncrease))}`} change={<span>선택 기간 신규·기존 결제 합계</span>}/>
       </AdminMetricGrid>
       <p className="tracking-help">CTA 클릭은 1회 이상 클릭한 세션입니다. 카톡방은 선택 기간 종료일 자정 인원에서 시작일 전날 자정 인원을 뺀 증가분입니다.</p>
       {filtered && <p className="tracking-help" role="status">실측값은 소재·기기 필터가 적용되지 않습니다. 필터 적용 중에는 CTA 이후 실측 전환율을 표시하지 않습니다.</p>}
       {report.ui?.errors.actuals && <InlineError onRetry={onRetry}>{report.ui.errors.actuals}</InlineError>}
     </section>
+    <AdminMetricGrid columns={4} className="tracking-priority-metrics">
+      <AdminMetric label="기간 광고비" value={report.data_state.meta_exists ? money(b.spend) : linked ? '수집 전' : '연동 전'} note="Meta에서 수집한 금액"/>
+      <AdminMetric label="Meta 링크 클릭" value={metaValue(b.meta_link_clicks)} note="광고에서 링크를 누른 횟수"/>
+      <AdminMetric label="방문 → 클릭" value={percentage(funnelRate(clicks, visits))} note="신청 버튼을 누른 세션 비율"/>
+    </AdminMetricGrid>
     <details className="tracking-metric-details"><summary>상세 지표 · Meta 성과 · 누적 성과</summary>
     <AdminMetricGrid columns={8} className="tracking-kpis">
       <AdminMetric label="고유 방문자" value={count(hasVisits ? b.visitors : null)} note="중복 제외" change={compare && <Compare current={b.visitors} previous={a?.visitors} hasData={previousHasVisits}/>}/>
       <AdminMetric label="방문자 CTA 전환율" value={b.visitors ? `${visitorRate.toFixed(1)}%` : hasVisits ? '계산 불가' : '—'} note="전환 방문자 ÷ 고유 방문자" change={compare && <Compare current={visitorRate} previous={a ? rate(a.converted_visitors, a.visitors) : undefined} hasData={previousHasVisits} unit="%"/>}/>
       <AdminMetric label="CTA 클릭 횟수" value={count(hasVisits ? b.cta_clicks : null)} note="기간 내 전체 클릭" change={compare && <Compare current={b.cta_clicks} previous={a?.cta_clicks} hasData={previousHasVisits} unit="회"/>}/>
-      <AdminMetric label="광고비" value={report.data_state.meta_exists ? money(b.spend) : metaValue(b.spend)} note="선택 기간 Meta"/>
+      <AdminMetric label="광고비" value={report.data_state.meta_exists ? money(b.spend) : metaValue(b.spend)} note="선택 기간 Meta · 수집된 광고비"/>
       <AdminMetric label="Meta 노출" value={metaValue(b.meta_impressions)} note="선택 기간"/>
       <AdminMetric label="Meta 링크 클릭" value={metaValue(b.meta_link_clicks)} note={`Meta CTR ${report.data_state.meta_exists ? percentage(funnelRate(b.meta_link_clicks, b.meta_impressions)) : linked ? '계산 불가' : '연동 전'}`}/>
-      <AdminMetric label="누적 매출" value={money(hasPayments ? summary.revenue : null)} note={`신규·기존 결제 ${hasPayments ? count(summary.new_payments + summary.existing_payments) + '건' : '—'}`}/>
-      <AdminMetric label="ROAS" value={summary.roas == null ? hasPayments ? '계산 불가' : '—' : `${count(summary.roas)}%`} note={`누적 광고비 ${money(report.campaign.meta_last_synced_at || summary.spend > 0 || report.data_state.meta_exists ? summary.spend : null)}`}/>
+      <AdminMetric label="수기 누적 매출" value={money(hasPayments ? summary.revenue : null)} note={`신규·기존 결제 ${hasPayments ? count(summary.new_payments + summary.existing_payments) + '건' : '—'}`}/>
+      <AdminMetric label="수기 매출 대비 광고비" value={summary.roas == null ? hasPayments ? '계산 불가' : '—' : `${count(summary.roas)}%`} note={`누적 광고비 ${money(report.campaign.meta_last_synced_at || summary.spend > 0 || report.data_state.meta_exists ? summary.spend : null)}`}/>
     </AdminMetricGrid>
     </details>
-    <p className="tracking-help">마지막 데이터 수집: {kstTime(report.ui?.last_collected_at)}</p>
+    <p className="tracking-help">수기 결제·매출은 주문 원장과 별도입니다. 기수 전체 순매출·ROAS 판단과 구분하세요.<br/>마지막 데이터 수집: {kstTime(report.ui?.last_collected_at)}</p>
     {report.ui?.errors.collection && <InlineError onRetry={onRetry}>{report.ui.errors.collection}</InlineError>}
+    <div className="tracking-detail-heading"><div><h2>광고 소재 비교</h2><p className="tracking-help">방문·클릭·광고비를 먼저 확인하세요.</p></div><AdminButton size="sm" aria-pressed={details} onClick={() => setDetails(value => !value)}>{details ? '핵심 항목만 보기' : '상세 항목 보기'}</AdminButton></div>
     <PerformanceTable report={report} onClassify={onClassify} pending={pending} sampleMin={sampleMin} onSampleMin={onSampleMin} filterSummary={filterSummary}/>
     <TrendChart report={report} compare={compare} onRetry={onRetry}/>
   </div>;

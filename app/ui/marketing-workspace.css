@@ -30,3 +30,30 @@
   .edu-admin .marketing-workspace nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:8px 0}
   .edu-admin .marketing-workspace nav a{min-width:0;min-height:44px;display:flex;align-items:center;padding:8px;font-size:13px;overflow-wrap:anywhere}
 }
+
+/* Marketing navigation shares admin tokens and keeps destinations in view. */
+.edu-admin .marketing-workspace{display:block;padding:16px 18px;border-radius:16px;background:var(--admin-surface,#fff);box-shadow:0 2px 8px #17203303}
+.edu-admin .marketing-workspace-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px}
+.edu-admin .marketing-workspace-heading>span{font-size:12px;color:var(--text-secondary)}
+.edu-admin .marketing-workspace .marketing-task-nav{display:grid;grid-template-columns:1.4fr 1.25fr 1fr;gap:16px;margin:12px 0 0}
+.edu-admin .marketing-task-group{min-width:0}
+.edu-admin .marketing-task-group>span{display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:11px;font-weight:600;color:var(--text-secondary)}
+.edu-admin .marketing-task-group>div{display:flex;gap:4px;flex-wrap:wrap}
+.edu-admin .marketing-workspace .marketing-task-nav a{display:flex;align-items:center;justify-content:center;min-height:36px;padding:7px 10px;border:0;border-radius:9px;background:var(--admin-surface-subtle,#f5f6f8);color:var(--ink);font-size:12px;font-weight:600;transition:background .15s}
+.edu-admin .marketing-workspace .marketing-task-nav a:hover{background:#eceef2}
+.edu-admin .marketing-workspace .marketing-task-nav a[aria-current=page]{background:var(--ba-red-soft,#fff0f0);color:var(--ba-red-hover,#a92525);box-shadow:inset 0 0 0 1px #bd373718}
+.edu-admin .marketing-workspace .marketing-workspace-help>summary{min-height:32px;font-size:12px;margin-top:8px;justify-content:flex-end}
+.edu-admin .marketing-workspace .marketing-workspace-help>summary::before{content:none}
+.edu-admin .marketing-workspace-inquiry-link{margin-top:10px}
+.edu-admin .marketing-ownership{font-size:13px;padding:12px 16px;background:var(--admin-surface-subtle,#f5f6f8);border-radius:10px}
+.edu-admin .admin-crm-workspace-actions{display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+.edu-admin .marketing-list-search{display:flex;gap:8px;align-items:center;max-width:420px;flex:1}
+.edu-admin .marketing-list-search input{width:100%;min-width:0}
+@media(max-width:900px){.edu-admin .marketing-workspace .marketing-task-nav{grid-template-columns:1fr;gap:8px}.edu-admin .marketing-task-group{display:grid;grid-template-columns:64px 1fr;align-items:center}.edu-admin .marketing-task-group>span{margin:0}.edu-admin .marketing-workspace .marketing-task-nav a{min-height:40px}.edu-admin .marketing-workspace-heading>span{display:none}}
+@media(max-width:480px){.edu-admin .marketing-workspace{padding:12px}.edu-admin .marketing-task-group{grid-template-columns:1fr;gap:4px}.edu-admin .marketing-task-group>span{font-size:10px}.edu-admin .marketing-workspace .marketing-task-nav a{padding:6px 8px;min-height:40px;font-size:11px}.edu-admin .marketing-list-search{flex-basis:100%}}
+
+.edu-admin .analytics-period-presets{display:flex;gap:4px;background:var(--admin-surface-subtle,#f5f6f8);padding:4px;border-radius:10px;width:fit-content;margin-bottom:12px}.edu-admin .analytics-period-presets .admin-button{border:0;border-radius:7px;min-width:60px}.edu-admin .analytics-period-presets [aria-pressed=true]{background:white;color:var(--ba-red-hover,#a92525);box-shadow:0 1px 4px #17203312}
+
+.edu-admin .marketing-list-search>.meta{white-space:nowrap}.edu-admin .marketing-list-search{margin-block:12px}
+
+.edu-admin .marketing-appearance-settings{border:1px solid var(--admin-border);border-radius:12px;padding:12px 16px;margin-bottom:20px;background:var(--admin-surface,#fff)}.edu-admin .marketing-appearance-settings>summary{cursor:pointer;min-height:40px;font-size:14px;font-weight:600;align-content:center}.edu-admin .marketing-appearance-settings>summary span{display:block;font-size:12px;font-weight:400;color:var(--text-secondary);margin-top:4px}.edu-admin .marketing-appearance-settings>summary:focus-visible{outline:2px solid var(--red);outline-offset:3px}
