@@ -26,7 +26,7 @@ export async function GET(request: Request) {
       if (linked.error) throw linked.error;
       if (!linked.data) return reply({ error: '이 상품에 연결된 기수가 아닙니다.' }, 404);
     }
-    const member = 'profiles!inner(id,full_name,status)';
+    const member = 'profiles:profiles!user_id!inner(id,full_name,status)';
     const enrollment = `enrollments!inner(id,user_id,course_id,cohort_id,${member},cohorts(id,name))`;
     let query;
     if (view === 'students') {
