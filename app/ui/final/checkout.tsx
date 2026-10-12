@@ -1,7 +1,7 @@
 "use client";
 import { money, number as num, text as t, type User } from "@/lib/platform";
 import { cohortPeriod } from "@/lib/qa-rules";
-import { ArrowLeft, ArrowRight, CreditCard, Landmark } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, CreditCard, Landmark } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
@@ -13,10 +13,9 @@ import { MOONSHOT_SUPPORT_URL } from "@/lib/purchase-onboarding";
 import "./checkout.css";
 
 const paymentMethods = [
-  { value: "CARD", label: "신용·체크카드", button: "카드로 결제하기", mark: "" },
-  { value: "KAKAOPAY", label: "카카오페이", button: "카카오페이로 결제하기", mark: "kakao pay" },
-  { value: "TOSSPAY", label: "토스페이", button: "토스페이로 결제하기", mark: "toss pay" },
-  { value: "NAVERPAY", label: "네이버페이", button: "네이버페이로 결제하기", mark: "N pay" },
+  { value: "QUICK_TRANSFER", label: "퀵계좌이체", button: "퀵계좌이체로 결제하기", description: "처음 한 번 계좌를 연결하고 비밀번호로 간편하게 결제" },
+  { value: "TRANSFER", label: "실시간 계좌이체", button: "실시간 계좌이체로 결제하기", description: "토스페이먼츠 결제창에서 은행 계좌를 인증하고 결제" },
+  { value: "CARD", label: "카드·간편결제", button: "카드·간편결제로 결제하기", description: "신용·체크카드, 카카오페이, 토스페이, 네이버페이" },
 ] as const;
 type PaymentMethod = typeof paymentMethods[number]["value"];
 
@@ -38,7 +37,10 @@ export function Checkout({
   const [processing, setProcessing] = useState(false),
     [error, setError] = useState(""),
     [agreed, setAgreed] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CARD");
+  // This is a display gate, not a Toss contract switch. Enable only after
+  // confirming quick transfer on the EDU production MID's actual payment window.
+  const quickTransferEnabled = process.env.NEXT_PUBLIC_TOSS_QUICK_TRANSFER_ENABLED === "true";
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(quickTransferEnabled ? "QUICK_TRANSFER" : "TRANSFER");
   const selectedPayment = paymentMethods.find((method) => method.value === paymentMethod)!;
   const lock = useRef(false),
     cohort = (data.cohorts || []).find((c) => c.id === cohortId),
@@ -51,6 +53,10 @@ export function Checkout({
   const couponLoading = couponRegistration.loading;
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (paymentMethod === "QUICK_TRANSFER" && !quickTransferEnabled) {
+      setError("퀵계좌이체는 준비 중입니다. 실시간 계좌이체 또는 카드·간편결제를 선택해 주세요.");
+      return;
+    }
     if (coupon.trim() && !quote) { setError('쿠폰 등록을 완료해 주세요.'); return; }
     if (!agreed) {
       setError("필수 약관에 동의해 주세요.");
@@ -94,14 +100,13 @@ export function Checkout({
         successUrl: location.origin + "/payment/success",
         failUrl: location.origin + "/payment/fail",
       } as const;
-      // Resume virtual-account requests only after the live merchant service is activated.
-      await payment.requestPayment({
-        ...paymentRequest,
-        method: "CARD",
-        ...(paymentMethod === "CARD" ? {} : {
-          card: { flowMode: "DIRECT" as const, easyPay: paymentMethod },
-        }),
-      });
+      // Both transfer choices use Toss's supported TRANSFER request. The merchant
+      // contract and buyer's selection in the Toss window determine the flow.
+      if (paymentMethod !== "CARD") {
+        await payment.requestPayment({ ...paymentRequest, method: "TRANSFER" });
+      } else {
+        await payment.requestPayment({ ...paymentRequest, method: "CARD" });
+      }
     } catch (cause) {
       setError((cause as Error).message);
     } finally {
@@ -309,7 +314,7 @@ export function Checkout({
                 <p className="meta checkout-payment-intro">원하는 결제 방법을 선택해 주세요.</p>
                 <div className="checkout-payment-options" role="radiogroup" aria-label="결제 수단">
                   {paymentMethods.map((method) => (
-                    <label className="checkout-payment-option" key={method.value} data-method={method.value}>
+                    <label className="checkout-payment-option" key={method.value} data-method={method.value} data-unavailable={method.value === "QUICK_TRANSFER" && !quickTransferEnabled || undefined}>
                       <input
                         type="radio"
                         name="payment"
@@ -317,29 +322,24 @@ export function Checkout({
                         aria-label={method.label}
                         checked={paymentMethod === method.value}
                         onChange={() => setPaymentMethod(method.value)}
-                        disabled={pending || processing}
+                        disabled={pending || processing || (method.value === "QUICK_TRANSFER" && !quickTransferEnabled)}
                       />
+                      {method.value === "QUICK_TRANSFER" && <span className={quickTransferEnabled ? "checkout-payment-recommended" : "checkout-payment-coming"}>{quickTransferEnabled ? "추천" : "준비 중"}</span>}
                       <span className="checkout-payment-mark" aria-hidden="true">
-                        {method.value === "CARD" ? <CreditCard /> : method.mark}
+                        {method.value === "CARD" ? <CreditCard /> : <Landmark />}
                       </span>
-                      <span className="checkout-payment-name">{method.label}</span>
+                      <span className="checkout-payment-copy">
+                        <span className="checkout-payment-name">{method.label}</span>
+                        <span className="checkout-payment-description">{method.value === "QUICK_TRANSFER" && !quickTransferEnabled ? "지금은 실시간 계좌이체 또는 카드·간편결제를 이용해 주세요." : method.description}</span>
+                      </span>
+                      <Check className="checkout-payment-check" aria-hidden="true" />
                     </label>
                   ))}
                 </div>
-                <p className="meta checkout-payment-next" aria-live="polite">
-                  약관 동의 후 ‘{selectedPayment.button}’를 누르면 {paymentMethod === "CARD" ? "카드 결제창" : `${selectedPayment.label} 결제창`}이 열립니다.
-                </p>
-                <label className="radio-card checkout-payment-unavailable">
-                    <input
-                      type="radio"
-                      name="payment"
-                      value="VIRTUAL_ACCOUNT"
-                      disabled
-                      aria-describedby="checkout-transfer-help"
-                    />
-                    <Landmark aria-hidden="true" />
-                    가상계좌 · 일시 중단
-                </label>
+                <div className="notice checkout-payment-next" aria-live="polite">
+                  <h3>결제 수단은 결제창에서 최종 선택합니다</h3>
+                  <p>약관 동의 후 ‘{selectedPayment.button}’를 누르면 토스페이먼츠 결제창이 열립니다. {paymentMethod === "CARD" ? "결제창에서 카드나 간편결제를 선택해 주세요." : "이용 가능한 계좌이체 방식과 인증 절차는 결제창에서 확인해 주세요. 현금영수증도 결제창에서 신청할 수 있어요."}</p>
+                </div>
                 <div className="notice checkout-transfer-help" id="checkout-transfer-help">
                   <h3>계좌이체로 수강하시려면</h3>
                   <p>계좌이체를 원하시면 아래 국민은행 계좌로 입금해 주세요.</p>
