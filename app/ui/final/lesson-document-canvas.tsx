@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { EditorContent, useEditor, Node, Extension, ReactNodeViewRenderer, NodeViewWrapper, type NodeViewProps, type JSONContent, type Editor } from '@tiptap/react';
-import { Plugin, TextSelection } from '@tiptap/pm/state';
+import { NodeSelection, Plugin, TextSelection } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import { lessonImageColumns } from '@/lib/lesson-image-row';
 import { Fragment } from '@tiptap/pm/model';
@@ -12,6 +12,7 @@ import { blocksFromCanvas, canvasTextContent, duplicateLessonBlock, isCanvasText
 import { LessonBlockView } from './lesson-block-view';
 import { GripVertical } from 'lucide-react';
 import { lessonRichExtensions, LessonFormatToolbar } from './lesson-rich-input';
+import { lessonCanvasMovableExtensions } from './lesson-canvas-movable';
 import { useLessonImageDrag } from './lesson-image-drag';
 import type { LessonImagePosition } from '@/lib/lesson-image-position';
 import './lesson-document-canvas.css';
@@ -28,7 +29,7 @@ function Activity({ node, extension, editor, selected, getPos }: NodeViewProps) 
   const block = node.attrs.block as LessonBlock;
   if (!block) return <NodeViewWrapper />;
   return <NodeViewWrapper className={'ldc-activity' + (selected ? ' is-selected' : '')} data-author-block={block.id} data-block-type={block.type} contentEditable={false}>
-    <div className="ldc-activity-actions"><span data-drag-handle draggable={block.type === 'image' && editor.isEditable ? true : undefined} className="ldc-drag" aria-label="드래그하여 항목 순서 변경" title="드래그하여 순서 변경"><GripVertical size={18} aria-hidden="true" /></span><button type="button" className="btn small" disabled={!editor.isEditable} onClick={() => { const pos = getPos(); if (typeof pos === 'number') editor.commands.setNodeSelection(pos); extension.options.onSettings(block.id); }}>{extension.options.labels[block.type] || '항목'} 설정</button></div>
+    <div className="ldc-activity-actions"><span data-drag-handle draggable={editor.isEditable} className="ldc-drag" role="button" tabIndex={0} aria-label="드래그하여 항목 순서 변경" title="드래그하여 순서 변경" onKeyDown={event => { if ((event.key === 'Enter' || event.key === ' ') && editor.isEditable) { event.preventDefault(); const pos = getPos(); if (typeof pos === 'number') editor.commands.setNodeSelection(pos); } }}><GripVertical size={18} aria-hidden="true" /></span><button type="button" className="btn small" disabled={!editor.isEditable} onClick={() => { const pos = getPos(); if (typeof pos === 'number') editor.commands.setNodeSelection(pos); extension.options.onSettings(block.id); }}>{extension.options.labels[block.type] || '항목'} 설정</button></div>
     <LessonBlockView floatingAudio document={publicLessonBlocks({ schemaVersion: 1, blocks: [block], checklist: [] })} values={emptyValues} onChange={() => {}} readOnly />
   </NodeViewWrapper>;
 }
@@ -64,10 +65,11 @@ export function LessonDocumentCanvas(props: Props) {
   const editor = useEditor({
     immediatelyRender: false, shouldRerenderOnTransaction: false,
     extensions: [
-      ...lessonRichExtensions().filter(extension => !['starterKit', 'lessonImage'].includes(extension.name)),
+      ...lessonRichExtensions().filter(extension => !['starterKit', 'lessonImage', 'blockquote'].includes(extension.name)),
       // Same text schema and input rules as the existing body editor, with one
       // document root for the whole lesson rather than one editor per paragraph.
-      lessonRichExtensions()[0].configure({ document: false }),
+      lessonRichExtensions()[0].configure({ document: false, paragraph: false, heading: false, bulletList: false, orderedList: false }),
+      ...lessonCanvasMovableExtensions,
       Node.create({ name: 'doc', topNode: true, content: 'lessonItem*' }),
       Node.create({
         name: 'lessonText', group: 'lessonItem', content: 'block+', defining: true, isolating: true,
@@ -96,6 +98,21 @@ export function LessonDocumentCanvas(props: Props) {
         addProseMirrorPlugins() {
           return [new Plugin({
             props: {
+              handleDOMEvents: {
+                keydown(view, event) {
+                  if (event.key !== 'Enter' && event.key !== ' ') return false;
+                  const wrapper = (event.target as HTMLElement).closest('.lesson-toggle-drag')?.closest('[data-type="details"]');
+                  if (!wrapper) return false;
+                  const $pos = view.state.doc.resolve(view.posAtDOM(wrapper, 0));
+                  for (let depth = $pos.depth; depth > 0; depth--) {
+                    if ($pos.node(depth).type.name !== 'details') continue;
+                    event.preventDefault();
+                    view.dispatch(view.state.tr.setSelection(NodeSelection.create(view.state.doc, $pos.before(depth))));
+                    return true;
+                  }
+                  return false;
+                },
+              },
               decorations(state) {
                 const blocks: LessonBlock[] = []; state.doc.forEach(node => { if (node.attrs.block) blocks.push(node.attrs.block); });
                 const columns = lessonImageColumns(blocks), decorations: Decoration[] = [];
@@ -258,7 +275,7 @@ export function LessonDocumentCanvas(props: Props) {
     });
   }
   return <div className="ldc-root" ref={root} {...imageDrag.handlers}>
-    <p className="meta">글을 바로 클릭해 수정하세요. 빈 줄에서 / 또는 ‘현재 위치에 추가’로 질문·자료를 넣습니다.</p>
+    <p className="meta">글을 바로 클릭해 수정하세요. 빈 줄에서 / 또는 ‘현재 위치에 추가’로 질문·자료를 넣고, 왼쪽 손잡이를 끌어 순서를 바꿀 수 있어요.</p>
     {props.blocks.some(block => block.type === 'image') && <p className="meta ldc-image-drag-help">이미지를 펼친 토글 안에 끌어 넣을 수 있어요. 이미지 설정의 ‘토글 안으로 이동’도 사용할 수 있습니다. 다른 이미지 옆에 놓으면 최대 3장까지 나란히 붙어요.</p>}
     {outline.length > 0 && <details className="ldc-outline"><summary>수업 목차 · {outline.length}개</summary><nav aria-label="수업 목차">{outline.map(item => <button type="button" className="btn small" key={`${item.id}-${item.index}`} onClick={() => jump(item.id, item.index)}>{item.label || '제목 입력 전'}</button>)}</nav></details>}
     <div className="lesson-body-editor ldc-editor">

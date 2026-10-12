@@ -45,10 +45,11 @@ const LESSON_COLORS = [
   ["연한 파랑", "#dbeafe"], ["연한 보라", "#f3e8ff"], ["연한 분홍", "#fce7f3"], ["연한 회색", "#f3f4f6"],
 ] as const;
 
-const LessonQuote = Blockquote.extend({
+export const LessonQuote = Blockquote.extend({
   addInputRules() { return [wrappingInputRule({ find: /^" $/, type: this.type })]; },
 });
 const LessonDetails = Details.extend({
+  draggable: true,
   addInputRules() {
     return [new InputRule({ find: /^> $/, handler: ({ chain, range }) => {
       if (!chain().deleteRange(range).setDetails().run()) return null;
@@ -58,6 +59,21 @@ const LessonDetails = Details.extend({
   // Opening a toggle is a reading preference, not a change to lesson content.
   persist: false,
   renderToggleButton: ({ element, isOpen }) => {
+    const wrapper = element.parentElement;
+    if (wrapper && !wrapper.querySelector(':scope > .lesson-toggle-drag')) {
+      const handle = document.createElement('span');
+      handle.className = 'lesson-toggle-drag';
+      handle.setAttribute('data-drag-handle', '');
+      handle.setAttribute('role', 'button');
+      handle.setAttribute('tabindex', '0');
+      handle.setAttribute('aria-label', '접기·펼치기 블록 이동');
+      handle.title = '끌어서 접기·펼치기 블록 이동';
+      handle.draggable = true;
+      handle.contentEditable = 'false';
+      handle.onmousedown = event => event.stopPropagation();
+      handle.textContent = '⠿';
+      wrapper.insertBefore(handle, element);
+    }
     element.contentEditable = "false";
     element.setAttribute("aria-label", isOpen ? "내용 접기" : "내용 펼치기");
     element.setAttribute("aria-expanded", String(isOpen));
