@@ -60,7 +60,10 @@ export function presetRange(preset: PerformancePreset, campaign: Pick<Performanc
   const today = kstDate(now);
   if (preset === 'today') return { startDay: today, endDay: today };
   if (preset === 'yesterday') return { startDay: shift(today, -1), endDay: shift(today, -1) };
-  if (preset === '7d' || preset === '14d') return { startDay: shift(today, -(Number(preset.slice(0,-1)) - 1)), endDay: today };
+  if (preset === '7d' || preset === '14d') {
+    const end = today > campaign.end_day ? campaign.end_day : today;
+    return { startDay: shift(end, -(Number(preset.slice(0,-1)) - 1)), endDay: end };
+  }
   if (preset === 'campaign') return { startDay: campaign.start_day, endDay: campaign.end_day };
   return { startDay: today, endDay: today };
 }

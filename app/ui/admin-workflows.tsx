@@ -139,12 +139,13 @@ function CrmTemplateFields({ editing }: { editing: Row | null }) {
     </label>
   </>;
 }
-function useReport(url: string) {
+function useReport(url: string | null) {
   const [result, setResult] = useState<Record<string, unknown>>({});
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [retry, setRetry] = useState(0);
   useEffect(() => {
+    if (!url) return;
     const c = new AbortController();
     const timer = setTimeout(() => {
       setLoading(true);
@@ -332,6 +333,7 @@ function StaffPermissions({ data, send, pending }: Props) {
     </form>
   );
 }
+const crmTriggerLabels: Record<string, string> = { member_joined: '회원 가입', marketing_consent: '수신 동의', tag_assigned: '태그 지정', purchase_completed: '결제 완료' };
 function CrmManager({ section, data, send, pending }: Props) {
   const [defaultSchedule] = useState(() =>
     new Date(Date.now() + 15 * 60000).toISOString(),
@@ -345,6 +347,8 @@ function CrmManager({ section, data, send, pending }: Props) {
   const delivery = rows(data, "crm_delivery_state")[0];
   const smsSettings = rows(data, "crm_sms_settings")[0];
   const items = rows(data, table);
+  const [listSearch, setListSearch] = useState("");
+  const visibleItems = items.filter(item => [item.name, item.content, crmTriggerLabels[String(item.trigger_type)] || item.trigger_type].some(value => String(value || "").toLocaleLowerCase().includes(listSearch.trim().toLocaleLowerCase())));
   const templates = rows(data, "crm_templates").filter(
     (item) => item.is_active,
   );
@@ -439,21 +443,21 @@ function CrmManager({ section, data, send, pending }: Props) {
   return (
     <>
       <div className="admin-crm-workspace-actions">
-        <p className="meta">목록에서 수정할 항목을 고르거나 아래에서 새로 작성하세요.</p>
-        <AdminButton type="button" variant="outline" onClick={focusEditor}>{editing ? "작성 중인 내용으로 이동" : "새 안내 작성"}</AdminButton>
+        <label className="marketing-list-search"><input type="search" className="admin-input" aria-label={`${title} 검색`} placeholder="이름·내용 검색" value={listSearch} onChange={event => setListSearch(event.target.value)}/><span className="meta">{visibleItems.length}건</span></label>
+        <AdminButton type="button" tone="primary" onClick={focusEditor}>{editing ? "작성 중인 내용으로 이동" : section === "templates" ? "템플릿 만들기" : section === "campaigns" ? "발송 예약 만들기" : "자동 안내 만들기"}</AdminButton>
       </div>
       <AdminDataTable
         label={`${title} 목록`}
-        rows={items}
+        rows={visibleItems}
         getRowId={item => item.id}
         columns={[
           { id: "name", header: "이름·내용", render: item => <div className="admin-crm-primary"><strong>{named(item)}</strong>{section === "templates" && <small title={t(item, "content")}>{t(item, "content")}</small>}{section === "campaigns" && <small>{item.recruitment_id ? "모집 연결 안내" : "일반 캠페인"}</small>}</div> },
-          { id: "scope", header: section === "templates" ? "채널·목적" : section === "campaigns" ? "예약 시각" : "실행 조건", render: item => section === "templates" ? `${String(item.channel).toUpperCase()} · ${item.purpose === "marketing" ? "마케팅" : "정보성"}` : section === "campaigns" ? item.scheduled_at ? timeLabel(item.scheduled_at) : "예약 미정" : `${t(item, "trigger_type")} · ${Number(item.delay_minutes || 0)}분 후` },
+          { id: "scope", header: section === "templates" ? "채널·목적" : section === "campaigns" ? "예약 시각" : "실행 조건", render: item => section === "templates" ? `${String(item.channel).toUpperCase()} · ${item.purpose === "marketing" ? "마케팅" : "정보성"}` : section === "campaigns" ? item.scheduled_at ? timeLabel(item.scheduled_at) : "예약 미정" : `${crmTriggerLabels[t(item, "trigger_type")] || "조건 확인 필요"} · ${Number(item.delay_minutes || 0) === 0 ? "즉시" : `${Number(item.delay_minutes)}분 후`}` },
           ...(section === "campaigns" ? [{ id: "delivery", header: "발송", render: (item: Row) => `대상 ${Number(item.recipient_count || 0)} · 성공 ${Number(item.success_count || 0)} · 실패 ${Number(item.failure_count || 0)}` }] : []),
           { id: "status", header: "상태", render: item => <AdminStatusBadge status={section === "campaigns" ? t(item, "status") : item.is_active ? "active" : "inactive"} label={section === "templates" && item.channel === "alimtalk" && (!item.is_active || !item.alimtalk_template_id) ? "준비 중 · 미발송" : section === "automations" ? item.is_active ? "자동 실행 중" : "중지" : undefined} /> },
           { id: "action", header: "관리", align: "action" as const, render: item => <AdminButton size="sm" variant="outline" disabled={pending || (section === "campaigns" && (!!item.recruitment_id || ["sending", "completed"].includes(t(item, "status"))))} onClick={() => { if (pending || (dirty && !window.confirm("저장하지 않은 변경사항을 버리고 다른 항목을 수정할까요?"))) return; setEditing(item); setDirty(false); setMessage(""); focusEditor(); }}>수정</AdminButton> },
         ]}
-        empty={<AdminEmptyState title={section === "templates" ? "등록된 메시지 템플릿이 없습니다." : section === "campaigns" ? "등록된 예약 캠페인이 없습니다." : "등록된 자동 메시지가 없습니다."} />}
+        empty={<AdminEmptyState title={listSearch.trim() ? "검색 결과가 없습니다." : section === "templates" ? "등록된 메시지 템플릿이 없습니다." : section === "campaigns" ? "등록된 예약 캠페인이 없습니다." : "등록된 자동 메시지가 없습니다."} />}
       />
       <details className="panel admin-crm-settings mb24">
         <summary>문자 발송 설정 <span>발신번호·수신거부 번호 확인</span></summary>
@@ -490,7 +494,7 @@ function CrmManager({ section, data, send, pending }: Props) {
           </Field>
         </div>
         <label className="checkline mt16"><input type="checkbox" name="transactional_enabled" defaultChecked={Boolean(smsSettings?.transactionalEnabled)} disabled={!smsSettings?.canConfigure} /> 결제·이용 안내 문자 허용</label>
-        <label className="checkline"><input type="checkbox" name="marketing_enabled" defaultChecked={Boolean(smsSettings?.marketingEnabled)} disabled={!smsSettings?.canConfigure} /> 광고 문자 허용 (마케팅 동의·080 번호·오전 8시~오후 9시 적용)</label>
+        <label className="checkline"><input type="checkbox" name="marketing_enabled" defaultChecked={Boolean(smsSettings?.marketingEnabled)} disabled={!smsSettings?.canConfigure} /> 광고 문자 허용 (수신 동의·080 번호·발송 가능 시간 적용)</label>
         <p className="meta mt16">광고 문자는 자동으로 <b>(광고) 발신자명</b>과 <b>무료수신거부 080번호</b>를 붙입니다. 정보성 결제 안내에는 광고 문구를 붙이지 않습니다. 전체 발송은 서버의 안전 스위치가 켜져야 실행됩니다.</p>
         {Boolean(smsSettings?.canConfigure) && <button className="btn small mt16" disabled={pending || !(smsSettings?.senders as string[] || []).length}>문자 설정 저장</button>}
       </form>
@@ -1529,7 +1533,7 @@ function SettingsForm({ section, data, send, pending }: Props) {
       {section === 'seo' && <nav className="tabs catalog-tabs seo-settings-tabs" aria-label="검색코드 설정 탭">
         {([['search', '검색·공유'], ['verification', '소유 확인'], ['measurement', '측정·추가 코드']] as const).map(([tab, label]) => <button key={tab} type="button" className={seoTab === tab ? 'tab active' : 'tab'} aria-pressed={seoTab === tab} onClick={() => setSeoTab(tab)}>{label}</button>)}
       </nav>}
-      {section === 'settings' && process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' && <><AppBrandingEditor/><LearningNoticeEditor/><MvpEditor name="미리보기"/></>}
+      {section === 'settings' && process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' && <details className="marketing-appearance-settings"><summary>학습 화면·앱 꾸미기 <span>아이콘 · 전체 공지 · 우수 수강생 색상</span></summary><AppBrandingEditor/><LearningNoticeEditor/><MvpEditor name="미리보기"/></details>}
       <div className={section === 'metrics' ? 'stack metrics-data-layout' : section === 'seo' && seoTab !== 'search' ? 'stack seo-settings-layout' : 'settings-layout'}>
         <form
           key={section + String(metric?.key || "new")}
@@ -1627,7 +1631,7 @@ function SettingsForm({ section, data, send, pending }: Props) {
                 방문·아티클·클래스 조회와 신청 버튼 클릭 수집
               </label>
               <p className="meta mt16">
-                활성화 이후의 공개 페이지 활동을 랜딩 성과에서 확인합니다.
+                활성화 이후의 공개 페이지 활동을 전체 유입 성과에서 확인합니다.
                 회원정보·학습실·결제 식별자가 포함된 주소는 기록하지 않습니다.
               </p>
             </>
@@ -1827,6 +1831,7 @@ function SettingsForm({ section, data, send, pending }: Props) {
   );
 }
 function Analytics() {
+  const [today, setToday] = useState(() => new Date(Date.now()+9*3600000).toISOString().slice(0,10));
   const [from, setFrom] = useState(() =>
     new Date(Date.now() + 9 * 3600000 - 29 * 86400000).toISOString().slice(0, 10),
   );
@@ -1834,8 +1839,10 @@ function Analytics() {
   const end = Number.isFinite(Date.parse(to))
     ? new Date(Date.parse(to) + 86400000).toISOString()
     : "";
+  const dateError = !from || !to || !Number.isFinite(Date.parse(from)) || !Number.isFinite(Date.parse(to)) ? '시작일과 종료일을 선택해 주세요.' : from > to ? '종료일은 시작일 이후로 선택해 주세요.' : Date.parse(to) - Date.parse(from) >= 366 * 86400000 ? '조회 기간은 1년 이내로 선택해 주세요.' : '';
+  const [pathSearch, setPathSearch] = useState('');
   const { result, error, loading, retry } = useReport(
-    "/api/platform/workflows?" +
+    dateError ? null : "/api/platform/workflows?" +
       new URLSearchParams({
         kind: "analytics",
         from: from ? from + "T00:00:00+09:00" : "",
@@ -1847,8 +1854,10 @@ function Analytics() {
   const empty = !Number(result.visitors) && !Number(result.events) && !Number(result.paidOrders) && !Number(result.revenue) && !paths.length && !Object.values(stages).some(Number);
   return (
     <>
-      <AdminFilterBar date={<><AdminDatePicker label="시작일 (한국 시간)" value={from} onChange={event => setFrom(event.target.value)} /><AdminDatePicker label="종료일" value={to} onChange={event => setTo(event.target.value)} /></>} action={<AdminButton variant="outline" onClick={retry} disabled={loading}>새로고침</AdminButton>} />
-      {loading ? (
+      <div className="analytics-period-presets" role="group" aria-label="빠른 조회 기간">{[7,30,90].map(days => <AdminButton key={days} size="sm" aria-pressed={!dateError && to === today && Math.round((Date.parse(to)-Date.parse(from))/86400000)+1 === days} onClick={() => { const today = new Date(Date.now()+9*3600000).toISOString().slice(0,10); setToday(today); setTo(today); setFrom(new Date(Date.parse(today)-(days-1)*86400000).toISOString().slice(0,10)); }}>{days}일</AdminButton>)}</div>
+      <AdminFilterBar date={<><AdminDatePicker label="시작일 (한국 시간)" value={from} onChange={event => setFrom(event.target.value)} /><AdminDatePicker label="종료일" value={to} onChange={event => setTo(event.target.value)} /></>} action={<AdminButton variant="outline" onClick={retry} disabled={loading || !!dateError}>새로고침</AdminButton>} />
+          <label className="marketing-list-search"><input type="search" className="admin-input" placeholder="페이지 주소 검색" aria-label="페이지 주소 검색" value={pathSearch} onChange={event => setPathSearch(event.target.value)}/></label>
+      {dateError ? <p role="alert" className="notice mt24">{dateError}</p> : loading ? (
         <p className="notice mt24" role="status" aria-live="polite">선택한 기간의 유입 성과를 조회하고 있습니다.</p>
       ) : error ? (
         <AdminErrorState onRetry={retry}>{error}</AdminErrorState>
@@ -1891,7 +1900,7 @@ function Analytics() {
               ))}
             </div>
           </section>
-          <AdminDataTable label="페이지별 유입 성과" rows={paths} getRowId={row => t(row, "path")} loading={loading} columns={[
+          <AdminDataTable label="페이지별 유입 성과" rows={paths.filter(row => t(row, 'path').toLowerCase().includes(pathSearch.toLowerCase()))} getRowId={row => t(row, "path")} loading={loading} columns={[
             { id: "path", header: "페이지", value: row => t(row, "path") },
             { id: "views", header: "조회 수", value: row => Number(row.views || 0), align: "number" },
             { id: "visitors", header: "방문 세션", value: row => Number(row.visitors || 0), align: "number" },

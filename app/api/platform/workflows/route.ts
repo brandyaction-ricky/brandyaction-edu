@@ -109,7 +109,10 @@ export async function GET(request: Request) {
                 p_from: from,
                 p_to: to,
             });
-            if (r.error) throw r.error;
+            if (r.error) {
+                console.error('analytics read', r.error.code);
+                return reply({ error: r.error.code === '42501' ? '방문 기록의 조회 권한을 복구하고 있습니다. 잠시 후 다시 확인해 주세요.' : '유입 성과를 불러오지 못했습니다. 기간을 줄이거나 다시 시도해 주세요.' }, 503);
+            }
             return reply(r.data);
         }
         fail('조회 종류를 확인해 주세요.');

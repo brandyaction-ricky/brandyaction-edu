@@ -4,13 +4,12 @@ test('message workspace starts with work, keeps help available and uses the same
   await page.goto('/admin-ux-audit-test');
   const title = page.getByRole('heading', { name: '메시지 템플릿', exact: true });
   await expect(title).toBeVisible();
-  expect((await title.boundingBox())!.y).toBeLessThan(310);
+  expect((await title.boundingBox())!.y).toBeLessThan(520);
   const list = page.getByRole('table', { name: '메시지 템플릿 목록' });
   const settings = page.locator('.admin-crm-settings');
   expect((await list.boundingBox())!.y).toBeLessThan((await settings.boundingBox())!.y);
   await expect(settings.getByRole('combobox', { name: '문자 발신번호' })).toBeHidden();
-  await page.locator('.marketing-workspace-menus > summary').click();
-  const nav = page.getByRole('navigation', { name: '마케팅·전환 메뉴' });
+  const nav = page.getByRole('navigation', { name: '마케팅 작업 빠른 이동' });
   await expect(nav.getByRole('link', { name: '메시지 템플릿', exact: true })).toHaveAttribute('aria-current', 'page');
   await expect(nav.getByRole('link', { name: '캠페인 발송', exact: true })).toBeVisible();
   await page.locator('.marketing-workspace-help > summary').click();
@@ -51,4 +50,20 @@ test('editing a distant row reveals and focuses the form without losing changes 
   page.once('dialog', dialog => dialog.accept());
   await page.getByRole('button', { name: '새로 등록', exact: true }).click();
   await expect(name).toHaveValue(''); await expect(name).toBeFocused();
+});
+
+test('marketing search narrows templates without losing the editor draft',async({page},testInfo)=>{
+  await page.goto('/admin-ux-audit-test');
+  await page.getByRole('searchbox',{name:'메시지 템플릿 검색'}).fill('마지막');
+  const list=page.getByRole('table',{name:'메시지 템플릿 목록'});
+  await expect(list.locator('tbody tr')).toHaveCount(1);
+  await list.getByRole('button',{name:'수정',exact:true}).click();
+  const form=page.locator('.admin-crm-editor');
+  await form.locator('input[name=name]').fill('작성 중 문구');
+  await page.getByRole('searchbox',{name:'메시지 템플릿 검색'}).fill('찾을 수 없는 문구');
+  await expect(list).toContainText('검색 결과가 없습니다.');
+  await expect(form.locator('input[name=name]')).toHaveValue('작성 중 문구');
+  await page.getByRole('searchbox',{name:'메시지 템플릿 검색'}).fill('');
+  await page.evaluate(()=>window.scrollTo(0,0));
+  await page.screenshot({path:`/private/tmp/edu-marketing-${testInfo.project.name}.png`});
 });

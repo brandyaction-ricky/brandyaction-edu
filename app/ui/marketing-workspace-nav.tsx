@@ -1,6 +1,7 @@
 'use client';
 
 import Link, { useLinkStatus } from 'next/link';
+import { ChevronDown, CircleHelp, ChartLine, Send, Settings2 } from 'lucide-react';
 import { marketingContextHref, recruitmentContext } from '@/lib/marketing-context';
 import './marketing-workspace.css';
 import type { Section } from '@/lib/platform';
@@ -81,24 +82,25 @@ export function MarketingWorkspaceNav({ current, available, search = "", prefetc
   const inquiryHref = `${conversionHref}${conversionHref.includes('?') ? '&' : '?'}view=inquiries`;
 
   return <section className="marketing-workspace" aria-label="마케팅·전환 작업 공간">
-    <strong>마케팅·전환</strong>
-    {selectedRecruitment && <p>지금 보고 있는 모집: <strong>{selectedRecruitment}</strong></p>}
-    <details className="marketing-workspace-menus" key={`menus-${current}`}>
-    <summary>관련 메뉴 보기</summary>
-    <nav aria-label="마케팅·전환 메뉴">
-      {destinations.filter(([key]) => available.some(section => section.key === key)).map(([key, label, description]) =>
-        <Link key={key} prefetch={true} scroll={false} href={key === "conversion" || key === "landing" ? marketingContextHref(key, search) : "/admin/" + key} aria-current={current === key ? 'page' : undefined} title={description} onPointerEnter={() => prefetchSection(key)} onFocus={() => prefetchSection(key)}>{adminNavigationTitles[key] || label}<NavigationHint /></Link>)}
+    <div className="marketing-workspace-heading"><strong>마케팅·전환</strong><span>모집부터 안내까지</span></div>
+    {selectedRecruitment && <p>선택한 모집 <strong>{selectedRecruitment}</strong></p>}
+    <nav className="marketing-task-nav" aria-label="마케팅 작업 빠른 이동">
+      {[
+        { title: '모집·성과', keys: ['conversion', 'landing', 'analytics'], icon: ChartLine },
+        { title: '메시지', keys: ['templates', 'campaigns', 'automations'], icon: Send },
+        { title: '설정', keys: ['seo', 'settings'], icon: Settings2 },
+      ].filter(group => group.keys.some(key => available.some(section => section.key === key))).map(group => <div key={group.title} className="marketing-task-group"><span><group.icon size={14} aria-hidden="true"/>{group.title}</span><div>{destinations.filter(([key]) => group.keys.includes(key) && available.some(section => section.key === key)).map(([key,,description]) => <Link key={key} prefetch scroll={false} href={key === 'conversion' || key === 'landing' ? marketingContextHref(key, search) : '/admin/' + key} aria-current={current === key ? 'page' : undefined} title={description} onPointerEnter={() => prefetchSection(key)} onFocus={() => prefetchSection(key)}>{adminNavigationTitles[key]}<NavigationHint/></Link>)}</div></div>)}
     </nav>
-    </details>
     {current === 'conversion' && <Link className="marketing-workspace-inquiry-link" href={inquiryHref} scroll={false}>문의·Jev 검토 바로가기 →</Link>}
     {guide && <details className="marketing-workspace-help" key={current} id="marketing-workspace-help">
-      <summary>이 화면 사용법</summary>
+      <summary><CircleHelp size={15} aria-hidden="true"/>도움말<ChevronDown size={14} aria-hidden="true"/></summary>
       <section className="marketing-workspace-guide" aria-labelledby="marketing-workspace-guide-title">
       <h2 id="marketing-workspace-guide-title">{guide.heading}</h2>
       <p>{guide.summary}</p>
       <ol>{guide.steps.map((step) => <li key={step}>{step}</li>)}</ol>
       {guide.caution && <p className="marketing-workspace-guide-caution">{guide.caution}</p>}
       </section>
+      <div className="marketing-ownership"><strong>팁스와 중복 관리하지 않기</strong><p>모집 연결, 실제 인원, 결제·환불, 동의와 메시지 발송은 에듀에서 관리합니다. 팁스는 이 기록을 바탕으로 성과를 분석하고 다음 행동을 추천합니다.</p><p>현재 성과 화면은 팁스 전환 전까지 사용합니다. 광고비 수동 동기화는 보완용이며, 수기 결제 기록은 주문 원장의 매출과 구분합니다.</p></div>
       {current === 'conversion' && <p className="meta">광고 결과와 문의 뒤의 결제는 따로 확인합니다. 문의 화면의 답변 초안은 발송 예약에 자동으로 들어가지 않으니, 보낼 문구는 다시 확인해 주세요.</p>}
     </details>}
     {['campaigns', 'automations'].includes(current) && <p className="marketing-workspace-live-notice">{guide?.caution}</p>}

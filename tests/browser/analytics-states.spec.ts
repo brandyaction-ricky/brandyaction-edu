@@ -41,3 +41,20 @@ test('analytics uses KST calendar bounds and does not label payment-only data em
   await expect(page.getByText('기간 내 페이지별 참여 기록이 없습니다.')).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
+
+test('analytics validates dates before querying and offers quick periods and page search', async ({ page }) => {
+  let requests=0;
+  await page.route('**/api/platform/workflows?**',async route=>{requests++;await route.fulfill({json:{...empty,visitors:5,paths:[{path:'/classes/example',views:5,visitors:3,clicks:2},{path:'/articles/example',views:2,visitors:2,clicks:0}]}});});
+  await page.goto('/analytics-test');
+  await expect(page.getByRole('table',{name:'페이지별 유입 성과'})).toBeVisible();
+  await page.getByRole('button',{name:'7일',exact:true}).click();
+  await expect(page.getByRole('button',{name:'7일',exact:true})).toHaveAttribute('aria-pressed','true');
+  await page.getByRole('searchbox',{name:'페이지 주소 검색'}).fill('/articles');
+  await expect(page.getByRole('table').locator('tbody tr')).toHaveCount(1);
+  await page.getByLabel('시작일 (한국 시간)').fill('2099-01-01');
+  await expect(page.getByRole('alert')).toContainText('종료일은 시작일 이후');
+  const count=requests;
+  await page.getByLabel('종료일').fill('2020-01-01');
+  await expect(page.getByRole('alert')).toContainText('종료일은 시작일 이후');
+  expect(requests).toBe(count);
+});

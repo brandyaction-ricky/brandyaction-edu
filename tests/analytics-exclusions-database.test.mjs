@@ -24,6 +24,15 @@ test('E1 explicit exclusions preserve the ledger and agree across revenue, journ
   const read = file => readFileSync(new URL('../supabase/migrations/'+file, import.meta.url), 'utf8');
   await db.exec(read('202609210005_webinar_registration.sql'));
   await db.exec(read('20261005020515_edu_internal_order_analytics_e1.sql'));
+  await db.exec('alter table customer_journey_events enable row level security; revoke select on customer_journey_events from service_role; set role service_role');
+  await assert.rejects(db.query("select edu_analytics_report('2009-01-01','2011-01-01')"), /permission denied for table customer_journey_events/);
+  await db.exec('reset role');
+  await db.exec(read('20261012022421_edu_marketing_read_access.sql'));
+  for (const role of ['anon','authenticated']) {
+    await db.exec('set role '+role);
+    await assert.rejects(db.query('select * from customer_journey_events'), /permission denied/);
+    await db.exec('reset role');
+  }
   await db.exec('set role service_role');
   const call = async (fn,args=[]) => (await db.query(`select ${fn}(${args.map((_,i)=>'$'+(i+1)).join(',')}) as v`,args)).rows[0].v;
   const mark = (kind,key,excluded,expected=false,actor=admin,reason='합성 검수 주문') => call('edu_set_analytics_exclusion',[actor,kind,key,excluded,expected,reason]);
