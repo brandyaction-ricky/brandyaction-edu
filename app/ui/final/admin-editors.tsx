@@ -25,6 +25,7 @@ import { productConversion, DEFAULT_CTA_COLOR } from "@/lib/product-conversion";
 import { productDocument, validateProductDocument } from "@/lib/product-html-document";
 import { ProductDetailHtml } from "./product-detail-html";
 import { DigitalContentManager } from "./digital-content-manager";
+import { ProductStudentsWorkspace } from "./product-students-workspace";
 import { ProductCurriculumWorkspace } from "./product-curriculum-workspace";
 import { ProductCohortWorkspace } from "./product-cohort-workspace";
 import { LessonBodyEditor } from "./lesson-body-editor";
@@ -223,7 +224,7 @@ function ProductResources({ row, pending, send }: { row?: Row; pending: boolean;
   </>;
 }
 
-export function ProductEditor({ data, row, pending, send, back }: { data: Data; row?: Row; pending: boolean; send: WorkflowSend; back: () => void }) {
+export function ProductEditor({ data, row, pending, send, back, actorId, canManageMembers = false }: { data: Data; row?: Row; pending: boolean; send: WorkflowSend; back: () => void; actorId?: string; canManageMembers?: boolean }) {
   const section = sections.find(s => s.key === "products")!;
   const metadata = object(row, "metadata");
   const editorRow = { ...row, ...Object.fromEntries(productMetadataFields.map(key => [key, metadata[key]])) } as Row;
@@ -253,7 +254,7 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
   const [validationAttempted, setValidationAttempted] = useState(false);
   const [nativeErrors, setNativeErrors] = useState<ProductInputError[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
-  const groups = [["basic", "기본·판매"], ["detail", "상세페이지"], ...(preview.category === "digital" ? [["resources", "콘텐츠 구성"]] : [["curriculum", "커리큘럼"], ["cohorts", "기수·회차"]]), ["access", "수강·권한"], ["publish", "공개·검색"]];
+  const groups = [["basic", "기본·판매"], ["detail", "상세페이지"], ...(preview.category === "digital" ? [["resources", "콘텐츠 구성"]] : [["curriculum", "커리큘럼"], ["cohorts", "기수·회차"]]), ["students", "수강생"], ["access", "수강·권한"], ["publish", "공개·검색"]];
   const resourceCount = productResources(metadata).length;
   const previewSalePrice = preview.category === "free" ? 0 : cohort ? num(cohort, "price") : preview.price;
   const statusLabels: Record<string, string> = { draft: "작성 중", published: "판매 중", archived: "판매 종료" };
@@ -414,6 +415,9 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
         {preview.category !== "digital" && <div id="product-panel-cohorts" data-independent-editor data-tab="cohorts" role="tabpanel" aria-labelledby="product-tab-cohorts" hidden={tab !== "cohorts"} onChange={event => event.stopPropagation()} onKeyDown={event => { if (event.key === "Enter" && event.target instanceof HTMLInputElement) event.preventDefault(); }}>
           {tab === "cohorts" && <ProductCohortWorkspace course={row} cohorts={cohorts} selectedId={cohortId} onSelect={setCohortId} pending={pending} send={send} validationErrors={Object.fromEntries(inputErrors.filter(item => item.tab === "cohorts").map(item => [item.field, item.message]))} />}
         </div>}
+        <div className="section-pad" id="product-panel-students" data-independent-editor data-tab="students" role="tabpanel" aria-labelledby="product-tab-students" hidden={tab !== "students"} onChange={event => event.stopPropagation()}>
+          {tab === "students" && <ProductStudentsWorkspace key={String(row?.id || "new") + actorId} courseId={row?.id} cohorts={cohorts} actorId={actorId} allowed={canManageMembers} />}
+        </div>
         <div className="section-pad" id="product-panel-access" data-tab="access" role="tabpanel" aria-labelledby="product-tab-access" hidden={tab !== "access"}>
           <ProductSaleCheck sale={sale} cohort={cohort} />
           {preview.category === "digital" && inputErrors.filter(item => item.tab === "access" && item.field.startsWith("cohort_")).map(item => <p key={item.field} className="product-field-error" data-validation-field={item.field} tabIndex={-1}>{item.message} <Link href="/admin/cohorts" target="_blank">기수·회차 관리 열기</Link></p>)}
@@ -446,7 +450,7 @@ export function ProductEditor({ data, row, pending, send, back }: { data: Data; 
           </section>
           <section className="product-conversion-card"><h2>Tracking integration</h2><p className="meta">상품별 광고 추적을 연결하세요.</p><ProductField controlId="product-pixel-id" error={fieldError("meta_pixel_id")} label="Meta Pixel ID (Optional)" hint="입력한 상품에만 PageView와 CTA 클릭(Lead)을 전송합니다. 구매 완료 이벤트는 결제 처리와 구분됩니다. 비워 두면 사용하지 않습니다."><input id="product-pixel-id" name="meta_pixel_id" aria-invalid={Boolean(fieldError("meta_pixel_id"))} aria-describedby={fieldError("meta_pixel_id") ? "product-pixel-id-error" : undefined} inputMode="numeric" pattern="[0-9]{5,30}" maxLength={30} defaultValue={conversion.pixelId} placeholder="Meta Pixel ID" disabled={pending} /></ProductField></section>
         </div>
-      </section><div className="editor-savebar">{!["curriculum", "cohorts"].includes(tab) && row?.id && !row.archived_at && <AdminButton variant="danger" type="button" onClick={() => void removeProduct()} disabled={pending || detailUploadStatus === "uploading"}>상품 삭제</AdminButton>}<span className="dirty-note">{tab === "curriculum" ? "학습·미션·공통 자료는 각 항목의 저장 버튼으로 반영됩니다." : tab === "cohorts" ? "기수는 항목별로 저장됩니다." : dirty ? "저장하지 않은 변경사항이 있습니다." : "변경 내용을 저장하면 반영됩니다."}</span><AdminButton variant="outline" type="button" data-leaves-learning-editor onClick={close} disabled={pending || detailUploadStatus === "uploading"}>목록으로</AdminButton>{!["curriculum", "cohorts", "publish"].includes(tab) && <AdminButton variant="secondary" type="button" onClick={() => setTab("publish")} disabled={pending || detailUploadStatus === "uploading"}>공개 전 확인</AdminButton>}{!["curriculum", "cohorts"].includes(tab) && <AdminButton variant="primary" type="submit" loading={pending} disabled={detailUploadStatus !== "idle"}>{pending ? "저장 중…" : detailUploadStatus === "uploading" ? "업로드 중…" : "저장하기"}</AdminButton>}</div>{error && <AdminInlineError>{error}</AdminInlineError>}</div>
+      </section><div className="editor-savebar">{!["curriculum", "cohorts", "students"].includes(tab) && row?.id && !row.archived_at && <AdminButton variant="danger" type="button" onClick={() => void removeProduct()} disabled={pending || detailUploadStatus === "uploading"}>상품 삭제</AdminButton>}<span className="dirty-note">{tab === "curriculum" ? "학습·미션·공통 자료는 각 항목의 저장 버튼으로 반영됩니다." : tab === "students" ? "수강생 운영 기록은 조회 전용입니다." : tab === "cohorts" ? "기수는 항목별로 저장됩니다." : dirty ? "저장하지 않은 변경사항이 있습니다." : "변경 내용을 저장하면 반영됩니다."}</span><AdminButton variant="outline" type="button" data-leaves-learning-editor onClick={close} disabled={pending || detailUploadStatus === "uploading"}>목록으로</AdminButton>{!["curriculum", "cohorts", "students", "publish"].includes(tab) && <AdminButton variant="secondary" type="button" onClick={() => setTab("publish")} disabled={pending || detailUploadStatus === "uploading"}>공개 전 확인</AdminButton>}{!["curriculum", "cohorts", "students"].includes(tab) && <AdminButton variant="primary" type="submit" loading={pending} disabled={detailUploadStatus !== "idle"}>{pending ? "저장 중…" : detailUploadStatus === "uploading" ? "업로드 중…" : "저장하기"}</AdminButton>}</div>{error && <AdminInlineError>{error}</AdminInlineError>}</div>
       <aside className="editor-aside"><div className="side-preview"><span className="section-code">고객에게 보이는 상품</span><div className="preview-cover mt16"><p>BRANDYACTION EDU</p><h3>{preview.title || "상품명"}</h3><p className="accent">{labels[preview.category] || "유료 클래스"}</p></div><div className="preview-meta"><b>{!previewSalePrice ? "무료" : money(previewSalePrice)}</b>{preview.regular > previewSalePrice && <s>{money(preview.regular)}</s>}</div><p className="meta mt8">{cohort ? t(cohort, "name") + " 기수 판매가" : "상품 기본 판매가"}</p><p className="meta mt8">{preview.summary || "상품 소개를 입력해 주세요."}</p><div className="divider" /><ProductSaleCheck sale={sale} cohort={cohort} /><div className="setting-line"><span>저장할 상품 설정</span><b>{statusLabels[preview.status]}</b></div><div className="setting-line"><span>제공 자료</span><b>{resourceCount}개</b></div><Link className="btn full mt16" href="/admin/cohorts">기수·회차 관리</Link></div></aside></div>
     </form>
   </div>;

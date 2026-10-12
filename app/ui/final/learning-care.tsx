@@ -48,8 +48,8 @@ function ShareSummary({ data }: { data: CareSnapshot }) {
   return <><section className="care-share" aria-label="개인정보 없는 공유용 요약"><span className="care-eyebrow">BRANDYACTION EDU · 함께 쌓는 실행</span><h2>배움이 실행으로<br/>이어지고 있습니다.</h2><p>{title}</p><div className="care-share-stats"><div><strong>{a.members}<small>명</small></strong><span>함께하는 수강생</span></div><div><strong>{a.learning}<small>건</small></strong><span>학습 완료</span></div><div><strong>{a.recent}<small>건</small></strong><span>최근 7일 완료</span></div></div><div className="care-share-growth">최근 7일, <b>{a.recent}개의 새로운 완료</b>가 쌓였습니다.</div><small>{careTime(data.asOf)} 기준 · 현재 공개된 학습의 완료 기록</small></section><p className="care-note">공유 이미지에는 이름·이메일·개인별 진도가 들어가지 않습니다. 전체 기수 기준이며 검색 필터는 적용하지 않습니다.</p><button className="btn" onClick={() => exportSummary(title, a, data.asOf)}><Download/> 공유 이미지 저장</button></>;
 }
 
-export function AdminLearningCare({ actorId, messagesEnabled = process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === 'true' }: { actorId?: string; messagesEnabled?: boolean } = {}) {
-  const [cohort, setCohort] = useState('');
+export function AdminLearningCare({ actorId, initialCohortId = '', messagesEnabled = process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === 'true' }: { actorId?: string; initialCohortId?: string; messagesEnabled?: boolean } = {}) {
+  const [cohort, setCohort] = useState(initialCohortId);
   const { data: source, error, reload } = useCare<CareSnapshot>('/api/admin/learning-care' + (cohort ? '?cohort=' + cohort : ''), actorId);
   const data = useMemo(() => source ? careLearningSnapshot(source) : null, [source]);
   const [tab, setTab] = useState('overview'), [search, setSearch] = useState(''), [filter, setFilter] = useState('all'), [lessonId, setLessonId] = useState(''), [selected, setSelected] = useState<string[]>([]), [detailId, setDetailId] = useState(''), [compose, setCompose] = useState(false), [content, setContent] = useState(''), [sending, setSending] = useState(false), [notice, setNotice] = useState('');
