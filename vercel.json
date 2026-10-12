@@ -83,7 +83,8 @@
       "codex/edu-tips-erasure-monitor-20261010": false,
       "codex/edu-tips-erasure-scheduler-20261010": false,
       "codex/edu-tips-erasure-integration-20261010": false,
-      "codex/edu-tips-eligibility-20261012": false
+      "codex/edu-tips-eligibility-20261012": false,
+      "codex/edu-tips-data-recovery-20261012": false
     }
   },
   "regions": [
@@ -113,6 +114,10 @@
     {
       "path": "/api/cron/tips-erasure-deadlines",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/tips-data-retention",
+      "schedule": "15 * * * *"
     }
   ]
 }

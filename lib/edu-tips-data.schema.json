@@ -1,0 +1,1297 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.brandyaction.invalid/edu/2.0.0-rc.2/schema.json",
+  "title": "EDU personal export candidate — NOT DEPLOYED",
+  "$defs": {
+    "PaymentPayload": {
+      "type": "object",
+      "properties": {
+        "consent_epoch": {
+          "type": "string",
+          "pattern": "^ce_[A-Za-z0-9_-]{32}$"
+        },
+        "consent_version": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9:_-]{0,79}$"
+        },
+        "record_revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "order_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        },
+        "payment_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        },
+        "cohort_code": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9:_-]{0,79}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "amount_paid": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "currency": {
+          "const": "KRW"
+        },
+        "entry_src": {
+          "enum": [
+            "paid",
+            "organic",
+            "alumni",
+            "youtube",
+            "unknown"
+          ]
+        },
+        "attribution_def": {
+          "const": "path_cohort@1"
+        }
+      },
+      "required": [
+        "consent_epoch",
+        "consent_version",
+        "record_revision",
+        "expires_at",
+        "order_id",
+        "payment_id",
+        "cohort_code",
+        "amount_paid",
+        "currency",
+        "entry_src",
+        "attribution_def"
+      ],
+      "additionalProperties": false
+    },
+    "RefundPayload": {
+      "type": "object",
+      "properties": {
+        "consent_epoch": {
+          "type": "string",
+          "pattern": "^ce_[A-Za-z0-9_-]{32}$"
+        },
+        "consent_version": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9:_-]{0,79}$"
+        },
+        "record_revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "order_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        },
+        "payment_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        },
+        "refund_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        },
+        "cohort_code": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9:_-]{0,79}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "amount_refunded": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "currency": {
+          "const": "KRW"
+        },
+        "original_payment_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "attribution_def": {
+          "const": "path_cohort@1"
+        }
+      },
+      "required": [
+        "consent_epoch",
+        "consent_version",
+        "record_revision",
+        "expires_at",
+        "order_id",
+        "payment_id",
+        "refund_id",
+        "cohort_code",
+        "amount_refunded",
+        "currency",
+        "original_payment_at",
+        "attribution_def"
+      ],
+      "additionalProperties": false
+    },
+    "PaymentEvent": {
+      "type": "object",
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        },
+        "tenant_id": {
+          "const": "brandyaction"
+        },
+        "brand_id": {
+          "const": "brandyaction_edu"
+        },
+        "event_timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "T[0-2][0-9]:00:00(?:\\.000)?Z$"
+        },
+        "source": {
+          "const": "server"
+        },
+        "schema_version": {
+          "const": "1.4"
+        },
+        "customer_id": {
+          "type": "string",
+          "pattern": "^k[1-9][0-9]*:[A-Za-z0-9_-]{43}$"
+        },
+        "product_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9:_-]{0,79}$"
+        },
+        "session_id": {
+          "const": null
+        },
+        "event_type": {
+          "const": "payment_completed"
+        },
+        "payload": {
+          "$ref": "#/$defs/PaymentPayload"
+        }
+      },
+      "required": [
+        "event_id",
+        "tenant_id",
+        "brand_id",
+        "event_timestamp",
+        "source",
+        "schema_version",
+        "customer_id",
+        "product_id",
+        "session_id",
+        "event_type",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "RefundEvent": {
+      "type": "object",
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        },
+        "tenant_id": {
+          "const": "brandyaction"
+        },
+        "brand_id": {
+          "const": "brandyaction_edu"
+        },
+        "event_timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "T[0-2][0-9]:00:00(?:\\.000)?Z$"
+        },
+        "source": {
+          "const": "server"
+        },
+        "schema_version": {
+          "const": "1.4"
+        },
+        "customer_id": {
+          "type": "string",
+          "pattern": "^k[1-9][0-9]*:[A-Za-z0-9_-]{43}$"
+        },
+        "product_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9:_-]{0,79}$"
+        },
+        "session_id": {
+          "const": null
+        },
+        "event_type": {
+          "const": "order_refunded"
+        },
+        "payload": {
+          "$ref": "#/$defs/RefundPayload"
+        }
+      },
+      "required": [
+        "event_id",
+        "tenant_id",
+        "brand_id",
+        "event_timestamp",
+        "source",
+        "schema_version",
+        "customer_id",
+        "product_id",
+        "session_id",
+        "event_type",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "Event": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/PaymentEvent"
+        },
+        {
+          "$ref": "#/$defs/RefundEvent"
+        }
+      ]
+    },
+    "LearningRow": {
+      "type": "object",
+      "properties": {
+        "consent_epoch": {
+          "type": "string",
+          "pattern": "^ce_[A-Za-z0-9_-]{32}$"
+        },
+        "consent_version": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9:_-]{0,79}$"
+        },
+        "record_revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "record_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        },
+        "customer_id": {
+          "type": "string",
+          "pattern": "^k[1-9][0-9]*:[A-Za-z0-9_-]{43}$"
+        },
+        "product_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9:_-]{0,79}$"
+        },
+        "cohort_code": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9:_-]{0,79}$"
+        },
+        "date_kst": {
+          "type": "string",
+          "format": "date"
+        },
+        "vod_completed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "resource_used": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "live_used": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "replay_used": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "completed_items": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "total_items": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "curriculum_version": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9:_-]{0,79}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "availability": {
+          "enum": [
+            "available",
+            "not_available",
+            "unknown"
+          ]
+        },
+        "cohort_state": {
+          "enum": [
+            "before_start",
+            "active",
+            "alumni",
+            "paused",
+            "unknown"
+          ]
+        },
+        "usage_ratio": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "consent_epoch",
+        "consent_version",
+        "record_revision",
+        "expires_at",
+        "record_id",
+        "customer_id",
+        "product_id",
+        "cohort_code",
+        "date_kst",
+        "vod_completed",
+        "resource_used",
+        "live_used",
+        "replay_used",
+        "completed_items",
+        "total_items",
+        "curriculum_version",
+        "availability",
+        "cohort_state",
+        "usage_ratio"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "anyOf": [
+              {
+                "properties": {
+                  "completed_items": {
+                    "type": "null"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "total_items": {
+                    "enum": [
+                      null,
+                      0
+                    ]
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "curriculum_version": {
+                    "type": "null"
+                  }
+                }
+              }
+            ]
+          },
+          "then": {
+            "properties": {
+              "usage_ratio": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "EventPage": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "const": "brandyaction_edu"
+        },
+        "tenant_id": {
+          "const": "brandyaction"
+        },
+        "brand_id": {
+          "const": "brandyaction_edu"
+        },
+        "contract_version": {
+          "const": "2.0.0-rc.2"
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "stream_generation": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "snapshot_upper": {
+          "type": "string",
+          "pattern": "^(ev|lu|ts|rc)_[A-Za-z0-9_-]{20,512}$"
+        },
+        "next_cursor": {
+          "type": "string",
+          "pattern": "^(ev|lu|ts|rc)_[A-Za-z0-9_-]{20,512}$"
+        },
+        "has_more": {
+          "type": "boolean"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Event"
+          },
+          "maxItems": 500
+        }
+      },
+      "required": [
+        "source",
+        "tenant_id",
+        "brand_id",
+        "contract_version",
+        "generated_at",
+        "stream_generation",
+        "snapshot_upper",
+        "next_cursor",
+        "has_more",
+        "events"
+      ],
+      "additionalProperties": false
+    },
+    "LearningPage": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "const": "brandyaction_edu"
+        },
+        "tenant_id": {
+          "const": "brandyaction"
+        },
+        "brand_id": {
+          "const": "brandyaction_edu"
+        },
+        "contract_version": {
+          "const": "2.0.0-rc.2"
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "stream_generation": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "snapshot_upper": {
+          "type": "string",
+          "pattern": "^(ev|lu|ts|rc)_[A-Za-z0-9_-]{20,512}$"
+        },
+        "next_cursor": {
+          "type": "string",
+          "pattern": "^(ev|lu|ts|rc)_[A-Za-z0-9_-]{20,512}$"
+        },
+        "has_more": {
+          "type": "boolean"
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/LearningRow"
+          },
+          "maxItems": 500
+        }
+      },
+      "required": [
+        "source",
+        "tenant_id",
+        "brand_id",
+        "contract_version",
+        "generated_at",
+        "stream_generation",
+        "snapshot_upper",
+        "next_cursor",
+        "has_more",
+        "rows"
+      ],
+      "additionalProperties": false
+    },
+    "Tombstone": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "customer_id": {
+          "type": "string",
+          "pattern": "^k[1-9][0-9]*:[A-Za-z0-9_-]{43}$"
+        },
+        "consent_epoch": {
+          "type": "string",
+          "pattern": "^ce_[A-Za-z0-9_-]{32}$"
+        },
+        "reason": {
+          "enum": [
+            "consent_withdrawn",
+            "account_deleted",
+            "identity_retired"
+          ]
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "cursor": {
+          "type": "string",
+          "pattern": "^(ev|lu|ts|rc)_[A-Za-z0-9_-]{20,512}$"
+        },
+        "active_due_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$",
+          "description": "Exactly 5 elapsed UTC days after original at; retries must not extend. Enforced by semantic validation, not date-time format alone."
+        },
+        "model_due_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$",
+          "description": "Exactly 30 elapsed UTC days after original at; retries must not extend. Enforced by semantic validation, not date-time format alone."
+        },
+        "residual_due_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$",
+          "description": "Exactly 30 elapsed UTC days after original at; retries must not extend. Enforced by semantic validation, not date-time format alone."
+        }
+      },
+      "required": [
+        "requestId",
+        "customer_id",
+        "consent_epoch",
+        "reason",
+        "at",
+        "cursor",
+        "active_due_at",
+        "model_due_at",
+        "residual_due_at"
+      ],
+      "additionalProperties": false
+    },
+    "TombstonePage": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "const": "brandyaction_edu"
+        },
+        "tenant_id": {
+          "const": "brandyaction"
+        },
+        "brand_id": {
+          "const": "brandyaction_edu"
+        },
+        "contract_version": {
+          "const": "2.0.0-rc.2"
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "stream_generation": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "snapshot_upper": {
+          "type": "string",
+          "pattern": "^(ev|lu|ts|rc)_[A-Za-z0-9_-]{20,512}$"
+        },
+        "next_cursor": {
+          "type": "string",
+          "pattern": "^(ev|lu|ts|rc)_[A-Za-z0-9_-]{20,512}$"
+        },
+        "has_more": {
+          "type": "boolean"
+        },
+        "tombstones": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Tombstone"
+          },
+          "maxItems": 500
+        },
+        "acked_through": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^(ev|lu|ts|rc)_[A-Za-z0-9_-]{20,512}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "source",
+        "tenant_id",
+        "brand_id",
+        "contract_version",
+        "generated_at",
+        "stream_generation",
+        "snapshot_upper",
+        "next_cursor",
+        "has_more",
+        "tombstones",
+        "acked_through"
+      ],
+      "additionalProperties": false
+    },
+    "EligibilitySubject": {
+      "type": "object",
+      "properties": {
+        "customer_id": {
+          "type": "string",
+          "pattern": "^k[1-9][0-9]*:[A-Za-z0-9_-]{43}$"
+        },
+        "consent_epoch": {
+          "type": "string",
+          "pattern": "^ce_[A-Za-z0-9_-]{32}$"
+        }
+      },
+      "required": [
+        "customer_id",
+        "consent_epoch"
+      ],
+      "additionalProperties": false
+    },
+    "EligibilityRequest": {
+      "type": "object",
+      "properties": {
+        "subjects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EligibilitySubject"
+          },
+          "minItems": 1,
+          "maxItems": 100
+        }
+      },
+      "required": [
+        "subjects"
+      ],
+      "additionalProperties": false
+    },
+    "EligibilityResult": {
+      "type": "object",
+      "properties": {
+        "customer_id": {
+          "type": "string",
+          "pattern": "^k[1-9][0-9]*:[A-Za-z0-9_-]{43}$"
+        },
+        "consent_epoch": {
+          "type": "string",
+          "pattern": "^ce_[A-Za-z0-9_-]{32}$"
+        },
+        "eligible": {
+          "type": "boolean"
+        },
+        "reason": {
+          "enum": [
+            "allowed",
+            "not_eligible"
+          ]
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "customer_id",
+        "consent_epoch",
+        "eligible",
+        "reason",
+        "generation"
+      ],
+      "additionalProperties": false
+    },
+    "EligibilityResponse": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "const": "brandyaction_edu"
+        },
+        "tenant_id": {
+          "const": "brandyaction"
+        },
+        "brand_id": {
+          "const": "brandyaction_edu"
+        },
+        "contract_version": {
+          "const": "2.0.0-rc.2"
+        },
+        "checked_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EligibilityResult"
+          },
+          "maxItems": 100
+        }
+      },
+      "required": [
+        "source",
+        "tenant_id",
+        "brand_id",
+        "contract_version",
+        "checked_at",
+        "results"
+      ],
+      "additionalProperties": false
+    },
+    "ReceiptRequest": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "receipt_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "receipt_revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "customer_id": {
+          "type": "string",
+          "pattern": "^k[1-9][0-9]*:[A-Za-z0-9_-]{43}$"
+        },
+        "consent_epoch": {
+          "type": "string",
+          "pattern": "^ce_[A-Za-z0-9_-]{32}$"
+        },
+        "phase": {
+          "enum": [
+            "blocked",
+            "active_erased",
+            "model_resolved",
+            "completed"
+          ]
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "blocked_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "active_erased_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "model_resolved_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "residual_erased_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "counts": {
+          "type": "object",
+          "properties": {
+            "events": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "learning_rows": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "profiles": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "predictions": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "files": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "models": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "events",
+            "learning_rows",
+            "profiles",
+            "predictions",
+            "files",
+            "models"
+          ],
+          "additionalProperties": false
+        },
+        "models": {
+          "enum": [
+            "pending",
+            "done",
+            "not_applicable"
+          ]
+        },
+        "residuals": {
+          "enum": [
+            "pending",
+            "done",
+            "not_applicable"
+          ]
+        },
+        "evidence_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "error_code": {
+          "anyOf": [
+            {
+              "enum": [
+                "delete_retry",
+                "model_retry",
+                "residual_pending",
+                "verification_failed"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "requestId",
+        "receipt_id",
+        "receipt_revision",
+        "customer_id",
+        "consent_epoch",
+        "phase",
+        "observed_at",
+        "blocked_at",
+        "active_erased_at",
+        "model_resolved_at",
+        "residual_erased_at",
+        "counts",
+        "models",
+        "residuals",
+        "evidence_sha256",
+        "error_code"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "enum": [
+                  "active_erased",
+                  "model_resolved",
+                  "completed"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "active_erased_at": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "enum": [
+                  "model_resolved",
+                  "completed"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "model_resolved_at": {
+                "type": "string"
+              },
+              "models": {
+                "enum": [
+                  "done",
+                  "not_applicable"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "enum": [
+                  "completed"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "residual_erased_at": {
+                "type": "string"
+              },
+              "residuals": {
+                "enum": [
+                  "done",
+                  "not_applicable"
+                ]
+              },
+              "error_code": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ReceiptResponse": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "receipt_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "accepted_revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "phase": {
+          "enum": [
+            "blocked",
+            "active_erased",
+            "model_resolved",
+            "completed"
+          ]
+        }
+      },
+      "required": [
+        "requestId",
+        "receipt_id",
+        "accepted_revision",
+        "phase"
+      ],
+      "additionalProperties": false
+    },
+    "AckRequest": {
+      "type": "object",
+      "properties": {
+        "through": {
+          "type": "string",
+          "pattern": "^(ev|lu|ts|rc)_[A-Za-z0-9_-]{20,512}$"
+        }
+      },
+      "required": [
+        "through"
+      ],
+      "additionalProperties": false
+    },
+    "AckResponse": {
+      "type": "object",
+      "properties": {
+        "acked_through": {
+          "type": "string",
+          "pattern": "^(ev|lu|ts|rc)_[A-Za-z0-9_-]{20,512}$"
+        }
+      },
+      "required": [
+        "acked_through"
+      ],
+      "additionalProperties": false
+    },
+    "RecoveryRequest": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "reason": {
+          "enum": [
+            "initial",
+            "cursor_expired",
+            "consumer_rebuild"
+          ]
+        }
+      },
+      "required": [
+        "requestId",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "RecoveryResponse": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "const": "brandyaction_edu"
+        },
+        "tenant_id": {
+          "const": "brandyaction"
+        },
+        "brand_id": {
+          "const": "brandyaction_edu"
+        },
+        "contract_version": {
+          "const": "2.0.0-rc.2"
+        },
+        "recovery_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "status": {
+          "const": "paused_for_rebuild"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "event_cursor": {
+          "type": "string",
+          "pattern": "^(ev|lu|ts|rc)_[A-Za-z0-9_-]{20,512}$"
+        },
+        "learning_cursor": {
+          "type": "string",
+          "pattern": "^(ev|lu|ts|rc)_[A-Za-z0-9_-]{20,512}$"
+        },
+        "tombstone_cursor": {
+          "type": "string",
+          "pattern": "^(ev|lu|ts|rc)_[A-Za-z0-9_-]{20,512}$"
+        },
+        "cutoff_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        }
+      },
+      "required": [
+        "source",
+        "tenant_id",
+        "brand_id",
+        "contract_version",
+        "recovery_id",
+        "status",
+        "expires_at",
+        "event_cursor",
+        "learning_cursor",
+        "tombstone_cursor",
+        "cutoff_at"
+      ],
+      "additionalProperties": false
+    },
+    "RecoveryCompleteRequest": {
+      "type": "object",
+      "properties": {
+        "recovery_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "event_through": {
+          "type": "string",
+          "pattern": "^(ev|lu|ts|rc)_[A-Za-z0-9_-]{20,512}$"
+        },
+        "learning_through": {
+          "type": "string",
+          "pattern": "^(ev|lu|ts|rc)_[A-Za-z0-9_-]{20,512}$"
+        },
+        "tombstone_through": {
+          "type": "string",
+          "pattern": "^(ev|lu|ts|rc)_[A-Za-z0-9_-]{20,512}$"
+        }
+      },
+      "required": [
+        "recovery_id",
+        "event_through",
+        "learning_through",
+        "tombstone_through"
+      ],
+      "additionalProperties": false
+    },
+    "RecoveryCompleteResponse": {
+      "type": "object",
+      "properties": {
+        "recovery_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "status": {
+          "const": "reconciled"
+        },
+        "completed_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        }
+      },
+      "required": [
+        "recovery_id",
+        "status",
+        "completed_at"
+      ],
+      "additionalProperties": false
+    },
+    "Error": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "enum": [
+            "disabled",
+            "unauthorized",
+            "forbidden_scope",
+            "invalid_request",
+            "unknown_cursor",
+            "cursor_expired",
+            "recovery_required",
+            "recovery_incomplete",
+            "idempotency_conflict",
+            "revision_conflict",
+            "ack_gap",
+            "incomplete_erasure",
+            "rate_limited",
+            "contract_violation",
+            "unavailable"
+          ]
+        }
+      },
+      "required": [
+        "error"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
