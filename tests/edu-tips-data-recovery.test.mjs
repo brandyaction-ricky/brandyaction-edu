@@ -31,6 +31,7 @@ async function setup(t){
  await owner(sql);
  await owner(readFileSync(new URL('../supabase/migrations/20261012041637_edu_tips_expired_revision_guard.sql',import.meta.url),'utf8'));
  await owner(readFileSync(new URL('../supabase/migrations/20261012052049_edu_tips_rest_safe_updates.sql',import.meta.url),'utf8'));
+ await owner(readFileSync(new URL('../supabase/migrations/20261012064140_edu_tips_catalog_code_compat.sql',import.meta.url),'utf8'));
  await owner('delete from edu_tips_private.erasure_outbox');
  await owner("update edu_tips_private.feed_state set capture_enabled=true,serving_enabled=true;update edu_tips_private.feed_state set capture_since=date_trunc('day',now() at time zone 'Asia/Seoul') at time zone 'Asia/Seoul'");
  await owner("insert into edu_tips_private.data_keys values($1,$2,array['edu.events.read','edu.learning.read','edu.recovery'],'2099-01-01',null)",[hash(key),id(90)]);
@@ -265,4 +266,39 @@ test('all feed singleton updates retain an explicit predicate under the REST saf
  await f.owner("update payments set approved_at=now()-interval '400 days' where id=$1",[id(125)]);
  assert.equal(await f.value('select count(*)::int as v from edu_tips_private.feed_quarantine'),0);
  assert.equal((await f.call('events',{after:r.body.event_cursor})).body.error,'recovery_required');
+});
+
+
+test('existing uppercase course/cohort codes retain v1 identity across payment, refund and learning',async t=>{
+ const f=await setup(t);
+ await f.owner("update courses set course_code='PRD-AB12';update cohorts set cohort_code='COHORT4'");
+ for(const n of [5,6])await f.value('select edu_tips_private.capture_member($1) as v',[id(n)]);
+ await f.owner("insert into refunds values($1,$2,'done',10000,now()-interval '1 hour')",[id(301),id(125)]);
+ await f.owner("update payments set cancelled_amount=10000,status='partial_cancelled' where id=$1",[id(125)]);
+ await f.owner("insert into learning_usage_events values($1,$2,'material_download',$3,now(),now(),'signed_file_issued')",[id(401),id(135),id(410)]);
+ const r=await f.recover();assert.equal(r.status,200,JSON.stringify(r.body));
+ const e=await snapshot(f,'events',r.body.event_cursor);assert.equal(e.rows.length,3);
+ for(const row of e.rows){assert.equal(row.product_id,'PRD-AB12');assert.equal(row.payload.cohort_code,'PRD-AB12:COHORT4');}
+ const l=await snapshot(f,'learning',r.body.learning_cursor);assert.equal(l.rows.length,1);assert.equal(l.rows[0].product_id,'PRD-AB12');assert.equal(l.rows[0].cohort_code,'PRD-AB12:COHORT4');
+ assert.equal(await f.value('select count(*)::int as v from edu_tips_private.feed_quarantine'),0);
+});
+test('catalog names remain distinct by case and invalid identifiers never enter a successful page',async t=>{
+ const f=await setup(t);
+ await f.owner("update courses set course_code='PRD-AB12'");await f.value('select edu_tips_private.capture_member($1) as v',[id(5)]);
+ await f.owner("insert into courses values($1,'prd-ab12')",[id(202)]);await f.owner("insert into cohorts values($1,'4')",[id(203)]);
+ await f.owner('update order_items set course_id=$1,cohort_id=$2 where id=$3',[id(202),id(203),id(116)]);
+ await f.owner('update enrollments set course_id=$1,cohort_id=$2 where id=$3',[id(202),id(203),id(136)]);
+ const r=await f.recover();assert.equal(r.status,200);const e=await snapshot(f,'events',r.body.event_cursor);
+ assert.deepEqual(new Set(e.rows.map(x=>x.product_id)),new Set(['PRD-AB12','prd-ab12']));
+ await f.owner("update courses set course_code='bad code' where id=$1",[id(200)]);await f.value('select edu_tips_private.capture_member($1) as v',[id(5)]);
+ assert.equal((await f.recover(id(901))).status,503);
+});
+
+
+test('accepting catalog capitals does not broaden consent versions or private identity formats',async t=>{
+ const f=await setup(t);const r=await f.recover();
+ for(const mutation of [x=>x.payload.consent_version='V1',x=>x.customer_id=id(5),x=>x.event_id=id(125)]){
+  const bad=async(name,args)=>{const result=await f.rpc(name,args);if(name==='edu_tips_data_operation'&&result.data?.items?.length)mutation(result.data.items[0]);return result;};
+  assert.equal((await f.call('events',{after:r.body.event_cursor,rpcOverride:bad})).status,503);
+ }
 });
