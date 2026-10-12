@@ -3,6 +3,7 @@
   "framework": "nextjs",
   "git": {
     "deploymentEnabled": {
+      "codex/edu-question-read-loop-20261012": false,
       "codex/edu-request-batch-20261012": false,
       "codex/edu-checkout-methods-20261012": false,
       "codex/edu-content-drag-20261012": false,
