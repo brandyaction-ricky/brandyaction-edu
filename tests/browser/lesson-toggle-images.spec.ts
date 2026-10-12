@@ -45,7 +45,7 @@ test('settings move preserves private image, caption and questions after save/re
   await canvas.getByRole('button', { name: '내용 펼치기', exact: true }).click();
   await expect(canvas.locator('[data-type="detailsContent"] [data-author-block="image"] img')).toBeVisible();
   await canvas.locator('[data-type="details"]').evaluate(element => element.scrollIntoView({ block: 'center' }));
-  await canvas.locator('[data-type="details"]').screenshot({ path: info.outputPath('toggle-image-editor.png') });
+  await page.screenshot({ path: info.outputPath('toggle-image-editor.png') });
   await page.getByRole('button', { name: '학생 화면 보기' }).click();
   const reader = page.locator('.lesson-blocks').first(), image = reader.locator('[data-lesson-block="image"]');
   await expect(reader.locator('[data-lesson-block="image"]')).toHaveCount(1); await expect(image).toBeHidden();
