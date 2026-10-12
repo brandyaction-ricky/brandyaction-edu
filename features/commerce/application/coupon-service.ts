@@ -1,4 +1,4 @@
-import { couponError } from "@/lib/coupon-rules";
+import { couponError, couponHistoryViews, type CouponHistoryView } from "@/lib/coupon-rules";
 import {
   COUPON_CODE_MAX_LENGTH,
   isUuid,
@@ -14,7 +14,8 @@ type RepositoryResult<T> = {
 };
 
 export type CouponRepository = {
-  getHistory: (couponId: string, page: number) => Promise<RepositoryResult<unknown[]>>;
+  getHistory: (couponId: string, page: number, view: CouponHistoryView) => Promise<RepositoryResult<unknown[]>>;
+  getHistoryCounts: (couponId: string) => Promise<Record<CouponHistoryView, number>>;
   quote: (userId: string, cohortId: string, code: string) => Promise<RepositoryResult<unknown>>;
   cancelZeroOrder: (actorId: string, orderId: string) => Promise<RepositoryResult<unknown>>;
 };
@@ -27,13 +28,15 @@ export class CouponApplicationError extends Error {
 
 export function createCouponService(repository: CouponRepository) {
   return {
-    async getHistory(actor: CouponActor, couponId: unknown, requestedPage: unknown) {
+    async getHistory(actor: CouponActor, couponId: unknown, requestedPage: unknown, requestedView: unknown = null) {
       if (actor.role !== "admin") throw new CouponApplicationError("관리자 권한이 필요합니다.", 403);
       if (!isUuid(couponId)) throw new CouponApplicationError("쿠폰을 확인해 주세요.", 400);
-      const page = Math.max(1, Math.min(100000, Number(requestedPage) || 1));
-      const result = await repository.getHistory(couponId, page);
+      const view = requestedView == null ? 'usage' : requestedView;
+      if (!couponHistoryViews.includes(view as CouponHistoryView)) throw new CouponApplicationError("내역 보기를 확인해 주세요.", 400);
+      const page = Math.max(1, Math.min(100000, Math.floor(Number(requestedPage) || 1)));
+      const [result, counts] = await Promise.all([repository.getHistory(couponId, page, view as CouponHistoryView), repository.getHistoryCounts(couponId)]);
       if (result.error) throw result.error;
-      return { rows: result.data ?? [], count: result.count ?? 0, page };
+      return { rows: result.data ?? [], count: result.count ?? 0, page, view, counts };
     },
 
     async register(actor: CouponActor, input: unknown) {

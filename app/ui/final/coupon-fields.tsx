@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from 'react';
 import { money, text as t, type Row } from '@/lib/platform';
-import { couponKstInput } from '@/lib/coupon-rules';
+import { couponKstInput, couponHistoryLabel, type CouponHistoryView } from '@/lib/coupon-rules';
 
 export function CouponFields({ row, data }: { row?: Row; data: Record<string, Row[]> }) {
   const [type, setType] = useState(String(row?.discount_type || 'percentage'));
@@ -48,15 +48,18 @@ export function CouponFields({ row, data }: { row?: Row; data: Record<string, Ro
 
 function CouponHistory({ id }: { id: string }) {
   const [page, setPage] = useState(1), [revision, setRevision] = useState(0);
-  const [result, setResult] = useState<{ rows: Row[]; count: number } | null>(null), [error, setError] = useState('');
+  const [view, setView] = useState<CouponHistoryView>('usage');
+  const [result, setResult] = useState<{ rows: Row[]; count: number; counts?: Record<CouponHistoryView, number> } | null>(null), [error, setError] = useState('');
+  const [counts, setCounts] = useState<Partial<Record<CouponHistoryView, number>>>({});
   const [pending, setPending] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`/api/coupons?history=${id}&page=${page}`, { signal: controller.signal }).then(async response => {
+    fetch(`/api/coupons?history=${id}&page=${page}&view=${view}`, { signal: controller.signal }).then(async response => {
       const body = await response.json(); if (!response.ok) throw Error(body.error); return body;
-    }).then(body => { setResult(body); setError(''); }).catch(cause => { if (!controller.signal.aborted) setError(cause.message); });
+    }).then(body => { if (!controller.signal.aborted) { setResult(body); setCounts(body.counts || {[view]: body.count}); setError(''); } }).catch(cause => { if (!controller.signal.aborted) setError(cause.message); });
     return () => controller.abort();
-  }, [id, page, revision]);
+  }, [id, page, revision, view]);
+  function changeView(next: CouponHistoryView) { setResult(null); setError(''); setPage(1); setView(next); }
   async function cancel(orderId: string) {
     if (!window.confirm('0원 주문을 취소하고 이 주문의 수강권을 회수할까요? 쿠폰은 다시 사용할 수 있습니다.')) return;
     setPending(true);
@@ -66,11 +69,17 @@ function CouponHistory({ id }: { id: string }) {
       setRevision(n => n + 1);
     } catch (cause) { setError((cause as Error).message); } finally { setPending(false); }
   }
-  return <section><h3>쿠폰 사용 내역</h3>{error ? <p role="alert">{error}</p> : !result ? <p>내역을 불러오는 중…</p> : !result.rows.length ? <p>사용 내역이 없습니다.</p> : <>
-    <div className="table-wrap"><table><thead><tr>{['회원·주문·상품','상품금액','할인','최종금액','사용일·상태'].map(label => <th key={label}>{label}</th>)}</tr></thead><tbody>{result.rows.map(r => {
+  return <section className="coupon-history"><h3>쿠폰 사용 내역</h3>
+    <div className="status-tabs" role="group" aria-label="쿠폰 내역 보기">{([['usage','실제 사용·복원'],['attempts','결제 미완료 시도'],['pending','결제 대기']] as const).map(([key,label]) => <button type="button" key={key} className={`tab${view===key?' active':''}`} aria-pressed={view===key} onClick={() => {if(view!==key)changeView(key);}}>{label}{counts[key] != null ? ` ${counts[key]}건` : ''}</button>)}</div>
+    <p className="meta">실제 사용·복원 기록만 기본으로 표시합니다. 결제 미완료 시도와 예약은 사용 횟수에 포함되지 않습니다.</p>
+    {error ? <p role="alert">{error} <button type="button" className="btn small" onClick={() => {setError('');setRevision(n=>n+1);}}>다시 불러오기</button></p> : !result ? <p role="status">내역을 불러오는 중…</p> : !result.rows.length ? <p>{view==='usage'?'실제 사용·복원 내역이 없습니다.':view==='attempts'?'결제 미완료 시도가 없습니다.':'결제 대기 내역이 없습니다.'}</p> : <>
+    <div className="table-wrap"><table aria-label="쿠폰 사용 내역"><thead><tr>{['회원·주문·상품·상태','상품금액','할인','최종금액'].map(label => <th key={label}>{label}</th>)}</tr></thead><tbody>{result.rows.map(r => {
       const order = r.orders as Row; const profile = r.profiles as Row; const items = (order?.order_items || []) as Row[];
       const original = Number(r.original_amount ?? items.reduce((n, i) => n + Number(i.unit_price) * Number(i.quantity || 1), 0));
-      return <tr key={r.id}><td>{t(profile,'full_name') || '탈퇴 회원'}<small>{t(order,'order_number')}</small><small>{items.map(i => t(i,'item_name')).join(', ')}</small></td><td>{money(original)}</td><td>{money(Number(r.discount_amount))}</td><td>{money(Number(r.final_amount ?? order?.total_amount))}</td><td>{r.used_at ? new Date(String(r.used_at)).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}) : '—'}<small>{{used:'사용 완료',cancelled:'취소·복원',reserved:'결제 대기',released:'미사용'}[String(r.status)] || String(r.status)}</small>{order?.status === 'paid' && Number(order.total_amount) === 0 && <button type="button" className="btn" disabled={pending} onClick={() => void cancel(String(r.order_id))}>0원 주문 취소</button>}</td></tr>;
+      const actual = r.status === 'used' || r.status === 'cancelled';
+      const date = new Date(String(r.used_at || r.created_at || ''));
+      const when = Number.isFinite(date.getTime()) ? `${r.used_at?'사용':'시도'} ${date.toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})} KST` : '일시 미기록';
+      return <tr key={r.id} className={actual?'':'coupon-history-attempt'}><td><strong>{t(profile,'full_name') || '탈퇴 회원'}</strong><span className="coupon-history-status">{couponHistoryLabel(r,order)}</span><small>{t(order,'order_number')}</small><small>{items.map(i => t(i,'item_name')).join(', ')}</small><small>{when}</small>{order?.status === 'paid' && Number(order.total_amount) === 0 && <button type="button" className="btn small" disabled={pending} onClick={() => void cancel(String(r.order_id))}>0원 주문 취소</button>}</td><td data-label="상품금액">{money(original)}</td><td data-label="할인">{actual?money(Number(r.discount_amount)):'—'}</td><td data-label="최종금액">{actual?money(Number(r.final_amount ?? order?.total_amount)):'—'}</td></tr>;
     })}</tbody></table></div><div className="actions"><button type="button" className="btn" disabled={page===1} onClick={() => {setResult(null);setPage(n=>n-1);}}>이전 내역</button><span>{page} 페이지 · {result.count}건</span><button type="button" className="btn" disabled={page*30>=result.count} onClick={() => {setResult(null);setPage(n=>n+1);}}>다음 내역</button></div>
   </>}</section>;
 }

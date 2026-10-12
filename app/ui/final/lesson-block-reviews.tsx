@@ -24,7 +24,7 @@ export function LessonBlockReviews() {
   const [search, setSearch] = useState('');
   const [queue, setQueue] = useState<{ key: string; data?: Queue; error?: string } | null>(null);
   const queueKey = JSON.stringify(filter);
-  const [selected, setSelected] = useState('');
+  const [selected, setSelected] = useState(routeParams.get('block') || '');
   const [reload, setReload] = useState(0);
   const detailKey = `${selected}:${reload}`;
   const [loaded, setLoaded] = useState<{ key: string; detail?: BlockSubmissionDetail; error?: string } | null>(null);
