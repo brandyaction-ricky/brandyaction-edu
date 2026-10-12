@@ -1,0 +1,32 @@
+import { readFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { fixture, document } from './lesson-block-review.mjs';
+const migration = name => readFileSync(new URL('../../supabase/migrations/' + name, import.meta.url), 'utf8');
+export async function qaFixture() {
+ const body='edu-lesson:v1\n'+JSON.stringify({type:'doc',content:[{type:'paragraph',content:[{type:'text',text:'앞 설명'}]},{type:'paragraph',content:[{type:'text',text:'정확한 설명 단락'}]},{type:'paragraph',content:[{type:'text',text:'뒤 설명'}]}]});
+ const f=await fixture({...document,blocks:[{id:'intro',type:'text',content:body},...document.blocks]});
+ await f.db.exec('reset role');
+ await f.db.exec(`alter table cohorts add column name text default '시험 기수';
+ alter table curriculum_lessons add column day_number integer not null default 1,add column description text,add column duration_label text,add column content_type text not null default 'text',add column is_preview boolean not null default false,add column display_order integer not null default 0,add column updated_at timestamptz not null default now();
+ alter table lesson_contents add column vod_url text,add column external_url text,add column resource_storage_path text,add column resource_name text,add column updated_at timestamptz not null default now();
+ create table audit_logs(id uuid primary key default gen_random_uuid(),actor_user_id uuid,action text,entity_type text,entity_id text,before_data jsonb,after_data jsonb);
+ grant select,insert on audit_logs to service_role;
+ create function mission_operator_allowed(actor uuid,scope text) returns boolean language sql as $$select exists(select 1 from public.profiles where id=actor and role='admin' and status='active')$$;
+ create table edu_questions(id uuid primary key,user_id uuid,course_id uuid,lesson_id uuid,title text,content text,is_archived boolean default false,deleted_at timestamptz,answer_head_id uuid,answer text,status text default 'open',updated_at timestamptz default now());
+ create table edu_question_answers(id uuid primary key,question_id uuid,actor_id uuid,author_name text,source text,expected_head uuid,content text);
+ create table qa_test_notices(id uuid primary key);
+ grant select,insert,update on edu_questions,edu_question_answers,qa_test_notices to service_role;
+ create function qa_test_mirror() returns trigger language plpgsql as $$begin update public.edu_questions set answer_head_id=new.id,answer=new.content,status='answered',updated_at=now() where id=new.question_id;insert into public.qa_test_notices values(new.id);return new;end;$$;
+ create trigger qa_test_mirror after insert on edu_question_answers for each row execute function qa_test_mirror();`);
+ await f.db.exec(migration('20261001065746_lesson_author_drafts.sql'));
+ const answer=migration('20260928205907_question_answer_threads.sql').match(/create function public\.edu_add_question_answer[\s\S]*?end; \$\$;/)[0];
+ await f.db.exec(answer);
+ await f.db.exec('revoke all on function edu_add_question_answer(uuid,uuid,uuid,uuid,text) from public;grant execute on function edu_add_question_answer(uuid,uuid,uuid,uuid,text) to service_role;');
+ await f.db.exec(migration('20261012102950_edu_approved_lesson_qa.sql'));
+ const question=randomUUID();await f.db.query("insert into edu_questions(id,user_id,course_id,lesson_id,title,content) values($1,$2,$3,$4,'비공개 원문 제목','원문 작성자 정보')",[question,f.student,f.course,f.lesson]);
+ await f.db.exec('set role service_role');
+ const read=async(actor=f.admin)=>(await f.db.query('select edu_read_lesson_qa($1,$2) v',[actor,question])).rows[0].v;
+ const prepare=async({source,request=randomUUID(),block='intro',node=1,title='정리한 질문',answer='검토한 답변',actor=f.admin}={})=>{source??=await read(actor);return(await f.db.query('select edu_prepare_lesson_qa($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) v',[actor,question,request,source.questionStamp,source.publicStamp,source.cohortStamp,source.authorHead,block,node,title,answer])).rows[0].v;};
+ const apply=async(plan,actor=f.admin)=>(await f.db.query('select edu_apply_lesson_qa($1,$2,$3) v',[actor,plan.id,plan.digest])).rows[0].v;
+ return {...f,question,body,read,prepare,apply};
+}
