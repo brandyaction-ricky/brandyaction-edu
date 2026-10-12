@@ -1,6 +1,30 @@
 import { expect, test } from '@playwright/test';
 const quickTransferEnabled=process.env.FIXTURE_TOSS_QUICK_TRANSFER_ENABLED==='true';
 const cohort='00000000-0000-4000-8000-000000000001';
+test('coupon history separates used, restored, incomplete and pending records without hiding status',async({page},testInfo)=>{
+  const counts={usage:6,attempts:5,pending:1};
+  await page.route('**/api/coupons?history=*',route=>{
+    const view=new URL(route.request().url()).searchParams.get('view') || 'usage';
+    const row=(id:string,status:string,orderStatus:string)=>({id,status,original_amount:1650000,discount_amount:550000,final_amount:1100000,used_at:status==='used'||status==='cancelled'?'2026-09-29T08:00:00Z':null,created_at:'2026-09-29T08:00:00Z',profiles:{full_name:id},orders:{order_number:'QA-'+id,status:orderStatus,total_amount:1100000,order_items:[{item_name:'합성 상품'}]}});
+    const rows=view==='usage'?[row('사용 회원','used','paid'),row('복원 회원','cancelled','cancelled')]:view==='attempts'?[row('실패 회원','released','failed')]:[row('대기 회원','reserved','pending')];
+    return route.fulfill({json:{rows,count:counts[view as keyof typeof counts],counts,page:1,view}});
+  });
+  await page.goto('/coupons-test');await page.getByRole('button',{name:'쿠폰 만들기',exact:true}).click();
+  await page.getByLabel('쿠폰명 *',{exact:true}).fill('합성 쿠폰');await page.getByLabel('쿠폰 코드 *',{exact:true}).fill('QA3333');
+  await page.getByRole('button',{name:'저장하기',exact:true}).click();await page.getByRole('button',{name:'쿠폰 만들기',exact:true}).click();
+  const table=page.getByRole('table',{name:'쿠폰 사용 내역',exact:true});
+  await expect(page.getByRole('button',{name:'실제 사용·복원 6건',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(table).toContainText('사용 완료');await expect(table).toContainText('취소·복원');await expect(table).not.toContainText('실패 회원');
+  await page.getByRole('button',{name:'결제 미완료 시도 5건',exact:true}).click();
+  await expect(table).toContainText('결제 실패 · 쿠폰 사용 안 됨');await expect(table).not.toContainText('550,000원');await expect(table).not.toContainText('1,100,000원');
+  const row=table.getByRole('row').filter({hasText:'실패 회원'});
+  await expect(row).toBeVisible();
+  const bounds=await row.boundingBox(),status=await row.locator('.coupon-history-status').boundingBox();
+  expect(status!.x).toBeGreaterThanOrEqual(bounds!.x);expect(status!.x+status!.width).toBeLessThanOrEqual(bounds!.x+bounds!.width+1);
+  await page.getByRole('button',{name:'결제 대기 1건',exact:true}).click();await expect(table).toContainText('결제 대기 · 쿠폰 예약');
+  await page.getByRole('button',{name:'실제 사용·복원 6건',exact:true}).click();await expect(table).toContainText('복원 회원');
+  await table.screenshot({path:testInfo.outputPath('coupon-history-scopes.png')});
+});
 test('coupon drawer preserves admin defaults, multiple products and KST after save/reopen',async({page},testInfo)=>{
   await page.route('**/api/coupons?history=*',route=>route.fulfill({json:{rows:[{
     id:'history-row',original_amount:1000,discount_amount:1000,final_amount:0,status:'cancelled',used_at:'2026-09-27T12:00:00Z',

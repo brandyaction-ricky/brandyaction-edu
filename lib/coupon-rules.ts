@@ -1,5 +1,20 @@
 import type { Row } from './platform';
 
+export const couponHistoryViews = ['usage', 'attempts', 'pending'] as const;
+export type CouponHistoryView = typeof couponHistoryViews[number];
+export const couponHistoryStatuses: Record<CouponHistoryView, string[]> = {
+  usage: ['used', 'cancelled'], attempts: ['released'], pending: ['reserved'],
+};
+export function couponHistoryLabel(row: Row, order?: Row) {
+  if (row.status === 'used') return '사용 완료';
+  if (row.status === 'cancelled') return '취소·복원';
+  if (row.status === 'reserved') return '결제 대기 · 쿠폰 예약';
+  if (order?.status === 'failed') return '결제 실패 · 쿠폰 사용 안 됨';
+  if (order?.status === 'cancelled') return '결제 취소 · 쿠폰 사용 안 됨';
+  if (order?.status === 'expired') return '결제 만료 · 쿠폰 사용 안 됨';
+  return '결제 미완료 · 쿠폰 사용 안 됨';
+}
+
 export function couponStatus(row: Row, now = Date.now()) {
   if (row.is_draft) return 'draft';
   if (!row.is_active) return 'inactive';

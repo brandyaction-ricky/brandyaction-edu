@@ -169,6 +169,8 @@
 
 /* Long coupon history stays in its own scroll area without widening the form. */
 .edu-admin .coupon-settings-form{grid-template-columns:minmax(0,1fr);min-width:0}.edu-admin .coupon-settings-form>*{min-width:0}.edu-admin .coupon-settings-form .table-wrap{max-width:100%}
+.edu-admin .coupon-history .status-tabs{flex-wrap:wrap;gap:var(--space-2)}.edu-admin .coupon-history .tab{padding:var(--space-2);font-size:var(--type-small);border:1px solid var(--line);border-radius:var(--radius-sm)}.edu-admin .coupon-history table{min-width:0;width:100%;table-layout:fixed}.edu-admin .coupon-history th:first-child{width:46%}.edu-admin .coupon-history td{white-space:normal;overflow-wrap:anywhere;padding:var(--space-3) var(--space-2)}.edu-admin .coupon-history-status{display:block;font-weight:600;font-size:var(--type-small);margin:var(--space-2) 0}.edu-admin .coupon-history-attempt{color:var(--text-secondary)}
+@media(max-width:680px){.edu-admin .coupon-history thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.edu-admin .coupon-history tbody{display:grid;gap:var(--space-3)}.edu-admin .coupon-history tr{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--line);border-radius:var(--radius-sm)}.edu-admin .coupon-history td:first-child{grid-column:1/-1}.edu-admin .coupon-history td[data-label]::before{content:attr(data-label);display:block;color:var(--text-secondary);font-size:var(--type-small);margin-bottom:var(--space-1)}}
 
 /* Shared admin controls use one predictable size and a restrained focus ring. */
 .edu-admin .btn{min-height:40px;box-sizing:border-box}
