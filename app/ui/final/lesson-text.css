@@ -40,3 +40,4 @@
 :is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body .lesson-callout-content > :last-child { margin-bottom:0; }
 @media(max-width:540px) { :is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body .lesson-toggle-content { padding:16px; } }
 @media(prefers-reduced-motion:reduce) { :is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body summary, :is(.edu-admin,.edu-front) .lesson-rich-body.lesson-rich-body summary::before { transition:none; } }
+.lesson-rich-body:not(.ldc-document) .lesson-toggle-drag { display:none; }

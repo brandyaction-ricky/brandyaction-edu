@@ -1,5 +1,6 @@
 import {test,expect,type Page,type Locator} from '@playwright/test';
 import type {LessonBlockDocument} from '../../lib/lesson-blocks';
+import { parseLessonDocument, serializeLessonDocument } from '../../lib/lesson-body';
 const initial:LessonBlockDocument={schemaVersion:1,blocks:[
  {id:'heading',type:'heading',content:'오늘의 실행 목표'},
  {id:'body',type:'text',content:'첫 문단입니다.\n\n두 번째 문단입니다.'},
@@ -162,4 +163,58 @@ test('callout handle moves only the notice past an activity and preserves conten
  await page.screenshot({path:testInfo.outputPath('callout-moved.png')});
  await page.getByRole('button',{name:'구성 미리보기',exact:true}).click();
  await expect(page.getByLabel('구성 미리보기').getByRole('button',{name:'안내 박스 이동'})).toHaveCount(0);
+});
+
+test('toggle and every body block expose drag handles; moving a toggle keeps its content and old question',async({page},testInfo)=>{
+ test.skip(Boolean(testInfo.project.use.hasTouch),'Native mouse drag is covered on desktop.');
+ const content=serializeLessonDocument({type:'doc',content:[
+  {type:'paragraph',content:[{type:'text',text:'첫 문단'}]},
+  {type:'details',content:[{type:'detailsSummary',content:[{type:'text',text:'이동할 토글'}]},{type:'detailsContent',content:[{type:'paragraph',content:[{type:'text',text:'토글 안 내용'}]}]}]},
+  {type:'heading',attrs:{level:2},content:[{type:'text',text:'다음 제목'}]},
+  {type:'bulletList',content:[{type:'listItem',content:[{type:'paragraph',content:[{type:'text',text:'목록 항목'}]}]}]},
+  {type:'blockquote',content:[{type:'paragraph',content:[{type:'text',text:'인용문 내용'}]}]},
+  {type:'paragraph',content:[{type:'text',text:'마지막 문단'}]},
+ ]});
+ const server=await backend(page,{...initial,blocks:[{id:'body',type:'text',content},initial.blocks[2]]});
+ await page.goto('/lesson-block-author-test');const canvas=doc(page);await expect(canvas).toBeVisible();
+ for(const label of ['문단 이동','제목 이동','목록 이동','인용문 이동','접기·펼치기 블록 이동','드래그하여 항목 순서 변경']) await expect(canvas.getByRole('button',{name:label}).first()).toBeVisible();
+ await canvas.getByRole('button',{name:'접기·펼치기 블록 이동'}).focus();await page.keyboard.press('Enter');
+ await expect(canvas.locator('[data-type="details"]')).toHaveClass(/ProseMirror-selectednode/);
+ await startCalloutDrag(page,canvas.getByRole('button',{name:'접기·펼치기 블록 이동'}));
+ const target=canvas.locator('[data-author-block="body"] p').last();await target.evaluate(el=>el.scrollIntoView({block:'center'}));const box=await target.boundingBox();
+ await page.mouse.move(box!.x+40,box!.y+box!.height-3,{steps:15});await page.mouse.up();
+ await expect.poll(()=>canvas.locator('[data-author-block="body"] [data-type="details"]').count()).toBe(1);
+ await save(page);
+ const saved=server.get();expect(saved.blocks.find(block=>block.id==='question')).toEqual(initial.blocks[2]);
+ const nodes=parseLessonDocument(saved.blocks[0].content!)!.content!;expect(nodes.map(node=>node.type)).toEqual(['paragraph','heading','bulletList','blockquote','details','paragraph']);
+ expect(nodes[4].content?.[1].content?.[0].content?.[0].text).toBe('토글 안 내용');
+ await page.getByRole('button',{name:'편집 다시 열기'}).click();await expect(doc(page).getByText('이동할 토글',{exact:true})).toBeVisible();
+});
+
+test('mouse reorders paragraphs, headings, lists, quotes and questions without losing content',async({page},testInfo)=>{
+ test.skip(Boolean(testInfo.project.use.hasTouch),'Mouse reordering is covered on desktop.');
+ const content=serializeLessonDocument({type:'doc',content:[
+  {type:'paragraph',content:[{type:'text',text:'첫 문단'}]},
+  {type:'heading',attrs:{level:2},content:[{type:'text',text:'첫 제목'}]},
+  {type:'bulletList',content:[{type:'listItem',content:[{type:'paragraph',content:[{type:'text',text:'첫 목록'}]}]}]},
+  {type:'blockquote',content:[{type:'paragraph',content:[{type:'text',text:'첫 인용문'}]}]},
+  {type:'paragraph',content:[{type:'text',text:'끝 문단'}]},
+ ]});
+ const server=await backend(page,{...initial,blocks:[{id:'body',type:'text',content},initial.blocks[2]]});
+ await page.goto('/lesson-block-author-test');const canvas=doc(page);await expect(canvas).toBeVisible();
+ const target=()=>canvas.locator('[data-author-block="body"] p.ldc-movable').filter({hasText:'끝 문단'});
+ await startCalloutDrag(page,canvas.getByRole('button',{name:'제목 이동'}));await dropCallout(page,target());
+ await startCalloutDrag(page,canvas.getByRole('button',{name:'목록 이동'}));await dropCallout(page,target());
+ await startCalloutDrag(page,canvas.getByRole('button',{name:'인용문 이동'}));await dropCallout(page,target());
+ await startCalloutDrag(page,canvas.getByRole('button',{name:'문단 이동'}).first());await dropCallout(page,target());
+ await save(page);
+ const movedNodes=parseLessonDocument(server.get().blocks[0].content!)!.content!;
+ expect(movedNodes.map(node=>node.type).sort()).toEqual(['blockquote','bulletList','heading','paragraph','paragraph'].sort());
+ expect(movedNodes.map(node=>node.type)).not.toEqual(['paragraph','heading','bulletList','blockquote','paragraph']);
+ for(const text of ['첫 문단','첫 제목','첫 목록','첫 인용문','끝 문단']) expect(server.get().blocks[0].content).toContain(text);
+ expect(server.get().blocks.find(block=>block.id==='question')).toEqual(initial.blocks[2]);
+ await page.getByRole('button',{name:'편집 다시 열기'}).click();
+ await startCalloutDrag(page,canvas.getByRole('button',{name:'드래그하여 항목 순서 변경'}));await dropCallout(page,canvas.locator('[data-author-block="body"] p').first());
+ await save(page);expect(server.get().blocks[0]).toEqual(initial.blocks[2]);
+ await page.getByRole('button',{name:'편집 다시 열기'}).click();await canvas.screenshot({path:testInfo.outputPath('movable-content.png')});
 });
