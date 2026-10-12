@@ -44,7 +44,8 @@
   opacity: .65;
 }
 
-.checkout-payment-recommended {
+.checkout-payment-recommended,
+.checkout-payment-coming {
   position: absolute;
   top: -13px;
   left: 20px;
@@ -54,6 +55,13 @@
   color: #fff;
   font-size: var(--type-small);
   font-weight: 700;
+}
+
+.checkout-payment-coming { background: #616875; }
+.checkout-payment-option[data-unavailable]:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 1;
+  background: var(--surface-muted, #f5f6f8);
 }
 
 .checkout-payment-mark { display: flex; flex-shrink: 0; }
