@@ -6,6 +6,7 @@ import { AnswerText } from './lesson-text';
 import { MvpBadge, useMemberMvps } from './member-mvp';
 import { QuestionAiBatch } from './question-ai-batch';
 import { QuestionImage } from './question-image';
+import { QuestionAnswerHistory } from './question-thread';
 import { lessonBodyPlainText } from "@/lib/lesson-body";
 import {
   date,
@@ -926,14 +927,28 @@ export function AdminCatalog({
                       <h2 className="mt8">{t(q, "title")}</h2>
                     </div>
                     <AdminButton size="sm" variant="outline" className="question-answer-open" onClick={() => edit(s, q)}>
-                      {q.answer ? "답변 수정" : "답변하기"}
+                      {process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED === 'true' ? q.is_archived ? '대화 보기' : '답글 달기' : q.answer ? "답변 수정" : "답변하기"}
                     </AdminButton>
                   </div>
                   <div className="panel-body">
                     {Boolean(q.learning_context) && <p className="meta">학습 위치: {t(q, "learning_context")}</p>}
                     <p className="reading-copy">{t(q, "content")}</p>
                     <QuestionImage key={String(q.image_id || q.id)} questionId={String(q.id)} imageId={q.image_id}/>
-                    {Boolean(q.answer) && (
+                    {process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED === 'true' ? (
+                      <section className="mt24" aria-label="후속 질문과 답변 댓글">
+                        <h3>후속 질문 · 답변</h3>
+                        <QuestionAnswerHistory
+                          questionId={String(q.id)}
+                          fallback={t(q, 'answer')}
+                          initiallyOpen
+                          readOnly
+                          refreshKey={[q.answer_head_id, q.updated_at, q.status, q.is_archived].map(value => String(value ?? '')).join(':')}
+                        />
+                        <AdminButton size="sm" variant="outline" className="mt16" onClick={() => edit(s, q)}>
+                          {q.is_archived ? '대화 보기' : '답글 달기'}
+                        </AdminButton>
+                      </section>
+                    ) : Boolean(q.answer) && (
                       <div className="answer-block mt16">
                         <b>운영자 답변</b>
                         <p className="reading-copy"><AnswerText text={t(q, "answer")}/></p>
