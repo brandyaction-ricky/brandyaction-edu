@@ -37,7 +37,7 @@ test('question list shows followups and answers immediately, then refreshes comm
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('textbox', { name: '새 답변', exact: true }).fill('이어지는 예시 답글');
   await dialog.getByRole('button', { name: '답변 추가하기', exact: true }).click();
-  await expect(dialog.getByRole('status')).toContainText('답변을 추가했습니다');
+  await expect(dialog.getByRole('status').filter({ hasText: '답변을 추가했습니다' })).toContainText('답변을 추가했습니다');
   await dialog.getByRole('button', { name: '닫기', exact: true }).last().click();
   await expect(comments.getByText('이어지는 예시 답글', { exact: true })).toBeVisible();
   await expect(comments.getByText('후속 질문: 다음 단계도 설명해 주세요.', { exact: true })).toBeVisible();
