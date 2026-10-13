@@ -29,6 +29,10 @@ test('question list shows followups and answers immediately, then refreshes comm
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByText('목록에 저장된 이전 답변', { exact: true })).toHaveCount(0);
   await expect(comments.getByRole('textbox')).toHaveCount(0); expect(server.writes).toHaveLength(0);
+  await comments.getByRole('button', { name: '답변 이력 접기', exact: true }).click();
+  await expect(comments.getByText('목록에 저장된 이전 답변', { exact: true })).toBeVisible();
+  await comments.getByRole('button', { name: '답변 전체 보기', exact: true }).click();
+  await expect(comments.getByText('후속 질문: 다음 단계도 설명해 주세요.', { exact: true })).toBeVisible();
   await comments.getByRole('button', { name: '답글 달기', exact: true }).click();
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('textbox', { name: '새 답변', exact: true }).fill('이어지는 예시 답글');

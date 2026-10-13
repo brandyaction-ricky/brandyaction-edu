@@ -939,6 +939,7 @@ export function AdminCatalog({
                         <h3>후속 질문 · 답변</h3>
                         <QuestionAnswerHistory
                           questionId={String(q.id)}
+                          fallback={t(q, 'answer')}
                           initiallyOpen
                           readOnly
                           refreshKey={[q.answer_head_id, q.updated_at, q.status, q.is_archived].map(value => String(value ?? '')).join(':')}
