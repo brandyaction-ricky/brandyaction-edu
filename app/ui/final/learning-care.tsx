@@ -9,6 +9,7 @@ import type { CareDeliveryReceipt, CareDeliverySelection } from '@/lib/learning-
 import { CareStudentDetail } from './learning-care-detail';
 import { AdminDrawer } from '@/features/admin-ui';
 import { CareOverview } from './learning-care-overview';
+import { CareDayOverview } from './learning-care-days';
 import { clearAdminCare, readAdminCare } from '@/lib/learning-care-client';
 
 function useCare<T>(url: string, actorId?: string) {
@@ -101,6 +102,7 @@ export function AdminLearningCare({ actorId, initialCohortId = '', messagesEnabl
       {tab === 'share' ? <ShareSummary data={data}/> : <>
         {tab !== 'overview' && <div className="care-stats"><div><Users/><span>수강생</span><b>{aggregate!.members}<small>명</small></b></div><div><ChartNoAxesCombined/><span>공개된 학습 진행률</span><b>{aggregate!.percent === null ? '—' : aggregate!.percent + '%'}</b><small>{aggregate!.completed} / {aggregate!.available}건</small></div><div><span>운영자 검토 대기</span><b>{aggregate!.pending}<small>건</small></b><Link href="/admin/reviews?tab=blocks">검토하러 가기 →</Link></div><div><span>최근 7일 완료한 학습</span><b>+{aggregate!.recent}<small>건</small></b></div></div>}
         {tab === 'overview' ? <CareOverview key={data.cohortId} rows={data.rows} asOf={data.asOf} onStudent={setDetailId} onDay={(id, value) => { setTab('days'); setLessonId(id); setFilter(value); setSearch(''); resetSelection(); }}/> : <>
+        {tab === 'days' && <CareDayOverview key={data.cohortId} rows={data.rows} asOf={data.asOf} onDay={(id, value) => { setLessonId(id); setFilter(value); setSearch(''); resetSelection(); }}/> }
         <div className="care-controls"><label>수강생 찾기<input value={search} placeholder="이름 또는 이메일" onChange={e => { setSearch(e.target.value); setSelected([]); }}/></label>{tab === 'days' && <label>확인할 일차<select value={currentLesson} onChange={e => { setLessonId(e.target.value); resetSelection(); }}>{lessons.map(c => <option key={c.lessonId} value={c.lessonId}>{careLessonLabel(c)} · {c.title}</option>)}</select></label>}</div>
         <div className="care-filters" aria-label="빠른 필터">{[['all', '전체'], ['completed', '완료'], ['not_submitted', '미완료'], ['submitted', '검토 대기'], ['changes_requested', '보완 요청'], ['locked', '앞 단계 대기'], ['scheduled', '공개 예정'], ['quiet', '3일 이상 방문 기록 없음'], ['recent', '24시간 내 안내']].map(([value, label]) => <button key={value} aria-pressed={filter === value} onClick={() => { setFilter(value); setSelected([]); }}>{label}</button>)}</div>
         <div className="care-list-caption"><b>{filtered.length}개 수강 기록</b>{tab === 'days' && <button className="btn" onClick={() => setSelected([...new Set(filtered.filter(r => canCareContact(r, currentLesson, data.asOf)).map(r => r.memberId))].slice(0, 100))}>안내할 수강생 선택 · 최대 100명</button>}{tab === 'days' && <button className="btn primary" disabled={!selected.length || !messagesEnabled} onClick={prepare}>선택한 {selected.length}명 안내 내용 작성</button>}</div>
