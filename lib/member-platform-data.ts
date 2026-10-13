@@ -93,7 +93,7 @@ export async function readMemberPlatformData(userId: string, view: MemberView, e
         : 'id,title,slug,category,list_price,schedule_label,duration_label';
       return checked(await admin.from('courses').select(columns).in('id', courseIds).limit(limit), '상품');
     })() : null,
-    cohortIds.length && learningViews.has(view) ? (async () => checked(await admin.from('cohorts').select('id,course_id,name,status,operation_start_at,operation_end_at').in('id', cohortIds).limit(limit), '기수'))() : null,
+    cohortIds.length && learningViews.has(view) ? (async () => checked(await admin.from('cohorts').select('id,course_id,name,status,operation_start_at,operation_end_at,alumni_access_on_enroll').in('id', cohortIds).limit(limit), '기수'))() : null,
     courseIds.length && learningViews.has(view) ? (async () => readCurriculumRows((from, to) => admin.from('curriculum_weeks').select('id,course_id,week_number,title,goal,is_published,display_order,archived_at').in('course_id', courseIds).order('week_number').order('id').range(from, to), '커리큘럼 주차'))() : null,
     activeIds.length && (view === 'dashboard' || view === 'classes' || view === 'learn') ? (async () => checked(await db.from('lesson_progress').select('id,enrollment_id,lesson_id,completed_at,updated_at').in('enrollment_id', activeIds).limit(limit), '학습 진도'))() : null,
     activeIds.length && missionViews.has(view) ? (async () => checked(await db.from('mission_submissions').select('id,enrollment_id,mission_id,attempt_number,status,response,submitted_at,reviewed_at,reviewer_feedback').in('enrollment_id', activeIds).limit(limit), '미션 제출'))() : null,

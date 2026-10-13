@@ -3,22 +3,35 @@ import { newGuidedBlock, PERSONA_QUESTIONS, Q4_OPTIONS, Q4_1_MAP, LANDING_QUESTI
 import { validateBlockAnswers, type LessonBlockAnswers } from '../../lib/lesson-blocks';
 
 type Kind = 'persona-generator' | 'landing-planner';
-async function backend(page: Page, kind: Kind, saved?: LessonBlockAnswers, historical = false) {
+async function backend(page: Page, kind: Kind, saved?: LessonBlockAnswers, historical = false, alumni = false) {
   const document={schemaVersion:1 as const,blocks:[newGuidedBlock(kind,'tool')],checklist:[]};
   let values=saved, writeId:string|null=null;
   const writes:LessonBlockAnswers[]=[];
   await page.route('**/api/platform/lesson-blocks**',async route=>{
     if(route.request().method()==='GET'){
-      await route.fulfill({json:{document,revision:'11111111-1111-4111-8111-111111111111',currentRevision:historical?'22222222-2222-4222-8222-222222222222':'11111111-1111-4111-8111-111111111111',draft:values?{values,writeId,updatedAt:'2026-09-29T00:00:00Z'}:null,previousDrafts:[]}});return;
+      await route.fulfill({json:{practice:alumni?{enabled:true,draft:values?{values,writeId,updatedAt:'2026-09-29T00:00:00Z'}:null}:null,document,revision:'11111111-1111-4111-8111-111111111111',currentRevision:historical?'22222222-2222-4222-8222-222222222222':'11111111-1111-4111-8111-111111111111',draft:values?{values,writeId,updatedAt:'2026-09-29T00:00:00Z'}:null,previousDrafts:[]}});return;
     }
     const body=route.request().postDataJSON();
-    expect(body.action).toBe('draft');
+    expect(body.action).toBe(alumni?'practice-draft':'draft');
     values=validateBlockAnswers(body.values,document);writeId=body.requestId;writes.push(values);
     await route.fulfill({json:{writeId,updatedAt:'2026-09-29T00:00:00Z'}});
   });
   return {getValues:()=>values,writes};
 }
 async function saved(page:Page){await expect(page.getByRole('status').filter({hasText:'답변 저장됨'})).toBeVisible();}
+
+test('graduate persona practice produces a prompt and restores personal answers',async({page,context})=>{
+ const server=await backend(page,'persona-generator',undefined,false,true);
+ await context.grantPermissions(['clipboard-read','clipboard-write']);await page.goto('/lesson-blocks-test?alumni=1');
+ const panel=page.getByRole('region',{name:'핵심 고객 페르소나 생성기'});
+ for(const q of PERSONA_QUESTIONS.slice(0,14))await panel.getByRole('button',{name:q.opts![0],exact:true}).click();
+ await panel.getByRole('textbox',{name:PERSONA_QUESTIONS[14].text}).fill('졸업생의 새로운 사업');
+ await panel.getByRole('button',{name:'페르소나 생성하기'}).click();await saved(page);
+ await expect(panel.getByRole('textbox',{name:'완성된 프롬프트'})).toHaveValue(/졸업생의 새로운 사업/);
+ expect(Object.keys(server.getValues()!.blocks.tool)).toHaveLength(15);
+ await page.reload();await expect(panel.getByRole('textbox',{name:'완성된 프롬프트'})).toHaveValue(/졸업생의 새로운 사업/);
+ await expect(page.getByRole('button',{name:/미션 제출하기|학습 완료하기/})).toHaveCount(0);
+});
 
 test('persona resumes a partial draft, completes all 15 answers, copies output and preserves cancelled reset',async({page,context},testInfo)=>{
   const server=await backend(page,'persona-generator');
