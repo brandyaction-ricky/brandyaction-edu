@@ -21,8 +21,8 @@
 /* Shared row tracks keep full lesson titles and each metric aligned across cards. */
 .care-day-overview{border-top:1px solid #d9e3db;margin-top:32px;padding-top:4px;min-width:0}
 .care-day-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,180px),1fr));gap:12px;min-width:0}
-.care-day-tiles article{display:grid;grid-row:span 6;grid-template-rows:subgrid;gap:10px;min-width:0;padding:16px;background:white;border:1px solid #dce6df;border-radius:12px;overflow:hidden}
-.care-day-tiles article>button{display:grid;grid-row:span 5;grid-template-rows:subgrid;gap:10px;align-items:start;text-align:left;width:100%;min-width:0;border:0;padding:0;background:transparent;color:#285b44;overflow-wrap:anywhere}
+.care-day-tiles article{display:grid;grid-row:span 8;grid-template-rows:subgrid;gap:10px;min-width:0;padding:16px;background:white;border:1px solid #dce6df;border-radius:12px;overflow:hidden}
+.care-day-tiles article>button{display:grid;grid-row:span 7;grid-template-rows:subgrid;gap:10px;align-items:start;text-align:left;width:100%;min-width:0;border:0;padding:0;background:transparent;color:#285b44;overflow-wrap:anywhere}
 .care-day-tiles article>button b{font-size:11px;letter-spacing:.03em}
 .care-day-tiles strong{font-size:26px;line-height:1.2}
 .care-day-tiles article>button span{font-size:11px;color:#67766c;line-height:1.6}
@@ -78,3 +78,7 @@
 .care-channel-statuses li{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px;border:1px solid #dce4df;border-radius:8px;background:#fff;font-size:13px}
 .care-channel-statuses small{white-space:nowrap;border-radius:12px;padding:3px 6px;background:#edf0ee;color:#53665d;font-size:11px}
 @media(max-width:360px){.care-channel-statuses{grid-template-columns:1fr}}
+
+.care-attention-heading{margin:0 0 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}.care-attention-heading p{font-size:12px;color:#687873;margin:0}.care-attention-heading button{min-height:44px}.care-attention-table .care-signal{margin:4px 0}.care-attention-table td:nth-child(2){max-width:240px;overflow-wrap:anywhere}.care-day-duration b{display:block;font-size:14px!important;letter-spacing:0!important;color:#285b44}
+
+@media(max-width:760px){.care-attention-table{min-width:0}.care-attention-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.care-attention-table tbody{display:block}.care-attention-table tbody tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:16px;border-bottom:1px solid #e0e8e3}.care-attention-table tbody th{width:auto;grid-column:1/-1}.care-attention-table th,.care-attention-table td{padding:0;border:0;min-width:0;overflow-wrap:anywhere}.care-attention-table td:nth-child(2),.care-attention-table td:nth-child(3){grid-column:1/-1;max-width:none}.care-attention-table td::before{content:attr(data-label);display:block;color:#687873;font-size:11px;margin-bottom:5px}.care-attention-table tbody tr:last-child{border-bottom:0}}
