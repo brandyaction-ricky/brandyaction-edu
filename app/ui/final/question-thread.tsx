@@ -16,10 +16,10 @@ async function request<T>(question: string, body?: unknown, before?: string, sig
  });
  const value = await response.json(); if (!response.ok) throw Object.assign(new Error(value.error || '답변을 확인하지 못했습니다.'), { status: response.status }); return value;
 }
-function useThread(questionId: string, active = true) {
+function useThread(questionId: string, active = true, refreshKey = '') {
  const [revision, setRevision] = useState(0), [state, setState] = useState<{ key: string; data?: Thread; error?: string }>();
  const [olderError, setOlderError] = useState(''), [olderBusy, setOlderBusy] = useState(false);
- const key = questionId + ':' + revision, generation = useRef(key), olderGate = useRef(false);
+ const key = questionId + ':' + refreshKey + ':' + revision, generation = useRef(key), olderGate = useRef(false);
  useEffect(() => { generation.current = key; }, [key]);
  useEffect(() => {
   if (!active) return; const abort = new AbortController(); const timer = setTimeout(() => abort.abort(), 10000); let alive = true;
@@ -45,8 +45,8 @@ function Answers({ state, onDelete, locked = false }: { state: ReturnType<typeof
   </>}
  </section>;
 }
-export function QuestionAnswerHistory({ questionId, fallback = '', onStatusChange, onResolved, initiallyOpen = false, readOnly = false }: { questionId: string; fallback?: string; onStatusChange?: (status: string) => void; onResolved?: () => void; initiallyOpen?: boolean; readOnly?: boolean }) {
- const [open, setOpen] = useState(initiallyOpen), state = useThread(questionId, open || Boolean(fallback));
+export function QuestionAnswerHistory({ questionId, fallback = '', onStatusChange, onResolved, initiallyOpen = false, readOnly = false, refreshKey = '' }: { questionId: string; fallback?: string; onStatusChange?: (status: string) => void; onResolved?: () => void; initiallyOpen?: boolean; readOnly?: boolean; refreshKey?: string }) {
+ const [open, setOpen] = useState(initiallyOpen), state = useThread(questionId, open || Boolean(fallback), refreshKey);
  const [content, setContent] = useState(''), [busy, setBusy] = useState(false), [uncertain, setUncertain] = useState(false), [stale, setStale] = useState(false), [notice, setNotice] = useState('');
  const gate = useRef(false), retry = useRef<{ action: 'followup'; questionId: string; content: string; requestId: string; expectedHeadId: string | null } | null>(null);
  useUnsavedLearningChanges(Boolean(content) || busy || uncertain);
