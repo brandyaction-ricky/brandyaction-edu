@@ -76,3 +76,19 @@ test('official submissions, completion credit and mentor decisions stay closed a
  for(const role of ['anon','authenticated']){await f.db.exec('reset role;set role '+role);await assert.rejects(f.read(),/permission denied/);await assert.rejects(f.save(),/permission denied/);await assert.rejects(f.db.query('select * from edu_alumni_practice_drafts'),/permission denied/);}
  }finally{await f.db.close();}
 });
+
+test('authenticated learners retain owned progress writes before graduation and RLS ownership while alumni writes close',async()=>{
+ const f=await setup();try{
+ await f.db.exec(`reset role;grant select on enrollments to authenticated;
+ alter table lesson_progress enable row level security;
+ create policy own_progress on lesson_progress for all to authenticated using (enrollment_id in (select id from enrollments where user_id=auth.uid())) with check (enrollment_id in (select id from enrollments where user_id=auth.uid()));`);
+ await f.db.query("select set_config('request.jwt.claim.sub',$1,false)",[f.student]);await f.db.exec('set role authenticated');
+ await f.db.query('insert into lesson_progress(enrollment_id,lesson_id,progress_percent) values($1,$2,10)',[f.enrollment,f.lesson]);
+ assert.equal((await f.db.query('select progress_percent from lesson_progress where enrollment_id=$1',[f.enrollment])).rows[0].progress_percent,10);
+ await f.db.query("select set_config('request.jwt.claim.sub',$1,false)",[f.other]);
+ assert.equal((await f.db.query('update lesson_progress set progress_percent=20 where enrollment_id=$1 returning id',[f.enrollment])).rows.length,0);
+ await f.db.exec('reset role');await f.graduate();await f.db.query("select set_config('request.jwt.claim.sub',$1,false)",[f.student]);await f.db.exec('set role authenticated');
+ await assert.rejects(f.db.query('update lesson_progress set progress_percent=30 where enrollment_id=$1',[f.enrollment]),/ALUMNI_PARTICIPATION_CLOSED/);
+ await assert.rejects(f.read(),/permission denied/);
+ }finally{await f.db.close();}
+});

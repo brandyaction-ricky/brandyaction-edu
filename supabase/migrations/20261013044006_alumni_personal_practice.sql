@@ -99,10 +99,16 @@ end;
 $$;
 
 -- Enforce the official-participation boundary even through direct server RPCs.
-create function public.edu_guard_alumni_participation()
-returns trigger language plpgsql security invoker set search_path='' as $$
+-- Existing RLS still authorizes client writes. This private trigger only reads
+-- inaccessible graduate status to deny writes; it never grants or writes data.
+create function edu_private.edu_guard_alumni_participation()
+returns trigger language plpgsql security definer set search_path='' as $$
 declare enrollment uuid;
 begin
+  if current_setting('role',true) in ('anon','authenticated') and
+    (auth.uid() is null or not exists(select 1 from public.profiles where id=auth.uid() and status='active')) then
+    raise exception 'BLOCK_FORBIDDEN';
+  end if;
   if tg_table_name in ('edu_lesson_block_reviews','edu_lesson_block_feedback') then
     select enrollment_id into enrollment from public.edu_lesson_block_submissions where id=new.submission_id;
   else enrollment:=new.enrollment_id;
@@ -110,13 +116,13 @@ begin
   if public.edu_is_graduate_enrollment(enrollment) then raise exception 'ALUMNI_PARTICIPATION_CLOSED'; end if;
   return new;
 end; $$;
-create trigger edu_alumni_block_submission before insert on public.edu_lesson_block_submissions for each row execute function public.edu_guard_alumni_participation();
-create trigger edu_alumni_block_review before insert on public.edu_lesson_block_reviews for each row execute function public.edu_guard_alumni_participation();
-create trigger edu_alumni_block_feedback before insert on public.edu_lesson_block_feedback for each row execute function public.edu_guard_alumni_participation();
-create trigger edu_alumni_mission_submission before insert or update on public.mission_submissions for each row execute function public.edu_guard_alumni_participation();
-create trigger edu_alumni_ongoing_completion before insert on public.edu_ongoing_completions for each row execute function public.edu_guard_alumni_participation();
-create trigger edu_alumni_official_progress before insert or update on public.lesson_progress for each row execute function public.edu_guard_alumni_participation();
+create trigger edu_alumni_block_submission before insert on public.edu_lesson_block_submissions for each row execute function edu_private.edu_guard_alumni_participation();
+create trigger edu_alumni_block_review before insert on public.edu_lesson_block_reviews for each row execute function edu_private.edu_guard_alumni_participation();
+create trigger edu_alumni_block_feedback before insert on public.edu_lesson_block_feedback for each row execute function edu_private.edu_guard_alumni_participation();
+create trigger edu_alumni_mission_submission before insert or update on public.mission_submissions for each row execute function edu_private.edu_guard_alumni_participation();
+create trigger edu_alumni_ongoing_completion before insert on public.edu_ongoing_completions for each row execute function edu_private.edu_guard_alumni_participation();
+create trigger edu_alumni_official_progress before insert or update on public.lesson_progress for each row execute function edu_private.edu_guard_alumni_participation();
 
-revoke all on function public.edu_assert_alumni_practice_access(uuid,uuid,uuid),public.edu_read_alumni_practice(uuid,uuid,uuid,uuid),public.edu_save_alumni_practice(uuid,uuid,uuid,uuid,uuid,uuid,jsonb),public.edu_guard_alumni_participation() from public,anon,authenticated;
-grant execute on function public.edu_assert_alumni_practice_access(uuid,uuid,uuid),public.edu_read_alumni_practice(uuid,uuid,uuid,uuid),public.edu_save_alumni_practice(uuid,uuid,uuid,uuid,uuid,uuid,jsonb),public.edu_guard_alumni_participation() to service_role;
+revoke all on function public.edu_assert_alumni_practice_access(uuid,uuid,uuid),public.edu_read_alumni_practice(uuid,uuid,uuid,uuid),public.edu_save_alumni_practice(uuid,uuid,uuid,uuid,uuid,uuid,jsonb),edu_private.edu_guard_alumni_participation() from public,anon,authenticated;
+grant execute on function public.edu_assert_alumni_practice_access(uuid,uuid,uuid),public.edu_read_alumni_practice(uuid,uuid,uuid,uuid),public.edu_save_alumni_practice(uuid,uuid,uuid,uuid,uuid,uuid,jsonb),edu_private.edu_guard_alumni_participation() to service_role;
 commit;
