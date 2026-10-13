@@ -14,7 +14,7 @@ export async function isGraduateEnrollment(userId: string, enrollmentId: string)
   if (!enrollment || !hasLearningAccess(enrollment)) return false;
   const [courseResult, cohortResult] = await Promise.all([
     db.from('courses').select('id,category').eq('id', enrollment.course_id).maybeSingle(),
-    db.from('cohorts').select('id,status,operation_end_at').eq('id', enrollment.cohort_id).maybeSingle(),
+    db.from('cohorts').select('id,status,operation_end_at,alumni_access_on_enroll').eq('id', enrollment.cohort_id).maybeSingle(),
   ]);
   if (courseResult.error || cohortResult.error) throw new Error('졸업 상태를 확인하지 못했습니다.');
   return isGraduate(enrollment, courseResult.data || undefined, cohortResult.data || undefined);

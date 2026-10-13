@@ -5,6 +5,7 @@ import { randomUUID as id } from 'node:crypto';
 import { fixture, document, answers } from './helpers/lesson-block-review.mjs';
 const root=new URL('../supabase/migrations/',import.meta.url);
 const migration=fs.readFileSync(new URL('20261013044006_alumni_personal_practice.sql',root),'utf8');
+const reentryMigration=fs.readFileSync(new URL('20261013080958_alumni_reentry_cohort_access.sql',root),'utf8');
 async function setup(){
  const f=await fixture();const {db}=f;
  try{
@@ -21,7 +22,7 @@ async function setup(){
  const access=visibility.slice(visibility.indexOf('create or replace function public.edu_assert_block_access'),visibility.indexOf('create or replace function public.edu_read_lesson_progression'));
  await db.exec(access);
  await db.exec(fs.readFileSync(new URL('20261001024207_alumni_read_mode.sql',root),'utf8').split('\n').slice(0,21).join('\n').replace(/^begin;/,''));
- await db.exec(migration);await db.exec('set role service_role');
+ await db.exec(migration);await db.exec(reentryMigration);await db.exec('set role service_role');
  const query=async(sql,args)=>(await db.query(sql,args)).rows[0]?.result;
  const read=(actor=f.student,revision=f.revision)=>query('select edu_read_alumni_practice($1,$2,$3,$4) as result',[actor,f.lesson,f.enrollment,revision]);
  const save=({actor=f.student,revision=f.revision,expected=null,write=id(),values=answers}={})=>query('select edu_save_alumni_practice($1,$2,$3,$4,$5,$6,$7) as result',[actor,f.lesson,f.enrollment,revision,expected,write,values]);
@@ -29,6 +30,20 @@ async function setup(){
  return {...f,query,read,save,graduate};
  }catch(e){await db.close();throw e;}
 }
+
+test('recruiting alumni re-entry grants personal practice immediately but closes official submissions',async()=>{
+ const f=await setup();try{
+  const draft=await f.draft();
+  await f.db.query("update cohorts set status='recruiting',operation_end_at=now()+interval '30 days' where id=$1",[f.cohort]);
+  assert.equal((await f.db.query('select edu_is_graduate_enrollment($1) graduate',[f.enrollment])).rows[0].graduate,false);
+  await f.db.query('update cohorts set alumni_access_on_enroll=true where id=$1',[f.cohort]);
+  assert.equal((await f.db.query('select edu_is_graduate_enrollment($1) graduate',[f.enrollment])).rows[0].graduate,true);
+  assert.equal((await f.save()).writeId.length>0,true);
+  await assert.rejects(f.db.query("insert into edu_lesson_block_submissions(id,enrollment_id,lesson_id,revision,draft_write_id,values,assessment,outcome) values($1,$2,$3,$4,$5,$6,'{}','submitted')",[id(),f.enrollment,f.lesson,f.revision,draft,answers]),/ALUMNI_PARTICIPATION_CLOSED/);
+  await f.db.query('update cohorts set alumni_access_on_enroll=false where id=$1',[f.cohort]);
+  assert.equal((await f.db.query('select edu_is_graduate_enrollment($1) graduate',[f.enrollment])).rows[0].graduate,false);
+ }finally{await f.db.close();}
+});
 
 test('personal input survives rereading with optimistic conflicts and leaves official drafts, submissions and progress intact',async()=>{
  const f=await setup();try{
