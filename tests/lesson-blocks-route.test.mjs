@@ -6,9 +6,9 @@ const id='11111111-1111-4111-8111-111111111111',lesson='22222222-2222-4222-8222-
 function compile(file, mocks={}) { const out={};new Function('exports','require',ts.transpileModule(fs.readFileSync(new URL('../'+file,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(out,name=>mocks[name]);return out; }
 const blocks=compile('lib/lesson-blocks.ts',{'./lesson-guided-tools':compile('lib/lesson-guided-tools.ts'),'./lesson-calculators':compile('lib/lesson-calculators.ts')});
 const document={schemaVersion:1,blocks:[{id:'quiz',type:'quiz',quiz:{passPercent:100,questions:[{id:'q',prompt:'시험',options:['가','나'],correctIndex:1}]}},{id:'answer',type:'question',question:{label:'질문',kind:'text',required:true}}],checklist:[]};
-function harness({user={id,role:'member'},editable=false,readError=null,saveError=null,current=revision,savedDraft=null,savedSubmission=null}={}) {
+function harness({user={id,role:'member'},editable=false,readError=null,saveError=null,current=revision,savedDraft=null,savedSubmission=null,graduate=false}={}) {
  const calls=[];const db={rpc:async(name,args)=>{calls.push({name,args});return ['edu_read_lesson_blocks','edu_read_block_submission'].includes(name)?{data:{editable,revision,currentRevision:current,document,draft:savedDraft,submission:savedSubmission,previousDrafts:[]},error:readError}:{data:{writeId:id,revision},error:saveError};}};
- const route=compile('app/api/platform/lesson-blocks/route.ts',{'@/lib/lesson-blocks':blocks,'@/lib/edu-workflows':{uuid:v=>typeof v==='string'&&/^[a-f\d-]{36}$/.test(v)},'@/lib/supabase/admin':{createAdminClient:()=>db},'@/lib/alumni-access-server':{assertParticipationOpen:async()=>{}},'@/lib/server-auth':{getAuthenticatedUser:async()=>user}});
+ const route=compile('app/api/platform/lesson-blocks/route.ts',{'@/lib/lesson-blocks':blocks,'@/lib/edu-workflows':{uuid:v=>typeof v==='string'&&/^[a-f\d-]{36}$/.test(v)},'@/lib/supabase/admin':{createAdminClient:()=>db},'@/lib/alumni-practice-server':{readAlumniPractice:async()=>({enabled:graduate,draft:null})},'@/lib/alumni-access-server':{assertParticipationOpen:async()=>{if(graduate)throw Object.assign(new Error('공식 제출 종료'),{status:403});}},'@/lib/server-auth':{getAuthenticatedUser:async()=>user}});
  const get=(query=`lesson=${lesson}&enrollment=${id}`)=>route.GET(new Request('https://edu.test/api/platform/lesson-blocks?'+query));
  const post=(body,origin='https://edu.test')=>route.POST(new Request('https://edu.test/api/platform/lesson-blocks',{method:'POST',headers:origin?{origin,'content-type':'application/json'}:{},body:JSON.stringify(body)}));
  const draft={action:'draft',lessonId:lesson,enrollmentId:id,revision,expectedWriteId:null,requestId:id,values:{blocks:{answer:'답변'},checklist:[]}};
@@ -71,3 +71,12 @@ test('learner reopen is bound to the latest owned submission and cannot imperson
  assert.equal(result.status,200);assert.equal(h.calls[1].name,'edu_decide_lesson_blocks');assert.equal(h.calls[1].args.p_actor,id);assert.equal(h.calls[1].args.p_decision,'reopened');assert.equal(h.calls[1].args.p_feedback,'');
  const stale=harness();assert.equal((await stale.post({...stale.draft,action:'reopen',submissionId:id,expectedStateId:id})).status,409);assert.equal(stale.calls.length,1);
 });
+
+ test('graduates save personal practice and self-check quiz but cannot submit, reopen, or overwrite official drafts',async()=>{
+ const h=harness({graduate:true,savedSubmission:{id},savedDraft:{writeId:id,values:{blocks:{answer:'과거 공식 답변',quiz:{q:1}},checklist:[]}}});
+ const read=await h.get();assert.equal((await read.json()).practice.enabled,true);
+ const personal=await h.post({...h.draft,action:'practice-draft',p_actor:lesson});assert.equal(personal.status,200);
+ assert.equal(h.calls.at(-1).name,'edu_save_alumni_practice');assert.equal(h.calls.at(-1).args.p_actor,id);
+ const quiz=await h.post({...h.draft,action:'grade',blockId:'quiz',values:{blocks:{quiz:{q:1}},checklist:[]}});assert.equal(quiz.status,200);assert.equal((await quiz.json()).result.passed,true);
+ for(const action of ['draft','submit','reopen']){const before=h.calls.length;assert.equal((await h.post({...h.draft,action,writeId:id,submissionId:id,expectedStateId:id})).status,403);assert.equal(h.calls.length,before);}
+ });

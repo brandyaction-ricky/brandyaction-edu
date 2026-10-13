@@ -11,6 +11,7 @@ function failure(error: unknown) {
   const e = error as { message?: string; status?: number };
   if (e.status && e.status < 500) return reply({ error: e.message }, e.status);
   const errors: Record<string, [string, number]> = {
+    ALUMNI_PARTICIPATION_CLOSED: ['졸업한 수강생의 공식 제출·멘토 검수는 종료되었습니다.', 403],
     BLOCK_FORBIDDEN: ['제출물을 검토할 권한 또는 유효한 수강권이 없습니다.', 403],
     BLOCK_NOT_FOUND: ['제출물을 찾지 못했습니다.', 404],
     BLOCK_REVIEW_CHANGED: ['검토 상태가 바뀌었습니다. 최신 제출물을 다시 확인해 주세요.', 409],

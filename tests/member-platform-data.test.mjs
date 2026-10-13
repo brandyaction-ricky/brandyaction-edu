@@ -95,6 +95,14 @@ test('enrolled dashboard starts independent curriculum and progress reads togeth
   assert.deepEqual(result.lesson_progress, []);
 });
 
+test('learner views fetch immediate alumni re-entry status for the cohort', async () => {
+  const enrollment = { id: 'owned', user_id: 'owner', course_id: 'course', cohort_id: 'cohort', status: 'active' };
+  const member = harness({ enrollments: [enrollment], cohorts: [{ id: 'cohort', course_id: 'course', status: 'recruiting', alumni_access_on_enroll: true }] });
+  const result = await member.read('owner', 'classes');
+  assert.equal(result.cohorts[0].alumni_access_on_enroll, true);
+  assert.match(member.calls.find(call => call.table === 'cohorts').columns, /alumni_access_on_enroll/);
+});
+
 test('learning requires a current owner enrollment before requesting content', async () => {
   const denied = harness({ enrollments: [{ id: 'other', user_id: 'other', course_id: 'private', status: 'active' }] });
   assert.deepEqual(await denied.read('owner', 'learn', 'other'), { enrollments: [] });

@@ -3,6 +3,7 @@
   "framework": "nextjs",
   "git": {
     "deploymentEnabled": {
+      "codex/edu-alumni-practice-20261013": false,
       "codex/edu-question-read-loop-20261012": false,
       "codex/edu-request-batch-20261012": false,
       "codex/edu-checkout-methods-20261012": false,
@@ -91,7 +92,8 @@
       "codex/edu-callout-drag-20261010": false,
       "codex/edu-admin-ux-audit-20261010": false,
       "codex/edu-marketing-ux-20261012": false,
-      "codex/edu-marketing-qa-46241cbc-20261012": false
+      "codex/edu-marketing-qa-46241cbc-20261012": false,
+      "codex/edu-learning-care-insights-20261013": false
     }
   },
   "regions": [

@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { uuid } from '@/lib/edu-workflows';
 import { assessBlockCompletion, gradeBlockQuiz, publicLessonBlocks, validateBlockAnswers, validateLessonBlocks } from '@/lib/lesson-blocks';
+import { readAlumniPractice } from '@/lib/alumni-practice-server';
 import { assertParticipationOpen } from '@/lib/alumni-access-server';
 
 const reply = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'private, no-store' } });
@@ -30,6 +31,7 @@ async function readBody(request: Request) {
 function failure(error: unknown) {
   const e = error as { status?: number; message?: string };
   const known: Record<string, [string, number]> = {
+    ALUMNI_PARTICIPATION_CLOSED: ['졸업 후 공식 제출과 멘토 검수는 종료됩니다. 개인 실습은 계속 이용할 수 있습니다.', 403],
     ONGOING_INVALID: ['지속 챌린지는 자체 완료 방식으로 설정하고 일차 진행 번호를 비워 주세요.', 400],
     ONGOING_PERIOD_REQUIRED: ['지속 챌린지의 기간별 답변 화면을 다시 열어 주세요.', 409],
     BLOCK_FORBIDDEN: ['이 학습에 접근할 권한이 없습니다.', 403],
@@ -37,6 +39,7 @@ function failure(error: unknown) {
     BLOCK_CONTENT_CHANGED: ['수업 내용이 변경되었습니다. 작성한 답변은 보관하고 최신 수업을 다시 열어 주세요.', 409],
     BLOCK_DRAFT_CHANGED: ['다른 화면에서 답변을 저장했습니다. 현재 입력을 보관하고 저장된 답변을 확인해 주세요.', 409],
     BLOCK_REQUEST_REUSED: ['이미 사용한 저장 요청입니다. 내용을 확인한 뒤 다시 저장해 주세요.', 409],
+    BLOCK_FILE_INVALID: ['다른 수강권의 첨부파일을 사용할 수 없습니다.', 400],
     BLOCK_MEDIA_INVALID: ['파일 업로드가 끝났는지, 같은 상품의 자료인지 확인해 주세요.', 400],
     BLOCK_INVALID: ['저장할 내용을 확인해 주세요.', 400],
     BLOCK_ALREADY_SUBMITTED: ['이미 제출한 답변입니다. 제출 기록을 다시 확인해 주세요.', 409],
@@ -77,7 +80,9 @@ export async function GET(request: Request) {
     if (error) throw error;
     if (!data) fail('학습 내용을 찾을 수 없습니다.', 404);
     const document = data.document ? validateLessonBlocks(data.document) : null;
-    return reply({ ...data, document: document && (data.editable === true ? document : publicLessonBlocks(document)) });
+    const enrollment = optionalId(params.get('enrollment'));
+    const practice = enrollment && data.revision ? await readAlumniPractice(db, user.id, requiredId(params.get('lesson')), enrollment, data.revision) : null;
+    return reply({ ...data, practice, document: document && (data.editable === true ? document : publicLessonBlocks(document)) });
   } catch (error) { return failure(error); }
 }
 
@@ -97,9 +102,9 @@ export async function POST(request: Request) {
       if (error) throw error;
       return reply(data);
     }
-    if (!['draft', 'grade', 'submit', 'reopen'].includes(body.action)) fail('요청 종류를 확인해 주세요.');
+    if (!['draft', 'practice-draft', 'grade', 'submit', 'reopen'].includes(body.action)) fail('요청 종류를 확인해 주세요.');
     const enrollment = requiredId(body.enrollmentId), revision = requiredId(body.revision);
-    await assertParticipationOpen(user.id, enrollment);
+    if (body.action !== 'practice-draft' && body.action !== 'grade') await assertParticipationOpen(user.id, enrollment);
     const loaded = await db.rpc('edu_read_lesson_blocks', { p_actor: user.id, p_lesson: lesson, p_enrollment: enrollment, p_revision: revision });
     if (loaded.error) throw loaded.error;
     if (!loaded.data?.document) fail('학습 내용을 찾을 수 없습니다.', 404);
@@ -136,7 +141,7 @@ export async function POST(request: Request) {
       const answers = values.blocks[block.id];
       return reply({ revision, blockId: block.id, result: gradeBlockQuiz(block, typeof answers === 'object' ? answers : {}) });
     }
-    const { data, error } = await db.rpc('edu_save_block_draft', {
+    const { data, error } = await db.rpc(body.action === 'practice-draft' ? 'edu_save_alumni_practice' : 'edu_save_block_draft', {
       p_actor: user.id, p_lesson: lesson, p_enrollment: enrollment, p_revision: revision,
       p_expected_write: optionalId(body.expectedWriteId), p_write: requiredId(body.requestId), p_values: values,
     });

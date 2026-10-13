@@ -10,6 +10,7 @@ import { BlockSubmissionHistory } from './lesson-block-submission-history';
 
 type Snapshot = {
   ongoing?: string | null;
+  practice?: { enabled: boolean; draft: Snapshot['draft'] } | null;
   document: PublicBlockDocument | null; revision: string | null; currentRevision: string | null;
   draft: { values: LessonBlockAnswers; writeId: string; updatedAt: string } | null;
   previousDrafts: { revision: string; updatedAt: string }[];
@@ -26,8 +27,11 @@ async function request<T>(url: string, body?: unknown, signal?: AbortSignal): Pr
 const statusText: Record<AutosaveState['phase'], string> = { saved: '답변 저장됨', dirty: '답변 저장 대기 중', saving: '답변 저장 중…', error: '답변을 저장하지 못했습니다.', conflict: '저장된 답변과 현재 입력이 다릅니다.' };
 
 function SessionContent({ snapshot, lessonId, enrollmentId, readOnly, onSelectRevision, onCompleted }: { snapshot: Snapshot; lessonId: string; enrollmentId: string; readOnly: boolean; onSelectRevision: (revision: string | null) => void; onCompleted?: () => void }) {
-  const [values, setValues] = useState<LessonBlockAnswers>(() => snapshot.draft?.values || { blocks: {}, checklist: [] });
-  const [status, setStatus] = useState<AutosaveState>({ phase: 'saved', message: '', updatedAt: snapshot.draft?.updatedAt || null });
+  const practice = snapshot.practice?.enabled === true;
+  const draft = practice ? snapshot.practice?.draft : snapshot.draft;
+  const canPractice = practice && snapshot.revision === snapshot.currentRevision;
+  const [values, setValues] = useState<LessonBlockAnswers>(() => draft?.values || snapshot.draft?.values || { blocks: {}, checklist: [] });
+  const [status, setStatus] = useState<AutosaveState>({ phase: 'saved', message: '', updatedAt: draft?.updatedAt || null });
   const saver = useRef<LessonBlockAutosave | null>(null);
   const valuesRef = useRef(values);
   const uploadsRef = useRef(new Set<string>());
@@ -40,20 +44,20 @@ function SessionContent({ snapshot, lessonId, enrollmentId, readOnly, onSelectRe
   const submissionRequest = useRef<{ requestId: string; writeId: string } | null>(null);
   const reopenRequest = useRef<string | null>(null);
   const [reopening, setReopening] = useState(false);
-  const locked = !canEditBlockSubmission(submission);
+  const locked = !practice && !canEditBlockSubmission(submission);
   const submissionState = submission && blockSubmissionState(submission);
   const submissionHistory = submission ? [submission, ...(snapshot.submissions || []).filter(item => item.id !== submission.id)] : snapshot.submissions || [];
   const credited = useRef(false);
   useEffect(() => {
-    if (!historical && !credited.current && ['approved', 'completed'].includes(submissionState || '')) { credited.current = true; onCompleted?.(); }
-  }, [historical, submissionState, onCompleted]);
+    if (!practice && !historical && !credited.current && ['approved', 'completed'].includes(submissionState || '')) { credited.current = true; onCompleted?.(); }
+  }, [practice, historical, submissionState, onCompleted]);
   const policy = snapshot.document?.completion || defaultBlockCompletion;
   const missing = snapshot.document ? missingBlockRequirements(snapshot.document, values) : [];
   useEffect(() => {
-    if (readOnly || historical || !canEditBlockSubmission(snapshot.submission)) return;
+    if ((readOnly && !canPractice) || historical || (!practice && !canEditBlockSubmission(snapshot.submission))) return;
     // Create inside the effect: StrictMode setup/cleanup must not leave a
     // disposed controller attached to a newly mounted lesson.
-    const autosave = new LessonBlockAutosave(snapshot.draft?.values || { blocks: {}, checklist: [] }, snapshot.draft?.writeId || null, write => request('/api/platform/lesson-blocks', { action: 'draft', lessonId, enrollmentId, revision: snapshot.revision, ...write }));
+    const autosave = new LessonBlockAutosave(draft?.values || snapshot.draft?.values || { blocks: {}, checklist: [] }, draft?.writeId || null, write => request('/api/platform/lesson-blocks', { action: practice ? 'practice-draft' : 'draft', lessonId, enrollmentId, revision: snapshot.revision, ...write }));
     saver.current = autosave;
     const unsubscribe = autosave.subscribe(() => setStatus(autosave.getSnapshot()));
     function unload(event: BeforeUnloadEvent) { if (autosave.hasUnsaved() || uploadsRef.current.size > 0) { event.preventDefault(); event.returnValue = ''; } }
@@ -68,7 +72,7 @@ function SessionContent({ snapshot, lessonId, enrollmentId, readOnly, onSelectRe
     window.addEventListener('beforeunload', unload);
     document.addEventListener('click', leaving, true);
     return () => { window.removeEventListener('beforeunload', unload); document.removeEventListener('click', leaving, true); unsubscribe(); autosave.dispose(); saver.current = null; };
-  }, [snapshot, lessonId, enrollmentId, historical, readOnly]);
+  }, [snapshot, lessonId, enrollmentId, historical, readOnly, practice, canPractice, draft]);
   function change(next: LessonBlockAnswers) { valuesRef.current = next; setValues(next); saver.current?.change(next); }
   function select(revision: string | null) {
     if ((saver.current?.hasUnsaved() || uploadsRef.current.size > 0) && !window.confirm('저장되지 않은 답변이 있습니다. 현재 입력을 보관한 뒤 다른 기록을 열어 주세요. 계속 이동할까요?')) return;
@@ -79,7 +83,7 @@ function SessionContent({ snapshot, lessonId, enrollmentId, readOnly, onSelectRe
     return data.result;
   }
   async function submit() {
-    if (submitting || historical || locked || uploadsRef.current.size > 0 || !saver.current) return;
+    if (practice || readOnly || submitting || historical || locked || uploadsRef.current.size > 0 || !saver.current) return;
     if (missing.length) { setSubmitError('아래 필수 항목을 먼저 완료해 주세요.'); return; }
     setSubmitting(true); setSubmitError('');
     try {
@@ -97,7 +101,7 @@ function SessionContent({ snapshot, lessonId, enrollmentId, readOnly, onSelectRe
     finally { setSubmitting(false); }
   }
   async function reopen() {
-    if (!submission || reopening || !window.confirm('제출한 답변을 수정할까요? 이전 제출물과 검토 의견은 보관되며 이미 완료한 진도는 유지됩니다.')) return;
+    if (practice || readOnly || !submission || reopening || !window.confirm('제출한 답변을 수정할까요? 이전 제출물과 검토 의견은 보관되며 이미 완료한 진도는 유지됩니다.')) return;
     setReopening(true); setSubmitError('');
     reopenRequest.current ??= crypto.randomUUID();
     try {
@@ -114,13 +118,14 @@ function SessionContent({ snapshot, lessonId, enrollmentId, readOnly, onSelectRe
     const anchor = document.createElement('a'); anchor.href = url; anchor.download = '내-학습-답변.json'; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   return <section className="lesson-block-session" aria-label="학습 내용과 내 답변">
-    {readOnly ? <div className="lb-session-notice">졸업생 열람 모드입니다. 공개된 최신 수업과 기존 답변을 볼 수 있습니다.</div>
+    {practice && <div className="lb-session-notice">졸업생 개인 실습입니다. 입력·저장과 프롬프트 생성은 계속 이용할 수 있습니다. 공식 미션 제출과 멘토 검수는 종료되었습니다.</div>}
+    {readOnly && !practice ? <div className="lb-session-notice">졸업생 열람 모드입니다. 공개된 최신 수업과 기존 답변을 볼 수 있습니다.</div>
       : historical ? <div className="lb-session-notice">이전 수업에서 작성한 답변입니다. 읽기만 할 수 있습니다. <button className="btn small" type="button" onClick={() => select(null)}>현재 수업으로</button></div>
-      : <div className="lb-save-status"><span role="status" aria-live="polite">{statusText[status.phase]}</span><button type="button" className="btn small" disabled={status.phase === 'saved' || status.phase === 'saving' || status.phase === 'conflict'} onClick={() => void saver.current?.flush()}>{status.phase === 'error' ? '저장 다시 시도' : '지금 저장'}</button></div>}
+      : <div className="lb-save-status"><span role="status" aria-live="polite">{practice ? '개인 실습 · ' : ''}{statusText[status.phase]}</span><button type="button" className="btn small" disabled={status.phase === 'saved' || status.phase === 'saving' || status.phase === 'conflict'} onClick={() => void saver.current?.flush()}>{status.phase === 'error' ? '저장 다시 시도' : '지금 저장'}</button></div>}
     {(status.phase === 'error' || status.phase === 'conflict') && <div className="lb-session-notice" role="alert"><p>{status.message} 현재 입력은 이 화면에 남아 있습니다.</p><button className="btn small" type="button" onClick={downloadAnswers}>현재 답변 내려받기</button>{status.phase === 'conflict' && <button className="btn small" type="button" onClick={() => select(null)}>저장된 답변 다시 확인</button>}</div>}
     {submission?.feedback && <div className="lb-session-notice"><h3>멘토 피드백</h3><p className="reading-copy">{submission.feedback}</p></div>}
-    {snapshot.document && <LessonBlockView floatingAudio document={snapshot.document} values={values} onChange={change} fileContext={{ lessonId, enrollmentId, revision: snapshot.revision! }} onFilePending={filePending} onAnswerChange={(id, value) => change({ ...valuesRef.current, blocks: { ...valuesRef.current.blocks, [id]: value } })} readOnly={readOnly || historical || submitting || submitUncertain || locked} grade={readOnly || historical || locked ? undefined : grade} />}
-    {!readOnly && !historical && <section className="lb-session-notice" aria-label="학습 제출">
+    {snapshot.document && <LessonBlockView floatingAudio document={snapshot.document} values={values} onChange={change} fileContext={{ lessonId, enrollmentId, revision: snapshot.revision! }} onFilePending={filePending} onAnswerChange={(id, value) => change({ ...valuesRef.current, blocks: { ...valuesRef.current.blocks, [id]: value } })} filesReadOnly={practice} readOnly={(readOnly && !canPractice) || historical || submitting || submitUncertain || locked} grade={(readOnly && !canPractice) || historical || locked ? undefined : grade} />}
+    {!practice && !readOnly && !historical && <section className="lb-session-notice" aria-label="학습 제출">
       {locked ? <>
         <p role="status">{submissionState === 'completed' ? '학습을 완료했습니다.' : submissionState === 'approved' ? submission?.approvalKind === 'automatic' ? '자동승인되어 학습을 완료했습니다.' : '멘토가 승인했습니다. 학습을 완료했습니다.' : '미션을 제출했습니다. 멘토의 확인을 기다려 주세요.'}</p>
         <button className="btn small" type="button" disabled={reopening} onClick={() => select(null)}>검토 결과 새로고침</button>
@@ -162,8 +167,8 @@ function SessionLoader({ lessonId, enrollmentId, readOnly = false, fallback, onC
   function select(revision: string | null) { setSelection(previous => ({ revision, reload: previous.reload + 1 })); }
   if (loaded?.key !== key) return <p role="status">학습 내용과 저장된 답변을 불러오고 있습니다.</p>;
   if (loaded.error) return <div className="lb-session-notice" role="alert"><p>{loaded.error}</p><button type="button" className="btn small" onClick={() => select(selection.revision)}>다시 불러오기</button></div>;
-  if (loaded.snapshot?.ongoing) return <OngoingLessonSession lessonId={lessonId} enrollmentId={enrollmentId} readOnly={readOnly} />;
+  if (loaded.snapshot?.ongoing && !loaded.snapshot.practice?.enabled) return <OngoingLessonSession lessonId={lessonId} enrollmentId={enrollmentId} readOnly={readOnly} />;
   if (!loaded.snapshot?.document) return <>{fallback}</>;
   if (!canRenderLessonBlocks(loaded.snapshot.document)) return <p role="alert">학습 도구를 준비하고 있습니다. 잠시 후 다시 확인해 주세요.</p>;
-  return <SessionContent key={key} snapshot={loaded.snapshot} lessonId={lessonId} enrollmentId={enrollmentId} readOnly={readOnly} onSelectRevision={select} onCompleted={onCompleted} />;
+  return <><SessionContent key={key} snapshot={loaded.snapshot} lessonId={lessonId} enrollmentId={enrollmentId} readOnly={readOnly} onSelectRevision={select} onCompleted={onCompleted} />{loaded.snapshot.ongoing && loaded.snapshot.practice?.enabled && <details className="mt24"><summary>졸업 전 기간별 챌린지 기록 보기</summary><OngoingLessonSession lessonId={lessonId} enrollmentId={enrollmentId} readOnly /></details>}</>;
 }
