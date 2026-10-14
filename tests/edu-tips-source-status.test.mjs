@@ -1,5 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {readFileSync,writeFileSync} from 'node:fs';import{createRequire}from'node:module';import ts from'typescript';
+import {tmpdir} from 'node:os';import {join} from 'node:path';
 import {candidate} from './helpers/edu-tips-candidate-loader.mjs';
 const require=createRequire(import.meta.url),status=candidate('edu-tips-source-status');
 const data={registration_pending:1,registration_attention:0,projection_pending:2,projection_attention:1,withdrawal_pending:3,withdrawal_attention:0,unclassified:0,identity_enabled:true,publisher_enabled:true,withdrawal_enabled:true};
@@ -23,5 +24,5 @@ test('admin notice hides while OFF and distinguishes pending/attention from dele
  const render=s=>renderToStaticMarkup(React.createElement(out.TipsSourcePanel,{snapshot:s}));assert.equal(render({state:'disabled'}),'');
  const html=render(status.classifySourceStatus(data));assert.ok(html.includes('role="alert"'));assert.ok(html.includes('등록 대기 1건'));assert.ok(html.includes('삭제 완료를 뜻하지 않습니다'));
  const pending=render({...status.classifySourceStatus(data),state:'pending'});assert.ok(pending.includes('role="status"'));
- writeFileSync('/private/tmp/edu-hmac-source-panel-QA.html','<!doctype html><html lang="ko"><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;margin:24px;color:#20252a;background:#f5f6f7}.panel{padding:24px;background:white;border:1px solid #ddd;border-radius:12px}'+readFileSync(new URL('../app/ui/final/tips-erasure-monitor-notice.css',import.meta.url),'utf8')+'</style><body class="edu-admin">'+html+'</body></html>');
+ writeFileSync(join(tmpdir(),'edu-hmac-source-panel-QA.html'),'<!doctype html><html lang="ko"><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;margin:24px;color:#20252a;background:#f5f6f7}.panel{padding:24px;background:white;border:1px solid #ddd;border-radius:12px}'+readFileSync(new URL('../app/ui/final/tips-erasure-monitor-notice.css',import.meta.url),'utf8')+'</style><body class="edu-admin">'+html+'</body></html>');
 });
