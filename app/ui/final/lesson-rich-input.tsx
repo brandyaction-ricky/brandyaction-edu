@@ -50,6 +50,7 @@ export const LessonQuote = Blockquote.extend({
   addInputRules() { return [wrappingInputRule({ find: /^" $/, type: this.type })]; },
 });
 const LessonDetails = Details.extend({
+  priority: 1000,
   draggable: true,
   addKeyboardShortcuts() {
     return {
