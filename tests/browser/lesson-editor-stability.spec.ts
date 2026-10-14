@@ -8,7 +8,7 @@ async function paste(page: Page, html: string) {
   await canvas(page).evaluate((el, clipboardData) => el.dispatchEvent(new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true })), data);
   await data.dispose();
 }
-test('Enter on a closed toggle title opens its content and keeps new text inside', async ({ page }) => {
+test('Enter on a closed toggle title opens its content and keeps new text inside', async ({ page }, info) => {
   const server = await backend(page);
   server.get().payload.blocks.document.blocks = [{ id: 'body', type: 'text', content: serializeLessonDocument({ type: 'doc', content: [
     { type: 'details', content: [{ type: 'detailsSummary', content: [{ type: 'text', text: '접어 둔 제목' }] }, { type: 'detailsContent', content: [{ type: 'paragraph' }] }] },
@@ -27,7 +27,7 @@ test('Enter on a closed toggle title opens its content and keeps new text inside
   await expect(doc).toContainText('토글 바깥 새 문단');
   await expect(toggle).not.toContainText('토글 바깥 새 문단');
   await expect.poll(() => server.get().payload.blocks.document.blocks[0].content).toContain('토글 바깥 새 문단');
-  await doc.screenshot({ path: '/private/tmp/edu-editor-toggle-review.png' });
+  await doc.screenshot({ path: info.outputPath('toggle-review.png') });
 });
 test('empty paragraphs with and without move handles have no repeated placeholder', async ({ page }) => {
   const server = await backend(page);
