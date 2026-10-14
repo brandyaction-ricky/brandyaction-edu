@@ -23,7 +23,11 @@ const movableBlock: NodeViewRenderer = ({ node, editor, getPos, HTMLAttributes }
   handle.innerHTML = '<svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg>';
   const select = () => {
     const pos = getPos();
-    if (editor.isEditable && typeof pos === 'number') editor.view.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, pos)));
+    if (editor.isEditable && typeof pos === 'number') {
+      editor.view.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, pos)));
+      // Keep subsequent IME input in the editor, not on the non-editable handle.
+      editor.view.focus();
+    }
   };
   handle.onclick = select;
   handle.onkeydown = event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); select(); } };
