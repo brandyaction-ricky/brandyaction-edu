@@ -1,7 +1,9 @@
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { validPersonalizationChoices } from '@/lib/personalization-consent';
+import { consentSourceAfterSave } from '@/lib/edu-tips-source-server';
+export const maxDuration = 60;
 const reply = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { 'Cache-Control': 'private, no-store' } });
 const uuid = (v: unknown) => typeof v === 'string' && /^[a-f\d]{8}-[a-f\d]{4}-[1-5][a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}$/i.test(v);
 function failure(message?: string) {
@@ -14,6 +16,11 @@ async function execute(args: Record<string, unknown>) {
   const { data, error } = await createAdminClient().rpc('edu_personalization_consent', args);
   if (error) return failure(error.message);
   const accepting = process.env.EDU_PERSONALIZATION_CONSENT_ENABLED === 'true' && !!data?.terms;
+  if (args.p_request && (process.env.EDU_TIPS_IDENTITY_RUNTIME_ENABLED === 'true' || process.env.EDU_TIPS_CONTROL_RUNTIME_ENABLED === 'true')) {
+    // Register after a successful commit, never on GET/failure. Dispatch errors
+    // cannot make a saved consent look failed; durable DB jobs retain retries.
+    try { after(async () => { try { await consentSourceAfterSave(String(args.p_member)); } catch { /* Guarded cron repairs pending jobs. */ } }); } catch { /* DB queue remains authoritative. */ }
+  }
   return reply({ ...data, accepting, eligible: accepting && data?.eligible === true });
 }
 export async function GET() {

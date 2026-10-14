@@ -3,7 +3,8 @@ import { createEduIdentityCandidate, IDENTITY_PROFILE, newConsentEpoch, type Ide
 import { CONTROL_VERSION, isEduControlBlock, type ControlBlock, type ControlResult } from './edu-tips-control-candidate';
 import { deliverEduControlLeaseCandidate, type ControlLease } from './edu-tips-control-worker-candidate';
 
-// Server-only adapters; intentionally not wired to consent routes or cron.
+// Server-only adapters. The source runtime wires these to consent/worker routes
+// behind independent default-OFF gates; no deployed keys/receiver are assumed.
 export type CandidateRpc = (name: string, args: Record<string, unknown>, signal?: AbortSignal) => Promise<{ data: unknown; error: unknown }>;
 async function callRpc(rpc: CandidateRpc, name: string, args: Record<string, unknown>) {
   const controller = new AbortController();

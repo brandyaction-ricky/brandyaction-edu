@@ -1,3 +1,28 @@
+# 최신 — EDU 동의 저장·등록·철회 runtime 연결 후보 (2026-10-14)
+
+현재 단계: DEV 후보 / 정식 rc.2 보존, 새 identity/control은 미합의 draft.1.
+
+이번 묶음에서 실제 consent PUT 저장 성공 후 Next after()를 통해 인증된 회원의 등록 작업과 별도 철회 큐를 시도하도록 연결했습니다. GET·인증/출처/입력/DB 실패에서는 실행하지 않습니다. 후속 작업이나 after 스케줄 실패가 저장 성공 응답을 뒤집지 않습니다. 클라이언트가 회원/customer/epoch를 지정하지 못합니다.
+
+- SQL 20261014054801_edu_tips_identity_jobs_candidate.sql: 성공한 현재 분석·해외 동의와 등록 대기 작업이 같은 트랜잭션으로 남습니다. 설치 기본값은 이전 identity_enabled=false이며 기존 회원 백필이나 키 등록은 없습니다. SKIP LOCKED·60초 lease·정확 revision/lease CAS, 장애 재시도, 철회·탈퇴·내부/관리자 전환 취소와 완료 시 실제 subject/현재 동의 재확인을 추가했습니다. 브라우저 역할은 대기 큐 및 RPC에 접근할 수 없습니다.
+- /api/cron/tips-source-candidate: callback 유실/등록·통신 실패를 복구할 독립 worker 경로입니다. GET만 허용하고 HEAD는405, 기본OFF, Cron 인증·환경·목적별 키·정확 host/profile/version을 검사합니다. 응답은 운영 건수만 반환합니다. **Vercel 예약 일정은 추가하지 않았습니다.**
+- 분석 수집·번호 등록 OFF 또는 번호 설정 오류가 별도로 유효한 철회 통신을 막지 않게 분리했습니다. 부적절한 설정은 cron503으로 남기면서 유효한 철회는 처리합니다. 정확 blocked 확인만 저장하며 erasure completed/최종 ACK로 승격하지 않습니다.
+- 목적별 HMAC 키는 서버 Secret만 사용하고 SQL로 전달하지 않습니다. 새 runtime 기본OFF, 실제 origin/kid/consumer/Secret 미등록. EDU_TIPS_HMAC_PUBLISHER_READY는 **활성화 사전 조건을 나타내는 운영자 gate이며 publisher 구현/이행 증거가 아닙니다.** 현재 난수 record allocator→HMAC publisher/profile 전환·전체 snapshot 이행이 끝나기 전 켜면 안 됩니다.
+
+검수: 전체 단위1,457 통과, 관련33 통과, TypeScript·변경 ESLint 오류/경고0·로컬 webpack build 통과. PGlite에 실제 후보 SQL 적용·RPC를 실행하고 Next route/mock after와 합성 mock HTTP를 검수했습니다. 등록 응답 유실/pending epoch 재사용, cron 복구, 철회 후 stale lease, B보존, 광고 revision에서 ID 유지, 내부 회원 제외, 완료 증거 없는 성공 거절, 수집OFF·번호 설정 오류 중 철회 독립 전송을 확인했습니다. 실제 두 PostgreSQL 연결·정식 DEV HTTP·TIPS 원자적 차단·미국 Modal/모델/백업은 미검수입니다. UI 화면 변경이 없어 브라우저 UI 검수는 미실행입니다.
+
+전 단계 c5b98e1의 필수 CI는 성공·migrate-dev SKIPPED를 읽기 확인했습니다. 아래 새 연결부 후보의 CI는 별도로 확인하며 이전 성공을 승계하지 않습니다. 이 브랜치 자동배포false 유지. 공유DEV/운영 코드·원격 DB·실제 키/환경변수·고객/TIPS 전송·고객발송 변경0.
+
+남은 독립/공동 작업: HMAC publisher/profile migration·전체 snapshot 이행, 관리자 화면 source 등록/철회 경보 표시, 정식 TIPS receiver URL/runtime/전용키 및 D1/D2/D4 합의, 별도 승인 후 실제 DEV 다중PG/HTTP·원격 경쟁/재시도/receipt/연속ACK·격리복원 공동 검수입니다. 이번 묶음은 원천 저장 후 runtime 연결 후보까지이며 전체 고객별 연동 완료가 아닙니다.
+
+MYIN은 기존 ID 산식을 유지하면서 즉시 철회 push/재시도, 과거5/30/5 혼합 authority·pull 호환, 키 교체·복구/원격 eligibility 경쟁 검수를 준비해야 합니다. 10/12 담당 회신은 그날 기준 보고이며 오늘 직접 MYIN runtime 확인이 아닙니다. MYIN 코드·34파일을 여기서 변경하지 않습니다.
+
+중간 자료를 보내지 않고 이 묶음의 구현·검수 결과를 한 최종 통합 자료로 정리합니다. 실제 공동 검수/공유DEV/SQL·설정 활성화·운영은 기존 별도 승인 후입니다.
+
+---
+
+## 이전 후보 이력 (아래 수치·미연결 설명은 당시 상태)
+
 > 최신 결과: 로컬 후보 보완 완료. 전체단위1,448건·관련23건·최종SQL관련12건·타입/변경ESLint/빌드 통과. 외부합의/실제2PG·HTTP 공동 검수/route·publisher·cron·알림UI/운영은 미완료. 이전 설명은 당시 후보의 이력입니다.
 
 # EDU TIPS identity and control candidate — local batch, 2026-10-14

@@ -16,3 +16,18 @@ test('personalization route protects identity/origin and lets users withdraw whi
  assert.equal((await h({error:{message:'PERSONALIZATION_TERMS'}}).put(body)).status,409);
  assert.doesNotMatch(await(await h({error:{message:'private DB detail'}}).GET()).text(),/private DB detail/);
 });
+test('post-save source work cannot break consent response; GET/auth/origin/failed commits never schedule it',async t=>{
+ const previous={control:process.env.EDU_TIPS_CONTROL_RUNTIME_ENABLED,personalization:process.env.EDU_PERSONALIZATION_CONSENT_ENABLED};
+ t.after(()=>{for(const[k,v]of[['EDU_TIPS_CONTROL_RUNTIME_ENABLED',previous.control],['EDU_PERSONALIZATION_CONSENT_ENABLED',previous.personalization]])if(v===undefined)delete process.env[k];else process.env[k]=v;});
+ process.env.EDU_TIPS_CONTROL_RUNTIME_ENABLED='true';delete process.env.EDU_PERSONALIZATION_CONSENT_ENABLED;
+ const callbacks=[],commits=[],sources=[];
+ const route=compile('app/api/account/personalization-consent/route.ts',{'next/server':{NextResponse:{json:(b,o)=>Response.json(b,o)},after:fn=>callbacks.push(fn)},'@/lib/server-auth':{getAuthenticatedUser:async()=>({id})},'@/lib/supabase/admin':{createAdminClient:()=>({rpc:async(n,a)=>{commits.push(a);return{data:{choices:logic.noPersonalization,revision:id,eligible:false},error:null};}})},'@/lib/personalization-consent':logic,'@/lib/edu-tips-source-server':{consentSourceAfterSave:async member=>{sources.push(member);throw Error('background transport unavailable');}}});
+ const req={requestId:id,expectedRevision:null,wordingVersion:null,choices:logic.noPersonalization,memberId:'untrusted'};
+ const res=await route.PUT(new Request('https://edu.test/api/account/personalization-consent',{method:'PUT',headers:{origin:'https://edu.test'},body:JSON.stringify(req)}));
+ assert.equal(res.status,200);assert.equal(callbacks.length,1);assert.equal(commits[0].p_member,id);assert.deepEqual(sources,[]);
+ await callbacks[0]();assert.deepEqual(sources,[id]);assert.equal((await res.json()).eligible,false);
+ await route.GET();assert.equal(callbacks.length,1);
+ const failed=compile('app/api/account/personalization-consent/route.ts',{'next/server':{NextResponse:{json:(b,o)=>Response.json(b,o)},after:()=>{throw Error('must not schedule');}},'@/lib/server-auth':{getAuthenticatedUser:async()=>({id})},'@/lib/supabase/admin':{createAdminClient:()=>({rpc:async()=>({data:null,error:{message:'PERSONALIZATION_CONFLICT'}})})},'@/lib/personalization-consent':logic});
+ const make=()=>new Request('https://edu.test/api/account/personalization-consent',{method:'PUT',headers:{origin:'https://edu.test'},body:JSON.stringify(req)});
+ assert.equal((await failed.PUT(make())).status,409);
+});
