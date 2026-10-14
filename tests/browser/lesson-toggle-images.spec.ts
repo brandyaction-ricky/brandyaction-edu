@@ -64,6 +64,8 @@ test('first nested image caption edit keeps the settings input and viewport in p
   await settings.getByRole('textbox', { name: '이미지 대체 설명', exact: true }).fill('새 대체 설명');
   await expect(image).toHaveClass(/is-selected/);
   await expect(canvas.locator('[data-type="details"]')).toHaveClass(/is-open/);
+  await expect(image).toBeVisible();
+  await expect(image.locator('img')).toBeVisible();
   await page.screenshot({ path: info.outputPath('toggle-caption-stable.png') });
   await page.getByRole('button', { name: '설정 닫기', exact: true }).click();
   await save(page);
