@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { EditorContent, useEditor, Node, Extension, ReactNodeViewRenderer, NodeViewWrapper, type NodeViewProps, type JSONContent, type Editor } from '@tiptap/react';
-import { NodeSelection, Plugin, TextSelection } from '@tiptap/pm/state';
+import { NodeSelection, Plugin, Selection, TextSelection } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import { lessonImageColumns } from '@/lib/lesson-image-row';
-import { Fragment, Slice } from '@tiptap/pm/model';
+import { Fragment, Mark, Slice, type Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { isHistoryTransaction } from '@tiptap/pm/history';
 import { publicLessonBlocks, type LessonBlock, type LessonBlockType } from '@/lib/lesson-blocks';
 import { blocksFromCanvas, canvasTextContent, duplicateLessonBlock, isCanvasText, lessonCanvasNodes, lessonClipboardNodes, type CanvasNode } from '@/lib/lesson-document-canvas';
@@ -223,7 +223,30 @@ export function LessonDocumentCanvas(props: Props) {
     if (!editor || JSON.stringify(props.blocks) === last.current) return;
     const open = [...editor.view.dom.querySelectorAll<HTMLElement>('[data-type="details"]')].map((element, index) => element.classList.contains('is-open') ? index : -1).filter(index => index >= 0);
     const nodes = lessonCanvasNodes(props.blocks).map(node => editor.schema.nodeFromJSON(node));
-    const tr = editor.state.tr.replaceWith(0, editor.state.doc.content.size, nodes).setMeta('lessonStructure', true);
+    const next = editor.schema.topNodeType.create(null, nodes);
+    const updates: { pos: number; node: ProseMirrorNode }[] = [];
+    function sameContent(before: ProseMirrorNode, after: ProseMirrorNode, pos: number): boolean {
+      if (before.eq(after)) return true;
+      if (before.type !== after.type || before.isText || before.childCount !== after.childCount || before.nodeSize !== after.nodeSize) return false;
+      // Settings change attributes, never text or marks. Keep the existing
+      // content DOM and toggle state instead of replacing the whole lesson.
+      if (!Mark.sameSet(before.marks, after.marks)) return false;
+      if (!before.sameMarkup(after)) updates.push({ pos, node: after });
+      let offset = pos + 1;
+      for (let index = 0; index < before.childCount; index++) {
+        if (!sameContent(before.child(index), after.child(index), offset)) return false;
+        offset += before.child(index).nodeSize;
+      }
+      return true;
+    }
+    const attributesOnly = sameContent(editor.state.doc, next, -1);
+    const tr = editor.state.tr.setMeta('lessonStructure', true);
+    if (attributesOnly) {
+      for (const { pos, node } of updates) tr.setNodeMarkup(pos, undefined, node.attrs, node.marks);
+      // Replacing even a leaf's attributes maps its node selection past it.
+      // Equal content/structure makes the original selection positions valid.
+      tr.setSelection(Selection.fromJSON(tr.doc, editor.state.selection.toJSON()));
+    } else tr.replaceWith(0, editor.state.doc.content.size, nodes);
     last.current = JSON.stringify(props.blocks); editor.view.dispatch(tr);
     const toggles = editor.view.dom.querySelectorAll<HTMLElement>('[data-type="details"]');
     open.forEach(index => { const toggle = toggles[index]; if (toggle && !toggle.classList.contains('is-open')) toggle.querySelector<HTMLButtonElement>(':scope > button')?.click(); });
