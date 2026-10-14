@@ -1,3 +1,28 @@
+# 최신 — EDU HMAC 발행 연결·전환 장벽·관리자 상태 후보 (2026-10-14)
+
+현재 단계: 에듀 독립 구현 로컬 QA 완료 / 정식 TIPS rc.2 보존, identity/control draft.1 미합의.
+
+서버가 현재 원천 UUID로 HMAC 번호를 만든 뒤 검증된 lease·자료 revision·동의에 묶어 원자적으로 저장/발행하도록 연결했습니다. 비밀키는 DB나 외부 payload로 보내지 않습니다. 기존 난수 allocator의 정확 설치 projector를 별도 내부 함수로 복사하고 기존 capture_member OID는 유지했습니다. 기존 상품 대소문자·TTL 정정·REST safeupdates·학습 분모 null 규칙을 그대로 재사용합니다.
+
+- SQL 20261014062210_edu_tips_hmac_projection_candidate.sql은 로컬 파일이며 실제 DB 미적용입니다. hmac 설정 기본OFF, 실제 key/consumer/회원 seed 없음. 새 hmac_subjects에 profile·record key version·목적별 fingerprint를 고정합니다. 기존 subject/ref를 덮어쓰거나 기술 rekey를 자동 승인하지 않습니다.
+- 신규 HMAC 등록은 별도 prepare/finish RPC만 사용합니다. old subject가 있으면 기존 번호/산식을 보존하며 migration_required로 보류합니다. 과거 요청의 원삭제 완료·모든 기록된 소비자의 완료/연속 ACK가 있어야 다음 세대를 허용하고, 원래 실제 선택 동의 receipt 검사도 유지합니다. 기술 세대와 법적 동의 증빙의 별도 이행 권위는 아직 합의/구현하지 않았으므로 자동 재동의를 만들지 않습니다. 테스트의 합성 완료 fixture는 실제 삭제 증거가 아닙니다.
+- 결제/환불/학습 저장은 HMAC 계산을 기다리지 않고 동일 트랜잭션에 projection job과 자료 준비 보류만 남깁니다. SQL private claim은 source UUID/날짜만 서버에 전달합니다. 서버는 목적별 key fingerprint를 확인하고 정확 descriptor를 HMAC으로 변환합니다. apply는 현재 subject/동의·lease/revision·profile/key pin·정확한 전체 ref 집합을 재검사합니다. 누락/중복/타 고객/변경 source/철회/키 불일치에서는 발행하지 않습니다.
+- 완료 전 public feed/recovery는 정상 빈 snapshot이나 오래된 자료를 반환하지 않습니다. 완성한 자료만 기존 outbox/fact_versions/publish sequence로 발행합니다. 같은 금액의 부분환불은 별도 ID, 원결제 정정은 같은 ID+revision, 학습은 member/cohort/KST일자별 같은 ID를 유지합니다. 원래 expiry는 늘리지 않습니다.
+- profile ON/OFF·key 설정 이동은 serving을 끄고 feed generation을 올려 옛 cursor의 조용한 연속 사용을 막습니다. 재개하려면 owner가 별도로 serving을 켜고 새 snapshot을 대조해야 합니다. 값 변경만으로 TIPS 계약을 자동 승격하지 않습니다. 철회/회원 hard delete는 pending job을 취소하고 member 연결을 지우되 원 customer/epoch·삭제 원장·refs를 보존합니다.
+- source runtime의 등록 뒤 projection worker를 연결했습니다. publisher·registration·withdrawal은 독립 기본OFF이며 Cron 인증·목적별 키 분리·환경/profile pin 검사를 유지합니다. 새 env는 EDU_TIPS_HMAC_PUBLISHER_ENABLED, EDU_TIPS_RECORD_KEY_VERSION, EDU_TIPS_SOURCE_STATUS_ENABLED이며 실제 값/키를 등록하지 않았습니다. cron schedule도 추가하지 않습니다.
+- 관리자 회원 화면에 연결 대기/확인 필요 notice를 준비했습니다. 읽기 전용 관리자 API는 role을 확인하고 건수만 반환합니다. 활성화 전 hide, 권한 없는 응답 hide, 자료 준비/철회 확인과 실제 삭제 완료를 구분합니다. 읽기 자체가 승인·발송·재시도 실행을 하지 않습니다.
+
+검수: 최종 전체단위1,471 통과·실패0, 관련47 통과, 타입·변경ESLint 오류/경고0·로컬 webpack build 통과. 마지막 SQL index/FK/전환 장벽 변경 이후 관련·전체 단위를 재실행했습니다. PGlite 실제 SQL/RPC+Node HMAC 및 mock HTTP/Next route에서 결제·부분환불·학습/정정·복구·pending/lease 응답유실·철회·다른 고객 보존·연속 ACK 장벽·source 불일치 rollback·키 pin·hard delete를 확인했습니다. 단일 PGlite 스케줄은 실제 두 PostgreSQL connection 경합/운영 성능 증거가 아닙니다.
+관리자 notice는 SSR 테스트와 별도 헤드리스 HTML 렌더로 390px/1024px 무가로넘침·문구/경보 role을 확인했습니다. 실제 로그인된 DEV 회원 화면 전체 E2E/공동 HTTP는 미실행. 처음 local Chromium은 sandbox MachPort 권한 오류, 격리 합성 HTML만 권한 확장 재실행으로 성공했습니다. CLI migration new도 local telemetry 권한 때문에 재실행했으며 DB 적용/연결은 없었습니다.
+
+실행 경계: 같은 격리 codex 브랜치/Draft PR447, 자동 Vercel 배포false. 공유DEV/운영/원격SQL·환경변수·실제키/고객별전송·발송·MYIN repo 변경0. 새 SHA CI는 별도 확인하며 이전 후보 성공을 승계하지 않습니다. 정식 EDU schema ba95...·MYIN34파일 보존, 후보와 정식 계약을 구분한 통합 파일 하나로 정리합니다.
+
+이후 조건: D1/D2/D4 profile·이행/epoch/서명 의미 합의, TIPS 실제 정식 DEV receiver/runtimeSHA·목적별 Secret/kid와 영구 원장·block commit 준비, 별도 승인 후 실제 DEV SQL/키/합성 A/B·두 PG/HTTP·원격 철회 경쟁/receipt/연속 ACK/복원 공동 검수. Modal 미국 실행/미잔류·모델/백업 전체 삭제 증거와 운영 code/DB/활성화 승인은 여전히 별도입니다. 이 독립 batch가 전체 운영 고객별 v2 완료는 아닙니다.
+
+---
+
+## 이전 — 저장 후 source runtime 연결 후보 이력
+
 # 최신 — EDU 동의 저장·등록·철회 runtime 연결 후보 (2026-10-14)
 
 현재 단계: DEV 후보 / 정식 rc.2 보존, 새 identity/control은 미합의 draft.1.

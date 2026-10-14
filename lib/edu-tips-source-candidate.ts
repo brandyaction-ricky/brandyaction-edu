@@ -22,13 +22,14 @@ function object(x: unknown): x is Record<string, unknown> { return !!x && typeof
 function exact(x: Record<string, unknown>, keys: string[]) { return Object.keys(x).length === keys.length && keys.every(k => Object.hasOwn(x, k)); }
 export async function registerEduIdentityCandidate(input: { member: string; version: string; revision: string }, deps: {
   enabled?: boolean; agreedProfile?: string; rpc: CandidateRpc;
+  hmacPublisher?: boolean;
   identities: Parameters<typeof createEduIdentityCandidate>[0];
 }): Promise<{ status: 'disabled' | 'blocked' | 'unavailable' } | { status: 'registered' | 'existing'; customer_id: string; consent_epoch: string; needs_migration: boolean }> {
   if (deps.enabled !== true || deps.agreedProfile !== IDENTITY_PROFILE) return { status: 'disabled' };
   if (!uuid(input.member) || !uuid(input.revision) || !input.version || input.version.length > 100) return { status: 'blocked' };
   try {
     const ids = createEduIdentityCandidate(deps.identities);
-    const prepared = await callRpc(deps.rpc, 'edu_tips_prepare_identity_candidate', {
+    const prepared = await callRpc(deps.rpc, deps.hmacPublisher ? 'edu_tips_prepare_hmac_identity_candidate' : 'edu_tips_prepare_identity_candidate', {
       p_member: input.member, p_version: input.version, p_revision: input.revision, p_epoch: newConsentEpoch(),
     });
     if (prepared.error || !object(prepared.data)) return { status: 'unavailable' };
@@ -41,7 +42,7 @@ export async function registerEduIdentityCandidate(input: { member: string; vers
     if (p.state !== 'pending' || !exact(p, ['state', 'pending_id', 'consent_epoch', 'revision'])
       || !uuid(p.pending_id) || !epoch(p.consent_epoch) || p.revision !== input.revision) return { status: 'unavailable' };
     const derived = ids.customerId(input.member, p.consent_epoch);
-    const finished = await callRpc(deps.rpc, 'edu_tips_finish_identity_candidate', { p_member: input.member,
+    const finished = await callRpc(deps.rpc, deps.hmacPublisher ? 'edu_tips_finish_hmac_identity_candidate' : 'edu_tips_finish_identity_candidate', { p_member: input.member,
       p_pending: p.pending_id, p_epoch: p.consent_epoch, p_customer: derived, p_version: input.version, p_revision: input.revision });
     if (finished.error || !object(finished.data)) return { status: 'unavailable' };
     if (exact(finished.data, ['error'])) return { status: 'blocked' };

@@ -1,16 +1,22 @@
 import test from 'node:test';import assert from 'node:assert/strict';import{fixture,id}from'./helpers/edu-tips-erasure.mjs';import{candidate}from'./helpers/edu-tips-candidate-loader.mjs';
+import {installProjectionSchema} from './helpers/edu-tips-projection.mjs';
 const runtime=candidate('edu-tips-source-runtime'),identity=candidate('edu-tips-identity-candidate');
-const extras=['20261012014228_edu_tips_eligibility_v2.sql','20261014042612_edu_tips_control_delivery_candidate.sql','20261014054801_edu_tips_identity_jobs_candidate.sql'];
-const env={NEXT_PUBLIC_APP_ENV:'development',EDU_TIPS_SOURCE_ENVIRONMENT:'dev',EDU_TIPS_IDENTITY_RUNTIME_ENABLED:'true',EDU_TIPS_IDENTITY_PROFILE:identity.IDENTITY_PROFILE,EDU_TIPS_HMAC_PUBLISHER_READY:'true',EDU_TIPS_CUSTOMER_KEY_VERSION:'k1',EDU_TIPS_CUSTOMER_KEY:Buffer.alloc(32,1).toString('base64'),EDU_TIPS_RECORD_KEY:Buffer.alloc(32,2).toString('base64'),EDU_TIPS_SOURCE_CRON_ENABLED:'true',CRON_SECRET:'synthetic-cron-key-not-registered-0000000000'};
+const extras=['20261010080829_edu_tips_erasure_http_v2.sql','20261012014228_edu_tips_eligibility_v2.sql','20261014042612_edu_tips_control_delivery_candidate.sql','20261014054801_edu_tips_identity_jobs_candidate.sql'];
+const env={NEXT_PUBLIC_APP_ENV:'development',EDU_TIPS_SOURCE_ENVIRONMENT:'dev',EDU_TIPS_IDENTITY_RUNTIME_ENABLED:'true',EDU_TIPS_IDENTITY_PROFILE:identity.IDENTITY_PROFILE,EDU_TIPS_HMAC_PUBLISHER_READY:'true',EDU_TIPS_HMAC_PUBLISHER_ENABLED:'true',EDU_TIPS_RECORD_KEY_VERSION:'rk1',EDU_TIPS_CUSTOMER_KEY_VERSION:'k1',EDU_TIPS_CUSTOMER_KEY:Buffer.alloc(32,1).toString('base64'),EDU_TIPS_RECORD_KEY:Buffer.alloc(32,2).toString('base64'),EDU_TIPS_SOURCE_CRON_ENABLED:'true',CRON_SECRET:'synthetic-cron-key-not-registered-0000000000'};
 const request=(e=env)=>new Request('https://synthetic.invalid/api/cron/tips-source-candidate',{headers:{authorization:'Bearer '+e.CRON_SECRET}});
 async function setup(t){const f=await fixture(t,extras);
+ await installProjectionSchema(f);
+ await f.owner('update edu_tips_private.hmac_settings set enabled=true,record_key_fingerprint=$1 where id=1',[candidate('edu-tips-projection-candidate').recordKeyFingerprint(Buffer.alloc(32,2))]);
  await f.owner('insert into profiles(id) values($1),($2)',[id(5),id(6)]);
  const prefs=(n,analysis=true,rev=id(n+10))=>f.owner("insert into edu_personalization_preferences(member_id,wording_version,analysis,overseas,revision) values($1,'v1',$2,$2,$3) on conflict(member_id) do update set analysis=excluded.analysis,overseas=excluded.overseas,revision=excluded.revision",[id(n),analysis,rev]);
  const rpc=async(name,a)=>{try{
  let data;switch(name){
  case'edu_tips_claim_identity_jobs_candidate':data=await f.value('select edu_tips_claim_identity_jobs_candidate($1,$2) as v',[a.p_member,a.p_limit]);break;
  case'edu_tips_prepare_identity_candidate':data=await f.value('select edu_tips_prepare_identity_candidate($1,$2,$3,$4) as v',[a.p_member,a.p_version,a.p_revision,a.p_epoch]);break;
+ case'edu_tips_prepare_hmac_identity_candidate':data=await f.value('select edu_tips_prepare_hmac_identity_candidate($1,$2,$3,$4) as v',[a.p_member,a.p_version,a.p_revision,a.p_epoch]);break;
  case'edu_tips_finish_identity_candidate':data=await f.value('select edu_tips_finish_identity_candidate($1,$2,$3,$4,$5,$6) as v',[a.p_member,a.p_pending,a.p_epoch,a.p_customer,a.p_version,a.p_revision]);break;
+ case'edu_tips_finish_hmac_identity_candidate':data=await f.value('select edu_tips_finish_hmac_identity_candidate($1,$2,$3,$4,$5,$6) as v',[a.p_member,a.p_pending,a.p_epoch,a.p_customer,a.p_version,a.p_revision]);break;
+ case'edu_tips_claim_hmac_projection_candidate':data=await f.value('select edu_tips_claim_hmac_projection_candidate($1) as v',[a.p_limit]);break;
  case'edu_tips_claim_control_candidate':data=await f.value('select edu_tips_claim_control_candidate($1,$2,$3) as v',[a.p_consumer,a.p_environment,a.p_limit]);break;
  case'edu_tips_confirm_control_candidate':data=await f.value('select edu_tips_confirm_control_candidate($1,$2,$3,$4,$5::jsonb) as v',[a.p_request,a.p_lease,a.p_consumer,a.p_environment,JSON.stringify(a.p_ack)]);break;
  case'edu_tips_defer_control_candidate':data=await f.value('select edu_tips_defer_control_candidate($1,$2,$3,$4,$5,$6,$7) as v',[a.p_request,a.p_lease,a.p_consumer,a.p_environment,a.p_code,a.p_next,a.p_attention]);break;
@@ -21,7 +27,7 @@ async function setup(t){const f=await fixture(t,extras);
 
 test('both feature gates OFF perform no RPC/send; wrong purpose/environment/profile/readiness fails closed',async()=>{
  let calls=0;const fail=()=>{calls++;throw Error('must not call');};await runtime.afterConsentSourceCandidate(id(5),{env:{},rpc:fail,fetch:fail});assert.equal(calls,0);
- for(const change of [{EDU_TIPS_HMAC_PUBLISHER_READY:undefined},{EDU_TIPS_IDENTITY_PROFILE:'legacy'},{EDU_TIPS_SOURCE_ENVIRONMENT:'production'},{EDU_TIPS_CUSTOMER_KEY:'not base64'},{EDU_TIPS_RECORD_KEY:env.EDU_TIPS_CUSTOMER_KEY}]){
+ for(const change of [{EDU_TIPS_HMAC_PUBLISHER_READY:undefined},{EDU_TIPS_IDENTITY_PROFILE:'legacy'},{EDU_TIPS_SOURCE_ENVIRONMENT:'production'},{EDU_TIPS_RECORD_KEY:'not base64'},{EDU_TIPS_RECORD_KEY:env.EDU_TIPS_CUSTOMER_KEY}]){
   const e={...env,...change};await runtime.afterConsentSourceCandidate(id(5),{env:e,rpc:fail,fetch:fail});assert.equal(runtime.sourceRuntimeConfiguration(e).valid,false);
  }assert.equal(calls,0);
 });
@@ -36,7 +42,7 @@ test('SQL job capture is OFF by default; successful consent and registration job
 });
 test('lost after callback and transient registration failure are retried by cron without requiring another customer save',async t=>{
  const f=await setup(t);await f.owner('update edu_tips_private.control_settings set identity_enabled=true where id=1');await f.prefs(5);
- const broken={...f.deps,rpc:async(n,a,s)=>n==='edu_tips_finish_identity_candidate'?{data:null,error:{message:'private failed response'}}:f.rpc(n,a,s)};
+ const broken={...f.deps,rpc:async(n,a,s)=>n==='edu_tips_finish_hmac_identity_candidate'?{data:null,error:{message:'private failed response'}}:f.rpc(n,a,s)};
  await runtime.afterConsentSourceCandidate(id(5),broken);
  assert.equal(await f.value('select completed_at is null as v from edu_tips_private.identity_jobs where member_id=$1',[id(5)]),true);
  const pending=await f.value('select consent_epoch as v from edu_tips_private.pending_identities where member_id=$1',[id(5)]);

@@ -16,7 +16,7 @@ async function execute(args: Record<string, unknown>) {
   const { data, error } = await createAdminClient().rpc('edu_personalization_consent', args);
   if (error) return failure(error.message);
   const accepting = process.env.EDU_PERSONALIZATION_CONSENT_ENABLED === 'true' && !!data?.terms;
-  if (args.p_request && (process.env.EDU_TIPS_IDENTITY_RUNTIME_ENABLED === 'true' || process.env.EDU_TIPS_CONTROL_RUNTIME_ENABLED === 'true')) {
+  if (args.p_request && (process.env.EDU_TIPS_IDENTITY_RUNTIME_ENABLED === 'true' || process.env.EDU_TIPS_CONTROL_RUNTIME_ENABLED === 'true' || process.env.EDU_TIPS_HMAC_PUBLISHER_ENABLED === 'true')) {
     // Register after a successful commit, never on GET/failure. Dispatch errors
     // cannot make a saved consent look failed; durable DB jobs retain retries.
     try { after(async () => { try { await consentSourceAfterSave(String(args.p_member)); } catch { /* Guarded cron repairs pending jobs. */ } }); } catch { /* DB queue remains authoritative. */ }
