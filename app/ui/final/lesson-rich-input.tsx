@@ -54,6 +54,16 @@ const LessonDetails = Details.extend({
   addKeyboardShortcuts() {
     return {
       ...this.parent?.(),
+      'Mod-Enter': () => {
+        const { state, view } = this.editor, { $head } = state.selection;
+        for (let depth = $head.depth; depth > 0; depth--) {
+          if ($head.node(depth).type.name !== 'details') continue;
+          const at = $head.after(depth), tr = state.tr.insert(at, state.schema.nodes.paragraph.create());
+          tr.setSelection(TextSelection.create(tr.doc, at + 1)); view.dispatch(tr.scrollIntoView());
+          return true;
+        }
+        return false;
+      },
       Enter: () => {
         const { state, view } = this.editor, { $head } = state.selection;
         if ($head.parent.type.name !== 'detailsSummary' || !state.selection.empty) return false;
@@ -107,7 +117,7 @@ const LessonDetails = Details.extend({
     };
   },
 });
-// Blank lines stay in the toggle. Use ArrowDown at its end to leave it.
+// Blank lines stay in the toggle. Mod-Enter intentionally creates a line outside.
 const LessonDetailsContent = DetailsContent.extend({ addKeyboardShortcuts() { return {}; } });
 const LessonInputUndo = Extension.create({
   name: "lessonInputUndo", priority: 1000,
@@ -162,7 +172,7 @@ export function LessonRichInput({ value, onChange, label = "학습 내용", disa
       <EditorContent editor={editor} />
     </div>
     {name && <input type="hidden" name={name} value={value} />}
-    <small id={`${editorId}-help`} className="field-hint">줄 맨 앞에 <code>#</code> · <code>##</code> · <code>###</code>와 공백을 입력하면 제목, <code>-</code>는 글머리 목록, <code>1.</code>은 번호 목록, <code>&gt;</code>는 접기·펼치기, <code>&quot;</code>는 인용문이 됩니다. 토글 제목에서 Enter를 누르면 펼쳐져 안쪽에 글을 쓸 수 있습니다. 토글 끝에서 아래 화살표를 누르면 밖으로 이동합니다. Shift+Enter는 줄바꿈입니다. 변경 후 학습을 저장해 주세요.</small>
+    <small id={`${editorId}-help`} className="field-hint">줄 맨 앞에 <code>#</code> · <code>##</code> · <code>###</code>와 공백을 입력하면 제목, <code>-</code>는 글머리 목록, <code>1.</code>은 번호 목록, <code>&gt;</code>는 접기·펼치기, <code>&quot;</code>는 인용문이 됩니다. 토글 제목에서 Enter를 누르면 펼쳐져 안쪽에 글을 쓸 수 있습니다. Ctrl+Enter(맥은 ⌘+Enter)는 토글 밖에 새 문단을 만듭니다. Shift+Enter는 줄바꿈입니다. 변경 후 학습을 저장해 주세요.</small>
   </div>;
 }
 

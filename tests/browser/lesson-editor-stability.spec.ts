@@ -23,6 +23,11 @@ test('Enter on a closed toggle title opens its content and keeps new text inside
   await page.keyboard.press('Enter'); await page.keyboard.press('Enter'); await page.keyboard.type('토글 내부 다음 줄');
   await expect(toggle.locator('[data-type="detailsContent"]')).toContainText('토글 내부 다음 줄');
   await expect.poll(() => server.get().payload.blocks.document.blocks[0].content).toContain('토글 내부 다음 줄');
+  await page.keyboard.press('ControlOrMeta+Enter'); await page.keyboard.type('토글 바깥 새 문단');
+  await expect(doc).toContainText('토글 바깥 새 문단');
+  await expect(toggle).not.toContainText('토글 바깥 새 문단');
+  await expect.poll(() => server.get().payload.blocks.document.blocks[0].content).toContain('토글 바깥 새 문단');
+  await doc.screenshot({ path: '/private/tmp/edu-editor-toggle-review.png' });
 });
 test('empty paragraphs with and without move handles have no repeated placeholder', async ({ page }) => {
   const server = await backend(page);

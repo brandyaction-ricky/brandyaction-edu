@@ -275,7 +275,7 @@ export function LessonDocumentCanvas(props: Props) {
     });
   }
   return <div className="ldc-root" ref={root} {...imageDrag.handlers}>
-    <p className="meta">글을 바로 클릭해 수정하세요. 빈 줄에서 / 또는 ‘현재 위치에 추가’로 질문·자료를 넣고, 왼쪽 손잡이를 끌어 순서를 바꿀 수 있어요.</p>
+    <p className="meta">글을 바로 클릭해 수정하세요. 빈 줄에서 / 또는 ‘현재 위치에 추가’로 질문·자료를 넣고, 왼쪽 손잡이를 끌어 순서를 바꿀 수 있어요. 토글 제목에서 Enter는 안쪽 입력, Ctrl+Enter(맥은 ⌘+Enter)는 토글 밖 새 문단입니다.</p>
     {props.blocks.some(block => block.type === 'image') && <p className="meta ldc-image-drag-help">이미지를 펼친 토글 안에 끌어 넣을 수 있어요. 이미지 설정의 ‘토글 안으로 이동’도 사용할 수 있습니다. 다른 이미지 옆에 놓으면 최대 3장까지 나란히 붙어요.</p>}
     {outline.length > 0 && <details className="ldc-outline"><summary>수업 목차 · {outline.length}개</summary><nav aria-label="수업 목차">{outline.map(item => <button type="button" className="btn small" key={`${item.id}-${item.index}`} onClick={() => jump(item.id, item.index)}>{item.label || '제목 입력 전'}</button>)}</nav></details>}
     <div className="lesson-body-editor ldc-editor">
