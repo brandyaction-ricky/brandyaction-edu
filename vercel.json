@@ -86,7 +86,8 @@
       "codex/edu-tips-eligibility-20261012": false,
       "codex/edu-tips-data-recovery-20261012": false,
       "codex/edu-tips-rest-safe-updates-20261012": false,
-      "codex/edu-tips-catalog-compat-20261012": false
+      "codex/edu-tips-catalog-compat-20261012": false,
+      "codex/edu-tips-identity-control-batch-20261014": false
     }
   },
   "regions": [

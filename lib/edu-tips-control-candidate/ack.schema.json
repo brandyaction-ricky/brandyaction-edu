@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.brandyaction.invalid/tips-control/1.0.0-draft.1/block-ack.json",
+  "title": "DRAFT ONLY \u2014 durable-block confirmation, never completed erasure",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "control_version",
+    "environment",
+    "tenant_id",
+    "brand_id",
+    "receiver_id",
+    "requestId",
+    "customer_id",
+    "consent_epoch",
+    "request_digest",
+    "status",
+    "blocked_at",
+    "cancellation"
+  ],
+  "properties": {
+    "control_version": {
+      "const": "1.0.0-draft.1"
+    },
+    "environment": {
+      "enum": [
+        "dev",
+        "production"
+      ]
+    },
+    "tenant_id": {
+      "const": "brandyaction"
+    },
+    "brand_id": {
+      "enum": [
+        "myin",
+        "brandyaction_edu"
+      ]
+    },
+    "receiver_id": {
+      "const": "tips-customer-controls"
+    },
+    "requestId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "customer_id": {
+      "type": "string",
+      "pattern": "^k[1-9][0-9]{0,2}:[A-Za-z0-9_-]{43}$"
+    },
+    "consent_epoch": {
+      "type": "string",
+      "pattern": "^ce_[A-Za-z0-9_-]{32}$"
+    },
+    "request_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "status": {
+      "const": "blocked"
+    },
+    "blocked_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}(?:\\d{3})?Z$"
+    },
+    "cancellation": {
+      "const": "requested"
+    }
+  },
+  "$comment": "Scope/target/digest echo equality and original block time checks required. Status200 is acceptable only after durable fences; cancellation=requested is not physical termination proof."
+}

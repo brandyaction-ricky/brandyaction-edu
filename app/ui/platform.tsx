@@ -4,6 +4,7 @@ import { MobileRefresh } from './final/mobile-refresh';
 import { contentVisibility } from '@/lib/content-visibility';
 import { MemberErasureQueue } from './final/member-erasure-queue';
 import { TipsErasureMonitorNotice } from './final/tips-erasure-monitor-notice';
+import { TipsSourceNotice } from './final/tips-source-notice';
 import { QuestionImage } from './final/question-image';
 import { QuestionThreadDialog } from './final/question-thread';
 import { LearningNoticeBar } from './final/learning-notice';
@@ -1108,6 +1109,7 @@ export function Platform({
         )}
         {key === 'customers' && user?.role === 'admin' && <MemberErasureQueue key={notice} />}
         {key === 'customers' && user?.role === 'admin' && <TipsErasureMonitorNotice />}
+        {key === 'customers' && user?.role === 'admin' && <TipsSourceNotice />}
       </AdminShell>
     );
   }
