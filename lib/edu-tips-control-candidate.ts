@@ -99,7 +99,10 @@ export function isEduControlAck(ack: unknown, b: ControlBlock, now: number): ack
     && micros(a.blocked_at)! >= micros(b.block.at)! && micros(a.blocked_at)! <= BigInt(now + 60000) * BigInt(1000);
 }
 async function boundedAck(response: Response): Promise<unknown> {
-  if (!response.body || response.headers.get('content-type')?.split(';')[0].trim().toLowerCase() !== 'application/json') throw new Error('invalid_ack');
+  // Match the explicit UTF-8 draft profile. Do not ignore unsupported charset,
+  // duplicate type, or unknown parameters; valid ASCII is not profile evidence.
+  const contentType = response.headers.get('content-type');
+  if (!response.body || !contentType || !/^application\/json(?:\s*;\s*charset\s*=\s*(?:utf-8|"utf-8"))?$/i.test(contentType.trim())) throw new Error('invalid_ack');
   const reader = response.body.getReader(), parts: Uint8Array[] = [];
   let size = 0;
   try {

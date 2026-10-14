@@ -52,3 +52,12 @@ MYIN 실제 ID 산식과 과거 5/30/5 원기한은 보존합니다. EDU sender�
 - 최종 관련 시험23개(기존10개+정밀시각/로컬 DB12개), TypeScript·변경 ESLint·로컬 빌드 통과. 전체 최종 단위1,448건 통과(실패0), 마지막 미분류 상태 조회 정정 뒤 관련DB12건 재통과. 단위 결과는 실제 운영 증거가 아닙니다. 앞의1,435/마이그레이션0/DB미구현 설명은 이전 후보6ae9056의 기록입니다.
 - Typecheck와 build를 동시에 실행한 한 번은 .next 타입 산출물 교체로 TS6053이 났고, build 완료 후 단독 typecheck 재실행으로 통과했습니다. 코드 결함으로 판정하거나 기존 파일/설정을 삭제하지 않았습니다.
 - 실제 Supabase advisors·두 실제 PostgreSQL connection 경합·공동 HTTP·실제 부하·원격 서버 장애·Modal/model/backup은 미검수입니다. 원격 DB/환경변수/Secret/공유DEV/운영 변경0. candidate migration은 파일 생성+로컬 PGlite 실행만 했습니다.
+
+
+## TIPS D1~D5 회신 후속 (2026-10-14)
+
+- 대표가 전달한 담당자 보고: HMAC profile/기술epoch 원칙은 협의 후보, 실제 TIPS DEV origin/runtimeSHA/kid/Secret경로·HTTP receiver route 미등록. Python raw-body/사업digest/strictUTF8·UTC3/6자리 검증 후보와 EDU RC2 원코드 대소문자 보존 매핑/변환 로컬 후보는 진척됐으나 영구 facts·모델입력·현재자격·원격 atomic nonce/request/native fence·후속 receipt/연속ACK·미국/모델/백업·MYIN과거5/30/5 혼합pull 호환 미완료. 직접 TIPS 원천 조회/코드 검수 결과로 확대하지 않습니다.
+- 전달된 ZIP8261a...와그 안의 source883a1f4는 그대로 보존. source883a1f4의 GitHub필수CI는05:19:09UTC 성공, migrate-dev는skipped 확인. CI성공은 배포/DB적용/계약합의가 아닙니다.
+- ACK MIME검사 보완: application/json 또는 명시UTF-8만 허용, UTF16/다른charset/중복type/중복charset/알수없는parameter는 거절합니다. request signature bytes/초안version/정식rc.2는 변경하지 않습니다. 전달파일은 재생성하지 않으며 다음 의미있는 통합묶음에만 반영합니다.
+- 관련24개시험·타입·변경ESLint통과. 실제 remote HTTP/계약합의·sharedDEV/DB/키/운영·고객전송 변경0.
+- 다음: EDU source HMAC publisher/profile 이행·동의후dispatch/cron/알림UI의 후보 준비와원정밀시각/epoch/authority합의. TIPS는규격별fenced read/normalizer→영구facts·전체snapshot대조·nonce/request/native block 원자DB→정식receiver/전용키·고정SHA·합성공동검수준비. 실제URL/runtime 없는동안 주소를 추측해 호출하거나운영전송을켜지 않습니다.

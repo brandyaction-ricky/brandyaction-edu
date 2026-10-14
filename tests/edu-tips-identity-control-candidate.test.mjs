@@ -128,3 +128,11 @@ test('canonical sender bytes ignore DB property order while preserving microseco
  const b=structuredClone(base);for(const k of ['at','active_due_at','model_due_at','residual_due_at'])b.block[k]=b.block[k].replace('.000Z','.000123Z');assert(api.isEduControlBlock(b));
  assert.ok(api.canonicalControlBody(b).includes('.000123Z'));b.block.residual_due_at=b.block.residual_due_at.replace('123Z','124Z');assert.equal(api.isEduControlBlock(b),false);
 });
+test('D4 UTF-8 MIME profile accepts only JSON or explicit UTF-8, not duplicate type or other charset/parameters',async()=>{
+ for(const contentType of ['application/json','application/json; charset=utf-8','Application/JSON; Charset="UTF-8"']){
+  const r=await send(base,{fetch:async()=>new Response(JSON.stringify(ack()),{headers:{'content-type':contentType}})});assert.equal(r.confirmed,true);
+ }
+ for(const contentType of ['application/json; charset=utf-16','application/json; charset=iso-8859-1','application/json; charset=utf-8; charset=utf-8','application/json, application/json','application/json; version=1','text/json']){
+  const r=await send(base,{fetch:async()=>new Response(JSON.stringify(ack()),{headers:{'content-type':contentType}})});assert.equal(r.code,'invalid_ack');
+ }
+});
