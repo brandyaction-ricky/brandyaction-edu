@@ -16,14 +16,16 @@ async function pasteSelection(page: Page, content: { html: string; text: string 
     el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
   }, content);
 }
-async function longLesson(page: Page, repeat = 50) {
+async function longLesson(page: Page, repeat = 50, loadTimeout = 5000) {
   const server = await backend(page);
   const content = serializeLessonDocument({ type: 'doc', content: [
     { type: 'paragraph', content: [{ type: 'text', text: '복사할 짧은 한 줄', marks: [{ type: 'bold' }] }] },
     ...Array.from({ length: 120 }, (_, n) => ({ type: 'paragraph', content: [{ type: 'text', text: `가상 본문 ${n} ` + '한글 학습 내용을 보존합니다. '.repeat(repeat) }] })),
   ] });
   server.get().payload.blocks.document.blocks = [{ id: 'body', type: 'text', content }];
-  await page.goto('/lesson-block-author-test?serverDraft=1'); await expect(canvas(page)).toBeVisible();
+  const loadStarted = Date.now();
+  await page.goto('/lesson-block-author-test?serverDraft=1'); await expect(canvas(page)).toBeVisible({ timeout: loadTimeout });
+  console.info('internal fixture load:', JSON.stringify({ characters: content.length, elapsedMs: Date.now() - loadStarted }));
   return { server, content };
 }
 async function selectFirstLine(page: Page) {
@@ -105,8 +107,12 @@ test('bulk internal cut-paste and undo preserve a long lesson while autosave is 
 test('internal copying stays proportional to the selection in a million-character lesson', async ({ page }, info) => {
   test.skip(info.project.name !== 'desktop', 'Large document stress runs once on desktop.');
   test.setTimeout(180000);
-  const { server, content } = await longLesson(page, 500), errors: string[] = [];
-  page.on('pageerror', e => errors.push(e.message)); page.on('crash', () => errors.push('page crashed'));
+  const errors: string[] = [];
+  page.on('pageerror', e => { errors.push(e.message); console.error('large fixture page error:', e.message); });
+  page.on('crash', () => { errors.push('page crashed'); console.error('large fixture page crashed'); });
+  // This intentionally exceeds a normal lesson's size. CI's shared two-worker
+  // runner needs a load budget separate from the subsequent edit assertions.
+  const { server, content } = await longLesson(page, 500, 30000);
   for (let n = 0; n < 20; n++) {
     await selectFirstLine(page); const copied = await copySelection(page);
     expect(copied.html.length).toBeLessThan(10000);
