@@ -123,3 +123,8 @@ test('worker retries original immutable request independently of collection/pull
  assert.equal(await run(l,{send:async()=>{throw Error('secret');},store:{defer:async()=>false}}),'lease_lost');
  await assert.rejects(()=>run(l,{send:async()=>({confirmed:false,code:'disabled',attention:false}),store:{defer:async()=>{throw Error('secret');}}}),/TIPS_CONTROL_STORE_UNAVAILABLE/);
 });
+test('canonical sender bytes ignore DB property order while preserving microseconds and first digest',()=>{
+ const reversed=Object.fromEntries(Object.entries(base).reverse());reversed.block=Object.fromEntries(Object.entries(base.block).reverse());assert.equal(api.canonicalControlBody(reversed),cv.raw_body);
+ const b=structuredClone(base);for(const k of ['at','active_due_at','model_due_at','residual_due_at'])b.block[k]=b.block[k].replace('.000Z','.000123Z');assert(api.isEduControlBlock(b));
+ assert.ok(api.canonicalControlBody(b).includes('.000123Z'));b.block.residual_due_at=b.block.residual_due_at.replace('123Z','124Z');assert.equal(api.isEduControlBlock(b),false);
+});

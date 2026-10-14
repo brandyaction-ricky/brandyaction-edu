@@ -39,10 +39,13 @@ const requestValid = ajv.compile(requestSchema), ackValid = ajv.compile(ackSchem
 const top = ['control_version', 'environment', 'tenant_id', 'brand_id', 'receiver_id', 'origin_contract_version', 'deadline_profile'] as const;
 const fields = ['requestId', 'customer_id', 'consent_epoch', 'reason', 'at', 'active_due_at', 'model_due_at', 'residual_due_at'] as const;
 const sha = (raw: string | Buffer) => createHash('sha256').update(raw).digest('hex');
-function utc(value: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)
-    && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
+function micros(value: string): bigint | null {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}(?:\d{3})?Z$/.test(value)) return null;
+  const milliseconds = value.slice(0, 23) + 'Z';
+  if (!Number.isFinite(Date.parse(milliseconds)) || new Date(milliseconds).toISOString() !== milliseconds) return null;
+  return BigInt(Date.parse(milliseconds)) * BigInt(1000) + BigInt(value.length === 27 ? value.slice(23, 26) : 0);
 }
+function utc(value: string): boolean { return micros(value) !== null; }
 export function isEduControlBlock(input: unknown): input is ControlBlock {
   if (!requestValid(input)) return false;
   const b = input as ControlBlock, t = b.block;
@@ -50,19 +53,26 @@ export function isEduControlBlock(input: unknown): input is ControlBlock {
     || b.deadline_profile !== 'rc2_5_30_30'
     || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(t.requestId)
     || !fields.slice(4).every(k => utc(t[k]))) return false;
-  return Date.parse(t.active_due_at) - Date.parse(t.at) === 120 * 3600000
-    && Date.parse(t.model_due_at) - Date.parse(t.at) === 720 * 3600000
-    && Date.parse(t.residual_due_at) - Date.parse(t.at) === 720 * 3600000;
+  return micros(t.active_due_at)! - micros(t.at)! === BigInt(120) * BigInt(3600000000)
+    && micros(t.model_due_at)! - micros(t.at)! === BigInt(720) * BigInt(3600000000)
+    && micros(t.residual_due_at)! - micros(t.at)! === BigInt(720) * BigInt(3600000000);
 }
 export function controlDigest(b: ControlBlock) {
   if (!isEduControlBlock(b)) throw new Error('TIPS_CONTROL_INVALID');
   return sha(JSON.stringify(['tips.block.v1', ...top.map(k => b[k]), ...fields.map(k => b.block[k])]));
 }
+export function canonicalControlBody(b: ControlBlock): string {
+  if (!isEduControlBlock(b)) throw new Error('TIPS_CONTROL_INVALID');
+  // Fixed ordering and ASCII field domains keep persisted semantic snapshots
+  // byte-identical across jsonb/REST property ordering and retries.
+  return JSON.stringify({ ...Object.fromEntries(top.map(k => [k, b[k]])),
+    block: Object.fromEntries(fields.map(k => [k, b.block[k]])) });
+}
 export function signedControlHeaders(raw: string, b: ControlBlock, key: ControlKey, now: number, nonce = randomBytes(24).toString('base64url')) {
   if (!isEduControlBlock(b) || !validKey(key, b, now) || !/^[A-Za-z0-9_-]{32}$/.test(nonce)
     || !Number.isSafeInteger(now) || now < 1000) throw new Error('TIPS_CONTROL_INVALID');
   // Only canonical, validated DTO bytes may be signed; callers cannot sign arbitrary JSON.
-  if (raw !== JSON.stringify(b)) throw new Error('TIPS_CONTROL_INVALID');
+  if (raw !== canonicalControlBody(b)) throw new Error('TIPS_CONTROL_INVALID');
   const timestamp = String(Math.floor(now / 1000));
   const frame = ['TIPS-BLOCK-V1', 'POST', CONTROL_PATH, CONTROL_RECEIVER, b.environment,
     b.tenant_id, b.brand_id, key.kid, timestamp, nonce, sha(raw)].join('\n');
@@ -86,7 +96,7 @@ export function isEduControlAck(ack: unknown, b: ControlBlock, now: number): ack
   return (['control_version', 'environment', 'tenant_id', 'brand_id', 'receiver_id'] as const).every(k => a[k] === b[k])
     && ['requestId', 'customer_id', 'consent_epoch'].every(k => a[k as keyof ControlAck] === b.block[k as keyof ControlBlock['block']])
     && a.request_digest === controlDigest(b) && utc(a.blocked_at)
-    && Date.parse(a.blocked_at) >= Date.parse(b.block.at) && Date.parse(a.blocked_at) <= now + 60000;
+    && micros(a.blocked_at)! >= micros(b.block.at)! && micros(a.blocked_at)! <= BigInt(now + 60000) * BigInt(1000);
 }
 async function boundedAck(response: Response): Promise<unknown> {
   if (!response.body || response.headers.get('content-type')?.split(';')[0].trim().toLowerCase() !== 'application/json') throw new Error('invalid_ack');
@@ -127,10 +137,10 @@ export async function sendEduControlCandidate(input: unknown, deps: {
   if (deps.enabled !== true || deps.agreedVersion !== CONTROL_VERSION) return failed('disabled');
   if (!isEduControlBlock(input)) return failed('invalid_request', true);
   // Copy before the first await so mutation by a caller cannot alter signed identity/ACK binding.
-  const raw = JSON.stringify(input), b = JSON.parse(raw) as ControlBlock;
+  const raw = canonicalControlBody(input), b = JSON.parse(raw) as ControlBlock;
   const now = deps.now ?? Date.now, at = now(), url = target(deps.origin, deps.allowedOrigin);
   const timeout = deps.timeoutMs ?? 5000;
-  if (!Number.isSafeInteger(at) || Date.parse(b.block.at) > at + 60000) return failed('invalid_request', true);
+  if (!Number.isSafeInteger(at) || micros(b.block.at)! > BigInt(at + 60000) * BigInt(1000)) return failed('invalid_request', true);
   if (!url || deps.environment !== b.environment || !deps.key || !validKey(deps.key, b, at)
     || !Number.isInteger(timeout) || timeout < 1 || timeout > 5000) return failed('invalid_configuration', true);
   const headers = signedControlHeaders(raw, b, deps.key, at);
