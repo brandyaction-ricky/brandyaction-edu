@@ -12,7 +12,6 @@
 .edu-admin .lesson-body-editor button:disabled { opacity:.4; cursor:default; }
 .edu-admin .lesson-body-editor[aria-disabled=true] { opacity:.65; }
 .edu-admin .lesson-body-editor .tiptap { min-height:300px; max-height:600px; overflow-y:auto; padding:16px; outline:none; }
-.edu-admin .lesson-body-editor .tiptap p:only-child:has(br:only-child)::before { content:'학습할 내용을 작성해 주세요.'; float:left; height:0; pointer-events:none; color:#8b8e93; }
 .edu-admin .lesson-link-controls { display:flex; flex-wrap:wrap; gap:6px; padding:8px; border-bottom:1px solid var(--line,#d1d5db); }
 .edu-admin .lesson-link-controls input { flex:1 1 180px; min-width:0; width:auto; }
 .edu-admin .lesson-link-controls button { padding:6px 10px; border:1px solid var(--line,#d1d5db); background:white; border-radius:4px; font-size:12px; cursor:pointer; }

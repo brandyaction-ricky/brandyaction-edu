@@ -24,11 +24,13 @@ export function isBlockEditorDocument(v: unknown): v is LessonBlockDocument {
     const allowed = ['id', 'type', 'content'];
     if (['image', 'audio', 'video', 'link'].includes(String(b.type))) allowed.push('url', 'alt');
     if (['image', 'audio', 'video'].includes(String(b.type))) allowed.push('assetId');
+    if (b.type === 'image') allowed.push('imageGroup');
     if (b.type === 'question') allowed.push('question');
     if (['prompt-generator', 'persona-generator', 'landing-planner', 'recipe-calculator', 'margin-calculator', 'marketing-funnel'].includes(String(b.type))) allowed.push('fields');
     if (['persona-generator', 'landing-planner', 'recipe-calculator', 'margin-calculator', 'marketing-funnel'].includes(String(b.type))) allowed.push('toolVersion');
     if (b.type === 'quiz') allowed.push('quiz');
     if (!only(b, allowed)) return false;
+    if (b.imageGroup !== undefined && !identity(b.imageGroup)) return false;
     if (b.type === 'question' && (!obj(b.question) || !str(b.question.label) || !['text', 'image', 'file'].includes(String(b.question.kind)) || !bool(b.question.required))) return false;
     if (['prompt-generator', 'persona-generator', 'landing-planner', 'recipe-calculator', 'margin-calculator', 'marketing-funnel'].includes(String(b.type)) && !list(b.fields, 100, f => obj(f) && identity(f.id) && ['label', 'variable', 'placeholder'].every(k => str(f[k])) && bool(f.required) && bool(f.sensitive) && (f.options === undefined || list(f.options, 100, str)))) return false;
     if (b.type === 'quiz' && (!obj(b.quiz) || !Number.isFinite(b.quiz.passPercent) || !list(b.quiz.questions, 100, q => obj(q) && identity(q.id) && str(q.prompt) && list(q.options, 20, str) && Number.isInteger(q.correctIndex)))) return false;

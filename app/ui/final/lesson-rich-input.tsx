@@ -10,6 +10,7 @@ import { Bold, Italic, Underline, List, ListOrdered, Link2, Undo2, Redo2, Remove
 import { LessonCallout, insertLessonNotice } from "./lesson-callout";
 import { LESSON_FONT_SIZES, normalizeLessonColor, lessonDocumentForEditor, serializeLessonDocument } from "@/lib/lesson-body";
 import { safeUrl } from "@/lib/platform";
+import { TextSelection } from '@tiptap/pm/state';
 import "./lesson-text.css";
 import "./lesson-body-editor.css";
 
@@ -50,6 +51,26 @@ export const LessonQuote = Blockquote.extend({
 });
 const LessonDetails = Details.extend({
   draggable: true,
+  addKeyboardShortcuts() {
+    return {
+      ...this.parent?.(),
+      Enter: () => {
+        const { state, view } = this.editor, { $head } = state.selection;
+        if ($head.parent.type.name !== 'detailsSummary' || !state.selection.empty) return false;
+        const wrapper = view.nodeDOM($head.before($head.depth - 1)) as HTMLElement | null;
+        if (!wrapper?.classList.contains('is-open')) wrapper?.querySelector<HTMLButtonElement>(':scope > button')?.click();
+        const at = $head.after() + 1;
+        const content = state.doc.nodeAt($head.after());
+        if (!content || content.type.name !== 'detailsContent') return false;
+        const tr = state.tr;
+        // Reuse the empty first line instead of adding a blank outside the toggle.
+        if (content.firstChild?.type.name !== 'paragraph' || content.firstChild.content.size) tr.insert(at, state.schema.nodes.paragraph.create());
+        tr.setSelection(TextSelection.create(tr.doc, at + 1));
+        view.dispatch(tr.scrollIntoView());
+        return true;
+      },
+    };
+  },
   addInputRules() {
     return [new InputRule({ find: /^> $/, handler: ({ chain, range }) => {
       if (!chain().deleteRange(range).setDetails().run()) return null;
@@ -86,6 +107,8 @@ const LessonDetails = Details.extend({
     };
   },
 });
+// Blank lines stay in the toggle. Use ArrowDown at its end to leave it.
+const LessonDetailsContent = DetailsContent.extend({ addKeyboardShortcuts() { return {}; } });
 const LessonInputUndo = Extension.create({
   name: "lessonInputUndo", priority: 1000,
   addKeyboardShortcuts() {
@@ -105,7 +128,7 @@ export function lessonRichExtensions() {
       // input rule and discards its undo state. Enter already creates paragraphs.
       heading: { levels: [1, 2, 3] }, trailingNode: false, blockquote: false, code: false, codeBlock: false, horizontalRule: false,
       link: { openOnClick: false, HTMLAttributes: { target: "_blank", rel: "noopener noreferrer" }, isAllowedUri: url => Boolean(safeUrl(url)) },
-    }), TextStyle, LessonFontSize, LessonColor, LessonBackgroundColor, LessonQuote, LessonDetails, DetailsSummary, DetailsContent, LessonCallout, LessonInputUndo,
+    }), TextStyle, LessonFontSize, LessonColor, LessonBackgroundColor, LessonQuote, LessonDetails, DetailsSummary, LessonDetailsContent, LessonCallout, LessonInputUndo,
     Node.create({ name: 'lessonImage', group: 'block', atom: true, addAttributes: () => ({ blockId: { default: null } }), renderHTML: () => ['div', { 'data-lesson-image-reference': '' }, '이미지 · 문서 편집 화면에서 확인'] })];
 }
 
@@ -139,7 +162,7 @@ export function LessonRichInput({ value, onChange, label = "학습 내용", disa
       <EditorContent editor={editor} />
     </div>
     {name && <input type="hidden" name={name} value={value} />}
-    <small id={`${editorId}-help`} className="field-hint">줄 맨 앞에 <code>#</code> · <code>##</code> · <code>###</code>와 공백을 입력하면 제목, <code>-</code>는 글머리 목록, <code>1.</code>은 번호 목록, <code>&gt;</code>는 접기·펼치기, <code>&quot;</code>는 인용문이 됩니다. 토글은 화살표로 펼친 뒤 제목에서 Enter를 누르면 안쪽에 글을 쓸 수 있습니다. Shift+Enter는 줄바꿈입니다. 변경 후 학습을 저장해 주세요.</small>
+    <small id={`${editorId}-help`} className="field-hint">줄 맨 앞에 <code>#</code> · <code>##</code> · <code>###</code>와 공백을 입력하면 제목, <code>-</code>는 글머리 목록, <code>1.</code>은 번호 목록, <code>&gt;</code>는 접기·펼치기, <code>&quot;</code>는 인용문이 됩니다. 토글 제목에서 Enter를 누르면 펼쳐져 안쪽에 글을 쓸 수 있습니다. 토글 끝에서 아래 화살표를 누르면 밖으로 이동합니다. Shift+Enter는 줄바꿈입니다. 변경 후 학습을 저장해 주세요.</small>
   </div>;
 }
 
