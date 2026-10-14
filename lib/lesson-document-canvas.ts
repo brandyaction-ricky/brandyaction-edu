@@ -5,6 +5,18 @@ import { lessonEmbeddedImageIds } from './lesson-toggle-images';
 export type CanvasNode = { type: string; text?: string; marks?: LessonNode['marks']; attrs?: Record<string, unknown> & { block?: LessonBlock | null }; content?: CanvasNode[] };
 export const isCanvasText = (block: LessonBlock) => ['text', 'heading', 'subheading'].includes(block.type);
 
+// ProseMirror puts open ancestor attributes into data-pm-slice. The original
+// body is a round-trip cache, not part of the selection: carrying it here
+// makes even a one-line copy include the entire lesson (and retain it on paste).
+// Keep selected content and block metadata; never mutate the live document.
+export function lessonClipboardNodes(nodes: CanvasNode[]): CanvasNode[] {
+  return nodes.map(node => ({
+    ...node,
+    ...(node.type === 'lessonText' && node.attrs?.block ? { attrs: { ...node.attrs, block: { ...node.attrs.block, content: '' } } } : {}),
+    ...(node.content ? { content: lessonClipboardNodes(node.content) } : {}),
+  }));
+}
+
 export function canvasTextContent(block: LessonBlock): LessonNode[] {
   if (block.type === 'text') return lessonDocumentForEditor(block.content || '').content || [{ type: 'paragraph' }];
   return [{ type: 'heading', attrs: { level: block.type === 'heading' ? 2 : 3 }, content: block.content ? [{ type: 'text', text: block.content }] : [] }];

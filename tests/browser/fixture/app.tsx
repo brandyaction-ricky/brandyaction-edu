@@ -1,4 +1,5 @@
 import { MarketingQaFixture } from './marketing-qa';
+import { installInternalClipboardLab } from './internal-clipboard-api';
 import { AdminUxAuditFixture } from './admin-ux-audit';
 import { AdminLearningCare, MemberLearningCare } from '../../../app/ui/final/learning-care';
 import { FloatingAudioFixture } from './floating-audio';
@@ -162,6 +163,7 @@ function HomeHeroTouchFixture() {
   return <div className="edu-front"><HomeHero banners={new URLSearchParams(location.search).has('many') ? banners : banners.slice(0, 2)} freeOpen={false} /></div>;
 }
 const path = window.location.pathname;
+if (path === '/lesson-block-author-test' && new URLSearchParams(location.search).has('localInternalCopy')) installInternalClipboardLab();
 // Destination pages are outside this fixture's scope. Keep them inert so their
 // fallback admin screen cannot rewrite the URL before navigation is asserted.
 const fixture = path === '/analytics-test' ? <div className="edu-admin" style={{padding:24}}><AdminWorkflows section="analytics" data={{}} pending={false} send={async()=>({})}/></div> : ['/checkout', '/apply', '/safe-custom', '/learn/enrolled-fixture', '/my/profile'].includes(path) ? <main data-testid="navigation-destination" /> : path === '/admin-pilot-orders-test' ? <AdminPilotFixture screen="orders"/> : path === '/admin-pilot-products-test' ? <AdminPilotFixture screen="products"/> : path === '/admin-pilot-editor-test' ? <AdminPilotFixture screen="editor"/> : path === '/admin-component-system-test' ? <AdminComponentsFixture/> : path === '/admin-full-crm-test' ? <FullMigrationFixture screen="crm" /> : path === '/admin-full-settings-test' ? <FullMigrationFixture screen="settings" /> : path === '/admin-full-articles-test' ? <ArticleMigrationFixture/> : path === '/review-audit-test' ? <SubmissionReviewFixture/> : path === '/retained-member-dialog-test' ? <RetainedMemberDialogFixture/> : ['/member-operations-test', '/admin/customers', '/admin/questions', '/admin/reviews', '/admin/members'].includes(path) ? <MemberOperationsFixture/> : path === '/admin-week-order-test' ? <WeekCatalogFixture/> : path.startsWith('/mission-integrity-test') ? <MissionIntegrityFixture/> : path.startsWith('/admin-shell-test')
