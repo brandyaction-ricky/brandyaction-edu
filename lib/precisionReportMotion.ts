@@ -179,12 +179,13 @@ function attachMotion(doc: Document): Undo {
     select('.top5card,.spec .pole', '.t5-gauge i', false, 'sheen');
     select('.need-map-grid', '.need-map-card');
     select('.e-dual > div', '.e-diagram path,.e-diagram circle', false, 'ink');
-    select('.v-lanes > div', 'b,span,strong', true);
-    select('.v-riskmap > a', 'strong,b', true);
+    // Rows of one diagram read top to bottom as one sequence (CEO QA 10-15: two rows of 18장 lit at once).
+    select('.v-lanes', ':scope > div > b,:scope > div > span,:scope > div > strong', true);
+    select('.v-riskmap', ':scope > a > strong,:scope > a > b', true);
     select('.v-flow-list', ':scope > li', true);
     select('.v-boundary', ':scope > b');
     select('.v-money-card', ':scope > b,:scope > dl', true);
-    select('.levelrow', ':scope > div', true);
+    select('.final-block:has(> .levelrow)', ':scope > .levelrow > div:not(.arr)', true);
     select('.timeline', ':scope > .era', true);
     if (!groups.length) { cleanup(); return noop; }
 
