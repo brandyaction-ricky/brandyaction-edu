@@ -25,8 +25,10 @@ const PROGRESS_CSS = `#${PROGRESS_ID}{display:none}@media(max-width:880px){#${PR
 // A facet name in the TOP5 MAP or the needs map shows its one-line meaning on tap or hover (CSS :focus/:hover only, so it
 // also works where the frame runs no listeners). The meaning is the report's own line from 01 검사 요약.
 const TERM_CSS = '.myin-term{position:relative;text-decoration:underline dotted;text-underline-offset:3px;cursor:help;outline:none}'
-  + '.myin-term-pop{display:none;position:absolute;left:0;top:calc(100% + 6px);z-index:40;width:max-content;max-width:min(260px,80vw);padding:9px 11px;border-radius:9px;background:#0d1531;color:#fff;font-size:12.5px;font-weight:500;line-height:1.55;text-align:left;white-space:normal;box-shadow:0 10px 24px rgba(13,21,49,.25)}'
-  + '.myin-term:hover .myin-term-pop,.myin-term:focus .myin-term-pop,.myin-term:focus-within .myin-term-pop{display:block}@media print{.myin-term-pop{display:none!important}.myin-term{text-decoration:none}}';
+  // A short sheet near the bottom of the reader at every width: a name in a right-hand column never pushes the page sideways.
+  + '.myin-term-pop{display:none;position:fixed;left:50%;bottom:72px;transform:translateX(-50%);z-index:310;width:min(420px,calc(100% - 32px));padding:9px 11px;border-radius:9px;background:#0d1531;color:#fff;font-size:12.5px;font-weight:500;line-height:1.55;text-align:left;white-space:normal;box-shadow:0 10px 24px rgba(13,21,49,.25)}'
+  + '.myin-term:hover .myin-term-pop,.myin-term:focus .myin-term-pop,.myin-term:focus-within .myin-term-pop{display:block}'
+  + '@media print{.myin-term-pop{display:none!important}.myin-term{text-decoration:none}}';
 // Same chapters as readerFrame: the answer to the buyer's own question (#my-question) sits after 01 and is read too.
 const SECTION = /^(s\d{1,2}|my-question)$/;
 const keyOf = (doc: Document) => {
@@ -103,7 +105,10 @@ export function attachReaderAssist(doc: Document): () => void {
     // The chapter whose title last crossed the upper third of the reader is the one being read: remembered for next time
     // (with a report id) and shown on phones as 'n / total장'.
     if (typeof IntersectionObserver === 'undefined') return cleanup;
-    const numbered = sections.filter(el => el.id !== 'my-question');
+    // The chapter number shown on the page (.sec-no, 00 = 들어가기) out of the last one, as the report itself counts.
+    const noOf = (el: Element | null | undefined) => el?.querySelector('.sec-no')?.textContent?.trim() ?? '';
+    const numbered = sections.filter(el => /^\d{2}$/.test(noOf(el)));
+    const lastNo = numbered.length ? Number(noOf(numbered[numbered.length - 1])) : 0;
     const pill = Object.assign(doc.createElement('div'), { id: PROGRESS_ID });
     pill.setAttribute('aria-hidden', 'true');
     const pillStyle = Object.assign(doc.createElement('style'), { textContent: PROGRESS_CSS });
@@ -113,8 +118,8 @@ export function attachReaderAssist(doc: Document): () => void {
         const section = e.target.parentElement, id = section?.id;
         if (!id || !SECTION.test(id)) continue;
         if (key) try { window.localStorage.setItem(key, id); } catch { /* storage off */ }
-        const i = numbered.indexOf(section as HTMLElement);
-        pill.textContent = id === 'my-question' ? '내 질문에 대한 답' : i >= 0 ? `${i + 1} / ${numbered.length}장` : pill.textContent;
+        const no = noOf(section);
+        pill.textContent = id === 'my-question' ? '내 질문에 대한 답' : no === '00' ? '들어가기' : /^\d{2}$/.test(no) ? `${Number(no)} / ${lastNo}장` : pill.textContent;
       }
     }, { rootMargin: '0px 0px -66% 0px' });
     doc.querySelectorAll('section[id] > h2').forEach(h => io.observe(h));
