@@ -20,7 +20,7 @@ async function backend(page: Page, data = snapshot) {
 test('day metrics and both sorts use cohort-wide denominators in overview and day tab', async ({ page }) => {
   await backend(page); await page.goto('/learning-care-test');
   const current = page.getByRole('button', { name: '1주차 2일차 · 반복 업무 찾기 명단 보기', exact: true });
-  await expect(current).toContainText('67%'); await expect(current).toContainText('2/3명 완료');
+  await expect(current).toContainText('29%'); await expect(current).toContainText('2/7명 완료');
   await expect(current).toContainText('18시간'); await expect(current).toContainText('2명 완료 기록 기준');
   await expect(page.getByRole('button', { name: '1주차 1일차 · 첫 필수 학습 명단 보기' })).toContainText('— (첫 일차)');
   await page.getByRole('combobox', { name: '일차 정렬' }).selectOption('completion');
@@ -30,7 +30,7 @@ test('day metrics and both sorts use cohort-wide denominators in overview and da
   await current.click(); await expect(page.getByRole('tab', { name: '일차별', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(current).toContainText('18시간');
   await page.getByRole('combobox', { name: '일차 정렬' }).selectOption('completion');
-  await expect(page.locator('.care-day-tiles article').first()).toContainText('50%');
+  await expect(page.locator('.care-day-tiles article').first()).toContainText('14%');
 });
 test('top attention list shows factual clocks/visits/contact and opens existing detail and encouragement without sending', async ({ page }, info) => {
   const writes = await backend(page); await page.goto('/learning-care-test');
@@ -57,7 +57,7 @@ test('old snapshots without predecessor data keep progress and visit attention; 
   const legacy = { ...snapshot, rows: snapshot.rows.map(r => ({ ...r, cells: r.cells.map(c => Object.fromEntries(Object.entries(c).filter(([key]) => key !== 'timing'))) })) };
   await backend(page, legacy as typeof snapshot); await page.goto('/learning-care-test');
   const current = page.getByRole('button', { name: '1주차 2일차 · 반복 업무 찾기 명단 보기' });
-  await expect(current).toContainText('67%'); await expect(current).toContainText('기록 확인 필요');
+  await expect(current).toContainText('29%'); await expect(current).toContainText('기록 확인 필요');
   await expect(page.getByRole('button', { name: '확인 필요 수강생 2명' })).toBeVisible();
   await page.getByRole('button', { name: '확인 필요 수강생 2명' }).click();
   const table = page.getByRole('table', { name: '확인 필요 수강생 목록' });

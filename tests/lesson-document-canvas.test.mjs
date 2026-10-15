@@ -10,7 +10,7 @@ function load(name) {
   new Function('exports','require', ts.transpileModule(source, {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(exports, path => load(path.replace('./','')));
   return exports;
 }
-const {lessonCanvasNodes,blocksFromCanvas,duplicateLessonBlock} = load('lesson-document-canvas');
+const {lessonCanvasNodes,blocksFromCanvas,duplicateLessonBlock,lessonClipboardNodes} = load('lesson-document-canvas');
 const {newGuidedBlock} = load('lesson-guided-tools');
 const {newCalculatorBlock} = load('lesson-calculators');
 const {lessonDocumentForEditor, serializeLessonDocument, parseLessonDocument, normalizeLessonDocument, lessonBodyPlainText} = load('lesson-body');
@@ -55,6 +55,17 @@ test('callout content persists through the canvas without changing activities or
 });
 test('whole lesson projection round-trips every opaque tool and untouched legacy text exactly',()=>{
   assert.deepEqual(blocksFromCanvas(lessonCanvasNodes(blocks)),blocks);
+});
+test('clipboard projection omits the original text cache without mutating content, marks or activity identities',()=>{
+ const nodes=lessonCanvasNodes(blocks), before=structuredClone(nodes), copied=lessonClipboardNodes(nodes);
+ assert.deepEqual(nodes,before);
+ for(let n=0;n<3;n++) {
+  assert.equal(copied[n].attrs.block.content,'');
+  assert.deepEqual(copied[n].content,nodes[n].content);
+  assert.equal(copied[n].attrs.block.id,blocks[n].id);
+ }
+ assert.deepEqual(copied.slice(3),nodes.slice(3));
+ assert.deepEqual(lessonClipboardNodes([]),[]);
 });
 test('editing plain heading preserves identity; richer heading becomes formatted text without dropping marks',()=>{
  const nodes=lessonCanvasNodes(blocks);nodes[1].content[0].content[0].text='새 제목';

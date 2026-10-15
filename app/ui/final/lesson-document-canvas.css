@@ -29,7 +29,7 @@
 .ldc-document .ldc-movable-blockquote > .ldc-move-handle { left:8px; z-index:4; }
 .ldc-document .ldc-movable > .ldc-move-handle:hover { background:#edf1f6; color:#243447; }
 .ldc-document .ldc-movable > .ldc-move-content { min-width:0; }
-.ldc-document .ldc-movable-bulletList > .ldc-move-content > ul, .ldc-document .ldc-movable-orderedList > .ldc-move-content > ol { margin-top:0; }
+.ldc-document .ldc-movable-bulletList > ul.ldc-move-content, .ldc-document .ldc-movable-orderedList > ol.ldc-move-content { margin-top:0; }
 .ldc-document [data-type=details] > .lesson-toggle-drag { display:inline-flex; align-items:center; justify-content:center; flex:none; width:24px; min-height:32px; border-radius:5px; color:#748091; cursor:grab; user-select:none; }
 .ldc-document [data-type=details] > .lesson-toggle-drag:hover { background:#edf1f6; color:#243447; }
 .ldc-document[contenteditable="false"] :is(.ldc-move-handle,.lesson-toggle-drag,.ldc-drag) { display:none; }

@@ -49,3 +49,18 @@ test('all existing guided and calculator definitions survive a local backup with
  for(const type of ['recipe-calculator','margin-calculator','marketing-funnel'])d.blocks.document.blocks.push(newCalculatorBlock(type,type));
  assert.deepEqual(parseLearningEditorDraft(JSON.stringify(d),actor,lesson),d);
 });
+
+test('image groups survive browser backup and author save validation; malformed groups stay rejected',()=>{
+ const d=draft();d.form.basic.week_id=actor;
+ d.blocks.document.blocks.push({id:'image1',type:'image',url:'https://example.test/a.png',imageGroup:'group_1'},{id:'image2',type:'image',url:'https://example.test/b.png',imageGroup:'group_1'});
+ assert.deepEqual(parseLearningEditorDraft(JSON.stringify(d),actor,lesson),d);
+ const {validateAuthorPayload}=load('lesson-author-drafts');
+ const payload={form:d.form,blocks:{active:true,document:d.blocks.document}};
+ assert.deepEqual(validateAuthorPayload(payload),payload);assert.deepEqual(validateAuthorPayload(payload,true),payload);
+ for(const group of ['',null,42,{},'../x','constructor','prototype']){
+  const invalid=structuredClone(d);invalid.blocks.document.blocks[1].imageGroup=group;
+  assert.throws(()=>parseLearningEditorDraft(JSON.stringify(invalid),actor,lesson));
+ }
+ const nonImage=structuredClone(d);nonImage.blocks.document.blocks[0].imageGroup='group_1';
+ assert.throws(()=>parseLearningEditorDraft(JSON.stringify(nonImage),actor,lesson));
+});

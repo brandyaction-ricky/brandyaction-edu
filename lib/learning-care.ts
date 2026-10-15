@@ -104,7 +104,7 @@ export function careDaySummaries(rows: CareRow[], asOf?: string) {
     const medianMilliseconds = !invalid && elapsed.length ? (elapsed.length % 2 ? elapsed[mid] : (elapsed[mid - 1] + elapsed[mid]) / 2) : null;
     return { day: lesson.day, week: lesson.week, title: lesson.title, lessonId: lesson.lessonId, invalid,
       available: published.length, done, percent: !invalid && published.length ? Math.round(done / published.length * 100) : null,
-      eligible, completionRate: !invalid && eligible ? Math.round(done / eligible * 100) : null,
+      eligible, total: rows.length, completionRate: !invalid && published.length && rows.length ? Math.round(done / rows.length * 100) : null,
       medianMilliseconds, timingSamples: invalid ? 0 : elapsed.length,
       firstDay: published.length > 0 && published.every(c => c.timing?.state === 'first'),
       timingMissing: completed.filter(c => c.timing?.state !== 'first').length - elapsed.length,
@@ -118,8 +118,8 @@ export function careDaySummaries(rows: CareRow[], asOf?: string) {
 export type CareDaySort = 'curriculum' | 'completion' | 'duration';
 export function careSortDays(days: ReturnType<typeof careDaySummaries>, sort: CareDaySort) {
   return [...days].sort((a, b) => {
-    const av = sort === 'completion' ? a.completionRate === null ? null : a.done / a.eligible : a.medianMilliseconds;
-    const bv = sort === 'completion' ? b.completionRate === null ? null : b.done / b.eligible : b.medianMilliseconds;
+    const av = sort === 'completion' ? a.completionRate === null ? null : a.done / a.total : a.medianMilliseconds;
+    const bv = sort === 'completion' ? b.completionRate === null ? null : b.done / b.total : b.medianMilliseconds;
     const order = sort === 'curriculum' ? 0 : av === null ? bv === null ? 0 : 1 : bv === null ? -1 : sort === 'completion' ? av - bv : bv - av;
     return order || a.week - b.week || a.day - b.day || a.lessonId.localeCompare(b.lessonId);
   });

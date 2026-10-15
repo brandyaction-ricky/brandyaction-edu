@@ -10,10 +10,27 @@ import { Bold, Italic, Underline, List, ListOrdered, Link2, Undo2, Redo2, Remove
 import { LessonCallout, insertLessonNotice } from "./lesson-callout";
 import { LESSON_FONT_SIZES, normalizeLessonColor, lessonDocumentForEditor, serializeLessonDocument } from "@/lib/lesson-body";
 import { safeUrl } from "@/lib/platform";
+import { TextSelection } from '@tiptap/pm/state';
+import type { EditorView } from '@tiptap/pm/view';
 import "./lesson-text.css";
 import "./lesson-body-editor.css";
 
 export type LessonBodyEditorProps = { value: string; onChange: (value: string) => void; label?: string; disabled?: boolean; name?: string; id?: string; showLabel?: boolean };
+
+// A contenteditable's DOM caret is not its sequential keyboard-focus position.
+// Native Tab starts at its first embedded handle, regardless of the caret.
+export function focusOutsideLessonEditor(view: EditorView, event: KeyboardEvent) {
+  if (event.key !== 'Tab' || event.isComposing || view.composing) return false;
+  const target = event.target as HTMLElement | null;
+  if (!target?.isContentEditable) return false;
+  const fields = [...view.dom.ownerDocument.querySelectorAll<HTMLElement>('button,a[href],input,select,textarea,summary,[tabindex]')]
+    .filter(field => field.tabIndex >= 0 && !view.dom.contains(field) && !field.closest('[inert]') && !field.matches(':disabled') && field.getClientRects().length > 0 && getComputedStyle(field).visibility !== 'hidden');
+  const direction = event.shiftKey ? globalThis.Node.DOCUMENT_POSITION_PRECEDING : globalThis.Node.DOCUMENT_POSITION_FOLLOWING;
+  const candidates = fields.filter(field => view.dom.compareDocumentPosition(field) & direction);
+  const next = event.shiftKey ? candidates.at(-1) : candidates[0];
+  if (!next) return false;
+  event.preventDefault(); next.focus(); return true;
+}
 
 const LessonFontSize = FontSize.extend({
   addGlobalAttributes() {
@@ -49,7 +66,38 @@ export const LessonQuote = Blockquote.extend({
   addInputRules() { return [wrappingInputRule({ find: /^" $/, type: this.type })]; },
 });
 const LessonDetails = Details.extend({
+  priority: 1000,
   draggable: true,
+  addKeyboardShortcuts() {
+    return {
+      ...this.parent?.(),
+      'Mod-Enter': () => {
+        const { state, view } = this.editor, { $head } = state.selection;
+        for (let depth = $head.depth; depth > 0; depth--) {
+          if ($head.node(depth).type.name !== 'details') continue;
+          const at = $head.after(depth), tr = state.tr.insert(at, state.schema.nodes.paragraph.create());
+          tr.setSelection(TextSelection.create(tr.doc, at + 1)); view.dispatch(tr.scrollIntoView());
+          return true;
+        }
+        return false;
+      },
+      Enter: () => {
+        const { state, view } = this.editor, { $head } = state.selection;
+        if ($head.parent.type.name !== 'detailsSummary' || !state.selection.empty) return false;
+        const wrapper = view.nodeDOM($head.before($head.depth - 1)) as HTMLElement | null;
+        if (!wrapper?.classList.contains('is-open')) wrapper?.querySelector<HTMLButtonElement>(':scope > button')?.click();
+        const at = $head.after() + 1;
+        const content = state.doc.nodeAt($head.after());
+        if (!content || content.type.name !== 'detailsContent') return false;
+        const tr = state.tr;
+        // Reuse the empty first line instead of adding a blank outside the toggle.
+        if (content.firstChild?.type.name !== 'paragraph' || content.firstChild.content.size) tr.insert(at, state.schema.nodes.paragraph.create());
+        tr.setSelection(TextSelection.create(tr.doc, at + 1));
+        view.dispatch(tr.scrollIntoView());
+        return true;
+      },
+    };
+  },
   addInputRules() {
     return [new InputRule({ find: /^> $/, handler: ({ chain, range }) => {
       if (!chain().deleteRange(range).setDetails().run()) return null;
@@ -86,6 +134,8 @@ const LessonDetails = Details.extend({
     };
   },
 });
+// Blank lines stay in the toggle. Mod-Enter intentionally creates a line outside.
+const LessonDetailsContent = DetailsContent.extend({ addKeyboardShortcuts() { return {}; } });
 const LessonInputUndo = Extension.create({
   name: "lessonInputUndo", priority: 1000,
   addKeyboardShortcuts() {
@@ -105,7 +155,7 @@ export function lessonRichExtensions() {
       // input rule and discards its undo state. Enter already creates paragraphs.
       heading: { levels: [1, 2, 3] }, trailingNode: false, blockquote: false, code: false, codeBlock: false, horizontalRule: false,
       link: { openOnClick: false, HTMLAttributes: { target: "_blank", rel: "noopener noreferrer" }, isAllowedUri: url => Boolean(safeUrl(url)) },
-    }), TextStyle, LessonFontSize, LessonColor, LessonBackgroundColor, LessonQuote, LessonDetails, DetailsSummary, DetailsContent, LessonCallout, LessonInputUndo,
+    }), TextStyle, LessonFontSize, LessonColor, LessonBackgroundColor, LessonQuote, LessonDetails, DetailsSummary, LessonDetailsContent, LessonCallout, LessonInputUndo,
     Node.create({ name: 'lessonImage', group: 'block', atom: true, addAttributes: () => ({ blockId: { default: null } }), renderHTML: () => ['div', { 'data-lesson-image-reference': '' }, '이미지 · 문서 편집 화면에서 확인'] })];
 }
 
@@ -117,7 +167,7 @@ export function LessonRichInput({ value, onChange, label = "학습 내용", disa
     extensions: lessonRichExtensions(),
     content: lessonDocumentForEditor(value),
     editable: !disabled,
-    editorProps: { attributes: { id: editorId, role: "textbox", "aria-label": label, "aria-multiline": "true", "aria-describedby": `${editorId}-help`, class: "lesson-rich-body" } },
+    editorProps: { attributes: { id: editorId, role: "textbox", "aria-label": label, "aria-multiline": "true", "aria-describedby": `${editorId}-help`, class: "lesson-rich-body" }, handleKeyDown: focusOutsideLessonEditor },
     onUpdate: ({ editor }) => {
       const next = serializeLessonDocument(editor.getJSON());
       lastValue.current = next;
@@ -139,7 +189,7 @@ export function LessonRichInput({ value, onChange, label = "학습 내용", disa
       <EditorContent editor={editor} />
     </div>
     {name && <input type="hidden" name={name} value={value} />}
-    <small id={`${editorId}-help`} className="field-hint">줄 맨 앞에 <code>#</code> · <code>##</code> · <code>###</code>와 공백을 입력하면 제목, <code>-</code>는 글머리 목록, <code>1.</code>은 번호 목록, <code>&gt;</code>는 접기·펼치기, <code>&quot;</code>는 인용문이 됩니다. 토글은 화살표로 펼친 뒤 제목에서 Enter를 누르면 안쪽에 글을 쓸 수 있습니다. Shift+Enter는 줄바꿈입니다. 변경 후 학습을 저장해 주세요.</small>
+    <small id={`${editorId}-help`} className="field-hint">줄 맨 앞에 <code>#</code> · <code>##</code> · <code>###</code>와 공백을 입력하면 제목, <code>-</code>는 글머리 목록, <code>1.</code>은 번호 목록, <code>&gt;</code>는 접기·펼치기, <code>&quot;</code>는 인용문이 됩니다. 토글 제목에서 Enter를 누르면 펼쳐져 안쪽에 글을 쓸 수 있습니다. Ctrl+Enter(맥은 ⌘+Enter)는 토글 밖에 새 문단을 만듭니다. Shift+Enter는 줄바꿈입니다. 변경 후 학습을 저장해 주세요.</small>
   </div>;
 }
 

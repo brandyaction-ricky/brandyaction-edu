@@ -2,16 +2,16 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { EditorContent, useEditor, Node, Extension, ReactNodeViewRenderer, NodeViewWrapper, type NodeViewProps, type JSONContent, type Editor } from '@tiptap/react';
-import { NodeSelection, Plugin, TextSelection } from '@tiptap/pm/state';
+import { NodeSelection, Plugin, Selection, TextSelection } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import { lessonImageColumns } from '@/lib/lesson-image-row';
-import { Fragment } from '@tiptap/pm/model';
+import { Fragment, Mark, Slice, type Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { isHistoryTransaction } from '@tiptap/pm/history';
 import { publicLessonBlocks, type LessonBlock, type LessonBlockType } from '@/lib/lesson-blocks';
-import { blocksFromCanvas, canvasTextContent, duplicateLessonBlock, isCanvasText, lessonCanvasNodes, type CanvasNode } from '@/lib/lesson-document-canvas';
+import { blocksFromCanvas, canvasTextContent, duplicateLessonBlock, isCanvasText, lessonCanvasNodes, lessonClipboardNodes, type CanvasNode } from '@/lib/lesson-document-canvas';
 import { LessonBlockView } from './lesson-block-view';
 import { GripVertical } from 'lucide-react';
-import { lessonRichExtensions, LessonFormatToolbar } from './lesson-rich-input';
+import { lessonRichExtensions, LessonFormatToolbar, focusOutsideLessonEditor } from './lesson-rich-input';
 import { lessonCanvasMovableExtensions } from './lesson-canvas-movable';
 import { useLessonImageDrag } from './lesson-image-drag';
 import type { LessonImagePosition } from '@/lib/lesson-image-position';
@@ -55,12 +55,31 @@ export function LessonDocumentCanvas(props: Props) {
   useEffect(() => { latest.current = props; }, [props]);
   const last = useRef(JSON.stringify(props.blocks));
   const [menu, setMenu] = useState(false), [message, setMessage] = useState(''), [selectedId, setSelectedId] = useState<string | null>(null);
+  // useEditor consumes initial content once. Parent edits and autosave status
+  // rerenders must not parse a second full document; external replacements are
+  // handled by the props.blocks effect below.
+  const [initialContent] = useState(() => ({ type: 'doc', content: lessonCanvasNodes(props.blocks) as JSONContent[] }));
   const root = useRef<HTMLDivElement>(null), insertRange = useRef<{ from: number; to: number } | null>(null);
   function openMenu(editor: Editor, slash = false) {
     const { from, to } = editor.state.selection;
     insertRange.current = { from, to: slash ? from + 1 : to };
     setMenu(true);
     requestAnimationFrame(() => root.current?.querySelector<HTMLButtonElement>('.ldc-insert-menu button')?.focus());
+  }
+  function syncClipboardSelection(view: Editor['view']) {
+    if (view.composing) return false;
+    const selection = view.dom.ownerDocument.getSelection();
+    if (!selection?.anchorNode || !selection.focusNode || !view.dom.contains(selection.anchorNode) || !view.dom.contains(selection.focusNode)) return false;
+    try {
+      const anchor = view.posAtDOM(selection.anchorNode, selection.anchorOffset), head = view.posAtDOM(selection.focusNode, selection.focusOffset);
+      // selectionchange can still be queued after a click/delete. Clipboard
+      // parsing and replacement must use the visible range, not the previous
+      // lesson block. Leave matching node/all selections intact.
+      if (anchor !== view.state.selection.anchor || head !== view.state.selection.head) {
+        view.dispatch(view.state.tr.setSelection(TextSelection.between(view.state.doc.resolve(anchor), view.state.doc.resolve(head))));
+      }
+    } catch { /* The DOM may be being replaced; keep the current safe selection. */ }
+    return false;
   }
   const editor = useEditor({
     immediatelyRender: false, shouldRerenderOnTransaction: false,
@@ -147,12 +166,22 @@ export function LessonDocumentCanvas(props: Props) {
         },
       }),
     ],
-    content: { type: 'doc', content: lessonCanvasNodes(props.blocks) as JSONContent[] },
+    content: initialContent,
     editable: !props.disabled,
     editorProps: {
       attributes: { role: 'textbox', 'aria-label': '수업 문서', 'aria-multiline': 'true', class: 'lesson-rich-body ldc-document' },
+      handleDOMEvents: { copy: syncClipboardSelection, cut: syncClipboardSelection, paste: syncClipboardSelection },
+      transformCopied(slice, view) {
+        return new Slice(Fragment.fromJSON(view.state.schema, lessonClipboardNodes(slice.content.toJSON() || [])), slice.openStart, slice.openEnd);
+      },
+      transformPasted(slice, view) {
+        // Also accept clipboard data produced before this fix without retaining
+        // its unselected original body in the pasted nodes or undo history.
+        return new Slice(Fragment.fromJSON(view.state.schema, lessonClipboardNodes(slice.content.toJSON() || [])), slice.openStart, slice.openEnd);
+      },
       handleKeyDown(view, event) {
         if (event.isComposing || view.composing) return false;
+        if (focusOutsideLessonEditor(view, event)) return true;
         if (event.key === 'Escape') { setMenu(false); return false; }
         if (event.key === '/' && view.state.selection.empty && view.state.selection.$from.parent.isTextblock && !view.state.selection.$from.parent.textContent) {
           const activeEditor = editorRef.current;
@@ -195,7 +224,30 @@ export function LessonDocumentCanvas(props: Props) {
     if (!editor || JSON.stringify(props.blocks) === last.current) return;
     const open = [...editor.view.dom.querySelectorAll<HTMLElement>('[data-type="details"]')].map((element, index) => element.classList.contains('is-open') ? index : -1).filter(index => index >= 0);
     const nodes = lessonCanvasNodes(props.blocks).map(node => editor.schema.nodeFromJSON(node));
-    const tr = editor.state.tr.replaceWith(0, editor.state.doc.content.size, nodes).setMeta('lessonStructure', true);
+    const next = editor.schema.topNodeType.create(null, nodes);
+    const updates: { pos: number; node: ProseMirrorNode }[] = [];
+    function sameContent(before: ProseMirrorNode, after: ProseMirrorNode, pos: number): boolean {
+      if (before.eq(after)) return true;
+      if (before.type !== after.type || before.isText || before.childCount !== after.childCount || before.nodeSize !== after.nodeSize) return false;
+      // Settings change attributes, never text or marks. Keep the existing
+      // content DOM and toggle state instead of replacing the whole lesson.
+      if (!Mark.sameSet(before.marks, after.marks)) return false;
+      if (!before.sameMarkup(after)) updates.push({ pos, node: after });
+      let offset = pos + 1;
+      for (let index = 0; index < before.childCount; index++) {
+        if (!sameContent(before.child(index), after.child(index), offset)) return false;
+        offset += before.child(index).nodeSize;
+      }
+      return true;
+    }
+    const attributesOnly = sameContent(editor.state.doc, next, -1);
+    const tr = editor.state.tr.setMeta('lessonStructure', true);
+    if (attributesOnly) {
+      for (const { pos, node } of updates) tr.setNodeMarkup(pos, undefined, node.attrs, node.marks);
+      // Replacing even a leaf's attributes maps its node selection past it.
+      // Equal content/structure makes the original selection positions valid.
+      tr.setSelection(Selection.fromJSON(tr.doc, editor.state.selection.toJSON()));
+    } else tr.replaceWith(0, editor.state.doc.content.size, nodes);
     last.current = JSON.stringify(props.blocks); editor.view.dispatch(tr);
     const toggles = editor.view.dom.querySelectorAll<HTMLElement>('[data-type="details"]');
     open.forEach(index => { const toggle = toggles[index]; if (toggle && !toggle.classList.contains('is-open')) toggle.querySelector<HTMLButtonElement>(':scope > button')?.click(); });
@@ -275,7 +327,7 @@ export function LessonDocumentCanvas(props: Props) {
     });
   }
   return <div className="ldc-root" ref={root} {...imageDrag.handlers}>
-    <p className="meta">글을 바로 클릭해 수정하세요. 빈 줄에서 / 또는 ‘현재 위치에 추가’로 질문·자료를 넣고, 왼쪽 손잡이를 끌어 순서를 바꿀 수 있어요.</p>
+    <p className="meta">글을 바로 클릭해 수정하세요. 빈 줄에서 / 또는 ‘현재 위치에 추가’로 질문·자료를 넣고, 왼쪽 손잡이를 끌어 순서를 바꿀 수 있어요. 토글 제목에서 Enter는 안쪽 입력, Ctrl+Enter(맥은 ⌘+Enter)는 토글 밖 새 문단입니다.</p>
     {props.blocks.some(block => block.type === 'image') && <p className="meta ldc-image-drag-help">이미지를 펼친 토글 안에 끌어 넣을 수 있어요. 이미지 설정의 ‘토글 안으로 이동’도 사용할 수 있습니다. 다른 이미지 옆에 놓으면 최대 3장까지 나란히 붙어요.</p>}
     {outline.length > 0 && <details className="ldc-outline"><summary>수업 목차 · {outline.length}개</summary><nav aria-label="수업 목차">{outline.map(item => <button type="button" className="btn small" key={`${item.id}-${item.index}`} onClick={() => jump(item.id, item.index)}>{item.label || '제목 입력 전'}</button>)}</nav></details>}
     <div className="lesson-body-editor ldc-editor">

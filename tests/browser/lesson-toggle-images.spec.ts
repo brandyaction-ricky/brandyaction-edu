@@ -10,8 +10,8 @@ const seed: LessonBlockDocument = { schemaVersion: 1, blocks: [
   { id: 'image', type: 'image', assetId: 'aaaaaaaa-1111-4111-8111-111111111111', alt: '프로젝트 지침 화면', content: '지침 설정 예시' },
   { id: 'question', type: 'question', question: { label: '기존 확인 질문', kind: 'text', required: true } },
 ], checklist: [] };
-async function setup(page: Page) {
-  let document = structuredClone(seed), revision = 'aaaaaaaa-1111-4111-8111-111111111112';
+async function setup(page: Page, initial = seed) {
+  let document = structuredClone(initial), revision = 'aaaaaaaa-1111-4111-8111-111111111112';
   await page.route('**/api/platform/lesson-blocks**', async route => {
     if (new URL(route.request().url()).searchParams.get('action') === 'progression') { await route.fulfill({ json: { lessons: [{ lessonId: 'aaaaaaab-1111-4111-8111-000000000004', isUnlocked: true, track: null, dayNumber: null, automaticApproval: false, reason: '' }] } }); return; }
     if (route.request().method() === 'POST') { const body = route.request().postDataJSON(); document = body.document; revision = body.requestId; }
@@ -36,6 +36,49 @@ async function moveWithSettings(page: Page) {
   await page.getByRole('combobox', { name: '토글 안으로 이동', exact: true }).selectOption('1');
   await page.getByRole('button', { name: '설정 닫기', exact: true }).click();
 }
+
+test('first nested image caption edit keeps the settings input and viewport in place', async ({ page }, info) => {
+  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+  const long = structuredClone(seed);
+  long.blocks[0].content = serializeLessonDocument({ type: 'doc', content: [
+    { type: 'details', content: [{ type: 'detailsSummary', content: [{ type: 'text', text: '새 이미지 토글' }] }, { type: 'detailsContent', content: [{ type: 'paragraph', content: [{ type: 'text', text: '프로젝트 지침 안내' }] }, { type: 'lessonImage', attrs: { blockId: 'image' } }] }] },
+    ...Array.from({ length: 80 }, (_, index) => ({ type: 'paragraph', content: [{ type: 'text', text: `하단 본문 ${index + 1}` }] })),
+  ] });
+  long.blocks[1].content = '';
+  const { canvas, saved } = await setup(page, long);
+  await canvas.getByRole('button', { name: '내용 펼치기', exact: true }).click();
+  await canvas.locator('[data-type="detailsContent"] [data-author-block="image"]').getByRole('button', { name: '이미지 설정', exact: true }).click();
+  const settings = page.getByRole('complementary', { name: '선택 항목 설정' });
+  const caption = settings.getByRole('textbox', { name: '설명', exact: true });
+  await caption.click();
+  const image = canvas.locator('[data-type="detailsContent"] [data-author-block="image"]').first();
+  await expect(image).toHaveClass(/is-selected/);
+  const before = await caption.evaluate(element => ({ y: scrollY, top: element.getBoundingClientRect().top, editorY: document.querySelector('.lesson-body-editor .tiptap')?.scrollTop ?? 0 }));
+  await caption.pressSequentially(' 첫 설명');
+  await expect(image).toHaveClass(/is-selected/);
+  await expect(caption).toBeFocused();
+  await expect(caption).toBeInViewport();
+  const after = await caption.evaluate(element => ({ y: scrollY, top: element.getBoundingClientRect().top, editorY: document.querySelector('.lesson-body-editor .tiptap')?.scrollTop ?? 0 }));
+  expect(Math.abs(after.y - before.y)).toBeLessThan(80);
+  expect(Math.abs(after.top - before.top)).toBeLessThan(80);
+  expect(Math.abs(after.editorY - before.editorY)).toBeLessThan(80);
+  await settings.getByRole('textbox', { name: '이미지 대체 설명', exact: true }).fill('새 대체 설명');
+  await expect(image).toHaveClass(/is-selected/);
+  await expect(canvas.locator('[data-type="details"]')).toHaveClass(/is-open/);
+  await expect(image).toBeVisible();
+  await expect(image.locator('img')).toBeVisible();
+  await expect(image.locator('img')).toBeInViewport();
+  await page.screenshot({ path: info.outputPath('toggle-caption-stable.png'), animations: 'allow', caret: 'initial' });
+  await expect(canvas.locator('[data-type="details"]')).toHaveClass(/is-open/);
+  await expect(image.locator('img')).toBeInViewport();
+  await page.getByRole('button', { name: '설정 닫기', exact: true }).click();
+  await save(page);
+  expect(saved().blocks.find(block => block.id === 'image')!.content).toBe(' 첫 설명');
+  expect(saved().blocks.find(block => block.id === 'question')).toEqual(seed.blocks[2]);
+  expect(saved().blocks.find(block => block.id === 'image')!.alt).toBe('새 대체 설명');
+  expect(saved().blocks[0]).toEqual(long.blocks[0]);
+  expect(errors).toEqual([]);
+});
 
 test('settings move preserves private image, caption and questions after save/reopen; reader hides and enlarges the image with its toggle', async ({ page }, info) => {
   const { canvas, saved } = await setup(page); await moveWithSettings(page); await save(page);

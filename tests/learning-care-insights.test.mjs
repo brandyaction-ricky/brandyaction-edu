@@ -7,14 +7,14 @@ new Function('exports',ts.transpileModule(fs.readFileSync(new URL('../lib/learni
 const hour=3600000, start='2026-10-01T00:00:00Z', end=n=>new Date(Date.parse(start)+n*hour).toISOString();
 const cell=(state='completed',elapsed=18,extra={})=>({lessonId:'current',title:'실제 학습',week:2,day:8,track:'learning',published:true,state,completedAt:end(elapsed),timing:{state:'known',previousLessonId:'required-before',previousCompletedAt:start},...extra});
 const row=cells=>({memberId:'member',cells,lastVisitAt:end(100),lastContactAt:null});
-test('bottleneck completion uses only existing completed + incomplete counts; overall progress stays intact',()=>{
+test('daily completion uses the same cohort denominator including waiting learners',()=>{
  const states=['completed','not_submitted','locked','scheduled','submitted','changes_requested'];
  const rows=states.map(state=>row([cell(state,18,{published:state!=='scheduled'})]));
  const day=logic.careDaySummaries(rows,end(100))[0];
- assert.equal(day.percent,20);assert.equal(day.completionRate,50);assert.equal(day.eligible,2);
+ assert.equal(day.percent,20);assert.equal(day.completionRate,17);assert.equal(day.eligible,2);assert.equal(day.total,6);
  assert.deepEqual([day.done,day.missing,day.locked,day.pending,day.returned],[1,1,1,1,1]);
  assert.equal(logic.careAggregate(rows,end(100)).percent,20);
- assert.equal(logic.careDaySummaries([row([cell('locked')])])[0].completionRate,null);
+ assert.equal(logic.careDaySummaries([row([cell('locked')])])[0].completionRate,0);
 });
 test('median uses predecessor timestamps, excludes unfinished/first/missing/reversed/future records and handles even/odd samples',()=>{
  const durations=[1,18,24,100];
@@ -39,9 +39,21 @@ test('72 hour boundary uses currently actionable published learning and never in
  assert.equal(logic.careAttention({...base,lastVisitAt:end(100)},end(100)).needsAttention,true);
 });
 test('sorts exact completion fractions and medians; missing values last; never mutates curriculum ordering',()=>{
- const days=[{lessonId:'a',week:1,day:1,completionRate:33,done:1,eligible:3,medianMilliseconds:null},{lessonId:'b',week:1,day:2,completionRate:33,done:33,eligible:100,medianMilliseconds:50*hour},{lessonId:'c',week:1,day:3,completionRate:null,done:0,eligible:0,medianMilliseconds:2*hour}];
+ const days=[{lessonId:'a',week:1,day:1,completionRate:33,done:1,total:3,medianMilliseconds:null},{lessonId:'b',week:1,day:2,completionRate:33,done:33,total:100,medianMilliseconds:50*hour},{lessonId:'c',week:1,day:3,completionRate:null,done:0,total:0,medianMilliseconds:2*hour}];
  assert.deepEqual(logic.careSortDays(days,'completion').map(d=>d.lessonId),['b','a','c']);
  assert.deepEqual(logic.careSortDays(days,'duration').map(d=>d.lessonId),['b','c','a']);
  assert.deepEqual(days.map(d=>d.lessonId),['a','b','c']);
  assert.equal(logic.careDuration(18*hour),'18시간');assert.equal(logic.careDuration(null),'기록 확인 필요');
+});
+
+test('sequential completion counts remain comparable when actionable denominators shrink',()=>{
+ const counts=[112,100,96,76,65,53,39];
+ const rows=Array.from({length:118},(_,i)=>row(counts.map((n,day)=>cell(i<n?'completed':i<(counts[day-1]??118)?'not_submitted':'locked',18,{lessonId:'day'+day,day:day+1}))));
+ const days=logic.careDaySummaries(rows);
+ assert.deepEqual(days.map(d=>d.total),counts.map(()=>118));
+ assert.deepEqual(days.map(d=>d.completionRate),[95,85,81,64,55,45,33]);
+ assert.ok(days.every((d,i)=>!i||d.completionRate<=days[i-1].completionRate));
+ assert.equal(logic.careDaySummaries([row([cell('scheduled',18,{published:false})])])[0].completionRate,null);
+ const independent=logic.careDaySummaries([row([cell('not_submitted',18,{lessonId:'before',day:1}),cell('completed',18,{lessonId:'later',day:2})])]);
+ assert.deepEqual(independent.map(d=>d.completionRate),[0,100]); // Never hide genuine out-of-order data with a clamp.
 });
