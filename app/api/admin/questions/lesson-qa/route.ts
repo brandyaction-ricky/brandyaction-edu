@@ -2,7 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getOperatorUser } from '@/lib/operator-permissions';
 import { uuid } from '@/lib/edu-workflows';
 import { hubBody } from '@/lib/question-hub-server';
-import { lessonQaAnchors, qaPlainText } from '@/lib/lesson-qa';
+import { LessonQaUnavailableError, lessonQaAnchors, qaPlainText } from '@/lib/lesson-qa';
 import { validateAuthorPayload } from '@/lib/lesson-author-drafts';
 import { revalidateTag } from 'next/cache';
 import { PUBLIC_CACHE_TAG } from '@/lib/public-platform-plan';
@@ -15,6 +15,7 @@ async function actor() {
   return user;
 }
 function failure(error: unknown) {
+  if (error instanceof LessonQaUnavailableError) return reply({ error: error.message, code: error.code }, 422);
   const e = error as { message?: string; status?: number };
   const known: Record<string, string> = {
     QA_CHANGED: '질문·답변·수업 버전이 바뀌었습니다. 최신 내용을 다시 확인해 주세요.',

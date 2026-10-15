@@ -15,9 +15,9 @@ export function LessonQaReview({ questionId, locked, onChanged, onDirtyChange, o
     if (gate.current || locked || (uncertain && action !== 'approve')) return; gate.current = true; setBusy(true); onBusyChange(true); setError(''); setNotice('');
     try {
       if (action === 'load') {
+        setSource(null); setPlan(null); setAnchor(''); setPrivacy(false); setCohorts(false); request.current = '';
         setSource(await questionRequest<Source>('/api/admin/questions/lesson-qa?question=' + questionId));
-        setPlan(null); setAnchor(''); setPrivacy(false); setCohorts(false); request.current = '';
-      } else if (action === 'prepare' && source) {
+      } else if (action === 'prepare' && source && source.anchors.length && !source.draftPending && !source.applied) {
         const selected = source.anchors.find((_, i) => String(i) === anchor);
         if (!selected) throw new Error('삽입 위치를 선택해 주세요.');
         if (!request.current) request.current = crypto.randomUUID();
@@ -37,7 +37,7 @@ export function LessonQaReview({ questionId, locked, onChanged, onDirtyChange, o
     <button type="button" className="btn small" disabled={disabled || uncertain} onClick={() => void run('load')}>{source ? '최신 공개본 다시 확인' : '삽입 위치 확인'}</button>
     {error && <p role="alert">{error}</p>}
     {source && <><p>{source.lessonTitle} · 같은 상품의 모든 기수에 적용</p><p className="meta">연결 기수: {source.cohorts.map(c => c.name).join(', ') || '없음'}</p>
-      {source.draftPending || source.applied ? <p role="status">{source.applied ? '이 질문은 이미 수업에 반영됐습니다.' : '다른 편집 초안이 있어 반영 준비를 중단했습니다. 기존 초안을 먼저 확인해 주세요.'}</p> : <>
+      {source.draftPending || source.applied ? <p role="status">{source.applied ? '이 질문은 이미 수업에 반영됐습니다.' : '다른 편집 초안이 있어 반영 준비를 중단했습니다. 기존 초안을 먼저 확인해 주세요.'}</p> : !source.anchors.length ? <p role="status">이 수업에는 질문·답변을 넣을 수 있는 설명 위치가 없습니다. 설명 문단이 있는 수업에서 사용할 수 있습니다.</p> : <>
         <label className="field">설명 다음 삽입 위치<select disabled={editDisabled} value={anchor} onChange={e => { setAnchor(e.target.value); edit(); }}><option value="">위치 선택</option>{source.anchors.map((item, i) => <option key={item.blockId + ':' + item.node} value={String(i)}>{item.label}</option>)}</select></label>
         <label className="field">개인정보를 지운 질문 제목<input maxLength={200} disabled={editDisabled} value={title} onChange={e => { setTitle(e.target.value); edit(); }}/></label>
         <label className="field">학생 답변과 수업에 사용할 동일한 답변<textarea rows={6} maxLength={10000} disabled={editDisabled} value={answer} onChange={e => { setAnswer(e.target.value); edit(); }}/></label>
