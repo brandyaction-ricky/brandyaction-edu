@@ -47,6 +47,6 @@ test('student can delete their lesson question without leaving the classroom',as
  await page.getByRole('button',{name:'질문 삭제',exact:true}).click();
  await page.getByRole('dialog').getByRole('button',{name:'질문 삭제',exact:true}).click();
  await expect(page.getByRole('heading',{name:'해결된 수업 질문'})).toHaveCount(0);
- await expect(page.getByRole('status')).toContainText('질문을 삭제했습니다.');
+ await expect(page.getByRole('status').filter({hasText:'질문을 삭제했습니다.'})).toBeVisible();
  await expect(page).toHaveURL(/classroom-questions-test/);
 });

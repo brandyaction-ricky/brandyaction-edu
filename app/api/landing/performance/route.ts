@@ -56,8 +56,8 @@ export async function GET(request: Request) {
             p_campaigns: null, p_ad_types: null, p_adsets: null, p_creatives: null, p_devices: null, p_layouts: null,
           });
         if (rpc.error || !rpc.data) throw Error('성과 데이터를 불러오지 못했습니다.');
-        const ui = rpc.data.ui ?? await performanceUiDetails(db, campaign, params, request.signal);
-        return { ...rpc.data, ui, campaign, source_title: courseRows.data?.find(value => value.id === campaign.landing_id)?.title || campaign.name, range: { startDay: range.startDay, endDay: range.endDay, compareStartDay: compareStart || null, compareEndDay: compareEnd || null } };
+        const ui = await performanceUiDetails(db, campaign, params, request.signal, user.id, rpc.data.ui);
+        return { ...rpc.data, financial_mode: 'orders', ui, campaign, source_title: courseRows.data?.find(value => value.id === campaign.landing_id)?.title || campaign.name, range: { startDay: range.startDay, endDay: range.endDay, compareStartDay: compareStart || null, compareEndDay: compareEnd || null } };
       }));
       return reply({ multi: true, reports });
     }
@@ -79,8 +79,8 @@ export async function GET(request: Request) {
     });
     if (rpc.error) throw Error('성과 데이터를 불러오지 못했습니다.');
     if (!rpc.data) return reply({ error: '캠페인 범위 안에서 조회해 주세요.' }, 400);
-    const ui = rpc.data.ui ?? (params.get('include') === 'ui' ? await performanceUiDetails(db, campaign, params, request.signal) : undefined);
-    return reply({ ...rpc.data, ...(ui ? { ui } : {}), campaign, range: { startDay: range.startDay, endDay: range.endDay, compareStartDay: compareStart || null, compareEndDay: compareEnd || null } });
+    const ui = params.get('include') === 'ui' ? await performanceUiDetails(db, campaign, params, request.signal, user.id, rpc.data.ui) : rpc.data.ui;
+    return reply({ ...rpc.data, financial_mode: 'orders', ...(ui ? { ui } : {}), campaign, range: { startDay: range.startDay, endDay: range.endDay, compareStartDay: compareStart || null, compareEndDay: compareEnd || null } });
   } catch (error) { const message=error instanceof Error?error.message:'조회에 실패했습니다.';return reply({ error: message }, /날짜|기간|선택/.test(message)?400:503); }
 }
 
