@@ -133,7 +133,8 @@ function attachMotion(doc: Document): Undo {
     return group;
   };
   const select = (selector: string, children: string, sequence = false, kind: Kind | ((el: Element) => Kind) = 'focus') => {
-    doc.querySelectorAll(selector).forEach(root => add(root, Array.from(root.querySelectorAll(children)), sequence, kind));
+    // One selector a browser cannot parse (e.g. :has) skips only that diagram, not the whole reader (EDU review #449).
+    try { doc.querySelectorAll(selector).forEach(root => add(root, Array.from(root.querySelectorAll(children)), sequence, kind)); } catch { /* skip */ }
   };
 
   try {
