@@ -11,10 +11,26 @@ import { LessonCallout, insertLessonNotice } from "./lesson-callout";
 import { LESSON_FONT_SIZES, normalizeLessonColor, lessonDocumentForEditor, serializeLessonDocument } from "@/lib/lesson-body";
 import { safeUrl } from "@/lib/platform";
 import { TextSelection } from '@tiptap/pm/state';
+import type { EditorView } from '@tiptap/pm/view';
 import "./lesson-text.css";
 import "./lesson-body-editor.css";
 
 export type LessonBodyEditorProps = { value: string; onChange: (value: string) => void; label?: string; disabled?: boolean; name?: string; id?: string; showLabel?: boolean };
+
+// A contenteditable's DOM caret is not its sequential keyboard-focus position.
+// Native Tab starts at its first embedded handle, regardless of the caret.
+export function focusOutsideLessonEditor(view: EditorView, event: KeyboardEvent) {
+  if (event.key !== 'Tab' || event.isComposing || view.composing) return false;
+  const target = event.target as HTMLElement | null;
+  if (!target?.isContentEditable) return false;
+  const fields = [...view.dom.ownerDocument.querySelectorAll<HTMLElement>('button,a[href],input,select,textarea,summary,[tabindex]')]
+    .filter(field => field.tabIndex >= 0 && !view.dom.contains(field) && !field.closest('[inert]') && !field.matches(':disabled') && field.getClientRects().length > 0 && getComputedStyle(field).visibility !== 'hidden');
+  const direction = event.shiftKey ? globalThis.Node.DOCUMENT_POSITION_PRECEDING : globalThis.Node.DOCUMENT_POSITION_FOLLOWING;
+  const candidates = fields.filter(field => view.dom.compareDocumentPosition(field) & direction);
+  const next = event.shiftKey ? candidates.at(-1) : candidates[0];
+  if (!next) return false;
+  event.preventDefault(); next.focus(); return true;
+}
 
 const LessonFontSize = FontSize.extend({
   addGlobalAttributes() {
@@ -151,7 +167,7 @@ export function LessonRichInput({ value, onChange, label = "학습 내용", disa
     extensions: lessonRichExtensions(),
     content: lessonDocumentForEditor(value),
     editable: !disabled,
-    editorProps: { attributes: { id: editorId, role: "textbox", "aria-label": label, "aria-multiline": "true", "aria-describedby": `${editorId}-help`, class: "lesson-rich-body" } },
+    editorProps: { attributes: { id: editorId, role: "textbox", "aria-label": label, "aria-multiline": "true", "aria-describedby": `${editorId}-help`, class: "lesson-rich-body" }, handleKeyDown: focusOutsideLessonEditor },
     onUpdate: ({ editor }) => {
       const next = serializeLessonDocument(editor.getJSON());
       lastValue.current = next;

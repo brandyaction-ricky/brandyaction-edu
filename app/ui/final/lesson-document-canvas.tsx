@@ -11,7 +11,7 @@ import { publicLessonBlocks, type LessonBlock, type LessonBlockType } from '@/li
 import { blocksFromCanvas, canvasTextContent, duplicateLessonBlock, isCanvasText, lessonCanvasNodes, lessonClipboardNodes, type CanvasNode } from '@/lib/lesson-document-canvas';
 import { LessonBlockView } from './lesson-block-view';
 import { GripVertical } from 'lucide-react';
-import { lessonRichExtensions, LessonFormatToolbar } from './lesson-rich-input';
+import { lessonRichExtensions, LessonFormatToolbar, focusOutsideLessonEditor } from './lesson-rich-input';
 import { lessonCanvasMovableExtensions } from './lesson-canvas-movable';
 import { useLessonImageDrag } from './lesson-image-drag';
 import type { LessonImagePosition } from '@/lib/lesson-image-position';
@@ -181,6 +181,7 @@ export function LessonDocumentCanvas(props: Props) {
       },
       handleKeyDown(view, event) {
         if (event.isComposing || view.composing) return false;
+        if (focusOutsideLessonEditor(view, event)) return true;
         if (event.key === 'Escape') { setMenu(false); return false; }
         if (event.key === '/' && view.state.selection.empty && view.state.selection.$from.parent.isTextblock && !view.state.selection.$from.parent.textContent) {
           const activeEditor = editorRef.current;
