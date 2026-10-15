@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { Printer, X } from 'lucide-react';
+import { enhancePrecisionDiagrams } from '@/lib/precisionReportMotion';
 
 // Match MYIN's reader isolation. Keep the issued styles/font/body unchanged;
 // scripts and external requests must not run inside the EDU account origin.
@@ -15,15 +16,20 @@ export function diagnosisReaderDocument(html: string) {
 export function DiagnosisReportReader({ html, error, onClose, onError }: { html: string; error?: string; onClose: () => void; onError: (message: string) => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const frame = useRef<HTMLIFrameElement>(null);
+  const stopMotion = useRef<() => void>(() => {});
   useEffect(() => {
     const reader = dialog.current, previousOverflow = document.body.style.overflow;
     reader?.showModal();
     document.body.style.overflow = 'hidden';
     frame.current?.focus({ preventScroll: true });
-    return () => { reader?.close(); document.body.style.overflow = previousOverflow; };
+    return () => { stopMotion.current(); reader?.close(); document.body.style.overflow = previousOverflow; };
   }, []);
   function connectContents() {
     const document = frame.current?.contentDocument;
+    // Same as MYIN (2026-10-15, CEO): diagrams in the open reader get one emphasis as they scroll in. The issued HTML,
+    // print and PDF keep the static original; nothing runs inside the frame (its CSP still blocks every script).
+    stopMotion.current();
+    stopMotion.current = document ? enhancePrecisionDiagrams(document) : () => {};
     // WebKit suppresses JS listeners in a script-disabled sandbox. Native
     // fragment links must address srcdoc itself, not the parent page URL.
     if (document) document.documentElement.style.setProperty('scroll-padding-top', `${document.querySelector('.report-topbar')?.getBoundingClientRect().height || 0}px`);
