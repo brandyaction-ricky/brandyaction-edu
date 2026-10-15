@@ -2,6 +2,7 @@ import type { createAdminClient } from './supabase/admin';
 import { filterValues, type DashboardReport, type PerformanceCampaign } from './landing-performance';
 import { kstDate } from './landing';
 import { periodActuals } from './landing-operations-phase1';
+import type { LandingInsights } from './landing-insights';
 
 type Db = ReturnType<typeof createAdminClient>;
 type Session = { session_id: string; visitor_id?: string; created_at: string; last_seen_at: string; clicks?: number; attribution: Record<string, string> | null };
@@ -40,11 +41,11 @@ export function filterAdTypes(rows: Session[], dimensions: Dimension[], selected
   const types = new Map(dimensions.map(d => [tuple(d.adset_key, d.creative_key), d.ad_type]));
   return rows.filter(row => selected.includes(types.get(tuple(row.attribution?.utm_term || '', row.attribution?.utm_content || '')) || 'unclassified'));
 }
-export async function performanceUiDetails(db: Db, campaign: PerformanceCampaign, params: URLSearchParams, signal: AbortSignal): Promise<NonNullable<DashboardReport['ui']>> {
+export async function performanceUiDetails(db: Db, campaign: PerformanceCampaign, params: URLSearchParams, signal: AbortSignal, actorId?: string, baseUi?: NonNullable<DashboardReport['ui']>): Promise<NonNullable<DashboardReport['ui']>> {
   const errors: NonNullable<DashboardReport['ui']>['errors'] = {};
   const limitedSignal = AbortSignal.any([signal, AbortSignal.timeout(12000)]);
   const adTypes = filterValues(params, 'ad_type');
-  const dimensions = adTypes.length ? pages<Dimension>((from, to) => db.from('landing_campaign_dimensions').select('adset_key,creative_key,ad_type').eq('campaign_id', campaign.id).order('adset_key').order('creative_key').range(from, to).abortSignal(limitedSignal)) : Promise.resolve([] as Dimension[]);
+  const dimensions = !baseUi && adTypes.length ? pages<Dimension>((from, to) => db.from('landing_campaign_dimensions').select('adset_key,creative_key,ad_type').eq('campaign_id', campaign.id).order('adset_key').order('creative_key').range(from, to).abortSignal(limitedSignal)) : Promise.resolve([] as Dimension[]);
   // PostgREST expression values are quoted, including escaped quotes/backslashes.
   const quote = (value: string) => JSON.stringify(value);
   function sessions(start: string, end: string, columns: string) {
@@ -91,6 +92,16 @@ export async function performanceUiDetails(db: Db, campaign: PerformanceCampaign
       return { period: periodActuals(rows, params.get('start')!, params.get('end')!), presence: { new_payments: rows.some(row => row.new_payments !== null), existing_payments: rows.some(row => row.existing_payments !== null) }, previous: Object.fromEntries(rows.map(row => [row.day, byDay.get(new Date(Date.parse(row.day + 'T00:00:00Z') - 86400000).toISOString().slice(0, 10)) ?? null])) };
     } catch { errors.actuals = '실측 입력 여부와 전일 인원을 확인하지 못했습니다.'; return null; }
   };
-  const [daily_a, last_collected_at, actual] = await Promise.all([trend(), collection(), actuals()]);
-  return { daily_a, last_collected_at, actual_presence: actual?.presence || null, previous_day_members: actual?.previous || {}, period_actuals: actual?.period ?? null, errors };
+  const insights = async (): Promise<LandingInsights | null> => {
+    if (!actorId) return null;
+    try {
+      const filters = Object.fromEntries(['utm_campaign','adset','creative','device','layout','ad_type'].map(key => [key, filterValues(params, key)]));
+      const result = await db.rpc('edu_marketing_insights', { p_actor: actorId, p_campaign: campaign.id, p_from: params.get('start'), p_to: params.get('end'), p_filters: filters }).abortSignal(limitedSignal);
+      if (result.error || !result.data?.revenue || !result.data?.behavior) throw Error();
+      return result.data as LandingInsights;
+    } catch { errors.insights = '자동 매출·행동 분석을 불러오지 못했습니다. 다시 조회해 주세요.'; return null; }
+  };
+  if (baseUi) { const analysis = await insights(); return { ...baseUi, ...(actorId ? { insights: analysis } : {}), errors: { ...baseUi.errors, ...errors } }; }
+  const [daily_a, last_collected_at, actual, analysis] = await Promise.all([trend(), collection(), actuals(), insights()]);
+  return { daily_a, last_collected_at, actual_presence: actual?.presence || null, previous_day_members: actual?.previous || {}, period_actuals: actual?.period ?? null, ...(actorId ? { insights: analysis } : {}), errors };
 }
