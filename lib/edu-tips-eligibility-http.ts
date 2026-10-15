@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import Ajv from 'ajv/dist/2020';
 import addFormats from 'ajv-formats';
 import schema from './edu-tips-eligibility.schema.json';
+import { parseStrictTipsJson } from './edu-tips-json';
 
 const ajv = new Ajv({ strict: false, allErrors: false });
 addFormats(ajv);
@@ -36,7 +37,7 @@ async function boundedBody(request: Request, signal: AbortSignal) {
       if (bytes > 16384) { await reader.cancel(); throw new InvalidBody(413); }
       chunks.push(part.value);
     }
-    try { return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown; }
+    try { return parseStrictTipsJson(Buffer.concat(chunks)); }
     catch { throw new InvalidBody(400); }
   } finally { signal.removeEventListener('abort', abort); reader.releaseLock(); }
 }

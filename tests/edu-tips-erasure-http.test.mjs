@@ -1,23 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { createHash, createHmac, randomBytes } from 'node:crypto';
-import ts from 'typescript';
 import { fixture, id, receipt, customer, epoch } from './helpers/edu-tips-erasure.mjs';
-const require = createRequire(import.meta.url);
-const exports = {};
-const schema = JSON.parse(readFileSync(new URL('../lib/edu-tips-erasure.schema.json', import.meta.url)));
-const code = ts.transpileModule(readFileSync(new URL('../lib/edu-tips-erasure-http.ts', import.meta.url), 'utf8'),
- { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText;
-new Function('exports','require',code)(exports,name=>name.endsWith('.schema.json')?schema:require(name));
+import { candidate } from './helpers/edu-tips-candidate-loader.mjs';
+const exports = candidate('edu-tips-erasure-http');
 const hash = x => createHash('sha256').update(x).digest('hex');
 const key = 'synthetic-development-erasure-key-000000';
 const otherKey = 'synthetic-production-erasure-key-000000';
 const readerKey = 'synthetic-readonly-erasure-key-00000000';
 const secret = 'synthetic-cursor-signing-secret-not-for-use-000000000000';
-async function setup(t) {
- const f = await fixture(t,['20261010080829_edu_tips_erasure_http_v2.sql']);
+async function setup(t,extraMigrations=[]) {
+ const f = await fixture(t,['20261010080829_edu_tips_erasure_http_v2.sql',...extraMigrations]);
  await f.owner("update edu_tips_private.erasure_outbox set active_due_at=requested_at+interval '120 hours',model_due_at=requested_at+interval '720 hours',residual_due_at=requested_at+interval '720 hours'");
  for (const [token,consumer,scopes] of [[key,90,['edu.erasure.read','edu.erasure.ack']],[otherKey,91,['edu.erasure.read','edu.erasure.ack']],[readerKey,90,['edu.erasure.read']]]) {
   await f.owner("insert into edu_tips_private.erasure_keys(key_hash,consumer_id,scopes,expires_at) values($1,$2,$3,'2099-01-01')",[hash(token),id(consumer),scopes]);
@@ -77,6 +70,55 @@ test('real SQL pages use immutable snapshots, opaque cursors, exact deadlines an
  assert.equal(empty.status,200);assert.equal(empty.body.tombstones.length,0);assert.equal(empty.body.has_more,false);
  const replay=await f.call('page',{query:`?limit=2&after=${first.body.next_cursor}`});
  assert.deepEqual(replay.body.tombstones.map(x=>x.requestId),second.body.tombstones.map(x=>x.requestId));
+});
+
+test('SQL tombstones retain six-digit source times through the Request/Response HTTP adapter and replay',async t=>{
+ const f=await setup(t);
+ await f.owner("update edu_tips_private.erasure_outbox set requested_at='2026-01-01T00:00:00.123456Z',active_due_at='2026-01-06T00:00:00.123456Z',model_due_at='2026-01-31T00:00:00.123456Z',residual_due_at='2026-01-31T00:00:00.123456Z'");
+ const first=await f.call();assert.equal(first.status,200);
+ for(const row of first.body.tombstones){assert.equal(row.at,'2026-01-01T00:00:00.123456Z');assert.equal(row.active_due_at,'2026-01-06T00:00:00.123456Z');assert.equal(row.model_due_at,'2026-01-31T00:00:00.123456Z');assert.equal(row.residual_due_at,row.model_due_at);}
+ const replay=await f.call();assert.equal(replay.status,200);
+ assert.deepEqual(replay.body.tombstones.map(({at,active_due_at,model_due_at,residual_due_at})=>({at,active_due_at,model_due_at,residual_due_at})),first.body.tombstones.map(({at,active_due_at,model_due_at,residual_due_at})=>({at,active_due_at,model_due_at,residual_due_at})));
+});
+
+test('a one-microsecond deadline extension is rejected rather than rounded into the allowed interval',async t=>{
+ const f=await setup(t);
+ await f.owner("update edu_tips_private.erasure_outbox set requested_at='2026-01-01T00:00:00.123456Z',active_due_at='2026-01-06T00:00:00.123457Z',model_due_at='2026-01-31T00:00:00.123456Z',residual_due_at='2026-01-31T00:00:00.123456Z'");
+ const result=await f.call();assert.equal(result.status,503);assert.deepEqual(result.body,{error:'contract_violation'});
+});
+
+test('source offset normalization is lossless and invalid calendar/zone/precision fails the whole page',async t=>{
+ const f=await setup(t);
+ const cases=[
+  ['2026-01-01T09:00:00.123+09:00','2026-01-01T00:00:00.123Z'],
+  ['2026-01-01T09:00:00.123456+09:00','2026-01-01T00:00:00.123456Z'],
+  ['2025-12-31T19:00:00.123456-05:00','2026-01-01T00:00:00.123456Z'],
+  ['2026-01-01T00:00:00.123000Z','2026-01-01T00:00:00.123000Z'],
+  ['2026-01-01T00:00:00.1234+00:00','2026-01-01T00:00:00.123400Z'],
+  ['2026-01-01T00:00:00.1Z','2026-01-01T00:00:00.100Z'],
+  ['2026-01-01T00:00:00Z','2026-01-01T00:00:00.000Z'],
+  ['2026-02-30T00:00:00.123456Z',null],
+  ['2026-01-01T00:00:00.1234567Z',null],
+  ['2026-01-01T00:00:00.123456+14:01',null],
+  ['2026-01-01T00:00:00.123456-00:00',null],
+ ];
+ for(const[at,expected]of cases){
+  const rpcOverride=async(n,a,s)=>{const result=await f.rpc(n,a,s);if(n==='edu_tips_erasure_http_page'){
+   for(const row of result.data.tombstones){row.at=at;row.active_due_at=at.replace('2026-01-01','2026-01-06').replace('2025-12-31','2026-01-05');row.model_due_at=at.replace('2026-01-01','2026-01-31').replace('2025-12-31','2026-01-30');row.residual_due_at=row.model_due_at;}
+  }return result;};
+  const result=await f.call('page',{rpcOverride});assert.equal(result.status,expected?200:503,at);
+  if(expected)assert.equal(result.body.tombstones[0].at,expected);else assert.deepEqual(result.body,{error:'contract_violation'});
+ }
+});
+
+test('HTTP pull times equal the actual source control serializer for millisecond and microsecond SQL values',async t=>{
+ const f=await setup(t,['20261012014228_edu_tips_eligibility_v2.sql','20261014042612_edu_tips_control_delivery_candidate.sql']);
+ for(const fraction of ['000000','100000','123456','999999']){
+  await f.owner("update edu_tips_private.erasure_outbox set requested_at=$1::timestamptz,active_due_at=$1::timestamptz+interval '120 hours',model_due_at=$1::timestamptz+interval '720 hours',residual_due_at=$1::timestamptz+interval '720 hours'",['2026-01-01T23:59:59.'+fraction+'Z']);
+  const expected=(await f.owner("select jsonb_build_object('at',edu_tips_private.control_utc(requested_at),'active_due_at',edu_tips_private.control_utc(active_due_at),'model_due_at',edu_tips_private.control_utc(model_due_at),'residual_due_at',edu_tips_private.control_utc(residual_due_at)) as v from edu_tips_private.erasure_outbox limit 1")).rows[0].v;
+  const response=await f.call();assert.equal(response.status,200,fraction);
+  for(const row of response.body.tombstones)for(const key of Object.keys(expected))assert.equal(row[key],expected[key],fraction+':'+key);
+ }
 });
 
 test('forged, signed but unissued, cross-consumer, snapshot and expired cursors cannot advance a consumer',async t=>{

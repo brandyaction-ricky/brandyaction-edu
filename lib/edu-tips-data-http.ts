@@ -2,6 +2,7 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypt
 import Ajv from 'ajv/dist/2020';
 import addFormats from 'ajv-formats';
 import schema from './edu-tips-data.schema.json';
+import { parseStrictTipsJson } from './edu-tips-json';
 const ajv = new Ajv({ strict: false, allErrors: false }); addFormats(ajv); ajv.addSchema(schema);
 const validators = Object.fromEntries(['EventPage','LearningPage','RecoveryRequest','RecoveryResponse','RecoveryCompleteRequest','RecoveryCompleteResponse']
   .map(name => [name, ajv.compile({ $ref: `${schema.$id}#/$defs/${name}` })]));
@@ -30,7 +31,7 @@ async function body(request: Request,signal: AbortSignal) {
   const chunks: Uint8Array[]=[];let size=0;const cancel=()=>{void reader.cancel();};signal.addEventListener('abort',cancel,{once:true});
   try { while(true) { signal.throwIfAborted();const part=await reader.read();signal.throwIfAborted();if(part.done)break;
     size+=part.value.byteLength;if(size>4096){await reader.cancel();fail(400,'invalid_request');}chunks.push(part.value); }
-    try{return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown;}catch{return fail(400,'invalid_request');}
+    try{return parseStrictTipsJson(Buffer.concat(chunks));}catch{return fail(400,'invalid_request');}
   }finally{signal.removeEventListener('abort',cancel);reader.releaseLock();}
 }
 const codes: Record<string,[number,string]>={
