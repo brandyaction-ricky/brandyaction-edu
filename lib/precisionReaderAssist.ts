@@ -16,6 +16,7 @@ const CHIP_ID = 'myin-resume';
 const CHIP_CSS = `#${CHIP_ID}{position:fixed;left:50%;bottom:18px;z-index:300;transform:translateX(-50%);display:flex;align-items:center;gap:10px;max-width:calc(100% - 32px);padding:10px 12px 10px 16px;border-radius:999px;background:#0d1531;color:#fff;font:600 13px/1.4 inherit;box-shadow:0 10px 30px rgba(13,21,49,.28);animation:myin-resume-out .4s ease 14s forwards}`
   + `#${CHIP_ID} span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#${CHIP_ID} a{flex:none;padding:6px 12px;border-radius:999px;background:#fff;color:#0d1531;text-decoration:none;font-weight:700}`
   + `@keyframes myin-resume-out{to{opacity:0;visibility:hidden;pointer-events:none}}@media print{#${CHIP_ID}{display:none!important}}`;
+const NEXT_CSS = '.myin-next{display:flex;justify-content:flex-end;margin:28px 0 0}.myin-next a{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:10px 16px;border:1px solid var(--line,#dfe4f4);border-radius:999px;background:#fff;color:#0d1531;font-size:14px;font-weight:700;text-decoration:none}.myin-next a b{color:var(--blue,#2735c8);font-variant-numeric:tabular-nums}@media print{.myin-next{display:none!important}}';
 const SECTION = /^s\d{1,2}$/;
 const keyOf = (doc: Document) => {
   const id = doc.querySelector('meta[name="report-id"]')?.getAttribute('content') || doc.querySelector('meta[name="response-id"]')?.getAttribute('content');
@@ -29,9 +30,9 @@ export function attachReaderAssist(doc: Document): () => void {
   const cleanup = () => { while (undo.length) undo.pop()!(); };
   try {
     const key = keyOf(doc), win = doc.defaultView;
-    if (!key || !win || typeof IntersectionObserver === 'undefined') return cleanup;
+    if (!win) return cleanup;
     let saved: string | null = null;
-    try { saved = window.localStorage.getItem(key); } catch { /* storage off */ }
+    if (key) try { saved = window.localStorage.getItem(key); } catch { /* storage off */ }
     const target = saved && SECTION.test(saved) && !['s0', 's1'].includes(saved) ? doc.getElementById(saved) : null;
     if (target && !doc.getElementById(CHIP_ID)) {
       const style = Object.assign(doc.createElement('style'), { textContent: CHIP_CSS });
@@ -50,7 +51,27 @@ export function attachReaderAssist(doc: Document): () => void {
       doc.head.append(style); doc.body.append(chip);
       undo.push(() => { chip.remove(); style.remove(); });
     }
+    // Each chapter ends with a link to the next one in reading order (21 chapters; phones have no side contents).
+    const sections = Array.from(doc.querySelectorAll<HTMLElement>('section.section[id]')).filter(el => SECTION.test(el.id));
+    if (sections.length > 1 && !doc.querySelector('.myin-next')) {
+      const style = Object.assign(doc.createElement('style'), { textContent: NEXT_CSS });
+      doc.head.append(style); undo.push(() => style.remove());
+      sections.slice(0, -1).forEach((section, i) => {
+        const next = sections[i + 1], title = next.querySelector('h2')?.textContent?.trim();
+        if (!title) return;
+        const box = Object.assign(doc.createElement('div'), { className: 'myin-next' });
+        const link = Object.assign(doc.createElement('a'), { href: `about:srcdoc#${next.id}` });
+        const no = next.querySelector('.sec-no')?.textContent?.trim();
+        link.append('다음 장 ', ...(no ? [Object.assign(doc.createElement('b'), { textContent: no })] : []), ` ${title} →`);
+        link.addEventListener('click', event => {
+          event.preventDefault(); event.stopPropagation();
+          win.scrollTo({ top: next.getBoundingClientRect().top + win.scrollY - (parseFloat(win.getComputedStyle(next).scrollMarginTop) || 0) });
+        });
+        box.append(link); section.append(box); undo.push(() => box.remove());
+      });
+    }
     // The chapter whose title last crossed the upper third of the reader is the one being read.
+    if (!key || typeof IntersectionObserver === 'undefined') return cleanup;
     const io = new IntersectionObserver(entries => {
       for (const e of entries) if (e.isIntersecting) {
         const id = e.target.parentElement?.id;
