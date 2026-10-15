@@ -10,6 +10,12 @@ export const READER_LAYOUT_CSS = '.spec-body:not(:has(.slider)){grid-template-co
   + '.spec-body:not(:has(.slider)) .pole.right{text-align:left;border-left:1px solid var(--line,#e1dbd0);padding-left:22px}'
   + '.spec-body:not(:has(.slider)) .pole.right li:before{content:"·";color:var(--fill);margin-right:6px}'
   + '.spec-body:not(:has(.slider)) .pole.right li:after{content:none}'
+  // CEO QA 10-15: a light card inside a dark chapter (02's '직접 적은 경험과 연결하기') inherited the chapter's white text.
+  + '.mode-deficit .callout h3,.mode-mission .callout h3{color:#171a22!important}.mode-deficit .callout p,.mode-mission .callout p{color:#4a5165!important}'
+  // Two cards side by side keep one height: 11장 '기여와 경계' (the arrow stays centred) and every paired list.
+  // (!important: the issued CSS sets these with #s11 and .section selectors.)
+  + '.e-balance{align-items:stretch!important}.e-balance>span{align-self:center}'
+  + '.v-pair{align-items:stretch!important}.v-pair>.final-block{margin:0!important;display:flex;flex-direction:column}.v-pair>.final-block>:last-child{flex:1 1 auto}'
   + '@media(max-width:700px){.spec-body:not(:has(.slider)){grid-template-columns:1fr}.spec-body:not(:has(.slider)) .pole.right{border-left:0;padding-left:0;border-top:1px solid var(--line,#e1dbd0);padding-top:16px}}';
 
 const CHIP_ID = 'myin-resume';
