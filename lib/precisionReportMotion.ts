@@ -166,7 +166,8 @@ function attachMotion(doc: Document): Undo {
     select('.e-sequence', ':scope > span', true);
     select('.e-identity', '.e-identity-main,.e-identity-criteria,.e-identity-result', true);
     select('.v-panel:has(.v-fork)', '.v-fork-root,.v-route');
-    select('.v-job-branches', ':scope > div');
+    // Branches read in order: the core need's column first in the TOP5 MAP, current roles before wider ones in chapter 14.
+    select('.v-job-branches', ':scope > div', true);
     select('.v-environment', ':scope > .v-good,:scope > .v-risk');
     select('.e-balance', ':scope > div');
     select('.v-compare', ':scope > div');
