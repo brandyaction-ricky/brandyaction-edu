@@ -56,10 +56,10 @@ export async function GET(request: Request) {
             p_a_start: compareStart || null, p_a_end: compareEnd || null,
             p_campaigns: null, p_ad_types: null, p_adsets: null, p_creatives: null, p_devices: null, p_layouts: null,
           }),
-          performanceUiDetails(db, campaign, params, request.signal),
+          performanceUiDetails(db, campaign, params, request.signal, user.id),
         ]);
         if (rpc.error || !rpc.data) throw Error('성과 데이터를 불러오지 못했습니다.');
-        return { ...rpc.data, ui, campaign, source_title: courseRows.data?.find(value => value.id === campaign.landing_id)?.title || campaign.name, range: { startDay: range.startDay, endDay: range.endDay, compareStartDay: compareStart || null, compareEndDay: compareEnd || null } };
+        return { ...rpc.data, financial_mode: 'orders', ui, campaign, source_title: courseRows.data?.find(value => value.id === campaign.landing_id)?.title || campaign.name, range: { startDay: range.startDay, endDay: range.endDay, compareStartDay: compareStart || null, compareEndDay: compareEnd || null } };
       }));
       return reply({ multi: true, reports });
     }
@@ -78,13 +78,13 @@ export async function GET(request: Request) {
       p_campaigns: nullable(filterValues(params, 'utm_campaign')), p_ad_types: nullable(filterValues(params, 'ad_type')),
       p_adsets: nullable(filterValues(params, 'adset')), p_creatives: nullable(filterValues(params, 'creative')),
       p_devices: nullable(filterValues(params, 'device')), p_layouts: nullable(filterValues(params, 'layout').map(Number).filter(Number.isInteger)),
-    }), params.get('include') === 'ui' ? performanceUiDetails(db, campaign, params, request.signal) : Promise.resolve(undefined)]);
+    }), params.get('include') === 'ui' ? performanceUiDetails(db, campaign, params, request.signal, user.id) : Promise.resolve(undefined)]);
     if (rpc.error) throw Error('성과 데이터를 불러오지 못했습니다.');
     if (!rpc.data) return reply({ error: '캠페인 범위 안에서 조회해 주세요.' }, 400);
     const performance = Array.isArray(rpc.data.performance) ? rpc.data.performance as { adset?: unknown; creative?: unknown }[] : [];
     const observed = performance.map(row => ({ campaign_id: campaign.id, adset_key: String(row.adset || '').slice(0,250), creative_key: String(row.creative || '').slice(0,250), ad_type: 'unclassified', updated_at: new Date().toISOString() }));
     if (observed.length) await db.from('landing_campaign_dimensions').upsert(observed, { onConflict: 'campaign_id,adset_key,creative_key', ignoreDuplicates: true });
-    return reply({ ...rpc.data, ...(ui ? { ui } : {}), campaign, range: { startDay: range.startDay, endDay: range.endDay, compareStartDay: compareStart || null, compareEndDay: compareEnd || null } });
+    return reply({ ...rpc.data, financial_mode: 'orders', ...(ui ? { ui } : {}), campaign, range: { startDay: range.startDay, endDay: range.endDay, compareStartDay: compareStart || null, compareEndDay: compareEnd || null } });
   } catch (error) { const message=error instanceof Error?error.message:'조회에 실패했습니다.';return reply({ error: message }, /날짜|기간|선택/.test(message)?400:503); }
 }
 

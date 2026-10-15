@@ -1,4 +1,5 @@
 import { kstDate } from './landing';
+import type { LandingInsights } from './landing-insights';
 
 export const PERFORMANCE_PRESETS = ['today', 'yesterday', '7d', '14d', 'campaign'] as const;
 export type PerformancePreset = typeof PERFORMANCE_PRESETS[number] | 'custom';
@@ -32,13 +33,15 @@ export type ActualRow = {
   memo: string | null; revenue: number; updated_at: string;
 };
 export type DashboardReport = {
+  financial_mode?: 'orders';
   ui?: {
+    insights?: LandingInsights | null;
     daily_a: DashboardReport['daily'] | null;
     last_collected_at: string | null;
     actual_presence: { new_payments: boolean; existing_payments: boolean } | null;
     previous_day_members: Record<string, number | null>;
     period_actuals?: { kakao_members: number | null; kakao_delta: number | null; kakao_day: string | null; baseline_day: string; payments: number | null } | null;
-    errors: { trend?: string; collection?: string; actuals?: string };
+    errors: { trend?: string; collection?: string; actuals?: string; insights?: string };
   };
   campaign: PerformanceCampaign; summary_b: MetricSummary; summary_a: MetricSummary | null;
   performance: PerformanceRow[];
