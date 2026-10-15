@@ -29,7 +29,16 @@ const movableBlock: NodeViewRenderer = ({ node, editor, getPos, HTMLAttributes }
       editor.view.focus();
     }
   };
-  handle.onclick = select;
+  const restoreTabStop = () => { handle.tabIndex = 0; dom.ownerDocument.removeEventListener('mouseup', restoreTabStop); };
+  handle.onmousedown = event => {
+    if (event.button !== 0) return;
+    // Keep mouse focus in the editor while allowing the native drag default.
+    // A focusable, non-editable handle briefly takes Mac's input context away.
+    handle.removeAttribute('tabindex'); select();
+    dom.ownerDocument.addEventListener('mouseup', restoreTabStop, { once: true });
+  };
+  handle.ondragend = restoreTabStop;
+  handle.onclick = () => { if (!editor.view.hasFocus()) select(); };
   handle.onkeydown = event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); select(); } };
   dom.addEventListener('dragstart', () => editor.view.dispatch(closeHistory(editor.state.tr)), true);
   const contentDOM = document.createElement(type === 'bulletList' ? 'ul' : type === 'orderedList' ? 'ol' : ['paragraph', 'heading'].includes(type) ? 'span' : 'div');
@@ -44,6 +53,7 @@ const movableBlock: NodeViewRenderer = ({ node, editor, getPos, HTMLAttributes }
     // Drag events reach ProseMirror; keyboard/click on the handle stay controls.
     stopEvent(event) { return !!event.target && handle.contains(event.target as globalThis.Node) && !event.type.startsWith('drag') && event.type !== 'mousedown'; },
     ignoreMutation(mutation) { return mutation.type !== 'selection' && (handle.contains(mutation.target) || mutation.target === dom); },
+    destroy() { dom.ownerDocument.removeEventListener('mouseup', restoreTabStop); },
   };
 };
 
