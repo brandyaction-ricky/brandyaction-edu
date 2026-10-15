@@ -23,7 +23,10 @@ const CHIP_CSS = `#${CHIP_ID}{position:fixed;left:50%;bottom:18px;z-index:300;tr
   + `#${CHIP_ID} span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#${CHIP_ID} a{flex:none;padding:6px 12px;border-radius:999px;background:#fff;color:#0d1531;text-decoration:none;font-weight:700}`
   + `@media(max-width:600px){#${CHIP_ID}{left:16px;right:72px;bottom:58px;transform:none;max-width:none}}`
   + `@keyframes myin-resume-out{to{opacity:0;visibility:hidden;pointer-events:none}}@media print{#${CHIP_ID}{display:none!important}}`;
-const NEXT_CSS = '.myin-next{display:flex;justify-content:flex-end;margin:28px 0 0}.myin-next a{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:10px 16px;border:1px solid var(--line,#dfe4f4);border-radius:999px;background:#fff;color:#0d1531;font-size:14px;font-weight:700;text-decoration:none}.myin-next a b{color:var(--blue,#2735c8);font-variant-numeric:tabular-nums}@media print{.myin-next{display:none!important}}';
+const DIAGRAM_LABEL_CSS = '.myin-dlabel{display:none}@media(max-width:600px){svg.e-diagram text{display:none}.myin-dlabel{display:block;margin:4px 0 0;font-size:13px;line-height:1.6;font-weight:600;text-align:center;color:inherit}}';
+const NEXT_CSS = '.myin-next{display:flex;justify-content:flex-end;margin:28px 0 0}.myin-next a{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:10px 16px;border:1px solid var(--line,#dfe4f4);border-radius:999px;background:#fff;color:#0d1531;font-size:14px;font-weight:700;text-decoration:none}.myin-next a b{color:var(--blue,#2735c8);font-variant-numeric:tabular-nums}.myin-next .nx-k{white-space:nowrap;font-weight:600;color:#66718a}.myin-next .nx-t{min-width:0}'
+  // CEO QA 10-15 (phone): '다음 장' broke over two lines and the title squeezed beside it; a full-width row reads as one line.
+  + '@media(max-width:600px){.myin-next{display:block}.myin-next a{display:flex;width:100%;box-sizing:border-box;border-radius:14px;padding:12px 16px;line-height:1.5}}@media print{.myin-next{display:none!important}}';
 // Phones (CEO 10-15): which chapter of how many, since the side contents is hidden there. Set from the parent page, so
 // it needs no script inside the frame.
 const PROGRESS_ID = 'myin-progress';
@@ -81,12 +84,25 @@ export function attachReaderAssist(doc: Document): () => void {
         const box = Object.assign(doc.createElement('div'), { className: 'myin-next' });
         const link = Object.assign(doc.createElement('a'), { href: `about:srcdoc#${next.id}` });
         const no = next.querySelector('.sec-no')?.textContent?.trim();
-        link.append('다음 장 ', ...(no ? [Object.assign(doc.createElement('b'), { textContent: no })] : []), ` ${title} →`);
+        link.append(Object.assign(doc.createElement('span'), { className: 'nx-k', textContent: '다음 장 ' }), ...(no ? [Object.assign(doc.createElement('b'), { textContent: no })] : []),
+          Object.assign(doc.createElement('span'), { className: 'nx-t', textContent: ` ${title} →` }));
         link.addEventListener('click', event => {
           event.preventDefault(); event.stopPropagation();
           win.scrollTo({ top: next.getBoundingClientRect().top + win.scrollY - (parseFloat(win.getComputedStyle(next).scrollMarginTop) || 0) });
         });
         box.append(link); section.append(box); undo.push(() => box.remove());
+      });
+    }
+    // CEO QA 10-15 (phone): the words inside the small line diagrams shrink to a few pixels with the drawing. On phones they
+    // are shown under it as text, read from the diagram's own label (the same words, joined by arrows).
+    const diagrams = Array.from(doc.querySelectorAll<SVGElement>('svg.e-diagram[aria-label]'));
+    if (diagrams.length) {
+      const style = Object.assign(doc.createElement('style'), { textContent: DIAGRAM_LABEL_CSS });
+      doc.head.append(style); undo.push(() => style.remove());
+      diagrams.forEach(svg => {
+        const label = Object.assign(doc.createElement('p'), { className: 'myin-dlabel', textContent: svg.getAttribute('aria-label') ?? '' });
+        label.setAttribute('aria-hidden', 'true');
+        svg.after(label); undo.push(() => label.remove());
       });
     }
     // Facet meanings from the report's own 01 summary cards.

@@ -168,8 +168,8 @@ function attachMotion(doc: Document): Undo {
     select('.e-identity', '.e-identity-main,.e-identity-criteria,.e-identity-result', true);
     select('.v-panel:has(.v-fork)', '.v-fork-root,.v-route');
     // Branches read in order: the core need's column first in the TOP5 MAP, current roles before wider ones in chapter 14.
-    select('.v-job-branches', ':scope > div', true);
-    select('.v-environment', ':scope > .v-good,:scope > .v-risk');
+    select('.v-job-branches:not(.mm2 > .v-job-branches)', ':scope > div', true);
+    select('.v-environment:not(.mm2 > .v-environment)', ':scope > .v-good,:scope > .v-risk');
     select('.e-balance', ':scope > div');
     select('.v-compare', ':scope > div');
     select('.v-low-map', ':scope > div');
@@ -180,10 +180,13 @@ function attachMotion(doc: Document): Undo {
     select('.need-map-grid', '.need-map-card');
     select('.e-dual > div', '.e-diagram path,.e-diagram circle', false, 'ink');
     // Rows of one diagram read top to bottom as one sequence (CEO QA 10-15: two rows of 18장 lit at once).
-    select('.v-lanes', ':scope > div > b,:scope > div > span,:scope > div > strong', true);
-    select('.v-riskmap', ':scope > a > strong,:scope > a > b', true);
+    // CEO QA 10-15: the behavior map lit every word in turn; its three scene boxes are enough.
+    select('.v-lanes', ':scope > div', true);
+    select('.v-riskmap:not(.mm2 > .v-riskmap)', ':scope > a > strong,:scope > a > b', true);
+    // The 20장 money block: only its three scene cards, one after another (CEO QA 10-15: '너무 번잡해').
+    select('.mm2 > .v-riskmap', ':scope > a', true);
     select('.v-flow-list', ':scope > li', true);
-    select('.v-boundary', ':scope > b');
+    select('.v-panel:not(:has(.v-lanes)) .v-boundary', ':scope > b');
     select('.v-money-card', ':scope > b,:scope > dl', true);
     select('.final-block:has(> .levelrow)', ':scope > .levelrow > div:not(.arr)', true);
     select('.timeline', ':scope > .era', true);
