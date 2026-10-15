@@ -105,16 +105,22 @@ test('Korean IME starts safely at the boundary beside a move handle', async ({ p
   await page.keyboard.insertText('나다');
   await expect(paragraph).toContainText('가나다');
 });
-test('Korean typing after selecting a blank paragraph handle keeps its first consonant', async ({ page }) => {
+test('Korean typing after selecting a blank paragraph handle keeps its first consonant', async ({ page }, info) => {
   const server = await setup(page, 2);
   const cdp = await page.context().newCDPSession(page);
-  await canvas(page).getByRole('button', { name: '문단 이동', exact: true }).first().click();
+  const handle = canvas(page).getByRole('button', { name: '문단 이동', exact: true }).first();
+  await handle.hover(); await page.mouse.down();
+  // The native Mac IME must keep an editable input context before mouseup.
+  await expect(canvas(page)).toBeFocused();
+  await page.mouse.up();
+  await expect(handle).toHaveAttribute('tabindex', '0');
   await cdp.send('Input.imeSetComposition', { text: 'ㄱ', selectionStart: 1, selectionEnd: 1 });
   await cdp.send('Input.imeSetComposition', { text: '가', selectionStart: 1, selectionEnd: 1 });
   await cdp.send('Input.insertText', { text: '가' });
   await page.keyboard.insertText('나다');
   await expect(canvas(page)).toContainText('가나다');
   await expect.poll(() => server.get().payload.blocks.document.blocks[0].content).toContain('가나다');
+  await canvas(page).screenshot({ path: info.outputPath('ime-handle-focus.png') });
 });
 test('Korean composition in a checklist field survives controlled updates and draft save', async ({ page }) => {
   const server = await setup(page, 1);
