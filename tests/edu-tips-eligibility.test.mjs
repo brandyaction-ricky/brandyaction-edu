@@ -1,15 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
-import {createRequire} from 'node:module';
 import {createHash} from 'node:crypto';
-import ts from 'typescript';
 import {fixture,id,customer,epoch} from './helpers/edu-tips-erasure.mjs';
-const require=createRequire(import.meta.url), api={};
-const schema=JSON.parse(readFileSync(new URL('../lib/edu-tips-eligibility.schema.json',import.meta.url)));
-const code=ts.transpileModule(readFileSync(new URL('../lib/edu-tips-eligibility-http.ts',import.meta.url),'utf8'),
- {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText;
-new Function('exports','require',code)(api,n=>n.endsWith('.schema.json')?schema:require(n));
+import {candidate} from './helpers/edu-tips-candidate-loader.mjs';
+const api=candidate('edu-tips-eligibility-http');
 const hash=x=>createHash('sha256').update(x).digest('hex');
 const key='synthetic-eligibility-development-key-00000', second='synthetic-eligibility-second-key-00000000', prod='synthetic-eligibility-production-key-00000';
 const subjects=[5,6].map(n=>({customer_id:customer(n),consent_epoch:epoch(n)}));

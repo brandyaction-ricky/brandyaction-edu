@@ -113,8 +113,13 @@ export async function scheduledSourceCandidate(request: Request, deps: Deps) {
   const cfg = sourceRuntimeConfiguration(deps.env, (deps.now ?? Date.now)());
   if (!cfg.identityEnabled && !cfg.controlEnabled && !cfg.publisherEnabled) return response({ status: 'configuration_required' }, 503);
   try {
-    const [registration, withdrawal] = await Promise.all([identityJobs(deps, null, 4), controls(deps, 4)]);
+    // A failed registration claim must not end this invocation while an
+    // independent withdrawal is still being committed. Each worker has bounded
+    // RPC/transport timeouts; wait for both, then service existing projections.
+    const [registrationTask, withdrawalTask] = await Promise.allSettled([identityJobs(deps, null, 4), controls(deps, 4)]);
     const projection = await projections(deps);
+    if (registrationTask.status === 'rejected' || withdrawalTask.status === 'rejected') return response({ status: 'unavailable' }, 503);
+    const registration = registrationTask.value, withdrawal = withdrawalTask.value;
     const ok = cfg.valid && registration.failures === 0 && withdrawal.status !== 'unavailable' && projection.status !== 'unavailable';
     return response({ status: !cfg.valid ? 'configuration_required' : ok ? 'processed' : 'unavailable', registration, withdrawal, projection }, ok ? 200 : 503);
   } catch { return response({ status: 'unavailable' }, 503); }

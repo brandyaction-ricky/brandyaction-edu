@@ -83,3 +83,54 @@ test('withdrawal dispatch remains independent of collection/identity OFF and con
  let sent=0;await runtime.afterConsentSourceCandidate(id(5),{...f.deps,env:e,fetch:async(_url,options)=>{sent++;const b=JSON.parse(options.body);return Response.json({control_version:b.control_version,environment:b.environment,tenant_id:b.tenant_id,brand_id:b.brand_id,receiver_id:b.receiver_id,requestId:b.block.requestId,customer_id:b.block.customer_id,consent_epoch:b.block.consent_epoch,request_digest:control.controlDigest(b),status:'blocked',blocked_at:new Date(Date.now()+10).toISOString(),cancellation:'requested'});}});
  assert.equal(sent,1);assert.equal(await f.value('select count(*)::int as v from edu_tips_private.control_deliveries where confirmed_at is not null'),1);assert.equal(await f.value('select count(*)::int as v from edu_tips_private.erasure_outbox where completed_at is not null'),0);
 });
+
+test('cron waits for independent withdrawal and projection even when registration claim fails',async t=>{
+ const f=await setup(t);await f.owner('update edu_tips_private.control_settings set identity_enabled=true where id=1');await f.prefs(5);await runtime.afterConsentSourceCandidate(id(5),f.deps);
+ await f.owner("update edu_tips_private.control_settings set capture_enabled=true,sending_enabled=true,environment='dev',consumer_id=$1,source_authority_ref='synthetic:local-test' where id=1",[id(90)]);
+ await f.prefs(5,false,id(51));await f.prefs(6);const bBefore=await f.value('select to_jsonb(p) as v from edu_personalization_preferences p where member_id=$1',[id(6)]);
+ const control=candidate('edu-tips-control-candidate');
+ const e={...env,EDU_TIPS_CONTROL_RUNTIME_ENABLED:'true',EDU_TIPS_CONTROL_VERSION:control.CONTROL_VERSION,EDU_TIPS_CONTROL_KEY_PURPOSE:'source_to_tips:control:block',EDU_TIPS_CONTROL_KEY:Buffer.alloc(32,3).toString('base64'),EDU_TIPS_CONTROL_KEY_ID:'edu_dev',EDU_TIPS_CONTROL_KEY_EXPIRES_AT:'2099-01-01T00:00:00.000Z',EDU_TIPS_CONTROL_CONSUMER_ID:id(90),EDU_TIPS_CONTROL_ORIGIN:'https://tips.example.invalid',EDU_TIPS_CONTROL_ALLOWED_ORIGIN:'https://tips.example.invalid'};
+ let release,entered,settled=false,projectionCalls=0,sent=0;
+ const delayed=new Promise(r=>{release=r;}),claimEntered=new Promise(r=>{entered=r;});
+ const rpc=async(n,a,s)=>{
+  if(n==='edu_tips_claim_identity_jobs_candidate')return{data:null,error:{message:'synthetic private registration failure'}};
+  if(n==='edu_tips_claim_control_candidate'){const result=await f.rpc(n,a,s);entered();await delayed;return result;}
+  if(n==='edu_tips_claim_hmac_projection_candidate')projectionCalls++;
+  return f.rpc(n,a,s);
+ };
+ const fetch=async(_url,options)=>{sent++;const b=JSON.parse(options.body);return Response.json({control_version:b.control_version,environment:b.environment,tenant_id:b.tenant_id,brand_id:b.brand_id,receiver_id:b.receiver_id,requestId:b.block.requestId,customer_id:b.block.customer_id,consent_epoch:b.block.consent_epoch,request_digest:control.controlDigest(b),status:'blocked',blocked_at:new Date(Date.now()+10).toISOString(),cancellation:'requested'});};
+ const running=runtime.scheduledSourceCandidate(request(e),{...f.deps,env:e,rpc,fetch}).then(r=>{settled=true;return r;});
+ let premature;
+ try{await claimEntered;await new Promise(r=>setImmediate(r));premature=settled;}
+ finally{release();}
+ const result=await running;
+ assert.equal(premature,false,'cron must not return while independent withdrawal work is still pending');
+ assert.equal(result.status,503);assert.deepEqual(await result.json(),{status:'unavailable'});
+ assert.equal(sent,1);assert.equal(projectionCalls,1,'existing projections still get a turn');
+ assert.equal(await f.value('select count(*)::int as v from edu_tips_private.control_deliveries where confirmed_at is not null'),1);
+ assert.equal(await f.value('select count(*)::int as v from edu_tips_private.erasure_outbox where completed_at is not null'),0);
+ assert.equal(await f.value('select analysis as v from edu_personalization_preferences where member_id=$1',[id(5)]),false);
+ assert.deepEqual(await f.value('select to_jsonb(p) as v from edu_personalization_preferences p where member_id=$1',[id(6)]),bBefore);
+});
+
+test('cron keeps every worker failure visible without leaking diagnostics or suppressing other workers',async()=>{
+ const control=candidate('edu-tips-control-candidate');
+ const e={...env,EDU_TIPS_CONTROL_RUNTIME_ENABLED:'true',EDU_TIPS_CONTROL_VERSION:control.CONTROL_VERSION,EDU_TIPS_CONTROL_KEY_PURPOSE:'source_to_tips:control:block',EDU_TIPS_CONTROL_KEY:Buffer.alloc(32,3).toString('base64'),EDU_TIPS_CONTROL_KEY_ID:'edu_dev',EDU_TIPS_CONTROL_KEY_EXPIRES_AT:'2099-01-01T00:00:00.000Z',EDU_TIPS_CONTROL_CONSUMER_ID:id(90),EDU_TIPS_CONTROL_ORIGIN:'https://tips.example.invalid',EDU_TIPS_CONTROL_ALLOWED_ORIGIN:'https://tips.example.invalid'};
+ const operations=['edu_tips_claim_identity_jobs_candidate','edu_tips_claim_control_candidate','edu_tips_claim_hmac_projection_candidate'];
+ for(const failed of operations){
+  const calls=[];const rpc=async name=>{calls.push(name);assert.ok(operations.includes(name));return name===failed?{data:null,error:{message:'private synthetic diagnostic'}}:{data:[],error:null};};
+  const result=await runtime.scheduledSourceCandidate(request(e),{env:e,rpc,fetch:()=>{throw Error('empty batch must not send');}});
+  assert.equal(result.status,503);const text=JSON.stringify(await result.json());assert.ok(!text.includes('private'));
+  for(const name of operations)assert.equal(calls.filter(x=>x===name).length,1,failed+' must not suppress '+name);
+ }
+});
+
+test('cron preserves registration-before-projection order rather than claiming the new projection too early',async()=>{
+ let release,entered,projected=false;const gate=new Promise(r=>{release=r;}),started=new Promise(r=>{entered=r;});
+ const running=runtime.scheduledSourceCandidate(request(),{env,fetch:()=>{throw Error('control OFF');},rpc:async name=>{
+  if(name==='edu_tips_claim_identity_jobs_candidate'){entered();await gate;return{data:[],error:null};}
+  assert.equal(name,'edu_tips_claim_hmac_projection_candidate');projected=true;return{data:[],error:null};
+ }});
+ let premature;try{await started;await new Promise(r=>setImmediate(r));premature=projected;}finally{release();}
+ const response=await running;assert.equal(premature,false);assert.equal(projected,true);assert.equal(response.status,200);
+});

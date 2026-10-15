@@ -2,6 +2,7 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypt
 import Ajv from 'ajv/dist/2020';
 import addFormats from 'ajv-formats';
 import schema from './edu-tips-erasure.schema.json';
+import { parseStrictTipsJson } from './edu-tips-json';
 
 const ajv = new Ajv({ strict: false, allErrors: false });
 addFormats(ajv);
@@ -23,6 +24,28 @@ function exact(value: Record<string, unknown>, keys: string[]) {
 }
 function validate(name: string, value: unknown, input = false) {
   if (!validators[name](value)) fail(input ? 400 : 503, input ? 'invalid_request' : 'contract_violation');
+}
+function sourceTime(value: unknown): { text: string; micros: bigint } {
+  if (typeof value !== 'string') return fail(503, 'contract_violation');
+  const match = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,6}))?(Z|[+-]\d{2}:\d{2})$/.exec(value);
+  if (!match) return fail(503, 'contract_violation');
+  const [, whole, fraction = '', zone] = match;
+  // Validate the local calendar before offset conversion; Date normalizes some
+  // invalid dates. Never pass fractional seconds through a millisecond Date.
+  const local = Date.parse(whole + 'Z');
+  if (!Number.isFinite(local) || new Date(local).toISOString() !== whole + '.000Z' || zone === '-00:00') return fail(503, 'contract_violation');
+  if (zone !== 'Z') {
+    const hours = Number(zone.slice(1, 3)), minutes = Number(zone.slice(4));
+    if (hours > 14 || minutes > 59 || hours * 60 + minutes > 14 * 60) return fail(503, 'contract_violation');
+  }
+  const milliseconds = Date.parse(whole + zone);
+  if (!Number.isFinite(milliseconds)) return fail(503, 'contract_violation');
+  const utcWhole = new Date(milliseconds).toISOString().slice(0, -5);
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(utcWhole)) return fail(503, 'contract_violation');
+  // PostgreSQL JSON may omit trailing zeros. Choose 3/6 digits losslessly;
+  // already issued 3/6-digit UTC values retain their exact representation.
+  const digits = fraction.padEnd(fraction.length > 3 ? 6 : 3, '0');
+  return { text: utcWhole + '.' + digits + 'Z', micros: BigInt(milliseconds) * BigInt(1000) + BigInt(fraction.padEnd(6, '0')) };
 }
 function response(body: unknown, status = 200) {
   return Response.json(body, { status, headers: { 'Cache-Control': 'no-store', 'X-Contract-Version': version,
@@ -46,7 +69,7 @@ async function readBody(request: Request, signal: AbortSignal) {
       if (size > 16384) { await reader.cancel(); return fail(413, 'request_too_large'); }
       chunks.push(value);
     }
-    try { return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown; }
+    try { return parseStrictTipsJson(Buffer.concat(chunks)); }
     catch { return fail(400, 'invalid_request'); }
   } finally { signal.removeEventListener('abort', abort); reader.releaseLock(); }
 }
@@ -111,11 +134,10 @@ export async function handleErasure(request: Request, action: Action, deps: Eras
         const item = object(value);
         exact(item, ['requestId', 'customer_id', 'consent_epoch', 'reason', 'at', 'active_due_at', 'model_due_at', 'residual_due_at', 'cursor_slot']);
         if (item.cursor_slot !== index) fail(503, 'contract_violation');
-        const iso = (key: string) => { if (typeof item[key] !== 'string') return fail(503, 'contract_violation'); return new Date(item[key] as string).toISOString(); };
-        const at = iso('at'); const active = iso('active_due_at'); const model = iso('model_due_at'); const residual = iso('residual_due_at');
-        if (Date.parse(active) - Date.parse(at) !== 120 * 3600000 || Date.parse(model) - Date.parse(at) !== 720 * 3600000 || Date.parse(residual) - Date.parse(at) !== 720 * 3600000) fail(503, 'contract_violation');
+        const at = sourceTime(item.at), active = sourceTime(item.active_due_at), model = sourceTime(item.model_due_at), residual = sourceTime(item.residual_due_at);
+        if (active.micros - at.micros !== BigInt(120) * BigInt(3600000000) || model.micros - at.micros !== BigInt(720) * BigInt(3600000000) || residual.micros - at.micros !== BigInt(720) * BigInt(3600000000)) fail(503, 'contract_violation');
         return { requestId: item.requestId, customer_id: item.customer_id, consent_epoch: item.consent_epoch, reason: item.reason,
-          at, active_due_at: active, model_due_at: model, residual_due_at: residual, cursor: tokens[index] };
+          at: at.text, active_due_at: active.text, model_due_at: model.text, residual_due_at: residual.text, cursor: tokens[index] };
       });
       const page = { source: 'brandyaction_edu', tenant_id: 'brandyaction', brand_id: 'brandyaction_edu', contract_version: version,
         generated_at: new Date().toISOString(), stream_generation: raw.stream_generation, snapshot_upper: tokens[limit + 1],

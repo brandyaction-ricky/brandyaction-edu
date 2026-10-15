@@ -1,14 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {createRequire} from 'node:module';
 import {createHash} from 'node:crypto';
-import ts from 'typescript';
 import {fixture,id,customer,epoch} from './helpers/edu-tips-erasure.mjs';
-const require=createRequire(import.meta.url),api={};
-const schema=JSON.parse(readFileSync(new URL('../lib/edu-tips-data.schema.json',import.meta.url)));
-new Function('exports','require',ts.transpileModule(readFileSync(new URL('../lib/edu-tips-data-http.ts',import.meta.url),'utf8'),
- {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText)(api,n=>n.endsWith('.schema.json')?schema:require(n));
+import {candidate} from './helpers/edu-tips-candidate-loader.mjs';
+const api=candidate('edu-tips-data-http');
 const sql=readFileSync(new URL('../supabase/migrations/20261012030707_edu_tips_data_recovery_v2.sql',import.meta.url),'utf8');
 const hash=v=>createHash('sha256').update(v).digest('hex');
 const key='synthetic-data-recovery-key-development-00000';
