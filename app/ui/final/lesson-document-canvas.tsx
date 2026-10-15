@@ -11,7 +11,7 @@ import { publicLessonBlocks, type LessonBlock, type LessonBlockType } from '@/li
 import { blocksFromCanvas, canvasTextContent, duplicateLessonBlock, isCanvasText, lessonCanvasNodes, lessonClipboardNodes, type CanvasNode } from '@/lib/lesson-document-canvas';
 import { LessonBlockView } from './lesson-block-view';
 import { GripVertical } from 'lucide-react';
-import { lessonRichExtensions, LessonFormatToolbar, focusOutsideLessonEditor } from './lesson-rich-input';
+import { lessonRichExtensions, LessonFormatToolbar, focusLessonMoveHandle } from './lesson-rich-input';
 import { lessonCanvasMovableExtensions } from './lesson-canvas-movable';
 import { useLessonImageDrag } from './lesson-image-drag';
 import type { LessonImagePosition } from '@/lib/lesson-image-position';
@@ -181,7 +181,7 @@ export function LessonDocumentCanvas(props: Props) {
       },
       handleKeyDown(view, event) {
         if (event.isComposing || view.composing) return false;
-        if (focusOutsideLessonEditor(view, event)) return true;
+        if (focusLessonMoveHandle(view, event)) return true;
         if (event.key === 'Escape') { setMenu(false); return false; }
         if (event.key === '/' && view.state.selection.empty && view.state.selection.$from.parent.isTextblock && !view.state.selection.$from.parent.textContent) {
           const activeEditor = editorRef.current;
@@ -338,7 +338,11 @@ export function LessonDocumentCanvas(props: Props) {
       </div>
       {menu && <div className="ldc-insert-menu" role="group" aria-label="문서에 넣을 항목">{props.choices.map(choice => <button className="btn small" type="button" disabled={props.disabled} key={choice.type} onClick={() => insert(choice.type)}>{choice.label}</button>)}<button className="btn small" type="button" onClick={() => { setMenu(false); editor?.commands.focus(); }}>닫기</button></div>}
       </div>
-      <EditorContent editor={editor} />
+      <EditorContent editor={editor} onKeyDownCapture={event => {
+        // Node views intentionally stop handle key events before ProseMirror.
+        // Capture Tab here so handles and editable text share one sequence.
+        if (editor && (event.target as HTMLElement).closest('[data-drag-handle]') && focusLessonMoveHandle(editor.view, event.nativeEvent)) event.stopPropagation();
+      }} />
       {!props.blocks.length && <button type="button" className="btn" onClick={() => insert('text')} disabled={props.disabled}>글 쓰기 시작</button>}
     </div>
     {message && <p className="notice" role="alert">{message}</p>}

@@ -22,13 +22,39 @@ export type LessonBodyEditorProps = { value: string; onChange: (value: string) =
 export function focusOutsideLessonEditor(view: EditorView, event: KeyboardEvent) {
   if (event.key !== 'Tab' || event.isComposing || view.composing) return false;
   const target = event.target as HTMLElement | null;
-  if (!target?.isContentEditable) return false;
+  if (!target?.isContentEditable && !target?.closest('[data-drag-handle]')) return false;
   const fields = [...view.dom.ownerDocument.querySelectorAll<HTMLElement>('button,a[href],input,select,textarea,summary,[tabindex]')]
     .filter(field => field.tabIndex >= 0 && !view.dom.contains(field) && !field.closest('[inert]') && !field.matches(':disabled') && field.getClientRects().length > 0 && getComputedStyle(field).visibility !== 'hidden');
   const direction = event.shiftKey ? globalThis.Node.DOCUMENT_POSITION_PRECEDING : globalThis.Node.DOCUMENT_POSITION_FOLLOWING;
   const candidates = fields.filter(field => view.dom.compareDocumentPosition(field) & direction);
   const next = event.shiftKey ? candidates.at(-1) : candidates[0];
   if (!next) return false;
+  event.preventDefault(); next.focus(); return true;
+}
+
+// Walk handles relative to the caret, rather than restarting the browser's
+// tab sequence at the first control inside the contenteditable.
+export function focusLessonMoveHandle(view: EditorView, event: KeyboardEvent) {
+  if (event.key !== 'Tab' || event.isComposing || view.composing) return false;
+  const target = event.target as HTMLElement | null;
+  const handles = [...view.dom.querySelectorAll<HTMLElement>('[data-drag-handle]')]
+    .filter(handle => handle.tabIndex >= 0 && handle.getClientRects().length > 0 && getComputedStyle(handle).visibility !== 'hidden');
+  const focused = target?.closest<HTMLElement>('[data-drag-handle]');
+  let next: HTMLElement | undefined;
+  if (focused) next = handles[handles.indexOf(focused) + (event.shiftKey ? -1 : 1)];
+  else if (target?.isContentEditable) {
+    let pos = view.state.selection.head;
+    const selection = view.dom.ownerDocument.getSelection();
+    if (selection?.focusNode && view.dom.contains(selection.focusNode)) {
+      try { pos = view.posAtDOM(selection.focusNode, selection.focusOffset); } catch { /* Use the editor selection while its DOM is updating. */ }
+    }
+    const candidates = handles.filter(handle => {
+      const at = view.posAtDOM(handle, 0);
+      return event.shiftKey ? at <= pos : at > pos;
+    });
+    next = event.shiftKey ? candidates.at(-1) : candidates[0];
+  } else return false;
+  if (!next) return focusOutsideLessonEditor(view, event);
   event.preventDefault(); next.focus(); return true;
 }
 
