@@ -36,7 +36,7 @@ function setup({initial=campaign,role='admin',fetchRows=async()=>[],account=comm
     if(patch){row={...row,...patch};writes++;}
     return{data:list?[structuredClone(row)]:structuredClone(row),error:null};
   }return query;},async rpc(name,args){rpcCalls.push({name,args});return{data:name==='edu_marketing_dashboard'?{performance:[],summary_b:{spend:37.5},...(ui?{ui}:{})}:null,error:null}}};
-  const mocks={'@/lib/supabase/admin':{createAdminClient:()=>db},'@/lib/operator-permissions':{getOperatorUser:async()=>role?{role,id:null}:null},'@/lib/landing-performance-ui-server':{performanceUiDetails:async()=>{if(ui)throw Error("redundant supplemental read");return null;}},'@/lib/meta-marketing':{fetchMetaCampaigns:fetchRows}};
+  const mocks={'@/lib/supabase/admin':{createAdminClient:()=>db},'@/lib/operator-permissions':{getOperatorUser:async()=>role?{role,id:null}:null},'@/lib/landing-performance-ui-server':{performanceUiDetails:async(_db,_campaign,_params,_signal,_actor,base)=>{if(ui)assert.deepEqual(base,ui,'reuse existing RPC snapshot');return base||null;}},'@/lib/meta-marketing':{fetchMetaCampaigns:fetchRows}};
   const api=load('app/api/landing/performance/route.ts',mocks), meta=load('app/api/landing/performance/meta/route.ts',mocks);
   const request=(values,origin='https://fixture.test')=>new Request('https://fixture.test/api/landing/performance',{method:'POST',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify({action:'campaign',campaign_id:row.id,values})});
   return{api,meta,request,row:()=>row,writes:()=>writes,rpcCalls};
@@ -155,7 +155,7 @@ test('shared setting query failure leaves stored campaign values untouched',asyn
   assert.equal(response.status,400);assert.match((await response.json()).error,/공통 설정/);assert.equal(h.writes(),0);
 });
 
-test('optimized dashboard UI comes from the RPC snapshot without supplemental reads or GET writes',async()=>{const ui={errors:{},daily_a:[],last_collected_at:null,actual_presence:{new_payments:false,existing_payments:false},previous_day_members:{},period_actuals:null}; const h=setup({ui}); const response=await h.api.GET(new Request(`https://fixture.test/api/landing/performance?landing=${campaign.landing_id}&campaign=${campaign.id}&start=2026-09-15&end=2026-09-15&include=ui`)); assert.equal(response.status,200);assert.deepEqual((await response.json()).ui,ui);assert.equal(h.writes(),0);assert.equal(h.rpcCalls.length,1);});
+test('optimized dashboard UI snapshot is passed to the supplement without GET writes',async()=>{const ui={errors:{},daily_a:[],last_collected_at:null,actual_presence:{new_payments:false,existing_payments:false},previous_day_members:{},period_actuals:null}; const h=setup({ui}); const response=await h.api.GET(new Request(`https://fixture.test/api/landing/performance?landing=${campaign.landing_id}&campaign=${campaign.id}&start=2026-09-15&end=2026-09-15&include=ui`)); assert.equal(response.status,200);assert.deepEqual((await response.json()).ui,ui);assert.equal(h.writes(),0);assert.equal(h.rpcCalls.length,1);});
 
 test('historical recruitment links retain archived or recategorized campaign courses without unrelated paid products',async()=>{
  const h=setup({catalog:[{id:campaign.landing_id,title:'Archived webinar',category:'paid_class',archived_at:'2026-10-01'},{id:'unrelated',category:'paid_class'},{id:'free-new',category:'free',archived_at:null}]});
