@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import type { Editor } from '@tiptap/core';
 import { backend } from './helpers/lesson-author-backend';
 import { serializeLessonDocument } from '../../lib/lesson-body';
 
@@ -20,7 +21,7 @@ async function setup(page: Page, paragraphs: number) {
 test('Korean IME preserves the first consonant on an empty movable paragraph', async ({ page }) => {
   const server = await setup(page, 2);
   const cdp = await page.context().newCDPSession(page);
-  const paragraph = canvas(page).locator('p.ldc-movable-paragraph').first();
+  const paragraph = canvas(page).locator('.ldc-movable-paragraph').first();
   for (let n = 0; n < 8; n++) {
     await paragraph.click(); await page.keyboard.press('Home'); await page.keyboard.press('Shift+End'); await page.keyboard.press('Backspace');
     await cdp.send('Input.imeSetComposition', { text: 'ㄱ', selectionStart: 1, selectionEnd: 1 });
@@ -32,9 +33,53 @@ test('Korean IME preserves the first consonant on an empty movable paragraph', a
   await expect.poll(() => server.get().payload.blocks.document.blocks[0].content).toContain('가나다');
   expect(server.writes.filter(row => row.action === 'publish')).toHaveLength(0);
 });
+test('deleting a whole line preserves its editable content DOM before Korean composition', async ({ page }) => {
+  const server = await backend(page);
+  server.get().payload.blocks.document.blocks = [{ id: 'body', type: 'text', content: serializeLessonDocument({ type: 'doc', content: [
+    { type: 'paragraph', content: [{ type: 'text', text: '기존 굵은 문장', marks: [{ type: 'bold' }] }] },
+    { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: '기존 제목' }] },
+    { type: 'paragraph', content: [{ type: 'text', text: '기존 일반 문장' }] },
+  ] }) }];
+  await page.goto('/lesson-block-author-test?serverDraft=1');
+  await expect(canvas(page).locator('[data-lesson-movable]')).toHaveText(['기존 굵은 문장', '기존 제목', '기존 일반 문장']);
+  const cdp = await page.context().newCDPSession(page);
+  const mac = await page.evaluate(() => /Mac/.test(navigator.platform));
+  for (const index of [0, 1, 2]) {
+    const block = canvas(page).locator('[data-lesson-movable]').nth(index);
+    for (let repeat = 0; repeat < 4; repeat++) {
+      await block.locator('.ldc-move-content').click();
+      if (mac) {
+        await page.keyboard.press('Meta+ArrowRight');
+        // Native caret motion dispatches selectionchange asynchronously on Mac.
+        // Verify the deletion starts at the intended line end in both models.
+        await expect.poll(() => canvas(page).evaluate(el => {
+          const editor = (el as HTMLElement & { editor: Editor }).editor;
+          const selection = getSelection(), { $head } = editor.state.selection;
+          return !!selection?.focusNode && $head.parentOffset === $head.parent.content.size &&
+            editor.view.posAtDOM(selection.focusNode, selection.focusOffset) === $head.pos;
+        })).toBe(true);
+        await page.keyboard.press('Meta+Backspace');
+      } else {
+        await page.keyboard.press('Home'); await page.keyboard.press('Shift+End'); await page.keyboard.press('Backspace');
+      }
+      // Chrome may remove the content wrapper, not just its text. The node view
+      // must let ProseMirror observe that deletion and repair its input context.
+      await expect(block.locator('.ldc-move-content')).toBeAttached();
+      await expect(block).toHaveText('');
+      await cdp.send('Input.imeSetComposition', { text: 'ㄱ', selectionStart: 1, selectionEnd: 1 });
+      await cdp.send('Input.imeSetComposition', { text: '가', selectionStart: 1, selectionEnd: 1 });
+      await cdp.send('Input.insertText', { text: '가' }); await page.keyboard.insertText('나다');
+      await expect(block).toHaveText('가나다');
+    }
+  }
+  await expect.poll(() => server.get().payload.blocks.document.blocks[0].content?.match(/가나다/g)?.length).toBe(3);
+  await page.getByRole('button', { name: '편집 다시 열기', exact: true }).click();
+  await expect(canvas(page).locator('[data-lesson-movable]')).toHaveText(['가나다', '가나다', '가나다']);
+  expect(server.writes.filter(row => row.action === 'publish')).toHaveLength(0);
+});
 test('Tab on the last paragraph never jumps to the first move handle', async ({ page }) => {
   await setup(page, 80);
-  const last = canvas(page).locator('p.ldc-movable-paragraph').last();
+  const last = canvas(page).locator('.ldc-movable-paragraph').last();
   await last.click(); await page.keyboard.press('End');
   const before = await page.evaluate(() => scrollY);
   await page.keyboard.press('Tab');
@@ -45,7 +90,7 @@ test('Tab walks adjacent handles from the caret and Shift+Tab returns without ed
   const server = await setup(page, 4);
   const original = server.get().payload.blocks.document.blocks[0].content;
   const handles = canvas(page).getByRole('button', { name: '문단 이동', exact: true });
-  await canvas(page).locator('p.ldc-movable-paragraph').nth(2).click();
+  await canvas(page).locator('.ldc-movable-paragraph').nth(2).click();
   await page.keyboard.press('End');
   await page.keyboard.press('Tab');
   await expect(handles.nth(3)).toBeFocused();
@@ -59,7 +104,7 @@ test('Tab walks adjacent handles from the caret and Shift+Tab returns without ed
 });
 test('Shift+Tab from text focuses its own handle, then exits before the first', async ({ page }) => {
   await setup(page, 2);
-  await canvas(page).locator('p.ldc-movable-paragraph').first().click();
+  await canvas(page).locator('.ldc-movable-paragraph').first().click();
   await page.keyboard.press('Shift+Tab');
   await expect(canvas(page).getByRole('button', { name: '문단 이동', exact: true }).first()).toBeFocused();
   await page.keyboard.press('Shift+Tab');
@@ -78,7 +123,7 @@ test('Tab follows visible handles across lists, quotes and a closed toggle', asy
   await page.goto('/lesson-block-author-test?serverDraft=1');
   const handles = canvas(page).locator('[data-drag-handle]:visible');
   await expect(handles).toHaveCount(5);
-  await canvas(page).locator('p.ldc-movable-paragraph').first().click();
+  await canvas(page).locator('.ldc-movable-paragraph').first().click();
   await page.keyboard.press('Shift+Tab');
   await expect(handles.first()).toBeFocused();
   for (let n = 1; n < 5; n++) {
@@ -93,7 +138,7 @@ test('Tab follows visible handles across lists, quotes and a closed toggle', asy
 test('Korean IME starts safely at the boundary beside a move handle', async ({ page }) => {
   await setup(page, 2);
   const cdp = await page.context().newCDPSession(page);
-  const paragraph = canvas(page).locator('p.ldc-movable-paragraph').first();
+  const paragraph = canvas(page).locator('.ldc-movable-paragraph').first();
   await paragraph.click();
   await paragraph.evaluate(el => {
     const range = document.createRange(); range.setStart(el, 1); range.collapse(true);
@@ -138,7 +183,7 @@ test('Korean composition in a checklist field survives controlled updates and dr
 test('delayed autosave response preserves a Korean syllable still being composed', async ({ page }) => {
   const server = await setup(page, 1);
   const release = server.pauseNextSave();
-  const paragraph = canvas(page).locator('p.ldc-movable-paragraph').first();
+  const paragraph = canvas(page).locator('.ldc-movable-paragraph').first();
   await paragraph.click();
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Input.imeSetComposition', { text: 'ㄱ', selectionStart: 1, selectionEnd: 1 });
