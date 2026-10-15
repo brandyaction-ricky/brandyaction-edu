@@ -34,3 +34,21 @@ test('reduced motion keeps the report static',async({page})=>{
   await expect(frame.locator('#myin-precision-motion')).toHaveCount(0);
   await expect(frame.locator('[data-myin-motion]')).toHaveCount(0);
 });
+
+test('the reader remembers the chapter being read and offers to continue there next time',async({page})=>{
+  const withId=html.replace('<head>','<head><meta name="report-id" content="00000000-0000-4000-8000-000000000003">').replace('<section id="s3">','<section id="s3"><span class="sec-no">03</span><h2>핵심 욕구 해설</h2>');
+  await page.route('**/api/platform/diagnosis/session',r=>r.fulfill({json:submitted}));
+  await page.context().addCookies([{name:'diagnosis_download_fixture',value:'original',url:`http://127.0.0.1:${process.env.FIXTURE_PORT || 4173}`}]);
+  await page.context().route('**/api/platform/diagnosis/report*',r=>new URL(r.request().url()).searchParams.has('html')
+    ?r.fulfill({contentType:'text/html; charset=utf-8',body:withId}):r.fulfill({json:{state:'ready',updatedAt:'2026-10-01T00:00:00.000Z',canRetry:false,downloadAvailable:true}}));
+  await page.goto('/diagnosis-test?reports');
+  await page.getByRole('button',{name:'보고서 열기',exact:true}).click();
+  let frame=page.frameLocator('iframe[title="나의 N6 정밀 보고서"]');
+  await frame.locator('#s3 h2').evaluate(el=>el.ownerDocument.defaultView!.scrollTo(0,el.getBoundingClientRect().top+el.ownerDocument.defaultView!.scrollY-40));
+  await expect.poll(()=>page.evaluate(()=>localStorage.getItem('myin_reader_last:00000000-0000-4000-8000-000000000003'))).toBe('s3');
+  await page.getByRole('button',{name:'보고서 닫기'}).click();
+  await page.getByRole('button',{name:'보고서 열기',exact:true}).click();
+  frame=page.frameLocator('iframe[title="나의 N6 정밀 보고서"]');
+  await expect(frame.locator('#myin-resume')).toContainText('지난번 읽던 곳 · 03 핵심 욕구 해설');
+  await expect(frame.locator('#myin-resume a')).toHaveAttribute('href','about:srcdoc#s3');
+});

@@ -3,12 +3,13 @@
 import { useEffect, useRef } from 'react';
 import { Printer, X } from 'lucide-react';
 import { enhancePrecisionDiagrams } from '@/lib/precisionReportMotion';
+import { attachReaderAssist, READER_LAYOUT_CSS } from '@/lib/precisionReaderAssist';
 
 // Match MYIN's reader isolation. Keep the issued styles/font/body unchanged;
 // scripts and external requests must not run inside the EDU account origin.
 const policy = "default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'";
 export function diagnosisReaderDocument(html: string) {
-  return `<!doctype html><meta http-equiv="Content-Security-Policy" content="${policy}"><meta name="referrer" content="no-referrer"><style>.print-btn{display:none!important}
+  return `<!doctype html><meta http-equiv="Content-Security-Policy" content="${policy}"><meta name="referrer" content="no-referrer"><style>.print-btn{display:none!important}${READER_LAYOUT_CSS}
 @media screen and (max-width:900px){.report-topbar .topbar-inner{height:auto!important;min-height:60px;flex-wrap:wrap;gap:8px!important;padding-top:12px;padding-bottom:10px}.report-topbar .topbar-links{display:flex!important;flex:0 0 100%;overflow-x:auto;gap:18px!important;margin:0!important;padding:4px 0}.report-topbar .topbar-links a{white-space:nowrap;display:flex;align-items:center;min-height:36px}}
 </style>${html}`;
 }
@@ -17,12 +18,13 @@ export function DiagnosisReportReader({ html, error, onClose, onError }: { html:
   const dialog = useRef<HTMLDialogElement>(null);
   const frame = useRef<HTMLIFrameElement>(null);
   const stopMotion = useRef<() => void>(() => {});
+  const stopAssist = useRef<() => void>(() => {});
   useEffect(() => {
     const reader = dialog.current, previousOverflow = document.body.style.overflow;
     reader?.showModal();
     document.body.style.overflow = 'hidden';
     frame.current?.focus({ preventScroll: true });
-    return () => { stopMotion.current(); reader?.close(); document.body.style.overflow = previousOverflow; };
+    return () => { stopMotion.current(); stopAssist.current(); reader?.close(); document.body.style.overflow = previousOverflow; };
   }, []);
   function connectContents() {
     const document = frame.current?.contentDocument;
@@ -30,6 +32,9 @@ export function DiagnosisReportReader({ html, error, onClose, onError }: { html:
     // print and PDF keep the static original; nothing runs inside the frame (its CSP still blocks every script).
     stopMotion.current();
     stopMotion.current = document ? enhancePrecisionDiagrams(document) : () => {};
+    // Same reader help as MYIN: the chapter being read is remembered in this browser and offered next time.
+    stopAssist.current();
+    stopAssist.current = document ? attachReaderAssist(document) : () => {};
     // WebKit suppresses JS listeners in a script-disabled sandbox. Native
     // fragment links must address srcdoc itself, not the parent page URL.
     if (document) document.documentElement.style.setProperty('scroll-padding-top', `${document.querySelector('.report-topbar')?.getBoundingClientRect().height || 0}px`);
