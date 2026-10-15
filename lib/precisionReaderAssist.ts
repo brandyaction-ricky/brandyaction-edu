@@ -15,7 +15,7 @@ export const READER_LAYOUT_CSS = '.spec-body:not(:has(.slider)){grid-template-co
   // Two cards side by side keep one height: 11장 '기여와 경계' (the arrow stays centred) and every paired list.
   // (!important: the issued CSS sets these with #s11 and .section selectors.)
   + '.e-balance{align-items:stretch!important}.e-balance>span{align-self:center}'
-  + '.v-pair{align-items:stretch!important}.v-pair>.final-block{margin:0!important;display:flex;flex-direction:column}.v-pair>.final-block>*{flex:1 1 auto}'
+  + '.v-pair{align-items:stretch!important}.v-pair>.final-block{margin:0!important;display:flex;flex-direction:column}.v-pair>.final-block>:last-child{flex:1 1 auto}'
   + '@media(max-width:700px){.spec-body:not(:has(.slider)){grid-template-columns:1fr}.spec-body:not(:has(.slider)) .pole.right{border-left:0;padding-left:0;border-top:1px solid var(--line,#e1dbd0);padding-top:16px}}';
 
 const CHIP_ID = 'myin-resume';
