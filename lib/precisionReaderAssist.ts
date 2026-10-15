@@ -13,11 +13,13 @@ export const READER_LAYOUT_CSS = '.spec-body:not(:has(.slider)){grid-template-co
   + '@media(max-width:700px){.spec-body:not(:has(.slider)){grid-template-columns:1fr}.spec-body:not(:has(.slider)) .pole.right{border-left:0;padding-left:0;border-top:1px solid var(--line,#e1dbd0);padding-top:16px}}';
 
 const CHIP_ID = 'myin-resume';
-const CHIP_CSS = `#${CHIP_ID}{position:fixed;left:50%;bottom:18px;z-index:300;transform:translateX(-50%);display:flex;align-items:center;gap:10px;max-width:calc(100% - 32px);padding:10px 12px 10px 16px;border-radius:999px;background:#0d1531;color:#fff;font:600 13px/1.4 inherit;box-shadow:0 10px 30px rgba(13,21,49,.28);animation:myin-resume-out .4s ease 14s forwards}`
+const CHIP_CSS = `#${CHIP_ID}{position:fixed;left:50%;bottom:18px;z-index:300;transform:translateX(-50%);display:flex;align-items:center;gap:10px;max-width:calc(100% - 32px);padding:10px 12px 10px 16px;border-radius:999px;background:#0d1531;color:#fff;font-weight:600;font-size:13px;line-height:1.4;box-shadow:0 10px 30px rgba(13,21,49,.28);animation:myin-resume-out .4s ease 14s forwards}`
   + `#${CHIP_ID} span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#${CHIP_ID} a{flex:none;padding:6px 12px;border-radius:999px;background:#fff;color:#0d1531;text-decoration:none;font-weight:700}`
+  + `@media(max-width:600px){#${CHIP_ID}{left:16px;right:72px;transform:none;max-width:none}}`
   + `@keyframes myin-resume-out{to{opacity:0;visibility:hidden;pointer-events:none}}@media print{#${CHIP_ID}{display:none!important}}`;
 const NEXT_CSS = '.myin-next{display:flex;justify-content:flex-end;margin:28px 0 0}.myin-next a{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:10px 16px;border:1px solid var(--line,#dfe4f4);border-radius:999px;background:#fff;color:#0d1531;font-size:14px;font-weight:700;text-decoration:none}.myin-next a b{color:var(--blue,#2735c8);font-variant-numeric:tabular-nums}@media print{.myin-next{display:none!important}}';
-const SECTION = /^s\d{1,2}$/;
+// Same chapters as readerFrame: the answer to the buyer's own question (#my-question) sits after 01 and is read too.
+const SECTION = /^(s\d{1,2}|my-question)$/;
 const keyOf = (doc: Document) => {
   const id = doc.querySelector('meta[name="report-id"]')?.getAttribute('content') || doc.querySelector('meta[name="response-id"]')?.getAttribute('content');
   return id && /^[\w-]{8,64}$/.test(id) ? `myin_reader_last:${id}` : null;
