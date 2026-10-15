@@ -186,7 +186,7 @@ function attachMotion(doc: Document): Undo {
     // The 20장 money block: only its three scene cards, one after another (CEO QA 10-15: '너무 번잡해').
     select('.mm2 > .v-riskmap', ':scope > a', true);
     select('.v-flow-list', ':scope > li', true);
-    select('.v-panel:not(:has(.v-lanes)) .v-boundary', ':scope > b');
+    select('.v-boundary:not(.v-panel:has(.v-lanes) .v-boundary)', ':scope > b');
     select('.v-money-card', ':scope > b,:scope > dl', true);
     select('.final-block:has(> .levelrow)', ':scope > .levelrow > div:not(.arr)', true);
     select('.timeline', ':scope > .era', true);
