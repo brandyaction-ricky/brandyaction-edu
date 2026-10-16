@@ -29,7 +29,7 @@ async function longLesson(page: Page, repeat = 50, loadTimeout = 5000) {
   return { server, content };
 }
 async function selectFirstLine(page: Page) {
-  await canvas(page).locator('p').first().locator('.ldc-move-content').click();
+  await canvas(page).locator('.ldc-movable-paragraph > .ldc-move-content').first().click();
   await canvas(page).locator('p').first().evaluate(el => {
     const range = document.createRange(); range.selectNodeContents(el.querySelector('.ldc-move-content') || el);
     const selection = window.getSelection()!; selection.removeAllRanges(); selection.addRange(range);
@@ -77,7 +77,7 @@ test('bulk internal cut-paste and undo preserve a long lesson while autosave is 
   const resume = server.pauseNextSave();
   await page.getByLabel('제목 *', { exact: true }).fill('저장 중 내부 편집');
   await expect.poll(() => server.writes.filter(w => w.action === 'save').length).toBeGreaterThan(0);
-  await canvas(page).locator('p').first().locator('.ldc-move-content').click();
+  await canvas(page).locator('.ldc-movable-paragraph > .ldc-move-content').first().click();
   await page.keyboard.press('ControlOrMeta+a');
   const copied = await copySelection(page);
   expect(copied.text).toContain('복사할 짧은 한 줄');
@@ -135,7 +135,7 @@ test('internal rich-text copy preserves toggle content, links and colors at anot
   await page.goto('/lesson-block-author-test?serverDraft=1'); await expect(canvas(page)).toBeVisible();
   const toggle = canvas(page).locator('[data-type="details"]');
   await toggle.locator(':scope > button').click();
-  const selected = toggle.locator('[data-type="detailsContent"] p .ldc-move-content');
+  const selected = toggle.locator('[data-type="detailsContent"] .ldc-movable-paragraph > .ldc-move-content');
   await selected.click(); await selected.evaluate(el => {
     const range = document.createRange(); range.selectNodeContents(el);
     const selection = window.getSelection()!; selection.removeAllRanges(); selection.addRange(range); document.dispatchEvent(new Event('selectionchange'));
