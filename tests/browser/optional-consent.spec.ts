@@ -27,13 +27,13 @@ test('signup is unchecked, skippable, contains no SMS choice and does not trust 
  await expect(page.getByRole('checkbox',{name:/문자/})).toHaveCount(0);await required(page);await page.getByRole('button',{name:'동의하고 가입 완료'}).click();
  await expect(page.getByRole('heading',{name:'가입 완료 목적지'})).toBeVisible();expect(b.writes).toHaveLength(0);expect(b.auth[0].data).not.toHaveProperty('marketing_consent');
 });
-test('signup with Kakao choice shows a dated receipt and continue, records no SMS and guards its dependency',async({page},info)=>{
+test('signup with Kakao choice saves consent and reaches the destination without another click',async({page},info)=>{
  const b=await backend(page);await page.goto('/optional-signup-test');await required(page);await page.getByRole('checkbox',{name:'카카오톡 광고 받기',exact:true}).check();
  await page.getByRole('button',{name:'동의하고 가입 완료'}).click();await expect(page.getByRole('alert').last()).toContainText('내 정보');expect(b.writes).toHaveLength(0);
  await page.getByRole('checkbox',{name:'맞춤 소식에 내 정보를 사용하는 데 동의해요',exact:true}).check();await page.getByRole('button',{name:'동의하고 가입 완료'}).click();
- await expect(page.getByRole('status')).toContainText('2026년 10월 20일');expect(b.writes[0].choices).toEqual({...no,marketingUse:true,kakao:true});
+ await expect(page.getByRole('heading',{name:'가입 완료 목적지'})).toBeVisible();expect(b.writes[0].choices).toEqual({...no,marketingUse:true,kakao:true});
+ await expect(page.getByRole('button',{name:'계속하기',exact:true})).toHaveCount(0);
  await page.screenshot({path:info.outputPath('consent-signup.png'),fullPage:true});
- await page.getByRole('button',{name:'계속하기',exact:true}).click();await expect(page.getByRole('heading',{name:'가입 완료 목적지'})).toBeVisible();
 });
 test('optional save failure never blocks signup once the user deselects optional news',async({page})=>{
  const b=await backend(page,{failure:true});await page.goto('/optional-signup-test');await required(page);await page.getByRole('checkbox',{name:'[선택] 교육·할인·행사 소식 받기 (광고)',exact:true}).check();await page.getByRole('button',{name:'동의하고 가입 완료'}).click();await expect(page.getByRole('alert')).toContainText('해제하고 가입');
@@ -54,8 +54,7 @@ test('lost signup opt-in followed by deselection revokes the actual stored choic
  const b=await backend(page,{lost:true});await page.goto('/optional-signup-test');await required(page);
  await page.getByRole('checkbox',{name:'[선택] 교육·할인·행사 소식 받기 (광고)',exact:true}).check();await page.getByRole('button',{name:'동의하고 가입 완료'}).click();await expect(page.getByRole('alert')).toBeVisible();
  await page.getByRole('checkbox',{name:'[선택] 교육·할인·행사 소식 받기 (광고)',exact:true}).uncheck();await page.getByRole('button',{name:'동의하고 가입 완료'}).click();
- await expect(page.getByRole('status')).toContainText('동의 철회');expect(b.writes).toHaveLength(2);expect(b.writes[1].choices).toEqual(no);expect(b.writes[1].expectedRevision).toBe(b.writes[0].requestId);
- await page.getByRole('button',{name:'계속하기',exact:true}).click();await expect(page.getByRole('heading',{name:'가입 완료 목적지'})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'가입 완료 목적지'})).toBeVisible();expect(b.writes).toHaveLength(2);expect(b.writes[1].choices).toEqual(no);expect(b.writes[1].expectedRevision).toBe(b.writes[0].requestId);
 });
 
 test('legacy news remains visible and can be withdrawn before the scheduled cutoff',async({page})=>{
