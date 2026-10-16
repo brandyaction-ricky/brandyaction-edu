@@ -60,7 +60,21 @@ test('deleting a whole line preserves its editable content DOM before Korean com
         })).toBe(true);
         await page.keyboard.press('Meta+Backspace');
       } else {
-        await page.keyboard.press('Home'); await page.keyboard.press('Shift+End'); await page.keyboard.press('Backspace');
+        await page.keyboard.press('Home'); await page.keyboard.press('Shift+End');
+        // The Linux CI runner also delivers native selectionchange later than
+        // the key event. Do not send Backspace while the model still has a
+        // collapsed caret: that tests a different deletion than this case.
+        await expect.poll(() => block.evaluate(el => {
+          const editor = (el.closest('[aria-label="수업 문서"]') as HTMLElement & { editor: Editor }).editor;
+          const content = el.querySelector('.ldc-move-content')!;
+          const start = editor.view.posAtDOM(content, 0);
+          const end = editor.view.posAtDOM(content, content.childNodes.length);
+          const selection = getSelection(), { from, to } = editor.state.selection;
+          return !!selection?.anchorNode && !!selection.focusNode && from === start && to === end && from < to &&
+            Math.min(editor.view.posAtDOM(selection.anchorNode, selection.anchorOffset), editor.view.posAtDOM(selection.focusNode, selection.focusOffset)) === start &&
+            Math.max(editor.view.posAtDOM(selection.anchorNode, selection.anchorOffset), editor.view.posAtDOM(selection.focusNode, selection.focusOffset)) === end;
+        })).toBe(true);
+        await page.keyboard.press('Backspace');
       }
       // Chrome may remove the content wrapper, not just its text. The node view
       // must let ProseMirror observe that deletion and repair its input context.
