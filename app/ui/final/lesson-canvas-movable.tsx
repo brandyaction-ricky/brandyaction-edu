@@ -12,7 +12,8 @@ import { LessonQuote } from './lesson-rich-input';
 // keep their editable DOM synchronous without a React portal/flushSync per line.
 const movableBlock: NodeViewRenderer = ({ node, editor, getPos, HTMLAttributes }) => {
   const type = node.type.name;
-  const tag = type === 'paragraph' ? 'p' : type === 'heading' ? `h${node.attrs.level}` : type === 'blockquote' ? 'blockquote' : 'div';
+  const contentTag = type === 'paragraph' ? 'p' : type === 'heading' ? `h${node.attrs.level}` : type === 'bulletList' ? 'ul' : type === 'orderedList' ? 'ol' : 'div';
+  const tag = type === 'blockquote' ? 'blockquote' : 'div';
   const label = type === 'paragraph' ? '문단' : type === 'heading' ? '제목' : type === 'blockquote' ? '인용문' : '목록';
   const dom = document.createElement(tag), handle = document.createElement('span');
   for (const [key, value] of Object.entries(HTMLAttributes)) dom.setAttribute(key, String(value));
@@ -29,10 +30,22 @@ const movableBlock: NodeViewRenderer = ({ node, editor, getPos, HTMLAttributes }
       editor.view.focus();
     }
   };
-  handle.onclick = select;
+  const restoreTabStop = () => { handle.tabIndex = 0; dom.ownerDocument.removeEventListener('mouseup', restoreTabStop); };
+  handle.onmousedown = event => {
+    if (event.button !== 0) return;
+    // Keep mouse focus in the editor while allowing the native drag default.
+    // A focusable, non-editable handle briefly takes Mac's input context away.
+    handle.removeAttribute('tabindex'); select();
+    dom.ownerDocument.addEventListener('mouseup', restoreTabStop, { once: true });
+  };
+  handle.ondragend = restoreTabStop;
+  handle.onclick = () => { if (!editor.view.hasFocus()) select(); };
   handle.onkeydown = event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); select(); } };
   dom.addEventListener('dragstart', () => editor.view.dispatch(closeHistory(editor.state.tr)), true);
-  const contentDOM = document.createElement(type === 'bulletList' ? 'ul' : type === 'orderedList' ? 'ol' : ['paragraph', 'heading'].includes(type) ? 'span' : 'div');
+  // Keep controls outside the actual text block. Chrome removes an inline
+  // content span when its last text is deleted, leaving the caret beside the
+  // non-editable handle. A normal p/heading remains a valid empty input target.
+  const contentDOM = document.createElement(contentTag);
   contentDOM.className = 'ldc-move-content';
   const attributes = (current: typeof node) => { if (type === 'orderedList') contentDOM.setAttribute('start', String(current.attrs.start || 1)); };
   attributes(node); dom.append(handle, contentDOM);
@@ -43,7 +56,15 @@ const movableBlock: NodeViewRenderer = ({ node, editor, getPos, HTMLAttributes }
     deselectNode() { dom.classList.remove('ProseMirror-selectednode'); },
     // Drag events reach ProseMirror; keyboard/click on the handle stay controls.
     stopEvent(event) { return !!event.target && handle.contains(event.target as globalThis.Node) && !event.type.startsWith('drag') && event.type !== 'mousedown'; },
-    ignoreMutation(mutation) { return mutation.type !== 'selection' && (handle.contains(mutation.target) || mutation.target === dom); },
+    ignoreMutation(mutation) {
+      // Chrome can remove contentDOM itself when deleting the last text in a
+      // line. Ignoring that childList change leaves ProseMirror holding a
+      // detached input container until the next keystroke. Only our handle and
+      // shell attributes are outside the editable document.
+      return mutation.type !== 'selection' && (handle.contains(mutation.target) ||
+        (mutation.type === 'attributes' && mutation.target === dom));
+    },
+    destroy() { dom.ownerDocument.removeEventListener('mouseup', restoreTabStop); },
   };
 };
 

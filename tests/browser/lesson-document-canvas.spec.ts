@@ -202,7 +202,7 @@ test('mouse reorders paragraphs, headings, lists, quotes and questions without l
  ]});
  const server=await backend(page,{...initial,blocks:[{id:'body',type:'text',content},initial.blocks[2]]});
  await page.goto('/lesson-block-author-test');const canvas=doc(page);await expect(canvas).toBeVisible();
- const target=()=>canvas.locator('[data-author-block="body"] p.ldc-movable').filter({hasText:'끝 문단'});
+ const target=()=>canvas.locator('[data-author-block="body"] .ldc-movable-paragraph').filter({hasText:'끝 문단'});
  await startCalloutDrag(page,canvas.getByRole('button',{name:'제목 이동'}));await dropCallout(page,target());
  await startCalloutDrag(page,canvas.getByRole('button',{name:'목록 이동'}));await dropCallout(page,target());
  await startCalloutDrag(page,canvas.getByRole('button',{name:'인용문 이동'}));await dropCallout(page,target());
