@@ -8,9 +8,8 @@ import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { POLICY_VERSION } from "@/lib/legal-policies";
 import { OptionalConsent } from '@/app/ui/optional-consent';
-import { consentReceipt, emptyConsent, OPTIONAL_CONSENT_VERSION, validateConsentChoices, type ConsentChoices, type ConsentSnapshot } from '@/lib/optional-consent';
+import { emptyConsent, OPTIONAL_CONSENT_VERSION, validateConsentChoices, type ConsentChoices, type ConsentSnapshot } from '@/lib/optional-consent';
 import { ConsentPolicy } from "@/app/ui/consent-policy";
-import { useSignupEncouragement } from "@/app/ui/signup-encouragement";
 
 import { safeNext } from "@/lib/platform";
 
@@ -21,13 +20,11 @@ export default function SocialConsentPage() {
   const [marketing, setMarketing] = useState(false);
   const optionalEnabled = process.env.NEXT_PUBLIC_EDU_OPTIONAL_CONSENT_ENABLED === 'true';
   const [choices, setChoices] = useState<ConsentChoices>({ ...emptyConsent });
-  const [receipt, setReceipt] = useState('');
   const [optionalUnresolved, setOptionalUnresolved] = useState(false);
   const consentAttempt = useRef<{ requestId: string; choices: ConsentChoices } | null>(null);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const busy = useRef(false);
-  const encouragement = useSignupEncouragement(process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true');
 
   const complete = async () => {
     if (busy.current) return;
@@ -43,7 +40,6 @@ export default function SocialConsentPage() {
     busy.current = true;
     setMessage("");
     try {
-    const publishEncouragement = encouragement.prepare();
     const supabase = createClient();
     const { error } = await supabase.auth.updateUser({
       data: {
@@ -59,7 +55,6 @@ export default function SocialConsentPage() {
       setPending(false);
       return;
     }
-    let savedReceipt = '';
     let expectedRevision: string | null = null;
     let reconcileWithdrawal = false;
     // A lost opt-in response may already have committed. Never silently skip a
@@ -85,11 +80,9 @@ export default function SocialConsentPage() {
         setMessage("마케팅 수신 동의 정보를 저장하지 못했습니다. 다시 시도하거나 선택 항목을 해제하고 가입할 수 있어요.");
         return;
       }
-      if (optionalEnabled) { savedReceipt = consentReceipt(await consentResponse.json()); setOptionalUnresolved(false); }
+      if (optionalEnabled) setOptionalUnresolved(false);
     }
-    await publishEncouragement();
-    if (savedReceipt) setReceipt(savedReceipt);
-    if (!savedReceipt) goNext();
+    goNext();
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "가입 정보를 저장하지 못했습니다. 연결 상태를 확인하고 다시 시도해 주세요.");
     } finally {
@@ -99,13 +92,6 @@ export default function SocialConsentPage() {
   };
 
   const goNext = () => { router.replace(safeNext(new URLSearchParams(window.location.search).get("next"))); router.refresh(); };
-  const continueWithPendingNews = async () => {
-    if (busy.current || !terms || !privacy) return;
-    busy.current = true; setPending(true);
-    try { await encouragement.prepare()(); goNext(); }
-    catch (cause) { setMessage(cause instanceof Error ? cause.message : '가입을 완료하지 못했어요. 다시 시도해 주세요.'); }
-    finally { busy.current = false; setPending(false); }
-  };
   const cancel = async () => {
     if (busy.current) return;
     busy.current = true;
@@ -133,29 +119,27 @@ export default function SocialConsentPage() {
                 필수 약관에 동의하면 회원가입이 완료됩니다.
               </p>
             </div>
-            <fieldset className="stack mt32 email-auth-fields" disabled={pending || !!receipt}>
+            <fieldset className="stack mt32 email-auth-fields" disabled={pending}>
               <ConsentPolicy kind="terms" checked={terms} onChange={setTerms} />
               <ConsentPolicy kind="privacy" checked={privacy} onChange={setPrivacy} />
-              {optionalEnabled ? <OptionalConsent value={choices} onChange={setChoices} disabled={pending || !!receipt}/> : <label className="checkline">
+              {optionalEnabled ? <OptionalConsent value={choices} onChange={setChoices} disabled={pending}/> : <label className="checkline">
                 <input type="checkbox" checked={marketing} onChange={event => setMarketing(event.target.checked)}/>
                 <span>[선택] 클래스·무료강의 등 마케팅 정보 수신 동의</span>
               </label>}
-              {encouragement.fields}
             </fieldset>
             {message && (
               <p className="notice mt16" role="alert">
                 {message}
               </p>
             )}
-            {optionalEnabled && optionalUnresolved && message && <button className="btn ghost full mt16" type="button" disabled={pending || !terms || !privacy} onClick={continueWithPendingNews}>가입 계속하기 · 수신 설정은 회원 정보에서 확인</button>}
-            {receipt && <p className="notice mt16" role="status">{receipt}</p>}
+            {optionalEnabled && optionalUnresolved && message && <button className="btn ghost full mt16" type="button" disabled={pending || !terms || !privacy} onClick={goNext}>가입 계속하기 · 수신 설정은 회원 정보에서 확인</button>}
             <button
               className="btn primary full mt24"
               type="button"
-              onClick={receipt ? goNext : complete}
+              onClick={complete}
               disabled={pending || !terms || !privacy}
             >
-              {pending ? "저장 중..." : receipt ? "계속하기" : "동의하고 가입 완료"}
+              {pending ? "저장 중..." : "동의하고 가입 완료"}
               <ArrowRight />
             </button>
             <button
