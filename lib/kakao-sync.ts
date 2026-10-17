@@ -4,6 +4,7 @@ export type KakaoSyncConfig = {
   channelId: string;
   termsTag: string;
   privacyTag: string;
+  privacyVersion?: string;
   readChannel: boolean;
   readPhone: boolean;
   setupConfirmed: boolean;
@@ -11,7 +12,7 @@ export type KakaoSyncConfig = {
 };
 export const defaultKakaoSyncConfig: KakaoSyncConfig = {
   enabled: false, appId: '', channelId: '', termsTag: '', privacyTag: '',
-  readChannel: false, readPhone: false, setupConfirmed: false, revision: 0,
+  readChannel: false, readPhone: false, setupConfirmed: false, revision: 0, privacyVersion: '',
 };
 export function validateKakaoSyncConfig(input: unknown): KakaoSyncConfig {
   if (!input || typeof input !== 'object') throw Error('설정을 확인해 주세요.');
@@ -30,6 +31,7 @@ export function validateKakaoSyncConfig(input: unknown): KakaoSyncConfig {
     channelId: field('channelId', /^_[a-zA-Z0-9]{1,80}$/),
     termsTag: field('termsTag', /^[a-zA-Z0-9_-]{1,100}$/),
     privacyTag: field('privacyTag', /^[a-zA-Z0-9_-]{1,100}$/),
+    privacyVersion: v.privacyVersion === undefined ? '' : field('privacyVersion', /^\d{4}-\d{2}-\d{2}$/),
     readChannel: v.readChannel === true,
     readPhone: v.readPhone === true,
     setupConfirmed: v.setupConfirmed === true,
@@ -81,4 +83,12 @@ export function kakaoConsentSnapshot(id: string, config: KakaoSyncConfig, termsR
   const relation = matches.length === 1 ? obj(matches[0]).relation : null;
   const channelRelation = relation === 'ADDED' || relation === 'BLOCKED' || relation === 'NONE' ? relation : 'UNKNOWN';
   return { terms, requiredAgreed: terms.every(term => term.agreed), channelRelation };
+}
+
+/** EDU shares the Kakao app with MYIN. Select the registered age term only;
+ * EDU required policies and optional choices are collected on the EDU signup.
+ * Never inherit the app's default MYIN terms or client-supplied extra scopes. */
+export function kakaoLoginOptions(rawScopes?: unknown): { queryParams:{service_terms:string};scopes?:string } {
+  const scopes=typeof rawScopes==='string' ? [...new Set(rawScopes.split(',').filter(scope=>scope==='plusfriends' || scope==='phone_number'))] : [];
+  return {queryParams:{service_terms:'user_age_check'},...(scopes.length ? {scopes:scopes.join(',')} : {})};
 }

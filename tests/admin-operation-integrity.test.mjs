@@ -19,6 +19,7 @@ function load(path, dependencies = {}) {
     if (name === '@/lib/member-platform-data') return { readMemberPlatformData: async () => ({}) };
     if (name === '@/lib/alumni-access-server') return { assertParticipationOpen: async () => {} };
     if (name === 'next/cache') return { revalidateTag: () => {} };
+    if (name === '@/lib/meta-purchase-server') return { captureMetaPurchaseContext: async () => {} };
     if (!(name in dependencies)) throw Error(name);
     return dependencies[name];
   });

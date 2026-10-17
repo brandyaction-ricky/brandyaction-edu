@@ -4,7 +4,7 @@ export type PersonalizationTerms = {
   version: string; analysis: string; overseas: string;
 };
 export type PersonalizationSnapshot = {
-  choices: PersonalizationChoices; revision: string | null; updatedAt: string | null;
+  activeChoices?: PersonalizationChoices; recordedVersion?: string | null; choices: PersonalizationChoices; revision: string | null; updatedAt: string | null;
   terms: PersonalizationTerms | null; needsRenewal: boolean; eligible: boolean; accepting: boolean;
 };
 export function validPersonalizationChoices(value: unknown): value is PersonalizationChoices {

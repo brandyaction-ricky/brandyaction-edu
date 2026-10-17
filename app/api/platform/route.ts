@@ -1,4 +1,5 @@
 import { memberDirectoryScope } from '@/lib/member-directory';
+import { captureMetaPurchaseContext } from '@/lib/meta-purchase-server';
 import { questionDeletionReady } from '@/lib/question-deletion-server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { reviewMutation, reviewWriteError } from '@/lib/submission-review';
@@ -10,7 +11,7 @@ import { getEduSettings } from '@/lib/edu-settings';
 import { isListedProductLink } from '@/lib/product-visibility';
 import { gradeQuiz, type QuizDefinition } from '@/lib/mission-quiz';
 import { adminSelectColumns, adminTables, archiveValues, cohortStatus, phoneNumber, validImage, assetPath, imagePreviewUrl, databaseMessage, excludedMemberStatus } from '@/lib/qa-rules';
-import { POLICY_VERSION } from '@/lib/legal-policies';
+import { POLICY_VERSION, CURRENT_PRIVACY_VERSION } from '@/lib/legal-policies';
 import { getOperatorUser, permissionsFor, sectionScopes } from '@/lib/operator-permissions';
 import { crmDeliveryState } from '@/lib/crm-delivery';
 import { contactEmail } from '@/lib/crm-purchase-contact';
@@ -1124,7 +1125,7 @@ export async function POST(request: Request) {
                 p_customer_email: user.contact_email || user.email,
                 p_customer_phone: phone,
                 p_terms_version: POLICY_VERSION,
-                p_privacy_version: POLICY_VERSION,
+                p_privacy_version: CURRENT_PRIVACY_VERSION,
                 p_refund_policy_version: POLICY_VERSION,
                 p_code: String(body.coupon || '').trim().toUpperCase(),
                 p_entry_src: typeof body.entrySource === 'string' && ['paid','organic','alumni','youtube'].includes(body.entrySource) ? body.entrySource : null,
@@ -1137,6 +1138,7 @@ export async function POST(request: Request) {
             const result = r.data as Record<string, unknown>;
             if (result.free === true && Number(result.totalAmount) === 0) return reply(result);
             if (!process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY) fail('결제 서비스 연결을 확인하고 있습니다.', 503);
+            await captureMetaPurchaseContext(request, user.id, result.orderId);
             return reply(result);
         }
         if (['progress', 'mission', 'review'].includes(action)) {

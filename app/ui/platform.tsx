@@ -1,4 +1,5 @@
 "use client";
+import { kakaoLoginOptions } from "@/lib/kakao-sync";
 import { memberDirectoryScope } from '@/lib/member-directory';
 import { MobileRefresh } from './final/mobile-refresh';
 import { contentVisibility } from '@/lib/content-visibility';
@@ -532,15 +533,13 @@ export function Platform({
         );
       const next = safeNext(new URLSearchParams(location.search).get("next"));
       // Only Kakao opts into Sync. Google and the anonymous free-class CTA are unchanged.
-      let syncOptions: { scopes?: string } = {};
+      let syncOptions: { scopes?: string; queryParams?: Record<string,string> } = provider === "kakao" ? kakaoLoginOptions() : {};
       if (provider === "kakao") {
         try {
           const response = await fetch("/api/auth/kakao-sync", { cache: "no-store", signal: AbortSignal.timeout(2500) });
           if (response.ok) {
             const config = await response.json();
-            const scopes = String(config.options?.scopes || "").split(",")
-              .filter((scope) => scope === "plusfriends" || scope === "phone_number");
-            if (scopes.length) syncOptions = { scopes: scopes.join(",") };
+            syncOptions = kakaoLoginOptions(config.options?.scopes);
           }
         } catch { /* Fall back to the existing Kakao login. */ }
       }

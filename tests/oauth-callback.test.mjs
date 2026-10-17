@@ -17,7 +17,7 @@ const compiledModule = { exports: {} };
 new Function("exports", compiled)(compiledModule.exports);
 const { oauthCallbackRecoveryPath } = compiledModule.exports;
 
-function callbackHarness({ metadata = { terms_version: '2026', privacy_version: '2026' } } = {}) {
+function callbackHarness({ metadata = { terms_version: '2026', privacy_version: '2026' }, syncAgreed = false } = {}) {
   const source = fs.readFileSync(
     new URL('../app/auth/callback/route.ts', import.meta.url),
     'utf8',
@@ -48,7 +48,7 @@ function callbackHarness({ metadata = { terms_version: '2026', privacy_version: 
         },
       }),
     };
-    if (name === '@/lib/kakao-sync-server') return { syncKakaoConsent: async () => false };
+    if (name === '@/lib/kakao-sync-server') return { syncKakaoConsent: async () => syncAgreed };
     if (name === 'next/server') return {
       NextResponse: {
         redirect(url) {
@@ -138,4 +138,16 @@ test('older email-change links guide members when their code opened in a differe
   assert.equal(response.redirectUrl, 'https://edu.example/auth/email-change-help');
   const oauthFailure = await exports.GET(new Request('https://edu.example/auth/callback?code=oauth-code&next=%2Fmy%2Fprofile&provider=kakao'));
   assert.equal(oauthFailure.redirectUrl, 'https://edu.example/login?error=auth_callback');
+});
+
+test('new Kakao member sees combined signup even after provider required terms sync', async () => {
+  const harness=callbackHarness({metadata:{},syncAgreed:true});
+  const response=await harness.get(new Request('https://edu.example/auth/callback?code=oauth-code&provider=kakao&next=%2Fcheckout'));
+  assert.equal(response.redirectUrl,'https://edu.example/auth/consent?next=%2Fcheckout');
+  assert.deepEqual(response.cookies.values,harness.cookieMutations);
+});
+test('existing Kakao member goes directly to the requested destination',async()=>{
+  const harness=callbackHarness({syncAgreed:true});
+  const response=await harness.get(new Request('https://edu.example/auth/callback?code=oauth-code&provider=kakao&next=%2Fcheckout'));
+  assert.equal(response.redirectUrl,'https://edu.example/checkout');
 });
