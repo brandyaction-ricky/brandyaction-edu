@@ -8,7 +8,7 @@ import { POLICY_VERSION, CURRENT_PRIVACY_VERSION } from '@/lib/legal-policies';
 import { RequiredConsent } from '@/app/ui/consent-policy';
 import { WelcomeConsentOptions } from '@/app/ui/welcome-consent-options';
 import { useWelcomeConsent } from '@/app/ui/use-welcome-consent';
-import { noWelcomeChoices } from '@/lib/welcome-consent';
+import { noWelcomeChoices, WELCOME_CONSENT_NOTICE } from '@/lib/welcome-consent';
 import styles from '@/app/ui/welcome-consent.module.css';
 import { safeNext } from '@/lib/platform';
 import { disableDevicePush } from '@/lib/web-push-client';
@@ -61,7 +61,7 @@ export default function SocialConsentPage() {
     <div className="text-center"><Link href="/" className="eyebrow">BRANDYACTION EDU</Link><h1>서비스 이용 동의</h1><p className="muted mt16">가입에 필요한 동의와 선택 사항을 한 번에 확인해 주세요.</p></div>
     {checkingRequired ? <p className="muted mt32" role="status">필수 약관 동의를 확인하고 있어요.</p> : kakaoRequired ? <div className="notice mt32"><p className="flex"><CheckCircle2/>필수 약관은 카카오에서 동의한 내용을 확인했어요.</p><p className="meta"><Link href="/policies/terms" target="_blank">이용약관 보기</Link> · <Link href="/policies/privacy" target="_blank">개인정보처리방침 보기</Link></p></div> : <fieldset className="stack mt32 email-auth-fields" disabled={locked}><RequiredConsent checked={required} onChange={setRequired}/></fieldset>}
     {optionalEnabled && <section className={styles.signup} aria-label="선택 동의">
-      <div className={styles.heading}><Gift size={24} aria-hidden="true"/><div><h2>{coupon ? '1만원 쿠폰, 가입할 때 받아 가세요' : '혜택 소식과 맞춤 추천'}</h2><p>모두 선택이에요. {coupon && '마케팅 정보 수신만 동의해도 쿠폰을 받아요. '}가입 후 회원 정보에서 언제든 바꿀 수 있어요.</p></div></div>
+      <div className={styles.heading}><Gift size={24} aria-hidden="true"/><div><h2>{coupon ? '1만원 쿠폰, 가입할 때 받아 가세요' : '혜택 소식과 맞춤 추천'}</h2><p>{coupon && '쿠폰은 마케팅 정보 수신만 동의해도 드려요. '}{WELCOME_CONSENT_NOTICE}</p></div></div>
       {snapshot ? <><WelcomeConsentOptions snapshot={snapshot} value={optional.choices} onChange={value=>optional.setChoices(value)} disabled={locked || optional.unresolved || snapshot.handled}/>
         {snapshot.handled && <p className={styles.footnote}>선택 항목은 이미 저장했어요. 아래에서 가입을 마무리해 주세요.</p>}
         {coupon && <p className={styles.footnote}>이메일 또는 카카오 한 채널만 선택해도 발급 · 유료 클래스 · 최소 결제금액 없음 · 발급 후 30일 · 계정당 1회</p>}</> : !optional.error && <p className={styles.footnote} role="status">선택 사항을 불러오는 중이에요. 기다리지 않고 필수 동의만으로 가입해도 돼요.</p>}

@@ -4,7 +4,7 @@ import { Gift } from 'lucide-react';
 import Link from 'next/link';
 import { useWelcomeConsent } from './use-welcome-consent';
 import { WelcomeConsentOptions } from './welcome-consent-options';
-import type { WelcomeChoices, ConsentScope } from '@/lib/welcome-consent';
+import { WELCOME_CONSENT_NOTICE, type WelcomeChoices, type ConsentScope } from '@/lib/welcome-consent';
 import styles from './welcome-consent.module.css';
 export function WelcomeConsent({ settings=false }: { settings?:boolean }) {
   const state=useWelcomeConsent(), s=state.snapshot, box=useRef<HTMLElement>(null);
@@ -16,7 +16,7 @@ export function WelcomeConsent({ settings=false }: { settings?:boolean }) {
   const allReady=s.accepting.marketing && s.accepting.personal && s.accepting.meta, some=Object.values(state.choices).some(Boolean), locked=state.busy || state.unresolved;
   const change=(next:WelcomeChoices,scope:ConsentScope)=>{state.setChoices(next);if(settings)void state.save(scope,next);};
   const content=<section ref={box} tabIndex={settings ? undefined : -1} id={settings ? 'consent-settings' : undefined} role={settings ? undefined : 'dialog'} aria-label={settings ? '선택 동의 관리' : '선택 동의'} className={`${styles.card} ${settings ? styles.settings : ''}`} onKeyDown={e=>{if(!settings && e.key==='Escape'){e.stopPropagation();setClosed(true);}}}>
-    <div className={styles.heading}><Gift size={24} aria-hidden="true"/><div><h2>{settings ? '선택 동의 관리' : '1만원 쿠폰, 지금 받아 가세요'}</h2><p>{settings ? '가입 후 선택한 내용을 확인하고 각 항목을 바꿀 수 있어요. 체크를 바꾸면 바로 저장해요.' : '마케팅 정보 수신에 동의하면 바로 드려요. 모두 선택이고, 언제든 회원 정보에서 끌 수 있어요.'}</p></div></div>
+    <div className={styles.heading}><Gift size={24} aria-hidden="true"/><div><h2>{settings ? '선택 동의 관리' : '1만원 쿠폰, 지금 받아 가세요'}</h2>{settings && <p>가입 후 선택한 내용을 확인하고 각 항목을 바꿀 수 있어요. 체크를 바꾸면 바로 저장해요.</p>}<p>{!settings && s.reward.available && '쿠폰은 마케팅 정보 수신만 동의해도 드려요. '}{WELCOME_CONSENT_NOTICE}</p></div></div>
     <WelcomeConsentOptions snapshot={s} value={state.choices} onChange={change} disabled={locked}/>
     {settings && s.personal.needsRenewal && <div className={styles.detail}><p>맞춤 추천 안내가 바뀌어 기존 동의로는 분석하지 않아요. 새 안내를 확인해 선택하거나 기존 동의를 철회할 수 있어요.</p>{s.personal.choices.analysis && !state.choices.analysis && <button type="button" disabled={locked} onClick={()=>void state.save('analysis',{...state.choices,analysis:false})}>기존 맞춤 추천 동의 철회</button>}{s.personal.choices.overseas && !state.choices.overseas && <button type="button" disabled={locked} onClick={()=>void state.save('overseas',{...state.choices,overseas:false})}>기존 해외 분석 서버 동의 철회</button>}</div>}
     {settings && s.meta.needsRenewal && s.meta.consented && <div className={styles.detail}><p>Meta 안내가 바뀌어 기존 동의로는 구매 정보를 보내지 않아요.</p><button type="button" disabled={locked} onClick={()=>void state.save('meta',{...state.choices,meta:false})}>기존 Meta 동의 철회</button></div>}

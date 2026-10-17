@@ -4,6 +4,7 @@ import type { MetaPurchaseSnapshot } from './meta-purchase-consent';
 import type { RewardSnapshot } from './consent-reward';
 
 export const WELCOME_CONSENT_COPY = 'edu-welcome-e-20261017';
+export const WELCOME_CONSENT_NOTICE = '동의하신 정보는 각 항목에 적힌 목적으로만 쓰여요. 적힌 목적 외에는 어디에도 활용되지 않습니다.';
 export type WelcomeChoices = { email: boolean; kakao: boolean; analysis: boolean; overseas: boolean; meta: boolean };
 export const noWelcomeChoices: WelcomeChoices = { email: false, kakao: false, analysis: false, overseas: false, meta: false };
 export type ConsentScope = 'welcome' | 'dismiss' | 'marketing' | 'analysis' | 'overseas' | 'meta';
