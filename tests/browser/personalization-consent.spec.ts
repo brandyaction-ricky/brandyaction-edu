@@ -46,6 +46,6 @@ test('new terms require an unchecked fresh choice; stale writes require reload',
 });
 test('unapproved disclosure cannot collect consent',async({page})=>{
  const b=await backend(page,{unready:true});await page.goto('/personalization-consent-test');
- await expect(page.getByRole('region',{name:'소식 수신 설정'})).toBeVisible();
+ await expect(page.getByRole('region',{name:'선택 동의 관리'})).toBeVisible();
  await expect(panel(page)).toHaveCount(0);expect(b.writes).toHaveLength(0);
 });

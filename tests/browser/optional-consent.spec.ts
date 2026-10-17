@@ -20,7 +20,7 @@ async function backend(page:Page,options:{failure?:boolean;lost?:boolean;existin
  await page.route('**/synthetic-auth/consent',async route=>{auth.push(route.request().postDataJSON());await route.fulfill({json:{ok:true}});});
  return{writes,auth,setFailure:(v:boolean)=>{failure=v;}};
 }
-async function required(page:Page){await page.getByRole('checkbox',{name:'[필수] 이용약관 동의',exact:true}).check();await page.getByRole('checkbox',{name:'[필수] 개인정보처리방침 동의',exact:true}).check();}
+async function required(page:Page){await page.getByRole('checkbox',{name:'[필수] 이용약관 및 개인정보처리방침 동의',exact:true}).check();}
 test('signup is unchecked, skippable, contains no SMS choice and does not trust Auth marketing metadata',async({page})=>{
  const b=await backend(page);await page.goto('/optional-signup-test');
  for(const checkbox of await page.getByRole('checkbox').all())await expect(checkbox).not.toBeChecked();

@@ -1,9 +1,10 @@
 'use client';
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { type ConsentChoices, type ConsentSnapshot } from '@/lib/optional-consent';
 import styles from './optional-consent.module.css';
-export function OptionalConsent({ value, onChange, disabled = false, dates }: {
+export function OptionalConsent({ value, onChange, disabled = false, dates, children }: {
   value: ConsentChoices; onChange: (value: ConsentChoices) => void; disabled?: boolean; dates?: ConsentSnapshot['dates'];
+  children?: ReactNode;
 }) {
   const id = useId();
   const parent = useRef<HTMLInputElement>(null);
@@ -22,5 +23,6 @@ export function OptionalConsent({ value, onChange, disabled = false, dates }: {
       {(value.kakao || value.email) && !value.marketingUse && <p role="alert" className={styles.help}>광고 소식을 받으려면 위의 ‘내 정보를 사용하는 데 동의해요’도 선택해 주세요.</p>}
       <details className={styles.details}><summary>어떤 소식을 보내나요?</summary><p>주식회사 브랜디액션(브랜디에듀)이 교육상품·할인·행사 광고를 선택한 방법으로 보냅니다. 카카오톡은 휴대폰 번호, 이메일은 이메일 주소를 사용합니다. 동의를 취소하거나 탈퇴할 때까지 사용하며, 동의하지 않아도 서비스 이용에는 제한이 없습니다. 이메일 광고 발송을 시작할 경우 Resend, Inc.(미국)를 이용합니다.</p></details>
     </div>
+    {children}
   </div>;
 }

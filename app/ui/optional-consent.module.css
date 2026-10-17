@@ -12,4 +12,8 @@
 .status { border-left: 3px solid #219369; background: #f3f9f6; padding: 14px; line-height: 1.75; overflow-wrap: anywhere; }
 .error { border-left-color: #c91c2d; background: #fff5f5; }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.benefit { border-top: 1px solid #eceef1; padding-top: 14px; display: grid; gap: 6px; font-size: 14px; }
 @media (max-width: 480px) { .block { padding: 16px; } .channels { gap: 12px 18px; } }
+.disclosure { margin: 12px 0 0; display: grid; gap: 4px; }
+.disclosure dt { font-weight: 700; }
+.disclosure dd { margin: 0 0 10px; white-space: pre-wrap; overflow-wrap: anywhere; }

@@ -24,8 +24,7 @@ async function backend(page: Page, options: { consentFailure?: boolean; marketin
 }
 
 async function agree(page: Page) {
-  await page.getByRole('checkbox', { name: '[필수] 이용약관 동의', exact: true }).check();
-  await page.getByRole('checkbox', { name: '[필수] 개인정보처리방침 동의', exact: true }).check();
+  await page.getByRole('checkbox', { name: '[필수] 이용약관 및 개인정보처리방침 동의', exact: true }).check();
 }
 
 test('signup omits encouragement and finishes after one submit while saving required and optional choices', async ({ page }) => {
