@@ -2,9 +2,57 @@ import { expect,test } from '@playwright/test';
 import { welcomeBackend } from './fixture/welcome-backend';
 const marketing='[선택] 마케팅 정보 수신 (이메일·카카오) 쿠폰';
 const meta='[선택] Meta 구매 정보 전송 (광고 성과 측정, 미국 이전)';
-test('signup has one required checkbox and no optional card; completes without an extra click',async({page})=>{
- const b=await welcomeBackend(page);await page.goto('/optional-signup-test');await expect(page.getByRole('checkbox')).toHaveCount(1);
- await page.getByRole('checkbox').check();await page.getByRole('button',{name:'동의하고 가입 완료'}).click();await expect(page.getByRole('heading',{name:'가입 완료 목적지'})).toBeVisible();expect(b.auth).toHaveLength(1);expect(b.writes).toHaveLength(0);
+test('explicit signup all-consent submits four grants and required terms once, after an unchecked start',async({page})=>{
+ const b=await welcomeBackend(page);await page.goto('/optional-signup-test');
+ await expect(page.getByRole('checkbox')).toHaveCount(5);for(const c of await page.getByRole('checkbox').all())await expect(c).not.toBeChecked();
+ const submit=page.getByRole('button',{name:'모두 동의하고 1만원 쿠폰 받아 가입 완료',exact:true});await expect(submit).toBeDisabled();
+ await page.getByRole('checkbox',{name:'[필수] 이용약관 및 개인정보처리방침 동의',exact:true}).check();await submit.click();
+ await expect(page.getByRole('heading',{name:'가입 완료 목적지'})).toBeVisible();expect(b.writes).toHaveLength(1);expect(b.auth).toHaveLength(1);expect(b.issues()).toBe(1);
+ expect(b.writes[0].choices).toEqual({email:true,kakao:true,analysis:true,overseas:true,meta:true});await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+test('signup combines required and four optional choices; required-only completes in one submit',async({page})=>{
+ const b=await welcomeBackend(page);await page.goto('/optional-signup-test');await expect(page.getByRole('checkbox')).toHaveCount(5);
+ await page.getByRole('checkbox',{name:'[필수] 이용약관 및 개인정보처리방침 동의',exact:true}).check();
+ await page.getByRole('button',{name:'필수만 동의하고 가입 완료',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'가입 완료 목적지'})).toBeVisible();expect(b.auth).toHaveLength(1);expect(b.writes).toHaveLength(1);expect(Object.values(b.writes[0].choices).every(v=>!v)).toBe(true);expect(b.issues()).toBe(0);
+ await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+test('signup marketing-only choice issues coupon without Meta and finishes without another prompt',async({page})=>{
+ const b=await welcomeBackend(page);await page.goto('/optional-signup-test');
+ await page.getByRole('checkbox',{name:'[필수] 이용약관 및 개인정보처리방침 동의',exact:true}).check();
+ await page.getByRole('checkbox',{name:marketing,exact:true}).check();
+ await page.getByRole('button',{name:'동의하고 1만원 쿠폰 받아 가입 완료',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'가입 완료 목적지'})).toBeVisible();expect(b.auth).toHaveLength(1);expect(b.issues()).toBe(1);expect(b.writes[0].choices).toEqual({email:true,kakao:true,analysis:false,overseas:false,meta:false});
+ await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+test('signup never silently grants all when the plain completion button is used without a coupon campaign',async({page})=>{
+ const b=await welcomeBackend(page,{unavailable:true});await page.goto('/optional-signup-test');
+ await page.getByRole('checkbox',{name:'[필수] 이용약관 및 개인정보처리방침 동의',exact:true}).check();
+ await page.getByRole('button',{name:'동의하고 가입 완료',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'가입 완료 목적지'})).toBeVisible();expect(Object.values(b.writes[0].choices).every(v=>!v)).toBe(true);expect(b.issues()).toBe(0);
+});
+test('lost optional acknowledgement is retried using the same request before final signup',async({page})=>{
+ const b=await welcomeBackend(page,{lost:true});await page.goto('/optional-signup-test');
+ await page.getByRole('checkbox',{name:'[필수] 이용약관 및 개인정보처리방침 동의',exact:true}).check();
+ await page.getByRole('checkbox',{name:marketing,exact:true}).check();
+ await page.getByRole('button',{name:'동의하고 1만원 쿠폰 받아 가입 완료',exact:true}).click();
+ await expect(page.getByRole('alert')).toBeVisible();expect(b.auth).toHaveLength(0);
+ await page.getByRole('button',{name:'같은 선택으로 다시 확인하고 가입 완료',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'가입 완료 목적지'})).toBeVisible();expect(b.writes[0]).toEqual(b.writes[1]);expect(b.issues()).toBe(1);expect(b.auth).toHaveLength(1);
+});
+test('optional backend failure does not prevent required-only signup',async({page})=>{
+ const b=await welcomeBackend(page,{failure:true});await page.goto('/optional-signup-test');
+ await page.getByRole('checkbox',{name:'[필수] 이용약관 및 개인정보처리방침 동의',exact:true}).check();
+ await page.getByRole('button',{name:'필수만 동의하고 가입 완료',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'가입 완료 목적지'})).toBeVisible();expect(b.auth).toHaveLength(1);expect(b.issues()).toBe(0);
+});
+test('retrying required consent never repeats saved optional receipts or coupon issuance',async({page})=>{
+ const b=await welcomeBackend(page);let fail=true;
+ await page.route('**/synthetic-auth/consent',async r=>r.fulfill({status:fail?503:200,json:{ok:!fail}}));
+ await page.goto('/optional-signup-test');await page.getByRole('checkbox',{name:'[필수] 이용약관 및 개인정보처리방침 동의',exact:true}).check();
+ await page.getByRole('checkbox',{name:marketing,exact:true}).check();await page.getByRole('button',{name:'동의하고 1만원 쿠폰 받아 가입 완료',exact:true}).click();
+ await expect(page.getByRole('alert')).toContainText('약관 동의를 저장하지 못했습니다');expect(b.writes).toHaveLength(1);fail=false;
+ await page.getByRole('button',{name:'동의하고 1만원 쿠폰 받아 가입 완료',exact:true}).click();await expect(page.getByRole('heading',{name:'가입 완료 목적지'})).toBeVisible();expect(b.writes).toHaveLength(1);expect(b.issues()).toBe(1);
 });
 test('E card has only four empty round choices and individual details, with no group row',async({page},info)=>{
  await welcomeBackend(page);await page.goto('/consent-reward-test');const card=page.getByRole('dialog',{name:'선택 동의'});

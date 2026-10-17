@@ -27,10 +27,11 @@ export async function GET(request: Request) {
       if (userData.user && next === '/auth/reset-password') {
         return redirectWithCookies(`${origin}/auth/reset-password`, cookies);
       }
-      const syncAgreed = searchParams.get("provider") === "kakao" && userData.user
-        ? await syncKakaoConsent(userData.user, sessionData.session?.provider_token)
-        : false;
-      if (!syncAgreed && (!metadata.terms_version || !metadata.privacy_version)) {
+      const needsConsent = !metadata.terms_version || !metadata.privacy_version;
+      if (searchParams.get("provider") === "kakao" && userData.user) {
+        await syncKakaoConsent(userData.user, sessionData.session?.provider_token);
+      }
+      if (needsConsent) {
         return redirectWithCookies(`${origin}/auth/consent?next=${encodeURIComponent(next)}`, cookies);
       }
       return redirectWithCookies(`${origin}${next}`, cookies);

@@ -2,17 +2,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { WELCOME_CONSENT_COPY, welcomeChoices, noWelcomeChoices, type WelcomeRequest, type WelcomeSnapshot, type WelcomeChoices, type ConsentScope } from '@/lib/welcome-consent';
 const endpoint = '/api/account/welcome-consent';
-export function useWelcomeConsent() {
+export function useWelcomeConsent(enabled = true) {
   const [snapshot,setSnapshot] = useState<WelcomeSnapshot | null>(null), [choices,setChoices] = useState<WelcomeChoices>({...noWelcomeChoices});
   const [unresolved,setUnresolved]=useState(false);
   const [busy,setBusy] = useState(false), [error,setError] = useState(''), [notice,setNotice] = useState('');
   const attempt = useRef<WelcomeRequest | null>(null), working = useRef(false);
   const accept = (s: WelcomeSnapshot) => { setSnapshot(s); setChoices(welcomeChoices(s)); attempt.current = null; setUnresolved(false); setError(''); };
   useEffect(() => {
+    if (!enabled) return;
     const controller = new AbortController();
     void fetch(endpoint,{cache:'no-store',signal:controller.signal}).then(async r => { if (!r.ok) throw Error(); const s = await r.json(); if (!controller.signal.aborted) accept(s); }).catch(() => { if (!controller.signal.aborted) setError('설정을 불러오지 못했어요. 잠시 후 다시 확인해 주세요.'); });
     return () => controller.abort();
-  },[]);
+  },[enabled]);
   async function reload() {
     if (working.current) return;
     working.current=true; setBusy(true); try { const r=await fetch(endpoint,{cache:'no-store'}); if(!r.ok) throw Error(); accept(await r.json()); setNotice(''); }
