@@ -56,7 +56,7 @@ export default function SocialConsentPage() {
     try{await disableDevicePush().catch(()=>{});await createClient().auth.signOut({scope:'local'});router.replace('/login');router.refresh();}
     catch{setMessage('로그아웃하지 못했습니다. 다시 시도해 주세요.');}finally{working.current=false;setPending(false);}
   }
-  const primary=offerAll ? '모두 동의하고 1만원 쿠폰 받아 가입 완료' : some && coupon && (optional.choices.email || optional.choices.kakao) ? '동의하고 1만원 쿠폰 받아 가입 완료' : '동의하고 가입 완료';
+  const primary=offerAll ? '모두 동의하고 1만원 쿠폰 받기' : some && coupon && (optional.choices.email || optional.choices.kakao) ? '동의하고 1만원 쿠폰 받아 가입 완료' : '동의하고 가입 완료';
   return <div className="edu-front"><main className="form-page"><section className="form-card"><div>
     <div className="text-center"><Link href="/" className="eyebrow">BRANDYACTION EDU</Link><h1>서비스 이용 동의</h1><p className="muted mt16">가입에 필요한 동의와 선택 사항을 한 번에 확인해 주세요.</p></div>
     {checkingRequired ? <p className="muted mt32" role="status">필수 약관 동의를 확인하고 있어요.</p> : kakaoRequired ? <div className="notice mt32"><p className="flex"><CheckCircle2/>필수 약관은 카카오에서 동의한 내용을 확인했어요.</p><p className="meta"><Link href="/policies/terms" target="_blank">이용약관 보기</Link> · <Link href="/policies/privacy" target="_blank">개인정보처리방침 보기</Link></p></div> : <fieldset className="stack mt32 email-auth-fields" disabled={locked}><RequiredConsent checked={required} onChange={setRequired}/></fieldset>}

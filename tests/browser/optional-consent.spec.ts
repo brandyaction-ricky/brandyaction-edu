@@ -5,7 +5,7 @@ const meta='[선택] Meta 구매 정보 전송 (광고 성과 측정, 미국 이
 test('explicit signup all-consent submits four grants and required terms once, after an unchecked start',async({page})=>{
  const b=await welcomeBackend(page);await page.goto('/optional-signup-test');
  await expect(page.getByRole('checkbox')).toHaveCount(5);for(const c of await page.getByRole('checkbox').all())await expect(c).not.toBeChecked();
- const submit=page.getByRole('button',{name:'모두 동의하고 1만원 쿠폰 받아 가입 완료',exact:true});await expect(submit).toBeDisabled();
+ const submit=page.getByRole('button',{name:'모두 동의하고 1만원 쿠폰 받기',exact:true});await expect(submit).toBeDisabled();
  await page.getByRole('checkbox',{name:'[필수] 이용약관 및 개인정보처리방침 동의',exact:true}).check();await submit.click();
  await expect(page.getByRole('heading',{name:'가입 완료 목적지'})).toBeVisible();expect(b.writes).toHaveLength(1);expect(b.auth).toHaveLength(1);expect(b.issues()).toBe(1);
  expect(b.writes[0].choices).toEqual({email:true,kakao:true,analysis:true,overseas:true,meta:true});await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -88,5 +88,5 @@ test('verified Kakao required terms are read-only and never requested again on s
 test('a forged Kakao URL flag cannot remove the required checkbox',async({page})=>{
  const b=await welcomeBackend(page);await page.goto('/optional-signup-test?kakao_required=1&requiredAccepted=true');
  await expect(page.getByRole('checkbox',{name:'[필수] 이용약관 및 개인정보처리방침 동의',exact:true})).not.toBeChecked();
- await expect(page.getByRole('button',{name:'모두 동의하고 1만원 쿠폰 받아 가입 완료',exact:true})).toBeDisabled();expect(b.auth).toHaveLength(0);
+ await expect(page.getByRole('button',{name:'모두 동의하고 1만원 쿠폰 받기',exact:true})).toBeDisabled();expect(b.auth).toHaveLength(0);
 });
