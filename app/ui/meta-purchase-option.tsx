@@ -8,8 +8,8 @@ export function MetaPurchaseOption({ state, disabled = false, immediate = false 
     <label><input type="checkbox" checked={state.value} disabled={disabled || state.busy || !terms} onChange={event => {
       state.setValue(event.target.checked);
       if (immediate) void state.save(event.target.checked);
-    }}/><span>[선택] Meta 구매 전환 측정을 위한 정보 제공·국외 이전 동의</span></label>
-    <p className={styles.help}>Facebook·Instagram 광고 성과를 측정하는 항목이에요. 선택하지 않아도 광고 수신 동의와 쿠폰 발급에는 영향이 없어요.</p>
+    }}/><span>[선택] Meta 구매 전환 측정·광고 최적화를 위한 정보 제공·국외 이전 동의</span></label>
+    <p className={styles.help}>Facebook·Instagram 광고 성과 측정과 광고 최적화에 사용하는 항목이에요. 선택하지 않아도 광고 수신 동의와 쿠폰 발급에는 영향이 없어요.</p>
     {terms ? <details className={styles.details}><summary>Meta에 보내는 정보와 국외 이전 안내</summary><dl className={styles.disclosure}>
       <dt>제공받는 자</dt><dd>{terms.recipient}</dd>
       <dt>이전 국가</dt><dd>{terms.country}</dd>

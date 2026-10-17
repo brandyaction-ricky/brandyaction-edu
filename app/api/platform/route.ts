@@ -1,4 +1,5 @@
 import { memberDirectoryScope } from '@/lib/member-directory';
+import { captureMetaPurchaseContext } from '@/lib/meta-purchase-server';
 import { questionDeletionReady } from '@/lib/question-deletion-server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { reviewMutation, reviewWriteError } from '@/lib/submission-review';
@@ -1137,6 +1138,7 @@ export async function POST(request: Request) {
             const result = r.data as Record<string, unknown>;
             if (result.free === true && Number(result.totalAmount) === 0) return reply(result);
             if (!process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY) fail('결제 서비스 연결을 확인하고 있습니다.', 503);
+            await captureMetaPurchaseContext(request, user.id, result.orderId);
             return reply(result);
         }
         if (['progress', 'mission', 'review'].includes(action)) {

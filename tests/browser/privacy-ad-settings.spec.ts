@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 async function interceptMeta(page: Page) {
   const requests: string[] = [];
+  await page.route('**/api/account/meta-purchase-rejection', route => route.fulfill({ json: { account: 'anonymous' } }));
   await page.route('https://connect.facebook.net/**', route => { requests.push(route.request().url()); return route.fulfill({ contentType: 'application/javascript', body: '' }); });
   await page.route('https://www.facebook.com/**', route => { requests.push(route.request().url()); return route.abort(); });
   return requests;
@@ -15,6 +16,24 @@ test('saved refusal blocks Meta before loading and survives reload on desktop an
   await page.reload();
   await expect(page.getByRole('status')).toContainText('맞춤형 광고를 거부했어요');
   expect(requests).toHaveLength(0);
+});
+test('reject revokes account purchase consent and distinguishes a failed server save from browser blocking', async ({ page }) => {
+  await interceptMeta(page);
+  let attempts = 0;
+  await page.route('**/api/account/meta-purchase-rejection', route => {
+    attempts++;
+    expect(route.request().method()).toBe('POST');
+    return attempts === 1 ? route.fulfill({ status: 503, json: { error: 'Synthetic failure' } })
+      : route.fulfill({ json: { account: 'withdrawn' } });
+  });
+  await page.goto('/privacy-settings-test');
+  await page.getByRole('button', { name: '맞춤형 광고 거부', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('맞춤형 광고를 거부했어요');
+  await expect(page.getByRole('alert')).toContainText('계정의 구매 정보 전송 중단을 저장하지 못했어요');
+  await page.getByRole('button', { name: '계정 설정 다시 저장' }).click();
+  await expect(page.getByText('이 계정의 Meta 구매 정보 전송 동의도 철회했어요.', { exact: false })).toBeVisible();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  expect(attempts).toBe(2);
 });
 test('reject clears pre-load events, saves one year and prevents events after reload', async ({ page, context }) => {
   const requests = await interceptMeta(page);

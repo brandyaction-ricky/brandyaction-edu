@@ -6,7 +6,7 @@ const id = n => `00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 test('Meta consent is separate, versioned, revocable, idempotent and inaccessible to browser roles', async t => {
  const db = new PGlite(); t.after(() => db.close());
  await db.exec("create role anon;create role authenticated;create role service_role bypassrls;create table profiles(id uuid primary key,status text default 'active',marketing_consent boolean default false);grant select,update on profiles to service_role;");
- await db.exec(readFileSync(new URL('../supabase/migrations/20261017040000_edu_meta_purchase_consent.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../supabase/migrations/20261017030825_edu_meta_purchase_delivery.sql',import.meta.url),'utf8').split('-- Purchase delivery')[0]+'commit;');
  await db.query('insert into profiles(id) values($1),($2)',[id(1),id(2)]);
  const read = async (member=id(1)) => (await db.query('select edu_meta_purchase_consent($1) as v',[member])).rows[0].v;
  const save = async (n, consented, version=null, expected=null, surface='signup', member=id(1)) => (await db.query('select edu_meta_purchase_consent($1,$2,$3,$4,$5,$6) as v',[member,id(n),expected,consented,version,surface])).rows[0].v;

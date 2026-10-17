@@ -16,6 +16,7 @@ const offer = { id: '11111111-1111-4111-8111-111111111111', course_id: course.id
 
 function setup(patch = {}, orderError = null, options = {}) {
   const calls = [];
+  const captures = [];
   const attribution = [];
   const attributionFilters = [];
   const db = {
@@ -38,20 +39,22 @@ function setup(patch = {}, orderError = null, options = {}) {
     },
   };
   const { POST } = compile('../app/api/platform/route.ts', {
+    '@/lib/meta-purchase-server': { captureMetaPurchaseContext: async (...args) => { captures.push(args.slice(1)); } },
     '@/lib/supabase/admin': { createAdminClient: () => db },
     '@/lib/server-auth': { getAuthenticatedUser: async () => ({ id: 'member', email: 'member@example.test', contact_email: options.contactEmail || null }) },
     '@/lib/platform-rules': rules,
     '@/lib/qa-rules': { phoneNumber: () => '01000000000' },
     '@/lib/legal-policies': { POLICY_VERSION: 'test-policy' },
   });
-  return { calls, attribution, attributionFilters, send: (entrySource) => POST(new Request('https://edu.example/api/platform', { method: 'POST', headers: { origin: 'https://edu.example', 'content-type': 'application/json' }, body: JSON.stringify({ action: 'order', cohortId: offer.id, agreed: true, name: 'Synthetic', phone: '01000000000', entrySource }) })) };
+  return { calls, captures, attribution, attributionFilters, send: (entrySource) => POST(new Request('https://edu.example/api/platform', { method: 'POST', headers: { origin: 'https://edu.example', 'content-type': 'application/json' }, body: JSON.stringify({ action: 'order', cohortId: offer.id, agreed: true, name: 'Synthetic', phone: '01000000000', entrySource }) })) };
 }
 
 test('paid order reaches the existing checkout RPC without any curriculum query or publication mutation', async () => {
-  const { calls, attribution, send } = setup();
+  const { calls, captures, attribution, send } = setup();
   const response = await send();
   assert.equal(response.status, 200);
   assert.equal((await response.json()).orderId, 'order');
+  assert.deepEqual(captures, [['member', 'order']]);
   assert.deepEqual(calls.map(call => call.name), ['edu_checkout_with_source']);
   assert.equal(calls[0].args.p_user_id, 'member');
   assert.equal(calls[0].args.p_entry_src,null); assert.deepEqual(attribution, []);
@@ -66,10 +69,11 @@ test('checkout stores only the four agreed campaign sources on the order', async
 });
 
 test('zero-total checkout delegates source and coupon finalization to the same transaction', async () => {
-  const { calls, attribution, attributionFilters, send } = setup({}, null, { free: true });
+  const { calls, captures, attribution, attributionFilters, send } = setup({}, null, { free: true });
   const response = await send('paid');
   assert.equal(response.status, 200);
   assert.equal((await response.json()).free, true);
+  assert.deepEqual(captures, []);
   assert.deepEqual(calls.map(call => call.name), ['edu_checkout_with_source']);
   assert.equal(calls[0].args.p_entry_src,'paid'); assert.deepEqual(attribution, []);
   assert.deepEqual(attributionFilters, []);

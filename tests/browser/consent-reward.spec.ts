@@ -146,7 +146,7 @@ test('unavailable coupon offer does not block signup or imply issuance', async (
   expect(b.marketing).toHaveLength(1); expect(b.rewards).toHaveLength(0);
 });
 
-const metaOption = (page: Page) => page.getByRole('checkbox', { name: '[선택] Meta 구매 전환 측정을 위한 정보 제공·국외 이전 동의', exact: true });
+const metaOption = (page: Page) => page.getByRole('checkbox', { name: '[선택] Meta 구매 전환 측정·광고 최적화를 위한 정보 제공·국외 이전 동의', exact: true });
 test('marketing aggregate never includes Meta; Meta alone saves separately without a coupon or marketing opt-in', async ({ page }) => {
   const meta = await metaBackend(page), b = await backend(page); await signup(page);
   const allNews = page.getByRole('checkbox', { name: '[선택] 교육·할인·행사 소식 받기 (광고)', exact: true });
