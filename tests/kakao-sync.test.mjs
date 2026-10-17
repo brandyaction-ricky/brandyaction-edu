@@ -184,3 +184,9 @@ test('anonymous free-class CTA is not wrapped by login, signup or Sync', () => {
   assert.match(source, /<ProductCtaLink conversion=\{conversion\}/);
   assert.doesNotMatch(source, /signInWithOAuth|\/login|\/signup|kakao-sync|requestSubmit/);
 });
+
+test('EDU explicitly requests the age term and excludes the shared app MYIN terms even on Sync failure',()=>{
+ assert.deepEqual(logic.kakaoLoginOptions(),{queryParams:{service_terms:'user_age_check'}});
+ assert.deepEqual(logic.kakaoLoginOptions('phone_number,admin,myin_terms_20261002,plusfriends,phone_number'),{queryParams:{service_terms:'user_age_check'},scopes:'phone_number,plusfriends'});
+ for(const invalid of [null,{},[],123])assert.deepEqual(logic.kakaoLoginOptions(invalid),{queryParams:{service_terms:'user_age_check'}});
+});

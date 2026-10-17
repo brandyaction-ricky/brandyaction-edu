@@ -84,3 +84,11 @@ export function kakaoConsentSnapshot(id: string, config: KakaoSyncConfig, termsR
   const channelRelation = relation === 'ADDED' || relation === 'BLOCKED' || relation === 'NONE' ? relation : 'UNKNOWN';
   return { terms, requiredAgreed: terms.every(term => term.agreed), channelRelation };
 }
+
+/** EDU shares the Kakao app with MYIN. Select the registered age term only;
+ * EDU required policies and optional choices are collected on the EDU signup.
+ * Never inherit the app's default MYIN terms or client-supplied extra scopes. */
+export function kakaoLoginOptions(rawScopes?: unknown): { queryParams:{service_terms:string};scopes?:string } {
+  const scopes=typeof rawScopes==='string' ? [...new Set(rawScopes.split(',').filter(scope=>scope==='plusfriends' || scope==='phone_number'))] : [];
+  return {queryParams:{service_terms:'user_age_check'},...(scopes.length ? {scopes:scopes.join(',')} : {})};
+}
