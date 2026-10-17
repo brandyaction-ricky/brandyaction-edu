@@ -77,3 +77,16 @@ test('lost settings acknowledgement can be read back before withdrawing without 
 test('stale settings must be reloaded rather than silently overwriting another tab',async({page})=>{
  const b=await welcomeBackend(page,{conflict:true});await page.goto('/optional-consent-test');await page.getByRole('checkbox',{name:marketing,exact:true}).check();await expect(page.getByRole('alert')).toContainText('다른 화면');await expect(page.getByRole('button',{name:'같은 선택 다시 확인하기'})).toHaveCount(0);await page.getByRole('button',{name:'저장된 설정 다시 불러오기'}).click();await expect(page.getByRole('checkbox',{name:marketing,exact:true})).not.toBeChecked();expect(b.writes).toHaveLength(1);
 });
+
+test('verified Kakao required terms are read-only and never requested again on signup',async({page})=>{
+ const b=await welcomeBackend(page,{kakaoRequired:true});await page.goto('/optional-signup-test');
+ await expect(page.getByText('필수 약관은 카카오에서 동의한 내용을 확인했어요.',{exact:true})).toBeVisible();
+ await expect(page.getByRole('checkbox')).toHaveCount(4);for(const c of await page.getByRole('checkbox').all())await expect(c).not.toBeChecked();
+ await page.getByRole('button',{name:'선택하지 않고 가입 완료',exact:true}).click();await expect(page.getByRole('heading',{name:'가입 완료 목적지'})).toBeVisible();
+ expect(b.auth).toHaveLength(1);expect((b.auth[0] as {data:{consented_at:string}}).data.consented_at).toBe('2026-10-17T01:00:00Z');expect(b.issues()).toBe(0);
+});
+test('a forged Kakao URL flag cannot remove the required checkbox',async({page})=>{
+ const b=await welcomeBackend(page);await page.goto('/optional-signup-test?kakao_required=1&requiredAccepted=true');
+ await expect(page.getByRole('checkbox',{name:'[필수] 이용약관 및 개인정보처리방침 동의',exact:true})).not.toBeChecked();
+ await expect(page.getByRole('button',{name:'모두 동의하고 1만원 쿠폰 받아 가입 완료',exact:true})).toBeDisabled();expect(b.auth).toHaveLength(0);
+});

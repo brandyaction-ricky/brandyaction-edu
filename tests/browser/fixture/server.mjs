@@ -43,6 +43,7 @@ const server = createServer((request,response)=>{
   if(/^\/installation-guide\/iphone-chrome-(address|share|more|home-add|icon)\.png$/.test(url.pathname)||/^\/installation-guide\/iphone-chrome-(login|confirm)\.jpg$/.test(url.pathname)){response.setHeader('Content-Type',url.pathname.endsWith('.png')?'image/png':'image/jpeg');response.end(readFileSync(resolve('public'+url.pathname)));return;}
   if(/^\/installation-guide\/android-google-(menu|choices|confirm)\.png$/.test(url.pathname)){response.setHeader('Content-Type','image/png');response.end(readFileSync(resolve('public'+url.pathname)));return;}
   if(url.pathname==='/api/app-branding'&&url.searchParams.get('icon')==='192'){response.writeHead(307,{Location:'/icons/edu-192.png'}).end();return;}
+  if(url.pathname==='/api/auth/signup-consent'){response.setHeader('Content-Type','application/json');response.end(JSON.stringify({requiredAccepted:false,agreedAt:null}));return;}
   if(url.pathname==='/api/account/welcome-consent'){
     response.setHeader('Content-Type','application/json');
     if(request.method!=='GET'){response.writeHead(503).end(JSON.stringify({error:'Synthetic consent writes require an explicit test backend'}));return;}

@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import type { WelcomeRequest, WelcomeSnapshot } from '../../../lib/welcome-consent';
-export async function welcomeBackend(page:Page,options:{lost?:boolean;conflict?:boolean;unavailable?:boolean;existing?:boolean;termsUnavailable?:boolean;failure?:boolean;renewal?:boolean;personalOff?:boolean}={}) {
+export async function welcomeBackend(page:Page,options:{lost?:boolean;conflict?:boolean;unavailable?:boolean;existing?:boolean;termsUnavailable?:boolean;failure?:boolean;renewal?:boolean;personalOff?:boolean;kakaoRequired?:boolean}={}) {
   const on=!!options.existing, revision=on ? '11111111-1111-4111-8111-111111111111' : null;
   let s:WelcomeSnapshot={
     marketing:{choices:{marketingUse:on,sms:false,email:on,kakao:on},revision,updatedAt:null,dates:{marketingUse:null,sms:null,email:null,kakao:null},legacyRetired:true},
@@ -11,6 +11,7 @@ export async function welcomeBackend(page:Page,options:{lost?:boolean;conflict?:
   };
   if(options.termsUnavailable)s.meta.terms=null;
   const writes:WelcomeRequest[]=[],auth:unknown[]=[],receipts=new Set<string>();let lost=options.lost,failure=options.failure,issues=0;
+  await page.route('**/api/auth/signup-consent',async r=>r.fulfill({json:{requiredAccepted:!!options.kakaoRequired,agreedAt:options.kakaoRequired?'2026-10-17T01:00:00Z':null}}));
   await page.route('**/synthetic-auth/consent',async r=>{auth.push(r.request().postDataJSON());await r.fulfill({json:{ok:true}});});
   await page.route('**/api/account/welcome-consent',async route=>{
     if(route.request().method()==='GET')return route.fulfill({json:s});

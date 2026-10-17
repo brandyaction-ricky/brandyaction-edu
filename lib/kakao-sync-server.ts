@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
-import { POLICY_VERSION } from '@/lib/legal-policies';
+import { POLICY_VERSION, CURRENT_PRIVACY_VERSION } from '@/lib/legal-policies';
 import { defaultKakaoSyncConfig, validateKakaoSyncConfig, verifiedKakaoIdentity, kakaoConsentSnapshot, kakaoPhoneNumber } from '@/lib/kakao-sync';
 import type { User } from '@supabase/supabase-js';
 
@@ -34,7 +34,7 @@ export async function syncKakaoConsent(user: User, token: string | undefined | n
     const snapshot = kakaoConsentSnapshot(identity, config, terms, channels);
     const { error } = await createAdminClient().rpc('edu_record_kakao_consent', {
       p_user: user.id, p_kakao_id: identity, p_app_id: config.appId,
-      p_revision: config.revision, p_policy: POLICY_VERSION,
+      p_revision: config.revision, p_policy: `${POLICY_VERSION}/${config.privacyVersion || POLICY_VERSION}`,
       p_terms: snapshot.terms, p_channel: config.channelId, p_relation: snapshot.channelRelation,
     });
     // An unavailable audit store must not silently mark required terms accepted.
@@ -50,4 +50,23 @@ export async function syncKakaoConsent(user: User, token: string | undefined | n
     // Keep normal login/onsite consent available during Kakao or DB outages.
     return false;
   }
+}
+
+/** Only a server-recorded, identity-bound receipt for the current wording can
+ * remove a required checkbox. Query strings and user-editable metadata cannot. */
+export async function getKakaoRequiredConsent(user: User): Promise<{ agreedAt:string } | null> {
+  if (!user.identities?.some(identity=>identity.provider==='kakao')) return null;
+  try {
+    const config=await getKakaoSyncConfig();
+    if (!config.enabled || config.privacyVersion!==CURRENT_PRIVACY_VERSION) return null;
+    const {data:receipt,error}=await createAdminClient().from('kakao_sync_members')
+      .select('app_id,kakao_user_id,policy_version,terms,checked_at').eq('user_id',user.id).maybeSingle();
+    if(error || !receipt || receipt.app_id!==config.appId || receipt.policy_version!==`${POLICY_VERSION}/${CURRENT_PRIVACY_VERSION}` ||
+      !user.identities.some(identity=>identity.provider==='kakao' && identity.id===receipt.kakao_user_id)) return null;
+    const checked=Date.parse(receipt.checked_at),signedIn=Date.parse(user.last_sign_in_at || '');
+    if(!Number.isFinite(checked) || !Number.isFinite(signedIn) || checked<signedIn || checked>Date.now()+60000)return null;
+    const snapshot=kakaoConsentSnapshot(receipt.kakao_user_id,config,{id:receipt.kakao_user_id,service_terms:receipt.terms},null);
+    if(!snapshot.requiredAgreed)return null;
+    return {agreedAt:snapshot.terms.map(term=>term.agreed_at!).sort().at(-1)!};
+  } catch { return null; }
 }

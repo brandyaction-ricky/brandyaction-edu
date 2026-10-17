@@ -158,7 +158,7 @@ test('public OAuth config fails safe and does not expose admin config', async ()
   assert.deepEqual(await response.json(), { options: {} });
   assert.equal(response.headers.get('cache-control'), 'no-store');
 });
-test('callback keeps Google/normal consent fallback and allows verified Kakao consent only', async () => {
+test('new Kakao callback preserves the signup choice screen even with provider required consent', async () => {
   let accepted = false, count = 0, metadata = {};
   const route = load('app/auth/callback/route.ts', {
     '@/lib/platform': { safeNext: value => value.startsWith('/') && !value.startsWith('//') ? value : '/my' },
@@ -172,7 +172,7 @@ test('callback keeps Google/normal consent fallback and allows verified Kakao co
   const req = provider => new Request('https://dev.example/auth/callback?code=test&next=/my&provider=' + provider);
   assert.match((await route.GET(req('kakao'))).headers.get('location'), /\/auth\/consent/);
   accepted = true;
-  assert.equal((await route.GET(req('kakao'))).headers.get('location'), 'https://dev.example/my');
+  assert.equal((await route.GET(req('kakao'))).headers.get('location'), 'https://dev.example/auth/consent?next=%2Fmy');
   const before = count;
   assert.match((await route.GET(req('google'))).headers.get('location'), /\/auth\/consent/); assert.equal(count, before);
   metadata = { terms_version: 'existing', privacy_version: 'existing' };

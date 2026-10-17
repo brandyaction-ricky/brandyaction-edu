@@ -4,6 +4,7 @@ export type KakaoSyncConfig = {
   channelId: string;
   termsTag: string;
   privacyTag: string;
+  privacyVersion?: string;
   readChannel: boolean;
   readPhone: boolean;
   setupConfirmed: boolean;
@@ -11,7 +12,7 @@ export type KakaoSyncConfig = {
 };
 export const defaultKakaoSyncConfig: KakaoSyncConfig = {
   enabled: false, appId: '', channelId: '', termsTag: '', privacyTag: '',
-  readChannel: false, readPhone: false, setupConfirmed: false, revision: 0,
+  readChannel: false, readPhone: false, setupConfirmed: false, revision: 0, privacyVersion: '',
 };
 export function validateKakaoSyncConfig(input: unknown): KakaoSyncConfig {
   if (!input || typeof input !== 'object') throw Error('설정을 확인해 주세요.');
@@ -30,6 +31,7 @@ export function validateKakaoSyncConfig(input: unknown): KakaoSyncConfig {
     channelId: field('channelId', /^_[a-zA-Z0-9]{1,80}$/),
     termsTag: field('termsTag', /^[a-zA-Z0-9_-]{1,100}$/),
     privacyTag: field('privacyTag', /^[a-zA-Z0-9_-]{1,100}$/),
+    privacyVersion: v.privacyVersion === undefined ? '' : field('privacyVersion', /^\d{4}-\d{2}-\d{2}$/),
     readChannel: v.readChannel === true,
     readPhone: v.readPhone === true,
     setupConfirmed: v.setupConfirmed === true,
