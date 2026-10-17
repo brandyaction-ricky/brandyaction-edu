@@ -1,11 +1,11 @@
 import test from 'node:test';import assert from 'node:assert/strict';import{readFileSync}from'node:fs';import ts from'typescript';
 function compile(file,mocks={}){const out={};new Function('exports','require',ts.transpileModule(readFileSync(new URL('../'+file,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(out,n=>mocks[n]);return out;}
 const logic=compile('lib/personalization-consent.ts');const id='11111111-1111-4111-8111-111111111111';
-function h({user={id},error=null}={}){const calls=[];const route=compile('app/api/account/personalization-consent/route.ts',{'next/server':{NextResponse:{json:(b,o)=>Response.json(b,o)}},'@/lib/server-auth':{getAuthenticatedUser:async()=>user},'@/lib/supabase/admin':{createAdminClient:()=>({rpc:async(n,args)=>{calls.push({n,args});return{data:{terms:{version:'v1'},eligible:true},error};}})},'@/lib/personalization-consent':logic});return{...route,calls,put:(body,origin='https://edu.test')=>route.PUT(new Request('https://edu.test/api/account/personalization-consent',{method:'PUT',headers:origin?{origin}:{},body:JSON.stringify(body)}))};}
+function h({user={id},error=null,current={choices:{analysis:false,overseas:false},revision:null,recordedVersion:null}}={}){const calls=[];const route=compile('app/api/account/personalization-consent/route.ts',{'next/server':{NextResponse:{json:(b,o)=>Response.json(b,o)}},'@/lib/server-auth':{getAuthenticatedUser:async()=>user},'@/lib/supabase/admin':{createAdminClient:()=>({rpc:async(n,args)=>{calls.push({n,args});return{data:{...current,terms:{version:'v1'},eligible:true},error};}})},'@/lib/personalization-consent':logic});return{...route,calls,put:(body,origin='https://edu.test')=>route.PUT(new Request('https://edu.test/api/account/personalization-consent',{method:'PUT',headers:origin?{origin}:{},body:JSON.stringify(body)}))};}
 test('personalization route protects identity/origin and lets users withdraw while collection is disabled',async t=>{
  const before=process.env.EDU_PERSONALIZATION_CONSENT_ENABLED;t.after(()=>{if(before===undefined)delete process.env.EDU_PERSONALIZATION_CONSENT_ENABLED;else process.env.EDU_PERSONALIZATION_CONSENT_ENABLED=before;});
  const body={requestId:id,expectedRevision:null,wordingVersion:'v1',choices:{analysis:true,overseas:true}};
- delete process.env.EDU_PERSONALIZATION_CONSENT_ENABLED;const a=h();assert.equal((await a.put(body)).status,503);assert.equal(a.calls.length,0);
+ delete process.env.EDU_PERSONALIZATION_CONSENT_ENABLED;const a=h();assert.equal((await a.put(body)).status,503);assert.equal(a.calls.length,1);
  assert.equal((await a.put({...body,choices:logic.noPersonalization})).status,200);assert.equal((await(await a.GET()).json()).eligible,false);
  process.env.EDU_PERSONALIZATION_CONSENT_ENABLED='true';const b=h();
  for(const origin of [null,'https://evil.test'])assert.equal((await b.put(body,origin)).status,403);
@@ -15,4 +15,16 @@ test('personalization route protects identity/origin and lets users withdraw whi
  assert.equal((await h({error:{message:'PERSONALIZATION_CONFLICT'}}).put(body)).status,409);
  assert.equal((await h({error:{message:'PERSONALIZATION_TERMS'}}).put(body)).status,409);
  assert.doesNotMatch(await(await h({error:{message:'private DB detail'}}).GET()).text(),/private DB detail/);
+});
+
+test('OFF permits one-box withdrawal with the original wording and preserves the other grant',async t=>{
+ const before=process.env.EDU_PERSONALIZATION_CONSENT_ENABLED;delete process.env.EDU_PERSONALIZATION_CONSENT_ENABLED;t.after(()=>{if(before===undefined)delete process.env.EDU_PERSONALIZATION_CONSENT_ENABLED;else process.env.EDU_PERSONALIZATION_CONSENT_ENABLED=before;});
+ for(const choices of [{analysis:false,overseas:true},{analysis:true,overseas:false}]){
+  const a=h({current:{choices:{analysis:true,overseas:true},revision:id,recordedVersion:'old-v0'}});
+  assert.equal((await a.put({requestId:id,expectedRevision:id,wordingVersion:'v1',choices})).status,200);
+  assert.equal(a.calls.length,2);assert.deepEqual(a.calls[1].args.p_choices,choices);assert.equal(a.calls[1].args.p_version,'old-v0');
+ }
+ const a=h({current:{choices:{analysis:false,overseas:true},revision:id,recordedVersion:'old-v0'}});
+ assert.equal((await a.put({requestId:id,expectedRevision:id,wordingVersion:'v1',choices:{analysis:true,overseas:true}})).status,503);assert.equal(a.calls.length,1);
+ assert.equal((await a.put({requestId:id,expectedRevision:null,wordingVersion:'v1',choices:{analysis:false,overseas:true}})).status,409);
 });

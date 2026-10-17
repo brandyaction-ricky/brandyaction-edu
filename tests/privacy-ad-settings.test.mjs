@@ -74,14 +74,21 @@ test('the existing test mode remains effective and an opt-out never starts the S
 });
 
 const policies = load('lib/legal-policies.ts');
-test('notice preparation retains the current consent version and N6 wording; the new document is upcoming', () => {
+test('new policy separates four optional purposes, preserves N6 and archived policy, and discloses server Meta fields', () => {
   assert.equal(policies.POLICY_VERSION, '2026-08-11');
   assert.equal(policies.UPCOMING_PRIVACY_VERSION, '2026-10-20');
   assert.equal(policies.ARCHIVED_PRIVACY_VERSION, '2026-08-11');
-  assert.equal(policies.defaultPolicies.privacy, policies.archivedPrivacyPolicy);
+  assert.equal(policies.CURRENT_PRIVACY_VERSION, '2026-10-17');
+  assert.notEqual(policies.defaultPolicies.privacy, policies.archivedPrivacyPolicy);
+  assert.match(policies.defaultPolicies.privacy, /시행일: 2026년 10월 17일/);
+  assert.match(policies.defaultPolicies.privacy, /팁스는 주식회사 브랜디액션의 내부 고객 분석 시스템/);
+  assert.match(policies.defaultPolicies.privacy, /Modal Labs, Inc/);
+  assert.match(policies.defaultPolicies.privacy, /해시 처리한 확인된 계정 이메일/);
+  assert.doesNotMatch(policies.defaultPolicies.privacy, /전환 API도 쓰지 않습니다/);
+  assert.match(policies.defaultPolicies.privacy, /마케팅 정보 수신 한 항목만/);
   assert.match(policies.archivedPrivacyPolicy, /시행일: 2026년 8월 11일/);
   assert.doesNotMatch(policies.archivedPrivacyPolicy, /2026년 10월 20일/);
-  assert.match(policies.defaultPolicies.privacy, /N6 진단 관련 추가 안내/);
+  assert.match(policies.archivedPrivacyPolicy, /N6 진단 관련 추가 안내/);
   for (const copy of [policies.defaultPolicies.privacy, policies.upcomingPrivacyPolicy]) {
     assert.match(copy, /Anthropic, PBC/); assert.match(copy, /privacy@anthropic.com/);
     assert.match(copy, /진단 응답과 결과 보고서: 회원 탈퇴 시까지/);
@@ -119,7 +126,7 @@ test('only the known policy versions route successfully; unknown versions and ex
     '@/lib/landing-admin-state': {}, '@/lib/platform': { sections: [] },
     'next/headers': {}, '@/lib/product-sharing': {},
   });
-  for (const path of [['policies', 'privacy'], ['policies', 'privacy', '2026-08-11'], ['policies', 'privacy', '2026-10-20'], ['policies', 'terms'], ['policies', 'refund']]) {
+  for (const path of [['policies', 'privacy'], ['policies', 'privacy', '2026-08-11'], ['policies', 'privacy', '2026-10-17'], ['policies', 'privacy', '2026-10-20'], ['policies', 'terms'], ['policies', 'refund']]) {
     assert.deepEqual((await route.default({ params: Promise.resolve({ path }) })).props.path, path);
   }
   for (const path of [['policies', 'privacy', '2027-01-01'], ['policies', 'terms', '2026-10-20'], ['policies', 'privacy', '2026-10-20', 'extra']]) {

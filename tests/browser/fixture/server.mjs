@@ -43,6 +43,11 @@ const server = createServer((request,response)=>{
   if(/^\/installation-guide\/iphone-chrome-(address|share|more|home-add|icon)\.png$/.test(url.pathname)||/^\/installation-guide\/iphone-chrome-(login|confirm)\.jpg$/.test(url.pathname)){response.setHeader('Content-Type',url.pathname.endsWith('.png')?'image/png':'image/jpeg');response.end(readFileSync(resolve('public'+url.pathname)));return;}
   if(/^\/installation-guide\/android-google-(menu|choices|confirm)\.png$/.test(url.pathname)){response.setHeader('Content-Type','image/png');response.end(readFileSync(resolve('public'+url.pathname)));return;}
   if(url.pathname==='/api/app-branding'&&url.searchParams.get('icon')==='192'){response.writeHead(307,{Location:'/icons/edu-192.png'}).end();return;}
+  if(url.pathname==='/api/account/welcome-consent'){
+    response.setHeader('Content-Type','application/json');
+    if(request.method!=='GET'){response.writeHead(503).end(JSON.stringify({error:'Synthetic consent writes require an explicit test backend'}));return;}
+    response.end(JSON.stringify({marketing:{choices:{marketingUse:false,sms:false,email:false,kakao:false},revision:null,updatedAt:null,dates:{marketingUse:null,sms:null,email:null,kakao:null},legacyRetired:true},personal:{choices:{analysis:false,overseas:false},revision:null,updatedAt:null,needsRenewal:false,eligible:false,accepting:false,terms:null},meta:{consented:false,active:false,needsRenewal:false,revision:null,updatedAt:null,terms:null},reward:{available:false,handled:true,awarded:false,analysisAvailable:false,personalRevision:null,marketingRevision:null,terms:null,reward:{days:30,minimum:0}},handled:true,promptedAt:null,accepting:{marketing:false,personal:false,meta:false}}));return;
+  }
   if(url.pathname==='/api/account/meta-purchase-consent'){response.setHeader('Content-Type','application/json');response.end(JSON.stringify({consented:false,active:false,needsRenewal:false,revision:null,updatedAt:null,terms:null}));return;}
   if(url.pathname==='/api/account/consent-reward'){response.setHeader('Content-Type','application/json');response.end(JSON.stringify({available:false}));return;}
   if(url.pathname==='/api/account/marketing-consent'){

@@ -2,7 +2,6 @@
 import { curriculumDay } from '@/lib/curriculum-days';
 import { MemberLearningCare } from "./learning-care";
 import { ConsentRewardCard } from "../consent-reward-card";
-import { PersonalizationSettings } from '../personalization-settings';
 import { ConsentSettings } from '../consent-settings';
 import { contentVisibility } from '@/lib/content-visibility';
 import { PushSettings } from './push-settings';
@@ -509,7 +508,6 @@ function Dashboard({
         )}
       </section>}
       {blockLearningEnabled && <EncouragementWall/>}
-      {process.env.NEXT_PUBLIC_EDU_CONSENT_REWARD_ENABLED === "true" && <ConsentRewardCard key={user.id} memberKey={user.id}/>}
       <div className="member-shortcuts">
         {hasMemberResources(data) && <Link href="/my/resources">
           <Download />
@@ -1164,8 +1162,7 @@ function Profile({
         )}
       </form>
       <LoginEmailSettings email={user.email} />
-      {(process.env.NEXT_PUBLIC_EDU_PERSONALIZATION_CONSENT_ENABLED === 'true' || process.env.NEXT_PUBLIC_EDU_CONSENT_REWARD_ENABLED === 'true') && <PersonalizationSettings/>}
-      {(process.env.NEXT_PUBLIC_EDU_OPTIONAL_CONSENT_ENABLED === 'true' || process.env.NEXT_PUBLIC_EDU_CONSENT_REWARD_ENABLED === 'true') && <ConsentSettings/>}
+      <ConsentSettings/>
       {process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' && <EncouragementEditor/>}
     </>
   );
@@ -1461,6 +1458,7 @@ export function MemberViews({
         </aside>
         <div className="account-main">{content}</div>
       </div>
+      {process.env.NEXT_PUBLIC_EDU_CONSENT_REWARD_ENABLED === "true" && ["", "dashboard", "classes", "coupons", "orders", "reviews", "resources"].includes(section || "") && <ConsentRewardCard key={user.id} memberKey={user.id}/>}
     </div>
   );
 }

@@ -36,9 +36,16 @@ export async function PUT(request: Request) {
       !validPersonalizationChoices(body.choices) || (body.wordingVersion !== null && (typeof body.wordingVersion !== 'string' || body.wordingVersion.length > 100))) {
       return reply({ error: '선택한 내용을 다시 확인해 주세요.' }, 400);
     }
-    // Turning collection off must never prevent withdrawal.
-    if ((body.choices.analysis || body.choices.overseas) && process.env.EDU_PERSONALIZATION_CONSENT_ENABLED !== 'true') {
-      return reply({ error: '맞춤 안내를 준비 중이에요. 기존 동의는 언제든 취소할 수 있어요.' }, 503);
+    // OFF still permits a pure decrease, without silently renewing the other box.
+    const enabled = process.env.EDU_PERSONALIZATION_CONSENT_ENABLED === 'true';
+    if ((body.choices.analysis || body.choices.overseas) && (!enabled || body.choices.analysis !== body.choices.overseas)) {
+      const current = await createAdminClient().rpc('edu_personalization_consent', { p_member: user.id });
+      if (current.error) return failure(current.error.message);
+      const previous = current.data;
+      if (previous.revision !== body.expectedRevision) return failure('PERSONALIZATION_CONFLICT');
+      const reducing = (!body.choices.analysis || previous.choices.analysis) && (!body.choices.overseas || previous.choices.overseas);
+      if (!enabled && !reducing) return reply({ error: '맞춤 안내를 준비 중이에요. 기존 동의는 언제든 취소할 수 있어요.' }, 503);
+      if (reducing) body.wordingVersion = previous.recordedVersion ?? null;
     }
     return await execute({ p_member: user.id, p_request: body.requestId, p_choices: body.choices,
       p_expected: body.expectedRevision, p_version: body.wordingVersion });

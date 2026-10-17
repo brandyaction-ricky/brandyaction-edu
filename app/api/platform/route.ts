@@ -11,7 +11,7 @@ import { getEduSettings } from '@/lib/edu-settings';
 import { isListedProductLink } from '@/lib/product-visibility';
 import { gradeQuiz, type QuizDefinition } from '@/lib/mission-quiz';
 import { adminSelectColumns, adminTables, archiveValues, cohortStatus, phoneNumber, validImage, assetPath, imagePreviewUrl, databaseMessage, excludedMemberStatus } from '@/lib/qa-rules';
-import { POLICY_VERSION } from '@/lib/legal-policies';
+import { POLICY_VERSION, CURRENT_PRIVACY_VERSION } from '@/lib/legal-policies';
 import { getOperatorUser, permissionsFor, sectionScopes } from '@/lib/operator-permissions';
 import { crmDeliveryState } from '@/lib/crm-delivery';
 import { contactEmail } from '@/lib/crm-purchase-contact';
@@ -1125,7 +1125,7 @@ export async function POST(request: Request) {
                 p_customer_email: user.contact_email || user.email,
                 p_customer_phone: phone,
                 p_terms_version: POLICY_VERSION,
-                p_privacy_version: POLICY_VERSION,
+                p_privacy_version: CURRENT_PRIVACY_VERSION,
                 p_refund_policy_version: POLICY_VERSION,
                 p_code: String(body.coupon || '').trim().toUpperCase(),
                 p_entry_src: typeof body.entrySource === 'string' && ['paid','organic','alumni','youtube'].includes(body.entrySource) ? body.entrySource : null,

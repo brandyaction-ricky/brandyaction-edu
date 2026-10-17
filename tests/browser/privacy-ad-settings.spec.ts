@@ -79,7 +79,7 @@ test('public mobile footer leads directly to usable ad settings, without horizon
 test('current, archived and upcoming privacy pages stay distinct and retain N6 disclosures', async ({ page }) => {
   await interceptMeta(page);
   await page.goto('/policies/privacy');
-  await expect(page.locator('.privacy-policy-copy')).toContainText('시행일: 2026년 8월 11일');
+  await expect(page.locator('.privacy-policy-copy')).toContainText('시행일: 2026년 10월 17일');
   await page.getByRole('link', { name: /바뀌는 처리방침 보기/ }).click();
   await expect(page).toHaveURL(/\/policies\/privacy\/2026-10-20$/);
   await expect(page.getByLabel('시행 예정 개정안')).toBeVisible();
