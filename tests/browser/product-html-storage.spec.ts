@@ -19,7 +19,7 @@ test('10MB HTML uploads outside the save payload, renders safely', async ({ page
   await expect(page).toHaveURL(/product-sale-test$/);
   await expect(page.locator('iframe[title="상품 HTML 상세페이지"]')).toHaveAttribute('sandbox', 'allow-same-origin');
   await page.getByText('HTML 파일이 등록되었습니다', { exact: true }).scrollIntoViewIfNeeded();
-  await page.screenshot({ path: testInfo.outputPath('html-storage-upload.png') });
+  await page.locator('.product-editor').screenshot({ path: testInfo.outputPath('html-storage-upload.png') });
   await page.getByRole('button', { name: '저장하기', exact: true }).click();
   const values = JSON.parse(await page.getByLabel('저장한 상품 값').innerText());
   expect(values.detail_html_file).toBe(htmlPath); expect(values.detail_html_document).toBeFalsy();
