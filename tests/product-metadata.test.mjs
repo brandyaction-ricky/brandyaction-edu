@@ -446,3 +446,29 @@ test('sharing thumbnails resolve public storage and legacy paths; invalid images
   }
   assert.equal(productShareImage({thumbnail_url:'edu/cover.webp'},origin,''),origin+'/og');
 });
+
+
+test('product save verifies stored HTML before writing the compact reference and server fallback', async () => {
+  const actor = '11111111-1111-4111-8111-111111111111';
+  const file = `edu/product-html/${actor}/22222222-2222-4222-8222-222222222222.txt`;
+  const blob = new Blob(['<h1>서버에서 확인한 HTML</h1><!--' + 'x'.repeat(4_000_000) + '-->']);
+  const writes = []; let missing = false;
+  const db = { storage: { from: () => ({ info: async () => ({ data: missing ? null : { size: blob.size, contentType: 'text/plain' } }), download: async () => ({ data: blob }) }) }, from(table) {
+    assert.equal(table, 'courses'); let update = false;
+    return { select() { return this; }, eq() { return this; }, update(values) { update = true; writes.push(values); return this; }, async single() { return { data: update ? { id: 'product' } : { metadata: { campaign: 'preserved' } }, error: null }; } };
+  } };
+  const route = load('app/api/platform/route.ts', {
+    '@/lib/supabase/admin': { createAdminClient: () => db }, '@/lib/supabase/server': {},
+    '@/lib/server-auth': { getAuthenticatedUser: async () => ({ id: actor }) },
+    '@/lib/operator-permissions': { permissionsFor: async () => ({ products: true }), sectionScopes: { products: 'products' } },
+    '@/lib/edu-settings': {}, '@/lib/crm-delivery': {}, '@/lib/crm-sms-settings': {},
+  });
+  const send = () => route.POST(new Request('https://edu.example/api/platform', { method: 'POST', headers: { origin: 'https://edu.example' }, body: JSON.stringify({ action: 'save', section: 'products', id: 'product', values: { detail_html_document: null, detail_html_file: file, detail_html: 'untrusted' } }) }));
+  assert.equal((await send()).status, 200);
+  assert.equal(writes[0].metadata.detail_html_file, file);
+  assert.equal(writes[0].metadata.detail_html_document, '');
+  assert.match(writes[0].metadata.detail_html, /서버에서 확인한 HTML/);
+  assert.equal(writes[0].metadata.campaign, 'preserved');
+  assert.ok(JSON.stringify(writes[0]).length < 1000);
+  missing = true; assert.equal((await send()).status, 400); assert.equal(writes.length, 1);
+});
