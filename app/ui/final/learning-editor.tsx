@@ -232,7 +232,7 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
     draftRef.current?.saveNow();
     if(publishing&&draftConflict){setMessage('두 편집본은 보관되어 있습니다. 겹친 부분만 고른 뒤 학생에게 반영해 주세요.');return false;}
     if(publishing&&publication&&!rebasing&&authorPublicChanged(publication.snapshot)){setMessage('공개된 수업이 바뀌었습니다. 편집본은 보관되어 있으니 현재 공개본과 비교한 뒤 반영해 주세요.');return false;}
-    if (quizDirty && (!publication || publishing)) { showIssue("확인 퀴즈의 변경사항을 먼저 저장해 주세요.", quizSectionRef.current); return false; }
+    if (quizDirty && (!publication || publishing)) { showIssue("아래 확인 퀴즈의 변경사항을 먼저 저장해 주세요.", quizSectionRef.current); return false; }
     if ((!publication || publishing) && blockState.active && !blockRef.current?.validate()) { validationNavigation.current = true; setMessage('학생 화면에 반영하기 전에 학습 구성의 표시된 항목을 확인해 주세요.'); setPreviewOnly(false); return false; }
     if ((!publication || publishing) && format === "material" && uploadStatus !== "idle") {
       setContentIssue("자료 업로드 오류를 확인한 뒤 다시 저장해 주세요.");
@@ -249,7 +249,7 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
     const selectedValue = { text: lessonBodyHasText(bodyText) ? bodyText : "", vod: videoUrl, material: resourcePath, link: externalUrl }[format].trim();
     if ((!publication || publishing) && !blockState.active && (contentExists || publishing) && !selectedValue) {
       setContentIssue("선택한 콘텐츠 유형에 맞는 본문·영상·자료·링크를 입력해 주세요.");
-      showIssue("선택한 콘텐츠 유형에 맞는 본문·영상·자료·링크를 입력해 주세요.", contentSectionRef.current?.querySelector<HTMLElement>('[role="tabpanel"]') || contentSectionRef.current);
+      showIssue("학습 본문에서 표시된 항목을 확인해 주세요.", contentSectionRef.current?.querySelector<HTMLElement>('[role="tabpanel"]') || contentSectionRef.current);
       return false;
     }
     inFlight.current=true;if(automatic)setAutosaving(true);else setSaving(true);
