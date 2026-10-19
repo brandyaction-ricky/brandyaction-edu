@@ -33,7 +33,7 @@ export function paidCourseReadinessIssues(course: Row, cohorts: Row[]) {
   const ownCohorts = cohorts.filter((item) => item.course_id === course.id && !item.archived_at);
   const issues: string[] = [];
   const metadata = course.metadata && typeof course.metadata === 'object' ? course.metadata as Record<string, unknown> : {};
-  const hasDetail = Boolean(String(course.description || '').trim() || String(metadata.detail_html || '').trim() || String(metadata.detail_html_document || '').trim() || (Array.isArray(metadata.detail_images) && metadata.detail_images.length));
+  const hasDetail = Boolean(String(course.description || '').trim() || String(metadata.detail_html || '').trim() || String(metadata.detail_html_document || '').trim() || String(metadata.detail_html_file || '').trim() || (Array.isArray(metadata.detail_images) && metadata.detail_images.length));
   if (!ownCohorts.some((item) => Number(item.price) > 0 && item.recruitment_end_at)) issues.push('판매 기수·모집 기간');
   if (!course.duration_label && !ownCohorts.some((item) => item.operation_start_at && item.operation_end_at)) issues.push('학습 기간');
   if (!course.schedule_label && !ownCohorts.some((item) => item.operation_start_at)) issues.push('일정 안내');

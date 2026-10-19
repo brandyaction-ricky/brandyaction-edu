@@ -1,7 +1,7 @@
 'use client';
-import { createElement, memo, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { createElement, memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { parseProductHtml, type ProductHtmlNode } from '@/lib/product-metadata';
-import { buildProductDocument } from '@/lib/product-html-document';
+import { buildProductDocument, storedProductDocumentPath, validateStoredProductDocument, MAX_STORED_PRODUCT_DOCUMENT_BYTES } from '@/lib/product-html-document';
 import { conversionUrl, PRODUCT_CTA_EVENT } from '@/lib/product-conversion';
 
 function ProductDocumentFrame({ source, ctaUrl, ctaDeadline }: { source: string; ctaUrl: string; ctaDeadline?: string }) {
@@ -67,7 +67,35 @@ function ProductDocumentFrame({ source, ctaUrl, ctaDeadline }: { source: string;
   return <iframe ref={ref} title="상품 HTML 상세페이지" sandbox="allow-same-origin" referrerPolicy="no-referrer" srcDoc={srcDoc} style={{ display: 'block', width: '100%', height: 640, border: 0 }} />;
 }
 
+function StoredProductDocument({ path, ctaUrl, ctaDeadline }: { path: string; ctaUrl: string; ctaDeadline?: string }) {
+  const [source, setSource] = useState('');
+  const [error, setError] = useState('');
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const response = await fetch(`/api/platform/product-html?file=${encodeURIComponent(path)}`, { signal: controller.signal, cache: 'no-store' });
+        const grant = await response.json();
+        if (!response.ok || !grant.url) throw new Error('grant');
+        // Fetch bytes directly from Storage. Neither request nor response carries the HTML through Vercel.
+        const file = await fetch(grant.url, { signal: controller.signal, credentials: 'omit' });
+        if (!file.ok || Number(file.headers.get('content-length')) > MAX_STORED_PRODUCT_DOCUMENT_BYTES) throw new Error('download');
+        const content = validateStoredProductDocument(await file.text());
+        if (!controller.signal.aborted) setSource(content);
+      } catch {
+        if (!controller.signal.aborted) setError('상세페이지를 불러오지 못했습니다.');
+      }
+    })();
+    return () => controller.abort();
+  }, [path, attempt]);
+  if (error) return <p role="alert">{error} <button type="button" onClick={() => { setError(''); setAttempt(value => value + 1); }}>다시 불러오기</button></p>;
+  return source ? <ProductDocumentFrame source={source} ctaUrl={ctaUrl} ctaDeadline={ctaDeadline} /> : <p role="status">상세페이지를 불러오고 있습니다.</p>;
+}
+
 export const ProductDetailHtml = memo(function ProductDetailHtml({ html, documentSource = '', className = 'product-detail-html reading-copy', ctaUrl = '', ctaDeadline }: { html: string; documentSource?: string; className?: string; ctaUrl?: string; ctaDeadline?: string }) {
+  const path = storedProductDocumentPath(documentSource);
+  if (path) return <div className={className}><StoredProductDocument key={path} path={path} ctaUrl={ctaUrl} ctaDeadline={ctaDeadline} /></div>;
   if (documentSource) return <div className={className}><ProductDocumentFrame source={documentSource} ctaUrl={ctaUrl} ctaDeadline={ctaDeadline} /></div>;
   function render(nodes: ProductHtmlNode[]): ReactNode[] {
     return nodes.map((node, index) => {

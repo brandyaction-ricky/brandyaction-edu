@@ -923,7 +923,13 @@ export async function POST(request: Request) {
             if (section.table === 'courses') {
                 const previous = body.id ? await db.from('courses').select('metadata').eq('id', body.id).single() : { data: null, error: null };
                 if (previous.error) fail('기존 상품 정보를 불러오지 못했습니다. 새로고침 후 다시 저장해 주세요.', 409);
-                try { values.metadata = mergeProductMetadata(previous.data?.metadata, values); }
+                try {
+                    if (values.detail_html_file || previous.data?.metadata?.detail_html_file) {
+                      const { prepareStoredProductMetadata } = await import('@/lib/product-html-storage');
+                      await prepareStoredProductMetadata(db, user.id, (previous.data?.metadata || {}) as Record<string, unknown>, values);
+                    }
+                    values.metadata = mergeProductMetadata(previous.data?.metadata, values);
+                }
                 catch (error) { fail((error as Error).message); }
                 for (const field of productMetadataFields) delete values[field];
             }

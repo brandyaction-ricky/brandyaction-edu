@@ -1,6 +1,6 @@
 import { safeUrl } from './platform';
 import { conversionUrl } from './product-conversion';
-import { validateProductDocument } from './product-html-document';
+import { validateProductDocument, validProductDocumentPath } from './product-html-document';
 
 function validProductImage(value: unknown) {
   if (typeof value !== 'string' || !value || value.length > 2048 || value.includes('..')) return false;
@@ -13,7 +13,7 @@ function validProductImage(value: unknown) {
   return /^(?:\/?(?:edu|site|images|assets|courses)\/)[a-z0-9/_\-.]+\.(?:png|jpe?g|webp|gif|avif)(?:\?[^#]*)?$/i.test(value);
 }
 
-export const productMetadataFields = ['thumbnail_url', 'detail_image_url', 'detail_images', 'regular_price', 'seo_title', 'seo_description', 'detail_html', 'detail_html_document', 'cta_price_label', 'cta_label', 'cta_url', 'cta_color', 'meta_pixel_id', 'is_listed', 'recruitment_countdown_enabled'] as const;
+export const productMetadataFields = ['thumbnail_url', 'detail_image_url', 'detail_images', 'regular_price', 'seo_title', 'seo_description', 'detail_html', 'detail_html_document', 'detail_html_file', 'cta_price_label', 'cta_label', 'cta_url', 'cta_color', 'meta_pixel_id', 'is_listed', 'recruitment_countdown_enabled'] as const;
 export type ProductDetailImage = { path: string; name: string; alt: string };
 export const productResourceScopes = ['public', 'authenticated', 'enrolled', 'purchaser'] as const;
 export type ProductResourceScope = (typeof productResourceScopes)[number];
@@ -193,11 +193,16 @@ export function mergeProductMetadata(previous: unknown, values: Record<string, u
       metadata.detail_images = images;
       metadata.detail_image_url = images[0]?.path || '';
       delete metadata.detailImageUrl;
+    } else if (field === 'detail_html_file') {
+      if (value !== '' && value !== null && !validProductDocumentPath(value)) throw new Error('상세 HTML 저장 파일을 확인해 주세요.');
+      metadata.detail_html_file = value || '';
+      if (value) metadata.detail_html_document = '';
     } else if (field === 'detail_html_document') {
       const source = validateProductDocument(value);
       metadata.detail_html_document = source;
+      if (source) metadata.detail_html_file = '';
       // Keep the legacy text-only fallback safe for older clients and search previews.
-      metadata.detail_html = sanitizeProductHtml(source);
+      if (source || !values.detail_html_file) metadata.detail_html = sanitizeProductHtml(source);
     } else if (field === 'cta_price_label' || field === 'cta_label' || field === 'cta_url' || field === 'cta_color' || field === 'meta_pixel_id') {
       if (value !== null && typeof value !== 'string') throw new Error('CTA·추적 설정 형식을 확인해 주세요.');
       const content = String(value || '').trim();

@@ -31,7 +31,7 @@ import { EmailAuth } from "../email-auth";
 import { GoogleIdSignIn } from "../google-id-signin";
 import { ProductDetailHtml } from './product-detail-html';
 import { RecruitmentCountdown } from './product-countdown';
-import { productDocument } from '@/lib/product-html-document';
+import { productDocument, storedProductDocumentPath } from '@/lib/product-html-document';
 import { productConversion } from '@/lib/product-conversion';
 import { ProductPixel, ProductCtaLink } from './product-conversion';
 import { productDetailImages, productDigitalSections, productResources } from '@/lib/product-metadata';
@@ -203,7 +203,7 @@ function StandardProductDetail({
     detailImage = detailImages[0]?.path || '';
   const detailHtml = typeof meta.detail_html === 'string' ? meta.detail_html : '';
   const documentSource = productDocument(meta);
-  const mismatchedFreeContent = !free && containsFreeClassCampaign(documentSource || detailHtml);
+  const mismatchedFreeContent = !free && containsFreeClassCampaign(storedProductDocumentPath(documentSource) ? detailHtml : documentSource || detailHtml);
   const visibleDocumentSource = mismatchedFreeContent ? '' : documentSource;
   const visibleDetailHtml = mismatchedFreeContent ? '' : detailHtml;
   const readinessIssues = paidCourseReadinessIssues(c, cohorts);

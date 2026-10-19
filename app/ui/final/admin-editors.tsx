@@ -18,11 +18,11 @@ import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import { BlocksField, UploadField, uploadPlatformFile } from "../editor-fields";
 import type { Data, WorkflowSend } from "../learning-workflows";
 import { Badge } from "./primitives";
-import { productDetailImages, productMetadataFields, productResources, sanitizeProductHtml, type ProductResourceScope } from "@/lib/product-metadata";
+import { productDetailImages, productMetadataFields, productResources, type ProductResourceScope } from "@/lib/product-metadata";
 import { isProductListed } from "@/lib/product-visibility";
 import { DetailImageGallery } from "./detail-image-gallery";
 import { productConversion, DEFAULT_CTA_COLOR } from "@/lib/product-conversion";
-import { productDocument, validateProductDocument } from "@/lib/product-html-document";
+import { productDocument, storedProductDocumentPath, validateStoredProductDocument, MAX_STORED_PRODUCT_DOCUMENT_BYTES } from "@/lib/product-html-document";
 import { ProductDetailHtml } from "./product-detail-html";
 import { DigitalContentManager } from "./digital-content-manager";
 import { ProductStudentsWorkspace } from "./product-students-workspace";
@@ -247,6 +247,7 @@ export function ProductEditor({ data, row, pending, send, back, actorId, canMana
   const [listed, setListed] = useState(isProductListed(row));
   const [showCountdown, setShowCountdown] = useState(metadata.recruitment_countdown_enabled === true);
   const [htmlFilename, setHtmlFilename] = useState("");
+  const [htmlUploading, setHtmlUploading] = useState(false);
   const [detailUploadStatus, setDetailUploadStatus] = useState<"idle" | "uploading" | "error">("idle");
   const [preview, setPreview] = useState({ title: t(row, "title"), summary: t(row, "summary"), price: num(row, "list_price"), regular: Number(metadata.regular_price || 0), status: t(row, "status") || "draft", category: t(row, "category") || "paid_class", slug: t(row, "slug"), seoTitle: String(metadata.seo_title || ""), seoDescription: String(metadata.seo_description || "") });
   const [draftValues, setDraftValues] = useState<Record<string, unknown>>({});
@@ -322,6 +323,7 @@ export function ProductEditor({ data, row, pending, send, back, actorId, canMana
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError("");
+    if (htmlUploading) { setTab("detail"); setError("HTML 파일 업로드가 끝난 뒤 저장해 주세요."); return; }
     if (detailUploadStatus !== "idle") { setTab("detail"); setError(detailUploadStatus === "uploading" ? "상세 이미지 업로드가 끝난 뒤 저장해 주세요." : "상세 이미지 업로드 오류를 확인해 주세요."); return; }
     const form = event.currentTarget;
     const submitted = new FormData(form);
@@ -399,10 +401,23 @@ export function ProductEditor({ data, row, pending, send, back, actorId, canMana
             <button type="button" role="tab" aria-selected={detailMode === "image"} className={detailMode === "image" ? "active" : ""} onClick={() => { setDetailMode("image"); setDirty(true); }}><ImageIcon aria-hidden="true" />이미지 상세페이지</button>
             <button type="button" role="tab" aria-selected={detailMode === "html"} className={detailMode === "html" ? "active" : ""} onClick={() => { setDetailMode("html"); setDirty(true); }}><Code2 aria-hidden="true" />HTML 상세페이지</button>
           </div>
-          <input type="hidden" name="detail_html_document" value={detailMode === "html" ? htmlSource : ""} />
+          <input type="hidden" name="detail_html_document" value={detailMode === "html" && !storedProductDocumentPath(htmlSource) ? htmlSource : ""} />
+          <input type="hidden" name="detail_html_file" value={detailMode === "html" ? storedProductDocumentPath(htmlSource) : ""} />
           <input type="hidden" name="description" value={t(row, "description")} />
           {detailMode === "html" && <>
-            <div className={`upload-box html-detail-upload${htmlSource ? " has-file" : ""}`}><Download aria-hidden="true" /><div><b>{htmlSource ? "HTML 파일이 등록되었습니다" : "상세페이지 HTML 파일을 선택하세요"}</b><p className="meta">HTML·HTM · CSS 유지 · 스크립트·폼 실행 차단</p></div><label className="btn upload-label"><input type="file" accept=".html,.htm,text/html" disabled={pending} onChange={async event => { const input = event.currentTarget; const file = input.files?.[0]; if (!file) return; setError(""); if (!/\.html?$/i.test(file.name)) { setError("HTML 또는 HTM 파일을 선택해 주세요."); input.value = ""; return; } try { if (file.size > 3_000_000) throw new Error("HTML 파일은 3MB 이하로 등록해 주세요."); const source = validateProductDocument(await file.text()); const clean = sanitizeProductHtml(source); if (!clean.trim()) throw new Error("등록 가능한 HTML 본문이 없습니다. 파일 내용을 확인해 주세요."); setHtmlSource(source); setHtmlFilename(file.name.normalize("NFC")); setDirty(true); } catch (cause) { setError((cause as Error).message || "HTML 파일을 읽지 못했습니다. 다시 선택해 주세요."); } finally { input.value = ""; } }} />{htmlSource ? "다른 HTML 파일로 교체" : "HTML 파일 선택"}</label><p className="html-upload-status" role="status">{htmlFilename ? `${htmlFilename} · 불러오기 완료` : htmlSource ? "클릭하여 다른 파일로 교체할 수 있습니다." : "파일을 선택한 뒤 상품을 저장하면 고객 상세페이지에 반영됩니다."}</p>{htmlSource && <button className="btn small" type="button" disabled={pending} onClick={() => { setHtmlSource(""); setHtmlFilename(""); setDirty(true); }}>등록 HTML 삭제</button>}</div>
+            <div className={`upload-box html-detail-upload${htmlSource ? " has-file" : ""}`}><Download aria-hidden="true" /><div><b>{htmlSource ? "HTML 파일이 등록되었습니다" : "상세페이지 HTML 파일을 선택하세요"}</b><p className="meta">HTML·HTM · 최대 20MB · CSS 유지 · 스크립트·폼 실행 차단</p></div><label className="btn upload-label"><input type="file" accept=".html,.htm,text/html" disabled={pending || htmlUploading} onChange={async event => {
+              const input = event.currentTarget, file = input.files?.[0];
+              if (!file) return;
+              setError(""); setHtmlUploading(true);
+              try {
+                if (!/\.html?$/i.test(file.name)) throw new Error("HTML 또는 HTM 파일을 선택해 주세요.");
+                if (!file.size || file.size > MAX_STORED_PRODUCT_DOCUMENT_BYTES) throw new Error("HTML 파일은 20MB 이하로 등록해 주세요.");
+                validateStoredProductDocument(await file.text());
+                const uploaded = await uploadPlatformFile(file, "product-html");
+                setHtmlSource(`edu-html:${uploaded.path}`); setHtmlFilename(file.name.normalize("NFC")); setDirty(true);
+              } catch (cause) { setError((cause as Error).message || "HTML 파일을 올리지 못했습니다. 다시 선택해 주세요."); }
+              finally { input.value = ""; setHtmlUploading(false); }
+            }} />{htmlUploading ? "HTML 업로드 중…" : htmlSource ? "다른 HTML 파일로 교체" : "HTML 파일 선택"}</label><p className="html-upload-status" role="status">{htmlUploading ? "파일을 업로드하고 있습니다. 완료될 때까지 기다려 주세요." : htmlFilename ? `${htmlFilename} · 업로드 완료 · 상품을 저장하면 반영됩니다.` : htmlSource ? "클릭하여 다른 파일로 교체할 수 있습니다." : "파일을 선택한 뒤 상품을 저장하면 고객 상세페이지에 반영됩니다."}</p>{htmlSource && <button className="btn small" type="button" disabled={pending || htmlUploading} onClick={() => { setHtmlSource(""); setHtmlFilename(""); setDirty(true); }}>등록 HTML 삭제</button>}</div>
             {htmlSource && <details className="product-extra mt24"><summary>HTML 디자인 확인</summary><p className="meta mt16">스크립트와 폼 실행은 차단됩니다. CSS가 이미 제거된 기존 파일은 원본 HTML을 다시 선택해 주세요.</p><div className="product-html-preview mt16"><ProductDetailHtml html="" documentSource={htmlSource} /></div></details>}
           </>}
           {detailMode === "image" && <DetailImageGallery key={String(row?.id || "new-product")} initial={productDetailImages(metadata)} disabled={pending} onChange={() => { setDirty(true); requestAnimationFrame(updatePreview); }} onStatusChange={setDetailUploadStatus} />}

@@ -145,7 +145,7 @@ function ArticleMigrationFixture() {
 
 function ProductHtmlCtaFixture() {
   const documentSource = '<!doctype html><html><body><a href="#faq">자주 묻는 질문</a><a href="#">무료강의 대기방 입장 →</a><p id="faq">FAQ</p></body></html>';
-  return <ProductDetailHtml html="" documentSource={documentSource} ctaUrl="/join/synthetic/organic" />;
+  return <ProductDetailHtml html="" documentSource={new URLSearchParams(location.search).has("stored") ? "edu-html:edu/product-html/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222.txt" : documentSource} ctaUrl="/join/synthetic/organic" />;
 }
 function OrderCompleteFixture() {
   const params = new URLSearchParams(location.search);

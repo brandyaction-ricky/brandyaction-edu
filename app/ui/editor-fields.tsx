@@ -4,7 +4,7 @@ import { Plus, Trash2, Upload } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { imagePreviewUrl } from '@/lib/qa-rules';
 
-export type PlatformUploadKind = 'image' | 'detail-image' | 'resource';
+export type PlatformUploadKind = 'image' | 'detail-image' | 'resource' | 'product-html';
 
 export async function uploadPlatformFile(file: File, kind: PlatformUploadKind) {
     const response = await fetch('/api/platform/upload', {
