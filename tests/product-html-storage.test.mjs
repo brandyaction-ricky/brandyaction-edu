@@ -9,7 +9,7 @@ const actor = '11111111-1111-4111-8111-111111111111';
 const filePath = `edu/product-html/${actor}/22222222-2222-4222-8222-222222222222.txt`;
 function load(file, mocks = {}) {
   const exports = {};
-  const code = ts.transpileModule(fs.readFileSync(new URL('../' + file, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const code = ts.transpileModule(fs.readFileSync(new URL('../' + file, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   new Function('exports', 'require', code)(exports, name => {
     if (name in mocks) return mocks[name];
     if (name.startsWith('@/')) return load(name.slice(2) + '.ts', mocks);
@@ -91,4 +91,27 @@ test('only a live published course or product operator can obtain a short-lived 
   const editor = harness(); const response = await editor.read(); assert.equal(response.status, 200); assert.equal(response.headers.get('cache-control'), 'private, no-store');
   assert.equal((await editor.read('../private.txt')).status, 400);
   assert.equal((await harness({ published: true, size: 21 * 1024 * 1024 }).read()).status, 409);
+});
+
+test('the real Storage SDK receives a text/plain Blob even when the selected file is text/html', async () => {
+  const { createClient } = require('@supabase/supabase-js');
+  let transferred = false;
+  const client = createClient('https://synthetic.supabase.co', 'synthetic-anon', {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch: async (url, options) => {
+      assert.match(String(url), /storage\/v1\/object\/upload\/sign\/course-resources\//);
+      assert.ok(options.body instanceof FormData);
+      assert.equal(options.body.get('').type, 'text/plain');
+      assert.equal(await options.body.get('').text(), '<h1>UTF-8 HTML</h1>');
+      transferred = true;
+      return Response.json({ Key: `course-resources/${filePath}`, Id: actor });
+    } },
+  });
+  const field = load('app/ui/editor-fields.tsx', { '@/lib/supabase/client': { createClient: () => client } });
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = async () => Response.json({ bucket: 'course-resources', path: filePath, token: 'synthetic', contentType: 'text/plain', value: filePath });
+  try {
+    await field.uploadPlatformFile(new File(['<h1>UTF-8 HTML</h1>'], 'detail.html', { type: 'text/html' }), 'product-html');
+    assert.equal(transferred, true);
+  } finally { globalThis.fetch = previousFetch; }
 });

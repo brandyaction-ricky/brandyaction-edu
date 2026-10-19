@@ -14,7 +14,9 @@ export async function uploadPlatformFile(file: File, kind: PlatformUploadKind) {
     });
     const result = await response.json().catch(() => ({ error: '업로드 요청을 처리하지 못했습니다. 다시 시도해 주세요.' }));
     if (!response.ok) throw new Error(result.error || '파일 업로드를 시작하지 못했습니다.');
-    const uploaded = await createClient().storage.from(result.bucket).uploadToSignedUrl(result.path, result.token, file, {
+    // Storage sends Blob.type in multipart uploads, ignoring contentType for File/Blob bodies.
+    const body = kind === 'product-html' ? file.slice(0, file.size, result.contentType) : file;
+    const uploaded = await createClient().storage.from(result.bucket).uploadToSignedUrl(result.path, result.token, body, {
         contentType: result.contentType,
     });
     if (uploaded.error) throw new Error(`파일 전송에 실패했습니다. ${uploaded.error.message || '다시 시도해 주세요.'}`);
