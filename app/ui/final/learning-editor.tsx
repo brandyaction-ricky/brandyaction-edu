@@ -26,6 +26,7 @@ import { uuid } from '@/lib/edu-workflows';
 import { LessonAuthorWorkspace, authorRequest, readAuthor, type AuthorSession } from './lesson-author-workspace';
 import { useUnsavedLearningChanges } from './use-unsaved-learning-changes';
 import { authorValuesEqual, mergeAuthorDraft, type AuthorChoices, type AuthorConflict } from '@/lib/lesson-author-merge';
+import { revealLessonIssue } from '@/lib/lesson-validation-focus';
 
 export type LearningEditorSession = { dirty: boolean; busy: boolean; save: () => Promise<boolean> };
 function EditorSettings({ embedded, children }: { embedded?: boolean; children: ReactNode }) {
@@ -140,6 +141,20 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
   const formRef = useRef<HTMLFormElement>(null);
   const formId = useId();
   const saveFeedbackRef = useRef<HTMLDivElement>(null);
+  const [validationAttempted, setValidationAttempted] = useState(false);
+  const [issueTarget, setIssueTarget] = useState<{ element: HTMLElement | null } | null>(null);
+  const validationNavigation = useRef(false);
+  const contentSectionRef = useRef<HTMLElement>(null), quizSectionRef = useRef<HTMLElement>(null);
+  const [contentIssue, setContentIssue] = useState('');
+  function showIssue(message: string, element: HTMLElement | null) {
+    validationNavigation.current = true;
+    setValidationAttempted(true); setPreviewOnly(false); setMessage(message); setIssueTarget({ element });
+  }
+  useEffect(() => {
+    if (!issueTarget) return;
+    const frame = requestAnimationFrame(() => revealLessonIssue(issueTarget.element));
+    return () => cancelAnimationFrame(frame);
+  }, [issueTarget]);
   const [draftConflict, setDraftConflict] = useState<{base:AuthorPayload;mine:AuthorPayload;latest:AuthorSnapshot;conflicts:AuthorConflict[]}|null>(null);
   const [conflictChoices, setConflictChoices] = useState<AuthorChoices>({});
   const [quizDirty, setQuizDirty] = useState(false);
@@ -213,29 +228,28 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
   }
   async function save(publishing = false, prepared?: {payload:AuthorPayload;snapshot:AuthorSnapshot}, automatic=false): Promise<boolean> {
     if (inFlight.current || saveBlocked) { if(!automatic)setMessage(saveBlockedReason); return false; }
+    if (!automatic) validationNavigation.current = false;
     draftRef.current?.saveNow();
     if(publishing&&draftConflict){setMessage('두 편집본은 보관되어 있습니다. 겹친 부분만 고른 뒤 학생에게 반영해 주세요.');return false;}
     if(publishing&&publication&&!rebasing&&authorPublicChanged(publication.snapshot)){setMessage('공개된 수업이 바뀌었습니다. 편집본은 보관되어 있으니 현재 공개본과 비교한 뒤 반영해 주세요.');return false;}
-    if (quizDirty && (!publication || publishing)) { setMessage("아래 확인 퀴즈의 변경사항을 먼저 저장해 주세요."); return false; }
-    if ((!publication || publishing) && blockState.active && !blockRef.current?.validate()) { setMessage('학생 화면에 반영하기 전에 학습 구성의 표시된 항목을 확인해 주세요.'); setPreviewOnly(false); blockSectionRef.current?.scrollIntoView({ block: 'start' }); return false; }
+    if (quizDirty && (!publication || publishing)) { showIssue("확인 퀴즈의 변경사항을 먼저 저장해 주세요.", quizSectionRef.current); return false; }
+    if ((!publication || publishing) && blockState.active && !blockRef.current?.validate()) { validationNavigation.current = true; setMessage('학생 화면에 반영하기 전에 학습 구성의 표시된 항목을 확인해 주세요.'); setPreviewOnly(false); return false; }
     if ((!publication || publishing) && format === "material" && uploadStatus !== "idle") {
-      setPreviewOnly(false);
-      setMessage("자료 업로드 오류를 확인한 뒤 다시 저장해 주세요.");
+      setContentIssue("자료 업로드 오류를 확인한 뒤 다시 저장해 주세요.");
+      showIssue("자료 업로드 오류를 확인한 뒤 다시 저장해 주세요.", contentSectionRef.current);
       return false;
     }
     const form = formRef.current;
     if (!form) { setMessage("편집 화면을 준비하고 있습니다. 잠시 후 다시 저장해 주세요."); return false; }
     if ((!publication || publishing) && !form.checkValidity()) {
-      setMessage("학생 화면에 반영하기 전에 수업 제목·주차와 표시된 입력 항목을 확인해 주세요.");
-      setPreviewOnly(false);
-      form.querySelectorAll<HTMLDetailsElement>("details").forEach(details => { details.open = true; });
-      requestAnimationFrame(() => form.reportValidity());
+      const field = Array.from(form.elements).find(element => element instanceof HTMLElement && 'validity' in element && !(element as HTMLInputElement).validity.valid) as HTMLElement | undefined;
+      showIssue("학생 화면에 반영하기 전에 표시된 입력 항목을 확인해 주세요.", field || form);
       return false;
     }
     const selectedValue = { text: lessonBodyHasText(bodyText) ? bodyText : "", vod: videoUrl, material: resourcePath, link: externalUrl }[format].trim();
-    if ((!publication || publishing) && !blockState.active && contentExists && !selectedValue) {
-      setPreviewOnly(false);
-      setMessage("선택한 콘텐츠 유형에 맞는 본문·영상·자료·링크를 입력해 주세요.");
+    if ((!publication || publishing) && !blockState.active && (contentExists || publishing) && !selectedValue) {
+      setContentIssue("선택한 콘텐츠 유형에 맞는 본문·영상·자료·링크를 입력해 주세요.");
+      showIssue("선택한 콘텐츠 유형에 맞는 본문·영상·자료·링크를 입력해 주세요.", contentSectionRef.current?.querySelector<HTMLElement>('[role="tabpanel"]') || contentSectionRef.current);
       return false;
     }
     inFlight.current=true;if(automatic)setAutosaving(true);else setSaving(true);
@@ -377,7 +391,7 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
     const payload={form:{basic,format,bodyText,videoUrl,externalUrl,resourceName,resourcePath},blocks:blockRef.current?.captureDraft()};
     const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download='수업-편집내용.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
-  useEffect(() => { if (message) saveFeedbackRef.current?.scrollIntoView({ block: 'nearest' }); }, [message]);
+  useEffect(() => { if (message && !validationNavigation.current) saveFeedbackRef.current?.scrollIntoView({ block: 'nearest' }); }, [message]);
   const changeKey=JSON.stringify({basic,format,bodyText,videoUrl,externalUrl,resourceName,resourcePath,blocks:blockState.changeKey});
   useEffect(()=>{live.current=captureAuthorPayload;autoLatest.current=()=>{
     if(publication&&(dirty||blockState.dirty)&&!inFlight.current&&!retryBlocked.current)void save(false,undefined,true);
@@ -392,8 +406,8 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
     setPreviewOnly(previous => !previous);
     requestAnimationFrame(() => previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
-  return <div className={"learning-editor" + (embedded ? " learning-editor--embedded" : "")}>
-    {embedded ? <header className="studio-document-header adm-box"><div className="studio-document-heading"><p className="studio-step-label">1 · 수업 정보</p><p className="meta">{num(week, "week_number")}주차 · {displayDay}일차</p></div><div className="studio-document-title-row"><label>수업 제목<input form={formId} aria-label="수업 제목" required maxLength={300} value={basic.title} onChange={event => changeBasic("title", event.target.value)} disabled={busy} /></label><div className="studio-document-actions"><AdminButton variant="outline" onClick={showPreview}>{previewOnly ? "편집으로" : "학습자 미리보기"}</AdminButton><AdminButton variant="primary" type="button" onClick={() => void save()} disabled={saveBlocked} aria-describedby={saveBlocked ? saveStatusId : undefined} loading={busy}>{publication ? "지금 저장" : "학습 저장"}</AdminButton></div></div><p className="meta studio-document-note" role="status">{publication ? `${autosaving ? "서버에 저장 중…" : autoStatus} · 완성되면 ‘학생 화면에 반영’을 눌러 주세요.` : row?.is_published && week?.is_published ? "공개 수업 · 저장하면 수강생 화면에도 반영됩니다." : row?.is_published ? "상위 주차가 비공개여서 수강생에게 보이지 않습니다." : "비공개 수업 · 공개 설정을 바꾸지 않으면 계속 비공개입니다."}</p></header> : <AdminHeading title="학습 콘텐츠 편집" eyebrow="LEARNING EDITOR" description={lessonId ? `Day ${displayDay} · ${t(week, "week_number") || "—"}주차 / ${basic.title}` : "일차별 학습 본문과 확인 퀴즈를 등록합니다."}>
+  return <div className={"learning-editor" + (embedded ? " learning-editor--embedded" : "") + (validationAttempted ? " learning-was-validated" : "")}>
+    {embedded ? <header className="studio-document-header adm-box"><div className="studio-document-heading"><p className="studio-step-label">1 · 수업 정보</p><p className="meta">{num(week, "week_number")}주차 · {displayDay}일차</p></div><div className="studio-document-title-row"><label>수업 제목<input form={formId} aria-label="수업 제목" required pattern={".*\\S.*"} maxLength={300} value={basic.title} onChange={event => changeBasic("title", event.target.value)} disabled={busy} /></label><div className="studio-document-actions"><AdminButton variant="outline" onClick={showPreview}>{previewOnly ? "편집으로" : "학습자 미리보기"}</AdminButton><AdminButton variant="primary" type="button" onClick={() => void save()} disabled={saveBlocked} aria-describedby={saveBlocked ? saveStatusId : undefined} loading={busy}>{publication ? "지금 저장" : "학습 저장"}</AdminButton></div></div><p className="meta studio-document-note" role="status">{publication ? `${autosaving ? "서버에 저장 중…" : autoStatus} · 완성되면 ‘학생 화면에 반영’을 눌러 주세요.` : row?.is_published && week?.is_published ? "공개 수업 · 저장하면 수강생 화면에도 반영됩니다." : row?.is_published ? "상위 주차가 비공개여서 수강생에게 보이지 않습니다." : "비공개 수업 · 공개 설정을 바꾸지 않으면 계속 비공개입니다."}</p></header> : <AdminHeading title="학습 콘텐츠 편집" eyebrow="LEARNING EDITOR" description={lessonId ? `Day ${displayDay} · ${t(week, "week_number") || "—"}주차 / ${basic.title}` : "일차별 학습 본문과 확인 퀴즈를 등록합니다."}>
       <AdminButton variant="outline" type="button" onClick={showPreview}>{previewOnly ? "편집으로" : "학습자 미리보기"}</AdminButton><AdminStatusBadge status={basic.is_published ? "published" : "hidden"} label={basic.is_published ? "공개" : "비공개"} />
     </AdminHeading>}
     {backupError && <p className="notice" role="alert">{backupError}</p>}
@@ -413,9 +427,9 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
       <section className="panel" hidden={previewOnly}>
         <div className="panel-head"><h2>기본 정보</h2><label className="review-switch"><input type="checkbox" checked={basic.is_published} onChange={event => changeBasic("is_published", event.target.checked)} disabled={busy} /> 공개</label></div>
         <fieldset className="section-pad form-grid learning-editor-fields" disabled={busy}>
-          <Field label="주차 안 수업 순서 *" hint="표시 일차는 앞 주차의 수업 수를 합산해 자동으로 계산합니다. 0주차는 제외합니다."><input type="number" min={1} value={basic.day_number} required onChange={event => changeBasic("day_number", event.target.value)} /></Field>
+          <Field label="주차 안 수업 순서 *" hint="표시 일차는 앞 주차의 수업 수를 합산해 자동으로 계산합니다. 0주차는 제외합니다."><input type="number" min={1} max={2147483647} value={basic.day_number} required onChange={event => changeBasic("day_number", event.target.value)} /></Field>
           <Field label="주차 (Week) *"><select value={basic.week_id} required onChange={event => changeBasic("week_id", event.target.value)}><option value="">주차 선택</option>{(data.curriculum_weeks || []).filter(item=>!publication || publication.isNew || item.course_id === course?.id).map(item => <option key={item.id} value={item.id}>{t((data.courses || []).find(entry => entry.id === item.course_id), "title")} · {num(item, "week_number")}주차 · {t(item, "title")}</option>)}</select></Field>
-          <Field label="제목 *" wide><input value={basic.title} maxLength={300} required onChange={event => changeBasic("title", event.target.value)} /></Field>
+          <Field label="제목 *" wide><input value={basic.title} maxLength={300} required pattern={".*\\S.*"} onChange={event => changeBasic("title", event.target.value)} /></Field>
           {!blockState.active && <Field label="콘텐츠 유형"><select value={format} onChange={event => changeFormat(event.target.value as ContentType)}>{formats.map(item => <option value={item.key} key={item.key}>{item.label}</option>)}</select></Field>}
           <Field label="소요 시간" hint="예: 20분 · 영상 15분 + 실습 10분"><input value={basic.duration_label} onChange={event => changeBasic("duration_label", event.target.value)} /></Field>
           <div className="field wide"><label className="review-switch"><input type="checkbox" checked={basic.is_preview} onChange={event => changeBasic("is_preview", event.target.checked)} /> 무료 미리보기</label></div>
@@ -427,8 +441,8 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
         <LessonBlockAuthor autosave={Boolean(publication)} key={row?.id || 'new'} ref={blockRef} lessonId={lessonId} initialSnapshot={publication ? {revision:publication.snapshot.revision,document:publication.snapshot.payload.blocks.active ? publication.snapshot.payload.blocks.document : null,editable:true} : undefined} courseId={course?.id} sources={cardSources} legacyBlocks={legacyBlocks} disabled={pending || saving || uploadStatus === "uploading"} onState={setBlockState} />
       </div></section>}
       {blockEditingEnabled && blockState.active && lessonId && (!publication || !publication.isNew) && <section className="studio-ongoing-section"><p className="studio-step-label">{embedded && "3 · "}반복 학습 운영</p>{publication && <p className="notice">반복 학습 운영 설정은 아래에서 별도로 저장하며 바로 적용됩니다.</p>}<OngoingLessonSettings lessonId={lessonId} disabled={saveBlocked || dirty || blockState.dirty || Boolean(publication && publication.snapshot.revision !== publication.snapshot.publishedRevision)} /></section>}
-      {!blockState.active && !(blockEditingEnabled && blockState.blocked) && <section className={"panel" + (previewOnly ? "" : " mt24")}>
-        <div className="panel-head"><h2>학습 본문</h2><span className="meta">{t(course, "title") || "학습 콘텐츠와 미리보기"}</span></div>
+      {!blockState.active && !(blockEditingEnabled && blockState.blocked) && <section ref={contentSectionRef} data-validation-error={contentIssue ? true : undefined} className={"panel" + (previewOnly ? "" : " mt24")} onInput={() => setContentIssue("")} onChange={() => setContentIssue("")}>
+        {contentIssue && <p className="lesson-validation-error" role="alert">{contentIssue}</p>}<div className="panel-head"><h2>학습 본문</h2><span className="meta">{t(course, "title") || "학습 콘텐츠와 미리보기"}</span></div>
         <div className={"section-pad lesson-body-grid" + (previewOnly ? " learning-preview-only" : "")}>
           <fieldset className="learning-editor-fields learning-content-fields" disabled={busy} hidden={previewOnly}>
             <Field label="도입 · 학습 안내"><textarea rows={3} value={basic.description} onChange={event => changeBasic("description", event.target.value)} /></Field>
@@ -454,7 +468,8 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
       {publication&&<details className="author-save-note"><summary>저장 메모 남기기 (선택)</summary><label>이번 수정 메모<input maxLength={160} value={saveNote} onChange={e=>setSaveNote(e.target.value)} placeholder="예: 설치 설명 보완"/></label><small>‘지금 저장’을 누르면 이 메모와 함께 중요한 버전으로 남습니다. 학생 화면은 바뀌지 않습니다.</small></details>}
       <div className="editor-savebar adm-savebar"><span id={`${saveStatusId}-bottom`} className="dirty-note" role="status">{saveBlockedReason || (publication ? autoStatus : dirty || blockState.dirty ? "저장하지 않은 변경사항이 있습니다." : "기본 정보와 학습 내용을 함께 저장합니다.")}</span><AdminButton variant="outline" type="button" onClick={close} disabled={busy} hidden={embedded}><ArrowLeft size={16} />목록으로</AdminButton><AdminButton variant="primary" type="submit" disabled={saveBlocked} aria-describedby={`${saveStatusId}-bottom`} loading={busy}>{blockState.uploading ? "파일 업로드 중…" : busy || autosaving ? "저장 중…" : publication ? "지금 저장" : lessonId ? "학습 저장" : "학습 등록"}</AdminButton>{publication && <AdminButton variant="primary" type="button" disabled={publishBlocked} aria-describedby={`${saveStatusId}-bottom`} onClick={()=>void save(true)}>학생 화면에 반영</AdminButton>}</div>
     </form>
-    <section className="panel mt24 learning-quiz-panel studio-quiz-section" hidden={previewOnly}>
+    <section ref={quizSectionRef} className="panel mt24 learning-quiz-panel studio-quiz-section" data-validation-error={validationAttempted && quizDirty ? true : undefined} hidden={previewOnly}>
+      {validationAttempted && quizDirty && <p className="lesson-validation-error" role="alert">확인 퀴즈의 변경사항을 먼저 저장해 주세요.</p>}
       {publication && <p className="notice">아래 미션 확인 퀴즈는 별도 저장됩니다. 퀴즈 저장을 누르면 학생 화면에도 바로 반영됩니다. 본문 안에 넣은 확인 문제는 위 초안에 포함됩니다.</p>}
       {missions.length > 1 && <div className="section-pad learning-mission-picker"><Field label="퀴즈를 연결할 미션"><select value={mission?.id || ""} onChange={event => setSelectedMissionId(event.target.value)} disabled={busy || quizDirty}>{missions.map(item => <option key={item.id} value={item.id}>{t(item, "title")}</option>)}</select></Field></div>}
       {mission ? <LessonQuiz key={`${mission.id}-${quiz?.revision || "new"}`} mission={mission} current={quiz} pending={busy} send={send} onDirty={setQuizDirty} stepLabel={embedded ? "4" : undefined} /> : <><div className="panel-head"><h2>{embedded && "4 · "}확인 퀴즈</h2><AdminLinkButton size="sm" href="/admin/missions">미션 관리</AdminLinkButton></div><div className="section-pad"><AdminEmptyState title={lessonId ? "연결된 미션이 없습니다." : "학습 등록 후 퀴즈를 연결할 수 있습니다."}>미션 관리에서 이 학습에 미션을 등록한 뒤 질문·선택지·정답을 설정하세요.</AdminEmptyState></div></>}
