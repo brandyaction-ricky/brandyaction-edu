@@ -69,13 +69,16 @@ test('save waits for HTML transfer and oversized files do not request an upload'
 
 
 test('a failed stored-document read can be retried without replacing the selected file', async ({ page }) => {
-  let reads = 0;
-  await page.route('**/api/platform/product-html?*', route => route.fulfill(++reads === 1 ? { status: 409, json: { error: 'synthetic temporary error' } } : { json: { url: '/recovered-document.txt' } }));
+  // StrictMode may abort the first mount request. Keep the outage active until
+  // the user retries instead of letting an aborted request consume the failure.
+  let unavailable = true;
+  await page.route('**/api/platform/product-html?*', route => route.fulfill(unavailable ? { status: 409, json: { error: 'synthetic temporary error' } } : { json: { url: '/recovered-document.txt' } }));
   await page.route('**/recovered-document.txt', route => route.fulfill({ contentType: 'text/plain', body: '<h1>복구된 상세페이지</h1>' }));
   await page.goto('/product-sale-test?storedHtml=1');
   await page.getByRole('tab', { name: '상세페이지', exact: true }).click();
   await page.getByText('HTML 디자인 확인', { exact: true }).click();
   await expect(page.getByText('상세페이지를 불러오지 못했습니다.', { exact: false })).toBeVisible();
+  unavailable = false;
   await page.getByRole('button', { name: '다시 불러오기', exact: true }).click();
   await expect(page.frameLocator('iframe[title="상품 HTML 상세페이지"]').getByRole('heading', { name: '복구된 상세페이지' })).toBeVisible();
 });
