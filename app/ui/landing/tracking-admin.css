@@ -61,7 +61,7 @@
 .edu-admin .tracking-detail-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .edu-admin .tracking-detail-heading h2{font-size:16px;margin:0}
 .edu-admin .tracking-detail-heading p{margin:4px 0 0}
-.edu-admin .tracking-stack[data-metric-detail=false] .tracking-performance-table :is(th,td):is(:nth-child(5),:nth-child(8),:nth-child(9),:nth-child(11),:nth-child(12)){display:none}
+.edu-admin .tracking-stack[data-metric-detail=false] .tracking-performance-table :is(th,td):is(:nth-child(5),:nth-child(8),:nth-child(9),:nth-child(11)){display:none}
 .edu-admin .tracking-stack[data-metric-detail=false] .tracking-performance-context th{display:table-cell}
 .edu-admin .tracking-metric-details{border:1px solid var(--admin-border);border-radius:12px;padding:4px 16px;background:var(--admin-surface,#fff)}
 .edu-admin .tracking-funnel .admin-metric{border-radius:14px;box-shadow:0 2px 8px #17203304}

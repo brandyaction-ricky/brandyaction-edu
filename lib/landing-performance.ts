@@ -8,6 +8,7 @@ export type PerformanceCourse = {
   tracking: 'active' | 'paused' | 'not_configured'; campaigns: PerformanceCampaign[];
 };
 export type PerformanceCampaign = {
+  updated_at?: string; paid_cohort_id?: string | null; paid_cohort_label?: string | null;
   id: string; landing_id: string; name: string; utm_campaign: string; start_day: string; end_day: string;
   new_customer_price: number; existing_customer_price: number; live_peak: number | null;
   uses_ads: boolean;
@@ -26,6 +27,7 @@ export type PerformanceRow = {
   avg_scroll_depth: number | null; avg_dwell_ms: number | null;
   impressions: number; link_clicks: number; spend: number; registrations: number; registration_cost: number | null;
   registration_available?: boolean | null;
+  landing_page_views?: number | null; landing_page_view_available?: boolean | null;
 };
 export type ActualRow = {
   campaign_id: string; day: string; kakao_members: number | null; new_payments: number | null;
@@ -40,7 +42,7 @@ export type DashboardReport = {
     last_collected_at: string | null;
     actual_presence: { new_payments: boolean; existing_payments: boolean } | null;
     previous_day_members: Record<string, number | null>;
-    period_actuals?: { kakao_members: number | null; kakao_delta: number | null; kakao_day: string | null; baseline_day: string; payments: number | null } | null;
+    period_actuals?: { kakao_members: number | null; kakao_delta: number | null; kakao_day: string | null; baseline_day: string; baseline_members?: number | null; payments: number | null } | null;
     errors: { trend?: string; collection?: string; actuals?: string; insights?: string };
   };
   campaign: PerformanceCampaign; summary_b: MetricSummary; summary_a: MetricSummary | null;
@@ -57,7 +59,7 @@ const DAY = 86400000;
 const dateValue = (value: string) => Date.parse(value + 'T00:00:00Z');
 const shift = (value: string, days: number) => new Date(dateValue(value) + days * DAY).toISOString().slice(0, 10);
 export function validDay(value: unknown): value is string {
-  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && new Date(value + 'T00:00:00Z').toISOString().slice(0, 10) === value;
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value + 'T00:00:00Z')) && new Date(value + 'T00:00:00Z').toISOString().slice(0, 10) === value;
 }
 export function presetRange(preset: PerformancePreset, campaign: Pick<PerformanceCampaign,'start_day'|'end_day'>, now = new Date()) {
   const today = kstDate(now);

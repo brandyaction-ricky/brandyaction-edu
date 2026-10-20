@@ -3,18 +3,20 @@ import { expect, test, type Page } from '@playwright/test';
 // Exercise the actual React screen with deterministic transport failures and
 // responses. These tests never write to DEV/Production, Auth or Meta.
 async function fixture(page: Page, failClassification = false, metaOnly = false, multipleCampaigns = false) {
-  let campaign = { id: 'bbbbbbbb-bbbb-4000-8000-000000000002', landing_id: 'aaaaaaaa-aaaa-4000-8000-000000000001', name: '운영 검증 캠페인', utm_campaign: 'qa', start_day: '2026-09-01', end_day: '2026-09-30', new_customer_price: 1650000, existing_customer_price: 1100000, live_peak: null, uses_ads: metaOnly, meta_ad_account_id: metaOnly ? 'act_245402678098216' : null, meta_campaign_ids: metaOnly ? ['120252432290300270'] : [], meta_sync_status: metaOnly ? 'success' : 'not_configured', meta_last_synced_at: null, meta_sync_error: null };
+  let campaign = { id: 'bbbbbbbb-bbbb-4000-8000-000000000002', landing_id: 'aaaaaaaa-aaaa-4000-8000-000000000001', updated_at: '2026-10-20T00:00:00Z', name: '운영 검증 캠페인', utm_campaign: 'qa', start_day: '2026-09-01', end_day: '2026-09-30', new_customer_price: 1650000, existing_customer_price: 1100000, live_peak: null, uses_ads: metaOnly, meta_ad_account_id: metaOnly ? 'act_245402678098216' : null, meta_campaign_ids: metaOnly ? ['120252432290300270'] : [], meta_sync_status: metaOnly ? 'success' : 'not_configured', meta_last_synced_at: null, meta_sync_error: null };
   const sourceRows = metaOnly ? Array.from({ length: 8 }, (_, index) => ({ creative: `cr${String(index + 1).padStart(2, '0')}`, sessions: 0, visitors: 0, cta_click_sessions: 0, cta_clicks: 0 })) : [
     { creative: '소재 60', sessions: 60, visitors: 30, cta_click_sessions: 20, cta_clicks: 60 },
     { creative: '소재 40', sessions: 40, visitors: 20, cta_click_sessions: 4, cta_clicks: 12 },
     { creative: '소재 2', sessions: 2, visitors: 1, cta_click_sessions: 2, cta_clicks: 6 },
   ];
-  const rows = sourceRows.map((row, index) => ({ ...row, campaign: metaOnly ? 'META_Cold_카톡방입장_2609' : 'qa', adset: metaOnly ? 'A_메인_브로드_25-54' : '광고세트', ad_type: 'unclassified', impressions: metaOnly ? 1000 + index : 0, link_clicks: metaOnly ? 50 + index : 0, spend: metaOnly ? 10000 + index : 0, registrations: metaOnly ? 5 + index : 0, avg_scroll_depth: metaOnly ? null : 50, avg_dwell_ms: metaOnly ? null : 60000 }));
+  const rows = sourceRows.map((row, index) => ({ ...row, campaign: metaOnly ? 'META_Cold_카톡방입장_2609' : 'qa', adset: metaOnly ? 'A_메인_브로드_25-54' : '광고세트', ad_type: 'unclassified', impressions: metaOnly ? 1000 + index : 0, link_clicks: metaOnly ? 50 + index : 0, spend: metaOnly ? 10000 + index : 0, landing_page_views: metaOnly ? 696 + index : null, landing_page_view_available: metaOnly, registration_available: metaOnly, registration_cost: null, registrations: metaOnly ? 5 + index : 0, avg_scroll_depth: metaOnly ? null : 50, avg_dwell_ms: metaOnly ? null : 60000 }));
   let classificationRequests = 0;
+  const created: typeof campaign[] = [], saves: Record<string, unknown>[] = [];
   await page.route('**/api/landing/performance**', async route => {
     const url = new URL(route.request().url());
     if (route.request().method() === 'POST') {
       const body = route.request().postDataJSON();
+      if (body.action === 'create_campaign') { const saved = { ...campaign, ...body.values, id: body.campaign_id, landing_id: body.landing_id }; created.push(saved); saves.push(body); await route.fulfill({ json: { ok: true, campaign: saved } }); return; }
       if (body.action === 'classification') {
         classificationRequests++;
         if (failClassification && classificationRequests === 1) { await route.fulfill({ status: 503, json: { error: '광고 유형을 저장하지 못했습니다.' } }); return; }
@@ -24,24 +26,25 @@ async function fixture(page: Page, failClassification = false, metaOnly = false,
       if (body.action === 'campaign') { campaign = { ...campaign, ...body.values }; await route.fulfill({ json: { ok: true, campaign } }); return; }
       await route.fulfill({ status: 405, json: { error: '이 검증에서는 저장하지 않습니다.' } }); return;
     }
+    if (url.searchParams.has('actual_day')) { await route.fulfill({ json: { actual: null } }); return; }
     if (!url.searchParams.has('start')) {
       const second = { ...campaign, id: 'cccccccc-cccc-4000-8000-000000000003', name: '두 번째 캠페인', start_day: '2026-09-10', end_day: '2026-09-24' };
-      await route.fulfill({ json: { can_manage_campaign: true, courses: [{ id: campaign.landing_id, title: '운영 검증 클래스', status: 'published', tracking: 'active', campaigns: multipleCampaigns ? [campaign, second] : [campaign] }] } }); return;
+      await route.fulfill({ json: { can_manage_campaign: true, cohorts: [{ id: 'dddddddd-dddd-4000-8000-000000000004', title: '유료 문샷', cohort_code: 'MOONSHOT_004' }], courses: [{ id: campaign.landing_id, title: '운영 검증 클래스', status: 'published', tracking: 'active', campaigns: [...(multipleCampaigns ? [campaign, second] : [campaign]), ...created] }] } }); return;
     }
     const devices = url.searchParams.getAll('device'), creatives = url.searchParams.getAll('creative');
     const performance = creatives.length ? rows.filter(row => creatives.includes(row.creative)) : devices.length === 1 ? rows.slice(0, 1) : rows;
     await route.fulfill({ json: {
-      campaign, performance, summary_b: { has_data: true, sessions: metaOnly ? 0 : devices.length === 1 ? 60 : 102, visitors: metaOnly ? 0 : 51, cta_click_sessions: metaOnly ? 0 : 26, cta_clicks: metaOnly ? 0 : 78, converted_visitors: metaOnly ? 0 : 13, meta_impressions: metaOnly ? 8028 : 0, meta_link_clicks: metaOnly ? 428 : 0, spend: metaOnly ? 80028 : 0 }, summary_a: null,
+      campaign: created.find(value => value.id === url.searchParams.get('campaign')) || campaign, performance, summary_b: { has_data: true, sessions: metaOnly ? 0 : devices.length === 1 ? 60 : 102, visitors: metaOnly ? 0 : 51, cta_click_sessions: metaOnly ? 0 : 26, cta_clicks: metaOnly ? 0 : 78, converted_visitors: metaOnly ? 0 : 13, meta_impressions: metaOnly ? 8028 : 0, meta_link_clicks: metaOnly ? 428 : 0, spend: metaOnly ? 80028 : 0 }, summary_a: null,
       actuals: [], daily: [], options: { campaigns: [metaOnly ? 'META_Cold_카톡방입장_2609' : 'qa'], adsets: [metaOnly ? 'A_메인_브로드_25-54' : '광고세트'], creatives: rows.map(r => r.creative), devices: metaOnly ? [] : ['mobile', 'desktop'], layouts: metaOnly ? [] : [1], ad_types: metaOnly ? ['unclassified'] : ['unclassified', 'cold', 'retarget'] },
       data_state: { sessions_exist: !metaOnly, filtered_sessions_exist: !metaOnly, meta_exists: metaOnly },
       campaign_summary: { kakao_members: 100, kakao_delta: 20, new_payments: 31, existing_payments: 7, revenue: 58850000, spend: 0, roas: null, live_peak: null },
-      ui: { errors: {}, daily_a: null, last_collected_at: null, actual_presence: { new_payments: true, existing_payments: true }, previous_day_members: {}, period_actuals: { kakao_members: 80, kakao_day: '2026-09-10', payments: 3 } },
+      ui: { errors: {}, daily_a: null, last_collected_at: null, actual_presence: { new_payments: true, existing_payments: true }, previous_day_members: {}, period_actuals: { kakao_members: 80, kakao_day: '2026-09-10', baseline_day: '2026-09-14', baseline_members: null, kakao_delta: null, payments: 3 } },
       range: { startDay: url.searchParams.get('start'), endDay: url.searchParams.get('end'), compareStartDay: null, compareEndDay: null },
     } });
   });
   await page.goto('/admin/landing?preset=custom&start=2026-09-15&end=2026-09-15');
   await expect(page.getByRole('region', { name: '소재별 성과표' })).toBeVisible();
-  return { requests: () => classificationRequests };
+  return { requests: () => classificationRequests, saves };
 }
 
 test('Meta-only dimensions populate all supported filters and reset without web-only options', async ({ page }) => {
@@ -151,4 +154,45 @@ test('performance shows core columns first and lets operators reveal supporting 
   await page.evaluate(()=>window.scrollTo(0,0));
   await page.screenshot({path:testInfo.outputPath('edu-performance.png')});
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
+
+test('separate cohort campaign creation selects the new campaign and preserves existing campaigns', async ({ page }) => {
+  const result = await fixture(page);
+  await page.getByRole('button', { name: '캠페인 추가', exact: true }).click();
+  const drawer = page.getByRole('dialog', { name: '새 기수 캠페인' });
+  await drawer.getByLabel('캠페인명', { exact: true }).fill('문샷 5기');
+  await drawer.getByLabel('UTM 캠페인', { exact: true }).fill('moonshot-5');
+  await drawer.getByLabel('시작일', { exact: true }).fill('2026-10-20');
+  await drawer.getByLabel('종료일', { exact: true }).fill('2026-11-05');
+  await drawer.getByLabel('Meta 캠페인 ID', { exact: true }).fill('120253093437610270');
+  await drawer.getByRole('checkbox', { name: '광고 사용' }).check();
+  await expect(drawer.getByLabel('매출을 집계할 유료 기수')).toHaveValue('');
+  await drawer.getByRole('button', { name: '캠페인 만들기', exact: true }).click();
+  await expect(drawer).not.toBeVisible();
+  await expect(page).toHaveURL(/start=2026-10-20&end=2026-11-05/);
+  await expect(page.getByRole('combobox', { name: '기수·캠페인' })).toHaveValue(String(result.saves[0].campaign_id));
+  await expect(page.getByRole('checkbox', { name: /운영 검증 캠페인/ })).not.toBeChecked();
+  await expect(page.getByRole('checkbox', { name: /문샷 5기/ })).toBeChecked();
+  expect((result.saves[0].values as Record<string, unknown>).paid_cohort_id).toBe('');
+});
+
+test('missing baseline opens the exact date with clear midnight guidance and no payment fields', async ({ page }) => {
+  await fixture(page);
+  await page.getByRole('button', { name: '인원 입력', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '실측 기록 추가' });
+  await expect(dialog.getByLabel('날짜 · KST')).toHaveValue('2026-09-14');
+  await dialog.getByLabel('날짜 · KST').fill('2026-08-31');
+  await expect(dialog).toContainText('이 날짜 밤 12시(다음날 0시) 기준 인원');
+  await expect(dialog.getByLabel('카카오톡방 현재 인원')).toBeEnabled();
+  await expect(dialog.getByLabel('신규 고객 결제 건수')).toHaveCount(0);
+});
+
+test('Meta landing views and derived registration costs remain visible with source labels', async ({ page }) => {
+  await fixture(page, false, true);
+  const table = page.getByRole('region', { name: '소재별 성과표' });
+  await expect(table.getByRole('columnheader', { name: 'Meta 랜딩 조회', exact: true })).toBeVisible();
+  await expect(table.getByRole('columnheader', { name: 'Meta 등록완료', exact: true })).toBeVisible();
+  await expect(table.locator('tbody tr').first()).toContainText('696');
+  await expect(table.locator('tbody tr').first()).toContainText('광고비 ÷ 등록완료');
 });
