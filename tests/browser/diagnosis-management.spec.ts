@@ -5,6 +5,28 @@ const data={enabled:true,allPublished:false,revision:0,eligibleCount:103,started
 test.beforeEach(async({page})=>{
  await page.route('**/api/platform?**',route=>route.fulfill({json:{user:{id:id(99),full_name:'합성 관리자',role:'admin'},data:{admin_summary:[{pendingReviews:0,openQuestions:0}]}}}));
 });
+test('cohort selection scopes counts and pages, confirms exact cohort, preserves request on retry and disables stale writes',async({page},info)=>{
+ const four=id(104),five=id(105),writes:Record<string,unknown>[]=[],reads:URL[]=[];let revision=0,lost=true,broken=false,published=false;
+ const cohorts=[{id:four,name:'4기',code:'MOONSHOT_004',courseTitle:'AI 문샷 챌린지',enabled:false,inherited:true},{id:five,name:'5기',code:'MOONSHOT_005',courseTitle:'AI 문샷 챌린지',enabled:false,inherited:true}];
+ await page.route('**/api/admin/diagnosis**',async r=>{
+  if(r.request().method()==='POST'){const body=r.request().postDataJSON();writes.push(body);if(lost){lost=false;await r.abort();return;}revision++;published=body.enabled;await r.fulfill({json:{revision}});return;}
+  const url=new URL(r.request().url());reads.push(url);const selected=url.searchParams.get('cohort');
+  await r.fulfill(broken?{status:503,json:{error:'기수 정보를 불러오지 못했습니다.'}}:{json:{...data,revision,cohorts,cohort:selected?{id:selected,name:selected===four?'4기':'5기',enabled:published,inherited:revision===0,individualCount:1}:null,eligibleCount:selected?3:103,startedCount:selected?1:2,nextCursor:selected&&!url.searchParams.has('before')?id(90):null,rows:selected?[{...data.rows[0],published,override:null}]:data.rows}});
+ });
+ await page.goto('/diagnosis-test?manage');await page.getByLabel('공개 대상 기수').selectOption(four);
+ await expect(page.getByRole('heading',{name:'4기 진단 공개',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'한 번에 모두 공개',exact:true})).toHaveCount(0);
+ await expect(page.getByText('3명',{exact:true})).toBeVisible();await expect(page.getByText('선택 기수 기준',{exact:false})).toBeVisible();expect(reads.at(-1)?.searchParams.get('cohort')).toBe(four);
+ await page.getByRole('button',{name:'선택 기수 공개',exact:true}).click();const modal=page.getByRole('dialog');await expect(modal).toContainText('4기 진단 공개');await expect(modal).toContainText('다른 기수의 설정은 바꾸지 않습니다');await expect(modal).toContainText('개인별 설정 1건');
+ await modal.getByRole('button',{name:'취소',exact:true}).click();expect(writes).toHaveLength(0);
+ await page.getByRole('button',{name:'선택 기수 공개',exact:true}).click();await modal.getByRole('button',{name:'이 기수 공개하기',exact:true}).click();await expect(modal.getByRole('alert')).toBeVisible();await modal.getByRole('button',{name:'이 기수 공개하기',exact:true}).click();await expect(modal).toHaveCount(0);
+ expect(writes).toHaveLength(2);expect(writes[1]).toEqual(writes[0]);expect(writes[0]).toMatchObject({action:'publish_cohort',cohortId:four,enabled:true,revision:0});expect(writes[0]).not.toHaveProperty('userId');
+ await page.getByRole('button',{name:'다음',exact:true}).click();await expect.poll(()=>reads.at(-1)?.searchParams.get('before')).toBe(id(90));expect(reads.at(-1)?.searchParams.get('cohort')).toBe(four);
+ await page.getByLabel('수강생 검색').fill('학생 A');await page.getByRole('button',{name:'검색',exact:true}).click();await expect.poll(()=>reads.at(-1)?.searchParams.get('query')).toBe('학생 A');expect(reads.at(-1)?.searchParams.has('before')).toBe(false);
+ await page.getByLabel('공개 대상 기수').selectOption(five);await expect(page.getByRole('heading',{name:'5기 진단 공개',exact:true})).toBeVisible();expect(reads.at(-1)?.searchParams.get('query')).toBe('');
+ await page.getByRole('button',{name:'선택 기수 닫기',exact:true}).click();await expect(modal).toContainText('5기 진단 닫기');await modal.getByRole('button',{name:'취소',exact:true}).click();
+ await page.screenshot({path:info.outputPath('n6-cohort-publication.png'),fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ broken=true;await page.locator('#admin-content').getByRole('button',{name:'새로고침',exact:true}).click();await expect(page.getByRole('alert')).toContainText('기수 정보를 불러오지 못했습니다');await expect(page.getByRole('button',{name:'선택 기수 공개',exact:true})).toBeDisabled();expect(writes).toHaveLength(2);
+});
 test('timeline separates start, submit, issue in Korea time and keeps polling time inside history',async({page})=>{
  const row={...data.rows[2],report:{...report,state:'ready',canRetry:false,errorCode:null,startedAt:'2026-10-04T11:24:00Z',submittedAt:'2026-10-04T23:30:00Z',issuedAt:'2026-10-05T00:40:00Z',checkedAt:'2026-10-06T00:00:00Z'}};
  await page.route('**/api/admin/diagnosis**',r=>r.fulfill({json:{...data,rows:[row]}}));
