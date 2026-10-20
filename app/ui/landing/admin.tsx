@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { metaCampaignIds } from '@/lib/meta-campaign-settings';
 import { DEFAULT_SAMPLE_MIN, parseSampleMin } from '@/lib/landing-operations-phase1';
+import { preferredCampaign, type CampaignCohort } from '@/lib/landing-campaign-management';
+import { kstDate } from '@/lib/landing';
 import type { Classify } from './ad-type-control';
-import { RefreshCw, Settings2 } from 'lucide-react';
+import { Plus, RefreshCw, Settings2 } from 'lucide-react';
 import { PERFORMANCE_PRESETS, campaignRange, preserveCampaignPeriod, presetRange, previousRange, validDay, type ActualRow, type DashboardReport, type PerformanceCampaign, type PerformanceCourse, type PerformancePreset } from '@/lib/landing-performance';
 import { appendFilters, campaignStatus, emptyFilters, FILTER_LABELS, metaStatus, periodError, readFilters, readPeriod, type TrackingFilters, type TrackingPeriod } from '@/lib/landing-admin-state';
 import { AdminButton, AdminDrawer, AdminPage, AdminPageHeader, AdminStatusBadge, AdminToast } from '@/features/admin-ui';
@@ -27,7 +29,8 @@ export function LandingAdmin() {
   const [list, setList] = useState({ loading: true, error: '', canManage: false }), [listVersion, setListVersion] = useState(0), [reload, setReload] = useState(0);
   const [result, setResult] = useState<{ requestKey: string; report?: ReportResult; error?: string }>({ requestKey: '' });
   const [pending, setPending] = useState(false), [syncing, setSyncing] = useState(false), [dirty, setDirty] = useState(false), [message, setMessage] = useState('');
-  const [drawer, setDrawer] = useState<{ row: ActualRow | null } | null>(null);
+  const [drawer, setDrawer] = useState<{ row: ActualRow | null; day?: string } | null>(null);
+  const [cohorts, setCohorts] = useState<CampaignCohort[]>([]), [newCampaign, setNewCampaign] = useState<PerformanceCampaign | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sampleMin, setSampleMin] = useState(String(DEFAULT_SAMPLE_MIN));
   const [navigation, setNavigation] = useState<{ proceed: () => void } | null>(null);
@@ -41,13 +44,13 @@ export function LandingAdmin() {
     fetch('/api/landing/performance', { cache: 'no-store', signal: controller.signal }).then(responseJson).then(value => {
       if (controller.signal.aborted || sequence !== listSequence.current) return;
       const items: PerformanceCourse[] = value.courses || [];
-      setCourses(items); setList({ loading: false, error: '', canManage: Boolean(value.can_manage_campaign) });
+      setCourses(items); setCohorts(value.cohorts || []); setList({ loading: false, error: '', canManage: Boolean(value.can_manage_campaign) });
       if (initialized.current) return;
       const url = new URLSearchParams(location.search), requestedCourse = url.get('course') || url.get('landing'), requestedCampaigns = [...new Set(url.getAll('campaign'))], requestedCampaign = requestedCampaigns[0];
       setSampleMin(String(parseSampleMin(url.get('sample_min')) ?? DEFAULT_SAMPLE_MIN));
-      const nextCourse = requestedCourse ? items.find(item => item.id === requestedCourse) : requestedCampaign ? items.find(item => item.campaigns.some(c => c.id === requestedCampaign)) : items.find(item => item.status === 'published' && item.tracking === 'active') || items[0];
+      const nextCourse = requestedCourse ? items.find(item => item.id === requestedCourse) : requestedCampaign ? items.find(item => item.campaigns.some(c => c.id === requestedCampaign)) : items.find(item => item.campaigns.some(c => c.id === preferredCampaign(items, kstDate())?.id)) || items[0];
       const requestedItems = requestedCampaigns.flatMap(id => items.flatMap(item => item.campaigns).filter(campaign => campaign.id === id));
-      const nextCampaign = requestedCampaign ? requestedItems[0] : nextCourse?.campaigns[0];
+      const nextCampaign = requestedCampaign ? requestedItems[0] : preferredCampaign(nextCourse ? [nextCourse] : [], kstDate());
       setSettingsOpen(url.get('panel') === 'settings' || url.get('tab') === 'settings'); actualsRequested.current = url.get('tab') === 'actuals'; setFilters(readFilters(url));
       if ((requestedCourse && !nextCourse) || (requestedCampaign && !nextCampaign)) { setList({ loading: false, error: '존재하지 않거나 접근할 수 없는 클래스·캠페인입니다. 선택을 다시 확인해 주세요.', canManage: Boolean(value.can_manage_campaign) }); return; }
       initialized.current = true;
@@ -112,6 +115,22 @@ export function LandingAdmin() {
       if (nextCampaign && start <= end) setPeriod(old => preserveCampaignPeriod(old, { start_day: start, end_day: end }));
     });
   }
+  function selectCampaign(id: string) {
+    navigate(() => {
+      const owner = courses.find(item => item.campaigns.some(value => value.id === id)), selected = owner?.campaigns.find(value => value.id === id);
+      if (!selected) return;
+      setCourseId(owner!.id); setCampaignId(id); setSelectedCampaignIds([id]); setFilters(emptyFilters()); setDrawer(null); setSettingsOpen(false); setMessage('');
+      const prior = previousRange(selected.start_day, selected.end_day);
+      setPeriod({ preset: 'campaign', start: selected.start_day, end: selected.end_day, compare: false, compareStart: prior.startDay, compareEnd: prior.endDay });
+    });
+  }
+  function beginCampaign() {
+    navigate(() => {
+      const landing = course || courses[0]; if (!landing) return;
+      const today = kstDate();
+      setNewCampaign({ id: crypto.randomUUID(), landing_id: landing.id, name: '', utm_campaign: '', start_day: today, end_day: today, new_customer_price: campaign?.new_customer_price ?? 1650000, existing_customer_price: campaign?.existing_customer_price ?? 1100000, live_peak: null, uses_ads: false, meta_ad_account_id: campaign?.meta_ad_account_id || null, meta_campaign_id: null, meta_campaign_ids: [], meta_sync_status: 'not_configured', meta_last_synced_at: null, meta_sync_error: null });
+    });
+  }
   function choosePreset(value: PerformancePreset) {
     if (!selectionRange) return;
     if (value === 'custom') { setPeriod(previous => ({ ...previous, preset: value })); return; }
@@ -131,7 +150,7 @@ export function LandingAdmin() {
       // A pre-save GET must not overwrite the confirmed persisted state.
       requestSequence.current++;
       if (value.campaign) listSequence.current++;
-      if (value.campaign) { const saved = value.campaign as PerformanceCampaign; setCourses(previous => previous.map(item => ({ ...item, campaigns: item.campaigns.map(c => c.id === saved.id ? saved : c) }))); setDirty(false); const range = campaignRange({ startDay: period.start, endDay: period.end }, saved); if (range.startDay !== period.start || range.endDay !== period.end) { const prior = previousRange(range.startDay, range.endDay); setPeriod(old => ({ ...old, start: range.startDay, end: range.endDay, compareStart: prior.startDay, compareEnd: prior.endDay })); } }
+      if (value.campaign) { const saved = value.campaign as PerformanceCampaign; setCourses(previous => previous.map(item => ({ ...item, campaigns: item.id === saved.landing_id ? item.campaigns.some(c => c.id === saved.id) ? item.campaigns.map(c => c.id === saved.id ? saved : c) : [saved, ...item.campaigns] : item.campaigns }))); setDirty(false); if (body.action === 'create_campaign') { setNewCampaign(null); setCourseId(saved.landing_id); setCampaignId(saved.id); setSelectedCampaignIds([saved.id]); setFilters(emptyFilters()); setPeriod({ ...initialPeriod, preset: 'campaign', start: saved.start_day, end: saved.end_day }); } const range = campaignRange({ startDay: period.start, endDay: period.end }, saved); if (body.action !== 'create_campaign' && (range.startDay !== period.start || range.endDay !== period.end)) { const prior = previousRange(range.startDay, range.endDay); setPeriod(old => ({ ...old, start: range.startDay, end: range.endDay, compareStart: prior.startDay, compareEnd: prior.endDay })); } }
       setMessage(success); setReload(value => value + 1); return true;
     } catch (error) { setMessage((error as Error).message); if (propagateError) throw error; return false; } finally { pendingRef.current = false; setPending(false); }
   }
@@ -156,7 +175,7 @@ export function LandingAdmin() {
   return <AdminPage width="wide" template="analytics" className="landing-admin tracking-admin">
     <AdminPageHeader title="광고·웨비나 성과" description="광고·무료강의 성과를 확인하고, 실측 데이터와 캠페인 설정을 한 흐름에서 관리합니다."/>
     <section className="tracking-toolbar" aria-label="무료클래스 조회 조건">
-      <div className="tracking-context-row"><fieldset className="tracking-course-multi" disabled={pending || !courses.length}><legend>무료클래스 · 여러 개 선택 가능</legend>{courses.flatMap(item => item.campaigns.map(value => <label key={value.id}><input type="checkbox" checked={selectedCampaignIds.includes(value.id)} onChange={event => toggleCampaign(value.id, event.target.checked)}/><span>{item.title}{item.campaigns.length > 1 ? ` · ${value.name}` : ''}</span><AdminStatusBadge status={value.uses_ads ? 'active' : 'not_configured'} label={value.uses_ads ? '페이드' : '오가닉'}/></label>))}</fieldset><div className="tracking-context-status"><AdminStatusBadge status={stateKey} label={stateLabel}/>{selectedCampaignIds.length === 1 && campaign && <AdminStatusBadge status={campaign.meta_sync_status} label={metaStatus(campaign, syncing)} tone={campaign.meta_sync_status === 'failed' ? 'danger' : campaign.meta_sync_status === 'success' ? 'success' : undefined}/>}</div><span className="tracking-toolbar-spacer"/><AdminButton onClick={refresh} disabled={pending || loading}><RefreshCw size={16}/>새로고침</AdminButton><AdminButton tone="secondary" onClick={() => setSettingsOpen(true)} disabled={!campaign || selectedCampaignIds.length !== 1}><Settings2 size={16}/>캠페인 설정</AdminButton></div>
+      <div className="tracking-context-row"><label className="admin-field">기수·캠페인<select className="admin-select" value={selectedCampaignIds.length === 1 ? campaignId : ''} disabled={pending} onChange={event => selectCampaign(event.target.value)}><option value="" disabled>캠페인 선택</option>{courses.flatMap(item => item.campaigns.map(value => <option key={value.id} value={value.id}>{item.title} · {value.name}</option>))}</select></label>{list.canManage && <AdminButton onClick={beginCampaign} disabled={pending || !courses.length}><Plus size={16}/>캠페인 추가</AdminButton>}<fieldset className="tracking-course-multi" disabled={pending || !courses.length}><legend>무료클래스 · 여러 개 선택 가능</legend>{courses.flatMap(item => item.campaigns.map(value => <label key={value.id}><input type="checkbox" checked={selectedCampaignIds.includes(value.id)} onChange={event => toggleCampaign(value.id, event.target.checked)}/><span>{item.title}{item.campaigns.length > 1 ? ` · ${value.name}` : ''}</span><AdminStatusBadge status={value.uses_ads ? 'active' : 'not_configured'} label={value.uses_ads ? '페이드' : '오가닉'}/></label>))}</fieldset><div className="tracking-context-status"><AdminStatusBadge status={stateKey} label={stateLabel}/>{selectedCampaignIds.length === 1 && campaign && <AdminStatusBadge status={campaign.meta_sync_status} label={metaStatus(campaign, syncing)} tone={campaign.meta_sync_status === 'failed' ? 'danger' : campaign.meta_sync_status === 'success' ? 'success' : undefined}/>}</div><span className="tracking-toolbar-spacer"/><AdminButton onClick={refresh} disabled={pending || loading}><RefreshCw size={16}/>새로고침</AdminButton><AdminButton tone="secondary" onClick={() => setSettingsOpen(true)} disabled={!campaign || selectedCampaignIds.length !== 1}><Settings2 size={16}/>캠페인 설정</AdminButton></div>
       {campaign && <><div className="tracking-periods" role="group" aria-label="조회 기간">{[...PERFORMANCE_PRESETS, 'custom' as const].map(value => <AdminButton size="sm" key={value} className={period.preset === value ? 'selected' : ''} aria-pressed={period.preset === value} onClick={() => choosePreset(value)}>{labels[value]}</AdminButton>)}<label className="tracking-check"><input type="checkbox" checked={period.compare} onChange={event => toggleCompare(event.target.checked)}/>비교 모드</label><span className="tracking-help">{period.start} — {period.end} · KST</span></div>
       {period.preset === 'custom' && <div className="tracking-date-inputs"><label>B 시작일<input className="admin-input" type="date" value={period.start} min={selectionRange?.start_day} max={selectionRange?.end_day} onChange={event => dateChange('start', event.target.value)}/></label><label>B 종료일<input className="admin-input" type="date" value={period.end} min={selectionRange?.start_day} max={selectionRange?.end_day} onChange={event => dateChange('end', event.target.value)}/></label></div>}
       {period.compare && <div className="tracking-compare"><div className="tracking-compare-presets">{([1, 7, 14] as const).map(days => <AdminButton size="sm" key={days} onClick={() => comparisonPreset(days)}>{days === 1 ? '어제 → 오늘' : `직전 ${days}일 → 최근 ${days}일`}</AdminButton>)}<AdminButton size="sm" onClick={() => choosePreset('custom')}>직접 맞추기</AdminButton></div><div className="tracking-date-inputs"><label>A · 예전 기간 시작<input className="admin-input" type="date" value={period.compareStart} onChange={event => setPeriod(old => ({ ...old, compareStart: event.target.value }))}/></label><label>A · 예전 기간 종료<input className="admin-input" type="date" value={period.compareEnd} onChange={event => setPeriod(old => ({ ...old, compareEnd: event.target.value }))}/></label><span className="tracking-help">B · 최근 기간 {period.start} — {period.end}</span></div></div>}
@@ -168,11 +187,12 @@ export function LandingAdmin() {
       {error && <InlineError onRetry={() => setReload(value => value + 1)}>{error}{report && ' 이전 조회 결과는 아래에 유지됩니다.'}</InlineError>}
       {!campaign ? list.loading ? <TrackingSkeleton/> : <CompactEmpty title={courses.length ? '캠페인이 등록되지 않았습니다.' : '무료클래스가 등록되지 않았습니다.'} action={<Link className="admin-button admin-button--tertiary" href="/admin/products">상품 관리 확인</Link>}>무료클래스와 연결된 캠페인 구성을 확인해 주세요.</CompactEmpty> : !report && !multiReports ? error ? null : <TrackingSkeleton/> : <>
         {loading && <p className="tracking-help" role="status">새 조건을 조회하고 있습니다. 아래는 이전 조회 결과입니다.</p>}
-        <div aria-busy={loading} className={loading ? 'tracking-refreshing' : ''}>{multiReports ? <MultiSourceComparison reports={multiReports}/> : report && <><PerformanceDashboard key={campaign.id} report={report} compare={period.compare} filtered={Object.values(filters).some(values => values.length > 0)} filterSummary={Object.entries(filters).flatMap(([key, values]) => values.map(value => `${FILTER_LABELS[key as keyof TrackingFilters]}: ${filterLabel(key as keyof TrackingFilters, value)}`)).join(' · ') || '적용된 상세 필터 없음'} sampleMin={sampleMin} onSampleMin={setSampleMin} pending={pending || loading || !!error} onRetry={() => setReload(value => value + 1)} onClassify={classify}/><ActualsPanel report={report} onEdit={row => setDrawer({ row })} onAdd={() => setDrawer({ row: null })} onSettings={() => setSettingsOpen(true)} onRetry={() => setReload(value => value + 1)}/></>}</div>
+        <div aria-busy={loading} className={loading ? 'tracking-refreshing' : ''}>{multiReports ? <MultiSourceComparison reports={multiReports}/> : report && <><PerformanceDashboard key={campaign.id} report={report} compare={period.compare} filtered={Object.values(filters).some(values => values.length > 0)} filterSummary={Object.entries(filters).flatMap(([key, values]) => values.map(value => `${FILTER_LABELS[key as keyof TrackingFilters]}: ${filterLabel(key as keyof TrackingFilters, value)}`)).join(' · ') || '적용된 상세 필터 없음'} sampleMin={sampleMin} onSampleMin={setSampleMin} pending={pending || loading || !!error} onRetry={() => setReload(value => value + 1)} onClassify={classify}/><ActualsPanel report={report} onEdit={row => setDrawer({ row })} onAdd={day => setDrawer({ row: null, day })} onSettings={() => setSettingsOpen(true)} onRetry={() => setReload(value => value + 1)}/></>}</div>
       </>}
     </div>
-    {drawer && campaign && <ActualDrawer campaign={campaign} initial={drawer.row} pending={pending} onClose={() => setDrawer(null)} onSave={values => post({ action: 'actual', campaign_id: campaign.id, values }, '일별 실측값을 저장했습니다.')}/>}
-    {settingsOpen && campaign && <AdminDrawer title="캠페인 설정" size="large" className="tracking-settings-drawer" onClose={closeSettings}><CampaignSettings key={JSON.stringify(campaign) + ':' + listVersion} campaign={campaign} canManage={list.canManage} pending={pending} syncing={syncing} onDirty={setDirty} onSave={values => post({ action: 'campaign', campaign_id: campaign.id, values }, '캠페인 설정을 저장했습니다.', true)} onSync={sync}/></AdminDrawer>}
+    {drawer && campaign && <ActualDrawer campaign={campaign} initial={drawer.row} initialDay={drawer.day} pending={pending} onClose={() => setDrawer(null)} onSave={values => post({ action: 'actual', campaign_id: campaign.id, values }, '일별 실측값을 저장했습니다.')}/>}
+    {settingsOpen && campaign && <AdminDrawer title="캠페인 설정" size="large" className="tracking-settings-drawer" onClose={closeSettings}><CampaignSettings key={JSON.stringify(campaign) + ':' + listVersion} campaign={campaign} cohorts={cohorts} canManage={list.canManage} pending={pending} syncing={syncing} onDirty={setDirty} onSave={values => post({ action: 'campaign', campaign_id: campaign.id, expected_updated_at: campaign.updated_at, values }, '캠페인 설정을 저장했습니다.', true)} onSync={sync}/></AdminDrawer>}
+    {newCampaign && <AdminDrawer title="새 기수 캠페인" size="large" onClose={() => navigate(() => setNewCampaign(null))}><label className="admin-field">무료클래스<select className="admin-select" value={newCampaign.landing_id} disabled={pending} onChange={event => setNewCampaign(value => value && ({ ...value, landing_id: event.target.value }))}>{courses.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label><CampaignSettings campaign={newCampaign} cohorts={cohorts} creating canManage={list.canManage} pending={pending} syncing={false} onDirty={setDirty} onSave={values => post({ action: 'create_campaign', campaign_id: newCampaign.id, landing_id: newCampaign.landing_id, values }, '새 기수 캠페인을 만들었습니다.', true)} onSync={async () => false}/></AdminDrawer>}
     {navigation && (
       <DiscardConfirmation message="변경한 캠페인 설정을 저장하지 않고 이동할까요?" onCancel={() => setNavigation(null)} onDiscard={() => { const proceed = navigation.proceed; setNavigation(null); setDirty(false); proceed(); }}/>
     )}

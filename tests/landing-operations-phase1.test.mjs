@@ -46,14 +46,14 @@ test('funnel snapshots respect end date and payment flow respects both inclusive
     { day: '2026-09-10', kakao_members: 80, new_payments: 9, existing_payments: 1 },
     { day: '2026-09-15', kakao_members: null, new_payments: 2, existing_payments: 1 },
   ];
-  assert.deepEqual(periodActuals(rows, '2026-09-15', '2026-09-15'), { kakao_members: null, kakao_delta: null, kakao_day: null, baseline_day: '2026-09-14', payments: 3 });
+  assert.deepEqual(periodActuals(rows, '2026-09-15', '2026-09-15'), { kakao_members: null, kakao_delta: null, kakao_day: null, baseline_day: '2026-09-14', baseline_members: null, payments: 3 });
   assert.equal(periodActuals(rows, '2026-09-10', '2026-09-15').payments, 13);
-  assert.deepEqual(periodActuals([], '2026-09-15', '2026-09-15'), { kakao_members: null, kakao_delta: null, kakao_day: null, baseline_day: '2026-09-14', payments: null });
+  assert.deepEqual(periodActuals([], '2026-09-15', '2026-09-15'), { kakao_members: null, kakao_delta: null, kakao_day: null, baseline_day: '2026-09-14', baseline_members: null, payments: null });
   assert.equal(periodActuals([{ day: '2026-09-15', kakao_members: 0, new_payments: 0, existing_payments: null }], '2026-09-15', '2026-09-15').payments, 0);
   assert.deepEqual(periodActuals([
     { day: '2026-09-14', kakao_members: 100, new_payments: null, existing_payments: null },
     { day: '2026-09-15', kakao_members: 128, new_payments: null, existing_payments: null },
-  ], '2026-09-15', '2026-09-15'), { kakao_members: 128, kakao_delta: 28, kakao_day: '2026-09-15', baseline_day: '2026-09-14', payments: null });
+  ], '2026-09-15', '2026-09-15'), { kakao_members: 128, kakao_delta: 28, kakao_day: '2026-09-15', baseline_day: '2026-09-14', baseline_members: 100, payments: null });
 });
 test('funnel rates distinguish measured zero, no data, zero denominator and snapshot ratios above 100%', () => {
   assert.equal(funnelRate(0, 10), 0); assert.equal(funnelRate(1, 0), null);
@@ -67,7 +67,7 @@ const report = {
   performance: [row], daily: [], actuals: [], options: {}, range: { startDay: '2026-09-15', endDay: '2026-09-15' },
   data_state: { sessions_exist: true, meta_exists: false },
   campaign_summary: { new_payments: 31, existing_payments: 7, revenue: 100, roas: null, spend: 0 },
-  ui: { errors: {}, last_collected_at: null, actual_presence: { new_payments: true, existing_payments: true }, period_actuals: { kakao_members: 128, kakao_delta: 28, kakao_day: '2026-09-15', baseline_day: '2026-09-14', payments: 3 } },
+  ui: { errors: {}, last_collected_at: null, actual_presence: { new_payments: true, existing_payments: true }, period_actuals: { kakao_members: 128, kakao_delta: 28, kakao_day: '2026-09-15', baseline_day: '2026-09-14', baseline_members: 100, payments: 3 } },
 };
 test('funnel renders ordered session-based quantities, separate cumulative data, and hides unattributed conversion under filters', () => {
   const { PerformanceDashboard } = load('app/ui/landing/performance-dashboard.tsx');
