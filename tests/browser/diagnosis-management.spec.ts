@@ -5,6 +5,13 @@ const data={enabled:true,allPublished:false,revision:0,eligibleCount:103,started
 test.beforeEach(async({page})=>{
  await page.route('**/api/platform?**',route=>route.fulfill({json:{user:{id:id(99),full_name:'합성 관리자',role:'admin'},data:{admin_summary:[{pendingReviews:0,openQuestions:0}]}}}));
 });
+test('switching from a cohort to a member clears the previous cohort scope without a remount from the router',async({page})=>{
+ const cohort=id(104),reads:URL[]=[];
+ await page.route('**/api/admin/diagnosis**',r=>{const url=new URL(r.request().url());reads.push(url);const member=url.searchParams.has('member'),scoped=url.searchParams.has('cohort');return r.fulfill({json:{...data,cohorts:[{id:cohort,name:'4기',code:'MOONSHOT_004',courseTitle:'AI 문샷',enabled:false,inherited:true}],cohort:scoped?{id:cohort,name:'4기',enabled:false,inherited:true,individualCount:0}:null,rows:member?[data.rows[0]]:data.rows}});});
+ await page.goto('/diagnosis-test?manage&switch-member');await page.getByLabel('공개 대상 기수').selectOption(cohort);await expect(page.getByRole('heading',{name:'4기 진단 공개',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'합성 회원 바로가기',exact:true}).click();await expect.poll(()=>reads.at(-1)?.searchParams.get('member')).toBe(id(1));expect(reads.at(-1)?.searchParams.has('cohort')).toBe(false);
+ await expect(page.getByRole('row',{name:/학생 A/})).toBeVisible();await expect(page.getByRole('row',{name:/학생 B/})).toHaveCount(0);await expect(page.getByLabel('공개 대상 기수')).toHaveCount(0);await expect(page.getByText('선택 기수 기준',{exact:false})).toHaveCount(0);
+});
 test('cohort selection scopes counts and pages, confirms exact cohort, preserves request on retry and disables stale writes',async({page},info)=>{
  const four=id(104),five=id(105),writes:Record<string,unknown>[]=[],reads:URL[]=[];let revision=0,lost=true,broken=false,published=false;
  const cohorts=[{id:four,name:'4기',code:'MOONSHOT_004',courseTitle:'AI 문샷 챌린지',enabled:false,inherited:true},{id:five,name:'5기',code:'MOONSHOT_005',courseTitle:'AI 문샷 챌린지',enabled:false,inherited:true}];

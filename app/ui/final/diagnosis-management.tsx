@@ -12,6 +12,9 @@ const date=(v:string|null|undefined)=>v?new Date(v).toLocaleString('ko-KR',{time
 const reportLabels:Record<string,string>={not_submitted:'검사 진행 중',queued:'발급 대기',processing:'보고서 작성 중',ready:'발급 완료',needs_review:'확인 필요',access_denied:'이용 권한 확인 필요'};
 const errorLabels:Record<string,string>={COMPLETION_REVIEW_REQUIRED:'최종 내용 검토를 통과하지 못해 발급을 보류했습니다.',JOB_DEADLINE_REACHED:'처리 시간이 초과되었습니다.',PROVIDER_RECONCILIATION_REQUIRED:'AI 요청의 처리·비용 확인이 필요합니다.',ANSWERS_REQUIRE_REVIEW:'제출한 답변의 확인이 필요합니다.',ISSUED_ARTIFACT_REQUIRES_REVIEW:'발급 파일의 확인이 필요합니다.',ADMIN_RETRY_REQUESTED:'관리자가 저장된 답변으로 재발급을 요청했습니다.',PROVIDER_RATE_LIMIT:'AI 공급자 처리 한도에 도달했습니다.'};
 export function DiagnosisManagement({member}:{member?:string}={}){
+  return <DiagnosisManagementScope key={member??'all'} member={member}/>;
+}
+function DiagnosisManagementScope({member}:{member?:string}){
   const [data,setData]=useState<DiagnosisAdminList|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(''),[notice,setNotice]=useState('');
   const [search,setSearch]=useState(''),[query,setQuery]=useState(''),[cursors,setCursors]=useState<(string|null)[]>([null]);
   const [cohort,setCohort]=useState('');
