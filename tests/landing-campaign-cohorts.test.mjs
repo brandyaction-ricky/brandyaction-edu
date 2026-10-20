@@ -46,6 +46,8 @@ test('campaign SQL: atomic creation, permissions, overlap, stale edits, cohort i
  grant select on all tables in schema public to service_role;grant usage,select on all sequences in schema public to service_role;`);
  const align=fs.readFileSync('supabase/migrations/20260929150200_free_class_marketing_dashboard_alignment.sql','utf8');await db.exec(align.slice(align.indexOf('create or replace function public.edu_decode_landing_utm_once'),align.indexOf('create or replace function public.edu_store_campaign_meta')));
  await db.exec(fs.readFileSync('supabase/migrations/20261015112712_edu_marketing_approved_cohort_links.sql','utf8'));await db.exec(migration);
+ await db.exec('alter function public.edu_marketing_export(uuid,date,date,text[],text[],text[],text[],text[],integer[]) rename to edu_marketing_export_reference');
+ await db.exec(fs.readFileSync('supabase/migrations/20261020055100_edu_marketing_export_decode_once.sql','utf8'));
  const admin=uuid(),staff=uuid(),student=uuid(),free=uuid(),paid=uuid(),cohort=uuid(),c4=uuid(),c5=uuid();
  for(const [id,role] of [[admin,'admin'],[staff,'staff'],[student,'student']])await db.query("insert into profiles values($1,$2,'active',null)",[id,role]);
  await db.query("insert into courses values($1,'무료강의','free',null),($2,'문샷','paid_class',null)",[free,paid]);await db.query('insert into landing_configs values($1)',[free]);await db.query("insert into cohorts values($1,$2,'MOONSHOT_004')",[cohort,paid]);await db.exec(`insert into site_settings values('edu_meta_marketing','{"adAccountId":"act_245402678098216"}')`);
@@ -75,6 +77,19 @@ test('campaign SQL: atomic creation, permissions, overlap, stale edits, cohort i
  await db.query("insert into funnel_sessions values($1,$2,$3,'2026-10-20T02:00Z','2026-10-20T02:00Z','{}',1,1,70,1000,'{}')",[uuid(),free,uuid()]);
  await db.exec('set role service_role');
  const dash=async(id,from,to)=>(await db.query('select edu_marketing_dashboard($1,$2,$3) v',[id,from,to])).rows[0].v;
+ // Legacy encoded and normalized session values must keep identical export rows,
+ // classification, filters and ordering after decoding is materialized once.
+ await db.exec('reset role');
+ for(const attribution of [{utm_campaign:encodeURIComponent('광고 4기'),utm_term:encodeURIComponent('한글 세트'),utm_content:encodeURIComponent('소재_01'),device:'mobile'},{utm_campaign:encodeURIComponent('다른 원본'),utm_campaign_normalized:'광고 4기',utm_term_normalized:'한글 세트',utm_content_normalized:'소재_01',device:'desktop'}])
+  await db.query("insert into funnel_sessions values($1,$2,$3,'2026-09-20T02:00Z','2026-09-20T02:00Z',$4,1,1,70,1000,'{}')",[uuid(),free,uuid(),attribution]);
+ await db.query("insert into landing_campaign_dimensions(campaign_id,adset_key,creative_key,ad_type) values($1,'한글 세트','소재_01','cold')",[c4]);
+ await db.exec('set role service_role');
+ for(const filters of [[null,null,null,null,null,null],[['광고 4기'],['cold'],['한글 세트'],['소재_01'],null,null],[null,null,null,null,['mobile'],[1]],[['없음'],null,null,null,null,null]]) {
+  const args=[c4,'2026-09-14','2026-09-28',...filters];
+  const reference=(await db.query('select edu_marketing_export_reference($1,$2,$3,$4,$5,$6,$7,$8,$9) v',args)).rows[0].v;
+  const optimized=(await db.query('select edu_marketing_export($1,$2,$3,$4,$5,$6,$7,$8,$9) v',args)).rows[0].v;
+  assert.deepEqual(optimized,reference);
+ }
  const four=await dash(c4,'2026-09-14','2026-09-28');assert.equal(four.campaign_summary.spend,0);assert.equal(four.ui.period_actuals.kakao_delta,4845);
  const five=await dash(c5,'2026-10-20','2026-11-05');assert.equal(five.summary_b.spend,358189);assert.equal(five.performance.find(r=>r.creative==='J_Img_01').landing_page_views,696);assert.equal(five.performance.find(r=>r.creative==='').sessions,1);
  const exported=(await db.query("select edu_marketing_export($1,'2026-10-20','2026-11-05') v",[c5])).rows[0].v;assert.equal(exported.find(r=>r.creative==='J_Img_01').landing_page_views,696);
