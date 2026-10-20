@@ -2,8 +2,9 @@ import type { MemberPaymentContact } from './member-directory';
 import { DiagnosisBridgeError } from './diagnosis-bridge';
 import { validAdminDiagnosisBinding, validateAdminReportRows, validateAdminRetry, type AdminDiagnosisBinding, type AdminReportStatus } from './diagnosis-admin-bridge';
 
-export type DiagnosisAdminRow = {id:string; name:string; email?:string|null; phone?:string|null; paymentContacts?:MemberPaymentContact[]; published:boolean; attemptId:string|null; state:string; startedAt:string|null; updatedAt:string|null; report:(AdminReportStatus & {checkedAt:string})|null; statusAvailable:boolean};
-export type DiagnosisAdminList = {enabled:boolean; allPublished:boolean; revision:number; eligibleCount:number; startedCount:number; nextCursor:string|null; rows:DiagnosisAdminRow[]; remoteAvailable:boolean};
+export type DiagnosisAdminRow = {id:string; name:string; email?:string|null; phone?:string|null; paymentContacts?:MemberPaymentContact[]; published:boolean; override?:boolean|null; attemptId:string|null; state:string; startedAt:string|null; updatedAt:string|null; report:(AdminReportStatus & {checkedAt:string})|null; statusAvailable:boolean};
+export type DiagnosisCohort = {id:string;name:string;code:string;courseTitle:string;enabled:boolean;inherited:boolean};
+export type DiagnosisAdminList = {enabled:boolean; allPublished:boolean; revision:number; eligibleCount:number; startedCount:number; nextCursor:string|null; rows:DiagnosisAdminRow[]; remoteAvailable:boolean;cohorts?:DiagnosisCohort[];cohort?:{id:string;name:string;enabled:boolean;inherited:boolean;individualCount:number}|null};
 type InternalRow = DiagnosisAdminRow & {binding: AdminDiagnosisBinding|null};
 type Dependencies = {actor:{id:string};rpc:(name:string,args:Record<string,unknown>)=>PromiseLike<{data:unknown;error:unknown}>;send:(input:Record<string,unknown>)=>Promise<unknown>;now?:()=>number};
 export async function runDiagnosisAdmin(deps:Dependencies,input:Record<string,unknown>) {
@@ -14,8 +15,9 @@ export async function runDiagnosisAdmin(deps:Dependencies,input:Record<string,un
     return result.data;
   };
   if(input.action==='list'){
-    const data=await call(input.member?'edu_diagnosis_admin_member':'edu_diagnosis_admin_list',input.member?{p_member:input.member}:{p_before:input.before??null,p_query:input.query??'',p_limit:100}) as Omit<DiagnosisAdminList,'rows'> & {rows:InternalRow[]};
+    const data=await call(input.member?'edu_diagnosis_admin_member':input.cohort?'edu_diagnosis_admin_scoped_list':'edu_diagnosis_admin_list',input.member?{p_member:input.member}:{...(input.cohort?{p_cohort:input.cohort}:{}),p_before:input.before??null,p_query:input.query??'',p_limit:100}) as Omit<DiagnosisAdminList,'rows'> & {rows:InternalRow[]};
     if(!data||!Array.isArray(data.rows)||data.rows.length>100)throw new DiagnosisBridgeError('UNAVAILABLE',503);
+    if(input.cohort&&data.cohort?.id!==input.cohort)throw new DiagnosisBridgeError('UNAVAILABLE',503);
     const bindings=data.rows.map(r=>r.binding).filter((b):b is AdminDiagnosisBinding=>validAdminDiagnosisBinding(b));
     const checkedAt=new Date(now()).toISOString();let remoteAvailable=true;
     let reports=new Map<string,AdminReportStatus>();
@@ -27,13 +29,14 @@ export async function runDiagnosisAdmin(deps:Dependencies,input:Record<string,un
     }
     // A role change during the remote read must not expose the earlier list.
     await call('edu_diagnosis_assert_admin',{});
-    return {enabled:data.enabled,allPublished:data.allPublished,revision:data.revision,eligibleCount:data.eligibleCount,startedCount:data.startedCount,nextCursor:data.nextCursor,remoteAvailable,
+    return {enabled:data.enabled,allPublished:data.allPublished,revision:data.revision,eligibleCount:data.eligibleCount,startedCount:data.startedCount,nextCursor:data.nextCursor,remoteAvailable,cohorts:data.cohorts,cohort:data.cohort,
       rows:data.rows.map(r=>{const fresh=r.attemptId?reports.get(r.attemptId):undefined;
         const prior=r.report;
-        return {id:r.id,name:r.name,email:r.email,phone:r.phone,paymentContacts:r.paymentContacts,published:r.published,attemptId:r.attemptId,state:r.state,startedAt:r.startedAt,updatedAt:r.updatedAt,
+        return {id:r.id,name:r.name,email:r.email,phone:r.phone,paymentContacts:r.paymentContacts,published:r.published,override:r.override,attemptId:r.attemptId,state:r.state,startedAt:r.startedAt,updatedAt:r.updatedAt,
           statusAvailable:!r.binding||remoteAvailable,
           report:fresh?{queuePosition:fresh.queuePosition,queuedAt:fresh.queuedAt,queueObservedAt:fresh.queueObservedAt,retryMode:fresh.retryMode,rewritesRemaining:fresh.rewritesRemaining,startedAt:fresh.startedAt,submittedAt:fresh.submittedAt,issuedAt:fresh.issuedAt,state:fresh.state,updatedAt:fresh.updatedAt,errorCode:fresh.errorCode,canRetry:fresh.canRetry,version:fresh.version,details:fresh.details,checkedAt}:prior?{...prior,canRetry:false}:null};})} satisfies DiagnosisAdminList;
   }
+  if(input.action==='publish_cohort')return call('edu_diagnosis_admin_cohort_publication',{p_request:input.requestId,p_cohort:input.cohortId,p_enabled:input.enabled,p_revision:input.revision});
   if(input.action==='publish_all'||input.action==='publish_member')return call('edu_diagnosis_admin_publication',{p_request:input.requestId,p_action:input.action,p_user:input.userId??null,p_enabled:input.enabled,p_revision:input.revision});
   if(input.action!=='retry')throw new DiagnosisBridgeError('INVALID',400);
   const args={p_request:input.requestId,p_attempt:input.attemptId,p_expected:input.expectedVersion};
