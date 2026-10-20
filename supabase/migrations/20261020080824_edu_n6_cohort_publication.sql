@@ -85,8 +85,9 @@ begin
  on conflict(user_id) do update set enabled=excluded.enabled,updated_by=excluded.updated_by,updated_at=now();
  else
  update public.edu_diagnosis_control set learners_published=p_enabled where singleton;
- update public.edu_diagnosis_publication_overrides set enabled=p_enabled,updated_by=p_actor,updated_at=now();
- update public.edu_diagnosis_cohort_publication set enabled=p_enabled,updated_by=p_actor,updated_at=now();
+ -- Preserve the existing safeupdate protection while retaining explicit bulk semantics.
+ update public.edu_diagnosis_publication_overrides set enabled=p_enabled,updated_by=p_actor,updated_at=now() where user_id is not null;
+ update public.edu_diagnosis_cohort_publication set enabled=p_enabled,updated_by=p_actor,updated_at=now() where cohort_id is not null;
  end if;
  update public.edu_diagnosis_control set publication_revision=publication_revision+1 where singleton returning * into c;
  v:=jsonb_build_object('revision',c.publication_revision,'allPublished',c.learners_published,'userId',p_user,'enabled',p_enabled);

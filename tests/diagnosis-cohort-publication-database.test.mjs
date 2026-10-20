@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {PGlite} from '@electric-sql/pglite';
 const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
+test('explicit global publication retains safeupdate predicates on both non-null primary keys',()=>{
+ const sql=readFileSync(new URL('../supabase/migrations/20261020080824_edu_n6_cohort_publication.sql',import.meta.url),'utf8');
+ for(const [table,key]of [['edu_diagnosis_publication_overrides','user_id'],['edu_diagnosis_cohort_publication','cohort_id']])assert.match(sql,new RegExp(`update public\\.${table} set [^;]+ where ${key} is not null;`));
+});
 test('cohort publication persists for later members, isolates cohorts, keeps personal overrides and started attempts, fences writes and permissions',async t=>{
  const db=new PGlite();t.after(()=>db.close());
  await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;
