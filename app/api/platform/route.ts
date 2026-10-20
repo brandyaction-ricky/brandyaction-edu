@@ -404,7 +404,7 @@ export async function GET(request: Request) {
             if (orderIds.length) {
                 const [items, payments] = await Promise.all([
                     db.from('order_items').select(adminSelectColumns(sectionKey, 'order_items')).in('order_id', orderIds),
-                    db.from('payments').select('id,order_id,method,status,approved_amount,cancelled_amount,receipt_url,approved_at,created_at').in('order_id', orderIds),
+                    db.from('payments').select('id,order_id,method,status,approved_amount,cancelled_amount,receipt_url,approved_at,created_at,card_approval_number:provider_payload->card->>approveNo').in('order_id', orderIds),
                 ]);
                 if (items.error) throw items.error;
                 if (payments.error) throw payments.error;
