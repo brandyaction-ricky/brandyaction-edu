@@ -75,13 +75,14 @@ test('operator checks reuse the already verified request user and preserve denie
 });
 
 function apiHarness(user, failure = null, fixtures = {}, staffPermissions = {}, rpcResult = { data: { archived: true }, error: null }) {
-  const calls = { auth: 0, summaries: 0, tables: [], filters: [], rpcs: [] };
+  const calls = { auth: 0, summaries: 0, tables: [], filters: [], rpcs: [], selects: [] };
   const db = {
     from(table) {
       calls.tables.push(table);
       let rows = table === 'site_settings' ? { value: staffPermissions } : fixtures[table] || [];
       const query = new Proxy({}, { get: (_, key) => {
         if (key === 'then') return resolve => Promise.resolve({ data: rows, error: null, count: 3 }).then(resolve);
+        if (key === 'select') return columns => { calls.selects.push([table, columns]); return query; };
         if (key === 'eq') return (field, value) => { calls.filters.push([table, 'eq', field, value]); if (Array.isArray(rows)) rows = rows.filter(row => row[field] === value); return query; };
         if (key === 'in') return (field, values) => { calls.filters.push([table, 'in', field, values]); if (Array.isArray(rows)) rows = rows.filter(row => values.includes(row[field])); return query; };
         return () => query;
@@ -157,6 +158,25 @@ test('order revenue summary covers every order page and keeps the navigation bad
   assert.equal(third.data.admin_summary[0].pendingReviews, 3);
   assert.equal(third.data.admin_summary[0].openQuestions, 3);
   assert.equal(api.calls.summaries, 2);
+});
+
+test('order payment reads select only the nested card approval number within the visible order scope', async () => {
+  const api = apiHarness(admin, null, {
+    orders: [{ id: 'visible-order', status: 'paid' }],
+    payments: [{ id: 'payment', order_id: 'visible-order', status: 'done', card_approval_number: '00123456' }],
+  });
+  const response = await api.read('orders');
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).data.payments[0].card_approval_number, '00123456');
+  const paymentSelect = api.calls.selects.find(([table]) => table === 'payments')[1];
+  assert.ok(paymentSelect.split(',').includes('card_approval_number:provider_payload->card->>approveNo'));
+  assert.ok(!paymentSelect.split(',').some(column => column === '*' || column === 'provider_payload' || column === 'provider_payment_key'));
+  assert.ok(api.calls.filters.some(filter => JSON.stringify(filter) === JSON.stringify(['payments', 'in', 'order_id', ['visible-order']])));
+  for (const user of [null, { ...admin, role: 'member' }, { ...admin, role: 'staff' }]) {
+    const denied = apiHarness(user);
+    assert.notEqual((await denied.read('orders')).status, 200);
+    assert.ok(!denied.calls.tables.includes('payments'));
+  }
 });
 
 test('product curriculum tab loads on demand behind product permission', async () => {
