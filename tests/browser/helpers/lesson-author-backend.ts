@@ -4,8 +4,9 @@ import type {AuthorPayload,AuthorSnapshot} from '../../../lib/lesson-author-draf
 export const id=(n:number)=>`aaaaaaab-1111-4111-8111-${String(n).padStart(12,'0')}`;
 export const payload=():AuthorPayload=>({form:{basic:{week_id:id(5),day_number:'1',title:'공개된 수업',description:'',duration_label:'10분',is_published:true,is_preview:false},format:'text',bodyText:'원래 본문',videoUrl:'',externalUrl:'',resourceName:'',resourcePath:''},blocks:{active:true,document:{schemaVersion:1,blocks:[{id:'original',type:'text',content:'학생이 보는 원래 본문'}],checklist:[]}}});
 const jsonb=(value:unknown)=>JSON.parse(JSON.stringify(value,(_key,item)=>item && !Array.isArray(item) && typeof item==='object' ? Object.fromEntries(Object.entries(item).sort(([a],[b])=>b.localeCompare(a))) : item));
-export async function backend(page:Page){
- let state:AuthorSnapshot & {public:{payload:AuthorPayload}}={lessonId:id(4),revision:null,publishedRevision:null,publishedStamp:null,baseStamp:'a'.repeat(32),payload:payload(),public:{stamp:'a'.repeat(32),payload:payload(),blockRevision:id(70)},history:[]};
+export async function backend(page:Page,{lessonId=id(4),day=1}:{lessonId?:string;day?:number}={}){
+ const initial=payload();initial.form.basic.day_number=String(day);
+ let state:AuthorSnapshot & {public:{payload:AuthorPayload}}={lessonId,revision:null,publishedRevision:null,publishedStamp:null,baseStamp:'a'.repeat(32),payload:structuredClone(initial),public:{stamp:'a'.repeat(32),payload:structuredClone(initial),blockRevision:id(70)},history:[]};
  const versions=new Map<string,AuthorPayload>([[id(71),payload()]]), writes:Record<string,unknown>[]=[];let failSave=0,failPublish=0,hold:Promise<void>|null=null;
  const handler=async (route:Route)=>{
   if(route.request().method()==='GET'&&new URL(route.request().url()).searchParams.get('history')==='1'){
