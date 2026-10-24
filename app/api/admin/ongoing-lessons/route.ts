@@ -37,7 +37,9 @@ export async function GET(request: Request) {
     if (q.get('metadata') === '1') return reply({ id: file.id, name: file.name, kind: file.kind, size: file.size });
     const signed = await db.storage.from(file.bucket).createSignedUrl(file.path, 60, { download: file.kind === 'file' || q.get('download') === '1' ? file.name : false });
     if (signed.error) throw signed.error;
-    return new Response(null, { status: 303, headers: { ...headers, Location: signed.data.signedUrl } });
+    const location = new URL(signed.data.signedUrl);
+    if (file.kind === 'file' || q.get('download') === '1') location.searchParams.set('download', file.name);
+    return new Response(null, { status: 303, headers: { ...headers, Location: location.href } });
   } catch (error) {
     const e = error as { message?: string; status?: number };
     if (e.status && e.status < 500) return reply({ error: e.message }, e.status);
