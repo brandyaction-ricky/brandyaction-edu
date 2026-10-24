@@ -74,4 +74,4 @@
 
 .lb-download{display:flex;align-items:center;gap:14px;padding:16px;border:1px solid #e2e5e9;border-radius:12px;background:#fafbfc;margin:12px 0;min-width:0;color:#222}
 .lb-download-info{flex:1;min-width:0}.lb-download-info strong{display:block;overflow-wrap:anywhere}.lb-download-info small{display:block;color:#69727d}.lb-download-info p{margin:4px 0;white-space:pre-wrap;overflow-wrap:anywhere}.lb-download>.btn{flex-shrink:0;display:inline-flex;gap:6px;align-items:center}
-@media(max-width:480px){.lb-download{flex-wrap:wrap}.lb-download>.btn{margin-left:auto}}
+@media(max-width:480px){.lb-download{flex-wrap:wrap;align-items:flex-start}.lb-download>svg{flex-shrink:0}.lb-download-info{flex:1 1 calc(100% - 40px)}.lb-download>.btn{margin-left:auto}}
