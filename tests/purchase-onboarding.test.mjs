@@ -38,3 +38,15 @@ test('only Moonshot fourth cohort uses the direct Telegram guidance', () => {
   assert.equal(TELEGRAM_IOS_INSTALL_URL, 'https://telegram.org/dl/ios');
   assert.equal(TELEGRAM_ANDROID_INSTALL_URL, 'https://telegram.org/dl/android');
 });
+
+ test('OT acknowledgement settings reject impossible dates and cross-format lesson identifiers', () => {
+  for (const orientationAt of ['2026-02-30T20:00:00+09:00','yesterday','2026-11-06T20:00:00Z']) assert.throws(() => purchaseOnboardingSettings({roomName:'안내',orientationAt}),/OT/);
+  assert.throws(() => purchaseOnboardingSettings({roomName:'안내',firstLessonId:'/learn/other'}),/첫 학습/);
+  assert.throws(() => purchaseOnboardingSettings({roomName:'안내',enabled:true,checklistEnabled:true,inviteUrl:'https://t.me/+ExampleCode123'}),/OT 일정/);
+  assert.equal(purchaseOnboardingSettings({roomName:'안내',orientationAt:'2026-11-06T20:00:00+09:00'}).orientationAt,'2026-11-06T20:00:00+09:00');
+ });
+
+test('OT can have a real date with its time still undecided', () => {
+ assert.equal(purchaseOnboardingSettings({roomName:'5기',orientationAt:'2026-11-09'}).orientationAt,'2026-11-09');
+ assert.throws(()=>purchaseOnboardingSettings({roomName:'5기',orientationAt:'2026-02-30'}),/OT/);
+});

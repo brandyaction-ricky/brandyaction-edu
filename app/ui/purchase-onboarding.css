@@ -75,3 +75,14 @@
   .purchase-onboarding-user .onboarding-header-link{display:none}
   .purchase-onboarding-user .onboarding-install-actions{grid-template-columns:1fr}
 }
+
+.onboarding-four-steps{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+.onboarding-four-steps li{padding:0!important}.onboarding-four-steps button{width:100%;min-height:76px;text-align:left;border:0;background:transparent;color:inherit;padding:16px;cursor:pointer}.onboarding-four-steps button:disabled{cursor:default}.onboarding-four-steps button:focus-visible{outline:3px solid #161b20;outline-offset:3px}
+.onboarding-schedule{background:#fff6dc;border-radius:12px;padding:24px;font-size:22px;line-height:1.6}.onboarding-schedule small{font-size:14px}
+.onboarding-comment{display:grid;gap:10px;margin-top:24px;font-weight:700}.onboarding-comment textarea{width:100%;box-sizing:border-box;padding:14px;border:1px solid #cdd1d5;border-radius:8px;font:inherit;resize:vertical;min-height:120px}
+.onboarding-learning-status{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:20px 0}.onboarding-done{background:#f0faf4!important}.onboarding-done svg{color:#28764b}.onboarding-panel .app-install{border:1px solid #dedfe2;border-radius:12px;padding:20px;margin:24px 0}
+@media(max-width:640px){.onboarding-four-steps{grid-template-columns:repeat(2,minmax(0,1fr))!important}.onboarding-four-steps button{padding:12px}.onboarding-schedule{font-size:19px;padding:18px}}
+
+.onboarding-four-steps button span,.onboarding-four-steps button strong{display:block}
+
+.onboarding-return-guide{padding:18px;border:1px solid #dfd5b9;border-radius:10px;background:#fff9e9;margin-bottom:16px}.onboarding-return-guide ol{padding-left:22px;margin:12px 0}.onboarding-return-guide li{margin:8px 0;line-height:1.65}

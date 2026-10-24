@@ -11,6 +11,8 @@ const empty: PurchaseOnboardingSettings = { roomName: '', inviteUrl: '', paidIma
 
 export function PurchaseOnboardingAdmin() {
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
+  const [lessons, setLessons] = useState<{ id: string; title: string }[]>([]);
+  const [comments, setComments] = useState<{ order_id: string; comment: string; confirmed_at: string }[]>([]);
   const [cohort, setCohort] = useState('');
   const [settings, setSettings] = useState<PurchaseOnboardingSettings>(empty);
   const [telegramOnly, setTelegramOnly] = useState(false);
@@ -26,14 +28,14 @@ export function PurchaseOnboardingAdmin() {
     }).catch(cause => setError(cause instanceof Error ? cause.message : '기수를 불러오지 못했습니다.'));
   }, []);
   const load = async (id: string) => {
-    setCohort(id); setSettings(empty); setTelegramOnly(false); setMessage(''); setError('');
+    setCohort(id); setSettings(empty); setLessons([]); setComments([]); setTelegramOnly(false); setMessage(''); setError('');
     if (!id) return;
     setPending(true);
     try {
       const response = await fetch(`/api/admin/purchase-onboarding?cohort=${encodeURIComponent(id)}`, { cache: 'no-store' });
       const result = await response.json();
       if (!response.ok) throw Error(result.error || '설정을 불러오지 못했습니다.');
-      setSettings(result.settings);
+      setSettings(result.settings); setLessons(result.lessons || []); setComments(result.comments || []);
       setTelegramOnly(result.telegramOnly === true);
     } catch (cause) { setError(cause instanceof Error ? cause.message : '설정을 불러오지 못했습니다.'); }
     finally { setPending(false); }
@@ -59,10 +61,18 @@ export function PurchaseOnboardingAdmin() {
         {!telegramOnly && <><label>광고 방 프로필 이미지<UploadField key={`${cohort}:paid`} name="광고 방 프로필 이미지" value={settings.paidImage} image disabled={pending} onChange={value => setSettings(current => ({ ...current, paidImage: value }))} onStatusChange={state => setUploading(state === 'uploading')} /></label>
         <label>오가닉 방 프로필 이미지<UploadField key={`${cohort}:organic`} name="오가닉 방 프로필 이미지" value={settings.organicImage} image disabled={pending} onChange={value => setSettings(current => ({ ...current, organicImage: value }))} onStatusChange={state => setUploading(state === 'uploading')} /></label></>}
         {telegramOnly && <p className="meta">문샷 챌린지 4기는 웹 유입 설문 없이 텔레그램 설치·가입·공지방 입장을 안내합니다.</p>}
+        <label>OT 날짜 · 한국 시간<input type="date" value={(settings.orientationAt || '').slice(0,10)} disabled={pending} onChange={event => setSettings(current => ({ ...current, orientationAt: event.target.value ? event.target.value + (current.orientationAt?.includes('T') ? current.orientationAt.slice(10) : '') : '' }))}/></label>
+        <label>OT 시간 · 미정이면 비워 두세요<input type="time" value={(settings.orientationAt || '').includes('T') ? settings.orientationAt!.slice(11,16) : ''} disabled={pending || !settings.orientationAt} onChange={event => setSettings(current => ({ ...current, orientationAt: current.orientationAt ? current.orientationAt.slice(0,10) + (event.target.value ? `T${event.target.value}:00+09:00` : '') : '' }))}/></label>
+        <p className="meta">수강생은 시청 없이 이 일정을 확인합니다. 일정이 바뀌면 다시 확인해야 합니다.</p>
+        <label>첫 학습 · 운영 가이드 및 규정<select value={settings.firstLessonId || ''} disabled={pending} onChange={event => setSettings(current => ({ ...current, firstLessonId: event.target.value }))}><option value="">학습 선택</option>{lessons.map(lesson => <option value={lesson.id} key={lesson.id}>{lesson.title}</option>)}</select></label>
+        <p className="meta">수강생이 바로 열 수 있는 첫 학습을 선택하고, 커리큘럼에서 해당 주차·학습을 이 기수에 공개해 주세요. 실제 학습 완료 후 확인 댓글을 저장합니다.</p>
+        <label className="onboarding-toggle"><input type="checkbox" checked={settings.checklistEnabled === true} disabled={pending} onChange={event => setSettings(current => ({ ...current, checklistEnabled: event.target.checked }))}/>4단계 시작 준비 사용 · 텔레그램 → 앱 설치 → OT 일정 → 첫 학습·댓글</label>
+        <p className="meta">체크한 기수에만 새 4단계 안내가 적용됩니다. 기존 기수는 유지됩니다. 켜기 전에 OT 일정과 첫 학습을 등록해 주세요.</p>
         <label className="onboarding-toggle"><input type="checkbox" checked={settings.enabled} disabled={pending} onChange={event => setSettings(current => ({ ...current, enabled: event.target.checked }))} />결제 완료 수강생에게 안내 화면 열기</label>
         {!telegramOnly && <p className="meta">알림톡은 이 체크박스로 발송되지 않습니다. 승인된 템플릿과 자동화 설정이 따로 필요합니다.</p>}
         <button className="btn primary" type="button" disabled={pending || uploading} onClick={() => void save()}>설정 저장</button>
       </div>}
+      {comments.length > 0 && <section className="onboarding-panel"><h2>첫 학습 확인 댓글 · 최근 100건</h2>{comments.map(item => <article key={item.order_id}><p className="meta">주문 {item.order_id} · {new Date(item.confirmed_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}</p><p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{item.comment}</p></article>)}</section>}
       {message && <p role="status" className="notice">{message}</p>}{error && <p role="alert" className="notice">{error}</p>}
     </section>
   </div></main>;
