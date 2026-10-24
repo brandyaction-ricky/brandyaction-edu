@@ -75,7 +75,7 @@ export async function GET(request: Request) {
     const { data: file, error } = await db.rpc('edu_read_lesson_media', { p_actor: actor.id, p_asset: id(params.get('asset')), p_lesson: params.has('lesson') ? id(params.get('lesson')) : null, p_enrollment: params.has('enrollment') ? id(params.get('enrollment')) : null, p_revision: params.has('revision') ? id(params.get('revision')) : null, p_submission: params.has('submission') ? id(params.get('submission')) : null });
     if (error) throw error;
     if (params.get('metadata') === '1') return reply({ id: file.id, name: file.name, kind: file.kind, size: file.size });
-    const signed = await db.storage.from(bucket).createSignedUrl(file.path, 300, { download: params.get('download') === '1' ? file.name : false });
+    const signed = await db.storage.from(bucket).createSignedUrl(file.path, 300, { download: file.kind === 'file' || params.get('download') === '1' ? file.name : false });
     if (signed.error) throw signed.error;
     return new Response(null, { status: 303, headers: { ...headers, Location: signed.data.signedUrl } });
   } catch (error) { return failure(error); }

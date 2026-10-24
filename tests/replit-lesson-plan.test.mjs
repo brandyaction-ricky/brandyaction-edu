@@ -11,9 +11,9 @@ import { lessonImportContract } from '../scripts/lib/lesson-import-contract.mjs'
 import { sourceFixture, imageBytes } from './fixtures/replit-import-source.mjs';
 const contract = await lessonImportContract();
 
-test('converts all 17 block types in displayed numeric order, preserves payload provenance and old answer/check identities', async () => {
+test('converts historical 17 block types in displayed numeric order, preserves payload provenance and old answer/check identities', async () => {
   const source = sourceFixture(), copy = structuredClone(source), { plan } = await prepareReplitLessonPlan(source), lesson = plan.lessons[0];
-  assert.deepEqual(source, copy); assert.deepEqual(new Set(lesson.document.blocks.map(b=>b.type)),new Set(contract.lessonBlockTypes));
+  assert.deepEqual(source, copy); assert.deepEqual(new Set(lesson.document.blocks.map(b=>b.type)),new Set(contract.lessonBlockTypes.filter(type=>type!=='file')));
   assert.equal(lesson.document.blocks[0].content, '첫 번째 제목'); assert.equal(lesson.document.blocks[1].content, source.days[0].blocks[0].content);
   assert.equal(lesson.mapping[0].sourceArrayIndex, 1); assert.equal(lesson.mapping[1].sourceArrayIndex, 0);
   assert.ok(lesson.mapping.some(m=>m.answerSourceId==='answer.old:1')); assert.equal(lesson.checklistMapping[0].sourceCheck,'check.old:1');

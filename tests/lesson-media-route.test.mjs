@@ -50,3 +50,9 @@ test('migration receipt denies anonymous/foreign authors, pending bytes, missing
   [{},`asset=${id}`,409,1], [{ready:true,sha256:null},`asset=${id}`,409,1], [{ready:true},'asset=bad',400,0],
  ]) { const h=harness(options),response=await h.get(query+'&receipt=1');assert.equal(response.status,status);assert.equal(h.calls.length,calls);assert.equal(h.storageCalls.length,0);assert.doesNotMatch(await response.text(),/sha256|private-token|storage\.test|test\.png/); }
 });
+test('download-only attachments force Content-Disposition even when download query is omitted, after authorization',async()=>{
+ const h=harness({kind:'file'}),response=await h.get(`asset=${id}&lesson=${id}&enrollment=${id}&revision=${id}`);
+ assert.equal(response.status,303);assert.equal(h.storageCalls[0].options.download,'test.png');assert.equal(h.calls[0].args.p_lesson,id);assert.equal(h.calls[0].args.p_enrollment,id);assert.equal(h.calls[0].args.p_revision,id);
+ const metadata=harness({kind:'file'}),res=await metadata.get(`asset=${id}&metadata=1`);assert.equal(res.status,200);assert.equal((await res.json()).kind,'file');assert.equal(metadata.storageCalls.length,0);
+ const denied=harness({kind:'file',dbError:{message:'BLOCK_FORBIDDEN'}});assert.equal((await denied.get(`asset=${id}&download=1`)).status,403);assert.equal(denied.storageCalls.length,0);
+});

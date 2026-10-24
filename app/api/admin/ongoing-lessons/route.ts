@@ -34,6 +34,7 @@ export async function GET(request: Request) {
     const result = await db.rpc('edu_read_ongoing_review_file', { ...args, p_file: id(q.get('file')), p_kind: kind }); if (result.error) throw result.error;
     const file = result.data;
     if (!file || !['lesson-answer-files', 'lesson-content-media'].includes(file.bucket)) throw new Error('Invalid file receipt');
+    if (q.get('metadata') === '1') return reply({ id: file.id, name: file.name, kind: file.kind, size: file.size });
     const signed = await db.storage.from(file.bucket).createSignedUrl(file.path, 60, { download: file.kind === 'file' || q.get('download') === '1' ? file.name : false });
     if (signed.error) throw signed.error;
     return new Response(null, { status: 303, headers: { ...headers, Location: signed.data.signedUrl } });

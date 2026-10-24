@@ -1,6 +1,7 @@
 "use client";
 import { lessonImageColumns } from '@/lib/lesson-image-row';
 import { lessonEmbeddedImageIds } from '@/lib/lesson-toggle-images';
+import { LessonDownload } from './lesson-download';
 import { LessonImage } from './lesson-image';
 import { LessonLinkCard } from './lesson-link-preview';
 
@@ -21,7 +22,7 @@ import './lesson-blocks.css';
 import { LessonTag } from './lesson-tag';
 
 export type BlockGrade = { correct: number; total: number; passed: boolean; results: { id: string; answered: boolean; correct: boolean }[] };
-const supported = new Set(['heading', 'subheading', 'text', 'video', 'audio', 'image', 'question', 'divider', 'link', 'prompt', 'prompt-generator', 'quiz']);
+const supported = new Set(['heading', 'subheading', 'text', 'video', 'audio', 'image', 'file', 'question', 'divider', 'link', 'prompt', 'prompt-generator', 'quiz']);
 export function canRenderLessonBlocks(document: PublicBlockDocument) {
   return document.blocks.every(block => isGuidedTool(block.type) ? hasGuidedDefinition(block) : isCalculator(block.type) ? hasCalculatorDefinition(block) : supported.has(block.type) && (block.type !== 'question' || ['text', 'image', 'file'].includes(block.question?.kind || '')));
 }
@@ -100,8 +101,8 @@ export function LessonBlockView({ document, values, onChange, readOnly = false, 
   const embeddedImages = lessonEmbeddedImageIds(document.blocks);
   const visibleBlocks = document.blocks.filter(block => !embeddedImages.has(block.id));
   const imageColumns = lessonImageColumns(visibleBlocks);
-  const images = new Map(document.blocks.filter(block => block.type === 'image').map(block => [block.id,
-    <div key={block.id} data-lesson-block={block.id}>{block.assetId
+  const images = new Map(document.blocks.filter(block => ['image', 'file'].includes(block.type)).map(block => [block.id,
+    <div key={block.id} data-lesson-block={block.id}>{block.type === 'file' ? block.assetId && <LessonDownload assetId={block.assetId} caption={block.content} context={fileContext} submissionId={submissionId} /> : block.assetId
       ? <LessonPrivateMedia assetId={block.assetId} kind="image" alt={block.alt} caption={block.content} context={fileContext} submissionId={submissionId} />
       : mediaUrl(block.url) && <figure><LessonImage src={mediaUrl(block.url)} alt={block.alt}/>{block.content && <figcaption>{block.content}</figcaption>}</figure>}</div>
   ]));
@@ -110,7 +111,8 @@ export function LessonBlockView({ document, values, onChange, readOnly = false, 
     {visibleBlocks.map(block => {
       const url = mediaUrl(block.url), value = values.blocks[block.id];
       let content;
-      if (block.assetId && ['image', 'audio', 'video'].includes(block.type)) content = <LessonPrivateMedia key={block.assetId} assetId={block.assetId} floatingAudio={floatingAudio} kind={block.type as LessonMediaKind} alt={block.alt} caption={block.content} context={fileContext} submissionId={submissionId} />;
+      if (block.type === 'file') content = block.assetId ? <LessonDownload key={block.assetId} assetId={block.assetId} caption={block.content} context={fileContext} submissionId={submissionId} /> : <p>다운로드할 파일을 첨부해 주세요.</p>;
+      else if (block.assetId && ['image', 'audio', 'video'].includes(block.type)) content = <LessonPrivateMedia key={block.assetId} assetId={block.assetId} floatingAudio={floatingAudio} kind={block.type as LessonMediaKind} alt={block.alt} caption={block.content} context={fileContext} submissionId={submissionId} />;
       else switch (block.type) {
         case 'heading': content = <h2>{block.content}</h2>; break;
         case 'subheading': content = <h3>{block.content}</h3>; break;

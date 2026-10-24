@@ -8,7 +8,7 @@ export type TextImportResult = Pick<LessonBlockDocument, 'blocks' | 'checklist'>
 export type LessonCardSource = { id: string; label: string };
 const uid = () => crypto.randomUUID();
 export const importBlockLabels: Record<LessonBlockType, string> = {
-  heading: '큰 제목', subheading: '작은 제목', text: '본문', video: '영상', audio: '음성', image: '이미지', question: '중간 질문', divider: '구분선', link: '외부 링크', prompt: '복사할 프롬프트',
+  heading: '큰 제목', subheading: '작은 제목', text: '본문', video: '영상', audio: '음성', image: '이미지', file: '파일 첨부', question: '중간 질문', divider: '구분선', link: '외부 링크', prompt: '복사할 프롬프트',
   'prompt-generator': '프롬프트 생성기', 'persona-generator': '페르소나 생성기', 'landing-planner': '랜딩페이지 기획', 'recipe-calculator': '레시피 계산기', 'margin-calculator': '마진 계산기', 'marketing-funnel': '마케팅 퍼널', quiz: '확인 문제',
 };
 export function summarizeImportBlock(block: LessonBlock) {

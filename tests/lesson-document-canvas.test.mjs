@@ -95,3 +95,15 @@ test('text colors round-trip canvas and reject injected or unsupported styles',(
   assert.deepEqual(clean.content[0].content[0].marks,[{type:'textStyle',attrs:{fontSize:'20px'}}]);
  }
 });
+test('file attachments survive toggle embedding, clipboard remapping, duplication, and moving outside',()=>{
+ const file={id:'download',type:'file',assetId:'aaaaaaaa-1111-4111-8111-111111111111',content:'수업 템플릿'};
+ const owner={id:'body',type:'text',content:serializeLessonDocument({type:'doc',content:[{type:'details',content:[{type:'detailsSummary',content:[{type:'text',text:'첨부 자료'}]},{type:'detailsContent',content:[{type:'paragraph'}]}]}]})};
+ const original=[owner,file],moved=positionLessonImage(original,file,{blockId:'body',togglePath:[0,1]},'unused');
+ assert.deepEqual(blocksFromCanvas(lessonCanvasNodes(moved)),moved);assert.deepEqual([...lessonEmbeddedImageIds(moved)],['download']);
+ assert.equal(parseLessonDocument(moved[0].content).content[0].content[1].content[1].type,'lessonFile');
+ const copied=cloneLessonCards(moved);assert.deepEqual([...lessonEmbeddedImageIds(copied)],[copied[1].id]);assert.equal(copied[1].assetId,file.assetId);
+ assert.deepEqual(positionLessonImage(moved,file,{blockId:'body',after:true},'unused'),original);
+ assert.equal(lessonEmbeddedImageIds(removeLessonImageReference(moved,'download')).size,0);
+ const onlyFile={type:'doc',content:[{type:'lessonFile',attrs:{blockId:'download',url:'https://bad.test',block:{private:1}}}]};
+ assert.deepEqual(parseLessonDocument(serializeLessonDocument(onlyFile)).content,[{type:'lessonFile',attrs:{blockId:'download'}}]);
+});

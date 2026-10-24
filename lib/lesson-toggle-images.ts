@@ -1,13 +1,13 @@
 import { parseLessonDocument, serializeLessonDocument, type LessonNode } from './lesson-body';
 import type { LessonBlock } from './lesson-blocks';
 
-// Only references are stored in rich text. Private assets remain normal image
+// Only references are stored in rich text. Private assets remain normal image/file
 // blocks so the existing authorization, snapshots and media lifecycle apply.
 export function lessonImageReferences(node: LessonNode): string[] {
-  return node.type === 'lessonImage' ? [String(node.attrs?.blockId || '')] : (node.content || []).flatMap(lessonImageReferences);
+  return ['lessonImage', 'lessonFile'].includes(node.type) ? [String(node.attrs?.blockId || '')] : (node.content || []).flatMap(lessonImageReferences);
 }
 export function lessonEmbeddedImageIds(blocks: Pick<LessonBlock, 'id' | 'type' | 'content'>[]): Set<string> {
-  const images = new Set(blocks.filter(block => block.type === 'image').map(block => block.id));
+  const images = new Set(blocks.filter(block => ['image', 'file'].includes(block.type)).map(block => block.id));
   return new Set(blocks.filter(block => block.type === 'text').flatMap(block => {
     const doc = parseLessonDocument(block.content || '');
     return doc ? lessonImageReferences(doc).filter(id => images.has(id)) : [];
@@ -32,9 +32,9 @@ export function remapLessonImages(content: string, ids: ReadonlyMap<string, stri
   const doc = parseLessonDocument(content);
   if (!doc || !lessonImageReferences(doc).length) return content;
   function visit(node: LessonNode): LessonNode {
-    if (node.type === 'lessonImage') {
+    if (['lessonImage', 'lessonFile'].includes(node.type)) {
       const blockId = ids.get(String(node.attrs?.blockId));
-      if (!blockId) throw new Error('토글 안의 이미지도 함께 선택해 주세요.');
+      if (!blockId) throw new Error(node.type === 'lessonFile' ? '토글 안의 첨부 파일도 함께 선택해 주세요.' : '토글 안의 이미지도 함께 선택해 주세요.');
       return { type: node.type, attrs: { blockId } };
     }
     return { ...node, ...(node.content ? { content: node.content.map(visit) } : {}) };
@@ -44,7 +44,7 @@ export function remapLessonImages(content: string, ids: ReadonlyMap<string, stri
 export function removeLessonImageReference(blocks: LessonBlock[], imageId: string): LessonBlock[] {
   function visit(node: LessonNode): LessonNode {
     if (!node.content) return node;
-    const content = node.content.filter(child => child.type !== 'lessonImage' || child.attrs?.blockId !== imageId).map(visit);
+    const content = node.content.filter(child => !['lessonImage', 'lessonFile'].includes(child.type) || child.attrs?.blockId !== imageId).map(visit);
     return { ...node, content: node.type === 'detailsContent' && !content.length ? [{ type: 'paragraph' }] : content };
   }
   return blocks.map(block => {
