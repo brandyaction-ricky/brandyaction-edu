@@ -182,7 +182,7 @@ export function lessonRichExtensions() {
       heading: { levels: [1, 2, 3] }, trailingNode: false, blockquote: false, code: false, codeBlock: false, horizontalRule: false,
       link: { openOnClick: false, HTMLAttributes: { target: "_blank", rel: "noopener noreferrer" }, isAllowedUri: url => Boolean(safeUrl(url)) },
     }), TextStyle, LessonFontSize, LessonColor, LessonBackgroundColor, LessonQuote, LessonDetails, DetailsSummary, LessonDetailsContent, LessonCallout, LessonInputUndo,
-    Node.create({ name: 'lessonImage', group: 'block', atom: true, addAttributes: () => ({ blockId: { default: null } }), renderHTML: () => ['div', { 'data-lesson-image-reference': '' }, '이미지 · 문서 편집 화면에서 확인'] })];
+    ...['lessonImage', 'lessonFile'].map(name => Node.create({ name, group: 'block', atom: true, addAttributes: () => ({ blockId: { default: null } }), renderHTML: () => ['div', { 'data-lesson-image-reference': '' }, name === 'lessonFile' ? '첨부 파일 · 문서 편집 화면에서 확인' : '이미지 · 문서 편집 화면에서 확인'] }))];
 }
 
 export function LessonRichInput({ value, onChange, label = "학습 내용", disabled = false, name, id, showLabel = true }: LessonBodyEditorProps) {

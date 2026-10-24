@@ -38,7 +38,7 @@ function itemAt(editor: Editor) {
   const { $from } = editor.state.selection;
   for (let depth = $from.depth; depth > 1; depth--) if ($from.node(depth).attrs.block) return { node: $from.node(depth), pos: $from.before(depth), index: $from.index(depth - 1) };
   const at = editor.state.doc.nodeAt($from.pos);
-  if (at?.type.name === 'lessonImage') return { node: at, pos: $from.pos, index: $from.index() };
+  if (at && ['lessonImage', 'lessonFile'].includes(at.type.name)) return { node: at, pos: $from.pos, index: $from.index() };
   if ($from.depth) return { node: $from.node(1), pos: $from.before(1), index: $from.index(0) };
   const node = editor.state.doc.nodeAt($from.pos);
   return node ? { node, pos: $from.pos, index: $from.index(0) } : null;
@@ -84,7 +84,7 @@ export function LessonDocumentCanvas(props: Props) {
   const editor = useEditor({
     immediatelyRender: false, shouldRerenderOnTransaction: false,
     extensions: [
-      ...lessonRichExtensions().filter(extension => !['starterKit', 'lessonImage', 'blockquote'].includes(extension.name)),
+      ...lessonRichExtensions().filter(extension => !['starterKit', 'lessonImage', 'lessonFile', 'blockquote'].includes(extension.name)),
       // Same text schema and input rules as the existing body editor, with one
       // document root for the whole lesson rather than one editor per paragraph.
       lessonRichExtensions()[0].configure({ document: false, paragraph: false, heading: false, bulletList: false, orderedList: false }),
@@ -106,9 +106,16 @@ export function LessonDocumentCanvas(props: Props) {
       }),
       Node.create({
         name: 'lessonImage', group: 'block', atom: true, draggable: true,
-        addOptions: () => ({ onSettings: (id: string) => latest.current.onSettings(id), labels: { image: '이미지' } }),
+        addOptions: () => ({ onSettings: (id: string) => latest.current.onSettings(id), labels: { image: '이미지', file: '파일 첨부' } }),
         addAttributes: () => ({ blockId: { default: null }, block: { default: null, rendered: false } }),
         renderHTML: () => ['div', { 'data-lesson-image-reference': '' }, '학습 이미지'],
+        addNodeView: () => ReactNodeViewRenderer(Activity),
+      }),
+      Node.create({
+        name: 'lessonFile', group: 'block', atom: true, draggable: true,
+        addOptions: () => ({ onSettings: (id: string) => latest.current.onSettings(id), labels: { image: '이미지', file: '파일 첨부' } }),
+        addAttributes: () => ({ blockId: { default: null }, block: { default: null, rendered: false } }),
+        renderHTML: () => ['div', { 'data-lesson-file-reference': '' }, '첨부 파일'],
         addNodeView: () => ReactNodeViewRenderer(Activity),
       }),
       // Plugin callbacks run on editor transactions, never during React render.
@@ -144,8 +151,8 @@ export function LessonDocumentCanvas(props: Props) {
             },
             filterTransaction(tr, state) {
               if (!tr.docChanged || tr.getMeta('lessonStructure') || isHistoryTransaction(tr)) return true;
-              const activityIds = new Set<string>(); tr.doc.descendants(node => { if (['lessonActivity', 'lessonImage'].includes(node.type.name)) activityIds.add(node.attrs.block?.id); });
-              let lost = false; state.doc.descendants(node => { if (['lessonActivity', 'lessonImage'].includes(node.type.name) && !activityIds.has(node.attrs.block?.id)) lost = true; });
+              const activityIds = new Set<string>(); tr.doc.descendants(node => { if (['lessonActivity', 'lessonImage', 'lessonFile'].includes(node.type.name)) activityIds.add(node.attrs.block?.id); });
+              let lost = false; state.doc.descendants(node => { if (['lessonActivity', 'lessonImage', 'lessonFile'].includes(node.type.name) && !activityIds.has(node.attrs.block?.id)) lost = true; });
               if (lost) queueMicrotask(() => setMessage('질문·자료가 포함된 영역입니다. 해당 항목을 선택한 뒤 ‘항목 삭제’를 사용해 주세요.'));
               return !lost;
             },
@@ -153,11 +160,11 @@ export function LessonDocumentCanvas(props: Props) {
               if (!transactions.some(tr => tr.docChanged)) return null;
               const tr = state.tr, ids = new Set<string>();
               state.doc.descendants((node, pos) => {
-                if (!['lessonText', 'lessonActivity', 'lessonImage'].includes(node.type.name)) return;
+                if (!['lessonText', 'lessonActivity', 'lessonImage', 'lessonFile'].includes(node.type.name)) return;
                 const block = node.attrs.block as LessonBlock | null;
                 if (!block || ids.has(block.id)) {
                   const next = block ? duplicateLessonBlock(block, () => crypto.randomUUID()) : latest.current.create('text');
-                  tr.setNodeMarkup(pos, undefined, { ...node.attrs, block: next, ...(node.type.name === 'lessonImage' ? { blockId: next.id } : {}) }); ids.add(next.id);
+                  tr.setNodeMarkup(pos, undefined, { ...node.attrs, block: next, ...(['lessonImage', 'lessonFile'].includes(node.type.name) ? { blockId: next.id } : {}) }); ids.add(next.id);
                 } else ids.add(block.id);
               });
               return tr.docChanged ? tr : null;
@@ -260,11 +267,11 @@ export function LessonDocumentCanvas(props: Props) {
     const block = props.create(type), newNode = editor.schema.nodeFromJSON(lessonCanvasNodes([block])[0]);
     const tr = editor.state.tr.setMeta('lessonStructure', true);
     let focus = 0;
-    const inside = type === 'image' && imagePosition($pos).togglePath;
+    const inside = ['image', 'file'].includes(type) && imagePosition($pos).togglePath;
     if (inside) {
       for (let depth = $pos.depth; depth > 1; depth--) if ($pos.node(depth).type.name === 'detailsContent') {
         const at = $pos.depth > depth ? $pos.after(depth + 1) : $pos.pos;
-        tr.insert(at, editor.schema.nodes.lessonImage.create({ blockId: block.id, block }));
+        tr.insert(at, editor.schema.nodes[type === 'file' ? 'lessonFile' : 'lessonImage'].create({ blockId: block.id, block }));
         editor.view.dispatch(tr); props.onSettings(block.id); setMenu(false); insertRange.current = null; return;
       }
     }
@@ -304,7 +311,7 @@ export function LessonDocumentCanvas(props: Props) {
       if (nodes.length >= 1000) return;
       function copyNode(node: CanvasNode): CanvasNode {
         const copy = structuredClone(node);
-        if (copy.attrs?.block) { const block = duplicateLessonBlock(copy.attrs.block, () => crypto.randomUUID()); copy.attrs = { ...copy.attrs, block, ...(copy.type === 'lessonImage' ? { blockId: block.id } : {}) }; }
+        if (copy.attrs?.block) { const block = duplicateLessonBlock(copy.attrs.block, () => crypto.randomUUID()); copy.attrs = { ...copy.attrs, block, ...(['lessonImage', 'lessonFile'].includes(copy.type) ? { blockId: block.id } : {}) }; }
         if (copy.content) copy.content = copy.content.map(copyNode);
         return copy;
       }

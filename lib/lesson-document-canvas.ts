@@ -23,9 +23,9 @@ export function canvasTextContent(block: LessonBlock): LessonNode[] {
 }
 
 export function lessonCanvasNodes(blocks: LessonBlock[]): CanvasNode[] {
-  const embedded = lessonEmbeddedImageIds(blocks), images = new Map(blocks.filter(block => block.type === 'image').map(block => [block.id, block]));
+  const embedded = lessonEmbeddedImageIds(blocks), images = new Map(blocks.filter(block => ['image', 'file'].includes(block.type)).map(block => [block.id, block]));
   function hydrate(node: LessonNode): CanvasNode {
-    if (node.type === 'lessonImage') return { type: node.type, attrs: { blockId: node.attrs?.blockId, block: images.get(String(node.attrs?.blockId)) || null } };
+    if (['lessonImage', 'lessonFile'].includes(node.type)) return { type: node.type, attrs: { blockId: node.attrs?.blockId, block: images.get(String(node.attrs?.blockId)) || null } };
     return { ...node, ...(node.content ? { content: node.content.map(hydrate) } : {}) };
   }
   return blocks.filter(block => !embedded.has(block.id)).map(block => ({ type: isCanvasText(block) ? 'lessonText' : 'lessonActivity', attrs: { block }, ...(isCanvasText(block) ? { content: canvasTextContent(block).map(hydrate) } : {}) }));
@@ -40,9 +40,9 @@ export function blocksFromCanvas(nodes: CanvasNode[]): LessonBlock[] {
     ids.add(block.id); return block;
   }
   function images(node: CanvasNode): LessonBlock[] {
-    if (node.type === 'lessonImage') {
+    if (['lessonImage', 'lessonFile'].includes(node.type)) {
       const block = identity(node.attrs?.block);
-      if (block.type !== 'image' || node.attrs?.blockId !== block.id) throw new Error('이미지 연결을 확인해 주세요.');
+      if (block.type !== (node.type === 'lessonFile' ? 'file' : 'image') || node.attrs?.blockId !== block.id) throw new Error('첨부 자료 연결을 확인해 주세요.');
       return [block];
     }
     return (node.content || []).flatMap(images);

@@ -33,7 +33,7 @@ const DocumentCanvas = lazy(() => import('./lesson-document-canvas').then(module
 const empty = (): LessonBlockDocument => ({ schemaVersion: 1, blocks: [], checklist: [] });
 const choices: { type: LessonBlockType; label: string }[] = [
   { type: 'heading', label: '큰 제목' }, { type: 'subheading', label: '작은 제목' }, { type: 'text', label: '본문' },
-  { type: 'image', label: '이미지' }, { type: 'audio', label: '음성' }, { type: 'video', label: '영상' },
+  { type: 'image', label: '이미지' }, { type: 'file', label: '파일 첨부' }, { type: 'audio', label: '음성' }, { type: 'video', label: '영상' },
   { type: 'question', label: '중간 질문' }, { type: 'link', label: '외부 링크' }, { type: 'prompt', label: '복사할 프롬프트' },
   { type: 'prompt-generator', label: '프롬프트 생성기' }, { type: 'quiz', label: '확인 문제' }, { type: 'divider', label: '구분선' },
   { type: 'persona-generator', label: '페르소나 생성기' }, { type: 'landing-planner', label: '랜딩페이지 기획 문답' },
@@ -152,7 +152,7 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
   function positionImage(image: LessonBlock, position: LessonImagePosition) {
     try {
       const blocks = positionLessonImage(document.blocks, image, position, crypto.randomUUID());
-      setDocument(previous => ({ ...previous, blocks })); setEditingTextId(null); setMessage(autosave ? '이미지 위치를 바꿨습니다. 자동저장합니다.' : '이미지 위치를 바꿨습니다. 아래 저장 버튼을 눌러 보관해 주세요.');
+      setDocument(previous => ({ ...previous, blocks })); setEditingTextId(null); setMessage(autosave ? '첨부 위치를 바꿨습니다. 자동저장합니다.' : '첨부 위치를 바꿨습니다. 아래 저장 버튼을 눌러 보관해 주세요.');
     } catch (error) { setMessage((error as Error).message); }
   }
   async function insertImage(files: File[], position: LessonImagePosition) {
@@ -247,12 +247,12 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
           ? <LessonBodyEditor label={`항목 ${index + 1} 본문`} value={block.content || ''} disabled={disabled || conflict} onChange={content => update(block.id, { content })} />
           : <div><div className="lba-text-preview"><LessonText text={serializeLessonDocument(lessonDocumentForEditor(block.content || '본문을 입력해 주세요.'))} /></div><button type="button" className="btn small" onClick={() => setEditingTextId(block.id)} aria-label={`항목 ${index + 1} 본문 편집`}>본문 편집</button></div>
           : ['heading', 'subheading', 'prompt'].includes(block.type) ? <Field label="내용 *"><textarea required rows={block.type === 'prompt' ? 5 : 2} maxLength={200000} value={block.content || ''} onChange={event => update(block.id, { content: event.target.value })} /></Field> : null}
-        {block.type === 'image' && <>
-          <fieldset disabled={disabled || conflict || uploading} className="lba-image-row-settings"><legend>토글 이미지</legend>
+        {['image', 'file'].includes(block.type) && <>
+          <fieldset disabled={disabled || conflict || uploading} className="lba-image-row-settings"><legend>{block.type === 'file' ? '토글 첨부 파일' : '토글 이미지'}</legend>
             <label className="field"><span>토글 안으로 이동</span><select aria-label="토글 안으로 이동" value="" onChange={event => { if (!event.target.value) return; const target = lessonToggleChoices(document.blocks)[Number(event.target.value) - 1]; if (target) positionImage(block, { blockId: target.blockId, togglePath: target.path }); }}><option value="">토글 선택</option>{lessonToggleChoices(document.blocks).map((choice, n) => <option key={`${choice.blockId}:${choice.path.join('.')}`} value={n + 1}>{n + 1}. {choice.label}</option>)}</select></label>
             {lessonEmbeddedImageIds(document.blocks).has(block.id) && <button type="button" className="btn small" onClick={() => positionImage(block, { blockId: lessonImageOwner(document.blocks, block.id)?.id || null, after: true })}>토글 밖으로 꺼내기</button>}
           </fieldset>
-          <fieldset className="lba-image-row-settings" disabled={disabled || conflict || uploading}>
+          {block.type === 'image' && <><fieldset className="lba-image-row-settings" disabled={disabled || conflict || uploading}>
             <legend>이미지 배치</legend>
             <p className="meta">{lessonImageRows(document.blocks).find(row => row.some(item => item.id === block.id))!.length > 1 ? '나란히 배치 중 · 이미지별 ↑·↓로 순서를 바꿀 수 있습니다.' : '바로 다음 이미지와 한 줄로 묶을 수 있습니다. 최대 3장까지, 원본 비율을 유지합니다.'}</p>
             <div className="lba-actions"><button type="button" className="btn small" disabled={lessonEmbeddedImageIds(document.blocks).has(block.id) || !nextImageRowSize(document.blocks, block.id) || nextImageRowSize(document.blocks, block.id) > 3 || lessonEmbeddedImageIds(document.blocks).has(document.blocks[document.blocks.indexOf(block) + 1]?.id)} onClick={() => setDocument(previous => ({ ...previous, blocks: joinNextImageRow(previous.blocks, block.id, crypto.randomUUID()) }))}>다음 이미지와 나란히</button>
@@ -262,12 +262,12 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
           {positionedIds.includes(block.id) ? <p className="lba-image-placeholder" role="status">이 위치에 이미지를 올리고 있습니다…</p> : <>
             <button type="button" className="btn small lba-image-handle" draggable={!disabled && !conflict && !uploading} disabled={uploading} data-image-move={block.id} aria-label={`항목 ${index + 1} 이미지 이동 손잡이`}>⠿ 이미지 이동</button>
             {(block.assetId || block.url) && <div className="lba-image-preview" draggable={!disabled && !conflict && !uploading} data-image-move={block.id}><LessonBlockView document={{ ...empty(), blocks: [block] }} values={{ blocks: {}, checklist: [] }} onChange={() => {}} readOnly /></div>}
-          </>}
+          </>}</>}
         </>}
-        {['image', 'audio', 'video', 'link'].includes(block.type) && !positionedIds.includes(block.id) && <fieldset className="lba-media-fields" disabled={uploadIds.includes(block.id)}>
+        {['image', 'audio', 'video', 'file', 'link'].includes(block.type) && !positionedIds.includes(block.id) && <fieldset className="lba-media-fields" disabled={uploadIds.includes(block.id)}>
           {block.type !== 'link' && <LessonMediaUpload courseId={courseId} kind={block.type as LessonMediaKind} assetId={block.assetId} disabled={disabled || conflict || uploadIds.includes(block.id)} onReady={id => attach(block.id, id)} onPending={pending => uploadPending(block.id, pending)} />}
-          {block.assetId ? <button type="button" className="btn small" onClick={() => { if (window.confirm('파일 연결을 지우고 외부 주소를 입력할까요? 기존 저장본의 파일은 보관됩니다.')) setDocument(previous => ({ ...previous, blocks: previous.blocks.map(item => { if (item.id !== block.id) return item; const next = { ...item, url: '' }; delete next.assetId; return next; }) })); }}>외부 주소로 바꾸기</button>
-            : <Field label="주소 *" hint={block.type !== 'link' ? '파일을 올리거나 HTTPS 주소를 입력해 주세요.' : undefined}><input required type="url" pattern="https://.*" maxLength={4000} value={block.url || ''} placeholder="https://" onChange={event => update(block.id, { url: event.target.value })} /></Field>}<Field label={block.type === 'link' ? '링크에 표시할 문구' : '설명'}><input value={block.content || ''} maxLength={5000} onChange={event => update(block.id, { content: event.target.value })} /></Field>{block.type === 'image' && <Field label="이미지 대체 설명"><input maxLength={1000} value={block.alt || ''} onChange={event => update(block.id, { alt: event.target.value })} /></Field>}</fieldset>}
+          {block.type !== 'file' && (block.assetId ? <button type="button" className="btn small" onClick={() => { if (window.confirm('파일 연결을 지우고 외부 주소를 입력할까요? 기존 저장본의 파일은 보관됩니다.')) setDocument(previous => ({ ...previous, blocks: previous.blocks.map(item => { if (item.id !== block.id) return item; const next = { ...item, url: '' }; delete next.assetId; return next; }) })); }}>외부 주소로 바꾸기</button>
+            : <Field label="주소 *" hint={block.type !== 'link' ? '파일을 올리거나 HTTPS 주소를 입력해 주세요.' : undefined}><input required type="url" pattern="https://.*" maxLength={4000} value={block.url || ''} placeholder="https://" onChange={event => update(block.id, { url: event.target.value })} /></Field>)}<Field label={block.type === 'link' ? '링크에 표시할 문구' : '설명'}><input value={block.content || ''} maxLength={5000} onChange={event => update(block.id, { content: event.target.value })} /></Field>{block.type === 'image' && <Field label="이미지 대체 설명"><input maxLength={1000} value={block.alt || ''} onChange={event => update(block.id, { alt: event.target.value })} /></Field>}</fieldset>}
         {block.type === 'link' && <LessonLinkPreview key={block.id + ':' + (block.url || '')} url={block.url || ''} onApply={content => update(block.id, { content })}/>}
         {block.type === 'question' && <><Field label="질문 문구 *"><textarea required rows={3} maxLength={5000} value={block.question?.label || ''} onChange={event => update(block.id, { question: { ...block.question!, label: event.target.value } })} /></Field><label className="lb-choice"><input type="checkbox" checked={block.question?.required || false} onChange={event => update(block.id, { question: { ...block.question!, required: event.target.checked } })} />필수 답변</label><Field label="답변 유형"><select value={block.question?.kind || 'text'} onChange={event => update(block.id, { question: { ...block.question!, kind: event.target.value as 'text' | 'image' | 'file' } })}><option value="text">텍스트</option><option value="image">이미지</option><option value="file">압축파일</option></select></Field></>}
         {block.type === 'prompt-generator' && <GeneratorFields block={block} update={patch => update(block.id, patch)} />}

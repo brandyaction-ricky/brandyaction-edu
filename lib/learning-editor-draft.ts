@@ -24,6 +24,7 @@ export function isBlockEditorDocument(v: unknown): v is LessonBlockDocument {
     const allowed = ['id', 'type', 'content'];
     if (['image', 'audio', 'video', 'link'].includes(String(b.type))) allowed.push('url', 'alt');
     if (['image', 'audio', 'video'].includes(String(b.type))) allowed.push('assetId');
+    if (b.type === 'file') allowed.push('assetId');
     if (b.type === 'image') allowed.push('imageGroup');
     if (b.type === 'question') allowed.push('question');
     if (['prompt-generator', 'persona-generator', 'landing-planner', 'recipe-calculator', 'margin-calculator', 'marketing-funnel'].includes(String(b.type))) allowed.push('fields');
