@@ -77,6 +77,9 @@ export async function GET(request: Request) {
     if (params.get('metadata') === '1') return reply({ id: file.id, name: file.name, kind: file.kind, size: file.size });
     const signed = await db.storage.from(bucket).createSignedUrl(file.path, 300, { download: file.kind === 'file' || params.get('download') === '1' ? file.name : false });
     if (signed.error) throw signed.error;
-    return new Response(null, { status: 303, headers: { ...headers, Location: signed.data.signedUrl } });
+    const location = new URL(signed.data.signedUrl);
+    // Normalize only the filename: Storage SDK versions may encode this query twice.
+    if (file.kind === 'file' || params.get('download') === '1') location.searchParams.set('download', file.name);
+    return new Response(null, { status: 303, headers: { ...headers, Location: location.href } });
   } catch (error) { return failure(error); }
 }
