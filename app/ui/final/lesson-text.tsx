@@ -3,7 +3,7 @@ import { lessonTextSegments, parseLessonDocument, type LessonNode } from "@/lib/
 import "./lesson-text.css";
 
 function RichNode({ node, images }: { node: LessonNode; images?: ReadonlyMap<string, ReactNode> }): ReactNode {
-  if (["lessonImage", "lessonFile"].includes(node.type)) return images?.get(String(node.attrs?.blockId)) || null;
+  if (["lessonImage", "lessonFile", "lessonEmbed"].includes(node.type)) return images?.get(String(node.attrs?.blockId)) || null;
   if (node.type === "text") {
     const color = node.marks?.find(mark => mark.type === "textStyle" && mark.attrs?.color)?.attrs?.color;
     const linkColor = typeof color === "string" ? color : undefined;

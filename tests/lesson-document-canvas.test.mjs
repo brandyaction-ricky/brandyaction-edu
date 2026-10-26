@@ -107,3 +107,32 @@ test('file attachments survive toggle embedding, clipboard remapping, duplicatio
  const onlyFile={type:'doc',content:[{type:'lessonFile',attrs:{blockId:'download',url:'https://bad.test',block:{private:1}}}]};
  assert.deepEqual(parseLessonDocument(serializeLessonDocument(onlyFile)).content,[{type:'lessonFile',attrs:{blockId:'download'}}]);
 });
+
+test('all non-text activities can live in toggles without changing answers, quiz keys or copy identities',()=>{
+ const {validateLessonBlocks,publicLessonBlocks}=load('lesson-blocks');
+ const owner={id:'body',type:'text',content:serializeLessonDocument({type:'doc',content:[{type:'details',content:[{type:'detailsSummary',content:[{type:'text',text:'학습 도구'}]},{type:'detailsContent',content:[{type:'paragraph'}]}]}]})};
+ const tools=[{id:'prompt',type:'prompt',content:'줄 하나\n둘'},...blocks.slice(3)];
+ for(const tool of tools){
+  const original=[owner,tool], nested=positionLessonImage(original,tool,{blockId:'body',togglePath:[0,1]},'unused');
+  assert.equal(parseLessonDocument(nested[0].content).content[0].content[1].content[1].type,'lessonEmbed');
+  assert.deepEqual(blocksFromCanvas(lessonCanvasNodes(nested)),nested);
+  assert.deepEqual(nested[1],tool);
+  assert.deepEqual(validateLessonBlocks({schemaVersion:1,blocks:nested,checklist:[]}).blocks,nested);
+  const copied=cloneLessonCards(nested);
+  assert.deepEqual([...lessonEmbeddedImageIds(copied)],[copied[1].id]);
+  assert.throws(()=>cloneLessonCards([nested[0]]),/학습 항목도 함께/);
+  assert.deepEqual(positionLessonImage(nested,tool,{blockId:'body',after:true},'unused'),original);
+  assert.equal(lessonEmbeddedImageIds(removeLessonImageReference(nested,tool.id)).size,0);
+  if(tool.type==='quiz')assert.equal(publicLessonBlocks({schemaVersion:1,blocks:nested,checklist:[]}).blocks[1].quiz.questions[0].correctIndex,undefined);
+ }
+});
+test('embedded tools reject missing, recursive, wrong-type and repeated references before saving',()=>{
+ const {validateLessonBlocks}=load('lesson-blocks');
+ const prompt={id:'prompt',type:'prompt',content:'복사할 내용'};
+ const make=(refs)=>({schemaVersion:1,blocks:[{id:'body',type:'text',content:serializeLessonDocument({type:'doc',content:refs.map(blockId=>({type:'lessonEmbed',attrs:{blockId}}))})},prompt],checklist:[]});
+ for(const refs of [['missing'],['body'],['prompt','prompt']])assert.throws(()=>validateLessonBlocks(make(refs)),/학습 항목 연결/);
+ const nodes=lessonCanvasNodes(make(['prompt']).blocks);nodes[0].content[0].attrs.block={id:'prompt',type:'text',content:'잘못된 본문'};
+ assert.throws(()=>blocksFromCanvas(nodes),/연결/);
+ const saved=serializeLessonDocument({type:'doc',content:[{type:'lessonEmbed',attrs:{blockId:'prompt',block:{quiz:{secret:1}},onclick:'bad'}}]});
+ assert.deepEqual(parseLessonDocument(saved).content,[{type:'lessonEmbed',attrs:{blockId:'prompt'}}]);
+});
