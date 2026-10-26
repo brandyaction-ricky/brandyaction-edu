@@ -50,6 +50,51 @@ function imagePosition($pos: Editor['state']['selection']['$from']): LessonImage
   return { blockId: $pos.depth ? $pos.node(1).attrs.block?.id || null : null, ...($pos.depth > 1 && $pos.node(1).attrs.block?.type === 'text' ? { textBoundary: $pos.index(1) + 1 } : { after: true }) };
 }
 
+// Text items are isolating so ordinary joins cannot absorb questions or media.
+// At their boundary, remove only one empty paragraph (or its now-empty wrapper)
+// and map the caret through the deletion, allowing the next key to do the same.
+function deleteEmptyTextBoundary(editor: Editor, direction: -1 | 1) {
+  const { view } = editor;
+  if (!view.editable) return false;
+  const { selection, doc } = view.state;
+  if (!(selection instanceof TextSelection) || !selection.empty) return false;
+  const { $from } = selection;
+  if ($from.depth < 2 || $from.node(1).type.name !== 'lessonText' || !$from.parent.isTextblock) return false;
+  if ($from.parentOffset !== (direction < 0 ? 0 : $from.parent.content.size)) return false;
+  for (let depth = 1; depth < $from.depth; depth++) {
+    if ($from.index(depth) !== (direction < 0 ? 0 : $from.node(depth).childCount - 1)) return false;
+  }
+  const current = $from.node(1), currentPos = $from.before(1);
+  const boundary = direction < 0 ? currentPos : currentPos + current.nodeSize;
+  const $boundary = doc.resolve(boundary);
+  const neighbor = direction < 0 ? $boundary.nodeBefore : $boundary.nodeAfter;
+  if (!neighbor) return false;
+  const neighborPos = direction < 0 ? boundary - neighbor.nodeSize : boundary;
+  const edge = neighbor.type.name === 'lessonText' ? direction < 0 ? neighbor.lastChild : neighbor.firstChild : null;
+  const emptyParagraph = (node: ProseMirrorNode | null) => node?.type.name === 'paragraph' && node.content.size === 0;
+  const tr = view.state.tr;
+  if (emptyParagraph(edge)) {
+    const from = neighbor.childCount === 1 ? neighborPos : direction < 0 ? boundary - 1 - edge!.nodeSize : neighborPos + 1;
+    const to = neighbor.childCount === 1 ? neighborPos + neighbor.nodeSize : from + edge!.nodeSize;
+    tr.delete(from, to);
+    tr.setSelection(selection.map(tr.doc, tr.mapping));
+  } else if ($from.depth === 2 && emptyParagraph($from.parent)) {
+    // A caret in an empty item should join the adjacent text, as an ordinary
+    // blank paragraph would. Move into text without merging its list or toggle.
+    const next = Selection.findFrom(doc.resolve(boundary), direction, true);
+    const from = current.childCount === 1 ? currentPos : $from.before(2);
+    const to = current.childCount === 1 ? currentPos + current.nodeSize : $from.after(2);
+    tr.delete(from, to);
+    tr.setSelection(next instanceof TextSelection && next.$from.depth >= 2 && next.$from.before(1) === neighborPos
+      ? next.map(tr.doc, tr.mapping)
+      : Selection.near(tr.doc.resolve(tr.mapping.map(boundary, direction)), direction));
+  } else return false;
+  // Preserve the editor's usual first Backspace after a Markdown input rule.
+  if (direction < 0 && editor.commands.undoInputRule()) return true;
+  view.dispatch(tr.scrollIntoView());
+  return true;
+}
+
 export function LessonDocumentCanvas(props: Props) {
   const latest = useRef(props);
   useEffect(() => { latest.current = props; }, [props]);
@@ -66,15 +111,15 @@ export function LessonDocumentCanvas(props: Props) {
     setMenu(true);
     requestAnimationFrame(() => root.current?.querySelector<HTMLButtonElement>('.ldc-insert-menu button')?.focus());
   }
-  function syncClipboardSelection(view: Editor['view']) {
+  function syncTextSelection(view: Editor['view']) {
     if (view.composing) return false;
     const selection = view.dom.ownerDocument.getSelection();
     if (!selection?.anchorNode || !selection.focusNode || !view.dom.contains(selection.anchorNode) || !view.dom.contains(selection.focusNode)) return false;
     try {
       const anchor = view.posAtDOM(selection.anchorNode, selection.anchorOffset), head = view.posAtDOM(selection.focusNode, selection.focusOffset);
-      // selectionchange can still be queued after a click/delete. Clipboard
-      // parsing and replacement must use the visible range, not the previous
-      // lesson block. Leave matching node/all selections intact.
+      // selectionchange can still be queued after a click/delete. Editing and
+      // clipboard commands must use the visible range, not the previous lesson
+      // block. Leave matching node/all selections intact.
       if (anchor !== view.state.selection.anchor || head !== view.state.selection.head) {
         view.dispatch(view.state.tr.setSelection(TextSelection.between(view.state.doc.resolve(anchor), view.state.doc.resolve(head))));
       }
@@ -177,7 +222,7 @@ export function LessonDocumentCanvas(props: Props) {
     editable: !props.disabled,
     editorProps: {
       attributes: { role: 'textbox', 'aria-label': '수업 문서', 'aria-multiline': 'true', class: 'lesson-rich-body ldc-document' },
-      handleDOMEvents: { copy: syncClipboardSelection, cut: syncClipboardSelection, paste: syncClipboardSelection },
+      handleDOMEvents: { copy: syncTextSelection, cut: syncTextSelection, paste: syncTextSelection },
       transformCopied(slice, view) {
         return new Slice(Fragment.fromJSON(view.state.schema, lessonClipboardNodes(slice.content.toJSON() || [])), slice.openStart, slice.openEnd);
       },
@@ -189,6 +234,11 @@ export function LessonDocumentCanvas(props: Props) {
       handleKeyDown(view, event) {
         if (event.isComposing || view.composing) return false;
         if (focusLessonMoveHandle(view, event)) return true;
+        if (!event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && (event.key === 'Backspace' || event.key === 'Delete')) {
+          if (view.state.selection instanceof TextSelection) syncTextSelection(view);
+          const activeEditor = editorRef.current;
+          if (activeEditor && deleteEmptyTextBoundary(activeEditor, event.key === 'Backspace' ? -1 : 1)) return true;
+        }
         if (event.key === 'Escape') { setMenu(false); return false; }
         if (event.key === '/' && view.state.selection.empty && view.state.selection.$from.parent.isTextblock && !view.state.selection.$from.parent.textContent) {
           const activeEditor = editorRef.current;
