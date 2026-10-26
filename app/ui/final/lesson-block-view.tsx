@@ -10,7 +10,7 @@ import { LessonAudio } from './lesson-audio';
 import { LessonPrivateMedia } from './lesson-private-media';
 import type { LessonMediaKind } from '@/lib/lesson-media';
 import type { AnswerFileContext } from '@/lib/lesson-files';
-import { useId, useState } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { defaultBlockCompletion, fillBlockPrompt, type BlockAnswer, type LessonBlockAnswers, type PublicBlockDocument, type PublicLessonBlock } from '@/lib/lesson-blocks';
 import { LessonText } from './lesson-text';
 import { Video } from './primitives';
@@ -101,14 +101,8 @@ export function LessonBlockView({ document, values, onChange, readOnly = false, 
   const embeddedImages = lessonEmbeddedImageIds(document.blocks);
   const visibleBlocks = document.blocks.filter(block => !embeddedImages.has(block.id));
   const imageColumns = lessonImageColumns(visibleBlocks);
-  const images = new Map(document.blocks.filter(block => ['image', 'file'].includes(block.type)).map(block => [block.id,
-    <div key={block.id} data-lesson-block={block.id}>{block.type === 'file' ? block.assetId && <LessonDownload assetId={block.assetId} caption={block.content} context={fileContext} submissionId={submissionId} /> : block.assetId
-      ? <LessonPrivateMedia assetId={block.assetId} kind="image" alt={block.alt} caption={block.content} context={fileContext} submissionId={submissionId} />
-      : mediaUrl(block.url) && <figure><LessonImage src={mediaUrl(block.url)} alt={block.alt}/>{block.content && <figcaption>{block.content}</figcaption>}</figure>}</div>
-  ]));
-  return <div className={'lesson-blocks' + (imageColumns.size ? ' has-image-rows' : '')}>
-    <LessonTag label={document.presentation?.tagLabel} />
-    {visibleBlocks.map(block => {
+  const embedded = new Map<string, ReactNode>();
+  function renderBlock(block: PublicLessonBlock) {
       const url = mediaUrl(block.url), value = values.blocks[block.id];
       let content;
       if (block.type === 'file') content = block.assetId ? <LessonDownload key={block.assetId} assetId={block.assetId} caption={block.content} context={fileContext} submissionId={submissionId} /> : <p>다운로드할 파일을 첨부해 주세요.</p>;
@@ -116,7 +110,7 @@ export function LessonBlockView({ document, values, onChange, readOnly = false, 
       else switch (block.type) {
         case 'heading': content = <h2>{block.content}</h2>; break;
         case 'subheading': content = <h3>{block.content}</h3>; break;
-        case 'text': content = <div className="reading-copy"><LessonText text={block.content || ''} images={images} /></div>; break;
+        case 'text': content = <div className="reading-copy"><LessonText text={block.content || ''} images={embedded} /></div>; break;
         case 'divider': content = <hr />; break;
         case 'image': content = url && <figure><LessonImage src={url} alt={block.alt}/>{block.content && <figcaption>{block.content}</figcaption>}</figure>; break;
         case 'audio': content = url && <figure><figcaption>{block.content || '음성 자료'}</figcaption><LessonAudio key={url} floating={floatingAudio} src={url} aria-label={block.alt || '학습 음성'}><a href={url}>음성 파일 열기</a></LessonAudio></figure>; break;
@@ -135,7 +129,13 @@ export function LessonBlockView({ document, values, onChange, readOnly = false, 
       }
       const column = imageColumns.get(block.id);
       return <div key={block.id} data-lesson-block={block.id} data-image-columns={column?.count} style={column ? { gridColumn: `${column.start} / span ${6 / column.count}` } : undefined}>{content}</div>;
-    })}
+  }
+  // Referenced activities use exactly the same renderer and answer callbacks as
+  // top-level activities. Text cannot be embedded, so references cannot recurse.
+  for (const block of document.blocks) if (embeddedImages.has(block.id)) embedded.set(block.id, renderBlock(block));
+  return <div className={'lesson-blocks' + (imageColumns.size ? ' has-image-rows' : '')}>
+    <LessonTag label={document.presentation?.tagLabel} />
+    {visibleBlocks.map(renderBlock)}
     {document.checklist.length > 0 && <fieldset className="lb-card" disabled={readOnly}><legend>오늘의 체크리스트</legend>{document.checklist.map(item => <label className="lb-choice" key={item.id}><input type="checkbox" checked={values.checklist.includes(item.id)} onChange={event => onChange({ ...values, checklist: event.target.checked ? [...values.checklist, item.id] : values.checklist.filter(id => id !== item.id) })} />{item.label}{item.required ? ' (필수)' : ''}</label>)}</fieldset>}
   </div>;
 }

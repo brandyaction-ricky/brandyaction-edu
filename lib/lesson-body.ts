@@ -92,7 +92,7 @@ export function normalizeLessonDocument(value: unknown): LessonNode | null {
       return { type, text: node.text, ...(marks.length ? { marks } : {}) };
     }
     if (type === "hardBreak") return { type };
-    if (type === "lessonImage" || type === "lessonFile") {
+    if (["lessonImage", "lessonFile", "lessonEmbed"].includes(type)) {
       if (typeof attrs.blockId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$/.test(attrs.blockId)) throw new Error("Invalid lesson image reference");
       return { type, attrs: { blockId: attrs.blockId } };
     }
@@ -127,7 +127,7 @@ function documentText(node: LessonNode): string {
   return (node.content || []).map(documentText).join(["paragraph", "heading", "detailsSummary"].includes(node.type) ? "" : "\n");
 }
 function documentHasImage(node: LessonNode): boolean {
-  return ["lessonImage", "lessonFile"].includes(node.type) || Boolean(node.content?.some(documentHasImage));
+  return ["lessonImage", "lessonFile", "lessonEmbed"].includes(node.type) || Boolean(node.content?.some(documentHasImage));
 }
 export function lessonBodyHasText(text: string): boolean {
   return Boolean(lessonBodyPlainText(text).trim());

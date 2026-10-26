@@ -14,7 +14,7 @@ import { LessonMediaUpload } from './lesson-media-upload';
 import { lessonMediaSpec, type LessonMediaKind } from '@/lib/lesson-media';
 import { uploadLessonMedia } from '@/lib/lesson-media-upload';
 import { positionLessonImage, type LessonImagePosition } from '@/lib/lesson-image-position';
-import { lessonEmbeddedImageIds, lessonToggleChoices, lessonImageOwner, removeLessonImageReference } from '@/lib/lesson-toggle-images';
+import { canEmbedLessonBlock, lessonEmbeddedImageIds, lessonToggleChoices, lessonImageOwner, removeLessonImageReference } from '@/lib/lesson-toggle-images';
 import { joinNextImageRow, splitImageRow, lessonImageRows, nextImageRowSize } from '@/lib/lesson-image-row';
 import { lessonDocumentForEditor, serializeLessonDocument } from '@/lib/lesson-body';
 import { LessonImageLayout } from './lesson-image-layout';
@@ -61,7 +61,9 @@ function Field({ label, children, hint }: { label: string; children: ReactNode; 
 function blockProblem(block: LessonBlock) {
   try {
     if (['heading', 'subheading', 'prompt', 'prompt-generator'].includes(block.type) && !block.content?.trim()) throw new Error('내용을 입력해 주세요.');
-    validateLessonBlocks({ schemaVersion: 1, blocks: [block], checklist: [] });
+    // A single field card has no siblings to resolve; the complete document is
+    // validated with references enabled before saving/publishing.
+    validateLessonBlocks({ schemaVersion: 1, blocks: [block], checklist: [] }, { checkReferences: false });
     return '';
   } catch (error) { return (error as Error).message; }
 }
@@ -152,7 +154,7 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
   function positionImage(image: LessonBlock, position: LessonImagePosition) {
     try {
       const blocks = positionLessonImage(document.blocks, image, position, crypto.randomUUID());
-      setDocument(previous => ({ ...previous, blocks })); setEditingTextId(null); setMessage(autosave ? '첨부 위치를 바꿨습니다. 자동저장합니다.' : '첨부 위치를 바꿨습니다. 아래 저장 버튼을 눌러 보관해 주세요.');
+      setDocument(previous => ({ ...previous, blocks })); setEditingTextId(null); setMessage(autosave ? '학습 항목 위치를 바꿨습니다. 자동저장합니다.' : '학습 항목 위치를 바꿨습니다. 아래 저장 버튼을 눌러 보관해 주세요.');
     } catch (error) { setMessage((error as Error).message); }
   }
   async function insertImage(files: File[], position: LessonImagePosition) {
@@ -247,8 +249,8 @@ const LoadedAuthor = forwardRef<BlockAuthorHandle, Props & { snapshot: Snapshot 
           ? <LessonBodyEditor label={`항목 ${index + 1} 본문`} value={block.content || ''} disabled={disabled || conflict} onChange={content => update(block.id, { content })} />
           : <div><div className="lba-text-preview"><LessonText text={serializeLessonDocument(lessonDocumentForEditor(block.content || '본문을 입력해 주세요.'))} /></div><button type="button" className="btn small" onClick={() => setEditingTextId(block.id)} aria-label={`항목 ${index + 1} 본문 편집`}>본문 편집</button></div>
           : ['heading', 'subheading', 'prompt'].includes(block.type) ? <Field label="내용 *"><textarea required rows={block.type === 'prompt' ? 5 : 2} maxLength={200000} value={block.content || ''} onChange={event => update(block.id, { content: event.target.value })} /></Field> : null}
-        {['image', 'file'].includes(block.type) && <>
-          <fieldset disabled={disabled || conflict || uploading} className="lba-image-row-settings"><legend>{block.type === 'file' ? '토글 첨부 파일' : '토글 이미지'}</legend>
+        {canEmbedLessonBlock(block) && <>
+          <fieldset disabled={disabled || conflict || uploading} className="lba-image-row-settings"><legend>{block.type === 'file' ? '토글 첨부 파일' : block.type === 'image' ? '토글 이미지' : '접기 안의 학습 항목'}</legend>
             <label className="field"><span>토글 안으로 이동</span><select aria-label="토글 안으로 이동" value="" onChange={event => { if (!event.target.value) return; const target = lessonToggleChoices(document.blocks)[Number(event.target.value) - 1]; if (target) positionImage(block, { blockId: target.blockId, togglePath: target.path }); }}><option value="">토글 선택</option>{lessonToggleChoices(document.blocks).map((choice, n) => <option key={`${choice.blockId}:${choice.path.join('.')}`} value={n + 1}>{n + 1}. {choice.label}</option>)}</select></label>
             {lessonEmbeddedImageIds(document.blocks).has(block.id) && <button type="button" className="btn small" onClick={() => positionImage(block, { blockId: lessonImageOwner(document.blocks, block.id)?.id || null, after: true })}>토글 밖으로 꺼내기</button>}
           </fieldset>

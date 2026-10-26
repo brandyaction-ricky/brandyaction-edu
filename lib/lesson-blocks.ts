@@ -2,6 +2,7 @@
 // learner responses must use publicLessonBlocks(), never a cast of stored JSON.
 import { hasGuidedDefinition, isGuidedTool } from './lesson-guided-tools';
 import { hasCalculatorDefinition, isCalculator, validateCalculatorValues } from './lesson-calculators';
+import { parseLessonDocument, type LessonNode } from './lesson-body';
 export const lessonBlockTypes = ['heading', 'subheading', 'text', 'video', 'audio', 'image', 'file', 'question', 'divider', 'link', 'prompt', 'prompt-generator', 'persona-generator', 'landing-planner', 'recipe-calculator', 'margin-calculator', 'marketing-funnel', 'quiz'] as const;
 export type LessonBlockType = typeof lessonBlockTypes[number];
 export type BlockField = { id: string; label: string; variable: string; placeholder: string; required: boolean; sensitive: boolean; options?: string[] };
@@ -51,7 +52,7 @@ function httpsUrl(value: unknown) {
   return raw;
 }
 
-export function validateLessonBlocks(input: unknown): LessonBlockDocument {
+export function validateLessonBlocks(input: unknown, { checkReferences = true }: { checkReferences?: boolean } = {}): LessonBlockDocument {
   const doc = object(input); onlyKeys(doc, ['schemaVersion', 'blocks', 'checklist', 'completion', 'progression', 'presentation']);
   if (doc.schemaVersion !== 1) invalid('지원하지 않는 수업 버전입니다.');
   if (new TextEncoder().encode(JSON.stringify(input)).byteLength > 2_000_000) invalid('수업 내용이 너무 큽니다. 이미지는 업로드한 주소로 등록해 주세요.');
@@ -111,6 +112,23 @@ export function validateLessonBlocks(input: unknown): LessonBlockDocument {
     return block;
   });
   unique(blocks.map(b => b.id));
+  // Embedded tools refer to the same flat blocks used for answers and grading.
+  // Never allow missing, repeated or text references to hide a required tool or
+  // create recursive rendering. Existing image/file documents stay compatible.
+  const referenced = new Set<string>();
+  const byId = new Map(blocks.map(block => [block.id, block]));
+  function checkReference(node: LessonNode) {
+    if (node.type === 'lessonEmbed') {
+      const target = byId.get(String(node.attrs?.blockId));
+      if (!target || ['text', 'heading', 'subheading', 'image', 'file'].includes(target.type) || referenced.has(target.id)) invalid('접기 안의 학습 항목 연결을 확인해 주세요.');
+      referenced.add(target.id);
+    }
+    node.content?.forEach(checkReference);
+  }
+  for (const block of checkReferences ? blocks : []) {
+    const rich = block.type === 'text' && parseLessonDocument(block.content || '');
+    if (rich) checkReference(rich);
+  }
   const checklist = array(doc.checklist, 1000).map(raw => {
     const item = object(raw); onlyKeys(item, ['id', 'label', 'required']);
     return { id: id(item.id), label: text(item.label, 5000, true), required: bool(item.required) };

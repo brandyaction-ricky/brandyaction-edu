@@ -1,6 +1,6 @@
 import { lessonDocumentForEditor, normalizeLessonDocument, serializeLessonDocument, type LessonNode } from './lesson-body';
 import type { LessonBlock } from './lesson-blocks';
-import { lessonEmbeddedImageIds } from './lesson-toggle-images';
+import { lessonEmbeddedImageIds, canEmbedLessonBlock, lessonReferenceType } from './lesson-toggle-images';
 
 export type CanvasNode = { type: string; text?: string; marks?: LessonNode['marks']; attrs?: Record<string, unknown> & { block?: LessonBlock | null }; content?: CanvasNode[] };
 export const isCanvasText = (block: LessonBlock) => ['text', 'heading', 'subheading'].includes(block.type);
@@ -23,9 +23,9 @@ export function canvasTextContent(block: LessonBlock): LessonNode[] {
 }
 
 export function lessonCanvasNodes(blocks: LessonBlock[]): CanvasNode[] {
-  const embedded = lessonEmbeddedImageIds(blocks), images = new Map(blocks.filter(block => ['image', 'file'].includes(block.type)).map(block => [block.id, block]));
+  const embedded = lessonEmbeddedImageIds(blocks), images = new Map(blocks.filter(canEmbedLessonBlock).map(block => [block.id, block]));
   function hydrate(node: LessonNode): CanvasNode {
-    if (['lessonImage', 'lessonFile'].includes(node.type)) return { type: node.type, attrs: { blockId: node.attrs?.blockId, block: images.get(String(node.attrs?.blockId)) || null } };
+    if (['lessonImage', 'lessonFile', 'lessonEmbed'].includes(node.type)) return { type: node.type, attrs: { blockId: node.attrs?.blockId, block: images.get(String(node.attrs?.blockId)) || null } };
     return { ...node, ...(node.content ? { content: node.content.map(hydrate) } : {}) };
   }
   return blocks.filter(block => !embedded.has(block.id)).map(block => ({ type: isCanvasText(block) ? 'lessonText' : 'lessonActivity', attrs: { block }, ...(isCanvasText(block) ? { content: canvasTextContent(block).map(hydrate) } : {}) }));
@@ -40,9 +40,9 @@ export function blocksFromCanvas(nodes: CanvasNode[]): LessonBlock[] {
     ids.add(block.id); return block;
   }
   function images(node: CanvasNode): LessonBlock[] {
-    if (['lessonImage', 'lessonFile'].includes(node.type)) {
+    if (['lessonImage', 'lessonFile', 'lessonEmbed'].includes(node.type)) {
       const block = identity(node.attrs?.block);
-      if (block.type !== (node.type === 'lessonFile' ? 'file' : 'image') || node.attrs?.blockId !== block.id) throw new Error('첨부 자료 연결을 확인해 주세요.');
+      if (!canEmbedLessonBlock(block) || lessonReferenceType(block) !== node.type || node.attrs?.blockId !== block.id) throw new Error('첨부 자료 연결을 확인해 주세요.');
       return [block];
     }
     return (node.content || []).flatMap(images);
