@@ -12,3 +12,18 @@
 @media(max-width:640px){.diagnosis-management table{min-width:0;display:block}.diagnosis-management thead{display:none}.diagnosis-management tbody{display:grid;gap:0}.diagnosis-management tbody tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding:20px;border-bottom:1px solid var(--dm-border)}.diagnosis-management tbody tr:last-child{border:0}.diagnosis-management tbody th{grid-column:1/-1;font-size:16px}.diagnosis-management tbody th,.diagnosis-management tbody td{padding:0;border:0;min-width:0}.diagnosis-management tbody td::before{content:attr(data-label);display:block;font-size:12px;color:var(--dm-muted);margin-bottom:8px}.diagnosis-management tbody td:nth-child(4),.diagnosis-management tbody td:nth-child(5){grid-column:1/-1}.diagnosis-management details{max-width:none}.diagnosis-management .admin-page-actions{min-width:0}.diagnosis-management .admin-page-actions>a{width:100%;min-width:0}.diagnosis-management-toolbar>.admin-field{max-width:none;flex-basis:100%}}
 
 .diagnosis-management-queue{margin-top:12px;padding:12px;background:#f5f7fa;border-radius:8px;max-width:270px}.diagnosis-management-queue strong{font-size:14px}.diagnosis-management-review{max-width:300px;margin:12px 0 0;color:#875000;font-size:13px;line-height:1.7}.diagnosis-management-review span{display:block;margin-top:6px}
+
+/* Status navigation is deliberately page-scoped; the server pages the full list. */
+.edu-admin .diagnosis-management-summary{grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--adm-space-3,12px)}
+.edu-admin .diagnosis-management-filter-area{min-width:0}
+.edu-admin .diagnosis-management-filters{display:flex;gap:var(--adm-space-4,16px);max-width:100%;overflow-x:auto;border-bottom:1px solid var(--adm-border,#e2e5e9)}
+.edu-admin .diagnosis-management-filters button{flex:none;min-height:44px;padding:0 4px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--adm-text-sub,#626770);font-size:13px;font-weight:600}
+.edu-admin .diagnosis-management-filters button[aria-pressed=true]{border-bottom-color:var(--adm-primary,#c9232d);color:var(--adm-text,#161719)}
+.edu-admin .diagnosis-management-filters button:focus-visible,.edu-admin .diagnosis-management-row-actions summary:focus-visible{outline:2px solid var(--adm-primary,#c9232d);outline-offset:-2px}
+.edu-admin .diagnosis-management-filter-area p{margin:var(--adm-space-2,8px) 0 0;color:var(--adm-text-sub,#626770);font-size:12px;line-height:1.6}
+.edu-admin .diagnosis-management-row-actions>summary{display:inline-flex;align-items:center;min-height:36px;padding:0 12px;border:1px solid var(--adm-border-strong,#cfd3d8);border-radius:var(--adm-radius-md,8px);background:var(--adm-surface,#fff);font-size:12px;list-style:none}
+.edu-admin .diagnosis-management-row-actions>summary::-webkit-details-marker{display:none}
+.edu-admin .diagnosis-management-row-actions[open]>summary{margin-bottom:12px}
+.edu-admin .diagnosis-management tbody th>small{display:block;margin-top:6px}
+@media(max-width:1024px){.edu-admin .diagnosis-management-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.edu-admin .diagnosis-management-summary{grid-template-columns:minmax(0,1fr)}}
