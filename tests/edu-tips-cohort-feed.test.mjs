@@ -20,7 +20,7 @@ async function setup(t,{activate=true,syntheticScope=false}={}){
    alter table enrollments add column status text not null default 'active',add column revoked_at timestamptz,add column access_starts_at timestamptz not null default now()-interval '1 day',add column access_ends_at timestamptz;`);
   await f.db.exec(readFileSync(new URL('../supabase/migrations/20261027063226_edu_tips_cohort_feed.sql',import.meta.url),'utf8'));
   await f.db.exec(readFileSync(new URL('../supabase/migrations/20261027065931_edu_tips_same_day_learning_capture.sql',import.meta.url),'utf8'));
-  if(syntheticScope) await f.db.exec(readFileSync(new URL('../supabase/migrations/20261027082254_edu_tips_synthetic_cohort_scope.sql',import.meta.url),'utf8'));
+  if(syntheticScope) await f.db.exec(readFileSync(new URL('../supabase/operations/20261027082254_edu_tips_synthetic_cohort_scope.dev.sql',import.meta.url),'utf8'));
  } catch(error) { await f.db.exec('rollback');throw error; } finally { await f.db.exec('set role service_role'); }
  const signatures={
  edu_tips_prepare_hmac_identity_candidate:['p_member','p_version','p_revision','p_epoch'],
