@@ -11,7 +11,7 @@ function fixture({enabled=true,sessions=true,reports=true,user=actor,error=null}
   const route={},calls=[];
   const mocks={'@/lib/diagnosis-ready-push':{diagnosisReadyPushEnabled:()=>false},'@/lib/diagnosis-audience':audience,'@/lib/server-auth':{getAuthenticatedUser:async()=>user},'@/lib/supabase/admin':{createAdminClient:()=>({rpc:async()=>({data:null,error:null})})},
     '@/lib/diagnosis-bridge':{DiagnosisBridgeError:BridgeError},'@/lib/diagnosis-report':{sendDiagnosisReportCommand:()=>{}},
-    '@/lib/diagnosis-report-service':{runDiagnosisReport:async(deps,action)=>{calls.push({actor:deps.actor,action});if(error)throw error;return{state:'ready',updatedAt:'2026-10-01T00:00:00Z',canRetry:false,downloadAvailable:true,...(action==='download'?{markdown:'# 합성 N6 결과'}:action==='html'?{html:'<!doctype html><h1>원본 정밀 보고서</h1>'}:{})};}}};
+    '@/lib/diagnosis-report-service':{runDiagnosisReport:async(deps,action)=>{calls.push({actor:deps.actor,action});if(error)throw error;return{state:'ready',updatedAt:'2026-10-01T00:00:00Z',canRetry:false,downloadAvailable:true,...(action==='download'?{markdown:'# 합성 N6 결과'}:['html','readable'].includes(action)?{html:'<!doctype html><h1>원본 정밀 보고서</h1>'}:{})};}}};
   new Function('exports','require','process',source)(route,n=>mocks[n],{env:{EDU_MYIN_DIAGNOSIS_ENABLED:String(enabled),EDU_MYIN_DIAGNOSIS_SESSIONS_ENABLED:String(sessions),EDU_MYIN_DIAGNOSIS_REPORTS_ENABLED:String(reports)}});
   return{calls,get:(query='')=>route.GET(new Request('https://edu.test/api/platform/diagnosis/report'+query))};
 }
@@ -26,7 +26,7 @@ test('status, safe preview and fixed-name MD attachment are private and non-snif
   assert.deepEqual(h.calls.map(c=>c.action),['status','download','download']);assert.ok(h.calls.every(c=>c.actor===actor));
 });
 test('caller identifiers, duplicate modes, and malformed modes are refused',async()=>{
-  const h=fixture();for(const q of ['?subject=other','?download=0','?preview=1&download=1','?download=1&download=1','?preview=1&reportId=other','?html=0','?html=1&download=1','?html=1&html=1','?html=1&subject=other'])assert.equal((await h.get(q)).status,400);assert.equal(h.calls.length,0);
+  const h=fixture();for(const q of ['?subject=other','?download=0','?preview=1&download=1','?download=1&download=1','?preview=1&reportId=other','?html=0','?html=1&download=1','?html=1&html=1','?html=1&subject=other','?readable=0','?readable=1&html=1','?readable=1&download=1','?readable=1&preview=1','?readable=1&readable=1','?readable=1&subject=other'])assert.equal((await h.get(q)).status,400);assert.equal(h.calls.length,0);
 });
 test('original HTML is private, downloadable, and sandboxed without changing the issued bytes',async()=>{
   const h=fixture(),r=await h.get('?html=1');assert.equal(r.status,200);
@@ -39,4 +39,17 @@ test('revoked or unready reports return safe Korean messages, not backend detail
   for(const error of [new BridgeError('FORBIDDEN',403),new BridgeError('NOT_READY',409),Error('secret answer storage path')]){const r=await fixture({error}).get('?download=1');assert.equal(r.status,error.status??503);assert.doesNotMatch(await r.text(),/secret|storage path/);assert.equal(r.headers.get('content-disposition'),null);}
 });
 
-test('student and staff cannot get report status, HTML or Markdown',async()=>{for(const role of ['student','staff',undefined]){const h=fixture({user:{...actor,role}});for(const query of ['', '?html=1','?download=1','?preview=1'])assert.equal((await h.get(query)).status,403);assert.equal(h.calls.length,0);}});
+test('student and staff cannot get report status, HTML or Markdown',async()=>{for(const role of ['student','staff',undefined]){const h=fixture({user:{...actor,role}});for(const query of ['', '?html=1','?download=1','?preview=1','?readable=1'])assert.equal((await h.get(query)).status,403);assert.equal(h.calls.length,0);}});
+
+
+test('readable HTML uses the same private sandbox but has no attachment disposition',async()=>{
+  const h=fixture(),r=await h.get('?readable=1'),original=await h.get('?html=1');
+  assert.equal(r.status,200);assert.equal(h.calls[0].action,'readable');
+  for(const name of ['content-type','cache-control','vary','x-content-type-options','x-robots-tag','content-security-policy'])assert.equal(r.headers.get(name),original.headers.get(name));
+  assert.equal(r.headers.get('content-disposition'),null);
+  assert.equal(await r.text(),'<!doctype html><h1>원본 정밀 보고서</h1>');
+  for(const error of [new BridgeError('FORBIDDEN',403),new BridgeError('NOT_READY',409)]){
+    const denied=await fixture({error}).get('?readable=1');assert.equal(denied.status,error.status);
+    assert.match(denied.headers.get('content-type'),/application\/json/);assert.equal(denied.headers.get('content-disposition'),null);
+  }
+});

@@ -233,3 +233,44 @@ test('HTML and MD downloads still work when the in-app browser ignores blob link
     await expect(page.getByRole('heading',{name:'정밀 보고서가 준비됐어요.'})).toBeVisible();
   }
 });
+
+test('readable view opens in the existing isolated reader and closing restores its own button focus',async({page})=>{
+  await session(page);const files:string[]=[];let remoteRequests=0,downloads=0;
+  page.on('download',()=>downloads++);
+  await page.route('https://invalid.test/**',r=>{remoteRequests++;return r.abort();});
+  await page.route('**/api/platform/diagnosis/report*',r=>{
+    const query=new URL(r.request().url()).searchParams;
+    if(!query.size)return r.fulfill({json:report('ready')});
+    files.push(query.toString());
+    return r.fulfill({contentType:'text/html; charset=utf-8',body:query.has('readable')?'<html lang="ko"><head><style>@font-face{font-family:Readable;src:url(https://invalid.test/font.woff2)}body{font-family:Readable,system-ui}</style></head><body><h1>글 위주의 합성 보고서</h1><p>내 경험 한 칸</p><script>parent.readableExecuted=true</script></body></html>':'<h1>기존 합성 보고서</h1>'});
+  });
+  await page.goto('/diagnosis-test?reports');
+  const open=page.getByRole('button',{name:'읽기 쉬운 버전으로 보기',exact:true});
+  await expect(open).toBeVisible();await expect(open).toHaveAccessibleDescription('읽기 쉬운 버전은 글 위주로 편하게 읽는 화면이에요. 내용은 보고서와 같아요.');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.screenshot({path:test.info().outputPath('readable-ready.png'),fullPage:true});
+  await open.click();
+  const dialog=page.getByRole('dialog',{name:'보고서 읽기'}),iframe=page.locator('iframe');
+  await expect(dialog).toBeVisible();await expect(iframe).toHaveAttribute('sandbox','allow-same-origin');
+  await expect(page.frameLocator('iframe').getByRole('heading',{name:'글 위주의 합성 보고서'})).toBeVisible();
+  await expect(page.frameLocator('iframe').getByText('내 경험 한 칸',{exact:true})).toBeVisible();
+  expect(await page.evaluate(()=>Reflect.get(window,'readableExecuted'))).toBeUndefined();
+  expect(remoteRequests).toBe(0);expect(downloads).toBe(0);expect(files).toEqual(['readable=1']);
+  await expect(page.getByRole('button',{name:'보고서 닫기'})).toBeInViewport();
+  await page.screenshot({path:test.info().outputPath('readable-reader.png')});
+  await page.getByRole('button',{name:'보고서 닫기'}).click();await expect(open).toBeFocused();
+  await page.getByRole('button',{name:'보고서 열기',exact:true}).click();
+  await expect(page.frameLocator('iframe').getByRole('heading',{name:'기존 합성 보고서'})).toBeVisible();
+  expect(files).toEqual(['readable=1','html=1']);
+});
+
+test('readable view stays unavailable before ready and revocation clears all report actions',async({page})=>{
+  await session(page);let state='needs_review';
+  await page.route('**/api/platform/diagnosis/report*',r=>new URL(r.request().url()).searchParams.has('readable')?r.fulfill({status:403,json:{error:'검사 결과를 이용할 수 있는 구매·수강 정보를 확인해 주세요.'}}):r.fulfill({json:report(state)}));
+  await page.goto('/diagnosis-test?reports');
+  await expect(page.getByRole('heading',{name:'보고서 발급 전 확인이 필요해요.'})).toBeVisible();
+  const open=page.getByRole('button',{name:'읽기 쉬운 버전으로 보기',exact:true});await expect(open).toHaveCount(0);
+  state='ready';await page.reload();await open.click();
+  await expect(page.getByRole('alert')).toContainText('구매·수강 정보를 확인');
+  await expect(open).toHaveCount(0);await expect(page.getByRole('dialog')).toHaveCount(0);
+});

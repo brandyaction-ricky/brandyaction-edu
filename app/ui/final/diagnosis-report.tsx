@@ -98,13 +98,14 @@ export function DiagnosisReportView({ userId, readyPushEnabled = false, onExit, 
   function refresh() {
     setStatus(null); setPreview(null); setDownloadFormat(null); setError(''); setLoading(true); setPaused(false); setReload(n => n + 1);
   }
-  async function getFile(mode: 'read' | 'html' | 'markdown') {
-    const download = mode !== 'read';
+  async function getFile(mode: 'read' | 'readable' | 'html' | 'markdown', opener?: HTMLButtonElement) {
+    const download = mode === 'html' || mode === 'markdown';
+    if (opener) openReport.current = opener;
     const version = ++fileVersion.current;
     fileRequest.current?.abort(); fileRequest.current = new AbortController();
     setError(''); setDownloadFormat(null); if (download) setDownloading(true); else setFetchingPreview(true);
     try {
-      const response = await fetch(`${endpoint}?${mode === 'markdown' ? 'download' : 'html'}=1`, { cache: 'no-store',
+      const response = await fetch(`${endpoint}?${mode === 'markdown' ? 'download' : mode === 'readable' ? 'readable' : 'html'}=1`, { cache: 'no-store',
         signal: AbortSignal.any([fileRequest.current.signal, AbortSignal.timeout(15_000)]) });
       if (!response.ok) await readResponse(response);
       if (download) {
@@ -155,10 +156,12 @@ export function DiagnosisReportView({ userId, readyPushEnabled = false, onExit, 
       </div>}
       {userId && readyPushEnabled && status && ['queued', 'processing', 'needs_review'].includes(status.state) && <div className="diagnosis-report-notifications"><PushSettings key={userId} userId={userId} diagnosis/></div>}
       {status?.state === 'ready' && <>
-        <div className="diagnosis-report-actions"><button ref={openReport} className="diagnosis-primary" onClick={() => void getFile('read')} disabled={fetchingPreview || downloading}>{fetchingPreview ? <LoaderCircle className="diagnosis-spin" size={18}/> : <FileText size={18}/>}보고서 열기</button>
+        <div className="diagnosis-report-actions"><button className="diagnosis-primary" onClick={event => void getFile('read', event.currentTarget)} disabled={fetchingPreview || downloading}>{fetchingPreview ? <LoaderCircle className="diagnosis-spin" size={18}/> : <FileText size={18}/>}보고서 열기</button>
+          <button className="diagnosis-secondary" aria-describedby="diagnosis-readable-help" onClick={event => void getFile('readable', event.currentTarget)} disabled={fetchingPreview || downloading}><FileText size={18}/>읽기 쉬운 버전으로 보기</button>
           <button className="diagnosis-secondary" onClick={() => void getFile('html')} disabled={fetchingPreview || downloading}><Download size={18}/>HTML 파일 받기</button>
           <button className="diagnosis-secondary" onClick={() => void getFile('markdown')} disabled={fetchingPreview || downloading}>{downloading ? <LoaderCircle className="diagnosis-spin" size={18}/> : <Download size={18}/>}MD 파일 받기</button></div>
         {downloadFormat && <p className="diagnosis-report-help" role="status">파일 저장 창을 확인해 주세요. 창이 안 뜨면 <a href={`${endpoint}?${downloadFormat === 'markdown' ? 'download' : 'html'}=1`} download={downloadFormat === 'markdown' ? 'N6-검사결과.md' : 'N6-정밀보고서.html'}>저장 창 다시 열기</a>를 눌러 주세요. 계속 안 되면 Safari·Chrome에서 이 화면을 열어 받아 주세요.</p>}
+        <p id="diagnosis-readable-help" className="diagnosis-report-help">읽기 쉬운 버전은 글 위주로 편하게 읽는 화면이에요. 내용은 보고서와 같아요.</p>
         <p className="diagnosis-report-help">HTML은 지금 보는 디자인 그대로 보관하는 파일입니다. MD는 다음 날 커리큘럼에서 내 사업에 맞게 정리할 때 사용합니다. 두 파일 모두 다시 받을 수 있습니다.</p>
       </>}
       {preview !== null && <DiagnosisReportReader html={preview} error={error} onClose={() => setPreview(null)} onError={setError}/>}
