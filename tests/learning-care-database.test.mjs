@@ -20,6 +20,13 @@ test('receipt projection preserves every care cell across submission and review 
  assert.equal((await f.snapshot()).rows[0].cells.find(c => c.lessonId === f.lesson).state, 'changes_requested');
  assert.equal((await f.snapshot()).rows[0].cells.find(c => c.lessonId === second.lesson).state, 'locked');
  assert.equal((await f.snapshot()).rows[0].cells.find(c => c.lessonId === hidden.lesson).published, false);
+ const other = await setup(t), approved = await other.submitCell();
+ await other.approve(approved);
+ await other.db.exec('reset role'); await other.db.exec(prior); await other.db.exec('set role service_role');
+ const before = await other.db.query('select edu_private.edu_learning_care_cells($1) as cells', [other.enrollment]);
+ await other.db.exec('reset role'); await other.db.exec(next); await other.db.exec('set role service_role');
+ const after = await other.db.query('select edu_private.edu_learning_care_cells($1) as cells', [other.enrollment]);
+ assert.deepEqual(after.rows[0].cells, before.rows[0].cells);
 });
 test('care distinguishes no submission, review waiting, completion, prerequisite and cohort release',async t=>{
  const f=await setup(t), second=await f.add('daily',2), hidden=await f.add('daily',3,false), learning=await f.add('learning',1);
