@@ -37,7 +37,7 @@ export function CareOverview({ rows, asOf, onStudent, onDay }: {
       })}
     </div>
     {!shown.length && <p className="care-empty">조건에 맞는 수강생이 없습니다.</p>}
-    <p className="care-note">진행률에는 현재 공개된 학습만 포함합니다. 빨강은 시작 단계이며 지연 판정이 아닙니다. 확인 필요는 보완 요청 또는 3일 이상 방문 기록이 없고 지금 수행 가능한 항목이 있는 경우입니다.</p>
+    <p className="care-note">진행률에는 현재 공개된 학습만 포함합니다. 필터의 빨간 상태 점은 시작 단계이며 지연 판정이 아닙니다. 확인 필요는 보완 요청 또는 3일 이상 방문 기록이 없고 지금 수행 가능한 항목이 있는 경우입니다.</p>
     <section id="care-day-overview" className="care-day-overview" aria-label="일차별 학습 진행률">
       <div className="care-board-heading"><div><h2>일차별로 진행 상황을 확인하세요</h2><p>기수 전체의 공개된 학습 기준입니다. 일차를 누르면 해당 수강생 명단이 열립니다.</p></div></div>
       {!days.length && <p className="care-empty">아직 등록된 학습이 없습니다.</p>}
