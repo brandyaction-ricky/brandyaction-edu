@@ -123,3 +123,55 @@
   .edu-admin .learning-care .care-student-tile{padding:12px}
   .edu-admin .learning-care .care-day-tiles article{padding:12px}
 }
+
+/* Admin care uses the same neutral/brand palette as the rest of the workspace.
+   Semantic status colours remain limited to status indicators and progress. */
+.edu-admin .learning-care {
+  --care-green:var(--adm-primary,#c9232d);
+  --care-ink:var(--adm-text,#161719);
+  color:var(--adm-text,#161719);
+}
+.edu-admin .learning-care :is(.care-note,.care-header-actions small,.care-board-count,.care-board-tools>small,.care-legend,.care-detail-top p,.care-detail-help,.care-detail-list small,.care-channel-options label span,.care-channel-unavailable>p,.care-channel-members li>span small){color:var(--adm-text-sub,#626770)}
+.edu-admin .learning-care .care-cohort-context{color:var(--adm-text,#161719)}
+.edu-admin .learning-care .care-cohort-context>span{background:var(--adm-neutral-soft,#f0f2f4);color:var(--adm-neutral,#50545b)}
+.edu-admin .learning-care .care-cohort-context small{color:var(--adm-text-sub,#626770)}
+.edu-admin .learning-care .care-stats svg{color:var(--adm-text-muted,#7a8089)}
+.edu-admin .learning-care .care-stats span{color:var(--adm-text-sub,#626770)}
+.edu-admin .learning-care .care-stats a{color:var(--adm-info,#315e8b)}
+.edu-admin .learning-care .care-band-starting{--band:var(--adm-error,#a71922);--band-bg:var(--adm-error-soft,#fff0f1);--band-border:#f3c7ca}
+.edu-admin .learning-care .care-band-progressing{--band:var(--adm-warning,#865600);--band-bg:var(--adm-warning-soft,#fff6df);--band-border:#f0dca8}
+.edu-admin .learning-care .care-band-finishing{--band:var(--adm-success,#176345);--band-bg:var(--adm-success-soft,#eaf5ef);--band-border:#c7e3d1}
+.edu-admin .learning-care .care-band-unknown{--band:var(--adm-neutral,#50545b);--band-bg:var(--adm-neutral-soft,#f0f2f4);--band-border:var(--adm-border,#e2e5e9)}
+.edu-admin .learning-care .care-band-filters button{background:var(--adm-surface,#fff);border-color:var(--adm-border,#e2e5e9);color:var(--adm-text,#161719);border-radius:var(--adm-radius-md,8px)}
+.edu-admin .learning-care .care-band-filters button[aria-pressed=true]{outline:2px solid var(--adm-text,#161719);outline-offset:1px}
+.edu-admin .learning-care .care-band-filter small{color:var(--adm-text-sub,#626770)}
+.edu-admin .learning-care .care-student-tile{background:var(--adm-surface,#fff);color:var(--adm-text,#161719);border-color:var(--adm-border,#e2e5e9);border-top-color:var(--band)}
+.edu-admin .learning-care .care-student-tile:hover{box-shadow:0 5px 16px #16171914}
+.edu-admin .learning-care .care-student-tile:focus-visible{outline:2px solid var(--adm-info,#315e8b)}
+.edu-admin .learning-care .care-tile-number small,.edu-admin .learning-care :is(.care-tile-next,.care-tile-published){color:var(--adm-text-sub,#626770)}
+.edu-admin .learning-care .care-tile-progress{background:var(--adm-neutral-soft,#f0f2f4)}
+.edu-admin .learning-care :is(.care-filters button,.care-basis button,.care-attention-toggle,.care-day-actions button){border-color:var(--adm-border-strong,#cfd3d8);background:var(--adm-surface,#fff);color:var(--adm-text,#161719)}
+.edu-admin .learning-care :is(.care-filters,.care-basis) button[aria-pressed=true],.edu-admin .learning-care .care-attention-toggle[aria-pressed=true]{background:var(--adm-text,#161719);border-color:var(--adm-text,#161719);color:var(--adm-surface,#fff)}
+.edu-admin .learning-care :is(.care-table th>small,.care-table td>small){color:var(--adm-text-sub,#626770)}
+.edu-admin .learning-care :is(.care-meter progress,.care-day-tiles progress){accent-color:var(--adm-neutral,#50545b)}
+.edu-admin .learning-care .care-completed{background:var(--adm-success-soft,#eaf5ef);color:var(--adm-success,#176345)}
+.edu-admin .learning-care .care-submitted{background:var(--adm-warning-soft,#fff6df);color:var(--adm-warning,#865600)}
+.edu-admin .learning-care .care-changes_requested{background:var(--adm-error-soft,#fff0f1);color:var(--adm-error,#a71922)}
+.edu-admin .learning-care :is(.care-not_submitted,.care-locked,.care-scheduled){background:var(--adm-neutral-soft,#f0f2f4);color:var(--adm-neutral,#50545b)}
+.edu-admin .learning-care :is(.care-day-overview,.care-detail-top,.care-upcoming,.care-detail-list article,.care-channel-members li,.care-compose>.care-controls){border-color:var(--adm-border,#e2e5e9)}
+.edu-admin .learning-care .care-day-tiles article>button{color:var(--adm-text,#161719)}
+.edu-admin .learning-care .care-day-tiles article>button span{color:var(--adm-text-sub,#626770)}
+.edu-admin .learning-care .care-day-tiles .care-day-unpublished{background:var(--adm-surface-subtle,#f7f8f9)}
+.edu-admin .learning-care :is(.care-detail-target select,.care-compose textarea,.care-channel-picker,.care-channel-picker select,.care-channel-options label,.care-channel-unavailable,.care-channel-statuses li,.care-delivery-results){border-color:var(--adm-border,#e2e5e9)}
+.edu-admin .learning-care :is(.care-channel-unavailable,.care-sms-preview){background:var(--adm-surface-subtle,#f7f8f9)}
+.edu-admin .learning-care .care-channel-unavailable>strong{color:var(--adm-text,#161719)}
+.edu-admin .learning-care .care-channel-statuses small{background:var(--adm-neutral-soft,#f0f2f4);color:var(--adm-neutral,#50545b)}
+.edu-admin .learning-care .care-question{background:var(--adm-warning-soft,#fff6df);color:var(--adm-warning,#865600)}
+.edu-admin .learning-care .care-error{background:var(--adm-error-soft,#fff0f1);color:var(--adm-error,#a71922)}
+.edu-admin .learning-care .care-notice{background:var(--adm-success-soft,#eaf5ef);color:var(--adm-success,#176345);border-color:#c7e3d1}
+.edu-admin .learning-care .care-channel-warning{background:var(--adm-warning-soft,#fff6df);color:var(--adm-warning,#865600)}
+.edu-admin .learning-care .care-signal{color:var(--adm-error,#a71922);border-color:#f3c7ca}
+.edu-admin .learning-care .care-signal-review{color:var(--adm-info,#315e8b);border-color:#c9d9ea}
+.edu-admin .learning-care .care-share{background:var(--adm-text,#161719);color:var(--adm-surface,#fff);border-radius:var(--adm-radius-lg,10px)}
+.edu-admin .learning-care .care-share :is(.care-eyebrow,p,small,.care-share-stats span){color:#cfd3d8}
+.edu-admin .learning-care .care-share-growth{border-color:#50545b}

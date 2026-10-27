@@ -45,13 +45,13 @@ function exportSummary(title: string, aggregate: ReturnType<typeof careAggregate
   // Drawing known text on canvas avoids HTML injection and private DOM capture.
   const canvas = document.createElement('canvas'); canvas.width = 1440; canvas.height = 900;
   const ctx = canvas.getContext('2d'); if (!ctx) return;
-  ctx.fillStyle = '#102c2a'; ctx.fillRect(0, 0, 1440, 900);
+  ctx.fillStyle = '#161719'; ctx.fillRect(0, 0, 1440, 900);
   const line = (text: string, x: number, y: number, size: number, color = '#fff') => { ctx.fillStyle = color; ctx.font = `600 ${size}px sans-serif`; ctx.fillText(text, x, y, 1280); };
-  line('BRANDYACTION EDU · 함께 쌓는 실행', 80, 100, 26, '#a8dfc4');
+  line('BRANDYACTION EDU · 함께 쌓는 실행', 80, 100, 26, '#cfd3d8');
   line(title, 80, 190, 44); line('배움이 실행으로 이어지고 있습니다.', 80, 270, 48);
-  [['함께하는 수강생', aggregate.members + '명'], ['학습 완료', aggregate.learning + '건'], ['최근 7일 완료', aggregate.recent + '건']].forEach(([label, count], i) => { line(label, 80 + i * 440, 440, 27, '#a8dfc4'); line(count, 80 + i * 440, 530, 64); });
+  [['함께하는 수강생', aggregate.members + '명'], ['학습 완료', aggregate.learning + '건'], ['최근 7일 완료', aggregate.recent + '건']].forEach(([label, count], i) => { line(label, 80 + i * 440, 440, 27, '#cfd3d8'); line(count, 80 + i * 440, 530, 64); });
   line(`최근 7일 동안 ${aggregate.recent}개의 학습을 완료했습니다.`, 80, 690, 34);
-  line(`${careTime(asOf)} 기준 · 현재 공개된 학습의 완료 기록 · 개인별 순위 없음`, 80, 800, 22, '#a8dfc4');
+  line(`${careTime(asOf)} 기준 · 현재 공개된 학습의 완료 기록 · 개인별 순위 없음`, 80, 800, 22, '#cfd3d8');
   canvas.toBlob(blob => { if (!blob) return; const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'brandy-edu-learning-summary.png'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 10000); }, 'image/png');
 }
 function ShareSummary({ data }: { data: CareSnapshot }) {

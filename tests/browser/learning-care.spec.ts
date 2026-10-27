@@ -153,3 +153,27 @@ test('a long multi-week grid stays within its table cell at desktop and tablet w
    expect(size.height).toBeLessThan(600);
  }
 });
+
+test('admin care surfaces use shared neutral colours while progress keeps semantic status colours', async ({page}) => {
+ await backend(page);
+ await page.goto('/learning-care-test');
+ await page.locator('main.edu-admin').evaluate(el=>el.classList.add('adm'));
+ const style=async (selector:string,property:'color'|'backgroundColor'|'borderBottomColor') => page.locator(selector).first().evaluate((el,prop)=>getComputedStyle(el)[prop],property);
+ expect(await style('.learning-care','color')).toBe('rgb(22, 23, 25)');
+ expect(await style('.care-student-tile','backgroundColor')).toBe('rgb(255, 255, 255)');
+ expect(await style('.care-band-finishing','color')).toBe('rgb(22, 23, 25)');
+ expect(await style('.care-band-finishing i','backgroundColor')).toBe('rgb(23, 99, 69)');
+ expect(await style('.care-tabs [aria-selected=true]','borderBottomColor')).toBe('rgb(22, 23, 25)');
+ await page.getByRole('tab',{name:'수강생별',exact:true}).click();
+ expect(await style('.care-filters [aria-pressed=true]','backgroundColor')).toBe('rgb(22, 23, 25)');
+ expect(await style('.care-cell.care-completed','color')).toBe('rgb(23, 99, 69)');
+ await page.getByRole('button',{name:'가상 지민',exact:true}).click();
+ await expect(page.getByRole('dialog',{name:'수강생 상세'})).toBeVisible();
+ await page.getByRole('dialog',{name:'수강생 상세'}).getByRole('button',{name:'닫기',exact:true}).click();
+ await page.getByRole('tab',{name:'일차별',exact:true}).click();
+ await expect(page.getByRole('combobox',{name:'확인할 일차'})).toBeVisible();
+ await page.getByRole('tab',{name:'공유용 요약',exact:true}).click();
+ expect(await style('.care-share','backgroundColor')).toBe('rgb(22, 23, 25)');
+ expect(await style('.care-share','color')).toBe('rgb(255, 255, 255)');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+});
