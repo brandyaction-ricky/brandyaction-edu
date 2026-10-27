@@ -81,7 +81,8 @@ test('existing admin care route handles review envelope without entering manual 
     process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED='true';
     assert.equal((await post({tipsReview:f.command})).status,200);
     const bad=[{tipsReview:{...f.command,actorId:f.other}},{tipsReview:f.command,content:'try sending'},
-      {tipsReview:{...f.command,deliveryAllowed:true}},{tipsReview:{...f.command,memberId:'invalid'}}];
+      {tipsReview:{...f.command,deliveryAllowed:true}},{tipsReview:{...f.command,memberId:'invalid'}},
+      {tipsReview:{...f.command,intent:['learning_support']}},{tipsReview:{...f.command,channel:['email']}}];
     for(const payload of bad)assert.equal((await post(payload)).status,400);
     const count=f.calls.length;assert.equal((await post({tipsReview:f.command},'https://other.invalid')).status,403);
     allowed=false;assert.equal((await post({tipsReview:f.command})).status,403);allowed=true;loggedIn=false;

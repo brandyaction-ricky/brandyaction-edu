@@ -17,8 +17,8 @@ export function parseTipsActionReview(value: unknown): TipsActionReview | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const x = value as Record<string, unknown>;
   const keys = ['intent', 'memberId', 'courseId', 'cohortId', 'channel', 'enrollmentId', 'lessonId'];
-  if (Object.keys(x).some(k => !keys.includes(k)) || !['learning_support', 'course_offer'].includes(String(x.intent))
-    || !['email', 'kakao'].includes(String(x.channel)) || !['memberId', 'courseId', 'cohortId'].every(k => uuid(x[k]))) return null;
+  if (Object.keys(x).some(k => !keys.includes(k)) || typeof x.intent !== 'string' || !['learning_support', 'course_offer'].includes(x.intent)
+    || typeof x.channel !== 'string' || !['email', 'kakao'].includes(x.channel) || !['memberId', 'courseId', 'cohortId'].every(k => uuid(x[k]))) return null;
   if (x.intent === 'learning_support' && (!uuid(x.enrollmentId) || !uuid(x.lessonId))) return null;
   if (x.intent === 'course_offer' && ('enrollmentId' in x || 'lessonId' in x)) return null;
   return x as TipsActionReview;
