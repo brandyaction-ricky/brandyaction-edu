@@ -3,6 +3,7 @@
   "framework": "nextjs",
   "git": {
     "deploymentEnabled": {
+      "codex/edu-synthetic-cohort-refresh": false,
       "codex/edu-tips-preserve-ui-dev-20261027": false,
       "codex/edu-tips-cohort-feed-20261027": false,
       "codex/edu-tips-source-gate-20261027": false,

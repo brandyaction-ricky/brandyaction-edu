@@ -11,14 +11,16 @@ const dataApi=candidate('edu-tips-data-http');
 const keys={environment:'dev',profile:identity.IDENTITY_PROFILE,recordKey:Buffer.alloc(32,2),customerKey:Buffer.alloc(32,1),customerVersion:'k1'};
 const ids=identity.createEduIdentityCandidate(keys);
 const extras=['20261010080829_edu_tips_erasure_http_v2.sql','20261012014228_edu_tips_eligibility_v2.sql','20261014042612_edu_tips_control_delivery_candidate.sql','20261014054801_edu_tips_identity_jobs_candidate.sql'];
-async function setup(t,{activate=true}={}){
+async function setup(t,{activate=true,syntheticScope=false}={}){
  const f=await fixture(t,extras);await installProjectionSchema(f);
  await f.db.exec('reset role');
  try {
-  await f.db.exec(`alter table cohorts add column status text not null default 'in_progress', add column operation_start_at timestamptz default now()-interval '1 day', add column operation_end_at timestamptz;
+  await f.db.exec(`alter table profiles add column email text;
+   alter table cohorts add column status text not null default 'in_progress', add column operation_start_at timestamptz default now()-interval '1 day', add column operation_end_at timestamptz;
    alter table enrollments add column status text not null default 'active',add column revoked_at timestamptz,add column access_starts_at timestamptz not null default now()-interval '1 day',add column access_ends_at timestamptz;`);
   await f.db.exec(readFileSync(new URL('../supabase/migrations/20261027063226_edu_tips_cohort_feed.sql',import.meta.url),'utf8'));
   await f.db.exec(readFileSync(new URL('../supabase/migrations/20261027065931_edu_tips_same_day_learning_capture.sql',import.meta.url),'utf8'));
+  if(syntheticScope) await f.db.exec(readFileSync(new URL('../supabase/migrations/20261027082254_edu_tips_synthetic_cohort_scope.sql',import.meta.url),'utf8'));
  } catch(error) { await f.db.exec('rollback');throw error; } finally { await f.db.exec('set role service_role'); }
  const signatures={
  edu_tips_prepare_hmac_identity_candidate:['p_member','p_version','p_revision','p_epoch'],
@@ -50,7 +52,7 @@ async function setup(t,{activate=true}={}){
  await f.owner('update edu_tips_private.feed_state set capture_enabled=true,serving_enabled=true where singleton');
  await f.owner("update edu_tips_private.feed_state set capture_since=date_trunc('day',now() at time zone 'Asia/Seoul') at time zone 'Asia/Seoul' where singleton");
  await f.owner("insert into courses values($1,'MoonShot4');",[id(200)]);await f.owner("insert into cohorts values($1,'Cohort4')",[id(201)]);
- for(const n of[5,6]){await f.owner('insert into profiles(id) values($1)',[id(n)]);await f.owner("insert into edu_personalization_preferences(member_id,wording_version,analysis,overseas,revision) values($1,'v1',true,true,$2)",[id(n),id(n+10)]);}
+ for(const n of[5,6]){await f.owner('insert into profiles(id,email) values($1,$2)',[id(n),`edu-live-test-${n}@example.invalid`]);await f.owner("insert into edu_personalization_preferences(member_id,wording_version,analysis,overseas,revision) values($1,'v1',true,true,$2)",[id(n),id(n+10)]);}
  // B stays a legacy subject with its existing references throughout this batch.
  await f.value("select edu_tips_register_subject($1,$2,$3,'v1',$4) as v",[id(6),customer(6),epoch(6),id(16)]);await payment(6);
  assert.equal((await register(5)).status,'registered');
@@ -203,4 +205,36 @@ test('same-day post-consent learning is captured for both identity profiles; old
  }
  await f.run();
  for(const n of[5,6]){const r=await row(f,n);assert.equal(r.cohort_state,'active');assert.equal(r.resource_used,1);assert.equal(r.usage_ratio,null);}
+});
+
+
+test('synthetic scope refreshes only explicitly listed reserved-email legacy member',async t=>{
+ const f=await setup(t,{syntheticScope:true});await prepare(f);
+ await assert.rejects(()=>f.owner("insert into edu_tips_private.cohort_synthetic_allowlist values($1,'edu-live-wrong@example.invalid')",[id(6)]),/IDENTITY_MISMATCH/);
+ await f.owner("insert into edu_tips_private.cohort_synthetic_allowlist values($1,'edu-live-test-6@example.invalid'),($2,'edu-live-test-5@example.invalid')",[id(6),id(5)]);
+ const other=await row(f,5);assert.equal(other.cohort_state,'unknown');
+ await f.owner('update edu_tips_private.cohort_refresh_settings set enabled=true where id=1');
+ await assert.rejects(()=>f.owner('delete from edu_tips_private.cohort_synthetic_allowlist where member_id=$1',[id(6)]),/SCOPE_LOCKED/);
+ await refresh(f);await f.run();
+ assert.equal((await row(f,6)).cohort_state,'active');assert.deepEqual(await row(f,5),other);
+ await f.owner("update cohorts set status='completed' where id=$1",[id(201)]);
+ await refresh(f);await f.run();
+ assert.equal((await row(f,6)).cohort_state,'alumni');assert.deepEqual(await row(f,5),other);
+ await f.owner("update profiles set email='changed@example.invalid' where id=$1",[id(6)]);
+ await f.owner("update cohorts set status='in_progress' where id=$1",[id(201)]);
+ await refresh(f);await f.run();assert.equal((await row(f,6)).cohort_state,'alumni');
+ await f.db.exec('reset role;set role authenticated');
+ await assert.rejects(()=>f.db.query('select * from edu_tips_private.cohort_synthetic_allowlist'),/permission denied/);
+ await assert.rejects(()=>f.db.query('select edu_tips_refresh_synthetic_cohort_feed_candidate(1)'),/permission denied/);
+});
+
+test('synthetic cron is DEV only and never drains global HMAC jobs',async t=>{
+ const f=await setup(t,{syntheticScope:true});await prepare(f);
+ await f.owner("insert into edu_tips_private.cohort_synthetic_allowlist values($1,'edu-live-test-6@example.invalid')",[id(6)]);
+ await f.owner('update edu_tips_private.cohort_refresh_settings set enabled=true where id=1');
+ const env={NEXT_PUBLIC_APP_ENV:'development',EDU_TIPS_SOURCE_ENVIRONMENT:'dev',EDU_TIPS_SYNTHETIC_COHORT_ONLY:'true',EDU_TIPS_COHORT_FEED_ENABLED:'true',CRON_SECRET:'synthetic-cron-secret-not-registered-0000'};
+ const request=new Request('https://synthetic.invalid/cron',{headers:{authorization:'Bearer '+env.CRON_SECRET}});const calls=[];
+ const deps={env,fetch:()=>{throw Error('must not send');},rpc:async(name,args)=>{calls.push(name);if(name!=='edu_tips_refresh_synthetic_cohort_feed_candidate')throw Error('unexpected global worker');return{data:await f.value('select edu_tips_refresh_synthetic_cohort_feed_candidate($1) as v',[args.p_limit]),error:null};}};
+ let result=await runtime.scheduledCohortFeedCandidate(request,deps);assert.equal(result.status,200);assert.deepEqual(calls,['edu_tips_refresh_synthetic_cohort_feed_candidate']);assert.equal((await row(f,6)).cohort_state,'active');
+ calls.length=0;result=await runtime.scheduledCohortFeedCandidate(request,{...deps,env:{...env,NEXT_PUBLIC_APP_ENV:'production',EDU_TIPS_SOURCE_ENVIRONMENT:'production'}});assert.equal(result.status,503);assert.deepEqual(calls,[]);
 });

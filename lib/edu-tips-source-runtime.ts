@@ -111,14 +111,16 @@ export async function scheduledCohortFeedCandidate(request: Request, deps: Deps)
   if (!secret || secret.length < 32 || !got || Buffer.byteLength(got) !== Buffer.byteLength(`Bearer ${secret}`)
     || !timingSafeEqual(Buffer.from(got), Buffer.from(`Bearer ${secret}`))) return response({ status: 'unauthorized' }, 401);
   const cfg = sourceRuntimeConfiguration(deps.env, (deps.now ?? Date.now)());
-  if (!cfg.publisherEnabled) return response({ status: 'configuration_required' }, 503);
+  const syntheticOnly = deps.env.EDU_TIPS_SYNTHETIC_COHORT_ONLY === 'true' && cfg.environment === 'dev';
+  if (!cfg.publisherEnabled && !syntheticOnly) return response({ status: 'configuration_required' }, 503);
   try {
-    const refresh = await rpc(deps, 'edu_tips_refresh_cohort_feed_candidate', { p_limit: 20 });
+    const refresh = await rpc(deps, syntheticOnly ? 'edu_tips_refresh_synthetic_cohort_feed_candidate' : 'edu_tips_refresh_cohort_feed_candidate', { p_limit: 20 });
     if (!record(refresh) || refresh.status !== 'processed' || !Number.isSafeInteger(refresh.processed)
       || Number(refresh.processed) < 0 || Number(refresh.processed) > 20 || typeof refresh.pending !== 'boolean') {
       return response({ status: 'unavailable' }, 503);
     }
     const projection = { claimed: 0, applied: 0, pending: 0, stale: 0, failures: 0 };
+    if (syntheticOnly) return response({ status: 'processed', refresh, projection });
     for (let i = 0; i < 5; i++) {
       const batch = await projections(deps);
       if (batch.status !== 'processed') return response({ status: 'unavailable' }, 503);
