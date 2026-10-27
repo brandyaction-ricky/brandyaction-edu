@@ -3,6 +3,7 @@
   "framework": "nextjs",
   "git": {
     "deploymentEnabled": {
+      "codex/edu-tips-source-gate-20261027": false,
       "codex/edu-tips-final-review-20261027": false,
       "codex/edu-campaign-insights-20261015": false,
       "codex/edu-tips-dev-rehearsal-20261015": false,
