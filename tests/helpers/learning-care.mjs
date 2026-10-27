@@ -29,6 +29,7 @@ export async function setup(t) {
  await f.db.exec(read('20261008073102_learning_care_batch_projection.sql'));
  await f.db.exec(read('20261008084305_learning_care_cohort_history.sql'));
  await f.db.exec(read('20261013061722_learning_care_completion_timing.sql'));
+ await f.db.exec(read('20261027090000_learning_care_receipt_projection.sql'));
  f.parity=async()=>{const result=await f.db.query('select edu_private.edu_learning_care_cells($1) as actual, edu_private.edu_learning_care_cells_reference($1) as expected',[f.enrollment]);assert.deepEqual(result.rows[0].actual.map(({timing,...cell})=>cell),result.rows[0].expected);};
  await f.db.exec('set role service_role');
  f.snapshot = async(actor=f.admin,cohort=f.cohort)=>{await f.parity();return(await f.db.query('select edu_admin_learning_care($1,$2) as r',[actor,cohort])).rows[0].r;};

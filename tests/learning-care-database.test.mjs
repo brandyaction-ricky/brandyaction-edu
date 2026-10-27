@@ -1,7 +1,33 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID as id } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { setup } from './helpers/learning-care.mjs';
+test('receipt projection preserves every care cell across submission and review states', async t => {
+ const f = await setup(t), second = await f.add('daily', 2), hidden = await f.add('learning', 3, false);
+ const prior = readFileSync(new URL('../supabase/migrations/20261013061722_learning_care_completion_timing.sql', import.meta.url), 'utf8');
+ const next = readFileSync(new URL('../supabase/migrations/20261027090000_learning_care_receipt_projection.sql', import.meta.url), 'utf8');
+ async function compare() {
+  await f.db.exec('reset role'); await f.db.exec(prior); await f.db.exec('set role service_role');
+  const before = await f.db.query('select edu_private.edu_learning_care_cells($1) as cells', [f.enrollment]);
+  await f.db.exec('reset role'); await f.db.exec(next); await f.db.exec('set role service_role');
+  const after = await f.db.query('select edu_private.edu_learning_care_cells($1) as cells', [f.enrollment]);
+  assert.deepEqual(after.rows[0].cells, before.rows[0].cells);
+ }
+ await compare();
+ const submission = await f.submitCell(); await compare();
+ await f.approve(submission, 'changes_requested'); await compare();
+ assert.equal((await f.snapshot()).rows[0].cells.find(c => c.lessonId === f.lesson).state, 'changes_requested');
+ assert.equal((await f.snapshot()).rows[0].cells.find(c => c.lessonId === second.lesson).state, 'locked');
+ assert.equal((await f.snapshot()).rows[0].cells.find(c => c.lessonId === hidden.lesson).published, false);
+ const other = await setup(t), approved = await other.submitCell();
+ await other.approve(approved);
+ await other.db.exec('reset role'); await other.db.exec(prior); await other.db.exec('set role service_role');
+ const before = await other.db.query('select edu_private.edu_learning_care_cells($1) as cells', [other.enrollment]);
+ await other.db.exec('reset role'); await other.db.exec(next); await other.db.exec('set role service_role');
+ const after = await other.db.query('select edu_private.edu_learning_care_cells($1) as cells', [other.enrollment]);
+ assert.deepEqual(after.rows[0].cells, before.rows[0].cells);
+});
 test('care distinguishes no submission, review waiting, completion, prerequisite and cohort release',async t=>{
  const f=await setup(t), second=await f.add('daily',2), hidden=await f.add('daily',3,false), learning=await f.add('learning',1);
  let cells=(await f.snapshot()).rows[0].cells;
