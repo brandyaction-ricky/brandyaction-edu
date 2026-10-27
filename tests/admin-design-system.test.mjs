@@ -37,7 +37,7 @@ test('all admin routes share the adm token and class contract without changing p
   const platform = fs.readFileSync('app/ui/platform.tsx', 'utf8');
   const components = fs.readFileSync('features/admin-ui/components/admin-system.tsx', 'utf8');
   const shell = fs.readFileSync('app/ui/final/admin-shell.tsx', 'utf8');
-  for (const token of ['--adm-bg:#F5F6F8', '--adm-surface:#FFFFFF', '--adm-border:#E3E5E9', '--adm-text:#15171A', '--adm-primary:#C9232D', '--adm-control:36px', '--adm-control-sm:30px', '--adm-sidebar-width:210px', '--adm-tree-width:320px', '--adm-page-max:1440px']) assert.ok(admin.includes(token), token);
+  for (const token of ['--adm-bg:#F7F8F9', '--adm-surface:#FFFFFF', '--adm-border:#E2E5E9', '--adm-text:#161719', '--adm-primary:#C9232D', '--adm-control:36px', '--adm-control-sm:30px', '--adm-sidebar-width:236px', '--adm-tree-width:320px', '--adm-page-max:1440px']) assert.ok(admin.includes(token), token);
   for (const selector of ['.adm-shell', '.adm-sidebar', '.adm-main', '.adm-topbar', '.adm-page', '.adm-page-head', '.adm-btn', '.adm-field', '.adm-table-wrap', '.adm-table', '.adm-filterbar', '.adm-tabs', '.adm-modal', '.adm-stats']) assert.ok(admin.includes(selector), selector);
   assert.match(platform, /"edu-admin adm adm-shell"/);
   for (const className of ['adm-sidebar', 'adm-main', 'adm-topbar', 'adm-page']) assert.ok(shell.includes(className), className);
