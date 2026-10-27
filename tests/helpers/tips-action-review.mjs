@@ -11,7 +11,7 @@ export function compile(file, modules) {
 }
 export async function tipsReviewFixture(t) {
   const f=await setup(t), learning=await f.add('learning',1), calls=[];
-  f.lesson=learning.lesson;
+  f.lesson=learning.lesson; f.learningRevision=learning.revision;
   const read=name=>fs.readFileSync(new URL('../../supabase/migrations/'+name,import.meta.url),'utf8');
   await f.db.exec(`reset role; alter table profiles add column marketing_consent boolean default false;
     alter table profiles add column marketing_consent_at timestamptz; alter table profiles add column marketing_opt_out_at timestamptz;
@@ -47,7 +47,7 @@ export async function tipsReviewFixture(t) {
     try{
       if(url.pathname.includes('/rpc/')){
         const body=JSON.parse(init.body),args=Object.values(body);
-        if(!['edu_admin_learning_care','edu_personalization_consent'].includes(table))throw Error('Unexpected RPC');
+        if(!['edu_admin_learning_care','edu_personalization_consent','edu_tips_action_review_context'].includes(table))throw Error('Unexpected RPC');
         const named=Object.keys(body).map((k,i)=>`${k}=>$${i+1}`).join(',');
         return Response.json((await f.db.query(`select ${table}(${named}) as r`,args)).rows[0].r);
       }
@@ -79,6 +79,7 @@ export async function tipsReviewFixture(t) {
   };
   const client=createClient('https://fixture.invalid','SYNTHETIC-ONLY',{global:{fetch},auth:{persistSession:false,autoRefreshToken:false}});
   const rules=compile('lib/learning-care.ts',{});
-  const review=compile('lib/edu-tips-action-review-server.ts',{'server-only':{},'@/lib/supabase/admin':{createAdminClient:()=>client},'@/lib/learning-care':rules,'@/lib/edu-workflows':{uuid:x=>typeof x==='string'&&/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(x)}});
-  return {...f,command,client,review,calls,order,item,payment,setFault:x=>{fault=x;}};
+  const evaluator=compile('lib/edu-tips-action-review.ts',{'./learning-care':rules,'./edu-workflows':{uuid:x=>typeof x==='string'&&/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(x)}});
+  const review=compile('lib/edu-tips-action-review-server.ts',{'./edu-tips-action-review':evaluator,'server-only':{},'@/lib/supabase/admin':{createAdminClient:()=>client},'@/lib/learning-care':rules,'@/lib/edu-workflows':{uuid:x=>typeof x==='string'&&/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(x)}});
+  return {...f,command,client,review,evaluator,calls,order,item,payment,setFault:x=>{fault=x;}};
 }
