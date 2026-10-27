@@ -5,7 +5,7 @@ import { careDaySummaries, careSortDays, careDuration, type CareDaySort, type Ca
 export function CareDayOverview({ rows, asOf, onDay }: { rows: CareRow[]; asOf: string; onDay: (id: string, filter: string) => void }) {
   const [sort, setSort] = useState<CareDaySort>('curriculum');
   const days = careSortDays(careDaySummaries(rows, asOf), sort);
-  return <section className="care-day-overview" aria-label="일차별 학습 진행률">
+  return <section id="care-day-overview" className="care-day-overview" aria-label="일차별 학습 진행률">
     <div className="care-board-heading"><div><h2>일차별로 진행 상황을 확인하세요</h2><p>일차를 누르면 해당 수강생 명단이 열립니다.</p></div></div>
     <div className="care-controls"><label>일차 정렬<select value={sort} onChange={e => setSort(e.target.value as CareDaySort)}>
       <option value="curriculum">커리큘럼 순</option><option value="completion">완료율 낮은 순</option><option value="duration">완료시간 중앙값 긴 순</option>

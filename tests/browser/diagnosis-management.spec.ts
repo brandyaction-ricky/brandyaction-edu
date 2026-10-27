@@ -5,10 +5,11 @@ const data={enabled:true,allPublished:false,revision:0,eligibleCount:103,started
 test.beforeEach(async({page})=>{
  await page.route('**/api/platform?**',route=>route.fulfill({json:{user:{id:id(99),full_name:'합성 관리자',role:'admin'},data:{admin_summary:[{pendingReviews:0,openQuestions:0}]}}}));
 });
+async function openRowActions(page:import('@playwright/test').Page,name:string){await page.getByLabel(`${name} 관리 메뉴`).click();}
 test('switching from a cohort to a member clears the previous cohort scope without a remount from the router',async({page})=>{
  const cohort=id(104),reads:URL[]=[];
  await page.route('**/api/admin/diagnosis**',r=>{const url=new URL(r.request().url());reads.push(url);const member=url.searchParams.has('member'),scoped=url.searchParams.has('cohort');return r.fulfill({json:{...data,cohorts:[{id:cohort,name:'4기',code:'MOONSHOT_004',courseTitle:'AI 문샷',enabled:false,inherited:true}],cohort:scoped?{id:cohort,name:'4기',enabled:false,inherited:true,individualCount:0}:null,rows:member?[data.rows[0]]:data.rows}});});
- await page.goto('/diagnosis-test?manage&switch-member');await page.getByLabel('공개 대상 기수').selectOption(cohort);await expect(page.getByRole('heading',{name:'4기 진단 공개',exact:true})).toBeVisible();
+ await page.goto('/diagnosis-test?manage&switch-member');await page.getByRole('button',{name:'공개 설정'}).click();await page.getByLabel('공개 대상 기수').selectOption(cohort);await expect(page.getByRole('heading',{name:'4기 진단 공개',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'합성 회원 바로가기',exact:true}).click();await expect.poll(()=>reads.at(-1)?.searchParams.get('member')).toBe(id(1));expect(reads.at(-1)?.searchParams.has('cohort')).toBe(false);
  await expect(page.getByRole('row',{name:/학생 A/})).toBeVisible();await expect(page.getByRole('row',{name:/학생 B/})).toHaveCount(0);await expect(page.getByLabel('공개 대상 기수')).toHaveCount(0);await expect(page.getByText('선택 기수 기준',{exact:false})).toHaveCount(0);
 });
@@ -20,7 +21,7 @@ test('cohort selection scopes counts and pages, confirms exact cohort, preserves
   const url=new URL(r.request().url());reads.push(url);const selected=url.searchParams.get('cohort');
   await r.fulfill(broken?{status:503,json:{error:'기수 정보를 불러오지 못했습니다.'}}:{json:{...data,revision,cohorts,cohort:selected?{id:selected,name:selected===four?'4기':'5기',enabled:published,inherited:revision===0,individualCount:1}:null,eligibleCount:selected?3:103,startedCount:selected?1:2,nextCursor:selected&&!url.searchParams.has('before')?id(90):null,rows:selected?[{...data.rows[0],published,override:null}]:data.rows}});
  });
- await page.goto('/diagnosis-test?manage');await page.getByLabel('공개 대상 기수').selectOption(four);
+ await page.goto('/diagnosis-test?manage');await page.getByRole('button',{name:'공개 설정'}).click();await page.getByLabel('공개 대상 기수').selectOption(four);
  await expect(page.getByRole('heading',{name:'4기 진단 공개',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'한 번에 모두 공개',exact:true})).toHaveCount(0);
  await expect(page.getByText('3명',{exact:true})).toBeVisible();await expect(page.getByText('선택 기수 기준',{exact:false})).toBeVisible();expect(reads.at(-1)?.searchParams.get('cohort')).toBe(four);
  await page.getByRole('button',{name:'선택 기수 공개',exact:true}).click();const modal=page.getByRole('dialog');await expect(modal).toContainText('4기 진단 공개');await expect(modal).toContainText('다른 기수의 설정은 바꾸지 않습니다');await expect(modal).toContainText('개인별 설정 1건');
@@ -34,6 +35,16 @@ test('cohort selection scopes counts and pages, confirms exact cohort, preserves
  await page.screenshot({path:info.outputPath('n6-cohort-publication.png'),fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  broken=true;await page.locator('#admin-content').getByRole('button',{name:'새로고침',exact:true}).click();await expect(page.getByRole('alert')).toContainText('기수 정보를 불러오지 못했습니다');await expect(page.getByRole('button',{name:'선택 기수 공개',exact:true})).toBeDisabled();expect(writes).toHaveLength(2);
 });
+test('status filters disclose their page scope and keep every record available',async({page})=>{
+ await page.route('**/api/admin/diagnosis**',r=>r.fulfill({json:data}));await page.goto('/diagnosis-test?manage');
+ const filters=page.getByRole('group',{name:'현재 페이지 진단 상태 필터'});
+ await expect(page.getByText(/상태 필터와 숫자는 현재 페이지 기준/)).toBeVisible();
+ await expect(page.getByRole('link',{name:'N6 진단 받기 (새 탭)',exact:true})).toHaveAttribute('target','_blank');
+ await filters.getByRole('button',{name:'시작 전 1'}).click();await expect(page.getByRole('row',{name:/학생 B/})).toBeVisible();await expect(page.getByRole('row',{name:/학생 A/})).toHaveCount(0);
+ await filters.getByRole('button',{name:'발급 보류 1'}).click();await expect(page.getByRole('row',{name:/학생 A/})).toBeVisible();
+ await filters.getByRole('button',{name:'전체 3'}).click();await expect(page.locator('.diagnosis-management tbody tr')).toHaveCount(3);
+ await expect(page.getByRole('button',{name:'한 번에 모두 공개'})).toHaveCount(0);await page.getByRole('button',{name:'공개 설정'}).click();await expect(page.getByRole('button',{name:'한 번에 모두 공개'})).toBeVisible();
+});
 test('timeline separates start, submit, issue in Korea time and keeps polling time inside history',async({page})=>{
  const row={...data.rows[2],report:{...report,state:'ready',canRetry:false,errorCode:null,startedAt:'2026-10-04T11:24:00Z',submittedAt:'2026-10-04T23:30:00Z',issuedAt:'2026-10-05T00:40:00Z',checkedAt:'2026-10-06T00:00:00Z'}};
  await page.route('**/api/admin/diagnosis**',r=>r.fulfill({json:{...data,rows:[row]}}));
@@ -41,14 +52,14 @@ test('timeline separates start, submit, issue in Korea time and keeps polling ti
  await expect(item.getByText(/검사 시작 2026\. 10\. 4\. 오후 08:24/)).toBeVisible();
  await expect(item.getByText(/제출 완료 2026\. 10\. 5\. 오전 08:30/)).toBeVisible();
  await expect(item.getByText(/보고서 발급 2026\. 10\. 5\. 오전 09:40/)).toBeVisible();
- await expect(item.getByText(/상태 조회:/)).not.toBeVisible();await item.getByText('진행·오류 기록 보기').click();
+ await expect(item.getByText(/상태 조회:/)).not.toBeVisible();await openRowActions(page,'학생 C');await item.getByText('진행·오류 기록 보기').click();
  await expect(item.getByText(/상태 조회: 2026\. 10\. 6\./)).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 test('admin can find direct diagnosis, confirm whole or individual publication and see progress without document overflow',async({page},info)=>{
  const writes:unknown[]=[];let latest=data;
  await page.route('**/api/admin/diagnosis**',async route=>{if(route.request().method()==='POST'){const b=route.request().postDataJSON();writes.push(b);latest={...latest,revision:latest.revision+1,allPublished:b.action==='publish_all'?b.enabled:latest.allPublished,rows:latest.rows.map(r=>b.action==='publish_all'||b.userId===r.id?{...r,published:b.enabled}:r)};await route.fulfill({json:{revision:latest.revision}});return;}await route.fulfill({json:latest});});
- await page.goto('/diagnosis-test?manage');await expect(page.getByRole('heading',{name:'N6 진단 관리',exact:true})).toBeVisible();await expect(page.locator('.diagnosis-management').getByRole('link',{name:'N6 진단 받기'})).toHaveAttribute('href','/admin/diagnosis');
+ await page.goto('/diagnosis-test?manage');await expect(page.getByRole('heading',{name:'N6 진단 관리',exact:true})).toBeVisible();await expect(page.locator('.diagnosis-management').getByRole('link',{name:'N6 진단 받기'})).toHaveAttribute('href','/admin/diagnosis');await page.getByRole('button',{name:'공개 설정'}).click();
  await page.getByRole('button',{name:'한 번에 모두 공개'}).click();await expect(page.getByRole('dialog')).toContainText('103명');await page.getByRole('button',{name:'취소',exact:true}).click();expect(writes).toHaveLength(0);
  await page.getByRole('button',{name:'학생 B 진단 공개'}).click();await expect(page.getByRole('dialog')).toContainText('학생 B');await page.getByRole('button',{name:'공개하기',exact:true}).click();await expect(page.getByRole('button',{name:'학생 B 진단 닫기'})).toBeVisible();expect(writes[0]).toMatchObject({action:'publish_member',userId:id(2),revision:0,enabled:true});
  await page.getByRole('button',{name:'한 번에 모두 공개'}).click();await page.getByRole('button',{name:'공개하기',exact:true}).click();await expect(page.getByRole('status').filter({hasText:'진단 공개 설정을 저장했습니다.'})).toBeVisible();expect(writes[1]).toMatchObject({action:'publish_all',revision:1});
@@ -65,19 +76,19 @@ test('diagnosis management retains admin navigation and mobile menu without chan
  await sidebar.getByRole('link',{name:'회원 관리',exact:true}).click();await expect(page).toHaveURL(/\/admin\/customers$/);
  await page.goBack();await expect(page.getByRole('heading',{name:'N6 진단 관리',exact:true})).toBeVisible();
  if(info.project.name!=='desktop'){const opener=page.getByRole('button',{name:'관리자 메뉴 열기'});await opener.click();await page.keyboard.press('Escape');await expect(sidebar).not.toBeVisible();await expect(opener).toBeFocused();}
- await expect(page.getByRole('button',{name:'한 번에 모두 공개'})).toBeEnabled();
+ await page.getByRole('button',{name:'공개 설정'}).click();await expect(page.getByRole('button',{name:'한 번에 모두 공개'})).toBeEnabled();
  expect(writes).toHaveLength(0);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.screenshot({path:info.outputPath('diagnosis-management-navigation.png'),fullPage:true});
 });
 test('retry confirms frozen answers and uses same request after lost acknowledgment; ready reports never offer regeneration',async({page})=>{
  const writes:Record<string,unknown>[]=[];let lost=true;
  await page.route('**/api/admin/diagnosis**',async route=>{if(route.request().method()==='POST'){writes.push(route.request().postDataJSON());if(lost){lost=false;await route.abort();return;}await route.fulfill({json:{state:'queued'}});return;}await route.fulfill({json:data});});
- await page.goto('/diagnosis-test?manage');const row=page.getByRole('row',{name:/학생 A/}),ready=page.getByRole('row',{name:/학생 C/});await expect(ready.getByRole('button',{name:'보고서 재발급'})).toBeDisabled();await row.getByText('진행·오류 기록 보기').click();await expect(row).toContainText('JOB_DEADLINE_REACHED');
+ await page.goto('/diagnosis-test?manage');const row=page.getByRole('row',{name:/학생 A/}),ready=page.getByRole('row',{name:/학생 C/});await openRowActions(page,'학생 A');await openRowActions(page,'학생 C');await expect(ready.getByRole('button',{name:'보고서 재발급'})).toBeDisabled();await row.getByText('진행·오류 기록 보기').click();await expect(row).toContainText('JOB_DEADLINE_REACHED');
  await row.getByRole('button',{name:'보고서 재발급'}).click();await expect(page.getByRole('dialog')).toContainText('검사를 다시 할 필요는 없습니다');await page.getByRole('button',{name:'저장된 답변으로 재발급'}).click();await expect(page.getByRole('dialog').getByRole('alert')).toBeVisible();await page.getByRole('button',{name:'저장된 답변으로 재발급'}).click();await expect(page.getByRole('dialog')).toHaveCount(0);expect(writes).toHaveLength(2);expect(writes[1]).toEqual(writes[0]);expect(writes[0]).toMatchObject({action:'retry',attemptId:id(10),expectedVersion:version});
 });
 test('temporary remote outage shows last check and disables retry; failed reads disable all changes',async({page})=>{
  let failed=false;await page.route('**/api/admin/diagnosis**',route=>route.fulfill(failed?{status:503,json:{error:'조회할 수 없습니다.'}}:{json:{...data,remoteAvailable:false,rows:data.rows.map(r=>({...r,statusAvailable:false,report:r.report?{...r.report,canRetry:false}:null}))}}));
- await page.goto('/diagnosis-test?manage');await expect(page.getByText(/마지막 확인 기록/)).toBeVisible();for(const b of await page.getByRole('button',{name:'보고서 재발급'}).all())await expect(b).toBeDisabled();failed=true;await page.locator('#admin-content').getByRole('button',{name:'새로고침',exact:true}).click();await expect(page.getByRole('alert')).toContainText('조회할 수 없습니다');await expect(page.getByRole('button',{name:'한 번에 모두 공개'})).toBeDisabled();
+ await page.goto('/diagnosis-test?manage');await expect(page.getByText(/마지막 확인 기록/)).toBeVisible();await openRowActions(page,'학생 A');for(const b of await page.getByRole('button',{name:'보고서 재발급'}).all())await expect(b).toBeDisabled();await page.getByRole('button',{name:'공개 설정'}).click();failed=true;await page.locator('#admin-content').getByRole('button',{name:'새로고침',exact:true}).click();await expect(page.getByRole('alert')).toContainText('조회할 수 없습니다');await expect(page.getByRole('button',{name:'한 번에 모두 공개'})).toBeDisabled();
 });
 test('pagination and search use bounded server pages; 320px layout keeps controls readable',async({page},info)=>{
  const queries:string[]=[];await page.route('**/api/admin/diagnosis**',async route=>{queries.push(route.request().url());await route.fulfill({json:data});});await page.setViewportSize({width:320,height:844});await page.goto('/diagnosis-test?manage');await page.getByRole('button',{name:'다음',exact:true}).click();await expect.poll(()=>queries.at(-1)).toContain('before=');await page.getByRole('textbox',{name:'수강생 검색'}).fill('학생 A');await page.getByRole('button',{name:'검색',exact:true}).click();await expect.poll(()=>queries.at(-1)).toContain('query=');expect(new URL(queries.at(-1)!).searchParams.has('before')).toBe(false);await page.screenshot({path:info.outputPath('diagnosis-management-320.png'),fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
@@ -90,13 +101,13 @@ test('queue observation is visible but stale positions disappear when live looku
 });
 test('review without a code explains disabled action instead of silently hiding the reason',async({page})=>{
  await page.route('**/api/admin/diagnosis**',r=>r.fulfill({json:{...data,rows:[{...data.rows[0],report:{...report,errorCode:null,canRetry:false,details:[]}}]}}));
- await page.goto('/diagnosis-test?manage');await expect(page.getByText(/보고서 검토가 필요해 발급이 보류/)).toBeVisible();await expect(page.getByRole('button',{name:'보고서 재발급'})).toBeDisabled();
+ await page.goto('/diagnosis-test?manage');await expect(page.getByText(/보고서 검토가 필요해 발급이 보류/)).toBeVisible();await openRowActions(page,'학생 A');await expect(page.getByRole('button',{name:'보고서 재발급'})).toBeDisabled();
  await page.getByText('진행·오류 기록 보기').click();await expect(page.getByText('서버에서 상세 사유를 아직 제공하지 않았습니다.')).toBeVisible();
 });
 test('rewrite requires explicit capability and confirmation, preserves request after lost response',async({page},info)=>{
  const writes:Record<string,unknown>[]=[];let permitted=false;
  await page.route('**/api/admin/diagnosis**',r=>{if(r.request().method()==='POST'){writes.push(r.request().postDataJSON());return writes.length===1?r.abort():r.fulfill({json:{state:'queued'}});}return r.fulfill({json:{...data,rows:[{...data.rows[0],report:{...report,errorCode:'COMPLETION_REVIEW_REQUIRED',retryMode:permitted?'rewrite':null,rewritesRemaining:2}}]}});});
- await page.goto('/diagnosis-test?manage');await expect(page.getByRole('button',{name:'보고서 재발급'})).toBeDisabled();permitted=true;await page.locator('#admin-content').getByRole('button',{name:'새로고침',exact:true}).click();
+ await page.goto('/diagnosis-test?manage');await openRowActions(page,'학생 A');await expect(page.getByRole('button',{name:'보고서 재발급'})).toBeDisabled();permitted=true;await page.locator('#admin-content').getByRole('button',{name:'새로고침',exact:true}).click();
  await page.getByRole('button',{name:'보고서 새로 작성'}).click();const modal=page.getByRole('dialog');await expect(modal).toContainText('약 1.3달러');await expect(modal).toContainText('최대 2회');expect(writes).toHaveLength(0);
  await page.screenshot({path:info.outputPath('n6-rewrite-confirmation.png'),fullPage:true});
  await modal.getByRole('button',{name:'비용 확인 후 새로 작성'}).click();await expect(modal.getByRole('alert')).toBeVisible();await modal.getByRole('button',{name:'비용 확인 후 새로 작성'}).click();await expect(modal).toHaveCount(0);expect(writes[1]).toEqual(writes[0]);expect(writes[0]).toMatchObject({retryMode:'rewrite',expectedVersion:version});
@@ -115,7 +126,7 @@ test('second rewrite shows remaining allowance and uses a new request after an a
   if(r.request().method()==='POST'){writes.push(r.request().postDataJSON());remaining--;return r.fulfill({json:{state:'queued'}});}
   return r.fulfill({json:{...data,rows:[{...data.rows[0],report:{...report,errorCode:'COMPLETION_REVIEW_REQUIRED',canRetry:remaining>0,retryMode:remaining>0?'rewrite':null,rewritesRemaining:remaining,version:(remaining===2?'a':'b').repeat(64)}}]}});
  });
- await page.goto('/diagnosis-test?manage');
+ await page.goto('/diagnosis-test?manage');await openRowActions(page,'학생 A');
  for(const count of [2,1]){
   await expect(page.getByText(`새로 작성 최대 2회 · 남은 ${count}회`,{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'보고서 새로 작성',exact:true}).click();const modal=page.getByRole('dialog');
@@ -137,7 +148,7 @@ test('unknown, invalid, exhausted or stale allowance cannot start a paid rewrite
   if(r.request().method()==='POST')writes.push(r.request().postDataJSON());
   return r.fulfill({json:{...data,remoteAvailable:available,rows:[{...data.rows[0],statusAvailable:available,report:{...report,errorCode:'COMPLETION_REVIEW_REQUIRED',retryMode:'rewrite',rewritesRemaining:count}}]}});
  });
- await page.goto('/diagnosis-test?manage');
+ await page.goto('/diagnosis-test?manage');await openRowActions(page,'학생 A');
  for(const value of [null,undefined,-1,3,1.5,'1',0]){
   count=value;await page.locator('#admin-content').getByRole('button',{name:'새로고침',exact:true}).click();
   await expect(page.getByRole('button',{name:'보고서 새로 작성',exact:true})).toBeDisabled();
