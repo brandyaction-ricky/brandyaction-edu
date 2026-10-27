@@ -18,11 +18,25 @@ export async function POST(request: Request) {
   try {
     if (request.headers.get('origin') !== new URL(request.url).origin) return reply({ error: '허용되지 않은 요청입니다.' }, 403);
     const user = await actor(); if (!user) return reply({ error: '회원 관리 권한이 필요합니다.' }, 403);
-    if (process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED !== 'true') return reply({ error: '메시지 기능을 준비 중입니다.' }, 404);
     const reader = request.body?.getReader(); if (!reader) return reply({ error: '안내 내용을 확인해 주세요.' }, 400);
     let text = '', size = 0; const decoder = new TextDecoder();
     try { for (;;) { const chunk = await reader.read(); if (chunk.done) break; size += chunk.value.byteLength; if (size > 40000) { await reader.cancel(); return reply({ error: '안내 내용이 너무 깁니다.' }, 413); } text += decoder.decode(chunk.value, { stream: true }); } text += decoder.decode(); } finally { reader.releaseLock(); }
     let body; try { body = JSON.parse(text); } catch { return reply({ error: '안내 내용을 확인해 주세요.' }, 400); }
+    if (body && typeof body === 'object' && Object.hasOwn(body, 'tipsReview')) {
+      // An operator can review an AI-selected candidate here. The review cannot
+      // fall through into the manual send path or supply its own actor/result.
+      if (process.env.EDU_TIPS_ACTION_REVIEW_ENABLED !== 'true') return reply({ error: 'TIPS 안내 검수를 준비 중입니다.' }, 404);
+      const { parseTipsActionReview, reviewTipsAction } = await import('@/lib/edu-tips-action-review-server');
+      const command = Object.keys(body).length === 1 ? parseTipsActionReview(body.tipsReview) : null;
+      if (!command) return reply({ error: 'TIPS 안내 후보를 다시 확인해 주세요.' }, 400);
+      try {
+        const review = await reviewTipsAction(user.id, command, createAdminClient(), AbortSignal.any([request.signal, AbortSignal.timeout(15000)]));
+        return reply({ review, mode: 'review_only', deliveryAllowed: false });
+      } catch {
+        return reply({ error: '구매·환불·수강 상태를 확인하지 못해 판정을 보류했습니다. 다시 확인해 주세요.', mode: 'review_only', deliveryAllowed: false }, 503);
+      }
+    }
+    if (process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED !== 'true') return reply({ error: '메시지 기능을 준비 중입니다.' }, 404);
     if (!body || !uuid(body.requestId) || !uuid(body.cohortId) || !uuid(body.lessonId) || typeof body.content !== 'string' || !body.content.trim() || body.content.length > 5000 || !Array.isArray(body.recipients) || !body.recipients.length || body.recipients.length > 100 || !body.recipients.every(uuid)) return reply({ error: '안내 내용과 받는 사람을 확인해 주세요.' }, 400);
     const args = { p_actor: user.id, p_request: body.requestId, p_cohort: body.cohortId, p_lesson: body.lessonId, p_recipients: [...new Set(body.recipients)].sort(), p_content: body.content.trim() };
     let channelArgs: Record<string,unknown> | null = null;
