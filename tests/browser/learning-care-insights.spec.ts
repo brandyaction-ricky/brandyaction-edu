@@ -63,3 +63,38 @@ test('old snapshots without predecessor data keep progress and visit attention; 
   const table = page.getByRole('table', { name: '확인 필요 수강생 목록' });
   await expect(table).not.toContainText('72시간 이상 학습 정체'); await expect(table).toContainText('3일 이상 방문 기록 없음');
 });
+
+test('long attention labels stay within columns, and lesson buttons retain week context and order', async ({ page }, info) => {
+  const longTitle = '아주 긴 학습 제목과상태배지가겹치지않아야합니다'.repeat(8);
+  const longRows = snapshot.rows.map((row, index) => index === 2 ? {
+    ...row, name: '아주 긴 이름을 가진 가상 수강생 '.repeat(4),
+    cells: row.cells.map((cell, cellIndex) => ({ ...cell, title: cellIndex === 1 ? longTitle : cell.title, week: cellIndex === 2 ? 2 : 1 })),
+  } : row);
+  const writes = await backend(page, { ...snapshot, rows: longRows });
+  await page.goto('/learning-care-test');
+  const overview = page.getByRole('region', { name: '기수별 수강생 현황판' });
+  await expect(overview.getByRole('link', { name: '일차별 현황 바로 보기' })).toHaveAttribute('href', '#care-day-overview');
+  await overview.getByRole('link', { name: '일차별 현황 바로 보기' }).click();
+  await expect(page).toHaveURL(/#care-day-overview$/);
+  await expect(page.getByRole('heading', { name: '일차별로 진행 상황을 확인하세요' })).toBeVisible();
+  await overview.getByRole('button', { name: '확인 필요 수강생 3명' }).click();
+  const row = page.getByRole('table', { name: '확인 필요 수강생 목록' }).locator('tbody tr').filter({ hasText: longTitle });
+  await expect(row).toHaveCount(1);
+  for (const width of info.project.name === 'desktop' ? [1440, 1024] : [page.viewportSize()!.width]) {
+    await page.setViewportSize({ width, height: 900 });
+    const layout = await row.evaluate(element => Array.from(element.querySelectorAll('th,td')).map(cell => ({ overflow: cell.scrollWidth > cell.clientWidth + 1, whiteSpace: getComputedStyle(cell).whiteSpace })));
+    expect(layout.every(cell => !cell.overflow && cell.whiteSpace !== 'nowrap')).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  }
+  await page.getByRole('tab', { name: '수강생별', exact: true }).click();
+  const studentRow = page.locator('.care-table tbody tr').filter({ hasText: longRows[2].name });
+  await expect(studentRow.locator('.care-week-label')).toHaveText(['1주차', '2주차', '1주차']);
+  const buttons = studentRow.locator('.care-week-cells button');
+  await expect(buttons).toHaveCount(4);
+  await expect(buttons.nth(0)).toHaveAttribute('aria-label', /1주차 1일차/);
+  await expect(buttons.nth(2)).toHaveAttribute('aria-label', /2주차 3일차/);
+  await expect(buttons.nth(3)).toHaveAttribute('aria-label', /1주차 4일차/);
+  await buttons.nth(2).click();
+  await expect(page.getByRole('dialog', { name: '수강생 상세' })).toBeVisible();
+  expect(writes).toEqual([]);
+});

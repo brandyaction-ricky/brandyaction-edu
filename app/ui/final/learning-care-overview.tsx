@@ -19,7 +19,7 @@ export function CareOverview({ rows, asOf, onStudent, onDay }: {
   const attentionCount = new Set(students.filter(s => s.attention.needsAttention).map(s => s.row.memberId)).size;
   return <section className="care-overview" aria-label="기수별 수강생 현황판">
     <div className="care-attention-heading"><button className="care-attention-toggle" aria-pressed={attentionOnly} aria-controls="care-student-list" onClick={() => { setAttentionOnly(v => !v); setBand('all'); setSearch(''); }}><Flag size={15}/> 확인 필요 수강생 <b>{attentionCount}명</b></button><p>72시간 이상 학습 정체 · 3일 이상 방문 기록 없음 · 보완 요청</p></div>
-    <div className="care-board-heading"><div><span className="care-eyebrow">기수별 진행 현황</span><h2>수강생별 진행률</h2><p>지금 공개된 학습 중 완료한 비율입니다.</p></div><span className="care-board-count">{rows.length}개 수강 기록</span></div>
+    <div className="care-board-heading"><div><span className="care-eyebrow">기수별 진행 현황</span><h2>수강생별 진행률</h2><p>지금 공개된 학습 중 완료한 비율입니다.</p></div><div className="care-board-heading-actions"><span className="care-board-count">{rows.length}개 수강 기록</span><a href="#care-day-overview">일차별 현황 바로 보기 ↓</a></div></div>
     <div className="care-band-filters" aria-label="진행률 필터">
       <button aria-pressed={band === 'all'} onClick={() => setBand('all')}>전체 <b>{rows.length}</b></button>
       {bands.map(value => <button key={value} className={'care-band-filter care-band-' + value} aria-pressed={band === value} onClick={() => setBand(value)}><i aria-hidden="true"/><span>{value === 'finishing' ? '80% 이상 완료' : careBandLabels[value]}<small>{ranges[value]}</small></span><b>{students.filter(s => s.progress.band === value).length}</b></button>)}

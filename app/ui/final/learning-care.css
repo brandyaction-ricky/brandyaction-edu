@@ -99,3 +99,43 @@
 .edu-admin .learning-care .care-board-heading h2{font-size:18px;color:var(--adm-text,#161719)}
 .edu-admin .learning-care .care-controls :is(input,select){border-color:var(--adm-border-strong,#cfd3d8);border-radius:var(--adm-radius-md,8px)}
 @media(max-width:760px){.edu-admin .learning-care .care-header{align-items:flex-start}.edu-admin .learning-care .care-header-actions{align-items:stretch}}
+
+/* Keep long titles inside their own attention-table columns. */
+.edu-admin .learning-care .care-attention-table{table-layout:fixed;min-width:900px}
+.edu-admin .learning-care .care-attention-table :is(th,td){white-space:normal;overflow-wrap:anywhere;word-break:normal;vertical-align:top}
+.edu-admin .learning-care .care-attention-table :is(th,td):nth-child(1){width:16%}
+.edu-admin .learning-care .care-attention-table :is(th,td):nth-child(2){width:28%;max-width:none}
+.edu-admin .learning-care .care-attention-table :is(th,td):nth-child(3){width:19%}
+.edu-admin .learning-care .care-attention-table :is(th,td):nth-child(n+4){width:12.33%}
+.edu-admin .learning-care .care-attention-table .care-signal{width:fit-content;max-width:100%;white-space:normal;line-height:1.45}
+.edu-admin .learning-care .care-name{min-width:0;max-width:100%;text-align:left;overflow-wrap:anywhere}
+.edu-admin .learning-care .care-name svg{flex:none}
+
+/* Keep the original lesson order and show each contiguous week's label. */
+.edu-admin .learning-care .care-grid{display:flex;align-items:flex-start;gap:12px;max-width:100%;min-width:240px}
+.edu-admin .learning-care .care-week-group{min-width:0;max-width:100%}
+.edu-admin .learning-care .care-week-label{display:block;margin-bottom:6px;color:var(--adm-text-sub,#626770);font-size:11px;font-weight:650}
+.edu-admin .learning-care .care-week-cells{display:flex;flex-wrap:wrap;gap:5px}
+.edu-admin .learning-care .care-board-heading-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap;justify-content:flex-end}
+.edu-admin .learning-care .care-board-heading-actions a{color:var(--adm-text,#161719);font-size:12px;font-weight:650;text-decoration:underline;text-underline-offset:3px}
+.edu-admin .learning-care .care-day-overview{scroll-margin-top:80px}
+.edu-admin .learning-care .care-student-tile{padding:14px;border-radius:var(--adm-radius-lg,10px)}
+.edu-admin .learning-care .care-tile-number{font-size:32px;margin:12px 0 6px}
+.edu-admin .learning-care .care-tile-progress{margin:10px 0}
+.edu-admin .learning-care .care-tile-signals{padding-top:8px}
+.edu-admin .learning-care .care-day-tiles article{gap:8px;padding:16px}
+.edu-admin .learning-care .care-day-tiles article>button{gap:8px}
+.edu-admin .learning-care .care-day-tiles article>button b{font-size:12px}
+.edu-admin .learning-care .care-day-tiles article>button span{font-size:12px;line-height:1.5}
+.edu-admin .learning-care .care-day-tiles .care-day-title{color:var(--adm-text,#161719);font-weight:600}
+.edu-admin .learning-care .care-day-tiles strong{font-size:24px}
+.edu-admin .learning-care .care-board-tools input{border-color:var(--adm-border-strong,#cfd3d8);border-radius:var(--adm-radius-md,8px)}
+@media(max-width:760px){
+  .edu-admin .learning-care .care-table tbody th,.edu-admin .learning-care .care-table thead th:first-child{position:static}
+  .edu-admin .learning-care .care-attention-table{min-width:0;table-layout:auto}
+  .edu-admin .learning-care .care-attention-table :is(th,td):nth-child(n){width:auto;max-width:none}
+  .edu-admin .learning-care .care-attention-table tbody th{position:static}
+  .edu-admin .learning-care .care-board-heading-actions{justify-content:flex-start}
+  .edu-admin .learning-care .care-student-tile{padding:12px}
+  .edu-admin .learning-care .care-day-tiles article{padding:12px}
+}
