@@ -554,6 +554,7 @@
 .adm-tabs,.adm .tabs{display:flex;align-items:center;gap:var(--adm-space-4);max-width:100%;overflow-x:auto;border-bottom:1px solid var(--adm-border)}
 .adm-tabs :is(button,a),.adm .tabs .tab{min-height:40px;padding:0 var(--adm-space-1);border:0;border-bottom:2px solid transparent;background:transparent;color:var(--adm-text-sub);font-size:var(--adm-font-13);font-weight:600;white-space:nowrap}
 .adm-tabs :is(button,a)[aria-selected=true],.adm .tabs .tab.active{border-bottom-color:var(--adm-primary);color:var(--adm-text)}
+.adm.edu-admin .pill.active{border-color:var(--adm-primary);background:var(--adm-primary);color:var(--adm-surface)}
 .adm-pagination{display:flex;align-items:center;justify-content:flex-end;gap:var(--adm-space-2);min-height:48px;color:var(--adm-text-sub);font-size:var(--adm-font-12)}
 .adm-empty{padding:var(--adm-space-6);border:1px dashed var(--adm-border-strong);border-radius:var(--adm-radius-lg);background:var(--adm-surface-subtle);color:var(--adm-text-sub);text-align:center}
 .adm-tree{width:var(--adm-tree-width);min-width:0;border:1px solid var(--adm-border);border-radius:var(--adm-radius-lg);background:var(--adm-surface);overflow:hidden}
@@ -625,8 +626,8 @@
 /* Questions use the same list-and-detail layout as the admin review screens. */
 .edu-admin .question-state-tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--adm-border,#e2e5e9);margin-bottom:16px}
 .edu-admin .question-state-tabs button{flex:none;min-height:44px;padding:0 14px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--adm-text-sub,#626770);font-size:13px;font-weight:600}
-.edu-admin .question-state-tabs button[aria-pressed=true]{border-bottom-color:var(--adm-text,#161719);color:var(--adm-text,#161719)}
-.edu-admin .question-state-tabs button:focus-visible,.edu-admin .question-inbox-item:focus-visible{outline:2px solid var(--adm-info,#315e8b);outline-offset:-2px}
+.edu-admin .question-state-tabs button[aria-pressed=true]{border-bottom-color:var(--adm-primary,#c9232d);color:var(--adm-text,#161719)}
+.edu-admin .question-state-tabs button:focus-visible,.edu-admin .question-inbox-item:focus-visible{outline:2px solid var(--adm-primary,#c9232d);outline-offset:-2px}
 .edu-admin .question-catalog-filter{margin-bottom:16px}
 .edu-admin .question-inbox-actions{display:flex;gap:8px;margin-top:16px}
 .edu-admin .question-inbox{display:grid;grid-template-columns:minmax(240px,340px) minmax(0,1fr);min-width:0;min-height:360px;border:1px solid var(--adm-border,#e2e5e9);border-radius:var(--adm-radius-lg,10px);background:#fff;overflow:hidden}
@@ -636,7 +637,7 @@
 .edu-admin .question-inbox-item{display:grid;gap:4px;width:100%;min-width:0;padding:12px 14px;border:0;border-bottom:1px solid var(--adm-border,#e2e5e9);background:#fff;color:var(--adm-text,#161719);text-align:left;line-height:1.5}
 .edu-admin .question-inbox-item:last-child{border-bottom:0}
 .edu-admin .question-inbox-item:hover{background:var(--adm-surface-subtle,#f7f8f9)}
-.edu-admin .question-inbox-item[aria-pressed=true]{background:var(--adm-info-soft,#edf3f9);box-shadow:inset 3px 0 0 var(--adm-info,#315e8b)}
+.edu-admin .question-inbox-item[aria-pressed=true]{background:var(--adm-primary-soft,#fff0f1);box-shadow:inset 3px 0 0 var(--adm-primary,#c9232d)}
 .edu-admin .question-inbox-item>strong{font-size:13px;font-weight:650;overflow-wrap:anywhere}
 .edu-admin .question-inbox-item>span:not(.question-inbox-item-meta){color:var(--adm-text-sub,#626770);font-size:12px;overflow-wrap:anywhere}
 .edu-admin .question-inbox-item-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--adm-text-sub,#626770);font-size:12px}
