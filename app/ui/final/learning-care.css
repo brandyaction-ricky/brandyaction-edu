@@ -82,3 +82,20 @@
 .care-attention-heading{margin:0 0 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}.care-attention-heading p{font-size:12px;color:#687873;margin:0}.care-attention-heading button{min-height:44px}.care-attention-table .care-signal{margin:4px 0}.care-attention-table td:nth-child(2){max-width:240px;overflow-wrap:anywhere}.care-day-duration b{display:block;font-size:14px!important;letter-spacing:0!important;color:#285b44}
 
 @media(max-width:760px){.care-attention-table{min-width:0}.care-attention-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.care-attention-table tbody{display:block}.care-attention-table tbody tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:16px;border-bottom:1px solid #e0e8e3}.care-attention-table tbody th{width:auto;grid-column:1/-1}.care-attention-table th,.care-attention-table td{padding:0;border:0;min-width:0;overflow-wrap:anywhere}.care-attention-table td:nth-child(2),.care-attention-table td:nth-child(3){grid-column:1/-1;max-width:none}.care-attention-table td::before{content:attr(data-label);display:block;color:#687873;font-size:11px;margin-bottom:5px}.care-attention-table tbody tr:last-child{border-bottom:0}}
+
+/* Admin surfaces follow the shared visual system; progress colours keep their meaning. */
+.edu-admin .learning-care{color:var(--adm-text,#161719)}
+.edu-admin .learning-care .care-header{align-items:flex-end;gap:16px;padding-bottom:16px;border-bottom:1px solid var(--adm-border,#e2e5e9)}
+.edu-admin .learning-care .care-header h1{margin:4px 0;font-size:22px;line-height:1.3;letter-spacing:-.01em}
+.edu-admin .learning-care .care-header p,.edu-admin .learning-care .care-board-heading p{color:var(--adm-text-sub,#626770)}
+.edu-admin .learning-care .care-eyebrow{color:var(--adm-text-sub,#626770)}
+.edu-admin .learning-care .care-tabs{gap:2px;border-color:var(--adm-border,#e2e5e9)}
+.edu-admin .learning-care .care-tabs button{color:var(--adm-text-sub,#626770);border-bottom:2px solid transparent}
+.edu-admin .learning-care .care-tabs button[aria-selected=true]{color:var(--adm-text,#161719);border-bottom-color:var(--adm-text,#161719)}
+.edu-admin .learning-care .care-stats>div,.edu-admin .learning-care .care-day-tiles article{border-color:var(--adm-border,#e2e5e9);border-radius:var(--adm-radius-lg,10px)}
+.edu-admin .learning-care .care-table-scroll{border-color:var(--adm-border,#e2e5e9);border-radius:var(--adm-radius-lg,10px)}
+.edu-admin .learning-care .care-table thead,.edu-admin .learning-care .care-table thead th:first-child{background:var(--adm-surface-subtle,#f7f8f9);color:var(--adm-text-sub,#626770)}
+.edu-admin .learning-care .care-table th,.edu-admin .learning-care .care-table td{border-bottom-color:var(--adm-border,#e2e5e9)}
+.edu-admin .learning-care .care-board-heading h2{font-size:18px;color:var(--adm-text,#161719)}
+.edu-admin .learning-care .care-controls :is(input,select){border-color:var(--adm-border-strong,#cfd3d8);border-radius:var(--adm-radius-md,8px)}
+@media(max-width:760px){.edu-admin .learning-care .care-header{align-items:flex-start}.edu-admin .learning-care .care-header-actions{align-items:stretch}}

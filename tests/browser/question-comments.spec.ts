@@ -70,3 +70,43 @@ test('failed comment reads show a retry instead of the stale answer, and recover
   await expect(comments.getByText('후속 질문: 다음 단계도 설명해 주세요.', { exact: true })).toBeVisible();
   expect(server.writes).toHaveLength(0);
 });
+
+test('question inbox selects one detail and preserves current-page search', async ({ page, context }, info) => {
+  await backend(context);
+  await page.goto('/question-comments-test?multiple');
+  const list = page.getByRole('region', { name: '질문 목록' });
+  const detail = page.getByRole('article', { name: '선택한 질문 상세' });
+  const first = list.getByRole('button', { name: /예시 학습 질문/ });
+  const second = list.getByRole('button', { name: /두 번째 학습 질문/ });
+  await expect(first).toHaveAttribute('aria-pressed', 'true');
+  await expect(detail).toContainText('예시: 다음 학습 단계가 궁금합니다.');
+  await expect(detail).not.toContainText('두 번째 질문의 본문입니다.');
+  await second.click();
+  await expect(second).toHaveAttribute('aria-pressed', 'true');
+  await expect(first).toHaveAttribute('aria-pressed', 'false');
+  await expect(detail).toContainText('두 번째 질문의 본문입니다.');
+  await expect(detail.getByRole('button', { name: '답글 달기' }).first()).toBeVisible();
+  await page.getByRole('searchbox', { name: '질문함 목록 검색' }).fill('예시 학습 질문');
+  await expect(second).toHaveCount(0);
+  await expect(first).toHaveAttribute('aria-pressed', 'true');
+  await expect(detail).toContainText('예시: 다음 학습 단계가 궁금합니다.');
+  if (info.project.name === 'desktop') {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    const [listBox, detailBox] = await Promise.all([list.boundingBox(), detail.boundingBox()]);
+    expect(listBox && detailBox && detailBox.x >= listBox.x + listBox.width - 1).toBeTruthy();
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: info.outputPath('question-inbox.png'), fullPage: true });
+});
+
+test('a long question list scrolls independently without expanding all answer histories', async ({ page, context }) => {
+  await backend(context);
+  await page.goto('/question-comments-test?many');
+  const list = page.getByRole('region', { name: '질문 목록' });
+  await expect(list.getByRole('button')).toHaveCount(40);
+  await expect(page.getByRole('article', { name: '선택한 질문 상세' })).toHaveCount(1);
+  const size = await list.evaluate(element => ({ height: element.clientHeight, content: element.scrollHeight }));
+  expect(size.content).toBeGreaterThan(size.height);
+  expect(size.height).toBeLessThanOrEqual(900);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
