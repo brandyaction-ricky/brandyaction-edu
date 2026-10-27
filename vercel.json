@@ -3,6 +3,10 @@
   "framework": "nextjs",
   "git": {
     "deploymentEnabled": {
+      "codex/edu-synthetic-cohort-refresh": false,
+      "codex/edu-tips-preserve-ui-dev-20261027": false,
+      "codex/edu-tips-cohort-feed-20261027": false,
+      "codex/edu-tips-source-gate-20261027": false,
       "codex/edu-tips-final-review-20261027": false,
       "codex/edu-campaign-insights-20261015": false,
       "codex/edu-tips-dev-rehearsal-20261015": false,
@@ -90,7 +94,8 @@
       "codex/edu-tips-data-recovery-20261012": false,
       "codex/edu-tips-rest-safe-updates-20261012": false,
       "codex/edu-tips-catalog-compat-20261012": false,
-      "codex/edu-tips-identity-control-batch-20261014": false
+      "codex/edu-tips-identity-control-batch-20261014": false,
+      "codex/tips-source-check-dev-20261027": false
     }
   },
   "regions": [
@@ -124,6 +129,10 @@
     {
       "path": "/api/cron/tips-data-retention",
       "schedule": "15 * * * *"
+    },
+    {
+      "path": "/api/cron/tips-cohort-feed",
+      "schedule": "* * * * *"
     }
   ]
 }
