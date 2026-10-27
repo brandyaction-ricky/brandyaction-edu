@@ -78,3 +78,19 @@
 .care-channel-statuses li{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px;border:1px solid #dce4df;border-radius:8px;background:#fff;font-size:13px}
 .care-channel-statuses small{white-space:nowrap;border-radius:12px;padding:3px 6px;background:#edf0ee;color:#53665d;font-size:11px}
 @media(max-width:360px){.care-channel-statuses{grid-template-columns:1fr}}
+/* Admin surfaces follow the shared visual system; progress colours keep their meaning. */
+.edu-admin .learning-care{color:var(--adm-text,#161719)}
+.edu-admin .learning-care .care-header{align-items:flex-end;gap:16px;padding-bottom:16px;border-bottom:1px solid var(--adm-border,#e2e5e9)}
+.edu-admin .learning-care .care-header h1{margin:4px 0;font-size:22px;line-height:1.3;letter-spacing:-.01em}
+.edu-admin .learning-care .care-header p,.edu-admin .learning-care .care-board-heading p{color:var(--adm-text-sub,#626770)}
+.edu-admin .learning-care .care-eyebrow{color:var(--adm-text-sub,#626770)}
+.edu-admin .learning-care .care-tabs{gap:2px;border-color:var(--adm-border,#e2e5e9)}
+.edu-admin .learning-care .care-tabs button{color:var(--adm-text-sub,#626770);border-bottom:2px solid transparent}
+.edu-admin .learning-care .care-tabs button[aria-selected=true]{color:var(--adm-text,#161719);border-bottom-color:var(--adm-text,#161719)}
+.edu-admin .learning-care .care-stats>div,.edu-admin .learning-care .care-day-tiles article{border-color:var(--adm-border,#e2e5e9);border-radius:var(--adm-radius-lg,10px)}
+.edu-admin .learning-care .care-table-scroll{border-color:var(--adm-border,#e2e5e9);border-radius:var(--adm-radius-lg,10px)}
+.edu-admin .learning-care .care-table thead,.edu-admin .learning-care .care-table thead th:first-child{background:var(--adm-surface-subtle,#f7f8f9);color:var(--adm-text-sub,#626770)}
+.edu-admin .learning-care .care-table th,.edu-admin .learning-care .care-table td{border-bottom-color:var(--adm-border,#e2e5e9)}
+.edu-admin .learning-care .care-board-heading h2{font-size:18px;color:var(--adm-text,#161719)}
+.edu-admin .learning-care .care-controls :is(input,select){border-color:var(--adm-border-strong,#cfd3d8);border-radius:var(--adm-radius-md,8px)}
+@media(max-width:760px){.edu-admin .learning-care .care-header{align-items:flex-start}.edu-admin .learning-care .care-header-actions{align-items:stretch}}

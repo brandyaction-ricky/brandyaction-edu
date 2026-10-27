@@ -96,6 +96,7 @@ export function AdminCatalog({
     [tagMode, setTagMode] = useState(""),
     [now] = useState(Date.now);
   const [localMissionState, setLocalMissionState] = useState<MissionScope["state"]>("active");
+  const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null);
   const [restoreError, setRestoreError] = useState("");
   const course = memberScope?.course ?? missionScope?.courseId ?? localCourse, week = missionScope?.weekId ?? localWeek;
   const missionState = missionScope?.state ?? localMissionState;
@@ -212,6 +213,9 @@ export function AdminCatalog({
           : lessons.find((l) => l.id === r.lesson_id)?.week_id) === week) &&
     (s.key === "customers" ? `${JSON.stringify(r)} ${customerTags(r.id).map(named).join(" ")} ${customerCourses(r.id).join(" ")}` : JSON.stringify(r)).toLowerCase().includes(query.toLowerCase())),
   ).toSorted((a, b) => s.key === "banners" ? num(a, "display_order") - num(b, "display_order") : s.key === "weeks" ? num(a, "week_number") - num(b, "week_number") || named(a).localeCompare(named(b), "ko") : 0);
+  const q = s.key === "questions"
+    ? filtered.find(question => String(question.id) === selectedQuestionId) || filtered[0]
+    : undefined;
   const mvps = useMemberMvps(s.key === "customers" ? filtered.map(row => row.id) : [], blockLearningEnabled);
   const allCourseWeeks = course ? rows.filter((row) => row.course_id === course).toSorted((a, b) => num(a, "week_number") - num(b, "week_number")) : [];
   // Onboarding stays at week zero; only the regular weeks can trade places.
@@ -917,8 +921,22 @@ export function AdminCatalog({
             </div>
           ) : s.key === "questions" ? (
             <div className="stack question-admin-list">{process.env.NEXT_PUBLIC_EDU_QUESTION_AI_BATCH_ENABLED === 'true' && process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED === 'true' && <QuestionAiBatch changed={onQuestionChanged}/>}
-              {filtered.map((q) => (
-                <article className="panel question-admin-card" key={q.id}>
+              {q && <div className="question-inbox">
+                <section className="question-inbox-list" aria-label="질문 목록">
+                  <div className="question-inbox-list-heading"><strong>질문 목록</strong><span>{filtered.length}개 표시</span></div>
+                  {filtered.map((question) => <button
+                    className="question-inbox-item"
+                    type="button"
+                    key={question.id}
+                    aria-pressed={question.id === q.id}
+                    onClick={() => setSelectedQuestionId(String(question.id))}
+                  >
+                    <strong>{t(question, "title") || "제목 없는 질문"}</strong>
+                    <span>{t(object(question, 'profiles') as Row, 'full_name') || '회원 정보 확인 필요'} · {t(object(question, 'courses') as Row, 'title') || '일반 질문'}</span>
+                    <span className="question-inbox-item-meta"><AdminStatusBadge status={question.is_archived ? "archived" : t(question, "status")} label={question.is_archived ? "보관" : labels[t(question, "status")]} /><time>{date(question.created_at)}</time></span>
+                  </button>)}
+                </section>
+                <article className="question-admin-card question-inbox-detail" key={q.id} aria-label="선택한 질문 상세">
                   <div className="panel-head">
                     <div>
                       <p className="meta">{t(object(q, 'profiles') as Row, 'full_name') || '회원 정보 확인 필요'} · {t(object(q, 'profiles') as Row, 'email')} · {t(object(q, 'courses') as Row, 'title') || '일반 질문'}</p>
@@ -943,7 +961,7 @@ export function AdminCatalog({
                     {Boolean(q.user_id) && <Link className="text-link" href={`/admin/customers?member=${encodeURIComponent(t(q, 'user_id'))}`}>회원 운영 정보 보기</Link>}
                   </div>
                 </article>
-              ))}
+              </div>}
             </div>
           ) : (
             <CatalogTable label={["weeks", "cohorts"].includes(s.key) ? `${s.title} 데이터` : `${s.title} 목록`} loading={loading} wide={s.key === 'products'}>
