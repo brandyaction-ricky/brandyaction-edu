@@ -104,6 +104,30 @@ export async function afterConsentSourceCandidate(member: string, deps: Deps): P
   await Promise.allSettled([projections(deps)]);
 }
 const response = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' } });
+export async function scheduledCohortFeedCandidate(request: Request, deps: Deps) {
+  if (request.method !== 'GET') return response({ status: 'method_not_allowed' }, 405);
+  if (deps.env.EDU_TIPS_COHORT_FEED_ENABLED !== 'true') return response({ status: 'disabled' });
+  const secret = deps.env.CRON_SECRET, got = request.headers.get('authorization');
+  if (!secret || secret.length < 32 || !got || Buffer.byteLength(got) !== Buffer.byteLength(`Bearer ${secret}`)
+    || !timingSafeEqual(Buffer.from(got), Buffer.from(`Bearer ${secret}`))) return response({ status: 'unauthorized' }, 401);
+  const cfg = sourceRuntimeConfiguration(deps.env, (deps.now ?? Date.now)());
+  if (!cfg.publisherEnabled) return response({ status: 'configuration_required' }, 503);
+  try {
+    const refresh = await rpc(deps, 'edu_tips_refresh_cohort_feed_candidate', { p_limit: 20 });
+    if (!record(refresh) || refresh.status !== 'processed' || !Number.isSafeInteger(refresh.processed)
+      || Number(refresh.processed) < 0 || Number(refresh.processed) > 20 || typeof refresh.pending !== 'boolean') {
+      return response({ status: 'unavailable' }, 503);
+    }
+    const projection = { claimed: 0, applied: 0, pending: 0, stale: 0, failures: 0 };
+    for (let i = 0; i < 5; i++) {
+      const batch = await projections(deps);
+      if (batch.status !== 'processed') return response({ status: 'unavailable' }, 503);
+      for (const key of Object.keys(projection) as (keyof typeof projection)[]) projection[key] += batch[key];
+      if (batch.claimed < 4) break;
+    }
+    return response({ status: 'processed', refresh, projection });
+  } catch { return response({ status: 'unavailable' }, 503); }
+}
 export async function scheduledSourceCandidate(request: Request, deps: Deps) {
   if (request.method !== 'GET') return response({ status: 'method_not_allowed' }, 405);
   if (deps.env.EDU_TIPS_SOURCE_CRON_ENABLED !== 'true') return response({ status: 'disabled' }, 503);
