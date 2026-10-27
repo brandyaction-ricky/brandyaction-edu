@@ -33,6 +33,7 @@ import { createClient } from "@/lib/supabase/client";
 import { getSupabasePublicConfig } from "@/lib/supabase/config";
 import { ArrowRight, CalendarDays, CreditCard, LayoutDashboard, LogOut, Menu, Plus, Search, Ticket, UserRound, X } from "lucide-react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   useCallback,
@@ -43,18 +44,14 @@ import {
   type ComponentProps,
   type ReactNode,
 } from "react";
-import { AdminWorkflows, standaloneAdmin } from "./admin-workflows";
+import { standaloneAdmin } from '@/lib/admin-workflow-sections';
 import { BlocksField, UploadField } from "./editor-fields";
-import { AdminLearningCare } from "./final/learning-care";
 import { clearAdminCare, prefetchAdminCare } from '@/lib/learning-care-client';
 import { AdminCatalog, type MissionScope } from "./final/admin-catalog";
 import { MissionTargetFields, type MissionContext } from "./final/mission-target-fields";
 import { useAdminDialog, useRouteDialog } from "@/features/admin-ui";
 import { ArticleBannerEditor } from "./final/article-banner-editor";
 import { ArticleCategoryManager } from "./final/article-category-manager";
-import { ProductEditor } from "./final/admin-editors";
-import { CurriculumEditor } from "./final/curriculum-editor";
-import { LearningEditor } from "./final/learning-editor";
 import {
   AdminHeading,
   AdminShell,
@@ -101,6 +98,13 @@ import {
   AdminToast,
   adminSectionEyebrow,
 } from "@/features/admin-ui";
+// Keep authoring code out of the initial bundle for unrelated admin menus.
+const editorLoading = () => <AdminLoadingState title="편집기를 준비하고 있습니다." />;
+const ProductEditor = dynamic(() => import('./final/admin-editors').then(module => module.ProductEditor), { loading: editorLoading });
+const CurriculumEditor = dynamic(() => import('./final/curriculum-editor').then(module => module.CurriculumEditor), { loading: editorLoading });
+const LearningEditor = dynamic(() => import('./final/learning-editor').then(module => module.LearningEditor), { loading: editorLoading });
+const AdminWorkflows = dynamic(() => import('./admin-workflows').then(module => module.AdminWorkflows), { loading: () => <AdminLoadingState /> });
+const AdminLearningCare = dynamic(() => import('./final/learning-care').then(module => module.AdminLearningCare), { loading: () => <AdminLoadingState /> });
 type Data = Record<string, Row[]>;
 type AdminRead = {
   ok: boolean;
@@ -272,7 +276,7 @@ export function Platform({
     ? searchParams.get("id") || ""
     : "";
   const customerScope = memberDirectoryScope(searchParams);
-  const scopeQuery = adminSection === "customers" ? new URLSearchParams({ member: searchParams.get("member") || "", memberQuery: customerScope.query, memberStatus: customerScope.status, memberCourse: customerScope.course }).toString() : adminSection === "orders" ? new URLSearchParams(orderScope).toString() : adminSection === "missions" ? new URLSearchParams({ course: missionScope.courseId, week: missionScope.weekId, missionState: missionScope.state }).toString() : ["customers", "questions", "reviews"].includes(adminSection) ? new URLSearchParams({ member: searchParams.get("member") || "", submission: searchParams.get("submission") || "", question: searchParams.get("question") || "", questionState: searchParams.get("questionState") || "active" }).toString() : "";
+  const scopeQuery = adminSection === 'learning' && path[1] === 'learning' ? 'part=picker' : adminSection === "customers" ? new URLSearchParams({ member: searchParams.get("member") || "", memberQuery: customerScope.query, memberStatus: customerScope.status, memberCourse: customerScope.course }).toString() : adminSection === "orders" ? new URLSearchParams(orderScope).toString() : adminSection === "missions" ? new URLSearchParams({ course: missionScope.courseId, week: missionScope.weekId, missionState: missionScope.state }).toString() : ["customers", "questions", "reviews"].includes(adminSection) ? new URLSearchParams({ member: searchParams.get("member") || "", submission: searchParams.get("submission") || "", question: searchParams.get("question") || "", questionState: searchParams.get("questionState") || "active" }).toString() : "";
   const pagingKey = adminSection + "?" + scopeQuery;
   const adminPage = adminPaging.section === pagingKey ? adminPaging.page : 1;
   // An editor's one-record response is not a catalog response, even though both
@@ -395,7 +399,7 @@ export function Platform({
       if (!admin || !user?.id || section === adminSection) return;
       const page =
         adminPaging.section === section ? adminPaging.page : 1;
-      void readAdminSection(user.id, section, page);
+      void readAdminSection(user.id, section, page, '', false, section === 'learning' ? 'part=picker' : '');
       if (section === "conversion") prefetchConversionReview(user.id);
     },
     [admin, adminPaging, adminSection, user],

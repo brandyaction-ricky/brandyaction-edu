@@ -51,20 +51,7 @@ import {
   AdminSummaryCard,
 } from "@/features/admin-ui";
 
-export const standaloneAdmin = [
-  "staff",
-  "templates",
-  "campaigns",
-  "automations",
-  "members",
-  "reviews",
-  "landing",
-  "analytics",
-  "metrics",
-  "seo",
-  "settings",
-  "orders",
-];
+export { standaloneAdmin } from '@/lib/admin-workflow-sections';
 type Props = {
   section: string;
   data: Data;
