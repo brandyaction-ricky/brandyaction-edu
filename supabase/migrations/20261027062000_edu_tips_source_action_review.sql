@@ -35,7 +35,7 @@ begin
  join public.edu_personalization_preferences pref on pref.member_id=s.member_id
  join public.edu_personalization_terms terms on terms.version=s.wording_version
  where s.customer_id=p_command->>'customer_id' and s.consent_epoch=p_command->>'consent_epoch'
- and s.retired_at is null and p.status='active' and p.role not in ('admin','staff') and not p.is_internal and p.deleted_at is null
+ and s.retired_at is null and p.email like 'edu-live-%@example.invalid' and p.status='active' and p.role not in ('admin','staff') and not p.is_internal and p.deleted_at is null
  and pref.analysis and pref.overseas and pref.wording_version=s.wording_version
  and terms.is_current and terms.approved_at<=statement_timestamp() and terms.effective_at<=statement_timestamp()
  and not exists(select 1 from edu_tips_private.subjects prior join edu_tips_private.erasure_outbox q on q.subject_id=prior.id

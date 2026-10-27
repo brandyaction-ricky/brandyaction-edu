@@ -23,6 +23,7 @@ export async function tipsReviewFixture(t) {
   await f.db.exec(read('20261008074257_edu_personalization_consent.sql'));
   await f.db.exec(`insert into edu_personalization_terms values('QA','Synthetic analysis','Synthetic overseas',now()-interval '1 day',now()-interval '1 day',true); set role service_role;`);
   for(const member of [f.student,f.other]){
+    await f.db.query("update profiles set email=$1 where id=$2",['edu-live-'+member+'@example.invalid',member]);
     await f.db.query('select edu_personalization_consent($1,$2,$3,$4,null)',[member,id(),{analysis:true,overseas:true},'QA']);
     await f.db.query(`select edu_account_consent($1,$2,'{"marketingUse":true,"sms":false,"kakao":true,"email":true}'::jsonb,'profile','2026-10-20',null)`,[member,id()]);
     await f.db.query(`insert into edu_member_visits values($1,((now()-interval '4 days') at time zone 'Asia/Seoul')::date,now()-interval '4 days',now()-interval '4 days')`,[member]);
