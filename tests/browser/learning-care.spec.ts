@@ -28,8 +28,28 @@ test('student and DAY views show actual statuses, safe recipient selection and r
 test('search and filters cover full cohort, share view and saved PNG omit private data',async({page})=>{
  await backend(page);await page.goto('/learning-care-test');await page.getByRole('tab',{name:'수강생별',exact:true}).click();await page.getByPlaceholder('이름 또는 이메일').fill('수빈');await expect(page.getByText('1개 수강 기록')).toBeVisible();
  await page.getByRole('tab',{name:'공유용 요약'}).click();const share=page.getByRole('region',{name:'개인정보 없는 공유용 요약'});await expect(share).toContainText('함께하는 수강생');await expect(share).not.toContainText('가상 수빈');await expect(page.locator('body')).not.toContainText('qa1@example.test');
+ await expect(page.locator('.care-share-actions')).toContainText('전체 기수 기준');await expect(page.locator('body')).not.toContainText('공유 이미지에는 이름·이메일·개인별 진도가 들어가지 않습니다');
  const download=page.waitForEvent('download');await page.getByRole('button',{name:'공유 이미지 저장'}).click();expect((await download).suggestedFilename()).toBe('brandy-edu-learning-summary.png');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+});
+test('status select preserves all single-filter choices and clears selected recipients when the filter changes',async({page})=>{
+ await backend(page);await page.goto('/learning-care-test');await page.getByRole('tab',{name:'일차별',exact:true}).click();
+ const filter=page.getByRole('combobox',{name:'상태 선택'});
+ await expect(filter.locator('option')).toHaveText(['전체','완료','미완료','검토 대기','보완 요청','앞 단계 대기','공개 예정','3일 이상 방문 기록 없음','24시간 내 안내']);
+ await page.getByRole('checkbox',{name:'가상 지민 안내 선택'}).check();
+ await expect(page.getByRole('button',{name:'선택한 1명 안내 내용 작성'})).toBeEnabled();
+ await filter.selectOption('submitted');await expect(page.getByText('1개 수강 기록')).toBeVisible();await expect(page.getByRole('button',{name:'가상 수빈',exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'선택한 0명 안내 내용 작성'})).toBeDisabled();
+ await filter.selectOption('all');await expect(page.getByRole('checkbox',{name:'가상 지민 안내 선택'})).not.toBeChecked();
+ await filter.selectOption('quiet');await expect(page.getByText('조건에 맞는 수강 기록이 없습니다.')).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+});
+test('admin guidance notes have clear spacing after cards and the table',async({page})=>{
+ await backend(page);await page.goto('/learning-care-test');await page.locator('main.edu-admin').evaluate(el=>el.classList.add('adm'));
+ const topGap=async (previous:string,note:string)=>page.evaluate(([a,b])=>document.querySelector(b)!.getBoundingClientRect().top-document.querySelector(a)!.getBoundingClientRect().bottom,[previous,note]);
+ expect(await topGap('.care-student-tiles','.care-overview > .care-note')).toBeGreaterThanOrEqual(20);
+ await page.getByRole('tab',{name:'수강생별',exact:true}).click();
+ expect(await topGap('.care-table-scroll','.care-workspace > .care-note')).toBeGreaterThanOrEqual(20);
 });
 test('personal next step links to returned mission and own growth; errors never become zero progress',async({page})=>{
  const api=await backend(page,true);await page.goto('/learning-care-test');await expect(page.getByRole('alert')).toContainText('합성 조회 실패');await expect(page.getByText('0명',{exact:true})).toHaveCount(0);api.recover();await page.getByRole('button',{name:'다시 불러오기'}).click();await expect(page.getByText('4개 수강 기록')).toBeVisible();
@@ -169,7 +189,7 @@ test('admin care surfaces use shared red accents while progress keeps semantic s
  expect(await style('.care-board-heading-actions a','color')).toBe('rgb(201, 35, 45)');
  expect(await page.locator('.care-band-filters [aria-pressed=true]').evaluate(el=>getComputedStyle(el).outlineColor)).toBe('rgb(201, 35, 45)');
  await page.getByRole('tab',{name:'수강생별',exact:true}).click();
- expect(await style('.care-filters [aria-pressed=true]','backgroundColor')).toBe('rgb(201, 35, 45)');
+ await expect(page.getByRole('combobox',{name:'상태 선택'})).toHaveValue('all');
  expect(await page.locator('.care-meter progress').first().evaluate(el=>getComputedStyle(el).accentColor)).toBe('rgb(201, 35, 45)');
  expect(await style('.care-cell.care-completed','color')).toBe('rgb(23, 99, 69)');
  await page.getByRole('button',{name:'가상 지민',exact:true}).click();
