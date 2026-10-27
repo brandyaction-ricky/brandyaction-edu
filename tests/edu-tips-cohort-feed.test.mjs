@@ -238,3 +238,12 @@ test('synthetic cron is DEV only and never drains global HMAC jobs',async t=>{
  let result=await runtime.scheduledCohortFeedCandidate(request,deps);assert.equal(result.status,200);assert.deepEqual(calls,['edu_tips_refresh_synthetic_cohort_feed_candidate']);assert.equal((await row(f,6)).cohort_state,'active');
  calls.length=0;result=await runtime.scheduledCohortFeedCandidate(request,{...deps,env:{...env,NEXT_PUBLIC_APP_ENV:'production',EDU_TIPS_SOURCE_ENVIRONMENT:'production'}});assert.equal(result.status,503);assert.deepEqual(calls,[]);
 });
+
+
+test('synthetic cron fails closed when scope RPC is unavailable or credentials are wrong',async t=>{
+ const env={NEXT_PUBLIC_APP_ENV:'development',EDU_TIPS_SOURCE_ENVIRONMENT:'dev',EDU_TIPS_SYNTHETIC_COHORT_ONLY:'true',EDU_TIPS_COHORT_FEED_ENABLED:'true',CRON_SECRET:'synthetic-cron-secret-not-registered-0000'};
+ const calls=[];const deps={env,fetch:()=>{throw Error('must not send');},rpc:async(name)=>{calls.push(name);return {error:{message:'not installed'},data:null};}};
+ const request=key=>new Request('https://synthetic.invalid/cron',{headers:{authorization:'Bearer '+key}});
+ assert.equal((await runtime.scheduledCohortFeedCandidate(request('wrong'),deps)).status,401);assert.deepEqual(calls,[]);
+ assert.equal((await runtime.scheduledCohortFeedCandidate(request(env.CRON_SECRET),deps)).status,503);assert.deepEqual(calls,['edu_tips_refresh_synthetic_cohort_feed_candidate']);
+});
