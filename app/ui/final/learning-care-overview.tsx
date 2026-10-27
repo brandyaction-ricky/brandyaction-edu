@@ -16,7 +16,7 @@ export function CareOverview({ rows, asOf, onStudent, onDay }: {
     (band === 'all' || band === progress.band) && (!attentionOnly || attention.needsAttention));
   const days = careDaySummaries(rows);
   return <section className="care-overview" aria-label="기수별 수강생 현황판">
-    <div className="care-board-heading"><div><span className="care-eyebrow">기수별 진행 현황</span><h2>수강생별 진행률</h2><p>지금 공개된 학습 중 완료한 비율입니다.</p></div><span className="care-board-count">{rows.length}개 수강 기록</span></div>
+    <div className="care-board-heading"><div><span className="care-eyebrow">기수별 진행 현황</span><h2>수강생별 진행률</h2><p>지금 공개된 학습 중 완료한 비율입니다.</p></div><div className="care-board-heading-actions"><span className="care-board-count">{rows.length}개 수강 기록</span><a href="#care-day-overview">일차별 현황 바로 보기 ↓</a></div></div>
     <div className="care-band-filters" aria-label="진행률 필터">
       <button aria-pressed={band === 'all'} onClick={() => setBand('all')}>전체 <b>{rows.length}</b></button>
       {bands.map(value => <button key={value} className={'care-band-filter care-band-' + value} aria-pressed={band === value} onClick={() => setBand(value)}><i aria-hidden="true"/><span>{value === 'finishing' ? '80% 이상 완료' : careBandLabels[value]}<small>{ranges[value]}</small></span><b>{students.filter(s => s.progress.band === value).length}</b></button>)}
@@ -38,7 +38,7 @@ export function CareOverview({ rows, asOf, onStudent, onDay }: {
     </div>
     {!shown.length && <p className="care-empty">조건에 맞는 수강생이 없습니다.</p>}
     <p className="care-note">진행률에는 현재 공개된 학습만 포함합니다. 빨강은 시작 단계이며 지연 판정이 아닙니다. 확인 필요는 보완 요청 또는 3일 이상 방문 기록이 없고 지금 수행 가능한 항목이 있는 경우입니다.</p>
-    <section className="care-day-overview" aria-label="일차별 학습 진행률">
+    <section id="care-day-overview" className="care-day-overview" aria-label="일차별 학습 진행률">
       <div className="care-board-heading"><div><h2>일차별로 진행 상황을 확인하세요</h2><p>기수 전체의 공개된 학습 기준입니다. 일차를 누르면 해당 수강생 명단이 열립니다.</p></div></div>
       {!days.length && <p className="care-empty">아직 등록된 학습이 없습니다.</p>}
       <div className="care-day-tiles">{days.map(day => <article key={day.lessonId} className={!day.available ? 'care-day-unpublished' : ''}>
