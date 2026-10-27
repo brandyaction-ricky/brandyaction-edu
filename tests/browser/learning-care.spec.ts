@@ -119,3 +119,37 @@ test('mission data never enters admin progress, detail, DAY options or the share
  await expect(page.getByRole('region',{name:'개인정보 없는 공유용 요약'})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
 });
+
+test('student lesson grid labels weeks without changing lesson order or detail access', async ({page}) => {
+ await backend(page);
+ const lessons = [{...cell('completed',1),week:1},{...cell('not_submitted',2),week:1},{...cell('scheduled',3),week:2}];
+ await page.route('**/api/admin/learning-care**',route=>route.fulfill({json:{...snapshot,rows:[{...rows[0],cells:lessons}]}}));
+ await page.goto('/learning-care-test');
+ await expect(page.getByRole('link',{name:'일차별 현황 바로 보기 ↓'})).toHaveAttribute('href','#care-day-overview');
+ await page.getByRole('tab',{name:'수강생별',exact:true}).click();
+ const groups=page.locator('.care-week-group');
+ await expect(groups).toHaveCount(2);
+ await expect(groups.nth(0)).toContainText('1주차');
+ await expect(groups.nth(1)).toContainText('2주차');
+ await expect(groups.nth(0).locator('.care-cell')).toHaveCount(2);
+ await expect(groups.nth(1).locator('.care-cell')).toHaveCount(1);
+ await groups.nth(1).locator('.care-cell').click();
+ await expect(page.getByRole('dialog',{name:'수강생 상세'})).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+});
+
+test('a long multi-week grid stays within its table cell at desktop and tablet widths', async ({page}) => {
+ await backend(page);
+ const lessons = Array.from({length:36},(_,i)=>({...cell('scheduled',i+1),week:Math.floor(i/6)+1,day:i+1}));
+ await page.route('**/api/admin/learning-care**',route=>route.fulfill({json:{...snapshot,rows:[{...rows[0],cells:lessons}]}}));
+ await page.goto('/learning-care-test');
+ await page.getByRole('tab',{name:'수강생별',exact:true}).click();
+ for (const width of [1440,1024,834,390]) {
+   await page.setViewportSize({width,height:900});
+   const grid=page.locator('.care-grid').first();
+   await expect(grid.locator('.care-week-group')).toHaveCount(6);
+   const size=await grid.evaluate(el=>({grid:el.scrollWidth,cell:el.closest('td')!.clientWidth,height:el.getBoundingClientRect().height}));
+   expect(size.grid).toBeLessThanOrEqual(size.cell+1);
+   expect(size.height).toBeLessThan(600);
+ }
+});

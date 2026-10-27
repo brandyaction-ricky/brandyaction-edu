@@ -66,6 +66,18 @@ test('readonly records paginate without losing focus and preserve archived quest
   await expect(page.getByText('전체 회원', { exact: true })).toHaveCount(0);
 });
 
+test('question status tabs expose the archived list and preserve its detail without a data write', async ({page}) => {
+  await page.getByRole('link', { name: '질문함', exact: true }).click();
+  const tabs = page.getByRole('navigation', { name: '질문 처리 상태' });
+  await expect(tabs.getByRole('button', { name: '전체 운영 질문', pressed: true })).toBeVisible();
+  await tabs.getByRole('button', { name: '보관', exact: true }).click();
+  await expect(page).toHaveURL(/questionState=archived/);
+  await expect(tabs.getByRole('button', { name: '보관', pressed: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: '질문 목록' })).toContainText('합성 보관 질문');
+  await expect(page.getByRole('article', { name: '선택한 질문 상세' })).toContainText('다음 학습은 어디에서 보나요?');
+  await expect(page.getByRole('button', { name: '질문 보관' })).toHaveCount(0);
+});
+
 test('failed member reads offer an accessible retry, then recover with panel focus', async ({ page }) => {
   let fail = true;
   await page.route('**/api/admin/member-overview?**', async route => {

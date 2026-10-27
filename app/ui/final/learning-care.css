@@ -95,14 +95,6 @@
 .edu-admin .learning-care .care-controls :is(input,select){border-color:var(--adm-border-strong,#cfd3d8);border-radius:var(--adm-radius-md,8px)}
 @media(max-width:760px){.edu-admin .learning-care .care-header{align-items:flex-start}.edu-admin .learning-care .care-header-actions{align-items:stretch}}
 
-/* Keep long titles inside their own attention-table columns. */
-.edu-admin .learning-care .care-attention-table{table-layout:fixed;min-width:900px}
-.edu-admin .learning-care .care-attention-table :is(th,td){white-space:normal;overflow-wrap:anywhere;word-break:normal;vertical-align:top}
-.edu-admin .learning-care .care-attention-table :is(th,td):nth-child(1){width:16%}
-.edu-admin .learning-care .care-attention-table :is(th,td):nth-child(2){width:28%;max-width:none}
-.edu-admin .learning-care .care-attention-table :is(th,td):nth-child(3){width:19%}
-.edu-admin .learning-care .care-attention-table :is(th,td):nth-child(n+4){width:12.33%}
-.edu-admin .learning-care .care-attention-table .care-signal{width:fit-content;max-width:100%;white-space:normal;line-height:1.45}
 .edu-admin .learning-care .care-name{min-width:0;max-width:100%;text-align:left;overflow-wrap:anywhere}
 .edu-admin .learning-care .care-name svg{flex:none}
 
@@ -127,9 +119,6 @@
 .edu-admin .learning-care .care-board-tools input{border-color:var(--adm-border-strong,#cfd3d8);border-radius:var(--adm-radius-md,8px)}
 @media(max-width:760px){
   .edu-admin .learning-care .care-table tbody th,.edu-admin .learning-care .care-table thead th:first-child{position:static}
-  .edu-admin .learning-care .care-attention-table{min-width:0;table-layout:auto}
-  .edu-admin .learning-care .care-attention-table :is(th,td):nth-child(n){width:auto;max-width:none}
-  .edu-admin .learning-care .care-attention-table tbody th{position:static}
   .edu-admin .learning-care .care-board-heading-actions{justify-content:flex-start}
   .edu-admin .learning-care .care-student-tile{padding:12px}
   .edu-admin .learning-care .care-day-tiles article{padding:12px}
