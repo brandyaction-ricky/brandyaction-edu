@@ -18,6 +18,7 @@ async function setup(t,{activate=true}={}){
   await f.db.exec(`alter table cohorts add column status text not null default 'in_progress', add column operation_start_at timestamptz default now()-interval '1 day', add column operation_end_at timestamptz;
    alter table enrollments add column status text not null default 'active',add column revoked_at timestamptz,add column access_starts_at timestamptz not null default now()-interval '1 day',add column access_ends_at timestamptz;`);
   await f.db.exec(readFileSync(new URL('../supabase/migrations/20261027063226_edu_tips_cohort_feed.sql',import.meta.url),'utf8'));
+  await f.db.exec(readFileSync(new URL('../supabase/migrations/20261027065931_edu_tips_same_day_learning_capture.sql',import.meta.url),'utf8'));
  } catch(error) { await f.db.exec('rollback');throw error; } finally { await f.db.exec('set role service_role'); }
  const signatures={
  edu_tips_prepare_hmac_identity_candidate:['p_member','p_version','p_revision','p_epoch'],
@@ -182,4 +183,24 @@ test('start, cancelled and recapture transitions invalidate the old state and pr
  await f.owner('update edu_tips_private.cohort_refresh_settings set enabled=true where id=1');
  assert.deepEqual(await gate(f),{error:'disabled'});await refresh(f);await f.run();
  const after=await row(f,5);assert.equal(after.cohort_state,'active');assert.equal(after.record_id,before.record_id);assert.equal(after.resource_used,before.resource_used);
+});
+
+test('same-day post-consent learning is captured for both identity profiles; older and future observations stay excluded',async t=>{
+ const f=await setup(t);await f.owner('update edu_tips_private.cohort_refresh_settings set enabled=true where id=1');
+ await f.owner("update edu_tips_private.feed_state set capture_since=now()-interval '3 seconds' where singleton");
+ await f.owner("update edu_tips_private.subjects set created_at=now()-interval '1 second' where member_id in($1,$2)",[id(5),id(6)]);
+ for(const n of[5,6]){
+  await f.owner("insert into edu_tips_private.learning_days(enrollment_id,date_kst,item_type,item_id,observed_at) values($1,(now() at time zone 'Asia/Seoul')::date,'material_download',$2,now()-interval '2 seconds')",[id(n+130),id(n+500)]);
+  await f.owner('select edu_tips_private.capture_member($1)',[id(n)]);
+ }
+ await f.run();assert.equal(await row(f,5),undefined);assert.equal(await row(f,6),undefined);
+ for(const n of[5,6])await f.owner("insert into learning_usage_events values($1,$2,'material_download',$3,clock_timestamp(),clock_timestamp(),'signed_file_issued')",[id(n+400),id(n+130),id(n+500)]);
+ await f.run();for(const n of[5,6])assert.equal((await row(f,n)).resource_used,1);
+ await refresh(f);await f.run();
+ for(const n of[5,6]){
+  await f.owner("insert into edu_tips_private.learning_days(enrollment_id,date_kst,item_type,item_id,observed_at) values($1,(now() at time zone 'Asia/Seoul')::date,'material_download',$2,now()+interval '1 hour')",[id(n+130),id(n+600)]);
+  await f.owner('select edu_tips_private.capture_member($1)',[id(n)]);
+ }
+ await f.run();
+ for(const n of[5,6]){const r=await row(f,n);assert.equal(r.cohort_state,'active');assert.equal(r.resource_used,1);assert.equal(r.usage_ratio,null);}
 });
