@@ -59,7 +59,8 @@ test('readonly records paginate without losing focus and preserve archived quest
   await page.getByRole('link', { name: '질문·답변 보기', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/questions\?question=/);
   await expect(page.getByRole('heading', { name: '합성 보관 질문', exact: true })).toBeVisible();
-  await expect(page.getByLabel('질문 처리 상태')).toHaveValue('selected');
+  await expect(page.getByText('연결된 질문만 조회 중입니다.', { exact: false })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: '질문 처리 상태' }).getByRole('button', { pressed: true })).toHaveCount(0);
   await page.getByRole('link', { name: '회원 운영 정보 보기', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/customers\?member=/);
   await expect(page.getByText('전체 회원', { exact: true })).toHaveCount(0);
