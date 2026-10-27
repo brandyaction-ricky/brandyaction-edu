@@ -74,14 +74,14 @@ test('operator checks reuse the already verified request user and preserve denie
   assert.equal(auth.calls(), 1);
 });
 
-function apiHarness(user, failure = null, fixtures = {}, staffPermissions = {}, rpcResult = { data: { archived: true }, error: null }) {
+function apiHarness(user, failure = null, fixtures = {}, staffPermissions = {}, rpcResult = { data: { archived: true }, error: null }, queryResult = async () => null) {
   const calls = { auth: 0, summaries: 0, tables: [], filters: [], rpcs: [], selects: [] };
   const db = {
     from(table) {
       calls.tables.push(table);
       let rows = table === 'site_settings' ? { value: staffPermissions } : fixtures[table] || [];
       const query = new Proxy({}, { get: (_, key) => {
-        if (key === 'then') return resolve => Promise.resolve({ data: rows, error: null, count: 3 }).then(resolve);
+        if (key === 'then') return resolve => Promise.resolve().then(async () => ({ data: rows, error: await queryResult(table), count: 3 })).then(resolve);
         if (key === 'select') return columns => { calls.selects.push([table, columns]); return query; };
         if (key === 'eq') return (field, value) => { calls.filters.push([table, 'eq', field, value]); if (Array.isArray(rows)) rows = rows.filter(row => row[field] === value); return query; };
         if (key === 'in') return (field, values) => { calls.filters.push([table, 'in', field, values]); if (Array.isArray(rows)) rows = rows.filter(row => values.includes(row[field])); return query; };
@@ -240,6 +240,74 @@ test('product mission tab reads only the selected course lessons and missions', 
   const denied = apiHarness({ ...admin, role: 'member' });
   assert.equal((await denied.read(`products&record=${record}&part=missions`)).status, 403);
   assert.deepEqual(denied.calls.tables, []);
+});
+
+test('curriculum picker omits unrelated lesson bodies and quizzes while direct lesson editing still loads its dependencies', async () => {
+  const picker = apiHarness(admin);
+  const response = await picker.read('learning&part=picker');
+  assert.equal(response.status, 200);
+  assert.deepEqual(Object.keys((await response.json()).data).sort(), ['admin_summary', 'courses']);
+  assert.deepEqual(picker.calls.tables.sort(), ['courses', 'edu_questions', 'mission_submissions']);
+  for (const section of ['learning', 'learning&record=' + admin.id]) {
+    const direct = apiHarness(admin);
+    assert.equal((await direct.read(section)).status, 200);
+    for (const table of ['curriculum_weeks', 'curriculum_lessons', 'lesson_contents', 'curriculum_missions', 'mission_quizzes']) assert.ok(direct.calls.tables.includes(table));
+  }
+  for (const user of [null, { ...admin, role: 'member' }, { ...admin, role: 'staff' }]) {
+    const denied = apiHarness(user);
+    assert.notEqual((await denied.read('learning&part=picker')).status, 200);
+    assert.ok(!denied.calls.tables.includes('courses'));
+  }
+});
+
+test('product curriculum reads run in three dependency stages instead of waiting for independent queries', async () => {
+  const record = admin.id;
+  const gates = new Map(), started = new Set();
+  const fixtures = {
+    cohorts: [{ id: 'cohort', course_id: record }],
+    curriculum_weeks: [{ id: 'week', course_id: record }],
+    curriculum_lessons: [{ id: 'lesson', week_id: 'week' }],
+    edu_lesson_block_heads: [{ lesson_id: 'lesson' }],
+  };
+  const previous = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED;
+  process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED = 'true';
+  const queryResult = table => { started.add(table); return new Promise(resolve => gates.set(table, () => resolve(null))); };
+  const api = apiHarness(admin, null, fixtures, {}, undefined, queryResult);
+  const read = api.read(`products&record=${record}&part=curriculum`);
+  const tick = () => new Promise(resolve => setImmediate(resolve));
+  try {
+    await tick();
+    assert.deepEqual([...started].sort(), ['cohorts', 'curriculum_weeks']);
+    gates.get('cohorts')(); gates.get('curriculum_weeks')(); await tick();
+    assert.ok(started.has('edu_cohort_week_visibility'));
+    assert.ok(started.has('curriculum_lessons'));
+    assert.ok(!started.has('lesson_contents'));
+    gates.get('edu_cohort_week_visibility')(); gates.get('curriculum_lessons')(); await tick();
+    for (const table of ['edu_cohort_lesson_visibility', 'lesson_contents', 'edu_lesson_block_heads']) assert.ok(started.has(table), table);
+    for (const release of gates.values()) release();
+    const response = await read;
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).data.curriculum_lessons[0].has_blocks, true);
+    assert.ok(api.calls.filters.some(filter => JSON.stringify(filter) === JSON.stringify(['edu_cohort_lesson_visibility', 'in', 'cohort_id', ['cohort']])));
+    assert.ok(api.calls.filters.some(filter => JSON.stringify(filter) === JSON.stringify(['edu_lesson_block_heads', 'in', 'lesson_id', ['lesson']])));
+  } finally {
+    for (const release of gates.values()) release();
+    await read;
+    if (previous === undefined) delete process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED;
+    else process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED = previous;
+  }
+});
+
+test('parallel curriculum reads fail closed if a scoped dependency is unavailable', async () => {
+  const fixtures = { cohorts: [{ id: 'cohort', course_id: admin.id }], curriculum_weeks: [{ id: 'week', course_id: admin.id }], curriculum_lessons: [{ id: 'lesson', week_id: 'week' }] };
+  for (const part of ['curriculum', 'missions']) {
+    for (const table of ['cohorts', 'curriculum_weeks', 'edu_cohort_week_visibility', 'curriculum_lessons', 'edu_cohort_lesson_visibility', part === 'missions' ? 'curriculum_missions' : 'lesson_contents']) {
+      const api = apiHarness(admin, null, fixtures, {}, undefined, async current => current === table ? { message: 'synthetic query failure' } : null);
+      const response = await api.read(`products&record=${admin.id}&part=${part}`);
+      assert.equal(response.status, 500, table);
+      assert.equal((await response.json()).data, undefined);
+    }
+  }
 });
 
 test('staff product reads enforce their product permission before querying product records', async () => {
