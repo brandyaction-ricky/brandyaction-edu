@@ -633,6 +633,12 @@
 .edu-admin .admin-menu-search-result{padding:8px 12px;font-size:12px;line-height:1.6;color:#656b73}
 
 /* Questions use the same list-and-detail layout as the admin review screens. */
+.edu-admin .question-state-tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--adm-border,#e2e5e9);margin-bottom:16px}
+.edu-admin .question-state-tabs button{flex:none;min-height:44px;padding:0 14px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--adm-text-sub,#626770);font-size:13px;font-weight:600}
+.edu-admin .question-state-tabs button[aria-pressed=true]{border-bottom-color:var(--adm-text,#161719);color:var(--adm-text,#161719)}
+.edu-admin .question-state-tabs button:focus-visible,.edu-admin .question-inbox-item:focus-visible{outline:2px solid var(--adm-info,#315e8b);outline-offset:-2px}
+.edu-admin .question-catalog-filter{margin-bottom:16px}
+.edu-admin .question-inbox-actions{display:flex;gap:8px;margin-top:16px}
 .edu-admin .question-inbox{display:grid;grid-template-columns:minmax(240px,340px) minmax(0,1fr);min-width:0;min-height:360px;border:1px solid var(--adm-border,#e2e5e9);border-radius:var(--adm-radius-lg,10px);background:#fff;overflow:hidden}
 .edu-admin .question-inbox-list{min-width:0;max-height:min(72vh,900px);overflow:auto;overscroll-behavior:contain;border-right:1px solid var(--adm-border,#e2e5e9)}
 .edu-admin .question-inbox-list-heading{position:sticky;top:0;z-index:1;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--adm-border,#e2e5e9);background:var(--adm-surface-subtle,#f7f8f9);font-size:13px}

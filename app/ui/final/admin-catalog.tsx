@@ -217,6 +217,13 @@ export function AdminCatalog({
   const q = s.key === "questions"
     ? filtered.find(question => String(question.id) === selectedQuestionId) || filtered[0]
     : undefined;
+  const questionState = params.has('question') ? 'selected' : params.get('questionState') || 'active';
+  const changeQuestionState = (value: string) => {
+    const next = new URLSearchParams(params.toString());
+    next.set('questionState', value);
+    next.delete('question');
+    router.push(`/admin/questions?${next}`);
+  };
   const mvps = useMemberMvps(s.key === "customers" ? filtered.map(row => row.id) : [], blockLearningEnabled);
   const allCourseWeeks = course ? rows.filter((row) => row.course_id === course).toSorted((a, b) => num(a, "week_number") - num(b, "week_number")) : [];
   // Onboarding stays at week zero; only the regular weeks can trade places.
@@ -841,6 +848,9 @@ export function AdminCatalog({
             ["learning", "missions", "questions"].includes(s.key) ? "" : s.key === "weeks" ? "panel weeks-table-workspace" : "panel"
           }
         >
+          {s.key === "questions" && <nav className="question-state-tabs" aria-label="질문 처리 상태">
+            {([["open", "답변 대기"], ["answered", "답변 완료"], ["archived", "보관"], ["active", "전체 운영 질문"]] as const).map(([value, label]) => <button type="button" key={value} aria-pressed={questionState === value} disabled={loading} onClick={() => changeQuestionState(value)}>{label}</button>)}
+          </nav>}
           {s.key === "products" && <AdminFilterBar
             className="admin-pilot-filter"
             filters={<><AdminSelect label="상품 유형" labelHidden value={type} onChange={event => { setType(event.target.value); setSelection([]); }}><option value="">전체 유형</option>{["무료 클래스", "유료 클래스", "디지털 상품"].map(value => <option key={value}>{value}</option>)}</AdminSelect><AdminSelect label="상품 표시 범위" labelHidden value={productVisibility} onChange={event => { setProductVisibility(event.target.value as "active" | "archived"); setSelection([]); }}><option value="active">판매 상품</option><option value="archived">삭제된 상품</option></AdminSelect></>}
@@ -849,14 +859,14 @@ export function AdminCatalog({
             action={<AdminButton variant="primary" onClick={() => edit(s)}><Plus size={16} aria-hidden="true" />상품 등록</AdminButton>}
           />}
           {s.key !== "products" && !["missions", "tags"].includes(s.key) && <AdminFilterBar
-            className="admin-catalog-filter"
+            className={s.key === "questions" ? "admin-catalog-filter question-catalog-filter" : "admin-catalog-filter"}
             filters={<>
               {s.key === "articles" && <AdminSelect label="콘텐츠 유형" labelHidden value={type} onChange={(e) => setType(e.target.value)}><option value="">전체 유형</option><option value="column">글</option><option value="video">영상</option></AdminSelect>}
               {s.key === "product-reviews" && <AdminSelect label="후기 상품" labelHidden value={course} onChange={(event) => { setCourse(event.target.value); setSelection([]); }}><option value="">전체 상품</option>{courses.map((item) => <option key={item.id} value={item.id}>{named(item)}</option>)}</AdminSelect>}
               {s.key === "weeks" && <AdminSelect label="주차 상품" aria-label="주차 상품" labelHidden value={course} onChange={(event) => { setCourse(event.target.value); setSelection([]); }}><option value="">전체 상품</option>{courses.map((item) => <option key={item.id} value={item.id}>{named(item)}</option>)}</AdminSelect>}
               {s.key === "customers" && <AdminSelect label="수강 클래스" labelHidden value={course} onChange={(event) => { setCourse(event.target.value); setSelection([]); }}><option value="">전체 클래스</option>{courses.map((item) => <option key={item.id} value={item.id}>{t(item, "title")}</option>)}</AdminSelect>}
             </>}
-            status={s.key === "questions" ? <AdminSelect label="질문 처리 상태" labelHidden value={params.has('question') ? 'selected' : params.get('questionState') || 'active'} onChange={event => { const next = new URLSearchParams(params.toString()); next.set('questionState', event.target.value); next.delete('question'); router.push(`/admin/questions?${next}`); }}>{params.has('question') && <option value="selected" disabled>선택한 질문 · 보관 포함</option>}<option value="active">전체 운영 질문</option><option value="open">미답변</option><option value="answered">답변 완료</option><option value="archived">보관</option></AdminSelect> : statusFilter}
+            status={s.key === "questions" ? undefined : statusFilter}
             search={search}
             action={s.key === "weeks" ? <AdminButton className="weeks-create" variant="primary" type="button" onClick={() => edit(s)}><Plus size={16} aria-hidden="true" />새로 등록</AdminButton> : undefined}
           />}
@@ -974,6 +984,7 @@ export function AdminCatalog({
                     )}
                     <p className="meta mt16">접수 {date(q.created_at)} · {q.status === 'open' && !q.is_archived ? '답변 필요' : q.is_archived ? '보관된 질문 · 삭제되지 않음' : '답변 완료'}</p>
                     {Boolean(q.user_id) && <Link className="text-link" href={`/admin/customers?member=${encodeURIComponent(t(q, 'user_id'))}`}>회원 운영 정보 보기</Link>}
+                    {!q.is_archived && <div className="question-inbox-actions"><AdminButton type="button" size="sm" variant="outline" disabled={pending || loading} onClick={() => archive(s, [recordId(q)])}>질문 보관</AdminButton></div>}
                   </div>
                 </article>
               </div>}

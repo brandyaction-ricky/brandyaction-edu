@@ -110,3 +110,27 @@ test('a long question list scrolls independently without expanding all answer hi
   expect(size.height).toBeLessThanOrEqual(900);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
+
+test('question status tabs keep their server scope, and the selected question can be archived', async ({ page, context }) => {
+  await backend(context);
+  await page.goto('/question-comments-test?tabs');
+  const tabs = page.getByRole('navigation', { name: '질문 처리 상태' });
+  await expect(tabs.getByRole('button', { name: '전체 운영 질문' })).toHaveAttribute('aria-pressed', 'true');
+  await tabs.getByRole('button', { name: '답변 대기' }).click();
+  await expect(page).toHaveURL(/questionState=open/);
+  await expect(page.getByRole('article', { name: '선택한 질문 상세' })).toContainText('예시 학습 질문');
+  await expect(page.getByRole('button', { name: /두 번째 학습 질문/ })).toHaveCount(0);
+  const spacing = await page.locator('.question-catalog-filter').evaluate(element => parseFloat(getComputedStyle(element).marginBottom));
+  expect(spacing).toBeGreaterThanOrEqual(16);
+  await page.getByRole('button', { name: '질문 보관' }).click();
+  await expect(page.getByRole('article', { name: '선택한 질문 상세' })).toHaveCount(0);
+  await tabs.getByRole('button', { name: '보관' }).click();
+  await expect(page).toHaveURL(/questionState=archived/);
+  await expect(page.getByRole('button', { name: /예시 학습 질문/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /보관된 질문/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: '질문 보관' })).toHaveCount(0);
+  await tabs.getByRole('button', { name: '답변 완료' }).click();
+  await expect(page).toHaveURL(/questionState=answered/);
+  await expect(page.getByRole('article', { name: '선택한 질문 상세' })).toContainText('두 번째 학습 질문');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
