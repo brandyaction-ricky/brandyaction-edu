@@ -5,6 +5,7 @@ import { AdminWorkflows } from '../../../app/ui/admin-workflows';
 import { sections, type Row } from '../../../lib/platform';
 import { Overview } from '../../../app/ui/final/admin-shell';
 import { AdminCommentsFixture } from './admin-comments';
+import { AdminRemainingFixture } from './admin-remaining';
 
 // Local UI fixture only: no customer data, server authentication or message delivery.
 export function AdminUxAuditFixture() {
@@ -17,6 +18,7 @@ export function AdminUxAuditFixture() {
     channel: 'lms', purpose: 'transactional', content: '다음 학습을 확인해 주세요. 질문이 있으면 질문·답변에서 도와드릴게요.', is_active: i % 2 === 0,
   })));
   if (new URLSearchParams(location.search).has('comments')) return <AdminCommentsFixture/>;
+  if (new URLSearchParams(location.search).has('remaining')) return <AdminRemainingFixture/>;
   if (new URLSearchParams(location.search).has('overview')) return <main className="edu-admin adm adm-shell"><AdminShell current="" available={available} user={{ full_name: '시험 운영자', role: 'admin' }} mobile={mobile} setMobile={setMobile} logout={async () => {}}><Overview available={available} data={{ admin_summary: [{ id: 'summary', pendingReviews: 2, openQuestions: 3, members: 100, activeEnrollments: 80, netRevenue: 1000000 }] }} /></AdminShell></main>;
   return <main className="edu-admin adm adm-shell">
     <AdminShell current="templates" available={available} user={{ full_name: '시험 운영자', role: staff ? 'staff' : 'admin' }} mobile={mobile} setMobile={setMobile} logout={async () => {}}>
