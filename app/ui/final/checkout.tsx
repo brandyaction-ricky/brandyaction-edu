@@ -4,13 +4,14 @@ import { cohortPeriod } from "@/lib/qa-rules";
 import { ArrowLeft, ArrowRight, Check, CreditCard, Landmark } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { type Data, type WorkflowSend } from "../learning-workflows";
 import { Badge, Empty, Heading, courseType } from "./primitives";
 import { parseEntrySource, withEntrySource } from '@/lib/entry-source';
 import { CheckoutCouponRegistration, useCheckoutCouponRegistration } from "@/features/commerce/ui";
 import { MOONSHOT_SUPPORT_URL } from "@/lib/purchase-onboarding";
 import "./checkout.css";
+import { useTossCheckoutWidget } from "./toss-checkout-widget";
 
 type PaymentMethod = "CARD" | "TRANSFER";
 
@@ -50,11 +51,20 @@ export function Checkout({
   const coupon = couponRegistration.appliedCode;
   const quote = couponRegistration.quote;
   const couponLoading = couponRegistration.loading;
+  const widgetEnabled = process.env.NEXT_PUBLIC_TOSS_WIDGET_ENABLED === "true" && !!user && !!cohort && !free;
+  const widgetAmount = quote?.totalAmount ?? num(cohort, "price");
+  const latestWidgetAmount = useRef(widgetAmount);
+  useEffect(() => { latestWidgetAmount.current = widgetAmount; }, [widgetAmount]);
+  const tossWidget = useTossCheckoutWidget(widgetEnabled, user?.id || "", Math.max(1, widgetAmount));
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (coupon.trim() && !quote) { setError('쿠폰 등록을 완료해 주세요.'); return; }
     if (!agreed) {
       setError("필수 약관에 동의해 주세요.");
+      return;
+    }
+    if (widgetEnabled && widgetAmount > 0 && !tossWidget.ready) {
+      setError("결제 수단을 확인한 후 다시 시도해 주세요.");
       return;
     }
     if (lock.current) return;
@@ -77,6 +87,17 @@ export function Checkout({
       );
       if (result.free) {
         router.push("/applied?order=" + result.orderId);
+        return;
+      }
+      if (widgetEnabled) {
+        if (Number(result.totalAmount) !== widgetAmount || latestWidgetAmount.current !== widgetAmount) throw new Error("결제 금액이 변경됐습니다. 새로고침 후 다시 확인해 주세요.");
+        if (!tossWidget.widget.current || !tossWidget.ready) throw new Error("결제 수단을 확인한 후 다시 시도해 주세요.");
+        await tossWidget.widget.current.requestPayment({
+          orderId: String(result.orderNumber), orderName: String(result.orderName || t(course, "title")),
+          customerName: String(f.get("name")), customerEmail: user!.contact_email || user!.email,
+          successUrl: location.origin + "/payment/success?integration=widget",
+          failUrl: location.origin + "/payment/fail",
+        });
         return;
       }
       const key = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY;
@@ -189,14 +210,14 @@ export function Checkout({
     <>
       <button
         className="btn primary full large"
-        disabled={pending || processing || couponLoading || !agreed || (!!coupon.trim() && !quote)}
+        disabled={pending || processing || couponLoading || !agreed || (!!coupon.trim() && !quote) || (widgetEnabled && widgetAmount > 0 && !tossWidget.ready)}
         aria-describedby="checkout-agreement-help"
       >
         {pending || processing
           ? "처리 중..."
           : free || quote?.totalAmount === 0
             ? "무료로 신청 완료하기"
-            : selectedPayment.button}
+            : widgetEnabled ? "결제하기" : selectedPayment.button}
         <ArrowRight />
       </button>
       {!agreed && <p className="meta mt8" id="checkout-agreement-help">필수 약관에 동의하면 {free ? "신청" : "결제"}할 수 있습니다.</p>}
@@ -300,7 +321,15 @@ export function Checkout({
                 <CheckoutCouponRegistration controller={couponRegistration} />
               </div>
             </section>
-            {quote?.totalAmount === 0 ? <section className="panel"><div className="panel-body">최종 금액 0원 · 결제창 없이 신청을 완료합니다.</div></section> : <section className="panel">
+            {widgetEnabled && <section className="panel" hidden={quote?.totalAmount === 0}>
+              <div className="panel-head"><h2>결제 수단</h2></div>
+              <div className="panel-body">
+                <div id="toss-payment-methods" />
+                <div id="toss-payment-agreement" />
+                {tossWidget.error && <p role="alert" className="form-error">{tossWidget.error}</p>}
+              </div>
+            </section>}
+            {quote?.totalAmount === 0 ? <section className="panel"><div className="panel-body">최종 금액 0원 · 결제창 없이 신청을 완료합니다.</div></section> : !widgetEnabled && <section className="panel">
               <div className="panel-head">
                 <h2>결제 수단</h2>
               </div>

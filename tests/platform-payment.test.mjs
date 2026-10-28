@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
 
-function paymentHandler({ user = { id: 'buyer' }, authError = null, order, orderError = null, provider, finalized = [], updates = [], rpcError = null }) {
+function paymentHandler({ user = { id: 'buyer' }, authError = null, order, orderError = null, provider, finalized = [], updates = [], rpcError = null, env = { TOSS_SECRET_KEY: 'test-only' } }) {
   const source = fs.readFileSync(new URL('../app/api/platform/payment/route.ts', import.meta.url), 'utf8');
   const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const query = {
@@ -15,7 +15,7 @@ function paymentHandler({ user = { id: 'buyer' }, authError = null, order, order
   };
   const db = { from: () => query, rpc: async (...args) => { finalized.push(args); return { error: rpcError }; } };
   const exports = {};
-  new Function('exports', 'require', 'fetch', 'process', 'Buffer', compiled)(exports, name => name.includes('server-auth') ? { getAuthenticatedUser: async () => { const error = typeof authError === 'function' ? authError() : authError; if (error) throw error; return user; } } : { createAdminClient: () => db }, provider, { env: { TOSS_SECRET_KEY: 'test-only' } }, Buffer);
+  new Function('exports', 'require', 'fetch', 'process', 'Buffer', compiled)(exports, name => name.includes('server-auth') ? { getAuthenticatedUser: async () => { const error = typeof authError === 'function' ? authError() : authError; if (error) throw error; return user; } } : name.endsWith('toss-environment') ? { tossMode: (client, secret) => client?.startsWith('test_') && secret?.startsWith('test_') ? 'test' : 'missing' } : { createAdminClient: () => db }, provider, { env }, Buffer);
   return exports.POST;
 }
 const request = (body = {}, origin = 'https://edu.example') => new Request('https://edu.example/api/platform/payment', { method: 'POST', headers: { origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ paymentKey: 'test-payment', orderId: 'BAE-1', amount: 1000, ...body }) });
@@ -217,4 +217,14 @@ test('quick transfer completion finalizes the verified amount and provider metho
   assert.equal(finalized[0][0], 'finalize_toss_payment');
   assert.equal(finalized[0][1].p_method, '계좌이체');
   assert.equal(finalized[0][1].p_approved_amount, 1000);
+});
+
+test('widget callback uses its own key and mismatched session does not fail the order', async () => {
+  const calls = []; const updates = [];
+  const h = paymentHandler({ order: { id: 'order', status: 'pending', total_amount: 1000 }, updates,
+    env: { NEXT_PUBLIC_TOSS_CLIENT_KEY: 'test_ck_old', TOSS_SECRET_KEY: 'test_old', NEXT_PUBLIC_TOSS_WIDGET_CLIENT_KEY: 'test_gck_new', TOSS_WIDGET_SECRET_KEY: 'test_widget' },
+    provider: async (_, options) => { calls.push(options); return Response.json({code:'NOT_FOUND_PAYMENT_SESSION'}, {status: 400}); } });
+  assert.equal((await h(request({ integration: 'widget' }))).status, 409);
+  assert.equal(calls[0].headers.Authorization, 'Basic ' + Buffer.from('test_widget:').toString('base64'));
+  assert.deepEqual(updates, []);
 });

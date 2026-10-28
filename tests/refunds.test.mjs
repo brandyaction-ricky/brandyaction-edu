@@ -81,3 +81,14 @@ test('mismatched provider payment identity prevents cancellation', async () => {
   const h = handler({ provider: async () => Response.json({ ...current, paymentKey: 'another-payment' }) });
   assert.equal((await h.run()).status, 409); assert.equal(h.calls.some(r => r.method === 'POST'), false);
 });
+
+test('widget refund resolves its secret by read-only lookup and sends one cancellation', async () => {
+  const h = handler({ env: { ...testEnv, NEXT_PUBLIC_TOSS_WIDGET_CLIENT_KEY: 'test_gck_widget', TOSS_WIDGET_SECRET_KEY: 'test_widget_key' }, provider: async (_, options) => {
+    const widget = options.headers.Authorization === 'Basic ' + Buffer.from('test_widget_key:').toString('base64');
+    if (!widget) return Response.json({ code: 'NOT_FOUND' }, { status: 404 });
+    return Response.json(options.method === 'POST' ? { ...current, balanceAmount: 900, status: 'PARTIAL_CANCELED', cancels: [cancellation] } : current);
+  }});
+  assert.equal((await h.run()).status, 200);
+  assert.equal(h.calls.filter(r => r.method === 'POST').length, 1);
+  assert.equal(h.calls.at(-1).headers.Authorization, 'Basic ' + Buffer.from('test_widget_key:').toString('base64'));
+});
