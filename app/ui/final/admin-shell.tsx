@@ -200,9 +200,6 @@ export function LegacyAdminShell({
             <small>EDU / ADMIN</small>
           </span>
         </Link>
-        <div className="workspace-label">
-          <span className="square">B</span>클래스 운영 워크스페이스
-        </div>
         <nav aria-label="관리자 카테고리">
           {navLink("overview")}
           {finalAdminGroups

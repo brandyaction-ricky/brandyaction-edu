@@ -237,6 +237,12 @@ function StaffPermissions({ data, send, pending }: Props) {
     readPermissions(memberId),
   );
   const [message, setMessage] = useState("");
+  const [memberQuery, setMemberQuery] = useState("");
+  const memberQueryText = memberQuery.trim().toLocaleLowerCase();
+  const matchingMembers = members.filter(member =>
+    `${named(member)} ${t(member, "email")}`.toLocaleLowerCase().includes(memberQueryText),
+  );
+  const selectedOutsideSearch = selected && !matchingMembers.some(member => member.id === selected.id);
   async function submit(event: FormEvent) {
     event.preventDefault();
     try {
@@ -250,13 +256,24 @@ function StaffPermissions({ data, send, pending }: Props) {
     }
   }
   return (
-    <form className="panel pad" onSubmit={submit}>
+    <form className="panel pad admin-staff-permissions" onSubmit={submit}>
       <h2>스태프별 접근 권한</h2>
       <p className="meta mt16">
         선택한 업무 영역만 관리자 메뉴와 서버 API에서 허용됩니다. 모든 권한을
         끄면 일반 회원으로 전환됩니다.
       </p>
-      <Field label="회원 선택">
+      <div className="admin-staff-member-picker">
+        <div className="admin-staff-search-field">
+          <span>이름·이메일 검색</span>
+          <AdminSearchField
+            label="권한 관리 회원 찾기"
+            placeholder="이름 또는 이메일로 회원 찾기"
+            value={memberQuery}
+            onChange={event => setMemberQuery(event.target.value)}
+            onKeyDown={event => { if (event.key === "Enter") event.preventDefault(); }}
+          />
+        </div>
+        <Field label="회원 선택">
         <select
           value={memberId}
           required
@@ -267,7 +284,8 @@ function StaffPermissions({ data, send, pending }: Props) {
           }}
         >
           <option value="">회원을 선택하세요</option>
-          {members.map((member) => (
+          {selectedOutsideSearch && <optgroup label="현재 선택한 회원 · 선택 유지"><option value={selected.id}>{named(selected)} · {t(selected, "email")} {selected.role === "admin" ? "(관리자)" : selected.role === "staff" ? "(스태프)" : ""}</option></optgroup>}
+          {matchingMembers.map((member) => (
             <option key={member.id} value={member.id}>
               {named(member) || "회원"} · {t(member, "email")}{" "}
               {member.role === "admin"
@@ -278,7 +296,12 @@ function StaffPermissions({ data, send, pending }: Props) {
             </option>
           ))}
         </select>
-      </Field>
+        </Field>
+        <p className="meta admin-staff-search-result" role="status">
+          불러온 회원 중 {matchingMembers.length}명 검색됨
+          {memberQueryText && selectedOutsideSearch ? " · 현재 선택한 회원은 유지됩니다." : " · 검색만으로 선택이나 권한이 변경되지 않습니다."}
+        </p>
+      </div>
       {selected?.role === "admin" ? (
         <Status message="최고 관리자 권한은 이 화면에서 변경할 수 없습니다." />
       ) : memberId ? (
