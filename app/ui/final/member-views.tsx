@@ -1374,7 +1374,7 @@ export function MemberViews({
     case "messages":
     case "questions":
       content = (
-        <><Questions data={data} pending={pending} send={send} order={order} /><details className="panel pad mt24"><summary>질문·답변 알림 설정</summary><PushSettings userId={user.id}/></details>{process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === "true" && <details className="panel pad mt24" open={section === "messages"}><summary>이전 메시지 기록</summary><MemberMessages userId={user.id} readOnly /></details>}</>
+        <><Questions data={data} pending={pending} send={send} order={order} /><details className="panel pad mt24 member-notification-settings"><summary>질문·답변 알림 설정</summary><PushSettings userId={user.id}/></details>{process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === "true" && <details className="panel pad mt24" open={section === "messages"}><summary>이전 메시지 기록</summary><MemberMessages userId={user.id} readOnly /></details>}</>
       );
       break;
     case "orders":

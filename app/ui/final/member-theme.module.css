@@ -86,6 +86,50 @@
 .workspace.workspace :global(.care-personal h2) { font-size: var(--type-h4); line-height: 1.5; }
 .workspace.workspace :global(.member-task) { padding: var(--space-6); border-color: var(--border-default); }
 
+.workspace.workspace :global(.member-notification-settings > summary) {
+  cursor: pointer;
+  font-size: var(--type-body);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-ui);
+}
+.workspace.workspace :global(.member-notification-settings > summary:focus-visible) {
+  outline: 2px solid var(--ba-red);
+  outline-offset: 4px;
+}
+.workspace.workspace :global(.member-notification-settings > .member-push-settings) {
+  margin: 0;
+  padding: var(--space-6) 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.workspace.workspace :global(.member-push-settings h2) {
+  margin: 0 0 var(--space-3);
+  font-size: var(--type-h4);
+  line-height: var(--leading-ui);
+}
+.workspace.workspace :global(.member-push-settings > p) {
+  margin: var(--space-3) 0 0;
+  font-size: var(--type-small);
+  color: var(--text-secondary);
+  line-height: var(--leading-body);
+}
+.workspace.workspace :global(.member-push-settings > p[role="status"]) {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
+  color: var(--text-primary);
+}
+.workspace.workspace :global(.member-push-settings > p[role="alert"]) { color: var(--ba-red); }
+.workspace.workspace :global(.member-push-actions) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+.emailHelp { display: block; margin-top: var(--space-2); color: var(--text-secondary); line-height: var(--leading-body); }
+.emailActions { display: flex; justify-content: flex-end; margin-top: var(--space-6); }
+
 /* Progress information stays neutral; red identifies actions and active navigation. */
 .workspace.workspace :global(.care-personal) { margin: var(--space-6) 0; }
 .workspace.workspace :global(.care-eyebrow) { color: var(--ba-red); letter-spacing: 0; }
@@ -131,4 +175,6 @@
   .workspace.workspace :global(.care-next-actions) { margin-top: var(--space-4); }
   .workspace.workspace :global(.member-stats) { gap: var(--space-2); }
   .workspace.workspace :global(.member-stat) { padding: var(--space-3); }
+  .workspace.workspace :global(.member-push-actions) { flex-direction: column; align-items: stretch; }
+  .emailActions > :global(.btn) { width: 100%; }
 }
