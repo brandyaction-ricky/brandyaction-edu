@@ -27,6 +27,7 @@ export function OrderResult({
   const orderId = params.get("orderId") || params.get("order");
   const paymentKey = params.get("paymentKey");
   const amount = params.get("amount");
+  const widgetPayment = params.get("integration") === "widget";
   const [state, setState] = useState<"checking" | "paid" | "waiting" | "error">("checking");
   const [error, setError] = useState("");
   const [virtualAccount, setVirtualAccount] = useState<VirtualAccount | null>(null);
@@ -64,7 +65,7 @@ export function OrderResult({
       const response = await fetch("/api/platform/payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentKey, orderId, amount: Number(amount) }),
+        body: JSON.stringify({ paymentKey, orderId, amount: Number(amount), integration: widgetPayment ? "widget" : "legacy" }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error);
@@ -84,7 +85,7 @@ export function OrderResult({
       );
       setState("error");
     }
-  }, [paymentKey, orderId, failed, amount, refresh, setState, setError, setVirtualAccount]);
+  }, [paymentKey, orderId, failed, amount, widgetPayment, refresh, setState, setError, setVirtualAccount]);
 
   useEffect(() => {
     const timer = setTimeout(() => void confirm(), 0);
