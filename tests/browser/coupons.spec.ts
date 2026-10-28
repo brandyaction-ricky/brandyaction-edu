@@ -64,8 +64,7 @@ test('coupon drawer preserves admin defaults, multiple products and KST after sa
 });
 
 for (const method of [
-  ...(quickTransferEnabled?[{code:'TRANSFER',label:'퀵계좌이체',button:'퀵계좌이체로 결제하기'}]:[]),
-  {code:'TRANSFER',label:'실시간 계좌이체',button:'실시간 계좌이체로 결제하기'},
+  {code:'TRANSFER',label:quickTransferEnabled?'퀵 계좌이체':'실시간 계좌이체',button:quickTransferEnabled?'퀵 계좌이체로 결제하기':'실시간 계좌이체로 결제하기'},
   {code:'CARD',label:'카드·간편결제',button:'카드·간편결제로 결제하기'},
 ]) for (const discounted of [false,true]) test(`positive checkout ${method.label} ${discounted?'with coupon':'without coupon'} sends authoritative amount to mocked Toss`,async({page},testInfo)=>{
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
@@ -75,20 +74,16 @@ for (const method of [
   await page.route('**/fixture/order',route=>route.fulfill({json:{orderId:'positive-order',orderNumber:'EDU-COUPON-QA',totalAmount:finalAmount}}));
   await page.route('**/fixture/toss',route=>route.fulfill({json:{ok:true}}));
   await page.goto('/coupon-checkout-test?cohort='+cohort);
-  await expect(page.getByRole('radio')).toHaveCount(3);
+  await expect(page.getByRole('radio')).toHaveCount(2);
   await expect(page.getByText(/가상계좌/)).toHaveCount(0);
-  await expect(page.getByRole('radio',{name:quickTransferEnabled?'퀵계좌이체':'실시간 계좌이체',exact:true})).toBeChecked();
-  if(quickTransferEnabled) await expect(page.getByRole('radio',{name:'퀵계좌이체',exact:true})).toBeEnabled();
-  else {
-    await expect(page.getByRole('radio',{name:'퀵계좌이체',exact:true})).toBeDisabled();
-    await expect(page.getByText('준비 중',{exact:true})).toBeVisible();
-    await expect(page.getByText('추천',{exact:true})).toHaveCount(0);
-  }
+  await expect(page.getByRole('radio',{name:'카드·간편결제',exact:true})).toBeChecked();
+  await expect(page.locator('.checkout-payment-option').first()).toContainText('추천');
+  await expect(page.locator('.checkout-payment-option').first()).toContainText('카드·간편결제');
   await expect(page.getByText('954201-00-094916',{exact:true})).toBeVisible();
   await expect(page.getByText('주식회사 브랜디액션',{exact:true})).toBeVisible();
   await expect(page.getByRole('link',{name:'입금 후 카카오톡 채널 문의'})).toHaveAttribute('href','http://pf.kakao.com/_ydxjhxj/chat');
   await expect(page.getByText('입금 후 카카오톡 채널로 문의해 주시면 계산서 발급과 수강 절차를 안내해 드리겠습니다.')).toBeVisible();
-  for(const label of ['퀵계좌이체','실시간 계좌이체','카드·간편결제']) await expect(page.getByRole('radio',{name:label,exact:true})).toBeVisible();
+  for(const label of [quickTransferEnabled?'퀵 계좌이체':'실시간 계좌이체','카드·간편결제']) await expect(page.getByRole('radio',{name:label,exact:true})).toBeVisible();
   await page.getByRole('radio',{name:method.label,exact:true}).check();
   await expect(page.getByRole('radio',{name:method.label,exact:true})).toBeChecked();
   await expect(page.getByRole('button',{name:method.button,exact:true})).toBeDisabled();

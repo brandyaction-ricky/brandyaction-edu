@@ -341,7 +341,7 @@ test('classroom, mission, checkout and completion preserve authorized workflow e
   assert.match(checkout, /<button[^>]*disabled=""[^>]*aria-describedby="checkout-agreement-help"[^>]*>[^<]*결제하기/s);
   assert.match(checkout, /value="CARD"/);
   assert.doesNotMatch(checkout, /VIRTUAL_ACCOUNT|가상계좌/);
-  assert.match(checkout, /<input[^>]*checked=""[^>]*value="TRANSFER"/);
+  assert.match(checkout, /<input[^>]*checked=""[^>]*value="CARD"/);
   assert.match(checkout, /카드·간편결제/);
   assert.match(checkout, /계산서 발급과 수강 절차를 안내/);
   assert.match(read('app/api/platform/route.ts'), /paidCourseReadinessIssues[\s\S]*판매 준비가 완료되지 않았습니다/);
