@@ -7,7 +7,7 @@ type Dependencies = { watch?: (context: DiagnosisReportContext) => Promise<void>
 
 export async function runDiagnosisReport({ actor, rpc, send, watch }: Dependencies, action: DiagnosisReportAction):
   Promise<DiagnosisReportStatus & { markdown?: string; html?: string }> {
-  if (!['status','download','html'].includes(action)) throw new DiagnosisBridgeError('INVALID', 400);
+  if (!['status','download','html','readable'].includes(action)) throw new DiagnosisBridgeError('INVALID', 400);
   async function currentContext() {
     // This private function rechecks the active profile, enabled offer and current paid/manual grant.
     const { data, error } = await rpc('edu_diagnosis_context', { p_actor: actor.id });
@@ -29,5 +29,5 @@ export async function runDiagnosisReport({ actor, rpc, send, watch }: Dependenci
   if (watch && ['queued','processing','needs_review'].includes(report.state)) await watch(after);
   // Lost submit acknowledgments may leave the EDU revision behind MYIN's frozen revision; no new attempt is needed.
   return { state: report.state, updatedAt: report.updatedAt, canRetry: false, downloadAvailable: report.downloadAvailable,
-    ...(action === 'download' ? { markdown: report.markdown } : action === 'html' ? { html: report.html } : {}) };
+    ...(action === 'download' ? { markdown: report.markdown } : action === 'html' || action === 'readable' ? { html: report.html } : {}) };
 }
