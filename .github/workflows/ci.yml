@@ -23,7 +23,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 65
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -255,6 +255,11 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Admin focus browser regression tests
         run: npm run test:browser
+      - name: Enabled Toss widget browser regression tests
+        env:
+          FIXTURE_TOSS_WIDGET_ENABLED: 'true'
+          FIXTURE_PORT: '4180'
+        run: npx playwright test tests/browser/toss-widget.spec.ts
       - name: Production build
         run: npm run build
 
