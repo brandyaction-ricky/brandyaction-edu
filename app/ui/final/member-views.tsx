@@ -63,6 +63,7 @@ import { Badge, Empty, Heading, ResourceRow } from "./primitives";
 import { DigitalContentOutline, ProductResourceRow } from "./primitives";
 import { productDigitalSections, productResources } from "@/lib/product-metadata";
 import './member-learning-ux.css';
+import memberTheme from './member-theme.module.css';
 
 const accountGroups = [
   [
@@ -1399,7 +1400,7 @@ export function MemberViews({
       content = <Empty title="페이지를 찾을 수 없습니다." />;
   }
   return (
-    <div className="account-bg">
+    <div className={`account-bg ${memberTheme.workspace}`}>
       <div className="wrap account-layout">
         <aside className="account-aside">
           <div className="account-profile">

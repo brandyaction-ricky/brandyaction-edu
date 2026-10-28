@@ -1,0 +1,134 @@
+/* Member-only presentation: shared EDU tokens, no changes to status or actions.
+   Repeated scope outranks legacy global rules regardless of CSS chunk order. */
+:global(.edu-front) .workspace.workspace {
+  background: var(--surface-subtle);
+  color: var(--text-primary);
+}
+
+.workspace.workspace :global(.account-layout) {
+  gap: var(--space-8);
+  padding-top: var(--space-8);
+  padding-bottom: var(--space-12);
+}
+.workspace.workspace :global(.account-main) { min-width: 0; }
+.workspace.workspace :global(.account-profile) {
+  padding-bottom: var(--space-6);
+  margin-bottom: var(--space-6);
+  border-color: var(--border-default);
+}
+.workspace.workspace :global(.member-nav-group) { gap: var(--space-1); }
+.workspace.workspace :global(.member-nav-label) { color: var(--text-secondary); }
+.workspace.workspace :global(.account-nav a) {
+  min-height: var(--button-height);
+  border-radius: var(--radius-sm);
+  gap: var(--space-3);
+  color: var(--text-secondary);
+}
+.workspace.workspace :global(.account-nav a.active) {
+  background: var(--ba-red-soft);
+  border-color: var(--ba-red-soft);
+  color: var(--ba-red);
+  font-weight: 700;
+}
+.workspace.workspace :global(.page-head) { margin-bottom: var(--space-8); }
+.workspace.workspace :global(.page-head .between) { gap: var(--space-4); flex-wrap: wrap; }
+.workspace.workspace :global(.page-head p) { margin-top: var(--space-2); color: var(--text-secondary); }
+
+.workspace.workspace :global(.member-learning-intro),
+.workspace.workspace :global(.care-personal),
+.workspace.workspace :global(.panel),
+.workspace.workspace :global(.member-class-card) {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  box-shadow: none;
+}
+.workspace.workspace :global(.member-learning-intro),
+.workspace.workspace :global(.care-personal) { padding: var(--space-6); }
+.workspace.workspace :global(.panel.pad) { padding: var(--space-6); }
+.workspace.workspace :global(.encouragement-heading h2) { font-size: var(--type-h4); line-height: 1.5; }
+.workspace.workspace :global(.member-journey-head) { align-items: center; gap: var(--space-6); }
+.workspace.workspace :global(.member-journey-head h2) {
+  font-size: var(--type-h3);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.workspace.workspace :global(.member-next-lesson) {
+  margin-top: var(--space-6);
+  padding: var(--space-4);
+  border-color: var(--border-default);
+  background: var(--surface-subtle);
+}
+.workspace.workspace :global(.member-next-lesson small) { line-height: 1.6; }
+.workspace.workspace :global(.member-focus-grid),
+.workspace.workspace :global(.member-lower-grid) { gap: var(--space-6); }
+.workspace.workspace :global(.member-stats) {
+  gap: var(--space-3);
+  margin: var(--space-6) 0;
+  border: 0;
+  background: transparent;
+}
+.workspace.workspace :global(.member-stat) {
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+.workspace.workspace :global(.member-stat p) { color: var(--text-secondary); line-height: 1.6; }
+.workspace.workspace :global(.panel-head) {
+  padding: var(--space-6);
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  border-color: var(--border-default);
+}
+.workspace.workspace :global(.panel-head h2),
+.workspace.workspace :global(.care-personal h2) { font-size: var(--type-h4); line-height: 1.5; }
+.workspace.workspace :global(.member-task) { padding: var(--space-6); border-color: var(--border-default); }
+
+/* Progress information stays neutral; red identifies actions and active navigation. */
+.workspace.workspace :global(.care-personal) { margin: var(--space-6) 0; }
+.workspace.workspace :global(.care-eyebrow) { color: var(--ba-red); letter-spacing: 0; }
+.workspace.workspace :global(.care-personal h2) { margin: var(--space-2) 0 var(--space-4); }
+.workspace.workspace :global(.care-personal h3) { font-size: 16px; line-height: 1.5; }
+.workspace.workspace :global(.care-personal article) { gap: var(--space-6); padding: var(--space-6) 0; }
+.workspace.workspace :global(.care-personal article > div:first-child) { min-width: 0; overflow-wrap: anywhere; }
+.workspace.workspace :global(.care-personal article + article) { border-color: var(--border-default); }
+.workspace.workspace :global(.care-personal small),
+.workspace.workspace :global(.care-personal p),
+.workspace.workspace :global(.care-growth),
+.workspace.workspace :global(.care-growth span) { color: var(--text-secondary); }
+.workspace.workspace :global(.care-growth b) { color: var(--text-primary); }
+.workspace.workspace :global(.care-next-actions) { gap: var(--space-2); }
+.workspace.workspace :global(.care-note) { margin: var(--space-4) 0 0; line-height: 1.7; }
+
+.workspace.workspace :global(.btn) {
+  min-height: var(--button-height);
+  border-radius: var(--radius-sm);
+  white-space: normal;
+  text-align: center;
+  line-height: 1.5;
+}
+.workspace.workspace :global(.btn.primary) { background: var(--ba-red); border-color: var(--ba-red); }
+.workspace.workspace :global(.btn.primary:hover) { background: var(--ba-red-hover); border-color: var(--ba-red-hover); }
+.workspace.workspace :global(.account-nav a:focus-visible),
+.workspace.workspace :global(.btn:focus-visible),
+.workspace.workspace :global(.member-stat:focus-visible) { outline: 2px solid var(--ba-red); outline-offset: 3px; }
+
+@media (max-width: 1024px) {
+  .workspace.workspace :global(.account-layout) { gap: var(--space-6); padding-top: var(--space-6); }
+}
+@media (max-width: 680px) {
+  .workspace.workspace :global(.account-layout) { padding-top: var(--space-4); }
+  .workspace.workspace :global(.page-head) { margin-bottom: var(--space-6); }
+  .workspace.workspace :global(.member-learning-intro),
+  .workspace.workspace :global(.care-personal),
+  .workspace.workspace :global(.panel.pad),
+  .workspace.workspace :global(.panel-head),
+  .workspace.workspace :global(.member-task) { padding: var(--space-4); }
+  .workspace.workspace :global(.member-journey-head) { display: block; }
+  .workspace.workspace :global(.care-personal article) { display: block; padding: var(--space-4) 0; }
+  .workspace.workspace :global(.care-next-actions) { margin-top: var(--space-4); }
+  .workspace.workspace :global(.member-stats) { gap: var(--space-2); }
+  .workspace.workspace :global(.member-stat) { padding: var(--space-3); }
+}
