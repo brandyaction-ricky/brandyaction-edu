@@ -12,12 +12,7 @@ import { CheckoutCouponRegistration, useCheckoutCouponRegistration } from "@/fea
 import { MOONSHOT_SUPPORT_URL } from "@/lib/purchase-onboarding";
 import "./checkout.css";
 
-const paymentMethods = [
-  { value: "QUICK_TRANSFER", label: "퀵계좌이체", button: "퀵계좌이체로 결제하기", description: "처음 한 번 계좌를 연결하고 비밀번호로 간편하게 결제" },
-  { value: "TRANSFER", label: "실시간 계좌이체", button: "실시간 계좌이체로 결제하기", description: "토스페이먼츠 결제창에서 은행 계좌를 인증하고 결제" },
-  { value: "CARD", label: "카드·간편결제", button: "카드·간편결제로 결제하기", description: "신용·체크카드, 카카오페이, 토스페이, 네이버페이" },
-] as const;
-type PaymentMethod = typeof paymentMethods[number]["value"];
+type PaymentMethod = "CARD" | "TRANSFER";
 
 export function Checkout({
   data,
@@ -40,7 +35,11 @@ export function Checkout({
   // This is a display gate, not a Toss contract switch. Enable only after
   // confirming quick transfer on the EDU production MID's actual payment window.
   const quickTransferEnabled = process.env.NEXT_PUBLIC_TOSS_QUICK_TRANSFER_ENABLED === "true";
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(quickTransferEnabled ? "QUICK_TRANSFER" : "TRANSFER");
+  const paymentMethods = [
+    { value: "CARD", label: "카드·간편결제", button: "카드·간편결제로 결제하기", description: "신용·체크카드, 카카오페이, 토스페이, 네이버페이" },
+    { value: "TRANSFER", label: quickTransferEnabled ? "퀵 계좌이체" : "실시간 계좌이체", button: quickTransferEnabled ? "퀵 계좌이체로 결제하기" : "실시간 계좌이체로 결제하기", description: "토스페이먼츠 결제창에서 은행 계좌를 인증하고 결제" },
+  ] as const;
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CARD");
   const selectedPayment = paymentMethods.find((method) => method.value === paymentMethod)!;
   const lock = useRef(false),
     cohort = (data.cohorts || []).find((c) => c.id === cohortId),
@@ -53,10 +52,6 @@ export function Checkout({
   const couponLoading = couponRegistration.loading;
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (paymentMethod === "QUICK_TRANSFER" && !quickTransferEnabled) {
-      setError("퀵계좌이체는 준비 중입니다. 실시간 계좌이체 또는 카드·간편결제를 선택해 주세요.");
-      return;
-    }
     if (coupon.trim() && !quote) { setError('쿠폰 등록을 완료해 주세요.'); return; }
     if (!agreed) {
       setError("필수 약관에 동의해 주세요.");
@@ -100,8 +95,7 @@ export function Checkout({
         successUrl: location.origin + "/payment/success",
         failUrl: location.origin + "/payment/fail",
       } as const;
-      // Both transfer choices use Toss's supported TRANSFER request. The merchant
-      // contract and buyer's selection in the Toss window determine the flow.
+      // Toss determines the available transfer options in its payment window.
       if (paymentMethod !== "CARD") {
         await payment.requestPayment({ ...paymentRequest, method: "TRANSFER" });
       } else {
@@ -314,7 +308,7 @@ export function Checkout({
                 <p className="meta checkout-payment-intro">원하는 결제 방법을 선택해 주세요.</p>
                 <div className="checkout-payment-options" role="radiogroup" aria-label="결제 수단">
                   {paymentMethods.map((method) => (
-                    <label className="checkout-payment-option" key={method.value} data-method={method.value} data-unavailable={method.value === "QUICK_TRANSFER" && !quickTransferEnabled || undefined}>
+                    <label className="checkout-payment-option" key={method.value} data-method={method.value}>
                       <input
                         type="radio"
                         name="payment"
@@ -322,15 +316,15 @@ export function Checkout({
                         aria-label={method.label}
                         checked={paymentMethod === method.value}
                         onChange={() => setPaymentMethod(method.value)}
-                        disabled={pending || processing || (method.value === "QUICK_TRANSFER" && !quickTransferEnabled)}
+                        disabled={pending || processing}
                       />
-                      {method.value === "QUICK_TRANSFER" && <span className={quickTransferEnabled ? "checkout-payment-recommended" : "checkout-payment-coming"}>{quickTransferEnabled ? "추천" : "준비 중"}</span>}
+                      {method.value === "CARD" && <span className="checkout-payment-recommended">추천</span>}
                       <span className="checkout-payment-mark" aria-hidden="true">
                         {method.value === "CARD" ? <CreditCard /> : <Landmark />}
                       </span>
                       <span className="checkout-payment-copy">
                         <span className="checkout-payment-name">{method.label}</span>
-                        <span className="checkout-payment-description">{method.value === "QUICK_TRANSFER" && !quickTransferEnabled ? "지금은 실시간 계좌이체 또는 카드·간편결제를 이용해 주세요." : method.description}</span>
+                        <span className="checkout-payment-description">{method.description}</span>
                       </span>
                       <Check className="checkout-payment-check" aria-hidden="true" />
                     </label>
