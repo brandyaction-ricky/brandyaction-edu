@@ -319,7 +319,7 @@ export function Overview({
           </Link>
         )}
       </AdminHeading>
-      {can("learning-care") && <Link className="btn" href="/admin/learning-care">수강생 현황 · 학습과 미션 한눈에 보기 <ArrowRight/></Link>}
+      {can("learning-care") && <div className={usability.overviewAction}><Link className="btn primary" href="/admin/learning-care">수강생 현황 · 학습과 미션 한눈에 보기 <ArrowRight/></Link></div>}
       <div className="metrics">
         {can("reviews") && (
           <Metric
