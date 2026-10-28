@@ -325,6 +325,7 @@ export function Checkout({
               <div className="panel-head"><h2>결제 수단</h2></div>
               <div className="panel-body">
                 <div id="toss-payment-methods" />
+                <p className="meta">실시간 계좌이체에서 개인계좌를 선택하면 퀵계좌이체를 이용할 수 있어요.</p>
                 <div id="toss-payment-agreement" />
                 {tossWidget.error && <p role="alert" className="form-error">{tossWidget.error}</p>}
               </div>
