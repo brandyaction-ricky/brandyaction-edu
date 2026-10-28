@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Gift, ChevronRight } from 'lucide-react';
+import { Gift, ChevronDown, ChevronRight } from 'lucide-react';
 import { noRewardChoices, type RewardChoices, type RewardPayload, type RewardSnapshot } from '@/lib/consent-reward';
 import { OPTIONAL_CONSENT_VERSION } from '@/lib/optional-consent';
 import styles from './consent-reward-card.module.css';
@@ -63,8 +63,11 @@ export function ConsentRewardCard({ memberKey }: { memberKey: string }) {
     <label><input type="checkbox" checked={choices[name]} disabled={locked || disabled} onChange={e => setChoices({ ...choices, [name]: e.target.checked })}/><span>{title}{name === 'overseas' && <small className={styles.description}>나에게 맞는 교육·혜택을 추천하기 위해 구매·학습 기록을 해외 분석 서버에서 처리해요.</small>}{name === 'kakao' && <small className={styles.coupon}>쿠폰</small>}</span></label>
     <details><summary aria-label={`${title} 자세히`}><ChevronRight size={18}/></summary><p>{name === 'overseas' && <><strong>개인정보 국외 이전 안내</strong><br/></>}{detail}</p></details>
   </div>;
-  return <section className={styles.card} aria-labelledby="consent-reward-title">
-    <div className={styles.heading}><Gift size={27} aria-hidden="true"/><div><h2 id="consent-reward-title">1만원 할인쿠폰 받고,<br className={styles.mobileBreak}/> {analysisAvailable ? '나에게 맞는 혜택을 받아보세요' : '교육·할인 소식을 받아보세요'}</h2><p>혜택 소식 받기만 동의해도 쿠폰을 드려요.<br/>선택하지 않아도 수강은 그대로예요.</p></div></div>
+  return <section className={`${styles.card} ${styles.compact}`} aria-labelledby="consent-reward-title">
+    <details className={styles.disclosure}>
+      <summary className={styles.summary}><Gift size={20} aria-hidden="true"/><span><strong id="consent-reward-title" className={styles.summaryTitle}>쿠폰·혜택 안내</strong><small>선택 동의 후 1만원 쿠폰 · 수강과 무관</small></span><span className={styles.toggle}>자세히 보기 <ChevronDown size={18} aria-hidden="true"/></span></summary>
+      <div className={styles.body}>
+    <div className={styles.heading}><div><h3>1만원 할인쿠폰 받고,<br className={styles.mobileBreak}/> {analysisAvailable ? '나에게 맞는 혜택을 받아보세요' : '교육·할인 소식을 받아보세요'}</h3><p>혜택 소식 받기만 동의해도 쿠폰을 드려요.<br/>선택하지 않아도 수강은 그대로예요.</p></div></div>
     {analysisAvailable && <label className={styles.all}><input ref={parent} type="checkbox" checked={all} aria-checked={any && !all ? 'mixed' : all} disabled={locked || !snapshot!.analysisAvailable} onChange={e => setChoices({ analysis: e.target.checked, overseas: e.target.checked, kakao: e.target.checked })}/><span>선택 항목 모두 동의하기 <small>선택 3개</small></span></label>}
     <div className={styles.options}>
       {analysisAvailable && option('analysis', '[선택] 구매·학습 기록 분석', snapshot!.terms?.analysis ?? '안내를 준비 중이에요. 지금은 선택할 수 없어요.', !snapshot!.analysisAvailable)}
@@ -76,5 +79,7 @@ export function ConsentRewardCard({ memberKey }: { memberKey: string }) {
     {error && <div role="alert" className={styles.error}>{error}{conflict && <button type="button" onClick={() => void reload()} disabled={busy}>다시 불러오기</button>}</div>}
     <button type="button" className={styles.skip} onClick={dismiss} disabled={busy || pending}>지금은 괜찮아요</button>
     <p className={styles.footnote}>동의 변경·취소는 <Link href="/my/profile#consent-settings">회원 정보</Link>에서 할 수 있어요.</p>
+      </div>
+    </details>
   </section>;
 }

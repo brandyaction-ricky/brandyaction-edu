@@ -8,6 +8,7 @@ import { QuestionAnswerHistory } from './question-thread';
 import { Heading } from './primitives';
 import { AnswerText } from './lesson-text';
 import { QuestionDeleteControl } from './question-delete-control';
+import usability from './usability.module.css';
 
 export function QuestionCard({ question: q, initiallyOpen = false, changed, deleted }: { question: Row; initiallyOpen?: boolean; changed?: () => void; deleted: () => void }) {
   return <article className="question-card" id={'question-' + q.id}>
@@ -47,7 +48,7 @@ export function QuestionHub({ order }: { order?: string | null }) {
       {tab === 'mine' && <div className="chips mb24">{['전체','답변 대기','답변 있음','질문 종료'].map(f => <button className={'chip ' + (filter === f ? 'active' : '')} key={f} aria-pressed={filter === f} onClick={() => setFilter(f)}>{f}</button>)}</div>}
       {tab === 'mine' && <p className="meta mb24">‘답변 있음’은 운영자가 답변을 남긴 질문, ‘질문 종료’는 수강생 또는 운영자가 대화를 마친 질문입니다. 종료 후에도 후속 질문을 남길 수 있어요.</p>}
       {questions.map(q => <QuestionCard key={q.id} question={q} initiallyOpen={target === q.id} changed={() => setVersion(v => v + 1)} deleted={() => { setNotice('질문을 삭제했습니다.'); setShowAll(true); setVersion(v => v + 1); }}/>) }
-      {!questions.length && <p className="notice">{tab === 'public' ? '아직 공개된 질문이 없어요. 첫 질문을 남겨 보세요.' : filter === '전체' ? '아직 남긴 질문이 없어요. 질문하기에서 편하게 물어보세요.' : '이 페이지에는 해당 상태의 질문이 없습니다.'}</p>}
+      {!questions.length && <div className={usability.emptyNotice}><p>{tab === 'public' ? (query ? '검색한 내용과 일치하는 질문이 없어요. 직접 질문을 남겨 보세요.' : '아직 공개된 질문이 없어요. 첫 질문을 남겨 보세요.') : filter === '전체' ? '아직 남긴 질문이 없어요. 질문하기에서 편하게 물어보세요.' : '이 페이지에는 해당 상태의 질문이 없습니다.'}</p><button type="button" className="btn primary" onClick={() => select('write')}>질문 작성하기</button></div>}
       {(page > 0 || data.hasMore) && <div className="question-hub-pages"><button className="btn small" disabled={!page} onClick={() => setPage(p => p - 1)}>이전</button><span>{page + 1}페이지</span><button className="btn small" disabled={!data.hasMore} onClick={() => setPage(p => p + 1)}>다음</button></div>}
     </>)}
   </>;

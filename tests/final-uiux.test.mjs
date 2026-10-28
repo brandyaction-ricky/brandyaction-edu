@@ -158,7 +158,9 @@ test('five admin categories and scoped navigation render from the admin UI featu
   assert.match(navigationMarkup, /href="\/admin\/questions"[\s\S]*?미답변 2건[\s\S]*?>2<\/span>/);
   assert.match(markup, /href="\/admin\/questions"[^>]*>[\s\S]*?질문함<\/a>/);
   for (const [label] of finalAdminGroups) assert.ok(markup.includes(label));
-  assert.match(markup, /class="nav-group"/); assert.match(markup, /lucide/); assert.match(markup, /category-strip/);
+  assert.match(markup, /class="nav-group"/); assert.match(markup, /lucide/);
+  assert.match(markup, /aria-label="운영 메뉴 바로가기"/);
+  assert.ok(markup.indexOf('지금 처리할 일') < markup.indexOf('aria-label="운영 메뉴 바로가기"'));
   const expectedIcons = {
     products: 'package', cohorts: 'calendar-days',
     contents: 'film', missions: 'clipboard-check', members: 'user-round-check', reviews: 'file-check-corner',

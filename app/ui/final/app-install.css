@@ -1,4 +1,13 @@
 .app-install{margin-top:24px;min-width:0;overflow-wrap:anywhere}
+.app-install-toolbar{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap}
+.app-install-heading{flex:1 1 280px;min-width:0}
+.app-install-heading p{margin:0;color:var(--text-secondary,#687080);font-size:14px}
+.app-install-actions .btn{min-height:44px;display:inline-flex;align-items:center;justify-content:center}
+.app-install .app-install-intro{margin:16px 0 0}
+.app-install-footer{display:flex;align-items:center;justify-content:space-between;gap:16px;border-top:1px solid var(--border-default,#e3e5e8);padding-top:16px;margin-top:20px}
+.app-install-footer p{flex:1;margin:0;font-size:12px;color:var(--text-secondary,#687080)}
+.app-install-footer .btn{flex-shrink:0}
+@media(max-width:680px){.app-install-toolbar{gap:16px}.app-install-actions{width:100%}.app-install-actions .btn{flex:1 1 auto}.app-install-footer{align-items:flex-start;flex-direction:column}.app-install-footer .btn{align-self:flex-end}}
 .app-install-heading{display:flex;align-items:center;gap:16px}
 .app-install-heading img{border-radius:14px;flex-shrink:0}
 .edu-front .app-install h2{font-size:18px;line-height:1.4;margin:0 0 6px}

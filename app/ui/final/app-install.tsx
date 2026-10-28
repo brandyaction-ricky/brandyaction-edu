@@ -61,17 +61,21 @@ export function AppInstallCard({ settings = false }: { settings?: boolean }) {
     catch { setCopied('주소를 길게 누르거나 선택해서 직접 복사해 주세요.'); }
   }
   return <section className="panel pad app-install" aria-label="브랜디에듀 홈 화면 추가">
+    <div className="app-install-toolbar">
     <div className="app-install-heading"><img src="/api/app-branding?icon=192" onError={event => { if (!event.currentTarget.src.endsWith('/icons/edu-192.png')) event.currentTarget.src = '/icons/edu-192.png'; }} width={56} height={56} alt=""/><div><h2>브랜디에듀 아이콘 추가하기</h2><p>다음부터는 아이콘을 눌러 수업에 들어오세요.</p></div></div>
+    <div className="app-install-actions">
+      {(state.available || state.busy) && state.chrome && <button type="button" className="btn primary" disabled={state.busy} onClick={state.install}>{state.busy ? '설치 창을 확인해 주세요' : '아이콘 추가하기'}</button>}
+      <button type="button" className="btn" aria-expanded={guideOpen} aria-controls={guideId} onClick={() => setGuideOpen(open => !open)}>그림 보며 따라 하기</button>
+    </div>
+    </div>
     <p className="app-install-intro"><strong>브랜디에듀는 스토어에서 받는 앱이 아니에요.</strong><br/>크롬에서 휴대폰 홈 화면이나 컴퓨터에 아이콘을 추가해요. 무료예요.</p>
     {!state.chrome && <div className="notice mt16"><p><strong>먼저 Chrome(크롬)으로 열어 주세요.</strong></p><p>아래 주소를 복사한 뒤 크롬을 직접 열어 주소 칸에 붙여넣으세요. 지금 창의 아이콘 추가 기능은 사용하지 않아요.</p><input aria-label="설치할 사이트 주소" readOnly value={state.homeUrl}/><button type="button" className="btn small" onClick={() => void copy()}>사이트 주소 복사</button>{copied && <p role="status">{copied}</p>}</div>}
-    <div className="app-install-actions mt16">
-      {(state.available || state.busy) && state.chrome && <button type="button" className="btn primary" disabled={state.busy} onClick={state.install}>{state.busy ? '설치 창을 확인해 주세요' : '아이콘 추가하기'}</button>}
-      <button type="button" className={`btn ${state.available || state.busy ? '' : 'primary'}`} aria-expanded={guideOpen} aria-controls={guideId} onClick={() => setGuideOpen(open => !open)}>그림 보며 따라 하기</button>
-    </div>
     {state.busy && <p role="status">브라우저의 설치 창에서 선택해 주세요.</p>}
     {state.message && <p role="status" className="notice mt16">{state.message}</p>}
     <div id={guideId} hidden={!guideOpen}>{guideOpen && <AppInstallGuide device={state.device} homeUrl={state.homeUrl}/>}</div>
-    <p className="app-install-existing mt16"><strong>이미 아이콘이 잘 열리나요?</strong> 그대로 사용하세요. 열리지 않으면 안내에 따라 크롬에서 새로 추가하세요.</p>
-    {!settings && <button type="button" className="btn ghost small mt16" onClick={state.dismiss}>나중에 · 7일 동안 접기</button>}
+    <div className="app-install-footer">
+      <p className="app-install-existing"><strong>이미 아이콘이 잘 열리나요?</strong> 그대로 사용하세요. 열리지 않으면 안내에 따라 크롬에서 새로 추가하세요.</p>
+      {!settings && <button type="button" className="btn ghost small" onClick={state.dismiss}>나중에 · 7일 동안 접기</button>}
+    </div>
   </section>;
 }

@@ -18,6 +18,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import type { Data } from "../learning-workflows";
 import { AdminSuccessState, AdminSummaryCard, PageHeader, adminNavigationIcon } from "@/features/admin-ui";
+import usability from './usability.module.css';
 
 export { AdminShell } from "@/features/admin-ui";
 
@@ -318,20 +319,7 @@ export function Overview({
           </Link>
         )}
       </AdminHeading>
-      {can("learning-care") && <Link className="btn" href="/admin/learning-care">수강생 현황 · 학습과 미션 한눈에 보기 <ArrowRight/></Link>}
-      <div className="category-strip">
-        {finalAdminGroups.map(([title, keys]) => {
-          const first = keys.find(can),
-            Icon = adminNavigationIcon(first || "");
-          return first ? (
-            <Link href={"/admin/" + first} key={title}>
-              <Icon />
-              <h3>{title}</h3>
-              <p>{keys.filter(can).length}개 메뉴</p>
-            </Link>
-          ) : null;
-        })}
-      </div>
+      {can("learning-care") && <div className={usability.overviewAction}><Link className="btn primary" href="/admin/learning-care">수강생 현황 · 학습과 미션 한눈에 보기 <ArrowRight/></Link></div>}
       <div className="metrics">
         {can("reviews") && (
           <Metric
@@ -526,6 +514,15 @@ export function Overview({
           </section>
         </div>
       </div>
+      <section className={usability.menuSection} aria-label="운영 메뉴 바로가기">
+        <div className={usability.scopeHeading}><h2>운영 메뉴 바로가기</h2></div>
+        <div className={usability.menuLinks}>
+          {finalAdminGroups.map(([title, keys]) => {
+            const first = keys.find(can), Icon = adminNavigationIcon(first || "");
+            return first ? <Link href={"/admin/" + first} key={title}><Icon /><h3>{title}</h3><p>{keys.filter(can).length}개 메뉴</p></Link> : null;
+          })}
+        </div>
+      </section>
     </>
   );
 }

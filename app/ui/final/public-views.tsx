@@ -49,6 +49,7 @@ import {
   Video,
   courseType,
 } from "./primitives";
+import authLayout from './auth-layout.module.css';
 
 export function AuthView({
   signup,
@@ -69,7 +70,7 @@ export function AuthView({
     (process.env.NEXT_PUBLIC_GOOGLE_GIS_ENABLED === "true" || googlePreview);
   return (
     <div className="form-page">
-      <section className="form-card auth-card">
+      <section className={`form-card auth-card ${authLayout.card}`}>
         {signup ? (
           <div className="eyebrow">Welcome to Brandyaction</div>
         ) : (

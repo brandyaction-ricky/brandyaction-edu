@@ -1,0 +1,23 @@
+/* Scope login spacing so legacy .full margins cannot offset one provider. */
+.card.card :global(.auth-social-stack) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+  margin-bottom: var(--space-6);
+}
+.card.card :global(.auth-social-stack > .btn),
+.card.card :global(.google-id-signin > .btn) {
+  width: 100%;
+  margin: 0;
+  min-height: 40px;
+  height: 40px;
+}
+.card.card :global(.google-id-signin) { min-width: 0; }
+.card.card :global(.google-id-signin:has(> .btn) > .google-id-button:empty) { display: none; }
+.card.card :global(.email-auth > .btn) { margin-top: 0; }
+.card.card :global(.email-auth) { margin-top: 0; }
+@media (max-width: 680px) {
+  .card.card { padding: var(--space-6); }
+}
