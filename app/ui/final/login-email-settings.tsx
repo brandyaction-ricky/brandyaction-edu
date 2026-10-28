@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { emailAddress, emailConfirmRedirect, loginEmailChangeError } from "@/lib/email-auth";
 import { isValidPassword, PASSWORD_REQUIREMENT } from "@/lib/auth-validation";
+import memberTheme from './member-theme.module.css';
 
 export function LoginEmailSettings({ email }: { email: string }) {
   const [currentEmail, setCurrentEmail] = useState(email);
@@ -75,8 +76,8 @@ export function LoginEmailSettings({ email }: { email: string }) {
         <label className="field mt16">비밀번호 한 번 더
           <input type="password" autoComplete="new-password" minLength={8} maxLength={128} required value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} disabled={busy} />
         </label>
-        <small>{PASSWORD_REQUIREMENT}</small>
-        <button className="btn primary mt16" type="submit" disabled={busy || !nextEmail.trim() || !password || !confirmPassword}>{busy ? "처리 중…" : "비밀번호 설정하고 확인 메일 받기"}</button>
+        <small className={memberTheme.emailHelp}>{PASSWORD_REQUIREMENT}</small>
+        <div className={memberTheme.emailActions}><button className="btn primary" type="submit" disabled={busy || !nextEmail.trim() || !password || !confirmPassword}>{busy ? "처리 중…" : "비밀번호 설정하고 확인 메일 받기"}</button></div>
       </form>
       {emailError && <p className="notice red mt16" role="alert">{emailError}</p>}
       {emailMessage && <p className="notice mt16" role="status">{emailMessage}</p>}

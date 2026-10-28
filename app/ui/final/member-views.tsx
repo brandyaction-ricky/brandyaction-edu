@@ -1,4 +1,5 @@
 "use client";
+import usability from './usability.module.css';
 import { curriculumDay } from '@/lib/curriculum-days';
 import { MemberLearningCare } from "./learning-care";
 import { ConsentRewardCard } from "../consent-reward-card";
@@ -62,6 +63,7 @@ import { Badge, Empty, Heading, ResourceRow } from "./primitives";
 import { DigitalContentOutline, ProductResourceRow } from "./primitives";
 import { productDigitalSections, productResources } from "@/lib/product-metadata";
 import './member-learning-ux.css';
+import memberTheme from './member-theme.module.css';
 
 const accountGroups = [
   [
@@ -1108,7 +1110,8 @@ function Profile({
                 <p className="meta">내 학습 계정</p>
               </div>
             </div>
-            <div className="profile-grid">
+            <p className={usability.profileHelp}>이름·휴대폰 번호·안내받을 이메일은 입력 후 ‘변경 내용 저장’을 눌러야 반영됩니다. 아래의 로그인 이메일 변경과 수신 설정은 각 영역에서 따로 관리합니다.</p>
+            <div className={`profile-grid ${usability.profileFields}`}>
               <label className="field">
                 이름
                 <input
@@ -1371,7 +1374,7 @@ export function MemberViews({
     case "messages":
     case "questions":
       content = (
-        <><Questions data={data} pending={pending} send={send} order={order} /><details className="panel pad mt24"><summary>질문·답변 알림 설정</summary><PushSettings userId={user.id}/></details>{process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === "true" && <details className="panel pad mt24" open={section === "messages"}><summary>이전 메시지 기록</summary><MemberMessages userId={user.id} readOnly /></details>}</>
+        <><Questions data={data} pending={pending} send={send} order={order} /><details className="panel pad mt24 member-notification-settings"><summary>질문·답변 알림 설정</summary><PushSettings userId={user.id}/></details>{process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === "true" && <details className="panel pad mt24" open={section === "messages"}><summary>이전 메시지 기록</summary><MemberMessages userId={user.id} readOnly /></details>}</>
       );
       break;
     case "orders":
@@ -1397,7 +1400,7 @@ export function MemberViews({
       content = <Empty title="페이지를 찾을 수 없습니다." />;
   }
   return (
-    <div className="account-bg">
+    <div className={`account-bg ${memberTheme.workspace}`}>
       <div className="wrap account-layout">
         <aside className="account-aside">
           <div className="account-profile">
