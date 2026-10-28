@@ -168,9 +168,6 @@ export function AdminShell({
           <Image className="brand-logo" src="/brandy-action-logo.png" alt="BrandyAction" width={164} height={32} priority />
           <span><small>EDU / ADMIN</small></span>
         </Link>
-        <div className="workspace-label">
-          <span className="square">B</span>클래스 운영 워크스페이스
-        </div>
         <div className="admin-menu-search">
           <Search aria-hidden="true" />
           <input ref={menuSearchRef} type="search" aria-label="관리자 메뉴 찾기" placeholder="메뉴 찾기" value={menuQuery} onChange={event => setMenuQuery(event.target.value)} />

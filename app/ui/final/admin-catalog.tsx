@@ -633,11 +633,11 @@ export function AdminCatalog({
       }}
     />
   );
-  const search = memberScope ? <form style={{display:"flex",flexWrap:"wrap",gap:8}} onSubmit={event => { event.preventDefault(); onMemberScopeChange?.({...memberScope,query:query.trim()}); }}>{searchField}<AdminButton type="submit">전체 회원 검색</AdminButton><AdminButton type="button" onClick={()=>onMemberScopeChange?.({query:"",status:"",course:""})}>검색 초기화</AdminButton></form> : searchField;
+  const search = memberScope ? <form className="admin-member-search" onSubmit={event => { event.preventDefault(); onMemberScopeChange?.({...memberScope,query:query.trim()}); }}>{searchField}<AdminButton type="submit">전체 회원 검색</AdminButton><AdminButton type="button" onClick={()=>onMemberScopeChange?.({query:"",status:"",course:""})}>검색 초기화</AdminButton></form> : searchField;
   const statusFilter = (
     <AdminSelect
       label="상태 필터"
-      labelHidden
+      labelHidden={s.key !== "customers"}
       value={status}
       onChange={(e) => {
         if(memberScope)onMemberScopeChange?.({...memberScope,status:e.target.value});
@@ -846,7 +846,7 @@ export function AdminCatalog({
         )}
         <div
           className={
-            ["learning", "missions", "questions"].includes(s.key) ? "" : s.key === "weeks" ? "panel weeks-table-workspace" : "panel"
+            ["learning", "missions", "questions"].includes(s.key) ? "" : s.key === "weeks" ? "panel weeks-table-workspace" : "panel admin-catalog-panel"
           }
         >
           {s.key === "questions" && <nav className="question-state-tabs" aria-label="질문 처리 상태">
@@ -860,15 +860,15 @@ export function AdminCatalog({
             action={<AdminButton variant="primary" onClick={() => edit(s)}><Plus size={16} aria-hidden="true" />상품 등록</AdminButton>}
           />}
           {s.key !== "products" && !["missions", "tags"].includes(s.key) && <AdminFilterBar
-            className={s.key === "questions" ? "admin-catalog-filter question-catalog-filter" : "admin-catalog-filter"}
+            className={s.key === "questions" ? "admin-catalog-filter question-catalog-filter" : s.key === "customers" ? "admin-catalog-filter admin-customer-filter" : "admin-catalog-filter"}
             filters={<>
               {s.key === "articles" && <AdminSelect label="콘텐츠 유형" labelHidden value={type} onChange={(e) => setType(e.target.value)}><option value="">전체 유형</option><option value="column">글</option><option value="video">영상</option></AdminSelect>}
               {s.key === "product-reviews" && <AdminSelect label="후기 상품" labelHidden value={course} onChange={(event) => { setCourse(event.target.value); setSelection([]); }}><option value="">전체 상품</option>{courses.map((item) => <option key={item.id} value={item.id}>{named(item)}</option>)}</AdminSelect>}
               {s.key === "weeks" && <AdminSelect label="주차 상품" aria-label="주차 상품" labelHidden value={course} onChange={(event) => { setCourse(event.target.value); setSelection([]); }}><option value="">전체 상품</option>{courses.map((item) => <option key={item.id} value={item.id}>{named(item)}</option>)}</AdminSelect>}
-              {s.key === "customers" && <AdminSelect label="수강 클래스" labelHidden value={course} onChange={(event) => { setCourse(event.target.value); setSelection([]); }}><option value="">전체 클래스</option>{courses.map((item) => <option key={item.id} value={item.id}>{t(item, "title")}</option>)}</AdminSelect>}
+              {s.key === "customers" && <AdminSelect label="수강 클래스" value={course} onChange={(event) => { setCourse(event.target.value); setSelection([]); }}><option value="">전체 클래스</option>{courses.map((item) => <option key={item.id} value={item.id}>{t(item, "title")}</option>)}</AdminSelect>}
             </>}
             status={s.key === "questions" ? undefined : statusFilter}
-            search={search}
+            search={s.key === "customers" ? <div className="admin-customer-search-group"><span>회원 검색</span>{search}</div> : search}
             action={s.key === "weeks" ? <AdminButton className="weeks-create" variant="primary" type="button" onClick={() => edit(s)}><Plus size={16} aria-hidden="true" />새로 등록</AdminButton> : undefined}
           />}
           {s.key === "weeks" && <p className="meta week-order-help">상품을 선택하면 해당 상품 안에서 주차 순서를 조정할 수 있습니다. 검색·상태 필터를 해제한 뒤 이동해 주세요.</p>}
