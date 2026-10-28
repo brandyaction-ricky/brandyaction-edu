@@ -37,6 +37,8 @@ test('cohort selection scopes counts and pages, confirms exact cohort, preserves
 });
 test('status filters disclose their page scope and keep every record available',async({page})=>{
  await page.route('**/api/admin/diagnosis**',r=>r.fulfill({json:data}));await page.goto('/diagnosis-test?manage');
+ await expect(page.getByRole('region',{name:'진단 대상 범위 요약',exact:true})).toContainText('103명');
+ await expect(page.getByRole('region',{name:'현재 페이지 상태 요약',exact:true})).toContainText('현재 불러온 수강생만 집계');
  const filters=page.getByRole('group',{name:'현재 페이지 진단 상태 필터'});
  await expect(page.getByText(/상태 필터와 숫자는 현재 페이지 기준/)).toBeVisible();
  await expect(page.getByRole('link',{name:'N6 진단 받기 (새 탭)',exact:true})).toHaveAttribute('target','_blank');

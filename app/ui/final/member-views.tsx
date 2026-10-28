@@ -1,4 +1,5 @@
 "use client";
+import usability from './usability.module.css';
 import { curriculumDay } from '@/lib/curriculum-days';
 import { MemberLearningCare } from "./learning-care";
 import { ConsentRewardCard } from "../consent-reward-card";
@@ -1108,7 +1109,8 @@ function Profile({
                 <p className="meta">내 학습 계정</p>
               </div>
             </div>
-            <div className="profile-grid">
+            <p className={usability.profileHelp}>이름·휴대폰 번호·안내받을 이메일은 입력 후 ‘변경 내용 저장’을 눌러야 반영됩니다. 아래의 로그인 이메일 변경과 수신 설정은 각 영역에서 따로 관리합니다.</p>
+            <div className={`profile-grid ${usability.profileFields}`}>
               <label className="field">
                 이름
                 <input

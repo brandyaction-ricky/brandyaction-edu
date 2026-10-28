@@ -31,6 +31,7 @@ export function AdminPilotFixture({ screen }: { screen: 'orders' | 'products' | 
     return {};
   };
   const orderData = {
+    order_summary: [{ id: 'pilot-summary', approvedRevenue: 24000, refundedRevenue: 0, processingRefunds: 1 }],
     courses: productSeed,
     orders: orderSeed,
     order_items: orderSeed.map(order => ({ id: `${order.id}-item`, order_id: order.id, course_id: productSeed[1].id, item_name: productSeed[1].title })),

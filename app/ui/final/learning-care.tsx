@@ -97,7 +97,7 @@ export function AdminLearningCare({ actorId, initialCohortId = '', messagesEnabl
     {!data ? !error && <p role="status">수강생 현황을 불러오는 중입니다.</p> : <>
       
       {selectedCohort && <p className="care-cohort-context"><b>{selectedCohort.courseTitle} · {selectedCohort.name}</b>{selectedCohort.status && <span>{careCohortStatus[selectedCohort.status]}</span>}<span>수강생 {data.rows.length}명</span>{selectedCohort.status === 'completed' && <small>기수가 종료되어도 수강생과 완료 기록을 계속 확인할 수 있습니다.</small>}</p>}
-      {!data.rows.length && <p role="status" className="care-empty">이 기수에 등록된 수강생이 아직 없습니다. 수강생이 등록되면 여기에 자동으로 나타납니다.</p>}
+      {!data.rows.length && <p role="status" className="care-empty care-empty-inline">이 기수에 등록된 수강생이 아직 없습니다. 수강생이 등록되면 여기에 자동으로 나타납니다.</p>}
       <div className="care-tabs" role="tablist" aria-label="현황 보기">{[['overview', '한눈에 보기'], ['students', '수강생별'], ['days', '일차별'], ['share', '공유용 요약']].map(([value, label]) => <button role="tab" aria-selected={tab === value} key={value} onClick={() => { setTab(value); setFilter('all'); resetSelection(); }}>{label}</button>)}</div>
       {tab === 'share' ? <ShareSummary data={data}/> : <>
         {tab !== 'overview' && <div className="care-stats"><div><Users/><span>수강생</span><b>{aggregate!.members}<small>명</small></b></div><div><ChartNoAxesCombined/><span>공개된 학습 진행률</span><b>{aggregate!.percent === null ? '—' : aggregate!.percent + '%'}</b><small>{aggregate!.completed} / {aggregate!.available}건</small></div><div><span>운영자 검토 대기</span><b>{aggregate!.pending}<small>건</small></b><Link href="/admin/reviews?tab=blocks">검토하러 가기 →</Link></div><div><span>최근 7일 완료한 학습</span><b>+{aggregate!.recent}<small>건</small></b></div></div>}

@@ -1,0 +1,79 @@
+.scopeSection {
+  min-width: 0;
+  margin-bottom: 24px;
+}
+
+.scopeHeading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+}
+
+.scopeHeading.scopeHeading h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.scopeHeading.scopeHeading p {
+  margin: 0;
+  color: var(--adm-text-sub, #626770);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.scopeGroups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.scopeGroups .scopeSection { margin-bottom: 0; }
+.scopeCards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.menuSection { margin-top: 32px; }
+.menuSection .menuLinks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+.menuLinks a {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--adm-border, #e2e5e9);
+  border-radius: 8px;
+  background: var(--adm-surface, #fff);
+}
+.menuLinks a:hover { border-color: var(--adm-primary, #c9232d); }
+.menuLinks svg { width: 18px; height: 18px; }
+.menuLinks.menuLinks h3 { margin: 0; font-size: 14px; }
+.menuLinks.menuLinks p { margin: 0; font-size: 12px; color: var(--adm-text-sub, #626770); }
+
+.emptyNotice {
+  padding: 20px;
+  border: 1px solid var(--line, #e2e5e9);
+  border-radius: 8px;
+  background: var(--surface, #fff);
+}
+.emptyNotice.emptyNotice p { margin: 0 0 16px; line-height: 1.7; }
+
+/* Override sibling field spacing only inside the two-column profile grid. */
+.profileFields > label { margin-top: 0 !important; }
+.profileHelp.profileHelp { margin: 0 0 20px; color: var(--muted, #626770); line-height: 1.7; }
+
+@media (max-width: 1024px) {
+  .scopeGroups { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 600px) {
+  .scopeCards { grid-template-columns: minmax(0, 1fr); }
+  .scopeHeading { align-items: flex-start; }
+}

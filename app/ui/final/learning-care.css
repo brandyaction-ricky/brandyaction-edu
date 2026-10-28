@@ -164,5 +164,6 @@
 .edu-admin .learning-care .care-search-filters select{width:100%;min-width:180px}
 .edu-admin .learning-care .care-bulk-actions,.edu-admin .learning-care .care-share-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .edu-admin .learning-care .care-share-actions{margin-top:16px}
+.edu-admin .learning-care .care-empty-inline{min-height:0;padding:16px 20px;margin:16px 0 24px;text-align:left;border:1px solid var(--adm-border,#e2e5e9);border-radius:var(--adm-radius-lg,10px);background:var(--adm-surface,#fff)}
 .edu-admin .learning-care .care-share-actions span{color:var(--adm-text-sub,#626770);font-size:12px}
 @media(max-width:760px){.edu-admin .learning-care .care-header{align-items:flex-start}.edu-admin .learning-care .care-header-actions{align-items:stretch}.edu-admin .learning-care .care-table tbody th,.edu-admin .learning-care .care-table thead th:first-child{position:static}.edu-admin .learning-care .care-board-heading-actions{justify-content:flex-start}.edu-admin .learning-care .care-student-tile{padding:12px}.edu-admin .learning-care .care-day-tiles article{padding:12px}.edu-admin .learning-care .care-search-filters label{flex:1 1 180px}.edu-admin .learning-care .care-search-filters input,.edu-admin .learning-care .care-search-filters select{width:100%;min-width:0}.edu-admin .learning-care .care-bulk-actions{width:100%}}

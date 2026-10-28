@@ -6,6 +6,7 @@ import { ArrowRight, Compass, RefreshCw } from 'lucide-react';
 import { AdminButton, AdminEmptyState, AdminInlineError, AdminInput, AdminLinkButton, AdminModal, AdminPage, AdminPageHeader, AdminStatusBadge, AdminSummaryCard } from '@/features/admin-ui';
 import type { DiagnosisAdminList, DiagnosisAdminRow } from '@/lib/diagnosis-admin-service';
 import './diagnosis-management.css';
+import usability from './usability.module.css';
 
 type Change={title:string;description:string;body:Record<string,unknown>;label:string};
 const date=(v:string|null|undefined)=>v?new Date(v).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',year:'numeric',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
@@ -69,11 +70,21 @@ function DiagnosisManagementScope({member}:{member?:string}){
   const reportsKnown=!!data&&!error&&data.remoteAvailable&&data.rows.every(row=>!row.attemptId||row.state==='in_progress'||row.state==='preparing'||(row.statusAvailable&&!!row.report));
   return <AdminPage width="wide" className="diagnosis-management">
     <AdminPageHeader title="N6 진단 관리" description="수강생에게 진단을 공개하고, 검사와 보고서 진행 상태를 확인하세요." actions={<><AdminLinkButton href="/admin/diagnosis" target="_blank" rel="noopener noreferrer"><Compass size={17}/>N6 진단 받기 (새 탭)<ArrowRight size={16}/></AdminLinkButton>{!member&&<AdminButton aria-expanded={publicationOpen} aria-controls="diagnosis-publication-settings" onClick={()=>setPublicationOpen(open=>!open)}>공개 설정</AdminButton>}</>}/>
-    <div className="diagnosis-management-summary">
+    <div className={usability.scopeGroups}>
+      <section className={usability.scopeSection} aria-label="진단 대상 범위 요약">
+        <div className={usability.scopeHeading}><h2>진단 대상 범위</h2><p>현재 페이지 상태 집계와 기준이 다릅니다.</p></div>
+        <div className={usability.scopeCards}>
       <AdminSummaryCard label="진단 이용 가능한 수강생" value={`${scopeReady?data?.eligibleCount??'—':'—'}명`} scope={cohort?'선택 기수 · 검사가 연결된 상품의 구매·수강 권한 기준':'검사가 연결된 상품의 현재 구매·수강 권한 기준'}/>
       <AdminSummaryCard label="검사를 시작한 수강생" value={`${scopeReady?data?.startedCount??'—':'—'}명`} scope={`관리자 테스트 제외 · ${cohort?'선택 기수':'전체 수강생'} 기준`}/>
+        </div>
+      </section>
+      <section className={usability.scopeSection} aria-label="현재 페이지 상태 요약">
+        <div className={usability.scopeHeading}><h2>현재 페이지 상태</h2><p>현재 불러온 수강생만 집계합니다.</p></div>
+        <div className={usability.scopeCards}>
       <AdminSummaryCard label="시작 전" value={data&&scopeReady?`${pageCount('not_started')}명`:'—'} scope="현재 페이지 기준"/>
       <AdminSummaryCard label="보고서 발급 보류" value={reportsKnown&&scopeReady?`${pageCount('needs_review')}명`:'—'} scope={reportsKnown&&scopeReady?'현재 페이지 기준':'현재 페이지 · 보고서 상태 확인 필요'}/>
+        </div>
+      </section>
     </div>
     {member&&<p className="diagnosis-management-notice">알림에서 선택한 수강생의 진단입니다. <Link href="/admin/diagnosis/manage">전체 수강생 보기</Link></p>}
     {!member&&publicationOpen&&<section id="diagnosis-publication-settings" className="diagnosis-management-publication" aria-label="진단 공개 범위 설정">
