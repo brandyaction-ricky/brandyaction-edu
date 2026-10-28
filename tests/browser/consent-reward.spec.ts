@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-async function backend(page: Page, opts: { lost?: boolean; conflict?: boolean; unavailable?: boolean; termsMissing?: boolean; handled?: boolean } = {}) {
+async function backend(page: Page, opts: { lost?: boolean; conflict?: boolean; unavailable?: boolean; termsMissing?: boolean; handled?: boolean; collapsed?: boolean } = {}) {
   const writes: { requestId: string; payload: { choices: { analysis: boolean; overseas: boolean; kakao: boolean } } }[] = [];
   let lost = opts.lost, handled = opts.handled;
   await page.route('**/api/account/consent-reward', async route => {
@@ -15,11 +15,12 @@ async function backend(page: Page, opts: { lost?: boolean; conflict?: boolean; u
     return route.fulfill({ json: { saved: true, awarded: body.payload.choices.kakao } });
   });
   await page.goto('/consent-reward-test');
+  if (!opts.collapsed && !opts.unavailable && !handled) await page.getByText('쿠폰·혜택 안내', { exact: true }).click();
   return writes;
 }
 const all = (page: Page) => page.getByRole('checkbox', { name: /선택 항목 모두 동의하기/ });
 const kakao = (page: Page) => page.getByRole('checkbox', { name: /카카오톡 혜택 소식/ });
-test('all optional choices take two clicks, without preselection or overflow', async ({ page }, info) => {
+test('expanded optional choices require selection and confirmation, without preselection or overflow', async ({ page }, info) => {
   const writes = await backend(page);
   await expect(all(page)).toBeVisible();
   for (const box of await page.getByRole('checkbox').all()) await expect(box).not.toBeChecked();
@@ -31,6 +32,25 @@ test('all optional choices take two clicks, without preselection or overflow', a
   expect(writes[0].payload.choices).toEqual({ analysis: true, overseas: true, kakao: true });
   await expect(page.getByRole('link', { name: /내 쿠폰 보기/ })).toHaveAttribute('href', '/my/coupons');
   await page.reload(); await expect(all(page)).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('optional promotion starts compact; keyboard disclosure never selects or saves consent', async ({ page }, info) => {
+  const writes = await backend(page, { collapsed: true });
+  const card = page.getByRole('region', { name: '쿠폰·혜택 안내' });
+  const disclosure = card.locator('details').first();
+  await expect(disclosure).not.toHaveAttribute('open');
+  await expect(all(page)).toBeHidden();
+  await expect(page.getByRole('button', { name: '동의하고 1만원 쿠폰 받기' })).toBeHidden();
+  expect((await card.boundingBox())!.height).toBeLessThan(130);
+  await card.screenshot({ path: info.outputPath('benefits-collapsed.png') });
+  await disclosure.locator('summary').first().focus(); await page.keyboard.press('Enter');
+  await expect(all(page)).toBeVisible();
+  for (const checkbox of await card.getByRole('checkbox').all()) await expect(checkbox).not.toBeChecked();
+  await expect(page.getByRole('button', { name: '동의하고 1만원 쿠폰 받기' })).toBeDisabled();
+  await disclosure.locator('summary').first().press('Enter');
+  await expect(all(page)).toBeHidden();
+  expect(writes).toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 test('Kakao only earns the coupon, details need no navigation', async ({ page }) => {
