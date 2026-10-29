@@ -85,24 +85,17 @@
   .checkout-payment-mark svg { width: 24px; height: 24px; }
 }
 
-.checkout-transfer-help {
-  margin-top: var(--space-4);
-}
-
-.checkout-transfer-help h3 {
-  margin-bottom: var(--space-2);
-  color: var(--text-primary);
-  font-size: var(--type-body);
-}
+.checkout-bank-transfer .panel-head h2 { display: flex; align-items: center; gap: var(--space-2); }
+.checkout-bank-transfer .panel-head h2 svg { width: 20px; height: 20px; flex-shrink: 0; }
+.checkout-transfer-label { flex-shrink: 0; padding: 4px 8px; border-radius: 6px; background: var(--surface-muted, #f5f6f8); color: var(--text-secondary); font-size: var(--type-small); }
+.checkout-transfer-details { display: flex; align-items: center; gap: var(--space-4); margin: var(--space-4) 0; padding: var(--space-4); border: 1px solid var(--border-default); border-radius: var(--radius-sm); background: var(--surface-muted, #f5f6f8); }
 
 .checkout-transfer-account {
   display: grid;
   gap: var(--space-2);
-  margin: var(--space-4) 0;
-  padding: var(--space-4);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-sm);
-  background: var(--surface-base, #fff);
+  flex: 1;
+  min-width: 0;
+  margin: 0;
   color: var(--text-primary);
 }
 
@@ -124,9 +117,19 @@
 .checkout-transfer-account strong {
   display: inline-block;
   white-space: nowrap;
+  user-select: text;
 }
 
-.checkout-transfer-help .btn {
+.checkout-transfer-copy { flex-shrink: 0; min-height: 44px; }
+.checkout-transfer-copy svg { width: 16px; height: 16px; }
+.checkout-bank-transfer .panel-body .checkout-transfer-copy-status { margin-bottom: var(--space-3); }
+.checkout-transfer-contact {
   margin-top: var(--space-4);
   min-height: 44px;
+}
+
+@media (max-width: 640px) {
+  .checkout-bank-transfer .panel-head { align-items: flex-start; gap: var(--space-2); }
+  .checkout-transfer-details { flex-direction: column; align-items: stretch; }
+  .checkout-transfer-copy { justify-content: center; }
 }

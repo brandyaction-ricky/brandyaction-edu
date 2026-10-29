@@ -1,7 +1,7 @@
 "use client";
 import { money, number as num, text as t, type User } from "@/lib/platform";
 import { cohortPeriod } from "@/lib/qa-rules";
-import { ArrowLeft, ArrowRight, Check, CreditCard, Landmark } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Copy, CreditCard, Landmark } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -14,6 +14,39 @@ import "./checkout.css";
 import { useTossCheckoutWidget } from "./toss-checkout-widget";
 
 type PaymentMethod = "CARD" | "TRANSFER";
+
+function BankTransferHelp() {
+  const [copyMessage, setCopyMessage] = useState("");
+  async function copyAccount() {
+    try {
+      await navigator.clipboard.writeText("954201-00-094916");
+      setCopyMessage("계좌번호를 복사했습니다.");
+    } catch {
+      setCopyMessage("계좌번호를 길게 누르거나 선택해 복사해 주세요.");
+    }
+  }
+  return <section className="panel checkout-bank-transfer" aria-labelledby="checkout-transfer-title">
+    <div className="panel-head">
+      <h2 id="checkout-transfer-title"><Landmark aria-hidden="true" /> 계좌이체로 수강하시려면</h2>
+      <span className="checkout-transfer-label">직접 입금</span>
+    </div>
+    <div className="panel-body">
+      <p className="meta">아래 계좌로 입금한 뒤 카카오톡 채널에 알려 주세요.</p>
+      <div className="checkout-transfer-details">
+        <dl className="checkout-transfer-account">
+          <div><dt>입금 계좌</dt><dd>KB국민은행 <strong>954201-00-094916</strong></dd></div>
+          <div><dt>예금주</dt><dd>주식회사 브랜디액션</dd></div>
+        </dl>
+        <button className="btn btn-outline checkout-transfer-copy" type="button" onClick={() => void copyAccount()}><Copy aria-hidden="true" /> 계좌번호 복사</button>
+      </div>
+      {copyMessage && <p className="meta checkout-transfer-copy-status" role="status">{copyMessage}</p>}
+      <p className="meta">입금 후 카카오톡 채널로 문의해 주시면 계산서 발급과 수강 절차를 안내해 드리겠습니다.</p>
+      <a className="btn btn-outline checkout-transfer-contact" href={MOONSHOT_SUPPORT_URL} target="_blank" rel="noopener noreferrer">
+        입금 후 카카오톡 채널 문의 <ArrowRight aria-hidden="true" />
+      </a>
+    </div>
+  </section>;
+}
 
 export function Checkout({
   data,
@@ -364,20 +397,9 @@ export function Checkout({
                   <h3>결제 수단은 결제창에서 최종 선택합니다</h3>
                   <p>약관 동의 후 ‘{selectedPayment.button}’를 누르면 토스페이먼츠 결제창이 열립니다. {paymentMethod === "CARD" ? "결제창에서 카드나 간편결제를 선택해 주세요." : "이용 가능한 계좌이체 방식과 인증 절차는 결제창에서 확인해 주세요. 현금영수증도 결제창에서 신청할 수 있어요."}</p>
                 </div>
-                <div className="notice checkout-transfer-help" id="checkout-transfer-help">
-                  <h3>계좌이체로 수강하시려면</h3>
-                  <p>계좌이체를 원하시면 아래 국민은행 계좌로 입금해 주세요.</p>
-                  <dl className="checkout-transfer-account">
-                    <div><dt>입금 계좌</dt><dd>KB국민은행 <strong>954201-00-094916</strong></dd></div>
-                    <div><dt>예금주</dt><dd>주식회사 브랜디액션</dd></div>
-                  </dl>
-                  <p>입금 후 카카오톡 채널로 문의해 주시면 계산서 발급과 수강 절차를 안내해 드리겠습니다.</p>
-                  <a className="btn btn-outline" href={MOONSHOT_SUPPORT_URL} target="_blank" rel="noopener noreferrer">
-                    입금 후 카카오톡 채널 문의 <ArrowRight aria-hidden="true" />
-                  </a>
-                </div>
               </div>
             </section>}
+            {quote?.totalAmount !== 0 && <BankTransferHelp />}
           </div>
           <aside className="product-aside">
             <div className="purchase-card checkout-payment-summary">

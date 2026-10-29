@@ -2,6 +2,19 @@ import { test, expect } from '@playwright/test';
 
 test.skip(process.env.FIXTURE_TOSS_WIDGET_ENABLED !== 'true', 'Widget fixture is opt-in.');
 const cohort = '00000000-0000-4000-8000-000000000001';
+test('manual deposit stays available with the widget and copying the account never submits an order', async ({page, context}) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  let orders = 0;
+  await page.route('**/fixture/order', async route => { orders++; await route.fulfill({json:{error:'No order expected'}}); });
+  await page.goto('/coupon-checkout-test?cohort='+cohort);
+  await expect(page.getByRole('heading',{name:'계좌이체로 수강하시려면',exact:true})).toBeVisible();
+  await expect(page.getByRole('link',{name:'입금 후 카카오톡 채널 문의'})).toHaveAttribute('href','http://pf.kakao.com/_ydxjhxj/chat');
+  await page.getByRole('button',{name:'계좌번호 복사',exact:true}).click();
+  await expect(page.getByRole('status')).toHaveText('계좌번호를 복사했습니다.');
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('954201-00-094916');
+  expect(orders).toBe(0);
+});
+
 test('widget uses the quoted amount, and never requests payment if the order amount changes', async ({page}) => {
   const amounts: number[] = [];
   let requested = 0;
