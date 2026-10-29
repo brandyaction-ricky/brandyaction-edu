@@ -77,11 +77,11 @@ test('closed cohort points to its status and allows product save after the separ
 test('invalid format in a hidden tab is highlighted and focused', async ({ page }) => {
   await page.goto('/product-sale-test');
   await page.getByRole('tab', { name: '공개·검색' }).click();
-  await page.getByLabel('Meta Pixel ID (Optional)', { exact: true }).fill('abc');
+  await page.getByLabel('Meta 픽셀 번호 (선택)', { exact: true }).fill('abc');
   await page.getByRole('tab', { name: '기본·판매' }).click();
   await page.getByRole('button', { name: '저장하기', exact: true }).click();
-  await expect(page.getByLabel('Meta Pixel ID (Optional)', { exact: true })).toBeFocused();
-  await expect(page.getByLabel('Meta Pixel ID (Optional)', { exact: true })).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByLabel('Meta 픽셀 번호 (선택)', { exact: true })).toBeFocused();
+  await expect(page.getByLabel('Meta 픽셀 번호 (선택)', { exact: true })).toHaveAttribute('aria-invalid', 'true');
   await expect(page.getByLabel('합성 저장 횟수')).toHaveText('0');
 });
 

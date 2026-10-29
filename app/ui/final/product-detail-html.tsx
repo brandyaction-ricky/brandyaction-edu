@@ -73,6 +73,10 @@ function StoredProductDocument({ path, ctaUrl, ctaDeadline }: { path: string; ct
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
+    const timer = setTimeout(() => {
+      setError('상세페이지를 불러오는 데 시간이 걸리고 있습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.');
+      controller.abort();
+    }, 30000);
     void (async () => {
       try {
         const response = await fetch(`/api/platform/product-html?file=${encodeURIComponent(path)}`, { signal: controller.signal, cache: 'no-store' });
@@ -85,9 +89,11 @@ function StoredProductDocument({ path, ctaUrl, ctaDeadline }: { path: string; ct
         if (!controller.signal.aborted) setSource(content);
       } catch {
         if (!controller.signal.aborted) setError('상세페이지를 불러오지 못했습니다.');
+      } finally {
+        clearTimeout(timer);
       }
     })();
-    return () => controller.abort();
+    return () => { clearTimeout(timer); controller.abort(); };
   }, [path, attempt]);
   if (error) return <p role="alert">{error} <button type="button" onClick={() => { setError(''); setAttempt(value => value + 1); }}>다시 불러오기</button></p>;
   return source ? <ProductDocumentFrame source={source} ctaUrl={ctaUrl} ctaDeadline={ctaDeadline} /> : <p role="status">상세페이지를 불러오고 있습니다.</p>;

@@ -3,6 +3,7 @@
   "framework": "nextjs",
   "git": {
     "deploymentEnabled": {
+      "codex/edu-site-stabilization-20261029": false,
       "codex/edu-readable-view-20261027": false,
       "codex/edu-alumni-practice-20261013": false,
       "codex/edu-question-read-loop-20261012": false,

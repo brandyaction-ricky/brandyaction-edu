@@ -112,3 +112,22 @@ test('disabled articles are absent from public lists, home and direct article re
   assert.equal(JSON.stringify(result).includes('https://private.example/video'),false);
  }
 });
+
+test('all public offer reads exclude archived cohorts before cards, details and checkout',async()=>{
+  for(const view of ['home','classes','class','checkout']) {
+    const fixture=harness({courses:[{id:'course',slug:'course'}],cohorts:[{id:'cohort',course_id:'course'}]});
+    await fixture.read(view,'course','cohort',1,'','');
+    const reads=fixture.calls.filter(call=>call.table==='cohorts');
+    assert.ok(reads.length>0,view);
+    assert.ok(reads.every(call=>call.filters.some(([key,value])=>key==='archived_at'&&value===null)),view);
+  }
+});
+
+test('home omits broken product banners but retains valid product and external links',async()=>{
+ const fixture=harness({courses:[{id:'course',slug:'available'}],site_banners:[{id:'valid',link_url:'/classes/available'},{id:'broken',link_url:'https://brandyaction-edu.com/classes/deleted'},{id:'external',link_url:'https://other.example/classes/external'},{id:'list',link_url:'/classes'}]});
+ const result=await fixture.read('home','','',1,'','');
+ assert.deepEqual(result.data.site_banners.map(x=>x.id),['valid','external','list']);
+ const read=fixture.calls.find(x=>x.table==='courses'&&x.filters.some(([key])=>key==='slug'));
+ assert.ok(read.filters.some(([key,value])=>key==='status'&&value==='published'));
+ assert.ok(read.filters.some(([key,value])=>key==='archived_at'&&value===null));
+});

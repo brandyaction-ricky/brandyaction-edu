@@ -121,3 +121,34 @@ test('curriculum day labels continue across weeks in the outline, header, previe
  const dialog=page.getByRole('dialog');await expect(dialog.locator('li').first()).toContainText('6일차');
  await dialog.getByRole('button',{name:'다음 수업 위로'}).click();await expect(dialog.locator('li').first()).toContainText('현재 7일차 → 6일차');
 });
+
+test('focus mode preserves unsaved text while hiding only navigation and management', async ({page}, info) => {
+  const {writes}=await setup(page); await page.goto('/curriculum-editor-test'); await openLesson(page);
+  const editor=page.getByRole('textbox',{name:'학습 내용',exact:true});
+  await editor.fill('저장 전 작성 내용 가나다');
+  await page.getByRole('button',{name:'수업 작성에 집중',exact:true}).click();
+  await expect(page.locator('.curriculum-outline')).toBeHidden();
+  await expect(page.locator('.studio-management-bar')).toBeHidden();
+  await expect(editor).toHaveText('저장 전 작성 내용 가나다');
+  await expect(editor).toBeVisible();
+  await page.screenshot({path:info.outputPath('focus-mode.png'),fullPage:true});
+  await page.getByRole('button',{name:'목차·설정 다시 보기',exact:true}).click();
+  await expect(page.locator('.curriculum-outline')).toBeVisible();
+  await expect(editor).toHaveText('저장 전 작성 내용 가나다');
+  expect(writes).toHaveLength(0);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
+test('lesson search handles case, hides nonmatching lessons, and recovers from no result',async({page})=>{
+  const {lessons}=await setup(page);
+  lessons.push({id:'lesson-three',week_id:'week-two',day_number:3,title:'고객 인터뷰 준비하기',is_published:false,content_type:'text'});
+  await page.goto('/curriculum-editor-test');
+  await page.getByRole('button',{name:'AI 문샷 챌린지 커리큘럼 열기'}).click();
+  await page.getByRole('searchbox',{name:'수업 찾기'}).fill('ai');
+  await expect(page.locator('.studio-lesson-link').filter({hasText:'AI에게 내 사업 알려주기'})).toBeVisible();
+  await expect(page.locator('.studio-lesson-link').filter({hasText:'고객 인터뷰 준비하기'})).toBeHidden();
+  await page.getByRole('searchbox',{name:'수업 찾기'}).fill('없는 제목');
+  await expect(page.getByText('검색한 수업이 없습니다.')).toBeVisible();
+  await page.getByRole('button',{name:'검색 지우기'}).click();
+  await expect(page.getByRole('searchbox',{name:'수업 찾기'})).toHaveValue('');
+});

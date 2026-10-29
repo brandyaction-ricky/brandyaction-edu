@@ -1,0 +1,91 @@
+{
+  "status": "draft-not-applied",
+  "preparedAt": "2026-10-29",
+  "freeEventValidThrough": "2026-11-05T23:59:00+09:00",
+  "candidates": [
+    {
+      "courseId": "c73c9629-7e5e-478c-b337-8f044cfdf55f",
+      "slug": "product-cf147f74-6783-43f7-a205-8c2128a48997",
+      "expectedCopySha256": "e64008a5dd26195458794129e06a0644bec81ac5bb6727aa8b3bd70ddaaeacff",
+      "copyHashFields": [
+        "title",
+        "summary",
+        "metadata"
+      ],
+      "template": "moonshot.html",
+      "summary": "내 사업의 기준부터 콘텐츠·광고·고객 관리까지. 반복 업무를 AI와 연결하는 6주 실행 과정.",
+      "ctaLabel": "신청 가능한 기수 확인하기",
+      "ctaPriceLabel": "기수별 가격 확인",
+      "preserve": [
+        "price",
+        "cohort dates",
+        "coupon rules",
+        "entitlements",
+        "CTA destination",
+        "tracking identifiers"
+      ],
+      "requires": [
+        "re-read and compare expected copy hash",
+        "upload HTML through existing product editor",
+        "review landing snapshot publication if configured",
+        "customer preview and CTA eligibility check before publishing"
+      ]
+    },
+    {
+      "courseId": "ee095fb0-8e69-4d08-aa96-95c4f7e4a6cf",
+      "slug": "product-cf6fb7a4-6eb9-41ea-a27a-02201bf07d1b",
+      "expectedCopySha256": "c2d832bfeccc6180bff6afdf36cf695016208127888f81a7f42e111a8e5c7138",
+      "copyHashFields": [
+        "title",
+        "summary",
+        "metadata"
+      ],
+      "template": "free-live.html",
+      "summary": "혼자 떠안던 마케팅 업무를 AI와 나누는 방법. 11월 5일 무료 라이브에서 실제 작업 흐름을 확인하세요.",
+      "ctaLabel": "무료 라이브 대기방 입장하기",
+      "ctaPriceLabel": "무료 (0원)",
+      "preserve": [
+        "price",
+        "cohort dates",
+        "coupon rules",
+        "entitlements",
+        "CTA destination",
+        "tracking identifiers"
+      ],
+      "requires": [
+        "re-read and compare expected copy hash",
+        "upload HTML through existing product editor",
+        "review landing snapshot publication if configured",
+        "customer preview and CTA eligibility check before publishing"
+      ]
+    },
+    {
+      "courseId": "76e9b7ef-3882-4b35-b01b-8140bdcb9ee7",
+      "slug": "product-b8e479a5-60f2-418a-892e-cc2720cd9326",
+      "expectedCopySha256": "e6d5e9560e55e2248a4d28bab3624643b95209a801863e98471b80185a189aba",
+      "copyHashFields": [
+        "title",
+        "summary",
+        "metadata"
+      ],
+      "template": "free-live.html",
+      "summary": "혼자 떠안던 마케팅 업무를 AI와 나누는 방법. 11월 5일 무료 라이브에서 실제 작업 흐름을 확인하세요.",
+      "ctaLabel": "무료 라이브 대기방 입장하기",
+      "ctaPriceLabel": "무료 (0원)",
+      "preserve": [
+        "price",
+        "cohort dates",
+        "coupon rules",
+        "entitlements",
+        "CTA destination",
+        "tracking identifiers"
+      ],
+      "requires": [
+        "re-read and compare expected copy hash",
+        "upload HTML through existing product editor",
+        "review landing snapshot publication if configured",
+        "customer preview and CTA eligibility check before publishing"
+      ]
+    }
+  ]
+}

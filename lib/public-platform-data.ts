@@ -11,6 +11,17 @@ type PublicResult = { data: Record<string, Row[]>; pagination: { page: number; p
 const cardColumns = 'id,slug,title,summary,category,list_price,duration_label,schedule_label,display_order,thumb:metadata->>thumbnailUrl,legacy_thumb:metadata->>thumbnail_url,product_type:metadata->>productType';
 const articleCardColumns = 'id,slug,title,summary,category_id,content_type,cover_image_path,cover_image_alt,published_at,is_featured';
 
+function bannerCourseKey(value: unknown): string | null {
+  try {
+    const url = new URL(String(value || ''), 'https://brandyaction-edu.com');
+    if (!['brandyaction-edu.com', 'www.brandyaction-edu.com'].includes(url.hostname)) return null;
+    const match = /^\/classes\/([^/]+)\/?$/.exec(url.pathname);
+    if (!match) return null;
+    const key = decodeURIComponent(match[1]);
+    return /^[a-zA-Z0-9_-]{1,180}$/.test(key) ? key : '';
+  } catch { return null; }
+}
+
 function publicDb() {
   const { publicUrl, publishableKey } = getSupabasePublicConfig();
   // No cookies or service key: the cached read is identical for every visitor
@@ -81,25 +92,27 @@ export async function readPublicPlatformDataUncached(view: PublicView, slug: str
     ]);
     data.courses = rows(courses).map(card);
     const ids = data.courses.map(course => course.id);
-    if (ids.length) data.cohorts = rows(await db.from('cohorts').select('id,course_id,status,recruitment_start_at,recruitment_end_at,operation_end_at').in('course_id', ids).order('created_at', { ascending: false }).limit(100));
+    if (ids.length) data.cohorts = rows(await db.from('cohorts').select('id,course_id,status,recruitment_start_at,recruitment_end_at,operation_end_at').is('archived_at', null).in('course_id', ids).order('created_at', { ascending: false }).limit(100));
     data.articles = rows(articles).map(article);
     data.review_videos = rows(stories);
     data.site_banners = rows(banners).map(banner => ({ ...banner, image_url: imagePreviewUrl(String(banner.image_path || ''), process.env.NEXT_PUBLIC_SUPABASE_URL || '') }));
     const bannerKeys = [...new Set(data.site_banners.flatMap(banner => {
-      try {
-        const match = /^\/classes\/([^/]+)\/?$/.exec(new URL(String(banner.link_url || ''), 'https://brandyaction-edu.com').pathname);
-        const key = match ? decodeURIComponent(match[1]) : '';
-        return /^[a-zA-Z0-9_-]{1,180}$/.test(key) ? [key] : [];
-      } catch { return []; }
+      const key = bannerCourseKey(banner.link_url);
+      return key ? [key] : [];
     }))];
     if (bannerKeys.length) {
       const uuidKeys = bannerKeys.filter(key => /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(key));
       const [bySlug, byId] = await Promise.all([
-        db.from('courses').select('id,slug,listed:metadata->is_listed').in('slug', bannerKeys).limit(12),
-        uuidKeys.length ? db.from('courses').select('id,slug,listed:metadata->is_listed').in('id', uuidKeys).limit(12) : Promise.resolve({ data: [], error: null }),
+        db.from('courses').select('id,slug,listed:metadata->is_listed').eq('status', 'published').is('archived_at', null).in('slug', bannerKeys).limit(12),
+        uuidKeys.length ? db.from('courses').select('id,slug,listed:metadata->is_listed').eq('status', 'published').is('archived_at', null).in('id', uuidKeys).limit(12) : Promise.resolve({ data: [], error: null }),
       ]);
       const targets = [...rows(bySlug), ...rows(byId)];
       unlistedBannerCourses = targets.filter(course => course.listed === false).map(course => ({ id: course.id, slug: course.slug, metadata: { is_listed: false } }));
+      // Do not send customers to a deleted, private or unpublished product.
+      data.site_banners = data.site_banners.filter(banner => {
+        const key = bannerCourseKey(banner.link_url);
+        return key === null || targets.some(course => course.slug === key || course.id === key);
+      });
     }
   } else if (view === 'classes') {
     let courses = db.from('courses').select(cardColumns, { count: 'exact' }).eq('status', 'published').is('archived_at', null).or('metadata->is_listed.is.null,metadata->is_listed.neq.false');
@@ -111,7 +124,7 @@ export async function readPublicPlatformDataUncached(view: PublicView, slug: str
     data.courses = rows(result).map(card);
     pagination = { page, pageSize: PUBLIC_PAGE_SIZE, total: result.count || 0 };
     const ids = data.courses.map(course => course.id);
-    if (ids.length) data.cohorts = rows(await db.from('cohorts').select('id,course_id,status,recruitment_start_at,recruitment_end_at,operation_end_at').in('course_id', ids).limit(100));
+    if (ids.length) data.cohorts = rows(await db.from('cohorts').select('id,course_id,status,recruitment_start_at,recruitment_end_at,operation_end_at').is('archived_at', null).in('course_id', ids).limit(100));
   } else if (view === 'class') {
     let courseQuery = db.from('courses').select('id,slug,title,summary,description,category,instructor_name,list_price,duration_label,schedule_label,status,metadata').eq('status', 'published').is('archived_at', null);
     courseQuery = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(slug) ? courseQuery.eq('id', slug) : courseQuery.eq('slug', slug);
@@ -120,7 +133,7 @@ export async function readPublicPlatformDataUncached(view: PublicView, slug: str
     const course = data.courses[0];
     if (course) {
       const [cohorts, weeks, reviews] = await Promise.all([
-        db.from('cohorts').select('id,course_id,name,price,capacity,status,recruitment_start_at,recruitment_end_at,operation_start_at,operation_end_at').eq('course_id', course.id).order('created_at', { ascending: false }).limit(50),
+        db.from('cohorts').select('id,course_id,name,price,capacity,status,recruitment_start_at,recruitment_end_at,operation_start_at,operation_end_at').is('archived_at', null).eq('course_id', course.id).order('created_at', { ascending: false }).limit(50),
         db.from('curriculum_weeks').select('id,course_id,week_number,title,goal,display_order,is_published').eq('course_id', course.id).eq('is_published', true).order('week_number').limit(100),
         db.from('reviews').select('id,course_id,author_name,author_nickname,rating,body,is_featured,display_order,published_at').eq('course_id', course.id).eq('status', 'published').order('display_order').limit(30),
       ]);
@@ -173,10 +186,10 @@ export async function readPublicPlatformDataUncached(view: PublicView, slug: str
     const result = await db.from('review_videos').select('id,title,reviewer_name,reviewer_role,description,video_url,thumbnail_url,display_order').eq('is_published', true).order('display_order').limit(100);
     data.review_videos = rows(result);
   } else if (view === 'checkout') {
-    const offer = await db.from('cohorts').select('id,course_id,name,price,capacity,status,recruitment_start_at,recruitment_end_at,operation_start_at,operation_end_at').eq('id', cohortId).limit(1);
+    const offer = await db.from('cohorts').select('id,course_id,name,price,capacity,status,recruitment_start_at,recruitment_end_at,operation_start_at,operation_end_at').is('archived_at', null).eq('id', cohortId).limit(1);
     data.cohorts = rows(offer);
     if (data.cohorts.length) {
-      const course = await db.from('courses').select('id,slug,title,summary,category,list_price,duration_label,schedule_label,status').eq('id', data.cohorts[0].course_id).eq('status', 'published').limit(1);
+      const course = await db.from('courses').select('id,slug,title,summary,category,list_price,duration_label,schedule_label,status').eq('id', data.cohorts[0].course_id).eq('status', 'published').is('archived_at', null).limit(1);
       data.courses = rows(course);
     }
   }
