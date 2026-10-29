@@ -166,7 +166,7 @@ function ProductSaleCheck({ sale, cohort }: { sale: ReturnType<typeof productSal
     <div className="setting-line"><b>실제 판매 상태</b><Badge color={sale.label === "판매 중" ? "green" : "amber"}>{sale.label}</Badge></div>
     <p className="meta mt8">연결 기수 상태: {cohort ? `${t(cohort, "name")} · ${labels[t(cohort, "status")] || t(cohort, "status")}` : "미연결"}</p>
     {cohort?.status === "upcoming" && <p className="meta mt8">준비 중 기수도 모집 마감·운영 기간 등 기존 판매 조건을 충족하면 신청할 수 있습니다.</p>}
-    {sale.hasCustomCta && <p className="meta mt8">고객 버튼은 기본 결제 대신 설정한 Destination URL로 이동합니다.</p>}
+    {sale.hasCustomCta && <p className="meta mt8">고객 버튼은 기본 결제 대신 설정한 이동 주소로 이동합니다.</p>}
     {sale.issues.length > 0 && <div className="notice warning mt8"><b>신청 전 확인할 항목</b><ul>{sale.issues.map(issue => <li key={issue}>{issue}</li>)}</ul><p>판매 중으로 저장하려면 위 항목을 입력해 주세요. 저장 버튼을 누르면 입력 위치를 안내합니다.</p></div>}
   </section>;
 }
@@ -476,8 +476,8 @@ export function ProductEditor({ data, row, pending, send, back, actorId, canMana
           </section>
           <section className="product-conversion-card"><h2>신청 버튼</h2><p className="meta">고객이 클릭할 주요 버튼과 이동할 페이지를 설정하세요.</p>
             <ProductField controlId="product-cta-price-label" label="버튼 옆 안내 문구" hint="상세페이지 하단 신청 버튼 옆에 표시됩니다. 비워 두면 ‘무료’로 표시됩니다."><input id="product-cta-price-label" name="cta_price_label" maxLength={40} defaultValue={conversion.priceLabel} placeholder="무료" disabled={pending} /></ProductField>
-            <ProductField controlId="product-cta-label" label="Button Label"><input id="product-cta-label" name="cta_label" maxLength={100} defaultValue={conversion.label} placeholder="무료 웨비나 참여하기" disabled={pending} /></ProductField>
-            <ProductField controlId="product-cta-url" label="Destination URL" hint="비워 두면 기존 신청·결제·학습 이동 동작을 사용합니다."><input id="product-cta-url" name="cta_url" maxLength={2048} defaultValue={conversion.url} placeholder="https://open.kakao.com/o/..." disabled={pending} /></ProductField>
+            <ProductField controlId="product-cta-label" label="버튼에 표시할 문구"><input id="product-cta-label" name="cta_label" maxLength={100} defaultValue={conversion.label} placeholder="무료 웨비나 참여하기" disabled={pending} /></ProductField>
+            <ProductField controlId="product-cta-url" label="버튼을 눌렀을 때 이동할 주소" hint="비워 두면 기존 신청·결제·학습 이동 동작을 사용합니다."><input id="product-cta-url" name="cta_url" maxLength={2048} defaultValue={conversion.url} placeholder="https://open.kakao.com/o/..." disabled={pending} /></ProductField>
             <ProductField controlId="product-cta-color" error={fieldError("cta_color")} label="신청 버튼 색상" hint="색상 선택 또는 #을 포함한 6자리 HEX 코드를 입력하세요."><div className="product-color-control"><input type="color" aria-label="신청 버튼 색상 선택" value={/^#[0-9a-f]{6}$/i.test(ctaColor) ? ctaColor : DEFAULT_CTA_COLOR} onChange={event => setCtaColor(event.target.value)} disabled={pending} /><input id="product-cta-color" name="cta_color" aria-invalid={Boolean(fieldError("cta_color"))} aria-describedby={fieldError("cta_color") ? "product-cta-color-error" : undefined} value={ctaColor} onChange={event => setCtaColor(event.target.value)} pattern="#[0-9a-fA-F]{6}" maxLength={7} required disabled={pending} /></div></ProductField>
           </section>
           <section className="product-conversion-card"><h2>광고 성과 측정</h2><p className="meta">상품별 광고 추적을 연결하세요.</p><ProductField controlId="product-pixel-id" error={fieldError("meta_pixel_id")} label="Meta 픽셀 번호 (선택)" hint="입력한 상품에만 PageView와 CTA 클릭(Lead)을 전송합니다. 구매 완료 이벤트는 결제 처리와 구분됩니다. 비워 두면 사용하지 않습니다."><input id="product-pixel-id" name="meta_pixel_id" aria-invalid={Boolean(fieldError("meta_pixel_id"))} aria-describedby={fieldError("meta_pixel_id") ? "product-pixel-id-error" : undefined} inputMode="numeric" pattern="[0-9]{5,30}" maxLength={30} defaultValue={conversion.pixelId} placeholder="Meta Pixel ID" disabled={pending} /></ProductField></section>
