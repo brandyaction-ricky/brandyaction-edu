@@ -48,3 +48,13 @@ test('public title suppresses only the operational suffix, without deduplicating
   assert.equal(c.title, 'AI 직원 자동화 (오가닉)');
   assert.equal(c.slug, 'organic');
 });
+
+test('free campaign operation start is never presented as a live schedule', () => {
+  const free = { ...paid, category: 'free', list_price: 0 };
+  const schedules = [{ ...cohort, operation_start_at: '2026-10-19T01:00:00Z' }];
+  const result = courseSchedule(free, schedules, Date.parse('2026-10-29'));
+  assert.match(result, /^모집 마감 ·/);
+  assert.match(result, /23:59/);
+  assert.doesNotMatch(result, /10\. 19|라이브/);
+  assert.equal(courseSchedule({ ...free, schedule_label: '11월 5일 21시 · 유튜브 라이브' }, schedules), '11월 5일 21시 · 유튜브 라이브');
+});

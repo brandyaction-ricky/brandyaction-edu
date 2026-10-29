@@ -25,7 +25,9 @@ test('home separates expired cards, displays stored schedule and preserves produ
   await page.goto('/public-data-test?publicScreen=home');
   const open = page.locator('.course-card', { hasText: '실행 무료 클래스' });
   await expect(open).toContainText('모집 중 · D-7');
-  await expect(open).toContainText('21:00');
+  await expect(open).toContainText('모집 마감 ·');
+  await expect(open).toContainText('20:00');
+  await expect(open).not.toContainText('21:00');
   await expect(open).not.toContainText('오가닉');
   await expect(open).toHaveAttribute('href', '/classes/open');
   await expect(page.getByRole('heading', { name: '모집이 끝난 클래스' })).toBeVisible();

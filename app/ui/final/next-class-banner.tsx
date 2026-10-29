@@ -7,8 +7,8 @@ import styles from './next-class-banner.module.css';
 export function NextClassBanner({ courses, cohorts, now }: { courses: Row[]; cohorts: Row[]; now?: number }) {
   const course = courses.filter(row => catalogType(row) === 'free' && courseAvailability(row, cohorts, now).state === 'open')
     .sort((a, b) => {
-      const start = (row: Row) => Date.parse(String(courseAvailability(row, cohorts, now).cohort?.operation_start_at || '')) || Infinity;
-      return start(a) - start(b);
+      const deadline = (row: Row) => Date.parse(String(courseAvailability(row, cohorts, now).cohort?.recruitment_end_at || '')) || Infinity;
+      return deadline(a) - deadline(b);
     })[0];
   const schedule = course ? courseSchedule(course, cohorts, now) : '';
   return <section className={styles.banner} aria-label="다음 학습 안내">

@@ -30,7 +30,8 @@ test('stories and home disclose individual results and offer a real free-class n
     await page.goto('/public-data-test?publicScreen=' + screen);
     await expect(page.getByText('개인 사례이며 결과는 사람마다 다릅니다.').first()).toBeVisible();
     const next = page.getByRole('region', { name: '다음 학습 안내' });
-    await expect(next).toContainText('21:00');
+    await expect(next).toContainText('모집 마감 ·');
+    await expect(next).toContainText('20:00');
     await expect(next.getByRole('link')).toHaveAttribute('href', '/classes/next-free');
     await expect(page.locator('.site-footer').getByRole('link', { name: '카카오톡으로 문의 (로그인 없이)' })).toHaveAttribute('href', 'http://pf.kakao.com/_ydxjhxj/chat');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();

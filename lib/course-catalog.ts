@@ -40,11 +40,16 @@ export function courseAvailability(course: Row, cohorts: Row[], now = Date.now()
 
 export function courseSchedule(course: Row, cohorts: Row[], now = Date.now()) {
   if (text(course, 'schedule_label').trim()) return text(course, 'schedule_label').trim();
-  const start = timestamp(courseAvailability(course, cohorts, now).cohort?.operation_start_at);
-  if (!Number.isFinite(start)) return '';
-  return new Intl.DateTimeFormat('ko-KR', {
+  const availability = courseAvailability(course, cohorts, now);
+  // Free live products also use operation_start_at for campaign operations.
+  // It is not evidence of a live event time. Use an explicitly labeled
+  // recruitment deadline until a real public schedule_label is supplied.
+  const free = catalogType(course) === 'free';
+  const value = timestamp(free ? availability.cohort?.recruitment_end_at : availability.cohort?.operation_start_at);
+  if (!Number.isFinite(value)) return '';
+  return `${free ? '모집 마감' : '과정 시작'} · ` + new Intl.DateTimeFormat('ko-KR', {
     timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', weekday: 'short', hour: 'numeric', minute: '2-digit', hour12: false,
-  }).format(new Date(start));
+  }).format(new Date(value));
 }
 
 export function sortedCatalog(courses: Row[], cohorts: Row[], now = Date.now()) {
