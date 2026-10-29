@@ -689,3 +689,48 @@
  .adm.edu-admin .admin-member-search>.admin-search-field{flex-basis:100%}
  .adm.edu-admin .admin-staff-permissions .permission-grid{grid-template-columns:minmax(0,1fr)}
 }
+
+/* Remaining admin workspaces: section headings must not inherit public-page h2 sizes.
+   Keep this limited to settings/CRM/quiz surfaces, never lesson or customer content. */
+.edu-admin :is(.admin-crm-editor,.admin-crm-settings,.admin-quiz-editor,.settings-layout>form,.seo-settings-layout>form,.marketing-appearance-settings) h2,
+.edu-admin [aria-labelledby="kakao-sync-heading"]>h2{
+ font-size:var(--adm-font-16,16px);line-height:1.5;font-weight:700;margin:0 0 16px;overflow-wrap:anywhere;
+}
+.edu-admin .admin-crm-editor>.between>h2{margin:0}
+.edu-admin :is(.admin-crm-editor,.admin-quiz-editor,.settings-layout>form,.seo-settings-layout>form){min-width:0;padding:24px}
+.edu-admin :is(.admin-crm-editor,.admin-crm-settings,.admin-quiz-editor,.settings-layout,.seo-settings-layout) :is(.grid2,.field-row){gap:16px;min-width:0}
+.edu-admin :is(.admin-crm-editor,.admin-crm-settings,.admin-quiz-editor,.settings-layout,.seo-settings-layout) .field{min-width:0}
+.edu-admin :is(.admin-crm-editor,.admin-crm-settings,.admin-quiz-editor,.settings-layout,.seo-settings-layout) .field>small{line-height:1.6;color:var(--adm-text-sub,#626770)}
+.edu-admin .admin-quiz-editor>.field{margin-top:20px}
+.adm.edu-admin .settings-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:24px}
+.edu-admin .settings-layout>.stack{min-width:0}
+.edu-admin .settings-layout .panel-body>h3{font-size:var(--adm-font-16,16px);line-height:1.5}
+.edu-admin .seo-settings-tabs{border-top:0;margin-top:0}
+.edu-admin .product-scope{border-radius:var(--admin-radius-surface);gap:16px}
+.edu-admin .product-scope>div:first-child{min-width:0;flex:0 1 320px}
+.edu-admin .product-scope>div:first-child>label{display:grid;gap:8px;font-size:12px;font-weight:600}
+.edu-admin .product-scope select{width:100%;min-width:0}
+
+/* Wrap the campaign context before fields are squeezed into unreadable columns. */
+.edu-admin .tracking-admin .tracking-context-row{flex-wrap:wrap;gap:12px}
+.edu-admin .tracking-admin .tracking-context-row>.admin-field{flex:1 1 240px;width:auto;min-width:0}
+.edu-admin .tracking-admin .tracking-context-row>.tracking-course-multi{flex:2 1 420px;min-width:0}
+
+@media(max-width:1250px){
+ /* A preview/help panel remains readable below the form instead of disappearing. */
+ .edu-admin .settings-layout>aside.stack{display:grid;grid-template-columns:minmax(0,1fr)}
+}
+@media(max-width:720px){
+ .edu-admin :is(.admin-crm-editor,.admin-quiz-editor,.settings-layout>form,.seo-settings-layout>form){padding:20px}
+ .edu-admin :is(.admin-crm-editor,.admin-crm-settings,.admin-quiz-editor,.settings-layout,.seo-settings-layout) :is(.grid2,.field-row){grid-template-columns:minmax(0,1fr)}
+ .adm.edu-admin :is(.admin-crm-editor,.admin-crm-settings,.admin-quiz-editor,.settings-layout,.seo-settings-layout) :is(input:not([type=checkbox]):not([type=radio]),select){min-height:44px}
+ .edu-admin .admin-crm-workspace-actions{align-items:stretch;gap:8px}
+ .edu-admin .admin-crm-workspace-actions>.marketing-list-search{flex-basis:100%;max-width:none;margin:0}
+ .edu-admin .admin-crm-workspace-actions>.admin-button{width:100%;min-height:44px}
+ .edu-admin .admin-crm-editor>.between{align-items:flex-start}
+ .edu-admin .admin-crm-editor>.admin-button[type=submit]{width:100%;min-height:44px}
+ .edu-admin .product-scope{align-items:stretch;flex-direction:column}
+ .edu-admin .product-scope>div:first-child{flex-basis:auto;width:100%}
+ .edu-admin .product-scope .spacer{display:none}
+ .edu-admin .tracking-admin .tracking-context-row>.tracking-course-multi{flex-basis:100%;width:100%}
+}

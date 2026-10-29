@@ -976,7 +976,7 @@ function QuizManager(props: Props) {
   const missions = rows(props.data, "curriculum_missions");
   const mission = missions.find((m) => m.id === id) || missions[0];
   return (
-    <section className="panel pad mb24">
+    <section className="panel pad mb24 admin-quiz-editor">
       <h2>이해도 퀴즈 편집</h2>
       <Field label="미션 선택">
         <select
