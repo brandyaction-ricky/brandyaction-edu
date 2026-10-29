@@ -1,0 +1,84 @@
+/* Only the result shell is themed. The private report document/reader is unchanged. */
+:global(.edu-diagnosis) .report.report:global(.diagnosis-report) {
+  width: min(100%, 808px);
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-6) var(--space-16);
+  color: var(--text-primary);
+}
+:global(.edu-diagnosis) .report.report :global(.diagnosis-report-steps) {
+  width: 100%; max-width: none; margin: 0 0 var(--space-6);
+  padding: var(--space-4) 0; border: 0; border-radius: 0; background: transparent;
+}
+:global(.edu-diagnosis) .report.report :global(.diagnosis-report-steps li) { gap: var(--space-2); }
+:global(.edu-diagnosis) .report.report :global(.diagnosis-report-steps .is-complete),
+:global(.edu-diagnosis) .report.report :global(.diagnosis-report-steps li[aria-current]) { color: var(--ba-red); }
+:global(.edu-diagnosis) .report.report :global(.diagnosis-report-steps .is-complete .diagnosis-step-marker),
+:global(.edu-diagnosis) .report.report :global(.diagnosis-report-steps li[aria-current] .diagnosis-step-marker) {
+  background: var(--ba-red-soft); color: var(--ba-red); border: 0; box-shadow: none;
+}
+:global(.edu-diagnosis) .report.report :global(.diagnosis-report-steps .is-complete + li::before) { background: var(--border-strong); }
+:global(.edu-diagnosis) .report.report :global(.diagnosis-report-summary),
+:global(.edu-diagnosis) .report.report :global(.diagnosis-report-details),
+:global(.edu-diagnosis) .report.report :global(.diagnosis-report-timing) {
+  width: 100%; max-width: none; margin: 0 0 var(--space-6);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  background: var(--surface-raised); color: var(--text-secondary); text-align: left;
+}
+:global(.edu-diagnosis) .report.report :global(.diagnosis-report-summary) { padding: var(--space-8); }
+:global(.edu-diagnosis) .report.report :global(.diagnosis-report-icon) {
+  display: flex; width: 44px; height: 44px; margin: 0 0 var(--space-4);
+  border-radius: var(--radius-md); background: var(--ba-red-soft); color: var(--ba-red);
+}
+:global(.edu-diagnosis) .report.report :global(.diagnosis-report-icon svg) { width: 24px; height: 24px; }
+:global(.edu-diagnosis) .report.report :global(.diagnosis-eyebrow) { display: block; color: var(--ba-red); letter-spacing: 0; }
+:global(.edu-diagnosis) .report.report:global(.diagnosis-report) :global(.diagnosis-report-summary h1) {
+  width: auto; max-width: none; margin: var(--space-3) 0 var(--space-4);
+  padding: 0; border: 0; border-radius: 0; background: transparent;
+  color: var(--text-primary); font-size: var(--type-h2); line-height: 1.4; text-align: left;
+}
+:global(.edu-diagnosis) .report.report :global(.diagnosis-report-description) {
+  max-width: none; margin: 0; padding: 0; border: 0; border-radius: 0;
+  background: transparent; color: var(--text-secondary); text-align: left; line-height: var(--leading-body);
+}
+:global(.edu-diagnosis) .report.report :global(.diagnosis-report-description strong) { color: var(--text-primary); }
+:global(.edu-diagnosis) .report.report :global(.diagnosis-report-details) { padding: 0 var(--space-6); }
+:global(.edu-diagnosis) .report.report :global(.diagnosis-report-details summary) { padding: var(--space-4) 0; min-height: 56px; }
+:global(.edu-diagnosis) .report.report :global(.diagnosis-report-details-body) { padding: 0 0 var(--space-6); border-top: 1px solid var(--border-default); }
+:global(.edu-diagnosis) .report.report :global(.diagnosis-report-details-body h2) { font-size: var(--type-small); line-height: var(--leading-ui); }
+:global(.edu-diagnosis) .report.report :global(.diagnosis-report-timing) { padding: var(--space-6); }
+:global(.edu-diagnosis) .report.report :global(.diagnosis-report-notifications) { width: 100%; max-width: none; margin: 0 0 var(--space-6); }
+:global(.edu-diagnosis) .report.report :global(.diagnosis-report-notifications > .panel) {
+  width: 100%; max-width: none; margin: 0; padding: var(--space-6);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-raised);
+}
+:global(.edu-diagnosis) .report.report :global(.member-push-settings h2) { margin: 0 0 var(--space-3); font-size: var(--type-h4); line-height: var(--leading-ui); }
+:global(.edu-diagnosis) .report.report :global(.member-push-settings p) { margin: var(--space-3) 0 0; color: var(--text-secondary); font-size: var(--type-small); line-height: var(--leading-body); }
+:global(.edu-diagnosis) .report.report :global(.member-push-settings p[role="status"]) { padding: var(--space-3); border-radius: var(--radius-sm); background: var(--surface-subtle); color: var(--text-primary); }
+:global(.edu-diagnosis) .report.report :global(.member-push-actions) { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-4); }
+:global(.edu-diagnosis) .report.report :global(.diagnosis-report-actions) {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3);
+  padding: 0; margin: 0 0 var(--space-4);
+}
+:global(.edu-diagnosis) .report.report :global(.diagnosis-report-actions > *) { width: 100%; max-width: none; }
+:global(.edu-diagnosis) .report.report :global(.diagnosis-primary),
+:global(.edu-diagnosis) .report.report :global(.diagnosis-secondary),
+:global(.edu-diagnosis) .report.report :global(.member-push-actions .btn) {
+  min-height: var(--button-height); border-radius: var(--radius-sm); gap: var(--space-2);
+  font-size: var(--type-small); line-height: var(--leading-ui); white-space: normal;
+}
+:global(.edu-diagnosis) .report.report :global(.diagnosis-primary) { background: var(--ba-red); border-color: var(--ba-red); }
+:global(.edu-diagnosis) .report.report :global(.diagnosis-primary:hover) { background: var(--ba-red-hover); border-color: var(--ba-red-hover); }
+:global(.edu-diagnosis) .report.report :global(.diagnosis-review-return) { margin-top: var(--space-6); }
+:global(.edu-diagnosis) .report.report :global(.diagnosis-report-help) { width: 100%; max-width: none; margin: var(--space-3) 0; padding: 0; text-align: left; font-size: var(--type-small); color: var(--text-secondary); }
+:global(.edu-diagnosis) .report.report :global(.diagnosis-report-footer) { width: 100%; max-width: none; margin: var(--space-6) 0 0; padding: 0; border: 0; justify-content: flex-end; }
+@media (max-width: 680px) {
+  :global(.edu-diagnosis) .report.report:global(.diagnosis-report) { padding: var(--space-4) var(--space-4) var(--space-10); }
+  :global(.edu-diagnosis) .report.report :global(.diagnosis-report-summary),
+  :global(.edu-diagnosis) .report.report :global(.diagnosis-report-notifications > .panel),
+  :global(.edu-diagnosis) .report.report :global(.diagnosis-report-timing) { padding: var(--space-6); }
+  :global(.edu-diagnosis) .report.report :global(.diagnosis-report-details) { padding: 0 var(--space-6); }
+  :global(.edu-diagnosis) .report.report :global(.diagnosis-report-actions) { grid-template-columns: minmax(0, 1fr); }
+  :global(.edu-diagnosis) .report.report :global(.member-push-actions) { align-items: stretch; flex-direction: column; }
+  :global(.edu-diagnosis) .report.report :global(.member-push-actions > .btn) { flex: 0 1 auto; }
+  :global(.edu-diagnosis) .report.report :global(.diagnosis-report-footer > *) { width: 100%; }
+}

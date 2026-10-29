@@ -76,7 +76,7 @@ test('review explains the hold with keyboard-accessible details and reflects a l
   await expect(description).toHaveCount(3);
   expect((await description.nth(1).boundingBox())!.y).toBeGreaterThan((await description.first().boundingBox())!.y);
   const title=page.getByRole('heading',{name:'보고서 발급 전 확인이 필요해요.'});
-  expect((await title.boundingBox())!.width).toBeLessThanOrEqual(640);
+  expect((await title.boundingBox())!.width).toBeLessThan((await page.locator('.diagnosis-report-summary').boundingBox())!.width);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await page.screenshot({path:test.info().outputPath('diagnosis-progress-review.png'),fullPage:true});
   const toggle=page.locator('summary').filter({hasText:'자세한 안내'});
