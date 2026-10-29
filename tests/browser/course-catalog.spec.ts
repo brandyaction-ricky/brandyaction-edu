@@ -33,6 +33,8 @@ test('home separates expired cards, displays stored schedule and preserves produ
   await expect(open.locator('.cover')).toHaveCSS('color', 'rgb(255, 255, 255)');
   await expect(open.locator('.cover')).toHaveCSS('background-image', /linear-gradient/);
   await expect(open).toHaveCSS('border-top-width', '1px');
+  await expect(open.locator('.card-price')).toHaveCSS('justify-content', 'space-between');
+  await expect(page.getByRole('heading', { name: '모집이 끝난 클래스' })).toHaveCSS('margin-top', '32px');
   await expect(page.getByRole('heading', { name: '모집이 끝난 클래스' })).toBeVisible();
   const closed = page.locator('.course-card', { hasText: '마감된 유료 과정' });
   await expect(closed).toContainText('모집 마감');
