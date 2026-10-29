@@ -11,11 +11,23 @@
   padding-bottom: var(--space-12);
 }
 .workspace.workspace :global(.account-main) { min-width: 0; }
+.workspace.workspace :global(.account-aside) {
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
 .workspace.workspace :global(.account-profile) {
+  padding-left: var(--space-2);
+  padding-right: var(--space-2);
   padding-bottom: var(--space-6);
   margin-bottom: var(--space-6);
   border-color: var(--border-default);
 }
+.workspace.workspace :global(.account-profile > div:last-child) { min-width: 0; overflow-wrap: anywhere; }
+.workspace.workspace :global(.account-profile .avatar),
+.workspace.workspace :global(.account-nav svg) { flex-shrink: 0; }
 .workspace.workspace :global(.member-nav-group) { gap: var(--space-1); }
 .workspace.workspace :global(.member-nav-label) { color: var(--text-secondary); }
 .workspace.workspace :global(.account-nav a) {
@@ -27,6 +39,7 @@
 .workspace.workspace :global(.account-nav a.active) {
   background: var(--ba-red-soft);
   border-color: var(--ba-red-soft);
+  border-left-color: var(--ba-red);
   color: var(--ba-red);
   font-weight: 700;
 }
@@ -195,6 +208,11 @@
 
 @media (max-width: 1024px) {
   .workspace.workspace :global(.account-layout) { gap: var(--space-6); padding-top: var(--space-6); }
+}
+@media (max-width: 900px) {
+  /* Keep the existing horizontal navigation, including the operator entry. */
+  .workspace.workspace :global(.account-aside) { padding: var(--space-3); }
+  .workspace.workspace :global(.account-nav) { border-bottom: 0; padding-bottom: 0; }
 }
 @media (max-width: 680px) {
   .workspace.workspace :global(.account-layout) { padding-top: var(--space-4); }
