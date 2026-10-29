@@ -21,9 +21,9 @@ permissions:
   contents: read
 
 jobs:
-  verify:
+  code-checks:
     runs-on: ubuntu-latest
-    timeout-minutes: 65
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -251,17 +251,74 @@ jobs:
         run: npx tsc --noEmit
       - name: Content and achievement regression tests
         run: npm test
-      - name: Install browser test runtime
-        run: npx playwright install --with-deps chromium
-      - name: Admin focus browser regression tests
-        run: npm run test:browser
+      - name: Production build
+        run: npm run build
+
+  browser:
+    name: Browser shard ${{ matrix.shard }}/3
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Full browser regression tests
+        run: npx playwright test --shard=${{ matrix.shard }}/3
+      - name: Save failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-failures-${{ matrix.shard }}
+          path: test-results/
+          retention-days: 3
+
+  payment-widget:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
       - name: Enabled Toss widget browser regression tests
         env:
           FIXTURE_TOSS_WIDGET_ENABLED: 'true'
           FIXTURE_PORT: '4180'
         run: npx playwright test tests/browser/toss-widget.spec.ts
-      - name: Production build
-        run: npm run build
+      - name: Save failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: payment-widget-failures
+          path: test-results/
+          retention-days: 3
+
+  verify:
+    if: always()
+    needs: [code-checks, browser, payment-widget]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every check to pass
+        env:
+          CODE_CHECKS: ${{ needs.code-checks.result }}
+          BROWSER: ${{ needs.browser.result }}
+          PAYMENT_WIDGET: ${{ needs.payment-widget.result }}
+        run: |
+          test "$CODE_CHECKS" = success
+          test "$BROWSER" = success
+          test "$PAYMENT_WIDGET" = success
 
   migrate-dev:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/develop' && inputs.apply_all_pending_dev_migrations

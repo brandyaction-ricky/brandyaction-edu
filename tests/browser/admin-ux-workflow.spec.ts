@@ -4,8 +4,11 @@ test('message workspace starts with work, keeps help available and uses the same
   await page.goto('/admin-ux-audit-test');
   const title = page.getByRole('heading', { name: '메시지 템플릿', exact: true });
   await expect(title).toBeVisible();
-  expect((await title.boundingBox())!.y).toBeLessThan(520);
+  // The work heading and list must be visible without scrolling. Use the
+  // viewport rather than a font/OS-dependent pixel offset.
+  await expect(title).toBeInViewport();
   const list = page.getByRole('table', { name: '메시지 템플릿 목록' });
+  await expect(list.locator('thead')).toBeInViewport();
   const settings = page.getByRole('link', { name: '문자 발송 설정 관리 →', exact: true });
   expect((await list.boundingBox())!.y).toBeLessThan((await settings.boundingBox())!.y);
   await expect(settings).toHaveAttribute('href', '/admin/campaigns#sms-settings');
