@@ -275,7 +275,7 @@ test('product HTML takes precedence over old images and per-product CTA settings
   const form = new FormData(); form.set('title', '이름만 변경');
   assert.deepEqual(formValues(platform.sections.find(row => row.key === 'products'), form), { title: '이름만 변경' });
   const editorMarkup = html(load('app/ui/final/admin-editors.tsx').ProductEditor, { data, row: changed, pending: false, send: async () => {}, back: () => {} });
-  assert.match(editorMarkup, /CTA 왼쪽 문구/);
+  assert.match(editorMarkup, /버튼 옆 안내 문구/);
   assert.match(editorMarkup, /name="cta_price_label"/);
 });
 test('article management renders the connected three-video banner editor', () => {
@@ -425,8 +425,8 @@ test('catalogues and separate editors render without dropping existing fields', 
   assert.match(markup, /HTML 상세페이지/);
   assert.match(markup, /name="detail_html_document"/);
   assert.match(markup, /상품 삭제/);
-  assert.match(markup, /Call to Action/);
-  assert.match(markup, /Tracking integration/);
+  assert.match(markup, /신청 버튼/);
+  assert.match(markup, /광고 성과 측정/);
   assert.match(markup, /name="cta_color"/);
   assert.match(markup, /name="meta_pixel_id"/);
   assert.match(markup, /name="recruitment_start_at"/);

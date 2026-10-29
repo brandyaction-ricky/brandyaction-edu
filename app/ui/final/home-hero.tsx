@@ -9,9 +9,9 @@ import { useEffect, useState } from "react";
 const DEFAULT_BANNER = {
   id: "default-main-banner",
   eyebrow: "BRANDYACTION EDU · LEARN TO ACT",
-  title: "배운 것을,\n내 일의 성과로.",
+  title: "혼자 떠안던 마케팅,\n이제 AI와 나눠 하세요.",
   description:
-    "AI와 마케팅을 아는 것에서 끝내지 마세요.\n내 업무에 적용하고, 실행한 결과를 남기는 교육.",
+    "고객 조사부터 콘텐츠와 광고 준비까지.\n내 사업에 맞는 작업 흐름을 배우고 직접 연결해 보세요.",
   linkLabel: "무료 클래스부터 시작하기",
   linkUrl: "/classes?type=free",
   imageUrl: "",

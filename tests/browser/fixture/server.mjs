@@ -27,6 +27,7 @@ const brandLogo = readFileSync(resolve('public/brandy-action-logo.png'));
 const failedMemberReads = new Set();
 const server = createServer((request,response)=>{
   const url=new URL(request.url,'http://localhost');
+  if(['/copy-candidate/free-live','/copy-candidate/moonshot'].includes(url.pathname)){response.setHeader('Content-Type','text/html; charset=utf-8');response.end(readFileSync(resolve('content/stabilization-20261029',url.pathname.split('/').at(-1)+'.html')));return;}
   if(url.pathname==='/question-comments-app.js'){response.setHeader('Content-Type','application/javascript');response.end(commentsResult.outputFiles.find(f=>f.path.endsWith('.js')).text);return;}
   if(url.pathname==='/question-comments-app.css'){response.setHeader('Content-Type','text/css');response.end(commentsResult.outputFiles.find(f=>f.path.endsWith('.css')).text);return;}
   if(url.pathname==='/question-comments-test'){response.setHeader('Content-Type','text/html');response.end('<!doctype html><html lang="ko"><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/question-comments-app.css"></head><body><div id="root"></div><script type="module" src="/question-comments-app.js"></script></body></html>');return;}

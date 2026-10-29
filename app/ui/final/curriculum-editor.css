@@ -352,3 +352,10 @@
 .edu-admin .curriculum-editor-page .curriculum-workspace--direct .product-curriculum-week li.selected { background:#fff1f3; }
 .edu-admin .curriculum-editor-page .curriculum-workspace--direct .curriculum-add-lesson { border-radius:10px; background:#fafbfc; }
 .edu-admin .curriculum-editor-page .studio-lesson-link { padding-inline:4px; }
+
+/* Keep the editor mounted so focus mode never discards an unsaved lesson. */
+.adm.edu-admin .studio-writing-guide{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:16px;border:1px solid var(--adm-border);border-radius:12px;background:var(--adm-surface)}
+.adm.edu-admin .studio-writing-guide p{margin:6px 0 0;color:var(--adm-muted);font-size:14px}
+.adm.edu-admin .curriculum-editor-page .curriculum-workspace--direct.studio-focus-mode .curriculum-studio{grid-template-columns:minmax(0,1fr)}
+.adm.edu-admin .curriculum-editor-page .curriculum-workspace--direct.studio-focus-mode .curriculum-outline,.adm.edu-admin .studio-focus-mode>.studio-import-actions,.adm.edu-admin .studio-focus-mode>.studio-management-bar{display:none}
+.adm.edu-admin .studio-search-result{padding:8px;font-size:13px}

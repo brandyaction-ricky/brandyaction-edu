@@ -1123,6 +1123,7 @@ export async function POST(request: Request) {
             const offer = await db.from('cohorts').select('*,courses!inner(*)').eq('id', body.cohortId).single();
             if (offer.error || !offer.data) fail('상품 모집 정보를 확인해 주세요.', 409);
             const offeredCourse = offer.data.courses as Row;
+            if (offer.data.archived_at || offeredCourse.archived_at) fail('판매가 종료된 상품입니다. 다른 클래스를 확인해 주세요.', 409);
             if (offeredCourse.category === 'paid_class') {
                 const metadata = (offeredCourse.metadata && typeof offeredCourse.metadata === 'object' ? offeredCourse.metadata : {}) as Record<string, unknown>;
                 const source = String(metadata.detail_html_document || metadata.detail_html || '');

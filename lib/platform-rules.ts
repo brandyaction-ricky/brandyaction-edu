@@ -7,14 +7,14 @@ export function hasLearningAccess(enrollment: Row, now = Date.now()) {
 }
 
 export function isRecruiting(cohort: Row, now = Date.now()) {
-  return (cohort.status === 'recruiting' || (cohort.status === 'upcoming' && Boolean(cohort.recruitment_end_at)))
+  return !cohort.archived_at && (cohort.status === 'recruiting' || (cohort.status === 'upcoming' && Boolean(cohort.recruitment_end_at)))
     && (!cohort.recruitment_start_at || Date.parse(String(cohort.recruitment_start_at)) <= now)
     && (!cohort.recruitment_end_at || Date.parse(String(cohort.recruitment_end_at)) > now)
     && (!cohort.operation_end_at || Date.parse(String(cohort.operation_end_at)) > now);
 }
 
 export function isPurchasableOffer(course: Row, cohort: Row, now = Date.now()) {
-  if (course.status !== 'published' || course.category === 'free') return false;
+  if (course.archived_at || cohort.archived_at || course.status !== 'published' || course.category === 'free') return false;
   if (isRecruiting(cohort, now)) return true;
   if (cohort.status !== 'upcoming') return false;
   return Boolean(cohort.recruitment_end_at)

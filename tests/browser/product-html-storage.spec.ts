@@ -82,3 +82,19 @@ test('a failed stored-document read can be retried without replacing the selecte
   await page.getByRole('button', { name: '다시 불러오기', exact: true }).click();
   await expect(page.frameLocator('iframe[title="상품 HTML 상세페이지"]').getByRole('heading', { name: '복구된 상세페이지' })).toBeVisible();
 });
+
+test('stalled stored HTML times out and explicit retry recovers the same document',async({page})=>{
+ await page.clock.install();
+ let stalled=true;
+ await page.route('**/api/platform/product-html?*',route=>{if(stalled)return;return route.fulfill({json:{url:'/recovered-document.txt'}});});
+ await page.route('**/recovered-document.txt',route=>route.fulfill({contentType:'text/plain',body:'<h1>지연 후 복구된 상세</h1>'}));
+ await page.goto('/product-sale-test?storedHtml=1');
+ await page.getByRole('tab',{name:'상세페이지',exact:true}).click();
+ await page.getByText('HTML 디자인 확인',{exact:true}).click();
+ await expect(page.getByText('상세페이지를 불러오고 있습니다.')).toBeVisible();
+ await page.clock.fastForward(31000);
+ await expect(page.getByRole('alert')).toContainText('시간이 걸리고 있습니다');
+ stalled=false;
+ await page.getByRole('button',{name:'다시 불러오기',exact:true}).click();
+ await expect(page.frameLocator('iframe[title="상품 HTML 상세페이지"]').getByRole('heading',{name:'지연 후 복구된 상세'})).toBeVisible();
+});

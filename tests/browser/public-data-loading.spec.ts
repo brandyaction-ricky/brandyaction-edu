@@ -134,3 +134,21 @@ test('customer stories show video thumbnails and aligned reviewer details', asyn
   if (!isMobile) expect(cards[0]).toBe(cards[1]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
 });
+
+test('slow read stops loading and a deliberate retry recovers without automatic loops',async({page})=>{
+  let reads=0;
+  await page.clock.install();
+  await page.route('**/api/platform?**',route=>{
+    reads++;
+    if(reads===1) return;
+    return route.fulfill({json:{user:null,data:{courses:[course(1)],cohorts:[]},support:{}}});
+  });
+  await page.goto('/public-data-test?publicScreen=classes');
+  await expect.poll(()=>reads).toBe(1);
+  await page.clock.fastForward(13000);
+  await expect(page.getByRole('alert')).toContainText('불러오기가 지연');
+  expect(reads).toBe(1);
+  await page.getByRole('button',{name:'다시 시도',exact:true}).click();
+  await expect(page.locator('.course-card')).toHaveCount(1);
+  expect(reads).toBe(2);
+});

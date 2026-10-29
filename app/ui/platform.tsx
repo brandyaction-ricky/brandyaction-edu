@@ -1,4 +1,5 @@
 "use client";
+import { readJson } from '@/lib/read-json';
 import { memberDirectoryScope } from '@/lib/member-directory';
 import { MobileRefresh } from './final/mobile-refresh';
 import { contentVisibility } from '@/lib/content-visibility';
@@ -47,7 +48,7 @@ import {
 import { standaloneAdmin } from '@/lib/admin-workflow-sections';
 import { BlocksField, UploadField } from "./editor-fields";
 import { clearAdminCare, prefetchAdminCare } from '@/lib/learning-care-client';
-import { AdminCatalog, type MissionScope } from "./final/admin-catalog";
+import type { MissionScope } from "./final/admin-catalog";
 import { MissionTargetFields, type MissionContext } from "./final/mission-target-fields";
 import { useAdminDialog, useRouteDialog } from "@/features/admin-ui";
 import { ArticleBannerEditor } from "./final/article-banner-editor";
@@ -59,11 +60,8 @@ import {
   finalAdminTitles,
   sectionDescription,
 } from "./final/admin-shell";
-import { Checkout } from "./final/checkout";
-import { Classroom } from "./final/classroom";
 import { MemberViews, enrollmentLessons } from "./final/member-views";
 import { LearningQuestionShortcut } from './final/learning-question-dialog';
-import { CustomerWorkspace } from "./final/customer-workspace";
 import { MemberVisitRecorder } from "./final/member-visit-recorder";
 import {
   ArticleCard,
@@ -100,6 +98,10 @@ import {
 } from "@/features/admin-ui";
 // Keep authoring code out of the initial bundle for unrelated admin menus.
 const editorLoading = () => <AdminLoadingState title="편집기를 준비하고 있습니다." />;
+const AdminCatalog = dynamic(() => import('./final/admin-catalog').then(module => module.AdminCatalog), { loading: () => <AdminLoadingState /> });
+const CustomerWorkspace = dynamic(() => import('./final/customer-workspace').then(module => module.CustomerWorkspace), { loading: () => <AdminLoadingState /> });
+const Checkout = dynamic(() => import('./final/checkout').then(module => module.Checkout), { loading: () => <p role="status">결제 정보를 준비하고 있습니다.</p> });
+const Classroom = dynamic(() => import('./final/classroom').then(module => module.Classroom), { loading: () => <p role="status">수업을 준비하고 있습니다.</p> });
 const ProductEditor = dynamic(() => import('./final/admin-editors').then(module => module.ProductEditor), { loading: editorLoading });
 const CurriculumEditor = dynamic(() => import('./final/curriculum-editor').then(module => module.CurriculumEditor), { loading: editorLoading });
 const LearningEditor = dynamic(() => import('./final/learning-editor').then(module => module.LearningEditor), { loading: editorLoading });
@@ -333,14 +335,11 @@ export function Platform({
             scopeQuery,
           )
         : await (async () => {
-            const response = await fetch(`/api/platform?${publicParamsString}`, {
-              cache: "no-store",
-              signal: controller.signal,
-            });
+            const { response, data: result } = await readJson(`/api/platform?${publicParamsString}`, { signal: controller.signal });
             return {
               ok: response.ok,
               status: response.status,
-              result: await response.json(),
+              result,
               serverTiming: response.headers.get("Server-Timing"),
             };
           })();
@@ -742,8 +741,8 @@ export function Platform({
             <div className="section-head">
               <div>
                 <div className="eyebrow">01 / NEXT PROGRAM</div>
-                <h2>지금 참여할 수 있는 클래스</h2>
-                <p>시작의 크기는 달라도, 목표는 실제 업무의 변화입니다.</p>
+                <h2>내 사업에 바로 연결할 클래스</h2>
+                <p>혼자 떠안던 마케팅과 반복 업무, 이제 배운 방법으로 하나씩 바꿔보세요.</p>
               </div>
               <Link className="link" href="/classes">
                 모든 클래스 <ArrowRight />
@@ -763,7 +762,7 @@ export function Platform({
               <div>
                 <div className="eyebrow">03 / INSIGHT TO ACTION</div>
                 <h2>일하는 방식을 바꾸는 인사이트</h2>
-                <p>내 업무에 가져갈 수 있는 구체적인 관점과 방법.</p>
+                <p>읽고 끝내기 아까운 방법들. 오늘 내 업무에 한 가지부터 적용해 보세요.</p>
               </div>
               <Link className="link" href="/articles">
                 아티클 전체 보기 <ArrowRight />
@@ -782,7 +781,7 @@ export function Platform({
               <div className="section-head">
                 <div>
                   <div className="eyebrow">04 / LEARNING IN PRACTICE</div>
-                  <h2>실행한 과정이, 다음 사람의 시작으로.</h2>
+                  <h2>나와 비슷한 사장님들은 어떻게 바꿨을까요?</h2>
                 </div>
                 <Link className="link" href="/stories">
                   고객 이야기 <ArrowRight />
@@ -796,8 +795,8 @@ export function Platform({
           <div className="wrap">
             <div>
               <div className="eyebrow">YOUR NEXT ACTION</div>
-              <h2>첫 실행은, 무료 클래스에서.</h2>
-              <p>내 업무 한 가지를 떠올리고 시작해 보세요.</p>
+              <h2>혼자 하던 일의 다음 방법, 무료로 만나보세요.</h2>
+              <p>바꾸고 싶은 업무 하나를 떠올려 보세요. 내게 맞는 방법인지 먼저 확인할 수 있습니다.</p>
             </div>
             <Link className="btn primary large" href="/classes?type=free">
               무료 클래스 살펴보기 <ArrowRight />
@@ -810,8 +809,8 @@ export function Platform({
     body = (
       <div className="wrap">
         <Heading
-          title="내 일의 다음 단계를 찾아보세요."
-          description="무료 클래스부터 실전 과정, 바로 사용하는 자료까지."
+          title="배운 오늘, 내 사업에 써먹을 한 가지."
+          description="AI 활용부터 마케팅 실행까지. 지금 막힌 일에 맞춰 클래스를 골라보세요."
         />
         <div className="filter-row">
           <div className="chips">
@@ -819,6 +818,7 @@ export function Platform({
               <button
                 key={f}
                 className={"chip " + (filter === f ? "active" : "")}
+                aria-pressed={filter === f}
                 onClick={() => setFilter(f)}
               >
                 {f}
@@ -1493,7 +1493,7 @@ function LegacyEditor({
             <>
               {section.key === "banners" && (
                 <div className="notice mb24">
-                  이 화면의 상단 문구·메인 제목·설명 문구·CTA가 프론트 메인 배너에 그대로 표시됩니다. 활성 배너가 2개 이상이면 슬라이드 순서대로 자동 전환됩니다.
+                  입력한 제목·설명·버튼이 고객 첫 화면에 그대로 표시됩니다. 행사 날짜가 있는 배너는 노출 종료일도 설정해 주세요. 종료일을 비워 두면 계속 표시됩니다. 배너가 여러 개면 정한 순서대로 바뀝니다.
                 </div>
               )}
               {section.key === "customers" && row && (
