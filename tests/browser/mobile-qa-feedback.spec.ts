@@ -1,14 +1,16 @@
 import { test, expect } from '@playwright/test';
 
-test('header help remains visible and fits narrow mobile screens', async ({ page }) => {
+test('header help stays accessible in the mobile menu and desktop header', async ({ page }) => {
   await page.route('**/api/platform?**', r => r.fulfill({json:{user:{id:'synthetic',full_name:'검증 회원',role:'student'},data:{review_videos:[]},support:{}}}));
   await page.goto('/public-data-test?publicScreen=stories');
   for (const width of [320,390,834,1440]) {
     await page.setViewportSize({width,height:844});
-    const action=page.locator('.header-questions');
+    if(width<=900) await page.getByRole('button',{name:'메뉴 열기',exact:true}).click();
+    const action=width<=900?page.getByRole('navigation',{name:'모바일 메뉴'}).getByRole('link',{name:'질문·답변',exact:true}):page.locator('.header-questions');
     await expect(action).toBeVisible();
     await expect(action).toHaveAttribute('href','/my/questions');
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    if(width<=900) await page.keyboard.press('Escape');
   }
 });
 
@@ -18,7 +20,7 @@ for(const flags of [{enabled:false,articlesEnabled:false},{enabled:true,articles
   await page.goto('/public-data-test?publicScreen=articles');
   await expect(page.locator('.article-library')).toHaveCount(flags.articlesEnabled?1:0);
   await expect(page.locator('.ab-banner')).toHaveCount(flags.enabled?1:0);
-  await expect(page.locator('.main-nav a[href="/articles"]')).toHaveCount(flags.enabled||flags.articlesEnabled?1:0);
+  await expect(page.locator('.main-nav a[href="/articles"]')).toHaveCount(flags.articlesEnabled?1:0);
   if(flags.enabled){await expect(page.locator('.ab-lesson')).toHaveCount(1);await expect(page.getByText('주소 없는 영상')).toHaveCount(0);}
  });
 }

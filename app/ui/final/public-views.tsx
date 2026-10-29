@@ -1,5 +1,6 @@
 "use client";
 import { contentVisibility } from '@/lib/content-visibility';
+import { MOONSHOT_SUPPORT_URL } from '@/lib/purchase-onboarding';
 import {
   date,
   money,
@@ -420,6 +421,7 @@ function StandardProductDetail({
                 {offerCountdown}
                 {!enrolled && readinessIssues.length > 0 && <p className="notice mb24">수강 신청을 준비하고 있습니다. 모집이 시작되면 이 페이지에서 신청할 수 있습니다.</p>}
                 {button}
+                {!signedIn && <a className="btn mt16" href={MOONSHOT_SUPPORT_URL} target="_blank" rel="noopener noreferrer">신청 전 카카오톡 문의</a>}
               </div>
             </aside>
           </div>
@@ -719,8 +721,10 @@ export function StoriesView({
         <section className="story-feature">
           <div className="story-feature-copy">
             <div className="eyebrow">LEARNING IN PRACTICE</div>
+            <Badge>개인 실행 사례</Badge>
             <h2>{t(featured, "title")}</h2>
             <p className="lead mt16">{t(featured, "description")}</p>
+            <p className="meta mt16">개인 사례이며 결과는 사람마다 다릅니다.</p>
             <div className="story-person">
               <span className="avatar" aria-hidden="true">
                 {t(featured, "reviewer_name").slice(0, 1)}
@@ -747,12 +751,13 @@ export function StoriesView({
                 <span className="story-video-thumb">{thumbnail ? <img src={thumbnail} alt="" loading="lazy" /> : <small>STORY {String(index + 1).padStart(2, "0")}</small>}<span className="story-video-play" aria-hidden="true"><Play /></span></span>
                 <strong>{t(s, "title")}</strong>
                 <span>{t(s, "reviewer_name")} · {t(s, "reviewer_role")}</span>
+                <small>개인 사례이며 결과는 사람마다 다릅니다.</small>
               </button>
             );
           })}
           {!loading && !error && !stories.length && (
             <Empty title="공개된 고객 이야기가 없습니다.">
-              <div className="row center mt16"><Link className="btn primary" href="/classes?type=free">무료 클래스 보기</Link><Link className="btn" href="/my/questions">문의하기</Link></div>
+              <div className="row center mt16"><Link className="btn primary" href="/classes?type=free">무료 클래스 보기</Link><a className="btn" href={MOONSHOT_SUPPORT_URL} target="_blank" rel="noopener noreferrer">카카오톡 문의</a></div>
             </Empty>
           )}
         </div>

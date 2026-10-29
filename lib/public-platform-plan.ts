@@ -12,7 +12,7 @@ export const publicTables: Record<PublicView, readonly string[]> = {
   class: ['courses', 'cohorts', 'curriculum_weeks', 'curriculum_lessons', 'reviews', 'landing_configs'],
   articles: ['articles', 'article_categories', 'article_banner'],
   article: ['articles'],
-  stories: ['review_videos'],
+  stories: ['review_videos', 'courses', 'cohorts'],
   checkout: ['courses', 'cohorts'],
 };
 

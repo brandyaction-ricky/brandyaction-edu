@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import './site-footer.css';
+import { MOONSHOT_SUPPORT_URL } from '@/lib/purchase-onboarding';
 
-export function SiteFooter({ supportEmail, supportUrl }: { supportEmail?: string; supportUrl?: string } = {}) {
+export function SiteFooter({ supportEmail, supportUrl, signedIn = false }: { supportEmail?: string; supportUrl?: string; signedIn?: boolean } = {}) {
   const email = supportEmail || 'edu@brandyaction.co.kr';
   return (
     <footer className="site-footer">
@@ -15,7 +16,8 @@ export function SiteFooter({ supportEmail, supportUrl }: { supportEmail?: string
             <Link href="/policies/terms">이용약관</Link>
             <Link href="/policies/privacy">개인정보처리방침</Link>
             <Link href="/policies/refund">환불규정</Link>
-            <Link href={supportUrl || '/my/questions'}>문의하기</Link>
+            {signedIn ? <Link href={supportUrl || '/my/questions'}>문의하기</Link>
+              : <a href={MOONSHOT_SUPPORT_URL} target="_blank" rel="noopener noreferrer">카카오톡으로 문의 (로그인 없이)</a>}
           </nav>
         </div>
         <div className="site-footer-ad-notice">

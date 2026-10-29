@@ -1,0 +1,19 @@
+:global(.edu-front) .card.card { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: white; display: flex; flex-direction: column; }
+:global(.edu-front) .card.card :global(.cover) { border-radius: 0; }
+:global(.edu-front) .card :global(.card-body) { padding: 20px; display: flex; flex-direction: column; flex: 1; }
+:global(.edu-front) .card :global(.card-price) { margin-top: auto; gap: 12px; padding-top: 16px; justify-content: space-between; }
+.card :global(.card-body h3) { margin-top: 12px; }
+.card :global(.card-body p) { margin-bottom: 16px; }
+.status { display: inline-flex; align-items: center; width: fit-content; font-size: 12px; font-weight: 650; border-radius: 4px; padding: 4px 8px; color: #505861; background: #f0f2f4; }
+.open { background: #e5f3ec; color: #1c6747; }
+.schedule { display: block; font-size: 13px; line-height: 1.6; background: #f6f7f8; color: var(--text-secondary); border-radius: 4px; padding: 10px 12px; margin: 0 0 16px; overflow-wrap: anywhere; }
+:global(.edu-front) .card :global(.card-price) .cta { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 650; white-space: nowrap; color: var(--ba-red); }
+.card.closed.closed { background: #f8f9fa; }
+.closed :global(.cover) { display: none; }
+:global(.edu-front) .closed :global(.card-price) .cta { color: var(--text-secondary); }
+:global(.edu-front) .fallback.fallback:global(.cover) { background: linear-gradient(135deg, #203c4b, #14252f); color: white; }
+.fallback :global(.cover-label), .fallback :global(.cover-bottom) { color: #d5e5ec; }
+.fallback strong { max-width: 100%; overflow-wrap: anywhere; }
+:global(.edu-front) .sectionTitle { font-size: 20px; margin: 32px 0 16px; }
+.group { margin-bottom: 32px; }
+@media(max-width: 680px) { :global(.edu-front) .card :global(.card-body) { padding: 16px; } }

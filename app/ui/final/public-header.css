@@ -1,0 +1,8 @@
+@media (max-width: 900px) {
+  .edu-front .public-site-header .main-nav,
+  .edu-front .public-site-header .header-user > .link,
+  .edu-front .public-site-header .header-user > .profile-menu-wrap,
+  .edu-front .public-site-header .header-user > .header-login { display: none; }
+  .edu-front .public-site-header .header-inner { gap: 12px; }
+  .edu-front .public-site-header .header-user { gap: 0; }
+}

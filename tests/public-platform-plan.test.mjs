@@ -20,7 +20,7 @@ test('public routes request only their own content contract', () => {
       assert.equal(tables.includes(privateTable), false, `${privateTable} must not be shared`);
     }
   }
-  assert.deepEqual(publicTables.stories, ['review_videos']);
+  assert.deepEqual(publicTables.stories, ['review_videos', 'courses', 'cohorts']);
   assert.deepEqual(publicTables.classes, ['courses', 'cohorts']);
 });
 
