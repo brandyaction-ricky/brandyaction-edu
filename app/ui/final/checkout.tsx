@@ -1,23 +1,52 @@
 "use client";
 import { money, number as num, text as t, type User } from "@/lib/platform";
 import { cohortPeriod } from "@/lib/qa-rules";
-import { ArrowLeft, ArrowRight, Check, CreditCard, Landmark } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Copy, CreditCard, Landmark } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { type Data, type WorkflowSend } from "../learning-workflows";
 import { Badge, Empty, Heading, courseType } from "./primitives";
 import { parseEntrySource, withEntrySource } from '@/lib/entry-source';
 import { CheckoutCouponRegistration, useCheckoutCouponRegistration } from "@/features/commerce/ui";
 import { MOONSHOT_SUPPORT_URL } from "@/lib/purchase-onboarding";
 import "./checkout.css";
+import { useTossCheckoutWidget } from "./toss-checkout-widget";
 
-const paymentMethods = [
-  { value: "QUICK_TRANSFER", label: "퀵계좌이체", button: "퀵계좌이체로 결제하기", description: "처음 한 번 계좌를 연결하고 비밀번호로 간편하게 결제" },
-  { value: "TRANSFER", label: "실시간 계좌이체", button: "실시간 계좌이체로 결제하기", description: "토스페이먼츠 결제창에서 은행 계좌를 인증하고 결제" },
-  { value: "CARD", label: "카드·간편결제", button: "카드·간편결제로 결제하기", description: "신용·체크카드, 카카오페이, 토스페이, 네이버페이" },
-] as const;
-type PaymentMethod = typeof paymentMethods[number]["value"];
+type PaymentMethod = "CARD" | "TRANSFER";
+
+function BankTransferHelp() {
+  const [copyMessage, setCopyMessage] = useState("");
+  async function copyAccount() {
+    try {
+      await navigator.clipboard.writeText("954201-00-094916");
+      setCopyMessage("계좌번호를 복사했습니다.");
+    } catch {
+      setCopyMessage("계좌번호를 길게 누르거나 선택해 복사해 주세요.");
+    }
+  }
+  return <section className="panel checkout-bank-transfer" aria-labelledby="checkout-transfer-title">
+    <div className="panel-head">
+      <h2 id="checkout-transfer-title"><Landmark aria-hidden="true" /> 계좌이체로 수강하시려면</h2>
+      <span className="checkout-transfer-label">직접 입금</span>
+    </div>
+    <div className="panel-body">
+      <p className="meta">아래 계좌로 입금한 뒤 카카오톡 채널에 알려 주세요.</p>
+      <div className="checkout-transfer-details">
+        <dl className="checkout-transfer-account">
+          <div><dt>입금 계좌</dt><dd>KB국민은행 <strong>954201-00-094916</strong></dd></div>
+          <div><dt>예금주</dt><dd>주식회사 브랜디액션</dd></div>
+        </dl>
+        <button className="btn btn-outline checkout-transfer-copy" type="button" onClick={() => void copyAccount()}><Copy aria-hidden="true" /> 계좌번호 복사</button>
+      </div>
+      {copyMessage && <p className="meta checkout-transfer-copy-status" role="status">{copyMessage}</p>}
+      <p className="meta">입금 후 카카오톡 채널로 문의해 주시면 계산서 발급과 수강 절차를 안내해 드리겠습니다.</p>
+      <a className="btn btn-outline checkout-transfer-contact" href={MOONSHOT_SUPPORT_URL} target="_blank" rel="noopener noreferrer">
+        입금 후 카카오톡 채널 문의 <ArrowRight aria-hidden="true" />
+      </a>
+    </div>
+  </section>;
+}
 
 export function Checkout({
   data,
@@ -40,7 +69,11 @@ export function Checkout({
   // This is a display gate, not a Toss contract switch. Enable only after
   // confirming quick transfer on the EDU production MID's actual payment window.
   const quickTransferEnabled = process.env.NEXT_PUBLIC_TOSS_QUICK_TRANSFER_ENABLED === "true";
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(quickTransferEnabled ? "QUICK_TRANSFER" : "TRANSFER");
+  const paymentMethods = [
+    { value: "CARD", label: "카드·간편결제", button: "카드·간편결제로 결제하기", description: "신용·체크카드, 카카오페이, 토스페이, 네이버페이" },
+    { value: "TRANSFER", label: quickTransferEnabled ? "퀵 계좌이체" : "실시간 계좌이체", button: quickTransferEnabled ? "퀵 계좌이체로 결제하기" : "실시간 계좌이체로 결제하기", description: "토스페이먼츠 결제창에서 은행 계좌를 인증하고 결제" },
+  ] as const;
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CARD");
   const selectedPayment = paymentMethods.find((method) => method.value === paymentMethod)!;
   const lock = useRef(false),
     cohort = (data.cohorts || []).find((c) => c.id === cohortId),
@@ -51,15 +84,20 @@ export function Checkout({
   const coupon = couponRegistration.appliedCode;
   const quote = couponRegistration.quote;
   const couponLoading = couponRegistration.loading;
+  const widgetEnabled = process.env.NEXT_PUBLIC_TOSS_WIDGET_ENABLED === "true" && !!user && !!cohort && !free;
+  const widgetAmount = quote?.totalAmount ?? num(cohort, "price");
+  const latestWidgetAmount = useRef(widgetAmount);
+  useEffect(() => { latestWidgetAmount.current = widgetAmount; }, [widgetAmount]);
+  const tossWidget = useTossCheckoutWidget(widgetEnabled, user?.id || "", Math.max(1, widgetAmount));
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (paymentMethod === "QUICK_TRANSFER" && !quickTransferEnabled) {
-      setError("퀵계좌이체는 준비 중입니다. 실시간 계좌이체 또는 카드·간편결제를 선택해 주세요.");
-      return;
-    }
     if (coupon.trim() && !quote) { setError('쿠폰 등록을 완료해 주세요.'); return; }
     if (!agreed) {
       setError("필수 약관에 동의해 주세요.");
+      return;
+    }
+    if (widgetEnabled && widgetAmount > 0 && !tossWidget.ready) {
+      setError("결제 수단을 확인한 후 다시 시도해 주세요.");
       return;
     }
     if (lock.current) return;
@@ -84,6 +122,17 @@ export function Checkout({
         router.push("/applied?order=" + result.orderId);
         return;
       }
+      if (widgetEnabled) {
+        if (Number(result.totalAmount) !== widgetAmount || latestWidgetAmount.current !== widgetAmount) throw new Error("결제 금액이 변경됐습니다. 새로고침 후 다시 확인해 주세요.");
+        if (!tossWidget.widget.current || !tossWidget.ready) throw new Error("결제 수단을 확인한 후 다시 시도해 주세요.");
+        await tossWidget.widget.current.requestPayment({
+          orderId: String(result.orderNumber), orderName: String(result.orderName || t(course, "title")),
+          customerName: String(f.get("name")), customerEmail: user!.contact_email || user!.email,
+          successUrl: location.origin + "/payment/success?integration=widget",
+          failUrl: location.origin + "/payment/fail",
+        });
+        return;
+      }
       const key = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY;
       if (!key) throw new Error("결제 서비스를 준비하고 있습니다.");
       const { loadTossPayments } = await import(
@@ -100,8 +149,7 @@ export function Checkout({
         successUrl: location.origin + "/payment/success",
         failUrl: location.origin + "/payment/fail",
       } as const;
-      // Both transfer choices use Toss's supported TRANSFER request. The merchant
-      // contract and buyer's selection in the Toss window determine the flow.
+      // Toss determines the available transfer options in its payment window.
       if (paymentMethod !== "CARD") {
         await payment.requestPayment({ ...paymentRequest, method: "TRANSFER" });
       } else {
@@ -195,14 +243,14 @@ export function Checkout({
     <>
       <button
         className="btn primary full large"
-        disabled={pending || processing || couponLoading || !agreed || (!!coupon.trim() && !quote)}
+        disabled={pending || processing || couponLoading || !agreed || (!!coupon.trim() && !quote) || (widgetEnabled && widgetAmount > 0 && !tossWidget.ready)}
         aria-describedby="checkout-agreement-help"
       >
         {pending || processing
           ? "처리 중..."
           : free || quote?.totalAmount === 0
             ? "무료로 신청 완료하기"
-            : selectedPayment.button}
+            : widgetEnabled ? "결제하기" : selectedPayment.button}
         <ArrowRight />
       </button>
       {!agreed && <p className="meta mt8" id="checkout-agreement-help">필수 약관에 동의하면 {free ? "신청" : "결제"}할 수 있습니다.</p>}
@@ -306,7 +354,16 @@ export function Checkout({
                 <CheckoutCouponRegistration controller={couponRegistration} />
               </div>
             </section>
-            {quote?.totalAmount === 0 ? <section className="panel"><div className="panel-body">최종 금액 0원 · 결제창 없이 신청을 완료합니다.</div></section> : <section className="panel">
+            {widgetEnabled && <section className="panel" hidden={quote?.totalAmount === 0}>
+              <div className="panel-head"><h2>결제 수단</h2></div>
+              <div className="panel-body">
+                <div id="toss-payment-methods" />
+                <p className="meta">실시간 계좌이체에서 개인계좌를 선택하면 퀵계좌이체를 이용할 수 있어요.</p>
+                <div id="toss-payment-agreement" />
+                {tossWidget.error && <p role="alert" className="form-error">{tossWidget.error}</p>}
+              </div>
+            </section>}
+            {quote?.totalAmount === 0 ? <section className="panel"><div className="panel-body">최종 금액 0원 · 결제창 없이 신청을 완료합니다.</div></section> : !widgetEnabled && <section className="panel">
               <div className="panel-head">
                 <h2>결제 수단</h2>
               </div>
@@ -314,7 +371,7 @@ export function Checkout({
                 <p className="meta checkout-payment-intro">원하는 결제 방법을 선택해 주세요.</p>
                 <div className="checkout-payment-options" role="radiogroup" aria-label="결제 수단">
                   {paymentMethods.map((method) => (
-                    <label className="checkout-payment-option" key={method.value} data-method={method.value} data-unavailable={method.value === "QUICK_TRANSFER" && !quickTransferEnabled || undefined}>
+                    <label className="checkout-payment-option" key={method.value} data-method={method.value}>
                       <input
                         type="radio"
                         name="payment"
@@ -322,15 +379,15 @@ export function Checkout({
                         aria-label={method.label}
                         checked={paymentMethod === method.value}
                         onChange={() => setPaymentMethod(method.value)}
-                        disabled={pending || processing || (method.value === "QUICK_TRANSFER" && !quickTransferEnabled)}
+                        disabled={pending || processing}
                       />
-                      {method.value === "QUICK_TRANSFER" && <span className={quickTransferEnabled ? "checkout-payment-recommended" : "checkout-payment-coming"}>{quickTransferEnabled ? "추천" : "준비 중"}</span>}
+                      {method.value === "CARD" && <span className="checkout-payment-recommended">추천</span>}
                       <span className="checkout-payment-mark" aria-hidden="true">
                         {method.value === "CARD" ? <CreditCard /> : <Landmark />}
                       </span>
                       <span className="checkout-payment-copy">
                         <span className="checkout-payment-name">{method.label}</span>
-                        <span className="checkout-payment-description">{method.value === "QUICK_TRANSFER" && !quickTransferEnabled ? "지금은 실시간 계좌이체 또는 카드·간편결제를 이용해 주세요." : method.description}</span>
+                        <span className="checkout-payment-description">{method.description}</span>
                       </span>
                       <Check className="checkout-payment-check" aria-hidden="true" />
                     </label>
@@ -340,20 +397,9 @@ export function Checkout({
                   <h3>결제 수단은 결제창에서 최종 선택합니다</h3>
                   <p>약관 동의 후 ‘{selectedPayment.button}’를 누르면 토스페이먼츠 결제창이 열립니다. {paymentMethod === "CARD" ? "결제창에서 카드나 간편결제를 선택해 주세요." : "이용 가능한 계좌이체 방식과 인증 절차는 결제창에서 확인해 주세요. 현금영수증도 결제창에서 신청할 수 있어요."}</p>
                 </div>
-                <div className="notice checkout-transfer-help" id="checkout-transfer-help">
-                  <h3>계좌이체로 수강하시려면</h3>
-                  <p>계좌이체를 원하시면 아래 국민은행 계좌로 입금해 주세요.</p>
-                  <dl className="checkout-transfer-account">
-                    <div><dt>입금 계좌</dt><dd>KB국민은행 <strong>954201-00-094916</strong></dd></div>
-                    <div><dt>예금주</dt><dd>주식회사 브랜디액션</dd></div>
-                  </dl>
-                  <p>입금 후 카카오톡 채널로 문의해 주시면 계산서 발급과 수강 절차를 안내해 드리겠습니다.</p>
-                  <a className="btn btn-outline" href={MOONSHOT_SUPPORT_URL} target="_blank" rel="noopener noreferrer">
-                    입금 후 카카오톡 채널 문의 <ArrowRight aria-hidden="true" />
-                  </a>
-                </div>
               </div>
             </section>}
+            {quote?.totalAmount !== 0 && <BankTransferHelp />}
           </div>
           <aside className="product-aside">
             <div className="purchase-card checkout-payment-summary">

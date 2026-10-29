@@ -18,6 +18,7 @@ test('question and marketing selections use the shared admin accent without chan
   await expect(page.getByRole('button', { name: '답변 대기' })).toHaveCSS('border-bottom-color', primary);
   await expect(page.getByRole('button', { name: '선택된 질문' })).toHaveCSS('background-color', 'rgb(255, 240, 241)');
   await expect(page.getByRole('link', { name: '광고 결과' })).toHaveCSS('background-color', 'rgb(255, 240, 241)');
+  await expect(page.getByRole('link', { name: '광고 결과' })).toHaveCSS('color', primary);
   await expect(page.getByRole('link', { name: '광고 결과' })).toHaveCSS('border-color', primary);
   await expect(page.getByRole('button', { name: '전체 주차' })).toHaveCSS('background-color', primary);
   await expect(page.getByText('완료', { exact: true }).last()).toHaveCSS('color', 'rgb(23, 99, 69)');
