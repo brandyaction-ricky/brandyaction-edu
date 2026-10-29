@@ -220,7 +220,7 @@ export function Checkout({
   const agreement = (
     <div className="check-group">
       <label className="checkline">
-        <input type="checkbox" name="agreement" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} required />
+        <input id="checkout-agreement" type="checkbox" name="agreement" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} required />
         <span>
           [필수] 상품 정보와{" "}
           <Link href="/policies/terms" target="_blank">
@@ -240,26 +240,33 @@ export function Checkout({
     </div>
   );
   const submitButton = (
-    <>
-      <button
-        className="btn primary full large"
-        disabled={pending || processing || couponLoading || !agreed || (!!coupon.trim() && !quote) || (widgetEnabled && widgetAmount > 0 && !tossWidget.ready)}
-        aria-describedby="checkout-agreement-help"
-      >
-        {pending || processing
-          ? "처리 중..."
-          : free || quote?.totalAmount === 0
-            ? "무료로 신청 완료하기"
-            : widgetEnabled ? "결제하기" : selectedPayment.button}
-        <ArrowRight />
-      </button>
-      {!agreed && <p className="meta mt8" id="checkout-agreement-help">필수 약관에 동의하면 {free ? "신청" : "결제"}할 수 있습니다.</p>}
+    <div className={free ? undefined : "checkout-submit"}>
+      {!free && <div className="checkout-submit-amount">
+        <span>최종 결제 금액</span>
+        <strong>{money(widgetAmount)}</strong>
+        {!agreed && <a href="#checkout-agreement">필수 약관 확인</a>}
+      </div>}
+      <div className="checkout-submit-main">
+        <button
+          className="btn primary full large"
+          disabled={pending || processing || couponLoading || !agreed || (!!coupon.trim() && !quote) || (widgetEnabled && widgetAmount > 0 && !tossWidget.ready)}
+          aria-describedby={agreed ? undefined : "checkout-agreement-help"}
+        >
+          {pending || processing
+            ? "처리 중..."
+            : free || quote?.totalAmount === 0
+              ? "무료로 신청 완료하기"
+              : widgetEnabled ? "결제하기" : selectedPayment.button}
+          <ArrowRight />
+        </button>
+        {!agreed && <p className="meta mt8" id="checkout-agreement-help">필수 약관에 동의하면 {free ? "신청" : "결제"}할 수 있습니다.</p>}
+      </div>
       {error && (
         <p className="form-error mt16" role="alert">
           {error}
         </p>
       )}
-    </>
+    </div>
   );
   if (!user)
     return (
@@ -310,7 +317,7 @@ export function Checkout({
       </div>
     );
   return (
-    <div className="wrap">
+    <div className="wrap checkout-page">
       <Heading
         title="주문·결제"
         description="신청 정보를 확인하고 배움을 시작하세요."
