@@ -1,5 +1,6 @@
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { tossMode } from '@/lib/toss-environment';
 export async function POST(request: Request) {
     const origin = request.headers.get('origin');
     if (origin && origin !== new URL(request.url).origin)
@@ -31,7 +32,16 @@ export async function POST(request: Request) {
             return Response.json({ ok: true });
         if (!['pending', 'payment_failed'].includes(order.status))
             return Response.json({ error: '결제할 수 없는 주문입니다.' }, { status: 409 });
-        const secret = process.env.TOSS_SECRET_KEY || process.env.PG_SECRET_KEY;
+        // The provider requires the secret paired with the client key that
+        // initiated this payment. Old callbacks continue to use the old key.
+        const widget = body.integration === 'widget';
+        const secret = widget ? process.env.TOSS_WIDGET_SECRET_KEY : (process.env.TOSS_SECRET_KEY || process.env.PG_SECRET_KEY);
+        if (widget) {
+            const mode = tossMode(process.env.NEXT_PUBLIC_TOSS_WIDGET_CLIENT_KEY, secret);
+            const legacyMode = tossMode(process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY, process.env.TOSS_SECRET_KEY || process.env.PG_SECRET_KEY);
+            if ((mode !== 'test' && mode !== 'live') || mode !== legacyMode || (process.env.VERCEL_ENV === 'production' && mode !== 'live'))
+                return Response.json({ error: '결제 설정을 확인하고 있습니다.' }, { status: 503 });
+        }
         if (!secret)
             return Response.json({ error: '결제 설정을 확인하고 있습니다.' }, { status: 503 });
         const headers = { 'Authorization': 'Basic ' + Buffer.from(secret + ':').toString('base64'), 'Content-Type': 'application/json', 'Idempotency-Key': 'edu-confirm-' + order.id };
@@ -50,7 +60,6 @@ export async function POST(request: Request) {
             const terminalRejections = new Set([
                 'REJECT_ACCOUNT_PAYMENT', 'REJECT_CARD_PAYMENT', 'REJECT_CARD_COMPANY',
                 'INVALID_REJECT_CARD', 'INVALID_STOPPED_CARD', 'INVALID_CARD_LOST_OR_STOLEN',
-                'NOT_FOUND_PAYMENT_SESSION',
             ]);
             if (!checkingProcessedPayment && response.status >= 400 && response.status < 500 && terminalRejections.has(payment.code)) {
                 const failed = await db.from('orders').update({ status: 'payment_failed' }).eq('id', order.id).eq('user_id', user.id).eq('status', 'pending');
