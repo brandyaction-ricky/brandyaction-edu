@@ -16,7 +16,7 @@ test('class cards load in 12-row pages and searching requests only the current v
     const courses = q ? [course(7)] : pageNumber === 1 ? Array.from({ length: 12 }, (_, index) => course(index + 1)) : [course(13)];
     return route.fulfill({ json: { user: null, data: { courses, cohorts: [] }, pagination: { page: pageNumber, pageSize: 12, total: q ? 1 : 13 }, support: {} } });
   });
-  await page.goto('/public-data-test?publicScreen=classes');
+  await page.goto('/public-data-test?publicScreen=classes&navigationFixture=1');
   await page.clock.runFor(1);
   await expect(page.locator('.course-card')).toHaveCount(12);
   await page.getByRole('button', { name: '다음' }).click();

@@ -20,6 +20,8 @@ import Link from "next/link";
 import Image from "next/image";
 import type { ReactNode } from "react";
 import type { DigitalContentSection, ProductResource } from "@/lib/product-metadata";
+import { catalogTitle, courseAvailability, courseSchedule } from '@/lib/course-catalog';
+import catalogStyles from './course-catalog.module.css';
 
 export function Badge({
   children,
@@ -85,14 +87,14 @@ export function courseType(c: Row) {
       ? "무료 클래스"
       : "유료 클래스";
 }
-export function Cover({ course }: { course: Row }) {
+export function Cover({ course, catalogSchedule }: { course: Row; catalogSchedule?: string }) {
   const type = courseType(course),
     meta = object(course, "metadata"),
     image = safeUrl(meta.thumbnailUrl || meta.thumbnail_url);
   return (
     <div
       className={
-        "cover " + (image ? "has-image " : "") +
+        "cover " + (catalogSchedule !== undefined && !image ? catalogStyles.fallback + ' ' : '') + (image ? "has-image " : "") +
         (type === "무료 클래스"
           ? "red"
           : type === "디지털 상품"
@@ -110,12 +112,12 @@ export function Cover({ course }: { course: Row }) {
         <>
           <span className="cover-label">
             {type === "무료 클래스"
-              ? "FREE LIVE CLASS"
+              ? "FREE CLASS"
               : type === "디지털 상품"
                 ? "WORK TOOLKIT / DIGITAL"
                 : "AI MARKETING / CLASS"}
           </span>
-          <strong>{t(course, "title")}</strong>
+          <strong>{catalogSchedule === undefined ? t(course, "title") : catalogSchedule || (type === '디지털 상품' ? '내 업무를 위한 도구' : '다음 배움을 만나보세요')}</strong>
           <div className="cover-bottom">
             <span>BRANDYACTION EDU</span>
             <ArrowRight />
@@ -126,12 +128,16 @@ export function Cover({ course }: { course: Row }) {
     </div>
   );
 }
-export function CourseCard({ course }: { course: Row }) {
+export function CourseCard({ course, cohorts = [], now }: { course: Row; cohorts?: Row[]; now?: number }) {
+  const availability = courseAvailability(course, cohorts, now);
+  const schedule = courseSchedule(course, cohorts, now);
+  const closed = availability.state === 'closed';
   return (
-    <Link className="course-card" href={"/classes/" + t(course, "slug")}>
-      <Cover course={course} />
+    <Link className={`course-card ${catalogStyles.card} ${closed ? catalogStyles.closed : ''}`} href={"/classes/" + t(course, "slug")}>
+      <Cover course={course} catalogSchedule={schedule} />
       <div className="card-body">
-        <div className="flex gap8">
+        <div className="flex gap8" style={{flexWrap: 'wrap'}}>
+          <span className={`${catalogStyles.status} ${availability.state === 'open' ? catalogStyles.open : ''}`}>{availability.label}</span>
           <Badge color={num(course, "list_price") === 0 ? "red" : ""}>
             {courseType(course)}
           </Badge>
@@ -139,13 +145,14 @@ export function CourseCard({ course }: { course: Row }) {
             <Badge>{t(course, "duration_label")}</Badge>
           )}
         </div>
-        <h3>{t(course, "title")}</h3>
-        <p>{t(course, "schedule_label") || t(course, "summary")}</p>
+        <h3>{catalogTitle(course)}</h3>
+        {t(course, 'summary') && <p>{t(course, 'summary')}</p>}
+        {schedule && <span className={catalogStyles.schedule}>{schedule}</span>}
         <div className="card-price">
-          {num(course, "list_price") === 0
+          <span>{closed ? '다음 모집 준비 중' : num(course, "list_price") === 0
             ? "무료"
-            : money(num(course, "list_price"))}
-          <ArrowRight className="arrow" />
+            : money(num(course, "list_price"))}</span>
+          <span className={catalogStyles.cta}>자세히 보기 <ArrowRight className="arrow" /></span>
         </div>
       </div>
     </Link>
@@ -181,9 +188,10 @@ export function Story({ story }: { story: Row }) {
       <div className="story-card-cover">
         {thumbnail ? <Image src={thumbnail} alt="" width={640} height={360} sizes="(max-width: 680px) 82vw, (max-width: 900px) 50vw, 33vw" unoptimized /> : <span>BRANDYACTION EDU</span>}
       </div>
-      <Badge>고객 이야기</Badge>
+      <Badge>개인 실행 사례</Badge>
       <blockquote>“{t(story, "title")}”</blockquote>
       <p>{t(story, "description")}</p>
+      <p className="meta">개인 사례이며 결과는 사람마다 다릅니다.</p>
       <div className="who mt24">
         <span className="avatar">
           {t(story, "reviewer_name").slice(0, 1) || <UserRound />}

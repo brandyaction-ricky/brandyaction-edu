@@ -16,6 +16,7 @@ function load(file, mocks = {}) {
   new Function('exports', 'require', code)(exports, name => {
     if (name in mocks) return mocks[name];
     if (name.startsWith('@/lib/')) return load(name.slice(2) + '.ts', mocks);
+    if (file.startsWith('lib/') && name.startsWith('./')) return load(path.relative(root, path.resolve(path.dirname(absolute), name + '.ts')), mocks);
     if (name.startsWith('./')) return new Proxy({}, { get: () => () => null });
     return require(name);
   });
@@ -34,6 +35,7 @@ function renderClass({ loading = true, error = '', data = {} } = {}) {
     '@/features/admin-ui': load('features/admin-ui/components/use-route-dialog.ts'),
     'next/navigation': { useRouter: () => ({}), useSearchParams: () => new URLSearchParams() },
     'next/link': { default: ({ children, ...props }) => React.createElement('a', props, children) },
+    './final/use-course-catalog': { useCatalogLocation: () => ({ filter: '전체', query: '', page: 1 }), useCatalogClock: () => Date.now() },
     './final/primitives': {
       Empty: ({ title }) => React.createElement('h2', null, title), Brand: () => null,
       courseType: () => '무료 클래스',

@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, Pause, Play } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import { catalogTitle } from '@/lib/course-catalog';
 
 const DEFAULT_BANNER = {
   id: "default-main-banner",
@@ -73,8 +74,8 @@ function FeaturedFreeClass({ course, open }: { course?: Row; open: boolean }) {
         <span className="offer-status">무료 클래스</span>
       </div>
       <div className="offer-content">
-        <span className="offer-category">01 / 내 업무를 바꾸는 첫 클래스</span>
-        <h2>{t(course, "title")}</h2>
+        <span className="offer-category">내 업무를 바꾸는 첫 클래스</span>
+        <h2>{catalogTitle(course)}</h2>
         <p>{t(course, "summary")}</p>
       </div>
       <dl className="offer-spec">
