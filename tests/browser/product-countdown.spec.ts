@@ -52,12 +52,14 @@ test('missing sales schedule and closed products stay blocked; missing deadlines
 });
 
 test('closed paid offer removes both outer application links from keyboard and navigation', async ({ page }) => {
-  for (const selector of ['.product-aside .btn', '.bottom-cta .btn']) {
+  for (const selector of ['.product-aside .btn.primary', '.bottom-cta .btn.primary']) {
     await page.goto('/product-countdown-test?closed=1');
     const cta = page.locator(selector);
     await expect(cta).toBeAttached();
     await expect(cta).toBeDisabled();
     await expect(cta).not.toHaveAttribute('href', /.+/);
+    // An inquiry remains available even when purchasing is closed.
+    await expect(page.getByRole('link',{name:'신청 전 카카오톡 문의',exact:true})).toHaveAttribute('href',/pf\.kakao\.com/);
     if (await cta.isVisible()) {
       await cta.focus();
       await page.keyboard.press('Enter');
@@ -73,7 +75,7 @@ test('closed paid offer removes both outer application links from keyboard and n
 test('open and enrolled paid offers retain their outer destinations', async ({ page }) => {
   for (const [query, destination] of [['off=1', /\/login\?next=%2Fcheckout/], ['off=1&enrolled=1', /\/learn\/enrolled-fixture$/]] as const) {
     await page.goto(`/product-countdown-test?${query}`);
-    const cta = page.locator('.product-aside .btn');
+    const cta = page.locator('.product-aside .btn.primary');
     await expect(cta).toBeEnabled();
     await expect(cta).toHaveAttribute('href', destination);
   }

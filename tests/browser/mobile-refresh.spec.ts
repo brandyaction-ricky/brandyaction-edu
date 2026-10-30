@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 for (const screen of ['student', 'admin']) {
   test(`${screen} mobile refresh fits the header and reloads the current URL`, async ({ page }, info) => {
     if (screen === 'student') await page.route('**/api/platform?**', route => route.fulfill({ json: { user: { id: 'synthetic', full_name: '검증 회원', role: 'student' }, data: { review_videos: [] }, support: {} } }));
-    await page.goto(screen === 'student' ? '/public-data-test?publicScreen=stories' : '/admin-shell-test?refresh=1');
+    await page.goto(screen === 'student' ? '/public-data-test?publicScreen=my' : '/admin-shell-test?refresh=1');
     const refresh = page.getByRole('button', { name: '새로고침', exact: true });
     for (const width of [320, 390, 720, 1440]) {
       await page.setViewportSize({ width, height: 844 });
@@ -34,3 +34,11 @@ for (const screen of ['student', 'admin']) {
     await expect(refresh).toBeEnabled();
   });
 }
+
+// Public discovery deliberately omits the account/learning refresh control.
+test('public discovery keeps its menu without an account refresh action', async ({page})=>{
+ await page.goto('/public-data-test?publicScreen=stories');
+ await page.setViewportSize({width:390,height:844});
+ await expect(page.getByRole('button',{name:'새로고침',exact:true})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'메뉴 열기',exact:true})).toBeVisible();
+});
