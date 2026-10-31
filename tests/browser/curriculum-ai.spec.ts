@@ -30,3 +30,20 @@ test('API failure preserves input and mentor remains available without automatic
 test('usage loads only on opening, distinguishes unmeasured costs and filters by cohort and period',async({page})=>{
  const h=await backend(page);await page.goto('/curriculum-ai-test');expect(h.usage).toHaveLength(0);await page.getByText('기수별 AI API 사용량',{exact:true}).click();await expect(page.getByRole('cell',{name:'토큰 미확인 1건',exact:false})).toBeVisible();await expect(page.getByText('금액 미확인 1건 별도')).toBeVisible();await page.getByLabel('AI 사용량 기수').selectOption(id);await expect(page.getByRole('rowheader')).toContainText('문샷 3기');await page.getByLabel('AI 사용량 기간').selectOption('7');await expect.poll(()=>h.usage.length).toBe(2);expect(h.usage[1]).toContain('days=7');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
+test('usage summaries follow the cohort filter and do not double count cached tokens',async({page})=>{
+ const h=await backend(page);const other='22222222-2222-4222-8222-222222222222';
+ await page.route('**/api/admin/ai-usage?**',route=>{h.usage.push(route.request().url());return route.fulfill({json:{rows:[
+  {cohort_id:id,cohort_name:'문샷 3기',course_title:'AI 문샷 챌린지',requests:3,succeeded:2,failed:1,pending:0,calls:{api_calls:3,input_tokens:1000,cached_tokens:100,output_tokens:200,estimated_usd:0.001,unmeasured_calls:0,unpriced_calls:0}},
+  {cohort_id:other,cohort_name:'문샷 4기',course_title:'AI 문샷 챌린지',requests:5,succeeded:5,failed:0,pending:0,calls:{api_calls:5,input_tokens:2000,cached_tokens:400,output_tokens:300,estimated_usd:0.002,unmeasured_calls:0,unpriced_calls:0}},
+ ]}});});
+ await page.goto('/curriculum-ai-test');expect(h.usage).toHaveLength(0);await page.getByText('기수별 AI API 사용량',{exact:true}).click();
+ const summary=page.getByLabel('선택 범위 AI 사용량 요약');await expect(summary).toContainText('3,500');await expect(summary).toContainText('$0.0030');await expect(summary).toContainText('완료 7 · 실패 1 · 대기 0');
+ await page.getByLabel('AI 사용량 기수').selectOption(id);await expect(summary).toContainText('1,200');await expect(summary).toContainText('$0.0010');await expect(summary).not.toContainText('3,500');await expect(page.getByRole('rowheader')).toHaveCount(1);expect(h.usage).toHaveLength(1);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+test('fully unpriced calls show pending cost rather than zero and failed reads retain retry',async({page})=>{
+ await backend(page);let fail=false;
+ await page.route('**/api/admin/ai-usage?**',route=>route.fulfill(fail?{status:503,json:{error:'사용량 조회를 잠시 사용할 수 없습니다.'}}:{json:{rows:[{cohort_id:id,cohort_name:'문샷 3기',course_title:'AI 문샷 챌린지',requests:1,succeeded:0,failed:1,pending:0,calls:{api_calls:1,unmeasured_calls:1,unpriced_calls:1}}]}}));
+ await page.goto('/curriculum-ai-test');await page.getByText('기수별 AI API 사용량',{exact:true}).click();const summary=page.getByLabel('선택 범위 AI 사용량 요약');await expect(summary).toContainText('집계 대기');await expect(summary).not.toContainText('$0.0000');await expect(page.getByRole('cell',{name:'집계 대기 금액 미확인 1건 별도'})).toBeVisible();
+ await expect(page.getByText('금액 미확인 1건 별도')).toBeVisible();fail=true;await page.getByRole('button',{name:'사용량 새로고침'}).click();await expect(page.getByRole('alert')).toContainText('사용량 조회를 잠시 사용할 수 없습니다.');await expect(summary).toHaveCount(0);await expect(page.getByRole('button',{name:'사용량 새로고침'})).toBeEnabled();
+});
