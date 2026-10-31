@@ -19,7 +19,7 @@ function Track({ group, enrollmentId, compact }: { group: LearningGroup; enrollm
   const waiting = !complete && !group.next;
   const weeks = [...new Set(group.items.map(item => item.week))];
   const label = ongoing ? '챌린지 보기' : group.next ? '이어서 학습하기' : '복습하기';
-  return <section className="elo-track" aria-label={group.title}>
+  return <section className={'elo-track' + (group.key === 'other' ? ' elo-standard' : '')} aria-label={group.title}>
     <div className="elo-heading"><h3>{group.title}</h3>{!ongoing && <span>{Math.round(group.completed / group.items.length * 100)}%</span>}</div>
     {ongoing ? <p className="meta">기간마다 다시 참여하는 챌린지입니다.</p> : <>
       <p className="meta">현재 공개된 학습 {group.completed} / {group.items.length}개 완료</p>

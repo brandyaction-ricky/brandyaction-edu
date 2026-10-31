@@ -2,6 +2,8 @@
 .edu-front .member-learning-intro > h2 { margin:0 0 6px; }
 .enrollment-learning-overview { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; min-width:0; margin-top:20px; }
 .enrollment-learning-overview .elo-track { min-width:0; padding:24px; border:1px solid #dfe3e8; border-radius:10px; background:#fff; overflow-wrap:anywhere; }
+.enrollment-learning-overview > .elo-track:only-child,
+.enrollment-learning-overview > .elo-standard { grid-column:1/-1; }
 .elo-heading { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:8px; }
 .elo-heading h3,.elo-heading h4 { margin:0; }
 .elo-heading > span { font-size:14px; color:#505b68; }

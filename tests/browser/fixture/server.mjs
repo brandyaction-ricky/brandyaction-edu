@@ -105,8 +105,19 @@ const server = createServer((request,response)=>{
   }
   const asset=assets.get(url.pathname);
   if(asset){response.setHeader('Content-Type',url.pathname.endsWith('.css')?'text/css':'text/javascript');response.end(asset);return;}
+  // Read-only synthetic defaults let the local visual preview run without login or real data.
+  if(['/api/platform/encouragement','/api/platform/question-thread','/api/member/push'].includes(url.pathname)){
+    response.setHeader('Content-Type','application/json');
+    if(request.method!=='GET'){response.writeHead(405).end(JSON.stringify({error:'합성 화면 조회만 허용합니다.'}));return;}
+    const value=url.pathname==='/api/member/push'?{enabled:false}:url.pathname==='/api/platform/encouragement'?(url.searchParams.has('mine')?{publicName:'',message:'',revision:null}:{rows:[],nextCursor:null}):{question:{id:'22222222-2222-4222-8222-222222222222',status:'answered',resolved:false,archived:false,headId:null},answers:[],nextCursor:null,canAnswer:false,canFollowUp:true};
+    response.end(JSON.stringify(value));return;
+  }
   if(url.pathname==='/api/platform/diagnosis/report'){
-    const key=(request.headers.cookie || '').match(/(?:^|;\s*)diagnosis_download_fixture=(original|embedded)(?:;|$)/)?.[1];
+    const state=new URL(request.headers.referer||'http://127.0.0.1').searchParams.get('local-report');
+    if(!url.search&&['ready','needs_review','queued','processing','access_denied'].includes(state)){
+      response.setHeader('Content-Type','application/json');response.end(JSON.stringify({state,updatedAt:'2026-10-01T00:00:00.000Z',canRetry:false,downloadAvailable:state==='ready'}));return;
+    }
+    const key=(request.headers.cookie || '').match(/(?:^|;\s*)diagnosis_download_fixture=(original|embedded)(?:;|$)/)?.[1] || (state==='ready'?'embedded':undefined);
     const files=key && reportFiles[key],format=url.searchParams.has('html')?'html':'markdown';
     if(!files){response.writeHead(404).end();return;}
     if(!url.search){response.setHeader('Content-Type','application/json');response.end(JSON.stringify({state:'ready',updatedAt:'2026-10-01T00:00:00.000Z',canRetry:false,downloadAvailable:true}));return;}
@@ -115,7 +126,7 @@ const server = createServer((request,response)=>{
     response.setHeader('Content-Disposition',`attachment; filename*=UTF-8''${encodeURIComponent(name)}`);
     response.end(files[format]);return;
   }
-  if(url.pathname==='/api/platform/diagnosis/session' && /diagnosis_download_fixture=(original|embedded)/.test(request.headers.cookie || '')){
+  if(url.pathname==='/api/platform/diagnosis/session' && (/diagnosis_download_fixture=(original|embedded)/.test(request.headers.cookie || '') || new URL(request.headers.referer||'http://127.0.0.1').searchParams.has('local-report'))){
     response.setHeader('Content-Type','application/json');response.end(JSON.stringify({state:'submitted',revision:8,answers:[],submittedAt:'2026-10-01T00:00:00Z',needsReview:false,survey:{code:'needs6_n30',version:'synthetic',title:'합성 N6 검사',coreQuestionCount:0,questions:[]}}));return;
   }
   if(url.pathname==='/diagnosis-test'){
