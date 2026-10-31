@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { questionCategories, type QuestionCategory, type QuestionContext, type SharedAnswer } from '@/lib/question-hub';
-import { QuestionImagePicker, type QuestionImagePickerHandle } from './question-image';
+import { QuestionImagePicker, type QuestionImagePickerHandle, type ReadyQuestionImage } from './question-image';
 import { AnswerText } from './lesson-text';
 import { useUnsavedLearningChanges } from './use-unsaved-learning-changes';
 import './question-hub.css';
@@ -30,10 +30,10 @@ export function RelatedAnswers({ query, context }: { query: string; context: Que
   if (query.trim().length < 2 || result?.key !== key) return null;
   return <aside className="question-related" aria-label="비슷한 질문의 답변"><b>먼저 확인해 보세요</b>{result.error ? <p role="status" className="meta">{result.error}</p> : !result.answers.length ? <p className="meta">아직 비슷한 답변이 없어요. 아래에서 질문을 등록해 주세요.</p> : result.answers.map(a => <SharedAnswerCard key={a.id} answer={a}/>)}</aside>;
 }
-export function QuestionComposer({ initialContext, initialContent = '', initialPrivate = false, order, onCreated, quick = false, onStateChange }: { initialContext?: QuestionContext; initialContent?:string; initialPrivate?:boolean; order?: string | null; onCreated: () => void; quick?: boolean; onStateChange?: (state: { dirty: boolean; locked: boolean }) => void }) {
+export function QuestionComposer({ initialContext, initialContent = '', initialPrivate = false, initialImage, initialCategory = 'learning', order, onCreated, quick = false, onStateChange }: { initialContext?: QuestionContext; initialContent?:string; initialPrivate?:boolean; initialImage?:ReadyQuestionImage; initialCategory?:QuestionCategory; order?: string | null; onCreated: () => void; quick?: boolean; onStateChange?: (state: { dirty: boolean; locked: boolean }) => void }) {
   const [contexts, setContexts] = useState<QuestionContext[]>(initialContext ? [initialContext] : []), [context, setContext] = useState<QuestionContext | null>(initialContext || null);
-  const [category, setCategory] = useState<QuestionCategory>(order ? 'payment' : 'learning'), [title, setTitle] = useState(order ? '주문 ' + order + ' 문의' : ''), [content, setContent] = useState(initialContent), [visibility, setVisibility] = useState<'cohort' | 'private'>(initialPrivate ? 'private' : 'cohort');
-  const [image, setImage] = useState<{ id: string | null; busy: boolean; draft: boolean }>({ id: null, busy: false, draft: false }), [imageKey, setImageKey] = useState(0);
+  const [category, setCategory] = useState<QuestionCategory>(order ? 'payment' : initialCategory), [title, setTitle] = useState(order ? '주문 ' + order + ' 문의' : ''), [content, setContent] = useState(initialContent), [visibility, setVisibility] = useState<'cohort' | 'private'>(initialPrivate ? 'private' : 'cohort');
+  const [image, setImage] = useState<{ id: string | null; busy: boolean; draft: boolean }>({ id: initialImage?.id || null, busy: false, draft: Boolean(initialImage) }), [imageKey, setImageKey] = useState(0);
   const [busy, setBusy] = useState(false), [uncertain, setUncertain] = useState(false), [error, setError] = useState(''), [contextError, setContextError] = useState(''), [contextVersion, setContextVersion] = useState(0);
   const gate = useRef(false), retry = useRef<Record<string, unknown> | null>(null), imagePicker = useRef<QuestionImagePickerHandle>(null), touchedContext = useRef(Boolean(initialContext || order));
   const locked = busy || uncertain, imagesEnabled = process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED === 'true';
@@ -74,9 +74,9 @@ export function QuestionComposer({ initialContext, initialContent = '', initialP
   }}>
     {!quick && options}
     {contextError && <p role="status" className="meta">{contextError} <button type="button" className="link" disabled={locked} onClick={() => setContextVersion(v => v + 1)}>목록 다시 불러오기</button></p>}
-    <label className="field">질문 내용<textarea autoFocus={quick} required={!image.id} rows={quick ? 4 : 6} maxLength={10000} disabled={locked} value={content} onChange={e => setContent(e.target.value)} placeholder={quick ? '어디에서 막혔나요? 짧게 적거나 화면을 붙여 넣어 주세요.' : '어느 부분에서 막혔나요? 지금 하고 있는 일과 궁금한 점을 편하게 적어 주세요.'}/></label>
+    <label className="field">질문 내용<textarea autoFocus={quick} required={!image.id} rows={quick ? 4 : 6} maxLength={10000} disabled={locked} value={content} onChange={e => setContent(e.target.value)} placeholder={'예: 이 수업의 프롬프트를 실행했는데 예시와 다른 결과가 나와요. 어떤 부분을 확인하면 될까요?'}/></label>
     {category === 'learning' && <RelatedAnswers query={content} context={context}/>}
-    {imagesEnabled && <QuestionImagePicker key={imageKey} ref={imagePicker} enrollmentId={context?.enrollmentId || null} lessonId={context?.lessonId || null} locked={locked} compact={quick} publicQuestion={Boolean(context && category === 'learning' && visibility === 'cohort')} changed={(id, uploading, draft) => setImage({ id, busy: uploading, draft })}/>}
+    {imagesEnabled && <QuestionImagePicker key={imageKey} ref={imagePicker} initialImage={imageKey === 0 ? initialImage : undefined} enrollmentId={context?.enrollmentId || null} lessonId={context?.lessonId || null} locked={locked} compact={quick} publicQuestion={Boolean(context && category === 'learning' && visibility === 'cohort')} changed={(id, uploading, draft) => setImage({ id, busy: uploading, draft })}/>}
     {quick && <details className="question-quick-options"><summary>제목·관련 수업 변경 (선택)</summary>{options}</details>}
     <fieldset className="question-privacy" disabled={locked}><legend>공개 범위</legend>{context && category === 'learning' ? <><div className="question-visibility-options"><label><input type="radio" name="question-visibility" value="cohort" checked={visibility === 'cohort'} onChange={() => setVisibility('cohort')}/> 전체 공개</label><label><input type="radio" name="question-visibility" value="private" checked={visibility === 'private'} onChange={() => setVisibility('private')}/> 비밀 질문</label></div><small>{visibility === 'cohort' ? '같은 기수 수강생이 질문·첨부 이미지·답변·후속 질문을 함께 볼 수 있어요. 개인정보가 포함되면 비밀 질문을 선택해 주세요.' : '나와 담당 운영자만 질문과 답변을 볼 수 있어요.'}</small></> : <><b>비밀 질문</b><small>{category === 'learning' ? '관련 학습을 선택하면 같은 기수에 공개할 수 있어요.' : '일반·결제·계정 문의는 나와 담당 운영자만 볼 수 있어요.'}</small></>}</fieldset>
     {uncertain && <p role="status">등록 결과를 확인하지 못했습니다. 같은 요청으로 다시 확인하면 중복 등록되지 않습니다.</p>}
