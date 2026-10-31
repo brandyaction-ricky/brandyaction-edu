@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { createAdminClient } from './supabase/admin';
-import { aiFallback, curriculumInstructions, curriculumText, parseCurriculumAnswer, retrieveCurriculum, type AiTurn, type CurriculumLesson } from './curriculum-ai';
+import { aiFallback, curriculumInstructions, curriculumText, parseCurriculumAnswer, retrieveCurriculum, studentCapabilityAnswer, type AiTurn, type CurriculumLesson } from './curriculum-ai';
 type Db = ReturnType<typeof createAdminClient>;
 type Usage = { input_tokens?: unknown; output_tokens?: unknown; input_tokens_details?: { cached_tokens?: unknown } };
 export function aiFailure(message: string, status = 503): never { throw Object.assign(new Error(message), { expose:true, status }); }
@@ -70,7 +70,8 @@ export async function generateCurriculumAnswer(db: Db, options: { actor:string; 
   }
   if (!body || body.status==='incomplete' || body.status==='failed') throw new Error('AI_OUTPUT_INCOMPLETE');
   const text = (body.output || []).filter(o=>o.type==='message').flatMap(o=>o.content || []).filter(o=>o.type==='output_text').map(o=>o.text || '').join('');
-  const answer = parseCurriculumAnswer(JSON.parse(text),retrieved.sources);
+  const parsed = { ...parseCurriculumAnswer(JSON.parse(text),retrieved.sources), searchedLessons:retrieved.searchedLessons };
+  const answer = options.mode === 'student' ? studentCapabilityAnswer(parsed) : parsed;
   // Entitlement, publication, pilot switch and operator permission may change
   // during generation. Do not return the answer after access is revoked.
   await assertAccess();
