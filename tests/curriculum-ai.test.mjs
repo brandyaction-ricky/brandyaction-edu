@@ -25,6 +25,10 @@ test('source IDs must refer to retrieved data; unsupported answers become mentor
 test('cost uses actual provider counts including cached input; missing usage and unknown models remain unpriced',()=>{
  const usage={input_tokens:1000000,output_tokens:1000000,input_tokens_details:{cached_tokens:500000}};
  assert.equal(measuredUsage(usage,'gpt-5-mini').estimated_usd,2.1375);
+ assert.equal(measuredUsage({input_tokens:100000,output_tokens:2000,input_tokens_details:{cached_tokens:50000}},'gpt-6.1-terra').estimated_usd,0.0625);
+ assert.equal(measuredUsage({input_tokens:272000,output_tokens:2000,input_tokens_details:{cached_tokens:0}},'gpt-6.1-terra').estimated_usd,0.282);
+ assert.equal(measuredUsage(usage,'gpt-6.1-terra').estimated_usd,8.55);
+ assert.equal(measuredUsage(undefined,'gpt-6.1-terra').estimated_usd,null);
  assert.equal(measuredUsage(undefined,'gpt-5-mini').estimated_usd,null);
  assert.equal(measuredUsage(usage,'unknown-model').estimated_usd,null);
  assert.equal(measuredUsage({...usage,input_tokens_details:{cached_tokens:2000000}},'gpt-5-mini').estimated_usd,null);
