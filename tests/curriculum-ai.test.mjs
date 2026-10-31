@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {loadTs} from './helpers/question-ai.mjs';
-const {retrieveCurriculum,parseCurriculumAnswer,parseAiTurns,aiFallback}=loadTs('lib/curriculum-ai.ts');
+const {retrieveCurriculum,parseCurriculumAnswer,parseAiTurns,aiFallback,studentCapabilityAnswer,studentImageHandoff}=loadTs('lib/curriculum-ai.ts');
 const {measuredUsage}=loadTs('lib/curriculum-ai-server.ts',{'./supabase/admin':{}});
 test('retrieval searches beyond the old 12000-character prefix and finds related lessons, preserving authoritative revision',()=>{
  const lessons=[{id:'current',title:'첫 수업',body_text:'기본 소개'},{id:'related',title:'고객 인터뷰',revision:'version-2',body_text:'소개\n'.repeat(6000)+'고객 질문은 열린 질문으로 작성하고 고객의 실제 경험을 확인합니다.'}];
@@ -28,4 +28,13 @@ test('cost uses actual provider counts including cached input; missing usage and
  assert.equal(measuredUsage(undefined,'gpt-5-mini').estimated_usd,null);
  assert.equal(measuredUsage(usage,'unknown-model').estimated_usd,null);
  assert.equal(measuredUsage({...usage,input_tokens_details:{cached_tokens:2000000}},'gpt-5-mini').estimated_usd,null);
+});
+test('student image-upload promises become an honest mentor handoff without unrelated citations',()=>{
+ const source={id:'S1',lessonId:'lesson',title:'수업',revision:null,excerpt:'설치 안내'};
+ const answer={answer:'사진이 없어 버튼을 확인할 수 없습니다. 스크린샷을 올려주시면 좌표와 오류 문구를 찾아 알려드릴게요.',needsMentor:false,sources:[source],searchedLessons:21};
+ assert.deepEqual(studentCapabilityAnswer(answer),{answer:studentImageHandoff,needsMentor:true,sources:[],searchedLessons:21});
+ for(const text of ['사진을 올려 주시면 확인해 드릴게요.','이미지를 첨부해 주시면 분석해 드릴게요.','캡처를 보내 주시면 찾아 드릴게요.'])assert.equal(studentCapabilityAnswer({...answer,answer:text}).answer,studentImageHandoff);
+ for(const text of ['클로드에 제품 사진을 첨부하세요.','사진 확인은 멘토에게 질문에서 요청해 주세요.','사진은 90_첨부에 보관합니다.']){
+  const original={...answer,answer:text};assert.equal(studentCapabilityAnswer(original),original);
+ }
 });
