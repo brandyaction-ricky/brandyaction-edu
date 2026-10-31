@@ -70,5 +70,8 @@ test('invalid RPC, errors, oversized replies and malformed streams fall back wit
 });
 test('a stalled MCP request is aborted and leaves the curriculum-only path available',async t=>{
  const h=harness(t);global.fetch=async(_url,{signal})=>new Promise((_,reject)=>signal.addEventListener('abort',()=>reject(signal.reason),{once:true}));
+ // AbortSignal.timeout is unref'ed. A mocked fetch has no socket to keep Node
+ // alive, so retain a test-only handle until the real abort has been observed.
+ const keepAlive=setTimeout(()=>{},10_000);t.after(()=>clearTimeout(keepAlive));
  const start=Date.now();assert.deepEqual(await h.read('폴더 전체 보안 걱정',sources),[]);assert.ok(Date.now()-start<5000);
 });
