@@ -6,7 +6,7 @@ import { publicLessonBlocks, validateLessonBlocks, type LessonBlockDocument } fr
 import { answerFileSpec, matchesAnswerFile } from './lesson-files';
 type Db = ReturnType<typeof createAdminClient>;
 export type AiQuestion = { id: string; title: string; content: string; lesson_id?: string | null; course_id?: string | null; image_id?: string | null; answer_head_id?: string | null; is_resolved?: boolean; status?: string };
-export type QuestionAiReference = { lessonTitle: string | null; revision: string | null; truncated: boolean; imageIncluded: boolean; imageFirstFrame: boolean; contextMissing: boolean };
+export type QuestionAiReference = { lessonTitle: string | null; revision: string | null; truncated: boolean; imageIncluded: boolean; imageFirstFrame: boolean; contextMissing: boolean; sources?: {id:string;lessonId:string;title:string;revision:string|null;excerpt:string}[]; searchedLessons?:number; needsMentor?:boolean };
 export const questionContextLimit = 12000;
 export function lessonQuestionContext(input: { title: string; document?: LessonBlockDocument | null; body?: string | null; description?: string | null }) {
  const lines: string[] = [input.title];

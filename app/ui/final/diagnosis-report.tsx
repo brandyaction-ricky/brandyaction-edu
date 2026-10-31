@@ -6,6 +6,7 @@ import { ArrowRight, Check, CheckCircle2, ChevronDown, Clock3, Download, FileTex
 import type { DiagnosisReportStatus } from '@/lib/diagnosis-report';
 import { DiagnosisReportReader } from './diagnosis-report-reader';
 import './diagnosis-report.css';
+import theme from './diagnosis-report-theme.module.css';
 
 const endpoint = '/api/platform/diagnosis/report';
 const statusCopy = {
@@ -133,7 +134,7 @@ export function DiagnosisReportView({ userId, readyPushEnabled = false, onExit, 
     } finally { if (version === fileVersion.current) { setDownloading(false); setFetchingPreview(false); } }
   }
   const copy = status ? statusCopy[status.state] : null;
-  return <section className={`diagnosis-report${status ? ` is-${status.state}` : ''}`} aria-label="N6 검사 결과">
+  return <section className={`${theme.report} diagnosis-report${status ? ` is-${status.state}` : ''}`} aria-label="N6 검사 결과">
     {loading ? <div role="status" className="diagnosis-report-loading"><LoaderCircle className="diagnosis-spin"/><p>검사 결과를 확인하고 있어요.</p></div> : <>
       {status && <ReportProgress state={status.state}/>}
       {copy && <div className="diagnosis-report-summary">

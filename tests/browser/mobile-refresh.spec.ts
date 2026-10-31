@@ -1,13 +1,25 @@
 import { expect, test } from '@playwright/test';
 
 for (const screen of ['student', 'admin']) {
-  test(`${screen} mobile refresh fits the header and reloads the current URL`, async ({ page }, info) => {
+  test(`${screen} mobile refresh fits its navigation and reloads the current URL`, async ({ page }, info) => {
     if (screen === 'student') await page.route('**/api/platform?**', route => route.fulfill({ json: { user: { id: 'synthetic', full_name: '검증 회원', role: 'student' }, data: { review_videos: [] }, support: {} } }));
-    await page.goto(screen === 'student' ? '/public-data-test?publicScreen=stories' : '/admin-shell-test?refresh=1');
+    await page.goto(screen === 'student' ? '/public-data-test?publicScreen=my' : '/admin-shell-test?refresh=1');
     const refresh = page.getByRole('button', { name: '새로고침', exact: true });
-    for (const width of [320, 390, 720, 1440]) {
+    // Account refresh lives inside the mobile menu; learning/admin keep their header action.
+    const openStudentMenu = async () => {
+      if (screen !== 'student') return;
+      const menu = page.getByRole('button', { name: '메뉴 열기', exact: true });
+      if (await menu.getAttribute('aria-expanded') !== 'true') {
+        await expect(refresh).toHaveCount(0);
+        await menu.click();
+      }
+      await expect(menu).toHaveAttribute('aria-expanded', 'true');
+    };
+    const mobileWidth = screen === 'student' ? 680 : 720;
+    for (const width of [320, 390, 680, 720, 1440]) {
       await page.setViewportSize({ width, height: 844 });
-      if (width > 720) { await expect(refresh).toBeHidden(); continue; }
+      if (width > mobileWidth) { await expect(refresh).toBeHidden(); continue; }
+      await openStudentMenu();
       await expect(refresh).toBeVisible();
       const box = await refresh.boundingBox();
       expect(box!.height).toBeGreaterThanOrEqual(44);
@@ -19,6 +31,7 @@ for (const screen of ['student', 'admin']) {
     const originalURL = page.url();
     await Promise.all([page.waitForEvent('load'), refresh.click()]);
     expect(page.url()).toBe(originalURL);
+    await openStudentMenu();
     await expect(refresh).toBeVisible();
     // A real beforeunload listener must still be able to cancel a refresh.
     await page.evaluate(() => {
@@ -34,3 +47,11 @@ for (const screen of ['student', 'admin']) {
     await expect(refresh).toBeEnabled();
   });
 }
+
+// Public discovery deliberately omits the account/learning refresh control.
+test('public discovery keeps its menu without an account refresh action', async ({page})=>{
+ await page.goto('/public-data-test?publicScreen=stories');
+ await page.setViewportSize({width:390,height:844});
+ await expect(page.getByRole('button',{name:'새로고침',exact:true})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'메뉴 열기',exact:true})).toBeVisible();
+});

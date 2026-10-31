@@ -1,0 +1,11 @@
+import {createRoot} from 'react-dom/client';
+import {CurriculumAiConversation} from '../../../app/ui/final/curriculum-ai-conversation';
+import {QuestionHub} from '../../../app/ui/final/question-hub';
+import {QuestionEntry} from '../../../app/ui/final/question-entry';
+import {AdminAiUsage} from '../../../app/ui/final/admin-ai-usage';
+import '../../../app/ui/final/frontend.css';
+import '../../../app/ui/final/tokens.css';
+import '../../../app/ui/final/admin.css';
+const id='11111111-1111-4111-8111-111111111111';
+const changed=(state:{dirty:boolean;locked:boolean})=>{document.documentElement.dataset.locked=String(state.locked);};
+createRoot(document.getElementById('root')!).render(<main className="edu-front" style={{maxWidth:780,margin:'auto',padding:20}}><p>가상 문서 검수 · 실제 API 호출·학생 데이터 저장 없음</p><h1>수업 AI 질문</h1>{new URLSearchParams(location.search).has('hub')?<QuestionHub/>:new URLSearchParams(location.search).has('entry')?<QuestionEntry onCreated={()=>{document.documentElement.dataset.questionCreated='true';}}/>:<CurriculumAiConversation context={{enrollmentId:id,lessonId:id,label:'1일차 · 문샷 3기 · 고객 인터뷰',recent:true}} onStateChange={changed} onCreated={()=>{document.documentElement.dataset.questionCreated='true';}}/>}<hr/><AdminAiUsage/></main>);

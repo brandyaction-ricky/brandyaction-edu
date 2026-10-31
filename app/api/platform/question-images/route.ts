@@ -12,7 +12,7 @@ function failure(error: unknown) {
   const e = error as { message?: string; status?: number };
   if (e.status && e.status < 500) return reply({ error: e.message }, e.status);
   const known: Record<string, [string, number]> = {
-    BLOCK_FORBIDDEN: ['답변에 사진을 첨부할 권한이 없습니다.', 403], MESSAGE_FORBIDDEN: ['이미지를 이용할 권한이 없습니다.', 403], QUESTION_FORBIDDEN: ['첨부파일을 이용할 권한이 없습니다.', 403], QUESTION_NOT_FOUND: ['첨부파일을 찾지 못했습니다.', 404],
+    AI_FORBIDDEN: ['첨부 이미지를 이용할 권한이 없습니다.', 403], BLOCK_FORBIDDEN: ['답변에 사진을 첨부할 권한이 없습니다.', 403], MESSAGE_FORBIDDEN: ['이미지를 이용할 권한이 없습니다.', 403], QUESTION_FORBIDDEN: ['첨부파일을 이용할 권한이 없습니다.', 403], QUESTION_NOT_FOUND: ['첨부파일을 찾지 못했습니다.', 404],
     QUESTION_REQUEST_REUSED: ['다른 파일에 사용한 요청입니다. 파일을 다시 선택해 주세요.', 409],
     QUESTION_UPLOAD_LIMIT: ['오늘 이미지 첨부 횟수를 초과했습니다. 내일 다시 시도해 주세요.', 429], QUESTION_INVALID: ['첨부할 질문과 파일 형식을 확인해 주세요.', 400],
   };
@@ -66,8 +66,9 @@ export async function GET(request: Request) {
   try {
     const actor = await getAuthenticatedUser(); if (!actor) fail('로그인이 필요합니다.', 401);
     const params = new URL(request.url).searchParams, db = createAdminClient();
-    const { data: file, error } = await db.rpc(params.has('answer') ? 'edu_read_answer_image' : 'edu_read_question_image', { p_actor: actor.id, p_question: id(params.get('question')), ...(params.has('answer') ? { p_answer: id(params.get('answer')) } : {}) });
+    const { data: file, error } = await (params.has('ai') ? db.rpc('edu_ai_student_image', { p_actor:actor.id, p_request:id(params.get('ai')) }) : db.rpc(params.has('answer') ? 'edu_read_answer_image' : 'edu_read_question_image', { p_actor: actor.id, p_question: id(params.get('question')), ...(params.has('answer') ? { p_answer: id(params.get('answer')) } : {}) }));
     if (error) throw error;
+    if (!file || (params.has('ai') && !file.ready_at)) fail('첨부 이미지를 확인하지 못했습니다.',404);
     if (params.get('metadata') === '1') return reply({ id: file.id, name: file.name, size: file.size });
     const download = await db.storage.from(bucket).download(file.path);
     if (download.error) throw download.error;

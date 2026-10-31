@@ -20,7 +20,17 @@ export async function GET(request: Request) {
     }
     const access = await db.rpc('edu_question_contexts', { p_actor: user.id });
     if (access.error) throw access.error;
-    if (mode === 'contexts') return hubReply({ contexts: (access.data || []).map((c: { enrollment_id: string; lesson_id: string; label: string; recent: boolean }) => ({ enrollmentId: c.enrollment_id, lessonId: c.lesson_id, label: c.label, recent: c.recent })) });
+    if (mode === 'contexts') {
+      const contexts = (access.data || []) as { enrollment_id:string; lesson_id:string; label:string; recent:boolean }[];
+      const ids = [...new Set(contexts.map(c=>c.lesson_id))];
+      const dayNumbers = new Map<string,number>();
+      for(let start=0;start<ids.length;start+=200) {
+        const lessons=await db.from('curriculum_lessons').select('id,day_number').in('id',ids.slice(start,start+200));
+        if(lessons.error)throw lessons.error;
+        for(const lesson of lessons.data || []) if(Number.isInteger(lesson.day_number))dayNumbers.set(lesson.id,lesson.day_number);
+      }
+      return hubReply({contexts:contexts.map(c=>({enrollmentId:c.enrollment_id,lessonId:c.lesson_id,label:(dayNumbers.has(c.lesson_id)?dayNumbers.get(c.lesson_id)+'일차 · ':'')+c.label,recent:c.recent}))});
+    }
     if (mode !== 'mine') hubFail('조회 항목을 확인해 주세요.');
     let read = db.from('edu_questions').select('id,title,content,answer,status,is_resolved,created_at,learning_context,image_id,sharing_requested,category,visibility').eq('user_id', user.id).eq('is_archived', false).order('created_at', { ascending: false }).order('id').range(page * 20, page * 20 + 20);
     const target = hubId(params.get('question'), true); if (target) read = read.eq('id', target);
