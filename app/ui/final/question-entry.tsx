@@ -12,7 +12,7 @@ export function QuestionEntry({order,onCreated}:{order?:string|null;onCreated:()
  useEffect(()=>{if(!enabled)return;const abort=new AbortController();void questionRequest<{contexts:QuestionContext[]}>('/api/platform/question-hub?mode=contexts',undefined,abort.signal).then(data=>{setContexts(data.contexts);setReady(true);setError('');}).catch(()=>{if(!abort.signal.aborted){setError('수업 목록을 불러오지 못했어요. 다시 불러오거나 일반 문의를 남겨 주세요.');setReady(true);}});return()=>abort.abort();},[enabled,version]);
  if(!enabled)return <QuestionComposer order={order} onCreated={onCreated}/>;
  const context=contexts.find(c=>c.enrollmentId+':'+c.lessonId===chosen);
- function change(action:()=>void) {if(state.current.locked)return;if(state.current.dirty&&!window.confirm('수업이나 문의 종류를 바꾸면 작성 중인 질문·첨부·대화가 사라집니다. 바꿀까요?'))return;state.current={dirty:false,locked:false};action();}
+ function change(action:()=>void) {if(state.current.locked)return;if(state.current.dirty&&!window.confirm('수업이나 문의 종류를 바꾸면 아직 보내지 않은 질문·첨부가 사라집니다. 저장된 AI 대화는 남아 있어요. 바꿀까요?'))return;state.current={dirty:false,locked:false};action();}
  return <section className="question-entry" aria-label="질문할 수업 선택">
   <div className="row"><button type="button" className={'btn'+(!general?' primary':'')} aria-pressed={!general} onClick={()=>{if(general)change(()=>setGeneral(false));}}>수업 질문</button><button type="button" className={'btn'+(general?' primary':'')} aria-pressed={general} onClick={()=>{if(!general)change(()=>setGeneral(true));}}>일반·결제·계정 문의</button></div>
   {general?<QuestionComposer initialCategory="general" onStateChange={update} onCreated={onCreated}/>:<>

@@ -50,10 +50,10 @@ export function QuestionImagePicker({ enrollmentId, lessonId, locked, publicQues
   {busy && <p role="status">이미지를 올리고 있습니다.</p>}{ready && <p role="status">이미지 준비 완료. {ai ? 'AI 답변 받기를 누르면 이 캡처도 전달됩니다.' : `${noun}을 등록하면 함께 저장됩니다.`}</p>}{error && <p role="alert" className="form-error">{error}</p>}
  </div>;
 }
-export function QuestionImage({ questionId, imageId, answerId }: { questionId: string; imageId?: unknown; answerId?: string }) {
+export function QuestionImage({ questionId, imageId, answerId, aiRequestId }: { questionId: string; imageId?: unknown; answerId?: string; aiRequestId?: string }) {
  const noun = answerId ? '답변' : '질문';
  const [attempt, setAttempt] = useState(0), [failed, setFailed] = useState(false);
  if (process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED !== 'true' || !imageId) return null;
- const src = '/api/platform/question-images?' + new URLSearchParams({ question: questionId, ...(answerId ? { answer: answerId } : {}), attempt: String(attempt) });
+ const src = '/api/platform/question-images?' + new URLSearchParams({ ...(aiRequestId ? { ai:aiRequestId } : { question: questionId, ...(answerId ? { answer: answerId } : {}) }), attempt: String(attempt) });
  return <figure className="mt16" style={{ marginInline: 0 }}>{failed ? <p role="alert">{noun} 이미지를 불러오지 못했습니다. <button type="button" className="btn small" onClick={() => { setAttempt(v => v + 1); setFailed(false); }}>이미지 다시 보기</button></p> : <><a href={src} target="_blank" rel="noopener noreferrer" aria-label={`${noun} 이미지 크게 보기`}><img src={src} alt={`${noun} 첨부 이미지`} loading="lazy" onError={() => setFailed(true)} style={{ maxWidth: '100%', maxHeight: 400, objectFit: 'contain' }}/></a><figcaption className="meta">이미지를 누르면 크게 볼 수 있습니다.</figcaption></>}</figure>;
 }
