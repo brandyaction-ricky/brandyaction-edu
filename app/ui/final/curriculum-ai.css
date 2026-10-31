@@ -1,3 +1,65 @@
-.curriculum-ai{display:grid;gap:16px}.curriculum-ai .row{flex-wrap:wrap}.curriculum-ai-turns{display:grid;gap:12px}.curriculum-ai-turn{padding:16px;background:#f6f7f9;border:1px solid #e2e5e9;border-radius:12px;min-width:0;overflow-wrap:anywhere}.curriculum-ai-turn.user{background:#fff8f8}.curriculum-ai-turn p{white-space:pre-wrap;line-height:1.7}.curriculum-ai details{margin-top:8px}.curriculum-ai summary{cursor:pointer;min-height:44px;display:flex;align-items:center}.curriculum-ai textarea{width:100%;font-size:16px}.curriculum-ai form{display:grid;gap:12px}.ai-usage-table{overflow:auto}.ai-usage-table table{width:100%;border-collapse:collapse;min-width:720px}.ai-usage-table th,.ai-usage-table td{padding:12px;text-align:left;border-bottom:1px solid #e2e5e9}.ai-usage-table caption{text-align:left;padding:12px 0}
-
-.curriculum-ai-context{display:grid;gap:6px;padding:12px 16px;border:1px solid #e2e5e9;border-radius:10px;background:#f6f7f9;overflow-wrap:anywhere}.curriculum-ai-context span{font-size:14px;color:#555}.curriculum-ai textarea::placeholder,.question-composer textarea::placeholder{color:#858a94;opacity:1}.question-entry{display:grid;gap:16px}.question-entry select{width:100%;max-width:100%;font-size:16px}.question-entry .row{flex-wrap:wrap}
+.curriculum-ai{display:grid;gap:24px;padding:24px;border:1px solid #e2e5e9;border-radius:18px;background:#fff;color:#24272d;font-size:16px;line-height:1.7;min-width:0}
+.curriculum-ai p,.curriculum-ai h3,.my-ai-conversations h3,.my-ai-conversations h4,.my-ai-conversations p{margin:0}
+.curriculum-ai .row{flex-wrap:wrap;gap:10px}
+.curriculum-ai .curriculum-ai-switch{display:flex;gap:4px;padding:4px;background:#f2f3f5;border-radius:12px}
+.curriculum-ai .curriculum-ai-switch .btn{flex:1;min-height:44px;padding:10px 12px;border:0;border-radius:9px;background:transparent;color:#626874;font-size:14px;line-height:1.5;box-shadow:none}
+.curriculum-ai .curriculum-ai-switch .btn[aria-pressed=true]{background:#fff;color:#af2430;box-shadow:0 1px 4px #20242a14;font-weight:700}
+.curriculum-ai .curriculum-ai-switch .btn:disabled{opacity:.5}
+.curriculum-ai-body:not([hidden]){display:grid;gap:20px;min-width:0}
+.curriculum-ai-context{display:grid;gap:5px;padding:14px 16px;border-radius:12px;background:#f7f8fa;overflow-wrap:anywhere}
+.curriculum-ai-context b{font-size:12px;font-weight:500;color:#69717e}
+.curriculum-ai-context span{font-size:14px;font-weight:600;color:#343942;line-height:1.6}
+.curriculum-ai .curriculum-ai-guide{margin:0;border-bottom:1px solid #edf0f3;padding-bottom:16px;color:#626a76;font-size:13px;line-height:1.7}
+.curriculum-ai .curriculum-ai-guide summary{display:list-item;cursor:pointer;min-height:0;padding:4px 0;font-size:13px}
+.curriculum-ai-guide summary span{display:block;margin:3px 0 0 14px;font-size:12px;color:#69717e}
+.curriculum-ai-guide>div{display:grid;gap:10px;padding-top:12px}
+.curriculum-ai-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.curriculum-ai-toolbar h3{font-size:16px;line-height:1.5;font-weight:700}
+.curriculum-ai-toolbar p{margin-top:3px;color:#69717e;font-size:12px;line-height:1.6}
+.curriculum-ai .curriculum-ai-toolbar .btn{flex:none;min-height:40px;padding:8px 12px;font-size:12px;border-color:#e2e5e9;color:#505865}
+.curriculum-ai-older{justify-self:center}
+.curriculum-ai-turns{display:grid;gap:20px;min-width:0}
+.curriculum-ai-turns:empty{display:none}
+.curriculum-ai-turn{display:grid;gap:10px;padding:20px;background:#f6f7f9;border:1px solid #e9ecf0;border-radius:4px 16px 16px 16px;min-width:0;overflow-wrap:anywhere}
+.curriculum-ai-turn.user{width:min(92%,620px);justify-self:end;background:#fff5f4;border-color:#f3e3e2;border-radius:16px 4px 16px 16px}
+.curriculum-ai-speaker{font-size:12px;line-height:1.5;color:#626a76;font-weight:700}
+.curriculum-ai-turn.user .curriculum-ai-speaker{color:#a02b36}
+.curriculum-ai-turn p{white-space:pre-wrap;line-height:1.85;font-size:15px}
+.curriculum-ai small{font-size:12px;line-height:1.65;color:#626a76}
+.curriculum-ai-attachment{display:grid;gap:8px;margin-top:4px}
+.curriculum-ai-attachment figure{margin:0!important}
+.curriculum-ai-attachment img{display:block;max-width:100%;max-height:200px!important;border:1px solid #e2e5e9;border-radius:10px;background:#fff}
+.curriculum-ai-attachment figcaption{margin-top:6px;font-size:11px;line-height:1.6}
+.curriculum-ai-sources{display:grid;gap:8px;padding-top:12px;margin-top:2px;border-top:1px solid #e0e4e9}
+.curriculum-ai-sources details{padding:0 12px;background:#fff;border:1px solid #e2e5e9;border-radius:10px}
+.curriculum-ai-sources summary{cursor:pointer;min-height:44px;padding:10px 0;font-size:13px;line-height:1.7}
+.curriculum-ai-sources details[open]{padding-bottom:12px}
+.curriculum-ai-sources details p{font-size:13px;line-height:1.8;margin:8px 0}
+.curriculum-ai-empty{padding:24px 16px;text-align:center;border:1px dashed #dbe0e7;border-radius:12px;color:#626a76;font-size:14px;line-height:1.9}
+.curriculum-ai form.curriculum-ai-composer{display:grid;gap:14px;padding:20px;border:1px solid #dde2e8;border-radius:14px;background:#fff}
+.curriculum-ai-composer>.field{display:grid;gap:10px;margin:0;font-size:14px;font-weight:600}
+.curriculum-ai textarea{box-sizing:border-box;width:100%;min-height:112px;padding:14px 16px;border:1px solid #d5dbe3;border-radius:10px;background:#fafbfc;font-size:16px;font-weight:400;line-height:1.7;resize:vertical}
+.curriculum-ai textarea::placeholder,.question-composer textarea::placeholder{color:#858a94;opacity:1}
+.curriculum-ai-composer .question-image-picker{display:grid;gap:6px;margin:0;font-size:13px}
+.curriculum-ai-composer .question-image-picker>label{display:none}
+.curriculum-ai-composer .question-image-picker>.btn{justify-self:start;min-height:40px;font-size:13px;padding:8px 12px}
+.curriculum-ai-composer .question-image-picker>small{font-weight:400}
+.curriculum-ai-composer>.btn.primary{justify-self:stretch;min-height:48px;font-size:14px;border-radius:10px}
+.curriculum-ai :focus-visible,.my-ai-conversations :focus-visible{outline:2px solid #b82331;outline-offset:3px}
+.my-ai-conversations{display:grid;gap:20px;min-width:0}
+.my-ai-heading{display:grid;gap:6px}
+.my-ai-heading h3{font-size:18px;line-height:1.5}
+.my-ai-heading p{font-size:13px;line-height:1.7;color:#626a76}
+.my-ai-list{display:grid;gap:14px}
+.my-ai-list:empty{display:none}
+.my-ai-card{display:grid;gap:12px;padding:22px;border:1px solid #e2e5e9;border-radius:14px;background:#fff;min-width:0}
+.my-ai-card-meta{display:flex;justify-content:space-between;align-items:center;gap:12px;color:#69717e;font-size:12px}
+.my-ai-card-meta>span{padding:4px 8px;border-radius:6px;background:#f5f6f8;color:#5c6471;font-size:11px}
+.my-ai-card h4{font-size:16px;line-height:1.65;overflow-wrap:anywhere}
+.my-ai-last-question{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:#626a76;font-size:14px;line-height:1.75;overflow-wrap:anywhere}
+.my-ai-card .btn{justify-self:start;display:flex;gap:12px;min-height:44px;padding:9px 14px;border-radius:9px;font-size:13px;color:#a32633;border-color:#eed2d5;background:#fffafa}
+.my-ai-conversations>.btn{justify-self:start}
+.my-ai-conversations .curriculum-ai,.learning-question-dialog .curriculum-ai{padding:0;border:0;border-radius:0}
+.question-entry{display:grid;gap:16px}.question-entry select{width:100%;max-width:100%;font-size:16px}.question-entry .row{flex-wrap:wrap}
+.ai-usage-table{overflow:auto}.ai-usage-table table{width:100%;border-collapse:collapse;min-width:720px}.ai-usage-table th,.ai-usage-table td{padding:12px;text-align:left;border-bottom:1px solid #e2e5e9}.ai-usage-table caption{text-align:left;padding:12px 0}
+@media(max-width:600px){.curriculum-ai{padding:16px;gap:20px;border-radius:14px}.curriculum-ai-body:not([hidden]){gap:16px}.curriculum-ai-turn{padding:16px;gap:10px}.curriculum-ai-turn.user{width:96%}.curriculum-ai-turn p{font-size:15px}.curriculum-ai-toolbar{align-items:flex-start}.curriculum-ai .curriculum-ai-toolbar .btn{padding:8px;font-size:11px;min-height:40px}.curriculum-ai-toolbar h3{font-size:15px}.curriculum-ai-toolbar p{font-size:12px}.curriculum-ai form.curriculum-ai-composer{padding:14px;gap:12px}.my-ai-card{padding:16px}.my-ai-card h4{font-size:15px}.my-ai-card .btn{justify-self:stretch;justify-content:space-between}.curriculum-ai-attachment img{max-height:160px!important}}
