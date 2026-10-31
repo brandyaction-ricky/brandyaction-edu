@@ -1,6 +1,6 @@
 # Curriculum AI: technical setup and verification
 
-The feature searches all eligible published lessons in the enrollment's course locally, then sends up to six relevant text excerpts to the Responses API. It does not fine-tune a model or upload a persistent curriculum file. Student access excludes locked lessons and unpublished cohort material. Draft lesson versions, learner submissions and quiz answer keys are excluded. Text retrieval does not read words embedded only in lesson images or downloads; the mentor's existing verified question-image loader remains supported.
+The feature searches all eligible published lessons in the enrollment's course locally, then sends up to six relevant text excerpts to the Responses API. It does not fine-tune a model or upload a persistent curriculum file. Student access excludes locked lessons and unpublished cohort material. Draft lesson versions, learner submissions and quiz answer keys are excluded. Text retrieval does not read words embedded only in lesson images or downloads; a student's explicitly attached screenshot and the mentor's existing verified question-image loader are supported. Lesson images and downloads are not automatically read.
 
 ## Gates and persistence
 
@@ -33,3 +33,14 @@ First turn off the two deployment flags and restore the previous deployment. Res
 - Repository lint, typecheck, unit suite, build and all required remote browser shards/final verdict.
 
 Cost rates for `gpt-5-mini` were checked against https://developers.openai.com/api/docs/models/gpt-5-mini on 2026-10-30. Other configured models remain explicitly unpriced until their rate mapping is reviewed. Estimated USD is not an invoice.
+
+## Question entry and screenshots
+
+- In-lesson questions bind the current enrollment/lesson automatically and display its day and title. The separate Q&A write screen requires an explicit accessible lesson/day selection before opening the same AI/mentor conversation; general, account and payment questions remain available without a lesson. Changing scope confirms discarding an unsaved conversation or attachment and is blocked while a request/upload is in flight.
+- Gray examples are placeholders only; they are never submitted as question content.
+- With the existing question-image flag enabled, students can paste one screenshot into the AI question field or pick a file (up to 10MB). The existing private prepare/upload/verify pipeline is reused. Upload failure retains the text and blocks an incomplete send. A preview can be removed before asking. The chosen screenshot accompanies subsequent questions until removed; only that chosen image is sent, not past image history.
+- The server accepts only an image UUID, verifies owner, enrollment, lesson, ready state, size, signature and immutable SHA-256, then re-encodes the first frame with metadata removed and a 2048px bound. Arbitrary client URLs/base64 are not provider image inputs. Current access is checked before and after generation. Provider storage is disabled and image bytes do not enter the usage ledger. Uploaded originals remain in the existing private question-image storage; closing a conversation does not delete an upload.
+- Students are told that attached screenshots go to OpenAI and to redact personal information/passwords. Vision is a reading aid and may miss small or cropped text; missing curriculum evidence still requires mentor review. The same uploaded screenshot can accompany an explicitly reviewed private mentor handoff without uploading it again. No question or answer is automatically posted.
+- No new SQL or environment variable is required for this UI/server addition. Existing upload quotas and permission checks remain in force. Actual screenshot answer quality needs separately authorized DEV provider calls; synthetic tests do not establish that quality.
+
+References: [OpenAI image inputs](https://developers.openai.com/api/docs/guides/images-vision), [Supabase private storage download](https://supabase.com/docs/reference/javascript/storage-from-download).

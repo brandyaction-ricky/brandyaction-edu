@@ -5,11 +5,10 @@ export type AiSource = { id: string; lessonId: string; title: string; revision: 
 export type CurriculumLesson = { id: string; title: string; description?: string | null; revision?: string | null; document?: unknown; body_text?: string | null };
 export type CurriculumAnswer = { answer: string; needsMentor: boolean; sources: AiSource[]; searchedLessons: number };
 export const studentImageHandoff = '이 AI 대화는 텍스트 질문만 지원해요. 화면의 오류 문구나 막힌 부분을 글로 설명해 주세요. 사진 확인이 필요하면 ‘멘토에게 질문’에서 스크린샷을 첨부해 주세요. 비밀번호와 개인정보는 가려 주세요.';
-export function studentCapabilityAnswer(answer: CurriculumAnswer): CurriculumAnswer {
- // The student chat has no image input. Do not promise a future upload/analysis
- // even when the provider inferred that capability from a lesson's instructions.
+export function studentCapabilityAnswer(answer: CurriculumAnswer, imagesAvailable = false): CurriculumAnswer {
+ // Do not describe an absent image as if it had already been inspected.
  const imagePromise = /(?:사진|이미지|스크린샷|캡처)[\s\S]*?(?:올려\s*주|첨부해\s*주|보내\s*주|올리면|첨부하면)[\s\S]{0,600}?(?:알려\s*드릴|확인해\s*드릴|분석해\s*드릴|찾아\s*드릴|읽어\s*드릴|봐\s*드릴|안내해\s*드릴)/;
- return imagePromise.test(answer.answer) ? { ...answer, answer:studentImageHandoff, needsMentor:true, sources:[] } : answer;
+ return imagePromise.test(answer.answer) ? { ...answer, answer:imagesAvailable?'아직 이 질문에 캡처가 첨부되지 않았어요. 개인정보를 가린 화면을 입력란에 붙여넣거나 사진·화면 캡처 첨부로 올려 주세요. 이미지를 읽기 어렵거나 수업 자료만으로 확인할 수 없으면 멘토에게 질문할 수 있어요.':studentImageHandoff, needsMentor:true, sources:[] } : answer;
 }
 export type AiTurn = { role: 'user' | 'assistant'; text: string };
 export const aiFallback = '수업 자료에서 충분한 근거를 찾지 못했어요. 지금까지의 질문을 멘토에게 보내 주시면 확인해서 안내해 드릴게요.';

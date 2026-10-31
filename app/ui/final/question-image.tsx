@@ -6,9 +6,11 @@ async function post(body: unknown) {
  const response = await fetch('/api/platform/question-images', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(20000) });
  const result = await response.json(); if (!response.ok) throw new Error(result.error || '이미지를 올리지 못했습니다. 다시 시도해 주세요.'); return result;
 }
+export type ReadyQuestionImage = { id: string; name: string; preview: string };
 export type QuestionImagePickerHandle = { paste: (files: File[]) => void };
-export function QuestionImagePicker({ enrollmentId, lessonId, locked, publicQuestion = false, compact = false, answerQuestionId, changed, ref }: { enrollmentId: string | null; lessonId: string | null; locked: boolean; publicQuestion?: boolean; compact?: boolean; answerQuestionId?: string; changed: (id: string | null, busy: boolean, hasDraft: boolean) => void; ref?: Ref<QuestionImagePickerHandle> }) {
+export function QuestionImagePicker({ enrollmentId, lessonId, locked, publicQuestion = false, compact = false, answerQuestionId, initialImage, ai = false, changed, ref }: { enrollmentId: string | null; lessonId: string | null; locked: boolean; publicQuestion?: boolean; compact?: boolean; answerQuestionId?: string; initialImage?: ReadyQuestionImage; ai?: boolean; changed: (id: string | null, busy: boolean, hasDraft: boolean, image?: ReadyQuestionImage) => void; ref?: Ref<QuestionImagePickerHandle> }) {
  const noun = answerQuestionId ? '답변' : '질문';
+ const [inherited, setInherited] = useState(initialImage || null);
  const scope = answerQuestionId ? { purpose: 'answer', questionId: answerQuestionId } : {};
  const [selection, setSelection] = useState<{ file: File; request: string; preview: string } | null>(null), [busy, setBusy] = useState(false), [ready, setReady] = useState(false), [error, setError] = useState('');
  const gate = useRef(false), mounted = useRef(false), notify = useRef(changed);
@@ -28,24 +30,24 @@ export function QuestionImagePicker({ enrollmentId, lessonId, locked, publicQues
     const done = await post({ ...scope, action: 'complete', fileId: prepared.id });
     if (done.id !== next.request) throw new Error('이미지 등록 결과를 확인하지 못했습니다.');
    } else if (prepared.id !== next.request) throw new Error('이미지 등록 결과를 확인하지 못했습니다.');
-   if (mounted.current) { setReady(true); notify.current(next.request, false, true); }
+   if (mounted.current) { setReady(true); notify.current(next.request, false, true, {id:next.request,name:next.file.name,preview:next.preview}); }
   } catch (e) { if (mounted.current) { setError((e as Error).message); notify.current(null, false, true); } }
   finally { gate.current = false; if (mounted.current) setBusy(false); }
  }
  function choose(file?: File) {
   if (!file || locked || gate.current) return;
   try { answerFileSpec(file.name, file.size, 'image'); } catch (e) { setError((e as Error).message); return; }
-  const next = { file, request: crypto.randomUUID(), preview: URL.createObjectURL(file) }; setSelection(next); void upload(next);
+  const next = { file, request: crypto.randomUUID(), preview: URL.createObjectURL(file) }; setInherited(null); setSelection(next); void upload(next);
  }
- function remove() { if (locked || gate.current) return; setSelection(null); setReady(false); setError(''); notify.current(null, false, false); }
+ function remove() { if (locked || gate.current) return; setSelection(null); setInherited(null); setReady(false); setError(''); notify.current(null, false, false); }
  useImperativeHandle(ref, () => ({ paste(files) {
   if (locked || gate.current || !files.length) return;
   if (files.length !== 1) { setError(`${noun} 이미지는 한 장씩 붙여넣어 주세요.`); return; }
   choose(files[0]);
  } }));
  return <div className="field question-image-picker"><label>{noun} 이미지 (선택)<input ref={input} hidden={compact} type="file" accept="image/png,image/jpeg,image/webp,image/gif" disabled={locked || busy} onChange={e => { choose(e.target.files?.[0]); e.target.value = ''; }}/></label>{compact && <button type="button" className="btn" disabled={locked || busy} onClick={() => input.current?.click()}>사진·화면 캡처 첨부</button>}<small>{compact ? `이미지 한 장, 최대 10MB. 복사한 화면은 ${noun} 입력란에 붙여 넣어도 됩니다.` : <>JPG·PNG·WEBP·GIF 한 장, 최대 10MB. 복사한 이미지는 {noun} 입력란에 붙여넣을 수 있습니다. {publicQuestion ? '전체 공개 질문의 이미지는 같은 기수 수강생도 볼 수 있습니다.' : '본인과 담당 운영자만 볼 수 있습니다.'}</>}</small>
-  {selection && <figure><img src={selection.preview} alt={`첨부할 ${noun} 이미지`} style={{ maxWidth: '100%', maxHeight: 280, objectFit: 'contain' }}/><figcaption style={{ overflowWrap: 'anywhere' }}>{selection.file.name}</figcaption><div className="row mt16"><button type="button" className="btn small" disabled={locked || busy} onClick={remove}>이미지 빼기</button>{!ready && !busy && <button type="button" className="btn small" disabled={locked} onClick={() => void upload(selection)}>이미지 다시 올리기</button>}</div></figure>}
-  {busy && <p role="status">이미지를 올리고 있습니다.</p>}{ready && <p role="status">이미지 준비 완료. {noun}을 등록하면 함께 저장됩니다.</p>}{error && <p role="alert" className="form-error">{error}</p>}
+  {(selection || inherited) && <figure><img src={selection?.preview || inherited!.preview} alt={`첨부할 ${noun} 이미지`} style={{ maxWidth: '100%', maxHeight: 280, objectFit: 'contain' }}/><figcaption style={{ overflowWrap: 'anywhere' }}>{selection?.file.name || inherited!.name}</figcaption><div className="row mt16"><button type="button" className="btn small" disabled={locked || busy} onClick={remove}>이미지 빼기</button>{selection && !ready && !busy && <button type="button" className="btn small" disabled={locked} onClick={() => void upload(selection)}>이미지 다시 올리기</button>}</div></figure>}
+  {busy && <p role="status">이미지를 올리고 있습니다.</p>}{ready && <p role="status">이미지 준비 완료. {ai ? 'AI 답변 받기를 누르면 이 캡처도 전달됩니다.' : `${noun}을 등록하면 함께 저장됩니다.`}</p>}{error && <p role="alert" className="form-error">{error}</p>}
  </div>;
 }
 export function QuestionImage({ questionId, imageId, answerId }: { questionId: string; imageId?: unknown; answerId?: string }) {
