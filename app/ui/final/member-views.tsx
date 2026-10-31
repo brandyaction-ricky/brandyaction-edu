@@ -37,7 +37,6 @@ import { cohortLessonVisible, cohortWeekVisible } from '@/lib/cohort-curriculum-
 import {
   ArrowRight,
   BookOpen,
-  CalendarDays,
   ChevronRight,
   Download,
   FileText,
@@ -472,22 +471,6 @@ function Dashboard({
           {!returned.length && !todo.length && (
             <p className="panel-body muted">지금 처리할 미션이 없습니다.</p>
           )}
-        </section>
-        <section className="panel member-agenda">
-          <div className="panel-head">
-            <h2>다가오는 일정</h2>
-            <CalendarDays />
-          </div>
-          {participating.map((e) => (
-            <LiveSchedule key={e.id} data={data} cohortId={t(e, "cohort_id")} />
-          ))}
-          {!rows(data, "cohort_sessions").some((s) =>
-            participating.some((e) => s.cohort_id === e.cohort_id),
-          ) && <p className="panel-body muted">지금 확인할 일정이 없습니다. 새 일정이 등록되면 이곳에서 확인할 수 있습니다.</p>}
-          <Link className="member-agenda-link" href="/my/orders">
-            신청·주문 내역 확인
-            <ArrowRight />
-          </Link>
         </section>
       </div>
       {(!blockLearningEnabled || active.length !== 1) && <section className="member-classes">
@@ -964,7 +947,7 @@ function Coupons({ data }: { data: Data }) {
             <article className="coupon" key={c.id}>
               <div className="coupon-content">
                 <Badge color="red">
-                  {date(c.expires_at || coupon.ends_at)}까지
+                  {c.status === "used" ? "사용 완료" : c.status === "revoked" ? "회수됨" : c.expires_at || coupon.ends_at ? `${date(c.expires_at || coupon.ends_at)}까지` : "사용 기한 안내 없음"}
                 </Badge>
                 <strong className="mt16">
                   {coupon.discount_type === "percentage"
@@ -976,7 +959,7 @@ function Coupons({ data }: { data: Data }) {
                 <p>
                   코드 · {String(coupon.code || "")}
                   <br />
-                  결제 단계에서 적용 조건을 확인하세요.
+                  {c.status === "used" ? "사용을 완료한 쿠폰입니다." : c.status === "revoked" ? "회수된 쿠폰입니다." : "결제 단계에서 적용 조건을 확인하세요."}
                 </p>
                 <Link className="btn small mt16" href="/classes">
                   클래스 보기
@@ -991,7 +974,7 @@ function Coupons({ data }: { data: Data }) {
       </div>
       {!list.length && <Empty title="해당하는 쿠폰이 없습니다." />}
       <div className="notice mt24">
-        결제 화면에서 쿠폰 코드를 입력하세요. 쿠폰마다 사용 기간과 적용 조건이 다를 수 있으니 결제창에서 할인 금액을 확인해 주세요.
+        {tab === "available" ? "결제 화면에서 쿠폰 코드를 입력하세요. 쿠폰마다 사용 기간과 적용 조건이 다를 수 있으니 결제창에서 할인 금액을 확인해 주세요." : tab === "used" ? "이미 사용한 쿠폰 내역입니다." : "회수된 쿠폰 내역입니다."}
       </div>
     </>
   );
@@ -1145,8 +1128,7 @@ function Profile({
               </label>
             </div>
           </div>
-        </section>
-        <div className="between mt24">
+        <div className="member-profile-actions">
           <button
             className="btn ghost"
             type="button"
@@ -1161,10 +1143,11 @@ function Profile({
           </button>
         </div>
         {message && (
-          <p className="notice mt16" role="status">
+          <p className="notice member-profile-status" role="status">
             {message}
           </p>
         )}
+        </section>
       </form>
       <LoginEmailSettings email={user.email} />
       {(process.env.NEXT_PUBLIC_EDU_PERSONALIZATION_CONSENT_ENABLED === 'true' || process.env.NEXT_PUBLIC_EDU_CONSENT_REWARD_ENABLED === 'true') && <PersonalizationSettings/>}
@@ -1230,7 +1213,7 @@ function Reviews({
       {tab === "write" ? (
         <>
           {active.map((e) => (
-            <article className="order-card" key={e.id}>
+            <article className="order-card member-review-invite" key={e.id}>
               <div className="order-card-body">
                 <div className="row-text">
                   <Badge color="green">수강 확인</Badge>
@@ -1240,10 +1223,11 @@ function Reviews({
                       "title",
                     )}
                   </h3>
-                  <p>내 업무에 적용한 경험을 남겨 주세요.</p>
+                  <p>배우기 전과 달라진 점이나 직접 해본 일을 들려주세요.</p>
+                  <small>짧은 경험도 다음 수강생의 선택에 도움이 됩니다.</small>
                 </div>
-                <button className="btn small" onClick={() => setSelected(e.id)}>
-                  후기 작성
+                <button className="btn primary" onClick={() => setSelected(e.id)}>
+                  내 경험 남기기<ArrowRight aria-hidden="true"/>
                 </button>
               </div>
             </article>
@@ -1359,7 +1343,7 @@ export function MemberViews({
               )}
             </div>
           ))}
-          {hasMemberResources(data) && <Link className="btn mb24" href="/my/resources"><Download/> 수강 자료·구매 파일 받기</Link>}
+          {hasMemberResources(data) && <div className="member-resource-cta"><Link className="btn primary" href="/my/resources"><Download/> 수강 자료·구매 파일 받기</Link></div>}
           {!enrollments.length && (
             <Empty title="신청한 클래스가 없습니다.">
               <Link href="/classes">클래스 찾아보기</Link>

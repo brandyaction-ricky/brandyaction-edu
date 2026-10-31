@@ -609,7 +609,7 @@ export function Platform({
             </nav>
           )}
           <div className="header-user">
-            {(account || learning) && <MobileRefresh />}
+            {learning && <MobileRefresh />}
             {user ? (
               <>
                 {learning && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' ? <LearningQuestionShortcut key={routeKey} context={questionContext}/> : <Link className="link header-questions" href={admin ? "/admin/questions" : "/my/questions"}>질문·답변</Link>}
@@ -669,6 +669,7 @@ export function Platform({
               </Link>
             ))}
             <Link href="/my">마이페이지</Link>
+            {account && <MobileRefresh />}
           </nav>
         )}
       </header>

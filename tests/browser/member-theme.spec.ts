@@ -38,6 +38,20 @@ for (const section of ['classes', 'missions', 'orders', 'coupons', 'reviews', 'p
     await expect(nav).toBeVisible();
     await expect(nav.locator('a[aria-current="page"]')).toHaveAttribute('href', `/my/${section}`);
     await expect(nav.locator('a[aria-current="page"]')).toHaveCSS('color', 'rgb(201, 35, 45)');
+    const aside = page.locator('.account-aside');
+    await expect(aside).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+    await expect(aside).toHaveCSS('border-top-width', '1px');
+    await expect(aside).toHaveCSS('border-radius', '8px');
+    const panel = (await aside.boundingBox())!, content = (await page.locator('.account-main').boundingBox())!;
+    if (info.project.name === 'desktop') {
+      expect(Math.abs(panel.width - 208)).toBeLessThan(2);
+      expect(content.x - panel.x - panel.width).toBeGreaterThanOrEqual(31);
+    } else {
+      await expect(nav).toHaveCSS('overflow-x', 'auto');
+      expect(content.y - panel.y - panel.height).toBeGreaterThanOrEqual(15);
+      await nav.locator('a[aria-current="page"]').focus();
+      await expect(nav.locator('a[aria-current="page"]')).toBeFocused();
+    }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: info.outputPath(`member-${section}.png`), fullPage: true });
   });
