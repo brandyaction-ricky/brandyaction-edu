@@ -1,0 +1,3 @@
+.question-image-dropzone{position:relative;min-width:0}
+.question-image-drop-hint{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:20px;border:2px dashed var(--brand,#c91e2c);border-radius:12px;background:rgba(255,248,249,.96);color:#8e1721;pointer-events:none;text-align:center;line-height:1.6}
+.question-image-drop-hint strong{font-size:18px}.question-image-drop-hint span{font-size:14px}

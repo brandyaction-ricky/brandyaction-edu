@@ -67,3 +67,38 @@ test('direct question entry requires an explicit lesson, prevents mixing drafts 
  await page.goto('/curriculum-ai-test?hub=1');await page.getByRole('tab',{name:'질문하기',exact:true}).click();const select=page.getByRole('combobox',{name:'질문할 수업·일차'});await expect(select).toHaveValue('');await expect(page.getByRole('textbox',{name:'궁금한 점'})).toHaveCount(0);await select.selectOption(id+':'+id);const input=page.getByRole('textbox',{name:'궁금한 점'});await input.fill('1일차 작성 중');page.once('dialog',d=>d.dismiss());await select.selectOption(id+':'+other.lessonId);await expect(input).toHaveValue('1일차 작성 중');await expect(select).toHaveValue(id+':'+id);
  page.once('dialog',d=>d.accept());await select.selectOption(id+':'+other.lessonId);await expect(input).toHaveValue('');await input.fill('16일차 새 질문');await page.getByRole('button',{name:'AI 답변 받기',exact:true}).click();await expect(input).toHaveValue('');expect(h.ai[0].lessonId).toBe(other.lessonId);expect(h.questions).toHaveLength(0);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.getByRole('button',{name:'멘토에게 질문',exact:true}).click();await page.getByRole('button',{name:'질문 등록',exact:true}).click();await page.getByRole('tab',{name:'내 질문',exact:true}).waitFor();await page.getByRole('tab',{name:'질문하기',exact:true}).click();await expect(select).toHaveValue('');expect(h.questions[0].lessonId).toBe(other.lessonId);
 });
+
+async function dragQuestionFiles(page:Page,type:string,{mentor=false,names=['화면 캡처.png'],oversize=false,text=false}={}){
+ return page.getByRole('textbox',{name:mentor?'질문 내용':'궁금한 점',exact:true}).evaluate((el,args)=>{
+  const dt=new DataTransfer();
+  if(args.text)dt.setData('text/plain','드래그한 글');
+  else for(const name of args.names)dt.items.add(new File([args.oversize?new Uint8Array(10*1024*1024+1):Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jxjQAAAAASUVORK5CYII='),c=>c.charCodeAt(0))],name,{type:name.endsWith('.pdf')?'application/pdf':'image/png'}));
+  const event=new DragEvent(args.type,{dataTransfer:dt,bubbles:true,cancelable:true});el.dispatchEvent(event);return event.defaultPrevented;
+ },{type,names,oversize,text});
+}
+test('file drag highlights the question area, clears on leaving and leaves text drags alone',async({page})=>{
+ const h=await backend(page),files=await screenshotUpload(page);await page.goto('/curriculum-ai-test');
+ expect(await dragQuestionFiles(page,'dragenter',{text:true})).toBe(false);await expect(page.getByText('사진·화면 캡처를 여기에 놓으세요')).toHaveCount(0);
+ expect(await dragQuestionFiles(page,'dragenter')).toBe(true);await expect(page.getByText('사진·화면 캡처를 여기에 놓으세요')).toBeVisible();
+ // Crossing descendants must not dismiss the drop target while still inside it.
+ await dragQuestionFiles(page,'dragenter');await dragQuestionFiles(page,'dragleave');await expect(page.getByText('사진·화면 캡처를 여기에 놓으세요')).toBeVisible();
+ await dragQuestionFiles(page,'dragleave');await expect(page.getByText('사진·화면 캡처를 여기에 놓으세요')).toHaveCount(0);
+ expect(await dragQuestionFiles(page,'drop',{text:true})).toBe(false);expect(files.uploads).toHaveLength(0);expect(h.ai).toHaveLength(0);expect(h.questions).toHaveLength(0);
+});
+test('dropping a screenshot uploads once, preserves the question and cannot replace an in-flight attachment',async({page},info)=>{
+ const h=await backend(page,{delay:400}),files=await screenshotUpload(page,{delay:400});const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('/curriculum-ai-test');
+ const input=page.getByRole('textbox',{name:'궁금한 점'});await input.fill('화면의 오류가 왜 생기나요?');await dragQuestionFiles(page,'dragenter');await page.screenshot({path:info.outputPath('screenshot-drop-target.png')});expect(await dragQuestionFiles(page,'drop')).toBe(true);
+ await expect(page.getByText('이미지를 올리고 있습니다.')).toBeVisible();expect(await dragQuestionFiles(page,'drop',{names:['다른 사진.png']})).toBe(true);await expect(page.getByRole('button',{name:'AI 답변 받기',exact:true})).toBeDisabled();
+ await expect(page.getByText('이미지 준비 완료.',{exact:false})).toBeVisible();await expect(page.getByRole('img',{name:'첨부할 질문 이미지'})).toBeVisible();await expect(input).toHaveValue('화면의 오류가 왜 생기나요?');expect(files.uploads).toHaveLength(2);expect(files.puts).toEqual(['PUT']);expect(h.ai).toHaveLength(0);
+ await page.getByRole('button',{name:'AI 답변 받기',exact:true}).click();expect(await dragQuestionFiles(page,'drop',{names:['답변 대기 중.png']})).toBe(true);await expect(page.getByText(answer.answer,{exact:true})).toBeVisible();expect(h.ai[0].imageId).toBe(files.uploads[0].requestId);expect(files.uploads).toHaveLength(2);
+ await page.getByRole('button',{name:'이미지 빼기'}).click();await expect(page.getByRole('img',{name:'첨부할 질문 이미지'})).toHaveCount(0);expect(errors).toEqual([]);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+test('mentor accepts a dropped screenshot, rejects invalid replacements and locks drops after an uncertain save',async({page})=>{
+ const h=await backend(page),files=await screenshotUpload(page);await page.goto('/curriculum-ai-test');await page.getByRole('button',{name:'멘토에게 질문',exact:true}).click();const input=page.getByRole('textbox',{name:'질문 내용',exact:true});await input.fill('멘토에게 캡처를 보냅니다');
+ expect(await dragQuestionFiles(page,'drop',{mentor:true})).toBe(true);await expect(page.getByText('이미지 준비 완료.',{exact:false})).toBeVisible();expect(h.questions).toHaveLength(0);
+ await dragQuestionFiles(page,'drop',{mentor:true,names:['잘못된 파일.pdf']});await expect(page.getByRole('alert')).toContainText(/JPG|PNG/);
+ await dragQuestionFiles(page,'drop',{mentor:true,names:['하나.png','둘.png']});await expect(page.getByRole('alert')).toContainText('한 장씩');
+ await dragQuestionFiles(page,'drop',{mentor:true,oversize:true});await expect(page.getByRole('alert')).toContainText('10MB');await expect(input).toHaveValue('멘토에게 캡처를 보냅니다');await expect(page.getByRole('img',{name:'첨부할 질문 이미지'})).toBeVisible();expect(files.uploads).toHaveLength(2);
+ await page.route('**/api/platform/question-hub',route=>{h.questions.push(route.request().postDataJSON());return route.fulfill({status:503,json:{error:'등록 결과 미확인'}});});await page.getByRole('button',{name:'질문 등록',exact:true}).click();await expect(page.getByRole('button',{name:'등록 결과 다시 확인'})).toBeVisible();
+ expect(h.questions[0].imageId).toBe(files.uploads[0].requestId);expect(await dragQuestionFiles(page,'drop',{mentor:true,names:['잠금 중.png']})).toBe(true);expect(files.uploads).toHaveLength(2);await expect(input).toHaveValue('멘토에게 캡처를 보냅니다');expect(h.questions).toHaveLength(1);
+});
