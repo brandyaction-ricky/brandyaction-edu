@@ -52,7 +52,8 @@ test('AI answer generation fetches the question server-side and returns an unreg
   const provider = route.reads.find(item => item.url === 'https://api.openai.com/v1/responses');
   assert.ok(provider);
   const payload = JSON.parse(provider.options.body);
-  assert.equal(payload.model, 'gpt-5-mini');
+  assert.equal(payload.model, 'gpt-6.1-terra');
+  assert.deepEqual(payload.reasoning, {effort:'low'});
   assert.equal(payload.store, false);
   assert.match(payload.input, /질문 본문/);
   assert.equal(route.reads.find(item => item.id === questionId)?.['is_archived'], false);

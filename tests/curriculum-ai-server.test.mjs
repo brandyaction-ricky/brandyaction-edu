@@ -3,7 +3,7 @@ import {loadTs} from './helpers/question-ai.mjs';
 const id='11111111-1111-4111-8111-111111111111';
 function harness(t,{beginError=null,afterRevoked=false,contextChanged=false,providerStatus=200,badCitation=false,usage=true,answerText='고객의 경험을 묻는 열린 질문을 작성해 주세요.',mode='student',image,imageId,imageDenied=false,persist=false,cached=false}={}){
  const rpc=[],writes=[],providers=[],lessons=[{id,title:'고객 인터뷰',body_text:'고객 질문은 열린 질문으로 작성합니다.',revision:null}];let asserts=0,contextReads=0;
- const priorKey=process.env.OPENAI_API_KEY;process.env.OPENAI_API_KEY='fixture-only';t.after(()=>{if(priorKey===undefined)delete process.env.OPENAI_API_KEY;else process.env.OPENAI_API_KEY=priorKey;});
+ const priorKey=process.env.OPENAI_API_KEY,priorModel=process.env.OPENAI_MODEL;process.env.OPENAI_API_KEY='fixture-only';delete process.env.OPENAI_MODEL;t.after(()=>{if(priorKey===undefined)delete process.env.OPENAI_API_KEY;else process.env.OPENAI_API_KEY=priorKey;if(priorModel===undefined)delete process.env.OPENAI_MODEL;else process.env.OPENAI_MODEL=priorModel;});
  const previous=global.fetch;t.after(()=>global.fetch=previous);
  global.fetch=async(url,options)=>{providers.push({url,body:JSON.parse(options.body)});return Response.json({status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({answer:answerText,needsMentor:false,sourceIds:[badCitation?'FAKE':'S1']})}]}],...(usage?{usage:{input_tokens:100,output_tokens:20,input_tokens_details:{cached_tokens:0}}}:{})},{status:providerStatus});};
  const db={rpc(name,args){rpc.push({name,args});let result={data:null,error:null};
@@ -18,9 +18,15 @@ function harness(t,{beginError=null,afterRevoked=false,contextChanged=false,prov
 }
 test('generation uses authorised curriculum as user data, stores no provider response, records usage and never publishes a mentor answer',async t=>{
  const h=harness(t),result=await h.run();assert.equal(result.sources[0].lessonId,id);assert.equal(h.providers.length,1);
- const body=h.providers[0].body;assert.equal(body.store,false);assert.equal(body.tools,undefined);assert.doesNotMatch(body.instructions,/ignore all rules/);assert.match(body.input[0].content[0].text,/ignore all rules/);assert.equal(body.text.format.type,'json_schema');
+ const body=h.providers[0].body;assert.equal(body.model,'gpt-6.1-terra');assert.deepEqual(body.reasoning,{effort:'low'});assert.equal(body.store,false);assert.equal(body.tools,undefined);assert.doesNotMatch(body.instructions,/ignore all rules/);assert.match(body.input[0].content[0].text,/ignore all rules/);assert.equal(body.text.format.type,'json_schema');
  assert.ok(h.writes.some(w=>w.table==='edu_ai_calls'&&w.data.status==='succeeded'&&w.data.input_tokens===100));assert.ok(h.writes.some(w=>w.table==='edu_ai_requests'&&w.data.status==='succeeded'));
  assert.ok(h.writes.every(w=>['edu_ai_calls','edu_ai_requests'].includes(w.table)));assert.doesNotMatch(JSON.stringify(h.writes),/고객의 경험|ignore all rules|fixture-only/);
+});
+test('student, mentor and batch use the Terra model and record its matching token estimate',async t=>{
+ for(const mode of ['student','mentor','batch'])await t.test(mode,async sub=>{
+  const h=harness(sub,{mode});await h.run();assert.equal(h.providers[0].body.model,'gpt-6.1-terra');
+  const recorded=h.writes.find(w=>w.table==='edu_ai_calls'&&w.data.status==='succeeded');assert.equal(recorded.data.estimated_usd,0.0002);assert.equal(recorded.data.rates.input,1);
+ });
 });
 test('rate limits and unauthorised requests never reach the paid provider',async t=>{const h=harness(t,{beginError:'AI_LIMIT'});await assert.rejects(h.run,e=>e.message==='AI_LIMIT');assert.equal(h.providers.length,0);assert.equal(h.writes.length,0);});
 test('revoked access or withdrawn source after generation prevents returning content and marks the request failed',async t=>{
