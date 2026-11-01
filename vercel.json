@@ -3,6 +3,7 @@
   "framework": "nextjs",
   "git": {
     "deploymentEnabled": {
+      "codex/edu-ai-staff-dev-20261101": false,
       "codex/edu-readable-dev-integration-20261027": false,
       "codex/edu-readable-view-20261027": false,
       "codex/edu-synthetic-cohort-refresh": false,
