@@ -6,6 +6,7 @@ const assets=new Map(output.outputFiles.map(f=>['/'+f.path.split('/').at(-1),f.c
 const fixture=await build({entryPoints:['tests/campus-fixture/data.ts'],bundle:true,write:false,format:'esm',platform:'node'});
 const {student,admin}=await import('data:text/javascript;base64,'+Buffer.from(fixture.outputFiles[0].text).toString('base64'));
 const server=createServer((req,res)=>{const url=new URL(req.url,'http://localhost');res.setHeader('Cache-Control','no-store');if(req.method!=='GET'){res.writeHead(405).end();return;}
+if(url.pathname==='/api/campus/focus'){res.writeHead(404,{'Content-Type':'application/json'}).end(JSON.stringify({error:'준비 중'}));return;}
 if(url.pathname==='/api/campus'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify(url.searchParams.has('enrollmentId')?student:{...student,selectedEnrollmentId:null,lessons:[]}));return;}
 if(url.pathname==='/api/campus/admin'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify(url.searchParams.has('cohortId')?admin:{schemaVersion:1,cohorts:[{id:admin.cohort.id,name:admin.cohort.name,courseTitle:admin.cohort.courseTitle}]}));return;}
 if(assets.has(url.pathname)){res.setHeader('Content-Type',url.pathname.endsWith('.css')?'text/css':'text/javascript');res.end(assets.get(url.pathname));return;}
