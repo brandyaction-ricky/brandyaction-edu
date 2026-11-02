@@ -1,0 +1,71 @@
+'use client';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { ArrowUpRight, ArrowRight, Orbit, Rocket, RefreshCw, Check, Flag, Target, MessageCircle, Download, X, Clock3, CircleHelp } from 'lucide-react';
+import type { CampusSnapshot } from '../contracts';
+import type { CampusAdminSnapshot } from '../admin-metrics';
+import { learnerMetrics } from '../learner-metrics';
+import { downloadProgressCard } from './progress-card';
+import styles from './dashboard.module.css';
+
+export function CampusFrame({ children, demo = false, admin = false }: { children: React.ReactNode; demo?: boolean; admin?: boolean }) {
+  return <div className={styles.root}><header className={styles.header}><Link href={demo ? '/' : '/my/classes'} className={styles.brand}><Orbit size={27} /> MOONSHOT <span>CAMPUS</span></Link><span className={styles.private}>{admin ? '운영 워크스페이스' : '나의 성장 워크스페이스'}</span></header>
+    {demo && <div className={styles.demo}>화면 검수용 · 모든 이름과 수치는 가상 예시입니다. 실제 회원 기록·발송·결제와 연결되지 않습니다.</div>}
+    <main className={styles.main}>{children}</main><footer className={styles.footer}>BRANDYACTION EDU <span>배운 것을, 내 일의 성과로.</span></footer></div>;
+}
+export function LearnerDashboard({ snapshot, onOpen, onRefresh, onSelect, demo = false }: {
+  snapshot: CampusSnapshot; onOpen: (lessonId: string, missionId?: string) => void;
+  onRefresh: () => void; onSelect: (id: string) => void; demo?: boolean;
+}) {
+  const metrics = learnerMetrics(snapshot);
+  const [filter, setFilter] = useState('all');
+  const [report, setReport] = useState(false);
+  useEffect(() => {
+    if(!report)return;
+    const dialog=document.querySelector<HTMLElement>('[aria-labelledby="progress-card-title"]');
+    const close=(event:KeyboardEvent)=>{
+      if(event.key==='Escape'){setReport(false);return;}
+      if(event.key==='Tab'&&dialog){const nodes=Array.from(dialog.querySelectorAll<HTMLElement>('button,a[href],input'));const first=nodes[0],last=nodes.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}}
+    };
+    document.addEventListener('keydown',close);
+    return()=>{document.removeEventListener('keydown',close);document.querySelector<HTMLElement>('[data-progress-trigger]')?.focus();};
+  },[report]);
+  const selected = snapshot.scopes.find(s => s.enrollmentId === snapshot.selectedEnrollmentId);
+  const steps = metrics.steps.filter(s => filter === 'all' || (filter === 'revision' ? s.status === 'revision' : s.status === 'complete'));
+  const action = metrics.nextActions[0];
+  return <>
+    <div className={styles.heading}><div><span className={styles.eyebrow}>MY MOONSHOT</span><h1>{snapshot.viewer.displayName}님의 다음 도약</h1><p>어디까지 왔는지 확인하고, 오늘의 실행을 이어가세요.</p></div><div className={styles.tools}>
+      <label className={styles.srOnly} htmlFor="campus-scope">내 수강 기수</label><select id="campus-scope" value={snapshot.selectedEnrollmentId || ''} onChange={e => onSelect(e.target.value)}><option value="" disabled>기수 선택</option>{snapshot.scopes.map(s => <option key={s.enrollmentId} value={s.enrollmentId}>{s.courseTitle} · {s.cohortName}</option>)}</select>
+      <button onClick={onRefresh} aria-label="학습 기록 새로고침"><RefreshCw size={17}/></button></div></div>
+    {!snapshot.scopes.length ? <div className={styles.empty}><h2>이용 가능한 수업을 확인해 주세요</h2><p>수강권이 연결되면 이곳에서 나의 미션과 실행 기록을 확인할 수 있어요.</p><Link href="/my/classes">내 클래스 보기</Link></div> : <>
+    <section className={styles.hero}><div className={styles.heroCopy}><div className={styles.badge}><span/> {selected?.cohortName || '나의 과정'} · 실행 여정</div><h2>배움이 쌓이면,<br/><em>나의 결과물이 됩니다.</em></h2><p>강의 완료부터 과제 제출, 피드백 반영까지.<br/>내 실행 기록을 따라 다음 한 걸음을 찾아보세요.</p><button data-progress-trigger className={styles.lightButton} onClick={() => setReport(true)}>내 성장 카드 보기 <ArrowUpRight size={18}/></button></div>
+      <div className={styles.orbitGraphic} aria-label={`필수 과제 승인 ${metrics.approvedRequired}개 / ${metrics.totalRequired}개`}><div className={styles.orbitRing}/><div className={styles.orbitRing2}/><div className={styles.planet}/><Rocket className={styles.rocket} strokeWidth={1} size={83}/><div className={styles.orbitNumber}><strong>{metrics.approvalPercent === null ? '—' : `${metrics.approvalPercent}%`}</strong><span>필수 과제 승인율</span><small>{metrics.approvedRequired} / {metrics.totalRequired}개 승인</small></div></div></section>
+    <div className={styles.stats}><Stat label="완료한 수업" value={`${metrics.completedLessons} / ${metrics.totalLessons}`} note="수업 완료 표시 기준" icon={<Check/>}/><Stat label="승인받은 필수 과제" value={`${metrics.approvedRequired} / ${metrics.totalRequired}`} note="현재 공개된 필수 과제 기준" icon={<Flag/>}/><Stat label="피드백 대기" value={String(metrics.submittedCount)} note="제출 후 검토를 기다리는 과제" icon={<MessageCircle/>}/><Stat label="다듬을 과제" value={String(metrics.revisionCount)} note="수정 요청 또는 재제출 필요" icon={<Target/>}/></div>
+    <div className={styles.columns}><section className={styles.panel}><div className={styles.sectionHead}><div><span className={styles.eyebrow}>NEXT MOVE</span><h2>지금, 이 한 걸음부터</h2></div><ArrowUpRight/></div>
+      {action ? <div className={styles.nextAction}><span className={styles.pill}>{action.kind === 'revision' ? '피드백 반영 우선' : '다음 실행 추천'}</span><h3>{action.day}일차 · {action.title}</h3><p>{action.description}</p><button className={styles.primary} onClick={() => onOpen(action.lessonId, action.missionId)}>이어서 실행하기 <ArrowRight size={17}/></button></div> : <div className={styles.nextAction}><h3>{metrics.unknownCount ? '확인이 필요한 과제가 있어요' : metrics.submittedCount ? '피드백을 기다리고 있어요' : metrics.totalLessons ? '지금 할 일을 모두 확인했어요' : '공개 수업 준비 중이에요'}</h3><p>새로 공개되는 수업과 피드백을 확인해 주세요.</p></div>}
+      <p className={styles.small}>수정 요청 → 시작하지 않은 필수 과제 → 미완료 수업 순으로 안내해요.</p></section>
+      <section className={styles.panel}><div className={styles.sectionHead}><div><span className={styles.eyebrow}>SMALL WINS</span><h2>실행으로 얻은 이정표</h2></div><Orbit/></div><div className={styles.milestones}>{metrics.milestones.map(m => <div className={m.earned ? styles.earned : styles.milestone} key={m.id}><div className={styles.milestoneIcon}>{m.earned ? <Check size={18}/> : <Flag size={18}/>}</div><div><strong>{m.title}</strong><p>{m.description}</p></div><small>{m.earned ? '달성' : '도전 중'}</small></div>)}</div></section></div>
+    <section className={styles.panel}><div className={styles.sectionHead}><div><span className={styles.eyebrow}>MISSION PATH</span><h2>나의 미션 지도</h2><p>일차를 눌러 수업과 과제를 이어가세요. 먼저 끝난 날도 자유롭게 다시 볼 수 있어요.</p></div><div className={styles.tabs} role="group" aria-label="미션 상태 필터">{[['all','전체'],['revision','수정 필요'],['complete','완료']].map(([value,label]) => <button key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>{label}</button>)}</div></div>
+      <div className={styles.lessonGrid}>{steps.map(step => <button className={styles.lesson} key={step.lessonId} onClick={() => onOpen(step.lessonId)}><div className={styles.lessonTop}><b>DAY {String(step.day).padStart(2,'0')}</b><span className={styles[step.status] || styles.pill}>{({revision:'수정 필요',waiting:'검토 대기',ready:'실행 준비',complete:'완료',not_started:'시작 전',in_progress:'진행 중',unknown:'확인 필요'})[step.status]}</span></div><h3>{step.title}</h3><span className={styles.small}>필수 과제 {step.approvedRequired} / {step.totalRequired} 승인</span><div className={styles.track}><span style={{width:`${step.totalRequired ? step.approvedRequired/step.totalRequired*100 : 0}%`}}/></div><span className={styles.lessonLink}>수업 열기 <ArrowUpRight size={15}/></span></button>)}</div>{!steps.length && <p className={styles.empty}>이 상태의 수업이 없습니다.</p>}</section>
+    <details className={styles.definitions}><summary><CircleHelp size={16}/> 지표는 어떻게 계산하나요?</summary><p>수업 완료는 학습 화면의 완료 표시, 과제 승인은 최신 제출 건의 검토 상태입니다. 공개 과제가 바뀌면 전체 개수도 달라집니다. 승인율은 매출·실력·수료 여부를 뜻하지 않습니다. 동료 피드백을 포함한 로켓 발사 조건은 아직 연결되지 않았습니다.</p><p>집계 시점: {new Date(snapshot.fetchedAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})} KST · 매출·고객 확보·시간 절감은 현재 수집하지 않습니다.</p></details>
+    </>}
+    {report && <div className={styles.scrim} onClick={() => setReport(false)}><section className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="progress-card-title" onClick={e => e.stopPropagation()}><button className={styles.close} autoFocus aria-label="성장 카드 닫기" onClick={() => setReport(false)}><X/></button><span className={styles.eyebrow}>MY PROGRESS, MY PROOF</span><h2 id="progress-card-title">나의 실행 기록</h2><p>개인 보관용 성장 카드예요. 공개 게시 없이 파일로 저장합니다.</p><pre>{demo ? '[가상 예시 · 검수용]\n' : ''}{metrics.reportText}</pre><button className={styles.primary} onClick={() => downloadProgressCard(snapshot, demo)}><Download size={17}/> 성장 카드 이미지 저장</button><p className={styles.small}>수료증이나 사업 성과 인증서가 아닙니다.</p></section></div>}
+  </>;
+}
+function Stat({label,value,note,icon}:{label:string;value:string;note:string;icon:React.ReactNode}) {return <div className={styles.stat}><div className={styles.statLabel}>{label}{icon}</div><strong>{value}</strong><p>{note}</p></div>;}
+
+export function AdminDashboard({ snapshot, onRefresh }: { snapshot: CampusAdminSnapshot; onRefresh: () => void }) {
+  const [filter,setFilter] = useState('submitted');
+  const m = snapshot.metrics;
+  const queue = snapshot.queue.filter(q => filter === 'all' || (filter === 'revision' ? q.status !== 'submitted' : q.status === 'submitted'));
+  return <>
+    <div className={styles.heading}><div><span className={styles.eyebrow}>MISSION CONTROL</span><h1>실행이 멈추지 않도록.</h1><p>{snapshot.cohort.courseTitle} · {snapshot.cohort.name}의 과제 진행과 지원 현황입니다.</p></div><button className={styles.secondary} onClick={onRefresh}><RefreshCw size={16}/> 새로고침</button></div>
+    <section className={styles.adminHero}><div><span className={styles.badge}>COHORT PULSE</span><h2>{m.pendingOver2Days > 0 ? `${m.pendingOver2Days}건의 제출물이 이틀 이상 기다리고 있어요.` : '오늘의 피드백 흐름을 확인하세요.'}</h2><p>지원이 필요한 순간을 먼저 보고, 기다림을 줄여 주세요.</p></div><div className={styles.adminBig}><strong>{m.pendingReviews}</strong><span>검토 대기 과제</span></div></section>
+    <div className={styles.stats}><Stat label="현재 수강 가능" value={`${m.activeLearners}명`} note="활성 회원·유효 수강권 기준" icon={<Orbit/>}/><Stat label="필수 과제 제출 경험" value={`${m.participatingLearners}명`} note={`${m.activeLearners}명 중 · 제출 건수와 다름`} icon={<Flag/>}/><Stat label="필수 과제 전체 승인" value={`${m.allApprovedLearners}명`} note={`${m.requiredMissions}개 필수 과제 기준`} icon={<Check/>}/><Stat label="수정 요청 대상" value={`${m.revisionLearners}명`} note="최신 과제에 수정·재제출 필요" icon={<MessageCircle/>}/></div>
+    <section className={styles.panel}><div className={styles.sectionHead}><div><span className={styles.eyebrow}>LESSON SIGNALS</span><h2>어느 일차에서 실행이 느려질까요?</h2><p>각 수업의 필수 과제 기준 · 막대는 현재 수강 가능한 인원 대비 전체 승인 인원</p></div></div><div className={styles.tableWrap}><table><caption className={styles.srOnly}>일차별 과제 진행 현황</caption><thead><tr><th>수업</th><th>제출 경험</th><th>전체 승인</th><th>검토 대기</th><th>수정 필요</th><th>제출 전</th></tr></thead><tbody>{snapshot.lessons.map(l => <tr key={l.id}><th><span className={styles.small}>DAY {l.day} · 필수 {l.requiredMissions}개</span><strong>{l.title}</strong><div className={styles.track}><span style={{width:`${m.activeLearners ? l.approvedLearners/m.activeLearners*100 : 0}%`}}/></div></th><td>{l.submittedLearners}명</td><td>{l.approvedLearners}명</td><td>{l.waitingLearners}명</td><td>{l.revisionLearners}명</td><td>{l.notStartedLearners}명</td></tr>)}</tbody></table></div><p className={styles.small}>한 사람이 여러 과제 상태에 포함될 수 있어 열별 인원을 합산하지 않습니다. 제출 전을 이탈로 단정하지 않습니다.</p></section>
+    <section className={styles.panel}><div className={styles.sectionHead}><div><span className={styles.eyebrow}>CARE QUEUE</span><h2>먼저 챙길 피드백</h2><p>오래 기다린 제출물부터 확인하세요. 알림이나 답변은 자동 발송하지 않습니다.</p></div><div className={styles.tabs} role="group" aria-label="지원 목록 필터">{[['submitted','검토 대기'],['revision','수정 요청'],['all','전체']].map(([v,l]) => <button aria-pressed={filter === v} key={v} onClick={() => setFilter(v)}>{l}</button>)}</div></div>
+      <div className={styles.queue}>{queue.map(q => <div key={q.enrollmentId+q.missionId} className={styles.queueItem}><span className={styles.avatar}>{q.displayName.slice(0,1)}</span><div><strong>{q.displayName}</strong><p>{q.lessonTitle} · {q.missionTitle}</p></div><span className={styles.pill}><Clock3 size={13}/>{q.status === 'submitted' ? q.waitingDays === null ? '대기 시간 미확인' : `${q.waitingDays}일 대기` : '수정 요청'}</span><Link href="/admin/reviews">검토 화면 <ArrowUpRight size={15}/></Link></div>)}</div>{!queue.length && <p className={styles.empty}>{snapshot.queueTotal > snapshot.queue.length ? '현재 표시된 목록에는 이 상태의 항목이 없습니다. 전체 항목은 검토 화면에서 확인해 주세요.' : '이 상태의 지원 항목이 없습니다.'}</p>}<p className={styles.small}>전체 지원 항목 {snapshot.queueTotal}건 · 표시 {snapshot.queue.length}건 (현재 필터 {queue.length}건)</p></section>
+    <details className={styles.definitions}><summary><CircleHelp size={16}/> 집계 범위와 해석</summary>{snapshot.definitions.map(d => <p key={d}>{d}</p>)}<p>집계 시점 {new Date(snapshot.fetchedAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})} KST. 매출·고객 확보·시간 절감은 이 화면에서 측정하지 않습니다.</p></details>
+  </>;
+}
+export { styles as campusStyles };
