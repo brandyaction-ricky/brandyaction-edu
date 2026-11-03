@@ -24,6 +24,7 @@ test('two real browser tabs see each other, arbitrate a seat, exchange and delet
 });
 
 test('focus supports 25/50/free, pause/resume, 3/5 minute breaks and reload',async({page})=>{
+ await page.emulateMedia({reducedMotion:'reduce'});
  await page.clock.install({time:new Date('2026-11-03T00:00:00Z')});await page.goto('/space');await page.getByLabel('공간 화면',{exact:true}).selectOption('classic');await light(page);
  await page.getByRole('button',{name:'집중 시작',exact:true}).click();await page.clock.fastForward(60_000);await expect(page.getByLabel('집중 타이머',{exact:true})).toHaveText('24:00');
  await page.getByRole('button',{name:'잠시 멈추기',exact:true}).click();await page.clock.fastForward(90_000);await expect(page.getByLabel('집중 타이머',{exact:true})).toHaveText('24:00');await page.reload();await page.getByLabel('공간 화면',{exact:true}).selectOption('classic');await light(page);await expect(page.getByLabel('집중 타이머',{exact:true})).toHaveText('24:00');

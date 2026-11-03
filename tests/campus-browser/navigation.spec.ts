@@ -62,3 +62,22 @@ test('cancelled navigation keeps an unsaved space note',async({page})=>{
  await expect(page.getByLabel('나만 보는 메모',{exact:true})).toHaveValue('아직 저장하지 않은 메모');
  await expect(page.getByRole('heading',{name:'문샷 공간',exact:true})).toBeVisible();
 });
+
+test('a known enrollment opens with one authorized snapshot request',async({page})=>{
+ const requests:string[]=[];page.on('request',r=>{if(new URL(r.url()).pathname==='/api/campus')requests.push(r.url());});
+ const snapshot=await(await page.request.get('/api/campus')).json();const id=snapshot.scopes[0].enrollmentId;
+ await page.goto('/workspace-live?enrollmentId='+id+'&section=journal');
+ await expect(page.getByRole('heading',{name:'나의 실행 수첩'})).toBeVisible();
+ expect(requests).toHaveLength(1);expect(new URL(requests[0]).searchParams.get('enrollmentId')).toBe(id);
+});
+test('browser back restores the enrollment as well as the section',async({page})=>{
+ await page.goto('/workspace-scope-test');const select=page.getByLabel('학습 공간 기수',{exact:true});const first=await select.inputValue();
+ await select.selectOption('00000000-0000-4000-8000-000000000102');
+ await expect(page).toHaveURL(/enrollmentId=00000000-0000-4000-8000-000000000102/);
+ await page.goBack();await expect(select).toHaveValue(first);await expect(page).toHaveURL(url=>url.searchParams.get('enrollmentId')===first);
+});
+test('slow space loading offers a usable fallback instead of a blank screen',async({page})=>{
+ await page.goto('/space?view=immersive');await expect(page.getByRole('status').filter({hasText:'나의 문샷 공간을 열고 있어요'})).toBeVisible();
+ await page.getByRole('button',{name:'가벼운 화면으로 시작',exact:true}).click();
+ await expect(page.getByRole('navigation',{name:'문샷 공간 선택'})).toBeVisible();await expect(page.locator('iframe')).toHaveCount(0);
+});
