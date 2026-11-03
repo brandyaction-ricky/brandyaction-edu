@@ -8,12 +8,14 @@ import {attachStudyScene,STUDY_ACTIVITY_TARGETS} from './vendor/study-scene.js';
 import {drawAvatarNameplate} from './vendor/avatar-nameplate.js';
 import {drawAvatarSpeech} from './vendor/avatar-chat.js';
 import {acceptsHost,toWire,visiblePeers,appearance} from './contract.mjs';
+import {createFrameBudget} from './frame-budget.mjs';
 import {createRenderQuality} from '../src/render-quality.mjs';
 
 const token=new URLSearchParams(location.hash.slice(1)).get('bridge')||'';
 const root=document.getElementById('office'),status=document.getElementById('status');
 let office,scene,editor,ready=false,started=false,timer,restorePerformance,closed=new Set(),lastPosition='',lastSent=0;
 const speech=new Map(),pending=new Map();
+let wakeWorld=()=>{};
 const send=(type,payload={})=>{if(token.length>=32&&parent!==window)parent.postMessage({source:'moonshot-world',token,type,payload},location.origin);};
 const say=text=>{status.textContent=text;};
 const sections={focus:'desk',mission:'mission',feedback:'board',lounge:'chat',launch:'launch'};
@@ -28,6 +30,7 @@ function moveZone(id){
   root.focus({preventScroll:true});
 }
 function handle(type,p={}){
+  wakeWorld();
   if(type==='profile'){
     office.campusIdentity={...office.campusIdentity,...appearance(p),displayId:String(p.name||'문샷 동료').slice(0,24),gender:p.gender==='female'?'female':'male',coat:/^#[0-9a-f]{6}$/i.test(p.coat)?p.coat:'#527086'};
     office.draw();
@@ -71,7 +74,13 @@ async function start(){
     // Reuse the EDU measured-quality policy, and do no GPU work in hidden tabs.
     const quality=createRenderQuality(devicePixelRatio,innerWidth<600),render=office.gl.render;
     let tier='',previous=0;
-    const visible=()=>{office.setVisible(!document.hidden);if(document.hidden)office.pauseCampusInput();else office.resumeCampusInput();previous=0;};
+    const budget=createFrameBudget(),originalFrame=office.frame;
+    wakeWorld=()=>budget.wake(performance.now());wakeWorld();
+    const activity=event=>{if(event.type!=='pointermove'||event.buttons)wakeWorld();};
+    const events=['keydown','keyup','pointerdown','pointermove','pointerup','wheel'];
+    for(const type of events)window.addEventListener(type,activity,{passive:true});
+    office.frame=function(now){const moving=!!this.campusAvatar?.moving||!!this.campusInputState?.keys?.length||!!this.campusInputState?.jumping;if(budget.shouldDraw(now,{moving,hidden:document.hidden}))return originalFrame.call(this,now);};
+    const visible=()=>{office.setVisible(!document.hidden);if(document.hidden)office.pauseCampusInput();else{office.resumeCampusInput();wakeWorld();}previous=0;};
     office.gl.render=function(...args){
       if(document.hidden)return;
       const before=performance.now(),gap=previous?before-previous:0;previous=before;
@@ -80,7 +89,7 @@ async function start(){
       root.dataset.renderQuality=settings.name;return result;
     };
     document.addEventListener('visibilitychange',visible);visible();
-    restorePerformance=()=>{document.removeEventListener('visibilitychange',visible);office.gl.render=render;};
+    restorePerformance=()=>{document.removeEventListener('visibilitychange',visible);office.gl.render=render;office.frame=originalFrame;wakeWorld=()=>{};for(const type of events)window.removeEventListener(type,activity);};
     office.campusIdentity={displayId:'문샷 동료',level:0};
     root.addEventListener('campus-room-change',event=>{root.dataset.room=event.detail.roomId;if(event.detail.roomId==='office')say('나만의 사무공간 · 실제 AI 직원 연결은 준비 중이에요.');});
     ready=true;root.dataset.ready='true';
