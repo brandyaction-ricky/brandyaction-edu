@@ -15,7 +15,7 @@ async function rows(query: PromiseLike<ReadResult>): Promise<Row[]> {
 }
 const ids = (values: unknown[]) => [...new Set(values.map(String))];
 
-export async function loadCampusSnapshot(db: Database, viewer: { id: string; full_name?: string | null }, enrollmentId: string | null, now = Date.now()) {
+export async function loadCampusSnapshot(db: Database, viewer: { id: string; full_name?: string | null }, enrollmentId: string | null, now = Date.now(), getVisibilityDb: () => Pick<Database, 'from'> | Promise<Pick<Database, 'from'>> = async () => (await import('@/lib/supabase/admin')).createAdminClient()) {
   const enrollments = (await rows(db.from('enrollments')
     .select('id,user_id,course_id,cohort_id,status,revoked_at,access_starts_at,access_ends_at', { count: 'exact' })
     .eq('user_id', viewer.id).eq('status', 'active').limit(200))).filter(e => hasLearningAccess(e, now));
@@ -28,10 +28,13 @@ export async function loadCampusSnapshot(db: Database, viewer: { id: string; ful
   const scope = scopes.find(s => s.enrollmentId === enrollmentId);
   if (enrollmentId && !scope) campusError(403, '현재 이용 가능한 수강권을 선택해 주세요.');
   if (!scope) return campusSnapshot({ viewer, scopes, enrollmentId: null, now });
+  // Publication overrides intentionally have no student SELECT grant. Only read
+  // this verified owner's cohort with the server client; content stays under RLS.
+  const visibilityDb=await getVisibilityDb();
   const [allWeeks,weekVisibility,lessonVisibility]=await Promise.all([
     rows(db.from('curriculum_weeks').select('id,course_id,is_published,archived_at',{count:'exact'}).eq('course_id',scope.courseId).eq('is_published',true).is('archived_at',null).limit(500)),
-    rows(db.from('edu_cohort_week_visibility').select('cohort_id,week_id,is_published',{count:'exact'}).eq('cohort_id',scope.cohortId).limit(500)),
-    rows(db.from('edu_cohort_lesson_visibility').select('cohort_id,lesson_id,is_published',{count:'exact'}).eq('cohort_id',scope.cohortId).limit(500)),
+    rows(visibilityDb.from('edu_cohort_week_visibility').select('cohort_id,week_id,is_published',{count:'exact'}).eq('cohort_id',scope.cohortId).limit(500)),
+    rows(visibilityDb.from('edu_cohort_lesson_visibility').select('cohort_id,lesson_id,is_published',{count:'exact'}).eq('cohort_id',scope.cohortId).limit(500)),
   ]);
   const visibility={curriculum_weeks:allWeeks,edu_cohort_week_visibility:weekVisibility,edu_cohort_lesson_visibility:lessonVisibility};
   const weeks=allWeeks.filter(w=>cohortWeekVisible(visibility,scope.cohortId,w));
