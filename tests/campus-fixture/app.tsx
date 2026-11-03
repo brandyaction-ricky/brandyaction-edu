@@ -1,4 +1,7 @@
 import React, { useState } from 'react';
+import {WebinarRoom} from '../../features/campus/webinar/room';
+import {WebinarAdmin} from '../../features/campus/webinar/admin';
+import {event as webinarEvent} from '../webinar-fixture/data';
 import { createRoot } from 'react-dom/client';
 import { CampusFrame, LearnerDashboard, AdminDashboard } from '../../features/campus/ui/dashboard';
 import { LearnerLive, AdminLive } from '../../features/campus/ui/live';
@@ -13,6 +16,8 @@ import {SupportAdminPanel} from '../../features/campus/support/admin-panel';
 import {PublicReview} from '../../features/campus/business/public-review';
 import {CampusWorkspace} from '../../features/campus/ui/workspace';
 function App(){const [mode,setMode]=useState('student');const [notice,setNotice]=useState('');
+if(location.pathname==='/webinar')return <WebinarRoom event={{...webinarEvent,youtubeId:new URLSearchParams(location.search).has('video')?'abcdefghijk':''}} demo={!new URLSearchParams(location.search).has('api')}/>;
+if(location.pathname==='/webinar-admin')return <WebinarAdmin/>;
 if(location.pathname==='/workspace-scope-test')return <ScopeFixture/>;
 if(location.pathname==='/community-live')return <CampusFrame demo><CommunityPanel snapshot={student} demo={false}/></CampusFrame>;
 if(location.pathname==='/archive-live')return <PersonalArchive/>;
