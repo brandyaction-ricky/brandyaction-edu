@@ -11,8 +11,8 @@ test('imported world loads locally; movement, camera, EDU seat and fallback work
  await expect(world.locator('#office')).toHaveAttribute('data-ready','true',{timeout:30000});
  // Capture real child -> host position messages; no renderer internals are faked.
  await page.evaluate(()=>{(window as typeof window & {moves:unknown[]}).moves=[];window.addEventListener('message',e=>{if(e.data?.type==='position')(window as typeof window & {moves:unknown[]}).moves.push(e.data.payload);});});
- await page.getByRole('button',{name:'캠퍼스 입장',exact:true}).click();
- await expect(page.getByRole('button',{name:'공간 나가기',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'동료와 함께하기',exact:true}).click();
+ await expect(page.getByRole('button',{name:'동료 연결 끊기',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'3인칭',exact:true}).click();
  await expect(world.locator('#office')).toHaveAttribute('data-study-camera','third');
  if(info.project.name==='mobile'){
@@ -51,7 +51,7 @@ test('original twelve character models, palette and props preview, save and reop
  test.setTimeout(120000);const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto('/space');await expect(page.getByLabel('공간 화면',{exact:true})).toHaveValue('office');
  const world=page.frameLocator('iframe[title="문샷 우주선 3D 공간"]');await expect(world.locator('#office')).toHaveAttribute('data-ready','true',{timeout:30000});
- await page.getByRole('button',{name:'캠퍼스 입장',exact:true}).click();await expect(page.getByRole('button',{name:'공간 나가기',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'동료와 함께하기',exact:true}).click();await expect(page.getByRole('button',{name:'동료 연결 끊기',exact:true})).toBeVisible();
  await world.getByRole('button',{name:'캐릭터 꾸미기',exact:true}).click();const dialog=world.getByRole('dialog',{name:'캐릭터 꾸미기',exact:true});await expect(dialog).toBeVisible();
  for(const gender of ['male','female']){await dialog.getByLabel('캐릭터 유형',{exact:true}).selectOption(gender);for(let model=0;model<6;model++){await dialog.getByLabel('외형 스타일',{exact:true}).selectOption(String(model));await expect(world.locator('#avatar-preview')).toHaveAttribute('data-model',`${gender}:${model}`);}}
  await dialog.getByLabel('캐릭터 유형',{exact:true}).selectOption('male');await dialog.getByLabel('외형 스타일',{exact:true}).selectOption('0');await dialog.getByLabel('닉네임',{exact:true}).fill('문샷 동료');

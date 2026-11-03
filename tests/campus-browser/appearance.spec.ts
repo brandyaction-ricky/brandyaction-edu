@@ -28,7 +28,7 @@ test('workspace navigation and journal controls have explicit readable text',asy
 });
 
 test('saved night desk keeps labels, timer and inputs readable',async({page})=>{
- await page.goto('/space');await page.getByRole('button',{name:'캠퍼스 입장',exact:true}).click();
+ await page.goto('/space');await page.getByRole('button',{name:'동료와 함께하기',exact:true}).click();
  await page.getByLabel('공간 화면',{exact:true}).selectOption('classic');
  await page.getByRole('tab',{name:'내 자리',exact:true}).click();await page.getByLabel('내 집중 책상 분위기',{exact:true}).selectOption('night');await page.getByRole('button',{name:'내 자리 저장',exact:true}).click();
  await page.getByRole('tab',{name:'집중과 휴식',exact:true}).click();

@@ -1,3 +1,4 @@
+import {attachCameraControls} from './camera-controls.mjs';
 import {attachSpatialActions} from './spatial-actions.mjs';
 import {attachAppearanceEditor} from './appearance-editor.mjs';
 import * as CampusPlan from './vendor/campus-plan.js';
@@ -14,7 +15,7 @@ import {createRenderQuality} from '../src/render-quality.mjs';
 
 const token=new URLSearchParams(location.hash.slice(1)).get('bridge')||'';
 const root=document.getElementById('office'),status=document.getElementById('status');
-let office,scene,editor,spatialActions,uiBlocked=false,ready=false,started=false,timer,restorePerformance,closed=new Set(),lastPosition='',lastSent=0;
+let office,scene,camera,editor,spatialActions,uiBlocked=false,ready=false,started=false,timer,restorePerformance,closed=new Set(),lastPosition='',lastSent=0;
 const speech=new Map(),pending=new Map();
 let wakeWorld=()=>{};
 const send=(type,payload={})=>{if(token.length>=32&&parent!==window)parent.postMessage({source:'moonshot-world',token,type,payload},location.origin);};
@@ -41,7 +42,7 @@ function handle(type,p={}){
   else if(type==='progress'){
     office.campusIdentity={...office.campusIdentity,level:Number.isSafeInteger(p.level)?Math.max(0,p.level):0};office.draw();
   }else if(type==='peers')scene.setParticipants(visiblePeers(p.items));
-  else if(type==='camera'){scene.setCameraMode(p.mode==='third'?'third':'overall');root.focus({preventScroll:true});}
+  else if(type==='camera'){camera?.set(p.mode==='first'?'first':p.mode==='third'?'third':'overall');closeGuide();root.focus({preventScroll:true});}
   else if(type==='zone')moveZone(p.id);
   else if(type==='controls')closed=new Set(Array.isArray(p.closedZones)?p.closedZones:[]);
   else if(type==='seat'){
@@ -72,7 +73,8 @@ async function start(){
     attachOfficeEnvironment(office,root);
     attachAvatarAppearance(office);
     attachCampusNavigation(office,root,{initialRoom:'study',reduceMotion:matchMedia('(prefers-reduced-motion: reduce)').matches});
-    scene=attachStudyScene({office,root,onInteract:interact});scene.setRoom('study');
+    camera=attachCameraControls({office,root,onChange:mode=>{document.getElementById('third-view').disabled=office.getCampusRoom()!=='study';document.getElementById('third-view').textContent=mode==='third'?'1인칭으로 보기':'3인칭으로 보기';say(mode==='overall'?'전체 지도 · 공간 이름을 누르면 바로 열려요.':mode==='third'?'3인칭 · 내 캐릭터를 따라 이동해요.':'1인칭 · 캐릭터의 눈높이에서 바라봐요.');}});
+    scene=attachStudyScene({office,root,onInteract:interact});scene.setRoom('study');camera.connect(scene);
     if(new URLSearchParams(location.hash.slice(1)).get('spatial')==='1'){document.body.classList.add('spatial-ui');spatialActions=attachSpatialActions({office,root,onAction:id=>{office.pauseCampusInput();office.resumeCampusInput();interact(id);},isClosed:id=>closed.has(id)});}
     editor=attachAppearanceEditor(office,send);document.getElementById('appearance-open').disabled=false;
     // Reuse the EDU measured-quality policy, and do no GPU work in hidden tabs.
@@ -96,7 +98,7 @@ async function start(){
     restorePerformance=()=>{document.removeEventListener('visibilitychange',visible);office.gl.render=render;office.frame=originalFrame;wakeWorld=()=>{};for(const type of events)window.removeEventListener(type,activity);};
     office.campusIdentity={displayId:'문샷 동료',level:0};
     root.addEventListener('campus-room-change',event=>{root.dataset.room=event.detail.roomId;if(event.detail.roomId==='office')say('나만의 사무공간 · 실제 AI 직원 연결은 준비 중이에요.');});
-    ready=true;root.dataset.ready='true';
+    ready=true;root.dataset.ready='true';document.getElementById('map-view').disabled=false;document.getElementById('third-view').disabled=false;
     for(const[type,payload]of pending)handle(type,payload);pending.clear();
     say(document.body.classList.contains('spatial-ui')?'책상이나 공간 이름을 눌러 시작해 보세요.':'WASD · 방향키 · 바닥 클릭 이동 / E 가까운 공간 열기');send('ready');
     timer=setInterval(()=>{
@@ -118,8 +120,11 @@ window.addEventListener('message',event=>{
 });
 const guide=document.getElementById('space-guide');document.getElementById('guide-toggle').onclick=()=>{guide.hidden=!guide.hidden;document.getElementById('guide-toggle').setAttribute('aria-expanded',String(!guide.hidden));};
 for(const button of document.querySelectorAll('[data-task]'))button.onclick=()=>{guide.hidden=true;document.getElementById('guide-toggle').setAttribute('aria-expanded','false');interact(button.dataset.task);};
-document.getElementById('map-view').onclick=()=>scene?.setCameraMode('overall');document.getElementById('third-view').onclick=()=>scene?.setCameraMode('third');
-document.getElementById('appearance-open').onclick=()=>editor?.open();
+function closeGuide(){guide.hidden=true;document.getElementById('guide-toggle').setAttribute('aria-expanded','false');}
+window.addEventListener('keydown',event=>{if(event.key==='Escape')closeGuide();});
+document.addEventListener('pointerdown',event=>{if(!event.target.closest('.room-tools'))closeGuide();});
+document.getElementById('map-view').onclick=()=>{closeGuide();camera?.set('overall');root.focus();};document.getElementById('third-view').onclick=()=>{closeGuide();camera?.set(camera.mode==='third'?'first':'third');root.focus();};
+document.getElementById('appearance-open').onclick=()=>{closeGuide();editor?.open();};
 document.getElementById('study').onclick=()=>{office?.setCampusRoom('study');scene?.setCameraMode('overall');root.focus();};
 document.getElementById('private-room').onclick=()=>{office?.setCampusRoom('office');root.focus();};
 document.getElementById('office-link').onclick=()=>send('navigate',{section:'office'});

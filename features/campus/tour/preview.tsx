@@ -3,7 +3,7 @@ import {useEffect,useRef,useState} from 'react';
 import {Map,LockKeyhole,ArrowUpRight,Check,Maximize,Orbit,DoorOpen,Users,Bot,Sparkles} from 'lucide-react';
 import type {CampusSnapshot} from '../contracts';
 import {OfficePanel} from '../office/panel';
-import {LearnerDashboard} from '../ui/dashboard';
+import {LessonTaskPanel} from '../ui/lesson-task-panel';
 import {CampusWindow} from '../ui/campus-window';
 import {canEnter,rooms,roleNames,oxQuestions,levelQuestions,levelResult,type TourRole,type TourRoom} from './model';
 import styles from './preview.module.css';
@@ -44,7 +44,7 @@ export function FourSpacesPreview({snapshot}:{snapshot:CampusSnapshot}){
  {room==='welcome'&&['video','quiz','level','checklist'].includes(tool)&&<div className={styles.lesson}>{welcomeBody}</div>}
  <div hidden={tool!=='office'}>{officeVisited&&canEnter(role,'office')&&<OfficePanel key={role} snapshot={snapshot} demo/>}</div>
  {tool==='bots'&&<div className={styles.lesson}><Bot size={38}/><h2>내 AI 직원 연결 준비</h2><p>윤익님 사무공간과 작업 관리를 같은 공간에서 열었어요. 실제 텔레그램 봇은 이 미리보기에 연결하지 않았습니다.</p><div className={styles.result}><strong>연결된 실제 AI 직원 0명</strong><p>실제 봇 초대·작업 실행·외부 전송은 일어나지 않아요.</p></div><button className={styles.primary} onClick={()=>setTool('office')}>이 사무실의 업무 관리 열기</button></div>}
- {tool==='learning'&&<LearnerDashboard snapshot={snapshot} demo onSelect={()=>{}} onRefresh={()=>setNotice('가상 수업 목록입니다.')} onOpen={id=>{setSelectedLesson(snapshot.lessons.find(l=>l.id===id)?.title||'오늘 수업');setTool('lesson');}}/>}
+ {tool==='learning'&&<LessonTaskPanel snapshot={snapshot} onOpen={id=>{setSelectedLesson(snapshot.lessons.find(l=>l.id===id)?.title||'오늘 수업');setTool('lesson');}}/>}
  {tool==='lesson'&&<div className={styles.lesson}><small>미리보기용 수업 안내</small><h2>{selectedLesson}</h2><p>실제 서비스에서는 해당 수강권으로 공개된 수업과 과제를 연결합니다. 이 화면은 동선 확인용 예시입니다.</p><button onClick={()=>setTool('learning')}>수업 목록으로</button></div>}
  {tool==='focus'&&<div className={styles.lesson}><h2>오늘은 무엇을 완성할까요?</h2><p>책상에 앉아 작은 실행 하나에 집중해 보세요. 창을 닫거나 다른 공간으로 가도 타이머는 이어져요.</p><div className={styles.timer}>{focusUntil?`${Math.floor(remaining/60)}:${String(remaining%60).padStart(2,'0')}`:'25:00'}</div><button className={styles.primary} onClick={()=>{setFocusUntil(Date.now()+25*60*1000);setTool('');}}>25분 집중 시작</button>{focusUntil&&<button onClick={()=>setFocusUntil(null)}>집중 마무리</button>}<p>미리보기 타이머 · 실제 학습 기록에 반영되지 않아요.</p></div>}
  {tool==='feedback'&&<div className={styles.lesson}><h2>동료에게 도움이 되는 한마디</h2><p>가상 결과물: 처음 방문한 고객이 이해하기 쉬운 소개 페이지</p><label>내 피드백<textarea rows={4} value={feedback} onChange={e=>{setFeedback(e.target.value);setFeedbackSent(false);}} placeholder="좋았던 점 하나와, 더 명확해지면 좋을 점 하나를 적어 주세요."/></label><button className={styles.primary} disabled={!feedback.trim()} onClick={()=>setFeedbackSent(true)}>미리보기 의견 남기기</button>{feedbackSent&&<p className={styles.success}>이 창에 의견을 남겼어요. 실제 동료에게 전송되지 않았습니다.</p>}</div>}
