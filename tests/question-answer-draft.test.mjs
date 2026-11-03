@@ -18,7 +18,7 @@ function routeHarness({ user = { id: 'operator' }, question = { id: questionId, 
     if (name === '@/lib/supabase/admin') return { createAdminClient: () => ({ from(table) {
       assert.equal(table, 'edu_questions');
       const filters = {};
-      const query = { select(columns) { assert.equal(columns, 'id,title,content'); return this; }, eq(key, value) { filters[key] = value; return this; }, async maybeSingle() { reads.push({ ...filters }); return { data: question, error: null }; } };
+      const query = { select(columns) { assert.ok(['id,title,content','id'].includes(columns)); return this; }, eq(key, value) { filters[key] = value; return this; }, async maybeSingle() { reads.push({ ...filters }); return { data: question, error: null }; } };
       return query;
     } }) };
     throw new Error(`Unexpected dependency ${name}`);
@@ -52,7 +52,8 @@ test('AI answer generation fetches the question server-side and returns an unreg
   const provider = route.reads.find(item => item.url === 'https://api.openai.com/v1/responses');
   assert.ok(provider);
   const payload = JSON.parse(provider.options.body);
-  assert.equal(payload.model, 'gpt-5-mini');
+  assert.equal(payload.model, 'gpt-6.1-terra');
+  assert.deepEqual(payload.reasoning, {effort:'low'});
   assert.equal(payload.store, false);
   assert.match(payload.input, /질문 본문/);
   assert.equal(route.reads.find(item => item.id === questionId)?.['is_archived'], false);
