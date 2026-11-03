@@ -15,3 +15,4 @@
 .exhibition{margin:16px 0;padding:16px;border:1px solid #d4e3f0;border-radius:15px;background:#f7fbff;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.exhibition h3,.exhibition p{grid-column:1/-1;margin:0}.exhibition h3{font-size:14px}.exhibition p{font-size:12px;color:#63798f;margin-bottom:4px}.exhibition button{display:grid;gap:6px;text-align:left;min-width:0;padding:12px;background:#fff;border:1px solid #dce7f1;border-radius:10px;color:#294d71}.exhibition strong,.exhibition span{overflow-wrap:anywhere;font-size:12px}.exhibition span{font-size:11px;color:#70839a}
 
 .worldBar select{font:inherit;font-size:12px;padding:8px;border:1px solid #cbd8e8;border-radius:8px;background:#fff;color:#243b5b;max-width:100%}
+@media(max-width:600px){.worldBar{flex-wrap:wrap;gap:8px}.worldBar>label{flex:1;min-width:170px}.worldBar>button{white-space:nowrap}.worldBar>span{order:3;flex-basis:100%;line-height:1.6}}
