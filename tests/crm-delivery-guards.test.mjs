@@ -92,7 +92,7 @@ function dispatchFixture({ channel = 'lms', current = member, blackPages = [{ bl
     SOLAPI_SENDER_PHONE: '0200000000', SOLAPI_OPTOUT_PHONE: '0800000000',
     SOLAPI_KAKAO_PF_ID: 'pf',
   } });
-  return { dispatch: exports.dispatchDueCrm, steps, updates, sentMessages, queriedTables, runFilters };
+  return { dispatch: exports.dispatchDueCrm, sendBatch: exports.sendBatch, steps, updates, sentMessages, queriedTables, runFilters };
 }
 
 test('purchase-only mode does not inspect campaigns or queued marketing runs', async () => {
@@ -164,4 +164,24 @@ test('recruitment room links survive the fresh consent lookup before provider su
   const text=qa.sentMessages[0].text;
   if(channel) assert.match(text,new RegExp('src='+channel)); else assert.doesNotMatch(text,/src=/);
  }
+});
+
+test('purchase room notices render the assigned link for SMS and Alimtalk without SMS fallback', async () => {
+  const settings = { transactionalEnabled: true, senderPhone: '0200000000' };
+  const room = 'https://t.me/+AssignedRoom';
+  const buyer = { ...member, full_name: '가상 구매자' };
+  for (const channel of ['sms', 'alimtalk']) {
+    const qa = dispatchFixture();
+    const result = await qa.sendBatch({
+      id: 'transactional', channel, purpose: 'transactional', alimtalk_template_id: 'approved',
+      content: channel === 'sms' ? '공지방 {{roomLink}}' : '#{이름}님 #{공지방링크}',
+    }, [buyer], { purchaseBatchId: 'buyer-batch', purchaseRoomLink: room }, settings);
+    assert.equal(result.sent, 1);
+    assert.equal(qa.sentMessages[0].to, buyer.phone);
+    assert.ok(qa.sentMessages[0].text.includes(room));
+    if (channel === 'alimtalk') {
+      assert.equal(qa.sentMessages[0].kakaoOptions.disableSms, true);
+      assert.deepEqual(qa.sentMessages[0].kakaoOptions.variables, { '#{이름}': buyer.full_name, '#{공지방링크}': room });
+    }
+  }
 });

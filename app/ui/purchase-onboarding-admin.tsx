@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { UploadField } from '@/app/ui/editor-fields';
 import type { PurchaseOnboardingSettings } from '@/lib/purchase-onboarding';
+import { PurchaseBuyerDelivery } from './purchase-buyer-delivery';
 import './purchase-onboarding.css';
 
 type Cohort = { id: string; name: string; courses: { title: string } | { title: string }[] | null };
@@ -52,8 +53,9 @@ export function PurchaseOnboardingAdmin() {
   };
   return <main className="edu-front purchase-onboarding"><div className="wrap narrow">
     <Link href="/admin/products">← 상품 관리</Link><p className="eyebrow mt24">PURCHASE ONBOARDING</p><h1>결제 후 안내 설정</h1>
-    <p className="lead">기수를 선택하고 텔레그램 방 정보를 등록하세요. 이미지는 나중에 추가할 수 있습니다.</p>
-    <section className="onboarding-panel"><label>안내할 기수<select value={cohort} disabled={pending} onChange={event => void load(event.target.value)}><option value="">기수를 선택하세요</option>{cohorts.map(item => <option key={item.id} value={item.id}>{(Array.isArray(item.courses) ? item.courses[0]?.title : item.courses?.title) || '상품'} · {item.name}</option>)}</select></label>
+    {cohort && <nav className="onboarding-actions" aria-label="결제 후 안내 관리"><a className="btn" href="#completion-settings">완료 화면 설정</a><a className="btn" href="#buyer-delivery">구매자 공지·발송 내역</a></nav>}
+    <p className="lead">기수를 선택해 결제 완료 화면을 설정하고, 모집 마감 후 구매자에게 공지를 보내세요.</p>
+    <section id="completion-settings" className="onboarding-panel"><h2>1. 결제 완료 화면</h2><label>안내할 기수<select value={cohort} disabled={pending} onChange={event => void load(event.target.value)}><option value="">기수를 선택하세요</option>{cohorts.map(item => <option key={item.id} value={item.id}>{(Array.isArray(item.courses) ? item.courses[0]?.title : item.courses?.title) || '상품'} · {item.name}</option>)}</select></label>
       {cohort && <div className="onboarding-admin-fields">
         <label>텔레그램 방 이름<input value={settings.roomName} disabled={pending} maxLength={80} onChange={event => setSettings(current => ({ ...current, roomName: event.target.value }))} /></label>
         <label>텔레그램 초대 링크<input type="url" value={settings.inviteUrl} disabled={pending} placeholder="https://t.me/+..." onChange={event => setSettings(current => ({ ...current, inviteUrl: event.target.value }))} /></label>
@@ -69,11 +71,12 @@ export function PurchaseOnboardingAdmin() {
         <label className="onboarding-toggle"><input type="checkbox" checked={settings.checklistEnabled === true} disabled={pending} onChange={event => setSettings(current => ({ ...current, checklistEnabled: event.target.checked }))}/>4단계 시작 준비 사용 · 텔레그램 → 앱 설치 → OT 일정 → 첫 학습·댓글</label>
         <p className="meta">체크한 기수에만 새 4단계 안내가 적용됩니다. 기존 기수는 유지됩니다. 켜기 전에 OT 일정과 첫 학습을 등록해 주세요.</p>
         <label className="onboarding-toggle"><input type="checkbox" checked={settings.enabled} disabled={pending} onChange={event => setSettings(current => ({ ...current, enabled: event.target.checked }))} />결제 완료 수강생에게 안내 화면 열기</label>
-        {!telegramOnly && <p className="meta">알림톡은 이 체크박스로 발송되지 않습니다. 승인된 템플릿과 자동화 설정이 따로 필요합니다.</p>}
+        <p className="meta">발송 예약은 아래 구매자 공지에서 따로 진행합니다.</p>
         <button className="btn primary" type="button" disabled={pending || uploading} onClick={() => void save()}>설정 저장</button>
       </div>}
       {comments.length > 0 && <section className="onboarding-panel"><h2>첫 학습 확인 댓글 · 최근 100건</h2>{comments.map(item => <article key={item.order_id}><p className="meta">주문 {item.order_id} · {new Date(item.confirmed_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}</p><p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{item.comment}</p></article>)}</section>}
       {message && <p role="status" className="notice">{message}</p>}{error && <p role="alert" className="notice">{error}</p>}
     </section>
+    {cohort && <PurchaseBuyerDelivery key={cohort} cohort={cohort} />}
   </div></main>;
 }

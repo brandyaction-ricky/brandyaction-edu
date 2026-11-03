@@ -86,3 +86,11 @@
 .onboarding-four-steps button span,.onboarding-four-steps button strong{display:block}
 
 .onboarding-return-guide{padding:18px;border:1px solid #dfd5b9;border-radius:10px;background:#fff9e9;margin-bottom:16px}.onboarding-return-guide ol{padding-left:22px;margin:12px 0}.onboarding-return-guide li{margin:8px 0;line-height:1.65}
+
+.onboarding-delivery { margin-top: 24px; }
+.onboarding-delivery fieldset { border: 0; padding: 0; min-width: 0; }
+.onboarding-delivery legend { font-weight: 700; margin-top: 16px; }
+.onboarding-delivery textarea { width: 100%; resize: vertical; }
+.onboarding-recipient-list { max-height: 240px; overflow: auto; padding: 8px 12px; border: 1px solid var(--line, #dedfe2); border-radius: 8px; }
+.onboarding-delivery-review, .onboarding-delivery-history { padding: 12px; border: 1px solid var(--line, #dedfe2); border-radius: 8px; margin-block: 10px; }
+.onboarding-message-copy { white-space: pre-wrap; overflow-wrap: anywhere; }
