@@ -15,6 +15,7 @@ const eslintConfig = defineConfig([
     "design-reference/**",
     // Pinned third-party distribution; keep campus source linted.
     "public/campus/world/vendor/**",
+    "public/campus/world/office/vendor/**",
   ]),
 ]);
 
