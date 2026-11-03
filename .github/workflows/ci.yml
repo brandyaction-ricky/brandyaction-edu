@@ -41,6 +41,25 @@ jobs:
             exit 0
           fi
 
+          if [ "$head_ref" = "codex/edu-purchase-delivery-main-release-20261103" ]; then
+            # Compare the merge result to the fully tested payload. The live
+            # deployment already includes changes absent from GitHub main.
+            expected_main=bd6207f45c953fd428dad2b9629fb0aa54ac4d4a
+            tested_payload=9d5e93f00c328adc54ea66c40b09a801d0371378
+            if [ "$(git rev-parse HEAD^1)" != "$expected_main" ]; then
+              echo "Production main moved; revalidate the scoped release."
+              exit 1
+            fi
+
+            if ! git diff --exit-code "$tested_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'; then
+              echo "The merge result differs from the tested purchase delivery payload."
+              exit 1
+            fi
+
+            echo "Purchase delivery production release scope verified."
+            exit 0
+          fi
+
           if [ "$head_ref" = "codex/edu-google-prod-canary-20260930" ]; then
             changed_files="$(git diff --name-only "origin/${BASE_REF}...HEAD")"
             while IFS= read -r path; do
