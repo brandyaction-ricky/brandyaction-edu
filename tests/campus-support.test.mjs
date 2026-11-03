@@ -1,0 +1,87 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {build} from 'esbuild';
+import {fileURLToPath} from 'node:url';
+import {PGlite} from '@electric-sql/pglite';
+const uid=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
+async function load(path){const r=await build({entryPoints:[fileURLToPath(new URL(path,import.meta.url))],write:false,bundle:true,platform:'node',format:'esm'});return import('data:text/javascript;base64,'+Buffer.from(r.outputFiles[0].text).toString('base64'));}
+const domain=await load('../features/campus/support/domain.ts');
+const {handleSupport}=await load('../features/campus/support/handler.ts');
+test('support validates actual category, safe URLs, plain bounded notes and specific public lesson',()=>{
+ const b={id:uid(1),enrollmentId:uid(2),lessonId:null,category:'tool',title:'오류 확인',tried:'다시 실행',question:'도구 실행 방법을 확인하고 싶습니다.',contextUrl:'https://example.com/a'};
+ assert.equal(domain.parseIntake(b).context_url,'https://example.com/a');
+ for(const url of ['javascript:alert(1)','https://u:p@example.com','http://127.0.0.1/a','http://192.168.2.1/a'])assert.throws(()=>domain.parseIntake({...b,contextUrl:url}));
+ for(const fields of [{category:'forged'},{question:' '},{question:'x'.repeat(4001)},{id:'fake'},{lessonId:uid(3),lessonVersion:''}])assert.throws(()=>domain.parseIntake({...b,...fields}));
+});
+test('support calendar guards start/end/capacity and version changes preserve old references',()=>{
+ const now=Date.now(),b={id:uid(1),cohortId:uid(2),title:'질문 상담',sessionKind:'mentor',startsAt:new Date(now+10000).toISOString(),endsAt:new Date(now+3600000).toISOString(),capacity:2,locationUrl:''};
+ assert.equal(domain.parseSession(b,now).kind,'mentor');for(const fields of [{capacity:0},{capacity:101},{endsAt:b.startsAt},{sessionKind:'fake'}])assert.throws(()=>domain.parseSession({...b,...fields},now));
+ const snapshot={lessons:[{id:uid(3),version:'v2',title:'광고 고객',day:1,missions:[]},{id:uid(4),version:'v1',title:'전환',day:2,missions:[]}]};
+ assert.deepEqual(domain.changedLessons(snapshot,{knownLessons:{[uid(3)]:'v1'}}).map(l=>l.id),[uid(3)]);
+ assert.deepEqual(domain.relatedLessons(snapshot,'고객').map(l=>l.id),[uid(3)]);
+ assert.equal(domain.supportMetrics([]).forecast,null);
+});
+test('support API rejects foreign origin, absent auth, malformed scope/body and hides SQL failures',async()=>{
+ const deps={enabled:true,authenticate:async()=>({id:uid(1)}),read:async()=>({safe:true}),write:async()=>({safe:true})};
+ const base='https://edu.test/api/campus/support?scope='+uid(2);
+ assert.equal((await handleSupport(new Request(base),deps)).status,200);
+ assert.equal((await handleSupport(new Request(base),{...deps,enabled:false})).status,404);
+ assert.equal((await handleSupport(new Request(base),{...deps,authenticate:async()=>null})).status,401);
+ assert.equal((await handleSupport(new Request(base,{method:'POST',headers:{origin:'https://evil.test'}}),deps)).status,403);
+ assert.equal((await handleSupport(new Request(base,{method:'POST',headers:{origin:'https://edu.test','content-type':'application/json'},body:'{'}),deps)).status,400);
+ const failed=await handleSupport(new Request(base),{...deps,read:async()=>{throw Error('private db key detail');}});assert.equal(failed.status,503);assert.doesNotMatch(await failed.text(),/private db/);
+});
+test('support SQL enforces owner/cohort RLS, private handover, finite bookings and admin CAS',async()=>{
+ const db=new PGlite();try{
+ await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;create schema auth;
+ create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
+ grant usage on schema auth to authenticated,service_role;grant execute on function auth.uid() to authenticated,service_role;
+ create table profiles(id uuid primary key,status text,role text);create table courses(id uuid primary key,status text,archived_at timestamptz);
+ create table cohorts(id uuid primary key,course_id uuid,archived_at timestamptz);create table enrollments(id uuid primary key,user_id uuid,course_id uuid,cohort_id uuid,status text,revoked_at timestamptz,access_starts_at timestamptz,access_ends_at timestamptz);
+ create table curriculum_weeks(id uuid primary key,course_id uuid,is_published boolean);create table curriculum_lessons(id uuid primary key,week_id uuid,is_published boolean,updated_at timestamptz);create table curriculum_missions(id uuid primary key,lesson_id uuid);
+ insert into profiles values('${uid(1)}','active','member'),('${uid(2)}','active','member'),('${uid(3)}','active','member'),('${uid(4)}','active','admin');
+ insert into courses values('${uid(10)}','published',null);insert into cohorts(id,course_id) values('${uid(20)}','${uid(10)}'),('${uid(21)}','${uid(10)}');
+ insert into enrollments(id,user_id,course_id,cohort_id,status) values('${uid(31)}','${uid(1)}','${uid(10)}','${uid(20)}','active'),('${uid(32)}','${uid(2)}','${uid(10)}','${uid(20)}','active'),('${uid(33)}','${uid(3)}','${uid(10)}','${uid(21)}','active');
+ insert into curriculum_weeks values('${uid(40)}','${uid(10)}',true);insert into curriculum_lessons values('${uid(50)}','${uid(40)}',true,now());
+ grant select on profiles,courses,cohorts,enrollments,curriculum_weeks,curriculum_lessons to authenticated,service_role;grant update on profiles to service_role;`);
+ await db.exec(readFileSync(new URL('../supabase/migrations/20261102152007_edu_campus_support_workspace.sql',import.meta.url),'utf8'));
+ const login=async n=>db.exec(`reset role;set role authenticated;select set_config('request.jwt.claim.sub','${uid(n)}',false);`),server=async()=>db.exec('reset role;set role service_role;');
+ await login(1);await db.query("insert into edu_campus_support_requests(id,user_id,enrollment_id,category,title,question) values($1,$2,$3,'tool','도구 오류','실행 방법 확인')",[uid(60),uid(1),uid(31)]);
+ await assert.rejects(db.query("insert into edu_campus_support_requests(id,user_id,enrollment_id,category,title,question) values($1,$2,$3,'tool','침입','다른 사람')",[uid(61),uid(2),uid(32)]),/row-level security/);
+ await assert.rejects(db.exec("update edu_campus_support_requests set status='resolved'"),/permission denied/);
+ await assert.rejects(db.query('select edu_campus_support_followup($1,$2,$3,1,$4,$5,$6)',[uid(4),uid(60),uid(70),'reply','불법','resolved']),/permission denied/);
+ await login(2);assert.equal((await db.query('select * from edu_campus_support_requests')).rows.length,0);
+ await server();await db.query("select edu_campus_support_followup($1,$2,$3,1,'handover','담당자 전용 인계','in_progress')",[uid(4),uid(60),uid(70)]);
+ await assert.rejects(db.query("select edu_campus_support_followup($1,$2,$3,1,'reply','오래된 수정','resolved')",[uid(4),uid(60),uid(71)]),/Revision conflict/);
+ await db.query("select edu_campus_support_followup($1,$2,$3,2,'reply','이 순서로 실행해 주세요','resolved')",[uid(4),uid(60),uid(71)]);
+ await login(1);const visible=(await db.query('select * from edu_campus_support_actions')).rows;assert.equal(visible.length,1);assert.equal(visible[0].kind,'reply');
+ await server();await db.query("insert into edu_campus_office_sessions(id,cohort_id,title,kind,starts_at,ends_at,capacity,created_by) values($1,$2,'멘토 시간','mentor',now()+interval '1 day',now()+interval '25 hours',1,$3)",[uid(80),uid(20),uid(4)]);
+ await login(3);assert.equal((await db.query('select * from edu_campus_office_sessions')).rows.length,0);
+ await login(1);assert.equal((await db.query('select * from edu_campus_office_sessions')).rows.length,1);await assert.rejects(db.query('select edu_campus_reserve_office($1,$2,$3,false)',[uid(1),uid(80),uid(90)]),/permission denied/);
+ await server();await db.query('select edu_campus_reserve_office($1,$2,$3,false)',[uid(1),uid(80),uid(90)]);await db.query('select edu_campus_reserve_office($1,$2,$3,false)',[uid(1),uid(80),uid(90)]);
+ await assert.rejects(db.query('select edu_campus_reserve_office($1,$2,$3,false)',[uid(2),uid(80),uid(91)]),/Session full/);
+ await assert.rejects(db.query('select edu_campus_reserve_office($1,$2,$3,false)',[uid(3),uid(80),uid(92)]),/Access denied/);
+ await db.query('select edu_campus_reserve_office($1,$2,$3,true)',[uid(1),uid(80),uid(90)]);await db.query('select edu_campus_reserve_office($1,$2,$3,false)',[uid(2),uid(80),uid(91)]);
+ await server();const studyArgs=[uid(1),uid(31),uid(81),'동료와 문구 쓰기','각자 한 문단',new Date(Date.now()+1000).toISOString(),new Date(Date.now()+3600000).toISOString(),2];
+ await db.query('select edu_campus_create_study($1,$2,$3,$4,$5,$6,$7,$8)',studyArgs);
+ await db.query('select edu_campus_create_study($1,$2,$3,$4,$5,$6,$7,$8)',studyArgs);
+ await assert.rejects(db.query('select edu_campus_create_study($1,$2,$3,$4,$5,$6,$7,$8)',[uid(3),...studyArgs.slice(1)]),/Access denied/);
+ await assert.rejects(db.query('select edu_campus_create_study($1,$2,$3,$4,$5,$6,$7,$8)',[...studyArgs.slice(0,4),'다른 목표',...studyArgs.slice(5)]),/Study retry mismatch/);
+ await db.query('select edu_campus_reserve_office($1,$2,$3,false)',[uid(2),uid(81),uid(93)]);
+ await db.query("select edu_campus_office_queue($1,$2,'checkin')",[uid(2),uid(81)]);
+ await assert.rejects(db.query("select edu_campus_office_queue($1,$2,'call',$3)",[uid(2),uid(81),uid(93)]),/Access denied/);
+ await db.query("select edu_campus_office_queue($1,$2,'present')",[uid(4),uid(81)]);
+ await db.query("select edu_campus_office_queue($1,$2,'call',$3)",[uid(4),uid(81),uid(93)]);
+ assert.equal((await db.query('select queue_status from edu_campus_office_bookings where id=$1',[uid(93)])).rows[0].queue_status,'called');
+ await db.query("select edu_campus_office_queue($1,$2,'done',$3)",[uid(4),uid(81),uid(93)]);
+ await assert.rejects(db.query("select edu_campus_office_queue($1,$2,'call',$3)",[uid(4),uid(81),uid(93)]),/Queue changed/);
+ await login(1);assert.equal((await db.query('select * from edu_campus_office_bookings')).rows.length,1);assert.equal((await db.query('select * from edu_campus_office_bookings')).rows[0].status,'cancelled');
+ await db.exec('reset role; update cohorts set archived_at=now()');await login(1);assert.equal((await db.query('select * from edu_campus_support_requests')).rows.length,0);
+ await server();await assert.rejects(db.query('select edu_campus_reserve_office($1,$2,$3,false)',[uid(1),uid(80),uid(94)]),/Access denied/);
+ await assert.rejects(db.query('select edu_campus_create_study($1,$2,$3,$4,$5,$6,$7,$8)',studyArgs),/Access denied/);
+ await assert.rejects(db.query("select edu_campus_office_queue($1,$2,'checkin')",[uid(2),uid(81)]),/Access denied/);
+ await db.exec('reset role; update cohorts set archived_at=null');
+ await db.exec('reset role');await db.query("update enrollments set status='revoked' where user_id=$1",[uid(1)]);await login(1);assert.equal((await db.query('select * from edu_campus_support_requests')).rows.length,0);assert.equal((await db.query('select * from edu_campus_office_sessions')).rows.length,0);
+ }finally{await db.close();}
+});

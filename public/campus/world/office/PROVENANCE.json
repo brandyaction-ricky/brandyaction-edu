@@ -1,0 +1,435 @@
+{
+  "archiveSha256": "1b95991ac32cc8c747ea6b95bc57b2ebc1c304e189fbb319b2d9df48a6a70ab6",
+  "files": [
+    {
+      "path": "office.js",
+      "sourceSha256": "7ff3083b68ae0c623fd62ddb1940c440e6ebb48c216d8d499c300ed76a727d77",
+      "importSha256": "9251a124d04bc1d7738facd8400a0a8bbca8a553bf32b77383baca43e7f27a53"
+    },
+    {
+      "path": "office3d.js",
+      "sourceSha256": "b45dd4c5cba821669a53bdb666b0ea6b21ca8b16a163a7a1c5c6e6bb9b7ab748",
+      "importSha256": "be9c19926921c1019ad8f8c52bc068ee4cf3cc6cafd1b6acdb8841b02afd7745"
+    },
+    {
+      "path": "campus-plan.js",
+      "sourceSha256": "cce3c2f280cd1301b350584d4aae17b3b40ed7fe9e864273daa26fc701dd9428",
+      "importSha256": "cce3c2f280cd1301b350584d4aae17b3b40ed7fe9e864273daa26fc701dd9428"
+    },
+    {
+      "path": "campus-navigation.js",
+      "sourceSha256": "6bf2f9dd467fe7b4b150acc42b1d5da13a1059d4c447c165924bc5d1deb7f6b5",
+      "importSha256": "eb6e8cb6a0124c0148ea73b4b7dab0fefe65aac166e4387a4cc58d8ba0f2c152"
+    },
+    {
+      "path": "study-scene.js",
+      "sourceSha256": "02758aeec9d86e6f839df7bbacbde7e49aa6fc1d402ad1a6b4040242e0b1b32a",
+      "importSha256": "02758aeec9d86e6f839df7bbacbde7e49aa6fc1d402ad1a6b4040242e0b1b32a"
+    },
+    {
+      "path": "motion-interpolation.js",
+      "sourceSha256": "33d3ecc3fc9dc6e43cd88a8b84b5b4534523451f20398566ac8d52b059a901a9",
+      "importSha256": "33d3ecc3fc9dc6e43cd88a8b84b5b4534523451f20398566ac8d52b059a901a9"
+    },
+    {
+      "path": "interior-layout.js",
+      "sourceSha256": "472f1a59feea24e19225c3ee237a527fff2dd6341a755273f6d6d3e198b53231",
+      "importSha256": "472f1a59feea24e19225c3ee237a527fff2dd6341a755273f6d6d3e198b53231"
+    },
+    {
+      "path": "avatar-appearance.js",
+      "sourceSha256": "bb7e0e182ead50ade92aa7f41fcc3fcedfe4d90b50da0b36cfaf1f52044db1bb",
+      "importSha256": "bb7e0e182ead50ade92aa7f41fcc3fcedfe4d90b50da0b36cfaf1f52044db1bb"
+    },
+    {
+      "path": "avatar-nameplate.js",
+      "sourceSha256": "3b0a754c1111adfb2d8ef432b341394cf045635e45ace072055a3cabb77859e9",
+      "importSha256": "3b0a754c1111adfb2d8ef432b341394cf045635e45ace072055a3cabb77859e9"
+    },
+    {
+      "path": "avatar-chat.js",
+      "sourceSha256": "71440917b0be24087b7d1a545b658d4f9bd71dac9cac7f5201372b1bd94ee6b3",
+      "importSha256": "71440917b0be24087b7d1a545b658d4f9bd71dac9cac7f5201372b1bd94ee6b3"
+    },
+    {
+      "path": "office-environment.js",
+      "sourceSha256": "196e6dc9ad20383d4baea1153c4a493967eead425a651e39200592e6b398a2e7",
+      "importSha256": "196e6dc9ad20383d4baea1153c4a493967eead425a651e39200592e6b398a2e7"
+    },
+    {
+      "path": "interior-3d.js",
+      "sourceSha256": "4c2b196f499e34b16f6c0c80199faa244284cac42c23ae9e97ae6cc6dd3e2be0",
+      "importSha256": "4c2b196f499e34b16f6c0c80199faa244284cac42c23ae9e97ae6cc6dd3e2be0"
+    },
+    {
+      "path": "LICENSE",
+      "sourceSha256": "9aa38f5646d4d9ce083798a4299d2ff63b8f73b5a085b69333f84189d5a97e89",
+      "importSha256": "9aa38f5646d4d9ce083798a4299d2ff63b8f73b5a085b69333f84189d5a97e89"
+    },
+    {
+      "path": "assets/agents/MAGPIE-LICENSE",
+      "sourceSha256": "79d2c8444715d4bc453ec4f8a0aaf2051a4c1ee5ac08f5bd2e5848aef87c7572",
+      "importSha256": "79d2c8444715d4bc453ec4f8a0aaf2051a4c1ee5ac08f5bd2e5848aef87c7572"
+    },
+    {
+      "path": "assets/agents/README.md",
+      "sourceSha256": "0ac2023eb73b8ba925a10cbb9aa6d37c47045695513c25c67e10e843a54ef920",
+      "importSha256": "0ac2023eb73b8ba925a10cbb9aa6d37c47045695513c25c67e10e843a54ef920"
+    },
+    {
+      "path": "assets/agents/antigravity.png",
+      "sourceSha256": "193ba1805de11c23cd0c7a1df92aa0a886708e57350f6f7766100afe5befed73",
+      "importSha256": "193ba1805de11c23cd0c7a1df92aa0a886708e57350f6f7766100afe5befed73"
+    },
+    {
+      "path": "assets/agents/claude.png",
+      "sourceSha256": "4004381309500f25e49a1ae639912ce307ea81da74cc383954a1ac8b9d343fe6",
+      "importSha256": "4004381309500f25e49a1ae639912ce307ea81da74cc383954a1ac8b9d343fe6"
+    },
+    {
+      "path": "assets/agents/codex.png",
+      "sourceSha256": "8e82b26c98a10e45798ce48124515720657f7735fb8d0853b3f087eaa8a6b74e",
+      "importSha256": "8e82b26c98a10e45798ce48124515720657f7735fb8d0853b3f087eaa8a6b74e"
+    },
+    {
+      "path": "assets/agents/copilot.svg",
+      "sourceSha256": "c72c1e0018e84b3128c5a1ac43ec2be135ac6ec4eb9c0ea18ed76416d23f2af3",
+      "importSha256": "c72c1e0018e84b3128c5a1ac43ec2be135ac6ec4eb9c0ea18ed76416d23f2af3"
+    },
+    {
+      "path": "assets/agents/dsh.svg",
+      "sourceSha256": "deba5f98a5c1796e20fcac3149bcd7eb8a32f0bdd04d048819400b1f28bd1439",
+      "importSha256": "deba5f98a5c1796e20fcac3149bcd7eb8a32f0bdd04d048819400b1f28bd1439"
+    },
+    {
+      "path": "assets/agents/gemini.png",
+      "sourceSha256": "5e7cfecaa53f4f65a313fe89b0f389548126544a78fad8489510c70ae641a4a1",
+      "importSha256": "5e7cfecaa53f4f65a313fe89b0f389548126544a78fad8489510c70ae641a4a1"
+    },
+    {
+      "path": "assets/agents/grok.svg",
+      "sourceSha256": "89eb7de9f0d02a41cfecd9109e253d7fd3529e27467dee4254faa67f3ac21451",
+      "importSha256": "89eb7de9f0d02a41cfecd9109e253d7fd3529e27467dee4254faa67f3ac21451"
+    },
+    {
+      "path": "assets/agents/kimi.svg",
+      "sourceSha256": "ed08131b46acf70e6e2144eceb775e74098b58ea65fa21eaee04be7b05cfe63b",
+      "importSha256": "ed08131b46acf70e6e2144eceb775e74098b58ea65fa21eaee04be7b05cfe63b"
+    },
+    {
+      "path": "assets/agents/omp.svg",
+      "sourceSha256": "6b9680b181e24624820c5733061fcb46e52fed3e866e829b2335009beb73edb0",
+      "importSha256": "6b9680b181e24624820c5733061fcb46e52fed3e866e829b2335009beb73edb0"
+    },
+    {
+      "path": "assets/audio/keyboard-og104.m4a",
+      "sourceSha256": "99800d7441e343e33a750d670c44ea30bbd6b0415ba86a46ad79ba3009074a5c",
+      "importSha256": "99800d7441e343e33a750d670c44ea30bbd6b0415ba86a46ad79ba3009074a5c"
+    },
+    {
+      "path": "assets/audio/rain-house.m4a",
+      "sourceSha256": "a2b7629106e523667539f2041ae0349472ee3c41998ca3d90eba1bc641db6e2f",
+      "importSha256": "a2b7629106e523667539f2041ae0349472ee3c41998ca3d90eba1bc641db6e2f"
+    },
+    {
+      "path": "assets/kenney/LICENSE-furniture-kit.txt",
+      "sourceSha256": "5a0a89b223ca334a7148e6b994f4fd771f9a1672c34260b29aa21c9e12187718",
+      "importSha256": "5a0a89b223ca334a7148e6b994f4fd771f9a1672c34260b29aa21c9e12187718"
+    },
+    {
+      "path": "assets/kenney/LICENSE-mini-characters.txt",
+      "sourceSha256": "a77857d974741c95eef3f9a42605d380c6949d9cc3035007ec67750ad8a236dc",
+      "importSha256": "a77857d974741c95eef3f9a42605d380c6949d9cc3035007ec67750ad8a236dc"
+    },
+    {
+      "path": "assets/kenney/characters/Textures/colormap.png",
+      "sourceSha256": "0d4947d34ff32acf4a359c7f22ca784e057e7e72f622170a9a77b6fc88fdb70e",
+      "importSha256": "0d4947d34ff32acf4a359c7f22ca784e057e7e72f622170a9a77b6fc88fdb70e"
+    },
+    {
+      "path": "assets/kenney/characters/character-female-a.glb",
+      "sourceSha256": "8792676b34e78c21c8e47996da33e7ef75a1a7dd3a8ada63cd2c2f331c752555",
+      "importSha256": "8792676b34e78c21c8e47996da33e7ef75a1a7dd3a8ada63cd2c2f331c752555"
+    },
+    {
+      "path": "assets/kenney/characters/character-female-b.glb",
+      "sourceSha256": "d373d7ec5f32afed6fe90b9a99873d625208f1d77bae3ff944a83fa57eaf3744",
+      "importSha256": "d373d7ec5f32afed6fe90b9a99873d625208f1d77bae3ff944a83fa57eaf3744"
+    },
+    {
+      "path": "assets/kenney/characters/character-female-c.glb",
+      "sourceSha256": "914dc5ed9d8d1866ad3584f38016e81687138ab0782ef755524dd33f78a4fc3f",
+      "importSha256": "914dc5ed9d8d1866ad3584f38016e81687138ab0782ef755524dd33f78a4fc3f"
+    },
+    {
+      "path": "assets/kenney/characters/character-female-d.glb",
+      "sourceSha256": "a1e7d98545061ba31b1db134d57d85bed3b54aa17fd0c1257a8dfd850ad38d4a",
+      "importSha256": "a1e7d98545061ba31b1db134d57d85bed3b54aa17fd0c1257a8dfd850ad38d4a"
+    },
+    {
+      "path": "assets/kenney/characters/character-female-e.glb",
+      "sourceSha256": "2bbf0ff9f7348e6f30487c85802a0fa3ce32a6b51ffed95d7c0de592d7408470",
+      "importSha256": "2bbf0ff9f7348e6f30487c85802a0fa3ce32a6b51ffed95d7c0de592d7408470"
+    },
+    {
+      "path": "assets/kenney/characters/character-female-f.glb",
+      "sourceSha256": "ec3b80bc9c5d6b4da4ad4d8f443f3454a4959715511d9df208b7430b0beafcc9",
+      "importSha256": "ec3b80bc9c5d6b4da4ad4d8f443f3454a4959715511d9df208b7430b0beafcc9"
+    },
+    {
+      "path": "assets/kenney/characters/character-male-a.glb",
+      "sourceSha256": "f38b16f1cfb8bc7f859c0e6f00831976ed09109e52802e678b1228e5cd10c800",
+      "importSha256": "f38b16f1cfb8bc7f859c0e6f00831976ed09109e52802e678b1228e5cd10c800"
+    },
+    {
+      "path": "assets/kenney/characters/character-male-b.glb",
+      "sourceSha256": "4682c2c90db794d65c6bcef37ee625b36155ceb767f229edbbf273094903f3d4",
+      "importSha256": "4682c2c90db794d65c6bcef37ee625b36155ceb767f229edbbf273094903f3d4"
+    },
+    {
+      "path": "assets/kenney/characters/character-male-c.glb",
+      "sourceSha256": "25667385e8f775da9d9ce809f9485669500ec6ad08c92d08547a9133f901a945",
+      "importSha256": "25667385e8f775da9d9ce809f9485669500ec6ad08c92d08547a9133f901a945"
+    },
+    {
+      "path": "assets/kenney/characters/character-male-d.glb",
+      "sourceSha256": "f7773502b36082b94e8a0e00d30b4e9ebcd3ef9ce4d9edab8ae5f5065b6b12df",
+      "importSha256": "f7773502b36082b94e8a0e00d30b4e9ebcd3ef9ce4d9edab8ae5f5065b6b12df"
+    },
+    {
+      "path": "assets/kenney/characters/character-male-e.glb",
+      "sourceSha256": "0e790a2eb5fc7845df795e67287761d1b77bf4868decc64a6b3c21ceb5ce71f0",
+      "importSha256": "0e790a2eb5fc7845df795e67287761d1b77bf4868decc64a6b3c21ceb5ce71f0"
+    },
+    {
+      "path": "assets/kenney/characters/character-male-f.glb",
+      "sourceSha256": "af6bb146257509309becc622150e4cc5724e7950561f4f47ecfd4aad570b76b9",
+      "importSha256": "af6bb146257509309becc622150e4cc5724e7950561f4f47ecfd4aad570b76b9"
+    },
+    {
+      "path": "assets/kenney/furniture/benchCushion.glb",
+      "sourceSha256": "9652799839de525f6a3587967caaa917f75b90d6dbeebe13148683c94d266301",
+      "importSha256": "9652799839de525f6a3587967caaa917f75b90d6dbeebe13148683c94d266301"
+    },
+    {
+      "path": "assets/kenney/furniture/bookcaseOpen.glb",
+      "sourceSha256": "35f70d461013a3746081e263307618615ecf31ef56657e38de7848a448f3bbfd",
+      "importSha256": "35f70d461013a3746081e263307618615ecf31ef56657e38de7848a448f3bbfd"
+    },
+    {
+      "path": "assets/kenney/furniture/books.glb",
+      "sourceSha256": "48ea36358c52cd9d3d04c5659d713f20fe79559e166bd340f58805d09aa64328",
+      "importSha256": "48ea36358c52cd9d3d04c5659d713f20fe79559e166bd340f58805d09aa64328"
+    },
+    {
+      "path": "assets/kenney/furniture/cabinetTelevision.glb",
+      "sourceSha256": "7c2fdc0b66dfa9c679abbca0a7cef274c75b6fc2519235c844edd2e14b4b8b8d",
+      "importSha256": "7c2fdc0b66dfa9c679abbca0a7cef274c75b6fc2519235c844edd2e14b4b8b8d"
+    },
+    {
+      "path": "assets/kenney/furniture/cardboardBoxClosed.glb",
+      "sourceSha256": "e3837f49fb42a68caacbf0e1d3f51f47d2a65f1fdf410ab255448d019139256a",
+      "importSha256": "e3837f49fb42a68caacbf0e1d3f51f47d2a65f1fdf410ab255448d019139256a"
+    },
+    {
+      "path": "assets/kenney/furniture/chairCushion.glb",
+      "sourceSha256": "987cfee3f96c4f41d74268e1213f08c2cc0bf518dbbd71b02d5dc55b2b5949ab",
+      "importSha256": "987cfee3f96c4f41d74268e1213f08c2cc0bf518dbbd71b02d5dc55b2b5949ab"
+    },
+    {
+      "path": "assets/kenney/furniture/chairDesk.glb",
+      "sourceSha256": "c5758e365c8b9c8f13dcdca1edc7db62320e84cc87fef16547820143ef9e1a24",
+      "importSha256": "c5758e365c8b9c8f13dcdca1edc7db62320e84cc87fef16547820143ef9e1a24"
+    },
+    {
+      "path": "assets/kenney/furniture/chairModernCushion.glb",
+      "sourceSha256": "25941b62b41ce06025133f0022690e47be40d37bfbddb1752095302f220455e1",
+      "importSha256": "25941b62b41ce06025133f0022690e47be40d37bfbddb1752095302f220455e1"
+    },
+    {
+      "path": "assets/kenney/furniture/coatRackStanding.glb",
+      "sourceSha256": "f54e0bd4d74366b21d383d0e3995dfbc1cb560c73d1b6fbc5d86268f02ef2c16",
+      "importSha256": "f54e0bd4d74366b21d383d0e3995dfbc1cb560c73d1b6fbc5d86268f02ef2c16"
+    },
+    {
+      "path": "assets/kenney/furniture/computerKeyboard.glb",
+      "sourceSha256": "79e1f452b2159dc0cca91c256d9072022ae5cc7a3a26075d11c1cf86e4c972c8",
+      "importSha256": "79e1f452b2159dc0cca91c256d9072022ae5cc7a3a26075d11c1cf86e4c972c8"
+    },
+    {
+      "path": "assets/kenney/furniture/computerMouse.glb",
+      "sourceSha256": "565b1f75ab2297557ed98596b5cc081ea11f9704bd0d4db4d815cebf3e838db9",
+      "importSha256": "565b1f75ab2297557ed98596b5cc081ea11f9704bd0d4db4d815cebf3e838db9"
+    },
+    {
+      "path": "assets/kenney/furniture/computerScreen.glb",
+      "sourceSha256": "7a4c94511ab87cfb0e33c05ec654a44a8741b13cb9681ce5dc442815a5e64efb",
+      "importSha256": "7a4c94511ab87cfb0e33c05ec654a44a8741b13cb9681ce5dc442815a5e64efb"
+    },
+    {
+      "path": "assets/kenney/furniture/desk.glb",
+      "sourceSha256": "c88ddf271a2dec68dc31ad5856153da9731ef80afb6b3f055c915e6a16535340",
+      "importSha256": "c88ddf271a2dec68dc31ad5856153da9731ef80afb6b3f055c915e6a16535340"
+    },
+    {
+      "path": "assets/kenney/furniture/doorway.glb",
+      "sourceSha256": "77cc90128ad3d3a0616c8f0543291bb24e689f49724d8b9152e09a55ea185e48",
+      "importSha256": "77cc90128ad3d3a0616c8f0543291bb24e689f49724d8b9152e09a55ea185e48"
+    },
+    {
+      "path": "assets/kenney/furniture/kitchenBar.glb",
+      "sourceSha256": "2fc32b1dd25c2171fdb176bc2f440efd7363a5c9035efc2b2c3079772ab01f92",
+      "importSha256": "2fc32b1dd25c2171fdb176bc2f440efd7363a5c9035efc2b2c3079772ab01f92"
+    },
+    {
+      "path": "assets/kenney/furniture/kitchenCabinet.glb",
+      "sourceSha256": "c1a30b2eb26fb0d74a526aebb8f70be01edd4d00812554f786b5486dbb5131e9",
+      "importSha256": "c1a30b2eb26fb0d74a526aebb8f70be01edd4d00812554f786b5486dbb5131e9"
+    },
+    {
+      "path": "assets/kenney/furniture/kitchenCoffeeMachine.glb",
+      "sourceSha256": "251d59a84dc626e9f72f6afe35d3af8fcf19d667f2104cdbe490a7e3ed5b6dd0",
+      "importSha256": "251d59a84dc626e9f72f6afe35d3af8fcf19d667f2104cdbe490a7e3ed5b6dd0"
+    },
+    {
+      "path": "assets/kenney/furniture/kitchenFridgeLarge.glb",
+      "sourceSha256": "1f74588fe64a329d367c6eb7dc3e6d8001c200a9083ebb15acb60bb2ba3d8102",
+      "importSha256": "1f74588fe64a329d367c6eb7dc3e6d8001c200a9083ebb15acb60bb2ba3d8102"
+    },
+    {
+      "path": "assets/kenney/furniture/kitchenMicrowave.glb",
+      "sourceSha256": "a2d5d245f9b985dc5e65f759ab242bef4bccaa3ef257c38f3576cb2f74035739",
+      "importSha256": "a2d5d245f9b985dc5e65f759ab242bef4bccaa3ef257c38f3576cb2f74035739"
+    },
+    {
+      "path": "assets/kenney/furniture/kitchenSink.glb",
+      "sourceSha256": "41e507a5fa392be9f379c61a8b2b66cef84a944e38a727568b46e43ef28b5e0a",
+      "importSha256": "41e507a5fa392be9f379c61a8b2b66cef84a944e38a727568b46e43ef28b5e0a"
+    },
+    {
+      "path": "assets/kenney/furniture/lampRoundFloor.glb",
+      "sourceSha256": "444c3e6b692804e90330ba129fd4183b346ed346c8a08286d8d6059b1479fe38",
+      "importSha256": "444c3e6b692804e90330ba129fd4183b346ed346c8a08286d8d6059b1479fe38"
+    },
+    {
+      "path": "assets/kenney/furniture/lampSquareTable.glb",
+      "sourceSha256": "f8fba21c758d74b6d900499de177ca230ab8eabfbb9302ee386a373438910d20",
+      "importSha256": "f8fba21c758d74b6d900499de177ca230ab8eabfbb9302ee386a373438910d20"
+    },
+    {
+      "path": "assets/kenney/furniture/laptop.glb",
+      "sourceSha256": "28cbecd635f955e0505180be4c429e9263abb07325da3348fc80d9cdef1544a1",
+      "importSha256": "28cbecd635f955e0505180be4c429e9263abb07325da3348fc80d9cdef1544a1"
+    },
+    {
+      "path": "assets/kenney/furniture/loungeChairRelax.glb",
+      "sourceSha256": "de91ebada48ab83161f82e78d52ac27441ef6f0417f5a0188fc187982956e30e",
+      "importSha256": "de91ebada48ab83161f82e78d52ac27441ef6f0417f5a0188fc187982956e30e"
+    },
+    {
+      "path": "assets/kenney/furniture/loungeSofa.glb",
+      "sourceSha256": "d3870cf9bcf7f7ec37a46dd9742cf50c7d264ef924b42134dc099905f5a554a1",
+      "importSha256": "d3870cf9bcf7f7ec37a46dd9742cf50c7d264ef924b42134dc099905f5a554a1"
+    },
+    {
+      "path": "assets/kenney/furniture/plantSmall1.glb",
+      "sourceSha256": "c8bcbc68c38a5d6f5a2c10ac699026f23ecfae7a4311ac056b0db084ed02671e",
+      "importSha256": "c8bcbc68c38a5d6f5a2c10ac699026f23ecfae7a4311ac056b0db084ed02671e"
+    },
+    {
+      "path": "assets/kenney/furniture/plantSmall2.glb",
+      "sourceSha256": "efc1195f15f2fc9d2c9d56945d6c2b162255e2542e673162c5f4244ccd1f9bd2",
+      "importSha256": "efc1195f15f2fc9d2c9d56945d6c2b162255e2542e673162c5f4244ccd1f9bd2"
+    },
+    {
+      "path": "assets/kenney/furniture/plantSmall3.glb",
+      "sourceSha256": "74b5c24e6abc527d324f46afca38e9bb1e39875a5ccba1d7f56208ea15840fa5",
+      "importSha256": "74b5c24e6abc527d324f46afca38e9bb1e39875a5ccba1d7f56208ea15840fa5"
+    },
+    {
+      "path": "assets/kenney/furniture/pottedPlant.glb",
+      "sourceSha256": "98c9004f0ee94d50f354e7ee5363fe027109b4c4ca625f263ceeefd74d692eda",
+      "importSha256": "98c9004f0ee94d50f354e7ee5363fe027109b4c4ca625f263ceeefd74d692eda"
+    },
+    {
+      "path": "assets/kenney/furniture/radio.glb",
+      "sourceSha256": "97bcb44d4f6b81b14da0a959099e506ea42a636cc6316783a8b33d0b1e9c3f0e",
+      "importSha256": "97bcb44d4f6b81b14da0a959099e506ea42a636cc6316783a8b33d0b1e9c3f0e"
+    },
+    {
+      "path": "assets/kenney/furniture/rugRectangle.glb",
+      "sourceSha256": "296cb022a2f77e76bb5e6ec1796b87b3645be90066c79c484a89b8b82d38cf63",
+      "importSha256": "296cb022a2f77e76bb5e6ec1796b87b3645be90066c79c484a89b8b82d38cf63"
+    },
+    {
+      "path": "assets/kenney/furniture/rugRound.glb",
+      "sourceSha256": "0ebdaecf60492df440ad85798ab54c3b7eaa9f86c183eaa69e5c366d211bc025",
+      "importSha256": "0ebdaecf60492df440ad85798ab54c3b7eaa9f86c183eaa69e5c366d211bc025"
+    },
+    {
+      "path": "assets/kenney/furniture/sideTable.glb",
+      "sourceSha256": "e737b4b09f504296a9f567d7cf9cb8a7b3d921016f018d58d56a6ac280a009e7",
+      "importSha256": "e737b4b09f504296a9f567d7cf9cb8a7b3d921016f018d58d56a6ac280a009e7"
+    },
+    {
+      "path": "assets/kenney/furniture/speaker.glb",
+      "sourceSha256": "3b2ead02f42aca8447e1bf2a5c9342dc634c237fabb65aeeefe852e438e28f13",
+      "importSha256": "3b2ead02f42aca8447e1bf2a5c9342dc634c237fabb65aeeefe852e438e28f13"
+    },
+    {
+      "path": "assets/kenney/furniture/stoolBar.glb",
+      "sourceSha256": "2cb818d1cbb65c103d271ac1742328835dc3433a5c5635e8d8254e68a71a7dbe",
+      "importSha256": "2cb818d1cbb65c103d271ac1742328835dc3433a5c5635e8d8254e68a71a7dbe"
+    },
+    {
+      "path": "assets/kenney/furniture/table.glb",
+      "sourceSha256": "9808ee30632b5de9073e46f6e1339ae1b487c454d15987024e180dc152c7446e",
+      "importSha256": "9808ee30632b5de9073e46f6e1339ae1b487c454d15987024e180dc152c7446e"
+    },
+    {
+      "path": "assets/kenney/furniture/tableCoffee.glb",
+      "sourceSha256": "36022d425f51f76eac7d82df97f60cbed792dd900d25a5c21d0072cc78b0170f",
+      "importSha256": "36022d425f51f76eac7d82df97f60cbed792dd900d25a5c21d0072cc78b0170f"
+    },
+    {
+      "path": "assets/kenney/furniture/tableRound.glb",
+      "sourceSha256": "3ee5d8faf1cc3973b5c6cb39bcdc2fd0315fa73f58c37f891c2637f304d4fed3",
+      "importSha256": "3ee5d8faf1cc3973b5c6cb39bcdc2fd0315fa73f58c37f891c2637f304d4fed3"
+    },
+    {
+      "path": "assets/kenney/furniture/televisionModern.glb",
+      "sourceSha256": "4461ac0614cb734f204f41cff250bea74cf1087f1ff6b8959dea305703648be7",
+      "importSha256": "4461ac0614cb734f204f41cff250bea74cf1087f1ff6b8959dea305703648be7"
+    },
+    {
+      "path": "assets/kenney/furniture/toaster.glb",
+      "sourceSha256": "9db1ea7bc41978283135b628de209c18e2ee0381533c5cee7132a7b599743987",
+      "importSha256": "9db1ea7bc41978283135b628de209c18e2ee0381533c5cee7132a7b599743987"
+    },
+    {
+      "path": "assets/kenney/furniture/trashcan.glb",
+      "sourceSha256": "47f64a0cefe143bc3a6e10acd0c9247e019c692f1883cb45ffea441e160ea426",
+      "importSha256": "47f64a0cefe143bc3a6e10acd0c9247e019c692f1883cb45ffea441e160ea426"
+    },
+    {
+      "path": "assets/kenney/furniture/wallWindow.glb",
+      "sourceSha256": "b669ca8a0b1ab63461c06fb62b8dde78b22414f0f14c48405213f8f57ccbcaf4",
+      "importSha256": "b669ca8a0b1ab63461c06fb62b8dde78b22414f0f14c48405213f8f57ccbcaf4"
+    },
+    {
+      "path": "assets/launch-axis-campus.webp",
+      "sourceSha256": "0b6a094a981e1094b967bb90863260bc136b4ee16f78050df782ab3361ae1712",
+      "importSha256": "0b6a094a981e1094b967bb90863260bc136b4ee16f78050df782ab3361ae1712"
+    },
+    {
+      "path": "licenses/MESHOPT-LICENSE.txt",
+      "sourceSha256": "3883a2d559eedbb462336d9c0b0e8855589d0dfac46a343819add053be8e5569",
+      "importSha256": "3883a2d559eedbb462336d9c0b0e8855589d0dfac46a343819add053be8e5569"
+    },
+    {
+      "path": "licenses/THREE-LICENSE.txt",
+      "sourceSha256": "97de7ac302052bcea7f20e5ae89635c10e049614f56409288d554d63fceb614f",
+      "importSha256": "97de7ac302052bcea7f20e5ae89635c10e049614f56409288d554d63fceb614f"
+    }
+  ]
+}

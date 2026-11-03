@@ -1,0 +1,422 @@
+{
+  "sourceCommit": "ca31870",
+  "mode": "Reuse ca31870 runtime modules with explicit campus adaptations; historical SQL retained only as reference/test fixtures. Existing DEV metadata verified separately; new campus allowlist only.",
+  "files": [
+    {
+      "path": "app/ui/final/curriculum-ai-conversation.tsx",
+      "sha256": "2c423cdb1d383ba778c297338d6de97796be83e51ea03592db619671091cb806",
+      "originalSourceSha256": "c00383a1ae3717c42fa7d91937530ba9adf03ff3dc866ed4918be1af2bf1e913",
+      "adaptedInCampusWorkspace": true
+    },
+    {
+      "path": "lib/question-hub.ts",
+      "sha256": "06ab8d437a4e317d8120940a234dcef27f137922d30e76a7dbcc837094e5926b",
+      "originalSourceSha256": "06ab8d437a4e317d8120940a234dcef27f137922d30e76a7dbcc837094e5926b",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "lib/curriculum-ai.ts",
+      "sha256": "d1f663f61cdc2b3f0bd7ced450b9a560101c4b29b906ccee5d3771afdd1d685e",
+      "originalSourceSha256": "d1f663f61cdc2b3f0bd7ced450b9a560101c4b29b906ccee5d3771afdd1d685e",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "lib/lesson-body.ts",
+      "sha256": "e02cfc8e19c0c33efbefe707643df2dcdbd0b9d5b9684646409b59be38791e36",
+      "originalSourceSha256": "e02cfc8e19c0c33efbefe707643df2dcdbd0b9d5b9684646409b59be38791e36",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "lib/lesson-blocks.ts",
+      "sha256": "952d0188882fae2bdaac0f262314db7f1a0df43c0857d92a5b8da62dedfdf61a",
+      "originalSourceSha256": "952d0188882fae2bdaac0f262314db7f1a0df43c0857d92a5b8da62dedfdf61a",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "lib/lesson-guided-tools.ts",
+      "sha256": "e0cda0ba4675deac7e7471fdebb5434ae90170e81af2da3ffab859faab2ae46b",
+      "originalSourceSha256": "e0cda0ba4675deac7e7471fdebb5434ae90170e81af2da3ffab859faab2ae46b",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "lib/lesson-calculators.ts",
+      "sha256": "b1d49437d26b13d638a4882fd3793f504a4648f4a9206be1080d781cae99330f",
+      "originalSourceSha256": "b1d49437d26b13d638a4882fd3793f504a4648f4a9206be1080d781cae99330f",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "lib/curriculum-ai-history.ts",
+      "sha256": "0f5ec4d32ec096c5626957585671ac1fb364c87b1ce79b0f0be92a615601e2b7",
+      "originalSourceSha256": "0f5ec4d32ec096c5626957585671ac1fb364c87b1ce79b0f0be92a615601e2b7",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "app/ui/final/question-image.tsx",
+      "sha256": "96605d8c7c917e1e1db1aeb5df7e4da5775b9e6e4d7dc3b7757136801b269ee6",
+      "originalSourceSha256": "96605d8c7c917e1e1db1aeb5df7e4da5775b9e6e4d7dc3b7757136801b269ee6",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "lib/lesson-files.ts",
+      "sha256": "a444248c51be6b0ad383556ba5c374aa412898208e4749e1748e25a054cf7433",
+      "originalSourceSha256": "a444248c51be6b0ad383556ba5c374aa412898208e4749e1748e25a054cf7433",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "lib/ongoing-lessons.ts",
+      "sha256": "3315e5fad85b1ec89e69944c29c1e39595537ffca30ba66ccf2dcbd755295919",
+      "originalSourceSha256": "3315e5fad85b1ec89e69944c29c1e39595537ffca30ba66ccf2dcbd755295919",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "app/ui/final/question-image-dropzone.tsx",
+      "sha256": "6d58b6c2a5ebfcb25766e04a3dba0a568449060409e78b736c3206f7b1c7de9a",
+      "originalSourceSha256": "6d58b6c2a5ebfcb25766e04a3dba0a568449060409e78b736c3206f7b1c7de9a",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "app/ui/final/question-image-dropzone.css",
+      "sha256": "37d8af7493c4c67e43db43e19b696e2436fb64fc42a81d49fcfe30278c77fbf9",
+      "originalSourceSha256": "37d8af7493c4c67e43db43e19b696e2436fb64fc42a81d49fcfe30278c77fbf9",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "app/ui/final/question-composer.tsx",
+      "sha256": "f796d4718e9a4fb849d1725b5c55ece3350eb94f69aee28edd93467f0e4b7230",
+      "originalSourceSha256": "f796d4718e9a4fb849d1725b5c55ece3350eb94f69aee28edd93467f0e4b7230",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "app/ui/final/lesson-text.tsx",
+      "sha256": "24ea9133724977e7e5f2bc191a415e1c1f7bc23f00c464486179dba28274c6aa",
+      "originalSourceSha256": "24ea9133724977e7e5f2bc191a415e1c1f7bc23f00c464486179dba28274c6aa",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "app/ui/final/lesson-text.css",
+      "sha256": "2436117d33ee87578f6aa792e1de6ec040dc5dc8334caf998f7b29c11a7c12e2",
+      "originalSourceSha256": "2436117d33ee87578f6aa792e1de6ec040dc5dc8334caf998f7b29c11a7c12e2",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "app/ui/final/use-unsaved-learning-changes.ts",
+      "sha256": "76d25952efa24c6377f82260d6d529274ff2e40e597941233bafbcc99fe9be21",
+      "originalSourceSha256": "76d25952efa24c6377f82260d6d529274ff2e40e597941233bafbcc99fe9be21",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "app/ui/final/question-hub.css",
+      "sha256": "e04b004823298e46feea4498181bed1a52cf4d20640274d22fdbd6db62cfa21c",
+      "originalSourceSha256": "e04b004823298e46feea4498181bed1a52cf4d20640274d22fdbd6db62cfa21c",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "app/ui/final/curriculum-ai.css",
+      "sha256": "d4ca2370b8cfd5f5e398daff6fa40f25909e1ceaac536b670eaa77d8fd517455",
+      "originalSourceSha256": "d4ca2370b8cfd5f5e398daff6fa40f25909e1ceaac536b670eaa77d8fd517455",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "app/ui/final/curriculum-ai-history.tsx",
+      "sha256": "c99e480b48d903e0f43706cb9b33fc30c51c9e2f1c5a7873d723c35574ccce42",
+      "originalSourceSha256": "c99e480b48d903e0f43706cb9b33fc30c51c9e2f1c5a7873d723c35574ccce42",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "app/ui/final/question-admin-hub.tsx",
+      "sha256": "f454bef97fc2f884f22f249ecb23e2594ed727db5b8df9b008f5a40f7ad68235",
+      "originalSourceSha256": "dcf182c41872f739776b878ab0fda8d3b0c9c27ab4c5786d351956fa51132c49",
+      "adaptedInCampusWorkspace": true
+    },
+    {
+      "path": "app/ui/final/question-ai-batch.tsx",
+      "sha256": "713e94ae1997cf69b9cb1ccdd24c896c5f2a668013e7a2101e509d6bde2c8486",
+      "originalSourceSha256": "713e94ae1997cf69b9cb1ccdd24c896c5f2a668013e7a2101e509d6bde2c8486",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "lib/question-ai-context.ts",
+      "sha256": "34c8e2b29089d93d7bc603e94f914976b2ac16cea8db41d21f409c90105375f7",
+      "originalSourceSha256": "34c8e2b29089d93d7bc603e94f914976b2ac16cea8db41d21f409c90105375f7",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "app/ui/final/question-thread.tsx",
+      "sha256": "556709feeb23fa5ffcae56a49a399d225f5ffa127299f255ee47fe49ca21d3ec",
+      "originalSourceSha256": "4ede71ad02514ff7d7c5390daf578ef1b9513c0108c835df83358eec0bfd7554",
+      "adaptedInCampusWorkspace": true
+    },
+    {
+      "path": "app/ui/final/question-ai-reference.tsx",
+      "sha256": "d50b6ba14daba17cf765b75cb732922dfe8bc46a3839a5ecb445d62e6835d2d9",
+      "originalSourceSha256": "d50b6ba14daba17cf765b75cb732922dfe8bc46a3839a5ecb445d62e6835d2d9",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "app/ui/final/question-hub.tsx",
+      "sha256": "251aa83177cfd9c7bf4239bd2e13bd8b3f7f9f2b1f24650566f1c5bd44f3ca6a",
+      "originalSourceSha256": "251aa83177cfd9c7bf4239bd2e13bd8b3f7f9f2b1f24650566f1c5bd44f3ca6a",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "app/ui/final/question-entry.tsx",
+      "sha256": "57178e75f9d14d9aadc721bb3e8dc27a9cbd70639b9f5b9798e37d4178a27ac6",
+      "originalSourceSha256": "57178e75f9d14d9aadc721bb3e8dc27a9cbd70639b9f5b9798e37d4178a27ac6",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "app/api/platform/question-hub/route.ts",
+      "sha256": "0c56d2cd86c983bb14bd411a2489465b5e2e437aa4cca39e2c4c6002306e06e2",
+      "originalSourceSha256": "0c56d2cd86c983bb14bd411a2489465b5e2e437aa4cca39e2c4c6002306e06e2",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "lib/question-hub-server.ts",
+      "sha256": "e141af0fb8c30a113786a151bbee677106eb57a643d1d611cbd52a974d96abd8",
+      "originalSourceSha256": "e141af0fb8c30a113786a151bbee677106eb57a643d1d611cbd52a974d96abd8",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "app/api/platform/question-thread/route.ts",
+      "sha256": "a6cf9d23bc03514809a8c5431b052ea2c60818813d1b5c467077bec4c480fa7c",
+      "originalSourceSha256": "a6cf9d23bc03514809a8c5431b052ea2c60818813d1b5c467077bec4c480fa7c",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "app/api/platform/question-images/route.ts",
+      "sha256": "7b6985fdb4691bc802e8252695f23f969023dc57c338960fa1886cecca5162c7",
+      "originalSourceSha256": "7b6985fdb4691bc802e8252695f23f969023dc57c338960fa1886cecca5162c7",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "app/api/platform/curriculum-ai/route.ts",
+      "sha256": "647a1aaec8efc76780fca42c4091d53ed3d329f27f0edb69588840eca916df03",
+      "originalSourceSha256": "647a1aaec8efc76780fca42c4091d53ed3d329f27f0edb69588840eca916df03",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "lib/curriculum-ai-server.ts",
+      "sha256": "716d21b1aaea891f9b99aef0c734e73ad4ff8c2ebfeff01eef81251e51cf9fe8",
+      "originalSourceSha256": "716d21b1aaea891f9b99aef0c734e73ad4ff8c2ebfeff01eef81251e51cf9fe8",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "lib/curriculum-ai-image.ts",
+      "sha256": "5d82a2ae3d8cb5297053c1a83cd3788293ca7b0c97c16852575de4a3b281e429",
+      "originalSourceSha256": "5d82a2ae3d8cb5297053c1a83cd3788293ca7b0c97c16852575de4a3b281e429",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "lib/curriculum-tutor-server.ts",
+      "sha256": "d78934cbb5a21f02f34767dd1d47e908375704caeaedc3b01bb5108f7ce91cc9",
+      "originalSourceSha256": "d78934cbb5a21f02f34767dd1d47e908375704caeaedc3b01bb5108f7ce91cc9",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "lib/curriculum-tutor.ts",
+      "sha256": "edcbc8243f4592f3dbc851476fa1ec44b8b91a7b5bd59c29272ea7044c75e5b8",
+      "originalSourceSha256": "edcbc8243f4592f3dbc851476fa1ec44b8b91a7b5bd59c29272ea7044c75e5b8",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "app/api/platform/curriculum-ai/history/route.ts",
+      "sha256": "95e7be822dbafc5bc0e842d32f4b7371d5be1eb19e9c1fcf8225bab48056e727",
+      "originalSourceSha256": "95e7be822dbafc5bc0e842d32f4b7371d5be1eb19e9c1fcf8225bab48056e727",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "app/api/platform/lesson-questions/route.ts",
+      "sha256": "6d115eef41a9f87d3d608a2fac584f2a120de2c02280d4865442de144ada226e",
+      "originalSourceSha256": "6d115eef41a9f87d3d608a2fac584f2a120de2c02280d4865442de144ada226e",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "app/api/admin/ai-usage/route.ts",
+      "sha256": "fe85816a5589f0f06a8ee5afa86d6079cdb973a2bfe9e976f9d180b60472b844",
+      "originalSourceSha256": "fe85816a5589f0f06a8ee5afa86d6079cdb973a2bfe9e976f9d180b60472b844",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "app/api/admin/questions/answer-draft/route.ts",
+      "sha256": "b90ee337059168021750f51553768a1427266644192151d8908be1670f573be9",
+      "originalSourceSha256": "b90ee337059168021750f51553768a1427266644192151d8908be1670f573be9",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "app/api/admin/questions/answer-drafts/route.ts",
+      "sha256": "349999db4c34e5e473b499656c4ab0649e7026b166f4ac2c36b876c7ec8c81e4",
+      "originalSourceSha256": "349999db4c34e5e473b499656c4ab0649e7026b166f4ac2c36b876c7ec8c81e4",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "app/api/admin/questions/hub/route.ts",
+      "sha256": "ffc2f71e62fadc3e19ff5773815dbf1c343f22a9aab96a46ce9253506c11bd6d",
+      "originalSourceSha256": "ffc2f71e62fadc3e19ff5773815dbf1c343f22a9aab96a46ce9253506c11bd6d",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "tests/fixtures/ai-reference-migrations/20261002102249_learner_feedback_question_push.sql",
+      "sha256": "00834d5232cc1d5ff95f459550988917472ae0eba453d9e23f6e407dfc8c8c56",
+      "originalSourcePath": "supabase/migrations/20261002102249_learner_feedback_question_push.sql",
+      "purpose": "Historical test/reference SQL; excluded from DEV deployment. Objects already present in actual DEV metadata.",
+      "originalSourceSha256": "00834d5232cc1d5ff95f459550988917472ae0eba453d9e23f6e407dfc8c8c56",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "tests/fixtures/ai-reference-migrations/20261002102052_learner_feedback_question_community.sql",
+      "sha256": "a2e37940183629dfb7302d502ad9e2dbd77f0cb96726a8647cdddcaa81e821a6",
+      "originalSourcePath": "supabase/migrations/20261002102052_learner_feedback_question_community.sql",
+      "purpose": "Historical test/reference SQL; excluded from DEV deployment. Objects already present in actual DEV metadata.",
+      "originalSourceSha256": "a2e37940183629dfb7302d502ad9e2dbd77f0cb96726a8647cdddcaa81e821a6",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "tests/fixtures/ai-reference-migrations/20260928205907_question_answer_threads.sql",
+      "sha256": "1aae882020912fe61b07931da30bafafef8ea2f3fa5e56c39a11cb1cbbb8724a",
+      "originalSourcePath": "supabase/migrations/20260928205907_question_answer_threads.sql",
+      "purpose": "Historical test/reference SQL; excluded from DEV deployment. Objects already present in actual DEV metadata.",
+      "originalSourceSha256": "1aae882020912fe61b07931da30bafafef8ea2f3fa5e56c39a11cb1cbbb8724a",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "tests/fixtures/ai-reference-migrations/20261008004234_question_answer_images.sql",
+      "sha256": "5101dd4c21af009ceedf12078e2efe7b02f3fbb0a5783728a02f0e4564c855c8",
+      "originalSourcePath": "supabase/migrations/20261008004234_question_answer_images.sql",
+      "purpose": "Historical test/reference SQL; excluded from DEV deployment. Objects already present in actual DEV metadata.",
+      "originalSourceSha256": "5101dd4c21af009ceedf12078e2efe7b02f3fbb0a5783728a02f0e4564c855c8",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "tests/fixtures/ai-reference-migrations/20260930055906_question_hub.sql",
+      "sha256": "8c273849f5911512b9e5e979ffdf85484e2b3e94581952815f02a1316259e513",
+      "originalSourcePath": "supabase/migrations/20260930055906_question_hub.sql",
+      "purpose": "Historical test/reference SQL; excluded from DEV deployment. Objects already present in actual DEV metadata.",
+      "originalSourceSha256": "8c273849f5911512b9e5e979ffdf85484e2b3e94581952815f02a1316259e513",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "tests/fixtures/ai-reference-migrations/20261030064453_edu_curriculum_ai_and_usage.sql",
+      "sha256": "7f135ad9c71f625406a095998235e37e358ccfa415dd04e57a5d3839720a6600",
+      "originalSourcePath": "supabase/migrations/20261030064453_edu_curriculum_ai_and_usage.sql",
+      "purpose": "Historical test/reference SQL; excluded from DEV deployment. Objects already present in actual DEV metadata.",
+      "originalSourceSha256": "7f135ad9c71f625406a095998235e37e358ccfa415dd04e57a5d3839720a6600",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "tests/fixtures/ai-reference-migrations/20260929071444_question_learner_followups.sql",
+      "sha256": "e5a87d36ba3962dc9f8cae6cf80a726041ae44aad8c31f614d00233556a4fd66",
+      "originalSourcePath": "supabase/migrations/20260929071444_question_learner_followups.sql",
+      "purpose": "Historical test/reference SQL; excluded from DEV deployment. Objects already present in actual DEV metadata.",
+      "originalSourceSha256": "e5a87d36ba3962dc9f8cae6cf80a726041ae44aad8c31f614d00233556a4fd66",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "tests/fixtures/ai-reference-migrations/20261001053500_alumni_questions.sql",
+      "sha256": "ee5b386a53e2d7bd4ae4511ee793a1067a1ecf3a3675f8c1a47762e253d74ef3",
+      "originalSourcePath": "supabase/migrations/20261001053500_alumni_questions.sql",
+      "purpose": "Historical test/reference SQL; excluded from DEV deployment. Objects already present in actual DEV metadata.",
+      "originalSourceSha256": "ee5b386a53e2d7bd4ae4511ee793a1067a1ecf3a3675f8c1a47762e253d74ef3",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "tests/fixtures/ai-reference-migrations/20260928211554_question_private_images.sql",
+      "sha256": "73dd1095304ed04b32e0917ac37329c93341acccf543526d7d011d4725d04c43",
+      "originalSourcePath": "supabase/migrations/20260928211554_question_private_images.sql",
+      "purpose": "Historical test/reference SQL; excluded from DEV deployment. Objects already present in actual DEV metadata.",
+      "originalSourceSha256": "73dd1095304ed04b32e0917ac37329c93341acccf543526d7d011d4725d04c43",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "tests/fixtures/ai-reference-migrations/20260927035640_lesson_private_questions.sql",
+      "sha256": "de578817ccd1939b8beba1d2612fb5c3661704a00947eb245c22c2b3b19eb7a2",
+      "originalSourcePath": "supabase/migrations/20260927035640_lesson_private_questions.sql",
+      "purpose": "Historical test/reference SQL; excluded from DEV deployment. Objects already present in actual DEV metadata.",
+      "originalSourceSha256": "de578817ccd1939b8beba1d2612fb5c3661704a00947eb245c22c2b3b19eb7a2",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "tests/curriculum-ai-image.test.mjs",
+      "sha256": "10ae79a7e74504e38801a5f30b5d5ad6fc58512d753551b569a13c33c1906558",
+      "originalSourceSha256": "10ae79a7e74504e38801a5f30b5d5ad6fc58512d753551b569a13c33c1906558",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "tests/curriculum-ai-server.test.mjs",
+      "sha256": "20453aa076de6c011fa0a83815f3b39845fdbd0f99d9d18302f0e156008ea5e5",
+      "originalSourceSha256": "20453aa076de6c011fa0a83815f3b39845fdbd0f99d9d18302f0e156008ea5e5",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "tests/question-hub-database.test.mjs",
+      "sha256": "d499dc8c03ac87b97cdee215c6ba7509797829f269c6441c04a47fd4b5a59803",
+      "originalSourceSha256": "41efbcecf3c5af46e6c21643f1abf63e2437c5807dbab80ecaa07a6f555b49a9",
+      "adaptedInCampusWorkspace": true
+    },
+    {
+      "path": "tests/curriculum-ai-database.test.mjs",
+      "sha256": "bdba509000e74d68d8a9c768e3d5b90d2cdb25eb38a017b2fe976f3702dc4bc1",
+      "originalSourceSha256": "bdba509000e74d68d8a9c768e3d5b90d2cdb25eb38a017b2fe976f3702dc4bc1",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "tests/curriculum-ai-routes.test.mjs",
+      "sha256": "44bc2999dd3b87c05fbc9b99d7a73ad974d9f8340a1ddbc14dc2311d63c1baa9",
+      "originalSourceSha256": "44bc2999dd3b87c05fbc9b99d7a73ad974d9f8340a1ddbc14dc2311d63c1baa9",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "tests/curriculum-ai-history-database.test.mjs",
+      "sha256": "3b3f9a7c5ab5fe70c08109ec194e4303e5c93f65135ca5d16e84d22582d6809b",
+      "originalSourceSha256": "3b3f9a7c5ab5fe70c08109ec194e4303e5c93f65135ca5d16e84d22582d6809b",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "tests/curriculum-ai.test.mjs",
+      "sha256": "edc2ec2f83c66222829c7fdd01d13e050328fa8744111d854e4f61ca3ec9fd7f",
+      "originalSourceSha256": "edc2ec2f83c66222829c7fdd01d13e050328fa8744111d854e4f61ca3ec9fd7f",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "tests/curriculum-tutor.test.mjs",
+      "sha256": "b7eda3f935a6baec7b8e6685ef56c5b18af6a0b588989a5f37af32da64ceccc6",
+      "originalSourceSha256": "b7eda3f935a6baec7b8e6685ef56c5b18af6a0b588989a5f37af32da64ceccc6",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "tests/question-hub-route.test.mjs",
+      "sha256": "cb49b8598fad9f7ec61774129cd3ab258973e22c8ef8406c6fc034acbd5e2d10",
+      "originalSourceSha256": "cb49b8598fad9f7ec61774129cd3ab258973e22c8ef8406c6fc034acbd5e2d10",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "lib/curriculum-ai-mentor.ts",
+      "sha256": "ed7f866c41363af878b7716456dd66883961afd3980f8edc5ef8b90ce82bbfe4",
+      "originalSourceSha256": "ed7f866c41363af878b7716456dd66883961afd3980f8edc5ef8b90ce82bbfe4",
+      "adaptedInCampusWorkspace": false
+    },
+    {
+      "path": "features/admin-ui/components/use-unsaved-warning.ts",
+      "sha256": "4bfc13ba54684cb2b8ac0ebdc87ea22d5ac82094cb750809cb7ba3dfd2e13d79",
+      "originalSourceSha256": "4bfc13ba54684cb2b8ac0ebdc87ea22d5ac82094cb750809cb7ba3dfd2e13d79",
+      "adaptedInCampusWorkspace": false
+    }
+  ],
+  "existingDifferentReviewedBoundaries": [
+    "lib/platform.ts",
+    "features/admin-ui.ts",
+    "app/ui/final/primitives.tsx",
+    "lib/server-auth.ts"
+  ],
+  "devMetadataEvidence": "Private, local-only verification record; not bundled with the public repository. See integration/campus/README.md.",
+  "historicalMigrationPolicy": "Never apply tests/fixtures/ai-reference-migrations to an existing DEV database automatically; clean-install prerequisites require a separate full-source migration plan.",
+  "additionalSchemaReferences": [
+    {
+      "path": "tests/fixtures/ai-reference-migrations/20261003054513_admin_sent_message_delete.sql",
+      "sourcePath": "supabase/migrations/20261003054513_admin_sent_message_delete.sql",
+      "sourceCommit": "ca31870",
+      "sha256": "6ad9da97f2cc37cd3d141ee169e6f937a701b1dd72c772b256d523165e60a795",
+      "reason": "edu_delete_question_answer runtime dependency; actual DEV signature exists; reference only, never auto-apply"
+    }
+  ],
+  "sourceLocationRecord": "Source checkout location is retained only in the private verification record; source commit and per-file hashes are preserved here."
+}

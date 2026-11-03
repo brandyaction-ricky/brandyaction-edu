@@ -175,6 +175,7 @@ export function AdminShell({
         </div>
         <nav aria-label="관리자 카테고리">
           {matchesMenu('overview', '운영 홈') && navLink('overview')}
+          {process.env.NEXT_PUBLIC_EDU_CAMPUS_ENABLED==='true'&&visibility.has('campaigns')&&matchesMenu('campus-webinars','캠퍼스 입장 링크')&&<Link className="nav-link" href="/admin/campus/webinars" onClick={()=>setMobile(false)}><Compass aria-hidden="true"/><span>캠퍼스 입장 링크</span></Link>}
           {user.role === 'admin' && matchesMenu('diagnosis-management') && <Link href="/admin/diagnosis/manage" className={`nav-link${selected === 'diagnosis-management' ? ' active' : ''}`} aria-current={selected === 'diagnosis-management' ? 'page' : undefined} onClick={() => setMobile(false)}><Compass aria-hidden="true"/>N6 진단 관리</Link>}
           {user.role === 'admin' && matchesMenu('diagnosis', 'N6 진단 받기') && <Link href="/admin/diagnosis" className="nav-link" onClick={() => setMobile(false)}><Compass aria-hidden="true"/>N6 진단 받기</Link>}
           {query && <p className="admin-menu-search-result" role="status">{matchingGroups.reduce((count, [, keys]) => count + keys.length, extra.length + matchingDirect)}개 메뉴 · 검색어를 지우면 전체 메뉴가 보입니다.</p>}

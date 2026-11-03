@@ -17,6 +17,14 @@ const nextConfig: NextConfig = {
         { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
         { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
       ],
+    }, {
+      // The local 3D world is embedded only by the authenticated campus host.
+      // Keep every other route unframeable, including payment and account pages.
+      source: "/campus/world/:path*",
+      headers: [
+        { key: "X-Frame-Options", value: "SAMEORIGIN" },
+        { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
+      ],
     }];
   },
 };

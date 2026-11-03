@@ -1,0 +1,38 @@
+import '../../app/ui/final/tokens.css';
+import React, { useState } from 'react';
+import {WebinarRoom} from '../../features/campus/webinar/room';
+import {WebinarAdmin} from '../../features/campus/webinar/admin';
+import {event as webinarEvent} from '../webinar-fixture/data';
+import { createRoot } from 'react-dom/client';
+import { CampusFrame, LearnerDashboard, AdminDashboard } from '../../features/campus/ui/dashboard';
+import { LearnerLive, AdminLive } from '../../features/campus/ui/live';
+import { student,admin } from './data';
+import {CommunityPanel} from '../../features/campus/community/panel';
+import {PersonalArchive} from '../../features/campus/business/archive-panel';
+import {BusinessCasesAdminPanel} from '../../features/campus/business/case-panel';
+import {SpaceAdminPanel} from '../../features/campus/space/admin-panel';
+import {BusinessPanel} from '../../features/campus/business/panel';
+import {SupportPanel} from '../../features/campus/support/panel';
+import {SupportAdminPanel} from '../../features/campus/support/admin-panel';
+import {PublicReview} from '../../features/campus/business/public-review';
+import {CampusWorkspace} from '../../features/campus/ui/workspace';
+function App(){const [mode,setMode]=useState('student');const [notice,setNotice]=useState('');
+if(location.pathname==='/webinar')return <WebinarRoom event={{...webinarEvent,youtubeId:new URLSearchParams(location.search).has('video')?'abcdefghijk':''}} demo={!new URLSearchParams(location.search).has('api')}/>;
+if(location.pathname==='/webinar-admin')return <WebinarAdmin/>;
+if(location.pathname==='/workspace-scope-test')return <ScopeFixture/>;
+if(location.pathname==='/community-live')return <CampusFrame demo><CommunityPanel snapshot={student} demo={false}/></CampusFrame>;
+if(location.pathname==='/archive-live')return <PersonalArchive/>;
+if(location.pathname==='/business-admin-live')return <CampusFrame admin><BusinessCasesAdminPanel cohortId={student.scopes[0].cohortId} demo={false}/></CampusFrame>;
+if(location.pathname==='/business-admin')return <CampusFrame demo admin><BusinessCasesAdminPanel cohortId={student.scopes[0].cohortId} demo/></CampusFrame>;
+if(location.pathname==='/space-admin')return <CampusFrame demo admin><SpaceAdminPanel cohortId={student.scopes[0].cohortId} demo/></CampusFrame>;
+if(location.pathname==='/support-live')return <CampusFrame demo><SupportPanel snapshot={student} demo={false}/></CampusFrame>;
+if(location.pathname==='/operations-live')return <CampusFrame demo admin><SupportAdminPanel cohortId={student.scopes[0].cohortId} demo={false}/></CampusFrame>;
+if(location.pathname==='/business-live')return <CampusFrame demo><BusinessPanel snapshot={student} demo={false}/></CampusFrame>;
+if(location.pathname==='/campus/review')return <PublicReview/>;
+if(location.pathname==='/operations')return <CampusFrame demo admin><SupportAdminPanel cohortId={student.scopes[0].cohortId} demo/></CampusFrame>;
+if(['/workspace','/space','/community','/business','/support','/ai','/office','/journal'].includes(location.pathname))return <CampusWorkspace snapshot={student} demo initialSection={location.pathname==='/workspace'?'learning':location.pathname.slice(1)} onOpen={(id)=>setNotice('가상 수업: '+id)} onSelect={()=>{}} onRefresh={()=>{}}/>;
+if(location.search.includes('live=student'))return <LearnerLive/>;
+if(location.search.includes('live=admin'))return <AdminLive/>;
+return <CampusFrame demo admin={mode==='admin'}><nav aria-label="미리보기 화면" style={{display:'flex',gap:10,marginBottom:25}}>{[['student','수강생 성장보드'],['admin','관리자 기수 현황']].map(([id,label])=><button key={id} onClick={()=>{setMode(id);setNotice('');}} aria-pressed={mode===id} style={{border:'1px solid #d6e2f1',borderRadius:9,padding:'10px 16px',background:mode===id?'#225bdb':'white',color:mode===id?'white':'#234',fontSize:13}}>{label}</button>)}</nav>{notice&&<p role="status" style={{padding:14,background:'#e9f2ff',marginBottom:18,borderRadius:10}}>{notice}</p>}{mode==='student'?<LearnerDashboard snapshot={student} demo onSelect={()=>{}} onRefresh={()=>setNotice('가상 학습 기록을 다시 확인했습니다.')} onOpen={(lessonId,missionId)=>setNotice(`${student.lessons.find(l=>l.id===lessonId)?.title} · ${missionId?'과제 제출·의견':'수업'} 화면으로 연결하는 동작입니다. 이 미리보기에서는 실제 수업을 열지 않습니다.`)}/>:<AdminDashboard snapshot={admin} onRefresh={()=>setNotice('가상 기수 기록을 다시 확인했습니다.')}/>}</CampusFrame>}
+function ScopeFixture(){const [selected,setSelected]=useState(student.selectedEnrollmentId!);const scopes=[...student.scopes,{...student.scopes[0],enrollmentId:'00000000-0000-4000-8000-000000000102',cohortName:'두 번째 가상 기수'}];return <CampusWorkspace snapshot={{...student,scopes,selectedEnrollmentId:selected}} demo onOpen={()=>{}} onSelect={setSelected} onRefresh={()=>{}}/>;}
+createRoot(document.getElementById('root')!).render(<App/>);
