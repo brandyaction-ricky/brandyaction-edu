@@ -16,7 +16,7 @@ export function fromWire(point) {
   const value = {x: bounds.minX+point.x/24*(bounds.maxX-bounds.minX), y: bounds.minY+point.y/22*(bounds.maxY-bounds.minY)};
   return pointInPolygon(value, room.outline) ? value : null;
 }
-export const COMMANDS = new Set(['init','profile','progress','peers','camera','zone','seat','stand','wave','controls','speech','focus-status','desk-seat','presentation','exhibition','launch','cohort-launch','appearance-open','appearance-result']);
+export const COMMANDS = new Set(['init','ui-blocked','profile','progress','peers','camera','zone','seat','stand','wave','controls','speech','focus-status','desk-seat','presentation','exhibition','launch','cohort-launch','appearance-open','appearance-result']);
 export function acceptsHost(event, origin, parent, token) {
   const value=event.data;
   return token.length>=32 && event.origin===origin && event.source===parent && !!value && value.source==='moonshot-host' && value.token===token && COMMANDS.has(value.type);

@@ -1,3 +1,4 @@
+import {attachSpatialActions} from './spatial-actions.mjs';
 import {attachAppearanceEditor} from './appearance-editor.mjs';
 import * as CampusPlan from './vendor/campus-plan.js';
 import * as CampusInterior from './vendor/interior-layout.js';
@@ -13,13 +14,13 @@ import {createRenderQuality} from '../src/render-quality.mjs';
 
 const token=new URLSearchParams(location.hash.slice(1)).get('bridge')||'';
 const root=document.getElementById('office'),status=document.getElementById('status');
-let office,scene,editor,ready=false,started=false,timer,restorePerformance,closed=new Set(),lastPosition='',lastSent=0;
+let office,scene,editor,spatialActions,uiBlocked=false,ready=false,started=false,timer,restorePerformance,closed=new Set(),lastPosition='',lastSent=0;
 const speech=new Map(),pending=new Map();
 let wakeWorld=()=>{};
 const send=(type,payload={})=>{if(token.length>=32&&parent!==window)parent.postMessage({source:'moonshot-world',token,type,payload},location.origin);};
 const say=text=>{status.textContent=text;};
 const sections={focus:'desk',mission:'mission',feedback:'board',lounge:'chat',launch:'launch'};
-function interact(activity){const section=sections[activity]||activity;if(closed.has(section))return;say('에듀에서 이어서 확인하세요.');send(section==='desk'?'seat':'navigate',{section});}
+function interact(activity){const section=sections[activity]||activity;if(closed.has(section))return;say('선택한 공간의 창을 열었어요. 닫으면 이 자리로 돌아와요.');send(section==='desk'?'seat':'navigate',{section});}
 function moveZone(id){
   if(closed.has(id))return;
   const key=Object.keys(sections).find(k=>sections[k]===id);
@@ -31,6 +32,7 @@ function moveZone(id){
 }
 function handle(type,p={}){
   wakeWorld();
+  if(type==='ui-blocked'){uiBlocked=p.blocked===true;root.inert=uiBlocked;if(uiBlocked)office.pauseCampusInput();else if(!document.hidden){office.resumeCampusInput();office.draw();}return;}
   if(type==='profile'){
     office.campusIdentity={...office.campusIdentity,...appearance(p),displayId:String(p.name||'문샷 동료').slice(0,24),gender:p.gender==='female'?'female':'male',coat:/^#[0-9a-f]{6}$/i.test(p.coat)?p.coat:'#527086'};
     office.draw();
@@ -45,12 +47,12 @@ function handle(type,p={}){
   else if(type==='seat'){
     // Only the EDU host's successful seat reservation may trigger sitting.
     const seat=CampusPlan.getStudySeats()[[0,2,4][p.index]];
-    if(seat&&scene.setPose('sit')){Object.assign(office.campusAvatar,{x:seat.x,y:seat.y});office.draw();say('자리에 앉았어요. 에듀 집중 타이머를 시작해 보세요.');}
+    if(seat&&scene.setPose('sit')){Object.assign(office.campusAvatar,{x:seat.x,y:seat.y});office.draw();say('자리에 앉았어요. 집중 창에서 시간을 골라 시작해 보세요.');}
   }else if(type==='stand')scene.setPose('stand');
   else if(type==='wave'){scene.setPose('wave');send('wave');}
   else if(type==='speech'&&typeof p.text==='string'&&typeof p.id==='string'){
     speech.set(p.id,{text:p.text.slice(0,120),until:Date.now()+12000});
-  }else if(type==='focus-status'&&p.done)say('집중을 마쳤어요. 에듀에서 오늘의 기록을 확인하세요.');
+  }else if(type==='focus-status'&&p.done)say('집중을 마쳤어요. 타이머를 눌러 오늘의 기록을 남겨 보세요.');
   else if(type==='launch'||type==='cohort-launch')say('발사 기록과 기념 연출은 기존 우주선 공간에서 확인할 수 있어요.');
 }
 async function start(){
@@ -70,7 +72,9 @@ async function start(){
     attachOfficeEnvironment(office,root);
     attachAvatarAppearance(office);
     attachCampusNavigation(office,root,{initialRoom:'study',reduceMotion:matchMedia('(prefers-reduced-motion: reduce)').matches});
-    scene=attachStudyScene({office,root,onInteract:interact});scene.setRoom('study');editor=attachAppearanceEditor(office,send);document.getElementById('appearance-open').disabled=false;
+    scene=attachStudyScene({office,root,onInteract:interact});scene.setRoom('study');
+    if(new URLSearchParams(location.hash.slice(1)).get('spatial')==='1'){document.body.classList.add('spatial-ui');spatialActions=attachSpatialActions({office,root,onAction:id=>{office.pauseCampusInput();office.resumeCampusInput();interact(id);},isClosed:id=>closed.has(id)});}
+    editor=attachAppearanceEditor(office,send);document.getElementById('appearance-open').disabled=false;
     // Reuse the EDU measured-quality policy, and do no GPU work in hidden tabs.
     const quality=createRenderQuality(devicePixelRatio,innerWidth<600),render=office.gl.render;
     let tier='',previous=0;
@@ -80,9 +84,9 @@ async function start(){
     const events=['keydown','keyup','pointerdown','pointermove','pointerup','wheel'];
     for(const type of events)window.addEventListener(type,activity,{passive:true});
     office.frame=function(now){const moving=!!this.campusAvatar?.moving||!!this.campusInputState?.keys?.length||!!this.campusInputState?.jumping;if(budget.shouldDraw(now,{moving,hidden:document.hidden}))return originalFrame.call(this,now);};
-    const visible=()=>{office.setVisible(!document.hidden);if(document.hidden)office.pauseCampusInput();else{office.resumeCampusInput();wakeWorld();}previous=0;};
+    const visible=()=>{office.setVisible(!document.hidden);if(document.hidden||uiBlocked)office.pauseCampusInput();else{office.resumeCampusInput();wakeWorld();}previous=0;};
     office.gl.render=function(...args){
-      if(document.hidden)return;
+      if(document.hidden||uiBlocked)return;
       const before=performance.now(),gap=previous?before-previous:0;previous=before;
       const result=render.apply(this,args),settings=quality.record(performance.now()-before,gap<1000?gap:0);
       if(tier!==settings.name){tier=settings.name;office.gl.setPixelRatio(settings.pixelRatio);office.gl.shadowMap.enabled=settings.shadows;}
@@ -94,7 +98,7 @@ async function start(){
     root.addEventListener('campus-room-change',event=>{root.dataset.room=event.detail.roomId;if(event.detail.roomId==='office')say('나만의 사무공간 · 실제 AI 직원 연결은 준비 중이에요.');});
     ready=true;root.dataset.ready='true';
     for(const[type,payload]of pending)handle(type,payload);pending.clear();
-    say('WASD · 방향키 · 바닥 클릭 이동 / E 가까운 공간 열기');send('ready');
+    say(document.body.classList.contains('spatial-ui')?'책상이나 공간 이름을 눌러 시작해 보세요.':'WASD · 방향키 · 바닥 클릭 이동 / E 가까운 공간 열기');send('ready');
     timer=setInterval(()=>{
       for(const[id,value]of speech)if(value.until<Date.now())speech.delete(id);
       if(document.hidden||office.getCampusRoom()!=='study')return;
@@ -112,6 +116,9 @@ window.addEventListener('message',event=>{
   if(ready)handle(type,payload&&typeof payload==='object'?payload:{});
   else pending.set(type,payload&&typeof payload==='object'?payload:{});
 });
+const guide=document.getElementById('space-guide');document.getElementById('guide-toggle').onclick=()=>{guide.hidden=!guide.hidden;document.getElementById('guide-toggle').setAttribute('aria-expanded',String(!guide.hidden));};
+for(const button of document.querySelectorAll('[data-task]'))button.onclick=()=>{guide.hidden=true;document.getElementById('guide-toggle').setAttribute('aria-expanded','false');interact(button.dataset.task);};
+document.getElementById('map-view').onclick=()=>scene?.setCameraMode('overall');document.getElementById('third-view').onclick=()=>scene?.setCameraMode('third');
 document.getElementById('appearance-open').onclick=()=>editor?.open();
 document.getElementById('study').onclick=()=>{office?.setCampusRoom('study');scene?.setCameraMode('overall');root.focus();};
 document.getElementById('private-room').onclick=()=>{office?.setCampusRoom('office');root.focus();};
@@ -121,5 +128,5 @@ for(const button of document.querySelectorAll('[data-direction]')){
   button.addEventListener('pointerdown',event=>{event.preventDefault();button.setPointerCapture(event.pointerId);office?.setCampusDirection(button.dataset.direction,true);});
   for(const type of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(type,()=>office?.setCampusDirection(button.dataset.direction,false));
 }
-window.addEventListener('pagehide',()=>{clearInterval(timer);restorePerformance?.();editor?.destroy();office?.destroy?.();speech.clear();pending.clear();});
+window.addEventListener('pagehide',()=>{clearInterval(timer);restorePerformance?.();editor?.destroy();spatialActions?.destroy();office?.destroy?.();speech.clear();pending.clear();});
 if(parent===window||token.length<32)say('에듀 캠퍼스 화면에서 이 공간을 열어 주세요.');else send('boot');
