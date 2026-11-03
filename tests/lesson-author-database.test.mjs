@@ -13,7 +13,7 @@ async function setup(){
  create table audit_logs(id uuid primary key default gen_random_uuid(),actor_user_id uuid,action text,entity_type text,entity_id text,before_data jsonb,after_data jsonb);
  grant select,insert on audit_logs to service_role;
  create function mission_operator_allowed(actor uuid, scope text) returns boolean language sql as $$ select exists(select 1 from public.profiles where id=actor and role='admin' and status='active') $$;`);
- await f.db.exec(sql);await f.db.exec('set role service_role');
+ await f.db.exec(sql);await f.db.exec(readFileSync(new URL('../supabase/migrations/20261005090119_lesson_author_conflict_backups.sql',import.meta.url),'utf8'));await f.db.exec('set role service_role');
  const read=async(lesson=f.lesson,actor=f.admin,version=null)=>(await f.db.query('select edu_read_lesson_author($1,$2,$3) as v',[actor,lesson,version])).rows[0].v;
  const save=async(payload,snapshot,opts={})=>(await f.db.query('select edu_save_lesson_author($1,$2,$3,$4,$5,$6,$7,$8) as v',[opts.actor||f.admin,opts.lesson||f.lesson,snapshot.revision,opts.request||id(),snapshot.public.stamp,payload,opts.create||false,opts.rebase||false])).rows[0].v;
  const publish=async(revision,request=id(),actor=f.admin)=>(await f.db.query('select edu_publish_lesson_author($1,$2,$3,$4) as v',[actor,f.lesson,revision,request])).rows[0].v;
@@ -75,4 +75,20 @@ test('new draft is an unpublished shell, first-save retries are safe and legacy 
   await assert.rejects(read(f.lesson,f.admin,request),/AUTHOR_NOT_FOUND/);
   for(const fn of ['edu_lesson_author_snapshot(uuid,uuid)','edu_read_lesson_author(uuid,uuid,uuid)','edu_save_lesson_author(uuid,uuid,uuid,uuid,text,jsonb,boolean,boolean)','edu_publish_lesson_author(uuid,uuid,uuid,uuid)'])for(const role of ['anon','authenticated','service_role'])assert.equal((await db.query("select has_function_privilege($1,$2,'EXECUTE') as ok",[role,fn])).rows[0].ok,role==='service_role');
  }finally{await db.close();}
+});
+
+test('competing and stale-public drafts can be backed up without replacing the shared head or students',async()=>{
+ const f=await setup();try{
+  const first=await f.read(),mine=structuredClone(first.payload);mine.form.basic.title='내 보관본';
+  const shared=structuredClone(first.payload);shared.form.basic.title='동료 공유 초안';const saved=await f.save(shared,first);
+  await f.db.query('update curriculum_lessons set is_published=false where id=$1',[f.lesson]);
+  const request=id(),args=[f.admin,f.lesson,request,first.public.stamp,mine];
+  for(let n=0;n<2;n++)assert.equal((await f.db.query('select edu_backup_lesson_author($1,$2,$3,$4,$5) as v',args)).rows[0].v.revision,request);
+  assert.equal((await f.read()).revision,saved.revision);assert.equal((await f.read(f.lesson,f.admin,request)).payload.form.basic.title,'내 보관본');
+  assert.equal((await f.db.query('select title from curriculum_lessons where id=$1',[f.lesson])).rows[0].title,'시험 수업');
+  assert.equal((await f.db.query('select count(*)::int n from edu_lesson_author_versions where id=$1',[request])).rows[0].n,1);
+  await assert.rejects(f.db.query('select edu_backup_lesson_author($1,$2,$3,$4,$5)',[f.admin,f.lesson,request,first.public.stamp,shared]),/AUTHOR_CHANGED/);
+  await assert.rejects(f.db.query('select edu_backup_lesson_author($1,$2,$3,$4,$5)',[f.student,f.lesson,id(),first.public.stamp,mine]),/AUTHOR_FORBIDDEN/);
+  for(const role of ['anon','authenticated','service_role'])assert.equal((await f.db.query("select has_function_privilege($1,'edu_backup_lesson_author(uuid,uuid,uuid,text,jsonb)','EXECUTE') as ok",[role])).rows[0].ok,role==='service_role');
+ }finally{await f.db.close();}
 });

@@ -21,6 +21,10 @@ async function handle(request: Request, write: boolean) {
   const {data,error}=await createAdminClient().rpc('edu_manage_webinar',{p_actor:actor.id,p_period:period,p_settings:settings});
   if(error?.code==='23505') conversionError('이미 다른 모집에 연결된 유료 기수입니다.',409);
   if(error) conversionDatabaseError(error);
+  if(actor.permissions.orders && data?.campaign?.paidCohort){
+   const coverage=await createAdminClient().rpc('edu_entry_source_coverage',{p_actor:actor.id,p_period:period});
+   data.sourceCoverage=coverage.error?{state:'unavailable'}:coverage.data;
+  }
   return reply(data);
  } catch(e) {const status=Number((e as {status?:number})?.status||503);return reply({error:status===503?'신청·구매 기록을 확인하지 못했습니다.':(e as Error).message},status);}
 }

@@ -1,0 +1,1071 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:brandyaction-edu:edu_web:1.0",
+  "title": "edu_web v1.0 내보내기 응답",
+  "description": "브랜디에듀 → 팁스 집계 계약. 설명 정본은 edu_web_contract_v1.md. 응답은 경로의 dataset에 맞는 $defs/response_<dataset>로 검사한다. 루트 anyOf는 편의용이다.",
+  "anyOf": [
+    {
+      "$ref": "#/$defs/response_daily_campaign_perf"
+    },
+    {
+      "$ref": "#/$defs/response_daily_totals"
+    },
+    {
+      "$ref": "#/$defs/response_ad_changes"
+    },
+    {
+      "$ref": "#/$defs/response_ops_daily"
+    }
+  ],
+  "x-contract-tests": {
+    "description": "스키마 검사 뒤 생산자 계약 테스트가 더 돌리는 검사. 키는 모든 깊이에서 대소문자를 무시하고 전체 일치로 본다. 값 패턴은 모든 문자열 값(배열 원소 포함)에 적용한다.",
+    "forbidden_keys": [
+      "email",
+      "customer_email",
+      "contact_email",
+      "phone",
+      "customer_phone",
+      "mobile",
+      "tel",
+      "name",
+      "full_name",
+      "customer_name",
+      "author_name",
+      "nickname",
+      "kakao_nickname",
+      "room_nickname",
+      "birth",
+      "birthday",
+      "birthdate",
+      "birth_year",
+      "recipient",
+      "recipient_name",
+      "recipient_masked",
+      "gift_message",
+      "address",
+      "avatar_url",
+      "user_id",
+      "member_id",
+      "customer_id",
+      "anonymous_id",
+      "anon_id",
+      "visitor_id",
+      "session_id",
+      "order_id",
+      "order_number",
+      "order_ref",
+      "enrollment_id",
+      "kakao_user_id",
+      "actor_id",
+      "diagnosis",
+      "diagnosis_code",
+      "answer",
+      "answers",
+      "raw_answers",
+      "response",
+      "responses",
+      "item_ms",
+      "ms",
+      "score",
+      "scores",
+      "gyeol",
+      "need",
+      "needs",
+      "diag_top_need",
+      "narrative",
+      "report",
+      "report_id",
+      "report_html",
+      "report_markdown",
+      "report_md",
+      "qcard",
+      "q_card",
+      "aha_response",
+      "research_consent",
+      "remote_response_id",
+      "ip",
+      "ip_address",
+      "ua",
+      "user_agent",
+      "_fbp",
+      "_fbc",
+      "fbp",
+      "fbc",
+      "fbclid",
+      "gclid",
+      "gbraid",
+      "wbraid",
+      "cid",
+      "ref",
+      "referrer",
+      "referer",
+      "cookie",
+      "cookies",
+      "payment_key",
+      "paymentkey",
+      "provider_payment_key",
+      "provider_payload",
+      "receipt_url",
+      "coupon",
+      "coupon_code",
+      "gift_code",
+      "code",
+      "url",
+      "link",
+      "destination",
+      "cs_body",
+      "content",
+      "body",
+      "message",
+      "title",
+      "subject",
+      "question",
+      "question_body",
+      "reply_text",
+      "feedback",
+      "mentor_feedback",
+      "review",
+      "values",
+      "assessment",
+      "submission",
+      "submission_url",
+      "practice_submission",
+      "practice_result",
+      "practice_comment",
+      "mission_response",
+      "instructions",
+      "jev_inquiry",
+      "inquiry",
+      "conversation",
+      "memo",
+      "note"
+    ],
+    "forbidden_value_patterns": [
+      {
+        "id": "email",
+        "pattern": "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}"
+      },
+      {
+        "id": "kr_mobile",
+        "pattern": "(^|[^0-9])01[016789][-. ]?[0-9]{3,4}[-. ]?[0-9]{4}([^0-9]|$)"
+      },
+      {
+        "id": "url",
+        "pattern": "[Hh][Tt][Tt][Pp][Ss]?://|[Ww][Ww][Ww]\\."
+      },
+      {
+        "id": "click_id_like_token",
+        "pattern": "(?=[A-Za-z0-9_-]*[A-Z])(?=[A-Za-z0-9_-]*[a-z])(?=[A-Za-z0-9_-]*[0-9])[A-Za-z0-9_-]{30,}"
+      },
+      {
+        "id": "uuid",
+        "pattern": "[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}"
+      }
+    ]
+  },
+  "$defs": {
+    "tenant": {
+      "const": "brandyaction_edu"
+    },
+    "contract_version": {
+      "const": "1.0"
+    },
+    "metric_version": {
+      "type": "string",
+      "pattern": "^edu_web@[1-9][0-9]*$",
+      "description": "집계 규칙 판 번호. v1 시작값 edu_web@1"
+    },
+    "datetime": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,6})?(Z|[+-][0-9]{2}:[0-9]{2})$"
+    },
+    "datetime_or_null": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/datetime"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "date_kst": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "count_or_null": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "krw": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "원 단위 정수"
+    },
+    "krw_or_null": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "null_only": {
+      "type": "null"
+    },
+    "platform": {
+      "const": "meta"
+    },
+    "meta_id": {
+      "type": "string",
+      "pattern": "^[0-9]{1,30}$"
+    },
+    "meta_id_or_null": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]{1,30}$"
+    },
+    "cohort_code": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 129,
+      "pattern": "^[^:]+:[^:]+$",
+      "description": "courses.course_code + ':' + cohorts.cohort_code"
+    },
+    "cohort_code_or_null": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/cohort_code"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "daily_campaign_perf": {
+      "description": "광고 행(revenue_grain=ad)은 상단 퍼널만, 기수 행(revenue_grain=cohort)은 광고방 URL 매출만 채운다. 한 칸은 한 행 종류에만 값이 있어 모든 행을 더해도 두 번 세지 않는다.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date_kst",
+        "platform",
+        "campaign_id",
+        "adset_id",
+        "ad_id",
+        "campaign_kind",
+        "cohort_code",
+        "landings",
+        "chat_clicks",
+        "registrations",
+        "orders",
+        "new_buyers",
+        "gross_vat_incl",
+        "refunds",
+        "net_vat_incl",
+        "revenue_grain",
+        "attribution_def",
+        "matured"
+      ],
+      "properties": {
+        "date_kst": {
+          "$ref": "#/$defs/date_kst"
+        },
+        "platform": {
+          "$ref": "#/$defs/platform"
+        },
+        "campaign_id": {
+          "$ref": "#/$defs/meta_id_or_null"
+        },
+        "adset_id": {
+          "$ref": "#/$defs/meta_id_or_null"
+        },
+        "ad_id": {
+          "$ref": "#/$defs/meta_id_or_null"
+        },
+        "campaign_kind": {
+          "enum": [
+            "cold",
+            "retarget",
+            "unclassified",
+            null
+          ],
+          "description": "landing_campaign_dimensions.ad_type 값 그대로"
+        },
+        "cohort_code": {
+          "$ref": "#/$defs/cohort_code_or_null"
+        },
+        "landings": {
+          "$ref": "#/$defs/count_or_null"
+        },
+        "chat_clicks": {
+          "$ref": "#/$defs/count_or_null"
+        },
+        "registrations": {
+          "$ref": "#/$defs/count_or_null"
+        },
+        "orders": {
+          "$ref": "#/$defs/count_or_null"
+        },
+        "new_buyers": {
+          "$ref": "#/$defs/count_or_null"
+        },
+        "gross_vat_incl": {
+          "$ref": "#/$defs/krw_or_null"
+        },
+        "refunds": {
+          "$ref": "#/$defs/krw_or_null"
+        },
+        "net_vat_incl": {
+          "$ref": "#/$defs/krw_or_null"
+        },
+        "revenue_grain": {
+          "enum": [
+            "ad",
+            "cohort"
+          ]
+        },
+        "attribution_def": {
+          "const": "path_cohort@1"
+        },
+        "matured": {
+          "type": "boolean"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "revenue_grain": {
+                "const": "ad"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "landings": {
+                "$ref": "#/$defs/count"
+              },
+              "chat_clicks": {
+                "$ref": "#/$defs/count"
+              },
+              "registrations": {
+                "$ref": "#/$defs/null_only"
+              },
+              "orders": {
+                "$ref": "#/$defs/null_only"
+              },
+              "new_buyers": {
+                "$ref": "#/$defs/null_only"
+              },
+              "gross_vat_incl": {
+                "$ref": "#/$defs/null_only"
+              },
+              "refunds": {
+                "$ref": "#/$defs/null_only"
+              },
+              "net_vat_incl": {
+                "$ref": "#/$defs/null_only"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "revenue_grain": {
+                "const": "cohort"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "campaign_id": {
+                "$ref": "#/$defs/null_only"
+              },
+              "adset_id": {
+                "$ref": "#/$defs/null_only"
+              },
+              "ad_id": {
+                "$ref": "#/$defs/null_only"
+              },
+              "campaign_kind": {
+                "$ref": "#/$defs/null_only"
+              },
+              "cohort_code": {
+                "$ref": "#/$defs/cohort_code"
+              },
+              "landings": {
+                "$ref": "#/$defs/null_only"
+              },
+              "chat_clicks": {
+                "$ref": "#/$defs/count"
+              },
+              "registrations": {
+                "$ref": "#/$defs/count"
+              },
+              "orders": {
+                "$ref": "#/$defs/count"
+              },
+              "new_buyers": {
+                "$ref": "#/$defs/count"
+              },
+              "gross_vat_incl": {
+                "$ref": "#/$defs/krw"
+              },
+              "refunds": {
+                "$ref": "#/$defs/krw"
+              },
+              "net_vat_incl": {
+                "$ref": "#/$defs/krw"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "net_by_src": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "paid",
+        "organic",
+        "alumni",
+        "youtube",
+        "unknown"
+      ],
+      "description": "orders.entry_src 값별 순매출. unknown = entry_src IS NULL(관리자 화면 '미기록')",
+      "properties": {
+        "paid": {
+          "$ref": "#/$defs/krw"
+        },
+        "organic": {
+          "$ref": "#/$defs/krw"
+        },
+        "alumni": {
+          "$ref": "#/$defs/krw"
+        },
+        "youtube": {
+          "$ref": "#/$defs/krw"
+        },
+        "unknown": {
+          "$ref": "#/$defs/krw"
+        }
+      }
+    },
+    "funnel_course_v2": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "키는 course_v2 표준 이벤트 이름. 수기 단계는 _manual을 붙인다. null = 미측정·수기 미입력",
+      "required": [
+        "landing_viewed",
+        "chat_clicked",
+        "chat_joined_manual",
+        "class_registered",
+        "live_entered",
+        "practice_submitted",
+        "product_viewed",
+        "checkout_started",
+        "payment_completed",
+        "lesson_started",
+        "week1_active",
+        "usage_50"
+      ],
+      "properties": {
+        "landing_viewed": {
+          "$ref": "#/$defs/count_or_null"
+        },
+        "chat_clicked": {
+          "$ref": "#/$defs/count_or_null"
+        },
+        "chat_joined_manual": {
+          "$ref": "#/$defs/count_or_null"
+        },
+        "class_registered": {
+          "$ref": "#/$defs/count_or_null"
+        },
+        "live_entered": {
+          "$ref": "#/$defs/count_or_null"
+        },
+        "practice_submitted": {
+          "$ref": "#/$defs/count_or_null"
+        },
+        "product_viewed": {
+          "$ref": "#/$defs/count_or_null"
+        },
+        "checkout_started": {
+          "$ref": "#/$defs/count_or_null"
+        },
+        "payment_completed": {
+          "$ref": "#/$defs/count_or_null"
+        },
+        "lesson_started": {
+          "$ref": "#/$defs/count_or_null"
+        },
+        "week1_active": {
+          "$ref": "#/$defs/count_or_null"
+        },
+        "usage_50": {
+          "$ref": "#/$defs/count_or_null"
+        }
+      }
+    },
+    "consent_pool": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "그날 끝 기준 '마케팅 목적 이용 + 해당 매체 광고 수신' 동의자 수. 기수 행과 새 동의 시행 전 날짜는 null",
+      "required": [
+        "marketing_sms",
+        "marketing_email",
+        "marketing_kakao"
+      ],
+      "properties": {
+        "marketing_sms": {
+          "$ref": "#/$defs/count_or_null"
+        },
+        "marketing_email": {
+          "$ref": "#/$defs/count_or_null"
+        },
+        "marketing_kakao": {
+          "$ref": "#/$defs/count_or_null"
+        }
+      }
+    },
+    "consent_pool_null": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "기수 행의 consent_pool. 동의자 풀은 기수에 묶이지 않아 모두 null",
+      "required": [
+        "marketing_sms",
+        "marketing_email",
+        "marketing_kakao"
+      ],
+      "properties": {
+        "marketing_sms": {
+          "$ref": "#/$defs/null_only"
+        },
+        "marketing_email": {
+          "$ref": "#/$defs/null_only"
+        },
+        "marketing_kakao": {
+          "$ref": "#/$defs/null_only"
+        }
+      }
+    },
+    "daily_totals": {
+      "description": "키는 (date_kst, cohort_code). cohort_code=null 행은 날짜마다 1개 있고 기수에 묶이지 않는 값을 담는다.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date_kst",
+        "cohort_code",
+        "orders",
+        "new_buyers",
+        "net_vat_incl_total",
+        "net_vat_incl_by_src",
+        "refund_reserve_krw",
+        "funnel",
+        "consent_pool",
+        "matured"
+      ],
+      "properties": {
+        "date_kst": {
+          "$ref": "#/$defs/date_kst"
+        },
+        "cohort_code": {
+          "$ref": "#/$defs/cohort_code_or_null"
+        },
+        "orders": {
+          "$ref": "#/$defs/count"
+        },
+        "new_buyers": {
+          "$ref": "#/$defs/count"
+        },
+        "net_vat_incl_total": {
+          "$ref": "#/$defs/krw"
+        },
+        "net_vat_incl_by_src": {
+          "$ref": "#/$defs/net_by_src"
+        },
+        "refund_reserve_krw": {
+          "$ref": "#/$defs/krw_or_null"
+        },
+        "funnel": {
+          "$ref": "#/$defs/funnel_course_v2"
+        },
+        "consent_pool": {
+          "$ref": "#/$defs/consent_pool"
+        },
+        "matured": {
+          "type": "boolean"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "cohort_code": {
+                "type": "string"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "consent_pool": {
+                "$ref": "#/$defs/consent_pool_null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ad_change_value": {
+      "type": [
+        "string",
+        "number",
+        "null"
+      ],
+      "maxLength": 200
+    },
+    "ad_changes": {
+      "description": "광고 변경 1건 = 1행. 마이인 D-3과 같은 칸에 date_kst, matured를 더했다.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date_kst",
+        "changed_at",
+        "platform",
+        "campaign_id",
+        "adset_id",
+        "field",
+        "before",
+        "after",
+        "decided_by",
+        "approver_role",
+        "reason",
+        "source",
+        "matured"
+      ],
+      "properties": {
+        "date_kst": {
+          "$ref": "#/$defs/date_kst"
+        },
+        "changed_at": {
+          "$ref": "#/$defs/datetime"
+        },
+        "platform": {
+          "$ref": "#/$defs/platform"
+        },
+        "campaign_id": {
+          "$ref": "#/$defs/meta_id"
+        },
+        "adset_id": {
+          "$ref": "#/$defs/meta_id_or_null"
+        },
+        "field": {
+          "enum": [
+            "budget",
+            "bid",
+            "status",
+            "creative"
+          ]
+        },
+        "before": {
+          "$ref": "#/$defs/ad_change_value"
+        },
+        "after": {
+          "$ref": "#/$defs/ad_change_value"
+        },
+        "decided_by": {
+          "enum": [
+            "manual",
+            "rule",
+            "mab"
+          ]
+        },
+        "approver_role": {
+          "enum": [
+            "owner",
+            null
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 200
+        },
+        "source": {
+          "enum": [
+            "sheet",
+            "tips_exec"
+          ]
+        },
+        "matured": {
+          "type": "boolean"
+        }
+      }
+    },
+    "reasons_without_manual": {
+      "type": "array",
+      "not": {
+        "type": "array",
+        "contains": {
+          "const": "manual"
+        }
+      }
+    },
+    "controls": {
+      "description": "팁스 예산 실행의 선행 조건. 상태 기준 시각은 min(date_kst 끝, generated_at). null이면 팁스는 동결로 본다.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "freeze",
+        "freeze_source",
+        "freeze_reasons",
+        "override_until",
+        "cohort_code",
+        "cohort_budget_krw"
+      ],
+      "properties": {
+        "freeze": {
+          "type": "boolean"
+        },
+        "freeze_source": {
+          "enum": [
+            "auto",
+            "manual"
+          ]
+        },
+        "freeze_reasons": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "cpr_high",
+              "mer_provisional_low",
+              "refund_requests_high",
+              "input_missing",
+              "manual"
+            ]
+          }
+        },
+        "override_until": {
+          "$ref": "#/$defs/datetime_or_null"
+        },
+        "cohort_code": {
+          "$ref": "#/$defs/cohort_code_or_null"
+        },
+        "cohort_budget_krw": {
+          "$ref": "#/$defs/krw_or_null"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "freeze": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "freeze_reasons": {
+                "type": "array",
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "freeze_source": {
+                "const": "auto"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "override_until": {
+                "$ref": "#/$defs/null_only"
+              },
+              "freeze_reasons": {
+                "$ref": "#/$defs/reasons_without_manual"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "freeze_source": {
+                "const": "auto"
+              },
+              "freeze": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "freeze_reasons": {
+                "type": "array",
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "freeze_source": {
+                "const": "manual"
+              },
+              "freeze": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "override_until": {
+                "$ref": "#/$defs/datetime"
+              },
+              "freeze_reasons": {
+                "$ref": "#/$defs/reasons_without_manual"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "freeze_source": {
+                "const": "manual"
+              },
+              "freeze": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "freeze_reasons": {
+                "type": "array",
+                "contains": {
+                  "const": "manual"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ops_daily": {
+      "description": "날짜마다 1행. 에듀 전체(기수 구분 없음) 운영 집계와 통제 신호.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date_kst",
+        "paid_orders_n",
+        "refund_requests_n",
+        "refunds_done_n",
+        "refund_amount",
+        "active_learners_n",
+        "usage_below_50_n",
+        "question_backlog_n",
+        "crm_info_n",
+        "crm_ad_n",
+        "mail_n",
+        "push_n",
+        "controls",
+        "matured"
+      ],
+      "properties": {
+        "date_kst": {
+          "$ref": "#/$defs/date_kst"
+        },
+        "paid_orders_n": {
+          "$ref": "#/$defs/count"
+        },
+        "refund_requests_n": {
+          "$ref": "#/$defs/count"
+        },
+        "refunds_done_n": {
+          "$ref": "#/$defs/count"
+        },
+        "refund_amount": {
+          "$ref": "#/$defs/krw"
+        },
+        "active_learners_n": {
+          "$ref": "#/$defs/count"
+        },
+        "usage_below_50_n": {
+          "$ref": "#/$defs/count_or_null"
+        },
+        "question_backlog_n": {
+          "$ref": "#/$defs/count"
+        },
+        "crm_info_n": {
+          "$ref": "#/$defs/count"
+        },
+        "crm_ad_n": {
+          "$ref": "#/$defs/count"
+        },
+        "mail_n": {
+          "$ref": "#/$defs/count"
+        },
+        "push_n": {
+          "$ref": "#/$defs/count"
+        },
+        "controls": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/controls"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "matured": {
+          "type": "boolean"
+        }
+      }
+    },
+    "response_daily_campaign_perf": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tenant",
+        "contract_version",
+        "metric_version",
+        "generated_at",
+        "rows"
+      ],
+      "properties": {
+        "tenant": {
+          "$ref": "#/$defs/tenant"
+        },
+        "contract_version": {
+          "$ref": "#/$defs/contract_version"
+        },
+        "metric_version": {
+          "$ref": "#/$defs/metric_version"
+        },
+        "generated_at": {
+          "$ref": "#/$defs/datetime"
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/daily_campaign_perf"
+          }
+        }
+      }
+    },
+    "response_daily_totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tenant",
+        "contract_version",
+        "metric_version",
+        "generated_at",
+        "rows"
+      ],
+      "properties": {
+        "tenant": {
+          "$ref": "#/$defs/tenant"
+        },
+        "contract_version": {
+          "$ref": "#/$defs/contract_version"
+        },
+        "metric_version": {
+          "$ref": "#/$defs/metric_version"
+        },
+        "generated_at": {
+          "$ref": "#/$defs/datetime"
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/daily_totals"
+          }
+        }
+      }
+    },
+    "response_ad_changes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tenant",
+        "contract_version",
+        "metric_version",
+        "generated_at",
+        "rows"
+      ],
+      "properties": {
+        "tenant": {
+          "$ref": "#/$defs/tenant"
+        },
+        "contract_version": {
+          "$ref": "#/$defs/contract_version"
+        },
+        "metric_version": {
+          "$ref": "#/$defs/metric_version"
+        },
+        "generated_at": {
+          "$ref": "#/$defs/datetime"
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ad_changes"
+          }
+        }
+      }
+    },
+    "response_ops_daily": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tenant",
+        "contract_version",
+        "metric_version",
+        "generated_at",
+        "rows"
+      ],
+      "properties": {
+        "tenant": {
+          "$ref": "#/$defs/tenant"
+        },
+        "contract_version": {
+          "$ref": "#/$defs/contract_version"
+        },
+        "metric_version": {
+          "$ref": "#/$defs/metric_version"
+        },
+        "generated_at": {
+          "$ref": "#/$defs/datetime"
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ops_daily"
+          }
+        }
+      }
+    }
+  }
+}

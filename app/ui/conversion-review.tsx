@@ -217,7 +217,7 @@ export function ConversionReview({ workspace = false, initialPeriod, initialView
   };
 
   return <AdminPage width="wide" template="review" className="conversion-review">
-    <AdminPageHeader title={workspace ? "모집 운영" : "전환 관리"} description={workspace ? "모집별 연결·구매 현황·후속 안내를 한곳에서 관리합니다." : "문의에 필요한 설명을 찾고, 검토한 내용을 기록합니다."} eyebrow="MARKETING" actions={<>
+    <AdminPageHeader title="모집·문의 검토" description={workspace ? "모집별 연결·구매 현황·후속 안내를 한곳에서 관리합니다." : "문의에 필요한 설명을 찾고, 검토한 내용을 기록합니다."} eyebrow="MARKETING" actions={<>
       <AdminButton disabled={pending || loading} onClick={() => void refresh()}>새로고침</AdminButton>
       {snapshot && (!workspace || workspaceView === 'inquiries') && <>
         <AdminButton disabled={pending} onClick={() => openCase(undefined, 'native')}>사이트 문의 연결</AdminButton>

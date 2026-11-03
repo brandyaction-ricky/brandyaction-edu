@@ -1,0 +1,12 @@
+.edu-admin .reorder-handle { display:inline-grid; flex:none; place-items:center; width:32px; height:32px; min-width:32px; min-height:32px; padding:0; border:1px solid transparent; border-radius:6px; background:transparent; color:#7a8391; cursor:grab; touch-action:none; }
+.edu-admin .reorder-handle:hover { background:#f4f5f7; color:#292e36; }
+.edu-admin .reorder-handle:focus-visible { outline:2px solid #c9212c; outline-offset:2px; }
+.edu-admin .reorder-handle:active { cursor:grabbing; }
+.edu-admin .reorder-handle:disabled { opacity:.35; cursor:not-allowed; }
+.edu-admin .reorder-item-dragging { opacity:.5; }
+.edu-admin .reorder-item-over { box-shadow:inset 0 2px #c9212c; }
+.edu-front .reorder-handle { display:inline-grid; place-items:center; width:36px; height:36px; padding:0; border:1px solid #dfe3e8; border-radius:6px; background:#fff; color:#68717e; cursor:grab; touch-action:none; }
+.edu-front .reorder-handle:focus-visible { outline:2px solid #c9212c; outline-offset:2px; }
+.edu-front .reorder-item-over { box-shadow:inset 0 2px #c9212c; }
+.edu-admin .article-settings-main .article-lesson-editor { grid-template-columns:32px 28px minmax(0,1fr) 34px; }
+@media(max-width:650px) { .edu-admin .article-settings-main .article-lesson-editor { grid-template-columns:32px 22px minmax(0,1fr) 30px; } }

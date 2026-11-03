@@ -19,8 +19,9 @@ const lessonDocument = {
   ], checklist: [{ id: 'check', label: '소개 문장을 정리했습니다.', required: true }],
 };
 type Draft = { values: { blocks: Record<string, unknown>; checklist: string[] }; writeId: string; updatedAt: string } | null;
-async function mock(page: Page, options: { failure?: number; historical?: boolean; unsupported?: boolean; empty?: boolean } = {}) {
+async function mock(page: Page, options: { failure?: number; historical?: boolean; unsupported?: boolean; empty?: boolean; alumni?: boolean; ongoing?: boolean } = {}) {
   let draft: Draft = null;
+  let practiceDraft: Draft = null;
   const writes: Record<string, unknown>[] = [];
   let failure = options.failure || 0;
   await page.route('https://example.test/**', route => route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="30"><rect width="100" height="30" fill="gray"/></svg>' }));
@@ -28,6 +29,8 @@ async function mock(page: Page, options: { failure?: number; historical?: boolea
     if (route.request().method() === 'GET') {
       const isOld = new URL(route.request().url()).searchParams.get('revision') === oldRevision;
       await route.fulfill({ json: {
+        practice: options.alumni ? { enabled: true, draft: practiceDraft } : null, ongoing: options.ongoing ? 'daily' : null,
+        submission: options.alumni ? { id: oldRevision, revision, writeId: oldRevision, outcome: 'submitted', state: 'approved', feedback: '졸업 전 피드백 보존' } : null,
         editable: false, currentRevision: revision, revision: isOld ? oldRevision : revision,
         document: options.empty ? null : { ...lessonDocument, blocks: options.unsupported ? [...lessonDocument.blocks, { id: 'tool', type: 'persona-generator', fields: [] }] : lessonDocument.blocks },
         draft: isOld ? { writeId: oldRevision, updatedAt: '2026-09-28T12:00:00Z', values: { blocks: { answer: '예전에 작성한 답변', generator: { customer: '이전 고객', category: '식품' } }, checklist: [] } } : draft,
@@ -38,10 +41,11 @@ async function mock(page: Page, options: { failure?: number; historical?: boolea
     if (body.action === 'grade') { await route.fulfill({ json: { result: { total: 1, correct: 1, passed: true, results: [{ id: 'q1', answered: true, correct: true }] } } }); return; }
     writes.push(body);
     if (failure) { const status = failure; failure = 0; await route.fulfill({ status, json: { error: status === 409 ? '다른 화면에서 저장했습니다.' : '연결이 끊겼습니다.' } }); return; }
-    draft = { writeId: body.requestId, values: body.values, updatedAt: new Date().toISOString() };
-    await route.fulfill({ json: { writeId: draft.writeId, updatedAt: draft.updatedAt } });
+    const saved = { writeId: body.requestId, values: body.values, updatedAt: new Date().toISOString() };
+    if (body.action === 'practice-draft') practiceDraft = saved; else draft = saved;
+    await route.fulfill({ json: { writeId: saved.writeId, updatedAt: saved.updatedAt } });
   });
-  return { writes, getDraft: () => draft };
+  return { writes, getDraft: () => draft, getPractice: () => practiceDraft };
 }
 
 test('mixed lesson answers, generator, quiz and checklist survive reopening; private input never saves', async ({ page, context }, testInfo) => {
@@ -182,3 +186,23 @@ test('load failure is explicit and retry restores saved answers without showing 
   await page.getByRole('button', { name: '다시 불러오기' }).click();
   await expect(page.getByRole('textbox', { name: '내 사업의 고객은 누구인가요?' })).toHaveValue('서버에 저장된 답변');
 });
+
+ test('graduate personal inputs and prompts save and reopen without changing official submissions or feedback',async({page,context},testInfo)=>{
+ const backend=await mock(page,{alumni:true,ongoing:true});await context.grantPermissions(['clipboard-read','clipboard-write']);
+ await page.goto('/lesson-blocks-test?alumni=1');
+ await expect(page.getByText('졸업생 개인 실습입니다.',{exact:false})).toBeVisible();
+ await expect(page.getByText('졸업 전 피드백 보존',{exact:true})).toBeVisible();
+ await page.getByRole('textbox',{name:'내 사업의 고객은 누구인가요?'}).fill('졸업 후 개인 실습');
+ await page.getByRole('textbox',{name:'고객 (필수)',exact:true}).fill('기존 사업자');
+ await page.getByRole('combobox',{name:'분야'}).selectOption('교육');
+ await page.getByLabel('비공개 값',{exact:false}).fill('synthetic-private-value');
+ await page.getByRole('button',{name:'프롬프트 만들기'}).click();
+ await expect(page.locator('.lb-prompt pre')).toContainText('고객: 기존 사업자');
+ await page.getByRole('button',{name:'프롬프트 복사'}).click();expect(await page.evaluate(()=>navigator.clipboard.readText())).toContain('기존 사업자');
+ await expect.poll(()=>backend.getPractice()?.values.blocks.answer).toBe('졸업 후 개인 실습');
+ expect(backend.getDraft()).toBeNull();expect(backend.writes.every(w=>w.action==='practice-draft')).toBe(true);expect(JSON.stringify(backend.writes)).not.toContain('synthetic-private-value');
+ await expect(page.getByRole('button',{name:/미션 제출하기|학습 완료하기|답변 수정하기|이번 기간 챌린지 완료/})).toHaveCount(0);
+ await page.reload();await expect(page.getByRole('textbox',{name:'내 사업의 고객은 누구인가요?'})).toHaveValue('졸업 후 개인 실습');await expect(page.getByRole('textbox',{name:'고객 (필수)',exact:true})).toHaveValue('기존 사업자');
+ await expect(page.getByLabel('비공개 값',{exact:false})).toHaveValue('');await expect(page.getByText('졸업 전 피드백 보존',{exact:true})).toBeVisible();
+ await page.screenshot({path:testInfo.outputPath('alumni-practice.png'),fullPage:true});
+ });

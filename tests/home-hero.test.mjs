@@ -88,6 +88,17 @@ test('managed banner fields become the homepage hero slide data', () => {
   assert.equal(unsafe[0].linkUrl, '/classes/free-class');
 });
 
+test('placeholder hero copy and free-class CTA do not point to the unfiltered catalog', () => {
+  const [slide] = homeHeroSlides([{
+    id: 'placeholder', title: '이미지 배너', link_label: '무료 클래스부터 시작하기',
+    link_url: '/classes', image_url: 'https://cdn.example/hero.webp',
+  }], '/classes/free-class');
+  assert.equal(slide.title, '혼자 떠안던 마케팅,\n이제 AI와 나눠 하세요.');
+  assert.equal(slide.linkUrl, '/classes?type=free');
+  assert.equal(slide.imageUrl, 'https://cdn.example/hero.webp');
+  assert.equal(homeHeroSlides([{ ...banners[0], link_label: '전체 클래스 보기', link_url: '/classes' }], '/classes/free-class')[0].linkUrl, '/classes');
+});
+
 test('two or more managed banners render carousel controls and only one main CTA', () => {
   const markup = renderToStaticMarkup(React.createElement(HomeHero, {
     banners,
@@ -109,7 +120,7 @@ test('one banner stays static and admin exposes every hero content control', () 
   const controls = sections.find(section => section.key === 'banners').fields;
   const fields = new Map(controls.map(field => [field.key, field.label]));
   assert.deepEqual([...fields.keys()], ['eyebrow', 'title', 'description', 'image_path', 'link_label', 'link_url', 'is_active', 'display_order', 'starts_at', 'ends_at']);
-  for (const label of ['브랜드 상단 문구', '메인 제목', '설명 문구', 'CTA 버튼 문구', 'CTA 연결 주소', '슬라이드 순서']) assert.ok([...fields.values()].includes(label));
+  for (const label of ['브랜드 상단 문구', '메인 제목', '설명 문구', '버튼 문구', '버튼 연결 주소', '슬라이드 순서']) assert.ok([...fields.values()].includes(label));
   assert.equal(controls.find(field => field.key === 'title').maxLength, 120);
 });
 

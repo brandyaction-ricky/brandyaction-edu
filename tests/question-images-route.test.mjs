@@ -33,3 +33,11 @@ test('rejects SVG, archives, huge inputs, bad IDs and stays disabled by default'
  assert.equal((await h.post({...h.body,padding:'한'.repeat(1800)})).status,413);assert.equal(h.calls.length,0);
  delete process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED;assert.equal((await h.post(h.body)).status,404);assert.equal((await h.get()).status,404);assert.equal(h.calls.length,0);
 });
+
+test('answer image upload, completion and reads use answer-scoped authorization without accepting caller paths',async()=>{
+ const h=harness();assert.equal((await h.post({...h.body,purpose:'answer',questionId:id})).status,200);assert.deepEqual(h.calls[0],{name:'edu_prepare_answer_image',args:{p_actor:id,p_question:id,p_request:id,p_spec:files.answerFileSpec('질문.png',8,'image')}});
+ assert.equal((await h.post({action:'complete',purpose:'answer',fileId:id})).status,200);assert.deepEqual(h.calls.slice(1).map(c=>c.name),['edu_owned_answer_image','edu_complete_answer_image']);
+ assert.equal((await h.get(`question=${id}&answer=${id}`)).status,200);assert.deepEqual(h.calls.at(-1),{name:'edu_read_answer_image',args:{p_actor:id,p_question:id,p_answer:id}});
+ const denied=harness({dbError:{message:'BLOCK_FORBIDDEN'}});assert.equal((await denied.post({...denied.body,purpose:'answer',questionId:id})).status,403);assert.equal(denied.storageCalls.length,0);
+ const invalid=harness();for(const body of [{...invalid.body,purpose:'bad'},{...invalid.body,purpose:'answer',questionId:'bad'}])assert.equal((await invalid.post(body)).status,400);assert.equal((await invalid.get(`question=${id}&answer=bad`)).status,400);assert.equal(invalid.calls.length,0);
+});

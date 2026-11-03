@@ -133,6 +133,7 @@ test('private resource signing only follows a published lesson and authorized co
  function resource(user,publication,content){let reads=0;const query={select(){return this;},eq(){return this;},async single(){return {data:reads++===0?publication:content};}};
  return load('app/api/platform/resource/route.ts',{
  '@/lib/server-auth':{getAuthenticatedUser:async()=>user},
+ '@/lib/learning-usage-server':{recordLearningUsage:async()=>{throw new Error('Admin previews must not be recorded');}},
  '@/lib/supabase/server':{createClient:async()=>({from:()=>query})},
  '@/lib/platform-rules':load('lib/platform-rules.ts'),
  '@/lib/product-metadata':load('lib/product-metadata.ts',{'./platform':load('lib/platform.ts'),'./product-conversion':load('lib/product-conversion.ts'),'./product-html-document':load('lib/product-html-document.ts')}),

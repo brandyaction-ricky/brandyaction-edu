@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { uuid } from '@/lib/edu-workflows';
-import { refundReadiness } from '@/lib/toss-environment';
+import { refundReadiness, tossMode } from '@/lib/toss-environment';
 
 type Body = Record<string, unknown>;
 const reply = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'private, no-store' } });
@@ -23,7 +23,7 @@ export async function processRefund(actor: string, body: Body) {
   if (claim.data.status === 'completed') return reply({ ok: true, message: '이미 완료된 환불입니다.' });
   if (claim.data.status === 'failed') return reply({ error: '종료된 요청입니다. 결제 상태를 확인한 뒤 새로 요청해 주세요.' }, 409);
   const marker = `[EDU:${body.requestId}] ${reason}`;
-  const headers = { Authorization: 'Basic ' + Buffer.from(secret + ':').toString('base64'), 'Content-Type': 'application/json', 'Idempotency-Key': 'edu-refund-' + body.requestId };
+  const headersFor = (key: string) => ({ Authorization: 'Basic ' + Buffer.from(key + ':').toString('base64'), 'Content-Type': 'application/json', 'Idempotency-Key': 'edu-refund-' + body.requestId });
   const endpoint = 'https://api.tosspayments.com/v1/payments/' + encodeURIComponent(payment.provider_payment_key);
   const valid = (v: Body) => v.paymentKey === payment.provider_payment_key && v.orderId === order.order_number && v.totalAmount === payment.approved_amount && v.currency === 'KRW';
   const reconcile = async (value: Body) => {
@@ -35,12 +35,29 @@ export async function processRefund(actor: string, body: Body) {
   };
   try {
     // Retries only read provider state. An ambiguous external write is never replayed.
-    const check = await fetch(endpoint, { headers, cache: 'no-store', signal: AbortSignal.timeout(15000) });
-    if (!check.ok) throw new Error('provider unavailable');
-    const current = await check.json();
+    // A payment may have been created by either integration. Only read-only
+    // lookups are retried with the other key; cancellation uses exactly the key
+    // whose provider response matches this order and amount.
+    const widgetSecret = process.env.TOSS_WIDGET_SECRET_KEY;
+    const widgetMode = tossMode(process.env.NEXT_PUBLIC_TOSS_WIDGET_CLIENT_KEY, widgetSecret);
+    const keys = [secret, widgetMode === readiness.mode ? widgetSecret : undefined].filter((key): key is string => !!key);
+    let headers: ReturnType<typeof headersFor> | undefined;
+    let current: Body | undefined;
+    let mismatched = false;
+    for (const key of [...new Set(keys)]) {
+      let response: Response;
+      try { response = await fetch(endpoint, { headers: headersFor(key), cache: 'no-store', signal: AbortSignal.timeout(15000) }); }
+      catch { continue; }
+      if (!response.ok) continue;
+      const result = await response.json();
+      if (valid(result)) { current = result; headers = headersFor(key); break; }
+      mismatched = true;
+    }
+    if (!current && mismatched) return reply({ error: '결제 정보를 확인할 수 없습니다. 환불 요청은 보내지 않았습니다.' }, 409);
+    if (!current || !headers) throw new Error('provider unavailable');
     if (await reconcile(current)) return reply({ ok: true, message: '환불 완료를 확인했습니다.' });
     if (!claim.data.isNew) return reply({ error: '환불 결과 확인 중입니다. 잠시 후 결과 재확인을 눌러 주세요. 환불 요청은 중복 전송하지 않습니다.' }, 409);
-    if (!valid(current) || !['DONE', 'PARTIAL_CANCELED'].includes(current.status) || current.balanceAmount !== payment.approved_amount - claim.data.baseline_cancelled || current.method === '가상계좌') {
+    if (!valid(current) || typeof current.status !== 'string' || !['DONE', 'PARTIAL_CANCELED'].includes(current.status) || current.balanceAmount !== payment.approved_amount - claim.data.baseline_cancelled || current.method === '가상계좌') {
       await db.from('edu_refund_requests').update({ status: 'failed' }).eq('id', body.requestId);
       return reply({ error: '환불 요청을 보내지 않았습니다. 결제 상태·잔액을 확인해 주세요. 가상계좌 환불은 결제사에서 처리해 주세요.' }, 409);
     }

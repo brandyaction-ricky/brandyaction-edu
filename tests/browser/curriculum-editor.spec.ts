@@ -30,7 +30,7 @@ async function setup(page: Page, options: {fail?: boolean; blocks?: boolean; qui
 async function openLesson(page:Page, second=false) {
   await page.getByRole('button',{name:'AI 문샷 챌린지 커리큘럼 열기'}).click();
   await page.locator('.studio-week-disclosure > summary').nth(second?1:0).click();
-  await page.getByRole('button',{name:second?'2일차 AI에게 내 사업 알려주기':'1일차 학습 목적 이해하기',exact:true}).click();
+  await page.getByRole('button',{name:second?'1일차 AI에게 내 사업 알려주기':'1일차 학습 목적 이해하기',exact:true}).click();
   await expect(page.getByRole('textbox',{name:'수업 제목',exact:true})).toHaveValue(second?'AI에게 내 사업 알려주기':'학습 목적 이해하기');
 }
 
@@ -39,7 +39,16 @@ test('product picker opens scoped document editing, full week rows work by keybo
   await expect(page.getByRole('textbox',{name:'학습 내용',exact:true})).toBeVisible();
   const header=page.locator('.studio-week-disclosure > summary').first();await header.focus();await page.keyboard.press('Enter');await expect(page.getByRole('button',{name:'1일차 학습 목적 이해하기'})).toBeHidden();await page.keyboard.press('Enter');
   const bounds=await header.boundingBox();expect(bounds!.height).toBeGreaterThanOrEqual(44);
-  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  const layout=await page.evaluate(()=>{
+    const workspace=document.querySelector<HTMLElement>('.curriculum-studio');
+    const outline=document.querySelector<HTMLElement>('.curriculum-outline');
+    const select=document.querySelector<HTMLElement>('.studio-product-bar select');
+    const panel=document.querySelector<HTMLElement>('.studio-document-header');
+    const style=workspace?getComputedStyle(workspace):null;
+    return {fits:document.documentElement.scrollWidth<=innerWidth,columns:style?.gridTemplateColumns||'',gap:style?.columnGap||'',outlineWidth:Math.round(outline?.getBoundingClientRect().width||0),controlHeight:Math.round(select?.getBoundingClientRect().height||0),radius:panel?getComputedStyle(panel).borderRadius:''};
+  });
+  expect(layout.fits).toBe(true);expect(layout.controlHeight).toBe(36);expect(layout.radius).toBe('10px');
+  if(info.project.name==='desktop'){expect(layout.outlineWidth).toBe(320);expect(layout.gap).toBe('16px');expect(layout.columns.split(' ')).toHaveLength(2);}else{expect(layout.columns.split(' ')).toHaveLength(1);}
   await page.screenshot({path:info.outputPath('curriculum-studio.png'),fullPage:true});
 });
 
@@ -71,6 +80,8 @@ test('new lesson keeps chosen week and is private; recent selection opens direct
 
 test('continuous document opens directly and saving keeps question, generator and mentor-review identity',async({page},info)=>{
  const {blockWrites}=await setup(page,{blocks:true});await page.goto('/curriculum-editor-test?blocks=1');await openLesson(page,true);
+ await expect(page.getByText('1 · 수업 정보',{exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:'2 · 학습 구성'})).toBeVisible();
+ await expect(page.getByText('3 · 반복 학습 운영',{exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:'4 · 확인 퀴즈'})).toBeVisible();await expect(page.getByText('저장 기록 · 이전 편집본 복구',{exact:true})).toBeVisible();
  const editorDocument=page.getByRole('textbox',{name:'수업 문서',exact:true});await expect(editorDocument).toBeVisible();await expect(editorDocument).toContainText('오늘의 목표는?');
  await expect(page.getByRole('link',{name:'학습 구성 편집·미리보기'})).toHaveCount(0);
  await editorDocument.locator('[data-author-block="intro"] p').click();await page.keyboard.press('End');await page.keyboard.type(' 수정한 문장');
@@ -93,4 +104,51 @@ test('outline search keeps unsaved week settings and blocks leaving until they a
  const week=page.getByRole('region',{name:'0주차 온보딩'});await week.getByText('주차 설정',{exact:true}).click();await week.getByRole('textbox',{name:'주차 제목',exact:true}).fill('수정 중인 온보딩');
  await page.getByRole('searchbox',{name:'수업 찾기'}).fill('회사의');await expect(week).toBeHidden();await page.getByRole('searchbox',{name:'수업 찾기'}).fill('');await expect(week.getByRole('textbox',{name:'주차 제목',exact:true})).toHaveValue('수정 중인 온보딩');
  await page.getByRole('combobox',{name:'편집할 상품'}).selectOption('course-two');await expect(page.getByRole('alert').filter({hasText:'주차 설정을 먼저 저장'})).toBeVisible();await expect(page.getByRole('combobox',{name:'편집할 상품'})).toHaveValue('course-one');
+});
+
+test('curriculum day labels continue across weeks in the outline, header, preview and order dialog',async({page})=>{
+ const weeks=[{id:'intro',course_id:'course-one',week_number:0,title:'준비',is_published:true},{id:'w1',course_id:'course-one',week_number:1,title:'첫 주',is_published:true},{id:'w2',course_id:'course-one',week_number:2,title:'둘째 주',is_published:true}];
+ const lessons=[{id:'intro-lesson',week_id:'intro',day_number:1,title:'준비 수업',content_type:'text'},...Array.from({length:5},(_,i)=>({id:'one-'+i,week_id:'w1',day_number:i+1,title:'첫 주 수업 '+(i+1),content_type:'text'})),{id:'six',week_id:'w2',day_number:1,title:'이어지는 수업',content_type:'text'},{id:'seven',week_id:'w2',day_number:2,title:'다음 수업',content_type:'text'}];
+ const data={curriculum_weeks:weeks,curriculum_lessons:lessons,lesson_contents:lessons.map(l=>({lesson_id:l.id,body_text:'검수 본문'}))};
+ await page.route('**/api/platform?**',r=>r.fulfill({json:{data}}));
+ await page.goto('/curriculum-editor-test');await page.getByRole('button',{name:'AI 문샷 챌린지 커리큘럼 열기'}).click();
+ await page.locator('.studio-week-disclosure > summary').filter({hasText:'2주차'}).click();
+ await page.getByRole('button',{name:'6일차 이어지는 수업',exact:true}).click();
+ await expect(page.locator('.studio-document-heading')).toContainText('2주차 · 6일차');
+ await page.getByRole('button',{name:'학습자 미리보기',exact:true}).click();await expect(page.locator('.learning-preview-badges')).toContainText('DAY 6');
+ const region=page.getByRole('region',{name:'2주차 둘째 주'});
+ await region.getByRole('button',{name:'수업 순서 바꾸기'}).click();
+ const dialog=page.getByRole('dialog');await expect(dialog.locator('li').first()).toContainText('6일차');
+ await dialog.getByRole('button',{name:'다음 수업 위로'}).click();await expect(dialog.locator('li').first()).toContainText('현재 7일차 → 6일차');
+});
+
+test('focus mode preserves unsaved text while hiding only navigation and management', async ({page}, info) => {
+  const {writes}=await setup(page); await page.goto('/curriculum-editor-test'); await openLesson(page);
+  const editor=page.getByRole('textbox',{name:'학습 내용',exact:true});
+  await editor.fill('저장 전 작성 내용 가나다');
+  await page.getByRole('button',{name:'수업 작성에 집중',exact:true}).click();
+  await expect(page.locator('.curriculum-outline')).toBeHidden();
+  await expect(page.locator('.studio-management-bar')).toBeHidden();
+  await expect(editor).toHaveText('저장 전 작성 내용 가나다');
+  await expect(editor).toBeVisible();
+  await page.screenshot({path:info.outputPath('focus-mode.png'),fullPage:true});
+  await page.getByRole('button',{name:'목차·설정 다시 보기',exact:true}).click();
+  await expect(page.locator('.curriculum-outline')).toBeVisible();
+  await expect(editor).toHaveText('저장 전 작성 내용 가나다');
+  expect(writes).toHaveLength(0);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
+test('lesson search handles case, hides nonmatching lessons, and recovers from no result',async({page})=>{
+  const {lessons}=await setup(page);
+  lessons.push({id:'lesson-three',week_id:'week-two',day_number:3,title:'고객 인터뷰 준비하기',is_published:false,content_type:'text'});
+  await page.goto('/curriculum-editor-test');
+  await page.getByRole('button',{name:'AI 문샷 챌린지 커리큘럼 열기'}).click();
+  await page.getByRole('searchbox',{name:'수업 찾기'}).fill('ai');
+  await expect(page.locator('.studio-lesson-link').filter({hasText:'AI에게 내 사업 알려주기'})).toBeVisible();
+  await expect(page.locator('.studio-lesson-link').filter({hasText:'고객 인터뷰 준비하기'})).toBeHidden();
+  await page.getByRole('searchbox',{name:'수업 찾기'}).fill('없는 제목');
+  await expect(page.getByText('검색한 수업이 없습니다.')).toBeVisible();
+  await page.getByRole('button',{name:'검색 지우기'}).click();
+  await expect(page.getByRole('searchbox',{name:'수업 찾기'})).toHaveValue('');
 });

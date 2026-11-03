@@ -16,7 +16,7 @@ test('class cards load in 12-row pages and searching requests only the current v
     const courses = q ? [course(7)] : pageNumber === 1 ? Array.from({ length: 12 }, (_, index) => course(index + 1)) : [course(13)];
     return route.fulfill({ json: { user: null, data: { courses, cohorts: [] }, pagination: { page: pageNumber, pageSize: 12, total: q ? 1 : 13 }, support: {} } });
   });
-  await page.goto('/public-data-test?publicScreen=classes');
+  await page.goto('/public-data-test?publicScreen=classes&navigationFixture=1');
   await page.clock.runFor(1);
   await expect(page.locator('.course-card')).toHaveCount(12);
   await page.getByRole('button', { name: '다음' }).click();
@@ -124,7 +124,31 @@ test('customer stories show video thumbnails and aligned reviewer details', asyn
   await expect.poll(() => page.locator('.story-video-thumb img').first().evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
   await page.getByRole('button', { name: /한 달 동안 매출과 고객 경험/ }).click();
   await expect(page.locator('.story-person-details strong')).toHaveText('박서연');
+  await expect(page.locator('.story-player')).toBeFocused();
+  await expect(page.locator('.story-player iframe')).toBeInViewport();
+  await expect(page.locator('.story-player iframe')).toHaveAttribute('src', /9bZkp7q19f0/);
+  await page.locator('.story-video-card').last().locator('strong').click();
+  await expect(page.locator('.story-player iframe')).toBeInViewport();
+  await expect(page.getByRole('link',{name:'원본 영상 열기'})).toHaveAttribute('href', stories[1].video_url);
   const cards = await page.locator('.story-video-card').evaluateAll(elements => elements.map(element => element.getBoundingClientRect().top));
   if (!isMobile) expect(cards[0]).toBe(cards[1]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
+});
+
+test('slow read stops loading and a deliberate retry recovers without automatic loops',async({page})=>{
+  let reads=0;
+  await page.clock.install();
+  await page.route('**/api/platform?**',route=>{
+    reads++;
+    if(reads===1) return;
+    return route.fulfill({json:{user:null,data:{courses:[course(1)],cohorts:[]},support:{}}});
+  });
+  await page.goto('/public-data-test?publicScreen=classes');
+  await expect.poll(()=>reads).toBe(1);
+  await page.clock.fastForward(13000);
+  await expect(page.getByRole('alert')).toContainText('불러오기가 지연');
+  expect(reads).toBe(1);
+  await page.getByRole('button',{name:'다시 시도',exact:true}).click();
+  await expect(page.locator('.course-card')).toHaveCount(1);
+  expect(reads).toBe(2);
 });

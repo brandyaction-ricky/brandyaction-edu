@@ -45,7 +45,7 @@ export async function eligiblePurchase(userId: string, requestedOrder: string | 
           const cohort = byCohort.get(item.cohort_id);
           const course = Array.isArray(cohort?.courses) ? cohort.courses[0] : cohort?.courses;
           return { orderId: order.id, orderNumber: order.order_number, itemName: item.item_name, cohortId: item.cohort_id,
-            telegramOnly: isMoonshotFourth(course?.title, cohort?.name), settings };
+            telegramOnly: settings.checklistEnabled === true || isMoonshotFourth(course?.title, cohort?.name), settings };
         }
       } catch { /* Invalid or incomplete settings cannot make an order eligible. */ }
     }

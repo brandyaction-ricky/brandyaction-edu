@@ -12,7 +12,7 @@ export function AdminTabs({ label, items, value, onChange, children }: {
 }) {
   const id = useId();
   return <div className="admin-workspace-tabs">
-    <div className="tabs" role="tablist" aria-label={label} onKeyDown={event => {
+    <div className="tabs adm-tabs" role="tablist" aria-label={label} onKeyDown={event => {
       if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
       const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
       const current = tabs.indexOf(document.activeElement as HTMLButtonElement);

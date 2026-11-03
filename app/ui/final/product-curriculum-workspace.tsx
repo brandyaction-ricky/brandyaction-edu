@@ -1,4 +1,6 @@
 "use client";
+import { readJson } from '@/lib/read-json';
+import { curriculumDay } from '@/lib/curriculum-days';
 
 import Link from "next/link";
 import { number as num, safeUrl, text as t, type Row } from "@/lib/platform";
@@ -15,11 +17,12 @@ import { CurriculumCopyPanel } from "./curriculum-copy-panel";
 import { LessonCurriculumImport } from "./lesson-curriculum-import";
 import { ProductMissionWorkspace } from "./product-mission-workspace";
 
-import { ChevronRight, Plus, BookOpen, ArrowUp, ArrowDown, Eye, ArchiveRestore } from 'lucide-react';
+import { ChevronRight, Plus, BookOpen, ArrowUp, ArrowDown, Eye, ArchiveRestore, GripVertical } from 'lucide-react';
 import { CurriculumVisibility, readCurriculum } from './curriculum-visibility';
 import { curriculumFingerprint } from '@/lib/curriculum-controls';
 import { CurriculumLessonPane } from './curriculum-lesson-pane';
 import { CurriculumLessonOrder } from './curriculum-lesson-order';
+import { moveOrderedItem, useReorderDrag } from './reorder-drag';
 import type { LearningEditorSession } from './learning-editor';
 export type CurriculumNavigation = { leave: (next: () => void) => void };
 type StudioOptions = { actorId: string; initialLessonId?: string; onLessonChange: (id: string) => void; navigationRef: Ref<CurriculumNavigation>; blockEditingEnabled?: boolean };
@@ -118,9 +121,8 @@ export function ProductCurriculumWorkspace({ course, pending, send, commonResour
     if (!course?.id || !isActive) return;
     const controller = new AbortController();
     let active = true;
-    fetch(`/api/platform?admin=1&section=products&record=${encodeURIComponent(String(course.id))}&part=curriculum`, { cache: "no-store", signal: controller.signal })
-      .then(async (response) => {
-        const result = await response.json();
+    readJson<{ data: Data; error?: string }>(`/api/platform?admin=1&section=products&record=${encodeURIComponent(String(course.id))}&part=curriculum`, { signal: controller.signal })
+      .then(({ response, data: result }) => {
         if (!response.ok) throw new Error(result.error || "커리큘럼을 불러오지 못했습니다.");
         return result.data as Data;
       })
@@ -145,7 +147,11 @@ export function ProductCurriculumWorkspace({ course, pending, send, commonResour
   const publishedWeeks = weeks.filter(week => week.is_published === true);
   const publishedWeekIds = new Set(publishedWeeks.map(week => String(week.id)));
   const publishedLessons = lessons.filter(lesson => lesson.is_published === true && publishedWeekIds.has(String(lesson.week_id)));
+  const [focusMode, setFocusMode] = useState(false);
   const [outlineSearch, setOutlineSearch] = useState("");
+  const searchTerm = outlineSearch.trim().toLocaleLowerCase();
+  const matchesTitle = (row: Row) => t(row, 'title').toLocaleLowerCase().includes(searchTerm);
+  const matchesWeek = (week: Row) => matchesTitle(week) || lessons.some(lesson => lesson.week_id === week.id && matchesTitle(lesson));
   const [weekTitle, setWeekTitle] = useState("");
   const weekCreation = useRef<{ title: string; requestId: string } | null>(null);
   const [weekId, setWeekId] = useState("");
@@ -190,6 +196,10 @@ export function ProductCurriculumWorkspace({ course, pending, send, commonResour
   const archivePanel = useRef<HTMLDetailsElement>(null);
   const reordering = useRef(false);
   useEffect(() => { if (weekOrder) reorderDialog.current?.showModal(); else reorderDialog.current?.close(); }, [weekOrder]);
+  const regularWeekIds = weekOrder?.filter(item => num(item, 'week_number') > 0).map(item => String(item.id)) || [];
+  const weekDrag = useReorderDrag(regularWeekIds, (from, to) => {
+    setWeekOrder(current => current ? [...current.filter(item => num(item, 'week_number') === 0), ...moveOrderedItem(current.filter(item => num(item, 'week_number') > 0), from, to)] : current);
+  }, busy);
   function acceptControlsData(data: Data) { setSnapshot(data); setControlsRevision(value => value + 1); }
   function planWeekMove(week: Row, direction: -1 | 1) {
     requestNavigation(() => {
@@ -330,7 +340,7 @@ export function ProductCurriculumWorkspace({ course, pending, send, commonResour
       ? String(selectedLesson?.week_id) === affectedWeek
       : String(selectedLesson?.id) === String(row.id));
     if (archived && selectedIsAffected && contentDirty && !window.confirm("저장하지 않은 학습 내용이 있습니다. 목록에서 삭제하면 이 변경사항은 버려집니다. 계속할까요?")) return;
-    const label = kind === "week" ? `${num(row, "week_number")}주차 · ${t(row, "title")}` : `Day ${num(row, "day_number")} · ${t(row, "title")}`;
+    const label = kind === "week" ? `${num(row, "week_number")}주차 · ${t(row, "title")}` : `Day ${curriculumDay(curriculum, row)} · ${t(row, "title")}`;
     if (archived && !window.confirm(`「${label}」을 현재 커리큘럼 목록에서 삭제할까요? 학습 진도·미션 제출 기록·자료는 지우지 않고 보관하며, 삭제한 항목에서 복구할 수 있습니다.${kind === "week" ? " 주차 안의 학습도 함께 숨겨집니다." : ""}`)) return;
     const numberInUse = kind === "week" && !archived && weeks.some(week => String(week.id) !== String(row.id) && num(week, "week_number") === num(row, "week_number"));
     const reassignOnConflict = Boolean(numberInUse && window.confirm(`복구하려는 ${num(row, "week_number")}주차 번호는 이미 사용 중입니다. 다른 빈 주차 번호로 옮겨 복구할까요? 학습 기록과 연결은 그대로 유지됩니다.`));
@@ -363,7 +373,8 @@ export function ProductCurriculumWorkspace({ course, pending, send, commonResour
 
   if (!course?.id) return <div className="section-pad"><p className="notice">상품을 먼저 저장하면 같은 화면에서 주차·일차·콘텐츠를 등록할 수 있습니다.</p></div>;
 
-  return <div className={"section-pad product-curriculum-workspace" + (studio ? " curriculum-workspace--direct" : "")}>
+  return <div className={"section-pad product-curriculum-workspace" + (studio ? " curriculum-workspace--direct" : "") + (focusMode ? " studio-focus-mode" : "")}>
+    {studio && <section className="studio-writing-guide" aria-label="수업 작성 안내"><div><b>수업 작성 순서</b><p>① 목차에서 수업 선택 → ② 내용 작성·저장 → ③ 미리보기·공개 범위 확인</p></div><button type="button" className="btn" aria-pressed={focusMode} disabled={!selectedLesson && !focusMode} onClick={() => setFocusMode(value => !value)}>{focusMode ? '목차·설정 다시 보기' : '수업 작성에 집중'}</button></section>}
     {!studio && <><h2>상품별 커리큘럼</h2><Link className="btn primary" href={`/admin/learning?course=${encodeURIComponent(String(course.id))}`}>커리큘럼 편집 바로 열기</Link></>}
     <p hidden={Boolean(studio)} className="meta">학습 편집을 선택해 본문·영상·자료와 미션을 함께 관리합니다. 같은 상품의 기수는 본문을 공유하고, 수강생 공개 범위는 기수별로 정합니다.</p>
     <section hidden={Boolean(studio)} className="product-curriculum-guide" aria-label="학습 공개 상태">
@@ -372,25 +383,28 @@ export function ProductCurriculumWorkspace({ course, pending, send, commonResour
       <p>커리큘럼이 비공개여도 상품 모집과 결제를 진행할 수 있습니다. 판매 설정은 기본·판매 탭에서 확인하세요.</p>
       <details><summary>공개 범위와 등록 방법</summary><p>주차와 학습 본문을 저장·공개한 다음, ‘공개 범위 확인’에서 기수를 골라 수강생에게 보여 줄 항목을 체크합니다.</p><p>본문 공개 설정은 모든 기수의 콘텐츠 준비 상태입니다. 기수별 공개 범위를 끄면 해당 기수의 수강생에게 보이지 않습니다. 무료 미리보기는 별도 설정입니다.</p><p>가격과 모집·교육 일정은 기수·회차 탭에서 관리합니다. 같은 상품의 기수는 본문을 공유합니다.</p></details>
     </section>
-    <details className="curriculum-copy-disclosure"><summary>기존 커리큘럼 불러오기</summary><CurriculumCopyPanel targetId={String(course.id)} eligible={t(course, "status") === "draft" && !(curriculum.curriculum_weeks || []).length && resourceCount === 0} disabled={saving} dirty={productDirty || Boolean(weekTitle.trim()) || Boolean(lessonTitle.trim())} onCopied={() => { setLoading(true); setReadVersion(version => version + 1); }} /></details>
-    {process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' && <details><summary>외부 커리큘럼 가져오기</summary><LessonCurriculumImport key={String(course.id)} courseId={String(course.id)} disabled={saving || productDirty || contentDirty || Boolean(weekTitle.trim()) || Boolean(lessonTitle.trim())} onImported={() => { setLoading(true); setReadVersion(version => version + 1); }} /></details>}
+    <div className={studio ? "studio-import-actions" : undefined}>
+      <details className="curriculum-copy-disclosure"><summary>기존 커리큘럼 불러오기</summary><CurriculumCopyPanel targetId={String(course.id)} eligible={t(course, "status") === "draft" && !(curriculum.curriculum_weeks || []).length && resourceCount === 0} disabled={saving} dirty={productDirty || Boolean(weekTitle.trim()) || Boolean(lessonTitle.trim())} onCopied={() => { setLoading(true); setReadVersion(version => version + 1); }} /></details>
+      {process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' && <details><summary>외부 커리큘럼 가져오기</summary><LessonCurriculumImport key={String(course.id)} courseId={String(course.id)} disabled={saving || productDirty || contentDirty || Boolean(weekTitle.trim()) || Boolean(lessonTitle.trim())} onImported={() => { setLoading(true); setReadVersion(version => version + 1); }} /></details>}
+    </div>
     {loading && <p className="meta" role="status">상품 커리큘럼을 불러오는 중입니다.</p>}
     {readError && <p className="notice warning" role="alert">{readError} <button className="btn small" type="button" onClick={() => { setLoading(true); setReadVersion((version) => version + 1); }}>다시 시도</button></p>}
-    {studio && <div className="studio-management-bar"><div><b>본문 준비 {publishedLessons.length}개</b><span>전체 {lessons.length}개 수업 · 기수별 공개는 별도 설정</span></div><div><button type="button" className="btn" disabled={saving} onClick={()=>requestNavigation(()=>setVisibilityOpen(true))}><Eye size={18}/> 기수별 공개 범위</button><button type="button" className="btn" disabled={saving} onClick={()=>{if(archivePanel.current){archivePanel.current.open=true;archivePanel.current.querySelector('summary')?.focus();archivePanel.current.scrollIntoView({block:'center'});}}}><ArchiveRestore size={18}/> 삭제한 항목 복구</button></div></div>}
-    <div className="curriculum-studio">
-    <div className="curriculum-outline" aria-label="커리큘럼 목차">
+    {studio && <div className="studio-management-bar adm-box"><div><b>본문 준비 {publishedLessons.length}개</b><span>전체 {lessons.length}개 수업 · 기수별 공개는 별도 설정</span></div><div><button type="button" className="btn" disabled={saving} onClick={()=>requestNavigation(()=>setVisibilityOpen(true))}><Eye size={18}/> 기수별 공개 범위</button><button type="button" className="btn" disabled={saving} onClick={()=>{if(archivePanel.current){archivePanel.current.open=true;archivePanel.current.querySelector('summary')?.focus();archivePanel.current.scrollIntoView({block:'center'});}}}><ArchiveRestore size={18}/> 삭제한 항목 복구</button></div></div>}
+    <div className="curriculum-studio adm-split">
+    <div className="curriculum-outline adm-tree" aria-label="커리큘럼 목차">
     {studio && <label className="studio-outline-search">수업 찾기<input type="search" value={outlineSearch} onChange={event => setOutlineSearch(event.target.value)} placeholder="주차 또는 수업 제목" /></label>}
+    {studio && searchTerm && <div className="studio-search-result"><p role="status">{weeks.some(matchesWeek) ? '검색어가 포함된 주차와 수업입니다.' : '검색한 수업이 없습니다.'}</p><button type="button" className="btn small" onClick={() => setOutlineSearch('')}>검색 지우기</button></div>}
     <details className="studio-add-week" open={!studio || undefined}><summary><Plus size={18} /> 주차 추가</summary><div className="product-curriculum-create">
       <label>새 주차 제목<input value={weekTitle} maxLength={300} onChange={(event) => setWeekTitle(event.target.value)} placeholder="예: 시작하기" disabled={saving} /></label>
       <button className="btn" type="button" onClick={() => void createWeek()} disabled={saving || !weekTitle.trim()}>주차 추가</button>
     </div>
     <p className="meta">새 주차는 1주차부터 가장 낮은 빈 번호로 추가됩니다. 삭제한 주차를 되살리려면 아래 ‘삭제한 주차·학습 보기’에서 복구해 주세요.</p></details>
     {!weeks.length && <p className="notice">먼저 주차를 추가해 주세요.</p>}
-    {weeks.map((week) => <section hidden={Boolean(studio && outlineSearch.trim() && !t(week, "title").includes(outlineSearch.trim()) && !lessons.some(lesson => lesson.week_id === week.id && t(lesson, "title").includes(outlineSearch.trim())))} key={week.id} className="product-curriculum-week" aria-label={`${num(week, "week_number")}주차 ${t(week, "title")}`}>
+    {weeks.map((week) => <section hidden={Boolean(studio && searchTerm && !matchesWeek(week))} key={week.id} className="product-curriculum-week" aria-label={`${num(week, "week_number")}주차 ${t(week, "title")}`}>
       <details open={!studio || Boolean(outlineSearch.trim()) || week.id === selectedLesson?.week_id || undefined} className="studio-week-disclosure"><summary>{studio && <span className="studio-chevron"><ChevronRight size={20} aria-hidden="true" /></span>}<span className="studio-week-title"><h3>{num(week, "week_number")}주차 · {t(week, "title")}</h3><span className="meta">{lessons.filter(l=>l.week_id===week.id).length}개 학습</span></span><span className={"studio-visibility " + (week.is_published ? "is-public" : "")}>{week.is_published ? "공개" : "비공개"}</span></summary>
-      <div className="product-curriculum-week-actions">{studio && <button className="btn small" type="button" aria-label={`${t(week,'title')} 수업 순서 바꾸기`} disabled={saving || lessons.filter(lesson=>lesson.week_id===week.id).length < 2} onClick={()=>requestNavigation(()=>setLessonOrderWeek(String(week.id)))}>수업 순서 바꾸기</button>}{studio && num(week,'week_number') > 0 && <><button className="btn small" type="button" aria-label={`${t(week,'title')} 주차 위로`} onClick={()=>planWeekMove(week,-1)} disabled={saving || week.id===weeks.find(item=>num(item,'week_number')>0)?.id}><ArrowUp size={16}/> 위로</button><button className="btn small" type="button" aria-label={`${t(week,'title')} 주차 아래로`} onClick={()=>planWeekMove(week,1)} disabled={saving || week.id===weeks.at(-1)?.id}><ArrowDown size={16}/> 아래로</button></>}<button className="btn small danger" type="button" onClick={() => archiveCurriculum("week", week, true)} disabled={saving}>주차 삭제</button></div>
+      <div className="product-curriculum-week-actions">{studio && <button className="btn small" type="button" aria-label={`${t(week,'title')} 수업 순서 바꾸기`} disabled={saving || lessons.filter(lesson=>lesson.week_id===week.id).length < 2} onClick={()=>requestNavigation(()=>setLessonOrderWeek(String(week.id)))}>수업 순서 바꾸기</button>}{studio && num(week,'week_number') > 0 && <><button className="btn small" type="button" aria-label="주차 순서 드래그로 바꾸기" disabled={saving || weeks.filter(item=>num(item,'week_number')>0).length<2} onClick={()=>requestNavigation(()=>setWeekOrder([...weeks]))}><GripVertical size={16}/> 주차 순서</button><button className="btn small" type="button" aria-label={`${t(week,'title')} 주차 위로`} onClick={()=>planWeekMove(week,-1)} disabled={saving || week.id===weeks.find(item=>num(item,'week_number')>0)?.id}><ArrowUp size={16}/> 위로</button><button className="btn small" type="button" aria-label={`${t(week,'title')} 주차 아래로`} onClick={()=>planWeekMove(week,1)} disabled={saving || week.id===weeks.at(-1)?.id}><ArrowDown size={16}/> 아래로</button></>}<button className="btn small danger" type="button" onClick={() => archiveCurriculum("week", week, true)} disabled={saving}>주차 삭제</button></div>
       <details className="curriculum-week-settings" ref={element => { if (element) weekSettingsRefs.current.set(String(week.id), element); else weekSettingsRefs.current.delete(String(week.id)); }}><summary>주차 설정</summary><WeekSettings key={`${week.id}:${week.updated_at}`} week={week} disabled={saving} send={send} onDirty={studio ? trackWeekDraft : undefined} onSaved={() => { setLoading(true); setReadVersion((version) => version + 1); }} /></details>
-      {lessons.filter((lesson) => lesson.week_id === week.id).length ? <ul>{lessons.filter((lesson) => lesson.week_id === week.id).map((lesson) => <li key={lesson.id} className={lesson.id === lessonId ? "selected" : ""}><div>{studio ? <button type="button" className="studio-lesson-link" aria-current={lesson.id === lessonId ? "page" : undefined} onClick={() => selectLesson(lesson)} disabled={saving}><BookOpen size={17} aria-hidden="true" /><span><small>{num(lesson, "day_number")}일차</small><b>{t(lesson, "title")}</b></span></button> : <span>Day {num(lesson, "day_number")} · {t(lesson, "title")}</span>}<small>{({text:"텍스트",vod:"영상",material:"자료",link:"외부 링크"} as Record<string,string>)[t(lesson,"content_type")] || "학습"} · {(lesson.has_blocks || (curriculum.lesson_contents || []).some(c=>c.lesson_id===lesson.id)) ? "내용 등록됨" : "내용 없음"} · {lessonVisibility(lesson, week)}</small></div><div className="row"><button hidden={Boolean(studio)} className="btn small" type="button" aria-pressed={lesson.id===lessonId} onClick={() => selectLesson(lesson)} disabled={saving}>학습 편집</button><button className="btn small danger" type="button" aria-label={`${t(lesson, "title")} 삭제`} onClick={() => archiveCurriculum("lesson", lesson, true)} disabled={saving}>삭제</button></div></li>)}</ul> : <p className="meta">등록된 학습이 없습니다.</p>}
+      {lessons.filter((lesson) => lesson.week_id === week.id).length ? <ul>{lessons.filter((lesson) => lesson.week_id === week.id).map((lesson) => <li hidden={Boolean(studio && searchTerm && !matchesTitle(week) && !matchesTitle(lesson))} key={lesson.id} className={lesson.id === lessonId ? "selected" : ""}><div>{studio ? <button type="button" className="studio-lesson-link" aria-current={lesson.id === lessonId ? "page" : undefined} onClick={() => selectLesson(lesson)} disabled={saving}><BookOpen size={17} aria-hidden="true" /><span><small>{curriculumDay(curriculum, lesson)}일차</small><b>{t(lesson, "title")}</b></span></button> : <span>Day {curriculumDay(curriculum, lesson)} · {t(lesson, "title")}</span>}<small>{({text:"텍스트",vod:"영상",material:"자료",link:"외부 링크"} as Record<string,string>)[t(lesson,"content_type")] || "학습"} · {(lesson.has_blocks || (curriculum.lesson_contents || []).some(c=>c.lesson_id===lesson.id)) ? "내용 등록됨" : "내용 없음"} · {lessonVisibility(lesson, week)}</small></div><div className="row"><button hidden={Boolean(studio)} className="btn small" type="button" aria-pressed={lesson.id===lessonId} onClick={() => selectLesson(lesson)} disabled={saving}>학습 편집</button><button className="btn small danger" type="button" aria-label={`${t(lesson, "title")} 삭제`} onClick={() => archiveCurriculum("lesson", lesson, true)} disabled={saving}>삭제</button></div></li>)}</ul> : <p className="meta">등록된 학습이 없습니다.</p>}
       <button className="btn small curriculum-add-lesson" type="button" disabled={saving} onClick={()=>{setWeekId(String(week.id));setAddingTo(String(week.id));}}>＋ 학습 추가</button>
       {addingTo === week.id && <div className="product-curriculum-create"><label>새 일차 제목<input autoFocus value={lessonTitle} maxLength={300} onChange={event=>setLessonTitle(event.target.value)} disabled={saving}/></label><button type="button" className="btn" disabled={saving || !lessonTitle.trim()} onClick={()=>void createLesson()}>일차 추가</button></div>}
       </details>
@@ -408,7 +422,7 @@ export function ProductCurriculumWorkspace({ course, pending, send, commonResour
           const parent = (curriculum.curriculum_weeks || []).find(week => String(week.id) === String(lesson.week_id));
           const parentArchived = Boolean(parent?.archived_at);
           return <li key={`lesson-${lesson.id}`}>
-            <span>{parent ? `${num(parent, "week_number")}주차 · ` : ""}Day {num(lesson, "day_number")} · {t(lesson, "title")} <small>{parentArchived ? "상위 주차를 먼저 복구하세요" : "학습"}</small></span>
+            <span>{parent ? `${num(parent, "week_number")}주차 · ` : ""}Day {curriculumDay(curriculum, lesson)} · {t(lesson, "title")} <small>{parentArchived ? "상위 주차를 먼저 복구하세요" : "학습"}</small></span>
             <button className="btn small" type="button" onClick={() => archiveCurriculum("lesson", lesson, false)} disabled={saving || parentArchived}>학습 복구</button>
           </li>;
         })}
@@ -416,10 +430,10 @@ export function ProductCurriculumWorkspace({ course, pending, send, commonResour
     </details>}
     </div>
     <div className="curriculum-editor-column">
-    {!selectedLesson && <div className="curriculum-editor-empty"><h3>편집할 학습을 선택해 주세요</h3><p>목차에서 수업 제목을 누르면 바로 내용을 작성할 수 있습니다.</p></div>}
+    {!selectedLesson && <div className="curriculum-editor-empty adm-empty"><h3>편집할 학습을 선택해 주세요</h3><p>목차에서 수업 제목을 누르면 바로 내용을 작성할 수 있습니다.</p></div>}
     {studio && selectedLesson && course && <CurriculumLessonPane key={`${selectedLesson.id}:${controlsRevision}`} lesson={selectedLesson} course={course} curriculum={curriculum} pending={pending} send={send} actorId={studio.actorId} sessionRef={editorSession} blockEditingEnabled={studio.blockEditingEnabled} onSaved={() => { setReadVersion(version => version + 1); }} />}
     {!studio && selectedLesson && <section ref={contentEditorRef} tabIndex={-1} className="product-curriculum-content" aria-label="일차별 콘텐츠 편집">
-      <header className="curriculum-editor-heading"><div><p className="meta">{num(weeks.find(w=>w.id===selectedLesson.week_id), "week_number")}주차 · 선택한 학습</p><h3>Day {num(selectedLesson, "day_number")} · {t(selectedLesson, "title")}</h3></div><button className="btn small" type="button" hidden={Boolean(selectedLesson.has_blocks)} aria-expanded={previewOpen} onClick={()=>setPreviewOpen(value=>!value)}>{previewOpen ? "미리보기 닫기" : "학습 내용 미리보기"}</button></header>
+      <header className="curriculum-editor-heading"><div><p className="meta">{num(weeks.find(w=>w.id===selectedLesson.week_id), "week_number")}주차 · 선택한 학습</p><h3>Day {curriculumDay(curriculum, selectedLesson)} · {t(selectedLesson, "title")}</h3></div><button className="btn small" type="button" hidden={Boolean(selectedLesson.has_blocks)} aria-expanded={previewOpen} onClick={()=>setPreviewOpen(value=>!value)}>{previewOpen ? "미리보기 닫기" : "학습 내용 미리보기"}</button></header>
       {previewOpen && !selectedLesson.has_blocks && <div className="curriculum-lesson-preview" role="region" aria-label="학습 내용 미리보기"><p className="meta">현재 편집 내용의 미리보기입니다. 저장·공개·수강 권한은 변경되지 않습니다.</p>{contentType === "text" ? <div className="reading-copy"><LessonText text={contentValue || "아직 작성한 내용이 없습니다."} /></div> : contentType === "vod" && safeUrl(contentValue) ? <Video url={contentValue}/> : <p>{contentType === "material" ? resourceName || "학습 자료" : contentValue}</p>}</div>}
       <div className="notice" aria-label="저장된 학습 공개 상태">
         <p><b>{lessonVisibility(selectedLesson, weeks.find(week => week.id === selectedLesson.week_id))}</b> · 저장된 설정 기준</p>
@@ -445,7 +459,7 @@ export function ProductCurriculumWorkspace({ course, pending, send, commonResour
     {error && <p className="notice warning" role="alert">{error}</p>}
     {studio && lessonOrderWeek && <CurriculumLessonOrder courseId={String(course.id)} weekId={lessonOrderWeek} onRefresh={acceptControlsData} onClose={()=>{setLessonOrderWeek("");setLoading(true);setReadVersion(version=>version+1);}} />}
     {studio && visibilityOpen && <CurriculumVisibility courseId={String(course.id)} initial={curriculum} onRefresh={acceptControlsData} onClose={()=>setVisibilityOpen(false)} />}
-    {studio && <dialog ref={reorderDialog} className="studio-control-dialog studio-order-dialog" aria-labelledby="week-order-title" onCancel={event=>{event.preventDefault();if(!busy)setWeekOrder(null);}}><header><h2 id="week-order-title">주차 순서를 바꿀까요?</h2></header><p>0주차 온보딩은 그대로 두고, 나머지 주차 번호를 아래 순서대로 다시 매깁니다. 수업·수강 기록의 연결과 공개 상태는 유지됩니다.</p><p className="notice">주차 번호에 따른 학습 개방 순서에도 영향을 줄 수 있습니다. 변경될 주차를 확인해 주세요.</p><ol className="studio-week-order">{weekOrder?.map((week,index)=><li key={week.id}><b>{index+(num(weekOrder[0],'week_number')===0?0:1)}주차</b><span>{t(week,'title')}</span><small>현재 {num(week,'week_number')}주차</small></li>)}</ol><footer><button type="button" className="btn" disabled={busy} onClick={()=>setWeekOrder(null)}>취소</button><button type="button" className="btn primary" disabled={busy} onClick={()=>void applyWeekOrder()}>{busy?'저장 중…':'이 순서로 저장'}</button></footer></dialog>}
+    {studio && <dialog ref={reorderDialog} className="studio-control-dialog studio-order-dialog" aria-labelledby="week-order-title" onCancel={event=>{event.preventDefault();if(!busy)setWeekOrder(null);}}><header><h2 id="week-order-title">주차 순서를 바꿀까요?</h2></header><p>0주차 온보딩은 그대로 두고, 손잡이를 끌거나 방향키로 나머지 주차를 옮겨 주세요. 수업·수강 기록의 연결과 공개 상태는 유지됩니다.</p><p className="notice">주차 번호에 따른 학습 개방 순서에도 영향을 줄 수 있습니다. 변경될 주차를 확인해 주세요.</p><ol className="studio-week-order">{weekOrder?.map((week,index)=>{const id=String(week.id), fixed=num(week,'week_number')===0;return <li key={id} {...(!fixed ? weekDrag.row(id) : {})} className={`${weekDrag.draggedId===id?'reorder-item-dragging ':''}${weekDrag.overId===id?'reorder-item-over':''}`}>{fixed ? <span className="studio-week-fixed" aria-hidden="true"><GripVertical size={18}/></span> : weekDrag.handle(id,t(week,'title'))}<b>{index+(num(weekOrder[0],'week_number')===0?0:1)}주차</b><span>{t(week,'title')}</span><small>현재 {num(week,'week_number')}주차</small></li>;})}</ol><footer><button type="button" className="btn" disabled={busy} onClick={()=>setWeekOrder(null)}>취소</button><button type="button" className="btn primary" disabled={busy} onClick={()=>void applyWeekOrder()}>{busy?'저장 중…':'이 순서로 저장'}</button></footer></dialog>}
     {studio && <dialog ref={navigationDialog} className="studio-navigation-dialog" aria-labelledby="studio-navigation-title" onCancel={event => { event.preventDefault(); if (!switching) setNextNavigation(null); }}>
       <h2 id="studio-navigation-title">작성한 내용을 저장할까요?</h2><p>저장한 뒤 다른 수업이나 상품으로 이동합니다. 공개 범위는 현재 수업 설정을 따릅니다.</p>
       <div><button type="button" className="btn" disabled={switching} onClick={() => setNextNavigation(null)}>계속 작성</button><button type="button" className="btn primary" disabled={switching} onClick={async () => { setSwitching(true); const saved = await editorSession.current?.save(); setSwitching(false); if (saved) { const next = nextNavigation; setNextNavigation(null); next?.run(); } else { setNextNavigation(null); setError("저장하지 못해 현재 수업을 유지했습니다. 편집기의 안내를 확인해 주세요."); } }}>{switching ? "저장 중…" : "저장하고 이동"}</button></div>

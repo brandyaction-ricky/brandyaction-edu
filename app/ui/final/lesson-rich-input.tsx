@@ -1,18 +1,62 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { EditorContent, useEditor, useEditorState, Extension, InputRule, wrappingInputRule, type Editor } from "@tiptap/react";
+import { EditorContent, useEditor, useEditorState, Extension, InputRule, wrappingInputRule, Node, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Blockquote from "@tiptap/extension-blockquote";
 import { Details, DetailsContent, DetailsSummary } from "@tiptap/extension-details";
-import { TextStyle, FontSize } from "@tiptap/extension-text-style";
-import { Bold, Italic, Underline, List, ListOrdered, Link2, Undo2, Redo2, RemoveFormatting, Quote, ListCollapse } from "lucide-react";
-import { LESSON_FONT_SIZES, lessonDocumentForEditor, serializeLessonDocument } from "@/lib/lesson-body";
+import { TextStyle, FontSize, Color, BackgroundColor } from "@tiptap/extension-text-style";
+import { Bold, Italic, Underline, List, ListOrdered, Link2, Undo2, Redo2, RemoveFormatting, Quote, ListCollapse, Lightbulb, Baseline, Highlighter } from "lucide-react";
+import { LessonCallout, insertLessonNotice } from "./lesson-callout";
+import { LESSON_FONT_SIZES, normalizeLessonColor, lessonDocumentForEditor, serializeLessonDocument } from "@/lib/lesson-body";
 import { safeUrl } from "@/lib/platform";
+import { TextSelection } from '@tiptap/pm/state';
+import type { EditorView } from '@tiptap/pm/view';
 import "./lesson-text.css";
 import "./lesson-body-editor.css";
 
 export type LessonBodyEditorProps = { value: string; onChange: (value: string) => void; label?: string; disabled?: boolean; name?: string; id?: string; showLabel?: boolean };
+
+// A contenteditable's DOM caret is not its sequential keyboard-focus position.
+// Native Tab starts at its first embedded handle, regardless of the caret.
+export function focusOutsideLessonEditor(view: EditorView, event: KeyboardEvent) {
+  if (event.key !== 'Tab' || event.isComposing || view.composing) return false;
+  const target = event.target as HTMLElement | null;
+  if (!target?.isContentEditable && !target?.closest('[data-drag-handle]')) return false;
+  const fields = [...view.dom.ownerDocument.querySelectorAll<HTMLElement>('button,a[href],input,select,textarea,summary,[tabindex]')]
+    .filter(field => field.tabIndex >= 0 && !view.dom.contains(field) && !field.closest('[inert]') && !field.matches(':disabled') && field.getClientRects().length > 0 && getComputedStyle(field).visibility !== 'hidden');
+  const direction = event.shiftKey ? globalThis.Node.DOCUMENT_POSITION_PRECEDING : globalThis.Node.DOCUMENT_POSITION_FOLLOWING;
+  const candidates = fields.filter(field => view.dom.compareDocumentPosition(field) & direction);
+  const next = event.shiftKey ? candidates.at(-1) : candidates[0];
+  if (!next) return false;
+  event.preventDefault(); next.focus(); return true;
+}
+
+// Walk handles relative to the caret, rather than restarting the browser's
+// tab sequence at the first control inside the contenteditable.
+export function focusLessonMoveHandle(view: EditorView, event: KeyboardEvent) {
+  if (event.key !== 'Tab' || event.isComposing || view.composing) return false;
+  const target = event.target as HTMLElement | null;
+  const handles = [...view.dom.querySelectorAll<HTMLElement>('[data-drag-handle]')]
+    .filter(handle => handle.tabIndex >= 0 && handle.getClientRects().length > 0 && getComputedStyle(handle).visibility !== 'hidden');
+  const focused = target?.closest<HTMLElement>('[data-drag-handle]');
+  let next: HTMLElement | undefined;
+  if (focused) next = handles[handles.indexOf(focused) + (event.shiftKey ? -1 : 1)];
+  else if (target?.isContentEditable) {
+    let pos = view.state.selection.head;
+    const selection = view.dom.ownerDocument.getSelection();
+    if (selection?.focusNode && view.dom.contains(selection.focusNode)) {
+      try { pos = view.posAtDOM(selection.focusNode, selection.focusOffset); } catch { /* Use the editor selection while its DOM is updating. */ }
+    }
+    const candidates = handles.filter(handle => {
+      const at = view.posAtDOM(handle, 0);
+      return event.shiftKey ? at <= pos : at > pos;
+    });
+    next = event.shiftKey ? candidates.at(-1) : candidates[0];
+  } else return false;
+  if (!next) return focusOutsideLessonEditor(view, event);
+  event.preventDefault(); next.focus(); return true;
+}
 
 const LessonFontSize = FontSize.extend({
   addGlobalAttributes() {
@@ -23,10 +67,63 @@ const LessonFontSize = FontSize.extend({
   },
 });
 
-const LessonQuote = Blockquote.extend({
+const LessonColor = Color.extend({
+  addGlobalAttributes() {
+    return (this.parent?.() || []).map(group => ({ ...group, attributes: {
+      ...group.attributes, color: { ...group.attributes.color, parseHTML: (element: HTMLElement) => normalizeLessonColor(element.style.color) },
+    } }));
+  },
+});
+const LessonBackgroundColor = BackgroundColor.extend({
+  addGlobalAttributes() {
+    return (this.parent?.() || []).map(group => ({ ...group, attributes: {
+      ...group.attributes, backgroundColor: { ...group.attributes.backgroundColor, parseHTML: (element: HTMLElement) => normalizeLessonColor(element.style.backgroundColor) },
+    } }));
+  },
+});
+const LESSON_COLORS = [
+  ["검정", "#202428"], ["회색", "#6b7280"], ["흰색", "#ffffff"], ["빨강", "#c51e2c"],
+  ["주황", "#c2410c"], ["노랑", "#facc15"], ["초록", "#15803d"], ["파랑", "#1d4ed8"],
+  ["보라", "#7e22ce"], ["분홍", "#be185d"], ["연한 노랑", "#fef08a"], ["연한 초록", "#dcfce7"],
+  ["연한 파랑", "#dbeafe"], ["연한 보라", "#f3e8ff"], ["연한 분홍", "#fce7f3"], ["연한 회색", "#f3f4f6"],
+] as const;
+
+export const LessonQuote = Blockquote.extend({
   addInputRules() { return [wrappingInputRule({ find: /^" $/, type: this.type })]; },
 });
 const LessonDetails = Details.extend({
+  priority: 1000,
+  draggable: true,
+  addKeyboardShortcuts() {
+    return {
+      ...this.parent?.(),
+      'Mod-Enter': () => {
+        const { state, view } = this.editor, { $head } = state.selection;
+        for (let depth = $head.depth; depth > 0; depth--) {
+          if ($head.node(depth).type.name !== 'details') continue;
+          const at = $head.after(depth), tr = state.tr.insert(at, state.schema.nodes.paragraph.create());
+          tr.setSelection(TextSelection.create(tr.doc, at + 1)); view.dispatch(tr.scrollIntoView());
+          return true;
+        }
+        return false;
+      },
+      Enter: () => {
+        const { state, view } = this.editor, { $head } = state.selection;
+        if ($head.parent.type.name !== 'detailsSummary' || !state.selection.empty) return false;
+        const wrapper = view.nodeDOM($head.before($head.depth - 1)) as HTMLElement | null;
+        if (!wrapper?.classList.contains('is-open')) wrapper?.querySelector<HTMLButtonElement>(':scope > button')?.click();
+        const at = $head.after() + 1;
+        const content = state.doc.nodeAt($head.after());
+        if (!content || content.type.name !== 'detailsContent') return false;
+        const tr = state.tr;
+        // Reuse the empty first line instead of adding a blank outside the toggle.
+        if (content.firstChild?.type.name !== 'paragraph' || content.firstChild.content.size) tr.insert(at, state.schema.nodes.paragraph.create());
+        tr.setSelection(TextSelection.create(tr.doc, at + 1));
+        view.dispatch(tr.scrollIntoView());
+        return true;
+      },
+    };
+  },
   addInputRules() {
     return [new InputRule({ find: /^> $/, handler: ({ chain, range }) => {
       if (!chain().deleteRange(range).setDetails().run()) return null;
@@ -36,10 +133,25 @@ const LessonDetails = Details.extend({
   // Opening a toggle is a reading preference, not a change to lesson content.
   persist: false,
   renderToggleButton: ({ element, isOpen }) => {
+    const wrapper = element.parentElement;
+    if (wrapper && !wrapper.querySelector(':scope > .lesson-toggle-drag')) {
+      const handle = document.createElement('span');
+      handle.className = 'lesson-toggle-drag';
+      handle.setAttribute('data-drag-handle', '');
+      handle.setAttribute('role', 'button');
+      handle.setAttribute('tabindex', '0');
+      handle.setAttribute('aria-label', '접기·펼치기 블록 이동');
+      handle.title = '끌어서 접기·펼치기 블록 이동';
+      handle.draggable = true;
+      handle.contentEditable = 'false';
+      handle.onmousedown = event => event.stopPropagation();
+      handle.textContent = '⠿';
+      wrapper.insertBefore(handle, element);
+    }
     element.contentEditable = "false";
     element.setAttribute("aria-label", isOpen ? "내용 접기" : "내용 펼치기");
     element.setAttribute("aria-expanded", String(isOpen));
-    element.textContent = isOpen ? "▾" : "▸";
+    element.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>';
     // ProseMirror's Enter/Space handlers must not consume a focused button.
     element.onkeydown = event => {
       if (event.key === "Enter" || event.key === " ") {
@@ -48,11 +160,16 @@ const LessonDetails = Details.extend({
     };
   },
 });
+// Blank lines stay in the toggle. Mod-Enter intentionally creates a line outside.
+const LessonDetailsContent = DetailsContent.extend({ addKeyboardShortcuts() { return {}; } });
 const LessonInputUndo = Extension.create({
   name: "lessonInputUndo", priority: 1000,
   addKeyboardShortcuts() {
     return {
       "Mod-z": () => this.editor.commands.undoInputRule() || this.editor.commands.undo(),
+      // Keep redo in this higher-priority keymap: on Ctrl-based platforms,
+      // ProseMirror can otherwise fall back from Shift+z to our undo binding.
+      "Shift-Mod-z": () => { this.editor.commands.redo(); return true; },
       Backspace: () => this.editor.commands.undoInputRule(),
     };
   },
@@ -64,7 +181,8 @@ export function lessonRichExtensions() {
       // input rule and discards its undo state. Enter already creates paragraphs.
       heading: { levels: [1, 2, 3] }, trailingNode: false, blockquote: false, code: false, codeBlock: false, horizontalRule: false,
       link: { openOnClick: false, HTMLAttributes: { target: "_blank", rel: "noopener noreferrer" }, isAllowedUri: url => Boolean(safeUrl(url)) },
-    }), TextStyle, LessonFontSize, LessonQuote, LessonDetails, DetailsSummary, DetailsContent, LessonInputUndo];
+    }), TextStyle, LessonFontSize, LessonColor, LessonBackgroundColor, LessonQuote, LessonDetails, DetailsSummary, LessonDetailsContent, LessonCallout, LessonInputUndo,
+    ...['lessonImage', 'lessonFile', 'lessonEmbed'].map(name => Node.create({ name, group: 'block', atom: true, addAttributes: () => ({ blockId: { default: null } }), renderHTML: () => ['div', { 'data-lesson-image-reference': '' }, name === 'lessonEmbed' ? '학습 항목 · 문서 편집 화면에서 확인' : name === 'lessonFile' ? '첨부 파일 · 문서 편집 화면에서 확인' : '이미지 · 문서 편집 화면에서 확인'] }))];
 }
 
 export function LessonRichInput({ value, onChange, label = "학습 내용", disabled = false, name, id, showLabel = true }: LessonBodyEditorProps) {
@@ -75,7 +193,7 @@ export function LessonRichInput({ value, onChange, label = "학습 내용", disa
     extensions: lessonRichExtensions(),
     content: lessonDocumentForEditor(value),
     editable: !disabled,
-    editorProps: { attributes: { id: editorId, role: "textbox", "aria-label": label, "aria-multiline": "true", "aria-describedby": `${editorId}-help`, class: "lesson-rich-body" } },
+    editorProps: { attributes: { id: editorId, role: "textbox", "aria-label": label, "aria-multiline": "true", "aria-describedby": `${editorId}-help`, class: "lesson-rich-body" }, handleKeyDown: focusOutsideLessonEditor },
     onUpdate: ({ editor }) => {
       const next = serializeLessonDocument(editor.getJSON());
       lastValue.current = next;
@@ -97,11 +215,14 @@ export function LessonRichInput({ value, onChange, label = "학습 내용", disa
       <EditorContent editor={editor} />
     </div>
     {name && <input type="hidden" name={name} value={value} />}
-    <small id={`${editorId}-help`} className="field-hint">줄 맨 앞에 <code>#</code> · <code>##</code> · <code>###</code>와 공백을 입력하면 제목, <code>-</code>는 글머리 목록, <code>1.</code>은 번호 목록, <code>&gt;</code>는 접기·펼치기, <code>&quot;</code>는 인용문이 됩니다. 토글은 화살표로 펼친 뒤 제목에서 Enter를 누르면 안쪽에 글을 쓸 수 있습니다. Shift+Enter는 줄바꿈입니다. 변경 후 학습을 저장해 주세요.</small>
+    <small id={`${editorId}-help`} className="field-hint">줄 맨 앞에 <code>#</code> · <code>##</code> · <code>###</code>와 공백을 입력하면 제목, <code>-</code>는 글머리 목록, <code>1.</code>은 번호 목록, <code>&gt;</code>는 접기·펼치기, <code>&quot;</code>는 인용문이 됩니다. 토글 제목에서 Enter를 누르면 펼쳐져 안쪽에 글을 쓸 수 있습니다. Ctrl+Enter(맥은 ⌘+Enter)는 토글 밖에 새 문단을 만듭니다. Shift+Enter는 줄바꿈입니다. 변경 후 학습을 저장해 주세요.</small>
   </div>;
 }
 
 export function LessonFormatToolbar({ editor, disabled = false }: { editor: Editor | null; disabled?: boolean }) {
+  const [colorOpen, setColorOpen] = useState<"color" | "backgroundColor" | null>(null);
+  const [customColor, setCustomColor] = useState("#c51e2c");
+  const colorPanelId = useId();
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [linkError, setLinkError] = useState("");
@@ -109,13 +230,30 @@ export function LessonFormatToolbar({ editor, disabled = false }: { editor: Edit
   const state = useEditorState({ editor, selector: ({ editor }) => ({
     block: editor?.isActive("heading", { level: 1 }) ? "h1" : editor?.isActive("heading", { level: 2 }) ? "h2" : editor?.isActive("heading", { level: 3 }) ? "h3" : "p",
     size: String(editor?.getAttributes("textStyle").fontSize || ""),
+    color: normalizeLessonColor(editor?.getAttributes("textStyle").color), backgroundColor: normalizeLessonColor(editor?.getAttributes("textStyle").backgroundColor),
     bold: editor?.isActive("bold"), italic: editor?.isActive("italic"), underline: editor?.isActive("underline"),
     bullet: editor?.isActive("bulletList"), ordered: editor?.isActive("orderedList"), link: editor?.isActive("link"),
-    quote: editor?.isActive("blockquote"), details: editor?.isActive("details"),
+    quote: editor?.isActive("blockquote"), details: editor?.isActive("details"), callout: editor?.isActive("callout"),
     undo: editor?.can().undoInputRule() || editor?.can().undo(), redo: editor?.can().redo(),
   }) });
+  function toggleColor(kind: "color" | "backgroundColor") {
+    if (!editor || disabled) return;
+    setLinkOpen(false);
+    setCustomColor(normalizeLessonColor(editor.getAttributes("textStyle")[kind]) || (kind === "color" ? "#c51e2c" : "#fef08a"));
+    setColorOpen(colorOpen === kind ? null : kind);
+  }
+  function applyColor(value: string | null) {
+    if (!editor || disabled || !colorOpen) return;
+    const color = normalizeLessonColor(value);
+    if (value !== null && !color) return;
+    const chain = editor.chain().focus();
+    if (colorOpen === "color") { if (color) chain.setColor(color).run(); else chain.unsetColor().run(); }
+    else { if (color) chain.setBackgroundColor(color).run(); else chain.unsetBackgroundColor().run(); }
+    setColorOpen(null);
+  }
   function toggleLink() {
     if (!editor) return;
+    setColorOpen(null);
     setLinkSelection({ from: editor.state.selection.from, to: editor.state.selection.to });
     setLinkUrl(String(editor.getAttributes("link").href || ""));
     setLinkError(""); setLinkOpen(!linkOpen);
@@ -139,6 +277,7 @@ export function LessonFormatToolbar({ editor, disabled = false }: { editor: Edit
     { label: "번호 목록", icon: ListOrdered, active: state?.ordered, action: () => editor?.chain().focus().toggleOrderedList().run() },
     { label: "접기·펼치기", icon: ListCollapse, active: state?.details, action: () => editor?.isActive("details") ? editor.chain().focus().unsetDetails().run() : editor?.chain().focus().setDetails().run() },
     { label: "인용문", icon: Quote, active: state?.quote, action: () => editor?.chain().focus().toggleBlockquote().run() },
+    { label: "콜아웃", icon: Lightbulb, active: state?.callout, action: () => editor?.chain().focus().toggleWrap("callout").run() },
     { label: "링크", icon: Link2, active: state?.link || linkOpen, action: toggleLink },
     { label: "서식 지우기", icon: RemoveFormatting, action: () => editor?.chain().focus().unsetAllMarks().clearNodes().run() },
     { label: "실행 취소", icon: Undo2, unavailable: !state?.undo, action: () => editor?.chain().focus().undoInputRule().run() || editor?.chain().focus().undo().run() },
@@ -146,12 +285,19 @@ export function LessonFormatToolbar({ editor, disabled = false }: { editor: Edit
   ];
   return <>
       <div className="lesson-format-controls" role="group" aria-label="본문 서식">
+        <button type="button" className="lesson-notice-add" disabled={disabled || !editor} onMouseDown={event => event.preventDefault()} onClick={() => editor && insertLessonNotice(editor)}><Lightbulb size={16} aria-hidden="true" />필독 공지 추가</button>
         <select aria-label="문단 스타일" value={state?.block || "p"} disabled={disabled || !editor} onChange={event => {
           const chain = editor?.chain().focus().command(({ tr, state }) => {
             // Heading size applies to the entire affected paragraph, including
             // when only the caret (rather than its text) is selected.
             tr.doc.nodesBetween(tr.selection.from, tr.selection.to, (node, pos) => {
-              if (node.isTextblock) tr.removeMark(pos + 1, pos + node.nodeSize - 1, state.schema.marks.textStyle);
+              if (node.isTextblock) node.descendants((child, offset) => {
+                const mark = child.marks.find(mark => mark.type === state.schema.marks.textStyle);
+                if (!child.isText || !mark?.attrs.fontSize) return;
+                const attrs = { ...mark.attrs, fontSize: null };
+                tr.removeMark(pos + 1 + offset, pos + 1 + offset + child.nodeSize, mark.type);
+                if (Object.values(attrs).some(Boolean)) tr.addMark(pos + 1 + offset, pos + 1 + offset + child.nodeSize, mark.type.create(attrs));
+              });
             });
             return true;
           }).unsetFontSize();
@@ -159,8 +305,22 @@ export function LessonFormatToolbar({ editor, disabled = false }: { editor: Edit
           else chain?.setHeading({ level: event.target.value === "h1" ? 1 : event.target.value === "h2" ? 2 : 3 }).run();
         }}><option value="p">본문</option><option value="h1">제목 1 · H1</option><option value="h2">제목 2 · H2</option><option value="h3">제목 3 · H3</option></select>
         <select aria-label="글자 크기" value={state?.size || ""} disabled={disabled || !editor} onChange={event => event.target.value ? editor?.chain().focus().setFontSize(event.target.value).run() : editor?.chain().focus().unsetFontSize().run()}><option value="">기본 크기</option>{LESSON_FONT_SIZES.map(size => <option key={size} value={`${size}px`}>{size}px</option>)}</select>
+        <button type="button" className="lesson-color-trigger" title="글자색" aria-label="글자색" aria-expanded={colorOpen === "color"} aria-controls={colorPanelId} disabled={disabled || !editor} onMouseDown={event => event.preventDefault()} onClick={() => toggleColor("color")}><Baseline size={16} aria-hidden="true" /><span style={{ backgroundColor: state?.color || "#202428" }} /></button>
+        <button type="button" className="lesson-color-trigger" title="배경색" aria-label="배경색" aria-expanded={colorOpen === "backgroundColor"} aria-controls={colorPanelId} disabled={disabled || !editor} onMouseDown={event => event.preventDefault()} onClick={() => toggleColor("backgroundColor")}><Highlighter size={16} aria-hidden="true" /><span style={{ backgroundColor: state?.backgroundColor || "#fef08a" }} /></button>
         {buttons.map(button => <button type="button" key={button.label} title={button.label} aria-label={button.label} aria-pressed={button.active} disabled={disabled || !editor || button.unavailable} onMouseDown={event => event.preventDefault()} onClick={button.action}><button.icon size={16} aria-hidden="true" /></button>)}
       </div>
+      {colorOpen && <div id={colorPanelId} className="lesson-color-panel" role="group" aria-label={colorOpen === "color" ? "글자색 선택" : "배경색 선택"} onKeyDown={event => { if (event.key === "Escape") { event.preventDefault(); setColorOpen(null); editor?.commands.focus(); } }}>
+        <strong>{colorOpen === "color" ? "글자색" : "배경색 (형광펜)"}</strong>
+        <div className="lesson-color-swatches">
+          {LESSON_COLORS.map(([name, color]) => <button key={color} type="button" title={name} aria-label={name} aria-pressed={state?.[colorOpen] === color} disabled={disabled || !editor} style={{ backgroundColor: color }} onMouseDown={event => event.preventDefault()} onClick={() => applyColor(color)} />)}
+        </div>
+        <div className="lesson-color-actions">
+          <label>직접 선택<input type="color" style={{ width: 40, minWidth: 40, height: 34, padding: 2, flex: "none" }} aria-label="사용자 지정 색상" value={customColor} disabled={disabled || !editor} onChange={event => setCustomColor(event.target.value)} /></label>
+          <button type="button" disabled={disabled || !editor} onClick={() => applyColor(customColor)}>색상 적용</button>
+          <button type="button" disabled={disabled || !editor} onMouseDown={event => event.preventDefault()} onClick={() => applyColor(null)}>{colorOpen === "color" ? "기본 글자색" : "배경색 없애기"}</button>
+          <button type="button" onClick={() => { setColorOpen(null); editor?.commands.focus(); }}>닫기</button>
+        </div>
+      </div>}
       {linkOpen && <div className="lesson-link-controls" role="group" aria-label="링크 편집">
         <input aria-label="링크 주소" value={linkUrl} placeholder="https://" autoFocus disabled={disabled} onChange={event => setLinkUrl(event.target.value)} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); applyLink(); } if (event.key === "Escape") { event.preventDefault(); setLinkOpen(false); editor?.commands.focus(); } }} />
         <button type="button" disabled={disabled} onClick={() => applyLink()}>적용</button><button type="button" disabled={disabled} onClick={() => applyLink(true)}>링크 해제</button><button type="button" onClick={() => { setLinkOpen(false); editor?.commands.focus(); }}>닫기</button>

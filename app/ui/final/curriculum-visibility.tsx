@@ -1,4 +1,5 @@
 "use client";
+import { curriculumDay } from '@/lib/curriculum-days';
 
 import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
@@ -80,7 +81,7 @@ export function CurriculumVisibility({ courseId, initial, onRefresh, onClose }: 
       <label className="studio-visibility-week"><input type="checkbox" checked={plannedVisibility(week,'weeks',draft,data,cohortId)} disabled={busy || !selectedCohort || !week.is_published} onChange={event=>setDraft({...draft,[visibilityKey('weeks',String(week.id))]:event.target.checked})}/><span>{num(week,'week_number')}주차 · {t(week,'title')}{!week.is_published ? ' · 본문 공개 먼저 필요' : ''}</span></label>
       {lessons.filter(lesson=>lesson.week_id===week.id).map(lesson=>{
         const checked=plannedVisibility(lesson,'learning',draft,data,cohortId), open=plannedVisibility(week,'weeks',draft,data,cohortId), ready=lessonReady(lesson,data);
-        return <label key={lesson.id} className="studio-visibility-lesson"><input type="checkbox" checked={checked} disabled={busy || !selectedCohort || (!checked && (!ready || !lesson.is_published || !week.is_published))} onChange={event=>setDraft({...draft,[visibilityKey('learning',String(lesson.id))]:event.target.checked})}/><span><b>{num(lesson,'day_number')}일차 · {t(lesson,'title')}</b><small>{!ready || !lesson.is_published?'본문을 먼저 저장·공개해 주세요':checked?(open?'이 기수에 공개':'주차 비공개로 숨김'):'이 기수에 비공개'}{lesson.is_preview?' · 무료 미리보기 설정 있음':''}</small></span></label>;
+        return <label key={lesson.id} className="studio-visibility-lesson"><input type="checkbox" checked={checked} disabled={busy || !selectedCohort || (!checked && (!ready || !lesson.is_published || !week.is_published))} onChange={event=>setDraft({...draft,[visibilityKey('learning',String(lesson.id))]:event.target.checked})}/><span><b>{curriculumDay(data, lesson)}일차 · {t(lesson,'title')}</b><small>{!ready || !lesson.is_published?'본문을 먼저 저장·공개해 주세요':checked?(open?'이 기수에 공개':'주차 비공개로 숨김'):'이 기수에 비공개'}{lesson.is_preview?' · 무료 미리보기 설정 있음':''}</small></span></label>;
       })}
     </section>)}</div>}
     <footer><span role="status">{busy?'저장 상태를 확인하고 있습니다…':`변경 ${plan.changes.length}개`}</span><div><button type="button" className="btn" disabled={busy} onClick={()=>review?setReview(false):onClose()}>{review?'선택 수정':'닫기'}</button><button type="button" className="btn primary" disabled={busy || uncertain || !selectedCohort || !plan.changes.length || Boolean(plan.invalid.length)} onClick={()=>review?void apply():setReview(true)}>{review?'확인한 공개 범위 적용':'변경 내용 확인'}</button></div></footer>

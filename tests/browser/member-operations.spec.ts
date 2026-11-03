@@ -1,6 +1,9 @@
 import { expect, test } from '@playwright/test';
 
-test.beforeEach(async ({ page }) => { await page.goto('/member-operations-test'); });
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/admin/learning-usage**', r => r.fulfill({ json: { rows: [], total: 0, page: 1, pageSize: 10 } }));
+  await page.goto('/member-operations-test');
+});
 
 test('retained layout clears the old member drawer after a round trip, including query-only changes', async ({ page }) => {
   await page.goto('/retained-member-dialog-test');
@@ -46,7 +49,7 @@ test('member tabs retain profile edits, support keyboard activation and restore 
 test('readonly records paginate without losing focus and preserve archived question deep links', async ({ page }) => {
   await page.getByRole('button', { name: '회원 상세 열기', exact: true }).click();
   await page.getByRole('tab', { name: '학습 기록', exact: true }).click();
-  await expect(page.getByText('아직 저장된 기록이 없습니다.', { exact: true })).toBeVisible();
+  await expect(page.getByText('저장된 개별 학습 완료 기록이 없습니다.', { exact: true })).toBeVisible();
   await page.getByRole('tab', { name: '제출물', exact: true }).click();
   await page.getByRole('button', { name: '다음', exact: true }).click();
   await expect(page.getByRole('heading', { name: '첫 실행 미션 21', exact: true })).toBeVisible();
@@ -56,10 +59,23 @@ test('readonly records paginate without losing focus and preserve archived quest
   await page.getByRole('link', { name: '질문·답변 보기', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/questions\?question=/);
   await expect(page.getByRole('heading', { name: '합성 보관 질문', exact: true })).toBeVisible();
-  await expect(page.getByLabel('질문 처리 상태')).toHaveValue('selected');
+  await expect(page.getByText('연결된 질문만 조회 중입니다.', { exact: false })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: '질문 처리 상태' }).getByRole('button', { pressed: true })).toHaveCount(0);
   await page.getByRole('link', { name: '회원 운영 정보 보기', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/customers\?member=/);
   await expect(page.getByText('전체 회원', { exact: true })).toHaveCount(0);
+});
+
+test('question status tabs expose the archived list and preserve its detail without a data write', async ({page}) => {
+  await page.getByRole('link', { name: '질문함', exact: true }).click();
+  const tabs = page.getByRole('navigation', { name: '질문 처리 상태' });
+  await expect(tabs.getByRole('button', { name: '전체 운영 질문', pressed: true })).toBeVisible();
+  await tabs.getByRole('button', { name: '보관', exact: true }).click();
+  await expect(page).toHaveURL(/questionState=archived/);
+  await expect(tabs.getByRole('button', { name: '보관', pressed: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: '질문 목록' })).toContainText('합성 보관 질문');
+  await expect(page.getByRole('article', { name: '선택한 질문 상세' })).toContainText('다음 학습은 어디에서 보나요?');
+  await expect(page.getByRole('button', { name: '질문 보관' })).toHaveCount(0);
 });
 
 test('failed member reads offer an accessible retry, then recover with panel focus', async ({ page }) => {

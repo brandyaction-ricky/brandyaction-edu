@@ -14,12 +14,35 @@ export function withEntrySource(href: string, source: EntrySource | null): strin
     const url = new URL(href, 'https://brandyaction-edu.com');
     const relative = href.startsWith('/') && !href.startsWith('//');
     if (!relative && !['brandyaction-edu.com', 'www.brandyaction-edu.com', 'brandyaction-edu-dev.vercel.app'].includes(url.hostname)) return href;
-    if (!['/checkout', '/apply'].includes(url.pathname)) return href;
+    if (url.username || url.password || url.port || (!relative && url.protocol !== 'https:')) return href;
+    if (!['/checkout', '/apply'].includes(url.pathname) && !/^\/classes\/[a-zA-Z0-9_-]+$/.test(url.pathname)) return href;
     url.searchParams.set('src', source);
     return relative ? `${url.pathname}${url.search}${url.hash}` : url.href;
   } catch {
     return href;
   }
+}
+
+// Recruitment SMS follows the recorded room, never an email/name match.
+// Missing room evidence stays unknown even when a generic template has src=paid.
+export function recruitmentMessageLinks(content: string, channel: unknown): string {
+  const source = channel === 'paid' || channel === 'organic' ? channel : null;
+  return content.replace(/https?:\/\/[^\s<>"']+/g, token => {
+    const suffix = token.match(/[\])}.,!?]+$/)?.[0] || '';
+    const href = suffix ? token.slice(0, -suffix.length) : token;
+    try {
+      const url = new URL(href);
+      if (url.protocol !== 'https:' || url.username || url.password || url.port ||
+        !['brandyaction-edu.com', 'www.brandyaction-edu.com', 'brandyaction-edu-dev.vercel.app'].includes(url.hostname)) return token;
+      const broadcast = url.pathname.match(/^(\/go\/[0-9a-f-]{36}\/(?:first|encore)\/)(?:paid|organic|unknown)(\/(?:live|offer))$/i);
+      if (broadcast) url.pathname = broadcast[1] + (source || 'unknown') + broadcast[2];
+      else if (['/checkout', '/apply'].includes(url.pathname) || /^\/classes\/[a-zA-Z0-9_-]+$/.test(url.pathname)) {
+        if (source) url.searchParams.set('src', source);
+        else url.searchParams.delete('src');
+      } else return token;
+      return url.href + suffix;
+    } catch { return token; }
+  });
 }
 
 export function loginBeforeCheckout(href: string, signedIn: boolean): string {

@@ -1,5 +1,6 @@
-import {test,expect,type Page} from '@playwright/test';
+import {test,expect,type Page,type Locator} from '@playwright/test';
 import type {LessonBlockDocument} from '../../lib/lesson-blocks';
+import { parseLessonDocument, serializeLessonDocument } from '../../lib/lesson-body';
 const initial:LessonBlockDocument={schemaVersion:1,blocks:[
  {id:'heading',type:'heading',content:'오늘의 실행 목표'},
  {id:'body',type:'text',content:'첫 문단입니다.\n\n두 번째 문단입니다.'},
@@ -15,6 +16,26 @@ async function backend(page:Page, input=initial){
 }
 const doc=(page:Page)=>page.getByRole('textbox',{name:'수업 문서',exact:true});
 async function save(page:Page){await page.getByRole('button',{name:'학습 저장',exact:true}).click();await expect(page.getByText('학습 기본 정보와 콘텐츠를 저장했습니다.',{exact:true})).toBeVisible();}
+test('top notice persists alongside existing activities without changing their identities',async({page})=>{
+ const server=await backend(page);await page.goto('/lesson-block-author-test');await expect(doc(page)).toBeVisible();
+ await page.getByRole('button',{name:'필독 공지 추가',exact:true}).click();
+ await page.keyboard.type('질문 제출 전에 읽어 주세요.');
+ await expect(doc(page).locator('[data-lesson-callout]')).toHaveCount(1);
+ await save(page);
+ const saved=server.get();expect(saved.blocks[0].id).toBe('heading');expect(saved.blocks[0].type).toBe('text');expect(saved.blocks[0].content).toContain('callout');
+ expect(saved.blocks.find(b=>b.id==='question')).toEqual(initial.blocks[2]);expect(saved.blocks.slice(1)).toEqual(initial.blocks.slice(1));
+ await page.getByRole('button',{name:'편집 다시 열기'}).click();await expect(doc(page).locator('[data-lesson-callout]')).toContainText('질문 제출 전에 읽어 주세요.');
+ await page.getByRole('button',{name:'필독 공지 추가',exact:true}).click();await expect(doc(page).locator('[data-lesson-callout]')).toHaveCount(1);
+ await page.getByRole('button',{name:'구성 미리보기',exact:true}).click();await expect(page.getByLabel('구성 미리보기').locator('[data-lesson-callout]')).toContainText('질문 제출 전에 읽어 주세요.');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+test('notice before a question gets a fresh text identity and can be undone safely',async({page})=>{
+ const input={...initial,blocks:[initial.blocks[2]]};const server=await backend(page,input);await page.goto('/lesson-block-author-test');await expect(doc(page)).toBeVisible();
+ await page.getByRole('button',{name:'필독 공지 추가',exact:true}).click();await page.keyboard.type('첫 질문 안내');await save(page);
+ const saved=server.get();expect(saved.blocks).toHaveLength(2);expect(saved.blocks[0].type).toBe('text');expect(saved.blocks[0].id).not.toBe('question');expect(saved.blocks[1]).toEqual(input.blocks[0]);
+ await page.getByRole('button',{name:'실행 취소',exact:true}).click();await expect(doc(page)).toContainText('어떤 업무인가요?');
+ await expect(doc(page).locator('[data-author-block="question"]')).toBeVisible();
+});
 test('one continuous editor preserves the whole lesson on save and edits text without a body-edit button',async({page})=>{
  const server=await backend(page);await page.goto('/lesson-block-author-test');await expect(doc(page)).toBeVisible();
  await expect(page.getByRole('button',{name:/본문 편집/})).toHaveCount(0);await expect(page.locator('.ProseMirror')).toHaveCount(1);
@@ -78,4 +99,122 @@ test('format tools remain reachable when editing the bottom of a long lesson',as
  await doc(page).locator('[data-author-block="paragraph-90"] p').click();await page.keyboard.press('End');await page.keyboard.type(' 편집');
  const bar=await page.locator('.ldc-sticky-toolbar').boundingBox();expect(bar).not.toBeNull();expect(bar!.y).toBeGreaterThanOrEqual(0);expect(bar!.y+bar!.height).toBeLessThan((await page.viewportSize())!.height);
  await page.getByRole('button',{name:'굵게',exact:true}).click();await page.keyboard.type(' 강조');await expect(doc(page).locator('[data-author-block="paragraph-90"] strong')).toContainText('강조');
+});
+
+test('image and link settings stay reachable beside a long embedded lesson and deletion closes the panel',async({page},info)=>{
+ const blocks:LessonBlockDocument['blocks']=[...Array.from({length:80},(_,i)=>({id:`long-${i}`,type:'text' as const,content:`긴 수업 안내 ${i+1}. 본문을 보면서 자료를 수정합니다.`})),{id:'photo',type:'image',url:'https://example.test/preview.png',content:'설명 이미지',alt:'원래 설명'},{id:'reference',type:'link',url:'https://example.test/guide',content:'참고 링크'},...Array.from({length:12},(_,i)=>({id:`after-${i}`,type:'text' as const,content:`아래 안내 ${i+1}`}))];
+ const server=await backend(page,{...initial,blocks});
+ await page.route('https://example.test/preview.png',route=>route.fulfill({contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aMwoAAAAASUVORK5CYII=','base64')}));
+ await page.goto('/lesson-block-author-test?embedded');await expect(doc(page)).toBeVisible();
+ const photo=doc(page).locator('[data-author-block="photo"]');await photo.getByRole('button',{name:'이미지 설정',exact:true}).click();
+ const panel=page.getByRole('complementary',{name:'선택 항목 설정'});
+ async function onScreen(){await expect.poll(async()=>{const b=await panel.boundingBox();return !!b&&b.y>=60&&b.y+b.height<=(page.viewportSize()!.height-70)&&b.x>=0&&b.x+b.width<=page.viewportSize()!.width;}).toBe(true);}
+ await onScreen();expect(await page.evaluate(()=>scrollY)).toBeGreaterThan(1000);
+ await page.evaluate(()=>window.scrollBy(0,180));await onScreen();
+ await panel.getByLabel('이미지 대체 설명',{exact:true}).fill('수정한 이미지 설명');await onScreen();expect(await page.evaluate(()=>scrollY)).toBeGreaterThan(1000);
+ await page.screenshot({path:info.outputPath('floating-image-settings.png')});
+ page.once('dialog',dialog=>dialog.accept());await panel.getByRole('button',{name:/항목 \d+ 삭제/,exact:true}).click();await expect(panel).toHaveCount(0);await expect(doc(page).locator('[data-author-block="photo"]')).toHaveCount(0);
+ await doc(page).locator('[data-author-block="reference"]').getByRole('button',{name:'외부 링크 설정',exact:true}).click();await onScreen();
+ await panel.getByLabel('주소 *',{exact:true}).fill('https://example.test/updated');await panel.getByLabel('링크에 표시할 문구',{exact:true}).fill('수정한 참고 링크');
+ await panel.getByRole('button',{name:'설정 닫기',exact:true}).click();await page.getByRole('button',{name:'학습 저장',exact:true}).last().click();await expect.poll(()=>server.writes.length).toBe(1);
+ expect(server.get().blocks.some(b=>b.id==='photo')).toBe(false);expect(server.get().blocks.find(b=>b.id==='reference')).toMatchObject({url:'https://example.test/updated',content:'수정한 참고 링크'});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
+async function startCalloutDrag(page:Page,handle:Locator){
+ await handle.hover();const box=await handle.boundingBox();
+ await page.mouse.down();await page.mouse.move(box!.x+box!.width/2+10,box!.y+box!.height/2,{steps:5});
+}
+async function dropCallout(page:Page,target:Locator){
+ // Bring the destination past the fixed save bar while the native drag is active.
+ await target.evaluate(el=>el.scrollIntoView({block:'center'}));const box=await target.boundingBox();
+ await page.mouse.move(box!.x+30,box!.y+10,{steps:15});await page.mouse.move(box!.x+30,box!.y+10);await page.mouse.up();
+}
+test('callout handle moves only the notice past an activity and preserves content through undo and save',async({page},testInfo)=>{
+ test.skip(Boolean(testInfo.project.use.hasTouch),'Native mouse drag is covered on desktop.');
+ const server=await backend(page);await page.goto('/lesson-block-author-test');await expect(doc(page)).toBeVisible();
+ await page.getByRole('button',{name:'필독 공지 추가',exact:true}).click();await page.keyboard.type('이동할 안내 문구');
+ const handle=doc(page).getByRole('button',{name:'안내 박스 이동',exact:true});
+ const target=doc(page).locator('[data-author-block="end"] p');
+ await startCalloutDrag(page,handle);await dropCallout(page,target);
+ await expect(doc(page).locator('[data-author-block="end"] [data-lesson-callout]')).toContainText('이동할 안내 문구');
+ await expect(doc(page).locator('[data-lesson-callout]')).toHaveCount(1);
+ await expect(doc(page).locator('[data-author-block="heading"]')).toContainText('오늘의 실행 목표');
+ await expect(doc(page).locator('[data-author-block="question"]')).toContainText('어떤 업무인가요?');
+ await page.getByRole('button',{name:'실행 취소',exact:true}).click();
+ await expect(doc(page).locator('[data-author-block="heading"] [data-lesson-callout]')).toContainText('이동할 안내 문구');
+ await page.getByRole('button',{name:'다시 실행',exact:true}).click();
+ await expect(doc(page).locator('[data-author-block="end"] [data-lesson-callout]')).toContainText('이동할 안내 문구');
+ await save(page);expect(server.get().blocks.find(b=>b.id==='question')).toEqual(initial.blocks[2]);
+ expect(server.get().blocks.find(b=>b.id==='end')?.content).toContain('이동할 안내 문구');
+ expect(server.get().blocks.map(b=>b.content||'').join('')).not.toContain('안내 박스 이동');
+ await page.getByRole('button',{name:'편집 다시 열기'}).click();
+ await expect(doc(page).locator('[data-author-block="end"] [data-lesson-callout]')).toContainText('이동할 안내 문구');
+ await expect(doc(page).locator('[data-author-block="end"] [data-lesson-callout] strong')).toHaveText('필독 안내');
+ // An aborted drag must neither remove the notice nor alter the saved lesson.
+ await startCalloutDrag(page,handle);await page.keyboard.press('Escape');await page.mouse.up();
+ await expect(doc(page).locator('[data-author-block="end"] [data-lesson-callout]')).toContainText('이동할 안내 문구');
+ // Move upwards as well, then undo: source text, notice formatting and question IDs survive.
+ await startCalloutDrag(page,handle);await dropCallout(page,doc(page).locator('[data-author-block="body"] p').first());
+ await expect(doc(page).locator('[data-author-block="body"] [data-lesson-callout]')).toContainText('이동할 안내 문구');
+ await page.getByRole('button',{name:'실행 취소',exact:true}).click();
+ await expect(doc(page).locator('[data-author-block="end"] [data-lesson-callout]')).toContainText('이동할 안내 문구');
+ await doc(page).locator('[data-author-block="end"] [data-lesson-callout]').evaluate(el=>el.scrollIntoView({block:'center'}));
+ await page.screenshot({path:testInfo.outputPath('callout-moved.png')});
+ await page.getByRole('button',{name:'구성 미리보기',exact:true}).click();
+ await expect(page.getByLabel('구성 미리보기').getByRole('button',{name:'안내 박스 이동'})).toHaveCount(0);
+});
+
+test('toggle and every body block expose drag handles; moving a toggle keeps its content and old question',async({page},testInfo)=>{
+ test.skip(Boolean(testInfo.project.use.hasTouch),'Native mouse drag is covered on desktop.');
+ const content=serializeLessonDocument({type:'doc',content:[
+  {type:'paragraph',content:[{type:'text',text:'첫 문단'}]},
+  {type:'details',content:[{type:'detailsSummary',content:[{type:'text',text:'이동할 토글'}]},{type:'detailsContent',content:[{type:'paragraph',content:[{type:'text',text:'토글 안 내용'}]}]}]},
+  {type:'heading',attrs:{level:2},content:[{type:'text',text:'다음 제목'}]},
+  {type:'bulletList',content:[{type:'listItem',content:[{type:'paragraph',content:[{type:'text',text:'목록 항목'}]}]}]},
+  {type:'blockquote',content:[{type:'paragraph',content:[{type:'text',text:'인용문 내용'}]}]},
+  {type:'paragraph',content:[{type:'text',text:'마지막 문단'}]},
+ ]});
+ const server=await backend(page,{...initial,blocks:[{id:'body',type:'text',content},initial.blocks[2]]});
+ await page.goto('/lesson-block-author-test');const canvas=doc(page);await expect(canvas).toBeVisible();
+ for(const label of ['문단 이동','제목 이동','목록 이동','인용문 이동','접기·펼치기 블록 이동','드래그하여 항목 순서 변경']) await expect(canvas.getByRole('button',{name:label}).first()).toBeVisible();
+ await canvas.getByRole('button',{name:'접기·펼치기 블록 이동'}).focus();await page.keyboard.press('Enter');
+ await expect(canvas.locator('[data-type="details"]')).toHaveClass(/ProseMirror-selectednode/);
+ await startCalloutDrag(page,canvas.getByRole('button',{name:'접기·펼치기 블록 이동'}));
+ const target=canvas.locator('[data-author-block="body"] p').last();await target.evaluate(el=>el.scrollIntoView({block:'center'}));const box=await target.boundingBox();
+ await page.mouse.move(box!.x+40,box!.y+box!.height-3,{steps:15});await page.mouse.up();
+ await expect.poll(()=>canvas.locator('[data-author-block="body"] [data-type="details"]').count()).toBe(1);
+ await save(page);
+ const saved=server.get();expect(saved.blocks.find(block=>block.id==='question')).toEqual(initial.blocks[2]);
+ const nodes=parseLessonDocument(saved.blocks[0].content!)!.content!;expect(nodes.map(node=>node.type)).toEqual(['paragraph','heading','bulletList','blockquote','details','paragraph']);
+ expect(nodes[4].content?.[1].content?.[0].content?.[0].text).toBe('토글 안 내용');
+ await page.getByRole('button',{name:'편집 다시 열기'}).click();await expect(doc(page).getByText('이동할 토글',{exact:true})).toBeVisible();
+});
+
+test('mouse reorders paragraphs, headings, lists, quotes and questions without losing content',async({page},testInfo)=>{
+ test.skip(Boolean(testInfo.project.use.hasTouch),'Mouse reordering is covered on desktop.');
+ const content=serializeLessonDocument({type:'doc',content:[
+  {type:'paragraph',content:[{type:'text',text:'첫 문단'}]},
+  {type:'heading',attrs:{level:2},content:[{type:'text',text:'첫 제목'}]},
+  {type:'bulletList',content:[{type:'listItem',content:[{type:'paragraph',content:[{type:'text',text:'첫 목록'}]}]}]},
+  {type:'blockquote',content:[{type:'paragraph',content:[{type:'text',text:'첫 인용문'}]}]},
+  {type:'paragraph',content:[{type:'text',text:'끝 문단'}]},
+ ]});
+ const server=await backend(page,{...initial,blocks:[{id:'body',type:'text',content},initial.blocks[2]]});
+ await page.goto('/lesson-block-author-test');const canvas=doc(page);await expect(canvas).toBeVisible();
+ const target=()=>canvas.locator('[data-author-block="body"] .ldc-movable-paragraph').filter({hasText:'끝 문단'});
+ await startCalloutDrag(page,canvas.getByRole('button',{name:'제목 이동'}));await dropCallout(page,target());
+ await startCalloutDrag(page,canvas.getByRole('button',{name:'목록 이동'}));await dropCallout(page,target());
+ await startCalloutDrag(page,canvas.getByRole('button',{name:'인용문 이동'}));await dropCallout(page,target());
+ await startCalloutDrag(page,canvas.getByRole('button',{name:'문단 이동'}).first());await dropCallout(page,target());
+ await save(page);
+ const movedNodes=parseLessonDocument(server.get().blocks[0].content!)!.content!;
+ expect(movedNodes.map(node=>node.type).sort()).toEqual(['blockquote','bulletList','heading','paragraph','paragraph'].sort());
+ expect(movedNodes.map(node=>node.type)).not.toEqual(['paragraph','heading','bulletList','blockquote','paragraph']);
+ for(const text of ['첫 문단','첫 제목','첫 목록','첫 인용문','끝 문단']) expect(server.get().blocks[0].content).toContain(text);
+ expect(server.get().blocks.find(block=>block.id==='question')).toEqual(initial.blocks[2]);
+ await page.getByRole('button',{name:'편집 다시 열기'}).click();
+ await startCalloutDrag(page,canvas.getByRole('button',{name:'드래그하여 항목 순서 변경'}));await dropCallout(page,canvas.locator('[data-author-block="body"] p').first());
+ await save(page);expect(server.get().blocks[0]).toEqual(initial.blocks[2]);
+ await page.getByRole('button',{name:'편집 다시 열기'}).click();await canvas.screenshot({path:testInfo.outputPath('movable-content.png')});
 });

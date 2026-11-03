@@ -4,6 +4,16 @@ import { safeUrl } from "./platform";
 // and is only converted when the author changes the document.
 export const LESSON_BODY_PREFIX = "edu-lesson:v1\n";
 export const LESSON_FONT_SIZES = [12, 14, 16, 18, 20, 24, 28, 32] as const;
+// Keep CSS values finite and deterministic across pasted HTML, storage and rendering.
+export function normalizeLessonColor(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const color = value.trim().toLowerCase();
+  if (/^#[0-9a-f]{6}$/.test(color)) return color;
+  if (/^#[0-9a-f]{3}$/.test(color)) return "#" + [...color.slice(1)].map(c => c + c).join("");
+  const rgb = /^rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/.exec(color);
+  if (rgb && rgb.slice(1).every(c => Number(c) <= 255)) return "#" + rgb.slice(1).map(c => Number(c).toString(16).padStart(2, "0")).join("");
+  return null;
+}
 export type LessonMark = { type: string; attrs?: Record<string, string | number> };
 export type LessonNode = { type: string; text?: string; attrs?: Record<string, string | number>; marks?: LessonMark[]; content?: LessonNode[] };
 export type LessonSegment = { text: string; href?: string };
@@ -51,7 +61,7 @@ export function lessonTextSegments(text: string): LessonSegment[] {
   return nodes.filter(node => node.text);
 }
 
-const blockTypes = new Set(["doc", "paragraph", "heading", "bulletList", "orderedList", "listItem", "blockquote", "details", "detailsSummary", "detailsContent"]);
+const blockTypes = new Set(["doc", "paragraph", "heading", "bulletList", "orderedList", "listItem", "blockquote", "details", "detailsSummary", "detailsContent", "callout"]);
 const simpleMarks = new Set(["bold", "italic", "underline", "strike"]);
 const record = (value: unknown): Record<string, unknown> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 
@@ -69,14 +79,27 @@ export function normalizeLessonDocument(value: unknown): LessonNode | null {
         const mark = record(raw), markAttrs = record(mark.attrs);
         if (simpleMarks.has(String(mark.type))) marks.push({ type: String(mark.type) });
         if (mark.type === "link" && safeUrl(markAttrs.href)) marks.push({ type: "link", attrs: { href: safeUrl(markAttrs.href) } });
-        if (mark.type === "textStyle" && LESSON_FONT_SIZES.some(size => `${size}px` === markAttrs.fontSize)) marks.push({ type: "textStyle", attrs: { fontSize: String(markAttrs.fontSize) } });
+        if (mark.type === "textStyle") {
+          const style: Record<string, string> = {};
+          if (LESSON_FONT_SIZES.some(size => `${size}px` === markAttrs.fontSize)) style.fontSize = String(markAttrs.fontSize);
+          for (const key of ["color", "backgroundColor"] as const) {
+            const color = normalizeLessonColor(markAttrs[key]);
+            if (color) style[key] = color;
+          }
+          if (Object.keys(style).length) marks.push({ type: "textStyle", attrs: style });
+        }
       }
       return { type, text: node.text, ...(marks.length ? { marks } : {}) };
     }
     if (type === "hardBreak") return { type };
+    if (["lessonImage", "lessonFile", "lessonEmbed"].includes(type)) {
+      if (typeof attrs.blockId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$/.test(attrs.blockId)) throw new Error("Invalid lesson image reference");
+      return { type, attrs: { blockId: attrs.blockId } };
+    }
     if (!blockTypes.has(type)) return null;
     const content = (Array.isArray(node.content) ? node.content : []).map(child => visit(child, depth + 1)).filter((child): child is LessonNode => Boolean(child));
     if (type === "heading") return { type, attrs: { level: attrs.level === 1 ? 1 : attrs.level === 3 ? 3 : 2 }, content };
+    if (type === "callout" && (!content.length || content.some(child => ["text", "hardBreak", "doc", "detailsSummary", "detailsContent"].includes(child.type)))) throw new Error("Invalid lesson callout");
     if (type === "details") {
       if (content.length !== 2 || content[0].type !== "detailsSummary" || content[1].type !== "detailsContent") throw new Error("Invalid lesson toggle");
       return { type, content };
@@ -103,6 +126,9 @@ function documentText(node: LessonNode): string {
   if (node.type === "hardBreak") return "\n";
   return (node.content || []).map(documentText).join(["paragraph", "heading", "detailsSummary"].includes(node.type) ? "" : "\n");
 }
+function documentHasImage(node: LessonNode): boolean {
+  return ["lessonImage", "lessonFile", "lessonEmbed"].includes(node.type) || Boolean(node.content?.some(documentHasImage));
+}
 export function lessonBodyHasText(text: string): boolean {
   return Boolean(lessonBodyPlainText(text).trim());
 }
@@ -112,6 +138,6 @@ export function lessonBodyPlainText(text: string): string {
 }
 export function serializeLessonDocument(value: unknown): string {
   const doc = normalizeLessonDocument(value);
-  if (!doc || !documentText(doc).trim()) return "";
+  if (!doc || (!documentText(doc).trim() && !documentHasImage(doc))) return "";
   return LESSON_BODY_PREFIX + JSON.stringify(doc);
 }

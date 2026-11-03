@@ -5,13 +5,14 @@ import { ArrowLeft, ArrowRight, Pause, Play } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import { catalogTitle } from '@/lib/course-catalog';
 
 const DEFAULT_BANNER = {
   id: "default-main-banner",
   eyebrow: "BRANDYACTION EDU · LEARN TO ACT",
-  title: "배운 것을,\n내 일의 성과로.",
+  title: "혼자 떠안던 마케팅,\n이제 AI와 나눠 하세요.",
   description:
-    "AI와 마케팅을 아는 것에서 끝내지 마세요.\n내 업무에 적용하고, 실행한 결과를 남기는 교육.",
+    "고객 조사부터 콘텐츠와 광고 준비까지.\n내 사업에 맞는 작업 흐름을 배우고 직접 연결해 보세요.",
   linkLabel: "무료 클래스부터 시작하기",
   linkUrl: "/classes?type=free",
   imageUrl: "",
@@ -28,13 +29,17 @@ export function homeHeroSlides(banners: Row[], freeHref: string): HomeHeroSlide[
     const title = t(banner, "title").trim();
     const description = t(banner, "description").trim();
     const linkLabel = t(banner, "link_label").trim();
+    const linkUrl = safeUrl(banner.link_url);
+    const effectiveLabel = linkLabel || DEFAULT_BANNER.linkLabel;
     return {
       id: String(banner.id),
       eyebrow: eyebrow || DEFAULT_BANNER.eyebrow,
-      title: title || DEFAULT_BANNER.title,
+      title: title && title !== "이미지 배너" ? title : DEFAULT_BANNER.title,
       description: description || DEFAULT_BANNER.description,
-      linkLabel: linkLabel || DEFAULT_BANNER.linkLabel,
-      linkUrl: safeUrl(banner.link_url) || freeHref || DEFAULT_BANNER.linkUrl,
+      linkLabel: effectiveLabel,
+      linkUrl: effectiveLabel === DEFAULT_BANNER.linkLabel && linkUrl === "/classes"
+        ? DEFAULT_BANNER.linkUrl
+        : linkUrl || freeHref || DEFAULT_BANNER.linkUrl,
       imageUrl: safeUrl(banner.image_url || banner.image_path),
     };
   });
@@ -69,8 +74,8 @@ function FeaturedFreeClass({ course, open }: { course?: Row; open: boolean }) {
         <span className="offer-status">무료 클래스</span>
       </div>
       <div className="offer-content">
-        <span className="offer-category">01 / 내 업무를 바꾸는 첫 클래스</span>
-        <h2>{t(course, "title")}</h2>
+        <span className="offer-category">내 업무를 바꾸는 첫 클래스</span>
+        <h2>{catalogTitle(course)}</h2>
         <p>{t(course, "summary")}</p>
       </div>
       <dl className="offer-spec">

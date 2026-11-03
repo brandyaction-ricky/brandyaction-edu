@@ -1,4 +1,4 @@
-import { diagnosisAudienceAllows } from '@/lib/diagnosis-audience';
+import { resolveDiagnosisAudience } from '@/lib/diagnosis-audience';
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { DiagnosisBridgeError, sendDiagnosisCommand } from '@/lib/diagnosis-bridge';
@@ -13,7 +13,7 @@ async function handle(request: Request, write: boolean) {
     if (write && request.headers.get('origin') !== new URL(request.url).origin) return reply({ error: '요청 출처를 확인해 주세요.' }, 403);
     const actor = await getAuthenticatedUser();
     if (!actor) return reply({ error: '로그인이 필요합니다.' }, 401);
-    if (!diagnosisAudienceAllows(actor)) return reply({ error: '현재 관리자만 이용할 수 있습니다.' }, 403);
+    if (!await resolveDiagnosisAudience(actor, async (name, args) => await createAdminClient().rpc(name, args))) return reply({ error: '현재 계정에는 진단이 공개되지 않았습니다.' }, 403);
     let input: unknown = { action: new URL(request.url).searchParams.get('view') === 'catalog' ? 'catalog' : 'read' };
     if (write) {
       const reader = request.body?.getReader(); if (!reader) return reply({ error: '입력 내용을 확인해 주세요.' }, 400);
@@ -32,6 +32,7 @@ async function handle(request: Request, write: boolean) {
       INCOMPLETE: '빠진 문항과 안내 확인 문항을 확인해 주세요. 원하는 모습은 5개를 선택해 주세요.',
       CONFLICT: '다른 화면에서 답변이 변경되었습니다. 최신 답변을 불러와 주세요.',
       FORBIDDEN: '검사를 이용할 수 있는 구매·수강 정보를 확인해 주세요.',
+      STARTS_PAUSED: '검사 업데이트 중입니다. 잠시 후 새 검사를 시작해 주세요. 진행 중인 검사는 계속할 수 있습니다.',
       UNAVAILABLE: '검사 정보를 확인하지 못했습니다. 답변을 유지한 채 잠시 후 다시 시도해 주세요.',
     };
     return reply({ code, error: messages[code] || messages.UNAVAILABLE }, error instanceof DiagnosisBridgeError ? error.status : 503);

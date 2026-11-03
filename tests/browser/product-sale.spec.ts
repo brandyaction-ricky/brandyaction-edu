@@ -258,3 +258,19 @@ test('switching lessons scopes missions and preserves unfinished mission drafts'
   await week.getByRole('listitem').filter({ hasText: '수업 1' }).getByRole('button', { name: '학습 편집' }).click();
   await expect(page.getByRole('textbox', { name: '미션 제목' })).toHaveValue('첫 수업 임시 미션');
 });
+
+test('product setup guide and keyboard tabs retain draft values', async ({page}, info) => {
+  await page.goto('/product-sale-test?new');
+  await page.getByRole('textbox',{name:'상품명',exact:true}).fill('새로운 실행 클래스');
+  await page.getByRole('button',{name:'2. 상세 안내',exact:true}).click();
+  await expect(page.getByRole('tab',{name:'상세페이지',exact:true})).toHaveAttribute('aria-selected','true');
+  await page.getByRole('tab',{name:'상세페이지',exact:true}).focus();
+  await page.keyboard.press('End');
+  await expect(page.getByRole('tab',{name:'공개·검색',exact:true})).toBeFocused();
+  await page.keyboard.press('Home');
+  await expect(page.getByRole('tab',{name:'기본·판매',exact:true})).toBeFocused();
+  await expect(page.getByRole('textbox',{name:'상품명',exact:true})).toHaveValue('새로운 실행 클래스');
+  await expect(page.getByLabel('합성 저장 횟수')).toHaveText('0');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.screenshot({path:info.outputPath('product-setup.png'),fullPage:true});
+});

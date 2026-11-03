@@ -29,6 +29,10 @@ test('stale or inaccessible source never populates the form; edits block importi
  await page.getByLabel('메시지 내용').fill('작성 중인 내용');
  await expect(page.getByRole('button',{name:'저장된 개별 초안 불러오기',exact:true})).toBeDisabled();
  await expect(page.getByLabel('메시지 내용')).toHaveValue('작성 중인 내용');
+ page.once('dialog',dialog=>dialog.dismiss());
+ await page.getByRole('button',{name:'새로 등록',exact:true}).click();
+ await expect(page.getByLabel('메시지 내용')).toHaveValue('작성 중인 내용');
+ page.once('dialog',async dialog=>{expect(dialog.message()).toContain('저장하지 않은 변경사항');await dialog.accept();});
  await page.getByRole('button',{name:'새로 등록',exact:true}).click();
  await expect(page.getByLabel('메시지 내용')).toHaveValue('');
  await expect(page.getByRole('button',{name:'저장된 개별 초안 불러오기',exact:true})).toBeEnabled();

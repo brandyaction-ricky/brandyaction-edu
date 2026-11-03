@@ -1,3 +1,4 @@
+import { registrationCost } from './landing-campaign-management';
 import { displayDimension, rate, type ActualRow, type PerformanceRow } from './landing-performance';
 
 export const DEFAULT_SAMPLE_MIN = 30;
@@ -25,15 +26,16 @@ export function periodActuals(rows: ActualInput[], start: string, end: string) {
     kakao_delta: kakao && baseline ? kakao.kakao_members! - baseline.kakao_members! : null,
     kakao_day: kakao?.day ?? null,
     baseline_day: baselineDay,
+    baseline_members: baseline?.kakao_members ?? null,
     payments,
   };
 }
 export function funnelRate(next: number | null | undefined, previous: number | null | undefined) {
   return next == null || previous == null || previous <= 0 ? null : next / previous * 100;
 }
-export type SortKey = 'adset' | 'creative' | 'sessions' | 'visitors' | 'cta_click_sessions' | 'conversion' | 'avg_scroll_depth' | 'avg_dwell_ms' | 'spend' | 'ctr' | 'registrations' | 'registration_cost';
+export type SortKey = 'adset' | 'creative' | 'sessions' | 'visitors' | 'cta_click_sessions' | 'conversion' | 'avg_scroll_depth' | 'avg_dwell_ms' | 'spend' | 'ctr' | 'landing_page_views' | 'registrations' | 'registration_cost';
 export function sortPerformance(rows: PerformanceRow[], key: SortKey, direction: 'asc' | 'desc', sampleMin = DEFAULT_SAMPLE_MIN) {
-  const value = (row: PerformanceRow) => key === 'conversion' ? row.sessions > 0 ? rate(row.cta_click_sessions, row.sessions) : null : key === 'ctr' ? row.impressions > 0 ? rate(row.link_clicks, row.impressions) : null : row[key];
+  const value = (row: PerformanceRow) => key === 'registration_cost' ? registrationCost(row) : key === 'landing_page_views' ? row.landing_page_view_available === true ? row.landing_page_views : null : key === 'conversion' ? row.sessions > 0 ? rate(row.cta_click_sessions, row.sessions) : null : key === 'ctr' ? row.impressions > 0 ? rate(row.link_clicks, row.impressions) : null : row[key];
   return [...rows].sort((left, right) => {
     if (key === 'conversion' && (left.sessions < sampleMin) !== (right.sessions < sampleMin)) return left.sessions < sampleMin ? 1 : -1;
     const a = value(left), b = value(right);

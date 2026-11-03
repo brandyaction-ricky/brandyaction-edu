@@ -1,4 +1,6 @@
 "use client";
+import { contentVisibility } from '@/lib/content-visibility';
+import { MOONSHOT_SUPPORT_URL } from '@/lib/purchase-onboarding';
 import {
   date,
   money,
@@ -22,7 +24,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { loginBeforeCheckout, parseEntrySource, withEntrySource } from '@/lib/entry-source';
 import { youtubeThumbnailUrl } from '@/lib/youtube-thumbnail';
 import type { Data } from "../learning-workflows";
@@ -30,7 +32,7 @@ import { EmailAuth } from "../email-auth";
 import { GoogleIdSignIn } from "../google-id-signin";
 import { ProductDetailHtml } from './product-detail-html';
 import { RecruitmentCountdown } from './product-countdown';
-import { productDocument } from '@/lib/product-html-document';
+import { productDocument, storedProductDocumentPath } from '@/lib/product-html-document';
 import { productConversion } from '@/lib/product-conversion';
 import { ProductPixel, ProductCtaLink } from './product-conversion';
 import { productDetailImages, productDigitalSections, productResources } from '@/lib/product-metadata';
@@ -48,6 +50,7 @@ import {
   Video,
   courseType,
 } from "./primitives";
+import authLayout from './auth-layout.module.css';
 
 export function AuthView({
   signup,
@@ -68,7 +71,7 @@ export function AuthView({
     (process.env.NEXT_PUBLIC_GOOGLE_GIS_ENABLED === "true" || googlePreview);
   return (
     <div className="form-page">
-      <section className="form-card">
+      <section className={`form-card auth-card ${authLayout.card}`}>
         {signup ? (
           <div className="eyebrow">Welcome to Brandyaction</div>
         ) : (
@@ -83,7 +86,7 @@ export function AuthView({
             : "로그인하고 내 일의 다음 단계를 이어가세요."}
         </p>
         {authError && ['auth_callback', 'email_confirmation'].includes(authError) && <p className="notice mt16" role="alert">인증 링크가 만료되었거나 인증을 완료하지 못했습니다. 아래에서 로그인하거나 인증 메일을 다시 요청해 주세요.</p>}
-        <div className="social-stack">
+        <div className="social-stack auth-social-stack">
           <button
             className="btn kakao full"
             disabled={pending}
@@ -202,7 +205,7 @@ function StandardProductDetail({
     detailImage = detailImages[0]?.path || '';
   const detailHtml = typeof meta.detail_html === 'string' ? meta.detail_html : '';
   const documentSource = productDocument(meta);
-  const mismatchedFreeContent = !free && containsFreeClassCampaign(documentSource || detailHtml);
+  const mismatchedFreeContent = !free && containsFreeClassCampaign(storedProductDocumentPath(documentSource) ? detailHtml : documentSource || detailHtml);
   const visibleDocumentSource = mismatchedFreeContent ? '' : documentSource;
   const visibleDetailHtml = mismatchedFreeContent ? '' : detailHtml;
   const readinessIssues = paidCourseReadinessIssues(c, cohorts);
@@ -223,7 +226,7 @@ function StandardProductDetail({
   const href = loginBeforeCheckout(withEntrySource(baseHref, entrySource), signedIn);
   const cta = enrolled
     ? digital
-      ? "내 자료실로 이동"
+      ? "수강 자료·구매 파일로 이동"
       : "학습 이어가기"
     : unavailableFree ? '참여 링크 준비 중' : available
       ? free
@@ -261,8 +264,8 @@ function StandardProductDetail({
       ) : (
         <p className="notice">
           {enrolled
-            ? "등록된 자료는 내 자료실에 표시됩니다."
-            : "신청·구매 후 제공되는 자료는 내 자료실에서 확인할 수 있습니다."}
+            ? "등록된 자료는 수강 자료·구매 파일에 표시됩니다."
+            : "신청·구매 후 제공되는 자료는 수강 자료·구매 파일에서 확인할 수 있습니다."}
         </p>
       )}
     </section>
@@ -418,6 +421,7 @@ function StandardProductDetail({
                 {offerCountdown}
                 {!enrolled && readinessIssues.length > 0 && <p className="notice mb24">수강 신청을 준비하고 있습니다. 모집이 시작되면 이 페이지에서 신청할 수 있습니다.</p>}
                 {button}
+                {!signedIn && <a className="btn mt16" href={MOONSHOT_SUPPORT_URL} target="_blank" rel="noopener noreferrer">신청 전 카카오톡 문의</a>}
               </div>
             </aside>
           </div>
@@ -460,12 +464,12 @@ export function ArticleBanner({
     ? configured.videos.slice(0, 3).map((item, i) => {
         const video = item as Record<string, unknown>;
         return { id: `configured-${i}`, title: String(video.title || `무료 강의 ${i + 1}`), url: safeUrl(video.url), available: video.available === true };
-      })
+      }).filter(video => video.url || video.available)
     : [];
   const candidates = (data.curriculum_lessons || []).filter(
     (l) => l.is_preview,
   );
-  const lessons = configuredVideos.length ? configuredVideos : candidates.slice(0, 3),
+  const lessons = Array.isArray(configured.videos) ? configuredVideos : candidates.slice(0, 3),
     lesson = lessons[index] || lessons[0];
   const content = (data.lesson_contents || []).find(
     (c) => c.lesson_id === lesson?.id,
@@ -525,7 +529,7 @@ export function ArticleBanner({
             </button>
           ))}
         </div>
-        <div className="ab-actions mt24">
+        {(!user || contentVisibility(data).articles) && <div className="ab-actions mt24">
           <Link
             className="ab-primary"
             href={user ? "#article-library" : "/signup?next=/articles"}
@@ -538,7 +542,7 @@ export function ArticleBanner({
               이미 회원이라면 로그인
             </Link>
           )}
-        </div>
+        </div>}
       </div>
     </section>
   );
@@ -576,6 +580,7 @@ export function ArticlesView({
   const setType = onTypeChange ?? setLocalType;
   const all = data.articles || [],
     a = all.find((a) => a.slug === slug);
+  if (!contentVisibility(data).articles && (slug || !contentVisibility(data).lectures)) return <div className="wrap"><Empty title="콘텐츠를 준비하고 있습니다."><Link className="btn" href="/my">나의 학습으로 돌아가기</Link></Empty></div>;
   if (slug)
     return (
       <div className="wrap">
@@ -632,7 +637,7 @@ export function ArticlesView({
   return (
     <div className="wrap">
       <ArticleBanner data={data} user={user} />
-      <section className="article-library" id="article-library">
+      {contentVisibility(data).articles && <section className="article-library" id="article-library">
       <Heading
         title="일하는 방식을 바꾸는 인사이트"
         description="읽고, 배우고, 내 일에 적용해 보세요."
@@ -676,7 +681,7 @@ export function ArticlesView({
         <span>{pagination.page} / {Math.ceil(pagination.total / pagination.pageSize)}</span>
         <button className="btn" type="button" disabled={pagination.page >= Math.ceil(pagination.total / pagination.pageSize)} onClick={() => onPageChange(pagination.page + 1)}>다음</button>
       </div>}
-      </section>
+      </section>}
     </div>
   );
 }
@@ -697,6 +702,14 @@ export function StoriesView({
 }) {
   const stories = data.review_videos || [];
   const [selectedId, setSelectedId] = useState("");
+  const player = useRef<HTMLDivElement>(null);
+  function selectStory(id: string) {
+    setSelectedId(id);
+    requestAnimationFrame(() => {
+      player.current?.scrollIntoView({ block: 'start', behavior: 'instant' });
+      player.current?.focus({ preventScroll: true });
+    });
+  }
   const featured = stories.find((story) => story.id === selectedId) || stories[0];
   return (
     <div className="wrap">
@@ -708,8 +721,10 @@ export function StoriesView({
         <section className="story-feature">
           <div className="story-feature-copy">
             <div className="eyebrow">LEARNING IN PRACTICE</div>
+            <Badge>개인 실행 사례</Badge>
             <h2>{t(featured, "title")}</h2>
             <p className="lead mt16">{t(featured, "description")}</p>
+            <p className="meta mt16">개인 사례이며 결과는 사람마다 다릅니다.</p>
             <div className="story-person">
               <span className="avatar" aria-hidden="true">
                 {t(featured, "reviewer_name").slice(0, 1)}
@@ -720,25 +735,29 @@ export function StoriesView({
               </div>
             </div>
           </div>
-          <Video url={t(featured, "video_url")} />
+          <div ref={player} tabIndex={-1} className="story-player" aria-label={`${t(featured, "title")} 영상`} style={{scrollMarginTop:90}}>
+            <Video key={featured.id} url={t(featured, "video_url")} />
+            {safeUrl(featured.video_url) && <a className="link" href={safeUrl(featured.video_url)} target="_blank" rel="noopener noreferrer">원본 영상 열기 <ArrowRight size={16}/></a>}
+          </div>
         </section>
       )}
       <div className="section story-library">
-        <div className="section-head"><div><div className="eyebrow">MORE STORIES</div><h2>다양한 실행 후기를 만나보세요.</h2><p>후기를 선택하면 위 영상과 이야기가 바뀝니다.</p></div><b>{stories.length}개의 고객 이야기</b></div>
+        <div className="section-head"><div><div className="eyebrow">MORE STORIES</div><h2>다양한 실행 후기를 만나보세요.</h2><p>썸네일이나 제목을 누르면 선택한 영상으로 이동합니다.</p></div><b>{stories.length}개의 고객 이야기</b></div>
         <div className="story-video-grid">
           {stories.map((s, index) => {
             const thumbnail = storyThumbnailUrl(s);
             return (
-              <button type="button" className={"story-video-card " + (s.id === featured?.id ? "active" : "")} key={s.id} onClick={() => setSelectedId(s.id)} aria-pressed={s.id === featured?.id}>
+              <button type="button" className={"story-video-card " + (s.id === featured?.id ? "active" : "")} key={s.id} onClick={() => selectStory(s.id)} aria-pressed={s.id === featured?.id}>
                 <span className="story-video-thumb">{thumbnail ? <img src={thumbnail} alt="" loading="lazy" /> : <small>STORY {String(index + 1).padStart(2, "0")}</small>}<span className="story-video-play" aria-hidden="true"><Play /></span></span>
                 <strong>{t(s, "title")}</strong>
                 <span>{t(s, "reviewer_name")} · {t(s, "reviewer_role")}</span>
+                <small>개인 사례이며 결과는 사람마다 다릅니다.</small>
               </button>
             );
           })}
           {!loading && !error && !stories.length && (
             <Empty title="공개된 고객 이야기가 없습니다.">
-              <div className="row center mt16"><Link className="btn primary" href="/classes?type=free">무료 클래스 보기</Link><Link className="btn" href="/my/questions">문의하기</Link></div>
+              <div className="row center mt16"><Link className="btn primary" href="/classes?type=free">무료 클래스 보기</Link><a className="btn" href={MOONSHOT_SUPPORT_URL} target="_blank" rel="noopener noreferrer">카카오톡 문의</a></div>
             </Empty>
           )}
         </div>

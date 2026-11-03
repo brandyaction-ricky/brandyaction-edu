@@ -1,0 +1,15 @@
+.alu-panel { margin:20px 0; min-width:0; overflow-wrap:anywhere; }
+.alu-heading,.alu-rate { display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+.alu-heading h3 { margin:0; }
+.alu-panel .notice { margin:12px 0; }
+.alu-course { border:1px solid #dfe3e8; border-radius:8px; padding:18px; margin:12px 0; }
+.alu-course h4 { margin:0 0 10px; }
+.alu-rate { margin:16px 0; }
+.alu-types { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:12px 0; }
+.alu-types > div { display:grid; gap:4px; padding:12px; background:#f5f7f9; border-radius:6px; }
+.alu-course summary { cursor:pointer; min-height:44px; padding:12px 0; font-weight:600; }
+.alu-evidence { list-style:none; margin:0; padding:0; }
+.alu-evidence li { display:grid; gap:4px; border-top:1px solid #e5e7eb; padding:12px 0; }
+.alu-evidence small { color:#596171; }
+.alu-course > .meta { margin-top:12px; }
+@media(max-width:360px) { .alu-types { grid-template-columns:minmax(0,1fr); } }

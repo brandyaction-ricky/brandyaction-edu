@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { ChevronDown, ChevronUp, FileText, GripVertical, Pencil, Play, Plus, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronUp, FileText, Pencil, Play, Plus, Trash2, X } from "lucide-react";
 import { object, type Row } from "@/lib/platform";
 import { productDigitalSections, type DigitalContentItem, type DigitalContentSection } from "@/lib/product-metadata";
 import type { WorkflowSend } from "../learning-workflows";
 import { UploadField } from "../editor-fields";
+import { moveOrderedItem, useReorderDrag } from "./reorder-drag";
 
 const emptyItem = (): DigitalContentItem => ({ id: crypto.randomUUID(), title: "", type: "file", resourceId: "", videoUrl: "", body: "", durationLabel: "" });
 
@@ -41,8 +42,7 @@ export function DigitalContentManager({ row, pending, send }: { row?: Row; pendi
   async function moveSection(index: number, offset: -1 | 1) {
     const target = index + offset;
     if (target < 0 || target >= sections.length) return;
-    const next = [...sections]; [next[index], next[target]] = [next[target], next[index]];
-    await persist(next, "섹션 순서를 변경했습니다.");
+    await persist(moveOrderedItem(sections, index, target), "섹션 순서를 변경했습니다.");
   }
   async function removeSection(section: DigitalContentSection) {
     if (!window.confirm(`「${section.title}」 섹션과 포함된 콘텐츠를 삭제할까요?`)) return;
@@ -85,22 +85,30 @@ export function DigitalContentManager({ row, pending, send }: { row?: Row; pendi
     if (item.type === "file" && item.resourceId) try { await send({ action: "delete-product-resource", courseId: row!.id, resourceId: item.resourceId }, "연결 파일을 정리했습니다."); } catch {}
   }
   async function moveItem(sectionId: string, index: number, offset: -1 | 1) {
+    await moveItemTo(sectionId, index, index + offset);
+  }
+  async function moveItemTo(sectionId: string, index: number, target: number) {
     const next = sections.map(section => {
       if (section.id !== sectionId) return section;
-      const items = [...section.items], target = index + offset;
-      if (target < 0 || target >= items.length) return section;
-      [items[index], items[target]] = [items[target], items[index]];
-      return { ...section, items };
+      return { ...section, items: moveOrderedItem(section.items, index, target) };
     });
     await persist(next, "콘텐츠 순서를 변경했습니다.");
   }
+  const sectionDrag = useReorderDrag(sections.map(section => section.id), (from, to) => { void persist(moveOrderedItem(sections, from, to), "섹션 순서를 변경했습니다."); }, pending || !row?.id);
+  const itemIds = sections.flatMap(section => section.items.map(item => `${section.id}:${item.id}`));
+  const itemDrag = useReorderDrag(itemIds, (from, to) => {
+    const source = itemIds[from]?.split(':')[0], target = itemIds[to]?.split(':')[0];
+    if (!source || source !== target) return;
+    const items = sections.find(section => section.id === source)?.items || [];
+    void moveItemTo(source, items.findIndex(item => `${source}:${item.id}` === itemIds[from]), items.findIndex(item => `${source}:${item.id}` === itemIds[to]));
+  }, pending || !row?.id);
   const total = sections.reduce((sum, section) => sum + section.items.length, 0);
   return <>
     <div className="between digital-content-heading"><div><h2>콘텐츠 리스트</h2><p className="meta mt8">자료를 섹션별로 구성하고 고객에게 보일 순서를 관리합니다.</p></div><span className="badge">{sections.length}개 섹션 · {total}개 콘텐츠</span></div>
     {!row?.id && <p className="notice mt16">상품 기본 정보를 저장한 뒤 파일과 콘텐츠 섹션을 등록할 수 있습니다.</p>}
-    <div className="digital-section-list mt24">{sections.map((section, sectionIndex) => <section className="digital-section-card" key={section.id}>
-      <header><GripVertical aria-hidden="true" /><input aria-label="섹션 이름" defaultValue={section.title} maxLength={80} onBlur={event => { if (event.target.value.trim() !== section.title) void renameSection(section.id, event.target.value); }} disabled={pending} /><div className="row"><button className="icon-btn" type="button" aria-label="섹션 위로" onClick={() => void moveSection(sectionIndex, -1)} disabled={pending || sectionIndex === 0}><ChevronUp /></button><button className="icon-btn" type="button" aria-label="섹션 아래로" onClick={() => void moveSection(sectionIndex, 1)} disabled={pending || sectionIndex === sections.length - 1}><ChevronDown /></button><button className="icon-btn" type="button" aria-label="콘텐츠 추가" onClick={() => openItem(section.id)} disabled={pending}><Plus /></button><button className="icon-btn danger" type="button" aria-label="섹션 삭제" onClick={() => void removeSection(section)} disabled={pending}><Trash2 /></button></div></header>
-      {section.items.length ? <div className="digital-item-list">{section.items.map((item, itemIndex) => <div className="digital-item-row" key={item.id}>{item.type === "video" ? <Play aria-hidden="true" /> : <FileText aria-hidden="true" />}<div><b>{item.title}</b>{item.body && <p>{item.body}</p>}</div><span className="spacer"/><small>{item.durationLabel}</small><div className="row"><button className="icon-btn" type="button" aria-label="콘텐츠 위로" onClick={() => void moveItem(section.id, itemIndex, -1)} disabled={pending || itemIndex === 0}><ChevronUp /></button><button className="icon-btn" type="button" aria-label="콘텐츠 아래로" onClick={() => void moveItem(section.id, itemIndex, 1)} disabled={pending || itemIndex === section.items.length - 1}><ChevronDown /></button><button className="icon-btn" type="button" aria-label="콘텐츠 수정" onClick={() => openItem(section.id, item)} disabled={pending}><Pencil /></button><button className="icon-btn danger" type="button" aria-label="콘텐츠 삭제" onClick={() => void removeItem(section.id, item)} disabled={pending}><Trash2 /></button></div></div>)}</div> : <p className="digital-empty">콘텐츠가 없습니다. 콘텐츠를 추가해 주세요.</p>}
+    <div className="digital-section-list mt24">{sections.map((section, sectionIndex) => <section className={`digital-section-card${sectionDrag.overId === section.id ? ' reorder-item-over' : ''}`} key={section.id} {...sectionDrag.row(section.id)}>
+      <header>{sectionDrag.handle(section.id, section.title)}<input aria-label="섹션 이름" defaultValue={section.title} maxLength={80} onBlur={event => { if (event.target.value.trim() !== section.title) void renameSection(section.id, event.target.value); }} disabled={pending} /><div className="row"><button className="icon-btn" type="button" aria-label="섹션 위로" onClick={() => void moveSection(sectionIndex, -1)} disabled={pending || sectionIndex === 0}><ChevronUp /></button><button className="icon-btn" type="button" aria-label="섹션 아래로" onClick={() => void moveSection(sectionIndex, 1)} disabled={pending || sectionIndex === sections.length - 1}><ChevronDown /></button><button className="icon-btn" type="button" aria-label="콘텐츠 추가" onClick={() => openItem(section.id)} disabled={pending}><Plus /></button><button className="icon-btn danger" type="button" aria-label="섹션 삭제" onClick={() => void removeSection(section)} disabled={pending}><Trash2 /></button></div></header>
+      {section.items.length ? <div className="digital-item-list">{section.items.map((item, itemIndex) => { const dragId = `${section.id}:${item.id}`; return <div className={`digital-item-row${itemDrag.overId === dragId ? ' reorder-item-over' : ''}`} key={item.id} {...itemDrag.row(dragId)}>{itemDrag.handle(dragId, item.title)}{item.type === "video" ? <Play aria-hidden="true" /> : <FileText aria-hidden="true" />}<div><b>{item.title}</b>{item.body && <p>{item.body}</p>}</div><span className="spacer"/><small>{item.durationLabel}</small><div className="row"><button className="icon-btn" type="button" aria-label="콘텐츠 위로" onClick={() => void moveItem(section.id, itemIndex, -1)} disabled={pending || itemIndex === 0}><ChevronUp /></button><button className="icon-btn" type="button" aria-label="콘텐츠 아래로" onClick={() => void moveItem(section.id, itemIndex, 1)} disabled={pending || itemIndex === section.items.length - 1}><ChevronDown /></button><button className="icon-btn" type="button" aria-label="콘텐츠 수정" onClick={() => openItem(section.id, item)} disabled={pending}><Pencil /></button><button className="icon-btn danger" type="button" aria-label="콘텐츠 삭제" onClick={() => void removeItem(section.id, item)} disabled={pending}><Trash2 /></button></div></div>; })}</div> : <p className="digital-empty">콘텐츠가 없습니다. 콘텐츠를 추가해 주세요.</p>}
     </section>)}</div>
     <div className="row digital-content-actions"><button className="btn" type="button" onClick={() => void addSection()} disabled={pending || !row?.id || sections.length >= 30}>섹션 추가</button>{sections.length > 0 && <button className="btn primary" type="button" onClick={() => openItem(sections[0].id)} disabled={pending}>콘텐츠 추가</button>}</div>
     {message && <p className="notice mt16" role="status">{message}</p>}

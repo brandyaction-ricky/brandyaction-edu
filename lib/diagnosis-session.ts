@@ -3,9 +3,11 @@ export type DiagnosisQuestion = {
   id: string; code: string; text: string; type: 'pair_choice' | 'single_choice' | 'multi_choice' | 'text';
   section: string; core: boolean; required: boolean; pickExactly: number | null;
   exclusiveOptionIds: string[]; reconfirmInstructions: boolean; confirmationOptionId: string | null;
+  requiredOptionId?: string | null;
   placeholder: string; pair: { left: string; right: string } | null; options: { id: string; label: string }[];
 };
 export type DiagnosisSession = {
+  attemptId?: string; adminTest?: boolean; canRestart?: boolean;
   state: 'in_progress' | 'submitted'; revision: number; answers: DiagnosisAnswer[]; submittedAt: string | null; needsReview: boolean;
   survey: { code: string; version: string; title: string; coreQuestionCount: number; questions: DiagnosisQuestion[] };
 };
@@ -16,6 +18,7 @@ export function diagnosisQuestionAnswered(question: DiagnosisQuestion, answer?: 
   if (question.type === 'text') return Boolean(answer.value?.trim());
   if (question.type === 'multi_choice') return question.pickExactly
     ? answer.values?.length === question.pickExactly : Boolean(answer.values?.length);
+  if (question.requiredOptionId) return answer.optionId === question.requiredOptionId;
   return Boolean(answer.optionId);
 }
 

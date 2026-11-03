@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
 
+const entryRulesE2 = {}; new Function('exports', ts.transpileModule(fs.readFileSync(new URL('../lib/entry-source.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(entryRulesE2);
+
 function routeFor({ environment = 'development', role = 'admin', configured = true, fail = false } = {}) {
   const sent = [];
   const env = {
@@ -78,6 +80,7 @@ test('activating campaigns does not release older automation runs without a sepa
     '@/lib/supabase/admin': { createAdminClient: () => db },
     '@/lib/crm-purchase-contact': {},
     '@/lib/crm-purchase-email': { purchaseEmailConfigured: () => false },
+    '@/lib/entry-source': entryRulesE2,
     '@/lib/crm-sms-settings': { loadSmsSettings: async () => ({ senderPhone: '01098765432', transactionalEnabled: true, marketingEnabled: false }) },
   };
   new Function('exports', 'require', 'process', ts.transpileModule(source, {

@@ -1,5 +1,6 @@
 import { CTA_IDS, TEST_COOKIE, decodeLabel, validId, isTestRequest, rawAttribution, type LandingConfig, type LandingEvent } from './landing';
 import { createEngagementMeter } from './landing-engagement';
+import { adsRejected } from './ad-preferences';
 
 type Pixel = ((...args: unknown[]) => void) & { callMethod?: (...args: unknown[]) => void; queue?: unknown[][]; push?: Pixel; loaded?: boolean; version?: string };
 declare global { interface Window { fbq?: Pixel; _fbq?: Pixel; eduPixelIds?: Set<string>; } }
@@ -15,6 +16,7 @@ export function environment(ua: string) {
   return { device: /iPad|Tablet/i.test(ua) ? 'tablet' : /Mobi|iPhone|Android/i.test(ua) ? 'mobile' : 'desktop', browser, isInApp: ['Instagram','Facebook','Kakao'].includes(browser) };
 }
 export function pixel(config: Pick<LandingConfig, 'pixel_enabled' | 'pixel_id'>, event: string, values: Record<string, unknown> = {}, id?: string) {
+  if (adsRejected()) return;
   if (!config.pixel_enabled || !/^\d{5,30}$/.test(config.pixel_id) || syncTestMode()) return;
   try {
     if (!window.fbq) {

@@ -22,6 +22,9 @@
 .edu-front .site-footer-copyright { margin: 30px 0 0; color: #777777; font-size: 12px; line-height: 18px; letter-spacing: -.015em; }
 .edu-front .site-footer a:hover { color: #ffffff; }
 .edu-front .site-footer a:focus-visible { outline: 2px solid #d5d5d5; outline-offset: 5px; border-radius: 2px; }
+.edu-front .site-footer-ad-notice { margin-top: 24px; display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; border-top: 1px solid #333; padding-top: 20px; }
+.edu-front .site-footer-ad-notice p { margin: 0; color: #b3b3b3; font-size: 12px; line-height: 1.7; }
+.edu-front .site-footer-ad-notice a { display: inline-flex; align-items: center; min-height: 44px; color: #f5f5f5; font-size: 13px; font-weight: 700; text-decoration: underline; text-underline-offset: 4px; white-space: nowrap; }
 
 @media (max-width: 900px) {
   .edu-front .site-footer-top { flex-direction: column; gap: 20px; }
@@ -29,13 +32,14 @@
   .edu-front .site-footer-links a { min-height: 36px; }
 }
 @media (max-width: 600px) {
-  .edu-front .site-footer { display: none; }
+  .edu-front .site-footer { padding: 28px 0; }
   .edu-front .site-footer-inner { width: calc(100% - 40px); }
   .edu-front .site-footer-business { flex-direction: column; gap: 9px; }
   .edu-front .site-footer-links { column-gap: 20px; }
   .edu-front .site-footer-links a { min-height: 44px; font-size: 12px; }
   .edu-front .site-footer-company { margin-top: 20px; padding-top: 20px; }
   .edu-front .site-footer-copyright { margin-top: 28px; font-size: 11px; }
+  .edu-front .site-footer-ad-notice { align-items: flex-start; flex-direction: column; gap: 4px; margin-top: 20px; }
 }
 @media print { .edu-front .site-footer { display: none !important; } }
 

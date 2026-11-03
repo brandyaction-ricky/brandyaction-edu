@@ -9,8 +9,9 @@ function load(path, dependencies = {}) {
   const code = ts.transpileModule(fs.readFileSync(new URL('../' + path, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const exports = {};
   new Function('exports', 'require', code)(exports, name => {
-    if (name === '@/lib/cohort-curriculum-server') return { isLessonVisibleToCohort: async () => true };
+    if (name === '@/lib/question-deletion-server') return dependencies[name] || { questionDeletionReady: async () => false }; if (name === '@/lib/cohort-curriculum-server') return { isLessonVisibleToCohort: async () => true };
     if (name === '@/lib/cohort-curriculum-visibility') return { cohortLessonVisible: () => true, cohortWeekVisible: () => true };
+    if (name === '@/lib/member-directory') return load('lib/member-directory.ts');
     if (name === '@/lib/submission-review') return submissionReview;
     if (name === '@/lib/admin-order-list') return load('lib/admin-order-list.ts'); if (name === '@/lib/crm-purchase-contact') return load('lib/crm-purchase-contact.ts'); if (name === '@/lib/coupon-rules') return load('lib/coupon-rules.ts'); if (name === '@/lib/product-visibility') return productVisibility;
     if (name === '@/lib/public-platform-data') return { getPublicPlatformData: async () => ({ data: {}, pagination: null }), getPublicSupport: async () => ({}) };
@@ -26,7 +27,7 @@ function load(path, dependencies = {}) {
 const platform = load('lib/platform.ts'), rules = load('lib/qa-rules.ts');
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const admin = { id: id(1), role: 'admin', status: 'active', permissions: { members: true, products: true, marketing: true } };
-function harness({ missions = [], user = admin } = {}) {
+function harness({ missions = [], user = admin, deletionReady = false } = {}) {
   const tables = {
     profiles: [admin, { id: id(2), role: 'student', status: 'active', marketing_consent: true }, { id: id(3), role: 'student', status: 'withdrawn', marketing_consent: true }],
     curriculum_weeks: [{ id: id(11), course_id: id(101) }, { id: id(12), course_id: id(102) }],
@@ -61,12 +62,14 @@ function harness({ missions = [], user = admin } = {}) {
       return query;
     },
     async rpc(name, args) {
+      if (name === 'edu_admin_member_directory') { calls.push({rpc:name,args}); const rows=tables.profiles.filter(r=>r.status!=='withdrawn'&&(!args.p_member||r.id===args.p_member)); return {data:{rows,total:rows.length},error:null}; }
       if (name === 'edu_admin_summary') return { data: { id: 'summary', members: 3 }, error: null };
       if (name === 'edu_create_record') { writes.push({ table: args.p_table, values: args.p_values }); return { data: { id: id(99), ...args.p_values }, error: null }; }
       throw Error(name);
     },
   };
   const route = load('app/api/platform/route.ts', {
+    '@/lib/question-deletion-server': { questionDeletionReady: async () => deletionReady },
     '@/lib/server-auth': { getAuthenticatedUser: async () => user },
     '@/lib/supabase/admin': { createAdminClient: () => db }, '@/lib/supabase/server': { createClient: async () => db },
     '@/lib/platform': platform, '@/lib/platform-rules': load('lib/platform-rules.ts'), '@/lib/qa-rules': rules,
@@ -171,4 +174,16 @@ test('submission deep links and member scope use inner joins with unambiguous pr
   }
   assert.match(rules.adminSelectColumns('reviews', 'mission_submissions'), /enrollments!inner.*profiles!enrollments_user_id_fkey/);
   assert.equal(api.writes.length, 0);
+});
+
+test('member directory API forwards validated filters and uses the authenticated actor',async()=>{
+ const api=harness();const query=new URLSearchParams({section:'customers',memberQuery:' 결제자 샘플 ',memberStatus:'active',memberCourse:id(101),member:id(2),page:'2',p_actor:id(99)});
+ const res=await api.read(query);assert.equal(res.status,200);assert.deepEqual(api.calls.find(c=>c.rpc==='edu_admin_member_directory').args,{p_actor:admin.id,p_query:'결제자 샘플',p_status:'active',p_course:id(101),p_member:id(2),p_page:2,p_limit:100});
+ for(const invalid of ['memberQuery='+encodeURIComponent('x'.repeat(101)),'memberStatus=withdrawn','memberCourse=bad'])assert.equal((await api.read('section=customers&'+invalid)).status,400);
+ const denied=harness({user:{id:id(2),role:'student'}});assert.equal((await denied.read('section=customers')).status,403);assert.equal(denied.calls.length,0);
+});
+
+test('deleted questions are hidden from admin active, archived and direct reads before totals and pagination',async()=>{
+ const api=harness({deletionReady:true});api.tables.edu_questions=[{id:id(600),user_id:id(2),status:'open',is_archived:false,deleted_at:null},{id:id(601),user_id:id(2),status:'answered',is_archived:true,deleted_at:'2026-10-11'},{id:id(602),user_id:id(2),status:'answered',is_archived:true,deleted_at:null}];
+ for(const [query,ids] of [['section=questions',[id(600)]],['section=questions&questionState=archived',[id(602)]],['section=questions&question='+id(601),[]]]){const response=await api.read(query);assert.equal(response.status,200);const body=await response.json();assert.deepEqual(body.data.edu_questions.map(q=>q.id),ids);assert.equal(body.pagination.total,ids.length);}
 });

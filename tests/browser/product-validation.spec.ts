@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test';
+import { mockProductHtmlStorage } from './fixture/product-html-storage';
+test.beforeEach(async ({ page }) => { await mockProductHtmlStorage(page); });
 
 test('missing sales fields mark every affected tab, focus the first field, and save after correction', async ({ page }) => {
   await page.goto('/product-sale-test?missing=1');
@@ -15,6 +17,7 @@ test('missing sales fields mark every affected tab, focus the first field, and s
   await expect(page.locator('[data-validation-field="detail_content"]')).toHaveClass(/product-invalid-group/);
   await page.getByRole('tab', { name: 'HTML 상세페이지', exact: true }).click();
   await page.locator('input[type=file][accept=".html,.htm,text/html"]').setInputFiles({ name: 'detail.html', mimeType: 'text/html', buffer: Buffer.from('<!doctype html><html><body><h1>합성 상품 소개</h1></body></html>') });
+  await expect(page.getByText(/detail.html · 업로드 완료/)).toBeVisible();
   await expect(page.getByRole('tab', { name: '상세페이지', exact: true })).not.toHaveClass(/has-error/);
   await page.getByRole('button', { name: '저장하기', exact: true }).click();
   await expect(page.getByLabel('합성 저장 횟수')).toHaveText('1');
@@ -74,11 +77,11 @@ test('closed cohort points to its status and allows product save after the separ
 test('invalid format in a hidden tab is highlighted and focused', async ({ page }) => {
   await page.goto('/product-sale-test');
   await page.getByRole('tab', { name: '공개·검색' }).click();
-  await page.getByLabel('Meta Pixel ID (Optional)', { exact: true }).fill('abc');
+  await page.getByLabel('Meta 픽셀 번호 (선택)', { exact: true }).fill('abc');
   await page.getByRole('tab', { name: '기본·판매' }).click();
   await page.getByRole('button', { name: '저장하기', exact: true }).click();
-  await expect(page.getByLabel('Meta Pixel ID (Optional)', { exact: true })).toBeFocused();
-  await expect(page.getByLabel('Meta Pixel ID (Optional)', { exact: true })).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByLabel('Meta 픽셀 번호 (선택)', { exact: true })).toBeFocused();
+  await expect(page.getByLabel('Meta 픽셀 번호 (선택)', { exact: true })).toHaveAttribute('aria-invalid', 'true');
   await expect(page.getByLabel('합성 저장 횟수')).toHaveText('0');
 });
 
@@ -98,6 +101,7 @@ test('new published product validates against its automatically created cohort',
   await page.getByRole('button', { name: '상세페이지 이미지 또는 HTML 파일을 등록해 주세요.' }).click();
   await page.getByRole('tab', { name: 'HTML 상세페이지', exact: true }).click();
   await page.locator('input[type=file][accept=".html,.htm,text/html"]').setInputFiles({ name: 'detail.html', mimeType: 'text/html', buffer: Buffer.from('<html><body>새 상품 소개</body></html>') });
+  await expect(page.getByText(/detail.html · 업로드 완료/)).toBeVisible();
   await page.getByRole('button', { name: '저장하기', exact: true }).click();
   await expect(page.getByLabel('합성 저장 횟수')).toHaveText('1');
 });

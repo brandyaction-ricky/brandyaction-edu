@@ -1,4 +1,7 @@
 "use client";
+import './classroom-surface.css';
+import { curriculumDay } from '@/lib/curriculum-days';
+import { LearningProgress } from './learning-progress';
 import { DiagnosisEntry } from './diagnosis-entry';
 import {
   date,
@@ -83,7 +86,7 @@ export function Classroom({
   const allLessons = enrollmentLessons(data, enrollment);
   const selectedId = allLessons.find(item => item.id === path[2])?.id || allLessons[0]?.id;
   const selectedGate = progression.lessons?.find(item => item.lessonId === selectedId);
-  const lessonDay = (id: string, fallback: number) => progression.lessons?.find(item => item.lessonId === id)?.dayNumber ?? fallback;
+  const lessonDay = (id: string, fallback: number) => progression.lessons?.find(item => item.lessonId === id)?.dayNumber ?? (allLessons.some(item => item.id === id) ? curriculumDay(data, allLessons.find(item => item.id === id)) : fallback);
   const group = (gate?: LessonGate) => gate?.ongoing ? 'ongoing' : gate?.track;
   const hasTracks = progression.lessons?.some(item => group(item) != null);
   const lessonLabel = (id: string, fallback: number) => progression.lessons?.find(item => item.lessonId === id)?.ongoing ? '지속 챌린지' : `DAY ${lessonDay(id, fallback)}`;
@@ -102,7 +105,7 @@ export function Classroom({
   ]);
   const done = completedIds.has(String(lesson?.id)),
     current = lessons.findIndex((l) => l.id === lesson?.id);
-  const canOpen = (id: string) => graduate || !blockLearningEnabled || progression.lessons?.some(item => item.lessonId === id && item.isUnlocked) === true;
+  const canOpen = (id: string) => graduate || (blockLearningEnabled ? progression.lessons?.some(item => item.lessonId === id && item.isUnlocked) === true : completedIds.has(id) || allLessons.slice(0, allLessons.findIndex(item => item.id === id)).every(item => completedIds.has(item.id)));
   const entries = missionEntries(data, [enrollment]).filter(
       (x) => x.lesson?.id === lesson?.id,
     ),
@@ -240,7 +243,7 @@ export function Classroom({
   return (
     <div className="learning-bg">
       <div className="wrap">
-        {graduate && <p className="meta mb16">졸업생 모드 · 최신 공개 커리큘럼을 보고 질문할 수 있습니다. 학습 답변과 미션 제출은 종료되었습니다.</p>}
+        {graduate && <p className="meta mb16">졸업생 모드 · 최신 공개 커리큘럼을 보고 질문할 수 있습니다. {blockLearningEnabled && '개인 실습 입력·저장과 프롬프트 생성도 계속 이용할 수 있습니다. '}공식 미션 제출과 멘토 검수는 종료되었습니다.</p>}
         <div className="learning-top">
           <div>
             <h1>{t(course, "title")}</h1>
@@ -305,6 +308,7 @@ export function Classroom({
             ))}
           </aside>
           <div className="learning-content">
+            <LearningProgress complete={lessons.filter(l => completedIds.has(l.id)).length} total={lessons.length} label="현재 공개된 학습 진도"/>
             {lesson && canOpen(lesson.id) ? (
               <>
                 <header className="lesson-header">
@@ -317,7 +321,8 @@ export function Classroom({
                   </div>
                   <h1>{t(lesson, "title")}</h1>
                   <p>{t(lesson, "description")}</p>
-                  <a className="link" href="#lesson-questions">이 수업에 개인 질문 남기기</a>
+                  {done && Boolean(complete.find(progress => progress.lesson_id === lesson.id)?.completed_at) && <p className="lesson-completed-at">완료한 날 · {date(complete.find(progress => progress.lesson_id === lesson.id)?.completed_at)}</p>}
+                  <a className="link" href="#lesson-questions">이 수업에 질문 남기기</a>
                 </header>
                 <LessonContent enabled={blockLearningEnabled} readOnly={graduate} lessonId={lesson.id} enrollmentId={enrollment.id} legacyCompletion={legacyCompletion} onCompleted={() => { if (!completedIds.has(lesson.id)) { setCompletedHere(previous => previous.includes(`${enrollment.id}:${lesson.id}`) ? previous : [...previous, `${enrollment.id}:${lesson.id}`]); progression.reload(); } }}>
                 {safeUrl(content?.vod_url) && (
@@ -348,6 +353,7 @@ export function Classroom({
                     <ResourceRow content={content} />
                   </section>
                 )}
+                {entries.length > 0 && <section className="lesson-task-panel" aria-label="이 수업 과제"><div className="lesson-task-panel-head"><span className="eyebrow">MY TASK</span><h2>이 수업 과제</h2><p>제출 상태와 피드백을 여기에서 확인하세요.</p></div>
                 {!graduate && entries
                   .filter((x) => x.mission.submission_type === "quiz")
                   .map((x) => (
@@ -382,6 +388,8 @@ export function Classroom({
                       </div>
                     </section>
                   ))}
+                </section>}
+                <LessonQuestions key={enrollment.id + ":" + lesson.id} enrollmentId={String(enrollment.id)} lessonId={String(lesson.id)} lessonTitle={t(lesson, "title")} />
                 <div className="lesson-bottom">
                   {current > 0 ? (
                     <Link
@@ -400,7 +408,7 @@ export function Classroom({
                     <span />
                   )}
                   {!blockLearningEnabled && legacyCompletion}
-                  {current < lessons.length - 1 && (canOpen(lessons[current + 1].id) ? (
+                  {current < lessons.length - 1 && ((graduate || done || selectedGate?.ongoing) && canOpen(lessons[current + 1].id) ? (
                     <Link
                       className="btn"
                       href={
@@ -410,12 +418,11 @@ export function Classroom({
                         lessons[current + 1].id
                       }
                     >
-                      다음 학습
+                      다음 학습 · {t(lessons[current + 1], 'title')}
                       <ArrowRight />
                     </Link>
-                  ) : <button className="btn" disabled>다음 학습 · 잠김</button>)}
+                  ) : <button className="btn" disabled>{!done && !graduate && !selectedGate?.ongoing ? "학습 완료 후 다음 학습" : "다음 학습 · 잠김"}</button>)}
                 </div>
-                <LessonQuestions key={enrollment.id + ":" + lesson.id} enrollmentId={String(enrollment.id)} lessonId={String(lesson.id)} lessonTitle={t(lesson, "title")} />
               </>
             ) : (
               <Empty title={lesson && blockLearningEnabled ? progression.error || selectedGate?.reason || (progression.lessons ? '아직 열리지 않은 학습입니다.' : '학습 개방 상태를 확인하고 있습니다.') : '공개된 학습이 없습니다.'}>

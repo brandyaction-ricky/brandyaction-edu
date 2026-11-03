@@ -11,6 +11,9 @@ test('completed payment has one next step while loading and after the guide is r
     await route.fulfill({ json: { available: true, orderId: order } });
   });
   await page.goto(completion);
+  await expect(page.getByRole('list', { name: '클래스 시작 단계' })).toContainText('결제 확인');
+  await expect(page.getByRole('list', { name: '클래스 시작 단계' })).toContainText('공지방 입장');
+  await expect(page.getByRole('list', { name: '클래스 시작 단계' })).toContainText('첫 학습 시작');
   await expect(page.getByRole('button', { name: '시작 안내 확인 중' })).toBeDisabled();
   await expect(page.locator('.completion a')).toHaveCount(0);
   release();

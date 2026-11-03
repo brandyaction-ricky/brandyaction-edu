@@ -110,3 +110,30 @@ for (const screen of ['my/missions', 'learn/synthetic-enrollment']) {
     await expect(page.getByText('로그인하고 학습을 이어가세요.')).toHaveCount(0);
   });
 }
+
+test('logging out on a PC leaves the independently signed-in app session active',async({browser})=>{
+ const pc=await browser.newContext(),app=await browser.newContext();
+ const sessions={pc:true,app:true};const scopes:string[]=[];
+ try {
+  for(const [device,context] of [['pc',pc],['app',app]] as const){
+   await context.route('**/api/platform?**',route=>route.fulfill(sessions[device]
+    ?{json:{user:member,data:{enrollments:[],courses:[]},support:{}}}
+    :{status:401,json:{user:null,error:'로그인이 필요합니다.'}}));
+   await context.route('**/synthetic-auth/signout',async route=>{
+    const scope=route.request().postDataJSON().scope || 'global';scopes.push(scope);
+    if(scope==='local')sessions[device]=false;else {sessions.pc=false;sessions.app=false;}
+    await route.fulfill({json:{}});
+   });
+  }
+  const pcPage=await pc.newPage(),appPage=await app.newPage();
+  await appPage.goto('/public-data-test?publicScreen=my');await expect(appPage.getByRole('heading',{name:'마이페이지'})).toBeVisible();
+  await pcPage.goto('/public-data-test?publicScreen=my');await expect(pcPage.getByRole('heading',{name:'마이페이지'})).toBeVisible();
+  await pcPage.getByRole('button',{name:'내 프로필 메뉴',exact:true}).click();
+  await pcPage.getByRole('button',{name:'로그아웃',exact:true}).first().click();
+  expect(scopes).toEqual(['local']);expect(sessions.pc).toBe(false);expect(sessions.app).toBe(true);
+  await appPage.reload();await expect(appPage.getByRole('heading',{name:'마이페이지'})).toBeVisible();
+  sessions.pc=true;await pcPage.goto('/public-data-test?publicScreen=my');
+  await appPage.evaluate(()=>window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true})));
+  await expect(appPage.getByRole('heading',{name:'마이페이지'})).toBeVisible();
+ } finally {await pc.close();await app.close();}
+});

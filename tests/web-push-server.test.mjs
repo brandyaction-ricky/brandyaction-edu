@@ -8,11 +8,11 @@ import webpush from 'web-push';
 const require=createRequire(import.meta.url), pair=webpush.generateVAPIDKeys(), curve=createECDH('prime256v1');curve.generateKeys();
 const endpoint='https://fcm.googleapis.com/fcm/send/synthetic-secret';
 const subscription={endpoint,p256dh:curve.getPublicKey().toString('base64url'),auth:randomBytes(16).toString('base64url')};
-const env={EDU_WEB_PUSH_ENABLED:'true',NEXT_PUBLIC_EDU_MESSAGES_ENABLED:'true',EDU_WEB_PUSH_PUBLIC_KEY:pair.publicKey,EDU_WEB_PUSH_PRIVATE_KEY:pair.privateKey,EDU_WEB_PUSH_SUBJECT:'mailto:fixture@example.test'};
+const env={EDU_WEB_PUSH_ENABLED:'true',NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED:'true',EDU_WEB_PUSH_PUBLIC_KEY:pair.publicKey,EDU_WEB_PUSH_PRIVATE_KEY:pair.privateKey,EDU_WEB_PUSH_SUBJECT:'mailto:fixture@example.test'};
 function module(path,mocks={},environment=env){const exports={};const code=ts.transpileModule(fs.readFileSync(new URL('../'+path,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText;new Function('exports','require','process',code)(exports,n=>n in mocks?mocks[n]:require(n),{env:environment});return exports;}
 const load=(environment=env)=>module('lib/web-push-server.ts',{'server-only':{},'@/lib/supabase/admin':{createAdminClient(){throw Error('Unexpected live DB access');}}},environment);
 test('configuration fails closed for missing flags or mismatched keys and never calls DB or transport',async()=>{
- for(const change of [{EDU_WEB_PUSH_ENABLED:'false'},{NEXT_PUBLIC_EDU_MESSAGES_ENABLED:'false'},{EDU_WEB_PUSH_PRIVATE_KEY:'invalid'},{EDU_WEB_PUSH_PUBLIC_KEY:webpush.generateVAPIDKeys().publicKey},{EDU_WEB_PUSH_SUBJECT:'http://invalid.test'}]){const api=load({...env,...change});assert.equal(api.pushConfiguration(),null);assert.deepEqual(await api.dispatchWebPush(),{enabled:false,claimed:0,sent:0,deferred:0});}
+ for(const change of [{EDU_WEB_PUSH_ENABLED:'false'},{NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED:'false'},{EDU_WEB_PUSH_PRIVATE_KEY:'invalid'},{EDU_WEB_PUSH_PUBLIC_KEY:webpush.generateVAPIDKeys().publicKey},{EDU_WEB_PUSH_SUBJECT:'http://invalid.test'}]){const api=load({...env,...change});assert.equal(api.pushConfiguration(),null);assert.deepEqual(await api.dispatchWebPush(),{enabled:false,claimed:0,sent:0,deferred:0});}
  assert.equal(load().pushConfiguration().publicKey,pair.publicKey);
 });
 test('subscriptions require canonical known HTTPS push hosts and a valid curve key',()=>{
@@ -21,7 +21,21 @@ test('subscriptions require canonical known HTTPS push hosts and a valid curve k
  for(const url of ['http://fcm.googleapis.com/fcm/send/x','https://127.0.0.1/fcm/send/x','https://fcm.googleapis.com.evil.test/fcm/send/x','https://user@fcm.googleapis.com/fcm/send/x','https://fcm.googleapis.com:8443/fcm/send/x','https://fcm.googleapis.com/fcm/send/x#secret','https://fcm.googleapis.com/other','https://FCM.googleapis.com/fcm/send/x','https://fcm.googleapis.com/fcm/send/../x'])assert.throws(()=>api.validatePushEndpoint(url),/PUSH_INVALID/);
  for(const change of [{p256dh:'A'.repeat(87)},{auth:'A'.repeat(21)},{p256dh:subscription.p256dh+'='},{endpoint:'https://private.test'}])assert.throws(()=>api.validatePushSubscription({...subscription,...change}),/PUSH_INVALID/);
 });
-function dispatcher(statuses){const calls=[],sent=[],jobs=statuses.map(()=>({id:randomUUID(),lease:randomUUID()})),events=jobs.map(()=>randomUUID()),binding=randomUUID();const dependencies={rpc:async(name,args)=>{calls.push({name,args});if(name==='edu_claim_push')return{data:jobs,error:null};if(name==='edu_read_push_delivery'){const n=jobs.findIndex(j=>j.id===args.p_id);return{data:statuses[n]==='stale'?null:{...jobs[n],...subscription,eventId:events[n],binding,path:statuses[n]==='bad-path'?'https://external.test':'/my/messages'},error:null};}return{data:true,error:null};},send:async(sub,payload,options)=>{const data=JSON.parse(payload),n=events.indexOf(data.eventId);sent.push({sub,data,options});if(statuses[n]!==201)throw Object.assign(Error('SECRET PROVIDER DETAILS'),{statusCode:statuses[n]});return{statusCode:201,body:'',headers:{}};}};return{calls,sent,dependencies};}
+test('Aside push accepts only the observed exact Google host and send path',()=>{
+ const api=load(),endpoint='https://jmt17.google.com/fcm/send/synthetic';
+ assert.equal(api.validatePushEndpoint(endpoint),endpoint);
+ assert.deepEqual(api.validatePushSubscription({...subscription,endpoint}),{...subscription,endpoint});
+ for(const endpoint of ['https://jmt18.google.com/fcm/send/x','https://sub.jmt17.google.com/fcm/send/x','https://jmt17.google.com.evil.test/fcm/send/x','https://jmt17.google.com/wp/x','https://jmt17.google.com/fcm/send','http://jmt17.google.com/fcm/send/x','https://jmt17.google.com:8443/fcm/send/x','https://user@jmt17.google.com/fcm/send/x','https://jmt17.google.com/fcm/send/x#secret','https://jmt17.google.com/fcm/send/../x']) assert.throws(()=>api.validatePushEndpoint(endpoint),/PUSH_INVALID/);
+});
+test('Aside subscription and status keep the authenticated actor and normal API contract',async()=>{
+ const h=route(),endpoint='https://jmt17.google.com/fcm/send/synthetic';
+ for(const action of ['subscribe','status']){
+  const response=await h.post({...subscription,endpoint,action,actor:randomUUID()});
+  assert.equal(response.status,200);assert.equal((await response.json()).enabled,true);
+  assert.equal(h.calls.at(-1).args.p_actor,h.user.id);
+ }
+});
+function dispatcher(statuses){const calls=[],sent=[],jobs=statuses.map(()=>({id:randomUUID(),lease:randomUUID()})),events=jobs.map(()=>randomUUID()),binding=randomUUID();const dependencies={rpc:async(name,args)=>{calls.push({name,args});if(name==='edu_claim_push')return{data:jobs,error:null};if(name==='edu_read_push_delivery'){const n=jobs.findIndex(j=>j.id===args.p_id);return{data:statuses[n]==='stale'?null:{...jobs[n],...subscription,eventId:events[n],binding,path:statuses[n]==='bad-path'?'https://external.test':'/my/questions'},error:null};}return{data:true,error:null};},send:async(sub,payload,options)=>{const data=JSON.parse(payload),n=events.indexOf(data.eventId);sent.push({sub,data,options});if(statuses[n]!==201)throw Object.assign(Error('SECRET PROVIDER DETAILS'),{statusCode:statuses[n]});return{statusCode:201,body:'',headers:{}};}};return{calls,sent,dependencies};}
 test('dispatcher encrypts no private text, sends only current bindings and records bounded provider outcomes',async()=>{
  const h=dispatcher([201,410,404,429,503,401,undefined,'stale','bad-path']);const result=await load().dispatchWebPush(h.dependencies);assert.equal(result.sent,1);assert.equal(h.sent.length,7);
  assert.ok(h.sent.every(({data})=>Object.keys(data).sort().join(',')==='binding,eventId,path,version'));
@@ -50,4 +64,12 @@ test('cron requires an exact configured secret and never discloses queue/transpo
  let calls=0;const api=module('app/api/cron/push/route.ts',{'@/lib/web-push-server':{dispatchWebPush:async()=>{calls++;throw Error('SECRET ENDPOINT');}}},{CRON_SECRET:'synthetic-only'});
  const get=token=>api.GET(new Request('https://edu.test/api/cron/push',{headers:{authorization:token}}));
  assert.equal((await get('Bearer wrong')).status,401);assert.equal(calls,0);const r=await get('Bearer synthetic-only');assert.equal(r.status,503);assert.doesNotMatch(await r.text(),/SECRET ENDPOINT/);assert.equal(calls,1);
+});
+test('care push dispatch is separately gated while question delivery remains unchanged',async()=>{
+ for(const enabled of ['false','true']){
+  const h=dispatcher([201]),rpc=h.dependencies.rpc;
+  h.dependencies.rpc=async(name,args)=>{const result=await rpc(name,args);if(name==='edu_read_push_delivery')result.data.path='/my/messages';return result;};
+  await load({...env,EDU_CARE_DELIVERY_ENABLED:enabled}).dispatchWebPush(h.dependencies);
+  assert.equal(h.sent.length,enabled==='true'?1:0);assert.equal(h.calls.at(-1).args.p_outcome,enabled==='true'?'sent':'skipped');
+ }
 });

@@ -28,7 +28,25 @@ export async function GET(request: Request) {
       if (row.error) throw row.error;
       if (row.data) settings = purchaseOnboardingSettings(row.data.value);
     }
-    return reply({ cohorts: (cohorts.data || []).filter(row => { const course = relatedCourse(row.courses); return course?.category !== 'free' && Number(course?.list_price || 0) > 0; }), settings, telegramOnly: Boolean(moonshotFourth) });
+    let lessons: { id: string; title: string }[] = [];
+    let comments: { order_id: string; comment: string; confirmed_at: string }[] = [];
+    if (selected) {
+      const weeks = await db.from('curriculum_weeks').select('id,week_number').eq('course_id', selected.course_id).is('archived_at', null).order('week_number');
+      if (weeks.error) throw weeks.error;
+      if (weeks.data?.length) {
+        const rows = await db.from('curriculum_lessons').select('id,title,week_id').in('week_id', weeks.data.map(w => w.id)).is('archived_at', null).order('day_number');
+        if (rows.error) throw rows.error;
+        lessons = (weeks.data || []).flatMap(w => (rows.data || []).filter(l => l.week_id === w.id).map(l => ({ id: l.id, title: `${w.week_number}주차 · ${l.title}` })));
+      }
+      const items = await db.from('order_items').select('order_id').eq('cohort_id', selected.id);
+      if (items.error) throw items.error;
+      if (items.data?.length) {
+        const rows = await db.from('edu_onboarding_steps').select('order_id,comment,confirmed_at').eq('step', 'learning').in('order_id', items.data.map(i => i.order_id)).order('confirmed_at', { ascending: false }).limit(100);
+        if (rows.error) throw rows.error;
+        comments = rows.data || [];
+      }
+    }
+    return reply({ lessons, comments, cohorts: (cohorts.data || []).filter(row => { const course = relatedCourse(row.courses); return course?.category !== 'free' && Number(course?.list_price || 0) > 0; }), settings, telegramOnly: Boolean(moonshotFourth) || ('checklistEnabled' in settings && settings.checklistEnabled === true) });
   } catch { return reply({ error: '결제 후 안내 설정을 불러오지 못했습니다.' }, 503); }
 }
 
@@ -44,10 +62,16 @@ export async function POST(request: Request) {
     if (!body || typeof body !== 'object' || Array.isArray(body) || !uuid(body.cohort)) return reply({ error: '기수를 확인해 주세요.' }, 400);
     const settings = purchaseOnboardingSettings(body.settings);
     const db = createAdminClient();
-    const cohort = await db.from('cohorts').select('id,courses(category,list_price)').eq('id', body.cohort).maybeSingle();
+    const cohort = await db.from('cohorts').select('id,course_id,courses(category,list_price)').eq('id', body.cohort).maybeSingle();
     if (cohort.error) throw cohort.error;
     const course = relatedCourse(cohort.data?.courses);
     if (!cohort.data || course?.category === 'free' || Number(course?.list_price || 0) <= 0) return reply({ error: '유료 클래스의 기수를 선택해 주세요.' }, 400);
+    if (settings.firstLessonId) {
+      const lesson = await db.from('curriculum_lessons').select('id,curriculum_weeks!inner(course_id)').eq('id', settings.firstLessonId).is('archived_at', null).maybeSingle();
+      if (lesson.error) throw lesson.error;
+      const week = Array.isArray(lesson.data?.curriculum_weeks) ? lesson.data.curriculum_weeks[0] : lesson.data?.curriculum_weeks;
+      if (!lesson.data || week?.course_id !== cohort.data.course_id) return reply({ error: '이 클래스의 첫 학습을 선택해 주세요.' }, 400);
+    }
     const key = onboardingSettingsKey(body.cohort);
     const saved = await db.from('site_settings').upsert({ key, value: settings, is_public: false, updated_by: user.id, updated_at: new Date().toISOString() }, { onConflict: 'key' });
     if (saved.error) throw saved.error;
@@ -56,7 +80,7 @@ export async function POST(request: Request) {
     if (audit.error) throw audit.error;
     return reply({ ok: true, settings });
   } catch (error) {
-    const status = error instanceof Error && /방 이름|텔레그램|프로필 이미지|안내를 켜려면/.test(error.message) ? 400 : 503;
+    const status = error instanceof Error && /방 이름|텔레그램|프로필 이미지|안내를 켜려면|OT 일정|첫 학습/.test(error.message) ? 400 : 503;
     return reply({ error: status === 400 && error instanceof Error ? error.message : '결제 후 안내 설정을 저장하지 못했습니다.' }, status);
   }
 }

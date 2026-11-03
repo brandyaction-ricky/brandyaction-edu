@@ -1,0 +1,116 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { randomUUID as uuid } from 'node:crypto';
+import { PGlite } from '@electric-sql/pglite';
+
+const sql=readFileSync('supabase/migrations/20261015091932_edu_campaign_revenue_behavior_insights.sql','utf8');
+const e1=readFileSync('supabase/migrations/20261005020515_edu_internal_order_analytics_e1.sql','utf8');
+const alignment=readFileSync('supabase/migrations/20260929150200_free_class_marketing_dashboard_alignment.sql','utf8');
+
+test('actual insights SQL: E1 ledger, cohort spend dedupe, missing state, skipped sections and version scope',async t=>{
+ const db=new PGlite();t.after(()=>db.close());
+ await db.exec(`create role service_role bypassrls;create role anon;create role authenticated;
+ create table profiles(id uuid primary key,role text,status text,is_internal boolean default false,deleted_at timestamptz);
+ create table site_settings(key text primary key,value jsonb);
+ create table courses(id uuid primary key,title text);
+ create table cohorts(id uuid primary key,course_id uuid,cohort_code text);
+ create table orders(id uuid primary key,user_id uuid,status text,total_amount int,currency text default 'KRW',created_at timestamptz default now(),paid_at timestamptz,entry_src text,is_test_order boolean default false);
+ create table order_items(id uuid primary key,order_id uuid,cohort_id uuid);
+ create table payments(id uuid primary key,order_id uuid,status text,approved_amount int,cancelled_amount int,approved_at timestamptz);
+ create table refunds(payment_id uuid,amount int,status text,completed_at timestamptz);
+ create table landing_campaigns(id uuid primary key,landing_id uuid,start_day date,end_day date,uses_ads boolean,meta_sync_status text,meta_last_synced_at timestamptz);
+ create table edu_recruitment_marketing_links(campaign_id uuid primary key,period_id text);
+ create table edu_webinar_campaigns(period_id text primary key,paid_cohort_id uuid);
+ create table landing_campaign_meta_daily(campaign_id uuid,day date,meta_campaign_id text,meta_ad_id text,spend numeric,synced_at timestamptz);
+ create table landing_campaign_dimensions(campaign_id uuid,adset_key text,creative_key text,ad_type text,updated_at timestamptz);
+ create table funnel_sessions(landing_id uuid,session_id uuid,layout_ver int,created_at timestamptz,attribution jsonb,clicks int,max_scroll_depth numeric,sections jsonb);
+ create index on funnel_sessions(landing_id,created_at,layout_ver);
+ create table section_snapshots(landing_id uuid,layout_ver int,created_at timestamptz,note text,sections jsonb);
+ grant select on all tables in schema public to service_role;`);
+ await db.exec(e1.slice(e1.indexOf('create view public.edu_analytics_members'),e1.indexOf('create function public.edu_set_analytics_exclusion')));
+ await db.exec(alignment.slice(alignment.indexOf('create or replace function public.edu_decode_landing_utm_once'),alignment.indexOf('create or replace function public.edu_store_campaign_meta')));
+ await db.exec(sql);await db.exec(readFileSync('supabase/migrations/20261015112712_edu_marketing_approved_cohort_links.sql','utf8'));
+ const rights=(await db.query("select p.prosecdef,has_function_privilege('anon',p.oid,'execute') anon,has_function_privilege('authenticated',p.oid,'execute') member from pg_proc p where p.proname='edu_marketing_insights'")).rows[0];
+ assert.deepEqual(rights,{prosecdef:false,anon:false,member:false});
+ const admin=uuid(),student=uuid(),internal=uuid(),staff=uuid(),outsider=uuid(),course=uuid(),cohort=uuid(),landing=uuid(),campaign=uuid(),campaign2=uuid();
+ for(const [id,role,isInternal] of [[admin,'admin',true],[student,'student',false],[internal,'student',true],[staff,'staff',false],[outsider,'student',false]])await db.query("insert into profiles values($1,$2,'active',$3,null)",[id,role,isInternal]);
+ await db.query("insert into site_settings values($1,'{\"marketing\":true}')",['edu_staff_permissions_'+staff]);
+ await db.query("insert into courses values($1,'시험 강의')",[course]);await db.query("insert into cohorts values($1,$2,'C4')",[cohort,course]);
+ await db.query("insert into edu_webinar_campaigns values('qa',$1)",[cohort]);
+ for(const c of[campaign,campaign2]){
+  await db.query("insert into landing_campaigns values($1,$2,'2026-09-01','2026-09-30',true,'success',now())",[c,landing]);
+  await db.query("insert into edu_recruitment_marketing_links values($1,'qa')",[c]);
+  await db.query("insert into landing_campaign_meta_daily values($1,'2026-09-15','meta-c','ad1',100,now())",[c]);
+ }
+ const add=async(user,{test=false,amount=1000,refund=0,day='2026-09-15T02:00:00Z',items=1}={})=>{
+  const o=uuid(),p=uuid();await db.query("insert into orders(id,user_id,status,total_amount,paid_at,is_test_order) values($1,$2,'paid',$3,$4,$5)",[o,user,amount,day,test]);
+  for(let n=0;n<items;n++)await db.query('insert into order_items values($1,$2,$3)',[uuid(),o,cohort]);
+  await db.query("insert into payments values($1,$2,'done',$3,$4,$5)",[p,o,amount,refund,day]);
+  if(refund)await db.query("insert into refunds values($1,$2,'done','2026-10-01')",[p,refund]);return{o,p};
+ };
+ const a=await add(student,{amount:800,refund:200});
+ await add(student,{amount:500,day:'2026-10-01T03:00:00Z'});
+ await add(internal);await add(student,{test:true});await add(student,{amount:0});
+ const withdrawn=uuid();await db.query("insert into profiles values($1,'student','withdrawn',false,null)",[withdrawn]);await add(withdrawn);
+ // Reuse existing IDs per layout; no new tracking protocol.
+ await db.query("insert into section_snapshots values($1,1,'2026-09-01','수정 전','[\"hero\",\"detail\",\"final\"]'),($1,2,'2026-09-15','설명 보완','[\"hero\",\"detail\",\"final\"]')",[landing]);
+ const addSession=async(v,depth,sections,device='mobile',clicks=0)=>db.query("insert into funnel_sessions values($1,$2,$3,'2026-09-15T02:00:00Z',$4,$5,$6,$7)",[landing,uuid(),v,{device,utm_content:'A%20B',utm_term:'cold'},clicks,depth,sections]);
+ await addSession(1,20,{hero:100,final:50}); // skips detail; no subtraction/clamping
+ await addSession(1,80,{hero:100,detail:80},'mobile',1);
+ await addSession(1,null,{hero:10},'desktop');
+ await addSession(2,100,{hero:90,detail:80,final:50},'mobile',1);
+ const call=async(actor=admin,filters={})=>(await db.query("select public.edu_marketing_insights($1,$2,'2026-09-01','2026-09-30',$3) v",[actor,campaign,filters])).rows[0].v;
+ const before=(await db.query('select * from payments order by id')).rows;
+ await db.exec('set role service_role');
+ const r=await call();
+ assert.equal(r.revenue.state,'ready');assert.equal(r.revenue.orders,2);assert.equal(r.revenue.new_orders,1);assert.equal(r.revenue.gross,1300);assert.equal(r.revenue.refunds,200);assert.equal(r.revenue.net,1100);assert.equal(r.revenue.spend,100);assert.equal(r.revenue.roas,1100);
+ assert.equal(r.behavior.sessions,4);assert.equal(r.behavior.measured_sessions,3);
+ assert.deepEqual(r.behavior.scroll.map(x=>[x.depth,x.reached,x.not_continued]),[[0,3,1],[25,2,0],[50,2,0],[75,2,1],[90,1,0],[100,1,null]]);
+ const v1=r.behavior.versions.find(x=>x.layout_ver===1);
+ assert.equal(v1.sections[0].not_continued,2);assert.equal(v1.sections.at(-1).not_continued,null);
+ const filtered=await call(admin,{device:['mobile'],creative:['A B'],layout:['2']});
+ assert.equal(filtered.behavior.sessions,1);assert.equal(filtered.behavior.versions.length,1);assert.deepEqual({...filtered.revenue,as_of:null},{...r.revenue,as_of:null});
+ assert.equal((await call(staff)).revenue.state,'forbidden');
+ await assert.rejects(()=>call(outsider),/INSIGHTS_FORBIDDEN/);
+ await db.exec('reset role');
+ await db.query("update landing_campaigns set meta_sync_status='failed' where id=$1",[campaign2]);
+ assert.equal((await call()).revenue.spend,null);assert.equal((await call()).revenue.roas,null);
+ await db.query("update landing_campaigns set meta_sync_status='success' where id=$1",[campaign2]);
+ await db.query("update landing_campaign_meta_daily set spend='NaN'");assert.equal((await call()).revenue.spend,null);
+ await db.query("update landing_campaign_meta_daily set spend=100");
+ const otherCampaign=uuid(),otherCohort=uuid();
+ await db.query('insert into cohorts values($1,$2,$3)',[otherCohort,course,'Other']);
+ await db.query("insert into landing_campaigns values($1,$2,'2026-09-01','2026-09-30',true,'success',now())",[otherCampaign,uuid()]);
+ await db.query("insert into edu_webinar_campaigns values('other',$1)",[otherCohort]);
+ await db.query("insert into edu_recruitment_marketing_links values($1,'other')",[otherCampaign]);
+ await db.query("insert into landing_campaign_meta_daily values($1,'2026-09-15','meta-c','ad1',100,now())",[otherCampaign]);
+ assert.equal((await call()).revenue.spend,null);
+ await db.query("delete from landing_campaign_meta_daily where campaign_id=$1",[otherCampaign]);
+ assert.equal((await call()).revenue.spend,100);
+ await db.query("update payments set cancelled_amount=201 where id=$1",[a.p]);
+ const bad=await call();assert.equal(bad.revenue.state,'review');assert.equal(bad.revenue.net,null);
+ await db.query("update payments set cancelled_amount=200 where id=$1",[a.p]);
+ assert.deepEqual((await db.query('select * from payments order by id')).rows,before);
+ await assert.rejects(()=>call(admin,{device:'mobile'}));
+ await assert.rejects(()=>call(admin,{unknown:[]}));
+ await add(student,{items:2});assert.equal((await call()).revenue.state,'review');
+ await db.query('delete from edu_recruitment_marketing_links where campaign_id=$1',[campaign]);assert.equal((await call()).revenue.state,'unmapped');
+ // Explicitly confirmed old pages use a separate read-only mapping; recruitment remains intact.
+ await db.query("insert into edu_recruitment_marketing_links values($1,'qa')",[campaign]);
+ const oldPage=uuid(),oldCampaign=uuid();
+ await db.query("insert into landing_campaigns values($1,$2,'2026-09-01','2026-09-30',true,'success',now())",[oldCampaign,oldPage]);
+ await db.query('insert into edu_marketing_approved_cohort_links(campaign_id,cohort_id,confirmation_basis) values($1,$2,$3)',[oldCampaign,cohort,'Representative confirmed synthetic historical page']);
+ await db.query("insert into landing_campaign_meta_daily values($1,'2026-09-15','meta-c','old-ad',50,now())",[oldCampaign]);
+ // Prior bundle fixture deliberately remains review; ad spend must still include the old source.
+ assert.equal((await call()).revenue.spend,150);
+ const oldReport=(await db.query("select public.edu_marketing_insights($1,$2,'2026-09-01','2026-09-30','{}') v",[admin,oldCampaign])).rows[0].v;
+ assert.equal(oldReport.revenue.cohort_id,cohort);assert.equal(oldReport.revenue.spend,150);
+ assert.equal((await db.query('select count(*)::int n from edu_recruitment_marketing_links where campaign_id=$1',[oldCampaign])).rows[0].n,0);
+ await db.exec('set role service_role');assert.equal((await call()).revenue.spend,150);await assert.rejects(()=>db.query('insert into edu_marketing_approved_cohort_links(campaign_id,cohort_id,confirmation_basis) values($1,$2,$3)',[campaign,cohort,'Service must not edit configuration']),/permission denied/);await db.exec('reset role');
+ await db.query("insert into edu_recruitment_marketing_links values($1,'other')",[oldCampaign]);
+ await assert.rejects(()=>db.query("select public.edu_marketing_insights($1,$2,'2026-09-01','2026-09-30','{}')",[admin,oldCampaign]),/COHORT_CONFLICT/);
+ assert.equal((await call()).revenue.spend,null,'conflicting historical source cannot silently shrink cohort spend');
+ await db.exec('set role anon');await assert.rejects(()=>call(),/permission denied/);
+ await assert.rejects(()=>db.query('select * from edu_marketing_campaign_cohorts'),/permission denied/);
+});

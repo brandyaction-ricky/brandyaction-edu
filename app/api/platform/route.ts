@@ -1,3 +1,5 @@
+import { memberDirectoryScope } from '@/lib/member-directory';
+import { questionDeletionReady } from '@/lib/question-deletion-server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { reviewMutation, reviewWriteError } from '@/lib/submission-review';
 import { createClient } from '@/lib/supabase/server';
@@ -19,7 +21,7 @@ import { PUBLIC_CACHE_TAG, type PublicView } from '@/lib/public-platform-plan';
 import { revalidateTag } from 'next/cache';
 import { readMemberPlatformData, type MemberView } from '@/lib/member-platform-data';
 import { couponError } from '@/lib/coupon-rules';
-import { adminOrderQuery, ORDER_PAGE_SIZE, parseOrderListScope } from '@/lib/admin-order-list';
+import { adminOrderQuery, ORDER_PAGE_SIZE, parseOrderListScope, orderExclusionLabel } from '@/lib/admin-order-list';
 import { assertParticipationOpen } from '@/lib/alumni-access-server';
 import { isLessonVisibleToCohort } from '@/lib/cohort-curriculum-server';
 import { cohortLessonVisible, cohortWeekVisible } from '@/lib/cohort-curriculum-visibility';
@@ -134,43 +136,60 @@ export async function GET(request: Request) {
         // only when the operator opens the tab, scoped to the selected product.
         if (productEditorRead && ['curriculum', 'missions'].includes(params.get('part') || '')) {
             const part = params.get('part');
-            const cohortResult = await db.from('cohorts').select('id,course_id,name,cohort_code,status').eq('course_id', record!).order('created_at');
+            const [cohortResult, weekResult] = await Promise.all([
+                db.from('cohorts').select('id,course_id,name,cohort_code,status').eq('course_id', record!).order('created_at'),
+                db.from('curriculum_weeks').select('*').eq('course_id', record!).order('week_number'),
+            ]);
             if (cohortResult.error) return reply({ error: '상품 기수를 불러오지 못했습니다.' }, 500);
             const cohorts = (cohortResult.data || []) as Row[];
             const cohortIds = cohorts.map(cohort => String(cohort.id));
-            const weekResult = await db.from('curriculum_weeks').select('*').eq('course_id', record!).order('week_number');
             if (weekResult.error) return reply({ error: '상품 주차를 불러오지 못했습니다.' }, 500);
             const weeks = (weekResult.data || []) as Row[];
             const weekIds = weeks.map(week => String(week.id));
             if (!weekIds.length) return reply({ data: { cohorts, curriculum_weeks: [], curriculum_lessons: [], edu_cohort_week_visibility: [], edu_cohort_lesson_visibility: [], [part === 'missions' ? 'curriculum_missions' : 'lesson_contents']: [] } });
-            const weekVisibility = cohortIds.length ? await db.from('edu_cohort_week_visibility').select('cohort_id,week_id,is_published').in('cohort_id', cohortIds).in('week_id', weekIds).limit(5000) : { data: [], error: null };
+            const [weekVisibility, lessonResult] = await Promise.all([
+                cohortIds.length ? db.from('edu_cohort_week_visibility').select('cohort_id,week_id,is_published').in('cohort_id', cohortIds).in('week_id', weekIds).limit(5000) : Promise.resolve({ data: [], error: null }),
+                db.from('curriculum_lessons').select('*').in('week_id', weekIds).order('day_number'),
+            ]);
             if (weekVisibility.error) return reply({ error: '기수별 주차 공개 상태를 불러오지 못했습니다.' }, 500);
-            const lessonResult = await db.from('curriculum_lessons').select('*').in('week_id', weekIds).order('day_number');
             if (lessonResult.error) return reply({ error: '상품 일차를 불러오지 못했습니다.' }, 500);
             const lessons = (lessonResult.data || []) as Row[];
             const lessonIds = lessons.map(lesson => String(lesson.id));
             if (!lessonIds.length) return reply({ data: { cohorts, curriculum_weeks: weeks, curriculum_lessons: [], edu_cohort_week_visibility: weekVisibility.data || [], edu_cohort_lesson_visibility: [], [part === 'missions' ? 'curriculum_missions' : 'lesson_contents']: [] } });
-            const lessonVisibility = cohortIds.length ? await db.from('edu_cohort_lesson_visibility').select('cohort_id,lesson_id,is_published').in('cohort_id', cohortIds).in('lesson_id', lessonIds).limit(5000) : { data: [], error: null };
+            // These reads share the same authorized product scope but do not
+            // depend on each other's result. Keep only the ID discovery serial.
+            const [lessonVisibility, contentResult, heads] = await Promise.all([
+                cohortIds.length ? db.from('edu_cohort_lesson_visibility').select('cohort_id,lesson_id,is_published').in('cohort_id', cohortIds).in('lesson_id', lessonIds).limit(5000) : Promise.resolve({ data: [], error: null }),
+                part === 'missions'
+                    ? db.from('curriculum_missions').select('*').in('lesson_id', lessonIds).order('created_at')
+                    : db.from('lesson_contents').select('*').in('lesson_id', lessonIds),
+                part !== 'missions' && process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true'
+                    ? db.from('edu_lesson_block_heads').select('lesson_id').in('lesson_id', lessonIds)
+                    : Promise.resolve({ data: [], error: null }),
+            ]);
             if (lessonVisibility.error) return reply({ error: '기수별 학습 공개 상태를 불러오지 못했습니다.' }, 500);
             if (part === 'missions') {
-                const missionResult = await db.from('curriculum_missions').select('*').in('lesson_id', lessonIds).order('created_at');
-                if (missionResult.error) return reply({ error: '상품 미션을 불러오지 못했습니다.' }, 500);
-                return reply({ data: { cohorts, curriculum_weeks: weeks, curriculum_lessons: lessons, edu_cohort_week_visibility: weekVisibility.data || [], edu_cohort_lesson_visibility: lessonVisibility.data || [], curriculum_missions: missionResult.data || [] } });
+                if (contentResult.error) return reply({ error: '상품 미션을 불러오지 못했습니다.' }, 500);
+                return reply({ data: { cohorts, curriculum_weeks: weeks, curriculum_lessons: lessons, edu_cohort_week_visibility: weekVisibility.data || [], edu_cohort_lesson_visibility: lessonVisibility.data || [], curriculum_missions: contentResult.data || [] } });
             }
-            const contentResult = await db.from('lesson_contents').select('*').in('lesson_id', lessonIds);
             if (contentResult.error) return reply({ error: '학습 콘텐츠를 불러오지 못했습니다.' }, 500);
             if (process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true') {
                 // Only presence is needed here. Full authored bodies and quiz keys
                 // stay in the separate, permission-checked lesson editor endpoint.
-                const heads = await db.from('edu_lesson_block_heads').select('lesson_id').in('lesson_id', lessonIds);
                 if (heads.error) return reply({ error: '학습 구성 상태를 불러오지 못했습니다.' }, 500);
                 const blockIds = new Set((heads.data || []).map(row => String(row.lesson_id)));
                 for (const lesson of lessons) lesson.has_blocks = blockIds.has(String(lesson.id));
             }
             return reply({ data: { cohorts, curriculum_weeks: weeks, curriculum_lessons: lessons, edu_cohort_week_visibility: weekVisibility.data || [], edu_cohort_lesson_visibility: lessonVisibility.data || [], lesson_contents: contentResult.data || [] } });
         }
+        const directoryScope = adminMode && sectionKey === 'customers' ? memberDirectoryScope(params) : { query: '', status: '', course: '' };
+        if (adminMode && sectionKey === 'customers' && (directoryScope.query.length > 100 || !['', 'active', 'suspended'].includes(directoryScope.status) || (directoryScope.course && !uid(directoryScope.course)))) return reply({ error: '회원 검색 조건을 확인해 주세요.' }, 400);
         const settings = getEduSettings();
         let tables = productEditorRead ? ['courses', 'cohorts'] : adminMode ? adminTables[sectionKey] : ['courses', 'cohorts', 'curriculum_weeks', 'curriculum_lessons', 'articles', 'article_categories', 'review_videos', 'site_banners', 'reviews', 'cohort_sessions'];
+        // The curriculum picker consumes only courses. Its workspace already
+        // reads the chosen product and lesson through scoped author endpoints.
+        // Preserve the legacy direct lesson editor's record read.
+        if (adminMode && sectionKey === 'learning' && !record && params.get('part') === 'picker') tables = ['courses'];
         if (adminMode && sectionKey === 'home' && operator?.role === 'staff') tables = tables.filter((table) => (['courses', 'cohorts'].includes(table) && operator.permissions.products) || (['mission_submissions', 'edu_questions'].includes(table) && operator.permissions.members));
         const data: Record<string, Row[]> = {};
         let pagination: { page: number; pageSize: number; total: number } | null = null;
@@ -214,7 +233,7 @@ export async function GET(request: Request) {
                             processingRefunds: processing.count || 0,
                         }];
                         if (operator?.role === 'admin' || operator?.permissions.members) {
-                            data.admin_summary = [{ id: 'navigation-summary', pendingReviews: row.pendingReviews }];
+                            data.admin_summary = [{ id: 'navigation-summary', pendingReviews: row.pendingReviews, openQuestions: row.openQuestions }];
                         }
                         return;
                     }
@@ -233,12 +252,24 @@ export async function GET(request: Request) {
                     } : row];
                 } else if (operator?.role === 'admin' || operator?.permissions.members) {
                     // The sidebar needs only this badge, not full revenue/member aggregates.
-                    const pending = await db.from('mission_submissions').select('id', { count: 'exact', head: true }).eq('status', 'submitted');
+                    const [pending, questions] = await Promise.all([
+                        db.from('mission_submissions').select('id', { count: 'exact', head: true }).eq('status', 'submitted'),
+                        db.from('edu_questions').select('id', { count: 'exact', head: true }).eq('status', 'open').eq('is_archived', false),
+                    ]);
                     if (pending.error) throw pending.error;
-                    data.admin_summary = [{ id: 'navigation-summary', pendingReviews: pending.count || 0 }];
+                    if (questions.error) throw questions.error;
+                    data.admin_summary = [{ id: 'navigation-summary', pendingReviews: pending.count || 0, openQuestions: questions.count || 0 }];
                 }
             })(),
             ...tables.filter((table) => !deferredOrderTables.has(table)).map(async (table) => {
+                if (adminMode && sectionKey === 'customers' && table === 'profiles') {
+                    const scope = directoryScope;
+                    const result = await db.rpc('edu_admin_member_directory', { p_actor: user!.id, p_query: scope.query.trim(), p_status: scope.status, p_course: scope.course || null, p_member: memberScope || null, p_page: Math.floor(page), p_limit: pageSize });
+                    if (result.error) throw result.error;
+                    data.profiles = result.data.rows;
+                    pagination = { page: Math.floor(page), pageSize, total: result.data.total };
+                    return;
+                }
                 if (adminMode && sectionKey === 'orders' && table === 'orders') {
                     const scope = parseOrderListScope(params);
                     const [result, all, failed, refund, access] = await Promise.all([
@@ -247,8 +278,9 @@ export async function GET(request: Request) {
                     ]);
                     for (const item of [result, all, failed, refund, access]) if (item.error) throw item.error;
                     data.orders = ((result.data || []) as unknown as Row[]).map(row => {
-                        const clean = { ...row };
-                        for (const key of ['course_items', 'search_items', 'refund_payments', 'active_items']) delete clean[key];
+                        const member = Array.isArray(row.analytics_member) ? row.analytics_member[0] : row.analytics_member;
+                        const clean: Row = { ...row, analytics_exclusion: orderExclusionLabel(row, member as Row | null) };
+                        for (const key of ['course_items', 'search_items', 'refund_payments', 'active_items', 'analytics_member']) delete clean[key];
                         return clean;
                     });
                     data.order_filter_counts = [{ id: 'order-filter-counts', all: all.count || 0, failed: failed.count || 0, refund: refund.count || 0, access: access.count || 0 }];
@@ -279,6 +311,9 @@ export async function GET(request: Request) {
                         : '*';
                 const serverPaged = adminMode && !productEditorRead && table === primaryTable && !['home', 'members', 'reviews', 'analytics', 'metrics', 'seo', 'settings', 'staff', 'templates', 'campaigns', 'automations'].includes(sectionKey);
                 let query = db.from(table).select(columns, serverPaged ? { count: 'exact' } : undefined);
+                if (adminMode && table === 'edu_questions' && await questionDeletionReady(db)) query = query.is('deleted_at', null);
+                // Export credentials belong only to the server integration, including admin reads.
+                if (table === 'site_settings') query = query.neq('key', 'export_v1');
                 if (adminMode && table === 'coupons' && operator?.role !== 'admin') query = query.neq('discount_type', 'ADMIN_FREE');
                 if (adminMode && sectionKey === 'customers' && table === 'profiles' && memberScope) query = query.eq('id', memberScope);
                 if (adminMode && sectionKey === 'questions' && table === 'edu_questions') {
@@ -380,10 +415,11 @@ export async function GET(request: Request) {
             data.payments = [];
             data.enrollments = [];
             data.edu_refund_requests = [];
+            data.refunds = [];
             if (orderIds.length) {
                 const [items, payments] = await Promise.all([
                     db.from('order_items').select(adminSelectColumns(sectionKey, 'order_items')).in('order_id', orderIds),
-                    db.from('payments').select('id,order_id,method,status,approved_amount,cancelled_amount,receipt_url,approved_at,created_at').in('order_id', orderIds),
+                    db.from('payments').select('id,order_id,method,status,approved_amount,cancelled_amount,receipt_url,approved_at,created_at,card_approval_number:provider_payload->card->>approveNo').in('order_id', orderIds),
                 ]);
                 if (items.error) throw items.error;
                 if (payments.error) throw payments.error;
@@ -391,14 +427,17 @@ export async function GET(request: Request) {
                 data.payments = (payments.data || []) as Row[];
                 const itemIds = data.order_items.map((row) => row.id).filter(Boolean);
                 const paymentIds = data.payments.map((row) => row.id).filter(Boolean);
-                const [enrollments, refunds] = await Promise.all([
+                const [enrollments, refunds, completedRefunds] = await Promise.all([
                     itemIds.length ? db.from('enrollments').select(adminSelectColumns(sectionKey, 'enrollments')).in('order_item_id', itemIds) : Promise.resolve({ data: [], error: null }),
                     paymentIds.length ? db.from('edu_refund_requests').select('id,payment_id,amount,reason,status,created_at').in('payment_id', paymentIds) : Promise.resolve({ data: [], error: null }),
+                    paymentIds.length ? db.from('refunds').select('id,payment_id,amount,reason,status,requested_at,completed_at').in('payment_id', paymentIds) : Promise.resolve({ data: [], error: null }),
                 ]);
                 if (enrollments.error) throw enrollments.error;
                 if (refunds.error) throw refunds.error;
+                if (completedRefunds.error) throw completedRefunds.error;
                 data.enrollments = (enrollments.data || []) as unknown as Row[];
                 data.edu_refund_requests = (refunds.data || []) as Row[];
+                data.refunds = (completedRefunds.data || []) as Row[];
             }
         }
         if (user && !adminMode) {
@@ -424,9 +463,9 @@ export async function GET(request: Request) {
             const cohortIds = (data.enrollments || []).filter((e) => hasLearningAccess(e)).map((e) => e.cohort_id);
             const sessionIds = (data.cohort_sessions || []).filter((s) => cohortIds.includes(s.cohort_id)).map((s) => s.id);
             if (sessionIds.length) {
-                const r = await db.from('cohort_session_contents').select('session_id,live_url,replay_url').in('session_id', sessionIds);
+                const r = await db.from('cohort_session_contents').select('session_id,live_url,replay_url,resource_storage_path').in('session_id', sessionIds);
                 if (r.error) throw r.error;
-                data.cohort_session_contents = r.data as unknown as Row[];
+                data.cohort_session_contents = (r.data || []).map(({ resource_storage_path, ...row }) => ({ ...row, resource_available: Boolean(resource_storage_path) })) as unknown as Row[];
             }
             const ids = (data.enrollments || []).filter((e) => hasLearningAccess(e)).map((e) => e.id);
             if (ids.length) {
@@ -501,8 +540,11 @@ export async function GET(request: Request) {
                     const url = safeUrl(video.url);
                     return { title: String(video.title || '').slice(0, 120), available: Boolean(url), url: user ? url : '' };
                 }) : [];
-                data.article_banner = [{ id: 'edu_article_banner', key: 'edu_article_banner', value: { enabled: value?.enabled !== false, eyebrow: String(value?.eyebrow || '').slice(0, 80), title: String(value?.title || '').slice(0, 120), description: String(value?.description || '').slice(0, 240), signupNotice: String(value?.signupNotice || '').slice(0, 220), signupCTA: String(value?.signupCTA || '').slice(0, 45), memberCTA: String(value?.memberCTA || '').slice(0, 45), videos } }];
+                data.article_banner = [{ id: 'edu_article_banner', key: 'edu_article_banner', value: { enabled: value?.enabled !== false, articlesEnabled: value?.articlesEnabled !== false, eyebrow: String(value?.eyebrow || '').slice(0, 80), title: String(value?.title || '').slice(0, 120), description: String(value?.description || '').slice(0, 240), signupNotice: String(value?.signupNotice || '').slice(0, 220), signupCTA: String(value?.signupCTA || '').slice(0, 45), memberCTA: String(value?.memberCTA || '').slice(0, 45), videos } }];
             }
+        }
+        if (!adminMode && (data.article_banner?.[0]?.value as Record<string, unknown> | undefined)?.articlesEnabled === false) {
+            data.articles = []; data.article_categories = [];
         }
         if (adminMode) {
             if (['templates', 'campaigns', 'automations'].includes(sectionKey)) {
@@ -614,12 +656,13 @@ export async function POST(request: Request) {
             if (user.role !== 'admin') return reply({ error: '관리자만 회원을 삭제할 수 있습니다.' }, 403);
             if (!uid(body.id)) fail('삭제할 회원을 확인해 주세요.');
             if (body.id === user.id) fail('현재 로그인한 관리자 계정은 삭제할 수 없습니다.');
-            const result = await db.rpc('edu_delete_member', { p_actor: user.id, p_member: body.id });
+            const environment = process.env.NEXT_PUBLIC_APP_ENV === 'production' ? 'production' : 'dev';
+            const result = await db.rpc('edu_request_member_erasure', { p_actor: user.id, p_member: body.id, p_environment: environment });
             if (result.error) {
                 if (result.error.code !== 'P0001') console.error('member delete', result.error.code);
-                fail(result.error.message || '회원을 삭제하지 못했습니다.', 409);
+                fail('탈퇴 요청을 접수하지 못했습니다. 관리자 권한과 회원 상태를 확인해 주세요.', 409);
             }
-            return reply({ ok: true, result: result.data });
+            return reply({ ok: true, result: result.data, message: '탈퇴 요청을 접수했습니다. 진단 삭제 기록에서 처리 상태를 확인해 주세요.' });
         }
         if (action === 'save-product-resource' || action === 'delete-product-resource') {
             const permissions = await permissionsFor(user);
@@ -685,7 +728,7 @@ export async function POST(request: Request) {
                 return { title: String(video.title || '').trim().slice(0, 120), url };
             }) : [];
             if (!title || title.length > 120) fail('배너 제목을 확인해 주세요.');
-            const result = await db.from('site_settings').upsert({ key: 'edu_article_banner', value: { enabled: value?.enabled !== false, eyebrow: String(value?.eyebrow || '').trim().slice(0, 80), title, description: String(value?.description || '').trim().slice(0, 240), signupNotice: String(value?.signupNotice || '').trim().slice(0, 220), signupCTA: String(value?.signupCTA || '').trim().slice(0, 45), memberCTA: String(value?.memberCTA || '').trim().slice(0, 45), videos }, is_public: false }, { onConflict: 'key' });
+            const result = await db.from('site_settings').upsert({ key: 'edu_article_banner', value: { enabled: value?.enabled !== false, articlesEnabled: value?.articlesEnabled !== false, eyebrow: String(value?.eyebrow || '').trim().slice(0, 80), title, description: String(value?.description || '').trim().slice(0, 240), signupNotice: String(value?.signupNotice || '').trim().slice(0, 220), signupCTA: String(value?.signupCTA || '').trim().slice(0, 45), memberCTA: String(value?.memberCTA || '').trim().slice(0, 45), videos }, is_public: false }, { onConflict: 'key' });
             if (result.error) throw result.error;
             return publicWriteSuccess({ ok: true });
         }
@@ -895,7 +938,13 @@ export async function POST(request: Request) {
             if (section.table === 'courses') {
                 const previous = body.id ? await db.from('courses').select('metadata').eq('id', body.id).single() : { data: null, error: null };
                 if (previous.error) fail('기존 상품 정보를 불러오지 못했습니다. 새로고침 후 다시 저장해 주세요.', 409);
-                try { values.metadata = mergeProductMetadata(previous.data?.metadata, values); }
+                try {
+                    if (values.detail_html_file || previous.data?.metadata?.detail_html_file) {
+                      const { prepareStoredProductMetadata } = await import('@/lib/product-html-storage');
+                      await prepareStoredProductMetadata(db, user.id, (previous.data?.metadata || {}) as Record<string, unknown>, values);
+                    }
+                    values.metadata = mergeProductMetadata(previous.data?.metadata, values);
+                }
                 catch (error) { fail((error as Error).message); }
                 for (const field of productMetadataFields) delete values[field];
             }
@@ -948,6 +997,7 @@ export async function POST(request: Request) {
                 values.status = 'answered';
             }
             if (section.table === 'site_settings') {
+                if (values.key === 'export_v1' || body.id === 'export_v1') fail('서버 연동 설정은 이 화면에서 변경할 수 없습니다.', 403);
                 if (values.key === 'edu_app_branding' || body.id === 'edu_app_branding') fail('앱 아이콘 설정에서 변경해 주세요.', 403);
                 if (values.key === 'edu_learning_notice' || body.id === 'edu_learning_notice') fail('전체 학습 공지 설정에서 변경해 주세요.', 403);
                 if (!String(values.key || body.id).startsWith('edu_')) fail('설정 이름은 edu_로 시작해 주세요.');
@@ -1073,6 +1123,7 @@ export async function POST(request: Request) {
             const offer = await db.from('cohorts').select('*,courses!inner(*)').eq('id', body.cohortId).single();
             if (offer.error || !offer.data) fail('상품 모집 정보를 확인해 주세요.', 409);
             const offeredCourse = offer.data.courses as Row;
+            if (offer.data.archived_at || offeredCourse.archived_at) fail('판매가 종료된 상품입니다. 다른 클래스를 확인해 주세요.', 409);
             if (offeredCourse.category === 'paid_class') {
                 const metadata = (offeredCourse.metadata && typeof offeredCourse.metadata === 'object' ? offeredCourse.metadata : {}) as Record<string, unknown>;
                 const source = String(metadata.detail_html_document || metadata.detail_html || '');
@@ -1088,7 +1139,7 @@ export async function POST(request: Request) {
             }
             if (!phone || !String(body.name || '').trim()) fail('신청자 이름과 연락처를 확인해 주세요.');
             if (body.couponId) fail('쿠폰 코드를 입력해 주세요.');
-            const r = await db.rpc('edu_checkout_with_coupon', {
+            const r = await db.rpc('edu_checkout_with_source', {
                 p_user_id: user.id,
                 p_cohort_id: body.cohortId,
                 p_customer_name: String(body.name).trim(),
@@ -1098,6 +1149,7 @@ export async function POST(request: Request) {
                 p_privacy_version: POLICY_VERSION,
                 p_refund_policy_version: POLICY_VERSION,
                 p_code: String(body.coupon || '').trim().toUpperCase(),
+                p_entry_src: typeof body.entrySource === 'string' && ['paid','organic','alumni','youtube'].includes(body.entrySource) ? body.entrySource : null,
             });
             if (r.error) {
                 const msg = r.error.message;
@@ -1105,17 +1157,6 @@ export async function POST(request: Request) {
                 fail(msg.includes('ALREADY_ENROLLED') ? '이미 신청한 클래스입니다.' : msg.includes('RECRUIT') ? '현재 모집 중인 클래스가 아닙니다.' : msg.includes('CAPACITY') ? '모집 정원이 마감되었습니다.' : '주문을 만들지 못했습니다. 상품 모집 설정을 확인해 주세요.', 409);
             }
             const result = r.data as Record<string, unknown>;
-            const entrySource = typeof body.entrySource === 'string' && ['paid', 'organic', 'alumni', 'youtube'].includes(body.entrySource)
-                ? body.entrySource : null;
-            const attribution = await db.from('orders').update({ entry_src: entrySource })
-                .eq('id', result.orderId).eq('user_id', user.id)
-                .select('id').single();
-            if (attribution.error || !attribution.data) {
-                // The checkout RPC may already have finalized a zero-total order.
-                // Do not report payment failure after an entitlement was granted.
-                console.error('Order entry source update failed', attribution.error);
-                result.entrySourceRecorded = false;
-            }
             if (result.free === true && Number(result.totalAmount) === 0) return reply(result);
             if (!process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY) fail('결제 서비스 연결을 확인하고 있습니다.', 503);
             return reply(result);
@@ -1157,6 +1198,7 @@ export async function POST(request: Request) {
                     },
                     { onConflict: 'enrollment_id,lesson_id' },
                 );
+                if (r.error?.message === 'BLOCK_LESSON_LOCKED') fail('앞 학습에서 학습 완료하기를 눌러 주세요.', 409);
                 if (r.error?.message === 'BLOCK_COMPLETION_REQUIRED') fail('현재 학습 화면에서 필수 항목을 확인하고 제출해 주세요.', 409);
                 if (r.error) throw r.error;
                 return reply({ ok: true });

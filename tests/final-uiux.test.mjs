@@ -67,6 +67,15 @@ test('lesson text activates named and bare links while preserving existing copy'
   assert.match(html(LessonText, { text: '(https://example.test/download).' }), /<\/a>\)\./);
 });
 
+test('question answers activate safe links without executing HTML', () => {
+  const { AnswerText } = load('app/ui/final/lesson-text.tsx');
+  const markup = html(AnswerText, { text: '문의: http://example.test/help. <script>alert(1)</script> [다음 단계](https://example.test/next)' });
+  assert.match(markup, /<a href="http:\/\/example\.test\/help" target="_blank" rel="noopener noreferrer">http:\/\/example\.test\/help<\/a>\./);
+  assert.match(markup, /href="https:\/\/example\.test\/next"/);
+  assert.doesNotMatch(markup, /<script>/);
+  assert.doesNotMatch(html(AnswerText, { text: '[위험](javascript:alert(1))' }), /<a /);
+});
+
 test('lesson text never turns unsafe destinations or HTML into executable markup', () => {
   const { LessonText } = load('app/ui/final/lesson-text.tsx');
   for (const destination of ['javascript:alert(1)', 'data:text/html,<script>alert(1)</script>', '//example.test', '/\\example.test', 'https://', 'https://example.test/\u0001']) {
@@ -112,7 +121,7 @@ test('final design styles are isolated, reproducible and exclude prototype runti
       if (rule.parent.type === 'atrule' && /keyframes$/.test(rule.parent.name)) return;
       rule.selectors = rule.selectors.map(selector => [':root', 'body', 'html'].includes(selector) ? scope : /^(?:body|html)(?=[.\s:#[])/.test(selector) ? selector.replace(/^(body|html)/, scope) : `${scope} ${selector}`);
     });
-    assert.equal(read(`app/ui/final/${area}.css`), `/* Generated from final UIUX source; run node scripts/build-uiux-css.mjs. */\n${rules.toString()}\n`);
+    assert.equal(read(`app/ui/final/${area}.css`), `/* Generated from final UIUX source; run node scripts/build-uiux-css.mjs. */\n${rules.toString().trimEnd()}\n`);
   }
   const layout = read('app/layout.tsx');
   assert.ok(layout.includes('./ui/final/frontend.css') && layout.includes('./ui/final/admin.css') && layout.includes('@/features/admin-ui/styles/admin-system.css'));
@@ -137,15 +146,21 @@ test('five admin categories and scoped navigation render from the admin UI featu
   const { AdminShell, adminNavigationIcon, finalAdminGroups } = load('features/admin-ui.ts');
   const { Overview } = load('app/ui/final/admin-shell.tsx');
   assert.equal(finalAdminGroups.length, 5);
-  const props = { current: 'overview', available: platform.sections, user: { ...user, role: 'admin' }, pendingReviews: 1, mobile: false, setMobile() {}, logout: async () => {} };
+  assert.equal(finalAdminGroups[0][1].length, 9);
+  const props = { current: 'overview', available: platform.sections, user: { ...user, role: 'admin' }, pendingReviews: 1, openQuestions: 2, mobile: false, setMobile() {}, logout: async () => {} };
   const markup = html(AdminShell, { ...props, children: React.createElement(Overview, { data, available: platform.sections }) });
   const navigationMarkup = markup.match(/<nav aria-label="관리자 카테고리">[\s\S]*?<\/nav>/)?.[0] || '';
   assert.match(navigationMarkup, /상품·판매 설정/);
   assert.match(navigationMarkup, /커리큘럼 편집/);
+  assert.match(navigationMarkup, /수강생 현황/);
   assert.doesNotMatch(navigationMarkup, /href="\/admin\/weeks"/);
   assert.match(navigationMarkup, /href="\/admin\/learning"/);
+  assert.match(navigationMarkup, /href="\/admin\/questions"[\s\S]*?미답변 2건[\s\S]*?>2<\/span>/);
+  assert.match(markup, /href="\/admin\/questions"[^>]*>[\s\S]*?질문함<\/a>/);
   for (const [label] of finalAdminGroups) assert.ok(markup.includes(label));
-  assert.match(markup, /class="nav-group"/); assert.match(markup, /lucide/); assert.match(markup, /category-strip/);
+  assert.match(markup, /class="nav-group"/); assert.match(markup, /lucide/);
+  assert.match(markup, /aria-label="운영 메뉴 바로가기"/);
+  assert.ok(markup.indexOf('지금 처리할 일') < markup.indexOf('aria-label="운영 메뉴 바로가기"'));
   const expectedIcons = {
     products: 'package', cohorts: 'calendar-days',
     contents: 'film', missions: 'clipboard-check', members: 'user-round-check', reviews: 'file-check-corner',
@@ -177,9 +192,16 @@ test('home customer stories carousel and accessible profile dropdown are present
 });
 test('three signup methods and product detail variants use the final publishing structures', () => {
   const { AuthView, ProductDetail, ArticlesView, StoriesView } = load('app/ui/final/public-views.tsx');
+  const authCss = read('app/ui/google-id-signin.css');
+  const frontendCss = read('app/ui/final/frontend.css');
+  assert.match(frontendCss, /\.form-card\.auth-card>\.auth-social-stack,[^}]*\.form-card\.auth-card>\.email-auth\{width:100%;max-width:400px;margin-inline:auto\}/);
+  assert.match(frontendCss, /\.form-card\.auth-card>\.email-auth\{margin-bottom:16px\}/);
+  assert.match(frontendCss, /\.auth-social-stack>\.btn,[^}]*\.auth-social-stack>\.google-id-signin,[^}]*\.email-auth>\.btn\{width:100%;max-width:400px;box-sizing:border-box\}/);
+  assert.match(frontendCss, /\.auth-card>h1,[^}]*\.auth-card>\.lead\{text-align:center\}/);
+  assert.match(authCss, /\.google-id-button\{display:flex;justify-content:center;overflow:hidden\}/);
   for (const signup of [false, true]) {
     const markup = html(AuthView, { signup, pending: false, social: send, next: '/my' });
-    assert.match(markup, /form-card/); assert.match(markup, /카카오로 계속하기/); assert.match(markup, /Google로 계속하기/); assert.doesNotMatch(markup, /type="password"/);
+    assert.match(markup, /form-card auth-card/); assert.match(markup, /카카오로 계속하기/); assert.match(markup, /Google로 계속하기/); assert.doesNotMatch(markup, /type="password"/);
     assert.match(markup, new RegExp(signup ? '이메일로 회원가입' : '이메일로 로그인'));
   }
   assert.match(html(ProductDetail, { course, data }), /product-layout/);
@@ -225,7 +247,7 @@ test('article hub includes the managed free-video banner and representative thum
   const footerStyles = read('app/ui/final/site-footer.css');
   assert.match(footerSource, /제2026-충남천안-1825호/);
   assert.match(footerSource, /policies\/refund/);
-  assert.match(footerStyles, /@media \(max-width: 600px\)[\s\S]*?\.edu-front \.site-footer \{ display: none; \}/);
+  assert.match(footerSource, /policies\/privacy#advertising/);
   assert.match(footerStyles, /\.edu-front \.learning-footer-links/);
 });
 
@@ -253,7 +275,7 @@ test('product HTML takes precedence over old images and per-product CTA settings
   const form = new FormData(); form.set('title', '이름만 변경');
   assert.deepEqual(formValues(platform.sections.find(row => row.key === 'products'), form), { title: '이름만 변경' });
   const editorMarkup = html(load('app/ui/final/admin-editors.tsx').ProductEditor, { data, row: changed, pending: false, send: async () => {}, back: () => {} });
-  assert.match(editorMarkup, /CTA 왼쪽 문구/);
+  assert.match(editorMarkup, /버튼 옆 안내 문구/);
   assert.match(editorMarkup, /name="cta_price_label"/);
 });
 test('article management renders the connected three-video banner editor', () => {
@@ -262,7 +284,7 @@ test('article management renders the connected three-video banner editor', () =>
   assert.match(markup, /회원 무료강의 상단 영역/);
   assert.match(markup, /무료강의 3강 설정/);
   assert.equal((markup.match(/YouTube URL/g) || []).length, 3);
-  assert.match(read('app/ui/platform.tsx'), /아티클 콘텐츠[\s\S]*무료강의 상단 설정/);
+  assert.match(read('app/ui/platform.tsx'), /아티클 콘텐츠[\s\S]*노출·무료강의 설정/);
   assert.match(read('app/api/platform/route.ts'), /if \(!bannerResult\.error\)[\s\S]*사업자를 위한 마케팅·AI 매출 진단/);
   assert.ok(platform.sections.find(row => row.key === 'articles').fields.some(field => field.key === 'cover_image_path'));
 });
@@ -320,7 +342,9 @@ test('classroom, mission, checkout and completion preserve authorized workflow e
   assert.match(checkout, /checkout-layout/);
   assert.match(checkout, /<button[^>]*disabled=""[^>]*aria-describedby="checkout-agreement-help"[^>]*>[^<]*결제하기/s);
   assert.match(checkout, /value="CARD"/);
-  assert.match(checkout, /<input[^>]*disabled=""[^>]*value="VIRTUAL_ACCOUNT"/);
+  assert.doesNotMatch(checkout, /VIRTUAL_ACCOUNT|가상계좌/);
+  assert.match(checkout, /<input[^>]*checked=""[^>]*value="CARD"/);
+  assert.match(checkout, /카드·간편결제/);
   assert.match(checkout, /계산서 발급과 수강 절차를 안내/);
   assert.match(read('app/api/platform/route.ts'), /paidCourseReadinessIssues[\s\S]*판매 준비가 완료되지 않았습니다/);
   search = new URLSearchParams('order=order');
@@ -401,8 +425,8 @@ test('catalogues and separate editors render without dropping existing fields', 
   assert.match(markup, /HTML 상세페이지/);
   assert.match(markup, /name="detail_html_document"/);
   assert.match(markup, /상품 삭제/);
-  assert.match(markup, /Call to Action/);
-  assert.match(markup, /Tracking integration/);
+  assert.match(markup, /신청 버튼/);
+  assert.match(markup, /광고 성과 측정/);
   assert.match(markup, /name="cta_color"/);
   assert.match(markup, /name="meta_pixel_id"/);
   assert.match(markup, /name="recruitment_start_at"/);
@@ -646,4 +670,17 @@ test('positioning lesson images preserves rich list nodes, stable question IDs a
   assert.equal(positionLessonImage(blocks, blocks[1], { blockId: 'image' }, 'after'), blocks);
   assert.deepEqual(positionLessonImage(blocks, blocks[1], { blockId: 'body', textBoundary: 0 }, 'after').map(block => block.id), ['image', 'body', 'question']);
   assert.deepEqual(positionLessonImage(blocks, blocks[1], { blockId: 'body', textBoundary: 3 }, 'after').map(block => block.id), ['body', 'image', 'question']);
+});
+
+test('colored lesson links honor the selected color for both explicit and automatic links', () => {
+  const { LessonText } = load('app/ui/final/lesson-text.tsx');
+  const { serializeLessonDocument } = load('lib/lesson-body.ts');
+  const style = {type:'textStyle',attrs:{color:'#c51e2c',backgroundColor:'#fef08a'}};
+  const text = serializeLessonDocument({type:'doc',content:[{type:'paragraph',content:[
+    {type:'text',text:'참고 자료',marks:[{type:'link',attrs:{href:'https://example.test'}},style]},
+    {type:'text',text:' https://example.test/guide',marks:[style]},
+  ]}]});
+  const markup = html(LessonText,{text});
+  assert.equal((markup.match(/<a [^>]*style="color:#c51e2c"/g)||[]).length,2);
+  assert.match(markup,/background-color:#fef08a/);
 });

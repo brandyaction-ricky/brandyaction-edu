@@ -1,6 +1,6 @@
 'use client';
+import { MobileRefresh } from '@/app/ui/final/mobile-refresh';
 
-import { UnreadMessageLink } from '@/app/ui/final/unread-message-link';
 import { LearningNoticeBar } from '@/app/ui/final/learning-notice';
 import {
   ArrowRight,
@@ -8,6 +8,7 @@ import {
   LogOut,
   Menu,
   MessageCircle,
+  Search,
   X,
 } from 'lucide-react';
 import Image from 'next/image';
@@ -18,6 +19,7 @@ import {
   adminNavigationIcon,
   adminNavigationGroups,
   adminNavigationTitles,
+  adminNavigationSearchTerms,
   adminSectionTitle,
   normalizeAdminSectionKey,
   type AdminNavigationItem,
@@ -35,6 +37,7 @@ export function AdminShell({
   available,
   user,
   pendingReviews = 0,
+  openQuestions = 0,
   mobile,
   setMobile,
   logout,
@@ -45,6 +48,7 @@ export function AdminShell({
   available: AdminNavigationItem[];
   user: AdminShellUser;
   pendingReviews?: number;
+  openQuestions?: number;
   mobile: boolean;
   setMobile: (value: boolean) => void;
   logout: () => Promise<void>;
@@ -58,6 +62,11 @@ export function AdminShell({
   const contentWidth = adminContentWidth(selected);
   const sidebarRef = useRef<HTMLElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const menuSearchRef = useRef<HTMLInputElement>(null);
+  const [menuQuery, setMenuQuery] = useState('');
+  const query = menuQuery.trim().replace(/\s+/g, '').toLocaleLowerCase();
+  const matchesMenu = (key: string, fallback?: string) => !query || `${adminNavigationTitles[key] || byKey.get(key)?.title || fallback || key} ${adminNavigationSearchTerms[key] || ''}`.replace(/\s+/g, '').toLocaleLowerCase().includes(query);
+  const matchingGroups = groups.map(([title, keys]) => [title, keys.filter(key => matchesMenu(key))] as const).filter(([, keys]) => keys.length > 0);
   const [openGroups, setOpenGroups] = useState(() => new Set(
     groups.filter(([, keys]) => selected === 'overview' || keys.some(key => key === selected)).map(([title]) => title),
   ));
@@ -91,7 +100,7 @@ export function AdminShell({
     if (!sidebar) return;
     const restoreFocus = document.activeElement as HTMLElement | null;
     const previousOverflow = document.body.style.overflow;
-    const focusable = () => Array.from(sidebar.querySelectorAll<HTMLElement>('a[href],button,summary,[tabindex]:not([tabindex="-1"])')).filter(element => !element.hasAttribute('disabled') && element.getClientRects().length > 0);
+    const focusable = () => Array.from(sidebar.querySelectorAll<HTMLElement>('a[href],button,input,summary,[tabindex]:not([tabindex="-1"])')).filter(element => !element.hasAttribute('disabled') && element.getClientRects().length > 0);
     document.body.style.overflow = 'hidden';
     focusable()[0]?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
@@ -135,15 +144,17 @@ export function AdminShell({
         <Icon aria-hidden="true" />
         {item ? adminNavigationTitles[key] || item.title : '운영 홈'}
         {key === 'reviews' && pendingReviews > 0 && <span className="nav-count">{pendingReviews}</span>}
+        {key === 'questions' && openQuestions > 0 && <span className="nav-count" aria-label={`미답변 ${openQuestions}건`}>{openQuestions}</span>}
       </Link>
     );
   };
-  const extra = ['staff'].filter(key => byKey.has(key));
+  const extra = ['staff'].filter(key => byKey.has(key) && matchesMenu(key));
+  const matchingDirect = (matchesMenu('overview', '운영 홈') ? 1 : 0) + (user.role === 'admin' ? Number(matchesMenu('diagnosis-management')) + Number(matchesMenu('diagnosis', 'N6 진단 받기')) : 0);
   return (
     <>
       <a className="skip" href="#admin-content">본문으로 이동</a>
       {mobile && <button type="button" className="admin-sidebar-backdrop" aria-label="관리자 메뉴 닫기" onClick={() => setMobile(false)}/>}
-      <aside ref={sidebarRef} className={`sidebar ${mobile ? 'open' : ''}`} id="admin-sidebar" role={mobile ? 'dialog' : undefined} aria-modal={mobile ? 'true' : undefined} aria-label={mobile ? '관리자 메뉴' : undefined}>
+      <aside ref={sidebarRef} className={`sidebar adm-sidebar ${mobile ? 'open' : ''}`} id="admin-sidebar" role={mobile ? 'dialog' : undefined} aria-modal={mobile ? 'true' : undefined} aria-label={mobile ? '관리자 메뉴' : undefined}>
         <button
           type="button"
           className="btn ghost sidebar-close"
@@ -157,18 +168,23 @@ export function AdminShell({
           <Image className="brand-logo" src="/brandy-action-logo.png" alt="BrandyAction" width={164} height={32} priority />
           <span><small>EDU / ADMIN</small></span>
         </Link>
-        <div className="workspace-label">
-          <span className="square">B</span>클래스 운영 워크스페이스
+        <div className="admin-menu-search">
+          <Search aria-hidden="true" />
+          <input ref={menuSearchRef} type="search" aria-label="관리자 메뉴 찾기" placeholder="메뉴 찾기" value={menuQuery} onChange={event => setMenuQuery(event.target.value)} />
+          {menuQuery && <button type="button" aria-label="메뉴 검색 지우기" onClick={() => { setMenuQuery(''); menuSearchRef.current?.focus(); }}><X aria-hidden="true" /></button>}
         </div>
         <nav aria-label="관리자 카테고리">
-          {navLink('overview')}
-          {user.role === 'admin' && <Link href="/admin/diagnosis" className="nav-link" onClick={() => setMobile(false)}><Compass aria-hidden="true"/>N6 진단 검수</Link>}
-          {groups.map(([title, keys]) => (
+          {matchesMenu('overview', '운영 홈') && navLink('overview')}
+          {user.role === 'admin' && matchesMenu('diagnosis-management') && <Link href="/admin/diagnosis/manage" className={`nav-link${selected === 'diagnosis-management' ? ' active' : ''}`} aria-current={selected === 'diagnosis-management' ? 'page' : undefined} onClick={() => setMobile(false)}><Compass aria-hidden="true"/>N6 진단 관리</Link>}
+          {user.role === 'admin' && matchesMenu('diagnosis', 'N6 진단 받기') && <Link href="/admin/diagnosis" className="nav-link" onClick={() => setMobile(false)}><Compass aria-hidden="true"/>N6 진단 받기</Link>}
+          {query && <p className="admin-menu-search-result" role="status">{matchingGroups.reduce((count, [, keys]) => count + keys.length, extra.length + matchingDirect)}개 메뉴 · 검색어를 지우면 전체 메뉴가 보입니다.</p>}
+          {matchingGroups.map(([title, keys]) => (
             <details
               className="nav-group"
               key={title}
-              open={openGroups.has(title)}
+              open={!!query || openGroups.has(title)}
               onToggle={event => {
+                if (query) return;
                 const isOpen = event.currentTarget.open;
                 setOpenGroups(current => {
                   if (current.has(title) === isOpen) return current;
@@ -183,7 +199,8 @@ export function AdminShell({
             </details>
           ))}
           {extra.length > 0 && (
-            <details className="nav-group" open={openGroups.has('추가 운영 도구')} onToggle={event => {
+            <details className="nav-group" open={!!query || openGroups.has('추가 운영 도구')} onToggle={event => {
+              if (query) return;
               const isOpen = event.currentTarget.open;
               setOpenGroups(current => {
                 if (current.has('추가 운영 도구') === isOpen) return current;
@@ -203,16 +220,16 @@ export function AdminShell({
             <ArrowRight aria-hidden="true" />
           </Link>
         </div>
-        <div className="profile">
+        <Link className="profile admin-profile-link" href="/my/profile" aria-label="내 회원 정보" onClick={() => setMobile(false)}>
           <span className="avatar">{(user.full_name || '운영').slice(0, 1)}</span>
           <div>
             <b>{user.full_name || '운영자'}</b>
             <div className="meta">{user.role === 'admin' ? '관리자' : '스태프'}</div>
           </div>
-        </div>
+        </Link>
       </aside>
-      <div className="app" inert={mobile ? true : undefined}>
-        <header className="topbar">
+      <div className="app adm-main" inert={mobile ? true : undefined}>
+        <header className="topbar adm-topbar">
           <div className="crumb">
             <button
               ref={menuButtonRef}
@@ -229,20 +246,21 @@ export function AdminShell({
             <span>{adminSectionTitle(current, available)}</span>
           </div>
           <div className="topright">
-            {process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === "true" && <>{user.id ? <UnreadMessageLink key={user.id} userId={user.id} className="btn ghost small"/> : <Link className="btn ghost small" href="/my/messages">메시지</Link>}</>}
+            <MobileRefresh />
             {byKey.has('questions') && (
-              <Link className="btn iconbtn ghost" href="/admin/questions" aria-label="질문함">
+              <Link className="btn ghost small" href="/admin/questions">
                 <MessageCircle aria-hidden="true" />
+                질문함
               </Link>
             )}
             <button className="btn iconbtn ghost" onClick={() => void logout()} aria-label="로그아웃">
               <LogOut aria-hidden="true" />
             </button>
-            <span className="avatar">{(user.full_name || '운영').slice(0, 1)}</span>
+            <Link className="avatar admin-profile-link" href="/my/profile" aria-label="내 회원 정보" title="내 회원 정보">{(user.full_name || '운영').slice(0, 1)}</Link>
           </div>
         </header>
         {process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' && <LearningNoticeBar/>}
-        <div className={`content admin-content-${contentWidth}`} id="admin-content" tabIndex={-1}>
+        <div className={`content adm-page admin-content-${contentWidth}`} id="admin-content" tabIndex={-1}>
           {children}
         </div>
       </div>

@@ -9,7 +9,7 @@ function load(path, dependencies = {}) {
   const source = fs.readFileSync(new URL('../' + path, import.meta.url), 'utf8');
   const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const exports = {};
-  new Function('exports', 'require', compiled)(exports, name => { if (name === '@/lib/cohort-curriculum-server') return { isLessonVisibleToCohort: async () => true }; if (name === '@/lib/cohort-curriculum-visibility') return { cohortLessonVisible: () => true, cohortWeekVisible: () => true }; if (name === '@/lib/alumni-access-server') return { assertParticipationOpen: async () => {} }; if (name === '@/lib/admin-order-list') return load('lib/admin-order-list.ts'); if (name === '@/lib/crm-purchase-contact') return load('lib/crm-purchase-contact.ts'); if (name === '@/lib/coupon-rules') return load('lib/coupon-rules.ts'); if (name === '@/lib/product-visibility') return productVisibility; if (name === '@/lib/submission-review') return submissionReview; if (name === '@/lib/public-platform-data') return { getPublicPlatformData: async () => ({ data: {}, pagination: null }), getPublicSupport: async () => ({}) }; if (name === '@/lib/public-platform-plan') return { PUBLIC_CACHE_TAG: 'test' }; if (name === '@/lib/member-platform-data') return { readMemberPlatformData: async () => ({}) }; if (name === 'next/cache') return { revalidateTag: () => {} }; if (!(name in dependencies)) throw Error(name); return dependencies[name]; });
+  new Function('exports', 'require', compiled)(exports, name => { if (name === '@/lib/question-deletion-server') return { questionDeletionReady: async () => false }; if (name === '@/lib/cohort-curriculum-server') return { isLessonVisibleToCohort: async () => true }; if (name === '@/lib/cohort-curriculum-visibility') return { cohortLessonVisible: () => true, cohortWeekVisible: () => true }; if (name === '@/lib/alumni-access-server') return { assertParticipationOpen: async () => {} }; if (name === '@/lib/admin-order-list') return load('lib/admin-order-list.ts'); if (name === '@/lib/crm-purchase-contact') return load('lib/crm-purchase-contact.ts'); if (name === '@/lib/coupon-rules') return load('lib/coupon-rules.ts'); if (name === '@/lib/product-visibility') return productVisibility; if (name === '@/lib/member-directory') return load('lib/member-directory.ts'); if (name === '@/lib/submission-review') return submissionReview; if (name === '@/lib/public-platform-data') return { getPublicPlatformData: async () => ({ data: {}, pagination: null }), getPublicSupport: async () => ({}) }; if (name === '@/lib/public-platform-plan') return { PUBLIC_CACHE_TAG: 'test' }; if (name === '@/lib/member-platform-data') return { readMemberPlatformData: async () => ({}) }; if (name === 'next/cache') return { revalidateTag: () => {} }; if (!(name in dependencies)) throw Error(name); return dependencies[name]; });
   return exports;
 }
 const rules = load('lib/qa-rules.ts');
@@ -54,7 +54,7 @@ test('admin list APIs only load screen dependencies and lightweight relation fie
   process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED='true';
   try { assert.match(rules.adminSelectColumns('questions', 'edu_questions'), /,image_id$/); } finally { delete process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED; }
   assert.equal(rules.adminSelectColumns('orders', 'courses'), 'id,title,status,category,list_price,archived_at,display_order,created_at,updated_at');
-  assert.equal(rules.adminSelectColumns('orders', 'orders'), 'id,order_number,user_id,status,subtotal,discount_amount,total_amount,entry_src,customer_name,customer_email,customer_phone,created_at');
+  assert.equal(rules.adminSelectColumns('orders', 'orders'), 'id,order_number,user_id,status,subtotal,discount_amount,total_amount,entry_src,is_test_order,customer_name,customer_email,customer_phone,created_at');
   assert.equal(rules.adminSelectColumns('orders', 'order_items'), 'id,order_id,course_id,cohort_id,item_name,unit_price');
   assert.equal(rules.adminSelectColumns('orders', 'enrollments'), 'id,order_item_id,status');
   assert.equal(rules.adminSelectColumns('products', 'courses'), '*');
@@ -142,7 +142,7 @@ test('member administration exposes explicit roles and protects deletion', async
   assert.equal((await handler({ ...admin, role: 'student' }, db).POST(request({ action: 'delete-member', id: memberId }))).status, 403);
   assert.equal((await handler(admin, db).POST(request({ action: 'delete-member', id: admin.id }))).status, 400);
   assert.equal((await handler(admin, db).POST(request({ action: 'delete-member', id: memberId }))).status, 200);
-  assert.deepEqual(calls[0], ['edu_delete_member', { p_actor: admin.id, p_member: memberId }]);
+  assert.deepEqual(calls[0], ['edu_request_member_erasure', { p_actor: admin.id, p_member: memberId, p_environment: process.env.NEXT_PUBLIC_APP_ENV === 'production' ? 'production' : 'dev' }]);
 });
 test('customer catalog removes unrelated lower management panels', () => {
   const source = fs.readFileSync(new URL('../app/ui/final/admin-catalog.tsx', import.meta.url), 'utf8');

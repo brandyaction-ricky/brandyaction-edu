@@ -25,7 +25,7 @@ test('missing paid mapping remains unknown while free-only campaign saves and ge
  });
  await page.goto('/webinar-admin-test');
  await page.getByRole('combobox',{name:'웨비나 무료 상품',exact:true}).selectOption('22222222-2222-4222-8222-222222222222');
- await page.getByRole('checkbox').check();await page.getByRole('button',{name:'웨비나 신청 설정 저장'}).click();
+ await page.getByRole('checkbox',{name:'무료 신청 링크 활성화',exact:true}).check();await page.getByRole('button',{name:'웨비나 신청 설정 저장'}).click();
  await expect(page.getByText('유료 기수 연결 전 · 구매 실적 미확인',{exact:true})).toBeVisible();
  await expect(page.getByLabel('광고 방 신청 링크',{exact:true})).toHaveValue(/\/paid$/);
  await expect(page.getByText('신청 0건 · 웨비나 실제 참여: 미확인',{exact:true})).toBeVisible();

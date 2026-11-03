@@ -12,7 +12,7 @@ function failure(error: unknown) {
   const e = error as { message?: string; status?: number };
   if (e.status && e.status < 500) return reply({ error: e.message }, e.status);
   const known: Record<string, [string, number]> = {
-    MESSAGE_FORBIDDEN: ['이미지를 이용할 권한이 없습니다.', 403], QUESTION_FORBIDDEN: ['첨부파일을 이용할 권한이 없습니다.', 403], QUESTION_NOT_FOUND: ['첨부파일을 찾지 못했습니다.', 404],
+    BLOCK_FORBIDDEN: ['답변에 사진을 첨부할 권한이 없습니다.', 403], MESSAGE_FORBIDDEN: ['이미지를 이용할 권한이 없습니다.', 403], QUESTION_FORBIDDEN: ['첨부파일을 이용할 권한이 없습니다.', 403], QUESTION_NOT_FOUND: ['첨부파일을 찾지 못했습니다.', 404],
     QUESTION_REQUEST_REUSED: ['다른 파일에 사용한 요청입니다. 파일을 다시 선택해 주세요.', 409],
     QUESTION_UPLOAD_LIMIT: ['오늘 이미지 첨부 횟수를 초과했습니다. 내일 다시 시도해 주세요.', 429], QUESTION_INVALID: ['첨부할 질문과 파일 형식을 확인해 주세요.', 400],
   };
@@ -34,9 +34,11 @@ export async function POST(request: Request) {
     if (request.headers.get('origin') !== new URL(request.url).origin) fail('허용되지 않은 요청입니다.', 403);
     const actor = await getAuthenticatedUser(); if (!actor) fail('로그인이 필요합니다.', 401);
     const body = await readBody(request), db = createAdminClient();
+    if (body.purpose !== undefined && body.purpose !== 'answer') fail('파일 요청을 확인해 주세요.');
+    const answer = body.purpose === 'answer';
     if (body.action === 'prepare') {
       let spec; try { spec = answerFileSpec(body.name, body.size, 'image'); } catch (e) { fail((e as Error).message); }
-      const { data: file, error } = await db.rpc('edu_prepare_question_image', { p_actor: actor.id, p_lesson: body.lessonId === null && body.enrollmentId === null && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' ? null : id(body.lessonId), p_enrollment: body.lessonId === null && body.enrollmentId === null && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' ? null : id(body.enrollmentId), p_request: id(body.requestId), p_spec: spec });
+      const { data: file, error } = await db.rpc(answer ? 'edu_prepare_answer_image' : 'edu_prepare_question_image', answer ? { p_actor: actor.id, p_question: id(body.questionId), p_request: id(body.requestId), p_spec: spec } : { p_actor: actor.id, p_lesson: body.lessonId === null && body.enrollmentId === null && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' ? null : id(body.lessonId), p_enrollment: body.lessonId === null && body.enrollmentId === null && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' ? null : id(body.enrollmentId), p_request: id(body.requestId), p_spec: spec });
       if (error) throw error;
       if (file.ready_at) return reply({ id: file.id, name: file.name, size: file.size, ready: true });
       const upload = await db.storage.from(bucket).createSignedUploadUrl(file.path, { upsert: false });
@@ -44,7 +46,7 @@ export async function POST(request: Request) {
       return reply({ id: file.id, signedUrl: upload.data.signedUrl, contentType: file.content_type, ready: false });
     }
     if (body.action !== 'complete') fail('파일 요청을 확인해 주세요.');
-    const { data: file, error } = await db.rpc('edu_owned_question_image', { p_actor: actor.id, p_image: id(body.fileId) });
+    const { data: file, error } = await db.rpc(answer ? 'edu_owned_answer_image' : 'edu_owned_question_image', { p_actor: actor.id, p_image: id(body.fileId) });
     if (error) throw error;
     if (file.ready_at) return reply({ id: file.id, name: file.name, size: file.size });
     const storage = db.storage.from(bucket), info = await storage.info(file.path);
@@ -54,7 +56,7 @@ export async function POST(request: Request) {
     if (download.data.size !== file.size) fail('파일 업로드가 끝나지 않았습니다. 다시 시도해 주세요.');
     const bytes = new Uint8Array(await download.data.arrayBuffer()), spec = answerFileSpec(file.name, file.size, 'image');
     if (!matchesAnswerFile(bytes, spec)) fail('파일 내용과 확장자가 맞지 않습니다. 원본 파일을 확인해 주세요.');
-    const { data, error: completedError } = await db.rpc('edu_complete_question_image', { p_actor: actor.id, p_image: file.id, p_sha256: createHash('sha256').update(bytes).digest('hex') });
+    const { data, error: completedError } = await db.rpc(answer ? 'edu_complete_answer_image' : 'edu_complete_question_image', { p_actor: actor.id, p_image: file.id, p_sha256: createHash('sha256').update(bytes).digest('hex') });
     if (completedError) throw completedError;
     return reply(data);
   } catch (error) { return failure(error); }
@@ -64,7 +66,7 @@ export async function GET(request: Request) {
   try {
     const actor = await getAuthenticatedUser(); if (!actor) fail('로그인이 필요합니다.', 401);
     const params = new URL(request.url).searchParams, db = createAdminClient();
-    const { data: file, error } = await db.rpc('edu_read_question_image', { p_actor: actor.id, p_question: id(params.get('question')) });
+    const { data: file, error } = await db.rpc(params.has('answer') ? 'edu_read_answer_image' : 'edu_read_question_image', { p_actor: actor.id, p_question: id(params.get('question')), ...(params.has('answer') ? { p_answer: id(params.get('answer')) } : {}) });
     if (error) throw error;
     if (params.get('metadata') === '1') return reply({ id: file.id, name: file.name, size: file.size });
     const download = await db.storage.from(bucket).download(file.path);

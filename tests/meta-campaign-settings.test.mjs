@@ -22,7 +22,7 @@ const settings = load('lib/meta-campaign-settings.ts');
 const idA='120000000000000001', idB='120000000000000003';
 const campaign={id:'bbbbbbbb-bbbb-4000-8000-000000000002',landing_id:'aaaaaaaa-aaaa-4000-8000-000000000001',name:'Fixture campaign',utm_campaign:'fixture',start_day:'2026-09-01',end_day:'2036-09-01',new_customer_price:1200,existing_customer_price:900,live_peak:null,meta_ad_account_id:null,meta_campaign_id:null,meta_campaign_ids:[],meta_sync_status:'not_configured',meta_sync_error:null,updated_at:'2026-09-01T00:00:00.000Z'};
 const commonAccount='act_123456789';
-function setup({initial=campaign,role='admin',fetchRows=async()=>[],account=commonAccount,accountError=null}={}) {
+function setup({initial=campaign,role='admin',fetchRows=async()=>[],account=commonAccount,accountError=null,ui,catalog}={}) {
   let row=structuredClone(initial), writes=0; const rpcCalls=[];
   const db={from(table){let patch=null,filters=[];const query={
     select(){return query},eq(key,value){filters.push([key,value]);return query},is(){return query},order(){return query},
@@ -30,15 +30,15 @@ function setup({initial=campaign,role='admin',fetchRows=async()=>[],account=comm
     async maybeSingle(){return run(false)},async single(){return run(false)},then(resolve,reject){return Promise.resolve(run(true)).then(resolve,reject)}
   };function run(list){
     if(table==='site_settings')return{data:account==null?null:{value:{adAccountId:account}},error:accountError};
-    if(table==='courses')return{data:[{id:row.landing_id,title:'Fixture',category:'free'}],error:null};
+    if(table==='courses')return{data:catalog||[{id:row.landing_id,title:'Fixture',category:'free'}],error:null};
     if(table==='landing_configs')return{data:[],error:null};
     if(filters.some(([key,value])=>row[key]!==value))return{data:null,error:null};
     if(patch){row={...row,...patch};writes++;}
     return{data:list?[structuredClone(row)]:structuredClone(row),error:null};
-  }return query;},async rpc(name,args){rpcCalls.push({name,args});return{data:name==='edu_marketing_dashboard'?{performance:[],summary_b:{spend:37.5}}:null,error:null}}};
-  const mocks={'@/lib/supabase/admin':{createAdminClient:()=>db},'@/lib/operator-permissions':{getOperatorUser:async()=>role?{role,id:null}:null},'@/lib/landing-performance-ui-server':{performanceUiDetails:async()=>null},'@/lib/meta-marketing':{fetchMetaCampaigns:fetchRows}};
+  }return query;},async rpc(name,args){rpcCalls.push({name,args});if(name==='edu_manage_marketing_campaign'){if(accountError)return{data:null,error:accountError};const ids=args.p_values.meta_campaign_ids;const normalized=account?settings.normalizeMetaAccountId(account):null;row={...row,...args.p_values,paid_cohort_id:args.p_values.paid_cohort_id||null,paid_cohort_label:null,meta_ad_account_id:normalized,meta_campaign_id:ids[0]||null,meta_sync_status:normalized&&ids.length?'idle':'not_configured'};writes++;return{data:structuredClone(row),error:null};}return{data:name==='edu_marketing_dashboard'?{performance:[],summary_b:{spend:37.5},...(ui?{ui}:{})}:null,error:null}}};
+  const mocks={'@/lib/supabase/admin':{createAdminClient:()=>db},'@/lib/operator-permissions':{getOperatorUser:async()=>role?{role,id:null}:null},'@/lib/landing-performance-ui-server':{performanceUiDetails:async(_db,_campaign,_params,_signal,_actor,base)=>{if(ui)assert.deepEqual(base,ui,'reuse existing RPC snapshot');return base||null;}},'@/lib/meta-marketing':{fetchMetaCampaigns:fetchRows}};
   const api=load('app/api/landing/performance/route.ts',mocks), meta=load('app/api/landing/performance/meta/route.ts',mocks);
-  const request=(values,origin='https://fixture.test')=>new Request('https://fixture.test/api/landing/performance',{method:'POST',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify({action:'campaign',campaign_id:row.id,values})});
+  const request=(values,origin='https://fixture.test')=>new Request('https://fixture.test/api/landing/performance',{method:'POST',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify({action:'campaign',campaign_id:row.id,expected_updated_at:row.updated_at,values})});
   return{api,meta,request,row:()=>row,writes:()=>writes,rpcCalls};
 }
 const values={name:'Saved fixture',utm_campaign:'saved-fixture',start_day:'2026-09-01',end_day:'2036-09-01',new_customer_price:0,existing_customer_price:900,live_peak:''};
@@ -153,4 +153,15 @@ test('missing shared account prevents Meta requests even when a stale row has an
 test('shared setting query failure leaves stored campaign values untouched',async()=>{
   const h=setup({accountError:{message:'fixture failure'}});const response=await h.api.POST(h.request({...values,meta_campaign_ids:[idA]}));
   assert.equal(response.status,400);assert.match((await response.json()).error,/공통 설정/);assert.equal(h.writes(),0);
+});
+
+test('optimized dashboard UI snapshot is passed to the supplement without GET writes',async()=>{const ui={errors:{},daily_a:[],last_collected_at:null,actual_presence:{new_payments:false,existing_payments:false},previous_day_members:{},period_actuals:null}; const h=setup({ui}); const response=await h.api.GET(new Request(`https://fixture.test/api/landing/performance?landing=${campaign.landing_id}&campaign=${campaign.id}&start=2026-09-15&end=2026-09-15&include=ui`)); assert.equal(response.status,200);assert.deepEqual((await response.json()).ui,ui);assert.equal(h.writes(),0);assert.equal(h.rpcCalls.length,1);});
+
+test('historical recruitment links retain archived or recategorized campaign courses without unrelated paid products',async()=>{
+ const h=setup({catalog:[{id:campaign.landing_id,title:'Archived webinar',category:'paid_class',archived_at:'2026-10-01'},{id:'unrelated',category:'paid_class'},{id:'free-new',category:'free',archived_at:null}]});
+ const response=await h.api.GET(new Request('https://fixture.test/api/landing/performance'));
+ assert.equal(response.status,200);const value=await response.json();
+ assert.deepEqual(value.courses.map(c=>c.id),[campaign.landing_id,'free-new']);
+ assert.equal(value.courses[0].campaigns[0].id,campaign.id);
+ assert.equal((await setup({role:null}).api.GET(new Request('https://fixture.test/api/landing/performance'))).status,403);
 });

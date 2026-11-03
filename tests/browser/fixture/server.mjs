@@ -1,7 +1,9 @@
+import { learningCareFixture } from './learning-care.mjs';
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { build } from 'esbuild';
+import { reportFiles } from './diagnosis-report-files.mjs';
 import { lessonQuestionFixture } from './lesson-questions-api.mjs';
 import { reviewFixture } from './submission-review-api.mjs';
 
@@ -12,20 +14,42 @@ const campaign = {id:'bbbbbbbb-bbbb-4000-8000-000000000002',landing_id:'aaaaaaaa
 const actual = {campaign_id:campaign.id,day:relativeDay(-1),kakao_members:10,new_payments:0,existing_payments:0,memo:null,new_price_snapshot:1000,existing_price_snapshot:500};
 const summary = {has_data:false,sessions:0,visitors:0,cta_click_sessions:0,cta_clicks:0,converted_visitors:0,avg_dwell_ms:0,avg_scroll_depth:0,meta_impressions:0,meta_link_clicks:0,spend:0};
 const report = {campaign,summary_b:summary,summary_a:null,performance:[],daily:[],actuals:[actual],campaign_summary:{live_peak:null,kakao_members:10,kakao_delta:null,new_payments:0,existing_payments:0,revenue:0,spend:0,roas:null},options:{campaigns:[],ad_types:[],adsets:[],creatives:[],devices:[],layouts:[]},data_state:{sessions_exist:false,filtered_sessions_exist:false,meta_exists:false}};
-const result = await build({entryPoints:['tests/browser/fixture/app.tsx'],bundle:true,write:false,outdir:'focus-fixture',platform:'browser',format:'esm',jsx:'automatic',define:{'process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED':'"true"','process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY':'"test_ck_synthetic_only"','process.env.NODE_ENV':'"development"','process.env':'{}'},alias:{'@/lib/supabase/client':resolve('tests/browser/fixture/member-auth.ts'),'@tosspayments/tosspayments-sdk':resolve('tests/browser/fixture/toss.ts'),'next/image':resolve('tests/browser/fixture/image.tsx'),'next/link':resolve('tests/browser/fixture/link.tsx'),'next/navigation':resolve('tests/browser/fixture/navigation.ts')}});
+const result = await build({entryPoints:['tests/browser/fixture/app.tsx'],bundle:true,write:false,outdir:'focus-fixture',platform:'browser',format:'esm',jsx:'automatic',define:{'process.env.NEXT_PUBLIC_GOOGLE_GIS_CLIENT_ID':'"synthetic-google-client"','process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED':'"true"','process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY':'"test_ck_synthetic_only"','process.env.NEXT_PUBLIC_TOSS_QUICK_TRANSFER_ENABLED':JSON.stringify(process.env.FIXTURE_TOSS_QUICK_TRANSFER_ENABLED || 'false'),'process.env.NEXT_PUBLIC_TOSS_WIDGET_ENABLED':JSON.stringify(process.env.FIXTURE_TOSS_WIDGET_ENABLED || 'false'),'process.env.NEXT_PUBLIC_TOSS_WIDGET_CLIENT_KEY':'"test_gck_fixture"','process.env.NODE_ENV':'"development"','process.env':'{}'},alias:{'@/lib/supabase/client':resolve('tests/browser/fixture/member-auth.ts'),'@tosspayments/tosspayments-sdk':resolve('tests/browser/fixture/toss.ts'),'next/image':resolve('tests/browser/fixture/image.tsx'),'next/link':resolve('tests/browser/fixture/link.tsx'),'next/navigation':resolve('tests/browser/fixture/navigation.ts')}});
+const commentsResult = await build({entryPoints:['tests/browser/fixture/question-comments-app.tsx'],bundle:true,write:false,outdir:'comments-fixture',platform:'browser',format:'esm',jsx:'automatic',define:{'process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED':'"true"','process.env.NODE_ENV':'"development"','process.env':'{}'},alias:{'@/lib/supabase/client':resolve('tests/browser/fixture/member-auth.ts'),'next/image':resolve('tests/browser/fixture/image.tsx'),'next/link':resolve('tests/browser/fixture/link.tsx'),'next/navigation':resolve('tests/browser/fixture/navigation.ts')}});
 const consentResult = await build({entryPoints:['tests/browser/fixture/consent-app.tsx'],bundle:true,write:false,outdir:'consent-fixture',platform:'browser',format:'esm',jsx:'automatic',define:{'process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED':'"true"','process.env.NODE_ENV':'"development"','process.env':'{}'},alias:{'@/lib/supabase/client':resolve('tests/browser/fixture/consent-auth.ts'),'next/image':resolve('tests/browser/fixture/image.tsx'),'next/link':resolve('tests/browser/fixture/link.tsx'),'next/navigation':resolve('tests/browser/fixture/consent-navigation.ts')}});
-const hubResult = await build({entryPoints:['tests/browser/fixture/question-hub-app.tsx'],bundle:true,write:false,outdir:'question-hub-fixture',platform:'browser',format:'esm',jsx:'automatic',define:{'process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED':'"true"','process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED':'"true"','process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED':'"true"','process.env.NODE_ENV':'"development"','process.env':'{}'},alias:{'next/image':resolve('tests/browser/fixture/image.tsx'),'next/link':resolve('tests/browser/fixture/link.tsx'),'next/navigation':resolve('tests/browser/fixture/navigation.ts')}});
-const diagnosisResult = await build({entryPoints:['tests/browser/fixture/diagnosis-app.tsx'],bundle:true,write:false,outdir:'diagnosis-fixture',platform:'browser',format:'esm',jsx:'automatic',define:{'process.env.NODE_ENV':'"development"','process.env.NEXT_PUBLIC_EDU_MYIN_DIAGNOSIS_ENABLED':'"true"'},alias:{'next/link':resolve('tests/browser/fixture/link.tsx'),'next/image':resolve('tests/browser/fixture/image.tsx'),'next/navigation':resolve('tests/browser/fixture/navigation.ts')}});
-const assets = new Map([...result.outputFiles,...consentResult.outputFiles,...hubResult.outputFiles,...diagnosisResult.outputFiles].map(file=>['/'+file.path.split('/').at(-1),file.contents]));
+const hubResult = await build({entryPoints:['tests/browser/fixture/question-hub-app.tsx'],bundle:true,write:false,outdir:'question-hub-fixture',platform:'browser',format:'esm',jsx:'automatic',define:{'process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED':'"true"','process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED':'"true"','process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED':'"true"','process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED':'"true"','process.env.NODE_ENV':'"development"','process.env':'{}'},alias:{'@/lib/supabase/client':resolve('tests/browser/fixture/member-auth.ts'),'next/image':resolve('tests/browser/fixture/image.tsx'),'next/link':resolve('tests/browser/fixture/link.tsx'),'next/navigation':resolve('tests/browser/fixture/navigation.ts')}});
+const learningQuestionResult = await build({entryPoints:['tests/browser/fixture/learning-question-app.tsx'],bundle:true,write:false,outdir:'learning-question-fixture',platform:'browser',format:'esm',jsx:'automatic',define:{'process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED':'"true"','process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED':'"true"','process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED':'"true"','process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED':'"true"','process.env.NODE_ENV':'"development"','process.env':'{}'},alias:{'@/lib/supabase/client':resolve('tests/browser/fixture/member-auth.ts'),'next/image':resolve('tests/browser/fixture/image.tsx'),'next/link':resolve('tests/browser/fixture/link.tsx'),'next/navigation':resolve('tests/browser/fixture/navigation.ts')}});
+const diagnosisResult = await build({entryPoints:['tests/browser/fixture/diagnosis-app.tsx'],bundle:true,write:false,outdir:'diagnosis-fixture',platform:'browser',format:'esm',jsx:'automatic',define:{'process.env':'{}','process.env.NODE_ENV':'"development"','process.env.NEXT_PUBLIC_EDU_MYIN_DIAGNOSIS_ENABLED':'"true"'},alias:{'@/lib/supabase/client':resolve('tests/browser/fixture/member-auth.ts'),'@tosspayments/tosspayments-sdk':resolve('tests/browser/fixture/toss.ts'),'next/link':resolve('tests/browser/fixture/link.tsx'),'next/image':resolve('tests/browser/fixture/image.tsx'),'next/navigation':resolve('tests/browser/fixture/navigation.ts')}});
+const optionalConsentResult = await build({entryPoints:['tests/browser/fixture/optional-consent-app.tsx'],bundle:true,write:false,outdir:'optional-consent-fixture',platform:'browser',format:'esm',jsx:'automatic',define:{'process.env.NEXT_PUBLIC_EDU_OPTIONAL_CONSENT_ENABLED':'"true"','process.env.NODE_ENV':'"development"','process.env':'{}'},alias:{'@/lib/supabase/client':resolve('tests/browser/fixture/consent-auth.ts'),'next/link':resolve('tests/browser/fixture/link.tsx'),'next/navigation':resolve('tests/browser/fixture/consent-navigation.ts')}});
+const adControlResult = await build({entryPoints:['tests/browser/fixture/ad-controls-app.tsx'],bundle:true,write:false,outdir:'ad-control-fixture',platform:'browser',format:'esm',jsx:'automatic',define:{'process.env.NODE_ENV':'"development"','process.env':'{}'}});
+const assets = new Map([...adControlResult.outputFiles,...optionalConsentResult.outputFiles,...result.outputFiles,...consentResult.outputFiles,...hubResult.outputFiles,...diagnosisResult.outputFiles,...learningQuestionResult.outputFiles].map(file=>['/'+file.path.split('/').at(-1),file.contents]));
 const brandLogo = readFileSync(resolve('public/brandy-action-logo.png'));
 const failedMemberReads = new Set();
 const server = createServer((request,response)=>{
   const url=new URL(request.url,'http://localhost');
+  if(['/copy-candidate/free-live','/copy-candidate/moonshot'].includes(url.pathname)){response.setHeader('Content-Type','text/html; charset=utf-8');response.end(readFileSync(resolve('content/stabilization-20261029',url.pathname.split('/').at(-1)+'.html')));return;}
+  if(url.pathname==='/question-comments-app.js'){response.setHeader('Content-Type','application/javascript');response.end(commentsResult.outputFiles.find(f=>f.path.endsWith('.js')).text);return;}
+  if(url.pathname==='/question-comments-app.css'){response.setHeader('Content-Type','text/css');response.end(commentsResult.outputFiles.find(f=>f.path.endsWith('.css')).text);return;}
+  if(url.pathname==='/question-comments-test'){response.setHeader('Content-Type','text/html');response.end('<!doctype html><html lang="ko"><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/question-comments-app.css"></head><body><div id="root"></div><script type="module" src="/question-comments-app.js"></script></body></html>');return;}
+  if(learningCareFixture(request,response,url))return;
   if(lessonQuestionFixture(request,response,url))return;
   if(reviewFixture(request,response,url))return;
+  if(url.pathname==='/ad-controls-test'){
+    response.setHeader('Content-Type','text/html');response.end('<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ad controls fixture</title><link rel="stylesheet" href="/ad-controls-app.css"></head><body><div id="root"></div><script type="module" src="/ad-controls-app.js"></script></body></html>');return;
+  }
   if(url.pathname==='/edu-push-sw.js'){response.setHeader('Content-Type','application/javascript');response.setHeader('Cache-Control','no-store');response.end(readFileSync(resolve('public/edu-push-sw.js')));return;}
   if(/^\/icons\/edu-(192|512|maskable-512|badge-96|apple-180)\.png$/.test(url.pathname)){response.setHeader('Content-Type','image/png');response.end(readFileSync(resolve('public'+url.pathname)));return;}
+  if(/^\/installation-guide\/(ios-share|ios-add|android-menu|android-confirm)\.svg$/.test(url.pathname)){response.setHeader('Content-Type','image/svg+xml');response.end(readFileSync(resolve('public'+url.pathname)));return;}
+  if(/^\/installation-guide\/chrome-(menu|confirm)\.webp$/.test(url.pathname)){response.setHeader('Content-Type','image/webp');response.end(readFileSync(resolve('public'+url.pathname)));return;}
+  if(/^\/installation-guide\/iphone-chrome-(address|share|more|home-add|icon)\.png$/.test(url.pathname)||/^\/installation-guide\/iphone-chrome-(login|confirm)\.jpg$/.test(url.pathname)){response.setHeader('Content-Type',url.pathname.endsWith('.png')?'image/png':'image/jpeg');response.end(readFileSync(resolve('public'+url.pathname)));return;}
+  if(/^\/installation-guide\/android-google-(menu|choices|confirm)\.png$/.test(url.pathname)){response.setHeader('Content-Type','image/png');response.end(readFileSync(resolve('public'+url.pathname)));return;}
   if(url.pathname==='/api/app-branding'&&url.searchParams.get('icon')==='192'){response.writeHead(307,{Location:'/icons/edu-192.png'}).end();return;}
+  if(url.pathname==='/api/account/marketing-consent'){
+    response.setHeader('Content-Type','application/json');
+    if(request.method==='GET'){response.end(JSON.stringify({choices:{marketingUse:false,sms:false,kakao:false,email:false},dates:{marketingUse:null,sms:null,kakao:null,email:null},revision:null,updatedAt:null,legacyRetired:true}));return;}
+    let raw='';request.on('data',chunk=>raw+=chunk);request.on('end',()=>{try{const body=JSON.parse(raw);response.end(JSON.stringify({choices:body.choices,revision:body.requestId,updatedAt:'2026-10-20T01:00:00Z',legacyRetired:true,dates:Object.fromEntries(Object.entries(body.choices).map(([k,v])=>[k,v?'2026-10-20T01:00:00Z':null])),changed:Object.entries(body.choices).map(([kind,v])=>({kind,action:v?'consent':'refusal'}))}));}catch{response.writeHead(400).end('{}');}});return;
+  }
+  if(url.pathname==='/synthetic-auth/consent'){response.setHeader('Content-Type','application/json');response.end('{}');return;}
   if(request.method!=='GET'){response.writeHead(405).end();return;}
   if(url.pathname==='/synthetic-auth/session'){response.setHeader('Content-Type','application/json');response.end('{}');return;}
   if(url.pathname==='/api/platform'&&url.searchParams.get('part')==='curriculum'){
@@ -67,6 +91,12 @@ const server = createServer((request,response)=>{
     const rows=member===id(4)?[]:records;
     setTimeout(()=>response.end(JSON.stringify({rows:rows.slice((page-1)*20,page*20),total:rows.length,page,pageSize:20})),500);return;
   }
+  if(url.pathname==='/api/admin/analytics-exclusions'){
+    response.setHeader('Content-Type','application/json');response.writeHead(403).end(JSON.stringify({error:'합성 환경: 전용 집계 표시 검수에서만 허용'}));return;
+  }
+  if(url.pathname==='/api/admin/member-login-email'){
+    response.setHeader('Content-Type','application/json');response.writeHead(403).end(JSON.stringify({error:'합성 환경: 관리자 변경 테스트에서만 허용'}));return;
+  }
   if(url.pathname==='/brandy-action-logo.png'){response.setHeader('Content-Type','image/png');response.end(brandLogo);return;}
   if(url.pathname==='/api/landing/performance'){
     response.setHeader('Content-Type','application/json');
@@ -75,11 +105,42 @@ const server = createServer((request,response)=>{
   }
   const asset=assets.get(url.pathname);
   if(asset){response.setHeader('Content-Type',url.pathname.endsWith('.css')?'text/css':'text/javascript');response.end(asset);return;}
+  // Read-only synthetic defaults let the local visual preview run without login or real data.
+  if(['/api/platform/encouragement','/api/platform/question-thread','/api/member/push'].includes(url.pathname)){
+    response.setHeader('Content-Type','application/json');
+    if(request.method!=='GET'){response.writeHead(405).end(JSON.stringify({error:'합성 화면 조회만 허용합니다.'}));return;}
+    const value=url.pathname==='/api/member/push'?{enabled:false}:url.pathname==='/api/platform/encouragement'?(url.searchParams.has('mine')?{publicName:'',message:'',revision:null}:{rows:[],nextCursor:null}):{question:{id:'22222222-2222-4222-8222-222222222222',status:'answered',resolved:false,archived:false,headId:null},answers:[],nextCursor:null,canAnswer:false,canFollowUp:true};
+    response.end(JSON.stringify(value));return;
+  }
+  if(url.pathname==='/api/platform/diagnosis/report'){
+    const state=new URL(request.headers.referer||'http://127.0.0.1').searchParams.get('local-report');
+    if(!url.search&&['ready','needs_review','queued','processing','access_denied'].includes(state)){
+      response.setHeader('Content-Type','application/json');response.end(JSON.stringify({state,updatedAt:'2026-10-01T00:00:00.000Z',canRetry:false,downloadAvailable:state==='ready'}));return;
+    }
+    const key=(request.headers.cookie || '').match(/(?:^|;\s*)diagnosis_download_fixture=(original|embedded)(?:;|$)/)?.[1] || (state==='ready'?'embedded':undefined);
+    const files=key && reportFiles[key],format=url.searchParams.has('html')?'html':'markdown';
+    if(!files){response.writeHead(404).end();return;}
+    if(!url.search){response.setHeader('Content-Type','application/json');response.end(JSON.stringify({state:'ready',updatedAt:'2026-10-01T00:00:00.000Z',canRetry:false,downloadAvailable:true}));return;}
+    const name=format==='html'?'N6-정밀보고서.html':'N6-검사결과.md';
+    response.setHeader('Content-Type',format==='html'?'text/html; charset=utf-8':'text/markdown; charset=utf-8');
+    response.setHeader('Content-Disposition',`attachment; filename*=UTF-8''${encodeURIComponent(name)}`);
+    response.end(files[format]);return;
+  }
+  if(url.pathname==='/api/platform/diagnosis/session' && (/diagnosis_download_fixture=(original|embedded)/.test(request.headers.cookie || '') || new URL(request.headers.referer||'http://127.0.0.1').searchParams.has('local-report'))){
+    response.setHeader('Content-Type','application/json');response.end(JSON.stringify({state:'submitted',revision:8,answers:[],submittedAt:'2026-10-01T00:00:00Z',needsReview:false,survey:{code:'needs6_n30',version:'synthetic',title:'합성 N6 검사',coreQuestionCount:0,questions:[]}}));return;
+  }
   if(url.pathname==='/diagnosis-test'){
+    if(url.searchParams.has('file-qa'))response.setHeader('Set-Cookie','diagnosis_download_fixture=embedded; Path=/; SameSite=Lax');
     response.setHeader('Content-Type','text/html');response.end('<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Diagnosis fixture</title><link rel="stylesheet" href="/diagnosis-app.css"></head><body style="margin:0"><div id="root"></div><script type="module" src="/diagnosis-app.js"></script></body></html>');return;
+  }
+  if(url.pathname==='/learning-question-test'){
+    response.setHeader('Content-Type','text/html');response.end('<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Learning question fixture</title><link rel="stylesheet" href="/learning-question-app.css"></head><body style="margin:0"><div id="root"></div><script type="module" src="/learning-question-app.js"></script></body></html>');return;
   }
   if(url.pathname==='/question-hub-test'){
     response.setHeader('Content-Type','text/html');response.end('<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Question hub fixture</title><link rel="stylesheet" href="/question-hub-app.css"></head><body><div id="root"></div><script type="module" src="/question-hub-app.js"></script></body></html>');return;
+  }
+  if((url.pathname==='/consent-reward-test'||url.pathname==='/optional-consent-test'||url.pathname==='/personalization-consent-test')||url.pathname==='/optional-signup-test'){
+    response.setHeader('Content-Type','text/html');response.end('<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>소식 수신 설정 · 합성 검수</title><link rel="stylesheet" href="/optional-consent-app.css"></head><body style="margin:0"><div id="root"></div><script type="module" src="/optional-consent-app.js"></script></body></html>');return;
   }
   if(url.pathname==='/signup-consent-test'){
     response.setHeader('Content-Type','text/html');response.end('<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Signup consent fixture</title><link rel="stylesheet" href="/consent-app.css"></head><body><div id="root"></div><script type="module" src="/consent-app.js"></script></body></html>');return;

@@ -46,3 +46,20 @@ test('public drift includes changes made after the last acknowledged publication
 test('large lesson reads return one body and retrieve the public copy only on request',async()=>{
  const stored=payload();stored.form.bodyText='x'.repeat(3000000);const h=harness({stored});const response=await h.get('lesson='+h.body.lessonId);const raw=await response.text();assert.ok(Buffer.byteLength(raw)<3100000);assert.equal(JSON.parse(raw).public.payload,undefined);const current=await h.get('lesson='+h.body.lessonId+'&source=public');assert.equal((await current.json()).payload.form.bodyText.length,3000000);assert.equal(h.calls.at(-1).name,'edu_lesson_author_snapshot');
 });
+
+test('backup endpoint validates payload and uses the authenticated operator without publishing',async()=>{
+ const h=harness(),request={...h.body,action:'backup'};
+ assert.equal((await h.post(request)).status,200);assert.equal(h.calls[0].name,'edu_save_lesson_author_recorded');assert.equal(h.calls[0].args.p_source,'backup');assert.equal(h.calls[0].args.p_actor,h.user.id);assert.equal(h.invalidations.length,0);
+ assert.equal((await h.post({...request,stamp:'wrong'})).status,400);assert.equal((await h.post({...request,payload:{}})).status,400);
+});
+
+test('history validates cursor/date filters and uses only the authenticated actor',async()=>{
+ const h=harness();const base='lesson='+h.body.lessonId+'&history=1';
+ for(const suffix of ['&beforeAt=bad','&beforeId='+id(),'&from=2026-02-31','&from=2026-10-10&to=2026-10-01','&mode=bad','&version='+id()])assert.equal((await h.get(base+suffix)).status,400);
+ assert.equal(h.calls.length,0);assert.equal((await h.get(base+'&editor=Kim&mode=all&beforeAt=2026-10-01T01:00:00Z&beforeId='+id())).status,200);
+ assert.equal(h.calls[0].name,'edu_lesson_author_history');assert.equal(h.calls[0].args.p_actor,h.user.id);assert.equal(h.calls[0].args.p_editor,'Kim');
+});
+test('manual note and autosave source are validated before transactional storage',async()=>{
+ const h=harness();for(const fields of [{saveSource:'other'},{saveNote:'x'.repeat(161)},{saveSource:'autosave',saveNote:'manual note'}])assert.equal((await h.post({...h.body,...fields})).status,400);
+ assert.equal(h.calls.length,0);assert.equal((await h.post({...h.body,saveSource:'manual',saveNote:'설명 보완'})).status,200);assert.equal(h.calls[0].args.p_note,'설명 보완');assert.equal(h.calls[0].name,'edu_save_lesson_author_recorded');
+});

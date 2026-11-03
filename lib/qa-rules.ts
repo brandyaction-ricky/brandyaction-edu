@@ -62,6 +62,7 @@ export function databaseMessage(code?: string, message?: string): string {
 // Only dependencies used by the current screen. Analytics is always aggregated by RPC.
 export const adminTables: Record<string, string[]> = {
   conversion: [],
+  "learning-care": [],
   home: ['courses', 'cohorts', 'mission_submissions', 'edu_questions'],
   products: ['courses', 'cohorts', 'curriculum_weeks', 'curriculum_lessons', 'lesson_contents'], cohorts: ['courses', 'cohorts', 'cohort_sessions', 'cohort_session_contents'],
   learning: ['courses', 'curriculum_weeks', 'curriculum_lessons', 'lesson_contents', 'curriculum_missions', 'mission_quizzes'],
@@ -87,7 +88,7 @@ export function adminSelectColumns(section: string, table: string): string {
   if (section === 'questions' && table === 'edu_questions') return 'id,user_id,course_id,learning_context,title,content,answer,status,is_archived,created_at,updated_at,profiles(id,full_name,email),courses(id,title)' + (process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED === 'true' ? ',image_id' : '');
   if (section === 'reviews' && table === 'mission_submissions') return '*,enrollments!inner(user_id,course_id,cohort_id,profiles!enrollments_user_id_fkey(id,full_name,email),courses(id,title),cohorts(id,name)),curriculum_missions(id,title,instructions)';
   if (section === 'orders') {
-    if (table === 'orders') return 'id,order_number,user_id,status,subtotal,discount_amount,total_amount,entry_src,customer_name,customer_email,customer_phone,created_at';
+    if (table === 'orders') return 'id,order_number,user_id,status,subtotal,discount_amount,total_amount,entry_src,is_test_order,customer_name,customer_email,customer_phone,created_at';
     if (table === 'cohorts') return 'id,course_id,name';
     if (table === 'order_items') return 'id,order_id,course_id,cohort_id,item_name,unit_price';
     if (table === 'enrollments') return 'id,order_item_id,status';

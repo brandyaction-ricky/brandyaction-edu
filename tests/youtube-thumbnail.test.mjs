@@ -44,6 +44,7 @@ function load(file) {
   const moduleExports = {};
   cache.set(absolute, moduleExports);
   new Function('exports', 'require', component)(moduleExports, name => {
+    if (name.endsWith('.css')) return {};
     if (name === 'next/link') return LinkStub;
     if (name === 'next/image') return ImageStub;
     if (name.startsWith('@/') || name.startsWith('.')) {

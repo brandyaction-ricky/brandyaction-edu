@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { BlockAnswer, PublicLessonBlock } from '@/lib/lesson-blocks';
 import { calculateFunnel, calculateMargin, calculateRecipe, CHANNEL_PRESETS, hasCalculatorDefinition, isCalculator, MARGIN_DEFAULTS, MARGIN_INPUTS, MAX_CALCULATOR_VALUE, MAX_FUNNEL_STAGES, parseFunnelStages, RECIPE_INPUTS, validCalculatorNumber, validateCalculatorValues, type FunnelStage } from '@/lib/lesson-calculators';
 import { downloadFunnelImage } from '@/lib/lesson-funnel-image';
+import { moveOrderedItem, useReorderDrag } from './reorder-drag';
 import './lesson-calculator.css';
 
 type Props={block:PublicLessonBlock;answer?:BlockAnswer;readOnly:boolean;onChange:(answer:BlockAnswer)=>void};
@@ -36,7 +37,9 @@ function Funnel({values,readOnly,onChange}:Inputs){
   const stages=parseFunnelStages(values.data),rows=calculateFunnel(stages);
   function commit(next:FunnelStage[]){if(!readOnly)onChange({data:JSON.stringify(next)});}
   function update(id:string,patch:Partial<FunnelStage>){commit(stages.map(s=>s.id===id?{...s,...patch}:s));}
-  function move(index:number,offset:number){const next=[...stages];[next[index],next[index+offset]]=[next[index+offset],next[index]];commit(next);}
+  function move(index:number,offset:number){moveTo(index,index+offset);}
+  function moveTo(index:number,target:number){if(target>=0&&target<stages.length)commit(moveOrderedItem(stages,index,target));}
+  const stageDrag=useReorderDrag(stages.map(stage=>stage.id),moveTo,readOnly);
   async function download(){setDownloading(true);setError('');try{await downloadFunnelImage(stages);}catch{setError('이미지 다운로드에 실패했습니다. 다시 시도해 주세요.');}finally{setDownloading(false);}}
   return <section className="lb-card lb-calculator" aria-label="마케팅 퍼널 만들기"><h3>마케팅 퍼널 만들기</h3><h4>나의 마케팅 퍼널</h4>
     <figure className="lbc-funnel" aria-label="단계별 수와 전환율"><figcaption>오른쪽은 첫 단계 대비 비율입니다.</figcaption>{rows.map((row,i)=>{
@@ -44,7 +47,7 @@ function Funnel({values,readOnly,onChange}:Inputs){
       return <div className="lbc-funnel-row" key={row.id}><div><strong>{row.name||'단계'}</strong><span>{Math.round(row.number).toLocaleString('ko-KR')}</span>{row.previous!==null && <small>이전 대비 {Math.round(row.previous*10)/10}%</small>}</div><svg aria-hidden="true" viewBox="0 0 200 100" preserveAspectRatio="none"><polygon points={`${100-top/2},0 ${100+top/2},0 ${100+bottom/2},100 ${100-bottom/2},100`} fill={`rgba(26,171,223,${Math.max(.45,.9-i*.13)})`}/></svg><strong>{row.overall===null?'—':`${Math.round(row.overall*10)/10}%`}</strong></div>;
     })}</figure>
     {rows[0].overall===null && <p className="meta">첫 단계 값이 0이어서 전체 전환율은 계산할 수 없습니다.</p>}
-    {!readOnly && <section className="lbc-stage-editor"><h4>단계 편집</h4>{stages.map((stage,i)=><div className="lbc-stage" key={stage.id} data-funnel-stage={stage.id}><label className="lb-field"><span>단계 {i+1} 이름</span><input maxLength={100} value={stage.name} onChange={event=>update(stage.id,{name:event.target.value})}/></label><NumericInput label={`단계 ${i+1} 수`} value={stage.value} readOnly={false} onChange={value=>update(stage.id,{value})} onError={setError}/><div className="lbc-stage-actions"><button type="button" className="btn small" disabled={i===0} aria-label={`단계 ${i+1} 위로`} onClick={()=>move(i,-1)}>↑</button><button type="button" className="btn small" disabled={i===stages.length-1} aria-label={`단계 ${i+1} 아래로`} onClick={()=>move(i,1)}>↓</button><button type="button" className="btn small" disabled={stages.length<=2} aria-label={`단계 ${i+1} 삭제`} onClick={()=>{if(window.confirm('이 퍼널 단계를 삭제할까요?'))commit(stages.filter(s=>s.id!==stage.id));}}>삭제</button></div></div>)}<button type="button" className="btn" disabled={stages.length>=MAX_FUNNEL_STAGES} onClick={()=>commit([...stages,{id:crypto.randomUUID(),name:'새 단계',value:''}])}>단계 추가</button></section>}
+    {!readOnly && <section className="lbc-stage-editor"><h4>단계 편집</h4>{stages.map((stage,i)=><div className={`lbc-stage${stageDrag.overId===stage.id?' reorder-item-over':''}`} key={stage.id} data-funnel-stage={stage.id} {...stageDrag.row(stage.id)}>{stageDrag.handle(stage.id,`단계 ${i+1}`)}<label className="lb-field"><span>단계 {i+1} 이름</span><input maxLength={100} value={stage.name} onChange={event=>update(stage.id,{name:event.target.value})}/></label><NumericInput label={`단계 ${i+1} 수`} value={stage.value} readOnly={false} onChange={value=>update(stage.id,{value})} onError={setError}/><div className="lbc-stage-actions"><button type="button" className="btn small" disabled={i===0} aria-label={`단계 ${i+1} 위로`} onClick={()=>move(i,-1)}>↑</button><button type="button" className="btn small" disabled={i===stages.length-1} aria-label={`단계 ${i+1} 아래로`} onClick={()=>move(i,1)}>↓</button><button type="button" className="btn small" disabled={stages.length<=2} aria-label={`단계 ${i+1} 삭제`} onClick={()=>{if(window.confirm('이 퍼널 단계를 삭제할까요?'))commit(stages.filter(s=>s.id!==stage.id));}}>삭제</button></div></div>)}<button type="button" className="btn" disabled={stages.length>=MAX_FUNNEL_STAGES} onClick={()=>commit([...stages,{id:crypto.randomUUID(),name:'새 단계',value:''}])}>단계 추가</button></section>}
     <button type="button" className="btn primary lbc-download" disabled={downloading} onClick={()=>void download()}>{downloading?'이미지 만드는 중…':'퍼널 이미지 다운로드'}</button><p className="meta">다운로드한 이미지를 클로드에 올려 보고서를 요청해 보세요.</p>{error && <p role="alert">{error}</p>}
   </section>;
 }

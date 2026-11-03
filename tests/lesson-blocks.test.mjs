@@ -94,3 +94,8 @@ test('private author media uses a UUID instead of URL; links/text cannot smuggle
  assert.deepEqual(validateLessonBlocks(doc),doc);assert.deepEqual(publicLessonBlocks(doc),doc);
  for(const block of [{id:'x',type:'link',assetId},{id:'x',type:'text',assetId},{id:'x',type:'image',assetId:'../x'},{id:'x',type:'image',assetId,url:'https://example.test/x'},{id:'x',type:'image',assetId:null}])assert.throws(()=>validateLessonBlocks({...doc,blocks:[block]}));
 });
+test('file blocks require a server asset and cannot embed public or expiring URLs',()=>{
+ const document={schemaVersion:1,blocks:[{id:'download',type:'file',assetId:'aaaaaaaa-1111-4111-8111-111111111111',content:'수업 템플릿'}],checklist:[]};
+ assert.deepEqual(validateLessonBlocks(document),document);assert.deepEqual(publicLessonBlocks(document),document);
+ for(const block of [{id:'f',type:'file'},{...document.blocks[0],assetId:'bad'},{id:'f',type:'file',url:'https://public.test/file.zip'},{...document.blocks[0],url:'https://public.test/file.zip'}])assert.throws(()=>validateLessonBlocks({...document,blocks:[block]}));
+});

@@ -31,3 +31,9 @@ test('Aside export is an operator-only versioned package with no identity, image
  const h=harness(),r=await h.post({action:'export',questionId:id,requestId:id},{isAdmin:true});assert.equal(r.status,200);const result=await r.json();assert.equal(result.handoff.schemaVersion,1);assert.equal(result.handoff.jobId,id);assert.deepEqual(Object.keys(result.handoff.question).sort(),['content','title']);assert.equal(result.handoff.lesson.text,'공개된 수업 내용');assert.equal(h.calls.filter(c=>c.name==='edu_question_assist').length,2);
  const invalid=await h.post({action:'import',questionId:id,requestId:id,draft:' '},{isAdmin:true});assert.equal(invalid.status,400);
 });
+test('explicit public/private intent reaches the new RPC; cohort reads derive identity on server',async()=>{
+ const h=harness();assert.equal((await h.post({...h.body,enrollmentId:id,lessonId:id,category:'learning',visibility:'cohort'})).status,200);
+ assert.equal(h.calls[0].name,'edu_create_visible_question');assert.equal(h.calls[0].args.p_visibility,'cohort');assert.equal(h.calls[0].args.p_actor,id);assert.equal(Object.hasOwn(h.calls[0].args,'p_share'),false);
+ await h.get('mode=public&userId=victim');assert.equal(h.calls[1].name,'edu_read_cohort_questions');assert.equal(h.calls[1].args.p_actor,id);assert.equal(h.calls[1].args.p_include_own,false);
+ assert.equal((await h.post({...h.body,visibility:'all'})).status,400);
+});

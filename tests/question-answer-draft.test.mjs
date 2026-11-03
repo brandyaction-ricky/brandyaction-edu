@@ -18,7 +18,7 @@ function routeHarness({ user = { id: 'operator' }, question = { id: questionId, 
     if (name === '@/lib/supabase/admin') return { createAdminClient: () => ({ from(table) {
       assert.equal(table, 'edu_questions');
       const filters = {};
-      const query = { select(columns) { assert.equal(columns, 'id,title,content'); return this; }, eq(key, value) { filters[key] = value; return this; }, async maybeSingle() { reads.push({ ...filters }); return { data: question, error: null }; } };
+      const query = { select(columns) { assert.ok(['id,title,content', 'id'].includes(columns)); return this; }, eq(key, value) { filters[key] = value; return this; }, async maybeSingle() { reads.push({ ...filters }); return { data: question, error: null }; } };
       return query;
     } }) };
     throw new Error(`Unexpected dependency ${name}`);

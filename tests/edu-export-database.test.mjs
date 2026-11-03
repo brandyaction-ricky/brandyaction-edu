@@ -1,0 +1,101 @@
+import test from 'node:test';import assert from 'node:assert/strict';import{readFileSync}from'node:fs';import{randomUUID as id,createHash}from'node:crypto';import{PGlite}from'@electric-sql/pglite';
+import{logic,contract}from'./helpers/edu-export.mjs';
+const read=name=>readFileSync(new URL('../supabase/migrations/'+name,import.meta.url),'utf8');
+const timestamp='2026-10-06T03:00:00Z',now=new Date('2026-10-07T03:00:00Z'),days=['2026-10-06','2026-10-07'];
+test('real migration protects settings, atomic shared limit, source snapshot and all E1 exclusions without touching the ledger',async t=>{
+ const db=new PGlite();t.after(()=>db.close());
+ await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;
+ alter default privileges in schema public grant all on tables to service_role;
+ create function public.is_admin() returns boolean language sql as 'select true';
+ create table profiles(id uuid primary key,role text,status text,is_internal boolean default false,deleted_at timestamptz);
+ create table site_settings(key text primary key,value jsonb,is_public boolean not null default false);
+ alter table site_settings enable row level security;
+ grant select,insert,update,delete on site_settings to anon,authenticated;
+ create policy public_read_settings on site_settings for select to anon,authenticated using(is_public);
+ create policy admins_manage_settings on site_settings for all to authenticated using(is_admin()) with check(is_admin());
+ create table courses(id uuid primary key,course_code text,slug text);
+ create table cohorts(id uuid primary key,course_id uuid,cohort_code text,operation_start_at timestamptz,operation_end_at timestamptz,recruitment_start_at timestamptz,recruitment_end_at timestamptz);
+ create table orders(id uuid primary key,user_id uuid,status text,total_amount int,created_at timestamptz,paid_at timestamptz,entry_src text,is_test_order boolean default false);
+ create table order_items(id uuid primary key,order_id uuid,cohort_id uuid);
+ create table payments(id uuid primary key,order_id uuid,status text,approved_amount int,cancelled_amount int,approved_at timestamptz);
+ create table refunds(payment_id uuid,amount int,status text,completed_at timestamptz);
+ create table enrollments(id uuid primary key,user_id uuid,cohort_id uuid,order_item_id uuid,source text,created_at timestamptz,access_starts_at timestamptz,access_ends_at timestamptz,revoked_at timestamptz);
+ create table learning_usage_events(enrollment_id uuid,item_type text,item_id uuid,first_used_at timestamptz);
+ create table synthetic_catalog(enrollment_id uuid,item_type text,item_id uuid);
+ create function edu_learning_usage_catalog(p_enrollment uuid) returns table(item_type text,item_id uuid) language sql security invoker as 'select item_type,item_id from public.synthetic_catalog where enrollment_id=p_enrollment';
+ create table edu_member_visits(user_id uuid,first_seen_at timestamptz);
+ create table landing_campaigns(id uuid,landing_id uuid,utm_campaign text,start_day date,end_day date,uses_ads boolean);
+ create table edu_recruitment_marketing_links(campaign_id uuid,period_id text);
+ create table edu_webinar_campaigns(id uuid,period_id text,paid_cohort_id uuid);
+ create table edu_webinar_registrations(user_id uuid,period_id text,channel text,registered_at timestamptz);
+ create table edu_recruitment_clicks(period_id text,channel text,created_at timestamptz);
+ create table edu_broadcast_visits(campaign_id uuid,target text,created_at timestamptz);
+ create table landing_campaign_dimensions(campaign_id uuid,adset_key text,creative_key text,ad_type text,meta_ad_id text,meta_adset_id text);
+ create table landing_campaign_meta_daily(campaign_id uuid,day date,meta_ad_id text,meta_campaign_id text);
+ create table funnel_events(created_at timestamptz,landing_id uuid,session_id uuid,layout_ver int,event_type text);
+ create table funnel_sessions(landing_id uuid,session_id uuid,layout_ver int,attribution jsonb);
+ create table landing_campaign_actuals(campaign_id uuid,day date,kakao_members int);
+ create table customer_journey_events(user_id uuid,session_id text,event_name text,path text,occurred_at timestamptz);
+ create table edu_questions(id uuid,user_id uuid,created_at timestamptz,archived_at timestamptz);
+ create table edu_question_answers(question_id uuid,source text,created_at timestamptz,deleted_at timestamptz);
+ create table edu_refund_requests(payment_id uuid,created_at timestamptz);
+ create table crm_message_logs(member_id uuid,campaign_id uuid,channel text,sent_at timestamptz,status text);
+ create table crm_campaigns(id uuid,template_id uuid);create table crm_templates(id uuid,purpose text);
+ create table edu_push_events(id uuid,user_id uuid);create table edu_push_deliveries(event_id uuid,finished_at timestamptz,status text);
+ create table edu_consent_events(member_id uuid,kind text,action text,occurred_at timestamptz,wording_version text);`);
+ // Exercise the exact existing E1 view definitions, rather than a second eligibility rule.
+ const e1=read('20261005020515_edu_internal_order_analytics_e1.sql');
+ for(const name of ['edu_analytics_members','edu_analytics_orders']){
+  const ddl=e1.match(new RegExp('create view public\\.'+name+'[\\s\\S]*?;'))?.[0];assert.ok(ddl,name);await db.exec(ddl);
+ }
+ await db.exec(read('20261007092316_edu_export_v1_e4.sql'));
+ const student=id(),course=id(),cohort=id();
+ await db.query("insert into profiles values($1,'student','active',false,null)",[student]);
+ await db.query("insert into courses values($1,'moonshot','moonshot')",[course]);
+ await db.query("insert into cohorts values($1,$2,'4','2026-10-05','2026-11-20','2026-09-01','2026-10-10')",[cohort,course]);
+ async function order(user,{amount=10000,test=false,source='purchase',src='paid',refund=2000}={}){
+  const o=id(),i=id(),p=id(),e=id(),item=id();
+  await db.query("insert into orders values($1,$2,'partially_refunded',$3,$4,$4,$5,$6)",[o,user,amount,timestamp,src,test]);
+  await db.query('insert into order_items values($1,$2,$3)',[i,o,cohort]);
+  await db.query("insert into payments values($1,$2,'partial_cancelled',$3,$4,$5)",[p,o,amount,refund,timestamp]);
+  await db.query("insert into refunds values($1,$2,'done',$3)",[p,refund,timestamp]);
+  await db.query("insert into enrollments values($1,$2,$3,$4,$5,$6,'2026-10-05','2026-11-20',null)",[e,user,cohort,i,source,timestamp]);
+  await db.query("insert into learning_usage_events values($1,'vod_complete',$2,$3)",[e,item,timestamp]);
+  await db.query("insert into synthetic_catalog values($1,'vod_complete',$2)",[e,item]);
+  await db.query('insert into edu_member_visits values($1,$2)',[user,timestamp]);
+  return{o,e,i};
+ }
+ await order(student);
+ const snapshot=async()=> (await db.query('select edu_export_v1_source($1,$2,$3) v',[days[0],days[1],now.toISOString()])).rows[0].v;
+ const exported=async()=>{const s=await snapshot();return Object.fromEntries(['daily_totals','daily_campaign_perf','ops_daily'].map(ds=>[ds,logic.aggregateExport(ds,s,days,now)]));};
+ await db.exec('set role service_role');const before=await exported();
+ for(const [ds,res]of Object.entries(before))assert.equal(contract.validExport(ds,res),true,ds);
+ for(const [role,status,internal]of[['admin','active',false],['staff','active',false],['student','withdrawn',false],['student','active',true]]){
+  const u=id();await db.query('insert into profiles values($1,$2,$3,$4,null)',[u,role,status,internal]);await order(u);
+ }
+ await order(null);await order(student,{amount:0,refund:0});await order(student,{test:true});
+ // Manual grants have no order by design; attaching one would describe a real paid order.
+ const granted=id();await db.query("insert into enrollments values($1,$2,$3,null,'admin_grant',$4,'2026-10-05','2026-11-20',null)",[granted,student,cohort,timestamp]);
+ await db.query("insert into learning_usage_events values($1,'vod_complete',$2,$3)",[granted,id(),timestamp]);
+ assert.deepEqual(await exported(),before);
+ const result=before.daily_totals.rows.filter(r=>r.cohort_code).reduce((n,r)=>n+r.net_vat_incl_total,0);
+ const ledger=(await db.query("select sum(p.approved_amount-p.cancelled_amount)::int n from payments p join edu_analytics_orders o on o.id=p.order_id where (o.paid_at at time zone 'Asia/Seoul')::date='2026-10-06' and o.status in ('paid','partially_refunded','refunded')")).rows[0].n;
+ assert.equal(result,ledger);assert.equal(result,8000);
+ const ledgerBefore=(await db.query('select * from payments order by id')).rows;
+ const hash=createHash('sha256').update('synthetic-edu-token').digest('hex');
+ const gate=async h=>(await db.query('select edu_export_v1_gate($1) v',[h])).rows[0].v;
+ assert.equal(await gate(hash),'disabled');
+ await db.query("update site_settings set value=value||$1::jsonb where key='export_v1'",[{enabled:true,tokenHash:hash}]);
+ assert.equal(await gate(createHash('sha256').update('MYIN-token').digest('hex')),'unauthorized');
+ for(let n=0;n<30;n++)assert.equal(await gate(hash),'ok');assert.equal(await gate(hash),'rate_limited');
+ await db.exec("update site_settings set value=value-'tokenHash' where key='export_v1'");assert.equal(await gate(hash),'unauthorized');
+ await db.exec("update site_settings set value=value||'{\"enabled\":false}' where key='export_v1'");assert.equal(await gate(hash),'disabled');
+ assert.deepEqual((await db.query('select * from payments order by id')).rows,ledgerBefore);
+ await db.exec("reset role;insert into site_settings values('public_test','{}',true);set role authenticated");
+ assert.equal((await db.query("select * from site_settings where key='export_v1'")).rows.length,0);
+ assert.equal((await db.query("select * from site_settings where key='public_test'")).rows.length,1);
+ await assert.rejects(db.query("insert into site_settings values('export_v1','{}',true)"),/constraint|policy/);
+ assert.equal((await db.query("update site_settings set value='{}' where key='export_v1' returning key")).rows.length,0);
+ for(const sql of ["select edu_export_v1_gate('anything')","select edu_export_v1_source('2026-10-06','2026-10-07',now())","select * from edu_export_rate_window"])await assert.rejects(db.query(sql),/permission denied/);
+ await db.exec('reset role;set role anon');assert.equal((await db.query("select * from site_settings where key='export_v1'")).rows.length,0);
+});

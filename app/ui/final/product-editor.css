@@ -222,3 +222,5 @@
 .edu-admin .product-editor :is(input, select, textarea)[aria-invalid=true] { border-color: #b51c2b; outline-color: #b51c2b; background-color: #fff8f8; }
 .edu-admin .product-editor .product-invalid-group { padding: 16px; border: 2px solid #b51c2b; border-radius: 6px; }
 .edu-admin .product-editor .product-field-error { min-width: 0; white-space: normal; overflow-wrap: anywhere; display: block; margin: 6px 0 12px; color: #b51c2b; font-size: 13px; }
+
+.edu-admin .product-setup-guide{padding:16px 20px;margin-bottom:20px;background:var(--admin-surface,#fff);border:1px solid var(--admin-border,#dedede);border-radius:12px}.edu-admin .product-setup-guide p{font-size:13px;line-height:1.6;margin:6px 0 12px;color:var(--text-secondary,#555)}.edu-admin .product-setup-guide ol{list-style:none;padding:0;margin:0;display:flex;gap:8px;flex-wrap:wrap}.edu-admin .product-setup-guide [aria-current=step]{border-color:var(--ba-red,#b62128);color:var(--ba-red,#b62128)}

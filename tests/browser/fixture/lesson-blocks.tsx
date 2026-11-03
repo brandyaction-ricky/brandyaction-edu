@@ -8,6 +8,6 @@ export function LessonBlocksFixture() {
     <h1>혼합 학습 검수</h1>
     <button type="button" onClick={() => setLesson('22222222-2222-4222-8222-222222222222')}>다른 학습으로 전환</button>
     <Link href="/my">내 클래스로 이동</Link>
-    <LessonBlockSession lessonId={lesson} enrollmentId="33333333-3333-4333-8333-333333333333" fallback={<p>기존 학습 본문 유지</p>} />
+    <LessonBlockSession lessonId={lesson} enrollmentId="33333333-3333-4333-8333-333333333333" readOnly={new URLSearchParams(location.search).has('alumni')} fallback={<p>기존 학습 본문 유지</p>} />
   </main>;
 }

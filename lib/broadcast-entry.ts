@@ -4,6 +4,7 @@ export type BroadcastReport={sessions:BroadcastSession[];offerReady:boolean;coun
 // Conservative filtering. This is a request count, never unique viewers or attendance.
 export function recordBroadcastRequest(request:Request) {
  if(request.method!=='GET')return false;
+ if((request.headers.get('cookie')||'').split(';').some(part=>part.trim()==='edu_landing_test=1'))return false;
  const purpose=[request.headers.get('purpose'),request.headers.get('sec-purpose'),request.headers.get('x-purpose')].join(' ');
  const ua=request.headers.get('user-agent')||'';
  if(!ua||/prefetch|prerender/i.test(purpose)||/bot|crawler|spider|preview|facebookexternalhit|kakaotalk-scrap|slackbot|curl|wget/i.test(ua))return false;

@@ -3,19 +3,19 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
 
-function paymentHandler({ user = { id: 'buyer' }, order, provider, finalized = [], updates = [], rpcError = null }) {
+function paymentHandler({ user = { id: 'buyer' }, authError = null, order, orderError = null, provider, finalized = [], updates = [], rpcError = null, env = { TOSS_SECRET_KEY: 'test-only' } }) {
   const source = fs.readFileSync(new URL('../app/api/platform/payment/route.ts', import.meta.url), 'utf8');
   const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const query = {
     select() { return this; },
     update(value) { updates.push(value); return this; },
     eq() { return this; },
-    async single() { return { data: order }; },
+    async maybeSingle() { return { data: order, error: typeof orderError === 'function' ? orderError() : orderError }; },
     then(resolve) { resolve({ data: null, error: null }); },
   };
   const db = { from: () => query, rpc: async (...args) => { finalized.push(args); return { error: rpcError }; } };
   const exports = {};
-  new Function('exports', 'require', 'fetch', 'process', 'Buffer', compiled)(exports, name => name.includes('server-auth') ? { getAuthenticatedUser: async () => user } : { createAdminClient: () => db }, provider, { env: { TOSS_SECRET_KEY: 'test-only' } }, Buffer);
+  new Function('exports', 'require', 'fetch', 'process', 'Buffer', compiled)(exports, name => name.includes('server-auth') ? { getAuthenticatedUser: async () => { const error = typeof authError === 'function' ? authError() : authError; if (error) throw error; return user; } } : name.endsWith('toss-environment') ? { tossMode: (client, secret) => client?.startsWith('test_') && secret?.startsWith('test_') ? 'test' : 'missing' } : { createAdminClient: () => db }, provider, { env }, Buffer);
   return exports.POST;
 }
 const request = (body = {}, origin = 'https://edu.example') => new Request('https://edu.example/api/platform/payment', { method: 'POST', headers: { origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ paymentKey: 'test-payment', orderId: 'BAE-1', amount: 1000, ...body }) });
@@ -33,6 +33,12 @@ test('tampering with the amount never reaches the payment provider', async () =>
   let called = false;
   const handler = paymentHandler({ order: { id: 'order', total_amount: 1000, status: 'pending' }, provider: async () => { called = true; } });
   assert.equal((await handler(request({ amount: 1 }))).status, 409);
+  assert.equal(called, false);
+});
+test('a missing owned order is rejected without charging', async () => {
+  let called = false;
+  const response = await paymentHandler({ order: null, provider: async () => { called = true; } })(request());
+  assert.equal(response.status, 409);
   assert.equal(called, false);
 });
 test('a completed order is idempotent and does not charge again', async () => {
@@ -156,4 +162,69 @@ test('a verified virtual account issuance is recorded without granting enrollmen
   assert.equal(finalized[0][1].p_amount, 1000);
   assert.equal(finalized[0][1].p_expires_at, providerData.virtualAccount.dueDate);
   assert.equal((await response.json()).status, 'waiting_for_deposit');
+});
+
+
+for (const [scenario, failure] of [
+  ['authentication outage', { authError: Object.assign(new Error('private auth detail'), { status: 503 }) }],
+  ['order lookup outage', { orderError: { code: 'DB_UNAVAILABLE', message: 'private order detail' } }],
+  ['order lookup error with data', { order: { id: 'order', total_amount: 1000, status: 'pending' }, orderError: { code: 'DB_UNAVAILABLE', message: 'private order detail' } }],
+]) {
+  test(`${scenario} returns a retryable response without charging`, async () => {
+    let providerCalls = 0;
+    const finalized = [], updates = [];
+    const response = await paymentHandler({ ...failure, finalized, updates, provider: async () => { providerCalls++; throw new Error('must not call provider'); } })(request());
+    assert.equal(response.status, 503);
+    const result = await response.json();
+    assert.equal(typeof result.error, 'string');
+    assert.doesNotMatch(result.error, /private|DB_UNAVAILABLE/);
+    assert.equal(providerCalls, 0);
+    assert.deepEqual(finalized, []);
+    assert.deepEqual(updates, []);
+  });
+}
+
+test('the same confirmation can succeed after authentication or order lookup recovers', async () => {
+  for (const dependency of ['authError', 'orderError']) {
+    let unavailable = true, providerCalls = 0;
+    const finalized = [], updates = [];
+    const handler = paymentHandler({
+      [dependency]: () => unavailable ? new Error('temporary dependency outage') : null,
+      order: { id: 'order', total_amount: 1000, status: 'pending' }, finalized, updates,
+      provider: async () => { providerCalls++; return Response.json({ paymentKey: 'test-payment', orderId: 'BAE-1', totalAmount: 1000, status: 'DONE', currency: 'KRW' }); },
+    });
+    assert.equal((await handler(request())).status, 503);
+    assert.equal(providerCalls, 0);
+    unavailable = false;
+    assert.equal((await handler(request())).status, 200);
+    assert.equal(providerCalls, 1);
+    assert.equal(finalized.length, 1);
+    assert.equal(finalized[0][0], 'finalize_toss_payment');
+    assert.deepEqual(updates, []);
+  }
+});
+
+// Quick transfer uses the existing confirmation/finalization path, never the deposit-wait path.
+test('quick transfer completion finalizes the verified amount and provider method', async () => {
+  const finalized = [];
+  const payment = { orderId: 'BAE-1', totalAmount: 1000, status: 'DONE', currency: 'KRW', paymentKey: 'test-payment', method: '계좌이체', approvedAt: '2026-10-12T00:00:00Z', transfer: { bankCode: '88', settlementStatus: 'INCOMPLETED' } };
+  const response = await paymentHandler({
+    order: { id: 'order', total_amount: 1000, status: 'pending' }, finalized,
+    provider: async () => Response.json(payment),
+  })(request());
+  assert.equal(response.status, 200);
+  assert.equal(finalized.length, 1);
+  assert.equal(finalized[0][0], 'finalize_toss_payment');
+  assert.equal(finalized[0][1].p_method, '계좌이체');
+  assert.equal(finalized[0][1].p_approved_amount, 1000);
+});
+
+test('widget callback uses its own key and mismatched session does not fail the order', async () => {
+  const calls = []; const updates = [];
+  const h = paymentHandler({ order: { id: 'order', status: 'pending', total_amount: 1000 }, updates,
+    env: { NEXT_PUBLIC_TOSS_CLIENT_KEY: 'test_ck_old', TOSS_SECRET_KEY: 'test_old', NEXT_PUBLIC_TOSS_WIDGET_CLIENT_KEY: 'test_gck_new', TOSS_WIDGET_SECRET_KEY: 'test_widget' },
+    provider: async (_, options) => { calls.push(options); return Response.json({code:'NOT_FOUND_PAYMENT_SESSION'}, {status: 400}); } });
+  assert.equal((await h(request({ integration: 'widget' }))).status, 409);
+  assert.equal(calls[0].headers.Authorization, 'Basic ' + Buffer.from('test_widget:').toString('base64'));
+  assert.deepEqual(updates, []);
 });

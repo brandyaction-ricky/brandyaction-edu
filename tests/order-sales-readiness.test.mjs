@@ -28,11 +28,11 @@ function setup(patch = {}, orderError = null, options = {}) {
         async single() { return options.attributionError ? { error: { message: 'synthetic attribution failure' } } : { data: { id: 'order' } }; },
       };
       assert.equal(table, 'cohorts');
-      return { select() { return this; }, eq() { return this; }, async single() { return { data: { ...offer, courses: { ...course, ...patch } } }; } };
+      return { select() { return this; }, eq() { return this; }, async single() { return { data: { ...offer, ...options.offerPatch, courses: { ...course, ...patch } } }; } };
     },
     async rpc(name, args) {
       calls.push({ name, args });
-      if (name === 'edu_checkout_with_coupon') return orderError ? { error: { message: orderError } } : { data: { orderId: 'order', totalAmount: options.free ? 0 : offer.price, ...(options.free ? { free: true } : {}) } };
+      if (name === 'edu_checkout_with_source') return orderError ? { error: { message: orderError } } : { data: { orderId: 'order', totalAmount: options.free ? 0 : offer.price, ...(options.free ? { free: true } : {}) } };
       assert.fail('Unexpected RPC ' + name);
       return { data: { totalAmount: offer.price } };
     },
@@ -52,34 +52,34 @@ test('paid order reaches the existing checkout RPC without any curriculum query 
   const response = await send();
   assert.equal(response.status, 200);
   assert.equal((await response.json()).orderId, 'order');
-  assert.deepEqual(calls.map(call => call.name), ['edu_checkout_with_coupon']);
+  assert.deepEqual(calls.map(call => call.name), ['edu_checkout_with_source']);
   assert.equal(calls[0].args.p_user_id, 'member');
-  assert.deepEqual(attribution, [{ entry_src: null }]);
+  assert.equal(calls[0].args.p_entry_src,null); assert.deepEqual(attribution, []);
 });
 
 test('checkout stores only the four agreed campaign sources on the order', async () => {
   for (const source of ['paid', 'organic', 'alumni', 'youtube', 'unknown']) {
-    const { attribution, send } = setup();
+    const { calls, attribution, send } = setup();
     assert.equal((await send(source)).status, 200);
-    assert.deepEqual(attribution, [{ entry_src: source === 'unknown' ? null : source }]);
+    assert.equal(calls[0].args.p_entry_src,source === 'unknown' ? null : source); assert.deepEqual(attribution, []);
   }
 });
 
-test('zero-total checkout records the source after atomic coupon finalization without a pending-status filter', async () => {
+test('zero-total checkout delegates source and coupon finalization to the same transaction', async () => {
   const { calls, attribution, attributionFilters, send } = setup({}, null, { free: true });
   const response = await send('paid');
   assert.equal(response.status, 200);
   assert.equal((await response.json()).free, true);
-  assert.deepEqual(calls.map(call => call.name), ['edu_checkout_with_coupon']);
-  assert.deepEqual(attribution, [{ entry_src: 'paid' }]);
-  assert.deepEqual(attributionFilters, [['id', 'order'], ['user_id', 'member']]);
+  assert.deepEqual(calls.map(call => call.name), ['edu_checkout_with_source']);
+  assert.equal(calls[0].args.p_entry_src,'paid'); assert.deepEqual(attribution, []);
+  assert.deepEqual(attributionFilters, []);
 });
 
-test('an attribution failure never reports a completed zero-total order as failed', async () => {
-  const { send } = setup({}, null, { free: true, attributionError: true });
+test('a transactional attribution failure does not report an order as completed', async () => {
+  const { send } = setup({}, 'ENTRY_SOURCE_ORDER_MISSING', { free: true });
   const response = await send('paid');
-  assert.equal(response.status, 200);
-  assert.equal((await response.json()).entrySourceRecorded, false);
+  assert.equal(response.status, 409);
+  assert.equal((await response.json()).free, undefined);
 });
 
 test('missing commercial details still block checkout before any order is created', async () => {
@@ -94,7 +94,7 @@ test('closed recruitment and capacity checks remain delegated to the transaction
   for (const error of ['RECRUIT_CLOSED', 'CAPACITY_EXCEEDED', 'ALREADY_ENROLLED']) {
     const { calls, send } = setup({}, error);
     assert.equal((await send()).status, 409);
-    assert.deepEqual(calls.map(call => call.name), ['edu_checkout_with_coupon']);
+    assert.deepEqual(calls.map(call => call.name), ['edu_checkout_with_source']);
   }
 });
 
@@ -106,3 +106,9 @@ test('checkout uses the saved delivery email and falls back to login when unset'
     assert.equal(calls[0].args.p_customer_email, preference || 'member@example.test');
   }
 });
+
+ test('archived product or cohort is rejected before order creation',async()=>{
+ for(const [patch, options] of [[{archived_at:'2026-10-01'},{}],[{}, {offerPatch:{archived_at:'2026-10-01'}}]]) {
+ const {calls,send}=setup(patch,null,options); const response=await send(); assert.equal(response.status,409); assert.match((await response.json()).error,/판매가 종료/); assert.deepEqual(calls,[]);
+ }
+ });

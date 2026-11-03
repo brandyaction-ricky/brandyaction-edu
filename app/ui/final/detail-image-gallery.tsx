@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDown, ArrowUp, GripVertical, ImagePlus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ImagePlus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { imagePreviewUrl } from "@/lib/qa-rules";
 import type { ProductDetailImage } from "@/lib/product-metadata";
+import { moveOrderedItem, useReorderDrag } from './reorder-drag';
 
 const MAX_IMAGES = 30;
 const MAX_BYTES = 20 * 1024 * 1024;
@@ -28,15 +29,14 @@ export function DetailImageGallery({ initial, disabled, onChange, onStatusChange
   const [images, setImages] = useState(initial);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
-  const [dragging, setDragging] = useState<number | null>(null);
   const update = (next: ProductDetailImage[]) => { setImages(next); onChange(); };
   const move = (index: number, offset: number) => {
     const target = index + offset;
     if (target < 0 || target >= images.length) return;
-    const next = [...images], [item] = next.splice(index, 1);
-    next.splice(target, 0, item);
-    update(next);
+    update(moveOrderedItem(images, index, target));
   };
+  const dragIds = images.map((image, index) => `${image.path}:${index}`);
+  const drag = useReorderDrag(dragIds, (from, to) => update(moveOrderedItem(images, from, to)), disabled || uploading);
   async function upload(files: FileList | null) {
     if (!files?.length) return;
     if (images.length + files.length > MAX_IMAGES) {
@@ -83,8 +83,9 @@ export function DetailImageGallery({ initial, disabled, onChange, onStatusChange
     {images.length > 0 && <div className="detail-gallery-list">
       {images.map((image, index) => {
         const preview = imagePreviewUrl(image.path, process.env.NEXT_PUBLIC_SUPABASE_URL || "");
-        return <article className={`detail-gallery-item${dragging === index ? " is-dragging" : ""}`} key={`${image.path}-${index}`} draggable={!disabled && !uploading} onDragStart={event => { setDragging(index); event.dataTransfer.effectAllowed = "move"; }} onDragEnd={() => setDragging(null)} onDragOver={event => { if (dragging !== null && dragging !== index) { event.preventDefault(); event.dataTransfer.dropEffect = "move"; } }} onDrop={event => { event.preventDefault(); if (dragging === null || dragging === index) return; const next = [...images], [item] = next.splice(dragging, 1); next.splice(index, 0, item); update(next); setDragging(null); }}>
-          <GripVertical className="detail-gallery-grip" aria-hidden="true" />
+        const dragId = dragIds[index];
+        return <article className={`detail-gallery-item${drag.draggedId === dragId ? " is-dragging" : ""}${drag.overId === dragId ? ' reorder-item-over' : ''}`} key={`${image.path}-${index}`} {...drag.row(dragId)}>
+          {drag.handle(dragId, image.name || `상세 이미지 ${index + 1}`)}
           {preview ? <img src={preview} alt="" /> : <div className="detail-gallery-missing">미리보기 없음</div>}
           <div className="detail-gallery-copy"><b>상세 이미지 {String(index + 1).padStart(2, "0")}</b><span>{image.name}</span><input aria-label={`${index + 1}번째 이미지 대체 문구`} value={image.alt} maxLength={500} placeholder="이미지 설명 (선택)" disabled={disabled || uploading} onChange={event => update(images.map((entry, position) => position === index ? { ...entry, alt: event.target.value } : entry))} /></div>
           <div className="detail-gallery-actions">

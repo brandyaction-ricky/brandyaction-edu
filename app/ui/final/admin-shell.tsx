@@ -18,6 +18,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import type { Data } from "../learning-workflows";
 import { AdminSuccessState, AdminSummaryCard, PageHeader, adminNavigationIcon } from "@/features/admin-ui";
+import usability from './usability.module.css';
 
 export { AdminShell } from "@/features/admin-ui";
 
@@ -27,6 +28,7 @@ export const finalAdminGroups = [
     [
       "products",
       "cohorts",
+      "learning",
       "contents",
       "missions",
       "members",
@@ -40,10 +42,10 @@ export const finalAdminGroups = [
   ["마케팅·전환", ["conversion", "landing", "analytics", "campaigns", "templates", "automations", "seo", "settings"]],
 ] as const;
 export const finalAdminTitles: Record<string, string> = {
-  products: "상품·커리큘럼 관리",
+  products: "상품·판매 설정",
   conversion: "모집·문의 검토",
   landing: "광고·웨비나 성과",
-  learning: "학습 콘텐츠 관리",
+  learning: "커리큘럼 편집",
   weeks: "주차 구성",
   contents: "영상·자료 관리",
   members: "회원 미션관리",
@@ -68,7 +70,7 @@ export const sectionDescription: Record<string, string> = {
   tags: "고객의 수강·구매 행동과 운영 기준으로 태그를 관리합니다.",
   coupons: "할인 금액·기간·수량과 적용 조건을 관리합니다.",
   "product-reviews": "수강 후기를 검토하고 공개 여부와 대표 노출을 관리합니다.",
-  banners: "프론트 메인 배너의 문구·이미지·CTA·슬라이드 순서와 노출 기간을 관리합니다.",
+  banners: "고객 첫 화면의 문구·이미지·버튼과 표시 순서·기간을 관리합니다.",
   articles: "글·영상 콘텐츠의 편집과 공개 상태를 관리합니다.",
   testimonials: "홈페이지에 노출할 고객 사례와 영상을 관리합니다.",
   orders: "주문·결제·환불 상태와 수강 권한을 함께 확인합니다.",
@@ -182,7 +184,7 @@ export function LegacyAdminShell({
       <a className="skip" href="#admin-content">
         본문으로 이동
       </a>
-      <aside className={"sidebar " + (mobile ? "open" : "")} id="admin-sidebar">
+      <aside className={"sidebar adm-sidebar " + (mobile ? "open" : "")} id="admin-sidebar">
         <button
           type="button"
           className="btn ghost sidebar-close"
@@ -198,9 +200,6 @@ export function LegacyAdminShell({
             <small>EDU / ADMIN</small>
           </span>
         </Link>
-        <div className="workspace-label">
-          <span className="square">B</span>클래스 운영 워크스페이스
-        </div>
         <nav aria-label="관리자 카테고리">
           {navLink("overview")}
           {finalAdminGroups
@@ -243,8 +242,8 @@ export function LegacyAdminShell({
           </div>
         </div>
       </aside>
-      <div className="app">
-        <header className="topbar">
+      <div className="app adm-main">
+        <header className="topbar adm-topbar">
           <div className="crumb">
             <button
               className="btn iconbtn ghost mobile-menu"
@@ -285,7 +284,7 @@ export function LegacyAdminShell({
             </span>
           </div>
         </header>
-        <div className={`content admin-content-${contentWidth}`} id="admin-content" tabIndex={-1}>
+        <div className={`content adm-page admin-content-${contentWidth}`} id="admin-content" tabIndex={-1}>
           {children}
         </div>
       </div>
@@ -317,19 +316,7 @@ export function Overview({
           </Link>
         )}
       </AdminHeading>
-      <div className="category-strip">
-        {finalAdminGroups.map(([title, keys]) => {
-          const first = keys.find(can),
-            Icon = adminNavigationIcon(first || "");
-          return first ? (
-            <Link href={"/admin/" + first} key={title}>
-              <Icon />
-              <h3>{title}</h3>
-              <p>{keys.filter(can).length}개 메뉴</p>
-            </Link>
-          ) : null;
-        })}
-      </div>
+      {can("learning-care") && <div className={usability.overviewAction}><Link className="btn primary" href="/admin/learning-care">수강생 현황 · 학습과 미션 한눈에 보기 <ArrowRight/></Link></div>}
       <div className="metrics">
         {can("reviews") && (
           <Metric
@@ -524,6 +511,15 @@ export function Overview({
           </section>
         </div>
       </div>
+      <section className={usability.menuSection} aria-label="운영 메뉴 바로가기">
+        <div className={usability.scopeHeading}><h2>운영 메뉴 바로가기</h2></div>
+        <div className={usability.menuLinks}>
+          {finalAdminGroups.map(([title, keys]) => {
+            const first = keys.find(can), Icon = adminNavigationIcon(first || "");
+            return first ? <Link href={"/admin/" + first} key={title}><Icon /><h3>{title}</h3><p>{keys.filter(can).length}개 메뉴</p></Link> : null;
+          })}
+        </div>
+      </section>
     </>
   );
 }

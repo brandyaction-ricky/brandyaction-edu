@@ -1,5 +1,7 @@
 import { dispatchDueCrm } from "@/lib/crm-delivery";
 
+import { dispatchPurchaseBuyerDelivery } from "@/lib/purchase-buyer-delivery-server";
+
 export const maxDuration = 60;
 
 export async function GET(request: Request) {
@@ -16,7 +18,10 @@ export async function GET(request: Request) {
       { headers: { "Cache-Control": "no-store" } },
     );
   try {
-    return Response.json({ ok: true, ...(await dispatchDueCrm()) });
+    const [crm, purchase] = await Promise.allSettled([dispatchDueCrm(), dispatchPurchaseBuyerDelivery()]);
+    if (purchase.status === "rejected") console.error("purchase buyer delivery queue failed");
+    if (crm.status === "rejected") throw crm.reason;
+    return Response.json({ ok: true, ...crm.value, purchaseQueueOk: purchase.status === "fulfilled" });
   } catch (error) {
     console.error(
       "crm cron",

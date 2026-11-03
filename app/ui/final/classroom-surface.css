@@ -1,0 +1,10 @@
+.edu-front .learning-bg { background:#f6f8fb; }
+.edu-front .learning-bg .learning-nav, .edu-front .learning-bg .lesson-header, .edu-front .learning-bg .reading { border-color:#e2e6ec; border-radius:18px; box-shadow:0 4px 18px #17223804; }
+.edu-front .learning-bg .lesson-header h1 { letter-spacing:-.025em; line-height:1.45; }
+.edu-front .learning-bg .lesson-nav { border-radius:10px; margin:4px 0; }
+.edu-front .learning-bg .lesson-nav.active { background:#fff0f2; }
+.edu-front .learning-bg .btn { border-radius:10px; }
+.edu-front .learning-bg .learning-mobile-toggle { border-radius:12px; }
+.edu-front .learning-bg .lesson-week-title { color:#69758a; font-size:12px; font-weight:600; }
+.edu-front .learning-bg .lesson-bottom { gap:12px; }
+@media(max-width:540px) { .edu-front .learning-bg .lesson-header, .edu-front .learning-bg .reading { border-radius:14px; } }

@@ -24,3 +24,8 @@ test('maskable artwork fits the 40 percent safe circle and every app tile is opa
  for(let y=0;y<info.height;y++)for(let x=0;x<info.width;x++){const index=(y*info.width+x)*4;assert.equal(data[index+3],255);if(data[index]>240&&data[index+1]>240&&data[index+2]>240){white++;assert.ok(Math.hypot(x-256,y-256)<512*.4,`mark clipped at ${x},${y}`);}}
  assert.ok(white>10000);const badge=await sharp(new URL('../public/icons/edu-badge-96.png',import.meta.url).pathname).metadata();assert.equal(badge.width,96);assert.equal(badge.hasAlpha,true);
 });
+
+test('Chrome install guidance excludes embedded and other Chromium browsers',()=>{
+ for(const ua of ['Chrome/140.0 Safari/537.36','iPhone CriOS/140.0 Mobile/15E148 Safari/604.1'])assert.equal(rules.chromeInstallBrowser(ua),true,ua);
+ for(const ua of ['Version/18 Safari/605','Chrome/140.0 Whale/4.0','Chrome/140.0 Edg/140.0','Chrome/140.0 EdgA/140.0','CriOS/140 EdgiOS/140','Chrome/140 OPR/10','Chrome/140 SamsungBrowser/29','Chrome/140 KAKAOTALK','Chrome/140 NAVER','Chrome/140 Android; wv)'])assert.equal(rules.chromeInstallBrowser(ua),false,ua);
+});

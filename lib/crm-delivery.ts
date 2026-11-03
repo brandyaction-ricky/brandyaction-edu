@@ -3,8 +3,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { purchaseContact, purchaseGuideLink } from "@/lib/crm-purchase-contact";
 import { maskEmail, purchaseEmailConfigured, sendPurchaseEmail } from "@/lib/crm-purchase-email";
 import { loadSmsSettings, marketingAllowedNow, marketingText, nextMarketingWindow, type SmsSettings } from "@/lib/crm-sms-settings";
+import { recruitmentMessageLinks } from "@/lib/entry-source";
 
-type Template = {
+export type Template = {
   id: string;
   channel: "sms" | "lms" | "alimtalk";
   purpose: "marketing" | "transactional";
@@ -13,7 +14,7 @@ type Template = {
   is_active?: boolean;
   buttons?: unknown;
 };
-type Member = {
+export type Member = {
   id: string;
   phone?: string | null;
   full_name?: string | null;
@@ -23,6 +24,10 @@ type Member = {
   marketing_consent_at?: string | null;
   marketing_opt_out_at?: string | null;
   status?: string;
+  entry_channel?: string;
+  recruitment?: boolean;
+  purchaseBatch?: boolean;
+  purchaseRoomLink?: string | null;
 };
 
 const digits = (value: unknown) => String(value || "").replace(/\D/g, "");
@@ -66,7 +71,8 @@ function message(
 ): MessageSchema {
   if (template.is_active === false)
     throw new Error("사용 중지된 템플릿은 발송할 수 없습니다.");
-  const content = render(template.content, member);
+  const raw = member.recruitment ? recruitmentMessageLinks(template.content, member.entry_channel) : template.content;
+  const content = render(member.purchaseRoomLink ? raw.replaceAll("{{roomLink}}", member.purchaseRoomLink).replaceAll("#{공지방링크}", member.purchaseRoomLink) : raw, member);
   if (template.channel === "alimtalk") {
     if (template.purpose === "marketing")
       throw new Error("마케팅 안내는 정보성 알림톡으로 발송할 수 없습니다. 광고 문자 템플릿을 사용해 주세요.");
@@ -80,6 +86,13 @@ function message(
       kakaoOptions: {
         pfId: process.env.SOLAPI_KAKAO_PF_ID,
         templateId: template.alimtalk_template_id,
+        ...(member.purchaseBatch ? {
+          disableSms: true,
+          variables: {
+            ...(template.content.includes("#{이름}") ? { "#{이름}": member.full_name || "회원" } : {}),
+            ...(member.purchaseRoomLink ? { "#{공지방링크}": member.purchaseRoomLink } : {}),
+          },
+        } : {}),
       },
     };
   }
@@ -156,10 +169,10 @@ async function providerOptOuts(service: SolapiMessageService, sender: string) {
   throw new Error("080 수신거부 목록을 끝까지 확인하지 못해 발송을 중단했습니다.");
 }
 
-async function sendBatch(
+export async function sendBatch(
   template: Template,
   members: Member[],
-  context: { campaignId?: string; recruitment?: boolean; automationRuns?: Record<string, string> },
+  context: { campaignId?: string; purchaseBatchId?: string; purchaseRoomLink?: string | null; recruitment?: boolean; automationRuns?: Record<string, string> },
   settings: SmsSettings,
 ) {
   const active = provider(settings.senderPhone);
@@ -171,7 +184,7 @@ async function sendBatch(
   if (template.channel === "alimtalk" && template.purpose === "marketing")
     throw new Error("마케팅 안내는 정보성 알림톡으로 발송할 수 없습니다.");
   const db = createAdminClient();
-  let currentMembers = members;
+  let currentMembers = context.purchaseBatchId ? members.map(member => ({ ...member, purchaseBatch: true, purchaseRoomLink: context.purchaseRoomLink })) : members;
   if (template.purpose === "marketing" && members.length) {
     // Recheck current consent and phone after campaign selection or recruitment claims.
     const latest = await db.from("profiles")
@@ -181,7 +194,8 @@ async function sendBatch(
     const byId = new Map((latest.data || []).map((member) => [member.id, member]));
     currentMembers = members.flatMap((member) => {
       const current = byId.get(member.id);
-      return current && digits(current.phone) === digits(member.phone) ? [current] : [];
+      return current && digits(current.phone) === digits(member.phone)
+        ? [{ ...current, entry_channel: member.entry_channel, recruitment: member.recruitment }] : [];
     });
   }
   const now = Date.now();
@@ -199,6 +213,7 @@ async function sendBatch(
     return { sent: 0, failed: members.length, disabled: false };
   const logs = eligible.map((member) => ({
     campaign_id: context.campaignId || null,
+    ...(context.purchaseBatchId ? { purchase_batch_id: context.purchaseBatchId } : {}),
     automation_run_id: context.automationRuns?.[member.id] || null,
     member_id: member.id,
     channel: template.channel,
@@ -225,7 +240,7 @@ async function sendBatch(
         sent_at: new Date().toISOString(),
       })
       .in("id", ids);
-    if (accepted.error && context.recruitment) throw new Error("발송 접수 기록을 확인하지 못했습니다.");
+    if (accepted.error && (context.recruitment || context.purchaseBatchId)) throw new Error("발송 접수 기록을 확인하지 못했습니다.");
     const failedPhones = new Set(
       response.failedMessageList.map((item) => digits(item.to)),
     );
@@ -252,22 +267,22 @@ async function sendBatch(
       disabled: false,
     };
   } catch (error) {
-    const reason = context.recruitment ? "메시지 사업자 접수 결과를 확인할 수 없습니다. 자동 재발송하지 않습니다." :
+    const reason = (context.recruitment || context.purchaseBatchId) ? "메시지 사업자 접수 결과를 확인할 수 없습니다. 자동 재발송하지 않습니다." :
       error instanceof Error
         ? error.message.slice(0, 500)
         : "메시지 사업자 요청 실패";
     await db
       .from("crm_message_logs")
       .update({
-        status: context.recruitment ? "unknown" : "failed",
-        provider_status: context.recruitment ? "unknown" : "failed",
+        status: (context.recruitment || context.purchaseBatchId) ? "unknown" : "failed",
+        provider_status: (context.recruitment || context.purchaseBatchId) ? "unknown" : "failed",
         error_message: reason,
       })
       .in(
         "id",
         inserted.data.map((log) => log.id),
       );
-    throw context.recruitment ? new Error(reason) : error;
+    throw (context.recruitment || context.purchaseBatchId) ? new Error(reason) : error;
   }
 }
 
@@ -359,7 +374,7 @@ export async function dispatchDueCrm() {
           if (claim.error) throw new Error('모집 안내 발송 전 검토가 중단됐습니다. 모집·문구·권한을 다시 확인해 주세요.');
           if (!claim.data || !Array.isArray(claim.data.members) || !claim.data.template)
             throw new Error('모집 안내 대상 응답을 확인하지 못했습니다.');
-          selectedMembers = claim.data.members;
+          selectedMembers = claim.data.members.map((member: Member) => ({ ...member, recruitment: true }));
           selectedTemplate = claim.data.template;
         } else {
           let ids: string[] | null = null;

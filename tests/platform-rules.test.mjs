@@ -36,6 +36,8 @@ test('published paid products can sell an upcoming cohort until its actual deadl
   assert.equal(isPurchasableOffer({ ...course, status: 'draft' }, upcoming, now), false);
   assert.equal(isPurchasableOffer({ ...course, category: 'free' }, upcoming, now), false);
   assert.equal(isPurchasableOffer(course, { ...upcoming, recruitment_end_at: '2026-09-11T12:00:00Z' }, now), false);
+  // A staged re-entry cohort has no recruitment dates until student publication.
+  assert.equal(isPurchasableOffer(course, { status: 'upcoming', recruitment_start_at: null, recruitment_end_at: null }, now), false);
 });
 
 test('paid products expose missing sales requirements before checkout', () => {

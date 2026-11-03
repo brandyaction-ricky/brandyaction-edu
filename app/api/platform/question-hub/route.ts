@@ -8,6 +8,11 @@ export async function GET(request: Request) {
     const user = await actor(), params = new URL(request.url).searchParams, db = createAdminClient();
     const mode = params.get('mode') || 'mine', page = Number(params.get('page') || 0);
     if (!Number.isInteger(page) || page < 0 || page > 10000) hubFail('페이지를 확인해 주세요.');
+    if (mode === 'public') {
+      const query = params.get('q') || ''; if (query.length > 500) hubFail('검색어가 너무 깁니다.');
+      const r = await db.rpc('edu_read_cohort_questions', { p_actor: user.id, p_query: query, p_enrollment: hubId(params.get('enrollment'), true), p_lesson: hubId(params.get('lesson'), true), p_page: page, p_include_own: false });
+      if (r.error) throw r.error; return hubReply(r.data);
+    }
     if (mode === 'shared') {
       const query = params.get('q') || ''; if (query.length > 1000) hubFail('검색어가 너무 깁니다.');
       const r = await db.rpc('edu_search_shared_answers', { p_actor: user.id, p_query: query, p_enrollment: hubId(params.get('enrollment'), true), p_lesson: hubId(params.get('lesson'), true), p_page: page });
@@ -17,7 +22,7 @@ export async function GET(request: Request) {
     if (access.error) throw access.error;
     if (mode === 'contexts') return hubReply({ contexts: (access.data || []).map((c: { enrollment_id: string; lesson_id: string; label: string; recent: boolean }) => ({ enrollmentId: c.enrollment_id, lessonId: c.lesson_id, label: c.label, recent: c.recent })) });
     if (mode !== 'mine') hubFail('조회 항목을 확인해 주세요.');
-    let read = db.from('edu_questions').select('id,title,content,answer,status,is_resolved,created_at,learning_context,image_id,sharing_requested,category').eq('user_id', user.id).eq('is_archived', false).order('created_at', { ascending: false }).order('id').range(page * 20, page * 20 + 20);
+    let read = db.from('edu_questions').select('id,title,content,answer,status,is_resolved,created_at,learning_context,image_id,sharing_requested,category,visibility').eq('user_id', user.id).eq('is_archived', false).order('created_at', { ascending: false }).order('id').range(page * 20, page * 20 + 20);
     const target = hubId(params.get('question'), true); if (target) read = read.eq('id', target);
     const r = await read;
     if (r.error) throw r.error; return hubReply({ questions: (r.data || []).slice(0, 20), hasMore: (r.data || []).length > 20 });
@@ -28,7 +33,8 @@ export async function POST(request: Request) {
     const user = await actor(), body = await hubBody(request);
     if (typeof body.content !== 'string' || body.content.length > 10000 || typeof body.title !== 'string' || body.title.length > 200 || !Object.hasOwn(questionCategories, body.category) || typeof body.share !== 'boolean') hubFail('질문 내용을 확인해 주세요.');
     if (body.imageId && process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED !== 'true') hubFail('이미지 첨부를 사용할 수 없습니다.');
-    const r = await createAdminClient().rpc('edu_create_hub_question', { p_actor: user.id, p_request: hubId(body.requestId), p_enrollment: hubId(body.enrollmentId, true), p_lesson: hubId(body.lessonId, true), p_title: questionTitle(body.content, body.title), p_content: body.content, p_image: hubId(body.imageId, true), p_category: body.category, p_share: body.share });
+    if (body.visibility !== undefined && !['private', 'cohort'].includes(body.visibility)) hubFail('공개 범위를 확인해 주세요.');
+    const r = await createAdminClient().rpc(body.visibility === undefined ? 'edu_create_hub_question' : 'edu_create_visible_question', { p_actor: user.id, p_request: hubId(body.requestId), p_enrollment: hubId(body.enrollmentId, true), p_lesson: hubId(body.lessonId, true), p_title: questionTitle(body.content, body.title), p_content: body.content, p_image: hubId(body.imageId, true), p_category: body.category, ...(body.visibility === undefined ? { p_share: body.share } : { p_visibility: body.visibility }) });
     if (r.error) throw r.error; return hubReply({ question: r.data });
   } catch (e) { return hubError(e); }
 }

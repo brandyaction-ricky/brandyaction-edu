@@ -3,10 +3,10 @@ import { createECDH, ECDH } from 'node:crypto';
 import webpush from 'web-push';
 import { createAdminClient } from '@/lib/supabase/admin';
 
-const paths = new Set(['/my/messages', '/my/questions', '/my/missions', '/admin/questions', '/admin/reviews', '/admin/reviews?tab=blocks', '/admin/reviews?tab=missions']);
-const allowedPath = (value: string) => paths.has(value) || /^\/my\/questions\?question=[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value) || /^\/learn\/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}\/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value);
+const paths = new Set(['/my/messages', '/my/questions', '/admin/questions', '/my/diagnosis', '/admin/diagnosis']);
+const allowedPath = (value: string) => paths.has(value) || /^\/my\/questions\?question=[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value);
 export function pushConfiguration() {
-  if (process.env.EDU_WEB_PUSH_ENABLED !== 'true' || process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED !== 'true') return null;
+  if (process.env.EDU_WEB_PUSH_ENABLED !== 'true' || process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED !== 'true') return null;
   const publicKey = process.env.EDU_WEB_PUSH_PUBLIC_KEY || '', privateKey = process.env.EDU_WEB_PUSH_PRIVATE_KEY || '', subject = process.env.EDU_WEB_PUSH_SUBJECT || '';
   try {
     if (!/^[A-Za-z0-9_-]{87}$/.test(publicKey) || !/^[A-Za-z0-9_-]{43}$/.test(privateKey)) return null;
@@ -22,6 +22,7 @@ export function validatePushEndpoint(value: unknown): string {
   // Push URLs are capability secrets and server destinations. Never accept an
   // arbitrary URL, custom port, credentials, IP or provider-looking suffix.
   const accepted = (url.hostname === 'fcm.googleapis.com' && /^\/(fcm\/send|wp)\//.test(url.pathname))
+    || (url.hostname === 'jmt17.google.com' && /^\/fcm\/send\//.test(url.pathname))
     || (url.hostname === 'updates.push.services.mozilla.com' && /^\/wpush\/v[12]\//.test(url.pathname))
     || (url.hostname === 'web.push.apple.com' && url.pathname.length > 1);
   if (!accepted || url.protocol !== 'https:' || url.port || url.username || url.password || url.hash || value !== url.href) throw new Error('PUSH_INVALID');
@@ -54,6 +55,7 @@ export async function dispatchWebPush(dependencies?: { rpc: Rpc; send: typeof we
       const job = jobs[index++];
       const finish = (outcome: string, code: string) => call('edu_finish_push', { p_id: job.id, p_lease: job.lease, p_outcome: outcome, p_code: code });
       const delivery = await call('edu_read_push_delivery', { p_id: job.id, p_lease: job.lease }) as Delivery | null;
+      if (delivery?.path === '/my/messages' && process.env.EDU_CARE_DELIVERY_ENABLED !== 'true') { await finish('skipped', 'CARE_DISABLED'); continue; }
       if (!delivery) { await finish('skipped', 'NO_LONGER_ELIGIBLE'); continue; }
       let subscription;
       try {

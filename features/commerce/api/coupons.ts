@@ -25,7 +25,7 @@ export async function GET(request: Request) {
       return reply({ error: "쿠폰 목록은 제공하지 않습니다. 보유한 쿠폰 코드를 등록해 주세요." }, 405);
     }
     const service = createCouponService(createCouponRepository());
-    return reply(await service.getHistory(user, params.get("history"), params.get("page")));
+    return reply(await service.getHistory(user, params.get("history"), params.get("page"), params.get("view")));
   } catch (cause) {
     return applicationError(cause, "쿠폰 정보를 불러오지 못했습니다. 다시 시도해 주세요.");
   }

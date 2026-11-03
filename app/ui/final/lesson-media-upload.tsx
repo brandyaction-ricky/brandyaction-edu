@@ -29,14 +29,14 @@ export function LessonMediaUpload({ courseId, kind, assetId, disabled, onReady, 
     catch (error) { setMessage((error as Error).message); return; }
     upload.current = { file, requestId: crypto.randomUUID(), courseId }; void run();
   }
-  const label = kind === 'image' ? '이미지' : kind === 'audio' ? '음성' : '영상';
+  const label = kind === 'image' ? '이미지' : kind === 'audio' ? '음성' : kind === 'file' ? '첨부' : '영상';
   return <div className="lba-media-upload" onPaste={event => {
     if (kind !== 'image' || disabled || active.current) return;
     const files = [...event.clipboardData.files].filter(file => file.type.startsWith('image/'));
     if (files.length) { event.preventDefault(); if (files.length > 1) setMessage('이미지는 한 번에 한 장씩 붙여 넣어 주세요.'); else select(files[0]); }
   }} tabIndex={kind === 'image' ? 0 : undefined} aria-label={`${label} 파일 등록`}>
     <label className="lb-field"><span>{label} 파일 선택</span><input type="file" aria-label={`${label} 파일 선택`} disabled={disabled || pending || !courseId} accept={Object.entries(lessonMediaTypes).filter(([, value]) => value.kind === kind).map(([ext]) => '.' + ext).join(',')} onChange={event => { select(event.target.files?.[0]); event.target.value = ''; }} /></label>
-    <p className="meta">{kind === 'image' ? '10MB 이하 · 이 영역을 클릭한 뒤 복사한 이미지를 붙여 넣을 수도 있습니다.' : '50MB 이하 · 큰 파일은 영상 서비스에 올린 뒤 주소로 연결해 주세요.'} {!courseId && '먼저 주차를 선택해 주세요.'}</p>
+    <p className="meta">{kind === 'file' ? '50MB 이하 · PDF·ZIP·DOCX·XLSX·PPTX·HWP·HWPX·TXT·MD·CSV' : kind === 'image' ? '10MB 이하 · 이 영역을 클릭한 뒤 복사한 이미지를 붙여 넣을 수도 있습니다.' : '50MB 이하 · 큰 파일은 영상 서비스에 올린 뒤 주소로 연결해 주세요.'} {!courseId && '먼저 주차를 선택해 주세요.'}</p>
     {assetId && <a href={lessonMediaUrl(assetId)} target="_blank" rel="noopener noreferrer">연결된 {label} 열기</a>}
     {message && <p role={retry ? 'alert' : 'status'}>{message}</p>}
     {retry && <button type="button" className="btn small" disabled={disabled || pending} onClick={() => { if (upload.current?.courseId !== courseId) { upload.current = null; setRetry(false); setMessage('주차가 바뀌었습니다. 파일을 다시 선택해 주세요.'); } else void run(); }}>같은 파일 다시 올리기</button>}

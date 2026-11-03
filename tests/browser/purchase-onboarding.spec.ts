@@ -3,59 +3,86 @@ import { expect, test } from '@playwright/test';
 const order = '11111111-1111-4111-8111-111111111111';
 const cohort = '22222222-2222-4222-8222-222222222222';
 
-test('Moonshot fourth buyer sees install and room guidance without a web survey', async ({ page }) => {
+const initialProgress = () => ({ telegram: false, app: false, orientation: false, learning: false,
+  orientationAt: '2026-11-06T20:00:00+09:00', lesson: { id: 'guide', title: '운영 가이드와 규정', url: '/learn/enrollment/guide', completed: false }, comment: '' });
+test('four steps persist across reload and require schedule, real learning and comment', async ({ page }, testInfo) => {
+  const progress = initialProgress();
+  let fail = false;
   const actions: string[] = [];
   await page.route('https://t.me/+ExampleCode123', route => route.fulfill({ body: 'Synthetic Telegram destination' }));
   await page.route('**/api/purchase-onboarding*', route => {
-    if (route.request().method() === 'GET') return route.fulfill({ json: { available: true, telegramOnly: true, orderId: order,
-      orderNumber: 'QA-4', itemName: '문샷 챌린지 4기', roomName: '4기 교육생 공지방', supportUrl: 'http://pf.kakao.com/_ydxjhxj/chat' } });
-    actions.push(route.request().postDataJSON().action);
-    return route.fulfill({ json: { ok: true, url: 'https://t.me/+ExampleCode123' } });
+    if (route.request().method() === 'GET') return route.fulfill({ json: { available: true, telegramOnly: true, orderId: order, itemName: '문샷 챌린지 4기', roomName: '4기 교육생 공지방', supportUrl: '', progress } });
+    const body = route.request().postDataJSON(); actions.push(body.action);
+    if (body.action === 'link') return route.fulfill({ json: { ok: true, url: 'https://t.me/+ExampleCode123' } });
+    if (fail) return route.fulfill({ status: 503, json: { error: '저장하지 못했습니다.' } });
+    if (body.step === 'learning') { progress.learning = true; progress.comment = body.comment; }
+    else if (body.step === 'orientation') { expect(body.orientationAt).toBe(progress.orientationAt); progress.orientation = true; }
+    else if (body.step === 'telegram') progress.telegram = true;
+    else if (body.step === 'app') progress.app = true;
+    return route.fulfill({ json: { ok: true } });
   });
   await page.goto(`/purchase-onboarding?order=${order}`);
-  await expect(page.getByRole('heading', { name: '4기 교육생 공지방에 입장해 주세요' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '어떤 경로로 참여하셨나요?' })).toHaveCount(0);
   await page.getByRole('button', { name: '텔레그램이 처음이에요' }).click();
   await expect(page.getByRole('link', { name: 'iPhone 앱 설치' })).toHaveAttribute('href', 'https://telegram.org/dl/ios');
-  await expect(page.getByRole('link', { name: 'Android 앱 설치' })).toHaveAttribute('href', 'https://telegram.org/dl/android');
-  await expect(page.getByText('1. 휴대폰에 텔레그램 앱을 설치하세요.')).toBeVisible();
-  await expect(page.getByText('2. 이 안내 화면으로 돌아와 아래 버튼으로 공지방에 입장하세요.')).toBeVisible();
-  await expect(page.getByText(/닉네임\/4기|고정 게시물|휴대폰 번호로 가입/)).toHaveCount(0);
-  await expect(page.getByRole('link', { name: '고객센터 문의' })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: '내 클래스 보기' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '초대 링크 복사' })).toHaveCount(0);
   const [room] = await Promise.all([page.waitForEvent('popup'), page.getByRole('button', { name: '텔레그램 공지방 입장' }).click()]);
-  await expect(room).toHaveURL('https://t.me/+ExampleCode123');
-  await expect(page).toHaveURL(`/purchase-onboarding?order=${order}`);
-  await expect(page.getByRole('heading', { name: '공지방에 들어오셨나요?' })).toBeVisible();
-  await expect(page.getByRole('link', { name: '내 클래스 확인하기' })).toHaveAttribute('href', '/my/classes');
-  expect(actions).toEqual(['link']);
+  await expect(room).toHaveURL('https://t.me/+ExampleCode123'); await room.close();
+  await expect(page.getByRole('checkbox', { name: /공지방에 입장했어요/ })).not.toBeChecked();
+  fail = true; await page.getByRole('checkbox', { name: /공지방에 입장했어요/ }).click();
+  await expect(page.getByRole('alert')).toContainText('저장하지 못했습니다');
+  fail = false; await page.getByRole('checkbox', { name: /공지방에 입장했어요/ }).click();
+  await expect(page.getByRole('heading', { name: '브랜디에듀 앱을 설치해 주세요' })).toBeVisible();
+  await page.reload(); await expect(page.getByRole('heading', { name: '브랜디에듀 앱을 설치해 주세요' })).toBeVisible();
+  await page.getByRole('button', { name: '그림 보며 따라 하기' }).click();
+  await page.getByRole('checkbox', { name: /브랜디에듀 아이콘을 추가하고 열어 봤어요/ }).click();
+  await expect(page.getByText(/2026년 11월 6일/)).toBeVisible();
+  await expect(page.getByText(/OT 시청은 필요하지 않아요/)).toBeVisible();
+  await page.screenshot({path: `/tmp/edu-onboarding-${testInfo.project.name}.png`, fullPage: true});
+  await page.getByRole('checkbox', { name: 'OT 일정을 확인했어요' }).click();
+  const save = page.getByRole('button', { name: '댓글 저장하고 시작 준비 완료' });
+  await page.getByRole('textbox', { name: '확인 댓글' }).fill('운영 가이드와 규정을 읽고 확인했습니다.');
+  await expect(save).toBeDisabled();
+  await expect(page.getByRole('link', { name: '운영 가이드 학습 열기' })).toHaveAttribute('href', '/learn/enrollment/guide');
+  progress.lesson.completed = true; await page.getByRole('button', { name: '학습 완료 다시 확인' }).click();
+  await expect(save).toBeEnabled(); await save.click();
+  await expect(page.getByRole('heading', { name: '시작 준비를 모두 마쳤어요!' })).toBeVisible();
+  await page.reload(); await expect(page.getByText('저장한 댓글: 운영 가이드와 규정을 읽고 확인했습니다.')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(actions).toContain('confirm');
 });
 
-test('existing Telegram users keep only room entry and can retry a failed link request', async ({ page }) => {
-  let fail = true;
-  await page.route('https://t.me/+ExampleCode123', route => route.fulfill({ body: 'Synthetic Telegram destination' }));
-  await page.route('**/api/purchase-onboarding*', route => {
-    if (route.request().method() === 'GET') return route.fulfill({ json: { available: true, telegramOnly: true, orderId: order, itemName: '문샷 챌린지 4기', orderNumber: 'QA-4', supportUrl: 'https://example.com/help' } });
-    expect(route.request().postDataJSON()).toEqual({ action: 'link', order });
-    return route.fulfill({ status: fail ? 503 : 200, json: fail ? { error: '잠시 후 다시 시도해 주세요.' } : { ok: true, url: 'https://t.me/+ExampleCode123' } });
-  });
-  await page.goto(`/purchase-onboarding?order=${order}`);
-  await expect(page.getByRole('button', { name: '텔레그램 공지방 입장' })).toHaveCount(0);
-  await page.getByRole('button', { name: '이미 텔레그램을 사용해요' }).click();
-  await expect(page.getByText('아래 버튼으로 공지방에 입장하세요.')).toBeVisible();
-  await expect(page.locator('.purchase-onboarding a')).toHaveCount(0);
-  await expect(page.getByText(/닉네임\/4기|고정 게시물/)).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '초대 링크 복사' })).toHaveCount(0);
-  const enter = page.getByRole('button', { name: '텔레그램 공지방 입장' });
-  const [failedRoom] = await Promise.all([page.waitForEvent('popup'), enter.click()]);
-  await expect(page.getByRole('alert')).toHaveText('잠시 후 다시 시도해 주세요.');
-  await expect.poll(() => failedRoom.isClosed()).toBe(true);
-  await expect(enter).toBeEnabled();
-  fail = false;
-  const [room] = await Promise.all([page.waitForEvent('popup'), enter.click()]);
-  await expect(room).toHaveURL('https://t.me/+ExampleCode123');
-  await expect(page.getByRole('link', { name: '내 클래스 확인하기' })).toBeVisible();
+test('Telegram return instructions survive reload and date-only OT does not invent a time', async ({ page }) => {
+ const progress = {...initialProgress(), orientationAt: '2026-11-09'};
+ await page.route('**/api/purchase-onboarding*', route => route.fulfill({json:{available:true,telegramOnly:true,orderId:order,itemName:'합성 5기',roomName:'공지방',supportUrl:'',progress}}));
+ await page.goto(`/purchase-onboarding?order=${order}`);
+ await page.getByRole('button',{name:'텔레그램이 처음이에요'}).click();
+ await expect(page.getByText('설치 후, 이 안내로 다시 돌아와 주세요')).toBeVisible();
+ await page.getByRole('button',{name:'이 안내 주소 복사'}).click();
+ await expect(page.getByRole('textbox',{name:'돌아올 안내 주소'})).toHaveValue(new RegExp('/purchase-onboarding\\?order='+order));
+ await page.evaluate(orderId=>sessionStorage.setItem(`edu-onboarding-telegram-return:${orderId}`,'1'),order);
+ await page.reload();
+ await expect(page.getByText(/다시 돌아오셨네요!/)).toBeVisible();
+ await expect(page.getByRole('button',{name:'텔레그램 공지방 입장'})).toBeVisible();
+ progress.telegram=true;progress.app=true;await page.reload();
+ await expect(page.getByText(/2026년 11월 9일/)).toBeVisible();
+ await expect(page.getByText('예정 · 시간은 추후 안내합니다')).toBeVisible();
+ await expect(page.getByText(/오전|오후/)).toHaveCount(0);
+});
+
+test('existing fourth cohort without checklist flag retains its existing Telegram flow', async ({ page }) => {
+ await page.route('**/api/purchase-onboarding*', route => route.fulfill({json:{available:true,telegramOnly:true,orderId:order,itemName:'문샷 4기',roomName:'4기 공지방',supportUrl:''}}));
+ await page.goto(`/purchase-onboarding?order=${order}`);
+ await expect(page.getByRole('heading',{name:'4기 공지방에 입장해 주세요'})).toBeVisible();
+ await expect(page.getByText('3단계 · 약 5분', {exact:false})).toBeVisible();
+ await expect(page.getByText('4단계를 마치면 수업 준비 끝!', {exact:false})).toHaveCount(0);
+});
+
+test('missing OT date stays pending instead of pretending onboarding is complete', async ({ page }) => {
+ const progress = {...initialProgress(), telegram: true, app: true, orientationAt: ''};
+ await page.route('**/api/purchase-onboarding*', route => route.fulfill({json:{available:true,telegramOnly:true,orderId:order,itemName:'합성 기수',roomName:'공지방',supportUrl:'',progress}}));
+ await page.goto(`/purchase-onboarding?order=${order}`);
+ await expect(page.getByText(/운영자가 OT 일정을 준비 중/)).toBeVisible();
+ await expect(page.getByRole('checkbox')).toHaveCount(0);
+ await expect(page.getByRole('button', {name:/4단계/})).toBeDisabled();
 });
 
 test('customer answers once, then sees the Telegram guide without exposing the invite URL early', async ({ page }) => {
@@ -165,4 +192,50 @@ test('onboarding lookup failure is visible and can be retried', async ({ page })
   retryAllowed = true;
   await page.getByRole('button', { name: '시작 안내 다시 확인' }).click();
   await expect(page.getByRole('link', { name: '결제 후 시작 안내' })).toHaveAttribute('href', `/purchase-onboarding?order=${order}`);
+});
+
+test('cohort purchase admin schedules an email for a selected room group and cancels it from the same screen', async ({ page }) => {
+  const other = '33333333-3333-4333-8333-333333333333';
+  let batch: Record<string, unknown> | null = null;
+  let cancelled = false;
+  await page.route('**/api/admin/purchase-onboarding?*', route => route.fulfill({ json: {
+    settings: { roomName: '', inviteUrl: '', paidImage: '', organicImage: '', enabled: true, mode: 'campus_welcome' },
+  } }));
+  await page.route('**/api/admin/purchase-onboarding', route => route.fulfill({ json: {
+    cohorts: [{ id: cohort, name: '5기', courses: { title: '문샷 챌린지' } }],
+  } }));
+  await page.route('**/api/admin/purchase-onboarding/delivery*', async route => {
+    if (route.request().method() === 'POST') {
+      const body = route.request().postDataJSON();
+      if (body.action === 'cancel') {
+        expect(body.id).toBe(batch?.id);
+        cancelled = true;
+      } else {
+        expect(body).toMatchObject({ cohort, action: 'schedule', channel: 'email', recipients: [other], subject: '2번 공지방', content: '입장 링크 확인' });
+        batch = body;
+      }
+      return route.fulfill({ json: { ok: true } });
+    }
+    expect(new URL(route.request().url()).searchParams.get('cohort')).toBe(cohort);
+    return route.fulfill({ json: {
+      buyers: [{ id: order, name: '첫째 구매자', channels: ['email'] }, { id: other, name: '둘째 구매자', channels: ['email'] }],
+      channels: { sms: true, lms: true, alimtalk: true, email: true }, templates: [],
+      history: batch ? [{ id: batch.id, channel: 'email', count: 1, subject: batch.subject, content: batch.content, status: cancelled ? 'cancelled' : 'scheduled', scheduled_at: batch.scheduledAt }] : [],
+    } });
+  });
+  await page.goto('/admin/purchase-onboarding-test');
+  await page.getByLabel('안내할 기수').selectOption(cohort);
+  await expect(page.getByRole('link', { name: '구매자 공지·발송 내역' })).toHaveAttribute('href', '#buyer-delivery');
+  await page.getByRole('combobox', { name: '채널', exact: true }).selectOption('email');
+  await page.getByLabel('둘째 구매자', { exact: false }).check();
+  await page.getByLabel('이메일 제목').fill('2번 공지방');
+  await page.getByLabel('이메일 내용').fill('입장 링크 확인');
+  await page.getByLabel('발송 시각 (현재 기기 시간)').fill('2027-12-01T12:00');
+  await page.getByRole('button', { name: '대상·문구 확인' }).click();
+  await expect(page.getByRole('heading', { name: '이메일 · 1명' })).toBeVisible();
+  expect(batch).toBeNull();
+  await page.getByRole('button', { name: '확인한 내용으로 발송 예약' }).click();
+  await page.getByText(/이메일 · 1명 · 예약 대기/).click();
+  await page.getByRole('button', { name: '이 예약 취소' }).click();
+  await expect(page.getByText(/이메일 · 1명 · 취소됨/)).toBeVisible();
 });

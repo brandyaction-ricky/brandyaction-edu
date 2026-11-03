@@ -1,0 +1,7 @@
+.lesson-audio-anchor { min-width:0; }
+.lesson-audio-player.is-floating { position:fixed; z-index:20; box-sizing:border-box; padding:8px 12px; background:#fff; color:#17202a; border:1px solid #d8dde3; border-radius:12px; box-shadow:0 5px 20px #17202a26; }
+.lesson-audio-tools:not([hidden]) { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:13px; }
+.lesson-audio-tools strong { flex:1 1 100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lesson-audio-tools button { border:1px solid #d8dde3; background:#fff; color:inherit; border-radius:6px; padding:6px 8px; cursor:pointer; font:inherit; min-height:36px; }
+.lesson-audio-player audio { display:block; width:100%; }
+@media(max-width:540px) { .lesson-audio-player.is-floating { padding:8px; } .lesson-audio-tools strong { flex-basis:100%; } }

@@ -70,7 +70,7 @@ test('invalid image files never upload and the image-only draft warns before nav
  let calls=0;await page.route('**/api/platform/lesson-questions?**',r=>r.fulfill({json:{questions:[]}}));await page.route('**/api/platform/question-images',r=>{calls++;return r.fulfill({status:503,json:{error:'연결 실패'}});});
  await open(page);await page.getByLabel('질문 이미지 (선택)').setInputFiles({name:'bad.svg',mimeType:'image/svg+xml',buffer:Buffer.from('<svg/>')});await expect(page.getByRole('alert')).toContainText('이미지는 JPG');expect(calls).toBe(0);
  await page.getByRole('textbox',{name:'질문 제목',exact:true}).fill('');await page.getByLabel('질문 이미지 (선택)').setInputFiles({name:'image.png',mimeType:'image/png',buffer:png});await expect(page.getByRole('alert')).toContainText('연결 실패');
- page.once('dialog',d=>d.dismiss());await page.getByRole('link',{name:'내 질문 전체 보기'}).click();await expect(page).toHaveURL(/classroom-questions-test/);await expect(page.getByAltText('첨부할 질문 이미지')).toBeVisible();
+ page.once('dialog',d=>d.dismiss());await page.getByRole('link',{name:'질문·답변 전체 보기'}).click();await expect(page).toHaveURL(/classroom-questions-test/);await expect(page.getByAltText('첨부할 질문 이미지')).toBeVisible();
 });
 test('operator sees the same image in answer dialog and can recover a failed private image read',async({page},testInfo)=>{
  let broken=true;await page.route('**/api/platform/question-thread?**',r=>r.fulfill({json:{question:{id,title:'이미지 질문',content:'사진을 확인해 주세요.',imageId:id,status:'open',resolved:false,archived:false,headId:null},answers:[],canAnswer:true,nextCursor:null}}));

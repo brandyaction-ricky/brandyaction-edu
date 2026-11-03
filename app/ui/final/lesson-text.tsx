@@ -2,21 +2,24 @@ import { Fragment, type ReactNode } from "react";
 import { lessonTextSegments, parseLessonDocument, type LessonNode } from "@/lib/lesson-body";
 import "./lesson-text.css";
 
-function RichNode({ node }: { node: LessonNode }): ReactNode {
+function RichNode({ node, images }: { node: LessonNode; images?: ReadonlyMap<string, ReactNode> }): ReactNode {
+  if (["lessonImage", "lessonFile", "lessonEmbed"].includes(node.type)) return images?.get(String(node.attrs?.blockId)) || null;
   if (node.type === "text") {
-    let text: ReactNode = node.marks?.some(mark => mark.type === "link") ? node.text : <PlainLinks text={node.text || ""} />;
+    const color = node.marks?.find(mark => mark.type === "textStyle" && mark.attrs?.color)?.attrs?.color;
+    const linkColor = typeof color === "string" ? color : undefined;
+    let text: ReactNode = node.marks?.some(mark => mark.type === "link") ? node.text : <PlainLinks text={node.text || ""} color={linkColor} />;
     for (const mark of node.marks || []) {
       if (mark.type === "bold") text = <strong>{text}</strong>;
       if (mark.type === "italic") text = <em>{text}</em>;
       if (mark.type === "underline") text = <u>{text}</u>;
       if (mark.type === "strike") text = <s>{text}</s>;
-      if (mark.type === "textStyle") text = <span style={{ fontSize: String(mark.attrs?.fontSize) }}>{text}</span>;
-      if (mark.type === "link") text = <a href={String(mark.attrs?.href)} target="_blank" rel="noopener noreferrer">{text}</a>;
+      if (mark.type === "textStyle") text = <span style={{ fontSize: mark.attrs?.fontSize ? String(mark.attrs.fontSize) : undefined, color: mark.attrs?.color ? String(mark.attrs.color) : undefined, backgroundColor: mark.attrs?.backgroundColor ? String(mark.attrs.backgroundColor) : undefined }}>{text}</span>;
+      if (mark.type === "link") text = <a href={String(mark.attrs?.href)} style={linkColor ? { color: linkColor } : undefined} target="_blank" rel="noopener noreferrer">{text}</a>;
     }
     return text;
   }
   if (node.type === "hardBreak") return <br />;
-  const children = node.content?.map((child, index) => <RichNode key={index} node={child} />);
+  const children = node.content?.map((child, index) => <RichNode key={index} node={child} images={images} />);
   switch (node.type) {
     case "heading": return node.attrs?.level === 1 ? <h1>{children}</h1> : node.attrs?.level === 3 ? <h3>{children}</h3> : <h2>{children}</h2>;
     case "paragraph": return <p>{children?.length ? children : <br />}</p>;
@@ -24,6 +27,7 @@ function RichNode({ node }: { node: LessonNode }): ReactNode {
     case "orderedList": return <ol start={Number(node.attrs?.start) || 1}>{children}</ol>;
     case "listItem": return <li>{children}</li>;
     case "blockquote": return <blockquote>{children}</blockquote>;
+    case "callout": return <aside className="lesson-callout" data-lesson-callout="" aria-label="학습 안내"><span className="lesson-callout-icon" aria-hidden="true">💡</span><div className="lesson-callout-content">{children}</div></aside>;
     case "details": return <details>{children}</details>;
     case "detailsSummary": return <summary>{children?.length ? children : "내용 펼치기"}</summary>;
     case "detailsContent": return <div className="lesson-toggle-content">{children}</div>;
@@ -31,13 +35,16 @@ function RichNode({ node }: { node: LessonNode }): ReactNode {
   }
 }
 
-export function LessonText({ text }: { text: string }) {
+export function LessonText({ text, images }: { text: string; images?: ReadonlyMap<string, ReactNode> }) {
   const doc = parseLessonDocument(text);
-  if (doc) return <div className="lesson-rich-body"><RichNode node={doc} /></div>;
+  if (doc) return <div className="lesson-rich-body"><RichNode node={doc} images={images} /></div>;
   return <span className="lesson-text-links"><PlainLinks text={text} /></span>;
 }
-function PlainLinks({ text }: { text: string }) {
+export function AnswerText({ text }: { text: string }) {
+  return <span className="lesson-text-links"><PlainLinks text={text} /></span>;
+}
+function PlainLinks({ text, color }: { text: string; color?: string }) {
   return <>{lessonTextSegments(text).map((part, index) => part.href
-    ? <a key={index} href={part.href} target="_blank" rel="noopener noreferrer">{part.text}</a>
+    ? <a key={index} href={part.href} style={color ? { color } : undefined} target="_blank" rel="noopener noreferrer">{part.text}</a>
     : <Fragment key={index}>{part.text}</Fragment>)}</>;
 }

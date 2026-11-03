@@ -29,7 +29,7 @@ export function AdminComponentsFixture() {
   const [modal, setModal] = useState(false);
   const [page, setPage] = useState(1);
   const [scope, setScope] = useState('all');
-  return <div className="edu-admin" style={{ padding: 24, minHeight: '100dvh' }}>
+  return <div className="edu-admin adm" style={{ padding: 24, minHeight: '100dvh' }}>
     <main><ContentContainer>
       <PageHeader title="컴포넌트 검증" description="합성 데이터만 사용하는 독립 테스트 화면" />
       <PageSection title="필터와 요약">
