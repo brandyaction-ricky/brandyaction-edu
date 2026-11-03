@@ -1,5 +1,6 @@
 import type { createClient } from '@/lib/supabase/server';
 import { analyzeSupport } from './analytics';
+import {requestTool} from './tool-dimensions';
 import {parseReviewPlan} from './review-planning';
 import {analyzeSupportDepth,type SupportDepthInput} from './depth-analytics';
 import { hasLearningAccess } from '@/lib/platform-rules';
@@ -30,7 +31,7 @@ export async function saveSupport(db:Database,admin:()=>Database,actor:string,b:
  const enrollment=id(b.enrollmentId);const member=await scope(db,actor,enrollment);
  if(b.kind==='intake'){
   const intake=parseIntake(b);const existing=await one(db.from('edu_campus_support_requests').select('*').eq('id',intake.id).eq('user_id',actor).maybeSingle());
-  if(existing){if(Object.entries(intake).some(([k,v])=>existing[k]!==v))campusError(409,'요청 내용이 다릅니다.');return loadSupport(db,actor,enrollment,admin);}
+  if(existing){const comparable:Record<string,unknown>={...existing,...requestTool({tool_kind:existing.tool_kind,tool_name:existing.tool_name})};if(Object.entries(intake).some(([k,v])=>comparable[k]!==v))campusError(409,'요청 내용이 다릅니다.');return loadSupport(db,actor,enrollment,admin);}
   const r=await db.from('edu_campus_support_requests').insert({...intake,user_id:actor});if(r.error){if(r.error.code==='23505')campusError(409,'중복 요청입니다.');if(r.error.code==='42501'||r.error.code==='23514')campusError(403,'현재 수업을 확인해 주세요.');unavailable();}
  }else if(b.kind==='study-create'){
   const data=parseSession({...b,cohortId:member.cohort_id,sessionKind:'study',locationUrl:''});if(b.shareGoal!==true)campusError(400,'기수 공유 범위를 확인해 주세요.');
