@@ -9,7 +9,7 @@ import './learning-question-dialog.css';
 
 export const learningQuestionCreatedEvent = 'edu:learning-question-created';
 
-export function LearningQuestionShortcut({ context }: { context?: QuestionContext }) {
+export function LearningQuestionShortcut({ context, label = "질문·답변" }: { context?: QuestionContext; label?: string }) {
   const [open, setOpen] = useState(false), [created, setCreated] = useState(false), [closeNotice, setCloseNotice] = useState('');
   const composer = useRef({ dirty: false, locked: false });
   const trigger = useRef<HTMLButtonElement>(null);
@@ -21,7 +21,7 @@ export function LearningQuestionShortcut({ context }: { context?: QuestionContex
     requestAnimationFrame(() => trigger.current?.focus({ preventScroll: true }));
   }
   return <>
-    <button ref={trigger} type="button" className="link header-questions learning-question-trigger" aria-haspopup="dialog" disabled={!context} onClick={() => { composer.current = { dirty: false, locked: false }; setCreated(false); setCloseNotice(''); setOpen(true); }}>질문·답변</button>
+    <button ref={trigger} type="button" className="link header-questions learning-question-trigger" aria-haspopup="dialog" disabled={!context} onClick={() => { composer.current = { dirty: false, locked: false }; setCreated(false); setCloseNotice(''); setOpen(true); }}>{label}</button>
     {open && context && <AdminModal title="이 수업에 질문하기" className="learning-question-dialog" initialFocus="textarea" onClose={close}>
       <div className="learning-question-body">
         {created ? <div className="learning-question-success" role="status"><Check aria-hidden="true"/><h3>질문을 등록했어요</h3><p>답변은 마이페이지의 ‘질문·답변’에서 확인할 수 있어요.</p><button autoFocus className="btn primary" onClick={close}>학습 계속하기</button></div> : <>

@@ -7,11 +7,11 @@ import { aiFallback, curriculumInstructions, curriculumText, parseCurriculumAnsw
 type Db = ReturnType<typeof createAdminClient>;
 type Usage = { input_tokens?: unknown; output_tokens?: unknown; input_tokens_details?: { cached_tokens?: unknown } };
 export function aiFailure(message: string, status = 503): never { throw Object.assign(new Error(message), { expose:true, status }); }
-export function aiErrorReply(error: unknown) {
+export function aiErrorReply(error: unknown, mode?: 'student') {
  const cause = error as { message?:string; expose?:boolean; status?:number };
  const code = cause.message || '';
  if (cause.expose) return { error:cause.message, status:cause.status || 503 };
- if (/AI_LIMIT/.test(code)) return { error:'오늘의 AI 이용 한도 또는 동시 요청 수에 도달했어요. 잠시 후 이용하거나 멘토에게 질문해 주세요.',status:429 };
+ if (/AI_LIMIT/.test(code)) return { error:mode === 'student' ? '이전 AI 질문을 처리 중이에요. 답변을 확인한 뒤 다음 질문을 보내 주세요.' : '멘토 초안 이용 한도에 도달했거나 이전 요청을 처리 중이에요.',status:429 };
  if (/AI_PENDING/.test(code)) return { error:'답변을 생성 중이거나 결과를 확인 중이에요. 대화 새로고침으로 확인해 주세요.',status:409 };
  if (/AI_PREVIOUS_FAILED/.test(code)) return { error:'이전 요청은 완료하지 못했어요. 대화를 새로고침한 뒤 새 질문으로 시도해 주세요.',status:409 };
  if (/AI_DUPLICATE/.test(code)) return { error:'이미 처리한 요청입니다. 답변을 확인한 뒤 새 질문으로 시도해 주세요.',status:409 };

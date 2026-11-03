@@ -16,5 +16,5 @@ export async function POST(request:Request) {
   try { parseAiTurns(body.history); } catch { return reply({error:'대화 길이를 줄여 다시 질문해 주세요.'},400); }
   const result = await generateCurriculumAnswer(createAdminClient(),{actor:user.id,requestId:body.requestId,mode:'student',enrollmentId:body.enrollmentId,lessonId:body.lessonId,question:body.question.trim(),saveHistory:true,...(body.imageId?{imageId:body.imageId}:{})});
   return reply(result);
- } catch (error) { const result=aiErrorReply(error); return reply({error:result.error},result.status); }
+ } catch (error) { const result=aiErrorReply(error, 'student'); return reply({error:result.error},result.status); }
 }
