@@ -1,80 +1,82 @@
-# Prepared DEV Auth · Storage · Realtime network QA
+# Prepared DEV Auth · Storage · Realtime smoke
 
-**Prepared only; no actor creation, login, network smoke, upload or Realtime join has been executed by this author.** The rollback SQL in `03-transactional-qa.sql` cannot prove these network behaviors.
+This is an inert, importable test runner, not a deployment or provisioning command. Running `04-network-smoke.mjs` directly prints `prepared-not-executed` and performs no network access. Local mock tests do not establish real Auth, Storage, browser or Realtime success.
 
-Target is only Supabase `vjmjhaidlqkmascdjocw` and a separately verified `brandyaction-edu-dev` deployment. Production, actual people, existing student work, paid AI, payment/refund, Telegram and customer notifications are excluded. The original 3D ZIP remains untouched.
+The target is the explicitly verified EDU DEV project and DEV app origin. Production, real learners, payments, AI calls, bot dispatch and customer notifications are outside this runner. Actual account IDs, state snapshots, trigger/rule evidence, generated provisioning SQL and cleanup ledgers belong in private operator artifacts, not this public document or repository.
 
-## Before any persistent QA write
+## Safety conditions before execution
 
-1. Complete the eleven-migration manifest/hash/postapply review and rollback smoke. Check the app deployment's actual Supabase project, source SHA and relevant feature flags, not merely a URL containing “dev”. Read the Realtime private-channel/public-access setting and retain a boolean-only proof; do not change a shared setting to pass QA. Do not turn on a shared production flag or replace any secret.
-2. Run the SELECT-only `04-notification-preflight.sql`. Review `04-trigger-risk.md` and any previously unseen queue-side triggers/worker dependencies. No shared trigger, rule, worker or transmission setting may be disabled to make the test work.
-3. A newly committed profile can enqueue `member_joined` and automatic tag events. **A reserved invalid email, `is_internal`, `qa_only` and marketing opt-out are not proven exclusions.** Creating a user then deleting its queues is too late if a worker claims them after commit. Proceed only after the event/rule/recipient path is shown unable to dispatch for these exact synthetic actors. Check enrollment insertion, revocation and account disable effects too. An Auth admin call does not send a confirmation email, but its ordinary database profile triggers still run.
-4. Read the target Auth-hook configuration and existing notification worker eligibility using metadata/code only. Do not dump secrets, hook URLs with credentials, templates or customer records. If a required isolation rule is unknown, keep persistent provisioning and this script unexecuted; the local and rollback tests remain useful.
-5. Verify every fixed namespace ID/email/course key below is absent. Any collision stops; do not reuse an unidentified account. Freeze a private, secret-free provisioning ledger and exact cleanup plan before creating the first record. Recheck the reviewed trigger hashes immediately before creation.
+- Check the fixed deployment source SHA, actual Supabase project, required migrations and feature flags. A URL containing “dev” is insufficient proof.
+- Review ordinary Auth/profile/enrollment triggers and active CRM, notification and integration rules. An invalid email, internal-account flag or marketing opt-out alone does not prove notification isolation. Never disable a shared trigger or queue worker to pass a test, and never rely on deleting queued messages after they become visible to a worker.
+- Provisioning is separate and must have exact-ID state comparisons, collision checks and independent recovery instructions. An existing synthetic-account path can avoid signup triggers when the current metadata supports that conclusion. Do not reactivate or move an original enrollment; create only the reviewed synthetic course/cohort/enrollment scope.
+- Verify the app's `private:true` contract and SQL Realtime authorization. `realtimePrivateChannelsReviewed:true` records that review, **not** a claim that the provider's global public-channel setting was read. If that setting is unavailable, the actual synthetic public/anonymous probes below remain required. A failed or inconclusive probe stops employee QA activation.
+- Keep any service credential inside the private operator process. The network runner accepts only a public/anon key and ordinary learner sessions. No secrets, cookies, token hashes, signed URL queries or raw provider exceptions may be logged, saved or supplied as shell arguments.
 
-## Separate synthetic fixture
+## Bounded synthetic artifacts
 
-Namespace is `f04c2026-1103-4000-8000-`; it does not overlap the rollback `f03c...` fixture.
+The fixed namespace is `f04c2026-1103-4000-8000-` and the fixture label is `campus-network-qa-20261103`.
 
-| Item | Suffix / value | Scope |
+| Artifact | Namespace suffix | Bound |
 |---|---|---|
-| Four Auth/profile actors | `000000000001` through `000000000004` | owner, same-cohort peer, other-cohort peer, revoked enrollment |
-| Email | `campus-network-qa-20261103-{1..4}@example.invalid` | no phone, no real address or recipient |
-| Course | `000000000010` | synthetic text only, hidden from catalogue |
-| Cohorts | `000000000020`, `000000000021` | fresh synthetic A and B |
-| Enrollments | `000000000031` through `000000000034` | first/second/fourth in A; third in B; fourth starts revoked/refunded |
-| Portfolio | `000000000500` | owner only initially |
-| Screenshot reservation | `000000000501` | generated 1×1 PNG, no person or customer information |
-| Request IDs | `000000000502` through `000000000507` | sharing and revocation only |
-| Space sessions | `000000000600`, `000000000601` | owner and peer |
+| Course | `10` | One synthetic, published course excluded from the catalogue |
+| Cohorts | `20`, `21` | Two synthetic scopes, closed for recruitment |
+| Enrollments in reuse mode | `31`, `32` | Owner and peer; only the new peer enrollment changes phase |
+| Portfolio | `500` | One private post initially |
+| Screenshot | `501` | One generated 1×1 PNG |
+| Sharing request IDs | `502`–`507` | Explicit sharing and withdrawal only |
+| Space sessions | `600`, `601` | Owner and peer |
 
-Provision through the supported Auth Admin API only after the above risk gate. `createUser` can take the explicit UUID; use generated unique passwords held only in memory, `email_confirm:true`, `phone` absent, no invitation or OTP email. Do not write to `auth.users` directly for this persistent test. Create only these profiles/course/cohorts/enrollments, with ordinary reviewed triggers. A permission-closed course must still meet campus eligibility (`published` + hidden catalogue + active synthetic enrollment); check it is not unexpectedly discoverable in the catalogue. No live lesson/mission is needed for this network smoke.
+Full UUID suffixes are zero-padded to twelve digits. Unlisted metadata is not private authorization: a direct detail URL may still expose the synthetic course's public metadata. No real course content or personal data belongs in this fixture.
 
-The runner does not provision accounts or accept service credentials. The operator obtains existing authorized DEV credentials in memory, provisions the fixture separately, and passes only the public/anon key plus four synthetic credentials to `runDevNetworkSmoke`.
+The separate `fresh-four` mode uses fixture actor suffixes `1`–`4` and enrollment suffixes `31`–`34`. It is permitted only if a separately reviewed provisioning plan proves that creating those users cannot trigger external dispatch. The runner itself never creates users.
 
-## Runner contract
+## Configuration and operator callbacks
 
-`04-network-smoke.mjs` is importable. Running it directly prints `prepared-not-executed` and makes **no network call**. It intentionally has no `--run` CLI shortcut, environment credential loader or automatic account creator.
+Call `runDevNetworkSmoke(config, dependencies)` inside the private operator process after review. Required configuration includes:
 
-To execute after review, call `runDevNetworkSmoke(config, { cleanupArtifacts })` inside the operator's in-memory process. Required config:
+- `execute:true`, exact `projectRef`, `supabaseUrl`, allowed DEV `appOrigin`, and `publishableKey`.
+- `proof:{appProjectRef, fixture, sourceSha, verifiedAt, notificationIsolationReviewed:true, migrationChecksPassed:true, realtimePrivateChannelsReviewed:true}`. The proof expires after fifteen minutes. These assertions do not replace the underlying checks.
+- Four roles in `actors:{owner,peer,otherCohort,refunded}`, each with `id`, `email`, `enrollmentId` and `cohortId`. Use invalid-domain synthetic addresses only.
+- Mandatory `cleanupArtifacts(ledger)`, returning `{storageRemoved:true,qaAccessRevoked:true}` only after exact cleanup is verified. It also runs after partial failures. A failed cleanup makes the overall result fail.
 
-- `execute:true`, `projectRef`, exact `supabaseUrl`, exact allowed DEV `appOrigin`, `publishableKey` (never service/secret key).
-- `proof:{ appProjectRef, fixture:'campus-network-qa-20261103', sourceSha, verifiedAt, notificationIsolationReviewed:true, freshActorsOnly:true, migrationChecksPassed:true, realtimePrivateChannelsReviewed:true }`. The proof must come from actual reviewed checks; the runner cannot independently validate app environment settings. It expires after 15 minutes.
-- `actors:{ owner, peer, otherCohort, refunded }`, each with fixed `id`, `email`, `enrollmentId`, `cohortId`, generated `password`. These objects must not be serialized, logged or placed in command arguments.
-- Required `cleanupArtifacts(ledger)` callback receives only fixture IDs. It must return `{storageRemoved:true,qaAccessRevoked:true}` **only after exact cleanup is verified**; otherwise the overall smoke fails. It is also called after a mid-test failure. Caller retains its independent provisioning ledger if the process is interrupted before `finally`.
+For **existing two-account reuse**, also set:
 
-The runner builds normal Supabase SSR cookies in memory from real password authentication and checks each Auth `getUser()` identity. It sends those cookies to the actual campus routes with a matching Origin; it does not bypass app routes using service-role RLS. Raw API bodies, cookies, signed URLs, access tokens and exception objects are never returned or printed. Diagnostic output is stage labels and pass/fail checks only. There is no automatic retry, fresh-key issuance, or live-data fallback.
+```js
+mode: 'reuse-two',
+reuseActors: privatelyVerifiedTwoActorIds, // { owner: uuid, peer: uuid }
+proof: { /* other reviewed fields */, existingQaMetadataVerified: true }
+```
 
-## Executed only when the runner is explicitly called
+The owner uses its verified ID and new enrollment `31`. The peer, other-cohort and refunded roles are three isolated sessions of the same second QA account, using new enrollment `32`. These are sequential authorization phases, not four concurrent people. No password is provided in this mode. Unknown/mismatched IDs or a non-synthetic email fail before network I/O.
 
-1. Real Auth password login + `getUser` for all four new actors; no-cookie app request is rejected.
-2. Owner creates one private portfolio. Same-cohort peer cannot read it.
-3. Owner prepares one screenshot through the real route, PUTs exact bytes directly to the **verified DEV bucket/path** using the returned signed URL, then calls completion. The actual server checks Storage info, MIME/signature and SHA-256. Owner download must return identical bytes.
-4. Sharing the post alone must not share the screenshot. An unconfirmed file share must fail. A separately confirmed file share allows only the same-cohort peer; another cohort, revoked enrollment and anonymous request are denied.
-5. Explicit file-share withdrawal stops new links. Re-sharing followed by setting the post private stops new links again. Already issued links remain possible for their 30-second TTL; downloaded copies cannot be recalled.
-6. Two synthetic actors join the actual space API. The same private Realtime topic delivers one synthetic `move` message from owner to peer. Other-cohort and revoked actors must receive an explicit channel authorization error; a timeout is **inconclusive/failure**, never counted as denial. An authenticated other-cohort client and a separate anonymous client also try `private:false` with the exact same topic. Neither may receive the private message; then the anonymous private-channel join must be explicitly rejected. All channels are closed.
-7. Leave space, sign out the QA sessions, remove only the exact created Storage object via Storage API, revoke QA access and verify cleanup. Keep safe audit rows/private evidence as needed. Do not mutate `storage.objects` by SQL, drop the bucket or delete existing records.
+Pass `authenticateExistingQa:existingQaRecoveryAuthenticator(admin, privatelyVerifiedTwoActorIds)`. The adapter verifies the exact existing user and confirmed email, then uses `generateLink({type:'recovery'})` and normal SSR `verifyOtp({type:'recovery'})`. It does not send mail or call a password update. The magiclink variant is deliberately excluded because it may create a missing user. Recovery returns a missing-user error instead. Ordinary provider hooks and audit effects still require review.
 
-The script checks API and SDK network transport, not actual human browser CORS, viewport UX, camera controls, large file performance, or simultaneous learner load. It returns `realBrowserCorsTested:false` even after a successful run.
+Pass `transitionPeer({actorId,enrollmentId,expectedPhase,nextPhase,cohortId})`. This callback must perform a guarded, committed comparison-and-swap on only the new peer enrollment and return `{verified:true,phase}` after checking the result. Phases are `same`, `foreign` and `refunded`. The runner restores `same` before testing share withdrawal so a denied request cannot pass merely because the peer remained refunded. Never guess a new timestamp after a conflict.
 
-## Required browser follow-up
+For fresh-four mode, set `proof.freshActorsOnly:true` and provide generated passwords held only in memory. Any signup-trigger uncertainty keeps that mode unexecuted.
 
-After the runner's isolated network check passes, use two fresh browser contexts with the same QA actors while the fixture remains available, or deliberately postpone final deactivation until this step. To avoid changing cleanup meaning, the runner currently requires deactivation; reactivate only those QA actors under the same reviewed provisioning plan before this follow-up, then deactivate again.
+## What the explicit run checks
 
-- Visit the real DEV URL, sign in, verify visible QA course selection and API connection status; no demo badge may be mistaken for live data.
-- Upload the generated PNG from the actual file input; confirm browser CORS and return/download. Never attach a real screenshot containing user data.
-- In separate QA windows, verify movement delivery, peer nickname, private-topic rejection, disconnect/rejoin and visibility changes; screenshots should contain only fictional QA aliases.
-- If browser storage rejects a cross-origin URL, retain the console's sanitized error class and exact origin pair, not tokens or the signed URL query. Do not loosen production CORS or Storage RLS as a workaround.
+1. In reuse mode, anonymous reads of `/api/platform?view=classes&q=NETWORK QA ONLY`, `view=home` and the exact two `view=checkout&cohort=...` scopes confirm list exclusion, real fixture presence, `closed` cohort status and past recruitment dates. A fresh ignored `filter` cache key avoids accepting a pre-provision empty cache. This depends on the reviewed route's current cache/filter contract; re-review when the fixed source changes.
+2. Normal Auth sessions produce SSR cookies in memory, and `getUser()` verifies each actor. An anonymous campus API request is denied.
+3. The owner creates one private portfolio, inaccessible to the same-cohort peer.
+4. The owner prepares the exact PNG through the app route, uploads to the returned **verified DEV bucket/path**, and asks the server to complete verification. Downloaded bytes must match. The client never follows a production or unexpected Storage URL.
+5. Sharing the post alone leaves the file private. An unconfirmed file share fails. An explicit file share allows only the same-cohort peer; foreign, refunded and anonymous requests fail. Withdrawal and subsequent post-private conversion each stop new download links. Previously issued short-lived signed links and already-downloaded copies cannot be recalled.
+6. Two actors join the space API. A private Realtime topic delivers a synthetic movement message to the peer. Authenticated-public and anonymous-public probes for the same topic must not receive it. Foreign/refunded and anonymous private joins must return the documented read-permission denial. A generic `CHANNEL_ERROR`, expired JWT, server error or timeout is **inconclusive/failure**, not authorization evidence.
+7. Every channel removal must return `ok`; `finally` also disconnects every authenticated and anonymous socket and verifies the closed state. Timeout/error is cleanup failure, even when the artifact cleanup succeeds. Sessions leave/sign out, and exact cleanup runs in `finally`. Only reviewed synthetic state is revoked/restored. Storage files must be removed through Storage API; never mutate `storage.objects` directly or empty a bucket.
 
-## Cleanup / stop behavior
+The runner reports stage labels and booleans only. It does not automatically retry, issue new keys or fall back to live data. A process killed before `finally` still requires the operator's independently retained recovery ledger.
 
-- Exact screenshot path is `<QA-owner-id>/<QA-post-id>/<QA-file-id>` in `campus-portfolio-private`; compare each component to the ledger before Storage removal. Keep metadata/audit rows if preservation is needed and close their access through QA enrollment/profile state.
-- Revoke only the four QA enrollments and ban/deactivate the exact QA Auth/profile actors. Archive only the two QA cohorts and synthetic course after checking references; no cascade deletion.
-- Ensure any local transaction failed cleanly before cleanup. Review new synthetic-only queued work and cancel only matching pending QA jobs with supported status transitions, if such rows legitimately exist. **Queue cleanup is remediation/evidence, not the primary notification safety gate.** A claimed or sent job triggers a stop and investigation.
-- Never print service credentials, synthetic passwords, Auth sessions, signed upload/download query strings or raw responses. A failed final cleanup must be reported as unverified, even if the functional checks passed.
+## Optional browser check before cleanup
 
-## Sources and local checks
+`verifyBrowser({actors,artifacts,getCookies})` runs after network checks and before cleanup. Cookies are for fresh in-memory browser contexts only. Return `{corsVerified:true,uiVerified:true}` only after actual browser observations; otherwise `realBrowserCorsTested` stays false or the run fails.
 
-The installed Supabase SSR/Auth SDK types and official [Admin createUser documentation](https://supabase.com/docs/reference/javascript/auth-admin-createuser) confirm the admin provisioning/email distinction. [Realtime authorization documentation](https://supabase.com/docs/guides/realtime/authorization) describes private-channel RLS and the public-access setting. Those documents do not prove the actual DEV configuration.
+This callback may preview/download only the exact existing PNG. It must not create an untracked second attachment. To measure browser upload CORS within the one-object budget, the operator can provide a `dependencies.fetch` adapter that performs this same signed PUT/download from a real DEV-origin browser during the main flow, then report its observed result in the callback. A separate file-input upload requires its own bounded artifact and cleanup contract.
 
-`node --test tests/campus-dev-network-smoke.test.mjs` runs local mock transports only: inert entrypoint/target/proof guards; full route and byte flow; cleanup on failure/production Storage rejection; private delivery and public/anonymous/foreign boundary sequencing. Passing these tests is not a real Auth/Storage/Realtime result.
+Browser follow-up should check the real connected UI, course selection, the stored attachment, peer movement, disconnect/rejoin and accessible controls. Never report mocked traffic, a demo badge, or API-only success as browser CORS/UI verification. This test does not establish high-concurrency capacity or large-file performance.
+
+## Sources and local validation
+
+The existing-user recovery distinction follows the official [Auth link handler](https://github.com/supabase/auth/blob/master/internal/api/mail.go), [verification handler](https://github.com/supabase/auth/blob/master/internal/api/verify.go) and [Admin generateLink documentation](https://supabase.com/docs/reference/javascript/auth-admin-generatelink). Realtime checks follow the [authorization documentation](https://supabase.com/docs/guides/realtime/authorization) and [channel handler](https://github.com/supabase/realtime/blob/master/lib/realtime_web/channels/realtime_channel.ex). Reading these sources does not prove a deployed provider version or environment setting.
+
+Run `node --test tests/campus-dev-network-smoke.test.mjs` for local mocks covering inert entry, unsafe-target rejection, exact Storage flow, cleanup on failure, reuse phases, existing-user authentication, explicit Realtime-denial classification, catalog isolation and the optional browser callback. No deployed actor, credential or environment evidence is included in those tests.

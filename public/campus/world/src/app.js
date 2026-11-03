@@ -66,10 +66,11 @@ root.querySelectorAll('[data-move]').forEach(b=>{
 });
 root.querySelector('[data-action="interact"]').addEventListener('click',()=>engine?.interact());
 async function boot(){
- const T=await import('../vendor/three.module.js');
+ const [T,{createRenderQuality}]=await Promise.all([import('../vendor/three.module.js'),import('./render-quality.mjs')]);
  const scene=new T.Scene();scene.background=new T.Color('#050d1c');
  const renderer=new T.WebGLRenderer({canvas,antialias:!matchMedia('(max-width: 700px)').matches,alpha:false,powerPreference:'low-power',preserveDrawingBuffer:false});
- renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,matchMedia('(max-width: 700px)').matches?1:1.5));renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFSoftShadowMap;renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.0;
+ const quality=createRenderQuality(window.devicePixelRatio||1,matchMedia('(max-width: 700px)').matches);let appliedQuality=quality.settings(),shadowPaintAt=-Infinity;
+ renderer.setPixelRatio(appliedQuality.pixelRatio);canvas.dataset.renderQuality=appliedQuality.name;canvas.dataset.renderPixelRatio=String(appliedQuality.pixelRatio);renderer.shadowMap.enabled=appliedQuality.shadows;renderer.shadowMap.type=T.PCFSoftShadowMap;renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.0;
  const camera=new T.PerspectiveCamera(50,1,.1,500);camera.position.set(15,14,19);camera.lookAt(5,.3,5);
  scene.add(new T.HemisphereLight('#d5dfe6','#152231',1.5));
  const sun=new T.DirectionalLight('#eff4fa',3);sun.position.set(-12,15,-18);sun.target.position.set(12,0,10);scene.add(sun.target);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-27,right:27,top:27,bottom:-27,near:.5,far:65});sun.shadow.normalBias=.035;sun.shadow.bias=-.0001;scene.add(sun);
@@ -329,7 +330,11 @@ function routeCamera(x,z){if(state.cameraMode!=='third')orbit.yaw=Math.atan2(pla
 
  let renderW=0,renderH=0;function size(){const w=canvas.clientWidth,h=canvas.clientHeight;if(w!==renderW||h!==renderH){renderer.setSize(w,h,false);renderW=w;renderH=h;camera.aspect=w/h;camera.updateProjectionMatrix();}}
  function project(pos){const v=pos.clone().project(camera);return {x:(v.x+1)*canvas.clientWidth/2,y:(1-v.y)*canvas.clientHeight/2,visible:v.z<1&&Math.abs(v.x)<1.1&&Math.abs(v.y)<1.15};}
- function paint(t=performance.now(),moving=false){root.classList.toggle('overview',!state.zoom);root.classList.toggle('rocket-inspect',!!state.rocketInspect);
+ function paint(t=performance.now(),moving=false,continuousGap=0){
+ const measuredStart=performance.now(),nextQuality=quality.settings();
+ if(nextQuality.name!==appliedQuality.name){appliedQuality=nextQuality;renderer.setPixelRatio(nextQuality.pixelRatio);renderer.shadowMap.enabled=nextQuality.shadows;renderer.shadowMap.autoUpdate=nextQuality.shadowInterval===0;renderer.shadowMap.needsUpdate=true;canvas.dataset.renderQuality=nextQuality.name;canvas.dataset.renderPixelRatio=String(nextQuality.pixelRatio);}
+ if(appliedQuality.shadowInterval&&(t-shadowPaintAt>=appliedQuality.shadowInterval||captureAllowed!==null)){renderer.shadowMap.needsUpdate=true;shadowPaintAt=t;}
+ root.classList.toggle('overview',!state.zoom);root.classList.toggle('rocket-inspect',!!state.rocketInspect);
  size();const aspect=canvas.clientWidth/canvas.clientHeight;focusHalo.visible=!!state.focusDone;focusHalo.position.set(player.x,.065,player.y);
  cameraPose(t);
  if(liftStarted){const p=reduceMotion?1:Math.min(1,(t-liftStarted)/4200);rocket.position.y=.37+(reduceMotion?25:p*p*32);flame.visible=p<1;flame.scale.y=1+Math.sin(t*.018)*.1;if(p>=1){liftStarted=0;canvas.dataset.launchAnimation='complete';const done=liftCallback;liftCallback=null;if(done)done();}}
@@ -342,15 +347,18 @@ function routeCamera(x,z){if(state.cameraMode!=='third')orbit.yaw=Math.atan2(pla
  const placements={desk:[.29,.35],mission:[.22,.57],board:[.66,.42],chat:[.40,.76],terrace:[.70,.74],launch:[.83,.21]};for(const [i,p]of pins.entries()){const v=project(new T.Vector3(p.px,.4,p.pz)),xy=placements[p.id],lx=canvas.clientWidth*xy[0],ly=canvas.clientHeight*xy[1];p.el.hidden=false;p.el.style.left=lx+'px';p.el.style.top=ly+'px';const l=leaderLines[i];l.setAttribute('x1',v.x);l.setAttribute('y1',v.y);l.setAttribute('x2',lx);l.setAttribute('y2',ly);}
  routeLine.visible=!!target;
  renderer.render(scene,camera);
+ // Apply a downgrade on the next render, so the current photo can never capture a resized blank buffer.
+ quality.record(performance.now()-measuredStart,continuousGap);
  {closeBy=nearest();const btn=root.querySelector('[data-action="interact"]');btn.disabled=!closeBy;btn.textContent=closeBy?closeBy.label:'가까이 다가가 상호작용';if(previousNear!==closeBy?.id){previousNear=closeBy?.id||'';btn.classList.toggle('ready',!!closeBy);}lastUI=t;}
  }
+ let continuousRender=false;
  function schedule(){dirty=true;if(!anim&&!document.hidden&&inView)anim=requestAnimationFrame(frame);}
- function frame(t){anim=0;if(t-last<32){schedule();return;}const dt=Math.min((t-last)/1000||.033,.06);last=t;let moving=false;const kx=(keys.has('d')||keys.has('arrowright')?1:0)-(keys.has('a')||keys.has('arrowleft')?1:0),kz=(keys.has('s')||keys.has('arrowdown')?1:0)-(keys.has('w')||keys.has('arrowup')?1:0);
+ function frame(t){anim=0;if(t-last<32){schedule();return;}const gap=continuousRender?t-last:0;continuousRender=false;const dt=Math.min((t-last)/1000||.033,.06);last=t;let moving=false;const kx=(keys.has('d')||keys.has('arrowright')?1:0)-(keys.has('a')||keys.has('arrowleft')?1:0),kz=(keys.has('s')||keys.has('arrowdown')?1:0)-(keys.has('w')||keys.has('arrowup')?1:0);
  if(kx||kz){target=null;path=[];pathFor=null;const len=Math.hypot(kx,kz),speed=2.8*dt;moving=move((kx*Math.cos(state.zoom?orbit.yaw:.087)+kz*Math.sin(state.zoom?orbit.yaw:.087))/len*speed,(-kx*Math.sin(state.zoom?orbit.yaw:.087)+kz*Math.cos(state.zoom?orbit.yaw:.087))/len*speed);}
  else if(target){const key=target.x+':'+target.y;if(pathFor!==key){pathFor=key;path=findPath(target.x,target.y);routeLine.geometry.dispose();routeLine.geometry=new T.BufferGeometry().setFromPoints([new T.Vector3(player.x,.23,player.y),...path.map(p=>new T.Vector3(p.x,.23,p.y))]);routeLine.computeLineDistances();if(!path.length){target=null;arrival=null;status('가구가 있는 위치예요. 빈 바닥이나 장소 버튼을 눌러주세요.');}}
  if(target&&path.length){const next=path[0],dx=next.x-player.x,dz=next.y-player.y,d=Math.hypot(dx,dz),s=2.8*dt;if(d<s){player.x=next.x;player.y=next.y;path.shift();}else moving=move(dx/d*s,dz/d*s);if(!path.length){target=null;pathFor=null;const fn=arrival;arrival=null;status('도착했어요. 가까운 대상에 E로 상호작용할 수 있어요.');if(fn)fn();}}
  }
- paint(t,moving);if(t-lastPosition>500){lastPosition=t;emit('position',{x:player.x,y:player.y,sitting:player.sitting});}dirty=false;if((target||keys.size||cameraSettling||liftStarted||t<waveUntil||t<bubbleUntil||humans.some(h=>!h.p.mine&&(Math.abs(h.p.tx-h.p.x)>.02||Math.abs(h.p.ty-h.p.y)>.02||t<(h.p.waveUntil||0)||t<(h.p.speechUntil||0))))&&!anim)anim=requestAnimationFrame(frame);
+ paint(t,moving,gap);if(t-lastPosition>500){lastPosition=t;emit('position',{x:player.x,y:player.y,sitting:player.sitting});}dirty=false;if((target||keys.size||cameraSettling||liftStarted||t<waveUntil||t<bubbleUntil||humans.some(h=>!h.p.mine&&(Math.abs(h.p.tx-h.p.x)>.02||Math.abs(h.p.ty-h.p.y)>.02||t<(h.p.waveUntil||0)||t<(h.p.speechUntil||0))))&&!anim){continuousRender=true;anim=requestAnimationFrame(frame);}
  }
  function tapWorld(e){
  if(state.panel==='entry'||mission.launching)return;
@@ -382,8 +390,8 @@ function routeCamera(x,z){if(state.cameraMode!=='third')orbit.yaw=Math.atan2(pla
  ['pointerup','pointercancel','lostpointercapture'].forEach(name=>canvas.addEventListener(name,releasePointer));
  canvas.addEventListener('wheel',e=>{e.preventDefault();state.zoom=true;orbit.pitch=Math.max(-.65,Math.min(.65,orbit.pitch+Math.sign(e.deltaY)*.035));schedule();},{passive:false});
 
- new ResizeObserver(schedule).observe(canvas);new IntersectionObserver(es=>{inView=es[0].isIntersecting;if(inView)schedule();else if(anim){cancelAnimationFrame(anim);anim=0;}}).observe(canvas);
- document.addEventListener('visibilitychange',()=>{if(document.hidden){keys.clear();if(anim)cancelAnimationFrame(anim);anim=0;}else{last=performance.now();schedule();}});
+ new ResizeObserver(schedule).observe(canvas);new IntersectionObserver(es=>{inView=es[0].isIntersecting;if(inView)schedule();else if(anim){cancelAnimationFrame(anim);anim=0;continuousRender=false;}}).observe(canvas);
+ document.addEventListener('visibilitychange',()=>{if(document.hidden){keys.clear();if(anim)cancelAnimationFrame(anim);anim=0;continuousRender=false;}else{last=performance.now();schedule();}});
  function syncPeers(items){
  items=items.slice(0,matchMedia('(max-width: 700px)').matches?4:8);const ids=new Set(items.map(p=>p.id));for(let i=humans.length-1;i>=0;i--){const h=humans[i];if(!h.p.mine&&!ids.has(h.p.id)){scene.remove(h.rig.g);h.rig.tag.remove();h.rig.sayEl.remove();h.rig.g.traverse(o=>{if(o.geometry)o.geometry.dispose();});humans.splice(i,1);}}
  for(const item of items.slice(0,matchMedia('(max-width: 700px)').matches?4:8)){let h=humans.find(h=>h.p.id===item.id);if(!h){const p={id:item.id,x:item.x,y:item.y,tx:item.x,ty:item.y,gender:item.gender,coat:item.coat,name:()=>p.label,level:()=>0,mine:false,sitting:false,label:item.name};h={p,rig:makeHuman(p)};humans.push(h);}Object.assign(h.p,{label:item.name,gender:item.gender,coat:item.coat,accessory:item.accessory,tx:item.x,ty:item.y,sitting:item.sitting});if(item.wave)h.p.waveUntil=performance.now()+1800;}schedule();
@@ -405,7 +413,7 @@ function routeCamera(x,z){if(state.cameraMode!=='third')orbit.yaw=Math.atan2(pla
  if(data.type==='stand'){player.sitting=false;walk(4.7,7.6);}
  if(data.type==='camera'){state.zoom=data.payload.mode!=='map';state.cameraMode=data.payload.mode==='first'?'first':'third';}
  if(data.type==='wave')greet();
- if(data.type==='photo'){captureAllowed=new Set(Array.isArray(data.payload.allowedIds)?data.payload.allowedIds:[]);paint();try{const url=canvas.toDataURL('image/png');emit('photo',{url});}catch{emit('error',{message:'사진을 저장하지 못했습니다.'});}captureAllowed=null;paint();}
+ if(data.type==='photo'){captureAllowed=new Set(Array.isArray(data.payload.allowedIds)?data.payload.allowedIds:[]);paint();try{const url=canvas.toDataURL('image/png');emit('photo',{url});}catch{emit('error',{message:'사진을 저장하지 못했습니다.'});}captureAllowed=null;shadowPaintAt=-Infinity;paint();}
  schedule();
  }
  engine={command,syncPeers,render:schedule,wake:schedule,interact,seatCamera,resetCamera,routeCamera,launch};emit('ready');if(bridgePeers.length)syncPeers(bridgePeers);root.querySelector('#ms-loading').hidden=true;schedule();status('문샷 궤도 정거장 · 공간을 선택하면 내부에서 이동합니다.');

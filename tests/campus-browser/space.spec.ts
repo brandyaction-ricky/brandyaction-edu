@@ -43,6 +43,7 @@ test('real isolated 3D world loads without fake peers, supports cameras and WASD
  await world.locator('#ms-canvas').press('w',{delay:800});await page.waitForTimeout(650);
  const after=await page.evaluate(()=>((window as unknown as Window&{worldPositions:unknown[]}).worldPositions.at(-1)) as {x:number;y:number}|undefined);expect(after).toBeTruthy();expect(JSON.stringify(after)).not.toBe(JSON.stringify(before));
  await page.getByRole('button',{name:'전체 지도',exact:true}).click();await page.getByRole('button',{name:'기념 사진 저장',exact:true}).click();await expect(page.getByRole('link',{name:'기념 사진 PNG 내려받기'})).toHaveAttribute('href',/^data:image\/png;base64,/);
+ const png=await page.getByRole('link',{name:'기념 사진 PNG 내려받기'}).getAttribute('href');const {default:sharp}=await import('sharp');const stats=await sharp(Buffer.from(png!.split(',')[1],'base64')).stats();expect(stats.channels.some(c=>c.stdev>5)).toBeTruthy();
  await noOverflow(page);await expect(world.locator('body')).toHaveJSProperty('scrollHeight',await world.locator('body').evaluate(el=>el.clientHeight));await page.screenshot({path:testInfo.outputPath('space-desktop.png'),fullPage:true});
 });
 
