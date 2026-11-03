@@ -5,6 +5,7 @@ import { MemberVisitsToggle } from './member-visits';
 import { AnswerText } from './lesson-text';
 import { MvpBadge, useMemberMvps } from './member-mvp';
 import { QuestionAiBatch } from './question-ai-batch';
+import { AdminAiUsage } from './admin-ai-usage';
 import { QuestionImage } from './question-image';
 import { QuestionAnswerHistory } from './question-thread';
 import { lessonBodyPlainText } from "@/lib/lesson-body";
@@ -932,7 +933,7 @@ export function AdminCatalog({
               {!!unmatchedMissions.length && <section className="week-card mission-catalog"><div className="week-head"><strong>학습 연결 확인</strong></div>{unmatchedMissions.map(renderMission)}</section>}
             </div>
           ) : s.key === "questions" ? (
-            <div className="stack question-admin-list">{process.env.NEXT_PUBLIC_EDU_QUESTION_AI_BATCH_ENABLED === 'true' && process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED === 'true' && <QuestionAiBatch changed={onQuestionChanged}/>}
+            <div className="stack question-admin-list">{process.env.NEXT_PUBLIC_EDU_CURRICULUM_AI_ENABLED === 'true' && <AdminAiUsage/>}{process.env.NEXT_PUBLIC_EDU_QUESTION_AI_BATCH_ENABLED === 'true' && process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED === 'true' && <QuestionAiBatch changed={onQuestionChanged}/>}
               {q && <div className="question-inbox">
                 <section className="question-inbox-list" aria-label="질문 목록">
                   <div className="question-inbox-list-heading"><strong>질문 목록</strong><span>{filtered.length}개 표시</span></div>
