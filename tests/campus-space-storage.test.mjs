@@ -18,11 +18,16 @@ test('space database enforces private notes, actor identity, cohort access, seat
  grant select on profiles,courses,cohorts,enrollments to authenticated;`);
  await db.exec(readFileSync(new URL('../supabase/migrations/20261102151632_edu_campus_space_presence.sql',import.meta.url),'utf8'));
  await db.exec(readFileSync(new URL('../supabase/migrations/20261102225154_edu_campus_space_controls.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../supabase/migrations/20261103060120_edu_campus_original_avatar_appearance.sql',import.meta.url),'utf8'));
  const login=async n=>db.exec(`reset role;set role authenticated;select set_config('request.jwt.claim.sub','${uid(n)}',false);`);
  const join=async n=>db.query(`insert into edu_campus_space_presence(cohort_id,user_id,session_id,nickname,gender,coat,status,expires_at) values($1,$2,$3,'동료','male','#527086','joinable','2099-01-01')`,[uid(20),uid(n),uid(100+n)]);
  await login(1);await join(1);
  assert.ok(Date.parse((await db.query('select expires_at from edu_campus_space_presence')).rows[0].expires_at)<Date.now()+80000);
  await db.exec(`insert into edu_campus_space_profiles(user_id,nickname,gender,coat,status,note,desk) values('${uid(1)}','나','male','#527086','quiet','비밀 메모','비밀 책상');`);
+ await db.exec("update edu_campus_space_profiles set avatar_model=5,hair_color='#00465b',skin_color='#63f5ec',pants_color='#425a78',held_item='book'");
+ assert.equal((await db.query('select avatar_model,held_item from edu_campus_space_profiles')).rows[0].held_item,'book');
+ for(const assignment of ["avatar_model=6","skin_color='javascript:bad'","held_item='admin'"])await assert.rejects(db.exec('update edu_campus_space_profiles set '+assignment),/check constraint/i);
+ assert.equal((await db.query('select held_item from edu_campus_space_presence')).rows[0].held_item,'none');
  await assert.rejects(db.exec(`update edu_campus_space_profiles set user_id='${uid(2)}'`),/row-level security/i);
  await assert.rejects(db.exec("update edu_campus_space_presence set status='working'"),/rate limit/i);
  await db.query(`insert into edu_campus_space_seats(cohort_id,seat_id,user_id,session_id)values($1,'desk-1',$2,$3)`,[uid(20),uid(1),uid(101)]);

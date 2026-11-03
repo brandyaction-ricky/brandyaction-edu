@@ -16,3 +16,11 @@ test('oversized streaming body is cancelled before being fully buffered',async()
 test('space operator handler refuses ordinary viewers and binds the authenticated operator instead of body actor',async()=>{const {handleSpaceAdmin}=await moduleAt('features/campus/space/admin.ts');let written;const deps={enabled:true,authenticate:async()=>null,read:async()=>({}),write:async(a,b)=>{written={a,b};return {};}};const request=()=>new Request('https://edu.test/api/campus/space/admin',{method:'POST',headers:{origin:'https://edu.test','content-type':'application/json'},body:JSON.stringify({actorId:'forged',cohortId:id,announcement:'안내',paused:true,revision:0})});assert.equal((await handleSpaceAdmin(request(),deps)).status,403);assert.equal(written,undefined);assert.equal((await handleSpaceAdmin(request(),{...deps,authenticate:async()=>({id})})).status,200);assert.equal(written.a,id);});
 
 test('collective celebration requires a positive observed goal and never treats absent or invalid counts as achievement',()=>{for(const value of [null,{}, {cohortLaunches:0,cohortGoal:0},{cohortLaunches:2,cohortGoal:3},{cohortLaunches:-1,cohortGoal:1},{cohortLaunches:Infinity,cohortGoal:1},{cohortLaunches:3,cohortGoal:2.5}])assert.equal(d.cohortGoalReached(value),false);assert.equal(d.cohortGoalReached({cohortLaunches:3,cohortGoal:3}),true);assert.equal(d.cohortGoalReached({cohortLaunches:4,cohortGoal:3}),true);});
+
+
+test('original character cosmetics survive profile and public peer normalization without admitting roles or private notes',()=>{
+ const raw={nickname:'동료',gender:'female',model:5,hairColor:'#00465B',skinColor:'#63F5EC',coat:'#262741',pantsColor:'#425A78',heldItem:'book',note:'private',role:'admin',userId:'forged'};
+ const p=d.profile(raw),peer=d.publicPeer(id,id,p);assert.equal(p.model,5);assert.equal(p.hairColor,'#00465b');assert.equal(peer.heldItem,'book');assert.equal(peer.pantsColor,'#425a78');assert(!('note' in peer));assert(!('role' in peer));
+ const limited=d.publicAvatar(raw);assert(!('note' in limited));assert(!('role' in limited));assert(!('userId' in limited));
+ const bad=d.profile({gender:'female',model:99,skinColor:'url(secret)',heldItem:'admin'});assert.equal(bad.model,1);assert.equal(bad.skinColor,'#e8b68b');assert.equal(bad.heldItem,'none');
+});

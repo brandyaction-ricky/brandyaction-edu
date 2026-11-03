@@ -44,12 +44,20 @@ shown. This is not a capacity result for hundreds of simultaneous users.
 
 ## Current integration
 
-- Space selector: existing ship or imported study space, preserving fallback.
+- Default space: original imported study space; existing ship remains a fallback.
 - WASD/arrows/floor click/touch pad, map/third-person, profile and remote peers.
 - EDU-reserved seats only; stand/wave; short-lived nearby speech.
 - Focus/mission/feedback/lounge links open the existing EDU tools.
-- Private-office button opens EDU's private task inbox, not the standalone
-  anonymous office or a fictional active worker.
+- Private-room button walks through the original room portal. The AI-office
+  button opens EDU's private task inbox; no fictional active worker is shown.
+- The original avatar preview, 12 GLB models, palette and held props are reused.
+  Appearance drafts stay in the host; save uses the existing profile boundary.
+  Cancel restores the saved appearance; personal notes and roles are excluded.
+  Preview rendering stops when closed/hidden. No extra backend is introduced.
+- Apply `20261103060120_edu_campus_original_avatar_appearance.sql` before deploying
+  this code to an authorized DEV environment: five constrained cosmetic columns
+  on each existing profile/presence table. No RLS/grant or membership changes.
+  This migration has only been tested locally, not applied to DEV/production.
 
 First-person, photo export and rocket animation remain in the existing ship.
 The imported space labels this limitation. The upstream 3D private-office
