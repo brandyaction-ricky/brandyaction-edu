@@ -13,7 +13,7 @@ async function readable(control:Locator){
 
 test('entry links stay readable and aligned on desktop and phone',async({page})=>{
  await page.route('**/api/admin/campus/webinars*',r=>r.fulfill({json:{events:[],cohorts:[{id:'00000000-0000-4000-8000-000000000003',name:'3기',courses:{title:'문샷',slug:'moonshot'}}]}}));
- await page.goto('/webinar-admin');await page.getByRole('button',{name:'새 행사 만들기'}).click();await page.getByLabel('판매·권한 확인 기수').selectOption('00000000-0000-4000-8000-000000000003');
+ await page.goto('/webinar-admin');await page.addStyleTag({content:'body{background:#080e1e}'});await page.getByRole('button',{name:'새 행사 만들기'}).click();await page.getByLabel('판매·권한 확인 기수').selectOption('00000000-0000-4000-8000-000000000003');
  const hub=page.getByRole('region',{name:'대상별 캠퍼스 입장 링크'});
  for(const control of await hub.locator('button,a').all()){await readable(control);expect((await control.boundingBox())!.height).toBeGreaterThanOrEqual(44);}
  await readable(page.getByLabel('공개 상태'));await readable(page.getByLabel('제목',{exact:true}));
