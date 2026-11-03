@@ -10,7 +10,7 @@ import { CommunityWorkflowPanel } from './workflow-panel';
 import { PortfolioFiles } from './file-panel';
 import { useCampusDraftGuard } from '../ui/draft-guard';
 
-type Props = { snapshot: CampusSnapshot; demo: boolean; onOpen?: (lessonId: string) => void; onRewards?: (rewards: CommunityRewards) => void };
+type Props = { initialTab?:Tab; snapshot: CampusSnapshot; demo: boolean; onOpen?: (lessonId: string) => void; onRewards?: (rewards: CommunityRewards) => void };
 type Tab = 'all' | 'mine' | 'feedback' | 'talent' | 'demo_day';
 const tabs: [Tab, string][] = [['all', '동료 작업실'], ['mine', '내 결과물 모음'], ['feedback', '의견 나누기'], ['talent', '재능 교환'], ['demo_day', '결과물 발표회']];
 function date(value: string) { return new Intl.DateTimeFormat('ko-KR', { month: 'short', day: 'numeric' }).format(new Date(value)); }
@@ -18,10 +18,10 @@ function postDraft(post?: CommunityPost, lessonId?: string): Partial<CommunityCo
 export function CommunityPanel(props: Props) {
   return <CommunitySession key={`${props.demo}:${props.snapshot.selectedEnrollmentId ?? ''}:${props.snapshot.viewer.id}`} {...props} />;
 }
-function CommunitySession({ snapshot, demo, onOpen, onRewards }: Props) {
+function CommunitySession({ snapshot, demo, onOpen, onRewards, initialTab }: Props) {
   const enrollmentId = snapshot.selectedEnrollmentId;
   const [state, setState] = useState<CommunityState | null>(() => demo ? getCommunityDemoState(snapshot.selectedEnrollmentId??'',snapshot.viewer.id)??createCommunityDemo(snapshot) : null);
-  const [tab, setTab] = useState<Tab>('all'), [selected, setSelected] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>(initialTab||'all'), [selected, setSelected] = useState<string | null>(null);
   const [focusPost,setFocusPost]=useState<string|null>(null);
   const [editing, setEditing] = useState<'new' | string | null>(null), [draft, setDraft] = useState<Partial<CommunityCommand>>(postDraft(undefined, snapshot.lessons[0]?.id));
   const [draftBaseline,setDraftBaseline]=useState('');

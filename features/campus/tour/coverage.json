@@ -1,0 +1,473 @@
+{
+  "scope": "Local preview routing. Not a claim of production or external integration completion.",
+  "features": [
+    {
+      "number": 1,
+      "name": "EDU 계정으로 입장",
+      "destination": "entry",
+      "status": "service-check-required"
+    },
+    {
+      "number": 2,
+      "name": "문샷 우주 캠퍼스",
+      "destination": "scene",
+      "status": "legacy-scene"
+    },
+    {
+      "number": 3,
+      "name": "목적별 공간",
+      "destination": "map",
+      "status": "preview"
+    },
+    {
+      "number": 4,
+      "name": "사람형 캐릭터",
+      "destination": "character",
+      "status": "preview"
+    },
+    {
+      "number": 5,
+      "name": "이동·카메라",
+      "destination": "camera",
+      "status": "preview"
+    },
+    {
+      "number": 6,
+      "name": "자리·주변 상호작용",
+      "destination": "focus",
+      "status": "preview"
+    },
+    {
+      "number": 7,
+      "name": "동료의 존재·상태",
+      "destination": "lounge",
+      "status": "preview"
+    },
+    {
+      "number": 8,
+      "name": "대화·조용한 응원",
+      "destination": "lounge",
+      "status": "preview"
+    },
+    {
+      "number": 9,
+      "name": "내 책상·작업물 전시",
+      "destination": "desk",
+      "status": "preview"
+    },
+    {
+      "number": 10,
+      "name": "가벼운 놀이·기념사진",
+      "destination": "legacy-space",
+      "status": "legacy-scene"
+    },
+    {
+      "number": 11,
+      "name": "개인 성장보드",
+      "destination": "growth",
+      "status": "preview"
+    },
+    {
+      "number": 12,
+      "name": "일차별 미션 지도",
+      "destination": "growth",
+      "status": "preview"
+    },
+    {
+      "number": 13,
+      "name": "다음 행동 추천",
+      "destination": "growth",
+      "status": "preview"
+    },
+    {
+      "number": 14,
+      "name": "수업·과제 바로 열기",
+      "destination": "learning",
+      "status": "preview"
+    },
+    {
+      "number": 15,
+      "name": "수업·템플릿 자료실",
+      "destination": "support:library",
+      "status": "preview"
+    },
+    {
+      "number": 16,
+      "name": "오늘 15분 모드",
+      "destination": "growth",
+      "status": "preview"
+    },
+    {
+      "number": 17,
+      "name": "다시 시작 버튼",
+      "destination": "growth",
+      "status": "preview"
+    },
+    {
+      "number": 18,
+      "name": "집중 타이머·작은 상태창",
+      "destination": "focus",
+      "status": "preview"
+    },
+    {
+      "number": 19,
+      "name": "휴식·환경음",
+      "destination": "sound",
+      "status": "preview"
+    },
+    {
+      "number": 20,
+      "name": "함께 집중·공부 약속",
+      "destination": "support:sessions",
+      "status": "preview"
+    },
+    {
+      "number": 21,
+      "name": "참여 방식 선택",
+      "destination": "support:settings",
+      "status": "preview"
+    },
+    {
+      "number": 22,
+      "name": "개인 실행 루틴",
+      "destination": "business:routine",
+      "status": "preview"
+    },
+    {
+      "number": 23,
+      "name": "실행 수첩·마무리 연출",
+      "destination": "journal",
+      "status": "preview"
+    },
+    {
+      "number": 24,
+      "name": "커리큘럼 변경 안내",
+      "destination": "support:settings",
+      "status": "preview"
+    },
+    {
+      "number": 25,
+      "name": "졸업 후 유지 모드",
+      "destination": "archive",
+      "status": "service-check-required"
+    },
+    {
+      "number": 26,
+      "name": "수업 기반 AI 조교",
+      "destination": "ai",
+      "status": "service-check-required"
+    },
+    {
+      "number": 27,
+      "name": "캡처 질문·대화 이어가기",
+      "destination": "ai",
+      "status": "service-check-required"
+    },
+    {
+      "number": 28,
+      "name": "멘토 질문 꾸러미",
+      "destination": "ai",
+      "status": "service-check-required"
+    },
+    {
+      "number": 29,
+      "name": "멘토 AI 답변 초안",
+      "destination": "admin:support",
+      "status": "service-check-required"
+    },
+    {
+      "number": 30,
+      "name": "막힘 해결 요청",
+      "destination": "support:request",
+      "status": "preview"
+    },
+    {
+      "number": 31,
+      "name": "현업 긴급 모드",
+      "destination": "business:resources",
+      "status": "preview"
+    },
+    {
+      "number": 32,
+      "name": "멘토 오피스아워",
+      "destination": "support:sessions",
+      "status": "preview"
+    },
+    {
+      "number": 33,
+      "name": "멘토 인계 노트",
+      "destination": "admin:support",
+      "status": "preview"
+    },
+    {
+      "number": 34,
+      "name": "실전 포트폴리오",
+      "destination": "community:mine",
+      "status": "preview"
+    },
+    {
+      "number": 35,
+      "name": "사이트 피드백 교환소",
+      "destination": "feedback",
+      "status": "preview"
+    },
+    {
+      "number": 36,
+      "name": "피드백 작성·도움됨",
+      "destination": "feedback",
+      "status": "preview"
+    },
+    {
+      "number": 37,
+      "name": "피드백 반영 기록",
+      "destination": "feedback",
+      "status": "preview"
+    },
+    {
+      "number": 38,
+      "name": "수정 전후 비교",
+      "destination": "feedback",
+      "status": "preview"
+    },
+    {
+      "number": 39,
+      "name": "동료 작업 과정 보기",
+      "destination": "feedback",
+      "status": "preview"
+    },
+    {
+      "number": 40,
+      "name": "재능 교환",
+      "destination": "community:talent",
+      "status": "preview"
+    },
+    {
+      "number": 41,
+      "name": "실패 실험 보관함",
+      "destination": "business:experiment",
+      "status": "preview"
+    },
+    {
+      "number": 42,
+      "name": "외부 고객 테스트 룸",
+      "destination": "business:customers",
+      "status": "preview"
+    },
+    {
+      "number": 43,
+      "name": "문샷 데모데이",
+      "destination": "community:demo_day",
+      "status": "preview"
+    },
+    {
+      "number": 44,
+      "name": "내 사업 브리프",
+      "destination": "business:brief",
+      "status": "preview"
+    },
+    {
+      "number": 45,
+      "name": "업종별 실행 경로",
+      "destination": "business:routes",
+      "status": "preview"
+    },
+    {
+      "number": 46,
+      "name": "고객 반응 리허설",
+      "destination": "business:rehearsal",
+      "status": "preview"
+    },
+    {
+      "number": 47,
+      "name": "발행 전 점검대",
+      "destination": "business:checklist",
+      "status": "preview"
+    },
+    {
+      "number": 48,
+      "name": "캠페인 조립대",
+      "destination": "business:campaign",
+      "status": "preview"
+    },
+    {
+      "number": 49,
+      "name": "나만의 실행 레시피",
+      "destination": "business:recipe",
+      "status": "preview"
+    },
+    {
+      "number": 50,
+      "name": "선택의 기록",
+      "destination": "business:decision",
+      "status": "preview"
+    },
+    {
+      "number": 51,
+      "name": "도움 없이 다시 해보기",
+      "destination": "business:practice",
+      "status": "preview"
+    },
+    {
+      "number": 52,
+      "name": "실행 이정표",
+      "destination": "growth",
+      "status": "preview"
+    },
+    {
+      "number": 53,
+      "name": "개인 성장 카드",
+      "destination": "growth",
+      "status": "preview"
+    },
+    {
+      "number": 54,
+      "name": "XP·레벨·배지",
+      "destination": "community:mine",
+      "status": "preview"
+    },
+    {
+      "number": 55,
+      "name": "동료 기여도",
+      "destination": "feedback",
+      "status": "preview"
+    },
+    {
+      "number": 56,
+      "name": "개인 로켓 발사",
+      "destination": "community:mine",
+      "status": "preview"
+    },
+    {
+      "number": 57,
+      "name": "기수 공동 로켓",
+      "destination": "community:mine",
+      "status": "preview"
+    },
+    {
+      "number": 58,
+      "name": "사업 성과 체크인",
+      "destination": "business:metric",
+      "status": "preview"
+    },
+    {
+      "number": 59,
+      "name": "내 사업 실험실",
+      "destination": "business:experiment",
+      "status": "preview"
+    },
+    {
+      "number": 60,
+      "name": "개인 성과 대시보드",
+      "destination": "business:outcomes",
+      "status": "preview"
+    },
+    {
+      "number": 61,
+      "name": "기수별 운영 대시보드",
+      "destination": "admin:dashboard",
+      "status": "preview"
+    },
+    {
+      "number": 62,
+      "name": "운영자 지원 보드",
+      "destination": "admin:support",
+      "status": "preview"
+    },
+    {
+      "number": 63,
+      "name": "반복 장애 지도",
+      "destination": "admin:support",
+      "status": "preview"
+    },
+    {
+      "number": 64,
+      "name": "지원 효과 확인",
+      "destination": "admin:support",
+      "status": "preview"
+    },
+    {
+      "number": 65,
+      "name": "운영 지원량 예상",
+      "destination": "admin:support",
+      "status": "preview"
+    },
+    {
+      "number": 66,
+      "name": "기수 회고 초안",
+      "destination": "admin:support",
+      "status": "preview"
+    },
+    {
+      "number": 67,
+      "name": "성과 사례 보관함",
+      "destination": "admin:cases",
+      "status": "preview"
+    },
+    {
+      "number": 68,
+      "name": "공간·모임 운영",
+      "destination": "admin:space",
+      "status": "preview"
+    },
+    {
+      "number": 69,
+      "name": "커뮤니티 관리",
+      "destination": "admin:moderation",
+      "status": "service-check-required"
+    },
+    {
+      "number": 70,
+      "name": "사용량·비용·오류 현황",
+      "destination": "admin:support",
+      "status": "preview"
+    },
+    {
+      "number": 71,
+      "name": "윤익님 공간 합본 연결",
+      "destination": "scene",
+      "status": "preview"
+    },
+    {
+      "number": 72,
+      "name": "내 AI 오피스·봇 상태",
+      "destination": "bots",
+      "status": "service-check-required"
+    },
+    {
+      "number": 73,
+      "name": "AI 동료에게 작업 맡기기",
+      "destination": "office",
+      "status": "service-check-required"
+    },
+    {
+      "number": 74,
+      "name": "실제 다중 사용자 연결",
+      "destination": "lounge",
+      "status": "service-check-required"
+    },
+    {
+      "number": 75,
+      "name": "재접속·여러 창 처리",
+      "destination": "lounge",
+      "status": "service-check-required"
+    },
+    {
+      "number": 76,
+      "name": "공개 범위·알림 설정",
+      "destination": "support:settings",
+      "status": "preview"
+    },
+    {
+      "number": 77,
+      "name": "모바일·저사양 대응",
+      "destination": "camera",
+      "status": "preview"
+    },
+    {
+      "number": 78,
+      "name": "성능·통합 검수",
+      "destination": "checks",
+      "status": "service-check-required"
+    }
+  ]
+}

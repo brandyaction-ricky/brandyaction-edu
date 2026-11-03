@@ -4,19 +4,21 @@ import type { CommunityModerationState } from './repository';
 import type { CommunityCommand } from './domain';
 import styles from './panel.module.css';
 import { CommunityWorkflowPanel } from './workflow-panel';
-export function CommunityModerationPanel({ cohortId }: { cohortId: string }) {
-  return <ModerationSession key={cohortId} cohortId={cohortId} />;
+export function CommunityModerationPanel({ cohortId,demo=false }: { cohortId: string;demo?:boolean }) {
+  return <ModerationSession key={cohortId} cohortId={cohortId} demo={demo} />;
 }
-function ModerationSession({ cohortId }: { cohortId: string }) {
-  const [state, setState] = useState<CommunityModerationState | null>(null), [error, setError] = useState(''), [busy, setBusy] = useState(false), [reason, setReason] = useState('');
+function ModerationSession({ cohortId,demo=false }: { cohortId: string;demo?:boolean }) {
+  const [state, setState] = useState<CommunityModerationState | null>(demo?{posts:[],comments:[],reports:[]}:null), [error, setError] = useState(''), [busy, setBusy] = useState(false), [reason, setReason] = useState('');
   useEffect(() => {
+    if(demo)return;
     const controller = new AbortController();
     fetch(`/api/campus/community/moderation?cohortId=${encodeURIComponent(cohortId)}`, { cache: 'no-store', signal: controller.signal })
       .then(async r => { const data = await r.json(); if (!r.ok) throw new Error(data.error); setState(data); })
       .catch(e => { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : '신고 목록을 확인하지 못했습니다.'); });
     return () => controller.abort();
-  }, [cohortId]);
+  }, [cohortId,demo]);
   async function moderate(postId: string, moderation: CommunityCommand['moderation'], reportId?: string, commentId?: string) {
+    if(demo){setError('실제 신고 처리는 DEV에서 검수합니다.');return;}
     if (busy || reason.trim().length < 5) return;
     setBusy(true); setError('');
     try {
@@ -27,6 +29,7 @@ function ModerationSession({ cohortId }: { cohortId: string }) {
     } catch (e) { setError(e instanceof Error ? e.message : '처리하지 못했습니다.'); } finally { setBusy(false); }
   }
   return <section className={styles.root} aria-label="커뮤니티 관리"><header className={styles.header}><div><span className={styles.eyebrow}>MOONSHOT · 운영 지원</span><h2>의견이 안전하게 오가는 작업실</h2><p>신고를 확인하고 숨김·복구·처리 완료를 기록합니다. 조치 이유와 담당자는 서버에 보존됩니다.</p></div></header>
+    {demo&&<p>가상 화면 · 실제 신고·운영자 조치는 조회하거나 저장하지 않습니다.</p>}
     {error && <p role="alert" className={styles.error}>{error}</p>}
     {!state && !error && <p role="status">신고 기록을 확인하고 있어요…</p>}
     {state?.viewerId&&<details><summary>결과물 발표회 발표 진행</summary>{state.posts.filter(p=>p.kind==='demo_day'&&p.visibility==='cohort'&&!p.hidden).map(p=><details key={p.id}><summary>{p.title} · {p.alias}</summary><CommunityWorkflowPanel post={p} viewerId={state.viewerId!} demo={false}/></details>)}</details>}

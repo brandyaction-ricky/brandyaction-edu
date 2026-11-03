@@ -20,7 +20,7 @@ import {CampusEntryBar} from '../../features/campus/ui/entry-bar';
 import {withCampusReturn} from '../../features/campus/ui/navigation';
 import {CampusWorkspace,WorkspaceLive} from '../../features/campus/ui/workspace';
 function App(){const [mode,setMode]=useState('student');const [notice,setNotice]=useState('');
-if(location.pathname==='/campus-tour')return <FourSpacesPreview snapshot={student}/>;
+if(location.pathname==='/campus-tour')return <FourSpacesPreview snapshot={student} adminSnapshot={admin}/>;
 if(location.pathname.startsWith('/learn/'))return <><CampusEntryBar returnTo={new URLSearchParams(location.search).get('campusReturn')||undefined}/><main style={{padding:32}}><h1>예시 수업 · 한 장 지도 작성</h1><p>이동·복귀 검수용 가상 수업입니다. 실제 학습 기록은 저장하지 않습니다.</p></main></>;
 if(location.pathname==='/webinar')return <WebinarRoom event={{...webinarEvent,youtubeId:new URLSearchParams(location.search).has('video')?'abcdefghijk':''}} demo={!new URLSearchParams(location.search).has('api')}/>;
 if(location.pathname==='/webinar-admin')return <WebinarAdmin/>;

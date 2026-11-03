@@ -7,15 +7,15 @@ import { emptyOfficeDemo, mutateOfficeDemo, receiveOfficeDemo } from './demo';
 import styles from './panel.module.css';
 import { useCampusDraftGuard } from '../ui/draft-guard';
 import { OfficeDispatchPanel } from './dispatch-panel';
-export function OfficePanel({ snapshot, demo }: { snapshot: CampusSnapshot; demo: boolean }) { return <OfficeSession key={`${snapshot.viewer.id}:${snapshot.selectedEnrollmentId}:${demo}`} snapshot={snapshot} demo={demo} />; }
+export function OfficePanel({ snapshot, demo,active=true }: { snapshot: CampusSnapshot; demo: boolean;active?:boolean }) { return <OfficeSession key={`${snapshot.viewer.id}:${snapshot.selectedEnrollmentId}:${demo}`} snapshot={snapshot} demo={demo} active={active} />; }
 export const Panel = OfficePanel;
-function OfficeSession({ snapshot, demo }: { snapshot: CampusSnapshot; demo: boolean }) {
+function OfficeSession({ snapshot, demo,active=true }: { snapshot: CampusSnapshot; demo: boolean;active?:boolean }) {
   const enrollmentId = snapshot.selectedEnrollmentId;
   const [state, setState] = useState<OfficeState | null>(() => demo ? emptyOfficeDemo() : null), [objective, setObjective] = useState(''), [materials, setMaterials] = useState(''), [output, setOutput] = useState<OfficeOutput>('plan');
   const [selected, setSelected] = useState<string | null>(null), [note, setNote] = useState(''), [error, setError] = useState(''), [notice, setNotice] = useState(''), [busy, setBusy] = useState(false), [showArchived, setShowArchived] = useState(false);
   const [dispatchLocked,setDispatchLocked]=useState(false);
   const [pending, setPending] = useState<OfficeCommand | null>(null);
-  useCampusDraftGuard(!!objective.trim()||!!materials.trim()||output!=='plan'||(state?.jobs.find(j=>j.id===selected)?.status==='review'&&!!note.trim()),busy);
+  useCampusDraftGuard(!!objective.trim()||!!materials.trim()||output!=='plan'||(state?.jobs.find(j=>j.id===selected)?.status==='review'&&!!note.trim()),busy,'campus-office',active);
   const receipts = useRef(new Map<string, string>()), alive = useRef(true);
   useEffect(() => {
     alive.current = true;

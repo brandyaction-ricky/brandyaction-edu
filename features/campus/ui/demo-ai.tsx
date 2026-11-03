@@ -6,9 +6,9 @@ import type {CampusSnapshot} from '../contracts';
 import s from '../support/panel.module.css';
 type Turn={question:string;image:string|null;imageName:string;lessonId:string};
 /** Isolated synthetic UI: deliberately imports no API client or live AI component. */
-export function DemoAi({snapshot,handoff}:{snapshot:CampusSnapshot;handoff?:{lessonId:string;context:string}|null}){
+export function DemoAi({snapshot,handoff,active=true}:{active?:boolean;snapshot:CampusSnapshot;handoff?:{lessonId:string;context:string}|null}){
  const [lessonId,setLessonId]=useState(handoff?.lessonId||snapshot.lessons[0]?.id||''),[question,setQuestion]=useState(handoff?.context||''),[attachment,setAttachment]=useState<{url:string;name:string}|null>(null),[turns,setTurns]=useState<Turn[]>([]),[error,setError]=useState('');
- useCampusDraftGuard(!!(question.trim()||attachment),false,'campus-ai');
+ useCampusDraftGuard(!!(question.trim()||attachment),false,'campus-ai',active);
  const urls=useRef<string[]>([]),file=useRef<HTMLInputElement>(null);
  useEffect(()=>()=>{for(const url of urls.current)URL.revokeObjectURL(url);},[]);
  function image(f:File|undefined){if(!f)return;if(!['image/png','image/jpeg','image/webp'].includes(f.type)||f.size>5*1024*1024){setError('PNG·JPG·WebP 캡처를 5MB 이하로 넣어 주세요.');return;}const url=URL.createObjectURL(f);urls.current.push(url);setAttachment({url,name:f.name||'붙여넣은 캡처'});setError('');}
