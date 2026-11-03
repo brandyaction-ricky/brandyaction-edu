@@ -15,7 +15,7 @@ test('support validates actual category, safe URLs, plain bounded notes and spec
  for(const fields of [{category:'forged'},{question:' '},{question:'x'.repeat(4001)},{id:'fake'},{lessonId:uid(3),lessonVersion:''}])assert.throws(()=>domain.parseIntake({...b,...fields}));
 });
 test('support calendar guards start/end/capacity and version changes preserve old references',()=>{
- const now=Date.now(),b={id:uid(1),cohortId:uid(2),title:'오피스아워',sessionKind:'mentor',startsAt:new Date(now+10000).toISOString(),endsAt:new Date(now+3600000).toISOString(),capacity:2,locationUrl:''};
+ const now=Date.now(),b={id:uid(1),cohortId:uid(2),title:'질문 상담',sessionKind:'mentor',startsAt:new Date(now+10000).toISOString(),endsAt:new Date(now+3600000).toISOString(),capacity:2,locationUrl:''};
  assert.equal(domain.parseSession(b,now).kind,'mentor');for(const fields of [{capacity:0},{capacity:101},{endsAt:b.startsAt},{sessionKind:'fake'}])assert.throws(()=>domain.parseSession({...b,...fields},now));
  const snapshot={lessons:[{id:uid(3),version:'v2',title:'광고 고객',day:1,missions:[]},{id:uid(4),version:'v1',title:'전환',day:2,missions:[]}]};
  assert.deepEqual(domain.changedLessons(snapshot,{knownLessons:{[uid(3)]:'v1'}}).map(l=>l.id),[uid(3)]);

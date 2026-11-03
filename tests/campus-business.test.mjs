@@ -123,3 +123,14 @@ test('repository saves, reopens, retries without duplicate creation, preserves e
  db.data.cohorts[0].archived_at=new Date().toISOString();await assert.rejects(loadBusiness(db,id(1),id(2)),{status:403});await assert.rejects(saveBusiness(db,id(1),{...command,id:id(90)}),{status:403});db.data.cohorts[0].archived_at=null;
  db.data.enrollments[0].status='refunded';await assert.rejects(loadBusiness(db,id(1),id(2)),{status:403});
 });
+
+test('plain choice labels keep historical records valid and leave user text and export values intact',()=>{
+ const old={...baseMetric,stage:'체크인'};
+ assert.equal(d.validatePayload('metric',old).stage,'체크인');
+ assert.equal(d.businessDisplayValue('metric','stage',old.stage),'최근 성과 기록');
+ assert.equal(d.businessDisplayValue('brief','product','체크인'),'체크인');
+ const record=row(15,old);
+ assert.equal(JSON.parse(d.exportBusiness([record])).records[0].payload.stage,'체크인');
+ assert.match(d.businessRecordText('metric',old),/기록 구분: 최근 성과 기록/);
+ assert.match(d.businessRecordText('metric',{...old,note:'고객이 말한 가설 지지'}),/고객이 말한 가설 지지/);
+});

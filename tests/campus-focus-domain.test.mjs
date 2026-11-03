@@ -51,7 +51,7 @@ test('concurrent or out-of-order edits fail with conflict',()=>{
 });
 
 test('finished result is immutable even with the current revision',()=>{
- const done=change(session(),'finish',now+5000,{resultNote:'완성한 초안',nextStep:'동료 피드백 요청'});
+ const done=change(session(),'finish',now+5000,{resultNote:'완성한 초안',nextStep:'동료 의견 요청'});
  for(const kind of ['pause','resume','finish'])assert.throws(()=>change(done,kind,now+10000,{resultNote:'덮어쓰기',nextStep:'변경'}),{status:409});
 });
 

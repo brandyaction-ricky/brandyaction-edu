@@ -37,7 +37,7 @@ test('world opens existing EDU office and rejects unauthenticated standalone sta
  test.setTimeout(60000);
  await page.goto('/space');await page.getByLabel('공간 화면',{exact:true}).selectOption('office');
  const world=page.frameLocator('iframe');await expect(world.locator('#office')).toHaveAttribute('data-ready','true',{timeout:30000});
- await world.getByRole('button',{name:'내 봇 사무실',exact:true}).click();
+ await world.getByRole('button',{name:'내 AI 사무실',exact:true}).click();
  await expect(page.getByRole('heading',{name:'새 작업 요청',exact:true})).toBeVisible();
  await page.goto('/campus/world/office/index.html');
  await expect(page.locator('#status')).toContainText('에듀 캠퍼스 화면에서');

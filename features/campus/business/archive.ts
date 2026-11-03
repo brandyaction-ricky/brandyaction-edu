@@ -1,7 +1,7 @@
 import type {createClient} from '@/lib/supabase/server';
 import {fail,safeUrl,validId,validateTitle} from './domain';
 type Database=Awaited<ReturnType<typeof createClient>>;
-export const archiveKinds={plan:'개인 실행 계획',recipe:'나의 레시피',artifact:'내 결과물',note:'개인 노트'};
+export const archiveKinds={plan:'개인 실행 계획',recipe:'나의 작업 순서',artifact:'내 결과물',note:'개인 노트'};
 export type ArchiveScope={id:string;courseTitle:string;cohortName:string;reason:string};
 export type ArchiveEntry={id:string;enrollment_id:string;kind:keyof typeof archiveKinds;title:string;body:string;url:string;source_kind:'business'|'post'|null;source_id:string|null;source_revision:number|null;revision:number;created_at:string;updated_at:string};
 export type ArchiveSource={id:string;kind:string;title:string;payload?:Record<string,unknown>;body?:string;url?:string;revision:number;updatedAt:string};

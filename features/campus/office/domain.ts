@@ -3,7 +3,7 @@ import { safeCommunityUrl } from '../community/domain';
 export const officeOutputs = ['plan', 'copy', 'checklist', 'analysis'] as const;
 export type OfficeOutput = typeof officeOutputs[number];
 export type OfficeStatus = 'awaiting_connection' | 'queued' | 'running' | 'review' | 'approved' | 'revision_requested' | 'failed' | 'archived';
-export const officeStatusLabels: Record<OfficeStatus, string> = { awaiting_connection: '연결 대기', queued: '봇 접수', running: '실행 중', review: '내 검토 필요', approved: '승인 완료', revision_requested: '수정 요청', failed: '실행 오류', archived: '보관됨' };
+export const officeStatusLabels: Record<OfficeStatus, string> = { awaiting_connection: '연결 대기', queued: '요청 접수', running: '실행 중', review: '내 검토 필요', approved: '승인 완료', revision_requested: '수정 요청', failed: '실행 오류', archived: '보관됨' };
 export const outputLabels: Record<OfficeOutput, string> = { plan: '실행 계획', copy: '문구 초안', checklist: '점검 목록', analysis: '분석 정리' };
 export type OfficeJob = { id: string; owner_id: string; enrollment_id: string; objective: string; material_urls: string[]; output_type: OfficeOutput; status: OfficeStatus; revision: number; draft_text: string; draft_url: string; review_note: string; error_note: string; created_at: string; updated_at: string };
 export type OfficeHistory = { id: string; job_id: string; revision: number; actor_type: 'learner' | 'connector'; action: string; status: OfficeStatus; note: string; draft_text: string; created_at: string };

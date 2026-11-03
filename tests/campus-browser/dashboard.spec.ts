@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 test('student next action, map filtering and private export',async({page})=>{
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto('/');await expect(page.getByRole('heading',{name:'문샷 동료님의 다음 도약'})).toBeVisible();
- await page.getByRole('button',{name:'이어서 실행하기'}).click();await expect(page.getByRole('status')).toContainText('과제 제출·피드백');
+ await page.getByRole('button',{name:'이어서 실행하기'}).click();await expect(page.getByRole('status')).toContainText('과제 제출·의견');
  await page.getByRole('button',{name:'수정 필요',exact:true}).click();await expect(page.getByRole('button',{name:/DAY 03/})).toBeVisible();await expect(page.getByRole('button',{name:/DAY 01/})).toHaveCount(0);
  await page.getByRole('button',{name:'내 성장 카드 보기'}).click();const dialog=page.getByRole('dialog');await expect(dialog).toContainText('가상 예시');
  const saved=page.waitForEvent('download');await page.getByRole('button',{name:'성장 카드 이미지 저장'}).click();expect((await saved).suggestedFilename()).toBe('moonshot-demo-progress.svg');
