@@ -20,6 +20,8 @@ function fixture() {
     courses: [{ id: uid(3), title: '문샷', status: 'published', archived_at: null }],
     cohorts: [{ id: uid(4), course_id: uid(3), name: 'QA 기수' }],
     curriculum_weeks: [{ id: uid(5), course_id: uid(3), is_published: true }],
+    edu_cohort_week_visibility:[{cohort_id:uid(4),week_id:uid(5),is_published:true}],
+    edu_cohort_lesson_visibility:[{cohort_id:uid(4),lesson_id:uid(6),is_published:true}],
     curriculum_lessons: [{ id: uid(6), week_id: uid(5), title: '공개 수업', day_number: 1, updated_at: 'v1', is_published: true },
       { id: uid(16), week_id: uid(5), title: '비공개 수업', day_number: 2, is_published: false }],
     curriculum_missions: [{ id: uid(7), lesson_id: uid(6), title: '과제', updated_at: 'm1', is_required: true, is_published: true, archived_at: null }],
@@ -52,6 +54,13 @@ function database(data, { failTable, truncateTable } = {}) {
   } };
 }
 const load = (data = fixture(), options) => loadCampusSnapshot(database(data, options), user, uid(2), now);
+test('selected cohort hides another cohorts published lesson and fails closed on visibility lookup',async()=>{
+ for(const table of ['edu_cohort_week_visibility','edu_cohort_lesson_visibility']){
+  const data=fixture();data[table][0].cohort_id=uid(99);assert.equal((await load(data)).lessons.length,0);
+  await assert.rejects(load(fixture(),{failTable:table}),{status:503});
+ }
+ const data=fixture();data.curriculum_lessons[0].archived_at='2026-01-01';assert.equal((await load(data)).lessons.length,0);
+});
 
 test('context reads only current owner scopes and no lesson bodies', async () => {
   const db = database(fixture());

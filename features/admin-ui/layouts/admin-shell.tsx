@@ -165,6 +165,7 @@ export function AdminShell({
         </div>
         <nav aria-label="관리자 카테고리">
           {navLink('overview')}
+          {visibility.has('campaigns')&&<Link className="nav-link" href="/admin/campus/webinars" onClick={()=>setMobile(false)}><Compass/><span>캠퍼스 입장 링크</span></Link>}
           {user.role === 'admin' && <Link href="/admin/diagnosis/manage" className={`nav-link${selected === 'diagnosis-management' ? ' active' : ''}`} aria-current={selected === 'diagnosis-management' ? 'page' : undefined} onClick={() => setMobile(false)}><Compass aria-hidden="true"/>N6 진단 관리</Link>}
           {user.role === 'admin' && <Link href="/admin/diagnosis" className="nav-link" onClick={() => setMobile(false)}><Compass aria-hidden="true"/>N6 진단 받기</Link>}
           {groups.map(([title, keys]) => (

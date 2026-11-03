@@ -2,6 +2,7 @@ import type { createClient } from '@/lib/supabase/server';
 import type { Row } from '@/lib/platform';
 import { hasLearningAccess } from '@/lib/platform-rules';
 import { campusError, campusScopes, campusSnapshot } from './snapshot';
+import {cohortWeekVisible,cohortLessonVisible} from '@/lib/cohort-curriculum-visibility';
 
 type Database = Awaited<ReturnType<typeof createClient>>;
 type ReadResult = { data: unknown; error: unknown; count: number | null };
@@ -21,17 +22,23 @@ export async function loadCampusSnapshot(db: Database, viewer: { id: string; ful
   if (enrollmentId && !enrollments.some(e => e.id === enrollmentId)) campusError(403, '현재 이용 가능한 수강권을 선택해 주세요.');
   const [courses, cohorts] = enrollments.length ? await Promise.all([
     rows(db.from('courses').select('id,title,status,archived_at', { count: 'exact' }).in('id', ids(enrollments.map(e => e.course_id))).eq('status', 'published').is('archived_at', null).limit(200)),
-    rows(db.from('cohorts').select('id,course_id,name', { count: 'exact' }).in('id', ids(enrollments.map(e => e.cohort_id))).limit(200)),
+    rows(db.from('cohorts').select('id,course_id,name,archived_at', { count: 'exact' }).in('id', ids(enrollments.map(e => e.cohort_id))).is('archived_at',null).limit(200)),
   ]) : [[], []];
   const scopes = campusScopes(viewer.id, enrollments, courses, cohorts, now);
   const scope = scopes.find(s => s.enrollmentId === enrollmentId);
   if (enrollmentId && !scope) campusError(403, '현재 이용 가능한 수강권을 선택해 주세요.');
   if (!scope) return campusSnapshot({ viewer, scopes, enrollmentId: null, now });
-  const weeks = await rows(db.from('curriculum_weeks').select('id,course_id,is_published', { count: 'exact' })
-    .eq('course_id', scope.courseId).eq('is_published', true).limit(500));
-  const lessons = weeks.length ? await rows(db.from('curriculum_lessons')
-    .select('id,week_id,title,day_number,updated_at,is_published', { count: 'exact' })
-    .in('week_id', weeks.map(w => w.id)).eq('is_published', true).order('day_number').limit(500)) : [];
+  const [allWeeks,weekVisibility,lessonVisibility]=await Promise.all([
+    rows(db.from('curriculum_weeks').select('id,course_id,is_published,archived_at',{count:'exact'}).eq('course_id',scope.courseId).eq('is_published',true).is('archived_at',null).limit(500)),
+    rows(db.from('edu_cohort_week_visibility').select('cohort_id,week_id,is_published',{count:'exact'}).eq('cohort_id',scope.cohortId).limit(500)),
+    rows(db.from('edu_cohort_lesson_visibility').select('cohort_id,lesson_id,is_published',{count:'exact'}).eq('cohort_id',scope.cohortId).limit(500)),
+  ]);
+  const visibility={curriculum_weeks:allWeeks,edu_cohort_week_visibility:weekVisibility,edu_cohort_lesson_visibility:lessonVisibility};
+  const weeks=allWeeks.filter(w=>cohortWeekVisible(visibility,scope.cohortId,w));
+  const allLessons = weeks.length ? await rows(db.from('curriculum_lessons')
+    .select('id,week_id,title,day_number,updated_at,is_published,archived_at', { count: 'exact' })
+    .in('week_id', weeks.map(w => w.id)).eq('is_published', true).is('archived_at',null).order('day_number').limit(500)) : [];
+  const lessons=allLessons.filter(l=>cohortLessonVisible(visibility,scope.cohortId,l));
   const [missions, progress] = lessons.length ? await Promise.all([
     rows(db.from('curriculum_missions').select('id,lesson_id,title,updated_at,is_required,is_published,archived_at', { count: 'exact' })
       .in('lesson_id', lessons.map(l => l.id)).eq('is_published', true).is('archived_at', null).limit(500)),

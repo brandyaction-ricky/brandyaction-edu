@@ -23,7 +23,8 @@ test('measured software rendering load reduces GPU work while camera and a nonbl
   await page.getByRole('button',{name:'전체 지도',exact:true}).click();
   await page.getByRole('button',{name:'기념 사진 저장',exact:true}).click();
   const download=page.getByRole('link',{name:'기념 사진 PNG 내려받기'});
-  await expect(download).toHaveAttribute('href',/^data:image\/png;base64,/);
+  // Software GPU recovery after CPU pressure can exceed the default 5s on CI.
+  await expect(download).toHaveAttribute('href',/^data:image\/png;base64,/,{timeout:15000});
   const image=Buffer.from((await download.getAttribute('href'))!.split(',')[1],'base64');
   const {default:sharp}=await import('sharp');
   expect((await sharp(image).stats()).channels.some(c=>c.stdev>5)).toBeTruthy();

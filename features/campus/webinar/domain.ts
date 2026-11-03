@@ -36,6 +36,6 @@ export function accessFor(enrollments: Record<string,unknown>[], userId:string, 
  const eligible=enrollments.filter(e=>e.user_id===userId&&e.cohort_id===cohortId&&e.status==='active'&&!e.revoked_at&&(!e.access_ends_at||Date.parse(String(e.access_ends_at))>now));
  const active=eligible.find(e=>uuid(e.id)&&(!e.access_starts_at||Date.parse(String(e.access_starts_at))<=now));
  if(active)return {kind:'member',href:'/campus/workspace?enrollmentId='+active.id};
- if(eligible.some(e=>Date.parse(String(e.access_starts_at))>now))return {kind:'welcome',href:'/my/classes'};
+ if(eligible.some(e=>Date.parse(String(e.access_starts_at))>now))return {kind:'welcome',href:'/campus/enter?cohort='+cohortId+'&welcome=1'};
  return {kind:'offer'};
 }

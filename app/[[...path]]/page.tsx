@@ -8,6 +8,7 @@ import { sections } from '@/lib/platform';
 import { headers } from 'next/headers';
 import { productShareImage, sharingOrigin } from '@/lib/product-sharing';
 import { isPolicyPath } from '@/lib/legal-policies';
+import {CampusEntryBar} from '@/features/campus/ui/entry-bar';
 export const dynamic = 'force-dynamic';
 export default async function Page({params,searchParams}:{params:Promise<{path?:string[]}>;searchParams:Promise<Record<string,string|string[]|undefined>>}) {
  const {path=[]} = await params;
@@ -27,8 +28,8 @@ export default async function Page({params,searchParams}:{params:Promise<{path?:
  // Platform loads the authenticated user and page data together from /api/platform.
  // Keeping it mounted across route changes preserves its in-memory state.
  const LessonFocus = root==='learn'&&process.env.EDU_CAMPUS_ENABLED==='true'&&process.env.EDU_CAMPUS_SPACE_ENABLED==='true' ? (await import('@/features/campus/space/lesson-focus')).LessonFocus : null;
- if (!LessonFocus) return <Platform path={path} user={null}/>;
- return <><Platform path={path} user={null}/><LessonFocus/></>;
+ const showCampusEntry=process.env.EDU_CAMPUS_ENABLED==='true'&&['my','learn'].includes(root);
+ return <>{showCampusEntry&&<CampusEntryBar/>}<Platform path={path} user={null}/>{LessonFocus&&<LessonFocus/>}</>;
 }
 
 export async function generateMetadata({params}:{params:Promise<{path?:string[]}>}):Promise<Metadata> {

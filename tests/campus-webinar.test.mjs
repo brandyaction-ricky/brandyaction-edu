@@ -8,11 +8,11 @@ test('event configuration restricts public output, embed IDs, redirects, time wi
  const parsed=d.validateWebinar(config);assert.equal(parsed.slug,config.slug);const pub=d.projectWebinar(parsed);assert.equal(pub.revision,undefined);assert.equal(pub.status,undefined);assert.equal(pub.cohortId,undefined);assert.match(pub.checkoutPath,/utm_campaign=moonshot-open/);
  for(const patch of [{slug:'../admin'},{slug:'a'},{title:''},{detailPath:'//evil.test'},{detailPath:'/classes/a?next=//evil.test'},{kakaoUrl:'https://pf.kakao.com.evil.test/a'},{kakaoUrl:'https://a:b@pf.kakao.com/a'},{kakaoUrl:'javascript:alert(1)'},{kakaoUrl:'https://pf.kakao.com:123/a'},{kakaoUrl:'https://pf.kakao.com/a?redirect=https://evil.test'},{youtubeId:'<script>'},{cohortId:'bad'},{revision:'bad'},{endsAt:config.startsAt},{endsAt:'2027-01-01'},{startsAt:'bad'},{status:'visible'},{privateKey:'secret'}])assert.throws(()=>d.validateWebinar({...config,...patch}),JSON.stringify(patch));
 });
-test('member access rejects foreign, refunded, expired, malformed windows and returns upcoming access only to classes',()=>{
+test('member access rejects foreign, refunded, expired, malformed windows and returns upcoming access only to welcome',()=>{
  const base={id:id(8),user_id:id(2),cohort_id:id(1),status:'active',revoked_at:null,access_starts_at:'2026-01-01',access_ends_at:'2027-01-01'},now=Date.parse('2026-11-03');
  assert.equal(d.accessFor([base],id(2),id(1),now).kind,'member');
  for(const patch of [{user_id:id(3)},{cohort_id:id(4)},{status:'revoked'},{revoked_at:'2026-11-02'},{access_ends_at:'2026-11-03'},{access_ends_at:'oops'},{access_starts_at:'oops'},{id:'bad'}])assert.equal(d.accessFor([{...base,...patch}],id(2),id(1),now).kind,'offer');
- assert.deepEqual(d.accessFor([{...base,access_starts_at:'2026-12-01'}],id(2),id(1),now),{kind:'welcome',href:'/my/classes'});assert.equal(d.accessFor([],id(2),id(1),now).kind,'offer');
+ assert.deepEqual(d.accessFor([{...base,access_starts_at:'2026-12-01'}],id(2),id(1),now),{kind:'welcome',href:'/campus/enter?cohort='+id(1)+'&welcome=1'});assert.equal(d.accessFor([],id(2),id(1),now).kind,'offer');
 });
 test('anonymous session refresh exemption never includes private access, admins, other campus routes or malformed paths',()=>{
  for(const method of ['GET','HEAD'])assert.equal(isAnonymousWebinarRoute('/campus/live/moonshot-open',method),true);
