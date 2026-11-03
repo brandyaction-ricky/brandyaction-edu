@@ -15,5 +15,5 @@ export async function handleBusiness(request:Request,deps:Dependencies){
     const command=await readBusinessJson(request,40000);
     if(!command||typeof command!=='object'||Array.isArray(command))return reply({error:'입력 형식을 확인해 주세요.'},400);
     return reply({record:await deps.save(viewer,command as BusinessCommand)},200);
-  }catch(error){const status=error instanceof Error&&'status'in error&&[400,403,404,409].includes(Number(error.status))?Number(error.status):503;const messages:Record<number,string>={400:'필수 입력·날짜·숫자·URL을 확인해 주세요.',403:'현재 이용 가능한 수강권이 필요합니다.',404:'내 기록을 찾을 수 없습니다.',409:'다른 화면에서 기록이 바뀌었습니다. 새로고침 후 다시 저장해 주세요.',503:'기록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'};return reply({error:messages[status]},status);}
+  }catch(error){const status=error instanceof Error&&'status'in error&&[400,403,404,409].includes(Number(error.status))?Number(error.status):503;const messages:Record<number,string>={400:'필수 입력·날짜·숫자·링크을 확인해 주세요.',403:'현재 이용 가능한 수강권이 필요합니다.',404:'내 기록을 찾을 수 없습니다.',409:'다른 화면에서 기록이 바뀌었습니다. 새로고침 후 다시 저장해 주세요.',503:'기록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'};return reply({error:messages[status]},status);}
 }

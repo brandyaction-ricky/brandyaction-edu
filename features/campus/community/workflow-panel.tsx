@@ -21,9 +21,9 @@ export function CommunityWorkflowPanel({post,viewerId,demo}:{post:CommunityPost;
  const isTalent=post.kind.startsWith('talent_'),own=post.owner_id===viewerId,slots=state.slots.filter(s=>s.post_id===post.id);
  function action(x:Exchange,act:FlowCommand['action'],label:string,actor=viewerId){return <button type="button" className={styles.secondary} disabled={busy} onClick={()=>void send({action:act,entityId:x.id,expectedRevision:x.revision},actor)}>{label}</button>;}
  if(post.visibility!=='cohort')return <p className={styles.privateNote}>같은 기수에 공유한 후 {isTalent?'재능 교환을 연결':'발표 시간을 예약'}할 수 있어요.</p>;
- return <section className={styles.flow} aria-label={isTalent?'재능 교환 진행':'데모데이 진행'}>
+ return <section className={styles.flow} aria-label={isTalent?'재능 교환 진행':'결과물 발표회 진행'}>
   <div className={styles.sectionHeader}><h4>{isTalent?'함께할 일을 합의해요':'발표 순서와 질문을 한곳에'}</h4>{!demo&&<button className={styles.textButton} onClick={()=>void refresh()} disabled={busy}>진행 새로고침</button>}</div>
-  <p className={styles.hint}>{isTalent?'제안 → 상대 수락 → 작업 내용 제출 → 상대 완료 확인. 교환 완료 자체로 XP가 지급되지는 않아요.':'발표자는 시간을 예약하고, 운영자가 시작과 종료를 기록해요. 스트리밍이나 외부 알림을 자동 실행하지 않습니다.'}</p>
+  <p className={styles.hint}>{isTalent?'제안 → 상대 수락 → 작업 내용 제출 → 상대 완료 확인. 교환 완료 자체로 성장 점수가 쌓이지는 않아요.':'발표자는 시간을 예약하고, 운영자가 시작과 종료를 기록해요. 방송을 시작하거나 알림을 보내지는 않습니다.'}</p>
   {error&&<p role="alert" className={styles.error}>{error}</p>}{!loaded&&<p>진행 기록을 확인하고 있어요.</p>}
   {pending&&error&&<button className={styles.textButton} disabled={busy} onClick={()=>void send(pending!)}>같은 요청 다시 확인</button>}
   <label className={styles.flowField}>{isTalent?'제안·작업 결과·처리 이유':'질문·답변·진행 메모'}<textarea maxLength={2000} rows={3} value={note} onChange={e=>setNote(e.target.value)} placeholder={isTalent?'도울 일과 범위, 완료 기준 또는 처리 이유를 구체적으로 적어 주세요.':'발표자에게 궁금한 점 또는 답변·진행 이유를 적어 주세요.'}/></label>

@@ -99,7 +99,8 @@
       "codex/edu-tips-catalog-compat-20261012": false,
       "codex/edu-tips-identity-control-batch-20261014": false,
       "codex/tips-source-check-dev-20261027": false,
-      "codex/edu-campus-webinar-20261103": false
+      "codex/edu-campus-webinar-20261103": false,
+      "codex/edu-office-merge-20261103": false
     }
   },
   "regions": [

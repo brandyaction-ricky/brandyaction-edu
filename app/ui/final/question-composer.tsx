@@ -75,7 +75,7 @@ export function QuestionComposer({ initialContext, initialContent = '', initialP
   }}>
     {!quick && options}
     {contextError && <p role="status" className="meta">{contextError} <button type="button" className="link" disabled={locked} onClick={() => setContextVersion(v => v + 1)}>목록 다시 불러오기</button></p>}
-    <label className="field">질문 내용<textarea autoFocus={quick} required={!image.id} rows={quick ? 4 : 6} maxLength={10000} disabled={locked} value={content} onChange={e => setContent(e.target.value)} placeholder={'예: 이 수업의 프롬프트를 실행했는데 예시와 다른 결과가 나와요. 어떤 부분을 확인하면 될까요?'}/></label>
+    <label className="field">질문 내용<textarea autoFocus={quick} required={!image.id} rows={quick ? 4 : 6} maxLength={10000} disabled={locked} value={content} onChange={e => setContent(e.target.value)} placeholder={'예: 수업에서 안내한 문장을 AI에게 입력했는데 예시와 다른 결과가 나와요. 어떤 부분을 확인하면 될까요?'}/></label>
     {category === 'learning' && <RelatedAnswers query={content} context={context}/>}
     {imagesEnabled && <QuestionImagePicker dragAndDrop key={imageKey} ref={imagePicker} initialImage={imageKey === 0 ? initialImage : undefined} enrollmentId={context?.enrollmentId || null} lessonId={context?.lessonId || null} locked={locked} compact={quick} publicQuestion={Boolean(context && category === 'learning' && visibility === 'cohort')} changed={(id, uploading, draft) => setImage({ id, busy: uploading, draft })}/>}
     {quick && <details className="question-quick-options"><summary>제목·관련 수업 변경 (선택)</summary>{options}</details>}

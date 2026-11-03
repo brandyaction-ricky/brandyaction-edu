@@ -64,7 +64,7 @@ test('export uses current lesson and required-mission denominators, excluding op
   const svg = progressCardSvg(snapshot());
   assert.match(svg, /완료한 수업  2 \/ 3/);
   assert.match(svg, /승인된 필수 과제  2 \/ 4/);
-  assert.match(svg, /피드백 대기 1개 · 수정 필요 1개/);
+  assert.match(svg, /의견 대기 1개 · 수정 필요 1개/);
 });
 
 test('card records KST as-of date and makes no invented revenue, XP or study-time claim', () => {

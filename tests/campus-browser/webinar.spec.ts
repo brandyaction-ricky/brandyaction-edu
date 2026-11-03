@@ -1,4 +1,18 @@
 import {test,expect} from '@playwright/test';
+test('operator copies scoped welcome and member links without publishing or changing enrollment',async({page,context})=>{
+ await context.grantPermissions(['clipboard-read','clipboard-write']);
+ const cohort='00000000-0000-4000-8000-000000000003';let writes=0;
+ await page.route('**/api/admin/campus/webinars*',r=>{if(r.request().method()!=='GET')writes++;return r.fulfill({json:{events:[],cohorts:[{id:cohort,name:'3기',courses:{title:'문샷',slug:'moonshot'}}]}});});
+ await page.goto('/webinar-admin');await page.getByRole('button',{name:'새 행사 만들기'}).click();
+ const hub=page.getByRole('region',{name:'대상별 캠퍼스 입장 링크'});
+ await expect(hub.getByRole('button')).toHaveCount(0);
+ await page.getByLabel('판매·권한 확인 기수').selectOption(cohort);
+ await hub.getByRole('button',{name:'구매자 웰컴용 링크 복사'}).click();
+ expect(await page.evaluate(()=>navigator.clipboard.readText())).toBe(new URL('/campus/enter?cohort='+cohort+'&welcome=1',page.url()).href);
+ await expect(hub.getByRole('link',{name:'수강생 전용 열기 ↗'})).toHaveAttribute('href','/campus/enter?cohort='+cohort);
+ await expect(hub.getByRole('link',{name:'웨비나 참여자용 열기 ↗'})).toHaveCount(0);
+ expect(writes).toBe(0);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBeTruthy();
+});
 test('anonymous preview enters, completes experience and opens a keyboard-accessible member gate without external calls',async({page})=>{
  const errors:string[]=[],writes:string[]=[];page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(r.method()==='POST')writes.push(r.url());});
  await page.goto('/webinar');await page.getByRole('button',{name:'무료 캠퍼스 입장하기'}).click();await expect(page.getByRole('heading',{name:'배운 것을, 내 일의 성과로.'})).toBeVisible();

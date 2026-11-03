@@ -33,7 +33,7 @@ export function mutateCommunityDemo(original: CommunityState, input: CommunityCo
     state.comments.push({ id: c.requestId, post_id: post!.id, author_id: actor, alias: c.alias!, body: c.body!, post_revision: post!.revision, hidden: false, created_at: now });
   } else if (c.action === 'acknowledge') {
     const comment = state.comments.find(v => v.id === c.commentId && v.post_id === post!.id && !v.hidden);
-    if (post!.owner_id !== actor || !comment || comment.author_id === actor) campusError(403, '피드백을 받은 사람만 확인할 수 있어요.');
+    if (post!.owner_id !== actor || !comment || comment.author_id === actor) campusError(403, '의견을 받은 사람만 확인할 수 있어요.');
     const prev = state.acknowledgments.find(v => v.comment_id === c.commentId);
     if ((prev?.revision ?? 0) !== c.expectedRevision) campusError(409, '확인 기록이 바뀌었습니다.');
     if (c.decision === 'apply' && (c.appliedRevision! <= comment.post_revision || !state.revisions.some(v => v.post_id === post!.id && v.revision === c.appliedRevision))) campusError(400, '의견을 받은 뒤 저장한 새 버전을 선택해 주세요.');

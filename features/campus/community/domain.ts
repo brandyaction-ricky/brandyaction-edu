@@ -2,7 +2,7 @@ import { campusError, isCampusId } from '../snapshot';
 
 export const communityKinds = ['portfolio', 'feedback', 'process', 'failure', 'talent_offer', 'talent_request', 'demo_day'] as const;
 export type CommunityKind = typeof communityKinds[number];
-export const kindLabels: Record<CommunityKind, string> = { portfolio: '내 포트폴리오', feedback: '피드백 요청', process: '작업 과정', failure: '실패에서 배운 점', talent_offer: '도움 드려요', talent_request: '도움 구해요', demo_day: '문샷 데모데이' };
+export const kindLabels: Record<CommunityKind, string> = { portfolio: '내 결과물 모음', feedback: '의견 요청', process: '작업 과정', failure: '실패에서 배운 점', talent_offer: '도움 드려요', talent_request: '도움 구해요', demo_day: '문샷 결과물 발표회' };
 export type CommunityPost = { id: string; owner_id: string; enrollment_id: string; cohort_id: string; alias: string; kind: CommunityKind; title: string; body: string; url: string; image_urls: string[]; lesson_id: string | null; visibility: 'private' | 'cohort'; revision: number; hidden: boolean; created_at: string; updated_at: string };
 export type CommunityRevision = Pick<CommunityPost, 'id' | 'title' | 'body' | 'url' | 'image_urls' | 'visibility' | 'revision' | 'created_at'> & { post_id: string; change_note: string };
 export type CommunityComment = { id: string; post_id: string; author_id: string; alias: string; body: string; post_revision: number; hidden: boolean; created_at: string };
@@ -49,7 +49,7 @@ export function validateCommunityCommand(input: unknown): CommunityCommand {
   }
   if (c.action === 'comment') { out.body = string(c.body, 10, 2000); out.alias = string(c.alias, 2, 24); }
   if (c.action === 'acknowledge') {
-    if (!out.commentId || typeof c.useful !== 'boolean' || !['pending', 'apply', 'keep'].includes(c.decision!)) campusError(400, '피드백 확인 방식을 선택해 주세요.');
+    if (!out.commentId || typeof c.useful !== 'boolean' || !['pending', 'apply', 'keep'].includes(c.decision!)) campusError(400, '의견 확인 방식을 선택해 주세요.');
     out.useful = c.useful; out.decision = c.decision; out.reason = string(c.reason ?? '', c.decision === 'pending' ? 0 : 5, 1000);
     if (c.decision === 'apply') { if (!Number.isSafeInteger(c.appliedRevision) || c.appliedRevision! < 2) campusError(400, '반영한 새 버전을 선택해 주세요.'); out.appliedRevision = c.appliedRevision; }
   }

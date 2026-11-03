@@ -22,10 +22,10 @@ export const industryGuides={
 };
 export function industryPath(snapshot:CampusSnapshot,industry:keyof typeof industryGuides){return common.map((s,i)=>({...s,id:`stage-${i}`,action:industryGuides[industry].actions[i],prerequisite:i?common[i-1].title:null,lessons:findResources(snapshot,s.words.join(' '))}));}
 export function campaignStages(p:Payload){return [
- {name:'유입',detail:String(p.channel||''),url:String(p.entryUrl||''),complete:Boolean(p.channel&&p.entryUrl),missing:'유입 채널과 콘텐츠 URL'},
- {name:'상세',detail:'제안·조건 안내',url:String(p.landingUrl||''),complete:Boolean(p.landingUrl),missing:'상세 페이지 URL'},
+ {name:'유입',detail:String(p.channel||''),url:String(p.entryUrl||''),complete:Boolean(p.channel&&p.entryUrl),missing:'유입 채널과 콘텐츠 링크'},
+ {name:'상세',detail:'제안·조건 안내',url:String(p.landingUrl||''),complete:Boolean(p.landingUrl),missing:'상세 페이지 링크'},
  {name:'행동 요청',detail:String(p.cta||''),url:'',complete:Boolean(p.cta),missing:'고객이 할 다음 행동'},
- {name:'신청 도착',detail:'신청·구매를 마칠 위치',url:String(p.applicationUrl||''),complete:Boolean(p.applicationUrl),missing:'신청 도착 URL'},
+ {name:'신청 도착',detail:'신청·구매를 마칠 위치',url:String(p.applicationUrl||''),complete:Boolean(p.applicationUrl),missing:'신청 도착 링크'},
  {name:'후속 안내',detail:String(p.followupAction||''),url:String(p.followupUrl||''),complete:Boolean(p.followupAction),missing:'신청 이후 안내·후속 행동'},
  ];}
 export function rehearsalFollowup(answer:string){
@@ -39,7 +39,7 @@ export function rehearsalCheck(p:Payload){return [
  {label:'추가 반문에 구체적으로 답변',done:String(p.insight||'').trim().length>=10},
  {label:'보장 표현을 점검',done:!/(무조건|100%|반드시 성공)/.test(String(p.answer||'')+' '+String(p.insight||''))},
  ];}
-export function practiceContext(p:Payload){return `독립 실행 실습 도움 요청 (본인 입력)\n새 상품: ${p.product||''}\n적용할 원리: ${p.principle||''}\n직접 해본 실행: ${p.action||''}\n막힌 지점: ${p.blocked||p.result||''}\n사용한 도움: ${p.support||'진행 중'}\n완성 답안을 대신 만들기보다 다음에 혼자 할 수 있는 작은 힌트를 주세요.`;}
+export function practiceContext(p:Payload){return `혼자 해보기 도움 요청 (본인 입력)\n새 상품: ${p.product||''}\n적용할 원리: ${p.principle||''}\n직접 해본 실행: ${p.action||''}\n막힌 지점: ${p.blocked||p.result||''}\n사용한 도움: ${p.support||'진행 중'}\n완성 답안을 대신 만들기보다 다음에 혼자 할 수 있는 작은 힌트를 주세요.`;}
 export function outcomeSeries(records:BusinessRecord[],currency:string){
  return records.filter(r=>r.kind==='metric'&&!r.archived_at&&r.payload.currency===currency).toSorted((a,b)=>String(a.payload.end).localeCompare(String(b.payload.end))||a.created_at.localeCompare(b.created_at)).map(r=>({id:r.id,label:`${r.payload.start} ~ ${r.payload.end}`,actions:Number(r.payload.actions),leads:Number(r.payload.leads),revenue:Number(r.payload.revenue),minutes:Number(r.payload.minutes)}));
 }

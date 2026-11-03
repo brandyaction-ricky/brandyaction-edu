@@ -72,7 +72,7 @@ test('combined owner records, cohort publication, actual mission rewards, revoke
  insert into edu_campus_space_presence(cohort_id,user_id,session_id,nickname,gender,coat,status)values('${uid(20)}','${uid(1)}','${uid(110)}','별 동료','female','#527086','joinable');`);
  const post={requestId:uid(120),enrollmentId:uid(31),action:'create',kind:'portfolio',title:'통합 첫 화면',body:'고객 관점에서 첫 화면 문구를 바꾸고 동료 의견을 기다립니다.',alias:'별 동료',url:'https://example.com/work',imageUrls:[],lessonId:uid(50),visibility:'cohort'};
  await db.query('select edu_campus_community_mutate($1)',[post]);
- await db.query('insert into edu_campus_business_records(id,user_id,enrollment_id,kind,title,payload,last_command_id,creation_fingerprint) values($1,$2,$3,$4,$5,$6,$7,$8)',[uid(130),uid(1),uid(31),'recipe','개인 실행 레시피',{goal:'문제 확인',prompt:'고객 문제를 좁히기',steps:'질문 후 기록',result:'본인 결과'},uid(131),'a'.repeat(64)]);
+ await db.query('insert into edu_campus_business_records(id,user_id,enrollment_id,kind,title,payload,last_command_id,creation_fingerprint) values($1,$2,$3,$4,$5,$6,$7,$8)',[uid(130),uid(1),uid(31),'recipe','개인 실행 작업 순서',{goal:'문제 확인',prompt:'고객 문제를 좁히기',steps:'질문 후 기록',result:'본인 결과'},uid(131),'a'.repeat(64)]);
  const rewards=(await db.query('select edu_campus_community_rewards($1) value',[uid(31)])).rows[0].value;assert.equal(rewards.approvedMissions,1);assert.equal(rewards.eligible,false);
  await db.query('select edu_campus_space_claim_seat($1,$2,$3)',[uid(20),uid(110),'desk-1']);
  // Explicit leave/rejoin creates a new session; the old tab cannot reclaim the new seat.

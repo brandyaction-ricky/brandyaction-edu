@@ -6,7 +6,7 @@ async function compose(page:Page, sharing=false) {
  await page.getByRole('button',{name:'결과물 남기기',exact:true}).first().click();
  await page.getByLabel('제목',{exact:true}).fill(title);
  await page.getByRole('textbox',{name:'작업 내용',exact:true}).fill('지역 공방을 위한 첫 제안과 신청 흐름을 만들었습니다. 대상과 결과가 잘 전달되는지 확인해 주세요.');
- await page.getByLabel('작업물 URL').fill('https://example.com/work');
+ await page.getByLabel('작업물 링크').fill('https://example.com/work');
  if(sharing)await page.getByRole('radio',{name:'같은 기수와 공유'}).check();
  await page.getByRole('button',{name:sharing?'기수에 공유하며 저장':'나만 보도록 저장',exact:true}).click();
  await expect(page.getByRole('article',{name:'선택한 작업물'})).toBeVisible();
@@ -70,9 +70,9 @@ test('peer feedback receipt grants no self XP, reporting is scoped and blocking 
 
 test('unsafe links never enter portfolio and retained forms allow correction',async({page})=>{
  await page.goto('/community');await page.getByRole('button',{name:'결과물 남기기',exact:true}).first().click();
- await page.getByLabel('제목',{exact:true}).fill(title);await page.getByRole('textbox',{name:'작업 내용',exact:true}).fill('공개 가능한 링크만 안전하게 공유하는지 확인합니다.');await page.getByLabel('작업물 URL').fill('http://example.com');
+ await page.getByLabel('제목',{exact:true}).fill(title);await page.getByRole('textbox',{name:'작업 내용',exact:true}).fill('공개 가능한 링크만 안전하게 공유하는지 확인합니다.');await page.getByLabel('작업물 링크').fill('http://example.com');
  await page.getByRole('button',{name:'나만 보도록 저장'}).click();await expect(page.getByRole('alert')).toContainText('HTTPS');
- await page.getByLabel('작업물 URL').fill('https://example.com');await page.getByRole('button',{name:'나만 보도록 저장'}).click();
+ await page.getByLabel('작업물 링크').fill('https://example.com');await page.getByRole('button',{name:'나만 보도록 저장'}).click();
  await expect(page.getByRole('link',{name:'작업물 열기'})).toHaveAttribute('rel','noopener noreferrer');await noOverflow(page);
 });
 
@@ -86,7 +86,7 @@ test('talent proposal needs recipient acceptance and recipient final confirmatio
  await flow.getByRole('textbox',{name:'제안·작업 결과·처리 이유'}).fill('세 가지 문구를 비교하고 고객 질문에 따라 두 번째 안으로 정리했습니다.');await flow.getByRole('button',{name:'체험: 동료가 완료 내용 제출'}).click();await flow.getByRole('textbox',{name:'제안·작업 결과·처리 이유'}).fill('합의한 문구 검토가 끝났고 결과를 받았습니다.');await flow.getByRole('button',{name:'결과 확인하고 완료'}).click();await expect(flow.getByText('서로 완료 확인 · 예시 동료',{exact:true})).toBeVisible();await expect(flow.getByText('변경 이력 · 4건')).toBeVisible();await noOverflow(page);expect(requests).toEqual([]);
 });
 test('demo day reserves a slot, accepts questions, presenter answers and operator finishes',async({page})=>{
- await page.goto('/community');await composeTyped(page,'demo_day','첫 고객 제안 발표');const flow=page.getByRole('region',{name:'데모데이 진행'});
+ await page.goto('/community');await composeTyped(page,'demo_day','첫 고객 제안 발표');const flow=page.getByRole('region',{name:'결과물 발표회 진행'});
  const tomorrow=new Date(Date.now()+86400000);const local=new Date(tomorrow.getTime()-tomorrow.getTimezoneOffset()*60000).toISOString().slice(0,16);await flow.getByLabel('발표 시작 시간').fill(local);await flow.getByRole('button',{name:'발표 슬롯 예약'}).click();
  await flow.getByRole('textbox',{name:'질문·답변·진행 메모'}).fill('발표 환경을 확인했고 이제 발표를 시작합니다.');await flow.getByRole('button',{name:'체험: 진행자가 발표 시작'}).click();await flow.getByRole('textbox',{name:'질문·답변·진행 메모'}).fill('고객이 첫 화면에서 가장 궁금해한 것은 무엇인가요?');await flow.getByRole('button',{name:'발표에 질문 남기기'}).click();await flow.getByRole('textbox',{name:'질문·답변·진행 메모'}).fill('얼마나 빨리 첫 결과를 얻는지 궁금해했습니다.');await flow.getByRole('button',{name:'위 메모로 답변하기'}).click();await expect(flow.getByText(/문샷 동료 · 답변 완료/)).toBeVisible();await flow.getByRole('textbox',{name:'질문·답변·진행 메모'}).fill('발표와 질문 응답을 모두 마무리했습니다.');await flow.getByRole('button',{name:'체험: 진행자가 발표 종료'}).click();await expect(flow.getByText('발표 종료',{exact:true}).first()).toBeVisible();await noOverflow(page);await page.screenshot({path:test.info().outputPath('demo-day.png'),fullPage:true});
 });
@@ -119,11 +119,11 @@ test('late workspace response cannot replace the latest selected portfolio view'
   else await route.fulfill({json:latestState});
  });
  await page.goto('/community-live');await expect.poll(()=>firstRequested).toBe(true);
- await page.getByRole('button',{name:'내 포트폴리오',exact:true}).click();
+ await page.getByRole('button',{name:'내 결과물 모음',exact:true}).click();
  await expect(page.getByRole('heading',{name:mine.title,exact:true})).toBeVisible();
  const lateResponse=page.waitForResponse(r=>r.url().includes('/api/campus/community?')&&new URL(r.url()).searchParams.get('view')==='all');
  releaseFirst();await lateResponse;await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
  await expect(page.getByRole('heading',{name:mine.title,exact:true})).toBeVisible();
- await expect(page.getByRole('button',{name:'내 포트폴리오',exact:true})).toHaveAttribute('aria-pressed','true');
+ await expect(page.getByRole('button',{name:'내 결과물 모음',exact:true})).toHaveAttribute('aria-pressed','true');
  await expect(page.getByText('작업실을 불러오고 있어요…',{exact:true})).toHaveCount(0);await noOverflow(page);
 });

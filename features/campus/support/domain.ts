@@ -2,7 +2,7 @@ import { isCampusId, campusError } from '../snapshot';
 import type { CampusSnapshot } from '../contracts';
 import {parseToolDimension,type ToolKind} from './tool-dimensions';
 
-export const obstacleKinds = { understanding:'수업 이해', tool:'도구 오류', decision:'판단이 어려움', feedback:'결과물 피드백', time:'시간·실행 계획' } as const;
+export const obstacleKinds = { understanding:'수업 이해', tool:'도구 오류', decision:'판단이 어려움', feedback:'결과물 의견', time:'시간·실행 계획' } as const;
 export type ObstacleKind = keyof typeof obstacleKinds;
 export type SupportRequest = { id:string;user_id:string;enrollment_id:string;lesson_id:string|null;lesson_version:string|null;category:ObstacleKind;tool_kind?:ToolKind;tool_name?:string;title:string;tried:string;question:string;context_url:string;status:'open'|'in_progress'|'resolved'|'withdrawn';revision:number;created_at:string;updated_at:string };
 export type SupportAction = { id:string;request_id:string;actor_id:string;kind:'reply'|'handover'|'status';content:string;created_at:string };
