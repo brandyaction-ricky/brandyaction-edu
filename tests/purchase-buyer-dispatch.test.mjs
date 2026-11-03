@@ -65,7 +65,8 @@ for (const channel of ['sms', 'alimtalk', 'email']) {
       } },
       '@/lib/operator-permissions': { permissionsFor: async () => ({ products: true, orders: true, marketing: true }) },
       '@/lib/purchase-buyer-delivery': load('../lib/purchase-buyer-delivery.ts', {}),
-    }, { CRM_DELIVERY_ENABLED: 'true', SOLAPI_API_KEY: 'mock', SOLAPI_API_SECRET: 'mock', SOLAPI_KAKAO_PF_ID: 'mock' },
+    }, { CRM_DELIVERY_ENABLED: 'true', CRM_CRON_ENABLED: 'false', CRM_AUTOMATIONS_PURCHASE_ONLY: 'true',
+      EDU_PURCHASE_BUYER_DELIVERY_ENABLED: 'true', SOLAPI_API_KEY: 'mock', SOLAPI_API_SECRET: 'mock', SOLAPI_KAKAO_PF_ID: 'mock' },
     async (url, options) => {
       assert.equal(url, 'https://api.resend.com/emails/batch');
       assert.equal(options.headers['Idempotency-Key'], 'edu-buyer-batch');

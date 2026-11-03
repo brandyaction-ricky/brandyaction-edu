@@ -12,12 +12,16 @@ type DeliveryTemplate = Template & { name: string };
 export const purchaseTemplateHash = (template: DeliveryTemplate) => createHash('sha256')
   .update(JSON.stringify([template.id, template.channel, template.purpose, template.name, template.content, template.alimtalk_template_id, template.buttons])).digest('hex');
 
+export function purchaseBuyerDeliveryEnabled() {
+  return process.env.EDU_PURCHASE_BUYER_DELIVERY_ENABLED === 'true' &&
+    process.env.CRM_DELIVERY_ENABLED === 'true';
+}
+
 export async function purchaseBuyerChannels() {
+  if (!purchaseBuyerDeliveryEnabled()) return { sms: false, lms: false, alimtalk: false, email: false };
   const sms = await loadSmsSettings();
-  const enabled = process.env.CRM_DELIVERY_ENABLED === 'true' && process.env.CRM_CRON_ENABLED !== 'false' &&
-    process.env.CRM_AUTOMATIONS_PURCHASE_ONLY !== 'true';
-  const mobile = enabled && Boolean(sms.transactionalEnabled && sms.senderPhone && process.env.SOLAPI_API_KEY && process.env.SOLAPI_API_SECRET);
-  return { sms: mobile, lms: mobile, alimtalk: mobile && !!process.env.SOLAPI_KAKAO_PF_ID, email: enabled && purchaseEmailConfigured() };
+  const mobile = Boolean(sms.transactionalEnabled && sms.senderPhone && process.env.SOLAPI_API_KEY && process.env.SOLAPI_API_SECRET);
+  return { sms: mobile, lms: mobile, alimtalk: mobile && !!process.env.SOLAPI_KAKAO_PF_ID, email: purchaseEmailConfigured() };
 }
 
 export async function purchaseBuyerTemplates() {
@@ -108,7 +112,7 @@ async function sendBuyerEmails(batch: { id: string; subject: string; content: st
 }
 
 export async function dispatchPurchaseBuyerDelivery() {
-  if (process.env.CRM_DELIVERY_ENABLED !== 'true' || process.env.CRM_AUTOMATIONS_PURCHASE_ONLY === 'true') return;
+  if (!purchaseBuyerDeliveryEnabled()) return;
   const db = createAdminClient();
   const channels = await purchaseBuyerChannels();
   const available = Object.entries(channels).filter(([, active]) => active).map(([channel]) => channel);

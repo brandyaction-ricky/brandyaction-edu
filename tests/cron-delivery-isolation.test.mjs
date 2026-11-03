@@ -11,7 +11,8 @@ function harness(env) {
     const modules = {
       'node:crypto': { timingSafeEqual },
       '@/lib/crm-delivery': { dispatchDueCrm: async () => { calls.crm++; return { sent: 1 }; } },
-      '@/lib/purchase-buyer-delivery-server': { dispatchPurchaseBuyerDelivery: async () => { calls.purchase++; } },
+      '@/lib/purchase-buyer-delivery-server': { dispatchPurchaseBuyerDelivery: async () => { calls.purchase++; },
+        purchaseBuyerDeliveryEnabled: () => env.EDU_PURCHASE_BUYER_DELIVERY_ENABLED === 'true' && env.CRM_DELIVERY_ENABLED === 'true' },
       '@/lib/web-push-server': { dispatchWebPush: async () => { calls.push++; return { sent: 1 }; } },
     };
     new Function('exports', 'require', 'process', ts.transpileModule(
@@ -55,6 +56,19 @@ test('existing environments keep scheduled delivery unless explicitly paused', a
     const result = await h.crm();
     assert.equal(result.status, 200);
     assert.deepEqual(await result.json(), { ok: true, sent: 1, purchaseQueueOk: true });
-    assert.deepEqual(h.calls, { crm: 1, purchase: 1, push: 0 });
+    assert.deepEqual(h.calls, { crm: 1, purchase: 0, push: 0 });
   }
+});
+
+
+test('buyer notices run independently without touching paused CRM campaigns or automations', async () => {
+  const h = harness({
+    CRON_SECRET: 'test-cron-secret', CRM_CRON_ENABLED: 'false', CRM_DELIVERY_ENABLED: 'true',
+    EDU_PURCHASE_BUYER_DELIVERY_ENABLED: 'true', CRM_AUTOMATIONS_ENABLED: 'true',
+  });
+  assert.equal((await h.crm('Bearer wrong')).status, 401);
+  const result = await h.crm();
+  assert.equal(result.status, 200);
+  assert.deepEqual(await result.json(), { ok: true, disabled: true, campaigns: 0, automations: 0, sent: 0, failed: 0, purchaseQueueOk: true });
+  assert.deepEqual(h.calls, { crm: 0, purchase: 1, push: 0 });
 });
