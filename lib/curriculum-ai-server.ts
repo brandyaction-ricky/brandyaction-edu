@@ -59,6 +59,16 @@ export async function generateCurriculumAnswer(db: Db, options: { actor:string; 
   if (r.error) throw r.error;
  }
  try {
+  const vagueQuestion = /^(?:안\s*(?:돼(?:요)?|되네요|됩니다|되는데요)|못\s*하겠어요|막혔어요|(?:it\s+)?(?:doesn['’]t work|not working))\s*[.!?…]*$/i.test(options.question.trim());
+  if (options.mode === 'student' && !options.image && !options.imageId && vagueQuestion) {
+   const answer = requestsEnglish(options.question)
+    ? 'Which step are you stuck on? Tell me what you were trying to do and share any error message you see.'
+    : '어느 단계에서 막혔나요? 하려던 작업과 화면에 나온 오류 문구를 알려 주세요.';
+   const result = { answer, needsMentor: false, sources: [], searchedLessons: 0 };
+   await assertAccess();
+   await finish('succeeded', result);
+   return result;
+  }
   const context = await db.rpc('edu_ai_curriculum',{p_actor:options.actor,p_request:options.requestId}).abortSignal(AbortSignal.timeout(10000));
   if (context.error) throw context.error;
   const english = requestsEnglish(options.question);
