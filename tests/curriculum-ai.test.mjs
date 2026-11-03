@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {loadTs} from './helpers/question-ai.mjs';
 const {retrieveCurriculum,parseCurriculumAnswer,parseAiTurns,aiFallback,studentCapabilityAnswer,studentImageHandoff}=loadTs('lib/curriculum-ai.ts');
-const {measuredUsage}=loadTs('lib/curriculum-ai-server.ts',{'./supabase/admin':{}});
+const {measuredUsage}=loadTs('lib/curriculum-ai-server.ts',{'./supabase/admin':{},'./curriculum-ai-image':{}});
 test('retrieval searches beyond the old 12000-character prefix and finds related lessons, preserving authoritative revision',()=>{
  const lessons=[{id:'current',title:'첫 수업',body_text:'기본 소개'},{id:'related',title:'고객 인터뷰',revision:'version-2',body_text:'소개\n'.repeat(6000)+'고객 질문은 열린 질문으로 작성하고 고객의 실제 경험을 확인합니다.'}];
  const r=retrieveCurriculum(lessons,'고객 인터뷰에서 열린 질문 작성 방법','current',false);
@@ -41,4 +41,15 @@ test('student image-upload promises become an honest mentor handoff without unre
  for(const text of ['클로드에 제품 사진을 첨부하세요.','사진 확인은 멘토에게 질문에서 요청해 주세요.','사진은 90_첨부에 보관합니다.']){
   const original={...answer,answer:text};assert.equal(studentCapabilityAnswer(original),original);
  }
+});
+test('retrieval reserves current lesson evidence and cites the section containing the explanation',()=>{
+ const document={schemaVersion:1,blocks:[
+  {id:'h',type:'heading',content:'2-1 직과 업'},
+  {id:'p',type:'text',content:'직은 명함에 쓰이는 역할이고 업은 그 일을 하는 이유입니다.'},
+ ],checklist:[]};
+ const lessons=[{id:'other',title:'직과 업 비교',body_text:'직과 업은 어떤 차이가 있나요?'},{id:'current',title:'3일차',document}];
+ const {sources}=retrieveCurriculum(lessons,'직이랑 업이 뭐가 달라요?', 'current');
+ assert.equal(sources[0].lessonId,'current');
+ assert.equal(sources[0].title,'2-1 직과 업');
+ assert.match(sources[0].excerpt,/^2-1 직과 업\n직은 명함/);
 });

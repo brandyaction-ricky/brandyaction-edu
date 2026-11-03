@@ -31,7 +31,7 @@ export function RelatedAnswers({ query, context }: { query: string; context: Que
   if (query.trim().length < 2 || result?.key !== key) return null;
   return <aside className="question-related" aria-label="비슷한 질문의 답변"><b>먼저 확인해 보세요</b>{result.error ? <p role="status" className="meta">{result.error}</p> : !result.answers.length ? <p className="meta">아직 비슷한 답변이 없어요. 아래에서 질문을 등록해 주세요.</p> : result.answers.map(a => <SharedAnswerCard key={a.id} answer={a}/>)}</aside>;
 }
-export function QuestionComposer({ initialContext, initialContent = '', initialPrivate = false, initialImage, initialCategory = 'learning', order, onCreated, quick = false, onStateChange }: { initialContext?: QuestionContext; initialContent?:string; initialPrivate?:boolean; initialImage?:ReadyQuestionImage; initialCategory?:QuestionCategory; order?: string | null; onCreated: () => void; quick?: boolean; onStateChange?: (state: { dirty: boolean; locked: boolean }) => void }) {
+export function QuestionComposer({ initialContext, initialContent = '', initialPrivate = true, initialImage, initialCategory = 'learning', order, onCreated, quick = false, onStateChange }: { initialContext?: QuestionContext; initialContent?:string; initialPrivate?:boolean; initialImage?:ReadyQuestionImage; initialCategory?:QuestionCategory; order?: string | null; onCreated: () => void; quick?: boolean; onStateChange?: (state: { dirty: boolean; locked: boolean }) => void }) {
   const [contexts, setContexts] = useState<QuestionContext[]>(initialContext ? [initialContext] : []), [context, setContext] = useState<QuestionContext | null>(initialContext || null);
   const [category, setCategory] = useState<QuestionCategory>(order ? 'payment' : initialCategory), [title, setTitle] = useState(order ? '주문 ' + order + ' 문의' : ''), [content, setContent] = useState(initialContent), [visibility, setVisibility] = useState<'cohort' | 'private'>(initialPrivate ? 'private' : 'cohort');
   const [image, setImage] = useState<{ id: string | null; busy: boolean; draft: boolean }>({ id: initialImage?.id || null, busy: false, draft: Boolean(initialImage) }), [imageKey, setImageKey] = useState(0);
@@ -50,7 +50,7 @@ export function QuestionComposer({ initialContext, initialContent = '', initialP
   }, [contextVersion]);
   function changeContext(next: QuestionContext | null) {
     if (image.draft && !window.confirm('학습을 바꾸면 첨부 이미지를 다시 올려야 합니다. 바꿀까요?')) return false;
-    touchedContext.current = true; setContext(next); setVisibility('cohort'); setImage({ id: null, busy: false, draft: false }); setImageKey(v => v + 1); return true;
+    touchedContext.current = true; setContext(next); setVisibility('private'); setImage({ id: null, busy: false, draft: false }); setImageKey(v => v + 1); return true;
   }
   async function submit(event: FormEvent) {
     event.preventDefault(); if (gate.current || image.busy || (image.draft && !image.id) || (!content.trim() && !image.id)) return;
@@ -59,13 +59,13 @@ export function QuestionComposer({ initialContext, initialContent = '', initialP
     try {
       const result = await questionRequest<{ question: { id: string } }>('/api/platform/question-hub', retry.current);
       if (!result.question?.id) throw new Error('등록 결과를 확인하지 못했습니다.');
-      retry.current = null; setUncertain(false); setContent(''); setTitle(''); setVisibility('cohort'); setImage({ id: null, busy: false, draft: false }); setImageKey(v => v + 1); onCreated();
+      retry.current = null; setUncertain(false); setContent(''); setTitle(''); setVisibility('private'); setImage({ id: null, busy: false, draft: false }); setImageKey(v => v + 1); onCreated();
     } catch (cause) { const e = cause as { message: string; status?: number }; const unknown = !e.status || e.status >= 500; setUncertain(unknown); if (!unknown) retry.current = null; setError(e.message); }
     finally { gate.current = false; setBusy(false); }
   }
   const options = <>
     <label className="field">질문 제목 (선택)<input maxLength={200} value={title} onChange={e => setTitle(e.target.value)} disabled={locked} placeholder="비워 두면 질문 내용으로 제목을 만들어요"/></label>
-    <div className="question-context-fields"><label className="field">문의 종류<select value={category} disabled={locked || image.busy} onChange={e => { const next = e.target.value as QuestionCategory; if (next === 'learning' || changeContext(null)) { setCategory(next); setVisibility('cohort'); } }}>{Object.entries(questionCategories).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+    <div className="question-context-fields"><label className="field">문의 종류<select value={category} disabled={locked || image.busy} onChange={e => { const next = e.target.value as QuestionCategory; if (next === 'learning' || changeContext(null)) { setCategory(next); setVisibility('private'); } }}>{Object.entries(questionCategories).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
     {category === 'learning' && <label className="field">관련 학습<select value={context ? context.enrollmentId + ':' + context.lessonId : ''} disabled={locked || image.busy} onChange={e => changeContext(contexts.find(c => c.enrollmentId + ':' + c.lessonId === e.target.value) || null)}><option value="">학습 선택 없이 질문하기</option>{contexts.map(c => <option key={c.enrollmentId + c.lessonId} value={c.enrollmentId + ':' + c.lessonId}>{c.label}</option>)}</select></label>}</div>
   </>;
   return <QuestionImageDropzone enabled={imagesEnabled} locked={locked || image.busy} onFiles={files => imagePicker.current?.paste(files)}><form className={'question-composer' + (quick ? ' question-composer-quick' : '')} onSubmit={submit} onPaste={event => {

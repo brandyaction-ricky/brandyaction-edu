@@ -14,14 +14,14 @@ async function backend(page:Page,{fail=false,searchFail=false}={}){
  await page.route('**/api/platform/lesson-questions?**',r=>r.fulfill({json:{questions:[],hasMore:false}}));
  return{bodies};
 }
-test('public-by-default composer suggests recent lesson, preserves draft across tabs and keeps failed submission idempotent',async({page},info)=>{
+test('private-by-default composer suggests recent lesson, preserves draft across tabs and keeps failed submission idempotent',async({page},info)=>{
  const h=await backend(page,{fail:true});await page.goto('/question-hub-test');await page.getByRole('tab',{name:'질문하기',exact:true}).click();
- await expect(page.getByLabel('관련 학습')).toHaveValue(id(1)+':'+id(4));await expect(page.getByRole('radio',{name:'전체 공개',exact:true})).toBeChecked();
+ await expect(page.getByLabel('관련 학습')).toHaveValue(id(1)+':'+id(4));await expect(page.getByRole('radio',{name:'비밀 질문',exact:true})).toBeChecked();
  await page.getByRole('textbox',{name:'질문 내용',exact:true}).fill('이미지가 안 보여요');
  await page.locator('summary').filter({hasText:shared.title}).click();await expect(page.getByText(shared.answer,{exact:true})).toBeVisible();await page.screenshot({path:info.outputPath('question-composer.png'),fullPage:true});
  await page.getByRole('tab',{name:'전체 질문'}).click();await expect(page.getByLabel('질문 검색')).toBeVisible();await page.getByRole('tab',{name:'질문하기',exact:true}).click();await expect(page.getByRole('textbox',{name:'질문 내용',exact:true})).toHaveValue('이미지가 안 보여요');
  await page.getByRole('button',{name:'질문 등록',exact:true}).click();await expect(page.getByRole('alert')).toContainText('등록 결과 확인 실패');await expect(page.getByLabel('관련 학습')).toBeDisabled();
- await page.getByRole('button',{name:'등록 결과 다시 확인'}).click();expect(h.bodies).toHaveLength(2);expect(h.bodies[1]).toEqual(h.bodies[0]);expect(h.bodies[0]).toMatchObject({lessonId:id(4),enrollmentId:id(1),title:'',share:false,visibility:'cohort'});
+ await page.getByRole('button',{name:'등록 결과 다시 확인'}).click();expect(h.bodies).toHaveLength(2);expect(h.bodies[1]).toEqual(h.bodies[0]);expect(h.bodies[0]).toMatchObject({lessonId:id(4),enrollmentId:id(1),title:'',share:false,visibility:'private'});
  await expect(page.getByRole('heading',{name:'질문 자동 제목'})).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:info.outputPath('question-hub.png'),fullPage:true});
 });
 test('payment questions need no lesson; suggestions failing never block writing',async({page})=>{
@@ -29,7 +29,7 @@ test('payment questions need no lesson; suggestions failing never block writing'
  await page.getByLabel('문의 종류').selectOption('payment');await expect(page.getByLabel('관련 학습')).toHaveCount(0);await expect(page.getByRole('checkbox')).toHaveCount(0);await page.getByRole('button',{name:'질문 등록',exact:true}).click();expect(h.bodies[0]).toMatchObject({category:'payment',lessonId:null,enrollmentId:null,share:false,visibility:'private'});
 });
 test('lesson entry uses same title-first composer with current lesson already selected',async({page})=>{
- const h=await backend(page);await page.goto('/question-hub-test?lesson=1');await page.getByRole('button',{name:'이 학습에 질문하기',exact:true}).click();await expect(page.getByLabel('관련 학습')).toHaveValue(id(1)+':'+id(4));await page.getByRole('textbox',{name:'질문 내용',exact:true}).fill('첫 학습의 질문입니다');await page.getByRole('radio',{name:'비밀 질문',exact:true}).check();await page.getByRole('button',{name:'질문 등록',exact:true}).click();expect(h.bodies[0]).toMatchObject({lessonId:id(4),share:false,visibility:'private'});await expect(page.getByText('질문을 등록했습니다. 질문·답변에서도 확인할 수 있습니다.')).toBeVisible();
+ const h=await backend(page);await page.goto('/question-hub-test?lesson=1');await page.getByRole('button',{name:'이 학습에 질문하기',exact:true}).click();const dialog=page.getByRole('dialog',{name:'이 수업에 질문하기'});await expect(dialog.getByText(context.label,{exact:true})).toBeVisible();const mentor=dialog.getByRole('button',{name:'멘토에게 질문',exact:true});if(await mentor.count()){await expect(dialog.getByRole('button',{name:'AI에게 질문',exact:true})).toHaveAttribute('aria-pressed','true');await mentor.click();}await dialog.getByRole('textbox',{name:'질문 내용',exact:true}).fill('첫 학습의 질문입니다');await expect(dialog.getByRole('radio',{name:'비밀 질문',exact:true})).toBeChecked();await page.getByRole('button',{name:'질문 등록',exact:true}).click();expect(h.bodies[0]).toMatchObject({lessonId:id(4),share:false,visibility:'private'});await expect(dialog.getByRole('heading',{name:'질문을 등록했어요'})).toBeVisible();
 });
 test('learner resolves an answered question without adding an answer',async({page})=>{
  await backend(page);let resolved=false;const writes:Record<string,unknown>[]=[];
@@ -56,7 +56,7 @@ test('public questions display peer replies without follow-up controls, and titl
  await page.goto('/question-hub-test');await expect(page.getByRole('heading',{name:'다른 수강생 질문'})).toBeVisible();await page.getByRole('button',{name:'답변 전체 보기'}).click();await expect(page.getByRole('textbox',{name:'후속 질문',exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'해결됐어요'})).toHaveCount(0);
  await page.getByRole('tab',{name:'질문하기',exact:true}).click();
  const title=await page.getByRole('textbox',{name:'질문 제목 (선택)',exact:true}).boundingBox(),body=await page.getByRole('textbox',{name:'질문 내용',exact:true}).boundingBox();expect(title!.y).toBeLessThan(body!.y);
- await expect(page.getByRole('radio',{name:'전체 공개',exact:true})).toBeChecked();await page.getByRole('radio',{name:'비밀 질문',exact:true}).check();await expect(page.getByText('나와 담당 운영자만 질문과 답변을 볼 수 있어요.')).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await expect(page.getByRole('radio',{name:'비밀 질문',exact:true})).toBeChecked();await page.getByRole('radio',{name:'비밀 질문',exact:true}).check();await expect(page.getByText('나와 담당 운영자만 질문과 답변을 볼 수 있어요.')).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 test('member navigation uses Q&A only and preserves old messages as read-only history',async({page},info)=>{
  await backend(page);
