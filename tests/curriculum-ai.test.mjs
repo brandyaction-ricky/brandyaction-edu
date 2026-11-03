@@ -53,3 +53,19 @@ test('retrieval reserves current lesson evidence and cites the section containin
  assert.equal(sources[0].title,'2-1 직과 업');
  assert.match(sources[0].excerpt,/^2-1 직과 업\n직은 명함/);
 });
+test('AARRR retrieval covers all five phases across eligible lessons and keeps the displayed day',()=>{
+ const stages=['Acquisition','Activation','Retention','Referral','Revenue'];
+ const lessons=[{id:'current',title:'GEO',day_number:7,body_text:'팔로워가 적다면 획득부터 시작합니다.'},
+  ...stages.map((stage,index)=>({id:String(index),title:'마케팅',day_number:6,body_text:stage}))];
+ const {sources}=retrieveCurriculum(lessons,'AARRR 순서와 팔로워가 적을 때 시작점','current',false);
+ assert.equal(sources[0].dayNumber,7);
+ for(const stage of stages) assert.ok(sources.some(source=>source.excerpt.includes(stage)),stage);
+});
+test('English questions and explicit English requests use a localized fallback',()=>{
+ const {requestsEnglish,aiFallbackEnglish}=loadTs('lib/curriculum-ai.ts');
+ assert.ok(requestsEnglish('How do I start?'));
+ assert.ok(requestsEnglish('영어로 설명해 주세요'));
+ assert.ok(requestsEnglish('이걸 in English 부탁해요'));
+ assert.equal(requestsEnglish('AARRR 순서를 알려주세요'),false);
+ assert.equal(parseCurriculumAnswer({answer:'No evidence',needsMentor:true,sourceIds:[]},[],true).answer,aiFallbackEnglish);
+});
