@@ -1,4 +1,5 @@
 'use client';
+import theme from './theme.module.css';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ArrowUpRight, ArrowRight, Orbit, Rocket, RefreshCw, Check, Flag, Target, MessageCircle, Download, X, Clock3, CircleHelp } from 'lucide-react';
@@ -11,7 +12,7 @@ import styles from './dashboard.module.css';
 
 export function CampusFrame({ children, demo = false, admin = false }: { children: React.ReactNode; demo?: boolean; admin?: boolean }) {
   const [navigationNotice,setNavigationNotice]=useState('');useEffect(()=>{const blocked=()=>setNavigationNotice('저장 또는 답변이 끝난 후 이동해 주세요.');window.addEventListener('campus:navigation-blocked',blocked);return()=>window.removeEventListener('campus:navigation-blocked',blocked);},[]);
-  return <div className={styles.root}><header className={styles.header}><Link href={demo ? '/' : '/my/classes'} className={styles.brand}><Orbit size={27} /> MOONSHOT <span>CAMPUS</span></Link><span className={styles.private}>{!demo&&<Link href={admin?"/admin/campus/operations":"/campus/workspace"}>전체 기능 열기 · </Link>}{!demo&&!admin&&<Link href="/campus/archive">개인 보관함 · </Link>}{admin ? '운영 학습 공간' : '나의 성장 학습 공간'}</span></header>
+  return <div className={`${theme.surface} ${styles.root}`}><header className={styles.header}><Link href={demo ? '/' : '/my/classes'} className={styles.brand}><Orbit size={27} /> MOONSHOT <span>CAMPUS</span></Link><span className={styles.private}>{!demo&&<Link href={admin?"/admin/campus/operations":"/campus/workspace"}>전체 기능 열기 · </Link>}{!demo&&!admin&&<Link href="/campus/archive">개인 보관함 · </Link>}{admin ? '운영 학습 공간' : '나의 성장 학습 공간'}</span></header>
     {demo && <div className={styles.demo}>화면 검수용 · 모든 이름과 수치는 가상 예시입니다. 실제 회원 기록·발송·결제와 연결되지 않습니다.</div>}
     {navigationNotice&&<p role="status" className={styles.demo}>{navigationNotice}</p>}<main className={styles.main}>{children}</main><footer className={styles.footer}>BRANDYACTION EDU <span>배운 것을, 내 일의 성과로.</span></footer></div>;
 }

@@ -1,0 +1,43 @@
+/* EDU controls are shared; the original 3D world keeps its own visual identity. */
+.surface {
+  color-scheme: light;
+  font-family: var(--font-sans, Pretendard, "Apple SD Gothic Neo", system-ui, sans-serif);
+  color: var(--text-primary, #161719);
+  line-height: 1.65;
+  --ink: var(--text-primary, #161719);
+  --muted: var(--text-secondary, #626770);
+  --line: var(--border-default, #e2e5e9);
+  --blue: var(--ba-red, #c9232d);
+}
+.surface :where(button, input, select, textarea) { font: inherit; }
+.surface :where(button) {
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid var(--border-strong, #cfd3d8);
+  border-radius: var(--radius-md, 8px);
+  background: var(--surface-raised, #fff);
+  color: var(--text-primary, #161719);
+  line-height: 1.5;
+  font-weight: 600;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  touch-action: manipulation;
+}
+.surface :where(input, select, textarea) {
+  color: var(--text-primary, #161719);
+  background: var(--surface-raised, #fff);
+  border: 1px solid var(--border-strong, #cfd3d8);
+  border-radius: var(--radius-md, 8px);
+  max-width: 100%;
+}
+.surface :where(input:not([type=checkbox]):not([type=radio]):not([type=color]), select, textarea) {
+  min-height: 44px;
+  padding: 10px 12px;
+}
+.surface :where(input, textarea)::placeholder { color: var(--text-secondary, #626770); opacity: 1; }
+.surface :where(button:disabled, input:disabled, select:disabled, textarea:disabled) { cursor: not-allowed; }
+.surface :where(button, a, input, select, textarea, summary):focus-visible { outline: 3px solid var(--ba-info, #315e8b); outline-offset: 3px; }
+.surface :where(h1, h2, h3, h4) { line-height: 1.4; letter-spacing: -.025em; word-break: keep-all; }
+@media(max-width:600px) {
+  .surface :where(input:not([type=checkbox]):not([type=radio]), select, textarea) { font-size: 16px; }
+}
