@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { questionRequest } from './question-composer';
-import { useUnsavedWarning } from '@/features/admin-ui';
+import { useUnsavedWarning } from '@/features/admin-ui/components/use-unsaved-warning';
 type HubState = { question: { sharing_requested: boolean; category: string; lesson_id: string | null }; shared: { title: string; answer: string; published: boolean } | null; job: { id: string; status: string; draft: string | null; expected_head: string | null } | null };
 export function QuestionAdminHub({ questionId, locked, headId, onUseDraft, onDirtyChange, onBusyChange }: { questionId: string; locked: boolean; headId: string | null; onUseDraft: (draft: string, jobId: string) => void; onDirtyChange: (dirty: boolean) => void; onBusyChange: (busy: boolean) => void }) {
   const [data, setData] = useState<HubState | null>(null), [error, setError] = useState(''), [notice, setNotice] = useState(''), [version, setVersion] = useState(0);

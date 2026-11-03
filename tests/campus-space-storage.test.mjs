@@ -1,0 +1,68 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {PGlite} from '@electric-sql/pglite';
+const uid=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
+test('space database enforces private notes, actor identity, cohort access, seat exclusivity, TTL, chat cap and realtime policy',async()=>{
+ const db=new PGlite();try{
+ await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;create schema auth;create schema realtime;
+ create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
+ create function realtime.topic() returns text language sql stable as $$select current_setting('realtime.topic',true)$$;
+ grant usage on schema auth,realtime to authenticated;grant execute on function auth.uid(),realtime.topic() to authenticated;
+ create table realtime.messages(id serial primary key,extension text);alter table realtime.messages enable row level security;grant select,insert on realtime.messages to authenticated;grant usage on sequence realtime.messages_id_seq to authenticated;
+ create table profiles(id uuid primary key,status text);create table courses(id uuid primary key,status text,archived_at timestamptz);
+ create table cohorts(id uuid primary key,course_id uuid,archived_at timestamptz);create table enrollments(id uuid primary key,user_id uuid,course_id uuid,cohort_id uuid,status text,revoked_at timestamptz,access_starts_at timestamptz,access_ends_at timestamptz);
+ insert into profiles values('${uid(1)}','active'),('${uid(2)}','active'),('${uid(3)}','active');
+ insert into courses values('${uid(10)}','published',null);insert into cohorts(id,course_id) values('${uid(20)}','${uid(10)}'),('${uid(21)}','${uid(10)}');
+ insert into enrollments(id,user_id,course_id,cohort_id,status) values('${uid(30)}','${uid(1)}','${uid(10)}','${uid(20)}','active'),('${uid(31)}','${uid(2)}','${uid(10)}','${uid(20)}','active'),('${uid(32)}','${uid(3)}','${uid(10)}','${uid(21)}','active');
+ grant select on profiles,courses,cohorts,enrollments to authenticated;`);
+ await db.exec(readFileSync(new URL('../supabase/migrations/20261102151632_edu_campus_space_presence.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../supabase/migrations/20261102225154_edu_campus_space_controls.sql',import.meta.url),'utf8'));
+ const login=async n=>db.exec(`reset role;set role authenticated;select set_config('request.jwt.claim.sub','${uid(n)}',false);`);
+ const join=async n=>db.query(`insert into edu_campus_space_presence(cohort_id,user_id,session_id,nickname,gender,coat,status,expires_at) values($1,$2,$3,'동료','male','#527086','joinable','2099-01-01')`,[uid(20),uid(n),uid(100+n)]);
+ await login(1);await join(1);
+ assert.ok(Date.parse((await db.query('select expires_at from edu_campus_space_presence')).rows[0].expires_at)<Date.now()+80000);
+ await db.exec(`insert into edu_campus_space_profiles(user_id,nickname,gender,coat,status,note,desk) values('${uid(1)}','나','male','#527086','quiet','비밀 메모','비밀 책상');`);
+ await assert.rejects(db.exec(`update edu_campus_space_profiles set user_id='${uid(2)}'`),/row-level security/i);
+ await assert.rejects(db.exec("update edu_campus_space_presence set status='working'"),/rate limit/i);
+ await db.query(`insert into edu_campus_space_seats(cohort_id,seat_id,user_id,session_id)values($1,'desk-1',$2,$3)`,[uid(20),uid(1),uid(101)]);
+ await login(2);await join(2);assert.equal((await db.query('select * from edu_campus_space_profiles')).rows.length,0);
+ assert.equal((await db.query('select * from edu_campus_space_presence')).rows.length,2);
+ await db.query(`select public.edu_campus_space_claim_seat($1,$2,'desk-2')`,[uid(20),uid(102)]);
+ await assert.rejects(db.query(`select public.edu_campus_space_claim_seat($1,$2,'desk-1')`,[uid(20),uid(102)]),/occupied/i);
+ assert.equal((await db.query(`select seat_id from edu_campus_space_seats where user_id='${uid(2)}'`)).rows[0].seat_id,'desk-2');
+ await assert.rejects(db.query(`select public.edu_campus_space_claim_seat($1,$2,'desk-3')`,[uid(20),uid(999)]),/Current session/i);
+ assert.equal((await db.query(`update edu_campus_space_seats set user_id='${uid(2)}',session_id='${uid(102)}' where seat_id='desk-1' returning seat_id`)).rows.length,0);
+ await assert.rejects(db.query(`insert into edu_campus_space_seats(cohort_id,seat_id,user_id,session_id) values($1,'desk-1',$2,$3)`,[uid(20),uid(2),uid(102)]),/unique/i);
+ await assert.rejects(db.query(`insert into edu_campus_space_presence(cohort_id,user_id,session_id,nickname,gender,coat,status) values($1,$2,$3,'가짜','male','#527086','joinable')`,[uid(21),uid(2),uid(102)]),/row-level security/i);
+ await assert.rejects(db.query(`insert into edu_campus_space_chat(id,cohort_id,user_id,session_id,body) values($1,$2,$3,$4,'사칭')`,[uid(200),uid(20),uid(1),uid(101)]),/row-level security/i);
+ for(let i=0;i<12;i++)await db.query(`insert into edu_campus_space_chat(id,cohort_id,user_id,session_id,nickname,body,created_at) values($1,$2,$3,$4,'사칭 닉네임','테스트','2000-01-01')`,[uid(210+i),uid(20),uid(2),uid(102)]);
+ const chat=(await db.query('select nickname,created_at from edu_campus_space_chat limit 1')).rows[0];assert.equal(chat.nickname,'동료');assert.ok(Date.parse(chat.created_at)>Date.parse('2026-01-01'));
+ await assert.rejects(db.query(`insert into edu_campus_space_chat(id,cohort_id,user_id,session_id,body)values($1,$2,$3,$4,'너무 빠름')`,[uid(250),uid(20),uid(2),uid(102)]),/rate limit/i);
+ await db.exec(`select set_config('realtime.topic','campus-space:${uid(20)}:${uid(2)}',false);insert into realtime.messages(extension)values('broadcast');`);
+ await db.exec(`reset role;create policy legacy_permissive_send on realtime.messages for insert to authenticated with check(true);`);await login(2);await db.exec(`select set_config('realtime.topic','campus-space:${uid(20)}:${uid(1)}',false);`);
+ await assert.rejects(db.exec("insert into realtime.messages(extension)values('broadcast')"),/row-level security/i);
+ await login(3);assert.equal((await db.query('select * from edu_campus_space_presence')).rows.length,0);assert.equal((await db.query('select * from edu_campus_space_chat')).rows.length,0);assert.equal((await db.query('select * from edu_campus_space_seats')).rows.length,0);
+ await db.exec(`reset role;alter table edu_campus_space_seats disable trigger campus_space_seat_guard;update edu_campus_space_seats set expires_at=now()-interval '1 second';alter table edu_campus_space_seats enable trigger campus_space_seat_guard;`);
+ await login(2);await db.query(`select public.edu_campus_space_claim_seat($1,$2,'desk-1')`,[uid(20),uid(102)]);assert.equal((await db.query(`select seat_id from edu_campus_space_seats where user_id='${uid(2)}'`)).rows[0].seat_id,'desk-1');
+ await db.exec(`reset role;update enrollments set revoked_at=now() where user_id='${uid(2)}';`);await login(2);
+ assert.equal((await db.query('select * from edu_campus_space_presence')).rows.length,1); // Own expired access can still clean up its lease.
+ assert.equal((await db.query(`select public.edu_campus_space_topic('campus-space:${uid(20)}:${uid(2)}',true) as allowed`)).rows[0].allowed,false);
+ await db.exec('delete from edu_campus_space_presence;delete from edu_campus_space_seats;');assert.equal((await db.query('select * from edu_campus_space_presence')).rows.length,0);assert.equal((await db.query('select * from edu_campus_space_seats')).rows.length,0);
+ await db.exec(`reset role;insert into edu_campus_space_controls(cohort_id,announcement,paused,updated_by)values('${uid(20)}','잠시 쉬어갑니다',true,'${uid(1)}');`);await login(1);
+ assert.equal((await db.query('select announcement from edu_campus_space_controls')).rows[0].announcement,'잠시 쉬어갑니다');
+ await assert.rejects(db.exec('update edu_campus_space_controls set paused=false'),/permission denied/i);
+ await assert.rejects(db.query(`insert into edu_campus_space_chat(id,cohort_id,user_id,session_id,body)values($1,$2,$3,$4,'중지 우회')`,[uid(260),uid(20),uid(1),uid(101)]),/row-level security/i);
+ assert.equal((await db.query(`select public.edu_campus_space_topic('campus-space:${uid(20)}:${uid(1)}',true) as allowed`)).rows[0].allowed,false);
+ await db.exec(`reset role;update edu_campus_space_controls set paused=false;`);await login(1);
+ await db.query('select public.edu_campus_space_claim_seat($1,$2,$3)',[uid(20),uid(101),'desk-2']);await db.exec(`reset role;update edu_campus_space_controls set closed_zones=array['desk','chat'];`);await login(1);await assert.rejects(db.query('select public.edu_campus_space_claim_seat($1,$2,$3)',[uid(20),uid(101),'desk-3']),/row-level security/i);assert.equal((await db.query('select seat_id from edu_campus_space_seats where user_id=$1',[uid(1)])).rows[0].seat_id,'desk-2');await assert.rejects(db.query("insert into edu_campus_space_chat(id,cohort_id,user_id,session_id,body) values($1,$2,$3,$4,'닫힌 라운지 우회')",[uid(261),uid(20),uid(1),uid(101)]),/row-level security/i);await db.exec(`reset role;update edu_campus_space_controls set closed_zones='{}';`);await login(1);
+ await db.exec("update edu_campus_space_profiles set accessory='headset',desk_theme='garden'");assert.equal((await db.query('select accessory from edu_campus_space_profiles')).rows[0].accessory,'headset');
+ await assert.rejects(db.exec("update edu_campus_space_profiles set accessory='evil'"),/check constraint/i);
+ await db.exec('reset role;');for(let i=300;i<=323;i++){await db.query(`insert into profiles values($1,'active')`,[uid(i)]);await db.query(`insert into enrollments(id,user_id,course_id,cohort_id,status)values($1,$2,$3,$4,'active')`,[uid(500+i),uid(i),uid(10),uid(20)]);}
+ const arrivals=await Promise.allSettled(Array.from({length:24},(_,index)=>{const n=300+index;return db.exec(`begin;set local role authenticated;select set_config('request.jwt.claim.sub','${uid(n)}',true);insert into edu_campus_space_presence(cohort_id,user_id,session_id,nickname,gender,coat,status)values('${uid(20)}','${uid(n)}','${uid(n+100)}','합성 동료','male','#527086','joinable');commit;`);}));
+ // PGlite serializes queued SQL requests: this verifies the admission invariant, not multi-server latency.
+ assert.equal(arrivals.filter(r=>r.status==='fulfilled').length,23);assert.equal(arrivals.filter(r=>r.status==='rejected').length,1);await db.exec('rollback;reset role;');await login(1);assert.equal((await db.query('select * from edu_campus_space_presence')).rows.length,24);
+ await db.exec(`reset role;update cohorts set archived_at=now() where id='${uid(20)}'`);await login(1);assert.equal((await db.query('select edu_campus_space_member($1) allowed',[uid(20)])).rows[0].allowed,false);assert.equal((await db.query('select edu_campus_space_topic($1,true) allowed',[`campus-space:${uid(20)}:${uid(1)}`])).rows[0].allowed,false);
+ await db.exec('reset role;set role anon;');await assert.rejects(db.query('select * from edu_campus_space_profiles'),/permission denied/i);
+ }finally{await db.close();}
+});

@@ -280,9 +280,35 @@ jobs:
           path: test-results/
           retention-days: 3
 
+  campus-browser:
+    name: Campus browser shard ${{ matrix.shard }}/2
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Campus browser regression tests
+        run: npx playwright test --config=playwright.campus.config.ts --shard=${{ matrix.shard }}/2
+      - name: Save campus failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: campus-browser-failures-${{ matrix.shard }}
+          path: test-results/
+          retention-days: 3
+
   verify:
     if: always()
-    needs: [code-checks, browser]
+    needs: [code-checks, browser, campus-browser]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -290,9 +316,11 @@ jobs:
         env:
           CODE_CHECKS: ${{ needs.code-checks.result }}
           BROWSER: ${{ needs.browser.result }}
+          CAMPUS_BROWSER: ${{ needs.campus-browser.result }}
         run: |
           test "$CODE_CHECKS" = success
           test "$BROWSER" = success
+          test "$CAMPUS_BROWSER" = success
 
   migrate-dev:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/develop' && inputs.apply_all_pending_dev_migrations

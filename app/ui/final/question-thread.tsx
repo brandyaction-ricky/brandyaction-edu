@@ -6,7 +6,8 @@ import { useUnsavedLearningChanges } from './use-unsaved-learning-changes';
 import { QuestionAdminHub } from './question-admin-hub';
 import { QuestionImage, QuestionImagePicker, type QuestionImagePickerHandle } from './question-image';
 import { AnswerText } from './lesson-text';
-import { AdminDrawer, useUnsavedWarning } from '@/features/admin-ui';
+import { AdminDrawer } from '@/features/admin-ui';
+import {useUnsavedWarning} from '@/features/admin-ui/components/use-unsaved-warning';
 type Answer = { imageId?: string | null; canDelete?: boolean; id: string; authorName: string; source?: 'learner' | 'operator' | 'legacy' | 'faq' | 'aside'; content: string; createdAt: string };
 type Thread = { question: { id: string; title: string; content: string; learningContext?: string | null; status: string; resolved: boolean; archived: boolean; headId: string | null; imageId?: string | null; visibility?: 'cohort' | 'private' }; answers: Answer[]; nextCursor: string | null; canAnswer: boolean; canFollowUp?: boolean };
 async function request<T>(question: string, body?: unknown, before?: string, signal?: AbortSignal): Promise<T> {

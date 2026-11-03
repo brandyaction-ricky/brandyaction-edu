@@ -13,3 +13,11 @@ supabase/.temp/
 
 /test-results/
 /playwright-report/
+.vercel
+
+# Local-only requirement audits and target-environment evidence; never publish.
+/integration/campus/coverage-audit-business.json
+/integration/campus/coverage-audit-final.json
+/integration/campus/schema-dependency-audit.json
+/integration/campus/dev-migrations/03-seed-metadata-baseline.json
+/integration/campus/dev-migrations/04-trigger-risk.private.md

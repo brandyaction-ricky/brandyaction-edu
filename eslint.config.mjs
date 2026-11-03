@@ -13,6 +13,8 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     "design-reference/**",
+    // Pinned third-party distribution; keep campus source linted.
+    "public/campus/world/vendor/**",
   ]),
 ]);
 

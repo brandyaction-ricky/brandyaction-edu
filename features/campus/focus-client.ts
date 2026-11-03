@@ -44,7 +44,7 @@ export function createFocusTransport(snapshot:CampusSnapshot,demo:boolean):Focus
         if(!current||current.id!==command.sessionId)throw fail('실행 기록을 확인해 주세요.',409);
         current=transitionFocusSession(current,command,Date.now());
       }
-      const result=wrap(current);localStorage.setItem(key,JSON.stringify(result));return result;
+      const result=wrap(current);localStorage.setItem(key,JSON.stringify(result));if(command.kind==='finish'){const historyKey=`moonshot-focus-journal-demo-v1:${snapshot.viewer.id}:${scope}`;let history:FocusSession[]=[];try{const raw=JSON.parse(localStorage.getItem(historyKey)||'[]');if(Array.isArray(raw))history=raw.map(validateFocusSession).filter(v=>v.user_id===snapshot.viewer.id&&v.enrollment_id===scope);}catch{}localStorage.setItem(historyKey,JSON.stringify([current,...history.filter(v=>v.id!==current.id)].slice(0,50)));}return result;
     },
   };
 }

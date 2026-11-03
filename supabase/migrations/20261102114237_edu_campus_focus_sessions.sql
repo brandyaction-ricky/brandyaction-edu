@@ -35,7 +35,7 @@ returns boolean language sql stable security invoker set search_path = '' as $$
     select 1 from public.enrollments e
     join public.profiles p on p.id = e.user_id and p.status = 'active'
     join public.courses c on c.id = e.course_id and c.status = 'published' and c.archived_at is null
-    join public.cohorts h on h.id = e.cohort_id and h.course_id = e.course_id
+    join public.cohorts h on h.id = e.cohort_id and h.course_id = e.course_id and h.archived_at is null
     where e.id = p_enrollment_id and e.user_id = p_user_id and e.status = 'active' and e.revoked_at is null
       and (e.access_starts_at is null or e.access_starts_at <= now())
       and (e.access_ends_at is null or e.access_ends_at > now())

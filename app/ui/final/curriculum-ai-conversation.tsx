@@ -14,11 +14,11 @@ function savedTurns(items:SavedAiExchange[]):Turn[]{return [...items].reverse().
  {role:'user' as const,text:item.question,requestId:item.requestId,imageId:item.imageId,imageAttached:Boolean(item.imageId)},
  {role:'assistant' as const,text:item.answer?.answer || (item.status==='pending'?'답변을 생성 중이에요. 잠시 후 대화를 새로고침해 주세요.':item.error || '답변을 확인하지 못했어요.'),result:item.answer || undefined,pending:item.status==='pending'},
 ]);}
-export function CurriculumAiConversation({context,showContext=true,onStateChange,onCreated}:{context:QuestionContext;showContext?:boolean;onStateChange:(value:{dirty:boolean;locked:boolean})=>void;onCreated:()=>void}) {
+export function CurriculumAiConversation({context,showContext=true,initialQuestion='',onStateChange,onCreated}:{context:QuestionContext;showContext?:boolean;initialQuestion?:string;onStateChange:(value:{dirty:boolean;locked:boolean})=>void;onCreated:()=>void}) {
  const imagesEnabled=process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED === 'true';
  const [image,setImage]=useState<{id:string|null;busy:boolean;draft:boolean;info?:ReadyQuestionImage}>({id:null,busy:false,draft:false}),[imageKey,setImageKey]=useState(0);
  const imagePicker=useRef<QuestionImagePickerHandle>(null);
- const [turns,setTurns]=useState<Turn[]>([]),[question,setQuestion]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[mentor,setMentor]=useState(false);
+ const [turns,setTurns]=useState<Turn[]>([]),[question,setQuestion]=useState(initialQuestion.slice(0,2000)),[busy,setBusy]=useState(false),[error,setError]=useState(''),[mentor,setMentor]=useState(false);
  const [loadedVersion,setLoadedVersion]=useState(-1),[historyError,setHistoryError]=useState(''),[version,setVersion]=useState(0),[more,setMore]=useState(false),[olderBusy,setOlderBusy]=useState(false);
  const loaded=loadedVersion===version;
  const [lastImage,setLastImage]=useState<ReadyQuestionImage>();

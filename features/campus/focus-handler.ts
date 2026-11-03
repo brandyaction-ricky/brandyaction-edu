@@ -1,3 +1,4 @@
+import {readCampusJson} from './request-json';
 import { isCampusId } from './snapshot';
 import type { FocusRequest, FocusState } from './focus-repository';
 type Viewer = { id: string };
@@ -23,12 +24,7 @@ export async function handleCampusFocus(request: Request, deps: Dependencies) {
       if (!enrollmentId || !isCampusId(enrollmentId)) return reply({ error: '수강권을 확인해 주세요.' }, 400);
       return reply(await deps.load(viewer, enrollmentId), 200);
     }
-    if (!request.headers.get('content-type')?.toLowerCase().startsWith('application/json')) return reply({ error: '요청 형식을 확인해 주세요.' }, 400);
-    if (Number(request.headers.get('content-length')) > 12000) return reply({ error: '입력 내용을 줄여 주세요.' }, 400);
-    const raw = await request.text();
-    if (raw.length > 12000) return reply({ error: '입력 내용을 줄여 주세요.' }, 400);
-    let command: unknown;
-    try { command = JSON.parse(raw); } catch { return reply({ error: '요청 형식을 확인해 주세요.' }, 400); }
+    const command=await readCampusJson(request,12000);
     if (!command || typeof command !== 'object' || Array.isArray(command) || !('kind' in command)
       || !['start', 'pause', 'resume', 'finish'].includes(String(command.kind))) return reply({ error: '실행 요청을 확인해 주세요.' }, 400);
     return reply(await deps.save(viewer, command as FocusRequest), 200);

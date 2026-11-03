@@ -10,9 +10,10 @@ import { FocusPanel } from './focus-panel';
 import styles from './dashboard.module.css';
 
 export function CampusFrame({ children, demo = false, admin = false }: { children: React.ReactNode; demo?: boolean; admin?: boolean }) {
-  return <div className={styles.root}><header className={styles.header}><Link href={demo ? '/' : '/my/classes'} className={styles.brand}><Orbit size={27} /> MOONSHOT <span>CAMPUS</span></Link><span className={styles.private}>{admin ? '운영 워크스페이스' : '나의 성장 워크스페이스'}</span></header>
+  const [navigationNotice,setNavigationNotice]=useState('');useEffect(()=>{const blocked=()=>setNavigationNotice('저장 또는 답변이 끝난 후 이동해 주세요.');window.addEventListener('campus:navigation-blocked',blocked);return()=>window.removeEventListener('campus:navigation-blocked',blocked);},[]);
+  return <div className={styles.root}><header className={styles.header}><Link href={demo ? '/' : '/my/classes'} className={styles.brand}><Orbit size={27} /> MOONSHOT <span>CAMPUS</span></Link><span className={styles.private}>{!demo&&<Link href={admin?"/admin/campus/operations":"/campus/workspace"}>전체 기능 열기 · </Link>}{!demo&&!admin&&<Link href="/campus/archive">개인 보관함 · </Link>}{admin ? '운영 워크스페이스' : '나의 성장 워크스페이스'}</span></header>
     {demo && <div className={styles.demo}>화면 검수용 · 모든 이름과 수치는 가상 예시입니다. 실제 회원 기록·발송·결제와 연결되지 않습니다.</div>}
-    <main className={styles.main}>{children}</main><footer className={styles.footer}>BRANDYACTION EDU <span>배운 것을, 내 일의 성과로.</span></footer></div>;
+    {navigationNotice&&<p role="status" className={styles.demo}>{navigationNotice}</p>}<main className={styles.main}>{children}</main><footer className={styles.footer}>BRANDYACTION EDU <span>배운 것을, 내 일의 성과로.</span></footer></div>;
 }
 export function LearnerDashboard({ snapshot, onOpen, onRefresh, onSelect, demo = false }: {
   snapshot: CampusSnapshot; onOpen: (lessonId: string, missionId?: string) => void;

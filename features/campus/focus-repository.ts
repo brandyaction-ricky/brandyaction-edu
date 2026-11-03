@@ -32,7 +32,7 @@ async function scope(db: Database, userId: string, enrollmentId: string, now: nu
   if (!enrollment || !hasLearningAccess(enrollment, now)) campusError(403, '현재 이용 가능한 수강권을 선택해 주세요.');
   const [course, cohort] = await Promise.all([
     one(db.from('courses').select('id').eq('id', enrollment.course_id).eq('status', 'published').is('archived_at', null).maybeSingle()),
-    one(db.from('cohorts').select('id').eq('id', enrollment.cohort_id).eq('course_id', enrollment.course_id).maybeSingle()),
+    one(db.from('cohorts').select('id').eq('id', enrollment.cohort_id).eq('course_id', enrollment.course_id).is('archived_at', null).maybeSingle()),
   ]);
   if (!course || !cohort) campusError(403, '현재 이용 가능한 수강권을 선택해 주세요.');
   return enrollment;

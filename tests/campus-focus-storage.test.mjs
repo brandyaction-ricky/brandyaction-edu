@@ -16,7 +16,7 @@ const viewer = { id: uid(1) };
 const start = { kind: 'start', requestId: uid(20), enrollmentId: uid(2), lessonId: uid(6), lessonVersion: 'v1', actionText: '고객 한 명의 문제를 적기' };
 function fixture() { return {
   enrollments: [{ id: uid(2), user_id: uid(1), course_id: uid(3), cohort_id: uid(4), status: 'active' }, { id: uid(12), user_id: uid(11), course_id: uid(3), cohort_id: uid(4), status: 'active' }],
-  courses: [{ id: uid(3), status: 'published', archived_at: null }], cohorts: [{ id: uid(4), course_id: uid(3) }],
+  courses: [{ id: uid(3), status: 'published', archived_at: null }], cohorts: [{ id: uid(4), course_id: uid(3), archived_at: null }],
   curriculum_weeks: [{ id: uid(5), course_id: uid(3), is_published: true }],
   curriculum_lessons: [{ id: uid(6), week_id: uid(5), is_published: true, updated_at: 'v1', title: 'PRIVATE TITLE', content: 'PRIVATE BODY' }],
   edu_campus_focus_sessions: [],
@@ -97,7 +97,7 @@ test('stale start rejected; hidden or edited lesson does not strand existing not
 });
 test('cross-user, revoked, expired, nonpublished course and foreign lesson blocked', async () => {
   for (const mutate of [d => { d.enrollments[0].status = 'refunded'; }, d => { d.enrollments[0].access_ends_at = new Date(now).toISOString(); },
-    d => { d.enrollments[0].revoked_at = new Date(now).toISOString(); }, d => { d.courses[0].status = 'draft'; },
+    d => { d.enrollments[0].revoked_at = new Date(now).toISOString(); }, d => { d.cohorts[0].archived_at = new Date(now).toISOString(); }, d => { d.courses[0].status = 'draft'; },
     d => { d.curriculum_weeks[0].course_id = uid(999); }]) {
     const db = database(); mutate(db.data); await assert.rejects(saveCampusFocus(db, viewer.id, start, now), { status: 403 });
   }
@@ -134,13 +134,13 @@ test('local PostgreSQL enforces RLS, identity, version transitions, uniqueness a
       grant usage on schema auth to authenticated; grant execute on function auth.uid() to authenticated;
       create table profiles(id uuid primary key, status text);
       create table courses(id uuid primary key, status text, archived_at timestamptz);
-      create table cohorts(id uuid primary key, course_id uuid);
+      create table cohorts(id uuid primary key, course_id uuid, archived_at timestamptz);
       create table enrollments(id uuid primary key, user_id uuid, course_id uuid, cohort_id uuid, status text, revoked_at timestamptz, access_starts_at timestamptz, access_ends_at timestamptz);
       create table curriculum_weeks(id uuid primary key, course_id uuid, is_published boolean);
       create table curriculum_lessons(id uuid primary key, week_id uuid, is_published boolean, updated_at timestamptz);
       insert into profiles values ('${uid(1)}','active'), ('${uid(11)}','active');
       insert into courses values ('${uid(3)}','published',null);
-      insert into cohorts values ('${uid(4)}','${uid(3)}');
+      insert into cohorts(id,course_id) values ('${uid(4)}','${uid(3)}');
       insert into enrollments(id,user_id,course_id,cohort_id,status) values ('${uid(2)}','${uid(1)}','${uid(3)}','${uid(4)}','active'), ('${uid(12)}','${uid(11)}','${uid(3)}','${uid(4)}','active');
       insert into curriculum_weeks values ('${uid(5)}','${uid(3)}',true);
       insert into curriculum_lessons values ('${uid(6)}','${uid(5)}',true,'2026-11-01T10:00:00Z');
@@ -172,6 +172,10 @@ test('local PostgreSQL enforces RLS, identity, version transitions, uniqueness a
     await db.exec("reset role; delete from curriculum_lessons;"); await login(uid(1));
     assert.equal((await db.query('select * from edu_campus_focus_sessions')).rows.length, 2);
     await db.exec(`update edu_campus_focus_sessions set revision=2,status='finished',running_since=null,result_note='삭제된 수업 기록 보존',next_step='다른 수업' where id='${uid(21)}';`);
+    await db.exec("reset role; update cohorts set archived_at=now();"); await login(uid(1));
+    assert.equal((await db.query('select * from edu_campus_focus_sessions')).rows.length, 0);
+    await assert.rejects(insert(uid(22)), /row-level security/i);
+    await db.exec("reset role; update cohorts set archived_at=null;");
     await db.exec("reset role; update enrollments set revoked_at=now();"); await login(uid(1));
     assert.equal((await db.query('select * from edu_campus_focus_sessions')).rows.length, 0);
     assert.equal((await db.query("update edu_campus_focus_sessions set revision=2,status='paused',running_since=null returning id")).rows.length, 0);

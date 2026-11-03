@@ -5,6 +5,7 @@ import type {CampusSnapshot} from '../contracts';
 import {learnerMetrics} from '../learner-metrics';
 import {remainingSeconds} from '../focus-domain';
 import {createFocusTransport,type FocusResponse,type FocusWrite} from '../focus-client';
+import {useCampusDraftGuard} from './draft-guard';
 import styles from './focus-panel.module.css';
 
 export function FocusPanel({snapshot,demo,onOpen}:{snapshot:CampusSnapshot;demo:boolean;onOpen:(lessonId:string)=>void}){
@@ -15,6 +16,7 @@ export function FocusPanel({snapshot,demo,onOpen}:{snapshot:CampusSnapshot;demo:
   const [lessonId,setLessonId]=useState(next?.lessonId||snapshot.lessons[0]?.id||'');
   const [action,setAction]=useState('');const [result,setResult]=useState('');const [nextStep,setNextStep]=useState('');
   const [finishing,setFinishing]=useState(false);const [saved,setSaved]=useState(false);const [serverClock,setServerClock]=useState(0);
+  useCampusDraftGuard(!!(action.trim()||result.trim()||nextStep.trim()),busy);
   const lastSessionId=useRef<string|null>(null);const inFlight=useRef(false);
   const startAttempt=useRef<{signature:string;requestId:string}|null>(null);const generation=useRef(0);const controller=useRef<AbortController|null>(null);
   const session=data?.session;const active=session&&session.status!=='finished';
@@ -36,7 +38,7 @@ export function FocusPanel({snapshot,demo,onOpen}:{snapshot:CampusSnapshot;demo:
   useEffect(()=>{if(!data||session?.status!=='running')return;const base=Date.parse(data.serverNow),anchor=performance.now();const timer=setInterval(()=>setServerClock(base+performance.now()-anchor),1000);return()=>clearInterval(timer);},[data,session?.status]);
   async function write(command:FocusWrite){
     if(inFlight.current)return;inFlight.current=true;setBusy(true);setError('');setSaved(false);const token=generation.current;
-    try{const response=await transport.write(command,controller.current?.signal);if(token!==generation.current)return;accept(response);if(command.kind==='finish'){setFinishing(false);setSaved(true);setAction('');setResult('');setNextStep('');startAttempt.current=null;}}
+    try{const response=await transport.write(command,controller.current?.signal);if(token!==generation.current)return;accept(response);if(command.kind==='start')setAction('');if(command.kind==='finish'){setFinishing(false);setSaved(true);setAction('');setResult('');setNextStep('');startAttempt.current=null;}}
     catch(err){if(token===generation.current){const e=err as Error&{status?:number};setError(e.message);if(e.status===401||e.status===403){setData(null);setResult('');setNextStep('');}}}
     finally{if(token===generation.current){inFlight.current=false;setBusy(false);}}
   }
