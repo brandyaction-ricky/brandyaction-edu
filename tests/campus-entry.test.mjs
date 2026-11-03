@@ -17,3 +17,18 @@ test('share links contain cohort only and never an individual enrollment or iden
  assert.equal(campusEntryPath(),'/campus/enter');
  assert.ok(!campusEntryPath(id(3)).includes(enrollment.id));
 });
+
+test('campus entry loads only for enabled member pages and preserves existing public and disabled route output',async()=>{
+ const {readFile}=await import('node:fs/promises'),{default:ts}=await import('typescript');
+ const jsx=(type,props)=>({type,props}),imports=[];
+ const mocks={'react/jsx-runtime':{jsx,jsxs:jsx,Fragment:'fragment'},'@/lib/edu-settings':{},'@/lib/supabase/server':{},'@/app/ui/platform':{Platform:'platform'},'next/navigation':{notFound:()=>{throw Error('404');}},'@/lib/landing-admin-state':{},'@/lib/platform':{sections:[]},'next/headers':{},'@/lib/product-sharing':{},'@/lib/legal-policies':{isPolicyPath:()=>false},'@/features/campus/ui/entry-bar':{CampusEntryBar:'campus-entry'},'@/features/campus/space/lesson-focus':{LessonFocus:'focus'}};
+ const output={};new Function('exports','require',ts.transpileModule(await readFile('app/[[...path]]/page.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText)(output,name=>{assert.ok(name in mocks,name);imports.push(name);return mocks[name];});
+ const original=process.env.EDU_CAMPUS_ENABLED,space=process.env.EDU_CAMPUS_SPACE_ENABLED;
+ const render=path=>output.default({params:Promise.resolve({path}),searchParams:Promise.resolve({})});
+ try{
+  process.env.EDU_CAMPUS_ENABLED='false';assert.equal((await render(['my','classes'])).type,'platform');assert.ok(!imports.includes('@/features/campus/ui/entry-bar'));
+  process.env.EDU_CAMPUS_ENABLED='true';process.env.EDU_CAMPUS_SPACE_ENABLED='true';assert.equal((await render(['classes','moonshot'])).type,'platform');assert.ok(!imports.includes('@/features/campus/ui/entry-bar'));
+  const my=await render(['my','classes']);assert.deepEqual(my.props.children.filter(Boolean).map(c=>c.type),['campus-entry','platform']);
+  const lesson=await render(['learn',id(1),id(2)]);assert.deepEqual(lesson.props.children.filter(Boolean).map(c=>c.type),['campus-entry','platform','focus']);
+ }finally{if(original===undefined)delete process.env.EDU_CAMPUS_ENABLED;else process.env.EDU_CAMPUS_ENABLED=original;if(space===undefined)delete process.env.EDU_CAMPUS_SPACE_ENABLED;else process.env.EDU_CAMPUS_SPACE_ENABLED=space;}
+});
