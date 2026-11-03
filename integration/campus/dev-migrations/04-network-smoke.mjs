@@ -58,54 +58,82 @@ export function realtimePermissionDenied(error,topic,publicProbe=false){
  const reason=[error?.message,error?.cause?.reason].filter(x=>typeof x==='string').join(' ');
  return reason.includes(`You do not have permissions to read from this Channel topic: ${topic}`)||(publicProbe&&reason.includes('This project only allows private channels'));
 }
-async function subscribe(channel,expected,topic){
+const realtimeStages=['connect','public-probe','private-owner','private-peer','send','delivery','foreign','refunded','anon','cleanup'];
+const realtimeCodes=['session-unavailable','permission-denied','private-only','unexpected-admission','subscription-timeout','channel-closed','invalid-jwt','channel-rate-limit','connection-rate-limit','tenant-unavailable','database-unavailable','realtime-disabled','transport-error','unknown-channel-error','send-failed','delivery-timeout','payload-mismatch','public-leak','cleanup-failed','unexpected-error'];
+const realtimeStatuses=['SUBSCRIBED','CHANNEL_ERROR','TIMED_OUT','CLOSED','UNKNOWN'];
+/** Persist only this closed vocabulary. Never copy an SDK object, topic, URL,
+ * token, message or cause into operator logs, even when a custom verifier throws. */
+export function sanitizeRealtimeDiagnostic(value){
+ return {stage:realtimeStages.includes(value?.stage)?value.stage:'connect',code:realtimeCodes.includes(value?.code)?value.code:'unexpected-error',status:realtimeStatuses.includes(value?.status)?value.status:'UNKNOWN',actor:[...roles,'anonymous','unknown'].includes(value?.actor)?value.actor:'unknown'};
+}
+export function classifyRealtimeFailure(error,topic,publicProbe=false){
+ const reason=[error?.message,error?.cause?.reason].filter(x=>typeof x==='string').join(' ');
+ if(publicProbe&&reason.includes('This project only allows private channels'))return 'private-only';
+ if(realtimePermissionDenied(error,topic))return 'permission-denied';
+ if(/InvalidJWTToken|JwtSignatureError|TokenExpired|JWT.*expired|expired.*JWT/i.test(reason))return 'invalid-jwt';
+ if(/ChannelRateLimitReached|TooManyChannels/i.test(reason))return 'channel-rate-limit';
+ if(/ConnectionRateLimitReached|TooManyConnections/i.test(reason))return 'connection-rate-limit';
+ if(/UnableToConnectToTenantDatabase|DatabaseConnectionIssue/i.test(reason))return 'database-unavailable';
+ if(/InitializingProjectConnection|RealtimeNodeDisconnected|TenantNotFound/i.test(reason))return 'tenant-unavailable';
+ if(/RealtimeDisabledForTenant|Realtime.*disabled/i.test(reason))return 'realtime-disabled';
+ if(/WebSocket|socket|network|transport|ECONN|ENOTFOUND/i.test(reason))return 'transport-error';
+ return 'unknown-channel-error';
+}
+function realtimeFailure(diagnostic){return Object.assign(new Error('Realtime verification failed'),{qaRealtimeDiagnostics:[sanitizeRealtimeDiagnostic(diagnostic)]});}
+async function subscribe(channel,expected,topic,stage,actor){
  return new Promise((resolve,reject)=>{
-  const timer=setTimeout(()=>reject(new Error('Realtime authorization timed out; inconclusive')),12000);
+  const timer=setTimeout(()=>reject(realtimeFailure({stage,actor,code:'subscription-timeout',status:'TIMED_OUT'})),12000);
   channel.subscribe((status,error)=>{
-   if(status==='SUBSCRIBED'){clearTimeout(timer);if(expected)resolve();else reject(new Error('Foreign Realtime subscription unexpectedly admitted'));}
-   else if(status==='CHANNEL_ERROR'){clearTimeout(timer);if(!expected&&realtimePermissionDenied(error,topic))resolve();else reject(new Error('Realtime channel error is not verified permission-denial evidence'));}
-   else if(status==='TIMED_OUT'){clearTimeout(timer);reject(new Error('Realtime timed out; not denial evidence'));}
+   if(status==='SUBSCRIBED'){clearTimeout(timer);if(expected)resolve();else reject(realtimeFailure({stage,actor,code:'unexpected-admission',status}));}
+   else if(status==='CHANNEL_ERROR'){clearTimeout(timer);if(!expected&&realtimePermissionDenied(error,topic))resolve();else reject(realtimeFailure({stage,actor,code:classifyRealtimeFailure(error,topic),status}));}
+   else if(status==='TIMED_OUT'||status==='CLOSED'){clearTimeout(timer);reject(realtimeFailure({stage,actor,code:status==='CLOSED'?'channel-closed':'subscription-timeout',status}));}
   });
  });
 }
 export async function verifyRealtimePair(clients,actors,sessionId,anonymous,options={}){
  assert(anonymous,'Independent anonymous Realtime client required');
  const topic=`campus-space:${actors.owner.cohortId}:${actors.owner.id}`;
- const channels=[],removed=new Set();let received,publicLeaked=false;
+ const channels=[],removed=new Set();let received,publicLeaked=false,stage='connect',actor='unknown',primary=[];
+ const notify=diagnostic=>{try{options.onDiagnostic?.(sanitizeRealtimeDiagnostic(diagnostic));}catch{/* Observation failure cannot skip socket cleanup. */}};
  const bounded=async operation=>{let timer;try{return await Promise.race([Promise.resolve().then(operation),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Realtime cleanup timed out')),12000);})]);}finally{clearTimeout(timer);}};
  const remove=async(client,channel)=>{if(removed.has(channel))return;assert(await bounded(()=>client.removeChannel(channel))==='ok','Realtime channel removal failed');removed.add(channel);};
  try{
-  for(const role of roles){const result=await clients[role].auth.getSession();assert(!result.error&&result.data?.session?.access_token,'Realtime session unavailable');await clients[role].realtime.setAuth(result.data.session.access_token);}
-  const own=clients.owner.channel(topic,{config:{private:true,broadcast:{ack:true,self:false}}});channels.push([clients.owner,own]);
-  const peer=clients.peer.channel(topic,{config:{private:true,broadcast:{ack:true,self:false}}});channels.push([clients.peer,peer]);
+  for(const role of roles){actor=role;const result=await clients[role].auth.getSession();assert(!result.error&&result.data?.session?.access_token,'Realtime session unavailable');await clients[role].realtime.setAuth(result.data.session.access_token);}
+  stage='private-owner';actor='owner';const own=clients.owner.channel(topic,{config:{private:true,broadcast:{ack:true,self:false}}});channels.push([clients.owner,own]);
+  stage='private-peer';actor='peer';const peer=clients.peer.channel(topic,{config:{private:true,broadcast:{ack:true,self:false}}});channels.push([clients.peer,peer]);
   const nonce=randomUUID();
   // A separate public channel must never receive traffic from the private topic.
   // The SDK de-duplicates identical topic names per client, so remove public probes
   // before reusing that client's topic for private-denial checks below.
   const publicProbes=[];
-  for(const client of [clients.otherCohort,anonymous]){
+  for(const [role,client] of [['otherCohort',clients.otherCohort],['anonymous',anonymous]]){
+   stage='public-probe';actor=role;
    const probe=client.channel(topic,{config:{private:false,broadcast:{ack:true,self:false}}});channels.push([client,probe]);publicProbes.push([client,probe]);
    probe.on('broadcast',{event:'move'},({payload})=>{if(payload?.qaNonce===nonce)publicLeaked=true;});
-   await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('Public probe timed out; inconclusive')),12000);probe.subscribe((status,error)=>{if(status==='SUBSCRIBED'||status==='CHANNEL_ERROR'&&realtimePermissionDenied(error,topic,true)){clearTimeout(timer);resolve();}else if(status==='CHANNEL_ERROR'){clearTimeout(timer);reject(new Error('Public probe transport/server error; inconclusive'));}else if(status==='TIMED_OUT'){clearTimeout(timer);reject(new Error('Public probe timed out; inconclusive'));}});});
+   await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(realtimeFailure({stage:'public-probe',actor:role,code:'subscription-timeout',status:'TIMED_OUT'})),12000);probe.subscribe((status,error)=>{if(status==='SUBSCRIBED'||status==='CHANNEL_ERROR'&&realtimePermissionDenied(error,topic,true)){clearTimeout(timer);resolve();}else if(status==='CHANNEL_ERROR'){clearTimeout(timer);reject(realtimeFailure({stage:'public-probe',actor:role,code:classifyRealtimeFailure(error,topic,true),status}));}else if(status==='TIMED_OUT'||status==='CLOSED'){clearTimeout(timer);reject(realtimeFailure({stage:'public-probe',actor:role,code:status==='CLOSED'?'channel-closed':'subscription-timeout',status}));}});});
   }
   let deliveryTimer,resolveDelivery;const delivery=new Promise(resolve=>{resolveDelivery=resolve;});received={resolve:value=>resolveDelivery(value),cancel:()=>clearTimeout(deliveryTimer)};
   peer.on('broadcast',{event:'move'},({payload})=>{if(payload?.qaNonce===nonce)received.resolve(payload);});
-  await Promise.all([subscribe(own,true,topic),subscribe(peer,true,topic)]);
-  const sent=await own.send({type:'broadcast',event:'move',payload:{sessionId,seq:0,x:12,y:8.8,sitting:false,qaNonce:nonce}});assert(sent==='ok','Authorized Realtime send failed');
-  const actual=await Promise.race([delivery,new Promise((_,reject)=>{deliveryTimer=setTimeout(()=>reject(new Error('Authorized Realtime delivery missing')),12000);})]);clearTimeout(deliveryTimer);assert(actual.sessionId===sessionId&&actual.x===12,'Realtime payload mismatch');
-  await new Promise(resolve=>setTimeout(resolve,1000));assert(!publicLeaked,'Private broadcast reached a public or anonymous channel');
-  for(const [client,probe]of publicProbes)await remove(client,probe);
-  await remove(clients.peer,peer);
-  for(const role of ['otherCohort','refunded']){if(options.transitionPeer)await options.transitionPeer(role==='otherCohort'?'foreign':'refunded');const foreign=clients[role].channel(topic,{config:{private:true,broadcast:{ack:true,self:false}}});channels.push([clients[role],foreign]);await subscribe(foreign,false,topic);}
-  const anonPrivate=anonymous.channel(topic,{config:{private:true,broadcast:{ack:true,self:false}}});channels.push([anonymous,anonPrivate]);await subscribe(anonPrivate,false,topic);
+  stage='private-owner';actor='owner';await Promise.all([subscribe(own,true,topic,'private-owner','owner'),subscribe(peer,true,topic,'private-peer','peer')]);
+  stage='send';actor='owner';const sent=await own.send({type:'broadcast',event:'move',payload:{sessionId,seq:0,x:12,y:8.8,sitting:false,qaNonce:nonce}});assert(sent==='ok','Authorized Realtime send failed');
+  stage='delivery';actor='peer';const actual=await Promise.race([delivery,new Promise((_,reject)=>{deliveryTimer=setTimeout(()=>reject(realtimeFailure({stage:'delivery',actor:'peer',code:'delivery-timeout',status:'TIMED_OUT'})),12000);})]);clearTimeout(deliveryTimer);assert(actual.sessionId===sessionId&&actual.x===12,'Realtime payload mismatch');
+  stage='public-probe';actor='unknown';await new Promise(resolve=>setTimeout(resolve,1000));assert(!publicLeaked,'Private broadcast reached a public or anonymous channel');
+  stage='cleanup';for(const [client,probe]of publicProbes)await remove(client,probe);
+  actor='peer';await remove(clients.peer,peer);
+  for(const role of ['otherCohort','refunded']){stage=role==='otherCohort'?'foreign':'refunded';actor=role;if(options.transitionPeer)await options.transitionPeer(role==='otherCohort'?'foreign':'refunded');const foreign=clients[role].channel(topic,{config:{private:true,broadcast:{ack:true,self:false}}});channels.push([clients[role],foreign]);await subscribe(foreign,false,topic,stage,role);}
+  stage='anon';actor='anonymous';const anonPrivate=anonymous.channel(topic,{config:{private:true,broadcast:{ack:true,self:false}}});channels.push([anonymous,anonPrivate]);await subscribe(anonPrivate,false,topic,stage,actor);
   return {positiveDelivery:true,otherCohortDenied:true,refundedDenied:true,publicAnonymousIsolated:true,anonymousPrivateDenied:true};
+ }catch(error){
+  const known={'Realtime session unavailable':'session-unavailable','Authorized Realtime send failed':'send-failed','Realtime payload mismatch':'payload-mismatch','Private broadcast reached a public or anonymous channel':'public-leak','Realtime channel removal failed':'cleanup-failed','Realtime cleanup timed out':'cleanup-failed'};
+  primary=Array.isArray(error?.qaRealtimeDiagnostics)?error.qaRealtimeDiagnostics.slice(0,1).map(sanitizeRealtimeDiagnostic):[sanitizeRealtimeDiagnostic({stage,actor,code:known[error?.message]??'unexpected-error'})];
+  primary.forEach(notify);throw Object.assign(new Error('Realtime verification failed'),{qaRealtimeDiagnostics:primary});
  }finally{
   received?.cancel();
   const removedResults=await Promise.allSettled(channels.map(([client,channel])=>remove(client,channel)));
   // Always disconnect every socket, even after unsubscribe failure. A fulfilled
   // Promise alone is insufficient: SDK disconnect can return 'timeout'.
   const disconnected=await Promise.allSettled([...new Set([...Object.values(clients),anonymous])].map(client=>bounded(async()=>{assert(client.realtime?.disconnect,'Realtime socket cleanup unavailable');assert(await client.realtime.disconnect()==='ok','Realtime socket disconnect failed');assert(client.realtime.connectionState()==='closed','Realtime socket did not close');})));
-  if([...removedResults,...disconnected].some(r=>r.status!=='fulfilled'))throw Object.assign(new Error('Realtime cleanup unverified'),{qaCleanupUnverified:true});
+  if([...removedResults,...disconnected].some(r=>r.status!=='fulfilled')){const failure=sanitizeRealtimeDiagnostic({stage:'cleanup',code:'cleanup-failed'});notify(failure);throw Object.assign(new Error('Realtime cleanup unverified'),{qaCleanupUnverified:true,qaRealtimeDiagnostics:[...primary,failure]});}
  }
 }
 /** Recovery is existing-user-only; verified confirmed QA gets a session without sending mail or updating a password. */
@@ -132,7 +160,7 @@ export async function runDevNetworkSmoke(input,dependencies={}){
  const request=dependencies.fetch??fetch,clientFactory=dependencies.createServerClient??createServerClient;
  const cleanup=dependencies.cleanupArtifacts,rt=dependencies.verifyRealtime??verifyRealtimePair;
  const clients={},jars={},checks=[],artifacts={fixture,postIds:[],fileIds:[],spaceSessions:[]};let step='authentication',failedStep=null,cleanupOkay=false,browserCorsVerified=false,realtimeCleanupUnverified=false;
- const result={status:'prepared',checks,failedStep:null,cleanup:'not-started',realBrowserCorsTested:false};
+ const diagnostics=[];const result={status:'prepared',checks,failedStep:null,cleanup:'not-started',realBrowserCorsTested:false,diagnostics};
  const mark=label=>checks.push(label);let peerPhase='same';
  const transitionPeer=async phase=>{if(c.mode!=='reuse-two'||phase===peerPhase)return;const outcome=await dependencies.transitionPeer({actorId:c.reuseActors.peer,enrollmentId:qaId(32),expectedPhase:peerPhase,nextPhase:phase,cohortId:qaId(phase==='foreign'?21:20)});assert(outcome?.verified===true&&outcome.phase===phase,'QA peer transition was not verified');peerPhase=phase;};
  const appRequest=async(role,path,body,expected=200)=>{
@@ -181,7 +209,7 @@ export async function runDevNetworkSmoke(input,dependencies={}){
   for(const role of ['otherCohort','refunded'])await appRequest(role,`/api/campus/space?cohortId=${c.actors.owner.cohortId}`,undefined,403);
   step='realtime';await transitionPeer('same');const anonymous=clientFactory(c.supabaseUrl,c.publishableKey,{auth:{autoRefreshToken:false,detectSessionInUrl:false},cookies:{getAll:()=>[],setAll:()=>{}}});const real=await rt(clients,c.actors,qaId(600),anonymous,{transitionPeer:c.mode==='reuse-two'?transitionPeer:undefined});assert(real.positiveDelivery&&real.otherCohortDenied&&real.refundedDenied&&real.publicAnonymousIsolated&&real.anonymousPrivateDenied,'Realtime verification incomplete');mark('real-private-broadcast-peer-and-foreign-denial');
   if(dependencies.verifyBrowser){step='browser';await transitionPeer('same');const browser=await dependencies.verifyBrowser({actors:c.actors,artifacts:structuredClone(artifacts),getCookies:role=>{assert(roles.includes(role),'Unknown QA browser actor');return [...jars[role]].map(([name,value])=>({name,value,url:c.appOrigin}));}});assert(browser?.corsVerified===true&&browser?.uiVerified===true,'Real browser verification incomplete');browserCorsVerified=true;mark('real-browser-cors-and-ui');}
- }catch(error){failedStep=step;realtimeCleanupUnverified=error?.qaCleanupUnverified===true;}
+ }catch(error){failedStep=step;realtimeCleanupUnverified=error?.qaCleanupUnverified===true;if(step==='realtime'){const observed=Array.isArray(error?.qaRealtimeDiagnostics)?error.qaRealtimeDiagnostics.slice(0,2):[{stage:'connect',code:'unexpected-error'}];diagnostics.push(...observed.map(sanitizeRealtimeDiagnostic));}}
  finally{
   let left=!realtimeCleanupUnverified;for(const {role,sessionId}of artifacts.spaceSessions){try{await appRequest(role,'/api/campus/space',{kind:'leave',cohortId:c.actors.owner.cohortId,sessionId});}catch{left=false;}}
   for(const role of Object.keys(clients)){try{const out=await clients[role].auth.signOut({scope:'local'});if(out.error)left=false;}catch{left=false;}jars[role]?.clear();}

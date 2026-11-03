@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { DEV_PROJECT, QA_PREFIX, validateNetworkSmokeConfig, runDevNetworkSmoke, verifyRealtimePair, realtimePermissionDenied, verifyQaCatalogIsolation, existingQaRecoveryAuthenticator } from '../integration/campus/dev-migrations/04-network-smoke.mjs';
+import { DEV_PROJECT, QA_PREFIX, validateNetworkSmokeConfig, runDevNetworkSmoke, verifyRealtimePair, realtimePermissionDenied, sanitizeRealtimeDiagnostic, classifyRealtimeFailure, verifyQaCatalogIsolation, existingQaRecoveryAuthenticator } from '../integration/campus/dev-migrations/04-network-smoke.mjs';
 const id=n=>QA_PREFIX+String(n).padStart(12,'0');
 const roles=['owner','peer','otherCohort','refunded'];
 const REUSE_ACTORS={owner:id(71),peer:id(72)}; // Synthetic fixture IDs, not deployed QA actors.
@@ -95,4 +95,45 @@ test('anonymous catalog isolation rejects listed QA or a recruiting cohort using
 test('Realtime channel or socket cleanup failure is never reported as verified and all sockets are attempted',async()=>{
  const c=configuration();for(const mode of ['remove-timeout','socket-timeout']){const disconnected=[];const make=role=>({auth:{getSession:async()=>({data:{session:{access_token:'MOCK_MEMORY_ONLY'}}})},realtime:{setAuth:async()=>{},disconnect:async()=>{disconnected.push(role);return mode==='socket-timeout'?'timeout':'ok';},connectionState:()=> 'closed'},channel(){return {on(){return this;},subscribe(callback){queueMicrotask(()=>callback('CHANNEL_ERROR',new Error('transport unavailable')));return this;}};},removeChannel:async()=>mode==='remove-timeout'?'timed out':'ok'});const clients=Object.fromEntries(roles.map(role=>[role,make(role)]));await assert.rejects(verifyRealtimePair(clients,c.actors,id(600),make('anonymous')),error=>error.qaCleanupUnverified===true);assert.deepEqual(disconnected.sort(),[...roles,'anonymous'].sort());}
  const h=harness();h.dependencies.verifyRealtime=async()=>{throw Object.assign(new Error('do not log raw SDK cause'),{qaCleanupUnverified:true});};const result=await runDevNetworkSmoke(h.c,h.dependencies);assert.equal(result.status,'failed');assert.equal(result.failedStep,'realtime');assert.equal(result.cleanup,'unverified');assert.ok(h.read().cleanup,'artifact cleanup still runs');
+});
+
+function diagnosticClients(mode){
+ const channels=[],disconnected=[];
+ const make=role=>({
+  auth:{getSession:async()=>mode==='connect'&&role==='owner'?{error:Error('SECRET https://unsafe.invalid?token=PRIVATE')}:{data:{session:{access_token:'MOCK_MEMORY_ONLY'}}}},
+  realtime:{setAuth:async()=>{},disconnect:async()=>{disconnected.push(role);return 'ok';},connectionState:()=> 'closed'},
+  channel(topic,options){const privateChannel=options.config.private;const ch={role,privateChannel,on(_event,_filter,callback){this.callback=callback;return this;},subscribe(callback){queueMicrotask(()=>{
+   const scope=privateChannel?({owner:'private-owner',peer:'private-peer',otherCohort:'foreign',refunded:'refunded',anonymous:'anon'}[role]):'public-probe';
+   if(mode===scope){
+    if(['foreign','anon'].includes(mode))return callback('SUBSCRIBED');
+    const reason=mode==='public-probe'?'InvalidJWTToken: SECRET':mode==='private-owner'?'ChannelRateLimitReached: SECRET':mode==='private-peer'?'UnableToConnectToTenantDatabase: SECRET':'WebSocket disconnected SECRET';
+    return callback('CHANNEL_ERROR',new Error(reason+' https://unsafe.invalid?token=PRIVATE'));
+   }
+   if(!privateChannel||['owner','peer'].includes(role))callback('SUBSCRIBED');
+   else callback('CHANNEL_ERROR',new Error(`Unauthorized: You do not have permissions to read from this Channel topic: ${topic}`));
+  });return this;},async send(message){if(mode==='send')return 'timed out';for(const peer of channels.filter(x=>x.role==='peer'&&x.privateChannel))peer.callback({payload:{...message.payload,...(mode==='delivery'?{x:99}:{})}});return 'ok';}};channels.push(ch);return ch;},
+  removeChannel:async()=>mode==='cleanup'?'timed out':'ok'
+ });
+ return{clients:Object.fromEntries(roles.map(role=>[role,make(role)])),anonymous:make('anonymous'),disconnected};
+}
+test('Realtime diagnostics identify each failing scope using only closed enums and still close every socket',async()=>{
+ const cases=[['connect','session-unavailable'],['public-probe','invalid-jwt'],['private-owner','channel-rate-limit'],['private-peer','database-unavailable'],['send','send-failed'],['delivery','payload-mismatch'],['foreign','unexpected-admission'],['refunded','transport-error'],['anon','unexpected-admission'],['cleanup','cleanup-failed']];
+ for(const [stage,code]of cases){const h=diagnosticClients(stage),observed=[];await assert.rejects(verifyRealtimePair(h.clients,configuration().actors,id(600),h.anonymous,{onDiagnostic:value=>observed.push(value)}),error=>{
+   assert.equal(error.qaRealtimeDiagnostics[0].stage,stage);assert.equal(error.qaRealtimeDiagnostics[0].code,code);
+   if(stage==='cleanup')assert.equal(error.qaCleanupUnverified,true);
+   const safe=JSON.stringify({error:error.message,diagnostics:error.qaRealtimeDiagnostics,observed});assert.ok(!/SECRET|PRIVATE|https:|token=|MOCK_MEMORY/.test(safe));return true;
+  });assert.deepEqual(h.disconnected.sort(),[...roles,'anonymous'].sort());}
+});
+test('Realtime result retains primary failure plus cleanup failure and never trusts arbitrary custom error fields',async()=>{
+ const h=diagnosticClients('public-probe');h.clients.owner.removeChannel=async()=> 'timed out';
+ await assert.rejects(verifyRealtimePair(h.clients,configuration().actors,id(600),h.anonymous),error=>{assert.deepEqual(error.qaRealtimeDiagnostics.map(x=>[x.stage,x.code]),[['public-probe','invalid-jwt'],['cleanup','cleanup-failed']]);assert.equal(error.qaCleanupUnverified,true);return true;});
+ const network=harness();network.dependencies.verifyRealtime=async()=>{throw Object.assign(Error('SECRET raw provider payload'),{qaRealtimeDiagnostics:[{stage:'private-owner',code:'permission-denied',status:'CHANNEL_ERROR',actor:'owner',token:'SECRET'}, {stage:'https://unsafe.invalid',code:'token=SECRET',status:'SECRET',actor:'SECRET'}]});};
+ const result=await runDevNetworkSmoke(network.c,network.dependencies);assert.equal(result.failedStep,'realtime');assert.equal(result.cleanup,'verified');assert.deepEqual(result.diagnostics,[{stage:'private-owner',code:'permission-denied',status:'CHANNEL_ERROR',actor:'owner'},{stage:'connect',code:'unexpected-error',status:'UNKNOWN',actor:'unknown'}]);assert.ok(!JSON.stringify(result).includes('SECRET'));assert.ok(network.read().cleanup);
+});
+test('Realtime classifier never treats provider initialization or generic Unauthorized as permission-denial proof',()=>{
+ const topic='campus-space:synthetic:synthetic';
+ assert.equal(classifyRealtimeFailure(new Error('InitializingProjectConnection: SECRET'),topic),'tenant-unavailable');
+ assert.equal(classifyRealtimeFailure(new Error('Unauthorized: SECRET'),topic),'unknown-channel-error');
+ assert.equal(realtimePermissionDenied(new Error('InitializingProjectConnection'),topic),false);
+ assert.deepEqual(sanitizeRealtimeDiagnostic({stage:'connect',code:'unexpected-error',message:'SECRET',cause:{token:'SECRET'}}),{stage:'connect',code:'unexpected-error',status:'UNKNOWN',actor:'unknown'});
 });

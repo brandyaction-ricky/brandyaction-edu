@@ -108,6 +108,15 @@ values('f03c2026-1103-4000-8000-000000000040','f03c2026-1103-4000-8000-000000000
 insert into public.curriculum_lessons(id,week_id,day_number,title,content_type,is_preview,is_published,display_order,access_mode,created_at,updated_at)
 values('f03c2026-1103-4000-8000-000000000050','f03c2026-1103-4000-8000-000000000040',1,'ROLLBACK QA LESSON','material',false,true,0,'enrolled',now(),'2026-11-03T00:00:00Z');
 
+-- QA fixture publication: only this transaction's two synthetic cohorts/week/lesson.
+-- Existing restrictive learner policies require both cohort publication rows.
+insert into public.edu_cohort_week_visibility(cohort_id,week_id,is_published) values
+ ('f03c2026-1103-4000-8000-000000000020','f03c2026-1103-4000-8000-000000000040',true),
+ ('f03c2026-1103-4000-8000-000000000021','f03c2026-1103-4000-8000-000000000040',true);
+insert into public.edu_cohort_lesson_visibility(cohort_id,lesson_id,is_published) values
+ ('f03c2026-1103-4000-8000-000000000020','f03c2026-1103-4000-8000-000000000050',true),
+ ('f03c2026-1103-4000-8000-000000000021','f03c2026-1103-4000-8000-000000000050',true);
+
 -- OWNER and future-refunded account initially create only their own QA records.
 reset role;
 select set_config('request.jwt.claim.sub','f03c2026-1103-4000-8000-000000000001',true),set_config('request.jwt.claims','{"sub":"f03c2026-1103-4000-8000-000000000001","role":"authenticated"}',true);
