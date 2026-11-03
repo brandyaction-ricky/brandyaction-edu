@@ -1,0 +1,10 @@
+import {test,expect} from '@playwright/test';
+import fs from 'node:fs';
+test('camera controls settle and hidden/editor rendering remains suspended',async({page},info)=>{
+ test.skip(info.project.name==='mobile','GPU idle budget is measured on desktop; mobile interaction has separate checks.');test.setTimeout(120000);
+ const source=fs.readFileSync('public/campus/world/tour/tour.mjs','utf8');expect(source).toContain('original();root.dataset.playerX');await page.route('**/campus/world/tour/tour.mjs',r=>r.fulfill({contentType:'text/javascript',body:source.replace('original();root.dataset.playerX','window.__tourDraws=(window.__tourDraws||0)+1;original();root.dataset.playerX')}));
+ await page.goto('/campus-tour');await page.getByRole('button',{name:'문샷 공부방 입장',exact:true}).click();await expect(page.getByRole('button',{name:'내 캐릭터',exact:true})).toBeEnabled({timeout:90000});const world=page.frameLocator('iframe'),count=()=>world.locator('body').evaluate(()=>(window as Window&{__tourDraws?:number}).__tourDraws||0);const results:Record<string,number>={};
+ for(const [mode,button]of [['overall','공간 전체 보기'],['third','3인칭으로 보기'],['first','1인칭으로 보기']]){await page.getByRole('button',{name:button,exact:true}).click();await page.waitForTimeout(2500);const start=await count();await page.waitForTimeout(7000);results[mode]=await count()-start;expect(results[mode],mode+' idle draws').toBeLessThanOrEqual(9);}
+ await page.getByRole('button',{name:'내 캐릭터',exact:true}).click();await expect(world.getByRole('dialog',{name:'캐릭터 꾸미기'})).toBeVisible();const before=await count();await page.waitForTimeout(2000);expect(await count()).toBe(before);await world.getByRole('button',{name:'취소',exact:true}).click();await expect(world.locator('#avatar-preview canvas')).toHaveCount(0);
+ await world.locator('body').evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});const start=await count();await page.waitForTimeout(3000);expect(await count()).toBe(start);await info.attach('idle-draws-per-seven-seconds',{body:JSON.stringify(results),contentType:'application/json'});
+});
