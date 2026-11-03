@@ -6,12 +6,14 @@ import { officeOutputs, officeStatusLabels, outputLabels, type OfficeCommand, ty
 import { emptyOfficeDemo, mutateOfficeDemo, receiveOfficeDemo } from './demo';
 import styles from './panel.module.css';
 import { useCampusDraftGuard } from '../ui/draft-guard';
+import { OfficeDispatchPanel } from './dispatch-panel';
 export function OfficePanel({ snapshot, demo }: { snapshot: CampusSnapshot; demo: boolean }) { return <OfficeSession key={`${snapshot.viewer.id}:${snapshot.selectedEnrollmentId}:${demo}`} snapshot={snapshot} demo={demo} />; }
 export const Panel = OfficePanel;
 function OfficeSession({ snapshot, demo }: { snapshot: CampusSnapshot; demo: boolean }) {
   const enrollmentId = snapshot.selectedEnrollmentId;
   const [state, setState] = useState<OfficeState | null>(() => demo ? emptyOfficeDemo() : null), [objective, setObjective] = useState(''), [materials, setMaterials] = useState(''), [output, setOutput] = useState<OfficeOutput>('plan');
   const [selected, setSelected] = useState<string | null>(null), [note, setNote] = useState(''), [error, setError] = useState(''), [notice, setNotice] = useState(''), [busy, setBusy] = useState(false), [showArchived, setShowArchived] = useState(false);
+  const [dispatchLocked,setDispatchLocked]=useState(false);
   const [pending, setPending] = useState<OfficeCommand | null>(null);
   useCampusDraftGuard(!!objective.trim()||!!materials.trim()||output!=='plan'||(state?.jobs.find(j=>j.id===selected)?.status==='review'&&!!note.trim()),busy);
   const receipts = useRef(new Map<string, string>()), alive = useRef(true);
@@ -52,10 +54,10 @@ function OfficeSession({ snapshot, demo }: { snapshot: CampusSnapshot; demo: boo
     {job && <article className={styles.detail} aria-label="선택한 오피스 작업"><div className={styles.listHeader}><h3>{outputLabels[job.output_type]}</h3><span className={styles.status} data-status={job.status}>{officeStatusLabels[job.status]}</span></div><p className={styles.body}>{job.objective}</p><div className={styles.links}>{job.material_urls.map((u, i) => <a href={u} key={u} target="_blank" rel="noopener noreferrer"><Link2 size={13} />참고 자료 {i + 1}</a>)}</div>
       {job.status === 'awaiting_connection' && <p className={styles.waiting}>아직 봇에 전달되지 않았어요. 실제 접수 이벤트가 와야 ‘봇 접수’로 바뀝니다.</p>}
       {job.draft_text && <section className={styles.draft}><h4>{job.status === 'approved' ? '내가 승인한 결과' : '검토할 초안'}</h4><p className={styles.body}>{job.draft_text}</p>{job.draft_url && <a href={job.draft_url} target="_blank" rel="noopener noreferrer">결과물 링크 열기</a>}</section>}
-      {job.error_note && <p role="alert" className={styles.error}>{job.error_note}</p>}
+      <OfficeDispatchPanel job={job} demo={demo} onChanged={refresh} onLockChange={setDispatchLocked}/>{job.error_note && <p role="alert" className={styles.error}>{job.error_note}</p>}
       {job.status === 'review' && <div className={styles.review}><label>검토 메모<textarea value={note} onChange={e => setNote(e.target.value)} rows={2} minLength={5} maxLength={2000} placeholder="확인한 내용이나 구체적인 수정 요청을 5자 이상 적어 주세요." /></label><div className={styles.actions}><button className={styles.secondary} type="button" disabled={busy || note.trim().length < 5} onClick={() => void send(command('request_revision'))}>수정 요청</button><button className={styles.primary} type="button" disabled={busy || note.trim().length < 5} onClick={() => void send(command('approve'))}><CheckCircle2 size={16} />검토 후 승인</button></div><p className={styles.hint}>승인은 오피스 안의 결과 확인입니다. 사이트 게시나 고객 발송을 실행하지 않아요.</p></div>}
       {job.review_note && <p className={styles.memo}>내 검토 기록: {job.review_note}</p>}
-      <div className={styles.actions}>{job.status === 'failed' && <button className={styles.secondary} type="button" disabled={busy} onClick={() => void send(command('retry'))}>다시 연결 대기로</button>}{!['queued','running','archived'].includes(job.status) && <button className={styles.textButton} type="button" disabled={busy} onClick={() => void send(command('archive'))}>이 작업 보관</button>}</div>
+      <div className={styles.actions}>{job.status === 'failed' && <button className={styles.secondary} type="button" disabled={busy||dispatchLocked} onClick={() => void send(command('retry'))}>다시 연결 대기로</button>}{!['queued','running','archived'].includes(job.status) && <button className={styles.textButton} type="button" disabled={busy||dispatchLocked} onClick={() => void send(command('archive'))}>이 작업 보관</button>}</div>
       {demo && <details className={styles.demoControls}><summary>로컬 검수용 예시 이벤트</summary><p>실제 봇이나 Telegram에 연결하지 않고 상태 전이만 확인합니다.</p><div className={styles.actions}>{(['accepted','started','draft','failed'] as const).map(event => <button type="button" className={styles.secondary} key={event} disabled={event === 'accepted' ? !['awaiting_connection','revision_requested'].includes(job.status) : event === 'started' ? job.status !== 'queued' : event === 'draft' ? job.status !== 'running' : !['queued','running'].includes(job.status)} onClick={() => receive(event)}>{({accepted:'예시 접수',started:'예시 실행 시작',draft:'예시 초안 도착',failed:'예시 실행 오류'})[event]}</button>)}</div></details>}
       <details className={styles.history}><summary>요청·검토 이력</summary><ol>{state?.history.filter(h => h.job_id === job.id).map(h => <li key={h.id}><strong>v{h.revision} · {officeStatusLabels[h.status]}</strong><span>{h.actor_type === 'learner' ? '내 요청' : demo ? '예시 봇 이벤트' : '서명 확인된 봇 이벤트'} · {h.note}</span>{h.draft_text && <details><summary>당시 초안</summary><p className={styles.body}>{h.draft_text}</p></details>}</li>)}</ol></details>
     </article>}

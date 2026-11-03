@@ -9,7 +9,7 @@ export type OfficeJob = { id: string; owner_id: string; enrollment_id: string; o
 export type OfficeHistory = { id: string; job_id: string; revision: number; actor_type: 'learner' | 'connector'; action: string; status: OfficeStatus; note: string; draft_text: string; created_at: string };
 export type OfficeState = { jobs: OfficeJob[]; history: OfficeHistory[]; connection: 'not_connected' | 'incoming_adapter_registered'; demo: boolean };
 export type OfficeCommand = { requestId: string; enrollmentId: string; action: 'create' | 'approve' | 'request_revision' | 'retry' | 'archive'; jobId?: string; expectedRevision?: number; objective?: string; materialUrls?: string[]; outputType?: OfficeOutput; note?: string };
-export type OfficeEvent = { jobId: string; expectedRevision: number; event: 'accepted' | 'started' | 'draft' | 'failed'; draftText?: string; draftUrl?: string; note?: string };
+export type OfficeEvent = { dispatchId?: string; jobId: string; expectedRevision: number; event: 'accepted' | 'started' | 'draft' | 'failed'; draftText?: string; draftUrl?: string; note?: string };
 function text(v: unknown, min: number, max: number) { if (typeof v !== 'string' || v.trim().length < min || v.length > max || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(v)) campusError(400, '입력 내용을 확인해 주세요.'); return v.trim(); }
 export function validateOfficeCommand(input: unknown): OfficeCommand {
   if (!input || typeof input !== 'object' || Array.isArray(input)) campusError(400, '요청 형식을 확인해 주세요.');
@@ -31,6 +31,7 @@ export function validateOfficeEvent(input: unknown): OfficeEvent {
   const e = input as OfficeEvent;
   if (!isCampusId(e.jobId) || !Number.isSafeInteger(e.expectedRevision) || e.expectedRevision < 1 || !['accepted', 'started', 'draft', 'failed'].includes(e.event)) campusError(400, 'Invalid event');
   const out: OfficeEvent = { jobId: e.jobId, expectedRevision: e.expectedRevision, event: e.event };
+  if(e.dispatchId!==undefined){if(!isCampusId(e.dispatchId))campusError(400,'Invalid dispatch');out.dispatchId=e.dispatchId;}
   if (e.event === 'draft') { out.draftText = text(e.draftText, 10, 10000); out.draftUrl = safeCommunityUrl(e.draftUrl); }
   out.note = text(e.note ?? '', e.event === 'failed' ? 5 : 0, 1000);
   return out;

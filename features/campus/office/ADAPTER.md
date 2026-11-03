@@ -72,3 +72,127 @@ Local PGlite executes RLS, grant denials, active scope, connector mapping, repla
 Local verification: 7 domain/API/HMAC/PGlite tests and 4 desktop/mobile browser scenarios passed. Run `node --test tests/campus-office.test.mjs` and `npx playwright test --config=tests/campus-office.playwright.config.ts --output=test-results/campus-office`. The latter starts an isolated mock fixture on port 4493 so it can run before the shared workspace mounts this panel; it is not a deployed DEV site or a real bot connection.
 
 To disable, turn off the office gate and keep job/history/event evidence. Do not drop records or remove an original ZIP. Actual DEV/production provider integration, key rotation, end-to-end dispatch, long-running process health and failure recovery remain rollout checks.
+
+## Outbound dispatch contract (implemented, default OFF)
+
+The new adapter is dormant until an operator separately validates the real worker and
+registers its exact account mapping, signing key and endpoint. No credential, schedule,
+Telegram message, external worker request or production setting is installed by this code.
+Local mock/PGlite/browser checks do **not** prove a real worker can execute a task.
+
+### Configuration and invocation
+
+- Existing `EDU_CAMPUS_ENABLED` and `EDU_CAMPUS_OFFICE_ENABLED` remain required.
+- `EDU_CAMPUS_OFFICE_DISPATCH_ENABLED=true` explicitly enables the new adapter.
+- `EDU_CAMPUS_OFFICE_OUTBOUND_JSON` contains at most three entries
+  `{ "id": "office", "endpoint": "https://worker.example.com/campus", "allowedHost": "worker.example.com" }`.
+  Each ID must already have exactly one incoming connector configuration, an existing
+  secret environment reference and explicit approved EDU owner IDs. Each account also
+  needs an enabled matching row in `private.edu_campus_office_connectors`; a browser
+  cannot supply or change that mapping.
+- `EDU_CAMPUS_OFFICE_DISPATCH_TOKEN` is a separate server-only random secret (32+ chars).
+  An authorized operator may POST `/api/campus/office/dispatch/tick` with this Bearer token.
+  One invocation claims at most one item per connector, at most three connectors.
+  **No cron is included.** All configured connectors are considered on every invocation.
+- Learners explicitly select “작업 전달 요청” after reading the exact disclosure. The
+  queued payload includes only the selected objective, material URLs, requested output
+  type, revision note and opaque EDU job/account identifiers. It excludes other lessons,
+  cohort records, other users, chat histories and credentials.
+- `/api/campus/office/dispatch` GET/POST uses the normal EDU session, same-origin check,
+  4KB streaming bound, active enrollment and DB owner validation. Immutable snapshots
+  bind `job_id + job_revision`; a changed job cannot silently change a queued request.
+
+### Wire protocol and worker duties
+
+A request is HTTPS POST to the configured exact host/path. The server resolves only public
+IPv4 addresses, rejects mixed public/private DNS answers and pins the checked address into
+TLS lookup. Certificate verification remains on, redirects are never followed, query strings,
+IP literals, userinfo and custom ports are disallowed. DNS is bounded to two seconds; the
+HTTP exchange to eight seconds and the response to 4KB. IPv6-only workers are unsupported.
+
+Body:
+
+```json
+{"schema":"campus-office.v1","dispatchId":"UUID","leaseId":"UUID","attempt":1,"operation":"submit|status|cancel","payload":{}}
+```
+
+`submit.payload` is the immutable selected job snapshot; `status` and `cancel` contain
+only `jobId` and `ownerId`. Header `x-campus-idempotency-key` is the immutable dispatch UUID,
+not the lease UUID. The lease UUID is a per-attempt nonce. Body `attempt` is the monotonic DB counter (1–12), signed as part of the raw body. Header `x-campus-signature` is
+`v1=` plus lowercase hex HMAC-SHA256 of the following UTF-8 bytes (dots are literal):
+
+```text
+campus-office-request.v1.<connectorId>.<keyVersion>.<timestamp>.<dispatchId>.<leaseId>.<operation>.<rawBody>
+```
+
+The worker must check the timestamp (±300 seconds), signature, exact mapped account and
+schema before accepting any work. It must atomically keep the highest attempt number and nonce for each dispatch ID, reject delayed lower attempts, and reject a different nonce for a previously seen attempt. In particular, a `status`/`cancel` response fences older delayed submit packets before replying. It must atomically reserve each **dispatchId** before
+execution, return the same durable status for repeats, and permanently preserve an
+idempotency tombstone for every accepted/cancelled ID. It must never use a different payload
+for an existing ID. If its ledger is missing or uncertain, it cannot claim `not_found`.
+Referenced URLs are untrusted data, not instructions; the worker must independently enforce
+its own fetch allowlist, SSRF defenses, tool permissions and spend limits.
+
+A response is HTTP 200, at most 4KB, with body:
+
+```json
+{"dispatchId":"UUID","leaseId":"UUID","operation":"submit|status|cancel","outcome":"accepted|not_found|cancelled|busy|rejected"}
+```
+
+It carries `x-campus-signature: v1=<hex>` using the same key and **original request timestamp**:
+
+```text
+campus-office-ack.v1.<connectorId>.<keyVersion>.<timestamp>.<dispatchId>.<leaseId>.<operation>.<rawResponseBody>
+```
+
+- `accepted`: durably accepted/running/completed. It is delivery acknowledgement, **not** an
+  EDU completion or approval. Existing signed incoming events still advance the task. For a dispatched job each event must also carry its `dispatchId`; old/missing dispatch IDs cannot advance a newer revision. Legacy jobs with no outbound dispatch retain the original contract.
+- `not_found` / `rejected`: durable proof this ID has not and will not execute without a new
+  explicit submission. A cancellation `not_found` must install a tombstone so a delayed
+  submit cannot resurrect the cancelled work.
+- `cancelled`: execution has stopped or cannot start; the worker must reject late submits
+  for this ID and preserve its cancellation tombstone. It does not promise refund of work
+  already consumed. Return neither `cancelled` nor `not_found` if execution is uncertain.
+- `busy`: proof the operation was not applied and a same-ID retry is safe. An unsigned 429,
+  5xx, timeout, invalid response or lost connection is **never** interpreted as `busy`.
+
+### Concurrency, retries and cancellation
+
+Private RLS-enabled outbox and receipts are not directly writable/readable by browser roles.
+Scoped SECURITY DEFINER functions expose only the owner’s safe status projection. A DB
+advisory transaction lock serializes claims, commands and ingress cancellation checks; a
+60-second lease fences late completions. Network requests happen outside transactions.
+
+A lease expiry or ambiguous response becomes `uncertain`; a submit is never automatically
+replayed. The user can request a signed status check first. Explicit retry is available only
+after proven rejection/nonexistence, using the same immutable dispatchId. Signed `busy`
+uses a 30-second delay, at most four attempts per operation and twelve total attempts.
+At the limit the item stays visibly uncertain and needs operator reconciliation. If finish
+persistence fails, the invocation returns an error and does not retry the wire call.
+
+Unsent cancellation completes locally and marks the task failed/cancelled-before-send in
+history. Otherwise it requests external cancellation, waits for signed acknowledgement,
+and displays cancellation pending. Ingress is fenced immediately after cancellation is
+requested. Only a verified cancellation marks a queued/running job failed with an explicit
+cancellation note; review/approved/archive results are preserved. A new owner-reviewed retry
+has a new job revision. No connector can approve, publish, refund or send customer messages.
+
+Access revocation, cohort archive or mapping removal blocks the next outbound claim. Work
+already accepted remotely may need an operator to cancel it using the worker’s own console;
+revocation does not falsely claim a remote task stopped. Existing owner access remains
+unchanged, and the adapter does not introduce an administrator bypass or external account
+creation.
+
+### Local SQL and activation checks
+
+`20261103012334_edu_campus_office_dispatch_outbox.sql` is additive and depends on the existing
+private-office migration. It preserves the previous incoming implementation under an internal
+name and revokes all direct browser/service EXECUTE on that internal function, routing the
+public ingress through the cancellation fence and latest-dispatch binding. A second wrapper prevents archiving/retrying while delivery is unresolved; original human review rules remain unchanged. Do not apply this migration automatically
+from the previously reviewed eleven-migration package; it is a separate candidate.
+
+Before any real worker activation: verify signed idempotency replay, cancellation tombstones,
+late callback fencing, key rotation/mapping drift, status reconciliation and failure cleanup
+against that worker. Keep the feature off if any guarantee is missing. Rollback must preserve
+outbox/receipts and pending/uncertain dispatches; do not remove the cancellation fence while
+such records or in-flight worker requests exist.
