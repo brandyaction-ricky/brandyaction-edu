@@ -19,10 +19,11 @@ const commentsResult = await build({entryPoints:['tests/browser/fixture/question
 const consentResult = await build({entryPoints:['tests/browser/fixture/consent-app.tsx'],bundle:true,write:false,outdir:'consent-fixture',platform:'browser',format:'esm',jsx:'automatic',define:{'process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED':'"true"','process.env.NODE_ENV':'"development"','process.env':'{}'},alias:{'@/lib/supabase/client':resolve('tests/browser/fixture/consent-auth.ts'),'next/image':resolve('tests/browser/fixture/image.tsx'),'next/link':resolve('tests/browser/fixture/link.tsx'),'next/navigation':resolve('tests/browser/fixture/consent-navigation.ts')}});
 const hubResult = await build({entryPoints:['tests/browser/fixture/question-hub-app.tsx'],bundle:true,write:false,outdir:'question-hub-fixture',platform:'browser',format:'esm',jsx:'automatic',define:{'process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED':'"true"','process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED':'"true"','process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED':'"true"','process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED':'"true"','process.env.NODE_ENV':'"development"','process.env':'{}'},alias:{'@/lib/supabase/client':resolve('tests/browser/fixture/member-auth.ts'),'next/image':resolve('tests/browser/fixture/image.tsx'),'next/link':resolve('tests/browser/fixture/link.tsx'),'next/navigation':resolve('tests/browser/fixture/navigation.ts')}});
 const learningQuestionResult = await build({entryPoints:['tests/browser/fixture/learning-question-app.tsx'],bundle:true,write:false,outdir:'learning-question-fixture',platform:'browser',format:'esm',jsx:'automatic',define:{'process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED':'"true"','process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED':'"true"','process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED':'"true"','process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED':'"true"','process.env.NODE_ENV':'"development"','process.env':'{}'},alias:{'@/lib/supabase/client':resolve('tests/browser/fixture/member-auth.ts'),'next/image':resolve('tests/browser/fixture/image.tsx'),'next/link':resolve('tests/browser/fixture/link.tsx'),'next/navigation':resolve('tests/browser/fixture/navigation.ts')}});
+const curriculumAiResult = await build({entryPoints:['tests/browser/fixture/curriculum-ai-app.tsx'],bundle:true,write:false,outdir:'curriculum-ai-fixture',platform:'browser',format:'esm',jsx:'automatic',define:{'process.env.NEXT_PUBLIC_EDU_CURRICULUM_AI_ENABLED':'"true"','process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED':'"true"','process.env.NODE_ENV':'"development"','process.env':'{}'},alias:{'@/lib/supabase/client':resolve('tests/browser/fixture/member-auth.ts'),'next/image':resolve('tests/browser/fixture/image.tsx'),'next/link':resolve('tests/browser/fixture/link.tsx'),'next/navigation':resolve('tests/browser/fixture/navigation.ts')}});
 const diagnosisResult = await build({entryPoints:['tests/browser/fixture/diagnosis-app.tsx'],bundle:true,write:false,outdir:'diagnosis-fixture',platform:'browser',format:'esm',jsx:'automatic',define:{'process.env':'{}','process.env.NODE_ENV':'"development"','process.env.NEXT_PUBLIC_EDU_MYIN_DIAGNOSIS_ENABLED':'"true"'},alias:{'@/lib/supabase/client':resolve('tests/browser/fixture/member-auth.ts'),'@tosspayments/tosspayments-sdk':resolve('tests/browser/fixture/toss.ts'),'next/link':resolve('tests/browser/fixture/link.tsx'),'next/image':resolve('tests/browser/fixture/image.tsx'),'next/navigation':resolve('tests/browser/fixture/navigation.ts')}});
 const optionalConsentResult = await build({entryPoints:['tests/browser/fixture/optional-consent-app.tsx'],bundle:true,write:false,outdir:'optional-consent-fixture',platform:'browser',format:'esm',jsx:'automatic',define:{'process.env.NEXT_PUBLIC_EDU_OPTIONAL_CONSENT_ENABLED':'"true"','process.env.NODE_ENV':'"development"','process.env':'{}'},alias:{'@/lib/supabase/client':resolve('tests/browser/fixture/consent-auth.ts'),'next/link':resolve('tests/browser/fixture/link.tsx'),'next/navigation':resolve('tests/browser/fixture/consent-navigation.ts')}});
 const adControlResult = await build({entryPoints:['tests/browser/fixture/ad-controls-app.tsx'],bundle:true,write:false,outdir:'ad-control-fixture',platform:'browser',format:'esm',jsx:'automatic',define:{'process.env.NODE_ENV':'"development"','process.env':'{}'}});
-const assets = new Map([...adControlResult.outputFiles,...optionalConsentResult.outputFiles,...result.outputFiles,...consentResult.outputFiles,...hubResult.outputFiles,...diagnosisResult.outputFiles,...learningQuestionResult.outputFiles].map(file=>['/'+file.path.split('/').at(-1),file.contents]));
+const assets = new Map([...curriculumAiResult.outputFiles,...adControlResult.outputFiles,...optionalConsentResult.outputFiles,...result.outputFiles,...consentResult.outputFiles,...hubResult.outputFiles,...diagnosisResult.outputFiles,...learningQuestionResult.outputFiles].map(file=>['/'+file.path.split('/').at(-1),file.contents]));
 const brandLogo = readFileSync(resolve('public/brandy-action-logo.png'));
 const failedMemberReads = new Set();
 const server = createServer((request,response)=>{
@@ -105,8 +106,19 @@ const server = createServer((request,response)=>{
   }
   const asset=assets.get(url.pathname);
   if(asset){response.setHeader('Content-Type',url.pathname.endsWith('.css')?'text/css':'text/javascript');response.end(asset);return;}
+  // Read-only synthetic defaults let the local visual preview run without login or real data.
+  if(['/api/platform/encouragement','/api/platform/question-thread','/api/member/push'].includes(url.pathname)){
+    response.setHeader('Content-Type','application/json');
+    if(request.method!=='GET'){response.writeHead(405).end(JSON.stringify({error:'합성 화면 조회만 허용합니다.'}));return;}
+    const value=url.pathname==='/api/member/push'?{enabled:false}:url.pathname==='/api/platform/encouragement'?(url.searchParams.has('mine')?{publicName:'',message:'',revision:null}:{rows:[],nextCursor:null}):{question:{id:'22222222-2222-4222-8222-222222222222',status:'answered',resolved:false,archived:false,headId:null},answers:[],nextCursor:null,canAnswer:false,canFollowUp:true};
+    response.end(JSON.stringify(value));return;
+  }
   if(url.pathname==='/api/platform/diagnosis/report'){
-    const key=(request.headers.cookie || '').match(/(?:^|;\s*)diagnosis_download_fixture=(original|embedded)(?:;|$)/)?.[1];
+    const state=new URL(request.headers.referer||'http://127.0.0.1').searchParams.get('local-report');
+    if(!url.search&&['ready','needs_review','queued','processing','access_denied'].includes(state)){
+      response.setHeader('Content-Type','application/json');response.end(JSON.stringify({state,updatedAt:'2026-10-01T00:00:00.000Z',canRetry:false,downloadAvailable:state==='ready'}));return;
+    }
+    const key=(request.headers.cookie || '').match(/(?:^|;\s*)diagnosis_download_fixture=(original|embedded)(?:;|$)/)?.[1] || (state==='ready'?'embedded':undefined);
     const files=key && reportFiles[key],format=url.searchParams.has('html')?'html':'markdown';
     if(!files){response.writeHead(404).end();return;}
     if(!url.search){response.setHeader('Content-Type','application/json');response.end(JSON.stringify({state:'ready',updatedAt:'2026-10-01T00:00:00.000Z',canRetry:false,downloadAvailable:true}));return;}
@@ -115,12 +127,15 @@ const server = createServer((request,response)=>{
     response.setHeader('Content-Disposition',`attachment; filename*=UTF-8''${encodeURIComponent(name)}`);
     response.end(files[format]);return;
   }
-  if(url.pathname==='/api/platform/diagnosis/session' && /diagnosis_download_fixture=(original|embedded)/.test(request.headers.cookie || '')){
+  if(url.pathname==='/api/platform/diagnosis/session' && (/diagnosis_download_fixture=(original|embedded)/.test(request.headers.cookie || '') || new URL(request.headers.referer||'http://127.0.0.1').searchParams.has('local-report'))){
     response.setHeader('Content-Type','application/json');response.end(JSON.stringify({state:'submitted',revision:8,answers:[],submittedAt:'2026-10-01T00:00:00Z',needsReview:false,survey:{code:'needs6_n30',version:'synthetic',title:'합성 N6 검사',coreQuestionCount:0,questions:[]}}));return;
   }
   if(url.pathname==='/diagnosis-test'){
     if(url.searchParams.has('file-qa'))response.setHeader('Set-Cookie','diagnosis_download_fixture=embedded; Path=/; SameSite=Lax');
     response.setHeader('Content-Type','text/html');response.end('<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Diagnosis fixture</title><link rel="stylesheet" href="/diagnosis-app.css"></head><body style="margin:0"><div id="root"></div><script type="module" src="/diagnosis-app.js"></script></body></html>');return;
+  }
+  if(url.pathname==='/curriculum-ai-test'){
+    response.setHeader('Content-Type','text/html');response.end('<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>수업 AI 질문 · 가상 검수</title><link rel="stylesheet" href="/curriculum-ai-app.css"></head><body style="margin:0"><div id="root"></div><script type="module" src="/curriculum-ai-app.js"></script></body></html>');return;
   }
   if(url.pathname==='/learning-question-test'){
     response.setHeader('Content-Type','text/html');response.end('<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Learning question fixture</title><link rel="stylesheet" href="/learning-question-app.css"></head><body style="margin:0"><div id="root"></div><script type="module" src="/learning-question-app.js"></script></body></html>');return;

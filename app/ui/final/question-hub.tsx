@@ -2,7 +2,9 @@
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { date, type Row } from '@/lib/platform';
-import { QuestionComposer, questionRequest, RelatedAnswers } from './question-composer';
+import { questionRequest, RelatedAnswers } from './question-composer';
+import { QuestionEntry } from './question-entry';
+import { MyAiConversations } from './curriculum-ai-history';
 import { QuestionImage } from './question-image';
 import { QuestionAnswerHistory } from './question-thread';
 import { Heading } from './primitives';
@@ -41,7 +43,8 @@ export function QuestionHub({ order }: { order?: string | null }) {
     <Heading title="질문·답변" description="궁금한 점을 남기고, 같은 기수 수강생의 질문과 답변도 함께 확인하세요."/>
     <div className="question-hub-tabs" role="tablist" aria-label="질문 메뉴">{([['public','전체 질문'],['mine','내 질문'],['write','질문하기']] as const).map(([value,label]) => <button type="button" key={value} role="tab" aria-selected={tab === value} onClick={() => select(value)}>{label}</button>)}</div>
     {notice && <p role="status" className="notice mb24">{notice}</p>}
-    <div hidden={tab !== 'write'} className="panel pad mb24"><QuestionComposer order={order} onCreated={() => { setNotice('질문을 등록했습니다. 답변은 이곳에서 확인할 수 있어요.'); setVersion(v => v + 1); select('mine'); }}/></div>
+    {tab === 'mine' && process.env.NEXT_PUBLIC_EDU_CURRICULUM_AI_ENABLED === 'true' && <div className="panel pad mb24"><MyAiConversations/></div>}
+    <div hidden={tab !== 'write'} className="panel pad mb24"><QuestionEntry order={order} onCreated={() => { setNotice('질문을 등록했습니다. 답변은 이곳에서 확인할 수 있어요.'); setVersion(v => v + 1); select('mine'); }}/></div>
     {target && tab === 'mine' && <button className="btn small mb24" onClick={()=>setShowAll(true)}>내 질문 전체 보기</button>}
     {tab === 'public' && <><p className="meta mb16">같은 기수에 공개한 학습 질문입니다. 비밀 질문은 ‘내 질문’에서 확인하세요.</p><label className="field mb24">질문 검색<input type="search" maxLength={500} value={query} onChange={e => { setQuery(e.target.value); setPage(0); }} placeholder="궁금한 내용을 검색해 보세요"/></label><RelatedAnswers query={query} context={null}/></>}
     {tab !== 'write' && (!data ? <p role="status">불러오고 있습니다.</p> : data.error ? <p role="alert">{data.error} <button className="btn small" onClick={() => setVersion(v => v + 1)}>다시 불러오기</button></p> : <>

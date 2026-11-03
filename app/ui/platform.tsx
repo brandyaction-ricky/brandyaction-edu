@@ -292,7 +292,7 @@ export function Platform({
   const questionEnrollment = learning ? (data.enrollments || []).find(row => row.id === path[1] && hasLearningAccess(row)) : undefined;
   const questionLessons = questionEnrollment ? enrollmentLessons(data, questionEnrollment) : [];
   const questionLesson = questionLessons.find(row => row.id === path[2]) || questionLessons[0];
-  const questionContext = questionEnrollment && questionLesson ? { enrollmentId: String(questionEnrollment.id), lessonId: String(questionLesson.id), label: t(questionLesson, 'title'), recent: true } : undefined;
+  const questionContext = questionEnrollment && questionLesson ? { enrollmentId: String(questionEnrollment.id), lessonId: String(questionLesson.id), label: [questionLesson.day_number != null ? String(questionLesson.day_number)+'일차' : '', t(questionLesson, 'title')].filter(Boolean).join(' · '), recent: true } : undefined;
   const setAdminPage = (update: number | ((page: number) => number)) =>
     setAdminPaging((current) => ({
       section: pagingKey,
@@ -609,7 +609,7 @@ export function Platform({
             </nav>
           )}
           <div className="header-user">
-            {(account || learning) && <MobileRefresh />}
+            {learning && <MobileRefresh />}
             {user ? (
               <>
                 {learning && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' ? <LearningQuestionShortcut key={routeKey} context={questionContext}/> : <Link className="link header-questions" href={admin ? "/admin/questions" : "/my/questions"}>질문·답변</Link>}
@@ -669,6 +669,7 @@ export function Platform({
               </Link>
             ))}
             <Link href="/my">마이페이지</Link>
+            {account && <MobileRefresh />}
           </nav>
         )}
       </header>
