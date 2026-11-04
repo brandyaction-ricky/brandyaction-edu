@@ -1,5 +1,7 @@
 import { dispatchDueCrm } from "@/lib/crm-delivery";
 
+import { dispatchPurchaseBuyerDelivery, purchaseBuyerDeliveryEnabled } from "@/lib/purchase-buyer-delivery-server";
+
 export const maxDuration = 60;
 
 export async function GET(request: Request) {
@@ -8,15 +10,22 @@ export async function GET(request: Request) {
     request.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`
   )
     return Response.json({ error: "Unauthorized" }, { status: 401 });
-  // Pause only the scheduled CRM queue; direct purchase/test sends keep their
-  // existing controls. Other cron jobs can share CRON_SECRET safely.
-  if (process.env.CRM_CRON_ENABLED === "false")
+  const crmEnabled = process.env.CRM_CRON_ENABLED !== "false";
+  const purchaseEnabled = purchaseBuyerDeliveryEnabled();
+  const paused = { disabled: true, campaigns: 0, automations: 0, sent: 0, failed: 0 };
+  if (!crmEnabled && !purchaseEnabled)
     return Response.json(
-      { ok: true, disabled: true, campaigns: 0, automations: 0, sent: 0, failed: 0 },
+      { ok: true, ...paused },
       { headers: { "Cache-Control": "no-store" } },
     );
   try {
-    return Response.json({ ok: true, ...(await dispatchDueCrm()) });
+    const [crm, purchase] = await Promise.allSettled([
+      crmEnabled ? dispatchDueCrm() : paused,
+      purchaseEnabled ? dispatchPurchaseBuyerDelivery() : undefined,
+    ]);
+    if (purchase.status === "rejected") console.error("purchase buyer delivery queue failed");
+    if (crm.status === "rejected") throw crm.reason;
+    return Response.json({ ok: true, ...crm.value, purchaseQueueOk: purchase.status === "fulfilled" });
   } catch (error) {
     console.error(
       "crm cron",

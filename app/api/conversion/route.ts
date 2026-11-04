@@ -22,8 +22,8 @@ export async function GET() {
       db.from('edu_conversion_cases').select('id,source_type,sample_origin,legacy_course_label,question_id,course_id,cohort_id,subject,content,source_label,received_at,customer_id,input_version,purchase_outcome,purchase_checked_at,purchase_checked_by,archived_at,archived_by,created_at').order('created_at', { ascending: false }).limit(200),
       db.from('edu_conversion_evidence').select('id,course_id,cohort_id,title,body,source_url,version,status').order('created_at', { ascending: false }).limit(500),
       db.from('edu_questions').select('id,title,content,course_id,user_id,created_at,updated_at').eq('is_archived', false).order('created_at', { ascending: false }).limit(200),
-      db.from('courses').select('id,title,status').order('created_at', { ascending: false }).limit(500),
-      db.from('cohorts').select('id,course_id,name,status').order('created_at', { ascending: false }).limit(500),
+      db.from('courses').select('id,title,status,category,list_price,archived_at').order('created_at', { ascending: false }).limit(500),
+      db.from('cohorts').select('id,course_id,name,status,price').order('created_at', { ascending: false }).limit(500),
       db.from('edu_conversion_runs').select('id,case_id,input_version,provider,result,evidence_versions,input_snapshot,evidence_snapshot,created_at').order('created_at', { ascending: false }).limit(500),
       db.from('edu_conversion_reviews').select('id,case_id,run_id,decision,reply_text,reason,calibration,calibration_sample_kind,created_at,actor_id').order('created_at', { ascending: false }).limit(500),
     ];

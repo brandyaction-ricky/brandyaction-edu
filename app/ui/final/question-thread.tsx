@@ -18,10 +18,10 @@ async function request<T>(question: string, body?: unknown, before?: string, sig
  });
  const value = await response.json(); if (!response.ok) throw Object.assign(new Error(value.error || '답변을 확인하지 못했습니다.'), { status: response.status }); return value;
 }
-function useThread(questionId: string, active = true) {
+function useThread(questionId: string, active = true, refreshKey = '') {
  const [revision, setRevision] = useState(0), [state, setState] = useState<{ key: string; data?: Thread; error?: string }>();
  const [olderError, setOlderError] = useState(''), [olderBusy, setOlderBusy] = useState(false);
- const key = questionId + ':' + revision, generation = useRef(key), olderGate = useRef(false);
+ const key = questionId + ':' + refreshKey + ':' + revision, generation = useRef(key), olderGate = useRef(false);
  useEffect(() => { generation.current = key; }, [key]);
  useEffect(() => {
   if (!active) return; const abort = new AbortController(); const timer = setTimeout(() => abort.abort(), 10000); let alive = true;
@@ -47,12 +47,17 @@ function Answers({ state, onDelete, locked = false }: { state: ReturnType<typeof
   </>}
  </section>;
 }
-export function QuestionAnswerHistory({ questionId, fallback = '', onStatusChange, onResolved, initiallyOpen = false, readOnly = false }: { questionId: string; fallback?: string; onStatusChange?: (status: string) => void; onResolved?: () => void; initiallyOpen?: boolean; readOnly?: boolean }) {
- const [open, setOpen] = useState(initiallyOpen), state = useThread(questionId, open || Boolean(fallback));
+export function QuestionAnswerHistory({ questionId, fallback = '', onStatusChange, onResolved, initiallyOpen = false, readOnly = false, refreshKey = '' }: { questionId: string; fallback?: string; onStatusChange?: (status: string) => void; onResolved?: () => void; initiallyOpen?: boolean; readOnly?: boolean; refreshKey?: string }) {
+ const [open, setOpen] = useState(initiallyOpen), state = useThread(questionId, open || Boolean(fallback), refreshKey);
  const [content, setContent] = useState(''), [busy, setBusy] = useState(false), [uncertain, setUncertain] = useState(false), [stale, setStale] = useState(false), [notice, setNotice] = useState('');
  const gate = useRef(false), retry = useRef<{ action: 'followup'; questionId: string; content: string; requestId: string; expectedHeadId: string | null } | null>(null);
  useUnsavedLearningChanges(Boolean(content) || busy || uncertain);
- useEffect(() => { if (state.data) onStatusChange?.(state.data.question.status); }, [state.data, onStatusChange]);
+ const statusChange = useRef(onStatusChange);
+ useEffect(() => { statusChange.current = onStatusChange; }, [onStatusChange]);
+ const status = state.data?.question.status;
+ // Parent list reads are asynchronous. A new callback after each parent render
+ // must not report the same status again and repeatedly abort that list read.
+ useEffect(() => { if (status) statusChange.current?.(status); }, [questionId, status]);
  const markedReplies = useRef(new Set<string>());
  const renderedAnswers = state.data?.answers;
  useEffect(() => {
@@ -98,8 +103,8 @@ export function QuestionAnswerHistory({ questionId, fallback = '', onStatusChang
    <button className="btn primary small mt16" disabled={busy || stale || !content.trim()}>{busy ? '등록 중…' : uncertain ? '같은 요청 결과 확인' : '후속 질문 등록'}</button>
   </form>}
   {notice && <p role="status" className="notice mt16">{notice}</p>}
- </> : fallback ? <div className="answer"><b>운영자 답변</b><p className="reading-copy"><AnswerText text={fallback}/></p>{state.data?.answers.filter(a => a.id === state.data?.question.headId).map(a => <QuestionImage key={a.id} questionId={questionId} answerId={a.id} imageId={a.imageId}/>)}</div> : <p className="meta">답변이 도착하면 이곳에서 확인해 주세요.</p>}
-  <div className="row mt16"><button type="button" className="btn small" disabled={busy || uncertain} onClick={() => setOpen(v => !v)}>{open ? '답변 이력 접기' : '답변 전체 보기'}</button>{!open && !readOnly && <button type="button" className="btn small" onClick={() => setOpen(true)}>후속 질문하기</button>}{open && <button type="button" className="btn small" disabled={busy || uncertain} onClick={() => { state.reload(); setStale(false); }}>최신 답변 확인</button>}</div>
+ </> : fallback ? <div className="answer"><b>운영자 답변</b><p className="reading-copy"><AnswerText text={fallback.length > 240 ? fallback.slice(0, 240) + "…" : fallback}/></p>{state.data?.answers.filter(a => a.id === state.data?.question.headId && a.imageId).map(a => <details key={a.id}><summary>답변 첨부 이미지 보기</summary><QuestionImage questionId={questionId} answerId={a.id} imageId={a.imageId}/></details>)}</div> : <p className="meta">답변이 도착하면 이곳에서 확인해 주세요.</p>}
+  <div className="row mt16 member-question-actions"><button type="button" className="btn small" disabled={busy || uncertain} onClick={() => setOpen(v => !v)}>{open ? '답변 이력 접기' : '답변 전체 보기'}</button>{!open && !readOnly && <button type="button" className="btn small" onClick={() => setOpen(true)}>후속 질문하기</button>}{open && <button type="button" className="btn small" disabled={busy || uncertain} onClick={() => { state.reload(); setStale(false); }}>최신 답변 확인</button>}</div>
  </div>;
 }
 export function QuestionThreadDialog({ questionId, close, changed, archive, pending = false, initialDraft = '', initialReference, onDraftChange, onDraftUsed }: { questionId: string; close: () => void; changed?: () => void; archive?: () => void; pending?: boolean; initialDraft?: string; initialReference?: QuestionAiReference; onDraftChange?: (value: string) => void; onDraftUsed?: () => void }) {

@@ -16,3 +16,8 @@
   .edu-front .site-header .brand img{width:92px}
   .edu-front .site-header .header-user{gap:4px}
 }
+
+@media(max-width:680px){
+  .edu-front .mobile-nav .mobile-page-refresh{flex-direction:row;justify-content:flex-start;width:100%;gap:8px;padding:12px 16px}
+  .edu-front .mobile-nav .mobile-page-refresh span{font-size:14px}
+}

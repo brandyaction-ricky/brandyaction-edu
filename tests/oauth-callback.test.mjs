@@ -17,7 +17,10 @@ const compiledModule = { exports: {} };
 new Function("exports", compiled)(compiledModule.exports);
 const { oauthCallbackRecoveryPath } = compiledModule.exports;
 
-function callbackHarness({ metadata = { terms_version: '2026', privacy_version: '2026' } } = {}) {
+function callbackHarness({
+  metadata = { terms_version: '2026', privacy_version: '2026' },
+  syncKakaoConsent = async () => false,
+} = {}) {
   const source = fs.readFileSync(
     new URL('../app/auth/callback/route.ts', import.meta.url),
     'utf8',
@@ -48,7 +51,7 @@ function callbackHarness({ metadata = { terms_version: '2026', privacy_version: 
         },
       }),
     };
-    if (name === '@/lib/kakao-sync-server') return { syncKakaoConsent: async () => false };
+    if (name === '@/lib/kakao-sync-server') return { syncKakaoConsent };
     if (name === 'next/server') return {
       NextResponse: {
         redirect(url) {
@@ -120,6 +123,24 @@ test('consent redirect also preserves the Supabase session cookies', async () =>
 
   assert.equal(response.redirectUrl, 'https://edu.example/auth/consent?next=%2Fmy');
   assert.deepEqual(response.cookies.values, harness.cookieMutations);
+});
+
+test('a new Kakao session needs onsite consent unless Kakao Sync verified the required terms', async () => {
+  for (const requiredTermsVerified of [false, true]) {
+    const syncCalls = [];
+    const harness = callbackHarness({
+      metadata: {},
+      syncKakaoConsent: async (user, token) => {
+        syncCalls.push([user.id, token]);
+        return requiredTermsVerified;
+      },
+    });
+    const response = await harness.get(new Request('https://edu.example/auth/callback?code=oauth-code&next=%2Fmy&provider=kakao'));
+
+    assert.deepEqual(syncCalls, [['member-1', 'provider-token']]);
+    assert.equal(response.redirectUrl, requiredTermsVerified ? 'https://edu.example/my' : 'https://edu.example/auth/consent?next=%2Fmy');
+    assert.deepEqual(response.cookies.values, harness.cookieMutations);
+  }
 });
 
 test('older email-change links guide members when their code opened in a different browser', async () => {

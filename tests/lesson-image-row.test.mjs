@@ -45,3 +45,25 @@ test('group metadata cannot be injected into other block types or CSS',()=>{
  assert.throws(()=>validateLessonBlocks(doc({id:'text',type:'text',content:'설명',imageGroup:'row'})));
  assert.deepEqual(validateLessonBlocks(doc(images()[0])),doc(images()[0]));
 });
+
+test('drag moves a single image into a row and reorders or splits it without losing content',()=>{
+ const {moveLessonImage}=load('lesson-image-row');
+ const input=[{id:'intro',type:'text',content:'Keep **rich text**'},...images(),{id:'end',type:'text',content:'End'}];
+ const pair=moveLessonImage(input,'image-3','image-1','right','pair');
+ assert.deepEqual(pair.map(b=>b.id),['intro','image-1','image-3','image-2','image-4','end']);
+ const triple=moveLessonImage(pair,'image-4','image-3','left','triple');
+ assert.deepEqual(lessonImageRows(triple).map(r=>r.length),[1,3,1,1]);
+ assert.throws(()=>moveLessonImage(triple,'image-2','image-1','right','four'),/3장/);
+ const reordered=moveLessonImage(triple,'image-1','image-3','right','reordered');
+ assert.deepEqual(reordered.slice(1,4).map(b=>b.id),['image-4','image-3','image-1']);
+ const split=moveLessonImage(reordered,'image-3','image-1','below','unused');
+ assert.deepEqual(lessonImageRows(split).map(r=>r.length),[1,2,1,1,1]);
+ assert.equal(split.find(b=>b.id==='image-3').imageGroup,undefined);
+ const single=moveLessonImage(split,'image-4','intro','above','unused');
+ assert.equal(single.find(b=>b.id==='image-1').imageGroup,undefined);
+ assert.deepEqual(single.map(({imageGroup,...b})=>b).sort((a,b)=>a.id.localeCompare(b.id)),input.toSorted((a,b)=>a.id.localeCompare(b.id)));
+ assert.deepEqual(blocksFromCanvas(lessonCanvasNodes(single)),single);
+ assert.deepEqual(input,[{id:'intro',type:'text',content:'Keep **rich text**'},...images(),{id:'end',type:'text',content:'End'}]);
+ assert.throws(()=>moveLessonImage(input,'intro','image-1','left','bad'));
+ assert.throws(()=>moveLessonImage(input,'image-1','intro','left','bad'));
+});

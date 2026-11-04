@@ -41,11 +41,11 @@ export function filterAdTypes(rows: Session[], dimensions: Dimension[], selected
   const types = new Map(dimensions.map(d => [tuple(d.adset_key, d.creative_key), d.ad_type]));
   return rows.filter(row => selected.includes(types.get(tuple(row.attribution?.utm_term || '', row.attribution?.utm_content || '')) || 'unclassified'));
 }
-export async function performanceUiDetails(db: Db, campaign: PerformanceCampaign, params: URLSearchParams, signal: AbortSignal, actorId?: string): Promise<NonNullable<DashboardReport['ui']>> {
+export async function performanceUiDetails(db: Db, campaign: PerformanceCampaign, params: URLSearchParams, signal: AbortSignal, actorId?: string, baseUi?: NonNullable<DashboardReport['ui']>): Promise<NonNullable<DashboardReport['ui']>> {
   const errors: NonNullable<DashboardReport['ui']>['errors'] = {};
   const limitedSignal = AbortSignal.any([signal, AbortSignal.timeout(12000)]);
   const adTypes = filterValues(params, 'ad_type');
-  const dimensions = adTypes.length ? pages<Dimension>((from, to) => db.from('landing_campaign_dimensions').select('adset_key,creative_key,ad_type').eq('campaign_id', campaign.id).order('adset_key').order('creative_key').range(from, to).abortSignal(limitedSignal)) : Promise.resolve([] as Dimension[]);
+  const dimensions = !baseUi && adTypes.length ? pages<Dimension>((from, to) => db.from('landing_campaign_dimensions').select('adset_key,creative_key,ad_type').eq('campaign_id', campaign.id).order('adset_key').order('creative_key').range(from, to).abortSignal(limitedSignal)) : Promise.resolve([] as Dimension[]);
   // PostgREST expression values are quoted, including escaped quotes/backslashes.
   const quote = (value: string) => JSON.stringify(value);
   function sessions(start: string, end: string, columns: string) {
@@ -101,6 +101,7 @@ export async function performanceUiDetails(db: Db, campaign: PerformanceCampaign
       return result.data as LandingInsights;
     } catch { errors.insights = '자동 매출·행동 분석을 불러오지 못했습니다. 다시 조회해 주세요.'; return null; }
   };
+  if (baseUi) { const analysis = await insights(); return { ...baseUi, ...(actorId ? { insights: analysis } : {}), errors: { ...baseUi.errors, ...errors } }; }
   const [daily_a, last_collected_at, actual, analysis] = await Promise.all([trend(), collection(), actuals(), insights()]);
   return { daily_a, last_collected_at, actual_presence: actual?.presence || null, previous_day_members: actual?.previous || {}, period_actuals: actual?.period ?? null, ...(actorId ? { insights: analysis } : {}), errors };
 }

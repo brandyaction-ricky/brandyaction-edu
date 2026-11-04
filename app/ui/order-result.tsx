@@ -6,6 +6,7 @@ import { useSearchParams, usePathname } from "next/navigation";
 import { ArrowRight, Check, CircleAlert } from "lucide-react";
 import { matchingOrder } from "@/lib/platform-rules";
 import { money, labels, type Row } from "@/lib/platform";
+import type { CompletionGuideSettings } from "@/lib/purchase-onboarding";
 import "./order-result.css";
 
 type VirtualAccount = {
@@ -27,10 +28,11 @@ export function OrderResult({
   const orderId = params.get("orderId") || params.get("order");
   const paymentKey = params.get("paymentKey");
   const amount = params.get("amount");
+  const widgetPayment = params.get("integration") === "widget";
   const [state, setState] = useState<"checking" | "paid" | "waiting" | "error">("checking");
   const [error, setError] = useState("");
   const [virtualAccount, setVirtualAccount] = useState<VirtualAccount | null>(null);
-  const [onboardingOrderId, setOnboardingOrderId] = useState<string | null>(null);
+  const [onboarding, setOnboarding] = useState<{ orderId: string; completionGuide?: CompletionGuideSettings } | null>(null);
   const [onboardingErrorOrderId, setOnboardingErrorOrderId] = useState<string | null>(null);
   const [onboardingCheckedOrderId, setOnboardingCheckedOrderId] = useState<string | null>(null);
   const [onboardingRetry, setOnboardingRetry] = useState(0);
@@ -38,7 +40,8 @@ export function OrderResult({
   const paidOrderId = order?.status === "paid" && typeof order.id === "string" ? order.id : null;
   const failed = path === "/payment/fail";
   const complete = !failed && (state === "paid" || order?.status === "paid");
-  const onboardingReady = complete && !!paidOrderId && onboardingOrderId === paidOrderId;
+  const onboardingReady = complete && !!paidOrderId && onboarding?.orderId === paidOrderId;
+  const completionGuide = onboardingReady ? onboarding.completionGuide : undefined;
   const onboardingFailed = complete && !!paidOrderId && onboardingErrorOrderId === paidOrderId;
   const onboardingLoading = complete && !!paidOrderId && onboardingCheckedOrderId !== paidOrderId;
   const showClassFallback = complete && !onboardingReady && !onboardingFailed && !onboardingLoading;
@@ -47,13 +50,14 @@ export function OrderResult({
     if (!complete || !paidOrderId) return;
     const controller = new AbortController();
     void fetch(`/api/purchase-onboarding?order=${encodeURIComponent(paidOrderId)}`, { cache: 'no-store', signal: controller.signal })
-      .then(response => {
+      .then(async response => {
+        const data = response.ok ? await response.json() : null;
         if (controller.signal.aborted) return;
-        setOnboardingOrderId(response.ok ? paidOrderId : null);
+        setOnboarding(response.ok ? { orderId: paidOrderId, completionGuide: data?.completionGuide } : null);
         setOnboardingErrorOrderId(!response.ok && response.status !== 404 ? paidOrderId : null);
         setOnboardingCheckedOrderId(paidOrderId);
       })
-      .catch(() => { if (!controller.signal.aborted) { setOnboardingOrderId(null); setOnboardingErrorOrderId(paidOrderId); setOnboardingCheckedOrderId(paidOrderId); } });
+      .catch(() => { if (!controller.signal.aborted) { setOnboarding(null); setOnboardingErrorOrderId(paidOrderId); setOnboardingCheckedOrderId(paidOrderId); } });
     return () => controller.abort();
   }, [complete, paidOrderId, onboardingRetry]);
 
@@ -64,7 +68,7 @@ export function OrderResult({
       const response = await fetch("/api/platform/payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentKey, orderId, amount: Number(amount) }),
+        body: JSON.stringify({ paymentKey, orderId, amount: Number(amount), integration: widgetPayment ? "widget" : "legacy" }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error);
@@ -84,7 +88,7 @@ export function OrderResult({
       );
       setState("error");
     }
-  }, [paymentKey, orderId, failed, amount, refresh, setState, setError, setVirtualAccount]);
+  }, [paymentKey, orderId, failed, amount, widgetPayment, refresh, setState, setError, setVirtualAccount]);
 
   useEffect(() => {
     const timer = setTimeout(() => void confirm(), 0);
@@ -124,9 +128,9 @@ export function OrderResult({
         <header className="order-complete-intro">
           <span>BrandyAction EDU</span>
           <h1>{complete ? "클래스 시작 준비" : "신청 상태 확인"}</h1>
-          <p>{complete ? "결제 확인부터 첫 학습까지 순서대로 안내해 드릴게요." : "주문 상태를 확인한 뒤 다음 단계로 안내해 드릴게요."}</p>
+          <p>{completionGuide ? "아래 링크에서 수강 준비를 시작하세요." : complete ? "결제 확인부터 첫 학습까지 순서대로 안내해 드릴게요." : "주문 상태를 확인한 뒤 다음 단계로 안내해 드릴게요."}</p>
         </header>
-        <ol className="order-complete-steps" aria-label="클래스 시작 단계">
+        {!completionGuide && !onboardingLoading && <ol className="order-complete-steps" aria-label="클래스 시작 단계">
           <li className={complete ? "complete" : "active"} aria-current={complete ? undefined : "step"}>
             <span>{firstStepLabel}</span>
             <strong>{state === "waiting" ? "입금 확인" : "결제 확인"}</strong>
@@ -139,7 +143,7 @@ export function OrderResult({
             <span>3단계</span>
             <strong>첫 학습 시작</strong>
           </li>
-        </ol>
+        </ol>}
         <section className={"completion order-complete-card " + (complete ? "is-complete" : "needs-attention")}>
           <div className="order-complete-summary">
             <div className={"success-icon " + (complete ? "" : "fail")} aria-hidden="true">
@@ -159,7 +163,7 @@ export function OrderResult({
                 : complete
                   ? showClassFallback
                     ? "내 클래스에서 신청한 클래스와 자료를 확인해 주세요."
-                    : "아래 버튼을 눌러 교육 시작 안내를 확인해 주세요."
+                    : completionGuide ? "결제한 클래스의 시작 안내를 준비했어요." : "아래 버튼을 눌러 교육 시작 안내를 확인해 주세요."
                   : "확인된 주문에 한해 수강권이 제공됩니다."}
               </p>
             </div>
@@ -208,13 +212,16 @@ export function OrderResult({
               )}
             </dl>
           )}
-          {complete && <div className="order-complete-next-copy">
+          {complete && !completionGuide && <div className="order-complete-next-copy">
             <span>다음 · 2단계</span>
             <h3>{onboardingReady ? "교육 시작 안내를 확인하세요" : "내 클래스에서 바로 시작하세요"}</h3>
             <p>{onboardingReady ? "공지방 입장 방법과 이어지는 학습 순서를 한 번에 확인할 수 있어요." : "신청한 클래스와 제공 자료를 내 클래스에서 확인할 수 있어요."}</p>
           </div>}
           <div className="grid2 mt24 order-complete-actions" style={complete ? { gridTemplateColumns: "1fr" } : undefined}>
-            {onboardingReady && paidOrderId && (
+            {completionGuide && <a className="btn primary" href={completionGuide.url} referrerPolicy="no-referrer">
+              {completionGuide.label} <ArrowRight />
+            </a>}
+            {onboardingReady && paidOrderId && !completionGuide && (
               <Link className="btn primary" href={`/purchase-onboarding?order=${encodeURIComponent(paidOrderId)}`}>
                 결제 후 시작 안내 <ArrowRight />
               </Link>

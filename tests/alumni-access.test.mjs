@@ -22,6 +22,8 @@ test('only active paid enrollments graduate after the cohort ends', () => {
   const now = Date.parse('2026-10-01T00:00:00Z');
   assert.equal(isGraduate(e, paid, { status: 'in_progress', operation_end_at: '2026-09-30T23:59:59Z' }, now), true);
   assert.equal(isGraduate(e, paid, { status: 'completed' }, now), true);
+  assert.equal(isGraduate(e, paid, { status: 'recruiting', alumni_access_on_enroll: true, operation_end_at: '2026-11-01' }, now), true);
+  assert.equal(isGraduate(e, paid, { status: 'recruiting', alumni_access_on_enroll: false, operation_end_at: '2026-11-01' }, now), false);
   assert.equal(isGraduate(e, paid, { status: 'in_progress', operation_end_at: '2026-10-02T00:00:00Z' }, now), false);
   assert.equal(isGraduate(e, { category: 'free' }, { status: 'completed' }, now), false);
   assert.equal(isGraduate({ ...e, status: 'revoked' }, paid, { status: 'completed' }, now), false);

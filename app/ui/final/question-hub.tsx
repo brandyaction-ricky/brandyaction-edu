@@ -9,8 +9,13 @@ import { QuestionImage } from './question-image';
 import { QuestionAnswerHistory } from './question-thread';
 import { Heading } from './primitives';
 import { AnswerText } from './lesson-text';
+import { QuestionDeleteControl } from './question-delete-control';
+import usability from './usability.module.css';
 
-export function QuestionCard({ question: q, initiallyOpen = false, changed }: { question: Row; initiallyOpen?: boolean; changed?: () => void }) {
+export function QuestionCard({ question: q, initiallyOpen = false, changed, deleted }: { question: Row; initiallyOpen?: boolean; changed?: () => void; deleted: () => void }) {
+  const [expanded, setExpanded] = useState(initiallyOpen);
+  const content = String(q.content || '');
+  const long = content.length > 240;
   const card = useRef<HTMLElement>(null);
   useEffect(() => {
     if (initiallyOpen) card.current?.scrollIntoView({ block: 'start' });
@@ -18,8 +23,11 @@ export function QuestionCard({ question: q, initiallyOpen = false, changed }: { 
   return <article ref={card} className="question-card" id={'question-' + q.id} style={initiallyOpen ? { scrollMarginTop: 'var(--header-height, 64px)' } : undefined}>
     <div className="between"><b>{q.is_resolved ? '질문 종료' : q.status === 'answered' ? '답변 있음' : '답변 대기'}</b><span className="meta">{date(q.created_at)}</span></div>
     <h3>{String(q.title)}</h3>{Boolean(q.learning_context) && <p className="meta">{String(q.learning_context)}</p>}
-    <p className="reading-copy">{String(q.content)}</p><QuestionImage questionId={String(q.id)} imageId={q.image_id}/>
+    <p className="reading-copy">{long && !expanded ? content.slice(0, 240) + '…' : content}</p>
+    {long && <button type="button" className="btn small" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>{expanded ? '질문 내용 접기' : '질문 내용 더 보기'}</button>}
+    {Boolean(q.image_id) && <details className="question-image-disclosure"><summary>질문 첨부 이미지 보기</summary><QuestionImage questionId={String(q.id)} imageId={q.image_id}/></details>}
     <p className="meta">{q.visibility === 'cohort' ? '전체 공개 · 같은 기수 수강생이 함께 봐요' : '비밀 질문 · 나와 담당 운영자만 볼 수 있어요'}</p>
+    {q.mine !== false && <div className="question-card-actions"><QuestionDeleteControl questionId={String(q.id)} onDeleted={deleted}/></div>}
     {process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED === 'true' ? <QuestionAnswerHistory questionId={String(q.id)} initiallyOpen={initiallyOpen} readOnly={q.mine === false} fallback={String(q.answer || '')} onResolved={changed} onStatusChange={status => { if (status !== q.status) changed?.(); }}/> : Boolean(q.answer) && <p className="answer reading-copy"><AnswerText text={String(q.answer)}/></p>}
   </article>;
 }
@@ -55,8 +63,8 @@ export function QuestionHub({ order }: { order?: string | null }) {
     {tab !== 'write' && (!data ? <p role="status">불러오고 있습니다.</p> : data.error ? <p role="alert">{data.error} <button className="btn small" onClick={() => setVersion(v => v + 1)}>다시 불러오기</button></p> : <>
       {tab === 'mine' && <div className="chips mb24">{['전체','답변 대기','답변 있음','질문 종료'].map(f => <button className={'chip ' + (filter === f ? 'active' : '')} key={f} aria-pressed={filter === f} onClick={() => setFilter(f)}>{f}</button>)}</div>}
       {tab === 'mine' && <p className="meta mb24">‘답변 있음’은 운영자가 답변을 남긴 질문, ‘질문 종료’는 수강생 또는 운영자가 대화를 마친 질문입니다. 종료 후에도 후속 질문을 남길 수 있어요.</p>}
-      {questions.map(q => <QuestionCard key={String(q.id) + (target === q.id ? ':focused' : '')} question={q} initiallyOpen={target === q.id} changed={() => setVersion(v => v + 1)}/>)}
-      {!questions.length && <p className="notice">{tab === 'public' ? '아직 공개된 질문이 없어요. 첫 질문을 남겨 보세요.' : filter === '전체' ? '아직 남긴 질문이 없어요. 질문하기에서 편하게 물어보세요.' : '이 페이지에는 해당 상태의 질문이 없습니다.'}</p>}
+      {questions.map(q => <QuestionCard key={String(q.id) + (target === q.id ? ':focused' : '')} question={q} initiallyOpen={target === q.id} changed={() => setVersion(v => v + 1)} deleted={() => { setNotice('질문을 삭제했습니다.'); if (target) router.replace('/my/questions?view=mine'); setVersion(v => v + 1); }}/>) }
+      {!questions.length && <div className={usability.emptyNotice}><p>{tab === 'public' ? (query ? '검색한 내용과 일치하는 질문이 없어요. 직접 질문을 남겨 보세요.' : '아직 공개된 질문이 없어요. 첫 질문을 남겨 보세요.') : filter === '전체' ? '아직 남긴 질문이 없어요. 질문하기에서 편하게 물어보세요.' : '이 페이지에는 해당 상태의 질문이 없습니다.'}</p><button type="button" className="btn primary" onClick={() => select('write')}>질문 작성하기</button></div>}
       {(!target || tab !== 'mine') && (page > 0 || data.hasMore) && <div className="question-hub-pages"><button className="btn small" disabled={!page} onClick={() => setPage(p => p - 1)}>이전</button><span>{page + 1}페이지</span><button className="btn small" disabled={!data.hasMore} onClick={() => setPage(p => p + 1)}>다음</button></div>}
     </>)}
   </>;

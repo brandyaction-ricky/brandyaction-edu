@@ -1,5 +1,30 @@
 import { expect, test } from '@playwright/test';
+const quickTransferEnabled=process.env.FIXTURE_TOSS_QUICK_TRANSFER_ENABLED==='true';
 const cohort='00000000-0000-4000-8000-000000000001';
+test('coupon history separates used, restored, incomplete and pending records without hiding status',async({page},testInfo)=>{
+  const counts={usage:6,attempts:5,pending:1};
+  await page.route('**/api/coupons?history=*',route=>{
+    const view=new URL(route.request().url()).searchParams.get('view') || 'usage';
+    const row=(id:string,status:string,orderStatus:string)=>({id,status,original_amount:1650000,discount_amount:550000,final_amount:1100000,used_at:status==='used'||status==='cancelled'?'2026-09-29T08:00:00Z':null,created_at:'2026-09-29T08:00:00Z',profiles:{full_name:id},orders:{order_number:'QA-'+id,status:orderStatus,total_amount:1100000,order_items:[{item_name:'합성 상품'}]}});
+    const rows=view==='usage'?[row('사용 회원','used','paid'),row('복원 회원','cancelled','cancelled')]:view==='attempts'?[row('실패 회원','released','failed')]:[row('대기 회원','reserved','pending')];
+    return route.fulfill({json:{rows,count:counts[view as keyof typeof counts],counts,page:1,view}});
+  });
+  await page.goto('/coupons-test');await page.getByRole('button',{name:'쿠폰 만들기',exact:true}).click();
+  await page.getByLabel('쿠폰명 *',{exact:true}).fill('합성 쿠폰');await page.getByLabel('쿠폰 코드 *',{exact:true}).fill('QA3333');
+  await page.getByRole('button',{name:'저장하기',exact:true}).click();await page.getByRole('button',{name:'쿠폰 만들기',exact:true}).click();
+  const table=page.getByRole('table',{name:'쿠폰 사용 내역',exact:true});
+  await expect(page.getByRole('button',{name:'실제 사용·복원 6건',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(table).toContainText('사용 완료');await expect(table).toContainText('취소·복원');await expect(table).not.toContainText('실패 회원');
+  await page.getByRole('button',{name:'결제 미완료 시도 5건',exact:true}).click();
+  await expect(table).toContainText('결제 실패 · 쿠폰 사용 안 됨');await expect(table).not.toContainText('550,000원');await expect(table).not.toContainText('1,100,000원');
+  const row=table.getByRole('row').filter({hasText:'실패 회원'});
+  await expect(row).toBeVisible();
+  const bounds=await row.boundingBox(),status=await row.locator('.coupon-history-status').boundingBox();
+  expect(status!.x).toBeGreaterThanOrEqual(bounds!.x);expect(status!.x+status!.width).toBeLessThanOrEqual(bounds!.x+bounds!.width+1);
+  await page.getByRole('button',{name:'결제 대기 1건',exact:true}).click();await expect(table).toContainText('결제 대기 · 쿠폰 예약');
+  await page.getByRole('button',{name:'실제 사용·복원 6건',exact:true}).click();await expect(table).toContainText('복원 회원');
+  await table.screenshot({path:testInfo.outputPath('coupon-history-scopes.png')});
+});
 test('coupon drawer preserves admin defaults, multiple products and KST after save/reopen',async({page},testInfo)=>{
   await page.route('**/api/coupons?history=*',route=>route.fulfill({json:{rows:[{
     id:'history-row',original_amount:1000,discount_amount:1000,final_amount:0,status:'cancelled',used_at:'2026-09-27T12:00:00Z',
@@ -39,40 +64,46 @@ test('coupon drawer preserves admin defaults, multiple products and KST after sa
 });
 
 for (const method of [
-  {code:'CARD',label:'신용·체크카드',button:'카드로 결제하기'},
-  {code:'KAKAOPAY',label:'카카오페이',button:'카카오페이로 결제하기'},
-  {code:'TOSSPAY',label:'토스페이',button:'토스페이로 결제하기'},
-  {code:'NAVERPAY',label:'네이버페이',button:'네이버페이로 결제하기'},
-]) for (const discounted of [false,true]) test(`positive checkout ${method.code} ${discounted?'with coupon':'without coupon'} sends authoritative amount to mocked Toss`,async({page},testInfo)=>{
+  {code:'TRANSFER',label:quickTransferEnabled?'퀵 계좌이체':'실시간 계좌이체'},
+  {code:'CARD',label:'카드·간편결제'},
+]) for (const discounted of [false,true]) test(`positive checkout ${method.label} ${discounted?'with coupon':'without coupon'} sends authoritative amount to mocked Toss`,async({page},testInfo)=>{
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
-  let couponListReads=0;
+  let couponListReads=0, orderCalls=0, paymentCalls=0;
   const finalAmount=discounted?71000:80000;
   await page.route('**/api/coupons**',route=>{if(route.request().method()==='GET'){couponListReads++;return route.fulfill({json:{coupons:[{couponCode:'LEAKED_CODE',couponName:'노출되면 안 되는 쿠폰'}]}});}return route.fulfill({json:{couponCode:'NORMAL_QA',couponName:'등록한 할인 쿠폰',couponDiscount:8000,totalAmount:72000}});});
-  await page.route('**/fixture/order',route=>route.fulfill({json:{orderId:'positive-order',orderNumber:'EDU-COUPON-QA',totalAmount:finalAmount}}));
-  await page.route('**/fixture/toss',route=>route.fulfill({json:{ok:true}}));
+  await page.route('**/fixture/order',route=>{orderCalls++;expect(route.request().postDataJSON().agreed).toBe(true);return route.fulfill({json:{orderId:'positive-order',orderNumber:'EDU-COUPON-QA',totalAmount:finalAmount}});});
+  await page.route('**/fixture/toss',route=>{paymentCalls++;return route.fulfill({json:{ok:true}});});
   await page.goto('/coupon-checkout-test?cohort='+cohort);
-  await expect(page.getByRole('radio',{name:'가상계좌 · 일시 중단'})).toBeDisabled();
-  await expect(page.getByRole('radio',{name:'신용·체크카드'})).toBeChecked();
+  await expect(page.getByRole('radio')).toHaveCount(2);
+  await expect(page.getByText(/가상계좌/)).toHaveCount(0);
+  await expect(page.getByRole('radio',{name:'카드·간편결제',exact:true})).toBeChecked();
+  await expect(page.locator('.checkout-payment-option').first()).toContainText('추천');
+  await expect(page.locator('.checkout-payment-option').first()).toContainText('카드·간편결제');
   await expect(page.getByText('954201-00-094916',{exact:true})).toBeVisible();
   await expect(page.getByText('주식회사 브랜디액션',{exact:true})).toBeVisible();
   await expect(page.getByRole('link',{name:'입금 후 카카오톡 채널 문의'})).toHaveAttribute('href','http://pf.kakao.com/_ydxjhxj/chat');
   await expect(page.getByText('입금 후 카카오톡 채널로 문의해 주시면 계산서 발급과 수강 절차를 안내해 드리겠습니다.')).toBeVisible();
-  for(const label of ['신용·체크카드','카카오페이','토스페이','네이버페이']) await expect(page.getByRole('radio',{name:label,exact:true})).toBeVisible();
+  for(const label of [quickTransferEnabled?'퀵 계좌이체':'실시간 계좌이체','카드·간편결제']) await expect(page.getByRole('radio',{name:label,exact:true})).toBeVisible();
   await page.getByRole('radio',{name:method.label,exact:true}).check();
   await expect(page.getByRole('radio',{name:method.label,exact:true})).toBeChecked();
-  await expect(page.getByRole('button',{name:method.button,exact:true})).toBeDisabled();
-  await expect(page.locator('.checkout-payment-next')).toContainText(method.button);
+  const selectRequired=page.getByRole('button',{name:'필수 항목 한 번에 선택',exact:true});
+  await expect(selectRequired).toBeEnabled();
+  await expect(page.locator('.checkout-payment-next')).toContainText('동의하고 결제창 열기');
   if(!discounted) await page.locator('section.panel').filter({has:page.getByRole('heading',{name:'결제 수단',exact:true})}).screenshot({path:testInfo.outputPath('checkout-easypay.png')});
   await expect(page.getByLabel('사용할 쿠폰')).toHaveCount(0);await expect(page.getByText('노출되면 안 되는 쿠폰')).toHaveCount(0);expect(couponListReads).toBe(0);
   if(discounted){await page.getByRole('button',{name:'쿠폰 등록하기',exact:true}).click();await page.getByLabel('쿠폰 코드',{exact:true}).fill('normal_qa');await page.getByRole('button',{name:'등록',exact:true}).click();await expect(page.getByRole('dialog')).toBeHidden();await expect(page.getByText('등록한 할인 쿠폰 할인이 자동으로 적용됐습니다.')).toBeVisible();await expect(page.locator('.checkout-payment-summary .checkout-discount-amount')).toHaveText('−8,000원');await expect(page.locator('.checkout-payment-summary .cost-total strong')).toHaveText('72,000원');}
   else await expect(page.locator('.checkout-payment-summary .cost-total strong')).toHaveText('80,000원');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
   if(discounted) {await page.locator('section.panel').filter({has:page.getByRole('heading',{name:'쿠폰 할인',exact:true})}).screenshot({path:testInfo.outputPath('edu-coupon-registration.png')});await page.locator('.checkout-payment-summary').screenshot({path:testInfo.outputPath('edu-coupon-summary.png')});}
-  await page.locator('input[name="agreement"]').check();
+  await selectRequired.click();
+  await expect(page.locator('input[name="agreement"]')).toBeChecked();
+  expect(orderCalls).toBe(0);
+  expect(paymentCalls).toBe(0);
   const payment=page.waitForRequest('**/fixture/toss');
-  await page.getByRole('button',{name:/결제하기/}).click();
-  const body=(await payment).postDataJSON();expect(body.amount.value).toBe(finalAmount);expect(body.method).toBe('CARD');expect(body.orderId).toBe('EDU-COUPON-QA');
-  expect(body.card).toEqual(method.code==='CARD'?undefined:{flowMode:'DIRECT',easyPay:method.code});
+  await page.getByRole('button',{name:'동의하고 결제창 열기',exact:true}).click();
+  const body=(await payment).postDataJSON();expect(body.amount.value).toBe(finalAmount);expect(body.method).toBe(method.code);expect(body.orderId).toBe('EDU-COUPON-QA');
+  expect(body.card).toBeUndefined();
+  expect(body.virtualAccount).toBeUndefined();
   expect(errors).toEqual([]);
 });
 test('zero coupon checkout previews server amount, removes coupon and never loads Toss',async({page})=>{
@@ -82,11 +113,14 @@ test('zero coupon checkout previews server amount, removes coupon and never load
   await page.route('**/fixture/order',async route=>{orderCalls++;expect(route.request().postDataJSON().coupon).toBe('ADMIN_QA');await route.fulfill({json:{orderId:'qa-order',totalAmount:0,free:true}});});
   await page.goto('/coupon-checkout-test?cohort='+cohort);
   await expect(page.getByText('노출되면 안 되는 관리자 쿠폰')).toHaveCount(0);expect(couponListReads).toBe(0);
-  await page.getByRole('radio',{name:'카카오페이',exact:true}).check();
+  await page.getByRole('radio',{name:'카드·간편결제',exact:true}).check();
   await page.getByRole('button',{name:'쿠폰 등록하기',exact:true}).click();await page.getByLabel('쿠폰 코드',{exact:true}).fill('ADMIN_QA');await page.getByRole('button',{name:'등록',exact:true}).click();
   await expect(page.getByText('최종 금액 0원 · 결제창 없이 신청을 완료합니다.')).toBeVisible();
   await page.getByRole('button',{name:'등록 취소',exact:true}).click();await expect(page.getByRole('heading',{name:'결제 수단',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'쿠폰 등록하기',exact:true}).click();await page.getByLabel('쿠폰 코드',{exact:true}).fill('ADMIN_QA');await page.getByRole('button',{name:'등록',exact:true}).click();
-  await page.locator('input[name="agreement"]').check();await page.getByRole('button',{name:'무료로 신청 완료하기'}).click();
+  await page.getByRole('button',{name:'필수 항목 한 번에 선택'}).click();
+  await expect(page.locator('input[name="agreement"]')).toBeChecked();
+  expect(orderCalls).toBe(0);
+  await page.getByRole('button',{name:'동의하고 무료 신청하기'}).click();
   await expect(page).toHaveURL(/\/applied\?order=qa-order/);expect(orderCalls).toBe(1);expect(tossCalls).toBe(0);
 });

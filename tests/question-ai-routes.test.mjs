@@ -2,9 +2,9 @@ import test from 'node:test';import assert from 'node:assert/strict';import fs f
 import {loadTs} from './helpers/question-ai.mjs';
 const contextFunctions=loadTs('lib/question-ai-context.ts'),id='11111111-1111-4111-8111-111111111111';
 const reference={lessonTitle:'수업 제목',revision:'revision',truncated:true,imageIncluded:true,imageFirstFrame:false,contextMissing:false};
-function harness({question={id,title:'원본 제목',content:'원본 질문',lesson_id:id,course_id:id,image_id:id,status:'open',is_resolved:false,answer_head_id:null},operator={id},providerStatus=200,outputs=['근거에 맞는 초안입니다.'],contextError=false,revoke=false,enabled=true,rows=[]}={}){
+function harness({question={id,title:'원본 제목',content:'원본 질문',lesson_id:id,course_id:id,image_id:id,status:'open',is_resolved:false,answer_head_id:null},operator={id},providerStatus=200,outputs=['근거에 맞는 초안입니다.'],contextError=false,revoke=false,enabled=true,rows=[],deletedDuringGeneration=false}={}){
  const calls=[],provider=[],reads=[];let authCalls=0;
- const db={from(table){reads.push(table);const q={select(v){calls.push(['select',v]);return q;},eq(...v){calls.push(['eq',...v]);return q;},is(...v){calls.push(['is',...v]);return q;},lte(...v){calls.push(['lte',...v]);return q;},order(...v){calls.push(['order',...v]);return q;},limit(...v){calls.push(['limit',...v]);return q;},gt(...v){calls.push(['gt',...v]);return q;},maybeSingle:async()=>({data:question,error:null}),then(resolve){return Promise.resolve({data:rows,error:null}).then(resolve);}};return q;}};
+ const db={from(table){reads.push(table);const q={select(v){calls.push(['select',v]);return q;},eq(...v){calls.push(['eq',...v]);return q;},is(...v){calls.push(['is',...v]);return q;},lte(...v){calls.push(['lte',...v]);return q;},order(...v){calls.push(['order',...v]);return q;},limit(...v){calls.push(['limit',...v]);return q;},gt(...v){calls.push(['gt',...v]);return q;},maybeSingle:async()=>({data:deletedDuringGeneration && provider.length ? null : question,error:null}),then(resolve){return Promise.resolve({data:rows,error:null}).then(resolve);}};return q;}};
  const env={OPENAI_API_KEY:'fixture-not-a-real-key',EDU_QUESTION_AI_CONTEXT_ENABLED:String(enabled),NEXT_PUBLIC_EDU_QUESTION_AI_BATCH_ENABLED:String(enabled)};
  function compile(file){const out={};new Function('exports','require','process','fetch',ts.transpileModule(fs.readFileSync(new URL('../'+file,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(out,name=>{
   if(name==='@/lib/operator-permissions')return{getOperatorUser:async()=>{authCalls++;return revoke&&authCalls>1?null:operator;}};
@@ -38,4 +38,8 @@ test('all-unanswered traversal enforces flag and permissions, stable snapshot an
  const rows=Array.from({length:26},(_,i)=>({id:`11111111-1111-4111-8111-${String(i).padStart(12,'0')}`,title:'시험 질문'})),h=harness({rows}),response=await h.get(),r=await response.json();assert.equal(r.rows.length,25);assert.equal(r.nextCursor,rows[24].id);assert.equal(typeof r.snapshot,'string');
  assert.ok(h.calls.some(c=>c[0]==='is'&&c[1]==='answer_head_id'&&c[2]===null));assert.ok(h.calls.some(c=>c[0]==='eq'&&c[1]==='is_resolved'&&c[2]===false));assert.equal(response.headers.get('vary'),'Cookie');
  await h.get('cursor='+id+'&snapshot='+encodeURIComponent(r.snapshot));assert.ok(h.calls.some(c=>c[0]==='gt'&&c[1]==='id'&&c[2]===id));assert.equal((await h.get('cursor=bad')).status,400);assert.equal((await h.get('snapshot=2099-01-01T00:00:00.000Z')).status,400);
+});
+
+test('deletion during provider generation prevents returning a draft containing deleted question data',async()=>{
+ const h=harness({deletedDuringGeneration:true}),response=await h.post();assert.equal(h.provider.length,1);assert.equal(response.status,404);const body=await response.text();assert.doesNotMatch(body,/근거에 맞는 초안|원본 질문/);
 });

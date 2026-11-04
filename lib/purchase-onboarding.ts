@@ -1,5 +1,6 @@
 export type SurveyRoom = 'paid' | 'organic' | 'unknown';
 export type TelegramPath = 'existing' | 'new';
+export type CompletionGuideSettings = { label: string; url: string };
 
 export type PurchaseOnboardingSettings = {
   roomName: string;
@@ -7,6 +8,9 @@ export type PurchaseOnboardingSettings = {
   paidImage: string;
   organicImage: string;
   enabled: boolean;
+  orientationAt?: string;
+  firstLessonId?: string;
+  checklistEnabled?: boolean;
 };
 
 export const DEFAULT_ONBOARDING_ROOM_NAME = 'AI Moonshot project #4기';
@@ -14,9 +18,25 @@ export const MOONSHOT_SUPPORT_URL = 'http://pf.kakao.com/_ydxjhxj/chat';
 export const TELEGRAM_IOS_INSTALL_URL = 'https://telegram.org/dl/ios';
 export const TELEGRAM_ANDROID_INSTALL_URL = 'https://telegram.org/dl/android';
 export const onboardingSettingsKey = (cohortId: string) => `edu_purchase_onboarding_${cohortId}`;
+export const completionGuideSettingsKey = (cohortId: string) => `edu_purchase_completion_guide_${cohortId}`;
 export const uuid = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 export const isMoonshotFourth = (courseTitle: unknown, cohortName: unknown) =>
   typeof courseTitle === 'string' && /문샷/.test(courseTitle) && typeof cohortName === 'string' && /(^|\D)4기(\D|$)/.test(cohortName);
+
+export function completionGuideSettings(value: unknown): CompletionGuideSettings {
+  if (!value || typeof value !== 'object' || !('label' in value) || !('url' in value) ||
+      typeof value.label !== 'string' || typeof value.url !== 'string') throw new Error('안내 링크 설정을 확인해 주세요.');
+  const label = value.label.trim();
+  const address = value.url.trim();
+  if (!label && !address) return { label: '', url: '' };
+  if (!label || label.length > 80) throw new Error('안내 링크 이름을 80자 이내로 입력해 주세요.');
+  try {
+    if (!/^https:\/\//i.test(address) || /[\s\\]/.test(address) || address.length > 1800) throw Error();
+    const url = new URL(address);
+    if (url.protocol !== 'https:' || url.username || url.password || url.href.length > 1800) throw Error();
+    return { label, url: url.href };
+  } catch { throw new Error('안내 링크는 https://로 시작하는 주소를 입력해 주세요.'); }
+}
 
 export function telegramInviteUrl(value: unknown): string {
   if (typeof value !== 'string' || !value.trim()) return '';
@@ -39,7 +59,16 @@ export function purchaseOnboardingSettings(value: unknown): PurchaseOnboardingSe
   }
   const enabled = item.enabled === true;
   if (enabled && !inviteUrl) throw new Error('안내를 켜려면 텔레그램 초대 링크를 입력해 주세요.');
-  return { roomName, inviteUrl, paidImage, organicImage, enabled };
+  const orientationAt = typeof item.orientationAt === 'string' ? item.orientationAt.trim() : '';
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(orientationAt);
+  const validDate = dateOnly ? Number.isFinite(Date.parse(orientationAt)) && new Date(orientationAt).toISOString().slice(0,10) === orientationAt
+    : /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00\+09:00$/.test(orientationAt) && Number.isFinite(Date.parse(orientationAt)) && new Date(Date.parse(orientationAt) + 9 * 3600000).toISOString().slice(0,16) === orientationAt.slice(0,16);
+  if (orientationAt && !validDate) throw new Error('OT 일정을 올바르게 입력해 주세요.');
+  const firstLessonId = typeof item.firstLessonId === 'string' ? item.firstLessonId : '';
+  if (firstLessonId && !uuid(firstLessonId)) throw new Error('첫 학습을 선택해 주세요.');
+  const checklistEnabled = item.checklistEnabled === true;
+  if (enabled && checklistEnabled && (!orientationAt || !firstLessonId)) throw new Error('4단계 안내를 켜려면 OT 일정과 첫 학습을 설정해 주세요.');
+  return { roomName, inviteUrl, paidImage, organicImage, enabled, orientationAt, firstLessonId, checklistEnabled };
 }
 
 export function surveyRoom(value: unknown): SurveyRoom | null {

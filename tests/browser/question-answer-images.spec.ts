@@ -21,11 +21,19 @@ async function backend(context:BrowserContext,{lost=false,uploadFails=false,conf
 }
 async function choose(page:Page){await page.getByLabel('답변 이미지 (선택)').setInputFiles({name:'커리큘럼 화면.png',mimeType:'image/png',buffer:png});}
 async function paste(page:Page){await page.getByRole('textbox',{name:'새 답변'}).evaluate((e,bytes)=>{const clipboardData=new DataTransfer();clipboardData.items.add(new File([new Uint8Array(bytes)],'capture.png',{type:'image/png'}));e.dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData}));},[...png]);}
-test('operator attaches a photo with explanation; learner sees and enlarges it without expanding history',async({page,context},info)=>{
+test('operator attaches a photo with explanation; learner opens and enlarges it without expanding history',async({page,context},info)=>{
  const b=await backend(context);await page.goto('/question-thread-test');await expect(page.getByRole('button',{name:'사진·화면 캡처 첨부'})).toBeVisible();await page.getByRole('textbox',{name:'새 답변'}).fill('커리큘럼 화면의 좌측 상단을 눌러 주세요.');await choose(page);
  await expect(page.getByText('이미지 준비 완료. 답변을 등록하면 함께 저장됩니다.')).toBeVisible();await expect(page.getByAltText('첨부할 답변 이미지')).toBeVisible();
  await page.screenshot({path:info.outputPath('answer-photo-admin.png'),fullPage:true});await page.getByRole('button',{name:'답변 추가하기'}).click();await expect(page.getByAltText('답변 첨부 이미지')).toBeVisible();expect(b.posts[0].imageId).toBe(b.uploads[0].requestId);
- const student=await context.newPage();await student.goto('/question-thread-test?student=1');await expect(student.getByAltText('답변 첨부 이미지')).toBeVisible();const pop=student.waitForEvent('popup');await student.getByRole('link',{name:'답변 이미지 크게 보기'}).click();const image=await pop;await image.waitForLoadState();expect(new URL(image.url()).searchParams.get('answer')).toBe(b.posts[0].requestId);await image.close();
+ const student=await context.newPage();await student.goto('/question-thread-test?student=1');
+ const attachment=student.getByAltText('답변 첨부 이미지');
+ const disclosure=student.getByText('답변 첨부 이미지 보기',{exact:true});
+ await expect(disclosure).toBeVisible();
+ await expect(attachment).toBeHidden();
+ await disclosure.click();
+ await expect(attachment).toBeVisible();
+ await expect(student.getByRole('button',{name:'답변 전체 보기'})).toBeVisible();
+ const pop=student.waitForEvent('popup');await student.getByRole('link',{name:'답변 이미지 크게 보기'}).click();const image=await pop;await image.waitForLoadState();expect(new URL(image.url()).searchParams.get('answer')).toBe(b.posts[0].requestId);await image.close();
  await student.getByRole('button',{name:'답변 전체 보기'}).click();await expect(student.getByText('커리큘럼 화면의 좌측 상단을 눌러 주세요.',{exact:true})).toBeVisible();await expect(student.getByAltText('답변 첨부 이미지')).toBeVisible();
  expect(await student.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await student.screenshot({path:info.outputPath('answer-photo-student.png'),fullPage:true});
 });

@@ -9,6 +9,7 @@ import type { CareDeliveryReceipt, CareDeliverySelection } from '@/lib/learning-
 import { CareStudentDetail } from './learning-care-detail';
 import { AdminDrawer } from '@/features/admin-ui';
 import { CareOverview } from './learning-care-overview';
+import { CareDayOverview } from './learning-care-days';
 import { clearAdminCare, readAdminCare } from '@/lib/learning-care-client';
 
 function useCare<T>(url: string, actorId?: string) {
@@ -60,8 +61,8 @@ function ShareSummary({ data }: { data: CareSnapshot }) {
   return <><section className="care-share" aria-label="개인정보 없는 공유용 요약"><span className="care-eyebrow">BRANDYACTION EDU · 함께 쌓는 실행</span><h2>배움이 실행으로<br/>이어지고 있습니다.</h2><p>{title}</p><div className="care-share-stats"><div><strong>{a.members}<small>명</small></strong><span>함께하는 수강생</span></div><div><strong>{a.learning}<small>건</small></strong><span>학습 완료</span></div><div><strong>{a.recent}<small>건</small></strong><span>최근 7일 완료</span></div></div><div className="care-share-growth">최근 7일, <b>{a.recent}개의 새로운 완료</b>가 쌓였습니다.</div><small>{careTime(data.asOf)} 기준 · 현재 공개된 학습의 완료 기록</small></section><div className="care-share-actions"><button className="btn" onClick={() => exportSummary(title, a, data.asOf)}><Download/> 공유 이미지 저장</button><span>전체 기수 기준</span></div></>;
 }
 
-export function AdminLearningCare({ actorId, messagesEnabled = process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === 'true' }: { actorId?: string; messagesEnabled?: boolean } = {}) {
-  const [cohort, setCohort] = useState('');
+export function AdminLearningCare({ actorId, initialCohortId = '', messagesEnabled = process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === 'true' }: { actorId?: string; initialCohortId?: string; messagesEnabled?: boolean } = {}) {
+  const [cohort, setCohort] = useState(initialCohortId);
   const { data: source, error, reload } = useCare<CareSnapshot>('/api/admin/learning-care' + (cohort ? '?cohort=' + cohort : ''), actorId);
   const data = useMemo(() => source ? careLearningSnapshot(source) : null, [source]);
   const [tab, setTab] = useState('overview'), [search, setSearch] = useState(''), [filter, setFilter] = useState('all'), [lessonId, setLessonId] = useState(''), [selected, setSelected] = useState<string[]>([]), [detailId, setDetailId] = useState(''), [compose, setCompose] = useState(false), [content, setContent] = useState(''), [sending, setSending] = useState(false), [notice, setNotice] = useState('');
@@ -108,11 +109,12 @@ export function AdminLearningCare({ actorId, messagesEnabled = process.env.NEXT_
     {!data ? !error && <p role="status">수강생 현황을 불러오는 중입니다.</p> : <>
       
       {selectedCohort && <p className="care-cohort-context"><b>{selectedCohort.courseTitle} · {selectedCohort.name}</b>{selectedCohort.status && <span>{careCohortStatus[selectedCohort.status]}</span>}<span>수강생 {data.rows.length}명</span>{selectedCohort.status === 'completed' && <small>기수가 종료되어도 수강생과 완료 기록을 계속 확인할 수 있습니다.</small>}</p>}
-      {!data.rows.length && <p role="status" className="care-empty">이 기수에 등록된 수강생이 아직 없습니다. 수강생이 등록되면 여기에 자동으로 나타납니다.</p>}
+      {!data.rows.length && <p role="status" className="care-empty care-empty-inline">이 기수에 등록된 수강생이 아직 없습니다. 수강생이 등록되면 여기에 자동으로 나타납니다.</p>}
       <div className="care-tabs" role="tablist" aria-label="현황 보기">{[['overview', '한눈에 보기'], ['students', '수강생별'], ['days', '일차별'], ['share', '공유용 요약']].map(([value, label]) => <button role="tab" aria-selected={tab === value} key={value} onClick={() => { setTab(value); setFilter('all'); resetSelection(); }}>{label}</button>)}</div>
       {tab === 'share' ? <ShareSummary data={data}/> : <>
         {tab !== 'overview' && <div className="care-stats"><div><Users/><span>수강생</span><b>{aggregate!.members}<small>명</small></b></div><div><ChartNoAxesCombined/><span>공개된 학습 진행률</span><b>{aggregate!.percent === null ? '—' : aggregate!.percent + '%'}</b><small>{aggregate!.completed} / {aggregate!.available}건</small></div><div><span>운영자 검토 대기</span><b>{aggregate!.pending}<small>건</small></b><Link href="/admin/reviews?tab=blocks">검토하러 가기 →</Link></div><div><span>최근 7일 완료한 학습</span><b>+{aggregate!.recent}<small>건</small></b></div></div>}
         {tab === 'overview' ? <CareOverview key={data.cohortId} rows={data.rows} asOf={data.asOf} onStudent={setDetailId} onDay={(id, value) => { setTab('days'); setLessonId(id); setFilter(value); setSearch(''); resetSelection(); }}/> : <>
+        {tab === 'days' && <CareDayOverview key={data.cohortId} rows={data.rows} asOf={data.asOf} onDay={(id, value) => { setLessonId(id); setFilter(value); setSearch(''); resetSelection(); }}/> }
         <div className="care-controls care-search-filters"><label>수강생 찾기<input value={search} placeholder="이름 또는 이메일" onChange={e => { setSearch(e.target.value); setSelected([]); }}/></label>{tab === 'days' && <label>확인할 일차<select value={currentLesson} onChange={e => { setLessonId(e.target.value); resetSelection(); }}>{lessons.map(c => <option key={c.lessonId} value={c.lessonId}>{careLessonLabel(c)} · {c.title}</option>)}</select></label>}<label>상태 선택<select value={filter} onChange={e => { setFilter(e.target.value); setSelected([]); }}>{[['all', '전체'], ['completed', '완료'], ['not_submitted', '미완료'], ['submitted', '검토 대기'], ['changes_requested', '보완 요청'], ['locked', '앞 단계 대기'], ['scheduled', '공개 예정'], ['quiet', '3일 이상 방문 기록 없음'], ['recent', '24시간 내 안내']].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label></div>
         <div className="care-list-caption"><b>{filtered.length}개 수강 기록</b>{tab === 'days' && <div className="care-bulk-actions" role="group" aria-label="학습 안내 대상 선택"><button className="btn" onClick={() => setSelected([...new Set(filtered.filter(r => canCareContact(r, currentLesson, data.asOf)).map(r => r.memberId))].slice(0, 100))}>안내할 수강생 선택 · 최대 100명</button><button className="btn primary" disabled={!selected.length || !messagesEnabled} onClick={prepare}>선택한 {selected.length}명 안내 내용 작성</button></div>}</div>
         <div className="care-legend" aria-label="진행 상태 색상 안내">{(['completed', 'submitted', 'changes_requested', 'not_submitted', 'locked', 'scheduled'] as const).map(state => <span key={state}><i className={'care-' + state}>{careSymbols[state]}</i>{careLabels[state]}</span>)}</div>

@@ -3,6 +3,19 @@ const req=createRequire(import.meta.url),modules=new Map();function load(name){i
 const {runDiagnosisAdmin}=load('diagnosis-admin-service'),{validateAdminReportRows,sendAdminDiagnosis,adminDiagnosisHeaders}=load('diagnosis-admin-bridge');
 const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`,actor={id:id(99)},binding={subject:id(1),attemptId:id(2),responseId:id(3),releaseId:id(4),packageVersion:'v1'},version='a'.repeat(64);
 const report={...binding,state:'needs_review',updatedAt:'2026-10-03T00:00:00Z',errorCode:'JOB_DEADLINE_REACHED',canRetry:true,version,details:[{code:'JOB_DEADLINE_REACHED',at:'2026-10-03T00:00:00Z'}]};
+test('cohort filters and writes remain server scoped; malformed and mixed targets never reach the service',async()=>{
+ const cohort=id(104),h=routeFixture({...actor,role:'admin'});
+ for(const q of ['?cohort=bad','?cohort=','?cohort='+cohort+'&member='+id(1)])assert.equal((await h.get(q)).status,400);
+ const body={action:'publish_cohort',requestId:id(81),cohortId:cohort,enabled:true,revision:0};
+ for(const bad of [{...body,cohortId:null},{...body,userId:id(1)},{...body,actorId:actor.id},{...body,action:'publish_all'},{...body,revision:0.5}])assert.equal((await h.post(bad)).status,400);
+ assert.equal(h.calls.length,0);assert.equal((await h.get('?cohort='+cohort+'&query=학생')).status,200);assert.equal(h.calls[0].input.cohort,cohort);
+ assert.equal((await h.post(body)).status,200);assert.deepEqual(h.calls[1].input,body);
+ const calls=[],source={enabled:true,allPublished:false,revision:3,eligibleCount:1,startedCount:0,nextCursor:null,cohorts:[{id:cohort,name:'4기',code:'MOONSHOT_004',courseTitle:'문샷',enabled:true,inherited:false}],cohort:{id:cohort,name:'4기',enabled:true,inherited:false,individualCount:0},rows:[{id:id(1),name:'학생',published:true,override:null,attemptId:null,report:null}]};
+ const d={actor,rpc:async(name,args)=>{calls.push([name,args]);return {data:name==='edu_diagnosis_admin_scoped_list'?source:null};},send:async()=>assert.fail('No attempts should be sent to MYIN')};
+ const result=await runDiagnosisAdmin(d,{action:'list',cohort,query:'학생'});assert.deepEqual(result.cohort,source.cohort);assert.deepEqual(result.cohorts,source.cohorts);assert.equal(calls[0][0],'edu_diagnosis_admin_scoped_list');assert.equal(calls[0][1].p_cohort,cohort);
+ await runDiagnosisAdmin(d,body);assert.equal(calls.at(-1)[0],'edu_diagnosis_admin_cohort_publication');assert.equal(calls.at(-1)[1].p_cohort,cohort);
+ source.cohort.id=id(105);await assert.rejects(runDiagnosisAdmin(d,{action:'list',cohort}),e=>e.code==='UNAVAILABLE');
+});
 test('recorded timeline is allowlisted, timezone-qualified and never substituted with observation time',async()=>{
  const times={startedAt:'2026-10-04T11:24:00Z',submittedAt:'2026-10-04T23:30:00Z',issuedAt:'2026-10-05T00:40:00Z'};
  const h=fixture();h.send=async()=>({version:1,rows:[{...report,...times,state:'ready',canRetry:false}]});

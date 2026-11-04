@@ -41,3 +41,31 @@ export function splitImageRow<T extends PublicLessonBlock>(blocks: T[], id: stri
     const copy = { ...block }; delete copy.imageGroup; return copy;
   });
 }
+
+export type ImageDropPlacement = 'left' | 'right' | 'above' | 'below';
+
+// Move one existing image, never merge/delete asset files or change block IDs.
+// Vertical drops go outside the entire target row; side drops join that row.
+export function moveLessonImage<T extends PublicLessonBlock>(blocks: T[], sourceId: string, targetId: string, placement: ImageDropPlacement, groupId: string): T[] {
+  if (sourceId === targetId) return blocks;
+  const rows = lessonImageRows(blocks).map(row => [...row]);
+  const sourceRow = rows.find(row => row.some(block => block.id === sourceId));
+  const source = sourceRow?.find(block => block.id === sourceId);
+  if (!sourceRow || source?.type !== 'image') throw new Error('이동할 이미지를 다시 선택해 주세요.');
+  const targetRow = rows.find(row => row.some(block => block.id === targetId));
+  if (!targetRow) throw new Error('이미지를 놓을 위치를 다시 선택해 주세요.');
+  const side = placement === 'left' || placement === 'right';
+  if (side && targetRow[0].type !== 'image') throw new Error('다른 이미지의 왼쪽이나 오른쪽에 놓아 주세요.');
+  if (side && targetRow.filter(block => block.id !== sourceId).length >= 3) throw new Error('한 줄에는 최대 3장까지 놓을 수 있어요. 위나 아래에 놓아 주세요.');
+  const moved = { ...source }; delete moved.imageGroup;
+  sourceRow.splice(sourceRow.indexOf(source), 1);
+  if (sourceRow.length === 1) { sourceRow[0] = { ...sourceRow[0] }; delete sourceRow[0].imageGroup; }
+  if (side) {
+    const at = targetRow.findIndex(block => block.id === targetId) + (placement === 'right' ? 1 : 0);
+    targetRow.splice(at, 0, moved);
+    targetRow.forEach((block, index) => { targetRow[index] = { ...block, imageGroup: groupId }; });
+  } else {
+    rows.splice(rows.indexOf(targetRow) + (placement === 'below' ? 1 : 0), 0, [moved]);
+  }
+  return rows.flat();
+}

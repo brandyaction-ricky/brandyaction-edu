@@ -26,7 +26,7 @@ test('invalid actions, filters, page and file/period identities cannot reach the
  assert.equal(h.calls.length,0);assert.equal(h.signs.length,0);
 });
 test('only DB-authorized files receive a 60 second link; failures and unrelated buckets never sign',async()=>{
- const h=harness(),result=await h.get({...h.file,snapshot:'completed',download:'1'});assert.equal(result.status,303);assert.equal(result.headers.get('location'),'https://storage.example.test/short-lived');assert.equal(result.headers.get('cache-control'),'private, no-store');assert.deepEqual(h.signs[0],{bucket:'lesson-answer-files',path:'private/file.png',expiry:60,options:{download:'증빙.png'}});assert.equal(h.calls[0].args.p_completed,true);
+ const h=harness(),result=await h.get({...h.file,snapshot:'completed',download:'1'});assert.equal(result.status,303);assert.equal(new URL(result.headers.get('location')).searchParams.get('download'),'증빙.png');assert.equal(result.headers.get('cache-control'),'private, no-store');assert.deepEqual(h.signs[0],{bucket:'lesson-answer-files',path:'private/file.png',expiry:60,options:{download:'증빙.png'}});assert.equal(h.calls[0].args.p_completed,true);
  const inline=harness({bucket:'lesson-content-media'});assert.equal((await inline.get({...inline.file,kind:'content'})).status,303);assert.equal(inline.signs[0].options.download,false);
  const download=harness({kind:'file'});await download.get(download.file);assert.equal(download.signs[0].options.download,'증빙.png');
  for(const options of [{error:{message:'BLOCK_FORBIDDEN'}},{error:{message:'BLOCK_NOT_FOUND'}},{bucket:'unrelated-private-bucket'}]){const bad=harness(options);assert.notEqual((await bad.get(bad.file)).status,303);assert.equal(bad.signs.length,0);}

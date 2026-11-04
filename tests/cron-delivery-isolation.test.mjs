@@ -5,12 +5,14 @@ import ts from 'typescript';
 import { timingSafeEqual } from 'node:crypto';
 
 function harness(env) {
-  const calls = { crm: 0, push: 0 };
+  const calls = { crm: 0, purchase: 0, push: 0 };
   function route(path) {
     const exports = {};
     const modules = {
       'node:crypto': { timingSafeEqual },
       '@/lib/crm-delivery': { dispatchDueCrm: async () => { calls.crm++; return { sent: 1 }; } },
+      '@/lib/purchase-buyer-delivery-server': { dispatchPurchaseBuyerDelivery: async () => { calls.purchase++; },
+        purchaseBuyerDeliveryEnabled: () => env.EDU_PURCHASE_BUYER_DELIVERY_ENABLED === 'true' && env.CRM_DELIVERY_ENABLED === 'true' },
       '@/lib/web-push-server': { dispatchWebPush: async () => { calls.push++; return { sent: 1 }; } },
     };
     new Function('exports', 'require', 'process', ts.transpileModule(
@@ -34,7 +36,7 @@ test('a shared cron credential can run push while scheduled SMS/email stays paus
   assert.equal(paused.headers.get('cache-control'), 'no-store');
   assert.deepEqual(await paused.json(), { ok: true, disabled: true, campaigns: 0, automations: 0, sent: 0, failed: 0 });
   assert.equal((await h.push()).status, 200);
-  assert.deepEqual(h.calls, { crm: 0, push: 1 });
+  assert.deepEqual(h.calls, { crm: 0, purchase: 0, push: 1 });
 });
 
 test('pausing CRM never bypasses authentication or invokes a delivery service', async () => {
@@ -44,7 +46,7 @@ test('pausing CRM never bypasses authentication or invokes a delivery service', 
       assert.equal((await h.crm(credential)).status, 401);
       assert.equal((await h.push(credential)).status, 401);
     }
-    assert.deepEqual(h.calls, { crm: 0, push: 0 });
+    assert.deepEqual(h.calls, { crm: 0, purchase: 0, push: 0 });
   }
 });
 
@@ -53,7 +55,20 @@ test('existing environments keep scheduled delivery unless explicitly paused', a
     const h = harness({ CRON_SECRET: 'test-cron-secret', CRM_CRON_ENABLED: enabled });
     const result = await h.crm();
     assert.equal(result.status, 200);
-    assert.deepEqual(await result.json(), { ok: true, sent: 1 });
-    assert.deepEqual(h.calls, { crm: 1, push: 0 });
+    assert.deepEqual(await result.json(), { ok: true, sent: 1, purchaseQueueOk: true });
+    assert.deepEqual(h.calls, { crm: 1, purchase: 0, push: 0 });
   }
+});
+
+
+test('buyer notices run independently without touching paused CRM campaigns or automations', async () => {
+  const h = harness({
+    CRON_SECRET: 'test-cron-secret', CRM_CRON_ENABLED: 'false', CRM_DELIVERY_ENABLED: 'true',
+    EDU_PURCHASE_BUYER_DELIVERY_ENABLED: 'true', CRM_AUTOMATIONS_ENABLED: 'true',
+  });
+  assert.equal((await h.crm('Bearer wrong')).status, 401);
+  const result = await h.crm();
+  assert.equal(result.status, 200);
+  assert.deepEqual(await result.json(), { ok: true, disabled: true, campaigns: 0, automations: 0, sent: 0, failed: 0, purchaseQueueOk: true });
+  assert.deepEqual(h.calls, { crm: 0, purchase: 1, push: 0 });
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { EditorContent, useEditor, useEditorState, Extension, InputRule, wrappingInputRule, type Editor } from "@tiptap/react";
+import { EditorContent, useEditor, useEditorState, Extension, InputRule, wrappingInputRule, Node, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Blockquote from "@tiptap/extension-blockquote";
 import { Details, DetailsContent, DetailsSummary } from "@tiptap/extension-details";
@@ -10,10 +10,53 @@ import { Bold, Italic, Underline, List, ListOrdered, Link2, Undo2, Redo2, Remove
 import { LessonCallout, insertLessonNotice } from "./lesson-callout";
 import { LESSON_FONT_SIZES, normalizeLessonColor, lessonDocumentForEditor, serializeLessonDocument } from "@/lib/lesson-body";
 import { safeUrl } from "@/lib/platform";
+import { TextSelection } from '@tiptap/pm/state';
+import type { EditorView } from '@tiptap/pm/view';
 import "./lesson-text.css";
 import "./lesson-body-editor.css";
 
 export type LessonBodyEditorProps = { value: string; onChange: (value: string) => void; label?: string; disabled?: boolean; name?: string; id?: string; showLabel?: boolean };
+
+// A contenteditable's DOM caret is not its sequential keyboard-focus position.
+// Native Tab starts at its first embedded handle, regardless of the caret.
+export function focusOutsideLessonEditor(view: EditorView, event: KeyboardEvent) {
+  if (event.key !== 'Tab' || event.isComposing || view.composing) return false;
+  const target = event.target as HTMLElement | null;
+  if (!target?.isContentEditable && !target?.closest('[data-drag-handle]')) return false;
+  const fields = [...view.dom.ownerDocument.querySelectorAll<HTMLElement>('button,a[href],input,select,textarea,summary,[tabindex]')]
+    .filter(field => field.tabIndex >= 0 && !view.dom.contains(field) && !field.closest('[inert]') && !field.matches(':disabled') && field.getClientRects().length > 0 && getComputedStyle(field).visibility !== 'hidden');
+  const direction = event.shiftKey ? globalThis.Node.DOCUMENT_POSITION_PRECEDING : globalThis.Node.DOCUMENT_POSITION_FOLLOWING;
+  const candidates = fields.filter(field => view.dom.compareDocumentPosition(field) & direction);
+  const next = event.shiftKey ? candidates.at(-1) : candidates[0];
+  if (!next) return false;
+  event.preventDefault(); next.focus(); return true;
+}
+
+// Walk handles relative to the caret, rather than restarting the browser's
+// tab sequence at the first control inside the contenteditable.
+export function focusLessonMoveHandle(view: EditorView, event: KeyboardEvent) {
+  if (event.key !== 'Tab' || event.isComposing || view.composing) return false;
+  const target = event.target as HTMLElement | null;
+  const handles = [...view.dom.querySelectorAll<HTMLElement>('[data-drag-handle]')]
+    .filter(handle => handle.tabIndex >= 0 && handle.getClientRects().length > 0 && getComputedStyle(handle).visibility !== 'hidden');
+  const focused = target?.closest<HTMLElement>('[data-drag-handle]');
+  let next: HTMLElement | undefined;
+  if (focused) next = handles[handles.indexOf(focused) + (event.shiftKey ? -1 : 1)];
+  else if (target?.isContentEditable) {
+    let pos = view.state.selection.head;
+    const selection = view.dom.ownerDocument.getSelection();
+    if (selection?.focusNode && view.dom.contains(selection.focusNode)) {
+      try { pos = view.posAtDOM(selection.focusNode, selection.focusOffset); } catch { /* Use the editor selection while its DOM is updating. */ }
+    }
+    const candidates = handles.filter(handle => {
+      const at = view.posAtDOM(handle, 0);
+      return event.shiftKey ? at <= pos : at > pos;
+    });
+    next = event.shiftKey ? candidates.at(-1) : candidates[0];
+  } else return false;
+  if (!next) return focusOutsideLessonEditor(view, event);
+  event.preventDefault(); next.focus(); return true;
+}
 
 const LessonFontSize = FontSize.extend({
   addGlobalAttributes() {
@@ -45,10 +88,42 @@ const LESSON_COLORS = [
   ["연한 파랑", "#dbeafe"], ["연한 보라", "#f3e8ff"], ["연한 분홍", "#fce7f3"], ["연한 회색", "#f3f4f6"],
 ] as const;
 
-const LessonQuote = Blockquote.extend({
+export const LessonQuote = Blockquote.extend({
   addInputRules() { return [wrappingInputRule({ find: /^" $/, type: this.type })]; },
 });
 const LessonDetails = Details.extend({
+  priority: 1000,
+  draggable: true,
+  addKeyboardShortcuts() {
+    return {
+      ...this.parent?.(),
+      'Mod-Enter': () => {
+        const { state, view } = this.editor, { $head } = state.selection;
+        for (let depth = $head.depth; depth > 0; depth--) {
+          if ($head.node(depth).type.name !== 'details') continue;
+          const at = $head.after(depth), tr = state.tr.insert(at, state.schema.nodes.paragraph.create());
+          tr.setSelection(TextSelection.create(tr.doc, at + 1)); view.dispatch(tr.scrollIntoView());
+          return true;
+        }
+        return false;
+      },
+      Enter: () => {
+        const { state, view } = this.editor, { $head } = state.selection;
+        if ($head.parent.type.name !== 'detailsSummary' || !state.selection.empty) return false;
+        const wrapper = view.nodeDOM($head.before($head.depth - 1)) as HTMLElement | null;
+        if (!wrapper?.classList.contains('is-open')) wrapper?.querySelector<HTMLButtonElement>(':scope > button')?.click();
+        const at = $head.after() + 1;
+        const content = state.doc.nodeAt($head.after());
+        if (!content || content.type.name !== 'detailsContent') return false;
+        const tr = state.tr;
+        // Reuse the empty first line instead of adding a blank outside the toggle.
+        if (content.firstChild?.type.name !== 'paragraph' || content.firstChild.content.size) tr.insert(at, state.schema.nodes.paragraph.create());
+        tr.setSelection(TextSelection.create(tr.doc, at + 1));
+        view.dispatch(tr.scrollIntoView());
+        return true;
+      },
+    };
+  },
   addInputRules() {
     return [new InputRule({ find: /^> $/, handler: ({ chain, range }) => {
       if (!chain().deleteRange(range).setDetails().run()) return null;
@@ -58,10 +133,25 @@ const LessonDetails = Details.extend({
   // Opening a toggle is a reading preference, not a change to lesson content.
   persist: false,
   renderToggleButton: ({ element, isOpen }) => {
+    const wrapper = element.parentElement;
+    if (wrapper && !wrapper.querySelector(':scope > .lesson-toggle-drag')) {
+      const handle = document.createElement('span');
+      handle.className = 'lesson-toggle-drag';
+      handle.setAttribute('data-drag-handle', '');
+      handle.setAttribute('role', 'button');
+      handle.setAttribute('tabindex', '0');
+      handle.setAttribute('aria-label', '접기·펼치기 블록 이동');
+      handle.title = '끌어서 접기·펼치기 블록 이동';
+      handle.draggable = true;
+      handle.contentEditable = 'false';
+      handle.onmousedown = event => event.stopPropagation();
+      handle.textContent = '⠿';
+      wrapper.insertBefore(handle, element);
+    }
     element.contentEditable = "false";
     element.setAttribute("aria-label", isOpen ? "내용 접기" : "내용 펼치기");
     element.setAttribute("aria-expanded", String(isOpen));
-    element.textContent = isOpen ? "▾" : "▸";
+    element.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>';
     // ProseMirror's Enter/Space handlers must not consume a focused button.
     element.onkeydown = event => {
       if (event.key === "Enter" || event.key === " ") {
@@ -70,11 +160,16 @@ const LessonDetails = Details.extend({
     };
   },
 });
+// Blank lines stay in the toggle. Mod-Enter intentionally creates a line outside.
+const LessonDetailsContent = DetailsContent.extend({ addKeyboardShortcuts() { return {}; } });
 const LessonInputUndo = Extension.create({
   name: "lessonInputUndo", priority: 1000,
   addKeyboardShortcuts() {
     return {
       "Mod-z": () => this.editor.commands.undoInputRule() || this.editor.commands.undo(),
+      // Keep redo in this higher-priority keymap: on Ctrl-based platforms,
+      // ProseMirror can otherwise fall back from Shift+z to our undo binding.
+      "Shift-Mod-z": () => { this.editor.commands.redo(); return true; },
       Backspace: () => this.editor.commands.undoInputRule(),
     };
   },
@@ -86,7 +181,8 @@ export function lessonRichExtensions() {
       // input rule and discards its undo state. Enter already creates paragraphs.
       heading: { levels: [1, 2, 3] }, trailingNode: false, blockquote: false, code: false, codeBlock: false, horizontalRule: false,
       link: { openOnClick: false, HTMLAttributes: { target: "_blank", rel: "noopener noreferrer" }, isAllowedUri: url => Boolean(safeUrl(url)) },
-    }), TextStyle, LessonFontSize, LessonColor, LessonBackgroundColor, LessonQuote, LessonDetails, DetailsSummary, DetailsContent, LessonCallout, LessonInputUndo];
+    }), TextStyle, LessonFontSize, LessonColor, LessonBackgroundColor, LessonQuote, LessonDetails, DetailsSummary, LessonDetailsContent, LessonCallout, LessonInputUndo,
+    ...['lessonImage', 'lessonFile', 'lessonEmbed'].map(name => Node.create({ name, group: 'block', atom: true, addAttributes: () => ({ blockId: { default: null } }), renderHTML: () => ['div', { 'data-lesson-image-reference': '' }, name === 'lessonEmbed' ? '학습 항목 · 문서 편집 화면에서 확인' : name === 'lessonFile' ? '첨부 파일 · 문서 편집 화면에서 확인' : '이미지 · 문서 편집 화면에서 확인'] }))];
 }
 
 export function LessonRichInput({ value, onChange, label = "학습 내용", disabled = false, name, id, showLabel = true }: LessonBodyEditorProps) {
@@ -97,7 +193,7 @@ export function LessonRichInput({ value, onChange, label = "학습 내용", disa
     extensions: lessonRichExtensions(),
     content: lessonDocumentForEditor(value),
     editable: !disabled,
-    editorProps: { attributes: { id: editorId, role: "textbox", "aria-label": label, "aria-multiline": "true", "aria-describedby": `${editorId}-help`, class: "lesson-rich-body" } },
+    editorProps: { attributes: { id: editorId, role: "textbox", "aria-label": label, "aria-multiline": "true", "aria-describedby": `${editorId}-help`, class: "lesson-rich-body" }, handleKeyDown: focusOutsideLessonEditor },
     onUpdate: ({ editor }) => {
       const next = serializeLessonDocument(editor.getJSON());
       lastValue.current = next;
@@ -119,7 +215,7 @@ export function LessonRichInput({ value, onChange, label = "학습 내용", disa
       <EditorContent editor={editor} />
     </div>
     {name && <input type="hidden" name={name} value={value} />}
-    <small id={`${editorId}-help`} className="field-hint">줄 맨 앞에 <code>#</code> · <code>##</code> · <code>###</code>와 공백을 입력하면 제목, <code>-</code>는 글머리 목록, <code>1.</code>은 번호 목록, <code>&gt;</code>는 접기·펼치기, <code>&quot;</code>는 인용문이 됩니다. 토글은 화살표로 펼친 뒤 제목에서 Enter를 누르면 안쪽에 글을 쓸 수 있습니다. Shift+Enter는 줄바꿈입니다. 변경 후 학습을 저장해 주세요.</small>
+    <small id={`${editorId}-help`} className="field-hint">줄 맨 앞에 <code>#</code> · <code>##</code> · <code>###</code>와 공백을 입력하면 제목, <code>-</code>는 글머리 목록, <code>1.</code>은 번호 목록, <code>&gt;</code>는 접기·펼치기, <code>&quot;</code>는 인용문이 됩니다. 토글 제목에서 Enter를 누르면 펼쳐져 안쪽에 글을 쓸 수 있습니다. Ctrl+Enter(맥은 ⌘+Enter)는 토글 밖에 새 문단을 만듭니다. Shift+Enter는 줄바꿈입니다. 변경 후 학습을 저장해 주세요.</small>
   </div>;
 }
 

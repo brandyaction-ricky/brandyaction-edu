@@ -40,3 +40,14 @@ test('supplement passes authenticated actor and all active filters, failures ret
  db.rpc=()=>({abortSignal:async()=>({data:null,error:{message:'missing migration'}})});
  const failed=await performanceUiDetails(db,{id:'campaign',landing_id:'landing'},params,new AbortController().signal,'actor');assert.equal(failed.insights,null);assert.match(failed.errors.insights,/불러오지/);
 });
+
+test('production summary remains authoritative and avoids source session scans',async()=>{
+ const {performanceUiDetails}=load('lib/landing-performance-ui-server.ts');
+ const base={daily_a:[{day:'2026-09-01',sessions:123}],last_collected_at:'2026-09-15T00:00:00Z',actual_presence:{new_payments:true},period_actuals:{payments:7},previous_day_members:{},errors:{actuals:'existing warning'}};
+ const db={from:()=>{throw Error('must reuse production summary, not scan source sessions');},rpc:()=>({abortSignal:async()=>({data:insights,error:null})})};
+ const params=new URLSearchParams('start=2026-09-01&end=2026-09-30&ad_type=cold');
+ const r=await performanceUiDetails(db,{id:'campaign',landing_id:'landing'},params,new AbortController().signal,'actor',base);
+ assert.deepEqual(r.insights,insights);assert.deepEqual(r.daily_a,base.daily_a);assert.deepEqual(r.period_actuals,base.period_actuals);assert.equal(r.errors.actuals,'existing warning');
+ db.rpc=()=>({abortSignal:async()=>({data:null,error:{message:'unavailable'}})});
+ const failed=await performanceUiDetails(db,{id:'campaign',landing_id:'landing'},params,new AbortController().signal,'actor',base);assert.equal(failed.insights,null);assert.deepEqual(failed.daily_a,base.daily_a);assert.ok(failed.errors.insights);
+});

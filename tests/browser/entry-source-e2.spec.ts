@@ -13,11 +13,11 @@ test('missing-source coverage shows threshold and configuration/errors without a
  let coverage:Record<string,unknown>={state:'ready',total:20,unknown:6,rate:30,overTarget:true};
  await page.route('**/api/conversion/webinar?*',route=>route.fulfill({json:{campaign:{id:'11111111-1111-4111-8111-111111111111',freeCourse:'22222222-2222-4222-8222-222222222222',paidCohort:'33333333-3333-4333-8333-333333333333',enabled:true,revision:1},registrations:10,purchases:null,purchase_state:'ready',sourceCoverage:coverage}}));
  await page.goto('/webinar-admin-test');await expect(page.getByText('전체 20건 중 미기록 6건 · 30%')).toBeVisible();
- await expect(page.getByText('목표 10%를 넘었습니다. 상품·문자의 결제 링크를 확인해 주세요.')).toBeVisible();
+ await expect(page.getByText('기본 목표 10% 초과 · 모집별 운영 기준을 확인해 주세요.')).toBeVisible();
  await page.getByText('모집 기간 결제 유입',{exact:true}).scrollIntoViewIfNeeded();
  await page.screenshot({path:info.outputPath('entry-source-coverage.png')});
  coverage={state:'ready',total:0,unknown:0,rate:null,overTarget:null};await page.getByRole('button',{name:'신청·구매 기록 새로고침'}).click();
- await expect(page.getByText('결제가 생기면 비율을 확인할 수 있습니다.')).toBeVisible();await expect(page.getByText('목표 10% 이하입니다.')).toHaveCount(0);
+ await expect(page.getByText('결제가 생기면 비율을 확인할 수 있습니다.')).toBeVisible();await expect(page.getByText(/목표 10% 이하입니다\./)).toHaveCount(0);
  coverage={state:'unconfigured'};await page.getByRole('button',{name:'신청·구매 기록 새로고침'}).click();await expect(page.getByText('상품 설정에서 모집 시작과 마감을 먼저 지정해 주세요.')).toBeVisible();
  coverage={state:'unavailable'};await page.getByRole('button',{name:'신청·구매 기록 새로고침'}).click();await expect(page.getByText('유입 비율을 확인하지 못했습니다. 새로고침해 주세요.')).toBeVisible();
 });

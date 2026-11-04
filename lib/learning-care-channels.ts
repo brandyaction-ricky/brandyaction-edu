@@ -1,7 +1,7 @@
 export const careChannelLabels = { push: '앱 푸시', email: '이메일', alimtalk: '알림톡', sms: '문자' } as const;
 export type CareChannel = keyof typeof careChannelLabels;
 export type CareDeliveryMode = 'push_first' | 'all';
-export type CareReach = { memberId: string; push: boolean; email: boolean; alimtalk: boolean; sms: boolean; emailMasked: string | null; phoneMasked: string | null };
+export type CareReach = { memberId: string; mobileOnly?: boolean; push: boolean; email: boolean; alimtalk: boolean; sms: boolean; emailMasked: string | null; phoneMasked: string | null };
 export type CareChannelConfig = { enabled: boolean; push: boolean; email: boolean; alimtalk: boolean; sms: boolean; alimtalkTemplateId: string | null };
 export type CareDeliveryReceipt = { count: number; requestId: string; deliveries: { memberId: string; channel: CareChannel; status: string; code?: string | null }[] };
 export const CARE_SMS_BODY = '브랜디에듀 학습 안내\nhttps://brandyaction-edu.com/my/messages';
@@ -10,6 +10,7 @@ export const careDeliveryStatus: Record<string,string> = { pending:'발송 대�
 export function careChannelsFor(reach: CareReach, config: CareChannelConfig, selected: CareChannel[], mode: CareDeliveryMode): CareChannel[] {
   if (!config.enabled) return [];
   const available = selected.filter(c => config[c] && reach[c]);
+  if (reach.mobileOnly) return available.includes('alimtalk') ? ['alimtalk'] : available.includes('sms') ? ['sms'] : [];
   if (mode !== 'push_first') return available;
   if (available.includes('push')) return ['push'];
   return available.includes('alimtalk') ? available.filter(c => c !== 'sms') : available;

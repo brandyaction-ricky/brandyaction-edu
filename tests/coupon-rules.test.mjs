@@ -30,7 +30,8 @@ const cohort='00000000-0000-4000-8000-000000000001';
 function setup(user, error) {
   const calls=[];
   const repository={
-    getHistory:async(couponId,page)=>{calls.push({name:'history',args:{couponId,page}});return {data:[],count:0,error:null};},
+    getHistory:async(couponId,page,view)=>{calls.push({name:'history',args:{couponId,page,view}});return {data:[],count:0,error:null};},
+    getHistoryCounts:async()=>({usage:6,attempts:5,pending:0}),
     quote:async(userId,cohortId,code)=>{calls.push({name:'quote',args:{userId,cohortId,code}});return error?{data:null,error:{message:error}}:{data:{couponCode:code,couponDiscount:1000,totalAmount:0},error:null};},
     cancelZeroOrder:async(actorId,orderId)=>{calls.push({name:'cancel',args:{actorId,orderId}});return {data:{ok:true},error:null};},
   };
@@ -42,6 +43,24 @@ function setup(user, error) {
   return {calls,...handlers};
 }
 const request=(body,origin='https://edu.test')=>new Request('https://edu.test/api/coupons',{method:'POST',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify(body)});
+test('coupon history defaults to real use and filters all rows before pagination',async()=>{
+ const h=setup({id:'admin',role:'admin'});
+ const first=await h.GET(new Request('https://edu.test/api/coupons?history='+cohort));
+ assert.equal(first.status,200);assert.deepEqual((await first.json()).counts,{usage:6,attempts:5,pending:0});
+ assert.deepEqual(h.calls[0].args,{couponId:cohort,page:1,view:'usage'});
+ assert.equal((await h.GET(new Request('https://edu.test/api/coupons?history='+cohort+'&view=attempts&page=2'))).status,200);
+ assert.equal(h.calls[1].args.view,'attempts');assert.equal(h.calls[1].args.page,2);
+ assert.equal((await h.GET(new Request('https://edu.test/api/coupons?history='+cohort+'&view=all'))).status,400);
+ assert.equal(h.calls.length,2);
+ const queries=[];
+ const repository=compile('../features/commerce/infrastructure/coupon-repository.ts',{
+  '@/lib/coupon-rules':rules,
+  '@/lib/supabase/admin':{createAdminClient:()=>({from(){const q={select(){return q},eq(){return q},in(field,values){queries.push({field,values});return q},order(){return q},range(){return {data:[],count:0,error:null}},then(resolve){resolve({count:2,error:null})}};return q}})},
+ }).createCouponRepository();
+ await repository.getHistory(cohort,2,'usage');await repository.getHistory(cohort,1,'attempts');
+ assert.deepEqual(queries,[{field:'status',values:['used','cancelled']},{field:'status',values:['released']}]);
+ assert.deepEqual(await repository.getHistoryCounts(cohort),{usage:2,attempts:2,pending:2});
+});
 test('coupon API uses server identity and rejects forged role/ID and cross-origin mutations',async()=>{
   const member={id:'real-member',role:'student'}, h=setup(member,'COUPON_ADMIN_ONLY');
   assert.equal((await h.POST(request({cohortId:cohort,code:'admin_qa',role:'admin',userId:'admin'}))).status,409);

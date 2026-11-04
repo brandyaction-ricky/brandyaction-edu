@@ -6,8 +6,8 @@ const base=fs.readFileSync(new URL('20260928141603_lesson_block_documents_and_dr
 const migration=fs.readFileSync(new URL('20260928155416_lesson_block_submissions_and_completion.sql',root),'utf8');
 export const document={schemaVersion:1,blocks:[{id:'q',type:'question',question:{label:'필수 질문',kind:'text',required:true}},{id:'quiz',type:'quiz',quiz:{passPercent:100,questions:[{id:'a',prompt:'확인',options:['가','나'],correctIndex:1}]}}],checklist:[{id:'c',label:'실행 확인',required:true}]};
 export const answers={blocks:{q:'나의 답변',quiz:{a:1}},checklist:['c']};
-export async function fixture(doc=document){
- const db=new PGlite(),admin=id(),student=id(),other=id(),course=id(),week=id(),lesson=id(),enrollment=id(),revision=id(),cohort=id();
+export async function fixture(doc=document,database=new PGlite()){
+ const db=database,admin=id(),student=id(),other=id(),course=id(),week=id(),lesson=id(),enrollment=id(),revision=id(),cohort=id();
  await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
  create table profiles(id uuid primary key,role text,status text,full_name text);
  create table site_settings(key text primary key,value jsonb);

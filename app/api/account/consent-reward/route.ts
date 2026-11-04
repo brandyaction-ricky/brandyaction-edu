@@ -17,7 +17,8 @@ export async function GET() {
     if (!enabled()) return reply({ available: false });
     const { data, error } = await createAdminClient().rpc('edu_consent_reward', { p_member: user.id });
     if (error) return failure(error.message);
-    return reply({ ...data, analysisAvailable: process.env.EDU_PERSONALIZATION_CONSENT_ENABLED === 'true' && !!data?.terms });
+    const analysisAvailable = process.env.EDU_PERSONALIZATION_CONSENT_ENABLED === 'true' && !!data?.terms;
+    return reply({ ...data, terms: analysisAvailable ? data.terms : null, analysisAvailable });
   } catch { return failure(); }
 }
 export async function POST(request: Request) {

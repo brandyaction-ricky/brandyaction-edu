@@ -248,7 +248,7 @@ export type PolicyKey = keyof typeof defaultPolicies;
 // E6 notice preparation only. Switching the consent version and current policy
 // requires the E6 consent rollout; the calendar alone must not activate it.
 export const UPCOMING_PRIVACY_VERSION = "2026-10-20";
-export const PRIVACY_REVISION_NOTICE = "2026년 10월 20일부터 개인정보처리방침이 바뀝니다. 바뀌는 내용: 처리 근거 구분, Meta 픽셀 등 행태정보·쿠키 안내와 거부 방법, 문자·이메일 발송 위탁사와 국외 이전 내역, 광고성 정보 수신 동의 방식.";
+export const PRIVACY_REVISION_NOTICE = "개인정보처리방침 개정안을 안내합니다. 현재 적용 중인 처리방침은 아래 본문입니다. 개정안의 주요 내용: 처리 근거 구분, Meta 픽셀 등 행태정보·쿠키 안내와 거부 방법, 문자·이메일 발송 위탁사와 국외 이전 내역, 광고성 정보 수신 동의 방식.";
 export const upcomingPrivacyPolicy = `브랜디액션 에듀 개인정보처리방침
 
 시행 예정일: 2026년 10월 20일

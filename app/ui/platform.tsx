@@ -1,8 +1,10 @@
 "use client";
+import { readJson } from '@/lib/read-json';
 import { memberDirectoryScope } from '@/lib/member-directory';
 import { MobileRefresh } from './final/mobile-refresh';
+import { articleDiscoveryVisible, contentVisibility } from '@/lib/content-visibility';
+import { NextClassBanner } from './final/next-class-banner';
 import { learningOverview } from '@/lib/learning-overview';
-import { contentVisibility } from '@/lib/content-visibility';
 import { MemberErasureQueue } from './final/member-erasure-queue';
 import { TipsErasureMonitorNotice } from './final/tips-erasure-monitor-notice';
 import { TipsSourceNotice } from './final/tips-source-notice';
@@ -26,7 +28,12 @@ import {
   type Section,
   type User,
 } from "@/lib/platform";
-import { homepageCourses, isRecruiting, localDateTime, recordId, hasLearningAccess } from "@/lib/platform-rules";
+import { isRecruiting, localDateTime, recordId, hasLearningAccess } from "@/lib/platform-rules";
+import { catalogTypes, courseAvailability, sortedCatalog } from '@/lib/course-catalog';
+import { useCatalogClock, useCatalogLocation } from './final/use-course-catalog';
+import { PublicMobileMenu } from './final/public-mobile-menu';
+import catalogStyles from './final/course-catalog.module.css';
+import './final/public-header.css';
 import { listedProducts } from "@/lib/product-visibility";
 import { publicReadParams } from "@/lib/public-platform-plan";
 import { archiveValues } from "@/lib/qa-rules";
@@ -36,6 +43,7 @@ import { createClient } from "@/lib/supabase/client";
 import { getSupabasePublicConfig } from "@/lib/supabase/config";
 import { ArrowRight, CalendarDays, CreditCard, LayoutDashboard, LogOut, Menu, Plus, Search, Ticket, UserRound, X } from "lucide-react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   useCallback,
@@ -46,18 +54,14 @@ import {
   type ComponentProps,
   type ReactNode,
 } from "react";
-import { AdminWorkflows, standaloneAdmin } from "./admin-workflows";
+import { standaloneAdmin } from '@/lib/admin-workflow-sections';
 import { BlocksField, UploadField } from "./editor-fields";
-import { AdminLearningCare } from "./final/learning-care";
 import { clearAdminCare, prefetchAdminCare } from '@/lib/learning-care-client';
-import { AdminCatalog, type MissionScope } from "./final/admin-catalog";
+import type { MissionScope } from "./final/admin-catalog";
 import { MissionTargetFields, type MissionContext } from "./final/mission-target-fields";
 import { useAdminDialog, useRouteDialog } from "@/features/admin-ui";
 import { ArticleBannerEditor } from "./final/article-banner-editor";
 import { ArticleCategoryManager } from "./final/article-category-manager";
-import { ProductEditor } from "./final/admin-editors";
-import { CurriculumEditor } from "./final/curriculum-editor";
-import { LearningEditor } from "./final/learning-editor";
 import {
   AdminHeading,
   AdminShell,
@@ -65,12 +69,9 @@ import {
   finalAdminTitles,
   sectionDescription,
 } from "./final/admin-shell";
-import { Checkout } from "./final/checkout";
-import { Classroom } from "./final/classroom";
 import { MemberViews, enrollmentLessons } from "./final/member-views";
 import { FloatingLearningQuestion } from './final/floating-learning-question';
 import { MentorReplyBell } from './final/mentor-reply-bell';
-import { CustomerWorkspace } from "./final/customer-workspace";
 import { MemberVisitRecorder } from "./final/member-visit-recorder";
 import {
   ArticleCard,
@@ -105,6 +106,17 @@ import {
   AdminToast,
   adminSectionEyebrow,
 } from "@/features/admin-ui";
+// Keep authoring code out of the initial bundle for unrelated admin menus.
+const editorLoading = () => <AdminLoadingState title="편집기를 준비하고 있습니다." />;
+const AdminCatalog = dynamic(() => import('./final/admin-catalog').then(module => module.AdminCatalog), { loading: () => <AdminLoadingState /> });
+const CustomerWorkspace = dynamic(() => import('./final/customer-workspace').then(module => module.CustomerWorkspace), { loading: () => <AdminLoadingState /> });
+const Checkout = dynamic(() => import('./final/checkout').then(module => module.Checkout), { loading: () => <p role="status">결제 정보를 준비하고 있습니다.</p> });
+const Classroom = dynamic(() => import('./final/classroom').then(module => module.Classroom), { loading: () => <p role="status">수업을 준비하고 있습니다.</p> });
+const ProductEditor = dynamic(() => import('./final/admin-editors').then(module => module.ProductEditor), { loading: editorLoading });
+const CurriculumEditor = dynamic(() => import('./final/curriculum-editor').then(module => module.CurriculumEditor), { loading: editorLoading });
+const LearningEditor = dynamic(() => import('./final/learning-editor').then(module => module.LearningEditor), { loading: editorLoading });
+const AdminWorkflows = dynamic(() => import('./admin-workflows').then(module => module.AdminWorkflows), { loading: () => <AdminLoadingState /> });
+const AdminLearningCare = dynamic(() => import('./final/learning-care').then(module => module.AdminLearningCare), { loading: () => <AdminLoadingState /> });
 type Data = Record<string, Row[]>;
 type AdminRead = {
   ok: boolean;
@@ -234,20 +246,8 @@ export function Platform({
   const [loadedReadKey, setLoadedReadKey] = useState("");
   const searchParams = useSearchParams();
   const routeKey = path.join("/") + "?" + searchParams.toString();
-  const [filters, setFilters] = useState({
-    route: routeKey,
-    value:
-      path[0] === "classes" && searchParams.get("type") === "free"
-        ? "무료 클래스"
-        : "전체",
-  });
-  const filter =
-    filters.route === routeKey
-      ? filters.value
-      : path[0] === "classes" && searchParams.get("type") === "free"
-        ? "무료 클래스"
-        : "전체";
-  const setFilter = (value: string) => { setPublicPage(1); setFilters({ route: routeKey, value }); };
+  const classList = path[0] === 'classes' && path.length === 1;
+  const catalogLocation = useCatalogLocation(classList, loadedData.catalog_counts?.[0]);
   const [editor, setEditor] = useRouteDialog<{
     route: string;
     section: Section;
@@ -276,14 +276,14 @@ export function Platform({
     ? searchParams.get("id") || ""
     : "";
   const customerScope = memberDirectoryScope(searchParams);
-  const scopeQuery = adminSection === "customers" ? new URLSearchParams({ member: searchParams.get("member") || "", memberQuery: customerScope.query, memberStatus: customerScope.status, memberCourse: customerScope.course }).toString() : adminSection === "orders" ? new URLSearchParams(orderScope).toString() : adminSection === "missions" ? new URLSearchParams({ course: missionScope.courseId, week: missionScope.weekId, missionState: missionScope.state }).toString() : ["customers", "questions", "reviews"].includes(adminSection) ? new URLSearchParams({ member: searchParams.get("member") || "", submission: searchParams.get("submission") || "", question: searchParams.get("question") || "", questionState: searchParams.get("questionState") || "active" }).toString() : "";
+  const scopeQuery = adminSection === 'learning' && path[1] === 'learning' ? 'part=picker' : adminSection === "customers" ? new URLSearchParams({ member: searchParams.get("member") || "", memberQuery: customerScope.query, memberStatus: customerScope.status, memberCourse: customerScope.course }).toString() : adminSection === "orders" ? new URLSearchParams(orderScope).toString() : adminSection === "missions" ? new URLSearchParams({ course: missionScope.courseId, week: missionScope.weekId, missionState: missionScope.state }).toString() : ["customers", "questions", "reviews"].includes(adminSection) ? new URLSearchParams({ member: searchParams.get("member") || "", submission: searchParams.get("submission") || "", question: searchParams.get("question") || "", questionState: searchParams.get("questionState") || "active" }).toString() : "";
   const pagingKey = adminSection + "?" + scopeQuery;
   const adminPage = adminPaging.section === pagingKey ? adminPaging.page : 1;
   // An editor's one-record response is not a catalog response, even though both
   // belong to the same section. Keep rows, totals and actions behind this key.
   const adminReadKey = JSON.stringify([adminSection, adminPage, editorRecordId, scopeQuery]);
   const hasCurrentAdminRead = loadedReadKey === adminReadKey;
-  const publicParams = publicReadParams(path, searchParams, publicPage, publicSearch, path[0] === "articles" ? articleFilter : filter);
+  const publicParams = publicReadParams(path, searchParams, classList ? catalogLocation.page : publicPage, classList ? catalogLocation.query : publicSearch, path[0] === "articles" ? articleFilter : catalogLocation.filter);
   const memberParams = new URLSearchParams({ view: "member", section: account ? (path[1] || "dashboard") : learning ? "learn" : "order-result" });
   if (learning) {
     memberParams.set("enrollment", path[1] || "");
@@ -292,6 +292,7 @@ export function Platform({
   const publicParamsString = publicParams?.toString() || (account || learning || ["order-complete", "applied", "payment"].includes(path[0]) ? memberParams.toString() : "view=identity");
   const publicReadKey = JSON.stringify([routeKey, publicParamsString]);
   const data = admin ? (hasCurrentAdminRead ? loadedData : {}) : (loadedReadKey === publicReadKey ? loadedData : {});
+  const catalogNow = useCatalogClock(data.cohorts || [], classList || path.length === 0 || path[0] === 'stories');
   const questionEnrollment = learning ? (data.enrollments || []).find(row => row.id === path[1] && hasLearningAccess(row)) : undefined;
   const questionLessons = questionEnrollment ? enrollmentLessons(data, questionEnrollment) : [];
   const questionLesson = questionLessons.find(row => row.id === path[2]) || questionLessons[0];
@@ -340,14 +341,11 @@ export function Platform({
             scopeQuery,
           )
         : await (async () => {
-            const response = await fetch(`/api/platform?${publicParamsString}`, {
-              cache: "no-store",
-              signal: controller.signal,
-            });
+            const { response, data: result } = await readJson(`/api/platform?${publicParamsString}`, { signal: controller.signal });
             return {
               ok: response.ok,
               status: response.status,
-              result: await response.json(),
+              result,
               serverTiming: response.headers.get("Server-Timing"),
             };
           })();
@@ -406,7 +404,7 @@ export function Platform({
       if (!admin || !user?.id || section === adminSection) return;
       const page =
         adminPaging.section === section ? adminPaging.page : 1;
-      void readAdminSection(user.id, section, page);
+      void readAdminSection(user.id, section, page, '', false, section === 'learning' ? 'part=picker' : '');
       if (section === "conversion") prefetchConversionReview(user.id);
     },
     [admin, adminPaging, adminSection, user],
@@ -516,7 +514,9 @@ export function Platform({
   const recruitingCourses = courses.filter((c) =>
     rows("cohorts").some((g) => g.course_id === c.id && isRecruiting(g)),
   );
-  const availableCourses = homepageCourses(courses, rows("cohorts"));
+  const orderedCourses = sortedCatalog(courses, rows('cohorts'), catalogNow);
+  const availableCourses = orderedCourses.filter(course => courseAvailability(course, rows('cohorts'), catalogNow).state !== 'closed');
+  const closedCourses = orderedCourses.filter(course => courseAvailability(course, rows('cohorts'), catalogNow).state === 'closed');
   const free =
     recruitingCourses.find((c) => t(c, "category") === "free") ||
     courses.find((c) => t(c, "category") === "free");
@@ -574,7 +574,7 @@ export function Platform({
   const logout = async () => {
     setPending(true);
     await disableDevicePush().catch(() => {});
-    const { error } = await createClient().auth.signOut();
+    const { error } = await createClient().auth.signOut({ scope: "local" });
     if (error) {
       setNotice("로그아웃에 실패했습니다.");
       setPending(false);
@@ -594,7 +594,7 @@ export function Platform({
       <a className="skip" href="#main">
         본문으로 이동
       </a>
-      <header className="site-header">
+      <header className={'site-header' + (!account && !learning ? ' public-site-header' : '')}>
         <div
           className={
             "wrap " + (account || learning ? "learning-chrome" : "header-inner")
@@ -608,7 +608,7 @@ export function Platform({
             </div>
           ) : (
             <nav className="main-nav" aria-label="주 메뉴">
-              {nav.filter(([href]) => href !== "/articles" || contentVisibility(data).articles || contentVisibility(data).lectures).map(([href, label]) => (
+              {nav.filter(([href]) => href !== "/articles" || articleDiscoveryVisible(data)).map(([href, label]) => (
                 <Link
                   href={href}
                   key={href}
@@ -620,7 +620,6 @@ export function Platform({
             </nav>
           )}
           <div className="header-user">
-            <MobileRefresh />
             {user ? (
               <>
                 {!admin && (account || learning) && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' && process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED === 'true' && <MentorReplyBell key={user.id}/>}
@@ -656,28 +655,33 @@ export function Platform({
                 </div>
               </>
             ) : (
-              <Link className="btn" href="/login">
+              <Link className="btn header-login" href="/login">
                 로그인
               </Link>
             )}
-            <button
+            {(account || learning) && <button
               className="icon-btn mobile-only"
-              aria-label="메뉴 열기"
+              aria-label={mobile ? "메뉴 닫기" : "메뉴 열기"}
+              aria-controls="member-mobile-navigation"
               aria-expanded={mobile}
               onClick={() => setMobile(!mobile)}
             >
               <Menu />
-            </button>
+            </button>}
+            {!account && !learning && <PublicMobileMenu key={routeKey}
+              links={nav.filter(([href]) => href !== '/articles' || articleDiscoveryVisible(data))}
+              signedIn={Boolean(user)} onLogout={() => { void logout(); }}/>}
           </div>
         </div>
-        {mobile && (
-          <nav className="mobile-nav open">
-            {nav.filter(([href]) => href !== "/articles" || contentVisibility(data).articles || contentVisibility(data).lectures).map(([href, label]) => (
+        {mobile && (account || learning) && (
+          <nav id="member-mobile-navigation" className="mobile-nav open" aria-label="모바일 메뉴">
+            {nav.filter(([href]) => href !== "/articles" || articleDiscoveryVisible(data)).map(([href, label]) => (
               <Link href={href} key={href}>
                 {label}
               </Link>
             ))}
             <Link href="/my">마이페이지</Link>
+            <MobileRefresh />
           </nav>
         )}
       </header>
@@ -700,7 +704,7 @@ export function Platform({
         </div>
       </footer>
     ) : (
-      <SiteFooter supportEmail={support.email} supportUrl={safeUrl(support.url)} />
+      <SiteFooter supportEmail={support.email} supportUrl={safeUrl(support.url)} signedIn={Boolean(user)} />
     );
   let body: ReactNode;
   if (path[0] === "login" || path[0] === "signup")
@@ -749,9 +753,9 @@ export function Platform({
           <section className="section recruiting-section">
             <div className="section-head">
               <div>
-                <div className="eyebrow">01 / NEXT PROGRAM</div>
-                <h2>지금 참여할 수 있는 클래스</h2>
-                <p>시작의 크기는 달라도, 목표는 실제 업무의 변화입니다.</p>
+                <div className="eyebrow">NEXT PROGRAM</div>
+                <h2>내 사업에 바로 연결할 클래스</h2>
+                <p>혼자 떠안던 마케팅과 반복 업무, 이제 배운 방법으로 하나씩 바꿔보세요.</p>
               </div>
               <Link className="link" href="/classes">
                 모든 클래스 <ArrowRight />
@@ -759,19 +763,24 @@ export function Platform({
             </div>
             <div className="grid3 course-grid">
               {availableCourses.slice(0, 3).map((c) => (
-                <CourseCard key={c.id} course={c} />
+                <CourseCard key={c.id} course={c} cohorts={rows('cohorts')} now={catalogNow} />
               ))}
             </div>
             {!loading && !error && !availableCourses.length && (
               <Empty title="새로운 클래스를 준비하고 있습니다." />
             )}
+            {closedCourses.length > 0 && <>
+              <h3 className={catalogStyles.sectionTitle}>모집이 끝난 클래스</h3>
+              <div className="grid3 course-grid">{closedCourses.slice(0, 3).map(course =>
+                <CourseCard key={course.id} course={course} cohorts={rows('cohorts')} now={catalogNow}/>)}</div>
+            </>}
           </section>
-          {contentVisibility(data).articles && <section className="section">
+          {contentVisibility(data).articles && rows('articles').length > 0 && <section className="section">
             <div className="section-head">
               <div>
-                <div className="eyebrow">03 / INSIGHT TO ACTION</div>
+                <div className="eyebrow">INSIGHT TO ACTION</div>
                 <h2>일하는 방식을 바꾸는 인사이트</h2>
-                <p>내 업무에 가져갈 수 있는 구체적인 관점과 방법.</p>
+                <p>읽고 끝내기 아까운 방법들. 오늘 내 업무에 한 가지부터 적용해 보세요.</p>
               </div>
               <Link className="link" href="/articles">
                 아티클 전체 보기 <ArrowRight />
@@ -789,8 +798,8 @@ export function Platform({
             <section className="section results-section">
               <div className="section-head">
                 <div>
-                  <div className="eyebrow">04 / LEARNING IN PRACTICE</div>
-                  <h2>실행한 과정이, 다음 사람의 시작으로.</h2>
+                  <div className="eyebrow">LEARNING IN PRACTICE</div>
+                  <h2>나와 비슷한 사장님들은 어떻게 바꿨을까요?</h2>
                 </div>
                 <Link className="link" href="/stories">
                   고객 이야기 <ArrowRight />
@@ -800,36 +809,26 @@ export function Platform({
             </section>
           )}
         </div>
-        {free && <section className="final-offer">
-          <div className="wrap">
-            <div>
-              <div className="eyebrow">YOUR NEXT ACTION</div>
-              <h2>첫 실행은, 무료 클래스에서.</h2>
-              <p>내 업무 한 가지를 떠올리고 시작해 보세요.</p>
-            </div>
-            <Link className="btn primary large" href="/classes?type=free">
-              무료 클래스 살펴보기 <ArrowRight />
-            </Link>
-          </div>
-        </section>}
+        {!loading && !error && <div className="wrap"><NextClassBanner courses={courses} cohorts={rows('cohorts')} now={catalogNow}/></div>}
       </>
     );
   else if (path[0] === "classes" && path.length === 1)
     body = (
       <div className="wrap">
         <Heading
-          title="내 일의 다음 단계를 찾아보세요."
-          description="무료 클래스부터 실전 과정, 바로 사용하는 자료까지."
+          title="배운 오늘, 내 사업에 써먹을 한 가지."
+          description="AI 활용부터 마케팅 실행까지. 지금 막힌 일에 맞춰 클래스를 골라보세요."
         />
         <div className="filter-row">
           <div className="chips">
-            {["전체", "무료 클래스", "유료 클래스", "디지털 상품"].map((f) => (
+            {Object.entries({ '': '전체', ...catalogTypes }).filter(([key]) => !key || !data.catalog_counts?.[0] || Number(data.catalog_counts[0][key]) > 0).map(([key, label]) => (
               <button
-                key={f}
-                className={"chip " + (filter === f ? "active" : "")}
-                onClick={() => setFilter(f)}
+                key={key}
+                className={"chip " + (catalogLocation.type === key ? "active" : "")}
+                aria-pressed={catalogLocation.type === key}
+                onClick={() => catalogLocation.setType(key)}
               >
-                {f}
+                {label}
               </button>
             ))}
           </div>
@@ -839,32 +838,29 @@ export function Platform({
               type="search"
               placeholder="클래스 검색"
               aria-label="클래스 검색"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              value={catalogLocation.input}
+              onChange={(e) => catalogLocation.setInput(e.target.value)}
             />
           </label>
         </div>
-        <div className="grid3 course-grid pb64">
-          {courses.map((c) => (
-              <CourseCard key={c.id} course={c} />
-            ))}
-        </div>
-        {!loading && !error && loadedReadKey === publicReadKey && query === publicSearch && !courses.length && (
-          query.trim() || filter !== "전체" ? (
+        {availableCourses.length > 0 && <div className={'grid3 course-grid ' + catalogStyles.group}>
+          {availableCourses.map(course => <CourseCard key={course.id} course={course} cohorts={rows('cohorts')} now={catalogNow}/>)}
+        </div>}
+        {closedCourses.length > 0 && <section className={catalogStyles.group} aria-label="모집이 끝난 클래스">
+          <h2 className={catalogStyles.sectionTitle}>모집이 끝난 클래스</h2>
+          <div className="grid3 course-grid">{closedCourses.map(course => <CourseCard key={course.id} course={course} cohorts={rows('cohorts')} now={catalogNow}/>)}</div>
+        </section>}
+        {!loading && !error && loadedReadKey === publicReadKey && catalogLocation.input === catalogLocation.query && !courses.length && (
+          catalogLocation.query || catalogLocation.type ? (
             <Empty title="검색 조건에 맞는 클래스가 없습니다.">
-              <button className="btn" type="button" onClick={() => {
-                setQuery("");
-                setPublicSearch("");
-                setFilter("전체");
-                if (searchParams.get("type") === "free") router.replace("/classes");
-              }}>검색·필터 초기화</button>
+              <button className="btn" type="button" onClick={catalogLocation.clear}>검색·필터 초기화</button>
             </Empty>
           ) : <Empty title="등록된 클래스가 없습니다." />
         )}
         {pagination && pagination.total > pagination.pageSize && <div className="row center mt24" aria-label="클래스 페이지">
-          <button className="btn" type="button" disabled={publicPage <= 1} onClick={() => setPublicPage(page => page - 1)}>이전</button>
-          <span>{publicPage} / {Math.ceil(pagination.total / pagination.pageSize)}</span>
-          <button className="btn" type="button" disabled={publicPage >= Math.ceil(pagination.total / pagination.pageSize)} onClick={() => setPublicPage(page => page + 1)}>다음</button>
+          <button className="btn" type="button" disabled={catalogLocation.page <= 1} onClick={() => catalogLocation.setPage(catalogLocation.page - 1)}>이전</button>
+          <span>{catalogLocation.page} / {Math.ceil(pagination.total / pagination.pageSize)}</span>
+          <button className="btn" type="button" disabled={catalogLocation.page >= Math.ceil(pagination.total / pagination.pageSize)} onClick={() => catalogLocation.setPage(catalogLocation.page + 1)}>다음</button>
         </div>}
       </div>
     );
@@ -875,7 +871,8 @@ export function Platform({
       <ArticlesView slug={path[1]} data={data} user={user} loading={loading} error={Boolean(error)} query={query} onQueryChange={setQuery} type={articleFilter} onTypeChange={value => { setArticleFilter(value); setPublicPage(1); }} pagination={pagination} onPageChange={setPublicPage} />
     );
   else if (path[0] === "stories")
-    body = <StoriesView data={data} loading={loading} error={Boolean(error)} />;
+    body = <><StoriesView data={data} loading={loading} error={Boolean(error)} />
+      {!loading && !error && <div className="wrap"><NextClassBanner courses={courses} cohorts={rows('cohorts')} now={catalogNow}/></div>}</>;
   else if (account && user)
     body = (
       <MemberViews
@@ -994,7 +991,7 @@ export function Platform({
         ) : !section ? (
           <AdminEmptyState title="이 화면에 접근할 운영 권한이 필요합니다.">운영 홈에서 현재 계정에 표시되는 메뉴를 선택해 주세요.</AdminEmptyState>
         ) : key === "learning-care" ? (
-          <AdminLearningCare key={user!.id} actorId={user!.id}/>
+          <AdminLearningCare key={user!.id} actorId={user!.id} initialCohortId={searchParams.get("cohort") || ""}/>
         ) : key === "conversion" ? (
           <ConversionReview workspace initialPeriod={searchParams.get("recruitment") || undefined} initialView={searchParams.get("view") === "inquiries" ? "inquiries" : "recruitment"} userId={user!.id} />
         ) : key === "learning" ? (
@@ -1007,6 +1004,8 @@ export function Platform({
           ) : key === "product-editor" ? (
             <ProductEditor
               key={edited?.id || "new-product"}
+              actorId={user!.id}
+              canManageMembers={user?.permissions?.members === true}
               data={data}
               row={edited}
               pending={pending}
@@ -1502,7 +1501,7 @@ function LegacyEditor({
             <>
               {section.key === "banners" && (
                 <div className="notice mb24">
-                  이 화면의 상단 문구·메인 제목·설명 문구·CTA가 프론트 메인 배너에 그대로 표시됩니다. 활성 배너가 2개 이상이면 슬라이드 순서대로 자동 전환됩니다.
+                  입력한 제목·설명·버튼이 고객 첫 화면에 그대로 표시됩니다. 행사 날짜가 있는 배너는 노출 종료일도 설정해 주세요. 종료일을 비워 두면 계속 표시됩니다. 배너가 여러 개면 정한 순서대로 바뀝니다.
                 </div>
               )}
               {section.key === "customers" && row && (

@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-async function backend(page: Page, opts: { lost?: boolean; conflict?: boolean; unavailable?: boolean; termsMissing?: boolean; handled?: boolean } = {}) {
+async function backend(page: Page, opts: { lost?: boolean; conflict?: boolean; unavailable?: boolean; termsMissing?: boolean; handled?: boolean; collapsed?: boolean } = {}) {
   const writes: { requestId: string; payload: { choices: { analysis: boolean; overseas: boolean; kakao: boolean } } }[] = [];
   let lost = opts.lost, handled = opts.handled;
   await page.route('**/api/account/consent-reward', async route => {
@@ -15,11 +15,12 @@ async function backend(page: Page, opts: { lost?: boolean; conflict?: boolean; u
     return route.fulfill({ json: { saved: true, awarded: body.payload.choices.kakao } });
   });
   await page.goto('/consent-reward-test');
+  if (!opts.collapsed && !opts.unavailable && !handled) await page.getByText('쿠폰·혜택 안내', { exact: true }).click();
   return writes;
 }
 const all = (page: Page) => page.getByRole('checkbox', { name: /선택 항목 모두 동의하기/ });
 const kakao = (page: Page) => page.getByRole('checkbox', { name: /카카오톡 혜택 소식/ });
-test('all optional choices take two clicks, without preselection or overflow', async ({ page }, info) => {
+test('expanded optional choices require selection and confirmation, without preselection or overflow', async ({ page }, info) => {
   const writes = await backend(page);
   await expect(all(page)).toBeVisible();
   for (const box of await page.getByRole('checkbox').all()) await expect(box).not.toBeChecked();
@@ -33,10 +34,29 @@ test('all optional choices take two clicks, without preselection or overflow', a
   await page.reload(); await expect(all(page)).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
+
+test('optional promotion starts compact; keyboard disclosure never selects or saves consent', async ({ page }, info) => {
+  const writes = await backend(page, { collapsed: true });
+  const card = page.getByRole('region', { name: '쿠폰·혜택 안내' });
+  const disclosure = card.locator('details').first();
+  await expect(disclosure).not.toHaveAttribute('open');
+  await expect(all(page)).toBeHidden();
+  await expect(page.getByRole('button', { name: '동의하고 1만원 쿠폰 받기' })).toBeHidden();
+  expect((await card.boundingBox())!.height).toBeLessThan(130);
+  await card.screenshot({ path: info.outputPath('benefits-collapsed.png') });
+  await disclosure.locator('summary').first().focus(); await page.keyboard.press('Enter');
+  await expect(all(page)).toBeVisible();
+  for (const checkbox of await card.getByRole('checkbox').all()) await expect(checkbox).not.toBeChecked();
+  await expect(page.getByRole('button', { name: '동의하고 1만원 쿠폰 받기' })).toBeDisabled();
+  await disclosure.locator('summary').first().press('Enter');
+  await expect(all(page)).toBeHidden();
+  expect(writes).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
 test('Kakao only earns the coupon, details need no navigation', async ({ page }) => {
   const writes = await backend(page);
   await page.getByLabel('[선택] 카카오톡 혜택 소식 받기(광고) 자세히', { exact: true }).click();
-  await expect(page.getByText(/이메일·문자 수신 설정은 바뀌지/)).toBeVisible();
+  await expect(page.getByText(/이메일·문자 수신을 추가로 신청하지/)).toBeVisible();
   await kakao(page).check(); await expect(all(page)).toHaveAttribute('aria-checked', 'mixed');
   await page.getByRole('button', { name: '동의하고 1만원 쿠폰 받기' }).click();
   expect(writes[0].payload.choices).toEqual({ analysis: false, overseas: false, kakao: true });
@@ -60,15 +80,28 @@ test('conflict needs reload and a fresh explicit choice', async ({ page }) => {
   await expect(page.getByRole('alert')).toBeVisible(); await expect(page.getByRole('button', { name: '저장 결과 다시 확인하기' })).toBeDisabled();
   await page.getByRole('button', { name: '다시 불러오기' }).click(); await expect(kakao(page)).not.toBeChecked(); expect(writes).toHaveLength(1);
 });
-test('analysis alone saves without promising a coupon; missing disclosures disable analysis but allow Kakao', async ({ page }) => {
+test('analysis alone saves without promising a coupon; missing disclosures hide analysis but allow Kakao', async ({ page }) => {
   const writes = await backend(page); await page.getByRole('checkbox', { name: /구매·학습 기록 분석/ }).check();
   await page.getByRole('button', { name: '선택한 내용에 동의하기' }).click();
   await expect(page.getByRole('status')).toContainText('선택한 내용을 저장'); await expect(page.getByRole('link', { name: /내 쿠폰 보기/ })).toHaveCount(0);
   expect(writes[0].payload.choices.kakao).toBe(false);
-  await backend(page, { termsMissing: true }); await expect(all(page)).toBeDisabled(); await kakao(page).check();
+  await backend(page, { termsMissing: true }); await expect(all(page)).toHaveCount(0);
+  await expect(page.getByRole('checkbox')).toHaveCount(1);
+  await expect(kakao(page)).not.toBeChecked();
+  await expect(page.getByText('교육·할인 소식을 받아보세요')).toBeVisible();
+  await expect(page.getByText(/구매·학습 기록 분석|해외 분석 서버 이용|안내를 준비 중/)).toHaveCount(0);
+  await expect(page.getByRole('link', { name: '회원 정보', exact: true })).toHaveAttribute('href', '/my/profile#consent-settings');
+  await kakao(page).check();
   await page.getByRole('button', { name: '동의하고 1만원 쿠폰 받기' }).click(); await expect(page.getByRole('status')).toContainText('1만원 쿠폰');
 });
 test('disabled or previously handled campaign never blocks learning', async ({ page }) => {
   await backend(page, { unavailable: true }); await expect(all(page)).toHaveCount(0); await expect(page.getByRole('button', { name: '이어서 학습하기' })).toBeVisible();
   await backend(page, { handled: true }); await expect(all(page)).toHaveCount(0);
+});
+
+test('Kakao-only coupon card is readable on the current viewport', async ({ page }, info) => {
+  await backend(page, { termsMissing: true });
+  await expect(kakao(page)).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: info.outputPath('kakao-only-coupon.png'), fullPage: true });
 });

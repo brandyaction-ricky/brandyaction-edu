@@ -1,4 +1,5 @@
 import { memberDirectoryScope } from '@/lib/member-directory';
+import { questionDeletionReady } from '@/lib/question-deletion-server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { reviewMutation, reviewWriteError } from '@/lib/submission-review';
 import { createClient } from '@/lib/supabase/server';
@@ -135,35 +136,46 @@ export async function GET(request: Request) {
         // only when the operator opens the tab, scoped to the selected product.
         if (productEditorRead && ['curriculum', 'missions'].includes(params.get('part') || '')) {
             const part = params.get('part');
-            const cohortResult = await db.from('cohorts').select('id,course_id,name,cohort_code,status').eq('course_id', record!).order('created_at');
+            const [cohortResult, weekResult] = await Promise.all([
+                db.from('cohorts').select('id,course_id,name,cohort_code,status').eq('course_id', record!).order('created_at'),
+                db.from('curriculum_weeks').select('*').eq('course_id', record!).order('week_number'),
+            ]);
             if (cohortResult.error) return reply({ error: '상품 기수를 불러오지 못했습니다.' }, 500);
             const cohorts = (cohortResult.data || []) as Row[];
             const cohortIds = cohorts.map(cohort => String(cohort.id));
-            const weekResult = await db.from('curriculum_weeks').select('*').eq('course_id', record!).order('week_number');
             if (weekResult.error) return reply({ error: '상품 주차를 불러오지 못했습니다.' }, 500);
             const weeks = (weekResult.data || []) as Row[];
             const weekIds = weeks.map(week => String(week.id));
             if (!weekIds.length) return reply({ data: { cohorts, curriculum_weeks: [], curriculum_lessons: [], edu_cohort_week_visibility: [], edu_cohort_lesson_visibility: [], [part === 'missions' ? 'curriculum_missions' : 'lesson_contents']: [] } });
-            const weekVisibility = cohortIds.length ? await db.from('edu_cohort_week_visibility').select('cohort_id,week_id,is_published').in('cohort_id', cohortIds).in('week_id', weekIds).limit(5000) : { data: [], error: null };
+            const [weekVisibility, lessonResult] = await Promise.all([
+                cohortIds.length ? db.from('edu_cohort_week_visibility').select('cohort_id,week_id,is_published').in('cohort_id', cohortIds).in('week_id', weekIds).limit(5000) : Promise.resolve({ data: [], error: null }),
+                db.from('curriculum_lessons').select('*').in('week_id', weekIds).order('day_number'),
+            ]);
             if (weekVisibility.error) return reply({ error: '기수별 주차 공개 상태를 불러오지 못했습니다.' }, 500);
-            const lessonResult = await db.from('curriculum_lessons').select('*').in('week_id', weekIds).order('day_number');
             if (lessonResult.error) return reply({ error: '상품 일차를 불러오지 못했습니다.' }, 500);
             const lessons = (lessonResult.data || []) as Row[];
             const lessonIds = lessons.map(lesson => String(lesson.id));
             if (!lessonIds.length) return reply({ data: { cohorts, curriculum_weeks: weeks, curriculum_lessons: [], edu_cohort_week_visibility: weekVisibility.data || [], edu_cohort_lesson_visibility: [], [part === 'missions' ? 'curriculum_missions' : 'lesson_contents']: [] } });
-            const lessonVisibility = cohortIds.length ? await db.from('edu_cohort_lesson_visibility').select('cohort_id,lesson_id,is_published').in('cohort_id', cohortIds).in('lesson_id', lessonIds).limit(5000) : { data: [], error: null };
+            // These reads share the same authorized product scope but do not
+            // depend on each other's result. Keep only the ID discovery serial.
+            const [lessonVisibility, contentResult, heads] = await Promise.all([
+                cohortIds.length ? db.from('edu_cohort_lesson_visibility').select('cohort_id,lesson_id,is_published').in('cohort_id', cohortIds).in('lesson_id', lessonIds).limit(5000) : Promise.resolve({ data: [], error: null }),
+                part === 'missions'
+                    ? db.from('curriculum_missions').select('*').in('lesson_id', lessonIds).order('created_at')
+                    : db.from('lesson_contents').select('*').in('lesson_id', lessonIds),
+                part !== 'missions' && process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true'
+                    ? db.from('edu_lesson_block_heads').select('lesson_id').in('lesson_id', lessonIds)
+                    : Promise.resolve({ data: [], error: null }),
+            ]);
             if (lessonVisibility.error) return reply({ error: '기수별 학습 공개 상태를 불러오지 못했습니다.' }, 500);
             if (part === 'missions') {
-                const missionResult = await db.from('curriculum_missions').select('*').in('lesson_id', lessonIds).order('created_at');
-                if (missionResult.error) return reply({ error: '상품 미션을 불러오지 못했습니다.' }, 500);
-                return reply({ data: { cohorts, curriculum_weeks: weeks, curriculum_lessons: lessons, edu_cohort_week_visibility: weekVisibility.data || [], edu_cohort_lesson_visibility: lessonVisibility.data || [], curriculum_missions: missionResult.data || [] } });
+                if (contentResult.error) return reply({ error: '상품 미션을 불러오지 못했습니다.' }, 500);
+                return reply({ data: { cohorts, curriculum_weeks: weeks, curriculum_lessons: lessons, edu_cohort_week_visibility: weekVisibility.data || [], edu_cohort_lesson_visibility: lessonVisibility.data || [], curriculum_missions: contentResult.data || [] } });
             }
-            const contentResult = await db.from('lesson_contents').select('*').in('lesson_id', lessonIds);
             if (contentResult.error) return reply({ error: '학습 콘텐츠를 불러오지 못했습니다.' }, 500);
             if (process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true') {
                 // Only presence is needed here. Full authored bodies and quiz keys
                 // stay in the separate, permission-checked lesson editor endpoint.
-                const heads = await db.from('edu_lesson_block_heads').select('lesson_id').in('lesson_id', lessonIds);
                 if (heads.error) return reply({ error: '학습 구성 상태를 불러오지 못했습니다.' }, 500);
                 const blockIds = new Set((heads.data || []).map(row => String(row.lesson_id)));
                 for (const lesson of lessons) lesson.has_blocks = blockIds.has(String(lesson.id));
@@ -174,6 +186,10 @@ export async function GET(request: Request) {
         if (adminMode && sectionKey === 'customers' && (directoryScope.query.length > 100 || !['', 'active', 'suspended'].includes(directoryScope.status) || (directoryScope.course && !uid(directoryScope.course)))) return reply({ error: '회원 검색 조건을 확인해 주세요.' }, 400);
         const settings = getEduSettings();
         let tables = productEditorRead ? ['courses', 'cohorts'] : adminMode ? adminTables[sectionKey] : ['courses', 'cohorts', 'curriculum_weeks', 'curriculum_lessons', 'articles', 'article_categories', 'review_videos', 'site_banners', 'reviews', 'cohort_sessions'];
+        // The curriculum picker consumes only courses. Its workspace already
+        // reads the chosen product and lesson through scoped author endpoints.
+        // Preserve the legacy direct lesson editor's record read.
+        if (adminMode && sectionKey === 'learning' && !record && params.get('part') === 'picker') tables = ['courses'];
         if (adminMode && sectionKey === 'home' && operator?.role === 'staff') tables = tables.filter((table) => (['courses', 'cohorts'].includes(table) && operator.permissions.products) || (['mission_submissions', 'edu_questions'].includes(table) && operator.permissions.members));
         const data: Record<string, Row[]> = {};
         let pagination: { page: number; pageSize: number; total: number } | null = null;
@@ -295,6 +311,7 @@ export async function GET(request: Request) {
                         : '*';
                 const serverPaged = adminMode && !productEditorRead && table === primaryTable && !['home', 'members', 'reviews', 'analytics', 'metrics', 'seo', 'settings', 'staff', 'templates', 'campaigns', 'automations'].includes(sectionKey);
                 let query = db.from(table).select(columns, serverPaged ? { count: 'exact' } : undefined);
+                if (adminMode && table === 'edu_questions' && await questionDeletionReady(db)) query = query.is('deleted_at', null);
                 // Export credentials belong only to the server integration, including admin reads.
                 if (table === 'site_settings') query = query.neq('key', 'export_v1');
                 if (adminMode && table === 'coupons' && operator?.role !== 'admin') query = query.neq('discount_type', 'ADMIN_FREE');
@@ -402,7 +419,7 @@ export async function GET(request: Request) {
             if (orderIds.length) {
                 const [items, payments] = await Promise.all([
                     db.from('order_items').select(adminSelectColumns(sectionKey, 'order_items')).in('order_id', orderIds),
-                    db.from('payments').select('id,order_id,method,status,approved_amount,cancelled_amount,receipt_url,approved_at,created_at').in('order_id', orderIds),
+                    db.from('payments').select('id,order_id,method,status,approved_amount,cancelled_amount,receipt_url,approved_at,created_at,card_approval_number:provider_payload->card->>approveNo').in('order_id', orderIds),
                 ]);
                 if (items.error) throw items.error;
                 if (payments.error) throw payments.error;
@@ -921,7 +938,13 @@ export async function POST(request: Request) {
             if (section.table === 'courses') {
                 const previous = body.id ? await db.from('courses').select('metadata').eq('id', body.id).single() : { data: null, error: null };
                 if (previous.error) fail('기존 상품 정보를 불러오지 못했습니다. 새로고침 후 다시 저장해 주세요.', 409);
-                try { values.metadata = mergeProductMetadata(previous.data?.metadata, values); }
+                try {
+                    if (values.detail_html_file || previous.data?.metadata?.detail_html_file) {
+                      const { prepareStoredProductMetadata } = await import('@/lib/product-html-storage');
+                      await prepareStoredProductMetadata(db, user.id, (previous.data?.metadata || {}) as Record<string, unknown>, values);
+                    }
+                    values.metadata = mergeProductMetadata(previous.data?.metadata, values);
+                }
                 catch (error) { fail((error as Error).message); }
                 for (const field of productMetadataFields) delete values[field];
             }
@@ -1100,6 +1123,7 @@ export async function POST(request: Request) {
             const offer = await db.from('cohorts').select('*,courses!inner(*)').eq('id', body.cohortId).single();
             if (offer.error || !offer.data) fail('상품 모집 정보를 확인해 주세요.', 409);
             const offeredCourse = offer.data.courses as Row;
+            if (offer.data.archived_at || offeredCourse.archived_at) fail('판매가 종료된 상품입니다. 다른 클래스를 확인해 주세요.', 409);
             if (offeredCourse.category === 'paid_class') {
                 const metadata = (offeredCourse.metadata && typeof offeredCourse.metadata === 'object' ? offeredCourse.metadata : {}) as Record<string, unknown>;
                 const source = String(metadata.detail_html_document || metadata.detail_html || '');

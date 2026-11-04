@@ -1,3 +1,4 @@
+import { curriculumDay } from './curriculum-days';
 import type { Row } from './platform';
 import { hasLearningAccess } from './platform-rules';
 import { cohortLessonVisible, cohortWeekVisible } from './cohort-curriculum-visibility';
@@ -48,7 +49,7 @@ export function learningOverview(data: Record<string, Row[]>, enrollment: Row): 
     const lesson = lessons.get(gate.lessonId);
     if (!lesson) continue;
     const group = groups.find(group => group.key === (gate.ongoing ? 'ongoing' : gate.track || 'other'))!;
-    const day = gate.dayNumber ?? (Number(lesson.day_number) || 0);
+    const day = gate.dayNumber ?? curriculumDay(data, lesson);
     group.items.push({ id: gate.lessonId, title: String(lesson.title || '학습'), day, week: gate.track ? Math.ceil(day / 5) : Number(weeks.get(String(lesson.week_id))?.week_number) || 0, done: !gate.ongoing && completed.has(gate.lessonId), unlocked: gate.isUnlocked, reason: gate.reason });
   }
   for (const group of groups) {

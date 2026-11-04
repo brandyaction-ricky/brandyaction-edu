@@ -45,6 +45,7 @@ test('new terms require an unchecked fresh choice; stale writes require reload',
  await expect(panel(page).getByRole('alert')).toContainText('다른 화면');await expect(panel(page).getByRole('button',{name:'같은 선택 다시 저장'})).toHaveCount(0);expect(b.writes).toHaveLength(1);
 });
 test('unapproved disclosure cannot collect consent',async({page})=>{
- const b=await backend(page,{unready:true});await open(page);for(const box of await panel(page).getByRole('checkbox').all())await expect(box).toBeDisabled();
- await expect(panel(page).getByRole('button',{name:'선택 저장',exact:true})).toBeDisabled();expect(b.writes).toHaveLength(0);
+ const b=await backend(page,{unready:true});await page.goto('/personalization-consent-test');
+ await expect(page.getByRole('region',{name:'소식 수신 설정'})).toBeVisible();
+ await expect(panel(page)).toHaveCount(0);expect(b.writes).toHaveLength(0);
 });

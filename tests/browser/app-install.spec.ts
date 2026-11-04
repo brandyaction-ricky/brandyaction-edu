@@ -20,6 +20,21 @@ async function offer(page: Page, outcome: 'accepted' | 'dismissed' | 'error' | '
   }, outcome);
 }
 const panel = (page: Page) => page.getByRole('region', { name: '브랜디에듀 홈 화면 추가' });
+test('install offer separates heading, actions and optional help without overflow or writes', async ({ page, viewport }, info) => {
+  const writes: string[] = []; page.on('request', request => { if (request.method() !== 'GET') writes.push(request.url()); });
+  await setup(page); await page.goto('/app-install-test');
+  const card = panel(page), heading = card.locator('.app-install-heading'), actions = card.locator('.app-install-actions');
+  const intro = card.locator('.app-install-intro'), footer = card.locator('.app-install-footer');
+  const headingBox = (await heading.boundingBox())!, actionsBox = (await actions.boundingBox())!, introBox = (await intro.boundingBox())!;
+  expect(introBox.y).toBeGreaterThanOrEqual(Math.max(headingBox.y + headingBox.height, actionsBox.y + actionsBox.height));
+  if (viewport!.width <= 680) expect(actionsBox.y).toBeGreaterThanOrEqual(headingBox.y + headingBox.height);
+  await expect(footer.getByRole('button', { name: '나중에 · 7일 동안 접기' })).toBeVisible();
+  const guide = card.getByRole('button', { name: '그림 보며 따라 하기' });
+  await expect(guide).not.toHaveClass(/primary/); await expect(guide).toHaveAttribute('aria-expanded', 'false');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(writes).toEqual([]);
+  await card.screenshot({ path: info.outputPath('install-offer-layout.png') });
+});
 test('install prompt waits for an explicit click, survives menu changes, and completion hides the offer', async ({ page }, info) => {
   const writes: string[] = []; page.on('request', request => { if (request.method() !== 'GET') writes.push(request.url()); });
   await setup(page); await page.goto('/app-install-test'); await expect(panel(page)).toBeVisible(); await expect(page.getByRole('button', { name: '아이콘 추가하기' })).toHaveCount(0);

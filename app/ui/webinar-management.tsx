@@ -1,5 +1,6 @@
 'use client';
 import { RecruitmentDetails, RecruitmentHelp } from './recruitment-help';
+import { webinarFreeCourse, webinarPaidCohort, testCatalogName, kstLabel } from '@/lib/marketing-qa';
 import { marketingContextHref } from '@/lib/marketing-context';
 import { RecruitmentCampaignLinks } from './recruitment-campaign-links';
 import { useEffect, useRef, useState } from 'react';
@@ -11,9 +12,13 @@ import { AdminButton, AdminSection, AdminSelect } from '@/features/admin-ui';
 import type { FunnelCourse, FunnelCohort } from '@/lib/recruitment-funnel';
 type Campaign={id:string;freeCourse:string;paidCohort:string|null;enabled:boolean;revision:number};
 type SourceCoverage={state:string;total?:number;unknown?:number;rate?:number|null;overTarget?:boolean|null;from?:string;to?:string};
-type Report={sourceCoverage?:SourceCoverage;campaign:Campaign|null;registrations:number;purchase_state:string;purchases:null|{orders:number;buyers:number;gross:number;refunds:number;net:number;needs_review:number;as_of:string}};
+type PurchaseTotals={orders:number;buyers:number;gross:number;refunds:number;net:number;needs_review:number;as_of:string};
+type Report={cohortPurchases?:PurchaseTotals|null;sourceCoverage?:SourceCoverage;campaign:Campaign|null;registrations:number;purchase_state:string;purchases:null|{orders:number;buyers:number;gross:number;refunds:number;net:number;needs_review:number;as_of:string}};
 export function WebinarManagement({period,courses,cohorts,workspace=false}:{period:string;courses:FunnelCourse[];cohorts:FunnelCohort[];workspace?:boolean}) {
  const [report,setReport]=useState<Report|null>(null),[free,setFree]=useState(''),[paid,setPaid]=useState(''),[enabled,setEnabled]=useState(false),[pending,setPending]=useState(true),[message,setMessage]=useState(''),[origin,setOrigin]=useState(''),[refresh,setRefresh]=useState(0);
+ const [showTests,setShowTests]=useState(false);
+ const freeOptions=courses.filter(c=>webinarFreeCourse(c)&&(showTests||!testCatalogName(c.title)));
+ const paidOptions=cohorts.filter(c=>webinarPaidCohort(c,courses)&&(showTests||!testCatalogName((courses.find(s=>s.id===c.course_id)?.title||'')+' '+c.name)));
  const [view,setView]=useState('settings');
  const stageNavigation=useRef<HTMLDivElement>(null);
  const busy=useRef(false);
@@ -39,8 +44,9 @@ export function WebinarManagement({period,courses,cohorts,workspace=false}:{peri
   <div hidden={workspace&&view!=='settings'}>
   <fieldset disabled={pending||!report}>
    <legend>신청 대상 연결</legend>
-   <AdminSelect label="웨비나 무료 상품" value={free} onChange={e=>setFree(e.target.value)}><option value="">공개된 무료 상품 선택</option>{courses.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}</AdminSelect>
-   <AdminSelect label="구매를 확인할 유료 기수" value={paid} onChange={e=>setPaid(e.target.value)}><option value="">미연결 · 확정 후 연결</option>{cohorts.map(c=><option key={c.id} value={c.id}>{courses.find(s=>s.id===c.course_id)?.title} · {c.name}</option>)}</AdminSelect>
+   <label><input type="checkbox" checked={showTests} onChange={e=>setShowTests(e.target.checked)}/> 시험용 이름의 상품도 표시</label>
+   <AdminSelect label="웨비나 무료 상품" disabled={!!report?.registrations} value={free} onChange={e=>setFree(e.target.value)}><option value="">공개된 무료 상품 선택</option>{free&&!freeOptions.some(c=>c.id===free)&&<option value={free}>현재 연결 · {courses.find(c=>c.id===free)?.title||'상품 확인 필요'}</option>}{freeOptions.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}</AdminSelect>
+   <AdminSelect label="구매를 확인할 유료 기수" disabled={!!report?.registrations&&!!report?.campaign?.paidCohort} value={paid} onChange={e=>setPaid(e.target.value)}><option value="">미연결 · 확정 후 연결</option>{paid&&!paidOptions.some(c=>c.id===paid)&&<option value={paid}>현재 연결 · {cohorts.find(c=>c.id===paid)?.name||'기수 확인 필요'}</option>}{paidOptions.map(c=><option key={c.id} value={c.id}>{courses.find(s=>s.id===c.course_id)?.title} · {c.name}</option>)}</AdminSelect>
    <label><input type="checkbox" checked={enabled} onChange={e=>setEnabled(e.target.checked)}/> 무료 신청 링크 활성화</label>
   </fieldset>
   <RecruitmentHelp title="연결 전 확인"><p>기본 기수를 자동으로 4기로 간주하지 않습니다.</p><p>신청이 발생한 뒤에는 무료 상품과 이미 연결한 유료 기수를 바꿀 수 없습니다.</p><p>미연결 유료 기수는 이후 추가할 수 있습니다.</p><p>같은 유료 기수는 한 모집에만 연결합니다.</p></RecruitmentHelp>
@@ -54,14 +60,14 @@ export function WebinarManagement({period,courses,cohorts,workspace=false}:{peri
    {(['paid','organic','unknown'] as const).map(channel=><RecruitmentCopyLink key={channel} label={`${channel==='paid'?'광고 방':channel==='organic'?'오가닉 방':'출처 미지정'} 신청 링크`} value={origin ? `${origin}/webinar/${report.campaign!.id}/${channel}` : ''} blocked={pending ? '설정을 확인하고 있습니다.' : free!==report.campaign!.freeCourse||paid!==(report.campaign!.paidCohort??'')||enabled!==report.campaign!.enabled ? '변경한 신청 설정을 먼저 저장하세요.' : !report.campaign!.enabled ? '신청이 중지되어 있습니다. 활성화 후 복사하세요.' : ''} usage={channel==='paid'?'광고방 공지에 사용하세요.':channel==='organic'?'오가닉방 공지에 사용하세요.':'유입 경로를 구분할 수 없는 공통 안내에 사용하세요.'}/>)}
    </div><div hidden={workspace&&view!=='performance'}>
    {workspace&&<p><a className="conversion-link" href={marketingContextHref('landing', typeof location === 'undefined' ? '' : location.search, {period,course:report.campaign.freeCourse})}>이 무료 교육의 광고·웨비나 성과 보기</a> · 캠페인은 성과 화면에서 확인하세요. 모집과의 자동 귀속은 적용하지 않습니다.</p>}
-   {report.sourceCoverage && <section className="notice"><strong>모집 기간 결제 유입</strong>{report.sourceCoverage.state==='ready'?<><p>전체 {report.sourceCoverage.total}건 중 미기록 {report.sourceCoverage.unknown}건 · {report.sourceCoverage.rate===null?'아직 결제 없음':report.sourceCoverage.rate+'%'}</p><p>{report.sourceCoverage.overTarget===null?'결제가 생기면 비율을 확인할 수 있습니다.':report.sourceCoverage.overTarget?'목표 10%를 넘었습니다. 상품·문자의 결제 링크를 확인해 주세요.':'목표 10% 이하입니다.'}</p><small>연결 기수의 모집 시작~마감 사이에 결제된 주문 기준 · 시험·내부·0원 주문 제외</small></>:<p>{report.sourceCoverage.state==='unconfigured'?'상품 설정에서 모집 시작과 마감을 먼저 지정해 주세요.':'유입 비율을 확인하지 못했습니다. 새로고침해 주세요.'}</p>}</section>}
-   <p>신청 {report.registrations}건 · 웨비나 실제 참여: 미확인</p>
+   {report.sourceCoverage && <section className="notice"><strong>모집 기간 결제 유입</strong>{report.sourceCoverage.state==='ready'?<><p>전체 {report.sourceCoverage.total}건 중 미기록 {report.sourceCoverage.unknown}건 · {report.sourceCoverage.rate===null?'아직 결제 없음':report.sourceCoverage.rate+'%'}</p><p>{report.sourceCoverage.overTarget===null?'결제가 생기면 비율을 확인할 수 있습니다.':report.sourceCoverage.overTarget?'기본 목표 10% 초과 · 모집별 운영 기준을 확인해 주세요.':'기본 목표 10% 이하입니다.'}</p><small>연결 기수의 모집 시작~마감 사이에 결제된 주문 기준 · 시험·내부·0원 주문 제외</small></>:<p>{report.sourceCoverage.state==='unconfigured'?'상품 설정에서 모집 시작과 마감을 먼저 지정해 주세요.':'유입 비율을 확인하지 못했습니다. 새로고침해 주세요.'}</p>}</section>}
+   <div className="webinar-purchase-scopes"><section aria-label="연결 기수 전체 결제" className="panel pad"><h3>연결 기수 전체 결제</h3><p className="meta">웨비나 신청 여부와 관계없이 · 기수 전체 기간</p>{report.cohortPurchases?<><strong>{report.cohortPurchases.orders}건 · {report.cohortPurchases.buyers}명</strong><p>순매출 {report.cohortPurchases.net.toLocaleString()}원</p><small>결제 {report.cohortPurchases.gross.toLocaleString()}원 − 환불 {report.cohortPurchases.refunds.toLocaleString()}원</small><p className="meta">검토 필요 {report.cohortPurchases.needs_review}건 · {kstLabel(report.cohortPurchases.as_of)}</p></>:<p>{report.purchase_state==='forbidden'?'주문 관리 권한이 필요합니다.':report.purchase_state==='unmapped'?'유료 기수 연결 전 · 전체 결제 미확인':'전체 결제 집계를 확인하지 못했습니다.'}</p>}</section><section aria-label="신청자 중 결제" className="panel pad"><h3>신청자 중 결제</h3><p className="meta">이 모집 신청과 같은 계정의 신청 이후 결제</p><p>신청 {report.registrations}건 · 웨비나 실제 참여: 미확인</p>
    {report.purchases?<>
     <p>신청 이후 유료 구매자 {report.purchases.buyers}명 · 결제 주문 {report.purchases.orders}건</p>
     <p>결제 {report.purchases.gross.toLocaleString()}원 − 환불 {report.purchases.refunds.toLocaleString()}원 = 순매출 {report.purchases.net.toLocaleString()}원</p>
-    <p>집계 제외·검토 필요 주문 {report.purchases.needs_review}건 · 조회 기준 {report.purchases.as_of}</p>
+    <p>집계 제외·검토 필요 주문 {report.purchases.needs_review}건 · 조회 기준 {kstLabel(report.purchases.as_of)}</p>
    </>:<p>{report.purchase_state==='forbidden'?'구매 조회에는 주문 관리 권한이 필요합니다.':'유료 기수 연결 전 · 구매 실적 미확인'}</p>}
-   <RecruitmentDetails title="구매 집계 기준 자세히 보기"><p>현재 모집 신청자와 동일한 회원 계정의 신청 이후 결제만 관찰합니다.</p><p>해당 유료 기수의 전체 매출·광고 효과·1차/앵콜 전환율이 아닙니다.</p><p>0원 주문은 유료 구매에서 제외하고, 여러 상품이 포함된 주문과 결제 증거가 맞지 않는 주문은 검토 대상으로 구분합니다.</p><p>환불은 조회 시점의 누적액입니다.</p></RecruitmentDetails>
+   </section></div><RecruitmentDetails title="구매 집계 기준 자세히 보기"><p>현재 모집 신청자와 동일한 회원 계정의 신청 이후 결제만 관찰합니다.</p><p>두 카드의 대상이 다르므로 숫자가 같지 않을 수 있습니다. 광고 효과·1차/앵콜 전환율로 해석하지 않습니다.</p><p>두 집계 모두 시험·내부·0원 주문을 제외합니다. 여러 상품이 포함된 주문과 결제 증거가 맞지 않는 주문은 검토 대상으로 구분합니다.</p><p>환불은 조회 시점의 누적액입니다.</p></RecruitmentDetails>
    </div>
   </>}
   {report?.campaign&&<div hidden={workspace&&view!=='broadcast'}><WebinarBroadcastManagement key={report.campaign.id} code={report.campaign.id} campaignEnabled={report.campaign.enabled}/></div>}

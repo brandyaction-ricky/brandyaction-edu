@@ -3,7 +3,7 @@ export type ConsentChoices = { marketingUse: boolean; sms: boolean; kakao: boole
 export const emptyConsent: ConsentChoices = { marketingUse: false, sms: false, kakao: false, email: false };
 export type ConsentSnapshot = {
   choices: ConsentChoices; revision: string | null; updatedAt: string | null;
-  dates: Record<keyof ConsentChoices, string | null>; legacyRetired: boolean;
+  dates: Record<keyof ConsentChoices, string | null>; legacyRetired: boolean; legacyActive?: boolean;
   changed?: { kind: keyof ConsentChoices; action: 'consent' | 'refusal' | 'withdrawal' }[];
 };
 export function validateConsentChoices(value: unknown): value is ConsentChoices {

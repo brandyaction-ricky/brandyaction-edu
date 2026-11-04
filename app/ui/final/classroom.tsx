@@ -1,4 +1,6 @@
 "use client";
+import './classroom-surface.css';
+import { curriculumDay } from '@/lib/curriculum-days';
 import { LearningProgress } from './learning-progress';
 import { DiagnosisEntry } from './diagnosis-entry';
 import {
@@ -20,7 +22,7 @@ import {
   Play,
 } from "lucide-react";
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   LiveSchedule,
   MissionForm,
@@ -53,8 +55,24 @@ export function Classroom({
   blockLearningEnabled?: boolean;
 }) {
   const [navOpen, setNavOpen] = useState(false);
-  const [completedHere, setCompletedHere] = useState<string[]>([]);
+  const navRef = useRef<HTMLElement>(null);
+  const enrollmentPathId = path[1], lessonPathId = path[2];
   const progression = useLessonProgression(path[1], blockLearningEnabled);
+  const navigationKey = progression.lessons?.map(item => `${item.lessonId}:${item.track}:${item.ongoing}`).join("|");
+  // Scroll only the lesson list; opening a lesson must not move the page itself.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      const nav = navRef.current;
+      const active = nav?.querySelector<HTMLElement>('.lesson-nav.active');
+      if (!nav || !active || !nav.clientHeight) return;
+      const list = nav.getBoundingClientRect(), item = active.getBoundingClientRect();
+      if (item.top < list.top || item.bottom > list.bottom) {
+        nav.scrollTop += item.top - list.top - Math.max(0, (nav.clientHeight - item.height) / 2);
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [enrollmentPathId, lessonPathId, navOpen, loading, data, navigationKey]);
+  const [completedHere, setCompletedHere] = useState<string[]>([]);
   const enrollment = (data.enrollments || []).find(
     (e) => e.id === path[1] && hasLearningAccess(e),
   );
@@ -84,7 +102,7 @@ export function Classroom({
   const allLessons = enrollmentLessons(data, enrollment);
   const selectedId = allLessons.find(item => item.id === path[2])?.id || allLessons[0]?.id;
   const selectedGate = progression.lessons?.find(item => item.lessonId === selectedId);
-  const lessonDay = (id: string, fallback: number) => progression.lessons?.find(item => item.lessonId === id)?.dayNumber ?? fallback;
+  const lessonDay = (id: string, fallback: number) => progression.lessons?.find(item => item.lessonId === id)?.dayNumber ?? (allLessons.some(item => item.id === id) ? curriculumDay(data, allLessons.find(item => item.id === id)) : fallback);
   const group = (gate?: LessonGate) => gate?.ongoing ? 'ongoing' : gate?.track;
   const hasTracks = progression.lessons?.some(item => group(item) != null);
   const lessonLabel = (id: string, fallback: number) => progression.lessons?.find(item => item.lessonId === id)?.ongoing ? '지속 챌린지' : `DAY ${lessonDay(id, fallback)}`;
@@ -241,7 +259,7 @@ export function Classroom({
   return (
     <div className="learning-bg">
       <div className="wrap">
-        {graduate && <p className="meta mb16">졸업생 모드 · 최신 공개 커리큘럼을 보고 질문할 수 있습니다. 학습 답변과 미션 제출은 종료되었습니다.</p>}
+        {graduate && <p className="meta mb16">졸업생 모드 · 최신 공개 커리큘럼을 보고 질문할 수 있습니다. {blockLearningEnabled && '개인 실습 입력·저장과 프롬프트 생성도 계속 이용할 수 있습니다. '}공식 미션 제출과 멘토 검수는 종료되었습니다.</p>}
         <div className="learning-top">
           <div>
             <h1>{t(course, "title")}</h1>
@@ -258,6 +276,7 @@ export function Classroom({
         <button
           className="btn learning-mobile-toggle"
           aria-expanded={navOpen}
+          aria-controls="classroom-lesson-list"
           onClick={() => setNavOpen(!navOpen)}
         >
           학습 목록
@@ -265,6 +284,8 @@ export function Classroom({
         </button>
         <div className="learning-layout">
           <aside
+            ref={navRef}
+            id="classroom-lesson-list"
             className={"learning-nav " + (navOpen ? "open" : "")}
             aria-label="학습 목록"
           >

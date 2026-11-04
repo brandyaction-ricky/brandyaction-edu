@@ -438,6 +438,8 @@ test('room settings save separately from product mapping and changing recruitmen
   await page.getByRole('button',{name:'새로고침',exact:true}).click();
   await page.getByRole('button',{name:'모집 경로 준비',exact:true}).click();
   await page.getByRole('button',{name:'모집별 카톡방 관리',exact:true}).click();
+  await expect(page.getByRole('textbox',{name:'즉시 공개 자료'})).toBeHidden();
+  await page.locator('.recruitment-announcement-disclosure > summary').click();
   await expect(page.getByRole('heading',{name:'카톡방 공지 만들기'})).toBeVisible();
   await page.getByRole('textbox',{name:'라이브 날짜'}).fill('10/30 (금)');
   await page.getByRole('textbox',{name:'즉시 공개 자료'}).fill('새 자료 제목');
@@ -498,7 +500,7 @@ test('recruitment links activate explicitly, show distinct channel URLs and stop
 test('integrated workspace separates inquiry review from recruitment and removes duplicate mapping draft', async ({ page }) => {
   await fixture(page);
   await page.goto('/admin/conversion?workspace=1');
-  await expect(page.getByRole('heading', { name: '모집 운영', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '모집·문의 검토', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '모집 경로 초안 저장', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '카톡 문의 붙여넣기', exact: true })).not.toBeVisible();
   await page.getByRole('button', { name: /문의·Jev 검토/ }).click();

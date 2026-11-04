@@ -10,10 +10,27 @@ function load(name) {
   new Function('exports','require', ts.transpileModule(source, {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(exports, path => load(path.replace('./','')));
   return exports;
 }
-const {lessonCanvasNodes,blocksFromCanvas,duplicateLessonBlock} = load('lesson-document-canvas');
+const {lessonCanvasNodes,blocksFromCanvas,duplicateLessonBlock,lessonClipboardNodes} = load('lesson-document-canvas');
 const {newGuidedBlock} = load('lesson-guided-tools');
 const {newCalculatorBlock} = load('lesson-calculators');
 const {lessonDocumentForEditor, serializeLessonDocument, parseLessonDocument, normalizeLessonDocument, lessonBodyPlainText} = load('lesson-body');
+const {positionLessonImage} = load('lesson-image-position');
+const {lessonEmbeddedImageIds, removeLessonImageReference} = load('lesson-toggle-images');
+const {cloneLessonCards} = load('lesson-editor-import');
+test('toggle images keep authorized flat assets through projection, copying and moving back out',()=>{
+ const image={id:'photo',type:'image',assetId:'aaaaaaaa-1111-4111-8111-111111111111',alt:'파일 안내',content:'원본 설명'};
+ const owner={id:'toggle',type:'text',content:serializeLessonDocument({type:'doc',content:[{type:'details',content:[{type:'detailsSummary',content:[{type:'text',text:'자료'}]},{type:'detailsContent',content:[{type:'paragraph'}]}]}]})};
+ const original=[owner,image,blocks[3]], moved=positionLessonImage(original,image,{blockId:'toggle',togglePath:[0,1]},'unused');
+ assert.deepEqual(moved.slice(1),original.slice(1)); assert.deepEqual([...lessonEmbeddedImageIds(moved)],['photo']);
+ assert.deepEqual(blocksFromCanvas(lessonCanvasNodes(moved)),moved);
+ const doc=parseLessonDocument(moved[0].content);assert.deepEqual(doc.content[0].content[1].content[1],{type:'lessonImage',attrs:{blockId:'photo'}});
+ const copied=cloneLessonCards(moved);assert.deepEqual([...lessonEmbeddedImageIds(copied)],[copied[1].id]);assert.equal(copied[1].assetId,image.assetId);
+ assert.throws(()=>cloneLessonCards([moved[0]]),/이미지도 함께/);
+ assert.deepEqual(positionLessonImage(moved,image,{blockId:'toggle',after:true},'unused'),original);
+ assert.equal(lessonEmbeddedImageIds(removeLessonImageReference(moved,'photo')).size,0);
+ const unsafe={type:'doc',content:[{type:'lessonImage',attrs:{blockId:'photo',src:'javascript:bad',style:'position:fixed',block:{quiz:{privateKey:1}}}}]};
+ assert.deepEqual(parseLessonDocument(serializeLessonDocument(unsafe)).content,[{type:'lessonImage',attrs:{blockId:'photo'}}]);
+});
 const blocks = [
   {id:'raw',type:'text',content:'원문\n\n[링크](https://example.com)'}, {id:'h',type:'heading',content:'한 제목'},
   {id:'s',type:'subheading',content:'작은 제목'}, {id:'q',type:'question',question:{label:'기존 질문',kind:'image',required:true}},
@@ -38,6 +55,17 @@ test('callout content persists through the canvas without changing activities or
 });
 test('whole lesson projection round-trips every opaque tool and untouched legacy text exactly',()=>{
   assert.deepEqual(blocksFromCanvas(lessonCanvasNodes(blocks)),blocks);
+});
+test('clipboard projection omits the original text cache without mutating content, marks or activity identities',()=>{
+ const nodes=lessonCanvasNodes(blocks), before=structuredClone(nodes), copied=lessonClipboardNodes(nodes);
+ assert.deepEqual(nodes,before);
+ for(let n=0;n<3;n++) {
+  assert.equal(copied[n].attrs.block.content,'');
+  assert.deepEqual(copied[n].content,nodes[n].content);
+  assert.equal(copied[n].attrs.block.id,blocks[n].id);
+ }
+ assert.deepEqual(copied.slice(3),nodes.slice(3));
+ assert.deepEqual(lessonClipboardNodes([]),[]);
 });
 test('editing plain heading preserves identity; richer heading becomes formatted text without dropping marks',()=>{
  const nodes=lessonCanvasNodes(blocks);nodes[1].content[0].content[0].text='새 제목';
@@ -66,4 +94,45 @@ test('text colors round-trip canvas and reject injected or unsupported styles',(
   const clean=normalizeLessonDocument({type:'doc',content:[{type:'paragraph',content:[{type:'text',text:'안내',marks:[{type:'textStyle',attrs:{color:invalid,backgroundColor:invalid,fontSize:'20px'}}]}]}]});
   assert.deepEqual(clean.content[0].content[0].marks,[{type:'textStyle',attrs:{fontSize:'20px'}}]);
  }
+});
+test('file attachments survive toggle embedding, clipboard remapping, duplication, and moving outside',()=>{
+ const file={id:'download',type:'file',assetId:'aaaaaaaa-1111-4111-8111-111111111111',content:'수업 템플릿'};
+ const owner={id:'body',type:'text',content:serializeLessonDocument({type:'doc',content:[{type:'details',content:[{type:'detailsSummary',content:[{type:'text',text:'첨부 자료'}]},{type:'detailsContent',content:[{type:'paragraph'}]}]}]})};
+ const original=[owner,file],moved=positionLessonImage(original,file,{blockId:'body',togglePath:[0,1]},'unused');
+ assert.deepEqual(blocksFromCanvas(lessonCanvasNodes(moved)),moved);assert.deepEqual([...lessonEmbeddedImageIds(moved)],['download']);
+ assert.equal(parseLessonDocument(moved[0].content).content[0].content[1].content[1].type,'lessonFile');
+ const copied=cloneLessonCards(moved);assert.deepEqual([...lessonEmbeddedImageIds(copied)],[copied[1].id]);assert.equal(copied[1].assetId,file.assetId);
+ assert.deepEqual(positionLessonImage(moved,file,{blockId:'body',after:true},'unused'),original);
+ assert.equal(lessonEmbeddedImageIds(removeLessonImageReference(moved,'download')).size,0);
+ const onlyFile={type:'doc',content:[{type:'lessonFile',attrs:{blockId:'download',url:'https://bad.test',block:{private:1}}}]};
+ assert.deepEqual(parseLessonDocument(serializeLessonDocument(onlyFile)).content,[{type:'lessonFile',attrs:{blockId:'download'}}]);
+});
+
+test('all non-text activities can live in toggles without changing answers, quiz keys or copy identities',()=>{
+ const {validateLessonBlocks,publicLessonBlocks}=load('lesson-blocks');
+ const owner={id:'body',type:'text',content:serializeLessonDocument({type:'doc',content:[{type:'details',content:[{type:'detailsSummary',content:[{type:'text',text:'학습 도구'}]},{type:'detailsContent',content:[{type:'paragraph'}]}]}]})};
+ const tools=[{id:'prompt',type:'prompt',content:'줄 하나\n둘'},...blocks.slice(3)];
+ for(const tool of tools){
+  const original=[owner,tool], nested=positionLessonImage(original,tool,{blockId:'body',togglePath:[0,1]},'unused');
+  assert.equal(parseLessonDocument(nested[0].content).content[0].content[1].content[1].type,'lessonEmbed');
+  assert.deepEqual(blocksFromCanvas(lessonCanvasNodes(nested)),nested);
+  assert.deepEqual(nested[1],tool);
+  assert.deepEqual(validateLessonBlocks({schemaVersion:1,blocks:nested,checklist:[]}).blocks,nested);
+  const copied=cloneLessonCards(nested);
+  assert.deepEqual([...lessonEmbeddedImageIds(copied)],[copied[1].id]);
+  assert.throws(()=>cloneLessonCards([nested[0]]),/학습 항목도 함께/);
+  assert.deepEqual(positionLessonImage(nested,tool,{blockId:'body',after:true},'unused'),original);
+  assert.equal(lessonEmbeddedImageIds(removeLessonImageReference(nested,tool.id)).size,0);
+  if(tool.type==='quiz')assert.equal(publicLessonBlocks({schemaVersion:1,blocks:nested,checklist:[]}).blocks[1].quiz.questions[0].correctIndex,undefined);
+ }
+});
+test('embedded tools reject missing, recursive, wrong-type and repeated references before saving',()=>{
+ const {validateLessonBlocks}=load('lesson-blocks');
+ const prompt={id:'prompt',type:'prompt',content:'복사할 내용'};
+ const make=(refs)=>({schemaVersion:1,blocks:[{id:'body',type:'text',content:serializeLessonDocument({type:'doc',content:refs.map(blockId=>({type:'lessonEmbed',attrs:{blockId}}))})},prompt],checklist:[]});
+ for(const refs of [['missing'],['body'],['prompt','prompt']])assert.throws(()=>validateLessonBlocks(make(refs)),/학습 항목 연결/);
+ const nodes=lessonCanvasNodes(make(['prompt']).blocks);nodes[0].content[0].attrs.block={id:'prompt',type:'text',content:'잘못된 본문'};
+ assert.throws(()=>blocksFromCanvas(nodes),/연결/);
+ const saved=serializeLessonDocument({type:'doc',content:[{type:'lessonEmbed',attrs:{blockId:'prompt',block:{quiz:{secret:1}},onclick:'bad'}}]});
+ assert.deepEqual(parseLessonDocument(saved).content,[{type:'lessonEmbed',attrs:{blockId:'prompt'}}]);
 });

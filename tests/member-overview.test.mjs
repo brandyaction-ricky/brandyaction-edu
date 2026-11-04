@@ -6,14 +6,15 @@ import ts from 'typescript';
 const source = fs.readFileSync(new URL('../app/api/admin/member-overview/route.ts', import.meta.url), 'utf8');
 const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
-function harness({ authenticated = true, allowed = true, profile = true, failure = '' } = {}) {
+function harness({ authenticated = true, allowed = true, profile = true, failure = '', deletionReady = false } = {}) {
   const calls = [];
-  const rows = Array.from({ length: 45 }, (_, n) => ({ id: id(n + 100), user_id: n < 25 ? id(1) : id(2), enrollments: { user_id: n < 25 ? id(1) : id(2) } }));
+  const rows = Array.from({ length: 45 }, (_, n) => ({ id: id(n + 100), deleted_at: n < 5 ? '2026-10-11' : null, user_id: n < 25 ? id(1) : id(2), enrollments: { user_id: n < 25 ? id(1) : id(2) } }));
   const db = { from(table) {
     const call = { table, filters: [], orders: [] }; calls.push(call);
     const query = {
       select(columns, options) { Object.assign(call, { columns, options }); return this; },
       eq(key, value) { call.filters.push([key, value]); return this; },
+      is(key, value) { call.filters.push([key, value]); return this; },
       neq(key, value) { call.excluded = [key, value]; return this; },
       order(key, options) { call.orders.push([key, options]); return this; },
       range(start, end) { call.range = [start, end]; return this; },
@@ -31,6 +32,7 @@ function harness({ authenticated = true, allowed = true, profile = true, failure
     '@/lib/server-auth': { getAuthenticatedUser: async () => authenticated ? { id: id(3) } : null },
     '@/lib/operator-permissions': { getOperatorUser: async (scope, user) => { assert.equal(scope, 'members'); assert.equal(user.id, id(3)); return allowed ? user : null; } },
     '@/lib/edu-workflows': { uuid: value => typeof value === 'string' && /^[0-9a-f-]{36}$/i.test(value) },
+    '@/lib/question-deletion-server': { questionDeletionReady: async () => { if (failure === 'deletion') throw Error('private SQL detail'); return deletionReady; } },
   };
   const exports = {};
   new Function('exports', 'require', code)(exports, name => { assert.ok(name in dependencies, name); return dependencies[name]; });
@@ -43,6 +45,15 @@ test('member read checks login and member scope before opening admin DB', async 
     assert.equal((await api.read()).status, expected);
     assert.equal(api.opened(), false);
   }
+});
+test('member questions omit deleted rows before totals and pagination; readiness errors fail closed', async () => {
+  const api = harness({ deletionReady: true }), response = await api.read('', 'questions');
+  assert.equal(response.status, 200); const body = await response.json();
+  assert.equal(body.total, 20); assert.equal(body.rows.length, 20);
+  assert.ok(body.rows.every(row => row.deleted_at === null));
+  assert.deepEqual(api.calls[1].filters, [['user_id', id(1)], ['deleted_at', null]]);
+  const failure = await harness({ failure: 'deletion' }).read('', 'questions');
+  assert.equal(failure.status, 503); assert.doesNotMatch(await failure.text(), /private SQL detail/);
 });
 test('member view and pagination reject invalid values before DB reads', async () => {
   for (const query of ['&page=0', '&page=-1', '&page=1.5', '&page=Infinity', '&page=100001']) {

@@ -26,7 +26,7 @@ const migrations = [
 ];
 
 
-test('reward saves explicit consent and one wallet coupon atomically without changing email or SMS', async t => {
+for (const mode of ['retired', 'pre-retirement']) test(`reward saves explicit consent and one wallet coupon atomically (${mode})`, async t => {
  const db=new PGlite({extensions:{pgcrypto}});t.after(()=>db.close());
     // Recreate only the Supabase platform objects referenced by these migrations.
     await db.exec(`
@@ -48,9 +48,21 @@ test('reward saves explicit consent and one wallet coupon atomically without cha
     `);
 
     for (const migration of migrations) {
-      await db.exec(readFileSync(new URL(`../supabase/migrations/${migration}.sql`, import.meta.url), 'utf8'));
+      const path = mode === 'pre-retirement' && migration === '20261007011925_edu_optional_consent_e6'
+        ? '../supabase/operations/edu_optional_consent_pre_retirement_bootstrap.sql'
+        : `../supabase/migrations/${migration}.sql`;
+      await db.exec(readFileSync(new URL(path, import.meta.url), 'utf8'));
     }
 
+ if (mode === 'pre-retirement') {
+  await db.exec(readFileSync(new URL('../supabase/operations/edu_consent_reward_campaign.sql', import.meta.url), 'utf8'));
+  assert.equal((await db.query('select enabled from edu_consent_reward_config')).rows[0].enabled,false);
+  assert.equal((await db.query('select count(*)::int n from customer_coupons')).rows[0].n,0);
+  assert.equal((await db.query('select count(*)::int n from edu_personalization_terms')).rows[0].n,0);
+  await db.exec(readFileSync(new URL('../supabase/operations/edu_consent_reward_activate.sql', import.meta.url), 'utf8'));
+  assert.equal((await db.query('select enabled from edu_consent_reward_config')).rows[0].enabled,true);
+  await db.exec("delete from edu_consent_reward_config; delete from coupons where code='EDU_KAKAO_WELCOME_10000'");
+ }
 
  const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
  for(let n=1;n<=5;n++)await db.query("insert into auth.users(id,email,raw_user_meta_data) values($1,$2,'{}')",[id(n),`reward${n}@example.invalid`]);

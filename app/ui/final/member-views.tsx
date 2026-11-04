@@ -1,4 +1,6 @@
 "use client";
+import usability from './usability.module.css';
+import { curriculumDay } from '@/lib/curriculum-days';
 import { MemberLearningCare } from "./learning-care";
 import { ConsentRewardCard } from "../consent-reward-card";
 import { PersonalizationSettings } from '../personalization-settings';
@@ -10,6 +12,7 @@ import { AppInstallCard } from './app-install';
 import { DiagnosisEntry } from './diagnosis-entry';
 import { QuestionImage } from './question-image';
 import { QuestionAnswerHistory } from './question-thread';
+import { QuestionDeleteControl } from './question-delete-control';
 import { AnswerText } from './lesson-text';
 import { MemberMessages } from './member-messages';
 import { EncouragementEditor, EncouragementWall } from './member-encouragement';
@@ -34,7 +37,6 @@ import { cohortLessonVisible, cohortWeekVisible } from '@/lib/cohort-curriculum-
 import {
   ArrowRight,
   BookOpen,
-  CalendarDays,
   ChevronRight,
   Download,
   FileText,
@@ -49,7 +51,7 @@ import {
   UserRound,
 } from "lucide-react";
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   LiveSchedule,
   type Data,
@@ -60,6 +62,8 @@ import { Badge, Empty, Heading, ResourceRow } from "./primitives";
 import { DigitalContentOutline, ProductResourceRow } from "./primitives";
 import { productDigitalSections, productResources } from "@/lib/product-metadata";
 import './member-learning-ux.css';
+import { MobileLearningDetails } from './mobile-learning-details';
+import memberTheme from './member-theme.module.css';
 
 const accountGroups = [
   [
@@ -68,6 +72,7 @@ const accountGroups = [
       ["", "마이페이지", LayoutDashboard],
       ["classes", "내 클래스", BookOpen],
       ["missions", "내 미션", Target],
+      ["resources", "수강 자료·구매 파일", Download],
       ["questions", process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === "true" ? "질문·답변" : "내 질문", MessageCircle],
     ],
   ],
@@ -225,6 +230,36 @@ function EnrolledCard({
     </article>
   );
 }
+function ArticleShortcut({ data }: { data: Data }) {
+  const [revision, setRevision] = useState(0);
+  const [result, setResult] = useState<{ count: number; videos: boolean; articlesEnabled: boolean; lecturesEnabled: boolean } | 'error' | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => { setResult('error'); controller.abort(); }, 10000);
+    void fetch('/api/platform?view=articles', { signal: controller.signal, cache: 'no-store' })
+      .then(async response => {
+        if (!response.ok) throw new Error('콘텐츠 조회 실패');
+        const body = await response.json();
+        const setting = body?.data?.article_banner?.[0]?.value;
+        if (!setting || typeof setting.articleCount !== 'number') throw new Error('콘텐츠 조회 결과 누락');
+        if (!controller.signal.aborted) setResult({ count: setting.articleCount, videos: Array.isArray(setting.videos) && setting.videos.some((video: { available?: boolean }) => video.available), articlesEnabled: setting.articlesEnabled !== false, lecturesEnabled: setting.enabled !== false });
+      }).catch(() => { if (!controller.signal.aborted) setResult('error'); }).finally(() => clearTimeout(timer));
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [revision]);
+  const visible = contentVisibility(data);
+  const articles = result && result !== 'error' ? result.articlesEnabled && result.count > 0 : visible.articles;
+  const videos = result && result !== 'error' ? result.lecturesEnabled && result.videos : visible.lectures;
+  const empty = result && result !== 'error' && !articles && !videos;
+  return <>
+    <Link href={empty ? '/classes?type=free' : '/articles'}>
+      <Play />
+      <div><b>{empty ? '무료 클래스 둘러보기' : articles ? videos ? '무료강의와 아티클' : '아티클' : '무료강의'}</b><span>{empty ? '지금 신청할 수 있는 클래스를 찾아보세요' : '업무에 적용할 인사이트'}</span></div>
+      <ArrowRight />
+    </Link>
+    {result === 'error' && <p className="meta" role="status">콘텐츠 현황을 확인하지 못했습니다. <button type="button" className="btn small" onClick={() => { setResult(null); setRevision(value => value + 1); }}>다시 확인</button></p>}
+  </>;
+}
+
 function Dashboard({
   data,
   user,
@@ -286,7 +321,7 @@ function Dashboard({
         </Link>
       </Heading>
       <div className="member-focus-grid">
-        {graduate && e ? <section className="member-learning-intro"><h2>{t(c, 'title')}</h2><p className="meta">{t(cohort, 'name')} · 졸업생</p><p>최신 공개 커리큘럼을 언제든 다시 볼 수 있습니다.</p><Link className="btn primary mt16" href={'/learn/' + e.id}>최신 커리큘럼 보기 <ArrowRight /></Link></section> : blockLearningEnabled && e ? <section className="member-learning-intro"><div className="member-journey-head"><div><span className="member-journey-eyebrow">나의 학습</span><h2>{t(c, "title")}</h2><p className="meta">{t(cohort, "name")} · 현재 공개된 학습을 이어가세요.</p></div>{primaryOverview?.status === 'ready' && <Link className="btn primary" href={'/learn/' + e.id + (upcomingLesson ? '/' + upcomingLesson.id : '')}>{upcomingLesson ? '이어서 학습하기' : '공개된 학습 보기'} <ArrowRight /></Link>}</div><div className="member-next-lesson"><span>다음 학습</span><b>{upcomingLesson ? `${nextAvailableItem?.day ? `DAY ${nextAvailableItem.day} · ` : ''}${t(upcomingLesson, 'title')}` : lessons.length && complete.length === lessons.length ? '현재 공개된 학습을 완료했습니다.' : lessons.length ? '다음 학습을 기다리고 있습니다.' : '공개된 학습을 준비하고 있습니다.'}</b><small>{upcomingLesson ? '이어보기를 눌러 학습을 시작하세요.' : '다음 학습이 열리면 이곳에서 확인할 수 있습니다.'}</small></div>{visibleWeeks.length > 0 && <div className="member-week-journey" aria-label="현재 공개된 주차">{visibleWeeks.map(week => { const weekLessons = lessons.filter(lesson => lesson.week_id === week.id); const weekDone = weekLessons.filter(lesson => complete.some(progress => progress.lesson_id === lesson.id)).length; return <div className="member-week-step" key={week.id}><span>{num(week, 'week_number') === 0 ? 'W0' : `W${num(week, 'week_number')}`}</span><b>{t(week, 'title')}</b><small>{weekDone} / {weekLessons.length}개 완료</small></div>; })}</div>}{!(primaryOverview?.status === 'ready' && primaryOverview.groups.length === 0) && <EnrollmentLearningOverview data={data} enrollment={e}/>}</section> : <>
+        {graduate && e ? <section className="member-learning-intro"><h2>{t(c, 'title')}</h2><p className="meta">{t(cohort, 'name')} · 졸업생</p><p>최신 공개 커리큘럼을 언제든 다시 볼 수 있습니다.</p><Link className="btn primary mt16" href={'/learn/' + e.id}>최신 커리큘럼 보기 <ArrowRight /></Link></section> : blockLearningEnabled && e ? <section className="member-learning-intro"><div className="member-journey-head"><div><span className="member-journey-eyebrow">나의 학습</span><h2>{t(c, "title")}</h2><p className="meta">{t(cohort, "name")} · 현재 공개된 학습을 이어가세요.</p></div>{primaryOverview?.status === 'ready' && <Link className="btn primary" href={'/learn/' + e.id + (upcomingLesson ? '/' + upcomingLesson.id : '')}>{upcomingLesson ? '이어서 학습하기' : '공개된 학습 보기'} <ArrowRight /></Link>}</div><div className="member-next-lesson"><span>다음 학습</span><b>{upcomingLesson ? `${nextAvailableItem?.day ? `DAY ${nextAvailableItem.day} · ` : ''}${t(upcomingLesson, 'title')}` : lessons.length && complete.length === lessons.length ? '현재 공개된 학습을 완료했습니다.' : lessons.length ? '다음 학습을 기다리고 있습니다.' : '공개된 학습을 준비하고 있습니다.'}</b><small>{upcomingLesson ? '이어보기를 눌러 학습을 시작하세요.' : '다음 학습이 열리면 이곳에서 확인할 수 있습니다.'}</small></div><MobileLearningDetails collapsible={primaryOverview?.status === 'ready' && primaryOverview.groups.length > 0}>{visibleWeeks.length > 0 && <><p className="member-scroll-hint">좌우로 밀어 다른 주차를 확인하세요.</p><div className="member-week-journey" aria-label="현재 공개된 주차">{visibleWeeks.map(week => { const weekLessons = lessons.filter(lesson => lesson.week_id === week.id); const weekDone = weekLessons.filter(lesson => complete.some(progress => progress.lesson_id === lesson.id)).length; return <div className={"member-week-step" + (upcomingLesson?.week_id === week.id ? " is-current" : "")} aria-current={upcomingLesson?.week_id === week.id ? "step" : undefined} key={week.id}><span>{num(week, 'week_number') === 0 ? 'W0' : `W${num(week, 'week_number')}`}</span><b>{t(week, 'title')}</b>{upcomingLesson?.week_id === week.id && <span className="member-current-week">현재 학습 주차</span>}<small>{weekDone} / {weekLessons.length}개 완료</small></div>; })}</div></>}{!(primaryOverview?.status === 'ready' && primaryOverview.groups.length === 0) && <EnrollmentLearningOverview data={data} enrollment={e}/>}</MobileLearningDetails></section> : <>
         <section className="member-continue">
           <div className="member-kicker">
             이어서 학습하기 <span>{t(cohort, "name") || "MY LEARNING"}</span>
@@ -300,7 +335,7 @@ function Dashboard({
           </h2>
           <p className="member-lesson-meta">
             {next
-              ? `DAY ${String(num(next, "day_number")).padStart(2, "0")} · ${t(next, "duration_label")}`
+              ? `DAY ${String(curriculumDay(data, next)).padStart(2, "0")} · ${t(next, "duration_label")}`
               : "내 업무에 필요한 클래스를 찾아보세요."}
           </p>
           <div className="member-progress-caption">
@@ -469,22 +504,6 @@ function Dashboard({
             <p className="panel-body muted">지금 처리할 미션이 없습니다.</p>
           )}
         </section>
-        <section className="panel member-agenda">
-          <div className="panel-head">
-            <h2>다가오는 일정</h2>
-            <CalendarDays />
-          </div>
-          {participating.map((e) => (
-            <LiveSchedule key={e.id} data={data} cohortId={t(e, "cohort_id")} />
-          ))}
-          {!rows(data, "cohort_sessions").some((s) =>
-            participating.some((e) => s.cohort_id === e.cohort_id),
-          ) && <p className="panel-body muted">지금 확인할 일정이 없습니다. 새 일정이 등록되면 이곳에서 확인할 수 있습니다.</p>}
-          <Link className="member-agenda-link" href="/my/orders">
-            신청·주문 내역 확인
-            <ArrowRight />
-          </Link>
-        </section>
       </div>
       {(!blockLearningEnabled || active.length !== 1) && <section className="member-classes">
         <div className="section-head">
@@ -517,14 +536,7 @@ function Dashboard({
           </div>
           <ArrowRight />
         </Link>}
-        {(contentVisibility(data).articles || contentVisibility(data).lectures) && <Link href="/articles">
-          <Play />
-          <div>
-            <b>{contentVisibility(data).articles ? contentVisibility(data).lectures ? "무료강의와 아티클" : "아티클" : "무료강의"}</b>
-            <span>업무에 적용할 인사이트</span>
-          </div>
-          <ArrowRight />
-        </Link>}
+        <ArticleShortcut data={data}/>
         <Link href="/my/reviews">
           <Star />
           <div>
@@ -560,7 +572,7 @@ function Missions({ data, active }: { data: Data; active: Row[] }) {
         description="공개된 미션의 제출 상태와 다음에 할 일을 확인하세요."
       />
       <section className="member-mission-journey" aria-label="미션 진행 안내"><div><b>1. 미션 작성</b><span>공개된 수업에서 제출</span></div><div><b>2. 검토·보완</b><span>피드백을 확인하고 수정</span></div><div><b>3. 승인 완료</b><span>완료 기록 확인</span></div></section>
-      <LearningProgress complete={entries.filter(entry => entry.status === "approved").length} total={entries.length} label="현재 공개된 미션 승인"/>
+      {entries.length ? <LearningProgress complete={entries.filter(entry => entry.status === "approved").length} total={entries.length} label="현재 공개된 미션 승인"/> : <p className="notice">아직 공개된 미션이 없습니다.</p>}
       <div className="member-mission-filter">
         <label>
           클래스 · 기수
@@ -615,7 +627,7 @@ function Missions({ data, active }: { data: Data; active: Row[] }) {
               <span className="member-mission-day">
                 DAY
                 <strong>
-                  {String(num(x.lesson, "day_number")).padStart(2, "0")}
+                  {String(curriculumDay(data, x.lesson)).padStart(2, "0")}
                 </strong>
               </span>
               <div className="row-text">
@@ -693,6 +705,7 @@ function LegacyQuestions({
     [writing, setWriting] = useState(!!order),
     [error, setError] = useState("");
   const [threadStatuses, setThreadStatuses] = useState<Record<string, string>>({});
+  const [deletedQuestions, setDeletedQuestions] = useState<string[]>([]);
   const questionStatus = (q: Row) => threadStatuses[String(q.id)] || q.status;
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -714,8 +727,8 @@ function LegacyQuestions({
   }
   const list = rows(data, "edu_questions").filter(
     (q) =>
-      filter === "전체" ||
-      (questionStatus(q) === "answered" ? "답변 완료" : "답변 대기") === filter,
+      !deletedQuestions.includes(String(q.id)) && (filter === "전체" ||
+      (questionStatus(q) === "answered" ? "답변 완료" : "답변 대기") === filter),
   );
   return (
     <>
@@ -765,6 +778,7 @@ function LegacyQuestions({
           </button>
         ))}
       </div>
+      {deletedQuestions.length > 0 && <p className="meta" role="status">질문을 삭제했습니다.</p>}
       {list.map((q) => (
         <article className="question-card" key={q.id}>
           <div className="between">
@@ -784,6 +798,7 @@ function LegacyQuestions({
           ) : (
             <p className="meta mt16">답변이 도착하면 이곳에서 확인해 주세요.</p>
           )}
+          {process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED === 'true' && <div className="question-card-actions"><QuestionDeleteControl questionId={String(q.id)} onDeleted={() => setDeletedQuestions(old => [...old, String(q.id)])}/></div>}
         </article>
       ))}
       {!list.length && <Empty title="이 상태의 질문이 없습니다." />}
@@ -872,7 +887,7 @@ function Orders({ data }: { data: Data }) {
             </div>
             <div className="order-card-body">
               <div className="summary-thumb">
-                {num(o, "total_amount") === 0 ? "FREE" : "CLASS"}
+                {num(o, "total_amount") === 0 ? "무료 신청" : "CLASS"}
               </div>
               <div>
                 <h3>
@@ -942,6 +957,7 @@ function Coupons({ data }: { data: Data }) {
         {["available", "used", "revoked"].map((s) => (
           <button
             className={"tab " + (tab === s ? "active" : "")}
+            aria-pressed={tab === s}
             key={s}
             onClick={() => setTab(s)}
           >
@@ -957,7 +973,7 @@ function Coupons({ data }: { data: Data }) {
             <article className="coupon" key={c.id}>
               <div className="coupon-content">
                 <Badge color="red">
-                  {date(c.expires_at || coupon.ends_at)}까지
+                  {c.status === "used" ? "사용 완료" : c.status === "revoked" ? "회수됨" : c.expires_at || coupon.ends_at ? `${date(c.expires_at || coupon.ends_at)}까지` : "사용 기한 안내 없음"}
                 </Badge>
                 <strong className="mt16">
                   {coupon.discount_type === "percentage"
@@ -969,7 +985,7 @@ function Coupons({ data }: { data: Data }) {
                 <p>
                   코드 · {String(coupon.code || "")}
                   <br />
-                  결제 단계에서 적용 조건을 확인하세요.
+                  {c.status === "used" ? "사용을 완료한 쿠폰입니다." : c.status === "revoked" ? "회수된 쿠폰입니다." : "결제 단계에서 적용 조건을 확인하세요."}
                 </p>
                 <Link className="btn small mt16" href="/classes">
                   클래스 보기
@@ -984,7 +1000,7 @@ function Coupons({ data }: { data: Data }) {
       </div>
       {!list.length && <Empty title="해당하는 쿠폰이 없습니다." />}
       <div className="notice mt24">
-        결제 화면에서 쿠폰 코드를 입력하세요. 쿠폰마다 사용 기간과 적용 조건이 다를 수 있으니 결제창에서 할인 금액을 확인해 주세요.
+        {tab === "available" ? "결제 화면에서 쿠폰 코드를 입력하세요. 쿠폰마다 사용 기간과 적용 조건이 다를 수 있으니 결제창에서 할인 금액을 확인해 주세요." : tab === "used" ? "이미 사용한 쿠폰 내역입니다." : "회수된 쿠폰 내역입니다."}
       </div>
     </>
   );
@@ -1091,7 +1107,7 @@ function Profile({
       <form onSubmit={submit}>
         <section className="panel">
           <div className="panel-head">
-            <h2>기본 정보</h2>
+            <h2>기본 정보</h2><span className="meta">변경 내용 저장 버튼으로 저장</span>
           </div>
           <div className="panel-body">
             <div className="flex mb24">
@@ -1103,7 +1119,8 @@ function Profile({
                 <p className="meta">내 학습 계정</p>
               </div>
             </div>
-            <div className="profile-grid">
+            <p className={usability.profileHelp}>이름·휴대폰 번호·안내받을 이메일은 입력 후 ‘변경 내용 저장’을 눌러야 반영됩니다. 아래의 로그인 이메일 변경과 수신 설정은 각 영역에서 따로 관리합니다.</p>
+            <div className={`profile-grid ${usability.profileFields}`}>
               <label className="field">
                 이름
                 <input
@@ -1137,8 +1154,7 @@ function Profile({
               </label>
             </div>
           </div>
-        </section>
-        <div className="between mt24">
+        <div className="member-profile-actions">
           <button
             className="btn ghost"
             type="button"
@@ -1153,10 +1169,11 @@ function Profile({
           </button>
         </div>
         {message && (
-          <p className="notice mt16" role="status">
+          <p className="notice member-profile-status" role="status">
             {message}
           </p>
         )}
+        </section>
       </form>
       <LoginEmailSettings email={user.email} />
       {(process.env.NEXT_PUBLIC_EDU_PERSONALIZATION_CONSENT_ENABLED === 'true' || process.env.NEXT_PUBLIC_EDU_CONSENT_REWARD_ENABLED === 'true') && <PersonalizationSettings/>}
@@ -1222,7 +1239,7 @@ function Reviews({
       {tab === "write" ? (
         <>
           {active.map((e) => (
-            <article className="order-card" key={e.id}>
+            <article className="order-card member-review-invite" key={e.id}>
               <div className="order-card-body">
                 <div className="row-text">
                   <Badge color="green">수강 확인</Badge>
@@ -1232,10 +1249,11 @@ function Reviews({
                       "title",
                     )}
                   </h3>
-                  <p>내 업무에 적용한 경험을 남겨 주세요.</p>
+                  <p>배우기 전과 달라진 점이나 직접 해본 일을 들려주세요.</p>
+                  <small>짧은 경험도 다음 수강생의 선택에 도움이 됩니다.</small>
                 </div>
-                <button className="btn small" onClick={() => setSelected(e.id)}>
-                  후기 작성
+                <button className="btn primary" onClick={() => setSelected(e.id)}>
+                  내 경험 남기기<ArrowRight aria-hidden="true"/>
                 </button>
               </div>
             </article>
@@ -1328,6 +1346,21 @@ export function MemberViews({
   ongoingLesson?: string;
   blockLearningEnabled?: boolean;
 }) {
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    const showActive = () => {
+      const activeLink = nav.querySelector<HTMLElement>('[aria-current="page"]');
+      if (!activeLink || nav.scrollWidth <= nav.clientWidth) return;
+      const bounds = nav.getBoundingClientRect(), item = activeLink.getBoundingClientRect();
+      if (item.left < bounds.left) nav.scrollLeft += item.left - bounds.left;
+      else if (item.right > bounds.right) nav.scrollLeft += item.right - bounds.right;
+    };
+    showActive();
+    window.addEventListener('resize', showActive);
+    return () => window.removeEventListener('resize', showActive);
+  }, [section]);
   const enrollments = rows(data, "enrollments"),
     active = enrollments.filter(enrollment => hasLearningAccess(enrollment));
   let content;
@@ -1351,7 +1384,7 @@ export function MemberViews({
               )}
             </div>
           ))}
-          {hasMemberResources(data) && <Link className="btn mb24" href="/my/resources"><Download/> 수강 자료·구매 파일 받기</Link>}
+          {hasMemberResources(data) && <div className="member-resource-cta"><Link className="btn" href="/my/resources"><Download/> 수강 자료·구매 파일 받기</Link></div>}
           {!enrollments.length && (
             <Empty title="신청한 클래스가 없습니다.">
               <Link href="/classes">클래스 찾아보기</Link>
@@ -1366,7 +1399,7 @@ export function MemberViews({
     case "messages":
     case "questions":
       content = (
-        <><Questions data={data} pending={pending} send={send} order={order} /><details className="panel pad mt24"><summary>질문·답변 알림 설정</summary><PushSettings userId={user.id}/></details>{process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === "true" && <details className="panel pad mt24" open={section === "messages"}><summary>이전 메시지 기록</summary><MemberMessages userId={user.id} readOnly /></details>}</>
+        <><Questions data={data} pending={pending} send={send} order={order} /><details className="panel pad mt24 member-notification-settings"><summary>질문·답변 알림 설정</summary><PushSettings userId={user.id}/></details>{process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED === "true" && <details className="panel pad mt24" open={section === "messages"}><summary>이전 메시지 기록</summary><MemberMessages userId={user.id} readOnly /></details>}</>
       );
       break;
     case "orders":
@@ -1392,7 +1425,7 @@ export function MemberViews({
       content = <Empty title="페이지를 찾을 수 없습니다." />;
   }
   return (
-    <div className="account-bg">
+    <div className={`account-bg ${memberTheme.workspace}`}>
       <div className="wrap account-layout">
         <aside className="account-aside">
           <div className="account-profile">
@@ -1404,7 +1437,8 @@ export function MemberViews({
               <p>나의 배움과 실행</p>
             </div>
           </div>
-          <nav className="account-nav" aria-label="마이페이지">
+          <p className="member-scroll-hint" id="member-menu-hint">메뉴를 좌우로 밀어 더 보기 ↔</p>
+          <nav ref={navRef} className="account-nav" aria-label="마이페이지" aria-describedby="member-menu-hint">
             {["admin", "staff"].includes(user.role) && (
               <Link className="member-mobile-admin-tab" href="/admin">
                 <Settings />

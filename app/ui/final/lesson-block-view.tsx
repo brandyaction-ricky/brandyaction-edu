@@ -1,5 +1,8 @@
 "use client";
 import { lessonImageColumns } from '@/lib/lesson-image-row';
+import { parseLessonDocument, type LessonNode } from '@/lib/lesson-body';
+import { lessonEmbeddedImageIds } from '@/lib/lesson-toggle-images';
+import { LessonDownload } from './lesson-download';
 import { LessonImage } from './lesson-image';
 import { LessonLinkCard } from './lesson-link-preview';
 
@@ -8,7 +11,7 @@ import { LessonAudio } from './lesson-audio';
 import { LessonPrivateMedia } from './lesson-private-media';
 import type { LessonMediaKind } from '@/lib/lesson-media';
 import type { AnswerFileContext } from '@/lib/lesson-files';
-import { useId, useState } from 'react';
+import { useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { defaultBlockCompletion, fillBlockPrompt, type BlockAnswer, type LessonBlockAnswers, type PublicBlockDocument, type PublicLessonBlock } from '@/lib/lesson-blocks';
 import { LessonText } from './lesson-text';
 import { Video } from './primitives';
@@ -20,7 +23,7 @@ import './lesson-blocks.css';
 import { LessonTag } from './lesson-tag';
 
 export type BlockGrade = { correct: number; total: number; passed: boolean; results: { id: string; answered: boolean; correct: boolean }[] };
-const supported = new Set(['heading', 'subheading', 'text', 'video', 'audio', 'image', 'question', 'divider', 'link', 'prompt', 'prompt-generator', 'quiz']);
+const supported = new Set(['heading', 'subheading', 'text', 'video', 'audio', 'image', 'file', 'question', 'divider', 'link', 'prompt', 'prompt-generator', 'quiz']);
 export function canRenderLessonBlocks(document: PublicBlockDocument) {
   return document.blocks.every(block => isGuidedTool(block.type) ? hasGuidedDefinition(block) : isCalculator(block.type) ? hasCalculatorDefinition(block) : supported.has(block.type) && (block.type !== 'question' || ['text', 'image', 'file'].includes(block.question?.kind || '')));
 }
@@ -94,26 +97,53 @@ function BlockQuiz({ block, answer, disabled, onChange, grade }: { block: Public
   </section>;
 }
 
-export function LessonBlockView({ document, values, onChange, readOnly = false, grade, fileContext, submissionId, onFilePending, onAnswerChange, livePrompts = false, floatingAudio = false }: { floatingAudio?: boolean; livePrompts?: boolean; fileContext?: AnswerFileContext; submissionId?: string; onFilePending?: (blockId: string, pending: boolean) => void; onAnswerChange?: (blockId: string, value: BlockAnswer) => void; document: PublicBlockDocument; values: LessonBlockAnswers; onChange: (values: LessonBlockAnswers) => void; readOnly?: boolean; grade?: (blockId: string) => Promise<BlockGrade> }) {
+type OutlineItem = { blockId: string; index: number; label: string };
+function lessonOutline(blocks: PublicLessonBlock[]): OutlineItem[] {
+  const result: OutlineItem[] = [];
+  const textOf = (node: LessonNode): string => (node.text || '') + (node.content || []).map(textOf).join('');
+  for (const block of blocks) {
+    if (block.type === 'heading' || block.type === 'subheading') {
+      if (block.content?.trim()) result.push({ blockId: block.id, index: 0, label: block.content.trim() });
+    } else if (block.type === 'text') {
+      const rich = parseLessonDocument(block.content || '');
+      let index = 0;
+      const visit = (node: LessonNode) => {
+        if (node.type === 'heading') {
+          const label = textOf(node).trim();
+          if (label) result.push({ blockId: block.id, index, label });
+          index++;
+        }
+        node.content?.forEach(visit);
+      };
+      if (rich) visit(rich);
+    }
+  }
+  return result;
+}
+
+export function LessonBlockView({ document, values, onChange, readOnly = false, filesReadOnly = false, grade, fileContext, submissionId, onFilePending, onAnswerChange, livePrompts = false, floatingAudio = false, showOutline = false }: { showOutline?: boolean; floatingAudio?: boolean; livePrompts?: boolean; fileContext?: AnswerFileContext; submissionId?: string; onFilePending?: (blockId: string, pending: boolean) => void; onAnswerChange?: (blockId: string, value: BlockAnswer) => void; document: PublicBlockDocument; values: LessonBlockAnswers; onChange: (values: LessonBlockAnswers) => void; readOnly?: boolean; filesReadOnly?: boolean; grade?: (blockId: string) => Promise<BlockGrade> }) {
+  const blocksRef = useRef<HTMLDivElement>(null);
   function answer(id: string, value: BlockAnswer) { if (onAnswerChange) { onAnswerChange(id, value); return; } onChange({ ...values, blocks: { ...values.blocks, [id]: value } }); }
-  const imageColumns = lessonImageColumns(document.blocks);
-  return <div className={'lesson-blocks' + (imageColumns.size ? ' has-image-rows' : '')}>
-    <LessonTag label={document.presentation?.tagLabel} />
-    {document.blocks.map(block => {
+  const embeddedImages = lessonEmbeddedImageIds(document.blocks);
+  const visibleBlocks = document.blocks.filter(block => !embeddedImages.has(block.id));
+  const imageColumns = lessonImageColumns(visibleBlocks);
+  const embedded = new Map<string, ReactNode>();
+  function renderBlock(block: PublicLessonBlock) {
       const url = mediaUrl(block.url), value = values.blocks[block.id];
       let content;
-      if (block.assetId && ['image', 'audio', 'video'].includes(block.type)) content = <LessonPrivateMedia key={block.assetId} assetId={block.assetId} floatingAudio={floatingAudio} kind={block.type as LessonMediaKind} alt={block.alt} caption={block.content} context={fileContext} submissionId={submissionId} />;
+      if (block.type === 'file') content = block.assetId ? <LessonDownload key={block.assetId} assetId={block.assetId} caption={block.content} context={fileContext} submissionId={submissionId} /> : <p>다운로드할 파일을 첨부해 주세요.</p>;
+      else if (block.assetId && ['image', 'audio', 'video'].includes(block.type)) content = <LessonPrivateMedia key={block.assetId} assetId={block.assetId} floatingAudio={floatingAudio} kind={block.type as LessonMediaKind} alt={block.alt} caption={block.content} context={fileContext} submissionId={submissionId} />;
       else switch (block.type) {
-        case 'heading': content = <h2>{block.content}</h2>; break;
+        case 'heading': content = <h2 tabIndex={showOutline ? -1 : undefined}>{block.content}</h2>; break;
         case 'subheading': content = <h3>{block.content}</h3>; break;
-        case 'text': content = <div className="reading-copy"><LessonText text={block.content || ''} /></div>; break;
+        case 'text': content = <div className="reading-copy"><LessonText text={block.content || ''} images={embedded} /></div>; break;
         case 'divider': content = <hr />; break;
         case 'image': content = url && <figure><LessonImage src={url} alt={block.alt}/>{block.content && <figcaption>{block.content}</figcaption>}</figure>; break;
         case 'audio': content = url && <figure><figcaption>{block.content || '음성 자료'}</figcaption><LessonAudio key={url} floating={floatingAudio} src={url} aria-label={block.alt || '학습 음성'}><a href={url}>음성 파일 열기</a></LessonAudio></figure>; break;
         case 'video': content = url && <><Video url={url} />{block.content && <p>{block.content}</p>}</>; break;
         case 'link': content = url && <LessonLinkCard url={url} title={block.content}/>; break;
         case 'prompt': content = <CopyPrompt text={block.content || ''} />; break;
-        case 'question': content = block.question?.kind === 'text' ? <label className="lb-field lb-card"><span>{block.question.label}{block.question.required && (document.completion || defaultBlockCompletion).requireAnswers ? ' (필수)' : ''}</span><textarea rows={5} maxLength={20000} value={typeof value === 'string' ? value : ''} readOnly={readOnly} onChange={event => answer(block.id, event.target.value)} /></label> : <AnswerFiles block={block} answer={value} onChange={value => answer(block.id, value)} readOnly={readOnly} context={fileContext} submissionId={submissionId} onPending={onFilePending} />; break;
+        case 'question': content = block.question?.kind === 'text' ? <label className="lb-field lb-card"><span>{block.question.label}{block.question.required && (document.completion || defaultBlockCompletion).requireAnswers ? ' (필수)' : ''}</span><textarea rows={5} maxLength={20000} value={typeof value === 'string' ? value : ''} readOnly={readOnly} onChange={event => answer(block.id, event.target.value)} /></label> : <AnswerFiles block={block} answer={value} onChange={value => answer(block.id, value)} readOnly={readOnly || filesReadOnly} context={fileContext} submissionId={submissionId} onPending={onFilePending} />; break;
         case 'prompt-generator': content = <PromptGenerator live={livePrompts} block={block} answer={value} disabled={readOnly} onChange={value => answer(block.id, value)} />; break;
         case 'persona-generator':
         case 'landing-planner': content = <LessonGuidedTool block={block} answer={value} readOnly={readOnly} onChange={value => answer(block.id, value)} />; break;
@@ -125,7 +155,33 @@ export function LessonBlockView({ document, values, onChange, readOnly = false, 
       }
       const column = imageColumns.get(block.id);
       return <div key={block.id} id={fileContext ? 'lesson-block-' + block.id : undefined} data-lesson-block={block.id} data-image-columns={column?.count} style={column ? { gridColumn: `${column.start} / span ${6 / column.count}` } : undefined}>{content}</div>;
-    })}
+  }
+  // Referenced activities use exactly the same renderer and answer callbacks as
+  // top-level activities. Text cannot be embedded, so references cannot recurse.
+  for (const block of document.blocks) if (embeddedImages.has(block.id)) embedded.set(block.id, renderBlock(block));
+  const outline = useMemo(() => {
+    if (!showOutline) return [];
+    const embedded = lessonEmbeddedImageIds(document.blocks);
+    return lessonOutline(document.blocks.filter(block => !embedded.has(block.id)));
+  }, [document, showOutline]);
+  function goToBlock(item: OutlineItem) {
+    const block = Array.from(blocksRef.current?.querySelectorAll<HTMLElement>('[data-lesson-block]') || []).find(element => element.dataset.lessonBlock === item.blockId);
+    const heading = block?.querySelectorAll<HTMLElement>('h1,h2,h3')[item.index];
+    if (!heading) return;
+    let parent: HTMLElement | null = heading.parentElement;
+    while (parent && parent !== blocksRef.current) {
+      if (parent instanceof HTMLDetailsElement) parent.open = true;
+      parent = parent.parentElement;
+    }
+    heading.scrollIntoView({ block: 'start', behavior: 'auto' });
+    if (!heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1');
+    heading.focus({ preventScroll: true });
+  }
+  return <div ref={blocksRef} className={'lesson-blocks' + (imageColumns.size ? ' has-image-rows' : '')}>
+    {outline.length > 1 && <details className="lesson-outline"><summary>이 수업 목차 <span>{outline.length}개 항목</span></summary><nav aria-label="이 수업 목차"><ol>{outline.map(item => <li key={`${item.blockId}:${item.index}`}><button type="button" onClick={() => goToBlock(item)}>{item.label}</button></li>)}</ol></nav></details>}
+    <LessonTag label={document.presentation?.tagLabel} />
+    {visibleBlocks.map(renderBlock)}
+    {showOutline && outline.length > 1 && <div className="lesson-back-to-top"><button type="button" className="btn small" onClick={() => (blocksRef.current?.closest('.learning-content') || blocksRef.current)?.scrollIntoView({ block: 'start', behavior: 'auto' })}>학습 맨 위로 ↑</button></div>}
     {document.checklist.length > 0 && <fieldset className="lb-card" disabled={readOnly}><legend>오늘의 체크리스트</legend>{document.checklist.map(item => <label className="lb-choice" key={item.id}><input type="checkbox" checked={values.checklist.includes(item.id)} onChange={event => onChange({ ...values, checklist: event.target.checked ? [...values.checklist, item.id] : values.checklist.filter(id => id !== item.id) })} />{item.label}{item.required ? ' (필수)' : ''}</label>)}</fieldset>}
   </div>;
 }

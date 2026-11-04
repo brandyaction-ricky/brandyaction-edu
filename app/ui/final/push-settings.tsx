@@ -40,13 +40,13 @@ export function PushSettings({ userId, diagnosis = false }: { userId: string; di
     catch (e) { setNotice((e as Error).message); }
     finally { gate.current = false; setBusy(false); }
   }
-  return <section className="panel pad" aria-label="이 기기의 앱 알림"><h2>{diagnosis ? "보고서 완성 알림" : "앱 알림"}</h2>
+  return <section className="panel pad member-push-settings" aria-label="이 기기의 앱 알림"><h2>{diagnosis ? "보고서 완성 알림" : "앱 알림"}</h2>
     <p>{diagnosis ? "알림을 켜 두면 화면을 닫아도 보고서가 완성됐을 때 알려드려요. 검사 답변과 결과 내용은 알림에 표시하지 않습니다." : "질문·답변 소식을 이 기기로 받습니다. 질문과 답변 본문은 알림에 표시하지 않습니다."}</p>
     {state.unsupported ? <p>이 브라우저에서는 앱 알림을 지원하지 않습니다. iPhone·iPad에서는 Safari에서 ‘홈 화면에 추가’한 뒤 앱을 열어 주세요. {diagnosis ? "완성된 보고서는 N6 진단 화면에서도 확인할 수 있습니다." : "답변은 질문·답변에서도 확인할 수 있습니다."}</p> : <>
       {state.loading ? <p role="status">알림 설정을 확인하고 있습니다.</p> : <p role="status">{!state.publicKey ? '앱 알림 발송이 일시 중지되어 있습니다.' : state.active ? (diagnosis ? '알림이 켜져 있어요. 완성되면 이 기기로 알려드릴게요.' : '이 기기 알림 켜짐') : '이 기기 알림 꺼짐'}</p>}
       {!state.loading && <p className="meta">알림은 이 기기의 앱·브라우저에 연결됩니다. iPhone은 홈 화면에 설치한 앱에서 켜 주세요. 알림이 안 보이면 iPhone 설정의 알림 허용·배너·집중 모드도 확인해 주세요.</p>}
       {state.error && <p role="alert">{state.error}</p>}
-      <div className="row"><button className="btn" disabled={busy || state.loading || (!state.active && !state.publicKey && !state.error)} onClick={() => void change(state.error && !state.publicKey ? false : !state.active)}>{busy ? '설정 확인 중…' : state.active || (state.error && !state.publicKey) ? '이 기기 알림 끄기' : '이 기기 알림 켜기'}</button><button className="btn" disabled={busy} onClick={() => { manualCheck.current = true; setNotice('알림 연결을 확인하고 있습니다.'); setRefresh(n => n + 1); }}>알림 설정 다시 확인</button>{state.active && <button className="btn" disabled={busy} onClick={() => void checkDisplay()}>이 기기 알림 표시 테스트</button>}</div>
+      <div className="row member-push-actions"><button className="btn" disabled={busy || state.loading || (!state.active && !state.publicKey && !state.error)} onClick={() => void change(state.error && !state.publicKey ? false : !state.active)}>{busy ? '설정 확인 중…' : state.active || (state.error && !state.publicKey) ? '이 기기 알림 끄기' : '이 기기 알림 켜기'}</button><button className="btn" disabled={busy} onClick={() => { manualCheck.current = true; setNotice('알림 연결을 확인하고 있습니다.'); setRefresh(n => n + 1); }}>알림 설정 다시 확인</button>{state.active && <button className="btn" disabled={busy} onClick={() => void checkDisplay()}>이 기기 알림 표시 테스트</button>}</div>
       {notice && <p role="status" className="notice mt16">{notice}</p>}
     </>}
   </section>;

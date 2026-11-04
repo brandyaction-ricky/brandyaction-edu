@@ -4,7 +4,7 @@ const cohort=id(1),lesson=id(2),asOf='2026-10-08T08:00:00Z';
 const rows=Array.from({length:4},(_,n)=>({memberId:id(n+10),enrollmentId:id(n+20),name:['푸시 수강생','이메일·알림톡 수강생','이메일 수강생','연락처 없는 수강생'][n],email:n===3?null:`qa${n}@example.test`,lastVisitAt:null,lastContactAt:null,openQuestions:0,cells:[{lessonId:lesson,title:'첫 학습 시작하기',week:0,day:1,track:'learning',state:'not_submitted',published:true}]}));
 const snapshot={cohorts:[{id:cohort,name:'4기',courseTitle:'검수 클래스'}],cohortId:cohort,rows,asOf};
 const reach=rows.map((r,n)=>({memberId:r.memberId,push:n===0,email:n!==3,alimtalk:n<2,sms:n<2,emailMasked:n===3?null:`q***@example.test`,phoneMasked:n<2?'010****5678':null}));
-async function backend(page:Page,{enabled=true,alimtalk=true,fail=false,uncertain=false,changed=false}={}){
+async function backend(page:Page,{enabled=true,alimtalk=true,fail=false,uncertain=false,changed=false,kakao=false}={}){
  const sent:Record<string,unknown>[]=[],reads:string[]=[];let receipt:unknown=null;let reachReads=0;
  await page.route('**/api/admin/learning-care**',async route=>{
   const url=new URL(route.request().url());
@@ -13,7 +13,7 @@ async function backend(page:Page,{enabled=true,alimtalk=true,fail=false,uncertai
    if(url.searchParams.has('request'))return route.fulfill(receipt?{json:receipt}:{status:404,json:{error:'없음'}});
    reachReads++;
    if(changed&&reachReads>1)await new Promise(resolve=>setTimeout(resolve,250));
-   return route.fulfill(fail?{status:503,json:{error:'연락 수단을 확인하지 못했습니다.'}}:{json:{config:{enabled,push:enabled,email:enabled,alimtalk:enabled&&alimtalk,sms:enabled},reach:!enabled?[]:changed&&reachReads>1?reach.map(r=>({...r,push:false})):reach}});
+   return route.fulfill(fail?{status:503,json:{error:'연락 수단을 확인하지 못했습니다.'}}:{json:{config:{enabled,push:enabled,email:enabled,alimtalk:enabled&&alimtalk,sms:enabled},reach:!enabled?[]:changed&&reachReads>1?reach.map(r=>({...r,push:false})):kakao?reach.map(r=>({...r,mobileOnly:true})):reach}});
   }
   if(route.request().method()==='POST'){
    const body=route.request().postDataJSON();sent.push(body);
@@ -88,4 +88,13 @@ test('changed contact routes can be refreshed without losing the draft or select
  await expect(page.getByRole('region',{name:'채널별 발송 결과'})).toBeVisible();
  expect(api.sent).toHaveLength(2);
  expect(api.sent[1].delivery).toMatchObject({channels:['push','email','alimtalk'],routes:[{memberId:id(10),channels:['alimtalk','email']},{memberId:id(11),channels:['alimtalk','email']},{memberId:id(12),channels:['email']},{memberId:id(13),channels:[]}]});
+});
+
+for(const alimtalk of [true,false])test(`Kakao recipients use ${alimtalk?'Alimtalk':'SMS'} even when all channels are selected`,async({page})=>{
+ const api=await backend(page,{kakao:true,alimtalk});await compose(page);
+ await expect(page.getByText(/카카오 가입자는 알림톡 우선/)).toBeVisible();
+ await page.getByRole('combobox',{name:'발송 방식'}).selectOption('all');
+ await page.getByRole('button',{name:'확인한 대상에게 보내기'}).click();
+ const delivery=api.sent[0].delivery as {routes:{channels:string[]}[]};
+ expect(delivery.routes.map(r=>r.channels)).toEqual([[alimtalk?'alimtalk':'sms'],[alimtalk?'alimtalk':'sms'],[],[]]);
 });

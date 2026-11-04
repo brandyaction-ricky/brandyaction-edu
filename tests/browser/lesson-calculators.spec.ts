@@ -3,16 +3,26 @@ import {readFileSync} from 'node:fs';
 import {newCalculatorBlock,RECIPE_INPUTS,MARGIN_INPUTS,type CalculatorType} from '../../lib/lesson-calculators';
 import {validateBlockAnswers,type LessonBlockAnswers} from '../../lib/lesson-blocks';
 const golden=JSON.parse(readFileSync('tests/fixtures/lesson-calculators-golden.json','utf8'));
-async function backend(page:Page,kind:CalculatorType,stored:Record<string,string>={},historical=false){
+async function backend(page:Page,kind:CalculatorType,stored:Record<string,string>={},historical=false,alumni=false){
   const document={schemaVersion:1 as const,blocks:[newCalculatorBlock(kind,'tool'),{id:'question',type:'question' as const,question:{label:'기존 질문',kind:'text' as const,required:false}}],checklist:[]};
   let values:LessonBlockAnswers={blocks:{tool:stored,question:'기존 답변'},checklist:[]},writeId='11111111-1111-4111-8111-111111111111';
   const writes:LessonBlockAnswers[]=[];
   await page.route('**/api/platform/lesson-blocks**',async route=>{
-    if(route.request().method()==='GET'){await route.fulfill({json:{document,revision:'11111111-1111-4111-8111-111111111111',currentRevision:historical?'22222222-2222-4222-8222-222222222222':'11111111-1111-4111-8111-111111111111',draft:{values,writeId,updatedAt:'2026-09-29T00:00:00Z'},previousDrafts:[]}});return;}
-    const body=route.request().postDataJSON();expect(body.action).toBe('draft');values=validateBlockAnswers(body.values,document);writeId=body.requestId;writes.push(values);await route.fulfill({json:{writeId,updatedAt:'2026-09-29T00:00:00Z'}});
+    if(route.request().method()==='GET'){await route.fulfill({json:{practice:alumni?{enabled:true,draft:{values,writeId,updatedAt:'2026-09-29T00:00:00Z'}}:null,document,revision:'11111111-1111-4111-8111-111111111111',currentRevision:historical?'22222222-2222-4222-8222-222222222222':'11111111-1111-4111-8111-111111111111',draft:{values,writeId,updatedAt:'2026-09-29T00:00:00Z'},previousDrafts:[]}});return;}
+    const body=route.request().postDataJSON();expect(body.action).toBe(alumni?'practice-draft':'draft');values=validateBlockAnswers(body.values,document);writeId=body.requestId;writes.push(values);await route.fulfill({json:{writeId,updatedAt:'2026-09-29T00:00:00Z'}});
   });return {values:()=>values,writes};
 }
 async function saved(page:Page){await expect(page.getByRole('status').filter({hasText:'답변 저장됨'})).toBeVisible();}
+
+test('graduate calculator input saves privately and restores calculated results',async({page})=>{
+ const server=await backend(page,'recipe-calculator',{},false,true),fixture=golden.recipe[1];
+ await page.goto('/lesson-blocks-test?alumni=1');const panel=page.getByRole('region',{name:'레시피 실행 계산기'});
+ for(const field of RECIPE_INPUTS)await panel.getByRole('spinbutton',{name:field.label}).fill(fixture.values[field.key]);
+ await saved(page);expect(server.values().blocks.tool).toEqual(fixture.values);
+ await page.reload();for(const field of RECIPE_INPUTS)await expect(panel.getByRole('spinbutton',{name:field.label})).toHaveValue(fixture.values[field.key]);
+ for(const result of fixture.expected.results)await expect(panel.getByLabel(result.label+' 결과')).toHaveText(result.value.toLocaleString('ko-KR')+' '+result.unit);
+ await expect(page.getByRole('button',{name:/미션 제출하기|학습 완료하기/})).toHaveCount(0);
+});
 
 test('recipe shows original daily averages and details, restores all inputs and rejects invalid numbers',async({page},info)=>{
   const server=await backend(page,'recipe-calculator'),fixture=golden.recipe[1];

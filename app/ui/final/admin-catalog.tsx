@@ -7,6 +7,7 @@ import { MvpBadge, useMemberMvps } from './member-mvp';
 import { QuestionAiBatch } from './question-ai-batch';
 import { AdminAiUsage } from './admin-ai-usage';
 import { QuestionImage } from './question-image';
+import { QuestionAnswerHistory } from './question-thread';
 import { lessonBodyPlainText } from "@/lib/lesson-body";
 import {
   date,
@@ -222,6 +223,7 @@ export function AdminCatalog({
     const next = new URLSearchParams(params.toString());
     next.set('questionState', value);
     next.delete('question');
+    setSelectedQuestionId(null);
     router.push(`/admin/questions?${next}`);
   };
   const mvps = useMemberMvps(s.key === "customers" ? filtered.map(row => row.id) : [], blockLearningEnabled);
@@ -632,11 +634,11 @@ export function AdminCatalog({
       }}
     />
   );
-  const search = memberScope ? <form style={{display:"flex",flexWrap:"wrap",gap:8}} onSubmit={event => { event.preventDefault(); onMemberScopeChange?.({...memberScope,query:query.trim()}); }}>{searchField}<AdminButton type="submit">전체 회원 검색</AdminButton><AdminButton type="button" onClick={()=>onMemberScopeChange?.({query:"",status:"",course:""})}>검색 초기화</AdminButton></form> : searchField;
+  const search = memberScope ? <form className="admin-member-search" onSubmit={event => { event.preventDefault(); onMemberScopeChange?.({...memberScope,query:query.trim()}); }}>{searchField}<AdminButton type="submit">전체 회원 검색</AdminButton><AdminButton type="button" onClick={()=>onMemberScopeChange?.({query:"",status:"",course:""})}>검색 초기화</AdminButton></form> : searchField;
   const statusFilter = (
     <AdminSelect
       label="상태 필터"
-      labelHidden
+      labelHidden={s.key !== "customers"}
       value={status}
       onChange={(e) => {
         if(memberScope)onMemberScopeChange?.({...memberScope,status:e.target.value});
@@ -845,7 +847,7 @@ export function AdminCatalog({
         )}
         <div
           className={
-            ["learning", "missions", "questions"].includes(s.key) ? "" : s.key === "weeks" ? "panel weeks-table-workspace" : "panel"
+            ["learning", "missions", "questions"].includes(s.key) ? "" : s.key === "weeks" ? "panel weeks-table-workspace" : "panel admin-catalog-panel"
           }
         >
           {s.key === "questions" && <nav className="question-state-tabs" aria-label="질문 처리 상태">
@@ -859,15 +861,15 @@ export function AdminCatalog({
             action={<AdminButton variant="primary" onClick={() => edit(s)}><Plus size={16} aria-hidden="true" />상품 등록</AdminButton>}
           />}
           {s.key !== "products" && !["missions", "tags"].includes(s.key) && <AdminFilterBar
-            className={s.key === "questions" ? "admin-catalog-filter question-catalog-filter" : "admin-catalog-filter"}
+            className={s.key === "questions" ? "admin-catalog-filter question-catalog-filter" : s.key === "customers" ? "admin-catalog-filter admin-customer-filter" : "admin-catalog-filter"}
             filters={<>
               {s.key === "articles" && <AdminSelect label="콘텐츠 유형" labelHidden value={type} onChange={(e) => setType(e.target.value)}><option value="">전체 유형</option><option value="column">글</option><option value="video">영상</option></AdminSelect>}
               {s.key === "product-reviews" && <AdminSelect label="후기 상품" labelHidden value={course} onChange={(event) => { setCourse(event.target.value); setSelection([]); }}><option value="">전체 상품</option>{courses.map((item) => <option key={item.id} value={item.id}>{named(item)}</option>)}</AdminSelect>}
               {s.key === "weeks" && <AdminSelect label="주차 상품" aria-label="주차 상품" labelHidden value={course} onChange={(event) => { setCourse(event.target.value); setSelection([]); }}><option value="">전체 상품</option>{courses.map((item) => <option key={item.id} value={item.id}>{named(item)}</option>)}</AdminSelect>}
-              {s.key === "customers" && <AdminSelect label="수강 클래스" labelHidden value={course} onChange={(event) => { setCourse(event.target.value); setSelection([]); }}><option value="">전체 클래스</option>{courses.map((item) => <option key={item.id} value={item.id}>{t(item, "title")}</option>)}</AdminSelect>}
+              {s.key === "customers" && <AdminSelect label="수강 클래스" value={course} onChange={(event) => { setCourse(event.target.value); setSelection([]); }}><option value="">전체 클래스</option>{courses.map((item) => <option key={item.id} value={item.id}>{t(item, "title")}</option>)}</AdminSelect>}
             </>}
             status={s.key === "questions" ? undefined : statusFilter}
-            search={search}
+            search={s.key === "customers" ? <div className="admin-customer-search-group"><span>회원 검색</span>{search}</div> : search}
             action={s.key === "weeks" ? <AdminButton className="weeks-create" variant="primary" type="button" onClick={() => edit(s)}><Plus size={16} aria-hidden="true" />새로 등록</AdminButton> : undefined}
           />}
           {s.key === "weeks" && <p className="meta week-order-help">상품을 선택하면 해당 상품 안에서 주차 순서를 조정할 수 있습니다. 검색·상태 필터를 해제한 뒤 이동해 주세요.</p>}
@@ -935,13 +937,7 @@ export function AdminCatalog({
               {q && <div className="question-inbox">
                 <section className="question-inbox-list" aria-label="질문 목록">
                   <div className="question-inbox-list-heading"><strong>질문 목록</strong><span>{filtered.length}개 표시</span></div>
-                  {filtered.map((question) => <button
-                    className="question-inbox-item"
-                    type="button"
-                    key={question.id}
-                    aria-pressed={question.id === q.id}
-                    onClick={() => setSelectedQuestionId(String(question.id))}
-                  >
+                  {filtered.map((question) => <button className="question-inbox-item" type="button" key={question.id} aria-pressed={question.id === q.id} onClick={() => setSelectedQuestionId(String(question.id))}>
                     <strong>{t(question, "title") || "제목 없는 질문"}</strong>
                     <span>{t(object(question, 'profiles') as Row, 'full_name') || '회원 정보 확인 필요'} · {t(object(question, 'courses') as Row, 'title') || '일반 질문'}</span>
                     <span className="question-inbox-item-meta"><AdminStatusBadge status={question.is_archived ? "archived" : t(question, "status")} label={question.is_archived ? "보관" : labels[t(question, "status")]} /><time>{date(question.created_at)}</time></span>
@@ -955,14 +951,28 @@ export function AdminCatalog({
                       <h2 className="mt8">{t(q, "title")}</h2>
                     </div>
                     <AdminButton size="sm" variant="outline" className="question-answer-open" onClick={() => edit(s, q)}>
-                      {q.answer ? "답변 수정" : "답변하기"}
+                      {process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED === 'true' ? q.is_archived ? '대화 보기' : '답글 달기' : q.answer ? "답변 수정" : "답변하기"}
                     </AdminButton>
                   </div>
                   <div className="panel-body">
                     {Boolean(q.learning_context) && <p className="meta">학습 위치: {t(q, "learning_context")}</p>}
                     <p className="reading-copy">{t(q, "content")}</p>
                     <QuestionImage key={String(q.image_id || q.id)} questionId={String(q.id)} imageId={q.image_id}/>
-                    {Boolean(q.answer) && (
+                    {process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED === 'true' ? (
+                      <section className="mt24" aria-label="후속 질문과 답변 댓글">
+                        <h3>후속 질문 · 답변</h3>
+                        <QuestionAnswerHistory
+                          questionId={String(q.id)}
+                          fallback={t(q, 'answer')}
+                          initiallyOpen
+                          readOnly
+                          refreshKey={[q.answer_head_id, q.updated_at, q.status, q.is_archived].map(value => String(value ?? '')).join(':')}
+                        />
+                        <AdminButton size="sm" variant="outline" className="mt16" onClick={() => edit(s, q)}>
+                          {q.is_archived ? '대화 보기' : '답글 달기'}
+                        </AdminButton>
+                      </section>
+                    ) : Boolean(q.answer) && (
                       <div className="answer-block mt16">
                         <b>운영자 답변</b>
                         <p className="reading-copy"><AnswerText text={t(q, "answer")}/></p>

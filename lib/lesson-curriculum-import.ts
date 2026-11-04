@@ -4,7 +4,7 @@ import { validateLessonBlocks, type LessonBlockDocument } from './lesson-blocks'
 export const lessonImportLimit = 4_000_000;
 export type ImportWeek = { id: string; number: number; title: string; goal: string; existing: boolean };
 export type ImportLesson = { ongoing?: OngoingCadence; id: string; revision: string; sourceKey: string; weekId: string; order: number; title: string; description: string; durationLabel: string; provenance: Record<string, unknown>; document: LessonBlockDocument };
-export type ImportMedia = { assetId: string; kind: 'image' | 'audio' | 'video'; sha256: string; bytes: number; mimeType: string };
+export type ImportMedia = { assetId: string; kind: 'image' | 'audio' | 'video' | 'file'; sha256: string; bytes: number; mimeType: string };
 export type LessonImportBatch = { formatVersion: 1; courseId: string; sourceDigest: string; sourceCapturedAt: string; weeks: ImportWeek[]; lessons: ImportLesson[]; media: ImportMedia[] };
 export type LessonImportReceipt = { requestId: string; applied: boolean; weeksCreated: number; lessonsCreated: number; daily: number; learning: number; ongoing?: number; lessons: { sourceKey: string; lessonId: string; revision: string }[] };
 const invalid = (): never => { throw new Error('가져올 커리큘럼 파일의 형식과 배치를 확인해 주세요.'); };
@@ -51,7 +51,7 @@ export function validateLessonImportBatch(input: unknown): LessonImportBatch {
   unique(lessons.filter(l => l.document.progression).map(l => `${l.document.progression!.track}:${l.document.progression!.dayNumber}`));
   const media = list(root.media, 2000).map(value => {
     const m = record(value, ['assetId', 'kind', 'sha256', 'bytes', 'mimeType']);
-    if (!['image', 'audio', 'video'].includes(String(m.kind))) invalid();
+    if (!['image', 'audio', 'video', 'file'].includes(String(m.kind))) invalid();
     return { assetId: id(m.assetId), kind: m.kind as ImportMedia['kind'], sha256: hash(m.sha256), bytes: positive(m.bytes, 50 * 1024 * 1024), mimeType: text(m.mimeType, 100, true) };
   });
   unique(media.map(m => m.assetId));

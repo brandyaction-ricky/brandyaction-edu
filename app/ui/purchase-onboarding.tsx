@@ -2,12 +2,14 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowRight, Check, Monitor, Smartphone } from 'lucide-react';
-import { TELEGRAM_ANDROID_INSTALL_URL, TELEGRAM_IOS_INSTALL_URL, type SurveyRoom, type TelegramPath } from '@/lib/purchase-onboarding';
+import { TELEGRAM_ANDROID_INSTALL_URL, TELEGRAM_IOS_INSTALL_URL, type CompletionGuideSettings, type SurveyRoom, type TelegramPath } from '@/lib/purchase-onboarding';
 import './purchase-onboarding.css';
+import { PurchaseOnboardingChecklist } from './purchase-onboarding-checklist';
+import type { OnboardingProgress } from '@/lib/purchase-onboarding-progress';
 
-type View = { orderId: string; orderNumber: string; itemName: string; roomName: string; surveyRoom: SurveyRoom | null; telegramPath: TelegramPath | null; profileImage: string; supportUrl: string; available: boolean; telegramOnly?: boolean };
+type View = { orderId: string; orderNumber: string; itemName: string; roomName: string; surveyRoom: SurveyRoom | null; telegramPath: TelegramPath | null; profileImage: string; supportUrl: string; available: boolean; telegramOnly?: boolean; progress?: OnboardingProgress; completionGuide?: CompletionGuideSettings };
 
 export function PurchaseOnboarding({ order, guideRequested }: { order: string; guideRequested: boolean }) {
   const router = useRouter();
@@ -18,12 +20,15 @@ export function PurchaseOnboarding({ order, guideRequested }: { order: string; g
   const [selectedPath, setSelectedPath] = useState<TelegramPath | null>(null);
   const [manualUrl, setManualUrl] = useState('');
   const [roomOpened, setRoomOpened] = useState(false);
+  const loadSequence = useRef(0);
   const load = useCallback(async () => {
+    const sequence = ++loadSequence.current;
     const response = await fetch('/api/purchase-onboarding' + (order ? `?order=${encodeURIComponent(order)}` : ''), { cache: 'no-store' });
     const data = await response.json();
+    if (sequence !== loadSequence.current) return;
     if (!response.ok) throw Object.assign(new Error(data.error || '안내를 불러오지 못했습니다.'), { status: response.status });
     setView(data);
-    if (guideRequested && !data.telegramOnly && !data.surveyRoom) router.replace('/purchase-onboarding' + (data.orderId ? `?order=${encodeURIComponent(data.orderId)}` : ''));
+    if (guideRequested && !data.completionGuide && !data.telegramOnly && !data.surveyRoom) router.replace('/purchase-onboarding' + (data.orderId ? `?order=${encodeURIComponent(data.orderId)}` : ''));
   }, [order, guideRequested, router]);
   useEffect(() => {
     const timer = setTimeout(() => { void load().catch(cause => setError(cause instanceof Error ? cause.message : '안내를 불러오지 못했습니다.')); }, 0);
@@ -56,6 +61,16 @@ export function PurchaseOnboarding({ order, guideRequested }: { order: string; g
     } else window.location.assign(result.url);
   };
 
+  const refreshProgress = useCallback(async () => {
+    try { await load(); setError(''); } catch (cause) { setError(cause instanceof Error ? cause.message : '진행 상황을 확인하지 못했습니다.'); }
+  }, [load]);
+  if (view?.completionGuide) return <main className="edu-front purchase-onboarding purchase-onboarding-user">
+    <div className="wrap onboarding-shell">
+      <div className="onboarding-title-block"><h1>결제 후 시작 안내</h1><p>{view.itemName}</p></div>
+      <section className="onboarding-panel"><a className="btn primary" href={view.completionGuide.url} referrerPolicy="no-referrer">{view.completionGuide.label} <ArrowRight aria-hidden="true"/></a></section>
+    </div>
+  </main>;
+  if (view?.telegramOnly && view.progress) return <PurchaseOnboardingChecklist key={`${view.orderId}:${view.progress.lesson?.id || ''}`} orderId={view.orderId} itemName={view.itemName} roomName={view.roomName} supportUrl={view.supportUrl} progress={view.progress} pending={pending} error={error} manualUrl={manualUrl} refresh={refreshProgress} openRoom={() => getLink(false)} confirm={async body => { if (await submit({ ...body, action: 'confirm' })) await refreshProgress(); }}/ >;
   const activeStep = roomOpened ? 2 : 1;
   const title = view?.telegramOnly ? `${view.itemName || '문샷 챌린지'} 시작 준비` : '결제 후 시작 안내';
 

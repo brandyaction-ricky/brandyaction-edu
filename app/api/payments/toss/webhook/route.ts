@@ -1,6 +1,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 
 import { createAdminClient } from '@/lib/supabase/admin';
+import { tossMode } from '@/lib/toss-environment';
 
 export const runtime = 'nodejs';
 
@@ -240,7 +241,23 @@ export async function POST(request: Request) {
   if (!secret) return reply({ error: '결제 조회 설정이 완료되지 않았습니다.' }, 503);
 
   try {
-    const payment = await queryPayment(event.type, event.hint, secret);
+    let payment: JsonObject | undefined;
+    let identityMismatch = false;
+    const widgetSecret = process.env.TOSS_WIDGET_SECRET_KEY;
+    const legacyMode = tossMode(process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY, secret);
+    const widgetMode = tossMode(process.env.NEXT_PUBLIC_TOSS_WIDGET_CLIENT_KEY, widgetSecret);
+    const secrets = [secret, (legacyMode === 'live' || legacyMode === 'test') && widgetMode === legacyMode ? widgetSecret : undefined].filter((key): key is string => !!key);
+    for (const key of [...new Set(secrets)]) {
+      try {
+        const candidate = await queryPayment(event.type, event.hint, key);
+        if (verifiedIdentity(event.type, event.hint, candidate)) { payment = candidate; break; }
+        identityMismatch = true;
+      } catch (error) {
+        if (error instanceof Error && error.message === 'INVALID_EVENT') throw error;
+      }
+    }
+    if (!payment && identityMismatch) return reply({ error: '결제 조회 결과가 일치하지 않습니다.' }, 409);
+    if (!payment) throw new Error('PROVIDER_UNAVAILABLE');
     if (!verifiedIdentity(event.type, event.hint, payment)) return reply({ error: '결제 조회 결과가 일치하지 않습니다.' }, 409);
 
     const db = createAdminClient();

@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { isMoonshotFourth, onboardingSettingsKey, purchaseOnboardingSettings, uuid, type PurchaseOnboardingSettings } from '@/lib/purchase-onboarding';
+import { completionGuideSettings, completionGuideSettingsKey, isMoonshotFourth, onboardingSettingsKey, purchaseOnboardingSettings, uuid, type CompletionGuideSettings, type PurchaseOnboardingSettings } from '@/lib/purchase-onboarding';
 
 export type EligiblePurchase = {
   orderId: string;
@@ -11,7 +11,9 @@ export type EligiblePurchase = {
   settings: PurchaseOnboardingSettings;
 };
 
-export async function eligiblePurchase(userId: string, requestedOrder: string | null): Promise<EligiblePurchase | null> {
+type CompletionGuidePurchase = Pick<EligiblePurchase, 'orderId' | 'orderNumber' | 'itemName'> & { completionGuide: CompletionGuideSettings };
+
+export async function eligiblePurchase(userId: string, requestedOrder: string | null): Promise<EligiblePurchase | CompletionGuidePurchase | null> {
   if (requestedOrder && !uuid(requestedOrder)) throw Object.assign(new Error('주문 번호를 확인해 주세요.'), { status: 400 });
   const db = await createClient();
   let query = db.from('orders').select('id,order_number,status,paid_at').eq('user_id', userId).eq('status', 'paid').order('paid_at', { ascending: false }).limit(requestedOrder ? 1 : 30);
@@ -25,7 +27,7 @@ export async function eligiblePurchase(userId: string, requestedOrder: string | 
   const itemRows = items.data || [];
   const cohortIds = [...new Set(itemRows.map(row => row.cohort_id).filter(uuid))];
   if (!cohortIds.length) return null;
-  const keys = cohortIds.map(onboardingSettingsKey);
+  const keys = cohortIds.flatMap(id => [onboardingSettingsKey(id), completionGuideSettingsKey(id)]);
   const adminDb = createAdminClient();
   const [configs, cohorts] = await Promise.all([
     adminDb.from('site_settings').select('key,value').in('key', keys).eq('is_public', false),
@@ -37,6 +39,14 @@ export async function eligiblePurchase(userId: string, requestedOrder: string | 
   const byCohort = new Map((cohorts.data || []).map(row => [row.id, row]));
   for (const order of rows) {
     for (const item of itemRows.filter(row => row.order_id === order.id)) {
+      const guideKey = completionGuideSettingsKey(item.cohort_id);
+      if (byKey.has(guideKey)) {
+        try {
+          const completionGuide = completionGuideSettings(byKey.get(guideKey));
+          if (completionGuide.url) return { orderId: order.id, orderNumber: order.order_number, itemName: item.item_name, completionGuide };
+        } catch { /* An invalid guide must never expose a destination. */ }
+        continue;
+      }
       const config = byKey.get(onboardingSettingsKey(item.cohort_id));
       if (!config) continue;
       try {
@@ -45,7 +55,7 @@ export async function eligiblePurchase(userId: string, requestedOrder: string | 
           const cohort = byCohort.get(item.cohort_id);
           const course = Array.isArray(cohort?.courses) ? cohort.courses[0] : cohort?.courses;
           return { orderId: order.id, orderNumber: order.order_number, itemName: item.item_name, cohortId: item.cohort_id,
-            telegramOnly: isMoonshotFourth(course?.title, cohort?.name), settings };
+            telegramOnly: settings.checklistEnabled === true || isMoonshotFourth(course?.title, cohort?.name), settings };
         }
       } catch { /* Invalid or incomplete settings cannot make an order eligible. */ }
     }

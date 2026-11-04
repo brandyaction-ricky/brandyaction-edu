@@ -11,14 +11,18 @@ test('completed payment has one next step while loading and after the guide is r
     await route.fulfill({ json: { available: true, orderId: order } });
   });
   await page.goto(completion);
-  await expect(page.getByRole('list', { name: '클래스 시작 단계' })).toContainText('결제 확인');
-  await expect(page.getByRole('list', { name: '클래스 시작 단계' })).toContainText('공지방 입장');
-  await expect(page.getByRole('list', { name: '클래스 시작 단계' })).toContainText('첫 학습 시작');
+  const steps = page.getByRole('list', { name: '클래스 시작 단계' });
   await expect(page.getByRole('button', { name: '시작 안내 확인 중' })).toBeDisabled();
+  await expect(steps).toHaveCount(0);
   await expect(page.locator('.completion a')).toHaveCount(0);
   release();
   const next = page.getByRole('link', { name: '결제 후 시작 안내' });
   await expect(next).toHaveAttribute('href', `/purchase-onboarding?order=${order}`);
+  await expect(steps.getByRole('listitem')).toHaveText([
+    /결제 확인/,
+    /공지방 입장/,
+    /첫 학습 시작/,
+  ]);
   await expect(page.locator('.completion a')).toHaveCount(1);
   await expect(page.getByText('아래 버튼을 눌러 교육 시작 안내를 확인해 주세요.')).toBeVisible();
   const buttonBox = await next.boundingBox();

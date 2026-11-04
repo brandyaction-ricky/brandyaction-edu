@@ -1,4 +1,5 @@
 'use client';
+import { kstToIso, kstLabel } from '@/lib/marketing-qa';
 import { useEffect, useRef, useState } from 'react';
 import { AdminButton, AdminInput, AdminSection, AdminSelect, AdminStack } from '@/features/admin-ui';
 import { RecruitmentDetails, RecruitmentHelp } from './recruitment-help';
@@ -20,7 +21,7 @@ export function RecruitmentDelivery({code}:{code:string}){
   if(busy.current)return;busy.current=true;setPending(true);setNotice('');
   try{
    const params={code,template,purpose};
-   const r=action==='review'?await fetch('/api/conversion/delivery?'+new URLSearchParams(params),{cache:'no-store'}):await fetch('/api/conversion/delivery',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(action==='cancel'?{code,cancel}:{...params,name,at:new Date(at).toISOString(),token:review?.token})});
+   const r=action==='review'?await fetch('/api/conversion/delivery?'+new URLSearchParams(params),{cache:'no-store'}):await fetch('/api/conversion/delivery',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(action==='cancel'?{code,cancel}:{...params,name,at:kstToIso(at),token:review?.token})});
    const d=await r.json();if(!r.ok)throw Error(d.error||'처리하지 못했습니다.');
    if(!active.current)return;
    setConfirmed(false);
@@ -46,16 +47,16 @@ export function RecruitmentDelivery({code}:{code:string}){
       <ul>{Object.entries(reasons).map(([key,label])=><li key={key}>{label}: {review.counts[key]??0}명</li>)}</ul>
       <p>템플릿: {review.template.name} · {review.template.channel.toUpperCase()}</p>
       <p style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{review.template.content}</p>
-      <p>조회 기준: {new Date(review.asOf).toLocaleString('ko-KR')}</p>
+      <p>조회 기준: {kstLabel(review.asOf)}</p>
       <AdminInput label="모집 안내 예약 이름" maxLength={100} value={name} onChange={e=>{setName(e.target.value);setConfirmed(false);}}/>
-      <AdminInput label="모집 안내 예약 시각 (현재 기기 시간)" type="datetime-local" value={at} onChange={e=>{setAt(e.target.value);setConfirmed(false);}}/>
+      <AdminInput label="모집 안내 예약 시각 (한국시간 KST)" type="datetime-local" value={at} onChange={e=>{setAt(e.target.value);setConfirmed(false);}}/>
       <label><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/> 대상 수·문구·시각을 확인했으며, 발송 활성화 시 실제 전송되는 예약을 저장합니다.</label>
       {(review.counts.candidate===0||review.counts.candidate>500)&&<p>예약은 검토 후보 1~500명일 때 가능합니다.</p>}
       <AdminButton disabled={pending||!confirmed||!name.trim()||!at||review.counts.candidate<1||review.counts.candidate>500} onClick={()=>void run('schedule')}>검토한 모집 안내 예약</AdminButton>
      </>}
     </AdminStack></fieldset>
     <RecruitmentDetails title="발송 전 확인 범위"><p>예약 당시 검토한 신청자만 대상으로 삼고, 이후 구매·주문 상태, 마케팅 수신 동의, 회원 상태, 전화번호와 중복 이력을 다시 확인합니다. 예약 후 새 신청자는 자동 추가되지 않습니다.</p><p>여러 회원이 같은 번호를 사용하면 모두 제외합니다. 같은 모집·같은 안내 목적의 발송 시도는 회원과 번호 기준으로 한 번만 허용합니다. 결과가 불명확해도 자동 재발송하지 않습니다.</p><p>모집 연결·문구·운영자 권한이 변경되면 발송을 중단합니다. 예약을 바꾸려면 취소 후 다시 검토하세요. YouTube 시청 여부와 카톡방 참여 여부는 개인별로 확인하지 않습니다.</p></RecruitmentDetails>
-    {setup.reservations.length>0&&<><h3>이 모집의 예약 내역</h3>{setup.reservations.map(item=><div key={item.id}><p>{item.name} · {({scheduled:'예약 대기',sending:'발송 처리 중',completed:'처리 완료',failed:'검토 필요',cancelled:'취소됨'} as Record<string,string>)[item.status]||item.status} · {new Date(item.scheduledAt).toLocaleString('ko-KR')}</p>{item.error&&<p role="status">{item.error}</p>}{item.status==='scheduled'&&<AdminButton disabled={pending} onClick={()=>void run('cancel',item.id)}>예약 취소: {item.name}</AdminButton>}</div>)}</>}
+    {setup.reservations.length>0&&<><h3>이 모집의 예약 내역</h3>{setup.reservations.map(item=><div key={item.id}><p>{item.name} · {({scheduled:'예약 대기',sending:'발송 처리 중',completed:'처리 완료',failed:'검토 필요',cancelled:'취소됨'} as Record<string,string>)[item.status]||item.status} · {kstLabel(item.scheduledAt)}</p>{item.error&&<p role="status">{item.error}</p>}{item.status==='scheduled'&&<AdminButton disabled={pending} onClick={()=>void run('cancel',item.id)}>예약 취소: {item.name}</AdminButton>}</div>)}</>}
    </>}
    <AdminButton disabled={pending} onClick={()=>{clear();setSetup(null);setRefresh(v=>v+1);}}>모집 안내 설정 다시 불러오기</AdminButton>
    {notice&&<p role="status">{notice}</p>}

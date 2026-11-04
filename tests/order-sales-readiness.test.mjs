@@ -28,7 +28,7 @@ function setup(patch = {}, orderError = null, options = {}) {
         async single() { return options.attributionError ? { error: { message: 'synthetic attribution failure' } } : { data: { id: 'order' } }; },
       };
       assert.equal(table, 'cohorts');
-      return { select() { return this; }, eq() { return this; }, async single() { return { data: { ...offer, courses: { ...course, ...patch } } }; } };
+      return { select() { return this; }, eq() { return this; }, async single() { return { data: { ...offer, ...options.offerPatch, courses: { ...course, ...patch } } }; } };
     },
     async rpc(name, args) {
       calls.push({ name, args });
@@ -106,3 +106,9 @@ test('checkout uses the saved delivery email and falls back to login when unset'
     assert.equal(calls[0].args.p_customer_email, preference || 'member@example.test');
   }
 });
+
+ test('archived product or cohort is rejected before order creation',async()=>{
+ for(const [patch, options] of [[{archived_at:'2026-10-01'},{}],[{}, {offerPatch:{archived_at:'2026-10-01'}}]]) {
+ const {calls,send}=setup(patch,null,options); const response=await send(); assert.equal(response.status,409); assert.match((await response.json()).error,/판매가 종료/); assert.deepEqual(calls,[]);
+ }
+ });

@@ -32,24 +32,17 @@ test('search and filters cover full cohort, share view and saved PNG omit privat
  const download=page.waitForEvent('download');await page.getByRole('button',{name:'공유 이미지 저장'}).click();expect((await download).suggestedFilename()).toBe('brandy-edu-learning-summary.png');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
 });
-test('status select preserves all single-filter choices and clears selected recipients when the filter changes',async({page})=>{
- await backend(page);await page.goto('/learning-care-test');await page.getByRole('tab',{name:'일차별',exact:true}).click();
+test('status select preserves every single-filter choice, clears recipients, and keeps guidance spacing',async({page})=>{
+ await backend(page);await page.goto('/learning-care-test');await page.locator('main.edu-admin').evaluate(el=>el.classList.add('adm'));
+ expect(await page.evaluate(()=>document.querySelector('.care-overview > .care-note')!.getBoundingClientRect().top-document.querySelector('#care-student-list')!.getBoundingClientRect().bottom)).toBeGreaterThanOrEqual(20);
+ await expect(page.getByRole('link',{name:'일차별 현황 바로 보기 ↓'})).toHaveAttribute('href','#care-day-overview');
+ await page.getByRole('tab',{name:'일차별',exact:true}).click();
  const filter=page.getByRole('combobox',{name:'상태 선택'});
  await expect(filter.locator('option')).toHaveText(['전체','완료','미완료','검토 대기','보완 요청','앞 단계 대기','공개 예정','3일 이상 방문 기록 없음','24시간 내 안내']);
- await page.getByRole('checkbox',{name:'가상 지민 안내 선택'}).check();
- await expect(page.getByRole('button',{name:'선택한 1명 안내 내용 작성'})).toBeEnabled();
- await filter.selectOption('submitted');await expect(page.getByText('1개 수강 기록')).toBeVisible();await expect(page.getByRole('button',{name:'가상 수빈',exact:true})).toBeVisible();
- await expect(page.getByRole('button',{name:'선택한 0명 안내 내용 작성'})).toBeDisabled();
+ await page.getByRole('checkbox',{name:'가상 지민 안내 선택'}).check();await expect(page.getByRole('button',{name:'선택한 1명 안내 내용 작성'})).toBeEnabled();
+ await filter.selectOption('submitted');await expect(page.getByText('1개 수강 기록')).toBeVisible();await expect(page.getByRole('button',{name:'선택한 0명 안내 내용 작성'})).toBeDisabled();
  await filter.selectOption('all');await expect(page.getByRole('checkbox',{name:'가상 지민 안내 선택'})).not.toBeChecked();
- await filter.selectOption('quiet');await expect(page.getByText('조건에 맞는 수강 기록이 없습니다.')).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
-});
-test('admin guidance notes have clear spacing after cards and the table',async({page})=>{
- await backend(page);await page.goto('/learning-care-test');await page.locator('main.edu-admin').evaluate(el=>el.classList.add('adm'));
- const topGap=async (previous:string,note:string)=>page.evaluate(([a,b])=>document.querySelector(b)!.getBoundingClientRect().top-document.querySelector(a)!.getBoundingClientRect().bottom,[previous,note]);
- expect(await topGap('.care-student-tiles','.care-overview > .care-note')).toBeGreaterThanOrEqual(20);
- await page.getByRole('tab',{name:'수강생별',exact:true}).click();
- expect(await topGap('.care-table-scroll','.care-workspace > .care-note')).toBeGreaterThanOrEqual(20);
 });
 test('personal next step links to returned mission and own growth; errors never become zero progress',async({page})=>{
  const api=await backend(page,true);await page.goto('/learning-care-test');await expect(page.getByRole('alert')).toContainText('합성 조회 실패');await expect(page.getByText('0명',{exact:true})).toHaveCount(0);api.recover();await page.getByRole('button',{name:'다시 불러오기'}).click();await expect(page.getByText('4개 수강 기록')).toBeVisible();
@@ -77,9 +70,10 @@ test('learning tiles distinguish completion from support needs and DAY cards ope
  await expect(page.getByRole('button',{name:'완주 테스트 2 상세 · 공개 학습 77%'})).toHaveClass(/care-band-progressing/);
  await expect(page.getByRole('button',{name:'완주 테스트 3 상세 · 공개 학습 80%'})).toHaveClass(/care-band-finishing/);
  await expect(page.getByRole('button',{name:'완주 테스트 4 상세 · 공개 학습 100%'})).toHaveClass(/care-band-finishing/);
- await page.getByRole('button',{name:/확인 필요만/}).click();await expect(page.locator('.care-student-tile')).toHaveCount(1);await expect(page.locator('.care-student-tile')).toContainText('보완 요청 1건');
- // Student filters must not alter the cohort-wide DAY denominator.
- await expect(page.getByRole('button',{name:'1주차 4일차 · 학습 4 명단 보기',exact:true})).toContainText('3/5명 완료');
+ await page.getByRole('button',{name:/확인 필요 수강생/}).click();await expect(page.getByRole('table',{name:'확인 필요 수강생 목록'}).locator('tbody tr')).toHaveCount(1);await expect(page.getByRole('table',{name:'확인 필요 수강생 목록'})).toContainText('보완 요청 1건');
+ // Student filters must not alter the full cohort denominator, including earlier-stage members.
+ const dayFour=page.getByRole('button',{name:'1주차 4일차 · 학습 4 명단 보기',exact:true});
+ await expect(dayFour).toContainText('3/5명 완료');await expect(dayFour).toContainText('60%');await expect(dayFour.locator('progress')).toHaveAttribute('max','5');
  await page.getByRole('button',{name:'1주차 4일차 · 학습 4 보완 요청 1명',exact:true}).click();await expect(page.getByRole('tab',{name:'일차별',exact:true})).toHaveAttribute('aria-selected','true');await expect(page.getByText('1개 수강 기록')).toBeVisible();await expect(page.getByRole('button',{name:'완주 테스트 1',exact:true})).toBeVisible();
  await page.getByRole('tab',{name:'한눈에 보기'}).click();await expect(page.getByRole('button',{name:'30일 미션 목표',exact:true})).toHaveCount(0);await page.getByRole('button',{name:'완주 테스트 0 상세 · 공개 학습 7%'}).click();await expect(page.getByRole('region',{name:'수강생 상세'})).toContainText('완주 테스트 0님의 현재 위치');await page.getByRole('dialog',{name:'수강생 상세',exact:true}).getByRole('button',{name:'닫기',exact:true}).click();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);

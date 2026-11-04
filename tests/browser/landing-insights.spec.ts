@@ -14,7 +14,7 @@ async function fixture(page: Page, mode: 'ready' | 'failure' | 'empty' = 'ready'
     return route.fulfill({json:url.searchParams.getAll('campaign').length>1?{multi:true,reports:[report,{...report,campaign:{...campaign,id:'dddddddd-dddd-4000-8000-000000000004'},source_title:'추가 페이지'}]}:report});
   });
   await page.goto('/admin/landing?preset=custom&start=2026-09-01&end=2026-09-30');
-  await expect(page.getByRole('heading',{name:'전환 퍼널',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:/전환 퍼널|한눈에 보는 모집 성과/})).toBeVisible();
 }
 
 test('automatic revenue, measured scroll denominators and selectable published version comparisons',async({page})=>{

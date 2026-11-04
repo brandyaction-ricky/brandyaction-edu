@@ -7,10 +7,10 @@ The feature searches all eligible published lessons in the enrollment's course l
 - `EDU_CURRICULUM_AI_ENABLED=true`: server routes and curriculum-backed mentor drafts.
 - `NEXT_PUBLIC_EDU_CURRICULUM_AI_ENABLED=true`: student conversation and lazy admin usage panel. Other cohorts remain blocked by the server and can still use mentor questions.
 - Existing question-hub, threads and bulk-draft feature flags retain their meanings. Enabling this feature does not enable them automatically.
-- `OPENAI_API_KEY`: server-only Secret. `OPENAI_MODEL` defaults to `gpt-6.1-terra`.
+- `OPENAI_API_KEY`: server-only Secret. `OPENAI_MODEL` defaults to `gpt-5-mini`.
 - Migration `20261030064453_edu_curriculum_ai_and_usage.sql` creates three private tables and four service-only RPCs; it changes no existing function. It inserts no enabled cohorts. Activate only the explicitly reviewed cohort via `edu_ai_cohort_settings` after independent environment approval.
 - Default caps: 500 requests per cohort per KST day, 30 per student per KST day; one pending student request, two pending mentor requests per actor. Failed requests count toward caps. Each request makes at most one provider call, with no automatic retry.
-- Student exchanges and screenshot references persist privately per lesson; mentor drafts remain unregistered until an operator reviews them. A student-confirmed mentor handoff uses existing question persistence. Nothing is automatically published or messaged.
+- Student conversations and mentor drafts are transient client state. Only a student-confirmed mentor question or operator-reviewed answer uses existing question persistence. Nothing is automatically published or messaged.
 - Usage stores UUID scope, a fingerprint, model, counts, rate snapshot and completion state, never raw prompts, source text, provider responses or keys. Counts are read from provider usage, not estimated from text length. Missing usage/pricing is shown separately. Ledger references become null on account/resource deletion.
 
 ## Isolated DEV verification
@@ -32,7 +32,7 @@ First turn off the two deployment flags and restore the previous deployment. Res
 - Existing learning-question, question-hub, question-thread and question-ai-batch regressions.
 - Repository lint, typecheck, unit suite, build and all required remote browser shards/final verdict.
 
-Cost rates for `gpt-6.1-terra` were checked against https://developers.openai.com/api/docs/models/gpt-6.1-terra on 2026-10-31. Historical `gpt-5-mini` rates are retained; unknown configured models remain unpriced. Estimated USD is not an invoice.
+Cost rates for `gpt-5-mini` were checked against https://developers.openai.com/api/docs/models/gpt-5-mini on 2026-10-30. Other configured models remain explicitly unpriced until their rate mapping is reviewed. Estimated USD is not an invoice.
 
 ## Question entry and screenshots
 
@@ -52,11 +52,3 @@ References: [OpenAI image inputs](https://developers.openai.com/api/docs/guides/
 - A lesson reopens its saved exchanges; My Questions has a separate private AI conversation list. Both use keyset pagination with 20 displayed records and one lookahead. Reading, pagination and reopening never call OpenAI. Authorization checks the current account, owned enrollment and accessible lesson. Other users/operators cannot read private AI exchanges through this API. Withdrawn/revoked lesson access is not bypassed by history reads.
 - Original attachments remain in the private question-image bucket. History stores only their immutable IDs and reads them through an authenticated request-scoped endpoint. They are not automatically sent on the next question. The latest screenshot may be reviewed in a mentor handoff before explicit registration. Metadata-only usage tables continue to exclude question/answer text.
 - Closing saved history is safe; unsent text/attachments still require confirmation. A lost response is recovered by refreshing the saved history or retrying the same immutable request. A failed save must not be presented as a successfully saved answer. Database removal or code rollback must preserve conversation data. The additive schema may remain unused when restoring the prior code; do not drop tables containing student history.
-
-
-## Fixed DEV staff QA (2026-11-01)
-
-- Integration starts from the deployed fixed DEV `e6d35d9` and applies only the curriculum AI commits. Existing admin layout and TIPS synthetic-only safeguards remain intact. Do not replace fixed DEV with the production-derived AI Preview tree.
-- Reuse the existing server-only `OPENAI_API_KEY` Secret in the **brandyaction-edu-dev** project; its target metadata includes fixed DEV and Preview. Its value is neither read nor regenerated. Vercel calls the fixed DEV target `production`; this is not the live **brandyaction-edu** project.
-- AI answers require both server/UI flags and an enabled cohort, owned active enrollment, published lesson and progression access. Setting a key alone never grants course access. Staff QA must retain these checks, private history, source revision verification and per-cohort usage limits.
-- No production deployment, customer enrollment, payment, message, or additional schema migration is part of this integration.

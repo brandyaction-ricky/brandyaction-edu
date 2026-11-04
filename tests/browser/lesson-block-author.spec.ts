@@ -165,7 +165,7 @@ test('one lesson save preserves original text, ordered questions/tools and displ
 test('new lesson keeps in-progress content after a lost save response and retries without duplicate versions', async ({ page }) => {
   const server = await backend(page, 503);
   await page.goto('/lesson-block-author-test?new');
-  await page.getByRole('spinbutton', { name: '일차 (Day)' }).fill('1');
+  await page.getByRole('spinbutton', { name: '주차 안 수업 순서' }).fill('1');
   await page.getByRole('combobox', { name: '주차 (Week)' }).selectOption({ index: 1 });
   await page.getByRole('textbox', { name: '제목', exact: false }).fill('새 학습');
   await page.getByRole('button', { name: '여러 항목으로 구성하기' }).click();
@@ -406,7 +406,7 @@ test('another editor tab draft is not overwritten or deleted by this tab', async
 
 test('new lesson draft restores before creation and partially registered lesson resumes at its assigned id', async ({ page }) => {
   const server = await backend(page, 503); await page.goto('/lesson-block-author-test?new');
-  await page.getByRole('spinbutton', { name: '일차 (Day)' }).fill('1'); await page.getByRole('combobox', { name: '주차 (Week)' }).selectOption({ index: 1 });
+  await page.getByRole('spinbutton', { name: '주차 안 수업 순서' }).fill('1'); await page.getByRole('combobox', { name: '주차 (Week)' }).selectOption({ index: 1 });
   await page.getByRole('textbox', { name: '제목', exact: false }).fill('구성 편집 검수'); await page.getByRole('checkbox', { name: '공개', exact: true }).check();
   await page.getByRole('button', { name: '여러 항목으로 구성하기' }).click();
   const heading = await add(page, 'heading'); await heading.getByRole('textbox', { name: '내용' }).fill('새 학습의 작성 내용');

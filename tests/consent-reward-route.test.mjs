@@ -7,7 +7,8 @@ test('reward route is gated, binds session identity and refuses forged/ambiguous
  const body={requestId:id,payload:{choices:{analysis:false,overseas:false,kakao:true},personalRevision:null,marketingRevision:null,wordingVersion:null,marketingVersion:'2026-10-20'}};
  const a=h();assert.equal((await a.post(body)).status,503);assert.equal((await(await a.GET()).json()).available,false);assert.equal(a.calls.length,0);
  process.env.EDU_CONSENT_REWARD_ENABLED='true';assert.equal((await a.post(body)).status,503);process.env.EDU_OPTIONAL_CONSENT_ENABLED='true';
- assert.equal((await a.post(body)).status,200);assert.equal(a.calls[0].args.p_member,id);
+ const adsOnly=await(await a.GET()).json();assert.equal(adsOnly.analysisAvailable,false);assert.equal(adsOnly.terms,null);
+ assert.equal((await a.post(body)).status,200);assert.equal(a.calls.at(-1).args.p_member,id);
  assert.equal((await a.post({...body,payload:{...body.payload,choices:{analysis:true,overseas:true,kakao:true}}})).status,409);
  process.env.EDU_PERSONALIZATION_CONSENT_ENABLED='true';
  for(const origin of [null,'https://evil.test'])assert.equal((await a.post(body,origin)).status,403);

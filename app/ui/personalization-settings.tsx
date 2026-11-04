@@ -48,6 +48,7 @@ export function PersonalizationSettings() {
   const hasConsent = snapshot && (snapshot.choices.analysis || snapshot.choices.overseas);
   const summary = !snapshot ? '확인 중' : snapshot.needsRenewal ? '안내 확인 필요' : snapshot.eligible ? '사용 중' : hasConsent ? '동의 내역 있음' : '사용 안 함';
   const unchanged = snapshot && !snapshot.needsRenewal && choices.analysis === snapshot.choices.analysis && choices.overseas === snapshot.choices.overseas;
+  if ((!snapshot && !error) || (snapshot && !snapshot.accepting && !hasConsent && !notice && !error)) return null;
   return <section id="personalization-settings" className={styles.card} aria-labelledby="personalization-title">
     <div className={styles.header}><div><span className={styles.eyebrow}>원할 때만 선택해요</span><h2 id="personalization-title">내게 맞는 학습·혜택 안내</h2></div><span className={styles.badge}>{error && !snapshot ? '확인 필요' : summary}</span></div>
     <p className={styles.lead}>구매·학습 기록을 바탕으로 나에게 맞는 안내를 준비해요.</p>

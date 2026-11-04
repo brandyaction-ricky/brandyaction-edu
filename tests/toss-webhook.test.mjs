@@ -68,6 +68,7 @@ function webhook({
   const require = name => {
     if (name === 'node:crypto') return { createHash, timingSafeEqual };
     if (name.endsWith('supabase/admin')) return { createAdminClient: () => db };
+    if (name.endsWith('toss-environment')) return { tossMode: (client, secret) => client?.startsWith('test_') && secret?.startsWith('test_') ? 'test' : 'missing' };
     throw new Error(`unexpected import: ${name}`);
   };
   const fetch = async (...args) => {
@@ -351,4 +352,16 @@ test('unknown provider statuses are not copied into diagnostic logs', async () =
   assert.deepEqual(handler.errors[0][1], {
     operation: 'event_lookup', paymentStatus: 'UNKNOWN', databaseCode: 'P0001', reason: 'ORDER_NOT_FOUND',
   });
+});
+
+test('widget webhook uses the matching provider key and reconciles only verified data', async () => {
+  const env = { TOSS_WEBHOOK_TOKEN:'webhook-secret', NEXT_PUBLIC_TOSS_CLIENT_KEY:'test_ck_legacy', TOSS_SECRET_KEY:'test_legacy', NEXT_PUBLIC_TOSS_WIDGET_CLIENT_KEY:'test_gck_widget', TOSS_WIDGET_SECRET_KEY:'test_widget' };
+  const handler = webhook({env, provider: async (_url, options) => {
+    return options.headers.Authorization === 'Basic ' + Buffer.from('test_widget:').toString('base64')
+      ? Response.json(payment) : Response.json({code:'NOT_FOUND'}, {status:404});
+  }});
+  const response = await handler.post(request(paymentEvent()));
+  assert.equal(response.status, 200);
+  assert.equal(handler.providerCalls.length, 2);
+  assert.equal(handler.rpcCalls[0].name, 'finalize_toss_payment');
 });

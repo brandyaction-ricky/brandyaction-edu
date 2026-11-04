@@ -22,6 +22,7 @@ export function validatePushEndpoint(value: unknown): string {
   // Push URLs are capability secrets and server destinations. Never accept an
   // arbitrary URL, custom port, credentials, IP or provider-looking suffix.
   const accepted = (url.hostname === 'fcm.googleapis.com' && /^\/(fcm\/send|wp)\//.test(url.pathname))
+    || (url.hostname === 'jmt17.google.com' && /^\/fcm\/send\//.test(url.pathname))
     || (url.hostname === 'updates.push.services.mozilla.com' && /^\/wpush\/v[12]\//.test(url.pathname))
     || (url.hostname === 'web.push.apple.com' && url.pathname.length > 1);
   if (!accepted || url.protocol !== 'https:' || url.port || url.username || url.password || url.hash || value !== url.href) throw new Error('PUSH_INVALID');

@@ -2,6 +2,9 @@ import { MemberViews } from '../../../app/ui/final/member-views';
 import type { Row } from '../../../lib/platform';
 import type { LessonGate } from '../../../lib/learning-overview';
 import { withExistingCohortVisibility } from './cohort-visibility';
+import { EncouragementEditor } from '../../../app/ui/final/member-encouragement';
+import { QuestionAnswerHistory } from '../../../app/ui/final/question-thread';
+import theme from '../../../app/ui/final/member-theme.module.css';
 
 export function LearningOverviewFixture() {
   const params = new URLSearchParams(location.search), scenario = params.get('scenario');
@@ -12,6 +15,7 @@ export function LearningOverviewFixture() {
     automaticApproval: false, reason: track === 'daily' ? '운영자가 다음 주차를 열면 시작할 수 있습니다.' : '이전 학습을 완료해 주세요.',
   })));
   gates.push({ lessonId: 'intro', track: null, dayNumber: null, isUnlocked: true, automaticApproval: false, reason: '' }, { lessonId: 'ongoing', track: null, dayNumber: null, ongoing: true, isUnlocked: true, automaticApproval: false, reason: '' });
+  if (scenario === 'single') gates.splice(0, gates.length, { lessonId: 'intro', track: null, dayNumber: null, isUnlocked: true, automaticApproval: false, reason: '' });
   const progress = gates.filter(gate => gate.ongoing || (gate.track && (scenario === 'complete' || (scenario !== 'locked' && Number(gate.dayNumber) <= (gate.track === 'daily' ? 5 : 1))))).map(gate => ({ id: 'p-' + gate.lessonId, enrollment_id: enrollment.id, lesson_id: gate.lessonId, completed_at: '2026-01-01' }));
   const data: Record<string, Row[]> = {
     enrollments: [enrollment], courses: [{ id: 'sample-course', title: '합성 문샷 과정', category: 'paid_class' }], cohorts: [{ id: 'sample-cohort', name: '합성 기수' }],
@@ -20,11 +24,17 @@ export function LearningOverviewFixture() {
     lesson_progress: progress,
     learning_overviews: scenario === 'missing' ? [] : [{ id: enrollment.id, status: scenario === 'error' ? 'error' : 'ready', lessons: gates }],
   };
+  if (params.has('couponStates')) data.customer_coupons = [
+    { id: 'available', status: 'available', coupon: { name: '기한 미정 쿠폰', discount_type: 'percentage', discount_value: 10, code: 'SAMPLE' } },
+    { id: 'used', status: 'used', coupon: { name: '사용한 쿠폰', discount_type: 'percentage', discount_value: 100, code: 'USED' } },
+    { id: 'revoked', status: 'revoked', coupon: { name: '회수된 쿠폰', discount_type: 'percentage', discount_value: 10, code: 'REVOKED' } },
+  ];
   if (scenario === 'empty') {
     data.curriculum_weeks = [];
     data.curriculum_lessons = [];
     data.learning_overviews = [{ id: enrollment.id, status: 'ready', lessons: [] }];
   }
+  if (scenario === 'single') data.courses[0].has_resources = true;
   if (scenario === 'multiple') {
     data.enrollments.push({ ...enrollment, id: 'second', course_id: 'second-course', cohort_id: 'second-cohort' }, { ...enrollment, id: 'expired', status: 'revoked' });
     data.courses.push({ id: 'second-course', title: '독립된 다른 과정' });
@@ -33,5 +43,5 @@ export function LearningOverviewFixture() {
     data.curriculum_lessons.push({ id: 'second-lesson', week_id: 'second-week', day_number: 1, title: '두 번째 과정 시작', is_published: true });
     data.learning_overviews.push({ id: 'second', status: 'ready', lessons: [{ ...gates[0], lessonId: 'second-lesson' }] });
   }
-  return <main className="edu-front"><MemberViews section={params.get('view') || 'dashboard'} data={withExistingCohortVisibility(data)} user={{ id: 'sample-user', full_name: '학습 QA 회원', email: 'learner@example.test', role: params.get('role') === 'admin' ? 'admin' : params.get('role') === 'staff' ? 'staff' : 'member', phone: null }} pending={false} send={async () => ({})} logout={async () => {}} blockLearningEnabled={scenario !== 'legacy'}/></main>;
+  return <main className="edu-front"><MemberViews section={params.get('view') || 'dashboard'} data={withExistingCohortVisibility(data)} user={{ id: 'sample-user', full_name: '학습 QA 회원', email: 'learner@example.test', role: params.get('role') === 'admin' ? 'admin' : params.get('role') === 'staff' ? 'staff' : 'member', phone: null }} pending={false} send={async () => ({})} logout={async () => {}} blockLearningEnabled={scenario !== 'legacy'}/>{params.has('comments') && <div className={theme.workspace}><div className="wrap account-main"><EncouragementEditor/><QuestionAnswerHistory questionId="22222222-2222-4222-8222-222222222222" fallback="합성 답변"/></div></div>}</main>;
 }

@@ -10,7 +10,7 @@ const alignment=readFileSync('supabase/migrations/20260929150200_free_class_mark
 
 test('actual insights SQL: E1 ledger, cohort spend dedupe, missing state, skipped sections and version scope',async t=>{
  const db=new PGlite();t.after(()=>db.close());
- await db.exec(`create role service_role;create role anon;create role authenticated;
+ await db.exec(`create role service_role bypassrls;create role anon;create role authenticated;
  create table profiles(id uuid primary key,role text,status text,is_internal boolean default false,deleted_at timestamptz);
  create table site_settings(key text primary key,value jsonb);
  create table courses(id uuid primary key,title text);
@@ -30,7 +30,7 @@ test('actual insights SQL: E1 ledger, cohort spend dedupe, missing state, skippe
  grant select on all tables in schema public to service_role;`);
  await db.exec(e1.slice(e1.indexOf('create view public.edu_analytics_members'),e1.indexOf('create function public.edu_set_analytics_exclusion')));
  await db.exec(alignment.slice(alignment.indexOf('create or replace function public.edu_decode_landing_utm_once'),alignment.indexOf('create or replace function public.edu_store_campaign_meta')));
- await db.exec(sql);
+ await db.exec(sql);await db.exec(readFileSync('supabase/migrations/20261015112712_edu_marketing_approved_cohort_links.sql','utf8'));
  const rights=(await db.query("select p.prosecdef,has_function_privilege('anon',p.oid,'execute') anon,has_function_privilege('authenticated',p.oid,'execute') member from pg_proc p where p.proname='edu_marketing_insights'")).rows[0];
  assert.deepEqual(rights,{prosecdef:false,anon:false,member:false});
  const admin=uuid(),student=uuid(),internal=uuid(),staff=uuid(),outsider=uuid(),course=uuid(),cohort=uuid(),landing=uuid(),campaign=uuid(),campaign2=uuid();
@@ -80,6 +80,8 @@ test('actual insights SQL: E1 ledger, cohort spend dedupe, missing state, skippe
  await db.query("update landing_campaign_meta_daily set spend='NaN'");assert.equal((await call()).revenue.spend,null);
  await db.query("update landing_campaign_meta_daily set spend=100");
  const otherCampaign=uuid(),otherCohort=uuid();
+ await db.query('insert into cohorts values($1,$2,$3)',[otherCohort,course,'Other']);
+ await db.query("insert into landing_campaigns values($1,$2,'2026-09-01','2026-09-30',true,'success',now())",[otherCampaign,uuid()]);
  await db.query("insert into edu_webinar_campaigns values('other',$1)",[otherCohort]);
  await db.query("insert into edu_recruitment_marketing_links values($1,'other')",[otherCampaign]);
  await db.query("insert into landing_campaign_meta_daily values($1,'2026-09-15','meta-c','ad1',100,now())",[otherCampaign]);
@@ -94,5 +96,21 @@ test('actual insights SQL: E1 ledger, cohort spend dedupe, missing state, skippe
  await assert.rejects(()=>call(admin,{unknown:[]}));
  await add(student,{items:2});assert.equal((await call()).revenue.state,'review');
  await db.query('delete from edu_recruitment_marketing_links where campaign_id=$1',[campaign]);assert.equal((await call()).revenue.state,'unmapped');
+ // Explicitly confirmed old pages use a separate read-only mapping; recruitment remains intact.
+ await db.query("insert into edu_recruitment_marketing_links values($1,'qa')",[campaign]);
+ const oldPage=uuid(),oldCampaign=uuid();
+ await db.query("insert into landing_campaigns values($1,$2,'2026-09-01','2026-09-30',true,'success',now())",[oldCampaign,oldPage]);
+ await db.query('insert into edu_marketing_approved_cohort_links(campaign_id,cohort_id,confirmation_basis) values($1,$2,$3)',[oldCampaign,cohort,'Representative confirmed synthetic historical page']);
+ await db.query("insert into landing_campaign_meta_daily values($1,'2026-09-15','meta-c','old-ad',50,now())",[oldCampaign]);
+ // Prior bundle fixture deliberately remains review; ad spend must still include the old source.
+ assert.equal((await call()).revenue.spend,150);
+ const oldReport=(await db.query("select public.edu_marketing_insights($1,$2,'2026-09-01','2026-09-30','{}') v",[admin,oldCampaign])).rows[0].v;
+ assert.equal(oldReport.revenue.cohort_id,cohort);assert.equal(oldReport.revenue.spend,150);
+ assert.equal((await db.query('select count(*)::int n from edu_recruitment_marketing_links where campaign_id=$1',[oldCampaign])).rows[0].n,0);
+ await db.exec('set role service_role');assert.equal((await call()).revenue.spend,150);await assert.rejects(()=>db.query('insert into edu_marketing_approved_cohort_links(campaign_id,cohort_id,confirmation_basis) values($1,$2,$3)',[campaign,cohort,'Service must not edit configuration']),/permission denied/);await db.exec('reset role');
+ await db.query("insert into edu_recruitment_marketing_links values($1,'other')",[oldCampaign]);
+ await assert.rejects(()=>db.query("select public.edu_marketing_insights($1,$2,'2026-09-01','2026-09-30','{}')",[admin,oldCampaign]),/COHORT_CONFLICT/);
+ assert.equal((await call()).revenue.spend,null,'conflicting historical source cannot silently shrink cohort spend');
  await db.exec('set role anon');await assert.rejects(()=>call(),/permission denied/);
+ await assert.rejects(()=>db.query('select * from edu_marketing_campaign_cohorts'),/permission denied/);
 });

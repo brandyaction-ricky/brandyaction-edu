@@ -2,8 +2,11 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { permissionsFor } from '@/lib/operator-permissions';
 import { getAuthenticatedUser } from '@/lib/server-auth';
 
+import { MAX_STORED_PRODUCT_DOCUMENT_BYTES } from '@/lib/product-html-document';
+
 const MB = 1024 * 1024;
 const fileKinds = {
+    'product-html': { bucket: 'course-resources', maxBytes: MAX_STORED_PRODUCT_DOCUMENT_BYTES, allowed: { html: 'text/plain', htm: 'text/plain' } as Record<string, string> },
     image: {
         bucket: 'course-assets',
         maxBytes: 10 * MB,
@@ -55,8 +58,9 @@ export async function POST(request: Request) {
             size?: unknown;
             kind?: unknown;
         };
-        const kind = body.kind === 'image' || body.kind === 'detail-image' ? body.kind : body.kind === 'resource' ? 'resource' : null;
+        const kind = body.kind === 'image' || body.kind === 'detail-image' || body.kind === 'product-html' ? body.kind : body.kind === 'resource' ? 'resource' : null;
         if (!kind) return Response.json({ error: '업로드 종류를 확인해 주세요.' }, { status: 400 });
+        if (kind === 'product-html' && !permissions?.products) return Response.json({ error: '상품 관리 권한이 필요합니다.' }, { status: 403 });
         const config = fileKinds[kind];
         const name = String(body.name || '').normalize('NFC');
         const size = Number(body.size);
@@ -64,7 +68,7 @@ export async function POST(request: Request) {
         if (!name || name.length > 240 || /[\\/\u0000-\u001f]/.test(name) || !config.allowed[extension])
             return Response.json(
                 {
-                    error: kind === 'resource' ? 'PDF, ZIP, TXT, CSV, 문서 파일을 선택해 주세요.' : kind === 'detail-image' ? 'PNG, JPG, WEBP, GIF 이미지를 선택해 주세요.' : 'PNG, JPG, WEBP 이미지를 선택해 주세요.',
+                    error: kind === 'product-html' ? 'HTML 또는 HTM 파일을 선택해 주세요.' : kind === 'resource' ? 'PDF, ZIP, TXT, CSV, 문서 파일을 선택해 주세요.' : kind === 'detail-image' ? 'PNG, JPG, WEBP, GIF 이미지를 선택해 주세요.' : 'PNG, JPG, WEBP 이미지를 선택해 주세요.',
                 },
                 { status: 400 },
             );
@@ -76,7 +80,7 @@ export async function POST(request: Request) {
                 { status: 400 },
             );
         const db = createAdminClient();
-        const path = `edu/${crypto.randomUUID()}.${extension}`;
+        const path = kind === 'product-html' ? `edu/product-html/${user!.id}/${crypto.randomUUID()}.txt` : `edu/${crypto.randomUUID()}.${extension}`;
         const { data, error } = await db.storage.from(config.bucket).createSignedUploadUrl(path, { upsert: false });
         if (error) {
             console.error('platform upload', error.message);
