@@ -2,7 +2,7 @@ import { getOperatorUser } from '@/lib/operator-permissions';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { telegramInviteUrl, uuid } from '@/lib/purchase-onboarding';
 import { purchaseBatchLimit, purchaseChannels, purchaseRecipientLimit, purchaseRoomToken, purchaseTextBytes, purchaseTextLimits, type PurchaseChannel } from '@/lib/purchase-buyer-delivery';
-import { purchaseBuyers, purchaseBuyerChannels, purchaseBuyerTemplates, purchaseTemplateHash, reachableBuyers } from '@/lib/purchase-buyer-delivery-server';
+import { purchaseBuyers, purchaseBuyerChannels, purchaseBuyerHistory, purchaseBuyerTemplates, purchaseTemplateHash, reachableBuyers } from '@/lib/purchase-buyer-delivery-server';
 
 const reply = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
 const error = (message: string, status = 400) => reply({ error: message }, status);
@@ -24,8 +24,8 @@ export async function GET(request: Request) {
     if (!await operator()) return error('상품·주문·마케팅 관리 권한이 필요합니다.', 403);
     const cohort = new URL(request.url).searchParams.get('cohort');
     if (!uuid(cohort) || !await paidCohort(cohort)) return error('유료 클래스 기수를 확인해 주세요.');
-    const [buyers, channels, templates, history] = await Promise.all([
-      purchaseBuyers(cohort), purchaseBuyerChannels(), purchaseBuyerTemplates(),
+    const [buyers, channels, templates, deliveryByBuyer, history] = await Promise.all([
+      purchaseBuyers(cohort), purchaseBuyerChannels(), purchaseBuyerTemplates(), purchaseBuyerHistory(cohort),
       createAdminClient().from('edu_purchase_delivery_reservations')
         .select('id,channel,subject,content,count,scheduled_at,status,pending_count,accepted_count,failed_count,skipped_count,unknown_count')
         .eq('cohort_id', cohort).order('created_at', { ascending: false }).order('id').limit(50),
@@ -35,7 +35,11 @@ export async function GET(request: Request) {
     return reply({
       channels,
       templates: templates.map(template => ({ id: template.id, name: template.name, channel: template.channel, content: template.content, version: purchaseTemplateHash(template) })),
-      buyers: buyers.map(buyer => ({ id: buyer.id, name: buyer.full_name || '이름 미등록', channels: purchaseChannels.filter(channel => reachable[channel].has(buyer.id)) })),
+      buyers: buyers.map(buyer => ({
+        id: buyer.id, name: buyer.full_name || '이름 미등록',
+        channels: purchaseChannels.filter(channel => reachable[channel].has(buyer.id)),
+        delivery: deliveryByBuyer.get(buyer.id),
+      })),
       history: history.data,
     });
   } catch {

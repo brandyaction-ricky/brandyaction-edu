@@ -5,7 +5,7 @@ import { loadSmsSettings } from '@/lib/crm-sms-settings';
 import { maskEmail, purchaseEmailConfigured } from '@/lib/crm-purchase-email';
 import { sendBatch, type Member, type Template } from '@/lib/crm-delivery';
 import { permissionsFor } from '@/lib/operator-permissions';
-import { purchaseDestination, purchaseRecipientLimit, validPurchaseDestination, type PurchaseChannel } from '@/lib/purchase-buyer-delivery';
+import { purchaseChannels, purchaseDestination, purchaseHistoryChannel, purchaseRecipientLimit, validPurchaseDestination, type PurchaseChannel, type PurchaseDeliveryHistory, type PurchaseDeliveryState } from '@/lib/purchase-buyer-delivery';
 
 type Buyer = Member & { role: string; deleted_at: string | null; is_internal: boolean | null };
 type DeliveryTemplate = Template & { name: string };
@@ -74,6 +74,56 @@ export function reachableBuyers(channel: PurchaseChannel, buyers: Buyer[]) {
     const destination = purchaseDestination(channel, buyer);
     return validPurchaseDestination(channel, destination) && counts.get(destination) === 1;
   });
+}
+
+export async function purchaseBuyerHistory(cohort: string) {
+  const db = createAdminClient();
+  const history = new Map<string, PurchaseDeliveryHistory>();
+  const pageSize = 500;
+
+  function mark(id: string, channel: string, state: keyof PurchaseDeliveryState) {
+    if (!purchaseChannels.includes(channel as PurchaseChannel)) return;
+    const key = purchaseHistoryChannel(channel as PurchaseChannel);
+    const delivery = history.get(id) ?? {};
+    (delivery[key] ??= {})[state] = true;
+    history.set(id, delivery);
+  }
+
+  async function readPending() {
+    let after: string | undefined;
+    for (;;) {
+      let query = db.from('edu_purchase_delivery_batches').select('id,channel,recipient_ids')
+        .eq('cohort_id', cohort).in('status', ['scheduled', 'sending']).order('id').limit(pageSize);
+      if (after) query = query.gt('id', after);
+      const result = await query;
+      if (result.error) throw result.error;
+      for (const row of result.data) {
+        for (const id of row.recipient_ids) mark(id, row.channel, 'pending');
+      }
+      if (result.data.length < pageSize) return;
+      after = result.data.at(-1)?.id;
+    }
+  }
+
+  async function readReceipts() {
+    let after: string | undefined;
+    for (;;) {
+      let query = db.from('crm_message_logs').select('id,member_id,channel,status,edu_purchase_delivery_batches!inner(cohort_id)')
+        .eq('edu_purchase_delivery_batches.cohort_id', cohort).in('status', ['accepted', 'processing', 'unknown'])
+        .not('member_id', 'is', null).order('id').limit(pageSize);
+      if (after) query = query.gt('id', after);
+      const result = await query;
+      if (result.error) throw result.error;
+      for (const row of result.data) {
+        if (row.member_id) mark(row.member_id, row.channel, row.status === 'accepted' ? 'accepted' : 'uncertain');
+      }
+      if (result.data.length < pageSize) return;
+      after = result.data.at(-1)?.id;
+    }
+  }
+
+  await Promise.all([readPending(), readReceipts()]);
+  return history;
 }
 
 async function sendBuyerEmails(batch: { id: string; subject: string; content: string }, buyers: Buyer[]) {

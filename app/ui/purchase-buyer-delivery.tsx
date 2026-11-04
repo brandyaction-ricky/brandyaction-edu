@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { purchaseBatchLimit, purchaseChannelLabels, purchaseChannels, purchaseRoomToken, purchaseTextBytes, purchaseTextLimits, type PurchaseChannel } from '@/lib/purchase-buyer-delivery';
+import { purchaseBatchLimit, purchaseChannelLabels, purchaseChannels, purchaseHistoryChannel, purchaseRoomToken, purchaseTextBytes, purchaseTextLimits, type PurchaseChannel, type PurchaseDeliveryHistory } from '@/lib/purchase-buyer-delivery';
 
-type Buyer = { id: string; name: string; channels: PurchaseChannel[] };
+type Buyer = { id: string; name: string; channels: PurchaseChannel[]; delivery?: PurchaseDeliveryHistory };
+type RecipientFilter = 'ready' | 'accepted' | 'pending' | 'all';
 type Template = { id: string; name: string; channel: PurchaseChannel; content: string; version: string };
 type Batch = { id: string; channel: PurchaseChannel; subject: string | null; content: string; count: number; scheduled_at: string; status: string; accepted_count: number; failed_count: number; skipped_count: number; unknown_count: number; pending_count: number };
 type Setup = { buyers: Buyer[]; templates: Template[]; channels: Record<PurchaseChannel, boolean>; history: Batch[] };
@@ -15,6 +16,8 @@ export function PurchaseBuyerDelivery({ cohort, productId }: { cohort: string; p
   const [channel, setChannel] = useState<PurchaseChannel>('sms');
   const [selected, setSelected] = useState<string[]>([]);
   const [search, setSearch] = useState('');
+  const [recipientFilter, setRecipientFilter] = useState<RecipientFilter>('ready');
+  const [customCount, setCustomCount] = useState('');
   const [visibleCount, setVisibleCount] = useState(100);
   const [templateId, setTemplateId] = useState('');
   const [roomLink, setRoomLink] = useState('');
@@ -35,9 +38,23 @@ export function PurchaseBuyerDelivery({ cohort, productId }: { cohort: string; p
   const textLimit = textChannel ? purchaseTextLimits[textChannel] : 0;
   const textBytes = directText ? purchaseTextBytes(textMessage.trim()) : 0;
   const needsRoom = Boolean(template?.content.includes(token));
-  const available = setup?.buyers.filter(buyer => buyer.channels.includes(channel)) ?? [];
-  const shown = available.filter(buyer => buyer.name.toLocaleLowerCase('ko').includes(search.trim().toLocaleLowerCase('ko')));
+  const recipients = setup?.buyers.map(buyer => {
+    const { accepted, pending, uncertain } = buyer.delivery?.[purchaseHistoryChannel(channel)] ?? {};
+    const reachable = buyer.channels.includes(channel);
+    return { ...buyer, accepted, pending, uncertain, reachable, selectable: reachable && !pending && !uncertain };
+  }) ?? [];
+  const ready = recipients.filter(buyer => buyer.selectable && !buyer.accepted);
+  const accepted = recipients.filter(buyer => buyer.accepted);
+  const pending = recipients.filter(buyer => buyer.pending || buyer.uncertain);
+  const availableCount = recipients.filter(buyer => buyer.selectable).length;
+  const filtered = { ready, accepted, pending, all: recipients }[recipientFilter];
+  const query = search.trim().toLocaleLowerCase('ko');
+  const shown = filtered.filter(buyer => buyer.name.toLocaleLowerCase('ko').includes(query));
+  const selectable = shown.filter(buyer => buyer.selectable);
+  const requestedCount = Number(customCount);
+  const validCustomCount = Number.isInteger(requestedCount) && requestedCount > 0 && requestedCount <= selectable.length;
   const selectedIds = new Set(selected);
+  const selectedPreviouslySent = accepted.filter(buyer => selectedIds.has(buyer.id)).length;
   const templateReturn = new URLSearchParams({ cohort });
   if (productId) templateReturn.set('product', productId);
   const templatesHref = '/admin/templates?' + new URLSearchParams({
@@ -58,10 +75,23 @@ export function PurchaseBuyerDelivery({ cohort, productId }: { cohort: string; p
 
   function edit() { setReview(false); requestId.current = ''; }
   function chooseChannel(next: PurchaseChannel) {
-    if (!(textChannel && (next === 'sms' || next === 'lms'))) setSelected([]);
+    if (purchaseHistoryChannel(next) !== purchaseHistoryChannel(channel)) {
+      setSelected([]);
+      setRecipientFilter('ready');
+    }
     setChannel(next);
     setVisibleCount(100);
     setTemplateId('');
+    edit();
+  }
+  function chooseRecipientFilter(next: RecipientFilter) {
+    setRecipientFilter(next);
+    setSelected([]);
+    setVisibleCount(100);
+    edit();
+  }
+  function chooseCount(count: number) {
+    setSelected(selectable.slice(0, count).map(buyer => buyer.id));
     edit();
   }
   async function submit(cancel?: string) {
@@ -83,7 +113,8 @@ export function PurchaseBuyerDelivery({ cohort, productId }: { cohort: string; p
       if (!response.ok) throw Error(result.error);
       setNotice(cancel ? '아직 발송하지 않은 대상의 예약을 취소했습니다.' : '발송 예약을 저장했습니다.');
       edit();
-      if (!cancel) setSelected([]);
+      setSelected([]);
+      setSetup(null);
       setReload(value => value + 1);
     } catch (error) { setNotice(error instanceof Error ? error.message : '예약 상태를 확인해 주세요.'); }
     finally { requestBusy.current = false; setBusy(false); }
@@ -119,21 +150,38 @@ export function PurchaseBuyerDelivery({ cohort, productId }: { cohort: string; p
           </>}
         </>}
         {needsRoom && <label>배정할 텔레그램 공지방 링크<input type="url" value={roomLink} maxLength={500} placeholder="https://t.me/+..." onChange={event => { setRoomLink(event.target.value); edit(); }} /></label>}
-        <p aria-live="polite">전체 결제자 <strong>{setup.buyers.length.toLocaleString('ko-KR')}명</strong> · 발송 가능 <strong>{available.length.toLocaleString('ko-KR')}명</strong> · 선택 <strong>{selected.length.toLocaleString('ko-KR')}명</strong></p>
-        <p className="meta">전체 결제자는 유효한 수강권이 있는 결제자 기준입니다. 미등록·중복 연락처는 발송 대상에서 제외합니다.</p>
+        <p aria-live="polite">전체 결제자 <strong>{setup.buyers.length.toLocaleString('ko-KR')}명</strong> · 발송 가능 <strong>{availableCount.toLocaleString('ko-KR')}명</strong> · 선택 <strong>{selected.length.toLocaleString('ko-KR')}명</strong></p>
+        <label>발송 이력<select value={recipientFilter} onChange={event => chooseRecipientFilter(event.target.value as RecipientFilter)}>
+          <option value="ready">미발송 · {ready.length.toLocaleString('ko-KR')}명</option>
+          <option value="accepted">발송 접수됨 · {accepted.length.toLocaleString('ko-KR')}명</option>
+          <option value="pending">예약·확인 필요 · {pending.length.toLocaleString('ko-KR')}명</option>
+          <option value="all">전체 결제자 · {recipients.length.toLocaleString('ko-KR')}명</option>
+        </select></label>
+        <p className="meta">선택한 채널의 구매자 공지 이력입니다. 문자와 장문 문자는 같은 이력으로 표시합니다. ‘발송 접수됨’은 발송 업체가 접수한 상태입니다.</p>
         <label>구매자 이름 검색<input value={search} onChange={event => { setSearch(event.target.value); setVisibleCount(100); }} /></label>
-        <div className="onboarding-actions">
-          <button className="btn" type="button" disabled={!available.length} onClick={() => { setSelected(available.map(buyer => buyer.id)); edit(); }}>발송 가능한 전체 선택</button>
-          {search.trim() && <button className="btn" type="button" disabled={!shown.length} onClick={() => { setSelected(current => [...new Set([...current, ...shown.map(buyer => buyer.id)])]); edit(); }}>검색 결과 {shown.length.toLocaleString('ko-KR')}명 선택</button>}
+        <div className="onboarding-recipient-actions" aria-label="빠른 인원 선택" role="group">
+          <button className="btn" type="button" disabled={!selectable.length} onClick={() => chooseCount(selectable.length)}>발송 가능한 전체 선택</button>
+          <button className="btn" type="button" disabled={!selectable.length} onClick={() => chooseCount(Math.ceil(selectable.length / 2))}>절반 선택</button>
+          <button className="btn" type="button" disabled={!selectable.length} onClick={() => chooseCount(50)}>50명 선택</button>
+          {query && <button className="btn" type="button" disabled={!selectable.length} onClick={() => { setSelected(current => [...new Set([...current, ...selectable.map(buyer => buyer.id)])]); edit(); }}>검색 결과 {selectable.length.toLocaleString('ko-KR')}명 선택</button>}
           <button className="btn" type="button" disabled={!selected.length} onClick={() => { setSelected([]); edit(); }}>선택 해제</button>
         </div>
+        <div className="onboarding-recipient-actions">
+          <label>선택할 인원<input type="number" min={1} max={selectable.length || 1} step={1} value={customCount} onChange={event => setCustomCount(event.target.value)} /></label>
+          <button className="btn" type="button" disabled={!validCustomCount} onClick={() => chooseCount(requestedCount)}>입력한 인원 선택</button>
+        </div>
+        <p className="meta">빠른 선택은 현재 보기와 검색에 맞는 대상의 위에서부터 적용됩니다. 50명보다 적으면 가능한 전원을 선택합니다.</p>
         {shown.length ? <div className="onboarding-recipient-list" aria-label="발송 대상">
-          {shown.slice(0, visibleCount).map(buyer => <label key={buyer.id} className="onboarding-toggle"><input type="checkbox" checked={selectedIds.has(buyer.id)} onChange={event => {
+          {shown.slice(0, visibleCount).map(buyer => <label key={buyer.id} className="onboarding-toggle"><input type="checkbox" disabled={!buyer.selectable} checked={selectedIds.has(buyer.id)} onChange={event => {
             const checked = event.target.checked;
             setSelected(current => checked ? [...current, buyer.id] : current.filter(id => id !== buyer.id));
             edit();
-          }} />{buyer.name} <small>· {buyer.id.slice(-6)}</small></label>)}
-        </div> : <p className="meta">{search.trim() ? '검색에 맞는 구매자가 없습니다.' : '이 채널로 발송할 수 있는 구매자가 없습니다.'}</p>}
+          }} /><span>{buyer.name} <small>· {buyer.id.slice(-6)}</small></span><span className="onboarding-recipient-status">
+            {buyer.accepted && <small data-status="accepted">발송 접수됨</small>}
+            {buyer.pending ? <small data-status="pending">예약·처리 중</small> : buyer.uncertain && <small data-status="uncertain">결과 확인 필요</small>}
+            {!buyer.reachable && <small>연락처 미등록·중복</small>}
+          </span></label>)}
+        </div> : <p className="meta">{query ? '검색에 맞는 구매자가 없습니다.' : '현재 보기에 해당하는 구매자가 없습니다.'}</p>}
         {shown.length > visibleCount && <button className="btn" type="button" onClick={() => setVisibleCount(count => count + 100)}>구매자 더 보기 · {visibleCount.toLocaleString('ko-KR')} / {shown.length.toLocaleString('ko-KR')}명</button>}
         <label>발송 시각 (현재 기기 시간)<input type="datetime-local" value={at} onChange={event => { setAt(event.target.value); edit(); }} /></label>
         <button className="btn" type="button" disabled={!setup.channels[channel] || !selected.length || !at || (needsRoom && !roomLink.trim()) || (channel === 'email' ? !subject.trim() || !content.trim() : directText ? !textBytes || textBytes > textLimit : !template)}
@@ -141,7 +189,8 @@ export function PurchaseBuyerDelivery({ cohort, productId }: { cohort: string; p
         {review && <section className="onboarding-delivery-review" aria-label="발송 예약 미리보기">
           <h3>{purchaseChannelLabels[channel]} · {selected.length}명</h3>
           <p>{new Date(at).toLocaleString('ko-KR')}</p>
-          <details><summary>선택한 구매자 확인</summary><p>{available.filter(buyer => selectedIds.has(buyer.id)).map(buyer => buyer.name + ' · ' + buyer.id.slice(-6)).join(', ')}</p></details>
+          {selectedPreviouslySent > 0 && <p>이전에 발송한 구매자 {selectedPreviouslySent.toLocaleString('ko-KR')}명이 포함돼 있습니다.</p>}
+          <details><summary>선택한 구매자 확인</summary><p>{recipients.filter(buyer => selectedIds.has(buyer.id)).map(buyer => buyer.name + ' · ' + buyer.id.slice(-6)).join(', ')}</p></details>
           {channel === 'email' && <strong>{subject}</strong>}
           <p className="onboarding-message-copy">{channel === 'email' ? content : directText ? textMessage.trim() : template?.content.replaceAll(token, roomLink.trim())}</p>
           <p className="meta">예약 시각에 결제와 수강권이 유효한 사람에게 발송합니다.{selected.length > purchaseBatchLimit && ' 대상이 많으면 여러 묶음으로 순차 발송합니다.'}</p>

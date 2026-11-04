@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
+import { createClient } from '@supabase/supabase-js';
 
 function load(path, modules = {}) {
   const exports = {};
@@ -16,6 +17,37 @@ const id = '22222222-2222-4222-8222-222222222222';
 const buyer = '33333333-3333-4333-8333-333333333333';
 const more = Array.from({ length: 104 }, (_, i) => '55555555-5555-4555-8555-' + String(i).padStart(12, '0'));
 const foreign = '44444444-4444-4444-8444-444444444444';
+
+test('buyer history is scoped to its cohort and preserves earlier accepted SMS alongside an active LMS reservation', async () => {
+  const requests = [];
+  const db = createClient('https://supabase.test', 'fixture-key', { global: { fetch: async (input, options) => {
+    assert.equal(options.method, 'GET');
+    const url = new URL(input);
+    const table = url.pathname.split('/').at(-1);
+    requests.push(table);
+    if (table === 'edu_purchase_delivery_batches') {
+      assert.equal(url.searchParams.get('cohort_id'), `eq.${cohort}`);
+      assert.equal(url.searchParams.get('status'), 'in.(scheduled,sending)');
+      return Response.json([{ id, channel: 'lms', recipient_ids: [buyer, more[0]] }]);
+    }
+    assert.equal(table, 'crm_message_logs');
+    assert.equal(url.searchParams.get('edu_purchase_delivery_batches.cohort_id'), `eq.${cohort}`);
+    assert.match(url.searchParams.get('select'), /edu_purchase_delivery_batches!inner\(cohort_id\)/);
+    assert.equal(url.searchParams.get('status'), 'in.(accepted,processing,unknown)');
+    return Response.json([
+      { id, member_id: buyer, channel: 'sms', status: 'accepted' },
+      { id: foreign, member_id: buyer, channel: 'email', status: 'unknown' },
+    ]);
+  } } });
+  const { purchaseBuyerHistory } = load('../lib/purchase-buyer-delivery-server.ts', {
+    '@/lib/supabase/admin': { createAdminClient: () => db },
+    '@/lib/purchase-buyer-delivery': load('../lib/purchase-buyer-delivery.ts'),
+  });
+  const result = await purchaseBuyerHistory(cohort);
+  assert.deepEqual(result.get(buyer), { sms: { accepted: true, pending: true }, email: { uncertain: true } });
+  assert.deepEqual(result.get(more[0]), { sms: { pending: true } });
+  assert.deepEqual(requests.sort(), ['crm_message_logs', 'edu_purchase_delivery_batches']);
+});
 
 test('reservation verifies scope and is idempotent for the same operator request', async () => {
   const rows = [];

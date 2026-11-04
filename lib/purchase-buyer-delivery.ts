@@ -2,6 +2,9 @@ export const purchaseBatchLimit = 100;
 export const purchaseRecipientLimit = 10_000;
 export const purchaseChannels = ['sms', 'lms', 'alimtalk', 'email'] as const;
 export type PurchaseChannel = typeof purchaseChannels[number];
+export type PurchaseDeliveryState = { accepted?: true; pending?: true; uncertain?: true };
+export type PurchaseDeliveryHistory = Partial<Record<Exclude<PurchaseChannel, 'lms'>, PurchaseDeliveryState>>;
+export const purchaseHistoryChannel = (channel: PurchaseChannel) => channel === 'lms' ? 'sms' : channel;
 export const purchaseChannelLabels: Record<PurchaseChannel, string> = {
   sms: '문자 (SMS)', lms: '장문 문자 (LMS)', alimtalk: '카카오 알림톡', email: '이메일',
 };

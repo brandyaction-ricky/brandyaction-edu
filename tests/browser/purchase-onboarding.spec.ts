@@ -311,6 +311,65 @@ test('direct SMS can select a group above 100, narrow it by name, then review an
   expect(sent).toEqual([expect.objectContaining({ action: 'schedule', cohort, channel: 'sms', templateId: '', content: text, recipients: buyers.slice(0, 103).map(buyer => buyer.id) })]);
 });
 
+test('purchase notice selects preset counts and separates accepted, reserved and uncertain buyers without scheduling', async ({ page }) => {
+  const buyers = Array.from({ length: 105 }, (_, i) => ({
+    id: '44444444-4444-4444-8444-' + String(i).padStart(12, '0'),
+    name: `검수 구매자 ${i}`,
+    channels: i === 104 ? [] : ['sms', 'lms', 'email'],
+    delivery: i === 1 ? { sms: { accepted: true } } : i === 2 ? { sms: { pending: true } } : i === 3 ? { sms: { uncertain: true } } : undefined,
+  }));
+  const writes: string[] = [];
+  await page.route(/\/api\/admin\/purchase-onboarding(?:\?|$)/, route => route.fulfill({
+    json: new URL(route.request().url()).searchParams.has('cohort') ? { settings: null } : { cohorts: [{ id: cohort, name: '5기' }] },
+  }));
+  await page.route('**/api/admin/purchase-onboarding/delivery*', route => {
+    if (route.request().method() !== 'GET') {
+      writes.push(route.request().method());
+      return route.abort();
+    }
+    return route.fulfill({ json: { buyers, channels: { sms: true, lms: true, email: true }, templates: [], history: [] } });
+  });
+
+  await page.goto('/admin/purchase-onboarding-test');
+  await page.getByLabel('안내할 기수').selectOption(cohort);
+  const history = page.getByLabel('발송 이력');
+  const count = (amount: number) => expect(page.getByText(`전체 결제자 105명 · 발송 가능 102명 · 선택 ${amount}명`, { exact: true })).toBeVisible();
+  const list = page.locator('[aria-label="발송 대상"]');
+  await expect(history).toHaveValue('ready');
+  await page.getByRole('button', { name: '절반 선택' }).click();
+  await count(51);
+  await page.getByRole('button', { name: '50명 선택' }).click();
+  await count(50);
+  await page.getByLabel('선택할 인원').fill('37');
+  await page.getByRole('button', { name: '입력한 인원 선택' }).click();
+  await count(37);
+  await page.getByRole('button', { name: '발송 가능한 전체 선택' }).click();
+  await count(101);
+
+  await history.selectOption('pending');
+  await count(0);
+  await expect(list.getByText('예약·처리 중', { exact: true })).toBeVisible();
+  await expect(list.getByText('결과 확인 필요', { exact: true })).toBeVisible();
+  await expect(list.getByRole('checkbox', { name: /검수 구매자 2 / })).toBeDisabled();
+  await expect(list.getByRole('checkbox', { name: /검수 구매자 3 / })).toBeDisabled();
+
+  await history.selectOption('accepted');
+  await expect(list.getByText('발송 접수됨', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '50명 선택' }).click();
+  await count(1);
+  await page.getByLabel('문자 내용').fill('새 공지');
+  await page.getByLabel('발송 시각 (현재 기기 시간)').fill('2027-12-01T12:00');
+  await page.getByRole('button', { name: '대상·문구 확인' }).click();
+  await expect(page.getByText('이전에 발송한 구매자 1명이 포함돼 있습니다.')).toBeVisible();
+
+  await page.getByRole('combobox', { name: '채널', exact: true }).selectOption('lms');
+  await expect(list.getByText('발송 접수됨', { exact: true })).toBeVisible();
+  await page.getByRole('combobox', { name: '채널', exact: true }).selectOption('email');
+  await expect(history).toHaveValue('ready');
+  await expect(list.getByText('발송 접수됨', { exact: true })).toHaveCount(0);
+  expect(writes).toEqual([]);
+});
+
 test('templates returns to the same purchase product and cohort, then back to the product editor', async ({ page }) => {
   const product = '33333333-3333-4333-8333-333333333333';
   await page.route(/\/api\/admin\/purchase-onboarding(?:\?|$)/, route => {
