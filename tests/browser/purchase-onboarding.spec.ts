@@ -194,48 +194,57 @@ test('onboarding lookup failure is visible and can be retried', async ({ page })
   await expect(page.getByRole('link', { name: '결제 후 시작 안내' })).toHaveAttribute('href', `/purchase-onboarding?order=${order}`);
 });
 
-test('cohort purchase admin schedules an email for a selected room group and cancels it from the same screen', async ({ page }) => {
-  const other = '33333333-3333-4333-8333-333333333333';
-  let batch: Record<string, unknown> | null = null;
-  let cancelled = false;
-  await page.route('**/api/admin/purchase-onboarding?*', route => route.fulfill({ json: {
-    settings: { roomName: '', inviteUrl: '', paidImage: '', organicImage: '', enabled: true, mode: 'campus_welcome' },
-  } }));
-  await page.route('**/api/admin/purchase-onboarding', route => route.fulfill({ json: {
-    cohorts: [{ id: cohort, name: '5기', courses: { title: '문샷 챌린지' } }],
-  } }));
-  await page.route('**/api/admin/purchase-onboarding/delivery*', async route => {
-    if (route.request().method() === 'POST') {
-      const body = route.request().postDataJSON();
-      if (body.action === 'cancel') {
-        expect(body.id).toBe(batch?.id);
-        cancelled = true;
-      } else {
-        expect(body).toMatchObject({ cohort, action: 'schedule', channel: 'email', recipients: [other], subject: '2번 공지방', content: '입장 링크 확인' });
-        batch = body;
+for (const [channel, label] of [['sms', '문자 (SMS)'], ['alimtalk', '카카오 알림톡'], ['email', '이메일']] as const) {
+  test(`cohort purchase admin schedules and cancels a ${channel} notice for selected buyers`, async ({ page }) => {
+    const other = '33333333-3333-4333-8333-333333333333';
+    const template = { id: 'test-template', channel, name: '검수용 결제 안내', content: '입장 링크 확인', version: 'test-version' };
+    let batch: Record<string, unknown> | null = null;
+    let cancelled = false;
+    await page.route('**/api/admin/purchase-onboarding?*', route => route.fulfill({ json: {
+      settings: { roomName: '', inviteUrl: '', paidImage: '', organicImage: '', enabled: true, mode: 'campus_welcome' },
+    } }));
+    await page.route('**/api/admin/purchase-onboarding', route => route.fulfill({ json: {
+      cohorts: [{ id: cohort, name: '5기', courses: { title: '문샷 챌린지' } }],
+    } }));
+    await page.route('**/api/admin/purchase-onboarding/delivery*', async route => {
+      if (route.request().method() === 'POST') {
+        const body = route.request().postDataJSON();
+        if (body.action === 'cancel') {
+          expect(body.id).toBe(batch?.id);
+          cancelled = true;
+        } else {
+          expect(body).toMatchObject({ cohort, action: 'schedule', channel, recipients: [other],
+            ...(channel === 'email' ? { subject: '2번 공지방', content: '입장 링크 확인' } :
+              { templateId: template.id, templateVersion: template.version }) });
+          batch = body;
+        }
+        return route.fulfill({ json: { ok: true } });
       }
-      return route.fulfill({ json: { ok: true } });
+      expect(new URL(route.request().url()).searchParams.get('cohort')).toBe(cohort);
+      return route.fulfill({ json: {
+        buyers: [{ id: order, name: '첫째 구매자', channels: [channel] }, { id: other, name: '둘째 구매자', channels: [channel] }],
+        channels: { sms: true, lms: true, alimtalk: true, email: true }, templates: channel === 'email' ? [] : [template],
+        history: batch ? [{ id: batch.id, channel, count: 1, subject: batch.subject, content: batch.content, status: cancelled ? 'cancelled' : 'scheduled', scheduled_at: batch.scheduledAt }] : [],
+      } });
+    });
+    await page.goto('/admin/purchase-onboarding-test');
+    await page.getByLabel('안내할 기수').selectOption(cohort);
+    await expect(page.getByRole('link', { name: '구매자 공지·발송 내역' })).toHaveAttribute('href', '#buyer-delivery');
+    await page.getByRole('combobox', { name: '채널', exact: true }).selectOption(channel);
+    await page.getByLabel('둘째 구매자', { exact: false }).check();
+    if (channel === 'email') {
+      await page.getByLabel('이메일 제목').fill('2번 공지방');
+      await page.getByLabel('이메일 내용').fill('입장 링크 확인');
+    } else {
+      await page.getByLabel('정보성 메시지 템플릿').selectOption(template.id);
     }
-    expect(new URL(route.request().url()).searchParams.get('cohort')).toBe(cohort);
-    return route.fulfill({ json: {
-      buyers: [{ id: order, name: '첫째 구매자', channels: ['email'] }, { id: other, name: '둘째 구매자', channels: ['email'] }],
-      channels: { sms: true, lms: true, alimtalk: true, email: true }, templates: [],
-      history: batch ? [{ id: batch.id, channel: 'email', count: 1, subject: batch.subject, content: batch.content, status: cancelled ? 'cancelled' : 'scheduled', scheduled_at: batch.scheduledAt }] : [],
-    } });
+    await page.getByLabel('발송 시각 (현재 기기 시간)').fill('2027-12-01T12:00');
+    await page.getByRole('button', { name: '대상·문구 확인' }).click();
+    await expect(page.getByRole('heading', { name: `${label} · 1명` })).toBeVisible();
+    expect(batch).toBeNull();
+    await page.getByRole('button', { name: '확인한 내용으로 발송 예약' }).click();
+    await page.getByText(`${label} · 1명 · 예약 대기`, { exact: false }).click();
+    await page.getByRole('button', { name: '이 예약 취소' }).click();
+    await expect(page.getByText(`${label} · 1명 · 취소됨`, { exact: false })).toBeVisible();
   });
-  await page.goto('/admin/purchase-onboarding-test');
-  await page.getByLabel('안내할 기수').selectOption(cohort);
-  await expect(page.getByRole('link', { name: '구매자 공지·발송 내역' })).toHaveAttribute('href', '#buyer-delivery');
-  await page.getByRole('combobox', { name: '채널', exact: true }).selectOption('email');
-  await page.getByLabel('둘째 구매자', { exact: false }).check();
-  await page.getByLabel('이메일 제목').fill('2번 공지방');
-  await page.getByLabel('이메일 내용').fill('입장 링크 확인');
-  await page.getByLabel('발송 시각 (현재 기기 시간)').fill('2027-12-01T12:00');
-  await page.getByRole('button', { name: '대상·문구 확인' }).click();
-  await expect(page.getByRole('heading', { name: '이메일 · 1명' })).toBeVisible();
-  expect(batch).toBeNull();
-  await page.getByRole('button', { name: '확인한 내용으로 발송 예약' }).click();
-  await page.getByText(/이메일 · 1명 · 예약 대기/).click();
-  await page.getByRole('button', { name: '이 예약 취소' }).click();
-  await expect(page.getByText(/이메일 · 1명 · 취소됨/)).toBeVisible();
-});
+}

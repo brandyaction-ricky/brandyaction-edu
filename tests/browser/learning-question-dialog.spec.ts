@@ -24,6 +24,7 @@ test('real learning header opens a focused quick composer without leaving or rem
   await expect(dialog.getByRole('textbox',{name:'질문 내용',exact:true})).toBeFocused();await expect(dialog.getByRole('textbox',{name:'질문 제목 (선택)',exact:true})).toBeHidden();
   await expect(dialog.getByRole('button',{name:'질문 등록',exact:true})).toBeDisabled();
   await dialog.getByRole('textbox',{name:'질문 내용',exact:true}).fill('막힌 부분입니다');await dialog.getByRole('radio',{name:'비밀 질문',exact:true}).check();
+  await dialog.getByRole('button',{name:'질문 등록',exact:true}).scrollIntoViewIfNeeded();
   await expect(dialog.getByRole('button',{name:'질문 등록',exact:true})).toBeInViewport();
   await page.screenshot({path:info.outputPath('learning-question-popup.png')});
   await dialog.getByRole('button',{name:'질문 등록',exact:true}).click();await expect(dialog.getByRole('heading',{name:'질문을 등록했어요'})).toBeVisible();
