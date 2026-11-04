@@ -3,6 +3,7 @@ import Link from 'next/link';
 import {lazy,Suspense,useEffect,useRef,useState} from 'react';
 import {ArrowUpRight,BookOpen,Bot,Check} from 'lucide-react';
 import type {CampusSnapshot} from '../contracts';
+import {ResourceLibrary} from './resource-library';
 import type {TourRoom} from '../tour/model';
 import {loginPath,type AccessResult,type PublicWebinar,type WebinarEvent} from './domain';
 import styles from './visitor.module.css';
@@ -17,7 +18,7 @@ const stories={
 export function WebinarRoom({event,demo=false,devReview=false,qaCrowd=false}:{event:PublicWebinar;demo?:boolean;devReview?:boolean;qaCrowd?:boolean}){
  const sent=useRef(new Set<string>());
  function record(name:WebinarEvent){if(demo||devReview||sent.current.has(name))return;sent.current.add(name);try{let session=sessionStorage.getItem('edu-visit');if(!session){session=crypto.randomUUID();sessionStorage.setItem('edu-visit',session);}void fetch(`/api/campus/webinar/${event.slug}/events`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session,event:name}),keepalive:true}).catch(()=>{});}catch{/* Entry works even without browser storage. */}}
- return <Suspense fallback={<main className={styles.loading} role="status">문샷 공간과 캐릭터를 준비하고 있어요…</main>}><Tour snapshot={visitorSnapshot} visitor={{devPresence:devReview,qaCrowd:devReview&&qaCrowd,title:event.title,onEnter:()=>record('entry'),onActivity:id=>{if(id==='experience')record('experience');},renderGate:room=><SpaceInvitation key={room} room={room} event={event} demo={demo} record={record}/>,renderTool:tool=>tool==='experience'?<Experience/>:tool.startsWith('story:')?<Story topic={tool.slice(6)} event={event} demo={demo} record={record}/>:<SpaceInvitation room="study" event={event} demo={demo} record={record} general/>}}/></Suspense>;
+ return <Suspense fallback={<main className={styles.loading} role="status">문샷 공간과 캐릭터를 준비하고 있어요…</main>}><Tour snapshot={visitorSnapshot} visitor={{devPresence:devReview,qaCrowd:devReview&&qaCrowd,title:event.title,onEnter:()=>record('entry'),onActivity:id=>{if(id==='experience')record('experience');},renderGate:room=><SpaceInvitation key={room} room={room} event={event} demo={demo} record={record}/>,renderTool:tool=>tool.startsWith('library:')?<ResourceLibrary items={event.resources} initial={tool==='library:replay'?'youtube':'file'}/>:tool==='experience'?<Experience/>:tool.startsWith('story:')?<Story topic={tool.slice(6)} event={event} demo={demo} record={record}/>:<SpaceInvitation room="study" event={event} demo={demo} record={record} general/>}}/></Suspense>;
 }
 function SpaceInvitation({room,event,demo,record,general=false}:{room:TourRoom;event:PublicWebinar;demo:boolean;record:(name:WebinarEvent)=>void;general?:boolean}){
  const story=stories[room==='office'?'office':room==='welcome'?'welcome':'study'];

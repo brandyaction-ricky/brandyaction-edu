@@ -2,6 +2,7 @@ import type {TourRole,TourRoom} from './model';
 export type TourTask={id:string;room:TourRoom;group:string;title:string;description:string;admin?:boolean;limited?:boolean};
 const task=(id:string,room:TourRoom,group:string,title:string,description:string,admin=false,limited=false):TourTask=>({id,room,group,title,description,admin,limited});
 export const tourTasks:TourTask[]=[
+ task('library:files','library','무료로 배우기','무료 자료','공개 자료 보기와 다운로드'),task('library:replay','library','무료로 배우기','다시보기','공개 유튜브 영상으로 복습하기'),
  task('learning','study','배우고 실행하기','수업·과제','오늘 할 수업과 제출할 과제'),
  task('growth','study','배우고 실행하기','성장·미션 지도','일차별 진행, 이정표와 성장 카드'),
  task('focus','study','배우고 실행하기','집중과 휴식','25분·50분·자유 집중과 짧은 휴식'),

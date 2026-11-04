@@ -7,7 +7,7 @@ test('mobile crowd reuses original avatars and keeps movement frames bounded',as
  page.on('response',async r=>{if(r.url().endsWith('/api/campus/preview-meetup')&&r.request().method()==='POST'&&r.request().postDataJSON()?.kind==='join')browserSession=await r.json();});
  const visitors=await startCrowdVisitors(baseURL,60,{socialGroups:true,animate:true,namespace}),errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  const source=fs.readFileSync('public/campus/world/tour/tour.mjs','utf8');
- await page.route('**/campus/world/tour/tour.mjs',r=>r.fulfill({contentType:'text/javascript',body:source.replace('original();root.dataset.playerX',"const cpuStart=performance.now();original();(window.__qaCosts ||= []).push(performance.now()-cpuStart);root.dataset.gpuCalls=String(office.gl.info.render.calls);(window.__qaFrames ||= []).push(performance.now());if(window.__qaFrames.length>600)window.__qaFrames.shift();root.dataset.playerX")}));
+ await page.route('**/campus/world/tour/tour.mjs',r=>r.fulfill({contentType:'text/javascript',body:source.replace('original();meetup?.labels?.();root.dataset.playerX',"const cpuStart=performance.now();original();meetup?.labels?.();(window.__qaCosts ||= []).push(performance.now()-cpuStart);root.dataset.gpuCalls=String(office.gl.info.render.calls);(window.__qaFrames ||= []).push(performance.now());if(window.__qaFrames.length>600)window.__qaFrames.shift();root.dataset.playerX")}));
  const crowdSource=fs.readFileSync('public/campus/world/tour/crowd-renderer.mjs','utf8');
  await page.route('**/campus/world/tour/crowd-renderer.mjs',r=>r.fulfill({contentType:'text/javascript',body:crowdSource.replace('office.scene.add(group);','office.scene.add(group);window.__qaCrowdVisible=value=>{group.visible=value;};')}));
  try{

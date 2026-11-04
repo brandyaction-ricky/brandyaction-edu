@@ -1,14 +1,15 @@
 /** Preview policy only. Production must resolve identity and entitlement on the server. */
 export type TourRole='guest'|'waiting'|'student'|'admin'|'expired';
-export type TourRoom='live'|'welcome'|'study'|'office';
+export type TourRoom='live'|'welcome'|'study'|'office'|'library';
 export const roleNames:Record<TourRole,string>={guest:'방문자',waiting:'개강 전 구매자',student:'수강생',admin:'관리자',expired:'수강권 종료'};
 export const rooms:{id:TourRoom;name:string;tag:string;description:string;access:string}[]=[
  {id:'live',name:'문샷 라이브홀',tag:'OPEN CAMPUS',description:'라이브를 보고, 문샷의 첫 실행을 체험해요.',access:'누구나 입장'},
+ {id:'library',name:'문샷 자료실',tag:'OPEN LIBRARY',description:'무료 자료를 꺼내 보고, 유튜브 다시보기로 복습해요.',access:'누구나 입장'},
  {id:'welcome',name:'문샷 웰컴 존',tag:'FIRST STEP',description:'영상과 작은 퀴즈로 개강을 준비해요.',access:'구매자부터'},
  {id:'study',name:'문샷 공부방',tag:'LEARN TOGETHER',description:'수업을 실행하고, 동료와 결과를 나눠요.',access:'개강한 수강생'},
  {id:'office',name:'내 AI 사무실',tag:'MY AI OFFICE',description:'내 AI 직원에게 일을 맡기고 결과를 확인해요.',access:'개강한 수강생 · 개인 공간'},
 ];
-export function canEnter(role:TourRole,room:TourRoom){return room==='live'||role==='admin'||role==='student'||role==='waiting'&&room==='welcome';}
+export function canEnter(role:TourRole,room:TourRoom){return room==='live'||room==='library'||role==='admin'||role==='student'||role==='waiting'&&room==='welcome';}
 export const oxQuestions=[
  {question:'AI가 만들어 준 답변은 확인 없이 바로 고객에게 보내도 된다.',answer:false,explanation:'AI도 틀릴 수 있어요. 사실·표현·개인정보를 확인한 뒤 사용하세요.'},
  {question:'AI에게 목표, 대상, 원하는 결과물 형태를 함께 알려 주면 도움이 된다.',answer:true,explanation:'구체적인 맥락이 있으면 내가 원하는 답변에 가까워져요.'},

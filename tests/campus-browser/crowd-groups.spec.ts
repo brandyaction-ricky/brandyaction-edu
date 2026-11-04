@@ -1,7 +1,8 @@
 import {test,expect} from '@playwright/test';
 import {startCrowdVisitors} from '../campus-fixture/crowd-visitors.mjs';
 test('connected crowd becomes a conversation only after approaching and joining',async({page,baseURL,isMobile})=>{
- test.setTimeout(120000);const namespace=test.info().testId;await page.setExtraHTTPHeaders({'x-campus-test-room':namespace});let browserSession:Record<string,string>|undefined;page.on('response',async response=>{if(response.url().endsWith('/api/campus/preview-meetup')&&response.request().method()==='POST'&&response.request().postDataJSON()?.kind==='join')browserSession=await response.json();});const visitors=await startCrowdVisitors(baseURL,20,{animate:true,namespace}),errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+ test.setTimeout(process.env.CI?240000:120000); // Software-rendered CI needs a longer interaction budget; hardware assertions remain unchanged.
+const namespace=test.info().testId;await page.setExtraHTTPHeaders({'x-campus-test-room':namespace});let browserSession:Record<string,string>|undefined;page.on('response',async response=>{if(response.url().endsWith('/api/campus/preview-meetup')&&response.request().method()==='POST'&&response.request().postDataJSON()?.kind==='join')browserSession=await response.json();});const visitors=await startCrowdVisitors(baseURL,20,{animate:true,namespace}),errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  try{
   await page.goto('/webinar?meet=1&qaChat=1');await page.getByRole('button',{name:'이 캐릭터로 바로 입장',exact:true}).click({timeout:90000});
   const world=page.frameLocator('iframe'),root=world.locator('#office');await expect(root).toHaveAttribute('data-crowd-count','20');await expect(world.locator('.meetup-population')).toContainText('가상 검수 20명');await expect(world.locator('.meetup-join')).toBeHidden();

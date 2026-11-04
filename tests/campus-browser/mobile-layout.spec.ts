@@ -1,5 +1,6 @@
 import {test,expect,type Locator} from '@playwright/test';
-test.setTimeout(120000);
+test.setTimeout(process.env.CI?240000:120000); // Software-rendered CI needs a longer interaction budget; hardware assertions remain unchanged.
+
 async function reachable(locator:Locator){
  await expect(locator).toBeVisible();
  const hit=await locator.evaluate(el=>{const r=el.getBoundingClientRect(),d=el.ownerDocument,w=d.defaultView!;const at=d.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return {inside:r.x>=0&&r.y>=0&&r.right<=w.innerWidth+1&&r.bottom<=w.innerHeight+1,hit:!!at&&(at===el||el.contains(at)),height:r.height,width:r.width};});
