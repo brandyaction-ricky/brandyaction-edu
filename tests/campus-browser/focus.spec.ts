@@ -16,6 +16,8 @@ test('focus pauses, survives reload, finishes with a note and resumes the next a
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
   await page.clock.install({time:new Date('2026-11-02T12:00:00Z')});
   await page.goto('/');
+  // Assertions measure intentional clock advances, not CI/trace wall-clock delays.
+  await page.clock.pauseAt(new Date('2026-11-02T12:10:00Z'));
   await expect(focus(page).getByText(/체험 기록은 이 브라우저에만/)).toBeVisible();
   await start(page);
   await page.clock.runFor(60_000);
@@ -57,6 +59,7 @@ test('timer expiry asks for an explicit finish without changing lesson or missio
   page.on('request',request=>{if(request.url().includes('/api/campus/focus'))focusRequests.push(request.url());});
   await page.clock.install({time:new Date('2026-11-02T13:00:00Z')});
   await page.goto('/');
+  await page.clock.pauseAt(new Date('2026-11-02T13:10:00Z'));
   const missionButtons=page.getByRole('button',{name:/DAY \d{2}/});
   await expect(missionButtons).toHaveCount(6);
   const initialMissions=await missionButtons.allTextContents();
