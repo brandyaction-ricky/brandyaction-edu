@@ -7,7 +7,7 @@ test('header help remains visible and fits narrow mobile screens', async ({ page
     await page.setViewportSize({width,height:844});
     const action=page.locator('.header-questions');
     await expect(action).toBeVisible();
-    await expect(action).toHaveAttribute('href','/my/questions');
+    await expect(action).toHaveAttribute('href','/my/questions?view=mine');
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   }
 });
