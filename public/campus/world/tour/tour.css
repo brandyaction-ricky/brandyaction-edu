@@ -4,8 +4,8 @@ html,body,.workspace,#office{width:100%;height:100%;margin:0;overflow:hidden}bod
 @media(max-width:650px){#status{bottom:170px}.tour-pad{bottom:215px}#appearance-editor{width:calc(100% - 20px);max-height:calc(100dvh - 28px)}}
 
 .tour-hotspot[hidden]{display:none}
-body[data-visitor=true] .campus-backdrop{filter:none;opacity:1;background:radial-gradient(1px 1px at 23px 35px,#d6e5ff 80%,transparent),radial-gradient(1px 1px at 92px 93px,#7d9fce 80%,transparent),radial-gradient(1.5px 1.5px at 147px 56px,#fff 70%,transparent),radial-gradient(ellipse at 70% 0%,#102749,#030b18 65%);background-size:173px 137px,251px 193px,337px 229px,100% 100%}
-body[data-visitor=true] .campus-backdrop:after{content:'';position:absolute;width:min(40vw,400px);aspect-ratio:1;right:5%;top:3%;border-radius:50%;background:linear-gradient(105deg,#02091600 30%,#020916ee 88%),url('../assets/moon-nasa-lroc-2k.jpg') center/cover;box-shadow:inset 8px 3px 25px #abc6f84d,0 0 70px #719acc18;opacity:.75}
+body:is([data-room=live],[data-room=study]) .campus-backdrop{filter:none;opacity:1;background:radial-gradient(1px 1px at 23px 35px,#d6e5ff 80%,transparent),radial-gradient(1px 1px at 92px 93px,#7d9fce 80%,transparent),radial-gradient(1.5px 1.5px at 147px 56px,#fff 70%,transparent),radial-gradient(ellipse at 70% 0%,#102749,#030b18 65%);background-size:173px 137px,251px 193px,337px 229px,100% 100%}
+body:is([data-room=live],[data-room=study]) .campus-backdrop:after{content:'';position:absolute;width:min(40vw,400px);aspect-ratio:1;right:5%;top:3%;border-radius:50%;background:linear-gradient(105deg,#02091600 30%,#020916ee 88%),url('../assets/moon-nasa-lroc-2k.jpg') center/cover;box-shadow:inset 8px 3px 25px #abc6f84d,0 0 70px #719acc18;opacity:.75}
 
 /* Shared editor keeps save/cancel reachable while only fields scroll. */
 .workspace{min-height:0}
