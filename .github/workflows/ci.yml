@@ -19,7 +19,7 @@ on:
         default: false
 
 concurrency:
-  group: dev-pipeline-${{ github.ref }}
+  group: dev-pipeline-${{ github.ref }}-${{ inputs.campus_render_diagnostic && 'rendering' || 'full' }}
   cancel-in-progress: true
 
 permissions:
