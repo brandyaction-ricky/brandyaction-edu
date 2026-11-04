@@ -8,6 +8,11 @@ export async function GET(request: Request) {
     const user = await actor(), params = new URL(request.url).searchParams, db = createAdminClient();
     const mode = params.get('mode') || 'mine', page = Number(params.get('page') || 0);
     if (!Number.isInteger(page) || page < 0 || page > 10000) hubFail('페이지를 확인해 주세요.');
+    if (mode === 'reply-notifications') {
+      const r = await db.rpc('edu_unread_mentor_replies', { p_actor: user.id }).abortSignal(AbortSignal.timeout(5000));
+      if (r.error) throw r.error;
+      return hubReply(r.data);
+    }
     if (mode === 'public') {
       const query = params.get('q') || ''; if (query.length > 500) hubFail('검색어가 너무 깁니다.');
       const r = await db.rpc('edu_read_cohort_questions', { p_actor: user.id, p_query: query, p_enrollment: hubId(params.get('enrollment'), true), p_lesson: hubId(params.get('lesson'), true), p_page: page, p_include_own: false });
@@ -18,9 +23,9 @@ export async function GET(request: Request) {
       const r = await db.rpc('edu_search_shared_answers', { p_actor: user.id, p_query: query, p_enrollment: hubId(params.get('enrollment'), true), p_lesson: hubId(params.get('lesson'), true), p_page: page });
       if (r.error) throw r.error; return hubReply(r.data);
     }
-    const access = await db.rpc('edu_question_contexts', { p_actor: user.id });
-    if (access.error) throw access.error;
     if (mode === 'contexts') {
+      const access = await db.rpc('edu_question_contexts', { p_actor: user.id });
+      if (access.error) throw access.error;
       const contexts = (access.data || []) as { enrollment_id:string; lesson_id:string; label:string; recent:boolean }[];
       const ids = [...new Set(contexts.map(c=>c.lesson_id))];
       const dayNumbers = new Map<string,number>();
@@ -41,6 +46,14 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await actor(), body = await hubBody(request);
+    if (body.action === 'read-replies') {
+      if (!Array.isArray(body.answerIds) || body.answerIds.length < 1 || body.answerIds.length > 20) hubFail('답변 정보를 확인해 주세요.');
+      const r = await createAdminClient().rpc('edu_mark_mentor_replies_read', {
+        p_actor: user.id, p_question: hubId(body.questionId), p_answers: body.answerIds.map((answerId: unknown) => hubId(answerId)),
+      }).abortSignal(AbortSignal.timeout(5000));
+      if (r.error) throw r.error;
+      return hubReply({ ok: true });
+    }
     if (typeof body.content !== 'string' || body.content.length > 10000 || typeof body.title !== 'string' || body.title.length > 200 || !Object.hasOwn(questionCategories, body.category) || typeof body.share !== 'boolean') hubFail('질문 내용을 확인해 주세요.');
     if (body.imageId && process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED !== 'true') hubFail('이미지 첨부를 사용할 수 없습니다.');
     if (body.visibility !== undefined && !['private', 'cohort'].includes(body.visibility)) hubFail('공개 범위를 확인해 주세요.');

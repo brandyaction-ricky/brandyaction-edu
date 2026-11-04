@@ -9,9 +9,14 @@ type Db = ReturnType<typeof createAdminClient>;
 type Usage = { input_tokens?: unknown; output_tokens?: unknown; input_tokens_details?: { cached_tokens?: unknown } };
 export function aiFailure(message: string, status = 503): never { throw Object.assign(new Error(message), { expose:true, status }); }
 export function aiErrorReply(error: unknown, mode?: 'student') {
- const cause = error as { message?:string; expose?:boolean; status?:number };
+ const cause = error as { message?:string; expose?:boolean; status?:number; details?:unknown };
  const code = cause.message || '';
  if (cause.expose) return { error:cause.message, status:cause.status || 503 };
+ if (code === 'AI_BURST_LIMIT') {
+  const seconds = Number(cause.details);
+  const retryAfter = Number.isInteger(seconds) && seconds > 0 && seconds <= 60 ? seconds : 60;
+  return { error:`짧은 시간에 질문을 여러 번 보냈어요. ${retryAfter}초 뒤에 다시 보내 주세요.`, status:429, retryAfter };
+ }
  if (/AI_LIMIT/.test(code)) return { error:mode === 'student' ? '이전 AI 질문을 처리 중이에요. 답변을 확인한 뒤 다음 질문을 보내 주세요.' : '멘토 초안 이용 한도에 도달했거나 이전 요청을 처리 중이에요.',status:429 };
  if (/AI_PENDING/.test(code)) return { error:'답변을 생성 중이거나 결과를 확인 중이에요. 대화 새로고침으로 확인해 주세요.',status:409 };
  if (/AI_PREVIOUS_FAILED/.test(code)) return { error:'이전 요청은 완료하지 못했어요. 대화를 새로고침한 뒤 새 질문으로 시도해 주세요.',status:409 };

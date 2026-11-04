@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import ts from 'typescript';
 import {loadTs} from './helpers/question-ai.mjs';
 const id='11111111-1111-4111-8111-111111111111';
-function harness({enabled=true,user={id},operator={id},images=true}={}){
+function harness({enabled=true,user={id},operator={id},images=true,generateError}={}){
  const generated=[],reads=[];
  const db={rpc(name,args){reads.push({name,args});const p=Promise.resolve({data:{rows:[]},error:null});p.abortSignal=()=>p;return p;}};
  const actual=loadTs('lib/curriculum-ai-server.ts');
@@ -12,7 +12,7 @@ function harness({enabled=true,user={id},operator={id},images=true}={}){
   if(name==='@/lib/edu-workflows')return{uuid:v=>typeof v==='string'&&/^[a-f\d-]{36}$/.test(v)};
   if(name==='@/lib/curriculum-ai-sensitive')return loadTs('lib/curriculum-ai-sensitive.ts');
   if(name==='@/lib/curriculum-ai')return loadTs('lib/curriculum-ai.ts');
-  if(name==='@/lib/curriculum-ai-server')return{...actual,generateCurriculumAnswer:async(db,input)=>{generated.push(input);return{answer:'합성 답변',sources:[]};}};
+  if(name==='@/lib/curriculum-ai-server')return{...actual,generateCurriculumAnswer:async(db,input)=>{generated.push(input);if(generateError)throw generateError;return{answer:'합성 답변',sources:[]};}};
   throw Error(name);
  },{env:{EDU_CURRICULUM_AI_ENABLED:String(enabled),NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED:String(images)}});return out;}
  const history=compile('app/api/platform/curriculum-ai/history/route.ts');
@@ -61,4 +61,15 @@ test('incorrect answer reporting uses the signed-in learner and owner-scoped RPC
  assert.equal((await h.rate(input)).status,200);
  assert.deepEqual(h.reads,[{name:'edu_ai_student_manage_turn',args:{p_actor:id,p_request:id,p_action:'incorrect',p_helpful:null}}]);
  assert.equal(h.generated.length,0);
+});
+
+test('rapid learner requests get a short retry time distinct from the in-progress message',async()=>{
+ const burst=await harness({generateError:{message:'AI_BURST_LIMIT',details:'17'}}).post();
+ assert.equal(burst.status,429);
+ assert.equal(burst.headers.get('retry-after'),'17');
+ assert.match((await burst.json()).error,/17초 뒤/);
+ const pending=await harness({generateError:{message:'AI_LIMIT'}}).post();
+ assert.equal(pending.status,429);
+ assert.equal(pending.headers.get('retry-after'),null);
+ assert.match((await pending.json()).error,/이전 AI 질문을 처리 중/);
 });
