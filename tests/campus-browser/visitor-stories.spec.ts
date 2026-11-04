@@ -1,13 +1,16 @@
 import {test,expect} from '@playwright/test';
-test('visitors explore clearly marked example conversations without free chat',async({page})=>{
+test('visitor chooses a greeting on their own avatar without opening a guide or free chat',async({page})=>{
  test.setTimeout(90000);const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
- await page.goto('/webinar');await page.getByRole('button',{name:'이 캐릭터로 바로 입장',exact:true}).click({timeout:80000});const world=page.frameLocator('iframe');
+ await page.goto('/webinar');await page.getByRole('button',{name:'이 캐릭터로 바로 입장',exact:true}).click({timeout:80000});const world=page.frameLocator('iframe'),root=world.locator('#office');
  await expect(world.getByRole('textbox',{name:'동료에게 한마디'})).toHaveCount(0);
- const expand=world.getByRole('button',{name:'체험 안내 열기',exact:true});if(await expand.isVisible())await expand.click();
- await expect(world.getByText('수업 속 대화 예시 · 자유 채팅은 사용하지 않아요.')).toBeVisible();
- await world.getByRole('button',{name:/체험 대화에 합류하기/}).click();
- await expect(page.getByText('수업 속 대화 예시 · 실제 참여자 발언이나 수강 후기가 아닙니다.')).toBeVisible();
- await expect(page.getByRole('link',{name:/문샷 과정 자세히 보기/})).toBeVisible();await expect(page.getByRole('link',{name:/카카오 채널로 문의하기/})).toBeVisible();
+ await world.getByRole('button',{name:'인사와 반응 열기',exact:true}).click();
+ await expect(world.getByRole('button',{name:/대단해요/})).toHaveCount(0);
+ const hello=world.locator('[data-reaction=hello]');await hello.click();
+ await expect(root).toHaveAttribute('data-own-reaction','hello');await expect(hello).toBeDisabled();
+ await expect(page.getByRole('dialog')).toHaveCount(0);await expect(world.locator('.visitor-reaction-feedback')).toContainText('안녕하세요');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect(errors).toEqual([]);
- await page.screenshot({path:test.info().outputPath('campus-visitor-story-'+test.info().project.name+'.png')});
+ await page.screenshot({path:test.info().outputPath('campus-reactions-'+test.info().project.name+'.png')});
+ await expect(root).toHaveAttribute('data-own-reaction','',{timeout:8000});await expect(hello).toBeEnabled();
+ await world.getByRole('button',{name:'인사와 반응 열기',exact:true}).click();await world.getByRole('button',{name:'🚀 문샷 좋아요',exact:true}).click();await expect(root).toHaveAttribute('data-own-reaction','moonshot');
+ await expect(hello).toBeHidden();await expect(world.getByRole('button',{name:'인사와 반응 열기',exact:true})).toBeVisible();
 });

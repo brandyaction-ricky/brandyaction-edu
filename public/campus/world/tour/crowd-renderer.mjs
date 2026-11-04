@@ -1,3 +1,4 @@
+import {drawReaction,reactionText} from './reactions.mjs';
 import {drawAvatarNameplate} from '../office/vendor/avatar-nameplate.js';
 import {styleAvatarActor,avatarModelSignature,visitorAnimation} from '../office/vendor/avatar-appearance.js';
 /** Original bundled characters at every distance. Bound count and animation work, never substitute bodies. */
@@ -20,6 +21,6 @@ export function attachCrowdRenderer(office,root){
   if(now-actor.crowdAnimationAt>=(walking?66:200)){actor.mixer.update(Math.min(.25,(now-actor.crowdAnimationAt)/1000));actor.crowdAnimationAt=now;}
   office.syncVisitorProp(actor,appearance.heldItem);
  }root.dataset.crowdActors=String(actors.size);}
- function labels(){if(root.inert)return;const self=office.campusAvatar||{x:0,y:0};let count=0;for(const p of [...figures].sort((a,b)=>Math.hypot(a.x-self.x,a.y-self.y)-Math.hypot(b.x-self.x,b.y-self.y))){if(!p.nickname||!actors.has(p.id)||Math.hypot(p.x-self.x,p.y-self.y)>18||count>=12)continue;const pos=sample(p,performance.now()),screen=office.projectInteriorPoint({x:pos.x-.05,y:pos.y-.05,w:.1,d:.1,height:1.9+(office.campusHeightAt?.(pos.x,pos.y)||0)});if(screen){drawAvatarNameplate(office.ctx,{x:screen.x,y:screen.y,name:p.nickname,level:0});count++;}}root.dataset.crowdLabels=String(count);}
- return {set,clear,labels,tick:draw,moving:()=>actors.size<figures.length||figures.some(p=>Math.hypot(p.x-p.from.x,p.y-p.from.y)>.02&&performance.now()-p.at<1800),destroy(){clear();group.removeFromParent();}};
+ function labels(){root.dataset.peerReactions=JSON.stringify(figures.filter(p=>p.reaction?.expiresAt>Date.now()&&reactionText(p.reaction.code)).map(p=>p.reaction.code));if(root.inert)return;const self=office.campusAvatar||{x:0,y:0};let count=0;for(const p of [...figures].sort((a,b)=>Math.hypot(a.x-self.x,a.y-self.y)-Math.hypot(b.x-self.x,b.y-self.y))){if(!p.nickname||!actors.has(p.id)||Math.hypot(p.x-self.x,p.y-self.y)>18||count>=12)continue;const pos=sample(p,performance.now()),screen=office.projectInteriorPoint({x:pos.x-.05,y:pos.y-.05,w:.1,d:.1,height:1.9+(office.campusHeightAt?.(pos.x,pos.y)||0)});if(screen){drawAvatarNameplate(office.ctx,{x:screen.x,y:screen.y,name:p.nickname,level:0});if(p.reaction?.expiresAt>Date.now())drawReaction(office,pos,p.reaction.code);count++;}}root.dataset.crowdLabels=String(count);}
+ return {set,clear,labels,tick:draw,moving:()=>figures.some(p=>p.reaction?.expiresAt>Date.now())||actors.size<figures.length||figures.some(p=>Math.hypot(p.x-p.from.x,p.y-p.from.y)>.02&&performance.now()-p.at<1800),destroy(){clear();group.removeFromParent();}};
 }
