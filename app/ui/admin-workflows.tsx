@@ -1,4 +1,5 @@
 "use client";
+import {CampusAnalyticsPanel} from '@/features/campus/analytics/panel';
 import usability from './final/usability.module.css';
 import dynamic from "next/dynamic";
 import { kstInput, kstToIso, kstLabel, overlappingAutomations } from "@/lib/marketing-qa";
@@ -1871,6 +1872,7 @@ function Analytics() {
   const empty = !Number(result.visitors) && !Number(result.events) && !Number(result.paidOrders) && !Number(result.revenue) && !paths.length && !Object.values(stages).some(Number);
   return (
     <>
+      <CampusAnalyticsPanel/>
       <div className="analytics-period-presets" role="group" aria-label="빠른 조회 기간">{[7,30,90].map(days => <AdminButton key={days} size="sm" aria-pressed={!dateError && to === today && Math.round((Date.parse(to)-Date.parse(from))/86400000)+1 === days} onClick={() => { const today = new Date(Date.now()+9*3600000).toISOString().slice(0,10); setToday(today); setTo(today); setFrom(new Date(Date.parse(today)-(days-1)*86400000).toISOString().slice(0,10)); }}>{days}일</AdminButton>)}</div>
       <AdminFilterBar date={<><AdminDatePicker label="시작일 (한국 시간)" value={from} onChange={event => setFrom(event.target.value)} /><AdminDatePicker label="종료일" value={to} onChange={event => setTo(event.target.value)} /></>} action={<AdminButton variant="outline" onClick={retry} disabled={loading || !!dateError}>새로고침</AdminButton>} />
           <label className="marketing-list-search"><input type="search" className="admin-input" placeholder="페이지 주소 검색" aria-label="페이지 주소 검색" value={pathSearch} onChange={event => setPathSearch(event.target.value)}/></label>

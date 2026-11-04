@@ -125,7 +125,8 @@
       "codex/tips-source-check-dev-20261027": false,
       "codex/campus-mobile-gestures-20261105": false,
       "codex/edu-campus-main-dev-20261104": false,
-      "codex/edu-campus-release-20261103": false
+      "codex/edu-campus-release-20261103": false,
+      "codex/campus-private-release-20261105": false
     }
   },
   "regions": [
@@ -163,6 +164,10 @@
     {
       "path": "/api/cron/tips-cohort-feed",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/campus-activity-retention",
+      "schedule": "17 * * * *"
     }
   ]
 }

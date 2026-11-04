@@ -16,8 +16,8 @@ test('library filters public materials, downloads a file and loads YouTube only 
  await page.context().route('https://files.example.test/moonshot.pdf',r=>r.fulfill({contentType:'application/pdf',headers:{'Content-Disposition':'attachment; filename="moonshot.pdf"'},body:'%PDF-1.4\n%%EOF'}));
  await library(page,'?library=1');await page.getByRole('button',{name:'이 공간에서 할 일',exact:true}).click();await page.getByRole('button',{name:'무료 자료',exact:true}).click();
  await expect(page.getByRole('heading',{name:'검수용 무료 자료',exact:true})).toBeVisible();await expect(page.getByText('비공개 검수 자료')).toHaveCount(0);
- const download=page.waitForEvent('download');await page.getByRole('link',{name:'다운로드',exact:true}).click();expect((await download).suggestedFilename()).toBe('moonshot.pdf');
- await page.getByRole('button',{name:'다시보기',exact:true}).click();expect(videoRequests).toBe(0);await page.getByRole('button',{name:'다시보기 재생',exact:true}).click();await expect(page.locator('iframe[title="검수용 다시보기"]')).toHaveAttribute('src','https://www.youtube-nocookie.com/embed/abcdefghijk');await expect.poll(()=>videoRequests).toBeGreaterThan(0);
+ const download=page.waitForEvent('download');await page.getByRole('link',{name:'무료 자료 받기 ↓',exact:true}).click();expect((await download).suggestedFilename()).toBe('moonshot.pdf');
+ await page.getByRole('button',{name:'다시보기',exact:true}).click();expect(videoRequests).toBe(0);await page.getByRole('button',{name:'큰 화면으로 보기 ▶',exact:true}).click();await expect(page.locator('iframe[title="검수용 다시보기"]')).toHaveAttribute('src','https://www.youtube-nocookie.com/embed/abcdefghijk');await expect.poll(()=>videoRequests).toBeGreaterThan(0);
  await page.getByRole('button',{name:'영상 닫기',exact:true}).click();await expect(page.locator('iframe[title="검수용 다시보기"]')).toHaveCount(0);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
 });
 test('operator adds, hides, reorders and saves library resources with the event revision',async({page})=>{

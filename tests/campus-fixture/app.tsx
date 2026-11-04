@@ -1,3 +1,5 @@
+import {CampusAnalyticsPanel} from '../../features/campus/analytics/panel';
+import {PersonalOffice} from '../../features/campus/office/agents/panel';
 import '../../app/ui/final/tokens.css';
 import React, { useState } from 'react';
 import {FourSpacesLive} from '../../features/campus/tour/live';
@@ -22,6 +24,8 @@ import {withCampusReturn} from '../../features/campus/ui/navigation';
 import {CampusWorkspace,WorkspaceLive} from '../../features/campus/ui/workspace';
 function App(){const [mode,setMode]=useState('student');const [notice,setNotice]=useState('');
 if((location.pathname==='/campus-tour-live'||location.pathname==='/campus/workspace'&&new URLSearchParams(location.search).get('tourLive')==='1'))return <FourSpacesLive operator={new URLSearchParams(location.search).get('operator')==='1'}/>;
+if(location.pathname==='/campus-analytics')return <CampusAnalyticsPanel/>;
+if(location.pathname==='/personal-office')return <div style={{padding:24,maxWidth:900,margin:'auto'}}><PersonalOffice enrollmentId={student.selectedEnrollmentId!} demo/></div>;
 if(location.pathname==='/campus-tour')return <FourSpacesPreview snapshot={student} adminSnapshot={admin}/>;
 if(location.pathname.startsWith('/learn/'))return <><CampusEntryBar returnTo={new URLSearchParams(location.search).get('campusReturn')||undefined}/><main style={{padding:32}}><h1>예시 수업 · 한 장 지도 작성</h1><p>이동·복귀 검수용 가상 수업입니다. 실제 학습 기록은 저장하지 않습니다.</p></main></>;
 if(location.pathname==='/webinar')return <WebinarRoom event={{...webinarEvent,resources:new URLSearchParams(location.search).has('library')?[{id:'qa-file',kind:'file',title:'검수용 무료 자료',description:'가상 다운로드 자료',url:'https://files.example.test/moonshot.pdf',published:true},{id:'qa-video',kind:'youtube',title:'검수용 다시보기',description:'재생 연결 확인용 가상 영상',url:'https://www.youtube.com/watch?v=abcdefghijk',published:true},{id:'qa-hidden',kind:'file',title:'비공개 검수 자료',description:'노출하지 않는 자료',url:'https://files.example.test/private.pdf',published:false}]:[],youtubeId:new URLSearchParams(location.search).has('video')?'abcdefghijk':''}} demo={!new URLSearchParams(location.search).has('api')}/>;
