@@ -7,6 +7,7 @@ test.beforeEach(async ({ page }) => {
 
 for (const view of ['dashboard', 'classes']) test(`single learning card fills its parent on ${view} without changing the learning link`, async ({ page }, info) => {
   await page.goto(`/learning-overview-test?scenario=single&view=${view}`);
+  if (view === 'dashboard' && info.project.name === 'mobile') await page.getByRole('button', { name: '주차별 진도·학습 목록' }).click();
   const overview = page.locator('.enrollment-learning-overview').first(), track = overview.locator(':scope > .elo-track');
   await expect(track).toHaveCount(1);
   const parent = (await overview.boundingBox())!, child = (await track.boundingBox())!;
@@ -15,13 +16,14 @@ for (const view of ['dashboard', 'classes']) test(`single learning card fills it
   await expect(page.getByRole('heading', { name: '다가오는 일정' })).toHaveCount(0);
   if (view === 'classes') {
     const cta = page.locator('.member-resource-cta');
-    await expect(cta.getByRole('link')).toHaveClass(/primary/);
+    await expect(cta.getByRole('link')).not.toHaveClass(/primary/);
     await expect(cta.getByRole('link')).toHaveAttribute('href', '/my/resources');
     await expect(cta).toHaveCSS('margin-top', '24px');
   } else await expect(page.getByRole('navigation', { name: '마이페이지', exact: true }).getByRole('link', { name: /신청·주문 내역/ })).toHaveAttribute('href', '/my/orders');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: info.outputPath(`${view}-full-width.png`), fullPage: true });
   await page.goto(`/learning-overview-test?view=${view}`);
+  if (view === 'dashboard' && info.project.name === 'mobile') await page.getByRole('button', { name: '주차별 진도·학습 목록' }).click();
   const mixed = page.locator('.enrollment-learning-overview').first();
   const normal = mixed.getByRole('region', { name: '일반 학습', exact: true });
   expect(Math.abs((await mixed.boundingBox())!.width - (await normal.boundingBox())!.width)).toBeLessThan(2);
@@ -118,6 +120,8 @@ test('mobile member menu retains refresh and existing shortcuts', async ({ page 
   await expect(header.getByRole('button', {name:'새로고침'})).toHaveCount(0);
   await expect(header.getByRole('link', {name:'질문·답변'})).toBeVisible();
   await header.getByRole('button', {name:'메뉴 열기'}).click();
+  await expect(header.getByRole('button', {name:'메뉴 닫기'})).toHaveAttribute('aria-expanded', 'true');
+  await expect(header.getByRole('navigation', {name:'모바일 메뉴'})).toBeVisible();
   await expect(header.getByRole('button', {name:'새로고침'})).toBeVisible();
   await expect(header.getByRole('link', {name:'마이페이지'}).last()).toBeVisible();
 });

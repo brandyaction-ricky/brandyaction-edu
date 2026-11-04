@@ -41,6 +41,13 @@
 .edu-front .member-week-step span,
 .edu-front .member-week-step small { display: block; font-size: 12px; color: var(--text-secondary); }
 .edu-front .member-week-step b { display: block; margin: 4px 0; font-size: 13px; line-height: 1.4; }
+.edu-front .member-week-step.is-current { border-color:var(--ba-red); background:var(--ba-red-soft); }
+.edu-front .member-week-step .member-current-week { color:var(--ba-red); font-weight:700; margin:8px 0; }
+.edu-front .member-scroll-hint { display:none; }
+.edu-front .member-learning-details > button { display:none; }
+@media(max-width:900px) {
+  .edu-front .account-aside > .member-scroll-hint { display:block; margin:0 0 8px; color:var(--text-secondary); font-size:12px; }
+}
 .edu-front .member-mission-journey {
   display: grid;
   grid-template-columns: repeat(3,minmax(0,1fr));
@@ -74,6 +81,13 @@
 .edu-front .lesson-bottom { flex-wrap: wrap; }
 .edu-front .lesson-bottom .btn { min-width: 0; max-width: 100%; white-space: normal; text-align: center; }
 @media(max-width:680px) {
+  .edu-front .member-learning-details { margin-top:16px; }
+  .edu-front .member-learning-details > button { display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; min-height:48px; padding:12px; border:1px solid var(--line); border-radius:var(--radius-sm); color:var(--ink); background:var(--surface-subtle); font:inherit; text-align:left; cursor:pointer; }
+  .edu-front .member-learning-details > button:focus-visible { outline:2px solid var(--ba-red); outline-offset:3px; }
+  .edu-front .member-learning-details.is-open > button svg { transform:rotate(180deg); }
+  .edu-front .member-learning-details:not(.is-open) > .member-learning-details-content { display:none; }
+  .edu-front .member-learning-details .member-scroll-hint { display:block; margin:16px 0 8px; font-size:12px; color:var(--text-secondary); }
+  .edu-front .member-learning-details .member-week-journey { padding-top:0; }
   .edu-front .member-learning-intro { padding: 20px; }
   .edu-front .member-journey-head { display: block; }
   .edu-front .member-journey-head .btn { margin-top: 16px; width: 100%; }

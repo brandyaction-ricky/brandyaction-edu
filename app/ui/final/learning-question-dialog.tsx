@@ -4,11 +4,13 @@ import { Check, MessageCircle } from 'lucide-react';
 import type { QuestionContext } from '@/lib/question-hub';
 import { AdminModal } from './admin-system';
 import { QuestionComposer } from './question-composer';
+import { CurriculumAiConversation } from './curriculum-ai-conversation';
 import './learning-question-dialog.css';
 
+export const openFloatingQuestionEvent = 'edu:open-floating-question';
 export const learningQuestionCreatedEvent = 'edu:learning-question-created';
 
-export function LearningQuestionShortcut({ context }: { context?: QuestionContext }) {
+export function LearningQuestionShortcut({ context, label = "질문·답변" }: { context?: QuestionContext; label?: string }) {
   const [open, setOpen] = useState(false), [created, setCreated] = useState(false), [closeNotice, setCloseNotice] = useState('');
   const composer = useRef({ dirty: false, locked: false });
   const trigger = useRef<HTMLButtonElement>(null);
@@ -20,13 +22,13 @@ export function LearningQuestionShortcut({ context }: { context?: QuestionContex
     requestAnimationFrame(() => trigger.current?.focus({ preventScroll: true }));
   }
   return <>
-    <button ref={trigger} type="button" className="link header-questions learning-question-trigger" aria-haspopup="dialog" disabled={!context} onClick={() => { composer.current = { dirty: false, locked: false }; setCreated(false); setCloseNotice(''); setOpen(true); }}>질문·답변</button>
+    <button ref={trigger} type="button" className="link header-questions learning-question-trigger" aria-haspopup="dialog" disabled={!context} onClick={() => { composer.current = { dirty: false, locked: false }; setCreated(false); setCloseNotice(''); setOpen(true); }}>{label}</button>
     {open && context && <AdminModal title="이 수업에 질문하기" className="learning-question-dialog" initialFocus="textarea" onClose={close}>
       <div className="learning-question-body">
         {created ? <div className="learning-question-success" role="status"><Check aria-hidden="true"/><h3>질문을 등록했어요</h3><p>답변은 마이페이지의 ‘질문·답변’에서 확인할 수 있어요.</p><button autoFocus className="btn primary" onClick={close}>학습 계속하기</button></div> : <>
           <p className="learning-question-context"><MessageCircle size={18} aria-hidden="true"/><span><b>지금 보고 있는 수업</b>{context.label}</span></p>
-          <p className="learning-question-hint">한 줄만 적어도 괜찮아요. 막힌 화면이 있으면 캡처를 첨부해 주세요.</p>
-          <QuestionComposer initialContext={context} quick onStateChange={updateState} onCreated={() => { composer.current = { dirty: false, locked: false }; setCreated(true); setCloseNotice(''); window.dispatchEvent(new CustomEvent(learningQuestionCreatedEvent, { detail: { enrollmentId: context.enrollmentId, lessonId: context.lessonId } })); }}/>
+          <p className="learning-question-hint">{process.env.NEXT_PUBLIC_EDU_CURRICULUM_AI_ENABLED === 'true' ? 'AI에게 먼저 물어보거나 멘토에게 바로 질문할 수 있어요.' : '한 줄만 적어도 괜찮아요. 막힌 화면이 있으면 캡처를 첨부해 주세요.'}</p>
+          {process.env.NEXT_PUBLIC_EDU_CURRICULUM_AI_ENABLED === 'true' ? <CurriculumAiConversation context={context} showContext={false} onStateChange={updateState} onCreated={() => { composer.current={dirty:false,locked:false};setCreated(true);setCloseNotice('');window.dispatchEvent(new CustomEvent(learningQuestionCreatedEvent,{detail:{enrollmentId:context.enrollmentId,lessonId:context.lessonId}})); }}/> : <QuestionComposer initialContext={context} quick onStateChange={updateState} onCreated={() => { composer.current = { dirty: false, locked: false }; setCreated(true); setCloseNotice(''); window.dispatchEvent(new CustomEvent(learningQuestionCreatedEvent, { detail: { enrollmentId: context.enrollmentId, lessonId: context.lessonId } })); }}/>}
         </>}
         {closeNotice && <p role="alert" className="form-error">{closeNotice}</p>}
       </div>

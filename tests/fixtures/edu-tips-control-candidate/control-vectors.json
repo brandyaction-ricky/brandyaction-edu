@@ -1,0 +1,11 @@
+{
+  "purpose": "PUBLIC FIXED SYNTHETIC INTEROP VECTOR. Not a real credential or sender.",
+  "test_control_key_hex": "4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d",
+  "timestamp": "1791939600",
+  "nonce": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+  "raw_body": "{\"control_version\":\"1.0.0-draft.1\",\"environment\":\"dev\",\"tenant_id\":\"brandyaction\",\"brand_id\":\"brandyaction_edu\",\"receiver_id\":\"tips-customer-controls\",\"origin_contract_version\":\"2.0.0-rc.2\",\"deadline_profile\":\"rc2_5_30_30\",\"block\":{\"requestId\":\"11111111-1111-4111-8111-111111111111\",\"customer_id\":\"k1:Ok2hKeV6ZRtHHLWZlUVFibXGD2cmZOC7z_IxTWiW_sM\",\"consent_epoch\":\"ce_AAECAwQFBgcICQoLDA0ODxAREhMUFRYX\",\"reason\":\"consent_withdrawn\",\"at\":\"2026-10-14T00:00:00.000Z\",\"active_due_at\":\"2026-10-19T00:00:00.000Z\",\"model_due_at\":\"2026-11-13T00:00:00.000Z\",\"residual_due_at\":\"2026-11-13T00:00:00.000Z\"}}",
+  "body_sha256": "ea11475b11479e7cdf8a96d0f71e8b2adb010d369c521cd8fe61dddca88e8480",
+  "signature_frame": "TIPS-BLOCK-V1\nPOST\n/api/internal/customer-controls/v1/blocks\ntips-customer-controls\ndev\nbrandyaction\nbrandyaction_edu\nedu_dev\n1791939600\nAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\nea11475b11479e7cdf8a96d0f71e8b2adb010d369c521cd8fe61dddca88e8480",
+  "signature": "v1=96231745510f9ef4319b0be6148d908e89e25bed095fe956304b6f325cf4ed7c",
+  "request_digest": "1c4c27a2e826d15c83ca6fb2429f4f53408f82d49b7a539610b66c1cf4589d63"
+}

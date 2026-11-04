@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.brandyaction.invalid/tips-control/1.0.0-draft.1/block.json",
+  "title": "DRAFT ONLY \u2014 new signed block transport, not deployed",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "control_version",
+    "environment",
+    "tenant_id",
+    "brand_id",
+    "receiver_id",
+    "origin_contract_version",
+    "deadline_profile",
+    "block"
+  ],
+  "properties": {
+    "control_version": {
+      "const": "1.0.0-draft.1"
+    },
+    "environment": {
+      "enum": [
+        "dev",
+        "production"
+      ]
+    },
+    "tenant_id": {
+      "const": "brandyaction"
+    },
+    "brand_id": {
+      "enum": [
+        "myin",
+        "brandyaction_edu"
+      ]
+    },
+    "receiver_id": {
+      "const": "tips-customer-controls"
+    },
+    "origin_contract_version": {
+      "enum": [
+        "2.0.0-rc.1",
+        "2.0.0-rc.2"
+      ]
+    },
+    "deadline_profile": {
+      "enum": [
+        "rc2_5_30_30",
+        "myin_legacy_5_30_5"
+      ]
+    },
+    "block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requestId",
+        "customer_id",
+        "consent_epoch",
+        "reason",
+        "at",
+        "active_due_at",
+        "model_due_at",
+        "residual_due_at"
+      ],
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "customer_id": {
+          "type": "string",
+          "pattern": "^k[1-9][0-9]{0,2}:[A-Za-z0-9_-]{43}$"
+        },
+        "consent_epoch": {
+          "type": "string",
+          "pattern": "^ce_[A-Za-z0-9_-]{32}$"
+        },
+        "reason": {
+          "enum": [
+            "consent_withdrawn",
+            "account_deleted",
+            "identity_retired"
+          ]
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}(?:\\d{3})?Z$"
+        },
+        "active_due_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}(?:\\d{3})?Z$"
+        },
+        "model_due_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}(?:\\d{3})?Z$"
+        },
+        "residual_due_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}(?:\\d{3})?Z$"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "deadline_profile": {
+            "const": "myin_legacy_5_30_5"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "brand_id": {
+            "const": "myin"
+          },
+          "origin_contract_version": {
+            "const": "2.0.0-rc.1"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "origin_contract_version": {
+            "const": "2.0.0-rc.2"
+          }
+        }
+      }
+    }
+  ],
+  "$comment": "Semantic exact 120/720/720 or MYIN historical120/720/120 hours, original-authority evidence and fixed business digest are separately enforced. Format alone does not prove these. Actual host/kid/scope still unagreed."
+}

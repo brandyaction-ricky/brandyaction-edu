@@ -1,79 +1,110 @@
 'use client';
 
-import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { UploadField } from '@/app/ui/editor-fields';
-import type { PurchaseOnboardingSettings } from '@/lib/purchase-onboarding';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import type { CompletionGuideSettings } from '@/lib/purchase-onboarding';
+import { AdminReturnLink } from './admin-return-navigation';
+import { PurchaseBuyerDelivery } from './purchase-buyer-delivery';
 import './purchase-onboarding.css';
 
 type Cohort = { id: string; name: string; courses: { title: string } | { title: string }[] | null };
-const empty: PurchaseOnboardingSettings = { roomName: '', inviteUrl: '', paidImage: '', organicImage: '', enabled: false };
+const empty: CompletionGuideSettings = { label: '', url: '' };
+const endpoint = '/api/admin/purchase-onboarding';
+const courseTitle = (cohort?: Cohort) => Array.isArray(cohort?.courses) ? cohort.courses[0]?.title : cohort?.courses?.title;
 
-export function PurchaseOnboardingAdmin() {
+export function PurchaseOnboardingAdmin({ productId, initialCohort }: { productId?: string; initialCohort?: string }) {
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
-  const [lessons, setLessons] = useState<{ id: string; title: string }[]>([]);
-  const [comments, setComments] = useState<{ order_id: string; comment: string; confirmed_at: string }[]>([]);
-  const [cohort, setCohort] = useState('');
-  const [settings, setSettings] = useState<PurchaseOnboardingSettings>(empty);
-  const [telegramOnly, setTelegramOnly] = useState(false);
+  const [chosenCohort, setChosenCohort] = useState<string>();
+  const requestedCohort = chosenCohort ?? initialCohort;
+  const cohort = cohorts.some(item => item.id === requestedCohort) ? requestedCohort! : '';
+  const scrolledToDelivery = useRef(false);
+  const [settings, setSettings] = useState<CompletionGuideSettings>(empty);
+  const [listLoading, setListLoading] = useState(true);
+  const [loadedCohort, setLoadedCohort] = useState('');
+  const loaded = !!cohort && cohort === loadedCohort;
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [uploading, setUploading] = useState(false);
   useEffect(() => {
-    void fetch('/api/admin/purchase-onboarding', { cache: 'no-store' }).then(async response => {
+    const controller = new AbortController();
+    const query = productId ? '?' + new URLSearchParams({ product: productId }) : '';
+    void fetch(endpoint + query, { cache: 'no-store', signal: controller.signal }).then(async response => {
       const result = await response.json();
       if (!response.ok) throw Error(result.error || '기수를 불러오지 못했습니다.');
-      setCohorts(result.cohorts || []);
-    }).catch(cause => setError(cause instanceof Error ? cause.message : '기수를 불러오지 못했습니다.'));
-  }, []);
-  const load = async (id: string) => {
-    setCohort(id); setSettings(empty); setLessons([]); setComments([]); setTelegramOnly(false); setMessage(''); setError('');
-    if (!id) return;
-    setPending(true);
-    try {
-      const response = await fetch(`/api/admin/purchase-onboarding?cohort=${encodeURIComponent(id)}`, { cache: 'no-store' });
+      if (!controller.signal.aborted) setCohorts(result.cohorts || []);
+    }).catch(cause => {
+      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : '기수를 불러오지 못했습니다.');
+    }).finally(() => { if (!controller.signal.aborted) setListLoading(false); });
+    return () => controller.abort();
+  }, [productId]);
+
+  useEffect(() => {
+    if (!cohort) return;
+    const controller = new AbortController();
+    const params = new URLSearchParams({ cohort });
+    if (productId) params.set('product', productId);
+    void fetch(endpoint + '?' + params, { cache: 'no-store', signal: controller.signal }).then(async response => {
       const result = await response.json();
       if (!response.ok) throw Error(result.error || '설정을 불러오지 못했습니다.');
-      setSettings(result.settings); setLessons(result.lessons || []); setComments(result.comments || []);
-      setTelegramOnly(result.telegramOnly === true);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : '설정을 불러오지 못했습니다.'); }
-    finally { setPending(false); }
-  };
-  const save = async () => {
+      if (!controller.signal.aborted) {
+        setSettings(result.settings || empty);
+        setLoadedCohort(cohort);
+      }
+    }).catch(cause => {
+      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : '설정을 불러오지 못했습니다.');
+    });
+    return () => controller.abort();
+  }, [cohort, productId]);
+
+  useEffect(() => {
+    if (cohort && !scrolledToDelivery.current && window.location.hash === '#buyer-delivery') {
+      scrolledToDelivery.current = true;
+      document.getElementById('buyer-delivery')?.scrollIntoView();
+    }
+  }, [cohort]);
+
+  function chooseCohort(id: string) {
+    setChosenCohort(id);
+    setLoadedCohort('');
+    setMessage('');
+    setError('');
+    const url = new URL(window.location.href);
+    if (id) url.searchParams.set('cohort', id);
+    else url.searchParams.delete('cohort');
+    window.history.replaceState(null, '', url);
+  }
+  const save = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!cohort || !loaded || pending) return;
     setPending(true); setMessage(''); setError('');
     try {
-      const response = await fetch('/api/admin/purchase-onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cohort, settings }) });
+      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ product: productId, cohort, settings }) });
       const result = await response.json();
       if (!response.ok) throw Error(result.error || '저장하지 못했습니다.');
-      setSettings(result.settings); setMessage(settings.enabled ? '결제 완료 수강생에게 시작 안내를 표시합니다.' : '설정을 저장했습니다. 결제 후 안내는 아직 꺼져 있습니다.');
+      setSettings(result.settings);
+      setMessage(result.settings.url ? '결제 완료 화면에 안내 링크를 표시합니다.' : '안내 링크를 표시하지 않도록 저장했습니다.');
     } catch (cause) { setError(cause instanceof Error ? cause.message : '저장하지 못했습니다.'); }
     finally { setPending(false); }
   };
   return <main className="edu-front purchase-onboarding"><div className="wrap narrow">
-    <Link href="/admin/products">← 상품 관리</Link><p className="eyebrow mt24">PURCHASE ONBOARDING</p><h1>결제 후 안내 설정</h1>
-    <p className="lead">기수를 선택하고 텔레그램 방 정보를 등록하세요. 이미지는 나중에 추가할 수 있습니다.</p>
-    <section className="onboarding-panel"><label>안내할 기수<select value={cohort} disabled={pending} onChange={event => void load(event.target.value)}><option value="">기수를 선택하세요</option>{cohorts.map(item => <option key={item.id} value={item.id}>{(Array.isArray(item.courses) ? item.courses[0]?.title : item.courses?.title) || '상품'} · {item.name}</option>)}</select></label>
-      {cohort && <div className="onboarding-admin-fields">
-        <label>텔레그램 방 이름<input value={settings.roomName} disabled={pending} maxLength={80} onChange={event => setSettings(current => ({ ...current, roomName: event.target.value }))} /></label>
-        <label>텔레그램 초대 링크<input type="url" value={settings.inviteUrl} disabled={pending} placeholder="https://t.me/+..." onChange={event => setSettings(current => ({ ...current, inviteUrl: event.target.value }))} /></label>
-        <p className="meta">링크는 운영자 설정에만 저장하고, 결제 완료가 확인된 수강생에게만 제공합니다.</p>
-        {!telegramOnly && <><label>광고 방 프로필 이미지<UploadField key={`${cohort}:paid`} name="광고 방 프로필 이미지" value={settings.paidImage} image disabled={pending} onChange={value => setSettings(current => ({ ...current, paidImage: value }))} onStatusChange={state => setUploading(state === 'uploading')} /></label>
-        <label>오가닉 방 프로필 이미지<UploadField key={`${cohort}:organic`} name="오가닉 방 프로필 이미지" value={settings.organicImage} image disabled={pending} onChange={value => setSettings(current => ({ ...current, organicImage: value }))} onStatusChange={state => setUploading(state === 'uploading')} /></label></>}
-        {telegramOnly && <p className="meta">문샷 챌린지 4기는 웹 유입 설문 없이 텔레그램 설치·가입·공지방 입장을 안내합니다.</p>}
-        <label>OT 날짜 · 한국 시간<input type="date" value={(settings.orientationAt || '').slice(0,10)} disabled={pending} onChange={event => setSettings(current => ({ ...current, orientationAt: event.target.value ? event.target.value + (current.orientationAt?.includes('T') ? current.orientationAt.slice(10) : '') : '' }))}/></label>
-        <label>OT 시간 · 미정이면 비워 두세요<input type="time" value={(settings.orientationAt || '').includes('T') ? settings.orientationAt!.slice(11,16) : ''} disabled={pending || !settings.orientationAt} onChange={event => setSettings(current => ({ ...current, orientationAt: current.orientationAt ? current.orientationAt.slice(0,10) + (event.target.value ? `T${event.target.value}:00+09:00` : '') : '' }))}/></label>
-        <p className="meta">수강생은 시청 없이 이 일정을 확인합니다. 일정이 바뀌면 다시 확인해야 합니다.</p>
-        <label>첫 학습 · 운영 가이드 및 규정<select value={settings.firstLessonId || ''} disabled={pending} onChange={event => setSettings(current => ({ ...current, firstLessonId: event.target.value }))}><option value="">학습 선택</option>{lessons.map(lesson => <option value={lesson.id} key={lesson.id}>{lesson.title}</option>)}</select></label>
-        <p className="meta">수강생이 바로 열 수 있는 첫 학습을 선택하고, 커리큘럼에서 해당 주차·학습을 이 기수에 공개해 주세요. 실제 학습 완료 후 확인 댓글을 저장합니다.</p>
-        <label className="onboarding-toggle"><input type="checkbox" checked={settings.checklistEnabled === true} disabled={pending} onChange={event => setSettings(current => ({ ...current, checklistEnabled: event.target.checked }))}/>4단계 시작 준비 사용 · 텔레그램 → 앱 설치 → OT 일정 → 첫 학습·댓글</label>
-        <p className="meta">체크한 기수에만 새 4단계 안내가 적용됩니다. 기존 기수는 유지됩니다. 켜기 전에 OT 일정과 첫 학습을 등록해 주세요.</p>
-        <label className="onboarding-toggle"><input type="checkbox" checked={settings.enabled} disabled={pending} onChange={event => setSettings(current => ({ ...current, enabled: event.target.checked }))} />결제 완료 수강생에게 안내 화면 열기</label>
-        {!telegramOnly && <p className="meta">알림톡은 이 체크박스로 발송되지 않습니다. 승인된 템플릿과 자동화 설정이 따로 필요합니다.</p>}
-        <button className="btn primary" type="button" disabled={pending || uploading} onClick={() => void save()}>설정 저장</button>
-      </div>}
-      {comments.length > 0 && <section className="onboarding-panel"><h2>첫 학습 확인 댓글 · 최근 100건</h2>{comments.map(item => <article key={item.order_id}><p className="meta">주문 {item.order_id} · {new Date(item.confirmed_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}</p><p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{item.comment}</p></article>)}</section>}
+    <AdminReturnLink fallback={productId ? '/admin/product-editor?id=' + encodeURIComponent(productId) : '/admin/products'} fallbackLabel={productId ? '상품 수정' : '상품 관리'} />
+    <p className="eyebrow mt24">PURCHASE ONBOARDING</p><h1>결제 후 안내 설정</h1>
+    {productId && courseTitle(cohorts[0]) && <p className="lead">{courseTitle(cohorts[0])}</p>}
+    {cohort && <nav className="onboarding-actions" aria-label="결제 후 안내 관리"><a className="btn" href="#completion-settings">완료 화면 설정</a><a className="btn" href="#buyer-delivery">구매자 공지·발송 내역</a></nav>}
+    <section id="completion-settings" className="onboarding-panel">
+      <h2>1. 결제 완료 화면</h2>
+      <label>안내할 기수<select value={cohort} disabled={pending || listLoading} onChange={event => chooseCohort(event.target.value)}>
+        <option value="">{listLoading ? '기수를 불러오는 중' : '기수를 선택하세요'}</option>
+        {cohorts.map(item => <option key={item.id} value={item.id}>{productId ? item.name : `${courseTitle(item) || '상품'} · ${item.name}`}</option>)}
+      </select></label>
+      {!listLoading && !error && !cohorts.length && <p className="meta">안내를 설정할 유료 클래스 기수가 없습니다.</p>}
+      {cohort && loaded && <form className="onboarding-admin-fields" onSubmit={save}>
+        <label>안내 링크 이름<input value={settings.label} disabled={pending} maxLength={80} placeholder="예: 문샷 공부방 입장하기" onChange={event => setSettings(current => ({ ...current, label: event.target.value }))} /></label>
+        <label>안내 링크<input type="url" value={settings.url} disabled={pending} maxLength={1800} placeholder="https://…" onChange={event => setSettings(current => ({ ...current, url: event.target.value }))} /></label>
+        <p className="meta">저장하면 결제한 수강생에게 이 링크를 보여 줍니다. 안내를 끄려면 두 칸을 비우고 저장하세요.</p>
+        <button className="btn primary" type="submit" disabled={pending}>설정 저장</button>
+      </form>}
       {message && <p role="status" className="notice">{message}</p>}{error && <p role="alert" className="notice">{error}</p>}
     </section>
+    {cohort && <PurchaseBuyerDelivery key={cohort} cohort={cohort} productId={productId} />}
   </div></main>;
 }

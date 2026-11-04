@@ -509,6 +509,8 @@
 .adm-topbar{height:var(--admin-topbar-height);padding-inline:var(--admin-page-gutter);border-bottom:1px solid var(--adm-border);background:var(--adm-surface)}
 .adm-page{width:100%;max-width:calc(var(--adm-page-max) + var(--adm-space-6) * 2);margin-inline:auto;padding:var(--adm-space-6);min-width:0}
 .adm-page.adm-stack,.adm-stack{display:grid;gap:var(--adm-space-6);min-width:0}
+.admin-return-nav{margin-bottom:var(--adm-space-3)}
+.admin-return-nav .btn{min-height:44px}
 .adm-page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--adm-space-6);padding-bottom:var(--adm-space-4);border-bottom:1px solid var(--adm-border)}
 .adm-page-head h1{margin:0;font-size:var(--adm-font-20);line-height:1.4;font-weight:700;letter-spacing:-.02em}
 .adm-page-head p{margin:var(--adm-space-1) 0 0;color:var(--adm-text-sub);font-size:var(--adm-font-13);line-height:1.6}

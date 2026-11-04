@@ -70,11 +70,10 @@ export function Checkout({
   // confirming quick transfer on the EDU production MID's actual payment window.
   const quickTransferEnabled = process.env.NEXT_PUBLIC_TOSS_QUICK_TRANSFER_ENABLED === "true";
   const paymentMethods = [
-    { value: "CARD", label: "카드·간편결제", button: "카드·간편결제로 결제하기", description: "신용·체크카드, 카카오페이, 토스페이, 네이버페이" },
-    { value: "TRANSFER", label: quickTransferEnabled ? "퀵 계좌이체" : "실시간 계좌이체", button: quickTransferEnabled ? "퀵 계좌이체로 결제하기" : "실시간 계좌이체로 결제하기", description: "토스페이먼츠 결제창에서 은행 계좌를 인증하고 결제" },
+    { value: "CARD", label: "카드·간편결제", description: "신용·체크카드, 카카오페이, 토스페이, 네이버페이" },
+    { value: "TRANSFER", label: quickTransferEnabled ? "퀵 계좌이체" : "실시간 계좌이체", description: "토스페이먼츠 결제창에서 은행 계좌를 인증하고 결제" },
   ] as const;
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CARD");
-  const selectedPayment = paymentMethods.find((method) => method.value === paymentMethod)!;
   const lock = useRef(false),
     cohort = (data.cohorts || []).find((c) => c.id === cohortId),
     course = (data.courses || []).find((c) => c.id === cohort?.course_id),
@@ -227,16 +226,13 @@ export function Checkout({
             이용약관
           </Link>
           ·
-          <Link href="/policies/privacy" target="_blank">
-            개인정보 처리방침
-          </Link>
-          ·
           <Link href="/policies/refund" target="_blank">
             이용 및 환불 안내
           </Link>
           를 확인하고 {free ? "신청" : "결제 진행"}에 동의합니다.
         </span>
       </label>
+      <p className="meta"><Link href="/policies/privacy" target="_blank">개인정보 처리방침 보기</Link></p>
     </div>
   );
   const submitButton = (
@@ -248,18 +244,27 @@ export function Checkout({
       </div>}
       <div className="checkout-submit-main">
         <button
-          className="btn primary full large"
-          disabled={pending || processing || couponLoading || !agreed || (!!coupon.trim() && !quote) || (widgetEnabled && widgetAmount > 0 && !tossWidget.ready)}
+          className={`btn ${agreed ? "primary" : "btn-outline"} full large`}
+          type={agreed ? "submit" : "button"}
+          onClick={agreed ? undefined : (event) => {
+            // The button becomes a submit control before this click's default action.
+            event.preventDefault();
+            setAgreed(true);
+            setError("");
+          }}
+          disabled={pending || processing || (agreed && (couponLoading || (!!coupon.trim() && !quote) || (widgetEnabled && widgetAmount > 0 && !tossWidget.ready)))}
           aria-describedby={agreed ? undefined : "checkout-agreement-help"}
         >
           {pending || processing
             ? "처리 중..."
-            : free || quote?.totalAmount === 0
-              ? "무료로 신청 완료하기"
-              : widgetEnabled ? "결제하기" : selectedPayment.button}
-          <ArrowRight />
+            : !agreed
+              ? "필수 항목 한 번에 선택"
+              : free || quote?.totalAmount === 0
+                ? "동의하고 무료 신청하기"
+                : "동의하고 결제창 열기"}
+          <ArrowRight aria-hidden="true" />
         </button>
-        {!agreed && <p className="meta mt8" id="checkout-agreement-help">필수 약관에 동의하면 {free ? "신청" : "결제"}할 수 있습니다.</p>}
+        {!agreed && <p className="meta mt8" id="checkout-agreement-help">필수 항목을 먼저 선택하고 다음 버튼으로 진행해 주세요.</p>}
       </div>
       {error && (
         <p className="form-error mt16" role="alert">
@@ -402,7 +407,7 @@ export function Checkout({
                 </div>
                 <div className="notice checkout-payment-next" aria-live="polite">
                   <h3>결제 수단은 결제창에서 최종 선택합니다</h3>
-                  <p>약관 동의 후 ‘{selectedPayment.button}’를 누르면 토스페이먼츠 결제창이 열립니다. {paymentMethod === "CARD" ? "결제창에서 카드나 간편결제를 선택해 주세요." : "이용 가능한 계좌이체 방식과 인증 절차는 결제창에서 확인해 주세요. 현금영수증도 결제창에서 신청할 수 있어요."}</p>
+                  <p>필수 항목을 선택한 뒤 ‘동의하고 결제창 열기’를 눌러 주세요. {paymentMethod === "CARD" ? "결제창에서 카드나 간편결제를 선택해 주세요." : "이용 가능한 계좌이체 방식과 인증 절차는 결제창에서 확인해 주세요. 현금영수증도 결제창에서 신청할 수 있어요."}</p>
                 </div>
               </div>
             </section>}

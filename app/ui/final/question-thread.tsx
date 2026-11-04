@@ -6,6 +6,8 @@ import { useUnsavedLearningChanges } from './use-unsaved-learning-changes';
 import { QuestionAdminHub } from './question-admin-hub';
 import { QuestionImage, QuestionImagePicker, type QuestionImagePickerHandle } from './question-image';
 import { AnswerText } from './lesson-text';
+import { mentorRepliesReadEvent } from '@/lib/question-hub';
+import { questionRequest } from './question-composer';
 import { AdminDrawer, useUnsavedWarning } from '@/features/admin-ui';
 type Answer = { imageId?: string | null; canDelete?: boolean; id: string; authorName: string; source?: 'learner' | 'operator' | 'legacy' | 'faq' | 'aside'; content: string; createdAt: string };
 type Thread = { question: { id: string; title: string; content: string; learningContext?: string | null; status: string; resolved: boolean; archived: boolean; headId: string | null; imageId?: string | null; visibility?: 'cohort' | 'private' }; answers: Answer[]; nextCursor: string | null; canAnswer: boolean; canFollowUp?: boolean };
@@ -56,6 +58,20 @@ export function QuestionAnswerHistory({ questionId, fallback = '', onStatusChang
  // Parent list reads are asynchronous. A new callback after each parent render
  // must not report the same status again and repeatedly abort that list read.
  useEffect(() => { if (status) statusChange.current?.(status); }, [questionId, status]);
+ const markedReplies = useRef(new Set<string>());
+ const renderedAnswers = state.data?.answers;
+ useEffect(() => {
+  if (!open || readOnly || !renderedAnswers || process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED !== 'true') return;
+  const answerIds = renderedAnswers.filter(answer => answer.source !== 'learner' && !markedReplies.current.has(answer.id)).map(answer => answer.id);
+  if (!answerIds.length) return;
+  const batches = Array.from({ length: Math.ceil(answerIds.length / 20) }, (_, index) => answerIds.slice(index * 20, index * 20 + 20));
+  void Promise.all(batches.map(ids => questionRequest('/api/platform/question-hub', { action: 'read-replies', questionId, answerIds: ids })))
+   .then(() => {
+    for (const id of answerIds) markedReplies.current.add(id);
+    window.dispatchEvent(new Event(mentorRepliesReadEvent));
+   })
+   .catch(() => { /* Keep the unread badge until the next successful read. */ });
+ }, [open, readOnly, questionId, renderedAnswers]);
  async function followUp() {
   if (gate.current || stale || !state.data?.canFollowUp) return;
   if (!retry.current) {
@@ -87,7 +103,7 @@ export function QuestionAnswerHistory({ questionId, fallback = '', onStatusChang
    <button className="btn primary small mt16" disabled={busy || stale || !content.trim()}>{busy ? '등록 중…' : uncertain ? '같은 요청 결과 확인' : '후속 질문 등록'}</button>
   </form>}
   {notice && <p role="status" className="notice mt16">{notice}</p>}
- </> : fallback ? <div className="answer"><b>운영자 답변</b><p className="reading-copy"><AnswerText text={fallback}/></p>{state.data?.answers.filter(a => a.id === state.data?.question.headId).map(a => <QuestionImage key={a.id} questionId={questionId} answerId={a.id} imageId={a.imageId}/>)}</div> : <p className="meta">답변이 도착하면 이곳에서 확인해 주세요.</p>}
+ </> : fallback ? <div className="answer"><b>운영자 답변</b><p className="reading-copy"><AnswerText text={fallback.length > 240 ? fallback.slice(0, 240) + "…" : fallback}/></p>{state.data?.answers.filter(a => a.id === state.data?.question.headId && a.imageId).map(a => <details key={a.id}><summary>답변 첨부 이미지 보기</summary><QuestionImage questionId={questionId} answerId={a.id} imageId={a.imageId}/></details>)}</div> : <p className="meta">답변이 도착하면 이곳에서 확인해 주세요.</p>}
   <div className="row mt16 member-question-actions"><button type="button" className="btn small" disabled={busy || uncertain} onClick={() => setOpen(v => !v)}>{open ? '답변 이력 접기' : '답변 전체 보기'}</button>{!open && !readOnly && <button type="button" className="btn small" onClick={() => setOpen(true)}>후속 질문하기</button>}{open && <button type="button" className="btn small" disabled={busy || uncertain} onClick={() => { state.reload(); setStale(false); }}>최신 답변 확인</button>}</div>
  </div>;
 }

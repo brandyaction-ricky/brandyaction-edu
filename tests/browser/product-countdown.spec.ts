@@ -52,7 +52,7 @@ test('missing sales schedule and closed products stay blocked; missing deadlines
 });
 
 test('closed paid offer removes both outer application links from keyboard and navigation', async ({ page }) => {
-  for (const selector of ['.product-aside .btn.primary', '.bottom-cta .btn.primary']) {
+  for (const selector of ['.product-aside .btn.primary', '.bottom-cta .btn']) {
     await page.goto('/product-countdown-test?closed=1');
     const cta = page.locator(selector);
     await expect(cta).toBeAttached();
@@ -91,8 +91,7 @@ test('when one cohort closes, countdown and CTA follow the same remaining offer'
 });
 
 test('cohort selection changes both countdown and embedded checkout; editor can turn toggle off again', async ({ page }) => {
-  // Selection assertions use one instant; the separate expiry test advances time.
-  await page.clock.setFixedTime(new Date('2099-10-01T14:58:58Z'));
+  await page.clock.install({ time: new Date('2099-10-01T14:58:58Z') });
   await page.goto('/product-countdown-test?multiple=1');
   await expect(page.locator('#class-detail [role="timer"]')).toHaveText('00:00:02');
   await page.getByRole('combobox', { name: '기수 선택' }).selectOption('cohort-b');

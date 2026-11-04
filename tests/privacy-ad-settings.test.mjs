@@ -117,7 +117,7 @@ test('only the known policy versions route successfully; unknown versions and ex
     '@/app/ui/platform': { Platform: 'platform' },
     'next/navigation': { notFound: () => { throw Error('404'); } },
     '@/lib/landing-admin-state': {}, '@/lib/platform': { sections: [] },
-    'next/headers': {}, '@/lib/product-sharing': {},
+    'next/headers': {}, '@/lib/product-sharing': {}, '@/lib/course-catalog': {},
   });
   for (const path of [['policies', 'privacy'], ['policies', 'privacy', '2026-08-11'], ['policies', 'privacy', '2026-10-20'], ['policies', 'terms'], ['policies', 'refund']]) {
     assert.deepEqual((await route.default({ params: Promise.resolve({ path }) })).props.path, path);

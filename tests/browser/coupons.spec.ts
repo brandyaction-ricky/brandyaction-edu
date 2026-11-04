@@ -64,15 +64,15 @@ test('coupon drawer preserves admin defaults, multiple products and KST after sa
 });
 
 for (const method of [
-  {code:'TRANSFER',label:quickTransferEnabled?'퀵 계좌이체':'실시간 계좌이체',button:quickTransferEnabled?'퀵 계좌이체로 결제하기':'실시간 계좌이체로 결제하기'},
-  {code:'CARD',label:'카드·간편결제',button:'카드·간편결제로 결제하기'},
+  {code:'TRANSFER',label:quickTransferEnabled?'퀵 계좌이체':'실시간 계좌이체'},
+  {code:'CARD',label:'카드·간편결제'},
 ]) for (const discounted of [false,true]) test(`positive checkout ${method.label} ${discounted?'with coupon':'without coupon'} sends authoritative amount to mocked Toss`,async({page},testInfo)=>{
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
-  let couponListReads=0;
+  let couponListReads=0, orderCalls=0, paymentCalls=0;
   const finalAmount=discounted?71000:80000;
   await page.route('**/api/coupons**',route=>{if(route.request().method()==='GET'){couponListReads++;return route.fulfill({json:{coupons:[{couponCode:'LEAKED_CODE',couponName:'노출되면 안 되는 쿠폰'}]}});}return route.fulfill({json:{couponCode:'NORMAL_QA',couponName:'등록한 할인 쿠폰',couponDiscount:8000,totalAmount:72000}});});
-  await page.route('**/fixture/order',route=>route.fulfill({json:{orderId:'positive-order',orderNumber:'EDU-COUPON-QA',totalAmount:finalAmount}}));
-  await page.route('**/fixture/toss',route=>route.fulfill({json:{ok:true}}));
+  await page.route('**/fixture/order',route=>{orderCalls++;expect(route.request().postDataJSON().agreed).toBe(true);return route.fulfill({json:{orderId:'positive-order',orderNumber:'EDU-COUPON-QA',totalAmount:finalAmount}});});
+  await page.route('**/fixture/toss',route=>{paymentCalls++;return route.fulfill({json:{ok:true}});});
   await page.goto('/coupon-checkout-test?cohort='+cohort);
   await expect(page.getByRole('radio')).toHaveCount(2);
   await expect(page.getByText(/가상계좌/)).toHaveCount(0);
@@ -86,17 +86,21 @@ for (const method of [
   for(const label of [quickTransferEnabled?'퀵 계좌이체':'실시간 계좌이체','카드·간편결제']) await expect(page.getByRole('radio',{name:label,exact:true})).toBeVisible();
   await page.getByRole('radio',{name:method.label,exact:true}).check();
   await expect(page.getByRole('radio',{name:method.label,exact:true})).toBeChecked();
-  await expect(page.getByRole('button',{name:method.button,exact:true})).toBeDisabled();
-  await expect(page.locator('.checkout-payment-next')).toContainText(method.button);
+  const selectRequired=page.getByRole('button',{name:'필수 항목 한 번에 선택',exact:true});
+  await expect(selectRequired).toBeEnabled();
+  await expect(page.locator('.checkout-payment-next')).toContainText('동의하고 결제창 열기');
   if(!discounted) await page.locator('section.panel').filter({has:page.getByRole('heading',{name:'결제 수단',exact:true})}).screenshot({path:testInfo.outputPath('checkout-easypay.png')});
   await expect(page.getByLabel('사용할 쿠폰')).toHaveCount(0);await expect(page.getByText('노출되면 안 되는 쿠폰')).toHaveCount(0);expect(couponListReads).toBe(0);
   if(discounted){await page.getByRole('button',{name:'쿠폰 등록하기',exact:true}).click();await page.getByLabel('쿠폰 코드',{exact:true}).fill('normal_qa');await page.getByRole('button',{name:'등록',exact:true}).click();await expect(page.getByRole('dialog')).toBeHidden();await expect(page.getByText('등록한 할인 쿠폰 할인이 자동으로 적용됐습니다.')).toBeVisible();await expect(page.locator('.checkout-payment-summary .checkout-discount-amount')).toHaveText('−8,000원');await expect(page.locator('.checkout-payment-summary .cost-total strong')).toHaveText('72,000원');}
   else await expect(page.locator('.checkout-payment-summary .cost-total strong')).toHaveText('80,000원');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
   if(discounted) {await page.locator('section.panel').filter({has:page.getByRole('heading',{name:'쿠폰 할인',exact:true})}).screenshot({path:testInfo.outputPath('edu-coupon-registration.png')});await page.locator('.checkout-payment-summary').screenshot({path:testInfo.outputPath('edu-coupon-summary.png')});}
-  await page.locator('input[name="agreement"]').check();
+  await selectRequired.click();
+  await expect(page.locator('input[name="agreement"]')).toBeChecked();
+  expect(orderCalls).toBe(0);
+  expect(paymentCalls).toBe(0);
   const payment=page.waitForRequest('**/fixture/toss');
-  await page.getByRole('button',{name:/결제하기/}).click();
+  await page.getByRole('button',{name:'동의하고 결제창 열기',exact:true}).click();
   const body=(await payment).postDataJSON();expect(body.amount.value).toBe(finalAmount);expect(body.method).toBe(method.code);expect(body.orderId).toBe('EDU-COUPON-QA');
   expect(body.card).toBeUndefined();
   expect(body.virtualAccount).toBeUndefined();
@@ -114,6 +118,9 @@ test('zero coupon checkout previews server amount, removes coupon and never load
   await expect(page.getByText('최종 금액 0원 · 결제창 없이 신청을 완료합니다.')).toBeVisible();
   await page.getByRole('button',{name:'등록 취소',exact:true}).click();await expect(page.getByRole('heading',{name:'결제 수단',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'쿠폰 등록하기',exact:true}).click();await page.getByLabel('쿠폰 코드',{exact:true}).fill('ADMIN_QA');await page.getByRole('button',{name:'등록',exact:true}).click();
-  await page.locator('input[name="agreement"]').check();await page.getByRole('button',{name:'무료로 신청 완료하기'}).click();
+  await page.getByRole('button',{name:'필수 항목 한 번에 선택'}).click();
+  await expect(page.locator('input[name="agreement"]')).toBeChecked();
+  expect(orderCalls).toBe(0);
+  await page.getByRole('button',{name:'동의하고 무료 신청하기'}).click();
   await expect(page).toHaveURL(/\/applied\?order=qa-order/);expect(orderCalls).toBe(1);expect(tossCalls).toBe(0);
 });

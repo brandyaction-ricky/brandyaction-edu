@@ -7,11 +7,6 @@ on:
     branches: [develop, main]
   workflow_dispatch:
     inputs:
-      campus_render_diagnostic:
-        description: Run only the focused software-graphics diagnostics (never a release gate)
-        required: false
-        type: boolean
-        default: false
       apply_all_pending_dev_migrations:
         description: Apply all pending SQL migrations to the DEV Supabase project
         required: true
@@ -19,7 +14,7 @@ on:
         default: false
 
 concurrency:
-  group: dev-pipeline-${{ github.ref }}-${{ inputs.campus_render_diagnostic && 'rendering' || 'full' }}
+  group: dev-pipeline-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -27,7 +22,6 @@ permissions:
 
 jobs:
   code-checks:
-    if: ${{ !inputs.campus_render_diagnostic }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -44,6 +38,85 @@ jobs:
         run: |
           head_ref="$HEAD_REF"
           if [ "$head_ref" = "develop" ]; then
+            exit 0
+          fi
+
+          if [ "$head_ref" = "codex/edu-signup-marketing-copy-20261104" ]; then
+            expected_main=bb803efeeedea347e5cf6b283591f4053b5131de
+            release_payload=aedfe204dabfcf3b5e54bcf04f6f7b2fa060f6cc
+            if [ "$(git rev-parse HEAD^1)" != "$expected_main" ]; then
+              echo "Production main moved; revalidate the signup marketing copy release."
+              exit 1
+            fi
+            if ! git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'; then
+              echo "The merge result differs from the tested signup marketing copy release."
+              exit 1
+            fi
+            echo "Signup marketing copy production release scope verified."
+            exit 0
+          fi
+
+          if [ "$head_ref" = "codex/edu-buyer-selection-main-release-20261104" ]; then
+            expected_main=f06729e9b9f16a3851f5a90b5263d0e8ea1baaed
+            release_payload=9f0958a4cea44fd2489df490a5f6b232df959dfe
+            if [ "$(git rev-parse HEAD^1)" != "$expected_main" ]; then
+              echo "Production main moved; revalidate the scoped buyer selection release."
+              exit 1
+            fi
+            if ! git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'; then
+              echo "The merge result differs from the tested buyer selection release."
+              exit 1
+            fi
+            echo "Buyer selection production release scope verified."
+            exit 0
+          fi
+
+          if [ "$head_ref" = "codex/edu-required-consent-main-release-20261104" ]; then
+            expected_main=6d534039ce82d988354afc3d5dab377590178dd4
+            release_payload=e97479d0aa892f007fef80fa2100760c2bdc5ffc
+            if [ "$(git rev-parse HEAD^1)" != "$expected_main" ]; then
+              echo "Production main moved; revalidate the scoped consent button release."
+              exit 1
+            fi
+            if ! git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'; then
+              echo "The merge result differs from the tested consent button release."
+              exit 1
+            fi
+            echo "Consent button production release scope verified."
+            exit 0
+          fi
+
+          if [ "$head_ref" = "codex/edu-purchase-notice-main-release-20261104" ]; then
+            expected_main=924894047d38e26c9e04c15f00da70acf849f8e8
+            release_payload=3352b7515fc79b2bc69df0701b4722bbd4fb3e4a
+            if [ "$(git rev-parse HEAD^1)" != "$expected_main" ]; then
+              echo "Production main moved; revalidate the scoped release."
+              exit 1
+            fi
+            if ! git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'; then
+              echo "The merge result differs from the scoped purchase notice release."
+              exit 1
+            fi
+            echo "Purchase notice production release scope verified."
+            exit 0
+          fi
+
+          if [ "$head_ref" = "codex/edu-purchase-delivery-main-release-20261103" ]; then
+            # Compare the merge result to the fully tested payload. The live
+            # deployment already includes changes absent from GitHub main.
+            expected_main=bd6207f45c953fd428dad2b9629fb0aa54ac4d4a
+            tested_payload=9d5e93f00c328adc54ea66c40b09a801d0371378
+            if [ "$(git rev-parse HEAD^1)" != "$expected_main" ]; then
+              echo "Production main moved; revalidate the scoped release."
+              exit 1
+            fi
+
+            if ! git diff --exit-code "$tested_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'; then
+              echo "The merge result differs from the tested purchase delivery payload."
+              exit 1
+            fi
+
+            echo "Purchase delivery production release scope verified."
             exit 0
           fi
 
@@ -261,7 +334,6 @@ jobs:
         run: npm run build
 
   browser:
-    if: ${{ !inputs.campus_render_diagnostic }}
     name: Browser shard ${{ matrix.shard }}/3
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -288,7 +360,6 @@ jobs:
           retention-days: 3
 
   payment-widget:
-    if: ${{ !inputs.campus_render_diagnostic }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -313,7 +384,6 @@ jobs:
           retention-days: 3
 
   campus-browser:
-    if: ${{ !inputs.campus_render_diagnostic }}
     name: Campus browser shard ${{ matrix.shard }}/8
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -339,41 +409,8 @@ jobs:
           path: test-results/
           retention-days: 3
 
-  rendering-diagnostic:
-    if: ${{ inputs.campus_render_diagnostic }}
-    name: Rendering check (${{ matrix.device }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 12
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - device: desktop
-            files: tests/campus-browser/tour-controls.spec.ts
-            pattern: all rooms retain
-          - device: mobile
-            files: tests/campus-browser/mobile-layout.spec.ts
-            pattern: phone pinch
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - name: Run unchanged interaction assertions on software graphics
-        run: npx playwright test --config=playwright.campus.config.ts --project=${{ matrix.device }} ${{ matrix.files }} --grep '${{ matrix.pattern }}' --reporter=line
-      - name: Preserve diagnostic evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: rendering-diagnostic-${{ matrix.device }}
-          path: test-results/
-          retention-days: 3
-
   verify:
-    if: ${{ always() && !inputs.campus_render_diagnostic }}
+    if: always()
     needs: [code-checks, browser, payment-widget, campus-browser]
     runs-on: ubuntu-latest
     timeout-minutes: 5

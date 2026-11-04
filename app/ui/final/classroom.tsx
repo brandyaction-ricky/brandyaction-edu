@@ -22,7 +22,7 @@ import {
   Play,
 } from "lucide-react";
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   LiveSchedule,
   MissionForm,
@@ -55,8 +55,24 @@ export function Classroom({
   blockLearningEnabled?: boolean;
 }) {
   const [navOpen, setNavOpen] = useState(false);
-  const [completedHere, setCompletedHere] = useState<string[]>([]);
+  const navRef = useRef<HTMLElement>(null);
+  const enrollmentPathId = path[1], lessonPathId = path[2];
   const progression = useLessonProgression(path[1], blockLearningEnabled);
+  const navigationKey = progression.lessons?.map(item => `${item.lessonId}:${item.track}:${item.ongoing}`).join("|");
+  // Scroll only the lesson list; opening a lesson must not move the page itself.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      const nav = navRef.current;
+      const active = nav?.querySelector<HTMLElement>('.lesson-nav.active');
+      if (!nav || !active || !nav.clientHeight) return;
+      const list = nav.getBoundingClientRect(), item = active.getBoundingClientRect();
+      if (item.top < list.top || item.bottom > list.bottom) {
+        nav.scrollTop += item.top - list.top - Math.max(0, (nav.clientHeight - item.height) / 2);
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [enrollmentPathId, lessonPathId, navOpen, loading, data, navigationKey]);
+  const [completedHere, setCompletedHere] = useState<string[]>([]);
   const enrollment = (data.enrollments || []).find(
     (e) => e.id === path[1] && hasLearningAccess(e),
   );
@@ -260,6 +276,7 @@ export function Classroom({
         <button
           className="btn learning-mobile-toggle"
           aria-expanded={navOpen}
+          aria-controls="classroom-lesson-list"
           onClick={() => setNavOpen(!navOpen)}
         >
           학습 목록
@@ -267,6 +284,8 @@ export function Classroom({
         </button>
         <div className="learning-layout">
           <aside
+            ref={navRef}
+            id="classroom-lesson-list"
             className={"learning-nav " + (navOpen ? "open" : "")}
             aria-label="학습 목록"
           >
@@ -328,7 +347,7 @@ export function Classroom({
                 {safeUrl(content?.vod_url) && (
                   <Video url={t(content, "vod_url")} />
                 )}
-                <section className="reading">
+                <section id="lesson-reading-start" className="reading">
                   {safeUrl(content?.external_url) && (
                     <a
                       className="btn primary mb24"

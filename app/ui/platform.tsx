@@ -4,7 +4,10 @@ import { memberDirectoryScope } from '@/lib/member-directory';
 import { MobileRefresh } from './final/mobile-refresh';
 import { articleDiscoveryVisible, contentVisibility } from '@/lib/content-visibility';
 import { NextClassBanner } from './final/next-class-banner';
+import { learningOverview } from '@/lib/learning-overview';
 import { MemberErasureQueue } from './final/member-erasure-queue';
+import { TipsErasureMonitorNotice } from './final/tips-erasure-monitor-notice';
+import { TipsSourceNotice } from './final/tips-source-notice';
 import { QuestionImage } from './final/question-image';
 import { QuestionThreadDialog } from './final/question-thread';
 import { LearningNoticeBar } from './final/learning-notice';
@@ -67,7 +70,8 @@ import {
   sectionDescription,
 } from "./final/admin-shell";
 import { MemberViews, enrollmentLessons } from "./final/member-views";
-import { LearningQuestionShortcut } from './final/learning-question-dialog';
+import { FloatingLearningQuestion } from './final/floating-learning-question';
+import { MentorReplyBell } from './final/mentor-reply-bell';
 import { MemberVisitRecorder } from "./final/member-visit-recorder";
 import {
   ArticleCard,
@@ -292,7 +296,14 @@ export function Platform({
   const questionEnrollment = learning ? (data.enrollments || []).find(row => row.id === path[1] && hasLearningAccess(row)) : undefined;
   const questionLessons = questionEnrollment ? enrollmentLessons(data, questionEnrollment) : [];
   const questionLesson = questionLessons.find(row => row.id === path[2]) || questionLessons[0];
-  const questionContext = questionEnrollment && questionLesson ? { enrollmentId: String(questionEnrollment.id), lessonId: String(questionLesson.id), label: t(questionLesson, 'title'), recent: true } : undefined;
+  const questionContext = questionEnrollment && questionLesson ? { enrollmentId: String(questionEnrollment.id), lessonId: String(questionLesson.id), label: [questionLesson.day_number != null ? String(questionLesson.day_number)+'일차' : '', t(questionLesson, 'title')].filter(Boolean).join(' · '), recent: true } : undefined;
+  const resumeQuestionLessons = new Map<string, string>();
+  if (account && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true') {
+    for (const enrollment of data.enrollments || []) {
+      const next = learningOverview(data, enrollment).groups.find(group => group.key !== 'ongoing' && group.next)?.next;
+      if (next) resumeQuestionLessons.set(enrollment.id, next.id);
+    }
+  }
   const setAdminPage = (update: number | ((page: number) => number)) =>
     setAdminPaging((current) => ({
       section: pagingKey,
@@ -609,10 +620,10 @@ export function Platform({
             </nav>
           )}
           <div className="header-user">
-            {learning && <MobileRefresh />}
             {user ? (
               <>
-                {learning && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' ? <LearningQuestionShortcut key={routeKey} context={questionContext}/> : <Link className="link header-questions" href={admin ? "/admin/questions" : "/my/questions"}>질문·답변</Link>}
+                {!admin && (account || learning) && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' && process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED === 'true' && <MentorReplyBell key={user.id}/>}
+                <Link className="link header-questions" href={admin ? "/admin/questions" : "/my/questions?view=mine"}>질문·답변</Link>
                 <Link className="link" href="/my">
                   마이페이지
                 </Link>
@@ -650,7 +661,8 @@ export function Platform({
             )}
             {(account || learning) && <button
               className="icon-btn mobile-only"
-              aria-label="메뉴 열기"
+              aria-label={mobile ? "메뉴 닫기" : "메뉴 열기"}
+              aria-controls="member-mobile-navigation"
               aria-expanded={mobile}
               onClick={() => setMobile(!mobile)}
             >
@@ -662,14 +674,14 @@ export function Platform({
           </div>
         </div>
         {mobile && (account || learning) && (
-          <nav className="mobile-nav open">
+          <nav id="member-mobile-navigation" className="mobile-nav open" aria-label="모바일 메뉴">
             {nav.filter(([href]) => href !== "/articles" || articleDiscoveryVisible(data)).map(([href, label]) => (
               <Link href={href} key={href}>
                 {label}
               </Link>
             ))}
             <Link href="/my">마이페이지</Link>
-            {account && <MobileRefresh />}
+            <MobileRefresh />
           </nav>
         )}
       </header>
@@ -1105,6 +1117,8 @@ export function Platform({
           </>
         )}
         {key === 'customers' && user?.role === 'admin' && <MemberErasureQueue key={notice} />}
+        {key === 'customers' && user?.role === 'admin' && <TipsErasureMonitorNotice />}
+        {key === 'customers' && user?.role === 'admin' && <TipsSourceNotice />}
       </AdminShell>
     );
   }
@@ -1138,6 +1152,7 @@ export function Platform({
         {body}
       </main>
       {!admin && footer}
+      {user && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' && (learning || account && (!path[1] || ['classes','questions'].includes(path[1]))) && <FloatingLearningQuestion key={user.id} member={user.id} current={questionContext} resumeLessons={resumeQuestionLessons}/>}
       {notice && (admin ? <AdminToast tone="success">{notice}</AdminToast> : <div className="toast" role="status">{notice}</div>)}
       {editor && editor.route === routeKey && (
         <Editor

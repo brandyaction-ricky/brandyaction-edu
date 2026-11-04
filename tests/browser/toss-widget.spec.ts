@@ -29,7 +29,7 @@ test('widget uses the quoted amount, and never requests payment if the order amo
   await page.getByRole('button',{name:'등록',exact:true}).click();
   await expect.poll(() => amounts.at(-1)).toBe(72000);
   await page.locator('input[name="agreement"]').check();
-  await page.getByRole('button',{name:'결제하기',exact:true}).click();
+  await page.getByRole('button',{name:'동의하고 결제창 열기',exact:true}).click();
   await expect(page.getByRole('alert')).toContainText('결제 금액이 변경됐습니다');
   expect(requested).toBe(0);
 });
@@ -41,7 +41,7 @@ test('widget requests payment only after matching the server amount', async ({pa
   await page.goto('/coupon-checkout-test?cohort='+cohort);
   await page.locator('input[name="agreement"]').check();
   const pending=page.waitForRequest('**/fixture/toss');
-  await page.getByRole('button',{name:'결제하기',exact:true}).click();
+  await page.getByRole('button',{name:'동의하고 결제창 열기',exact:true}).click();
   const request=(await pending).postDataJSON();
   expect(request.orderId).toBe('EDU-WIDGET-QA');
   expect(request.successUrl).toContain('integration=widget');
@@ -60,7 +60,7 @@ test('changing a coupon while the order is being created cannot start a payment'
   await page.route('**/api/coupons**', route => route.fulfill({json:{couponCode:'NORMAL_QA',couponName:'등록한 할인 쿠폰',couponDiscount:8000,totalAmount:72000}}));
   await page.goto('/coupon-checkout-test?cohort='+cohort);
   await page.locator('input[name="agreement"]').check();
-  await page.getByRole('button',{name:'결제하기',exact:true}).click();
+  await page.getByRole('button',{name:'동의하고 결제창 열기',exact:true}).click();
   await orderRequest;
   await expect(page.getByRole('button',{name:'처리 중...',exact:true})).toBeDisabled();
   await page.getByRole('button',{name:'쿠폰 등록하기',exact:true}).click();
@@ -75,17 +75,19 @@ test('changing a coupon while the order is being created cannot start a payment'
 const url='/coupon-checkout-test?cohort=00000000-0000-4000-8000-000000000001';
 
 test('checkout action stays reachable on narrow screens and opens the single agreement above it', async ({page}, testInfo) => {
+  let orders = 0;
   await page.route('**/fixture/toss-amount', route=>route.fulfill({json:{ok:true}}));
+  await page.route('**/fixture/order', route=>{ orders++; return route.fulfill({json:{error:'No order expected'}}); });
   await page.goto(url);
-  const action=page.getByRole('button',{name:'결제하기',exact:true});
+  const action=page.getByRole('button',{name:'필수 항목 한 번에 선택',exact:true});
   const bar=page.locator('.checkout-submit');
   await expect(action).toHaveCount(1);
-  await expect(action).toBeDisabled();
+  await expect(action).toBeEnabled();
   const narrow=testInfo.project.use.viewport!.width<=1024;
   await expect(bar).toHaveCSS('position',narrow?'fixed':'static');
   if (!narrow) return;
-  const assertOnScreen=async()=>{
-    const box=(await action.boundingBox())!;
+  const assertOnScreen=async(button=action)=>{
+    const box=(await button.boundingBox())!;
     expect(box.y).toBeGreaterThanOrEqual(0);
     expect(box.y+box.height).toBeLessThanOrEqual(testInfo.project.use.viewport!.height);
     expect(box.x+box.width).toBeLessThanOrEqual(testInfo.project.use.viewport!.width);
@@ -98,10 +100,13 @@ test('checkout action stays reachable on narrow screens and opens the single agr
   const text=(await page.locator('.check-group').boundingBox())!;
   expect(text.y).toBeGreaterThanOrEqual(0);
   expect(text.y+text.height).toBeLessThan((await bar.boundingBox())!.y);
-  await agreement.check();
-  await expect(action).toBeEnabled();
+  await action.click();
+  await expect(agreement).toBeChecked();
+  const continueButton=page.getByRole('button',{name:'동의하고 결제창 열기',exact:true});
+  await expect(continueButton).toBeEnabled();
+  expect(orders).toBe(0);
   await page.getByRole('heading',{name:'주문·결제',exact:true}).scrollIntoViewIfNeeded();
-  await assertOnScreen();
+  await assertOnScreen(continueButton);
   await expect(page.locator('input[name="agreement"]')).toHaveCount(1);
 });
 
@@ -118,7 +123,7 @@ test('floating amount follows coupons including zero and remains below the coupo
   await expect(dialog).toBeHidden();
   await expect(page.locator('.cost-total strong')).toHaveText('0원');
   if(testInfo.project.use.viewport!.width<=1024) await expect(page.locator('.checkout-submit-amount strong')).toHaveText('0원');
-  await expect(page.getByRole('button',{name:'무료로 신청 완료하기',exact:true})).toBeDisabled();
+  await expect(page.getByRole('button',{name:'필수 항목 한 번에 선택',exact:true})).toBeEnabled();
   await page.locator('#checkout-agreement').check();
-  await expect(page.getByRole('button',{name:'무료로 신청 완료하기',exact:true})).toBeEnabled();
+  await expect(page.getByRole('button',{name:'동의하고 무료 신청하기',exact:true})).toBeEnabled();
 });

@@ -13,6 +13,8 @@ import { ConsentPolicy } from "@/app/ui/consent-policy";
 
 import { safeNext } from "@/lib/platform";
 
+const marketingHelp = "동의 없이 계속할 수 있어요";
+
 export default function SocialConsentPage() {
   const router = useRouter();
   const [terms, setTerms] = useState(false);
@@ -25,10 +27,16 @@ export default function SocialConsentPage() {
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const busy = useRef(false);
+  const requiredSelected = terms && privacy;
+
+  const selectRequired = () => {
+    setTerms(true);
+    setPrivacy(true);
+  };
 
   const complete = async () => {
     if (busy.current) return;
-    if (!terms || !privacy) {
+    if (!requiredSelected) {
       setMessage("필수 약관에 모두 동의해 주세요.");
       return;
     }
@@ -122,10 +130,20 @@ export default function SocialConsentPage() {
             <fieldset className="stack mt32 email-auth-fields" disabled={pending}>
               <ConsentPolicy kind="terms" checked={terms} onChange={setTerms} />
               <ConsentPolicy kind="privacy" checked={privacy} onChange={setPrivacy} />
-              {optionalEnabled ? <OptionalConsent value={choices} onChange={setChoices} disabled={pending}/> : <label className="checkline">
-                <input type="checkbox" checked={marketing} onChange={event => setMarketing(event.target.checked)}/>
-                <span>[선택] 클래스·무료강의 등 마케팅 정보 수신 동의</span>
-              </label>}
+              <div className="stack gap8">
+                <p><strong>새 AI 마케팅 무료 자료, 나올 때마다 받아보세요</strong></p>
+                {optionalEnabled ? (
+                  <OptionalConsent value={choices} onChange={setChoices} disabled={pending} helpText={marketingHelp} />
+                ) : (
+                  <>
+                    <label className="checkline">
+                      <input type="checkbox" checked={marketing} onChange={event => setMarketing(event.target.checked)} aria-describedby="signup-marketing-help" />
+                      <span>[선택] 클래스·무료강의 등 마케팅 정보 수신 동의 (광고)</span>
+                    </label>
+                    <p className="meta" id="signup-marketing-help">{marketingHelp}</p>
+                  </>
+                )}
+              </div>
             </fieldset>
             {message && (
               <p className="notice mt16" role="alert">
@@ -134,13 +152,13 @@ export default function SocialConsentPage() {
             )}
             {optionalEnabled && optionalUnresolved && message && <button className="btn ghost full mt16" type="button" disabled={pending || !terms || !privacy} onClick={goNext}>가입 계속하기 · 수신 설정은 회원 정보에서 확인</button>}
             <button
-              className="btn primary full mt24"
+              className={`btn ${requiredSelected ? "primary" : "btn-outline"} full mt24`}
               type="button"
-              onClick={complete}
-              disabled={pending || !terms || !privacy}
+              onClick={requiredSelected ? complete : selectRequired}
+              disabled={pending}
             >
-              {pending ? "저장 중..." : "동의하고 가입 완료"}
-              <ArrowRight />
+              {pending ? "저장 중..." : requiredSelected ? "동의하고 가입 완료" : "필수 항목 한 번에 선택"}
+              <ArrowRight aria-hidden="true" />
             </button>
             <button
               className="btn ghost full mt8"

@@ -1,0 +1,13 @@
+{
+  "purpose": "PUBLIC SYNTHETIC INTEROP TEST VECTORS ONLY. These fixed byte sequences are not live secrets and must never be registered in DEV or production.",
+  "test_customer_key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "test_id_key_hex": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+  "member_uuid": "00000000-0000-4000-8000-000000000001",
+  "consent_epoch": "ce_AAECAwQFBgcICQoLDA0ODxAREhMUFRYX",
+  "customer_id": "k1:Ok2hKeV6ZRtHHLWZlUVFibXGD2cmZOC7z_IxTWiW_sM",
+  "event_id": "rqfSQbzNqG-DJJOA5XfJDWqAJCylQmCF29727JxnsqA",
+  "order_id": "O8wW2YGgcUoMEpYJR5LXg0cSKDiTFxYh2G79kB05EAc",
+  "payment_id": "CaPuF3D4yLLeyX04X08eBl3dlZGYcLxdbS5dp9C95DE",
+  "refund_id": "nmQrVQRSyj2Yi7ajYawd_R3lIuWc7H57AAuvfW6gh2E",
+  "learning_id": "zzvXwUkTyjTA-eK161agaeUoRItLuXnKG_mK48Pb5ZU"
+}

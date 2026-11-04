@@ -1,0 +1,5 @@
+.edu-admin .tips-erasure-monitor { margin-top:24px; padding:20px 24px; display:grid; gap:6px; font-size:14px; }
+.edu-admin .tips-erasure-monitor--warning { border-color:#cf9c56; background:#fffaf2; }
+.edu-admin .tips-erasure-monitor strong { font-size:16px; }
+.edu-admin .tips-erasure-monitor p { margin:0; line-height:1.6; }
+.edu-admin .tips-erasure-monitor small { color:var(--muted,#626b76); }

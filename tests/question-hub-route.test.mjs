@@ -1,10 +1,10 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import ts from 'typescript';
 const id='11111111-1111-4111-8111-111111111111';
 function compile(file,mocks={},env={}){const out={};new Function('exports','require','process',ts.transpileModule(fs.readFileSync(new URL('../'+file,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(out,n=>mocks[n],{env});return out;}
-function harness({enabled=true,user={id},operator=true,error=null}={}){
+function harness({enabled=true,user={id},operator=true,error=null,contexts=[],lessons=[]}={}){
  const env={NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED:String(enabled),NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED:'true'};
  const calls=[],reads=[],concept=compile('lib/question-hub.ts'),server=compile('lib/question-hub-server.ts',{'./edu-workflows':{uuid:v=>typeof v==='string'&&/^[a-f0-9-]{36}$/.test(v)}},env);
- const db={rpc:async(name,args)=>{calls.push({name,args});return{data:name==='edu_question_contexts'?[]:name==='edu_question_assist'?{id,status:'waiting',lessonRevision:null}:{id},error};},from:table=>{const chain={};for(const method of ['select','eq','order','range','limit'])chain[method]=(...args)=>{reads.push([table,method,...args]);return chain;};const value={data:{id,title:'질문 제목',content:'질문 본문',lesson_id:id,course_id:id},error};chain.single=chain.maybeSingle=async()=>value;chain.then=(a,b)=>Promise.resolve({data:[],error}).then(a,b);return chain;}};
+ const db={rpc:(name,args)=>{calls.push({name,args});const result=Promise.resolve({data:name==='edu_question_contexts'?contexts:name==='edu_question_assist'?{id,status:'waiting',lessonRevision:null}:{id},error});result.abortSignal=()=>result;return result;},from:table=>{const chain={};for(const method of ['select','eq','order','range','limit','in'])chain[method]=(...args)=>{reads.push([table,method,...args]);return chain;};const value={data:{id,title:'질문 제목',content:'질문 본문',lesson_id:id,course_id:id},error};chain.single=chain.maybeSingle=async()=>value;chain.then=(a,b)=>Promise.resolve({data:table==='curriculum_lessons'?lessons:[],error}).then(a,b);return chain;}};
  const mocks={'@/lib/question-hub':concept,'@/lib/question-hub-server':server,'@/lib/alumni-access-server':{assertParticipationOpen:async()=>{}},'@/lib/server-auth':{getAuthenticatedUser:async()=>user},'@/lib/operator-permissions':{getOperatorUser:async()=>operator?user:null},'@/lib/supabase/admin':{createAdminClient:()=>db},'@/lib/question-ai-context':{loadQuestionAiContext:async()=>({reference:{lessonTitle:'현재 수업',revision:null},context:'공개된 수업 내용'})}};
  const member=compile('app/api/platform/question-hub/route.ts',mocks,env),admin=compile('app/api/admin/questions/hub/route.ts',mocks,env);
  const post=(body,{isAdmin=false,origin='https://edu.test'}={})=>(isAdmin?admin:member).POST(new Request('https://edu.test/api/question-hub',{method:'POST',headers:origin?{origin}:{},body:JSON.stringify(body)}));
@@ -36,4 +36,21 @@ test('explicit public/private intent reaches the new RPC; cohort reads derive id
  assert.equal(h.calls[0].name,'edu_create_visible_question');assert.equal(h.calls[0].args.p_visibility,'cohort');assert.equal(h.calls[0].args.p_actor,id);assert.equal(Object.hasOwn(h.calls[0].args,'p_share'),false);
  await h.get('mode=public&userId=victim');assert.equal(h.calls[1].name,'edu_read_cohort_questions');assert.equal(h.calls[1].args.p_actor,id);assert.equal(h.calls[1].args.p_include_own,false);
  assert.equal((await h.post({...h.body,visibility:'all'})).status,400);
+});
+
+test('context list adds day labels only to lessons authorized by the existing scoped RPC',async()=>{const h=harness({contexts:[{enrollment_id:id,lesson_id:id,label:'문샷 · 3기 · 소개',recent:true}],lessons:[{id,day_number:11}]});const r=await h.get('mode=contexts');assert.equal(r.status,200);assert.equal((await r.json()).contexts[0].label,'11일차 · 문샷 · 3기 · 소개');assert.ok(h.reads.some(x=>x[0]==='curriculum_lessons'&&x[1]==='in'&&x[2]==='id'&&x[3].length===1&&x[3][0]===id));});
+
+test('mentor reply notifications bind reads and acknowledgements to the signed-in learner',async()=>{
+ assert.equal((await harness({user:null}).get('mode=reply-notifications')).status,401);
+ const h=harness();
+ const read=await h.get('mode=reply-notifications&actor=other');
+ assert.equal(read.status,200);
+ assert.equal(read.headers.get('cache-control'),'private, no-store');
+ assert.deepEqual(h.calls[0],{name:'edu_unread_mentor_replies',args:{p_actor:id}});
+ const body={action:'read-replies',actor:'other',questionId:id,answerIds:[id]};
+ assert.equal((await h.post(body,{origin:'https://evil.test'})).status,403);
+ for(const answerIds of [[],['invalid'],Array(21).fill(id)]) assert.equal((await h.post({...body,answerIds})).status,400);
+ assert.equal(h.calls.length,1);
+ assert.equal((await h.post(body)).status,200);
+ assert.deepEqual(h.calls[1],{name:'edu_mark_mentor_replies_read',args:{p_actor:id,p_question:id,p_answers:[id]}});
 });

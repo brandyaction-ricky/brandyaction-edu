@@ -15,6 +15,7 @@ test('mobile member navigation keeps admin entry visible only for operators', as
 test('dashboard separates 30-day tracks and offers review while the next week is locked', async ({ page }, info) => {
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
   await page.goto('/learning-overview-test');
+  if ((page.viewportSize()?.width || 0) <= 680) await page.getByRole('button', { name: '주차별 진도·학습 목록' }).click();
   const overview = page.locator('.member-learning-intro');
   const daily = overview.getByRole('region', { name: '데일리 미션', exact: true }), learning = overview.getByRole('region', { name: '학습 & 시험', exact: true });
   await expect(daily).toContainText('현재 공개된 학습 5 / 30개 완료'); await expect(learning).toContainText('현재 공개된 학습 1 / 30개 완료');
@@ -36,6 +37,7 @@ test('dashboard separates 30-day tracks and offers review while the next week is
 
 test('completed and fully locked tracks have accurate actions; ordinary onboarding remains available', async ({ page }) => {
   await page.goto('/learning-overview-test?scenario=complete');
+  if ((page.viewportSize()?.width || 0) <= 680) await page.getByRole('button', { name: '주차별 진도·학습 목록' }).click();
   const overview = page.locator('.member-learning-intro'), daily = overview.getByRole('region', { name: '데일리 미션', exact: true });
   await expect(daily).toContainText('현재 공개된 학습 30 / 30개 완료'); await expect(daily).toContainText('현재 공개된 학습을 완료했습니다.');
   await expect(daily.getByRole('link')).toHaveAttribute('href', '/learn/sample-enrollment/daily-30');
@@ -44,6 +46,7 @@ test('completed and fully locked tracks have accurate actions; ordinary onboardi
   await expect(ordinary.getByRole('heading', { name: '온보딩', exact: true })).toBeVisible();
   await expect(ordinary.locator('li a')).toHaveAttribute('href', '/learn/sample-enrollment/intro');
   await page.goto('/learning-overview-test?scenario=locked');
+  if ((page.viewportSize()?.width || 0) <= 680) await page.getByRole('button', { name: '주차별 진도·학습 목록' }).click();
   await expect(daily).toContainText('현재 공개된 학습 0 / 30개 완료'); await expect(daily.getByRole('link')).toHaveCount(0);
 });
 
