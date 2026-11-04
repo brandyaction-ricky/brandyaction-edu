@@ -68,11 +68,12 @@ function message(
   member: Member,
   sender: string,
   settings: SmsSettings,
+  literalContent = false,
 ): MessageSchema {
   if (template.is_active === false)
     throw new Error("사용 중지된 템플릿은 발송할 수 없습니다.");
   const raw = member.recruitment ? recruitmentMessageLinks(template.content, member.entry_channel) : template.content;
-  const content = render(member.purchaseRoomLink ? raw.replaceAll("{{roomLink}}", member.purchaseRoomLink).replaceAll("#{공지방링크}", member.purchaseRoomLink) : raw, member);
+  const content = literalContent ? raw : render(member.purchaseRoomLink ? raw.replaceAll("{{roomLink}}", member.purchaseRoomLink).replaceAll("#{공지방링크}", member.purchaseRoomLink) : raw, member);
   if (template.channel === "alimtalk") {
     if (template.purpose === "marketing")
       throw new Error("마케팅 안내는 정보성 알림톡으로 발송할 수 없습니다. 광고 문자 템플릿을 사용해 주세요.");
@@ -172,7 +173,7 @@ async function providerOptOuts(service: SolapiMessageService, sender: string) {
 export async function sendBatch(
   template: Template,
   members: Member[],
-  context: { campaignId?: string; purchaseBatchId?: string; purchaseRoomLink?: string | null; recruitment?: boolean; automationRuns?: Record<string, string> },
+  context: { campaignId?: string; purchaseBatchId?: string; purchaseRoomLink?: string | null; purchaseText?: boolean; recruitment?: boolean; automationRuns?: Record<string, string> },
   settings: SmsSettings,
 ) {
   const active = provider(settings.senderPhone);
@@ -227,7 +228,7 @@ export async function sendBatch(
   if (inserted.error) throw inserted.error;
   try {
     const response = await active.service.send(
-      eligible.map((member) => message(template, member, active.sender, settings)),
+      eligible.map((member) => message(template, member, active.sender, settings, context.purchaseText)),
     );
     const groupId = response.groupInfo.groupId;
     const ids = inserted.data.map((log) => log.id);

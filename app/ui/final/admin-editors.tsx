@@ -379,7 +379,7 @@ export function ProductEditor({ data, row, pending, send, back, actorId, canMana
     } catch (cause) { setError((cause as Error).message); }
   }
   return <div className={"product-editor" + (tab === "curriculum" ? " curriculum-editing" : "")}>
-    <PageHeader title={row ? "상품 수정" : "상품 등록"} description={t(row, "title") || "상품 정보·상세페이지·제공 자료·판매 조건을 입력하세요."} eyebrow="PRODUCT EDITOR" actions={<>{row && <Link className="btn" href="/admin/purchase-onboarding">결제 후 안내 설정</Link>}{Boolean(row?.slug) && <Link className="btn" href={"/classes/" + t(row, "slug")} target="_blank">고객 화면 미리보기</Link>}</>} />
+    <PageHeader title={row ? "상품 수정" : "상품 등록"} description={t(row, "title") || "상품 정보·상세페이지·제공 자료·판매 조건을 입력하세요."} eyebrow="PRODUCT EDITOR" actions={<>{row?.id && <Link className="btn" href={`/admin/purchase-onboarding?product=${encodeURIComponent(String(row.id))}#completion-settings`}>결제 후 안내 설정</Link>}{Boolean(row?.slug) && <Link className="btn" href={"/classes/" + t(row, "slug")} target="_blank">고객 화면 미리보기</Link>}</>} />
     <form ref={formRef} noValidate onSubmit={submit} onChange={updatePreview}>
       <nav className="product-setup-guide" aria-label="상품 준비 순서"><b>처음 등록하시나요?</b><p>상품 정보를 저장한 뒤, 상세 안내와 수강 구성을 준비해 주세요. 마지막으로 공개 상태를 확인합니다.</p><ol>{[['basic', '상품 정보'], ['detail', '상세 안내'], [preview.category === 'digital' ? 'resources' : 'cohorts', preview.category === 'digital' ? '제공 자료' : '기수·가격·일정'], ['publish', '공개 전 확인']].map(([key, label], index) => <li key={key}><button type="button" className="btn small" aria-current={tab === key ? 'step' : undefined} onClick={() => setTab(key)}>{index + 1}. {label}</button></li>)}</ol></nav>
       <div className="editor-layout"><div className="editor-main"><section className="panel">
