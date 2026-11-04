@@ -13,6 +13,8 @@ import { ConsentPolicy } from "@/app/ui/consent-policy";
 
 import { safeNext } from "@/lib/platform";
 
+const marketingHelp = "동의 없이 계속할 수 있어요";
+
 export default function SocialConsentPage() {
   const router = useRouter();
   const [terms, setTerms] = useState(false);
@@ -128,10 +130,20 @@ export default function SocialConsentPage() {
             <fieldset className="stack mt32 email-auth-fields" disabled={pending}>
               <ConsentPolicy kind="terms" checked={terms} onChange={setTerms} />
               <ConsentPolicy kind="privacy" checked={privacy} onChange={setPrivacy} />
-              {optionalEnabled ? <OptionalConsent value={choices} onChange={setChoices} disabled={pending}/> : <label className="checkline">
-                <input type="checkbox" checked={marketing} onChange={event => setMarketing(event.target.checked)}/>
-                <span>[선택] 클래스·무료강의 등 마케팅 정보 수신 동의</span>
-              </label>}
+              <div className="stack gap8">
+                <p><strong>새 AI 마케팅 무료 자료, 나올 때마다 받아보세요</strong></p>
+                {optionalEnabled ? (
+                  <OptionalConsent value={choices} onChange={setChoices} disabled={pending} helpText={marketingHelp} />
+                ) : (
+                  <>
+                    <label className="checkline">
+                      <input type="checkbox" checked={marketing} onChange={event => setMarketing(event.target.checked)} aria-describedby="signup-marketing-help" />
+                      <span>[선택] 클래스·무료강의 등 마케팅 정보 수신 동의 (광고)</span>
+                    </label>
+                    <p className="meta" id="signup-marketing-help">{marketingHelp}</p>
+                  </>
+                )}
+              </div>
             </fieldset>
             {message && (
               <p className="notice mt16" role="alert">

@@ -36,7 +36,10 @@ test('signup omits encouragement and finishes after one submit while saving requ
   const selectRequired = page.getByRole('button', { name: '필수 항목 한 번에 선택' });
   const terms = page.getByRole('checkbox', { name: '[필수] 이용약관 동의' });
   const privacy = page.getByRole('checkbox', { name: '[필수] 개인정보처리방침 동의' });
-  const marketing = page.getByRole('checkbox', { name: '[선택] 클래스·무료강의 등 마케팅 정보 수신 동의' });
+  const marketing = page.getByRole('checkbox', { name: '[선택] 클래스·무료강의 등 마케팅 정보 수신 동의 (광고)', exact: true });
+  await expect(page.getByText('새 AI 마케팅 무료 자료, 나올 때마다 받아보세요', { exact: true })).toBeVisible();
+  await expect(marketing).toHaveAccessibleDescription('동의 없이 계속할 수 있어요');
+  await expect(marketing).not.toBeChecked();
   await expect(selectRequired).toBeEnabled();
   await selectRequired.click();
   await expect(terms).toBeChecked();

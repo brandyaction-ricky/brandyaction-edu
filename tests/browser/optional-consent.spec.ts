@@ -23,12 +23,20 @@ async function backend(page:Page,options:{failure?:boolean;lost?:boolean;existin
 async function required(page:Page){await page.getByRole('checkbox',{name:'[필수] 이용약관 동의',exact:true}).check();await page.getByRole('checkbox',{name:'[필수] 개인정보처리방침 동의',exact:true}).check();}
 test('signup is unchecked, skippable, contains no SMS choice and does not trust Auth marketing metadata',async({page})=>{
  const b=await backend(page);await page.goto('/optional-signup-test');
+ await expect(page.getByText('새 AI 마케팅 무료 자료, 나올 때마다 받아보세요',{exact:true})).toBeVisible();
+ await expect(page.getByText('동의 없이 계속할 수 있어요',{exact:true})).toBeVisible();
+ const marketing=page.getByRole('checkbox',{name:'[선택] 교육·할인·행사 소식 받기 (광고)',exact:true});
+ await expect(marketing).toBeVisible();
+ await expect(marketing).toHaveAccessibleDescription('동의 없이 계속할 수 있어요');
  for(const checkbox of await page.getByRole('checkbox').all())await expect(checkbox).not.toBeChecked();
  await expect(page.getByRole('checkbox',{name:/문자/})).toHaveCount(0);
  await page.getByRole('button',{name:'필수 항목 한 번에 선택'}).click();
  await expect(page.getByRole('checkbox',{name:'[필수] 이용약관 동의',exact:true})).toBeChecked();
  await expect(page.getByRole('checkbox',{name:'[필수] 개인정보처리방침 동의',exact:true})).toBeChecked();
- await expect(page.getByRole('checkbox',{name:/교육·할인·행사 소식/})).not.toBeChecked();
+ await expect(marketing).not.toBeChecked();
+ await expect(page.getByRole('checkbox',{name:'맞춤 소식에 내 정보를 사용하는 데 동의해요',exact:true})).not.toBeChecked();
+ await expect(page.getByRole('checkbox',{name:'카카오톡 광고 받기',exact:true})).not.toBeChecked();
+ await expect(page.getByRole('checkbox',{name:'이메일 광고 받기',exact:true})).not.toBeChecked();
  expect(b.auth).toHaveLength(0);expect(b.writes).toHaveLength(0);
  await page.getByRole('button',{name:'동의하고 가입 완료'}).click();
  await expect(page.getByRole('heading',{name:'가입 완료 목적지'})).toBeVisible();expect(b.writes).toHaveLength(0);expect(b.auth[0].data).not.toHaveProperty('marketing_consent');
