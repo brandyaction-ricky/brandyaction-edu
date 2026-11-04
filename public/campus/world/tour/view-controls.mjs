@@ -7,17 +7,17 @@ export function attachTourView({office,root,fitMap,wake,onChange,isBlocked}){
  function configure(){
   controls.object=office.camera;controls.enabled=mode!=='first'&&!isBlocked();controls.enablePan=mode==='overall';controls.enableRotate=mode!=='first';controls.enableZoom=mode!=='first';controls.enableDamping=true;controls.dampingFactor=.12;controls.zoomToCursor=mode==='overall';controls.minZoom=.55;controls.maxZoom=3;controls.minDistance=mode==='overall'?8:2;controls.maxDistance=mode==='overall'?200:12;controls.minPolarAngle=.2;controls.maxPolarAngle=1.48;
  }
- function resetFollow(){const a=office.campusAvatar;if(!a)return;last={x:a.x,y:a.y};yaw=Number.isFinite(a.yaw)?a.yaw:Math.PI;pitch=0;perspective.fov=58;perspective.position.set(a.x-Math.sin(yaw)*5,2.15,a.y-Math.cos(yaw)*5);controls.target.set(a.x,1.23,a.y);perspective.lookAt(controls.target);}
+ function resetFollow(){const a=office.campusAvatar;if(!a)return;last={x:a.x,y:a.y,h:a.jumpHeight||0};yaw=Number.isFinite(a.yaw)?a.yaw:Math.PI;pitch=0;const arrival=root.ownerDocument.body.dataset.room==='live';perspective.fov=arrival?(office.cw<=600?75:70):58;perspective.position.set(a.x-Math.sin(yaw)*5,(arrival?2.65:2.15)+(a.jumpHeight||0),a.y-Math.cos(yaw)*5);controls.target.set(a.x,(arrival?1.45:1.23)+(a.jumpHeight||0),a.y);perspective.lookAt(controls.target);}
  function sync(){
   const a=office.campusAvatar;if(!a)return;
   if(mode!=='overall'){
    perspective.aspect=Math.max(1,office.cw)/Math.max(1,office.ch);perspective.updateProjectionMatrix();
    const h=(a.studyPose==='sit'?.74:1.07)+(a.jumpHeight||0);
    if(mode==='third'){
-    if(last){perspective.position.x+=a.x-last.x;perspective.position.z+=a.y-last.y;}
-    controls.target.set(a.x,h*1.15,a.y);perspective.lookAt(controls.target);
+    if(last){perspective.position.x+=a.x-last.x;perspective.position.z+=a.y-last.y;perspective.position.y+=(a.jumpHeight||0)-last.h;}
+    controls.target.set(a.x,(h-(a.jumpHeight||0))*(root.ownerDocument.body.dataset.room==='live'?1.35:1.15)+(a.jumpHeight||0),a.y);perspective.lookAt(controls.target);
    }else{perspective.position.set(a.x,h,a.y);perspective.lookAt(a.x+Math.sin(yaw)*Math.cos(pitch)*5,h+Math.sin(pitch)*5,a.y+Math.cos(yaw)*Math.cos(pitch)*5);}
-   last={x:a.x,y:a.y};perspective.updateMatrixWorld(true);
+   last={x:a.x,y:a.y,h:a.jumpHeight||0};perspective.updateMatrixWorld(true);
   }
   if(office.campusAvatarMesh){office.campusAvatarMesh.obj.visible=mode!=='first';if(mode==='first'&&office.campusAvatarMesh.prop)office.campusAvatarMesh.prop.visible=false;}
   root.dataset.cameraMode=mode;root.dataset.cameraZoom=String(mode==='overall'?mapCamera.zoom:perspective.fov);root.dataset.cameraPosition=[office.camera.position.x,office.camera.position.y,office.camera.position.z].map(n=>n.toFixed(3)).join(',');

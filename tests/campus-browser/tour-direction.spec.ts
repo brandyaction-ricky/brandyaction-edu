@@ -6,7 +6,7 @@ test('movement follows screen left/right and forward/back after changing and rot
  const source=fs.readFileSync('public/campus/world/tour/view-controls.mjs','utf8');
  await page.route('**/campus/world/tour/view-controls.mjs',r=>r.fulfill({contentType:'text/javascript',body:source.replace('root.dataset.cameraMode=mode;',"root.dataset.testRight=JSON.stringify([office.camera.matrixWorld.elements[0],office.camera.matrixWorld.elements[2]]);root.dataset.testForward=JSON.stringify([-office.camera.matrixWorld.elements[8],-office.camera.matrixWorld.elements[10]]);root.dataset.cameraMode=mode;")}));
  await page.goto('/webinar');await page.getByRole('button',{name:'이 캐릭터로 바로 입장',exact:true}).click({timeout:90000});
- const world=page.frameLocator('iframe'),root=world.locator('#office');
+ const world=page.frameLocator('iframe'),root=world.locator('#office');await page.getByRole('button',{name:'공간 전체 보기',exact:true}).click();await expect(root).toHaveAttribute('data-camera-mode','overall');
  const point=async()=>[Number(await root.getAttribute('data-player-x')),Number(await root.getAttribute('data-player-y'))];
  for(const button of ['3인칭으로 보기','1인칭으로 보기','공간 전체 보기']){
   await page.getByRole('button',{name:button,exact:true}).click();
