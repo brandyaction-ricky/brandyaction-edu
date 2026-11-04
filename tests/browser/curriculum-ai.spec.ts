@@ -119,8 +119,8 @@ test('history read failure blocks a new paid request and retry restores the save
 test('a lost response is recovered from server history without regenerating the answer',async({page})=>{
  const h=await backend(page);await page.route('**/api/platform/curriculum-ai',async route=>{const input=route.request().postDataJSON();h.ai.push(input);h.stored.push({...input,answer,status:'succeeded',createdAt:new Date().toISOString()});await route.abort('failed');});await page.goto('/curriculum-ai-test');await page.getByRole('textbox',{name:'궁금한 점'}).fill('응답이 끊겨도 남겨 주세요');await page.getByRole('button',{name:'AI 답변 받기',exact:true}).click();await expect(page.getByText(answer.answer,{exact:true})).toBeVisible();await expect(page.getByRole('textbox',{name:'궁금한 점'})).toHaveValue('');expect(h.ai).toHaveLength(1);
 });
-test('an unrecorded interrupted request retries the same payload while keeping edits locked',async({page})=>{
- const h=await backend(page);await page.route('**/api/platform/curriculum-ai',async route=>{const input=route.request().postDataJSON();h.ai.push(input);if(h.ai.length===1)return route.abort('failed');h.stored.push({...input,answer,status:'succeeded',createdAt:new Date().toISOString()});return route.fulfill({json:answer});});await page.goto('/curriculum-ai-test');const input=page.getByRole('textbox',{name:'궁금한 점'});await input.fill('같은 요청을 다시 확인');await page.getByRole('button',{name:'AI 답변 받기',exact:true}).click();const retry=page.getByRole('button',{name:'답변 결과 다시 확인',exact:true});await expect(retry).toBeEnabled();await expect(input).toBeDisabled();await retry.click();await expect(input).toHaveValue('');await expect(input).toBeEnabled();expect(h.ai).toHaveLength(2);expect(h.ai[1]).toEqual(h.ai[0]);await expect(page.getByText(answer.answer,{exact:true})).toBeVisible();
+test('an interrupted request retries the same payload and preserves edits for the next question',async({page})=>{
+ const h=await backend(page);await page.route('**/api/platform/curriculum-ai',async route=>{const input=route.request().postDataJSON();h.ai.push(input);if(h.ai.length===1)return route.abort('failed');h.stored.push({...input,answer,status:'succeeded',createdAt:new Date().toISOString()});return route.fulfill({json:answer});});await page.goto('/curriculum-ai-test');const input=page.getByRole('textbox',{name:'궁금한 점'});await input.fill('같은 요청을 다시 확인');await page.getByRole('button',{name:'AI 답변 받기',exact:true}).click();const retry=page.getByRole('button',{name:'다시 보내기',exact:true});await expect(retry).toBeEnabled();await expect(input).toBeEnabled();await input.fill('수정해서 남겨 둘 다음 질문');await retry.click();await expect(input).toHaveValue('수정해서 남겨 둘 다음 질문');await expect(input).toBeEnabled();expect(h.ai).toHaveLength(2);expect(h.ai[1]).toEqual(h.ai[0]);await expect(page.getByText(answer.answer,{exact:true})).toBeVisible();
 });
 test('older exchanges are loaded on demand and pending saved requests cannot start another generation',async({page})=>{
  const h=await backend(page);const saved={requestId:id,question:'최근 질문',answer,status:'succeeded',createdAt:'2026-10-31T01:00:00.000Z'};let reads=0;
@@ -172,7 +172,7 @@ test('a learner can rate or remove their saved AI exchange',async({page})=>{
   const index=h.stored.findIndex(item=>item.requestId===requestId);
   if(index<0)return route.fulfill({status:404});
   if(action==='delete')h.stored.splice(index,1);
-  else h.stored[index].helpful=helpful;
+  else Object.assign(h.stored[index],{helpful:action==='feedback'&&helpful,incorrect:action==='incorrect'});
   return route.fulfill({json:{ok:true}});
  });
  await page.goto('/curriculum-ai-test');
@@ -183,6 +183,14 @@ test('a learner can rate or remove their saved AI exchange',async({page})=>{
  await expect(helpful).toHaveAttribute('aria-pressed','true');
  await page.reload();
  await expect(helpful).toHaveAttribute('aria-pressed','true');
+ const incorrect=page.getByRole('button',{name:'잘못된 답변 · 멘토에게 확인'});
+ await incorrect.click();
+ await expect(page.getByRole('textbox',{name:'질문 내용'})).toHaveValue(/평가와 삭제를 시험할 질문[\s\S]+AI 참고 답변[\s\S]+어디가 틀렸나요/);
+ await expect(page.getByText('답변 평가를 저장했어요.')).toBeVisible();
+ expect(h.questions).toHaveLength(0);
+ await page.reload();
+ await expect(incorrect).toHaveAttribute('aria-pressed','true');
+ await expect(helpful).toHaveAttribute('aria-pressed','false');
  page.once('dialog',dialog=>dialog.accept());
  await page.getByRole('button',{name:'이 질문과 답변 삭제'}).click();
  await expect(page.getByText('수업에서 막힌 부분을 편하게 물어보세요.',{exact:false})).toBeVisible();
@@ -255,4 +263,46 @@ test('saved markup is readable and a cited heading in the active lesson uses its
  await expect(citation).not.toHaveAttribute('target','_blank');
  await panel.getByRole('textbox',{name:'궁금한 점'}).fill('가'.repeat(1800));
  await expect(panel.getByText('200자 남았어요')).toBeVisible();
+});
+
+test('an open blank lesson question follows the new lesson and mobile closes the panel',async({page},info)=>{
+ const h=await backend(page);
+ await page.goto('/curriculum-ai-test?floating=1&lesson=1');
+ const trigger=page.getByRole('button',{name:'질문하기',exact:true});
+ const panel=page.getByRole('dialog',{name:'질문하기'});
+ await trigger.click();
+ await expect(panel.getByText('지금 보고 있는 수업')).toBeVisible();
+ await page.goto('/curriculum-ai-test?floating=1&lesson=2');
+ if(info.project.name==='mobile'){
+  await expect(trigger).toBeVisible();
+  await expect(panel).toBeHidden();
+  await trigger.click();
+ }
+ await expect(panel.getByText('2일차 · 문샷 3기 · 고객 문제')).toBeVisible();
+ await expect(panel.getByText('이어서 작성 중인 수업')).toHaveCount(0);
+ await panel.getByRole('textbox',{name:'궁금한 점'}).fill('2일차에서 새로 쓰는 질문');
+ await panel.getByRole('button',{name:'AI 답변 받기'}).click();
+ await expect.poll(()=>h.ai[0]?.lessonId).toBe('22222222-2222-4222-8222-222222222222');
+});
+
+test('an unfinished lesson draft survives a mobile close or desktop lesson change',async({page},info)=>{
+ await backend(page);
+ await page.goto('/curriculum-ai-test?floating=1&lesson=1');
+ const trigger=page.getByRole('button',{name:'질문하기',exact:true});
+ const panel=page.getByRole('dialog',{name:'질문하기'});
+ await trigger.click();
+ await panel.getByRole('textbox',{name:'궁금한 점'}).fill('보관할 1일차 질문');
+ await page.goto('/curriculum-ai-test?floating=1&lesson=2');
+ if(info.project.name==='mobile'){
+  await expect(panel).toBeHidden();
+  await trigger.click();
+ }
+ await expect(panel.getByText('이어서 작성 중인 수업')).toBeVisible();
+ await expect(panel.getByRole('textbox',{name:'궁금한 점'})).toHaveValue('보관할 1일차 질문');
+ await panel.getByRole('button',{name:'현재 수업으로 바꾸기'}).click();
+ await expect(panel.getByText('2일차 · 문샷 3기 · 고객 문제')).toBeVisible();
+ await expect(panel.getByRole('textbox',{name:'궁금한 점'})).toHaveValue('');
+ await page.goto('/curriculum-ai-test?floating=1&lesson=1');
+ if(info.project.name==='mobile')await trigger.click();
+ await expect(panel.getByRole('textbox',{name:'궁금한 점'})).toHaveValue('보관할 1일차 질문');
 });

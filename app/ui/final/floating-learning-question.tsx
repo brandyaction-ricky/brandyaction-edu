@@ -1,7 +1,8 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { MessageCircle, X } from 'lucide-react';
 import Link from 'next/link';
+import { hasStoredAiDraft } from '@/lib/curriculum-ai-draft';
 import type { QuestionContext } from '@/lib/question-hub';
 import { CurriculumAiConversation } from './curriculum-ai-conversation';
 import { learningQuestionCreatedEvent, openFloatingQuestionEvent } from './learning-question-dialog';
@@ -11,7 +12,8 @@ import './floating-learning-question.css';
 const contextKey = (context?: QuestionContext) => context ? context.enrollmentId + ':' + context.lessonId : '';
 
 export function FloatingLearningQuestion({ member, current }: { member: string; current?: QuestionContext }) {
-  const [panel, setPanel] = useState<{ open: boolean; selected?: QuestionContext }>({ open: false });
+  const pageLesson = contextKey(current);
+  const [panel, setPanel] = useState<{ open: boolean; selected?: QuestionContext; pageLesson?: string }>({ open: false });
   const [contexts, setContexts] = useState<QuestionContext[]>();
   const [loadFailed, setLoadFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -20,24 +22,39 @@ export function FloatingLearningQuestion({ member, current }: { member: string; 
   const trigger = useRef<HTMLButtonElement>(null);
   const close = useRef<HTMLButtonElement>(null);
   const storageKey = 'edu-floating-question:' + member;
-  const selected = panel.selected;
-  const selectionNeeded = panel.open && !current;
+  const onCurrentPage = panel.pageLesson === pageLesson;
+  const selected = onCurrentPage ? panel.selected : undefined;
+  const open = onCurrentPage && panel.open;
+  const selectionNeeded = open && !current;
 
   const update = useCallback((next: { dirty: boolean; locked: boolean }) => { composer.current = next; }, []);
   const save = useCallback((next: typeof panel) => {
-    setPanel(next);
-    try { sessionStorage.setItem(storageKey, JSON.stringify(next)); } catch { /* Panel remains usable without storage. */ }
-  }, [storageKey]);
+    const snapshot = { ...next, pageLesson };
+    setPanel(snapshot);
+    try { sessionStorage.setItem(storageKey, JSON.stringify(snapshot)); } catch { /* Panel remains usable without storage. */ }
+  }, [storageKey, pageLesson]);
 
+  const restore = useEffectEvent(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(storageKey) || 'null') as typeof panel | null;
+      if (saved && typeof saved.open === 'boolean') {
+        const moved = Boolean(pageLesson && saved.pageLesson !== pageLesson);
+        const prior = saved.selected;
+        const keepPrior = prior && (!current || contextKey(prior) === pageLesson || hasStoredAiDraft(prior));
+        const closeOnMobile = moved && window.matchMedia('(max-width: 680px)').matches;
+        const open = saved.open && !closeOnMobile;
+        save({ open, selected: keepPrior ? prior : open ? current : undefined });
+      } else {
+        save({ open: false });
+      }
+    } catch { save({ open: false }); }
+    composer.current = { dirty: false, locked: false };
+    setCreated(false);
+  });
   useEffect(() => {
-    const timer = setTimeout(() => {
-      try {
-        const saved = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
-        if (saved && typeof saved.open === 'boolean') setPanel({ open: saved.open, selected: saved.open ? saved.selected : undefined });
-      } catch { /* Ignore unavailable or malformed session data. */ }
-    }, 0);
+    const timer = setTimeout(() => restore(), 0);
     return () => clearTimeout(timer);
-  }, [storageKey]);
+  }, [pageLesson, storageKey]);
 
   useEffect(() => {
     if (!selectionNeeded) return;
@@ -56,7 +73,7 @@ export function FloatingLearningQuestion({ member, current }: { member: string; 
 
   function toggle(open: boolean) {
     if (open) setCreated(false);
-    save({ open, selected: open && current ? current : target });
+    save({ open, selected: target });
     requestAnimationFrame(() => (open ? close : trigger).current?.focus({ preventScroll: true }));
   }
   const openFor = useCallback((next?: QuestionContext) => {
@@ -81,7 +98,7 @@ export function FloatingLearningQuestion({ member, current }: { member: string; 
   };
 
   return <div className="floating-learning-question">
-    {(panel.open || selected) && <section id="floating-learning-question" role="dialog" aria-labelledby="floating-learning-question-title" hidden={!panel.open} className="floating-learning-question-panel" onKeyDown={event => {
+    {(open || selected) && <section id="floating-learning-question" role="dialog" aria-labelledby="floating-learning-question-title" hidden={!open} className="floating-learning-question-panel" onKeyDown={event => {
       if (event.key === 'Escape' && !event.defaultPrevented) { event.stopPropagation(); toggle(false); }
     }}>
       <header><h2 id="floating-learning-question-title">질문하기</h2><button ref={close} type="button" className="icon-btn" aria-label="닫기" onClick={() => toggle(false)}><X size={18} aria-hidden="true"/></button></header>
@@ -108,7 +125,7 @@ export function FloatingLearningQuestion({ member, current }: { member: string; 
         <div className="floating-question-links"><Link href="/my/questions?view=general">결제·환불·계정은 일반 문의로</Link><Link href="/my/questions?view=mine">내 질문 모아보기</Link></div>
       </div>
     </section>}
-    {!panel.open && <button ref={trigger} type="button" className="btn primary floating-learning-question-trigger" aria-expanded={panel.open} aria-controls={panel.open || selected ? 'floating-learning-question' : undefined} onClick={() => toggle(!panel.open)}>
+    {!open && <button ref={trigger} type="button" className="btn primary floating-learning-question-trigger" aria-expanded={open} aria-controls={open || selected ? 'floating-learning-question' : undefined} onClick={() => toggle(!open)}>
       <MessageCircle size={17} aria-hidden="true"/>질문하기
     </button>}
   </div>;
