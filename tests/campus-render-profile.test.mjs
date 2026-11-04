@@ -1,0 +1,4 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {renderProfile} from '../public/campus/world/tour/render-profile.mjs';
+test('wide touch tablets and landscape phones keep the touch rendering budget',()=>{for(const width of[390,768,844,1024])assert.deepEqual(renderProfile({coarse:true,width,ratio:3,renderer:'Apple GPU'}),{name:'touch',shadows:false,pixelRatio:1.25});});
+test('software graphics keep full geometry with bounded pixels and no live shadow pass',()=>{for(const renderer of['ANGLE SwiftShader','Mesa llvmpipe','software renderer'])assert.deepEqual(renderProfile({renderer,ratio:2}),{name:'compatibility',shadows:false,pixelRatio:1});});
+test('desktop hardware retains live shadows and existing quality',()=>{assert.deepEqual(renderProfile({renderer:'Apple M5 Pro',ratio:2}),{name:'desktop',shadows:true,pixelRatio:1.5});});

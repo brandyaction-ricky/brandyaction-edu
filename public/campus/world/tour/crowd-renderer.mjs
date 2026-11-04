@@ -2,7 +2,7 @@ import {drawAvatarNameplate} from '../office/vendor/avatar-nameplate.js';
 import {styleAvatarActor,avatarModelSignature,visitorAnimation} from '../office/vendor/avatar-appearance.js';
 /** Original bundled characters at every distance. Bound count and animation work, never substitute bodies. */
 export function attachCrowdRenderer(office,root){
- const limit=innerWidth<=600?40:80,group=new office.room.constructor();office.scene.add(group);
+ const limit=(matchMedia('(pointer:coarse)').matches||innerWidth<=600)?40:80,group=new office.room.constructor();office.scene.add(group);
  const actors=new Map();let figures=[],last=0;
  const profile=p=>({gender:p.gender==='female'?'female':'male',model:Number.isInteger(p.model)?p.model:0,coat:p.coat,hairColor:p.hair,skinColor:p.skin,pantsColor:p.pants,heldItem:p.heldItem||'none'});
  function sample(p,now){const t=Math.max(0,Math.min(1,(now-p.at)/1800));return{x:p.from.x+(p.x-p.from.x)*t,y:p.from.y+(p.y-p.from.y)*t,yaw:(p.from.yaw||0)+Math.atan2(Math.sin((p.yaw||0)-(p.from.yaw||0)),Math.cos((p.yaw||0)-(p.from.yaw||0)))*t};}

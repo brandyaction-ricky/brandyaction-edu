@@ -15,6 +15,7 @@ for(const [width,height]of [[320,568],[360,640],[390,844],[430,932],[844,390],[7
  await editor.getByLabel('닉네임').fill('휴대폰 검수');await editor.getByLabel('외형 스타일').selectOption('2');await editor.getByRole('button',{name:'저장하기',exact:true}).click();await page.getByRole('button',{name:'안내 닫기'}).click();
  for(const name of ['공간 이동','전체화면','공간 전체 보기','1인칭으로 보기','이 공간에서 할 일','내 캐릭터'])await reachable(page.getByRole('button',{name,exact:true}));
  for(const name of ['위로 이동','아래로 이동','왼쪽 이동','오른쪽 이동'])await reachable(world.getByRole('button',{name,exact:true}));
+ await expect(world.locator('#office')).toHaveAttribute('data-render-profile',/^(touch|compatibility)$/);
  const status=world.locator('#status');await expect(status).toContainText('바닥 터치');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBeTruthy();
  await page.screenshot({path:test.info().outputPath('phone-campus.png')});
  await page.getByRole('button',{name:'공간 이동',exact:true}).click();const map=page.getByRole('dialog',{name:'공간 이동',exact:true});await reachable(map.getByRole('button',{name:'공간 이동 닫기'}));await map.getByRole('button',{name:'내 AI 사무실 입장',exact:true}).click();
