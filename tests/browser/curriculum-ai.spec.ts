@@ -384,3 +384,10 @@ test('a different lesson capture gives one actionable link and editing clears an
  await page.getByRole('textbox',{name:'궁금한 점'}).fill('다른 질문을 적어요.');
  await expect(page.getByRole('alert')).toHaveCount(0);
 });
+
+ test('campus question handoff fills an empty draft without overwriting saved work or calling AI',async({page})=>{
+ const h=await backend(page);const suggested='현재 수업에서 고객 문제를 좁히고 싶어요';
+ await page.goto('/curriculum-ai-test?prefill='+encodeURIComponent(suggested));
+ const input=page.getByRole('textbox',{name:'궁금한 점'});await expect(input).toHaveValue(suggested);expect(h.ai).toHaveLength(0);
+ await input.fill('이미 작성한 질문은 그대로 남겨 주세요');await page.reload();await expect(input).toHaveValue('이미 작성한 질문은 그대로 남겨 주세요');expect(h.ai).toHaveLength(0);
+ });

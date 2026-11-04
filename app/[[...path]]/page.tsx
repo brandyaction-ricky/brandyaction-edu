@@ -27,7 +27,11 @@ export default async function Page({params,searchParams}:{params:Promise<{path?:
  // Stream the admin shell immediately instead of repeating Auth + profile queries.
  // Platform loads the authenticated user and page data together from /api/platform.
  // Keeping it mounted across route changes preserves its in-memory state.
- return <Platform path={path} user={null}/>;
+ const LessonFocus = root==='learn'&&process.env.EDU_CAMPUS_ENABLED==='true'&&process.env.EDU_CAMPUS_SPACE_ENABLED==='true' ? (await import('@/features/campus/space/lesson-focus')).LessonFocus : null;
+ const CampusEntryBar=process.env.EDU_CAMPUS_ENABLED==='true'&&['my','learn'].includes(root)?(await import('@/features/campus/ui/entry-bar')).CampusEntryBar:null;
+ const returnTo=CampusEntryBar?(await searchParams)?.campusReturn:undefined;
+ const platform=<Platform path={path} user={null}/>;
+ return CampusEntryBar||LessonFocus?<>{CampusEntryBar&&<CampusEntryBar returnTo={typeof returnTo==='string'?returnTo:undefined}/>}{platform}{LessonFocus&&<LessonFocus/>}</>:platform;
 }
 
 export async function generateMetadata({params}:{params:Promise<{path?:string[]}>}):Promise<Metadata> {

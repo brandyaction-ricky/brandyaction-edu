@@ -21,7 +21,7 @@ function savedTurns(items:SavedAiExchange[]):Turn[]{return [...items].reverse().
  {role:'user' as const,text:item.question,requestId:item.requestId,createdAt:item.createdAt,imageId:item.imageId,imageName:item.imageName,imageAttached:Boolean(item.imageId)},
  {role:'assistant' as const,requestId:item.requestId,createdAt:item.createdAt,helpful:item.helpful,incorrect:item.incorrect,text:item.answer?.answer || (item.status==='pending'?'답변을 생성 중이에요. 잠시 후 대화를 새로고침해 주세요.':item.error || '답변을 확인하지 못했어요.'),result:item.answer || undefined,pending:item.status==='pending'},
 ]);}
-export function CurriculumAiConversation({context,showContext=true,compact=false,onLessonPage=false,onStateChange,onCreated,onAnswerReady}:{context:QuestionContext;showContext?:boolean;compact?:boolean;onLessonPage?:boolean;onStateChange:(value:{dirty:boolean;locked:boolean})=>void;onCreated:()=>void;onAnswerReady?:()=>void}) {
+export function CurriculumAiConversation({context,showContext=true,compact=false,onLessonPage=false,initialQuestion='',onStateChange,onCreated,onAnswerReady}:{context:QuestionContext;showContext?:boolean;compact?:boolean;onLessonPage?:boolean;initialQuestion?:string;onStateChange:(value:{dirty:boolean;locked:boolean})=>void;onCreated:()=>void;onAnswerReady?:()=>void}) {
  const imagesEnabled=process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED === 'true';
  const [image,setImage]=useState<{id:string|null;busy:boolean;draft:boolean;info?:ReadyQuestionImage}>({id:null,busy:false,draft:false}),[imageKey,setImageKey]=useState(0);
  const imagePicker=useRef<QuestionImagePickerHandle>(null);
@@ -62,14 +62,14 @@ export function CurriculumAiConversation({context,showContext=true,compact=false
       setCanResume(true);
      }else sessionStorage.removeItem(requestKey);
     }
-    const savedDraft=sessionStorage.getItem(draftKey) ?? retry.current?.question ?? '';
+    const savedDraft=sessionStorage.getItem(draftKey) ?? retry.current?.question ?? initialQuestion.slice(0,2000);
     if(hasSensitiveQuestionText(savedDraft))sessionStorage.removeItem(draftKey);
     else {draftText.current=savedDraft;setQuestion(savedDraft);}
    }catch{/* Storage may be disabled. */}
    setDraftReady(true);
   },0);
   return()=>window.clearTimeout(restore);
- },[draftKey,requestKey]);
+ },[draftKey,requestKey,initialQuestion]);
  const updateQuestion=useCallback((value:string)=>{
   imagePicker.current?.clearValidation();
   draftText.current=value;

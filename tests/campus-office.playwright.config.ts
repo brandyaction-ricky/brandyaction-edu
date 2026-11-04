@@ -1,0 +1,3 @@
+import { defineConfig } from '@playwright/test';
+const port=Number(process.env.CAMPUS_OFFICE_QA_PORT||4493);
+export default defineConfig({testDir:'./campus-browser',testMatch:'office.spec.ts',fullyParallel:true,workers:2,retries:0,use:{baseURL:`http://127.0.0.1:${port}`,browserName:'chromium',trace:'retain-on-failure'},projects:[{name:'desktop',use:{viewport:{width:1440,height:1000}}},{name:'mobile',use:{viewport:{width:390,height:844},isMobile:true,hasTouch:true}}],webServer:{command:'node tests/campus-office-fixture.mjs',cwd:'..',url:`http://127.0.0.1:${port}`,reuseExistingServer:!process.env.CI}});

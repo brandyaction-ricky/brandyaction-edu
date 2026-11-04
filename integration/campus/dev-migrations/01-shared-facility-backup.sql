@@ -1,0 +1,7 @@
+-- Read-only metadata snapshot. Keep with fixed source hashes and the confirmed project ID.
+select jsonb_build_object(
+ 'schemas',(select jsonb_agg(jsonb_build_object('name',nspname,'owner',pg_get_userbyid(nspowner),'acl',nspacl::text)) from pg_namespace where nspname in ('public','private','edu_private','storage','realtime')),
+ 'relations',(select jsonb_agg(jsonb_build_object('schema',n.nspname,'name',c.relname,'owner',pg_get_userbyid(c.relowner),'acl',c.relacl::text,'rls',c.relrowsecurity,'forcedRls',c.relforcerowsecurity)) from pg_class c join pg_namespace n on n.oid=c.relnamespace where c.relkind in ('r','p') and (n.nspname in ('storage','realtime') or (n.nspname='public' and (c.relname in ('profiles','enrollments','cohorts','courses','curriculum_lessons','curriculum_weeks','mission_submissions','lesson_progress','edu_questions','edu_question_answers','edu_lesson_block_submissions','edu_ai_calls') or c.relname like 'edu_campus_%')))),
+ 'policies',(select jsonb_agg(jsonb_build_object('schema',schemaname,'table',tablename,'policy',policyname,'permissive',permissive,'roles',roles,'command',cmd,'using',qual,'withCheck',with_check)) from pg_policies where schemaname in ('storage','realtime') or tablename like 'edu_campus_%'),
+ 'candidateBucket',(select jsonb_agg(jsonb_build_object('id',id,'name',name,'public',public,'file_size_limit',file_size_limit,'allowed_mime_types',allowed_mime_types)) from storage.buckets where id='campus-portfolio-private')
+) as metadata;
