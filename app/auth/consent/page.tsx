@@ -25,10 +25,16 @@ export default function SocialConsentPage() {
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const busy = useRef(false);
+  const requiredSelected = terms && privacy;
+
+  const selectRequired = () => {
+    setTerms(true);
+    setPrivacy(true);
+  };
 
   const complete = async () => {
     if (busy.current) return;
-    if (!terms || !privacy) {
+    if (!requiredSelected) {
       setMessage("필수 약관에 모두 동의해 주세요.");
       return;
     }
@@ -134,13 +140,13 @@ export default function SocialConsentPage() {
             )}
             {optionalEnabled && optionalUnresolved && message && <button className="btn ghost full mt16" type="button" disabled={pending || !terms || !privacy} onClick={goNext}>가입 계속하기 · 수신 설정은 회원 정보에서 확인</button>}
             <button
-              className="btn primary full mt24"
+              className={`btn ${requiredSelected ? "primary" : "btn-outline"} full mt24`}
               type="button"
-              onClick={complete}
-              disabled={pending || !terms || !privacy}
+              onClick={requiredSelected ? complete : selectRequired}
+              disabled={pending}
             >
-              {pending ? "저장 중..." : "동의하고 가입 완료"}
-              <ArrowRight />
+              {pending ? "저장 중..." : requiredSelected ? "동의하고 가입 완료" : "필수 항목 한 번에 선택"}
+              <ArrowRight aria-hidden="true" />
             </button>
             <button
               className="btn ghost full mt8"

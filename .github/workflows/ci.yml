@@ -41,6 +41,21 @@ jobs:
             exit 0
           fi
 
+          if [ "$head_ref" = "codex/edu-required-consent-main-release-20261104" ]; then
+            expected_main=6d534039ce82d988354afc3d5dab377590178dd4
+            release_payload=e97479d0aa892f007fef80fa2100760c2bdc5ffc
+            if [ "$(git rev-parse HEAD^1)" != "$expected_main" ]; then
+              echo "Production main moved; revalidate the scoped consent button release."
+              exit 1
+            fi
+            if ! git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'; then
+              echo "The merge result differs from the tested consent button release."
+              exit 1
+            fi
+            echo "Consent button production release scope verified."
+            exit 0
+          fi
+
           if [ "$head_ref" = "codex/edu-purchase-notice-main-release-20261104" ]; then
             expected_main=924894047d38e26c9e04c15f00da70acf849f8e8
             release_payload=3352b7515fc79b2bc69df0701b4722bbd4fb3e4a
