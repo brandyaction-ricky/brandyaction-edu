@@ -4,11 +4,11 @@ import fs from 'node:fs';
 import ts from 'typescript';
 
 function compile(path, dependencies = {}) {
-  const module = {};
+  const compiledExports = {};
   const source = fs.readFileSync(new URL(path, import.meta.url), 'utf8');
   const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } });
-  new Function('exports', 'require', outputText)(module, name => dependencies[name]);
-  return module;
+  new Function('exports', 'require', outputText)(compiledExports, name => dependencies[name]);
+  return compiledExports;
 }
 
 const config = compile('../lib/purchase-onboarding.ts');
