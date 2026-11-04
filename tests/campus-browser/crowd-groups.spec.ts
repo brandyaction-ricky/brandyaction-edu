@@ -6,8 +6,8 @@ const namespace=test.info().testId;await page.setExtraHTTPHeaders({'x-campus-tes
  try{
   await page.goto('/webinar?meet=1&qaChat=1');await page.getByRole('button',{name:'이 캐릭터로 바로 입장',exact:true}).click({timeout:90000});
   const world=page.frameLocator('iframe'),root=world.locator('#office');await expect(root).toHaveAttribute('data-crowd-count','20');await expect(world.locator('.meetup-population')).toContainText('가상 검수 20명');await expect(world.locator('.meetup-join')).toBeHidden();
-  if(isMobile){const box=(await world.locator('[data-direction=right]').boundingBox())!;await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.waitForTimeout(550);await page.mouse.up();}else{await root.focus();await page.keyboard.down('d');await page.waitForTimeout(550);await page.keyboard.up('d');}
-  await expect(world.getByRole('button',{name:'가까운 그룹과 대화하기'})).toBeVisible();await world.getByRole('button',{name:'가까운 그룹과 대화하기'}).click();
+  if(isMobile){const box=(await world.locator('[data-direction=right]').boundingBox())!;await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();}else{await root.focus();await page.keyboard.down('d');}
+  try{await expect(world.getByRole('button',{name:'가까운 그룹과 대화하기'})).toBeVisible({timeout:10000});}finally{if(isMobile)await page.mouse.up();else await page.keyboard.up('d');}await world.getByRole('button',{name:'가까운 그룹과 대화하기'}).click();
   await expect(root).toHaveAttribute('data-group-joined',visitors.clients[0].session.partition);await expect(root).toHaveAttribute('data-peer-count',isMobile?'12':'20');
   await visitors.post({...visitors.clients[0].session,kind:'update',message:'합류한 동료에게만 보이는 인사'});await expect(world.locator('.meetup-messages')).toContainText('합류한 동료에게만 보이는 인사');
   await world.getByRole('textbox',{name:'동료에게 한마디'}).fill('반가워요! 함께 배워요.');

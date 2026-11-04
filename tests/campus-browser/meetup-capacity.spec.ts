@@ -37,9 +37,9 @@ test('capacity response keeps exploration, controls and course entry usable',asy
  const world=page.frameLocator('iframe'),root=world.locator('#office');
  await expect(world.locator('.meetup-toggle')).toContainText('둘러보기 가능');
  const before=Number(await root.getAttribute('data-player-x'));
- if(isMobile){const button=(await world.locator('[data-direction=right]').boundingBox())!;await page.mouse.move(button.x+button.width/2,button.y+button.height/2);await page.mouse.down();await page.waitForTimeout(500);await page.mouse.up();}
- else{await root.focus();await page.keyboard.down('d');await page.waitForTimeout(500);await page.keyboard.up('d');}
- await expect.poll(async()=>Math.abs(Number(await root.getAttribute('data-player-x'))-before)).toBeGreaterThan(.05);
+ if(isMobile){const button=(await world.locator('[data-direction=right]').boundingBox())!;await page.mouse.move(button.x+button.width/2,button.y+button.height/2);await page.mouse.down();}
+ else{await root.focus();await page.keyboard.down('d');}
+ try{await expect.poll(async()=>Math.abs(Number(await root.getAttribute('data-player-x'))-before),{timeout:10000}).toBeGreaterThan(.05);}finally{if(isMobile)await page.mouse.up();else await page.keyboard.up('d');}
  await page.getByRole('button',{name:'공간 전체 보기',exact:true}).click();await expect(root).toHaveAttribute('data-camera-mode','overall');
  await page.getByRole('button',{name:'공간 이동',exact:true}).click();await page.getByRole('button',{name:'문샷 공부방 입장',exact:true}).click();
  await expect(page.getByRole('dialog',{name:'공간 입장 안내',exact:true})).toBeVisible();

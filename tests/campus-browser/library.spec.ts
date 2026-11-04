@@ -6,7 +6,7 @@ async function library(page:import('@playwright/test').Page,query=''){
 }
 test('public library is a separate walkable space, empty until configured, with a clear return',async({page})=>{
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await library(page);
- const root=page.frameLocator('iframe').locator('#office');const x=await root.getAttribute('data-player-x');await root.focus();await page.keyboard.down('d');await page.waitForTimeout(450);await page.keyboard.up('d');await expect(root).not.toHaveAttribute('data-player-x',x!);
+ const root=page.frameLocator('iframe').locator('#office');const x=await root.getAttribute('data-player-x');await root.focus();await page.keyboard.down('d');try{await expect(root).not.toHaveAttribute('data-player-x',x!,{timeout:10000});}finally{await page.keyboard.up('d');}
  await page.getByRole('button',{name:'이 공간에서 할 일',exact:true}).click();await page.getByRole('button',{name:'무료 자료',exact:true}).click();await expect(page.getByRole('heading',{name:'자료를 준비하고 있어요'})).toBeVisible();
  await page.getByRole('button',{name:'무료 자료 닫기',exact:true}).click();await page.getByRole('button',{name:'공간 전체 보기',exact:true}).click();await page.screenshot({path:test.info().outputPath('library-space.png')});
  await page.frameLocator('iframe').getByRole('button',{name:'오픈 캠퍼스로',exact:true}).click();await expect(root).toHaveAttribute('data-room','live');expect(errors).toEqual([]);

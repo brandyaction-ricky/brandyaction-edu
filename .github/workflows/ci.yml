@@ -314,13 +314,13 @@ jobs:
 
   campus-browser:
     if: ${{ !inputs.campus_render_diagnostic }}
-    name: Campus browser shard ${{ matrix.shard }}/4
+    name: Campus browser shard ${{ matrix.shard }}/8
     runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -330,7 +330,7 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - name: Campus browser regression tests
-        run: npx playwright test --config=playwright.campus.config.ts --shard=${{ matrix.shard }}/4
+        run: npx playwright test --config=playwright.campus.config.ts --shard=${{ matrix.shard }}/8
       - name: Save campus failure evidence
         if: failure()
         uses: actions/upload-artifact@v4
