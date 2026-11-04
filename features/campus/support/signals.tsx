@@ -1,0 +1,25 @@
+'use client';
+import {useEffect,useState} from 'react';
+import type {CampusSnapshot} from '../contracts';
+import {changedLessons,type SupportState} from './domain';
+import s from './panel.module.css';
+export function WorkspaceSignals({snapshot,demo,onNavigate}:{snapshot:CampusSnapshot;demo:boolean;onNavigate:(section:string)=>void}){
+ const [state,setState]=useState<SupportState|null>(null),[now,setNow]=useState(Date.now);
+ useEffect(()=>{let active=true;const controller=new AbortController();const key='campus-demo-support-v1:'+snapshot.viewer.id+':'+snapshot.selectedEnrollmentId;
+  const read=async()=>{try{if(demo){const raw=localStorage.getItem(key);if(active)setState(raw?JSON.parse(raw):null);}else{const r=await fetch('/api/campus/support?view=signals&scope='+snapshot.selectedEnrollmentId,{cache:'no-store',signal:controller.signal});if(!r.ok){if(active)setState(null);return;}const data=await r.json();if(active)setState(data);}}catch{/* Main support panel provides retry/errors; passive reminders remain quiet. */}};
+  const update=(e:Event)=>{const detail=(e as CustomEvent).detail;if(detail?.enrollmentId===snapshot.selectedEnrollmentId&&detail.demo===demo)void read();};
+  void read();const tick=setInterval(()=>setNow(Date.now()),60000);window.addEventListener('campus:support-preferences-changed',update);window.addEventListener('campus:support-records-changed',update);return()=>{active=false;controller.abort();clearInterval(tick);window.removeEventListener('campus:support-preferences-changed',update);window.removeEventListener('campus:support-records-changed',update);};
+ },[snapshot.viewer.id,snapshot.selectedEnrollmentId,demo]);
+ if(!state)return null;
+ const changed=changedLessons(snapshot,state.preferences),reserved=new Set(state.bookings.filter(b=>b.status==='reserved').map(b=>b.session_id));
+ const upcoming=state.preferences.reminders?state.sessions.filter(v=>reserved.has(v.id)&&v.status==='open'&&Date.parse(v.starts_at)-now<=3600000&&Date.parse(v.ends_at)>now):[];
+ return <>{(changed.length>0||upcoming.length>0)&&<aside className={s.notice} aria-label="나의 캠퍼스 안내">{changed.length>0&&<div className={s.inline}><span>마지막 확인 후 달라진 수업 {changed.length}개 · {changed.slice(0,2).map(l=>l.title).join(', ')}</span><button onClick={()=>onNavigate('support')}>변경된 수업 확인</button></div>}{upcoming.map(v=><div key={v.id} className={s.inline}><span>{v.title} · {Date.parse(v.starts_at)<=now?'지금 참여할 수 있어요':Math.ceil((Date.parse(v.starts_at)-now)/60000)+'분 후 시작'}</span><button onClick={()=>onNavigate('support')}>내 예약 보기</button></div>)}</aside>}{state.preferences.reminders&&<RoutineReminder snapshot={snapshot} demo={demo} now={now} onOpen={()=>onNavigate('business')}/>}</>;
+}
+type Routine={id:string;user_id:string;enrollment_id:string;kind:string;payload:Record<string,unknown>};
+function RoutineReminder({snapshot,demo,now,onOpen}:{snapshot:CampusSnapshot;demo:boolean;now:number;onOpen:()=>void}){
+ const [records,setRecords]=useState<Routine[]>([]);
+ useEffect(()=>{let alive=true,sequence=0;const controller=new AbortController();const load=async()=>{const ticket=++sequence;try{let rows:Routine[]=[];if(demo){const raw=JSON.parse(localStorage.getItem(`moonshot-business-demo-v1:${snapshot.viewer.id}:${snapshot.selectedEnrollmentId}`)||'[]');if(!Array.isArray(raw))return;rows=raw;}else{let cursor:string|null=null;for(let i=0;i<20;i++){const r:Response=await fetch('/api/campus/business?enrollmentId='+snapshot.selectedEnrollmentId+(cursor?'&cursor='+encodeURIComponent(cursor):''),{cache:'no-store',signal:controller.signal});if(!r.ok){if(alive&&ticket===sequence)setRecords([]);return;}const page:{records:Routine[];nextCursor:string|null}=await r.json();if(!Array.isArray(page.records))return;rows.push(...page.records);cursor=page.nextCursor;if(!cursor)break;}if(cursor)return;}if(alive&&ticket===sequence)setRecords(rows.filter(r=>r.user_id===snapshot.viewer.id&&r.enrollment_id===snapshot.selectedEnrollmentId&&r.kind==='routine'&&r.payload));}catch{/* Passive reminder does not replace the editable business record screen. */}};
+ const update=(e:Event)=>{const d=(e as CustomEvent).detail;if(d?.enrollmentId===snapshot.selectedEnrollmentId&&d.demo===demo)void load();};void load();window.addEventListener('campus:business-records-changed',update);return()=>{alive=false;controller.abort();window.removeEventListener('campus:business-records-changed',update);};},[snapshot.viewer.id,snapshot.selectedEnrollmentId,demo]);
+ const today=new Date(now+9*3600000).toISOString().slice(0,10),items=records.flatMap(r=>{const offset=(Date.parse(today)-Date.parse(String(r.payload.week)))/86400000;const value=r.payload['day'+offset];return Number.isInteger(offset)&&offset>=0&&offset<=6&&typeof value==='string'&&value.trim()&&r.payload['done'+offset]!==true?[{id:r.id,text:value}]:[];});
+ return items.length?<aside className={s.notice} aria-label="오늘의 실행 계획 안내"><strong>오늘 내가 정한 작은 실행 · KST</strong>{items.slice(0,3).map(v=><p key={v.id}>{v.text}</p>)}<button onClick={onOpen}>주간 루틴 이어 하기</button></aside>:null;
+}

@@ -150,6 +150,7 @@ test('five admin categories and scoped navigation render from the admin UI featu
   const props = { current: 'overview', available: platform.sections, user: { ...user, role: 'admin' }, pendingReviews: 1, openQuestions: 2, mobile: false, setMobile() {}, logout: async () => {} };
   const markup = html(AdminShell, { ...props, children: React.createElement(Overview, { data, available: platform.sections }) });
   const navigationMarkup = markup.match(/<nav aria-label="관리자 카테고리">[\s\S]*?<\/nav>/)?.[0] || '';
+  assert.match(navigationMarkup, /href="\/admin\/campus\/webinars"[\s\S]*?웨비나·캠퍼스 관리/);
   assert.match(navigationMarkup, /상품·판매 설정/);
   assert.match(navigationMarkup, /커리큘럼 편집/);
   assert.match(navigationMarkup, /수강생 현황/);
@@ -176,6 +177,7 @@ test('five admin categories and scoped navigation render from the admin UI featu
     assert.match(markup, new RegExp(`href="/admin/${key}"[\\s\\S]*?lucide-${icon}`), key);
   }
   const restricted = html(AdminShell, { ...props, available: platform.sections.filter(row => row.key === 'products') });
+  assert.doesNotMatch(restricted, /href="\/admin\/campus\/webinars"/);
   assert.doesNotMatch(restricted, /href="\/admin\/(questions|customers|members|orders)"/);
 });
 test('home customer stories carousel and accessible profile dropdown are present', () => {

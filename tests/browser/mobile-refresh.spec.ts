@@ -8,6 +8,7 @@ for (const screen of ['student', 'admin']) {
     for (const width of [320, 390, 720, 1440]) {
       await page.setViewportSize({ width, height: 844 });
       if (width > 720) { await expect(refresh).toBeHidden(); continue; }
+      if (screen === 'student' && !(await refresh.isVisible())) await page.getByRole('button', { name: '메뉴 열기', exact: true }).click();
       await expect(refresh).toBeVisible();
       const box = await refresh.boundingBox();
       expect(box!.height).toBeGreaterThanOrEqual(44);
@@ -19,6 +20,7 @@ for (const screen of ['student', 'admin']) {
     const originalURL = page.url();
     await Promise.all([page.waitForEvent('load'), refresh.click()]);
     expect(page.url()).toBe(originalURL);
+    if (screen === 'student') await page.getByRole('button', { name: '메뉴 열기', exact: true }).click();
     await expect(refresh).toBeVisible();
     // A real beforeunload listener must still be able to cancel a refresh.
     await page.evaluate(() => {

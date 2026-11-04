@@ -15,6 +15,16 @@ export async function POST(request: Request) {
   let body: { questionId?: unknown; requireUnanswered?: unknown };
   try { body = JSON.parse(await bodyText(request)); } catch (e) { if ((e as {status?:number}).status) throw e; return reply({error:'요청 형식을 확인해 주세요.'},400); }
   const questionId = body?.questionId; if (!isUuid(questionId) || (body.requireUnanswered !== undefined && typeof body.requireUnanswered !== 'boolean')) return reply({error:'질문을 선택해 주세요.'},400);
+  if (process.env.EDU_CURRICULUM_AI_ENABLED === 'true') {
+   const { curriculumMentorDraft } = await import('@/lib/curriculum-ai-mentor');
+   try {
+    const result = await curriculumMentorDraft(createAdminClient(),operator.id,questionId,Boolean(body.requireUnanswered));
+    if (result) return reply(result);
+   } catch (error) {
+    const { aiErrorReply } = await import('@/lib/curriculum-ai-server');
+    const result=aiErrorReply(error); return reply({error:result.error},result.status);
+   }
+  }
   const enhanced = process.env.EDU_QUESTION_AI_CONTEXT_ENABLED === 'true';
   if (body.requireUnanswered && !enhanced) return reply({error:'일괄 초안 기능이 준비되지 않았습니다.'},503);
   const apiKey = process.env.OPENAI_API_KEY;

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>문샷 캠퍼스 · 공간</title>
+<link rel="stylesheet" href="./src/styles.css">
+<script defer src="./vendor/lucide.js"></script>
+<script type="module" src="./src/app.js"></script>
+</head>
+<body>
+<div id="moonshot-workmates" class="cabin" aria-label="문샷 작업실 미리보기">
+  <div class="ms-demo">MOONSHOT CAMPUS <span>달 표면: NASA SVS · WASD / 방향키로 이동</span></div>
+  <header class="ms-header"><div class="ms-brand">MOONSHOT<span>ORBITAL STATION</span></div><div class="ms-title"><h1>작은 실행이 모여, 거대한 도약으로.</h1><p>조금씩 만들고, 서로의 다음 한 걸음을 도와요.</p></div><button data-action="profile" class="ms-profile"><span class="ms-dot"></span><span id="ms-me">문샷 동료</span><i data-lucide="chevron-down"></i></button></header>
+  <div class="ms-world">
+    <div class="ms-roomtop"><span class="ms-roomname">문샷 궤도 정거장 <small>공간 선택 · 1인칭 / 3인칭 · WASD</small></span><button data-action="achievements"><i data-lucide="sprout"></i><span id="ms-growth">내 속도로 한 걸음</span><small id="ms-cohort-progress" hidden></small></button></div>
+    <canvas id="ms-canvas" tabindex="0" role="img" aria-label="큰 달과 별이 보이는 투명 문샷 우주선. 1인칭·3인칭 선택 가능. 방향키와 WASD로 이동, E로 가까운 대상과 상호작용합니다. 모바일에서는 방향 버튼 또는 바닥 터치를 사용할 수 있습니다."></canvas><div class="ms-keymap" aria-label="키보드 조작 안내"><span><kbd>W</kbd> 위</span><span><kbd>A</kbd> 왼쪽</span><span><kbd>S</kbd> 아래</span><span><kbd>D</kbd> 오른쪽</span><small>방향키 · E 상호작용<br>드래그로 둘러보기 · 휠로 시선 조절</small></div><div id="ms-labels"></div><nav id="ms-exhibition" aria-label="3D 작품 전시" hidden></nav><button id="ms-live-demo" data-action="presentation" hidden></button><p id="ms-focus-finish" role="status" hidden>집중 시간이 끝났어요. 잠깐 쉬고 오늘 한 일을 남겨보세요.</p><div id="ms-loading">문샷 발사대를 준비하는 중…</div><button class="ms-interact" data-action="interact" disabled>가까이 다가가 상호작용</button><div class="ms-touchpad" aria-label="이동 방향"><button data-move="w" aria-label="위로 이동">↑</button><button data-move="a" aria-label="왼쪽으로 이동">←</button><button data-move="s" aria-label="아래로 이동">↓</button><button data-move="d" aria-label="오른쪽으로 이동">→</button></div>
+    <div class="cabin-intro"><small>MOONSHOT / OBSERVATION DECK</small><h2>달을 마주하는,<br>우리의 다음 궤도.</h2></div><div class="overview-caption"><small>SMALL STEPS. GIANT LEAPS.</small><h2>나의 실행이<br>다음 궤도가 되는 곳.</h2><p>공간을 선택하고, 오늘의 미션을 시작하세요.</p></div><div id="ms-status" class="ms-status" role="status">바닥을 눌러 걸어가 보세요. 책상·동료·게시판도 눌러볼 수 있어요.</div>
+    <div class="ms-seat-invite" id="ms-seat-invite" hidden><button class="dismiss" data-action="dismissinvite" aria-label="자리 안내 닫기">×</button><small>YOUR NEXT SMALL STEP</small><strong>동료 곁에 빈자리가 있어요</strong><p>오늘 만들고 싶은 한 가지를 들고<br>편하게 앉아 보세요.</p><button class="primary" data-action="desk">빈자리로 걸어가기 <i data-lucide="arrow-up-right"></i></button></div>
+    <div class="quest-tracker" id="ms-quest-tracker" hidden></div><div class="ms-focus-hud" id="ms-focus-hud" hidden><div class="focus-info"><small>지금은, 나의 작은 미션</small><strong id="ms-focus-task"></strong></div><time id="ms-hud-timer">25:00</time><div class="row"><button data-action="pause">쉬기</button><button class="primary" data-action="finish">마무리</button></div></div>
+    <button class="rocket-closeup" data-action="rocketview">로켓 가까이 보기</button><div class="ms-dock"><button data-action="missionmap"><i data-lucide="orbit"></i>미션 지도</button><button data-action="places"><i data-lucide="map"></i>전체 지도</button><button data-action="firstperson" data-camera="first" aria-pressed="false">1인칭</button><button data-action="thirdperson" data-camera="third" aria-pressed="true">3인칭</button><button data-action="sounds"><i data-lucide="audio-lines"></i>소리</button></div>
+  </div>
+  <section id="ms-panel" class="ms-panel" aria-label="작업실 활동" hidden></section>
+  <div class="ms-bottom"><span><i data-lucide="leaf"></i>오늘 한 가지를 만들어도 충분해요.</span><span>공개 순위 없이, 내 속도로 성장</span></div>
+</div>
+</body>
+</html>

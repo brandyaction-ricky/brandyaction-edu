@@ -1,0 +1,56 @@
+{
+  "baseHead": "0e663a7baa70c1e06b5583dd3e04cde876b7e9e3",
+  "status": "local-candidate-not-applied",
+  "migration": {
+    "path": "supabase/migrations/20261103012413_edu_campus_support_tool_dimensions.sql",
+    "sha256": "72f1ea04919c8558b1d45b8a1f9e016e1d40d19388ce1057121269d4995299e7"
+  },
+  "rollback": {
+    "preferred": "restore prior app code and retain additive columns/evidence",
+    "path": "integration/campus/support-tools/rollback.sql",
+    "sha256": "0fd76be42b54ab357f5352f32c24ebe4017d819fc9af990e9d451a18a5fa1464",
+    "guard": "refuses removal when any selected tool kind/name exists"
+  },
+  "scope": {
+    "table": "public.edu_campus_support_requests",
+    "newColumns": {
+      "tool_kind": {
+        "type": "text",
+        "nullable": false,
+        "default": "unspecified"
+      },
+      "tool_name": {
+        "type": "text",
+        "nullable": false,
+        "default": ""
+      }
+    },
+    "newConstraints": [
+      "campus_support_tool_kind",
+      "campus_support_tool_name"
+    ],
+    "existingMigrationsChanged": false,
+    "newFunctions": [],
+    "grantsChanged": false,
+    "policiesChanged": false,
+    "externalCalls": false
+  },
+  "preflight": [
+    "Both columns and named constraints absent",
+    "Original eleven migration receipts unchanged",
+    "Capture table columns/constraints/RLS/grants and row count before transaction"
+  ],
+  "postflight": [
+    "Existing row count unchanged",
+    "Legacy rows still unclassified",
+    "SELECT/INSERT owner RLS and no learner UPDATE permission retained",
+    "New tool fields accepted and invalid kind/name rejected"
+  ],
+  "validation": {
+    "unitApiPglite": 17,
+    "browserDesktopMobileUnique": 20,
+    "typescript": "pass",
+    "scopedEslint": "pass",
+    "build": "pass"
+  }
+}
