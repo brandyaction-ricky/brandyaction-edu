@@ -7,11 +7,11 @@ export function attachTourView({office,root,fitMap,wake,onChange,isBlocked}){
  function configure(){
   controls.object=office.camera;controls.enabled=mode!=='first'&&!isBlocked();controls.enablePan=mode==='overall';controls.enableRotate=mode!=='first';controls.enableZoom=mode!=='first';controls.enableDamping=true;controls.dampingFactor=.12;controls.zoomToCursor=mode==='overall';controls.minZoom=.55;controls.maxZoom=3;controls.minDistance=mode==='overall'?8:2;controls.maxDistance=mode==='overall'?200:12;controls.minPolarAngle=.2;controls.maxPolarAngle=1.48;
  }
- function resetFollow(){const a=office.campusAvatar;if(!a)return;last={x:a.x,y:a.y,h:a.jumpHeight||0};yaw=Number.isFinite(a.yaw)?a.yaw:Math.PI;pitch=0;const arrival=root.ownerDocument.body.dataset.room==='live';perspective.fov=arrival?(office.cw<=600?75:70):58;perspective.position.set(a.x-Math.sin(yaw)*5,(arrival?2.65:2.15)+(a.jumpHeight||0),a.y-Math.cos(yaw)*5);controls.target.set(a.x,(arrival?1.45:1.23)+(a.jumpHeight||0),a.y);perspective.lookAt(controls.target);}
+ function resetFollow(){const a=office.campusAvatar;if(!a)return;last={x:a.x,y:a.y,h:a.jumpHeight||0};yaw=Number.isFinite(a.yaw)?a.yaw:Math.PI;pitch=0;const arrival=root.ownerDocument.body.dataset.room==='live';perspective.fov=arrival?(office.cw<=600?75:70):58;perspective.updateProjectionMatrix();perspective.position.set(a.x-Math.sin(yaw)*5,(arrival?2.65:2.15)+(a.jumpHeight||0),a.y-Math.cos(yaw)*5);controls.target.set(a.x,(arrival?1.45:1.23)+(a.jumpHeight||0),a.y);perspective.lookAt(controls.target);}
  function sync(){
   const a=office.campusAvatar;if(!a)return;
   if(mode!=='overall'){
-   perspective.aspect=Math.max(1,office.cw)/Math.max(1,office.ch);perspective.updateProjectionMatrix();
+   const aspect=Math.max(1,office.cw)/Math.max(1,office.ch);if(perspective.aspect!==aspect){perspective.aspect=aspect;perspective.updateProjectionMatrix();}
    const h=(a.studyPose==='sit'?.74:1.07)+(a.jumpHeight||0);
    if(mode==='third'){
     if(last){perspective.position.x+=a.x-last.x;perspective.position.z+=a.y-last.y;perspective.position.y+=(a.jumpHeight||0)-last.h;}
@@ -26,7 +26,7 @@ export function attachTourView({office,root,fitMap,wake,onChange,isBlocked}){
  office.drawCampusAvatarLabel=function(...args){if(mode!=='first')return originalLabel?.apply(this,args);};
  function set(next){if(!['overall','first','third'].includes(next))return;mode=next;office.camera=next==='overall'?mapCamera:perspective;configure();if(next==='overall')fitMap();else resetFollow();controls.update();wake();office.draw();onChange(mode);}
  function roomChanged(){office.camera=mapCamera;fitMap();if(mode!=='overall'){office.camera=perspective;resetFollow();}configure();wake();office.draw();onChange(mode);}
- function resize(){if(mode==='overall')fitMap();else{perspective.aspect=Math.max(1,office.cw)/Math.max(1,office.ch);perspective.updateProjectionMatrix();}wake();}
+ function resize(){if(mode==='overall')fitMap();else{const aspect=Math.max(1,office.cw)/Math.max(1,office.ch);if(perspective.aspect!==aspect){perspective.aspect=aspect;perspective.updateProjectionMatrix();}}wake();}
  const listen=(name,fn,options)=>{root.addEventListener(name,fn,options);return()=>root.removeEventListener(name,fn,options);};
  const remove=[
   listen('pointerdown',e=>{if(isBlocked()||e.target.closest('button'))return;pointers.add(e.pointerId);downCount=pointers.size;if(downCount>1)dragged=true;else dragged=false;drag={x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY};wake();},true),

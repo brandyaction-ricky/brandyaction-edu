@@ -29,6 +29,6 @@ test('legacy spaceship opens alone and returns to the tour camera',async({page})
  test.setTimeout(120000);const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto('/campus-tour');await room(page,'문샷 공부방');await page.getByRole('button',{name:'3인칭으로 보기',exact:true}).click();
  await page.getByRole('button',{name:'이 공간에서 할 일',exact:true}).click();await page.getByRole('button',{name:'기존 우주선·기념사진',exact:true}).click();
- const d=page.getByRole('dialog',{name:'기존 우주선·기념사진',exact:true});await expect(d).toBeVisible();await expect(page.locator('iframe')).toHaveCount(1);await expect(d.locator('iframe')).toHaveAttribute('src',/\/campus\/world\/index.html/);await expect(d.getByRole('button',{name:'기념 사진 저장',exact:true})).toBeVisible();
+ const d=page.getByRole('dialog',{name:'기존 우주선·기념사진',exact:true});await expect(d).toBeVisible();await expect(d.locator('iframe')).toBeVisible({timeout:30000});await expect(page.locator('iframe')).toHaveCount(1);await expect(d.locator('iframe')).toHaveAttribute('src',/\/campus\/world\/index.html/);await expect(d.getByRole('button',{name:'기념 사진 저장',exact:true})).toBeVisible();
  await d.getByRole('button',{name:'기존 우주선·기념사진 닫기',exact:true}).click();await expect(page.getByRole('button',{name:'내 캐릭터',exact:true})).toBeEnabled({timeout:90000});await expect(page.locator('iframe')).toHaveCount(1);await expect(page.frameLocator('iframe').locator('#office')).toHaveAttribute('data-camera-mode','third');expect(errors).toEqual([]);
 });

@@ -11,6 +11,6 @@ test('connected crowd becomes a conversation only after approaching and joining'
   await visitors.post({...visitors.clients[0].session,kind:'update',message:'합류한 동료에게만 보이는 인사'});await expect(world.locator('.meetup-messages')).toContainText('합류한 동료에게만 보이는 인사');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect(errors).toEqual([]);
   await page.screenshot({path:'/private/tmp/campus-crowd-'+(isMobile?'mobile':'desktop')+'.png'});
-  await world.getByRole('button',{name:'대화 나가기',exact:true}).click();await expect(root).toHaveAttribute('data-peer-count','0');await expect(root).toHaveAttribute('data-crowd-count','20');await expect(world.locator('.meetup-body')).toBeHidden();
+  await world.getByRole('button',{name:'대화 나가기',exact:true}).click();await expect(root).toHaveAttribute('data-peer-count','0');await expect(root).toHaveAttribute('data-crowd-count','20');await expect(world.locator('.meetup-body')).toBeHidden();await expect(world.locator('.meetup-toggle')).toHaveAttribute('aria-expanded','false');
  }finally{if(browserSession)await visitors.post({...browserSession,kind:'leave'}).catch(()=>{});await page.close();await visitors.stop();}
 });

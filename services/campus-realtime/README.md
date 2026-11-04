@@ -17,8 +17,14 @@ The 3D scene and EDU checkout/class APIs remain separate from this realtime proc
 - Only connected visitors in the public live room enter the crowd snapshot. Private rooms, names and messages are excluded. Snapshots refresh at most every 2 seconds during steady state, with at most 80 sampled remote people per partition; no invented population.
 - Phones draw at most 40 low-detail bodies, desktops 80, using eight shared instanced meshes. Detailed avatars stay at 12/24. A participant is never rendered in both tiers. Distant figures preserve position/height and coat/hair/skin color; existing detailed characters remain unchanged.
 - Approaching within 3.5 metres reveals a join action. Server checks live room, actual latest proximity (4 metres including floor height), group capacity and cooldown. Joining changes the conversation partition without teleporting. Leaving a conversation creates an independent group; private-room permissions do not change.
-- Counts are active connections, not deduplicated humans. Synthetic local QA sessions are prominently labelled and excluded from the displayed non-synthetic count. `crowd-demo.mjs` connects 60 labelled local-only clients to the separate fixture on port 4559. It must never run against a production endpoint.
+- Counts are active connections, not deduplicated humans. Synthetic local QA sessions are prominently labelled and excluded from the displayed non-synthetic count. `crowd-demo.mjs` connects 60 labelled local-only clients to the separate fixture on port 4563. It must never run against a production endpoint.
 - Group chat stays within its partition. Switching groups clears the switching member's previous message; public crowd packets never contain chat or names. Revocation/internet deployment gates below still apply.
+
+## Local mobile rendering QA
+
+- Static atrium meshes are merged only when material and attribute layouts match. Actual transformed vertices, indices, normals and UVs are retained; geometry.type/parameters are not shape evidence for custom atrium geometry. Curved stairs/buildings are not substituted with boxes. Static transforms and settled crowd buffers are not recomputed each frame.
+- Local marked QA visitors form spaced groups of 2–4, with four independently timed walkers. This choreography never repositions actual users. Shared demo groups correspond to their own conversation partitions.
+- Preview-only DOM diagnostics report moving-frame FPS, CPU draw cost, draw calls and GPU backend without network logging. Software-rendered headless Chromium is not physical phone performance. Validate actual devices and sustained heat before deployment.
 
 ## What is NOT yet ready for a real event
 
