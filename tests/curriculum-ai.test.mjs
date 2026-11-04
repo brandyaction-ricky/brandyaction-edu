@@ -100,12 +100,17 @@ test('a refund question reserves the first-day refund policy over unrelated sche
 
 test('English Projects navigation finds the Korean lesson section',()=>{
  const lessons=[
-  {id:'current',title:'학습 준비',body_text:'오리엔테이션'},
-  {id:'projects',title:'기본 사용법',day_number:2,document:{schemaVersion:1,checklist:[],blocks:[
-   {id:'projects-heading',type:'heading',content:'프로젝트 열기'},
-   {id:'projects-nav',type:'text',content:'클로드의 왼쪽 사이드바에서 프로젝트를 선택합니다.'},
+  {id:'current',title:'기본 사용법',day_number:2,document:{schemaVersion:1,checklist:[],blocks:[
+   {id:'definition-heading',type:'heading',content:'클로드 프로젝트 (Claude Projects)'},
+   {id:'definition',type:'text',content:'Claude Projects는 클로드 프로젝트의 대화와 자료를 묶는 기능입니다.'},
+   {id:'troubleshoot-heading',type:'heading',content:'Claude 프로젝트 연결 문제'},
+   {id:'troubleshoot',type:'text',content:'Claude 프로젝트 (Projects) 연결이 안 되면 파일을 확인합니다.'},
+   {id:'projects-heading',type:'heading',content:'볼트 폴더 연결하기'},
+   {id:'projects-nav',type:'text',content:'1. 클로드 > 왼쪽 사이드바에서 [프로젝트]를 누릅니다.\n2. [새 프로젝트]를 누릅니다.'},
   ]}},
+  ...Array.from({length:6},(_,i)=>({id:'other'+i,title:'어사이드 Projects 설정',day_number:i+3,body_text:'어사이드의 Settings → Projects → Create에서 프로젝트를 추가합니다.'})),
  ];
  const {sources}=retrieveCurriculum(lessons,'Where do I open Projects in Claude?', 'current');
- assert.ok(sources.some(source=>source.dayNumber===2 && source.blockId==='projects-heading' && source.excerpt.includes('사이드바')));
+ assert.equal(sources[0].blockId,'projects-heading');
+ assert.match(sources[0].excerpt,/클로드 > 왼쪽 사이드바에서 \[프로젝트\]/);
 });

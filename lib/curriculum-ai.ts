@@ -68,9 +68,12 @@ export function retrieveCurriculum(lessons: CurriculumLesson[], query: string, c
  const topics = [refund, orientation].filter(topic => topic.test(latestQuestion));
  if (!topics.length && schedule.test(latestQuestion)) topics.push(schedule);
  const aarrr = /\bAARRR\b/i.test(query);
+ const claudeProjectNavigation = /\bclaude\b|클로드/i.test(latestQuestion)
+  && /\bprojects?\b|프로젝트/i.test(latestQuestion)
+  && /\b(?:where|open|find|access|navigate|click)\b|어디|여는|찾는|접근|누르/i.test(latestQuestion);
  const stages = [/\bacquisition\b/i, /\bactivation\b/i, /\bretention\b/i, /\breferral\b/i, /\brevenue\b/i];
  const aliases = curriculumTermAliases.flatMap(([pattern, translation]) => pattern.test(query) ? [translation] : []);
- const wanted = terms([query, ...aliases].join(' ')), chunks: (AiSource & { score: number; order: number })[] = [];
+ const wanted = terms([query, ...aliases].join(' ')), chunks: (AiSource & { score: number; order: number; directNavigation: boolean })[] = [];
  let total = 0;
  for (const lesson of lessons) {
   const dayNumber = curriculumDay(lesson, blocks);
@@ -93,13 +96,16 @@ export function retrieveCurriculum(lessons: CurriculumLesson[], query: string, c
     let score = 0;
     for (const term of wanted) if (found.has(term)) score += titleTerms.has(term) ? 3 : 1;
     if (aarrr) score += stages.filter(stage => stage.test(excerpt)).length * 20;
-    chunks.push({ id: '', lessonId: lesson.id, title, blockId, ...(dayNumber === undefined ? {} : { dayNumber }), revision: lesson.revision || null, excerpt, score, order: chunks.length });
+    const directNavigation = claudeProjectNavigation && excerpt.split('\n').some(line =>
+     /\bclaude\b|클로드/i.test(line) && /\bprojects?\b|프로젝트/i.test(line)
+     && /\bsidebar\b|사이드\s*바|왼쪽\s*메뉴/i.test(line));
+    chunks.push({ id: '', lessonId: lesson.id, title, blockId, ...(dayNumber === undefined ? {} : { dayNumber }), revision: lesson.revision || null, excerpt, score, order: chunks.length, directNavigation });
    }
   }
  }
- chunks.sort((a,b) => b.score - a.score || a.order - b.order);
+ chunks.sort((a,b) => Number(b.directNavigation) - Number(a.directNavigation) || b.score - a.score || a.order - b.order);
  const current = chunks.filter(c => c.lessonId === currentLesson).slice(0, aarrr ? 1 : 2);
- const others = chunks.filter(c => !current.includes(c) && c.score > 0);
+ const others = chunks.filter(c => !current.includes(c) && (c.directNavigation || c.score > 0));
  const common = topics.flatMap(topic => {
   const matching = chunks.filter(source => source.dayNumber === 1 && topic.test(source.excerpt));
   const density = (excerpt: string) => excerpt.match(new RegExp(topic.source, 'gi'))?.length ?? 0;
