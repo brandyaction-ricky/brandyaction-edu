@@ -1,6 +1,6 @@
 import {attachCrowdRenderer} from './crowd-renderer.mjs';
 /** Curated educational examples, never attributed to real visitors. No chat transport. */
-export function attachVisitorExperience({office,root,send,wake,getRoom,CampusInstancedMesh,CampusSphereGeometry,devPresence=false,qaCrowd=false}){
+export function attachVisitorExperience({office,root,send,wake,getRoom,CampusInstancedMesh,CampusSphereGeometry,devPresence=false,qaCrowd=false,showStories=true}){
  const crowd=devPresence?attachCrowdRenderer(office,root,CampusInstancedMesh,CampusSphereGeometry):null;
  const panel=document.createElement('section');panel.className='visitor-stories';panel.setAttribute('aria-label','문샷 체험 안내');panel.hidden=true;
  const count=document.createElement('p');count.className='visitor-count';count.textContent=devPresence?'DEV 동료 연결 중…':'문샷에서 나눌 이야기';
@@ -10,7 +10,7 @@ export function attachVisitorExperience({office,root,send,wake,getRoom,CampusIns
  const topics=[{id:'study',x:-7,y:24,line:'“내가 만든 광고, 동료 의견을 받을 수 있나요?”'},{id:'office',x:8,y:23,line:'“AI가 만든 결과를 한곳에서 확인하고 싶어요.”'},{id:'welcome',x:0,y:29,line:'“AI를 처음 써도 시작할 수 있나요?”'}];
  let active=false,last=0,people=[],status=null,simulation=null,closed=false,lastVisual='';
  if(qaCrowd)void import('./qa-crowd-layout.mjs').then(m=>{if(!closed)simulation={people:m.crowdLayout(),motion:m.crowdMotion};});
- button.onclick=()=>{if(status)send('visitor-story',{id:status.id});};panel.append(count,hint,button,toggle);document.body.append(panel);
+ button.onclick=()=>{if(status)send('visitor-story',{id:status.id});};panel.append(count);if(showStories)panel.append(hint,button,toggle);document.body.append(panel);
  function tick(now){if(!active)return;crowd?.tick(now);if(now-last<500)return;last=now;const a=office.campusAvatar;if(!a)return;
   if(simulation&&getRoom()==='live')crowd.set([...people,...simulation.people.map((p,i)=>({...simulation.motion(p,i,Date.now()/1000),id:'qa-example-'+i,nickname:'검수 동료 '+(i+1),gender:i%2?'female':'male',model:i%6,coat:['#386eb4','#ad7258','#537f69','#8173aa'][i%4],skin:'#e8b68b',hair:'#302825'}))]);
   const topic=[...topics].sort((p,q)=>Math.hypot(p.x-a.x,p.y-a.y)-Math.hypot(q.x-a.x,q.y-a.y))[0];status=topic;
