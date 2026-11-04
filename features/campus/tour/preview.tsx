@@ -27,7 +27,7 @@ const isFeature=(id:string)=>['growth','journal','ai','office','feedback','archi
 const spacePane=(id:string)=>({focus:'focus',lounge:'lounge',sound:'settings',desk:'profile'} as const)[id as 'focus'];
 const STORAGE='moonshot-four-spaces-preview-v1';
 function readProgress(key=STORAGE):Progress{try{const p=JSON.parse(localStorage.getItem(key)||'null');if(p&&typeof p.video==='boolean'&&Array.isArray(p.quiz)&&p.quiz.length===3&&p.quiz.every((v:unknown)=>v===null||typeof v==='boolean')&&Array.isArray(p.level)&&p.level.length===4&&p.level.every((v:unknown)=>Number.isInteger(v)&&Number(v)>=-1&&Number(v)<3))return p;}catch{}return emptyProgress();}
-export type TourVisitor={devPresence?:boolean;qaCrowd?:boolean;title:string;renderGate:(room:TourRoom)=>ReactNode;renderTool:(tool:string)=>ReactNode;onEnter:()=>void;onActivity:(tool:string)=>void};
+export type TourVisitor={presenceId?:string;devPresence?:boolean;qaCrowd?:boolean;title:string;renderGate:(room:TourRoom)=>ReactNode;renderTool:(tool:string)=>ReactNode;onEnter:()=>void;onActivity:(tool:string)=>void};
 export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor}:{snapshot:CampusSnapshot;adminSnapshot?:CampusAdminSnapshot;live?:TourLiveConnection;visitor?:TourVisitor}){
  const devEpoch=useRef(0);
  const devConnection=useRef<ReturnType<typeof import('../webinar/dev-presence').connectDevVisitors>|null>(null);
@@ -36,7 +36,7 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor}:{snapsho
  const visibleTasks=(r:TourRoom,v:TourRole)=>roomTasks(r,v).filter(t=>!visitor||t.id!=='live-video');
  const avatarKey=visitor?'moonshot-webinar-avatar-v1':TOUR_AVATAR_KEY;
  const [arrival,setArrival]=useState(!!visitor);
- function visitorEntered(){post('meetup-start');if(visitorRef.current?.devPresence&&!devConnection.current){const epoch=devEpoch.current;void import('../webinar/dev-presence').then(m=>{if(epoch===devEpoch.current&&!devConnection.current)devConnection.current=m.connectDevVisitors(value=>post('dev-visitor-state',value));}).catch(()=>setNotice('동료 연결이 지연되고 있어요. 공간 체험은 계속할 수 있습니다.'));}setArrival(false);if(failed)setMapOpen(true);visitorRef.current?.onEnter();}
+ function visitorEntered(){post('meetup-start');if(visitorRef.current?.devPresence&&!devConnection.current){const epoch=devEpoch.current;void import('../webinar/dev-presence').then(m=>{if(epoch===devEpoch.current&&!devConnection.current)devConnection.current=m.connectDevVisitors(value=>post('dev-visitor-state',value),visitorRef.current?.presenceId);}).catch(()=>setNotice('동료 연결이 지연되고 있어요. 공간 체험은 계속할 수 있습니다.'));}setArrival(false);if(failed)setMapOpen(true);visitorRef.current?.onEnter();}
  function readAvatar(){return readTourAvatar(avatarKey,visitor?'문샷 방문자':undefined);}
 
  const demo=!live,progressKey=live?STORAGE+':'+snapshot.viewer.id+':'+snapshot.selectedEnrollmentId:STORAGE;

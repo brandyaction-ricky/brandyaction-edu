@@ -7,13 +7,14 @@ export function sanitizeDevVisitor(value:unknown){
  }
 
 /** DEV-only, public visual presence. No auth cookies, student records, chat or DB writes. */
-export function connectDevVisitors(onState:(value:Record<string,unknown>)=>void){
+export function connectDevVisitors(onState:(value:Record<string,unknown>)=>void,eventSlug='dev-office-review'){
+ if(!/^[a-z0-9][a-z0-9-]{2,59}$/.test(eventSlug))throw Error('행사 주소를 확인해 주세요.');
  const url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
  if(url!=='https://vjmjhaidlqkmascdjocw.supabase.co'||!key)throw Error('DEV 연결 설정을 확인해 주세요.');
  const db=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},realtime:{params:{eventsPerSecond:2}}});
  const id=crypto.randomUUID(),positions=new Map<string,Record<string,unknown>>();let closed=false,connected=false,last='',lastAt=0;
  let own:Record<string,unknown>={id,room:'live',nickname:'문샷 방문자',x:0,y:28,yaw:Math.PI,coat:'#386eb4',skin:'#e8b68b',hair:'#302825',moving:false};
- const channel=db.channel('campus-dev-open-review-v1',{config:{presence:{key:id},broadcast:{self:false,ack:false}}});
+ const channel=db.channel('campus-dev-open-review-v1:'+eventSlug,{config:{presence:{key:id},broadcast:{self:false,ack:false}}});
 
  function publish(){if(closed)return;const members=new Set(Object.keys(channel.presenceState()));for(const key of positions.keys())if(!members.has(key))positions.delete(key);onState({connected,count:members.size,people:[...positions.values()].filter(p=>p.id!==id&&p.room===own.room).slice(0,80)});}
  channel.on('presence',{event:'sync'},()=>{for(const [key,values]of Object.entries(channel.presenceState())){if(positions.has(key)||positions.size>=80)continue;const p=sanitizeDevVisitor(values[0]);if(p&&p.id===key)positions.set(key,p);}last='';publish();})
