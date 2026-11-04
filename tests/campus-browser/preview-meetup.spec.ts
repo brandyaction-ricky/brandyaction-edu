@@ -9,9 +9,24 @@ test('opt-in local visitors see each other, chat and leave without entering memb
   const a=await desktop.newPage(),b=await phone.newPage(),errors:string[]=[];
   for(const [page,name]of [[a,'동료 A'],[b,'동료 B']] as const){
    page.on('pageerror',e=>errors.push(e.message));
+   // Capture the first actual GL draw, before Office.ready (three frames).
+   // Applying the pixel/shadow budget after ready stalls a second software-rendered client.
+   await page.addInitScript(()=>{
+    const draw=WebGL2RenderingContext.prototype.drawElements;
+    WebGL2RenderingContext.prototype.drawElements=function(...args){
+     const canvas=this.canvas as HTMLCanvasElement;
+     if(canvas.classList?.contains('office-gl')&&!canvas.hasAttribute('data-first-render-pixels'))canvas.setAttribute('data-first-render-pixels',String(canvas.width*canvas.height));
+     return draw.apply(this,args);
+    };
+   });
    await page.goto(baseURL+'/webinar?meet=1&qaChat=1');
    await page.getByRole('button',{name:'캐릭터 꾸미고 입장',exact:true}).click({timeout:90000});
-   const world=page.frameLocator('iframe');await world.getByLabel('닉네임').fill(name);
+   const world=page.frameLocator('iframe');
+   if(await world.locator('#office').getAttribute('data-render-profile')==='compatibility'){
+    const initialPixels=Number(await world.locator('.office-gl').getAttribute('data-first-render-pixels'));
+    expect(initialPixels).toBeGreaterThan(0);expect(initialPixels).toBeLessThanOrEqual(200001);
+   }
+   await world.getByLabel('닉네임').fill(name);
    await world.getByRole('button',{name:'저장하기',exact:true}).click();
    await expect(world.getByRole('dialog',{name:'캐릭터 꾸미기'})).toBeHidden();
   }
