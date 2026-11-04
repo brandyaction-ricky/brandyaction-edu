@@ -1,0 +1,41 @@
+name: Campus rendering diagnostic
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: campus-render-check-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  rendering:
+    name: Rendering check (${{ matrix.device }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - device: desktop
+            files: tests/campus-browser/atrium.spec.ts tests/campus-browser/crowd-groups.spec.ts
+            pattern: arrival defaults|connected crowd
+          - device: mobile
+            files: tests/campus-browser/mobile-layout.spec.ts
+            pattern: 768x1024
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Run unchanged interaction assertions on software graphics
+        run: npx playwright test --config=playwright.campus.config.ts --project=${{ matrix.device }} ${{ matrix.files }} --grep '${{ matrix.pattern }}' --reporter=line
+      - name: Preserve diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rendering-diagnostic-${{ matrix.device }}
+          path: test-results/
+          retention-days: 3
+# Diagnostics never deploy, migrate or replace the full CI verification gate.
