@@ -1,3 +1,5 @@
+export const mentorRepliesReadEvent = 'edu-mentor-replies-read';
+
 export type QuestionContext = { enrollmentId: string; lessonId: string; label: string; recent: boolean; classLabel?: string };
 export type SharedAnswer = { id: string; title: string; answer: string; context: string | null; lessonId: string | null; enrollmentId: string | null };
 export const questionCategories = { learning: '학습·미션', general: '일반 문의', payment: '결제·환불', account: '로그인·계정' } as const;

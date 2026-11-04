@@ -69,6 +69,7 @@ import { Checkout } from "./final/checkout";
 import { Classroom } from "./final/classroom";
 import { MemberViews, enrollmentLessons } from "./final/member-views";
 import { FloatingLearningQuestion } from './final/floating-learning-question';
+import { MentorReplyBell } from './final/mentor-reply-bell';
 import { CustomerWorkspace } from "./final/customer-workspace";
 import { MemberVisitRecorder } from "./final/member-visit-recorder";
 import {
@@ -622,6 +623,7 @@ export function Platform({
             <MobileRefresh />
             {user ? (
               <>
+                {!admin && (account || learning) && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' && process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED === 'true' && <MentorReplyBell key={user.id}/>}
                 <Link className="link header-questions" href={admin ? "/admin/questions" : "/my/questions?view=mine"}>질문·답변</Link>
                 <Link className="link" href="/my">
                   마이페이지

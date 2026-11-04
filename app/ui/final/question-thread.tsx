@@ -6,6 +6,8 @@ import { useUnsavedLearningChanges } from './use-unsaved-learning-changes';
 import { QuestionAdminHub } from './question-admin-hub';
 import { QuestionImage, QuestionImagePicker, type QuestionImagePickerHandle } from './question-image';
 import { AnswerText } from './lesson-text';
+import { mentorRepliesReadEvent } from '@/lib/question-hub';
+import { questionRequest } from './question-composer';
 import { AdminDrawer, useUnsavedWarning } from '@/features/admin-ui';
 type Answer = { imageId?: string | null; canDelete?: boolean; id: string; authorName: string; source?: 'learner' | 'operator' | 'legacy' | 'faq' | 'aside'; content: string; createdAt: string };
 type Thread = { question: { id: string; title: string; content: string; learningContext?: string | null; status: string; resolved: boolean; archived: boolean; headId: string | null; imageId?: string | null; visibility?: 'cohort' | 'private' }; answers: Answer[]; nextCursor: string | null; canAnswer: boolean; canFollowUp?: boolean };
@@ -51,6 +53,20 @@ export function QuestionAnswerHistory({ questionId, fallback = '', onStatusChang
  const gate = useRef(false), retry = useRef<{ action: 'followup'; questionId: string; content: string; requestId: string; expectedHeadId: string | null } | null>(null);
  useUnsavedLearningChanges(Boolean(content) || busy || uncertain);
  useEffect(() => { if (state.data) onStatusChange?.(state.data.question.status); }, [state.data, onStatusChange]);
+ const markedReplies = useRef(new Set<string>());
+ const renderedAnswers = state.data?.answers;
+ useEffect(() => {
+  if (!open || readOnly || !renderedAnswers || process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED !== 'true') return;
+  const answerIds = renderedAnswers.filter(answer => answer.source !== 'learner' && !markedReplies.current.has(answer.id)).map(answer => answer.id);
+  if (!answerIds.length) return;
+  const batches = Array.from({ length: Math.ceil(answerIds.length / 20) }, (_, index) => answerIds.slice(index * 20, index * 20 + 20));
+  void Promise.all(batches.map(ids => questionRequest('/api/platform/question-hub', { action: 'read-replies', questionId, answerIds: ids })))
+   .then(() => {
+    for (const id of answerIds) markedReplies.current.add(id);
+    window.dispatchEvent(new Event(mentorRepliesReadEvent));
+   })
+   .catch(() => { /* Keep the unread badge until the next successful read. */ });
+ }, [open, readOnly, questionId, renderedAnswers]);
  async function followUp() {
   if (gate.current || stale || !state.data?.canFollowUp) return;
   if (!retry.current) {

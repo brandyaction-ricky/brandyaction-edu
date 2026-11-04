@@ -90,3 +90,43 @@ test('the general inquiry link defaults to a private general inquiry',async({pag
  await expect(page.getByLabel('관련 학습')).toHaveCount(0);
  await expect(page.getByText('비밀 질문',{exact:true})).toBeVisible();
 });
+
+test('the mentor bell links to the expanded reply and clears the unread badge only after viewing it',async({page})=>{
+ const questionId=id(9), answerId=id(10);
+ let unread=0;
+ const marks:Record<string,unknown>[]=[];
+ await page.route('**/my/questions?**',async route=>{
+  if(route.request().resourceType()!=='document')return route.fallback();
+  await route.fulfill({response:await page.request.get('/question-hub-test?bell=1')});
+ });
+ await page.route('**/api/platform/lesson-questions?**',r=>r.fulfill({json:{questions:[],hasMore:false}}));
+ await page.route('**/api/platform/question-hub**',r=>{
+  if(r.request().method()==='POST'){
+   marks.push(r.request().postDataJSON());
+   unread=0;
+   return r.fulfill({json:{ok:true}});
+  }
+  const params=new URL(r.request().url()).searchParams;
+  if(params.get('mode')==='reply-notifications')return r.fulfill({json:{count:unread,questions:unread?[{id:questionId,title:'수업 중 남긴 질문',count:unread}]:[]}});
+  if(params.get('question')===questionId)return r.fulfill({json:{questions:[{id:questionId,title:'수업 중 남긴 질문',content:'질문 본문',status:'answered'}],hasMore:false}});
+  return r.fulfill({json:{questions:[],hasMore:false,contexts:[]}});
+ });
+ await page.route('**/api/platform/question-thread?**',r=>r.fulfill({json:{question:{id:questionId,status:'answered'},answers:[{id:answerId,content:'멘토가 남긴 새 답변',authorName:'멘토',source:'operator'}],nextCursor:null}}));
+ await page.goto('/question-hub-test?lesson=1&bell=1');
+ await page.getByRole('button',{name:'멘토 답변 알림',exact:true}).click();
+ await expect(page.getByText('새 멘토 답변이 없어요.')).toBeVisible();
+ await page.keyboard.press('Escape');
+ unread=1;
+ await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+ await page.getByRole('button',{name:'멘토 답변 알림 1개'}).click();
+ const panel=page.getByRole('region',{name:'멘토 답변 알림'});
+ const box=await panel.boundingBox();
+ expect(box!.x).toBeGreaterThanOrEqual(0);
+ expect(box!.x+box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+ expect(marks).toHaveLength(0);
+ await panel.getByRole('link',{name:/수업 중 남긴 질문/}).click();
+ await expect(page).toHaveURL(new RegExp('question='+questionId));
+ await expect(page.getByText('멘토가 남긴 새 답변',{exact:true})).toBeVisible();
+ await expect.poll(()=>marks[0]).toEqual({action:'read-replies',questionId,answerIds:[answerId]});
+ await expect(page.getByRole('button',{name:'멘토 답변 알림',exact:true})).toBeVisible();
+});

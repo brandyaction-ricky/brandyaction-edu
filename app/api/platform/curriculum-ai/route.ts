@@ -5,7 +5,9 @@ import { hasSensitiveQuestionText, sensitiveQuestionMessage } from '@/lib/curric
 import { parseAiTurns } from '@/lib/curriculum-ai';
 import { aiErrorReply, generateCurriculumAnswer, readAiBody } from '@/lib/curriculum-ai-server';
 export const maxDuration = 60;
-const reply = (data:unknown,status=200) => Response.json(data,{status,headers:{'Cache-Control':'private, no-store',Vary:'Cookie'}});
+const reply = (data:unknown,status=200,retryAfter?:number) => Response.json(data,{
+ status,headers:{'Cache-Control':'private, no-store',Vary:'Cookie',...(retryAfter ? {'Retry-After':String(retryAfter)} : {})},
+});
 export async function POST(request:Request) {
  try {
   if (request.headers.get('origin') !== new URL(request.url).origin) return reply({error:'요청 출처를 확인해 주세요.'},403);
@@ -18,5 +20,5 @@ export async function POST(request:Request) {
   try { parseAiTurns(body.history); } catch { return reply({error:'대화 길이를 줄여 다시 질문해 주세요.'},400); }
   const result = await generateCurriculumAnswer(createAdminClient(),{actor:user.id,requestId:body.requestId,mode:'student',enrollmentId:body.enrollmentId,lessonId:body.lessonId,question:body.question.trim(),saveHistory:true,...(body.imageId?{imageId:body.imageId}:{})});
   return reply(result);
- } catch (error) { const result=aiErrorReply(error, 'student'); return reply({error:result.error},result.status); }
+ } catch (error) { const result=aiErrorReply(error, 'student'); return reply({error:result.error},result.status,result.retryAfter); }
 }
