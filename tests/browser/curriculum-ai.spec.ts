@@ -208,6 +208,22 @@ test('floating questions keep a lesson draft across closing and navigation and r
  await page.goto('/curriculum-ai-test?floating=1');
  await expect(panel.getByRole('combobox',{name:'질문할 수업·일차'})).toHaveValue(id);
  await expect(input).toHaveValue('고객 인터뷰에 대한 초안');
+ const attach = panel.getByRole('button',{name:'사진·화면 캡처 첨부'});
+ const send = panel.getByRole('button',{name:'AI 답변 받기'});
+ if (await attach.count()) {
+  const attachBox = await attach.boundingBox();
+  const sendBox = await send.boundingBox();
+  expect(attachBox).not.toBeNull();
+  expect(sendBox).not.toBeNull();
+  expect(Math.abs(attachBox!.y - sendBox!.y)).toBeLessThanOrEqual(1);
+  expect(attachBox!.x + attachBox!.width).toBeLessThan(sendBox!.x);
+  const guide = panel.getByText('AI 사용·저장 안내',{exact:false});
+  const attachmentGuide = panel.getByText('이미지 한 장(최대 10MB)',{exact:false});
+  await expect(attachmentGuide).toBeHidden();
+  await guide.click();
+  await expect(attachmentGuide).toBeVisible();
+  await guide.click();
+ }
  await page.screenshot({path:info.outputPath('floating-question.png')});
  await panel.getByRole('button',{name:'AI 답변 받기'}).click();
  await panel.getByRole('button',{name:'멘토에게 이어서 질문'}).click();
