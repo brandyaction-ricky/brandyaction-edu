@@ -1,0 +1,2 @@
+export function retryDelay(attempt,random=Math.random){return Math.floor(Math.min(30000,1000*2**Math.min(attempt,5))*(.5+random()*.5));}
+export function nearbyPeers(peers,self,limit,previous=[]){const keep=new Set(previous);return peers.filter(p=>p.id!==self.id).map(p=>({p,d:Math.hypot(p.x-self.x,p.y-self.y)-(keep.has(p.id)?.8:0)})).sort((a,b)=>a.d-b.d||a.p.id.localeCompare(b.p.id)).slice(0,limit).map(v=>v.p);}
