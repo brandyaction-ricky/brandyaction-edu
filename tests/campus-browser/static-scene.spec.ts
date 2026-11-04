@@ -9,5 +9,5 @@ test('static batching preserves actual curved geometry, material and normals',as
  const root=page.frameLocator('iframe').locator('#office');await expect(root).toHaveAttribute('data-room','live');
  const result=await root.evaluate(()=>{const w=window as unknown as {__geometryBefore:Record<string,number>,__geometryAfter:Record<string,number>};return{before:w.__geometryBefore,after:w.__geometryAfter};});
  expect(result.after.vertices).toBe(result.before.vertices);expect(result.after.triangles).toBe(result.before.triangles);expect(result.after.sum).toBeCloseTo(result.before.sum,1);expect(result.after.sum2).toBeCloseTo(result.before.sum2,0);expect(result.after.meshes).toBeLessThan(result.before.meshes/2);await info.attach('geometry-retention',{body:JSON.stringify(result),contentType:'application/json'});
- await page.screenshot({path:'/private/tmp/campus-natural-desktop.png'});
+ await page.screenshot({path:test.info().outputPath('campus-natural-desktop.png')});
 });
