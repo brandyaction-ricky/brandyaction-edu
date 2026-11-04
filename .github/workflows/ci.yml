@@ -43,7 +43,7 @@ jobs:
 
           if [ "$head_ref" = "codex/edu-buyer-selection-main-release-20261104" ]; then
             expected_main=f06729e9b9f16a3851f5a90b5263d0e8ea1baaed
-            release_payload=c8f3bc8f73f5a103a3a3c11ffcdfd420746737b3
+            release_payload=9f0958a4cea44fd2489df490a5f6b232df959dfe
             if [ "$(git rev-parse HEAD^1)" != "$expected_main" ]; then
               echo "Production main moved; revalidate the scoped buyer selection release."
               exit 1
