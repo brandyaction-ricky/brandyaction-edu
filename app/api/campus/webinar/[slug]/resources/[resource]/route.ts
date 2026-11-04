@@ -11,7 +11,7 @@ export async function GET(_request:Request,{params}:{params:Promise<{slug:string
   if(!item?.storagePath||!libraryPathValid(item.storagePath,slug,resource))return privateReply({error:'공개된 자료가 아닙니다.'},404);
   const storage=createAdminClient().storage.from('course-resources');
   const info=await storage.info(item.storagePath);
-  const size=info.data?.metadata?.size;
+  const size=info.data?.size;
   if(info.error||!info.data||typeof size!=='number'||!Number.isFinite(size)||size<1||size>LIBRARY_MAX_BYTES)return privateReply({error:'파일을 준비하지 못했어요.'},404);
   const {data,error}=await storage.createSignedUrl(item.storagePath,60,{download:item.fileName||true});
   if(error||!data)throw error||Error('download');
