@@ -41,6 +41,21 @@ jobs:
             exit 0
           fi
 
+          if [ "$head_ref" = "codex/edu-buyer-selection-main-release-20261104" ]; then
+            expected_main=f06729e9b9f16a3851f5a90b5263d0e8ea1baaed
+            release_payload=c8f3bc8f73f5a103a3a3c11ffcdfd420746737b3
+            if [ "$(git rev-parse HEAD^1)" != "$expected_main" ]; then
+              echo "Production main moved; revalidate the scoped buyer selection release."
+              exit 1
+            fi
+            if ! git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'; then
+              echo "The merge result differs from the tested buyer selection release."
+              exit 1
+            fi
+            echo "Buyer selection production release scope verified."
+            exit 0
+          fi
+
           if [ "$head_ref" = "codex/edu-required-consent-main-release-20261104" ]; then
             expected_main=6d534039ce82d988354afc3d5dab377590178dd4
             release_payload=e97479d0aa892f007fef80fa2100760c2bdc5ffc
