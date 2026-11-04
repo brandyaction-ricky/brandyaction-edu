@@ -1,4 +1,5 @@
 import {applyRenderProfile} from './render-profile.mjs';
+import {attachSceneTouchGuard} from './touch-guard.mjs';
 import {buildLibrary} from './library-scene.mjs';
 import {advanceMovement} from './movement-time.mjs';
 import {attachVisitorExperience} from './visitor-experience.mjs';
@@ -24,7 +25,8 @@ const names={library:'문샷 자료실',live:'문샷 라이브홀',welcome:'문�
 let started=false,publicVisitor=false,devPresence=false,qaCrowd=false;
 let meetup,sceneBatch,meetupWanted=false;
 let office,view,editor,editing=false,room='live',ready=false,blocked=false,previous=0,target=null,markers=[],currentRole='guest';
-document.querySelector('.tour-pad').addEventListener('contextmenu',e=>e.preventDefault());
+const detachTouchGuard=attachSceneTouchGuard(document);
+window.addEventListener('pagehide',detachTouchGuard,{once:true});
 document.querySelector('#appearance-close').onclick=()=>document.querySelector('#appearance-cancel').click();
 const keys=new Set(),groups=new Map(),positions=new Map(),obstacles={live:[],welcome:[],library:[]};
 const budget=createFrameBudget({activeWindow:1200,activeInterval:matchMedia('(pointer:coarse)').matches?1000/30:1000/60});

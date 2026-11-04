@@ -33,3 +33,9 @@
 @media(max-width:650px){.top{gap:8px}.brand{flex:1;padding:10px 8px}.brand strong{font-size:12px}.brand small{font-size:10px}.topButtons .primary{padding:10px;font-size:12px;gap:5px}.topButtons button:last-child{width:44px;padding:10px}.bottomActions{grid-template-columns:repeat(2,minmax(0,1fr))}.bottomActions button{min-width:0}.notice{top:calc(74px + env(safe-area-inset-top));margin:0;max-height:100px;overflow:auto}.notice button{min-width:44px;min-height:44px}.backLink{margin-bottom:6px;padding:8px 12px}.arrival{padding:20px}.arrival h1{font-size:26px}.arrival p{font-size:15px}.arrival small{font-size:11px}.activity{right:max(12px,env(safe-area-inset-right))}}
 @media(max-height:500px) and (min-width:651px){.top{top:max(8px,env(safe-area-inset-top))}.brand{padding:8px 12px}.brand small{display:none}.bottomActions{gap:5px}.bottomActions button{font-size:12px;padding:9px 10px}.activity{bottom:64px;max-height:calc(100% - 126px)}.notice{top:64px;bottom:auto;font-size:12px;padding:8px 12px;max-width:65%}.arrival{padding:18px 24px;gap:8px}.arrival h1{font-size:26px}.arrival p{font-size:14px;margin:0}.arrival small{font-size:10px}}
 .qa summary{min-height:44px;display:flex;align-items:center}.qa select{min-height:44px}
+
+/* Only spatial controls suppress selection; lessons, links and forms remain native. */
+.root{overflow:hidden;overscroll-behavior:none;max-width:100vw}
+.root [data-campus-chrome],.root [data-campus-chrome] *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.root [data-campus-chrome] button,.scene{touch-action:none}
+.root [data-campus-chrome] :is(input,textarea,select,a){-webkit-user-select:text;user-select:text;-webkit-touch-callout:default;touch-action:auto}
