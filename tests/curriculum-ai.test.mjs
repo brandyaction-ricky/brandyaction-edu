@@ -69,3 +69,21 @@ test('English questions and explicit English requests use a localized fallback',
  assert.equal(requestsEnglish('AARRR 순서를 알려주세요'),false);
  assert.equal(parseCurriculumAnswer({answer:'No evidence',needsMentor:true,sourceIds:[]},[],true).answer,aiFallbackEnglish);
 });
+
+test('common questions reserve a relevant first-day source without dropping current lesson',()=>{
+ const lessons=[
+  {id:'current',title:'13일차',day_number:13,body_text:'광고 집행'},
+  ...Array.from({length:6},(_,i)=>({id:'other'+i,title:'환불 일정',day_number:2+i,body_text:'환불 일정 예시'})),
+  {id:'welcome',title:'첫 수업',day_number:1,body_text:'환불은 운영팀에 문의해 주세요.'},
+ ];
+ const {sources}=retrieveCurriculum(lessons,'환불 일정이 궁금해요','current',false);
+ assert.ok(sources.some(source=>source.lessonId==='welcome'));
+ assert.ok(sources.some(source=>source.lessonId==='current'));
+});
+
+test('detects likely passwords and valid card numbers without blocking ordinary questions',()=>{
+ const {hasSensitiveQuestionText}=loadTs('lib/curriculum-ai-sensitive.ts');
+ assert.equal(hasSensitiveQuestionText('비밀번호: sample-test-value'),true);
+ assert.equal(hasSensitiveQuestionText('카드 4111 1111 1111 1111'),true);
+ assert.equal(hasSensitiveQuestionText('비밀번호를 잊었는데 어디에서 바꾸나요?'),false);
+});
