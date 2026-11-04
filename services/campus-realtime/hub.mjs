@@ -20,7 +20,7 @@ export function createCampusHub({authenticateJoin,maxSessions=1600,roomSize=25,t
  function refreshCrowd(){
   if(now()-crowdAt<2000)return;crowdAt=now();crowdVersion++;crowdByPartition.clear();
   const active=[...sessions.values()].filter(connected);qaCount=active.filter(p=>p.synthetic).length;
-  crowdIndex=active.filter(p=>p.room==='live').map(p=>({id:p.id,partition:p.partition,x:Math.round(p.x*4)/4,y:Math.round(p.y*4)/4,yaw:Math.round(p.yaw*10)/10,coat:p.appearance.coat,skin:p.appearance.skinColor,hair:p.appearance.hairColor}));
+  crowdIndex=active.filter(p=>p.room==='live').map(p=>({id:p.id,partition:p.partition,x:Math.round(p.x*4)/4,y:Math.round(p.y*4)/4,yaw:Math.round(p.yaw*10)/10,coat:p.appearance.coat,skin:p.appearance.skinColor,hair:p.appearance.hairColor,gender:p.appearance.gender,model:p.appearance.model,pants:p.appearance.pantsColor,heldItem:p.appearance.heldItem}));
  }
  function publicCrowd(p){
   refreshCrowd();if(p.room!=='live'||p.crowdVersion===crowdVersion)return {};

@@ -14,10 +14,10 @@ const stories={
  office:{title:'내 AI 사무실',eyebrow:'배운 AI를 내 업무에 적용하는 나만의 자리',description:'해야 할 일부터 만든 결과와 다음 실행까지, 흩어지지 않게 한곳에 모아보세요.',steps:[['할 일 정리','누구를 위한 일인지, 어떤 결과가 필요한지 정해요.'],['결과 검토','업무 요청과 결과를 모아 직접 확인해요.'],['다음 실행','작업 순서와 성과를 기록하고 다시 활용해요.']],note:'개인 업무는 다른 방문자에게 보이지 않아요. 실제 텔레그램 봇 초대·자동 실행은 별도 연결이 필요하며 현재 준비 중입니다.'},
  welcome:{title:'문샷 웰컴 존',eyebrow:'구매한 순간부터, 첫 수업을 준비하는 곳',description:'개강 전에도 작은 준비를 시작할 수 있어요. 처음이라 낯선 AI를 한 걸음씩 만나보세요.',steps:[['첫 안내','온보딩 영상으로 학습 흐름을 알아봐요.'],['OX 퀴즈','AI를 안전하게 쓰는 기본을 익혀요.'],['내 시작점','간단한 질문으로 어느 부분부터 연습할지 살펴봐요.']],note:'구매자에게 열리는 준비 공간입니다. 개강일과 정규 수업 이용 기간은 과정 안내에서 확인하세요.'},
 } as const;
-export function WebinarRoom({event,demo=false}:{event:PublicWebinar;demo?:boolean}){
+export function WebinarRoom({event,demo=false,devReview=false,qaCrowd=false}:{event:PublicWebinar;demo?:boolean;devReview?:boolean;qaCrowd?:boolean}){
  const sent=useRef(new Set<string>());
- function record(name:WebinarEvent){if(demo||sent.current.has(name))return;sent.current.add(name);try{let session=sessionStorage.getItem('edu-visit');if(!session){session=crypto.randomUUID();sessionStorage.setItem('edu-visit',session);}void fetch(`/api/campus/webinar/${event.slug}/events`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session,event:name}),keepalive:true}).catch(()=>{});}catch{/* Entry works even without browser storage. */}}
- return <Suspense fallback={<main className={styles.loading} role="status">문샷 공간과 캐릭터를 준비하고 있어요…</main>}><Tour snapshot={visitorSnapshot} visitor={{title:event.title,onEnter:()=>record('entry'),onActivity:id=>{if(id==='experience')record('experience');},renderGate:room=><SpaceInvitation key={room} room={room} event={event} demo={demo} record={record}/>,renderTool:tool=>tool==='experience'?<Experience/>:<SpaceInvitation room="study" event={event} demo={demo} record={record} general/>}}/></Suspense>;
+ function record(name:WebinarEvent){if(demo||devReview||sent.current.has(name))return;sent.current.add(name);try{let session=sessionStorage.getItem('edu-visit');if(!session){session=crypto.randomUUID();sessionStorage.setItem('edu-visit',session);}void fetch(`/api/campus/webinar/${event.slug}/events`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session,event:name}),keepalive:true}).catch(()=>{});}catch{/* Entry works even without browser storage. */}}
+ return <Suspense fallback={<main className={styles.loading} role="status">문샷 공간과 캐릭터를 준비하고 있어요…</main>}><Tour snapshot={visitorSnapshot} visitor={{devPresence:devReview,qaCrowd:devReview&&qaCrowd,title:event.title,onEnter:()=>record('entry'),onActivity:id=>{if(id==='experience')record('experience');},renderGate:room=><SpaceInvitation key={room} room={room} event={event} demo={demo} record={record}/>,renderTool:tool=>tool==='experience'?<Experience/>:tool.startsWith('story:')?<Story topic={tool.slice(6)} event={event} demo={demo} record={record}/>:<SpaceInvitation room="study" event={event} demo={demo} record={record} general/>}}/></Suspense>;
 }
 function SpaceInvitation({room,event,demo,record,general=false}:{room:TourRoom;event:PublicWebinar;demo:boolean;record:(name:WebinarEvent)=>void;general?:boolean}){
  const story=stories[room==='office'?'office':room==='welcome'?'welcome':'study'];
@@ -39,3 +39,13 @@ function SpaceInvitation({room,event,demo,record,general=false}:{room:TourRoom;e
  </article>;
 }
 function Experience(){const [answer,setAnswer]=useState<number|null>(null);return <section className={styles.invitation}><small>3분 체험 · 실제 AI 호출이나 과제 점수와 무관해요</small><h2>AI에게 일을 부탁해 볼까요?</h2><p>“우리 상품 홍보 글을 써줘”라는 요청을 어떻게 개선하면 좋을까요?</p><div className={styles.answers}>{['글의 길이만 길게 늘려 달라고 한다.','고객·해결할 문제·원하는 행동을 함께 알려준다.','같은 질문을 계속 반복한다.'].map((a,i)=><button key={a} aria-pressed={answer===i} onClick={()=>setAnswer(i)}>{a}</button>)}</div>{answer!==null&&<p role="status"><strong>{answer===1?'첫 미션 완료!':'한 번 더 생각해 볼까요?'}</strong><br/>{answer===1?'목적과 맥락을 알려주면 결과를 실제 업무에 적용하기 쉬워져요. 문샷에서는 내 사업의 결과물을 만들고 동료 의견으로 개선해요.':'AI가 누구를 위해 무엇을 해야 하는지 알 수 있도록 맥락을 더해 보세요.'}</p>}</section>;}
+
+const examples={
+ study:{title:'만든 결과를 함께 개선하는 시간',room:'study' as const,lines:[['질문 예시','광고 문구를 만들었는데 고객에게 와닿는지 모르겠어요.'],['동료 의견 예시','누구의 어떤 문제를 해결하는지 첫 문장부터 보여주면 어떨까요?']],next:'수업에서 만들고, 동료의 시선으로 개선하기'},
+ office:{title:'배운 AI를 내 일에 연결하기',room:'office' as const,lines:[['질문 예시','AI로 만든 초안이 여러 곳에 흩어져 있어요.'],['활용 예시','할 일과 결과를 사무실에 모아 검토하고 다음 실행으로 연결해 보세요.']],next:'내 AI 사무실에서 할 수 있는 일'},
+ welcome:{title:'처음이라도, 시작은 작게',room:'welcome' as const,lines:[['질문 예시','AI를 처음 사용하는데 따라갈 수 있을까요?'],['안내 예시','개강 전 안내와 짧은 퀴즈로 준비하고, 수업에서는 내 일에 하나씩 적용해 봐요.']],next:'문샷의 학습 흐름 알아보기'},
+};
+function Story({topic,event,demo,record}:{topic:string;event:PublicWebinar;demo:boolean;record:(name:WebinarEvent)=>void;onExplore?:()=>void}){
+ const story=examples[topic as keyof typeof examples]||examples.study;
+ return <section className={styles.invitation}><small>수업 속 대화 예시 · 실제 참여자 발언이나 수강 후기가 아닙니다.</small><h2>{story.title}</h2><div className={styles.exampleConversation}>{story.lines.map(([label,line])=><div key={label}><small>{label}</small><p>{line}</p></div>)}</div><p>이런 과정을 내 일에 적용해 보고 싶다면, 수업 구성과 필요한 준비를 먼저 확인해 보세요.</p><SpaceInvitation room={story.room} event={event} demo={demo} record={record}/></section>;
+}

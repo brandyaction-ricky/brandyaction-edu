@@ -3,7 +3,7 @@ import {startCrowdVisitors} from '../campus-fixture/crowd-visitors.mjs';
 test('connected crowd becomes a conversation only after approaching and joining',async({page,baseURL,isMobile})=>{
  test.setTimeout(120000);let browserSession:Record<string,string>|undefined;page.on('response',async response=>{if(response.url().endsWith('/api/campus/preview-meetup')&&response.request().method()==='POST'&&response.request().postDataJSON()?.kind==='join')browserSession=await response.json();});const visitors=await startCrowdVisitors(baseURL,20,{animate:true}),errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  try{
-  await page.goto('/webinar?meet=1');await page.getByRole('button',{name:'이 캐릭터로 바로 입장',exact:true}).click({timeout:90000});
+  await page.goto('/webinar?meet=1&qaChat=1');await page.getByRole('button',{name:'이 캐릭터로 바로 입장',exact:true}).click({timeout:90000});
   const world=page.frameLocator('iframe'),root=world.locator('#office');await expect(root).toHaveAttribute('data-crowd-count','20');await expect(world.locator('.meetup-population')).toContainText('가상 검수 20명');await expect(world.locator('.meetup-join')).toBeHidden();
   if(isMobile){const box=(await world.locator('[data-direction=right]').boundingBox())!;await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.waitForTimeout(550);await page.mouse.up();}else{await root.focus();await page.keyboard.down('d');await page.waitForTimeout(550);await page.keyboard.up('d');}
   await expect(world.getByRole('button',{name:'가까운 그룹과 대화하기'})).toBeVisible();await world.getByRole('button',{name:'가까운 그룹과 대화하기'}).click();

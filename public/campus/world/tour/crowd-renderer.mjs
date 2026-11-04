@@ -1,16 +1,23 @@
-/** Low-detail bodies share geometry/material: eight draw calls, no per-person skeletons. */
-export function attachCrowdRenderer(office,root,CampusInstancedMesh,CampusSphereGeometry){
+import {styleAvatarActor,avatarModelSignature,visitorAnimation} from '../office/vendor/avatar-appearance.js';
+/** Original bundled characters at every distance. Bound count and animation work, never substitute bodies. */
+export function attachCrowdRenderer(office,root){
  const limit=innerWidth<=600?40:80,group=new office.room.constructor();office.scene.add(group);
- const source=office.boxMesh(0,0,0,1,1,1,0xffffff,{group,rough:1,metal:0});group.remove(source);
- const pose=new office.room.constructor(),color=source.material.color.clone();
- const round=new CampusSphereGeometry(.5,10,8);
- const face=office.patternTexture((c,n)=>{c.clearRect(0,0,n,n);c.fillStyle='#142336';for(const x of [.3,.7]){c.beginPath();c.arc(n*x,n*.36,n*.07,0,Math.PI*2);c.fill();}c.lineWidth=n*.055;c.strokeStyle='#142336';c.beginPath();c.arc(n*.5,n*.48,n*.18,.15,Math.PI-.15);c.stroke();});const faceMaterial=source.material.clone();faceMaterial.map=face;faceMaterial.transparent=true;faceMaterial.depthWrite=false;
- const parts=[['coat',0,.65,0,.42,.45,.25],['skin',0,1.08,0,.58,.52,.48],['hair',0,1.3,-.04,.63,.28,.52],['skin',-.3,.65,0,.16,.36,.2],['skin',.3,.65,0,.16,.36,.2],['pants',-.12,.22,0,.19,.4,.23],['pants',.12,.22,0,.19,.4,.23],['face',0,1.08,.245,.38,.24,.012]];
- const meshes=parts.map((part,i)=>{const m=new CampusInstancedMesh(i===1||i===2?round:source.geometry,part[0]==='face'?faceMaterial:source.material,limit);m.count=0;m.frustumCulled=false;m.castShadow=false;m.receiveShadow=false;group.add(m);return m;});
- let figures=[],last=0,settled=true;
- function clear(){figures=[];settled=true;for(const m of meshes)m.count=0;root.dataset.crowdCount='0';}
- function set(list){const at=performance.now(),old=new Map(figures.map(p=>[p.id,p]));figures=[...list].sort((a,b)=>{const self=office.campusAvatar||{x:0,y:28};return(Math.hypot(a.x-self.x,a.y-self.y)-(old.has(a.id)?.8:0))-(Math.hypot(b.x-self.x,b.y-self.y)-(old.has(b.id)?.8:0));}).slice(0,limit).map(p=>({...p,from:old.get(p.id)?sample(old.get(p.id),at):p,at}));root.dataset.crowdCount=String(figures.length);settled=false;draw(at,true);}
+ const actors=new Map();let figures=[],last=0;
+ const profile=p=>({gender:p.gender==='female'?'female':'male',model:Number.isInteger(p.model)?p.model:0,coat:p.coat,hairColor:p.hair,skinColor:p.skin,pantsColor:p.pants,heldItem:p.heldItem||'none'});
  function sample(p,now){const t=Math.max(0,Math.min(1,(now-p.at)/1800));return{x:p.from.x+(p.x-p.from.x)*t,y:p.from.y+(p.y-p.from.y)*t,yaw:(p.from.yaw||0)+Math.atan2(Math.sin((p.yaw||0)-(p.from.yaw||0)),Math.cos((p.yaw||0)-(p.from.yaw||0)))*t};}
- function draw(now,force=false){if(!force&&(settled||now-last<100))return;last=now;for(let n=0;n<parts.length;n++){const [tone,x,y,z,w,h,d]=parts[n],mesh=meshes[n];mesh.count=figures.length;figures.forEach((p,i)=>{const pos=sample(p,now),yaw=pos.yaw||0,c=Math.cos(yaw),s=Math.sin(yaw);pose.position.set(pos.x+x*c+z*s,(office.campusHeightAt?.(pos.x,pos.y)||0)+y,pos.y+z*c-x*s);const walking=Math.hypot(p.x-p.from.x,p.y-p.from.y)>.02&&now-p.at<1800;const swing=walking?Math.sin(now*.009+i*1.7)*.28:0;pose.rotation.set(n===3||n===6?swing:n===4||n===5?-swing:0,yaw,0);pose.scale.set(w,h,d);pose.updateMatrix();mesh.setMatrixAt(i,pose.matrix);color.set(tone==='face'?'#ffffff':tone==='pants'?'#36485d':p[tone]||'#386eb4');mesh.setColorAt(i,color);});mesh.instanceMatrix.needsUpdate=true;if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;}settled=figures.every(p=>Math.hypot(p.x-p.from.x,p.y-p.from.y)<.02||now-p.at>=1800);}
- return{set,clear,tick:draw,moving:()=>figures.some(p=>Math.hypot(p.x-p.from.x,p.y-p.from.y)>.02&&performance.now()-p.at<1800),destroy(){clear();group.removeFromParent();for(const m of meshes)m.dispose();source.geometry.dispose();round.dispose();source.material.dispose();faceMaterial.dispose();face.dispose();}};
+ function dispose(id){const actor=actors.get(id);if(actor)office.disposeVisitorActor(actor,group);actors.delete(id);}
+ function clear(){figures=[];for(const id of actors.keys())dispose(id);root.dataset.crowdCount='0';}
+ function set(list){const at=performance.now(),old=new Map(figures.map(p=>[p.id,p]));figures=[...list].sort((a,b)=>{const self=office.campusAvatar||{x:0,y:28};return(Math.hypot(a.x-self.x,a.y-self.y)-(old.has(a.id)?.8:0))-(Math.hypot(b.x-self.x,b.y-self.y)-(old.has(b.id)?.8:0));}).slice(0,limit).map(p=>({...p,from:old.has(p.id)?sample(old.get(p.id),at):p,at}));for(const id of actors.keys())if(!figures.some(p=>p.id===id))dispose(id);root.dataset.crowdCount=String(figures.length);root.dataset.crowdModel='original-avatar';draw(at);}
+ function draw(now){if(document.hidden||root.inert||now-last<33)return;last=now;let created=0;for(const p of figures){
+  const appearance=profile(p);let actor=actors.get(p.id);
+  if(actor&&actor.appearanceKey!==avatarModelSignature(appearance)){dispose(p.id);actor=null;}
+  if(!actor){if(created>=2||!office.chars?.length)continue;actor=office.createVisitorActor(appearance,group,'crowd:'+p.id);actors.set(p.id,actor);created++;actor.crowdAnimationAt=now;}
+  styleAvatarActor(actor,appearance,(array,size)=>office.createAvatarAttribute(array,size));
+  const pos=sample(p,now),walking=Math.hypot(p.x-p.from.x,p.y-p.from.y)>.02&&now-p.at<1800;
+  actor.obj.visible=true;actor.obj.position.set(pos.x,office.campusHeightAt?.(pos.x,pos.y)||0,pos.y);actor.obj.rotation.y=pos.yaw||0;
+  office.play(actor,visitorAnimation(appearance.heldItem,{moving:walking}));
+  if(now-actor.crowdAnimationAt>=(walking?66:200)){actor.mixer.update(Math.min(.25,(now-actor.crowdAnimationAt)/1000));actor.crowdAnimationAt=now;}
+  office.syncVisitorProp(actor,appearance.heldItem);
+ }root.dataset.crowdActors=String(actors.size);}
+ return {set,clear,tick:draw,moving:()=>actors.size<figures.length||figures.some(p=>Math.hypot(p.x-p.from.x,p.y-p.from.y)>.02&&performance.now()-p.at<1800),destroy(){clear();group.removeFromParent();}};
 }
