@@ -58,3 +58,12 @@ test('analytics validates dates before querying and offers quick periods and pag
   await expect(page.getByRole('alert')).toContainText('종료일은 시작일 이후');
   expect(requests).toBe(count);
 });
+
+test('campus analysis is opened explicitly and does not replace or duplicate site filters',async({page})=>{
+ let campusReads=0;
+ await page.route('**/api/platform/workflows?**',r=>r.fulfill({json:empty}));
+ await page.route('**/api/admin/campus/analytics?**',r=>{campusReads++;return r.fulfill({json:{sessions:3,activeSeconds:90,trackingEnabled:true,rooms:[],actions:[],resources:[],targets:[],scopes:[]}});});
+ await page.goto('/analytics-test');await expect(page.getByText('기간 내 기록 없음',{exact:false})).toBeVisible();expect(campusReads).toBe(0);
+ await page.getByRole('button',{name:'문샷 캠퍼스 행동',exact:true}).click();await expect(page.getByRole('heading',{name:'문샷 캠퍼스 분석',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'새로고침',exact:true})).toHaveCount(1);await expect(page.getByLabel('시작일 (한국 시간)')).toHaveCount(0);await expect.poll(()=>campusReads).toBeGreaterThan(0);
+ await page.getByRole('button',{name:'사이트 유입·결제',exact:true}).click();await expect(page.getByLabel('시작일 (한국 시간)')).toBeVisible();await expect(page.getByRole('heading',{name:'문샷 캠퍼스 분석',exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'새로고침',exact:true})).toHaveCount(1);
+});
