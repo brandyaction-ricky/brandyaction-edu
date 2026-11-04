@@ -107,25 +107,48 @@ test('customer answers once, then sees the Telegram guide without exposing the i
   await expect(page.getByText('텔레그램 앱을 설치하고 계정을 만든 뒤')).toBeVisible();
 });
 
-test('operator can save a disabled draft before images or invite link are ready', async ({ page }) => {
+test('operator sees the product cohort and saves only the direct guide fields', async ({ page }) => {
+  const product = '33333333-3333-4333-8333-333333333333';
+  const settings = { label: '문샷 공부방 입장하기', url: 'https://campus.example.test/welcome?cohort=5' };
   const saved: unknown[] = [];
-  await page.route('**/api/admin/purchase-onboarding*', async route => {
+  await page.route('**/api/admin/purchase-onboarding/delivery*', route => route.fulfill({ json: { buyers: [], channels: {}, templates: [], history: [] } }));
+  await page.route(/\/api\/admin\/purchase-onboarding(?:\?|$)/, route => {
     const url = new URL(route.request().url());
-    if (route.request().method() === 'POST') { const body = route.request().postDataJSON(); saved.push(body); return route.fulfill({ json: { ok: true, settings: body.settings } }); }
+    if (route.request().method() === 'POST') {
+      const body = route.request().postDataJSON();
+      saved.push(body);
+      return route.fulfill({ json: { ok: true, settings: body.settings } });
+    }
+    expect(url.searchParams.get('product')).toBe(product);
     return route.fulfill({ json: url.searchParams.has('cohort')
-      ? { settings: { roomName: 'AI Moonshot project #4기', inviteUrl: '', paidImage: '', organicImage: '', enabled: false }, cohorts: [], telegramOnly: true }
-      : { settings: {}, cohorts: [{ id: cohort, name: '4기', courses: { title: '문샷 챌린지' } }] } });
+      ? { settings: null }
+      : { cohorts: [{ id: cohort, name: '5기', courses: { title: '문샷 챌린지' } }] } });
   });
-  await page.goto('/admin/purchase-onboarding-test');
+  await page.goto('/admin/purchase-onboarding-test?product=' + product);
   await page.getByLabel('안내할 기수').selectOption(cohort);
-  await expect(page.getByLabel('텔레그램 방 이름')).toHaveValue('AI Moonshot project #4기');
-  await expect(page.getByLabel('결제 완료 수강생에게 안내 화면 열기')).not.toBeChecked();
-  await expect(page.getByText('광고 방 프로필 이미지')).toHaveCount(0);
-  await expect(page.getByText(/웹 유입 설문 없이/)).toBeVisible();
-  await page.getByRole('button', { name: '설정 저장' }).click();
-  await expect(page.getByText('결제 후 안내는 아직 꺼져 있습니다.')).toBeVisible();
-  expect(saved).toHaveLength(1);
-  expect((saved[0] as { settings: { enabled: boolean; paidImage: string } }).settings).toMatchObject({ enabled: false, paidImage: '' });
+  const panel = page.locator('#completion-settings');
+  await expect(panel.getByRole('textbox')).toHaveCount(2);
+  await panel.getByLabel('안내 링크 이름', { exact: true }).fill(settings.label);
+  await panel.getByLabel('안내 링크', { exact: true }).fill(settings.url);
+  await panel.getByRole('button', { name: '설정 저장' }).click();
+  await expect(panel.getByRole('status')).toContainText('안내 링크를 표시합니다');
+  expect(saved).toEqual([{ product, cohort, settings }]);
+  await expect(page.getByRole('link', { name: '구매자 공지·발송 내역' })).toBeVisible();
+});
+
+test('a configured completion guide goes directly to the study room with no legacy steps', async ({ page }) => {
+  const completionGuide = { label: '문샷 공부방 입장하기', url: 'https://campus.example.test/welcome?cohort=5' };
+  await page.route('**/api/purchase-onboarding*', route => route.fulfill({ json: { available: true, orderId: order, completionGuide } }));
+  await page.route('https://campus.example.test/**', route => route.fulfill({ body: 'Synthetic welcome room' }));
+  await page.goto(`/order-complete-test?orderId=${order}`);
+  const direct = page.getByRole('link', { name: completionGuide.label });
+  await expect(direct).toHaveAttribute('href', completionGuide.url);
+  await expect(page.getByRole('list', { name: '클래스 시작 단계' })).toHaveCount(0);
+  await direct.click();
+  await expect(page).toHaveURL(completionGuide.url);
+  await page.goto(`/purchase-onboarding?order=${order}&step=guide`);
+  await expect(direct).toHaveAttribute('href', completionGuide.url);
+  await expect(page.getByText('공지방 입장', { exact: true })).toHaveCount(0);
 });
 
 test('paid completion offers onboarding only when the cohort guide is enabled', async ({ page }) => {

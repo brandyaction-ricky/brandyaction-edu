@@ -1,12 +1,15 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getOperatorUser } from '@/lib/operator-permissions';
-import { DEFAULT_ONBOARDING_ROOM_NAME, isMoonshotFourth, onboardingSettingsKey, purchaseOnboardingSettings, uuid } from '@/lib/purchase-onboarding';
+import { completionGuideSettings, completionGuideSettingsKey, uuid } from '@/lib/purchase-onboarding';
 
 const reply = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
-const relatedCourse = (value: unknown): { title?: string; category?: string; list_price?: number } | null => {
-  const row = Array.isArray(value) ? value[0] : value;
-  return row && typeof row === 'object' ? row as { title?: string; category?: string; list_price?: number } : null;
-};
+const cohortColumns = 'id,name,course_id,courses!inner(title,category,list_price)';
+
+function paidCohorts(db: ReturnType<typeof createAdminClient>, productId: string | null) {
+  const query = db.from('cohorts').select(cohortColumns).neq('courses.category', 'free').gt('courses.list_price', 0);
+  return productId ? query.eq('course_id', productId) : query;
+}
+
 async function operator() {
   const user = await getOperatorUser('products');
   return user?.permissions.orders ? user : null;
@@ -15,38 +18,25 @@ async function operator() {
 export async function GET(request: Request) {
   try {
     if (!await operator()) return reply({ error: '상품과 주문 관리 권한이 필요합니다.' }, 403);
+    const params = new URL(request.url).searchParams;
+    const cohortId = params.get('cohort');
+    const productId = params.get('product');
+    if (productId !== null && !uuid(productId)) return reply({ error: '상품을 확인해 주세요.' }, 400);
+    if (cohortId !== null && !uuid(cohortId)) return reply({ error: '기수를 확인해 주세요.' }, 400);
     const db = createAdminClient();
-    const cohortId = new URL(request.url).searchParams.get('cohort');
-    if (cohortId && !uuid(cohortId)) return reply({ error: '기수를 확인해 주세요.' }, 400);
-    const cohorts = await db.from('cohorts').select('id,name,course_id,courses(title,category,list_price)').order('created_at', { ascending: false }).limit(100);
-    if (cohorts.error) throw cohorts.error;
-    const selected = (cohorts.data || []).find(row => row.id === cohortId);
-    const moonshotFourth = selected && isMoonshotFourth(relatedCourse(selected.courses)?.title, selected.name);
-    let settings = { roomName: moonshotFourth ? DEFAULT_ONBOARDING_ROOM_NAME : '', inviteUrl: '', paidImage: '', organicImage: '', enabled: false };
-    if (cohortId) {
-      const row = await db.from('site_settings').select('value').eq('key', onboardingSettingsKey(cohortId)).eq('is_public', false).maybeSingle();
-      if (row.error) throw row.error;
-      if (row.data) settings = purchaseOnboardingSettings(row.data.value);
+    const query = paidCohorts(db, productId);
+    if (!cohortId) {
+      const cohorts = await query.order('created_at', { ascending: false }).order('id').limit(100);
+      if (cohorts.error) throw cohorts.error;
+      return reply({ cohorts: cohorts.data || [] });
     }
-    let lessons: { id: string; title: string }[] = [];
-    let comments: { order_id: string; comment: string; confirmed_at: string }[] = [];
-    if (selected) {
-      const weeks = await db.from('curriculum_weeks').select('id,week_number').eq('course_id', selected.course_id).is('archived_at', null).order('week_number');
-      if (weeks.error) throw weeks.error;
-      if (weeks.data?.length) {
-        const rows = await db.from('curriculum_lessons').select('id,title,week_id').in('week_id', weeks.data.map(w => w.id)).is('archived_at', null).order('day_number');
-        if (rows.error) throw rows.error;
-        lessons = (weeks.data || []).flatMap(w => (rows.data || []).filter(l => l.week_id === w.id).map(l => ({ id: l.id, title: `${w.week_number}주차 · ${l.title}` })));
-      }
-      const items = await db.from('order_items').select('order_id').eq('cohort_id', selected.id);
-      if (items.error) throw items.error;
-      if (items.data?.length) {
-        const rows = await db.from('edu_onboarding_steps').select('order_id,comment,confirmed_at').eq('step', 'learning').in('order_id', items.data.map(i => i.order_id)).order('confirmed_at', { ascending: false }).limit(100);
-        if (rows.error) throw rows.error;
-        comments = rows.data || [];
-      }
-    }
-    return reply({ lessons, comments, cohorts: (cohorts.data || []).filter(row => { const course = relatedCourse(row.courses); return course?.category !== 'free' && Number(course?.list_price || 0) > 0; }), settings, telegramOnly: Boolean(moonshotFourth) || ('checklistEnabled' in settings && settings.checklistEnabled === true) });
+
+    const cohort = await query.eq('id', cohortId).maybeSingle();
+    if (cohort.error) throw cohort.error;
+    if (!cohort.data) return reply({ error: '이 상품에서 안내할 유료 클래스의 기수를 선택해 주세요.' }, 400);
+    const row = await db.from('site_settings').select('value').eq('key', completionGuideSettingsKey(cohortId)).eq('is_public', false).maybeSingle();
+    if (row.error) throw row.error;
+    return reply({ settings: row.data ? completionGuideSettings(row.data.value) : null });
   } catch { return reply({ error: '결제 후 안내 설정을 불러오지 못했습니다.' }, 503); }
 }
 
@@ -56,31 +46,26 @@ export async function POST(request: Request) {
     const user = await operator();
     if (!user) return reply({ error: '상품과 주문 관리 권한이 필요합니다.' }, 403);
     const raw = await request.text();
-    if (raw.length > 3000) return reply({ error: '입력 내용이 너무 큽니다.' }, 413);
+    if (raw.length > 4000) return reply({ error: '입력 내용이 너무 큽니다.' }, 413);
     let body: Record<string, unknown>;
     try { body = JSON.parse(raw); } catch { return reply({ error: '입력 형식을 확인해 주세요.' }, 400); }
     if (!body || typeof body !== 'object' || Array.isArray(body) || !uuid(body.cohort)) return reply({ error: '기수를 확인해 주세요.' }, 400);
-    const settings = purchaseOnboardingSettings(body.settings);
+    const productId = body.product ?? null;
+    if (productId !== null && !uuid(productId)) return reply({ error: '상품을 확인해 주세요.' }, 400);
+    let settings;
+    try { settings = completionGuideSettings(body.settings); }
+    catch (error) { return reply({ error: error instanceof Error ? error.message : '안내 링크를 확인해 주세요.' }, 400); }
+
     const db = createAdminClient();
-    const cohort = await db.from('cohorts').select('id,course_id,courses(category,list_price)').eq('id', body.cohort).maybeSingle();
+    const cohort = await paidCohorts(db, productId).eq('id', body.cohort).maybeSingle();
     if (cohort.error) throw cohort.error;
-    const course = relatedCourse(cohort.data?.courses);
-    if (!cohort.data || course?.category === 'free' || Number(course?.list_price || 0) <= 0) return reply({ error: '유료 클래스의 기수를 선택해 주세요.' }, 400);
-    if (settings.firstLessonId) {
-      const lesson = await db.from('curriculum_lessons').select('id,curriculum_weeks!inner(course_id)').eq('id', settings.firstLessonId).is('archived_at', null).maybeSingle();
-      if (lesson.error) throw lesson.error;
-      const week = Array.isArray(lesson.data?.curriculum_weeks) ? lesson.data.curriculum_weeks[0] : lesson.data?.curriculum_weeks;
-      if (!lesson.data || week?.course_id !== cohort.data.course_id) return reply({ error: '이 클래스의 첫 학습을 선택해 주세요.' }, 400);
-    }
-    const key = onboardingSettingsKey(body.cohort);
+    if (!cohort.data) return reply({ error: '이 상품에서 안내할 유료 클래스의 기수를 선택해 주세요.' }, 400);
+    const key = completionGuideSettingsKey(body.cohort);
     const saved = await db.from('site_settings').upsert({ key, value: settings, is_public: false, updated_by: user.id, updated_at: new Date().toISOString() }, { onConflict: 'key' });
     if (saved.error) throw saved.error;
     const audit = await db.from('audit_logs').insert({ actor_user_id: user.id, action: 'purchase_onboarding.settings_saved', entity_type: 'cohort', entity_id: body.cohort,
-      after_data: { enabled: settings.enabled, inviteConfigured: Boolean(settings.inviteUrl), paidImageConfigured: Boolean(settings.paidImage), organicImageConfigured: Boolean(settings.organicImage) } });
+      after_data: { enabled: Boolean(settings.url), guideConfigured: Boolean(settings.url) } });
     if (audit.error) throw audit.error;
     return reply({ ok: true, settings });
-  } catch (error) {
-    const status = error instanceof Error && /방 이름|텔레그램|프로필 이미지|안내를 켜려면|OT 일정|첫 학습/.test(error.message) ? 400 : 503;
-    return reply({ error: status === 400 && error instanceof Error ? error.message : '결제 후 안내 설정을 저장하지 못했습니다.' }, status);
-  }
+  } catch { return reply({ error: '결제 후 안내 설정을 저장하지 못했습니다.' }, 503); }
 }

@@ -19,6 +19,7 @@ export async function GET(request: Request) {
     if (!user) return reply({ error: '로그인이 필요합니다.' }, 401);
     const purchase = await eligiblePurchase(user.id, new URL(request.url).searchParams.get('order'));
     if (!purchase) return reply({ available: false, error: '안내할 결제 완료 주문이 없습니다.' }, 404);
+    if ('completionGuide' in purchase) return reply({ available: true, ...purchase });
     if (purchase.telegramOnly) return reply({ available: true, telegramOnly: true, orderId: purchase.orderId,
       orderNumber: purchase.orderNumber, itemName: purchase.itemName, roomName: purchase.settings.roomName || '교육생 공지방',
       ...(purchase.settings.checklistEnabled ? { progress: await readOnboardingProgress(user.id, purchase) } : {}),
@@ -47,6 +48,7 @@ export async function POST(request: Request) {
     if (!body || typeof body !== 'object' || Array.isArray(body) || typeof body.order !== 'string') return reply({ error: '주문을 확인해 주세요.' }, 400);
     const purchase = await eligiblePurchase(user.id, body.order);
     if (!purchase) return reply({ error: '결제 완료 주문을 확인해 주세요.' }, 404);
+    if ('completionGuide' in purchase) return reply({ error: '지원하지 않는 요청입니다.' }, 400);
     if (purchase.telegramOnly) {
       if (body.action === 'confirm' && purchase.settings.checklistEnabled) return reply(await confirmOnboardingStep(user.id, purchase, body));
       if (body.action !== 'link') return reply({ error: '지원하지 않는 요청입니다.' }, 400);
