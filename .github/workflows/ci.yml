@@ -349,11 +349,11 @@ jobs:
       matrix:
         include:
           - device: desktop
-            files: tests/campus-browser/atrium.spec.ts tests/campus-browser/crowd-groups.spec.ts
-            pattern: arrival defaults|connected crowd
+            files: tests/campus-browser/four-spaces.spec.ts tests/campus-browser/tour-direction.spec.ts
+            pattern: map role switch|movement follows
           - device: mobile
-            files: tests/campus-browser/mobile-layout.spec.ts
-            pattern: 768x1024
+            files: tests/campus-browser/mobile-layout.spec.ts tests/campus-browser/tour-direction.spec.ts
+            pattern: 768x1024|movement follows
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
