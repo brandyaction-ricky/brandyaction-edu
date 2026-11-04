@@ -67,7 +67,7 @@ import {
   sectionDescription,
 } from "./final/admin-shell";
 import { MemberViews, enrollmentLessons } from "./final/member-views";
-import { LearningQuestionShortcut } from './final/learning-question-dialog';
+import { FloatingLearningQuestion } from './final/floating-learning-question';
 import { MemberVisitRecorder } from "./final/member-visit-recorder";
 import {
   ArticleCard,
@@ -612,7 +612,7 @@ export function Platform({
             {learning && <MobileRefresh />}
             {user ? (
               <>
-                {learning && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' ? <LearningQuestionShortcut key={routeKey} context={questionContext}/> : <Link className="link header-questions" href={admin ? "/admin/questions" : "/my/questions"}>질문·답변</Link>}
+                <Link className="link header-questions" href={admin ? "/admin/questions" : "/my/questions?view=mine"}>질문·답변</Link>
                 <Link className="link" href="/my">
                   마이페이지
                 </Link>
@@ -1138,6 +1138,7 @@ export function Platform({
         {body}
       </main>
       {!admin && footer}
+      {user && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' && (learning || account && (!path[1] || ['classes','questions'].includes(path[1]))) && <FloatingLearningQuestion key={user.id} member={user.id} current={questionContext}/>}
       {notice && (admin ? <AdminToast tone="success">{notice}</AdminToast> : <div className="toast" role="status">{notice}</div>)}
       {editor && editor.route === routeKey && (
         <Editor

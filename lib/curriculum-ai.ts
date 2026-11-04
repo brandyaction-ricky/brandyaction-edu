@@ -1,9 +1,10 @@
 import { lessonBodyPlainText } from './lesson-body';
 import { publicLessonBlocks, validateLessonBlocks } from './lesson-blocks';
 
-export type AiSource = { id: string; lessonId: string; title: string; dayNumber?: number; revision: string | null; excerpt: string };
+export type AiSource = { id: string; lessonId: string; title: string; blockId?: string; dayNumber?: number; revision: string | null; excerpt: string };
 export type CurriculumLesson = { id: string; title: string; day_number?: number | null; description?: string | null; revision?: string | null; document?: unknown; body_text?: string | null };
-export type CurriculumAnswer = { answer: string; needsMentor: boolean; sources: AiSource[]; searchedLessons: number };
+export type CaptureLesson = { lessonId: string; title: string; dayNumber?: number };
+export type CurriculumAnswer = { captureLesson?: CaptureLesson; answer: string; needsMentor: boolean; sources: AiSource[]; searchedLessons: number };
 export const studentImageHandoff = '이 AI 대화는 텍스트 질문만 지원해요. 화면의 오류 문구나 막힌 부분을 글로 설명해 주세요. 사진 확인이 필요하면 ‘멘토에게 질문’에서 스크린샷을 첨부해 주세요. 비밀번호와 개인정보는 가려 주세요.';
 export function studentCapabilityAnswer(answer: CurriculumAnswer, imagesAvailable = false): CurriculumAnswer {
  // Do not describe an absent image as if it had already been inspected.
@@ -21,16 +22,23 @@ function terms(text: string) {
  const normalized = text.normalize('NFKC').toLowerCase();
  return new Set((normalized.match(/[\p{L}\p{N}]+/gu) || []).flatMap(word => [word, word.replace(/(?<=[가-힣])(?:이랑|하고|에서|은|는|이|가|을|를|과|와)$/u, ''), ...Array.from({ length: Math.min(word.length - 1, 80) }, (_, i) => word.slice(i, i + 2))]));
 }
+const curriculumTermAliases = [
+ [/\bclaude\b/i, '클로드'],
+ [/\b(?:mac|macos|macbook)\b|맥북|맥(?:에서|용)|설치/i, '맥 맥북 설치 다운로드'],
+ [/\bprojects?\b/i, '프로젝트'],
+ [/\bsidebar\b|\bside (?:bar|menu)\b/i, '사이드바 왼쪽 메뉴'],
+ [/\bknowledge base\b/i, '지식 자료'],
+] as const;
 function curriculumSections(lesson: CurriculumLesson, blocks: boolean) {
  let lines = [lesson.title];
- const sections: { title: string; lines: string[] }[] = [{ title: lesson.title, lines }];
+ const sections: { title: string; blockId?: string; lines: string[] }[] = [{ title: lesson.title, lines }];
  if (blocks && lesson.document) {
   const doc = publicLessonBlocks(validateLessonBlocks(lesson.document));
   for (const b of doc.blocks) {
    if (b.content) {
     const content = lessonBodyPlainText(b.content);
     if ((b.type === 'heading' || b.type === 'subheading') && content.trim()) {
-     lines = []; sections.push({ title: content.trim().slice(0, 120), lines });
+     lines = []; sections.push({ title: content.trim().slice(0, 120), blockId: b.id, lines });
     }
     lines.push(content);
    }
@@ -41,7 +49,7 @@ function curriculumSections(lesson: CurriculumLesson, blocks: boolean) {
   }
   for (const c of doc.checklist) lines.push(c.label);
  } else lines.push(lessonBodyPlainText(lesson.body_text || lesson.description || ''));
- return sections.map(section => ({ title: section.title, text: section.lines.filter(Boolean).join('\n') }));
+ return sections.map(section => ({ title: section.title, blockId: section.blockId, text: section.lines.filter(Boolean).join('\n') }));
 }
 export function curriculumText(lesson: CurriculumLesson, blocks = true) {
  return curriculumSections(lesson, blocks).map(section => section.text).join('\n');
@@ -61,12 +69,13 @@ export function retrieveCurriculum(lessons: CurriculumLesson[], query: string, c
  if (!topics.length && schedule.test(latestQuestion)) topics.push(schedule);
  const aarrr = /\bAARRR\b/i.test(query);
  const stages = [/\bacquisition\b/i, /\bactivation\b/i, /\bretention\b/i, /\breferral\b/i, /\brevenue\b/i];
- const wanted = terms(query), chunks: (AiSource & { score: number; order: number })[] = [];
+ const aliases = curriculumTermAliases.flatMap(([pattern, translation]) => pattern.test(query) ? [translation] : []);
+ const wanted = terms([query, ...aliases].join(' ')), chunks: (AiSource & { score: number; order: number })[] = [];
  let total = 0;
  for (const lesson of lessons) {
   const dayNumber = curriculumDay(lesson, blocks);
   for (const section of curriculumSections(lesson, blocks)) {
-   const { text, title } = section;
+   const { text, title, blockId } = section;
    total += text.length;
    if (total > 5_000_000) throw new Error('AI_CONTEXT_LIMIT');
    const titleTerms = terms(title);
@@ -84,7 +93,7 @@ export function retrieveCurriculum(lessons: CurriculumLesson[], query: string, c
     let score = 0;
     for (const term of wanted) if (found.has(term)) score += titleTerms.has(term) ? 3 : 1;
     if (aarrr) score += stages.filter(stage => stage.test(excerpt)).length * 20;
-    chunks.push({ id: '', lessonId: lesson.id, title, ...(dayNumber === undefined ? {} : { dayNumber }), revision: lesson.revision || null, excerpt, score, order: chunks.length });
+    chunks.push({ id: '', lessonId: lesson.id, title, blockId, ...(dayNumber === undefined ? {} : { dayNumber }), revision: lesson.revision || null, excerpt, score, order: chunks.length });
    }
   }
  }
@@ -106,7 +115,7 @@ export function retrieveCurriculum(lessons: CurriculumLesson[], query: string, c
    if (match && selected.length < 6) selected.push(match);
   }
  }
- const picked = [...new Set([...selected, ...others])].slice(0,6).map((c,i) => ({ id:'S'+(i+1), lessonId:c.lessonId, title:c.title, ...(c.dayNumber === undefined ? {} : {dayNumber:c.dayNumber}), revision:c.revision, excerpt:c.excerpt }));
+ const picked = [...new Set([...selected, ...others])].slice(0,6).map((c,i) => ({ id:'S'+(i+1), lessonId:c.lessonId, title:c.title, ...(c.blockId ? {blockId:c.blockId} : {}), ...(c.dayNumber === undefined ? {} : {dayNumber:c.dayNumber}), revision:c.revision, excerpt:c.excerpt }));
  return { sources:picked, searchedLessons:lessons.length };
 }
 export function parseCurriculumAnswer(value: unknown, sources: AiSource[], english = false) {

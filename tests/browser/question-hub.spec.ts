@@ -29,7 +29,7 @@ test('payment questions need no lesson; suggestions failing never block writing'
  await page.getByLabel('문의 종류').selectOption('payment');await expect(page.getByLabel('관련 학습')).toHaveCount(0);await expect(page.getByRole('checkbox')).toHaveCount(0);await page.getByRole('button',{name:'질문 등록',exact:true}).click();expect(h.bodies[0]).toMatchObject({category:'payment',lessonId:null,enrollmentId:null,share:false,visibility:'private'});
 });
 test('lesson entry uses same title-first composer with current lesson already selected',async({page})=>{
- const h=await backend(page);await page.goto('/question-hub-test?lesson=1');await page.getByRole('button',{name:'이 학습에 질문하기',exact:true}).click();const dialog=page.getByRole('dialog',{name:'이 수업에 질문하기'});await expect(dialog.locator('.learning-question-context')).toContainText('문샷 4기 · 1일차');const mentor=dialog.getByRole('button',{name:'멘토에게 질문',exact:true});if(await mentor.count()){await expect(dialog.getByRole('button',{name:'AI에게 질문',exact:true})).toHaveAttribute('aria-pressed','true');await mentor.click();}await dialog.getByRole('textbox',{name:'질문 내용',exact:true}).fill('첫 학습의 질문입니다');await expect(dialog.getByRole('radio',{name:'비밀 질문',exact:true})).toBeChecked();await page.getByRole('button',{name:'질문 등록',exact:true}).click();expect(h.bodies[0]).toMatchObject({lessonId:id(4),share:false,visibility:'private'});await expect(dialog.getByRole('heading',{name:'질문을 등록했어요'})).toBeVisible();
+ const h=await backend(page);await page.goto('/question-hub-test?lesson=1');await page.getByRole('button',{name:'이 학습에 질문하기',exact:true}).click();const dialog=page.getByRole('dialog',{name:'질문하기'});await expect(dialog.locator('.floating-question-context')).toContainText('문샷 4기 · 1일차');const mentor=dialog.getByRole('button',{name:'멘토에게 질문',exact:true});if(await mentor.count()){await expect(dialog.getByRole('button',{name:'AI에게 질문',exact:true})).toHaveAttribute('aria-pressed','true');await mentor.click();}await dialog.getByRole('textbox',{name:'질문 내용',exact:true}).fill('첫 학습의 질문입니다');await expect(dialog.getByRole('radio',{name:'비밀 질문',exact:true})).toBeChecked();await page.getByRole('button',{name:'질문 등록',exact:true}).click();expect(h.bodies[0]).toMatchObject({lessonId:id(4),share:false,visibility:'private'});await expect(dialog.getByRole('status')).toContainText('멘토 질문을 등록했어요.');
 });
 test('learner resolves an answered question without adding an answer',async({page})=>{
  await backend(page);let resolved=false;const writes:Record<string,unknown>[]=[];
@@ -106,4 +106,13 @@ test('answered and closed questions explain their different meanings',async({pag
  await expect(page.getByRole('heading',{name:'종료한 질문'})).toHaveCount(0);
  await page.getByRole('button',{name:'질문 종료',exact:true}).click();
  await expect(page.getByRole('heading',{name:'종료한 질문'})).toBeVisible();
+});
+
+test('the general inquiry link defaults to a private general inquiry',async({page})=>{
+ await backend(page);
+ await page.goto('/question-hub-test?view=general');
+ await expect(page.getByRole('tab',{name:'질문하기',exact:true})).toHaveAttribute('aria-selected','true');
+ await expect(page.getByLabel('문의 종류')).toHaveValue('general');
+ await expect(page.getByLabel('관련 학습')).toHaveCount(0);
+ await expect(page.getByText('비밀 질문',{exact:true})).toBeVisible();
 });
