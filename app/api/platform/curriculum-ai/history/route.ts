@@ -1,7 +1,7 @@
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { uuid } from '@/lib/edu-workflows';
-import { aiErrorReply } from '@/lib/curriculum-ai-server';
+import { aiErrorReply, readAiBody } from '@/lib/curriculum-ai-server';
 export const maxDuration=20;
 const reply=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'private, no-store',Vary:'Cookie'}});
 export async function GET(request:Request){
@@ -15,5 +15,19 @@ export async function GET(request:Request){
   if(result.error)throw result.error;
   const data=result.data || {},key=enrollment?'items':'conversations',rows=Array.isArray(data[key])?data[key]:[];
   return reply({[key]:rows.slice(0,20),hasMore:rows.length>20});
+ }catch(error){const e=aiErrorReply(error);return reply({error:e.error},e.status);}
+}
+
+export async function PATCH(request:Request){
+ if(request.headers.get('origin')!==new URL(request.url).origin)return reply({error:'요청 출처를 확인해 주세요.'},403);
+ if(process.env.EDU_CURRICULUM_AI_ENABLED!=='true')return reply({error:'AI 질문 기능은 준비 중이에요.'},404);
+ try{
+  const actor=await getAuthenticatedUser();
+  if(!actor)return reply({error:'로그인이 필요해요.'},401);
+  const {requestId,action,helpful}=await readAiBody(request);
+  if(!uuid(requestId) || (action!=='delete' && (action!=='feedback' || typeof helpful!=='boolean')))return reply({error:'질문과 요청을 확인해 주세요.'},400);
+  const result=await createAdminClient().rpc('edu_ai_student_manage_turn',{p_actor:actor.id,p_request:requestId,p_action:action,p_helpful:action==='feedback'?helpful:null}).abortSignal(AbortSignal.timeout(10000));
+  if(result.error)throw result.error;
+  return reply({ok:true});
  }catch(error){const e=aiErrorReply(error);return reply({error:e.error},e.status);}
 }

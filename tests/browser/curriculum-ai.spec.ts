@@ -164,3 +164,32 @@ test('a pending answer can be reopened and recovered without a second generation
  await expect(input).toHaveValue('');
  expect(h.ai).toHaveLength(1);
 });
+
+test('a learner can rate or remove their saved AI exchange',async({page})=>{
+ const h=await backend(page);
+ await page.route('**/api/platform/curriculum-ai/history',route=>{
+  const {requestId,action,helpful}=route.request().postDataJSON();
+  const index=h.stored.findIndex(item=>item.requestId===requestId);
+  if(index<0)return route.fulfill({status:404});
+  if(action==='delete')h.stored.splice(index,1);
+  else h.stored[index].helpful=helpful;
+  return route.fulfill({json:{ok:true}});
+ });
+ await page.goto('/curriculum-ai-test');
+ await page.getByRole('textbox',{name:'궁금한 점'}).fill('평가와 삭제를 시험할 질문');
+ await page.getByRole('button',{name:'AI 답변 받기'}).click();
+ const helpful=page.getByRole('button',{name:'도움이 됐어요'});
+ await helpful.click();
+ await expect(helpful).toHaveAttribute('aria-pressed','true');
+ await page.reload();
+ await expect(helpful).toHaveAttribute('aria-pressed','true');
+ page.once('dialog',dialog=>dialog.accept());
+ await page.getByRole('button',{name:'이 질문과 답변 삭제'}).click();
+ await expect(page.getByText('수업에서 막힌 부분을 편하게 물어보세요.',{exact:false})).toBeVisible();
+ await expect(page.getByText('평가와 삭제를 시험할 질문',{exact:true})).toHaveCount(0);
+ await page.reload();
+ await expect(page.getByText('수업에서 막힌 부분을 편하게 물어보세요.',{exact:false})).toBeVisible();
+ await expect(page.getByText('평가와 삭제를 시험할 질문',{exact:true})).toHaveCount(0);
+ expect(h.stored).toHaveLength(0);
+ expect(h.ai).toHaveLength(1);
+});
