@@ -650,7 +650,8 @@ export function Platform({
             )}
             {(account || learning) && <button
               className="icon-btn mobile-only"
-              aria-label="메뉴 열기"
+              aria-label={mobile ? "메뉴 닫기" : "메뉴 열기"}
+              aria-controls="member-mobile-navigation"
               aria-expanded={mobile}
               onClick={() => setMobile(!mobile)}
             >
@@ -662,7 +663,7 @@ export function Platform({
           </div>
         </div>
         {mobile && (account || learning) && (
-          <nav className="mobile-nav open">
+          <nav id="member-mobile-navigation" className="mobile-nav open" aria-label="모바일 메뉴">
             {nav.filter(([href]) => href !== "/articles" || articleDiscoveryVisible(data)).map(([href, label]) => (
               <Link href={href} key={href}>
                 {label}

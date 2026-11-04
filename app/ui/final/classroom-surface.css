@@ -8,3 +8,20 @@
 .edu-front .learning-bg .lesson-week-title { color:#69758a; font-size:12px; font-weight:600; }
 .edu-front .learning-bg .lesson-bottom { gap:12px; }
 @media(max-width:540px) { .edu-front .learning-bg .lesson-header, .edu-front .learning-bg .reading { border-radius:14px; } }
+
+/* The lesson panels provide their own borders; keep the column itself neutral. */
+.edu-front .learning-bg .learning-content { border:0; background:transparent; border-radius:0; }
+@media (min-width:681px) { .edu-front .learning-bg .learning-mobile-toggle { display:none; } }
+@media (max-width:680px) {
+  .edu-front .learning-bg .learning-top { margin-bottom:12px; }
+  .edu-front .learning-bg .diagnosis-entry { padding:12px 14px; margin-bottom:12px; gap:10px; }
+  .edu-front .learning-bg .diagnosis-entry-icon { width:36px; height:36px; }
+  .edu-front .learning-bg .diagnosis-entry h2 { font-size:15px; }
+  .edu-front .learning-bg .diagnosis-entry p { font-size:13px; line-height:1.45; }
+  .edu-front .learning-bg .diagnosis-entry .btn { width:auto; margin-left:auto; }
+  .edu-front .learning-bg .learning-mobile-toggle { margin-bottom:12px; }
+  .edu-front .learning-bg .learning-progress-summary { margin-bottom:12px; padding:14px 16px; }
+  /* Only images explicitly described as logos are reduced; instructional images retain their size. */
+  .edu-front .learning-bg .lb-image-open img[alt$="로고"],
+  .edu-front .learning-bg .lb-image-open img[alt$="logo" i] { max-width:96px; max-height:96px; width:auto; object-fit:contain; }
+}

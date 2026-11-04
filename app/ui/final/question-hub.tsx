@@ -13,10 +13,15 @@ import { QuestionDeleteControl } from './question-delete-control';
 import usability from './usability.module.css';
 
 export function QuestionCard({ question: q, initiallyOpen = false, changed, deleted }: { question: Row; initiallyOpen?: boolean; changed?: () => void; deleted: () => void }) {
+  const [expanded, setExpanded] = useState(initiallyOpen);
+  const content = String(q.content || '');
+  const long = content.length > 240;
   return <article className="question-card" id={'question-' + q.id}>
     <div className="between"><b>{q.is_resolved ? '질문 종료' : q.status === 'answered' ? '답변 있음' : '답변 대기'}</b><span className="meta">{date(q.created_at)}</span></div>
     <h3>{String(q.title)}</h3>{Boolean(q.learning_context) && <p className="meta">{String(q.learning_context)}</p>}
-    <p className="reading-copy">{String(q.content)}</p><QuestionImage questionId={String(q.id)} imageId={q.image_id}/>
+    <p className="reading-copy">{long && !expanded ? content.slice(0, 240) + '…' : content}</p>
+    {long && <button type="button" className="btn small" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>{expanded ? '질문 내용 접기' : '질문 내용 더 보기'}</button>}
+    {Boolean(q.image_id) && <details className="question-image-disclosure"><summary>질문 첨부 이미지 보기</summary><QuestionImage questionId={String(q.id)} imageId={q.image_id}/></details>}
     <p className="meta">{q.visibility === 'cohort' ? '전체 공개 · 같은 기수 수강생이 함께 봐요' : '비밀 질문 · 나와 담당 운영자만 볼 수 있어요'}</p>
     {q.mine !== false && <div className="question-card-actions"><QuestionDeleteControl questionId={String(q.id)} onDeleted={deleted}/></div>}
     {process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED === 'true' ? <QuestionAnswerHistory questionId={String(q.id)} initiallyOpen={initiallyOpen} readOnly={q.mine === false} fallback={String(q.answer || '')} onResolved={changed} onStatusChange={status => { if (status !== q.status) changed?.(); }}/> : Boolean(q.answer) && <p className="answer reading-copy"><AnswerText text={String(q.answer)}/></p>}

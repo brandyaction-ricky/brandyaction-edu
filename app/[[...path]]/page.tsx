@@ -8,6 +8,7 @@ import { sections } from '@/lib/platform';
 import { headers } from 'next/headers';
 import { productShareImage, sharingOrigin } from '@/lib/product-sharing';
 import { isPolicyPath } from '@/lib/legal-policies';
+import { catalogTitle } from '@/lib/course-catalog';
 export const dynamic = 'force-dynamic';
 export default async function Page({params,searchParams}:{params:Promise<{path?:string[]}>;searchParams:Promise<Record<string,string|string[]|undefined>>}) {
  const {path=[]} = await params;
@@ -45,7 +46,8 @@ export async function generateMetadata({params}:{params:Promise<{path?:string[]}
   if(data){
    const row=data as unknown as {title:string;summary?:string;seo_title?:string;seo_description?:string;is_listed?:boolean|string};
    unlisted=isCourse&&row.is_listed===false;
-   title=(isCourse&&row.seo_title?.trim()?row.seo_title:row.title)+' | BrandyAction EDU';
+   const displayTitle=isCourse ? catalogTitle({id: path[1], title: row.seo_title?.trim() || row.title}) : row.title;
+   title=displayTitle+' | BrandyAction EDU';
    description=String((isCourse&&row.seo_description)||row.summary||description);
    if(isCourse) shareImage=productShareImage(data as unknown as Record<string,unknown>,origin,process.env.NEXT_PUBLIC_SUPABASE_URL||'');
   }

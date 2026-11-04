@@ -51,7 +51,7 @@ import {
   UserRound,
 } from "lucide-react";
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   LiveSchedule,
   type Data,
@@ -71,6 +71,7 @@ const accountGroups = [
       ["", "마이페이지", LayoutDashboard],
       ["classes", "내 클래스", BookOpen],
       ["missions", "내 미션", Target],
+      ["resources", "수강 자료·구매 파일", Download],
       ["questions", process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === "true" ? "질문·답변" : "내 질문", MessageCircle],
     ],
   ],
@@ -228,6 +229,36 @@ function EnrolledCard({
     </article>
   );
 }
+function ArticleShortcut({ data }: { data: Data }) {
+  const [revision, setRevision] = useState(0);
+  const [result, setResult] = useState<{ count: number; videos: boolean; articlesEnabled: boolean; lecturesEnabled: boolean } | 'error' | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => { setResult('error'); controller.abort(); }, 10000);
+    void fetch('/api/platform?view=articles', { signal: controller.signal, cache: 'no-store' })
+      .then(async response => {
+        if (!response.ok) throw new Error('콘텐츠 조회 실패');
+        const body = await response.json();
+        const setting = body?.data?.article_banner?.[0]?.value;
+        if (!setting || typeof setting.articleCount !== 'number') throw new Error('콘텐츠 조회 결과 누락');
+        if (!controller.signal.aborted) setResult({ count: setting.articleCount, videos: Array.isArray(setting.videos) && setting.videos.some((video: { available?: boolean }) => video.available), articlesEnabled: setting.articlesEnabled !== false, lecturesEnabled: setting.enabled !== false });
+      }).catch(() => { if (!controller.signal.aborted) setResult('error'); }).finally(() => clearTimeout(timer));
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [revision]);
+  const visible = contentVisibility(data);
+  const articles = result && result !== 'error' ? result.articlesEnabled && result.count > 0 : visible.articles;
+  const videos = result && result !== 'error' ? result.lecturesEnabled && result.videos : visible.lectures;
+  const empty = result && result !== 'error' && !articles && !videos;
+  return <>
+    <Link href={empty ? '/classes?type=free' : '/articles'}>
+      <Play />
+      <div><b>{empty ? '무료 클래스 둘러보기' : articles ? videos ? '무료강의와 아티클' : '아티클' : '무료강의'}</b><span>{empty ? '지금 신청할 수 있는 클래스를 찾아보세요' : '업무에 적용할 인사이트'}</span></div>
+      <ArrowRight />
+    </Link>
+    {result === 'error' && <p className="meta" role="status">콘텐츠 현황을 확인하지 못했습니다. <button type="button" className="btn small" onClick={() => { setResult(null); setRevision(value => value + 1); }}>다시 확인</button></p>}
+  </>;
+}
+
 function Dashboard({
   data,
   user,
@@ -504,14 +535,7 @@ function Dashboard({
           </div>
           <ArrowRight />
         </Link>}
-        {(contentVisibility(data).articles || contentVisibility(data).lectures) && <Link href="/articles">
-          <Play />
-          <div>
-            <b>{contentVisibility(data).articles ? contentVisibility(data).lectures ? "무료강의와 아티클" : "아티클" : "무료강의"}</b>
-            <span>업무에 적용할 인사이트</span>
-          </div>
-          <ArrowRight />
-        </Link>}
+        <ArticleShortcut data={data}/>
         <Link href="/my/reviews">
           <Star />
           <div>
@@ -547,7 +571,7 @@ function Missions({ data, active }: { data: Data; active: Row[] }) {
         description="공개된 미션의 제출 상태와 다음에 할 일을 확인하세요."
       />
       <section className="member-mission-journey" aria-label="미션 진행 안내"><div><b>1. 미션 작성</b><span>공개된 수업에서 제출</span></div><div><b>2. 검토·보완</b><span>피드백을 확인하고 수정</span></div><div><b>3. 승인 완료</b><span>완료 기록 확인</span></div></section>
-      <LearningProgress complete={entries.filter(entry => entry.status === "approved").length} total={entries.length} label="현재 공개된 미션 승인"/>
+      {entries.length ? <LearningProgress complete={entries.filter(entry => entry.status === "approved").length} total={entries.length} label="현재 공개된 미션 승인"/> : <p className="notice">아직 공개된 미션이 없습니다.</p>}
       <div className="member-mission-filter">
         <label>
           클래스 · 기수
@@ -862,7 +886,7 @@ function Orders({ data }: { data: Data }) {
             </div>
             <div className="order-card-body">
               <div className="summary-thumb">
-                {num(o, "total_amount") === 0 ? "FREE" : "CLASS"}
+                {num(o, "total_amount") === 0 ? "무료 신청" : "CLASS"}
               </div>
               <div>
                 <h3>
@@ -932,6 +956,7 @@ function Coupons({ data }: { data: Data }) {
         {["available", "used", "revoked"].map((s) => (
           <button
             className={"tab " + (tab === s ? "active" : "")}
+            aria-pressed={tab === s}
             key={s}
             onClick={() => setTab(s)}
           >
@@ -1081,7 +1106,7 @@ function Profile({
       <form onSubmit={submit}>
         <section className="panel">
           <div className="panel-head">
-            <h2>기본 정보</h2>
+            <h2>기본 정보</h2><span className="meta">변경 내용 저장 버튼으로 저장</span>
           </div>
           <div className="panel-body">
             <div className="flex mb24">
@@ -1320,6 +1345,21 @@ export function MemberViews({
   ongoingLesson?: string;
   blockLearningEnabled?: boolean;
 }) {
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    const showActive = () => {
+      const activeLink = nav.querySelector<HTMLElement>('[aria-current="page"]');
+      if (!activeLink || nav.scrollWidth <= nav.clientWidth) return;
+      const bounds = nav.getBoundingClientRect(), item = activeLink.getBoundingClientRect();
+      if (item.left < bounds.left) nav.scrollLeft += item.left - bounds.left;
+      else if (item.right > bounds.right) nav.scrollLeft += item.right - bounds.right;
+    };
+    showActive();
+    window.addEventListener('resize', showActive);
+    return () => window.removeEventListener('resize', showActive);
+  }, [section]);
   const enrollments = rows(data, "enrollments"),
     active = enrollments.filter(enrollment => hasLearningAccess(enrollment));
   let content;
@@ -1343,7 +1383,7 @@ export function MemberViews({
               )}
             </div>
           ))}
-          {hasMemberResources(data) && <div className="member-resource-cta"><Link className="btn primary" href="/my/resources"><Download/> 수강 자료·구매 파일 받기</Link></div>}
+          {hasMemberResources(data) && <div className="member-resource-cta"><Link className="btn" href="/my/resources"><Download/> 수강 자료·구매 파일 받기</Link></div>}
           {!enrollments.length && (
             <Empty title="신청한 클래스가 없습니다.">
               <Link href="/classes">클래스 찾아보기</Link>
@@ -1396,7 +1436,7 @@ export function MemberViews({
               <p>나의 배움과 실행</p>
             </div>
           </div>
-          <nav className="account-nav" aria-label="마이페이지">
+          <nav ref={navRef} className="account-nav" aria-label="마이페이지">
             {["admin", "staff"].includes(user.role) && (
               <Link className="member-mobile-admin-tab" href="/admin">
                 <Settings />

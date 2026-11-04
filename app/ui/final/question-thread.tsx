@@ -87,7 +87,7 @@ export function QuestionAnswerHistory({ questionId, fallback = '', onStatusChang
    <button className="btn primary small mt16" disabled={busy || stale || !content.trim()}>{busy ? '등록 중…' : uncertain ? '같은 요청 결과 확인' : '후속 질문 등록'}</button>
   </form>}
   {notice && <p role="status" className="notice mt16">{notice}</p>}
- </> : fallback ? <div className="answer"><b>운영자 답변</b><p className="reading-copy"><AnswerText text={fallback}/></p>{state.data?.answers.filter(a => a.id === state.data?.question.headId).map(a => <QuestionImage key={a.id} questionId={questionId} answerId={a.id} imageId={a.imageId}/>)}</div> : <p className="meta">답변이 도착하면 이곳에서 확인해 주세요.</p>}
+ </> : fallback ? <div className="answer"><b>운영자 답변</b><p className="reading-copy"><AnswerText text={fallback.length > 240 ? fallback.slice(0, 240) + "…" : fallback}/></p>{state.data?.answers.filter(a => a.id === state.data?.question.headId && a.imageId).map(a => <details key={a.id}><summary>답변 첨부 이미지 보기</summary><QuestionImage questionId={questionId} answerId={a.id} imageId={a.imageId}/></details>)}</div> : <p className="meta">답변이 도착하면 이곳에서 확인해 주세요.</p>}
   <div className="row mt16 member-question-actions"><button type="button" className="btn small" disabled={busy || uncertain} onClick={() => setOpen(v => !v)}>{open ? '답변 이력 접기' : '답변 전체 보기'}</button>{!open && !readOnly && <button type="button" className="btn small" onClick={() => setOpen(true)}>후속 질문하기</button>}{open && <button type="button" className="btn small" disabled={busy || uncertain} onClick={() => { state.reload(); setStale(false); }}>최신 답변 확인</button>}</div>
  </div>;
 }
