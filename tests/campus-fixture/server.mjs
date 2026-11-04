@@ -1,3 +1,4 @@
+import {createPreviewMeetup} from './meetup-server.mjs';
 import {createServer} from 'node:http';
 import {build} from 'esbuild';
 import {resolve,extname} from 'node:path';
@@ -8,11 +9,12 @@ const octets=host.split('.').map(Number);
 if(octets.length!==4||octets.some(n=>!Number.isInteger(n)||n<0||n>255)||!(host==='127.0.0.1'||octets[0]===10||octets[0]===192&&octets[1]===168||octets[0]===172&&octets[1]>=16&&octets[1]<=31))throw Error('Use loopback or a private LAN address for synthetic preview');
 // randomUUID needs HTTPS on phones. getRandomValues remains secure and available over local HTTP.
 const uuidFallback=`if(!crypto.randomUUID)crypto.randomUUID=()=>{const b=crypto.getRandomValues(new Uint8Array(16));b[6]=(b[6]&15)|64;b[8]=(b[8]&63)|128;return [...b].map((v,i)=>([4,6,8,10].includes(i)?'-':'')+v.toString(16).padStart(2,'0')).join('');};`;
-const output=await build({entryPoints:['tests/campus-fixture/app.tsx'],bundle:true,write:false,outdir:'campus-fixture',format:'esm',platform:'browser',jsx:'automatic',alias:{'next/link':resolve('tests/browser/fixture/link.tsx')},define:{'process.env':JSON.stringify({NODE_ENV:'development',NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED:'true',NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED:'true',NEXT_PUBLIC_EDU_CURRICULUM_AI_ENABLED:'true'})}});
+const output=await build({entryPoints:['tests/campus-fixture/app.tsx'],bundle:true,write:false,outdir:'campus-fixture',format:'esm',platform:'browser',jsx:'automatic',alias:{'next/link':resolve('tests/browser/fixture/link.tsx')},define:{'process.env':JSON.stringify({NODE_ENV:'development',NEXT_PUBLIC_CAMPUS_LOCAL_MEETUP:'true',NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED:'true',NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED:'true',NEXT_PUBLIC_EDU_CURRICULUM_AI_ENABLED:'true'})}});
 const assets=new Map(output.outputFiles.map(f=>['/'+f.path.split('/').at(-1),f.contents]));
 const fixture=await build({entryPoints:['tests/campus-fixture/data.ts'],bundle:true,write:false,format:'esm',platform:'node'});
 const {student,admin}=await import('data:text/javascript;base64,'+Buffer.from(fixture.outputFiles[0].text).toString('base64'));
-const server=createServer((req,res)=>{const url=new URL(req.url,'http://localhost');res.setHeader('Cache-Control','no-store');if(req.method!=='GET'){res.writeHead(405).end();return;}
+const meetup=createPreviewMeetup();
+const server=createServer(async(req,res)=>{const url=new URL(req.url,'http://localhost');res.setHeader('Cache-Control','no-store');if(await meetup.handle(req,res,url))return;if(req.method!=='GET'){res.writeHead(405).end();return;}
 if(url.pathname.startsWith('/campus/world/')){const base=resolve('public/campus/world');const target=resolve('public'+decodeURIComponent(url.pathname));if(!target.startsWith(base+'/')||!existsSync(target)){res.writeHead(404).end();return;}try{const mime={'.mjs':'text/javascript','.js':'text/javascript','.css':'text/css','.jpg':'image/jpeg','.png':'image/png','.svg':'image/svg+xml','.html':'text/html','.webp':'image/webp','.mp3':'audio/mpeg','.mp4':'video/mp4'};res.setHeader('Content-Type',mime[extname(target)]||'application/octet-stream');res.end(readFileSync(target));}catch{res.writeHead(404).end();}return;}
 if(url.pathname==='/api/campus/focus'){res.writeHead(404,{'Content-Type':'application/json'}).end(JSON.stringify({error:'준비 중'}));return;}
 if(url.pathname==='/api/campus'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify(url.searchParams.has('enrollmentId')?student:{...student,selectedEnrollmentId:null,lessons:[]}));return;}

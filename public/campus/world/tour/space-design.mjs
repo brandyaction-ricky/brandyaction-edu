@@ -1,3 +1,4 @@
+import {architecture} from './architecture.mjs';
 /** Architectural finishes only. Original avatars, seats, collisions and task coordinates are unchanged. */
 function beams(office,group,segments,color,width=.16,emissive=false){
  const mesh=office.boxMesh(0,0,0,1,1,1,color,{group,rough:.55,metal:.2,shadow:false,...emissive?{emissive:color,ei:.4}:{}}),vertices=[];
@@ -58,7 +59,8 @@ export function applyWarmStudy(office,plan){
    const p=node.geometry.attributes.position,uv=[];for(let i=0;i<p.count;i++)uv.push(p.getX(i)/8,p.getZ(i)/5);node.geometry.setAttribute('uv',new p.constructor(new Float32Array(uv),2));node.material.needsUpdate=true;
   }else if(colors.has(current)){node.material=node.material.clone();node.material.color.setHex(colors.get(current));}else if(node.material.color?.r>.35&&node.material.color.r>node.material.color.g*1.35&&node.material.color.g>node.material.color.b*.8){node.material=node.material.clone();node.material.color.setHex(0xc5b594);}
  });
- const accents=new group.constructor();accents.name='moonshot-warm-orbital-studio';group.add(accents);
+ for(const n of group.children)if(n.isMesh&&[0x355a71,0x9db5bd,0xdcdcc8,0x6c91a5].includes(n.material?.color?.getHex()))n.visible=false;
+ const accents=new group.constructor();accents.name='moonshot-warm-orbital-studio';group.add(accents);const design=architecture(office,accents);
  const b=(x,y,z,w,d,h,c,glow=false)=>office.boxMesh(x,y,z,w,d,h,c,{group:accents,rough:.8,metal:.05,shadow:false,...glow?{emissive:c,ei:.35}:{}});
  const outline=plan.getCampusRoom('study').indoorOutline,ribs=[],glow=[];
  // Follow the existing rear glazing; do not place furniture or colliders in a walkway.
@@ -68,12 +70,16 @@ export function applyWarmStudy(office,plan){
  beams(office,accents,ribs,0xb3a18a,.28);beams(office,accents,glow,0xffd6a0,.05,true);
  for(const desk of plan.getStudyDesks()){
   // Thin oak top overlays the existing tabletop, so saved seat and interaction coordinates stay valid.
-  b(desk.x,desk.y,.762,2.8,1.0,.018,0xc6ad86);
+  design.rounded(desk.x-.07,desk.y-.06,.73,2.94,1.32,.11,.2,0xc6ad86);for(const dx of[.2,2.6])design.cylinder(desk.x+dx,desk.y+.6,0,.08,.73,0x535f65,'metal');
+  for(const dx of[.7,2.1]){design.rounded(desk.x+dx-.27,desk.y+1.08,.12,.54,.62,.3,.15,0x314a6a,'fabric');design.rounded(desk.x+dx-.27,desk.y+1.64,.4,.54,.12,.5,.06,0x314a6a,'fabric');}
   b(desk.x+.08,desk.y+.03,.78,2.64,.035,.012,0xf0dfbf);
   // Warm desk lighting sits on the existing tabletop; no extra real-time lights.
   b(desk.x+.15,desk.y+.35,1.42,2.5,.18,.07,0x9b8870);b(desk.x+.2,desk.y+.39,1.395,2.4,.1,.025,0xffd7a0,true);
   for(const dx of[.4,2.4])b(desk.x+dx,desk.y+.43,.78,.025,.025,.64,0x676a66);
  }
+ const backA=outline[0],backB=outline[1],center=(backA[0]+backB[0])/2,radius=(backB[0]-backA[0])/2;
+ for(const y of[backA[1],backA[1]+6])for(let i=0;i<16;i++){const point=t=>[center-radius*Math.cos(t),3.3+2.8*Math.sin(t),y];design.beam(point(i/16*Math.PI),point((i+1)/16*Math.PI),.18,0xc5b9a3);}
+ design.glass(backA[0],backA[1],3.3,radius*2,.025,2.2);
  const shelf=plan.getStudyBookcase(),oldRoom=office.room;office.room=accents;
  office.buildSign({text:'MOONSHOT STUDY  /  오늘의 작은 실행',x:shelf.x+3.3,y:shelf.y-.05,z:2.6,w:6.6,h:.55,bg:'#34495d',fg:'#f4e9d7',font:'system-ui, sans-serif'});office.room=oldRoom;
 }

@@ -1,0 +1,32 @@
+/** Explicit synthetic-LAN adapter. Production does not enable this or host its endpoint. */
+export function attachPreviewMeetup({office,root,getRoom,getRole,wake}){
+ if(!new URLSearchParams(location.search).has('previewMeetup'))return null;
+ let session=null,stream=null,joining=false,pendingRole=false,closed=false,last=0,lastSignature='',lastHeartbeat=0,peers=[],lastChat=0;
+ const history=new Map(),motions=new Map();
+ const panel=document.createElement('section');panel.className='meetup';panel.setAttribute('aria-label','미리보기 동료');
+ const toggle=document.createElement('button');toggle.type='button';toggle.className='meetup-toggle';toggle.textContent='동료 연결 준비';toggle.setAttribute('aria-expanded','false');
+ const body=document.createElement('div');body.className='meetup-body';body.hidden=true;
+ const note=document.createElement('p');note.textContent='같은 미리보기 링크로 들어온 동료예요. 실제 수강생 수가 아닙니다.';
+ const list=document.createElement('div');list.className='meetup-messages';list.setAttribute('aria-live','polite');
+ const form=document.createElement('form'),input=document.createElement('input'),submit=document.createElement('button');input.placeholder='동료에게 한마디';input.setAttribute('aria-label','동료에게 한마디');input.maxLength=120;submit.textContent='보내기';submit.type='button';form.append(input,submit);
+ const wave=document.createElement('button');wave.type='button';wave.textContent='👋 안녕하세요';body.append(note,list,wave,form);panel.append(toggle,body);document.body.append(panel);panel.hidden=true;
+ const profile=()=>({...office.campusIdentity,nickname:String(office.campusIdentity?.displayId||'문샷 동료').replace(/ · 미리보기$/,'').slice(0,24)});
+ function clear(){peers=[];motions.clear();history.clear();office.studyCompanions=[];list.replaceChildren();root.dataset.peerCount='0';wake();}
+ function display(){toggle.textContent=session?(getRoom()==='office'?'나만의 사무실 · 비공개':`함께 ${peers.length+1}명 · 대화`):'동료 다시 연결';root.dataset.peerCount=String(peers.length);}
+ async function request(body){const response=await fetch('/api/campus/preview-meetup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),cache:'no-store'});const result=await response.json();if(!response.ok)throw new Error('동료 연결을 확인해 주세요.');return result;}
+ function receive(data){if(data.room!==getRoom())return;const now=performance.now();peers=Array.isArray(data.peers)?data.peers.slice(0,23).filter(p=>p&&typeof p.id==='string'&&Number.isFinite(p.x)&&Number.isFinite(p.y)):[];
+  office.studyCompanions=peers.map(p=>{const old=motions.get(p.id),from=old?sample(old,now):{x:p.x,y:p.y};motions.set(p.id,{from,to:{x:p.x,y:p.y},at:now});if(p.message&&Date.now()-p.messageAt<20000&&!history.has(p.id+':'+p.messageAt)){history.set(p.id+':'+p.messageAt,{name:p.appearance?.nickname||'동료',text:p.message});}return {...p.appearance,id:p.id,label:String(p.appearance?.nickname||'동료').slice(0,24),x:p.x,y:p.y,yaw:p.yaw,pose:p.sitting?'sit':'stand',moving:p.moving};});
+  for(const id of motions.keys())if(!peers.some(p=>p.id===id))motions.delete(id);while(history.size>12)history.delete(history.keys().next().value);list.replaceChildren();for(const m of history.values()){const line=document.createElement('p'),name=document.createElement('strong');name.textContent=m.name+' ';line.append(name,document.createTextNode(m.text));list.append(line);}display();wake();
+ }
+ function sample(m,now){const t=Math.min(1,(now-m.at)/480);return{x:m.from.x+(m.to.x-m.from.x)*t,y:m.from.y+(m.to.y-m.from.y)*t};}
+ const priorSample=office.sampleStudyCompanion;office.sampleStudyCompanion=p=>{const m=motions.get(p.id);return m?{...p,...sample(m,performance.now())}:p;};
+ async function join(){if(session||joining||closed)return;joining=true;panel.hidden=false;toggle.textContent='동료 연결 중…';try{const value=await request({kind:'join',room:getRoom(),role:getRole(),appearance:profile()});if(closed)return;session=value;stream=new EventSource('/api/campus/preview-meetup?id='+encodeURIComponent(value.id)+'&ticket='+encodeURIComponent(value.ticket));stream.onmessage=e=>{try{receive(JSON.parse(e.data));}catch{}};stream.onerror=()=>{stream?.close();stream=null;session=null;clear();display();};lastSignature='';last=0;display();}catch{toggle.textContent='동료 다시 연결';}finally{joining=false;if(pendingRole){pendingRole=false;roleChanged();}}}
+ function send(message){if(!session||getRoom()==='office'||Date.now()-lastChat<1500)return;lastChat=Date.now();const own={name:profile().nickname,text:message};history.set('self:'+lastChat,own);void request({...session,kind:'update',room:getRoom(),message}).then(()=>{input.value='';receive({room:getRoom(),peers});}).catch(()=>{toggle.textContent='메시지를 보내지 못했어요';});}
+ toggle.onclick=()=>{if(!session){void join();return;}body.hidden=!body.hidden;toggle.setAttribute('aria-expanded',String(!body.hidden));};wave.onclick=()=>send('👋 안녕하세요!');const submitMessage=()=>{const text=input.value.trim();if(text)send(text);};submit.onclick=submitMessage;form.onsubmit=e=>{e.preventDefault();submitMessage();};
+ const heartbeat=setInterval(()=>tick(performance.now()),1000);
+ function tick(now){if(!session||closed||now-last<500)return;last=now;const a=office.campusAvatar;if(!a)return;const payload={room:getRoom(),x:Math.round(a.x*100)/100,y:Math.round(a.y*100)/100,yaw:a.yaw,moving:a.moving,sitting:a.studyPose==='sit',appearance:profile()},signature=JSON.stringify(payload);if(signature===lastSignature&&now-lastHeartbeat<10000)return;lastSignature=signature;lastHeartbeat=now;void request({...session,kind:'update',...payload}).catch(()=>{stream?.close();stream=null;session=null;clear();display();});}
+ function roomChanged(){clear();body.hidden=true;form.hidden=getRoom()==='office';wave.hidden=getRoom()==='office';lastSignature='';last=0;tick(performance.now());display();}
+ function roleChanged(){if(joining){pendingRole=true;return;}if(!session)return;const prior=session;session=null;stream?.close();stream=null;void request({...prior,kind:'leave'}).catch(()=>{});clear();void join();}
+ function destroy(){closed=true;clearInterval(heartbeat);stream?.close();if(session)void fetch('/api/campus/preview-meetup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...session,kind:'leave'}),keepalive:true}).catch(()=>{});office.sampleStudyCompanion=priorSample;panel.remove();}
+ return {join,tick,roomChanged,roleChanged,destroy,moving:()=>peers.some(p=>p.moving)};
+}
