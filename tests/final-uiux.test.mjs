@@ -340,7 +340,7 @@ test('classroom, mission, checkout and completion preserve authorized workflow e
   const { Checkout } = load('app/ui/final/checkout.tsx');
   const checkout = html(Checkout, { data, user, send, pending: false });
   assert.match(checkout, /checkout-layout/);
-  assert.match(checkout, /<button[^>]*disabled=""[^>]*aria-describedby="checkout-agreement-help"[^>]*>[^<]*결제하기/s);
+  assert.match(checkout, /<button[^>]*type="button"[^>]*aria-describedby="checkout-agreement-help"[^>]*>[^<]*필수 항목 한 번에 선택/s);
   assert.match(checkout, /value="CARD"/);
   assert.doesNotMatch(checkout, /VIRTUAL_ACCOUNT|가상계좌/);
   assert.match(checkout, /<input[^>]*checked=""[^>]*value="CARD"/);

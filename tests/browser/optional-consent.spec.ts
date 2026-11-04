@@ -24,7 +24,13 @@ async function required(page:Page){await page.getByRole('checkbox',{name:'[필�
 test('signup is unchecked, skippable, contains no SMS choice and does not trust Auth marketing metadata',async({page})=>{
  const b=await backend(page);await page.goto('/optional-signup-test');
  for(const checkbox of await page.getByRole('checkbox').all())await expect(checkbox).not.toBeChecked();
- await expect(page.getByRole('checkbox',{name:/문자/})).toHaveCount(0);await required(page);await page.getByRole('button',{name:'동의하고 가입 완료'}).click();
+ await expect(page.getByRole('checkbox',{name:/문자/})).toHaveCount(0);
+ await page.getByRole('button',{name:'필수 항목 한 번에 선택'}).click();
+ await expect(page.getByRole('checkbox',{name:'[필수] 이용약관 동의',exact:true})).toBeChecked();
+ await expect(page.getByRole('checkbox',{name:'[필수] 개인정보처리방침 동의',exact:true})).toBeChecked();
+ await expect(page.getByRole('checkbox',{name:/교육·할인·행사 소식/})).not.toBeChecked();
+ expect(b.auth).toHaveLength(0);expect(b.writes).toHaveLength(0);
+ await page.getByRole('button',{name:'동의하고 가입 완료'}).click();
  await expect(page.getByRole('heading',{name:'가입 완료 목적지'})).toBeVisible();expect(b.writes).toHaveLength(0);expect(b.auth[0].data).not.toHaveProperty('marketing_consent');
 });
 test('signup with Kakao choice saves consent and reaches the destination without another click',async({page},info)=>{
