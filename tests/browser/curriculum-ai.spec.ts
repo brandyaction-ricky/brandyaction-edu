@@ -193,3 +193,47 @@ test('a learner can rate or remove their saved AI exchange',async({page})=>{
  expect(h.stored).toHaveLength(0);
  expect(h.ai).toHaveLength(1);
 });
+
+test('floating questions keep a lesson draft across closing and navigation and review mentor handoff',async({page},info)=>{
+ const h=await backend(page);
+ await page.goto('/curriculum-ai-test?floating=1&lesson=1');
+ await page.getByRole('button',{name:'질문하기',exact:true}).click();
+ const panel=page.getByRole('dialog',{name:'질문하기'});
+ const input=panel.getByRole('textbox',{name:'궁금한 점'});
+ await expect(panel.getByText('지금 보고 있는 수업')).toBeVisible();
+ await input.fill('고객 인터뷰에 대한 초안');
+ await panel.getByRole('button',{name:'닫기'}).click();
+ await expect(panel).toBeHidden();
+ await page.getByRole('button',{name:'질문하기',exact:true}).click();
+ await page.goto('/curriculum-ai-test?floating=1');
+ await expect(panel.getByRole('combobox',{name:'질문할 수업·일차'})).toHaveValue(id);
+ await expect(input).toHaveValue('고객 인터뷰에 대한 초안');
+ await page.screenshot({path:info.outputPath('floating-question.png')});
+ await panel.getByRole('button',{name:'AI 답변 받기'}).click();
+ await panel.getByRole('button',{name:'멘토에게 이어서 질문'}).click();
+ const mentor=panel.getByRole('textbox',{name:'질문 내용'});
+ await expect(mentor).toHaveValue(/고객 인터뷰에 대한 초안[\s\S]+AI 참고 답변/);
+ await expect(panel.getByRole('radio',{name:'비밀 질문'})).toBeChecked();
+ expect(h.questions).toHaveLength(0);
+ await expect(panel.getByRole('link',{name:'내 질문 모아보기'})).toHaveAttribute('href','/my/questions?view=mine');
+});
+
+test('saved markup is readable and a cited heading in the active lesson uses its anchor',async({page})=>{
+ const h=await backend(page);
+ h.stored.push({
+  requestId:'33333333-3333-4333-8333-333333333333',lessonId:id,question:'저장된 질문',
+  answer:{...answer,answer:'**고객 인터뷰**에서 `프로젝트`를 확인하세요.',sources:[{...answer.sources[0],blockId:'heading1'}]},
+  status:'succeeded',createdAt:'2026-11-04T00:00:00.000Z',
+ });
+ await page.goto('/curriculum-ai-test?floating=1&lesson=1');
+ await page.getByRole('button',{name:'질문하기',exact:true}).click();
+ const panel=page.getByRole('dialog',{name:'질문하기'});
+ await expect(panel.getByRole('log')).toContainText('고객 인터뷰에서 프로젝트를 확인하세요.');
+ await expect(panel.getByRole('log').locator('time')).toHaveCount(2);
+ await panel.getByText('고객 인터뷰 수업 · 근거 보기').click();
+ const citation=panel.getByRole('link',{name:'이 수업의 근거 위치로 이동'});
+ await expect(citation).toHaveAttribute('href',`/learn/${id}/${id}#lesson-block-heading1`);
+ await expect(citation).not.toHaveAttribute('target','_blank');
+ await panel.getByRole('textbox',{name:'궁금한 점'}).fill('가'.repeat(1800));
+ await expect(panel.getByText('200자 남았어요')).toBeVisible();
+});

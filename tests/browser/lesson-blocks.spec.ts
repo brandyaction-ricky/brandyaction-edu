@@ -182,3 +182,11 @@ test('load failure is explicit and retry restores saved answers without showing 
   await page.getByRole('button', { name: '다시 불러오기' }).click();
   await expect(page.getByRole('textbox', { name: '내 사업의 고객은 누구인가요?' })).toHaveValue('서버에 저장된 답변');
 });
+
+test('a direct citation anchor scrolls to the lesson block once the document loads', async ({ page }) => {
+  await mock(page);
+  await page.goto('/lesson-blocks-test#lesson-block-quiz');
+  const target = page.locator('#lesson-block-quiz');
+  await expect(target).toContainText('배운 내용 확인');
+  await expect(target.getByRole('heading', { name: '배운 내용 확인' })).toBeInViewport();
+});

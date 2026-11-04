@@ -124,7 +124,7 @@ export function LessonBlockView({ document, values, onChange, readOnly = false, 
         default: content = <p role="alert">이 학습 도구의 연결을 확인하고 있습니다.</p>;
       }
       const column = imageColumns.get(block.id);
-      return <div key={block.id} data-lesson-block={block.id} data-image-columns={column?.count} style={column ? { gridColumn: `${column.start} / span ${6 / column.count}` } : undefined}>{content}</div>;
+      return <div key={block.id} id={fileContext ? 'lesson-block-' + block.id : undefined} data-lesson-block={block.id} data-image-columns={column?.count} style={column ? { gridColumn: `${column.start} / span ${6 / column.count}` } : undefined}>{content}</div>;
     })}
     {document.checklist.length > 0 && <fieldset className="lb-card" disabled={readOnly}><legend>오늘의 체크리스트</legend>{document.checklist.map(item => <label className="lb-choice" key={item.id}><input type="checkbox" checked={values.checklist.includes(item.id)} onChange={event => onChange({ ...values, checklist: event.target.checked ? [...values.checklist, item.id] : values.checklist.filter(id => id !== item.id) })} />{item.label}{item.required ? ' (필수)' : ''}</label>)}</fieldset>}
   </div>;

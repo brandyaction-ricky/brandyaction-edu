@@ -34,6 +34,10 @@ function SessionContent({ snapshot, lessonId, enrollmentId, readOnly, onSelectRe
   const [uploading, setUploading] = useState(false);
   function filePending(id: string, pending: boolean) { if (pending) uploadsRef.current.add(id); else uploadsRef.current.delete(id); setUploading(uploadsRef.current.size > 0); }
   const historical = snapshot.revision !== snapshot.currentRevision;
+  useEffect(() => {
+    if (historical || !window.location.hash.startsWith('#lesson-block-')) return;
+    document.getElementById(window.location.hash.slice(1))?.scrollIntoView({ block: 'start' });
+  }, [historical]);
   const [submission, setSubmission] = useState(snapshot.submission || null);
   const [submitting, setSubmitting] = useState(false), [submitError, setSubmitError] = useState('');
   const [submitUncertain, setSubmitUncertain] = useState(false);
