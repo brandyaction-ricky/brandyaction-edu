@@ -23,10 +23,10 @@ export function validateWebinar(input: unknown): Webinar {
  const kakaoUrl=text(v.kakaoUrl,250,'카카오 상담 주소');
  if(kakaoUrl){let u:URL;try{u=new URL(kakaoUrl);}catch{fail('카카오 채널 주소를 확인해 주세요.');}if(u!.protocol!=='https:'||u!.hostname!=='pf.kakao.com'||u!.port||u!.username||u!.password||u!.search||u!.hash||!/^\/[a-zA-Z0-9_-]+(?:\/chat)?$/.test(u!.pathname))fail('https://pf.kakao.com/ 채널 주소만 사용할 수 있습니다.');}
  const youtubeId=text(v.youtubeId,11,'유튜브 영상 ID'); if(youtubeId&&!/^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) fail('유튜브 영상 ID 11자를 확인해 주세요.');
- return {slug,title,description,status:v.status as Webinar['status'],startsAt:new Date(start).toISOString(),endsAt:new Date(end).toISOString(),cohortId:v.cohortId,detailPath,kakaoUrl,youtubeId,revision:v.revision,resources:validateResources(v.resources)};
+ return {slug,title,description,status:v.status as Webinar['status'],startsAt:new Date(start).toISOString(),endsAt:new Date(end).toISOString(),cohortId:v.cohortId,detailPath,kakaoUrl,youtubeId,revision:v.revision,resources:validateResources(v.resources,slug)};
 }
 export function projectWebinar(w: Webinar): PublicWebinar {
- return {resources:(w.resources||[]).filter(r=>r.published),slug:w.slug,title:w.title,description:w.description,startsAt:w.startsAt,endsAt:w.endsAt,detailPath:w.detailPath,kakaoUrl:w.kakaoUrl,youtubeId:w.youtubeId,checkoutPath:`/checkout?cohort=${w.cohortId}&utm_source=campus&utm_medium=webinar&utm_campaign=${w.slug}`};
+ return {resources:(w.resources||[]).filter(r=>r.published).map(r=>{const result={...r};delete result.storagePath;return result;}),slug:w.slug,title:w.title,description:w.description,startsAt:w.startsAt,endsAt:w.endsAt,detailPath:w.detailPath,kakaoUrl:w.kakaoUrl,youtubeId:w.youtubeId,checkoutPath:`/checkout?cohort=${w.cohortId}&utm_source=campus&utm_medium=webinar&utm_campaign=${w.slug}`};
 }
 export function phase(w: Pick<Webinar,'startsAt'|'endsAt'>, now=Date.now()) { return now<Date.parse(w.startsAt)?'upcoming':now>=Date.parse(w.endsAt)?'ended':'live'; }
 export function loginPath(slug:string){return `/login?next=${encodeURIComponent('/campus/live/'+slug)}`;}

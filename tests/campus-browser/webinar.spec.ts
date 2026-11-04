@@ -27,12 +27,12 @@ test('anonymous visitor customizes, walks, views map and explores private-space 
  await expect(root).toHaveAttribute('data-camera-mode','third');await page.getByRole('button',{name:'1인칭으로 보기',exact:true}).click();await expect(root).toHaveAttribute('data-camera-mode','first');await page.getByRole('button',{name:'공간 전체 보기',exact:true}).click();await expect(root).toHaveAttribute('data-camera-mode','overall');
  await world.getByRole('button',{name:'내 AI 사무실',exact:true}).click();await expect(page.getByRole('dialog',{name:'공간 입장 안내'}).getByRole('heading',{name:'내 AI 사무실',exact:true})).toBeVisible();await page.getByRole('button',{name:'공간 입장 안내 닫기'}).click();
  for(const name of ['문샷 공부방','내 AI 사무실','문샷 웰컴 존']){const d=await gate(page,name);await expect(d.getByRole('heading',{name,exact:true})).toBeVisible();await expect(d.getByRole('link',{name:'문샷 과정 자세히 보기'})).toBeVisible();await expect(d.getByRole('link',{name:'카카오 채널로 문의하기'})).toBeVisible();await expect(root).toHaveAttribute('data-room','live');await d.getByRole('button',{name:'공간 입장 안내 닫기'}).click();}
- await activity(page,'AI 체험하기');await page.getByRole('button',{name:/고객·해결할 문제/}).click();await expect(page.getByText('첫 미션 완료!',{exact:true})).toBeVisible();await page.getByRole('button',{name:'AI 체험하기 닫기'}).click();
+ await activity(page,'고객 발견 체험');await page.getByRole('button',{name:'O 맞아요',exact:true}).click();await expect(page.getByText('정답이에요!',{exact:true})).toBeVisible();await page.getByRole('button',{name:'고객 발견 체험 닫기'}).click();
  await page.reload();await page.getByRole('button',{name:'캐릭터 꾸미고 입장',exact:true}).click({timeout:90000});await expect(editor.getByLabel('닉네임')).toHaveValue('첫 도약 방문자');await expect(editor.getByLabel('외형 스타일')).toHaveValue('4');await editor.getByRole('button',{name:'취소',exact:true}).click();await expect(page.getByRole('button',{name:'이 캐릭터로 바로 입장'})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBeTruthy();expect(errors).toEqual([]);expect(calls).toEqual([]);
 });
 test('public exploration never embeds video even when an old event has a video ID',async({page})=>{
- const youtube:string[]=[];page.on('request',r=>{if(/youtube|googlevideo/.test(r.url()))youtube.push(r.url());});await enter(page,'/webinar?video');await expect(page.getByRole('banner').getByText('문샷 오픈 캠퍼스',{exact:true})).toBeVisible();await expect(page.locator('iframe[src*="youtube"]')).toHaveCount(0);await expect(page.frameLocator('iframe').getByRole('button',{name:'라이브 보기',exact:true})).toHaveCount(0);await page.getByRole('button',{name:'이 공간에서 할 일',exact:true}).click();await expect(page.getByRole('button',{name:'문샷 라이브',exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'AI 체험하기',exact:true})).toBeVisible();expect(youtube).toEqual([]);
+ const youtube:string[]=[];page.on('request',r=>{if(/youtube|googlevideo/.test(r.url()))youtube.push(r.url());});await enter(page,'/webinar?video');await expect(page.getByRole('banner').getByText('문샷 오픈 캠퍼스',{exact:true})).toBeVisible();await expect(page.locator('iframe[src*="youtube"]')).toHaveCount(0);await expect(page.frameLocator('iframe').getByRole('button',{name:'라이브 보기',exact:true})).toHaveCount(0);await page.getByRole('button',{name:'이 공간에서 할 일',exact:true}).click();await expect(page.getByRole('button',{name:'문샷 라이브',exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'고객 발견 체험',exact:true})).toBeVisible();expect(youtube).toEqual([]);
 });
 test('configured conversion links and deliberate member check preserve server decisions and failed-access retry',async({page})=>{
  let result:{kind?:string;href?:string;error?:string}={kind:'member',href:'/campus/workspace?enrollmentId=abc'},status=200;const events:string[]=[],privateCalls:string[]=[];
@@ -46,10 +46,10 @@ test('configured conversion links and deliberate member check preserve server de
 test('course information opens from the activity panel and leaves the visitor in the campus',async({page,context})=>{
  await page.route('**/api/campus/webinar/*/events',r=>r.fulfill({status:204}));
  await context.route('**/classes/moonshot',r=>r.fulfill({contentType:'text/html',body:'<h1>Course information destination</h1>'}));
- await enter(page,'/webinar?api');await activity(page,'교육·상담 안내');
- const opened=page.waitForEvent('popup');await page.getByRole('dialog',{name:'교육·상담 안내',exact:true}).getByRole('link',{name:'문샷 과정 자세히 보기'}).click();
+ await enter(page,'/webinar?api');await activity(page,'문샷에서 배우는 것');
+ const opened=page.waitForEvent('popup');await page.getByRole('dialog',{name:'문샷에서 배우는 것',exact:true}).getByRole('link',{name:'상세페이지 크게 보기 ↗'}).click();
  const destination=await opened;await expect(destination.getByRole('heading',{name:'Course information destination'})).toBeVisible();await destination.close();
- await expect(page.getByRole('dialog',{name:'교육·상담 안내',exact:true})).toBeVisible();await page.getByRole('button',{name:'교육·상담 안내 닫기'}).click();await expect(page.frameLocator('iframe').locator('#office')).toHaveAttribute('data-room','live');
+ await expect(page.getByRole('dialog',{name:'문샷에서 배우는 것',exact:true})).toBeVisible();await page.getByRole('button',{name:'문샷에서 배우는 것 닫기'}).click();await expect(page.frameLocator('iframe').locator('#office')).toHaveAttribute('data-room','live');
 });
 test('admin loads, edits, handles a conflict and exposes aggregate click counts accurately',async({page})=>{
  const event={slug:'moonshot-open',title:'문샷 테스트',description:'소개',status:'published',startsAt:'2026-11-07T10:00:00Z',endsAt:'2026-11-07T12:00:00Z',cohortId:'c1',detailPath:'/classes/moonshot',kakaoUrl:'',youtubeId:'',revision:'r1'};let saves=0;

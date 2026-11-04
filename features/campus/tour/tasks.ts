@@ -30,7 +30,7 @@ export const tourTasks:TourTask[]=[
  ] as const).map(([id,title,description,group])=>task('business:'+id,'office',group,title,description)),
  task('archive','office','내 기록 보관','졸업 후 개인 보관함','과거 본인 기록을 이어 쓰는 화면',false,true),
  task('video','welcome','시작 준비','온보딩 영상','문샷에서 보내는 하루'),task('quiz','welcome','시작 준비','OX 퀴즈','안전하게 AI를 쓰는 기본 원칙'),task('level','welcome','시작 준비','AI 수준 확인','내 학습 시작점 확인'),task('checklist','welcome','시작 준비','내 준비 현황','영상·퀴즈·수준 확인 진행'),
- task('live-video','live','문샷 알아보기','문샷 라이브','행사 영상이 재생되는 자리'),task('experience','live','문샷 알아보기','AI 체험하기','목표를 요청문으로 정리하는 예시'),task('offer','live','문샷 알아보기','교육·상담 안내','수강 신청·상세 페이지·상담 동선'),
+ task('live-video','live','문샷 알아보기','문샷 라이브','행사 영상이 재생되는 자리'),task('experience','live','문샷 알아보기','고객 발견 체험','1분 OX 퀴즈로 고객의 마음 알아보기'),task('offer','live','문샷 알아보기','문샷에서 배우는 것','수강 신청·상세 페이지·상담 동선'),
  task('admin:dashboard','study','관리자 전용','기수별 학습 현황','제출·승인·보완과 검토 대기',true),
  task('admin:support','study','관리자 전용','지원·모임·사용량','지원 대기, 반복 막힘, 상담·AI 사용량',true),
  task('admin:moderation','study','관리자 전용','커뮤니티 신고 검토','신고·숨김·복구 처리',true,true),
