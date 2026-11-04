@@ -39,8 +39,9 @@ function SessionContent({ snapshot, lessonId, enrollmentId, readOnly, onSelectRe
   function filePending(id: string, pending: boolean) { if (pending) uploadsRef.current.add(id); else uploadsRef.current.delete(id); setUploading(uploadsRef.current.size > 0); }
   const historical = snapshot.revision !== snapshot.currentRevision;
   useEffect(() => {
-    if (historical || !window.location.hash.startsWith('#lesson-block-')) return;
-    document.getElementById(window.location.hash.slice(1))?.scrollIntoView({ block: 'start' });
+    const hash = window.location.hash.slice(1);
+    if (historical || (!hash.startsWith('lesson-block-') && hash !== 'lesson-reading-start')) return;
+    (document.getElementById(hash) || document.getElementById('lesson-reading-start'))?.scrollIntoView({ block: 'start' });
   }, [historical]);
   const [submission, setSubmission] = useState(snapshot.submission || null);
   const [submitting, setSubmitting] = useState(false), [submitError, setSubmitError] = useState('');
@@ -121,7 +122,7 @@ function SessionContent({ snapshot, lessonId, enrollmentId, readOnly, onSelectRe
     const url = URL.createObjectURL(new Blob([JSON.stringify({ lessonId, revision: snapshot.revision, values }, null, 2)], { type: 'application/json' }));
     const anchor = document.createElement('a'); anchor.href = url; anchor.download = '내-학습-답변.json'; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
-  return <section className="lesson-block-session" aria-label="학습 내용과 내 답변">
+  return <section id="lesson-reading-start" className="lesson-block-session" aria-label="학습 내용과 내 답변">
     {practice && <div className="lb-session-notice">졸업생 개인 실습입니다. 입력·저장과 프롬프트 생성은 계속 이용할 수 있습니다. 공식 미션 제출과 멘토 검수는 종료되었습니다.</div>}
     {readOnly && !practice ? <div className="lb-session-notice">졸업생 열람 모드입니다. 공개된 최신 수업과 기존 답변을 볼 수 있습니다.</div>
       : historical ? <div className="lb-session-notice">이전 수업에서 작성한 답변입니다. 읽기만 할 수 있습니다. <button className="btn small" type="button" onClick={() => select(null)}>현재 수업으로</button></div>

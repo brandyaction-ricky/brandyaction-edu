@@ -347,7 +347,7 @@ export function Classroom({
                 {safeUrl(content?.vod_url) && (
                   <Video url={t(content, "vod_url")} />
                 )}
-                <section className="reading">
+                <section id="lesson-reading-start" className="reading">
                   {safeUrl(content?.external_url) && (
                     <a
                       className="btn primary mb24"

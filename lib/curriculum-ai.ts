@@ -34,6 +34,7 @@ function curriculumSections(lesson: CurriculumLesson, blocks: boolean) {
  const sections: { title: string; blockId?: string; lines: string[] }[] = [{ title: lesson.title, lines }];
  if (blocks && lesson.document) {
   const doc = publicLessonBlocks(validateLessonBlocks(lesson.document));
+  sections[0].blockId = doc.blocks[0]?.id;
   for (const b of doc.blocks) {
    if (b.content) {
     const content = lessonBodyPlainText(b.content);

@@ -16,7 +16,7 @@ test('student sees grounded sources then reviews a private mentor handoff before
  const h=await backend(page);const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('/curriculum-ai-test');
  await page.getByRole('textbox',{name:'궁금한 점'}).fill('고객 인터뷰 질문을 어떻게 작성하나요?');await page.getByRole('button',{name:'AI 답변 받기'}).click();
  await expect(page.getByText(answer.answer,{exact:true})).toBeVisible();await page.getByText('고객 인터뷰 수업 · 근거 보기').click();await expect(page.getByText(answer.sources[0].excerpt,{exact:true})).toBeVisible();
- await expect(page.getByRole('link',{name:'참고 수업 새 창으로 열기'})).toHaveAttribute('href',`/learn/${id}/${id}`);expect(h.questions).toHaveLength(0);
+ await expect(page.getByRole('link',{name:'참고 수업 새 창으로 열기'})).toHaveAttribute('href',`/learn/${id}/${id}#lesson-reading-start`);expect(h.questions).toHaveLength(0);
  await page.getByRole('button',{name:'멘토에게 질문',exact:true}).click();const content=page.getByRole('textbox',{name:'질문 내용',exact:true});await expect(content).toHaveValue('');await content.fill('멘토에게 직접 작성한 질문');await expect(page.getByRole('radio',{name:'비밀 질문',exact:true})).toBeChecked();
  expect(h.questions).toHaveLength(0);await page.screenshot({path:info.outputPath('mentor-handoff.png')});await page.getByRole('button',{name:'질문 등록',exact:true}).click();await expect(page.locator('html')).toHaveAttribute('data-question-created','true');
  expect(h.questions[0]).toMatchObject({enrollmentId:id,lessonId:id,visibility:'private'});expect(errors).toEqual([]);
@@ -305,4 +305,82 @@ test('an unfinished lesson draft survives a mobile close or desktop lesson chang
  await page.goto('/curriculum-ai-test?floating=1&lesson=1');
  if(info.project.name==='mobile')await trigger.click();
  await expect(panel.getByRole('textbox',{name:'궁금한 점'})).toHaveValue('보관할 1일차 질문');
+});
+
+test('the desktop panel stays compact and opens the class with a lesson to continue', async ({page}) => {
+ await page.setViewportSize({width:1280,height:900});
+ await backend(page);
+ const next='22222222-2222-4222-8222-222222222222';
+ await page.route('**/api/platform/question-hub?mode=contexts', route => route.fulfill({json:{contexts:[
+  {...context,enrollmentId:next,classLabel:'완료한 클래스'},
+  {...context,classLabel:'학습 중인 클래스',recent:false},
+  {...context,classLabel:'학습 중인 클래스',lessonId:next,recent:false},
+ ]}}));
+ await page.goto('/curriculum-ai-test?floating=1&resume=1');
+ await page.getByRole('button',{name:'질문하기',exact:true}).click();
+ const panel=page.getByRole('dialog',{name:'질문하기'});
+ await expect(panel.getByRole('combobox',{name:'질문할 클래스'})).toHaveValue(id);
+ await expect(panel.getByRole('combobox',{name:'질문할 수업·일차'})).toHaveValue(next);
+ expect((await panel.boundingBox())?.width).toBeLessThanOrEqual(360);
+ await panel.getByRole('button',{name:'닫기'}).click();
+ const footer=page.getByRole('link',{name:'홈으로'});
+ await expect(footer.locator('..')).toHaveCSS('padding-bottom','72px');
+ await footer.click({trial:true});
+});
+
+test('an answer received with the panel closed marks the launcher until opened',async({page})=>{
+ await backend(page);
+ let releaseResponse!: () => void;
+ const responseGate=new Promise<void>(resolve=>{releaseResponse=resolve;});
+ let sent=0;
+ await page.route('**/api/platform/curriculum-ai',async route=>{
+  sent++;
+  await responseGate;
+  await route.fulfill({json:answer});
+ });
+ await page.goto('/curriculum-ai-test?floating=1&lesson=1');
+ await page.getByRole('button',{name:'질문하기',exact:true}).click();
+ const panel=page.getByRole('dialog',{name:'질문하기'});
+ await panel.getByRole('textbox',{name:'궁금한 점'}).fill('답변이 올 때까지 창을 접을게요.');
+ await panel.getByRole('button',{name:'AI 답변 받기'}).click();
+ await panel.getByRole('button',{name:'닫기'}).click();
+ releaseResponse();
+ const launcher=page.getByRole('button',{name:/질문하기.*새 답변/});
+ await expect(launcher).toBeVisible();
+ await launcher.click();
+ await expect(panel.getByText(answer.answer,{exact:true})).toBeVisible();
+ expect(sent).toBe(1);
+ await panel.getByRole('button',{name:'닫기'}).click();
+ await expect(page.getByRole('button',{name:'질문하기',exact:true})).toBeVisible();
+});
+
+test('mentor handoff brings the saved image into a private draft and allows removal before sending',async({page})=>{
+ const h=await backend(page),files=await screenshotUpload(page);
+ h.stored.push({...context,requestId:id,question:'캡처의 오류는 왜 생기나요?',imageId:id,imageName:'캡처.png',answer,status:'succeeded',createdAt:new Date().toISOString()});
+ await page.goto('/curriculum-ai-test');
+ await page.getByRole('button',{name:'멘토에게 이어서 질문'}).click();
+ await expect(page.getByRole('textbox',{name:'질문 내용'})).toHaveValue(/캡처의 오류/);
+ await expect(page.getByText('이미지 준비 완료.',{exact:false})).toBeVisible();
+ await expect(page.getByRole('radio',{name:'비밀 질문'})).toBeChecked();
+ expect(h.questions).toHaveLength(0);
+ expect(files.uploads[0]).toMatchObject({action:'prepare',name:'캡처.png'});
+ await page.getByRole('button',{name:'이미지 빼기'}).click();
+ await page.getByRole('button',{name:'질문 등록'}).click();
+ await expect.poll(()=>h.questions.length).toBe(1);
+ expect(h.questions[0]).toMatchObject({imageId:null,visibility:'private'});
+});
+
+test('a different lesson capture gives one actionable link and editing clears an old file warning',async({page})=>{
+ const h=await backend(page);
+ const next='22222222-2222-4222-8222-222222222222';
+ h.stored.push({...context,requestId:id,question:'캡처의 오류는 왜 생기나요?',answer:{...answer,answer:'수업 자료에서 충분한 근거를 찾지 못했어요.',sources:[],needsMentor:true,captureLesson:{lessonId:next,title:'고객 문제',dayNumber:2}},status:'succeeded',createdAt:new Date().toISOString()});
+ await page.goto('/curriculum-ai-test?floating=1&lesson=1');
+ await page.getByRole('button',{name:'질문하기',exact:true}).click();
+ await expect(page.getByRole('link',{name:'2일차 · 고객 문제'})).toHaveAttribute('href',`/learn/${id}/${next}`);
+ await expect(page.getByText('에서 다시 질문해 주세요.',{exact:false})).toBeVisible();
+ await expect(page.getByText(/근거를 찾지 못했어요|멘토 확인을 권해요/)).toHaveCount(0);
+ await dragQuestionFiles(page,'drop',{names:['지원하지 않는 파일.pdf']});
+ await expect(page.getByRole('alert')).toContainText('JPG');
+ await page.getByRole('textbox',{name:'궁금한 점'}).fill('다른 질문을 적어요.');
+ await expect(page.getByRole('alert')).toHaveCount(0);
 });

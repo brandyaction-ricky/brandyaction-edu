@@ -11,16 +11,18 @@ import './floating-learning-question.css';
 
 const contextKey = (context?: QuestionContext) => context ? context.enrollmentId + ':' + context.lessonId : '';
 
-export function FloatingLearningQuestion({ member, current }: { member: string; current?: QuestionContext }) {
+export function FloatingLearningQuestion({ member, current, resumeLessons }: { member: string; current?: QuestionContext; resumeLessons?: ReadonlyMap<string, string> }) {
   const pageLesson = contextKey(current);
   const [panel, setPanel] = useState<{ open: boolean; selected?: QuestionContext; pageLesson?: string }>({ open: false });
   const [contexts, setContexts] = useState<QuestionContext[]>();
   const [loadFailed, setLoadFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [created, setCreated] = useState(false);
+  const [newAnswer, setNewAnswer] = useState(false);
   const composer = useRef({ dirty: false, locked: false });
   const trigger = useRef<HTMLButtonElement>(null);
   const close = useRef<HTMLButtonElement>(null);
+  const openRef = useRef(false);
   const storageKey = 'edu-floating-question:' + member;
   const onCurrentPage = panel.pageLesson === pageLesson;
   const selected = onCurrentPage ? panel.selected : undefined;
@@ -30,6 +32,7 @@ export function FloatingLearningQuestion({ member, current }: { member: string; 
   const update = useCallback((next: { dirty: boolean; locked: boolean }) => { composer.current = next; }, []);
   const save = useCallback((next: typeof panel) => {
     const snapshot = { ...next, pageLesson };
+    openRef.current = snapshot.open;
     setPanel(snapshot);
     try { sessionStorage.setItem(storageKey, JSON.stringify(snapshot)); } catch { /* Panel remains usable without storage. */ }
   }, [storageKey, pageLesson]);
@@ -66,13 +69,16 @@ export function FloatingLearningQuestion({ member, current }: { member: string; 
   }, [selectionNeeded, attempt]);
 
   const classes = new Map(contexts?.map(context => [context.enrollmentId, context.classLabel || context.label]));
-  const activeClass = selected?.enrollmentId || contexts?.[0]?.enrollmentId || '';
+  const resumes = contexts?.filter(context => resumeLessons?.get(context.enrollmentId) === context.lessonId);
+  const suggested = resumes?.find(context => context.recent) || resumes?.[0]
+    || contexts?.find(context => context.recent) || contexts?.[0];
+  const activeClass = selected?.enrollmentId || suggested?.enrollmentId || '';
   const lessons = contexts?.filter(context => context.enrollmentId === activeClass) || [];
-  const target = selected ?? current ?? lessons[0];
+  const target = selected ?? current ?? suggested;
   const targetKey = contextKey(target);
 
   function toggle(open: boolean) {
-    if (open) setCreated(false);
+    if (open) { setCreated(false); setNewAnswer(false); }
     save({ open, selected: target });
     requestAnimationFrame(() => (open ? close : trigger).current?.focus({ preventScroll: true }));
   }
@@ -81,6 +87,7 @@ export function FloatingLearningQuestion({ member, current }: { member: string; 
       && (composer.current.locked || (composer.current.dirty && !window.confirm('작성 중인 첨부 또는 멘토 질문을 닫고 수업을 바꿀까요?')))) return;
     if (contextKey(next) !== targetKey) composer.current = { dirty: false, locked: false };
     setCreated(false);
+    setNewAnswer(false);
     save({ open: true, selected: contextKey(next) === contextKey(current) ? current : next });
     requestAnimationFrame(() => close.current?.focus({ preventScroll: true }));
   }, [save, targetKey, current]);
@@ -90,6 +97,8 @@ export function FloatingLearningQuestion({ member, current }: { member: string; 
     window.addEventListener(openFloatingQuestionEvent, open);
     return () => window.removeEventListener(openFloatingQuestionEvent, open);
   }, [openFor]);
+
+  const answerReady = useCallback(() => { if (!openRef.current) setNewAnswer(true); }, []);
 
   const submitted = () => {
     composer.current = { dirty: false, locked: false };
@@ -107,7 +116,8 @@ export function FloatingLearningQuestion({ member, current }: { member: string; 
           <label className="field">어느 수업에서 막혔나요?
             {classes.size > 1 && <select aria-label="질문할 클래스" value={activeClass} onChange={event => {
               const next = event.target.value;
-              openFor(contexts?.find(context => context.enrollmentId === next));
+              openFor(contexts?.find(context => context.enrollmentId === next && resumeLessons?.get(next) === context.lessonId)
+                || contexts?.find(context => context.enrollmentId === next));
             }}>{[...classes].map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>}
             <select aria-label="질문할 수업·일차" value={target?.lessonId || ''} onChange={event => openFor(lessons.find(context => context.lessonId === event.target.value))}>
               {!target && <option value="">{contexts ? '선택할 수업이 없어요' : '수업 목록 불러오는 중'}</option>}
@@ -119,14 +129,15 @@ export function FloatingLearningQuestion({ member, current }: { member: string; 
         </>}
         {created ? <p role="status">멘토 질문을 등록했어요. <Link href="/my/questions?view=mine">내 질문에서 확인하기</Link></p> : target && (
           process.env.NEXT_PUBLIC_EDU_CURRICULUM_AI_ENABLED === 'true'
-            ? <CurriculumAiConversation key={contextKey(target)} context={target} showContext={false} compact onLessonPage={targetKey===contextKey(current)} onStateChange={update} onCreated={submitted}/>
+            ? <CurriculumAiConversation key={contextKey(target)} context={target} showContext={false} compact onLessonPage={targetKey===contextKey(current)} onStateChange={update} onCreated={submitted} onAnswerReady={answerReady}/>
             : <QuestionComposer key={contextKey(target)} initialContext={target} initialPrivate quick onStateChange={update} onCreated={submitted}/>
         )}
         <div className="floating-question-links"><Link href="/my/questions?view=general">결제·환불·계정은 일반 문의로</Link><Link href="/my/questions?view=mine">내 질문 모아보기</Link></div>
       </div>
     </section>}
-    {!open && <button ref={trigger} type="button" className="btn primary floating-learning-question-trigger" aria-expanded={open} aria-controls={open || selected ? 'floating-learning-question' : undefined} onClick={() => toggle(!open)}>
+    {!open && <button ref={trigger} type="button" className="btn primary floating-learning-question-trigger" aria-label={newAnswer ? "질문하기 · 새 답변" : undefined} aria-expanded={open} aria-controls={open || selected ? 'floating-learning-question' : undefined} onClick={() => toggle(!open)}>
       <MessageCircle size={17} aria-hidden="true"/>질문하기
+      {newAnswer && <span className="floating-question-unread" role="status">새 답변</span>}
     </button>}
   </div>;
 }

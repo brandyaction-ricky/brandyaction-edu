@@ -86,5 +86,5 @@
 .lesson-outline button:focus-visible { outline:2px solid #c91929; outline-offset:2px; }
 .lesson-blocks [data-lesson-block] h1, .lesson-blocks [data-lesson-block] h2, .lesson-blocks [data-lesson-block] h3 { scroll-margin-top:84px; }
 .lesson-back-to-top { text-align:right; }
-.lesson-blocks > [id^="lesson-block-"] { scroll-margin-top: 84px; }
+.lesson-blocks > [id^="lesson-block-"], #lesson-reading-start { scroll-margin-top: 84px; }
 .lesson-blocks > [id^="lesson-block-"]:target { outline: 2px solid #c91e2c; outline-offset: 4px; }
