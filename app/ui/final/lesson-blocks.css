@@ -64,5 +64,5 @@
 .lb-image-dialog .lb-image-zoom.is-original img { width:auto; max-width:none; margin:0; }
 @media(max-width:540px) { .lesson-blocks.has-image-rows { column-gap:8px; } }
 
-.lesson-blocks > [id^="lesson-block-"] { scroll-margin-top: 84px; }
+.lesson-blocks > [id^="lesson-block-"], #lesson-reading-start { scroll-margin-top: 84px; }
 .lesson-blocks > [id^="lesson-block-"]:target { outline: 2px solid #c91e2c; outline-offset: 4px; }

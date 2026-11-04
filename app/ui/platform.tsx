@@ -1,6 +1,7 @@
 "use client";
 import { memberDirectoryScope } from '@/lib/member-directory';
 import { MobileRefresh } from './final/mobile-refresh';
+import { learningOverview } from '@/lib/learning-overview';
 import { contentVisibility } from '@/lib/content-visibility';
 import { MemberErasureQueue } from './final/member-erasure-queue';
 import { TipsErasureMonitorNotice } from './final/tips-erasure-monitor-notice';
@@ -294,6 +295,13 @@ export function Platform({
   const questionLessons = questionEnrollment ? enrollmentLessons(data, questionEnrollment) : [];
   const questionLesson = questionLessons.find(row => row.id === path[2]) || questionLessons[0];
   const questionContext = questionEnrollment && questionLesson ? { enrollmentId: String(questionEnrollment.id), lessonId: String(questionLesson.id), label: [questionLesson.day_number != null ? String(questionLesson.day_number)+'일차' : '', t(questionLesson, 'title')].filter(Boolean).join(' · '), recent: true } : undefined;
+  const resumeQuestionLessons = new Map<string, string>();
+  if (account && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true') {
+    for (const enrollment of data.enrollments || []) {
+      const next = learningOverview(data, enrollment).groups.find(group => group.key !== 'ongoing' && group.next)?.next;
+      if (next) resumeQuestionLessons.set(enrollment.id, next.id);
+    }
+  }
   const setAdminPage = (update: number | ((page: number) => number)) =>
     setAdminPaging((current) => ({
       section: pagingKey,
@@ -1143,7 +1151,7 @@ export function Platform({
         {body}
       </main>
       {!admin && footer}
-      {user && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' && (learning || account && (!path[1] || ['classes','questions'].includes(path[1]))) && <FloatingLearningQuestion key={user.id} member={user.id} current={questionContext}/>}
+      {user && process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' && (learning || account && (!path[1] || ['classes','questions'].includes(path[1]))) && <FloatingLearningQuestion key={user.id} member={user.id} current={questionContext} resumeLessons={resumeQuestionLessons}/>}
       {notice && (admin ? <AdminToast tone="success">{notice}</AdminToast> : <div className="toast" role="status">{notice}</div>)}
       {editor && editor.route === routeKey && (
         <Editor
