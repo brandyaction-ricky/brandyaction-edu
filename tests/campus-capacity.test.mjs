@@ -59,3 +59,5 @@ test('appearance is resent when a disconnected peer returns to the same partitio
   assert.equal(hub.stats().sessions,2);
  }finally{for(const a of aborts)a.abort();hub.close();server.closeAllConnections();await new Promise(r=>server.close(r));}
 });
+
+test('30 fps pacing does not drift to 20 fps on a jittering 60 Hz clock',()=>{const b=createFrameBudget({activeInterval:1000/30});let count=0;for(let i=0;i<120;i++)if(b.shouldDraw(i*1000/60+(i%3)*.08,{moving:true}))count++;assert.ok(count>=59&&count<=61);});

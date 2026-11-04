@@ -22,7 +22,7 @@ test('nearby avatar budget and reconnect preserve the assigned session',async({p
  const world=page.frameLocator('iframe'),root=world.locator('#office');
  await expect(root).toHaveAttribute('data-peer-count',isMobile?'12':'24');
  await expect(root).toHaveAttribute('data-total-count','1000');
- await expect(world.locator('.meetup-toggle')).toContainText('이 공간 25명');
+ await expect(world.locator('.meetup-toggle')).toContainText('내 그룹 25명');
  await root.evaluate(()=>{(window as unknown as {dropPeers:()=>void}).dropPeers();});
  await expect(root).toHaveAttribute('data-peer-count',isMobile?'12':'24',{timeout:10000});
  await expect.poll(()=>resumes).toBeGreaterThan(0);expect(joins).toBe(1);
