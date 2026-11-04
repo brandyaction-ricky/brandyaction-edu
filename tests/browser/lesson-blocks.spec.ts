@@ -206,3 +206,11 @@ test('load failure is explicit and retry restores saved answers without showing 
  await expect(page.getByLabel('비공개 값',{exact:false})).toHaveValue('');await expect(page.getByText('졸업 전 피드백 보존',{exact:true})).toBeVisible();
  await page.screenshot({path:testInfo.outputPath('alumni-practice.png'),fullPage:true});
  });
+
+test('a direct citation anchor scrolls to the lesson block once the document loads', async ({ page }) => {
+  await mock(page);
+  await page.goto('/lesson-blocks-test#lesson-block-quiz');
+  const target = page.locator('#lesson-block-quiz');
+  await expect(target).toContainText('배운 내용 확인');
+  await expect(target.getByRole('heading', { name: '배운 내용 확인' })).toBeInViewport();
+});

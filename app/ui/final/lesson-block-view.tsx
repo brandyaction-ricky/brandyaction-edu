@@ -154,7 +154,7 @@ export function LessonBlockView({ document, values, onChange, readOnly = false, 
         default: content = <p role="alert">이 학습 도구의 연결을 확인하고 있습니다.</p>;
       }
       const column = imageColumns.get(block.id);
-      return <div key={block.id} data-lesson-block={block.id} data-image-columns={column?.count} style={column ? { gridColumn: `${column.start} / span ${6 / column.count}` } : undefined}>{content}</div>;
+      return <div key={block.id} id={fileContext ? 'lesson-block-' + block.id : undefined} data-lesson-block={block.id} data-image-columns={column?.count} style={column ? { gridColumn: `${column.start} / span ${6 / column.count}` } : undefined}>{content}</div>;
   }
   // Referenced activities use exactly the same renderer and answer callbacks as
   // top-level activities. Text cannot be embedded, so references cannot recurse.

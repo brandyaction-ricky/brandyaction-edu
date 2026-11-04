@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {randomUUID as id} from 'node:crypto';
 import {communityFixture,read} from './helpers/question-community.mjs';
 const migration='20261031022224_edu_ai_student_conversation_history.sql';
-async function fixture(t){const h=await communityFixture(t);await h.owner('alter table curriculum_lessons add column description text;');for(const name of ['20261030064453_edu_curriculum_ai_and_usage.sql',migration]){await h.db.exec('reset role');try{await h.db.exec(read(name));}catch(e){await h.db.exec('rollback');throw e;}finally{await h.db.exec('set role service_role');}}await h.owner('insert into edu_ai_cohort_settings(cohort_id,enabled) values($1,true)',[h.cohort]);return h;}
+async function fixture(t){const h=await communityFixture(t);await h.owner('alter table curriculum_lessons add column description text;');for(const name of ['20261030064453_edu_curriculum_ai_and_usage.sql',migration,'20261104011652_edu_ai_history_controls.sql','20261104054213_edu_ai_incorrect_feedback.sql']){await h.db.exec('reset role');try{await h.db.exec(read(name));}catch(e){await h.db.exec('rollback');throw e;}finally{await h.db.exec('set role service_role');}}await h.owner('insert into edu_ai_cohort_settings(cohort_id,enabled) values($1,true)',[h.cohort]);return h;}
 const answer={answer:'질문의 최근 경험부터 확인하세요.',needsMentor:false,sources:[],searchedLessons:1};
 const begin=(h,overrides={})=>h.rpc('edu_ai_student_begin',Object.values({actor:h.student,request:id(),enrollment:h.enrollment,lesson:h.lesson,text:'고객 인터뷰 방법은?',image:null,fingerprint:'a'.repeat(64),...overrides}));
 const finish=(h,request,result=answer)=>h.rpc('edu_ai_student_finish',[h.student,request,result,result?null:'시험 실패']);
@@ -32,4 +32,36 @@ test('the same student has isolated lesson histories and cannot attach an image 
  const h=await fixture(t);const first=await begin(h);await finish(h,first.requestId);const lesson=id();await h.owner("insert into curriculum_lessons(id,week_id,is_published,title,day_number) values($1,$2,true,'다른 수업',1)",[lesson,h.week]);await h.owner('insert into edu_cohort_lesson_visibility(cohort_id,lesson_id,is_published) values($1,$2,true)',[h.cohort,lesson]);
  const image=id();await h.owner("insert into edu_question_images(id,owner_id,enrollment_id,lesson_id,name,size,extension,content_type,path,ready_at,sha256) values($1,$2,$3,$4,'원래 수업.png',12,'png','image/png','original-lesson-image',now(),$5)",[image,h.student,h.enrollment,h.lesson,'c'.repeat(64)]);
  await assert.rejects(()=>begin(h,{lesson,image}),/AI_FORBIDDEN/);const second=await begin(h,{lesson,text:'다른 수업의 질문'});assert.deepEqual(second.history,[]);await finish(h,second.requestId);assert.equal((await history(h,h.student,null,null)).conversations.length,2);assert.equal((await history(h)).items.length,1);const invalid=await begin(h,{lesson,text:'검증용 질문'});await assert.rejects(()=>finish(h,invalid.requestId,{}),/check constraint/);await finish(h,invalid.requestId,null);
+});
+
+test('only the owner can rate or delete an exchange; deletion also removes it from AI context',async t=>{
+ const h=await fixture(t);
+ const first=await begin(h,{text:'남겨 둘 질문'});await finish(h,first.requestId);
+ const second=await begin(h,{text:'삭제할 질문'});
+ const manage=(actor,request,action,helpful=null)=>h.rpc('edu_ai_student_manage_turn',[actor,request,action,helpful]);
+ await assert.rejects(()=>manage(h.student,second.requestId,'delete'),/AI_PENDING/);
+ await finish(h,second.requestId);
+ await assert.rejects(()=>manage(h.other,second.requestId,'feedback',true),/AI_FORBIDDEN/);
+ await assert.rejects(()=>manage(h.other,second.requestId,'delete'),/AI_FORBIDDEN/);
+ await manage(h.student,second.requestId,'feedback',true);
+ assert.equal((await history(h)).items[0].helpful,true);
+ assert.equal((await history(h)).items[0].incorrect,false);
+ await assert.rejects(()=>manage(h.other,second.requestId,'incorrect'),/AI_FORBIDDEN/);
+ await manage(h.student,second.requestId,'incorrect');
+ const rated=(await history(h)).items;
+ assert.equal(rated[0].helpful,false);
+ assert.equal(rated[0].incorrect,true);
+ assert.equal(rated[1].incorrect,false);
+ await manage(h.student,second.requestId,'delete');
+ assert.equal((await history(h,h.student,null,null)).conversations[0].lastQuestion,'남겨 둘 질문');
+ assert.equal((await history(h)).items.length,1);
+ assert.equal((await h.db.query('select count(*)::int n from edu_ai_requests')).rows[0].n,2);
+ const third=await begin(h,{text:'새 질문'});
+ assert.deepEqual(third.history.map(turn=>turn.text),['남겨 둘 질문',answer.answer]);
+ await finish(h,third.requestId);
+ await manage(h.student,third.requestId,'delete');
+ await manage(h.student,first.requestId,'delete');
+ assert.deepEqual((await history(h,h.student,null,null)).conversations,[]);
+ await h.db.exec('set role authenticated');
+ await assert.rejects(()=>manage(h.student,first.requestId,'delete'),/permission denied/);
 });
