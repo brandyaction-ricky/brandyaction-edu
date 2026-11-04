@@ -5,7 +5,7 @@ export function attachTourView({office,root,fitMap,wake,onChange,isBlocked}){
  const pointers=new Set();
  const originalRender=office.gl.render,originalLabel=office.drawCampusAvatarLabel;
  function configure(){
-  controls.object=office.camera;controls.enabled=mode!=='first'&&!isBlocked();controls.enablePan=mode==='overall';controls.enableRotate=mode!=='first';controls.enableZoom=mode!=='first';controls.enableDamping=true;controls.dampingFactor=.12;controls.zoomToCursor=mode==='overall';controls.minZoom=.55;controls.maxZoom=3;controls.minDistance=2;controls.maxDistance=12;controls.minPolarAngle=.2;controls.maxPolarAngle=1.48;
+  controls.object=office.camera;controls.enabled=mode!=='first'&&!isBlocked();controls.enablePan=mode==='overall';controls.enableRotate=mode!=='first';controls.enableZoom=mode!=='first';controls.enableDamping=true;controls.dampingFactor=.12;controls.zoomToCursor=mode==='overall';controls.minZoom=.55;controls.maxZoom=3;controls.minDistance=mode==='overall'?8:2;controls.maxDistance=mode==='overall'?200:12;controls.minPolarAngle=.2;controls.maxPolarAngle=1.48;
  }
  function resetFollow(){const a=office.campusAvatar;if(!a)return;last={x:a.x,y:a.y};yaw=Number.isFinite(a.yaw)?a.yaw:Math.PI;pitch=0;perspective.fov=58;perspective.position.set(a.x-Math.sin(yaw)*5,3,a.y-Math.cos(yaw)*5);controls.target.set(a.x,.85,a.y);perspective.lookAt(controls.target);}
  function sync(){
