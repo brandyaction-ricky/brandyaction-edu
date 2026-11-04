@@ -52,10 +52,13 @@ export function curriculumDay(lesson: CurriculumLesson, blocks: boolean) {
 }
 // Search the complete eligible curriculum locally. Only relevant excerpts are sent
 // to the provider; there are no persistent vendor files, drafts or quiz answer keys.
-export function retrieveCurriculum(lessons: CurriculumLesson[], query: string, currentLesson: string, blocks = true) {
+export function retrieveCurriculum(lessons: CurriculumLesson[], query: string, currentLesson: string, blocks = true, latestQuestion = query) {
  if (lessons.length > 120 || !lessons.some(l => l.id === currentLesson)) throw new Error('AI_CONTEXT_INVALID');
- const commonTopic = /환불|오리엔테이션|일정|\b(?:OT|refund|orientation|schedule)\b/i;
- const commonQuestion = commonTopic.test(query);
+ const refund = /환불|\brefund\b/i;
+ const orientation = /오리엔테이션|\b(?:OT|orientation)\b/i;
+ const schedule = /일정|\bschedule\b/i;
+ const topics = [refund, orientation].filter(topic => topic.test(latestQuestion));
+ if (!topics.length && schedule.test(latestQuestion)) topics.push(schedule);
  const aarrr = /\bAARRR\b/i.test(query);
  const stages = [/\bacquisition\b/i, /\bactivation\b/i, /\bretention\b/i, /\breferral\b/i, /\brevenue\b/i];
  const wanted = terms(query), chunks: (AiSource & { score: number; order: number })[] = [];
@@ -88,8 +91,14 @@ export function retrieveCurriculum(lessons: CurriculumLesson[], query: string, c
  chunks.sort((a,b) => b.score - a.score || a.order - b.order);
  const current = chunks.filter(c => c.lessonId === currentLesson).slice(0, aarrr ? 1 : 2);
  const others = chunks.filter(c => !current.includes(c) && c.score > 0);
- const common = commonQuestion ? others.find(source => source.dayNumber === 1 && commonTopic.test(source.excerpt)) : undefined;
- const selected = common ? [...current, common] : [...current];
+ const common = topics.flatMap(topic => {
+  const matching = chunks.filter(source => source.dayNumber === 1 && topic.test(source.excerpt));
+  const density = (excerpt: string) => excerpt.match(new RegExp(topic.source, 'gi'))?.length ?? 0;
+  matching.sort((a, b) => Number(topic.test(b.title)) - Number(topic.test(a.title))
+   || density(b.excerpt) - density(a.excerpt) || b.score - a.score || a.order - b.order);
+  return matching.slice(0, 1);
+ });
+ const selected = [...new Set([...current, ...common])];
  if (aarrr) {
   for (const stage of stages) {
    if (selected.some(source => stage.test(source.excerpt))) continue;
