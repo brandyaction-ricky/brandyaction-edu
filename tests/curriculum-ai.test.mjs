@@ -87,3 +87,12 @@ test('detects likely passwords and valid card numbers without blocking ordinary 
  assert.equal(hasSensitiveQuestionText('카드 4111 1111 1111 1111'),true);
  assert.equal(hasSensitiveQuestionText('비밀번호를 잊었는데 어디에서 바꾸나요?'),false);
 });
+
+test('a refund question reserves the first-day refund policy over unrelated schedule history',()=>{
+ const lessons=[
+  {id:'current',title:'2일차',day_number:2,body_text:'클로드 설치'},
+  {id:'common',title:'공통 안내',day_number:1,body_text:'환불 및 일정은 공지에서 확인해 주세요.\n'+'안내 내용입니다.\n'.repeat(180)+'환불 규정\n결제 후 7일 이내는 전액 환불 조건을 확인합니다. 환불 신청은 담당자에게 문의합니다.'},
+ ];
+ const {sources}=retrieveCurriculum(lessons,'일정 공지 오리엔테이션 OT 환불 문의','current',false,'환불은 어떻게 하나요?');
+ assert.ok(sources.some(source=>source.lessonId==='common'&&source.excerpt.includes('전액 환불')));
+});

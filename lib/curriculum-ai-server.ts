@@ -73,7 +73,7 @@ export async function generateCurriculumAnswer(db: Db, options: { actor:string; 
   const context = await db.rpc('edu_ai_curriculum',{p_actor:options.actor,p_request:options.requestId}).abortSignal(AbortSignal.timeout(10000));
   if (context.error) throw context.error;
   const english = requestsEnglish(options.question);
-  const retrieved = retrieveCurriculum(context.data as CurriculumLesson[],[...history.filter(t=>t.role==='user').map(t=>t.text),options.question].join('\n'),scope.lessonId,process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true');
+  const retrieved = retrieveCurriculum(context.data as CurriculumLesson[],[...history.filter(t=>t.role==='user').map(t=>t.text),options.question].join('\n'),scope.lessonId,process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true',options.question);
   if (!retrieved.sources.length) { const result={answer:english ? aiFallbackEnglish : aiFallback,needsMentor:true,sources:[],searchedLessons:retrieved.searchedLessons}; await assertAccess(); await finish('succeeded',result); return result; }
   const image = options.imageId ? await studentCurriculumImage(db,options.actor,options.enrollmentId!,options.lessonId!,options.imageId) : options.image;
   const mentorGuidance = await readTutorReferences(options.question,retrieved.sources);
