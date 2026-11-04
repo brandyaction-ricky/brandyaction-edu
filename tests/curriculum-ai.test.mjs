@@ -51,6 +51,7 @@ test('retrieval reserves current lesson evidence and cites the section containin
  const {sources}=retrieveCurriculum(lessons,'직이랑 업이 뭐가 달라요?', 'current');
  assert.equal(sources[0].lessonId,'current');
  assert.equal(sources[0].title,'2-1 직과 업');
+ assert.equal(sources[0].blockId,'h');
  assert.match(sources[0].excerpt,/^2-1 직과 업\n직은 명함/);
 });
 test('AARRR retrieval covers all five phases across eligible lessons and keeps the displayed day',()=>{
@@ -95,4 +96,16 @@ test('a refund question reserves the first-day refund policy over unrelated sche
  ];
  const {sources}=retrieveCurriculum(lessons,'일정 공지 오리엔테이션 OT 환불 문의','current',false,'환불은 어떻게 하나요?');
  assert.ok(sources.some(source=>source.lessonId==='common'&&source.excerpt.includes('전액 환불')));
+});
+
+test('English Projects navigation finds the Korean lesson section',()=>{
+ const lessons=[
+  {id:'current',title:'학습 준비',body_text:'오리엔테이션'},
+  {id:'projects',title:'기본 사용법',day_number:2,document:{schemaVersion:1,checklist:[],blocks:[
+   {id:'projects-heading',type:'heading',content:'프로젝트 열기'},
+   {id:'projects-nav',type:'text',content:'클로드의 왼쪽 사이드바에서 프로젝트를 선택합니다.'},
+  ]}},
+ ];
+ const {sources}=retrieveCurriculum(lessons,'Where do I open Projects in Claude?', 'current');
+ assert.ok(sources.some(source=>source.dayNumber===2 && source.blockId==='projects-heading' && source.excerpt.includes('사이드바')));
 });

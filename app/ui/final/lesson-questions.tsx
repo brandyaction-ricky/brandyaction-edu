@@ -6,7 +6,7 @@ import { useUnsavedLearningChanges } from './use-unsaved-learning-changes';
 import './lesson-questions.css';
 import { QuestionImagePicker, type QuestionImagePickerHandle } from './question-image';
 import { QuestionCard } from './question-hub';
-import { LearningQuestionShortcut, learningQuestionCreatedEvent } from './learning-question-dialog';
+import { openFloatingQuestionEvent, learningQuestionCreatedEvent } from './learning-question-dialog';
 
 export function LessonQuestions({ enrollmentId, lessonId, lessonTitle }: { enrollmentId: string; lessonId: string; lessonTitle: string }) {
   const [open, setOpen] = useState(false), [title, setTitle] = useState(''), [content, setContent] = useState('');
@@ -46,7 +46,7 @@ export function LessonQuestions({ enrollmentId, lessonId, lessonTitle }: { enrol
     finally{submitting.current=false;setBusy(false);}
   }
   return <section id="lesson-questions" className="lesson-private-questions" aria-label="이 학습의 질문·답변">
-    <div className="lesson-question-heading"><div><h2>이 학습의 질문·답변</h2><p>졸업 후에도 질문할 수 있습니다. 같은 기수의 공개 질문을 함께 보고, 개인적인 내용은 비밀 질문으로 남겨 주세요.</p></div>{process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' ? <LearningQuestionShortcut context={{enrollmentId,lessonId,label:lessonTitle,recent:true}} label="이 학습에 질문하기"/> : <button type="button" className="btn" onClick={()=>setOpen(value=>!value)}>{open?'작성 접기':'이 학습에 질문하기'}</button>}</div>
+    <div className="lesson-question-heading"><div><h2>이 학습의 질문·답변</h2><p>졸업 후에도 질문할 수 있습니다. 같은 기수의 공개 질문을 함께 보고, 개인적인 내용은 비밀 질문으로 남겨 주세요.</p></div>{process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' ? <button type="button" className="btn" onClick={()=>window.dispatchEvent(new CustomEvent(openFloatingQuestionEvent,{detail:{enrollmentId,lessonId,label:lessonTitle,recent:true}}))}>이 학습에 질문하기</button> : <button type="button" className="btn" onClick={()=>setOpen(value=>!value)}>{open?'작성 접기':'이 학습에 질문하기'}</button>}</div>
     {process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' ? null : <form onSubmit={submit} className="lesson-question-form" style={open ? undefined : {display:"none"}} onPaste={event => {
       if (process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED !== 'true') return;
       const files = Array.from(event.clipboardData.items).filter(item => item.kind === 'file' && item.type.startsWith('image/')).map(item => item.getAsFile()).filter((file): file is File => file !== null);

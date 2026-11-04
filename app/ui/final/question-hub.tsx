@@ -25,7 +25,10 @@ export function QuestionCard({ question: q, initiallyOpen = false, changed, dele
 export function QuestionHub({ order }: { order?: string | null }) {
   const params = useSearchParams(), [showAll, setShowAll] = useState(false);
   const candidate = params.get('question'), target = !showAll && candidate && /^[a-f0-9-]{36}$/.test(candidate) ? candidate : null;
-  const [tab, setTab] = useState<'write' | 'mine' | 'public'>(order ? 'write' : target ? 'mine' : 'public');
+  const view = params.get('view');
+  const route = JSON.stringify([order, candidate, view]);
+  const [selectedTab, setSelectedTab] = useState<{route:string;value:'write'|'mine'|'public'}>();
+  const tab = selectedTab?.route === route ? selectedTab.value : order || view === 'general' ? 'write' : target || view === 'mine' ? 'mine' : 'public';
   const [page, setPage] = useState(0), [version, setVersion] = useState(0), [query, setQuery] = useState('');
   const [notice, setNotice] = useState(''), [filter, setFilter] = useState('전체');
   const [state, setState] = useState<{ key: string; questions?: Row[]; hasMore?: boolean; error?: string }>();
@@ -36,7 +39,7 @@ export function QuestionHub({ order }: { order?: string | null }) {
     const timer = setTimeout(() => void questionRequest<{ questions: Row[]; hasMore: boolean }>('/api/platform/question-hub?' + new URLSearchParams({ mode: tab, page: String(page), ...(tab === 'public' ? { q: query } : target ? { question: target } : {}) }), undefined, abort.signal).then(data => { if (alive) setState({ key, ...data }); }).catch(e => { if (alive) setState({ key, error: e.message }); }), tab === 'public' ? 300 : 0);
     return () => { alive = false; clearTimeout(timer); abort.abort(); };
   }, [key, tab, page, query, target]);
-  function select(next: typeof tab) { setTab(next); setPage(0); setFilter('전체'); }
+  function select(next: typeof tab) { setSelectedTab({route,value:next}); setPage(0); setFilter('전체'); }
   const data = state?.key === key ? state : undefined;
   const questions = (data?.questions || []).filter(q => filter === '전체' || (q.is_resolved ? '질문 종료' : q.status === 'answered' ? '답변 있음' : '답변 대기') === filter);
   return <>
@@ -44,7 +47,7 @@ export function QuestionHub({ order }: { order?: string | null }) {
     <div className="question-hub-tabs" role="tablist" aria-label="질문 메뉴">{([['public','전체 질문'],['mine','내 질문'],['write','질문하기']] as const).map(([value,label]) => <button type="button" key={value} role="tab" aria-selected={tab === value} onClick={() => select(value)}>{label}</button>)}</div>
     {notice && <p role="status" className="notice mb24">{notice}</p>}
     {tab === 'mine' && process.env.NEXT_PUBLIC_EDU_CURRICULUM_AI_ENABLED === 'true' && <details className="panel pad mb24"><summary>AI 대화 보기</summary><MyAiConversations/></details>}
-    <div hidden={tab !== 'write'} className="panel pad mb24"><QuestionEntry order={order} onCreated={() => { setNotice('질문을 등록했습니다. 답변은 이곳에서 확인할 수 있어요.'); setVersion(v => v + 1); select('mine'); }}/></div>
+    <div hidden={tab !== 'write'} className="panel pad mb24"><QuestionEntry key={route} order={order} initialGeneral={view==='general'} onCreated={() => { setNotice('질문을 등록했습니다. 답변은 이곳에서 확인할 수 있어요.'); setVersion(v => v + 1); select('mine'); }}/></div>
     {target && tab === 'mine' && <button className="btn small mb24" onClick={()=>setShowAll(true)}>내 질문 전체 보기</button>}
     {tab === 'public' && <><p className="meta mb16">같은 기수에 공개한 학습 질문입니다. 비밀 질문은 ‘내 질문’에서 확인하세요.</p><label className="field mb24">질문 검색<input type="search" maxLength={500} value={query} onChange={e => { setQuery(e.target.value); setPage(0); }} placeholder="궁금한 내용을 검색해 보세요"/></label><RelatedAnswers query={query} context={null}/></>}
     {tab !== 'write' && (!data ? <p role="status">불러오고 있습니다.</p> : data.error ? <p role="alert">{data.error} <button className="btn small" onClick={() => setVersion(v => v + 1)}>다시 불러오기</button></p> : <>

@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable @next/next/no-img-element -- private authenticated image endpoint and local object URL */
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
-import { answerFileSpec } from '@/lib/lesson-files';
+import { answerFileSpec, answerFileTypes } from '@/lib/lesson-files';
 async function post(body: unknown) {
  const response = await fetch('/api/platform/question-images', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(20000) });
  const result = await response.json(); if (!response.ok) throw new Error(result.error || '이미지를 올리지 못했습니다. 다시 시도해 주세요.'); return result;
@@ -36,6 +36,11 @@ export function QuestionImagePicker({ enrollmentId, lessonId, locked, publicQues
  }
  function choose(file?: File) {
   if (!file || locked || gate.current) return;
+  const extension = file.name.split('.').pop()?.toLowerCase() || '';
+  if (ai && answerFileTypes[extension]?.kind !== 'image') {
+   setError('화면 캡처는 JPG·PNG·WEBP·GIF 이미지로 첨부해 주세요.');
+   return;
+  }
   try { answerFileSpec(file.name, file.size, 'image'); } catch (e) { setError((e as Error).message); return; }
   const next = { file, request: crypto.randomUUID(), preview: URL.createObjectURL(file) }; setInherited(null); setSelection(next); void upload(next);
  }
