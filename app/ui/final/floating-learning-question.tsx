@@ -108,8 +108,8 @@ export function FloatingLearningQuestion({ member, current }: { member: string; 
         <div className="floating-question-links"><Link href="/my/questions?view=general">결제·환불·계정은 일반 문의로</Link><Link href="/my/questions?view=mine">내 질문 모아보기</Link></div>
       </div>
     </section>}
-    <button ref={trigger} type="button" className="btn primary floating-learning-question-trigger" aria-expanded={panel.open} aria-controls={panel.open || selected ? 'floating-learning-question' : undefined} onClick={() => toggle(!panel.open)}>
-      {panel.open ? <X size={16} aria-hidden="true"/> : <MessageCircle size={17} aria-hidden="true"/>}{panel.open ? '접기' : '질문하기'}
-    </button>
+    {!panel.open && <button ref={trigger} type="button" className="btn primary floating-learning-question-trigger" aria-expanded={panel.open} aria-controls={panel.open || selected ? 'floating-learning-question' : undefined} onClick={() => toggle(!panel.open)}>
+      <MessageCircle size={17} aria-hidden="true"/>질문하기
+    </button>}
   </div>;
 }

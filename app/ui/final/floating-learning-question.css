@@ -5,7 +5,6 @@
   bottom: calc(16px + env(safe-area-inset-bottom));
   display: grid;
   justify-items: end;
-  gap: 10px;
   pointer-events: none;
 }
 
@@ -27,7 +26,7 @@
   display: flex;
   flex-direction: column;
   width: min(416px, calc(100vw - 40px));
-  max-height: min(74dvh, 700px, calc(100dvh - 80px));
+  max-height: min(74dvh, 700px, calc(100dvh - 32px));
   overflow: hidden;
   background: #fff;
   border: 1px solid #e2e5e9;
@@ -105,6 +104,6 @@
 
 @media (max-width: 600px) {
   .floating-learning-question { right: calc(8px + env(safe-area-inset-right)); bottom: calc(8px + env(safe-area-inset-bottom)); }
-  .floating-learning-question-panel { width: calc(100vw - 16px - env(safe-area-inset-right) - env(safe-area-inset-left)); max-height: min(64dvh, calc(100dvh - 72px)); }
+  .floating-learning-question-panel { width: calc(100vw - 16px - env(safe-area-inset-right) - env(safe-area-inset-left)); max-height: min(64dvh, calc(100dvh - 16px)); }
   .floating-learning-question-body { padding: 12px; }
 }
