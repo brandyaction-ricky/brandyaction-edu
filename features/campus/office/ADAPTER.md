@@ -1,12 +1,12 @@
 # Personal AI Office adapter v1
 
-Status: local implementation and mock verification only. Yoonik's merged ZIP and actual Telegram worker have not been received/connected. No dispatch, bot process, AI request, Telegram message, production mutation or secret setup is performed by this module.
+Status (2026-11-05): Yoonik’s ZIP has been received and its character/space renderer is integrated. Personal bot profiles can be imported, saved and synchronized under the EDU account. The campus is deployed privately for active administrators; existing students cannot enter. The ZIP contains frontend desktop API calls, but no executable desktop worker backend or production worker credentials. Actual Telegram worker execution/live state is therefore not connected, and outbound dispatch remains OFF.
 
 ## EDU boundary
 
 `OfficePanel({ snapshot, demo })` from `panel.tsx` (alias `Panel`) is independent of the spatial renderer. Mount it in the EDU shell or open it from the office object in the future ZIP. Never move EDU session cookies or Supabase service keys into the ZIP/iframe. A renderer may request the panel open; EDU owns authentication, account mapping, job records, permissions, and human approvals.
 
-`GET /api/campus/office?enrollmentId=<uuid>` and `POST /api/campus/office` use the current EDU session and current active enrollment. Both require `EDU_CAMPUS_ENABLED=true` and `EDU_CAMPUS_OFFICE_ENABLED=true`. New SQL `20261102154425_edu_campus_private_office_jobs.sql` depends on the community migration's safe-URL helper; neither is applied remotely here.
+`GET /api/campus/office?enrollmentId=<uuid>` and `POST /api/campus/office` use the current EDU session and current active enrollment. Both require `EDU_CAMPUS_ENABLED=true` and `EDU_CAMPUS_OFFICE_ENABLED=true`. New SQL `20261102154425_edu_campus_private_office_jobs.sql` depends on the community migration's safe-URL helper; both are applied in DEV and the private production release.
 
 Learner commands:
 
@@ -63,7 +63,7 @@ Server-only `EDU_CAMPUS_OFFICE_CONNECTORS_JSON`:
 
 The referenced secret needs at least 32 characters and must be unique per connector. Malformed, duplicate or reused-secret configuration is rejected as a whole. No secret value is returned to the UI. The matching private DB mapping is also required. Public wrappers are security invoker; ingestion execution is granted only to `service_role`, with narrow private definer authorization. Normal authenticated users cannot call ingestion or directly mutate jobs/history/mappings.
 
-The current implementation has **no outbound worker dispatcher**. `incoming_adapter_registered` only means a mapped incoming adapter exists, not that a worker is alive or that jobs were sent. A future dispatcher must be added and tested with Yoonik's actual host/worker authentication and explicit account mappings before real execution can be claimed. The renderer's cosmetics and bot labels are not task evidence.
+An outbound worker dispatcher is implemented below but remains **disabled and unconnected to a real worker**. `incoming_adapter_registered` only means a mapped incoming adapter exists, not that a worker is alive or that jobs were sent. A future dispatcher must be added and tested with Yoonik's actual host/worker authentication and explicit account mappings before real execution can be claimed. The renderer's cosmetics and bot labels are not task evidence.
 
 ## Verification and rollback
 

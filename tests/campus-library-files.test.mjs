@@ -23,3 +23,13 @@ test('course information embeds only on the same origin; account and payment rou
  const config=(await load('next.config.ts')).default,headers=await config.headers();const general=headers.find(h=>h.source==='/:path*'),exceptions=headers.filter(h=>h.headers.some(x=>x.key==='X-Frame-Options'&&x.value==='SAMEORIGIN'));
  assert.equal(general.headers.find(h=>h.key==='X-Frame-Options').value,'DENY');assert.deepEqual(exceptions.map(h=>h.source).sort(),['/campus/world/:path*','/classes/:slug']);for(const h of exceptions)assert.equal(h.headers.find(x=>x.key==='Content-Security-Policy').value,"frame-ancestors 'self'");
 });
+
+const adminDownload=await load('app/api/admin/campus/webinars/[slug]/resources/[resource]/route.ts');
+test('staff can verify a draft file privately; anonymous callers, bad namespace and oversize files are denied',async()=>{
+ reset();state.event.status='draft';state.event.resources[0].published=false;
+ state.operator=null;assert.equal((await adminDownload.GET(new Request('https://edu.test'),context)).status,403);assert.equal(state.signed,0);
+ state.operator={id};const r=await adminDownload.GET(new Request('https://edu.test'),context);assert.equal(r.status,303);assert.match(r.headers.get('cache-control'),/private, no-store/);assert.equal(r.headers.get('vary'),'Cookie');
+ assert.equal(state.event.status,'draft');assert.equal((await download.GET(new Request('https://edu.test'),context)).status,404);
+ state.event.resources[0].storagePath='edu/paid.pdf';assert.equal((await adminDownload.GET(new Request('https://edu.test'),context)).status,400);
+ state.event.resources[0].storagePath=path;state.size=21*1024*1024;assert.equal((await adminDownload.GET(new Request('https://edu.test'),context)).status,404);assert.equal(state.signed,1);assert.equal(adminDownload.HEAD().status,405);
+});
