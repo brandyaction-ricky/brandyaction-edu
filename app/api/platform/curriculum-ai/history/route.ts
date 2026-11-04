@@ -25,7 +25,7 @@ export async function PATCH(request:Request){
   const actor=await getAuthenticatedUser();
   if(!actor)return reply({error:'로그인이 필요해요.'},401);
   const {requestId,action,helpful}=await readAiBody(request);
-  if(!uuid(requestId) || (action!=='delete' && (action!=='feedback' || typeof helpful!=='boolean')))return reply({error:'질문과 요청을 확인해 주세요.'},400);
+  if(!uuid(requestId) || (action!=='delete' && action!=='incorrect' && (action!=='feedback' || typeof helpful!=='boolean')))return reply({error:'질문과 요청을 확인해 주세요.'},400);
   const result=await createAdminClient().rpc('edu_ai_student_manage_turn',{p_actor:actor.id,p_request:requestId,p_action:action,p_helpful:action==='feedback'?helpful:null}).abortSignal(AbortSignal.timeout(10000));
   if(result.error)throw result.error;
   return reply({ok:true});

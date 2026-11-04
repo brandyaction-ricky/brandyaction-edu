@@ -25,10 +25,14 @@ test('mentor drafts derive the cohort from the saved question, deny forged scope
 });
 test('students can exceed both daily quotas; usage separates requests and API calls and marks missing measurements; browser roles have no access',async t=>{
  const h=await fixture(t);await enable(h);await h.owner('update edu_ai_cohort_settings set student_daily_limit=1,daily_limit=1');
- const request=id();await begin(h,{request});await h.db.query("update edu_ai_requests set status='succeeded' where id=$1",[request]);
- await begin(h);
+ const request=id();
+ for(let index=0;index<12;index++){
+  const attempt=await begin(h,index===0?{request}:{});
+  if(index===0)await assert.rejects(()=>begin(h),/AI_LIMIT/);
+  await h.db.query("update edu_ai_requests set status='succeeded' where id=$1",[attempt.requestId]);
+ }
  await h.db.query("insert into edu_ai_calls(request_id,attempt,model,status) values($1,1,'gpt-5-mini','unknown')",[request]);
- const report=await h.rpc('edu_ai_usage',[h.admin,30]);assert.equal(report.rows[0].requests,2);assert.equal(report.rows[0].calls.api_calls,1);assert.equal(report.rows[0].calls.unmeasured_calls,1);assert.equal(report.rows[0].calls.unpriced_calls,1);
+ const report=await h.rpc('edu_ai_usage',[h.admin,30]);assert.equal(report.rows[0].requests,12);assert.equal(report.rows[0].calls.api_calls,1);assert.equal(report.rows[0].calls.unmeasured_calls,1);assert.equal(report.rows[0].calls.unpriced_calls,1);
  await assert.rejects(()=>h.rpc('edu_ai_usage',[h.student,30]),/AI_FORBIDDEN/);
  await h.db.exec('set role authenticated');await assert.rejects(()=>h.db.query('select * from edu_ai_requests'),/permission denied/);await assert.rejects(()=>h.rpc('edu_ai_usage',[h.admin,30]),/permission denied/);
 });

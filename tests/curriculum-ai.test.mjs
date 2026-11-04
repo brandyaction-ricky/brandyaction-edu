@@ -82,11 +82,18 @@ test('common questions reserve a relevant first-day source without dropping curr
  assert.ok(sources.some(source=>source.lessonId==='current'));
 });
 
-test('detects likely passwords and valid card numbers without blocking ordinary questions',()=>{
+test('detects credential and payment patterns without blocking ordinary questions',()=>{
  const {hasSensitiveQuestionText}=loadTs('lib/curriculum-ai-sensitive.ts');
- assert.equal(hasSensitiveQuestionText('비밀번호: sample-test-value'),true);
- assert.equal(hasSensitiveQuestionText('카드 4111 1111 1111 1111'),true);
- assert.equal(hasSensitiveQuestionText('비밀번호를 잊었는데 어디에서 바꾸나요?'),false);
+ for(const text of ['비밀번호: sample-test-value','비번은 fake1234 이에요','pw: Test!2345',
+  '패스워드 samplefake','password is Test!2345','tester@example.test / Test!2345',
+  '카드 4111 1111 1111 1111','카드 1234-5678-9012-3456','１２３４－５６７８－９０１２－３４５６',
+  '주민등록번호 900101-1234567','9001011234567','sk-proj-'+'x'.repeat(30),'ghp_'+'x'.repeat(30)]){
+  assert.equal(hasSensitiveQuestionText(text),true,text);
+ }
+ for(const text of ['비밀번호를 잊었는데 어디에서 바꾸나요?','비밀번호는 어떻게 바꿔요?', 'How do I reset my password?',
+  'Where is the password reset page?', '연락처 010-0000-0000', 'tester@example.test / 문의 내용', 'API 키는 어디에서 만들어요?']){
+  assert.equal(hasSensitiveQuestionText(text),false,text);
+ }
 });
 
 test('a refund question reserves the first-day refund policy over unrelated schedule history',()=>{
