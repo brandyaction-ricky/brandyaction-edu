@@ -125,6 +125,17 @@ test('consent redirect also preserves the Supabase session cookies', async () =>
   assert.deepEqual(response.cookies.values, harness.cookieMutations);
 });
 
+test('cancelled social login keeps each campus entry destination for the next attempt', async () => {
+  const harness = callbackHarness();
+  for (const next of ['/campus/enter?mode=welcome&event=staff', '/campus/workspace?enrollmentId=qa&section=space']) {
+    const response = await harness.get(new Request('https://edu.example/auth/callback?error=access_denied&next=' + encodeURIComponent(next)));
+    const target = new URL(response.redirectUrl);
+    assert.equal(target.pathname, '/login');
+    assert.equal(target.searchParams.get('next'), next);
+    assert.equal(target.searchParams.get('error'), 'auth_callback');
+  }
+});
+
 test('a new Kakao session needs onsite consent unless Kakao Sync verified the required terms', async () => {
   for (const requiredTermsVerified of [false, true]) {
     const syncCalls = [];
@@ -158,5 +169,5 @@ test('older email-change links guide members when their code opened in a differe
   const response = await exports.GET(new Request('https://edu.example/auth/callback?code=old-code&next=%2Fmy%2Fprofile'));
   assert.equal(response.redirectUrl, 'https://edu.example/auth/email-change-help');
   const oauthFailure = await exports.GET(new Request('https://edu.example/auth/callback?code=oauth-code&next=%2Fmy%2Fprofile&provider=kakao'));
-  assert.equal(oauthFailure.redirectUrl, 'https://edu.example/login?error=auth_callback');
+  assert.equal(oauthFailure.redirectUrl, 'https://edu.example/login?error=auth_callback&next=%2Fmy%2Fprofile');
 });

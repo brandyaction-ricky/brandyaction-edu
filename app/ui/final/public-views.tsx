@@ -24,12 +24,14 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { loginBeforeCheckout, parseEntrySource, withEntrySource } from '@/lib/entry-source';
 import { youtubeThumbnailUrl } from '@/lib/youtube-thumbnail';
 import type { Data } from "../learning-workflows";
 import { EmailAuth } from "../email-auth";
 import { GoogleIdSignIn } from "../google-id-signin";
+import { BrowserLoginHelp } from '../browser-login-help';
+import { isEmbeddedLoginBrowser } from '@/lib/embedded-browser';
 import { ProductDetailHtml } from './product-detail-html';
 import { RecruitmentCountdown } from './product-countdown';
 import { productDocument, storedProductDocumentPath } from '@/lib/product-html-document';
@@ -51,6 +53,9 @@ import {
   courseType,
 } from "./primitives";
 import authLayout from './auth-layout.module.css';
+const subscribeBrowser=()=>()=>{};
+const browserAgent=()=>navigator.userAgent;
+const serverAgent=()=>'';
 
 export function AuthView({
   signup,
@@ -65,6 +70,9 @@ export function AuthView({
   next: string;
   authError?: string | null;
 }) {
+  const ua=useSyncExternalStore(subscribeBrowser,browserAgent,serverAgent),embedded=isEmbeddedLoginBrowser(ua),browserReady=!!ua;
+  const [browserHelp,setBrowserHelp]=useState(0);
+  function google(){if(isEmbeddedLoginBrowser(navigator.userAgent)){setBrowserHelp(n=>n+1);return;}void social('google');}
   const googlePreview = useSearchParams().get("google_preview") === "1";
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_GIS_CLIENT_ID;
   const useGoogleId = Boolean(googleClientId) &&
@@ -95,23 +103,24 @@ export function AuthView({
             <MessageCircle className="social-mark" />
             카카오로 계속하기
           </button>
-          {useGoogleId && googleClientId ? (
+          {browserReady && !embedded && useGoogleId && googleClientId ? (
             <GoogleIdSignIn
               clientId={googleClientId}
               next={next}
               disabled={pending}
-              fallback={() => void social("google")}
+              fallback={google}
             />
           ) : (
             <button
               className="btn full"
               disabled={pending}
-              onClick={() => void social("google")}
+              onClick={google}
             >
               <span className="social-mark">G</span>Google로 계속하기
             </button>
           )}
         </div>
+        <BrowserLoginHelp key={`${embedded}-${browserHelp}`} next={next} embedded={embedded} requested={browserHelp}/>
         <EmailAuth key={signup ? 'signup' : 'login'} signup={signup} next={next} disabled={pending} />
         <p className="meta">
           처음 방문하셨다면 가입 후 필수 약관을 확인합니다.

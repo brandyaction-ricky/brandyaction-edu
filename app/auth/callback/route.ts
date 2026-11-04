@@ -41,5 +41,5 @@ export async function GET(request: Request) {
   // A different browser cannot exchange their PKCE code, even if the address
   // confirmation itself succeeded. Do not strand the member at generic login.
   if (next === "/my/profile" && !searchParams.has("provider")) return NextResponse.redirect(`${origin}/auth/email-change-help`);
-  return NextResponse.redirect(`${origin}/login?error=auth_callback`);
+  return NextResponse.redirect(`${origin}/login?error=auth_callback&next=${encodeURIComponent(next)}`);
 }
