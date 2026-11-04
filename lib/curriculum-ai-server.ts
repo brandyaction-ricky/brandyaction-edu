@@ -1,3 +1,4 @@
+import { hasSensitiveQuestionText } from './curriculum-ai-sensitive';
 import { studentCurriculumImage } from './curriculum-ai-image';
 import { readTutorReferences } from './curriculum-tutor-server';
 import { tutorInstructions } from './curriculum-tutor';
@@ -51,7 +52,7 @@ export async function generateCurriculumAnswer(db: Db, options: { actor:string; 
  if (beginError) throw beginError;
  if (!scope || scope.requestId !== options.requestId) throw new Error('AI_SCOPE_INVALID');
  if (persistent && scope.cached) return scope.cached;
- const history:AiTurn[] = persistent ? scope.history || [] : options.history || [];
+ const history:AiTurn[] = (persistent ? scope.history || [] : options.history || []).filter((turn: AiTurn) => !hasSensitiveQuestionText(turn.text));
  async function assertAccess() { const r = await db.rpc('edu_ai_assert',{ p_actor:options.actor,p_request:options.requestId }); if (r.error) throw r.error; }
  async function finish(status:'succeeded'|'failed',answer?:unknown,error?:string) {
   if(persistent){const saved=await db.rpc('edu_ai_student_finish',{p_actor:options.actor,p_request:options.requestId,p_answer:status==='succeeded'?answer:null,p_error:error || null});if(saved.error)throw saved.error;return;}

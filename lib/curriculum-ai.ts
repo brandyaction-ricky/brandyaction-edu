@@ -54,6 +54,8 @@ export function curriculumDay(lesson: CurriculumLesson, blocks: boolean) {
 // to the provider; there are no persistent vendor files, drafts or quiz answer keys.
 export function retrieveCurriculum(lessons: CurriculumLesson[], query: string, currentLesson: string, blocks = true) {
  if (lessons.length > 120 || !lessons.some(l => l.id === currentLesson)) throw new Error('AI_CONTEXT_INVALID');
+ const commonTopic = /환불|오리엔테이션|일정|\b(?:OT|refund|orientation|schedule)\b/i;
+ const commonQuestion = commonTopic.test(query);
  const aarrr = /\bAARRR\b/i.test(query);
  const stages = [/\bacquisition\b/i, /\bactivation\b/i, /\bretention\b/i, /\breferral\b/i, /\brevenue\b/i];
  const wanted = terms(query), chunks: (AiSource & { score: number; order: number })[] = [];
@@ -86,7 +88,8 @@ export function retrieveCurriculum(lessons: CurriculumLesson[], query: string, c
  chunks.sort((a,b) => b.score - a.score || a.order - b.order);
  const current = chunks.filter(c => c.lessonId === currentLesson).slice(0, aarrr ? 1 : 2);
  const others = chunks.filter(c => !current.includes(c) && c.score > 0);
- const selected = [...current];
+ const common = commonQuestion ? others.find(source => source.dayNumber === 1 && commonTopic.test(source.excerpt)) : undefined;
+ const selected = common ? [...current, common] : [...current];
  if (aarrr) {
   for (const stage of stages) {
    if (selected.some(source => stage.test(source.excerpt))) continue;
