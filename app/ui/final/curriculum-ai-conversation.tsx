@@ -22,16 +22,34 @@ export function CurriculumAiConversation({context,showContext=true,onStateChange
  const [turns,setTurns]=useState<Turn[]>([]),[question,setQuestion]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[mentor,setMentor]=useState(false);
  const input=useRef<HTMLTextAreaElement>(null);
  const draftKey='edu-ai-draft:'+context.enrollmentId+':'+context.lessonId;
+ const requestKey=draftKey+':request';
  const [draftReady,setDraftReady]=useState(false);
+ const [canResume,setCanResume]=useState(false);
  const [copyStatus,setCopyStatus]=useState('');
+ const cursor=useRef<{time:string;id:string}|undefined>(undefined),retry=useRef<{requestId:string;question:string;imageId?:string}|null>(null);
+ const [uncertain,setUncertain]=useState(false);
+ const clearRetry=useCallback(()=>{
+  retry.current=null;
+  setCanResume(false);
+  try{sessionStorage.removeItem(requestKey);}catch{/* Storage may be disabled. */}
+ },[requestKey]);
  const sensitive=hasSensitiveQuestionText(question);
  useEffect(()=>{
   const restore=window.setTimeout(()=>{
-   try{setQuestion(sessionStorage.getItem(draftKey) || '');}catch{/* Storage may be disabled. */}
+   try{
+    const saved=sessionStorage.getItem(requestKey);
+    if(saved){
+     const request=JSON.parse(saved) as NonNullable<typeof retry.current>;
+     retry.current=request;
+     setQuestion(request.question);
+     setUncertain(true);
+     setCanResume(true);
+    }else setQuestion(sessionStorage.getItem(draftKey) || '');
+   }catch{/* Storage may be disabled. */}
    setDraftReady(true);
   },0);
   return()=>window.clearTimeout(restore);
- },[draftKey]);
+ },[draftKey,requestKey]);
  const updateQuestion=useCallback((value:string)=>{
   setQuestion(value);
   try{
@@ -41,40 +59,46 @@ export function CurriculumAiConversation({context,showContext=true,onStateChange
  },[draftKey]);
  const [loadedVersion,setLoadedVersion]=useState(-1),[historyError,setHistoryError]=useState(''),[version,setVersion]=useState(0),[more,setMore]=useState(false),[olderBusy,setOlderBusy]=useState(false);
  const loaded=loadedVersion===version && draftReady;
- const cursor=useRef<{time:string;id:string}|undefined>(undefined),retry=useRef<{requestId:string;question:string;imageId?:string}|null>(null);
- const [uncertain,setUncertain]=useState(false);
  useUnsavedLearningChanges(!mentor && Boolean(busy || image.draft));
  const gate=useRef(false),alive=useRef(true),composer=useRef({dirty:false,locked:false});
  const [mentorLocked,setMentorLocked]=useState(false);
  const updateMentor=useCallback((state:{dirty:boolean;locked:boolean})=>{composer.current=state;setMentorLocked(state.locked);onStateChange(state);},[onStateChange]);
  useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
- useEffect(()=>{if(!mentor)onStateChange({dirty:image.draft,locked:busy || image.busy || uncertain});},[question,busy,image.draft,image.busy,mentor,uncertain,onStateChange]);
+ useEffect(()=>{if(!mentor)onStateChange({dirty:image.draft && !canResume,locked:image.busy || ((busy || uncertain) && !canResume)});},[busy,image.draft,image.busy,mentor,uncertain,canResume,onStateChange]);
  useEffect(()=>{
+  if(!draftReady)return;
   const abort=new AbortController();let active=true;
   void questionRequest<{items:SavedAiExchange[];hasMore:boolean}>(aiHistoryUrl(context.enrollmentId,context.lessonId),undefined,abort.signal).then(data=>{
    if(!active)return;const items=data.items || [];setHistoryError('');setTurns(savedTurns(items));setMore(data.hasMore);const last=items.at(-1);cursor.current=last?{time:last.createdAt,id:last.requestId}:undefined;
    const pending=retry.current&&items.find(i=>i.requestId===retry.current!.requestId);
-   if(pending&&pending.status!=='pending'){if(pending.status==='succeeded'){updateQuestion('');setImage({id:null,busy:false,draft:false});setImageKey(k=>k+1);setError('');}retry.current=null;setUncertain(false);}
+   if(pending&&pending.status!=='pending'){if(pending.status==='succeeded'){updateQuestion('');setImage({id:null,busy:false,draft:false});setImageKey(k=>k+1);setError('');}clearRetry();setUncertain(false);}
    setLoadedVersion(version);
   }).catch(()=>{if(active){setHistoryError('인터넷 연결을 확인해 주세요.');setLoadedVersion(version);}});
   return()=>{active=false;abort.abort();};
- },[context.enrollmentId,context.lessonId,version,updateQuestion]);
+ },[context.enrollmentId,context.lessonId,version,updateQuestion,draftReady,clearRetry]);
+ const pendingAnswer=turns.some(turn=>turn.pending);
+ useEffect(()=>{
+  if(!loaded || !pendingAnswer || busy)return;
+  const timer=window.setTimeout(()=>setVersion(value=>value+1),2500);
+  return()=>window.clearTimeout(timer);
+ },[loaded,pendingAnswer,busy]);
  async function older(){
   if(!cursor.current||olderBusy)return;setOlderBusy(true);setError('');
   try{const data=await questionRequest<{items:SavedAiExchange[];hasMore:boolean}>(aiHistoryUrl(context.enrollmentId,context.lessonId,cursor.current));if(!alive.current)return;setTurns(old=>[...savedTurns(data.items),...old]);setMore(data.hasMore);const last=data.items.at(-1);cursor.current=last?{time:last.createdAt,id:last.requestId}:undefined;}
   catch{if(alive.current)setError('이전 대화를 불러오지 못했어요. 다시 시도해 주세요.');}finally{if(alive.current)setOlderBusy(false);}
  }
  async function submit(event:FormEvent,checkRetry=false) {
-  event.preventDefault();if(gate.current || !loaded || historyError || image.busy || (image.draft && !image.id) || !question.trim() || sensitive || turns.some(t=>t.pending))return;
+  event.preventDefault();if(gate.current || !loaded || historyError || image.busy || (image.draft && !image.id) || !question.trim() || sensitive || (!checkRetry && turns.some(t=>t.pending)))return;
   if(uncertain&&!checkRetry){setVersion(v=>v+1);return;}
   gate.current=true;setBusy(true);setError('');
   const request=retry.current || {requestId:crypto.randomUUID(),question:question.trim(),...(image.id?{imageId:image.id}:{})};retry.current=request;
+  try{sessionStorage.setItem(requestKey,JSON.stringify(request));setCanResume(true);}catch{/* Keep the dialog locked without a resumable request. */}
   try {
    const response=await fetch('/api/platform/curriculum-ai',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json'},signal:AbortSignal.timeout(55000),body:JSON.stringify({...request,enrollmentId:context.enrollmentId,lessonId:context.lessonId})});
    const data=await response.json();if(!response.ok)throw Object.assign(new Error(data.error || '답변을 불러오지 못했어요.'),{status:response.status});
    if(typeof data.answer!=='string' || !Array.isArray(data.sources))throw new Error('답변 형식을 확인하지 못했어요.');
-   if(alive.current){setTurns(old=>[...old,{role:'user',text:request.question,imageAttached:Boolean(request.imageId),requestId:request.requestId,imageId:request.imageId},{role:'assistant',text:data.answer,result:data}]);updateQuestion('');setImage({id:null,busy:false,draft:false});setImageKey(k=>k+1);retry.current=null;setUncertain(false);}
-  }catch(cause){if(alive.current){const e=cause as Error&{status?:number};setError(!e.status?'인터넷 연결을 확인해 주세요. 보낸 질문이 저장됐는지 확인하고 있어요.':e.status>=500?'답변을 불러오지 못했어요. 잠시 후 다시 확인해 주세요.':e.message);if(!e.status || e.status>=500 || e.status===409){setUncertain(true);setVersion(v=>v+1);}else retry.current=null;}}
+   if(alive.current){setTurns(old=>[...old,{role:'user',text:request.question,imageAttached:Boolean(request.imageId),requestId:request.requestId,imageId:request.imageId},{role:'assistant',text:data.answer,result:data}]);updateQuestion('');setImage({id:null,busy:false,draft:false});setImageKey(k=>k+1);clearRetry();setUncertain(false);}
+  }catch(cause){if(alive.current){const e=cause as Error&{status?:number};setError(!e.status?'인터넷 연결을 확인해 주세요. 보낸 질문이 저장됐는지 확인하고 있어요.':e.status>=500?'답변을 불러오지 못했어요. 잠시 후 다시 확인해 주세요.':e.message);if(!e.status || e.status>=500 || e.status===409){setUncertain(true);setVersion(v=>v+1);}else {clearRetry();setUncertain(false);}}}
   finally{gate.current=false;if(alive.current)setBusy(false);}
  }
  const locked=busy || uncertain;
