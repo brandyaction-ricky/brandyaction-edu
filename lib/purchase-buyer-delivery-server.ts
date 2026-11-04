@@ -5,7 +5,7 @@ import { loadSmsSettings } from '@/lib/crm-sms-settings';
 import { maskEmail, purchaseEmailConfigured } from '@/lib/crm-purchase-email';
 import { sendBatch, type Member, type Template } from '@/lib/crm-delivery';
 import { permissionsFor } from '@/lib/operator-permissions';
-import { purchaseDestination, validPurchaseDestination, type PurchaseChannel } from '@/lib/purchase-buyer-delivery';
+import { purchaseDestination, purchaseRecipientLimit, validPurchaseDestination, type PurchaseChannel } from '@/lib/purchase-buyer-delivery';
 
 type Buyer = Member & { role: string; deleted_at: string | null; is_internal: boolean | null };
 type DeliveryTemplate = Template & { name: string };
@@ -58,8 +58,8 @@ export async function purchaseBuyers(cohort: string, ids?: string[]) {
       seen.add(buyer.id);
       rows.push(buyer);
     }
+    if (offset >= purchaseRecipientLimit && result.data.length) throw new Error('대상 명단이 조회 한도를 초과했습니다.');
     if (result.data.length < 250) break;
-    if (offset >= 9750) throw new Error('대상 명단이 조회 한도를 초과했습니다.');
   }
   return rows;
 }
@@ -120,15 +120,22 @@ export async function dispatchPurchaseBuyerDelivery() {
     .eq('status', 'sending').lt('started_at', new Date(Date.now() - 5 * 60000).toISOString());
   if (stale.error) throw stale.error;
   if (!available.length) return;
+  const deadline = Date.now() + 30_000;
+  for (let handled = 0; handled < 4 && Date.now() < deadline; handled += 1) {
+    if (!await dispatchNextPurchaseBatch(db, available)) break;
+  }
+}
+
+async function dispatchNextPurchaseBatch(db: ReturnType<typeof createAdminClient>, available: string[]) {
   const due = await db.from('edu_purchase_delivery_batches').select('*').eq('status', 'scheduled')
     .in('channel', available).lte('scheduled_at', new Date().toISOString()).order('scheduled_at').order('id').limit(1).maybeSingle();
   if (due.error) throw due.error;
   const batch = due.data;
-  if (!batch) return;
+  if (!batch) return false;
   const lock = await db.from('edu_purchase_delivery_batches').update({ status: 'sending', started_at: new Date().toISOString() })
     .eq('id', batch.id).eq('status', 'scheduled').select('id').maybeSingle();
   if (lock.error) throw lock.error;
-  if (!lock.data) return;
+  if (!lock.data) return false;
 
   let status = 'failed';
   let accepted_count = 0, failed_count = 0, skipped_count = 0, unknown_count = 0;
@@ -140,8 +147,15 @@ export async function dispatchPurchaseBuyerDelivery() {
     const permissions = await permissionsFor(actor.data);
     if (!permissions.products || !permissions.orders || !permissions.marketing) throw new Error('예약자 권한이 변경됐습니다.');
     const channel = batch.channel as PurchaseChannel;
-    const template = channel === 'email' ? null : (await purchaseBuyerTemplates()).find(t => t.id === batch.template_id);
-    if (channel !== 'email' && (!template || purchaseTemplateHash(template) !== batch.template_hash)) throw new Error('템플릿이 변경됐습니다.');
+    const directText = !batch.template_id && (channel === 'sms' || channel === 'lms');
+    let template: Template | undefined;
+    if (directText) {
+      template = { id: batch.id, channel, purpose: 'transactional', content: batch.content };
+    } else if (channel !== 'email') {
+      const saved = (await purchaseBuyerTemplates()).find(t => t.id === batch.template_id);
+      if (!saved || purchaseTemplateHash(saved) !== batch.template_hash) throw new Error('템플릿이 변경됐습니다.');
+      template = saved;
+    }
     const ids = new Set<string>(batch.recipient_ids);
     const buyers = reachableBuyers(channel, await purchaseBuyers(batch.cohort_id)).filter(buyer => ids.has(buyer.id));
     skipped_count = ids.size - buyers.length;
@@ -154,7 +168,7 @@ export async function dispatchPurchaseBuyerDelivery() {
     } else if (buyers.length && template) {
       const settings = await loadSmsSettings();
       attempted = true;
-      const result = await sendBatch(template, buyers, { purchaseBatchId: batch.id, purchaseRoomLink: batch.room_link }, settings);
+      const result = await sendBatch(template, buyers, { purchaseBatchId: batch.id, purchaseRoomLink: batch.room_link, purchaseText: directText }, settings);
       if (result.disabled) throw new Error('문자 발송 설정을 확인해 주세요.');
       accepted_count = result.sent;
       failed_count = result.failed;
@@ -170,4 +184,5 @@ export async function dispatchPurchaseBuyerDelivery() {
     status, accepted_count, failed_count, skipped_count, unknown_count,
   }).eq('id', batch.id).eq('status', 'sending');
   if (finish.error) throw finish.error;
+  return true;
 }

@@ -271,3 +271,73 @@ for (const [channel, label] of [['sms', '문자 (SMS)'], ['alimtalk', '카카오
     await expect(page.getByText(`${label} · 1명 · 취소됨`, { exact: false })).toBeVisible();
   });
 }
+
+test('direct SMS can select a group above 100, narrow it by name, then review and save once', async ({ page }) => {
+  const buyers = Array.from({ length: 105 }, (_, i) => ({
+    id: '44444444-4444-4444-8444-' + String(i).padStart(12, '0'),
+    name: `검수 구매자 ${i}`, channels: i === 104 ? [] : ['sms', 'lms'],
+  }));
+  const sent: unknown[] = [];
+  await page.route('**/api/admin/purchase-onboarding', route => route.fulfill({ json: { cohorts: [{ id: cohort, name: '5기' }] } }));
+  await page.route('**/api/admin/purchase-onboarding?*', route => route.fulfill({ json: { settings: null } }));
+  await page.route('**/api/admin/purchase-onboarding/delivery*', route => {
+    if (route.request().method() === 'POST') {
+      sent.push(route.request().postDataJSON());
+      return route.fulfill({ json: { ok: true } });
+    }
+    return route.fulfill({ json: { buyers, channels: { sms: true, lms: true }, templates: [], history: [] } });
+  });
+  await page.goto('/admin/purchase-onboarding-test');
+  await page.getByLabel('안내할 기수').selectOption(cohort);
+  await expect(page.getByText('전체 결제자 105명 · 발송 가능 104명 · 선택 0명', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '발송 가능한 전체 선택' }).click();
+  await expect(page.getByText('전체 결제자 105명 · 발송 가능 104명 · 선택 104명', { exact: true })).toBeVisible();
+  await page.getByLabel('구매자 이름 검색').fill('구매자 103');
+  await page.getByLabel('검수 구매자 103').uncheck();
+  await expect(page.getByText('전체 결제자 105명 · 발송 가능 104명 · 선택 103명', { exact: true })).toBeVisible();
+  const body = page.getByLabel('문자 내용');
+  await body.fill('가'.repeat(46));
+  await expect(page.getByText('92 / 90바이트', { exact: false })).toBeVisible();
+  await page.getByLabel('발송 시각 (현재 기기 시간)').fill('2027-12-01T12:00');
+  await expect(page.getByRole('button', { name: '대상·문구 확인' })).toBeDisabled();
+  const text = '수업 안내 https://t.me/+synthetic';
+  await body.fill(text);
+  await page.getByRole('button', { name: '대상·문구 확인' }).click();
+  await expect(page.getByRole('heading', { name: '문자 (SMS) · 103명' })).toBeVisible();
+  await expect(page.getByRole('region', { name: '발송 예약 미리보기' }).getByText(text, { exact: true })).toBeVisible();
+  expect(sent).toHaveLength(0);
+  await page.getByRole('button', { name: '확인한 내용으로 발송 예약' }).click();
+  await expect(page.getByRole('status')).toHaveText('발송 예약을 저장했습니다.');
+  expect(sent).toEqual([expect.objectContaining({ action: 'schedule', cohort, channel: 'sms', templateId: '', content: text, recipients: buyers.slice(0, 103).map(buyer => buyer.id) })]);
+});
+
+test('templates returns to the same purchase product and cohort, then back to the product editor', async ({ page }) => {
+  const product = '33333333-3333-4333-8333-333333333333';
+  await page.route(/\/api\/admin\/purchase-onboarding(?:\?|$)/, route => {
+    const url = new URL(route.request().url());
+    expect(url.searchParams.get('product')).toBe(product);
+    return route.fulfill({ json: url.searchParams.has('cohort') ? { settings: null } : { cohorts: [{ id: cohort, name: '5기' }] } });
+  });
+  await page.route('**/api/admin/purchase-onboarding/delivery*', route => route.fulfill({ json: { buyers: [], templates: [], channels: {}, history: [] } }));
+  await page.goto(`/admin/product-editor?id=${product}&navigationFixture=1&careNavigationFixture=1&returnNavigationFixture=1`);
+  await page.getByRole('link', { name: '결제 후 안내 설정' }).click();
+  await page.getByLabel('안내할 기수').selectOption(cohort);
+  await page.getByRole('link', { name: '메시지 템플릿 관리' }).click();
+  const back = page.getByRole('link', { name: /구매자 공지로 돌아가기/ });
+  await expect(back).toHaveAttribute('href', `/admin/purchase-onboarding?cohort=${cohort}&product=${product}#buyer-delivery`);
+  await back.click();
+  await expect(page.getByLabel('안내할 기수')).toHaveValue(cohort);
+  await expect(page).toHaveURL(/#buyer-delivery$/);
+  await page.getByRole('link', { name: /이전 관리 화면으로/ }).click();
+  await expect(page).toHaveURL(new RegExp('/admin/product-editor\\?id=' + product));
+});
+
+test('admin cross-page returns preserve the previous filter and reject an external return target', async ({ page }) => {
+  await page.goto('/admin/products?query=Moonshot&navigationFixture=1&careNavigationFixture=1&returnNavigationFixture=1');
+  await page.getByRole('link', { name: '검수 상품 편집' }).click();
+  await page.getByRole('link', { name: /이전 관리 화면으로/ }).click();
+  await expect(page).toHaveURL(/\/admin\/products\?query=Moonshot/);
+  await expect(page.getByRole('link', { name: /운영 홈으로/ })).toHaveAttribute('href', '/admin');
+  await page.goto('/admin/templates?returnTo=%2F%2Fexternal.example&navigationFixture=1&careNavigationFixture=1&returnNavigationFixture=1');
+  await expect(page.getByRole('link', { name: /캠페인 발송으로/ })).toHaveAttribute('href', '/admin/campaigns');
+});

@@ -12,12 +12,14 @@ function load(file, deps, env, fetch) {
   return exports;
 }
 
-for (const channel of ['sms', 'alimtalk', 'email']) {
-  test(`scheduled ${channel} uses only buyers who are still eligible and is dispatched once`, async () => {
+for (const kind of ['sms', 'direct SMS', 'alimtalk', 'email']) {
+  test(`scheduled ${kind} uses only buyers who are still eligible and is dispatched once`, async () => {
+    const direct = kind === 'direct SMS';
+    const channel = direct ? 'sms' : kind;
     const member = { id: 'buyer', full_name: '가상 구매자', status: 'active', role: 'member', phone: '01000000001', email: 'buyer@example.test' };
     const template = { id: 'template', name: 'QA', channel, purpose: 'transactional', content: '공지', is_active: true, alimtalk_template_id: 'approved' };
     const batch = { id: 'batch', cohort_id: 'cohort', channel, created_by: 'operator', recipient_ids: ['buyer', 'refund'],
-      template_id: template.id, subject: '공지', content: '공지', status: 'scheduled' };
+      template_id: direct ? null : template.id, subject: '공지', content: direct ? '직접 작성한 공지 {{name}}' : '공지', status: 'scheduled' };
     const calls = [];
     const receipts = [];
     const db = { from(table) {
@@ -60,6 +62,8 @@ for (const channel of ['sms', 'alimtalk', 'email']) {
       '@/lib/crm-delivery': { sendBatch: async (selected, members, scope) => {
         calls.push(members.map(row => row.id));
         assert.equal(selected.channel, channel);
+        assert.equal(scope.purchaseText, direct);
+        if (direct) assert.equal(selected.content, batch.content);
         assert.equal(scope.purchaseBatchId, batch.id);
         return { sent: 1, failed: 0 };
       } },
@@ -73,7 +77,7 @@ for (const channel of ['sms', 'alimtalk', 'email']) {
       calls.push(JSON.parse(options.body).map(row => row.to));
       return Response.json({ data: [{ id: 'mock-receipt' }] });
     });
-    batch.template_hash = result.purchaseTemplateHash(template);
+    batch.template_hash = direct ? null : result.purchaseTemplateHash(template);
     await result.dispatchPurchaseBuyerDelivery();
     await result.dispatchPurchaseBuyerDelivery();
     assert.deepEqual(calls, channel === 'email' ? [[['buyer@example.test']]] : [['buyer']]);
