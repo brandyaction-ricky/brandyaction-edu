@@ -32,7 +32,7 @@ export function CurriculumAiConversation({context,showContext=true,compact=false
  const [canResume,setCanResume]=useState(false);
  const [copyStatus,setCopyStatus]=useState('');
  const [historyAction,setHistoryAction]=useState(false);
- const [historyNotice,setHistoryNotice]=useState('');
+ const [historyNotice,setHistoryNotice]=useState<{message:string;needsRefresh?:boolean}>();
  const [expandedHistory,setExpandedHistory]=useState(false);
  const [mentorDraft,setMentorDraft]=useState('');
  const cursor=useRef<{time:string;id:string}|undefined>(undefined),retry=useRef<{requestId:string;question:string;imageId?:string}|null>(null);
@@ -78,7 +78,7 @@ export function CurriculumAiConversation({context,showContext=true,compact=false
   if(!draftReady)return;
   const abort=new AbortController();let active=true;
   void questionRequest<{items:SavedAiExchange[];hasMore:boolean}>(aiHistoryUrl(context.enrollmentId,context.lessonId),undefined,abort.signal).then(data=>{
-   if(!active)return;const items=data.items || [];setHistoryError('');setTurns(savedTurns(items));setMore(data.hasMore);const last=items.at(-1);cursor.current=last?{time:last.createdAt,id:last.requestId}:undefined;
+   if(!active)return;const items=data.items || [];setHistoryError('');setHistoryNotice(notice=>notice?.needsRefresh?undefined:notice);setTurns(savedTurns(items));setMore(data.hasMore);const last=items.at(-1);cursor.current=last?{time:last.createdAt,id:last.requestId}:undefined;
    const pending=retry.current&&items.find(i=>i.requestId===retry.current!.requestId);
    if(pending&&pending.status!=='pending'){if(pending.status==='succeeded'){updateQuestion('');setImage({id:null,busy:false,draft:false});setImageKey(k=>k+1);setError('');}clearRetry();setUncertain(false);}
    setLoadedVersion(version);
@@ -114,7 +114,7 @@ export function CurriculumAiConversation({context,showContext=true,compact=false
   if(!turn.requestId || historyAction || busy || uncertain || olderBusy || !loaded)return;
   if(action==='delete'&&!window.confirm('이 질문과 답변을 내 AI 대화에서 삭제할까요? 이후 AI 답변에도 이 대화가 사용되지 않아요.'))return;
   setHistoryAction(true);
-  setHistoryNotice('');
+  setHistoryNotice(undefined);
   try{
    const response=await fetch('/api/platform/curriculum-ai/history',{
     method:'PATCH',headers:{'Content-Type':'application/json'},
@@ -124,8 +124,8 @@ export function CurriculumAiConversation({context,showContext=true,compact=false
    setTurns(previous=>action==='delete'
     ?previous.filter(item=>item.requestId!==turn.requestId)
     :previous.map(item=>item.role==='assistant'&&item.requestId===turn.requestId?{...item,helpful:!turn.helpful}:item));
-   setHistoryNotice(action==='delete'?'질문과 답변을 삭제했어요.':'답변 평가를 저장했어요.');
-  }catch{setHistoryNotice('변경 결과를 확인하지 못했어요. 대화 새로고침 후 다시 시도해 주세요.');}
+   setHistoryNotice({message:action==='delete'?'질문과 답변을 삭제했어요.':'답변 평가를 저장했어요.'});
+  }catch{setHistoryNotice({message:'변경 결과를 확인하지 못했어요. 대화 새로고침 후 다시 시도해 주세요.',needsRefresh:true});}
   finally{setHistoryAction(false);}
  }
  function continueWithMentor(turn:Turn){
@@ -143,7 +143,7 @@ export function CurriculumAiConversation({context,showContext=true,compact=false
   if(dialog && (active===document.body || (active instanceof HTMLButtonElement && active.getAttribute('aria-label')==='닫기' && dialog.contains(active))))field?.focus({preventScroll:true});
  },[loaded,locked,mentor]);
 
- const usageGuide=<details className="curriculum-ai-guide"><summary>AI 사용·저장 안내<span>OpenAI 전달 · 비공개 저장</span></summary><div><p>공개된 문샷 수업 자료에서 근거를 찾아 안내해요. 질문·최근 대화·관련 수업 자료와 이번에 첨부한 캡처가 OpenAI에 전달됩니다. AI 답변은 틀릴 수 있어요. 개인정보는 적지 마세요.</p><p>질문·AI 답변·첨부 내역은 이 수업과 ‘내 질문’에 자동 저장돼요. 이전 사진은 다시 첨부하지 않으면 다음 질문에 보내지 않아요.</p>{compact && imagesEnabled && <p>이미지 한 장(최대 10MB)을 붙여넣거나 질문 입력란에 끌어 놓을 수 있어요. 개인정보·비밀번호는 가려 주세요. 움직이는 이미지는 첫 화면만 확인해요.</p>}</div></details>;
+ const usageGuide=<details className="curriculum-ai-guide"><summary>AI 사용·저장 안내{!compact && <span>OpenAI 전달 · 비공개 저장</span>}</summary><div><p>공개된 문샷 수업 자료에서 근거를 찾아 안내해요. 질문·최근 대화·관련 수업 자료와 이번에 첨부한 캡처가 OpenAI에 전달됩니다. AI 답변은 틀릴 수 있어요. 개인정보는 적지 마세요.</p><p>질문·AI 답변·첨부 내역은 이 수업과 ‘내 질문’에 자동 저장돼요. 이전 사진은 다시 첨부하지 않으면 다음 질문에 보내지 않아요.</p>{compact && imagesEnabled && <p>이미지 한 장(최대 10MB)을 붙여넣거나 질문 입력란에 끌어 놓을 수 있어요. 개인정보·비밀번호는 가려 주세요. 움직이는 이미지는 첫 화면만 확인해요.</p>}</div></details>;
  return <section className="curriculum-ai" aria-label="수업 AI 질문과 멘토 연결">
   <div className="curriculum-ai-switch" role="group" aria-label="답변 받을 대상"><button type="button" className={'btn'+(!mentor?' primary':'')} disabled={locked || image.busy || mentorLocked} aria-pressed={!mentor} onClick={()=>{if(mentor && composer.current.dirty && !window.confirm('수정 중인 멘토 질문을 닫고 AI 질문으로 돌아갈까요?'))return;setMentorDraft('');setMentor(false);}}>AI에게 질문</button><button type="button" className={'btn'+(mentor?' primary':'')} disabled={locked || image.busy} aria-pressed={mentor} onClick={()=>setMentor(true)}>멘토에게 질문</button></div>
   {mentor && <><p>멘토에게 전달할 내용과 캡처를 직접 선택해 주세요. 기본은 비밀 질문입니다.</p><QuestionComposer initialContext={context} initialContent={mentorDraft} initialPrivate quick onStateChange={updateMentor} onCreated={onCreated}/></>}
@@ -152,14 +152,14 @@ export function CurriculumAiConversation({context,showContext=true,compact=false
    {!compact&&usageGuide}
    <QuestionImageDropzone enabled={imagesEnabled} locked={locked || image.busy || mentorLocked} onFiles={files=>imagePicker.current?.paste(files)}><form className="curriculum-ai-composer" onSubmit={submit} onPaste={event=>{if(!imagesEnabled || locked || image.busy)return;const files=Array.from(event.clipboardData.items).filter(item=>item.kind==='file' && item.type.startsWith('image/')).map(item=>item.getAsFile()).filter((file):file is File=>file!==null);if(files.length){event.preventDefault();imagePicker.current?.paste(files);}}}><p className="meta curriculum-ai-privacy">{compact?'OpenAI에 전송돼요. 개인정보는 가려 주세요.':'비밀번호·카드번호 등 개인정보는 질문에 적지 마세요.'}</p><label className="field">궁금한 점<textarea ref={input} rows={compact?2:3} maxLength={questionLimit} disabled={locked || !loaded} value={question} onChange={e=>updateQuestion(e.target.value)} placeholder="예: 이 수업의 프롬프트를 실행했는데 예시와 다른 결과가 나와요. 어떤 부분을 확인하면 될까요?"/></label>{question.length>=1800&&<small className="meta">{questionLimit-question.length}자 남았어요</small>}{imagesEnabled&&<><QuestionImagePicker key={imageKey} dragAndDrop ref={imagePicker} enrollmentId={context.enrollmentId} lessonId={context.lessonId} compact ai showHint={!compact} locked={locked || mentorLocked} changed={(id,uploading,draft,info)=>setImage({id,busy:uploading,draft,info})}/>{!compact && <small className="meta curriculum-ai-image-privacy">개인정보·비밀번호를 가린 캡처만 첨부해 주세요. 이번 질문에만 전달되며, 애니메이션은 첫 화면만 확인해요.</small>}</>}{image.id&&!question.trim()&&<p className="meta">캡처에서 궁금한 점을 한 줄만 적어 주세요.</p>}{sensitive&&<p role="alert" className="form-error">{sensitiveQuestionMessage}</p>}{error&&<p role="alert" className="form-error">{error}</p>}{uncertain?<p role="status">질문을 다시 보내기 전에 ‘대화 새로고침’으로 저장 결과를 확인해 주세요. 아직 내역이 없다면 같은 요청으로 <button type="button" className="link" disabled={busy || !loaded || Boolean(historyError) || turns.some(t=>t.pending)} onClick={event=>void submit(event,true)}>답변 결과 다시 확인</button>할 수 있어요.</p>:null}<button type="submit" className="btn primary" disabled={locked || !loaded || Boolean(historyError) || turns.some(t=>t.pending) || image.busy || (image.draft && !image.id) || !question.trim() || sensitive}>{busy?'수업 근거를 확인하고 있어요…':'AI 답변 받기'}</button></form></QuestionImageDropzone>
    {compact&&usageGuide}
-   <div className="curriculum-ai-toolbar"><div><h3>이 수업의 대화</h3><p>질문과 답변은 자동으로 저장돼요.</p></div><button type="button" className="btn small" disabled={busy || historyAction || image.busy || !loaded || olderBusy} onClick={()=>setVersion(v=>v+1)}>대화 새로고침</button></div>
+   <div className="curriculum-ai-toolbar"><div><h3>이 수업의 대화</h3>{!compact && <p>질문과 답변은 자동으로 저장돼요.</p>}</div>{(!compact || historyError || uncertain || pendingAnswer || historyNotice?.needsRefresh) && <button type="button" className="btn small" disabled={busy || historyAction || image.busy || !loaded || olderBusy} onClick={()=>setVersion(v=>v+1)}>대화 새로고침</button>}</div>
    {compact&&turns.length>2&&<button type="button" className="btn small" aria-expanded={expandedHistory} onClick={()=>setExpandedHistory(value=>!value)}>{expandedHistory?'이전 대화 접기':'이전 대화 보기'}</button>}
    {more&&(!compact||expandedHistory)&&<button type="button" className="btn small curriculum-ai-older" disabled={busy || historyAction || !loaded || olderBusy} onClick={()=>void older()}>이전 대화 더 보기</button>}
    {!loaded&&<p role="status">저장된 대화를 불러오고 있어요.</p>}{historyError&&<p role="alert">대화를 불러오지 못했어요. {historyError} 위의 ‘대화 새로고침’으로 다시 확인해 주세요.</p>}
    <div className="curriculum-ai-turns" role="log" aria-label="AI 질문 대화" aria-live="polite">{(compact&&!expandedHistory?turns.slice(-2):turns).map((turn,i)=><article key={turn.requestId?turn.role+':'+turn.requestId:i} className={'curriculum-ai-turn '+turn.role}><b className="curriculum-ai-speaker">{turn.role==='user'?'내 질문':'AI 참고 답변'}</b>{turn.createdAt&&<time className="meta" dateTime={turn.createdAt}>{messageTime.format(new Date(turn.createdAt))}</time>}{turn.result?.captureLesson&&<p>첨부한 화면은 지금 보고 있는 수업과 달라요. <Link href={`/learn/${context.enrollmentId}/${turn.result.captureLesson.lessonId}`}>{turn.result.captureLesson.dayNumber===undefined?'':turn.result.captureLesson.dayNumber+'일차 · '}{turn.result.captureLesson.title}</Link></p>}<p>{turn.role==='assistant'?readableAnswer(turn.text):turn.text}</p>{turn.imageAttached&&<div className="curriculum-ai-attachment"><small>화면 캡처 1장 함께 전달</small><QuestionImage questionId={turn.requestId!} aiRequestId={turn.requestId} imageId={turn.imageId}/></div>}{turn.result&&<div className="curriculum-ai-sources">{turn.result.sources.length>0&&<small>이 답변에 인용한 근거 {turn.result.sources.length}개</small>}{turn.result.sources.map(s=><details key={s.id}><summary>{s.title} · 근거 보기</summary><p>{s.excerpt}</p><small>{s.revision?'본문 버전 '+s.revision.slice(0,8):'기존 본문'}</small><p><Link href={`/learn/${context.enrollmentId}/${s.lessonId}${s.blockId ? '#lesson-block-' + encodeURIComponent(s.blockId) : ''}`} target={onLessonPage && s.blockId && s.lessonId===context.lessonId?undefined:'_blank'} rel="noopener noreferrer">{onLessonPage && s.blockId && s.lessonId===context.lessonId?'이 수업의 근거 위치로 이동':'참고 수업 새 창으로 열기'}</Link></p></details>)}<div className="row"><button type="button" className="btn small" aria-pressed={Boolean(turn.helpful)} disabled={locked || olderBusy || !loaded} onClick={()=>void manageTurn(turn,'feedback')}>도움이 됐어요</button><button type="button" className="btn small" onClick={async()=>{try{await navigator.clipboard.writeText(readableAnswer(turn.text));setCopyStatus('답변을 복사했어요.');}catch{setCopyStatus('복사하지 못했어요. 답변을 선택해 직접 복사해 주세요.');}}}>답변 복사</button><button type="button" className="btn small" disabled={locked || image.busy} onClick={()=>setMentor(true)}>잘못된 답변 · 멘토에게 확인</button><button type="button" className="btn small" disabled={locked || image.busy} onClick={()=>continueWithMentor(turn)}>멘토에게 이어서 질문</button></div>{turn.result.needsMentor&&<p>멘토 확인을 권해요. ‘멘토에게 질문’에서 이어갈 수 있어요.</p>}</div>}{turn.role==='assistant'&&turn.requestId&&!turn.pending&&<button type="button" className="btn small" disabled={locked || olderBusy || !loaded} onClick={()=>void manageTurn(turn,'delete')}>이 질문과 답변 삭제</button>}</article>)}</div>
-   <div role="status">{copyStatus}</div><div role="status">{historyNotice}</div>
+   <div role="status">{copyStatus}</div><div role="status">{historyNotice?.message}</div>
    {busy&&<><article className="curriculum-ai-turn user"><b className="curriculum-ai-speaker">내 질문</b><p>{question.trim()}</p></article><p role="status">답변을 준비하고 있어요.</p></>}
-   {loaded&&!busy&&!historyError&&!turns.length&&<p className="curriculum-ai-empty">수업에서 막힌 부분을 편하게 물어보세요.<br/>질문과 답변은 여기에 차곡차곡 남아요.</p>}
+   {loaded&&!busy&&!historyError&&!turns.length&&<p className="curriculum-ai-empty">{compact ? '아직 이 수업에 남긴 질문이 없어요.' : <>수업에서 막힌 부분을 편하게 물어보세요.<br/>질문과 답변은 여기에 차곡차곡 남아요.</>}</p>}
 
   </div>
  </section>;

@@ -208,6 +208,9 @@ test('floating questions keep a lesson draft across closing and navigation and r
  await page.goto('/curriculum-ai-test?floating=1');
  await expect(panel.getByRole('combobox',{name:'질문할 수업·일차'})).toHaveValue(id);
  await expect(input).toHaveValue('고객 인터뷰에 대한 초안');
+ await expect(page.getByText('기수별 AI API 사용량')).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'접기',exact:true})).toHaveCount(0);
+ await expect(panel.getByRole('button',{name:'대화 새로고침'})).toHaveCount(0);
  const attach = panel.getByRole('button',{name:'사진·화면 캡처 첨부'});
  const send = panel.getByRole('button',{name:'AI 답변 받기'});
  if (await attach.count()) {
