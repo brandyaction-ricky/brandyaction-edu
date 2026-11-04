@@ -21,6 +21,8 @@ test('real-time presets require live peers, matching rooms and cooldown; expiry 
   now+=REACTION_COOLDOWN;receive(peer,'thanks');assert.equal(states.at(-1).people[0].reaction.code,'thanks');
   assert.equal(connection.react('hello'),true);assert.equal(connection.react('moonshot'),false);assert.equal(sent.filter(x=>x.event==='reaction').length,1);
   now+=REACTION_TTL+1;handlers['presence:sync']();assert.equal(states.at(-1).people[0].reaction,undefined);
+  // A greeting may precede presence sync; it is never drawn until the sender is present.
+  receive(stranger,'hello');assert.equal(states.at(-1).people.some(p=>p.id===stranger),false);now+=500;members[stranger]=[{id:stranger,x:2,y:28,yaw:0,room:'live'}];handlers['presence:sync']();assert.equal(states.at(-1).people.find(p=>p.id===stranger).reaction.code,'hello');
   globalThis.document.hidden=true;assert.equal(connection.react('thanks'),false);globalThis.document.hidden=false;
   connection.move({room:'library',x:1,y:28,yaw:0});receive(peer,'hello');assert.deepEqual(states.at(-1).people,[]);
   connection.close();assert.equal(connection.react('hello'),false);
