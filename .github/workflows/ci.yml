@@ -41,6 +41,21 @@ jobs:
             exit 0
           fi
 
+          if [ "$head_ref" = "codex/edu-signup-marketing-copy-20261104" ]; then
+            expected_main=bb803efeeedea347e5cf6b283591f4053b5131de
+            release_payload=aedfe204dabfcf3b5e54bcf04f6f7b2fa060f6cc
+            if [ "$(git rev-parse HEAD^1)" != "$expected_main" ]; then
+              echo "Production main moved; revalidate the signup marketing copy release."
+              exit 1
+            fi
+            if ! git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'; then
+              echo "The merge result differs from the tested signup marketing copy release."
+              exit 1
+            fi
+            echo "Signup marketing copy production release scope verified."
+            exit 0
+          fi
+
           if [ "$head_ref" = "codex/edu-buyer-selection-main-release-20261104" ]; then
             expected_main=f06729e9b9f16a3851f5a90b5263d0e8ea1baaed
             release_payload=9f0958a4cea44fd2489df490a5f6b232df959dfe

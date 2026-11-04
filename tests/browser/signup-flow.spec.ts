@@ -4,12 +4,14 @@ async function backend(page: Page, options: { consentFailure?: boolean; marketin
   let consentFailure = options.consentFailure;
   let marketingFailure = options.marketingFailure;
   const calls: string[] = [];
+  const marketingChoices: unknown[] = [];
   await page.route('**/synthetic-auth/consent', async route => {
     calls.push('required consent');
     await route.fulfill({ status: consentFailure ? 503 : 200, json: { ok: !consentFailure } });
   });
   await page.route('**/api/account/marketing-consent', async route => {
     calls.push('marketing choice');
+    marketingChoices.push(route.request().postDataJSON());
     await route.fulfill({ status: marketingFailure ? 503 : 200, json: { ok: !marketingFailure } });
   });
   await page.route('**/api/platform/encouragement**', async route => {
@@ -18,6 +20,7 @@ async function backend(page: Page, options: { consentFailure?: boolean; marketin
   });
   return {
     calls,
+    marketingChoices,
     setConsentFailure(value: boolean) { consentFailure = value; },
     setMarketingFailure(value: boolean) { marketingFailure = value; },
   };
@@ -36,7 +39,10 @@ test('signup omits encouragement and finishes after one submit while saving requ
   const selectRequired = page.getByRole('button', { name: '필수 항목 한 번에 선택' });
   const terms = page.getByRole('checkbox', { name: '[필수] 이용약관 동의' });
   const privacy = page.getByRole('checkbox', { name: '[필수] 개인정보처리방침 동의' });
-  const marketing = page.getByRole('checkbox', { name: '[선택] 클래스·무료강의 등 마케팅 정보 수신 동의' });
+  const marketing = page.getByRole('checkbox', { name: '[선택] 클래스·무료강의 등 마케팅 정보 수신 동의 (광고)', exact: true });
+  await expect(page.getByText('새 AI 마케팅 무료 자료, 나올 때마다 받아보세요', { exact: true })).toBeVisible();
+  await expect(marketing).toHaveAccessibleDescription('동의 없이 계속할 수 있어요');
+  await expect(marketing).not.toBeChecked();
   await expect(selectRequired).toBeEnabled();
   await selectRequired.click();
   await expect(terms).toBeChecked();
@@ -52,6 +58,21 @@ test('signup omits encouragement and finishes after one submit while saving requ
   await page.getByRole('button', { name: '동의하고 가입 완료' }).click();
   await expect(page.getByRole('heading', { name: '가입 완료 목적지' })).toBeVisible();
   expect(server.calls).toEqual(['required consent', 'marketing choice']);
+});
+
+test('signup after social authentication completes with only required consent', async ({ page }) => {
+  const server = await backend(page);
+  await page.goto('/signup-consent-test?next=%2Fmy');
+  const marketing = page.getByRole('checkbox', { name: '[선택] 클래스·무료강의 등 마케팅 정보 수신 동의 (광고)', exact: true });
+  await expect(marketing).not.toBeChecked();
+  await page.getByRole('button', { name: '필수 항목 한 번에 선택' }).click();
+  await expect(marketing).not.toBeChecked();
+  await page.getByRole('button', { name: '동의하고 가입 완료' }).click();
+
+  await expect(page).toHaveURL(/\/my$/);
+  await expect(page.getByRole('heading', { name: '가입 완료 목적지' })).toBeVisible();
+  expect(server.calls).toEqual(['required consent', 'marketing choice']);
+  expect(server.marketingChoices).toEqual([{ consent: false }]);
 });
 
 test('a failed consent save stays on the form and does not publish an encouragement', async ({ page }) => {
