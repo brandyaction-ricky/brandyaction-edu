@@ -9,7 +9,8 @@
     {
       "path": "office3d.js",
       "sourceSha256": "b45dd4c5cba821669a53bdb666b0ea6b21ca8b16a163a7a1c5c6e6bb9b7ab748",
-      "importSha256": "be9c19926921c1019ad8f8c52bc068ee4cf3cc6cafd1b6acdb8841b02afd7745"
+      "importSha256": "5e07f48b00a88c80998af9bf5c5db39b1085ea2bf3ebc95e03553f8fd48daffe",
+      "localPatch": "Export existing bundled InstancedMesh and SphereGeometry classes for the campus adapter. Original avatar models and bundled licenses remain unchanged."
     },
     {
       "path": "campus-plan.js",
