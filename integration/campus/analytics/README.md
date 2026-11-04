@@ -7,7 +7,7 @@
 - No message text, bot messages, names, credentials, arbitrary URLs or client-reported purchases.
 - Transport: asynchronous 30–32 second batch, at most 32 actions and 35 active seconds; page-hide beacon; no movement-blocking UI state. No request per frame or per greeting.
 - Dwell: visible page + input within 60 seconds, elapsed delta capped at 2 seconds. Idle/hidden periods excluded. Client delivery can be lost; this is engagement telemetry, not billing evidence.
-- Server: origin validation, 10KB body limit, event configuration check/member authentication, DB idempotency by batch ID, six batches/session/minute, site `trackingEnabled` respected.
+- Server: origin validation, 10KB body limit, event configuration check/member authentication, DB idempotency by batch ID, six batches/session/minute, dedicated campus `edu_campus_analytics_settings.enabled` respected; default off, marketing operators control it in this panel; existing whole-site tracking remains unchanged.
 - Metrics: session visits, room entries, actions, active seconds, average active seconds/room session, distinct intent sessions and room intent rate. Detail/consult/checkout clicks are intent, not purchases. Downloads and video opens do not prove completed saves/views.
 - Retention: 90 days; hourly authenticated cleanup in chunks of 10,000 expired batches, oldest first. Aggregation stays in PostgreSQL and never silently samples a truncated row list.
 - QA: domain allowlist validation, real PostgreSQL aggregation/deduplication/RLS tests, mobile report layout and empty states.

@@ -10,6 +10,7 @@ export function useCampusAnalytics(scope:string|undefined,room:AnalyticsRoom){
   if(!scope)return;let session:string;try{session=sessionStorage.getItem('edu-campus-session')||crypto.randomUUID();sessionStorage.setItem('edu-campus-session',session);}catch{return;}
   const events:Activity[]=[];let dwell:Partial<Record<AnalyticsRoom,number>>={},last=performance.now(),active=last,stopped=false,inflight=false;
   const activity=()=>{active=performance.now();};
+  window.addEventListener('campus:activity-pulse',activity);
   const tick=()=>{const now=performance.now(),elapsed=Math.min(2,Math.max(0,(now-last)/1000));last=now;if(document.visibilityState==='visible'&&now-active<60000){const r=current.current;dwell[r]=Math.min(35,(dwell[r]||0)+elapsed);}};
   const flush=(beacon=false)=>{tick();if(stopped||inflight&&!beacon)return;let remaining=35;const seconds=Object.fromEntries(Object.entries(dwell).map(([k,v])=>{const n=Math.min(remaining,Math.floor(v));remaining-=n;return[k,n];}).filter(([,v])=>Number(v)>0));if(!events.length&&!Object.keys(seconds).length)return;
    const payload={id:crypto.randomUUID(),session,scope,events:events.splice(0,32),dwell:seconds};dwell={};const body=JSON.stringify(payload);
@@ -21,7 +22,7 @@ export function useCampusAnalytics(scope:string|undefined,room:AnalyticsRoom){
   const hidden=()=>{if(document.visibilityState==='hidden')flush(true);else{last=performance.now();active=last;}};const exit=()=>flush(true);
   const timer=setInterval(tick,1000),transport=setInterval(()=>flush(),30000+Math.random()*2000);
   for(const name of ['pointerdown','pointermove','keydown','touchstart'])window.addEventListener(name,activity,{passive:true});document.addEventListener('visibilitychange',hidden);window.addEventListener('pagehide',exit);
-  return()=>{flush(true);send.current=()=>{};window.removeEventListener('campus:activity',custom);clearInterval(timer);clearInterval(transport);for(const name of ['pointerdown','pointermove','keydown','touchstart'])window.removeEventListener(name,activity);document.removeEventListener('visibilitychange',hidden);window.removeEventListener('pagehide',exit);};
+  return()=>{flush(true);send.current=()=>{};window.removeEventListener('campus:activity-pulse',activity);window.removeEventListener('campus:activity',custom);clearInterval(timer);clearInterval(transport);for(const name of ['pointerdown','pointermove','keydown','touchstart'])window.removeEventListener(name,activity);document.removeEventListener('visibilitychange',hidden);window.removeEventListener('pagehide',exit);};
  },[scope]);
  useEffect(()=>{if(scope)send.current({room,action:'room_enter'});},[scope,room]);
  return (action:CampusAction,target?:string,location:AnalyticsRoom=current.current)=>send.current({room:location,action,...(target?{target}: {})});
