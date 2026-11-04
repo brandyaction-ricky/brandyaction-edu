@@ -6,3 +6,24 @@ html,body,.workspace,#office{width:100%;height:100%;margin:0;overflow:hidden}bod
 .tour-hotspot[hidden]{display:none}
 body[data-visitor=true] .campus-backdrop{filter:none;opacity:1;background:radial-gradient(1px 1px at 23px 35px,#d6e5ff 80%,transparent),radial-gradient(1px 1px at 92px 93px,#7d9fce 80%,transparent),radial-gradient(1.5px 1.5px at 147px 56px,#fff 70%,transparent),radial-gradient(ellipse at 70% 0%,#102749,#030b18 65%);background-size:173px 137px,251px 193px,337px 229px,100% 100%}
 body[data-visitor=true] .campus-backdrop:after{content:'';position:absolute;width:min(40vw,400px);aspect-ratio:1;right:5%;top:3%;border-radius:50%;background:linear-gradient(105deg,#02091600 30%,#020916ee 88%),url('../assets/moon-nasa-lroc-2k.jpg') center/cover;box-shadow:inset 8px 3px 25px #abc6f84d,0 0 70px #719acc18;opacity:.75}
+
+/* Shared editor keeps save/cancel reachable while only fields scroll. */
+.workspace{min-height:0}
+#appearance-editor{padding:18px;max-height:calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));overflow:hidden}
+#appearance-editor form{display:flex;flex-direction:column;max-height:calc(100dvh - 62px - env(safe-area-inset-top) - env(safe-area-inset-bottom));min-height:0}
+#appearance-editor header,#appearance-editor footer{flex-shrink:0}
+#appearance-editor h2{margin-bottom:14px}
+#appearance-editor .character-layout{overflow:auto;overscroll-behavior:contain;min-height:0;padding:4px;scroll-padding:12px}
+#appearance-editor .character-fields{min-width:0}
+#appearance-editor .character-fields :is(input,select){font-size:16px}
+#appearance-editor footer{padding-top:12px;margin-top:8px;border-top:1px solid #30434f}
+#appearance-error:empty{display:none}#appearance-error{flex-shrink:0;min-height:0;margin:8px 0 0}
+#avatar-name{overflow-wrap:anywhere}
+.tour-pad button{width:44px;height:44px;touch-action:none;padding:8px}
+@media(pointer:coarse){.tour-pad{right:max(12px,env(safe-area-inset-right));bottom:calc(70px + env(safe-area-inset-bottom))}#status{left:max(12px,env(safe-area-inset-left));right:auto;transform:none;max-width:calc(100% - 190px);bottom:calc(68px + env(safe-area-inset-bottom));white-space:normal;line-height:1.6;border-radius:12px}}
+@media(max-width:650px){.tour-pad{bottom:calc(114px + env(safe-area-inset-bottom))}#status{left:12px;right:auto;transform:none;bottom:calc(118px + env(safe-area-inset-bottom));max-width:calc(100% - 190px);font-size:11px;line-height:1.6;padding:8px;border-radius:12px}.tour-hotspot{padding:8px;min-height:44px}}
+@media(max-height:500px){#appearance-editor h2{font-size:18px;margin-bottom:10px}#appearance-editor header p{display:none}#appearance-editor footer{padding-top:8px;margin-top:4px}}
+
+@media(pointer:coarse){#status{white-space:pre-line;text-align:left;line-height:1.8;max-width:calc(100% - 180px)}}
+/* Member/preview footers include a return link or role selector above the dock. */
+@media(max-width:650px){body:not([data-visitor=true]) .tour-pad{bottom:calc(164px + env(safe-area-inset-bottom))}body:not([data-visitor=true]) #status{bottom:calc(168px + env(safe-area-inset-bottom))}}
