@@ -33,3 +33,28 @@ body:is([data-room=live],[data-room=study]) .campus-backdrop:after{content:'';po
 /* Leave room for the host's avatar-save notification above the social control. */
 .meetup{top:156px}@media(max-height:500px){.meetup{top:142px}.meetup-body{max-height:calc(100dvh - 220px)}}
 .meetup-population{margin:0 0 6px;padding:6px 10px;border-radius:9px;background:#0c1829e8;color:#dbeafe;font-size:12px;max-width:260px;line-height:1.5}.meetup-join{display:block;margin-top:6px;background:#2854bb!important;border-color:#82b2ff!important;box-shadow:0 4px 18px #08152555}.meetup-join:disabled{opacity:.6}@media(max-width:600px){.meetup{top:146px;left:10px}.meetup button{padding:8px 11px;font-size:12px}.meetup-population{max-width:230px;font-size:11px}}
+
+/* Group conversation: one clear composer and a separate, quiet exit action. */
+.meetup-body{box-sizing:border-box;width:332px;max-width:calc(100vw - 24px);padding:16px;display:flex;flex-direction:column;gap:12px;max-height:calc(100dvh - 300px);overscroll-behavior:contain;scrollbar-gutter:stable}
+.meetup-body .meetup-note{flex-shrink:0;margin:0;color:#bdcce0;font-size:12px;line-height:1.65}
+.meetup-messages:empty{display:none}
+.meetup-messages{flex:1 1 auto;min-height:0;max-height:180px;scrollbar-width:thin}
+.meetup-messages p{padding:9px 0;line-height:1.6}
+.meetup-body .meetup-wave{align-self:flex-start;min-height:40px;padding:8px 12px;font-size:13px;background:#1c334c;border-color:#536f8d}
+.meetup .meetup-compose{flex-shrink:0;display:grid;grid-template-columns:minmax(0,1fr) 68px;gap:8px;margin:0;align-items:stretch}
+.meetup .meetup-compose input{box-sizing:border-box;min-width:0;width:100%;height:46px;padding:11px 12px;border-radius:12px;font-size:16px;line-height:22px}
+.meetup .meetup-compose input::placeholder{color:#a4b7ce;opacity:1}
+.meetup .meetup-compose button{box-sizing:border-box;height:46px;padding:10px 8px;border-radius:12px;font-size:13px;font-weight:650;background:#315cce;border-color:#7fa1ff}
+.meetup-footer{border-top:1px solid #344c66;padding-top:10px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-shrink:0}
+.meetup-footer:has(.meetup-wave[hidden]):has(.meetup-leave[hidden]){display:none}
+.meetup .meetup-leave{min-height:40px;padding:8px 10px;border-color:transparent;background:transparent;color:#c6d3e5;font-size:12px}
+.meetup button:focus-visible,.meetup input:focus-visible{outline:2px solid #a9c8ff;outline-offset:3px}
+@media(max-width:600px){.meetup-body{width:320px;padding:14px;max-height:calc(100dvh - 356px)}}
+@media(max-height:500px){.meetup{top:76px}.meetup-body{max-height:calc(100dvh - 180px);gap:8px}.meetup-messages{max-height:90px}}
+@media(max-height:500px){
+ .meetup:has(.meetup-body:not([hidden])){top:58px}
+ .meetup:has(.meetup-body:not([hidden])) .meetup-population,.meetup:has(.meetup-body:not([hidden]))>.meetup-join{display:none}
+ .meetup-body{max-height:calc(100dvh - 174px)}
+}
+/* Choose another group after closing the current conversation, without a jumping panel. */
+.meetup:has(.meetup-body:not([hidden]))>.meetup-join{display:none}
