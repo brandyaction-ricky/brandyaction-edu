@@ -1,6 +1,5 @@
 'use client';
 import Link from 'next/link';
-import Link from 'next/link';
 import {useCampusDraftGuard} from '../ui/draft-guard';
 import theme from '../ui/theme.module.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
