@@ -1,4 +1,5 @@
 'use client';
+import { AdminReturnLink } from '@/app/ui/admin-return-navigation';
 import { MobileRefresh } from '@/app/ui/final/mobile-refresh';
 
 import { LearningNoticeBar } from '@/app/ui/final/learning-notice';
@@ -261,6 +262,11 @@ export function AdminShell({
         </header>
         {process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' && <LearningNoticeBar/>}
         <div className={`content adm-page admin-content-${contentWidth}`} id="admin-content" tabIndex={-1}>
+          {selected !== 'overview' && <nav className="admin-return-nav" aria-label="관리 화면 돌아가기">
+            {selected === 'templates' && byKey.has('campaigns')
+              ? <AdminReturnLink fallback="/admin/campaigns" fallbackLabel="캠페인 발송으로" />
+              : <AdminReturnLink />}
+          </nav>}
           {children}
         </div>
       </div>

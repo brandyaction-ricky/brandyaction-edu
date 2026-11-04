@@ -92,5 +92,14 @@
 .onboarding-delivery legend { font-weight: 700; margin-top: 16px; }
 .onboarding-delivery textarea { width: 100%; resize: vertical; }
 .onboarding-recipient-list { max-height: 240px; overflow: auto; padding: 8px 12px; border: 1px solid var(--line, #dedfe2); border-radius: 8px; }
+.onboarding-recipient-actions { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+.onboarding-recipient-actions label { display: grid; gap: 4px; }
+.onboarding-recipient-actions input { width: 104px; }
+.onboarding-recipient-list .onboarding-toggle { flex-wrap: wrap; gap: 4px 8px; min-height: 32px; }
+.onboarding-recipient-list .onboarding-toggle input { flex: 0 0 20px; }
+.onboarding-recipient-status { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.onboarding-recipient-status small { padding: 2px 6px; border-radius: 4px; background: #eef0f3; color: #343e4a; }
+.onboarding-recipient-status [data-status="accepted"] { background: #e5f3ea; color: #175634; }
+.onboarding-recipient-status [data-status="pending"], .onboarding-recipient-status [data-status="uncertain"] { background: #fff3d4; color: #6a4a00; }
 .onboarding-delivery-review, .onboarding-delivery-history { padding: 12px; border: 1px solid var(--line, #dedfe2); border-radius: 8px; margin-block: 10px; }
 .onboarding-message-copy { white-space: pre-wrap; overflow-wrap: anywhere; }
