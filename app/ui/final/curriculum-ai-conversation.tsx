@@ -10,10 +10,10 @@ import { QuestionImageDropzone } from './question-image-dropzone';
 import { QuestionComposer, questionRequest } from './question-composer';
 import './curriculum-ai.css';
 import { useUnsavedLearningChanges } from './use-unsaved-learning-changes';
-type Turn = AiTurn & { result?:CurriculumAnswer; imageAttached?:boolean; requestId?:string; imageId?:string|null; pending?:boolean };
+type Turn = AiTurn & { result?:CurriculumAnswer; imageAttached?:boolean; requestId?:string; imageId?:string|null; pending?:boolean; helpful?:boolean };
 function savedTurns(items:SavedAiExchange[]):Turn[]{return [...items].reverse().flatMap(item=>[
  {role:'user' as const,text:item.question,requestId:item.requestId,imageId:item.imageId,imageAttached:Boolean(item.imageId)},
- {role:'assistant' as const,text:item.answer?.answer || (item.status==='pending'?'답변을 생성 중이에요. 잠시 후 대화를 새로고침해 주세요.':item.error || '답변을 확인하지 못했어요.'),result:item.answer || undefined,pending:item.status==='pending'},
+ {role:'assistant' as const,requestId:item.requestId,helpful:item.helpful,text:item.answer?.answer || (item.status==='pending'?'답변을 생성 중이에요. 잠시 후 대화를 새로고침해 주세요.':item.error || '답변을 확인하지 못했어요.'),result:item.answer || undefined,pending:item.status==='pending'},
 ]);}
 export function CurriculumAiConversation({context,showContext=true,onStateChange,onCreated}:{context:QuestionContext;showContext?:boolean;onStateChange:(value:{dirty:boolean;locked:boolean})=>void;onCreated:()=>void}) {
  const imagesEnabled=process.env.NEXT_PUBLIC_EDU_QUESTION_IMAGES_ENABLED === 'true';
@@ -26,6 +26,8 @@ export function CurriculumAiConversation({context,showContext=true,onStateChange
  const [draftReady,setDraftReady]=useState(false);
  const [canResume,setCanResume]=useState(false);
  const [copyStatus,setCopyStatus]=useState('');
+ const [historyAction,setHistoryAction]=useState(false);
+ const [historyNotice,setHistoryNotice]=useState('');
  const cursor=useRef<{time:string;id:string}|undefined>(undefined),retry=useRef<{requestId:string;question:string;imageId?:string}|null>(null);
  const [uncertain,setUncertain]=useState(false);
  const clearRetry=useCallback(()=>{
@@ -88,7 +90,7 @@ export function CurriculumAiConversation({context,showContext=true,onStateChange
   catch{if(alive.current)setError('이전 대화를 불러오지 못했어요. 다시 시도해 주세요.');}finally{if(alive.current)setOlderBusy(false);}
  }
  async function submit(event:FormEvent,checkRetry=false) {
-  event.preventDefault();if(gate.current || !loaded || historyError || image.busy || (image.draft && !image.id) || !question.trim() || sensitive || (!checkRetry && turns.some(t=>t.pending)))return;
+  event.preventDefault();if(gate.current || historyAction || !loaded || historyError || image.busy || (image.draft && !image.id) || !question.trim() || sensitive || (!checkRetry && turns.some(t=>t.pending)))return;
   if(uncertain&&!checkRetry){setVersion(v=>v+1);return;}
   gate.current=true;setBusy(true);setError('');
   const request=retry.current || {requestId:crypto.randomUUID(),question:question.trim(),...(image.id?{imageId:image.id}:{})};retry.current=request;
@@ -97,11 +99,29 @@ export function CurriculumAiConversation({context,showContext=true,onStateChange
    const response=await fetch('/api/platform/curriculum-ai',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json'},signal:AbortSignal.timeout(55000),body:JSON.stringify({...request,enrollmentId:context.enrollmentId,lessonId:context.lessonId})});
    const data=await response.json();if(!response.ok)throw Object.assign(new Error(data.error || '답변을 불러오지 못했어요.'),{status:response.status});
    if(typeof data.answer!=='string' || !Array.isArray(data.sources))throw new Error('답변 형식을 확인하지 못했어요.');
-   if(alive.current){setTurns(old=>[...old,{role:'user',text:request.question,imageAttached:Boolean(request.imageId),requestId:request.requestId,imageId:request.imageId},{role:'assistant',text:data.answer,result:data}]);updateQuestion('');setImage({id:null,busy:false,draft:false});setImageKey(k=>k+1);clearRetry();setUncertain(false);}
+   if(alive.current){setTurns(old=>[...old,{role:'user',text:request.question,imageAttached:Boolean(request.imageId),requestId:request.requestId,imageId:request.imageId},{role:'assistant',requestId:request.requestId,text:data.answer,result:data}]);updateQuestion('');setImage({id:null,busy:false,draft:false});setImageKey(k=>k+1);clearRetry();setUncertain(false);}
   }catch(cause){if(alive.current){const e=cause as Error&{status?:number};setError(!e.status?'인터넷 연결을 확인해 주세요. 보낸 질문이 저장됐는지 확인하고 있어요.':e.status>=500?'답변을 불러오지 못했어요. 잠시 후 다시 확인해 주세요.':e.message);if(!e.status || e.status>=500 || e.status===409){setUncertain(true);setVersion(v=>v+1);}else {clearRetry();setUncertain(false);}}}
   finally{gate.current=false;if(alive.current)setBusy(false);}
  }
- const locked=busy || uncertain;
+ async function manageTurn(turn:Turn,action:'feedback'|'delete'){
+  if(!turn.requestId || historyAction || busy || uncertain || olderBusy || !loaded)return;
+  if(action==='delete'&&!window.confirm('이 질문과 답변을 내 AI 대화에서 삭제할까요? 이후 AI 답변에도 이 대화가 사용되지 않아요.'))return;
+  setHistoryAction(true);
+  setHistoryNotice('');
+  try{
+   const response=await fetch('/api/platform/curriculum-ai/history',{
+    method:'PATCH',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({requestId:turn.requestId,action,helpful:!turn.helpful}),
+   });
+   if(!response.ok)throw new Error('AI history action failed');
+   setTurns(previous=>action==='delete'
+    ?previous.filter(item=>item.requestId!==turn.requestId)
+    :previous.map(item=>item.role==='assistant'&&item.requestId===turn.requestId?{...item,helpful:!turn.helpful}:item));
+   setHistoryNotice(action==='delete'?'질문과 답변을 삭제했어요.':'답변 평가를 저장했어요.');
+  }catch{setHistoryNotice('변경 결과를 확인하지 못했어요. 대화 새로고침 후 다시 시도해 주세요.');}
+  finally{setHistoryAction(false);}
+ }
+ const locked=busy || uncertain || historyAction;
  useEffect(()=>{
   if(!loaded || locked || mentor)return;
   const field=input.current;
@@ -116,11 +136,11 @@ export function CurriculumAiConversation({context,showContext=true,onStateChange
   <div className="curriculum-ai-body" hidden={mentor}>
    {showContext&&<p className="curriculum-ai-context"><b>질문할 수업</b><span>{context.label}</span></p>}
    <details className="curriculum-ai-guide"><summary>AI 사용·저장 안내<span>OpenAI 전달 · 비공개 저장</span></summary><div><p>공개된 문샷 수업 자료에서 근거를 찾아 안내해요. 질문·최근 대화·관련 수업 자료와 이번에 첨부한 캡처가 OpenAI에 전달됩니다. AI 답변은 틀릴 수 있어요. 개인정보는 적지 마세요.</p><p>질문·AI 답변·첨부 내역은 이 수업과 ‘내 질문’에 자동 저장돼요. 이전 사진은 다시 첨부하지 않으면 다음 질문에 보내지 않아요.</p></div></details>
-   <div className="curriculum-ai-toolbar"><div><h3>이 수업의 대화</h3><p>질문과 답변은 자동으로 저장돼요.</p></div><button type="button" className="btn small" disabled={busy || image.busy || !loaded || olderBusy} onClick={()=>setVersion(v=>v+1)}>대화 새로고침</button></div>
-   {more&&<button type="button" className="btn small curriculum-ai-older" disabled={busy || !loaded || olderBusy} onClick={()=>void older()}>이전 대화 더 보기</button>}
+   <div className="curriculum-ai-toolbar"><div><h3>이 수업의 대화</h3><p>질문과 답변은 자동으로 저장돼요.</p></div><button type="button" className="btn small" disabled={busy || historyAction || image.busy || !loaded || olderBusy} onClick={()=>setVersion(v=>v+1)}>대화 새로고침</button></div>
+   {more&&<button type="button" className="btn small curriculum-ai-older" disabled={busy || historyAction || !loaded || olderBusy} onClick={()=>void older()}>이전 대화 더 보기</button>}
    {!loaded&&<p role="status">저장된 대화를 불러오고 있어요.</p>}{historyError&&<p role="alert">대화를 불러오지 못했어요. {historyError} 위의 ‘대화 새로고침’으로 다시 확인해 주세요.</p>}
-   <div className="curriculum-ai-turns" role="log" aria-label="AI 질문 대화" aria-live="polite">{turns.map((turn,i)=><article key={turn.requestId || i} className={'curriculum-ai-turn '+turn.role}><b className="curriculum-ai-speaker">{turn.role==='user'?'내 질문':'AI 참고 답변'}</b><p>{turn.role==='assistant'?turn.text.replace(/`([^`\n]+)`/g,'$1'):turn.text}</p>{turn.imageAttached&&<div className="curriculum-ai-attachment"><small>화면 캡처 1장 함께 전달</small><QuestionImage questionId={turn.requestId!} aiRequestId={turn.requestId} imageId={turn.imageId}/></div>}{turn.result&&<div className="curriculum-ai-sources"><small>이 답변에 인용한 근거 {turn.result.sources.length}개</small>{turn.result.sources.map(s=><details key={s.id}><summary>{s.title} · 근거 보기</summary><p>{s.excerpt}</p><small>{s.revision?'본문 버전 '+s.revision.slice(0,8):'기존 본문'}</small><p><Link href={`/learn/${context.enrollmentId}/${s.lessonId}`} target="_blank" rel="noopener noreferrer">참고 수업 새 창으로 열기</Link></p></details>)}<div className="row"><button type="button" className="btn small" onClick={async()=>{try{await navigator.clipboard.writeText(turn.text);setCopyStatus('답변을 복사했어요.');}catch{setCopyStatus('복사하지 못했어요. 답변을 선택해 직접 복사해 주세요.');}}}>답변 복사</button><button type="button" className="btn small" disabled={locked || image.busy} onClick={()=>setMentor(true)}>잘못된 답변 · 멘토에게 확인</button></div>{turn.result.needsMentor&&<p>멘토 확인을 권해요. ‘멘토에게 질문’에서 이어갈 수 있어요.</p>}</div>}</article>)}</div>
-   <div role="status">{copyStatus}</div>
+   <div className="curriculum-ai-turns" role="log" aria-label="AI 질문 대화" aria-live="polite">{turns.map((turn,i)=><article key={turn.requestId?turn.role+':'+turn.requestId:i} className={'curriculum-ai-turn '+turn.role}><b className="curriculum-ai-speaker">{turn.role==='user'?'내 질문':'AI 참고 답변'}</b><p>{turn.role==='assistant'?turn.text.replace(/`([^`\n]+)`/g,'$1'):turn.text}</p>{turn.imageAttached&&<div className="curriculum-ai-attachment"><small>화면 캡처 1장 함께 전달</small><QuestionImage questionId={turn.requestId!} aiRequestId={turn.requestId} imageId={turn.imageId}/></div>}{turn.result&&<div className="curriculum-ai-sources"><small>이 답변에 인용한 근거 {turn.result.sources.length}개</small>{turn.result.sources.map(s=><details key={s.id}><summary>{s.title} · 근거 보기</summary><p>{s.excerpt}</p><small>{s.revision?'본문 버전 '+s.revision.slice(0,8):'기존 본문'}</small><p><Link href={`/learn/${context.enrollmentId}/${s.lessonId}`} target="_blank" rel="noopener noreferrer">참고 수업 새 창으로 열기</Link></p></details>)}<div className="row"><button type="button" className="btn small" aria-pressed={Boolean(turn.helpful)} disabled={locked || olderBusy || !loaded} onClick={()=>void manageTurn(turn,'feedback')}>도움이 됐어요</button><button type="button" className="btn small" onClick={async()=>{try{await navigator.clipboard.writeText(turn.text);setCopyStatus('답변을 복사했어요.');}catch{setCopyStatus('복사하지 못했어요. 답변을 선택해 직접 복사해 주세요.');}}}>답변 복사</button><button type="button" className="btn small" disabled={locked || image.busy} onClick={()=>setMentor(true)}>잘못된 답변 · 멘토에게 확인</button></div>{turn.result.needsMentor&&<p>멘토 확인을 권해요. ‘멘토에게 질문’에서 이어갈 수 있어요.</p>}</div>}{turn.role==='assistant'&&turn.requestId&&!turn.pending&&<button type="button" className="btn small" disabled={locked || olderBusy || !loaded} onClick={()=>void manageTurn(turn,'delete')}>이 질문과 답변 삭제</button>}</article>)}</div>
+   <div role="status">{copyStatus}</div><div role="status">{historyNotice}</div>
    {busy&&<><article className="curriculum-ai-turn user"><b className="curriculum-ai-speaker">내 질문</b><p>{question.trim()}</p></article><p role="status">답변을 준비하고 있어요.</p></>}
    {loaded&&!busy&&!historyError&&!turns.length&&<p className="curriculum-ai-empty">수업에서 막힌 부분을 편하게 물어보세요.<br/>질문과 답변은 여기에 차곡차곡 남아요.</p>}
    <QuestionImageDropzone enabled={imagesEnabled} locked={locked || image.busy || mentorLocked} onFiles={files=>imagePicker.current?.paste(files)}><form className="curriculum-ai-composer" onSubmit={submit} onPaste={event=>{if(!imagesEnabled || locked || image.busy)return;const files=Array.from(event.clipboardData.items).filter(item=>item.kind==='file' && item.type.startsWith('image/')).map(item=>item.getAsFile()).filter((file):file is File=>file!==null);if(files.length){event.preventDefault();imagePicker.current?.paste(files);}}}><p className="meta">비밀번호·카드번호 등 개인정보는 질문에 적지 마세요.</p><label className="field">궁금한 점<textarea ref={input} rows={3} maxLength={2000} disabled={locked || !loaded} value={question} onChange={e=>updateQuestion(e.target.value)} placeholder="예: 이 수업의 프롬프트를 실행했는데 예시와 다른 결과가 나와요. 어떤 부분을 확인하면 될까요?"/></label>{imagesEnabled&&<><QuestionImagePicker key={imageKey} dragAndDrop ref={imagePicker} enrollmentId={context.enrollmentId} lessonId={context.lessonId} compact ai locked={locked || mentorLocked} changed={(id,uploading,draft,info)=>setImage({id,busy:uploading,draft,info})}/><small className="meta">개인정보·비밀번호를 가린 캡처만 첨부해 주세요. 이번 질문에만 전달되며, 애니메이션은 첫 화면만 확인해요.</small></>}{image.id&&!question.trim()&&<p className="meta">캡처에서 궁금한 점을 한 줄만 적어 주세요.</p>}{sensitive&&<p role="alert" className="form-error">{sensitiveQuestionMessage}</p>}{error&&<p role="alert" className="form-error">{error}</p>}{uncertain?<p role="status">질문을 다시 보내기 전에 ‘대화 새로고침’으로 저장 결과를 확인해 주세요. 아직 내역이 없다면 같은 요청으로 <button type="button" className="link" disabled={busy || !loaded || Boolean(historyError) || turns.some(t=>t.pending)} onClick={event=>void submit(event,true)}>답변 결과 다시 확인</button>할 수 있어요.</p>:null}<button type="submit" className="btn primary" disabled={locked || !loaded || Boolean(historyError) || turns.some(t=>t.pending) || image.busy || (image.draft && !image.id) || !question.trim() || sensitive}>{busy?'수업 근거를 확인하고 있어요…':'AI 답변 받기'}</button></form></QuestionImageDropzone>
