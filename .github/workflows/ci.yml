@@ -7,6 +7,11 @@ on:
     branches: [develop, main]
   workflow_dispatch:
     inputs:
+      campus_render_diagnostic:
+        description: Run only the focused software-graphics diagnostics (never a release gate)
+        required: false
+        type: boolean
+        default: false
       apply_all_pending_dev_migrations:
         description: Apply all pending SQL migrations to the DEV Supabase project
         required: true
@@ -22,6 +27,7 @@ permissions:
 
 jobs:
   code-checks:
+    if: ${{ !inputs.campus_render_diagnostic }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -255,6 +261,7 @@ jobs:
         run: npm run build
 
   browser:
+    if: ${{ !inputs.campus_render_diagnostic }}
     name: Browser shard ${{ matrix.shard }}/3
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -281,6 +288,7 @@ jobs:
           retention-days: 3
 
   payment-widget:
+    if: ${{ !inputs.campus_render_diagnostic }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -305,6 +313,7 @@ jobs:
           retention-days: 3
 
   campus-browser:
+    if: ${{ !inputs.campus_render_diagnostic }}
     name: Campus browser shard ${{ matrix.shard }}/4
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -330,8 +339,41 @@ jobs:
           path: test-results/
           retention-days: 3
 
+  rendering-diagnostic:
+    if: ${{ inputs.campus_render_diagnostic }}
+    name: Rendering check (${{ matrix.device }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - device: desktop
+            files: tests/campus-browser/atrium.spec.ts tests/campus-browser/crowd-groups.spec.ts
+            pattern: arrival defaults|connected crowd
+          - device: mobile
+            files: tests/campus-browser/mobile-layout.spec.ts
+            pattern: 768x1024
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Run unchanged interaction assertions on software graphics
+        run: npx playwright test --config=playwright.campus.config.ts --project=${{ matrix.device }} ${{ matrix.files }} --grep '${{ matrix.pattern }}' --reporter=line
+      - name: Preserve diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rendering-diagnostic-${{ matrix.device }}
+          path: test-results/
+          retention-days: 3
+
   verify:
-    if: always()
+    if: ${{ always() && !inputs.campus_render_diagnostic }}
     needs: [code-checks, browser, payment-widget, campus-browser]
     runs-on: ubuntu-latest
     timeout-minutes: 5
