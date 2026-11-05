@@ -274,10 +274,11 @@ test('onboarding lookup failure is visible and can be retried', async ({ page })
   await expect(page.getByRole('link', { name: '결제 후 시작 안내' })).toHaveAttribute('href', `/purchase-onboarding?order=${order}`);
 });
 
-for (const [channel, label] of [['sms', '문자 (SMS)'], ['alimtalk', '카카오 알림톡'], ['email', '이메일']] as const) {
+for (const [channel, label] of [['lms', '장문 문자 (LMS)'], ['alimtalk', '카카오 알림톡'], ['email', '이메일']] as const) {
   test(`cohort purchase admin schedules and cancels a ${channel} notice for selected buyers`, async ({ page }) => {
     const other = '33333333-3333-4333-8333-333333333333';
-    const template = { id: 'test-template', channel, name: '검수용 결제 안내', content: '입장 링크 확인', version: 'test-version' };
+    const roomLink = 'https://t.me/+synthetic';
+    const template = { id: 'test-template', channel, name: '검수용 결제 안내', content: channel === 'alimtalk' ? '입장 링크 #{공지방링크}' : '입장 링크 확인', version: 'test-version' };
     let batch: Record<string, unknown> | null = null;
     let cancelled = false;
     await page.route('**/api/admin/purchase-onboarding?*', route => route.fulfill({ json: {
@@ -295,7 +296,8 @@ for (const [channel, label] of [['sms', '문자 (SMS)'], ['alimtalk', '카카오
         } else {
           expect(body).toMatchObject({ cohort, action: 'schedule', channel, recipients: [other],
             ...(channel === 'email' ? { subject: '2번 공지방', content: '입장 링크 확인' } :
-              { templateId: template.id, templateVersion: template.version }) });
+              { templateId: template.id, templateVersion: template.version }),
+            ...(channel === 'alimtalk' ? { roomLink } : {}) });
           batch = body;
         }
         return route.fulfill({ json: { ok: true } });
@@ -310,14 +312,25 @@ for (const [channel, label] of [['sms', '문자 (SMS)'], ['alimtalk', '카카오
     await page.goto('/admin/purchase-onboarding-test');
     await page.getByLabel('안내할 기수').selectOption(cohort);
     await expect(page.getByRole('link', { name: '구매자 공지·발송 내역' })).toHaveAttribute('href', '#buyer-delivery');
-    await page.getByRole('combobox', { name: '채널', exact: true }).selectOption(channel);
-    await page.getByLabel('둘째 구매자', { exact: false }).check();
+    const channelSelect = page.getByRole('combobox', { name: '채널', exact: true });
+    await expect(channelSelect).toHaveValue('sms');
     if (channel === 'email') {
+      await channelSelect.selectOption(channel);
       await page.getByLabel('이메일 제목').fill('2번 공지방');
       await page.getByLabel('이메일 내용').fill('입장 링크 확인');
     } else {
-      await page.getByLabel('정보성 메시지 템플릿').selectOption(template.id);
+      await page.getByLabel('저장한 문자·알림톡 불러오기').selectOption(template.id);
+      await expect(channelSelect).toHaveValue(channel);
+      const chosen = page.getByRole('region', { name: '선택한 문구' });
+      if (channel === 'alimtalk') {
+        await expect(chosen).toContainText('[입력한 텔레그램 링크]');
+        await page.getByLabel('배정할 텔레그램 공지방 링크').fill(roomLink);
+        await expect(chosen).toContainText(roomLink);
+      } else {
+        await expect(chosen).toContainText(template.content);
+      }
     }
+    await page.getByLabel('둘째 구매자', { exact: false }).check();
     await page.getByLabel('발송 시각 (현재 기기 시간)').fill('2027-12-01T12:00');
     await page.getByRole('button', { name: '대상·문구 확인' }).click();
     await expect(page.getByRole('heading', { name: `${label} · 1명` })).toBeVisible();
@@ -346,6 +359,8 @@ test('direct SMS can select a group above 100, narrow it by name, then review an
   });
   await page.goto('/admin/purchase-onboarding-test');
   await page.getByLabel('안내할 기수').selectOption(cohort);
+  await expect(page.getByLabel('저장한 문자·알림톡 불러오기')).toBeDisabled();
+  await expect(page.getByText('저장된 문자·알림톡이 없습니다', { exact: true })).toHaveCount(1);
   await expect(page.getByText('전체 결제자 105명 · 발송 가능 104명 · 선택 0명', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '발송 가능한 전체 선택' }).click();
   await expect(page.getByText('전체 결제자 105명 · 발송 가능 104명 · 선택 104명', { exact: true })).toBeVisible();

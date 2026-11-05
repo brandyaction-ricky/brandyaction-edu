@@ -90,6 +90,10 @@
 .onboarding-delivery { margin-top: 24px; }
 .onboarding-delivery fieldset { border: 0; padding: 0; min-width: 0; }
 .onboarding-delivery legend { font-weight: 700; margin-top: 16px; }
+.onboarding-template-picker, .onboarding-template-preview { padding: 14px; border: 1px solid var(--line, #dedfe2); border-radius: 8px; background: #f6f7f8; }
+.onboarding-template-picker label { display: grid; gap: 8px; font-weight: 700; }
+.onboarding-template-picker select { width: 100%; min-width: 0; }
+.onboarding-template-picker p, .onboarding-template-preview p { margin: 8px 0 0; }
 .onboarding-admin-fields textarea,
 .onboarding-delivery textarea { width: 100%; resize: vertical; }
 .onboarding-recipient-list { max-height: 240px; overflow: auto; padding: 8px 12px; border: 1px solid var(--line, #dedfe2); border-radius: 8px; }
