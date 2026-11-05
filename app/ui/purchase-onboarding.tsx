@@ -10,7 +10,7 @@ import { PurchaseCompletionGuide } from './purchase-completion-guide';
 import { PurchaseOnboardingChecklist } from './purchase-onboarding-checklist';
 import type { OnboardingProgress } from '@/lib/purchase-onboarding-progress';
 
-type View = { orderId: string; orderNumber: string; itemName: string; roomName: string; surveyRoom: SurveyRoom | null; telegramPath: TelegramPath | null; profileImage: string; supportUrl: string; available: boolean; telegramOnly?: boolean; progress?: OnboardingProgress; completionGuide?: CompletionGuideSettings; loginId?: string };
+type View = { orderId: string; orderNumber: string; itemName: string; roomName: string; surveyRoom: SurveyRoom | null; telegramPath: TelegramPath | null; profileImage: string; supportUrl: string; available: boolean; telegramOnly?: boolean; progress?: OnboardingProgress; completionGuide?: CompletionGuideSettings; loginId?: string; loginMethod?: string };
 
 export function PurchaseOnboarding({ order, guideRequested }: { order: string; guideRequested: boolean }) {
   const router = useRouter();
@@ -69,7 +69,7 @@ export function PurchaseOnboarding({ order, guideRequested }: { order: string; g
     <div className="wrap onboarding-shell">
       <div className="onboarding-title-block"><h1>결제 후 시작 안내</h1><p>{view.itemName}</p></div>
       <section className="onboarding-panel">
-        <PurchaseCompletionGuide key={view.orderId} guide={view.completionGuide} loginId={view.loginId} />
+        <PurchaseCompletionGuide key={view.orderId} guide={view.completionGuide} loginId={view.loginId} loginMethod={view.loginMethod} />
       </section>
     </div>
   </main>;

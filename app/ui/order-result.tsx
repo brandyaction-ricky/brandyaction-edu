@@ -33,7 +33,7 @@ export function OrderResult({
   const [state, setState] = useState<"checking" | "paid" | "waiting" | "error">("checking");
   const [error, setError] = useState("");
   const [virtualAccount, setVirtualAccount] = useState<VirtualAccount | null>(null);
-  const [onboarding, setOnboarding] = useState<{ orderId: string; completionGuide?: CompletionGuideSettings; loginId?: string } | null>(null);
+  const [onboarding, setOnboarding] = useState<{ orderId: string; completionGuide?: CompletionGuideSettings; loginId?: string; loginMethod?: string } | null>(null);
   const [onboardingErrorOrderId, setOnboardingErrorOrderId] = useState<string | null>(null);
   const [onboardingCheckedOrderId, setOnboardingCheckedOrderId] = useState<string | null>(null);
   const [onboardingRetry, setOnboardingRetry] = useState(0);
@@ -54,7 +54,7 @@ export function OrderResult({
       .then(async response => {
         const data = response.ok ? await response.json() : null;
         if (controller.signal.aborted) return;
-        setOnboarding(response.ok ? { orderId: paidOrderId, completionGuide: data?.completionGuide, loginId: data?.loginId } : null);
+        setOnboarding(response.ok ? { orderId: paidOrderId, completionGuide: data?.completionGuide, loginId: data?.loginId, loginMethod: data?.loginMethod } : null);
         setOnboardingErrorOrderId(!response.ok && response.status !== 404 ? paidOrderId : null);
         setOnboardingCheckedOrderId(paidOrderId);
       })
@@ -213,7 +213,7 @@ export function OrderResult({
               )}
             </dl>
           )}
-          {completionGuide && <PurchaseCompletionGuide key={paidOrderId} guide={completionGuide} loginId={onboarding?.loginId} />}
+          {completionGuide && <PurchaseCompletionGuide key={paidOrderId} guide={completionGuide} loginId={onboarding?.loginId} loginMethod={onboarding?.loginMethod} />}
           {complete && !completionGuide && <div className="order-complete-next-copy">
             <span>다음 · 2단계</span>
             <h3>{onboardingReady ? "교육 시작 안내를 확인하세요" : "내 클래스에서 바로 시작하세요"}</h3>

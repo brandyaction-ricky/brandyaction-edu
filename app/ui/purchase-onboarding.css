@@ -104,3 +104,7 @@
 .onboarding-recipient-status [data-status="pending"], .onboarding-recipient-status [data-status="uncertain"] { background: #fff3d4; color: #6a4a00; }
 .onboarding-delivery-review, .onboarding-delivery-history { padding: 12px; border: 1px solid var(--line, #dedfe2); border-radius: 8px; margin-block: 10px; }
 .onboarding-message-copy { white-space: pre-wrap; overflow-wrap: anywhere; }
+.onboarding-guide-preview { padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-md); }
+.onboarding-guide-preview summary { cursor: pointer; font-weight: 700; }
+.onboarding-guide-preview > p { margin-top: var(--space-2); }
+.onboarding-guide-preview > .purchase-completion-guide { margin-top: var(--space-3); padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-sm); }

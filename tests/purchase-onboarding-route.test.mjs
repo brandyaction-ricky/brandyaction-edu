@@ -68,19 +68,19 @@ test('only opted-in cohorts can read and confirm the four-step checklist', async
 
 test('a direct guide shows the paid owner login and skips legacy survey or progress', async () => {
   const completionGuide = { label: '문샷 공부방 입장하기', url: 'https://campus.example.test/welcome', message: 'OT 안내를 확인해 주세요.' };
-  const user = { id: 'buyer', email: 'login@example.test', contact_email: 'billing@example.test' };
+  const user = { id: 'buyer', email: 'login@example.test', contact_email: 'billing@example.test', loginMethod: '카카오' };
   const request = new Request(`https://edu.test/api/purchase-onboarding?order=${orderId}`);
   const purchase = { orderId, orderNumber: 'QA', itemName: '문샷', completionGuide };
   const { route, calls, progressCalls } = handler({ user, purchase });
   const response = await route.GET(request);
   assert.equal(response.headers.get('cache-control'), 'private, no-store');
-  assert.deepEqual(await response.json(), { available: true, ...purchase, loginId: user.email });
+  assert.deepEqual(await response.json(), { available: true, ...purchase, loginId: user.email, loginMethod: '카카오' });
   assert.deepEqual(calls, [[user.id, orderId]]);
   assert.deepEqual(progressCalls, []);
 
   const noOwnedOrder = await handler({ user, purchase: null }).route.GET(request);
   assert.equal(noOwnedOrder.status, 404);
-  assert.equal((await noOwnedOrder.json()).loginId, undefined);
+  assert.deepEqual(await noOwnedOrder.json(), { available: false, error: '안내할 결제 완료 주문이 없습니다.' });
   const noLoginEmail = await handler({ user: { ...user, email: '' }, purchase }).route.GET(request);
   assert.equal((await noLoginEmail.json()).loginId, undefined);
 });

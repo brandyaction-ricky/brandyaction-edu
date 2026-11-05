@@ -1,15 +1,33 @@
 'use client';
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { COMPLETION_GUIDE_MESSAGE_MAX_LENGTH, type CompletionGuideSettings } from '@/lib/purchase-onboarding';
+import { COMPLETION_GUIDE_MESSAGE_MAX_LENGTH, completionGuideSettings, type CompletionGuideSettings } from '@/lib/purchase-onboarding';
 import { AdminReturnLink } from './admin-return-navigation';
 import { PurchaseBuyerDelivery } from './purchase-buyer-delivery';
+import { PurchaseCompletionGuide } from './purchase-completion-guide';
 import './purchase-onboarding.css';
 
 type Cohort = { id: string; name: string; courses: { title: string } | { title: string }[] | null };
 const empty: CompletionGuideSettings = { label: '', url: '' };
 const endpoint = '/api/admin/purchase-onboarding';
 const courseTitle = (cohort?: Cohort) => Array.isArray(cohort?.courses) ? cohort.courses[0]?.title : cohort?.courses?.title;
+
+function CompletionGuidePreview({ settings }: { settings: CompletionGuideSettings }) {
+  let guide: CompletionGuideSettings | undefined;
+  let notice = '입력한 안내가 없으면 결제 완료 화면에 이 영역이 표시되지 않습니다.';
+  try {
+    guide = completionGuideSettings(settings);
+  } catch (error) {
+    notice = error instanceof Error ? error.message : '안내 설정을 확인해 주세요.';
+  }
+  return <details className="onboarding-guide-preview">
+    <summary>고객 화면 미리보기</summary>
+    <p className="meta">입력 중인 안내를 보여 드립니다. 로그인 아이디는 예시입니다.</p>
+    {guide && (guide.url || guide.message)
+      ? <PurchaseCompletionGuide guide={guide} loginId="student@example.com" loginMethod="이메일" preview />
+      : <p className="meta">{notice}</p>}
+  </details>;
+}
 
 export function PurchaseOnboardingAdmin({ productId, initialCohort }: { productId?: string; initialCohort?: string }) {
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
@@ -111,6 +129,7 @@ export function PurchaseOnboardingAdmin({ productId, initialCohort }: { productI
         </label>
         <label>안내 링크 주소<input type="url" value={settings.url} disabled={pending} maxLength={1800} placeholder="https://…" onChange={event => setSettings(current => ({ ...current, url: event.target.value }))} /></label>
         <p className="meta">결제가 완료되면 선택한 기수의 구매자에게 안내가 바로 표시됩니다. 링크를 등록하면 복사와 입장 버튼이 생깁니다. 메시지만 표시하려면 제목과 링크 주소를 비워 두세요.</p>
+        <CompletionGuidePreview settings={settings} />
         <button className="btn primary" type="submit" disabled={pending}>설정 저장</button>
       </form>}
       {message && <p role="status" className="notice">{message}</p>}{error && <p role="alert" className="notice">{error}</p>}

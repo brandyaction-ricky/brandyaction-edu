@@ -19,9 +19,16 @@
   padding-inline-start: 1.4em;
 }
 .edu-front .purchase-guide-steps li::marker { font-weight: 700; }
-.edu-front .purchase-guide-steps button,
-.edu-front .purchase-guide-steps input { margin-top: var(--space-2); }
-.edu-front .purchase-guide-steps input { width: 100%; }
+.edu-front .purchase-guide-steps button { margin-top: var(--space-2); }
+.edu-front .purchase-guide-url {
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  font-size: var(--type-small);
+  user-select: text;
+}
 .edu-front .purchase-guide-steps [role="status"] { color: var(--text-secondary); font-size: var(--type-small); }
 .edu-front .purchase-guide-steps [role="status"]:not(:empty) { margin-top: var(--space-1); }
 .edu-front .purchase-guide-account dl {

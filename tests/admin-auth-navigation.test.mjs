@@ -47,6 +47,19 @@ function authHarness({ authError = null, profileError = null, profile = admin, a
   return { ...auth, calls: () => calls };
 }
 
+test('purchase guidance can show verified account login methods without exposing them elsewhere', async () => {
+  const authUser = { id: admin.id, email: admin.email };
+  for (const [provider, label] of [['kakao', '카카오'], ['google', '구글'], ['email', '이메일']]) {
+    const auth = authHarness({ authUser: { ...authUser, app_metadata: { provider } } });
+    assert.equal((await auth.getAuthenticatedUser(true)).loginMethod, label);
+    assert.equal((await auth.getAuthenticatedUser()).loginMethod, undefined);
+  }
+  const linked = authHarness({ authUser: { ...authUser, identities: ['kakao', 'google', 'google', 'unknown'].map(provider => ({ provider })) } });
+  assert.equal((await linked.getAuthenticatedUser(true)).loginMethod, '카카오 · 구글');
+  const unknown = authHarness({ authUser: { ...authUser, user_metadata: { provider: 'kakao' } } });
+  assert.equal((await unknown.getAuthenticatedUser(true)).loginMethod, undefined);
+});
+
 test('missing/invalid sessions are unauthenticated, transient Auth and profile failures remain retryable', async () => {
   for (const authError of [{ name: 'AuthSessionMissingError' }, { status: 401 }]) assert.equal(await authHarness({ authError }).getAuthenticatedUser(), null);
   for (const options of [{ authError: { status: 503 } }, { authError: { status: 429 } }, { profileError: { code: 'PGRST000' } }]) {
