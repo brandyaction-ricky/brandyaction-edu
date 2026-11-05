@@ -51,6 +51,9 @@ const server = createServer((request,response)=>{
     let raw='';request.on('data',chunk=>raw+=chunk);request.on('end',()=>{try{const body=JSON.parse(raw);response.end(JSON.stringify({choices:body.choices,revision:body.requestId,updatedAt:'2026-10-20T01:00:00Z',legacyRetired:true,dates:Object.fromEntries(Object.entries(body.choices).map(([k,v])=>[k,v?'2026-10-20T01:00:00Z':null])),changed:Object.entries(body.choices).map(([kind,v])=>({kind,action:v?'consent':'refusal'}))}));}catch{response.writeHead(400).end('{}');}});return;
   }
   if(url.pathname==='/synthetic-auth/consent'){response.setHeader('Content-Type','application/json');response.end('{}');return;}
+  if(url.pathname==='/api/coupons'&&request.method==='POST'){
+    let raw='';request.on('data',chunk=>raw+=chunk);request.on('end',()=>{try{const body=JSON.parse(raw);response.setHeader('Content-Type','application/json');if(body.action==='event-benefits')response.end(JSON.stringify({quote:null}));else response.writeHead(400).end(JSON.stringify({error:'Synthetic coupon quote requires an explicit test response'}));}catch{response.writeHead(400).end('{}');}});return;
+  }
   if(request.method!=='GET'){response.writeHead(405).end();return;}
   if(url.pathname==='/synthetic-auth/session'){response.setHeader('Content-Type','application/json');response.end('{}');return;}
   if(url.pathname==='/api/platform'&&url.searchParams.get('part')==='curriculum'){

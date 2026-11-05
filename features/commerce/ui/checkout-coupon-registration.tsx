@@ -3,12 +3,13 @@
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { money } from "@/lib/platform";
-import { COUPON_CODE_MAX_LENGTH, normalizeCouponCode, type CouponQuote } from "../domain/coupon";
+import { COUPON_CODE_MAX_LENGTH, normalizeCouponCode, isCouponQuote, type CouponQuote } from "../domain/coupon";
 import { requestCouponQuote } from "../infrastructure/coupon-client";
 
 type ScopedCouponQuote = CouponQuote & { scope: string };
 
-export function useCheckoutCouponRegistration(cohortId: string, scope: string) {
+export function useCheckoutCouponRegistration(cohortId: string, scope: string, autoEventBenefits = false) {
+  const [autoSettledScope,setAutoSettledScope]=useState<string|null>(null);
   const [openScope, setOpenScope] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [registration, setRegistration] = useState<{ code: string; quote: ScopedCouponQuote } | null>(null);
@@ -17,11 +18,12 @@ export function useCheckoutCouponRegistration(cohortId: string, scope: string) {
   const [dialogErrorResult, setDialogErrorResult] = useState<{ scope: string; text: string } | null>(null);
   const requestSequence = useRef(0);
   const currentScope = useRef(scope);
+  const autoRequest = useRef<{scope:string;promise:Promise<{quote?:CouponQuote}>}|null>(null);
   const scopedRegistration = registration?.quote.scope === scope ? registration : null;
   const appliedCode = scopedRegistration?.code ?? "";
   const quote = scopedRegistration?.quote ?? null;
   const open = openScope === scope;
-  const loading = loadingScope === scope;
+  const loading = loadingScope === scope || (autoEventBenefits && autoSettledScope!==scope);
   const notice = noticeResult?.scope === scope ? noticeResult.text : "";
   const dialogError = dialogErrorResult?.scope === scope ? dialogErrorResult.text : "";
 
@@ -30,7 +32,27 @@ export function useCheckoutCouponRegistration(cohortId: string, scope: string) {
     requestSequence.current += 1;
   }, [scope]);
 
+  useEffect(() => {
+    if (!autoEventBenefits || !cohortId) return;
+    const requestId = ++requestSequence.current;
+    let active = true;
+    if(autoRequest.current?.scope!==scope) autoRequest.current={scope,promise:fetch('/api/coupons', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'event-benefits',cohortId})})
+      .then(async response => {if (!response.ok) throw Error('이벤트 쿠폰을 자동 확인하지 못했습니다. 쿠폰을 등록하거나 새로고침해 주세요.');return response.json();})};
+    void autoRequest.current.promise
+      .then(body => {if (!active || requestId!==requestSequence.current || currentScope.current!==scope) return;
+        if (isCouponQuote(body.quote) && body.quote.couponCode) {
+          setRegistration({code:body.quote.couponCode,quote:{...body.quote,scope}});
+          setNoticeResult({scope,text:'내 계정의 이벤트 혜택을 자동으로 적용했습니다.'});
+        }
+      }).catch(error => {if(active && requestId===requestSequence.current)setNoticeResult({scope,text:error.message});})
+      .finally(()=>{if(active && requestId===requestSequence.current)setAutoSettledScope(scope);});
+    return ()=>{active=false;};
+  }, [scope,cohortId,autoEventBenefits]);
+
   function openDialog() {
+    setAutoSettledScope(scope);
+    requestSequence.current += 1;
+    setLoadingScope(null);
     setDraft(appliedCode);
     setDialogErrorResult(null);
     setOpenScope(scope);
@@ -66,7 +88,7 @@ export function useCheckoutCouponRegistration(cohortId: string, scope: string) {
       const nextQuote = await requestCouponQuote(cohortId, code);
       if (requestId !== requestSequence.current || currentScope.current !== requestScope) return;
       setDraft(code);
-      setRegistration({ code, quote: { ...nextQuote, scope: requestScope } });
+      setRegistration({ code: nextQuote.couponCode || code, quote: { ...nextQuote, scope: requestScope } });
       setNoticeResult({ scope: requestScope, text: `${nextQuote.couponName || nextQuote.couponCode || "쿠폰"} 할인이 자동으로 적용됐습니다.` });
       setOpenScope(null);
     } catch (cause) {
@@ -135,13 +157,14 @@ export function CheckoutCouponRegistration({
       <div className="checkout-coupon-entry">
         <div>
           <strong>{quote ? "쿠폰 할인이 적용됐습니다." : "보유한 쿠폰이 있나요?"}</strong>
-          <p className="meta">쿠폰 코드는 목록으로 공개되지 않으며, 등록 후 할인 금액이 자동 반영됩니다.</p>
+          <p className="meta">쿠폰을 등록하면 할인이 반영됩니다. 라이브 30만원과 이벤트 당첨 10만원 쿠폰은 중복 사용할 수 있습니다.</p>
         </div>
         <button type="button" className="btn" onClick={openDialog}>
           {quote ? "쿠폰 변경" : "쿠폰 등록하기"}
         </button>
       </div>
       {notice ? <p role="status" className="meta checkout-coupon-notice">{notice}</p> : null}
+      {quote?.coupons?.length ? quote.coupons.map(line => <div className="checkout-applied-coupon" key={line.couponCode}><span>{line.couponName}</span><strong>−{money(line.couponDiscount)}</strong></div>) : null}
       {quote ? (
         <div className="checkout-applied-coupon">
           <span>{quote.couponName || quote.couponCode || appliedCode}</span>

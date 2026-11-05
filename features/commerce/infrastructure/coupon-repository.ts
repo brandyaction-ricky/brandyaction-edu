@@ -28,7 +28,7 @@ export function createCouponRepository(): CouponRepository {
       return Object.fromEntries(entries) as Awaited<ReturnType<CouponRepository['getHistoryCounts']>>;
     },
     async quote(userId, cohortId, code) {
-      const result = await db.rpc("edu_coupon_quote", {
+      const result = await db.rpc("edu_event_quote", {
         p_user: userId,
         p_cohort: cohortId,
         p_code: code,

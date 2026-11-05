@@ -1,3 +1,4 @@
+import {EventFixture} from './event';
 import {cohortFiveWelcome} from '../../features/campus/welcome/content';
 import {DEFAULT_WELCOME} from '../../features/campus/welcome/content';
 import {CampusAnalyticsPanel} from '../../features/campus/analytics/panel';
@@ -35,6 +36,7 @@ if(location.pathname==='/operator-tour')return <FourSpacesPreview snapshot={{...
 if(location.pathname==='/campus-tour')return <FourSpacesPreview snapshot={student} adminSnapshot={admin} welcome={new URLSearchParams(location.search).has('welcome')?{settings:DEFAULT_WELCOME,resources:[{id:'welcome-video',kind:'youtube',title:'지난 라이브 함께 보기',description:'검수용 영상',url:'https://www.youtube.com/watch?v=abcdefghijk',published:true}]}:undefined}/>;
 if(location.pathname.startsWith('/learn/'))return <><CampusEntryBar returnTo={new URLSearchParams(location.search).get('campusReturn')||undefined}/><main style={{padding:32}}><h1>예시 수업 · 한 장 지도 작성</h1><p>이동·복귀 검수용 가상 수업입니다. 실제 학습 기록은 저장하지 않습니다.</p></main></>;
 if(location.pathname==='/webinar')return <WebinarRoom event={{...webinarEvent,ambientCount:Number(new URLSearchParams(location.search).get('ambient')||0),resources:new URLSearchParams(location.search).has('library')?[{id:'qa-file',kind:'file',title:'검수용 무료 자료',description:'가상 다운로드 자료',url:'https://files.example.test/moonshot.pdf',published:true},{id:'qa-video',kind:'youtube',title:'검수용 다시보기',description:'재생 연결 확인용 가상 영상',url:'https://www.youtube.com/watch?v=abcdefghijk',published:true},{id:'qa-hidden',kind:'file',title:'비공개 검수 자료',description:'노출하지 않는 자료',url:'https://files.example.test/private.pdf',published:false}]:[],youtubeId:new URLSearchParams(location.search).has('video')?'abcdefghijk':''}} demo={!new URLSearchParams(location.search).has('api')}/>;
+if(['/event-preview','/event-admin-preview'].includes(location.pathname))return <EventFixture/>;
 if(location.pathname==='/webinar-admin')return <WebinarAdmin/>;
 if(location.pathname==='/library-admin-preview')return <><p role="status" style={{margin:0,padding:'12px 24px',background:'#edf3ff',color:'#173b68'}}>로컬 미리보기 · 입력은 이 브라우저에만 저장되며 실제 DEV·운영 자료는 바뀌지 않습니다.</p><WebinarAdmin demo demoCohorts={[{id:student.scopes[0].cohortId,name:'가상 QA 기수',course_id:'00000000-0000-4000-8000-000000000003',courses:{title:'문샷 자료실 미리보기',slug:'moonshot'}}]}/></>;
 if(location.pathname==='/workspace-live')return <WorkspaceLive/>;
