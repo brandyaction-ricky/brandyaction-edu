@@ -6,7 +6,7 @@ test('operator copies scoped welcome and member links without publishing or chan
  await page.goto('/webinar-admin');await page.getByRole('button',{name:'새 행사 만들기'}).click();
  const hub=page.getByRole('region',{name:'대상별 캠퍼스 입장 링크'});
  await expect(hub.getByRole('button')).toHaveCount(0);
- await page.getByLabel('판매·권한 확인 기수').selectOption(cohort);
+ await page.getByLabel('연결할 교육 기수').selectOption(cohort);
  await hub.getByRole('button',{name:'구매자 웰컴용 링크 복사'}).click();
  expect(await page.evaluate(()=>navigator.clipboard.readText())).toBe(new URL('/campus/enter?cohort='+cohort+'&welcome=1',page.url()).href);
  await expect(hub.getByRole('link',{name:'수강생 전용 열기 ↗'})).toHaveAttribute('href','/campus/enter?cohort='+cohort);
