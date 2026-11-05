@@ -9,3 +9,5 @@
 - Configure future claim/use deadlines, upload materials, then enable the event and generate one invitation per winner. The existing live coupon's own eligibility and deadline still apply. Extending an event deadline does not retroactively extend already issued wallets.
 - `node scripts/build-event-preview.mjs /tmp/event-review` builds an isolated visual review. All its data lives in browser localStorage, its login/upload/payment paths are simulations, and it has no service credentials.
 - Tests: `node --test tests/campus-event-*.test.mjs`; `npx playwright test -c tests/campus-event.playwright.config.ts`; `npx playwright test tests/browser/coupons.spec.ts`.
+
+- Shared entry is an operator opt-in (`shared_link`). `/campus/event/:slug` can award any signed-in active account once while enabled and before the deadline. No invitation is consumed; existing individual mode remains available. Bonus + 1108 stacking and private download ownership are unchanged.

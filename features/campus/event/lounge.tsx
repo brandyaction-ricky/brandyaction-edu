@@ -12,7 +12,7 @@ export function EventLounge({initial,signedIn,invite}:{initial:EventView;signedI
   if(lock.current)return;lock.current=true;setBusy(true);setError('');
   try{const r=await fetch('/api/campus/event',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:view.slug,invite,action})});const d=await r.json();if(!r.ok)throw Error(d.error);setView(d);if(d.claimed)history.replaceState(null,'',eventPath(view.slug));}catch(e){setError((e as Error).message);}finally{lock.current=false;setBusy(false);}
  }
- useEffect(()=>{if(signedIn&&!initial.claimed&&invitePattern.test(invite)&&!auto.current){auto.current=true;void claim('claim');}},[signedIn,initial.claimed,invite]); // eslint-disable-line react-hooks/exhaustive-deps
+ useEffect(()=>{if(signedIn&&!initial.claimed&&(initial.sharedLink||invitePattern.test(invite))&&!auto.current){auto.current=true;void claim('claim');}},[signedIn,initial.claimed,initial.sharedLink,invite]); // eslint-disable-line react-hooks/exhaustive-deps
  const back=eventPath(view.slug)+(invitePattern.test(invite)?'?invite='+invite:'');
  const discount=view.quote?.couponDiscount||0;
  return <main className={styles.lounge}><div className={styles.inner}>

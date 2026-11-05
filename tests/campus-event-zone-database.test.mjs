@@ -50,6 +50,7 @@ test('event awards and stacked coupons preserve payment lifecycle and access bou
 
     await db.exec(`create table public.edu_consent_reward_config(coupon_id uuid);create table public.edu_consent_reward_awards(member_id uuid,wallet_id uuid);`);
     await db.exec(readFileSync(new URL('../supabase/migrations/20261105085527_campus_event_zone.sql',import.meta.url),'utf8'));
+    await db.exec(readFileSync(new URL('../supabase/migrations/20261105103056_campus_event_shared_link.sql',import.meta.url),'utf8'));
     await db.query(
       'insert into auth.users(id, email, raw_user_meta_data) values ($1, $2, $3)',
       ['00000000-0000-4000-8000-000000000001', 'qa@example.invalid', {}],
@@ -58,6 +59,7 @@ test('event awards and stacked coupons preserve payment lifecycle and access bou
     await db.exec(readFileSync(new URL('./admin-coupon-lifecycle.sql', import.meta.url), 'utf8'));
 
     await db.exec(readFileSync(new URL('./campus-event-zone.sql',import.meta.url),'utf8'));
+    await db.exec(readFileSync(new URL('./campus-event-shared-link.sql',import.meta.url),'utf8'));
     const { rows } = await db.query(`
       select
         (select count(*)::integer from public.orders) as orders,

@@ -15,7 +15,7 @@ const view=():EventView=>({...eventViewFixture,...settings,claimed:state().claim
 window.fetch=async(input,init)=>{
  const path=String(input),body=JSON.parse(String(init?.body||'{}'));
  if(path.startsWith('/api/admin/campus/events')){
-  if(!init?.method||init.method==='GET')return Response.json({zones:[{...settings,cohort_id:id,claim_ends_at:settings.claimEndsAt,revision:id}],cohorts:[{id,name:'5기 · 미리보기',courses:{title:'AI 문샷 챌린지'}}],counts:{awards:state().claimed?1:0},invites:[],liveCoupon:{discount_type:'fixed',discount_value:300000,is_active:true,is_draft:false}});
+  if(!init?.method||init.method==='GET')return Response.json({zones:[{...settings,shared_link:settings.sharedLink===true,cohort_id:id,claim_ends_at:settings.claimEndsAt,revision:id}],cohorts:[{id,name:'5기 · 미리보기',courses:{title:'AI 문샷 챌린지'}}],counts:{awards:state().claimed?1:0},invites:[],liveCoupon:{discount_type:'fixed',discount_value:300000,is_active:true,is_draft:false}});
   if(body.action==='save'){settings=body.settings;localStorage.setItem(key,JSON.stringify(settings));return Response.json({ok:true});}
   if(body.action==='invite')return Response.json({links:Array.from({length:body.count},(_,i)=>({id:String(i),label:`당첨자 ${i+1}`,path:'/campus/event/'+settings.slug+'?invite='+'a'.repeat(64)}))});
   if(body.action==='upload')return Response.json({path:`edu/campus-event/${settings.slug}/${body.id}/${id}.txt`,token:'preview-only',contentType:'text/plain'});

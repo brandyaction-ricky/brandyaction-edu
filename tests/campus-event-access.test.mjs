@@ -36,6 +36,6 @@ test('event management requires a marketing operator and a same-origin request',
  state.operator={id};assert.equal((await admin.POST(post({action:'save'},'https://foreign.test'))).status,403);assert.equal(state.calls.length,0);
 });
 test('event settings reject foreign files, invalid dates, duplicate materials and privilege fields',()=>{
- reset();const v={slug,title:'QA',description:'',cohortId:id,claimEndsAt:'2026-11-08T00:00:00Z',couponEndsAt:'2026-11-10T00:00:00Z',liveEndsAt:'2026-11-08T14:59:59.999Z',enabled:true,resources:state.zone.resources};assert.equal(model.eventSettings(v).resources.length,1);
- for(const patch of[{role:'admin'},{claimEndsAt:'bad'},{claimEndsAt:'2026-12-01T00:00:00Z'},{resources:[...v.resources,...v.resources]},{resources:[{...v.resources[0],storagePath:'edu/paid/other.pdf'}]},{resources:[{...v.resources[0],fileName:'run.html'}]}])assert.throws(()=>model.eventSettings({...v,...patch}));
+ reset();const v={slug,title:'QA',description:'',cohortId:id,claimEndsAt:'2026-11-08T00:00:00Z',couponEndsAt:'2026-11-10T00:00:00Z',liveEndsAt:'2026-11-08T14:59:59.999Z',enabled:true,resources:state.zone.resources};assert.equal(model.eventSettings(v).resources.length,1);assert.equal(model.eventSettings({...v,sharedLink:true}).sharedLink,true);
+ for(const patch of[{sharedLink:'true'},{role:'admin'},{claimEndsAt:'bad'},{claimEndsAt:'2026-12-01T00:00:00Z'},{resources:[...v.resources,...v.resources]},{resources:[{...v.resources[0],storagePath:'edu/paid/other.pdf'}]},{resources:[{...v.resources[0],fileName:'run.html'}]}])assert.throws(()=>model.eventSettings({...v,...patch}));
 });
