@@ -90,6 +90,7 @@
 .onboarding-delivery { margin-top: 24px; }
 .onboarding-delivery fieldset { border: 0; padding: 0; min-width: 0; }
 .onboarding-delivery legend { font-weight: 700; margin-top: 16px; }
+.onboarding-admin-fields textarea,
 .onboarding-delivery textarea { width: 100%; resize: vertical; }
 .onboarding-recipient-list { max-height: 240px; overflow: auto; padding: 8px 12px; border: 1px solid var(--line, #dedfe2); border-radius: 8px; }
 .onboarding-recipient-actions { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }

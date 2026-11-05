@@ -1,6 +1,7 @@
 export type SurveyRoom = 'paid' | 'organic' | 'unknown';
 export type TelegramPath = 'existing' | 'new';
-export type CompletionGuideSettings = { label: string; url: string };
+export type CompletionGuideSettings = { label: string; url: string; message?: string };
+export const COMPLETION_GUIDE_MESSAGE_MAX_LENGTH = 500;
 
 export type PurchaseOnboardingSettings = {
   roomName: string;
@@ -26,15 +27,23 @@ export const isMoonshotFourth = (courseTitle: unknown, cohortName: unknown) =>
 export function completionGuideSettings(value: unknown): CompletionGuideSettings {
   if (!value || typeof value !== 'object' || !('label' in value) || !('url' in value) ||
       typeof value.label !== 'string' || typeof value.url !== 'string') throw new Error('안내 링크 설정을 확인해 주세요.');
+  const rawMessage = 'message' in value ? value.message : undefined;
+  if (rawMessage !== undefined && typeof rawMessage !== 'string') throw new Error('안내 메시지를 확인해 주세요.');
+  const message = rawMessage?.replace(/\r\n?/g, '\n').trim() ?? '';
+  if (message.length > COMPLETION_GUIDE_MESSAGE_MAX_LENGTH) {
+    throw new Error(`안내 메시지를 ${COMPLETION_GUIDE_MESSAGE_MAX_LENGTH}자 이내로 입력해 주세요.`);
+  }
   const label = value.label.trim();
   const address = value.url.trim();
-  if (!label && !address) return { label: '', url: '' };
+  const settings: CompletionGuideSettings = { label, url: '' };
+  if (message) settings.message = message;
+  if (!label && !address) return settings;
   if (!label || label.length > 80) throw new Error('안내 링크 이름을 80자 이내로 입력해 주세요.');
   try {
     if (!/^https:\/\//i.test(address) || /[\s\\]/.test(address) || address.length > 1800) throw Error();
     const url = new URL(address);
     if (url.protocol !== 'https:' || url.username || url.password || url.href.length > 1800) throw Error();
-    return { label, url: url.href };
+    return { ...settings, url: url.href };
   } catch { throw new Error('안내 링크는 https://로 시작하는 주소를 입력해 주세요.'); }
 }
 

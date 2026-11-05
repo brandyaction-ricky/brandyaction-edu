@@ -44,7 +44,8 @@ export function OrderResult({
   const completionGuide = onboardingReady ? onboarding.completionGuide : undefined;
   const onboardingFailed = complete && !!paidOrderId && onboardingErrorOrderId === paidOrderId;
   const onboardingLoading = complete && !!paidOrderId && onboardingCheckedOrderId !== paidOrderId;
-  const showClassFallback = complete && !onboardingReady && !onboardingFailed && !onboardingLoading;
+  const showClassFallback = complete && !onboardingFailed && !onboardingLoading &&
+    (!onboardingReady || Boolean(completionGuide?.message && !completionGuide.url));
 
   useEffect(() => {
     if (!complete || !paidOrderId) return;
@@ -128,7 +129,7 @@ export function OrderResult({
         <header className="order-complete-intro">
           <span>BrandyAction EDU</span>
           <h1>{complete ? "클래스 시작 준비" : "신청 상태 확인"}</h1>
-          <p>{completionGuide ? "아래 링크에서 수강 준비를 시작하세요." : complete ? "결제 확인부터 첫 학습까지 순서대로 안내해 드릴게요." : "주문 상태를 확인한 뒤 다음 단계로 안내해 드릴게요."}</p>
+          <p>{completionGuide?.url ? "아래 링크에서 수강 준비를 시작하세요." : completionGuide ? "아래에서 수강 안내를 확인해 주세요." : complete ? "결제 확인부터 첫 학습까지 순서대로 안내해 드릴게요." : "주문 상태를 확인한 뒤 다음 단계로 안내해 드릴게요."}</p>
         </header>
         {!completionGuide && !onboardingLoading && <ol className="order-complete-steps" aria-label="클래스 시작 단계">
           <li className={complete ? "complete" : "active"} aria-current={complete ? undefined : "step"}>
@@ -212,13 +213,17 @@ export function OrderResult({
               )}
             </dl>
           )}
+          {completionGuide?.message && <section className="order-complete-guide" aria-label="수강 안내">
+            <h3>수강 안내</h3>
+            <p>{completionGuide.message}</p>
+          </section>}
           {complete && !completionGuide && <div className="order-complete-next-copy">
             <span>다음 · 2단계</span>
             <h3>{onboardingReady ? "교육 시작 안내를 확인하세요" : "내 클래스에서 바로 시작하세요"}</h3>
             <p>{onboardingReady ? "공지방 입장 방법과 이어지는 학습 순서를 한 번에 확인할 수 있어요." : "신청한 클래스와 제공 자료를 내 클래스에서 확인할 수 있어요."}</p>
           </div>}
           <div className="grid2 mt24 order-complete-actions" style={complete ? { gridTemplateColumns: "1fr" } : undefined}>
-            {completionGuide && <a className="btn primary" href={completionGuide.url} referrerPolicy="no-referrer">
+            {completionGuide?.url && <a className="btn primary" href={completionGuide.url} referrerPolicy="no-referrer">
               {completionGuide.label} <ArrowRight />
             </a>}
             {onboardingReady && paidOrderId && !completionGuide && (

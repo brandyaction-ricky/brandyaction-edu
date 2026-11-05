@@ -67,7 +67,7 @@ test('only opted-in cohorts can read and confirm the four-step checklist', async
 });
 
 test('a direct guide returns only the confirmed buyer link and avoids legacy survey or progress', async () => {
-  const completionGuide = { label: '문샷 공부방 입장하기', url: 'https://campus.example.test/welcome' };
+  const completionGuide = { label: '문샷 공부방 입장하기', url: 'https://campus.example.test/welcome', message: 'OT 안내를 확인해 주세요.' };
   const { route, progressCalls } = handler({ purchase: { orderId, orderNumber: 'QA', itemName: '문샷', completionGuide } });
   const response = await route.GET(new Request(`https://edu.test/api/purchase-onboarding?order=${orderId}`));
   assert.equal(response.headers.get('cache-control'), 'private, no-store');
@@ -115,11 +115,14 @@ test('only a paid order owner receives the guide for the ordered cohort, with le
     '@/lib/purchase-onboarding': config,
   });
   assert.deepEqual((await eligiblePurchase('buyer', orderId)).completionGuide, completionGuide);
+  const messageOnly = { label: '', url: '', message: 'OT 안내를 확인해 주세요.' };
+  guideRow.value = messageOnly;
+  assert.deepEqual((await eligiblePurchase('buyer', orderId)).completionGuide, messageOnly);
   assert.equal(await eligiblePurchase('another-user', orderId), null);
   rows.orders[0].status = 'cancelled';
   assert.equal(await eligiblePurchase('buyer', orderId), null);
   rows.orders[0].status = 'paid';
-  guideRow.value = { label: '', url: '' };
+  guideRow.value = { label: '', url: '', message: '   ' };
   assert.equal(await eligiblePurchase('buyer', orderId), null);
   rows.site_settings.shift();
   assert.equal((await eligiblePurchase('buyer', orderId)).settings.inviteUrl, inviteUrl);

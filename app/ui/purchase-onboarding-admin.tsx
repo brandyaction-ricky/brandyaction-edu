@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import type { CompletionGuideSettings } from '@/lib/purchase-onboarding';
+import { COMPLETION_GUIDE_MESSAGE_MAX_LENGTH, type CompletionGuideSettings } from '@/lib/purchase-onboarding';
 import { AdminReturnLink } from './admin-return-navigation';
 import { PurchaseBuyerDelivery } from './purchase-buyer-delivery';
 import './purchase-onboarding.css';
@@ -81,7 +81,7 @@ export function PurchaseOnboardingAdmin({ productId, initialCohort }: { productI
       const result = await response.json();
       if (!response.ok) throw Error(result.error || '저장하지 못했습니다.');
       setSettings(result.settings);
-      setMessage(result.settings.url ? '결제 완료 화면에 안내 링크를 표시합니다.' : '안내 링크를 표시하지 않도록 저장했습니다.');
+      setMessage(result.settings.url || result.settings.message ? '결제 완료 화면에 안내를 표시합니다.' : '결제 완료 화면에 안내를 표시하지 않도록 저장했습니다.');
     } catch (cause) { setError(cause instanceof Error ? cause.message : '저장하지 못했습니다.'); }
     finally { setPending(false); }
   };
@@ -98,9 +98,19 @@ export function PurchaseOnboardingAdmin({ productId, initialCohort }: { productI
       </select></label>
       {!listLoading && !error && !cohorts.length && <p className="meta">안내를 설정할 유료 클래스 기수가 없습니다.</p>}
       {cohort && loaded && <form className="onboarding-admin-fields" onSubmit={save}>
+        <label>안내 메시지 (선택)
+          <textarea
+            value={settings.message ?? ''}
+            disabled={pending}
+            rows={4}
+            maxLength={COMPLETION_GUIDE_MESSAGE_MAX_LENGTH}
+            placeholder="예: 첫 수업 전에 공지방에 입장해 준비물을 확인해 주세요."
+            onChange={event => setSettings(current => ({ ...current, message: event.target.value }))}
+          />
+        </label>
         <label>안내 링크 이름<input value={settings.label} disabled={pending} maxLength={80} placeholder="예: 문샷 공부방 입장하기" onChange={event => setSettings(current => ({ ...current, label: event.target.value }))} /></label>
         <label>안내 링크<input type="url" value={settings.url} disabled={pending} maxLength={1800} placeholder="https://…" onChange={event => setSettings(current => ({ ...current, url: event.target.value }))} /></label>
-        <p className="meta">저장하면 결제한 수강생에게 이 링크를 보여 줍니다. 안내를 끄려면 두 칸을 비우고 저장하세요.</p>
+        <p className="meta">결제가 완료되면 선택한 기수의 구매자에게 바로 표시됩니다. 메시지만 표시하려면 링크 입력란을 비워 두세요. 안내를 끄려면 입력란을 모두 비우고 저장하세요.</p>
         <button className="btn primary" type="submit" disabled={pending}>설정 저장</button>
       </form>}
       {message && <p role="status" className="notice">{message}</p>}{error && <p role="alert" className="notice">{error}</p>}

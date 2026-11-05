@@ -67,7 +67,14 @@ export function PurchaseOnboarding({ order, guideRequested }: { order: string; g
   if (view?.completionGuide) return <main className="edu-front purchase-onboarding purchase-onboarding-user">
     <div className="wrap onboarding-shell">
       <div className="onboarding-title-block"><h1>결제 후 시작 안내</h1><p>{view.itemName}</p></div>
-      <section className="onboarding-panel"><a className="btn primary" href={view.completionGuide.url} referrerPolicy="no-referrer">{view.completionGuide.label} <ArrowRight aria-hidden="true"/></a></section>
+      <section className="onboarding-panel">
+        {view.completionGuide.message && <p className="onboarding-message-copy">{view.completionGuide.message}</p>}
+        <div className={view.completionGuide.message ? "onboarding-actions" : undefined}>
+          {view.completionGuide.url
+            ? <a className="btn primary" href={view.completionGuide.url} referrerPolicy="no-referrer">{view.completionGuide.label} <ArrowRight aria-hidden="true"/></a>
+            : <Link className="btn primary" href="/my/classes">내 클래스 보기 <ArrowRight aria-hidden="true"/></Link>}
+        </div>
+      </section>
     </div>
   </main>;
   if (view?.telegramOnly && view.progress) return <PurchaseOnboardingChecklist key={`${view.orderId}:${view.progress.lesson?.id || ''}`} orderId={view.orderId} itemName={view.itemName} roomName={view.roomName} supportUrl={view.supportUrl} progress={view.progress} pending={pending} error={error} manualUrl={manualUrl} refresh={refreshProgress} openRoom={() => getLink(false)} confirm={async body => { if (await submit({ ...body, action: 'confirm' })) await refreshProgress(); }}/ >;

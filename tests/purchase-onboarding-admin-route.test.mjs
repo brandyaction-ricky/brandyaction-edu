@@ -71,6 +71,11 @@ test('product list and selected settings enforce the same cohort scope on reads 
   assert.equal(h.writes[0].key, config.completionGuideSettingsKey(cohort));
   assert.equal(h.writes[0].is_public, false);
   assert.equal(JSON.stringify(h.audits).includes(settings.url), false);
+  const messageOnly = { label: '', url: '', message: 'OT는 월요일에 진행합니다.\n준비물을 확인해 주세요.' };
+  assert.equal((await h.post({ settings: { ...messageOnly, message: ' ' + messageOnly.message.replace('\n', '\r\n') + ' ' } })).status, 200);
+  assert.deepEqual((await (await h.get({ product, cohort })).json()).settings, messageOnly);
+  assert.deepEqual(h.audits.at(-1).after_data, { enabled: true, guideConfigured: false, messageConfigured: true });
+  assert.equal(JSON.stringify(h.audits).includes('OT는 월요일'), false);
   assert.equal((await h.post({ settings: { label: '', url: '' } })).status, 200);
   assert.deepEqual((await (await h.get({ product, cohort })).json()).settings, { label: '', url: '' });
 });
@@ -80,6 +85,8 @@ test('unprivileged, cross-origin and incomplete or unsafe link writes are reject
   assert.equal((await handler().post({}, 'https://other.test')).status, 403);
   const h = handler();
   for (const invalid of [
+    { label: '', url: '', message: 5 },
+    { label: '', url: '', message: '가'.repeat(501) },
     { label: '', url: settings.url },
     { label: settings.label, url: '' },
     { label: settings.label, url: 'javascript:alert(1)' },
