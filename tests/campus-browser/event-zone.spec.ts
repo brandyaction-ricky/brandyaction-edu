@@ -5,7 +5,7 @@ test('guest sees benefits before login, preserves invite and has no download',as
  await page.goto('/event-preview?invite='+'a'.repeat(64));
  await expect(page.getByRole('link',{name:'로그인하고 이벤트 자료 받기'})).toHaveAttribute('href',/login\?next=.*invite/);
  await expect(page.getByRole('link',{name:'자료 다운로드'})).toHaveCount(0);
- await expect(page.getByText('추가 할인 10만원')).toHaveCount(0);
+ await expect(page.getByText('10만원 쿠폰 지급 완료')).toHaveCount(0);
  await expect(page.getByText('라이브 쿠폰 중복 가능')).toHaveCount(0);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
 });
@@ -13,12 +13,18 @@ test('claim, receive live coupon, download and move to detail on mobile and desk
  let claimed=0,live=0;
  await page.route('**/api/campus/event',async r=>{const body=r.request().postDataJSON();if(body.action==='claim')claimed++;if(body.action==='live')live++;await r.fulfill({json:body.action==='live'?{...view,liveOwned:true,quote:{couponCode:'1108+WIN_TEST',couponDiscount:400000,totalAmount:600000}}:view});});
  await page.goto('/event-preview?member=1&invite='+'a'.repeat(64));
- await expect(page.getByText('당첨 혜택을 내 계정에 보관했어요.')).toBeVisible();expect(claimed).toBe(1);
- await expect(page.getByText('추가 할인 10만원')).toBeVisible();
+ await expect(page.getByText('10만원 쿠폰이 내 계정에 지급됐어요.')).toBeVisible();expect(claimed).toBe(1);
+ await expect(page.getByText('10만원 쿠폰 지급 완료')).toBeVisible();
+ await expect(page.getByText('10만원은 이미 지급됐어요. 라이브 쿠폰은 아래 버튼을 눌러야 추가로 지급돼요.')).toBeVisible();
+ await expect(page.getByRole('link',{name:'100,000원 혜택으로 문샷 과정 보기'})).toBeVisible();
+ expect(live).toBe(0);
+ await page.screenshot({path:test.info().outputPath('event-before-live-'+test.info().project.name+'.png'),fullPage:true});
  expect(page.url()).not.toContain('invite=');
  await expect(page.getByRole('link',{name:'자료 다운로드'})).toHaveAttribute('href',/file=/);
- await page.getByRole('button',{name:'1108 등록하고 30만원 쿠폰 받기'}).click();
+ await page.getByRole('button',{name:'30만원 더 받고 · 총 40만원 할인받기'}).click();
  await expect(page.getByText('라이브 쿠폰 수령 완료')).toBeVisible();expect(live).toBe(1);
+ await expect(page.getByRole('button',{name:'30만원 더 받고 · 총 40만원 할인받기'})).toHaveCount(0);
+ await expect(page.getByRole('heading',{name:'라이브 30만원 쿠폰도 받았어요'})).toBeVisible();
  await expect(page.getByRole('link',{name:'400,000원 혜택으로 문샷 과정 보기'})).toHaveAttribute('href','/classes/moonshot?event='+slug);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
  await page.screenshot({path:test.info().outputPath('event-zone-'+test.info().project.name+'.png'),fullPage:true});
@@ -45,8 +51,8 @@ test('admin can edit save and generate one-use invitations with readable fields'
 test('shared link login return and one automatic claim per account mount',async({page})=>{
  await page.goto('/event-preview?shared=1');
  await expect(page.getByRole('link',{name:'로그인하고 이벤트 자료 받기'})).toHaveAttribute('href','/login?next='+encodeURIComponent('/campus/event/'+slug));
- await expect(page.getByText('추가 할인 10만원')).toHaveCount(0);
+ await expect(page.getByText('10만원 쿠폰 지급 완료')).toHaveCount(0);
  let claims=0;await page.route('**/api/campus/event',async r=>{claims++;expect(r.request().postDataJSON().invite).toBe('');await r.fulfill({json:{...view,sharedLink:true}});});
  await page.goto('/event-preview?shared=1&member=1');
- await expect(page.getByText('당첨 혜택을 내 계정에 보관했어요.')).toBeVisible();expect(claims).toBe(1);
+ await expect(page.getByText('10만원 쿠폰이 내 계정에 지급됐어요.')).toBeVisible();expect(claims).toBe(1);
 });
