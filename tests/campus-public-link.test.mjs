@@ -1,0 +1,13 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';import ts from 'typescript';import {build} from 'esbuild';
+const built=await build({entryPoints:['features/campus/webinar/public-route.ts'],bundle:true,platform:'node',format:'esm',write:false});const rules=await import('data:text/javascript;base64,'+Buffer.from(built.outputFiles[0].text).toString('base64'));
+let gates=0,sessions=0;const proxyModule={};const mocks={'@/features/campus/private-release':{campusPrivateRelease:()=>true,isCampusProtectedPath:p=>/^\/(campus|api\/campus|admin\/campus|api\/admin\/campus)(\/|$)/.test(p)},'@/features/campus/private-proxy':{privateCampusResponse:async()=>{gates++;return 'private';}},'next/server':{NextResponse:{next:()=> 'public'}},'@/features/campus/webinar/public-route':rules,'@/lib/supabase/proxy':{updateSession:async()=>{sessions++;return 'session';}}};
+new Function('exports','require',ts.transpileModule(readFileSync('proxy.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(proxyModule,n=>{assert.ok(n in mocks,n);return mocks[n];});
+const call=(pathname,method='GET')=>proxyModule.proxy({nextUrl:{pathname},method});
+test('published event ingress and necessary presentation assets pass before private campus gate',async()=>{
+ for(const path of ['/campus/live/moonshot-open-1107','/campus/world/tour/index.html','/campus/world/tour/tour.mjs','/campus/world/office/vendor/office3d.js','/campus/world/office/vendor/assets/kenney/characters/character-male-a.glb','/campus/showcase/learning-knowledge-full-v2.mp4'])for(const method of ['GET','HEAD'])assert.equal(await call(path,method),'public',path);
+ assert.equal(await call('/api/campus/webinar/moonshot-open-1107/resources/guide'),'public');for(const name of ['events','activity'])assert.equal(await call('/api/campus/webinar/moonshot-open-1107/'+name,'POST'),'public');assert.equal(gates,0);assert.equal(sessions,0);
+});
+test('private member/admin/QA APIs and writes never inherit the public exemption',async()=>{
+ for(const path of ['/campus','/campus/workspace','/campus/enter','/campus/qa/webinar','/admin/campus/webinars','/api/admin/campus/analytics','/api/campus/analytics','/api/campus/office/agents','/api/campus/webinar/moonshot-open-1107/access','/campus/world/office/index.html','/campus/world/tour/../secret.mjs','/campus/world/%2e%2e/secret.mjs'])assert.equal(await call(path),'private',path);
+ for(const path of ['/campus/live/moonshot-open-1107','/campus/world/tour/tour.mjs'])assert.equal(await call(path,'POST'),'private');assert.equal(await call('/classes'),'session');
+});

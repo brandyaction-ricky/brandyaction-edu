@@ -14,8 +14,9 @@ export function useCampusAnalytics(scope:string|undefined,room:AnalyticsRoom){
   const tick=()=>{const now=performance.now(),elapsed=Math.min(2,Math.max(0,(now-last)/1000));last=now;if(document.visibilityState==='visible'&&now-active<60000){const r=current.current;dwell[r]=Math.min(35,(dwell[r]||0)+elapsed);}};
   const flush=(beacon=false)=>{tick();if(stopped||inflight&&!beacon)return;let remaining=35;const seconds=Object.fromEntries(Object.entries(dwell).map(([k,v])=>{const n=Math.min(remaining,Math.floor(v));remaining-=n;return[k,n];}).filter(([,v])=>Number(v)>0));if(!events.length&&!Object.keys(seconds).length)return;
    const payload={id:crypto.randomUUID(),session,scope,events:events.splice(0,32),dwell:seconds};dwell={};const body=JSON.stringify(payload);
-   if(beacon){navigator.sendBeacon('/api/campus/analytics',new Blob([body],{type:'application/json'}));return;}
-   inflight=true;void fetch('/api/campus/analytics',{method:'POST',headers:{'Content-Type':'application/json'},body,keepalive:true}).then(r=>{if(r.status===403||r.status===404)stopped=true;}).catch(()=>{}).finally(()=>{inflight=false;});
+   const endpoint=scope==='member'?'/api/campus/analytics':`/api/campus/webinar/${encodeURIComponent(scope)}/activity`;
+   if(beacon){navigator.sendBeacon(endpoint,new Blob([body],{type:'application/json'}));return;}
+   inflight=true;void fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body,keepalive:true}).then(r=>{if(r.status===403||r.status===404)stopped=true;}).catch(()=>{}).finally(()=>{inflight=false;});
   };
   send.current=e=>{activity();if(!stopped&&events.length<32)events.push(e);};
   const custom=(event:Event)=>{const d=(event as CustomEvent).detail;if(d&&Object.hasOwn(actionLabels,d.action)&&(!d.target||typeof d.target==='string'&&/^[a-zA-Z0-9:_-]{1,80}$/.test(d.target)))send.current({room:current.current,action:d.action,...(d.target?{target:d.target}:{})});};window.addEventListener('campus:activity',custom);

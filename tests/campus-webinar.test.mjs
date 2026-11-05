@@ -53,3 +53,12 @@ test('telemetry accepts only bounded anonymous whitelisted events on published e
  assert.equal((await events.POST(req(undefined,body,{origin:'https://evil.test'}),params)).status,403);
  state.event.status='draft';assert.equal((await events.POST(req(undefined,body),params)).status,404);assert.equal(state.events.length,1);
 });
+const publicActivity=await route('app/api/campus/webinar/[slug]/activity/route.ts');
+test('public activity is bound to its published event and cannot submit member or other-event activity',async()=>{
+ reset();const body={id:id(21),session:id(22),scope:config.slug,events:[{room:'live',action:'room_enter'}],dwell:{live:5}};
+ const request=b=>req('/api/campus/webinar/'+config.slug+'/activity',b);
+ assert.equal((await publicActivity.POST(request(body),params)).status,204);assert.equal(state.events.length,1);assert.equal(state.events[0].args.p_user,null);
+ for(const scope of ['member','other-event'])assert.equal((await publicActivity.POST(request({...body,scope}),params)).status,400);
+ state.event.status='draft';assert.equal((await publicActivity.POST(request(body),params)).status,404);state.event.status='paused';assert.equal((await publicActivity.POST(request(body),params)).status,404);assert.equal(state.events.length,1);
+ assert.equal((await publicActivity.POST(req('/api/campus/webinar/'+config.slug+'/activity',body,{origin:'https://evil.test'}),params)).status,403);
+});
