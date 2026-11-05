@@ -17,6 +17,9 @@ test('private member/admin/QA APIs and writes never inherit the public exemption
 test('shared member links reach login/session handling while admin and unknown APIs stay operator-only',async()=>{
  for(const path of ['/campus','/campus/enter','/campus/workspace','/api/campus','/api/campus/space','/api/campus/office/agents','/api/campus/library'])assert.equal(await call(path),'session',path);
  assert.equal(await call('/api/campus/analytics','POST'),'session');
+ for(const method of ['GET','POST'])assert.equal(await call('/api/campus/welcome',method),'session');
+ for(const method of ['PUT','DELETE','PATCH'])assert.equal(await call('/api/campus/welcome',method),'private');
+ assert.equal(await call('/api/campus/welcome/admin'),'private');
  for(const path of ['/api/campus/office/dispatch','/api/campus/office/webhook','/api/campus/community/demo-session','/api/campus/new-endpoint'])assert.equal(await call(path),'private',path);
  for(const path of ['/campus/enter','/campus/workspace'])assert.equal(await call(path,'POST'),'private');
 });
