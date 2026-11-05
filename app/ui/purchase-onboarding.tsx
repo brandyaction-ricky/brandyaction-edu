@@ -6,10 +6,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowRight, Check, Monitor, Smartphone } from 'lucide-react';
 import { TELEGRAM_ANDROID_INSTALL_URL, TELEGRAM_IOS_INSTALL_URL, type CompletionGuideSettings, type SurveyRoom, type TelegramPath } from '@/lib/purchase-onboarding';
 import './purchase-onboarding.css';
+import { PurchaseCompletionGuide } from './purchase-completion-guide';
 import { PurchaseOnboardingChecklist } from './purchase-onboarding-checklist';
 import type { OnboardingProgress } from '@/lib/purchase-onboarding-progress';
 
-type View = { orderId: string; orderNumber: string; itemName: string; roomName: string; surveyRoom: SurveyRoom | null; telegramPath: TelegramPath | null; profileImage: string; supportUrl: string; available: boolean; telegramOnly?: boolean; progress?: OnboardingProgress; completionGuide?: CompletionGuideSettings };
+type View = { orderId: string; orderNumber: string; itemName: string; roomName: string; surveyRoom: SurveyRoom | null; telegramPath: TelegramPath | null; profileImage: string; supportUrl: string; available: boolean; telegramOnly?: boolean; progress?: OnboardingProgress; completionGuide?: CompletionGuideSettings; loginId?: string; loginMethod?: string };
 
 export function PurchaseOnboarding({ order, guideRequested }: { order: string; guideRequested: boolean }) {
   const router = useRouter();
@@ -67,7 +68,9 @@ export function PurchaseOnboarding({ order, guideRequested }: { order: string; g
   if (view?.completionGuide) return <main className="edu-front purchase-onboarding purchase-onboarding-user">
     <div className="wrap onboarding-shell">
       <div className="onboarding-title-block"><h1>결제 후 시작 안내</h1><p>{view.itemName}</p></div>
-      <section className="onboarding-panel"><a className="btn primary" href={view.completionGuide.url} referrerPolicy="no-referrer">{view.completionGuide.label} <ArrowRight aria-hidden="true"/></a></section>
+      <section className="onboarding-panel">
+        <PurchaseCompletionGuide key={view.orderId} guide={view.completionGuide} loginId={view.loginId} loginMethod={view.loginMethod} />
+      </section>
     </div>
   </main>;
   if (view?.telegramOnly && view.progress) return <PurchaseOnboardingChecklist key={`${view.orderId}:${view.progress.lesson?.id || ''}`} orderId={view.orderId} itemName={view.itemName} roomName={view.roomName} supportUrl={view.supportUrl} progress={view.progress} pending={pending} error={error} manualUrl={manualUrl} refresh={refreshProgress} openRoom={() => getLink(false)} confirm={async body => { if (await submit({ ...body, action: 'confirm' })) await refreshProgress(); }}/ >;

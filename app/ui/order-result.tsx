@@ -7,6 +7,7 @@ import { ArrowRight, Check, CircleAlert } from "lucide-react";
 import { matchingOrder } from "@/lib/platform-rules";
 import { money, labels, type Row } from "@/lib/platform";
 import type { CompletionGuideSettings } from "@/lib/purchase-onboarding";
+import { PurchaseCompletionGuide } from "./purchase-completion-guide";
 import "./order-result.css";
 
 type VirtualAccount = {
@@ -32,7 +33,7 @@ export function OrderResult({
   const [state, setState] = useState<"checking" | "paid" | "waiting" | "error">("checking");
   const [error, setError] = useState("");
   const [virtualAccount, setVirtualAccount] = useState<VirtualAccount | null>(null);
-  const [onboarding, setOnboarding] = useState<{ orderId: string; completionGuide?: CompletionGuideSettings } | null>(null);
+  const [onboarding, setOnboarding] = useState<{ orderId: string; completionGuide?: CompletionGuideSettings; loginId?: string; loginMethod?: string } | null>(null);
   const [onboardingErrorOrderId, setOnboardingErrorOrderId] = useState<string | null>(null);
   const [onboardingCheckedOrderId, setOnboardingCheckedOrderId] = useState<string | null>(null);
   const [onboardingRetry, setOnboardingRetry] = useState(0);
@@ -53,7 +54,7 @@ export function OrderResult({
       .then(async response => {
         const data = response.ok ? await response.json() : null;
         if (controller.signal.aborted) return;
-        setOnboarding(response.ok ? { orderId: paidOrderId, completionGuide: data?.completionGuide } : null);
+        setOnboarding(response.ok ? { orderId: paidOrderId, completionGuide: data?.completionGuide, loginId: data?.loginId, loginMethod: data?.loginMethod } : null);
         setOnboardingErrorOrderId(!response.ok && response.status !== 404 ? paidOrderId : null);
         setOnboardingCheckedOrderId(paidOrderId);
       })
@@ -128,7 +129,7 @@ export function OrderResult({
         <header className="order-complete-intro">
           <span>BrandyAction EDU</span>
           <h1>{complete ? "클래스 시작 준비" : "신청 상태 확인"}</h1>
-          <p>{completionGuide ? "아래 링크에서 수강 준비를 시작하세요." : complete ? "결제 확인부터 첫 학습까지 순서대로 안내해 드릴게요." : "주문 상태를 확인한 뒤 다음 단계로 안내해 드릴게요."}</p>
+          {!completionGuide && <p>{complete ? "결제 확인부터 첫 학습까지 순서대로 안내해 드릴게요." : "주문 상태를 확인한 뒤 다음 단계로 안내해 드릴게요."}</p>}
         </header>
         {!completionGuide && !onboardingLoading && <ol className="order-complete-steps" aria-label="클래스 시작 단계">
           <li className={complete ? "complete" : "active"} aria-current={complete ? undefined : "step"}>
@@ -144,7 +145,7 @@ export function OrderResult({
             <strong>첫 학습 시작</strong>
           </li>
         </ol>}
-        <section className={"completion order-complete-card " + (complete ? "is-complete" : "needs-attention")}>
+        <section className={"completion order-complete-card " + (complete ? "is-complete" : "needs-attention") + (completionGuide ? " has-purchase-guide" : "")}>
           <div className="order-complete-summary">
             <div className={"success-icon " + (complete ? "" : "fail")} aria-hidden="true">
               {complete ? <Check /> : <CircleAlert />}
@@ -212,16 +213,14 @@ export function OrderResult({
               )}
             </dl>
           )}
+          {completionGuide && <PurchaseCompletionGuide key={paidOrderId} guide={completionGuide} loginId={onboarding?.loginId} loginMethod={onboarding?.loginMethod} />}
           {complete && !completionGuide && <div className="order-complete-next-copy">
             <span>다음 · 2단계</span>
             <h3>{onboardingReady ? "교육 시작 안내를 확인하세요" : "내 클래스에서 바로 시작하세요"}</h3>
             <p>{onboardingReady ? "공지방 입장 방법과 이어지는 학습 순서를 한 번에 확인할 수 있어요." : "신청한 클래스와 제공 자료를 내 클래스에서 확인할 수 있어요."}</p>
           </div>}
-          <div className="grid2 mt24 order-complete-actions" style={complete ? { gridTemplateColumns: "1fr" } : undefined}>
-            {completionGuide && <a className="btn primary" href={completionGuide.url} referrerPolicy="no-referrer">
-              {completionGuide.label} <ArrowRight />
-            </a>}
-            {onboardingReady && paidOrderId && !completionGuide && (
+          {!completionGuide && <div className="grid2 mt24 order-complete-actions" style={complete ? { gridTemplateColumns: "1fr" } : undefined}>
+            {onboardingReady && paidOrderId && (
               <Link className="btn primary" href={`/purchase-onboarding?order=${encodeURIComponent(paidOrderId)}`}>
                 결제 후 시작 안내 <ArrowRight />
               </Link>
@@ -251,7 +250,7 @@ export function OrderResult({
             {!complete && <Link className="btn" href="/classes">
               클래스 둘러보기
             </Link>}
-          </div>
+          </div>}
           {onboardingFailed && !onboardingLoading && <p className="form-error" role="alert">시작 안내를 불러오지 못했습니다. 위 버튼을 눌러 다시 확인해 주세요.</p>}
         </section>
       </div>

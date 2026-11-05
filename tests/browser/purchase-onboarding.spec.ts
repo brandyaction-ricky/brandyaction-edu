@@ -107,10 +107,10 @@ test('customer answers once, then sees the Telegram guide without exposing the i
   await expect(page.getByText('텔레그램 앱을 설치하고 계정을 만든 뒤')).toBeVisible();
 });
 
-test('operator sees the product cohort and saves only the direct guide fields', async ({ page }) => {
+test('operator saves and reopens a completion message with the direct guide', async ({ page }) => {
   const product = '33333333-3333-4333-8333-333333333333';
-  const settings = { label: '문샷 공부방 입장하기', url: 'https://campus.example.test/welcome?cohort=5' };
-  const saved: unknown[] = [];
+  const settings = { label: '문샷 공부방 입장하기', url: 'https://campus.example.test/welcome?cohort=5', message: 'OT는 월요일에 진행합니다.\n준비물을 확인해 주세요.' };
+  const saved: Array<{ settings: typeof settings }> = [];
   await page.route('**/api/admin/purchase-onboarding/delivery*', route => route.fulfill({ json: { buyers: [], channels: {}, templates: [], history: [] } }));
   await page.route(/\/api\/admin\/purchase-onboarding(?:\?|$)/, route => {
     const url = new URL(route.request().url());
@@ -121,34 +121,91 @@ test('operator sees the product cohort and saves only the direct guide fields', 
     }
     expect(url.searchParams.get('product')).toBe(product);
     return route.fulfill({ json: url.searchParams.has('cohort')
-      ? { settings: null }
+      ? { settings: saved.at(-1)?.settings ?? null }
       : { cohorts: [{ id: cohort, name: '5기', courses: { title: '문샷 챌린지' } }] } });
   });
   await page.goto('/admin/purchase-onboarding-test?product=' + product);
   await page.getByLabel('안내할 기수').selectOption(cohort);
   const panel = page.locator('#completion-settings');
-  await expect(panel.getByRole('textbox')).toHaveCount(2);
-  await panel.getByLabel('안내 링크 이름', { exact: true }).fill(settings.label);
-  await panel.getByLabel('안내 링크', { exact: true }).fill(settings.url);
+  await expect(panel.getByRole('textbox')).toHaveCount(3);
+  const messageField = panel.getByLabel('안내 메시지 (선택)');
+  await messageField.fill(settings.message);
+  await panel.getByLabel('안내 링크 제목', { exact: true }).fill(settings.label);
+  await panel.getByLabel('안내 링크 주소', { exact: true }).fill(settings.url);
+  await panel.getByText('고객 화면 미리보기', { exact: true }).click();
+  const preview = panel.getByRole('region', { name: settings.label });
+  await expect(preview).toContainText(settings.message);
+  await expect(preview).toContainText(settings.url);
+  await expect(preview).toContainText('student@example.com (이메일)');
+  await expect(preview.getByRole('button', { name: '링크 복사' })).toBeDisabled();
+  await expect(preview.locator('.purchase-guide-enter')).not.toHaveAttribute('href');
+  expect(saved).toEqual([]);
+  await panel.getByLabel('안내 링크 주소', { exact: true }).fill('http://invalid.example.test');
+  await expect(panel.getByText('안내 링크는 https://로 시작하는 주소를 입력해 주세요.')).toBeVisible();
+  await panel.getByLabel('안내 링크 주소', { exact: true }).fill(settings.url);
   await panel.getByRole('button', { name: '설정 저장' }).click();
-  await expect(panel.getByRole('status')).toContainText('안내 링크를 표시합니다');
+  await expect(panel.getByRole('status')).toContainText('결제 완료 화면에 안내를 표시합니다');
   expect(saved).toEqual([{ product, cohort, settings }]);
+  await page.reload();
+  await page.getByLabel('안내할 기수').selectOption(cohort);
+  await expect(messageField).toHaveValue(settings.message);
   await expect(page.getByRole('link', { name: '구매자 공지·발송 내역' })).toBeVisible();
 });
 
-test('a configured completion guide goes directly to the study room with no legacy steps', async ({ page }) => {
-  const completionGuide = { label: '문샷 공부방 입장하기', url: 'https://campus.example.test/welcome?cohort=5' };
-  await page.route('**/api/purchase-onboarding*', route => route.fulfill({ json: { available: true, orderId: order, completionGuide } }));
+test('the paid buyer can copy the campus link, verify their login and enter directly', async ({ page }) => {
+  const completionGuide = { label: '문샷 공부방 입장하기', url: 'https://campus.example.test/welcome?cohort=5', message: 'OT는 월요일에 진행합니다.\n준비물을 확인해 주세요.' };
+  const loginId = 'buyer-login@example.test';
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+      writeText: async (value: string) => { (window as Window & { copiedCampusLink?: string }).copiedCampusLink = value; },
+    } });
+  });
+  await page.route('**/api/purchase-onboarding*', route => route.fulfill({ json: { available: true, orderId: order, completionGuide, loginId, loginMethod: '카카오' } }));
   await page.route('https://campus.example.test/**', route => route.fulfill({ body: 'Synthetic welcome room' }));
   await page.goto(`/order-complete-test?orderId=${order}`);
-  const direct = page.getByRole('link', { name: completionGuide.label });
+  const guide = page.getByRole('region', { name: completionGuide.label });
+  await expect(guide.getByRole('heading', { name: completionGuide.label })).toBeVisible();
+  const direct = guide.getByRole('link', { name: '링크 눌러 입장하기' });
   await expect(direct).toHaveAttribute('href', completionGuide.url);
+  const message = guide.getByText(completionGuide.message);
+  await expect(message).toHaveText(completionGuide.message);
+  expect(await message.textContent()).toBe(completionGuide.message);
+  await expect(message).toHaveCSS('white-space', 'pre-wrap');
+  const steps = guide.getByRole('listitem');
+  await expect(steps).toHaveCount(3);
+  await expect(steps.first().getByText(completionGuide.url, { exact: true })).toBeVisible();
+  await expect(steps.nth(1)).toContainText(loginId + ' (카카오)');
+  await expect(steps.nth(2).getByRole('link')).toHaveAttribute('href', completionGuide.url);
+  const copy = steps.first().getByRole('button', { name: '링크 복사' });
+  await copy.click();
+  await expect(guide.getByRole('status')).toHaveText('링크를 복사했어요.');
+  expect(await page.evaluate(() => (window as Window & { copiedCampusLink?: string }).copiedCampusLink)).toBe(completionGuide.url);
+  await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+    writeText: async () => { throw Error('Clipboard unavailable'); },
+  } }));
+  await copy.click();
+  await expect(guide.getByRole('status')).toHaveText('표시된 링크를 직접 복사해 주세요.');
   await expect(page.getByRole('list', { name: '클래스 시작 단계' })).toHaveCount(0);
   await direct.click();
   await expect(page).toHaveURL(completionGuide.url);
   await page.goto(`/purchase-onboarding?order=${order}&step=guide`);
   await expect(direct).toHaveAttribute('href', completionGuide.url);
+  await expect(guide.getByText(completionGuide.message)).toBeVisible();
+  await expect(guide.getByText(loginId, { exact: false })).toBeVisible();
   await expect(page.getByText('공지방 입장', { exact: true })).toHaveCount(0);
+});
+
+test('completion with only a message sends the buyer to their classes', async ({ page }) => {
+  const completionGuide = { label: '', url: '', message: '첫 수업 전에 준비물을 확인해 주세요.' };
+  await page.route('**/api/purchase-onboarding*', route => route.fulfill({ json: { available: true, orderId: order, completionGuide } }));
+  for (const path of [`/order-complete-test?orderId=${order}`, `/purchase-onboarding?order=${order}`]) {
+    await page.goto(path);
+    await expect(page.getByText(completionGuide.message)).toBeVisible();
+    await expect(page.getByText('가입할 때 사용한 로그인 방법으로 같은 계정에 접속해 주세요.')).toBeVisible();
+    await expect(page.getByRole('button', { name: '링크 복사' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: '내 클래스 보기' })).toHaveAttribute('href', '/my/classes');
+    await expect(page.locator('a[href=""]')).toHaveCount(0);
+  }
 });
 
 test('paid completion offers onboarding only when the cohort guide is enabled', async ({ page }) => {
