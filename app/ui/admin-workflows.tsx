@@ -3,7 +3,7 @@ import {CampusAnalyticsPanel} from '@/features/campus/analytics/panel';
 import usability from './final/usability.module.css';
 import dynamic from "next/dynamic";
 import { kstInput, kstToIso, kstLabel, overlappingAutomations } from "@/lib/marketing-qa";
-import { emptyOrderListScope, type OrderListScope } from "@/lib/admin-order-list";
+import { emptyOrderListScope, orderDatePresets, orderDateRange, type OrderListScope } from "@/lib/admin-order-list";
 import { FollowupTemplateSource } from "./followup-template-source";
 const LandingAdmin = dynamic(() => import("./landing/admin").then(m => m.LandingAdmin));
 const AdControlSettings = dynamic(() => import("./ad-control-settings").then(m => m.AdControlSettings));
@@ -1997,21 +1997,32 @@ function OrdersPanel({
   const selectedRemaining = Math.max(0, selectedApproved - selectedCancelled);
   return (
     <>
-      <section className={usability.scopeSection} aria-label="전체 기간 결제 요약">
-      <div className={usability.scopeHeading}><h2>전체 기간 결제 요약</h2><p>상품·결제 상태·기간·검색 조건은 아래 주문 목록에만 적용됩니다.</p></div>
+      <section className={usability.scopeSection} aria-label="기간별 결제 요약">
+      <div className={usability.scopeHeading}><h2>{orderScope.from || orderScope.to ? "선택 기간 결제 요약" : "전체 기간 결제 요약"}</h2><p>주문일 기간은 요약과 목록에 함께 적용됩니다. 상품·상태·검색 조건은 목록에만 적용됩니다.</p></div>
+      <div className={usability.datePresets} role="group" aria-label="기간 빠른 선택">
+        {orderDatePresets.map(preset => {
+          const range = orderDateRange(preset.value);
+          const selected = range.from === orderScope.from && range.to === orderScope.to;
+          return <AdminButton key={preset.value} size="sm" variant={selected ? "primary" : "outline"} aria-pressed={selected} disabled={loading} onClick={() => {
+            const dates = orderDateRange(preset.value);
+            setFrom(dates.from); setTo(dates.to); setDateError("");
+            changeScope(dates);
+          }}>{preset.label}</AdminButton>;
+        })}
+      </div>
       <div className="admin-pilot-summary" aria-busy={loading}>
         {[
           ["결제 완료액", money(paid), "고객 주문의 승인 결제 합계"],
           ["환불 완료액", money(refunded), "고객 주문의 취소 완료액"],
           ["순결제액", money(paid - refunded), "고객 결제 완료 − 고객 환불 완료"],
-          ["환불 처리 확인", Number(orderSummary?.processingRefunds || 0) + "건", "전체 주문의 결과 확인 중인 환불"],
+          ["환불 처리 확인", Number(orderSummary?.processingRefunds || 0) + "건", "조회 기간 주문의 결과 확인 중인 환불"],
         ].map(([label, value, note], index) => (
           <AdminSummaryCard key={label} label={label} value={loading || !orderSummary ? "—" : value} scope={note} compact className={index === 2 ? "admin-pilot-summary-highlight" : undefined} />
         ))}
       </div>
       <p className="meta mt8 mb16">매출·유입 통계는 시험·내부·무료 주문과 탈퇴·미연결 회원을 제외합니다. 아래 주문 목록에는 모두 표시됩니다.</p>
       </section>
-      <div className={usability.scopeHeading}><h2>주문 목록 검색</h2><p>조회 조건을 바꾸어도 위 결제 요약은 유지됩니다.</p></div>
+      <div className={usability.scopeHeading}><h2>주문 목록 검색</h2><p>기간 조회를 누르면 결제 요약과 주문 목록을 함께 갱신합니다.</p></div>
       <AdminFilterBar
         className="admin-pilot-filter admin-orders-filter"
         filters={<><AdminSelect label="상품" labelHidden value={course} onChange={event => { changeScope({ course: event.target.value }); }}><option value="">전체 상품</option>{course && !registeredCourses.some(item => item.id === course) && <option value={course}>선택한 상품</option>}{registeredCourses.map(item => <option key={item.id} value={item.id}>{named(item)}</option>)}</AdminSelect><AdminSelect label="결제 상태" labelHidden value={status} onChange={event => { changeScope({ status: event.target.value }); }}><option value="">전체 상태</option>{["paid", "pending", "payment_failed", "partially_refunded", "refunded", "cancelled"].map(value => <option key={value} value={value}>{labels[value] || value}</option>)}</AdminSelect></>}
@@ -2019,7 +2030,7 @@ function OrdersPanel({
         search={<AdminSearchField value={query} label="주문 검색" placeholder="주문번호 · 회원명 · 상품명 검색" onChange={event => { setQuery(event.target.value); setOpened(""); }} />}
         onReset={resetFilters}
         action={<AdminButton variant="primary" disabled={loading} onClick={applyDates}>기간 조회</AdminButton>}
-        appliedSummary={`목록 적용 기간: ${orderScope.from || "전체 시작일"} ~ ${orderScope.to || "전체 종료일"} · 주문일/KST, 종료일 포함 · 목록은 전체 주문에서 검색 · 한 페이지 최대 100건`}
+        appliedSummary={`요약·목록 적용 기간: ${orderScope.from || "전체 시작일"} ~ ${orderScope.to || "전체 종료일"} · 주문일/KST, 종료일 포함 · 목록은 전체 주문에서 검색 · 한 페이지 최대 100건`}
       />
       <section className="admin-pilot-workspace" aria-label="주문 목록" aria-busy={loading}>
         <AdminQuickFilter label="주문 예외 빠른 필터" value={quickStatus} onChange={value => { changeScope({ quick: value }); }} items={[{ value: "all", label: "전체", count: Number(quickCounts?.all || 0) }, { value: "failed", label: "결제 실패", count: Number(quickCounts?.failed || 0) }, { value: "refund", label: "환불 확인", count: Number(quickCounts?.refund || 0) }, { value: "access", label: "수강권 확인", count: Number(quickCounts?.access || 0) }]} />
