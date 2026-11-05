@@ -58,3 +58,21 @@ test('admin loads, edits, handles a conflict and exposes aggregate click counts 
 });
 
 test('unavailable 3D still lets visitors read space benefits without private APIs',async({page})=>{await page.route('**/campus/world/office/vendor/office3d.js',r=>r.abort());await page.goto('/webinar');await page.getByRole('button',{name:'공간 안내로 입장',exact:true}).click({timeout:90000});await page.getByRole('button',{name:'내 AI 사무실 입장',exact:true}).click();await expect(page.getByRole('dialog',{name:'공간 입장 안내'}).getByRole('heading',{name:'내 AI 사무실',exact:true})).toBeVisible();await expect(page.getByRole('link',{name:'문샷 과정 자세히 보기'})).toBeVisible();});
+
+test('save failure is visible in red near save and a successful retry enables the public link',async({page})=>{
+ const cohort='00000000-0000-4000-8000-000000000003';let reject=true;
+ await page.route('**/api/admin/campus/webinars*',r=>{
+  if(r.request().method()==='GET')return r.fulfill({json:{events:[],cohorts:[{id:cohort,name:'5기',courses:{title:'문샷',slug:'moonshot'}}]}});
+  if(reject)return r.fulfill({status:400,json:{error:'https://pf.kakao.com/ 채널 주소만 사용할 수 있습니다.'}});
+  return r.fulfill({json:{event:r.request().postDataJSON().event}});
+ });
+ await page.goto('/webinar-admin');await page.getByRole('button',{name:'새 행사 만들기'}).click();
+ await page.getByLabel('행사 주소',{exact:false}).fill('moonshot-error-qa');await page.getByLabel('연결할 교육 기수').selectOption(cohort);await page.getByLabel('공개 상태').selectOption('published');await page.getByLabel('카카오 채널 상담 주소').fill('http://pf.kakao.com/_moonshot/chat');
+ await page.getByRole('button',{name:'설정 저장',exact:true}).click();
+ const alert=page.getByRole('alert');await expect(alert).toContainText('https://pf.kakao.com/');await expect(alert).toHaveCSS('color','rgb(180, 35, 24)');await expect(alert).toBeFocused();await expect(alert).toBeInViewport();
+ await expect(page.getByRole('button',{name:'웨비나 참여자용 링크 복사'})).toHaveCount(0);
+ reject=false;await page.getByLabel('카카오 채널 상담 주소').fill('https://pf.kakao.com/_moonshot/chat');await page.getByRole('button',{name:'설정 저장',exact:true}).click();
+ await expect(alert).toHaveCount(0);await expect(page.getByRole('status')).toContainText('저장했습니다.');await expect(page.getByRole('button',{name:'웨비나 참여자용 링크 복사'})).toBeVisible();
+ await page.getByRole('button',{name:'+ 자료 추가',exact:true}).click();await page.getByLabel('파일 업로드').setInputFiles({name:'blocked.exe',mimeType:'application/octet-stream',buffer:Buffer.from('qa')});
+ await expect(page.getByRole('alert')).toBeVisible();await expect(page.getByRole('alert')).toHaveCSS('color','rgb(180, 35, 24)');
+});
