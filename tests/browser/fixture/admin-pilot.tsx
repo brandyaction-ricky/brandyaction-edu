@@ -54,7 +54,16 @@ export function AdminPilotFixture({ screen }: { screen: 'orders' | 'products' | 
     access: scopedOrders.filter(order => order.status === 'paid'),
   };
   const visibleOrders = quickResults[orderScope.quick as keyof typeof quickResults];
-  const filteredOrderData = { ...orderData, orders: visibleOrders, order_filter_counts: [{ id: 'pilot-counts', ...Object.fromEntries(Object.entries(quickResults).map(([key, values]) => [key, values.length])) }] };
+  const periodOrderIds = new Set(orderSeed.filter(order =>
+    (!orderScope.from || Date.parse(order.created_at) >= Date.parse(orderScope.from + 'T00:00:00+09:00')) &&
+    (!orderScope.to || Date.parse(order.created_at) < Date.parse(orderScope.to + 'T00:00:00+09:00') + 86400000)).map(order => order.id));
+  const periodPayments = orderData.payments.filter(payment => periodOrderIds.has(payment.order_id));
+  const filteredOrderData = { ...orderData, order_summary: [{
+    id: 'pilot-summary',
+    approvedRevenue: periodPayments.reduce((sum, payment) => sum + payment.approved_amount, 0),
+    refundedRevenue: 0,
+    processingRefunds: periodOrderIds.has('pilot-order-refund') ? 1 : 0,
+  }], orders: visibleOrders, order_filter_counts: [{ id: 'pilot-counts', ...Object.fromEntries(Object.entries(quickResults).map(([key, values]) => [key, values.length])) }] };
   return <div className="edu-admin adm admin-pilot-fixture" style={{ padding: 24, minHeight: '100vh' }}>
     <h1>{screen === 'orders' ? '주문 결제' : '상품 관리'}</h1>
     <p>합성 데이터 · 외부 인증/DB/결제 연결 없음</p>
