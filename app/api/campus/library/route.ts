@@ -12,5 +12,5 @@ export async function GET(request:Request){try{
  const db=createAdminClient(),result=await db.from('enrollments').select('id,cohort_id,status,revoked_at,access_starts_at,access_ends_at').eq('id',id).eq('user_id',user.id).maybeSingle();
  if(result.error)throw result.error;if(!result.data||!hasLearningAccess(result.data))return privateReply({error:'현재 이용 가능한 수강권이 없습니다.'},403);
  const welcome=await readWelcome(result.data.cohort_id);
- return privateReply({resources:welcome.resources,welcome:welcome.settings});
+ return privateReply({resources:welcome.resources,welcome:welcome.settings,content:welcome.content});
 }catch(e){return problem(e);}}

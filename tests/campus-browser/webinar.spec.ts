@@ -6,7 +6,7 @@ test('operator copies scoped welcome and member links without publishing or chan
  await page.goto('/webinar-admin');await page.getByRole('button',{name:'새 행사 만들기'}).click();
  const hub=page.getByRole('region',{name:'대상별 캠퍼스 입장 링크'});
  await expect(hub.getByRole('button')).toHaveCount(0);
- await page.getByLabel('연결할 교육 기수').selectOption(cohort);
+ await page.getByLabel('연결할 교육 기수').selectOption(cohort);await page.getByRole('navigation',{name:'관리 항목'}).getByRole('button',{name:'입장 링크',exact:true}).click();
  await hub.getByRole('button',{name:'구매자 웰컴용 링크 복사'}).click();
  expect(await page.evaluate(()=>navigator.clipboard.readText())).toBe(new URL('/campus/enter?cohort='+cohort+'&welcome=1',page.url()).href);
  await expect(hub.getByRole('link',{name:'수강생 전용 열기 ↗'})).toHaveAttribute('href','/campus/enter?cohort='+cohort);
@@ -68,7 +68,7 @@ test('course information opens from the activity panel and leaves the visitor in
 test('admin loads, edits, handles a conflict and exposes aggregate click counts accurately',async({page})=>{
  const event={slug:'moonshot-open',title:'문샷 테스트',description:'소개',status:'published',startsAt:'2026-11-07T10:00:00Z',endsAt:'2026-11-07T12:00:00Z',cohortId:'00000000-0000-4000-8000-000000000001',detailPath:'/classes/moonshot',kakaoUrl:'',youtubeId:'',revision:'00000000-0000-4000-8000-000000000002'};let saves=0;
  await page.route('**/api/admin/campus/webinars*',r=>{if(r.request().method()==='POST'){saves++;return r.fulfill({status:409,json:{error:'다른 운영자가 수정했습니다.'}});}if(r.request().url().includes('?'))return r.fulfill({json:{trackingEnabled:false,counts:{entry:10,experience:4,gate:3,detail:2,consult:1,checkout:2}}});return r.fulfill({json:{events:[event],cohorts:[{id:'00000000-0000-4000-8000-000000000001',name:'3기',courses:{title:'문샷',slug:'moonshot'}}]}});});
- await page.goto('/webinar-admin');await page.getByRole('button',{name:/문샷 테스트/}).click();await page.getByRole('textbox',{name:'제목',exact:true}).fill('수정 제목');await page.getByRole('button',{name:'설정 저장'}).click();await expect(page.getByRole('alert')).toContainText('다른 운영자');expect(saves).toBe(1);await page.getByRole('button',{name:'집계 새로고침'}).click();await expect(page.getByText(/새 이벤트가 저장되지 않습니다/)).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBeTruthy();await page.screenshot({path:test.info().outputPath('webinar-admin.png'),fullPage:true});
+ await page.goto('/webinar-admin');await page.getByRole('button',{name:/문샷 테스트/}).click();await page.getByRole('navigation',{name:'관리 항목'}).getByRole('button',{name:'행사 설정',exact:true}).click();await page.getByRole('textbox',{name:'제목',exact:true}).fill('수정 제목');await page.getByRole('button',{name:'설정 저장'}).click();await expect(page.getByRole('alert')).toContainText('다른 운영자');expect(saves).toBe(1);await page.getByRole('navigation',{name:'관리 항목'}).getByRole('button',{name:'입장 링크',exact:true}).click();await page.getByRole('button',{name:'집계 새로고침'}).click();await expect(page.getByText(/새 이벤트가 저장되지 않습니다/)).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBeTruthy();await page.screenshot({path:test.info().outputPath('webinar-admin.png'),fullPage:true});
 });
 
 test('unavailable 3D still lets visitors read space benefits without private APIs',async({page})=>{await page.route('**/campus/world/office/vendor/office3d.js',r=>r.abort());await page.goto('/webinar');await page.getByRole('button',{name:'공간 안내로 입장',exact:true}).click({timeout:90000});await page.getByRole('button',{name:'내 AI 사무실 입장',exact:true}).click();await expect(page.getByRole('dialog',{name:'공간 입장 안내'}).getByRole('heading',{name:'내 AI 사무실',exact:true})).toBeVisible();await expect(page.getByRole('link',{name:'문샷 과정 자세히 보기'})).toBeVisible();});
@@ -86,7 +86,7 @@ test('save failure is visible in red near save and a successful retry enables th
  const alert=page.getByRole('alert');await expect(alert).toContainText('https://pf.kakao.com/');await expect(alert).toHaveCSS('color','rgb(180, 35, 24)');await expect(alert).toBeFocused();await expect(alert).toBeInViewport();
  await expect(page.getByRole('button',{name:'웨비나 참여자용 링크 복사'})).toHaveCount(0);
  reject=false;await page.getByLabel('카카오 채널 상담 주소').fill('https://pf.kakao.com/_moonshot/chat');await page.getByRole('button',{name:'설정 저장',exact:true}).click();
- await expect(alert).toHaveCount(0);await expect(page.getByRole('status')).toContainText('저장했습니다.');await expect(page.getByRole('button',{name:'웨비나 참여자용 링크 복사'})).toBeVisible();
- await page.getByRole('button',{name:'+ 자료 추가',exact:true}).click();await page.getByLabel('파일 업로드').setInputFiles({name:'blocked.exe',mimeType:'application/octet-stream',buffer:Buffer.from('qa')});
+ await expect(alert).toHaveCount(0);await expect(page.getByRole('status')).toContainText('저장했습니다.');await page.getByRole('navigation',{name:'관리 항목'}).getByRole('button',{name:'입장 링크',exact:true}).click();await expect(page.getByRole('button',{name:'웨비나 참여자용 링크 복사'})).toBeVisible();
+ await page.getByRole('navigation',{name:'관리 항목'}).getByRole('button',{name:'문샷 자료실',exact:true}).click();await page.getByRole('button',{name:'+ 자료 추가',exact:true}).click();await page.getByLabel('파일 업로드').setInputFiles({name:'blocked.exe',mimeType:'application/octet-stream',buffer:Buffer.from('qa')});
  await expect(page.getByRole('alert')).toBeVisible();await expect(page.getByRole('alert')).toHaveCSS('color','rgb(180, 35, 24)');
 });

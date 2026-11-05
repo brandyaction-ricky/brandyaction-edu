@@ -26,7 +26,7 @@ export async function GET(request:Request){
 export async function POST(request:Request){
  try{
   if(request.headers.get('origin')!==new URL(request.url).origin)fail('요청 출처를 확인해 주세요.',403);
-  const user=await actor(),body=await readSpaceJson(request,180000);
+  const user=await actor(),body=await readSpaceJson(request,600000);
   if(Object.keys(body).some(k=>!['event','expectedRevision'].includes(k))||!(body.expectedRevision===null||uuid(body.expectedRevision)))fail('저장 요청을 확인해 주세요.');
   const w=validateWebinar(body.event),current=await readWebinar(w.slug),expected=body.expectedRevision;
   const success=()=>{revalidateTag(WEBINAR_TAG,{expire:0});return privateReply({event:w});};
