@@ -1,3 +1,4 @@
+import {canReviewCampus,campusReviewPath} from '@/features/campus/operator-access';
 import theme from '@/features/campus/ui/theme.module.css';
 import Link from 'next/link';
 import {notFound,redirect} from 'next/navigation';
@@ -13,6 +14,7 @@ export default async function Page({searchParams}:{searchParams:Promise<Record<s
  const q=await searchParams,cohort=typeof q.cohort==='string'?q.cohort:undefined,welcome=q.welcome==='1';
  if(q.cohort!==undefined&&(!cohort||!isCampusId(cohort)))notFound();
  const user=await getAuthenticatedUser();if(!user)redirect('/login?next='+encodeURIComponent(campusEntryPath(cohort,welcome)));
+ if(canReviewCampus(user))redirect(campusReviewPath(cohort,welcome));
  const db=await createClient();let query=db.from('enrollments').select('id,user_id,course_id,cohort_id,status,revoked_at,access_starts_at,access_ends_at').eq('user_id',user.id).eq('status','active').order('created_at',{ascending:false}).limit(200);
  if(cohort)query=query.eq('cohort_id',cohort);
  const r=await query;if(r.error)throw Error('수강권을 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.');

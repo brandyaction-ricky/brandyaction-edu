@@ -1,3 +1,4 @@
+import {canReviewCampus} from './operator-access';
 import {createServerClient} from '@supabase/ssr';
 import {NextResponse,type NextRequest} from 'next/server';
 import {getSupabasePublicConfig,hasSupabaseEnv} from '@/lib/supabase/config';
@@ -8,7 +9,7 @@ export async function privateCampusResponse(request:NextRequest){
  if(!hasSupabaseEnv())return closed(404);
  try{const{publicUrl,publishableKey}=getSupabasePublicConfig();const db=createServerClient(publicUrl,publishableKey,{cookies:{getAll:()=>request.cookies.getAll(),setAll:items=>{items.forEach(c=>request.cookies.set(c.name,c.value));response=NextResponse.next({request});items.forEach(c=>response.cookies.set(c.name,c.value,c.options));}}});
  const{data,error}=await db.auth.getUser();if(error||!data.user)return closed(error&&![400,401,403].includes(error.status||0)?503:404);
- const p=await db.from('profiles').select('role,status').eq('id',data.user.id).maybeSingle();if(p.error)return closed(503);if(p.data?.role!=='admin'||p.data.status!=='active')return closed(404);
+ const p=await db.from('profiles').select('role,status').eq('id',data.user.id).maybeSingle();if(p.error)return closed(503);if(!canReviewCampus(p.data))return closed(404);
  response.headers.set('Cache-Control','private, no-store');response.headers.set('Vary','Cookie');return response;
  }catch{return closed(503);}
 }

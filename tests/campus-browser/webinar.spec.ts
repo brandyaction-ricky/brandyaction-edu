@@ -34,14 +34,26 @@ test('anonymous visitor customizes, walks, views map and explores private-space 
 test('public exploration never embeds video even when an old event has a video ID',async({page})=>{
  const youtube:string[]=[];page.on('request',r=>{if(/youtube|googlevideo/.test(r.url()))youtube.push(r.url());});await enter(page,'/webinar?video');await expect(page.getByRole('banner').getByText('문샷 오픈 캠퍼스',{exact:true})).toBeVisible();await expect(page.locator('iframe[src*="youtube"]')).toHaveCount(0);await expect(page.frameLocator('iframe').getByRole('button',{name:'라이브 보기',exact:true})).toHaveCount(0);await page.getByRole('button',{name:'이 공간에서 할 일',exact:true}).click();await expect(page.getByRole('button',{name:'문샷 라이브',exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'고객 발견 체험',exact:true})).toBeVisible();expect(youtube).toEqual([]);
 });
-test('configured conversion links and deliberate member check preserve server decisions and failed-access retry',async({page})=>{
- let result:{kind?:string;href?:string;error?:string}={kind:'member',href:'/campus/workspace?enrollmentId=abc'},status=200;const events:string[]=[],privateCalls:string[]=[];
- await page.route('**/api/campus/webinar/*/events',r=>{events.push(r.request().postDataJSON().event);return r.fulfill({status:204});});await page.route('**/api/campus/webinar/*/access*',r=>{privateCalls.push(r.request().url());return r.fulfill({status,json:result});});
- await enter(page,'/webinar?api');let d=await gate(page);expect(privateCalls).toHaveLength(0);await expect(d.getByRole('link',{name:'문샷 과정 자세히 보기'})).toHaveAttribute('href','/classes/moonshot');await expect(d.getByRole('link',{name:'카카오 채널로 문의하기'})).toHaveAttribute('href','https://pf.kakao.com/_moonshot/chat');await expect(d.getByRole('link',{name:'문샷 과정 자세히 보기'})).toHaveAttribute('target','_blank');
- await d.getByText('이미 구매한 수강생인가요?',{exact:true}).click();await d.getByRole('button',{name:'내 수강권으로 입장하기'}).click();await expect(d.getByRole('link',{name:'내 문샷 공간으로 이동'})).toHaveAttribute('href',result.href!);await page.keyboard.press('Escape');
- result={kind:'offer'};d=await gate(page,'내 AI 사무실');await d.getByText('이미 구매한 수강생인가요?',{exact:true}).click();await d.getByRole('button',{name:'내 수강권으로 입장하기'}).click();await expect(d.getByText(/이 행사와 연결된 기수의 수강권이 없어요/)).toBeVisible();await page.keyboard.press('Escape');
- status=503;result={error:'연결 확인이 필요합니다.'};d=await gate(page);await d.getByText('이미 구매한 수강생인가요?',{exact:true}).click();await d.getByRole('button',{name:'내 수강권으로 입장하기'}).click();await expect(d.getByRole('alert')).toContainText('연결 확인이 필요합니다.');await expect(d.getByRole('link',{name:'내 문샷 공간으로 이동'})).toHaveCount(0);status=200;result={kind:'login',href:'/login?next=webinar'};await d.getByRole('button',{name:'내 수강권으로 입장하기'}).click();await expect(d.getByRole('link',{name:'에듀 계정으로 로그인'})).toHaveAttribute('href',result.href!);
- expect(events.filter(x=>x==='entry')).toHaveLength(1);expect(events.filter(x=>x==='gate')).toHaveLength(1);
+test('visitor invitations offer only detail and consultation without enrollment requests',async({page})=>{
+ const events:string[]=[],privateCalls:string[]=[];
+ await page.route('**/api/campus/webinar/*/events',r=>{events.push(r.request().postDataJSON().event);return r.fulfill({status:204});});
+ await page.route('**/api/campus/webinar/*/access*',r=>{privateCalls.push(r.request().url());return r.fulfill({status:403,json:{error:'No enrollment'}});});
+ await enter(page,'/webinar?api');
+ for(const room of ['문샷 공부방','내 AI 사무실','문샷 웰컴 존']){
+  const d=await gate(page,room);
+  await expect(d.getByRole('link',{name:'문샷 과정 자세히 보기'})).toHaveAttribute('href','/classes/moonshot');
+  await expect(d.getByRole('link',{name:'카카오 채널로 문의하기'})).toHaveAttribute('href','https://pf.kakao.com/_moonshot/chat');
+  await expect(d.getByRole('link',{name:/수강 신청하기/})).toHaveCount(0);
+  await expect(d.getByText('이미 구매한 수강생인가요?',{exact:true})).toHaveCount(0);
+  if(room==='내 AI 사무실'){
+   await expect(d.getByRole('link')).toHaveCount(2);
+   const image=d.locator('img');await expect(image).toHaveAttribute('src','/campus/showcase/ai-office-team-v2.webp');
+   expect(await image.evaluate((el:HTMLImageElement)=>el.complete&&el.naturalWidth>1000)).toBe(true);
+   await page.screenshot({path:test.info().outputPath('office-invitation.png')});
+  }
+  await d.getByRole('button',{name:'공간 입장 안내 닫기'}).click();
+ }
+ expect(privateCalls).toEqual([]);expect(events.filter(x=>x==='gate')).toHaveLength(1);
 });
 test('course information opens from the activity panel and leaves the visitor in the campus',async({page,context})=>{
  await page.route('**/api/campus/webinar/*/events',r=>r.fulfill({status:204}));

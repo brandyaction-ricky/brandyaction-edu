@@ -1,20 +1,19 @@
 'use client';
 import {campusActivity} from '../analytics/client';
 import {CustomerQuiz} from './customer-quiz';
-import Link from 'next/link';
-import {lazy,Suspense,useEffect,useRef,useState} from 'react';
+import {lazy,Suspense,useEffect,useRef} from 'react';
 import {ArrowUpRight,BookOpen,Bot,Check} from 'lucide-react';
 import type {CampusSnapshot} from '../contracts';
 import {ResourceLibrary} from './resource-library';
 import type {TourRoom} from '../tour/model';
-import {loginPath,type AccessResult,type PublicWebinar,type WebinarEvent} from './domain';
+import {type PublicWebinar,type WebinarEvent} from './domain';
 import styles from './visitor.module.css';
 const Tour=lazy(()=>import('../tour/preview').then(m=>({default:m.FourSpacesPreview})));
 // Public visitors never receive an enrollment, curriculum or account profile.
 const visitorSnapshot:CampusSnapshot={schemaVersion:1,fetchedAt:'',viewer:{id:'public-visitor',displayName:'문샷 방문자'},scopes:[],selectedEnrollmentId:null,lessons:[],links:{classes:'/my/classes',questions:'/my/questions'},launchEligibility:null};
 const stories={
  study:{title:'문샷 공부방',eyebrow:'혼자 보던 수업을, 함께 해내는 시간으로',description:'오늘 배운 것을 내 일에 적용하고, 동료와 결과를 나누는 수강생 공간이에요.',steps:[['오늘의 수업','내 일차의 수업과 과제를 바로 확인해요.'],['작게 실행하기','집중 시간을 정하고 나만의 결과물을 만들어요.'],['동료의 시선 더하기','결과물을 공유하고 받은 의견으로 개선해요.']],note:'수업과 과제는 본인의 기수·수강 기간에 맞춰 열립니다.'},
- office:{title:'내 AI 사무실',eyebrow:'혼자 하던 마케팅, 내 AI 직원들과 함께',description:'커리큘럼에서 만든 텔레그램 AI 직원들을 내 사무실에 모으세요. 고객 조사부터 콘텐츠 기획까지, 내 사업에 맞는 팀을 직접 구성합니다.',steps:[['내 직원 불러오기','내가 만든 텔레그램 봇을 사무실에 배치해요.'],['담당 업무 나누기','고객 조사·콘텐츠·문의 응대, 직원마다 역할을 정해요.'],['함께 실행하기','직원을 눌러 텔레그램으로 이동하고 결과를 검토해요.']],note:'내 계정에 연결한 직원만 보이는 개인 공간입니다. 실행 상태는 봇 연결 방식에 따라 표시됩니다.'},
+ office:{title:'내 AI 사무실',eyebrow:'혼자 하던 일을, 내 AI 자동화 팀과 함께',description:'조사하랴, 콘텐츠 만들랴, 문의에 답하랴. 이제 반복하는 일을 맡길 AI 직원을 직접 만들어 보세요. 문샷에서 배운 텔레그램 봇을 한 사무실에 모아, 내 사업에 맞는 자동화 팀을 구성합니다.',steps:[['내 일에 맞는 AI 직원 만들기','매일 반복하는 일부터 골라, 맡길 업무와 답변 기준을 정해요.'],['업무별로 팀 구성하기','고객 조사·콘텐츠 기획·문의 응대. 내가 만든 봇을 불러와 담당 업무를 나눠요.'],['나는 방향을 정하고, 결과를 다듬기','사무실에서 담당 봇을 찾아 텔레그램으로 요청하고, 돌아온 결과를 검토해 다음 실행으로 이어가요.']],note:'AI를 한 번 써보는 데서 끝내지 않고, 내 일을 함께할 팀을 만드는 과정. 문샷에서 시작하세요.'},
  welcome:{title:'문샷 웰컴 존',eyebrow:'구매한 순간부터, 첫 수업을 준비하는 곳',description:'개강 전에도 작은 준비를 시작할 수 있어요. 처음이라 낯선 AI를 한 걸음씩 만나보세요.',steps:[['첫 안내','온보딩 영상으로 학습 흐름을 알아봐요.'],['OX 퀴즈','AI를 안전하게 쓰는 기본을 익혀요.'],['내 시작점','간단한 질문으로 어느 부분부터 연습할지 살펴봐요.']],note:'구매자에게 열리는 준비 공간입니다. 개강일과 정규 수업 이용 기간은 과정 안내에서 확인하세요.'},
 } as const;
 export function WebinarRoom({event,demo=false,devReview=false,qaCrowd=false,collectActivity=true}:{event:PublicWebinar;demo?:boolean;devReview?:boolean;qaCrowd?:boolean;collectActivity?:boolean}){
@@ -24,22 +23,16 @@ export function WebinarRoom({event,demo=false,devReview=false,qaCrowd=false,coll
 }
 function SpaceInvitation({room,event,demo,record,general=false}:{room:TourRoom;event:PublicWebinar;demo:boolean;record:(name:WebinarEvent)=>void;general?:boolean}){
  const story=stories[room==='office'?'office':room==='welcome'?'welcome':'study'];
- const [access,setAccess]=useState<AccessResult|null>(null),[checking,setChecking]=useState(false),[error,setError]=useState('');
- const busy=useRef(false),abort=useRef<AbortController|null>(null);
- useEffect(()=>()=>abort.current?.abort(),[]);
  useEffect(()=>{if(!general)record('gate');},[general,record]);
- async function check(){if(busy.current)return;busy.current=true;setChecking(true);setError('');try{if(demo){setAccess({kind:'login',href:loginPath(event.slug)});return;}const controller=new AbortController();abort.current=controller;const section=room==='office'?'office':'space';const r=await fetch(`/api/campus/webinar/${event.slug}/access?section=${section}`,{cache:'no-store',signal:AbortSignal.any([controller.signal,AbortSignal.timeout(8000)])});const value=await r.json();if(!r.ok)throw Error(value.error||'수강 권한을 확인하지 못했어요.');setAccess(value);}catch(e){if(!abort.current?.signal.aborted)setError((e as Error).message);}finally{busy.current=false;setChecking(false);}}
- const link=(kind:'detail'|'consult'|'checkout',label:string,href:string)=><a className={kind==='detail'?styles.primary:styles.secondary} href={demo?'#preview':href} target={demo?undefined:'_blank'} rel="noopener noreferrer" onClick={e=>{if(demo)e.preventDefault();record(kind);}}>{label}<ArrowUpRight size={18}/></a>;
+ const link=(kind:'detail'|'consult',label:string,href:string)=><a className={kind==='detail'?styles.primary:styles.secondary} href={demo?'#preview':href} target={demo?undefined:'_blank'} rel="noopener noreferrer" onClick={e=>{if(demo)e.preventDefault();record(kind);}}>{label}<ArrowUpRight size={18}/></a>;
  return <article className={styles.invitation}>
   <div className={styles.hero} data-room={room}>{room==='office'?<Bot size={34}/>:<BookOpen size={34}/>}<small>{general?'MOONSHOT CHALLENGE':story.eyebrow}</small><h2>{general?'AI를 써보는 사람에서, 내 일에 쓰는 사람으로.':story.title}</h2><p>{general?'고객을 발견하고, 콘텐츠를 만들고, 반응을 확인하세요. 문샷은 배운 AI를 내 사업의 실행으로 연결하는 과정입니다.':story.description}</p></div>
-  {room==='office'&&<figure className={styles.proof}><img src="/campus/showcase/ai-office-real.jpg" width="938" height="941" alt="윤익님의 AI 사무실 실제 예시: 텔레그램 업무 봇 8명이 배치된 사무실과 담당 업무 목록"/><figcaption>윤익님이 연결한 실제 사무실 예시 · 봇 연결과 업무 구성은 사용자별로 달라요.</figcaption><a href="/campus/showcase/ai-office-real.jpg" target="_blank" rel="noopener noreferrer">원본 이미지 크게 보기 ↗</a></figure>}
+  {room==='office'&&<figure className={styles.proof}><img src="/campus/showcase/ai-office-team-v2.webp" width="1536" height="1024" alt="업무별 AI 직원들이 책상에 앉아 함께 일하는 사무실 구성 이미지"/><figcaption>내 AI 자동화 팀 구성 예시 · 기존 사무실을 바탕으로 만든 소개 이미지</figcaption><div className={styles.botRoles}><span>고객 조사</span><span>콘텐츠 기획</span><span>문의 응대</span><span>업무 정리</span></div></figure>}
   {room==='study'&&<figure className={styles.proof}><img src="/campus/showcase/learning-knowledge.webp" width="540" height="484" loading="lazy" alt="문샷에서 다루는 사업 지식 연결 예시: 내 자료와 마케팅 지식이 하나의 그래프로 연결된 모습"/><figcaption>문샷 공개 과정 소개의 실제 지식 연결 예시. 내 사업을 AI에게 알려 주고, 콘텐츠·랜딩페이지·고객상담 업무에 활용하는 흐름을 배워요.</figcaption><a href="/campus/showcase/learning-knowledge.webp" target="_blank" rel="noopener noreferrer">학습 예시 크게 보기 ↗</a></figure>}
   <ol className={styles.steps}>{story.steps.map(([title,description],i)=><li key={title}><span>0{i+1}</span><div><h3>{title}</h3><p>{description}</p></div><Check size={17}/></li>)}</ol>
   <p className={styles.note}>{story.note}</p>
   <div className={styles.actions}>{link('detail','문샷 과정 자세히 보기',event.detailPath)}{event.kakaoUrl?link('consult','카카오 채널로 문의하기',event.kakaoUrl):<p className={styles.note}>상담 채널을 준비하고 있어요. 과정 안내에서 문의 방법을 확인해 주세요.</p>}</div>
   <p className={styles.returnNote}>안내는 새 창에서 열려요. 돌아오면 이 공간에서 계속 둘러볼 수 있어요.</p>
-  <p className={styles.enroll}><a href={demo?'#preview':event.checkoutPath} target={demo?undefined:'_blank'} rel="noopener noreferrer" onClick={e=>{if(demo)e.preventDefault();record('checkout');}}>과정을 확인했다면 수강 신청하기 ↗</a></p>
-  <details className={styles.member}><summary>이미 구매한 수강생인가요?</summary><p>내 계정의 수강권을 확인한 뒤 전용 공간으로 연결해요.</p>{!access&&<button disabled={checking} onClick={()=>void check()}>{checking?'수강권 확인 중…':'내 수강권으로 입장하기'}</button>}{error&&<p role="alert">{error} 다시 시도해 주세요.</p>}{access?.kind==='member'||access?.kind==='welcome'?<a href={demo?'#preview':access.href} onClick={e=>{if(demo)e.preventDefault();}}>{access.kind==='member'?'내 문샷 공간으로 이동':'개강 준비 공간으로 이동'}</a>:access?.kind==='login'?<a href={demo?'#preview':access.href} onClick={e=>{if(demo)e.preventDefault();}}>에듀 계정으로 로그인</a>:access?.kind==='offer'?<p>이 행사와 연결된 기수의 수강권이 없어요. 다른 기수 수강생은 <Link href="/my/classes">내 클래스</Link>에서 입장해 주세요.</p>:null}</details>
   {demo&&<p className={styles.note}>동작 미리보기 · 외부 이동·결제·회원 정보 조회 없음</p>}
  </article>;
 }
