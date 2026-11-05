@@ -129,7 +129,7 @@ export function OrderResult({
         <header className="order-complete-intro">
           <span>BrandyAction EDU</span>
           <h1>{complete ? "클래스 시작 준비" : "신청 상태 확인"}</h1>
-          <p>{completionGuide?.url ? "아래 링크에서 수강 준비를 시작하세요." : completionGuide ? "아래에서 수강 안내를 확인해 주세요." : complete ? "결제 확인부터 첫 학습까지 순서대로 안내해 드릴게요." : "주문 상태를 확인한 뒤 다음 단계로 안내해 드릴게요."}</p>
+          {!completionGuide && <p>{complete ? "결제 확인부터 첫 학습까지 순서대로 안내해 드릴게요." : "주문 상태를 확인한 뒤 다음 단계로 안내해 드릴게요."}</p>}
         </header>
         {!completionGuide && !onboardingLoading && <ol className="order-complete-steps" aria-label="클래스 시작 단계">
           <li className={complete ? "complete" : "active"} aria-current={complete ? undefined : "step"}>
@@ -145,7 +145,7 @@ export function OrderResult({
             <strong>첫 학습 시작</strong>
           </li>
         </ol>}
-        <section className={"completion order-complete-card " + (complete ? "is-complete" : "needs-attention")}>
+        <section className={"completion order-complete-card " + (complete ? "is-complete" : "needs-attention") + (completionGuide ? " has-purchase-guide" : "")}>
           <div className="order-complete-summary">
             <div className={"success-icon " + (complete ? "" : "fail")} aria-hidden="true">
               {complete ? <Check /> : <CircleAlert />}
