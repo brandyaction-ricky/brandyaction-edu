@@ -1,0 +1,14 @@
+'use client';
+import {useState} from 'react';
+import {BookOpen,ChevronRight,Megaphone,Play} from 'lucide-react';
+import {campusActivity} from '../analytics/client';
+import {type CampusResource} from '../webinar/resources';
+import {DEFAULT_WELCOME,visibleWelcome,welcomeVideos,type WelcomeSettings} from './content';
+import styles from './welcome.module.css';
+export function WelcomePanel({action,settings=DEFAULT_WELCOME,resources=[],onPlay,completed=false,onComplete}:{completed?:boolean;onComplete?:()=>void;action:string;settings?:WelcomeSettings;resources?:CampusResource[];onPlay:(r:CampusResource)=>void}){
+ const content=visibleWelcome(settings),[selected,setSelected]=useState<string|null>(null);
+ const articles=action==='notices'?content.notices:content.lessons,item=articles.find(a=>a.id===selected),videos=welcomeVideos(content,resources);
+ return <section className={styles.panel}><header className={styles.intro}><small>MOONSHOT · FIRST STEP</small><h2>{action==='video'?content.videoTitle:action==='notices'?'공지사항':'AI 기초 지식 배우기'}</h2><p>{action==='video'?content.videoDescription:action==='notices'?'수업 일정과 준비할 내용을 이곳에서 확인하세요.':'처음이어도 괜찮아요. 한 번에 한 가지씩, 쉬운 예시로 알아봐요.'}</p></header>
+ {action==='video'?<div className={styles.cards}>{videos.length?videos.map(video=><article className={styles.card} key={video.id}><Play aria-hidden size={25}/><span>라이브 다시보기</span><h3>{video.title}</h3><p>{video.description}</p><button onClick={()=>{campusActivity('video_open',video.id);onPlay(video);}}>큰 화면으로 보기 <ChevronRight size={18}/></button></article>):<div className={styles.empty}><Play size={28}/><h3>다시보기를 준비하고 있어요</h3><p>영상이 등록되면 이곳에서 바로 볼 수 있어요. 먼저 AI 기초 지식과 공지를 둘러보세요.</p></div>}{videos.length>0&&onComplete&&<label className={styles.complete}><input type="checkbox" checked={completed} onChange={onComplete}/> 다시보기를 학습했어요 · 직접 체크</label>}</div>:item?<article className={styles.reading}><button onClick={()=>setSelected(null)}>← {action==='notices'?'공지 목록':'AI 기초 목록'}</button><h3>{item.title}</h3>{item.body.split(/\n+/).map((p,i)=><p key={i}>{p}</p>)}{item.url&&<a href={item.url} target="_blank" rel="noopener noreferrer">{item.linkLabel} ↗</a>}</article>:<div className={styles.cards}>{articles.length?articles.map((a,i)=><button className={styles.article} key={a.id} onClick={()=>{setSelected(a.id);campusActivity('tool_open',(action==='notices'?'notice:':'basic:')+a.id);}}><span className={styles.number}>{action==='notices'?<Megaphone size={22}/>:String(i+1).padStart(2,'0')}</span><span>{a.pinned&&<small>중요 공지</small>}<strong>{a.title}</strong><span>{a.body.split('\n')[0]}</span></span><ChevronRight size={18}/></button>):<div className={styles.empty}><BookOpen size={28}/><h3>{action==='notices'?'새로운 공지를 준비하고 있어요':'새로운 이야기를 준비하고 있어요'}</h3><p>등록된 내용이 이곳에 표시됩니다.</p></div>}</div>}
+ </section>;
+}

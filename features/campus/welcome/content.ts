@@ -1,0 +1,24 @@
+import {youtubeVideoId,type CampusResource} from '../webinar/resources';
+export type WelcomeArticle={id:string;title:string;body:string;url:string;linkLabel:string;published:boolean;pinned:boolean};
+export type WelcomeSettings={title:string;description:string;videoTitle:string;videoDescription:string;videoUrl:string;notices:WelcomeArticle[];lessons:WelcomeArticle[]};
+const lesson=(id:string,title:string,body:string):WelcomeArticle=>({id,title,body,url:'',linkLabel:'',published:true,pinned:false});
+export const DEFAULT_WELCOME:WelcomeSettings={title:'문샷에 오신 것을 환영해요',description:'다시보기로 분위기를 익히고, 쉬운 AI 이야기부터 시작하세요. 공지에서 수업 준비도 확인할 수 있어요.',videoTitle:'라이브 다시보기',videoDescription:'놓친 내용을 다시 보고, 내 일에 써볼 아이디어를 찾아보세요.',videoUrl:'',notices:[],lessons:[
+ lesson('what-is-ai','AI는 어떤 도구인가요?','AI는 많은 예시에서 배운 규칙을 바탕으로 답을 만들어 주는 컴퓨터 도구예요.\n예를 들어 “우리 빵집을 소개하는 글을 써 줘”라고 부탁하면 글의 초안을 만들어 줘요. 사람처럼 모든 내용을 이해하거나 정답을 아는 것은 아니에요.\n오늘 해보기: 내 일을 한 문장으로 소개하고, AI에게 소개 글의 제목 3개를 부탁해 보세요.'),
+ lesson('ask-clearly','AI에게 어떻게 부탁하나요?','친구에게 심부름을 부탁하듯, 무엇을 원하는지 자세히 말해 주세요. AI에게 주는 질문이나 부탁을 “프롬프트”라고 불러요.\n“글 써 줘”보다 “동네 빵집 사장이야. 아침에 출근하는 손님에게 새 샌드위치를 소개하는 글을 친근하게 3문장으로 써 줘”가 더 분명해요.\n기억할 세 가지: 누구를 위한 일인지, 무엇을 만들지, 어떤 모양으로 받을지.'),
+ lesson('check-answers','답이 그럴듯하면 믿어도 되나요?','AI는 실제로 없는 내용을 자신 있게 말할 때도 있어요. 그래서 AI의 답은 완성품보다 초안으로 생각하면 좋아요.\n날짜·가격·숫자·인용문은 원래 자료와 비교하고, 고객에게 보내기 전에 사람이 읽어 주세요.\n오늘 해보기: “이 답에서 내가 직접 확인해야 할 부분을 알려 줘”라고 다시 물어보세요.'),
+ lesson('protect-info','어떤 정보는 넣지 않아야 하나요?','비밀번호, 고객의 이름·전화번호, 공개하면 안 되는 회사 자료는 허락 없이 넣지 않아요.\n연습할 때는 “김고객, 010-…” 대신 “고객 A”처럼 바꿔 주세요. 사진이나 파일에도 개인정보가 들어 있는지 확인해요.\n기억하기: 다른 사람에게 보여줘도 되는 자료인지 먼저 생각해요.'),
+ lesson('bots-and-work','AI 봇과 자동화는 무엇인가요?','봇은 정해진 일을 하도록 만든 프로그램이에요. AI 봇은 AI를 이용해 글을 정리하거나 질문에 답하는 일을 도와줘요.\n자동화는 여러 일을 순서대로 연결하는 거예요. 예를 들어 “문의가 오면 → 종류를 나누고 → 답변 초안을 만든다”처럼요.\n처음에는 자동 발송 대신 초안 만들기부터 시작하고, 사람이 확인한 뒤 보내세요.'),
+ lesson('first-step','내 일에는 어디부터 쓰면 좋을까요?','매일 반복하지만 잘못되어도 쉽게 고칠 수 있는 작은 일 하나를 골라요.\n예를 들어 회의 메모 정리, 소개 글 제목 만들기, 공개된 자료 요약부터 시작할 수 있어요.\n오늘 해보기: 반복하는 일 3개를 적고, 그중 AI에게 초안을 맡길 일 하나에 동그라미를 쳐 보세요.')
+]};
+function fail(message:string):never{throw Object.assign(Error(message),{status:400});}
+function text(value:unknown,max:number,label:string,required=false){if(typeof value!=='string'||value.length>max||required&&!value.trim())fail(`웰컴 존 ${label}을 확인해 주세요.`);return value.trim();}
+export function welcomeLink(value:unknown){const s=text(value,1200,'링크');if(!s)return '';let u:URL;try{u=new URL(s);}catch{return fail('웰컴 존 링크는 https://로 시작하는 전체 주소를 넣어 주세요.');}if(u.protocol!=='https:'||u.username||u.password||u.port||u.hostname==='localhost'||/^[\d.]+$/.test(u.hostname)||u.hostname.includes(':')||u.hostname.endsWith('.local'))fail('웰컴 존 링크는 공개된 HTTPS 주소를 사용해 주세요.');return u.href;}
+export function validateWelcome(value:unknown):WelcomeSettings{
+ if(!value||typeof value!=='object'||Array.isArray(value))fail('웰컴 존 설정을 확인해 주세요.');const v=value as Record<string,unknown>;
+ if(Object.keys(v).some(k=>!['title','description','videoTitle','videoDescription','videoUrl','notices','lessons'].includes(k)))fail('알 수 없는 웰컴 존 설정입니다.');
+ const articles=(items:unknown,label:string,max:number)=>{if(!Array.isArray(items)||items.length>max)fail(`${label}은 최대 ${max}개까지 등록할 수 있어요.`);const seen=new Set<string>();return items.map((a):WelcomeArticle=>{if(!a||typeof a!=='object'||Object.keys(a).some(k=>!['id','title','body','url','linkLabel','published','pinned'].includes(k))||typeof a.id!=='string'||!/^[-\w]{1,60}$/.test(a.id)||seen.has(a.id)||typeof a.published!=='boolean'||typeof a.pinned!=='boolean')fail(`${label} 설정을 확인해 주세요.`);seen.add(a.id);const url=welcomeLink(a.url);return{id:a.id,title:text(a.title,80,`${label} 제목`,true),body:text(a.body,2000,`${label} 내용`,true),url,linkLabel:text(a.linkLabel,40,`${label} 버튼 이름`,!!url),published:a.published,pinned:a.pinned};});};
+ const videoUrl=text(v.videoUrl,1200,'영상 주소');if(videoUrl&&!youtubeVideoId(videoUrl))fail('웰컴 존 영상은 유튜브 전체 주소를 넣어 주세요.');
+ return{title:text(v.title,80,'제목',true),description:text(v.description,400,'소개'),videoTitle:text(v.videoTitle,80,'다시보기 제목',true),videoDescription:text(v.videoDescription,400,'다시보기 소개'),videoUrl,notices:articles(v.notices,'공지',12),lessons:articles(v.lessons,'AI 기초',12)};
+}
+export function visibleWelcome(settings:WelcomeSettings=DEFAULT_WELCOME):WelcomeSettings{return{...settings,notices:settings.notices.filter(a=>a.published).sort((a,b)=>Number(b.pinned)-Number(a.pinned)),lessons:settings.lessons.filter(a=>a.published)};}
+export function welcomeVideos(settings:WelcomeSettings,resources:CampusResource[]):CampusResource[]{const list=resources.filter(r=>r.published&&r.kind==='youtube');if(!settings.videoUrl)return list;return[{id:'welcome-featured',kind:'youtube',title:settings.videoTitle,description:settings.videoDescription,url:settings.videoUrl,published:true},...list.filter(r=>youtubeVideoId(r.url)!==youtubeVideoId(settings.videoUrl))];}
