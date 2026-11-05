@@ -42,7 +42,7 @@ export function createCouponService(repository: CouponRepository) {
     async register(actor: CouponActor, input: unknown) {
       const body = input && typeof input === "object" ? (input as Record<string, unknown>) : {};
       const code = normalizeCouponCode(body.code);
-      if (body.couponId || !isUuid(body.cohortId) || !code || code.length > COUPON_CODE_MAX_LENGTH) {
+      if (body.couponId || !isUuid(body.cohortId) || !code || code.length > COUPON_CODE_MAX_LENGTH || !/^[A-Z0-9_-]{3,30}(\+[A-Z0-9_-]{3,30})?$/.test(code)) {
         throw new CouponApplicationError("쿠폰 코드와 기수를 확인해 주세요.", 400);
       }
       const result = await repository.quote(actor.id, body.cohortId, code);

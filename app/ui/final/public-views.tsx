@@ -1,4 +1,5 @@
 "use client";
+import {EventBenefitBanner} from '@/features/campus/event/benefit-banner';
 import { contentVisibility } from '@/lib/content-visibility';
 import { MOONSHOT_SUPPORT_URL } from '@/lib/purchase-onboarding';
 import {
@@ -155,7 +156,7 @@ export function ProductDetail({ course, data, user }: { course: Row; data: Data;
     const campaignCourse = { ...course, ...frozen, metadata: { ...object(frozen as Row, "metadata"), ...currentMetadata } } as Row;
     return <CampaignFreeClass course={campaignCourse} config={config as unknown as LandingConfig} resources={productResources(currentMetadata)} />;
   }
-  return <StandardProductDetail course={course} data={data} signedIn={Boolean(user)} />;
+  return <><EventBenefitBanner signedIn={Boolean(user)} cohortIds={(data.cohorts||[]).filter(c=>c.course_id===course.id).map(c=>String(c.id))}/><StandardProductDetail course={course} data={data} signedIn={Boolean(user)} /></>;
 }
 
 function StandardProductDetail({

@@ -1,4 +1,4 @@
-export const COUPON_CODE_MAX_LENGTH = 30;
+export const COUPON_CODE_MAX_LENGTH = 61;
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -9,6 +9,7 @@ export type CouponActor = {
 
 export type CouponQuote = {
   couponCode: string | null;
+  coupons?: {couponCode:string;couponName:string;couponDiscount:number}[];
   couponName?: string;
   originalAmount?: number;
   couponDiscount: number;

@@ -79,7 +79,7 @@ export function Checkout({
     course = (data.courses || []).find((c) => c.id === cohort?.course_id),
     free = !!cohort && num(cohort, "price") === 0;
   const scope = `${user?.id || ''}:${cohortId}`;
-  const couponRegistration = useCheckoutCouponRegistration(cohortId, scope);
+  const couponRegistration = useCheckoutCouponRegistration(cohortId, scope, Boolean(user && !free));
   const coupon = couponRegistration.appliedCode;
   const quote = couponRegistration.quote;
   const couponLoading = couponRegistration.loading;

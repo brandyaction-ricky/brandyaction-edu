@@ -1,3 +1,5 @@
+import {ownedEventQuote} from "@/features/campus/event/server";
+import {isUuid} from "../domain/coupon";
 import { getAuthenticatedUser } from "@/lib/server-auth";
 import {
   CouponApplicationError,
@@ -39,6 +41,11 @@ export async function POST(request: Request) {
     const user = await getAuthenticatedUser();
     if (!user) return reply({ error: "로그인이 필요합니다." }, 401);
     const body = (await request.json()) as unknown;
+    if (body && typeof body === "object" && (body as Record<string,unknown>).action === "event-benefits") {
+      const cohort = (body as Record<string,unknown>).cohortId;
+      if (!isUuid(cohort)) return reply({error:"기수를 확인해 주세요."},400);
+      return reply({quote:await ownedEventQuote(user.id,cohort)});
+    }
     const service = createCouponService(createCouponRepository());
     if (body && typeof body === "object" && (body as Record<string, unknown>).action === "cancel-zero") {
       return reply(await service.cancelZeroOrder(user, (body as Record<string, unknown>).orderId));
