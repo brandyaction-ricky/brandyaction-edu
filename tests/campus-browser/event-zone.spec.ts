@@ -18,13 +18,15 @@ test('claim, receive live coupon, download and move to detail on mobile and desk
  await expect(page.getByText('10만원은 이미 지급됐어요. 라이브 쿠폰은 아래 버튼을 눌러야 추가로 지급돼요.')).toBeVisible();
  await expect(page.getByRole('link',{name:'100,000원 혜택으로 문샷 과정 보기'})).toBeVisible();
  expect(live).toBe(0);
+ await expect(page.getByText('받지 않으면 10만원 할인만 적용돼요!')).toBeVisible();
  await page.screenshot({path:test.info().outputPath('event-before-live-'+test.info().project.name+'.png'),fullPage:true});
  expect(page.url()).not.toContain('invite=');
  await expect(page.getByRole('link',{name:'자료 다운로드'})).toHaveAttribute('href',/file=/);
- await page.getByRole('button',{name:'30만원 더 받고 · 총 40만원 할인받기'}).click();
+ await page.getByRole('button',{name:'30만원 더 받고 총 40만원 할인받기 (클릭)'}).click();
  await expect(page.getByText('라이브 쿠폰 수령 완료')).toBeVisible();expect(live).toBe(1);
- await expect(page.getByRole('button',{name:'30만원 더 받고 · 총 40만원 할인받기'})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'30만원 더 받고 총 40만원 할인받기 (클릭)'})).toHaveCount(0);
  await expect(page.getByRole('heading',{name:'라이브 30만원 쿠폰도 받았어요'})).toBeVisible();
+ await expect(page.getByText('받지 않으면 10만원 할인만 적용돼요!')).toHaveCount(0);
  await expect(page.getByRole('link',{name:'400,000원 혜택으로 문샷 과정 보기'})).toHaveAttribute('href','/classes/moonshot?event='+slug);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
  await page.screenshot({path:test.info().outputPath('event-zone-'+test.info().project.name+'.png'),fullPage:true});
