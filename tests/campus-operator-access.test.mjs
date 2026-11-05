@@ -43,6 +43,9 @@ test('future buyer can read welcome while refunded and expired buyers cannot',as
  const before=process.env.EDU_CAMPUS_ENABLED;process.env.EDU_CAMPUS_ENABLED='true';const render=()=>mod.default({searchParams:Promise.resolve({cohort:id,welcome:'1'})});
  try{const result=await render();assert.equal(result.type,'tour');assert.equal(result.props.review.role,'waiting');assert.equal(result.props.review.room,'welcome');assert.deepEqual(result.props.snapshot.lessons,[]);assert.equal(calls,1);
  for(const patch of [{status:'refunded'},{access_ends_at:'2020-01-01T00:00:00Z'},{user_id:'another'},{revoked_at:'2020-01-01T00:00:00Z'}]){const original=enrollment;enrollment={...original,...patch};const denied=await render();assert.notEqual(denied.type,'tour');assert.equal(calls,1);enrollment=original;}
+ enrollment={...enrollment,access_starts_at:new Date(Date.now()-86400000).toISOString()};
+ await assert.rejects(render(),new RegExp('REDIRECT /campus/workspace\\?enrollmentId='+id+'&section=space&welcome=1'));
+ await assert.rejects(mod.default({searchParams:Promise.resolve({cohort:id})}),new RegExp('REDIRECT /campus/workspace\\?enrollmentId='+id+'&section=space$'));
  }finally{if(before===undefined)delete process.env.EDU_CAMPUS_ENABLED;else process.env.EDU_CAMPUS_ENABLED=before;}
 });
 test('real attendance display is enabled only by the authorized operator preview route',async()=>{

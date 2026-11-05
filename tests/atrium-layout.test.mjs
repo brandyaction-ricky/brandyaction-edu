@@ -21,3 +21,8 @@ test('library trail is a single finite mesh on the open ground aisle and ends at
  for(const p of [...libraryTrail,{x:libraryPortal.x+libraryPortal.w/2,y:libraryPortal.y+libraryPortal.d/2}]){assert.equal(atriumHeightAt(p.x,p.y),0);assert.ok(p.y>20&&p.x>-12);}
  const last=libraryTrail.at(-1);assert.ok(Math.hypot(last.x-(libraryPortal.x+1.5),last.y-(libraryPortal.y+1))<2);
 });
+
+import {ambientNickname} from '../public/campus/world/tour/ambient-nicknames.mjs';
+test('ambient nicknames stay stable and have varied lengths without duplicate names in a full crowd',()=>{
+ const names=Array.from({length:60},(_,i)=>ambientNickname(i));assert.equal(new Set(names).size,60);assert.ok(new Set(names.map(n=>n.length)).size>=5);assert.ok(names.some(n=>/[a-z]/i.test(n)));assert.ok(names.some(n=>/[가-힣]/.test(n)));assert.ok(names.some(n=>/\d/.test(n)));assert.equal(ambientNickname(17),ambientNickname(17));assert.ok(names.every(n=>n.length<=14));
+});

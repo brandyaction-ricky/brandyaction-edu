@@ -1,3 +1,4 @@
+import {ambientNickname} from './ambient-nicknames.mjs';
 import {attachCrowdRenderer} from './crowd-renderer.mjs';
 import {REACTIONS,drawReaction,REACTION_TTL,REACTION_COOLDOWN} from './reactions.mjs';
 /** Real visitors choose presets; examples never speak on their behalf. */
@@ -18,7 +19,7 @@ export function attachVisitorExperience({office,root,send,wake,getRoom,CampusIns
  disclosure();const explanation=document.createElement('small');explanation.className='visitor-ambience-note';explanation.textContent=ambientCount?'공간 안내 캐릭터가 함께 있어요. 실제 접속 수에는 포함하지 않아요.':'';explanation.hidden=!ambientCount;panel.append(population,...(operatorReview?[count]:[]),toggle,hint,grid,feedback,explanation);document.body.append(panel);
  if(qaCrowd||ambientCount)void import('./qa-crowd-layout.mjs').then(m=>{if(!closed)simulation={people:m.crowdLayout(ambientCount||60),motion:m.crowdMotion};});
  function tick(now){if(!active)return;crowd?.tick(now);if(own&&own.expiresAt<=Date.now()){own=null;feedback.textContent='';root.dataset.ownReaction='';wake();}if(now-last<500)return;last=now;let expired=false;for(const p of people)if(p.reaction&&p.reaction.expiresAt<=Date.now()){delete p.reaction;expired=true;}if(expired){crowd?.set(people);wake();}const a=office.campusAvatar;if(!a)return;
-  if(simulation&&getRoom()==='live')crowd.set([...people,...simulation.people.map((p,i)=>({...simulation.motion(p,i,Date.now()/1000),id:(ambientCount?'guide-':'qa-example-')+i,ambient:true,nickname:ambientCount?['루나','노바','아리','하루','별이','도담','리오','다온'][i%8]:'검수 동료 '+(i+1),gender:i%2?'female':'male',model:i%6,coat:['#386eb4','#ad7258','#537f69','#8173aa'][i%4],skin:'#e8b68b',hair:'#302825'}))]);
+  if(simulation&&getRoom()==='live')crowd.set([...people,...simulation.people.map((p,i)=>({...simulation.motion(p,i,Date.now()/1000),id:(ambientCount?'guide-':'qa-example-')+i,ambient:true,nickname:ambientCount?ambientNickname(i):'검수 동료 '+(i+1),gender:i%2?'female':'male',model:i%6,coat:['#386eb4','#ad7258','#537f69','#8173aa'][i%4],skin:'#e8b68b',hair:'#302825'}))]);
   if(devPresence&&['live','library'].includes(getRoom()))send('dev-visitor-move',{room:getRoom(),nickname:office.campusIdentity?.displayId,x:a.x,y:a.y,yaw:a.yaw,moving:a.moving,coat:office.campusIdentity?.coat,skin:office.campusIdentity?.skinColor,hair:office.campusIdentity?.hairColor,pants:office.campusIdentity?.pantsColor,gender:office.campusIdentity?.gender,model:office.campusIdentity?.model,heldItem:office.campusIdentity?.heldItem});
  }
  const motionTimer=setInterval(()=>{if(active&&simulation&&!document.hidden&&getRoom()==='live')wake();},500);
