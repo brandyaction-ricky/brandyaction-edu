@@ -10,6 +10,7 @@ type Template = { id: string; name: string; channel: PurchaseChannel; content: s
 type Batch = { id: string; channel: PurchaseChannel; subject: string | null; content: string; count: number; scheduled_at: string; status: string; accepted_count: number; failed_count: number; skipped_count: number; unknown_count: number; pending_count: number };
 type Setup = { buyers: Buyer[]; templates: Template[]; channels: Record<PurchaseChannel, boolean>; history: Batch[] };
 const statuses: Record<string, string> = { scheduled: '예약 대기', sending: '처리 중', completed: '처리 완료', failed: '발송 전 확인 필요', unknown: '결과 확인 필요', cancelled: '취소됨', partially_cancelled: '남은 대상 취소됨' };
+const templateChannels = ['sms', 'lms', 'alimtalk'] as const;
 
 export function PurchaseBuyerDelivery({ cohort, productId }: { cohort: string; productId?: string }) {
   const [setup, setSetup] = useState<Setup | null>(null);
@@ -32,9 +33,13 @@ export function PurchaseBuyerDelivery({ cohort, productId }: { cohort: string; p
   const requestId = useRef('');
   const requestBusy = useRef(false);
   const template = setup?.templates.find(row => row.id === templateId && row.channel === channel);
+  const templateGroups = templateChannels.map(templateChannel => ({
+    channel: templateChannel,
+    templates: setup?.templates.filter(row => row.channel === templateChannel) ?? [],
+  })).filter(group => group.templates.length > 0);
   const token = purchaseRoomToken(channel);
   const textChannel = channel === 'sms' || channel === 'lms' ? channel : null;
-  const directText = Boolean(textChannel && !templateId);
+  const directText = Boolean(textChannel && !template);
   const textLimit = textChannel ? purchaseTextLimits[textChannel] : 0;
   const textBytes = directText ? purchaseTextBytes(textMessage.trim()) : 0;
   const needsRoom = Boolean(template?.content.includes(token));
@@ -74,14 +79,14 @@ export function PurchaseBuyerDelivery({ cohort, productId }: { cohort: string; p
   }, [cohort, reload]);
 
   function edit() { setReview(false); requestId.current = ''; }
-  function chooseChannel(next: PurchaseChannel) {
+  function chooseChannel(next: PurchaseChannel, nextTemplateId = '') {
     if (purchaseHistoryChannel(next) !== purchaseHistoryChannel(channel)) {
       setSelected([]);
       setRecipientFilter('ready');
     }
     setChannel(next);
     setVisibleCount(100);
-    setTemplateId('');
+    setTemplateId(nextTemplateId);
     edit();
   }
   function chooseRecipientFilter(next: RecipientFilter) {
@@ -105,7 +110,7 @@ export function PurchaseBuyerDelivery({ cohort, productId }: { cohort: string; p
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(cancel ? { action: 'cancel', cohort, id: cancel } : {
           action: 'schedule', cohort, id: requestId.current, channel, recipients: selected,
-          templateId, templateVersion: template?.version, roomLink, subject, content: directText ? textMessage : content,
+          templateId: template?.id ?? '', templateVersion: template?.version, roomLink, subject, content: directText ? textMessage : content,
           scheduledAt: new Date(at).toISOString(),
         }),
       });
@@ -123,7 +128,6 @@ export function PurchaseBuyerDelivery({ cohort, productId }: { cohort: string; p
   return <section id="buyer-delivery" className="onboarding-panel onboarding-delivery">
     <h2>2. 구매자 공지 보내기</h2>
     <p>모집 마감 후 공지방을 정하고, 결제자 전체 또는 방별로 선택해 안내를 예약하세요.</p>
-    <p className="meta">채널별로 예약할 수 있습니다. 문자는 바로 작성하거나 저장한 문구를 고르고, 알림톡은 승인된 문구를 사용합니다.</p>
     <div className="onboarding-actions">
       <Link className="btn" href={templatesHref}>메시지 템플릿 관리</Link>
       <button className="btn" type="button" disabled={busy} onClick={() => { edit(); setSelected([]); setSetup(null); setReload(value => value + 1); }}>대상·이력 새로고침</button>
@@ -131,6 +135,18 @@ export function PurchaseBuyerDelivery({ cohort, productId }: { cohort: string; p
     {setup && <>
       <fieldset className="onboarding-admin-fields" disabled={busy}>
         <legend>발송 예약</legend>
+        <div className="onboarding-template-picker">
+          <label>저장한 문자·알림톡 불러오기<select value={template?.id ?? ''} aria-describedby="buyer-template-help" disabled={!templateGroups.length} onChange={event => {
+            const picked = setup.templates.find(item => item.id === event.target.value);
+            chooseChannel(picked?.channel ?? channel, picked?.id);
+          }}>
+            <option value="">{templateGroups.length ? '저장한 문구를 선택하세요' : '저장된 문자·알림톡이 없습니다'}</option>
+            {templateGroups.map(group => <optgroup key={group.channel} label={group.channel === 'alimtalk' ? '승인된 카카오 알림톡' : purchaseChannelLabels[group.channel]}>
+              {group.templates.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </optgroup>)}
+          </select></label>
+          <p className="meta" id="buyer-template-help">{templateGroups.length ? '문구를 고르면 발송 채널이 자동으로 바뀝니다. 문자와 이메일은 아래에서 직접 작성할 수도 있어요.' : '위의 메시지 템플릿 관리에서 문구를 등록하면 여기에 표시됩니다.'}</p>
+        </div>
         <label>채널<select value={channel} onChange={event => chooseChannel(event.target.value as PurchaseChannel)}>
           {purchaseChannels.map(item => <option key={item} value={item}>{purchaseChannelLabels[item]}{setup.channels[item] ? '' : ' · 설정 필요'}</option>)}
         </select></label>
@@ -138,18 +154,17 @@ export function PurchaseBuyerDelivery({ cohort, productId }: { cohort: string; p
         {channel === 'email' ? <>
           <label>이메일 제목<input value={subject} maxLength={120} onChange={event => { setSubject(event.target.value); edit(); }} /></label>
           <label>이메일 내용<textarea rows={5} maxLength={4000} value={content} onChange={event => { setContent(event.target.value); edit(); }} /></label>
-        </> : <>
-          <label>정보성 메시지 템플릿<select value={templateId} onChange={event => { setTemplateId(event.target.value); edit(); }}>
-            <option value="">{textChannel ? '직접 작성' : '승인된 템플릿 선택'}</option>
-            {setup.templates.filter(item => item.channel === channel).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </select></label>
-          {directText && <>
-            <label>문자 내용<textarea rows={5} maxLength={2000} value={textMessage} onChange={event => { setTextMessage(event.target.value); edit(); }} /></label>
-            <p className="meta">{textBytes === null ? '이모지 등 문자 발송에서 지원하지 않는 문자를 지워 주세요.' : `${textBytes.toLocaleString('ko-KR')} / ${textLimit.toLocaleString('ko-KR')}바이트`}{textChannel === 'sms' && (textBytes ?? 0) > textLimit && ' · 더 긴 내용은 장문 문자를 선택해 주세요.'}</p>
-            <p className="meta">수강·입장 안내처럼 결제자가 알아야 할 내용만 입력하세요. 링크도 본문에 붙여넣을 수 있습니다.</p>
-          </>}
+        </> : directText && <>
+          <label>문자 내용<textarea rows={5} maxLength={2000} value={textMessage} onChange={event => { setTextMessage(event.target.value); edit(); }} /></label>
+          <p className="meta">{textBytes === null ? '이모지 등 문자 발송에서 지원하지 않는 문자를 지워 주세요.' : `${textBytes.toLocaleString('ko-KR')} / ${textLimit.toLocaleString('ko-KR')}바이트`}{textChannel === 'sms' && (textBytes ?? 0) > textLimit && ' · 더 긴 내용은 장문 문자를 선택해 주세요.'}</p>
+          <p className="meta">수강·입장 안내처럼 결제자가 알아야 할 내용만 입력하세요. 링크도 본문에 붙여넣을 수 있습니다.</p>
         </>}
+        {channel === 'alimtalk' && !template && <p className="meta">{templateGroups.some(group => group.channel === 'alimtalk') ? '위에서 승인된 카카오 알림톡 문구를 선택해 주세요.' : '사용할 수 있는 승인된 알림톡 문구가 없습니다. 위의 메시지 템플릿 관리에서 등록 상태를 확인해 주세요.'}</p>}
         {needsRoom && <label>배정할 텔레그램 공지방 링크<input type="url" value={roomLink} maxLength={500} placeholder="https://t.me/+..." onChange={event => { setRoomLink(event.target.value); edit(); }} /></label>}
+        {template && <div className="onboarding-template-preview" role="region" aria-label="선택한 문구">
+          <strong>선택한 문구</strong>
+          <p className="onboarding-message-copy">{needsRoom ? template.content.replaceAll(token, roomLink.trim() || '[입력한 텔레그램 링크]') : template.content}</p>
+        </div>}
         <p aria-live="polite">전체 결제자 <strong>{setup.buyers.length.toLocaleString('ko-KR')}명</strong> · 발송 가능 <strong>{availableCount.toLocaleString('ko-KR')}명</strong> · 선택 <strong>{selected.length.toLocaleString('ko-KR')}명</strong></p>
         <label>발송 이력<select value={recipientFilter} onChange={event => chooseRecipientFilter(event.target.value as RecipientFilter)}>
           <option value="ready">미발송 · {ready.length.toLocaleString('ko-KR')}명</option>
