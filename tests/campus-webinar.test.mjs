@@ -62,3 +62,17 @@ test('public activity is bound to its published event and cannot submit member o
  state.event.status='draft';assert.equal((await publicActivity.POST(request(body),params)).status,404);state.event.status='paused';assert.equal((await publicActivity.POST(request(body),params)).status,404);assert.equal(state.events.length,1);
  assert.equal((await publicActivity.POST(req('/api/campus/webinar/'+config.slug+'/activity',body,{origin:'https://evil.test'}),params)).status,403);
 });
+
+const capability=await route('app/api/campus/operator-access/route.ts');
+test('operator capability is private, minimal and never grants anonymous or suspended accounts access',async()=>{
+ for(const user of [null,{role:'student',status:'active'},{role:'admin',status:'suspended'},{role:'admin',status:'active'},{role:'staff',status:'active'}]){
+  reset();state.user=user;const response=await capability.GET(req('/api/campus/operator-access'));
+  assert.equal(response.status,200);assert.match(response.headers.get('cache-control'),/private, no-store/);assert.equal(response.headers.get('vary'),'Cookie');
+  assert.deepEqual(await response.json(),{allowed:user?.status==='active'&&['admin','staff'].includes(user?.role)});assert.deepEqual(state.queries,[]);
+ }
+ reset();state.authError=true;assert.equal((await capability.GET(req())).status,503);
+ reset();assert.equal((await capability.GET(req('/',undefined,{'sec-fetch-site':'cross-site'}))).status,403);
+});
+test('webinar access recognizes active operators before any enrollment lookup',async()=>{
+ for(const role of ['admin','staff']){reset();state.user={id:id(2),role,status:'active'};const response=await access.GET(req(),params);assert.deepEqual(await response.json(),{kind:'operator',href:'/campus/operator?room=welcome&cohort='+config.cohortId});assert.ok(!state.queries.includes('enrollments'));}
+});

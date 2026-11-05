@@ -1,3 +1,4 @@
+import {libraryPortal} from './library-wayfinding.mjs';
 import {paintLibrarySign} from './library-signs.mjs';
 import {BotOfficeModel} from '../office/bot-profile.mjs';
 import {toBotOfficeSessions} from '../office/office-view-adapter.mjs';
@@ -64,7 +65,7 @@ function createScene(id){room=id;const group=new office.room.constructor();group
  group.visible=false;
 }
 const furniture=id=>Interior.getCampusInterior('study').find(i=>i.id===id);
-function actions(){if(room==='library')return [['library:files','무료 자료 받기','눌러서 파일 다운로드',{x:-7,y:8,w:4,d:1,height:.7}],['library:replay','다시보기 선택','눌러서 영상 목록 보기',{x:3,y:6,w:5,d:1,height:.65}],['destination:live','오픈 캠퍼스로','동료들과 다시 만나기',{x:-1,y:20,w:2,d:1,height:1}]];if(room==='live')return publicVisitor?[...openCampusActions,['destination:library','문샷 자료실','무료 자료 · 다시보기',{x:-10,y:9,w:3,d:2,height:2}]]:[...openCampusActions,['live-video','라이브 보기','영상 안내',{x:-4,y:-5,w:4,d:1,height:4}]];const desk=Plan.getStudyDesks()[0],books=Plan.getStudyBookcase();return {
+function actions(){if(room==='library')return [['library:files','무료 자료 받기','눌러서 파일 다운로드',{x:-7,y:8,w:4,d:1,height:.7}],['library:replay','다시보기 선택','눌러서 영상 목록 보기',{x:3,y:6,w:5,d:1,height:.65}],['destination:live','오픈 캠퍼스로','동료들과 다시 만나기',{x:-1,y:20,w:2,d:1,height:1}]];if(room==='live')return publicVisitor?[...openCampusActions,['destination:library','문샷 자료실','무료 자료 · 다시보기',libraryPortal]]:[...openCampusActions,['destination:library','문샷 자료실','무료 자료 · 다시보기',libraryPortal],['live-video','라이브 보기','영상 안내',{x:-4,y:-5,w:4,d:1,height:4}]];const desk=Plan.getStudyDesks()[0],books=Plan.getStudyBookcase();return {
  live:[['live-video','라이브 보기','무대 스크린',{x:-2,y:2,w:4,d:1,height:3}],['experience','AI 체험하기','작은 요청부터',{x:-5,y:13,w:2,d:1,height:1}],['offer','교육·상담 안내','내 다음 도약',{x:10,y:10,w:1.5,d:3,height:2}],['destination:study','문샷 공부방','어떤 곳일까요?',{x:-10,y:19,w:2,d:2,height:2}],['destination:office','내 AI 사무실','어떤 곳일까요?',{x:5,y:17,w:2,d:2,height:2}]],
  welcome:[['video','라이브 다시보기','놓친 내용 다시 보기',{x:-2,y:3,w:5,d:1,height:3}],['quiz','OX 퀴즈','02 · 안전한 AI 활용',{x:-6,y:11,w:3,d:2,height:2}],['level','AI 수준 확인','03 · 나에게 맞는 시작',{x:4,y:11,w:3,d:2,height:2}],['notices','공지사항','일정 · 수업 준비',{x:-2,y:18,w:6,d:1,height:1}],['basics','AI 기초 지식','쉬운 예시로 시작하기',{x:8,y:16,w:2,d:2,height:2}]],
  study:[['learning','수업·과제','오늘의 실행',{x:books.x,y:books.y,w:books.width,d:.6,height:2}],['focus','앉아서 집중','25분 시작',{...desk,w:2.8,d:1,height:1}],['feedback','동료 피드백','함께 더 나은 결과',furniture('study-low-shelf')]],

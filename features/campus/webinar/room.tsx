@@ -1,7 +1,7 @@
 'use client';
 import {campusActivity} from '../analytics/client';
 import {CustomerQuiz} from './customer-quiz';
-import {lazy,Suspense,useEffect,useRef} from 'react';
+import {lazy,Suspense,useEffect,useRef,useState} from 'react';
 import {ArrowUpRight,BookOpen,Bot,Check} from 'lucide-react';
 import type {CampusSnapshot} from '../contracts';
 import {ResourceLibrary} from './resource-library';
@@ -17,9 +17,11 @@ const stories={
  welcome:{title:'문샷 웰컴 존',eyebrow:'구매한 순간부터, 첫 수업을 준비하는 곳',description:'개강 전에도 작은 준비를 시작할 수 있어요. 처음이라 낯선 AI를 한 걸음씩 만나보세요.',steps:[['첫 안내','라이브 다시보기와 공지로 수업을 준비해요.'],['OX 퀴즈','AI를 안전하게 쓰는 기본을 익혀요.'],['내 시작점','간단한 질문으로 어느 부분부터 연습할지 살펴봐요.']],note:'구매자에게 열리는 준비 공간입니다. 개강일과 정규 수업 이용 기간은 과정 안내에서 확인하세요.'},
 } as const;
 export function WebinarRoom({event,demo=false,devReview=false,qaCrowd=false,collectActivity=true,operatorReview=false}:{event:PublicWebinar;demo?:boolean;devReview?:boolean;qaCrowd?:boolean;collectActivity?:boolean;operatorReview?:boolean}){
+ const [operator,setOperator]=useState(operatorReview);
+ useEffect(()=>{if(operatorReview)return;const controller=new AbortController();void fetch('/api/campus/operator-access',{cache:'no-store',signal:controller.signal}).then(r=>r.ok?r.json():null).then(result=>{if(result?.allowed===true)setOperator(true);}).catch(()=>{});return()=>controller.abort();},[operatorReview]);
  const sent=useRef(new Set<string>());
  function record(name:WebinarEvent){if(['detail','consult','checkout'].includes(name))campusActivity(name as 'detail'|'consult'|'checkout');if(demo||devReview||sent.current.has(name))return;sent.current.add(name);try{let session=sessionStorage.getItem('edu-visit');if(!session){session=crypto.randomUUID();sessionStorage.setItem('edu-visit',session);}void fetch(`/api/campus/webinar/${event.slug}/events`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session,event:name}),keepalive:true}).catch(()=>{});}catch{/* Entry works even without browser storage. */}}
- return <Suspense fallback={<main className={styles.loading} role="status">문샷 공간과 캐릭터를 준비하고 있어요…</main>}><Tour snapshot={visitorSnapshot} visitor={{analyticsScope:!demo&&collectActivity?event.slug:undefined,presenceId:event.slug,devPresence:devReview,qaCrowd:devReview&&qaCrowd,ambientCount:event.ambientCount??40,operatorReview,title:event.title,onEnter:()=>record('entry'),onActivity:id=>{if(id==='experience')record('experience');},renderGate:room=><SpaceInvitation key={room} room={room} event={event} demo={demo} record={record}/>,renderTool:(tool,onPlay)=>tool.startsWith('library:')?<ResourceLibrary onPlay={onPlay} items={event.resources} initial={tool==='library:all'?'all':tool==='library:replay'?'youtube':'file'}/>:tool==='experience'?<CustomerQuiz/>:tool.startsWith('story:')?<Story topic={tool.slice(6)} event={event} demo={demo} record={record}/>:<CourseDetail event={event} demo={demo} record={record}/>}}/></Suspense>;
+ return <Suspense fallback={<main className={styles.loading} role="status">문샷 공간과 캐릭터를 준비하고 있어요…</main>}><Tour snapshot={visitorSnapshot} visitor={{analyticsScope:!demo&&collectActivity?event.slug:undefined,presenceId:event.slug,devPresence:devReview,qaCrowd:devReview&&qaCrowd,ambientCount:event.ambientCount??40,operatorReview:operator,operatorEvent:event.slug,title:event.title,onEnter:()=>record('entry'),onActivity:id=>{if(id==='experience')record('experience');},renderGate:room=><SpaceInvitation key={room} room={room} event={event} demo={demo} record={record}/>,renderTool:(tool,onPlay)=>tool.startsWith('library:')?<ResourceLibrary onPlay={onPlay} items={event.resources} initial={tool==='library:all'?'all':tool==='library:replay'?'youtube':'file'}/>:tool==='experience'?<CustomerQuiz/>:tool.startsWith('story:')?<Story topic={tool.slice(6)} event={event} demo={demo} record={record}/>:<CourseDetail event={event} demo={demo} record={record}/>}}/></Suspense>;
 }
 function SpaceInvitation({room,event,demo,record,general=false}:{room:TourRoom;event:PublicWebinar;demo:boolean;record:(name:WebinarEvent)=>void;general?:boolean}){
  const story=stories[room==='office'?'office':room==='welcome'?'welcome':'study'];

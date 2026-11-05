@@ -5,6 +5,7 @@ new Function('exports','require',ts.transpileModule(readFileSync('proxy.ts','utf
 const call=(pathname,method='GET')=>proxyModule.proxy({nextUrl:{pathname},method});
 test('published event ingress and necessary presentation assets pass before private campus gate',async()=>{
  for(const path of ['/campus/live/moonshot-open-1107','/campus/world/tour/index.html','/campus/world/tour/tour.mjs','/campus/world/office/vendor/office3d.js','/campus/world/office/vendor/assets/kenney/characters/character-male-a.glb','/campus/showcase/learning-knowledge-full-v2.mp4'])for(const method of ['GET','HEAD'])assert.equal(await call(path,method),'public',path);
+ assert.equal(await call('/api/campus/operator-access'),'public');
  assert.equal(await call('/api/campus/webinar/moonshot-open-1107/resources/guide'),'public');for(const name of ['events','activity'])assert.equal(await call('/api/campus/webinar/moonshot-open-1107/'+name,'POST'),'public');assert.equal(gates,0);assert.equal(sessions,0);
 });
 test('private member/admin/QA APIs and writes never inherit the public exemption',async()=>{

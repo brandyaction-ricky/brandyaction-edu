@@ -1,3 +1,4 @@
+import {buildLibraryTrail} from './library-wayfinding.mjs';
 import {atriumFinish} from './atrium-finish.mjs';
 import {atriumHeightAt} from './atrium-layout.mjs';
 export {atriumHeightAt} from './atrium-layout.mjs';
@@ -10,6 +11,7 @@ export function buildLunarAtrium(office,group,box){
  // The blue floor guide curves around the staircase, leaving a clear central arrival axis.
  const route=[];for(let i=0;i<=40;i++){const t=i/40;route.push([4+Math.sin(t*Math.PI)*3,.018,33-t*29]);}
  for(let i=1;i<route.length;i++)a.beam(route[i-1],route[i],.035,blue,'glow');
+ buildLibraryTrail(a);
  // Real glass panels span a generous barrel vault, with slender steel mullions.
  const arch=t=>[-22*Math.cos(t),5+10*Math.sin(t)];
  for(const y of[-9,3,15,30])for(let i=0;i<20;i++){const p=arch(i/20*Math.PI),q=arch((i+1)/20*Math.PI);a.beam([p[0],p[1],y],[q[0],q[1],y],.15,0x6f7b83);}
