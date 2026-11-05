@@ -8,7 +8,7 @@ import {eventViewFixture} from './event';
 import type {EventSettings,EventView} from '../../features/campus/event/model';
 import '../../app/ui/final/tokens.css';
 const id='00000000-0000-4000-8000-000000000001',key='moonshot-event-review';
-const defaults:EventSettings={...eventViewFixture,cohortId:id,enabled:true,resources:[{id,title:'고객의 마음을 발견하는 AI 질문 모음',description:'내 사업에 맞는 질문을 골라 바로 실행해 보세요.',fileName:'문샷-이벤트-자료.txt',storagePath:`edu/campus-event/moonshot-winners-1108/${id}/${id}.txt`,published:true}]};
+const defaults:EventSettings={...eventViewFixture,cohortId:id,liveEndsAt:'2026-11-08T14:59:59.999Z',enabled:true,resources:[{id,title:'고객의 마음을 발견하는 AI 질문 모음',description:'내 사업에 맞는 질문을 골라 바로 실행해 보세요.',fileName:'문샷-이벤트-자료.txt',storagePath:`edu/campus-event/moonshot-winners-1108/${id}/${id}.txt`,published:true}]};
 let settings:EventSettings=JSON.parse(localStorage.getItem(key)||'null')||defaults;
 const state=()=>({claimed:localStorage.getItem(key+'-claim')==='1',live:localStorage.getItem(key+'-live')==='1'});
 const view=():EventView=>({...eventViewFixture,...settings,claimed:state().claimed,liveOwned:state().live,resources:state().claimed?settings.resources:[],quote:state().claimed?{couponCode:state().live?'1108+WIN_PREVIEW':'WIN_PREVIEW',couponDiscount:state().live?400000:100000,totalAmount:state().live?600000:900000}:null});

@@ -14,7 +14,7 @@ export async function GET(request:Request){try{
  if(z.error||c.error||h.error)throw z.error||c.error||h.error;
  let invites:unknown[]=[],counts:Record<string,number>={};
  if(slug){const zone=z.data.find(z=>z.slug===slug);if(zone){const [i,stats]=await Promise.all([db.from('edu_event_invites').select('id,label,user_id,claimed_at,revoked_at,created_at').eq('zone_id',zone.id).order('created_at',{ascending:false}).limit(1000),db.rpc('edu_event_stats',{p_zone:zone.id})]);if(i.error||stats.error)throw i.error||stats.error;invites=i.data;counts=stats.data;}}
- return privateReply({zones:z.data.map(z=>({...z,couponEndsAt:c.data.find(c=>c.id===z.bonus_coupon_id)?.ends_at})),cohorts:h.data,liveCoupon:c.data.find(c=>c.code==='1108')||null,invites,counts});
+ return privateReply({zones:z.data.map(z=>({...z,couponEndsAt:c.data.find(c=>c.id===z.bonus_coupon_id)?.ends_at,liveEndsAt:c.data.find(c=>c.id===z.live_coupon_id)?.ends_at})),cohorts:h.data,liveCoupon:c.data.find(c=>c.code==='1108')||null,invites,counts});
 }catch(e){return problem(e);}}
 export async function POST(request:Request){try{
  if(request.headers.get('origin')!==new URL(request.url).origin)fail('요청 출처를 확인해 주세요.',403);

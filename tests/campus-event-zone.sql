@@ -9,7 +9,8 @@ begin
  insert into public.courses(id,course_code,title,slug,category,status,list_price) values(course,'EVENT-QA','Event QA','event-qa','paid_class','published',1000000);
  insert into public.cohorts(id,cohort_code,course_id,name,status,price,recruitment_start_at,recruitment_end_at) values(cohort,'EVENT-QA',course,'Event QA','recruiting',1000000,now()-interval '1 day',now()+interval '7 days');
  insert into public.coupons(id,name,code,discount_type,discount_value,product_scope,per_user_limit,ends_at) values(live,'라이브 30만원','1108','fixed',300000,'all',1,now()+interval '7 days');
- zone:=public.edu_event_save(admin,jsonb_build_object('slug','event-qa','title','당첨자','description','QA','cohortId',cohort,'claimEndsAt',now()+interval '1 day','couponEndsAt',now()+interval '3 days','enabled',true,'resources','[]'::jsonb),null);
+ zone:=public.edu_event_save(admin,jsonb_build_object('slug','event-qa','title','당첨자','description','QA','cohortId',cohort,'claimEndsAt',now()+interval '1 day','couponEndsAt',now()+interval '3 days','liveEndsAt',now()+interval '2 days','enabled',true,'resources','[]'::jsonb),null);
+ if (select ends_at from public.coupons where id=live)<>now()+interval '2 days' then raise exception 'QA_LIVE_DEADLINE';end if;
  select bonus_coupon_id into bonus from public.edu_event_zones where id=zone;
  select c.code into code from public.coupons c where id=bonus;
  insert into public.edu_event_invites(zone_id,token_hash) values(zone,repeat('a',64));
@@ -51,6 +52,10 @@ begin
  update public.cohorts set price=250000 where id=cohort;
  q:=public.edu_event_quote(member,cohort,'1108+'||code);
  if jsonb_array_length(q->'coupons')<>1 or q->>'couponCode'<>'1108' then raise exception 'QA_UNUSED_BONUS %',q;end if;
+ update public.coupons set ends_at=now()-interval '1 second' where id=live;
+ if (public.edu_event_owned_quote(member,cohort)->>'couponDiscount')::integer<>100000 then raise exception 'QA_LIVE_EXPIRED_FALLBACK';end if;
+ begin perform public.edu_event_claim(member,'event-qa','',true);raise exception 'QA_LIVE_EXPIRED_CLAIM';exception when raise_exception then if sqlerrm<>'COUPON_EXPIRED' then raise;end if;end;
+ update public.coupons set ends_at=now()+interval '1 day' where id=live;
  update public.coupons set ends_at=now()-interval '1 second' where id=bonus;
  begin perform public.edu_event_quote(member,cohort,'1108+'||code);raise exception 'QA_EXPIRY';exception when raise_exception then if sqlerrm<>'COUPON_EXPIRED' then raise;end if;end;
  if has_table_privilege('authenticated','edu_event_invites','select') or has_table_privilege('anon','edu_event_zones','select') or has_function_privilege('authenticated','public.edu_event_claim(uuid,text,text,boolean)','execute') then raise exception 'QA_PUBLIC_ACCESS';end if;

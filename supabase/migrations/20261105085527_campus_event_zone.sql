@@ -220,10 +220,10 @@ begin
  end if;
 end; $$;
 
--- Only the named pair may stack. Configuration does not alter an existing live coupon.
+-- Only the named pair may stack. The operator explicitly sets the shared live coupon expiry.
 create function public.edu_event_save(p_actor uuid,p_values jsonb,p_expected uuid default null)
 returns uuid language plpgsql security invoker set search_path='' as $$
-declare z public.edu_event_zones%rowtype; live public.coupons%rowtype; bonus uuid; course uuid; zid uuid; deadline timestamptz; expiry timestamptz;
+declare z public.edu_event_zones%rowtype; live public.coupons%rowtype; bonus uuid; course uuid; zid uuid; deadline timestamptz; expiry timestamptz; live_expiry timestamptz;
 begin
  if not exists(select 1 from public.profiles where id=p_actor and status='active' and role in ('admin','staff')) then raise exception 'ADMIN_REQUIRED';end if;
  select * into z from public.edu_event_zones where slug=p_values->>'slug' for update;
@@ -234,9 +234,10 @@ begin
  select * into live from public.coupons where code='1108';
  if not found or live.discount_type<>'fixed' or live.discount_value<>300000 or not live.is_active or live.is_draft then raise exception 'EVENT_LIVE_COUPON_REQUIRED';end if;
  if live.product_scope='specific' and not exists(select 1 from public.coupon_products where coupon_id=live.id and course_id=course) then raise exception 'COUPON_PRODUCT_MISMATCH';end if;
- deadline:=(p_values->>'claimEndsAt')::timestamptz;expiry:=(p_values->>'couponEndsAt')::timestamptz;
- if deadline is null or expiry is null or deadline>expiry then raise exception 'EVENT_INVALID';end if;
+ deadline:=(p_values->>'claimEndsAt')::timestamptz;expiry:=(p_values->>'couponEndsAt')::timestamptz;live_expiry:=(p_values->>'liveEndsAt')::timestamptz;
+ if deadline is null or expiry is null or live_expiry is null or deadline>expiry then raise exception 'EVENT_INVALID';end if;
  if z.id is not null and (z.cohort_id<>(p_values->>'cohortId')::uuid or z.live_coupon_id<>live.id) then raise exception 'EVENT_TARGET_IMMUTABLE';end if;
+ update public.coupons set ends_at=live_expiry where id=live.id;
  zid:=coalesce(z.id,gen_random_uuid());bonus:=coalesce(z.bonus_coupon_id,gen_random_uuid());
  if z.id is null then
   insert into public.coupons(id,name,code,discount_type,discount_value,per_user_limit,product_scope,exclude_free,issue_target,issue_end_at,ends_at,created_by)
