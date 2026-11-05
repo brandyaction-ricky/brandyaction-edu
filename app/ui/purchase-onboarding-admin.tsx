@@ -103,7 +103,7 @@ export function PurchaseOnboardingAdmin({ productId, initialCohort }: { productI
     } catch (cause) { setError(cause instanceof Error ? cause.message : '저장하지 못했습니다.'); }
     finally { setPending(false); }
   };
-  return <main className="edu-front purchase-onboarding"><div className="wrap narrow">
+  return <main className="edu-front purchase-onboarding purchase-onboarding-admin"><div className="wrap narrow">
     <AdminReturnLink fallback={productId ? '/admin/product-editor?id=' + encodeURIComponent(productId) : '/admin/products'} fallbackLabel={productId ? '상품 수정' : '상품 관리'} />
     <p className="eyebrow mt24">PURCHASE ONBOARDING</p><h1>결제 후 안내 설정</h1>
     {productId && courseTitle(cohorts[0]) && <p className="lead">{courseTitle(cohorts[0])}</p>}

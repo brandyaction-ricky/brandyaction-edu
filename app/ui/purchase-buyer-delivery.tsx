@@ -30,6 +30,7 @@ export function PurchaseBuyerDelivery({ cohort, productId }: { cohort: string; p
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [reload, setReload] = useState(0);
+  const [guideOpen, setGuideOpen] = useState(false);
   const requestId = useRef('');
   const requestBusy = useRef(false);
   const template = setup?.templates.find(row => row.id === templateId && row.channel === channel);
@@ -125,7 +126,28 @@ export function PurchaseBuyerDelivery({ cohort, productId }: { cohort: string; p
     finally { requestBusy.current = false; setBusy(false); }
   }
 
-  return <section id="buyer-delivery" className="onboarding-panel onboarding-delivery">
+  return <div className="onboarding-delivery-layout">
+    <aside className="onboarding-delivery-guide" aria-labelledby="buyer-delivery-guide-title">
+      <div className="onboarding-delivery-guide-heading">
+        <div>
+          <p className="onboarding-delivery-guide-eyebrow">옆에서 보는 사용 안내</p>
+          <h2 id="buyer-delivery-guide-title">두 방으로 나눠 보내기</h2>
+        </div>
+        <button className="btn onboarding-delivery-guide-toggle" type="button" aria-expanded={guideOpen} aria-controls="buyer-delivery-guide-content" onClick={() => setGuideOpen(open => !open)}>{guideOpen ? '안내 접기' : '안내 보기'}</button>
+      </div>
+      <div id="buyer-delivery-guide-content" className="onboarding-delivery-guide-content" data-open={guideOpen}>
+        <p className="onboarding-delivery-guide-intro">같은 기수 · 서로 다른 링크 · 예약 2건</p>
+        <ol>
+          <li><strong>기수와 알림톡 선택</strong><p>위에서 안내할 기수를 고르고, ‘저장한 문자·알림톡 불러오기’에서 승인된 공지방 안내를 선택하세요.</p></li>
+          <li><strong>첫 번째 그룹 예약</strong><p>구매자 검색을 비우고 ‘미발송’에서 ‘절반 선택’을 누르세요. 첫 번째 방 링크와 발송 시각을 입력한 뒤 ‘대상·문구 확인’ → ‘확인한 내용으로 발송 예약’을 누르세요.</p></li>
+          <li><strong>저장 완료 후 새로고침</strong><p>‘발송 예약을 저장했습니다.’가 표시되면 ‘대상·이력 새로고침’을 누르세요.</p></li>
+          <li><strong>남은 인원은 두 번째 방으로</strong><p>‘미발송’에서 ‘발송 가능한 전체 선택’을 누르세요. 두 번째 방 링크로 바꾼 뒤 발송 시각을 입력하고 다시 확인·예약하세요.</p></li>
+          <li><strong>예약 두 건 확인</strong><p>아래 ‘이 기수의 예약·발송 내역’을 펼쳐 각 예약의 인원·방 링크·발송 시각을 확인하세요.</p></li>
+        </ol>
+        <p className="onboarding-delivery-guide-note">‘미발송’에서는 이미 발송했거나 예약·결과 확인 중인 인원이 제외됩니다. 두 그룹의 발송 시각은 같아도 됩니다.</p>
+      </div>
+    </aside>
+    <section id="buyer-delivery" className="onboarding-panel onboarding-delivery">
     <h2>2. 구매자 공지 보내기</h2>
     <p>모집 마감 후 공지방을 정하고, 결제자 전체 또는 방별로 선택해 안내를 예약하세요.</p>
     <div className="onboarding-actions">
@@ -223,5 +245,6 @@ export function PurchaseBuyerDelivery({ cohort, productId }: { cohort: string; p
       </details>)}
     </>}
     {notice && <p role="status" className="notice">{notice}</p>}
-  </section>;
+    </section>
+  </div>;
 }
