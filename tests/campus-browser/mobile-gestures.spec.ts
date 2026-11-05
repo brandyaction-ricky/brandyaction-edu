@@ -1,6 +1,6 @@
 import {test,expect} from '@playwright/test';
 test('spatial HUD rejects selection while character nickname and activity content stay usable',async({page,context,isMobile,browserName})=>{
- test.setTimeout(120000);await page.goto('/webinar');await page.getByRole('button',{name:'이 캐릭터로 바로 입장',exact:true}).click({timeout:90000});const world=page.frameLocator('iframe'),root=world.locator('#office'),count=world.locator('.visitor-count');
+ test.setTimeout(120000);await page.goto('/webinar');await page.getByRole('button',{name:'이 캐릭터로 바로 입장',exact:true}).click({timeout:90000});const world=page.frameLocator('iframe'),root=world.locator('#office'),count=world.locator('.visitor-population');
  await expect(count).toBeVisible();expect(await count.evaluate(el=>{const s=getComputedStyle(el);return s.userSelect||s.getPropertyValue('-webkit-user-select');})).toBe('none');
  expect(await count.evaluate(el=>!el.dispatchEvent(new Event('contextmenu',{bubbles:true,cancelable:true})))).toBe(true);
  expect(await count.evaluate(el=>!el.dispatchEvent(new Event('selectstart',{bubbles:true,cancelable:true})))).toBe(true);

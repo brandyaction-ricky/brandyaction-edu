@@ -39,3 +39,14 @@
 .root [data-campus-chrome],.root [data-campus-chrome] *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .root [data-campus-chrome] button,.scene{touch-action:none}
 .root [data-campus-chrome] :is(input,textarea,select,a){-webkit-user-select:text;user-select:text;-webkit-touch-callout:default;touch-action:auto}
+
+.reviewLabel{display:block;text-align:center;font-size:12px;color:#bcd2e6;padding:4px 8px}
+
+/* Exit is one consistent campus-level action, always reachable above the scene. */
+.topButtons .exitButton{gap:5px;padding:10px;min-width:74px}
+.arrival .arrivalGuide{font-size:13px;line-height:1.65;color:#bdd8f4;padding:12px;border:1px solid #426181;border-radius:10px;background:#132e49}
+@media(max-width:650px){.top{gap:5px}.topButtons{gap:4px}.topButtons .exitButton{width:auto;min-width:64px;font-size:11px;padding:8px}.topButtons .exitButton svg{width:16px}.arrival .arrivalGuide{font-size:12px}.brand{padding:10px 6px}}
+
+.topButtons .exitButton svg{flex-shrink:0}.topButtons .exitButton{min-width:74px}
+.accountSave{position:fixed;bottom:160px;left:50%;transform:translateX(-50%);z-index:210;width:max-content;max-width:calc(100% - 32px);padding:12px 18px;border:1px solid #a8c4dc;background:#fff;color:#183c62;border-radius:12px;box-shadow:0 4px 16px #102c4922;font-size:14px}.accountSave[role=alert]{color:#b42318;border-color:#e7aaa4}.accountSave button{margin-left:12px;min-height:40px}
+.roomCover{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:3}.managedArticle{max-width:860px;margin:auto;padding:24px;background:#fff;border-radius:16px;line-height:1.8;color:#18354f}.managedArticle img{max-width:100%;height:auto;max-height:640px;object-fit:contain}.managedArticle a{display:inline-flex;padding:12px 18px;border-radius:10px;background:#2868da;color:#fff;text-decoration:none}.managedArticle h2{font-size:clamp(22px,3vw,32px)}

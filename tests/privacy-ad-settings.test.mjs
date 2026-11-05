@@ -7,6 +7,7 @@ function load(file, mocks = {}, globals = {}) {
   const exports = {};
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   new Function('exports', 'require', ...Object.keys(globals), code)(exports, name => {
+    if(name==='@/features/campus/private-release')return{campusPrivateRelease:()=>true};
     if (name in mocks) return mocks[name];
     throw Error('Unexpected dependency ' + name);
   }, ...Object.values(globals));

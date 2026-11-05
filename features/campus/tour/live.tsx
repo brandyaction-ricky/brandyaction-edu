@@ -1,4 +1,6 @@
 'use client';
+import type {CampusContent} from '../content/model';
+import type {WelcomeSettings} from '../welcome/content';
 import type {CampusResource} from '../webinar/resources';
 import {useEffect,useRef,useState} from 'react';
 import dynamic from 'next/dynamic';
@@ -25,10 +27,12 @@ export function FourSpacesLive({operator=false,publicPresence=false}:{operator?:
  return <ConnectedCampus key={snapshot.viewer.id+snapshot.selectedEnrollmentId} snapshot={snapshot} operator={operator} publicPresence={publicPresence} error={error} onOpen={(lesson,mission)=>run(mission?bridge.current?.openMission(selected.current!,lesson,mission):bridge.current?.openLesson(selected.current!,lesson))} onRefresh={()=>run(bridge.current?.load(selected.current))} onSelect={id=>{selected.current=id;const u=new URL(location.href);u.searchParams.set('enrollmentId',id);history.replaceState(history.state,'',u);run(bridge.current?.load(id));}}/>;
 }
 function ConnectedCampus({snapshot,operator,publicPresence,error,onOpen,onRefresh,onSelect}:{snapshot:CampusSnapshot;operator:boolean;publicPresence:boolean;error:string;onOpen:(id:string,mission?:string)=>void;onRefresh:()=>void;onSelect:(id:string)=>void}){
+ const [content,setContent]=useState<CampusContent>({});
+ const [welcomeSettings,setWelcomeSettings]=useState<WelcomeSettings>();
  const [libraryResources,setLibraryResources]=useState<CampusResource[]>([]),[libraryError,setLibraryError]=useState('');
 
  const [avatar,setAvatar]=useState<TourAvatar|null>(null),[failure,setFailure]=useState(''),[denied,setDenied]=useState(false),[revision,setRevision]=useState(0),[level,setLevel]=useState<number|null>(null);
- useEffect(()=>{const controller=new AbortController();void fetch('/api/campus/library?enrollmentId='+snapshot.selectedEnrollmentId,{cache:'no-store',signal:controller.signal}).then(async r=>{const d=await r.json();if(!r.ok)throw Error(d.error||'자료실을 불러오지 못했어요.');setLibraryResources(d.resources);setLibraryError('');}).catch(e=>{if(e.name!=='AbortError')setLibraryError(e.message);});return()=>controller.abort();},[snapshot.selectedEnrollmentId,revision]);
+ useEffect(()=>{const controller=new AbortController();void fetch('/api/campus/library?enrollmentId='+snapshot.selectedEnrollmentId,{cache:'no-store',signal:controller.signal}).then(async r=>{const d=await r.json();if(!r.ok)throw Error(d.error||'자료실을 불러오지 못했어요.');setLibraryResources(d.resources);setWelcomeSettings(d.welcome);setContent(d.content||{});setLibraryError('');}).catch(e=>{if(e.name!=='AbortError')setLibraryError(e.message);});return()=>controller.abort();},[snapshot.selectedEnrollmentId,revision]);
  const cohort=snapshot.scopes.find(s=>s.enrollmentId===snapshot.selectedEnrollmentId)!.cohortId,writing=useRef(false),epoch=useRef(0),session=useRef('');
  useEffect(()=>{session.current=crypto.randomUUID();const controller=new AbortController();let stop=false;
  async function read(){if(stop||document.hidden||writing.current)return;const ticket=epoch.current;try{const r=await fetch('/api/campus/space?cohortId='+encodeURIComponent(cohort),{credentials:'same-origin',cache:'no-store',signal:controller.signal});const d=await r.json();if(!r.ok){if([401,403].includes(r.status))setDenied(true);throw Error(d.error||'캐릭터 정보를 확인하지 못했어요.');}if(!stop&&ticket===epoch.current&&!writing.current){setAvatar(tourAvatar(d.profile));setFailure('');}}catch(e){if(!stop&&(e as Error).name!=='AbortError')setFailure((e as Error).message);}}
@@ -40,5 +44,5 @@ function ConnectedCampus({snapshot,operator,publicPresence,error,onOpen,onRefres
  const next={...before.profile,...tourAvatar(value)},saved=await fetch('/api/campus/space',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'profile',cohortId:cohort,sessionId:session.current,profile:next})}),data=await saved.json();if(!saved.ok){if([401,403].includes(saved.status))setDenied(true);throw Error(data.error||'저장하지 못했어요.');}const result=tourAvatar(data.profile);setAvatar(result);window.dispatchEvent(new CustomEvent('campus:avatar-saved',{detail:{cohortId:cohort,appearance:result}}));return result;
  }finally{writing.current=false;}}
  if(denied)return <CampusFrame><h1>수강권을 다시 확인해 주세요</h1><p>이 공간을 계속 이용할 수 없습니다. 내 클래스에서 현재 권한을 확인해 주세요.</p><Link href="/my/classes">내 클래스</Link></CampusFrame>;
- return <><Campus snapshot={snapshot} live={{publicPresence,libraryResources,role:operator?'admin':'student',avatar,level,saveAvatar,onOpen,onRefresh,onSelect}}/>{(error||failure||libraryError)&&<div role="alert" style={{position:'fixed',top:90,left:24,zIndex:100,background:'#fff',color:'#9f1239',padding:12,borderRadius:12}}>{error||failure||libraryError} <button onClick={()=>{setRevision(v=>v+1);onRefresh();}}>다시 확인</button></div>}</>;
+ return <><Campus snapshot={snapshot} live={{publicPresence,initialRoom:typeof window!=='undefined'&&new URLSearchParams(window.location.search).get('welcome')==='1'?'welcome':undefined,libraryResources,welcomeSettings,content,role:operator?'admin':'student',avatar,level,saveAvatar,onOpen,onRefresh,onSelect}}/>{(error||failure||libraryError)&&<div role="alert" style={{position:'fixed',top:90,left:24,zIndex:100,background:'#fff',color:'#9f1239',padding:12,borderRadius:12}}>{error||failure||libraryError} <button onClick={()=>{setRevision(v=>v+1);onRefresh();}}>다시 확인</button></div>}</>;
 }

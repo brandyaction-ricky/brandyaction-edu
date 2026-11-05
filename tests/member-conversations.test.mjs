@@ -5,7 +5,7 @@ import ts from 'typescript';
 import { PGlite } from '@electric-sql/pglite';
 const id=n=>`11111111-1111-4111-8111-${String(n).padStart(12,'0')}`;
 const read=file=>fs.readFileSync(new URL('../'+file,import.meta.url),'utf8');
-function load(file,mocks={}){const exports={};new Function('exports','require',ts.transpileModule(read(file),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText)(exports,name=>{assert.ok(name in mocks,name);return mocks[name];});return exports;}
+function load(file,mocks={}){const exports={};new Function('exports','require',ts.transpileModule(read(file),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText)(exports,name=>{if(name==='@/features/campus/private-release')return{campusPrivateRelease:()=>true};assert.ok(name in mocks,name);return mocks[name];});return exports;}
 const rules=load('lib/member-conversations.ts');
 process.env.NEXT_PUBLIC_EDU_MESSAGES_ENABLED='true';process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED='true';
 function harness({user={id:id(1)},allowed=true,error=null}={}){

@@ -1,4 +1,5 @@
 "use client";
+import {CampusAnalyticsPanel} from '@/features/campus/analytics/panel';
 import usability from './final/usability.module.css';
 import dynamic from "next/dynamic";
 import { kstInput, kstToIso, kstLabel, overlappingAutomations } from "@/lib/marketing-qa";
@@ -1848,6 +1849,7 @@ function SettingsForm({ section, data, send, pending }: Props) {
   );
 }
 function Analytics() {
+  const [analysisView,setAnalysisView]=useState<'site'|'campus'>('site');
   const [today, setToday] = useState(() => new Date(Date.now()+9*3600000).toISOString().slice(0,10));
   const [from, setFrom] = useState(() =>
     new Date(Date.now() + 9 * 3600000 - 29 * 86400000).toISOString().slice(0, 10),
@@ -1859,7 +1861,7 @@ function Analytics() {
   const dateError = !from || !to || !Number.isFinite(Date.parse(from)) || !Number.isFinite(Date.parse(to)) ? '시작일과 종료일을 선택해 주세요.' : from > to ? '종료일은 시작일 이후로 선택해 주세요.' : Date.parse(to) - Date.parse(from) >= 366 * 86400000 ? '조회 기간은 1년 이내로 선택해 주세요.' : '';
   const [pathSearch, setPathSearch] = useState('');
   const { result, error, loading, retry } = useReport(
-    dateError ? null : "/api/platform/workflows?" +
+    dateError || analysisView==='campus' ? null : "/api/platform/workflows?" +
       new URLSearchParams({
         kind: "analytics",
         from: from ? from + "T00:00:00+09:00" : "",
@@ -1869,8 +1871,11 @@ function Analytics() {
   const stages = (result.stages || {}) as Record<string, number>;
   const paths = (result.paths || []) as Row[];
   const empty = !Number(result.visitors) && !Number(result.events) && !Number(result.paidOrders) && !Number(result.revenue) && !paths.length && !Object.values(stages).some(Number);
+  const analysisTabs=<div className="analytics-period-presets" role="group" aria-label="분석 화면 선택"><AdminButton variant={analysisView==='site'?'primary':'outline'} aria-pressed={analysisView==='site'} onClick={()=>setAnalysisView('site')}>사이트 유입·결제</AdminButton><AdminButton variant={analysisView==='campus'?'primary':'outline'} aria-pressed={analysisView==='campus'} onClick={()=>setAnalysisView('campus')}>문샷 캠퍼스 행동</AdminButton></div>;
+  if(analysisView==='campus')return <>{analysisTabs}<CampusAnalyticsPanel/></>;
   return (
     <>
+      {analysisTabs}
       <div className="analytics-period-presets" role="group" aria-label="빠른 조회 기간">{[7,30,90].map(days => <AdminButton key={days} size="sm" aria-pressed={!dateError && to === today && Math.round((Date.parse(to)-Date.parse(from))/86400000)+1 === days} onClick={() => { const today = new Date(Date.now()+9*3600000).toISOString().slice(0,10); setToday(today); setTo(today); setFrom(new Date(Date.parse(today)-(days-1)*86400000).toISOString().slice(0,10)); }}>{days}일</AdminButton>)}</div>
       <AdminFilterBar date={<><AdminDatePicker label="시작일 (한국 시간)" value={from} onChange={event => setFrom(event.target.value)} /><AdminDatePicker label="종료일" value={to} onChange={event => setTo(event.target.value)} /></>} action={<AdminButton variant="outline" onClick={retry} disabled={loading || !!dateError}>새로고침</AdminButton>} />
           <label className="marketing-list-search"><input type="search" className="admin-input" placeholder="페이지 주소 검색" aria-label="페이지 주소 검색" value={pathSearch} onChange={event => setPathSearch(event.target.value)}/></label>

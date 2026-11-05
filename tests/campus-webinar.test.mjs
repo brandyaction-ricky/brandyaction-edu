@@ -53,3 +53,26 @@ test('telemetry accepts only bounded anonymous whitelisted events on published e
  assert.equal((await events.POST(req(undefined,body,{origin:'https://evil.test'}),params)).status,403);
  state.event.status='draft';assert.equal((await events.POST(req(undefined,body),params)).status,404);assert.equal(state.events.length,1);
 });
+const publicActivity=await route('app/api/campus/webinar/[slug]/activity/route.ts');
+test('public activity is bound to its published event and cannot submit member or other-event activity',async()=>{
+ reset();const body={id:id(21),session:id(22),scope:config.slug,events:[{room:'live',action:'room_enter'}],dwell:{live:5}};
+ const request=b=>req('/api/campus/webinar/'+config.slug+'/activity',b);
+ assert.equal((await publicActivity.POST(request(body),params)).status,204);assert.equal(state.events.length,1);assert.equal(state.events[0].args.p_user,null);
+ for(const scope of ['member','other-event'])assert.equal((await publicActivity.POST(request({...body,scope}),params)).status,400);
+ state.event.status='draft';assert.equal((await publicActivity.POST(request(body),params)).status,404);state.event.status='paused';assert.equal((await publicActivity.POST(request(body),params)).status,404);assert.equal(state.events.length,1);
+ assert.equal((await publicActivity.POST(req('/api/campus/webinar/'+config.slug+'/activity',body,{origin:'https://evil.test'}),params)).status,403);
+});
+
+const capability=await route('app/api/campus/operator-access/route.ts');
+test('operator capability is private, minimal and never grants anonymous or suspended accounts access',async()=>{
+ for(const user of [null,{role:'student',status:'active'},{role:'admin',status:'suspended'},{role:'admin',status:'active'},{role:'staff',status:'active'}]){
+  reset();state.user=user;const response=await capability.GET(req('/api/campus/operator-access'));
+  assert.equal(response.status,200);assert.match(response.headers.get('cache-control'),/private, no-store/);assert.equal(response.headers.get('vary'),'Cookie');
+  assert.deepEqual(await response.json(),{allowed:user?.status==='active'&&['admin','staff'].includes(user?.role)});assert.deepEqual(state.queries,[]);
+ }
+ reset();state.authError=true;assert.equal((await capability.GET(req())).status,503);
+ reset();assert.equal((await capability.GET(req('/',undefined,{'sec-fetch-site':'cross-site'}))).status,403);
+});
+test('webinar access recognizes active operators before any enrollment lookup',async()=>{
+ for(const role of ['admin','staff']){reset();state.user={id:id(2),role,status:'active'};const response=await access.GET(req(),params);assert.deepEqual(await response.json(),{kind:'operator',href:'/campus/operator?room=welcome&cohort='+config.cohortId});assert.ok(!state.queries.includes('enrollments'));}
+});

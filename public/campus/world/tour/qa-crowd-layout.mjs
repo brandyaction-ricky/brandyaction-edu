@@ -1,5 +1,5 @@
 import {atriumHeightAt} from './atrium-layout.mjs';
-/** Local QA choreography only. Real visitors' positions are never rewritten. */
+/** Ambient character choreography, also reused by QA. Real visitors' positions are never rewritten. */
 const clusters=[
  [5.8,29,4],[-7.8,23,4],[-15.5,29.5,4],[17.3,23.7,4],
  [-10,18.7,3],[6.3,9,4],[14.5,8,4],[18.4,30.7,3],

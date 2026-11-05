@@ -90,6 +90,11 @@
 .onboarding-delivery { margin-top: 24px; }
 .onboarding-delivery fieldset { border: 0; padding: 0; min-width: 0; }
 .onboarding-delivery legend { font-weight: 700; margin-top: 16px; }
+.onboarding-template-picker, .onboarding-template-preview { padding: 14px; border: 1px solid var(--line, #dedfe2); border-radius: 8px; background: #f6f7f8; }
+.onboarding-template-picker label { display: grid; gap: 8px; font-weight: 700; }
+.onboarding-template-picker select { width: 100%; min-width: 0; }
+.onboarding-template-picker p, .onboarding-template-preview p { margin: 8px 0 0; }
+.onboarding-admin-fields textarea,
 .onboarding-delivery textarea { width: 100%; resize: vertical; }
 .onboarding-recipient-list { max-height: 240px; overflow: auto; padding: 8px 12px; border: 1px solid var(--line, #dedfe2); border-radius: 8px; }
 .onboarding-recipient-actions { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
@@ -103,3 +108,31 @@
 .onboarding-recipient-status [data-status="pending"], .onboarding-recipient-status [data-status="uncertain"] { background: #fff3d4; color: #6a4a00; }
 .onboarding-delivery-review, .onboarding-delivery-history { padding: 12px; border: 1px solid var(--line, #dedfe2); border-radius: 8px; margin-block: 10px; }
 .onboarding-message-copy { white-space: pre-wrap; overflow-wrap: anywhere; }
+.onboarding-guide-preview { padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-md); }
+.onboarding-guide-preview summary { cursor: pointer; font-weight: 700; }
+.onboarding-guide-preview > p { margin-top: var(--space-2); }
+.onboarding-guide-preview > .purchase-completion-guide { margin-top: var(--space-3); padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+
+.purchase-onboarding-admin .wrap { max-width: 1120px; }
+.purchase-onboarding-admin #completion-settings { max-width: 740px; }
+.onboarding-delivery-layout { display: grid; grid-template-columns: minmax(0, 740px) minmax(280px, 1fr); grid-template-areas: "form guide"; gap: 24px; align-items: start; margin-top: 24px; }
+.onboarding-delivery-layout > .onboarding-delivery { grid-area: form; min-width: 0; margin-top: 0; scroll-margin-top: 24px; }
+.onboarding-delivery-guide { grid-area: guide; position: sticky; top: 24px; max-height: calc(100dvh - 48px); overflow-y: auto; overscroll-behavior: contain; padding: 22px; border: 1px solid #d9dce0; border-radius: 16px; background: #fff; box-shadow: 0 8px 24px #18233108; }
+.onboarding-delivery-guide-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.onboarding-delivery-guide .onboarding-delivery-guide-eyebrow { margin: 0 0 6px; font-size: 12px; font-weight: 700; color: #777; }
+.onboarding-delivery-guide h2 { margin: 0; font-size: 19px; line-height: 1.45; }
+.onboarding-delivery-guide .onboarding-delivery-guide-intro { margin: 10px 0 20px; font-size: 13px; color: #68717c; }
+.onboarding-delivery-guide ol { display: grid; gap: 18px; margin: 0; padding: 0; list-style: none; counter-reset: delivery-guide; }
+.onboarding-delivery-guide li { position: relative; padding-left: 32px; counter-increment: delivery-guide; }
+.onboarding-delivery-guide li::before { content: counter(delivery-guide); position: absolute; left: 0; top: 0; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #f3e8e9; color: #a91c28; font-size: 12px; font-weight: 700; }
+.onboarding-delivery-guide li strong { display: block; font-size: 14px; line-height: 1.6; }
+.onboarding-delivery-guide li p { margin: 5px 0 0; font-size: 13px; line-height: 1.75; color: #535c67; overflow-wrap: anywhere; }
+.onboarding-delivery-guide .onboarding-delivery-guide-note { margin: 20px 0 0; padding: 12px; border-radius: 8px; background: #f6f7f8; font-size: 12px; line-height: 1.75; color: #535c67; }
+.purchase-onboarding-admin .onboarding-delivery-guide .onboarding-delivery-guide-toggle { display: none; }
+@media (max-width: 1100px) {
+  .purchase-onboarding-admin .wrap { max-width: 740px; }
+  .onboarding-delivery-layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "guide" "form"; gap: 16px; }
+  .onboarding-delivery-guide { position: static; max-height: none; overflow: visible; padding: 20px; }
+  .purchase-onboarding-admin .onboarding-delivery-guide .onboarding-delivery-guide-toggle { display: inline-flex; flex-shrink: 0; min-height: 44px; }
+  .onboarding-delivery-guide-content[data-open="false"] { display: none; }
+}
