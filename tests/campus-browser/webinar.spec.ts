@@ -46,8 +46,9 @@ test('visitor invitations offer only detail and consultation without enrollment 
   await expect(d.getByRole('link',{name:/수강 신청하기/})).toHaveCount(0);
   await expect(d.getByText('이미 구매한 수강생인가요?',{exact:true})).toHaveCount(0);
   if(room==='내 AI 사무실'){
-   await expect(d.getByRole('link')).toHaveCount(2);
-   const image=d.locator('img');await expect(image).toHaveAttribute('src','/campus/showcase/ai-office-team-v2.webp');
+   await expect(d.getByRole('link')).toHaveCount(3);
+   await expect(d.getByRole('link',{name:'실제 사무실 이미지 크게 보기'})).toHaveAttribute('href','/campus/showcase/ai-office-real-enhanced-v3.webp');
+   const image=d.locator('img');await expect(image).toHaveAttribute('src','/campus/showcase/ai-office-real-enhanced-v3.webp');
    expect(await image.evaluate((el:HTMLImageElement)=>el.complete&&el.naturalWidth>1000)).toBe(true);
    await page.screenshot({path:test.info().outputPath('office-invitation.png')});
   }
