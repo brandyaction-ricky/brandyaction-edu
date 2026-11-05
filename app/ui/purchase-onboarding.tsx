@@ -6,10 +6,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowRight, Check, Monitor, Smartphone } from 'lucide-react';
 import { TELEGRAM_ANDROID_INSTALL_URL, TELEGRAM_IOS_INSTALL_URL, type CompletionGuideSettings, type SurveyRoom, type TelegramPath } from '@/lib/purchase-onboarding';
 import './purchase-onboarding.css';
+import { PurchaseCompletionGuide } from './purchase-completion-guide';
 import { PurchaseOnboardingChecklist } from './purchase-onboarding-checklist';
 import type { OnboardingProgress } from '@/lib/purchase-onboarding-progress';
 
-type View = { orderId: string; orderNumber: string; itemName: string; roomName: string; surveyRoom: SurveyRoom | null; telegramPath: TelegramPath | null; profileImage: string; supportUrl: string; available: boolean; telegramOnly?: boolean; progress?: OnboardingProgress; completionGuide?: CompletionGuideSettings };
+type View = { orderId: string; orderNumber: string; itemName: string; roomName: string; surveyRoom: SurveyRoom | null; telegramPath: TelegramPath | null; profileImage: string; supportUrl: string; available: boolean; telegramOnly?: boolean; progress?: OnboardingProgress; completionGuide?: CompletionGuideSettings; loginId?: string };
 
 export function PurchaseOnboarding({ order, guideRequested }: { order: string; guideRequested: boolean }) {
   const router = useRouter();
@@ -68,12 +69,7 @@ export function PurchaseOnboarding({ order, guideRequested }: { order: string; g
     <div className="wrap onboarding-shell">
       <div className="onboarding-title-block"><h1>결제 후 시작 안내</h1><p>{view.itemName}</p></div>
       <section className="onboarding-panel">
-        {view.completionGuide.message && <p className="onboarding-message-copy">{view.completionGuide.message}</p>}
-        <div className={view.completionGuide.message ? "onboarding-actions" : undefined}>
-          {view.completionGuide.url
-            ? <a className="btn primary" href={view.completionGuide.url} referrerPolicy="no-referrer">{view.completionGuide.label} <ArrowRight aria-hidden="true"/></a>
-            : <Link className="btn primary" href="/my/classes">내 클래스 보기 <ArrowRight aria-hidden="true"/></Link>}
-        </div>
+        <PurchaseCompletionGuide key={view.orderId} guide={view.completionGuide} loginId={view.loginId} />
       </section>
     </div>
   </main>;

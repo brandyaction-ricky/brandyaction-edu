@@ -98,6 +98,7 @@ export function PurchaseOnboardingAdmin({ productId, initialCohort }: { productI
       </select></label>
       {!listLoading && !error && !cohorts.length && <p className="meta">안내를 설정할 유료 클래스 기수가 없습니다.</p>}
       {cohort && loaded && <form className="onboarding-admin-fields" onSubmit={save}>
+        <label>안내 링크 제목<input value={settings.label} disabled={pending} maxLength={80} placeholder="예: 문샷 캠퍼스 입장 안내" onChange={event => setSettings(current => ({ ...current, label: event.target.value }))} /></label>
         <label>안내 메시지 (선택)
           <textarea
             value={settings.message ?? ''}
@@ -108,9 +109,8 @@ export function PurchaseOnboardingAdmin({ productId, initialCohort }: { productI
             onChange={event => setSettings(current => ({ ...current, message: event.target.value }))}
           />
         </label>
-        <label>안내 링크 이름<input value={settings.label} disabled={pending} maxLength={80} placeholder="예: 문샷 공부방 입장하기" onChange={event => setSettings(current => ({ ...current, label: event.target.value }))} /></label>
-        <label>안내 링크<input type="url" value={settings.url} disabled={pending} maxLength={1800} placeholder="https://…" onChange={event => setSettings(current => ({ ...current, url: event.target.value }))} /></label>
-        <p className="meta">결제가 완료되면 선택한 기수의 구매자에게 바로 표시됩니다. 메시지만 표시하려면 링크 입력란을 비워 두세요. 안내를 끄려면 입력란을 모두 비우고 저장하세요.</p>
+        <label>안내 링크 주소<input type="url" value={settings.url} disabled={pending} maxLength={1800} placeholder="https://…" onChange={event => setSettings(current => ({ ...current, url: event.target.value }))} /></label>
+        <p className="meta">결제가 완료되면 선택한 기수의 구매자에게 안내가 바로 표시됩니다. 링크를 등록하면 복사와 입장 버튼이 생깁니다. 메시지만 표시하려면 제목과 링크 주소를 비워 두세요.</p>
         <button className="btn primary" type="submit" disabled={pending}>설정 저장</button>
       </form>}
       {message && <p role="status" className="notice">{message}</p>}{error && <p role="alert" className="notice">{error}</p>}

@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     if (!user) return reply({ error: '로그인이 필요합니다.' }, 401);
     const purchase = await eligiblePurchase(user.id, new URL(request.url).searchParams.get('order'));
     if (!purchase) return reply({ available: false, error: '안내할 결제 완료 주문이 없습니다.' }, 404);
-    if ('completionGuide' in purchase) return reply({ available: true, ...purchase });
+    if ('completionGuide' in purchase) return reply({ available: true, ...purchase, loginId: user.email || undefined });
     if (purchase.telegramOnly) return reply({ available: true, telegramOnly: true, orderId: purchase.orderId,
       orderNumber: purchase.orderNumber, itemName: purchase.itemName, roomName: purchase.settings.roomName || '교육생 공지방',
       ...(purchase.settings.checklistEnabled ? { progress: await readOnboardingProgress(user.id, purchase) } : {}),

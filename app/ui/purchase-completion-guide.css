@@ -1,0 +1,35 @@
+.edu-front .purchase-completion-guide {
+  display: grid;
+  gap: var(--space-4);
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+.edu-front .order-complete-card > .purchase-completion-guide {
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--line);
+}
+.edu-front .purchase-completion-guide h3 { font-size: var(--type-h4); }
+.edu-front .purchase-guide-message { line-height: 1.7; white-space: pre-wrap; }
+.edu-front .purchase-guide-steps {
+  display: grid;
+  gap: var(--space-4);
+  list-style: decimal;
+  margin: 0;
+  padding-inline-start: 1.4em;
+}
+.edu-front .purchase-guide-steps li::marker { font-weight: 700; }
+.edu-front .purchase-guide-steps button,
+.edu-front .purchase-guide-steps input { margin-top: var(--space-2); }
+.edu-front .purchase-guide-steps input { width: 100%; }
+.edu-front .purchase-guide-steps [role="status"] { color: var(--text-secondary); font-size: var(--type-small); }
+.edu-front .purchase-guide-steps [role="status"]:not(:empty) { margin-top: var(--space-1); }
+.edu-front .purchase-guide-account dl {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
+}
+.edu-front .purchase-guide-account dt { color: var(--text-secondary); font-size: var(--type-small); }
+.edu-front .purchase-guide-account dd { margin: 0; text-align: start; font-weight: 700; }
+.edu-front .purchase-guide-enter { width: 100%; min-height: 48px; }

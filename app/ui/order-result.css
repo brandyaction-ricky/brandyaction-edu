@@ -25,9 +25,6 @@
 .edu-front .order-complete-details dd{text-align:left;font-size:var(--type-small);font-weight:650;overflow-wrap:anywhere}
 .edu-front .order-complete-account{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:var(--space-3)}
 .edu-front .order-complete-account>div:nth-child(2n){border-right:0}
-.edu-front .order-complete-guide{margin-top:var(--space-5);padding-top:var(--space-5);border-top:1px solid var(--line)}
-.edu-front .order-complete-guide h3{font-size:var(--type-body)}
-.edu-front .order-complete-guide p{margin-top:var(--space-2);line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
 .edu-front .order-complete-next-copy{margin-top:var(--space-5);padding-top:var(--space-5);border-top:1px solid var(--line)}
 .edu-front .order-complete-next-copy>span{font-size:var(--type-eyebrow);font-weight:650;color:var(--text-secondary)}
 .edu-front .order-complete-next-copy h3{margin-top:2px;font-size:var(--type-body)}

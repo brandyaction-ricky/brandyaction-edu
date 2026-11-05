@@ -38,7 +38,7 @@ export function completionGuideSettings(value: unknown): CompletionGuideSettings
   const settings: CompletionGuideSettings = { label, url: '' };
   if (message) settings.message = message;
   if (!label && !address) return settings;
-  if (!label || label.length > 80) throw new Error('안내 링크 이름을 80자 이내로 입력해 주세요.');
+  if (!label || label.length > 80) throw new Error('안내 링크 제목을 80자 이내로 입력해 주세요.');
   try {
     if (!/^https:\/\//i.test(address) || /[\s\\]/.test(address) || address.length > 1800) throw Error();
     const url = new URL(address);
