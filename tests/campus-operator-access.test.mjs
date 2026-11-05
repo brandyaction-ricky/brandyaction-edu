@@ -45,3 +45,9 @@ test('future buyer can read welcome while refunded and expired buyers cannot',as
  for(const patch of [{status:'refunded'},{access_ends_at:'2020-01-01T00:00:00Z'},{user_id:'another'},{revoked_at:'2020-01-01T00:00:00Z'}]){const original=enrollment;enrollment={...original,...patch};const denied=await render();assert.notEqual(denied.type,'tour');assert.equal(calls,1);enrollment=original;}
  }finally{if(before===undefined)delete process.env.EDU_CAMPUS_ENABLED;else process.env.EDU_CAMPUS_ENABLED=before;}
 });
+test('real attendance display is enabled only by the authorized operator preview route',async()=>{
+ let allowed=false,reads=0;const jsx=(type,props)=>({type,props});
+ const mocks={'react/jsx-runtime':{jsx,jsxs:jsx},'next/navigation':{notFound:()=>{throw Error('404')}},'@/lib/operator-permissions':{getOperatorUser:async scope=>{assert.equal(scope,'marketing');return allowed?{id:'admin'}:null}},'@/features/campus/webinar/room':{WebinarRoom:'room'},'@/features/campus/webinar/server':{readWebinar:async()=>{reads++;return null}},'@/features/campus/webinar/domain':{projectWebinar:w=>w}};
+ const mod={};new Function('exports','require',ts.transpileModule(await readFile('app/admin/campus/preview/page.tsx','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText)(mod,name=>{assert.ok(name in mocks,name);return mocks[name]});
+ await assert.rejects(mod.default({searchParams:Promise.resolve({slug:'example'})}),/404/);assert.equal(reads,0);allowed=true;const result=await mod.default({searchParams:Promise.resolve({})});assert.equal(result.type,'room');assert.equal(result.props.operatorReview,true);
+});
