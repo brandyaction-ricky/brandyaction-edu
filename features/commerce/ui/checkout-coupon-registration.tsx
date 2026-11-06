@@ -157,7 +157,7 @@ export function CheckoutCouponRegistration({
       <div className="checkout-coupon-entry">
         <div>
           <strong>{quote ? "쿠폰 할인이 적용됐습니다." : "보유한 쿠폰이 있나요?"}</strong>
-          <p className="meta">쿠폰을 등록하면 할인이 반영됩니다. 라이브 30만원과 이벤트 당첨 10만원 쿠폰은 중복 사용할 수 있습니다.</p>
+          <p className="meta">일반 쿠폰 한 장에 중복 가능 쿠폰을 추가할 수 있습니다. 기존 라이브·당첨 쿠폰 조합도 사용할 수 있습니다.</p>
         </div>
         <button type="button" className="btn" onClick={openDialog}>
           {quote ? "쿠폰 변경" : "쿠폰 등록하기"}
@@ -191,7 +191,7 @@ export function CheckoutCouponRegistration({
             </button>
           </header>
           <div className="modal-body">
-            <p>보유한 쿠폰 번호를 입력하면 사용할 수 있는지 확인한 뒤 할인 금액을 바로 반영합니다.</p>
+            <p>쿠폰이 여러 장이면 +로 연결해 입력해 주세요. 예: LIVE+BONUS. 최대 10장까지 가능하며 각 쿠폰의 사용 조건을 확인합니다.</p>
             <label className="field">
               쿠폰 코드
               <input
