@@ -40,7 +40,7 @@ const spacePane=(id:string)=>({focus:'focus',lounge:'lounge',sound:'settings',de
 const EMPTY_CONTENT:CampusContent={};
 const STORAGE='moonshot-four-spaces-preview-v1';
 function readProgress(key=STORAGE):Progress{try{const p=JSON.parse(localStorage.getItem(key)||'null');if(p&&typeof p.video==='boolean'&&Array.isArray(p.quiz)&&p.quiz.length<=20&&p.quiz.every((v:unknown)=>v===null||typeof v==='boolean')&&Array.isArray(p.level)&&p.level.length<=12&&p.level.every((v:unknown)=>Number.isInteger(v)&&Number(v)>=-1&&Number(v)<3))return p;}catch{}return emptyProgress();}
-export type TourVisitor={content?:CampusContent;analyticsScope?:string;presenceId?:string;devPresence?:boolean;qaCrowd?:boolean;ambientCount?:number;operatorReview?:boolean;operatorEvent?:string;title:string;renderGate:(room:TourRoom)=>ReactNode;renderTool:(tool:string,onPlay?:(item:CampusResource)=>void)=>ReactNode;onEnter:()=>void;onActivity:(tool:string)=>void};
+export type TourVisitor={content?:CampusContent;analyticsScope?:string;presenceId?:string;devPresence?:boolean;realtimePresence?:boolean;qaCrowd?:boolean;ambientCount?:number;operatorReview?:boolean;operatorEvent?:string;title:string;renderGate:(room:TourRoom)=>ReactNode;renderTool:(tool:string,onPlay?:(item:CampusResource)=>void)=>ReactNode;onEnter:()=>void;onActivity:(tool:string)=>void};
 export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,welcome}:{welcome?:{settings:WelcomeSettings;resources:CampusResource[];content?:CampusContent};review?:{room:TourRoom;role?:'waiting'};snapshot:CampusSnapshot;adminSnapshot?:CampusAdminSnapshot;live?:TourLiveConnection;visitor?:TourVisitor}){
  const welcomeSettings=welcome?.settings||live?.welcomeSettings||DEFAULT_WELCOME;
  const assessment=welcomeSettings.assessment||DEFAULT_ASSESSMENT;
@@ -58,7 +58,7 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  const visibleTasks=(r:TourRoom,v:TourRole)=>contentTasks(managed,r,v).filter(t=>!visitor||t.id!=='live-video');
  const avatarKey=visitor?'moonshot-webinar-avatar-v1':TOUR_AVATAR_KEY;
  const [arrival,setArrival]=useState(!!visitor);
- function visitorEntered(){post('meetup-start');if(visitorRef.current?.devPresence&&!devConnection.current){const epoch=devEpoch.current;void import('../webinar/dev-presence').then(m=>{if(epoch===devEpoch.current&&!devConnection.current)devConnection.current=m.connectDevVisitors(value=>post('dev-visitor-state',value),visitorRef.current?.presenceId);}).catch(()=>setNotice('동료 연결이 지연되고 있어요. 공간 체험은 계속할 수 있습니다.'));}setArrival(false);if(failed)setMapOpen(true);visitorRef.current?.onEnter();}
+ function visitorEntered(){post('meetup-start');if(visitorRef.current?.devPresence&&!devConnection.current){const epoch=devEpoch.current;void (visitorRef.current.realtimePresence?import('../webinar/gateway-presence').then(m=>m.connectGatewayVisitors):import('../webinar/dev-presence').then(m=>m.connectDevVisitors)).then(connect=>{if(epoch===devEpoch.current&&!devConnection.current)devConnection.current=connect(value=>post('dev-visitor-state',value),visitorRef.current?.presenceId);}).catch(()=>setNotice('동료 연결이 지연되고 있어요. 공간 체험은 계속할 수 있습니다.'));}setArrival(false);if(failed)setMapOpen(true);visitorRef.current?.onEnter();}
  function readAvatar(){return readTourAvatar(avatarKey,visitor?'문샷 방문자':undefined);}
 
  const demo=!live,progressKey=live||review?STORAGE+':'+snapshot.viewer.id+':'+snapshot.selectedEnrollmentId:STORAGE;
