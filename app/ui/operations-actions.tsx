@@ -32,27 +32,33 @@ export function EnrollmentGrant({ data, selection, send, pending }: { data: Data
 
 export function RefundAction({ payment, requests, send, pending }: { payment: Row; requests: Row[]; send: WorkflowSend; pending: boolean }) {
   const [message, setMessage] = useState('');
+  const [amountInput, setAmountInput] = useState('');
   const remaining = Number(payment.approved_amount) - Number(payment.cancelled_amount);
+  const amount = Number(amountInput);
+  const validAmount = Number.isSafeInteger(amount) && amount > 0 && amount <= remaining;
   const unresolved = requests.find(r => r.payment_id === payment.id && r.status === 'processing');
   async function execute(body: Record<string, unknown>) {
-    try { await send({ action: 'refund', paymentId: payment.id, ...body }, '환불 결과를 반영했습니다.'); setMessage('환불 완료를 확인했습니다.'); }
+    try { await send({ action: 'refund', paymentId: payment.id, ...body }, '환불 결과를 반영했습니다.'); setAmountInput(''); setMessage('환불 완료를 확인했습니다.'); }
     catch (error) { setMessage((error as Error).message); }
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const values = new FormData(event.currentTarget);
     const amount = Number(values.get('amount'));
-    if (!window.confirm(`${money(amount)}을 실제 환불할까요? 전액 환불이면 해당 주문의 수강권도 회수됩니다.`)) return;
+    if (!Number.isSafeInteger(amount) || amount < 1 || amount > remaining) { setMessage('환불 가능액 이내의 정수 금액을 입력해 주세요.'); return; }
+    if (!window.confirm(`${money(amount)}을 실제 환불할까요? 환불 후 잔액 ${money(remaining - amount)} · ${amount === remaining ? '해당 주문의 수강권도 회수됩니다.' : '수강권은 유지됩니다.'}`)) return;
     await execute({ amount, reason: values.get('reason') });
   }
   if (remaining <= 0 && !unresolved) return null;
   return <section className="mt24">
-    <h3>결제 취소·환불</h3>
-    <p className="meta mt16">환불 가능액 {money(remaining)} · 부분 환불은 수강권을 유지하고 전액 환불은 회수합니다. 실결제 환불은 별도 서버 승인 설정이 필요합니다.</p>
+    <h3>부분 환불·전액 환불</h3>
+    <p className="meta mt16">최초 결제 {money(Number(payment.approved_amount))} · 환불 누계 {money(Number(payment.cancelled_amount))} · 환불 가능액 {money(remaining)} · 부분 환불은 수강권을 유지하고 전액 환불은 회수합니다. 실결제 환불은 별도 서버 승인 설정이 필요합니다.</p>
     {unresolved ? <div className="notice mt16"><p>{money(Number(unresolved.amount))} 환불 결과 확인 중입니다. 중복 환불은 차단됩니다.</p><button className="btn mt16" disabled={pending} onClick={() => void execute({ requestId: unresolved.id, amount: unresolved.amount, reason: unresolved.reason })}>결과 재확인</button></div> : <form className="mt16" onSubmit={submit}>
-      <label className="field">환불 금액<input name="amount" type="number" min={1} max={remaining} step={1} required defaultValue={remaining}/></label>
+      <label className="field">이번에 환불할 금액 · 원<input name="amount" type="number" min={1} max={remaining} step={1} required value={amountInput} onChange={e => setAmountInput(e.target.value)} placeholder="부분 환불할 금액을 입력하세요"/></label>
+      <button type="button" className="btn small" disabled={pending} onClick={() => setAmountInput(String(remaining))}>남은 금액 전액 입력</button>
+      {validAmount && <p className="notice mt16" role="status">이번 환불 {money(amount)} · 환불 후 잔액 {money(remaining - amount)}<br/>{amount === remaining ? '전액 환불: 해당 주문의 수강권을 회수합니다.' : '부분 환불: 수강권을 유지합니다.'}</p>}
       <label className="field">환불 사유<input name="reason" minLength={2} maxLength={200} required placeholder="환불 사유를 입력하세요"/></label>
-      <button className="btn" disabled={pending}>환불 내용 확인</button>
+      <button className="btn" disabled={pending || !validAmount}>환불 내용 확인</button>
     </form>}
     {message && <p className="notice mt16" role="status">{message}</p>}
   </section>;

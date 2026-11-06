@@ -457,7 +457,7 @@ export function AdminCatalog({
           <>
             <b>{t(r, "name")}</b>
             <small>{t(r, "code")}</small>
-            {r.discount_type === 'ADMIN_FREE' && <AdminStatusBadge status="admin_only" label="관리자 전용" tone="info" />}
+            {r.discount_type === 'ADMIN_FREE' ? <AdminStatusBadge status="admin_only" label="관리자 전용" tone="info" /> : <AdminStatusBadge status={r.is_stackable ? 'active' : 'inactive'} label={r.is_stackable ? '중복 적용 가능' : '일반 쿠폰'} />}
           </>
         ),
       },
