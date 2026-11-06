@@ -25,5 +25,5 @@ test('question and marketing selections use the shared admin accent without chan
   await expect(page.getByText('확인 필요')).toHaveCSS('color', 'rgb(134, 86, 0)');
 
   await page.getByRole('button', { name: '답변 대기' }).focus();
-  await expect(page.getByRole('button', { name: '답변 대기' })).toHaveCSS('outline-color', primary);
+  await expect(page.getByRole('button', { name: '답변 대기' })).toHaveCSS('outline-color', 'rgb(49, 95, 154)');
 });

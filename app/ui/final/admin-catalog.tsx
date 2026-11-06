@@ -59,8 +59,8 @@ type Props = {
   blockLearningEnabled?: boolean;
 };
 type Column = { label: string; value: (row: Row) => ReactNode };
-function CatalogTable({ label, loading, wide = false, children }: { label: string; loading: boolean; wide?: boolean; children: ReactNode }) {
-  return <AdminDataTable label={label} density="standard" loading={loading} className={wide ? 'admin-wide-table' : undefined}>{children}</AdminDataTable>;
+function CatalogTable({ label, loading, wide = false, cards, children }: { label: string; loading: boolean; wide?: boolean; cards: boolean; children: ReactNode }) {
+  return <AdminDataTable label={label} density="standard" loading={loading} className={[wide && 'admin-wide-table', cards && 'admin-catalog-cards'].filter(Boolean).join(' ')}>{children}</AdminDataTable>;
 }
 const named = (r?: Row) =>
   t(r, "title") || t(r, "name") || t(r, "full_name") || t(r, "email") || "—";
@@ -986,7 +986,7 @@ export function AdminCatalog({
               </div>}
             </div>
           ) : (
-            <CatalogTable label={["weeks", "cohorts"].includes(s.key) ? `${s.title} 데이터` : `${s.title} 목록`} loading={loading} wide={s.key === 'products'}>
+            <CatalogTable label={["weeks", "cohorts"].includes(s.key) ? `${s.title} 데이터` : `${s.title} 목록`} loading={loading} wide={s.key === 'products'} cards={!bulkMode && s.key !== 'weeks'}>
                 <thead>
                   <tr>
                     {bulkMode && <th className="selection-column">{selectAll}</th>}
@@ -1029,7 +1029,7 @@ export function AdminCatalog({
                       </td>}
                       {cols.map((c) => (
                         <td data-label={c.label} key={c.label}>
-                          {c.value(r)}
+                          <div className="catalog-cell-value">{c.value(r)}</div>
                         </td>
                       ))}
                       <td data-label="관리" data-align="action">

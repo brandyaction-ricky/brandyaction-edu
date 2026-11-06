@@ -316,7 +316,59 @@ export function Overview({
           </Link>
         )}
       </AdminHeading>
-      {can("learning-care") && <div className={usability.overviewAction}><Link className="btn primary" href="/admin/learning-care">수강생 현황 · 학습과 미션 한눈에 보기 <ArrowRight/></Link></div>}
+      <section className="panel">
+        <div className="panel-head">
+          <h2>지금 처리할 일</h2>
+        </div>
+        {can("reviews") && pending > 0 && (
+          <div className="task">
+            <span className="task-icon">
+              <CheckSquare2 />
+            </span>
+            <div>
+              <h3>미션 검토 대기 {pending}건</h3>
+              <p>제출 내용과 피드백을 연결합니다.</p>
+            </div>
+            <Link className="btn small" href="/admin/reviews">
+              연속 검토
+            </Link>
+          </div>
+        )}
+        {can("questions") && questions > 0 && (
+          <div className="task">
+            <span className="task-icon">
+              <MessageCircle />
+            </span>
+            <div>
+              <h3>학습 질문 {questions}건</h3>
+              <p>학습자의 질문을 확인하세요.</p>
+            </div>
+            <Link className="btn small" href="/admin/questions">
+              답변하기
+            </Link>
+          </div>
+        )}
+        {(!can("reviews") || pending === 0) && (!can("questions") || questions === 0) && (
+          <div className="panel-body">
+            <AdminSuccessState title="대기 중인 검토·질문이 없습니다." compact>새 요청이 들어오면 사이드바 배지와 운영 홈에 표시됩니다.</AdminSuccessState>
+          </div>
+        )}
+        {can("customers") && (
+          <div className="task">
+            <span className="task-icon">
+              <UsersRound />
+            </span>
+            <div>
+              <h3>회원 참여 현황</h3>
+              <p>진행 상태 확인 후 필요한 안내를 전달합니다.</p>
+            </div>
+            <Link className="btn small" href="/admin/members">
+              회원 확인
+            </Link>
+          </div>
+        )}
+      </section>
+      {can("learning-care") && <div className={usability.overviewAction}><Link className="btn" href="/admin/learning-care">수강생 현황 · 학습과 미션 한눈에 보기 <ArrowRight/></Link></div>}
       <div className="metrics">
         {can("reviews") && (
           <Metric
@@ -334,7 +386,7 @@ export function Overview({
         )}
         {can("questions") && (
           <Metric
-            label="미답변 질문"
+            label="답변 대기"
             value={
               <>
                 {questions}
@@ -382,58 +434,6 @@ export function Overview({
       </div>
       <div className="two-col">
         <div className="stack">
-          <section className="panel">
-            <div className="panel-head">
-              <h2>지금 처리할 일</h2>
-            </div>
-            {can("reviews") && pending > 0 && (
-              <div className="task">
-                <span className="task-icon">
-                  <CheckSquare2 />
-                </span>
-                <div>
-                  <h3>미션 검토 대기 {pending}건</h3>
-                  <p>제출 내용과 피드백을 연결합니다.</p>
-                </div>
-                <Link className="btn small" href="/admin/reviews">
-                  연속 검토
-                </Link>
-              </div>
-            )}
-            {can("questions") && questions > 0 && (
-              <div className="task">
-                <span className="task-icon">
-                  <MessageCircle />
-                </span>
-                <div>
-                  <h3>학습 질문 {questions}건</h3>
-                  <p>학습자의 질문을 확인하세요.</p>
-                </div>
-                <Link className="btn small" href="/admin/questions">
-                  답변하기
-                </Link>
-              </div>
-            )}
-            {(!can("reviews") || pending === 0) && (!can("questions") || questions === 0) && (
-              <div className="panel-body">
-                <AdminSuccessState title="대기 중인 검토·질문이 없습니다." compact>새 요청이 들어오면 사이드바 배지와 운영 홈에 표시됩니다.</AdminSuccessState>
-              </div>
-            )}
-            {can("customers") && (
-              <div className="task">
-                <span className="task-icon">
-                  <UsersRound />
-                </span>
-                <div>
-                  <h3>회원 참여 현황</h3>
-                  <p>진행 상태 확인 후 필요한 안내를 전달합니다.</p>
-                </div>
-                <Link className="btn small" href="/admin/members">
-                  회원 확인
-                </Link>
-              </div>
-            )}
-          </section>
           <section className="panel">
             <div className="panel-head">
               <h2>클래스 운영</h2>

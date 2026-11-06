@@ -681,6 +681,7 @@ export function Platform({
               </Link>
             ))}
             <Link href="/my">마이페이지</Link>
+            <Link href="/my/questions?view=mine">질문·답변</Link>
             <MobileRefresh />
           </nav>
         )}

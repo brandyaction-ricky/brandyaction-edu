@@ -113,3 +113,18 @@ test('marketing navigation keeps all destinations, help and active state in a re
   await page.locator('.marketing-workspace-help>summary').click();
   await page.screenshot({ path: info.outputPath('marketing-grid.png') });
 });
+
+test('coupon fields stack with their column labels on mobile and keep their desktop columns', async ({ page, viewport }) => {
+  await page.goto(visit('coupons'));
+  const row = page.locator('.admin-catalog-cards tbody tr').first();
+  const cell = row.locator('td[data-label]').first();
+  await expect(cell).toBeVisible();
+  if (viewport!.width <= 720) {
+    await expect(row).toHaveCSS('display', 'grid');
+    expect(await cell.evaluate(element => getComputedStyle(element, '::before').content))
+      .toBe(JSON.stringify(await cell.getAttribute('data-label')));
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  } else {
+    await expect(row).toHaveCSS('display', 'table-row');
+  }
+});

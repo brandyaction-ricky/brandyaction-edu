@@ -253,7 +253,7 @@ test('article hub includes the managed free-video banner and representative thum
   assert.match(footerStyles, /\.edu-front \.learning-footer-links/);
 });
 
-test('product HTML takes precedence over old images and per-product CTA settings reach both layouts', () => {
+test('product HTML takes precedence over old images and both layouts retain the product CTA destination and label with the shared primary style', () => {
   const integrationStyles = read('app/ui/final/integration.css');
   assert.match(integrationStyles, /\.bottom-cta\.single-cta \.btn \{[^}]*max-width: none/);
   const { ProductDetail } = load('app/ui/final/public-views.tsx');
@@ -266,7 +266,8 @@ test('product HTML takes precedence over old images and per-product CTA settings
     assert.match(markup, campaigns.length ? /class="campaign-sticky"/ : /bottom-cta single-cta/);
     assert.doesNotMatch(markup, /class="cta-price"[^>]*>지금 무료/);
     assert.match(markup, /href="https:\/\/example.test\/webinar"/);
-    assert.match(markup, /background-color:#123456/);
+    assert.doesNotMatch(markup, /background-color:#123456/);
+    assert.match(markup, /class="btn primary[^"]*"[^>]*data-product-cta/);
   }
   const emptyFreeMarkup = html(ProductDetail, { course: changed, data: { ...data, enrollments: [], landing_configs: [], lesson_contents: [] } });
   assert.doesNotMatch(emptyFreeMarkup, /free-downloads|클래스와 함께 사용할 자료|신청·구매 후 제공되는 자료/);

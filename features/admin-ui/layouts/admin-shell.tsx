@@ -61,6 +61,7 @@ export function AdminShell({
   const byKey = new Map(available.map(item => [item.key, item]));
   const visibility = createAdminMenuVisibility(available);
   const groups = visibility.groups(adminNavigationGroups);
+  const groupTitle = groups.find(([, keys]) => keys.some(key => key === selected))?.[0];
   const contentWidth = adminContentWidth(selected);
   const sidebarRef = useRef<HTMLElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -200,7 +201,7 @@ export function AdminShell({
                 });
               }}
             >
-              <summary>{title}<span className="nav-category-count">{keys.filter(key => byKey.has(key)).length}</span></summary>
+              <summary>{title}</summary>
               {keys.map(navLink)}
             </details>
           ))}
@@ -247,8 +248,8 @@ export function AdminShell({
             >
               <Menu aria-hidden="true" />
             </button>
-            <span className="crumb-root">관리자</span>
-            <span className="crumb-root">/</span>
+            <span className="crumb-root">{groupTitle || "관리자"}</span>
+            <span className="crumb-root" aria-hidden="true">›</span>
             <span>{adminSectionTitle(current, available)}</span>
           </div>
           <div className="topright">

@@ -1,3 +1,4 @@
+import { CampusEntryBar } from '../../../features/campus/ui/entry-bar';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Platform } from '../../../app/ui/platform';
@@ -7,4 +8,4 @@ import '../../../app/ui/final/admin.css';
 import '../../../features/admin-ui/styles/admin-system.css';
 import '../../../app/ui/final/integration.css';
 const id = (n: number) => `11111111-1111-4111-8111-${String(n).padStart(12, '0')}`;
-createRoot(document.getElementById('root')!).render(<StrictMode><Platform path={['learn',id(1),id(4)]} user={{id:id(99),email:'synthetic@example.test',full_name:'검수 회원',phone:null,role:'student'}}/></StrictMode>);
+createRoot(document.getElementById('root')!).render(<StrictMode>{new URLSearchParams(location.search).has("campus") && <CampusEntryBar returnTo="/campus/workspace?enrollmentId=11111111-1111-4111-8111-111111111111&section=learning"/>}<Platform path={['learn',id(1),id(4)]} user={{id:id(99),email:'synthetic@example.test',full_name:'검수 회원',phone:null,role:'student'}}/></StrictMode>);

@@ -6,6 +6,7 @@ import './ui/landing/landing.css';
 import { EventsTracker } from './ui/events-tracker';
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
+import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
 import './ui/final/tokens.css';
 import './ui/final/frontend.css';
 import './ui/final/admin.css';

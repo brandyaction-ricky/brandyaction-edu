@@ -123,3 +123,11 @@
     padding-bottom: calc(72px + env(safe-area-inset-bottom));
   }
 }
+
+/* Mobile questions use a dedicated opaque dock, not a pill over text. */
+@media(max-width:680px){
+  .edu-front:has(.floating-learning-question){padding-bottom:calc(64px + env(safe-area-inset-bottom))}
+  .floating-learning-question{left:0;right:0;bottom:0;padding:8px max(12px,env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));background:var(--surface-raised,#fff);border-top:1px solid var(--line,#e2e5e9);box-sizing:border-box}
+  .edu-front .floating-learning-question-trigger{border-radius:8px;box-shadow:none;min-height:44px}
+  .floating-learning-question-panel{max-width:100%;max-height:min(64dvh,calc(100dvh - 80px - env(safe-area-inset-bottom)))}
+}
