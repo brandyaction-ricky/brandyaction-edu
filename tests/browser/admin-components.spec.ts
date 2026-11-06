@@ -4,7 +4,7 @@ test.beforeEach(async ({ page }) => { await page.goto('/admin-component-system-t
 
 test('tokens, controls and feedback expose default, focus, disabled, loading and error states', async ({ page, viewport }) => {
   await expect(page.getByRole('heading', { name: '컴포넌트 검증' })).toBeVisible();
-  await expect(page.locator('.edu-admin')).toHaveCSS('--adm-control', '36px');
+  await expect(page.locator('.edu-admin')).toHaveCSS('--adm-control', (viewport?.width || 0) <= 720 ? '44px' : '36px');
   await expect(page.getByRole('button', { name: 'disabled' })).toBeDisabled();
   await expect(page.getByRole('button', { name: '전체 2' })).toHaveCSS('font-size', '13px');
   await expect(page.locator('.admin-button[aria-busy=true]')).toBeDisabled();
