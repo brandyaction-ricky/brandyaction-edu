@@ -1,4 +1,4 @@
-export const COUPON_CODE_MAX_LENGTH = 61;
+export const COUPON_CODE_MAX_LENGTH = 309;
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

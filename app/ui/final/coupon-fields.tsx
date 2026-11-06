@@ -10,6 +10,7 @@ export function CouponFields({ row, data }: { row?: Row; data: Record<string, Ro
   const [value, setValue] = useState(Number(row?.discount_value || 10));
   const [limit, setLimit] = useState(String(row?.usage_limit ?? ''));
   const [memberLimit, setMemberLimit] = useState(String(row ? row.per_user_limit ?? '' : 1));
+  const [stackable, setStackable] = useState(!!row?.is_stackable);
   const [active, setActive] = useState(row?.is_active !== false);
   const [excludeFree, setExcludeFree] = useState(row?.exclude_free !== false);
   const admin = type === 'ADMIN_FREE';
@@ -20,7 +21,7 @@ export function CouponFields({ row, data }: { row?: Row; data: Record<string, Ro
       <label className="field">쿠폰 코드 *<input name="code" required pattern="[A-Za-z0-9_-]{3,30}" maxLength={30} defaultValue={t(row, 'code')} placeholder="영문·숫자·밑줄·하이픈 3~30자" /></label>
       <label className="field">할인 방식<select name="discount_type" value={type} onChange={e => {
         setType(e.target.value);
-        if (e.target.value === 'ADMIN_FREE') { setValue(100); setScope('paid'); setTarget('all'); setLimit(''); setMemberLimit(''); setActive(true); setExcludeFree(true); }
+        if (e.target.value === 'ADMIN_FREE') { setStackable(false); setValue(100); setScope('paid'); setTarget('all'); setLimit(''); setMemberLimit(''); setActive(true); setExcludeFree(true); }
       }}><option value="percentage">정률</option><option value="fixed">정액</option><option value="ADMIN_FREE">관리자 전용 100% 무료</option></select></label>
       <label className="field">할인 수치 *<input name="discount_value" type="number" min={1} max={type === 'fixed' ? 2147483647 : 100} required readOnly={admin} value={value} onChange={e => setValue(Number(e.target.value))} /></label>
       <label className="field">최대 할인액 · 원<input name="max_discount_amount" type="number" min={0} max={2147483647} defaultValue={row?.max_discount_amount == null ? '' : Number(row.max_discount_amount)} disabled={type !== 'percentage'} /></label>
@@ -37,6 +38,11 @@ export function CouponFields({ row, data }: { row?: Row; data: Record<string, Ro
       <label className="field">총 발급 수량<input name="usage_limit" type="number" min={1} max={2147483647} value={limit} onChange={e => setLimit(e.target.value)} placeholder="제한 없음" /></label>
       <label className="field">회원별 사용 횟수<input name="per_user_limit" type="number" min={1} max={2147483647} value={memberLimit} onChange={e => setMemberLimit(e.target.value)} placeholder="제한 없음" /></label>
     </div><p className="meta">빈 값은 제한 없음입니다. 결제 대기 수량은 잠시 예약하고 완료 후 사용 횟수에 반영합니다.</p></section>
+    <section className="coupon-limit-group"><h3>다른 쿠폰과 함께 쓰기</h3>
+      <label className="checkline"><input name="is_stackable" type="checkbox" checked={!admin && stackable} disabled={admin} onChange={e => setStackable(e.target.checked)} />다른 쿠폰과 중복 적용 가능</label>
+      <p className="meta">체크하면 일반 쿠폰 한 장에 이 쿠폰을 추가할 수 있습니다. 중복 가능 쿠폰끼리도 함께 쓸 수 있으며 한 주문에 최대 10장입니다. 할인 합계는 상품 금액을 넘지 않습니다. 기존 라이브·당첨 쿠폰 조합도 유지됩니다.</p>
+      <p className="meta">체크하지 않은 일반 쿠폰끼리는 함께 쓸 수 없습니다. 같은 쿠폰을 여러 주문에서 반복 사용하려면 위 ‘회원별 사용 횟수’를 비워 두세요. 사용 기간·상품·대상 조건은 그대로 적용됩니다. 관리자 전용 무료 쿠폰은 중복 적용할 수 없습니다.</p>
+    </section>
     <label className="checkline"><input name="is_alumni" type="checkbox" defaultChecked={!!row?.is_alumni} />기존 수강생 전용 쿠폰 · 이후 주문의 유입을 ‘동문’으로 기록</label>
     <p className="meta">실제로 기존 수강생에게 주는 쿠폰에만 선택해 주세요. 기존 주문의 유입은 바뀌지 않습니다.</p>
     <label className="checkline"><input name="is_draft" type="checkbox" defaultChecked={!!row?.is_draft} />임시 저장 · 발급 및 사용 차단</label>

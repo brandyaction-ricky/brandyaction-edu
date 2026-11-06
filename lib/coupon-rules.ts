@@ -37,7 +37,7 @@ export function couponKstUtc(value: FormDataEntryValue | null) {
 
 export function couponError(message: string) {
   const errors: Record<string, string> = {
-    COUPON_STACK_NOT_ALLOWED: '이 두 쿠폰은 함께 사용할 수 없습니다. 라이브 쿠폰과 당첨 쿠폰을 확인해 주세요.',
+    COUPON_STACK_NOT_ALLOWED: '이 쿠폰들은 함께 사용할 수 없습니다. 일반 쿠폰은 한 장만, 추가 쿠폰은 중복 적용이 허용된 쿠폰을 사용해 주세요.',
     COUPON_NOT_FOUND: '사용할 수 없는 쿠폰입니다.', COUPON_ADMIN_ONLY: '관리자만 사용할 수 있는 쿠폰입니다.',
     COUPON_INACTIVE: '비활성 또는 임시 저장 쿠폰입니다.', COUPON_NOT_STARTED: '쿠폰 사용 시작 전입니다.',
     COUPON_EXPIRED: '쿠폰 사용 기간이 종료됐습니다.', COUPON_ISSUE_PERIOD: '쿠폰 발급 기간이 아닙니다.',
