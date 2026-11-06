@@ -6,8 +6,8 @@
 .ldc-sticky-toolbar { position:sticky; top:64px; z-index:5; border:1px solid #e2e6ec; border-radius:14px; background:#fff; box-shadow:0 4px 16px #17223808; }
 .ldc-sticky-toolbar .lesson-format-controls { border-radius:14px 14px 0 0; }
 .ldc-sticky-toolbar .ldc-insert-menu { max-height:40vh; overflow:auto; }
-/* Wrapped touch controls must not cover the first editable lines on phones. */
-@media(max-width:720px) { .ldc-sticky-toolbar { position:static; } }
+/* Keep tools available in long lessons without covering the editing target. */
+@media(max-width:720px) { .ldc-sticky-toolbar { max-height:min(35dvh,calc(50dvh - 80px)); overflow-y:auto; } }
 .edu-admin .ldc-editor .ldc-document { max-height:none; overflow:visible; min-height:240px; padding:24px 12px; }
 .ldc-text { padding:4px 0; margin:0; border:0; }
 .ldc-text:focus-within { border:0; }
