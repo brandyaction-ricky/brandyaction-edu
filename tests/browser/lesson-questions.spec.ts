@@ -31,7 +31,12 @@ test('question list errors are recoverable and navigation protects an unfinished
 test('graduate can still open a private lesson question while lesson completion stays closed',async({page})=>{
  await page.route('**/api/platform/lesson-questions?**',r=>r.fulfill({json:{questions:[],hasMore:false}}));
  await page.goto('/classroom-questions-test?graduate=1');
- await expect(page.getByText('졸업생 모드 · 최신 공개 커리큘럼을 보고 질문할 수 있습니다.',{exact:false})).toBeVisible();
+ const notice=page.locator('.graduate-learning-notice');
+ await expect(notice.locator('summary')).toHaveText('졸업생 모드 · 학습·질문 이용 안내');
+ await expect(notice.locator('p')).toBeHidden();
+ await notice.locator('summary').click();
+ await expect(notice.locator('p')).toContainText('최신 공개 커리큘럼을 보고 질문할 수 있습니다.');
+ await expect(notice.locator('p')).toContainText('공식 미션 제출과 멘토 검수는 종료되었습니다.');
  await expect(page.getByRole('link',{name:'이 수업에 질문 남기기'})).toBeVisible();
  await expect(page.getByRole('button',{name:'학습 완료하기'})).toHaveCount(0);
  await page.getByRole('button',{name:'이 학습에 질문하기'}).click();

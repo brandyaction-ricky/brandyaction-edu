@@ -47,7 +47,7 @@ test('product picker opens scoped document editing, full week rows work by keybo
     const style=workspace?getComputedStyle(workspace):null;
     return {fits:document.documentElement.scrollWidth<=innerWidth,columns:style?.gridTemplateColumns||'',gap:style?.columnGap||'',outlineWidth:Math.round(outline?.getBoundingClientRect().width||0),controlHeight:Math.round(select?.getBoundingClientRect().height||0),radius:panel?getComputedStyle(panel).borderRadius:''};
   });
-  expect(layout.fits).toBe(true);expect(layout.controlHeight).toBe(36);expect(layout.radius).toBe('10px');
+  expect(layout.fits).toBe(true);expect(layout.controlHeight).toBe((page.viewportSize()?.width || 0)<=720?44:36);expect(layout.radius).toBe('10px');
   if(info.project.name==='desktop'){expect(layout.outlineWidth).toBe(320);expect(layout.gap).toBe('16px');expect(layout.columns.split(' ')).toHaveLength(2);}else{expect(layout.columns.split(' ')).toHaveLength(1);}
   await page.screenshot({path:info.outputPath('curriculum-studio.png'),fullPage:true});
 });

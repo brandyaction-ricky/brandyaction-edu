@@ -128,7 +128,8 @@
       "codex/edu-campus-release-20261103": false,
       "codex/campus-event-zone-20261105": false,
       "codex/campus-private-release-20261105": false,
-      "codex/edu-partial-refund-stackable-coupons-20261106": false
+      "codex/edu-partial-refund-stackable-coupons-20261106": false,
+      "codex/edu-refund-stackable-prod-20261106": false
     }
   },
   "regions": [
