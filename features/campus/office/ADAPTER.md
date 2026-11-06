@@ -1,5 +1,47 @@
 # Personal AI Office adapter v1
 
+## Telegram / Aside development pilot (2026-11-06)
+
+`scripts/campus-aside-watch.mjs` observes one explicitly selected local Aside
+session using documented CLI/REPL APIs. It does not consume Telegram updates,
+replace a webhook, execute AI tasks, or collect a vault. The employee receives
+instructions through its Telegram channel. The watcher reports the exact matched
+request, actual turn lifecycle and final answer to the signed webhook. A received
+answer remains **review**, never approval.
+
+1. Use verified DEV Supabase/Vercel and the owner's active QA enrollment. Create
+   the task in the office and note its ID (revision 1).
+2. Register one connector/owner mapping and a fresh signing key. Keep the local
+   key in a private file (600 on macOS/Linux), outside Git. Telegram credentials
+   remain in Aside's OS secure storage.
+3. Record the real Aside account, channel connection and session ID. Hash the
+   **exact** next Telegram task text with `promptDigest`; set `notBefore` before
+   sending it. Put the job ID in the message. Follow-ups or repeated identical
+   requests require reconciliation; the watcher does not guess.
+4. Prepare a private config with `environment: "development"`, `endpoint`,
+   `connectorId`, `keyVersion`, `secretFile`, `jobId`, `account` (e.g. `u0`),
+   `connectionId`, `sessionId`, `promptHash`, `notBefore` and `reportDir`.
+   Run `node scripts/campus-aside-watch.mjs /absolute/private/config.json`.
+   Optional `transport: "vercel-cli"` reuses the operator's existing Vercel login
+   for protected Preview access; it is not a student deployment requirement.
+5. Send the task in Telegram. Verify queued/running/review and the actual result
+   in the office, then reopen it. The panel polls every five seconds only while
+   active and visible, pauses during mutations, and reports refresh failures.
+6. On a transport failure, inspect saved reports and rerun the same config.
+   Persisted event IDs/bodies and server receipts prevent duplicate reports.
+   Never reset revisions or auto-approve a result to pass QA.
+
+`campus-office-report.mjs prepare INPUT_JSON SAVED_REPORT` and
+`send CONFIG_JSON SAVED_REPORT` also support explicit employee reports.
+A signature authenticates the reporter; it does not independently prove the work.
+
+Pilot limits: one existing job at revision 1, one exact Telegram request and
+Aside turn, latest 100 transcript messages, 30-minute observation, final answer
+of 10–10,000 characters. Missing/ambiguous evidence fails visibly. No self-service
+pairing, daemon, heartbeat, multi-employee dispatch or production rollout is
+implemented here. Disable the connector mapping/key when retiring the pilot.
+Local fixtures are synthetic; real DEV/Telegram evidence belongs in the OS log.
+
 Status (2026-11-05): Yoonik’s ZIP has been received and its character/space renderer is integrated. Personal bot profiles can be imported, saved and synchronized under the EDU account. The campus is deployed privately for active administrators; existing students cannot enter. The ZIP contains frontend desktop API calls, but no executable desktop worker backend or production worker credentials. Actual Telegram worker execution/live state is therefore not connected, and outbound dispatch remains OFF.
 
 ## EDU boundary
