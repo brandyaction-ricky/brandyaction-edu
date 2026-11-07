@@ -29,6 +29,7 @@ import { MvpEditor } from './final/member-mvp';
 import { LearningNoticeEditor } from './final/learning-notice';
 import { AnalyticsExclusion } from './final/analytics-exclusion';
 import { AppBrandingEditor } from './final/app-branding-editor';
+import { ShortLinks } from './short-links';
 import { timeLabel, type Data, type WorkflowSend } from "./learning-workflows";
 import { EnrollmentGrant, RefundAction } from "./operations-actions";
 import {
@@ -202,6 +203,7 @@ export function AdminWorkflows(props: Props) {
       </>
     );
   if (props.section === "landing" || props.section === "metrics") return <LandingAdmin />;
+  if (props.section === "links") return <ShortLinks />;
   if (props.section === "analytics") return <Analytics />;
   if (props.section === "orders") return <OrdersPanel {...p} />;
   return null;
