@@ -71,7 +71,7 @@ async function main(configPath,inputPath) {
   try {
     let state=null;try {await privateFile(file);state=JSON.parse(await readFile(file,'utf8'));}catch(e){if(e.code!=='ENOENT')throw e;}
     const persist=async s=>{await writeFile(file+'.tmp',JSON.stringify(s),{mode:0o600});await rename(file+'.tmp',file);};
-    const result=await reportSkill(config,input,state,(c,r)=>deliverReport(c,r,secret,c.transport==='vercel-cli'?protectedPreviewFetch:fetch),persist);
+    const result=await reportSkill(config,input,state,(c,r)=>deliverReport(c,r,secret,c.transport==='vercel-cli'?(url,init)=>protectedPreviewFetch(url,init,c.previewCliPath):fetch),persist);
     console.log(JSON.stringify(result));
   } finally {await handle.close();await unlink(lock);}
 }
