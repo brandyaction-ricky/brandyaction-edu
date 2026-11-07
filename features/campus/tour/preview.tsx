@@ -168,7 +168,7 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  {room==='welcome'&&['video','notices','basics','quiz','level','checklist'].includes(tool)&&<div className={['video','notices','basics','quiz','level'].includes(tool)?undefined:styles.lesson}>{welcomeBody}</div>}
 
  {tool==='bots'&&<>{review&&<p>운영자 연습 공간이에요. 여기서 배치한 직원은 이 브라우저에만 저장됩니다.</p>}<PersonalOffice enrollmentId={snapshot.selectedEnrollmentId||''} demo={demo} onChange={document=>post('personal-office',{document})}/><button onClick={()=>selectTask('office')}>이 사무실의 업무 관리 열기</button></>}
- {!review&&tool==='learning'&&<LessonTaskPanel snapshot={snapshot} onOpen={openLesson}/>}
+ {!review&&tool==='learning'&&<LessonTaskPanel key={snapshot.selectedEnrollmentId} live={!!live} mayLeave={mayLeave} onCompleted={live?.onRefresh} snapshot={snapshot} onOpen={openLesson}/>}
  {tool==='lesson'&&<div className={styles.lesson}><small>미리보기용 수업 안내</small><h2>{selectedLesson}</h2><p>실제 서비스에서는 해당 수강권으로 공개된 수업과 과제를 연결합니다. 이 화면은 동선 확인용 예시입니다.</p><button onClick={()=>{setTool(previous||'learning');setPrevious('');}}>수업 목록으로</button></div>}
  {tool==='intro:'+room&&canEnter(role,room)&&<article className={styles.managedArticle}><h2>{managed[room]?.title}</h2><LessonText text={managed[room]?.body||''}/></article>}
  {tool.startsWith('content:')&&canEnter(role,room)&&(()=>{const a=managed[room]?.articles.find(a=>'content:'+room+':'+a.id===tool&&a.published);return a?<article className={styles.managedArticle}><h2>{a.title}</h2>{a.image&&<img src={a.image} alt={a.imageAlt||a.title}/>}<LessonText text={a.body}/>{a.url&&<a href={a.url} target="_blank" rel="noopener noreferrer">{a.linkLabel} ↗</a>}</article>:null;})()}

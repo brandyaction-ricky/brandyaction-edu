@@ -1,4 +1,5 @@
 import type { Row } from '@/lib/platform';
+import { isGraduate } from '@/lib/alumni-access';
 import { hasLearningAccess } from '@/lib/platform-rules';
 import type { CampusScope, CampusSnapshot, CampusMission } from './contracts';
 
@@ -13,7 +14,7 @@ export function campusScopes(userId: string, enrollments: Row[], courses: Row[],
     const course = courses.find(c => c.id === e.course_id && c.status === 'published' && !c.archived_at);
     const cohort = cohorts.find(c => c.id === e.cohort_id && c.course_id === e.course_id && !c.archived_at);
     if (!course || !cohort || ![e.id, course.id, cohort.id].every(isCampusId)) return [];
-    return [{ enrollmentId: e.id, courseId: course.id, cohortId: cohort.id,
+    return [{ ...(isGraduate(e, course, cohort, now) ? { graduate: true } : {}), enrollmentId: e.id, courseId: course.id, cohortId: cohort.id,
       courseTitle: str(course.title), cohortName: str(cohort.name) }];
   });
 }

@@ -10,6 +10,7 @@ export type CampusScope = {
   enrollmentId: string;
   courseId: string;
   cohortId: string;
+  graduate?: boolean;
   courseTitle: string;
   cohortName: string;
 };
