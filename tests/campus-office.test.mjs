@@ -76,6 +76,7 @@ test('PostgreSQL isolates office ownership, mapped connector events, replay, CAS
  insert into profiles values('${uid(1)}','active'),('${uid(2)}','active');insert into courses values('${uid(10)}','published',null);insert into cohorts values('${uid(20)}','${uid(10)}',null);
  insert into enrollments(id,user_id,course_id,cohort_id,status) values('${uid(31)}','${uid(1)}','${uid(10)}','${uid(20)}','active'),('${uid(32)}','${uid(2)}','${uid(10)}','${uid(20)}','active');`);
  await db.exec(readFileSync(new URL('../supabase/migrations/20261102154425_edu_campus_private_office_jobs.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../supabase/migrations/20261107004756_edu_campus_office_registered_reports.sql',import.meta.url),'utf8'));
  const login=async n=>db.exec(`reset role;set role authenticated;select set_config('request.jwt.claim.sub','${uid(n)}',false);`);
  const mutate=async c=>(await db.query('select public.edu_campus_office_mutate($1::jsonb) result',[JSON.stringify(c)])).rows[0].result;
  const ingest=async(id,ev,owners=[uid(1)],hash='a'.repeat(64),connectorId='office',version='v1')=>(await db.query('select public.edu_campus_office_ingest($1,$2,$3::uuid[],$4,$5,$6::jsonb) result',[connectorId,version,owners,uid(id),hash,JSON.stringify(ev)])).rows[0].result;
@@ -87,6 +88,24 @@ test('PostgreSQL isolates office ownership, mapped connector events, replay, CAS
  await login(2);assert.equal((await db.query('select * from edu_campus_office_jobs')).rows.length,0);
  await assert.rejects(mutate({...create,requestId:uid(101)}),/scope/i);
  await db.exec(`reset role;insert into private.edu_campus_office_connectors values('office','${uid(1)}','v1',true,now());set role service_role;`);
+ const register=async(body,owners=[uid(1)],eventId=uid(800),hash='c'.repeat(64),version='v1')=>(await db.query('select public.edu_campus_office_register($1,$2,$3::uuid[],$4,$5,$6::jsonb) result',['office',version,owners,eventId,hash,JSON.stringify(body)])).rows[0].result;
+ const registration={event:'registered',jobId:uid(700),enrollmentId:uid(31),objective:'텔레그램에서 직접 지시한 개발 검수용 업무입니다.',outputType:'analysis'};
+ await assert.rejects(register({...registration,enrollmentId:uid(32)}),/scope/i);
+ await assert.rejects(register(registration,[uid(1),uid(2)]),/scope/i);
+ await assert.rejects(register(registration,[uid(1)],uid(800),'c'.repeat(64),'wrong'),/scope/i);
+ await assert.rejects(register({...registration,objective:null}),/registration/i);
+ assert.equal((await register({...registration,ownerId:uid(2)})).revision,1);
+ assert.equal((await register({...registration,ownerId:uid(2)})).revision,1);
+ await assert.rejects(register(registration,[uid(1)],uid(800),'d'.repeat(64)),/replay conflict/i);
+ await assert.rejects(register(registration,[uid(1)],uid(801)),/job conflict/i);
+ await login(2);assert.equal((await db.query('select * from edu_campus_office_jobs')).rows.length,0);
+ await assert.rejects(register(registration),/permission denied/i);
+ await login(1);assert.equal((await db.query('select owner_id from edu_campus_office_jobs where id=$1',[uid(700)])).rows[0].owner_id,uid(1));
+ await db.exec('reset role;set role service_role;');
+ await ingest(802,{jobId:uid(700),event:'accepted',expectedRevision:1,note:''});
+ await ingest(803,{jobId:uid(700),event:'started',expectedRevision:2,note:''});
+ await ingest(804,{jobId:uid(700),event:'draft',expectedRevision:3,draftText:'자동 등록 업무의 실제 검토 결과입니다.',draftUrl:''});
+ assert.equal((await register({...registration,ownerId:uid(2)})).revision,1);
  const accepted={jobId:uid(100),expectedRevision:1,event:'accepted',note:''};
  await assert.rejects(ingest(200,accepted,[uid(2)]),/scope/i);await assert.rejects(ingest(200,accepted,[uid(1)],'a'.repeat(64),'office','wrong-version'),/scope/i);
  assert.equal((await ingest(200,accepted)).status,'queued');assert.equal((await ingest(200,accepted)).revision,2);
@@ -97,7 +116,7 @@ test('PostgreSQL isolates office ownership, mapped connector events, replay, CAS
  await login(1);const approve={requestId:uid(300),enrollmentId:uid(31),action:'approve',jobId:uid(100),expectedRevision:4,note:'목표와 자료를 확인했고 사용 가능한 초안입니다.'};
  assert.equal((await mutate(approve)).status,'approved');await assert.rejects(mutate({...approve,requestId:uid(301)}),/revision conflict/i);
  await mutate({...approve,requestId:uid(302),action:'archive',expectedRevision:5,note:''});
- assert.equal((await db.query('select * from edu_campus_office_history')).rows.length,6);
+ assert.equal((await db.query('select * from edu_campus_office_history where job_id=$1',[uid(100)])).rows.length,6);
  await db.exec(`reset role;set role service_role;`);await assert.rejects(ingest(203,{...accepted,expectedRevision:6}),/transition/i);
  await db.exec(`reset role;update cohorts set archived_at=now() where id='${uid(20)}';`);await login(1);
  assert.equal((await db.query('select * from edu_campus_office_jobs')).rows.length,0);await assert.rejects(mutate({...create,requestId:uid(500)}),/scope/i);
@@ -106,4 +125,15 @@ test('PostgreSQL isolates office ownership, mapped connector events, replay, CAS
  await db.exec(`reset role;update enrollments set revoked_at=now() where id='${uid(31)}';`);await login(1);assert.equal((await db.query('select * from edu_campus_office_jobs')).rows.length,0);await assert.rejects(mutate(create),/scope/i);
  await db.exec(`reset role;set role anon;`);await assert.rejects(db.query('select * from edu_campus_office_jobs'),/permission denied/i);
  }finally{await db.close();}
+});
+
+test('registration is opt-in, single-owner, signed and cannot submit owner or result fields', async()=>{
+ const body={event:'registered',jobId:uid(700),enrollmentId:uid(31),objective:'자동으로 등록할 검수용 업무입니다.',outputType:'analysis',ownerId:uid(99),status:'approved'};
+ const {raw,headers}=signed(JSON.stringify(body));let seen;
+ const deps={enabled:true,connectors:[connector],now,ingest:async v=>{seen=v;return{};}};
+ const req=()=>new Request('https://edu.test/api/campus/office/webhook',{method:'POST',headers,body:raw});
+ assert.equal((await handleOfficeWebhook(req(),deps)).status,403);
+ assert.equal((await handleOfficeWebhook(req(),{...deps,registrationEnabled:true})).status,200);
+ assert.equal(seen.event.ownerId,undefined);assert.equal(seen.event.status,undefined);
+ assert.equal((await handleOfficeWebhook(req(),{...deps,registrationEnabled:true,connectors:[{...connector,ownerIds:[uid(1),uid(2)]}]})).status,403);
 });
