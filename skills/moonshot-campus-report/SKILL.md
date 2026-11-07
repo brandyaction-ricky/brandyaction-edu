@@ -1,11 +1,15 @@
 ---
 name: "moonshot-campus-report"
-description: "지정 Telegram 직원 대화에서 '캠퍼스 업무:'로 시작하는 요청을 수행할 때 문샷 캠퍼스 개인 사무실에 업무 시작과 실제 결과를 보고한다. 일반 대화·다른 봇·이전 업무에는 사용하지 않는다."
+description: "Telegram 개인 대화의 '캠퍼스 연결 준비'와 '캠퍼스 연결 확인'을 처리하고, 지정 Telegram 직원 대화에서 '캠퍼스 업무:'로 시작하는 요청을 수행할 때 문샷 캠퍼스 개인 사무실에 업무 시작과 실제 결과를 보고한다. 일반 대화·다른 봇·이전 업무에는 사용하지 않는다."
 ---
 
 # 문샷 캠퍼스 업무 보고
 
 이 스킬은 작업 중 짧은 보고 명령만 실행한다. 감시 프로그램·예약 작업·새 서버를 실행하지 않는다. 보고는 직원의 자기 보고이며, PC가 꺼지거나 Aside가 중단될 때 전달을 보장하는 시스템 훅이 아니다.
+
+## 수강생이 직접 연결할 때
+
+본인만 사용하도록 설정한 Telegram 직원 개인 대화에서 정확히 `캠퍼스 연결 준비` 또는 `캠퍼스 연결 확인 <12자리 확인번호>`를 받으면 아래의 공식 Aside·channel 정보에서 실제 현재 context를 구한다. 현재 요청의 원문을 requestText로 하고 context와 함께 로컬 입력 JSON에 저장한다. `node <this-skill-dir>/scripts/campus-student-device.mjs <accountRoot> <입력JSON절대경로>`를 실행한다. 준비 단계는 출력된 10분짜리 pairingCode만 사용자에게 답한다. 사용자가 캠퍼스의 내 AI 직원에서 코드를 입력한 다음, 같은 대화에서 확인번호를 보내면 확인 명령을 실행한다. connected가 true일 때만 연결을 알린다. 키 파일을 열거나 전송하지 않는다. 연결 명령은 업무로 등록하지 않는다. 연결 해제는 캠퍼스의 해당 직원 카드에서 한다.
 
 ## 범위와 준비
 
@@ -13,7 +17,7 @@ description: "지정 Telegram 직원 대화에서 '캠퍼스 업무:'로 시작�
 - 현재 대화의 `aside`와 `channel` 공식 스킬을 먼저 읽는다. REPL의 `await aside.sessions.current()`와 `channel.current()`에서 현재 세션/연결/Telegram 메시지 식별자를 얻는다. 식별자를 만들어 내거나 다른 작업의 값을 복사하지 않는다.
 - `aside.sessions.messages(session.id, {limit:20,order:'desc'})`에서 해당 사용자 요청의 본문·timestamp를 확인한다. 메시지가 모호하거나 현재 요청을 확인할 수 없으면 보고를 멈춘다.
 - 연결 설정은 `<accountRoot>/campus-office/connection.json`이다. accountRoot는 이 SKILL.md의 실제 경로에서 `skills/user/moonshot-campus-report`를 제거한 위치다. 설정 파일·키 파일을 읽어서 출력하지 않는다. 아래 보고 스크립트만 설정을 소비한다. 연결이 없으면 담당자에게 연결 준비가 필요하다고 알린다.
-- 기존 Node 런타임으로 실행한다. Node가 없거나 권한이 부족하면 설치·권한 확대를 임의로 하지 말고 미연결 상태를 알린다. 이 스킬은 학생용 자격 발급·설치 마법사가 아니다.
+- 기존 Node 런타임으로 실행한다. Node가 없거나 권한이 부족하면 설치·권한 확대를 임의로 하지 말고 미연결 상태를 알린다.
 
 ## 실행 절차
 
