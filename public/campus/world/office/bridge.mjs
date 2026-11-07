@@ -63,7 +63,7 @@ function handle(type,p={}){
 async function start(){
   if(started)return;started=true;
   try{
-    window.CampusPlan=CampusPlan;window.CampusInterior=CampusInterior;
+    /* campus-plan.js installs the renderer API, including its non-exported picking helpers. */window.CampusInterior=CampusInterior;
     await import('./vendor/office.js');
     const {Office3D}=await import('./vendor/office3d.js');
     office=new Office3D(root,{showAgent:false,deskCapacity:8,label:s=>s.fullName||s.project});

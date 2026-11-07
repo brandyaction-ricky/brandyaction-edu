@@ -32,6 +32,20 @@ test('original lighting and independent recorded tracks work without autoplay or
  expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
 });
 
+test('six original props can be picked on the rendered campus floor',async({page},info)=>{
+ test.skip(info.project.name!=='desktop','The hit map uses mouse hover before a physical pointer click.');test.setTimeout(90000);
+ const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('/campus-tour');
+ const frame=page.frameLocator('iframe'),root=frame.locator('#office');
+ const rooms=[{id:'study',name:'문샷 공부방',items:{'study-arcade':'미니 아케이드 · 100점','study-water-plant':'식물에 물을 줬습니다.','study-telescope':'달을 향해 망원경을 맞췄습니다.'}},{id:'office',name:'내 AI 사무실',items:{'office-coffee':'커피 한 잔, 준비됐습니다.','office-globe':'작은 지구를 한 바퀴 돌려봅니다.','office-mini-rocket':'3, 2, 1. 미니 로켓 발사!'}}];
+ for(const room of rooms){
+  const map=page.getByRole('dialog',{name:'공간 이동',exact:true});if(!await map.isVisible())await page.getByRole('button',{name:'공간 이동',exact:true}).click();await map.getByRole('button',{name:room.name+' 입장',exact:true}).click();await expect(root).toHaveAttribute('data-room',room.id,{timeout:60000});
+  // Discover the real mesh hit regions at this viewport without reaching into the renderer or assuming pixel coordinates.
+  const points=await root.evaluate((el,ids)=>{const found:Record<string,{x:number;y:number}>={};const b=el.getBoundingClientRect();for(const stride of [21,7])for(let y=10;y<b.height;y+=stride)for(let x=10;x<b.width;x+=stride){const t=document.elementFromPoint(b.left+x,b.top+y);if(!t||!el.contains(t))continue;t.dispatchEvent(new PointerEvent('pointermove',{bubbles:true,clientX:b.left+x,clientY:b.top+y}));const id=(el as HTMLElement).dataset.interiorHover;if(id&&ids.includes(id)&&!found[id])found[id]={x,y};if(Object.keys(found).length===ids.length)return found;}return found;},Object.keys(room.items));
+  for(const [id,message] of Object.entries(room.items)){expect(points[id],id).toBeDefined();await root.click({position:points[id]});await expect(frame.locator('#status')).toHaveText(message);}
+ }
+ expect(errors).toEqual([]);
+});
+
 test('main campus exposes the original controls only in member rooms and pauses audio outside them',async({page})=>{
  test.setTimeout(120000);const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto('/campus-tour');const frame=page.frameLocator('iframe'),root=frame.locator('#office');
