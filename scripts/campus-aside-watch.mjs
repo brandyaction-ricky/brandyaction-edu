@@ -50,9 +50,9 @@ export function observeTask(snapshot, config) {
   if (answer.length < 10 || answer.length > 10000) throw new Error('Result does not fit the office draft; review it manually');
   return { phase: 'review', turnId: turn.turnId, answer };
 }
-async function readAside(config) {
+export async function readAside(config) {
   if (!/^[a-zA-Z0-9_-]{1,100}$/.test(config.sessionId) || !/^u\d+$/.test(config.account)) throw new Error('Invalid Aside selector');
-  const script = `console.log("CAMPUS_EVIDENCE:"+JSON.stringify({session:aside.sessions.get(${JSON.stringify(config.sessionId)}),messages:await aside.sessions.messages(${JSON.stringify(config.sessionId)},{limit:100,order:"desc"})}))`;
+  const script = `console.log("CAMPUS_EVIDENCE:"+JSON.stringify({session:await aside.sessions.get(${JSON.stringify(config.sessionId)}),rows:(await aside.sessions.messageRows(${JSON.stringify(config.sessionId)})).map(r=>({id:r.id,role:r.role,timestamp:r.timestamp})),messages:await aside.sessions.messages(${JSON.stringify(config.sessionId)},{limit:200,order:"desc"})}))`;
   let stdout;
   try { ({ stdout } = await run('aside', ['--account', config.account, '--host', 'local', 'repl', script], { timeout: 20000, maxBuffer: 2000000 })); }
   catch { throw new Error('Local Aside evidence unavailable'); }

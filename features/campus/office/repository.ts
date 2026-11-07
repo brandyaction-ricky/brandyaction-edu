@@ -22,5 +22,5 @@ export async function saveOfficeCommand(db: Db, command: unknown) {
   const c = validateOfficeCommand(command); const r = await db.rpc('edu_campus_office_mutate', { p_command: c }); dbError(r.error); return r.data;
 }
 export async function ingestOfficeEvent(db: ReturnType<typeof createAdminClient>, event: VerifiedOfficeEvent) {
-  const r = await db.rpc('edu_campus_office_ingest', { p_connector: event.connectorId, p_key_version: event.keyVersion, p_allowed_owners: event.allowedOwners, p_event_id: event.eventId, p_payload_hash: event.payloadHash, p_event: event.event }); dbError(r.error); return r.data;
+  const r = await db.rpc(event.event.event === 'registered' ? 'edu_campus_office_register' : 'edu_campus_office_ingest', { p_connector: event.connectorId, p_key_version: event.keyVersion, p_allowed_owners: event.allowedOwners, p_event_id: event.eventId, p_payload_hash: event.payloadHash, p_event: event.event }); dbError(r.error); return r.data;
 }

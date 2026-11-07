@@ -5,6 +5,13 @@ import { pathToFileURL } from 'node:url';
 
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 export function prepareReport(input, eventId = randomUUID()) {
+  if (input?.event === 'registered') {
+    if (!uuid.test(input.jobId) || !uuid.test(input.enrollmentId) || !uuid.test(eventId)
+      || typeof input.objective !== 'string' || input.objective.trim().length < 10 || input.objective.length > 2000
+      || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(input.objective)
+      || !['plan','copy','checklist','analysis'].includes(input.outputType)) throw new Error('Invalid registration');
+    return { schema: 'campus-office-report.v1', eventId, raw: JSON.stringify({ event: 'registered', jobId: input.jobId, enrollmentId: input.enrollmentId, objective: input.objective.trim(), outputType: input.outputType }) };
+  }
   if (!input || !uuid.test(input.jobId) || !uuid.test(eventId)
     || !Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 1
     || !['accepted', 'started', 'draft', 'failed'].includes(input.event)) throw new Error('Invalid report');
@@ -22,7 +29,7 @@ export function prepareReport(input, eventId = randomUUID()) {
       body.draftUrl = input.draftUrl;
     }
   }
-  // Pilot supports manually created jobs only; never silently omit a dispatch binding.
+  // Incoming reports never silently omit a dispatch binding.
   if (input.dispatchId !== undefined) throw new Error('Dispatched jobs are not supported by this pilot');
   return { schema: 'campus-office-report.v1', eventId, raw: JSON.stringify(body) };
 }
@@ -37,6 +44,7 @@ export async function deliverReport(config, envelope, secret, fetcher = fetch, n
   const report = JSON.parse(envelope.raw);
   const canonical = prepareReport(report, envelope.eventId);
   if (canonical.raw !== envelope.raw || report.jobId !== config.jobId) throw new Error('Report does not match the configured job');
+  if (report.event === 'registered' && report.enrollmentId !== config.enrollmentId) throw new Error('Registration does not match configured enrollment');
   const timestamp = String(Math.floor(now / 1000));
   const signature = createHmac('sha256', secret)
     .update(`${config.connectorId}.${config.keyVersion}.${timestamp}.${envelope.eventId}.${envelope.raw}`).digest('hex');

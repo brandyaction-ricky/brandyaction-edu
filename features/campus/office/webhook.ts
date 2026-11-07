@@ -1,6 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { isCampusId } from '../snapshot';
-import { validateOfficeEvent, type OfficeEvent } from './domain';
+import { validateOfficeEvent, validateOfficeRegistration, type OfficeEvent, type OfficeRegistration } from './domain';
 import { readLimitedUtf8Body } from '../community/request-body';
 export type OfficeConnector = { id: string; keyVersion: string; secret: string; ownerIds: string[] };
 export function readOfficeConnectors(env: Record<string, string | undefined>): OfficeConnector[] {
@@ -21,7 +21,7 @@ export function readOfficeConnectors(env: Record<string, string | undefined>): O
     return out;
   } catch { return []; }
 }
-export type VerifiedOfficeEvent = { connectorId: string; keyVersion: string; allowedOwners: string[]; eventId: string; payloadHash: string; event: OfficeEvent };
+export type VerifiedOfficeEvent = { connectorId: string; keyVersion: string; allowedOwners: string[]; eventId: string; payloadHash: string; event: OfficeEvent | OfficeRegistration };
 export function verifyOfficeWebhook(raw: string, headers: Headers, connectors: OfficeConnector[], now = Date.now()): VerifiedOfficeEvent {
   const id = headers.get('x-campus-connector'), version = headers.get('x-campus-key-version'), timestamp = headers.get('x-campus-timestamp') ?? '', eventId = headers.get('x-campus-event-id') ?? '', signature = headers.get('x-campus-signature') ?? '';
   const connector = connectors.find(c => c.id === id && c.keyVersion === version);
@@ -31,9 +31,9 @@ export function verifyOfficeWebhook(raw: string, headers: Headers, connectors: O
   if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) throw Object.assign(new Error('Invalid webhook'), { status: 401 });
   let data: unknown;
   try { data = JSON.parse(raw); } catch { throw Object.assign(new Error('Invalid JSON'), { status: 400 }); }
-  return { connectorId: connector.id, keyVersion: connector.keyVersion, allowedOwners: connector.ownerIds, eventId, payloadHash: createHash('sha256').update(raw).digest('hex'), event: validateOfficeEvent(data) };
+  return { connectorId: connector.id, keyVersion: connector.keyVersion, allowedOwners: connector.ownerIds, eventId, payloadHash: createHash('sha256').update(raw).digest('hex'), event: data && typeof data === 'object' && 'event' in data && data.event === 'registered' ? validateOfficeRegistration(data) : validateOfficeEvent(data) };
 }
-export async function handleOfficeWebhook(request: Request, deps: { enabled: boolean; connectors: OfficeConnector[]; ingest: (event: VerifiedOfficeEvent) => Promise<unknown>; now?: number }) {
+export async function handleOfficeWebhook(request: Request, deps: { enabled: boolean; connectors: OfficeConnector[]; ingest: (event: VerifiedOfficeEvent) => Promise<unknown>; now?: number; registrationEnabled?: boolean }) {
   const reply = (body: unknown, status: number) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
   if (!deps.enabled || !deps.connectors.length) return reply({ error: 'Not connected' }, 404);
   if (request.method !== 'POST') return reply({ error: 'Method not allowed' }, 405);
@@ -41,6 +41,7 @@ export async function handleOfficeWebhook(request: Request, deps: { enabled: boo
   try {
     const raw = await readLimitedUtf8Body(request, 48000);
     const verified = verifyOfficeWebhook(raw, request.headers, deps.connectors, deps.now);
+    if (verified.event.event === 'registered' && (!deps.registrationEnabled || verified.allowedOwners.length !== 1)) return reply({ error: 'Registration unavailable' }, 403);
     return reply(await deps.ingest(verified), 200);
   } catch (e) {
     const status = e instanceof Error && 'status' in e && [400, 401, 403, 409].includes(Number(e.status)) ? Number(e.status) : 503;

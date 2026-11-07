@@ -15,16 +15,22 @@ test('incoming job reports update without manual refresh; network loss is visibl
  await expect(detail.getByText('요청 접수', { exact: true })).toBeVisible();
  job.status = 'running'; job.revision = 3;
  await expect(detail.getByText('실행 중', { exact: true })).toBeVisible({ timeout: 8000 });
- job.status = 'review'; job.revision = 4; job.draft_text = '로컬 HTTP 시험에서 수신한 분석 결과입니다. 실제 AI 업무 결과는 아닙니다.';
- await expect(detail.getByText(job.draft_text, { exact: true })).toBeVisible({ timeout: 8000 });
+ const resultText = '로컬 HTTP 시험에서 수신한 분석 결과입니다. 실제 AI 업무 결과는 아닙니다.';
+ job.status = 'review'; job.revision = 4; job.draft_text = `<citation refs="test_1">${resultText}</citation>\n[공식 문서](https://example.com/docs)\n[실행 금지](javascript:alert(1))`;
+ await expect(detail.getByText(resultText, { exact: false })).toBeVisible({ timeout: 8000 });
+ await expect(detail.getByRole('link', { name: '공식 문서' })).toHaveAttribute('href', 'https://example.com/docs');
+ await expect(detail.getByRole('link', { name: '실행 금지' })).toHaveCount(0);
+ await expect(detail).not.toContainText('<citation');
  unavailable = true;
  await expect(page.getByText(/작업 소식을 갱신하지 못했어요/)).toBeVisible({ timeout: 8000 });
- await expect(detail.getByText(job.draft_text, { exact: true })).toBeVisible();
+ await expect(detail.getByText(resultText, { exact: false })).toBeVisible();
  unavailable = false;
  await expect(page.getByText(/작업 소식을 갱신하지 못했어요/)).toHaveCount(0, { timeout: 8000 });
  await page.reload();
  await page.getByRole('button', { name: /개발 검수용 보고 상태 확인 작업/ }).click();
- await expect(page.getByText(job.draft_text, { exact: true })).toBeVisible();
+ await expect(detail.getByText(resultText, { exact: false })).toBeVisible();
+ await page.getByText('Telegram 업무를 사무실에서 확인하는 방법', { exact: true }).click();
+ await expect(page.getByText(/개발 검수 프로그램은 한 번에 최대 30분/)).toBeVisible();
  await noOverflow(page);
 });
 test('disconnected office stores private request; only explicit synthetic receipts reach review, human approval and archive',async({page})=>{
