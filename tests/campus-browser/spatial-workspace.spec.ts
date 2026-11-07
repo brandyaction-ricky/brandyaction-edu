@@ -35,7 +35,7 @@ test('inside guide reaches secondary tools, keyboard dialog and browser history 
  await world.getByRole('button',{name:'내 도구'}).click();
  await world.getByRole('button',{name:'공간 설정·소리'}).click();
  const settings=page.getByRole('dialog',{name:'공간 설정',exact:true});await expect(settings).toBeVisible();
- await expect(settings.getByLabel('소리 크기')).toBeVisible();
+ await expect(settings.getByRole('button',{name:'조명·배경음 열기'})).toBeVisible();
  await settings.press('Escape');await expect(settings).toBeHidden();
  await world.getByRole('button',{name:'동료와 대화',exact:true}).click();
  await expect(page.getByRole('dialog',{name:'동료와 대화',exact:true})).toBeVisible();

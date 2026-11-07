@@ -1,3 +1,6 @@
+import {attachAmbientMixer} from './vendor/ambient-mixer.js';
+import {attachInteriorInteractions} from './vendor/interior-interactions.js';
+import {attachEnvironmentControls} from './environment-controls.mjs';
 import {attachCameraControls} from './camera-controls.mjs';
 import {attachSpatialActions} from './spatial-actions.mjs';
 import {attachAppearanceEditor} from './appearance-editor.mjs';
@@ -15,7 +18,7 @@ import {createRenderQuality} from '../src/render-quality.mjs';
 
 const token=new URLSearchParams(location.hash.slice(1)).get('bridge')||'';
 const root=document.getElementById('office'),status=document.getElementById('status');
-let office,scene,camera,editor,spatialActions,uiBlocked=false,ready=false,started=false,timer,restorePerformance,closed=new Set(),lastPosition='',lastSent=0;
+let office,scene,camera,editor,spatialActions,environment,mixer,interiors,uiBlocked=false,ready=false,started=false,timer,restorePerformance,closed=new Set(),lastPosition='',lastSent=0;
 const speech=new Map(),pending=new Map();
 let wakeWorld=()=>{};
 const send=(type,payload={})=>{if(token.length>=32&&parent!==window)parent.postMessage({source:'moonshot-world',token,type,payload},location.origin);};
@@ -33,11 +36,12 @@ function moveZone(id){
 }
 function handle(type,p={}){
   wakeWorld();
-  if(type==='ui-blocked'){uiBlocked=p.blocked===true;root.inert=uiBlocked;if(uiBlocked)office.pauseCampusInput();else if(!document.hidden){office.resumeCampusInput();office.draw();}return;}
+  if(type==='ui-blocked'){uiBlocked=p.blocked===true;root.inert=uiBlocked||environment?.isOpen()===true;if(uiBlocked)office.pauseCampusInput();else if(!document.hidden){office.resumeCampusInput();office.draw();}return;}
   if(type==='profile'){
     office.campusIdentity={...office.campusIdentity,...appearance(p),displayId:String(p.name||'문샷 동료').slice(0,24),gender:p.gender==='female'?'female':'male',coat:/^#[0-9a-f]{6}$/i.test(p.coat)?p.coat:'#527086'};
     office.draw();
-  }else if(type==='appearance-open')editor?.open();
+  }else if(type==='environment-open')environment?.open();
+  else if(type==='appearance-open')editor?.open();
   else if(type==='appearance-result')editor?.result(p);
   else if(type==='progress'){
     office.campusIdentity={...office.campusIdentity,level:Number.isSafeInteger(p.level)?Math.max(0,p.level):0};office.draw();
@@ -72,6 +76,9 @@ async function start(){
     office.sun.shadow.mapSize.set(1024,1024);
     attachOfficeEnvironment(office,root);
     attachAvatarAppearance(office);
+    mixer=attachAmbientMixer(document.getElementById('ambient-host'));mixer.setRoom('study');
+    environment=attachEnvironmentControls({office,root,isBlocked:()=>uiBlocked,wake:()=>wakeWorld()});
+    interiors=attachInteriorInteractions({office,root,onMessage:say});
     attachCampusNavigation(office,root,{initialRoom:'study',reduceMotion:matchMedia('(prefers-reduced-motion: reduce)').matches});
     camera=attachCameraControls({office,root,onChange:mode=>{document.getElementById('third-view').disabled=office.getCampusRoom()!=='study';document.getElementById('third-view').textContent=mode==='third'?'1인칭으로 보기':'3인칭으로 보기';say(mode==='overall'?'전체 지도 · 공간 이름을 누르면 바로 열려요.':mode==='third'?'3인칭 · 내 캐릭터를 따라 이동해요.':'1인칭 · 캐릭터의 눈높이에서 바라봐요.');}});
     scene=attachStudyScene({office,root,onInteract:interact});scene.setRoom('study');camera.connect(scene);
@@ -97,7 +104,7 @@ async function start(){
     document.addEventListener('visibilitychange',visible);visible();
     restorePerformance=()=>{document.removeEventListener('visibilitychange',visible);office.gl.render=render;office.frame=originalFrame;wakeWorld=()=>{};for(const type of events)window.removeEventListener(type,activity);};
     office.campusIdentity={displayId:'문샷 동료',level:0};
-    root.addEventListener('campus-room-change',event=>{root.dataset.room=event.detail.roomId;if(event.detail.roomId==='office')say('나만의 사무공간 · 실제 AI 직원 연결은 준비 중이에요.');});
+    root.addEventListener('campus-room-change',event=>{root.dataset.room=event.detail.roomId;mixer?.setRoom(event.detail.roomId);if(event.detail.roomId==='office')say('나만의 사무공간 · 실제 AI 직원 연결은 준비 중이에요.');});
     ready=true;root.dataset.ready='true';document.getElementById('map-view').disabled=false;document.getElementById('third-view').disabled=false;
     for(const[type,payload]of pending)handle(type,payload);pending.clear();
     say(document.body.classList.contains('spatial-ui')?'책상이나 공간 이름을 눌러 시작해 보세요.':'WASD · 방향키 · 바닥 클릭 이동 / E 가까운 공간 열기');send('ready');
@@ -109,7 +116,7 @@ async function start(){
       const value=JSON.stringify(p);if(value===lastPosition||Date.now()-lastSent<500)return;
       lastPosition=value;lastSent=Date.now();send('position',p);
     },100);
-  }catch{say('3D 공간을 열지 못했어요. 가벼운 공간 메뉴로 계속할 수 있습니다.');send('error');office?.destroy?.();}
+  }catch{say('3D 공간을 열지 못했어요. 가벼운 공간 메뉴로 계속할 수 있습니다.');send('error');environment?.destroy();mixer?.destroy();interiors?.destroy();office?.destroy?.();}
 }
 window.addEventListener('message',event=>{
   if(!acceptsHost(event,location.origin,parent,token))return;
@@ -133,5 +140,5 @@ for(const button of document.querySelectorAll('[data-direction]')){
   button.addEventListener('pointerdown',event=>{event.preventDefault();button.setPointerCapture(event.pointerId);office?.setCampusDirection(button.dataset.direction,true);});
   for(const type of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(type,()=>office?.setCampusDirection(button.dataset.direction,false));
 }
-window.addEventListener('pagehide',()=>{clearInterval(timer);restorePerformance?.();editor?.destroy();spatialActions?.destroy();office?.destroy?.();speech.clear();pending.clear();});
+window.addEventListener('pagehide',()=>{clearInterval(timer);restorePerformance?.();environment?.destroy();mixer?.destroy();interiors?.destroy();editor?.destroy();spatialActions?.destroy();office?.destroy?.();speech.clear();pending.clear();});
 if(parent===window||token.length<32)say('에듀 캠퍼스 화면에서 이 공간을 열어 주세요.');else send('boot');

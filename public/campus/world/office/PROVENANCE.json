@@ -431,6 +431,21 @@
       "path": "licenses/THREE-LICENSE.txt",
       "sourceSha256": "97de7ac302052bcea7f20e5ae89635c10e049614f56409288d554d63fceb614f",
       "importSha256": "97de7ac302052bcea7f20e5ae89635c10e049614f56409288d554d63fceb614f"
+    },
+    {
+      "path": "ambient-mixer.js",
+      "sourceSha256": "94c162216ebd4b110a9bf6f86dc6e401cfd1bbe1e25a459c0adfe2095fcae623",
+      "importSha256": "94c162216ebd4b110a9bf6f86dc6e401cfd1bbe1e25a459c0adfe2095fcae623"
+    },
+    {
+      "path": "recorded-ambience.js",
+      "sourceSha256": "824c70cf06616714099192028192eeccee6894328b701d72af31ab919d3da564",
+      "importSha256": "2dc78d78120df15929607ef7ac83405d3313bb650dbe1c4e567146cae3337561"
+    },
+    {
+      "path": "interior-interactions.js",
+      "sourceSha256": "0eee02ee4af291548c234ee2ef5c5a7b251377efa83c36195c929dfad27de95e",
+      "importSha256": "0eee02ee4af291548c234ee2ef5c5a7b251377efa83c36195c929dfad27de95e"
     }
   ]
 }
