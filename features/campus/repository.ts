@@ -21,8 +21,8 @@ export async function loadCampusSnapshot(db: Database, viewer: { id: string; ful
     .eq('user_id', viewer.id).eq('status', 'active').limit(200))).filter(e => hasLearningAccess(e, now));
   if (enrollmentId && !enrollments.some(e => e.id === enrollmentId)) campusError(403, '현재 이용 가능한 수강권을 선택해 주세요.');
   const [courses, cohorts] = enrollments.length ? await Promise.all([
-    rows(db.from('courses').select('id,title,status,archived_at', { count: 'exact' }).in('id', ids(enrollments.map(e => e.course_id))).eq('status', 'published').is('archived_at', null).limit(200)),
-    rows(db.from('cohorts').select('id,course_id,name,archived_at', { count: 'exact' }).in('id', ids(enrollments.map(e => e.cohort_id))).is('archived_at',null).limit(200)),
+    rows(db.from('courses').select('id,title,status,category,archived_at', { count: 'exact' }).in('id', ids(enrollments.map(e => e.course_id))).eq('status', 'published').is('archived_at', null).limit(200)),
+    rows(db.from('cohorts').select('id,course_id,name,status,operation_end_at,alumni_access_on_enroll,archived_at', { count: 'exact' }).in('id', ids(enrollments.map(e => e.cohort_id))).is('archived_at',null).limit(200)),
   ]) : [[], []];
   const scopes = campusScopes(viewer.id, enrollments, courses, cohorts, now);
   const scope = scopes.find(s => s.enrollmentId === enrollmentId);

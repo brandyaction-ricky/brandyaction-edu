@@ -88,3 +88,9 @@
 .lesson-back-to-top { text-align:right; }
 .lesson-blocks > [id^="lesson-block-"], #lesson-reading-start { scroll-margin-top: 84px; }
 .lesson-blocks > [id^="lesson-block-"]:target { outline: 2px solid #c91e2c; outline-offset: 4px; }
+
+.lb-pages {min-width:0}
+.lb-page-position {font-weight:700;scroll-margin-block-start:4.5rem}
+.lb-pages>progress {display:block;width:100%;height:.4rem;margin:.5rem 0 1.25rem;accent-color:#225cca}
+.lb-pages>nav {display:flex;justify-content:space-between;gap:.75rem;margin-top:1.5rem}
+.lb-pages>nav button {min-height:44px}
