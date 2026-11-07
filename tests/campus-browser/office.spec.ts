@@ -30,7 +30,7 @@ test('incoming job reports update without manual refresh; network loss is visibl
  await page.getByRole('button', { name: /개발 검수용 보고 상태 확인 작업/ }).click();
  await expect(detail.getByText(resultText, { exact: false })).toBeVisible();
  await page.getByText('Telegram 업무를 사무실에서 확인하는 방법', { exact: true }).click();
- await expect(page.getByText(/개발 검수 프로그램은 한 번에 최대 30분/)).toBeVisible();
+ await expect(page.getByText(/스킬 호출이 빠지거나 PC·Aside가 종료되면 보고가 누락/)).toBeVisible();
  await noOverflow(page);
 });
 test('disconnected office stores private request; only explicit synthetic receipts reach review, human approval and archive',async({page})=>{
