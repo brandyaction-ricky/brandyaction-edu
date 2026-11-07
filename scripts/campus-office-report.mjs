@@ -36,8 +36,9 @@ export function prepareReport(input, eventId = randomUUID()) {
 
 export async function deliverReport(config, envelope, secret, fetcher = fetch, now = Date.now()) {
   const url = new URL(config.endpoint);
+  const directEndpoint = url.href === 'https://vjmjhaidlqkmascdjocw.supabase.co/functions/v1/campus-office-report';
   if (config.environment !== 'development' || url.protocol !== 'https:' || url.username || url.password
-    || url.search || url.hash || url.pathname !== '/api/campus/office/webhook'
+    || url.search || url.hash || (!directEndpoint && url.pathname !== '/api/campus/office/webhook')
     || !/^[a-z0-9_-]{1,40}$/.test(config.connectorId) || !/^[a-zA-Z0-9_-]{1,40}$/.test(config.keyVersion)
     || typeof secret !== 'string' || secret.length < 32) throw new Error('Invalid development connector configuration');
   if (envelope?.schema !== 'campus-office-report.v1' || typeof envelope.raw !== 'string') throw new Error('Invalid saved report');
@@ -56,6 +57,11 @@ export async function deliverReport(config, envelope, secret, fetcher = fetch, n
         'x-campus-event-id': envelope.eventId, 'x-campus-signature': `v1=${signature}` }, body: envelope.raw });
   } catch { throw new Error('Delivery unconfirmed. Keep this saved report and retry it; do not create another event.'); }
   if (!response.ok) throw new Error(`Report rejected (HTTP ${response.status}). Keep the saved report; check mapping/revision before retrying.`);
+  if (directEndpoint) {
+    const receipt = await response.json().catch(() => null);
+    const revision = report.event === 'registered' ? 1 : report.expectedRevision + 1;
+    if (receipt?.jobId !== report.jobId || receipt?.revision !== revision) throw new Error('Delivery unconfirmed: missing matching office receipt');
+  }
   // Do not echo result text, provider response, credentials or signatures to logs.
   return { delivered: true, eventId: envelope.eventId, jobId: report.jobId, event: report.event };
 }

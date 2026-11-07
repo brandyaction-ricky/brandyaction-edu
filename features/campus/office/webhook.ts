@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { isCampusId } from '../snapshot';
 import { validateOfficeEvent, validateOfficeRegistration, type OfficeEvent, type OfficeRegistration } from './domain';

@@ -238,3 +238,15 @@ late callback fencing, key rotation/mapping drift, status reconciliation and fai
 against that worker. Keep the feature off if any guarantee is missing. Rollback must preserve
 outbox/receipts and pending/uncertain dispatches; do not remove the cancellation fence while
 such records or in-flight worker requests exist.
+
+### DEV 검수 직원의 직접 HTTPS 보고
+
+개인 사무실 등록 한 건에 만료 시간이 있는 256비트 HMAC 키를 발급한다. 운영자가 DEV 함수의 `CAMPUS_OFFICE_REPORT_DEV_BINDING`에 `connectorId, keyVersion, ownerId, enrollmentId, secret, expiresAt`을 설정하고, 동일한 연결 ID·버전을 기존 DB 연결 테이블에 활성화한다. 이 단일 직원용 설정을 학생 전체에 공유하지 않는다. 학생 측 기존 Aside 스킬은 HTTPS 서명에 필요한 키만 로컬 비공개 파일에서 읽는다. 배포·DB 관리 키는 필요하지 않다.
+
+DEV 함수는 기존 webhook 검증기를 공유한다. 배포용 임시 프로젝트의 `supabase/functions/campus-office-report/index.ts`를 저장소 루트에서 다음과 같이 빌드한다.
+
+```sh
+node_modules/.bin/esbuild supabase/functions/campus-office-report/index.ts --bundle --platform=node --format=esm --outfile="$STAGING/supabase/functions/campus-office-report/index.ts"
+```
+
+해당 DEV 함수만 `verify_jwt = false`로 설정한다. 대신 모든 보고에 HMAC, 5분 서명 시각, 유효한 개인 연결, 수강 및 업무 소유권 검사를 적용한다. 운영 프로젝트에서는 함수가 요청을 거절한다. 회수는 해당 DB 연결의 `enabled=false`로 처리하고, 전용 함수 비밀 설정을 해제한다. 다음 검수에는 새 키를 발급한다. 이전 업무 보고 파일은 원래 연결에 보관한다.
