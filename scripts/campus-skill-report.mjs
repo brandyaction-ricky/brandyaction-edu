@@ -1,7 +1,7 @@
 // Called by the Aside agent only at explicit workflow steps. No watcher or AI runner.
 import { createHash } from 'node:crypto';
 import { readFile, writeFile, mkdir, rename, stat, open, unlink } from 'node:fs/promises';
-import { resolve, join } from 'node:path';
+import { resolve, join, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { prepareReport, deliverReport } from './campus-office-report.mjs';
 import { protectedPreviewFetch } from './campus-office-preview-transport.mjs';
@@ -55,10 +55,17 @@ async function privateFile(file) {
 }
 async function main(configPath,inputPath) {
   if(!configPath||!inputPath)throw Error('Usage: report.mjs PRIVATE_CONFIG INPUT_JSON');
-  await privateFile(configPath);
-  const config=JSON.parse(await readFile(configPath,'utf8'));
   if((await stat(inputPath)).size>64000)throw Error('Input too large');
   const input=JSON.parse(await readFile(inputPath,'utf8'));
+  // New device connections take precedence over the legacy one-employee pilot.
+  let selectedPath=configPath;
+  if (input.context?.platform==='telegram' && /^telegram:[1-9]\d*$/.test(input.context.channelId)) {
+    const {deviceDir}=await import('./campus-student-device.mjs');
+    const candidate=join(deviceDir(dirname(dirname(configPath)),input.context),'connection.json');
+    try {await privateFile(candidate);selectedPath=candidate;} catch(e){if(e.code!=='ENOENT')throw e;}
+  }
+  await privateFile(selectedPath);
+  const config=JSON.parse(await readFile(selectedPath,'utf8'));
   const binding=skillBinding(config,input);
   if(!config.stateDir||!config.secretFile)throw Error('Missing private report storage');
   await privateFile(config.secretFile);

@@ -3,6 +3,7 @@
   "framework": "nextjs",
   "git": {
     "deploymentEnabled": {
+      "codex/office-student-connect": false,
       "codex/campus-office-report-https": false,
       "codex/campus-aside-skill-20261107": false,
       "codex/campus-office-auto-20261107": false,
