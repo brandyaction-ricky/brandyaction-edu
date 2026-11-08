@@ -19,7 +19,7 @@ function CampusLessonGuard({ dirty, busy }: { dirty: boolean; busy: boolean }) {
   return null;
 }
 
-type CampusMaterial = { description?: string; updatedAt: string; body?: string; video?: string; link?: string; resourceName: string | null };
+export type CampusMaterial = { description?: string; updatedAt: string; body?: string; video?: string; link?: string; resourceName: string | null };
 
 type Snapshot = {
   campus?: CampusMaterial;
@@ -208,7 +208,7 @@ function SessionLoader({ lessonId, enrollmentId, readOnly = false, fallback, onC
   return <>{intro}<SessionContent campusGuided={campusGuided} key={key} snapshot={loaded.snapshot} lessonId={lessonId} enrollmentId={enrollmentId} readOnly={readOnly} onSelectRevision={select} onCompleted={onCompleted} />{resource}{loaded.snapshot.ongoing && loaded.snapshot.practice?.enabled && <details className="mt24"><summary>졸업 전 기간별 챌린지 기록 보기</summary><OngoingLessonSession lessonId={lessonId} enrollmentId={enrollmentId} readOnly /></details>}</>;
 }
 
-function LegacyCampusLesson({ material, lessonId, enrollmentId, readOnly, completed, onCompleted }: SessionProps & { material: CampusMaterial }) {
+export function LegacyCampusLesson({ material, lessonId, enrollmentId, readOnly, completed, onCompleted }: SessionProps & { material: CampusMaterial }) {
   const [saving, setSaving] = useState(false), [done, setDone] = useState(!!completed), [error, setError] = useState('');
   useCampusDraftGuard(false, saving, 'campus-lesson');
   const blocks: PublicBlockDocument['blocks'] = [];
@@ -223,7 +223,7 @@ function LegacyCampusLesson({ material, lessonId, enrollmentId, readOnly, comple
       setDone(true); onCompleted?.();
     } catch (err) { setError((err as Error).message); } finally { setSaving(false); }
   }
-  return <LessonPages positionKey={`campus:page:${enrollmentId}:${lessonId}:${material.updatedAt}`} document={document} enabled busy={saving}>{(pageBlocks,last) => <>
+  return <LessonPages positionKey={enrollmentId ? `campus:page:${enrollmentId}:${lessonId}:${material.updatedAt}` : undefined} document={document} enabled busy={saving}>{(pageBlocks,last) => <>
     {(pageBlocks ?? blocks).map(block => {
       if (block.type === 'video') return <Video key={block.id} url={block.url!} />;
       if (block.type === 'link') return <a key={block.id} className="btn primary" href={block.url} target="_blank" rel="noreferrer">외부 학습 열기</a>;
