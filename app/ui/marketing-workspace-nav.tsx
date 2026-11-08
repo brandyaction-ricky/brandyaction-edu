@@ -10,6 +10,7 @@ import { adminNavigationTitles } from '@/features/admin-ui/navigation/admin-navi
 const destinations = [
   ['conversion', '모집·문의 관리', '모집별 카톡방, 문의·Jev 검토, 구매 기록 관리'],
   ['landing', '광고·무료강의 결과', '광고별 방문과 신청 숫자 확인'],
+  ['links', '단축 링크', '긴 주소 줄이기 · 클릭 수'],
   ['analytics', '사이트 방문 결과', '사이트 전체 방문과 클릭 확인'],
   ['campaigns', '안내 문자 보내기', '회원에게 보낼 문자 예약'],
   ['templates', '안내 문구 만들기', '문자와 알림톡 문구 관리'],
@@ -61,6 +62,12 @@ const guides: Record<string, { heading: string; summary: string; steps: readonly
     steps: ['검색·공유, 소유 확인, 측정 코드 중 할 일을 고르세요.', '바꿀 내용을 확인하고 필요한 칸만 입력하세요.', '저장 버튼을 눌러 바뀐 내용을 적용하세요.'],
     caution: '모르는 인증 문구나 코드는 임의로 넣지 말고 담당자에게 확인하세요.',
   },
+  links: {
+    heading: '긴 주소를 짧은 주소로 줄여요',
+    summary: 'UTM 링크나 사이트 주소를 짧게 만들어 공유해요. 만든 주소는 그대로 두고 도착지만 바꿀 수 있어서 고정 링크로도 씁니다.',
+    steps: ['줄일 주소를 붙여 넣고 단축 링크 만들기를 누르세요. 이름·채널은 적지 않아도 됩니다.', '나온 짧은 주소를 복사해 영상 설명·고정 댓글·카톡에 넣으세요.', '도착지가 바뀌면 도착지 바꾸기를 누르세요. 이미 공유한 주소는 고치지 않아도 됩니다.'],
+    caution: '끄면 이 주소를 누른 사람은 사이트 첫 화면으로 가요. 다시 켜면 원래 도착지로 갑니다.',
+  },
   settings: {
     heading: '사이트 문의처와 운영 연결을 관리해요',
     summary: '문의받을 주소, 방문 기록, 카카오 가입 연결을 설정합니다.',
@@ -86,7 +93,7 @@ export function MarketingWorkspaceNav({ current, available, search = "", prefetc
     {selectedRecruitment && <p>선택한 모집 <strong>{selectedRecruitment}</strong></p>}
     <nav className="marketing-task-nav" aria-label="마케팅 작업 빠른 이동">
       {[
-        { title: '모집·성과', keys: ['conversion', 'landing', 'analytics'], icon: ChartLine },
+        { title: '모집·성과', keys: ['conversion', 'landing', 'links', 'analytics'], icon: ChartLine },
         { title: '메시지', keys: ['templates', 'campaigns', 'automations'], icon: Send },
         { title: '설정', keys: ['seo', 'settings'], icon: Settings2 },
       ].filter(group => group.keys.some(key => available.some(section => section.key === key))).map(group => <div key={group.title} className="marketing-task-group"><span><group.icon size={14} aria-hidden="true"/>{group.title}</span><div>{destinations.filter(([key]) => group.keys.includes(key) && available.some(section => section.key === key)).map(([key,,description]) => <Link key={key} prefetch scroll={false} href={key === 'conversion' || key === 'landing' ? marketingContextHref(key, search) : '/admin/' + key} aria-current={current === key ? 'page' : undefined} title={description} onPointerEnter={() => prefetchSection(key)} onFocus={() => prefetchSection(key)}>{adminNavigationTitles[key]}<NavigationHint/></Link>)}</div></div>)}
