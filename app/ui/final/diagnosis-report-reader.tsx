@@ -8,8 +8,14 @@ import { attachReaderAssist, READER_LAYOUT_CSS } from '@/lib/precisionReaderAssi
 // Match MYIN's reader isolation. Keep the issued styles/font/body unchanged;
 // scripts and external requests must not run inside the EDU account origin.
 const policy = "default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'";
+// Same as MYIN (CEO 11-08 "응 EDU도 적용해", myinlab-client #1123/#1125): the final design sheet has no rule for THIS
+// WEEK's '1사람 × 1막힌 일 → 1방법' line, so it stacked, and its 4 steps wrapped one box to a 2nd row. The line sits in
+// one row, the steps share one row at one height (text wraps inside a box); phones stack the steps, arrows pointing down.
+// This CSS sits before the issued sheet, so ties with the sheet's own .e-sequence rule need !important.
+const FINAL_DESIGN = '<meta name="design-version" content="myin-precision-final-design-v1">';
+const FINAL_FIXES = '.e-mission:empty{display:none}.e-mission{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:8px 18px;margin:0 0 24px}.e-mission>div{display:flex;align-items:baseline;gap:3px}.e-mission b{font-size:34px;line-height:1.1;font-weight:800;color:var(--blue-t)}.e-mission span{font-size:19px;font-weight:700;color:var(--ink)}.e-mission i{font-style:normal;font-size:22px;font-weight:700;color:var(--ink-2)}.e-sequence{flex-wrap:nowrap!important;align-items:stretch!important}.e-sequence span{flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;text-align:center;word-break:keep-all}.e-sequence i{align-self:center}@media(max-width:640px){.e-mission{gap:6px 12px;justify-content:flex-start}.e-mission b{font-size:28px}.e-mission span{font-size:17px}.e-sequence{flex-direction:column!important;align-items:flex-start!important}.e-sequence span{flex:none}.e-sequence i{align-self:auto;display:inline-block;transform:rotate(90deg);margin:0 0 0 18px}}';
 export function diagnosisReaderDocument(html: string) {
-  return `<!doctype html><meta http-equiv="Content-Security-Policy" content="${policy}"><meta name="referrer" content="no-referrer"><style>.print-btn{display:none!important}${READER_LAYOUT_CSS}
+  return `<!doctype html><meta http-equiv="Content-Security-Policy" content="${policy}"><meta name="referrer" content="no-referrer"><style>.print-btn{display:none!important}${READER_LAYOUT_CSS}${html.includes(FINAL_DESIGN) ? FINAL_FIXES : ''}
 @media screen and (max-width:900px){.report-topbar .topbar-inner{height:auto!important;min-height:60px;flex-wrap:wrap;gap:8px!important;padding-top:12px;padding-bottom:10px}.report-topbar .topbar-links{display:flex!important;flex:0 0 100%;overflow-x:auto;gap:18px!important;margin:0!important;padding:4px 0}.report-topbar .topbar-links a{white-space:nowrap;display:flex;align-items:center;min-height:36px}}
 </style>${html}`;
 }
