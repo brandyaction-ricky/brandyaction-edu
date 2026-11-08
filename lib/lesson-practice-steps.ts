@@ -88,7 +88,7 @@ export function practiceSteps(lessonId: string | undefined, blocks: PublicLesson
   const embedded = lessonEmbeddedImageIds(blocks);
   const rows = lessonImageRows(blocks.filter(b => !embedded.has(b.id)));
   // A reviewed boundary can be inside a rich text block. Split only at an
-  // intact, uniquely identified heading; keep embedded media and lists whole.
+  // whole heading or stand-alone section title; keep embedded media and lists whole.
   const units: {id: string; heading?: string; blocks: PublicLessonBlock[]}[] = [];
   for (const row of rows) {
     const block = row[0];
@@ -99,7 +99,7 @@ export function practiceSteps(lessonId: string | undefined, blocks: PublicLesson
     const nodes = doc.content;
     const cuts = [0];
     for (const heading of breaks) {
-      const matches = nodes.flatMap((node,i) => node.type === 'heading' &&
+      const matches = nodes.flatMap((node,i) => (node.type === 'heading' || node.type === 'paragraph') &&
         node.content?.map(child => child.text || '').join('').trim() === heading ? [i] : []);
       if (matches.length !== 1 || matches[0] <= cuts[cuts.length - 1]) return null;
       cuts.push(matches[0]);
