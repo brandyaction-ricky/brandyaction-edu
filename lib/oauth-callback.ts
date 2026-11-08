@@ -2,7 +2,7 @@ const OAUTH_CODE_PATTERN = /^[A-Za-z0-9._~-]{16,2048}$/;
 
 export const campusReturnCookie = 'edu-campus-login-return';
 
-const campusAdminPages = ['/admin/campus', '/admin/campus/webinars'] as const;
+const campusAdminPages = ['/admin/campus', '/admin/campus/webinars', '/admin/campus/study'] as const;
 export type CampusAdminPage = typeof campusAdminPages[number];
 
 export function isCampusAdminPage(path: string): path is CampusAdminPage {

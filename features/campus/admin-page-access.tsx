@@ -6,6 +6,7 @@ import { getOperatorUser } from '@/lib/operator-permissions';
 
 const menus = {
   '/admin/campus': { scope: 'members', label: '회원 관리' },
+  '/admin/campus/study': { scope: 'products', label: '상품 관리' },
   '/admin/campus/webinars': { scope: 'marketing', label: '마케팅' },
 } as const satisfies Record<CampusAdminPage, { scope: string; label: string }>;
 

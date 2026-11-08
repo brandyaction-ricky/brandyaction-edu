@@ -7,6 +7,7 @@ export const metadata = {title:'문샷 기수 운영 현황',robots:{index:false
 export default async function Page({ searchParams }: { searchParams: Promise<PageQuery> }) {
   if (process.env.EDU_CAMPUS_ENABLED !== 'true') notFound();
   const path = '/admin/campus';
-  if (!await campusAdminAccess(path, await searchParams)) return <CampusAdminDenied path={path}/>;
-  return <AdminLive/>;
+  const operator = await campusAdminAccess(path, await searchParams);
+  if (!operator) return <CampusAdminDenied path={path}/>;
+  return <AdminLive studySettings={operator.permissions?.products}/>;
 }

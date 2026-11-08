@@ -10,10 +10,12 @@ export type CampusScope = {
   enrollmentId: string;
   courseId: string;
   cohortId: string;
+  graduate?: boolean;
   courseTitle: string;
   cohortName: string;
 };
 export type CampusSnapshot = {
+  guidedLessons?: boolean;
   schemaVersion: 1;
   fetchedAt: string;
   viewer: { id: string; displayName: string };
@@ -23,6 +25,7 @@ export type CampusSnapshot = {
     id: string;
     title: string;
     day: number;
+    week?: number;
     version: string;
     completed: boolean;
     href: string;

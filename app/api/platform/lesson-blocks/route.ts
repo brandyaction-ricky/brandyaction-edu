@@ -1,3 +1,4 @@
+import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAuthenticatedUser } from '@/lib/server-auth';
 import { uuid } from '@/lib/edu-workflows';
@@ -62,6 +63,14 @@ export async function GET(request: Request) {
     if (!user) return reply({ error: '로그인이 필요합니다.' }, 401);
     const params = new URL(request.url).searchParams;
     const db = createAdminClient();
+    if (params.get('campus') === '1') {
+      const { cohortReaderEnabled } = await import('@/features/campus/cohort-reader');
+      const { data: owned, error } = await db.from('enrollments').select('cohort_id')
+        .eq('id', requiredId(params.get('enrollment'))).eq('user_id', user.id).maybeSingle();
+      if (error) throw error;
+      if (!owned || !await cohortReaderEnabled(db, owned.cohort_id))
+        return reply({ error: '이 기수의 수업은 기존 강의실에서 열어 주세요.' }, 403);
+    }
     if (params.get('action') === 'progression') {
       const { data, error } = await db.rpc('edu_read_lesson_progression', { p_actor: user.id, p_enrollment: requiredId(params.get('enrollment')) });
       if (error) throw error;
@@ -82,7 +91,23 @@ export async function GET(request: Request) {
     const document = data.document ? validateLessonBlocks(data.document) : null;
     const enrollment = optionalId(params.get('enrollment'));
     const practice = enrollment && data.revision ? await readAlumniPractice(db, user.id, requiredId(params.get('lesson')), enrollment, data.revision) : null;
-    return reply({ ...data, practice, document: document && (data.editable === true ? document : publicLessonBlocks(document)) });
+    let campus;
+    if (params.get('campus') === '1' && enrollment && data.revision === data.currentRevision) {
+      const studentDb = await createClient();
+      const fields = document ? 'resource_name,resource_storage_path' : 'resource_name,resource_storage_path,body_text,external_url,vod_url';
+      const {data: row, error} = await studentDb.from('curriculum_lessons')
+        .select(`description,updated_at,lesson_contents(${fields})`).eq('id', requiredId(params.get('lesson'))).single();
+      if (error) throw error;
+      const {description, updated_at, lesson_contents} = row as unknown as {
+        description: string | null; updated_at: string; lesson_contents: Record<string,string | null> | null;
+      };
+      const content = Array.isArray(lesson_contents) ? lesson_contents[0] : lesson_contents;
+      campus = { description, updatedAt: updated_at,
+        resourceName: content?.resource_storage_path ? content.resource_name || '학습 자료' : null,
+        ...(!document && { body: content?.body_text || '', video: content?.vod_url || '', link: content?.external_url || '' }),
+      };
+    }
+    return reply({ ...data, ...(campus && {campus}), practice, document: document && (data.editable === true ? document : publicLessonBlocks(document)) });
   } catch (error) { return failure(error); }
 }
 
