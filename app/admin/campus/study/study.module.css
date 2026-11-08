@@ -19,3 +19,6 @@
 .reader img { max-width:100%; }
 .reader :global(.lb-page-position) { font-variant-numeric:tabular-nums; }
 @media(max-width:600px){ .page {gap:.85rem;} .panel {border-radius:.75rem;} }
+.reader :global(.lb-page-jump) { display:flex; width:fit-content; max-width:100%; flex-wrap:wrap; white-space:nowrap; }
+.reader :global(.lb-page-jump select) { max-width:min(100%,24rem); text-overflow:ellipsis; }
+@media(max-width:600px){ .reader :global(.lb-page-jump) { display:grid; gap:.35rem; } }

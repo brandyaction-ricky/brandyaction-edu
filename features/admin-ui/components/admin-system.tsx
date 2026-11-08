@@ -41,8 +41,8 @@ export type AdminTemplate = 'data-list' | 'analytics' | 'editor' | 'review' | 's
 export function AdminPage({ width = 'standard', template, className, children, ...props }: HTMLAttributes<HTMLDivElement> & { width?: AdminContentWidth; template?: AdminTemplate }) {
   return <div className={classes('admin-page', 'adm-stack', `admin-page--${width}`, template && `admin-template--${template}`, className)} {...props}>{children}</div>;
 }
-export function AdminPageHeader({ title, description, eyebrow, actions, className }: { title: string; description?: ReactNode; eyebrow?: string; actions?: ReactNode; className?: string }) {
-  return <header className={classes('admin-page-header', 'adm-page-head', className)}><div>{eyebrow && <p className="admin-eyebrow">{eyebrow}</p>}<h1>{title}</h1>{description && <p className="admin-page-description">{description}</p>}</div>{actions && <div className="admin-page-actions">{actions}</div>}</header>;
+export function AdminPageHeader({ title, description, eyebrow, actions, className, compactActions }: { compactActions?: boolean; title: string; description?: ReactNode; eyebrow?: string; actions?: ReactNode; className?: string }) {
+  return <header className={classes('admin-page-header', 'adm-page-head', compactActions && 'admin-page-header--compact', className)}><div>{eyebrow && <p className="admin-eyebrow">{eyebrow}</p>}<h1>{title}</h1>{description && <p className="admin-page-description">{description}</p>}</div>{actions && <div className="admin-page-actions">{actions}</div>}</header>;
 }
 export function AdminContent({ className, ...props }: HTMLAttributes<HTMLDivElement>) { return <div className={classes('admin-content-flow', 'adm-stack', className)} {...props}/>; }
 export function AdminSection({ title, description, actions, bordered = false, className, children, ...props }: HTMLAttributes<HTMLElement> & { title?: ReactNode; description?: ReactNode; actions?: ReactNode; bordered?: boolean }) {

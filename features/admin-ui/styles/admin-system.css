@@ -741,3 +741,7 @@
 .edu-admin .admin-control-row > .admin-field { flex:0 1 auto; min-width:0; max-width:100%; }
 .edu-admin .admin-control-row :is(.admin-select,.admin-input) { width:100%; min-width:0; max-width:min(100%,34rem); min-height:44px; }
 .edu-admin .admin-control-row > .admin-button { flex:none; width:auto; max-width:100%; min-height:44px; }
+.edu-admin .admin-page-header--compact .admin-page-actions { display:flex; flex-wrap:wrap; width:auto; justify-self:start; }
+.edu-admin .admin-page-header--compact .admin-page-actions > .admin-button { width:auto; flex:none; min-height:44px; }
+.edu-admin .admin-control-row > .admin-field > :is(input.admin-input,select.admin-select) { box-sizing:border-box; height:44px; min-height:44px; padding-block:0; }
+.edu-admin .admin-control-row > .admin-field:has(input.admin-input) { width:min(100%,16rem); }

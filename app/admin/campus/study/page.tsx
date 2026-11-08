@@ -66,7 +66,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ l
     enabled:'이 기수는 캠퍼스 수강 중입니다. 기존 강의실로 전환한 뒤 목록에서 빼세요.',name:'표시 이름을 1~50자로 입력해 주세요.'};
   return <main className={'edu-admin '+styles.shell}><div className={styles.page}>
     <Link className={styles.back} href={manageList ? path : '/admin/campus/webinars'}>← {manageList ? '수업 검수로 돌아가기' : '캠퍼스 관리'}</Link>
-    <AdminPageHeader eyebrow="문샷 캠퍼스" title={manageList ? '검수 목록 관리' : '캠퍼스 수업 검수'}
+    <AdminPageHeader compactActions eyebrow="문샷 캠퍼스" title={manageList ? '검수 목록 관리' : '캠퍼스 수업 검수'}
       description={manageList ? '검수에 쓸 기수와 이 화면에 표시할 이름을 정하세요. 실제 기수와 수강권은 그대로 유지됩니다.' : '기수를 선택해 수강생이 보게 될 수업을 한 장씩 확인하세요.'}
       actions={!manageList && <AdminLinkButton href={path+'?manage=1'}>검수 목록 관리</AdminLinkButton>}/>
     {manageList ? <>
