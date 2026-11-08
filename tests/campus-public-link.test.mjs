@@ -1,7 +1,8 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';import ts from 'typescript';import {build} from 'esbuild';
 const built=await build({entryPoints:['features/campus/webinar/public-route.ts'],bundle:true,platform:'node',format:'esm',write:false});const rules=await import('data:text/javascript;base64,'+Buffer.from(built.outputFiles[0].text).toString('base64'));
 const memberBuild=await build({entryPoints:['features/campus/member-route.ts'],bundle:true,platform:'node',format:'esm',write:false});const members=await import('data:text/javascript;base64,'+Buffer.from(memberBuild.outputFiles[0].text).toString('base64'));
-let gates=0,sessions=0;const proxyModule={};const mocks={'@/features/campus/member-route':members,'@/features/campus/private-release':{campusPrivateRelease:()=>true,isCampusProtectedPath:p=>/^\/(campus|api\/campus|admin\/campus|api\/admin\/campus)(\/|$)/.test(p)},'@/features/campus/private-proxy':{privateCampusResponse:async()=>{gates++;return 'private';}},'next/server':{NextResponse:{next:()=> 'public'}},'@/features/campus/webinar/public-route':rules,'@/lib/supabase/proxy':{updateSession:async()=>{sessions++;return 'session';}}};
+const adminPages={};new Function('exports',ts.transpileModule(readFileSync('lib/oauth-callback.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(adminPages);
+let gates=0,sessions=0;const proxyModule={};const mocks={'@/lib/oauth-callback':adminPages,'@/features/campus/member-route':members,'@/features/campus/private-release':{campusPrivateRelease:()=>true,isCampusProtectedPath:p=>/^\/(campus|api\/campus|admin\/campus|api\/admin\/campus)(\/|$)/.test(p)},'@/features/campus/private-proxy':{privateCampusResponse:async()=>{gates++;return 'private';}},'next/server':{NextResponse:{next:()=> 'public'}},'@/features/campus/webinar/public-route':rules,'@/lib/supabase/proxy':{updateSession:async()=>{sessions++;return 'session';}}};
 new Function('exports','require',ts.transpileModule(readFileSync('proxy.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(proxyModule,n=>{assert.ok(n in mocks,n);return mocks[n];});
 const call=(pathname,method='GET')=>proxyModule.proxy({nextUrl:{pathname},method});
 test('published event ingress and necessary presentation assets pass before private campus gate',async()=>{
@@ -10,7 +11,7 @@ test('published event ingress and necessary presentation assets pass before priv
  assert.equal(await call('/api/campus/webinar/moonshot-open-1107/resources/guide'),'public');for(const name of ['events','activity'])assert.equal(await call('/api/campus/webinar/moonshot-open-1107/'+name,'POST'),'public');assert.equal(gates,0);assert.equal(sessions,0);
 });
 test('private member/admin/QA APIs and writes never inherit the public exemption',async()=>{
- for(const path of ['/campus/qa/webinar','/admin/campus/webinars','/api/admin/campus/analytics','/api/campus/analytics','/api/campus/webinar/moonshot-open-1107/access','/campus/world/office/index.html','/campus/world/tour/../secret.mjs','/campus/world/%2e%2e/secret.mjs'])assert.equal(await call(path),'private',path);
+ for(const path of ['/campus/qa/webinar','/admin/campus/preview','/api/admin/campus/analytics','/api/campus/analytics','/api/campus/webinar/moonshot-open-1107/access','/campus/world/office/index.html','/campus/world/tour/../secret.mjs','/campus/world/%2e%2e/secret.mjs'])assert.equal(await call(path),'private',path);
  for(const path of ['/campus/live/moonshot-open-1107','/campus/world/tour/tour.mjs'])assert.equal(await call(path,'POST'),'private');assert.equal(await call('/classes'),'session');
 });
 
@@ -22,4 +23,12 @@ test('shared member links reach login/session handling while admin and unknown A
  assert.equal(await call('/api/campus/welcome/admin'),'private');
  for(const path of ['/api/campus/office/dispatch','/api/campus/office/webhook','/api/campus/community/demo-session','/api/campus/new-endpoint'])assert.equal(await call(path),'private',path);
  for(const path of ['/campus/enter','/campus/workspace'])assert.equal(await call(path,'POST'),'private');
+});
+
+test('only the two guarded management pages use normal session refresh',async()=>{
+ for(const path of ['/admin/campus','/admin/campus/webinars']){
+  for(const method of ['GET','HEAD'])assert.equal(await call(path,method),'session');
+  for(const method of ['POST','PATCH','DELETE'])assert.equal(await call(path,method),'private');
+ }
+ for(const path of ['/admin/campus/unlisted','/api/admin/campus','/api/admin/campus/webinars'])assert.equal(await call(path),'private');
 });
