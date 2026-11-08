@@ -41,6 +41,21 @@ jobs:
             exit 0
           fi
 
+          if [ "$head_ref" = "fix/precision-this-week-layout-20261108" ]; then
+            expected_main=d9dba93c905b48a5824ad922f6086cb7a178e0bf
+            release_payload=4ac0169920452915792fdc5c3d3a468195ca35f4
+            if [ "$(git rev-parse HEAD^1)" != "$expected_main" ]; then
+              echo "Production main moved; revalidate the precision report THIS WEEK layout release."
+              exit 1
+            fi
+            if ! git diff --exit-code "$release_payload" HEAD -- . ':(exclude).github/workflows/ci.yml'; then
+              echo "The merge result differs from the tested THIS WEEK layout release."
+              exit 1
+            fi
+            echo "Precision report THIS WEEK layout production release scope verified."
+            exit 0
+          fi
+
           if [ "$head_ref" = "codex/edu-signup-marketing-copy-20261104" ]; then
             expected_main=bb803efeeedea347e5cf6b283591f4053b5131de
             release_payload=aedfe204dabfcf3b5e54bcf04f6f7b2fa060f6cc
