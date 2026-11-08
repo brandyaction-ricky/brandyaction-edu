@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { WEBINAR_PREFIX, WEBINAR_TAG, slugPattern, validateWebinar, projectWebinar } from './domain';
 export async function readWebinar(slug:string) {
  if(!slugPattern.test(slug))return null;
- const r=await createAdminClient().from('site_settings').select('value').eq('key',WEBINAR_PREFIX+slug).eq('is_public',false).is('value->>deletedAt',null).abortSignal(AbortSignal.timeout(5000)).maybeSingle();
+ const r=await createAdminClient().from('site_settings').select('value').eq('key',WEBINAR_PREFIX+slug).eq('is_public',false).abortSignal(AbortSignal.timeout(5000)).maybeSingle();
  if(r.error)throw r.error;
  return r.data?validateWebinar(r.data.value):null;
 }
