@@ -21,7 +21,7 @@ import { PUBLIC_CACHE_TAG, type PublicView } from '@/lib/public-platform-plan';
 import { revalidateTag } from 'next/cache';
 import { readMemberPlatformData, type MemberView } from '@/lib/member-platform-data';
 import { couponError } from '@/lib/coupon-rules';
-import { adminOrderQuery, ORDER_PAGE_SIZE, parseOrderListScope, orderExclusionLabel } from '@/lib/admin-order-list';
+import { adminOrderQuery, ORDER_PAGE_SIZE, parseOrderListScope, orderExclusionLabel, readOrderPeriodSummary } from '@/lib/admin-order-list';
 import { assertParticipationOpen } from '@/lib/alumni-access-server';
 import { isLessonVisibleToCohort } from '@/lib/cohort-curriculum-server';
 import { cohortLessonVisible, cohortWeekVisible } from '@/lib/cohort-curriculum-visibility';
@@ -223,15 +223,20 @@ export async function GET(request: Request) {
                     if (summary.error) throw summary.error;
                     const row = summary.data as Row;
                     if (sectionKey === 'orders') {
-                        const processing = await db.from('edu_refund_requests').select('id', { count: 'exact', head: true }).eq('status', 'processing');
-                        if (processing.error) throw processing.error;
-                        data.order_summary = [{
-                            id: 'order-summary',
-                            approvedRevenue: row.approvedRevenue,
-                            refundedRevenue: row.refundedRevenue,
-                            netRevenue: row.netRevenue,
-                            processingRefunds: processing.count || 0,
-                        }];
+                        const scope = parseOrderListScope(params);
+                        if (scope.from || scope.to) {
+                            data.order_summary = [{ id: 'order-summary', ...await readOrderPeriodSummary(db, scope) }];
+                        } else {
+                            const processing = await db.from('edu_refund_requests').select('id', { count: 'exact', head: true }).eq('status', 'processing');
+                            if (processing.error) throw processing.error;
+                            data.order_summary = [{
+                                id: 'order-summary',
+                                approvedRevenue: row.approvedRevenue,
+                                refundedRevenue: row.refundedRevenue,
+                                netRevenue: row.netRevenue,
+                                processingRefunds: processing.count || 0,
+                            }];
+                        }
                         if (operator?.role === 'admin' || operator?.permissions.members) {
                             data.admin_summary = [{ id: 'navigation-summary', pendingReviews: row.pendingReviews, openQuestions: row.openQuestions }];
                         }

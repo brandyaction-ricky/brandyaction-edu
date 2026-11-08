@@ -173,6 +173,19 @@ test('order revenue summary covers every order page and keeps the navigation bad
   assert.equal(api.calls.summaries, 2);
 });
 
+test('dated order API replaces global revenue with period summary and retains authorization', async () => {
+  const api = apiHarness(admin);
+  const response = await api.read('orders&from=2026-11-05&to=2026-11-05');
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).data.order_summary[0], { id: 'order-summary', approvedRevenue: 0, refundedRevenue: 0, netRevenue: 0, processingRefunds: 3 });
+  assert.ok(api.calls.selects.some(([table, columns]) => table === 'payments' && columns.includes('period_order:edu_analytics_orders!inner')));
+  for (const user of [null, { ...admin, role: 'member' }]) {
+    const denied = apiHarness(user);
+    assert.notEqual((await denied.read('orders&from=2026-11-05')).status, 200);
+    assert.ok(!denied.calls.tables.includes('payments'));
+  }
+});
+
 test('order payment reads select only the nested card approval number within the visible order scope', async () => {
   const api = apiHarness(admin, null, {
     orders: [{ id: 'visible-order', status: 'paid' }],
