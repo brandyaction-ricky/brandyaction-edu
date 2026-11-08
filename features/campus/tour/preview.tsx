@@ -123,7 +123,7 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  function selectTask(id:string){const t=managedTask(id);if(!t||t.admin&&role!=='admin')return;if(!canEnter(role,t.room)){setGate(t.room);return;}if(!mayLeave())return;if(room!==t.room){setRoom(t.room);post('room',{id:t.room});}setPrevious('');if(id==='learning')setRequestedLesson('');setTool(id);visitorRef.current?.onActivity(id);if(id==='legacy-space')setReady(false);setMapOpen(false);setActivityMenu(false);setNotice('');if(id==='office')setOfficeVisited(true);if(id==='ai')setAiVisited(true);const pane=spacePane(id);if(pane){setToolsPane(pane);setToolsVisited(true);}if(id==='focus')post('sit');}
  function open(id:string){if(visibleTasks(room,role).some(t=>t.id===id))selectTask(id);}
  function openLesson(id:string,missionId?:string){if(!mayLeave(true))return;track('lesson_open',id);if(live){
-   if(!missionId && process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED==='true' && canEnter(role,'study') && snapshot.lessons.some(lesson=>lesson.id===id)){
+   if(!missionId && snapshot.guidedLessons === true && process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED==='true' && canEnter(role,'study') && snapshot.lessons.some(lesson=>lesson.id===id)){
      setRequestedLesson(id);setPrevious(tool==='learning'?'':tool);setRoom('study');post('room',{id:'study'});setTool('learning');return;
    }
    live.onOpen(id,missionId);return;

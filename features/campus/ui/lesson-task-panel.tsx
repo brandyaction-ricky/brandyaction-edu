@@ -15,12 +15,12 @@ export function LessonTaskPanel({snapshot,onOpen,live,mayLeave,onCompleted,initi
  const [chosen,setChosen]=useState(initialLesson||recommended?.lessonId||snapshot.lessons[0]?.id||'');
  const lesson=snapshot.lessons.find(l=>l.id===chosen)||snapshot.lessons[0];
  const enrollment = snapshot.selectedEnrollmentId || '';
- const enabled = !!live && process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true';
+ const enabled = !!live && snapshot.guidedLessons === true && process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true';
  const gates = useLessonProgression(enrollment, enabled);
  const [reading, setReading] = useState(initialLesson || '');
  const gate = gates.lessons?.find(row => row.lessonId === lesson?.id);
  const graduate = snapshot.scopes.find(scope => scope.enrollmentId === enrollment)?.graduate;
- if (lesson && reading === lesson.id && gate?.isUnlocked) return <section className={styles.reader} aria-label="캠퍼스 수업">
+ if (enabled && lesson && reading === lesson.id && gate?.isUnlocked) return <section className={styles.reader} aria-label="캠퍼스 수업">
    <button type="button" className="btn small" onClick={() => {
      if (!mayLeave || mayLeave()) { setReading(''); gates.reload(); }
    }}>수업 목록으로</button>
@@ -39,7 +39,7 @@ export function LessonTaskPanel({snapshot,onOpen,live,mayLeave,onCompleted,initi
     <button className={styles.primary} disabled={!gate?.isUnlocked} onClick={() => setReading(lesson.id)}>{lesson.completed ? '캠퍼스에서 다시 보기' : '캠퍼스에서 수업 열기'}</button>
     {!gate?.isUnlocked && <p role="status">{gate?.reason || (gates.lessons ? '수업 개방 상태를 확인해 주세요.' : '수업 개방 상태를 확인하고 있어요.')}</p>}
     {primaryMission && <button onClick={() => onOpen(lesson.id,primaryMission.id)}>{action}</button>}
-  </> : <button className={styles.primary} onClick={()=>onOpen(lesson.id,primaryMission?.id)}>{action}<span aria-hidden="true"> →</span></button>}</article>
+  </> : <button className={styles.primary} onClick={()=>onOpen(lesson.id,primaryMission?.id)}>{live && !primaryMission ? '기존 강의실에서 수업 열기' : action}<span aria-hidden="true"> →</span></button>}</article>
   <div className={styles.tasks}><h3>이 수업의 과제</h3>{!lesson.missions.length?<p>별도로 제출할 과제가 없어요.</p>:lesson.missions.map(m=><div key={m.id} className={styles.task}><div><strong>{m.title}</strong><p>{statusText[m.status]||'상태 확인이 필요해요'}</p></div>{m.id!==primaryMission?.id&&<button onClick={()=>onOpen(lesson.id,m.id)}>{m.status==='not_started'?'과제 열기':m.status==='changes_requested'||m.status==='rejected'?'검토 의견 보기':'제출 내용 보기'}</button>}</div>)}</div>
   <p className={styles.hint}>위의 닫기 버튼 또는 Esc를 누르면 원래 공간으로 돌아가요.</p>
  </section>;

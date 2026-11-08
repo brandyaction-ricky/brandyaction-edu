@@ -1,0 +1,9 @@
+.page { margin: 0 auto; max-width: 60rem; padding: 2rem clamp(1rem, 4vw, 3rem) 4rem; }
+.controls { display: grid; gap: 1.1rem; padding-block: 1.25rem; border-block-end: 1px solid #dbe2ea; }
+.row { display: flex; flex-wrap: wrap; gap: .65rem; align-items: end; }
+.field { display: grid; gap: .35rem; font-weight: 600; min-width: 0; }
+.field select { max-width: min(100%, 35rem); min-height: 2.75rem; }
+.row > button { width: auto; }
+.setting { display: grid; justify-items: start; gap: .75rem; margin-block: 1.5rem; padding: 1.1rem; border: 1px solid #dbe2ea; border-radius: .75rem; }
+.setting h2, .setting p { margin: 0; }
+.setting input { width: auto; }
