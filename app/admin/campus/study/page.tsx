@@ -20,7 +20,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ l
   if (!await getOperatorUser('products', user)) notFound();
   const db = createAdminClient();
   const { data, error } = await db.from('courses')
-    .select('id,title,status,cohorts(id,name,archived_at),curriculum_weeks(week_number,archived_at,is_published,curriculum_lessons(id,title,day_number,archived_at,is_published))')
+    .select('id,title,status,cohorts(id,name,archived_at),curriculum_weeks(week_number,title,archived_at,is_published,curriculum_lessons(id,title,day_number,archived_at,is_published))')
     .is('archived_at', null).order('title');
   if (error) throw error;
   const courses = data ?? [];
@@ -38,11 +38,26 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ l
   const selectedCohort = listed.find(c => c.id === cohort) ?? listed.find(c => !cohort && lesson &&
     courses.find(x => x.id === c.courseId)?.curriculum_weeks.some(w => w.curriculum_lessons.some(l => l.id === lesson))) ?? listed[0];
   const course = courses.find(c => c.id === selectedCohort?.courseId);
-  const lessons = course?.curriculum_weeks.filter(w => !w.archived_at && w.is_published)
-    .sort((a,b) => a.week_number-b.week_number)
-    .flatMap(w => w.curriculum_lessons.filter(l => !l.archived_at && l.is_published)
-      .sort((a,b) => a.day_number-b.day_number)
-      .map(l => ({ id:l.id, title:l.title, position:w.week_number+'주차 · '+l.day_number+'일차', label:w.week_number+'주차 · '+l.day_number+'일차 · '+l.title }))) ?? [];
+  const previewDraft = course?.status === 'draft';
+  const weeks = (course?.curriculum_weeks ?? [])
+    .filter(week => !week.archived_at && (previewDraft || week.is_published))
+    .sort((a, b) => a.week_number - b.week_number)
+    .map(week => ({
+      number: week.week_number,
+      title: week.title,
+      lessons: week.curriculum_lessons
+        .filter(item => !item.archived_at && (previewDraft || item.is_published))
+        .sort((a, b) => a.day_number - b.day_number)
+        .map(item => ({
+          id: item.id,
+          title: item.title,
+          day: item.day_number,
+          position: week.week_number + '주차 · ' + item.day_number + '일차',
+          unpublished: !week.is_published || !item.is_published,
+        })),
+    }))
+    .filter(week => week.lessons.length > 0);
+  const lessons = weeks.flatMap(week => week.lessons);
   const selected = lessons.find(l => l.id === lesson) ?? lessons[0];
   const enabled = !manageList && selectedCohort ? await cohortReaderEnabled(db, selectedCohort.id) : false;
   const addable = options.filter(c => !labels.has(reviewCohortKey(c.id)));
@@ -103,8 +118,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ l
             </form>}</details>)}
       </section>
       {selectedCohort && <section className={styles.panel} aria-label="캠퍼스 수업">
-        {lessons.length>1 && selected && <AdminControlRow><LessonPicker cohort={selectedCohort.id} selected={selected.id} lessons={lessons}/></AdminControlRow>}
-        {selected && content ? <><header className={styles.lessonHead}><small>{selected.position}</small><h2>{selected.title}</h2></header>
+        {lessons.length>1 && selected && <AdminControlRow><LessonPicker cohort={selectedCohort.id} selected={selected.id} weeks={weeks}/></AdminControlRow>}
+        {selected && content ? <><header className={styles.lessonHead}><small>{selected.position}{selected.unpublished && ' · 미공개 수업'}</small><h2>{selected.title}</h2></header>
           <div className={styles.reader}><StudyPreview key={selected.id} lessonId={selected.id} {...content}/></div></> : <p>미리볼 공개 수업이 없습니다.</p>}
       </section>}
     </>}
