@@ -1,3 +1,4 @@
+import { moonshotPracticePlans, type StepPlan } from './moonshot-practice-plans';
 import { LESSON_BODY_PREFIX, parseLessonDocument } from './lesson-body';
 import type { PublicLessonBlock } from './lesson-blocks';
 import { lessonEmbeddedImageIds } from './lesson-toggle-images';
@@ -5,11 +6,9 @@ import { lessonImageRows } from './lesson-image-row';
 
 // Cohorts 3, 4 and 5 share one authored lesson. The private DEV mirror
 // preserves its block identities; the normal classroom does not paginate.
-type StepPlan = readonly (readonly [blockId: string, label: string, heading?: string])[];
+
 const moonshotDayOne: StepPlan = [
-    ['4c84becb-6361-4cc4-96cc-8a71329d2c13', '10초 답변 조교 사용법 살펴보기'],
-    ['85232adb-66b5-4d7a-a038-429f5f288f15', '클로드에 답변 조교 연결하기'],
-    ['ffd51bb2-8a9f-43e6-90b3-e38b1fd301e8', '막힌 화면을 캡처해 질문하기'],
+    ['d5b0f5ca-578c-4602-a9ab-69cf60a4860e', '수업 중 질문하는 방법 확인하기'],
     ['a844519d-ef39-44b4-9ed0-39021955487b', '오리엔테이션 다시 보기'],
     ['a3aeccd1-9fd2-425c-a2ad-153386d90cb8', '오늘 만들 AI 작업실 살펴보기'],
     ['8dc6ac15-a68e-4b07-9ca4-915cb64af2a1', '클로드 데스크톱 설치하고 로그인하기'],
@@ -31,7 +30,7 @@ const moonshotDayOne: StepPlan = [
     ['b6476c98-3d39-49f0-88b1-c3a15a3434e8', 'AI 브라우저와 볼트 복습하기'],
 ];
 const moonshotDayTwo: typeof moonshotDayOne = [
-    ['59dcfd83-78a6-42cb-85da-0a2c87c03585', '필요한 경우 10초 답변 조교 연결하기'],
+    ['f39f6182-6241-4a6f-8fd3-3273771a18f0', '수업 중 질문하는 방법 확인하기'],
     ['c23afc6f-34bc-48af-907a-201d05b40292', '오늘의 목표와 AI에게 알려줄 맥락 이해하기'],
     ['a33126c7-e2b7-4090-a435-6215830ca3a6', '클로드에 첫 질문을 보내고 답변 캡처하기'],
     ['facb487e-0f6b-4372-b273-f1228f04f965', '예시로 나의 직과 업 구분하기'],
@@ -77,6 +76,11 @@ const plans: Record<string, StepPlan> = {
   'aeca0139-a836-436b-ae76-dd429952c7fa': moonshotDayOne,
   'cfe15c08-4dec-465f-92e2-c1cbce2728d3': moonshotDayOne,
 };
+
+for (const { lessonId, reviewId, steps } of moonshotPracticePlans) {
+  plans[lessonId] = steps;
+  plans[reviewId] = steps;
+}
 
 export function practiceSteps(lessonId: string | undefined, blocks: PublicLessonBlock[]) {
   const plan = lessonId && plans[lessonId];
