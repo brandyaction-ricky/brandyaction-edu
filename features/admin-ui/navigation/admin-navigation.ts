@@ -87,7 +87,7 @@ export const adminNavigationTitles: Record<string, string> = {
   products: '상품·판매 설정',
   conversion: '모집·문의 검토',
   landing: '광고·웨비나 성과',
-  links: '고정 링크',
+  links: '단축 링크',
   analytics: '전체 유입 성과',
   campaigns: '캠페인 발송',
   templates: '메시지 템플릿',
@@ -119,7 +119,7 @@ export const adminNavigationSearchTerms: Record<string, string> = {
   templates: '문자 알림톡 문구 양식 템플릿',
   automations: '자동 안내 메시지 발송',
   seo: '검색 공유 제목 설명 인증',
-  links: '단축 링크 주소 카톡방 무료 자료 클릭 채널',
+  links: '단축 링크 짧은 주소 줄이기 UTM 고정 링크 카톡방 무료 자료 클릭',
 };
 
 const adminGroupEyebrows: Record<string, string> = {
@@ -157,7 +157,7 @@ export const adminSectionDescriptions: Record<string, string> = {
   testimonials: '홈페이지에 노출할 고객 사례와 영상을 관리합니다.',
   orders: '주문·결제·환불 상태와 수강 권한을 함께 확인합니다.',
   landing: '광고 성과를 확인하고, 실측 기록과 캠페인 설정을 관리합니다.',
-  links: '콘텐츠에 넣는 고정 주소를 만들고, 도착지와 클릭 수를 관리합니다.',
+  links: '긴 주소를 짧게 줄여 공유하고, 도착지와 클릭 수를 관리합니다.',
   analytics: '전체 사이트의 유입 경로와 고객 행동 성과를 확인합니다.',
   metrics: '광고·라이브·결제 실측 데이터를 날짜별로 기록하고 관리합니다.',
   seo: '검색 노출 정보와 측정·인증 코드를 안전하게 관리합니다.',
