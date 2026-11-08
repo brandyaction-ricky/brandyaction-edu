@@ -94,3 +94,6 @@
 .lb-pages>progress {display:block;width:100%;height:.4rem;margin:.5rem 0 1.25rem;accent-color:#225cca}
 .lb-pages>nav {display:flex;justify-content:space-between;gap:.75rem;margin-top:1.5rem}
 .lb-pages>nav button {min-height:44px}
+.lb-page-jump{display:inline-flex;align-items:center;gap:.5rem;margin-block:.25rem .5rem;font-size:.9rem}
+.lb-page-jump select{min-height:44px;padding:0 .5rem;border:1px solid #bacbde;border-radius:8px;background:#fff;color:#203653;font:inherit}
+.lb-page-jump{max-width:100%}.lb-page-jump select{min-width:0;max-width:min(24rem,65vw)}

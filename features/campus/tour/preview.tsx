@@ -71,6 +71,7 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  const [toolsVisited,setToolsVisited]=useState(false),[toolsPane,setToolsPane]=useState<'focus'|'lounge'|'settings'|'profile'>('focus'),[taskQuery,setTaskQuery]=useState(''),[previous,setPrevious]=useState(''),[handoff,setHandoff]=useState<{lessonId:string;context:string}|null>(null),[aiVisited,setAiVisited]=useState(false),[officeVisited,setOfficeVisited]=useState(false),[fullscreen,setFullscreen]=useState(false);
  useEffect(()=>{const change=()=>setFullscreen(document.fullscreenElement===shell.current);document.addEventListener('fullscreenchange',change);return()=>document.removeEventListener('fullscreenchange',change);},[]);
  const [selectedLesson,setSelectedLesson]=useState('');
+ const [requestedLesson,setRequestedLesson]=useState('');
  const frame=useRef<HTMLIFrameElement>(null),shell=useRef<HTMLDivElement>(null),token=useRef(''),state=useRef({role,room,tool,mapOpen,gate,camera});
  useEffect(()=>{
   const node=shell.current;if(!node)return;
@@ -119,9 +120,14 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  // A document navigation releases the WebGL scene/presence and rechecks operator auth.
  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
  function enter(id:TourRoom){post('meetup-start');if(!mayLeave())return;if(visitorRef.current?.operatorReview&&!['live','library'].includes(id)){const q=new URLSearchParams({room:id});if(visitorRef.current.operatorEvent)q.set('event',visitorRef.current.operatorEvent);window.location.assign('/campus/operator?'+q);return;}if(!canEnter(role,id)){setMapOpen(false);setActivityMenu(false);setGate(id);return;}setRoom(id);setMapOpen(false);setGate(null);setTool('');setPrevious('');setActivityMenu(false);setNotice('');post('room',{id});}
- function selectTask(id:string){const t=managedTask(id);if(!t||t.admin&&role!=='admin')return;if(!canEnter(role,t.room)){setGate(t.room);return;}if(!mayLeave())return;if(room!==t.room){setRoom(t.room);post('room',{id:t.room});}setPrevious('');setTool(id);visitorRef.current?.onActivity(id);if(id==='legacy-space')setReady(false);setMapOpen(false);setActivityMenu(false);setNotice('');if(id==='office')setOfficeVisited(true);if(id==='ai')setAiVisited(true);const pane=spacePane(id);if(pane){setToolsPane(pane);setToolsVisited(true);}if(id==='focus')post('sit');}
+ function selectTask(id:string){const t=managedTask(id);if(!t||t.admin&&role!=='admin')return;if(!canEnter(role,t.room)){setGate(t.room);return;}if(!mayLeave())return;if(room!==t.room){setRoom(t.room);post('room',{id:t.room});}setPrevious('');if(id==='learning')setRequestedLesson('');setTool(id);visitorRef.current?.onActivity(id);if(id==='legacy-space')setReady(false);setMapOpen(false);setActivityMenu(false);setNotice('');if(id==='office')setOfficeVisited(true);if(id==='ai')setAiVisited(true);const pane=spacePane(id);if(pane){setToolsPane(pane);setToolsVisited(true);}if(id==='focus')post('sit');}
  function open(id:string){if(visibleTasks(room,role).some(t=>t.id===id))selectTask(id);}
- function openLesson(id:string,missionId?:string){if(!mayLeave(true))return;track('lesson_open',id);if(live){live.onOpen(id,missionId);return;}setPrevious(tool);setSelectedLesson(snapshot.lessons.find(l=>l.id===id)?.title||'오늘 수업');setTool('lesson');}
+ function openLesson(id:string,missionId?:string){if(!mayLeave(true))return;track('lesson_open',id);if(live){
+   if(!missionId && process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED==='true' && canEnter(role,'study') && snapshot.lessons.some(lesson=>lesson.id===id)){
+     setRequestedLesson(id);setPrevious(tool==='learning'?'':tool);setRoom('study');post('room',{id:'study'});setTool('learning');return;
+   }
+   live.onOpen(id,missionId);return;
+ }setPrevious(tool);setSelectedLesson(snapshot.lessons.find(l=>l.id===id)?.title||'오늘 수업');setTool('lesson');}
  function ask(value:{lessonId:string;context:string}){if(!mayLeave(true))return;setPrevious(tool);setHandoff(value);setAiVisited(true);setTool('ai');}
  function navigate(id:string){selectTask(({community:'feedback',business:'business:brief',support:'support:request',learning:'learning'} as Record<string,string>)[id]||id);}
  useEffect(()=>{state.current={role,room,tool,mapOpen,gate,camera};},[role,room,tool,mapOpen,gate,camera]);
@@ -168,7 +174,7 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  {room==='welcome'&&['video','notices','basics','quiz','level','checklist'].includes(tool)&&<div className={['video','notices','basics','quiz','level'].includes(tool)?undefined:styles.lesson}>{welcomeBody}</div>}
 
  {tool==='bots'&&<>{review&&<p>운영자 연습 공간이에요. 여기서 배치한 직원은 이 브라우저에만 저장됩니다.</p>}<PersonalOffice enrollmentId={snapshot.selectedEnrollmentId||''} demo={demo} onChange={document=>post('personal-office',{document})}/><button onClick={()=>selectTask('office')}>이 사무실의 업무 관리 열기</button></>}
- {!review&&tool==='learning'&&<LessonTaskPanel key={snapshot.selectedEnrollmentId} live={!!live} mayLeave={mayLeave} onCompleted={live?.onRefresh} snapshot={snapshot} onOpen={openLesson}/>}
+ {!review&&tool==='learning'&&<LessonTaskPanel key={snapshot.selectedEnrollmentId} initialLesson={requestedLesson} live={!!live} mayLeave={mayLeave} onCompleted={live?.onRefresh} snapshot={snapshot} onOpen={openLesson}/>}
  {tool==='lesson'&&<div className={styles.lesson}><small>미리보기용 수업 안내</small><h2>{selectedLesson}</h2><p>실제 서비스에서는 해당 수강권으로 공개된 수업과 과제를 연결합니다. 이 화면은 동선 확인용 예시입니다.</p><button onClick={()=>{setTool(previous||'learning');setPrevious('');}}>수업 목록으로</button></div>}
  {tool==='intro:'+room&&canEnter(role,room)&&<article className={styles.managedArticle}><h2>{managed[room]?.title}</h2><LessonText text={managed[room]?.body||''}/></article>}
  {tool.startsWith('content:')&&canEnter(role,room)&&(()=>{const a=managed[room]?.articles.find(a=>'content:'+room+':'+a.id===tool&&a.published);return a?<article className={styles.managedArticle}><h2>{a.title}</h2>{a.image&&<img src={a.image} alt={a.imageAlt||a.title}/>}<LessonText text={a.body}/>{a.url&&<a href={a.url} target="_blank" rel="noopener noreferrer">{a.linkLabel} ↗</a>}</article>:null;})()}

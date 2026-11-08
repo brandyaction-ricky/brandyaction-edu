@@ -29,15 +29,15 @@ export function campusSnapshot(input: {
   const { viewer, scopes, enrollmentId, now } = input;
   const scope = scopes.find(s => s.enrollmentId === enrollmentId);
   if (enrollmentId && !scope) campusError(403, '현재 이용 가능한 수강권을 선택해 주세요.');
-  const weeks = new Set((input.weeks || []).filter(w => w.course_id === scope?.courseId && w.is_published === true).map(w => w.id));
+  const weeks = new Map((input.weeks || []).filter(w => w.course_id === scope?.courseId && w.is_published === true).map(w => [w.id, Number(w.week_number) || 0]));
   const lessons = scope ? (input.lessons || []).filter(l => weeks.has(str(l.week_id)) && l.is_published === true && isCampusId(l.id)) : [];
   return {
     schemaVersion: 1, fetchedAt: new Date(now).toISOString(),
     viewer: { id: viewer.id, displayName: viewer.full_name || '문샷 동료' }, scopes,
     selectedEnrollmentId: scope?.enrollmentId || null,
-    lessons: lessons.sort((a, b) => Number(a.day_number) - Number(b.day_number) || a.id.localeCompare(b.id)).map(l => {
+    lessons: lessons.sort((a, b) => (weeks.get(str(a.week_id))! - weeks.get(str(b.week_id))!) || Number(a.day_number) - Number(b.day_number) || a.id.localeCompare(b.id)).map(l => {
       const href = `/learn/${scope!.enrollmentId}/${l.id}`;
-      return { id: l.id, title: str(l.title), day: Number(l.day_number) || 0, version: str(l.updated_at), href,
+      return { id: l.id, title: str(l.title), day: Number(l.day_number) || 0, week: weeks.get(str(l.week_id)), version: str(l.updated_at), href,
         completed: (input.progress || []).some(p => p.enrollment_id === scope!.enrollmentId && p.lesson_id === l.id && !!p.completed_at),
         missions: (input.missions || []).filter(m => m.lesson_id === l.id && m.is_published === true && !m.archived_at && isCampusId(m.id)).map(m => {
           const latest = (input.submissions || []).filter(s => s.enrollment_id === scope!.enrollmentId && s.mission_id === m.id)

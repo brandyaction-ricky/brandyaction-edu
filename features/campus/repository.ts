@@ -32,7 +32,7 @@ export async function loadCampusSnapshot(db: Database, viewer: { id: string; ful
   // this verified owner's cohort with the server client; content stays under RLS.
   const visibilityDb=await getVisibilityDb();
   const [allWeeks,weekVisibility,lessonVisibility]=await Promise.all([
-    rows(db.from('curriculum_weeks').select('id,course_id,is_published,archived_at',{count:'exact'}).eq('course_id',scope.courseId).eq('is_published',true).is('archived_at',null).limit(500)),
+    rows(db.from('curriculum_weeks').select('id,course_id,week_number,is_published,archived_at',{count:'exact'}).eq('course_id',scope.courseId).eq('is_published',true).is('archived_at',null).limit(500)),
     rows(visibilityDb.from('edu_cohort_week_visibility').select('cohort_id,week_id,is_published',{count:'exact'}).eq('cohort_id',scope.cohortId).limit(500)),
     rows(visibilityDb.from('edu_cohort_lesson_visibility').select('cohort_id,lesson_id,is_published',{count:'exact'}).eq('cohort_id',scope.cohortId).limit(500)),
   ]);

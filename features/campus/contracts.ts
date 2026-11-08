@@ -24,6 +24,7 @@ export type CampusSnapshot = {
     id: string;
     title: string;
     day: number;
+    week?: number;
     version: string;
     completed: boolean;
     href: string;
