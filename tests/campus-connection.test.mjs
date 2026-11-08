@@ -205,3 +205,17 @@ test('bridge schema mismatch clears state and unsupported paths do not fetch', a
   assert.equal(count, 0);
   await assert.rejects(bridge.load()); assert.equal(states.at(-1).snapshot, null);
 });
+
+test('a new course lesson appears on the next campus read after its week and cohort publish it', async () => {
+  const data = fixture();
+  const lesson = { ...data.curriculum_lessons[0], id: uid(91), week_id: uid(90), title: '새 학습', is_published: false };
+  data.curriculum_weeks.push({ ...data.curriculum_weeks[0], id: uid(90), week_number: 2 });
+  data.curriculum_lessons.push(lesson);
+  data.edu_cohort_week_visibility.push({ cohort_id: uid(4), week_id: uid(90), is_published: true });
+  const visible = async () => (await load(data)).lessons.some(row => row.id === lesson.id);
+  assert.equal(await visible(), false);
+  lesson.is_published = true;
+  assert.equal(await visible(), false);
+  data.edu_cohort_lesson_visibility.push({ cohort_id: uid(4), lesson_id: lesson.id, is_published: true });
+  assert.equal(await visible(), true);
+});

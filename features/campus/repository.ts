@@ -21,8 +21,8 @@ export async function loadCampusSnapshot(db: Database, viewer: { id: string; ful
     .eq('user_id', viewer.id).eq('status', 'active').limit(200))).filter(e => hasLearningAccess(e, now));
   if (enrollmentId && !enrollments.some(e => e.id === enrollmentId)) campusError(403, '현재 이용 가능한 수강권을 선택해 주세요.');
   const [courses, cohorts] = enrollments.length ? await Promise.all([
-    rows(db.from('courses').select('id,title,status,archived_at', { count: 'exact' }).in('id', ids(enrollments.map(e => e.course_id))).eq('status', 'published').is('archived_at', null).limit(200)),
-    rows(db.from('cohorts').select('id,course_id,name,archived_at', { count: 'exact' }).in('id', ids(enrollments.map(e => e.cohort_id))).is('archived_at',null).limit(200)),
+    rows(db.from('courses').select('id,title,status,category,archived_at', { count: 'exact' }).in('id', ids(enrollments.map(e => e.course_id))).eq('status', 'published').is('archived_at', null).limit(200)),
+    rows(db.from('cohorts').select('id,course_id,name,status,operation_end_at,alumni_access_on_enroll,archived_at', { count: 'exact' }).in('id', ids(enrollments.map(e => e.cohort_id))).is('archived_at',null).limit(200)),
   ]) : [[], []];
   const scopes = campusScopes(viewer.id, enrollments, courses, cohorts, now);
   const scope = scopes.find(s => s.enrollmentId === enrollmentId);
@@ -32,7 +32,7 @@ export async function loadCampusSnapshot(db: Database, viewer: { id: string; ful
   // this verified owner's cohort with the server client; content stays under RLS.
   const visibilityDb=await getVisibilityDb();
   const [allWeeks,weekVisibility,lessonVisibility]=await Promise.all([
-    rows(db.from('curriculum_weeks').select('id,course_id,is_published,archived_at',{count:'exact'}).eq('course_id',scope.courseId).eq('is_published',true).is('archived_at',null).limit(500)),
+    rows(db.from('curriculum_weeks').select('id,course_id,week_number,is_published,archived_at',{count:'exact'}).eq('course_id',scope.courseId).eq('is_published',true).is('archived_at',null).limit(500)),
     rows(visibilityDb.from('edu_cohort_week_visibility').select('cohort_id,week_id,is_published',{count:'exact'}).eq('cohort_id',scope.cohortId).limit(500)),
     rows(visibilityDb.from('edu_cohort_lesson_visibility').select('cohort_id,lesson_id,is_published',{count:'exact'}).eq('cohort_id',scope.cohortId).limit(500)),
   ]);

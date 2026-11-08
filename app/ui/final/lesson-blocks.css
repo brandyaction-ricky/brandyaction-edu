@@ -26,8 +26,12 @@
 .lb-prompt [role=status] { display:block; margin-top:8px; }
 .lesson-blocks .btn { white-space:normal; min-height:44px; border-radius:10px; }
 .lb-link { color:#1757a1; text-decoration:underline; }
-.lb-save-status { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:12px 0; position:sticky; top:0; z-index:2; background:#fff; border-bottom:1px solid #e0e4e9; margin-bottom:20px; }
-.lb-save-status [role=status] { flex:1 1 180px; }
+.lb-save-status { display:flex; align-items:center; flex-wrap:wrap; gap:4px 10px; min-height:44px; margin-block:12px; }
+.lb-save-status [role=status] { display:inline-flex; align-items:center; gap:6px; max-width:100%; box-sizing:border-box; padding:4px 9px; border-radius:8px; font-size:.8125rem; font-weight:600; line-height:1.5; overflow-wrap:anywhere; color:#42546a; background:#edf1f5; }
+.lb-save-status svg { flex:none; }
+.lb-save-status[data-phase=saved] [role=status] { color:#216048; background:#e8f4ed; }
+.lb-save-status:is([data-phase=error],[data-phase=conflict]) [role=status] { color:#89331d; background:#fff0e9; }
+.lb-save-status button, .lb-pages>nav button { flex:0 1 auto; width:auto; max-width:100%; min-height:44px; }
 .lb-session-notice { border:1px solid #e1c679; border-radius:8px; padding:16px; margin-bottom:16px; background:#fff9e9; }
 @media(max-width:540px) { .lesson-blocks .lb-card { padding:14px; } .edu-front .learning-content > .lesson-block-session { padding:16px; } }
 .edu-front .learning-content > .lesson-block-session { padding:32px; margin-top:16px; min-width:0; background:#fff; border:1px solid #e2e6ec; border-radius:18px; box-shadow:0 4px 18px #17223804; }
@@ -88,3 +92,11 @@
 .lesson-back-to-top { text-align:right; }
 .lesson-blocks > [id^="lesson-block-"], #lesson-reading-start { scroll-margin-top: 84px; }
 .lesson-blocks > [id^="lesson-block-"]:target { outline: 2px solid #c91e2c; outline-offset: 4px; }
+
+.lb-pages {min-width:0}
+.lb-page-position {font-weight:700;scroll-margin-block-start:1rem}
+.lb-pages>progress {display:block;width:100%;height:.4rem;margin:.5rem 0 1.25rem;accent-color:#225cca}
+.lb-pages>nav {display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-start;gap:.5rem;margin-top:1rem}
+.lb-page-jump{display:inline-flex;align-items:center;gap:.5rem;margin-block:.25rem .5rem;font-size:.9rem}
+.lb-page-jump select{min-height:44px;padding:0 .5rem;border:1px solid #bacbde;border-radius:8px;background:#fff;color:#203653;font:inherit}
+.lb-page-jump{max-width:100%}.lb-page-jump select{min-width:0;max-width:min(24rem,65vw)}

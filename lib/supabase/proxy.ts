@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { oauthCallbackRecoveryPath } from "@/lib/oauth-callback";
+import { campusReturnCookie, oauthCallbackRecoveryPath } from "@/lib/oauth-callback";
 import { getSupabasePublicConfig, hasSupabaseEnv } from "./config";
 
 export async function updateSession(request: NextRequest) {
@@ -12,10 +12,13 @@ export async function updateSession(request: NextRequest) {
   const recoveryPath = oauthCallbackRecoveryPath({
     pathname: request.nextUrl.pathname,
     code: request.nextUrl.searchParams.get("code"),
+    campusReturn: request.cookies.get(campusReturnCookie)?.value,
     cookieNames: request.cookies.getAll().map(({ name }) => name),
   });
   if (recoveryPath) {
-    return NextResponse.redirect(new URL(recoveryPath, request.url));
+    const recovered = NextResponse.redirect(new URL(recoveryPath, request.url));
+    recovered.cookies.delete(campusReturnCookie);
+    return recovered;
   }
 
   let response = NextResponse.next({ request });
@@ -39,5 +42,8 @@ export async function updateSession(request: NextRequest) {
 
   // 서버 권한 판단에는 getSession()이 아니라 검증된 JWT claims를 사용합니다.
   await supabase.auth.getClaims();
+  if (request.nextUrl.pathname === '/auth/callback' && request.cookies.has(campusReturnCookie)) {
+    response.cookies.delete(campusReturnCookie);
+  }
   return response;
 }
