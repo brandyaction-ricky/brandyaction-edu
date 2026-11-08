@@ -1,4 +1,4 @@
-// Fixed short links: the address /go/<key> stays the same; only its destination changes.
+// Short links: /go/<key> shortens any https address and keeps its address while its destination changes (so it doubles as a fixed link).
 export type ShortLinkRow = {
   key: string; label: string; channel: string; destination: string; is_active: boolean;
   click_count: number; last_clicked_at: string | null; created_at: string; updated_at: string;
@@ -34,8 +34,9 @@ export function shortLinkTarget(value: unknown): string | null {
   return url.href;
 }
 
-const words = (value: unknown, max: number) =>
-  typeof value === 'string' && value.trim() && value.trim().length <= max && !/[\u0000-\u001f\u007f]/.test(value) ? value.trim() : null;
+// Name and channel are optional (empty is fine); only the destination is required.
+const words = (value: unknown, max: number) => value == null ? ''
+  : typeof value === 'string' && value.trim().length <= max && !/[\u0000-\u001f\u007f]/.test(value) ? value.trim() : null;
 const label = (value: unknown) => words(value, 80) ?? fail('이름을 80자 안으로 적어 주세요.');
 const channel = (value: unknown) => words(value, 40) ?? fail('채널을 40자 안으로 적어 주세요.');
 const target = (value: unknown) => shortLinkTarget(value) ?? fail('도착 주소는 https:// 로 시작하는 전체 주소로 적어 주세요.');

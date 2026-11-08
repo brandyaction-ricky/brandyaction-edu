@@ -32,7 +32,7 @@ async function handle(request: Request) {
   } catch (e) {
     const status = e instanceof ShortLinkError ? e.status : 503;
     // Neither the key nor database errors enter responses.
-    return reply({ message: status === 503 && !(e instanceof ShortLinkError) ? '고정 링크를 처리하지 못했어요. 잠시 뒤 다시 해 주세요.' : (e as Error).message }, status);
+    return reply({ message: status === 503 && !(e instanceof ShortLinkError) ? '단축 링크를 처리하지 못했어요. 잠시 뒤 다시 해 주세요.' : (e as Error).message }, status);
   }
 }
 export const GET = handle;

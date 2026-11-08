@@ -14,11 +14,15 @@ async function handle(request: Request) {
     const db = createAdminClient();
     if (request.method === 'GET') return reply({ items: (await listShortLinks(db)).map(row => toShortLink(row, origin)) });
     const body = await readShortLinkBody(request);
-    if (request.method === 'POST') return reply({ item: toShortLink((await createShortLink(db, shortLinkCreateInput(body), actor.id)).row, origin) }, 201);
+    if (request.method === 'POST') {
+      // The same address (with the same name and channel) gives back the link already made, so a double click makes one link.
+      const { row, created } = await createShortLink(db, shortLinkCreateInput(body), actor.id, true);
+      return reply({ item: toShortLink(row, origin), created }, created ? 201 : 200);
+    }
     return reply({ item: toShortLink(await updateShortLink(db, shortLinkPatchInput(body), actor.id), origin) });
   } catch (e) {
     const status = e instanceof ShortLinkError ? e.status : 503;
-    return reply({ error: status === 503 ? '고정 링크를 처리하지 못했어요. 잠시 뒤 다시 해 주세요.' : (e as Error).message }, status);
+    return reply({ error: status === 503 ? '단축 링크를 처리하지 못했어요. 잠시 뒤 다시 해 주세요.' : (e as Error).message }, status);
   }
 }
 export const GET = handle;

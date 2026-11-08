@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { ShortLinkError, type ShortLinkCreate, type ShortLinkPatch, type ShortLinkRow } from './short-links';
 
 const columns = 'key,label,channel,destination,is_active,click_count,last_clicked_at,created_at,updated_at';
-const unavailable = () => new ShortLinkError('고정 링크를 처리하지 못했어요. 잠시 뒤 다시 해 주세요.', 503);
+const unavailable = () => new ShortLinkError('단축 링크를 처리하지 못했어요. 잠시 뒤 다시 해 주세요.', 503);
 const letters = 'abcdefghjkmnpqrstuvwxyz23456789';
 const randomKey = () => Array.from({ length: 6 }, () => letters[randomInt(letters.length)]).join('');
 
@@ -42,6 +42,6 @@ export async function updateShortLink(db: SupabaseClient, { key, ...patch }: Sho
   const { data, error } = await db.from('edu_short_links').update({ ...patch, updated_by: by, updated_at: new Date().toISOString() })
     .eq('key', key).select(columns).maybeSingle();
   if (error) throw unavailable();
-  if (!data) throw new ShortLinkError('그 고정 링크를 찾지 못했어요.', 404);
+  if (!data) throw new ShortLinkError('그 단축 링크를 찾지 못했어요.', 404);
   return data as ShortLinkRow;
 }

@@ -62,6 +62,8 @@ test('destinations: https to a real host only, no login part, port, IP or loop b
   assert.deepEqual(lib.shortLinkCreateInput({ key: ' Free-Class ', label: ' 카톡방 ', channel: '마케팅', target: 'https://open.kakao.com/o/abc' }),
     { key: 'free-class', label: '카톡방', channel: '마케팅', destination: 'https://open.kakao.com/o/abc' });
   assert.throws(() => lib.shortLinkCreateInput({ label: 'x', channel: 'y', target: 'http://x.test' }), /https/);
+  assert.deepEqual(lib.shortLinkCreateInput({ target: 'https://x.test/a?utm_source=yt' }), { label: '', channel: '', destination: 'https://x.test/a?utm_source=yt' });
+  assert.throws(() => lib.shortLinkCreateInput({ label: 'a'.repeat(81), target: 'https://x.test/' }), /80자/);
   assert.throws(() => lib.shortLinkPatchInput({ key: 'abc' }), /바꿀 내용/);
   assert.throws(() => lib.shortLinkPatchInput({ key: 'abc', active: 'no' }), /켜기/);
 });
@@ -93,6 +95,10 @@ test('admin API needs marketing access and the same origin, and records who chan
   const created = await route.POST(send('POST', { label: '무료 자료', channel: '마케팅', target: 'https://drive.google.com/x', key: '' }));
   assert.equal(created.status, 201); const { item } = await created.json();
   assert.match(item.key, /^[a-z2-9]{6}$/); assert.equal(db.rows.at(-1).created_by, 'admin-1');
+  const quick = await route.POST(send('POST', { target: 'https://brandyaction-edu.com/classes/1?utm_source=youtube' })), again = await route.POST(send('POST', { target: 'https://brandyaction-edu.com/classes/1?utm_source=youtube' }));
+  assert.equal(quick.status, 201); assert.equal(again.status, 200);
+  const [q, r] = [await quick.json(), await again.json()];
+  assert.equal(q.item.label, ''); assert.equal(r.created, false); assert.equal(q.item.key, r.item.key);
   assert.equal((await route.POST(send('POST', { label: 'a', channel: 'b', target: 'https://x.test/', key: 'free-class' }))).status, 409);
   const changed = await route.PATCH(send('PATCH', { key: 'free-class', target: 'https://open.kakao.com/o/new' }));
   assert.equal((await changed.json()).item.target, 'https://open.kakao.com/o/new'); assert.equal(db.rows[0].updated_by, 'admin-1');
@@ -127,6 +133,10 @@ test('migration: additive table, only service role, counted hits and https-only 
   const db = new PGlite(); t.after(() => db.close());
   await db.exec('create role anon; create role authenticated; create role service_role bypassrls;');
   await db.exec(readFileSync(new URL('../supabase/migrations/20261107130000_edu_short_links.sql', import.meta.url), 'utf8'));
+  const optional = readFileSync(new URL('../supabase/migrations/20261108100000_edu_short_links_optional_names.sql', import.meta.url), 'utf8');
+  await db.exec(optional); await db.exec(optional);
+  await db.exec("insert into edu_short_links(key,label,channel,destination) values ('no-name','','','https://x.test/q?utm_source=yt')");
+  await assert.rejects(db.query('insert into edu_short_links(key,label,channel,destination) values ($1,$2,$3,$4)', ['too-long', 'a'.repeat(81), '', 'https://x.test/']), /check constraint/);
   await db.exec("insert into edu_short_links(key,label,channel,destination) values ('free-class','카톡방','마케팅','https://open.kakao.com/o/abc'),('off','x','y','https://x.test/'); update edu_short_links set is_active=false where key='off'");
   for (const [key, destination] of [['Bad', 'https://x.test/'], ['ok-key', 'http://x.test/'], ['ok-key', 'javascript:alert(1)'], ['ok-key', 'https://user@x.test/']])
     await assert.rejects(db.query('insert into edu_short_links(key,label,channel,destination) values ($1,$2,$3,$4)', [key, 'a', 'b', destination]), /check constraint/);
@@ -142,5 +152,5 @@ test('migration: additive table, only service role, counted hits and https-only 
   assert.equal(await hit('free-class', false), 'https://open.kakao.com/o/abc');
   assert.equal(await hit('off', true), null); assert.equal(await hit('missing', true), null);
   const counted = (await db.query("select key,click_count,last_clicked_at is not null as seen from edu_short_links order by key")).rows;
-  assert.deepEqual(counted, [{ key: 'free-class', click_count: 1, seen: true }, { key: 'off', click_count: 0, seen: false }]);
+  assert.deepEqual(counted, [{ key: 'free-class', click_count: 1, seen: true }, { key: 'no-name', click_count: 0, seen: false }, { key: 'off', click_count: 0, seen: false }]);
 });
