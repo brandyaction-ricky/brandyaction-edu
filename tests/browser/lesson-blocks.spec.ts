@@ -214,3 +214,29 @@ test('a direct citation anchor scrolls to the lesson block once the document loa
   await expect(target).toContainText('배운 내용 확인');
   await expect(target.getByRole('heading', { name: '배운 내용 확인' })).toBeInViewport();
 });
+
+test('campus save feedback stays below the answers and page buttons stay together', async ({ page }) => {
+  await mock(page);
+  await page.goto('/lesson-blocks-test?guided');
+  const pages = page.locator('.lb-pages');
+  const picker = pages.getByRole('combobox', { name: '페이지 이동' });
+  const field = pages.getByLabel('내 사업의 고객은 누구인가요?', { exact: false });
+  await expect(picker).toBeVisible();
+  const count = await picker.locator('option').count();
+  for (let n = 0; n < count && !(await field.isVisible()); n++) await picker.selectOption(String(n));
+  await field.fill('내 고객과 고객이 해결하려는 일을 정리합니다.');
+  const save = pages.locator('.lb-save-status');
+  await expect(save.getByRole('status')).toHaveText('답변 저장됨');
+  await expect(save.getByRole('button')).toHaveCount(0);
+  expect(await save.evaluate(el => getComputedStyle(el).position)).toBe('static');
+  const status = await save.getByRole('status').boundingBox();
+  const answer = await field.boundingBox();
+  expect(status!.y).toBeGreaterThanOrEqual(answer!.y + answer!.height);
+  await picker.selectOption('0');
+  const nav = pages.getByRole('navigation', { name: '수업 페이지 이동' });
+  const back = await nav.getByRole('button', { name: '이전 페이지' }).boundingBox();
+  const next = await nav.getByRole('button', { name: '다음 페이지' }).boundingBox();
+  expect(next!.x - (back!.x + back!.width)).toBeLessThanOrEqual(12);
+  expect(next!.height).toBeGreaterThanOrEqual(44);
+  expect(await pages.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+});

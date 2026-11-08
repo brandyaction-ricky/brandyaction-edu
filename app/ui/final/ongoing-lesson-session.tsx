@@ -4,10 +4,10 @@ import { LessonBlockAutosave,type AutosaveState } from '@/lib/lesson-block-autos
 import { missingBlockRequirements,type LessonBlockAnswers } from '@/lib/lesson-blocks';
 import { ongoingLabels,ongoingPeriodLabel,type OngoingSnapshot,type OngoingCompletion,type OngoingHistoryItem } from '@/lib/ongoing-lessons';
 import { LessonBlockView,canRenderLessonBlocks,type BlockGrade } from './lesson-block-view';
+import { LessonSaveStatus } from './lesson-save-status';
 import { useUnsavedLearningChanges } from './use-unsaved-learning-changes';
 const endpoint='/api/platform/ongoing-lessons';
 async function request<T>(url:string,body?:unknown,signal?:AbortSignal):Promise<T>{const r=await fetch(url,{method:body?'POST':'GET',cache:'no-store',credentials:'same-origin',signal,...(body?{headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});let data;try{data=await r.json();}catch{throw new Error('저장 응답을 확인하지 못했습니다. 다시 시도해 주세요.');}if(!r.ok)throw Object.assign(new Error(data.error||'학습 기록을 확인하지 못했습니다.'),{status:r.status});return data;}
-const saveLabels:Record<AutosaveState['phase'],string>={saved:'답변 저장됨',dirty:'답변 저장 대기 중',saving:'답변 저장 중…',error:'답변 저장 실패',conflict:'저장 결과 확인 필요'};
 export function OngoingLessonSession({lessonId,enrollmentId,readOnly=false}:{lessonId:string;enrollmentId:string;readOnly?:boolean}){
  const [selection,setSelection]=useState({period:null as string|null,reload:0}),[loaded,setLoaded]=useState<{key:string;snapshot?:OngoingSnapshot;error?:string}>();
  const key=`${lessonId}:${enrollmentId}:${selection.period}:${selection.reload}`;
@@ -44,10 +44,11 @@ function PeriodSession({snapshot,lessonId,enrollmentId,select,readOnly}:{snapsho
  return <section className="lesson-block-session" aria-label="지속 챌린지">
   <h2>{ongoingLabels[snapshot.cadence]} 챌린지</h2><p>{ongoingPeriodLabel(snapshot.periodStart,snapshot.periodEnd)} · 한국 시간</p>
   <p>{snapshot.stats.opportunities}회 중 {completedCount}회 완료 · {Math.round(completedCount*100/Math.max(1,snapshot.stats.opportunities))}% 달성</p>
-  {readOnly?<div className="lb-session-notice">졸업생 열람 모드 · 이전에 작성한 기간별 기록을 볼 수 있습니다.</div>:historical?<div className="lb-session-notice">이전 기간의 기록입니다. 읽기만 할 수 있습니다. <button className="btn" onClick={()=>move(null)}>이번 기간으로</button></div>:<p role="status">{saveLabels[status.phase]}</p>}
+  {readOnly?<div className="lb-session-notice">졸업생 열람 모드 · 이전에 작성한 기간별 기록을 볼 수 있습니다.</div>:historical?<div className="lb-session-notice">이전 기간의 기록입니다. 읽기만 할 수 있습니다. <button className="btn" onClick={()=>move(null)}>이번 기간으로</button></div>:null}
   {completion&&<p role="status">이번 기간 완료 · {new Date(completion.createdAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})}</p>}
-  {(error||status.message)&&<div role="alert"><p>{error||status.message}</p><p>현재 입력은 이 화면에 남아 있습니다.</p><button className="btn" onClick={download}>현재 답변 내려받기</button>{status.phase==='error'&&<button className="btn" onClick={()=>void saver.current?.flush()}>저장 다시 시도</button>}<button className="btn" onClick={()=>move(null)}>이번 기간 다시 확인</button></div>}
   <LessonBlockView floatingAudio document={snapshot.document} values={values} onChange={change} livePrompts fileContext={context} readOnly={readOnly||historical||busy||uncertain} grade={readOnly||historical?undefined:grade} onAnswerChange={(id,value)=>change({...valuesRef.current,blocks:{...valuesRef.current.blocks,[id]:value}})} onFilePending={(id,pending)=>{if(pending)uploads.current.add(id);else uploads.current.delete(id);setUploading(uploads.current.size>0);}}/>
+  {!readOnly&&!historical&&<LessonSaveStatus status={status} hasDraft={Boolean(snapshot.draft)} onSave={()=>void saver.current?.flush()}/>}
+  {(error||status.message)&&<div role="alert"><p>{error||status.message}</p><p>현재 입력은 이 화면에 남아 있습니다.</p><button className="btn" onClick={download}>현재 답변 내려받기</button><button className="btn" onClick={()=>move(null)}>이번 기간 다시 확인</button></div>}
   {!readOnly&&!historical&&!completion&&<button className="btn primary" disabled={busy||uploading||status.phase==='conflict'} onClick={()=>void complete()}>{busy?'저장·완료 중…':uncertain?'같은 답변으로 완료 결과 확인':'이번 기간 챌린지 완료'}</button>}
   {!readOnly&&!historical&&completion&&<p>완료 후에도 이번 기간의 메모를 수정할 수 있습니다. 완료 당시 답변은 따로 보관됩니다.</p>}
   {completion?.values&&<details><summary>완료 당시 답변 보기</summary><LessonBlockView document={snapshot.document} values={completion.values} onChange={()=>{}} readOnly livePrompts fileContext={context}/></details>}

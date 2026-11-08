@@ -11,6 +11,7 @@ import { BlockSubmissionHistory } from './lesson-block-submission-history';
 import { ResourceRow, Video } from './primitives';
 import { LessonText } from './lesson-text';
 import { safeUrl } from '@/lib/platform';
+import { LessonSaveStatus } from './lesson-save-status';
 import { LessonPages } from './lesson-pages';
 import { useCampusDraftGuard } from '@/features/campus/ui/draft-guard';
 
@@ -38,7 +39,6 @@ async function request<T>(url: string, body?: unknown, signal?: AbortSignal): Pr
   if (!response.ok) throw Object.assign(new Error(typeof data?.error === 'string' ? data.error : '학습 정보를 처리하지 못했습니다.'), { status: response.status });
   return data;
 }
-const statusText: Record<AutosaveState['phase'], string> = { saved: '답변 저장됨', dirty: '답변 저장 대기 중', saving: '답변 저장 중…', error: '답변을 저장하지 못했습니다.', conflict: '저장된 답변과 현재 입력이 다릅니다.' };
 
 function SessionContent({ snapshot, lessonId, enrollmentId, readOnly, onSelectRevision, onCompleted, campusGuided }: { campusGuided?: boolean; snapshot: Snapshot; lessonId: string; enrollmentId: string; readOnly: boolean; onSelectRevision: (revision: string | null) => void; onCompleted?: () => void }) {
   const practice = snapshot.practice?.enabled === true;
@@ -147,12 +147,13 @@ function SessionContent({ snapshot, lessonId, enrollmentId, readOnly, onSelectRe
     {practice && <div className="lb-session-notice">졸업생 개인 실습입니다. 입력·저장과 프롬프트 생성은 계속 이용할 수 있습니다. 공식 미션 제출과 멘토 검수는 종료되었습니다.</div>}
     {readOnly && !practice ? <div className="lb-session-notice">졸업생 열람 모드입니다. 공개된 최신 수업과 기존 답변을 볼 수 있습니다.</div>
       : historical ? <div className="lb-session-notice">이전 수업에서 작성한 답변입니다. 읽기만 할 수 있습니다. <button className="btn small" type="button" onClick={() => select(null)}>현재 수업으로</button></div>
-      : <div className="lb-save-status"><span role="status" aria-live="polite">{practice ? '개인 실습 · ' : ''}{statusText[status.phase]}</span><button type="button" className="btn small" disabled={status.phase === 'saved' || status.phase === 'saving' || status.phase === 'conflict'} onClick={() => void saver.current?.flush()}>{status.phase === 'error' ? '저장 다시 시도' : '지금 저장'}</button></div>}
-    {(status.phase === 'error' || status.phase === 'conflict') && <div className="lb-session-notice" role="alert"><p>{status.message} 현재 입력은 이 화면에 남아 있습니다.</p><button className="btn small" type="button" onClick={downloadAnswers}>현재 답변 내려받기</button>{status.phase === 'conflict' && <button className="btn small" type="button" onClick={() => select(null)}>저장된 답변 다시 확인</button>}</div>}
+      : null}
     {submission?.feedback && <div className="lb-session-notice"><h3>멘토 피드백</h3><p className="reading-copy">{submission.feedback}</p></div>}
     {campusGuided && <CampusLessonGuard dirty={status.phase !== 'saved'} busy={uploading || submitting || reopening || status.phase === 'saving'} />}
     <LessonPages positionKey={campusGuided ? `campus:page:${enrollmentId}:${lessonId}:${snapshot.revision}` : undefined} enabled={!!campusGuided} document={snapshot.document} busy={uploading || submitting || reopening}>{(pageBlocks, last) => <>
     {snapshot.document && <LessonBlockView pageBlocks={pageBlocks} showChecklist={last} floatingAudio={!campusGuided} showOutline={!campusGuided} document={snapshot.document} values={values} onChange={change} fileContext={{ lessonId, enrollmentId, revision: snapshot.revision! }} onFilePending={filePending} onAnswerChange={(id, value) => change({ ...valuesRef.current, blocks: { ...valuesRef.current.blocks, [id]: value } })} filesReadOnly={practice} readOnly={(readOnly && !canPractice) || historical || submitting || submitUncertain || locked} grade={(readOnly && !canPractice) || historical || locked ? undefined : grade} />}
+    {(!readOnly || canPractice) && !historical && !locked && <LessonSaveStatus status={status} hasDraft={Boolean(draft)} practice={practice} onSave={() => void saver.current?.flush()} />}
+    {(status.phase === 'error' || status.phase === 'conflict') && <div className="lb-session-notice" role="alert"><p>{status.message} 현재 입력은 이 화면에 남아 있습니다.</p><button className="btn small" type="button" onClick={downloadAnswers}>현재 답변 내려받기</button>{status.phase === 'conflict' && <button className="btn small" type="button" onClick={() => select(null)}>저장된 답변 다시 확인</button>}</div>}
     {last && !practice && !readOnly && !historical && <section className="lb-session-notice" aria-label="학습 제출">
       {locked ? <>
         <p role="status">{submissionState === 'completed' ? '학습을 완료했습니다.' : submissionState === 'approved' ? submission?.approvalKind === 'automatic' ? '자동승인되어 학습을 완료했습니다.' : '멘토가 승인했습니다. 학습을 완료했습니다.' : '미션을 제출했습니다. 멘토의 확인을 기다려 주세요.'}</p>
