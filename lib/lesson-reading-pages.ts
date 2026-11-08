@@ -1,6 +1,6 @@
 import type { PublicLessonBlock } from './lesson-blocks';
-import { LESSON_BODY_PREFIX, parseLessonDocument, type LessonNode } from './lesson-body';
-import { lessonEmbeddedImageIds } from './lesson-toggle-images';
+import { LESSON_BODY_PREFIX, lessonBodyPlainText, parseLessonDocument, type LessonNode } from './lesson-body';
+import { lessonEmbeddedImageIds, lessonImageReferences } from './lesson-toggle-images';
 import { lessonImageRows } from './lesson-image-row';
 
 const readingBudget = 1000;
@@ -30,41 +30,79 @@ function chunks<T>(items: T[], weight: (item: T) => number, heading: (item: T) =
 function textPieces(block: PublicLessonBlock) {
   const text = block.content || '';
   const doc = parseLessonDocument(text);
-  if (doc?.content?.length) {
-    const groups = chunks(doc.content, nodeWeight, node => node.type === 'heading');
+  if (doc) {
+    // Empty rich-text spacer blocks still belong to the source document.
+    if (!doc.content?.length || (!lessonBodyPlainText(text).trim() && !lessonImageReferences(doc).length)) {
+      return [{block, weight: 0}];
+    }
+    const sections: LessonNode[][] = [];
+    let titles: LessonNode[] = [];
+    for (const node of doc.content) {
+      if (node.type === 'heading') titles.push(node);
+      else {
+        sections.push([...titles, node]);
+        titles = [];
+      }
+    }
+    if (titles.length) {
+      if (sections.length) sections[sections.length - 1].push(...titles);
+      else sections.push(titles);
+    }
+    const groups = chunks(sections, nodes => nodes.reduce((sum, node) => sum + nodeWeight(node), 0),
+      nodes => nodes[0].type === 'heading').map(group => group.flat());
     return groups.map(nodes => ({
       block: groups.length === 1 ? block : { ...block, content: LESSON_BODY_PREFIX + JSON.stringify({type:'doc',content:nodes}) },
       weight: nodes.reduce((sum,node) => sum + nodeWeight(node), 0),
     }));
   }
-  const groups = chunks(text.match(/[^\n]*\n|[^\n]+$/g) || [''], line => line.length, () => false);
+  // Single line breaks are often just the author's visual line wrapping.
+  const paragraphs = text.match(/[\s\S]*?(?:\r?\n[ \t]*\r?\n|$)/g)?.filter(Boolean) || [];
+  const groups = chunks(paragraphs.length ? paragraphs : [''], paragraph => paragraph.length, () => false);
   return groups.map(lines => {
     const content = lines.join('');
     return { block: groups.length === 1 ? block : { ...block, content }, weight: content.trim().length };
   });
 }
 
+type ReadingUnit = { blocks: PublicLessonBlock[]; weight: number; startsPage: boolean; kind: 'title' | 'text' | 'activity' | 'space' };
+
 export function lessonReadingPages(blocks: PublicLessonBlock[]): PublicLessonBlock[][] {
   const embedded = lessonEmbeddedImageIds(blocks);
-  const pages: PublicLessonBlock[][] = [];
-  let page: PublicLessonBlock[] = [], size = 0, hasBody = false;
-  function append(row: PublicLessonBlock[], weight: number, startsSection: boolean) {
-    const last = page.at(-1);
-    const illustration = row[0].type === 'image' && last?.type === 'text' && size <= readingBudget;
-    if (hasBody && weight > 0 && (startsSection || (!illustration && size + weight > readingBudget))) {
-      pages.push(page); page = []; size = 0; hasBody = false;
+  const units: ReadingUnit[] = [];
+  function add(unit: ReadingUnit) {
+    const previous = units.at(-1);
+    // Keep instructions with the control or illustration they introduce,
+    // including any blank paragraphs between them. Measure the pair as one.
+    if (previous && (unit.kind === 'space' || (previous.kind === 'text' && unit.kind === 'activity'))) {
+      previous.blocks.push(...unit.blocks);
+      previous.weight += unit.weight;
+      if (unit.kind === 'activity') previous.kind = 'activity';
+    } else {
+      units.push(unit);
     }
-    page.push(...row); size += weight;
-    if (weight && !['heading','subheading','divider'].includes(row[0].type)) hasBody = true;
   }
+
   for (const row of lessonImageRows(blocks.filter(block => !embedded.has(block.id)))) {
     const block = row[0];
     if (block.type === 'text') {
-      for (const [i,piece] of textPieces(block).entries()) append([piece.block], piece.weight, i > 0);
+      for (const [i, piece] of textPieces(block).entries()) {
+        add({blocks: [piece.block], weight: piece.weight, startsPage: i > 0, kind: piece.weight ? 'text' : 'space'});
+      }
     } else {
       const title = block.type === 'heading' || block.type === 'subheading';
-      append(row, title ? 30 : block.type === 'divider' ? 0 : 360, title);
+      add({blocks: row, weight: title ? 30 : block.type === 'divider' ? 0 : 360,
+        startsPage: title, kind: title ? 'title' : block.type === 'divider' ? 'space' : 'activity'});
     }
+  }
+
+  const pages: PublicLessonBlock[][] = [];
+  let page: PublicLessonBlock[] = [], size = 0, hasBody = false;
+  for (const unit of units) {
+    if (hasBody && (unit.startsPage || size + unit.weight > readingBudget)) {
+      pages.push(page); page = []; size = 0; hasBody = false;
+    }
+    page.push(...unit.blocks); size += unit.weight;
+    if (unit.kind === 'text' || unit.kind === 'activity') hasBody = true;
   }
   if (page.length) pages.push(page);
   return pages;

@@ -30,3 +30,30 @@ test('long legacy text paginates without headings and reconstructs exactly', () 
   assert.ok(pages.length>1);
   assert.equal(pages.flat().map(b=>b.content).join(''),original);
 });
+
+test('an instruction stays with its following action across a spacer and size break', () => {
+  for (const type of ['link','audio','image','prompt','prompt-generator','question','quiz']) {
+    const blocks = [
+      {id:'intro',type:'text',content:'가'.repeat(850)},
+      {id:'step',type:'text',content:'아래 항목을 열어 실습하세요.'},
+      {id:'space',type:'text',content:'edu-lesson:v1\n'+JSON.stringify({type:'doc',content:[{type:'paragraph',content:[]}]})},
+      {id:'action',type},
+    ];
+    const pages = lessonReadingPages(blocks);
+    assert.deepEqual(pages.map(page => page.map(b => b.id)), [['intro'],['step','space','action']]);
+  }
+});
+
+test('a wrapped paragraph stays intact even when its size exceeds the reading budget', () => {
+  const paragraph = '문장이 계속됩니다\n'.repeat(120);
+  const pages = lessonReadingPages([{id:'body',type:'text',content:paragraph}]);
+  assert.deepEqual(pages.map(page=>page[0].content), [paragraph]);
+});
+
+test('a rich-text heading belongs to the paragraph it introduces', () => {
+  const node=(type,text)=>({type,content:[{type:'text',text}]});
+  const prefix='edu-lesson:v1\n';
+  const nodes=[node('paragraph','가'.repeat(950)),node('heading','실행 방법을 확인하고 다음 단계를 진행하세요.'.repeat(5)),node('paragraph','나'.repeat(1000))];
+  const pages=lessonReadingPages([{id:'body',type:'text',content:prefix+JSON.stringify({type:'doc',content:nodes})}]);
+  assert.deepEqual(pages.map(page=>JSON.parse(page[0].content.slice(prefix.length)).content.map(n=>n.type)),[['paragraph'],['heading','paragraph']]);
+});
