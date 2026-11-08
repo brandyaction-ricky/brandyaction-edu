@@ -90,7 +90,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ l
       scopes:[], selectedEnrollmentId:null, lessons:[], links:{classes:returnHref, questions:returnHref}, launchEligibility:null,
     }} review={{room:'study', role:'student', returnHref, lessonContent:
       <section className={readerStyles.reader} aria-label="캠퍼스 수업">
-        <Link className="btn small" href={returnHref}>수업 목록으로</Link>
+        <div className={readerStyles.readerTools}><Link className="btn small" href={returnHref}>수업 목록으로</Link>
+          <details><summary>질문·답변 안내</summary><p>수강생은 이 수업에서 질문을 남기고 답변을 확인할 수 있습니다. 관리자 미리보기에서는 질문을 전송하지 않습니다.</p></details>
+        </div>
         <h2 id="review-lesson" tabIndex={-1}>{selected.title}</h2>
         <StudyPreview key={selected.id} inCampus cohort={selectedCohort.id} lessonId={selected.id} nextLesson={next} {...content}/>
       </section>

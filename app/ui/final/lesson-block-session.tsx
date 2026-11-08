@@ -150,7 +150,7 @@ function SessionContent({ snapshot, lessonId, enrollmentId, readOnly, onSelectRe
       : null}
     {submission?.feedback && <div className="lb-session-notice"><h3>멘토 피드백</h3><p className="reading-copy">{submission.feedback}</p></div>}
     {campusGuided && <CampusLessonGuard dirty={status.phase !== 'saved'} busy={uploading || submitting || reopening || status.phase === 'saving'} />}
-    <LessonPages continuation={!historical && renderContinuation?.(Boolean((locked || readOnly || completed) && !uploading && !submitting && !reopening && status.phase === 'saved'))} positionKey={campusGuided ? `campus:page:${enrollmentId}:${lessonId}:${snapshot.revision}` : undefined} enabled={!!campusGuided} document={snapshot.document} busy={uploading || submitting || reopening}>{(pageBlocks, last) => <>
+    <LessonPages lessonId={lessonId} continuation={!historical && renderContinuation?.(Boolean((locked || readOnly || completed) && !uploading && !submitting && !reopening && status.phase === 'saved'))} positionKey={campusGuided ? `campus:page:${enrollmentId}:${lessonId}:${snapshot.revision}` : undefined} enabled={!!campusGuided} document={snapshot.document} busy={uploading || submitting || reopening}>{(pageBlocks, last) => <>
     {snapshot.document && <LessonBlockView pageBlocks={pageBlocks} showChecklist={last} floatingAudio={!campusGuided} showOutline={!campusGuided} document={snapshot.document} values={values} onChange={change} fileContext={{ lessonId, enrollmentId, revision: snapshot.revision! }} onFilePending={filePending} onAnswerChange={(id, value) => change({ ...valuesRef.current, blocks: { ...valuesRef.current.blocks, [id]: value } })} filesReadOnly={practice} readOnly={(readOnly && !canPractice) || historical || submitting || submitUncertain || locked} grade={(readOnly && !canPractice) || historical || locked ? undefined : grade} />}
     {(!readOnly || canPractice) && !historical && !locked && <LessonSaveStatus status={status} hasDraft={Boolean(draft)} practice={practice} onSave={() => void saver.current?.flush()} />}
     {(status.phase === 'error' || status.phase === 'conflict') && <div className="lb-session-notice" role="alert"><p>{status.message} 현재 입력은 이 화면에 남아 있습니다.</p><button className="btn small" type="button" onClick={downloadAnswers}>현재 답변 내려받기</button>{status.phase === 'conflict' && <button className="btn small" type="button" onClick={() => select(null)}>저장된 답변 다시 확인</button>}</div>}
@@ -224,7 +224,7 @@ export function LegacyCampusLesson({ material, lessonId, enrollmentId, readOnly,
       setDone(true); onCompleted?.();
     } catch (err) { setError((err as Error).message); } finally { setSaving(false); }
   }
-  return <LessonPages continuation={renderContinuation?.(Boolean(!saving && (done || readOnly)))} positionKey={enrollmentId ? `campus:page:${enrollmentId}:${lessonId}:${material.updatedAt}` : undefined} document={document} enabled busy={saving}>{(pageBlocks,last) => <>
+  return <LessonPages lessonId={lessonId} continuation={renderContinuation?.(Boolean(!saving && (done || readOnly)))} positionKey={enrollmentId ? `campus:page:${enrollmentId}:${lessonId}:${material.updatedAt}` : undefined} document={document} enabled busy={saving}>{(pageBlocks,last) => <>
     {(pageBlocks ?? blocks).map(block => {
       if (block.type === 'video') return <Video key={block.id} url={block.url!} />;
       if (block.type === 'link') return <a key={block.id} className="btn primary" href={block.url} target="_blank" rel="noreferrer">외부 학습 열기</a>;

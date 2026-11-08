@@ -26,7 +26,7 @@ export function StudyPreview({ lessonId, cohort, nextLesson, document, material,
     }}/>;
   return <>
     {material.description && <p>{material.description}</p>}
-    {document ? <LessonPages continuation={continuation} enabled document={document}>{(pageBlocks, last) =>
+    {document ? <LessonPages lessonId={lessonId} continuation={continuation} enabled document={document}>{(pageBlocks, last) =>
       <LessonBlockView document={document} pageBlocks={pageBlocks} showChecklist={last} filesReadOnly values={values} onChange={setValues}/>
     }</LessonPages> : <LegacyCampusLesson material={material} lessonId={lessonId} enrollmentId="" readOnly renderContinuation={() => continuation}/>}
     {material.resourceName && <ResourceRow content={{id: lessonId, lesson_id: lessonId, resource_name: material.resourceName}}/>}

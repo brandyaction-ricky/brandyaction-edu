@@ -1,5 +1,7 @@
 'use client';
 import {useEffect, useRef, useState} from 'react';
+import {FloatingLearningQuestion} from '@/app/ui/final/floating-learning-question';
+import {LessonQuestions} from '@/app/ui/final/lesson-questions';
 import {NextLessonAction} from '@/app/ui/final/lesson-pages';
 import dynamic from 'next/dynamic';
 import {useLessonProgression} from '@/app/ui/final/use-lesson-progression';
@@ -33,9 +35,11 @@ export function LessonTaskPanel({snapshot,onOpen,live,mayLeave,onCompleted,initi
  const nextGate = next && gates.lessons?.find(row => row.lessonId === next.id);
  const graduate = snapshot.scopes.find(scope => scope.enrollmentId === enrollment)?.graduate;
  if (enabled && lesson && reading === lesson.id && gate?.isUnlocked) return <section className={styles.reader} aria-label="캠퍼스 수업">
-   <button type="button" className="btn small" onClick={() => {
+   <div className={styles.readerTools}><button type="button" className="btn small" onClick={() => {
      if (!mayLeave || mayLeave()) { setReading(''); gates.reload(); }
    }}>수업 목록으로</button>
+     {process.env.NEXT_PUBLIC_EDU_QUESTION_HUB_ENABLED === 'true' && <FloatingLearningQuestion key={enrollment+':'+lesson.id} member={snapshot.viewer.id} current={{enrollmentId:enrollment,lessonId:lesson.id,label:lesson.day+'일차 · '+lesson.title,recent:true}}/>}
+   </div>
    <h2 ref={heading} tabIndex={-1}>{lesson.title}</h2>
    <GuidedSession campusGuided lessonId={lesson.id} enrollmentId={enrollment}
      readOnly={graduate} completed={lesson.completed} onCompleted={onCompleted}
@@ -49,6 +53,9 @@ export function LessonTaskPanel({snapshot,onOpen,live,mayLeave,onCompleted,initi
          setChosen(next.id);
          setReading(next.id);
        }}/>} />
+   <details key={enrollment+':'+lesson.id}><summary>이 수업의 질문·답변 보기</summary>
+     <LessonQuestions enrollmentId={enrollment} lessonId={lesson.id} lessonTitle={lesson.title}/>
+   </details>
  </section>;
  if(!lesson)return <section className={styles.panel}><h2>아직 공개된 수업이 없어요</h2><p>수업이 열리면 이곳에서 이어서 공부할 수 있어요.</p></section>;
  const priority=lesson.missions.find(m=>m.status==='changes_requested'||m.status==='rejected')||lesson.missions.find(m=>m.required&&m.status==='not_started');

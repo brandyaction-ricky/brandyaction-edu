@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react';
 import type { PublicBlockDocument, PublicLessonBlock } from '@/lib/lesson-blocks';
 import { lessonBodyPlainText } from '@/lib/lesson-body';
+import { practiceSteps } from '@/lib/lesson-practice-steps';
 import { lessonReadingPages } from '@/lib/lesson-reading-pages';
 
 
@@ -23,20 +24,22 @@ export function NextLessonAction({ position, onOpen, reason, end }: {
   </div>;
 }
 
-export function LessonPages({ document, enabled, busy, positionKey, continuation, children }: {
+export function LessonPages({ document, lessonId, enabled, busy, positionKey, continuation, children }: {
   document: PublicBlockDocument | null;
+  lessonId?: string;
   enabled: boolean;
   busy?: boolean;
   positionKey?: string;
   continuation?: ReactNode;
   children: (pageBlocks: PublicLessonBlock[] | undefined, last: boolean) => ReactNode;
 }) {
-  const pages = useMemo(() => enabled && document ? lessonReadingPages(document.blocks) : [], [document, enabled]);
-  const labels = useMemo(() => pages.map(page => {
+  const steps = useMemo(() => enabled && document ? practiceSteps(lessonId, document.blocks) : null, [enabled, document, lessonId]);
+  const pages = useMemo(() => steps?.map(step => step.blocks) ?? (enabled && document ? lessonReadingPages(document.blocks) : []), [steps, document, enabled]);
+  const labels = useMemo(() => steps?.map(step => step.label) ?? pages.map(page => {
     const first = page.find(b => b.type === 'heading' || b.type === 'subheading')
       || page.find(b => b.content?.trim() || b.question?.label || b.alt);
     return first && lessonBodyPlainText(first.question?.label || first.content || first.alt || '').trim().split('\n')[0].slice(0, 34);
-  }), [pages]);
+  }), [pages, steps]);
   const [index, setIndex] = useState(() => {
     try { return positionKey ? Math.max(0, Number.parseInt(sessionStorage.getItem(positionKey) || '0', 10) || 0) : 0; }
     catch { return 0; }

@@ -6,3 +6,8 @@
 .reader :global(.btn:disabled){opacity:.55;cursor:default}
 .reader :global(.btn:focus-visible){outline:3px solid #78a7ef;outline-offset:3px}
 .reader :global(.lb-page-position){margin:0 0 .3rem;padding-top:.6rem;font-size:.9rem;color:#3e5574}
+
+.readerTools{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap}
+.readerTools :global(.floating-learning-question):not(:has([role="dialog"]:not([hidden]))){position:static}
+.readerTools :global(.floating-learning-question-panel){max-width:calc(100vw - 32px)}
+.reader>details{margin-block:1.5rem}.reader>details>summary{cursor:pointer;padding-block:.6rem;font-weight:600}
