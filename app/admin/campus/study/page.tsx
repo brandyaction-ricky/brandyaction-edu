@@ -1,3 +1,5 @@
+import { FourSpacesPreview } from '@/features/campus/tour/preview';
+import readerStyles from '@/features/campus/ui/lesson-task-panel.module.css';
 import { AdminButton, AdminCheckbox, AdminControlRow, AdminInput, AdminLinkButton, AdminPageHeader, AdminSelect } from '@/features/admin-ui/components/admin-system';
 import { LessonPicker } from './lesson-picker';
 import { cohortReaderEnabled, reviewCohortKey } from '@/features/campus/cohort-reader';
@@ -14,9 +16,9 @@ import { StudyPreview } from './study-preview';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: '공부방 수업 미리보기', robots: { index: false, follow: false } };
 
-export default async function Page({ searchParams }: { searchParams: Promise<{ lesson?: string; cohort?: string; manage?: string; notice?: string }> }) {
-  const { lesson, cohort, manage, notice } = await searchParams;
-  const user = await campusUser('/admin/campus/study', { lesson, cohort, manage });
+export default async function Page({ searchParams }: { searchParams: Promise<{ lesson?: string; cohort?: string; manage?: string; notice?: string; view?: string }> }) {
+  const { lesson, cohort, manage, notice, view } = await searchParams;
+  const user = await campusUser('/admin/campus/study', { lesson, cohort, manage, view });
   if (!await getOperatorUser('products', user)) notFound();
   const db = createAdminClient();
   const { data, error } = await db.from('courses')
@@ -78,6 +80,22 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ l
   }
   const content = !manageList && selected ? await readLesson(selected.id) : null;
   const path = '/admin/campus/study';
+  const lessonQuery = selectedCohort && selected ? new URLSearchParams({cohort:selectedCohort.id, lesson:selected.id}) : null;
+  const previewHref = lessonQuery && path + '?' + lessonQuery + '&view=campus';
+  const next = nextLesson && {id:nextLesson.id, position:nextLesson.position};
+  if (view === 'campus' && !manageList && selectedCohort && selected && content && lessonQuery) {
+    const returnHref = path + '?' + lessonQuery;
+    return <FourSpacesPreview snapshot={{
+      schemaVersion:1, fetchedAt:new Date().toISOString(), viewer:{id:user.id, displayName:'수업 검수'},
+      scopes:[], selectedEnrollmentId:null, lessons:[], links:{classes:returnHref, questions:returnHref}, launchEligibility:null,
+    }} review={{room:'study', role:'student', returnHref, lessonContent:
+      <section className={readerStyles.reader} aria-label="캠퍼스 수업">
+        <Link className="btn small" href={returnHref}>수업 목록으로</Link>
+        <h2 id="review-lesson" tabIndex={-1}>{selected.title}</h2>
+        <StudyPreview key={selected.id} inCampus cohort={selectedCohort.id} lessonId={selected.id} nextLesson={next} {...content}/>
+      </section>
+    }}/>;
+  }
   const messages: Record<string,string> = {saved:'검수 목록에 저장했습니다.', removed:'목록에서 뺐습니다. 아래에서 다시 추가할 수 있습니다.',
     enabled:'이 기수는 캠퍼스 수강 중입니다. 기존 강의실로 전환한 뒤 목록에서 빼세요.',name:'표시 이름을 1~50자로 입력해 주세요.'};
   return <main className={'edu-admin '+styles.shell}><div className={styles.page}>
@@ -121,7 +139,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ l
       {selectedCohort && <section className={styles.panel} aria-label="캠퍼스 수업">
         {lessons.length>1 && selected && <AdminControlRow><LessonPicker cohort={selectedCohort.id} selected={selected.id} weeks={weeks}/></AdminControlRow>}
         {selected && content ? <><header id="review-lesson" tabIndex={-1} className={styles.lessonHead}><small>{selected.position}{selected.unpublished && ' · 미공개 수업'}</small><h2>{selected.title}</h2></header>
-          <div className={styles.reader}><StudyPreview key={selected.id} lessonId={selected.id} cohort={selectedCohort.id} nextLesson={nextLesson && {id: nextLesson.id, position: nextLesson.position}} {...content}/></div></> : <p>미리볼 공개 수업이 없습니다.</p>}
+          {previewHref && <AdminControlRow><AdminLinkButton href={previewHref}>캠퍼스 공부방에서 미리보기</AdminLinkButton></AdminControlRow>}
+          <div className={styles.reader}><StudyPreview key={selected.id} lessonId={selected.id} cohort={selectedCohort.id} nextLesson={next} {...content}/></div></> : <p>미리볼 공개 수업이 없습니다.</p>}
       </section>}
     </>}
   </div></main>;

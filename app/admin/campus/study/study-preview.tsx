@@ -8,7 +8,7 @@ import { LessonBlockView } from '@/app/ui/final/lesson-block-view';
 import { LegacyCampusLesson, type CampusMaterial } from '@/app/ui/final/lesson-block-session';
 import { ResourceRow } from '@/app/ui/final/primitives';
 
-export function StudyPreview({ lessonId, cohort, nextLesson, document, material }: { cohort: string; nextLesson?: { id: string; position: string }; lessonId: string; document: PublicBlockDocument | null; material: CampusMaterial }) {
+export function StudyPreview({ lessonId, cohort, nextLesson, document, material, inCampus = false }: { inCampus?: boolean; cohort: string; nextLesson?: { id: string; position: string }; lessonId: string; document: PublicBlockDocument | null; material: CampusMaterial }) {
   const [values, setValues] = useState<LessonBlockAnswers>({ blocks: {}, checklist: [] });
   const router = useRouter();
   useEffect(() => {
@@ -22,7 +22,7 @@ export function StudyPreview({ lessonId, cohort, nextLesson, document, material 
   const continuation = <NextLessonAction position={nextLesson?.position} end="전체 커리큘럼의 마지막 수업입니다."
     reason={needsCheck ? '필수 체크 항목을 확인해 주세요.' : undefined}
     onOpen={() => {
-      if (nextLesson) router.push('/admin/campus/study?' + new URLSearchParams({ cohort, lesson: nextLesson.id }) + '#review-lesson');
+      if (nextLesson) router.push('/admin/campus/study?' + new URLSearchParams({ cohort, lesson: nextLesson.id, ...(inCampus && {view:'campus'}) }) + '#review-lesson');
     }}/>;
   return <>
     {material.description && <p>{material.description}</p>}
