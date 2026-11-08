@@ -12,7 +12,7 @@ import { ResourceRow, Video } from './primitives';
 import { LessonText } from './lesson-text';
 import { safeUrl } from '@/lib/platform';
 import { LessonSaveStatus } from './lesson-save-status';
-import { LessonPages } from './lesson-pages';
+import { LessonPages, type RenderContinuation } from './lesson-pages';
 import { useCampusDraftGuard } from '@/features/campus/ui/draft-guard';
 
 function CampusLessonGuard({ dirty, busy }: { dirty: boolean; busy: boolean }) {
@@ -40,7 +40,7 @@ async function request<T>(url: string, body?: unknown, signal?: AbortSignal): Pr
   return data;
 }
 
-function SessionContent({ snapshot, lessonId, enrollmentId, readOnly, onSelectRevision, onCompleted, campusGuided }: { campusGuided?: boolean; snapshot: Snapshot; lessonId: string; enrollmentId: string; readOnly: boolean; onSelectRevision: (revision: string | null) => void; onCompleted?: () => void }) {
+function SessionContent({ snapshot, lessonId, enrollmentId, readOnly, onSelectRevision, onCompleted, campusGuided, renderContinuation, completed }: { renderContinuation?: RenderContinuation; completed?: boolean; campusGuided?: boolean; snapshot: Snapshot; lessonId: string; enrollmentId: string; readOnly: boolean; onSelectRevision: (revision: string | null) => void; onCompleted?: () => void }) {
   const practice = snapshot.practice?.enabled === true;
   const draft = practice ? snapshot.practice?.draft : snapshot.draft;
   const canPractice = practice && snapshot.revision === snapshot.currentRevision;
@@ -150,7 +150,7 @@ function SessionContent({ snapshot, lessonId, enrollmentId, readOnly, onSelectRe
       : null}
     {submission?.feedback && <div className="lb-session-notice"><h3>멘토 피드백</h3><p className="reading-copy">{submission.feedback}</p></div>}
     {campusGuided && <CampusLessonGuard dirty={status.phase !== 'saved'} busy={uploading || submitting || reopening || status.phase === 'saving'} />}
-    <LessonPages positionKey={campusGuided ? `campus:page:${enrollmentId}:${lessonId}:${snapshot.revision}` : undefined} enabled={!!campusGuided} document={snapshot.document} busy={uploading || submitting || reopening}>{(pageBlocks, last) => <>
+    <LessonPages continuation={!historical && renderContinuation?.(Boolean((locked || readOnly || completed) && !uploading && !submitting && !reopening && status.phase === 'saved'))} positionKey={campusGuided ? `campus:page:${enrollmentId}:${lessonId}:${snapshot.revision}` : undefined} enabled={!!campusGuided} document={snapshot.document} busy={uploading || submitting || reopening}>{(pageBlocks, last) => <>
     {snapshot.document && <LessonBlockView pageBlocks={pageBlocks} showChecklist={last} floatingAudio={!campusGuided} showOutline={!campusGuided} document={snapshot.document} values={values} onChange={change} fileContext={{ lessonId, enrollmentId, revision: snapshot.revision! }} onFilePending={filePending} onAnswerChange={(id, value) => change({ ...valuesRef.current, blocks: { ...valuesRef.current.blocks, [id]: value } })} filesReadOnly={practice} readOnly={(readOnly && !canPractice) || historical || submitting || submitUncertain || locked} grade={(readOnly && !canPractice) || historical || locked ? undefined : grade} />}
     {(!readOnly || canPractice) && !historical && !locked && <LessonSaveStatus status={status} hasDraft={Boolean(draft)} practice={practice} onSave={() => void saver.current?.flush()} />}
     {(status.phase === 'error' || status.phase === 'conflict') && <div className="lb-session-notice" role="alert"><p>{status.message} 현재 입력은 이 화면에 남아 있습니다.</p><button className="btn small" type="button" onClick={downloadAnswers}>현재 답변 내려받기</button>{status.phase === 'conflict' && <button className="btn small" type="button" onClick={() => select(null)}>저장된 답변 다시 확인</button>}</div>}
@@ -179,11 +179,11 @@ function SessionContent({ snapshot, lessonId, enrollmentId, readOnly, onSelectRe
 
 // Integrate only after the lesson-block DB migration is installed. Existing
 // lesson_contents are rendered via fallback when no block document exists.
-type SessionProps = { completed?: boolean; campusGuided?: boolean; lessonId: string; enrollmentId: string; readOnly?: boolean; fallback?: ReactNode; onCompleted?: () => void };
+type SessionProps = { renderContinuation?: RenderContinuation; completed?: boolean; campusGuided?: boolean; lessonId: string; enrollmentId: string; readOnly?: boolean; fallback?: ReactNode; onCompleted?: () => void };
 export function LessonBlockSession(props: SessionProps) {
   return <SessionLoader key={`${props.enrollmentId}:${props.lessonId}`} {...props} />;
 }
-function SessionLoader({ lessonId, enrollmentId, readOnly = false, fallback, onCompleted, campusGuided, completed }: SessionProps) {
+function SessionLoader({ lessonId, enrollmentId, readOnly = false, fallback, onCompleted, campusGuided, completed, renderContinuation }: SessionProps) {
   const [selection, setSelection] = useState<{ revision: string | null; reload: number }>({ revision: null, reload: 0 });
   const [loaded, setLoaded] = useState<{ key: string; snapshot?: Snapshot; error?: string } | null>(null);
   const key = `${enrollmentId}:${lessonId}:${selection.revision || ''}:${selection.reload}`;
@@ -198,18 +198,18 @@ function SessionLoader({ lessonId, enrollmentId, readOnly = false, fallback, onC
   function select(revision: string | null) { setSelection(previous => ({ revision, reload: previous.reload + 1 })); }
   if (loaded?.key !== key) return <p role="status">학습 내용과 저장된 답변을 불러오고 있습니다.</p>;
   if (loaded.error) return <div className="lb-session-notice" role="alert"><p>{loaded.error}</p><button type="button" className="btn small" onClick={() => select(selection.revision)}>다시 불러오기</button></div>;
-  if (loaded.snapshot?.ongoing && !loaded.snapshot.practice?.enabled) return <OngoingLessonSession lessonId={lessonId} enrollmentId={enrollmentId} readOnly={readOnly} />;
+  if (loaded.snapshot?.ongoing && !loaded.snapshot.practice?.enabled) return <OngoingLessonSession lessonId={lessonId} enrollmentId={enrollmentId} readOnly={readOnly} renderContinuation={renderContinuation} />;
   const material = loaded.snapshot?.campus;
   const intro = material?.description && <p>{material.description}</p>;
   const resource = material?.resourceName && <ResourceRow content={{id: lessonId, lesson_id: lessonId, resource_name: material.resourceName}} />;
   if (!loaded.snapshot?.document) return campusGuided && material
-    ? <>{intro}<LegacyCampusLesson material={material} lessonId={lessonId} enrollmentId={enrollmentId} readOnly={readOnly} completed={completed} onCompleted={onCompleted} />{resource}</>
+    ? <>{intro}<LegacyCampusLesson material={material} lessonId={lessonId} enrollmentId={enrollmentId} readOnly={readOnly} completed={completed} onCompleted={onCompleted} renderContinuation={renderContinuation} />{resource}</>
     : <>{fallback}</>;
   if (!canRenderLessonBlocks(loaded.snapshot.document)) return <p role="alert">학습 도구를 준비하고 있습니다. 잠시 후 다시 확인해 주세요.</p>;
-  return <>{intro}<SessionContent campusGuided={campusGuided} key={key} snapshot={loaded.snapshot} lessonId={lessonId} enrollmentId={enrollmentId} readOnly={readOnly} onSelectRevision={select} onCompleted={onCompleted} />{resource}{loaded.snapshot.ongoing && loaded.snapshot.practice?.enabled && <details className="mt24"><summary>졸업 전 기간별 챌린지 기록 보기</summary><OngoingLessonSession lessonId={lessonId} enrollmentId={enrollmentId} readOnly /></details>}</>;
+  return <>{intro}<SessionContent completed={completed} renderContinuation={renderContinuation} campusGuided={campusGuided} key={key} snapshot={loaded.snapshot} lessonId={lessonId} enrollmentId={enrollmentId} readOnly={readOnly} onSelectRevision={select} onCompleted={onCompleted} />{resource}{loaded.snapshot.ongoing && loaded.snapshot.practice?.enabled && <details className="mt24"><summary>졸업 전 기간별 챌린지 기록 보기</summary><OngoingLessonSession lessonId={lessonId} enrollmentId={enrollmentId} readOnly /></details>}</>;
 }
 
-export function LegacyCampusLesson({ material, lessonId, enrollmentId, readOnly, completed, onCompleted }: SessionProps & { material: CampusMaterial }) {
+export function LegacyCampusLesson({ material, lessonId, enrollmentId, readOnly, completed, onCompleted, renderContinuation }: SessionProps & { material: CampusMaterial }) {
   const [saving, setSaving] = useState(false), [done, setDone] = useState(!!completed), [error, setError] = useState('');
   useCampusDraftGuard(false, saving, 'campus-lesson');
   const blocks: PublicBlockDocument['blocks'] = [];
@@ -224,7 +224,7 @@ export function LegacyCampusLesson({ material, lessonId, enrollmentId, readOnly,
       setDone(true); onCompleted?.();
     } catch (err) { setError((err as Error).message); } finally { setSaving(false); }
   }
-  return <LessonPages positionKey={enrollmentId ? `campus:page:${enrollmentId}:${lessonId}:${material.updatedAt}` : undefined} document={document} enabled busy={saving}>{(pageBlocks,last) => <>
+  return <LessonPages continuation={renderContinuation?.(Boolean(!saving && (done || readOnly)))} positionKey={enrollmentId ? `campus:page:${enrollmentId}:${lessonId}:${material.updatedAt}` : undefined} document={document} enabled busy={saving}>{(pageBlocks,last) => <>
     {(pageBlocks ?? blocks).map(block => {
       if (block.type === 'video') return <Video key={block.id} url={block.url!} />;
       if (block.type === 'link') return <a key={block.id} className="btn primary" href={block.url} target="_blank" rel="noreferrer">외부 학습 열기</a>;

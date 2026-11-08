@@ -1,4 +1,5 @@
 "use client";
+import type { RenderContinuation } from './lesson-pages';
 import { useEffect,useRef,useState } from 'react';
 import { LessonBlockAutosave,type AutosaveState } from '@/lib/lesson-block-autosave';
 import { missingBlockRequirements,type LessonBlockAnswers } from '@/lib/lesson-blocks';
@@ -8,7 +9,7 @@ import { LessonSaveStatus } from './lesson-save-status';
 import { useUnsavedLearningChanges } from './use-unsaved-learning-changes';
 const endpoint='/api/platform/ongoing-lessons';
 async function request<T>(url:string,body?:unknown,signal?:AbortSignal):Promise<T>{const r=await fetch(url,{method:body?'POST':'GET',cache:'no-store',credentials:'same-origin',signal,...(body?{headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});let data;try{data=await r.json();}catch{throw new Error('저장 응답을 확인하지 못했습니다. 다시 시도해 주세요.');}if(!r.ok)throw Object.assign(new Error(data.error||'학습 기록을 확인하지 못했습니다.'),{status:r.status});return data;}
-export function OngoingLessonSession({lessonId,enrollmentId,readOnly=false}:{lessonId:string;enrollmentId:string;readOnly?:boolean}){
+export function OngoingLessonSession({lessonId,enrollmentId,readOnly=false,renderContinuation}:{renderContinuation?:RenderContinuation;lessonId:string;enrollmentId:string;readOnly?:boolean}){
  const [selection,setSelection]=useState({period:null as string|null,reload:0}),[loaded,setLoaded]=useState<{key:string;snapshot?:OngoingSnapshot;error?:string}>();
  const key=`${lessonId}:${enrollmentId}:${selection.period}:${selection.reload}`;
  useEffect(()=>{const abort=new AbortController(),query=new URLSearchParams({lesson:lessonId,enrollment:enrollmentId});if(selection.period)query.set('period',selection.period);
@@ -17,9 +18,9 @@ export function OngoingLessonSession({lessonId,enrollmentId,readOnly=false}:{les
  if(loaded?.key!==key)return <p role="status">지속 챌린지와 내 답변을 불러오고 있습니다.</p>;
  if(loaded.error||!loaded.snapshot)return <div role="alert"><p>{loaded.error||'학습을 찾지 못했습니다.'}</p><button className="btn" onClick={()=>select(selection.period)}>다시 불러오기</button></div>;
  if(!canRenderLessonBlocks(loaded.snapshot.document))return <p role="alert">이 학습 도구를 준비하고 있습니다.</p>;
- return <PeriodSession key={key} snapshot={loaded.snapshot} lessonId={lessonId} enrollmentId={enrollmentId} select={select} readOnly={readOnly}/>;
+ return <PeriodSession key={key} snapshot={loaded.snapshot} lessonId={lessonId} enrollmentId={enrollmentId} select={select} readOnly={readOnly} renderContinuation={renderContinuation}/>;
 }
-function PeriodSession({snapshot,lessonId,enrollmentId,select,readOnly}:{snapshot:OngoingSnapshot;lessonId:string;enrollmentId:string;select:(period:string|null)=>void;readOnly:boolean}){
+function PeriodSession({snapshot,lessonId,enrollmentId,select,readOnly,renderContinuation}:{renderContinuation?:RenderContinuation;snapshot:OngoingSnapshot;lessonId:string;enrollmentId:string;select:(period:string|null)=>void;readOnly:boolean}){
  const [values,setValues]=useState<LessonBlockAnswers>(snapshot.draft?.values||{blocks:{},checklist:[]}),valuesRef=useRef(values),saver=useRef<LessonBlockAutosave|null>(null);
  const [status,setStatus]=useState<AutosaveState>({phase:'saved',message:'',updatedAt:snapshot.draft?.updatedAt||null});
  const [completion,setCompletion]=useState(snapshot.completion),[busy,setBusy]=useState(false),[uncertain,setUncertain]=useState(false),[error,setError]=useState('');
@@ -53,5 +54,6 @@ function PeriodSession({snapshot,lessonId,enrollmentId,select,readOnly}:{snapsho
   {!readOnly&&!historical&&completion&&<p>완료 후에도 이번 기간의 메모를 수정할 수 있습니다. 완료 당시 답변은 따로 보관됩니다.</p>}
   {completion?.values&&<details><summary>완료 당시 답변 보기</summary><LessonBlockView document={snapshot.document} values={completion.values} onChange={()=>{}} readOnly livePrompts fileContext={context}/></details>}
   <details className="mt24"><summary>기간별 내 기록</summary>{visibleHistory.length?visibleHistory.map(item=><p key={item.periodStart}><button className="btn small" disabled={busy} onClick={()=>move(item.periodStart)}>{ongoingPeriodLabel(item.periodStart,item.periodEnd)} · {item.completed?'완료':'작성 중'}</button></p>):<p>아직 저장한 이전 기록이 없습니다.</p>}{historyBefore&&<button className="btn" disabled={historyBusy} onClick={()=>void more()}>이전 기록 더 보기</button>}</details>
+ {!historical && renderContinuation?.(Boolean((readOnly || completion) && !busy && !uploading && !uncertain && status.phase==='saved'))}
  </section>;
 }

@@ -1,5 +1,6 @@
 'use client';
-import {useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
+import {NextLessonAction} from '@/app/ui/final/lesson-pages';
 import dynamic from 'next/dynamic';
 import {useLessonProgression} from '@/app/ui/final/use-lesson-progression';
 const GuidedSession = dynamic(() => import('@/app/ui/final/lesson-block-session').then(module => module.LessonBlockSession), {
@@ -16,17 +17,38 @@ export function LessonTaskPanel({snapshot,onOpen,live,mayLeave,onCompleted,initi
  const lesson=snapshot.lessons.find(l=>l.id===chosen)||snapshot.lessons[0];
  const enrollment = snapshot.selectedEnrollmentId || '';
  const enabled = !!live && snapshot.guidedLessons === true && process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true';
- const gates = useLessonProgression(enrollment, enabled);
+ const gates = useLessonProgression(enrollment, enabled, snapshot.fetchedAt);
  const [reading, setReading] = useState(initialLesson || '');
  const gate = gates.lessons?.find(row => row.lessonId === lesson?.id);
+ const heading = useRef<HTMLHeadingElement>(null);
+ const focusNext = useRef(false);
+ useEffect(() => {
+   if (focusNext.current && heading.current) {
+     focusNext.current = false;
+     heading.current.focus({preventScroll:true});
+     heading.current.scrollIntoView({block:'start'});
+   }
+ }, [reading]);
+ const next = lesson && snapshot.lessons[snapshot.lessons.indexOf(lesson) + 1];
+ const nextGate = next && gates.lessons?.find(row => row.lessonId === next.id);
  const graduate = snapshot.scopes.find(scope => scope.enrollmentId === enrollment)?.graduate;
  if (enabled && lesson && reading === lesson.id && gate?.isUnlocked) return <section className={styles.reader} aria-label="캠퍼스 수업">
    <button type="button" className="btn small" onClick={() => {
      if (!mayLeave || mayLeave()) { setReading(''); gates.reload(); }
    }}>수업 목록으로</button>
-   <h2>{lesson.title}</h2>
+   <h2 ref={heading} tabIndex={-1}>{lesson.title}</h2>
    <GuidedSession campusGuided lessonId={lesson.id} enrollmentId={enrollment}
-     readOnly={graduate} completed={lesson.completed} onCompleted={onCompleted} />
+     readOnly={graduate} completed={lesson.completed} onCompleted={onCompleted}
+     renderContinuation={ready => <NextLessonAction
+       end="현재 공개된 마지막 수업입니다."
+       position={next && [next.week !== undefined && next.week + '주차', next.day + '일차'].filter(Boolean).join(' · ')}
+       reason={!ready ? '학습 완료 또는 제출 후 이동할 수 있어요.' : !nextGate?.isUnlocked ? nextGate?.reason || '아직 열리지 않은 수업입니다.' : undefined}
+       onOpen={() => {
+         if (!ready || !next || !nextGate?.isUnlocked || (mayLeave && !mayLeave())) return;
+         focusNext.current = true;
+         setChosen(next.id);
+         setReading(next.id);
+       }}/>} />
  </section>;
  if(!lesson)return <section className={styles.panel}><h2>아직 공개된 수업이 없어요</h2><p>수업이 열리면 이곳에서 이어서 공부할 수 있어요.</p></section>;
  const priority=lesson.missions.find(m=>m.status==='changes_requested'||m.status==='rejected')||lesson.missions.find(m=>m.required&&m.status==='not_started');

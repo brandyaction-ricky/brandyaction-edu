@@ -59,6 +59,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ l
     .filter(week => week.lessons.length > 0);
   const lessons = weeks.flatMap(week => week.lessons);
   const selected = lessons.find(l => l.id === lesson) ?? lessons[0];
+  const nextLesson = selected ? lessons[lessons.indexOf(selected) + 1] : undefined;
   const enabled = !manageList && selectedCohort ? await cohortReaderEnabled(db, selectedCohort.id) : false;
   const addable = options.filter(c => !labels.has(reviewCohortKey(c.id)));
   async function readLesson(id: string) {
@@ -119,8 +120,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ l
       </section>
       {selectedCohort && <section className={styles.panel} aria-label="캠퍼스 수업">
         {lessons.length>1 && selected && <AdminControlRow><LessonPicker cohort={selectedCohort.id} selected={selected.id} weeks={weeks}/></AdminControlRow>}
-        {selected && content ? <><header className={styles.lessonHead}><small>{selected.position}{selected.unpublished && ' · 미공개 수업'}</small><h2>{selected.title}</h2></header>
-          <div className={styles.reader}><StudyPreview key={selected.id} lessonId={selected.id} {...content}/></div></> : <p>미리볼 공개 수업이 없습니다.</p>}
+        {selected && content ? <><header id="review-lesson" tabIndex={-1} className={styles.lessonHead}><small>{selected.position}{selected.unpublished && ' · 미공개 수업'}</small><h2>{selected.title}</h2></header>
+          <div className={styles.reader}><StudyPreview key={selected.id} lessonId={selected.id} cohort={selectedCohort.id} nextLesson={nextLesson && {id: nextLesson.id, position: nextLesson.position}} {...content}/></div></> : <p>미리볼 공개 수업이 없습니다.</p>}
       </section>}
     </>}
   </div></main>;
