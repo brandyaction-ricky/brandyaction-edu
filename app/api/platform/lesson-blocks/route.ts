@@ -63,6 +63,14 @@ export async function GET(request: Request) {
     if (!user) return reply({ error: '로그인이 필요합니다.' }, 401);
     const params = new URL(request.url).searchParams;
     const db = createAdminClient();
+    if (params.get('campus') === '1') {
+      const { cohortReaderEnabled } = await import('@/features/campus/cohort-reader');
+      const { data: owned, error } = await db.from('enrollments').select('cohort_id')
+        .eq('id', requiredId(params.get('enrollment'))).eq('user_id', user.id).maybeSingle();
+      if (error) throw error;
+      if (!owned || !await cohortReaderEnabled(db, owned.cohort_id))
+        return reply({ error: '이 기수의 수업은 기존 강의실에서 열어 주세요.' }, 403);
+    }
     if (params.get('action') === 'progression') {
       const { data, error } = await db.rpc('edu_read_lesson_progression', { p_actor: user.id, p_enrollment: requiredId(params.get('enrollment')) });
       if (error) throw error;

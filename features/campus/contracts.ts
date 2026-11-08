@@ -15,6 +15,7 @@ export type CampusScope = {
   cohortName: string;
 };
 export type CampusSnapshot = {
+  guidedLessons?: boolean;
   schemaVersion: 1;
   fetchedAt: string;
   viewer: { id: string; displayName: string };

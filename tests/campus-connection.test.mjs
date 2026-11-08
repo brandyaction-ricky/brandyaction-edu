@@ -67,8 +67,8 @@ test('server-only publication lookup follows owner authorization and never reads
  const lookup=()=>{calls++;return server;};
  const result=await loadCampusSnapshot(student,user,uid(2),now,lookup);
  assert.equal(result.lessons.length,1);assert.equal(calls,1);
- assert.deepEqual(server.calls.map(c=>c.table),['edu_cohort_week_visibility','edu_cohort_lesson_visibility']);
- assert.ok(server.calls.every(c=>c.filters.some(f=>Array.isArray(f)&&f[0]==='cohort_id'&&f[1]===uid(4))));
+ assert.deepEqual(server.calls.map(c=>c.table),['edu_cohort_week_visibility','edu_cohort_lesson_visibility','site_settings']);
+ assert.ok(server.calls.filter(c=>c.table!=='site_settings').every(c=>c.filters.some(f=>Array.isArray(f)&&f[0]==='cohort_id'&&f[1]===uid(4))));
  assert.ok(student.calls.every(c=>!c.table.startsWith('edu_cohort_')));
  const denied=()=>{throw Error('Elevated lookup must not run');};
  await loadCampusSnapshot(database(data),user,null,now,denied);
@@ -218,4 +218,19 @@ test('a new course lesson appears on the next campus read after its week and coh
   assert.equal(await visible(), false);
   data.edu_cohort_lesson_visibility.push({ cohort_id: uid(4), lesson_id: lesson.id, is_published: true });
   assert.equal(await visible(), true);
+});
+
+test('the selected enrollment opts into page lessons per cohort without unlocking hidden lessons', async () => {
+ const data = fixture();
+ const setting = { key: 'edu_campus_page_reader_' + uid(4), is_public: false, value: { enabled: true } };
+ assert.equal((await load(data)).guidedLessons, false);
+ data.site_settings = [{ ...setting, key: 'edu_campus_page_reader_' + uid(99) }];
+ assert.equal((await load(data)).guidedLessons, false);
+ data.site_settings = [setting];
+ data.edu_cohort_lesson_visibility[0].is_published = false;
+ const selected = await load(data);
+ assert.equal(selected.guidedLessons, true);
+ assert.deepEqual(selected.lessons, []);
+ setting.value.enabled = false;
+ assert.equal((await load(data)).guidedLessons, false);
 });

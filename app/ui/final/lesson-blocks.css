@@ -100,3 +100,9 @@
 .lb-page-jump{display:inline-flex;align-items:center;gap:.5rem;margin-block:.25rem .5rem;font-size:.9rem}
 .lb-page-jump select{min-height:44px;padding:0 .5rem;border:1px solid #bacbde;border-radius:8px;background:#fff;color:#203653;font:inherit}
 .lb-page-jump{max-width:100%}.lb-page-jump select{min-width:0;max-width:min(24rem,65vw)}
+
+.lb-pages > nav { align-items:flex-start; }
+.lb-next-lesson { display:grid; justify-items:start; gap:.35rem; max-width:100%; }
+.lb-next-lesson > .btn { width:auto; min-height:44px; }
+.lb-next-lesson small,.lb-course-end { font-size:.875rem; color:#526376; }
+.lb-course-end { align-self:center; }

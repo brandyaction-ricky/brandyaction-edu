@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from 'react';
 export type LessonGate = { lessonId: string; isUnlocked: boolean; automaticApproval: boolean; ongoing?: boolean; tagLabel?: string; track: 'daily' | 'learning' | null; dayNumber: number | null; reason: string };
-export function useLessonProgression(enrollment: string, enabled: boolean) {
+export function useLessonProgression(enrollment: string, enabled: boolean, snapshotVersion?: string) {
   const [refresh, setRefresh] = useState(0);
   const key = `${enrollment}:${refresh}`;
   const [loaded, setLoaded] = useState<{ key: string; lessons?: LessonGate[]; error?: string } | null>(null);
@@ -16,6 +16,6 @@ export function useLessonProgression(enrollment: string, enabled: boolean) {
       }).then(lessons => { if (!abort.signal.aborted) setLoaded({ key, lessons }); })
       .catch(error => { if (!abort.signal.aborted) setLoaded({ key, error: error.message }); });
     return () => abort.abort();
-  }, [enrollment, enabled, key]);
+  }, [enrollment, enabled, key, snapshotVersion]);
   return { lessons: loaded?.key === key ? loaded.lessons : undefined, error: loaded?.key === key ? loaded.error : undefined, reload: () => setRefresh(value => value + 1) };
 }

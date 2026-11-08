@@ -1,5 +1,6 @@
 'use client';
-import {useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
+import {NextLessonAction} from '@/app/ui/final/lesson-pages';
 import dynamic from 'next/dynamic';
 import {useLessonProgression} from '@/app/ui/final/use-lesson-progression';
 const GuidedSession = dynamic(() => import('@/app/ui/final/lesson-block-session').then(module => module.LessonBlockSession), {
@@ -15,18 +16,39 @@ export function LessonTaskPanel({snapshot,onOpen,live,mayLeave,onCompleted,initi
  const [chosen,setChosen]=useState(initialLesson||recommended?.lessonId||snapshot.lessons[0]?.id||'');
  const lesson=snapshot.lessons.find(l=>l.id===chosen)||snapshot.lessons[0];
  const enrollment = snapshot.selectedEnrollmentId || '';
- const enabled = !!live && process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true';
- const gates = useLessonProgression(enrollment, enabled);
+ const enabled = !!live && snapshot.guidedLessons === true && process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true';
+ const gates = useLessonProgression(enrollment, enabled, snapshot.fetchedAt);
  const [reading, setReading] = useState(initialLesson || '');
  const gate = gates.lessons?.find(row => row.lessonId === lesson?.id);
+ const heading = useRef<HTMLHeadingElement>(null);
+ const focusNext = useRef(false);
+ useEffect(() => {
+   if (focusNext.current && heading.current) {
+     focusNext.current = false;
+     heading.current.focus({preventScroll:true});
+     heading.current.scrollIntoView({block:'start'});
+   }
+ }, [reading]);
+ const next = lesson && snapshot.lessons[snapshot.lessons.indexOf(lesson) + 1];
+ const nextGate = next && gates.lessons?.find(row => row.lessonId === next.id);
  const graduate = snapshot.scopes.find(scope => scope.enrollmentId === enrollment)?.graduate;
- if (lesson && reading === lesson.id && gate?.isUnlocked) return <section className={styles.reader} aria-label="캠퍼스 수업">
+ if (enabled && lesson && reading === lesson.id && gate?.isUnlocked) return <section className={styles.reader} aria-label="캠퍼스 수업">
    <button type="button" className="btn small" onClick={() => {
      if (!mayLeave || mayLeave()) { setReading(''); gates.reload(); }
    }}>수업 목록으로</button>
-   <h2>{lesson.title}</h2>
+   <h2 ref={heading} tabIndex={-1}>{lesson.title}</h2>
    <GuidedSession campusGuided lessonId={lesson.id} enrollmentId={enrollment}
-     readOnly={graduate} completed={lesson.completed} onCompleted={onCompleted} />
+     readOnly={graduate} completed={lesson.completed} onCompleted={onCompleted}
+     renderContinuation={ready => <NextLessonAction
+       end="현재 공개된 마지막 수업입니다."
+       position={next && [next.week !== undefined && next.week + '주차', next.day + '일차'].filter(Boolean).join(' · ')}
+       reason={!ready ? '학습 완료 또는 제출 후 이동할 수 있어요.' : !nextGate?.isUnlocked ? nextGate?.reason || '아직 열리지 않은 수업입니다.' : undefined}
+       onOpen={() => {
+         if (!ready || !next || !nextGate?.isUnlocked || (mayLeave && !mayLeave())) return;
+         focusNext.current = true;
+         setChosen(next.id);
+         setReading(next.id);
+       }}/>} />
  </section>;
  if(!lesson)return <section className={styles.panel}><h2>아직 공개된 수업이 없어요</h2><p>수업이 열리면 이곳에서 이어서 공부할 수 있어요.</p></section>;
  const priority=lesson.missions.find(m=>m.status==='changes_requested'||m.status==='rejected')||lesson.missions.find(m=>m.required&&m.status==='not_started');
@@ -39,7 +61,7 @@ export function LessonTaskPanel({snapshot,onOpen,live,mayLeave,onCompleted,initi
     <button className={styles.primary} disabled={!gate?.isUnlocked} onClick={() => setReading(lesson.id)}>{lesson.completed ? '캠퍼스에서 다시 보기' : '캠퍼스에서 수업 열기'}</button>
     {!gate?.isUnlocked && <p role="status">{gate?.reason || (gates.lessons ? '수업 개방 상태를 확인해 주세요.' : '수업 개방 상태를 확인하고 있어요.')}</p>}
     {primaryMission && <button onClick={() => onOpen(lesson.id,primaryMission.id)}>{action}</button>}
-  </> : <button className={styles.primary} onClick={()=>onOpen(lesson.id,primaryMission?.id)}>{action}<span aria-hidden="true"> →</span></button>}</article>
+  </> : <button className={styles.primary} onClick={()=>onOpen(lesson.id,primaryMission?.id)}>{live && !primaryMission ? '기존 강의실에서 수업 열기' : action}<span aria-hidden="true"> →</span></button>}</article>
   <div className={styles.tasks}><h3>이 수업의 과제</h3>{!lesson.missions.length?<p>별도로 제출할 과제가 없어요.</p>:lesson.missions.map(m=><div key={m.id} className={styles.task}><div><strong>{m.title}</strong><p>{statusText[m.status]||'상태 확인이 필요해요'}</p></div>{m.id!==primaryMission?.id&&<button onClick={()=>onOpen(lesson.id,m.id)}>{m.status==='not_started'?'과제 열기':m.status==='changes_requested'||m.status==='rejected'?'검토 의견 보기':'제출 내용 보기'}</button>}</div>)}</div>
   <p className={styles.hint}>위의 닫기 버튼 또는 Esc를 누르면 원래 공간으로 돌아가요.</p>
  </section>;

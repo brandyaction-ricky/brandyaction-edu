@@ -6,11 +6,29 @@ import { lessonBodyPlainText } from '@/lib/lesson-body';
 import { lessonReadingPages } from '@/lib/lesson-reading-pages';
 
 
-export function LessonPages({ document, enabled, busy, positionKey, children }: {
+export type RenderContinuation = (ready: boolean) => ReactNode;
+
+export function NextLessonAction({ position, onOpen, reason, end }: {
+  position?: string;
+  onOpen?: () => void;
+  reason?: string;
+  end: string;
+}) {
+  if (!position) return <span className="lb-course-end">{end}</span>;
+  return <div className="lb-next-lesson">
+    <button type="button" className="btn primary" disabled={Boolean(reason)} onClick={onOpen}>
+      다음 일차로 · {position}
+    </button>
+    {reason && <small>{reason}</small>}
+  </div>;
+}
+
+export function LessonPages({ document, enabled, busy, positionKey, continuation, children }: {
   document: PublicBlockDocument | null;
   enabled: boolean;
   busy?: boolean;
   positionKey?: string;
+  continuation?: ReactNode;
   children: (pageBlocks: PublicLessonBlock[] | undefined, last: boolean) => ReactNode;
 }) {
   const pages = useMemo(() => enabled && document ? lessonReadingPages(document.blocks) : [], [document, enabled]);
@@ -24,7 +42,7 @@ export function LessonPages({ document, enabled, busy, positionKey, children }: 
     catch { return 0; }
   });
   const position = useRef<HTMLParagraphElement>(null);
-  if (!pages.length) return children(undefined, true);
+  if (!pages.length) return <>{children(undefined, true)}{enabled && continuation}</>;
   const page = Math.min(index, pages.length - 1);
   const last = page === pages.length - 1;
   function move(next: number) {
@@ -40,9 +58,10 @@ export function LessonPages({ document, enabled, busy, positionKey, children }: 
     </select></label>}
     <progress aria-label="수업 페이지" value={page + 1} max={pages.length} />
     {children(pages[page], last)}
-    {pages.length > 1 && <nav aria-label="수업 페이지 이동">
-      <button type="button" className="btn" disabled={!page || busy} onClick={() => move(page - 1)}>이전 페이지</button>
+    {(pages.length > 1 || continuation) && <nav aria-label="수업 페이지 이동">
+      {pages.length > 1 && <button type="button" className="btn" disabled={!page || busy} onClick={() => move(page - 1)}>이전 페이지</button>}
       {!last && <button type="button" className="btn primary" disabled={busy} onClick={() => move(page + 1)}>다음 페이지</button>}
+      {last && continuation}
     </nav>}
   </div>;
 }

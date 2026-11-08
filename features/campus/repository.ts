@@ -1,3 +1,4 @@
+import { cohortReaderEnabled } from './cohort-reader';
 import type { createClient } from '@/lib/supabase/server';
 import type { Row } from '@/lib/platform';
 import { hasLearningAccess } from '@/lib/platform-rules';
@@ -31,10 +32,11 @@ export async function loadCampusSnapshot(db: Database, viewer: { id: string; ful
   // Publication overrides intentionally have no student SELECT grant. Only read
   // this verified owner's cohort with the server client; content stays under RLS.
   const visibilityDb=await getVisibilityDb();
-  const [allWeeks,weekVisibility,lessonVisibility]=await Promise.all([
+  const [allWeeks,weekVisibility,lessonVisibility,guidedLessons]=await Promise.all([
     rows(db.from('curriculum_weeks').select('id,course_id,week_number,is_published,archived_at',{count:'exact'}).eq('course_id',scope.courseId).eq('is_published',true).is('archived_at',null).limit(500)),
     rows(visibilityDb.from('edu_cohort_week_visibility').select('cohort_id,week_id,is_published',{count:'exact'}).eq('cohort_id',scope.cohortId).limit(500)),
     rows(visibilityDb.from('edu_cohort_lesson_visibility').select('cohort_id,lesson_id,is_published',{count:'exact'}).eq('cohort_id',scope.cohortId).limit(500)),
+    cohortReaderEnabled(visibilityDb, scope.cohortId),
   ]);
   const visibility={curriculum_weeks:allWeeks,edu_cohort_week_visibility:weekVisibility,edu_cohort_lesson_visibility:lessonVisibility};
   const weeks=allWeeks.filter(w=>cohortWeekVisible(visibility,scope.cohortId,w));
@@ -51,5 +53,5 @@ export async function loadCampusSnapshot(db: Database, viewer: { id: string; ful
   const submissions = missions.length ? await rows(db.from('mission_submissions')
     .select('id,enrollment_id,mission_id,attempt_number,status', { count: 'exact' })
     .eq('enrollment_id', scope.enrollmentId).in('mission_id', missions.map(m => m.id)).limit(1000)) : [];
-  return campusSnapshot({ viewer, scopes, enrollmentId, weeks, lessons, missions, submissions, progress, now });
+  return { ...campusSnapshot({ viewer, scopes, enrollmentId, weeks, lessons, missions, submissions, progress, now }), guidedLessons };
 }
