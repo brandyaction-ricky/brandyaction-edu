@@ -1,10 +1,12 @@
+import { LESSON_BODY_PREFIX, parseLessonDocument } from './lesson-body';
 import type { PublicLessonBlock } from './lesson-blocks';
 import { lessonEmbeddedImageIds } from './lesson-toggle-images';
 import { lessonImageRows } from './lesson-image-row';
 
 // Cohorts 3, 4 and 5 share one authored lesson. The private DEV mirror
 // preserves its block identities; the normal classroom does not paginate.
-const moonshotDayOne: readonly (readonly [string, string])[] = [
+type StepPlan = readonly (readonly [blockId: string, label: string, heading?: string])[];
+const moonshotDayOne: StepPlan = [
     ['4c84becb-6361-4cc4-96cc-8a71329d2c13', '10초 답변 조교 사용법 살펴보기'],
     ['85232adb-66b5-4d7a-a038-429f5f288f15', '클로드에 답변 조교 연결하기'],
     ['ffd51bb2-8a9f-43e6-90b3-e38b1fd301e8', '막힌 화면을 캡처해 질문하기'],
@@ -39,7 +41,37 @@ const moonshotDayTwo: typeof moonshotDayOne = [
     ['11ceba21-9eca-476a-921c-f1a6bb04646d', '쪽지시험으로 오늘 배운 내용 확인하기'],
     ['d17e0741-f644-411f-8e17-73da31f77369', '체크리스트로 2일차 마무리하기'],
 ];
-const plans: Record<string, typeof moonshotDayOne> = {
+const moonshotDayThree: StepPlan = [
+    ['fa08ab0d-f423-4fc1-a5de-41acc7ec299c', '오늘의 목표와 질문 방법 확인하기'],
+    ['d3-native-004', '볼트의 다섯 폴더와 메모 흐름 이해하기'],
+    ['3edc70d8-d705-4529-ac08-6785c3517708', '텔레그램과 작업할 PC 준비하기'],
+    ['49640b1d-a7bb-41d1-8d8c-e83212d797f8', '어사이드에서 텔레그램 웹 열기'],
+    ['a10cbcec-99c0-409a-86f2-e4bdc5ed3c15', 'QR 코드로 텔레그램 로그인하기'],
+    ['be31d44d-e6ee-4ef1-a467-215286be37f4', '전화번호로 텔레그램 로그인하기'],
+    ['061ae060-64f2-4249-8682-74457c30246f', '작업 폴더를 지정해 제2의 뇌 프로젝트 만들기'],
+    ['f3d0844f-e084-4733-bdcd-6905cd17c5b5', '텔레그램 채널 설정 시작하기'],
+    ['6f30c04b-59c1-4ac1-8904-f1b5a3e24b10', '봇 이름과 프로젝트를 정하고 연결 확인하기'],
+    ['e9fe140e-6591-45e5-af3e-2693c50b5c37', '내 봇에게 첫 인사를 보내고 답장 확인하기'],
+    ['eaaadfe5-b609-4cf4-acdb-40722c90f75d', '연결 실패 화면으로 도움 요청하기'],
+    ['91c54abf-447a-424a-8584-e289a4ad3ded', '제2의 뇌 정리 규칙 저장하기'],
+    ['1f2ff803-b98a-4fac-9c4b-e652e812ff35', '새 대화에서 정리 규칙이 작동하는지 확인하기'],
+    ['514e95b3-2c7c-4a12-834e-892a7b041aa5', '봇에게 볼트를 준비시키고 폴더 확인하기'],
+    ['165e8b96-7008-4b94-9008-770228c161c5', 'N6 결과 파일 내려받기'],
+    ['850d77f7-32fa-46a1-af19-80f17f68b555', '내 봇에 N6 파일을 보내고 원본 저장 확인하기'],
+    ['c4cb99bc-a096-45f2-b0b9-837fb23808b4', '저장된 자료를 읽기 전용으로 점검하기'],
+    ['a41cdf12-8fbb-499b-bfc3-130aa08265de', '점검 결과를 읽고 해결할 항목 정리하기'],
+    ['d3-native-037', '내 말로 노트 두 개를 고쳐 확정하기'],
+    ['9852996a-49d8-4066-b441-17e9068b0740', '봇에 링크를 보내고 정리된 메모 확인하기'],
+    ['9852996a-49d8-4066-b441-17e9068b0740', '아이디어를 보내고 저장 위치 확인하기', '② 아이디어 보내기'],
+    ['9852996a-49d8-4066-b441-17e9068b0740', '회의록을 보내고 원문과 결정 사항 구분하기', '③ 회의록 보내기'],
+    ['9852996a-49d8-4066-b441-17e9068b0740', '밖에서도 봇이 답할 수 있는지 확인하기', '오늘 마지막으로 확인하세요.'],
+    ['0cfe88b2-b7db-473b-a134-cace50a6d3aa', '내 상황에 맞춰 봇 연결 문제 점검하기'],
+    ['389cd4e1-8c36-454a-a6d3-2a29c692c94a', '보관한 어사이드 프로젝트 복구하기', '만약 어사이드 프로젝트가 보관(Archived) 되었다면?'],
+    ['d3-native-046', '쪽지시험과 체크리스트로 3일차 마무리하기'],
+];
+const plans: Record<string, StepPlan> = {
+  'f5043754-4e32-493a-9f6c-666734d0c5fa': moonshotDayThree,
+  '64e388ae-89e1-42fb-bac0-0a723e7b5c4c': moonshotDayThree,
   'b892a49e-1fe9-4094-89c0-144b9a0a27c0': moonshotDayTwo,
   '93b4bfe4-52fc-45d9-ae25-b890d4d23a80': moonshotDayTwo,
   'aeca0139-a836-436b-ae76-dd429952c7fa': moonshotDayOne,
@@ -51,9 +83,28 @@ export function practiceSteps(lessonId: string | undefined, blocks: PublicLesson
   if (!plan) return null;
   const embedded = lessonEmbeddedImageIds(blocks);
   const rows = lessonImageRows(blocks.filter(b => !embedded.has(b.id)));
-  const starts = plan.map(([id]) => rows.findIndex(row => row[0].id === id));
-  // A deleted/moved anchor or a new image row across a boundary invalidates
-  // the plan. Fall back to normal pagination without dropping any new content.
+  // A reviewed boundary can be inside a rich text block. Split only at an
+  // intact, uniquely identified heading; keep embedded media and lists whole.
+  const units: {id: string; heading?: string; blocks: PublicLessonBlock[]}[] = [];
+  for (const row of rows) {
+    const block = row[0];
+    const breaks = plan.flatMap(([id,,heading]) => id === block.id && heading ? [heading] : []);
+    if (!breaks.length) { units.push({id:block.id, blocks:row}); continue; }
+    const doc = block.type === 'text' && parseLessonDocument(block.content || '');
+    if (!doc || !doc.content) return null;
+    const nodes = doc.content;
+    const cuts = [0];
+    for (const heading of breaks) {
+      const matches = nodes.flatMap((node,i) => node.type === 'heading' &&
+        node.content?.map(child => child.text || '').join('').trim() === heading ? [i] : []);
+      if (matches.length !== 1 || matches[0] <= cuts[cuts.length - 1]) return null;
+      cuts.push(matches[0]);
+    }
+    cuts.forEach((start,i) => units.push({id:block.id, heading:breaks[i-1], blocks:[{
+      ...block, content:LESSON_BODY_PREFIX + JSON.stringify({...doc, content:nodes.slice(start,cuts[i+1])}),
+    }]}));
+  }
+  const starts = plan.map(([id,,heading]) => units.findIndex(unit => unit.id === id && unit.heading === heading));
   if (starts.some((n,i) => n < 0 || (i > 0 && n <= starts[i-1]))) return null;
-  return plan.map(([,label], i) => ({label, blocks: rows.slice(i ? starts[i] : 0, starts[i+1]).flat()}));
+  return plan.map(([,label],i) => ({label, blocks:units.slice(i ? starts[i] : 0,starts[i+1]).flatMap(unit => unit.blocks)}));
 }
