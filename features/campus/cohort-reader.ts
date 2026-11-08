@@ -8,3 +8,5 @@ export async function cohortReaderEnabled(db: Pick<ReturnType<typeof createAdmin
   if (error) throw new Error('기수별 수강 방식을 확인하지 못했습니다.');
   return data?.[0]?.value?.enabled === true;
 }
+
+export const reviewCohortKey = (cohortId: string) => 'edu_campus_review_cohort_' + cohortId;

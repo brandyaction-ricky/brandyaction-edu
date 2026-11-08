@@ -266,3 +266,8 @@ export function AdminToast({ children, tone = 'neutral' }: { children: ReactNode
 export function AdminDialogBody(props: HTMLAttributes<HTMLDivElement>) { return <div {...props} className={classes('admin-dialog-body', 'adm-modal-body', props.className)}/>; }
 export function AdminDialogFooter(props: HTMLAttributes<HTMLElement>) { return <footer {...props} className={classes('admin-dialog-footer', 'adm-modal-foot', props.className)}/>; }
 export type AdminTableProps = TableHTMLAttributes<HTMLTableElement>;
+
+/** Labeled controls align at their lower edge; actions keep their natural width. */
+export function AdminControlRow({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return <div className={classes('admin-control-row', className)} {...props}/>;
+}

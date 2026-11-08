@@ -1,9 +1,21 @@
-.page { margin: 0 auto; max-width: 60rem; padding: 2rem clamp(1rem, 4vw, 3rem) 4rem; }
-.controls { display: grid; gap: 1.1rem; padding-block: 1.25rem; border-block-end: 1px solid #dbe2ea; }
-.row { display: flex; flex-wrap: wrap; gap: .65rem; align-items: end; }
-.field { display: grid; gap: .35rem; font-weight: 600; min-width: 0; }
-.field select { max-width: min(100%, 35rem); min-height: 2.75rem; }
-.row > button { width: auto; }
-.setting { display: grid; justify-items: start; gap: .75rem; margin-block: 1.5rem; padding: 1.1rem; border: 1px solid #dbe2ea; border-radius: .75rem; }
-.setting h2, .setting p { margin: 0; }
-.setting input { width: auto; }
+.shell { min-height:100%; background:#f7f8fa; color:#172438; }
+.page { box-sizing:border-box; width:100%; max-width:64rem; margin:0 auto; display:grid; gap:1.25rem; padding:clamp(1.1rem,3vw,2.25rem) clamp(1rem,3vw,2.5rem) 4rem; overflow-wrap:anywhere; }
+.page > *, .page form, .reader { min-width:0; }
+.page .back { justify-self:start; font-size:.875rem; font-weight:600; text-decoration:none; color:#485b72; }
+.panel { display:grid; gap:1rem; padding:clamp(1rem,2.7vw,1.75rem); border:1px solid #dbe2eb; border-radius:1rem; background:white; }
+.panel h2 { font-size:1.15rem; line-height:1.45; margin:0; color:#182941; }
+.panel h2 span, .lessonHead small { font-weight:700; color:#445b79; }
+.choices { display:flex; flex-wrap:wrap; gap:.5rem; }
+.choices a { box-sizing:border-box; display:inline-flex; align-items:center; min-height:44px; padding:.5rem .95rem; border:1px solid #cdd6e0; border-radius:.6rem; color:#33465c; font-weight:600; text-decoration:none; }
+.choices a[aria-current] { background:#edf3ff; border-color:#5278b8; color:#173d79; }
+.choices a:hover, .back:hover { text-decoration:underline; }
+.panel .note, .entry p, .setting p { margin:0; font-size:.92rem; line-height:1.6; color:#526376; }
+.notice { margin:0; border-left:3px solid #436f9e; padding:.5rem .85rem; }
+.entry, .lessonHead { display:grid; gap:.4rem; }
+.entry + .entry, .setting { border-top:1px solid #e3e7ee; padding-top:.85rem; }
+.setting summary { cursor:pointer; font-weight:600; color:#33465c; padding:.35rem 0; }
+.setting[open] > p { margin:.5rem 0 .8rem; }
+.reader { max-width:48rem; width:100%; justify-self:center; }
+.reader img { max-width:100%; }
+.reader :global(.lb-page-position) { font-variant-numeric:tabular-nums; }
+@media(max-width:600px){ .page {gap:.85rem;} .panel {border-radius:.75rem;} }
