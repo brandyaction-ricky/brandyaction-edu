@@ -1,10 +1,6 @@
 .curriculum-ai{display:grid;gap:24px;padding:24px;border:1px solid #e2e5e9;border-radius:18px;background:#fff;color:#24272d;font-size:16px;line-height:1.7;min-width:0}
 .curriculum-ai p,.curriculum-ai h3,.my-ai-conversations h3,.my-ai-conversations h4,.my-ai-conversations p{margin:0}
 .curriculum-ai .row{flex-wrap:wrap;gap:10px}
-.curriculum-ai .curriculum-ai-switch{display:flex;gap:4px;padding:4px;background:#f2f3f5;border-radius:12px}
-.curriculum-ai .curriculum-ai-switch .btn{flex:1;min-height:44px;padding:10px 12px;border:0;border-radius:9px;background:transparent;color:#626874;font-size:14px;line-height:1.5;box-shadow:none}
-.curriculum-ai .curriculum-ai-switch .btn[aria-pressed=true]{background:#fff;color:#af2430;box-shadow:0 1px 4px #20242a14;font-weight:700}
-.curriculum-ai .curriculum-ai-switch .btn:disabled{opacity:.5}
 .curriculum-ai-body:not([hidden]){display:grid;gap:20px;min-width:0}
 .curriculum-ai-context{display:grid;gap:5px;padding:14px 16px;border-radius:12px;background:#f7f8fa;overflow-wrap:anywhere}
 .curriculum-ai-context b{font-size:12px;font-weight:500;color:#69717e}
@@ -67,7 +63,6 @@
 /* Keep answer actions in normal flow, including in the narrow campus dialog. */
 .ai-answer-actions{display:flex;align-items:center;flex-wrap:wrap;gap:4px 16px;margin-top:6px}
 .ai-answer-actions button,.ai-answer-actions summary{display:inline-flex;align-items:center;gap:6px;min-height:44px;width:fit-content;max-width:100%;padding:6px 8px;border:0;border-radius:8px;background:transparent;color:#41536c;font:inherit;font-size:13px;line-height:1.4;cursor:pointer;text-align:left}
-.ai-answer-actions .ai-answer-mentor{background:#e9eff9;color:#234a7c;font-weight:650;padding-inline:12px}
 .ai-answer-actions svg{flex:none}.ai-answer-secondary{display:flex;align-items:flex-start;gap:6px;flex-wrap:wrap;min-width:0}
 .ai-answer-more summary{list-style:none}.ai-answer-more summary::-webkit-details-marker{display:none}
 .ai-answer-more[open]{flex-basis:100%}.ai-answer-options{display:grid;justify-items:start;gap:2px;border-left:2px solid #dce2eb;padding-left:8px}
@@ -75,3 +70,10 @@
 .ai-answer-actions .ai-answer-delete{color:#94434a}
 .ai-answer-actions :is(button,summary):hover{background:#e0e7f2}
 .ai-answer-actions button:disabled{opacity:.5;cursor:default}
+
+
+.ai-conversation-heading{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.ai-conversation-heading h3{font-size:18px;line-height:1.4}
+.ai-mode-link{border:0;padding:6px 2px;background:transparent;color:#536379;cursor:pointer;font:inherit;font-size:13px;min-height:40px;text-decoration:underline;text-underline-offset:3px}
+.ai-mode-link:disabled{opacity:.5}
+.curriculum-ai-composer button[type="submit"]{display:inline-flex;align-items:center;justify-content:center;gap:6px}

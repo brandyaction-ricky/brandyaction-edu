@@ -243,6 +243,11 @@ test('floating questions keep a lesson draft across closing and navigation and r
  }
  await page.screenshot({path:info.outputPath('floating-question.png')});
  await panel.getByRole('button',{name:'AI 답변 받기'}).click();
+ const log=panel.getByRole('log');
+ await expect(log).toContainText(answer.answer);
+ expect(await log.evaluate(e=>Boolean(e.compareDocumentPosition(e.closest('section')!.querySelector('textarea')!)&Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
+ await expect(panel.getByRole('button',{name:'멘토에게 이어서 질문'})).toBeHidden();
+ await panel.getByText('더보기',{exact:true}).last().click();
  await panel.getByRole('button',{name:'멘토에게 이어서 질문'}).click();
  const mentor=panel.getByRole('textbox',{name:'질문 내용'});
  await expect(mentor).toHaveValue(/고객 인터뷰에 대한 초안[\s\S]+AI 참고 답변/);
@@ -364,6 +369,7 @@ test('mentor handoff brings the saved image into a private draft and allows remo
  const h=await backend(page),files=await screenshotUpload(page);
  h.stored.push({...context,requestId:id,question:'캡처의 오류는 왜 생기나요?',imageId:id,imageName:'캡처.png',answer,status:'succeeded',createdAt:new Date().toISOString()});
  await page.goto('/curriculum-ai-test');
+ await page.getByText('더보기',{exact:true}).last().click();
  await page.getByRole('button',{name:'멘토에게 이어서 질문'}).click();
  await expect(page.getByRole('textbox',{name:'질문 내용'})).toHaveValue(/캡처의 오류/);
  await expect(page.getByText('이미지 준비 완료.',{exact:false})).toBeVisible();
