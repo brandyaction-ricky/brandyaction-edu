@@ -2,7 +2,7 @@ import { FourSpacesPreview } from '@/features/campus/tour/preview';
 import readerStyles from '@/features/campus/ui/lesson-task-panel.module.css';
 import { AdminButton, AdminCheckbox, AdminControlRow, AdminInput, AdminLinkButton, AdminPageHeader, AdminSelect } from '@/features/admin-ui/components/admin-system';
 import { LessonPicker } from './lesson-picker';
-import { cohortReaderEnabled, reviewCohortKey } from '@/features/campus/cohort-reader';
+import { cohortReaderEnabled, isReferenceCohort, reviewCohortKey } from '@/features/campus/cohort-reader';
 import { editReviewCohort, saveReaderSetting } from './reader-setting';
 import styles from './study.module.css';
 import Link from 'next/link';
@@ -22,7 +22,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ l
   if (!await getOperatorUser('products', user)) notFound();
   const db = createAdminClient();
   const { data, error } = await db.from('courses')
-    .select('id,title,status,cohorts(id,name,archived_at),curriculum_weeks(week_number,title,archived_at,is_published,curriculum_lessons(id,title,day_number,archived_at,is_published))')
+    .select('id,title,status,metadata,cohorts(id,name,archived_at),curriculum_weeks(week_number,title,archived_at,is_published,curriculum_lessons(id,title,day_number,archived_at,is_published))')
     .is('archived_at', null).order('title');
   if (error) throw error;
   const courses = data ?? [];
@@ -40,15 +40,17 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ l
   const selectedCohort = listed.find(c => c.id === cohort) ?? listed.find(c => !cohort && lesson &&
     courses.find(x => x.id === c.courseId)?.curriculum_weeks.some(w => w.curriculum_lessons.some(l => l.id === lesson))) ?? listed[0];
   const course = courses.find(c => c.id === selectedCohort?.courseId);
-  const previewDraft = course?.status === 'draft';
+  // An unlisted DEV copy can serve a student cohort and a separate staff preview.
+  const previewOnly = !!course && (course.status === 'draft' ||
+    isReferenceCohort(course.metadata, selectedCohort?.id));
   const weeks = (course?.curriculum_weeks ?? [])
-    .filter(week => !week.archived_at && (previewDraft || week.is_published))
+    .filter(week => !week.archived_at && (previewOnly || week.is_published))
     .sort((a, b) => a.week_number - b.week_number)
     .map(week => ({
       number: week.week_number,
       title: week.title,
       lessons: week.curriculum_lessons
-        .filter(item => !item.archived_at && (previewDraft || item.is_published))
+        .filter(item => !item.archived_at && (previewOnly || item.is_published))
         .sort((a, b) => a.day_number - b.day_number)
         .map(item => ({
           id: item.id,
@@ -128,7 +130,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ l
         <nav aria-label="검수 기수" className={styles.choices}>{listed.map(c =>
           <Link key={c.id} aria-current={selectedCohort?.id===c.id ? 'page' : undefined} href={path+'?cohort='+c.id}>{c.name}</Link>)}</nav>
         {!listed.length && <p>‘검수 목록 관리’에서 첫 기수를 추가하세요.</p>}
-        {selectedCohort && (course?.status !== 'published' ? <p className={styles.note}>관리자 전용 원문 미리보기 · 수강생에게 공개되지 않습니다.</p>
+        {selectedCohort && (previewOnly || course?.status !== 'published' ? <p className={styles.note}>관리자 전용 원문 미리보기 · 수강생에게 공개되지 않습니다.</p>
           : <details className={styles.setting}><summary>수강 방식 설정 · {enabled ? '캠퍼스 페이지 수업' : '기존 강의실'}</summary>
             <p>이 기수에만 적용됩니다. 주차별 공개 일정과 수강 권한은 기존 강의실 설정을 따릅니다.</p>
             {(enabled || selected) && <form action={saveReaderSetting}><input type="hidden" name="cohort" value={selectedCohort.id}/>

@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { getOperatorUser } from '@/lib/operator-permissions';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isCampusId } from '@/features/campus/snapshot';
-import { cohortReaderEnabled, cohortReaderKey, reviewCohortKey } from '@/features/campus/cohort-reader';
+import { cohortReaderEnabled, cohortReaderKey, isReferenceCohort, reviewCohortKey } from '@/features/campus/cohort-reader';
 
 export async function saveReaderSetting(form: FormData) {
   const operator = await getOperatorUser('products');
@@ -21,11 +21,11 @@ export async function saveReaderSetting(form: FormData) {
   const params = new URLSearchParams({ cohort: cohortId });
   if (mode === 'guided') {
     const [course, registered] = await Promise.all([
-      db.from('courses').select('id').eq('id', cohort.course_id).eq('status', 'published').is('archived_at', null).maybeSingle(),
+      db.from('courses').select('id,metadata').eq('id', cohort.course_id).eq('status', 'published').is('archived_at', null).maybeSingle(),
       db.from('site_settings').select('key').eq('key', reviewCohortKey(cohortId)).eq('is_public', false).maybeSingle(),
     ]);
     if (course.error || registered.error) throw course.error || registered.error;
-    if (!course.data || !registered.data) notFound();
+    if (!course.data || !registered.data || isReferenceCohort(course.data.metadata, cohortId)) notFound();
     const lesson = String(form.get('lesson') || '');
     if (!isCampusId(lesson) || form.get('reviewed') !== 'on') notFound();
     const review = await db.from('curriculum_lessons').select('id,curriculum_weeks!inner(course_id)')

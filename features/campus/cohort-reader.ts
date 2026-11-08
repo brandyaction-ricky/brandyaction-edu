@@ -10,3 +10,7 @@ export async function cohortReaderEnabled(db: Pick<ReturnType<typeof createAdmin
 }
 
 export const reviewCohortKey = (cohortId: string) => 'edu_campus_review_cohort_' + cohortId;
+
+export function isReferenceCohort(metadata: Record<string, unknown> | null, cohortId: string | undefined) {
+  return !!cohortId && metadata?.is_listed === false && metadata.campus_preview_cohort_id === cohortId;
+}
