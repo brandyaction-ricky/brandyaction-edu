@@ -23,6 +23,18 @@ export default async function Page({params,searchParams}:{params:Promise<{path?:
   || (root === 'payment' && ['success','fail'].includes(section) && path.length === 2)
   || isPolicyPath(path);
  if (!valid) notFound();
+ // Old bookmarks can still point to the login form with a campus destination.
+ if (root === 'login') {
+  const { next } = await searchParams;
+  if (typeof next === 'string') {
+   const { campusLoginReturn } = await import('@/lib/oauth-callback');
+   const destination = campusLoginReturn(next);
+   if (destination) {
+    const { getAuthenticatedUser } = await import('@/lib/server-auth');
+    if (await getAuthenticatedUser()) redirect(destination);
+   }
+  }
+ }
  if (root === 'admin' && section === 'metrics') redirect(metricsRedirect(await searchParams));
  // The admin API verifies identity, account status and section permissions once.
  // Stream the admin shell immediately instead of repeating Auth + profile queries.

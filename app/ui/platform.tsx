@@ -12,6 +12,7 @@ import { QuestionImage } from './final/question-image';
 import { QuestionThreadDialog } from './final/question-thread';
 import { LearningNoticeBar } from './final/learning-notice';
 import { disableDevicePush, synchronizePushAccount } from "@/lib/web-push-client";
+import { campusLoginReturn, campusReturnCookie } from '@/lib/oauth-callback';
 import { defaultPolicies } from "@/lib/legal-policies";
 import { createMutationGate } from "@/lib/mutation-gate";
 import { sectionScopes } from "@/lib/operator-scopes";
@@ -555,6 +556,9 @@ export function Platform({
           }
         } catch { /* Fall back to the existing Kakao login. */ }
       }
+      const campus = campusLoginReturn(next);
+      document.cookie = campusReturnCookie + '=' + encodeURIComponent(campus || '') +
+        '; Path=/; SameSite=Lax; Max-Age=' + (campus ? 600 : 0) + (location.protocol === 'https:' ? '; Secure' : '');
       const { error } = await createClient().auth.signInWithOAuth({
         provider,
         options: {
