@@ -28,7 +28,20 @@ const moonshotDayOne: readonly (readonly [string, string])[] = [
     ['5fb5908f-4469-4be4-9225-d7173098f60b', '커넥터와 스킬 구분하기'],
     ['b6476c98-3d39-49f0-88b1-c3a15a3434e8', 'AI 브라우저와 볼트 복습하기'],
 ];
+const moonshotDayTwo: typeof moonshotDayOne = [
+    ['59dcfd83-78a6-42cb-85da-0a2c87c03585', '필요한 경우 10초 답변 조교 연결하기'],
+    ['c23afc6f-34bc-48af-907a-201d05b40292', '오늘의 목표와 AI에게 알려줄 맥락 이해하기'],
+    ['a33126c7-e2b7-4090-a435-6215830ca3a6', '클로드에 첫 질문을 보내고 답변 캡처하기'],
+    ['facb487e-0f6b-4372-b273-f1228f04f965', '예시로 나의 직과 업 구분하기'],
+    ['40c7cc11-b1cb-4146-916a-3a7d7bea23db', 'N6 진단의 목적과 방법 알아보기'],
+    ['b408a8e6-ee86-47bb-ad81-9e0bf1cb89be', 'N6 진단을 시작하고 답변 제출하기'],
+    ['4b97e8e6-2e5b-4358-a3a8-c1ad9c05ef73', '결과 파일 안내 확인하고 검사 완료 기록하기'],
+    ['11ceba21-9eca-476a-921c-f1a6bb04646d', '쪽지시험으로 오늘 배운 내용 확인하기'],
+    ['d17e0741-f644-411f-8e17-73da31f77369', '체크리스트로 2일차 마무리하기'],
+];
 const plans: Record<string, typeof moonshotDayOne> = {
+  'b892a49e-1fe9-4094-89c0-144b9a0a27c0': moonshotDayTwo,
+  '93b4bfe4-52fc-45d9-ae25-b890d4d23a80': moonshotDayTwo,
   'aeca0139-a836-436b-ae76-dd429952c7fa': moonshotDayOne,
   'cfe15c08-4dec-465f-92e2-c1cbce2728d3': moonshotDayOne,
 };
