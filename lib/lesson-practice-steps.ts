@@ -2,10 +2,9 @@ import type { PublicLessonBlock } from './lesson-blocks';
 import { lessonEmbeddedImageIds } from './lesson-toggle-images';
 import { lessonImageRows } from './lesson-image-row';
 
-// Reviewed starts in the DEV copy of cohort 5, week 1 day 1. Keep source blocks,
-// answers, and asset references live; do not apply to other editions by title.
-const plans: Record<string, readonly (readonly [string, string])[]> = {
-  'cfe15c08-4dec-465f-92e2-c1cbce2728d3': [
+// Cohorts 3, 4 and 5 share one authored lesson. The private DEV mirror
+// preserves its block identities; the normal classroom does not paginate.
+const moonshotDayOne: readonly (readonly [string, string])[] = [
     ['4c84becb-6361-4cc4-96cc-8a71329d2c13', '10초 답변 조교 사용법 살펴보기'],
     ['85232adb-66b5-4d7a-a038-429f5f288f15', '클로드에 답변 조교 연결하기'],
     ['ffd51bb2-8a9f-43e6-90b3-e38b1fd301e8', '막힌 화면을 캡처해 질문하기'],
@@ -28,7 +27,10 @@ const plans: Record<string, readonly (readonly [string, string])[]> = {
     ['fb23fc28-d72e-4b10-a820-54d15bcb18e1', '프로젝트와 코워크 구분하기'],
     ['5fb5908f-4469-4be4-9225-d7173098f60b', '커넥터와 스킬 구분하기'],
     ['b6476c98-3d39-49f0-88b1-c3a15a3434e8', 'AI 브라우저와 볼트 복습하기'],
-  ],
+];
+const plans: Record<string, typeof moonshotDayOne> = {
+  'aeca0139-a836-436b-ae76-dd429952c7fa': moonshotDayOne,
+  'cfe15c08-4dec-465f-92e2-c1cbce2728d3': moonshotDayOne,
 };
 
 export function practiceSteps(lessonId: string | undefined, blocks: PublicLessonBlock[]) {

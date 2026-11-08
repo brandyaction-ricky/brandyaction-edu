@@ -63,3 +63,15 @@
 .question-entry{display:grid;gap:16px}.question-entry select{width:100%;max-width:100%;font-size:16px}.question-entry .row{flex-wrap:wrap}
 .ai-usage-table{overflow:auto}.ai-usage-table table{width:100%;border-collapse:collapse;min-width:720px}.ai-usage-table th,.ai-usage-table td{padding:12px;text-align:left;border-bottom:1px solid #e2e5e9}.ai-usage-table caption{text-align:left;padding:12px 0}
 @media(max-width:600px){.curriculum-ai{padding:16px;gap:20px;border-radius:14px}.curriculum-ai-body:not([hidden]){gap:16px}.curriculum-ai-turn{padding:16px;gap:10px}.curriculum-ai-turn.user{width:96%}.curriculum-ai-turn p{font-size:15px}.curriculum-ai-toolbar{align-items:flex-start}.curriculum-ai .curriculum-ai-toolbar .btn{padding:8px;font-size:11px;min-height:40px}.curriculum-ai-toolbar h3{font-size:15px}.curriculum-ai-toolbar p{font-size:12px}.curriculum-ai form.curriculum-ai-composer{padding:14px;gap:12px}.my-ai-card{padding:16px}.my-ai-card h4{font-size:15px}.my-ai-card .btn{justify-self:stretch;justify-content:space-between}.curriculum-ai-attachment img{max-height:160px!important}}
+
+/* Keep answer actions in normal flow, including in the narrow campus dialog. */
+.ai-answer-actions{display:flex;align-items:center;flex-wrap:wrap;gap:4px 16px;margin-top:6px}
+.ai-answer-actions button,.ai-answer-actions summary{display:inline-flex;align-items:center;gap:6px;min-height:44px;width:fit-content;max-width:100%;padding:6px 8px;border:0;border-radius:8px;background:transparent;color:#41536c;font:inherit;font-size:13px;line-height:1.4;cursor:pointer;text-align:left}
+.ai-answer-actions .ai-answer-mentor{background:#e9eff9;color:#234a7c;font-weight:650;padding-inline:12px}
+.ai-answer-actions svg{flex:none}.ai-answer-secondary{display:flex;align-items:flex-start;gap:6px;flex-wrap:wrap;min-width:0}
+.ai-answer-more summary{list-style:none}.ai-answer-more summary::-webkit-details-marker{display:none}
+.ai-answer-more[open]{flex-basis:100%}.ai-answer-options{display:grid;justify-items:start;gap:2px;border-left:2px solid #dce2eb;padding-left:8px}
+.ai-answer-actions [aria-pressed="true"]{font-weight:700;background:#e6eef7}
+.ai-answer-actions .ai-answer-delete{color:#94434a}
+.ai-answer-actions :is(button,summary):hover{background:#e0e7f2}
+.ai-answer-actions button:disabled{opacity:.5;cursor:default}

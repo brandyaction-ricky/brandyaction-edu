@@ -178,10 +178,15 @@ test('a learner can rate or remove their saved AI exchange',async({page})=>{
  await page.goto('/curriculum-ai-test');
  await page.getByRole('textbox',{name:'궁금한 점'}).fill('평가와 삭제를 시험할 질문');
  await page.getByRole('button',{name:'AI 답변 받기'}).click();
- const helpful=page.getByRole('button',{name:'도움이 됐어요'});
+ const tools=page.getByRole('group',{name:'답변 도구'}).last();
+ const more=tools.getByText('더보기',{exact:true});
+ const helpful=tools.getByRole('button',{name:'도움이 됐어요'});
+ await expect(helpful).toBeHidden();
+ await more.click();
  await helpful.click();
  await expect(helpful).toHaveAttribute('aria-pressed','true');
  await page.reload();
+ await more.click();
  await expect(helpful).toHaveAttribute('aria-pressed','true');
  const incorrect=page.getByRole('button',{name:'잘못된 답변 · 멘토에게 확인'});
  await incorrect.click();
@@ -189,6 +194,7 @@ test('a learner can rate or remove their saved AI exchange',async({page})=>{
  await expect(page.getByText('답변 평가를 저장했어요.')).toBeVisible();
  expect(h.questions).toHaveLength(0);
  await page.reload();
+ await more.click();
  await expect(incorrect).toHaveAttribute('aria-pressed','true');
  await expect(helpful).toHaveAttribute('aria-pressed','false');
  page.once('dialog',dialog=>dialog.accept());
