@@ -89,7 +89,7 @@ export function MarketingWorkspaceNav({ current, available, search = "", prefetc
   const inquiryHref = `${conversionHref}${conversionHref.includes('?') ? '&' : '?'}view=inquiries`;
 
   return <section className="marketing-workspace" aria-label="마케팅·전환 작업 공간">
-    <div className="marketing-workspace-heading"><strong>마케팅·전환</strong><span>모집부터 안내까지</span></div>
+    <div className="marketing-workspace-heading"><strong>마케팅·전환</strong><span>관련 메뉴 빠른 이동</span></div>
     {selectedRecruitment && <p>선택한 모집 <strong>{selectedRecruitment}</strong></p>}
     <nav className="marketing-task-nav" aria-label="마케팅 작업 빠른 이동">
       {[

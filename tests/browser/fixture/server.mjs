@@ -55,6 +55,18 @@ const server = createServer((request,response)=>{
     let raw='';request.on('data',chunk=>raw+=chunk);request.on('end',()=>{try{const body=JSON.parse(raw);response.setHeader('Content-Type','application/json');if(body.action==='event-benefits')response.end(JSON.stringify({quote:null}));else response.writeHead(400).end(JSON.stringify({error:'Synthetic coupon quote requires an explicit test response'}));}catch{response.writeHead(400).end('{}');}});return;
   }
   if(request.method!=='GET'){response.writeHead(405).end();return;}
+  if(url.pathname==='/api/admin/diagnosis'){
+    response.setHeader('Content-Type','application/json');
+    response.end(JSON.stringify({enabled:true,allPublished:false,revision:0,eligibleCount:1,startedCount:0,nextCursor:null,remoteAvailable:true,rows:[{id:'00000000-0000-4000-8000-000000000001',name:'합성 수강생',published:false,attemptId:null,state:'not_started',report:null,statusAvailable:true}]}));return;
+  }
+  if(url.pathname==='/api/conversion'){
+    response.setHeader('Content-Type','application/json');
+    response.end(JSON.stringify({cases:[],evidence:[],questions:[],courses:[],cohorts:[],runs:[],reviews:[],capabilities:{can_manage_evidence:false,can_mock:false}}));return;
+  }
+  if(url.pathname==='/api/platform/workflows'&&url.searchParams.get('kind')==='analytics'){
+    response.setHeader('Content-Type','application/json');
+    response.end(JSON.stringify({visitors:120,events:180,paidOrders:3,revenue:30000,stages:{application_click:24},paths:[{id:'synthetic-path',path:'/classes/synthetic-course',visitors:30,events:45}]}));return;
+  }
   if(url.pathname==='/synthetic-auth/session'){response.setHeader('Content-Type','application/json');response.end('{}');return;}
   if(url.pathname==='/api/platform'&&url.searchParams.get('part')==='curriculum'){
     response.setHeader('Content-Type','application/json');

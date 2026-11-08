@@ -129,6 +129,25 @@
 .onboarding-delivery-guide li p { margin: 5px 0 0; font-size: 13px; line-height: 1.75; color: #535c67; overflow-wrap: anywhere; }
 .onboarding-delivery-guide .onboarding-delivery-guide-note { margin: 20px 0 0; padding: 12px; border-radius: 8px; background: #f6f7f8; font-size: 12px; line-height: 1.75; color: #535c67; }
 .purchase-onboarding-admin .onboarding-delivery-guide .onboarding-delivery-guide-toggle { display: none; }
+.adm.purchase-onboarding-admin .onboarding-panel,
+.adm.purchase-onboarding-admin .onboarding-delivery-guide {
+  padding:var(--adm-space-5);border-color:var(--adm-border);border-radius:var(--adm-radius-lg);
+  background:var(--adm-surface);box-shadow:none;
+}
+.adm.purchase-onboarding-admin .onboarding-panel h2 { margin:0 0 var(--adm-space-3); }
+.adm.purchase-onboarding-admin .onboarding-panel p { color:var(--adm-text-sub); }
+.adm.purchase-onboarding-admin .onboarding-admin-fields { gap:var(--adm-space-4); }
+.adm.purchase-onboarding-admin .onboarding-admin-fields > label { font-weight:600; }
+.adm.purchase-onboarding-admin .onboarding-admin-fields small { font-size:var(--adm-font-12);font-weight:400;color:var(--adm-text-sub); }
+.adm.purchase-onboarding-admin .onboarding-actions { gap:var(--adm-space-2); }
+.adm.purchase-onboarding-admin .onboarding-footer { flex-wrap:wrap;gap:var(--adm-space-4);font-size:var(--adm-font-13); }
+.adm.purchase-onboarding-admin .onboarding-footer a { display:inline-flex;align-items:center;min-height:var(--adm-control); }
+.adm.purchase-onboarding-admin .onboarding-delivery-guide li::before { background:var(--adm-primary-soft);color:var(--adm-primary-hover); }
+.adm.purchase-onboarding-admin .onboarding-delivery-guide .onboarding-delivery-guide-note { background:var(--adm-surface-subtle);color:var(--adm-text-sub); }
+@media (max-width:720px) {
+  .adm.purchase-onboarding-admin .onboarding-panel,
+  .adm.purchase-onboarding-admin .onboarding-delivery-guide { padding:var(--adm-space-4); }
+}
 @media (max-width: 1100px) {
   .purchase-onboarding-admin .wrap { max-width: 740px; }
   .onboarding-delivery-layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "guide" "form"; gap: 16px; }

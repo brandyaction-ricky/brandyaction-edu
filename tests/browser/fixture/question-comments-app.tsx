@@ -1,3 +1,4 @@
+import { AdminAllMenusFixture } from './admin-all-menus';
 import { StrictMode, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AdminCatalog } from '../../../app/ui/final/admin-catalog';
@@ -24,4 +25,4 @@ function Fixture() {
     {active && <QuestionThreadDialog questionId={String(active.id)} close={() => setActive(null)} changed={() => setRevision(value => value + 1)}/>}
   </main>;
 }
-createRoot(document.getElementById('root')!).render(<StrictMode><Fixture/></StrictMode>);
+createRoot(document.getElementById('root')!).render(<StrictMode>{new URLSearchParams(location.search).has('menu') ? <AdminAllMenusFixture/> : <Fixture/>}</StrictMode>);

@@ -83,10 +83,50 @@ test('save failure is visible in red near save and a successful retry enables th
  await page.goto('/webinar-admin');await page.getByRole('button',{name:'새 행사 만들기'}).click();
  await page.getByLabel('행사 주소',{exact:false}).fill('moonshot-error-qa');await page.getByLabel('연결할 교육 기수').selectOption(cohort);await page.getByLabel('공개 상태').selectOption('published');await page.getByLabel('카카오 채널 상담 주소').fill('http://pf.kakao.com/_moonshot/chat');
  await page.getByRole('button',{name:'설정 저장',exact:true}).click();
- const alert=page.getByRole('alert');await expect(alert).toContainText('https://pf.kakao.com/');await expect(alert).toHaveCSS('color','rgb(180, 35, 24)');await expect(alert).toBeFocused();await expect(alert).toBeInViewport();
+ const alert=page.getByRole('alert');await expect(alert).toContainText('https://pf.kakao.com/');await expect(alert).toHaveCSS('color','rgb(167, 25, 34)');await expect(alert).toBeFocused();await expect(alert).toBeInViewport();
  await expect(page.getByRole('button',{name:'웨비나 참여자용 링크 복사'})).toHaveCount(0);
  reject=false;await page.getByLabel('카카오 채널 상담 주소').fill('https://pf.kakao.com/_moonshot/chat');await page.getByRole('button',{name:'설정 저장',exact:true}).click();
  await expect(alert).toHaveCount(0);await expect(page.getByRole('status')).toContainText('저장했습니다.');await page.getByRole('navigation',{name:'관리 항목'}).getByRole('button',{name:'입장 링크',exact:true}).click();await expect(page.getByRole('button',{name:'웨비나 참여자용 링크 복사'})).toBeVisible();
  await page.getByRole('navigation',{name:'관리 항목'}).getByRole('button',{name:'문샷 자료실',exact:true}).click();await page.getByRole('button',{name:'+ 자료 추가',exact:true}).click();await page.getByLabel('파일 업로드').setInputFiles({name:'blocked.exe',mimeType:'application/octet-stream',buffer:Buffer.from('qa')});
- await expect(page.getByRole('alert')).toBeVisible();await expect(page.getByRole('alert')).toHaveCSS('color','rgb(180, 35, 24)');
+ await expect(page.getByRole('alert')).toBeVisible();await expect(page.getByRole('alert')).toHaveCSS('color','rgb(167, 25, 34)');
+});
+
+test('standalone webinar admin uses shared styles across every section without writes', async ({page,isMobile})=>{
+ let writes=0;
+ await page.route('**/api/admin/campus/webinars*',r=>{if(r.request().method()!=='GET')writes++;return r.fulfill({json:{events:[],cohorts:[]}});});
+ await page.goto('/webinar-admin');await page.getByRole('button',{name:'새 행사 만들기'}).click();
+ for(const width of isMobile?[390,320]:[1440,834]){
+  await page.setViewportSize({width,height:900});
+  await expect(page.getByRole('heading',{level:1})).toHaveCSS('font-size','20px');
+  await expect(page.getByRole('button',{name:'설정 저장',exact:true})).toHaveCSS('background-color','rgb(201, 35, 45)');
+  for(const name of ['입장 링크','문샷 라이브홀','문샷 자료실','문샷 웰컴 존','문샷 공부방','내 AI 사무실','행사 설정']){
+   const tab=page.getByRole('navigation',{name:'관리 항목'}).getByRole('button',{name,exact:true});await tab.click();
+   await expect(tab).toHaveCSS('background-color','rgb(255, 240, 241)');
+   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),name+' fits '+width).toBeTruthy();
+   if(isMobile)expect((await tab.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  }
+  if(isMobile){const lastField=page.getByLabel('공간 분위기 · 안내 캐릭터');const fieldBox=(await lastField.boundingBox())!,saveBox=(await page.getByRole('button',{name:'설정 저장',exact:true}).boundingBox())!;expect(saveBox.y).toBeGreaterThan(fieldBox.y+fieldBox.height);}
+  await page.screenshot({path:test.info().outputPath('webinar-settings-'+width+'.png'),fullPage:true});
+ }
+ expect(writes).toBe(0);
+});
+
+test('admin event list and empty selection share the neutral admin layout without writes', async ({page,isMobile},info)=>{
+ const writes:string[]=[];
+ await page.route('**/api/admin/campus/webinars*',r=>{
+  if(r.request().method()!=='GET')writes.push(r.request().url());
+  return r.fulfill({json:{events:[1,2,3].map(n=>({slug:'synthetic-campus-'+n,title:'합성 행사 '+n+' · AI 실무 자동화 공개 강의와 학습 공간',description:'합성 검수 행사',status:n===1?'published':'draft',startsAt:'2026-11-07T10:00:00Z',endsAt:'2026-11-07T12:00:00Z',cohortId:'00000000-0000-4000-8000-000000000001',detailPath:'/classes/synthetic-course',kakaoUrl:'',youtubeId:'',revision:'00000000-0000-4000-8000-000000000002'})),cohorts:[]}});
+ });
+ await page.goto('/webinar-admin');
+ await expect(page.getByRole('heading',{name:'관리할 행사를 선택하세요.'})).toBeVisible();
+ await expect(page.getByRole('button',{name:/합성 행사/})).toHaveCount(3);
+ for(const width of isMobile?[390,320]:[1440,2560]){
+  await page.setViewportSize({width,height:isMobile?844:1247});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+  await page.screenshot({path:info.outputPath(`campus-${width}.png`),fullPage:true});
+ }
+ await page.getByRole('button',{name:/합성 행사 2/}).click();
+ await expect(page.getByRole('navigation',{name:'관리 항목'})).toBeVisible();
+ await expect(page.getByRole('button',{name:/합성 행사 2/})).toHaveAttribute('aria-pressed','true');
+ expect(writes).toEqual([]);
 });

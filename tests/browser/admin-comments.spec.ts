@@ -57,7 +57,7 @@ test('all 85 questions and the full selected body remain reachable without clipp
   const bounds = await last.boundingBox(), container = await list.boundingBox();
   expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(container!.y + container!.height + 1);
   await last.press('Enter');
-  await expect(detail.getByRole('heading')).toContainText('85번째 질문');
+  await expect(detail.getByRole('heading', { level: 2 })).toContainText('85번째 질문');
   if (viewport!.width > 900) {
     expect(await list.evaluate(element => getComputedStyle(element).overflowY)).toBe('auto');
     expect(await detail.evaluate(element => getComputedStyle(element).overflowY)).toBe('auto');
@@ -101,7 +101,7 @@ test('marketing navigation keeps all destinations, help and active state in a re
   await page.route('**/api/conversion', route => route.fulfill({ json: { cases: [], evidence: [], questions: [], courses: [], cohorts: [], runs: [], reviews: [], capabilities: { can_manage_evidence: false, can_mock: false } } }));
   await page.goto(visit('conversion'));
   const nav = page.getByRole('navigation', { name: '마케팅 작업 빠른 이동' });
-  await expect(nav.getByRole('link')).toHaveCount(8);
+  await expect(nav.getByRole('link')).toHaveCount(9);
   await expect(nav.getByRole('link', { name: '모집·문의 검토' })).toHaveAttribute('aria-current', 'page');
   const groups = page.locator('.marketing-task-group');
   await expect(groups).toHaveCount(3);

@@ -472,3 +472,20 @@ test('admin cross-page returns preserve the previous filter and reject an extern
   await page.goto('/admin/templates?returnTo=%2F%2Fexternal.example&navigationFixture=1&careNavigationFixture=1&returnNavigationFixture=1');
   await expect(page.getByRole('link', { name: /캠페인 발송으로/ })).toHaveAttribute('href', '/admin/campaigns');
 });
+
+test('standalone purchase admin keeps shared styles and guide layout without writes',async({page,isMobile})=>{
+ let writes=0;
+ await page.route('**/api/admin/purchase-onboarding/delivery*',r=>{if(r.request().method()!=='GET')writes++;return r.fulfill({json:{buyers:[],channels:{},templates:[],history:[]}});});
+ await page.route(/\/api\/admin\/purchase-onboarding(?:\?|$)/,r=>{if(r.request().method()!=='GET')writes++;return r.fulfill({json:new URL(r.request().url()).searchParams.has('cohort')?{settings:null}:{cohorts:[{id:cohort,name:'가상 QA 기수',courses:{title:'문샷 챌린지'}}]}});});
+ await page.goto('/admin/purchase-onboarding-test');await page.getByLabel('안내할 기수').selectOption(cohort);
+ for(const width of isMobile?[390,320]:[page.viewportSize()!.width]){
+  await page.setViewportSize({width,height:900});
+  await expect(page.getByRole('heading',{level:1})).toHaveCSS('font-size','20px');
+  const save=page.locator('#completion-settings').getByRole('button',{name:'설정 저장'});
+  await expect(save).toHaveCSS('background-color','rgb(201, 35, 45)');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBeTruthy();
+  if(isMobile)expect((await save.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await page.screenshot({path:test.info().outputPath('purchase-settings-'+width+'.png'),fullPage:true});
+ }
+ expect(writes).toBe(0);
+});

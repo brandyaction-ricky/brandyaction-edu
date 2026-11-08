@@ -955,11 +955,14 @@ export function AdminCatalog({
                     </AdminButton>
                   </div>
                   <div className="panel-body">
-                    {Boolean(q.learning_context) && <p className="meta">학습 위치: {t(q, "learning_context")}</p>}
-                    <p className="reading-copy">{t(q, "content")}</p>
-                    <QuestionImage key={String(q.image_id || q.id)} questionId={String(q.id)} imageId={q.image_id}/>
+                    {Boolean(q.learning_context) && <div className="question-learning-context"><span>학습 위치</span><p>{t(q, "learning_context")}</p></div>}
+                    <section className="question-original" aria-label="질문 내용">
+                      <h3>질문 내용</h3>
+                      <p className="reading-copy">{t(q, "content")}</p>
+                      <QuestionImage key={String(q.image_id || q.id)} questionId={String(q.id)} imageId={q.image_id}/>
+                    </section>
                     {process.env.NEXT_PUBLIC_EDU_QUESTION_THREADS_ENABLED === 'true' ? (
-                      <section className="mt24" aria-label="후속 질문과 답변 댓글">
+                      <section className="question-conversation" aria-label="후속 질문과 답변 댓글">
                         <h3>후속 질문 · 답변</h3>
                         <QuestionAnswerHistory
                           questionId={String(q.id)}
@@ -973,14 +976,16 @@ export function AdminCatalog({
                         </AdminButton>
                       </section>
                     ) : Boolean(q.answer) && (
-                      <div className="answer-block mt16">
+                      <div className="answer-block question-conversation">
                         <b>운영자 답변</b>
                         <p className="reading-copy"><AnswerText text={t(q, "answer")}/></p>
                       </div>
                     )}
-                    <p className="meta mt16">접수 {date(q.created_at)} · {q.status === 'open' && !q.is_archived ? '답변 필요' : q.is_archived ? '보관된 질문 · 삭제되지 않음' : '답변 완료'}</p>
-                    {Boolean(q.user_id) && <Link className="text-link" href={`/admin/customers?member=${encodeURIComponent(t(q, 'user_id'))}`}>회원 운영 정보 보기</Link>}
-                    {!q.is_archived && <div className="question-inbox-actions"><AdminButton type="button" size="sm" variant="outline" disabled={pending || loading} onClick={() => archive(s, [recordId(q)])}>질문 보관</AdminButton></div>}
+                    <footer className="question-detail-footer">
+                      <div><p className="meta">접수 {date(q.created_at)} · {q.status === 'open' && !q.is_archived ? '답변 필요' : q.is_archived ? '보관된 질문 · 삭제되지 않음' : '답변 완료'}</p>
+                      {Boolean(q.user_id) && <Link className="text-link" href={`/admin/customers?member=${encodeURIComponent(t(q, 'user_id'))}`}>회원 운영 정보 보기</Link>}</div>
+                      {!q.is_archived && <div className="question-inbox-actions"><AdminButton type="button" size="sm" variant="outline" disabled={pending || loading} onClick={() => archive(s, [recordId(q)])}>질문 보관</AdminButton></div>}
+                    </footer>
                   </div>
                 </article>
               </div>}

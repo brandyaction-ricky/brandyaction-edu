@@ -6,6 +6,7 @@ import { AdminReturnLink } from './admin-return-navigation';
 import { PurchaseBuyerDelivery } from './purchase-buyer-delivery';
 import { PurchaseCompletionGuide } from './purchase-completion-guide';
 import './purchase-onboarding.css';
+import { AdminPageHeader } from '@/features/admin-ui/components/admin-system';
 
 type Cohort = { id: string; name: string; courses: { title: string } | { title: string }[] | null };
 const empty: CompletionGuideSettings = { label: '', url: '' };
@@ -103,10 +104,9 @@ export function PurchaseOnboardingAdmin({ productId, initialCohort }: { productI
     } catch (cause) { setError(cause instanceof Error ? cause.message : '저장하지 못했습니다.'); }
     finally { setPending(false); }
   };
-  return <main className="edu-front purchase-onboarding purchase-onboarding-admin"><div className="wrap narrow">
+  return <main className="edu-front edu-admin adm admin-standalone purchase-onboarding purchase-onboarding-admin"><div className="wrap narrow">
     <AdminReturnLink fallback={productId ? '/admin/product-editor?id=' + encodeURIComponent(productId) : '/admin/products'} fallbackLabel={productId ? '상품 수정' : '상품 관리'} />
-    <p className="eyebrow mt24">PURCHASE ONBOARDING</p><h1>결제 후 안내 설정</h1>
-    {productId && courseTitle(cohorts[0]) && <p className="lead">{courseTitle(cohorts[0])}</p>}
+    <AdminPageHeader title="결제 후 안내 설정" description={productId ? courseTitle(cohorts[0]) : undefined} />
     {cohort && <nav className="onboarding-actions" aria-label="결제 후 안내 관리"><a className="btn" href="#completion-settings">완료 화면 설정</a><a className="btn" href="#buyer-delivery">구매자 공지·발송 내역</a></nav>}
     <section id="completion-settings" className="onboarding-panel">
       <h2>1. 결제 완료 화면</h2>

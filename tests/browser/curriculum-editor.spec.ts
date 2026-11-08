@@ -34,7 +34,7 @@ async function openLesson(page:Page, second=false) {
   await expect(page.getByRole('textbox',{name:'수업 제목',exact:true})).toHaveValue(second?'AI에게 내 사업 알려주기':'학습 목적 이해하기');
 }
 
-test('product picker opens scoped document editing, full week rows work by keyboard and layout fits',async({page},info)=>{
+test('product picker opens scoped document editing, full week rows work by keyboard and layout fits',async({page,viewport},info)=>{
   await setup(page);await page.goto('/curriculum-editor-test');await openLesson(page);
   await expect(page.getByRole('textbox',{name:'학습 내용',exact:true})).toBeVisible();
   const header=page.locator('.studio-week-disclosure > summary').first();await header.focus();await page.keyboard.press('Enter');await expect(page.getByRole('button',{name:'1일차 학습 목적 이해하기'})).toBeHidden();await page.keyboard.press('Enter');

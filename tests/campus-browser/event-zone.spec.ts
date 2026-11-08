@@ -58,3 +58,20 @@ test('shared link login return and one automatic claim per account mount',async(
  await page.goto('/event-preview?shared=1&member=1');
  await expect(page.getByText('10만원 쿠폰이 내 계정에 지급됐어요.')).toBeVisible();expect(claims).toBe(1);
 });
+
+test('standalone event admin shares heading controls and responsive fields without writes',async({page,isMobile})=>{
+ let writes=0;
+ await page.route('**/api/admin/campus/events*',r=>{if(r.request().method()!=='GET')writes++;return r.fulfill({json:{zones:[],cohorts:[],invites:[],counts:{},liveCoupon:{discount_value:300000,discount_type:'fixed',is_active:true,is_draft:false}}});});
+ await page.goto('/event-admin-preview');
+ for(const width of isMobile?[390,320]:[1440,834]){
+  await page.setViewportSize({width,height:900});
+  await expect(page.getByRole('heading',{level:1})).toHaveCSS('font-size','20px');
+  const save=page.getByRole('button',{name:'이벤트 설정 저장'});await expect(save).toBeEnabled();
+  await expect(save).toHaveCSS('background-color','rgb(201, 35, 45)');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBeTruthy();
+  if(isMobile){expect((await save.boundingBox())!.height).toBeGreaterThanOrEqual(44);await expect(page.getByLabel('이벤트 주소')).toHaveCSS('font-size','16px');}
+  if(isMobile){const fieldBox=(await page.getByLabel('자료 추가 · 20MB 이하').boundingBox())!,saveBox=(await save.boundingBox())!;expect(saveBox.y).toBeGreaterThan(fieldBox.y+fieldBox.height);}
+  await page.screenshot({path:test.info().outputPath('event-settings-'+width+'.png'),fullPage:true});
+ }
+ expect(writes).toBe(0);
+});
