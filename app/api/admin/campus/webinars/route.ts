@@ -16,7 +16,7 @@ export async function GET(request:Request){
    return privateReply({counts:Object.fromEntries(stats),since,trackingEnabled:settings.data?.value?.trackingEnabled===true});
   }
   const [events,cohorts]=await Promise.all([
-   db.from('site_settings').select('value',{count:'exact'}).like('key',WEBINAR_PREFIX.replaceAll('_','\\_')+'%').eq('is_public',false).order('updated_at',{ascending:false}).limit(100).abortSignal(AbortSignal.timeout(5000)),
+   db.from('site_settings').select('value',{count:'exact'}).like('key',WEBINAR_PREFIX.replaceAll('_','\\_')+'%').eq('is_public',false).is('value->>deletedAt',null).order('updated_at',{ascending:false}).limit(100).abortSignal(AbortSignal.timeout(5000)),
    db.from('cohorts').select('id,name,course_id,courses(title,slug,status,archived_at)').is('archived_at',null).order('created_at',{ascending:false}).limit(200).abortSignal(AbortSignal.timeout(5000))
   ]);
   if(events.error||cohorts.error)throw events.error||cohorts.error;
@@ -39,9 +39,33 @@ export async function POST(request:Request){
   if(w.status==='published'&&(!course||course.status!=='published'||course.archived_at))fail('공개된 클래스의 기수만 연결할 수 있습니다.');
   if(!course?.slug||w.detailPath!=='/classes/'+course.slug)fail('선택한 기수의 상세 페이지와 주소가 다릅니다.');
   const row={value:w,is_public:false,updated_by:user.id,updated_at:new Date().toISOString()};
-  const r=expected===null?await db.from('site_settings').insert({key:WEBINAR_PREFIX+w.slug,...row}).select('key').abortSignal(AbortSignal.timeout(5000)).maybeSingle():await db.from('site_settings').update(row).eq('key',WEBINAR_PREFIX+w.slug).eq('is_public',false).eq('value->>revision',expected).select('key').abortSignal(AbortSignal.timeout(5000)).maybeSingle();
+  const r=expected===null?await db.from('site_settings').insert({key:WEBINAR_PREFIX+w.slug,...row}).select('key').abortSignal(AbortSignal.timeout(5000)).maybeSingle():await db.from('site_settings').update(row).eq('key',WEBINAR_PREFIX+w.slug).eq('is_public',false).is('value->>deletedAt',null).eq('value->>revision',expected).select('key').abortSignal(AbortSignal.timeout(5000)).maybeSingle();
   if(r.error&&r.error.code!=='23505')throw r.error;
+  if(r.error?.code==='23505'&&expected===null)fail('이미 사용한 행사 주소입니다. 다른 주소를 입력해 주세요.',409);
   if(r.error||!r.data)fail('저장 내용이 충돌했습니다. 최신 설정을 다시 불러와 주세요.',409);
   return success();
  }catch(e){return problem(e);}
+}
+
+export async function DELETE(request: Request) {
+  try {
+    if (request.headers.get('origin') !== new URL(request.url).origin) fail('요청 출처를 확인해 주세요.', 403);
+    const user = await actor();
+    const {slug, expectedRevision} = await readSpaceJson(request, 2048);
+    if (typeof slug !== 'string' || !slugPattern.test(slug) || !uuid(expectedRevision)) fail('삭제할 행사를 확인해 주세요.');
+    const current = await readWebinar(slug);
+    if (current) {
+      if (current.revision !== expectedRevision) fail('다른 운영자가 수정했습니다. 목록을 새로고침한 뒤 다시 확인해 주세요.', 409);
+      const deletedAt = new Date().toISOString();
+      const result = await createAdminClient().from('site_settings')
+        .update({value: {...current, deletedAt}, updated_at: deletedAt, updated_by: user.id})
+        .eq('key', WEBINAR_PREFIX + slug).eq('is_public', false)
+        .eq('value->>revision', expectedRevision).is('value->>deletedAt', null)
+        .select('key').maybeSingle();
+      if (result.error) throw result.error;
+      if (!result.data) fail('행사 상태가 변경됐습니다. 목록을 새로고침해 주세요.', 409);
+    }
+    revalidateTag(WEBINAR_TAG, {expire: 0});
+    return privateReply({deleted: true});
+  } catch (error) { return problem(error); }
 }

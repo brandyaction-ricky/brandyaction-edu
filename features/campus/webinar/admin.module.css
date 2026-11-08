@@ -11,3 +11,22 @@
 @media(max-width:420px){.quickLinks{grid-template-columns:1fr}.saveBar>span{max-width:45%}}
 .roomSettings{margin:18px 0;border:1px solid #d7e1ed;border-radius:12px;background:#f8fbff;padding:16px}.roomSettings>summary{cursor:pointer;font-weight:700;min-height:30px;line-height:30px}.roomSettings>section{margin-bottom:0;background:#fff}.page .errorNotice{position:relative;z-index:21}
 .page nav button[aria-pressed=true]:hover:not(:disabled),.page .newButton:hover:not(:disabled),.page .saveBar button:hover:not(:disabled){background:#244f7a;color:#fff}
+
+.quickLinks{grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr))}
+.layout{grid-template-columns:minmax(255px,310px) minmax(0,1fr);align-items:start}
+.layout .eventPanel{min-width:0;max-height:none;overflow:visible;gap:10px}
+.listHeading{display:flex;align-items:center;justify-content:space-between}
+.eventPanel .listHeading h2{margin:0;font-size:17px;color:#21374c}
+.eventPanel .refresh,.eventPanel .removeEvent{display:grid;place-items:center;width:44px;height:44px;padding:0;border:0;background:transparent;color:#52677b}
+.eventPanel .newButton{justify-content:center;width:100%;min-height:44px}
+.eventList{list-style:none;margin:2px 0 0;padding:2px;display:grid;gap:8px;max-height:min(68vh,720px);overflow:auto;scroll-padding:4px}
+.eventList li{display:grid;grid-template-columns:minmax(0,1fr) 44px;align-items:center;border:1px solid #d6dfe8;border-radius:12px;background:white}
+.eventList li[data-selected=true]{background:#edf4fc;border-color:#42719a}
+.eventList .eventPick,.eventList .eventPick[aria-pressed=true]{display:grid;gap:4px;min-width:0;height:auto;padding:12px 4px 12px 14px;border:0;background:transparent;line-height:1.4}
+.eventPick strong,.eventPick small{overflow-wrap:anywhere;white-space:normal}
+.eventPick strong{font-size:15px}.eventPick small{color:#536576;font-size:12px;font-weight:400}
+.eventStatus{justify-self:start;background:#edf0f3;color:#4b5865;border-radius:5px;padding:1px 7px;font-size:11px;font-weight:700}
+.eventStatus[data-status=published]{background:#e0f3e9;color:#216347}
+.eventStatus[data-status=paused]{background:#fbefd7;color:#805918}
+.eventPanel .removeEvent:hover:not(:disabled){color:#a32e37;background:#fff0f1}
+@media(max-width:800px){.layout{grid-template-columns:minmax(0,1fr)}.eventList{max-height:clamp(240px,40vh,400px)}}
