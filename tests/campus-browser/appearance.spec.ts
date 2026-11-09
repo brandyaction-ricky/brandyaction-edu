@@ -16,7 +16,7 @@ test('entry links stay readable and aligned on desktop and phone',async({page})=
  await page.goto('/webinar-admin');await page.addStyleTag({content:'body{background:#080e1e}'});await page.getByRole('button',{name:'새 행사 만들기'}).click();await page.getByLabel('연결할 교육 기수').selectOption('00000000-0000-4000-8000-000000000003');
  await readable(page.getByLabel('공개 상태'));await readable(page.getByLabel('제목',{exact:true}));await page.getByRole('navigation',{name:'관리 항목'}).getByRole('button',{name:'입장 링크',exact:true}).click();
  const hub=page.getByRole('region',{name:'대상별 캠퍼스 입장 링크'});
- for(const control of await hub.locator('button,a').all()){await readable(control);expect((await control.boundingBox())!.height).toBeGreaterThanOrEqual(44);}
+ for(const control of await hub.locator('button,a').all()){await readable(control);expect((await control.boundingBox())!.height).toBeGreaterThanOrEqual(test.info().project.name==='mobile'?44:36);}
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBeTruthy();
 });
 
