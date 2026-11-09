@@ -4,6 +4,7 @@ import type {CampusResource} from '../webinar/resources';
 import type {TourAvatar} from './appearance';
 import type {TourRole} from './model';
 export type TourLiveConnection={
+ studyPresence?:boolean;
  publicPresence?:boolean;
  initialRoom?:'welcome';
  libraryResources?:CampusResource[];
