@@ -9,7 +9,8 @@ function harness(count){const channels=[],transmissions=[],clients=[];let revoke
 }
 test('24 synthetic authorized clients coalesce 24000 moves, bound sends, bind received identity and clean up all channels',async()=>{
  const h=harness(24),states=new Map();try{await Promise.all(Array.from({length:24},async(_,i)=>{const n=i+1,t=await createLiveTransport(uid(50),uid(n),uid(100+n),s=>states.set(n,s),()=>{}, {client:h.client(),request:h.request});h.clients.push(t);await t.command({kind:'join'});}));
- assert.equal(h.channels.filter(c=>!c.removed).length,576);
+ assert.equal(h.channels.filter(c=>!c.removed&&c.topic.startsWith('campus-space:')).length,576);
+ assert.equal(h.channels.filter(c=>!c.removed&&c.topic.startsWith('campus-roster:')).length,24);
  for(const t of h.clients)for(let i=0;i<1000;i++)t.move({x:12+i/1000,y:8.8});await new Promise(r=>setTimeout(r,550));
  assert.ok(h.transmissions.length<=48,`bounded send count: ${h.transmissions.length}`);assert.equal(h.transmissions.length,48);assert.equal(states.size,24);assert.ok(states.get(1).metrics.received<=46);
  const forged=h.channels.find(c=>c.topic.endsWith(uid(1)));const before=states.get(2).peers.find(p=>p.userId===uid(1)).x;for(const cb of forged.callbacks)if(cb.event==='move')cb.fn({payload:{x:1,y:1,sessionId:uid(999),seq:999,userId:uid(2)}});assert.equal(states.get(2).peers.find(p=>p.userId===uid(1)).x,before);
