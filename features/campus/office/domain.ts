@@ -10,6 +10,13 @@ export type OfficeHistory = { id: string; job_id: string; revision: number; acto
 export type OfficeState = { jobs: OfficeJob[]; history: OfficeHistory[]; connection: 'not_connected' | 'incoming_adapter_registered'; demo: boolean };
 export type OfficeCommand = { requestId: string; enrollmentId: string; action: 'create' | 'approve' | 'request_revision' | 'retry' | 'archive'; jobId?: string; expectedRevision?: number; objective?: string; materialUrls?: string[]; outputType?: OfficeOutput; note?: string };
 export type OfficeEvent = { dispatchId?: string; jobId: string; expectedRevision: number; event: 'accepted' | 'started' | 'draft' | 'failed'; draftText?: string; draftUrl?: string; note?: string };
+export type OfficeRegistration = { event: 'registered'; jobId: string; enrollmentId: string; objective: string; outputType: OfficeOutput };
+export function validateOfficeRegistration(input: unknown): OfficeRegistration {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) campusError(400, 'Invalid registration');
+  const r = input as OfficeRegistration;
+  if (r.event !== 'registered' || !isCampusId(r.jobId) || !isCampusId(r.enrollmentId) || !officeOutputs.includes(r.outputType)) campusError(400, 'Invalid registration');
+  return { event: 'registered', jobId: r.jobId, enrollmentId: r.enrollmentId, objective: text(r.objective, 10, 2000), outputType: r.outputType };
+}
 function text(v: unknown, min: number, max: number) { if (typeof v !== 'string' || v.trim().length < min || v.length > max || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(v)) campusError(400, '입력 내용을 확인해 주세요.'); return v.trim(); }
 export function validateOfficeCommand(input: unknown): OfficeCommand {
   if (!input || typeof input !== 'object' || Array.isArray(input)) campusError(400, '요청 형식을 확인해 주세요.');

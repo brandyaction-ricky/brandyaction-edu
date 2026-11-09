@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  outputFileTracingIncludes: { '/api/campus/office/skill': ['./skills/packages/*.zip'] },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "vjmjhaidlqkmascdjocw.supabase.co", pathname: "/storage/v1/object/public/course-assets/**" },
