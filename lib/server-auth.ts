@@ -12,6 +12,7 @@ export const getAuthenticatedUser = cache(async (includeLoginMethod = false) => 
     }
     if (!data.user) return null;
     const { data: profile, error: profileError } = await db.from('profiles').select('id,email,contact_email,full_name,phone,role,status,marketing_consent').eq('id',data.user.id).maybeSingle();
+    if (profileError?.code === 'PT401' && profileError.message === 'ACCOUNT_WITHDRAWN') return null;
     if (profileError) throw profileError;
     if (!profile || profile.status !== 'active') return null;
     const user: typeof profile & { loginMethod?: string } = { ...profile, email: data.user.email || profile.email || '', id: data.user.id };

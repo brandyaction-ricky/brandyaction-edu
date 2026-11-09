@@ -72,6 +72,17 @@ test('account status and database role remain authoritative over user-editable m
   assert.equal((await authHarness({ profile: { ...admin, role: 'member' } }).getAuthenticatedUser()).role, 'member');
 });
 
+test('withdrawn-account Data API guard rejects an otherwise valid session without treating it as an outage', async () => {
+  const auth = authHarness({ profileError: { code: 'PT401', message: 'ACCOUNT_WITHDRAWN' } });
+  assert.equal(await auth.getAuthenticatedUser(), null);
+  assert.equal(await auth.getAdminUser(), null);
+  for (const profileError of [
+    { code: 'PT401', message: 'OTHER_AUTH_FAILURE' },
+    { code: 'PGRST000', message: 'ACCOUNT_WITHDRAWN' },
+    { code: '42501', message: 'permission denied' },
+  ]) await assert.rejects(authHarness({ profileError }).getAuthenticatedUser(), error => error.status === 503);
+});
+
 test('operator checks reuse the already verified request user and preserve denied scopes', async () => {
   const auth = authHarness();
   const operators = load('lib/operator-permissions.ts', {
