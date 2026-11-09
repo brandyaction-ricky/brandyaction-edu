@@ -8,7 +8,7 @@ export function OfficeFirstVisit({onEmployees,onInbox}:{onEmployees:()=>void;onI
   <ol>
    <li><strong>내 직원 연결하기</strong><span>‘내 AI 직원’에 봇 주소를 등록하고 ‘직원 보고 연결’을 마치세요. 자리에 배치하지 않아도 보고를 받을 수 있어요.</span></li>
    <li><strong>텔레그램에서 일 맡기기</strong><span>연결한 봇의 개인 대화에 “이번 주 수업 공지 초안을 써줘”라고 보내 보세요. 일상 대화와 일반 질문은 작업함에 남지 않아요.</span></li>
-   <li><strong>작업함에서 결과 검토하기</strong><span>‘AI 직원과 일하기’를 열면 직원의 진행 상태가 바뀌어요. 업무를 눌러 초안을 읽고 승인하거나 수정을 요청하세요.</span></li>
+   <li><strong>작업함에서 결과 검토하기</strong><span>아래 ‘내 작업함 열기’를 누르면 직원이 어디까지 일했는지 볼 수 있어요. 업무를 눌러 초안을 읽고 승인하거나 수정을 요청하세요.</span></li>
   </ol>
   <div><button type="button" onClick={onEmployees}>직원 등록·연결하기</button><button type="button" onClick={onInbox}>내 작업함 열기</button></div>
  </section>;
