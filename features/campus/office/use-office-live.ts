@@ -27,19 +27,21 @@ export function useOfficeLive({enabled,enrollment,refresh,onError,slow}:{enabled
    const invalidate=()=>{if(!closed){if(pending)queued=true;else schedule(80);}};
    request.current=invalidate;void read();
    if(process.env.NEXT_PUBLIC_APP_ENV==='development' && process.env.NEXT_PUBLIC_SUPABASE_URL==='https://vjmjhaidlqkmascdjocw.supabase.co'){
-    void import('@/lib/supabase/client').then(({createClient})=>{
+    void import('@/lib/supabase/client').then(async({createClient})=>{
      if(closed)return;const db=createClient();
+     const session=await db.auth.getSession();if(closed||!session.data.session)return;
+     // Set the signed-in session before constructing the join payload. An anonymous join
+     // is acknowledged at the socket level even when the private table rejects its filter.
+     await db.realtime.setAuth(session.data.session.access_token);if(closed)return;
      const ch=db.channel('office-inbox:'+enrollment+':'+crypto.randomUUID());
      let seen=0;
-     ch.on('postgres_changes',{event:'*',schema:'public',table:'edu_campus_office_inbox_signals',filter:'enrollment_id=eq.'+enrollment},msg=>{
-      const version=Number((msg.new as {version?:number}).version);
-      if(version>seen){seen=version;invalidate();}
-     }).subscribe(status=>{
-      if(closed)return;
-      live=status==='SUBSCRIBED';setConnected(live);
-      if(live){seen=0;invalidate();} // also reconcile the gap on (re)join
-      else if(!pending)schedule(15000);
-     });
+     const listen={schema:'public',table:'edu_campus_office_inbox_signals',filter:'enrollment_id=eq.'+enrollment};
+     const signal=(msg:{new:{version?:number}})=>{const version=Number(msg.new.version);if(version>seen){seen=version;invalidate();}};
+     const availability=(ok:boolean)=>{if(closed)return;live=ok;setConnected(ok);if(ok){seen=0;invalidate();}else if(!pending)schedule(15000);};
+     ch.on('postgres_changes',{...listen,event:'INSERT'},signal)
+       .on('postgres_changes',{...listen,event:'UPDATE'},signal)
+       .on('system',{},msg=>{if(msg.extension==='postgres_changes')availability(msg.status==='ok');})
+       .subscribe(status=>{if(status!=='SUBSCRIBED')availability(false);});
      unsubscribe=()=>{void db.removeChannel(ch).catch(()=>{});};
     }).catch(()=>{/* The normal polling fallback remains available. */});
    }
