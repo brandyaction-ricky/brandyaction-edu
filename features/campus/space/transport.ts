@@ -1,14 +1,17 @@
+import {watchStudyRoster} from './roster-channel';
 import {avatarAppearance, createMotionQueue, makeLimiter, position, publicPeer, initialMetrics, isNearby, nearText, type NearbyMessage, type SpaceChat, type SpacePeer, type SpaceProfile, type SpaceSeat, type SpaceState } from './domain';
 import type { SpaceCommand } from './server';
 export type SpaceTransport = { command:(command:Partial<SpaceCommand>&{kind:string})=>Promise<SpaceState>; move:(value:unknown)=>void; close:()=>void };
 export async function createLiveTransport(cohortId:string,userId:string,sessionId:string,onState:(s:SpaceState)=>void,onError:(message:string)=>void,overrides?:{client?:ReturnType<typeof import('@/lib/supabase/client').createClient>;request?:typeof fetch}):Promise<SpaceTransport>{
  const db=overrides?.client??(await import('@/lib/supabase/client')).createClient(),request=overrides?.request??fetch,channels=new Map<string,ReturnType<typeof db.channel>>(),receivers=new Map<string,ReturnType<typeof makeLimiter>>();
  let closed=false,lastState:SpaceState|null=null,sequence=0,localStatus='quiet';const metrics=initialMetrics(),nearby:NearbyMessage[]=[],canNear=makeLimiter(3000);
+ let stopRoster:(()=>void)|undefined;
+ const closeRoster=()=>{stopRoster?.();stopRoster=undefined;};
  const publish=()=>{if(lastState&&!closed)onState({...lastState,nearby:nearby.filter(m=>Date.now()-m.at<12000).slice(-30),metrics:{...metrics}});};
  const disconnect=()=>{for(const ch of channels.values())void db.removeChannel(ch);channels.clear();receivers.clear();};const lastSequence=new Map<string,number>();
  async function sync(state:SpaceState){
-  if(closed)return;
-  state.peers=state.peers.map(p=>{const previous=lastState?.peers.find(v=>v.userId===p.userId);if(previous&&previous.sessionId!==p.sessionId)lastSequence.delete(p.userId);const old=previous?.sessionId===p.sessionId?previous:null;return old?{...p,x:old.x,y:old.y,sitting:old.sitting}:p;});lastState=state;if(state.controls?.paused){state.peers=[];state.seats=[];nearby.length=0;disconnect();metrics.status='closed';publish();return;}publish();
+  if(closed||(lastState&&state.serverNow<lastState.serverNow))return;
+  state.peers=state.peers.map(p=>{const previous=lastState?.peers.find(v=>v.userId===p.userId);if(previous&&previous.sessionId!==p.sessionId)lastSequence.delete(p.userId);const old=previous?.sessionId===p.sessionId?previous:null;return old?{...p,x:old.x,y:old.y,sitting:old.sitting}:p;});lastState=state;if(state.controls?.paused){closeRoster();state.peers=[];state.seats=[];nearby.length=0;disconnect();metrics.status='closed';publish();return;}publish();
   const ids=new Set(state.peers.map(p=>p.userId));
   for(const [id,ch] of channels)if(!ids.has(id)){void db.removeChannel(ch);channels.delete(id);receivers.delete(id);lastSequence.delete(id);}
   for(const peer of state.peers){
@@ -24,17 +27,33 @@ export async function createLiveTransport(cohortId:string,userId:string,sessionI
    channels.set(peer.userId,channel);
   }
  }
+ async function refreshRoster(signal:AbortSignal){
+  const response=await request('/api/campus/space?cohortId='+encodeURIComponent(cohortId),{credentials:'same-origin',cache:'no-store',signal});
+  if(signal.aborted||closed||!lastState)return;
+  if(response.status===401||response.status===403){
+   lastState={...lastState,peers:[],messages:[],seats:[]};nearby.length=0;disconnect();closeRoster();publish();return;
+  }
+  if(response.ok){
+   const latest:SpaceState=await response.json();
+   if(!signal.aborted)await sync(latest);
+  }
+ }
  async function command(cmd:Partial<SpaceCommand>&{kind:string}){
   if(closed)throw new Error('공간 연결이 끝났어요. 다시 입장해 주세요.');
   if(cmd.kind==='nearby'||cmd.kind==='emote'){const text=nearText(cmd.text),mine=lastState?.peers.find(p=>p.userId===userId),ch=channels.get(userId);if(!text||!mine||lastState?.controls?.paused||localStatus==='quiet'||!canNear()||ch?.state!=='joined')throw new Error('가까운 대화는 함께 참여 중일 때 잠깐 간격을 두고 보낼 수 있어요.');const kind=cmd.kind==='emote'?'emote':'text',id=crypto.randomUUID();metrics.sent++;const outcome=await ch.send({type:'broadcast',event:'nearby',payload:{id,text,kind,sessionId}});if(outcome!=='ok'){metrics.errors++;publish();throw Error('한마디를 보내지 못했어요. 연결을 확인해 주세요.');}nearby.push({id,userId,nickname:mine.nickname,text,kind,at:Date.now()});if(nearby.length>30)nearby.shift();publish();return lastState!;}
   const body={...cmd,cohortId,sessionId};const started=performance.now();metrics.apiCalls++;
   let response:Response;try{response=await request('/api/campus/space',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),credentials:'same-origin',cache:'no-store'});}catch(e){metrics.errors++;metrics.status='reconnecting';publish();throw e;}metrics.lastRttMs=Math.round(performance.now()-started);
-  const data=await response.json();if(!response.ok){metrics.errors++;if([401,403].includes(response.status)){nearby.length=0;disconnect();metrics.status='closed';if(lastState){lastState={...lastState,peers:[],messages:[],seats:[]};publish();}closed=true;motion.close();clearInterval(renew);}else publish();throw new Error(data.error||'공간을 연결하지 못했습니다.');}if(cmd.profile)localStatus=cmd.profile.status;await sync(data);if(cmd.kind==='heartbeat'){const own=lastState?.peers.find(p=>p.userId===userId);if(own)motion.push({x:own.x,y:own.y,sitting:own.sitting});}return data as SpaceState;
+  const data=await response.json();if(!response.ok){metrics.errors++;if([401,403].includes(response.status)){nearby.length=0;disconnect();closeRoster();metrics.status='closed';if(lastState){lastState={...lastState,peers:[],messages:[],seats:[]};publish();}closed=true;motion.close();clearInterval(renew);}else publish();throw new Error(data.error||'공간을 연결하지 못했습니다.');}if(cmd.profile)localStatus=cmd.profile.status;await sync(data);
+  if(cmd.kind==='leave')closeRoster();
+  else if(!closed&&!stopRoster&&!data.controls?.paused&&(cmd.kind==='join'||cmd.kind==='heartbeat')){
+   stopRoster=watchStudyRoster(db,cohortId,refreshRoster);
+  }
+  if(cmd.kind==='heartbeat'){const own=lastState?.peers.find(p=>p.userId===userId);if(own)motion.push({x:own.x,y:own.y,sitting:own.sitting});}return data as SpaceState;
  }
  // Renew authorization periodically; disconnect if membership/profile check fails in API heartbeat.
  const motion=createMotionQueue(v=>{const own=lastState?.peers.find(p=>p.userId===userId);if(own)Object.assign(own,v);const ch=channels.get(userId);if(!closed&&!lastState?.controls?.paused&&ch&&ch.state==='joined'){metrics.sent++;void ch.send({type:'broadcast',event:'move',payload:{...v,sessionId,seq:sequence++}}).then(outcome=>{if(outcome!=='ok'){metrics.errors++;publish();}}).catch(()=>{metrics.errors++;publish();});publish();}});
  const renew=setInterval(()=>{if(closed)return;disconnect();lastSequence.clear();metrics.status='reconnecting';if(lastState)void sync(lastState);},60000);
- return {command,move(value){if(!closed)motion.push(value);},close(){closed=true;metrics.status='closed';motion.close();clearInterval(renew);disconnect();}};
+ return {command,move(value){if(!closed)motion.push(value);},close(){closed=true;closeRoster();metrics.status='closed';motion.close();clearInterval(renew);disconnect();}};
 }
 
 export function createDemoTransport(cohortId:string,userId:string,sessionId:string,initial:SpaceProfile,onState:(s:SpaceState)=>void):SpaceTransport{
