@@ -18,7 +18,7 @@ import {initialPreferences,parsePreferences,type Preferences} from '../support/d
 const statuses={joinable:'같이 해도 좋아요',quiet:'조용히 집중',help:'도움이 필요해요',working:'작업 중'};
 const zones=[['desk','문샷 집중실','한 가지에 몰입'],['mission','문샷 미션실','일차별 작은 실행'],['board','문샷 의견 나눔방','동료의 시선'],['chat','문샷 라운지','가벼운 대화'],['terrace','문샷 테라스','잠깐의 여백'],['launch','문샷 발사대','다음 도약']] as const;
 const emptyClock:FocusClock={phase:'idle',duration:0,elapsed:0,runningSince:null};
-export function SpacePanel({snapshot,demo,studyEntry,onOpenLesson,onNavigate,rewards,immersive=false,spatial=false,blocked=false,toolsPane,initialRenderer='office',toolsVisible=true}:{snapshot:CampusSnapshot;demo:boolean;studyEntry?:{host:HTMLElement|null;openLounge:()=>void};toolsPane?:'focus'|'lounge'|'settings'|'profile';initialRenderer?:'classic'|'office';toolsVisible?:boolean;immersive?:boolean;spatial?:boolean;blocked?:boolean;onOpenLesson?:(id:string)=>void;onNavigate?:(section:string)=>void;rewards?:CommunityRewards|null}){
+export function SpacePanel({snapshot,demo,studyEntry,onOpenLesson,onNavigate,rewards,immersive=false,spatial=false,blocked=false,toolsPane,initialRenderer='office',toolsVisible=true}:{snapshot:CampusSnapshot;demo:boolean;studyEntry?:{host:HTMLElement|null;openLounge:()=>void;onJoined:()=>void};toolsPane?:'focus'|'lounge'|'settings'|'profile';initialRenderer?:'classic'|'office';toolsVisible?:boolean;immersive?:boolean;spatial?:boolean;blocked?:boolean;onOpenLesson?:(id:string)=>void;onNavigate?:(section:string)=>void;rewards?:CommunityRewards|null}){
  const scope=snapshot.scopes.find(s=>s.enrollmentId===snapshot.selectedEnrollmentId),cohortId=scope?.cohortId;
  const [toolsOpen,setToolsOpen]=useState(false);
  const [renderer,setRenderer]=useState<'classic'|'office'>(initialRenderer);
@@ -129,6 +129,7 @@ export function SpacePanel({snapshot,demo,studyEntry,onOpenLesson,onNavigate,rew
     return;
    }
    joinedSession.current=true;
+   studyEntry?.onJoined();
    setActive(true);setNotice('입장했어요. 이동하거나 원하는 공간을 골라 보세요.');
   }catch(e){t.close();if(transport.current===t)transport.current=null;throw e;}
  });}
