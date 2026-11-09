@@ -114,7 +114,7 @@ test('the archived page keeps the original text after the active policy is repla
 test('only the known policy versions route successfully; unknown versions and extra segments return 404', async () => {
   const route = load('app/[[...path]]/page.tsx', {
     'react/jsx-runtime': { jsx: (type, props) => ({ type, props }) },
-    '@/lib/legal-policies': policies, '@/lib/edu-settings': {}, '@/lib/supabase/server': {},
+    '@/lib/legal-policies': policies, '@/lib/edu-settings': {}, '@/lib/supabase/server': {}, 'react': { cache: f => f }, '@/lib/edu-seo': {},
     '@/app/ui/platform': { Platform: 'platform' },
     'next/navigation': { notFound: () => { throw Error('404'); } },
     '@/lib/landing-admin-state': {}, '@/lib/platform': { sections: [] },

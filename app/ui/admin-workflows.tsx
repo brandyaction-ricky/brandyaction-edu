@@ -32,6 +32,7 @@ import { AppBrandingEditor } from './final/app-branding-editor';
 import { ShortLinks } from './short-links';
 import { timeLabel, type Data, type WorkflowSend } from "./learning-workflows";
 import { EnrollmentGrant, RefundAction } from "./operations-actions";
+import { seoText } from "@/lib/edu-seo";
 import {
   AdminButton,
   AdminCheckbox,
@@ -1495,8 +1496,8 @@ function SettingsForm({ section, data, send, pending }: Props) {
   const [seoTab, setSeoTab] = useState<'search' | 'verification' | 'measurement'>('search');
   const [codeOpen, setCodeOpen] = useState(false);
   const [seoDraft, setSeoDraft] = useState(() => ({
-    title: String(initial.title || 'BrandyAction EDU | 배운 것을, 내 일의 성과로.'),
-    description: String(initial.description || 'AI와 마케팅을 배우고 내 업무에 적용하는 실행 중심 교육.'),
+    title: seoText(initial, 'title'),
+    description: seoText(initial, 'description'),
     googleVerification: String(initial.googleVerification || ''),
     naverVerification: String(initial.naverVerification || ''),
   }));
