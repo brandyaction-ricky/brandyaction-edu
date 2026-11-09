@@ -23,7 +23,7 @@ function load(file, mocks = {}) {
   return exports;
 }
 
-function renderClass({ loading = true, error = '', data = {} } = {}) {
+function renderClass({ loading = true, error = '', data = {}, preview } = {}) {
   let state = 0;
   const { Platform } = load('app/ui/platform.tsx', {
     react: { ...React, useState(initial) {
@@ -42,7 +42,7 @@ function renderClass({ loading = true, error = '', data = {} } = {}) {
     },
     './final/public-views': { ProductDetail: () => React.createElement('article', null, '클래스 본문') },
   });
-  return renderToStaticMarkup(React.createElement(Platform, { path: ['classes', 'test-class'], user: null }));
+  return renderToStaticMarkup(React.createElement(Platform, { path: ['classes', 'test-class'], user: null, preview }));
 }
 
 test('class entry renders a waiting indicator, not the missing-page home action', () => {
@@ -73,4 +73,13 @@ test('an available class retains its normal content', () => {
   const html = renderClass({ loading: false, data: { courses: [{ id: 'course', slug: 'test-class', category: 'free' }] } });
   assert.match(html, /클래스 본문/);
   assert.doesNotMatch(html, /page-loading-spinner|곧 열립니다|페이지를 찾을 수 없습니다/);
+});
+
+test('search engines read the class name and summary in the server HTML while it loads (SEO 11-09)', () => {
+  const html = renderClass({ preview: { title: 'AI 직원 생성하기', summary: 'AI 자동화로 반복 업무를 넘기는 법' } });
+  assert.match(html, /class="page-loading"/);
+  assert.match(html, /<h1>AI 직원 생성하기<\/h1>/);
+  assert.match(html, /<p>AI 자동화로 반복 업무를 넘기는 법<\/p>/);
+  assert.doesNotMatch(html, /클래스 정보를 불러오는 중입니다/);
+  assert.doesNotMatch(renderClass({ loading: false, data: { courses: [{ id: 'course', slug: 'test-class', category: 'free' }] }, preview: { title: 'AI 직원 생성하기', summary: '' } }), /page-loading/);
 });

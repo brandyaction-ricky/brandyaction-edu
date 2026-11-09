@@ -207,10 +207,13 @@ export function Platform({
   path,
   user: initialUser,
   adminContent,
+  preview,
 }: {
   path: string[];
   user: User | null;
   adminContent?: ReactNode;
+  // Server-read name and summary of a public class/article, shown (and crawled) while the page loads.
+  preview?: { title: string; summary: string };
 }) {
   const router = useRouter();
   const admin = path[0] === "admin";
@@ -914,8 +917,8 @@ export function Platform({
         {loading || (!error && loadedReadKey !== publicReadKey) ? (
           <section className="page-loading" role="status" aria-live="polite" aria-busy="true">
             <span className="page-loading-spinner" aria-hidden="true" />
-            <h1>{path[0] === "classes" ? "클래스 정보를 불러오는 중입니다." : "페이지 정보를 불러오는 중입니다."}</h1>
-            <p>잠시만 기다려 주세요.</p>
+            <h1>{preview?.title || (path[0] === "classes" ? "클래스 정보를 불러오는 중입니다." : "페이지 정보를 불러오는 중입니다.")}</h1>
+            <p>{preview?.summary || "잠시만 기다려 주세요."}</p>
           </section>
         ) : (
           <>

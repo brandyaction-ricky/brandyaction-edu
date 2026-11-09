@@ -368,7 +368,7 @@ test('published product metadata drives search and sharing titles while an empty
   });
   const params = Promise.resolve({ path: ['classes', 'my-class'] });
   let metadata = await page.generateMetadata({ params });
-  assert.equal(metadata.title, '검색용 제목 | BrandyAction EDU');
+  assert.equal(metadata.title, '검색용 제목 | 브랜디에듀');
   assert.equal(metadata.description, '검색용 설명');
   assert.equal(metadata.openGraph.title, metadata.title);
   assert.equal(metadata.openGraph.images[0].url, 'https://preview.vercel.app/og');
@@ -379,7 +379,7 @@ test('published product metadata drives search and sharing titles while an empty
   assert.ok(filters.some(([key, value]) => key === 'status' && value === 'published'));
   product = { ...product, seo_title: '', seo_description: '' };
   metadata = await page.generateMetadata({ params });
-  assert.equal(metadata.title, '상품 이름 | BrandyAction EDU');
+  assert.equal(metadata.title, '상품 이름 | 브랜디에듀');
   assert.equal(metadata.description, '상품 소개');
   product.thumbnail_url = 'https://cdn.example/cover.jpg';
   metadata = await page.generateMetadata({ params });
@@ -471,4 +471,39 @@ test('product save verifies stored HTML before writing the compact reference and
   assert.equal(writes[0].metadata.campaign, 'preserved');
   assert.ok(JSON.stringify(writes[0]).length < 1000);
   missing = true; assert.equal((await send()).status, 400); assert.equal(writes.length, 1);
+});
+
+test('search basics (CEO 11-09): brand titles per section, plain canonical, structured data for the site and listed classes', async () => {
+  const { seoText, EDU_SEO_DEFAULT } = load('lib/edu-seo.ts');
+  assert.equal(seoText({ title: 'BrandyAction EDU | 배운 것을, 내 일의 성과로.' }, 'title'), EDU_SEO_DEFAULT.title);
+  assert.equal(seoText({ title: ' 직접 고른 제목 ' }, 'title'), '직접 고른 제목');
+  assert.match(EDU_SEO_DEFAULT.title + EDU_SEO_DEFAULT.description, /브랜디에듀.*AI 마케팅.*AI 자동화/);
+  let product = { title: 'AI 직원 생성하기', summary: 'AI 자동화 입문', is_listed: true };
+  const query = { select() { return this; }, eq() { return this; }, async maybeSingle() { return { data: product }; } };
+  const page = load('app/[[...path]]/page.tsx', {
+    '@/lib/edu-settings': { getEduSettings: async () => ({ seo: {} }) },
+    '@/lib/supabase/server': { createClient: async () => ({ from: () => query }) },
+    '@/app/ui/platform': { Platform: ({ preview }) => React.createElement('main', null, preview ? preview.title : '') }, '@/lib/server-auth': {}, 'next/navigation': { notFound() { throw new Error('404'); }, redirect() {} },
+  });
+  const meta = path => page.generateMetadata({ params: Promise.resolve({ path }) });
+  const render = async path => renderToStaticMarkup(await page.default({ params: Promise.resolve({ path }), searchParams: Promise.resolve({}) }));
+  const home = await meta([]);
+  assert.equal(home.title, EDU_SEO_DEFAULT.title);
+  assert.deepEqual(home.alternates, { canonical: '/' });
+  assert.equal(home.openGraph.siteName, '브랜디에듀');
+  assert.equal((await meta(['classes'])).title, 'AI 마케팅·AI 자동화 클래스 | 브랜디에듀');
+  assert.equal((await meta(['stories'])).title, '고객 이야기 | 브랜디에듀');
+  assert.deepEqual((await meta(['classes', 'ai-staff'])).alternates, { canonical: '/classes/ai-staff' });
+  assert.equal((await meta(['my', 'classes'])).alternates, undefined);
+  const homeHtml = await render([]);
+  assert.match(homeHtml, /"@type":"WebSite","name":"브랜디에듀","alternateName":\["BrandyAction EDU","브랜디액션 에듀"\]/);
+  const classHtml = await render(['classes', 'ai-staff']);
+  assert.match(classHtml, /"@type":"Course","name":"AI 직원 생성하기","description":"AI 자동화 입문","url":"https:\/\/brandyaction-edu.com\/classes\/ai-staff"/);
+  assert.match(classHtml, /<main>AI 직원 생성하기<\/main>/);
+  product = { ...product, title: '</script><b>x' };
+  assert.match(await render(['classes', 'ai-staff']), /"name":"\\u003c\/script>\\u003cb>x"/);
+  product = { ...product, is_listed: false };
+  const hidden = await render(['classes', 'ai-staff']);
+  assert.doesNotMatch(hidden, /ld\+json/);
+  assert.doesNotMatch(hidden, /<b>x/);
 });
