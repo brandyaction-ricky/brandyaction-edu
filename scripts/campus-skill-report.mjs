@@ -23,8 +23,17 @@ export async function reportSkill(config, input, state, send, persist) {
   if(state && (state.binding!==binding.binding || state.contextHash!==binding.contextHash || state.jobId!==binding.jobId)) throw Error('Saved report belongs to another connection or request');
   const envelope = body => prepareReport({jobId:binding.jobId,...body},uuid([binding.jobId,body.event]));
   if(input.action==='start') {
-    if(typeof input.requestText!=='string' || !input.requestText.startsWith('캠퍼스 업무:')) throw Error('Only explicitly marked work can be reported');
-    const objective=input.requestText.slice('캠퍼스 업무:'.length).trim();
+    const text = input.requestText;
+    if (typeof text !== 'string' || !text.trim()) throw Error('Missing original work request');
+    const prefix = '캠퍼스 업무:';
+    const marked = text.startsWith(prefix);
+    // Only newly paired student devices accept tasks identified by the employee.
+    // In this mode the office receives a task description, not the chat transcript.
+    if (!marked && (config.transport !== 'student-device' || config.reportMode !== 'assigned-tasks'
+      || typeof input.taskObjective !== 'string' || /^(?:캠퍼스 연결|MS1-|\/)/.test(text.trim()))) {
+      throw Error('Only assigned work from a paired employee can be reported');
+    }
+    const objective = marked ? text.slice(prefix.length).trim() : input.taskObjective.trim();
     const registered=envelope({event:'registered',enrollmentId:config.enrollmentId,objective,outputType:'analysis'});
     if(state && state.requestHash!==hash(input.requestText)) throw Error('Request changed after registration');
     if(!state) {

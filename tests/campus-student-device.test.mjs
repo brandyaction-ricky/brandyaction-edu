@@ -24,6 +24,7 @@ test('Only the employee DM can confirm its local verifier and report to the pinn
     assert.ok(!start.pairingCode.includes(token));return Response.json(ack);
   });
   const cfg=JSON.parse(await readFile(join(deviceDir(root,c),'connection.json'),'utf8'));
+  assert.equal(cfg.reportMode, 'assigned-tasks');
   const key=await readFile(cfg.secretFile,'utf8'),env=prepareReport({event:'started',expectedRevision:2,jobId});
   await deliverReport({...cfg,jobId},env,key,async(url,init)=>{
     assert.equal(init.redirect,'error');assert.equal(init.headers['x-campus-device'],key);return Response.json({jobId,revision:3});

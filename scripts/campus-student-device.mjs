@@ -39,7 +39,7 @@ export async function configureDevice(root,c,command,transport=fetch) {
     if(!/^s-[0-9a-f-]{36}$/.test(b.connectorId)||!/^[0-9a-f-]{36}$/.test(b.enrollmentId)||!Number.isSafeInteger(b.notBefore))throw Error('Invalid connection receipt');
     const secretFile=join(dir,b.connectorId+'.key');
     await writeFile(secretFile,token,{mode:0o600});
-    const config={...b,notBefore:localConfirmationTime,endpoint,environment:'development',transport:'student-device',keyVersion:'s1',secretFile,
+    const config={...b,notBefore:localConfirmationTime,endpoint,environment:'development',transport:'student-device',reportMode:'assigned-tasks',keyVersion:'s1',secretFile,
       sessionId:c.sessionId,connectionId:c.connectionId,channelId:c.channelId,stateDir:join(dir,'reports',b.connectorId)};
     await writeFile(join(dir,'connection.new'),JSON.stringify(config),{mode:0o600});
     await rename(join(dir,'connection.new'),join(dir,'connection.json'));
