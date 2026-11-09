@@ -46,3 +46,21 @@
   .edu-admin .erasure-card-footer>.btn { width:100%; }
   .edu-admin .erasure-queue>.erasure-note,.edu-admin .erasure-queue>.erasure-warning { margin:16px; }
 }
+.edu-admin .erasure-member { margin:16px 0 0; font-size:14px; overflow-wrap:anywhere; }
+.edu-admin .erasure-member strong { margin-right:8px; }
+.edu-admin .erasure-confirm { margin-top:16px; padding:20px; border:1px solid #e4b1b5; border-radius:10px; background:#fffafa; font-size:14px; line-height:1.7; }
+.edu-admin .erasure-confirm h3 { margin:0 0 12px; font-size:17px; }
+.edu-admin .erasure-confirm p { margin:8px 0; overflow-wrap:anywhere; }
+.edu-admin .erasure-confirm ul { padding-left:20px; margin:12px 0; }
+.edu-admin .erasure-confirm label { display:flex; align-items:flex-start; gap:10px; margin-top:18px; cursor:pointer; }
+.edu-admin .erasure-confirm input { width:18px; height:18px; margin-top:3px; flex-shrink:0; accent-color:#c91b2b; }
+.edu-admin .erasure-request-id { font-size:12px; color:var(--muted,#626b76); }
+.edu-admin .erasure-confirm-actions { display:flex; gap:12px; justify-content:flex-end; margin-top:18px; }
+@media(max-width:600px) {
+ .edu-admin .erasure-confirm { padding:16px; }
+ .edu-admin .erasure-confirm-actions .btn { flex:1; }
+}
+.edu-admin .erasure-confirm { scroll-margin-top:90px; }
+.edu-admin .erasure-confirm:focus { outline:2px solid #b71d2b; outline-offset:3px; }
+.edu-admin .erasure-confirm-actions .erasure-delete-action { background:#bd1d2c; color:white; border-color:#bd1d2c; }
+.edu-admin .erasure-confirm-actions .erasure-delete-action:disabled { opacity:.45; cursor:not-allowed; }
