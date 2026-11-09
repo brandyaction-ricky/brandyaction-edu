@@ -1,0 +1,66 @@
+{
+  "localOnly": true,
+  "owners": 200,
+  "seedJobs": 40200,
+  "chromium": 4,
+  "httpUsers": 196,
+  "poolSize": 20,
+  "peakHttpInFlight": 59,
+  "elapsedMs": 30546,
+  "failures": [],
+  "errors": [],
+  "pageErrors": [],
+  "statuses": {
+    "200": 870
+  },
+  "firstBothHttpMs": {
+    "n": 196,
+    "p50": 193,
+    "p95": 255,
+    "max": 261
+  },
+  "pollMs": {
+    "n": 392,
+    "p50": 6,
+    "p95": 14,
+    "max": 24
+  },
+  "paintMs": {
+    "n": 4,
+    "p50": 78,
+    "p95": 93,
+    "max": 93
+  },
+  "screenRawMs": [
+    76,
+    78,
+    93,
+    93
+  ],
+  "resultClickMs": {
+    "n": 4,
+    "p50": 65,
+    "p95": 92,
+    "max": 92
+  },
+  "reportMs": {
+    "n": 50,
+    "p50": 18,
+    "p95": 141,
+    "max": 141
+  },
+  "runningVisibleMs": {
+    "n": 4,
+    "p50": 15346,
+    "p95": 15354,
+    "max": 15354
+  },
+  "resultVisibleMs": {
+    "n": 4,
+    "p50": 12429,
+    "p95": 12437,
+    "max": 12437
+  },
+  "verifiedJobs": 10,
+  "mismatchedJobs": 0
+}
