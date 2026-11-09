@@ -68,6 +68,7 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  useEffect(()=>{if(tool)track('tool_open',tool);},[tool]); // eslint-disable-line react-hooks/exhaustive-deps
  useEffect(()=>{if(gate)track('room_gate',gate);},[gate]); // eslint-disable-line react-hooks/exhaustive-deps
  useEffect(()=>{if(mapOpen)track('map_open');},[mapOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+ const [officeFilter,setOfficeFilter]=useState<{id:string;name:string}|null>(null);
  const [toolsVisited,setToolsVisited]=useState(false),[toolsPane,setToolsPane]=useState<'focus'|'lounge'|'settings'|'profile'>('focus'),[taskQuery,setTaskQuery]=useState(''),[previous,setPrevious]=useState(''),[handoff,setHandoff]=useState<{lessonId:string;context:string}|null>(null),[aiVisited,setAiVisited]=useState(false),[officeVisited,setOfficeVisited]=useState(false),[fullscreen,setFullscreen]=useState(false);
  useEffect(()=>{const change=()=>setFullscreen(document.fullscreenElement===shell.current);document.addEventListener('fullscreenchange',change);return()=>document.removeEventListener('fullscreenchange',change);},[]);
  const [selectedLesson,setSelectedLesson]=useState('');
@@ -168,13 +169,13 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  {review&&(isFeature(tool)||(tool==='learning'&&!review.lessonContent))&&<section className={styles.lesson}><h2>{titles[tool]}</h2>{tool==='learning'&&review.studyPreview?<Link href="/admin/campus/study">공부방 수업 미리보기 →</Link>:<><p>운영자는 수강권 없이 모든 공간을 둘러볼 수 있어요. 실제 수업·학생 기록 관리는 관리자 화면에서 진행합니다.</p><Link href="/admin">관리자 화면으로 →</Link></>}</section>}
  {!review&&isFeature(tool)&&!['ai','office'].includes(tool)&&<FeaturePanel key={role+tool} id={tool} snapshot={snapshot} demo={demo} onRefresh={live?.onRefresh} onSelect={live?.onSelect} adminSnapshot={adminSnapshot} onOpen={openLesson} onAsk={ask} onNavigate={navigate} onNotice={setNotice}/>}
  <div hidden={tool!=='ai'}>{!review&&aiVisited&&canEnter(role,'study')&&<FeaturePanel key={role+JSON.stringify(handoff)} id="ai" demo={demo} active={tool==='ai'} snapshot={snapshot} handoff={handoff} onOpen={openLesson} onAsk={ask} onNavigate={navigate} onNotice={setNotice}/>}</div>
- <div hidden={tool!=='office'}>{!review&&officeVisited&&canEnter(role,'office')&&<FeaturePanel key={role} id="office" demo={demo} active={tool==='office'} snapshot={snapshot} onOpen={openLesson} onAsk={ask} onNavigate={navigate} onNotice={setNotice}/>}</div>
+ <div hidden={tool!=='office'}>{!review&&officeVisited&&canEnter(role,'office')&&<FeaturePanel key={role} officeFilter={officeFilter} id="office" demo={demo} active={tool==='office'} snapshot={snapshot} onOpen={openLesson} onAsk={ask} onNavigate={navigate} onNotice={setNotice}/>}</div>
  <div hidden={!spacePane(tool)}>{toolsVisited&&canEnter(role,'study')&&<SpaceTools snapshot={snapshot} demo={demo} toolsVisible={!!spacePane(tool)} toolsPane={toolsPane} onOpenEnvironment={()=>{setTool('');post('environment-open');}} onOpenLesson={openLesson} onNavigate={navigate}/>}</div>
  </Suspense>
  </div>
  {room==='welcome'&&['video','notices','basics','quiz','level','checklist'].includes(tool)&&<div className={['video','notices','basics','quiz','level'].includes(tool)?undefined:styles.lesson}>{welcomeBody}</div>}
 
- {tool==='bots'&&<>{review&&<p>운영자 연습 공간이에요. 여기서 배치한 직원은 이 브라우저에만 저장됩니다.</p>}<PersonalOffice enrollmentId={snapshot.selectedEnrollmentId||''} demo={demo} onChange={document=>post('personal-office',{document})}/><button onClick={()=>selectTask('office')}>이 사무실의 업무 관리 열기</button></>}
+ {tool==='bots'&&<>{review&&<p>운영자 연습 공간이에요. 여기서 배치한 직원은 이 브라우저에만 저장됩니다.</p>}<PersonalOffice onJobs={employee=>{setOfficeFilter({...employee});selectTask('office');}} enrollmentId={snapshot.selectedEnrollmentId||''} demo={demo} onChange={document=>post('personal-office',{document})}/><button onClick={()=>{setOfficeFilter(null);selectTask('office');}}>이 사무실의 업무 관리 열기</button></>}
  {!review&&tool==='learning'&&<LessonTaskPanel key={snapshot.selectedEnrollmentId} initialLesson={requestedLesson} live={!!live} mayLeave={mayLeave} onCompleted={live?.onRefresh} snapshot={snapshot} onOpen={openLesson}/>}
  {tool==='lesson'&&<div className={styles.lesson}><small>미리보기용 수업 안내</small><h2>{selectedLesson}</h2><p>실제 서비스에서는 해당 수강권으로 공개된 수업과 과제를 연결합니다. 이 화면은 동선 확인용 예시입니다.</p><button onClick={()=>{setTool(previous||'learning');setPrevious('');}}>수업 목록으로</button></div>}
  {tool==='intro:'+room&&canEnter(role,room)&&<article className={styles.managedArticle}><h2>{managed[room]?.title}</h2><LessonText text={managed[room]?.body||''}/></article>}

@@ -49,7 +49,7 @@ export function CampusWorkspace({snapshot,demo=false,initialSection='learning',s
  <div hidden={section!=='business'}>{visited.has('business')&&<BusinessPanel key={snapshot.viewer.id+snapshot.selectedEnrollmentId} snapshot={snapshot} demo={demo} onOpenLesson={open} onAsk={ask}/>}</div>
  <div hidden={section!=='support'}>{visited.has('support')&&<SupportPanel key={snapshot.viewer.id+snapshot.selectedEnrollmentId} snapshot={snapshot} demo={demo} onOpen={open} onAsk={ask}/>}</div>
  <div hidden={section!=='ai'}>{visited.has('ai')&&<AiPanel key={snapshot.viewer.id+snapshot.selectedEnrollmentId+(handoff?.context||'')} snapshot={snapshot} demo={demo} handoff={handoff}/>}</div>
- <div hidden={section!=='office'}>{visited.has('office')&&<OfficePanel key={snapshot.viewer.id+snapshot.selectedEnrollmentId} snapshot={snapshot} demo={demo}/>}</div>
+ <div hidden={section!=='office'}>{visited.has('office')&&<OfficePanel active={section==='office'} key={snapshot.viewer.id+snapshot.selectedEnrollmentId} snapshot={snapshot} demo={demo}/>}</div>
  <div hidden={section!=='journal'}>{visited.has('journal')&&<JournalPanel key={snapshot.viewer.id+snapshot.selectedEnrollmentId} snapshot={snapshot} demo={demo} active={section==='journal'}/>}</div>
 
  </>;

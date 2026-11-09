@@ -4,18 +4,23 @@ import { Bot, CheckCircle2, FileText, Link2, Radio, ShieldCheck } from 'lucide-r
 import type { CampusSnapshot } from '../contracts';
 import { officeOutputs, officeStatusLabels, outputLabels, type OfficeCommand, type OfficeState, type OfficeOutput, type OfficeEvent } from './domain';
 import { emptyOfficeDemo, mutateOfficeDemo, receiveOfficeDemo } from './demo';
+import {useDirectory} from './agents/directory';
 import styles from './panel.module.css';
 import { useCampusDraftGuard } from '../ui/draft-guard';
 import { OfficeConnectionGuide } from './connection-guide';
 import { officeReportText } from './report-text';
 import { AnswerText } from '@/app/ui/final/lesson-text';
 import { OfficeDispatchPanel } from './dispatch-panel';
-export function OfficePanel({ snapshot, demo,active=true }: { snapshot: CampusSnapshot; demo: boolean;active?:boolean }) { return <OfficeSession key={`${snapshot.viewer.id}:${snapshot.selectedEnrollmentId}:${demo}`} snapshot={snapshot} demo={demo} active={active} />; }
+export function OfficePanel({ snapshot, demo,initialEmployee,active=true }: { snapshot: CampusSnapshot; demo: boolean;initialEmployee?:{id:string;name:string}|null;active?:boolean }) { return <OfficeSession key={`${snapshot.viewer.id}:${snapshot.selectedEnrollmentId}:${demo}:${initialEmployee?.id||''}`} snapshot={snapshot} demo={demo} initialEmployee={initialEmployee} active={active} />; }
 export const Panel = OfficePanel;
-function OfficeSession({ snapshot, demo,active=true }: { snapshot: CampusSnapshot; demo: boolean;active?:boolean }) {
+function OfficeSession({ snapshot, demo,initialEmployee,active=true }: { snapshot: CampusSnapshot; demo: boolean;initialEmployee?:{id:string;name:string}|null;active?:boolean }) {
   const enrollmentId = snapshot.selectedEnrollmentId;
   const [state, setState] = useState<OfficeState | null>(() => demo ? emptyOfficeDemo() : null), [objective, setObjective] = useState(''), [materials, setMaterials] = useState(''), [output, setOutput] = useState<OfficeOutput>('plan');
   const [selected, setSelected] = useState<string | null>(null), [note, setNote] = useState(''), [error, setError] = useState(''), [notice, setNotice] = useState(''), [busy, setBusy] = useState(false), [showArchived, setShowArchived] = useState(false);
+  const [employee,setEmployee]=useState(initialEmployee?.id||''),[pages,setPages]=useState<{before:string;id:string}[]>([]);
+  const cursor=pages.at(-1),directory=useDirectory(enrollmentId,!demo&&active,0);
+  function resetList(){setPages([]);setSelected(null);setState(null);setNote('');}
+  function movePage(p:typeof pages){setPages(p);setSelected(null);setState(null);setNote('');}
   const [dispatchLocked,setDispatchLocked]=useState(false);
   const [pending, setPending] = useState<OfficeCommand | null>(null);
   useCampusDraftGuard(!!objective.trim()||!!materials.trim()||output!=='plan'||(state?.jobs.find(j=>j.id===selected)?.status==='review'&&!!note.trim()),busy,'campus-office',active);
@@ -29,11 +34,12 @@ function OfficeSession({ snapshot, demo,active=true }: { snapshot: CampusSnapsho
   const refresh = useCallback(async (signal?: AbortSignal) => {
     if (demo || !enrollmentId) return;
     const version = ++readVersion.current;
-    const r = await fetch(`/api/campus/office?enrollmentId=${enrollmentId}`, { cache: 'no-store', signal });
+    const params=new URLSearchParams({enrollmentId,archived:showArchived?'1':'0'});if(employee)params.set('employee',employee);if(cursor){params.set('before',cursor.before);params.set('id',cursor.id);}if(selected)params.set('job',selected);
+    const r = await fetch('/api/campus/office?'+params, { cache: 'no-store', signal });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || '작업함을 불러오지 못했습니다.');
     if (alive.current && !signal?.aborted && version === readVersion.current) { setState(data); setSyncError(''); }
-  }, [demo, enrollmentId]);
+  }, [demo, enrollmentId,employee,cursor,selected,showArchived]);
   useEffect(() => {
     if (demo || !enrollmentId || !active || busy) return;
     let stopped = false, timer: ReturnType<typeof setTimeout> | undefined;
@@ -44,7 +50,7 @@ function OfficeSession({ snapshot, demo,active=true }: { snapshot: CampusSnapsho
       const signal = controller.signal;
       try { await refresh(signal); }
       catch { if (!signal.aborted && !stopped) setSyncError('작업 소식을 갱신하지 못했어요. 마지막으로 받은 내용을 표시하고 있으며 다시 연결하고 있어요.'); }
-      finally { controller = undefined; if (!stopped && document.visibilityState === 'visible') timer = setTimeout(() => void poll(), 5000); }
+      finally { controller = undefined; if (!stopped && document.visibilityState === 'visible') timer = setTimeout(() => void poll(), cursor||showArchived ? 60000 : 15000); }
     }
     function visibility() {
       clearTimeout(timer);
@@ -54,16 +60,16 @@ function OfficeSession({ snapshot, demo,active=true }: { snapshot: CampusSnapsho
     document.addEventListener('visibilitychange', visibility);
     void poll();
     return () => { stopped = true; clearTimeout(timer); controller?.abort(); document.removeEventListener('visibilitychange', visibility); };
-  }, [demo, enrollmentId, active, busy, refresh]);
+  }, [demo, enrollmentId, active, busy, refresh,cursor,showArchived]);
   async function send(c: OfficeCommand) {
     if (busy) return false; readVersion.current++; setBusy(true); setError(''); setNotice(''); setPending(c);
     try {
       if (demo) setState(mutateOfficeDemo(state!, c, snapshot, receipts.current));
       else { const r = await fetch('/api/campus/office', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(c) }); const data = await r.json(); if (!r.ok) throw new Error(data.error); await refresh(); }
-      setSelected(c.action === 'create' ? c.requestId : c.jobId!); setPending(null);setNote('');if(c.action==='create')setOutput('plan'); setNotice(c.action === 'create' ? '요청을 보관했어요. AI 직원 연결 전에는 외부로 전송하거나 실행하지 않습니다.' : '작업 기록을 저장했어요.'); return true;
+      if(c.action==='create'&&!demo){resetList();setEmployee('');setShowArchived(false);}setSelected(c.action === 'create' ? c.requestId : c.jobId!); setPending(null);setNote('');if(c.action==='create')setOutput('plan'); setNotice(c.action === 'create' ? '요청을 보관했어요. AI 직원 연결 전에는 외부로 전송하거나 실행하지 않습니다.' : '작업 기록을 저장했어요.'); return true;
     } catch (e) { setError(e instanceof Error ? e.message : '저장하지 못했습니다.'); return false; } finally { setBusy(false); }
   }
-  const job = state?.jobs.find(j => j.id === selected);
+  const job = demo ? state?.jobs.find(j => j.id === selected) : state?.detail?.id===selected ? state?.detail : null;
   const command = (action: OfficeCommand['action']) => ({ requestId: crypto.randomUUID(), enrollmentId: enrollmentId!, action, jobId: job?.id, expectedRevision: job?.revision, note });
   function receive(event: OfficeEvent['event']) {
     if (!job || !state || !demo) return;
@@ -76,10 +82,16 @@ function OfficeSession({ snapshot, demo,active=true }: { snapshot: CampusSnapsho
     {syncError && <p role="status" className={styles.error}>{syncError}</p>}
     {error && <div role="alert" className={styles.error}>{error}{pending && <button type="button" onClick={() => void send(pending)} disabled={busy}>같은 요청 다시 확인</button>}</div>}{notice && <p role="status" className={styles.notice}>{notice}</p>}
     <div className={styles.layout}><form className={styles.form} onSubmit={async e => { e.preventDefault(); if (await send({ requestId: crypto.randomUUID(), enrollmentId, action: 'create', objective, materialUrls: materials.split('\n').filter(Boolean), outputType: output })) { setObjective(''); setMaterials(''); } }}><h3>새 작업 요청</h3><label>이루고 싶은 목표<textarea required minLength={10} maxLength={2000} rows={4} value={objective} onChange={e => setObjective(e.target.value)} placeholder="누구를 위한 작업인지, 어떤 결과를 원하고 무엇은 지켜야 하는지 적어 주세요." /></label><label>받고 싶은 결과물<select value={output} onChange={e => setOutput(e.target.value as OfficeOutput)}>{officeOutputs.map(o => <option key={o} value={o}>{outputLabels[o]}</option>)}</select></label><label>참고 자료 링크 <span>선택 · 최대 5개</span><textarea rows={2} value={materials} onChange={e => setMaterials(e.target.value)} placeholder="https://… 링크를 줄마다 하나씩" /></label><p className={styles.hint}>이 요청은 본인만 볼 수 있어요. 링크의 공개 범위는 원본 서비스에서 확인해 주세요.</p><button className={styles.primary} disabled={busy || !state}>요청 보관하기</button></form>
-      <div className={styles.inbox}><div className={styles.listHeader}><h3>내 작업함 <span>{state?.jobs.filter(j => j.status !== 'archived').length ?? 0}</span></h3><button type="button" className={styles.textButton} aria-pressed={showArchived} onClick={() => setShowArchived(!showArchived)}>{showArchived ? '진행 작업 보기' : '보관함 보기'}</button>{!demo && <button className={styles.textButton} type="button" onClick={() => void refresh().catch(e => setError(e.message))} disabled={busy}>새로고침</button>}</div>
+      <div className={styles.inbox}><div className={styles.listHeader}><h3>내 작업함 </h3><button type="button" className={styles.textButton} aria-pressed={showArchived} onClick={() => {if(!demo)resetList();setShowArchived(!showArchived);}}>{showArchived ? '진행 작업 보기' : '보관함 보기'}</button>{!demo && <button className={styles.textButton} type="button" onClick={() => void refresh().catch(e => setError(e.message))} disabled={busy}>새로고침</button>}</div>
+        {!demo&&<div className={styles.filters}><label>담당 직원 <select value={employee} onChange={e=>{resetList();setEmployee(e.target.value);}}>
+        <option value="">전체 직원 · 직접 보관한 요청 포함</option>
+        {employee&&!directory.data?.employees.some(p=>p.employeeId===employee)&&<option value={employee}>{initialEmployee?.id===employee?initialEmployee.name:'선택한 직원'}</option>}
+        {directory.data?.employees.map(p=><option key={p.employeeId} value={p.employeeId}>{p.name}</option>)}</select></label>
+        {(directory.page>1||directory.data?.next)&&<><button disabled={directory.page===1} onClick={directory.prev}>이전 직원 목록</button><button disabled={!directory.data?.next} onClick={directory.next}>다음 직원 목록</button></>}{directory.error&&<span role="alert">{directory.error}</span>}</div>}
         {!state && !error && <p role="status">작업함을 불러오고 있어요…</p>}
         {state && !state.jobs.some(j => showArchived ? j.status === 'archived' : j.status !== 'archived') && <div className={styles.empty}><FileText size={28} /><h4>{showArchived ? '보관한 작업이 없어요.' : '첫 번째 부탁을 적어볼까요?'}</h4><p>목표와 참고 자료를 정리해 두면 연결 후 이어갈 수 있어요.</p></div>}
         <div className={styles.jobs}>{state?.jobs.filter(j => showArchived ? j.status === 'archived' : j.status !== 'archived').map(j => <button type="button" className={`${styles.job} ${selected === j.id ? styles.selected : ''}`} key={j.id} onClick={() => { setSelected(j.id); setNote(''); }}><span className={styles.status} data-status={j.status}>{officeStatusLabels[j.status]}</span><h4>{j.objective}</h4><small>{outputLabels[j.output_type]} · v{j.revision}</small></button>)}</div>
+      {!demo&&<nav aria-label="업무 페이지" className={styles.filters}><button type="button" disabled={busy||!pages.length} onClick={()=>movePage(pages.slice(0,-1))}>이전 업무</button><span>{pages.length+1}페이지</span><button type="button" disabled={busy||!state?.next} onClick={()=>state?.next&&movePage([...pages,state.next])}>다음 업무</button></nav>}
       </div></div>
     {job && <article className={styles.detail} aria-label="선택한 AI 직원 작업"><div className={styles.listHeader}><h3>{outputLabels[job.output_type]}</h3><span className={styles.status} data-status={job.status}>{officeStatusLabels[job.status]}</span></div><p className={styles.body}>{job.objective}</p><div className={styles.links}>{job.material_urls.map((u, i) => <a href={u} key={u} target="_blank" rel="noopener noreferrer"><Link2 size={13} />참고 자료 {i + 1}</a>)}</div>
       {job.status === 'awaiting_connection' && <p className={styles.waiting}>아직 봇에 전달되지 않았어요. 실제 접수 이벤트가 와야 ‘요청 접수’로 바뀝니다.</p>}
@@ -89,7 +101,7 @@ function OfficeSession({ snapshot, demo,active=true }: { snapshot: CampusSnapsho
       {job.review_note && <p className={styles.memo}>내 검토 기록: {job.review_note}</p>}
       <div className={styles.actions}>{job.status === 'failed' && <button className={styles.secondary} type="button" disabled={busy||dispatchLocked} onClick={() => void send(command('retry'))}>다시 연결 대기로</button>}{!['queued','running','archived'].includes(job.status) && <button className={styles.textButton} type="button" disabled={busy||dispatchLocked} onClick={() => void send(command('archive'))}>이 작업 보관</button>}</div>
       {demo && <details className={styles.demoControls}><summary>로컬 검수용 예시 이벤트</summary><p>실제 봇이나 Telegram에 연결하지 않고 상태 전이만 확인합니다.</p><div className={styles.actions}>{(['accepted','started','draft','failed'] as const).map(event => <button type="button" className={styles.secondary} key={event} disabled={event === 'accepted' ? !['awaiting_connection','revision_requested'].includes(job.status) : event === 'started' ? job.status !== 'queued' : event === 'draft' ? job.status !== 'running' : !['queued','running'].includes(job.status)} onClick={() => receive(event)}>{({accepted:'예시 접수',started:'예시 실행 시작',draft:'예시 초안 도착',failed:'예시 실행 오류'})[event]}</button>)}</div></details>}
-      <details className={styles.history}><summary>요청·검토 이력</summary><ol>{state?.history.filter(h => h.job_id === job.id).map(h => <li key={h.id}><strong>v{h.revision} · {officeStatusLabels[h.status]}</strong><span>{h.actor_type === 'learner' ? '내 요청' : demo ? '연습용 작업 소식' : '연결된 AI 직원이 보낸 소식'} · {h.note}</span>{h.draft_text && <details><summary>당시 초안</summary><p className={styles.body}><AnswerText text={officeReportText(h.draft_text)}/></p></details>}</li>)}</ol></details>
+      <details className={styles.history}><summary>요청·검토 이력 · 최근 20개</summary><ol>{state?.history.filter(h => h.job_id === job.id).map(h => <li key={h.id}><strong>v{h.revision} · {officeStatusLabels[h.status]}</strong><span>{h.actor_type === 'learner' ? '내 요청' : demo ? '연습용 작업 소식' : '연결된 AI 직원이 보낸 소식'} · {h.note}</span>{h.draft_text && <details><summary>당시 초안</summary><p className={styles.body}><AnswerText text={officeReportText(h.draft_text)}/></p></details>}</li>)}</ol></details>
     </article>}
   </section>;
 }

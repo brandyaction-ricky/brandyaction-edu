@@ -3,3 +3,5 @@
 @media(max-width:480px){.root{padding:16px;border-radius:16px}.header{gap:12px}.header h2{font-size:21px}.header .icon{width:44px;height:44px;border-radius:12px}.header .icon svg{width:23px}.header p{font-size:10px}.connection{margin-left:56px;font-size:10px}.form,.inbox,.detail{padding:15px}.body{font-size:13px}.actions>*{flex:1}.listHeader{gap:3px}.textButton{padding:4px 6px;font-size:10px}.demoControls button{flex:1 1 40%}}
 @media(max-width:800px){.header{display:grid;grid-template-columns:52px minmax(0,1fr);align-items:start}.connection{grid-column:2;margin-left:0;justify-self:start}.header>div:nth-child(2){min-width:0}}
 @media(max-width:480px){.header{grid-template-columns:44px minmax(0,1fr)}.connection{margin-left:0}.header h2{word-break:keep-all}}
+
+.filters{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:12px 0}.filters label{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.filters select{max-width:100%;min-height:40px}.filters button{padding:7px 12px;border:1px solid var(--line);background:white;border-radius:8px}
