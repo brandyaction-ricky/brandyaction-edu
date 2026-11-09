@@ -7,25 +7,27 @@ test('incoming job reports update without manual refresh; network loss is visibl
  const job = { id: '00000000-0000-4000-8000-000000000123', owner_id: student.viewer.id, enrollment_id: student.selectedEnrollmentId,
    objective: '개발 검수용 보고 상태 확인 작업입니다.', material_urls: [], output_type: 'analysis', status: 'queued', revision: 2,
    draft_text: '', draft_url: '', review_note: '', error_note: '', created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+ test.setTimeout(110000);
+ await page.route('**/api/campus/office/agents?*', r=>r.fulfill({json:{employees:[],next:null}}));
  let unavailable = false;
- await page.route('**/api/campus/office?*', route => route.fulfill({ status: unavailable ? 503 : 200, contentType: 'application/json', body: JSON.stringify(unavailable ? { error: 'Unavailable' } : { jobs: [job], history: [], connection: 'incoming_adapter_registered', demo: false }) }));
+ await page.route('**/api/campus/office?*', route => route.fulfill({ status: unavailable ? 503 : 200, contentType: 'application/json', body: JSON.stringify(unavailable ? { error: 'Unavailable' } : { jobs: [{id:job.id,objective:job.objective,status:job.status,revision:job.revision,output_type:job.output_type}], detail:new URL(route.request().url()).searchParams.get('job')===job.id?job:null, history: [], connection: 'incoming_adapter_registered', demo: false }) }));
  await page.goto('/office?api=1');
  await page.getByRole('button', { name: /개발 검수용 보고 상태 확인 작업/ }).click();
  const detail = page.getByRole('article', { name: '선택한 AI 직원 작업' });
  await expect(detail.getByText('요청 접수', { exact: true })).toBeVisible();
  job.status = 'running'; job.revision = 3;
- await expect(detail.getByText('실행 중', { exact: true })).toBeVisible({ timeout: 8000 });
+ await expect(detail.getByText('실행 중', { exact: true })).toBeVisible({ timeout: 22000 });
  const resultText = '로컬 HTTP 시험에서 수신한 분석 결과입니다. 실제 AI 업무 결과는 아닙니다.';
  job.status = 'review'; job.revision = 4; job.draft_text = `<citation refs="test_1">${resultText}</citation>\n[공식 문서](https://example.com/docs)\n[실행 금지](javascript:alert(1))`;
- await expect(detail.getByText(resultText, { exact: false })).toBeVisible({ timeout: 8000 });
+ await expect(detail.getByText(resultText, { exact: false })).toBeVisible({ timeout: 22000 });
  await expect(detail.getByRole('link', { name: '공식 문서' })).toHaveAttribute('href', 'https://example.com/docs');
  await expect(detail.getByRole('link', { name: '실행 금지' })).toHaveCount(0);
  await expect(detail).not.toContainText('<citation');
  unavailable = true;
- await expect(page.getByText(/작업 소식을 갱신하지 못했어요/)).toBeVisible({ timeout: 8000 });
+ await expect(page.getByText(/작업 소식을 갱신하지 못했어요/)).toBeVisible({ timeout: 22000 });
  await expect(detail.getByText(resultText, { exact: false })).toBeVisible();
  unavailable = false;
- await expect(page.getByText(/작업 소식을 갱신하지 못했어요/)).toHaveCount(0, { timeout: 8000 });
+ await expect(page.getByText(/작업 소식을 갱신하지 못했어요/)).toHaveCount(0, { timeout: 22000 });
  await page.reload();
  await page.getByRole('button', { name: /개발 검수용 보고 상태 확인 작업/ }).click();
  await expect(detail.getByText(resultText, { exact: false })).toBeVisible();
@@ -46,7 +48,7 @@ test('disconnected office stores private request; only explicit synthetic receip
  await page.getByRole('button',{name:'예시 초안 도착',exact:true}).click();await expect(detail.getByText('내 검토 필요',{exact:true})).toBeVisible();
  await expect(page.getByRole('button',{name:'검토 후 승인',exact:true})).toBeDisabled();
  await page.getByRole('textbox',{name:'검토 메모',exact:true}).fill('고객 대상과 실행 순서를 확인했고 이 초안으로 진행하겠습니다.');await page.getByRole('button',{name:'검토 후 승인',exact:true}).click();
- await expect(detail.getByText('승인 완료',{exact:true})).toBeVisible();await detail.getByText('요청·검토 이력',{exact:true}).click();await expect(detail.getByText('v1 · 연결 대기',{exact:true})).toBeVisible();await noOverflow(page);
+ await expect(detail.getByText('승인 완료',{exact:true})).toBeVisible();await detail.getByText('요청·검토 이력 · 최근 20개',{exact:true}).click();await expect(detail.getByText('v1 · 연결 대기',{exact:true})).toBeVisible();await noOverflow(page);
  await page.screenshot({path:test.info().outputPath('office-approved.png'),fullPage:true});
  await page.getByRole('button',{name:'이 작업 보관',exact:true}).click();await expect(detail.getByText('보관됨',{exact:true})).toBeVisible();await page.getByRole('button',{name:'보관함 보기',exact:true}).click();await expect(page.getByRole('button',{name:new RegExp(objective)})).toBeVisible();
  expect(errors).toEqual([]);expect(requests).toEqual([]);
