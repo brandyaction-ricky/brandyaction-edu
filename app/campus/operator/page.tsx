@@ -1,6 +1,7 @@
 import {readWebinar} from '@/features/campus/webinar/server';
 import {readWelcome} from '@/features/campus/welcome/server';
 import {notFound,redirect} from 'next/navigation';
+import {getOperatorUser} from '@/lib/operator-permissions';
 import {getAuthenticatedUser} from '@/lib/server-auth';
 import {canReviewCampus} from '@/features/campus/operator-access';
 import {FourSpacesPreview} from '@/features/campus/tour/preview';
@@ -15,5 +16,6 @@ export default async function Page({searchParams}:{searchParams:Promise<Record<s
  const room=typeof q.room==='string'&&rooms.some(r=>r.id===q.room)?q.room as TourRoom:'study';
  const event=typeof q.event==='string'?await readWebinar(q.event):null;
  const welcome=await readWelcome(typeof q.cohort==='string'?q.cohort:event?.cohortId);
- return <FourSpacesPreview welcome={welcome} review={{room}} snapshot={{schemaVersion:1,fetchedAt:new Date().toISOString(),viewer:{id:user.id,displayName:user.full_name||'운영자'},scopes:[],selectedEnrollmentId:null,lessons:[],links:{classes:'/admin',questions:'/admin'},launchEligibility:null}}/>;
+ const studyPreview=!!await getOperatorUser('products',user);
+ return <FourSpacesPreview welcome={welcome} review={{room,studyPreview}} snapshot={{schemaVersion:1,fetchedAt:new Date().toISOString(),viewer:{id:user.id,displayName:user.full_name||'운영자'},scopes:[],selectedEnrollmentId:null,lessons:[],links:{classes:'/admin',questions:'/admin'},launchEligibility:null}}/>;
 }

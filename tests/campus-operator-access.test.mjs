@@ -21,13 +21,14 @@ test('welcome links route staff and admins to the requested room before enrollme
  }finally{if(before===undefined)delete process.env.EDU_CAMPUS_ENABLED;else process.env.EDU_CAMPUS_ENABLED=before;}
 });
 test('direct operator entry rejects students, inactive staff and missing sessions',async()=>{
- let user;const jsx=(type,props)=>({type,props});
- const mocks={'@/features/campus/webinar/server':{readWebinar:async()=>({cohortId:'event-cohort'})},'@/features/campus/welcome/server':{readWelcome:async()=>({settings:{},resources:[]})},'react/jsx-runtime':{jsx,jsxs:jsx},'@/features/campus/operator-access':policy,'next/navigation':{notFound:()=>{throw Error('404')},redirect:path=>{throw Error('REDIRECT '+path)}},'@/lib/server-auth':{getAuthenticatedUser:async()=>user},'@/features/campus/tour/preview':{FourSpacesPreview:'tour'},'@/features/campus/snapshot':{isCampusId:()=>true},'@/features/campus/tour/model':{rooms:[{id:'welcome'},{id:'study'}]}};
+ let user, productAccess=false;const jsx=(type,props)=>({type,props});
+ const mocks={'@/lib/operator-permissions':{getOperatorUser:async(scope,actor)=>{assert.equal(scope,'products');assert.equal(actor,user);return actor.role==='admin'||productAccess?actor:null;}},'@/features/campus/webinar/server':{readWebinar:async()=>({cohortId:'event-cohort'})},'@/features/campus/welcome/server':{readWelcome:async()=>({settings:{},resources:[]})},'react/jsx-runtime':{jsx,jsxs:jsx},'@/features/campus/operator-access':policy,'next/navigation':{notFound:()=>{throw Error('404')},redirect:path=>{throw Error('REDIRECT '+path)}},'@/lib/server-auth':{getAuthenticatedUser:async()=>user},'@/features/campus/tour/preview':{FourSpacesPreview:'tour'},'@/features/campus/snapshot':{isCampusId:()=>true},'@/features/campus/tour/model':{rooms:[{id:'welcome'},{id:'study'}]}};
  const mod={};new Function('exports','require',ts.transpileModule(await readFile('app/campus/operator/page.tsx','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText)(mod,name=>{assert.ok(name in mocks,name);return mocks[name]});
  const before=process.env.EDU_CAMPUS_ENABLED;process.env.EDU_CAMPUS_ENABLED='true';
  const render=()=>mod.default({searchParams:Promise.resolve({room:'welcome'})});
  try{
-  for(const role of ['admin','staff']){user={id:role,role,status:'active'};const result=await render();assert.equal(result.props.review.room,'welcome');assert.deepEqual(result.props.snapshot.scopes,[]);assert.equal(result.props.snapshot.viewer.id,role);}
+  for(const role of ['admin','staff']){user={id:role,role,status:'active'};const result=await render();assert.equal(result.props.review.room,'welcome');assert.equal(result.props.review.studyPreview,role==='admin');assert.deepEqual(result.props.snapshot.scopes,[]);assert.equal(result.props.snapshot.viewer.id,role);}
+  productAccess=true;assert.equal((await render()).props.review.studyPreview,true);
   for(const candidate of [{role:'student',status:'active'},{role:'staff',status:'suspended'}]){user=candidate;await assert.rejects(render(),/404/);}
   user=null;await assert.rejects(render(),/REDIRECT \/login/);
  }finally{if(before===undefined)delete process.env.EDU_CAMPUS_ENABLED;else process.env.EDU_CAMPUS_ENABLED=before;}
