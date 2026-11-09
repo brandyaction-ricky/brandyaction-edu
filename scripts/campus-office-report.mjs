@@ -1,5 +1,5 @@
 // Student-PC outbound reporter. No Telegram consumer, AI runner, or public port.
-import { studentEndpoint as targetEndpoint, studentEnvironment } from './student-target.mjs';
+import { studentEndpoint as targetEndpoint, studentEnvironment, gatewayHeaders } from './student-target.mjs';
 import { createHmac, randomUUID } from 'node:crypto';
 import { readFile, writeFile, stat } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
@@ -56,7 +56,7 @@ export async function deliverReport(config, envelope, secret, fetcher = fetch, n
   let response;
   try {
     response = await fetcher(url.href, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(15000),
-      headers: studentEndpoint ? { 'content-type':'application/json', 'x-campus-device':secret, 'x-campus-event-id':envelope.eventId } : { 'content-type': 'application/json', 'x-campus-connector': config.connectorId,
+      headers: studentEndpoint ? { ...await gatewayHeaders(), 'content-type':'application/json', 'x-campus-device':secret, 'x-campus-event-id':envelope.eventId } : { 'content-type': 'application/json', 'x-campus-connector': config.connectorId,
         'x-campus-key-version': config.keyVersion, 'x-campus-timestamp': timestamp,
         'x-campus-event-id': envelope.eventId, 'x-campus-signature': `v1=${signature}` }, body: envelope.raw });
   } catch { throw new Error('Delivery unconfirmed. Keep this saved report and retry it; do not create another event.'); }

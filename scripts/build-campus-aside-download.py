@@ -1,6 +1,9 @@
 """Build the public, credential-free Aside download from the portable bundle."""
 from pathlib import Path
+import base64
+import json
 import sys
+import time
 import subprocess
 import tempfile
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
@@ -14,6 +17,14 @@ target.parent.mkdir(exist_ok=True)
 with tempfile.TemporaryDirectory() as tmp:
     bundle = Path(tmp) / "moonshot-campus-report"
     subprocess.run(["node", root / "scripts/build-campus-aside-skill.mjs", bundle, environment], check=True)
+    if len(sys.argv) > 2:
+        if environment != 'production':
+            raise ValueError("A public production gateway key belongs only in the production package")
+        key = json.loads(Path(sys.argv[2]).read_text())['key']
+        claims = json.loads(base64.urlsafe_b64decode(key.split('.')[1] + '==='))
+        if claims.get('role') != 'anon' or claims.get('ref') != 'qitqxizuwmmlhlcgsrqe' or claims.get('sub') or claims.get('exp', 0) < time.time():
+            raise ValueError("Expected a current public anon key for the EDU production project")
+        (bundle / 'scripts/gateway-public.json').write_text(json.dumps({'key': key}))
     with ZipFile(target, "w") as archive:
         for entry in sorted(bundle.rglob("*")):
             if entry.is_file():

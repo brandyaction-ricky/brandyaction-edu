@@ -3,7 +3,7 @@ import {createHash, randomBytes} from 'node:crypto';
 import {mkdir, readFile, writeFile, rename, stat, open, unlink} from 'node:fs/promises';
 import {join, resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
-import { studentEndpoint as endpoint, studentEnvironment } from './student-target.mjs';
+import { studentEndpoint as endpoint, studentEnvironment, gatewayHeaders } from './student-target.mjs';
 export { endpoint };
 const sha = value => createHash('sha256').update(value).digest('hex');
 export function deviceDir(root,c) {
@@ -34,7 +34,7 @@ export async function configureDevice(root,c,command,transport=fetch) {
     const token=await readFile(pendingFile,'utf8');
     const localConfirmationTime=Date.now();
     const r=await transport(endpoint,{method:'POST',redirect:'error',signal:AbortSignal.timeout(15000),
-      headers:{'content-type':'application/json','x-campus-device':token},body:JSON.stringify({action:'confirm',code:match[1]})});
+      headers:{...await gatewayHeaders(),'content-type':'application/json','x-campus-device':token},body:JSON.stringify({action:'confirm',code:match[1]})});
     if(!r.ok)throw Error('Connection confirmation refused ('+r.status+')');
     const b=await r.json();
     if(!/^s-[0-9a-f-]{36}$/.test(b.connectorId)||!/^[0-9a-f-]{36}$/.test(b.enrollmentId)||!Number.isSafeInteger(b.notBefore))throw Error('Invalid connection receipt');
