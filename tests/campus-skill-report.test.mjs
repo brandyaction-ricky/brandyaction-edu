@@ -33,3 +33,27 @@ test('failed report never becomes a fabricated completed result',async()=>{
  assert.deepEqual(events.map(e=>e.event),['registered','accepted','started','failed']);
  await assert.rejects(reportSkill(config,{action:'result',context,resultText:'실패를 완료로 덮어쓰려는 답변입니다.'},saved,send,persist),/Terminal report changed/);
 });
+
+test('a newly paired employee reports one natural-language assignment without publishing the original DM', async () => {
+  const paired = {...config, transport: 'student-device', reportMode: 'assigned-tasks'};
+  const request = {action: 'start', context, requestText: '공지 써줘', taskObjective: '수강생에게 보낼 공지 초안 작성'};
+  const events = [];
+  let saved;
+  const send = async (_config, envelope) => events.push(JSON.parse(envelope.raw));
+  const persist = async state => { saved = structuredClone(state); };
+
+  for (const unsupported of [config, {...paired, reportMode: undefined}]) {
+    await assert.rejects(reportSkill(unsupported, request, null, send, persist));
+  }
+  for (const chat of [{...request, requestText: '안녕!', taskObjective: undefined},
+    {...request, requestText: '캠퍼스 연결 준비'}, {...request, requestText: '/start'}]) {
+    await assert.rejects(reportSkill(paired, chat, null, send, persist));
+  }
+  assert.equal(events.length, 0);
+  await reportSkill(paired, request, null, send, persist);
+  await reportSkill(paired, request, saved, send, persist);
+  await reportSkill(paired, {action: 'result', context, resultText: '이번 주 수업은 금요일 오후에 시작합니다.'}, saved, send, persist);
+  assert.deepEqual(events.map(event => event.event), ['registered', 'accepted', 'started', 'draft']);
+  assert.equal(events[0].objective, request.taskObjective);
+  assert.ok(!JSON.stringify(events).includes(request.requestText));
+});

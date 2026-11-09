@@ -36,6 +36,7 @@ export function StudentConnections({enrollmentId,employees}:{enrollmentId:string
   return <section aria-label="직원 보고 연결"><h3>직원 보고 연결</h3>
     <p><a href={`/api/campus/office/skill?enrollmentId=${encodeURIComponent(enrollmentId)}`} download>Aside 보고 스킬 받기</a> · 압축을 풀고 내 Aside 계정의 <code>skills/user</code>에 <code>moonshot-campus-report</code> 폴더를 넣으세요.</p>
     <p>내 Telegram 봇의 개인 대화에서 <strong>캠퍼스 연결 준비</strong>를 보내세요. 받은 코드는 10분 동안 사용할 수 있어요.</p>
+    <p>새 스킬로 연결한 뒤에는 “공지 초안 써줘”처럼 부탁하세요. 맡긴 업무의 요약과 결과가 내 작업함에 표시됩니다. 인사와 일반 질문은 대화에만 남아요.</p>
     {rows&&available.length>0&&<form onSubmit={e=>{e.preventDefault();void act('pair');}}>
       <label>연결할 직원<select value={selected} onChange={e=>setEmployee(e.target.value)}>{available.map(p=><option value={p.employeeId} key={p.employeeId}>{p.name}</option>)}</select></label>
       <label>직원이 보낸 연결 코드<input value={code} onChange={e=>setCode(e.target.value)} maxLength={82} autoComplete="off" spellCheck={false}/></label>
