@@ -2,9 +2,9 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {CheckCircle2,Clock3,RefreshCw,ShieldAlert} from 'lucide-react';
 import './member-erasure-queue.css';
-type RequestRow={requestId:string;memberId:string;state:string;receivedAt:string;deadlineAt:string;nextAttemptAt:string;attempts:number;uncertainAttempts:number;counts:Record<string,number>;storageRemoved:number;storageFailedCount:number;lastCode:string|null;completedAt:string|null;approvedAt?:string|null;disabledAt?:string|null;authErasedAt?:string|null;memberName?:string|null;memberEmail?:string|null};
+type RequestRow={requestId:string;memberId:string;state:string;receivedAt:string;deadlineAt:string;nextAttemptAt:string;attempts:number;uncertainAttempts:number;counts:Record<string,number>;storageRemoved:number;storageFailedCount:number;lastCode:string|null;completedAt:string|null;approvedAt?:string|null;disabledAt?:string|null;authErasedAt?:string|null;localErasedAt?:string|null;localCounts?:Record<string,number>;localStorageRemoved?:number;memberName?:string|null;memberEmail?:string|null};
 const labels:Record<string,string>={requested:'접수',processing:'삭제 중',retry:'다시 시도 예정',blocked:'관리자 확인 필요',complete:'삭제 완료'};
-const errors:Record<string,string>={NETWORK:'서버 연결이 끊겼습니다.',UNAVAILABLE:'마이인 서버가 처리 중입니다.',STORAGE_PENDING:'남은 파일을 다시 지울 예정입니다.',CONFIGURATION:'서버 연결 설정을 확인해 주세요.',UNAUTHORIZED:'서버 인증 설정을 확인해 주세요.',FORBIDDEN:'서버 환경을 확인해 주세요.',DISABLED:'마이인 삭제 기능이 아직 켜지지 않았습니다.',LOCAL_WITHDRAWAL_BLOCKED:'에듀 탈퇴 권한·상태를 확인해 주세요.',AUTH_ERASURE_FAILED:'로그인 계정 삭제를 다시 확인하고 있습니다.',AUTH_RECEIPT_PENDING:'로그인 계정 삭제 결과 기록을 다시 확인하고 있습니다.',INVALID_RESPONSE:'삭제 결과 형식을 확인해 주세요.'};
+const errors:Record<string,string>={LOCAL_UPLOAD_DRAIN_PENDING:'기존 업로드 링크의 만료를 기다리고 있습니다. 접근 차단 후 최대 2시간 2분 뒤 파일 삭제를 이어갑니다.',LOCAL_ERASURE_PENDING:'학습·AI 자료 삭제를 다시 확인하고 있습니다.',LOCAL_STORAGE_PENDING:'남은 학습 첨부 파일을 다시 삭제할 예정입니다.',NETWORK:'서버 연결이 끊겼습니다.',UNAVAILABLE:'마이인 서버가 처리 중입니다.',STORAGE_PENDING:'남은 파일을 다시 지울 예정입니다.',CONFIGURATION:'서버 연결 설정을 확인해 주세요.',UNAUTHORIZED:'서버 인증 설정을 확인해 주세요.',FORBIDDEN:'서버 환경을 확인해 주세요.',DISABLED:'마이인 삭제 기능이 아직 켜지지 않았습니다.',LOCAL_WITHDRAWAL_BLOCKED:'에듀 탈퇴 권한·상태를 확인해 주세요.',AUTH_ERASURE_FAILED:'로그인 계정 삭제를 다시 확인하고 있습니다.',AUTH_RECEIPT_PENDING:'로그인 계정 삭제 결과 기록을 다시 확인하고 있습니다.',INVALID_RESPONSE:'삭제 결과 형식을 확인해 주세요.'};
 export function MemberErasureQueue() {
   const [rows,setRows]=useState<RequestRow[]>([]),[enabled,setEnabled]=useState(false),[error,setError]=useState(''),[busy,setBusy]=useState(true);
   const [selected,setSelected]=useState<string|null>(null),[confirmed,setConfirmed]=useState(false),[message,setMessage]=useState('');
@@ -32,7 +32,7 @@ export function MemberErasureQueue() {
     </header>
     <div className="erasure-overview">
       {!busy&&!error&&rows.length>0&&<><span><strong>{pending}</strong>건 처리 대기</span><span><strong>{rows.length-pending}</strong>건 삭제 완료</span></>}
-      <details className="erasure-help"><summary>처리 안내</summary><p>{enabled?'요청별로 삭제 내용을 확인하고 실행해 주세요. 로그인 계정과 진단 데이터·파일 삭제가 모두 끝나야 완료됩니다.':'지금은 요청만 접수합니다. 삭제 연동 검수를 마친 뒤 처리합니다.'} 접수일부터 30일 안에 처리 상태를 확인해 주세요.</p></details>
+      <details className="erasure-help"><summary>처리 안내</summary><p>{enabled?'요청별로 삭제 내용을 확인하고 실행해 주세요. 로그인 계정과 학습·AI·진단 자료 및 첨부 파일 삭제가 모두 끝나야 완료됩니다. 기존 업로드 링크의 만료를 기다려 최대 2시간 2분 뒤 파일 삭제를 이어갑니다.':'지금은 요청만 접수합니다. 삭제 연동 검수를 마친 뒤 처리합니다.'} 접수일부터 30일 안에 처리 상태를 확인해 주세요.</p></details>
     </div>
     {!enabled&&<p className="erasure-note"><Clock3 size={16} aria-hidden="true"/>지금은 요청만 접수합니다.</p>}
     {message&&<p className="erasure-note" role="status">{message}</p>}
@@ -51,7 +51,7 @@ export function MemberErasureQueue() {
       {r.disabledAt&&r.state!=='complete'&&<p className="erasure-note">로그인·수강 접근이 차단됐습니다. 진행 중인 진단 처리를 정리한 뒤 남은 삭제를 이어갑니다.</p>}
       <div className="erasure-results" aria-label="확인된 삭제 결과">
         <span>진단 기록 <strong>{Object.values(r.counts).reduce((a,b)=>a+b,0)}건</strong></span>
-        <span>파일 <strong>{r.storageRemoved}개</strong></span>
+        <span>학습 자료 <strong>{Object.values(r.localCounts??{}).reduce((a,b)=>a+b,0)}건</strong></span><span>파일 <strong>{r.storageRemoved+(r.localStorageRemoved??0)}개</strong></span>
         {r.storageFailedCount>0&&<span className="erasure-remaining">남은 파일 <strong>{r.storageFailedCount}개</strong></span>}
       </div>
       {r.uncertainAttempts>0&&<p className="erasure-note"><ShieldAlert size={16} aria-hidden="true"/>응답을 받지 못한 시도가 있어 실제 삭제 건수는 더 많을 수 있습니다.</p>}
@@ -64,7 +64,7 @@ export function MemberErasureQueue() {
           {r.approvedAt&&<div><dt>처리 승인</dt><dd>{new Date(r.approvedAt).toLocaleString('ko-KR')}</dd></div>}
           {r.disabledAt&&<div><dt>접근 차단</dt><dd>{new Date(r.disabledAt).toLocaleString('ko-KR')}</dd></div>}
           {r.authErasedAt&&<div><dt>로그인 계정 삭제</dt><dd>{new Date(r.authErasedAt).toLocaleString('ko-KR')}</dd></div>}
-          {r.completedAt&&<div><dt>완료</dt><dd>{new Date(r.completedAt).toLocaleString('ko-KR')}</dd></div>}
+          {r.localErasedAt&&<div><dt>학습·첨부 삭제</dt><dd>{new Date(r.localErasedAt).toLocaleString('ko-KR')}</dd></div>}{r.completedAt&&<div><dt>완료</dt><dd>{new Date(r.completedAt).toLocaleString('ko-KR')}</dd></div>}
           {r.state==='retry'&&<div><dt>다음 시도</dt><dd>{new Date(r.nextAttemptAt).toLocaleString('ko-KR')}</dd></div>}
         </dl><p>표시한 수는 삭제 결과로 확인된 건수입니다.</p></details>
         {enabled&&['requested','retry','blocked'].includes(r.state)&&<button className="btn small" type="button" disabled={busy} aria-expanded={selected===r.requestId} onClick={()=>{setSelected(r.requestId);setConfirmed(false);setMessage('');}}>{r.approvedAt?'처리 이어가기':'삭제 내용 확인'}</button>}
@@ -75,7 +75,7 @@ export function MemberErasureQueue() {
         <p className="erasure-request-id">요청 번호 {r.requestId}</p>
         <ul>
           <li>회원정보를 익명화하고 로그인·수강 접근을 차단합니다.</li>
-          <li>로그인 계정과 연결된 진단 응답·보고서·파일을 삭제합니다.</li>
+          <li>로그인 계정과 학습·AI 대화·질문·진단 응답·보고서·첨부 파일을 삭제합니다. 다른 회원의 대화는 보존하며 탈퇴한 회원의 내용만 지웁니다.</li>
           <li>결제·환불 등 보존이 필요한 거래 기록과 처리 증빙은 유지합니다.</li>
         </ul>
         <p>삭제 후 복구할 수 없습니다. 일부 처리가 실패하면 완료로 표시하지 않고 같은 요청으로 이어갑니다.</p>

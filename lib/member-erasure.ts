@@ -3,6 +3,40 @@ import {EraseBridgeError,sendDiagnosisErase,type EraseReceipt} from './diagnosis
 
 type Rpc=(name:string,args:Record<string,unknown>)=>PromiseLike<{data:unknown;error:unknown}>;
 type Job={requestId:string;subject:string;lease:string;environment:string;authErased?:boolean};
+type LocalFile={id:string;bucket:string;path:string};
+const privateBuckets=new Set(['question-images','lesson-answer-files','campus-portfolio-private']);
+export async function eraseMemberLocalData(rpc:Rpc,job:Job,remove=(bucket:string,paths:string[])=>createAdminClient().storage.from(bucket).remove(paths)) {
+  const args={p_request:job.requestId,p_lease:job.lease};
+  const prepared=await rpc('edu_prepare_member_local_erasure',args);
+  if(prepared.error){
+    // Only fixed codes are propagated; never log SQL errors, file names or member content.
+    const code=typeof prepared.error==='object'&&prepared.error!==null&&'message' in prepared.error&&prepared.error.message==='LOCAL_UPLOAD_DRAIN_PENDING'
+      ?'LOCAL_UPLOAD_DRAIN_PENDING':'LOCAL_ERASURE_PENDING';
+    throw new EraseBridgeError(code,true);
+  }
+  if(!prepared.data||typeof prepared.data!=='object'||!('ready' in prepared.data))throw new EraseBridgeError('LOCAL_ERASURE_PENDING',true);
+  if(prepared.data.ready===true)return;
+  // Bounded work per lease; remaining objects stay in the durable queue for the same request.
+  for(let batch=0;batch<3;batch++){
+    const listed=await rpc('edu_list_member_erasure_files',args);
+    if(listed.error||!Array.isArray(listed.data)||listed.data.length>50)throw new EraseBridgeError('LOCAL_STORAGE_PENDING',true);
+    const files=listed.data as LocalFile[];
+    if(!files.length){
+      const saved=await rpc('edu_finish_member_local_erasure',args);
+      if(saved.error)throw new EraseBridgeError('LOCAL_STORAGE_PENDING',true);
+      return;
+    }
+    if(files.some(f=>!f||!privateBuckets.has(f.bucket)||typeof f.path!=='string'||!f.path||!f.id))throw new EraseBridgeError('LOCAL_STORAGE_PENDING',true);
+    for(const bucket of new Set(files.map(f=>f.bucket))){
+      const group=files.filter(f=>f.bucket===bucket);
+      const removed=await remove(bucket,group.map(f=>f.path));
+      if(removed.error)throw new EraseBridgeError('LOCAL_STORAGE_PENDING',true);
+      const saved=await rpc('edu_record_member_erasure_files',{...args,p_files:group.map(f=>f.id)});
+      if(saved.error)throw new EraseBridgeError('LOCAL_STORAGE_PENDING',true);
+    }
+  }
+  throw new EraseBridgeError('LOCAL_STORAGE_PENDING',true);
+}
 const environments={
   production:{host:'qitqxizuwmmlhlcgsrqe.supabase.co',origin:'https://server.myinlab.co.kr'},
   dev:{host:'vjmjhaidlqkmascdjocw.supabase.co',origin:'https://dev-server.myinlab.co.kr'},
@@ -33,9 +67,9 @@ export async function eraseMemberAuth(subject:string) {
   if(result.error)throw new EraseBridgeError('AUTH_ERASURE_FAILED',true);
 }
 
-export async function dispatchMemberErasure({rpc,send,eraseAuth=eraseMemberAuth,env=process.env,limit=3,requestId}: {
+export async function dispatchMemberErasure({rpc,send,eraseAuth=eraseMemberAuth,eraseLocal=eraseMemberLocalData,env=process.env,limit=3,requestId}: {
   rpc?:Rpc;send?:(subject:string,requestId:string)=>Promise<EraseReceipt>;
-  eraseAuth?:(subject:string)=>Promise<void>;env?:NodeJS.ProcessEnv;limit?:number;requestId?:string;
+  eraseAuth?:(subject:string)=>Promise<void>;eraseLocal?:(rpc:Rpc,job:Job)=>Promise<void>;env?:NodeJS.ProcessEnv;limit?:number;requestId?:string;
 }={}) {
   if(env.EDU_DIAGNOSIS_ERASURE_ENABLED!=='true')return {enabled:false,processed:0,completed:0};
   if(!memberErasureReady(env))throw new EraseBridgeError('CONFIGURATION',false);
@@ -49,6 +83,9 @@ export async function dispatchMemberErasure({rpc,send,eraseAuth=eraseMemberAuth,
     if(job.environment!==environment || (requestId&&job.requestId!==requestId))throw Error('ERASURE_ENVIRONMENT_MISMATCH');
     let result:EraseReceipt|null=null,code:string|null=null,retryable=false;
     try {
+      // Storage-owned objects can prevent Auth deletion. Revoke access in the approval
+      // transaction, drain signed uploads, then remove owned objects before deleting credentials.
+      await eraseLocal(call,job);
       if(!job.authErased){
         await eraseAuth(job.subject);
         const savedAuth=await call('edu_record_member_auth_erasure',{p_request:job.requestId,p_lease:job.lease});
