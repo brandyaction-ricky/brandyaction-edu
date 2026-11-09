@@ -4,6 +4,7 @@ import { Bot, CheckCircle2, FileText, Link2, Radio, ShieldCheck } from 'lucide-r
 import type { CampusSnapshot } from '../contracts';
 import { officeOutputs, officeStatusLabels, outputLabels, type OfficeCommand, type OfficeState, type OfficeOutput, type OfficeEvent } from './domain';
 import { emptyOfficeDemo, mutateOfficeDemo, receiveOfficeDemo } from './demo';
+import {useOfficeLive} from './use-office-live';
 import {useDirectory} from './agents/directory';
 import styles from './panel.module.css';
 import { useCampusDraftGuard } from '../ui/draft-guard';
@@ -40,27 +41,8 @@ function OfficeSession({ snapshot, demo,initialEmployee,active=true }: { snapsho
     if (!r.ok) throw new Error(data.error || '작업함을 불러오지 못했습니다.');
     if (alive.current && !signal?.aborted && version === readVersion.current) { setState(data); setSyncError(''); }
   }, [demo, enrollmentId,employee,cursor,selected,showArchived]);
-  useEffect(() => {
-    if (demo || !enrollmentId || !active || busy) return;
-    let stopped = false, timer: ReturnType<typeof setTimeout> | undefined;
-    let controller: AbortController | undefined;
-    async function poll() {
-      if (stopped || document.visibilityState !== 'visible' || controller) return;
-      controller = new AbortController();
-      const signal = controller.signal;
-      try { await refresh(signal); }
-      catch { if (!signal.aborted && !stopped) setSyncError('작업 소식을 갱신하지 못했어요. 마지막으로 받은 내용을 표시하고 있으며 다시 연결하고 있어요.'); }
-      finally { controller = undefined; if (!stopped && document.visibilityState === 'visible') timer = setTimeout(() => void poll(), cursor||showArchived ? 60000 : 15000); }
-    }
-    function visibility() {
-      clearTimeout(timer);
-      if (document.visibilityState === 'visible') { if (!controller) void poll(); }
-      else controller?.abort();
-    }
-    document.addEventListener('visibilitychange', visibility);
-    void poll();
-    return () => { stopped = true; clearTimeout(timer); controller?.abort(); document.removeEventListener('visibilitychange', visibility); };
-  }, [demo, enrollmentId, active, busy, refresh,cursor,showArchived]);
+  const syncFailed=useCallback(()=>setSyncError('작업 소식을 갱신하지 못했어요. 마지막으로 받은 내용을 표시하고 있으며 다시 연결하고 있어요.'),[]);
+  const liveUpdates=useOfficeLive({enabled:!demo&&active&&!busy,enrollment:enrollmentId,refresh,onError:syncFailed,slow:!!cursor||showArchived});
   async function send(c: OfficeCommand) {
     if (busy) return false; readVersion.current++; setBusy(true); setError(''); setNotice(''); setPending(c);
     try {
@@ -82,7 +64,7 @@ function OfficeSession({ snapshot, demo,initialEmployee,active=true }: { snapsho
     {syncError && <p role="status" className={styles.error}>{syncError}</p>}
     {error && <div role="alert" className={styles.error}>{error}{pending && <button type="button" onClick={() => void send(pending)} disabled={busy}>같은 요청 다시 확인</button>}</div>}{notice && <p role="status" className={styles.notice}>{notice}</p>}
     <div className={styles.layout}><form className={styles.form} onSubmit={async e => { e.preventDefault(); if (await send({ requestId: crypto.randomUUID(), enrollmentId, action: 'create', objective, materialUrls: materials.split('\n').filter(Boolean), outputType: output })) { setObjective(''); setMaterials(''); } }}><h3>새 작업 요청</h3><label>이루고 싶은 목표<textarea required minLength={10} maxLength={2000} rows={4} value={objective} onChange={e => setObjective(e.target.value)} placeholder="누구를 위한 작업인지, 어떤 결과를 원하고 무엇은 지켜야 하는지 적어 주세요." /></label><label>받고 싶은 결과물<select value={output} onChange={e => setOutput(e.target.value as OfficeOutput)}>{officeOutputs.map(o => <option key={o} value={o}>{outputLabels[o]}</option>)}</select></label><label>참고 자료 링크 <span>선택 · 최대 5개</span><textarea rows={2} value={materials} onChange={e => setMaterials(e.target.value)} placeholder="https://… 링크를 줄마다 하나씩" /></label><p className={styles.hint}>이 요청은 본인만 볼 수 있어요. 링크의 공개 범위는 원본 서비스에서 확인해 주세요.</p><button className={styles.primary} disabled={busy || !state}>요청 보관하기</button></form>
-      <div className={styles.inbox}><div className={styles.listHeader}><h3>내 작업함 </h3><button type="button" className={styles.textButton} aria-pressed={showArchived} onClick={() => {if(!demo)resetList();setShowArchived(!showArchived);}}>{showArchived ? '진행 작업 보기' : '보관함 보기'}</button>{!demo && <button className={styles.textButton} type="button" onClick={() => void refresh().catch(e => setError(e.message))} disabled={busy}>새로고침</button>}</div>
+      <div className={styles.inbox}><div className={styles.listHeader}><h3>내 작업함</h3>{liveUpdates&&<small className={styles.liveLabel}>실시간 갱신 중</small>}<button type="button" className={styles.textButton} aria-pressed={showArchived} onClick={() => {if(!demo)resetList();setShowArchived(!showArchived);}}>{showArchived ? '진행 작업 보기' : '보관함 보기'}</button>{!demo && <button className={styles.textButton} type="button" onClick={() => void refresh().catch(e => setError(e.message))} disabled={busy}>새로고침</button>}</div>
         {!demo&&<div className={styles.filters}><label>담당 직원 <select value={employee} onChange={e=>{resetList();setEmployee(e.target.value);}}>
         <option value="">전체 직원 · 직접 보관한 요청 포함</option>
         {employee&&!directory.data?.employees.some(p=>p.employeeId===employee)&&<option value={employee}>{initialEmployee?.id===employee?initialEmployee.name:'선택한 직원'}</option>}
