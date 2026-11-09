@@ -8,13 +8,13 @@ const receipt=()=>({erased:true,requestId,counts:Object.fromEntries(eraseCountKe
 test('erase domain matches published MYIN vector exactly and differs from management signature',()=>{const body=JSON.stringify({subject,requestId});assert.equal(eraseHeaders(body,env.EDU_MYIN_BRIDGE_SECRET,'dev','1790838000').Authorization,'Bearer 08afc8ec38c95e17329bd7fe575d39e1d839b9ee7b15d39f6f66a6237d7813cf');assert.notEqual(eraseHeaders(body,env.EDU_MYIN_BRIDGE_SECRET,'dev','1790838000').Authorization,load('diagnosis-admin-bridge').adminDiagnosisHeaders(body,env.EDU_MYIN_BRIDGE_SECRET,'dev','1790838000').Authorization);});
 test('transport sends only bound subject/requestId, strips provider fields/storage keys and fails closed on environment mismatch',async()=>{let calls=0;const fetcher=async(url,o)=>{calls++;assert.equal(url,env.EDU_MYIN_BRIDGE_ORIGIN+'/api/integrations/edu/diagnosis/erase');assert.deepEqual(JSON.parse(o.body),{subject,requestId});assert.equal(o.headers.Origin,undefined);assert.equal(o.redirect,'error');return Response.json({...receipt(),storageFailed:['private/key.html'],answers:'private'});};const v=await sendDiagnosisErase(subject,requestId,{env,fetcher});assert.equal(v.storageFailedCount,1);assert.doesNotMatch(JSON.stringify(v),/private|html|answers/);for(const patch of[{NEXT_PUBLIC_APP_ENV:'production'},{EDU_MYIN_BRIDGE_ENVIRONMENT:'production'},{EDU_MYIN_BRIDGE_ORIGIN:'https://attacker.test'},{EDU_MYIN_BRIDGE_SECRET:'bad'}])await assert.rejects(sendDiagnosisErase(subject,requestId,{env:{...env,...patch},fetcher}));assert.equal(calls,1);});
 test('only retryable errors back off; mismatched receipts, malformed counts and oversized response never complete',async()=>{for(const status of[400,401,403,404,413,503])await assert.rejects(sendDiagnosisErase(subject,requestId,{env,fetcher:async()=>new Response('private',{status})}),e=>e.retryable===(status===503));await assert.rejects(sendDiagnosisErase(subject,requestId,{env,fetcher:async()=>{throw Error('secret');}}),e=>e.code==='NETWORK'&&e.retryable);for(const v of[{...receipt(),requestId:subject},{...receipt(),counts:{sessions:-1}},{...receipt(),storageFailed:null}])assert.throws(()=>validateEraseReceipt(v,requestId));await assert.rejects(sendDiagnosisErase(subject,requestId,{env,fetcher:async()=>new Response('x'.repeat(262145))}),e=>e.code==='INVALID_RESPONSE');});
-test('disabled worker has no DB/remote side effects and partial storage uses same request/lease receipt',async()=>{let calls=[],sends=[];const job={subject,requestId,environment:'dev',lease:subject,authErased:true};const rpc=async(name,a)=>{calls.push([name,a]);return{data:name==='edu_claim_approved_member_erasure'?[job]:a.p_code===null,error:null};};assert.deepEqual(await dispatchMemberErasure({env:{...env,EDU_DIAGNOSIS_ERASURE_ENABLED:'false'},rpc}),{enabled:false,processed:0,completed:0});assert.equal(calls.length,0);const send=async(s,r)=>{sends.push([s,r]);return validateEraseReceipt({...receipt(),storageFailed:['key']},requestId);};assert.equal((await dispatchMemberErasure({env,rpc,send})).completed,0);assert.deepEqual(sends,[[subject,requestId]]);assert.equal(calls.at(-1)[1].p_code,'STORAGE_PENDING');assert.equal(calls.at(-1)[1].p_retryable,true);calls=[];await dispatchMemberErasure({env,rpc,send:async()=>{throw new EraseBridgeError('UNAUTHORIZED',false);}});assert.equal(calls.at(-1)[1].p_retryable,false);assert.equal(calls.at(-1)[1].p_result,null);});
+test('disabled worker has no DB/remote side effects and partial storage uses same request/lease receipt',async()=>{let calls=[],sends=[];const job={subject,requestId,environment:'dev',lease:subject,authErased:true};const rpc=async(name,a)=>{calls.push([name,a]);return{data:name==='edu_claim_approved_member_erasure'?[job]:name==='edu_prepare_member_local_erasure'?{ready:true}:a.p_code===null,error:null};};assert.deepEqual(await dispatchMemberErasure({env:{...env,EDU_DIAGNOSIS_ERASURE_ENABLED:'false'},rpc}),{enabled:false,processed:0,completed:0});assert.equal(calls.length,0);const send=async(s,r)=>{sends.push([s,r]);return validateEraseReceipt({...receipt(),storageFailed:['key']},requestId);};assert.equal((await dispatchMemberErasure({env,rpc,send})).completed,0);assert.deepEqual(sends,[[subject,requestId]]);assert.equal(calls.at(-1)[1].p_code,'STORAGE_PENDING');assert.equal(calls.at(-1)[1].p_retryable,true);calls=[];await dispatchMemberErasure({env,rpc,send:async()=>{throw new EraseBridgeError('UNAUTHORIZED',false);}});assert.equal(calls.at(-1)[1].p_retryable,false);assert.equal(calls.at(-1)[1].p_result,null);});
 
 test('worker targets only the confirmed request and cannot erase remote data before Auth receipt',async()=>{
  const calls=[];let remote=0,auth=0;
  const job={subject,requestId,environment:'dev',lease:subject,authErased:false};
  const rpc=async(name,args)=>{calls.push([name,args]);return {data:name==='edu_claim_approved_member_erasure'?[job]:null,error:name==='edu_record_member_auth_erasure'?{message:'private'}:null};};
- await dispatchMemberErasure({env,rpc,requestId,eraseAuth:async()=>{auth++;},send:async()=>{remote++;return validateEraseReceipt(receipt(),requestId);}});
+ await dispatchMemberErasure({env,rpc,requestId,eraseLocal:async()=>{},eraseAuth:async()=>{auth++;},send:async()=>{remote++;return validateEraseReceipt(receipt(),requestId);}});
  assert.equal(auth,1);assert.equal(remote,0);
  assert.deepEqual(calls[0],["edu_claim_approved_member_erasure",{p_environment:'dev',p_limit:1,p_request:requestId}]);
  assert.equal(calls.at(-1)[1].p_code,'AUTH_RECEIPT_PENDING');
@@ -37,4 +37,24 @@ test('Auth erasure uses irreversible soft deletion and resumes safely after a lo
  await eraseMemberAuth(subject);assert.equal(deletes,1);
  authMock.getUserById=async()=>({data:{user:null},error:{code:'unexpected',message:'private'}});
  await assert.rejects(eraseMemberAuth(subject),e=>e.code==='AUTH_ERASURE_FAILED'&&!e.message.includes('private'));
+});
+
+test('local Storage erasure retries lost receipts and never sends the remote request while local deletion is pending',async()=>{
+ const {eraseMemberLocalData}=load('member-erasure');
+ const job={subject,requestId,environment:'dev',lease:subject,authErased:true};
+ let pending=[{id:requestId,bucket:'question-images',path:subject+'/private.png'}],removed=0;
+ const rpc=async(name,args)=>{
+  if(name==='edu_prepare_member_local_erasure')return {data:{ready:false},error:null};
+  if(name==='edu_list_member_erasure_files')return {data:pending,error:null};
+  if(name==='edu_record_member_erasure_files'){
+   assert.deepEqual(args.p_files,[requestId]);pending=[];return {data:null,error:null};
+  }
+  return {data:null,error:null};
+ };
+ await assert.rejects(eraseMemberLocalData(rpc,job,async()=>({error:{message:'private-key'}})),e=>e.code==='LOCAL_STORAGE_PENDING'&&!e.message.includes('private-key'));
+ await eraseMemberLocalData(rpc,job,async(bucket,paths)=>{assert.equal(bucket,'question-images');assert.deepEqual(paths,[subject+'/private.png']);removed++;return {error:null};});
+ assert.equal(removed,1);
+ let sent=0,finish;
+ await dispatchMemberErasure({env,requestId,eraseLocal:async()=>{throw new EraseBridgeError('LOCAL_UPLOAD_DRAIN_PENDING',true);},send:async()=>{sent++;return validateEraseReceipt(receipt(),requestId);},rpc:async(name,args)=>{if(name==='edu_finish_member_erasure')finish=args;return {data:name==='edu_claim_approved_member_erasure'?[job]:null,error:null};}});
+ assert.equal(sent,0);assert.equal(finish.p_result,null);assert.equal(finish.p_code,'LOCAL_UPLOAD_DRAIN_PENDING');assert.equal(finish.p_retryable,true);
 });
