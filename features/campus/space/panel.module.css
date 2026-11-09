@@ -46,3 +46,21 @@
 @media(max-width:700px){.spatial>.header{bottom:14px;left:10px}.spatial>.header .connection{display:none}.spatial>.notice,.spatial>.error{top:64px;left:10px;max-width:calc(100% - 20px)}.spatial>.header button{font-size:12px}}
 .spatial .focusBadge{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:11;min-height:44px;background:#102c40ee;color:#e1f4ff;border-color:#577c97;box-shadow:0 6px 30px #0005;font-variant-numeric:tabular-nums}.focusBadge span{font-size:11px;margin-left:10px;color:#c2d8e8}@media(max-width:700px){.spatial .focusBadge{bottom:68px;left:14px;transform:none}.focusBadge span{display:none}}
 .spatial .fallbackGuide{position:absolute;bottom:20px;right:20px;z-index:15;min-height:44px;background:#18334b;color:#f0f7ff;border-color:#5a7b97}
+
+.studyEntry {
+  width:fit-content;
+  max-width:min(300px,calc(100vw - 32px));
+  padding:12px 16px;
+  margin-bottom:6px;
+  border:1px solid #b7cbdf;
+  border-radius:14px;
+  background:#f8fbff;
+  color:#193552;
+  box-shadow:0 3px 14px #06172833;
+}
+.studyEntry h2 {margin:0;font-size:15px}
+.studyEntry p,.studyEntry ul {margin:6px 0;font-size:13px}
+.studyEntry ul {display:flex;gap:4px 8px;flex-wrap:wrap;list-style:none;padding:0;max-height:4.5em;overflow:auto}
+.studyEntry li {overflow-wrap:anywhere}
+.studyEntry button {min-height:40px;padding:6px 12px;margin-top:4px;border:1px solid #335f8a;border-radius:8px;background:#214e79;color:white;cursor:pointer}
+.studyEntry button:disabled {opacity:.6}
