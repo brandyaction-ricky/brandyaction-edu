@@ -179,6 +179,7 @@ export function SpacePanel({snapshot,demo,studyEntry,onOpenLesson,onNavigate,onO
   setNotice(latest.nickname+'님과 같은 시간에 집중을 마쳐요.');
  }
  const ownDeadline=focusDeadline(clock);
+ useEffect(()=>{if(active)transport.current?.setFocusDeadline?.(ownDeadline);},[active,ownDeadline]);
  function focusAction(peer:SpacePeer, forRoster:boolean){
   const shared=peerFocusClock(peer,now);
   if(!shared)return null;
@@ -218,8 +219,8 @@ export function SpacePanel({snapshot,demo,studyEntry,onOpenLesson,onNavigate,onO
  const peers=state?.peers||[];
  const entryCard=studyEntry?.host&&createPortal(
   <section className={styles.studyEntry} aria-label="지금 공부 중인 수강생">
-   <h2>지금 공부 중</h2>
-   {active?<ul aria-label="공부방 참여자">{peers.map(peer=><li key={peer.userId}><span>{peer.nickname}{peer.userId===actor&&' · 나'}</span>{peer.userId!==actor&&focusAction(peer,true)}</li>)}</ul>
+   <header><h2>지금 공부 중</h2>{active&&<span>{peers.length}명</span>}</header>
+   {active?<ul aria-label="공부방 참여자">{peers.map(peer=><li key={peer.userId}><span className={styles.rosterName}>{peer.nickname}{peer.userId===actor&&' · 나'}</span>{peer.userId!==actor&&focusAction(peer,true)}</li>)}</ul>
     :<p role="status">{state?.controls?.paused?'공부방 참여가 잠시 중지됐어요.':busy||(!state&&!error)?'동료를 확인하고 있어요…':error||'동료 연결을 해제했어요.'}</p>}
    <button type="button" disabled={busy||!sessionId||(!state&&!error)||!!state?.controls?.paused} onClick={()=>active?studyEntry.openLounge():void join()}>{active?'대화에 참여하기':'공부방에 참여하기'}</button>
   </section>,studyEntry.host);
