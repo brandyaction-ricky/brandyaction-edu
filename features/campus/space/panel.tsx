@@ -42,7 +42,19 @@ export function SpacePanel({snapshot,demo,studyEntry,onOpenLesson,onNavigate,onO
  const followingChat=useRef(true);
  const chatVisible=pane==='lounge'&&(toolsPane?toolsVisible:!spatial||toolsOpen);
  const latestMessage=state?.messages.at(-1)?.id;
- useEffect(()=>{transport.current?.setChatVisible?.(chatVisible);},[chatVisible,active]);
+ useEffect(()=>{
+  // Opening the lounge and returning to it both reconcile against the stored messages.
+  const update=()=>transport.current?.setChatVisible?.(chatVisible&&!document.hidden&&navigator.onLine);
+  update();
+  document.addEventListener('visibilitychange',update);
+  window.addEventListener('offline',update);
+  window.addEventListener('online',update);
+  return ()=>{
+   document.removeEventListener('visibilitychange',update);
+   window.removeEventListener('offline',update);
+   window.removeEventListener('online',update);
+  };
+ },[chatVisible,active]);
  useLayoutEffect(()=>{
   if(!chatVisible){followingChat.current=true;return;}
   const list=chatList.current;
@@ -95,7 +107,13 @@ export function SpacePanel({snapshot,demo,studyEntry,onOpenLesson,onNavigate,onO
  },[token,post,state,demo,sessionId,snapshot.viewer.id,command]);
  useEffect(()=>{if(!active)return;
   let running=false;
-  const beat=async()=>{if(running||operation.current)return;running=true;try{const c=current.current.clock;await command({kind:'heartbeat',profile:current.current.saved,focusUntil:c.phase==='focus'&&c.runningSince!==null&&c.duration>elapsed(c)?new Date(Date.now()+(c.duration-elapsed(c))*1000).toISOString():null,focusMode:c.phase==='focus'?Math.round(c.duration/60):0});}catch(e){statusError(e);setActive(false);transport.current?.close();transport.current=null;}finally{running=false;}};
+  const beat=async()=>{if(running||operation.current||(!demo&&!navigator.onLine))return;running=true;const connection=transport.current;try{const c=current.current.clock;await command({kind:'heartbeat',profile:current.current.saved,focusUntil:c.phase==='focus'&&c.runningSince!==null&&c.duration>elapsed(c)?new Date(Date.now()+(c.duration-elapsed(c))*1000).toISOString():null,focusMode:c.phase==='focus'?Math.round(c.duration/60):0});}catch(e){
+   if(!connection||transport.current!==connection)return;
+   // A suspended radio can fail a heartbeat before the browser reports offline.
+   // Keep the session so the next heartbeat can retry. Server rejections still end it.
+   if(e instanceof TypeError)return;
+   statusError(e);setActive(false);connection.close();transport.current=null;
+  }finally{running=false;}};
   const timer=setInterval(beat,15000);const unload=()=>{if(!demo)void fetch('/api/campus/space',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'leave',cohortId,sessionId}),keepalive:true,credentials:'same-origin'}).catch(()=>{});transport.current?.close();};window.addEventListener('pagehide',unload);
   return()=>{clearInterval(timer);window.removeEventListener('pagehide',unload);};
  },[active,command,cohortId,sessionId,demo]);
