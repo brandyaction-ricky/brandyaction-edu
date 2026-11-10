@@ -6,14 +6,15 @@ import './lesson-audio.css';
 const activeAudioEvent = 'edu:lesson-audio-active';
 type Position = { top: number; left: number; width: number; height: number };
 
-export function LessonAudio({ floating = false, ...props }: AudioHTMLAttributes<HTMLAudioElement> & { floating?: boolean }) {
+export function LessonAudio({ floating = false, refreshOnError = false, ...props }: AudioHTMLAttributes<HTMLAudioElement> & { floating?: boolean; refreshOnError?: boolean }) {
   const anchor = useRef<HTMLDivElement>(null), player = useRef<HTMLDivElement>(null), audio = useRef<HTMLAudioElement>(null);
   const [active, setActive] = useState(false), [position, setPosition] = useState<Position | null>(null);
+  const playback = useRef({ time: 0, rate: 1, wanted: false, restoring: false, retried: false });
 
   useEffect(() => {
     if (!floating) return;
     const otherAudio = (event: Event) => {
-      if ((event as CustomEvent).detail !== audio.current) { audio.current?.pause(); setActive(false); }
+      if ((event as CustomEvent).detail !== audio.current) { playback.current.wanted = false; audio.current?.pause(); setActive(false); }
     };
     const media = audio.current;
     window.addEventListener(activeAudioEvent, otherAudio);
@@ -51,9 +52,43 @@ export function LessonAudio({ floating = false, ...props }: AudioHTMLAttributes<
   const docked = floating && active && position;
   // Keep the same media element when docking so playback and native controls survive scrolling.
   const media = <audio {...props} ref={audio} controls preload="none" onPlay={event => {
+    playback.current.wanted = true;
     if (floating) { setActive(true); window.dispatchEvent(new CustomEvent(activeAudioEvent, { detail: event.currentTarget })); }
     props.onPlay?.(event);
-  }} onEnded={event => { setActive(false); props.onEnded?.(event); }} />;
+  }} onPause={event => {
+    // A failed request also emits pause. An explicit pause during recovery still wins.
+    if (!event.currentTarget.error) playback.current.wanted = false;
+    props.onPause?.(event);
+  }} onSeeking={event => {
+    if (!playback.current.restoring) playback.current.time = event.currentTarget.currentTime;
+    props.onSeeking?.(event);
+  }} onTimeUpdate={event => {
+    if (!playback.current.restoring && !event.currentTarget.error) {
+      playback.current.time = event.currentTarget.currentTime;
+      props.onTimeUpdate?.(event);
+    }
+  }} onLoadedMetadata={event => {
+    props.onLoadedMetadata?.(event);
+    if (!playback.current.restoring) return;
+    const media = event.currentTarget;
+    media.currentTime = Math.min(playback.current.time, Number.isFinite(media.duration) ? media.duration : Infinity);
+    media.playbackRate = playback.current.rate;
+    playback.current.restoring = false;
+    if (playback.current.wanted) void media.play().catch(() => { playback.current.wanted = false; });
+  }} onError={event => {
+    const media = event.currentTarget;
+    if (refreshOnError && media.error?.code !== 1 && !playback.current.retried) {
+      playback.current.retried = true;
+      playback.current.restoring = true;
+      playback.current.rate = media.playbackRate;
+      // Reload the authenticated endpoint, not the previous short-lived storage URL.
+      // Keep this element so scrolling, volume, speed and focused controls survive.
+      media.load();
+      return;
+    }
+    playback.current.restoring = false;
+    props.onError?.(event);
+  }} onEnded={event => { playback.current.wanted = false; setActive(false); props.onEnded?.(event); }} />;
   if (!floating) return media;
   return <div ref={anchor} tabIndex={-1} className="lesson-audio-anchor" style={docked ? { minHeight: docked.height } : undefined}>
     <div ref={player} className={'lesson-audio-player' + (docked ? ' is-floating' : '')}
@@ -61,7 +96,7 @@ export function LessonAudio({ floating = false, ...props }: AudioHTMLAttributes<
       <div className="lesson-audio-tools" hidden={!docked}>
         <strong>{props['aria-label'] || '학습 음성'}</strong>
         <button type="button" onClick={() => { anchor.current?.focus({ preventScroll: true }); anchor.current?.scrollIntoView({ block: 'center', behavior: 'instant' }); }}>음성 위치로</button>
-        <button type="button" onClick={() => { audio.current?.pause(); setActive(false); }}>닫고 일시정지</button>
+        <button type="button" onClick={() => { playback.current.wanted = false; audio.current?.pause(); setActive(false); }}>닫고 일시정지</button>
       </div>
       {media}
     </div>
