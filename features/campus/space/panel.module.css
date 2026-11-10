@@ -60,7 +60,12 @@
 }
 .studyEntry h2 {margin:0;font-size:15px}
 .studyEntry p,.studyEntry ul {margin:6px 0;font-size:13px}
-.studyEntry ul {display:flex;gap:4px 8px;flex-wrap:wrap;list-style:none;padding:0;max-height:4.5em;overflow:auto}
+.studyEntry ul {display:flex;gap:4px 8px;flex-wrap:wrap;list-style:none;padding:0;max-height:min(24dvh,12rem);overflow:auto}
 .studyEntry li {overflow-wrap:anywhere}
 .studyEntry button {min-height:40px;padding:6px 12px;margin-top:4px;border:1px solid #335f8a;border-radius:8px;background:#214e79;color:white;cursor:pointer}
 .studyEntry button:disabled {opacity:.6}
+
+.studyEntry li:has(.rosterFocus) {flex-basis:100%;padding:4px 0}
+.rosterFocus {display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px;color:#395675}
+.rosterFocus time {font-variant-numeric:tabular-nums}
+.studyEntry .rosterFocus button {margin:0;min-height:40px;background:#fff;color:#214e79}
