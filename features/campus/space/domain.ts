@@ -33,6 +33,19 @@ export function position(value: unknown): { x: number; y: number; sitting: boole
  return { x: Math.round(v.x*100)/100, y: Math.round(v.y*100)/100, sitting: v.sitting === true, wave: v.wave === true };
 }
 export function elapsed(clock: FocusClock, now = Date.now()) { return Math.max(0, Math.floor(clock.elapsed + (clock.runningSince === null ? 0 : Math.max(0, now-clock.runningSince)/1000))); }
+export function focusDeadline(clock: FocusClock): number | null {
+  if (clock.phase !== 'focus' || clock.duration <= 0 || clock.runningSince === null) return null;
+  return clock.runningSince + (clock.duration - clock.elapsed) * 1000;
+}
+
+// Preserve the peer's end time, including sub-second precision, across subsequent heartbeats.
+export function peerFocusClock(peer: SpacePeer, now: number): FocusClock | null {
+  const end = Date.parse(peer.focusUntil || '');
+  if (!(Date.parse(peer.expiresAt) > now && end > now)) return null;
+  const duration = Math.ceil((end - now) / 1000);
+  if (duration > 50 * 60) return null;
+  return {phase: 'focus', duration, elapsed: 0, runningSince: end - duration * 1000};
+}
 export function clockText(clock: FocusClock, now = Date.now()) { const value = clock.duration ? Math.max(0,clock.duration-elapsed(clock,now)) : elapsed(clock,now); return `${String(Math.floor(value/60)).padStart(2,'0')}:${String(value%60).padStart(2,'0')}`; }
 export function pauseClock(clock: FocusClock, now = Date.now()): FocusClock { return {...clock, elapsed: elapsed(clock,now), runningSince: null}; }
 export function resumeClock(clock: FocusClock, now = Date.now()): FocusClock { return {...clock,runningSince: clock.phase !== 'idle' && clock.runningSince === null ? now : clock.runningSince}; }
