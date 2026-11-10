@@ -1,20 +1,40 @@
 import {watchStudyRoster} from './roster-channel';
 import {avatarAppearance, createMotionQueue, makeLimiter, position, publicPeer, initialMetrics, isNearby, nearText, type NearbyMessage, type SpaceChat, type SpacePeer, type SpaceProfile, type SpaceSeat, type SpaceState } from './domain';
 import type { SpaceCommand } from './server';
-export type SpaceTransport = { command:(command:Partial<SpaceCommand>&{kind:string})=>Promise<SpaceState>; move:(value:unknown)=>void; setChatVisible?:(visible:boolean)=>void; close:()=>void };
+export type SpaceTransport = { command:(command:Partial<SpaceCommand>&{kind:string})=>Promise<SpaceState>; move:(value:unknown)=>void; setFocusDeadline?:(end:number|null)=>void; setChatVisible?:(visible:boolean)=>void; close:()=>void };
 export async function createLiveTransport(cohortId:string,userId:string,sessionId:string,onState:(s:SpaceState)=>void,onError:(message:string)=>void,overrides?:{client?:ReturnType<typeof import('@/lib/supabase/client').createClient>;request?:typeof fetch}):Promise<SpaceTransport>{
  const db=overrides?.client??(await import('@/lib/supabase/client')).createClient(),request=overrides?.request??fetch,channels=new Map<string,ReturnType<typeof db.channel>>(),receivers=new Map<string,ReturnType<typeof makeLimiter>>();
  let closed=false,lastState:SpaceState|null=null,sequence=0,localStatus='quiet';const metrics=initialMetrics(),nearby:NearbyMessage[]=[],canNear=makeLimiter(3000);
  let roster:ReturnType<typeof watchStudyRoster>|undefined;
  let chatVisible=false;
  const closeRoster=()=>{roster?.close();roster=undefined;};
- const publish=()=>{if(lastState&&!closed)onState({...lastState,nearby:nearby.filter(m=>Date.now()-m.at<12000).slice(-30),metrics:{...metrics}});};
+ // Focus transitions travel on the same authorized actor topic as movement. The heartbeat
+ // persists the timer and supplies the fallback when a client misses a broadcast.
+ let ownFocus:number|null=null;
+ let focusChanged=false;
+ let persistedFocus:number|null=null;
+ const focusSignals=new Map<string,{sessionId:string;seq:number;end:number|null;received:number}>();
+ function broadcastFocus(){
+  const channel=channels.get(userId);
+  if(closed||lastState?.controls?.paused||channel?.state!=='joined'||!focusChanged)return;
+  void channel.send({type:'broadcast',event:'focus',payload:{sessionId,seq:sequence++,end:ownFocus}}).catch(()=>{});
+ }
+ const publish=()=>{
+  if(!lastState||closed)return;
+  const now=Date.now();
+  const peers=lastState.peers.map(peer=>{
+   const signal=focusSignals.get(peer.userId);
+   if(!signal||signal.sessionId!==peer.sessionId||now-signal.received>30000)return peer;
+   return {...peer,focusUntil:signal.end===null?null:new Date(signal.end).toISOString()};
+  });
+  onState({...lastState,peers,nearby:nearby.filter(m=>now-m.at<12000).slice(-30),metrics:{...metrics}});
+ };
  const disconnect=()=>{for(const ch of channels.values())void db.removeChannel(ch);channels.clear();receivers.clear();};const lastSequence=new Map<string,number>();
  async function sync(state:SpaceState){
   if(closed||(lastState&&state.serverNow<lastState.serverNow))return;
-  state.peers=state.peers.map(p=>{const previous=lastState?.peers.find(v=>v.userId===p.userId);if(previous&&previous.sessionId!==p.sessionId)lastSequence.delete(p.userId);const old=previous?.sessionId===p.sessionId?previous:null;return old?{...p,x:old.x,y:old.y,sitting:old.sitting}:p;});lastState=state;if(state.controls?.paused){closeRoster();state.peers=[];state.seats=[];nearby.length=0;disconnect();metrics.status='closed';publish();return;}publish();
+  state.peers=state.peers.map(p=>{const previous=lastState?.peers.find(v=>v.userId===p.userId);if(previous&&previous.sessionId!==p.sessionId)lastSequence.delete(p.userId);const old=previous?.sessionId===p.sessionId?previous:null;return old?{...p,x:old.x,y:old.y,sitting:old.sitting}:p;});lastState=state;if(state.controls?.paused){closeRoster();focusSignals.clear();state.peers=[];state.seats=[];nearby.length=0;disconnect();metrics.status='closed';publish();return;}publish();
   const ids=new Set(state.peers.map(p=>p.userId));
-  for(const [id,ch] of channels)if(!ids.has(id)){void db.removeChannel(ch);channels.delete(id);receivers.delete(id);lastSequence.delete(id);}
+  for(const [id,ch] of channels)if(!ids.has(id)){void db.removeChannel(ch);channels.delete(id);focusSignals.delete(id);receivers.delete(id);lastSequence.delete(id);}
   for(const peer of state.peers){
    if(channels.has(peer.userId))continue;
    const limiter=makeLimiter(400),nearLimiter=makeLimiter(1000);receivers.set(peer.userId,limiter);
@@ -24,7 +44,15 @@ export async function createLiveTransport(cohortId:string,userId:string,sessionI
     if(closed||!p||p.sessionId!==payload?.sessionId||!Number.isSafeInteger(payload?.seq)||payload.seq<0||!limiter())return;
     const v=position(payload);if(!v||payload.seq<=(lastSequence.get(peer.userId)??-1))return;
     lastSequence.set(peer.userId,payload.seq);Object.assign(p,v);metrics.received++;publish();
-   }).on('broadcast',{event:'nearby'},({payload})=>{const sender=lastState?.peers.find(p=>p.userId===peer.userId),mine=lastState?.peers.find(p=>p.userId===userId),text=nearText(payload?.text);if(closed||!sender||!mine||localStatus==='quiet'||sender.sessionId!==payload?.sessionId||typeof payload?.id!=='string'||!text||!isNearby(sender,mine)||!nearLimiter())return;if(nearby.some(m=>m.id===payload.id))return;nearby.push({id:payload.id,userId:sender.userId,nickname:sender.nickname,text,kind:payload.kind==='emote'?'emote':'text',at:Date.now()});if(nearby.length>30)nearby.shift();metrics.received++;publish();}).subscribe(status=>{if(closed)return;if(status==='SUBSCRIBED'){if(metrics.status==='reconnecting')metrics.reconnects++;metrics.status='connected';publish();}else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){metrics.errors++;metrics.status='reconnecting';publish();onError('실시간 연결을 다시 확인하고 있어요. 연결 상태에서 재입장할 수 있습니다.');}});
+   }).on('broadcast',{event:'focus'},({payload})=>{
+    const sender=lastState?.peers.find(p=>p.userId===peer.userId),now=Date.now();
+    if(closed||!sender||sender.userId===userId||Date.parse(sender.expiresAt)<=now||sender.sessionId!==payload?.sessionId)return;
+    const {seq,end}=payload;
+    if(!Number.isSafeInteger(seq)||seq<0||(end!==null&&(!Number.isSafeInteger(end)||end<=0||end>now+3001000)))return;
+    const previous=focusSignals.get(sender.userId);
+    if(previous?.sessionId===sender.sessionId&&seq<=previous.seq)return;
+    focusSignals.set(sender.userId,{sessionId:sender.sessionId,seq,end,received:now});publish();
+   }).on('broadcast',{event:'nearby'},({payload})=>{const sender=lastState?.peers.find(p=>p.userId===peer.userId),mine=lastState?.peers.find(p=>p.userId===userId),text=nearText(payload?.text);if(closed||!sender||!mine||localStatus==='quiet'||sender.sessionId!==payload?.sessionId||typeof payload?.id!=='string'||!text||!isNearby(sender,mine)||!nearLimiter())return;if(nearby.some(m=>m.id===payload.id))return;nearby.push({id:payload.id,userId:sender.userId,nickname:sender.nickname,text,kind:payload.kind==='emote'?'emote':'text',at:Date.now()});if(nearby.length>30)nearby.shift();metrics.received++;publish();}).subscribe(status=>{if(closed)return;if(status==='SUBSCRIBED'){if(peer.userId===userId)broadcastFocus();if(metrics.status==='reconnecting')metrics.reconnects++;metrics.status='connected';publish();}else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){metrics.errors++;metrics.status='reconnecting';publish();onError('실시간 연결을 다시 확인하고 있어요. 연결 상태에서 재입장할 수 있습니다.');}});
    channels.set(peer.userId,channel);
   }
  }
@@ -49,12 +77,21 @@ export async function createLiveTransport(cohortId:string,userId:string,sessionI
   else if(!closed&&!roster&&!data.controls?.paused&&(cmd.kind==='join'||cmd.kind==='heartbeat')){
    roster=watchStudyRoster(db,cohortId,refreshRoster,()=>chatVisible);
   }
+  if(cmd.kind==='heartbeat'){
+   const end=cmd.focusUntil?Date.parse(cmd.focusUntil):null;
+   // Repeat once after persistence in case a peer subscribed during the transition.
+   if(end!==persistedFocus&&end===ownFocus)broadcastFocus();
+   persistedFocus=end;
+  }
   if(cmd.kind==='heartbeat'){const own=lastState?.peers.find(p=>p.userId===userId);if(own)motion.push({x:own.x,y:own.y,sitting:own.sitting});}return data as SpaceState;
  }
  // Renew authorization periodically; disconnect if membership/profile check fails in API heartbeat.
  const motion=createMotionQueue(v=>{const own=lastState?.peers.find(p=>p.userId===userId);if(own)Object.assign(own,v);const ch=channels.get(userId);if(!closed&&!lastState?.controls?.paused&&ch&&ch.state==='joined'){metrics.sent++;void ch.send({type:'broadcast',event:'move',payload:{...v,sessionId,seq:sequence++}}).then(outcome=>{if(outcome!=='ok'){metrics.errors++;publish();}}).catch(()=>{metrics.errors++;publish();});publish();}});
  const renew=setInterval(()=>{if(closed)return;disconnect();lastSequence.clear();metrics.status='reconnecting';if(lastState)void sync(lastState);},60000);
- return {command,setChatVisible(visible){
+ return {command,setFocusDeadline(end){
+  if(end===ownFocus)return;
+  ownFocus=end;focusChanged=true;broadcastFocus();
+ },setChatVisible(visible){
   if(chatVisible===visible)return;
   chatVisible=visible;
   if(visible)roster?.refresh();

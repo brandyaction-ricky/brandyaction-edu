@@ -48,24 +48,29 @@
 .spatial .fallbackGuide{position:absolute;bottom:20px;right:20px;z-index:15;min-height:44px;background:#18334b;color:#f0f7ff;border-color:#5a7b97}
 
 .studyEntry {
-  width:fit-content;
-  max-width:min(300px,calc(100vw - 32px));
-  padding:12px 16px;
+  box-sizing:border-box;
+  width:min(300px,calc(100vw - 32px));
+  padding:12px 14px;
   margin-bottom:6px;
-  border:1px solid #b7cbdf;
+  border:1px solid #cad7e3;
   border-radius:14px;
-  background:#f8fbff;
+  background:#fff;
   color:#193552;
-  box-shadow:0 3px 14px #06172833;
+  box-shadow:0 3px 14px #06172826;
 }
-.studyEntry h2 {margin:0;font-size:15px}
-.studyEntry p,.studyEntry ul {margin:6px 0;font-size:13px}
-.studyEntry ul {display:flex;gap:4px 8px;flex-wrap:wrap;list-style:none;padding:0;max-height:min(24dvh,12rem);overflow:auto}
-.studyEntry li {overflow-wrap:anywhere}
-.studyEntry button {min-height:40px;padding:6px 12px;margin-top:4px;border:1px solid #335f8a;border-radius:8px;background:#214e79;color:white;cursor:pointer}
-.studyEntry button:disabled {opacity:.6}
-
-.studyEntry li:has(.rosterFocus) {flex-basis:100%;padding:4px 0}
-.rosterFocus {display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px;color:#395675}
+.studyEntry header {display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.studyEntry h2 {margin:0;font-size:15px;line-height:1.45}
+.studyEntry header span,.studyEntry p {font-size:12px;color:#526981}
+.studyEntry ul {margin:7px 0;padding:0;list-style:none;max-height:min(24dvh,12rem);overflow:auto;border-block:1px solid #e0e7ee}
+.studyEntry li {display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:8px;min-height:34px;padding:4px 0}
+.studyEntry li+li {border-top:1px solid #edf1f4}
+.rosterName {grid-column:1;font-size:13px;font-weight:600;overflow-wrap:anywhere}
+.rosterFocus {display:contents}
+.rosterFocus>span:first-child {grid-column:1;grid-row:2;font-size:12px;color:#415e75}
 .rosterFocus time {font-variant-numeric:tabular-nums}
-.studyEntry .rosterFocus button {margin:0;min-height:40px;background:#fff;color:#214e79}
+.rosterFocus>button,.rosterFocus>span:last-child {grid-column:2;grid-row:1 / span 2;align-self:center}
+.rosterFocus>span:last-child {font-size:12px;font-weight:600;color:#246351}
+.studyEntry button {min-height:40px;padding:6px 12px;border:1px solid #214e79;border-radius:8px;background:#214e79;color:white;cursor:pointer;font-size:13px;font-weight:600}
+.studyEntry button:disabled {opacity:.6}
+.studyEntry .rosterFocus button {background:#f4f8fc;border-color:#b8cede;color:#214e79}
+.studyEntry button:focus-visible {outline:2px solid #2770aa;outline-offset:2px}
