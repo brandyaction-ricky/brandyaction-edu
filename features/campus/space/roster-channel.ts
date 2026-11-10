@@ -1,7 +1,7 @@
 import type {SupabaseClient} from '@supabase/supabase-js';
 
 /** The broadcast is an invalidation only. Re-read the authorized snapshot after a burst. */
-export function watchStudyRoster(db:SupabaseClient, cohortId:string, refresh:(signal:AbortSignal)=>Promise<void>) {
+export function watchStudyRoster(db:SupabaseClient, cohortId:string, refresh:(signal:AbortSignal)=>Promise<void>, chatVisible:()=>boolean) {
  const lifetime=new AbortController();
  let timer:ReturnType<typeof setTimeout>|undefined;
  let reading=false, pending=false;
@@ -20,9 +20,10 @@ export function watchStudyRoster(db:SupabaseClient, cohortId:string, refresh:(si
  }
  const channel=db.channel('campus-roster:'+cohortId,{config:{private:true}});
  channel.on('broadcast',{event:'roster-changed'},changed)
+  .on('broadcast',{event:'chat-changed'},()=>{if(chatVisible())changed();})
   .subscribe(status=>{if(status==='SUBSCRIBED')changed();});
- return ()=>{
+ return {refresh:changed,close(){
   lifetime.abort();clearTimeout(timer);
   void db.removeChannel(channel).catch(()=>{});
- };
+ }};
 }
