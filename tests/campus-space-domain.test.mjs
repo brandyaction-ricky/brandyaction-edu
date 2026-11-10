@@ -24,3 +24,18 @@ test('original character cosmetics survive profile and public peer normalization
  const limited=d.publicAvatar(raw);assert(!('note' in limited));assert(!('role' in limited));assert(!('userId' in limited));
  const bad=d.profile({gender:'female',model:99,skinColor:'url(secret)',heldItem:'admin'});assert.equal(bad.model,1);assert.equal(bad.skinColor,'#e8b68b');assert.equal(bad.heldItem,'none');
 });
+
+test('joining peer focus preserves the exact deadline across ticks and rejects expired presence',()=>{
+  const now=Date.parse('2026-11-10T06:30:00.500Z');
+  const end=now+1490123;
+  const peer={focusUntil:new Date(end).toISOString(),expiresAt:new Date(now+75000).toISOString()};
+  for(const at of [now,now+1250]){
+    const clock=d.peerFocusClock(peer,at);
+    assert.equal(d.focusDeadline(clock),end);
+    assert.equal(d.focusDeadline(d.pauseClock(clock,at+1234)),null);
+  }
+  assert.equal(d.peerFocusClock(peer,now+75000),null);
+  assert.equal(d.peerFocusClock({...peer,focusUntil:new Date(now).toISOString()},now),null);
+  assert.equal(d.peerFocusClock({...peer,focusUntil:null},now),null);
+  assert.equal(d.focusDeadline({phase:'break',duration:180,runningSince:now,elapsed:0}),null);
+});
