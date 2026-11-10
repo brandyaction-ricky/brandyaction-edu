@@ -1,12 +1,13 @@
 import {watchStudyRoster} from './roster-channel';
 import {avatarAppearance, createMotionQueue, makeLimiter, position, publicPeer, initialMetrics, isNearby, nearText, type NearbyMessage, type SpaceChat, type SpacePeer, type SpaceProfile, type SpaceSeat, type SpaceState } from './domain';
 import type { SpaceCommand } from './server';
-export type SpaceTransport = { command:(command:Partial<SpaceCommand>&{kind:string})=>Promise<SpaceState>; move:(value:unknown)=>void; close:()=>void };
+export type SpaceTransport = { command:(command:Partial<SpaceCommand>&{kind:string})=>Promise<SpaceState>; move:(value:unknown)=>void; setChatVisible?:(visible:boolean)=>void; close:()=>void };
 export async function createLiveTransport(cohortId:string,userId:string,sessionId:string,onState:(s:SpaceState)=>void,onError:(message:string)=>void,overrides?:{client?:ReturnType<typeof import('@/lib/supabase/client').createClient>;request?:typeof fetch}):Promise<SpaceTransport>{
  const db=overrides?.client??(await import('@/lib/supabase/client')).createClient(),request=overrides?.request??fetch,channels=new Map<string,ReturnType<typeof db.channel>>(),receivers=new Map<string,ReturnType<typeof makeLimiter>>();
  let closed=false,lastState:SpaceState|null=null,sequence=0,localStatus='quiet';const metrics=initialMetrics(),nearby:NearbyMessage[]=[],canNear=makeLimiter(3000);
- let stopRoster:(()=>void)|undefined;
- const closeRoster=()=>{stopRoster?.();stopRoster=undefined;};
+ let roster:ReturnType<typeof watchStudyRoster>|undefined;
+ let chatVisible=false;
+ const closeRoster=()=>{roster?.close();roster=undefined;};
  const publish=()=>{if(lastState&&!closed)onState({...lastState,nearby:nearby.filter(m=>Date.now()-m.at<12000).slice(-30),metrics:{...metrics}});};
  const disconnect=()=>{for(const ch of channels.values())void db.removeChannel(ch);channels.clear();receivers.clear();};const lastSequence=new Map<string,number>();
  async function sync(state:SpaceState){
@@ -45,15 +46,19 @@ export async function createLiveTransport(cohortId:string,userId:string,sessionI
   let response:Response;try{response=await request('/api/campus/space',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),credentials:'same-origin',cache:'no-store'});}catch(e){metrics.errors++;metrics.status='reconnecting';publish();throw e;}metrics.lastRttMs=Math.round(performance.now()-started);
   const data=await response.json();if(!response.ok){metrics.errors++;if([401,403].includes(response.status)){nearby.length=0;disconnect();closeRoster();metrics.status='closed';if(lastState){lastState={...lastState,peers:[],messages:[],seats:[]};publish();}closed=true;motion.close();clearInterval(renew);}else publish();throw new Error(data.error||'공간을 연결하지 못했습니다.');}if(cmd.profile)localStatus=cmd.profile.status;await sync(data);
   if(cmd.kind==='leave')closeRoster();
-  else if(!closed&&!stopRoster&&!data.controls?.paused&&(cmd.kind==='join'||cmd.kind==='heartbeat')){
-   stopRoster=watchStudyRoster(db,cohortId,refreshRoster);
+  else if(!closed&&!roster&&!data.controls?.paused&&(cmd.kind==='join'||cmd.kind==='heartbeat')){
+   roster=watchStudyRoster(db,cohortId,refreshRoster,()=>chatVisible);
   }
   if(cmd.kind==='heartbeat'){const own=lastState?.peers.find(p=>p.userId===userId);if(own)motion.push({x:own.x,y:own.y,sitting:own.sitting});}return data as SpaceState;
  }
  // Renew authorization periodically; disconnect if membership/profile check fails in API heartbeat.
  const motion=createMotionQueue(v=>{const own=lastState?.peers.find(p=>p.userId===userId);if(own)Object.assign(own,v);const ch=channels.get(userId);if(!closed&&!lastState?.controls?.paused&&ch&&ch.state==='joined'){metrics.sent++;void ch.send({type:'broadcast',event:'move',payload:{...v,sessionId,seq:sequence++}}).then(outcome=>{if(outcome!=='ok'){metrics.errors++;publish();}}).catch(()=>{metrics.errors++;publish();});publish();}});
  const renew=setInterval(()=>{if(closed)return;disconnect();lastSequence.clear();metrics.status='reconnecting';if(lastState)void sync(lastState);},60000);
- return {command,move(value){if(!closed)motion.push(value);},close(){closed=true;closeRoster();metrics.status='closed';motion.close();clearInterval(renew);disconnect();}};
+ return {command,setChatVisible(visible){
+  if(chatVisible===visible)return;
+  chatVisible=visible;
+  if(visible)roster?.refresh();
+ },move(value){if(!closed)motion.push(value);},close(){closed=true;closeRoster();metrics.status='closed';motion.close();clearInterval(renew);disconnect();}};
 }
 
 export function createDemoTransport(cohortId:string,userId:string,sessionId:string,initial:SpaceProfile,onState:(s:SpaceState)=>void):SpaceTransport{
