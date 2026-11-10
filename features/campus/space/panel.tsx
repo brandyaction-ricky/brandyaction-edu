@@ -170,9 +170,9 @@ export function SpacePanel({snapshot,demo,studyEntry,onOpenLesson,onNavigate,rew
  async function celebrateCohort(){await act(async()=>{let verified=progress;if(!demo){const r=await fetch('/api/campus/community/rewards?enrollmentId='+encodeURIComponent(snapshot.selectedEnrollmentId!),{cache:'no-store',credentials:'same-origin'});if(!r.ok)throw Error('기수 목표 달성을 다시 확인하지 못했어요.');verified=await r.json() as CommunityRewards;setLoadedRewards(verified);}if(!cohortGoalReached(verified))throw Error('기수 공동 목표를 달성하면 기념 연출을 볼 수 있어요.');if(state?.controls?.paused||state?.controls?.closedZones?.includes('launch'))return;post('progress',{level:verified!.level,xp:verified!.xp,launched:!!verified!.claimedAt,cohortLaunches:verified!.cohortLaunches,cohortGoal:verified!.cohortGoal,demo});post('cohort-launch');setNotice((demo?'체험 · ':'')+'확인된 기수 공동 목표 달성을 축하합니다. 기념 연출이며 새 발사 기록이나 성장 점수를 만들지 않아요.');});}
  function startFocus(minutes:number){setClock({phase:'focus',duration:minutes*60,elapsed:0,runningSince:Date.now()});setNotice(minutes?`${minutes}분 동안 한 가지에 집중해요.`:'시간 제한 없이 내 속도로 집중해요.');}
 
- function joinFocus(peer:SpacePeer){
+ function joinFocus(peer:SpacePeer,joinedAt:number){
   const latest=current.current.space?.peers.find(p=>p.userId===peer.userId&&p.sessionId===peer.sessionId);
-  const next=latest&&peerFocusClock(latest,Date.now());
+  const next=latest&&peerFocusClock(latest,joinedAt);
   if(!active||!next||latest.userId===actor)return;
   setClock(next);
   setNotice(latest.nickname+'님과 같은 시간에 집중을 마쳐요.');
@@ -184,7 +184,7 @@ export function SpacePanel({snapshot,demo,studyEntry,onOpenLesson,onNavigate,rew
   const aligned=ownDeadline===focusDeadline(shared);
   return <div className={forRoster?styles.rosterFocus:styles.group}>
    <span>{!forRoster&&peer.nickname+' · '}집중 중 · <time>{clockText(shared,now)}</time> 남음</span>
-   {aligned?<span>함께 집중 중</span>:<button type="button" disabled={!active||busy} onClick={()=>joinFocus(peer)}>
+   {aligned?<span>함께 집중 중</span>:<button type="button" disabled={!active||busy} onClick={()=>joinFocus(peer,Date.now())}>
     {ownDeadline&&ownDeadline>now?'내 타이머 전환':forRoster?'함께하기':'남은 시간 함께하기'}
    </button>}
   </div>;
