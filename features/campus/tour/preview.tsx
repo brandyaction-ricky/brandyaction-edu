@@ -70,6 +70,7 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  const [enteredStudy,setEnteredStudy]=useState(false);
  const sharedStudy=!!live?.studyPresence&&role==='student'&&room==='study';
  useEffect(()=>{
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Mirror room/map state; the roster session must precede the 3D scene.
   if(!sharedStudy)setEnteredStudy(false);
   else if(!mapOpen)setEnteredStudy(true);
  },[sharedStudy,mapOpen]);
@@ -81,6 +82,7 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  const deferSceneForChat=sharedStudy&&tool==='lounge'&&!ready;
  useEffect(()=>{
   if(sceneStarted)return;
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Mirror room/map state; the roster session must precede the 3D scene.
   if(!sharedStudy){setSceneStarted(true);return;}
   if(mapOpen)return;
   const fallback=setTimeout(()=>setSceneStarted(true),1800);
