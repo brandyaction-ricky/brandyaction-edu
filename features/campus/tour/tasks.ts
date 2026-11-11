@@ -39,5 +39,9 @@ export const tourTasks:TourTask[]=[
  task('admin:cases','office','관리자 전용','성과 사례 검토','사례 동의·보완·공개 준비',true),
  task('admin:links','live','관리자 전용','입장 링크 관리','웨비나·웰컴·수강생 링크 설정',true),
 ];
+// Server switches (EDU_CAMPUS_*_ENABLED) behind each task. A task whose switch is off can only answer "준비 중인 기능입니다", so the menu leaves it out.
+export type TourModules={focus:boolean;support:boolean;community:boolean};
+export const taskModule=(id:string):keyof TourModules|undefined=>id==='journal'?'focus':id==='feedback'||id.startsWith('community:')||id==='admin:moderation'?'community':id.startsWith('support:')||id==='admin:support'?'support':undefined;
+export const taskOpen=(id:string,modules?:TourModules)=>{const m=taskModule(id);return !modules||!m||modules[m];};
 export function roomTasks(room:TourRoom,role:TourRole){return tourTasks.filter(t=>t.room===room&&(!t.admin||role==='admin'));}
 export const taskById=(id:string)=>tourTasks.find(t=>t.id===id);

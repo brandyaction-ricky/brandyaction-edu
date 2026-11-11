@@ -22,7 +22,7 @@ import type {CampusSnapshot} from '../contracts';
 import type {CampusAdminSnapshot} from '../admin-metrics';
 import {campusDraftState} from '../ui/draft-guard';
 import {MiniFocus} from '../space/mini-focus';
-import {taskById,tourTasks} from './tasks';
+import {taskById,taskOpen,tourTasks} from './tasks';
 import coverage from './coverage.json';
 import {getCommunityDemoRewards} from '../community/events';
 const FeaturePanel=lazy(()=>import('./feature-panels'));
@@ -57,7 +57,7 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  useEffect(()=>{if(screenVideo)post('camera',{mode:'third'});},[screenVideo]);
  const visitorRef=useRef(visitor);useEffect(()=>{visitorRef.current=visitor;},[visitor]);
  const roomName=(id:TourRoom)=>managed[id]?.title||(visitor&&id==='live'?'문샷 오픈 캠퍼스':rooms.find(r=>r.id===id)?.name);
- const visibleTasks=(r:TourRoom,v:TourRole)=>contentTasks(managed,r,v).filter(t=>!visitor||t.id!=='live-video');
+ const visibleTasks=(r:TourRoom,v:TourRole)=>contentTasks(managed,r,v).filter(t=>(!visitor||t.id!=='live-video')&&taskOpen(t.id,live?.modules));
  const avatarKey=visitor?'moonshot-webinar-avatar-v1':TOUR_AVATAR_KEY;
  const [arrival,setArrival]=useState(!!visitor);
  function visitorEntered(){post('meetup-start');if(visitorRef.current?.devPresence&&!devConnection.current){const epoch=devEpoch.current;void import('../webinar/dev-presence').then(m=>{if(epoch===devEpoch.current&&!devConnection.current)devConnection.current=m.connectDevVisitors(value=>post('dev-visitor-state',value),visitorRef.current?.presenceId);}).catch(()=>setNotice('동료 연결이 지연되고 있어요. 공간 체험은 계속할 수 있습니다.'));}setArrival(false);if(failed)setMapOpen(true);visitorRef.current?.onEnter();}

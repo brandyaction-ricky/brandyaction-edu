@@ -3,8 +3,10 @@ import type {WelcomeSettings} from '../welcome/content';
 import type {CampusResource} from '../webinar/resources';
 import type {TourAvatar} from './appearance';
 import type {TourRole} from './model';
+import type {TourModules} from './tasks';
 export type TourLiveConnection={
  studyPresence?:boolean;
+ modules?:TourModules;
  publicPresence?:boolean;
  initialRoom?:'welcome';
  libraryResources?:CampusResource[];
