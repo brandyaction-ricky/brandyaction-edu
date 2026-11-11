@@ -22,6 +22,13 @@ test('generation uses authorised curriculum as user data, stores no provider res
  assert.ok(h.writes.some(w=>w.table==='edu_ai_calls'&&w.data.status==='succeeded'&&w.data.input_tokens===100));assert.ok(h.writes.some(w=>w.table==='edu_ai_requests'&&w.data.status==='succeeded'));
  assert.ok(h.writes.every(w=>['edu_ai_calls','edu_ai_requests'].includes(w.table)));assert.doesNotMatch(JSON.stringify(h.writes),/고객의 경험|ignore all rules|fixture-only/);
 });
+test('real request instructions require evidence-based troubleshooting before escalation without adding provider calls',async t=>{
+ const h=harness(t,{image:'data:image/png;base64,fixture-only'});await h.run();
+ assert.equal(h.providers.length,1);const instructions=h.providers[0].body.instructions;
+ assert.match(instructions,/安全|안전한 해결 순서/);assert.match(instructions,/추가 확인 질문은 needsMentor=false/);
+ assert.match(instructions,/계정 접근·결제·개인별 권한·운영자 판단/);
+ assert.match(instructions,/더 선명한 캡처나 오류 문구를 요청/);assert.match(instructions,/자료에 없는 설정·파일·삭제 절차를 만들어 내지/);
+});
 test('reviewed mentor guidance stays user data below the current EDU sources in student, mentor and batch answers',async t=>{
  for(const mode of ['student','mentor','batch'])await t.test(mode,async sub=>{
   const tutor=[{id:'reviewed-only',title:'보조 자료',excerpt:'TUTOR_REFERENCE_AS_DATA',review:'2026-10-31'}];const h=harness(sub,{mode,tutor});const answer=await h.run();

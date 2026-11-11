@@ -36,6 +36,7 @@ import { LessonBlockSession } from './lesson-block-session';
 import { useLessonProgression, type LessonGate } from './use-lesson-progression';
 import { Badge, Empty, Heading, ResourceRow, Video } from "./primitives";
 import { LessonTag } from './lesson-tag';
+import { CourseReviewButton } from './product-reviews';
 
 export function Classroom({
   path,
@@ -409,6 +410,7 @@ export function Classroom({
                   ))}
                 </section>}
                 <LessonQuestions key={enrollment.id + ":" + lesson.id} enrollmentId={String(enrollment.id)} lessonId={String(lesson.id)} lessonTitle={t(lesson, "title")} />
+                <section className="lesson-review-invite" aria-label="수강 후기 작성"><div><b>이번 수업은 어떠셨나요?</b><p>수강 경험을 다른 분들과 나눠 주세요.</p></div><CourseReviewButton courseId={String(enrollment.course_id)} courseTitle={t(course, 'title')}/></section>
                 <div className="lesson-bottom">
                   {current > 0 ? (
                     <Link

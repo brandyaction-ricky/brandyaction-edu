@@ -1,3 +1,4 @@
+import { productReviewsFixture } from './product-reviews-api.mjs';
 import { learningCareFixture } from './learning-care.mjs';
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
@@ -28,6 +29,7 @@ const brandLogo = readFileSync(resolve('public/brandy-action-logo.png'));
 const failedMemberReads = new Set();
 const server = createServer((request,response)=>{
   const url=new URL(request.url,'http://localhost');
+  if(productReviewsFixture(request,response,url))return;
   if(['/copy-candidate/free-live','/copy-candidate/moonshot'].includes(url.pathname)){response.setHeader('Content-Type','text/html; charset=utf-8');response.end(readFileSync(resolve('content/stabilization-20261029',url.pathname.split('/').at(-1)+'.html')));return;}
   if(url.pathname==='/question-comments-app.js'){response.setHeader('Content-Type','application/javascript');response.end(commentsResult.outputFiles.find(f=>f.path.endsWith('.js')).text);return;}
   if(url.pathname==='/question-comments-app.css'){response.setHeader('Content-Type','text/css');response.end(commentsResult.outputFiles.find(f=>f.path.endsWith('.css')).text);return;}
