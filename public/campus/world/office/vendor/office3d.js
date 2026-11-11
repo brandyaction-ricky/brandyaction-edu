@@ -4274,7 +4274,17 @@ void main() {
   for(let i=0;i<room.outline.length;i++){const a=room.outline[i],b=room.outline[(i+1)%room.outline.length];edge(a,b,.30,.14,0x27465b,-.30,false,!study);if(!study)edge(a,b,.035,.07,0x99d2de,.02,true);}
   if(!study){
    const inside=(x,y)=>window.CampusPlan.pointInPolygon({x,y},outline);
-   for(let x=room.bounds.minX+.1;x<room.bounds.maxX;x+=1.5)for(let y=room.bounds.minY+.1;y<room.bounds.maxY;y+=1.5)if([[x,y],[x+1.4,y],[x+1.4,y+1.4],[x,y+1.4]].every(([a,b])=>inside(a,b)))archBox(x,y,.003,1.4,1.4,.008,0x617c8a,{rough:.8,metal:.1,shadow:false});
+   const centers=[];
+   for(let x=room.bounds.minX+.1;x<room.bounds.maxX;x+=1.5){
+    for(let y=room.bounds.minY+.1;y<room.bounds.maxY;y+=1.5){
+     if([[x,y],[x+1.4,y],[x+1.4,y+1.4],[x,y+1.4]].every(([a,b])=>inside(a,b)))centers.push([x+.7,y+.7]);
+    }
+   }
+   const tiles=own(new lr(own(new mn(1.4,.008,1.4)),own(new Ue({color:0x617c8a,roughness:.8,metalness:.1})),centers.length));
+   const transform=tiles.matrix.clone();
+   centers.forEach(([x,z],index)=>tiles.setMatrixAt(index,transform.makeTranslation(x,.007,z)));
+   tiles.receiveShadow=true;
+   this.room.add(tiles);
   }
   const left=outline[5],back=outline[0],distance=Math.hypot(back[0]-left[0],back[1]-left[1]);
   const shortened=[left[0]+(back[0]-left[0])/distance*1.2,left[1]+(back[1]-left[1])/distance*1.2];
@@ -4302,9 +4312,12 @@ void main() {
  this.room=this.campusRoomGroups.get('study');
  for(const {x,y}of window.CampusPlan.getStudyDesks())this.buildCampusStudyDesk(x,y);
  const bookcase=window.CampusPlan.getStudyBookcase();this.buildCampusBookcase(bookcase.x,bookcase.y,bookcase.width);
- buildCampusInterior(this,{Group:wt,Mesh:Ce,BoxGeometry:mn,CylinderGeometry:en,SphereGeometry:vi,ConeGeometry:yi,RingGeometry:mr,MeshStandardMaterial:Ue,MeshBasicMaterial:Gt,PointLight:En,CanvasTexture:Un,DoubleSide:Vt,SRGBColorSpace:ct});
+ if(this.loaded)this.installCampusInterior();
  this.room=campusRoot;this.updateCampusVisibility();
  this.fitCamera3D(true);
+}
+installCampusInterior(){
+ buildCampusInterior(this,{Group:wt,Mesh:Ce,BoxGeometry:mn,CylinderGeometry:en,SphereGeometry:vi,ConeGeometry:yi,RingGeometry:mr,MeshStandardMaterial:Ue,MeshBasicMaterial:Gt,PointLight:En,CanvasTexture:Un,DoubleSide:Vt,SRGBColorSpace:ct});
 }
 buildCampusMission(cx,cy){
  const base=new Ce(new en(1,1,.18,8),new Ue({color:0x2d4e66,roughness:.6,metalness:.25}));base.scale.set(2.28,1,1.95);base.rotation.y=Math.PI/8;base.position.set(cx,.13,cy);this.room.add(base);

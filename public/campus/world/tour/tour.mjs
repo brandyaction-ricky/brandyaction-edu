@@ -79,6 +79,36 @@ let contentTasks=null;
 let deskProfiles=[],deskJobs=[],deskMarkers=[];
 const officeSeats=Plan.createCampusPlan().officeSeats;
 let officeFirst=false, pendingOffice=null, initialRoomSync=false;
+let firstDeskFrame=null;
+
+// Render the original desk meshes with the final camera. Character and prop downloads
+// can finish later without replacing the desks, their seat coordinates or the canvas.
+function showFirstDeskFrame(){
+ const projectJobs=()=>{
+  layer.replaceChildren();
+  if(room!=='office'||blocked||!pendingOffice)return;
+  const profiles=pendingOffice.document?.profiles;
+  if(!Array.isArray(profiles)||!Array.isArray(pendingOffice.desks))return;
+  const markers=makeDeskMarkers(layer,officeSeats,profiles,pendingOffice.desks,jobId=>send('office-desk-job',{jobId}));
+  positionDeskMarkers(office,markers);
+ };
+ const paint=()=>{
+  if(room!=='office'||blocked)return;
+  fit();
+  office.gl.render(office.scene,office.camera);
+  root.dataset.officeStage='desks';
+  projectJobs();
+ };
+ paint();
+ // The observer delivers an initial notification even without a size change.
+ let width=office.cw,height=office.ch;
+ const observer=new ResizeObserver(()=>{
+  if(width===office.cw&&height===office.ch)return;
+  width=office.cw;height=office.ch;paint();
+ });
+ observer.observe(root);
+ return {projectJobs,finish(){observer.disconnect();layer.replaceChildren();delete root.dataset.officeStage;}};
+}
 let atriumMeshType;
 const preparedRooms=new Set(['office']);
 function prepareRoom(id){
@@ -116,12 +146,17 @@ function move(dt){if(blocked||editing||document.hidden)return;const a=office.cam
 async function start(){if(started)return;started=true;try{/* campus-plan.js installs the renderer API, including its non-exported picking helpers. */window.CampusInterior=Interior;await import('../office/vendor/office.js');const {Office3D,CampusInstancedMesh,CampusSphereGeometry}=await import('../office/vendor/office3d.js');office=new Office3D(root,{showAgent:false,deskCapacity:8});if(office.gl)applyRenderProfile(office.gl,root);office.update([]);
  let configuringOffice=officeFirst;
  if(officeFirst){
-  if(!office.gl || !await office.assetsReady)throw Error('renderer');
+  if(!office.gl)throw Error('renderer');
   // Configure the destination, camera and roster before paying for the first draw.
   const draw=office.draw.bind(office);
   office.draw=(...args)=>configuringOffice?false:draw(...args);
   office.getCampusVisibleRoom=()=>room==='office'?'office':'study';
   office.prepareRoomGeometry();
+  const needsInterior=!office.loaded;
+  firstDeskFrame=showFirstDeskFrame();
+  if(!await office.assetsReady)throw Error('renderer');
+  firstDeskFrame.finish();firstDeskFrame=null;
+  if(needsInterior)office.installCampusInterior();
  }else if(!await office.ready)throw Error('renderer');
  office.avatarNameplate=drawAvatarNameplate;attachOfficeEnvironment(office,root);attachAvatarAppearance(office);office.campusIdentity={displayId:'나 · 미리보기',gender:'male',coat:'#386eb4',hairColor:'#302825',skinColor:'#e8b68b',pantsColor:'#36485d',model:0};
  office.campusHeightAt=(x,y)=>room==='live'?atriumHeightAt(x,y):0;atriumMeshType=CampusInstancedMesh;if(!officeFirst)for(const id of ['study','welcome','library','live'])prepareRoom(id);office.getCampusVisibleRoom=()=>room==='office'?'office':'study';office.drawCampusRoomLabels=()=>{};office.updateCampusVisibility=()=>{for(const [id,g]of office.campusRoomGroups)g.visible=id===room;for(const [id,g]of groups)g.visible=id===room;office.plan.observationWindows=[];};office.fitCamera3D=fit;office.pauseCampusInput=()=>{editing=true;keys.clear();target=null;view?.refresh();};office.resumeCampusInput=()=>{editing=false;view?.refresh();budget.wake(performance.now());};
@@ -134,13 +169,15 @@ async function start(){if(started)return;started=true;try{/* campus-plan.js inst
  if(officeFirst)applyPersonalOffice(pendingOffice);
  pendingOffice=null;
  // showRoom also configures lighting and camera; paint once after both are set.
- showRoom(room);configuringOffice=false;ready=true;office.draw();initialRoomSync=true;send('ready');}catch{status.textContent='3D 공간을 열지 못했어요. 상단 공간 이동과 활동 메뉴로 계속할 수 있어요.';send('error');}}
+ showRoom(room);configuringOffice=false;ready=true;office.draw();initialRoomSync=true;send('ready');}catch{firstDeskFrame?.finish();firstDeskFrame=null;status.textContent='3D 공간을 열지 못했어요. 상단 공간 이동과 활동 메뉴로 계속할 수 있어요.';send('error');}}
 window.addEventListener('message',e=>{const m=e.data;if(e.origin!==location.origin||e.source!==parent||m?.source!=='moonshot-tour-host'||m.token!==token||token.length<32)return;const p=m.payload||{};if(m.type==='init'){if(!started){publicVisitor=p.visitor===true;operatorReview=p.operatorReview===true;devPresence=p.devPresence===true;qaCrowd=devPresence&&p.qaCrowd===true;ambientCount=[0,20,40,60].includes(p.ambientCount)?p.ambientCount:0;document.body.dataset.visitor=String(publicVisitor);if(publicVisitor&&devPresence){const seed=crypto.getRandomValues(new Uint32Array(1))[0];info.live={cx:0,cy:12,w:44,d:44,spawn:{x:(seed%9-4)*.9,y:27+((seed>>>8)%4)*.8}}};officeFirst=p.studentOffice===true&&!publicVisitor&&!operatorReview;
  if(officeFirst){room='office';currentRole='student';pendingOffice=p.personalOffice;}
  void start();}else if(ready)send('ready');return;}if(m.type==='meetup-start'){meetupWanted=true;void meetup?.join();return;}if(!ready){
  if(officeFirst && m.type==='personal-office')pendingOffice=p;
  if(officeFirst && m.type==='office-desks-clear')pendingOffice=null;
  if(officeFirst && m.type==='room' && names[p.id] && allowed(p.id))room=p.id;
+ if(officeFirst && m.type==='blocked')blocked=!!p.value;
+ if(['personal-office','office-desks-clear','room','blocked'].includes(m.type))firstDeskFrame?.projectJobs();
  return;
 }if(m.type==='dev-visitor-state')meetup?.receive?.(p);if(m.type==='personal-office'){
  applyPersonalOffice(p);setMarkers();office.draw();

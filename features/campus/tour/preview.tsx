@@ -74,7 +74,6 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  const [deskList,setDeskList]=useState<{enrollment:typeof snapshot.selectedEnrollmentId;jobs:OfficeDeskJob[]}|null>(null);
  const studentOffice=!!live&&role==='student'&&room==='office';
  const deskLoaded=!!deskList&&deskList.enrollment===snapshot.selectedEnrollmentId;
- const deskHasWork=deskLoaded&&deskList.jobs.length>0;
  const studentMap=!!live&&role==='student'&&mapOpen;
  const sharedStudy=!!live?.studyPresence&&role==='student'&&room==='study';
  useEffect(()=>{
@@ -93,7 +92,7 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
   if(studentOffice){
    // Give the signed-in desk read and its first paint priority over WebGL startup.
    if(tool)return;
-   const delay=deskHasWork?500:deskLoaded?2500:9000;
+   const delay=deskLoaded?80:1800;
    const timer=setTimeout(()=>setSceneStarted(true),delay);
    return ()=>clearTimeout(timer);
   }
@@ -102,7 +101,7 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
   if(mapOpen)return;
   const fallback=setTimeout(()=>setSceneStarted(true),1800);
   return ()=>clearTimeout(fallback);
- },[sceneStarted,sharedStudy,mapOpen,studentMap,studentOffice,deskLoaded,deskHasWork,tool]);
+ },[sceneStarted,sharedStudy,mapOpen,studentMap,studentOffice,deskLoaded,tool]);
  const track=useCampusAnalytics(visitor?.analyticsScope||(!visitor&&live?'member':undefined),room);
  useEffect(()=>{if(tool)track('tool_open',tool);},[tool]); // eslint-disable-line react-hooks/exhaustive-deps
  useEffect(()=>{if(gate)track('room_gate',gate);},[gate]); // eslint-disable-line react-hooks/exhaustive-deps
