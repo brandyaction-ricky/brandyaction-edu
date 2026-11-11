@@ -71,6 +71,11 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  const [role,setRole]=useState<TourRole>(visitor?'guest':review?(review.role||'admin'):live?.role||'student'),[room,setRoom]=useState<TourRoom>(visitor?'live':review?.room||live?.initialRoom||(live?.role==='waiting'?'welcome':'study')),[mapOpen,setMapOpen]=useState(!visitor&&!review&&!live?.initialRoom),[tool,setTool]=useState(review?.lessonContent ? 'learning' : ''),[gate,setGate]=useState<TourRoom|null>(null),[ready,setReady]=useState(false),[failed,setFailed]=useState(false),[notice,setNotice]=useState(''),[progress,setProgress]=useState<Progress>(emptyProgress),[storageReady,setStorageReady]=useState(false),[editing,setEditing]=useState(false),[camera,setCamera]=useState(visitor?'third':'overall'),[activityMenu,setActivityMenu]=useState(false);
  const [studyCardHost,setStudyCardHost]=useState<HTMLDivElement|null>(null);
  const [enteredStudy,setEnteredStudy]=useState(false);
+ const [deskList,setDeskList]=useState<{enrollment:typeof snapshot.selectedEnrollmentId;jobs:OfficeDeskJob[]}|null>(null);
+ const studentOffice=!!live&&role==='student'&&room==='office';
+ const deskLoaded=!!deskList&&deskList.enrollment===snapshot.selectedEnrollmentId;
+ const deskHasWork=deskLoaded&&deskList.jobs.length>0;
+ const studentMap=!!live&&role==='student'&&mapOpen;
  const sharedStudy=!!live?.studyPresence&&role==='student'&&room==='study';
  useEffect(()=>{
   // eslint-disable-next-line react-hooks/set-state-in-effect -- Mirror room/map state; the roster session must precede the 3D scene.
@@ -79,18 +84,25 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  },[sharedStudy,mapOpen]);
  // On the first visit the map covers the world. Start the scene after the
  // student's roster session is established so WebGL startup cannot block it.
- const [sceneStarted,setSceneStarted]=useState(!sharedStudy);
+ const [sceneStarted,setSceneStarted]=useState(!sharedStudy&&!studentMap&&!studentOffice);
  // Let the first chat take priority over WebGL initialization. Once the world
  // is ready, keep its iframe and the student's position when opening chat.
  const deferSceneForChat=sharedStudy&&tool==='lounge'&&!ready;
  useEffect(()=>{
-  if(sceneStarted)return;
+  if(sceneStarted||studentMap)return;
+  if(studentOffice){
+   // Give the signed-in desk read and its first paint priority over WebGL startup.
+   if(tool)return;
+   const delay=deskHasWork?500:deskLoaded?2500:9000;
+   const timer=setTimeout(()=>setSceneStarted(true),delay);
+   return ()=>clearTimeout(timer);
+  }
   // eslint-disable-next-line react-hooks/set-state-in-effect -- Mirror room/map state; the roster session must precede the 3D scene.
   if(!sharedStudy){setSceneStarted(true);return;}
   if(mapOpen)return;
   const fallback=setTimeout(()=>setSceneStarted(true),1800);
   return ()=>clearTimeout(fallback);
- },[sceneStarted,sharedStudy,mapOpen]);
+ },[sceneStarted,sharedStudy,mapOpen,studentMap,studentOffice,deskLoaded,deskHasWork,tool]);
  const track=useCampusAnalytics(visitor?.analyticsScope||(!visitor&&live?'member':undefined),room);
  useEffect(()=>{if(tool)track('tool_open',tool);},[tool]); // eslint-disable-line react-hooks/exhaustive-deps
  useEffect(()=>{if(gate)track('room_gate',gate);},[gate]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -178,7 +190,6 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
  useEffect(()=>()=>{devEpoch.current++;devConnection.current?.close();devConnection.current=null;},[]);
  const previousDeskView=useRef('');
  const deskTargets=useRef(new globalThis.Map<string,OfficeDeskJob>());
- const [deskList,setDeskList]=useState<{enrollment:typeof snapshot.selectedEnrollmentId;jobs:OfficeDeskJob[]}|null>(null);
  const refreshDesks=useCallback(async(signal?:AbortSignal)=>{
    const params=new URLSearchParams({enrollmentId:snapshot.selectedEnrollmentId||''});
    if(role==='student')params.set('desks','1');
