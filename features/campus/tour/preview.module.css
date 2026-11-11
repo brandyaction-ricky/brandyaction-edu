@@ -52,7 +52,7 @@
 .roomCover{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:3}.managedArticle{max-width:860px;margin:auto;padding:24px;background:#fff;border-radius:16px;line-height:1.8;color:#18354f}.managedArticle img{max-width:100%;height:auto;max-height:640px;object-fit:contain}.managedArticle a{display:inline-flex;padding:12px 18px;border-radius:10px;background:#2868da;color:#fff;text-decoration:none}.managedArticle h2{font-size:clamp(22px,3vw,32px)}
 
 .brand .officeHelp{pointer-events:auto;touch-action:manipulation;display:block;min-height:28px;font-size:12px;line-height:1.3;font-weight:600;color:#cbe1fc;border:0;background:transparent;padding:3px 0;text-align:left;text-decoration:underline;text-underline-offset:3px}
-/* Study room cards line up with the top bar; on phones the scene-loading notice sits above the bottom controls instead of covering them. */
+/* Study room cards line up with the top bar and share one card layout. */
 .miniFocus{left:max(12px,env(safe-area-inset-left));max-width:calc(100vw - 24px)}
 .miniFocus>aside{box-sizing:border-box;position:static;width:min(300px,calc(100vw - 32px));margin:0;padding:12px 14px;flex-wrap:wrap;gap:6px 8px;border:1px solid #cad7e3;border-radius:14px;background:#fff;backdrop-filter:none;box-shadow:0 3px 14px #06172826;color:#193552;font-size:12px}
 .miniFocus>aside>div{width:100%;flex:auto;justify-content:space-between;gap:8px}
@@ -60,4 +60,14 @@
 .miniFocus>aside>span[aria-label]{width:100%;max-width:none;color:#526981;font-size:12px}
 .miniFocus>aside button{flex:1;min-height:40px;padding:6px 12px;border:1px solid #b8cede;border-radius:8px;background:#f4f8fc;color:#214e79;font-size:13px;font-weight:600}
 .miniFocus>aside button:focus-visible{outline:2px solid #2770aa;outline-offset:2px}
-@media(max-width:650px){.loading{top:auto;bottom:170px}.miniFocus>aside{width:calc(100vw - 24px)}}
+@media(max-width:650px){.miniFocus>aside{width:calc(100vw - 24px)}}
+
+/* Let the study cards reserve their own height while the scene loads. */
+.miniFocus .loading {
+  position:static;
+  transform:none;
+  max-width:100%;
+  margin:6px 0 0;
+  padding:6px 10px;
+  pointer-events:none;
+}
