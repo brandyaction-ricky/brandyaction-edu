@@ -27,7 +27,10 @@ export async function POST(request:Request) {
   const r=await createAdminClient().rpc('edu_approve_member_erasure',{p_actor:user.id,p_request:input.requestId,p_environment:environment});
   if(r.error)return reply({error:'처리할 수 없는 요청입니다. 회원 상태와 관리자 권한을 확인하고 새로고침해 주세요.'},409);
   // Approval already saved. A scheduling failure is not a failed approval, and must not invite a new request.
-  try {await dispatchMemberErasure({requestId:input.requestId});}
+  try {
+    const result=await dispatchMemberErasure({requestId:input.requestId});
+    if(result.completed===1)return reply({ok:true,message:'탈퇴 처리가 완료됐습니다. 로그인 계정과 학습·첨부·진단 자료의 삭제를 확인했습니다.'});
+  }
   catch {return reply({ok:true,message:'탈퇴 처리를 접수했습니다. 후속 삭제 상태를 새로고침해 확인해 주세요.'},202);}
-  return reply({ok:true,message:'탈퇴 처리를 시작했습니다. 로그인·수강 접근은 차단되며, 진단 삭제는 안전 대기 후 이어집니다.'},202);
+  return reply({ok:true,message:'탈퇴 처리를 접수했습니다. 로그인·수강 접근은 즉시 차단됩니다. 남은 삭제는 자동으로 이어지며, 아래에서 진행 상태를 확인할 수 있습니다.'},202);
 }

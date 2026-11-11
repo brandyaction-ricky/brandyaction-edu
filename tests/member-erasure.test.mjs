@@ -58,3 +58,26 @@ test('local Storage erasure retries lost receipts and never sends the remote req
  await dispatchMemberErasure({env,requestId,eraseLocal:async()=>{throw new EraseBridgeError('LOCAL_UPLOAD_DRAIN_PENDING',true);},send:async()=>{sent++;return validateEraseReceipt(receipt(),requestId);},rpc:async(name,args)=>{if(name==='edu_finish_member_erasure')finish=args;return {data:name==='edu_claim_approved_member_erasure'?[job]:null,error:null};}});
  assert.equal(sent,0);assert.equal(finish.p_result,null);assert.equal(finish.p_code,'LOCAL_UPLOAD_DRAIN_PENDING');assert.equal(finish.p_retryable,true);
 });
+
+test('structural local deletion failures stop destructive retries without exposing SQL; timeout remains retryable',async()=>{
+ const {eraseMemberLocalData}=load('member-erasure');
+ for(const [code,retryable,label] of [['23503',false,'LOCAL_ERASURE_REVIEW_REQUIRED'],['42703',false,'LOCAL_ERASURE_REVIEW_REQUIRED'],['57014',true,'LOCAL_ERASURE_TIMEOUT']]) {
+  await assert.rejects(eraseMemberLocalData(async()=>({error:{code,message:'private table and member values'}}),{subject,requestId,lease:subject}),error=>error.code===label&&error.retryable===retryable&&!error.message.includes('private'));
+ }
+});
+test('last Storage batch completes immediately but unconfirmed remaining files never report success',async()=>{
+ const {eraseMemberLocalData}=load('member-erasure');
+ for(const remaining of [false,true]) {
+  let batch=0,finished=0;
+  const rpc=async name=>{
+   if(name==='edu_prepare_member_local_erasure')return {data:{ready:false}};
+   if(name==='edu_list_member_erasure_files')return {data:batch<3||remaining?[{id:requestId,bucket:'question-images',path:subject+'/qa.png'}]:[]};
+   if(name==='edu_record_member_erasure_files'){batch++;return {};}
+   if(name==='edu_finish_member_local_erasure'){finished++;return {};}
+   throw Error(name);
+  };
+  const promise=eraseMemberLocalData(rpc,{subject,requestId,lease:subject},async()=>({}));
+  if(remaining)await assert.rejects(promise,error=>error.code==='LOCAL_STORAGE_PENDING');else await promise;
+  assert.equal(finished,remaining?0:1);assert.equal(batch,3);
+ }
+});

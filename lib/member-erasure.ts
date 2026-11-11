@@ -10,9 +10,12 @@ export async function eraseMemberLocalData(rpc:Rpc,job:Job,remove=(bucket:string
   const prepared=await rpc('edu_prepare_member_local_erasure',args);
   if(prepared.error){
     // Only fixed codes are propagated; never log SQL errors, file names or member content.
-    const code=typeof prepared.error==='object'&&prepared.error!==null&&'message' in prepared.error&&prepared.error.message==='LOCAL_UPLOAD_DRAIN_PENDING'
-      ?'LOCAL_UPLOAD_DRAIN_PENDING':'LOCAL_ERASURE_PENDING';
-    throw new EraseBridgeError(code,true);
+    const failure=prepared.error as {message?:string;code?:string};
+    if(failure.message==='LOCAL_UPLOAD_DRAIN_PENDING')throw new EraseBridgeError('LOCAL_UPLOAD_DRAIN_PENDING',true);
+    // A broken relationship/schema cannot heal through repeated destructive retries.
+    // Keep provider text and member content out of both logs and administrator responses.
+    if(['23503','23514','42703','42P01','42501'].includes(failure.code??''))throw new EraseBridgeError('LOCAL_ERASURE_REVIEW_REQUIRED',false);
+    throw new EraseBridgeError(failure.code==='57014'?'LOCAL_ERASURE_TIMEOUT':'LOCAL_ERASURE_PENDING',true);
   }
   if(!prepared.data||typeof prepared.data!=='object'||!('ready' in prepared.data))throw new EraseBridgeError('LOCAL_ERASURE_PENDING',true);
   if(prepared.data.ready===true)return;
@@ -34,6 +37,12 @@ export async function eraseMemberLocalData(rpc:Rpc,job:Job,remove=(bucket:string
       const saved=await rpc('edu_record_member_erasure_files',{...args,p_files:group.map(f=>f.id)});
       if(saved.error)throw new EraseBridgeError('LOCAL_STORAGE_PENDING',true);
     }
+  }
+  // The third batch may have removed the final object; do not force an extra retry.
+  const remaining=await rpc('edu_list_member_erasure_files',args);
+  if(!remaining.error&&Array.isArray(remaining.data)&&remaining.data.length===0){
+    const saved=await rpc('edu_finish_member_local_erasure',args);
+    if(!saved.error)return;
   }
   throw new EraseBridgeError('LOCAL_STORAGE_PENDING',true);
 }

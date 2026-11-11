@@ -61,3 +61,9 @@ test('saved approval remains accepted when scheduling fails; failed approval nev
  const denied=admin({id:actor,role:'admin'},async()=>({data:null,error:{message:'private SQL'}}),async()=>{throw Error('Must not dispatch');});
  const failure=await denied.POST(input(command));assert.equal(failure.status,409);assert.doesNotMatch(await failure.text(),/private SQL/);
 });
+
+test('a completed synchronous deletion is reported as complete, not queued for another click',async t=>{
+ const before=process.env.EDU_DIAGNOSIS_ERASURE_ENABLED;process.env.EDU_DIAGNOSIS_ERASURE_ENABLED='true';t.after(()=>{if(before===undefined)delete process.env.EDU_DIAGNOSIS_ERASURE_ENABLED;else process.env.EDU_DIAGNOSIS_ERASURE_ENABLED=before;});
+ const api=admin({id:actor,role:'admin'},async()=>({data:{state:'requested'}}),async()=>({completed:1,processed:1}));
+ const result=await api.POST(input(command));assert.equal(result.status,200);assert.match((await result.json()).message,/완료됐습니다/);
+});

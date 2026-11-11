@@ -4,31 +4,56 @@ import {CheckCircle2,Clock3,RefreshCw,ShieldAlert} from 'lucide-react';
 import './member-erasure-queue.css';
 type RequestRow={requestId:string;memberId:string;state:string;receivedAt:string;deadlineAt:string;nextAttemptAt:string;attempts:number;uncertainAttempts:number;counts:Record<string,number>;storageRemoved:number;storageFailedCount:number;lastCode:string|null;completedAt:string|null;approvedAt?:string|null;disabledAt?:string|null;authErasedAt?:string|null;localErasedAt?:string|null;localCounts?:Record<string,number>;localStorageRemoved?:number;memberName?:string|null;memberEmail?:string|null};
 const labels:Record<string,string>={requested:'접수',processing:'삭제 중',retry:'다시 시도 예정',blocked:'관리자 확인 필요',complete:'삭제 완료'};
-const errors:Record<string,string>={LOCAL_UPLOAD_DRAIN_PENDING:'기존 업로드 링크의 만료를 기다리고 있습니다. 접근 차단 후 최대 2시간 2분 뒤 파일 삭제를 이어갑니다.',LOCAL_ERASURE_PENDING:'학습·AI 자료 삭제를 다시 확인하고 있습니다.',LOCAL_STORAGE_PENDING:'남은 학습 첨부 파일을 다시 삭제할 예정입니다.',NETWORK:'서버 연결이 끊겼습니다.',UNAVAILABLE:'마이인 서버가 처리 중입니다.',STORAGE_PENDING:'남은 파일을 다시 지울 예정입니다.',CONFIGURATION:'서버 연결 설정을 확인해 주세요.',UNAUTHORIZED:'서버 인증 설정을 확인해 주세요.',FORBIDDEN:'서버 환경을 확인해 주세요.',DISABLED:'마이인 삭제 기능이 아직 켜지지 않았습니다.',LOCAL_WITHDRAWAL_BLOCKED:'에듀 탈퇴 권한·상태를 확인해 주세요.',AUTH_ERASURE_FAILED:'로그인 계정 삭제를 다시 확인하고 있습니다.',AUTH_RECEIPT_PENDING:'로그인 계정 삭제 결과 기록을 다시 확인하고 있습니다.',INVALID_RESPONSE:'삭제 결과 형식을 확인해 주세요.'};
+const errors:Record<string,string>={LOCAL_UPLOAD_DRAIN_PENDING:'기존 업로드 링크의 만료를 기다리고 있습니다. 접근 차단 후 최대 2시간 2분 뒤 파일 삭제를 이어갑니다.',LOCAL_ERASURE_PENDING:'학습·AI 자료 삭제를 다시 확인하고 있습니다.',LOCAL_ERASURE_REVIEW_REQUIRED:'자료 연결 관계를 서버에서 확인해야 합니다. 반복 실행으로 해결되지 않으므로 담당자에게 확인해 주세요.',LOCAL_ERASURE_TIMEOUT:'자료 삭제 시간이 초과돼 같은 요청으로 자동 재시도합니다.',LOCAL_STORAGE_PENDING:'남은 학습 첨부 파일을 다시 삭제할 예정입니다.',NETWORK:'서버 연결이 끊겼습니다.',UNAVAILABLE:'마이인 서버가 처리 중입니다.',STORAGE_PENDING:'남은 파일을 다시 지울 예정입니다.',CONFIGURATION:'서버 연결 설정을 확인해 주세요.',UNAUTHORIZED:'서버 인증 설정을 확인해 주세요.',FORBIDDEN:'서버 환경을 확인해 주세요.',DISABLED:'마이인 삭제 기능이 아직 켜지지 않았습니다.',LOCAL_WITHDRAWAL_BLOCKED:'에듀 탈퇴 권한·상태를 확인해 주세요.',AUTH_ERASURE_FAILED:'로그인 계정 삭제를 다시 확인하고 있습니다.',AUTH_RECEIPT_PENDING:'로그인 계정 삭제 결과 기록을 다시 확인하고 있습니다.',INVALID_RESPONSE:'삭제 결과 형식을 확인해 주세요.'};
+async function readQueue(signal:AbortSignal):Promise<{rows:RequestRow[];enabled:boolean}>{
+  const res=await fetch('/api/admin/member-erasure',{cache:'no-store',signal});const data=await res.json();
+  if(!res.ok)throw Error(data.error);if(!Array.isArray(data.rows))throw Error('기록을 불러오지 못했습니다. 다시 시도해 주세요.');
+  return {rows:data.rows,enabled:data.enabled===true};
+}
 export function MemberErasureQueue() {
   const [rows,setRows]=useState<RequestRow[]>([]),[enabled,setEnabled]=useState(false),[error,setError]=useState(''),[busy,setBusy]=useState(true);
   const [selected,setSelected]=useState<string|null>(null),[confirmed,setConfirmed]=useState(false),[message,setMessage]=useState('');
   const confirmation=useRef<HTMLElement>(null);
   useEffect(()=>{if(selected){confirmation.current?.focus({preventScroll:true});confirmation.current?.scrollIntoView({block:'start'});}},[selected]);
-  const refresh=useCallback(async()=>{setBusy(true);try{const res=await fetch('/api/admin/member-erasure',{cache:'no-store'});const data=await res.json();if(!res.ok)throw Error(data.error);if(!Array.isArray(data.rows))throw Error('기록을 불러오지 못했습니다. 다시 시도해 주세요.');setRows(data.rows);setEnabled(data.enabled===true);setError('');}catch(e){setError(e instanceof Error?e.message:'기록을 불러오지 못했습니다.');}finally{setBusy(false);}},[]);
-  useEffect(()=>{const controller=new AbortController();
-    async function initialLoad(){try{const res=await fetch('/api/admin/member-erasure',{cache:'no-store',signal:controller.signal});const data=await res.json();if(!res.ok)throw Error(data.error);if(!Array.isArray(data.rows))throw Error('기록을 불러오지 못했습니다. 다시 시도해 주세요.');if(!controller.signal.aborted){setRows(data.rows);setEnabled(data.enabled===true);}}catch(e){if(!controller.signal.aborted)setError(e instanceof Error?e.message:'기록을 불러오지 못했습니다.');}finally{if(!controller.signal.aborted)setBusy(false);}}
-    void initialLoad();return()=>controller.abort();
+  const loading=useRef<AbortController|null>(null),mutating=useRef(false);
+  const refresh=useCallback(async()=>{
+    if(loading.current)return;
+    const controller=new AbortController();loading.current=controller;
+    try{
+      const data=await readQueue(controller.signal);
+      if(!controller.signal.aborted){setRows(data.rows);setEnabled(data.enabled===true);setError('');}
+    }catch(e){if(!controller.signal.aborted)setError(e instanceof Error?e.message:'기록을 불러오지 못했습니다.');}
+    finally{if(loading.current===controller){loading.current=null;}}
   },[]);
+  useEffect(()=>{
+    const controller=new AbortController();loading.current=controller;
+    void readQueue(controller.signal).then(data=>{if(!controller.signal.aborted){setRows(data.rows);setEnabled(data.enabled);setError('');}})
+      .catch(cause=>{if(!controller.signal.aborted)setError(cause instanceof Error?cause.message:'기록을 불러오지 못했습니다.');})
+      .finally(()=>{if(loading.current===controller)loading.current=null;if(!controller.signal.aborted)setBusy(false);});
+    return()=>{controller.abort();if(loading.current===controller)loading.current=null;};
+  },[]);
+  const polling=enabled&&rows.some(row=>row.approvedAt&&['requested','processing','retry'].includes(row.state));
+  useEffect(()=>{
+    if(!polling)return;
+    const check=()=>{if(document.visibilityState==='visible'&&!mutating.current)void refresh();};
+    const timer=setInterval(check,10000);document.addEventListener('visibilitychange',check);
+    return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',check);};
+  },[polling,refresh]);
   async function execute(requestId:string){
-    if(!confirmed||busy)return;
+    if(!confirmed||busy||mutating.current)return;
+    mutating.current=true;loading.current?.abort();loading.current=null;
     setBusy(true);setError('');setMessage('');
     try{
       const res=await fetch('/api/admin/member-erasure',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'execute',requestId,confirmation:requestId})});
       const data=await res.json();if(!res.ok)throw Error(data.error);
       setSelected(null);setConfirmed(false);setMessage(data.message||'탈퇴 처리를 시작했습니다.');await refresh();
-    }catch(e){setError(e instanceof Error?e.message:'처리를 시작하지 못했습니다.');}finally{setBusy(false);}
+    }catch(e){setError(e instanceof Error?e.message:'처리를 시작하지 못했습니다.');}finally{mutating.current=false;setBusy(false);}
   }
   const pending=rows.filter(r=>r.state!=='complete').length;
   return <section className="panel erasure-queue" aria-label="탈퇴 요청·진단 삭제 기록" aria-busy={busy}>
     <header className="erasure-heading">
-      <div><h2>탈퇴 요청·진단 삭제 기록</h2><p>접수한 요청의 처리 상태를 확인하세요.</p></div>
-      <button className="btn small" type="button" disabled={busy} onClick={()=>void refresh()}><RefreshCw size={16} aria-hidden="true"/>처리 상태 새로고침</button>
+      <div><h2>탈퇴 요청·진단 삭제 기록</h2><p>{polling?'처리 중에는 상태가 자동으로 갱신됩니다. 같은 요청을 반복 실행하지 않아도 됩니다.':'접수한 요청의 처리 상태를 확인하세요.'}</p></div>
+      <button className="btn small" type="button" disabled={busy} onClick={()=>{setBusy(true);void refresh().finally(()=>setBusy(false));}}><RefreshCw size={16} aria-hidden="true"/>처리 상태 새로고침</button>
     </header>
     <div className="erasure-overview">
       {!busy&&!error&&rows.length>0&&<><span><strong>{pending}</strong>건 처리 대기</span><span><strong>{rows.length-pending}</strong>건 삭제 완료</span></>}
@@ -48,7 +73,7 @@ export function MemberErasureQueue() {
         <a className="btn small ghost" href={`/admin/customers?member=${encodeURIComponent(r.memberId)}`}>해당 회원 확인</a>
       </div>
       {(r.memberName||r.memberEmail)&&<p className="erasure-member"><strong>{r.memberName||'회원'}</strong> {r.memberEmail}</p>}
-      {r.disabledAt&&r.state!=='complete'&&<p className="erasure-note">로그인·수강 접근이 차단됐습니다. 진행 중인 진단 처리를 정리한 뒤 남은 삭제를 이어갑니다.</p>}
+      {r.disabledAt&&r.state!=='complete'&&<p className="erasure-note">로그인·수강 접근이 차단됐습니다. 남은 학습·첨부·진단 자료 삭제를 이어갑니다.</p>}
       <div className="erasure-results" aria-label="확인된 삭제 결과">
         <span>진단 기록 <strong>{Object.values(r.counts).reduce((a,b)=>a+b,0)}건</strong></span>
         <span>학습 자료 <strong>{Object.values(r.localCounts??{}).reduce((a,b)=>a+b,0)}건</strong></span><span>파일 <strong>{r.storageRemoved+(r.localStorageRemoved??0)}개</strong></span>

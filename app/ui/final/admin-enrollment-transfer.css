@@ -1,0 +1,11 @@
+.enrollment-transfer{margin-top:20px;padding-top:16px;border-top:1px solid var(--line,#e1e4e8)}
+.enrollment-transfer-form{margin-top:16px;padding:20px;background:var(--bg,#f7f8fa);border:1px solid var(--line,#e1e4e8);border-radius:12px}
+.enrollment-transfer-form h4{margin:0 0 8px;font-size:16px}
+.enrollment-transfer-form .field{margin-top:16px}
+.enrollment-transfer-lookup{display:flex;gap:8px;align-items:stretch}
+.enrollment-transfer-lookup input{min-width:0;flex:1}
+.enrollment-transfer-lookup button{flex-shrink:0}
+.enrollment-transfer-target{display:grid;gap:6px;padding:16px;margin:16px 0;background:var(--surface,#fff);border:1px solid var(--line,#e1e4e8);border-radius:10px;overflow-wrap:anywhere}
+.enrollment-transfer-target>span:first-child{font-size:12px;color:var(--muted,#616875)}
+.enrollment-transfer-scope{margin:16px 0;padding-left:20px;font-size:13px;line-height:1.7;color:var(--muted,#616875)}
+@media(max-width:520px){.enrollment-transfer-form{padding:14px}.enrollment-transfer-lookup{flex-direction:column}.enrollment-transfer-lookup button{align-self:flex-start}}

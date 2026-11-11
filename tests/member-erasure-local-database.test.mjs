@@ -25,7 +25,9 @@ test('seeded learning data erases while financial/consent evidence and other lea
  alter table storage.objects enable row level security;create policy existing_storage_read on storage.objects for select to authenticated using(true);
  grant select on profiles,storage.objects to authenticated;`);
  await db.exec(readFileSync(new URL('./helpers/member-erasure-schema.sql',import.meta.url),'utf8'));
- await db.exec('grant select,insert,update on all tables in schema public to service_role');
+ await db.exec(`create table edu_push_deliveries(id uuid primary key,event_id uuid not null references edu_push_events(id),subscription_id uuid not null references edu_push_subscriptions(id));
+ create table edu_care_deliveries(id uuid primary key,event_id uuid references edu_push_events(id),destination_hash text,receipt text);`);
+ await db.exec('grant select,insert,update,delete on all tables in schema public to service_role');
  for(const f of ['20260914013836_manage_member_admin_roles_and_deletion.sql','20261004002124_edu_member_diagnosis_erasure.sql','20261109100648_edu_member_erasure_execution.sql','20261109122930_edu_member_erasure_local_data.sql'])await db.exec(read(f));
  const member=id(),other=id(),admin=id(),enrollment=id(),otherEnrollment=id(),q=id(),answer=id(),conversation=id(),request=id(),post=id(),comment=id(),order=id(),payment=id();
  await db.query("insert into profiles(id,email,role,status) values($1,'qa@example.test','student','active'),($2,'other@example.test','student','active'),($3,'admin@example.test','admin','active')",[member,other,admin]);
@@ -48,7 +50,11 @@ test('seeded learning data erases while financial/consent evidence and other lea
  await db.query("insert into edu_lesson_block_feedback(id,submission_id,actor_id,source,feedback) values($1,$2,$3,'comment','private-feedback')",[id(),submission,admin]);
  await db.query("insert into edu_campus_posts(id,owner_id,enrollment_id,alias,title,body,kind,visibility,hidden,revision) values($1,$2,$3,'가상별명','가상 게시글','private-post-body','portfolio','cohort',false,1)",[post,member,enrollment]);
  await db.query("insert into edu_campus_comments(id,post_id,author_id,alias,body) values($1,$2,$3,'다른회원','another-learner-comment')",[comment,post,other]);
- await db.query("insert into edu_push_subscriptions(id,user_id,endpoint,p256dh,auth) values($1,$2,'https://example.test/push','private-key','private-auth')",[id(),member]);
+ const push=id(),event=id(),otherPush=id(),otherEvent=id(),care=id();
+ await db.query("insert into edu_push_subscriptions(id,user_id,endpoint,p256dh,auth) values($1,$2,'https://example.test/push','private-key','private-auth'),($3,$4,'https://example.test/other','other-key','other-auth')",[push,member,otherPush,other]);
+ await db.query("insert into edu_push_events(id,user_id,kind,source,path) values($1,$2,'answer','qa','/my/questions'),($3,$4,'answer','qa','/my/questions')",[event,member,otherEvent,other]);
+ await db.query('insert into edu_push_deliveries values($1,$2,$3),($4,$5,$6)',[id(),event,push,id(),otherEvent,otherPush]);
+ await db.query("insert into edu_care_deliveries values($1,$2,'private-destination-hash','retained-audit-receipt')",[care,event]);
  for(const [table,bucket] of [['edu_question_images','question-images'],['edu_lesson_answer_files','lesson-answer-files'],['edu_campus_portfolio_files','campus-portfolio-private']]){
   const file=id(),path=member+'/'+file+'.png';
   await db.query('insert into '+table+'(id,owner_id,name,path) values($1,$2,\'private-file.png\',$3)',[file,member,path]);
@@ -73,8 +79,18 @@ test('seeded learning data erases while financial/consent evidence and other lea
  await assert.rejects(call('edu_prepare_member_local_erasure',[accepted.requestId,job.lease]),/LOCAL_UPLOAD_DRAIN_PENDING/);
  // Only the isolated test request's clock is advanced. No signed upload bearer token is issued in this fixture.
  await db.query("update edu_member_erasure_requests set disabled_at=now()-interval '3 hours' where request_id=$1",[accepted.requestId]);
+ // Reproduce the production RESTRICT-FK failure before applying the repair.
+ await assert.rejects(call('edu_prepare_member_local_erasure',[accepted.requestId,job.lease]),error=>error.code==='23503');
+ assert.equal((await db.query('select count(*)::int n from edu_push_deliveries')).rows[0].n,2);
+ await db.exec('reset role');
+ await db.exec('create table order_items(id uuid primary key);alter table payments add column cancelled_amount integer;alter table payments add column approved_amount integer;alter table payments add column status text');
+ await db.exec(read('20261111003951_edu_member_erasure_completion_and_enrollment_transfer.sql'));
+ await db.exec('set role service_role');
  assert.equal((await call('edu_prepare_member_local_erasure',[accepted.requestId,job.lease])).pending,5);
- for(const table of ['edu_questions','edu_question_answers','edu_ai_conversation_turns','edu_ai_conversations','edu_push_subscriptions','edu_question_images','edu_lesson_answer_files','edu_lesson_block_drafts','edu_lesson_block_submissions','edu_lesson_block_reviews','edu_lesson_block_feedback','edu_question_answer_images'])assert.equal((await db.query('select count(*)::int n from '+table)).rows[0].n,0,table);
+ assert.deepEqual((await db.query('select event_id,destination_hash,receipt from edu_care_deliveries where id=$1',[care])).rows[0],{event_id:null,destination_hash:null,receipt:'retained-audit-receipt'});
+ assert.equal((await db.query('select count(*)::int n from edu_push_deliveries')).rows[0].n,1);
+ assert.equal((await db.query('select user_id from edu_push_subscriptions')).rows[0].user_id,other);
+ for(const table of ['edu_questions','edu_question_answers','edu_ai_conversation_turns','edu_ai_conversations','edu_question_images','edu_lesson_answer_files','edu_lesson_block_drafts','edu_lesson_block_submissions','edu_lesson_block_reviews','edu_lesson_block_feedback','edu_question_answer_images'])assert.equal((await db.query('select count(*)::int n from '+table)).rows[0].n,0,table);
  assert.equal((await db.query('select content from edu_mission_drafts')).rows[0].content,'other-draft');
  assert.equal((await db.query('select body from edu_campus_comments where id=$1',[comment])).rows[0].body,'another-learner-comment');
  assert.equal((await db.query('select body from edu_campus_posts where id=$1',[post])).rows[0].body,'탈퇴한 회원의 콘텐츠가 삭제되었습니다.');
@@ -96,5 +112,10 @@ test('seeded learning data erases while financial/consent evidence and other lea
  assert.deepEqual(await call('edu_prepare_member_local_erasure',[accepted.requestId,job.lease]),{ready:true});
  assert.equal(await call('edu_finish_member_erasure',[accepted.requestId,job.lease,receipt,null,false]),true);
  const [row]=await call('edu_read_member_erasure',[admin]);assert.ok(row.localErasedAt);assert.equal(row.localStorageRemoved,5);
+ // No unconditional three-minute delay: the first approved claim starts immediately.
+ const newMember=id();await db.exec('reset role');await db.query("insert into profiles(id,role,status) values($1,'student','active')",[newMember]);await db.exec('set role service_role');
+ const fresh=await call('edu_request_member_erasure',[admin,newMember,'dev']);await call('edu_approve_member_erasure',[admin,fresh.requestId,'dev']);
+ const [immediate]=await call('edu_claim_approved_member_erasure',['dev',1,fresh.requestId]);assert.equal(immediate.subject,newMember);
+ await assert.rejects(call('edu_prepare_member_local_erasure',[fresh.requestId,immediate.lease]),/LOCAL_UPLOAD_DRAIN_PENDING/);
  await db.exec('reset role');assert.equal((await db.query('select count(*)::int n from storage.objects where name=$1',[other+'/untouched.png'])).rows[0].n,1);assert.equal((await db.query('select count(*)::int n from private.edu_erasure_storage_work where path is not null')).rows[0].n,0);
 });

@@ -70,3 +70,22 @@ test('pending request requires per-member review and explicit confirmation; canc
  await expect(area.getByText('삭제 완료',{exact:true})).toHaveCount(0);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
+
+test('approved deletion status refreshes automatically without another destructive request and stops polling on completion',async({page})=>{
+ await page.clock.install();let complete=false,reads=0,writes=0;
+ await page.route('**/api/admin/member-erasure',route=>{
+  if(route.request().method()==='POST')writes++;else reads++;
+  return route.fulfill({json:{enabled:true,rows:[complete?{...row,state:'complete',storageFailedCount:0,lastCode:null,completedAt:'2026-11-11T00:00:00Z'}:row]}});
+ });
+ await page.goto(screen);const area=page.getByRole('region',{name:'탈퇴 요청·진단 삭제 기록'});
+ await expect(area).toContainText('상태가 자동으로 갱신됩니다.');const initial=reads;complete=true;
+ await page.clock.runFor(10010);await expect(area).toContainText('삭제 완료');expect(reads).toBe(initial+1);expect(writes).toBe(0);
+ await page.clock.runFor(20010);expect(reads).toBe(initial+1);
+});
+
+test('structural failure is shown as a server review instead of another automatic retry',async({page})=>{
+ await page.route('**/api/admin/member-erasure',route=>route.fulfill({json:{enabled:true,rows:[{...row,state:'blocked',lastCode:'LOCAL_ERASURE_REVIEW_REQUIRED'}]}}));
+ await page.goto(screen);const area=page.getByRole('region',{name:'탈퇴 요청·진단 삭제 기록'});
+ await expect(area).toContainText('관리자 확인 필요');await expect(area).toContainText('반복 실행으로 해결되지 않으므로');
+ await expect(area).not.toContainText('상태가 자동으로 갱신됩니다.');
+});
