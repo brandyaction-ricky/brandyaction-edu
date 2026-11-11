@@ -71,3 +71,29 @@
   padding:6px 10px;
   pointer-events:none;
 }
+
+.loadingDeskList {
+  display: grid;
+  gap: 4px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  max-height: 42dvh;
+  overflow: auto;
+}
+.loadingDeskList button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 44px;
+  max-width: 100%;
+  padding: 6px 10px;
+  border: 1px solid #51738f;
+  border-radius: 8px;
+  background: #0c2034;
+  color: #edf6ff;
+  text-align: start;
+}
+.loadingDeskList span { overflow-wrap: anywhere; }
+.loadingDeskList strong { white-space: nowrap; color: #b9dbff; }
