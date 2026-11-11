@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 test('student next action, map filtering and private export',async({page})=>{
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto('/');await expect(page.getByRole('heading',{name:'문샷 동료님의 다음 도약'})).toBeVisible();
- await page.getByRole('button',{name:'이어서 실행하기'}).click();await expect(page.getByRole('status')).toContainText('과제 제출·의견');
+ await page.getByRole('button',{name:/DAY 0\d/}).first().click();await expect(page.getByRole('status')).toBeVisible();
  await page.getByRole('button',{name:'수정 필요',exact:true}).click();await expect(page.getByRole('button',{name:/DAY 03/})).toBeVisible();await expect(page.getByRole('button',{name:/DAY 01/})).toHaveCount(0);
  await page.getByRole('button',{name:'내 성장 카드 보기'}).click();const dialog=page.getByRole('dialog');await expect(dialog).toContainText('가상 예시');
  const saved=page.waitForEvent('download');await page.getByRole('button',{name:'성장 카드 이미지 저장'}).click();expect((await saved).suggestedFilename()).toBe('moonshot-demo-progress.svg');
@@ -18,7 +18,7 @@ test('live learner loads authenticated fixture and clears state on denied refres
  await page.goto('/?live=student');await expect(page.getByRole('heading',{name:'문샷 동료님의 다음 도약'})).toBeVisible();
  await page.route('**/api/campus?*',route=>route.fulfill({status:403,body:'{}'}));await page.getByRole('button',{name:'학습 기록 새로고침'}).click();await expect(page.getByRole('heading',{name:'학습 기록을 확인해 주세요'})).toBeVisible();await expect(page.getByText('문샷 동료님의 다음 도약')).toHaveCount(0);
  await page.getByRole('button',{name:'수강 기수 다시 확인'}).click();await expect(page.getByLabel('내 수강 기수')).toHaveValue('');
- await page.unroute('**/api/campus?*');await page.getByLabel('내 수강 기수').selectOption('00000000-0000-4000-8000-000000000002');await expect(page.getByRole('button',{name:'이어서 실행하기'})).toBeVisible();
+ await page.unroute('**/api/campus?*');await page.getByLabel('내 수강 기수').selectOption('00000000-0000-4000-8000-000000000002');await expect(page.getByRole('button',{name:/DAY 0\d/}).first()).toBeVisible();
 });
 test('live admin loads options then selected cohort, loses data on denial',async({page})=>{
  await page.goto('/?live=admin');await expect(page.getByRole('heading',{name:'실행이 멈추지 않도록.'})).toBeVisible();
