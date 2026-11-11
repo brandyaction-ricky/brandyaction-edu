@@ -1,5 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+export async function readOfficeVersion(db: SupabaseClient, enrollment: string, signal: AbortSignal) {
+  const {data, error} = await db.from('edu_campus_office_inbox_signals').select('version')
+    .eq('enrollment_id', enrollment).abortSignal(signal).maybeSingle();
+  if (error) throw error;
+  return Number(data?.version ?? 0);
+}
+
 export async function joinOfficeInbox(
   db: SupabaseClient, enrollment: string, signal: AbortSignal,
   ready: () => void, failed: () => void, invalidate: () => void,

@@ -60,18 +60,46 @@ test('desk and inbox share the connected enrollment until its last observer leav
   const states = [];
   const view = () => ({refresh:async()=>{}, slow:()=>false, connected:value=>states.push(value)});
   const desk = observeOffice('enrollment-A', view(), join);
-  t.mock.timers.tick(2250);
+  t.mock.timers.tick(41250);
   const inbox = observeOffice('enrollment-A', view(), join);
   assert.equal(connections.length,1);
   assert.deepEqual(states,[true,true]);
   inbox.close();
   assert.equal(connections[0].aborted,false);
   const other = observeOffice('enrollment-B', view(), join);
-  t.mock.timers.tick(2250);
+  t.mock.timers.tick(41250);
   assert.equal(connections.length,2);
   desk.close();
   assert.equal(connections[0].aborted,true);
   assert.equal(connections[1].aborted,false);
   other.close();
   assert.equal(connections[1].aborted,true);
+});
+
+test('waiting views refresh only for a newer counter and stop probing once connected', async t => {
+  t.mock.timers.enable({apis:['setTimeout','setInterval','Date'], now:0});
+  t.mock.method(Math, 'random', () => .5);
+  let reads = 0, probes = 0, version = 3, ready;
+  const box = startInboxSync({
+    refresh: async () => { reads++; }, slow: () => false, onConnected: () => {},
+    readVersion: async () => { probes++; return version; },
+    join: async (_signal, onReady) => { ready = onReady; },
+  });
+  async function advance(ms) { t.mock.timers.tick(ms); await Promise.resolve(); }
+  await advance(1100);
+  await advance(80);
+  assert.equal(reads,2);
+  await advance(2000);
+  await advance(80);
+  assert.equal(reads,2);
+  version++;
+  await advance(2000);
+  await advance(80);
+  assert.equal(reads,3);
+  await advance(27500);
+  ready();
+  const whenConnected = probes;
+  await advance(10000);
+  assert.equal(probes,whenConnected);
+  box.close();
 });
