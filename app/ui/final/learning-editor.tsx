@@ -32,7 +32,7 @@ export type LearningEditorSession = { dirty: boolean; busy: boolean; save: () =>
 function EditorSettings({ embedded, children }: { embedded?: boolean; children: ReactNode }) {
   return embedded ? <details className="studio-lesson-settings"><summary>수업 설정 <span>주차 · 일차 · 공개 범위</span></summary>{children}</details> : <>{children}</>;
 }
-type Props = { serverDraftsEnabled?: boolean; embedded?: boolean; sessionRef?: Ref<LearningEditorSession>; onSaved?: () => void; data: Data; row?: Row; pending: boolean; send: WorkflowSend; back: () => void; blockEditingEnabled?: boolean; actorId?: string };
+type Props = { courseId?: string; serverDraftsEnabled?: boolean; embedded?: boolean; sessionRef?: Ref<LearningEditorSession>; onSaved?: () => void; data: Data; row?: Row; pending: boolean; send: WorkflowSend; back: () => void; blockEditingEnabled?: boolean; actorId?: string };
 type ContentType = "text" | "vod" | "material" | "link";
 const formats: { key: ContentType; label: string; icon: typeof FileText }[] = [
   { key: "text", label: "학습 본문", icon: FileText },
@@ -98,18 +98,22 @@ function LessonQuiz({ mission, current, pending, send, onDirty, stepLabel }: { m
 }
 
 export function LearningEditor(props: Props) {
-  if (props.serverDraftsEnabled === false || !uuid(props.actorId) || (props.row && !uuid(props.row.id))) return <LoadedLearningEditor {...props} />;
+  // Resolve the course from the outline before the server draft replaces row.week_id.
+  // An unfinished or stale draft must not erase the choices needed to repair it.
+  const outlineWeek = (props.data.curriculum_weeks || []).find(item => item.id === props.row?.week_id);
+  const scopedCourseId = props.courseId || t(outlineWeek, 'course_id');
+  if (props.serverDraftsEnabled === false || !uuid(props.actorId) || (props.row && !uuid(props.row.id))) return <LoadedLearningEditor {...props} courseId={scopedCourseId} />;
   const row=props.row, content=(props.data.lesson_contents || []).find(item=>item.lesson_id===row?.id);
   const initial: AuthorPayload={form:{basic:{week_id:t(row,'week_id'),day_number:String(num(row,'day_number')||1),title:t(row,'title'),description:t(row,'description'),duration_label:t(row,'duration_label'),is_published:Boolean(row?.is_published),is_preview:Boolean(row?.is_preview)},format:(t(row,'content_type')||'text') as ContentType,bodyText:t(content,'body_text'),videoUrl:t(content,'vod_url'),externalUrl:t(content,'external_url'),resourceName:t(content,'resource_name'),resourcePath:t(content,'resource_storage_path')},blocks:{active:false,document:{schemaVersion:1,blocks:[],checklist:[]}}};
   return <LessonAuthorWorkspace lessonId={row?.id ? String(row.id) : undefined} initial={initial}>{publication=>{
     const f=publication.snapshot.payload.form;
     const seededRow={...row,id:publication.snapshot.lessonId,...f.basic,day_number:Number(f.basic.day_number),content_type:f.format};
     const seededContent={id:seededRow.id,lesson_id:seededRow.id,body_text:f.bodyText,vod_url:f.videoUrl,external_url:f.externalUrl,resource_name:f.resourceName,resource_storage_path:f.resourcePath};
-    return <LoadedLearningEditor {...props} row={seededRow} publication={publication} data={{...props.data,lesson_contents:[seededContent]}} />;
+    return <LoadedLearningEditor {...props} courseId={scopedCourseId} row={seededRow} publication={publication} data={{...props.data,lesson_contents:[seededContent]}} />;
   }}</LessonAuthorWorkspace>;
 }
 
-function LoadedLearningEditor({ publication, data, row, pending, send, back, actorId, embedded, sessionRef, onSaved, blockEditingEnabled = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' }: Props & { publication?: AuthorSession }) {
+function LoadedLearningEditor({ publication, courseId, data, row, pending, send, back, actorId, embedded, sessionRef, onSaved, blockEditingEnabled = process.env.NEXT_PUBLIC_EDU_LESSON_BLOCKS_ENABLED === 'true' }: Props & { publication?: AuthorSession }) {
   const content = (data.lesson_contents || []).find(item => item.lesson_id === row?.id);
   const [lessonId, setLessonId] = useState(row?.id || "");
   const [contentExists, setContentExists] = useState(Boolean(content));
@@ -189,7 +193,7 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
   const week = (data.curriculum_weeks || []).find(item => item.id === basic.week_id);
   const displayData = { ...data, curriculum_lessons: [...(data.curriculum_lessons || []).filter(item => item.id !== lessonId), { ...row, id: lessonId || '__new_lesson__', week_id: basic.week_id, day_number: Number(basic.day_number) }] };
   const displayDay = curriculumDay(displayData, displayData.curriculum_lessons.at(-1));
-  const course = (data.courses || []).find(item => item.id === week?.course_id);
+  const course = (data.courses || []).find(item => item.id === (courseId || week?.course_id));
   const cardSources = course ? (data.curriculum_weeks || []).filter(item => item.course_id === course.id)
     .sort((a, b) => num(a, 'week_number') - num(b, 'week_number'))
     .flatMap(w => (data.curriculum_lessons || []).filter(item => item.week_id === w.id)
@@ -428,7 +432,7 @@ function LoadedLearningEditor({ publication, data, row, pending, send, back, act
         <div className="panel-head"><h2>기본 정보</h2><label className="review-switch"><input type="checkbox" checked={basic.is_published} onChange={event => changeBasic("is_published", event.target.checked)} disabled={busy} /> 공개</label></div>
         <fieldset className="section-pad form-grid learning-editor-fields" disabled={busy}>
           <Field label="주차 안 수업 순서 *" hint="표시 일차는 앞 주차의 수업 수를 합산해 자동으로 계산합니다. 0주차는 제외합니다."><input type="number" min={1} max={2147483647} value={basic.day_number} required onChange={event => changeBasic("day_number", event.target.value)} /></Field>
-          <Field label="주차 (Week) *"><select value={basic.week_id} required onChange={event => changeBasic("week_id", event.target.value)}><option value="">주차 선택</option>{(data.curriculum_weeks || []).filter(item=>!publication || publication.isNew || item.course_id === course?.id).map(item => <option key={item.id} value={item.id}>{t((data.courses || []).find(entry => entry.id === item.course_id), "title")} · {num(item, "week_number")}주차 · {t(item, "title")}</option>)}</select></Field>
+          <Field label="주차 (Week) *"><select value={basic.week_id} required onChange={event => changeBasic("week_id", event.target.value)}><option value="">주차 선택</option>{(data.curriculum_weeks || []).filter(item=>courseId ? item.course_id === courseId : !publication || publication.isNew || item.course_id === course?.id).map(item => <option key={item.id} value={item.id}>{t((data.courses || []).find(entry => entry.id === item.course_id), "title")} · {num(item, "week_number")}주차 · {t(item, "title")}</option>)}</select></Field>
           <Field label="제목 *" wide><input value={basic.title} maxLength={300} required pattern={".*\\S.*"} onChange={event => changeBasic("title", event.target.value)} /></Field>
           {!blockState.active && <Field label="콘텐츠 유형"><select value={format} onChange={event => changeFormat(event.target.value as ContentType)}>{formats.map(item => <option value={item.key} key={item.key}>{item.label}</option>)}</select></Field>}
           <Field label="소요 시간" hint="예: 20분 · 영상 15분 + 실습 10분"><input value={basic.duration_label} onChange={event => changeBasic("duration_label", event.target.value)} /></Field>
