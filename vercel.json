@@ -3,6 +3,7 @@
   "framework": "nextjs",
   "git": {
     "deploymentEnabled": {
+      "codex/edu-n6-partial-refund-20261110": false,
       "codex/campus-admin-session": false,
       "codex/edu-site-stabilization-20261029": false,
       "codex/edu-readable-view-20261027": false,
