@@ -19,7 +19,7 @@ import {OfficePanel} from '../office/panel';
 import {useMemo,useEffect,useState} from 'react';
 import {LiveAiPanel} from '../ui/live-ai-panel';
 export {SpacePanel};
-export default function FeaturePanel({officeFilter,id,snapshot,adminSnapshot,onOpen,onAsk,onNavigate,handoff,onNotice,active=true,demo=true,onRefresh,onSelect}:{officeFilter?:{id:string;name:string}|null;demo?:boolean;onRefresh?:()=>void;onSelect?:(id:string)=>void;active?:boolean;id:string;snapshot:CampusSnapshot;adminSnapshot?:CampusAdminSnapshot;onOpen:(id:string,missionId?:string)=>void;onAsk:(value:{lessonId:string;context:string})=>void;onNavigate:(id:string)=>void;handoff?:{lessonId:string;context:string}|null;onNotice:(text:string)=>void}){
+export default function FeaturePanel({officeFilter,id,snapshot,adminSnapshot,onOpen,onAsk,onNavigate,handoff,onNotice,active=true,demo=true,onRefresh,onSelect}:{officeFilter?:{id:string;name:string;jobId?:string}|null;demo?:boolean;onRefresh?:()=>void;onSelect?:(id:string)=>void;active?:boolean;id:string;snapshot:CampusSnapshot;adminSnapshot?:CampusAdminSnapshot;onOpen:(id:string,missionId?:string)=>void;onAsk:(value:{lessonId:string;context:string})=>void;onNavigate:(id:string)=>void;handoff?:{lessonId:string;context:string}|null;onNotice:(text:string)=>void}){
  const cohort=snapshot.scopes.find(s=>s.enrollmentId===snapshot.selectedEnrollmentId)?.cohortId||'';
  const demoCohorts=useMemo(()=>snapshot.scopes.map(s=>({id:s.cohortId,name:s.cohortName,course_id:s.courseId,courses:{title:s.courseTitle,slug:'moonshot-demo'}})),[snapshot.scopes]);
  if(id==='growth')return <LearnerDashboard snapshot={snapshot} demo={demo} onOpen={onOpen} onRefresh={onRefresh||(()=>onNotice('가상 학습 기록입니다.'))} onSelect={onSelect||(()=>onNotice('예시 기수입니다.'))}/>;
