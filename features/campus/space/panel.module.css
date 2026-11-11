@@ -61,6 +61,7 @@
 .studyEntry header {display:flex;align-items:baseline;justify-content:space-between;gap:8px}
 .studyEntry h2 {margin:0;font-size:15px;line-height:1.45}
 .studyEntry header span,.studyEntry p {font-size:12px;color:#526981}
+.studyEntry p {margin:5px 0 8px}
 .studyEntry ul {margin:7px 0;padding:0;list-style:none;max-height:min(24dvh,12rem);overflow:auto;border-block:1px solid #e0e7ee}
 .studyEntry li {display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:8px;min-height:34px;padding:4px 0}
 .studyEntry li+li {border-top:1px solid #edf1f4}
@@ -74,3 +75,4 @@
 .studyEntry button:disabled {opacity:.6}
 .studyEntry .rosterFocus button {background:#f4f8fc;border-color:#b8cede;color:#214e79}
 .studyEntry button:focus-visible {outline:2px solid #2770aa;outline-offset:2px}
+@media(max-width:650px){.studyEntry{width:calc(100vw - 24px)}}
