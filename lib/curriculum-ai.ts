@@ -15,8 +15,9 @@ export type AiTurn = { role: 'user' | 'assistant'; text: string };
 export const aiFallback = '수업 자료에서 충분한 근거를 찾지 못했어요. 지금까지의 질문을 멘토에게 보내 주시면 확인해서 안내해 드릴게요.';
 export const aiFallbackEnglish = 'I couldn’t find enough evidence in the lesson materials to answer. You can send your question to a mentor for help.';
 export function requestsEnglish(question: string) {
- return (!/[가-힣]/.test(question) && /[a-z]+\s+[a-z]+/i.test(question))
-  || /\bin English\b|영어로\s*(?:답|설명|말|작성|부탁|해)/i.test(question);
+ const requested = [...question.matchAll(/\b(?:in|into)\s+(?:Korean|English)\b|(?:한국어|한글|영어)로\s*(?:답|설명|말|작성|부탁|해)/gi)].at(-1)?.[0];
+ if (requested) return /English|영어/i.test(requested);
+ return !/[가-힣]/.test(question) && /[a-z]+\s+[a-z]+/i.test(question);
 }
 function terms(text: string) {
  const normalized = text.normalize('NFKC').toLowerCase();

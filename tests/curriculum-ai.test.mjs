@@ -81,6 +81,14 @@ test('English questions and explicit English requests use a localized fallback',
  assert.equal(requestsEnglish('AARRR 순서를 알려주세요'),false);
  assert.equal(parseCurriculumAnswer({answer:'No evidence',needsMentor:true,sourceIds:[]},[],true).answer,aiFallbackEnglish);
 });
+test('explicit answer language overrides the language of a pasted browser error',()=>{
+ const {requestsEnglish}=loadTs('lib/curriculum-ai.ts');
+ assert.equal(requestsEnglish('Chrome import says Close Chrome and try the import again in Aside. Please explain in Korean what I can safely check before asking a mentor.'),false);
+ assert.equal(requestsEnglish('Close Chrome and try the import again 오류를 한국어로 설명해 주세요.'),false);
+ assert.equal(requestsEnglish('Please explain in English. Actually, answer in Korean.'),false);
+ assert.equal(requestsEnglish('한국어로 설명해 주세요. 대신 in English 부탁해요.'),true);
+ assert.equal(requestsEnglish('Translate the browser message from English into Korean.'),false);
+});
 
 test('common questions reserve a relevant first-day source without dropping current lesson',()=>{
  const lessons=[
