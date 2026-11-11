@@ -313,6 +313,60 @@ end;$$;
 revoke all on function private.edu_prepare_member_local_erasure(uuid,uuid) from public,anon,authenticated;
 grant execute on function private.edu_prepare_member_local_erasure(uuid,uuid) to service_role;
 
+
+-- Intake cancellation is possible only before approval or any access/data change.
+-- Keep cancelled requests and their UUIDs permanently; a new intake gets a new UUID.
+alter table public.edu_member_erasure_requests
+ drop constraint edu_member_erasure_requests_state_check,
+ drop constraint edu_member_erasure_requests_member_id_key,
+ add column cancelled_at timestamptz,
+ add column cancelled_by uuid references public.profiles(id),
+ add constraint edu_member_erasure_requests_state_check check(state in ('requested','processing','retry','blocked','complete','cancelled')),
+ add constraint edu_erasure_cancellation_pair check((state='cancelled')=(cancelled_at is not null) and (cancelled_at is null)=(cancelled_by is null)),
+ add constraint edu_erasure_cancellation_before_approval check(state<>'cancelled' or (approved_at is null and disabled_at is null and auth_erased_at is null and local_prepared_at is null and local_erased_at is null and attempts=0));
+create unique index edu_erasure_current_member on public.edu_member_erasure_requests(member_id) where state<>'cancelled';
+create or replace function public.edu_request_member_erasure(p_actor uuid,p_member uuid,p_environment text)
+returns jsonb language plpgsql security invoker set search_path='' as $$
+declare r public.edu_member_erasure_requests; target public.profiles;
+begin
+ if not exists(select 1 from public.profiles where id=p_actor and role='admin' and status='active') then raise exception 'ERASURE_FORBIDDEN';end if;
+ if p_actor=p_member or p_environment is null or p_environment not in ('dev','production') then raise exception 'ERASURE_INVALID';end if;
+ select * into target from public.profiles where id=p_member for update;
+ if not found then raise exception 'ERASURE_NOT_FOUND';end if;
+ select * into r from public.edu_member_erasure_requests where member_id=p_member and state<>'cancelled';
+ if found then
+   if r.environment<>p_environment then raise exception 'ERASURE_ENVIRONMENT';end if;
+   return jsonb_build_object('requestId',r.request_id,'state',r.state);
+ end if;
+ if target.role='admin' and (select count(*) from public.profiles where role='admin' and status='active')<=1 then raise exception 'ERASURE_LAST_ADMIN';end if;
+ insert into public.edu_member_erasure_requests(member_id,actor_id,environment) values(p_member,p_actor,p_environment) returning * into r;
+ insert into public.audit_logs(actor_user_id,action,entity_type,entity_id,after_data)
+ values(p_actor,'member.erasure_requested','profile',p_member::text,jsonb_build_object('requestId',r.request_id,'state','requested','deadlineAt',r.deadline_at));
+ return jsonb_build_object('requestId',r.request_id,'state',r.state);
+end;$$;
+
+
+create function public.edu_cancel_member_erasure(p_actor uuid,p_request uuid,p_environment text)
+returns jsonb language plpgsql security invoker set search_path='' as $$
+declare r public.edu_member_erasure_requests;
+begin
+ if not exists(select 1 from public.profiles where id=p_actor and role='admin' and status='active' and deleted_at is null) then raise exception 'ERASURE_FORBIDDEN';end if;
+ if p_environment is null or p_environment not in ('dev','production') then raise exception 'ERASURE_ENVIRONMENT';end if;
+ select * into r from public.edu_member_erasure_requests where request_id=p_request for update;
+ if not found or r.environment<>p_environment then raise exception 'ERASURE_NOT_FOUND';end if;
+ if r.state='cancelled' then return jsonb_build_object('requestId',p_request,'state','cancelled');end if;
+ if r.state<>'requested' or r.approved_at is not null or r.disabled_at is not null or r.auth_erased_at is not null
+  or r.local_prepared_at is not null or r.local_erased_at is not null or r.attempts<>0 or r.lease is not null
+  or not exists(select 1 from public.profiles where id=r.member_id and status='active' and deleted_at is null)
+ then raise exception 'ERASURE_CANNOT_CANCEL';end if;
+ update public.edu_member_erasure_requests set state='cancelled',cancelled_at=now(),cancelled_by=p_actor,last_code=null where request_id=p_request;
+ insert into public.audit_logs(actor_user_id,action,entity_type,entity_id,after_data)
+ values(p_actor,'member.erasure_cancelled','profile',r.member_id::text,jsonb_build_object('requestId',p_request,'environment',p_environment));
+ return jsonb_build_object('requestId',p_request,'state','cancelled');
+end;$$;
+revoke all on function public.edu_cancel_member_erasure(uuid,uuid,text) from public,anon,authenticated;
+grant execute on function public.edu_cancel_member_erasure(uuid,uuid,text) to service_role;
+
 create or replace function public.edu_approve_member_erasure(p_actor uuid,p_request uuid,p_environment text)
 returns jsonb language plpgsql security invoker set search_path='' as $$
 declare r public.edu_member_erasure_requests;
@@ -322,6 +376,7 @@ begin
  select * into r from public.edu_member_erasure_requests where request_id=p_request for update;
  if not found or r.environment<>p_environment then raise exception 'ERASURE_NOT_FOUND';end if;
  if r.member_id=p_actor then raise exception 'ERASURE_SELF';end if;
+ if r.state='cancelled' then raise exception 'ERASURE_CANCELLED';end if;
  if r.state='complete' or (r.state='processing' and r.lease_until>now()) then
   return jsonb_build_object('requestId',r.request_id,'state',r.state);
  end if;
@@ -369,6 +424,27 @@ end;$$;
 
 
 
+
+create or replace function public.edu_read_member_erasure(p_actor uuid)
+returns jsonb language plpgsql security invoker set search_path='' as $$
+begin
+ if not exists(select 1 from public.profiles where id=p_actor and role='admin' and status='active') then raise exception 'ERASURE_FORBIDDEN';end if;
+ return coalesce((select jsonb_agg(to_jsonb(r) order by r."receivedAt" desc) from (
+  select q.request_id as "requestId",q.member_id as "memberId",q.state,q.received_at as "receivedAt",q.deadline_at as "deadlineAt",
+   q.next_attempt_at as "nextAttemptAt",q.attempts,q.uncertain_attempts as "uncertainAttempts",q.counts,q.storage_removed as "storageRemoved",
+   q.storage_failed as "storageFailedCount",q.last_code as "lastCode",q.completed_at as "completedAt",q.cancelled_at as "cancelledAt",
+   q.local_erased_at as "localErasedAt",q.local_counts as "localCounts",q.local_storage_removed as "localStorageRemoved",q.approved_at as "approvedAt",q.disabled_at as "disabledAt",q.auth_erased_at as "authErasedAt",
+   case when q.disabled_at is null then p.full_name end as "memberName",
+   case when q.disabled_at is null then p.email end as "memberEmail"
+  from public.edu_member_erasure_requests q join public.profiles p on p.id=q.member_id order by q.received_at desc limit 100
+ )r),'[]'::jsonb);
+end;$$;
+
+-- Retired callers must also honor explicit approval; intake must never delete access.
+create or replace function public.edu_claim_member_erasure(p_environment text,p_limit integer default 3)
+returns jsonb language sql security invoker set search_path='' as $$
+ select public.edu_claim_approved_member_erasure(p_environment,p_limit,null);
+$$;
 
 -- Transfer access, not another member's personal records or payment ownership.
 create table private.edu_enrollment_transfers(

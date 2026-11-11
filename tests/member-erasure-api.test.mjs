@@ -67,3 +67,14 @@ test('a completed synchronous deletion is reported as complete, not queued for a
  const api=admin({id:actor,role:'admin'},async()=>({data:{state:'requested'}}),async()=>({completed:1,processed:1}));
  const result=await api.POST(input(command));assert.equal(result.status,200);assert.match((await result.json()).message,/완료됐습니다/);
 });
+
+test('intake cancellation works while deletion is OFF, uses the stored request and never calls a deletion worker',async t=>{
+ const before=process.env.EDU_DIAGNOSIS_ERASURE_ENABLED;delete process.env.EDU_DIAGNOSIS_ERASURE_ENABLED;t.after(()=>{if(before===undefined)delete process.env.EDU_DIAGNOSIS_ERASURE_ENABLED;else process.env.EDU_DIAGNOSIS_ERASURE_ENABLED=before;});
+ const calls=[];let worker=0;
+ const api=admin({id:actor,role:'admin'},async(name,args)=>{calls.push([name,args]);return{data:{state:'cancelled'},error:null};},async()=>{worker++;});
+ const result=await api.POST(input({...command,action:'cancel'}));assert.equal(result.status,200);assert.match((await result.json()).message,/계정과 수강권은 유지/);
+ assert.deepEqual(calls,[['edu_cancel_member_erasure',{p_actor:actor,p_request:requestId,p_environment:'dev'}]]);assert.equal(worker,0);
+ const denied=admin({id:actor,role:'admin'},async()=>({error:{message:'ERASURE_CANNOT_CANCEL private details'}}));
+ const no=await denied.POST(input({...command,action:'cancel'}));assert.equal(no.status,409);assert.doesNotMatch(await no.text(),/private details/);
+ const uncertain=admin({id:actor,role:'admin'},async()=>({data:null}));assert.equal((await uncertain.POST(input({...command,action:'cancel'}))).status,503);
+});

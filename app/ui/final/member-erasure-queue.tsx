@@ -2,8 +2,8 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {CheckCircle2,Clock3,RefreshCw,ShieldAlert} from 'lucide-react';
 import './member-erasure-queue.css';
-type RequestRow={requestId:string;memberId:string;state:string;receivedAt:string;deadlineAt:string;nextAttemptAt:string;attempts:number;uncertainAttempts:number;counts:Record<string,number>;storageRemoved:number;storageFailedCount:number;lastCode:string|null;completedAt:string|null;approvedAt?:string|null;disabledAt?:string|null;authErasedAt?:string|null;localErasedAt?:string|null;localCounts?:Record<string,number>;localStorageRemoved?:number;memberName?:string|null;memberEmail?:string|null};
-const labels:Record<string,string>={requested:'접수',processing:'삭제 중',retry:'다시 시도 예정',blocked:'관리자 확인 필요',complete:'삭제 완료'};
+type RequestRow={requestId:string;memberId:string;state:string;receivedAt:string;deadlineAt:string;nextAttemptAt:string;attempts:number;uncertainAttempts:number;counts:Record<string,number>;storageRemoved:number;storageFailedCount:number;lastCode:string|null;completedAt:string|null;approvedAt?:string|null;disabledAt?:string|null;authErasedAt?:string|null;localErasedAt?:string|null;localCounts?:Record<string,number>;localStorageRemoved?:number;memberName?:string|null;memberEmail?:string|null;cancelledAt?:string|null};
+const labels:Record<string,string>={requested:'승인 대기',processing:'삭제 중',retry:'다시 시도 예정',blocked:'관리자 확인 필요',complete:'삭제 완료',cancelled:'접수 취소'};
 const errors:Record<string,string>={LOCAL_UPLOAD_DRAIN_PENDING:'기존 업로드 링크의 만료를 기다리고 있습니다. 접근 차단 후 최대 2시간 2분 뒤 파일 삭제를 이어갑니다.',LOCAL_ERASURE_PENDING:'학습·AI 자료 삭제를 다시 확인하고 있습니다.',LOCAL_ERASURE_REVIEW_REQUIRED:'자료 연결 관계를 서버에서 확인해야 합니다. 반복 실행으로 해결되지 않으므로 담당자에게 확인해 주세요.',LOCAL_ERASURE_TIMEOUT:'자료 삭제 시간이 초과돼 같은 요청으로 자동 재시도합니다.',LOCAL_STORAGE_PENDING:'남은 학습 첨부 파일을 다시 삭제할 예정입니다.',NETWORK:'서버 연결이 끊겼습니다.',UNAVAILABLE:'마이인 서버가 처리 중입니다.',STORAGE_PENDING:'남은 파일을 다시 지울 예정입니다.',CONFIGURATION:'서버 연결 설정을 확인해 주세요.',UNAUTHORIZED:'서버 인증 설정을 확인해 주세요.',FORBIDDEN:'서버 환경을 확인해 주세요.',DISABLED:'마이인 삭제 기능이 아직 켜지지 않았습니다.',LOCAL_WITHDRAWAL_BLOCKED:'에듀 탈퇴 권한·상태를 확인해 주세요.',AUTH_ERASURE_FAILED:'로그인 계정 삭제를 다시 확인하고 있습니다.',AUTH_RECEIPT_PENDING:'로그인 계정 삭제 결과 기록을 다시 확인하고 있습니다.',INVALID_RESPONSE:'삭제 결과 형식을 확인해 주세요.'};
 async function readQueue(signal:AbortSignal):Promise<{rows:RequestRow[];enabled:boolean}>{
   const res=await fetch('/api/admin/member-erasure',{cache:'no-store',signal});const data=await res.json();
@@ -13,6 +13,7 @@ async function readQueue(signal:AbortSignal):Promise<{rows:RequestRow[];enabled:
 export function MemberErasureQueue() {
   const [rows,setRows]=useState<RequestRow[]>([]),[enabled,setEnabled]=useState(false),[error,setError]=useState(''),[busy,setBusy]=useState(true);
   const [selected,setSelected]=useState<string|null>(null),[confirmed,setConfirmed]=useState(false),[message,setMessage]=useState('');
+  const [action,setAction]=useState<'execute'|'cancel'>('execute');
   const confirmation=useRef<HTMLElement>(null);
   useEffect(()=>{if(selected){confirmation.current?.focus({preventScroll:true});confirmation.current?.scrollIntoView({block:'start'});}},[selected]);
   const loading=useRef<AbortController|null>(null),mutating=useRef(false);
@@ -44,20 +45,21 @@ export function MemberErasureQueue() {
     mutating.current=true;loading.current?.abort();loading.current=null;
     setBusy(true);setError('');setMessage('');
     try{
-      const res=await fetch('/api/admin/member-erasure',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'execute',requestId,confirmation:requestId})});
+      const res=await fetch('/api/admin/member-erasure',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,requestId,confirmation:requestId})});
       const data=await res.json();if(!res.ok)throw Error(data.error);
       setSelected(null);setConfirmed(false);setMessage(data.message||'탈퇴 처리를 시작했습니다.');await refresh();
     }catch(e){setError(e instanceof Error?e.message:'처리를 시작하지 못했습니다.');}finally{mutating.current=false;setBusy(false);}
   }
-  const pending=rows.filter(r=>r.state!=='complete').length;
+  const pending=rows.filter(r=>!['complete','cancelled'].includes(r.state)).length;
+  const cancelled=rows.filter(r=>r.state==='cancelled').length;
   return <section className="panel erasure-queue" aria-label="탈퇴 요청·진단 삭제 기록" aria-busy={busy}>
     <header className="erasure-heading">
       <div><h2>탈퇴 요청·진단 삭제 기록</h2><p>{polling?'처리 중에는 상태가 자동으로 갱신됩니다. 같은 요청을 반복 실행하지 않아도 됩니다.':'접수한 요청의 처리 상태를 확인하세요.'}</p></div>
       <button className="btn small" type="button" disabled={busy} onClick={()=>{setBusy(true);void refresh().finally(()=>setBusy(false));}}><RefreshCw size={16} aria-hidden="true"/>처리 상태 새로고침</button>
     </header>
     <div className="erasure-overview">
-      {!busy&&!error&&rows.length>0&&<><span><strong>{pending}</strong>건 처리 대기</span><span><strong>{rows.length-pending}</strong>건 삭제 완료</span></>}
-      <details className="erasure-help"><summary>처리 안내</summary><p>{enabled?'요청별로 삭제 내용을 확인하고 실행해 주세요. 로그인 계정과 학습·AI·진단 자료 및 첨부 파일 삭제가 모두 끝나야 완료됩니다. 기존 업로드 링크의 만료를 기다려 최대 2시간 2분 뒤 파일 삭제를 이어갑니다.':'지금은 요청만 접수합니다. 삭제 연동 검수를 마친 뒤 처리합니다.'} 접수일부터 30일 안에 처리 상태를 확인해 주세요.</p></details>
+      {!busy&&!error&&rows.length>0&&<><span><strong>{pending}</strong>건 처리 대기</span><span><strong>{rows.length-pending-cancelled}</strong>건 삭제 완료</span>{cancelled>0&&<span><strong>{cancelled}</strong>건 접수 취소</span>}</>}
+      <details className="erasure-help"><summary>처리 안내</summary><p>접수만으로는 계정이 삭제되지 않습니다. 승인 전에는 접수를 취소할 수 있고, 승인해 계정 차단·삭제를 시작하면 취소할 수 없습니다. {enabled?'로그인 계정과 학습·AI·진단 자료 및 첨부 파일 삭제가 모두 끝나야 완료됩니다. 기존 업로드 링크의 만료를 기다려 최대 2시간 2분 뒤 파일 삭제를 이어갑니다.':'삭제 연동 검수를 마친 뒤 처리합니다.'} 접수일부터 30일 안에 처리 상태를 확인해 주세요.</p></details>
     </div>
     {!enabled&&<p className="erasure-note"><Clock3 size={16} aria-hidden="true"/>지금은 요청만 접수합니다.</p>}
     {message&&<p className="erasure-note" role="status">{message}</p>}
@@ -74,6 +76,8 @@ export function MemberErasureQueue() {
       </div>
       {(r.memberName||r.memberEmail)&&<p className="erasure-member"><strong>{r.memberName||'회원'}</strong> {r.memberEmail}</p>}
       {r.disabledAt&&r.state!=='complete'&&<p className="erasure-note">로그인·수강 접근이 차단됐습니다. 남은 학습·첨부·진단 자료 삭제를 이어갑니다.</p>}
+      {r.approvedAt&&r.state!=='complete'&&<p className="meta">이미 승인되어 접수 취소는 할 수 없습니다. 삭제가 시작된 계정·자료는 복구할 수 없습니다.</p>}
+      {r.state==='cancelled'&&<p className="meta">승인 전에 접수를 취소했습니다. 계정·수강권·학습 자료는 유지됩니다.</p>}
       <div className="erasure-results" aria-label="확인된 삭제 결과">
         <span>진단 기록 <strong>{Object.values(r.counts).reduce((a,b)=>a+b,0)}건</strong></span>
         <span>학습 자료 <strong>{Object.values(r.localCounts??{}).reduce((a,b)=>a+b,0)}건</strong></span><span>파일 <strong>{r.storageRemoved+(r.localStorageRemoved??0)}개</strong></span>
@@ -87,25 +91,29 @@ export function MemberErasureQueue() {
           <div><dt>접수</dt><dd>{new Date(r.receivedAt).toLocaleString('ko-KR')}</dd></div>
           <div><dt>처리 기한</dt><dd>{new Date(r.deadlineAt).toLocaleDateString('ko-KR')}</dd></div>
           {r.approvedAt&&<div><dt>처리 승인</dt><dd>{new Date(r.approvedAt).toLocaleString('ko-KR')}</dd></div>}
+          {r.cancelledAt&&<div><dt>접수 취소</dt><dd>{new Date(r.cancelledAt).toLocaleString('ko-KR')}</dd></div>}
           {r.disabledAt&&<div><dt>접근 차단</dt><dd>{new Date(r.disabledAt).toLocaleString('ko-KR')}</dd></div>}
           {r.authErasedAt&&<div><dt>로그인 계정 삭제</dt><dd>{new Date(r.authErasedAt).toLocaleString('ko-KR')}</dd></div>}
           {r.localErasedAt&&<div><dt>학습·첨부 삭제</dt><dd>{new Date(r.localErasedAt).toLocaleString('ko-KR')}</dd></div>}{r.completedAt&&<div><dt>완료</dt><dd>{new Date(r.completedAt).toLocaleString('ko-KR')}</dd></div>}
           {r.state==='retry'&&<div><dt>다음 시도</dt><dd>{new Date(r.nextAttemptAt).toLocaleString('ko-KR')}</dd></div>}
         </dl><p>표시한 수는 삭제 결과로 확인된 건수입니다.</p></details>
-        {enabled&&['requested','retry','blocked'].includes(r.state)&&<button className="btn small" type="button" disabled={busy} aria-expanded={selected===r.requestId} onClick={()=>{setSelected(r.requestId);setConfirmed(false);setMessage('');}}>{r.approvedAt?'처리 이어가기':'삭제 내용 확인'}</button>}
+        <div className="erasure-row-actions">
+          {r.state==='requested'&&!r.approvedAt&&!r.disabledAt&&r.attempts===0&&<button className="btn small" type="button" disabled={busy} aria-expanded={selected===r.requestId&&action==='cancel'} onClick={()=>{setAction('cancel');setSelected(r.requestId);setConfirmed(false);setMessage('');}}>접수 취소</button>}
+          {enabled&&['requested','retry','blocked'].includes(r.state)&&<button className="btn small" type="button" disabled={busy} aria-expanded={selected===r.requestId&&action==='execute'} onClick={()=>{setAction('execute');setSelected(r.requestId);setConfirmed(false);setMessage('');}}>{r.approvedAt?'처리 이어가기':'승인 후 탈퇴 처리'}</button>}
+        </div>
       </div>
-      {selected===r.requestId&&<section ref={confirmation} tabIndex={-1} className="erasure-confirm" aria-label="탈퇴 처리 확인">
-        <h3>이 회원의 탈퇴를 처리할까요?</h3>
+      {selected===r.requestId&&!['complete','cancelled'].includes(r.state)&&<section ref={confirmation} tabIndex={-1} className="erasure-confirm" aria-label={action==='cancel'?'탈퇴 접수 취소 확인':'탈퇴 처리 확인'}>
+        <h3>{action==='cancel'?'이 탈퇴 접수를 취소할까요?':r.approvedAt?'남은 탈퇴 처리를 이어갈까요?':'승인하고 탈퇴 처리를 시작할까요?'}</h3>
         <p><strong>{r.memberName||'선택한 탈퇴 요청'}</strong>{r.memberEmail&&<> · {r.memberEmail}</>}</p>
         <p className="erasure-request-id">요청 번호 {r.requestId}</p>
-        <ul>
+        {action==='cancel'?<p>접수만 취소합니다. 회원 계정·수강권·학습 자료는 그대로 유지되며, 취소 기록은 남습니다.</p>:<><ul>
           <li>회원정보를 익명화하고 로그인·수강 접근을 차단합니다.</li>
           <li>로그인 계정과 학습·AI 대화·질문·진단 응답·보고서·첨부 파일을 삭제합니다. 다른 회원의 대화는 보존하며 탈퇴한 회원의 내용만 지웁니다.</li>
           <li>결제·환불 등 보존이 필요한 거래 기록과 처리 증빙은 유지합니다.</li>
         </ul>
-        <p>삭제 후 복구할 수 없습니다. 일부 처리가 실패하면 완료로 표시하지 않고 같은 요청으로 이어갑니다.</p>
-        <label><input type="checkbox" checked={confirmed} disabled={busy} onChange={e=>setConfirmed(e.target.checked)}/> 대상 회원과 삭제 내용을 확인했습니다.</label>
-        <div className="erasure-confirm-actions"><button className="btn" disabled={busy} onClick={()=>{setSelected(null);setConfirmed(false);}}>취소</button><button className="btn erasure-delete-action" disabled={busy||!confirmed} onClick={()=>void execute(r.requestId)}>{busy?'처리 중…':'탈퇴 처리 실행'}</button></div>
+        <p>삭제 후 복구할 수 없습니다. 일부 처리가 실패하면 완료로 표시하지 않고 같은 요청으로 이어갑니다.</p></>}
+        <label><input type="checkbox" checked={confirmed} disabled={busy} onChange={e=>setConfirmed(e.target.checked)}/> {action==='cancel'?'대상 회원과 접수 취소 내용을 확인했습니다.':'대상 회원과 삭제 내용을 확인했습니다.'}</label>
+        <div className="erasure-confirm-actions"><button type="button" className="btn" disabled={busy} onClick={()=>{setSelected(null);setConfirmed(false);}}>돌아가기</button><button type="button" className="btn erasure-delete-action" disabled={busy||!confirmed} onClick={()=>void execute(r.requestId)}>{busy?'처리 중…':action==='cancel'?'접수 취소 확정':r.approvedAt?'탈퇴 처리 실행':'승인하고 탈퇴 처리'}</button></div>
       </section>}
     </li>)}</ul>
   </section>;

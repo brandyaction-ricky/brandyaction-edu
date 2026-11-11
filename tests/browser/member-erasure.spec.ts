@@ -57,15 +57,15 @@ test('pending request requires per-member review and explicit confirmation; canc
   else await route.fulfill({json:{enabled:true,rows:[{...row,counts:{},storageRemoved:0,storageFailedCount:0,lastCode:null,state:'requested',approvedAt:writes?'2026-11-09T00:00:00Z':null,disabledAt:writes?'2026-11-09T00:00:00Z':null}]}});
  });
  await page.goto(screen);const area=page.getByRole('region',{name:'탈퇴 요청·진단 삭제 기록'});
- await area.getByRole('button',{name:'삭제 내용 확인'}).click();
+ await area.getByRole('button',{name:'승인 후 탈퇴 처리'}).click();
  const confirm=area.getByRole('region',{name:'탈퇴 처리 확인'});
  await expect(confirm).toContainText('learner@example.test');await expect(confirm).toContainText('결제·환불');
- await expect(confirm.getByRole('button',{name:'탈퇴 처리 실행'})).toBeDisabled();
- await confirm.getByRole('button',{name:'취소'}).click();expect(writes).toBe(0);
- await area.getByRole('button',{name:'삭제 내용 확인'}).click();
+ await expect(confirm.getByRole('button',{name:'승인하고 탈퇴 처리'})).toBeDisabled();
+ await confirm.getByRole('button',{name:'돌아가기'}).click();expect(writes).toBe(0);
+ await area.getByRole('button',{name:'승인 후 탈퇴 처리'}).click();
  await confirm.getByRole('checkbox').check();
  await area.screenshot({path:info.outputPath('erasure-confirm.png')});
- await confirm.getByRole('button',{name:'탈퇴 처리 실행'}).click();
+ await confirm.getByRole('button',{name:'승인하고 탈퇴 처리'}).click();
  await expect(area).toContainText('삭제 진행 대기');expect(writes).toBe(1);
  await expect(area.getByText('삭제 완료',{exact:true})).toHaveCount(0);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
@@ -88,4 +88,32 @@ test('structural failure is shown as a server review instead of another automati
  await page.goto(screen);const area=page.getByRole('region',{name:'탈퇴 요청·진단 삭제 기록'});
  await expect(area).toContainText('관리자 확인 필요');await expect(area).toContainText('반복 실행으로 해결되지 않으므로');
  await expect(area).not.toContainText('상태가 자동으로 갱신됩니다.');
+});
+
+test('cancel an unapproved intake while deletion is OFF; keep the cancellation receipt and never expose cancellation after approval',async({page},info)=>{
+ let cancelled=false,writes=0;
+ await page.route('**/api/admin/member-erasure',async route=>{
+  if(route.request().method()==='POST'){
+   expect(route.request().postDataJSON()).toEqual({action:'cancel',requestId,confirmation:requestId});writes++;cancelled=true;
+   return route.fulfill({json:{ok:true,message:'탈퇴 접수를 취소했습니다. 회원 계정과 수강권은 유지됩니다.'}});
+  }
+  return route.fulfill({json:{enabled:false,rows:[{...row,state:cancelled?'cancelled':'requested',attempts:0,approvedAt:null,disabledAt:null,lastCode:null,counts:{},storageRemoved:0,storageFailedCount:0,cancelledAt:cancelled?'2026-11-11T00:00:00Z':null}]}});
+ });
+ await page.goto(screen);const area=page.getByRole('region',{name:'탈퇴 요청·진단 삭제 기록'});
+ await expect(area).toContainText('승인 대기');await expect(area.getByRole('button',{name:'승인 후 탈퇴 처리'})).toHaveCount(0);
+ await area.getByRole('button',{name:'접수 취소',exact:true}).click();
+ const confirm=area.getByRole('region',{name:'탈퇴 접수 취소 확인'});
+ await expect(confirm).toContainText('계정·수강권·학습 자료는 그대로 유지');await expect(confirm.getByRole('button',{name:'접수 취소 확정'})).toBeDisabled();
+ await confirm.getByRole('button',{name:'돌아가기'}).click();expect(writes).toBe(0);
+ await area.getByRole('button',{name:'접수 취소',exact:true}).click();await confirm.getByRole('checkbox').check();await confirm.getByRole('button',{name:'접수 취소 확정'}).click();
+ await expect(area).toContainText('0건 처리 대기');await expect(area).toContainText('0건 삭제 완료');await expect(area).toContainText('1건 접수 취소');
+ await expect(area.getByRole('button',{name:'접수 취소',exact:true})).toHaveCount(0);expect(writes).toBe(1);
+ await area.screenshot({path:info.outputPath(`erasure-cancelled-${info.project.name}.png`)});
+});
+
+test('approved deletion cannot be cancelled or shown as restored',async({page})=>{
+ await page.route('**/api/admin/member-erasure',route=>route.fulfill({json:{enabled:true,rows:[row]}}));
+ await page.goto(screen);const area=page.getByRole('region',{name:'탈퇴 요청·진단 삭제 기록'});
+ await expect(area).toContainText('이미 승인되어 접수 취소는 할 수 없습니다.');await expect(area.getByRole('button',{name:'접수 취소',exact:true})).toHaveCount(0);
+ await expect(area.getByRole('button',{name:'처리 이어가기'})).toBeVisible();
 });

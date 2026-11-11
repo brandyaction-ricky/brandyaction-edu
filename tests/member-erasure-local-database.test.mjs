@@ -112,6 +112,23 @@ test('seeded learning data erases while financial/consent evidence and other lea
  assert.deepEqual(await call('edu_prepare_member_local_erasure',[accepted.requestId,job.lease]),{ready:true});
  assert.equal(await call('edu_finish_member_erasure',[accepted.requestId,job.lease,receipt,null,false]),true);
  const [row]=await call('edu_read_member_erasure',[admin]);assert.ok(row.localErasedAt);assert.equal(row.localStorageRemoved,5);
+ // Approval and cancellation are distinct durable operations. No cancelled UUID can be approved later.
+ const cancelMember=id();await db.exec('reset role');await db.query("insert into profiles(id,role,status) values($1,'student','active')",[cancelMember]);await db.exec('set role service_role');
+ const intake=await call('edu_request_member_erasure',[admin,cancelMember,'dev']);
+ assert.deepEqual(await call('edu_claim_member_erasure',['dev',3]),[]); // even retired callers require approval
+ await assert.rejects(call('edu_cancel_member_erasure',[other,intake.requestId,'dev']),/ERASURE_FORBIDDEN/);
+ await assert.rejects(call('edu_cancel_member_erasure',[admin,intake.requestId,'production']),/ERASURE_NOT_FOUND/);
+ const cancelled=await call('edu_cancel_member_erasure',[admin,intake.requestId,'dev']);assert.equal(cancelled.state,'cancelled');
+ assert.deepEqual(await call('edu_cancel_member_erasure',[admin,intake.requestId,'dev']),cancelled);
+ assert.deepEqual(await call('edu_claim_approved_member_erasure',['dev',3,intake.requestId]),[]);
+ await assert.rejects(call('edu_approve_member_erasure',[admin,intake.requestId,'dev']),/ERASURE_CANCELLED/);
+ assert.equal((await db.query('select status from profiles where id=$1',[cancelMember])).rows[0].status,'active');
+ const cancelledRecord=(await call('edu_read_member_erasure',[admin])).find(r=>r.requestId===intake.requestId);assert.ok(cancelledRecord.cancelledAt);assert.equal(cancelledRecord.disabledAt,null);
+ const nextIntake=await call('edu_request_member_erasure',[admin,cancelMember,'dev']);assert.notEqual(nextIntake.requestId,intake.requestId);
+ assert.deepEqual(await call('edu_request_member_erasure',[admin,cancelMember,'dev']),nextIntake);
+ await call('edu_approve_member_erasure',[admin,nextIntake.requestId,'dev']);
+ await assert.rejects(call('edu_cancel_member_erasure',[admin,nextIntake.requestId,'dev']),/ERASURE_CANNOT_CANCEL/);
+ assert.equal((await db.query("select count(*)::int n from audit_logs where action='member.erasure_cancelled'")).rows[0].n,1);
  // No unconditional three-minute delay: the first approved claim starts immediately.
  const newMember=id();await db.exec('reset role');await db.query("insert into profiles(id,role,status) values($1,'student','active')",[newMember]);await db.exec('set role service_role');
  const fresh=await call('edu_request_member_erasure',[admin,newMember,'dev']);await call('edu_approve_member_erasure',[admin,fresh.requestId,'dev']);

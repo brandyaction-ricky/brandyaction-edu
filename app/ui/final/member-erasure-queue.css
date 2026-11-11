@@ -64,3 +64,5 @@
 .edu-admin .erasure-confirm:focus { outline:2px solid #b71d2b; outline-offset:3px; }
 .edu-admin .erasure-confirm-actions .erasure-delete-action { background:#bd1d2c; color:white; border-color:#bd1d2c; }
 .edu-admin .erasure-confirm-actions .erasure-delete-action:disabled { opacity:.45; cursor:not-allowed; }
+.edu-admin .erasure-row-actions { display:flex; flex-wrap:wrap; gap:8px; }
+@media(max-width:600px) { .edu-admin .erasure-row-actions { width:100%; } .edu-admin .erasure-row-actions>.btn { flex:1; } }
