@@ -28,12 +28,14 @@ export function SpacePanel({snapshot,demo,studyEntry,onOpenLesson,onNavigate,onO
  const [loadedRewards,setLoadedRewards]=useState<CommunityRewards|null>(null);const progress=demo?(rewards||loadedRewards):loadedRewards;
  const [token,setToken]=useState(''),[sessionId,setSessionId]=useState(''),[localPane,setPane]=useState<'focus'|'lounge'|'profile'|'settings'|'directory'>('focus');
  const pane=toolsPane||localPane;
- const [active,setActive]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[worldReady,setWorldReady]=useState(false);
+ const [active,setActive]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[worldReady,setWorldReady]=useState(false);
  const [slowWorld,setSlowWorld]=useState(false);
+ const [pending,setPending]=useState<'foreground'|'auto-entry'|null>(null);
+ const busy=pending!==null;
  const [draft,setDraft]=useState<SpaceProfile>(()=>defaultProfile(snapshot.viewer.displayName)),[saved,setSaved]=useState<SpaceProfile>(()=>defaultProfile(snapshot.viewer.displayName));
  const [state,setState]=useState<SpaceState|null>(null),[text,setText]=useState(''),[clock,setClock]=useState<FocusClock>(emptyClock),[now,setNow]=useState(Date.now),[duration,setDuration]=useState(25),[compact,setCompact]=useState(false),[photo,setPhoto]=useState('');
  useEffect(()=>{if(toolsPane||compact||worldReady)return;const timer=setTimeout(()=>setSlowWorld(true),12000);return()=>clearTimeout(timer);},[compact,worldReady,renderer,toolsPane]);
- useCampusDraftGuard(JSON.stringify({...draft,status:saved.status})!==JSON.stringify(saved),busy,'campus-space',toolsVisible);
+ useCampusDraftGuard(JSON.stringify({...draft,status:saved.status})!==JSON.stringify(saved),pending==='foreground','campus-space',toolsVisible);
  useEffect(()=>{const changed=(e:Event)=>{const d=(e as CustomEvent).detail;if(!demo&&d?.cohortId===cohortId){const a=publicAvatar(d.appearance);setSaved(p=>({...p,...a}));setDraft(p=>({...p,...a}));}};window.addEventListener('campus:avatar-saved',changed);return()=>window.removeEventListener('campus:avatar-saved',changed);},[demo,cohortId]);
  const [sound,setSound]=useState<AmbientKind|null>(null),[volume,setVolume]=useState(25);const audio=useRef<AmbientAudio|null>(null),soundGeneration=useRef(0);
  const frame=useRef<HTMLIFrameElement>(null),transport=useRef<SpaceTransport|null>(null),current=useRef({saved,clock,active,progress,space:state}),operation=useRef(false),mounted=useRef(true),actions=useRef<{seat:()=>void;navigate:(s:string)=>void;saveAppearance:(p:unknown)=>void}>({seat:()=>{},navigate:()=>{},saveAppearance:()=>{}});
@@ -71,7 +73,7 @@ export function SpacePanel({snapshot,demo,studyEntry,onOpenLesson,onNavigate,onO
  function openEnvironment(){if(onOpenEnvironment){onOpenEnvironment();return;}frame.current?.scrollIntoView({block:'center'});setToolsOpen(false);post('environment-open');}
  const command=useCallback(async(cmd:Partial<SpaceCommand>&{kind:string})=>{if(!transport.current)throw new Error('먼저 캠퍼스에 입장해 주세요.');return transport.current.command(cmd);},[]);
  function statusError(e:unknown){setError(e instanceof Error?e.message:'공간 연결을 확인하지 못했습니다.');}
- async function act(fn:()=>Promise<void>){if(operation.current)return;operation.current=true;setBusy(true);setError('');try{await fn();}catch(e){statusError(e);}finally{operation.current=false;if(mounted.current)setBusy(false);}}
+ async function act(fn:()=>Promise<void>,kind:'foreground'|'auto-entry'='foreground'){if(operation.current)return;operation.current=true;setPending(kind);setError('');try{await fn();}catch(e){statusError(e);}finally{operation.current=false;if(mounted.current)setPending(null);}}
  useEffect(()=>{mounted.current=true;queueMicrotask(()=>{if(mounted.current){setToken(crypto.randomUUID());setSessionId(crypto.randomUUID());}});return()=>{mounted.current=false;void audio.current?.stop();transport.current?.close();transport.current=null;};},[]);
  useEffect(()=>{if(!cohortId)return;let ignore=false;transport.current?.close();transport.current=null;queueMicrotask(()=>{if(!ignore){setActive(false);setState(null);setWorldReady(false);setError('');}});
   try{const raw=JSON.parse(sessionStorage.getItem(clockKey)||'null');if(raw&&['idle','focus','break'].includes(raw.phase)&&Number.isInteger(raw.duration)&&raw.duration>=0&&raw.duration<=3000&&Number.isFinite(raw.elapsed)&&raw.elapsed>=0&&(raw.runningSince===null||Number.isFinite(raw.runningSince)))queueMicrotask(()=>{if(!ignore)setClock(raw);});else queueMicrotask(()=>{if(!ignore)setClock(emptyClock);});}catch{queueMicrotask(()=>{if(!ignore)setClock(emptyClock);});}
@@ -142,7 +144,7 @@ export function SpacePanel({snapshot,demo,studyEntry,onOpenLesson,onNavigate,onO
  useEffect(()=>{if(previousSeat.current&&!ownSeat&&active){post('stand');sittingRef.current=false;setNotice('자리 이용이 끝났어요. 빈자리를 다시 선택할 수 있습니다.');}previousSeat.current=ownSeat?.id||null;},[ownSeat,active,post]);
  useEffect(()=>{actions.current.saveAppearance=(value)=>{if(operation.current||!current.current.active){post('appearance-result',{ok:false,error:'캠퍼스에 입장한 뒤 저장해 주세요.'});return;}void act(async()=>{try{const appearance=publicAvatar(value),next={...current.current.saved,...appearance};await command({kind:'profile',profile:next});setSaved(next);setDraft(p=>({...p,...appearance}));post('appearance-result',{ok:true});setNotice('캐릭터를 저장했어요. 다음 입장에도 같은 모습으로 만나요.');}catch(e){post('appearance-result',{ok:false,error:'저장하지 못했어요. 연결을 확인한 뒤 다시 시도해 주세요.'});throw e;}});};actions.current.navigate=(s)=>{if(['chat','crew','profile','desk','questfocus','terrace','settings'].includes(s))setToolsOpen(true);if(s.startsWith('exhibit:')){openExhibit(s.slice(8));return;}const zone=s==='presentation'?'board':s==='curriculum'?'mission':s;if(state?.controls?.closedZones?.includes(zone)){setNotice('이 공간은 잠시 쉬고 있어요. 다른 공간을 선택해 주세요.');return;}if(['chat','crew'].includes(s)){setPane('lounge');return;}if(s==='settings'){setPane('settings');return;}if(s==='profile'){setPane('profile');return;}if(['desk','questfocus','terrace','settings'].includes(s)){setPane('focus');return;}if(['ai','business','support','journal'].includes(s)){onNavigate?.(s);return;}if(s==='presentation'){openDemoDay();return;}if(s==='office'){onNavigate?.('office');return;}if(['board','detail','newpost'].includes(s))onNavigate?.('community');else if(['curriculum','resources','mission','missionmap','launch','achievements'].includes(s))onNavigate?.('learning');};
  actions.current.seat=()=>{setToolsOpen(true);setPane('focus');if(state?.controls?.closedZones?.includes('desk')){setNotice('집중석 신규 이용은 잠시 쉬고 있어요. 개인 타이머는 사용할 수 있습니다.');return;}if(!active){setNotice('입장한 뒤 빈자리를 선택해 주세요.');return;}const seat=['desk-1','desk-2','desk-3'].find(id=>!state?.seats.some(s=>s.id===id&&s.userId!==actor));if(seat)void takeSeat(seat);else setNotice('집중석이 모두 사용 중이에요. 자유 집중은 바로 시작할 수 있어요.');};});
- async function join(){await act(async()=>{
+ async function join(kind:'foreground'|'auto-entry'='foreground'){await act(async()=>{
   if(!cohortId)return;
   if(studyEntry)triedStudyEntry.current=true;
   const entering={...saved,status:participationStatus(participation)};
@@ -161,11 +163,11 @@ export function SpacePanel({snapshot,demo,studyEntry,onOpenLesson,onNavigate,onO
    studyEntry?.onJoined();
    setActive(true);setNotice('입장했어요. 이동하거나 원하는 공간을 골라 보세요.');
   }catch(e){t.close();if(transport.current===t)transport.current=null;throw e;}
- });}
+ },kind);}
  useEffect(()=>{
   if(!studyEntry||!sessionId||!state||state.controls?.paused||triedStudyEntry.current||busy)return;
   triedStudyEntry.current=true;
-  void join();
+  void join('auto-entry');
  });
  async function leave(){await act(async()=>{await command({kind:'leave'});joinedSession.current=false;transport.current?.close();transport.current=null;setActive(false);post('stand');post('peers',{items:[]});setNotice('공간에서 나왔어요. 집중 타이머와 내 메모는 유지됩니다.');});}
  async function celebrateCohort(){await act(async()=>{let verified=progress;if(!demo){const r=await fetch('/api/campus/community/rewards?enrollmentId='+encodeURIComponent(snapshot.selectedEnrollmentId!),{cache:'no-store',credentials:'same-origin'});if(!r.ok)throw Error('기수 목표 달성을 다시 확인하지 못했어요.');verified=await r.json() as CommunityRewards;setLoadedRewards(verified);}if(!cohortGoalReached(verified))throw Error('기수 공동 목표를 달성하면 기념 연출을 볼 수 있어요.');if(state?.controls?.paused||state?.controls?.closedZones?.includes('launch'))return;post('progress',{level:verified!.level,xp:verified!.xp,launched:!!verified!.claimedAt,cohortLaunches:verified!.cohortLaunches,cohortGoal:verified!.cohortGoal,demo});post('cohort-launch');setNotice((demo?'체험 · ':'')+'확인된 기수 공동 목표 달성을 축하합니다. 기념 연출이며 새 발사 기록이나 성장 점수를 만들지 않아요.');});}

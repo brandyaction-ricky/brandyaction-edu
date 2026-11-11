@@ -52,3 +52,13 @@
 .roomCover{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:3}.managedArticle{max-width:860px;margin:auto;padding:24px;background:#fff;border-radius:16px;line-height:1.8;color:#18354f}.managedArticle img{max-width:100%;height:auto;max-height:640px;object-fit:contain}.managedArticle a{display:inline-flex;padding:12px 18px;border-radius:10px;background:#2868da;color:#fff;text-decoration:none}.managedArticle h2{font-size:clamp(22px,3vw,32px)}
 
 .brand .officeHelp{pointer-events:auto;touch-action:manipulation;display:block;min-height:28px;font-size:12px;line-height:1.3;font-weight:600;color:#cbe1fc;border:0;background:transparent;padding:3px 0;text-align:left;text-decoration:underline;text-underline-offset:3px}
+
+/* Let the study cards reserve their own height while the scene loads. */
+.miniFocus .loading {
+  position:static;
+  transform:none;
+  max-width:100%;
+  margin:6px 0 0;
+  padding:6px 10px;
+  pointer-events:none;
+}
