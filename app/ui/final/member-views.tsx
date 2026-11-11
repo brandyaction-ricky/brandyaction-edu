@@ -1,4 +1,5 @@
 "use client";
+import { CourseReviewButton } from "./product-reviews";
 import usability from './usability.module.css';
 import { curriculumDay } from '@/lib/curriculum-days';
 import { MemberLearningCare } from "./learning-care";
@@ -1185,37 +1186,14 @@ function Profile({
 function Reviews({
   data,
   active,
-  pending,
   send,
 }: {
   data: Data;
   active: Row[];
-  pending: boolean;
   send: WorkflowSend;
 }) {
-  const [tab, setTab] = useState("write"),
-    [selected, setSelected] = useState(""),
-    [message, setMessage] = useState("");
+  const [tab, setTab] = useState("write");
   const mine = rows(data, "my_reviews");
-  async function submit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    try {
-      await send(
-        {
-          action: "review",
-          enrollmentId: selected,
-          rating: Number(f.get("rating")),
-          content: f.get("content"),
-        },
-        "후기를 등록했습니다. 운영자 검토 후 공개됩니다.",
-      );
-      setSelected("");
-      setTab("mine");
-    } catch (cause) {
-      setMessage((cause as Error).message);
-    }
-  }
   return (
     <>
       <Heading
@@ -1238,7 +1216,7 @@ function Reviews({
       </div>
       {tab === "write" ? (
         <>
-          {active.map((e) => (
+          {active.filter((e, index) => active.findIndex(other => other.course_id === e.course_id) === index).map((e) => (
             <article className="order-card member-review-invite" key={e.id}>
               <div className="order-card-body">
                 <div className="row-text">
@@ -1252,47 +1230,10 @@ function Reviews({
                   <p>배우기 전과 달라진 점이나 직접 해본 일을 들려주세요.</p>
                   <small>짧은 경험도 다음 수강생의 선택에 도움이 됩니다.</small>
                 </div>
-                <button className="btn primary" onClick={() => setSelected(e.id)}>
-                  내 경험 남기기<ArrowRight aria-hidden="true"/>
-                </button>
+                <CourseReviewButton courseId={String(e.course_id)} courseTitle={t(rows(data, "courses").find(c => c.id === e.course_id), "title")} label={mine.some(r => r.course_id === e.course_id) ? "리뷰 수정" : "리뷰 작성"} save={send} onSaved={() => setTab("mine")}/>
               </div>
             </article>
           ))}
-          {selected && (
-            <form className="panel pad mt24" onSubmit={submit}>
-              <label className="field">
-                만족도
-                <select name="rating">
-                  {[5, 4, 3, 2, 1].map((v) => (
-                    <option key={v} value={v}>
-                      {v}점
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                실행 경험
-                <textarea name="content" required rows={5} />
-              </label>
-              <div className="flex">
-                <button
-                  className="btn"
-                  type="button"
-                  onClick={() => setSelected("")}
-                >
-                  취소
-                </button>
-                <button className="btn primary" disabled={pending}>
-                  후기 등록
-                </button>
-              </div>
-              {message && (
-                <p role="alert" className="form-error">
-                  {message}
-                </p>
-              )}
-            </form>
-          )}
           {!active.length && (
             <Empty title="수강 신청 후 후기를 작성할 수 있습니다." />
           )}
@@ -1315,6 +1256,7 @@ function Reviews({
               </div>
               <p>{t(r, "body")}</p>
               <div className="meta mt16">{date(r.created_at)}</div>
+              {active.some(e => e.course_id === r.course_id) && <CourseReviewButton courseId={String(r.course_id)} courseTitle={t(rows(data, "courses").find(c => c.id === r.course_id), "title")} label="리뷰 수정" save={send}/>}
             </article>
           ))}
           {!mine.length && <Empty title="아직 작성한 후기가 없습니다." />}
@@ -1418,7 +1360,7 @@ export function MemberViews({
       break;
     case "reviews":
       content = (
-        <Reviews data={data} active={active} pending={pending} send={send} />
+        <Reviews data={data} active={active} send={send} />
       );
       break;
     default:

@@ -1175,7 +1175,6 @@ export async function POST(request: Request) {
                 const rating = Number(body.rating);
                 const content = String(body.content || '').trim();
                 if (!Number.isInteger(rating) || rating < 1 || rating > 5 || !content || content.length > 5000) fail('별점과 후기 내용을 확인해 주세요.');
-                const { data: existing } = await db.from('reviews').select('id').eq('user_id', user.id).eq('course_id', enrollment.course_id).maybeSingle();
                 const values = {
                     user_id: user.id,
                     course_id: enrollment.course_id,
@@ -1185,9 +1184,9 @@ export async function POST(request: Request) {
                     body: content,
                     status: 'pending',
                 };
-                const r = existing ? await db.from('reviews').update(values).eq('id', existing.id) : await db.from('reviews').insert(values);
+                const r = await db.from('reviews').upsert(values, { onConflict: 'user_id,course_id' });
                 if (r.error) throw r.error;
-                return reply({ ok: true });
+                return publicWriteSuccess({ ok: true });
             }
             const lessonId = String(body.lessonId || '');
             const { data: lesson } = await db.from('curriculum_lessons').select('*,curriculum_weeks!inner(course_id,is_published)').eq('id', lessonId).eq('is_published', true).single();

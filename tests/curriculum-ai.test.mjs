@@ -42,6 +42,17 @@ test('student image-upload promises become an honest mentor handoff without unre
   const original={...answer,answer:text};assert.equal(studentCapabilityAnswer(original),original);
  }
 });
+test('image-capable students continue troubleshooting in the same AI conversation instead of an automatic mentor handoff',()=>{
+ const original={answer:'캡처를 보내 주시면 확인해 드릴게요.',needsMentor:true,sources:[{id:'S1'}],searchedLessons:21};
+ const result=studentCapabilityAnswer(original,true);
+ assert.equal(result.needsMentor,false);assert.deepEqual(result.sources,[]);assert.match(result.answer,/오류 문구와 막힌 단계/);assert.doesNotMatch(result.answer,/멘토/);
+});
+test('English browser/folder errors retrieve corresponding Korean curriculum while keeping current lesson evidence',()=>{
+ const lessons=[{id:'current',title:'진행 중 수업',body_text:'실행 결과를 확인하세요.'},{id:'aside',title:'어사이드 크롬 가져오기',body_text:'크롬 브라우저 방문 기록을 가져옵니다.'},{id:'folder',title:'클로드 작업 준비',body_text:'작업 폴더 파일 연결을 확인합니다.'}];
+ const imported=retrieveCurriculum(lessons,'Aside: Close Chrome and try the import again','current',false);
+ assert.ok(imported.sources.some(s=>s.lessonId==='aside'));
+ assert.ok(retrieveCurriculum(lessons,'Claude cannot read files in the folder','current',false).sources.some(s=>s.lessonId==='folder'));
+});
 test('retrieval reserves current lesson evidence and cites the section containing the explanation',()=>{
  const document={schemaVersion:1,blocks:[
   {id:'h',type:'heading',content:'2-1 직과 업'},
@@ -69,6 +80,14 @@ test('English questions and explicit English requests use a localized fallback',
  assert.ok(requestsEnglish('이걸 in English 부탁해요'));
  assert.equal(requestsEnglish('AARRR 순서를 알려주세요'),false);
  assert.equal(parseCurriculumAnswer({answer:'No evidence',needsMentor:true,sourceIds:[]},[],true).answer,aiFallbackEnglish);
+});
+test('explicit answer language overrides the language of a pasted browser error',()=>{
+ const {requestsEnglish}=loadTs('lib/curriculum-ai.ts');
+ assert.equal(requestsEnglish('Chrome import says Close Chrome and try the import again in Aside. Please explain in Korean what I can safely check before asking a mentor.'),false);
+ assert.equal(requestsEnglish('Close Chrome and try the import again 오류를 한국어로 설명해 주세요.'),false);
+ assert.equal(requestsEnglish('Please explain in English. Actually, answer in Korean.'),false);
+ assert.equal(requestsEnglish('한국어로 설명해 주세요. 대신 in English 부탁해요.'),true);
+ assert.equal(requestsEnglish('Translate the browser message from English into Korean.'),false);
 });
 
 test('common questions reserve a relevant first-day source without dropping current lesson',()=>{

@@ -550,7 +550,11 @@ test('campaign class keeps published content and one responsive sticky CTA', () 
   assert.doesNotMatch(html(ProductDetail, { course, data: { ...data, landing_configs: [{ ...cfg, enabled: false }] } }), /data-landing-cta/);
   const untracked = html(ProductDetail, { course, data: { ...data, enrollments: [], landing_configs: [{ ...cfg, enabled: false }] } });
   assert.equal((untracked.match(/href="https:\/\/open.kakao.com\/o\/testRoom"/g) || []).length, 1);
-  assert.doesNotMatch(untracked, /href="\/(?:apply|signup|login)/);
+  assert.doesNotMatch(untracked, /href="\/(?:apply|signup)/);
+  // Review sign-in is independent of the external free-class registration CTA.
+  const loginHrefs = [...untracked.matchAll(/href="(\/login[^\"]*)"/g)].map(match => match[1]);
+  assert.deepEqual(loginHrefs, ['/login?next=%2Fclasses%2Fcourse%23product-reviews']);
+  assert.match(untracked, /href="https:\/\/open.kakao.com\/o\/testRoom"[^>]*data-product-cta="sticky_cta"/);
   const missing = html(ProductDetail, { course, data: { ...data, enrollments: [], landing_configs: [{ ...cfg, kakao_url: '' }] } });
   assert.match(missing, /disabled="">참여 링크 준비 중/);
   assert.doesNotMatch(missing, /href="\/apply/);

@@ -34,6 +34,7 @@ import { GoogleIdSignIn } from "../google-id-signin";
 import { BrowserLoginHelp } from '../browser-login-help';
 import { isEmbeddedLoginBrowser } from '@/lib/embedded-browser';
 import { ProductDetailHtml } from './product-detail-html';
+import { useProductReviews, ProductReviewRating, ProductReviews } from './product-reviews';
 import { RecruitmentCountdown } from './product-countdown';
 import { productDocument, storedProductDocumentPath } from '@/lib/product-html-document';
 import { productConversion } from '@/lib/product-conversion';
@@ -154,9 +155,14 @@ export function ProductDetail({ course, data, user }: { course: Row; data: Data;
     const frozen = object(config, "course_snapshot");
     const currentMetadata = object(course, "metadata");
     const campaignCourse = { ...course, ...frozen, metadata: { ...object(frozen as Row, "metadata"), ...currentMetadata } } as Row;
-    return <CampaignFreeClass course={campaignCourse} config={config as unknown as LandingConfig} resources={productResources(currentMetadata)} />;
+    return <CampaignProductDetail course={campaignCourse} config={config as unknown as LandingConfig} resources={productResources(currentMetadata)} signedIn={Boolean(user)}/>;
   }
   return <><EventBenefitBanner signedIn={Boolean(user)} cohortIds={(data.cohorts||[]).filter(c=>c.course_id===course.id).map(c=>String(c.id))}/><StandardProductDetail course={course} data={data} signedIn={Boolean(user)} /></>;
+}
+
+function CampaignProductDetail({ course, config, resources, signedIn }: React.ComponentProps<typeof CampaignFreeClass> & { signedIn: boolean }) {
+  const reviewState = useProductReviews(String(course.id));
+  return <><CampaignFreeClass course={course} config={config} resources={resources}/><div className="wrap"><ProductReviews courseId={String(course.id)} courseTitle={t(course, "title")} signedIn={signedIn} state={reviewState}/></div></>;
 }
 
 function StandardProductDetail({
@@ -168,6 +174,7 @@ function StandardProductDetail({
   data: Data;
   signedIn: boolean;
 }) {
+  const reviewState = useProductReviews(String(c.id));
   const entrySource = parseEntrySource(useSearchParams().get('src'));
   const type = courseType(c),
     digital = type === "디지털 상품",
@@ -305,6 +312,7 @@ function StandardProductDetail({
                 </section>
               )}
               {hasResources && downloadSection}
+              <ProductReviews courseId={String(c.id)} courseTitle={t(c, "title")} signedIn={signedIn} state={reviewState}/>
             </div>
           </div>
         </>
@@ -321,10 +329,12 @@ function StandardProductDetail({
             <div className="product-main">
               <Cover course={c} />
               <h1>{t(c, "title")}</h1>
+              <ProductReviewRating state={reviewState}/>
               <p className="lead">{t(c, "summary")}</p>
               <nav className="subnav" aria-label="상품 상세 영역">
                 <a href="#class-detail">소개</a>
                 <a href="#curriculum">{digital ? "구성 자료" : "커리큘럼"}</a>
+                <a href="#product-reviews">리뷰{reviewState.data ? ` (${reviewState.data.summary.count})` : ""}</a>
               </nav>
               <section className="detail-section" id="class-detail">
                 {countdown}
@@ -369,6 +379,7 @@ function StandardProductDetail({
                   <p className="muted">커리큘럼 공개를 준비하고 있습니다.</p>
                 )}
               </section>
+              <ProductReviews courseId={String(c.id)} courseTitle={t(c, "title")} signedIn={signedIn} state={reviewState}/>
               {!digital && (
                   <section className="detail-section">
                     <h2>함께할 강사</h2>
