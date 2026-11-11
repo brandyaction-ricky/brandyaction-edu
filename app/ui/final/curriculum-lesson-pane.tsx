@@ -37,5 +37,5 @@ export function CurriculumLessonPane({ lesson, course, curriculum, pending, send
   };
   if (error) return <p className="notice warning" role="alert">{error} <button className="btn" onClick={() => { setError(''); setRetry(value => value + 1); }}>다시 시도</button></p>;
   if (!data) return <p role="status" className="studio-loading">수업 문서를 불러오고 있습니다…</p>;
-  return <LearningEditor embedded actorId={actorId} data={{ ...data, curriculum_weeks: curriculum.curriculum_weeks, curriculum_lessons: curriculum.curriculum_lessons, lesson_contents: curriculum.lesson_contents, courses: [course] }} row={lesson} pending={pending} send={sendWithQuizRefresh} back={() => {}} sessionRef={editor} onSaved={onSaved} blockEditingEnabled={blockEditingEnabled} />;
+  return <LearningEditor embedded courseId={String(course.id)} actorId={actorId} data={{ ...data, curriculum_weeks: curriculum.curriculum_weeks, curriculum_lessons: curriculum.curriculum_lessons, lesson_contents: curriculum.lesson_contents, courses: [course] }} row={lesson} pending={pending} send={sendWithQuizRefresh} back={() => {}} sessionRef={editor} onSaved={onSaved} blockEditingEnabled={blockEditingEnabled} />;
 }
