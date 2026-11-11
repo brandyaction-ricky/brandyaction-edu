@@ -2,7 +2,7 @@ type Join = (signal: AbortSignal, ready: () => void, failed: () => void) => Prom
 
 type InboxOptions = {
   refresh: (signal: AbortSignal) => Promise<void>;
-  onError: () => void;
+  onError?: () => void;
   onConnected: (connected: boolean) => void;
   slow: () => boolean;
   join?: Join;
@@ -11,7 +11,7 @@ type InboxOptions = {
 const pollMs = 15_000;
 const reconcileMs = 60_000;
 
-// One controller belongs to one visible inbox. Closing it cancels reads and future joins.
+// Socket retries and polling belong to the visible office session.
 export function startInboxSync(options: InboxOptions) {
   let closed = false;
   let connected = false;
@@ -38,7 +38,7 @@ export function startInboxSync(options: InboxOptions) {
     try {
       await options.refresh(request.signal);
     } catch {
-      if (!closed) options.onError();
+      if (!closed) options.onError?.();
     } finally {
       readRequest = undefined;
       if (queued && !closed) {
@@ -85,7 +85,7 @@ export function startInboxSync(options: InboxOptions) {
     if (!slow || Date.now() - lastReadAt >= reconcileMs) void read();
   }, pollMs);
   void read();
-  if (options.join) joinTimer = setTimeout(connect, Math.random() * 60_000);
+  if (options.join) joinTimer = setTimeout(connect, Math.random() * 3_000);
 
   return {
     invalidate,

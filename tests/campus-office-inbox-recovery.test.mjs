@@ -41,10 +41,37 @@ test('a staggered first join leaves the initial read immediate and is cancelled 
     onConnected: () => {}, onError: assert.fail, join: async () => { joins++; } });
   assert.equal(reads,1);
   await Promise.resolve();
-  t.mock.timers.tick(14999);
+  t.mock.timers.tick(2249);
   assert.equal(joins,0);
   box.close();
   t.mock.timers.tick(60000);
   assert.equal(joins,0);
   assert.equal(reads,1);
+});
+
+test('desk and inbox share the connected enrollment until its last observer leaves', async t => {
+  const source = fileURLToPath(new URL('../features/campus/office/shared-inbox.ts', import.meta.url));
+  const built = await build({entryPoints:[source], bundle:true, format:'esm', write:false});
+  const {observeOffice} = await import('data:text/javascript;base64,' + Buffer.from(built.outputFiles[0].contents).toString('base64'));
+  t.mock.timers.enable({apis:['setTimeout','setInterval','Date'], now:0});
+  t.mock.method(Math, 'random', () => .75);
+  const connections = [];
+  const join = async (signal, ready) => { connections.push(signal); ready(); };
+  const states = [];
+  const view = () => ({refresh:async()=>{}, slow:()=>false, connected:value=>states.push(value)});
+  const desk = observeOffice('enrollment-A', view(), join);
+  t.mock.timers.tick(2250);
+  const inbox = observeOffice('enrollment-A', view(), join);
+  assert.equal(connections.length,1);
+  assert.deepEqual(states,[true,true]);
+  inbox.close();
+  assert.equal(connections[0].aborted,false);
+  const other = observeOffice('enrollment-B', view(), join);
+  t.mock.timers.tick(2250);
+  assert.equal(connections.length,2);
+  desk.close();
+  assert.equal(connections[0].aborted,true);
+  assert.equal(connections[1].aborted,false);
+  other.close();
+  assert.equal(connections[1].aborted,true);
 });
