@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { observeOffice } from './shared-inbox';
-import { joinOfficeInbox } from './inbox-channel';
+import { joinOfficeInbox, readOfficeVersion } from './inbox-channel';
 
 type Options = {
   enabled: boolean;
@@ -54,6 +54,9 @@ export function useOfficeLive({ enabled, keepConnected = false, enrollment, refr
       }, isDev ? async (signal, ready, failed, changed) => {
         const { createClient } = await import('@/lib/supabase/client');
         if (!signal.aborted) await joinOfficeInbox(createClient(), enrollment, signal, ready, failed, changed);
+      } : undefined, isDev ? async signal => {
+        const { createClient } = await import('@/lib/supabase/client');
+        return signal.aborted ? 0 : readOfficeVersion(createClient(), enrollment, signal);
       } : undefined);
     }
 

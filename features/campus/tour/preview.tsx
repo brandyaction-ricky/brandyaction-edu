@@ -200,8 +200,10 @@ export function FourSpacesPreview({snapshot,adminSnapshot,live,visitor,review,we
    deskTargets.current.clear();
    post('office-desks-clear');
  },[]);
- const desksVisible=!!live&&canEnter(role,'office')&&room==='office'&&ready&&!mapOpen&&!tool&&!gate&&!activityMenu;
+ const desksVisible=!!live&&canEnter(role,'office')&&room==='office'&&!mapOpen&&!tool&&!gate&&!activityMenu;
  useOfficeLive({enabled:desksVisible,keepConnected:!!live&&room==='office'&&tool==='office'&&canEnter(role,'office'),enrollment:snapshot.selectedEnrollmentId,refresh:refreshDesks,onError:clearDesks,slow:false});
+ // A first desk read can finish before the 3D frame installs its message listener.
+ useEffect(()=>{if(ready&&desksVisible&&previousDeskView.current)post('personal-office',JSON.parse(previousDeskView.current));},[ready,desksVisible]);
  useEffect(()=>clearDesks,[snapshot.selectedEnrollmentId,desksVisible,clearDesks]);
 
  const quizDone=assessment.quiz.every((_,i)=>typeof progress.quiz[i]==='boolean'),levelDone=assessment.level.every((_,i)=>progress.level[i]>=0),done=Number(progress.video)+Number(quizDone)+Number(levelDone);

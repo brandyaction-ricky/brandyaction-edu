@@ -10,7 +10,7 @@ type Session = { views: Set<View>; connected: boolean; sync: ReturnType<typeof s
 const sessions = new Map<string, Session>();
 
 // One transport per enrollment in this tab. Each view owns its cancellable read.
-export function observeOffice(enrollment: string, view: View, join?: Join) {
+export function observeOffice(enrollment: string, view: View, join?: Join, readVersion?: (signal: AbortSignal) => Promise<number>) {
   let session = sessions.get(enrollment);
   if (session) {
     session.views.add(view);
@@ -25,6 +25,7 @@ export function observeOffice(enrollment: string, view: View, join?: Join) {
         if (session) session.connected = value;
         for (const item of views) item.connected(value);
       },
+      readVersion,
       join: join && ((signal, ready, failed) => join(signal, ready, failed, sync.invalidate)),
     });
     session = { views, connected: false, sync };

@@ -6,10 +6,12 @@ type InboxOptions = {
   onConnected: (connected: boolean) => void;
   slow: () => boolean;
   join?: Join;
+  readVersion?: (signal: AbortSignal) => Promise<number>;
 };
 
 const pollMs = 15_000;
 const reconcileMs = 60_000;
+const firstJoinWindowMs = 55_000;
 
 // Socket retries and polling belong to the visible office session.
 export function startInboxSync(options: InboxOptions) {
@@ -23,6 +25,36 @@ export function startInboxSync(options: InboxOptions) {
   let changeTimer: ReturnType<typeof setTimeout> | undefined;
   let joinTimer: ReturnType<typeof setTimeout> | undefined;
   let handshakeTimer: ReturnType<typeof setTimeout> | undefined;
+
+  let stopProbing: (() => void) | undefined;
+  let version = 0;
+
+  // While joins are spread out, check only the student's small revision counter.
+  // The normal poll still reconciles views if either transport fails.
+  function probeWhileWaiting() {
+    const readVersion = options.readVersion;
+    if (!options.join || !readVersion) return;
+    const controller = new AbortController();
+    const deadline = Date.now() + reconcileMs;
+    let timer: ReturnType<typeof setTimeout>;
+    async function probe() {
+      try {
+        const next = await readVersion!(controller.signal);
+        if (!controller.signal.aborted && next > version) {
+          version = next;
+          invalidate();
+        }
+      } catch {
+        // The next probe or the independent full read will retry.
+      } finally {
+        if (!controller.signal.aborted && Date.now() < deadline) {
+          timer = setTimeout(probe, 1500 + Math.random() * 1000);
+        }
+      }
+    }
+    timer = setTimeout(probe, 400 + Math.random() * 1400);
+    stopProbing = () => { clearTimeout(timer); controller.abort(); };
+  }
 
   async function read() {
     if (closed) return;
@@ -61,6 +93,7 @@ export function startInboxSync(options: InboxOptions) {
     const ready = () => {
       if (attempt.signal.aborted || connected) return;
       clearTimeout(handshakeTimer);
+      stopProbing?.();
       connected = true;
       failures = 0;
       options.onConnected(true);
@@ -70,6 +103,7 @@ export function startInboxSync(options: InboxOptions) {
       if (attempt.signal.aborted) return;
       clearTimeout(handshakeTimer);
       attempt.abort();
+      if (connected) probeWhileWaiting();
       connected = false;
       options.onConnected(false);
       const backoff = Math.min(60_000, 10_000 * 2 ** Math.min(failures++, 3));
@@ -85,12 +119,14 @@ export function startInboxSync(options: InboxOptions) {
     if (!slow || Date.now() - lastReadAt >= reconcileMs) void read();
   }, pollMs);
   void read();
-  if (options.join) joinTimer = setTimeout(connect, Math.random() * 3_000);
+  probeWhileWaiting();
+  if (options.join) joinTimer = setTimeout(connect, Math.random() * firstJoinWindowMs);
 
   return {
     invalidate,
     close() {
       closed = true;
+      stopProbing?.();
       clearInterval(poll);
       clearTimeout(changeTimer);
       clearTimeout(joinTimer);
