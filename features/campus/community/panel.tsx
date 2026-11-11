@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowUpRight, Check, ChevronRight, FilePlus2, Flag, History, LockKeyhole, MessageSquare, Rocket, ShieldCheck, Sparkles, ThumbsUp, Users, X } from 'lucide-react';
 import type { CampusSnapshot } from '../contracts';
-import { communityKinds, kindLabels, validateCommunityCommand, type CommunityState, type CommunityPost, type CommunityCommand, type CommunityComment, type CommunityRewards } from './domain';
+import { openKinds, kindLabels, validateCommunityCommand, type CommunityState, type CommunityPost, type CommunityCommand, type CommunityComment, type CommunityRewards } from './domain';
 import { createCommunityDemo, demoPeerId, mutateCommunityDemo } from './demo';
 import styles from './panel.module.css';
 import { rememberCommunityDemoRewards,consumeCommunityOpen,getCommunityDemoState,rememberCommunityDemoState } from './events';
@@ -12,7 +12,7 @@ import { useCampusDraftGuard } from '../ui/draft-guard';
 
 type Props = { initialTab?:Tab; snapshot: CampusSnapshot; demo: boolean; onOpen?: (lessonId: string) => void; onRewards?: (rewards: CommunityRewards) => void };
 type Tab = 'all' | 'mine' | 'feedback' | 'talent' | 'demo_day';
-const tabs: [Tab, string][] = [['all', '동료 작업실'], ['mine', '내 결과물 모음'], ['feedback', '의견 나누기'], ['talent', '재능 교환'], ['demo_day', '결과물 발표회']];
+const tabs: [Tab, string][] = [['all', '동료 작업실'], ['mine', '내 결과물 모음'], ['feedback', '의견 나누기']];
 function date(value: string) { return new Intl.DateTimeFormat('ko-KR', { month: 'short', day: 'numeric' }).format(new Date(value)); }
 function postDraft(post?: CommunityPost, lessonId?: string): Partial<CommunityCommand> { return { kind: post?.kind ?? 'portfolio', title: post?.title ?? '', body: post?.body ?? '', url: post?.url ?? '', imageUrls: post?.image_urls ?? [], lessonId: post?.lesson_id ?? lessonId ?? null, alias: post?.alias ?? '문샷 동료', visibility: post?.visibility ?? 'private', changeNote: '' }; }
 export function CommunityPanel(props: Props) {
@@ -99,7 +99,7 @@ function CommunitySession({ snapshot, demo, onOpen, onRewards, initialTab }: Pro
     {editing && <div className={styles.composer} ref={formRef}>
       <div className={styles.sectionHeader}><div><span className={styles.eyebrow}>{editing === 'new' ? '작은 초안도 괜찮아요' : '이전 버전은 그대로 보관해요'}</span><h3>{editing === 'new' ? '결과물 남기기' : '개선한 새 버전'}</h3></div><button className={styles.iconButton} aria-label="작성 닫기" onClick={() => setEditing(null)} type="button"><X size={20} /></button></div>
       <form onSubmit={async event => { event.preventDefault(); const original = posts.find(p => p.id === editing); if (await send(command({ ...draft, action: original ? 'revise' : 'create', postId: original?.id, expectedRevision: original?.revision }))) { setEditing(null); setTab('mine'); } }}>
-        <div className={styles.formGrid}><label>종류<select value={draft.kind} disabled={editing !== 'new'} onChange={e => setDraft({ ...draft, kind: e.target.value as CommunityCommand['kind'] })}>{communityKinds.map(k => <option key={k} value={k}>{kindLabels[k]}</option>)}</select></label><label>연결할 수업<select value={draft.lessonId ?? ''} onChange={e => setDraft({ ...draft, lessonId: e.target.value || null })}><option value="">수업 선택 안 함</option>{snapshot.lessons.map(l => <option key={l.id} value={l.id}>{l.day}일차 · {l.title}</option>)}</select></label></div>
+        <div className={styles.formGrid}><label>종류<select value={draft.kind} disabled={editing !== 'new'} onChange={e => setDraft({ ...draft, kind: e.target.value as CommunityCommand['kind'] })}>{(editing === 'new' ? openKinds : [draft.kind ?? 'portfolio']).map(k => <option key={k} value={k}>{kindLabels[k]}</option>)}</select></label><label>연결할 수업<select value={draft.lessonId ?? ''} onChange={e => setDraft({ ...draft, lessonId: e.target.value || null })}><option value="">수업 선택 안 함</option>{snapshot.lessons.map(l => <option key={l.id} value={l.id}>{l.day}일차 · {l.title}</option>)}</select></label></div>
         <label>제목<input required minLength={2} maxLength={100} value={draft.title} onChange={e => setDraft({ ...draft, title: e.target.value })} placeholder="어떤 작업을 했고, 무엇이 궁금한가요?" /></label>
         <label>작업 내용<textarea required minLength={10} maxLength={6000} rows={5} value={draft.body} onChange={e => setDraft({ ...draft, body: e.target.value })} placeholder={draft.kind === 'failure' ? '시도한 것 → 기대와 달랐던 결과 → 배운 점 → 다음 시도' : draft.kind === 'talent_offer' || draft.kind === 'talent_request' ? '도울 수 있는 일 또는 필요한 도움 · 예상 분량 · 가능한 시간 · 기대하는 교환' : '만든 목적 · 시도한 방법 · 구체적으로 의견받고 싶은 점을 적어 주세요.'} /></label>
         <div className={styles.formGrid}><label>작업물 링크 <span>선택</span><input type="url" value={draft.url} onChange={e => setDraft({ ...draft, url: e.target.value })} placeholder="https://…" /></label><label>공유할 별명<input required minLength={2} maxLength={24} value={draft.alias} onChange={e => setDraft({ ...draft, alias: e.target.value })} /></label></div>
