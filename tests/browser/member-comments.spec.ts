@@ -52,16 +52,19 @@ test('profile actions remain inside the same basic-information form; encourageme
   await page.screenshot({ path: info.outputPath('member-profile-comments.png'), fullPage: true });
 });
 
-test('review invitation opens the existing rating/content form without submitting anything', async ({ page }, info) => {
+test('review invitation opens the shared review form without submitting anything', async ({ page }, info) => {
   const writes: string[] = [];
   page.on('request', request => { if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method())) writes.push(request.url()); });
+  await page.route('**/api/product-reviews?**', route => route.fulfill({ json: { enrollmentId: 'sample-enrollment', review: null } }));
   await page.goto('/learning-overview-test?view=reviews');
   const card = page.locator('.member-review-invite');
   await expect(card).toContainText('짧은 경험도 다음 수강생의 선택에 도움이 됩니다.');
-  await card.getByRole('button', { name: '내 경험 남기기' }).click();
-  await expect(page.getByLabel('만족도')).toHaveValue('5');
-  await expect(page.getByLabel('실행 경험')).toHaveValue('');
-  await expect(page.getByRole('button', { name: '후기 등록', exact: true })).toBeVisible();
+  await card.getByRole('button', { name: '리뷰 작성', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('heading', { name: '리뷰 작성', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('radio', { name: '5점', exact: true })).toBeChecked();
+  await expect(dialog.getByRole('textbox', { name: '수강 경험' })).toHaveValue('');
+  await expect(dialog.getByRole('button', { name: '후기 저장', exact: true })).toBeVisible();
   expect(writes).toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: info.outputPath('review-invitation.png'), fullPage: true });

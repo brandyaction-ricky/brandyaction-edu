@@ -23,7 +23,7 @@ test('detail shows review tab, summary and paginated readable reviews',async({pa
   const section=page.locator('#product-reviews');await expect(section.getByText('5점 만점 · 공개 후기 13개')).toBeVisible();
   await expect(section.locator('article')).toHaveCount(10);
   await expect(section.getByText('문**',{exact:true}).first()).toBeVisible();
-  await section.screenshot({path:`/private/tmp/edu-review-previews/${info.project.name}-list.png`});
+  await section.screenshot({path:info.outputPath(`${info.project.name}-list.png`)});
   await page.getByRole('button',{name:'후기 더 보기'}).click();await expect(section.locator('article')).toHaveCount(13);await expect(page.getByRole('button',{name:'후기 더 보기'})).toHaveCount(0);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
@@ -32,7 +32,7 @@ test('detail creates one pending review, reopening edits the same review and key
   const entry=page.getByRole('button',{name:'리뷰 작성',exact:true});await entry.click();
   const dialog=page.getByRole('dialog');await expect(dialog.getByRole('textbox',{name:'수강 경험'})).toBeVisible();
   await dialog.getByRole('radio',{name:'4점',exact:true}).check();await dialog.getByRole('textbox',{name:'수강 경험'}).fill('고객 문제를 정리하고 직접 실행해 보게 됐어요.');
-  await dialog.screenshot({path:`/private/tmp/edu-review-previews/${info.project.name}-write.png`});
+  await dialog.screenshot({path:info.outputPath(`${info.project.name}-write.png`)});
   await dialog.getByRole('button',{name:'후기 저장',exact:true}).click();await expect(dialog).toHaveCount(0);expect(state.posts()).toBe(1);expect(state.review()?.rating).toBe(4);
   await entry.click();await expect(page.getByRole('heading',{name:'리뷰 수정'})).toBeVisible();await expect(page.getByRole('textbox',{name:'수강 경험'})).toHaveValue('고객 문제를 정리하고 직접 실행해 보게 됐어요.');
   await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);await expect(entry).toBeFocused();
