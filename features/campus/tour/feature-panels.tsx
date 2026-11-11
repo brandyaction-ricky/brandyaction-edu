@@ -26,7 +26,7 @@ export default function FeaturePanel({officeFilter,id,snapshot,adminSnapshot,onO
  if(id==='office')return <OfficePanel initialEmployee={officeFilter} snapshot={snapshot} demo={demo} active={active}/>;
  if(id==='ai'&&!demo)return <LiveAiPanel snapshot={snapshot} demo={false} handoff={handoff} active={active}/>;
  if(id==='ai')return <DemoAi snapshot={snapshot} handoff={handoff} active={active}/>;
- if(id==='journal')return <JournalPanel snapshot={snapshot} demo={demo} active/>;
+ if(id==='journal')return <JournalPanel snapshot={snapshot} demo={demo} active onStart={()=>onNavigate('growth')}/>;
  if(id==='feedback'||id.startsWith('community:'))return <CommunityPanel snapshot={snapshot} demo={demo} onOpen={onOpen} initialTab={id==='feedback'?'feedback':id.split(':')[1] as 'mine'|'talent'|'demo_day'}/>;
  if(id.startsWith('business:'))return <BusinessPanel snapshot={snapshot} demo={demo} view={id.slice(9) as BusinessView} onOpenLesson={onOpen} onAsk={onAsk}/>;
  if(id.startsWith('support:'))return <SupportPanel snapshot={snapshot} demo={demo} initialTab={id.slice(8)} focused onOpen={onOpen} onAsk={onAsk}/>;
