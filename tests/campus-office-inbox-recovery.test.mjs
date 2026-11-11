@@ -103,3 +103,37 @@ test('waiting views refresh only for a newer counter and stop probing once conne
   assert.equal(probes,whenConnected);
   box.close();
 });
+
+test('a stalled version read times out and a late response cannot replace the next probe', async t => {
+  t.mock.timers.enable({apis:['setTimeout','setInterval','Date'],now:0});
+  t.mock.method(Math,'random',()=>0);
+  const requests=[],reads=[];
+  let connected;
+  const box=startInboxSync({
+    refresh:async()=>{reads.push(Date.now());},slow:()=>false,onConnected:()=>{},
+    join:async(_signal,ready)=>{connected=ready;},
+    readVersion:signal=>new Promise(resolve=>requests.push({signal,resolve})),
+  });
+  const advance=async ms=>{t.mock.timers.tick(ms);await Promise.resolve();};
+  await advance(400);
+  assert.equal(requests.length,1);
+  await advance(2500);
+  assert.ok(requests[0].signal.aborted);
+  await advance(1500);
+  assert.equal(requests.length,2);
+  requests[0].resolve(99);
+  requests[1].resolve(1);
+  await Promise.resolve();
+  await advance(80);
+  assert.deepEqual(reads,[0,4480]);
+  await advance(1420);
+  assert.equal(requests.length,3);
+  connected();
+  assert.ok(requests[2].signal.aborted);
+  requests[2].resolve(100);
+  await advance(80);
+  box.close();
+  await advance(15000);
+  assert.equal(requests.length,3);
+  assert.deepEqual(reads,[0,4480,5980]);
+});

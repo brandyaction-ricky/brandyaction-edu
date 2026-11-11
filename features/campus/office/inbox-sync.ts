@@ -11,6 +11,7 @@ type InboxOptions = {
 
 const pollMs = 15_000;
 const reconcileMs = 60_000;
+const versionReadTimeoutMs = 2500;
 const firstJoinWindowMs = 55_000;
 
 // Socket retries and polling belong to the visible office session.
@@ -34,26 +35,45 @@ export function startInboxSync(options: InboxOptions) {
   function probeWhileWaiting() {
     const readVersion = options.readVersion;
     if (!options.join || !readVersion) return;
-    const controller = new AbortController();
     const deadline = Date.now() + reconcileMs;
+    let active: AbortController | undefined;
     let timer: ReturnType<typeof setTimeout>;
+
+    function scheduleNext() {
+      if (Date.now() < deadline) timer = setTimeout(probe, 1500 + Math.random() * 1000);
+    }
     async function probe() {
+      if (Date.now() >= deadline) return;
+      const request = new AbortController();
+      active = request;
+      // Retry even if a stalled transport settles long after it was aborted.
+      timer = setTimeout(() => {
+        active = undefined;
+        request.abort();
+        scheduleNext();
+      }, versionReadTimeoutMs);
       try {
-        const next = await readVersion!(controller.signal);
-        if (!controller.signal.aborted && next > version) {
+        const next = await readVersion!(request.signal);
+        if (active === request && next > version) {
           version = next;
           invalidate();
         }
       } catch {
         // The next probe or the independent full read will retry.
       } finally {
-        if (!controller.signal.aborted && Date.now() < deadline) {
-          timer = setTimeout(probe, 1500 + Math.random() * 1000);
+        if (active === request) {
+          clearTimeout(timer);
+          active = undefined;
+          scheduleNext();
         }
       }
     }
     timer = setTimeout(probe, 400 + Math.random() * 1400);
-    stopProbing = () => { clearTimeout(timer); controller.abort(); };
+    stopProbing = () => {
+      clearTimeout(timer);
+      active?.abort();
+      active = undefined;
+    };
   }
 
   async function read() {
